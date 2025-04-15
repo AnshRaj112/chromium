@@ -259,6 +259,7 @@ Kun personer med din adgangssætning kan læse dine krypterede data. Adgangssæt
 <translation id="22091350895006575">Tilføj brugernavn</translation>
 <translation id="221494669172414749">Hvis du åbner Chrome uden en profillås, fjernes dine gemte adgangskoder og betalingsmetoder fra bilen. Du kan beskytte disse data ved at bruge en profillås.</translation>
 <translation id="2227444325776770048">Fortsæt som <ph name="USER_FULL_NAME" /></translation>
+<translation id="2230288123399603508">Fanegruppen <ph name="TAB_GROUP_TITLE" /> har en ny aktivitet</translation>
 <translation id="2230777942707397948">Tomt vindue</translation>
 <translation id="223356358902285214">Web- og appaktivitet</translation>
 <translation id="2234827758954819389">Privatlivsguide</translation>
@@ -1485,7 +1486,7 @@ Du kan ændre denne indstilling ved at <ph name="BEGIN_LINK" />slette Chrome-dat
 <translation id="7663320421139257046">For at fortsætte deler <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> <ph name="FIELDS_STRING" /> med dette website. Se <ph name="BEGIN_LINK1" />privatlivspolitikken<ph name="END_LINK1" /> for dette website.</translation>
 <translation id="766587987807204883">Her vises artikler, som du kan læse, selv når du er offline</translation>
 <translation id="7666185984446444960"><ph name="TAB_GROUPS_AND_TABS_PART" /> er lukket</translation>
-<translation id="7682724950699840886">Prøv følgende tip: Sørg for, at der er nok ledig plads på din enhed, og prøv at eksportere igen.</translation>
+<translation id="7682724950699840886">Prøv følgende tips: Sørg for, at der er nok ledig plads på din enhed, og prøv at eksportere igen.</translation>
 <translation id="7686086654630106285">Mere om foreslåede annoncer fra websites</translation>
 <translation id="7690596512217303514">Din enhed kunne ikke åbne Chrome. Du kan løse problemet ved at downloade den nyeste Chrome-opdatering fra din appbutik.</translation>
 <translation id="7691043218961417207">Gennemse indhold, du vil følge</translation>

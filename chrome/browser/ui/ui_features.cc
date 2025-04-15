@@ -60,7 +60,7 @@ BASE_FEATURE(kExtensionsCollapseMainMenu,
 #if BUILDFLAG(IS_WIN)
 BASE_FEATURE(kOfferPinToTaskbarWhenSettingToDefault,
              "OfferPinToTaskbarWhenSettingDefault",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
@@ -123,7 +123,7 @@ BASE_FEATURE(kPressAndHoldEscToExitBrowserFullscreen,
 // is not interactable.
 BASE_FEATURE(kScrimForBrowserWindowModal,
              "ScrimForBrowserWindowModal",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When enabled, a scrim is shown behind tab modal dialogs to cover the content
 // area. This gives user a visual cue that the content area is not interactable.
@@ -249,7 +249,7 @@ BASE_FEATURE(kTearOffWebAppTabOpensWebAppWindow,
 #if !defined(ANDROID)
 BASE_FEATURE(kPinnedCastButton,
              "PinnedCastButton",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 // Enables enterprise profile badging for managed profiles on the toolbar
@@ -367,6 +367,12 @@ const base::FeatureParam<bool> kPageActionsMigrationZoom{&kPageActionsMigration,
                                                          "zoom", false};
 const base::FeatureParam<bool> kPageActionsMigrationOfferNotification{
     &kPageActionsMigration, "offer_notification", false};
+const base::FeatureParam<bool> kPageActionsMigrationFileSystemAccess{
+    &kPageActionsMigration, "file_system_access", false};
+const base::FeatureParam<bool> kPageActionsMigrationPwaInstall{
+    &kPageActionsMigration, "pwa_install", false};
+const base::FeatureParam<bool> kPageActionsMigrationPriceInsights{
+    &kPageActionsMigration, "price_insights", false};
 
 BASE_FEATURE(kCompositorLoadingAnimations,
              "CompositorLoadingAnimations",

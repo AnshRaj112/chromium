@@ -15,17 +15,25 @@ using NoticeMap = absl::flat_hash_map<NoticeId, std::unique_ptr<Notice>>;
 
 class NoticeCatalog {
  public:
-  NoticeCatalog();
-  ~NoticeCatalog();
-
+  virtual ~NoticeCatalog() = default;
   // Accessors.
-  const std::vector<std::unique_ptr<NoticeApi>>& GetNoticeApis();
-  const NoticeMap& GetNoticeMap();
+  virtual const std::vector<std::unique_ptr<NoticeApi>>& GetNoticeApis() = 0;
+  virtual const NoticeMap& GetNoticeMap() = 0;
+};
 
-  // Registers a new notice api.
+class NoticeCatalogImpl : public NoticeCatalog {
+ public:
+  NoticeCatalogImpl();
+  ~NoticeCatalogImpl() override;
+
+  const std::vector<std::unique_ptr<NoticeApi>>& GetNoticeApis() override;
+  const NoticeMap& GetNoticeMap() override;
+
+ private:
+  // Registers a new API and returns a pointer to it.
   NoticeApi* RegisterAndRetrieveNewApi();
 
-  // Registers a new notice.
+  // Registers a new notice and returns a pointer to it.
   Notice* RegisterAndRetrieveNewNotice(
       std::unique_ptr<Notice> (*notice_creator)(NoticeId),
       NoticeId notice_id);
@@ -38,7 +46,9 @@ class NoticeCatalog {
       std::vector<NoticeApi*>&& target_apis,
       std::vector<NoticeApi*>&& pre_req_apis = {});
 
- private:
+  // Populates the catalog with all the notices and their requirements.
+  void Populate();
+
   std::vector<std::unique_ptr<NoticeApi>> apis_;
   NoticeMap notices_;
 };

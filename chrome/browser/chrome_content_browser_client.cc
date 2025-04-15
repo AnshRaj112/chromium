@@ -351,6 +351,7 @@
 #include "content/public/browser/network_service_instance.h"
 #include "content/public/browser/overlay_window.h"
 #include "content/public/browser/permission_controller.h"
+#include "content/public/browser/permission_descriptor_util.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/site_isolation_mode.h"
@@ -806,6 +807,7 @@
 
 #if BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/feed/feed_service_factory.h"
+#include "chrome/browser/safe_browsing/advanced_protection_status_manager_android.h"
 #include "components/feed/feed_feature_list.h"
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -848,6 +850,10 @@ using web_apps::ChromeContentBrowserClientIsolatedWebAppsPart;
 namespace {
 
 const char kAIManagerUserDataKey[] = "ai_manager";
+
+// Whether to disable caching of the advanced-protection state in
+// ShouldEnableStrictSiteIsolation().
+bool g_disable_advanced_protection_caching_for_tests = false;
 
 BASE_FEATURE(kSkipPagehideInCommitForDSENavigation,
              "SkipPagehideInCommitForDSENavigation",
@@ -1675,6 +1681,11 @@ void ChromeContentBrowserClient::SetApplicationLocale(
 
   content::GetIOThreadTaskRunner({})->PostTask(
       FROM_HERE, base::BindOnce(&SetApplicationLocaleOnIOThread, locale));
+}
+
+// static
+void ChromeContentBrowserClient::DisableAdvancedProtectionCachingForTests() {
+  g_disable_advanced_protection_caching_for_tests = true;
 }
 
 void ChromeContentBrowserClient::MaybeProxyNetworkBoundRequest(
@@ -2560,7 +2571,27 @@ ChromeContentBrowserClient::GetOriginsRequiringDedicatedProcess() {
 }
 
 bool ChromeContentBrowserClient::ShouldEnableStrictSiteIsolation() {
-  return base::FeatureList::IsEnabled(features::kSitePerProcess);
+  if (base::FeatureList::IsEnabled(features::kSitePerProcess)) {
+    return true;
+  }
+
+#if BUILDFLAG(IS_ANDROID)
+  // Minimum memory requirements are checked in ShouldDisableSiteIsolation().
+  // See crbug.com/395862563
+
+  if (g_disable_advanced_protection_caching_for_tests) {
+    return safe_browsing::AdvancedProtectionStatusManagerAndroid::
+        QueryIsUnderAdvancedProtection();
+  }
+  // Don't change ShouldEnableStrictSiteIsolation() return value at runtime. A
+  // restart is needed to update site isolation mode when the Advanced
+  // Protection state changes.
+  static bool g_in_os_advanced_protection_mode = safe_browsing::
+      AdvancedProtectionStatusManagerAndroid::QueryIsUnderAdvancedProtection();
+  return g_in_os_advanced_protection_mode;
+#else
+  return false;
+#endif
 }
 
 bool ChromeContentBrowserClient::ShouldDisableSiteIsolation(
@@ -7784,7 +7815,10 @@ bool ChromeContentBrowserClient::IsClipboardPasteAllowed(
       browser_context->GetPermissionController();
   blink::mojom::PermissionStatus status =
       permission_controller->GetPermissionStatusForCurrentDocument(
-          blink::PermissionType::CLIPBOARD_READ_WRITE, render_frame_host);
+          content::PermissionDescriptorUtil::
+              CreatePermissionDescriptorForPermissionType(
+                  blink::PermissionType::CLIPBOARD_READ_WRITE),
+          render_frame_host);
   if (status == blink::mojom::PermissionStatus::GRANTED)
     return true;
 
@@ -8747,10 +8781,12 @@ bool ChromeContentBrowserClient::ShouldSuppressAXLoadComplete(
 void ChromeContentBrowserClient::BindAIManager(
     content::BrowserContext* browser_context,
     base::SupportsUserData* context_user_data,
+    content::RenderFrameHost* rfh,
     mojo::PendingReceiver<blink::mojom::AIManager> receiver) {
   if (!context_user_data->GetUserData(kAIManagerUserDataKey)) {
     context_user_data->SetUserData(
-        kAIManagerUserDataKey, std::make_unique<AIManager>(browser_context));
+        kAIManagerUserDataKey,
+        std::make_unique<AIManager>(browser_context, rfh));
   }
 
   AIManager* ai_manager = static_cast<AIManager*>(

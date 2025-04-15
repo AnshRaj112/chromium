@@ -87,8 +87,11 @@ void ReadAloudAppModel::ResetGranularityIndex() {
 }
 
 void ReadAloudAppModel::InitAXPositionWithNode(ui::AXNode* ax_node) {
-  // If instance is Null or Empty, create the next AxPosition
-  if (ax_node != nullptr && (!ax_position_ || ax_position_->IsNullPosition())) {
+  // If instance is Null or Empty, create the next AxPosition. Don't create a
+  // new position if the node's manager is missing, as that means we've
+  // received incorrect data somewhere.
+  if (ax_node != nullptr && (!ax_position_ || ax_position_->IsNullPosition()) &&
+      ax_node->GetManager()) {
     ax_position_ =
         ui::AXNodePosition::CreateTreePositionAtStartOfAnchor(*ax_node);
     current_text_index_ = 0;
@@ -571,21 +574,29 @@ ReadAloudAppModel::GetNextValidPositionFromCurrentPosition(
         new_position->CreateNextSentenceStartPosition(
             sentence_movement_options_);
 
-    // If the new position and the previous position are the same, try moving
-    // to the next line position instead. This seems to happen on pdfs sometimes
-    // where next sentence returns the same position and next paragraph skips
-    // some text.
+    // If the new position and the previous position are the same, try different
+    // granularities for the next position instead. Otherwise, we can get stuck
+    // in an infinite loop of calling CreateNextSentenceStartPosition, as it
+    // will always return the same position.
+    if (ArePositionsEqual(possible_new_position, new_position)) {
+      possible_new_position =
+          new_position->CreateNextWordStartPosition(sentence_movement_options_);
+    }
+
+    if (ArePositionsEqual(possible_new_position, new_position)) {
+      possible_new_position =
+          new_position->CreateNextCharacterPosition(sentence_movement_options_);
+    }
+    // If the new position and the previous position are still the same, try
+    // moving to the next line position instead. This seems to happen on pdfs
+    // sometimes where next sentence returns the same position and next
+    // paragraph skips some text.
     // TODO(crbug.com/40927698): Investigate whether this is helpful beyond pdfs
     if (is_pdf && ArePositionsEqual(possible_new_position, new_position)) {
       possible_new_position =
           new_position->CreateNextLineStartPosition(sentence_movement_options_);
     }
 
-    // If the new position and the previous position are the same, try moving
-    // to the next paragraph position instead. This happens rarely, but when
-    // it does, we can get stuck in an infinite loop of calling
-    // CreateNextSentenceStartPosition, as it will always return the same
-    // position.
     if (possible_new_position->IsNullPosition() ||
         ArePositionsEqual(possible_new_position, new_position)) {
       possible_new_position = new_position->CreateNextParagraphStartPosition(
@@ -604,9 +615,9 @@ ReadAloudAppModel::GetNextValidPositionFromCurrentPosition(
     }
 
     // If the new position is still the same as the old position after trying
-    // both line and paragraph positions, go ahead and return a null position
-    // instead, as ending speech early is preferable to getting stuck in an
-    // infinite loop.
+    // multiple different ways of getting a new position, go ahead and return
+    // a null position instead, as ending speech early is preferable to getting
+    // stuck in an infinite loop.
     if (ArePositionsEqual(possible_new_position, new_position)) {
       return ui::AXNodePosition::AXPosition::CreateNullPosition();
     }

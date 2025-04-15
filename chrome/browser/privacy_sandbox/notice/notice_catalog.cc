@@ -7,29 +7,45 @@
 #include <utility>
 
 #include "base/feature_list.h"
+#include "chrome/browser/privacy_sandbox/notice/notice_features.h"
+#include "chrome/browser/privacy_sandbox/notice/notice_model.h"
 
 namespace privacy_sandbox {
 
-NoticeCatalog::NoticeCatalog() = default;
-NoticeCatalog::~NoticeCatalog() = default;
+namespace {
 
-NoticeApi* NoticeCatalog::RegisterAndRetrieveNewApi() {
-  apis_.emplace_back(std::make_unique<NoticeApi>());
-  return apis_.back().get();
+using enum privacy_sandbox::notice::mojom::PrivacySandboxNotice;
+using enum privacy_sandbox::SurfaceType;
+
+template <typename T>
+std::unique_ptr<Notice> Make(NoticeId id) {
+  return std::make_unique<T>(id);
 }
 
-const std::vector<std::unique_ptr<NoticeApi>>& NoticeCatalog::GetNoticeApis() {
+}  // namespace
+
+NoticeCatalogImpl::NoticeCatalogImpl() {
+  Populate();
+}
+NoticeCatalogImpl::~NoticeCatalogImpl() = default;
+
+NoticeApi* NoticeCatalogImpl::RegisterAndRetrieveNewApi() {
+  return apis_.emplace_back(std::make_unique<NoticeApi>()).get();
+}
+
+const std::vector<std::unique_ptr<NoticeApi>>&
+NoticeCatalogImpl::GetNoticeApis() {
   return apis_;
 }
 
-Notice* NoticeCatalog::RegisterAndRetrieveNewNotice(
+Notice* NoticeCatalogImpl::RegisterAndRetrieveNewNotice(
     std::unique_ptr<Notice> (*notice_creator)(NoticeId),
     NoticeId notice_id) {
   notices_.emplace(notice_id, notice_creator(notice_id));
   return notices_[notice_id].get();
 }
 
-void NoticeCatalog::RegisterNoticeGroup(
+void NoticeCatalogImpl::RegisterNoticeGroup(
     std::unique_ptr<Notice> (*notice_creator)(NoticeId),
     std::vector<std::pair<NoticeId, const base::Feature*>>&& notice_ids,
     std::vector<NoticeApi*>&& target_apis,
@@ -43,7 +59,55 @@ void NoticeCatalog::RegisterNoticeGroup(
   }
 }
 
-const NoticeMap& NoticeCatalog::GetNoticeMap() {
+const NoticeMap& NoticeCatalogImpl::GetNoticeMap() {
   return notices_;
 }
+
+void NoticeCatalogImpl::Populate() {
+  // TODO(crbug.com/392612108): Add all eligibility and result callbacks.
+
+  // Define APIs.
+  NoticeApi* topics = RegisterAndRetrieveNewApi();
+  NoticeApi* protected_audience = RegisterAndRetrieveNewApi();
+  NoticeApi* measurement = RegisterAndRetrieveNewApi();
+
+  // Define Notices.
+  RegisterNoticeGroup(&Make<Consent>,
+                      {{{kTopicsConsentNotice, kDesktopNewTab},
+                        &kTopicsConsentDesktopModalFeature},
+                       {{kTopicsConsentNotice, kClankBrApp},
+                        &kTopicsConsentModalClankBrAppFeature},
+                       {{kTopicsConsentNotice, kClankCustomTab},
+                        &kTopicsConsentModalClankCCTFeature}},
+                      {topics});
+
+  RegisterNoticeGroup(&Make<Notice>,
+                      {{{kThreeAdsApisNotice, kDesktopNewTab},
+                        &kThreeAdsAPIsNoticeModalFeature},
+                       {{kThreeAdsApisNotice, kClankBrApp},
+                        &kThreeAdsAPIsNoticeModalClankBrAppFeature},
+                       {{kThreeAdsApisNotice, kClankCustomTab},
+                        &kThreeAdsAPIsNoticeModalClankCCTFeature}},
+                      {topics, protected_audience, measurement});
+
+  RegisterNoticeGroup(
+      &Make<Notice>,
+      {{{kProtectedAudienceMeasurementNotice, kDesktopNewTab},
+        &kProtectedAudienceMeasurementNoticeModalFeature},
+       {{kProtectedAudienceMeasurementNotice, kClankBrApp},
+        &kProtectedAudienceMeasurementNoticeModalClankBrAppFeature},
+       {{kProtectedAudienceMeasurementNotice, kClankCustomTab},
+        &kProtectedAudienceMeasurementNoticeModalClankCCTFeature}},
+      {protected_audience, measurement});
+
+  RegisterNoticeGroup(
+      &Make<Notice>,
+      {{{kMeasurementNotice, kDesktopNewTab}, &kMeasurementNoticeModalFeature},
+       {{kMeasurementNotice, kClankBrApp},
+        &kMeasurementNoticeModalClankBrAppFeature},
+       {{kMeasurementNotice, kClankCustomTab},
+        &kMeasurementNoticeModalClankCCTFeature}},
+      {measurement});
+}
+
 }  // namespace privacy_sandbox

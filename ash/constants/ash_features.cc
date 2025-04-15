@@ -266,6 +266,12 @@ BASE_FEATURE(kBocaNetworkRestriction,
              "BocaNetworkRestriction",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables or disables using a specific app name for speech recognition for Boca
+// on ChromeOS.
+BASE_FEATURE(kBocaClientTypeForSpeechRecognition,
+             "BocaClientTypeForSpeechRecognition",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 BASE_FEATURE(kCrosSwitcher, "CrosSwitcher", base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Indicates whether the camera super resolution is supported. Note that this
@@ -2729,6 +2735,18 @@ BASE_FEATURE(kShimlessRMA3pDiagnosticsAllowPermissionPolicy,
              "ShimlessRMA3pDiagnosticsAllowPermissionPolicy",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enables or disables the skip option of hardware validation on Shimless RMA
+// landing page.
+BASE_FEATURE(kShimlessRMAHardwareValidationSkip,
+             "ShimlessRMAHardwareValidationSkip",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables or disables the option of grey out specific input fields on Shimless
+// RMA device information page.
+BASE_FEATURE(kShimlessRMADynamicDeviceInfoInputs,
+             "ShimlessRMADynamicDeviceInfoInputs",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, system shortcuts will utilize state machiens instead of
 // keeping track of entire history of keys pressed.
 BASE_FEATURE(kShortcutStateMachines,
@@ -3462,6 +3480,10 @@ bool IsBocaSpotlightEnabled() {
 
 bool IsBocaNetworkRestrictionEnabled() {
   return base::FeatureList::IsEnabled(kBocaNetworkRestriction);
+}
+
+bool IsBocaClientTypeForSpeechRecognitionEnabled() {
+  return base::FeatureList::IsEnabled(kBocaClientTypeForSpeechRecognition);
 }
 
 bool IsBrightnessControlInSettingsEnabled() {
@@ -4497,6 +4519,14 @@ bool IsShimlessRMA3pDiagnosticsDevModeEnabled() {
 bool IsShimlessRMA3pDiagnosticsAllowPermissionPolicyEnabled() {
   return base::FeatureList::IsEnabled(
       kShimlessRMA3pDiagnosticsAllowPermissionPolicy);
+}
+
+bool IsShimlessRMAHardwareValidationSkipEnabled() {
+  return base::FeatureList::IsEnabled(kShimlessRMAHardwareValidationSkip);
+}
+
+bool IsShimlessRMADynamicDeviceInfoInputsEnabled() {
+  return base::FeatureList::IsEnabled(kShimlessRMADynamicDeviceInfoInputs);
 }
 
 bool IsShowSharingUserInLauncherContinueSectionEnabled() {

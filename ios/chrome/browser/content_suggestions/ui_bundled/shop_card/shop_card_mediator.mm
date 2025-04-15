@@ -7,6 +7,8 @@
 #import <optional>
 
 #import "base/memory/raw_ptr.h"
+#import "base/metrics/field_trial_params.h"
+#import "base/metrics/histogram_macros.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/strings/utf_string_conversions.h"
 #import "components/bookmarks/browser/bookmark_model.h"
@@ -23,7 +25,11 @@
 #import "components/prefs/pref_change_registrar.h"
 #import "components/prefs/pref_service.h"
 #import "components/url_formatter/elide_url.h"
+#import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_constants.h"
+#import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_metrics_constants.h"
+#import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_metrics_recorder.h"
 #import "ios/chrome/browser/content_suggestions/ui_bundled/impression_limits/impression_limit_service.h"
+#import "ios/chrome/browser/content_suggestions/ui_bundled/impression_limits/impression_limit_service_observer_bridge.h"
 #import "ios/chrome/browser/content_suggestions/ui_bundled/shop_card/shop_card_action_delegate.h"
 #import "ios/chrome/browser/content_suggestions/ui_bundled/shop_card/shop_card_constants.h"
 #import "ios/chrome/browser/content_suggestions/ui_bundled/shop_card/shop_card_data.h"
@@ -47,9 +53,16 @@ bool IsShopCardImpressionLimitsEnabled() {
   return base::FeatureList::IsEnabled(commerce::kShopCardImpressionLimits);
 }
 
+int GetImpressionLimit() {
+  return base::GetFieldTrialParamByFeatureAsInt(
+      commerce::kShopCard, commerce::kShopCardMaxImpressions,
+      kShopCardMaxImpressions);
+}
+
 }  // namespace
 
-@interface ShopCardMediator () <MagicStackModuleDelegate,
+@interface ShopCardMediator () <ImpressionLimitServiceObserverBridgeDelegate,
+                                MagicStackModuleDelegate,
                                 PrefObserverDelegate,
                                 ShopCardFaviconConsumerSource>
 @end
@@ -69,6 +82,8 @@ bool IsShopCardImpressionLimitsEnabled() {
   bool _faviconCallbackCalledOnce;
   id<ShopCardFaviconConsumer> _faviconConsumer;
   raw_ptr<ImpressionLimitService> _impressionLimitService;
+  std::unique_ptr<ImpressionLimitServiceObserverBridge>
+      _impressionLimitServiceObserverBridge;
 }
 
 - (instancetype)
@@ -95,6 +110,9 @@ bool IsShopCardImpressionLimitsEnabled() {
         &_prefChangeRegistrar);
     _faviconLoader = faviconLoader;
     _impressionLimitService = impressionLimitService;
+    _impressionLimitServiceObserverBridge =
+        std::make_unique<ImpressionLimitServiceObserverBridge>(
+            self, _impressionLimitService);
   }
   return self;
 }
@@ -105,6 +123,7 @@ bool IsShopCardImpressionLimitsEnabled() {
   _imageFetcher = nil;
   _faviconLoader = nil;
   _impressionLimitService = nil;
+  _impressionLimitServiceObserverBridge.reset();
 }
 
 - (void)reset {
@@ -307,10 +326,14 @@ std::u16string GetHostnameFromGURL(const GURL& url) {
     _prefService->SetBoolean(
         prefs::kHomeCustomizationMagicStackShopCardPriceTrackingEnabled, false);
   }
+  UMA_HISTOGRAM_ENUMERATION(kMagicStackModuleDisabledHistogram,
+                            ContentSuggestionsModuleType::kShopCard);
 }
 
 - (void)openShopCardItem:(ShopCardItem*)item {
   [self.NTPActionsDelegate shopCardOpened];
+  [self.contentSuggestionsMetricsRecorder
+      recordShopCardOpened:item.shopCardData];
   [self.shopCardActionDelegate openURL:item.shopCardData.productURL];
   [self.delegate removeShopCard];
   [self logEngagementForItem:item];
@@ -325,6 +348,17 @@ std::u16string GetHostnameFromGURL(const GURL& url) {
   if (index == 0) {
     DCHECK(magicStackModule);
     [self logImpressionForItem:static_cast<ShopCardItem*>(magicStackModule)];
+  }
+  [self.contentSuggestionsMetricsRecorder
+      recordShopCardImpression:static_cast<ShopCardItem*>(magicStackModule)
+                                   .shopCardData
+                       atIndex:index];
+}
+
+#pragma mark - ImpressionLimitServiceObserverBridgeDelegate
+- (void)onUrlUntracked:(GURL)url {
+  if (url == _shopCardItem.shopCardData.productURL) {
+    [self.delegate removeShopCard];
   }
 }
 
@@ -384,7 +418,7 @@ std::u16string GetHostnameFromGURL(const GURL& url) {
   }
   std::optional<int> count = _impressionLimitService->GetImpressionCount(
       url, shop_card_prefs::kShopCardPriceDropUrlImpressions);
-  return count.has_value() && count.value() >= kShopCardMaxImpressions;
+  return count.has_value() && count.value() >= GetImpressionLimit();
 }
 
 - (BOOL)hasBeenOpened:(const GURL&)url {

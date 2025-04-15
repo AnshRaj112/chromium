@@ -5985,6 +5985,7 @@ Use Ctrl + Alt + Diminuir o brilho para diminuir o zoom.</translation>
 <translation id="5186381005592669696">Personalize o idioma de apresentação das apps suportadas</translation>
 <translation id="5186788525428341874">Pode usar esta chave de acesso para iniciar sessão mais rapidamente nos seus dispositivos. Vai ser guardada no Gestor de Palavras-passe da Google de <ph name="ACCOUNT_NAME" />.</translation>
 <translation id="5187641678926990264">&amp;Instalar página como app…</translation>
+<translation id="5187671830619031922">Adicionar separador à vista dividida</translation>
 <translation id="5187826826541650604"><ph name="KEY_NAME" /> (<ph name="DEVICE" />)</translation>
 <translation id="5188242000716462162">Partilhado por <ph name="USER_NAME" /></translation>
 <translation id="5188648870018555788">Use a localização. Permita que os serviços, os Websites e as apps Android e ChromeOS com a autorização de acesso à localização usem a localização do seu dispositivo. A Precisão da localização oferece uma localização mais precisa para serviços e apps Android. Para isso, a Google trata periodicamente informações sobre os sensores e os sinais sem fios do dispositivo para recolher localizações de sinais sem fios. Estas são usadas sem identificar o utilizador para melhorar a Precisão da localização e os serviços baseados na localização, bem como para melhorar, oferecer e manter os serviços Google com base nos interesses legítimos da Google e de terceiros, atendendo às necessidades dos utilizadores. <ph name="BEGIN_LINK1" />Saiba mais acerca da utilização da localização<ph name="END_LINK1" /></translation>
@@ -11092,6 +11093,7 @@ Pode incluir informações sobre o software instalado, os ficheiros, o navegador
 <translation id="8827125715368568315">Bloqueou <ph name="PERMISSION" /> e mais <ph name="COUNT" /></translation>
 <translation id="8827289157496676362">Afixar extensão</translation>
 <translation id="8828933418460119530">Nome de DNS</translation>
+<translation id="8829979393064090868">Adicionar separador à vista dividida</translation>
 <translation id="883062543841130884">Substituições</translation>
 <translation id="8830779999439981481">A reiniciar para aplicar as atualizações…</translation>
 <translation id="8830796635868321089">A verificação de atualizações falhou utilizando as definições de proxy atuais. Ajuste as <ph name="PROXY_SETTINGS_LINK_START" />definições de proxy<ph name="PROXY_SETTINGS_LINK_END" />.</translation>

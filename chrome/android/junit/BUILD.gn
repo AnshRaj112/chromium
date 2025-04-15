@@ -36,8 +36,8 @@ if (is_android) {
   # Contain all source code that is used by tests in a different package.
   robolectric_library("chrome_junit_tests_helper") {
     sources = [
+      "//chrome/browser/bookmarks/android/junit/src/org/chromium/chrome/browser/bookmarks/FakeBookmarkModel.java",
       "src/org/chromium/chrome/browser/ChromeRobolectricTestRunner.java",
-      "src/org/chromium/chrome/browser/bookmarks/FakeBookmarkModel.java",
       "src/org/chromium/chrome/browser/compositor/overlays/strip/TestTabModel.java",
       "src/org/chromium/chrome/browser/multiwindow/MultiWindowTestUtils.java",
     ]
@@ -183,6 +183,7 @@ if (is_android) {
       "//chrome/browser/tabmodel:test_support_java",
       "//chrome/browser/tabmodel:test_support_java",
       "//chrome/browser/tabmodel/internal:java",
+      "//chrome/browser/tabwindow:java",
       "//chrome/browser/thumbnail:java",
       "//chrome/browser/ui/android/appmenu:java",
       "//chrome/browser/ui/android/appmenu:java",
@@ -276,6 +277,7 @@ if (is_android) {
       "//components/favicon/android:java",
       "//components/feature_engagement/public:public_java",
       "//components/feed/core/proto:proto_java_v2",
+      "//components/feed/core/v2:feedv2_common_core_java",
       "//components/feed/core/v2:feedv2_core_java",
       "//components/image_fetcher:java",
       "//components/image_fetcher:test_support_java",
@@ -483,49 +485,6 @@ if (is_android) {
   }
 
   robolectric_library(
-      "chrome_junit_tests_org.chromium.chrome.browser.bookmarks") {
-    sources = [
-      "src/org/chromium/chrome/browser/bookmarks/AddToBookmarksToolbarButtonControllerUnitTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BasicBookmarkQueryHandlerUnitTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkAddNewFolderCoordinatorTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkFolderPickerMediatorUnitTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkImageFetcherTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkManagerCoordinatorTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkManagerMediatorTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkManagerOpenerTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkManagerViewBinderTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkModelListTestUtil.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkPaneUnitTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkSaveFlowMediatorUnitTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkTextInputLayoutTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkToolbarMediatorTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkUiPrefsUnitTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkUiStateTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/BookmarkUtilsTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/FakeBookmarkModelTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/ImprovedBookmarkQueryHandlerTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/ImprovedBookmarkRowCoordinatorTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/ImprovedBookmarkRowTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/PendingRunnableTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/ReadingListSectionHeaderTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/ScopedBookmarkModelObservationTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/SharedBookmarkModelMocks.java",
-      "src/org/chromium/chrome/browser/bookmarks/ShoppingAccessoryCoordinatorTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/bar/BookmarkBarCoordinatorTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/bar/BookmarkBarItemsLayoutManagerTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/bar/BookmarkBarItemsProviderTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/bar/BookmarkBarSettingProviderTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/bar/BookmarkBarUtilsTest.java",
-      "src/org/chromium/chrome/browser/bookmarks/bar/BookmarkBarVisibilityProviderTest.java",
-    ]
-
-    deps = [
-      ":chrome_junit_tests_helper",
-      "//third_party/androidx:androidx_recyclerview_recyclerview_java",
-    ]
-  }
-
-  robolectric_library(
       "chrome_junit_tests_org.chromium.chrome.browser.browserservices") {
     sources = [
       "src/org/chromium/chrome/browser/browserservices/InstalledWebappBroadcastReceiverTest.java",
@@ -566,6 +525,7 @@ if (is_android) {
 
     sources = [
       "//chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/LayoutManagerChromeUnitTest.java",
+      "//chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/phone/AnimationInterruptorUnitTest.java",
       "//chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/phone/NewBackgroundTabAnimationHostViewUnitTest.java",
       "//chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/phone/NewTabAnimationLayoutUnitTest.java",
       "src/org/chromium/chrome/browser/compositor/CompositorSurfaceManagerImplTest.java",
@@ -588,6 +548,7 @@ if (is_android) {
       "src/org/chromium/chrome/browser/compositor/overlays/strip/TabUsageTrackerTest.java",
       "src/org/chromium/chrome/browser/compositor/overlays/strip/TooltipManagerUnitTest.java",
       "src/org/chromium/chrome/browser/compositor/overlays/strip/reorder/ExternalViewDragDropReorderStrategyTest.java",
+      "src/org/chromium/chrome/browser/compositor/overlays/strip/reorder/GroupReorderStrategyTest.java",
       "src/org/chromium/chrome/browser/compositor/overlays/strip/reorder/ReorderStrategyTestBase.java",
       "src/org/chromium/chrome/browser/compositor/overlays/strip/reorder/SourceViewDragDropReorderStrategyTest.java",
       "src/org/chromium/chrome/browser/compositor/overlays/strip/reorder/StripDragShadowViewUnitTest.java",
@@ -892,7 +853,6 @@ if (is_android) {
       "src/org/chromium/chrome/browser/password_manager/PasswordMigrationWarningBridgeTest.java",
       "src/org/chromium/chrome/browser/password_manager/settings/DialogManagerTest.java",
       "src/org/chromium/chrome/browser/password_manager/settings/EnsureAsyncPostingRule.java",
-      "src/org/chromium/chrome/browser/password_manager/settings/ExportWarningDialogFragmentTest.java",
       "src/org/chromium/chrome/browser/password_manager/settings/SingleThreadBarrierClosureTest.java",
       "src/org/chromium/chrome/browser/password_manager/settings/TimedCallbackDelayerTest.java",
     ]
@@ -1018,6 +978,7 @@ if (is_android) {
       "src/org/chromium/chrome/browser/suggestions/tile/TileGroupDelegateImplUnitTest.java",
       "src/org/chromium/chrome/browser/suggestions/tile/TileInteractionDelegateTest.java",
       "src/org/chromium/chrome/browser/suggestions/tile/TileRendererTest.java",
+      "src/org/chromium/chrome/browser/suggestions/tile/tile_edit_dialog/CustomTileEditCoordinatorUnitTest.java",
       "src/org/chromium/chrome/browser/suggestions/tile/tile_edit_dialog/CustomTileEditMediatorUnitTest.java",
       "src/org/chromium/chrome/browser/suggestions/tile/tile_edit_dialog/CustomTileEditViewUnitTest.java",
     ]
@@ -1091,7 +1052,6 @@ if (is_android) {
     resources_package = "org.chromium.chrome.browser.tasks.tab_management"
 
     sources = [
-      "//chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/ActionConfirmationManagerUnitTest.java",
       "//chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/CloseAllTabsHelperUnitTest.java",
       "//chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/CollaborationActivityMessageCardViewModelUnitTest.java",
       "//chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/GroupWindowCheckerUnitTest.java",
@@ -1158,6 +1118,7 @@ if (is_android) {
       "//chrome/android/features/tab_ui/junit/src/org/chromium/chrome/browser/tasks/tab_management/MessageCardProviderMediatorUnitTest.java",
       "//chrome/android/features/tab_ui/junit/src/org/chromium/chrome/browser/tasks/tab_management/PriceMessageServiceUnitTest.java",
       "//chrome/android/features/tab_ui/junit/src/org/chromium/chrome/browser/tasks/tab_management/TabGridDialogMediatorUnitTest.java",
+      "//chrome/android/features/tab_ui/junit/src/org/chromium/chrome/browser/tasks/tab_management/TabGridDialogViewBinderUnitTest.java",
       "//chrome/android/features/tab_ui/junit/src/org/chromium/chrome/browser/tasks/tab_management/TabGridItemTouchHelperCallbackUnitTest.java",
       "//chrome/android/features/tab_ui/junit/src/org/chromium/chrome/browser/tasks/tab_management/TabGridViewBinderUnitTest.java",
       "//chrome/android/features/tab_ui/junit/src/org/chromium/chrome/browser/tasks/tab_management/TabGroupCreationDialogManagerUnitTest.java",
@@ -1276,7 +1237,7 @@ if (is_android) {
       "src/org/chromium/chrome/browser/metrics/UmaUtilsTest.java",
       "src/org/chromium/chrome/browser/metrics/VariationsSessionTest.java",
       "src/org/chromium/chrome/browser/multiwindow/MultiInstanceManagerApi31UnitTest.java",
-      "src/org/chromium/chrome/browser/multiwindow/MultiInstanceManagerUnitTest.java",
+      "src/org/chromium/chrome/browser/multiwindow/MultiInstanceManagerImplUnitTest.java",
       "src/org/chromium/chrome/browser/multiwindow/MultiWindowUtilsUnitTest.java",
       "src/org/chromium/chrome/browser/native_page/ContextMenuManagerUnitTest.java",
       "src/org/chromium/chrome/browser/native_page/NativePageFactoryTest.java",

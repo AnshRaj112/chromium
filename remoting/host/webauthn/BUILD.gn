@@ -35,6 +35,10 @@ source_set("webauthn") {
   if (is_win) {
     deps += [ "//remoting/host/win:trust_util" ]
   }
+
+  if (is_mac) {
+    deps += [ "//remoting/host/mac:trust_util" ]
+  }
 }
 
 source_set("remote_webauthn_main_headers") {
@@ -86,26 +90,25 @@ source_set("unit_tests") {
   ]
 }
 
-executable("remote_webauthn") {
-  sources = [ "remote_webauthn_entry_point.cc" ]
+if (is_win || is_linux || is_mac) {
+  executable("remote_webauthn") {
+    sources = [ "remote_webauthn_entry_point.cc" ]
 
-  deps = [ ":remote_webauthn_main_headers" ]
-
-  if (is_win || is_linux) {
-    deps += [ "//remoting/host:remoting_core" ]
-  } else {
-    deps += [ ":main" ]
-  }
-
-  if (is_win) {
-    sources += [ "$root_gen_dir/remoting/version.rc" ]
-
-    defines =
-        host_predefines + [ "REMOTING_HOST_BINARY=BINARY_REMOTE_WEBAUTHN" ]
-
-    deps += [
-      "//build/win:default_exe_manifest",
-      "//remoting/host/win:remoting_windows_resources",
+    deps = [
+      ":remote_webauthn_main_headers",
+      "//remoting/host:remoting_core",
     ]
+
+    if (is_win) {
+      sources += [ "$root_gen_dir/remoting/version.rc" ]
+
+      defines =
+          host_predefines + [ "REMOTING_HOST_BINARY=BINARY_REMOTE_WEBAUTHN" ]
+
+      deps += [
+        "//build/win:default_exe_manifest",
+        "//remoting/host/win:remoting_windows_resources",
+      ]
+    }
   }
 }

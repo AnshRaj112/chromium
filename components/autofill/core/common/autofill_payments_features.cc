@@ -114,6 +114,12 @@ BASE_FEATURE(kAutofillEnableCvcStorageAndFillingStandaloneFormEnhancement,
              "AutofillEnableCvcStorageAndFillingStandaloneFormEnhancement",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// When enabled, flat rate card benefits sourced from Curinos will be shown in
+// Payments Autofill UI.
+BASE_FEATURE(kAutofillEnableFlatRateCardBenefitsFromCurinos,
+             "AutofillEnableFlatRateCardBenefitsFromCurinos",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // When enabled, server card retrieval will begin with a risk-based check
 // instead of jumping straight to CVC or biometric auth.
 BASE_FEATURE(kAutofillEnableFpanRiskBasedAuthentication,
@@ -179,6 +185,12 @@ BASE_FEATURE(kAutofillEnableSaveAndFill,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_ANDROID)
+// When enabled, save card securely message be displayed on upload card
+// UI message.
+BASE_FEATURE(kAutofillEnableShowSaveCardSecurelyMessage,
+             "AutofillEnableShowSaveCardSecurelyMessage",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // When enabled, Pix bank accounts are synced from Chrome Sync backend and
 // stored in the local db.
 BASE_FEATURE(kAutofillEnableSyncingOfPixBankAccounts,
@@ -252,6 +264,16 @@ const base::FeatureParam<int> kAutofillVcnEnrollRequestTimeoutMilliseconds{
     &kAutofillVcnEnrollRequestTimeout,
     "autofill_vcn_enroll_request_timeout_milliseconds",
     /*default_value=*/6500};
+
+// When enabled, updates the VCN strike database with different values of
+// kExpiryTimeDelta as part of of the VCN strike optimization experiment.
+// See go/vcn-strike-optimization-design.
+BASE_FEATURE(kAutofillVcnEnrollStrikeExpiryTime,
+             "AutofillVcnEnrollStrikeExpiryTime",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+const base::FeatureParam<int> kAutofillVcnEnrollStrikeExpiryTimeDays{
+    &kAutofillVcnEnrollStrikeExpiryTime, "autofill_vcn_strike_expiry_time_days",
+    /*default_value=*/180};
 
 #if BUILDFLAG(IS_ANDROID)
 // When enabled, eWallet accounts are synced from the Google Payments servers

@@ -723,6 +723,12 @@ BASE_FEATURE(kPeriodicBackgroundSync,
              "PeriodicBackgroundSync",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Use code paths for prefetch/prerender integration.
+// See also `kPrerender2FallbackPrefetchSpecRules`.
+BASE_FEATURE(kPrefetchPrerenderIntegration,
+             "PrefetchPrerenderIntegration",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, browser-initiated prefetch is allowed.
 // Please see crbug.com/40946257 for more details.
 BASE_FEATURE(kPrefetchBrowserInitiatedTriggers,
@@ -817,8 +823,15 @@ BASE_FEATURE(kOriginKeyedProcessesByDefault,
 // Fires the `pushsubscriptionchange` event defined here:
 // https://w3c.github.io/push-api/#the-pushsubscriptionchange-event
 // for subscription refreshes, revoked permissions or subscription losses
-BASE_FEATURE(kPushSubscriptionChangeEvent,
-             "PushSubscriptionChangeEvent",
+BASE_FEATURE(kPushSubscriptionChangeEventOnInvalidation,
+             "PushSubscriptionChangeEventOnInvalidation",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Fires the `pushsubscriptionchange` event defined here:
+// https://w3c.github.io/push-api/#the-pushsubscriptionchange-event
+// upon manual resubscription to previously unsubscribed notifications.
+BASE_FEATURE(kPushSubscriptionChangeEventOnResubscribe,
+             "PushSubscriptionChangeEventOnResubscribe",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // When enabled, queues navigations instead of cancelling the previous
@@ -877,6 +890,15 @@ BASE_FEATURE(kRestrictThreadPoolInBackground,
 // Set a tri-state priority on v8 isolates reflecting the renderer priority.
 BASE_FEATURE(kSetIsolatesPriority,
              "SetIsolatesPriority",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// When enabled, sends the spare renderer information when setting the
+// priority of renderers. Currently only Android handles the spare renderer
+// information in priority.
+// The target priority of a spare renderer in Android is decided by the feature
+// parameters in ContentFeatureList.java.
+BASE_FEATURE(kSpareRendererProcessPriority,
+             "SpareRendererProcessPriority",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Reuse compositor instances with RenderDocument
@@ -1248,7 +1270,7 @@ BASE_FEATURE(kElementCaptureOfOtherTabs,
 // Enable WebAssembly JSPI.
 BASE_FEATURE(kEnableExperimentalWebAssemblyJSPI,
              "WebAssemblyExperimentalJSPI",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enable WebAssembly lazy compilation (JIT on first call).
 BASE_FEATURE(kWebAssemblyLazyCompilation,
@@ -1478,6 +1500,13 @@ bool IsVideoCaptureServiceEnabledForOutOfProcess() {
 bool IsVideoCaptureServiceEnabledForBrowserProcess() {
   return GetVideoCaptureServiceConfiguration() ==
          VideoCaptureServiceConfiguration::kEnabledForBrowserProcess;
+}
+
+bool IsPushSubscriptionChangeEventEnabled() {
+  return base::FeatureList::IsEnabled(
+             features::kPushSubscriptionChangeEventOnInvalidation) ||
+         base::FeatureList::IsEnabled(
+             features::kPushSubscriptionChangeEventOnResubscribe);
 }
 
 }  // namespace features

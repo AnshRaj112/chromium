@@ -27,6 +27,7 @@
 #include "components/autofill/core/browser/metrics/payments/card_unmask_flow_metrics.h"
 #include "components/autofill/core/browser/metrics/payments/virtual_card_standalone_cvc_suggestion_metrics.h"
 #include "components/autofill/core/browser/payments/autofill_offer_manager.h"
+#include "components/autofill/core/browser/payments/constants.h"
 #include "components/autofill/core/browser/payments/credit_card_access_manager.h"
 #include "components/autofill/core/browser/payments/payments_autofill_client.h"
 #include "components/autofill/core/common/autofill_internals/log_message.h"
@@ -44,6 +45,13 @@ CreditCardFormEventLogger::CreditCardFormEventLogger(
       current_authentication_flow_(UnmaskAuthFlowType::kNone) {}
 
 CreditCardFormEventLogger::~CreditCardFormEventLogger() = default;
+
+void CreditCardFormEventLogger::OnBnplSuggestionShown() {
+  if (!has_logged_bnpl_suggestion_shown_) {
+    LogBnplFormEvent(BnplFormEvent::kBnplSuggestionShownOnce);
+    has_logged_bnpl_suggestion_shown_ = true;
+  }
+}
 
 void CreditCardFormEventLogger::OnDidFetchSuggestion(
     const std::vector<Suggestion>& suggestions,
@@ -347,6 +355,8 @@ void CreditCardFormEventLogger::OnDidFillFormFillingSuggestion(
   CreditCard::RecordType record_type = credit_card.record_type();
   signin_state_for_metrics_ = signin_state_for_metrics;
 
+  filled_credit_card_ = credit_card;
+
   client().GetFormInteractionsUkmLogger().LogDidFillSuggestion(
       driver().GetPageUkmSourceId(), form, field, record_type);
 
@@ -382,7 +392,11 @@ void CreditCardFormEventLogger::OnDidFillFormFillingSuggestion(
       }
       break;
     case CreditCard::RecordType::kVirtualCard:
-      Log(FORM_EVENT_VIRTUAL_CARD_SUGGESTION_FILLED, form);
+      // BNPL VCN metrics are handled separately to prevent them from
+      // influencing other VCN metrics, as these represent distinct user flows.
+      if (!credit_card.is_bnpl_card()) {
+        Log(FORM_EVENT_VIRTUAL_CARD_SUGGESTION_FILLED, form);
+      }
       break;
     case CreditCard::RecordType::kFullServerCard:
       // Full server cards are a temporary cached state that do not exist as
@@ -485,7 +499,17 @@ void CreditCardFormEventLogger::OnDidFillFormFillingSuggestion(
         }
         break;
       case CreditCard::RecordType::kVirtualCard:
-        Log(FORM_EVENT_VIRTUAL_CARD_SUGGESTION_FILLED_ONCE, form);
+        // BNPL VCN metrics are handled separately to prevent them from
+        // influencing other VCN metrics, as these represent distinct user
+        // flows.
+        if (credit_card.is_bnpl_card()) {
+          if (!has_logged_form_filled_with_bnpl_vcn_) {
+            LogFormFilledWithBnplVcn(credit_card.issuer_id());
+            has_logged_form_filled_with_bnpl_vcn_ = true;
+          }
+        } else {
+          Log(FORM_EVENT_VIRTUAL_CARD_SUGGESTION_FILLED_ONCE, form);
+        }
         break;
       case CreditCard::RecordType::kFullServerCard:
         // Full server cards are a temporary cached state that do not exist as
@@ -564,6 +588,18 @@ void CreditCardFormEventLogger::LogCardUnmaskAuthenticationPromptCompleted(
   current_authentication_flow_ = flow;
 }
 
+void CreditCardFormEventLogger::OnDidAcceptBnplSuggestion() {
+  if (!has_logged_bnpl_suggestion_accepted_) {
+    LogBnplFormEvent(BnplFormEvent::kBnplSuggestionAcceptedOnce);
+    has_logged_bnpl_suggestion_accepted_ = true;
+  }
+}
+
+std::optional<CreditCard>
+CreditCardFormEventLogger::GetFilledCreditCardForTesting() {
+  return filled_credit_card_;
+}
+
 void CreditCardFormEventLogger::RecordPollSuggestions() {
   base::RecordAction(
       base::UserMetricsAction("Autofill_PolledCreditCardSuggestions"));
@@ -584,7 +620,12 @@ void CreditCardFormEventLogger::LogWillSubmitForm(const FormStructure& form) {
   } else if (logged_suggestion_filled_was_masked_server_card_) {
     Log(FORM_EVENT_MASKED_SERVER_CARD_SUGGESTION_WILL_SUBMIT_ONCE, form);
   } else if (logged_suggestion_filled_was_virtual_card_) {
-    Log(FORM_EVENT_VIRTUAL_CARD_SUGGESTION_WILL_SUBMIT_ONCE, form);
+    CHECK(filled_credit_card_.has_value());
+    // BNPL VCN metrics are handled separately to prevent them from
+    // influencing other VCN metrics, as these represent distinct user flows.
+    if (!filled_credit_card_->is_bnpl_card()) {
+      Log(FORM_EVENT_VIRTUAL_CARD_SUGGESTION_WILL_SUBMIT_ONCE, form);
+    }
   } else {
     Log(FORM_EVENT_LOCAL_SUGGESTION_WILL_SUBMIT_ONCE, form);
   }
@@ -640,13 +681,23 @@ void CreditCardFormEventLogger::LogFormSubmitted(const FormStructure& form) {
     RecordCardUnmaskFlowEvent(current_authentication_flow_,
                               UnmaskAuthFlowEvent::kFormSubmitted);
   } else if (logged_suggestion_filled_was_virtual_card_) {
-    Log(FORM_EVENT_VIRTUAL_CARD_SUGGESTION_SUBMITTED_ONCE, form);
+    CHECK(filled_credit_card_.has_value());
+    // BNPL VCN metrics are handled separately to prevent them from
+    // influencing other VCN metrics, as these represent distinct user flows.
+    if (filled_credit_card_->is_bnpl_card()) {
+      if (!has_logged_form_submitted_with_bnpl_vcn_) {
+        LogFormSubmittedWithBnplVcn(filled_credit_card_->issuer_id());
+        has_logged_form_submitted_with_bnpl_vcn_ = true;
+      }
+    } else {
+      Log(FORM_EVENT_VIRTUAL_CARD_SUGGESTION_SUBMITTED_ONCE, form);
 
-    // Log BetterAuth.FlowEvents.
-    RecordCardUnmaskFlowEvent(current_authentication_flow_,
-                              UnmaskAuthFlowEvent::kFormSubmitted);
-    LogServerCardUnmaskFormSubmission(
-        payments::PaymentsAutofillClient::PaymentsRpcCardType::kVirtualCard);
+      // Log BetterAuth.FlowEvents.
+      RecordCardUnmaskFlowEvent(current_authentication_flow_,
+                                UnmaskAuthFlowEvent::kFormSubmitted);
+      LogServerCardUnmaskFormSubmission(
+          payments::PaymentsAutofillClient::PaymentsRpcCardType::kVirtualCard);
+    }
   } else {
     Log(FORM_EVENT_LOCAL_SUGGESTION_SUBMITTED_ONCE, form);
   }

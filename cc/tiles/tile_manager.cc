@@ -757,7 +757,7 @@ void TileManager::InitializeTilesWithResourcesForTesting(
   for (size_t i = 0; i < tiles.size(); ++i) {
     TileDrawInfo& draw_info = tiles[i]->draw_info();
     ResourcePool::InUsePoolResource resource = resource_pool_->AcquireResource(
-        tiles[i]->desired_texture_size(), raster_buffer_provider_->GetFormat(),
+        tiles[i]->desired_texture_size(), client_->GetTileFormat(),
         client_->GetTargetColorParams(gfx::ContentColorUsage::kSRGB)
             .color_space);
     raster_buffer_provider_->AcquireBufferForRaster(
@@ -972,7 +972,7 @@ TileManager::PrioritizedWorkToSchedule TileManager::AssignGpuMemoryToTiles() {
     MemoryUsage memory_required_by_tile_to_be_scheduled;
     if (!tile->raster_task_.get()) {
       memory_required_by_tile_to_be_scheduled = MemoryUsage::FromConfig(
-          tile->desired_texture_size(), DetermineFormat(tile));
+          tile->desired_texture_size(), client_->GetTileFormat());
     }
 
     bool tile_is_needed_now = priority.priority_bin == TilePriority::NOW;
@@ -1428,7 +1428,7 @@ scoped_refptr<TileTask> TileManager::CreateRasterTask(
   //
   // TODO(crbug.com/40128725): Once we have access to the display's buffer
   // format via gfx::DisplayColorSpaces, we should also do this for HBD images.
-  auto format = DetermineFormat(tile);
+  auto format = client_->GetTileFormat();
   if (target_color_params.color_space.IsHDR() &&
       GetContentColorUsageForPrioritizedTile(prioritized_tile) ==
           gfx::ContentColorUsage::kHDR) {
@@ -2003,10 +2003,6 @@ void TileManager::SetCheckerImagingForceDisabled(bool force_disable) {
 
 void TileManager::NeedsInvalidationForCheckerImagedTiles() {
   client_->RequestImplSideInvalidationForCheckerImagedTiles();
-}
-
-viz::SharedImageFormat TileManager::DetermineFormat(const Tile* tile) const {
-  return raster_buffer_provider_->GetFormat();
 }
 
 std::unique_ptr<base::trace_event::ConvertableToTraceFormat>

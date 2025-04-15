@@ -109,10 +109,6 @@ static const char kShowOrRefreshTree[] = "showOrRefreshTree";
 static const char kText[] = "text";
 static const char kWeb[] = "web";
 
-// Possible global flag values
-static const char kOff[] = "off";
-static const char kOn[] = "on";
-
 using ui::AXPropertyFilter;
 
 namespace {
@@ -203,17 +199,17 @@ void HandleAccessibilityRequestCallback(
 
   // The "native" and "web" flags are disabled if
   // --disable-renderer-accessibility is set.
-  data.Set(kNative, native ? kOn : kOff);
-  data.Set(kWeb, web ? kOn : kOff);
+  data.Set(kNative, native);
+  data.Set(kWeb, web);
 
   // The "text", "extendedProperties" and "html" flags are only
   // meaningful if "web" is enabled.
-  data.Set(kText, text ? kOn : kOff);
-  data.Set(kExtendedProperties, extendedProperties ? kOn : kOff);
-  data.Set(kHTML, html ? kOn : kOff);
+  data.Set(kText, text);
+  data.Set(kExtendedProperties, extendedProperties);
+  data.Set(kHTML, html);
 
   // The "pdfPrinting" flag is independent of the others.
-  data.Set(kPDFPrinting, pdf_printing ? kOn : kOff);
+  data.Set(kPDFPrinting, pdf_printing);
 
   std::string pref_api_type =
       pref->GetString(prefs::kShownAccessibilityApiType);
@@ -241,7 +237,7 @@ void HandleAccessibilityRequestCallback(
 
   bool is_mode_locked = !content::BrowserAccessibilityState::GetInstance()
                              ->IsAXModeChangeAllowed();
-  data.Set(kLocked, is_mode_locked ? kOn : kOff);
+  data.Set(kLocked, is_mode_locked);
 
   base::Value::List page_list;
   std::unique_ptr<content::RenderWidgetHostIterator> widget_iter(
@@ -305,7 +301,8 @@ std::string RecursiveDumpAXPlatformNodeAsString(
     return "";
   }
   std::string str(2 * indent, '+');
-  std::string line = node->GetDelegate()->GetData().ToString();
+  ui::AXPlatformNodeDelegate* const node_delegate = node->GetDelegate();
+  std::string line = node_delegate->GetData().ToString();
   std::vector<std::string> attributes = base::SplitString(
       line, " ", base::KEEP_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
   for (std::string attribute : attributes) {
@@ -315,8 +312,9 @@ std::string RecursiveDumpAXPlatformNodeAsString(
     }
   }
   str += "\n";
-  for (size_t i = 0; i < node->GetDelegate()->GetChildCount(); i++) {
-    gfx::NativeViewAccessible child = node->GetDelegate()->ChildAtIndex(i);
+  for (size_t i = 0, child_count = node_delegate->GetChildCount();
+       i < child_count; i++) {
+    gfx::NativeViewAccessible child = node_delegate->ChildAtIndex(i);
     ui::AXPlatformNode* child_node =
         ui::AXPlatformNode::FromNativeViewAccessible(child);
     str += RecursiveDumpAXPlatformNodeAsString(child_node, indent + 1,

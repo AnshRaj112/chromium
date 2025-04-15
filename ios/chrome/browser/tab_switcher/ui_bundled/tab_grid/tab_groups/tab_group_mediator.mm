@@ -62,10 +62,12 @@ using ScopedDataSharingSyncObservation =
 using tab_groups::SharingState;
 
 namespace {
+
 // The preferred size in points for the avatar icons.
 constexpr CGFloat kFacePileAvatarSize = 24;
 // The preferred size in points for the avatar icon in the activity label.
 constexpr CGFloat kActivityLabelAvatarSize = 16;
+
 }  // namespace
 
 @interface TabGroupMediator () <DataSharingServiceObserverDelegate,
@@ -393,9 +395,6 @@ constexpr CGFloat kActivityLabelAvatarSize = 16;
 
   if (!_shareKitService->IsSupported() ||
       !message.attribution.triggering_user.has_value()) {
-    // TODO(crbug.com/385090658): Now, `triggering_user` doesn't have a value in
-    // any cases (a tab is added / updated) and the label isn't created. Confirm
-    // why `triggering_user` is nil.
     return nil;
   }
 
@@ -629,6 +628,10 @@ constexpr CGFloat kActivityLabelAvatarSize = 16;
       [self addObservationForWebState:insertChange.inserted_web_state()];
       break;
     }
+    case WebStateListChange::Type::kGroupCreate: {
+      // Don't show tab group when created.
+      break;
+    }
     default:
       [super didChangeWebStateList:webStateList change:change status:status];
       break;
@@ -722,7 +725,7 @@ constexpr CGFloat kActivityLabelAvatarSize = 16;
   config.collabID = base::SysUTF8ToNSString(savedCollabID.value());
   config.showsEmptyState = YES;
   config.avatarSize = kFacePileAvatarSize;
-  [_groupConsumer setFacePileViewController:_shareKitService->FacePile(config)];
+  [_groupConsumer setFacePileView:_shareKitService->FacePileView(config)];
 }
 
 // Inserts an item representing `webState` in the consumer at `index`.
@@ -788,6 +791,10 @@ constexpr CGFloat kActivityLabelAvatarSize = 16;
 
     switch (message.collaboration_event) {
       case collaboration::messaging::CollaborationEvent::TAB_ADDED: {
+        numOfTabsAdded++;
+        break;
+      }
+      case collaboration::messaging::CollaborationEvent::TAB_UPDATED: {
         numOfTabsAdded++;
         break;
       }

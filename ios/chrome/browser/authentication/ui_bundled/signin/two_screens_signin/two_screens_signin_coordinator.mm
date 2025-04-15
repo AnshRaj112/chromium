@@ -10,12 +10,13 @@
 #import "base/notreached.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/signin/public/identity_manager/identity_manager.h"
+#import "ios/chrome/browser/authentication/ui_bundled/continuation.h"
 #import "ios/chrome/browser/authentication/ui_bundled/fullscreen_signin_screen/coordinator/fullscreen_signin_screen_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/history_sync/history_sync_coordinator.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin/interruptible_chrome_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/logging/upgrade_signin_logger.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_coordinator+protected.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/stop_animated_chrome_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/uno_signin_screen_provider.h"
 #import "ios/chrome/browser/first_run/ui_bundled/first_run_util.h"
 #import "ios/chrome/browser/screen/ui_bundled/screen_provider.h"
@@ -50,6 +51,8 @@ using base::UserMetricsAction;
 
   // The signin logger for the upgrade screen.
   UpgradeSigninLogger* _upgradeSigninLogger;
+
+  ChangeProfileContinuationProvider _continuationProvider;
 }
 
 - (instancetype)
@@ -57,13 +60,17 @@ using base::UserMetricsAction;
                        browser:(Browser*)browser
                   contextStyle:(SigninContextStyle)contextStyle
                    accessPoint:(signin_metrics::AccessPoint)accessPoint
-                   promoAction:(signin_metrics::PromoAction)promoAction {
+                   promoAction:(signin_metrics::PromoAction)promoAction
+          continuationProvider:
+              (const ChangeProfileContinuationProvider&)continuationProvider {
   DCHECK(!browser->GetProfile()->IsOffTheRecord());
   self = [super initWithBaseViewController:viewController
                                    browser:browser
                               contextStyle:contextStyle
                                accessPoint:accessPoint];
   if (self) {
+    CHECK(continuationProvider);
+    _continuationProvider = continuationProvider;
     // This coordinator should not be used in the FRE.
     CHECK_NE(accessPoint, signin_metrics::AccessPoint::kStartPage);
     _promoAction = promoAction;
@@ -160,12 +167,13 @@ using base::UserMetricsAction;
   switch (type) {
     case kSignIn:
       return [[FullscreenSigninScreenCoordinator alloc]
-          initWithBaseNavigationController:_navigationController
-                                   browser:self.browser
-                                  delegate:self
-                              contextStyle:self.contextStyle
-                               accessPoint:self.accessPoint
-                               promoAction:_promoAction];
+           initWithBaseNavigationController:_navigationController
+                                    browser:self.browser
+                                   delegate:self
+                               contextStyle:self.contextStyle
+                                accessPoint:self.accessPoint
+                                promoAction:_promoAction
+          changeProfileContinuationProvider:_continuationProvider];
     case kHistorySync:
       return [[HistorySyncCoordinator alloc]
           initWithBaseNavigationController:_navigationController
@@ -219,11 +227,9 @@ using base::UserMetricsAction;
 - (void)interruptAnimated:(BOOL)animated {
   // Interrupt the child coordinator UI first before dismissing the new
   // sign-in navigation controller.
-  if ([_childCoordinator
-          conformsToProtocol:@protocol(InterruptibleChromeCoordinator)]) {
-    [((id<InterruptibleChromeCoordinator>)_childCoordinator)
-        interruptAnimated:NO];
-  }
+  CHECK(![_childCoordinator
+      conformsToProtocol:@protocol(InterruptibleChromeCoordinator)]);
+  [_childCoordinator stop];
   [_navigationController.presentingViewController
       dismissViewControllerAnimated:animated
                          completion:nil];

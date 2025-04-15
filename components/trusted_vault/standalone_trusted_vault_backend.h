@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "base/functional/callback.h"
-#include "base/memory/raw_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/time/time.h"
 #include "components/signin/public/identity_manager/account_info.h"
@@ -53,8 +52,24 @@ class StandaloneTrustedVaultBackend
     Delegate& operator=(const Delegate&) = delete;
 
     virtual void NotifyRecoverabilityDegradedChanged() = 0;
-    // Called whenever persisted state changes.
-    virtual void NotifyStateChanged() = 0;
+  };
+
+  class LocalRecoveryFactorsFactory {
+   public:
+    LocalRecoveryFactorsFactory() = default;
+    LocalRecoveryFactorsFactory(const LocalRecoveryFactorsFactory&) = delete;
+    virtual ~LocalRecoveryFactorsFactory() = default;
+
+    LocalRecoveryFactorsFactory& operator=(const LocalRecoveryFactorsFactory&) =
+        delete;
+
+    // Creates LocalRecoveryFactor's for |primary_account|.
+    // Note that the returned LocalRecoveryFactor's will keep a reference to
+    // |storage_|.
+    virtual std::vector<std::unique_ptr<LocalRecoveryFactor>>
+    CreateLocalRecoveryFactors(
+        StandaloneTrustedVaultStorage* storage,
+        const std::optional<CoreAccountInfo>& primary_account) = 0;
   };
 
   enum class RefreshTokenErrorState {
@@ -139,27 +154,29 @@ class StandaloneTrustedVaultBackend
   std::vector<uint8_t> GetLastAddedRecoveryMethodPublicKeyForTesting() const;
   int GetLastKeyVersionForTesting(const GaiaId& gaia_id);
 
-  void SetLastRegistrationReturnedLocalDataObsoleteForTesting(
-      const GaiaId& gaia_id);
-
   bool HasPendingTrustedRecoveryMethodForTesting() const;
 
   static scoped_refptr<StandaloneTrustedVaultBackend> CreateForTesting(
       SecurityDomainId security_domain_id,
       std::unique_ptr<StandaloneTrustedVaultStorage> storage,
       std::unique_ptr<Delegate> delegate,
-      std::unique_ptr<TrustedVaultThrottlingConnection> connection);
+      std::unique_ptr<TrustedVaultThrottlingConnection> connection,
+      std::unique_ptr<LocalRecoveryFactorsFactory>
+          local_recovery_factors_factory);
 
  private:
   friend class base::RefCountedThreadSafe<StandaloneTrustedVaultBackend>;
 
-  // Constructor which allows specifying a TrustedVaultThrottlingConnection.
+  // Constructor which allows specifying a TrustedVaultThrottlingConnection and
+  // a LocalRecoveryFactorsFactory.
   // Only used in tests.
   StandaloneTrustedVaultBackend(
       SecurityDomainId security_domain_id,
       std::unique_ptr<StandaloneTrustedVaultStorage> storage,
       std::unique_ptr<Delegate> delegate,
-      std::unique_ptr<TrustedVaultThrottlingConnection> connection);
+      std::unique_ptr<TrustedVaultThrottlingConnection> connection,
+      std::unique_ptr<LocalRecoveryFactorsFactory>
+          local_recovery_factors_factory);
 
   static TrustedVaultDownloadKeysStatusForUMA
   GetDownloadKeysStatusForUMAFromResponse(
@@ -170,22 +187,20 @@ class StandaloneTrustedVaultBackend
   // Initializes |local_recovery_factors_| with the current |primary_account_|.
   void ResetLocalRecoveryFactors();
 
-  // Attempts to register device in case it's not yet registered and currently
-  // available local data is sufficient to do it. For the cases where
-  // registration is desirable (i.e. feature toggle enabled and user signed in),
-  // it returns an enum representing the registration state, intended to be used
-  // for metric recording. Otherwise it returns nullopt.
-  std::optional<TrustedVaultDeviceRegistrationStateForUMA>
-  MaybeRegisterDevice();
+  // Attempts to register local recovery factors in case they're not yet
+  // registered and currently available local data is sufficient to do it. Also
+  // records device registration related metrics.
+  void MaybeRegisterLocalRecoveryFactors();
 
   // Attempts to honor the pending operation stored in
   // |pending_trusted_recovery_method_|.
   void MaybeProcessPendingTrustedRecoveryMethod();
 
-  // Called when device registration for |gaia_id| is completed (either
-  // successfully or not). |storage_| must contain LocalTrustedVaultPerUser for
-  // given |gaia_id|.
-  void OnDeviceRegistered(TrustedVaultRegistrationStatus status,
+  // Called when registration of a local recovery factor for |gaia_id| is
+  // completed (either successfully or not). |storage_| must contain
+  // LocalTrustedVaultPerUser for given |gaia_id|.
+  void OnDeviceRegistered(LocalRecoveryFactorType local_recovery_factor_type,
+                          TrustedVaultRegistrationStatus status,
                           int key_version,
                           bool had_local_keys);
 
@@ -215,8 +230,6 @@ class StandaloneTrustedVaultBackend
   // for deletion due to accounts in cookie jar changes.
   void RemoveNonPrimaryAccountKeysIfMarkedForDeletion();
 
-  void WriteDataToDiskAndNotify();
-
   const SecurityDomainId security_domain_id_;
 
   const std::unique_ptr<StandaloneTrustedVaultStorage> storage_;
@@ -237,6 +250,9 @@ class StandaloneTrustedVaultBackend
   // vault server.
   std::optional<CoreAccountInfo> primary_account_;
 
+  // Factory to create |local_recovery_factors_|. Can be overwritten in tests.
+  const std::unique_ptr<LocalRecoveryFactorsFactory>
+      local_recovery_factors_factory_;
   // All known local recovery factors that can be used to attempt key recovery.
   // Note: |local_recovery_factors_| depends on |storage_|, thus it must be
   // destroyed before |storage_| (i.e. the order of the fields matters).

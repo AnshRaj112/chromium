@@ -74,9 +74,6 @@ BASE_DECLARE_FEATURE(kIosCleanupHangingPasswordFormExtractionRequests);
 extern const base::FeatureParam<int>
     kIosPasswordFormExtractionRequestsTimeoutMs;
 
-// Enable saving username in UFF on iOS.
-BASE_DECLARE_FEATURE(kIosDetectUsernameInUff);
-
 // Enables improving detecting the password fields when retrieving password
 // suggestions for filling.
 BASE_DECLARE_FEATURE(kIOSImprovePasswordFieldDetectionForFilling);
@@ -90,9 +87,6 @@ BASE_DECLARE_FEATURE(kIOSPasswordBottomSheetV2);
 BASE_DECLARE_FEATURE(kIOSProactivePasswordGenerationBottomSheet);
 
 #endif
-
-// Enables saving enterprise password hashes to a local state preference.
-BASE_DECLARE_FEATURE(kLocalStateEnterprisePasswordHashes);
 
 // Enables running the clientside form classifier to parse password forms.
 BASE_DECLARE_FEATURE(kPasswordFormClientsideClassifier);
@@ -184,9 +178,6 @@ inline constexpr base::FeatureParam<int> kLoginDbDeprecationExportDelay = {
 // affiliation service. It fixes problem with incorrect password suggestions on
 // websites like slack.com.
 BASE_DECLARE_FEATURE(kUseExtensionListForPSLMatching);
-
-// Enables async implementation of OSCrypt inside LoginDatabase (Stage 1).
-BASE_DECLARE_FEATURE(kUseAsyncOsCryptInLoginDatabase);
 
 // Enables new encryption method of OSCrypt inside LoginDatabase (Stage 2).
 BASE_DECLARE_FEATURE(kUseNewEncryptionMethod);

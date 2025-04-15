@@ -263,11 +263,6 @@ BASE_FEATURE(kAllowUndamagedNonrootRenderPassToSkip,
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
-// Enables occlusion culling for TextureDrawQuads when possible.
-BASE_FEATURE(kOcclusionCullingForTextureQuads,
-             "OcclusionCullingForTextureQuads",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Allow SurfaceAggregator to merge render passes when they contain quads that
 // require overlay (e.g. protected video). See usage in |EmitSurfaceContent|.
 BASE_FEATURE(kAllowForceMergeRenderPassWithRequireOverlayQuads,
@@ -351,24 +346,14 @@ BASE_FEATURE(kEnableADPFSetThreads,
 // If enabled, surface activation and draw do not block on dependencies.
 BASE_FEATURE(kDrawImmediatelyWhenInteractive,
              "DrawImmediatelyWhenInteractive",
-#if BUILDFLAG(IS_CHROMEOS)
-             base::FEATURE_DISABLED_BY_DEFAULT
-#else
-             base::FEATURE_ENABLED_BY_DEFAULT
-#endif
-);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, we immediately send acks to clients when a viz surface
 // activates. This effectively removes back-pressure. This can result in wasted
 // work and contention, but should regularize the timing of client rendering.
 BASE_FEATURE(kAckOnSurfaceActivationWhenInteractive,
              "AckOnSurfaceActivationWhenInteractive",
-#if BUILDFLAG(IS_CHROMEOS)
-             base::FEATURE_DISABLED_BY_DEFAULT
-#else
-             base::FEATURE_ENABLED_BY_DEFAULT
-#endif
-);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 const base::FeatureParam<int>
     kNumCooldownFramesForAckOnSurfaceActivationDuringInteraction{
@@ -538,12 +523,6 @@ int MaxOverlaysConsidered() {
 
 bool ShouldOnBeginFrameThrottleVideo() {
   return base::FeatureList::IsEnabled(features::kOnBeginFrameThrottleVideo);
-}
-
-bool IsOcclusionCullingForTextureQuadsEnabled() {
-  static bool enabled =
-      base::FeatureList::IsEnabled(features::kOcclusionCullingForTextureQuads);
-  return enabled;
 }
 
 bool ShouldDrawImmediatelyWhenInteractive() {

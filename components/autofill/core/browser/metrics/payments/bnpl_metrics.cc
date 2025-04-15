@@ -11,6 +11,17 @@
 
 namespace autofill::autofill_metrics {
 
+SupportedBnplIssuer GetEnumForIssuerId(std::string_view issuer_id) {
+  if (issuer_id == kBnplAffirmIssuerId) {
+    return SupportedBnplIssuer::kAffirm;
+  } else if (issuer_id == kBnplZipIssuerId) {
+    return SupportedBnplIssuer::kZip;
+  } else if (issuer_id == kBnplAfterpayIssuerId) {
+    return SupportedBnplIssuer::kAfterpay;
+  }
+  NOTREACHED();
+}
+
 std::string GetHistogramSuffixFromIssuerId(std::string_view issuer_id) {
   if (issuer_id == kBnplAffirmIssuerId) {
     return "Affirm";
@@ -18,6 +29,18 @@ std::string GetHistogramSuffixFromIssuerId(std::string_view issuer_id) {
     return "Zip";
   } else if (issuer_id == kBnplAfterpayIssuerId) {
     return "Afterpay";
+  }
+  NOTREACHED();
+}
+
+std::string ConvertBnplFlowResultToString(BnplFlowResult result) {
+  switch (result) {
+    case BnplFlowResult::kSuccess:
+      return "Success";
+    case BnplFlowResult::kFailure:
+      return "Failure";
+    case BnplFlowResult::kUserClosed:
+      return "UserClosed";
   }
   NOTREACHED();
 }
@@ -46,6 +69,15 @@ void LogBnplTosDialogResult(BnplTosDialogResult result,
   base::UmaHistogramEnumeration(histogram_name, result);
 }
 
+void LogSelectBnplIssuerDialogResult(SelectBnplIssuerDialogResult result) {
+  base::UmaHistogramEnumeration("Autofill.Bnpl.SelectionDialogResult", result);
+}
+
+void LogBnplIssuerSelection(std::string_view issuer_id) {
+  base::UmaHistogramEnumeration("Autofill.Bnpl.SelectionDialogIssuerSelected",
+                                GetEnumForIssuerId(issuer_id));
+}
+
 void LogBnplSuggestionNotShownReason(BnplSuggestionNotShownReason reason) {
   base::UmaHistogramEnumeration("Autofill.Bnpl.SuggestionNotShownReason",
                                 reason);
@@ -66,8 +98,48 @@ void LogBnplPopupWindowResult(std::string_view issuer_id,
   base::UmaHistogramEnumeration(histogram_name, result);
 }
 
+void LogBnplPopupWindowLatency(base::TimeDelta duration,
+                               std::string_view issuer_id,
+                               BnplFlowResult result) {
+  std::string histogram_name =
+      base::StrCat({"Autofill.Bnpl.PopupWindowLatency.",
+                    GetHistogramSuffixFromIssuerId(issuer_id), ".",
+                    ConvertBnplFlowResultToString(result)});
+
+  base::UmaHistogramLongTimes(histogram_name, duration);
+}
+
 void LogBnplFormEvent(BnplFormEvent event) {
   base::UmaHistogramEnumeration("Autofill.FormEvents.CreditCard.Bnpl", event);
+}
+
+void LogFormFilledWithBnplVcn(std::string_view issuer_id) {
+  if (issuer_id == kBnplAffirmIssuerId) {
+    LogBnplFormEvent(BnplFormEvent::kFormFilledWithAffirmOnce);
+  } else if (issuer_id == kBnplZipIssuerId) {
+    LogBnplFormEvent(BnplFormEvent::kFormFilledWithZipOnce);
+  } else if (issuer_id == kBnplAfterpayIssuerId) {
+    LogBnplFormEvent(BnplFormEvent::kFormFilledWithAfterpayOnce);
+  } else {
+    NOTREACHED();
+  }
+}
+
+void LogFormSubmittedWithBnplVcn(std::string_view issuer_id) {
+  if (issuer_id == kBnplAffirmIssuerId) {
+    LogBnplFormEvent(BnplFormEvent::kFormSubmittedWithAffirmOnce);
+  } else if (issuer_id == kBnplZipIssuerId) {
+    LogBnplFormEvent(BnplFormEvent::kFormSubmittedWithZipOnce);
+  } else if (issuer_id == kBnplAfterpayIssuerId) {
+    LogBnplFormEvent(BnplFormEvent::kFormSubmittedWithAfterpayOnce);
+  } else {
+    NOTREACHED();
+  }
+}
+
+void LogBnplSelectionDialogShown() {
+  base::UmaHistogramBoolean("Autofill.Bnpl.SelectionDialogShown",
+                            /*sample=*/true);
 }
 
 }  // namespace autofill::autofill_metrics

@@ -173,6 +173,15 @@ const char kAndroidKeyboardA11yDescription[] =
     "such as the tab strip, toolbar, and bookmarks bar.";
 #endif  // BUILDFLAG(IS_ANDROID)
 
+#if BUILDFLAG(IS_ANDROID)
+const char kAndroidMetaClickHistoryNavigationName[] =
+    "Allows use of meta keys on forward/back history navigation arrows";
+const char kAndroidMetaClickHistoryNavigationDescription[] =
+    "Allows use of meta keys (ctrl+shift+click to open in new focused tab, "
+    "ctrl+click to open in new background tab, shift+click to open in new "
+    "window) on forward/back history navigation arrows";
+#endif  // BUILDFLAG(IS_ANDROID)
+
 #if BUILDFLAG(IS_CHROMEOS)
 const char kIgnoreDeviceFlexArcEnabledPolicyName[] =
     "Ignore VPN Apps Enabling on ChromeOS Flex";
@@ -679,6 +688,12 @@ const char kAutofillEnableCardInfoRuntimeRetrievalDescription[] =
     "When enabled, runtime retrieval of CVC along with card number and expiry "
     "from issuer for enrolled cards will be enabled during form fill.";
 
+const char kAutofillEnableFlatRateCardBenefitsFromCurinosName[] =
+    "Enable showing flat rate card benefits sourced from Curinos";
+const char kAutofillEnableFlatRateCardBenefitsFromCurinosDescription[] =
+    "When enabled, flat rate card benefits sourced from Curinos will be shown "
+    "in Autofill suggestions.";
+
 const char kAutofillEnableLogFormEventsToAllParsedFormTypesName[] =
     "Enable logging form events to all parsed form on a web page.";
 const char kAutofillEnableLogFormEventsToAllParsedFormTypesDescription[] =
@@ -747,6 +762,12 @@ const char kAutofillEnableSaveAndFillDescription[] =
     "with a single click when users don't have any cards saved in Autofill.";
 
 #if BUILDFLAG(IS_ANDROID)
+const char kAutofillEnableShowSaveCardSecurelyMessageName[] =
+    "Enable updated credit card upload UI messaging";
+const char kAutofillEnableShowSaveCardSecurelyMessageDescription[] =
+    "When enabled, credit card upload messaging will match what is "
+    "shown on Desktop.";
+
 const char kAutofillEnableSyncingOfPixBankAccountsName[] =
     "Sync Pix bank accounts from Google Payments";
 const char kAutofillEnableSyncingOfPixBankAccountsDescription[] =
@@ -812,6 +833,12 @@ const char kAutofillVcnEnrollRequestTimeoutDescription[] =
     "When enabled, sets a client-side timeout on the Autofill credit card "
     "VCN enrollment request. Upon timeout, the client will terminate the VCN "
     "enrollment UI, but the request may still succeed server-side.";
+
+const char kAutofillVcnEnrollStrikeExpiryTimeName[] =
+    "Expiry duration for VCN enrollment strikes";
+const char kAutofillVcnEnrollStrikeExpiryTimeDescription[] =
+    "When enabled, changes the amount of time required for VCN enrollment "
+    "prompt strikes to expire.";
 
 const char kAutofillVirtualViewStructureAndroidName[] =
     "Enable the setting to provide a virtual view structure for Autofill";
@@ -1048,6 +1075,15 @@ const char kMediaSessionEnterPictureInPictureDescription[] =
 
 const char kCodeBasedRBDName[] = "Code-based RBD";
 const char kCodeBasedRBDDescription[] = "Enables the Code-based RBD.";
+
+const char kCollaborationAutomotiveName[] = "Collaboration Automotive";
+const char kCollaborationAutomotiveDescription[] =
+    "Enable the collaboration feature on automotive platforms.";
+
+const char kCollaborationEntrepriseV2Name[] = "Collaboration Entreprise V2";
+const char kCollaborationEntrepriseV2Description[] =
+    "Enables the collaboration feature for entreprise users within the same "
+    "domain.";
 
 const char kCollaborationMessagingName[] = "Collaboration Messaging";
 const char kCollaborationMessagingDescription[] =
@@ -2258,6 +2294,10 @@ const char kHardwareMediaKeyHandlingDescription[] =
     "Enables using media keys to control the active media session. This "
     "requires MediaSessionService to be enabled too";
 
+const char kHeadlessTabModelName[] = "Headless tab model";
+const char kHeadlessTabModelDescription[] =
+    "Enables loading and mutating tab models on Android without an activity";
+
 const char kHeavyAdPrivacyMitigationsName[] = "Heavy ad privacy mitigations";
 const char kHeavyAdPrivacyMitigationsDescription[] =
     "Enables privacy mitigations for the heavy ad intervention. Disabling "
@@ -3140,9 +3180,16 @@ const char kCrosSystemLevelPermissionBlockedWarningsDescription[] =
     "disabled in the OS.";
 #endif
 
-const char kPermissionsAIv1Name[] = "PermissionsAI";
+const char kPermissionsAIv1Name[] = "PermissionsAIv1";
 const char kPermissionsAIv1Description[] =
     "Use the Permission Predictions Service and the AIv1 model to surface "
+    "permission requests using a quieter UI when the likelihood of the user "
+    "granting the permission is predicted to be low. Requires `Make Searches "
+    "and Browsing Better` to be enabled.";
+
+const char kPermissionsAIv3Name[] = "PermissionsAIv3";
+const char kPermissionsAIv3Description[] =
+    "Use the Permission Predictions Service and the AIv3 model to surface "
     "permission requests using a quieter UI when the likelihood of the user "
     "granting the permission is predicted to be low. Requires `Make Searches "
     "and Browsing Better` to be enabled.";
@@ -3466,6 +3513,12 @@ const char kSafetyHubLocalPasswordsModuleName[] =
     "Enables the local passwords module in Safety Hub";
 const char kSafetyHubLocalPasswordsModuleDescription[] =
     "Enables showing the local passwords module in Safety Hub.";
+
+const char kSafetyHubUnifiedPasswordsModuleName[] =
+    "Enables the unified passwords module in Safety Hub";
+const char kSafetyHubUnifiedPasswordsModuleDescription[] =
+    "Enables the unified passwords module in Safety Hub, which includes "
+    "account and local passwords.";
 
 const char kSafetyHubAndroidSurveyName[] =
     "HaTS for Safety Check v2 on Android";
@@ -4858,6 +4911,9 @@ const char kReaderModeHeuristicsAdaboost[] = "Non-mobile-friendly articles";
 const char kReaderModeHeuristicsAllArticles[] = "All articles";
 const char kReaderModeHeuristicsAlwaysOff[] = "Never";
 const char kReaderModeHeuristicsAlwaysOn[] = "Always";
+const char kReaderModeImprovementsName[] = "Reader Mode improvements";
+const char kReaderModeImprovementsDescription[] =
+    "Collection of improvements to reader modefor android.";
 
 const char kReengagementNotificationName[] =
     "Enable re-engagement notifications";
@@ -4945,6 +5001,12 @@ const char kSupportMultipleServerRequestsForPixPaymentsName[] =
 const char kSupportMultipleServerRequestsForPixPaymentsDescription[] =
     "When enabled, the network interface with Google Payments supports "
     "handling multiple concurrent requests for Pix flows.";
+
+const char kSwapNewTabAndNewTabInGroupAndroidName[] =
+    "Swap new tab and new tab in group order";
+const char kSwapNewTabAndNewTabInGroupAndroidDescription[] =
+    "When enabled swaps the open in new tab and open in new tab in group menu "
+    "items.";
 
 const char kCrossDeviceTabPaneAndroidName[] = "Cross Device Tab Pane Android";
 const char kCrossDeviceTabPaneAndroidDescription[] =
@@ -5161,6 +5223,11 @@ const char kEnableLiveCaptionMultilangName[] = "Multilingual Live Caption";
 const char kEnableLiveCaptionMultilangDescription[] =
     "Enables the multilingual Live Caption Feature which allows "
     "for many language choices and automated language choices.";
+
+const char kEnableHeadlessLiveCaptionName[] = "Headless Live Captions";
+const char kEnableHeadlessLiveCaptionDescription[] =
+    "Enable features related to headless captions exploration. These are "
+    "very likely unstable.";
 
 const char kEnableCrOSLiveTranslateName[] = "Live Translate CrOS";
 const char kEnableCrOSLiveTranslateDescription[] =
@@ -7186,6 +7253,16 @@ const char kShimlessRMAOsUpdateName[] = "Enable OS updates in shimless RMA";
 const char kShimlessRMAOsUpdateDescription[] =
     "Turns on OS updating in Shimless RMA";
 
+const char kShimlessRMAHardwareValidationSkipName[] =
+    "Enable Hardware Validation Skip in Shimless RMA";
+const char kShimlessRMAHardwareValidationSkipDescription[] =
+    "Turns on Hardware Validation Skip in Shimless RMA";
+
+const char kShimlessRMADynamicDeviceInfoInputsName[] =
+    "Enable Dynamic Device Info Inputs in Shimless RMA";
+const char kShimlessRMADynamicDeviceInfoInputsDescription[] =
+    "Turns on Dynamic Device Info Inputs in Shimless RMA";
+
 const char kSchedulerConfigurationName[] = "Scheduler Configuration";
 const char kSchedulerConfigurationDescription[] =
     "Instructs the OS to use a specific scheduler configuration setting.";
@@ -7911,10 +7988,6 @@ const char kAccessiblePDFFormName[] = "Accessible PDF Forms";
 const char kAccessiblePDFFormDescription[] =
     "Enables accessibility support for PDF forms.";
 
-const char kPdfCr23Name[] = "PDF Chrome Refresh 2023";
-const char kPdfCr23Description[] =
-    "Use new CR23 icons and colors for the PDF Viewer.";
-
 #if BUILDFLAG(ENABLE_PDF_INK2)
 const char kPdfInk2Name[] = "PDF Ink Signatures";
 const char kPdfInk2Description[] =
@@ -7942,6 +8015,10 @@ const char kWebXrWebGpuBindingName[] = "WebXR/WebGPU Binding";
 const char kWebXrWebGpuBindingDescription[] =
     "Enables rendering with WebGPU for WebXR sessions. WebXR Projection "
     "Layers must be also be enabled to use this feature.";
+const char kWebXRDepthPerformanceName[] = "WebXR Depth Type";
+const char kWebXRDepthPerformanceDescription[] =
+    "Enables the ability for websites to request a specific XRDepthType when "
+    "configuring depth on a WebXR session.";
 const char kWebXrInternalsName[] = "WebXR Internals Debugging Page";
 const char kWebXrInternalsDescription[] =
     "Enables the webxr-internals developer page which can be used to help "
@@ -8088,12 +8165,6 @@ const char kProfilesReorderingDescription[] =
 #endif
 
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
-const char kBatchUploadDesktopName[] = "Batch Upload Desktop";
-const char kBatchUploadDesktopDescription[] =
-    "Enables the Batch Upload feature for Desktop. This allows to upload local "
-    "data to the account data when signed in. Currently only supports "
-    "Passwords and Addresses";
-
 const char kEnableHistorySyncOptinExpansionPillName[] =
     "History Sync Opt-in Expansion Pill";
 const char kEnableHistorySyncOptinExpansionPillDescription[] =
@@ -8236,9 +8307,11 @@ const char kSupervisedUserLocalWebApprovalsDescription[] =
 #endif  // #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 
 #if BUILDFLAG(IS_ANDROID)
-const char kHistoryOptInEntryPointsName[] = "History opt-in entry points";
-const char kHistoryOptInEntryPointsDescription[] =
-    "Add some history opt-in entry points.";
+const char kHistoryPageHistorySyncPromoName[] =
+    "History sync promo in History Page";
+const char kHistoryPageHistorySyncPromoDescription[] =
+    "Add a history sync opt-in promo in the History Page for signed-in users "
+    "that are not syncing history & tabs.";
 
 const char kWebSerialOverBluetoothName[] = "Enable Web Serial over Bluetooth";
 const char kWebSerialOverBluetoothDescription[] =

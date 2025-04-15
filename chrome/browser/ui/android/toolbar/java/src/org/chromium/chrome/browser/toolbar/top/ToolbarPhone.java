@@ -42,7 +42,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.content.res.AppCompatResources;
-import androidx.appcompat.graphics.drawable.DrawableWrapperCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.core.widget.ImageViewCompat;
@@ -63,13 +62,13 @@ import org.chromium.chrome.browser.omnibox.styles.OmniboxResourceProvider;
 import org.chromium.chrome.browser.omnibox.suggestions.OmniboxSuggestionsDropdownScrollListener;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.theme.ThemeUtils;
-import org.chromium.chrome.browser.toolbar.ButtonData;
 import org.chromium.chrome.browser.toolbar.R;
 import org.chromium.chrome.browser.toolbar.ToolbarDataProvider;
 import org.chromium.chrome.browser.toolbar.ToolbarProgressBar;
 import org.chromium.chrome.browser.toolbar.ToolbarTabController;
 import org.chromium.chrome.browser.toolbar.back_button.BackButtonCoordinator;
 import org.chromium.chrome.browser.toolbar.menu_button.MenuButtonCoordinator;
+import org.chromium.chrome.browser.toolbar.optional_button.ButtonData;
 import org.chromium.chrome.browser.toolbar.optional_button.OptionalButtonCoordinator;
 import org.chromium.chrome.browser.toolbar.optional_button.OptionalButtonCoordinator.TransitionType;
 import org.chromium.chrome.browser.toolbar.reload_button.ReloadButtonCoordinator;
@@ -351,7 +350,6 @@ public class ToolbarPhone extends ToolbarLayout
             ToggleTabStackButtonCoordinator tabSwitcherButtonCoordinator,
             NavigationPopup.HistoryDelegate historyDelegate,
             BooleanSupplier partnerHomepageEnabledSupplier,
-            ToolbarTablet.OfflineDownloader offlineDownloader,
             UserEducationHelper userEducationHelper,
             ObservableSupplier<Tracker> trackerSupplier,
             ToolbarProgressBar progressBar,
@@ -364,7 +362,6 @@ public class ToolbarPhone extends ToolbarLayout
                 tabSwitcherButtonCoordinator,
                 historyDelegate,
                 partnerHomepageEnabledSupplier,
-                offlineDownloader,
                 userEducationHelper,
                 trackerSupplier,
                 progressBar,
@@ -405,7 +402,6 @@ public class ToolbarPhone extends ToolbarLayout
         mLocationBarBackgroundVerticalInset =
                 res.getDimensionPixelSize(R.dimen.location_bar_vertical_margin);
         mLocationBarBackground = createModernLocationBarBackground(getContext());
-
         mActiveLocationBarBackground = mLocationBarBackground;
     }
 
@@ -421,6 +417,23 @@ public class ToolbarPhone extends ToolbarLayout
         drawable.mutate();
         drawable.setColor(ContextCompat.getColor(context, R.color.toolbar_text_box_bg_color));
         return drawable;
+    }
+
+    private void updateBackground(final boolean hasFocus) {
+        if (hasFocus) {
+            mDropdownListScrolled = false;
+            mActiveLocationBarBackground = mLocationBarBackground;
+        } else if (isLocationBarShownInNtp()) {
+            updateToNtpBackground();
+        }
+    }
+
+    // Replace location bar background with NTB fakebox background.
+    private void updateToNtpBackground() {
+        Drawable ntpDrawable =
+                AppCompatResources.getDrawable(
+                        getContext(), R.drawable.home_surface_search_box_background);
+        mActiveLocationBarBackground = ntpDrawable;
     }
 
     /** Set the background color of the location bar to appropriately match the theme color. */
@@ -1350,11 +1363,6 @@ public class ToolbarPhone extends ToolbarLayout
 
         // The search box on the NTP is visible if our omnibox is invisible, and vice-versa.
         ntpDelegate.setSearchBoxAlpha(1f - relativeAlpha);
-        if (!mForceDrawLocationBarBackground) {
-            if (mActiveLocationBarBackground instanceof NtpSearchBoxDrawable) {
-                ((NtpSearchBoxDrawable) mActiveLocationBarBackground).resetBoundsToLastNonToolbar();
-            }
-        }
 
         updateToolbarBackgroundFromState(mVisualState);
     }
@@ -1497,10 +1505,6 @@ public class ToolbarPhone extends ToolbarLayout
         if (shouldDrawLocationBar()) {
             canvas.save();
             if (shouldDrawLocationBarBackground()) {
-                if (mActiveLocationBarBackground instanceof NtpSearchBoxDrawable) {
-                    ((NtpSearchBoxDrawable) mActiveLocationBarBackground)
-                            .markPendingBoundsUpdateFromToolbar();
-                }
                 mActiveLocationBarBackground.setBounds(
                         mLocationBarBackgroundBounds.left + mLocationBarBackgroundNtpOffset.left,
                         mLocationBarBackgroundBounds.top + mLocationBarBackgroundNtpOffset.top,
@@ -2010,9 +2014,7 @@ public class ToolbarPhone extends ToolbarLayout
         super.onUrlFocusChange(hasFocus);
 
         updateBackground(hasFocus);
-
         updateLocationBarForNtp(mVisualState, urlHasFocus());
-
         getTabSwitcherButtonCoordinator().getContainerView().setClickable(!hasFocus);
         triggerUrlFocusAnimation(hasFocus);
     }
@@ -2020,28 +2022,6 @@ public class ToolbarPhone extends ToolbarLayout
     private boolean animatingSuggestionsListOnNtp() {
         return OmniboxFeatures.shouldAnimateSuggestionsListAppearance()
                 && getToolbarDataProvider().getNewTabPageDelegate().isLocationBarShown();
-    }
-
-    /**
-     * @param hasFocus Whether the URL field has gained focus.
-     */
-    private void updateBackground(final boolean hasFocus) {
-        if (hasFocus) {
-            mDropdownListScrolled = false;
-            mActiveLocationBarBackground = mLocationBarBackground;
-        } else if (isLocationBarShownInNtp()) {
-            updateToNtpBackground();
-        }
-    }
-
-    private void updateToNtpBackground() {
-        // TODO(crbug.com/41410296): Make the ripple drawable move properly from fake omnibox
-        //  to real omnibox when Build.VERSION.SDK_INT < Build.VERSION_CODES.P.
-        NtpSearchBoxDrawable ntpSearchBoxBackground = new NtpSearchBoxDrawable(getContext(), this);
-        getToolbarDataProvider()
-                .getNewTabPageDelegate()
-                .setSearchBoxBackground(ntpSearchBoxBackground);
-        mActiveLocationBarBackground = ntpSearchBoxBackground;
     }
 
     /**
@@ -2681,78 +2661,6 @@ public class ToolbarPhone extends ToolbarLayout
      */
     private boolean isMenuButtonPresent() {
         return getMenuButtonCoordinator().isVisible();
-    }
-
-    /**
-     * Custom drawable that allows sharing the NTP search box drawable between the toolbar and the
-     * NTP. This allows animations to continue as the drawable is switched between the two owning
-     * views.
-     */
-    private static class NtpSearchBoxDrawable extends DrawableWrapperCompat {
-        private final Drawable.Callback mCallback;
-
-        private int mBoundsLeft;
-        private int mBoundsTop;
-        private int mBoundsRight;
-        private int mBoundsBottom;
-        private boolean mPendingBoundsUpdateFromToolbar;
-        private boolean mDrawnByNtp;
-
-        /**
-         * Constructs the NTP search box drawable.
-         *
-         * @param context The context used to inflate the drawable.
-         * @param callback The callback to be notified on changes ot the drawable.
-         */
-        public NtpSearchBoxDrawable(Context context, Drawable.Callback callback) {
-            super(
-                    AppCompatResources.getDrawable(
-                            context, R.drawable.home_surface_search_box_background));
-
-            mCallback = callback;
-            setCallback(mCallback);
-        }
-
-        /** Mark that the pending bounds update is coming from the toolbar. */
-        void markPendingBoundsUpdateFromToolbar() {
-            mPendingBoundsUpdateFromToolbar = true;
-        }
-
-        /**
-         * Reset the bounds of the drawable to the last bounds received that was not marked from
-         * the toolbar.
-         */
-        void resetBoundsToLastNonToolbar() {
-            setBounds(mBoundsLeft, mBoundsTop, mBoundsRight, mBoundsBottom);
-        }
-
-        @Override
-        public void setBounds(int left, int top, int right, int bottom) {
-            super.setBounds(left, top, right, bottom);
-            if (!mPendingBoundsUpdateFromToolbar) {
-                mBoundsLeft = left;
-                mBoundsTop = top;
-                mBoundsRight = right;
-                mBoundsBottom = bottom;
-                mDrawnByNtp = true;
-            } else {
-                mDrawnByNtp = false;
-            }
-            mPendingBoundsUpdateFromToolbar = false;
-        }
-
-        @Override
-        public boolean setVisible(boolean visible, boolean restart) {
-            // Ignore visibility changes.  The NTP can toggle the visibility based on the scroll
-            // position of the page, so we simply ignore all of this as we expect the drawable to
-            // be visible at all times of the NTP.
-            return false;
-        }
-
-        @Override
-        public Callback getCallback() {
-            return mDrawnByNtp ? super.getCallback() : mCallback;
-        }
     }
 
     private void cancelAnimations() {

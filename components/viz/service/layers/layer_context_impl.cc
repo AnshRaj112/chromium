@@ -409,6 +409,7 @@ base::expected<void, std::string> UpdateLayer(const mojom::Layer& wire,
   layer.SetElementId(wire.element_id);
   layer.UnionUpdateRect(wire.update_rect);
   layer.SetOffsetToTransformParent(wire.offset_to_transform_parent);
+  layer.SetShouldCheckBackfaceVisibility(wire.should_check_backface_visibility);
 
   if (layer.GetLayerType() == cc::mojom::LayerType::kTileDisplay) {
     auto& tile_display_layer = static_cast<cc::TileDisplayLayerImpl&>(layer);
@@ -1263,6 +1264,9 @@ base::expected<void, std::string> LayerContextImpl::DoUpdateDisplayTree(
     }
   }
 
+  // This needs to happen before SetPageSvaleFactorAndLimitsForDisplayTree().
+  RETURN_IF_ERROR(UpdateViewportPropertyIds(layers, property_trees, *update));
+
   layers.set_background_color(update->background_color);
   layers.set_source_frame_number(update->source_frame_number);
   layers.set_trace_id(
@@ -1294,8 +1298,6 @@ base::expected<void, std::string> LayerContextImpl::DoUpdateDisplayTree(
   if (update->local_surface_id_from_parent) {
     layers.SetLocalSurfaceIdFromParent(*update->local_surface_id_from_parent);
   }
-
-  RETURN_IF_ERROR(UpdateViewportPropertyIds(layers, property_trees, *update));
 
   host_impl_->SetViewportDamage(update->viewport_damage_rect);
 

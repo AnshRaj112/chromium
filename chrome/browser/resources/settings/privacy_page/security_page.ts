@@ -193,27 +193,12 @@ export class SettingsSecurityPageElement extends
         },
       },
 
-      enableEsbAiStringUpdate_: {
-        type: Boolean,
-        readOnly: true,
-        value() {
-          return loadTimeData.getBoolean('enableEsbAiStringUpdate');
-        },
-      },
-
       hideExtendedReportingRadioButton_: {
         type: Boolean,
         value() {
           return loadTimeData.getBoolean(
                      'extendedReportingRemovePrefDependency') &&
               loadTimeData.getBoolean('hashPrefixRealTimeLookupsSamplePing');
-        },
-      },
-
-      enablePasswordLeakToggleMove_: {
-        type: Boolean,
-        value() {
-          return loadTimeData.getBoolean('enablePasswordLeakToggleMove');
         },
       },
 
@@ -271,9 +256,7 @@ export class SettingsSecurityPageElement extends
   declare private safeBrowsingStateOnOpen_: SafeBrowsingSetting;
   declare private isRouteSecurity_: boolean;
   private eventTracker_: EventTracker = new EventTracker();
-  declare private enableEsbAiStringUpdate_: boolean;
   declare private hideExtendedReportingRadioButton_: boolean;
-  declare private enablePasswordLeakToggleMove_: boolean;
 
   private browserProxy_: PrivacyPageBrowserProxy =
       PrivacyPageBrowserProxyImpl.getInstance();
@@ -464,12 +447,6 @@ export class SettingsSecurityPageElement extends
         SafeBrowsingSetting.STANDARD;
   }
 
-  private getSafeBrowsingEnhancedSubLabel_(): string {
-    return this.i18n(
-        this.enableEsbAiStringUpdate_ ? 'safeBrowsingEnhancedDescUpdated' :
-                                        'safeBrowsingEnhancedDesc');
-  }
-
   private getSafeBrowsingStandardSubLabel_(): string {
     return this.i18n(
         this.enableHashPrefixRealTimeLookups_ ?
@@ -493,15 +470,6 @@ export class SettingsSecurityPageElement extends
       }
     }
     return subLabel;
-  }
-
-  private computeSecureDnsSettingClass_(): string {
-    return this.enablePasswordLeakToggleMove_ ? 'hr' : 'no-hr';
-  }
-
-  private computeSafeBrowsingStandardNoCollapse_(): boolean {
-    return this.hideExtendedReportingRadioButton_ &&
-        this.enablePasswordLeakToggleMove_;
   }
 
   // Conversion helper for binding Integer pref values as String values.

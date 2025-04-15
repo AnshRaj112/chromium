@@ -1484,6 +1484,7 @@ data/accessibility/aria/aria-rowheader-expected-mac.txt
 data/accessibility/aria/aria-rowheader-expected-win.txt
 data/accessibility/aria/aria-rowheader.html
 data/accessibility/aria/aria-rowtext-expected-auralinux.txt
+data/accessibility/aria/aria-rowtext-expected-blink.txt
 data/accessibility/aria/aria-rowtext-expected-win.txt
 data/accessibility/aria/aria-rowtext.html
 data/accessibility/aria/aria-scrollbar-expected-android-assist-data.txt
@@ -3333,6 +3334,10 @@ data/accessibility/html/commandfor-api-popover-expected-mac.txt
 data/accessibility/html/commandfor-api-popover-expected-uia-win.txt
 data/accessibility/html/commandfor-api-popover-expected-win.txt
 data/accessibility/html/commandfor-api-popover.html
+data/accessibility/html/content-left-of-view-port-for-on-screen-mode-expected-blink.txt
+data/accessibility/html/content-left-of-view-port-for-on-screen-mode.html
+data/accessibility/html/content-with-3-view-port-scrolls-for-on-screen-mode-expected-blink.txt
+data/accessibility/html/content-with-3-view-port-scrolls-for-on-screen-mode.html
 data/accessibility/html/contenteditable-br-expected-blink.txt
 data/accessibility/html/contenteditable-br.html
 data/accessibility/html/contenteditable-descendants-expected-android-assist-data.txt
@@ -3771,6 +3776,7 @@ data/accessibility/html/heading-with-headingoffset-dialog-expected-win.txt
 data/accessibility/html/heading-with-headingoffset-dialog.html
 data/accessibility/html/heading-with-headingoffset-expected-android-assist-data.txt
 data/accessibility/html/heading-with-headingoffset-expected-android-external.txt
+data/accessibility/html/heading-with-headingoffset-expected-android.txt
 data/accessibility/html/heading-with-headingoffset-expected-auralinux.txt
 data/accessibility/html/heading-with-headingoffset-expected-blink.txt
 data/accessibility/html/heading-with-headingoffset-expected-mac.txt
@@ -7534,6 +7540,10 @@ data/lite_js_test.test-mojom
 data/loader/async_resource_handler.html
 data/loader/blank.html
 data/loader/change_title.js
+data/loader/compressed.html.gz
+data/loader/compressed.html.gz.mock-http-headers
+data/loader/compressed.js.gz
+data/loader/compressed.js.gz.mock-http-headers
 data/loader/cors_file_origin_test.html
 data/loader/cors_origin_access_list_test.html
 data/loader/cors_preflight.html

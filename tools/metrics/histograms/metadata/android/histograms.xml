@@ -617,7 +617,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Android.AssistContent.WebPageContentProvider.Latency.CreateToExtractionStart"
-    units="ms" expires_after="2025-06-01">
+    units="ms" expires_after="2025-10-12">
   <owner>salg@google.com</owner>
   <owner>ssid@google.com</owner>
   <summary>
@@ -629,7 +629,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Android.AssistContent.WebPageContentProvider.Latency.ExtractionStartToEnd"
-    units="ms" expires_after="2025-06-01">
+    units="ms" expires_after="2025-10-12">
   <owner>salg@google.com</owner>
   <owner>ssid@google.com</owner>
   <summary>
@@ -988,7 +988,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.BackPress.MinimizeAppAndCloseTab"
-    enum="MinimizeAppAndCloseTabType" expires_after="2025-05-25">
+    enum="MinimizeAppAndCloseTabType" expires_after="M143">
   <owner>lazzzis@chromium.org</owner>
   <owner>src/chrome/browser/back_press/android/OWNERS</owner>
   <summary>
@@ -1128,7 +1128,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.BrowsingDataModel.ModelDestructionTime" units="ms"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>alimariam@google.com</owner>
   <owner>dullweber@chromium.org</owner>
   <owner>chrome-browser-privacy-team@google.com</owner>
@@ -1380,7 +1380,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.DefaultBrowserPromo.Outcome.{CurrentState}"
-    enum="AndroidDefaultBrowserPromoOutcomeType" expires_after="2025-08-10">
+    enum="AndroidDefaultBrowserPromoOutcomeType" expires_after="2025-10-12">
   <owner>lazzzis@google.com</owner>
   <owner>twellington@chromium.org</owner>
   <summary>
@@ -1832,7 +1832,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.DynamicTopChrome.TabStripTransition.Finished"
-    enum="Boolean" expires_after="2025-08-10">
+    enum="Boolean" expires_after="2025-10-12">
   <owner>wenyufu@chromium.org</owner>
   <owner>clank-large-form-factors@google.com</owner>
   <summary>
@@ -2197,7 +2197,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.Hub.PaneFocused.PaneSwitcher" enum="HubPaneId"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>ckitagawa@chromium.org</owner>
   <owner>clank-hub-dev@google.com</owner>
   <summary>
@@ -2223,7 +2223,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.HubSearch.SearchBoxEntrypointV2"
-    enum="HubSearchEntrypoint" expires_after="2025-08-10">
+    enum="HubSearchEntrypoint" expires_after="2025-10-12">
   <owner>bjfong@google.com</owner>
   <owner>wylieb@google.com</owner>
   <owner>clank-hub-dev@google.com</owner>
@@ -2330,7 +2330,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.InputHintChecker.InitializationResult"
-    enum="InputHintInitializationResult" expires_after="2025-08-10">
+    enum="InputHintInitializationResult" expires_after="2025-10-12">
   <owner>pasko@chromium.org</owner>
   <owner>mthiesse@chromium.org</owner>
   <summary>
@@ -2373,7 +2373,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.InputOnViz.Browser.EventTypesInDroppedSequence"
-    enum="MotionEventAction" expires_after="2025-06-30">
+    enum="MotionEventAction" expires_after="2025-10-12">
   <owner>kartarsingh@google.com</owner>
   <owner>woa-performance-team@google.com</owner>
   <summary>
@@ -2384,7 +2384,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.InputOnViz.Browser.NumEventsInDroppedSequence"
-    units="counts" expires_after="2025-06-30">
+    units="counts" expires_after="2025-10-12">
   <owner>kartarsingh@google.com</owner>
   <owner>woa-performance-team@google.com</owner>
   <summary>
@@ -2395,7 +2395,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.InputOnViz.Browser.SequenceDroppedReason"
-    enum="InputOnVizSequenceDroppedReason" expires_after="2025-06-30">
+    enum="InputOnVizSequenceDroppedReason" expires_after="2025-10-12">
   <owner>kartarsingh@google.com</owner>
   <owner>woa-performance-team@google.com</owner>
   <summary>
@@ -4069,7 +4069,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.PartnerHomepageCustomization.Delegate2"
-    enum="PartnerCustomizationProviderDelegate" expires_after="2025-08-10">
+    enum="PartnerCustomizationProviderDelegate" expires_after="2025-10-12">
   <owner>donnd@chromium.org</owner>
   <owner>twellington@chromium.org</owner>
   <owner>wenyufu@chromium.org</owner>
@@ -4475,7 +4475,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.PredictiveGestureNavigation{Transition}"
-    enum="PredictiveNavTransitionPhase" expires_after="2025-08-10">
+    enum="PredictiveNavTransitionPhase" expires_after="2025-10-12">
   <owner>lazzzis@google.com</owner>
   <owner>clank-app-team@google.com</owner>
   <summary>
@@ -4516,7 +4516,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Android.PredictiveNavigationTransition.NTPFeedRestorationDuration"
-    units="ms" expires_after="2025-08-10">
+    units="ms" expires_after="2025-10-12">
   <owner>lazzzis@google.com</owner>
   <owner>clank-app-team@google.com</owner>
   <summary>
@@ -4527,7 +4527,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Android.PredictiveNavigationTransition.NTPSmoothTransitionByFallback"
-    enum="Boolean" expires_after="2025-08-10">
+    enum="Boolean" expires_after="2025-10-12">
   <owner>lazzzis@google.com</owner>
   <owner>clank-app-team@google.com</owner>
   <summary>
@@ -4592,7 +4592,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.RequestDesktopSite.UserSwitchToDesktop" enum="Boolean"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>gangwu@chromium.org</owner>
   <owner>fgorski@chromium.org</owner>
   <summary>
@@ -4811,7 +4811,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.SelectFileDialogContentSelected"
-    enum="SelectFileDialogContent" expires_after="2025-08-10">
+    enum="SelectFileDialogContent" expires_after="2025-10-12">
   <owner>finnur@chromium.org</owner>
   <owner>peter@chromium.org</owner>
   <summary>
@@ -5200,6 +5200,20 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Android.TabStrip.NullTabHoverCardView.ShowDelayed"
+    enum="Boolean" expires_after="2025-07-01">
+  <owner>renkens@google.com</owner>
+  <owner>aishwaryarj@google.com</owner>
+  <summary>
+    Emitted when mTabHoverCardView object is unexpectedly null during a
+    StripLayoutHelper.showTabHoverCardView call. The value is True if the
+    showTabHoverCardView call was delayed, and False if it was immediate.
+
+    Recorded once per call, if the mLastHoveredTab is not null and
+    mTabHoverCardView is null.
+  </summary>
+</histogram>
+
 <histogram name="Android.TabStrip.PlaceholderStripLeftoverTabsCount"
     units="tabs" expires_after="2025-02-09">
   <owner>nemco@google.com</owner>
@@ -5294,7 +5308,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Android.TabStrip.TimeToSwitchTab" units="ms"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>gauravjj@google.com</owner>
   <owner>twellington@chromium.org</owner>
   <owner>clank-large-form-factors@google.com</owner>
@@ -6530,6 +6544,17 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Android.WebView.LoadUrl.FailureScheme" enum="WebViewUrlScheme"
+    expires_after="2026-03-01">
+  <owner>peconn@chromium.org</owner>
+  <owner>src/android_webview/OWNERS</owner>
+  <summary>
+    Records the scheme for calls to loadUrl that have failed (they will have
+    recorded Android.WebView.LoadUrl.Success == false). Logged once per call to
+    loadUrl.
+  </summary>
+</histogram>
+
 <histogram name="Android.WebView.LoadUrl.Success" enum="BooleanSuccess"
     expires_after="2026-03-01">
   <owner>peconn@chromium.org</owner>
@@ -7414,21 +7439,43 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Android.WebView.ShouldInterceptRequest.InterceptDuration"
+    units="ms" expires_after="2026-03-01">
+  <owner>pbirk@chromium.org</owner>
+  <owner>src/android_webview/OWNERS</owner>
+  <summary>
+    Measures the total time for shouldInterceptRequest in WebView, from the time
+    the invocation is posted to the worker thread pool, until the response is
+    posted back to the IO thread.
+  </summary>
+</histogram>
+
 <histogram name="Android.WebView.ShouldInterceptRequest.IsRequestIntercepted"
-    enum="Boolean" expires_after="2024-06-13">
-  <owner>ntfschr@chromium.org</owner>
+    enum="Boolean" expires_after="2026-04-01">
+  <owner>pbirk@chromium.org</owner>
   <owner>src/android_webview/OWNERS</owner>
   <summary>
     Whether the network request was intercepted by the embedder of Android
     WebView. Intercepted requests are requests for which the
     shouldInterceptRequest() callback returned a non-null response. This is
     logged each time the shouldInterceptRequest() callback API is invoked by
-    WebView, which corresponds to every network request.
+    WebView.
+
+    Not all requests will result in the callback being invoked, and thus the
+    histogram will not be emitted in these cases. Some non-exhaustive edge cases
+    include post-redirect requests not invoking the callback, and callbacks
+    being triggered by non-network requests, such as data URIs. Note also that
+    the callback invocation will be skipped if the embedding application has not
+    implemented the callback and the
+    &quot;WebViewShortCircuitShouldInterceptRequest&quot; feature is enabled.
 
     This histogram was added in M116. Prior milestones logged
     &quot;Android.WebView.ShouldInterceptRequest.InterceptionType2&quot;,
     however that histogram further broke down the &quot;intercepted ==
     true&quot; case by which URL scheme was used for the URL.
+
+    Warning: this histogram was expired from 2024-06-13 to 2025-04-14; data may
+    be missing.
   </summary>
 </histogram>
 

@@ -80,20 +80,17 @@ std::string SyncExtensionHelper::InstallExtension(Profile* profile,
   if (!extension.get()) {
     NOTREACHED() << "Could not install extension " << name;
   }
-  extensions::ExtensionSystem::Get(profile)
-      ->extension_service()
-      ->OnExtensionInstalled(extension.get(), syncer::StringOrdinal(),
-                             extensions::kInstallFlagInstallImmediately);
+  extensions::ExtensionRegistrar::Get(profile)->OnExtensionInstalled(
+      extension.get(), syncer::StringOrdinal(),
+      extensions::kInstallFlagInstallImmediately);
   return extension->id();
 }
 
 void SyncExtensionHelper::UninstallExtension(Profile* profile,
                                              const std::string& name) {
-  extensions::ExtensionSystem::Get(profile)
-      ->extension_service()
-      ->UninstallExtension(crx_file::id_util::GenerateId(name),
-                           extensions::UNINSTALL_REASON_SYNC,
-                           nullptr /* error */);
+  extensions::ExtensionRegistrar::Get(profile)->UninstallExtension(
+      crx_file::id_util::GenerateId(name), extensions::UNINSTALL_REASON_SYNC,
+      nullptr /* error */);
 }
 
 std::vector<std::string> SyncExtensionHelper::GetInstalledExtensionNames(

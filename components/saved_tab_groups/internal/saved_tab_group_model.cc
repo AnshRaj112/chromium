@@ -429,7 +429,9 @@ void SavedTabGroupModel::RemoveTabFromGroupLocally(const base::Uuid& group_id,
 
   // Remove the group from the model if the last tab will be removed from it.
   if (group.saved_tabs().size() == 1) {
-    base::UmaHistogramBoolean("TabGroups.Shared.LastTabClosed", true);
+    if (group.is_shared_tab_group()) {
+      base::UmaHistogramBoolean("TabGroups.Shared.LastTabClosed2", true);
+    }
     RemovedLocally(group_id);
     return;
   }
@@ -530,9 +532,9 @@ void SavedTabGroupModel::UpdateTabLastSeenTime(const base::Uuid& group_id,
   // If the new time is not more recent than the one in the model,
   // ignore it. This data is managed by the account data sync bridge,
   // which always prefers the more recent time.
-  const base::Time& current_model_time =
+  const std::optional<base::Time>& current_model_time =
       tab->last_seen_time_windows_epoch_micros();
-  if (!current_model_time.is_null() && current_model_time >= time) {
+  if (current_model_time.has_value() && current_model_time.value() >= time) {
     return;
   }
 

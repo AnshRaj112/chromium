@@ -391,7 +391,7 @@ BASE_FEATURE(kGlicClientResponsivenessCheck,
 // in milliseconds.
 const base::FeatureParam<int> kGlicClientResponsivenessCheckIntervalMs{
     &kGlicClientResponsivenessCheck,
-    "glic-client-responsiveness-check-interval-ms", 1000};
+    "glic-client-responsiveness-check-interval-ms", 5000};
 // Maximum time to wait for glicWebClientCheckResponsive response during a
 // responsiveness check before flagging the web client as unresponsive.
 const base::FeatureParam<int> kGlicClientResponsivenessCheckTimeoutMs{
@@ -1135,6 +1135,11 @@ BASE_FEATURE(kSafetyHubWeakAndReusedPasswords,
 // Enables the local passwords module in Safety Hub.
 BASE_FEATURE(kSafetyHubLocalPasswordsModule,
              "SafetyHubLocalPasswordsModule",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables the unified passwords module in Safety Hub.
+BASE_FEATURE(kSafetyHubUnifiedPasswordsModule,
+             "SafetyHubUnifiedPasswordsModule",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_ANDROID)
 

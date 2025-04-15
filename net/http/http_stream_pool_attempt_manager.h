@@ -26,6 +26,7 @@
 #include "net/base/net_export.h"
 #include "net/base/priority_queue.h"
 #include "net/base/request_priority.h"
+#include "net/base/tracing.h"
 #include "net/dns/host_resolver.h"
 #include "net/dns/public/resolve_error_info.h"
 #include "net/http/http_stream_pool.h"
@@ -110,7 +111,7 @@ class HttpStreamPool::AttemptManager
   const NetLogWithSource& net_log();
 
   // Starts a Job. Will call one of Job::Delegate methods to notify results.
-  void StartJob(Job* job, const NetLogWithSource& request_net_log);
+  void StartJob(Job* job);
 
   // Creates idle streams or sessions for `num_streams` be opened.
   // Note that `job` will be notified once `this` has enough streams/sessions
@@ -512,6 +513,9 @@ class HttpStreamPool::AttemptManager
 
   const NetLogWithSource net_log_;
 
+  // For trace events.
+  const perfetto::Track track_;
+
   const base::TimeTicks created_time_;
 
   // Keeps the initial attempt state. Set when `this` starts a job or
@@ -562,14 +566,20 @@ class HttpStreamPool::AttemptManager
     kEndpointNotInResults = 2,
   };
   struct AbortedAttempt {
+    AbortedAttempt();
+    ~AbortedAttempt();
+
+    AbortedAttempt(AbortedAttempt&& other);
+    AbortedAttempt& operator=(AbortedAttempt&& other);
+
     AttemptAbortReason reason;
-    bool svcb_optional;
     bool service_endpoint_request_finished;
     IPEndPoint endpoint;
-    base::TimeDelta start_to_abort_time;
-    base::TimeDelta ssl_config_wait_to_abort_time;
+    std::vector<ServiceEndpoint> current_endpoints;
+    std::string service_endpoint_request_debug_string;
   };
   std::vector<AbortedAttempt> aborted_tcp_based_attempts_;
+  std::vector<std::vector<ServiceEndpoint>> service_endpoint_results_history_;
 
   // TODO(crbug.com/406936736): Remove this once we identify the cause of the
   // bug.

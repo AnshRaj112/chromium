@@ -85,6 +85,7 @@
 #import "ios/chrome/browser/credential_provider/model/features.h"
 #import "ios/chrome/browser/default_browser/model/utils.h"
 #import "ios/chrome/browser/download/ui/features.h"
+#import "ios/chrome/browser/enterprise/connectors/features.h"
 #import "ios/chrome/browser/find_in_page/model/util.h"
 #import "ios/chrome/browser/first_run/ui_bundled/features.h"
 #import "ios/chrome/browser/flags/chrome_switches.h"
@@ -868,6 +869,9 @@ const FeatureEntry::FeatureParam kPriceDropOnTabArm[] = {
 const FeatureEntry::FeatureParam kPriceTrackableProductOnTabArm[] = {
     {"ShopCardVariant", "arm_4"},
 };
+const FeatureEntry::FeatureParam kTabResumptionWithImpressionLimitsArm[] = {
+    {"ShopCardVariant", "arm_5"},
+};
 const FeatureEntry::FeatureParam kPriceDropForTrackedProductsFront[] = {
     {"ShopCardVariant", "arm_1"},
     {"ShopCardPosition", "shop_card_front"},
@@ -882,6 +886,10 @@ const FeatureEntry::FeatureParam kPriceDropOnTabFront[] = {
 };
 const FeatureEntry::FeatureParam kPriceTrackableProductOnTabFront[] = {
     {"ShopCardVariant", "arm_4"},
+    {"ShopCardPosition", "shop_card_front"},
+};
+const FeatureEntry::FeatureParam kTabResumptionWithImpressionLimitsFront[] = {
+    {"ShopCardVariant", "arm_5"},
     {"ShopCardPosition", "shop_card_front"},
 };
 
@@ -973,6 +981,9 @@ const FeatureEntry::FeatureVariation kShopCardOverrideOptions[] = {
      std::size(kPriceDropOnTabArm), nullptr},
     {"Card 4 Price Trackable on Tab Resumption", kPriceTrackableProductOnTabArm,
      std::size(kPriceTrackableProductOnTabArm), nullptr},
+    {"Card 5 Tab Resumption with Impression Limits",
+     kTabResumptionWithImpressionLimitsArm,
+     std::size(kTabResumptionWithImpressionLimitsArm), nullptr},
     {"Card 1 Price Drop at front of magic stack",
      kPriceDropForTrackedProductsFront,
      std::size(kPriceDropForTrackedProductsFront), nullptr},
@@ -983,6 +994,9 @@ const FeatureEntry::FeatureVariation kShopCardOverrideOptions[] = {
     {"Card 4 Price Trackable on Tab Resumption at front of magic stack",
      kPriceTrackableProductOnTabFront,
      std::size(kPriceTrackableProductOnTabFront), nullptr},
+    {"Card 5 Tab Resumption with Impression Limits at front of magic stack",
+     kTabResumptionWithImpressionLimitsFront,
+     std::size(kTabResumptionWithImpressionLimitsFront), nullptr},
 };
 
 const FeatureEntry::FeatureVariation kEphemeralCardRankerCardOverrideOptions[] =
@@ -1432,6 +1446,47 @@ const FeatureEntry::FeatureVariation kExplainGeminiEditMenuVariations[] = {
      std::size(kAfterEditExplainGeminiEditMenu), nullptr},
     {"After Search Gemini Edit Menu", kAfterSearchExplainGeminiEditMenu,
      std::size(kAfterSearchExplainGeminiEditMenu), nullptr}};
+
+// LINT.IfChange(AutofillVcnEnrollStrikeExpiryTime)
+const FeatureEntry::FeatureParam kAutofillVcnEnrollStrikeExpiryTime_120Days[] =
+    {{"autofill_vcn_strike_expiry_time_days", "120"}};
+
+const FeatureEntry::FeatureParam kAutofillVcnEnrollStrikeExpiryTime_60Days[] = {
+    {"autofill_vcn_strike_expiry_time_days", "60"}};
+
+const FeatureEntry::FeatureParam kAutofillVcnEnrollStrikeExpiryTime_30Days[] = {
+    {"autofill_vcn_strike_expiry_time_days", "30"}};
+
+const FeatureEntry::FeatureVariation
+    kAutofillVcnEnrollStrikeExpiryTimeOptions[] = {
+        {"120 days", kAutofillVcnEnrollStrikeExpiryTime_120Days,
+         std::size(kAutofillVcnEnrollStrikeExpiryTime_120Days), nullptr},
+        {"60 days", kAutofillVcnEnrollStrikeExpiryTime_60Days,
+         std::size(kAutofillVcnEnrollStrikeExpiryTime_60Days), nullptr},
+        {"30 days", kAutofillVcnEnrollStrikeExpiryTime_30Days,
+         std::size(kAutofillVcnEnrollStrikeExpiryTime_30Days), nullptr}};
+// LINT.ThenChange(/chrome/browser/about_flags.cc:AutofillVcnEnrollStrikeExpiryTime)
+
+const FeatureEntry::FeatureParam kWelcomeBackInFirstRunArm1[] = {
+    {first_run::kWelcomeBackInFirstRunParam, "1"}};
+const FeatureEntry::FeatureParam kWelcomeBackInFirstRunArm2[] = {
+    {first_run::kWelcomeBackInFirstRunParam, "2"}};
+const FeatureEntry::FeatureParam kWelcomeBackInFirstRunArm3[] = {
+    {first_run::kWelcomeBackInFirstRunParam, "3"}};
+const FeatureEntry::FeatureParam kWelcomeBackInFirstRunArm4[] = {
+    {first_run::kWelcomeBackInFirstRunParam, "4"}};
+
+const FeatureEntry::FeatureVariation kWelcomeBackInFirstRunVariations[] = {
+    {" - Variant A: Basics with Locked Incognito", kWelcomeBackInFirstRunArm1,
+     std::size(kWelcomeBackInFirstRunArm1), nullptr},
+    {" - Variant B: Basics with Save & Autofill Passwords",
+     kWelcomeBackInFirstRunArm2, std::size(kWelcomeBackInFirstRunArm2),
+     nullptr},
+    {" - Variant C: Productivity & Shopping", kWelcomeBackInFirstRunArm3,
+     std::size(kWelcomeBackInFirstRunArm3), nullptr},
+    {" - Variant D: Sign-in Benefits", kWelcomeBackInFirstRunArm4,
+     std::size(kWelcomeBackInFirstRunArm4), nullptr},
+};
 
 // To add a new entry, add to the end of kFeatureEntries. There are four
 // distinct types of entries:
@@ -2048,10 +2103,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(
          password_manager::features::kPasswordFormClientsideClassifier)},
-    {"password-manager-detect-username-in-uff",
-     flag_descriptions::kIOSDetectUsernameInUffName,
-     flag_descriptions::kIOSDetectUsernameInUffDescription, flags_ui::kOsIos,
-     FEATURE_VALUE_TYPE(password_manager::features::kIosDetectUsernameInUff)},
     {"identity-disc-account-menu",
      flag_descriptions::kIdentityDiscAccountMenuName,
      flag_descriptions::kIdentityDiscAccountMenuDescription, flags_ui::kOsIos,
@@ -2651,7 +2702,36 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kSyncTrustedVaultInfobarImprovementsDescription,
      flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(syncer::kSyncTrustedVaultInfobarImprovements)},
-
+    {"ios-choose-from-drive-simulated-click",
+     flag_descriptions::kIOSChooseFromDriveSimulatedClickName,
+     flag_descriptions::kIOSChooseFromDriveSimulatedClickDescription,
+     flags_ui::kOsIos, FEATURE_VALUE_TYPE(kIOSChooseFromDriveSimulatedClick)},
+    {"autofill-vcn-enroll-strike-expiry-time",
+     flag_descriptions::kAutofillVcnEnrollStrikeExpiryTimeName,
+     flag_descriptions::kAutofillVcnEnrollStrikeExpiryTimeDescription,
+     flags_ui::kOsIos,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         autofill::features::kAutofillVcnEnrollStrikeExpiryTime,
+         kAutofillVcnEnrollStrikeExpiryTimeOptions,
+         "AutofillVcnEnrollStrikeExpiryTime")},
+    {"enable-enterprise-url-filtering",
+     flag_descriptions::kIOSEnterpriseRealtimeUrlFilteringName,
+     flag_descriptions::kIOSEnterpriseRealtimeUrlFilteringDescription,
+     flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(
+         enterprise_connectors::kIOSEnterpriseRealtimeUrlFiltering)},
+    {"ios-welcome-back-screen", flag_descriptions::kWelcomeBackInFirstRunName,
+     flag_descriptions::kWelcomeBackInFirstRunDescription, flags_ui::kOsIos,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(first_run::kWelcomeBackInFirstRun,
+                                    kWelcomeBackInFirstRunVariations,
+                                    "WelcomeBackInFirstRun")},
+    {"autofill-enable-flat-rate-card-benefits-from-curinos",
+     flag_descriptions::kAutofillEnableFlatRateCardBenefitsFromCurinosName,
+     flag_descriptions::
+         kAutofillEnableFlatRateCardBenefitsFromCurinosDescription,
+     flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(
+         autofill::features::kAutofillEnableFlatRateCardBenefitsFromCurinos)},
 };
 
 bool SkipConditionalFeatureEntry(const flags_ui::FeatureEntry& entry) {

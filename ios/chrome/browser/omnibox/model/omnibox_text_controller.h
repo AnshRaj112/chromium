@@ -38,6 +38,9 @@ class OmniboxViewIOS;
 /// Removes all C++ references.
 - (void)disconnect;
 
+/// Updates the omnibox text based on its current client state.
+- (void)updateAppearance;
+
 #pragma mark - Autocomplete event
 
 /// Sets the additional text.
@@ -66,6 +69,9 @@ class OmniboxViewIOS;
 /// Cleans up the omnibox after scribble.
 - (void)cleanupAfterScribble;
 
+/// Called when the text input mode changed.
+- (void)onTextInputModeChange;
+
 /// Called when the omnibox text field starts editing.
 - (void)onDidBeginEditing;
 
@@ -93,9 +99,9 @@ class OmniboxViewIOS;
 
 #pragma mark - Omnibox popup event
 
-/// Previews `suggestion` in the Omnibox. Called when a suggestion is
-/// highlighted in the popup.
-- (void)previewSuggestion:(id<AutocompleteSuggestion>)suggestion;
+/// Sets the currently previewed autocomplete suggestion.
+- (void)previewSuggestion:(id<AutocompleteSuggestion>)suggestion
+            isFirstUpdate:(BOOL)isFirstUpdate;
 
 @end
 

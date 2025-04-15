@@ -9,9 +9,9 @@
 #import "base/notreached.h"
 #import "components/signin/public/identity_manager/identity_manager.h"
 #import "ios/chrome/browser/authentication/ui_bundled/fullscreen_signin_screen/coordinator/fullscreen_signin_screen_coordinator.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin/interruptible_chrome_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_coordinator+protected.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/stop_animated_chrome_coordinator.h"
 #import "ios/chrome/browser/first_run/ui_bundled/first_run_screen_delegate.h"
 #import "ios/chrome/browser/first_run/ui_bundled/first_run_util.h"
 #import "ios/chrome/browser/screen/ui_bundled/screen_provider.h"
@@ -25,28 +25,34 @@
 
 @property(nonatomic, strong) ScreenProvider* screenProvider;
 @property(nonatomic, strong)
-    ChromeCoordinator<InterruptibleChromeCoordinator>* childCoordinator;
+    ChromeCoordinator<StopAnimatedChromeCoordinator>* childCoordinator;
 
 // The view controller used by FullscreenSigninCoordinator.
 @property(nonatomic, strong) UINavigationController* navigationController;
 
 @end
 
-@implementation FullscreenSigninCoordinator
+@implementation FullscreenSigninCoordinator {
+  ChangeProfileContinuationProvider _changeProfileContinuationProvider;
+}
 
-- (instancetype)initWithBaseViewController:(UIViewController*)viewController
-                                   browser:(Browser*)browser
-                            screenProvider:(ScreenProvider*)screenProvider
-                              contextStyle:(SigninContextStyle)contextStyle
-                               accessPoint:
-                                   (signin_metrics::AccessPoint)accessPoint {
+- (instancetype)
+           initWithBaseViewController:(UIViewController*)viewController
+                              browser:(Browser*)browser
+                       screenProvider:(ScreenProvider*)screenProvider
+                         contextStyle:(SigninContextStyle)contextStyle
+                          accessPoint:(signin_metrics::AccessPoint)accessPoint
+    changeProfileContinuationProvider:(const ChangeProfileContinuationProvider&)
+                                          changeProfileContinuationProvider {
   DCHECK(!browser->GetProfile()->IsOffTheRecord());
   self = [super initWithBaseViewController:viewController
                                    browser:browser
                               contextStyle:contextStyle
                                accessPoint:accessPoint];
   if (self) {
+    CHECK(changeProfileContinuationProvider);
     _screenProvider = screenProvider;
+    _changeProfileContinuationProvider = changeProfileContinuationProvider;
   }
   return self;
 }
@@ -115,18 +121,19 @@
 }
 
 // Creates a screen coordinator according to `type`.
-- (ChromeCoordinator<InterruptibleChromeCoordinator>*)
+- (ChromeCoordinator<StopAnimatedChromeCoordinator>*)
     createChildCoordinatorWithScreenType:(ScreenType)type {
   switch (type) {
     case kSignIn:
       return [[FullscreenSigninScreenCoordinator alloc]
-          initWithBaseNavigationController:self.navigationController
-                                   browser:self.browser
-                                  delegate:self
-                              contextStyle:self.contextStyle
-                               accessPoint:self.accessPoint
-                               promoAction:signin_metrics::PromoAction::
-                                               PROMO_ACTION_NO_SIGNIN_PROMO];
+           initWithBaseNavigationController:self.navigationController
+                                    browser:self.browser
+                                   delegate:self
+                               contextStyle:self.contextStyle
+                                accessPoint:self.accessPoint
+                                promoAction:signin_metrics::PromoAction::
+                                                PROMO_ACTION_NO_SIGNIN_PROMO
+          changeProfileContinuationProvider:_changeProfileContinuationProvider];
     case kHistorySync:
     case kDefaultBrowserPromo:
     case kChoice:
@@ -160,9 +167,9 @@
 #pragma mark - InterruptibleChromeCoordinator
 
 - (void)interruptAnimated:(BOOL)animated {
-  // Interrupt the child coordinator UI first before dismissing the forced
+  // Stop the child coordinator UI first before dismissing the forced
   // sign-in navigation controller.
-  [self.childCoordinator interruptAnimated:NO];
+  [self.childCoordinator stopAnimated:NO];
 
   [self.navigationController.presentingViewController
       dismissViewControllerAnimated:animated

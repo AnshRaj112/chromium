@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "base/logging.h"
+#include "base/notimplemented.h"
 #include "base/time/time.h"
 #include "chrome/renderer/actor/tool_utils.h"
 #include "content/public/renderer/render_frame.h"
@@ -19,7 +20,7 @@
 namespace actor {
 
 ScrollTool::ScrollTool(mojom::ScrollActionPtr action,
-                       base::raw_ref<content::RenderFrame> frame)
+                       content::RenderFrame& frame)
     : frame_(frame), action_(std::move(action)) {}
 
 ScrollTool::~ScrollTool() = default;
@@ -33,9 +34,13 @@ void ScrollTool::Execute(ToolFinishedCallback callback) {
   }
 
   if (action_->target) {
-    // Currently only support DOMNodeId as target.
-    int32_t dom_node_id = action_->target->dom_node_id;
-    CHECK(dom_node_id);
+    if (action_->target->is_coordinate()) {
+      NOTIMPLEMENTED() << "Coordinate-based target not yet supported.";
+      std::move(callback).Run(false);
+      return;
+    }
+
+    int32_t dom_node_id = action_->target->get_dom_node_id();
     blink::WebNode node = GetNodeFromId(frame_.get(), dom_node_id);
     if (node.IsNull()) {
       DLOG(ERROR) << "Cannot find dom node with id " << dom_node_id;
@@ -44,6 +49,7 @@ void ScrollTool::Execute(ToolFinishedCallback callback) {
     }
 
     // TODO(crbug.com/402083666): add support for scrolling subscrollers later.
+    NOTIMPLEMENTED();
     std::move(callback).Run(false);
     return;
   }

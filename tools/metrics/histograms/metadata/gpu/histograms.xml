@@ -77,12 +77,20 @@ chromium-metrics-reviews@google.com.
   <variant name="Vulkan.CompileShaderToSPIRV"/>
   <variant name="Vulkan.CreateComputePipelines"/>
   <variant name="Vulkan.CreateGraphicsPipelines"/>
+  <variant name="Vulkan.CreateShaderModule"/>
 </variants>
 
 <variants name="WebGPUModule">
   <variant name="ComputePipeline"/>
   <variant name="RenderPipeline"/>
   <variant name="ShaderModule"/>
+</variants>
+
+<variants name="WebGPUShaderTiming">
+  <variant name="GenerateSPIRV"/>
+  <variant name="ProgramToIR"/>
+  <variant name="SingleEntryPoint"/>
+  <variant name="SubstituteOverrides"/>
 </variants>
 
 <histogram name="ConfigureDisplays.External.Modeset.AttemptSucceeded"
@@ -434,7 +442,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.CanvasOopRaster.OopRasterAndGpuAcceleration"
-    enum="CanvasOopRasterAndGpuAcceleration" expires_after="2025-08-10">
+    enum="CanvasOopRasterAndGpuAcceleration" expires_after="2025-10-12">
   <owner>vasilyt@chromium.org</owner>
   <owner>nazabris@microsoft.com</owner>
   <owner>jochin@microsoft.com</owner>
@@ -598,7 +606,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.DirectComposition.HardwareOverlaysSupported"
-    enum="BooleanOverlaySupported" expires_after="2025-08-10">
+    enum="BooleanOverlaySupported" expires_after="2025-10-12">
   <owner>magchen@chromium.org</owner>
   <owner>chrome-gpu-metric-alerts@chromium.org</owner>
   <summary>
@@ -1029,7 +1037,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.IntelGpuSeriesType" enum="IntelGpuSeriesType"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>sunnyps@chromium.org</owner>
   <owner>zmo@chromium.org</owner>
   <summary>
@@ -1141,7 +1149,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.PaintOpReader.DeserializationError"
-    enum="PaintOpDeserializationError" expires_after="2025-08-10">
+    enum="PaintOpDeserializationError" expires_after="2025-10-12">
   <owner>junov@chromium.org</owner>
   <owner>chrome-gpu-metric-alerts@chromium.org</owner>
   <summary>
@@ -1180,7 +1188,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.Presentation.VSyncCallbackDelay" units="microseconds"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>magchen@chromium.org</owner>
   <owner>vmiura@chromium.org</owner>
   <owner>chrome-gpu-metric-alerts@chromium.org</owner>
@@ -1250,7 +1258,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.ShaderLoadPrefixOK" enum="BooleanMatched"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>vikassoni@chromium.org</owner>
   <owner>chrome-gpu-metric-alerts@google.com</owner>
   <summary>
@@ -1280,7 +1288,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.SkiaBackendType" enum="SkiaBackendType"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>kylechar@chromium.org</owner>
   <owner>chrome-gpu-metric-alerts@google.com</owner>
   <summary>
@@ -1403,7 +1411,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="GPU.WebGLDisplayType" enum="EGLDisplayType"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>geofflang@chromium.org</owner>
   <owner>chrome-gpu-metric-alerts@chromium.org</owner>
   <summary>
@@ -1483,6 +1491,20 @@ chromium-metrics-reviews@google.com.
   </summary>
   <token key="AdapterType" variants="WebGPUAdapterType"/>
   <token key="GraphiteDawnOrWebGPU" variants="GraphiteDawnOrWebGPU"/>
+</histogram>
+
+<histogram name="GPU.{GraphiteDawnOrWebGPU}.ShaderModule{ShaderTiming}"
+    units="microseconds" expires_after="2026-06-09">
+  <owner>petermcneeley@google.com</owner>
+  <owner>mdb.webgpu-dev-team@google.com</owner>
+  <summary>
+    Tracks the amount of time in microseconds it takes for a call to
+    ShaderModule{ShaderTiming} to complete, excluding when the result is found
+    in frontend cache. Recorded only for clients that support high-resolution
+    clocks.
+  </summary>
+  <token key="GraphiteDawnOrWebGPU" variants="GraphiteDawnOrWebGPU"/>
+  <token key="ShaderTiming" variants="WebGPUShaderTiming"/>
 </histogram>
 
 <histogram name="GPU.{GraphiteDawnOrWebGPU}.Support" enum="WebGPUSupport"
@@ -1606,7 +1628,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Graphics.Exo.Surface.{ExoSurfaceCodePaths}" enum="Boolean"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>harthuang@google.com</owner>
   <owner>fangzhoug@chromium.org</owner>
   <owner>petermcneeley@chromium.org</owner>
@@ -1741,7 +1763,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Viz.BeginFrameSource.VSyncCallbackDelay" units="microseconds"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>magchen@chromium.org</owner>
   <owner>vmiura@chromium.org</owner>
   <owner>chrome-gpu-metric-alerts@chromium.org</owner>

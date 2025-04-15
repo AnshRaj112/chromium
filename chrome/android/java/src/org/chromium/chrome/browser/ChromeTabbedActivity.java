@@ -4,7 +4,7 @@
 
 package org.chromium.chrome.browser;
 
-import static org.chromium.chrome.browser.tabmodel.TabWindowManager.INVALID_WINDOW_ID;
+import static org.chromium.chrome.browser.tabwindow.TabWindowManager.INVALID_WINDOW_ID;
 import static org.chromium.chrome.browser.ui.IncognitoRestoreAppLaunchDrawBlocker.IS_INCOGNITO_SELECTED;
 
 import android.content.Context;
@@ -82,8 +82,8 @@ import org.chromium.chrome.browser.app.tabmodel.ArchivedTabModelOrchestrator;
 import org.chromium.chrome.browser.app.tabmodel.AsyncTabParamsManagerSingleton;
 import org.chromium.chrome.browser.app.tabmodel.ChromeNextTabPolicySupplier;
 import org.chromium.chrome.browser.app.tabmodel.TabModelOrchestrator;
-import org.chromium.chrome.browser.app.tabmodel.TabWindowManagerSingleton;
 import org.chromium.chrome.browser.app.tabmodel.TabbedModeTabModelOrchestrator;
+import org.chromium.chrome.browser.app.tabwindow.TabWindowManagerSingleton;
 import org.chromium.chrome.browser.auxiliary_search.AuxiliarySearchController;
 import org.chromium.chrome.browser.auxiliary_search.AuxiliarySearchControllerFactory;
 import org.chromium.chrome.browser.auxiliary_search.AuxiliarySearchMetrics;
@@ -118,6 +118,7 @@ import org.chromium.chrome.browser.educational_tip.EducationalTipModuleBuilder;
 import org.chromium.chrome.browser.educational_tip.EducationalTipModuleUtils;
 import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
 import org.chromium.chrome.browser.feed.FeedSurfaceTracker;
+import org.chromium.chrome.browser.feed.FeedUma;
 import org.chromium.chrome.browser.feedback.OmniboxFeedbackSource;
 import org.chromium.chrome.browser.firstrun.FirstRunSignInProcessor;
 import org.chromium.chrome.browser.flags.ActivityType;
@@ -160,6 +161,7 @@ import org.chromium.chrome.browser.metrics.MainIntentBehaviorMetrics;
 import org.chromium.chrome.browser.metrics.SimpleStartupForegroundSessionDetector;
 import org.chromium.chrome.browser.modaldialog.ChromeTabModalPresenter;
 import org.chromium.chrome.browser.multiwindow.MultiInstanceManager;
+import org.chromium.chrome.browser.multiwindow.MultiInstanceManagerFactory;
 import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
 import org.chromium.chrome.browser.multiwindow.MultiWindowUtils.InstanceAllocationType;
 import org.chromium.chrome.browser.native_page.NativePageAssassin;
@@ -177,6 +179,7 @@ import org.chromium.chrome.browser.paint_preview.StartupPaintPreviewHelperSuppli
 import org.chromium.chrome.browser.partnercustomizations.PartnerBrowserCustomizations;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+import org.chromium.chrome.browser.preferences.Pref;
 import org.chromium.chrome.browser.price_change.PriceChangeModuleBuilder;
 import org.chromium.chrome.browser.privacy_sandbox.PrivacySandboxSurveyController;
 import org.chromium.chrome.browser.profiles.OtrProfileId;
@@ -195,8 +198,8 @@ import org.chromium.chrome.browser.searchwidget.SearchActivityClientImpl;
 import org.chromium.chrome.browser.settings.SettingsNavigationFactory;
 import org.chromium.chrome.browser.share.ShareHelper;
 import org.chromium.chrome.browser.share.send_tab_to_self.SendTabToSelfAndroidBridge;
+import org.chromium.chrome.browser.signin.SigninAndHistorySyncActivityLauncherImpl;
 import org.chromium.chrome.browser.single_tab.SingleTabModuleBuilder;
-import org.chromium.chrome.browser.suggestions.SuggestionsMetrics;
 import org.chromium.chrome.browser.survey.ChromeSurveyController;
 import org.chromium.chrome.browser.sync.ui.SyncErrorMessage;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
@@ -212,6 +215,7 @@ import org.chromium.chrome.browser.tab.tab_restore.HistoricalTabModelObserver;
 import org.chromium.chrome.browser.tab_group_suggestion.GroupSuggestionsPromotionCoordinator;
 import org.chromium.chrome.browser.tab_group_suggestion.SuggestionEventObserver;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
+import org.chromium.chrome.browser.tab_ui.ActionConfirmationManager;
 import org.chromium.chrome.browser.tab_ui.TabGridIphDialogCoordinator;
 import org.chromium.chrome.browser.tab_ui.TabSwitcher;
 import org.chromium.chrome.browser.tab_ui.TabSwitcherUtils;
@@ -237,7 +241,6 @@ import org.chromium.chrome.browser.tabmodel.TabModelSelectorTabObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
 import org.chromium.chrome.browser.tasks.HomeSurfaceTracker;
 import org.chromium.chrome.browser.tasks.ReturnToChromeUtil;
-import org.chromium.chrome.browser.tasks.tab_management.ActionConfirmationManager;
 import org.chromium.chrome.browser.tasks.tab_management.CloseAllTabsDialog;
 import org.chromium.chrome.browser.tasks.tab_management.CloseAllTabsHelper;
 import org.chromium.chrome.browser.tasks.tab_management.TabGroupCreationUiFlow;
@@ -251,6 +254,7 @@ import org.chromium.chrome.browser.tasks.tab_management.TabSwitcherPaneBase;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiFeatureUtilities;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiUtils;
 import org.chromium.chrome.browser.tasks.tab_management.TabsSettings;
+import org.chromium.chrome.browser.theme.ThemeModuleUtils;
 import org.chromium.chrome.browser.toolbar.ToolbarIntentMetadata;
 import org.chromium.chrome.browser.toolbar.ToolbarManager;
 import org.chromium.chrome.browser.toolbar.top.ToolbarControlContainer;
@@ -262,6 +266,9 @@ import org.chromium.chrome.browser.ui.desktop_windowing.AppHeaderUtils;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils;
 import org.chromium.chrome.browser.ui.searchactivityutils.SearchActivityClient;
 import org.chromium.chrome.browser.ui.searchactivityutils.SearchActivityExtras.IntentOrigin;
+import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncConfig;
+import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetStrings;
+import org.chromium.chrome.browser.ui.signin.history_sync.HistorySyncConfig;
 import org.chromium.chrome.browser.undo_tab_close_snackbar.UndoBarController;
 import org.chromium.chrome.browser.usage_stats.UsageStatsService;
 import org.chromium.chrome.browser.util.ChromeAccessibilityUtil;
@@ -282,8 +289,10 @@ import org.chromium.components.feature_engagement.Tracker;
 import org.chromium.components.messages.MessageDispatcherProvider;
 import org.chromium.components.omnibox.OmniboxFeatures;
 import org.chromium.components.profile_metrics.BrowserProfileType;
+import org.chromium.components.signin.metrics.SigninAccessPoint;
 import org.chromium.components.tab_group_sync.TabGroupSyncService;
 import org.chromium.components.tab_group_sync.TabGroupUiActionHandler;
+import org.chromium.components.user_prefs.UserPrefs;
 import org.chromium.components.webapps.ShortcutSource;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.NavigationHandle;
@@ -567,7 +576,7 @@ public class ChromeTabbedActivity extends ChromeActivity {
     protected void onPreCreate() {
         super.onPreCreate();
         mMultiInstanceManager =
-                MultiInstanceManager.create(
+                MultiInstanceManagerFactory.create(
                         this,
                         getTabModelOrchestratorSupplier(),
                         getMultiWindowModeStateDispatcher(),
@@ -1371,8 +1380,10 @@ public class ChromeTabbedActivity extends ChromeActivity {
             getProfileProviderSupplier()
                     .runSyncOrOnAvailable(
                             (profileProvider) -> {
-                                SuggestionsMetrics.recordArticlesListVisible(
-                                        profileProvider.getOriginalProfile());
+                                boolean isArticlesListVisible =
+                                        UserPrefs.get(profileProvider.getOriginalProfile())
+                                                .getBoolean(Pref.ARTICLES_LIST_VISIBLE);
+                                FeedUma.recordArticlesListVisible(isArticlesListVisible);
                             });
         } else {
             mInactivityTracker.setLastVisibleTimeMsAndRecord(System.currentTimeMillis());
@@ -2689,6 +2700,36 @@ public class ChromeTabbedActivity extends ChromeActivity {
             }
 
             @Override
+            public void showHistorySyncOptIn() {
+                BottomSheetSigninAndHistorySyncConfig bottomSheetConfig =
+                        new BottomSheetSigninAndHistorySyncConfig.Builder(
+                                        new AccountPickerBottomSheetStrings.Builder(
+                                                        R.string
+                                                                .signin_account_picker_bottom_sheet_title)
+                                                .setSubtitleStringId(
+                                                        R.string
+                                                                .signin_account_picker_bottom_sheet_benefits_subtitle)
+                                                .build(),
+                                        BottomSheetSigninAndHistorySyncConfig.NoAccountSigninMode
+                                                .NO_SIGNIN,
+                                        BottomSheetSigninAndHistorySyncConfig.WithAccountSigninMode
+                                                .DEFAULT_ACCOUNT_BOTTOM_SHEET,
+                                        HistorySyncConfig.OptInMode.REQUIRED)
+                                .build();
+                @Nullable
+                Intent intent =
+                        SigninAndHistorySyncActivityLauncherImpl.get()
+                                .createBottomSheetSigninIntentOrShowError(
+                                        ChromeTabbedActivity.this,
+                                        mTabModelSelector.getCurrentModel().getProfile(),
+                                        bottomSheetConfig,
+                                        SigninAccessPoint.HISTORY_SYNC_EDUCATIONAL_TIP);
+                if (intent != null) {
+                    ChromeTabbedActivity.this.startActivity(intent);
+                }
+            }
+
+            @Override
             public int getTabCountForRelaunchFromSharedPrefs() {
                 return MultiWindowUtils.getTabCountForRelaunchFromSharedPrefs(mWindowId);
             }
@@ -3981,9 +4022,27 @@ public class ChromeTabbedActivity extends ChromeActivity {
         }
     }
 
+    @Override
+    protected void applyThemeOverlays() {
+        // Apply the theme overlay before applying dynamic colors in the super's call. The order
+        // ensures the color attributes for dynamic colors are not overridden by the overlay.
+        if (ThemeModuleUtils.isEnabled()) {
+            int themeModuleOverlay = ThemeModuleUtils.getProviderInstance().getThemeOverlay();
+            if (themeModuleOverlay != 0) {
+                applySingleThemeOverlay(themeModuleOverlay);
+            }
+        }
+
+        super.applyThemeOverlays();
+
+        // Theme overlay for the Hub buttons
+        applySingleThemeOverlay(R.style.HubToolbarActionButtonStyleOverlay_Baseline);
+    }
+
     /**
      * Reports that a new tab launcher shortcut was selected or an action equivalent to a shortcut
      * was performed.
+     *
      * @param isIncognito Whether the shortcut or action created a new incognito tab.
      */
     @RequiresApi(Build.VERSION_CODES.N_MR1)

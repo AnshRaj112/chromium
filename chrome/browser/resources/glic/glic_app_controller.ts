@@ -11,7 +11,7 @@ import type {PageInterface} from './glic.mojom-webui.js';
 import type {ApiHostEmbedder} from './glic_api_impl/glic_api_host.js';
 import {WebClientState} from './glic_api_impl/glic_api_host.js';
 import type {PageType, WebviewDelegate} from './webview.js';
-import {WebviewController} from './webview.js';
+import {WebviewController, WebviewPersistentState} from './webview.js';
 
 const transitionDuration = {
   microseconds: BigInt(100000),
@@ -41,6 +41,7 @@ interface PageElementTypes {
   webviewHeader: HTMLDivElement;
   webviewContainer: HTMLDivElement;
   signInButton: HTMLButtonElement;
+  unresponsiveOverlay: HTMLElement;
 }
 
 const $: PageElementTypes = new Proxy({}, {
@@ -71,6 +72,7 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
 
   // Present only when loading or after loading is finished. Removed on error.
   private webview?: WebviewController;
+  private webviewPersistentState = new WebviewPersistentState();
 
   private profileReadyState: ProfileReadyState|undefined = undefined;
   private profileReadyInitialState = Promise.withResolvers<void>();
@@ -218,11 +220,12 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
       WebUiState.kUnresponsive,
       {
         onEnter: () => {
-          // TODO(crbug.com/394162784): Create an unresponsive UI according to
-          // the design spec and remove the placeholder.
-          this.enterUnresponsiveUiPlaceholder();
+          $.unresponsiveOverlay.classList.toggle('hidden', false);
         },
-        onExit: this.exitUnresponsiveUiPlaceholder,
+        onExit:
+            () => {
+              $.unresponsiveOverlay.classList.toggle('hidden', true);
+            },
       },
     ],
     [
@@ -235,21 +238,6 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
       },
     ],
   ]);
-
-  private enterUnresponsiveUiPlaceholder(): void {
-    if (!this.webview) {
-      return;
-    }
-    this.webview.webview.style.webkitTransition = 'opacity 250ms';
-    this.webview.webview.style.opacity = '0.5';
-  }
-
-  private exitUnresponsiveUiPlaceholder(): void {
-    if (!this.webview) {
-      return;
-    }
-    this.webview.webview.style.opacity = '1';
-  }
 
   private cancelTimeout(): void {
     if (this.loadingTimer) {
@@ -295,7 +283,8 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
     // Load the web client only after cookie sync is complete.
     this.destroyWebview();
     this.webview = new WebviewController(
-        $.webviewContainer, this.browserProxy, this, this);
+        $.webviewContainer, this.browserProxy, this, this,
+        this.webviewPersistentState);
     this.webview.getWebClientState().subscribe(
         this.webClientStateChanged.bind(this));
 

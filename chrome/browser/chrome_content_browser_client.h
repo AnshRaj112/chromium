@@ -170,6 +170,10 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   // update our I/O thread cache of this value.
   static void SetApplicationLocale(const std::string& locale);
 
+  // Disables caching of the advanced-protection state in
+  // ShouldEnableStrictSiteIsolation().
+  static void DisableAdvancedProtectionCachingForTests();
+
   // content::ContentBrowserClient:
   std::unique_ptr<content::BrowserMainParts> CreateBrowserMainParts(
       bool is_integration_test) override;
@@ -1107,6 +1111,7 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   void BindAIManager(
       content::BrowserContext* browser_context,
       base::SupportsUserData* context_user_data,
+      content::RenderFrameHost* rfh,
       mojo::PendingReceiver<blink::mojom::AIManager> receiver) override;
 
 #if BUILDFLAG(ENABLE_ON_DEVICE_TRANSLATION)

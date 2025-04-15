@@ -33,13 +33,13 @@
 #include "components/services/storage/public/cpp/buckets/bucket_locator.h"
 #include "content/browser/indexed_db/indexed_db_leveldb_coding.h"
 #include "content/browser/indexed_db/indexed_db_value.h"
-#include "content/browser/indexed_db/instance/backing_store.h"
 #include "content/browser/indexed_db/instance/bucket_context.h"
 #include "content/browser/indexed_db/instance/connection.h"
 #include "content/browser/indexed_db/instance/cursor.h"
 #include "content/browser/indexed_db/instance/database_callbacks.h"
 #include "content/browser/indexed_db/instance/factory_client.h"
 #include "content/browser/indexed_db/instance/fake_transaction.h"
+#include "content/browser/indexed_db/instance/leveldb/backing_store.h"
 #include "content/browser/indexed_db/instance/mock_factory_client.h"
 #include "content/browser/indexed_db/instance/transaction.h"
 #include "content/browser/indexed_db/mock_mojo_indexed_db_database_callbacks.h"
@@ -668,7 +668,9 @@ class DatabaseOperationTest : public DatabaseTest {
         transaction_id, /*scope=*/std::set<int64_t>(),
         std::make_unique<FakeTransaction>(
             commit_success_, blink::mojom::IDBTransactionMode::VersionChange,
-            bucket_context_->backing_store()->AsWeakPtr()));
+            reinterpret_cast<level_db::BackingStore*>(
+                bucket_context_->backing_store())
+                ->AsWeakPtr()));
 
     std::vector<PartitionedLockManager::PartitionedLockRequest> lock_requests =
         {{GetDatabaseLockId(db_->metadata().name),

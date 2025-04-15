@@ -88,6 +88,7 @@
 #include "third_party/blink/renderer/platform/fonts/font_selector.h"
 #include "third_party/blink/renderer/platform/geometry/length_functions.h"
 #include "third_party/blink/renderer/platform/geometry/path.h"
+#include "third_party/blink/renderer/platform/geometry/path_builder.h"
 #include "third_party/blink/renderer/platform/graphics/graphics_context.h"
 #include "third_party/blink/renderer/platform/text/capitalize.h"
 #include "third_party/blink/renderer/platform/text/character.h"
@@ -123,7 +124,7 @@ struct SameSizeAsComputedStyleBase
 
  private:
   Member<void*> pointers[10];
-  unsigned bitfields[5];
+  unsigned bitfields[6];
 };
 
 struct SameSizeAsComputedStyle : public SameSizeAsComputedStyleBase {
@@ -1600,9 +1601,10 @@ PointAndTangent ComputedStyle::CalculatePointAndTangentOnBasicShape(
     // an offset starting position via offset-position,
     // it uses the specified offset starting position for that argument.
     path = circle_or_ellipse->GetPathFromCenter(
-        starting_point, gfx::RectF(reference_box_size), EffectiveZoom());
+        starting_point, gfx::RectF(reference_box_size), /*path_scale=*/1.f);
   } else {
-    path = shape.GetPath(gfx::RectF(reference_box_size), EffectiveZoom());
+    path = shape.GetPath(gfx::RectF(reference_box_size), EffectiveZoom(),
+                         /*path_scale=*/1.f);
   }
   float shape_length = path.length();
   float path_length = FloatValueForLength(OffsetDistance(), shape_length);
@@ -1684,12 +1686,6 @@ void ComputedStyle::ApplyMotionPathTransform(float origin_x,
         path_position = CalculatePointAndTangentOnPath(path.GetPath());
         break;
       }
-      case BasicShape::kStyleShapeType: {
-        const StyleShape& shape = To<StyleShape>(basic_shape);
-        path_position = CalculatePointAndTangentOnPath(
-            shape.GetPath(bounding_box, EffectiveZoom()));
-        break;
-      }
       case BasicShape::kStyleRayType: {
         const gfx::RectF reference_box = GetReferenceBox(box, coord_box);
         const gfx::PointF offset_from_reference_box =
@@ -1723,7 +1719,8 @@ void ComputedStyle::ApplyMotionPathTransform(float origin_x,
       case BasicShape::kBasicShapeCircleType:
       case BasicShape::kBasicShapeEllipseType:
       case BasicShape::kBasicShapeInsetType:
-      case BasicShape::kBasicShapePolygonType: {
+      case BasicShape::kBasicShapePolygonType:
+      case BasicShape::kStyleShapeType: {
         const gfx::RectF reference_box = GetReferenceBox(box, coord_box);
         const gfx::PointF offset_from_reference_box =
             GetOffsetFromContainingBlock(box) -
@@ -1774,7 +1771,7 @@ void ComputedStyle::ApplyMotionPathTransform(float origin_x,
     Path path;
     if (!target || !target->GetComputedStyle()) {
       // Failure to find a shape should be equivalent to a "m0,0" path.
-      path.MoveTo({0, 0});
+      path = PathBuilder().MoveTo({0, 0}).Finalize();
     } else {
       path = target->AsPath();
     }

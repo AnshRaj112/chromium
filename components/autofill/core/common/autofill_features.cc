@@ -499,11 +499,6 @@ BASE_FEATURE(kAutofillUseINAddressModel,
              "AutofillUseINAddressModel",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables using a custom address model for Italy, overriding the legacy one.
-BASE_FEATURE(kAutofillUseITAddressModel,
-             "AutofillUseITAddressModel",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables using a custom address model for Japan, overriding the legacy one.
 BASE_FEATURE(kAutofillSupportPhoneticNameForJP,
              "AutofillSupportPhoneticNameForJP",
@@ -527,11 +522,6 @@ BASE_FEATURE(kAutofillUseNLAddressModel,
              "AutofillUseNLAddressModel",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables using a custom address model for Poland, overriding the legacy one.
-BASE_FEATURE(kAutofillUsePLAddressModel,
-             "AutofillUsePLAddressModel",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // When enabled, the form field parser won't try to match other attributes if
 // any of the negative patterns matched.
 BASE_FEATURE(kAutofillUseNegativePatternForAllAttributes,
@@ -554,14 +544,6 @@ BASE_FEATURE_PARAM(bool,
                    &kAutofillModelPredictions,
                    "model_active",
                    false);
-
-// If enabled, a pre-filled field will only be overwritten if it's not
-// classified as meaningfully pre-filled based on server predictions. If also
-// flag `kAutofillSkipPreFilledFields` is enabled, a pre-filled field will only
-// be overwritten if it's classified as a placeholder.
-BASE_FEATURE(kAutofillOverwritePlaceholdersOnly,
-             "AutofillOverwritePlaceholdersOnly",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, a pre-filled field will not be filled.
 BASE_FEATURE(kAutofillSkipPreFilledFields,
@@ -850,9 +832,10 @@ BASE_FEATURE(kAutofillThirdPartyModeContentProvider,
 
 // Controls the whether the Chrome may provide a virtual view structure for
 // Android Autofill.
+// TODO: crbug.com/409579377 - Delete after M139.
 BASE_FEATURE(kAutofillVirtualViewStructureAndroid,
              "AutofillVirtualViewStructureAndroid",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -952,6 +935,11 @@ BASE_FEATURE(kAutofillServerCommunication,
              "AutofillServerCommunication",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enables showing DOM Node ID of elements.
+BASE_FEATURE(kShowDomNodeIDs,
+             "ShowDomNodeIDs",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Controls attaching the autofill type predictions to their respective
 // element in the DOM.
 BASE_FEATURE(kAutofillShowTypePredictions,
@@ -963,6 +951,13 @@ BASE_FEATURE(kAutofillShowTypePredictions,
 // texts.
 const base::FeatureParam<bool> kAutofillShowTypePredictionsVerboseParam{
     &kAutofillShowTypePredictions, "verbose", false};
+
+// This variation controls whether the autofill information of the element
+// is shown as 'title' of the form field elements. If this parameter is on,
+// the title attribute will be overwritten with autofill information.
+// By default this is disabled to avoid data collection corruption.
+const base::FeatureParam<bool> kAutofillShowTypePredictionsAsTitleParam{
+    &kAutofillShowTypePredictions, "as-title", false};
 
 // Autofill upload throttling limits uploading a form to the Autofill server
 // more than once over a `kAutofillUploadThrottlingPeriodInDays` period.

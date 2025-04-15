@@ -1936,6 +1936,28 @@ TEST_F(TabStripModelTest, AddToSplitInPinned) {
   EXPECT_TRUE(tabstrip.empty());
 }
 
+TEST_F(TabStripModelTest, AddToSplitInSelected) {
+  scoped_feature_list()->InitAndEnableFeature(features::kSideBySide);
+  TestTabStripModelDelegate delegate;
+  TabStripModel tabstrip(&delegate, profile());
+  EXPECT_TRUE(tabstrip.empty());
+
+  // Create five tabs.
+  ASSERT_NO_FATAL_FAILURE(
+      PrepareTabstripForSelectionTest(&tabstrip, 5, 0, "2"));
+
+  tabstrip.ActivateTabAt(0);
+  tabstrip.AddToNewSplit({1}, tabs::SplitTabLayout::kHorizontal);
+
+  EXPECT_EQ("0s 1s 2 3 4", GetTabStripStateString(tabstrip));
+  EXPECT_EQ(tabstrip.active_index(), 0);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(0));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(1));
+
+  tabstrip.CloseAllTabs();
+  EXPECT_TRUE(tabstrip.empty());
+}
+
 TEST_F(TabStripModelTest, UnsplitOperation) {
   scoped_feature_list()->InitAndEnableFeature(features::kSideBySide);
   TestTabStripModelDelegate delegate;
@@ -5553,4 +5575,210 @@ TEST_F(TabStripModelTest, AddToComparisonTable_AddToNewTableOpensTab) {
   ASSERT_TRUE(tab_strip->count() == 2);
   ASSERT_TRUE(tab_strip->GetActiveWebContents()->GetVisibleURL() ==
               commerce::GetProductSpecsTabUrl({url}));
+}
+
+TEST_F(TabStripModelTest, ExtendSelectionTo_SplitTabs) {
+  scoped_feature_list()->InitAndEnableFeature(features::kSideBySide);
+  TestTabStripModelDelegate delegate;
+  TabStripModel tabstrip(&delegate, profile());
+  EXPECT_TRUE(tabstrip.empty());
+
+  // Create six tabs with a split containing tabs 0 and 1 and another split with
+  // tabs 4 and 5.
+  ASSERT_NO_FATAL_FAILURE(
+      PrepareTabstripForSelectionTest(&tabstrip, 6, 0, "0"));
+  tabstrip.ActivateTabAt(0);
+  tabstrip.AddToNewSplit({1}, tabs::SplitTabLayout::kHorizontal);
+  tabstrip.ActivateTabAt(4);
+  tabstrip.AddToNewSplit({5}, tabs::SplitTabLayout::kHorizontal);
+
+  EXPECT_EQ("0s 1s 2 3 4s 5s", GetTabStripStateString(tabstrip));
+
+  // When active tab is part of a split, the selection should cover the split.
+  tabstrip.ActivateTabAt(1);
+  tabstrip.ExtendSelectionTo(2);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(0));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(1));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(2));
+  EXPECT_EQ(tabstrip.selection_model().size(), 3u);
+
+  // When index tab is part of a split and selection extends left, the selection
+  // should cover the split.
+  tabstrip.ActivateTabAt(2);
+  tabstrip.ExtendSelectionTo(1);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(0));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(1));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(2));
+  EXPECT_EQ(tabstrip.selection_model().size(), 3u);
+
+  // When index tab is part of a split and selection extends right, the
+  // selection should cover the split.
+  tabstrip.ActivateTabAt(3);
+  tabstrip.ExtendSelectionTo(4);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(3));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(4));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(5));
+  EXPECT_EQ(tabstrip.selection_model().size(), 3u);
+}
+
+TEST_F(TabStripModelTest, SelectTabAt_SplitTabs) {
+  scoped_feature_list()->InitAndEnableFeature(features::kSideBySide);
+  TestTabStripModelDelegate delegate;
+  TabStripModel tabstrip(&delegate, profile());
+  EXPECT_TRUE(tabstrip.empty());
+
+  // Create four tabs with a split containing tabs 2 and 3.
+  ASSERT_NO_FATAL_FAILURE(
+      PrepareTabstripForSelectionTest(&tabstrip, 4, 0, "0"));
+  tabstrip.ActivateTabAt(3);
+  tabstrip.AddToNewSplit({2}, tabs::SplitTabLayout::kHorizontal);
+
+  EXPECT_EQ("0 1 2s 3s", GetTabStripStateString(tabstrip));
+
+  // When selected tab is part of a split, both tabs in the split are selected.
+  tabstrip.ActivateTabAt(1);
+  tabstrip.SelectTabAt(2);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(2));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(3));
+}
+
+TEST_F(TabStripModelTest, DeselectTabAt_SplitTabs) {
+  scoped_feature_list()->InitAndEnableFeature(features::kSideBySide);
+  TestTabStripModelDelegate delegate;
+  TabStripModel tabstrip(&delegate, profile());
+  EXPECT_TRUE(tabstrip.empty());
+
+  // Create four tabs with a split containing tabs 2 and 3.
+  ASSERT_NO_FATAL_FAILURE(
+      PrepareTabstripForSelectionTest(&tabstrip, 4, 0, "0"));
+  tabstrip.ActivateTabAt(3);
+  tabstrip.AddToNewSplit({2}, tabs::SplitTabLayout::kHorizontal);
+
+  EXPECT_EQ("0 1 2s 3s", GetTabStripStateString(tabstrip));
+
+  // When deselected tab is part of a split, both tabs in the split are
+  // deselected.
+  tabstrip.ActivateTabAt(0);
+  tabstrip.SelectTabAt(2);
+  tabstrip.DeselectTabAt(2);
+  EXPECT_FALSE(tabstrip.selection_model().IsSelected(2));
+  EXPECT_FALSE(tabstrip.selection_model().IsSelected(3));
+  EXPECT_EQ(tabstrip.selection_model().size(), 1u);
+}
+
+TEST_F(TabStripModelTest, DeselectTabAt_CantDeselectOnlySelectedSplitTabs) {
+  scoped_feature_list()->InitAndEnableFeature(features::kSideBySide);
+  TestTabStripModelDelegate delegate;
+  TabStripModel tabstrip(&delegate, profile());
+  EXPECT_TRUE(tabstrip.empty());
+
+  // Create four tabs with a split containing tabs 2 and 3.
+  ASSERT_NO_FATAL_FAILURE(
+      PrepareTabstripForSelectionTest(&tabstrip, 4, 0, "0"));
+  tabstrip.ActivateTabAt(3);
+  tabstrip.AddToNewSplit({2}, tabs::SplitTabLayout::kHorizontal);
+
+  EXPECT_EQ("0 1 2s 3s", GetTabStripStateString(tabstrip));
+
+  // When deselected part of a split tab when no other tabs are selected,
+  // nothing happens.
+  tabstrip.ActivateTabAt(2);
+  tabstrip.DeselectTabAt(2);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(2));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(3));
+  EXPECT_EQ(tabstrip.selection_model().size(), 2u);
+}
+
+TEST_F(TabStripModelTest, RemoveSplitInSelectionActivatesRemainingTab) {
+  TestTabStripModelDelegate delegate;
+
+  TabStripModel tabstrip(&delegate, profile());
+  ASSERT_TRUE(tabstrip.empty());
+
+  // Add 6 tabs to the tabstrip model. The first 4 tabs will be selected with
+  // the tab at index 1 as the active tab. Tabs 1 and 2 are in a split view.
+  PrepareTabs(&tabstrip, 6);
+  ASSERT_EQ(6, tabstrip.count());
+  tabstrip.ActivateTabAt(1);
+  tabstrip.AddToNewSplit({2}, tabs::SplitTabLayout::kHorizontal);
+  tabstrip.ActivateTabAt(3);
+  tabstrip.SelectTabAt(0);
+  tabstrip.SelectTabAt(2);
+  tabstrip.SelectTabAt(1);
+
+  // Verify the selection model before closing the tab.
+  EXPECT_EQ(tabstrip.active_index(), 1);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(0));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(1));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(2));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(3));
+  EXPECT_EQ(tabstrip.selection_model().size(), 4u);
+
+  // Close the right half of the split tab.
+  tabstrip.CloseWebContentsAt(2, TabCloseTypes::CLOSE_NONE);
+
+  // Verify that the other half of the split is active and 3 tabs are selected.
+  EXPECT_EQ(tabstrip.active_index(), 1);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(0));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(1));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(2));
+  EXPECT_EQ(tabstrip.selection_model().size(), 3u);
+}
+
+TEST_F(TabStripModelTest, RemoveSplitUnselectsNonActiveTab) {
+  TestTabStripModelDelegate delegate;
+
+  TabStripModel tabstrip(&delegate, profile());
+  ASSERT_TRUE(tabstrip.empty());
+
+  // Add 4 tabs to the tabstrip model. Tabs 1 and 2 are in a split view and
+  // active/selected.
+  PrepareTabs(&tabstrip, 4);
+  ASSERT_EQ(4, tabstrip.count());
+  tabstrip.ActivateTabAt(1);
+  split_tabs::SplitTabId split_tab_id =
+      tabstrip.AddToNewSplit({2}, tabs::SplitTabLayout::kHorizontal);
+
+  // Verify the selection model before closing the tab.
+  EXPECT_EQ(tabstrip.active_index(), 1);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(1));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(2));
+  EXPECT_EQ(tabstrip.selection_model().size(), 2u);
+
+  // Unsplit the tabs
+  tabstrip.RemoveSplit(split_tab_id);
+
+  // Verify that only the active tab (1) is selected.
+  EXPECT_EQ(tabstrip.active_index(), 1);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(1));
+  EXPECT_FALSE(tabstrip.selection_model().IsSelected(2));
+  EXPECT_EQ(tabstrip.selection_model().size(), 1u);
+}
+
+TEST_F(TabStripModelTest, RemoveLeftTabInSplitActivatesRemainingTab) {
+  TestTabStripModelDelegate delegate;
+
+  TabStripModel tabstrip(&delegate, profile());
+  ASSERT_TRUE(tabstrip.empty());
+
+  // Add 4 tabs to the tabstrip model. Tabs 0 and 1 are in a split view.
+  PrepareTabs(&tabstrip, 4);
+  ASSERT_EQ(4, tabstrip.count());
+  tabstrip.ActivateTabAt(0);
+  tabstrip.AddToNewSplit({1}, tabs::SplitTabLayout::kHorizontal);
+
+  // Verify the selection model before closing the tab.
+  EXPECT_EQ("0s 1s 2 3", GetTabStripStateString(tabstrip));
+  EXPECT_EQ(tabstrip.active_index(), 0);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(0));
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(1));
+  EXPECT_EQ(tabstrip.selection_model().size(), 2u);
+
+  // Close the left half of the split tab.
+  tabstrip.CloseWebContentsAt(0, TabCloseTypes::CLOSE_NONE);
+
+  // Verify that the other half of the split is now active.
+  EXPECT_EQ(tabstrip.active_index(), 0);
+  EXPECT_TRUE(tabstrip.selection_model().IsSelected(0));
+  EXPECT_EQ(tabstrip.selection_model().size(), 1u);
 }

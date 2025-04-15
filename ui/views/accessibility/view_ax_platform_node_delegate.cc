@@ -145,7 +145,7 @@ ViewAXPlatformNodeDelegate::ViewAXPlatformNodeDelegate(View* view)
     : ViewAccessibility(view) {}
 
 void ViewAXPlatformNodeDelegate::Init() {
-  ax_platform_node_ = ui::AXPlatformNode::Create(this);
+  ax_platform_node_ = ui::AXPlatformNode::Create(*this);
   DCHECK(ax_platform_node_);
 
   static bool first_time = true;
@@ -486,7 +486,7 @@ std::wstring ViewAXPlatformNodeDelegate::ComputeListItemNameFromContent()
   // TODO(accessibility): We're aware the accessible name might be computed
   // incorrectly if there's a complex structure. Things might be missing for
   // descendants of descendants.
-  for (size_t i = 0; i < GetChildCount(); ++i) {
+  for (size_t i = 0, child_count = GetChildCount(); i < child_count; ++i) {
     auto* child = ui::AXPlatformNode::FromNativeViewAccessible(ChildAtIndex(i));
     if (GetData().role != ax::mojom::Role::kListMarker) {
       str += child->GetDelegate()->GetName();

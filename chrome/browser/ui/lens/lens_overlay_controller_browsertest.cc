@@ -239,7 +239,7 @@ constexpr char kCheckSidePanelThumbnailShownScript[] =
 constexpr char kCheckSidePanelToastShownScript[] =
     "(function() {const appRoot = "
     "document.getElementsByTagName('lens-side-panel-app')[0].shadowRoot;"
-    "const toast = appRoot.getElementById('toast');"
+    "const toast = appRoot.getElementById('messageToast');"
     "const toastStyle = window.getComputedStyle(toast);"
     "return toastStyle.visibility !== 'hidden' && "
     "        toastStyle.opacity !== 0;})();";
@@ -5392,6 +5392,33 @@ IN_PROC_BROWSER_TEST_P(LensOverlayControllerBrowserPDFContextualizationTest,
       static_cast<lens::TestLensOverlayQueryController*>(
           controller->get_lens_overlay_query_controller_for_testing());
   ASSERT_EQ(url, fake_query_controller->last_sent_page_url());
+}
+
+IN_PROC_BROWSER_TEST_P(LensOverlayControllerBrowserPDFContextualizationTest,
+                       CurrentPageIncludedInRequest) {
+  // Open the PDF document and wait for it to finish loading.
+  const GURL url = embedded_test_server()->GetURL(kPdfDocument);
+  content::RenderFrameHost* extension_host = LoadPdfGetExtensionHost(url);
+  ASSERT_TRUE(extension_host);
+
+  // State should start in off.
+  auto* controller = GetLensOverlayController();
+  ASSERT_TRUE(controller);
+  ASSERT_EQ(controller->state(), State::kOff);
+
+  // Open the overlay.
+  controller->ShowUI(LensOverlayInvocationSource::kAppMenu);
+  ASSERT_EQ(controller->state(), State::kScreenshot);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&]() { return controller->state() == State::kOverlay; }));
+
+  // Verify PDF page number was included in the query.
+  auto* fake_query_controller =
+      static_cast<lens::TestLensOverlayQueryController*>(
+          controller->get_lens_overlay_query_controller_for_testing());
+  ASSERT_EQ(0, fake_query_controller->sent_full_image_objects_request()
+                   .viewport_request_context()
+                   .pdf_page_number());
 }
 
 IN_PROC_BROWSER_TEST_P(LensOverlayControllerBrowserPDFContextualizationTest,

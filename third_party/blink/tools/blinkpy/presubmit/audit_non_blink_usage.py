@@ -1751,9 +1751,10 @@ _CONFIG = [
             'rtc::TaskQueue',
             'rtc::scoped_refptr',
             'viz::.+',
+            "webrtc::RefCountedObject",
             'webrtc::Aec3ConfigFromJsonString',
-            'webrtc::AudioProcessingBuilder',
             'webrtc::AudioProcessing',
+            'webrtc::AudioProcessingBuilder',
             'webrtc::AudioProcessorInterface',
             'webrtc::AudioTrackInterface',
             'webrtc::Config',
@@ -1764,8 +1765,10 @@ _CONFIG = [
             'webrtc::MediaStreamTrackInterface',
             'webrtc::ObserverInterface',
             'webrtc::StreamConfig',
+            'webrtc::TaskQueue',
             'webrtc::TypingDetection',
             'webrtc::VideoTrackInterface',
+            'webrtc::scoped_refptr',
         ],
         'inclass_allowed': [
             'base::(SingleThread|Sequenced)TaskRunner::(CurrentDefaultHandle|GetCurrentDefault)'
@@ -1857,6 +1860,7 @@ _CONFIG = [
             'webrtc::AudioTransport',
             'webrtc::kAdmMaxDeviceNameSize',
             'webrtc::kAdmMaxGuidSize',
+            'webrtc::scoped_refptr',
         ]
     },
     {
@@ -1885,6 +1889,18 @@ _CONFIG = [
             # renderer/platform/ violations.
             _DISALLOW_NON_BLINK_MOJOM,
         ]
+    },
+    {
+        'paths': [
+            'third_party/blink/renderer/platform/media/',
+        ],
+        'allowed': [
+            # TODO(crbug.com/40760651): migrate to Blink variant.
+            'media::mojom::MediaMetricsProvider',
+            'media::mojom::PlaybackPropertiesPtr',
+            'media::mojom::SecondaryPlaybackPropertiesPtr',
+            'media::mojom::WatchTimeRecorder',
+        ],
     },
     {
         'paths': [
@@ -2429,6 +2445,7 @@ _CONFIG = [
     },
     {
         'paths': [
+            'third_party/blink/public/platform/media/',
             'third_party/blink/public/platform/web_media_player_client.h',
         ],
         'allowed': [

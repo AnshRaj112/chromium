@@ -28,6 +28,7 @@
 #import "ios/chrome/app/profile/profile_state.h"
 #import "ios/chrome/browser/authentication/ui_bundled/authentication_flow/authentication_flow_in_profile.h"
 #import "ios/chrome/browser/authentication/ui_bundled/authentication_flow/authentication_flow_performer.h"
+#import "ios/chrome/browser/authentication/ui_bundled/authentication_flow/authentication_flow_request_helper.h"
 #import "ios/chrome/browser/authentication/ui_bundled/authentication_ui_util.h"
 #import "ios/chrome/browser/authentication/ui_bundled/history_sync/history_sync_capabilities_fetcher.h"
 #import "ios/chrome/browser/flags/ios_chrome_flag_descriptions.h"
@@ -36,6 +37,8 @@
 #import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
+#import "ios/chrome/browser/shared/model/browser/browser_provider.h"
+#import "ios/chrome/browser/shared/model/browser/browser_provider_interface.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/model/profile/features.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
@@ -274,7 +277,9 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
   // with a regular window size (like iPad).
   UIView* _anchorView;
   CGRect _anchorRect;
-  SigninCompletionCallback _signInCompletion;
+  // One of the method of the delegate, depending on whether a profile switch
+  // occurred.
+  SigninCompletionCallback _signInInProfileCompletion;
   AuthenticationFlowPerformer* _performer;
 
   // State machine tracking.
@@ -295,7 +300,7 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
 
   // This AuthenticationFlow keeps a reference to `self` while a sign-in flow is
   // is in progress to ensure it outlives any attempt to destroy it in
-  // `_signInCompletion`.
+  // `self.requestHelper`’s method.
   AuthenticationFlow* _selfRetainer;
 
   // Value of the ProfileSeparationDataMigrationSettings for
@@ -360,11 +365,13 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
   return self;
 }
 
-- (void)startSignInWithCompletion:(SigninCompletionCallback)completion {
+- (void)dealloc {
+  CHECK(!self.requestHelper, base::NotFatalUntil::M140);
+}
+
+- (void)startSignIn {
   DCHECK_EQ(AuthenticationState::kBegin, _state);
-  DCHECK(!_signInCompletion);
-  DCHECK(completion);
-  _signInCompletion = [completion copy];
+  CHECK(self.requestHelper);
   _selfRetainer = self;
   // Kick off the state machine.
   id<ChangeProfileCommands> changeProfileHandler = HandlerForProtocol(
@@ -449,9 +456,6 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
     case AuthenticationState::kSwitchProfileIfNeeded:
       return AuthenticationState::kHandOverToAuthenticationFlowInProfile;
     case AuthenticationState::kHandOverToAuthenticationFlowInProfile:
-      // The completion block has been passed to `AuthenticationFlowInProfile`,
-      // and the flow will continue there.
-      CHECK(!_signInCompletion);
       return AuthenticationState::kCleanupBeforeDone;
     case AuthenticationState::kCompleteWithFailure:
       return AuthenticationState::kCleanupBeforeDone;
@@ -462,7 +466,7 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
 }
 
 // Continues the sign-in state machine starting from `_state` and invokes
-// `_signInCompletion` when finished.
+// a `self.requestHelper`’s method when finished.
 - (void)continueFlow {
   ProfileIOS* profile = [self originalProfile];
   if (self.handlingError) {
@@ -698,6 +702,12 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
         UnsyncedDataTypeHistogram::kUnsyncedDataOnAccountSwitching,
         _unsyncedDataTypes.value());
     _browserForAuthenticationFlowInProfile = _browser;
+    CHECK(!_signInInProfileCompletion);
+    id<AuthenticationFlowRequestHelper> requestHelper =
+        [self takeRequestHelper];
+    _signInInProfileCompletion = ^(SigninCoordinatorResult result) {
+      [requestHelper authenticationFlowDidSignInInSameProfileWithResult:result];
+    };
     [self continueFlow];
     return;
   }
@@ -706,7 +716,8 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
       _unsyncedDataTypes.value());
   SceneState* sceneState = _browser->GetSceneState();
   [_performer switchToProfileWithIdentity:_identityToSignIn
-                               sceneState:sceneState];
+                               sceneState:sceneState
+                            requestHelper:[self takeRequestHelper]];
 }
 
 // Hands the sign-in flow over to `AuthenticationFlowInProfile`. This step is
@@ -728,9 +739,9 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
                                   isManagedIdentity);
   }
 
-  // The sign-in flow is passed to `authenticationFlowInProfile`, with the
-  // completion block. `AuthenticationFlowInProfile` retains itself until the
-  // sign-in is done. There is no need to own this instance.
+  // The sign-in flow is passed to `authenticationFlowInProfile`.
+  // `AuthenticationFlowInProfile` retains itself until the sign-in is done.
+  // There is no need to own this instance.
   AuthenticationFlowInProfile* authenticationFlowInProfile =
       [[AuthenticationFlowInProfile alloc]
                initWithBrowser:_browserForAuthenticationFlowInProfile
@@ -739,17 +750,17 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
                    accessPoint:_accessPoint
           precedingHistorySync:_precedingHistorySync
              postSignInActions:_postSignInActions];
-  [authenticationFlowInProfile startSignInWithCompletion:_signInCompletion];
-  _signInCompletion = nil;
+
+  [authenticationFlowInProfile
+      startSignInWithCompletion:_signInInProfileCompletion];
+  _signInInProfileCompletion = nil;
   [self continueFlow];
 }
 
-// Runs `_signInCompletion` asynchronously when the flow failed.
+// Runs `[self.requestHelper
+// authenticationFlowDidSignInInSameProfile:withResult:]` synchronously when the
+// flow failed.
 - (void)completeWithFailureStep {
-  // TODO(crbug.com/375605482): If there was a primary identity at the beginning
-  // of the flow, this primary identity should be restored if possible.
-  DCHECK(_signInCompletion)
-      << "`completeSignInWithResult` should not be called twice.";
   SigninCoordinatorResult result;
   switch (_cancelationReason) {
     case CancelationReason::kFailed:
@@ -761,9 +772,8 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
     case CancelationReason::kNotCanceled:
       NOTREACHED();
   }
-  SigninCompletionCallback signInCompletion = _signInCompletion;
-  _signInCompletion = nil;
-  signInCompletion(result);
+  [[self takeRequestHelper]
+      authenticationFlowDidSignInInSameProfileWithResult:result];
   [self continueFlow];
 }
 
@@ -896,14 +906,23 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
   [self handleAuthenticationError:error];
 }
 
-- (void)didSwitchToProfileWithNewProfileBrowser:(Browser*)newProfileBrowser {
+- (void)didSwitchToProfileWithNewProfileBrowser:(Browser*)newProfileBrowser
+                                     completion:(base::OnceClosure)completion {
   CHECK(AreSeparateProfilesForManagedAccountsEnabled());
+  CHECK(completion);
+  CHECK(newProfileBrowser);
   // With the profile switching `_browser` and `_presentingViewController` are
   // not valid anymore.
   _browser = nullptr;
   _presentingViewController = nil;
-
   _browserForAuthenticationFlowInProfile = newProfileBrowser;
+  CHECK(!_signInInProfileCompletion);
+  _signInInProfileCompletion = base::CallbackToBlock(base::BindOnce(
+      [](base::OnceClosure closure, SigninCoordinatorResult result) {
+        std::move(closure).Run();
+      },
+      std::move(completion)));
+
   [self continueFlow];
 }
 
@@ -923,6 +942,14 @@ void RecordUnsyncedDataHistogramIfNeeded(UnsyncedDataTypeHistogram histogram,
 }
 
 #pragma mark - Private methods
+
+// Returns the request helper exactly once. CHECK fail if its accessed twice.
+- (id<AuthenticationFlowRequestHelper>)takeRequestHelper {
+  CHECK(self.requestHelper, base::NotFatalUntil::M140);
+  id<AuthenticationFlowRequestHelper> requestHelper = self.requestHelper;
+  self.requestHelper = nil;
+  return requestHelper;
+}
 
 // The original profile used for services that don't exist in incognito mode.
 - (ProfileIOS*)originalProfile {

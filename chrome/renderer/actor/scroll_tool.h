@@ -8,7 +8,6 @@
 #include <cstdint>
 
 #include "base/memory/raw_ref.h"
-#include "base/memory/weak_ptr.h"
 #include "chrome/common/actor.mojom.h"
 #include "chrome/renderer/actor/tool_base.h"
 
@@ -21,8 +20,7 @@ namespace actor {
 // A tool that can be invoked to perform a scroll over a target.
 class ScrollTool : public ToolBase {
  public:
-  ScrollTool(mojom::ScrollActionPtr action,
-             base::raw_ref<content::RenderFrame> frame);
+  ScrollTool(mojom::ScrollActionPtr action, content::RenderFrame& frame);
 
   ~ScrollTool() override;
 

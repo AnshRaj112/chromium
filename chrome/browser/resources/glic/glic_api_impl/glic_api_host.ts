@@ -22,6 +22,7 @@ import type {ActInFocusedTabParams, DraggableArea, OpenSettingsOptions, PageMeta
 import {ActInFocusedTabErrorReason, CaptureScreenshotErrorReason, DEFAULT_INNER_TEXT_BYTES_LIMIT, DEFAULT_PDF_SIZE_LIMIT, ScrollToErrorReason} from '../glic_api/glic_api.js';
 import {ObservableValue} from '../observable.js';
 import type {ObservableValueReadOnly} from '../observable.js';
+import {OneShotTimer} from '../timer.js';
 
 import {replaceProperties} from './conversions.js';
 import type {PostMessageRequestHandler} from './post_message_transport.js';
@@ -33,7 +34,7 @@ export enum WebClientState {
   UNINITIALIZED,
   RESPONSIVE,
   UNRESPONSIVE,
-  ERROR,
+  ERROR,  // Final state
 }
 
 // Implemented by the embedder of GlicApiHost.
@@ -539,49 +540,6 @@ class HostMessageHandler implements HostMessageHandlerInterface {
   }
 }
 
-class OneShotTimer {
-  private timerId: number|undefined;
-  private promiseReject: ((reason?: any) => void)|undefined;
-
-  constructor(private delayMs: number) {}
-
-  // Cancels any running timer.
-  reset(): void {
-    if (this.timerId !== undefined) {
-      clearTimeout(this.timerId);
-      this.timerId = undefined;
-      if (this.promiseReject) {
-        this.promiseReject(new Error('Timer reset'));
-        this.promiseReject = undefined;
-      }
-    }
-  }
-
-  // Cancels any running timer, starts a new one. Callback is only
-  // run if the timer is not reset first.
-  start(callback: () => void): void {
-    this.startPromise().then(callback).catch(
-        () => {
-            // Catch and ignore timer reset.
-        });
-  }
-
-  // Cancels any running timer, starts a new one. Resolves when
-  // complete, rejects if canceled.
-  startPromise(): Promise<void> {
-    this.reset();
-    return new Promise<void>((resolve, reject) => {
-      this.promiseReject = reject;
-
-      this.timerId = setTimeout(() => {
-        this.timerId = undefined;
-        resolve();
-        this.promiseReject = undefined;
-      }, this.delayMs);
-    });
-  }
-}
-
 export class GlicApiHost implements PostMessageRequestHandler {
   private senderId = newSenderId();
   private messageHandler: HostMessageHandler;
@@ -589,8 +547,7 @@ export class GlicApiHost implements PostMessageRequestHandler {
   private sender: PostMessageRequestSender;
   private handler: WebClientHandlerRemote;
   private bootstrapPingIntervalId: number|undefined;
-  private webClientResponsivenessCheckInternalId: number|undefined;
-  private webClientUnresponsiveUiTimer: OneShotTimer;
+  private webClientErrorTimer: OneShotTimer;
   private webClientState =
       ObservableValue.withValue<WebClientState>(WebClientState.UNINITIALIZED);
   private waitingOnPanelWillOpenValue = false;
@@ -610,7 +567,7 @@ export class GlicApiHost implements PostMessageRequestHandler {
         this.handler.$.bindNewPipeAndPassReceiver());
     this.messageHandler =
         new HostMessageHandler(this.handler, this.sender, embedder, this);
-    this.webClientUnresponsiveUiTimer = new OneShotTimer(
+    this.webClientErrorTimer = new OneShotTimer(
         loadTimeData.getInteger('clientUnresponsiveUiMaxTimeMs'));
 
     this.bootstrapPingIntervalId =
@@ -619,11 +576,10 @@ export class GlicApiHost implements PostMessageRequestHandler {
   }
 
   destroy() {
-    this.webClientState =
-        ObservableValue.withValue<WebClientState>(WebClientState.UNINITIALIZED);
+    this.webClientState = ObservableValue.withValue<WebClientState>(
+        WebClientState.ERROR);  // Final state
     window.clearInterval(this.bootstrapPingIntervalId);
-    this.stopWebClientResponsivenessCheck();
-    this.stopUnresponsiveUiTimer();
+    this.webClientErrorTimer.reset();
     this.postMessageReceiver.destroy();
     this.messageHandler.destroy();
     this.sender.destroy();
@@ -648,7 +604,7 @@ export class GlicApiHost implements PostMessageRequestHandler {
   // Called when the web client is initialized.
   webClientInitialized() {
     this.setWebClientState(WebClientState.RESPONSIVE);
-    this.startWebClientResponsivenessCheck();
+    this.responsiveCheckLoop();
   }
 
   webClientInitializeFailed() {
@@ -687,64 +643,58 @@ export class GlicApiHost implements PostMessageRequestHandler {
     }
   }
 
-  startWebClientResponsivenessCheck() {
+  async responsiveCheckLoop() {
     if (!loadTimeData.getBoolean('isClientResponsivenessCheckEnabled')) {
       return;
     }
 
-    this.webClientResponsivenessCheckInternalId =
-        window.setInterval(async () => {
-          const responsePromise = this.sender.requestWithResponse(
-              'glicWebClientCheckResponsive', undefined);
+    // Timeout duration for waiting for a response. Increased in dev mode.
+    const timeoutMs: number =
+        loadTimeData.getInteger('clientResponsivenessCheckTimeoutMs') *
+        (loadTimeData.getBoolean('devMode') ? 1000 : 1);
+    // Interval in between the consecutive checks.
+    const checkIntervalMs: number =
+        loadTimeData.getInteger('clientResponsivenessCheckIntervalMs');
 
-          let timeoutId: number|undefined;
-          let timeoutMs =
-              loadTimeData.getInteger('clientResponsivenessCheckTimeoutMs');
-          if (loadTimeData.getBoolean('devMode')) {
-            timeoutMs = timeoutMs * 1000;
-          }
-          const timeoutPromise = new Promise((_, reject) => {
-            timeoutId = setTimeout(
-                () => reject(
-                    new Error('No response received from Glic web client.')),
-                timeoutMs);
-          });
+    while (this.webClientState.getCurrentValue() !== WebClientState.ERROR) {
+      let gotResponse = false;
+      const responsePromise =
+          this.sender
+              .requestWithResponse('glicWebClientCheckResponsive', undefined)
+              .then(() => {
+                gotResponse = true;
+              });
+      const responseTimeout = sleep(timeoutMs);
 
-          try {
-            await Promise.race([responsePromise, timeoutPromise]);
-            clearTimeout(timeoutId);
-            if (this.webClientState.getCurrentValue() !==
-                WebClientState.RESPONSIVE) {
-              this.setWebClientState(WebClientState.RESPONSIVE);
-              this.stopUnresponsiveUiTimer();
-            }
-          } catch (e) {
-            console.warn(e);
-            if (this.webClientState.getCurrentValue() !==
-                WebClientState.UNRESPONSIVE) {
-              this.setWebClientState(WebClientState.UNRESPONSIVE);
-              this.startUnresponsiveUiTimer();
-            }
-          }
-        }, loadTimeData.getInteger('clientResponsivenessCheckIntervalMs'));
-  }
+      await Promise.race([responsePromise, responseTimeout]);
+      if (this.webClientState.getCurrentValue() === WebClientState.ERROR) {
+        return;  // ERROR state is final.
+      }
 
-  stopWebClientResponsivenessCheck() {
-    if (this.webClientResponsivenessCheckInternalId !== undefined) {
-      clearInterval(this.webClientResponsivenessCheckInternalId);
-      this.webClientResponsivenessCheckInternalId = undefined;
+      if (gotResponse) {  // Success
+        this.webClientErrorTimer.reset();
+        this.setWebClientState(WebClientState.RESPONSIVE);
+
+        await sleep(checkIntervalMs);
+        continue;
+      }
+
+      // Failed, not responsive.
+      if (this.webClientState.getCurrentValue() === WebClientState.RESPONSIVE) {
+        this.setWebClientState(WebClientState.UNRESPONSIVE);
+        this.startWebClientErrorTimer();
+      }
+
+      // Crucial: Wait for the original (late) response promise to settle before
+      // the next check cycle starts.
+      await responsePromise;
     }
   }
 
-  startUnresponsiveUiTimer() {
-    this.webClientUnresponsiveUiTimer.start(() => {
+  startWebClientErrorTimer() {
+    this.webClientErrorTimer.start(() => {
       this.setWebClientState(WebClientState.ERROR);
-      this.stopWebClientResponsivenessCheck();
     });
-  }
-
-  stopUnresponsiveUiTimer() {
-    this.webClientUnresponsiveUiTimer.reset();
   }
 
   async openLinkInNewTab(url: string) {
@@ -813,6 +763,10 @@ enum GlicRequestEvent {
   MAX_VALUE = REQUEST_HANDLER_EXCEPTION,
 }
 
+// Returns a Promise resolving after 'ms' milliseconds
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // Utility functions for converting from mojom types to message types.
 // Summary of changes:

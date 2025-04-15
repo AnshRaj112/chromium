@@ -24,11 +24,11 @@
 #include "content/public/browser/site_instance.h"
 #include "extensions/browser/disable_reason.h"
 #include "extensions/browser/extension_prefs.h"
+#include "extensions/browser/extension_registrar.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/extension_util.h"
 #include "extensions/browser/pref_names.h"
-#include "extensions/browser/process_map.h"
 #include "extensions/browser/renderer_startup_helper.h"
 #include "extensions/browser/user_script_manager.h"
 #include "extensions/common/extension.h"
@@ -46,9 +46,7 @@
 #include "chromeos/ash/components/file_manager/app_id.h"
 #endif
 
-#if BUILDFLAG(IS_ANDROID)
-#include "chrome/browser/extensions/desktop_android/desktop_android_extension_system.h"
-#else
+#if !BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_sync_service.h"
 #include "chrome/browser/ui/browser.h"
@@ -66,18 +64,8 @@ std::string ReloadExtension(const std::string& extension_id,
   // When we reload the extension the ID may be invalidated if we've passed it
   // by const ref everywhere. Make a copy to be safe. http://crbug.com/103762
   std::string id = extension_id;
-#if BUILDFLAG(IS_ANDROID)
-  DesktopAndroidExtensionSystem* extension_system =
-      static_cast<DesktopAndroidExtensionSystem*>(
-          ExtensionSystem::Get(context));
-  CHECK(extension_system);
-  extension_system->ReloadExtension(id);
-#else
-  ExtensionService* service =
-      ExtensionSystem::Get(context)->extension_service();
-  CHECK(service);
-  service->ReloadExtension(id);
-#endif
+  ExtensionRegistrar::Get(context)->ReloadExtension(
+      extension_id, ExtensionRegistrar::LoadErrorBehavior::kNoisy);
   return id;
 }
 
@@ -267,51 +255,6 @@ void SetAllowFileAccess(const std::string& extension_id,
   ExtensionPrefs::Get(context)->SetAllowFileAccess(extension_id, allow);
 
   ReloadExtension(extension_id, context);
-}
-
-bool IsExtensionIdle(const std::string& extension_id,
-                     content::BrowserContext* context) {
-  std::vector<std::string> ids_to_check;
-  ids_to_check.push_back(extension_id);
-
-  const Extension* extension =
-      ExtensionRegistry::Get(context)->enabled_extensions().GetByID(
-          extension_id);
-  if (extension && extension->is_shared_module()) {
-    // We have to check all the extensions that use this shared module for idle
-    // to tell whether it is really 'idle'.
-    SharedModuleService* service = SharedModuleService::Get(context);
-    std::unique_ptr<ExtensionSet> dependents =
-        service->GetDependentExtensions(extension);
-    for (ExtensionSet::const_iterator i = dependents->begin();
-         i != dependents->end();
-         i++) {
-      ids_to_check.push_back((*i)->id());
-    }
-  }
-
-  ProcessManager* process_manager = ProcessManager::Get(context);
-  ProcessMap* process_map = ProcessMap::Get(context);
-  for (std::vector<std::string>::const_iterator i = ids_to_check.begin();
-       i != ids_to_check.end();
-       i++) {
-    const std::string id = (*i);
-    ExtensionHost* host = process_manager->GetBackgroundHostForExtension(id);
-    if (host)
-      return false;
-
-    if (!process_manager->GetRenderFrameHostsForExtension(id).empty()) {
-      return false;
-    }
-
-    // TODO(devlin): We can probably remove the checks above (for background
-    // hosts and frame hosts). If an extension has any active frames, it should
-    // have a dedicated process.
-    if (process_map->ExtensionHasProcess(id)) {
-      return false;
-    }
-  }
-  return true;
 }
 
 // TODO(crbug.com/356905053): Enable more extension util functions on

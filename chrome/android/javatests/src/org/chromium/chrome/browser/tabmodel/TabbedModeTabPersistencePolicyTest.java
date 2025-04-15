@@ -9,6 +9,8 @@ import static androidx.test.espresso.matcher.ViewMatchers.assertThat;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.when;
 
+import static org.chromium.base.test.util.Batch.UNIT_TESTS;
+
 import android.app.Activity;
 import android.content.Context;
 
@@ -31,12 +33,13 @@ import org.chromium.base.ThreadUtils;
 import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.base.supplier.OneshotSupplierImpl;
 import org.chromium.base.test.util.AdvancedMockContext;
+import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
-import org.chromium.chrome.browser.app.tabmodel.TabWindowManagerSingleton;
 import org.chromium.chrome.browser.app.tabmodel.TabbedModeTabModelOrchestrator;
+import org.chromium.chrome.browser.app.tabwindow.TabWindowManagerSingleton;
 import org.chromium.chrome.browser.crypto.CipherFactory;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
@@ -65,6 +68,7 @@ import java.nio.ByteBuffer;
  * Tests for the tabbed-mode persisitence policy. TODO: Consider turning this into a unit test after
  * resolving the task involving disk I/O.
  */
+@Batch(UNIT_TESTS)
 @RunWith(ChromeJUnit4ClassRunner.class)
 public class TabbedModeTabPersistencePolicyTest {
     private static final WebContentsState WEB_CONTENTS_STATE =

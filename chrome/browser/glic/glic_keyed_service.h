@@ -83,7 +83,10 @@ class GlicKeyedService : public KeyedService {
   void PrepareForOpen();
 
   // Fetch zero state suggestions for the active web contents.
-  void FetchZeroStateSuggestions();
+  void FetchZeroStateSuggestions(
+      bool is_first_run,
+      glic::mojom::WebClientHandler::
+          GetZeroStateSuggestionsForFocusedTabCallback callback);
 
   GlicEnabling& enabling() { return *enabling_.get(); }
 
@@ -123,8 +126,17 @@ class GlicKeyedService : public KeyedService {
   void SetContextAccessIndicator(bool show);
   void NotifyWindowIntentToShow();
 
-  // Callback for changes to focused tab data.
+  // Callback for all changes to focused tab.
   using FocusedTabChangedCallback =
+      base::RepeatingCallback<void(FocusedTabData)>;
+  // Callback for changes to focused tab data.
+  using FocusedTabDataChangedCallback =
+      base::RepeatingCallback<void(const glic::mojom::TabData*)>;
+  // Callback for changes to the focused tab instance.
+  using FocusedTabInstanceChangedCallback =
+      base::RepeatingCallback<void(content::WebContents*)>;
+  // Callback for changes to the focused tab container or candidate instances.
+  using FocusedTabOrCandidateInstanceChangedCallback =
       base::RepeatingCallback<void(FocusedTabData)>;
   // Callback for changes to the context access indicator status.
   using ContextAccessIndicatorChangedCallback =
@@ -139,6 +151,26 @@ class GlicKeyedService : public KeyedService {
   // called with nullptr as the supplied WebContents argument.
   base::CallbackListSubscription AddFocusedTabChangedCallback(
       FocusedTabChangedCallback callback);
+
+  // Callback for changes to either the focused tab or the focused tab candidate
+  // instances. If no tab is in focus an error reason is returned indicating
+  // why and maybe a tab candidate with details as to why it cannot be focused.
+  base::CallbackListSubscription
+  AddFocusedTabOrCandidateInstanceChangedCallback(
+      FocusedTabOrCandidateInstanceChangedCallback callback);
+
+  // Callback for changes to the `WebContents` comprising the focused tab. Only
+  // fired when the `WebContents` for the focused tab changes to/from nullptr or
+  // to different `WebContents` instance.
+  base::CallbackListSubscription AddFocusedTabInstanceChangedCallback(
+      FocusedTabInstanceChangedCallback callback);
+
+  // Callback for changes to the tab data representation of the focused tab.
+  // This includes any event that changes tab data -- e.g. favicon/title change
+  // events (where the container does not change), as well as container changed
+  // events.
+  base::CallbackListSubscription AddFocusedTabDataChangedCallback(
+      FocusedTabDataChangedCallback callback);
 
   // Registers a callback to be called any time the context access indicator
   // status changes. This is used to update UI effects on the focused tab
@@ -199,8 +231,19 @@ class GlicKeyedService : public KeyedService {
   void OnMemoryPressure(
       base::MemoryPressureListener::MemoryPressureLevel level);
 
+  // Called by GlicWindowController when the widget position is updated.
+  void SetPosition(const gfx::Point& position);
+  std::optional<gfx::Point> GetPreviousPosition();
+
  private:
   GlicPageHandler* GetPageHandler(const content::WebContents* webui_contents);
+  // A helper function to route GetZeroStateSuggestionsForFocusedTabCallback
+  // callbacks.
+  void OnZeroStateSuggestionsFetched(
+      glic::mojom::ZeroStateSuggestionsPtr suggestions,
+      glic::mojom::WebClientHandler::
+          GetZeroStateSuggestionsForFocusedTabCallback callback,
+      std::optional<std::vector<std::string>> returned_suggestions);
 
   // List of callbacks to be notified when the client requests a change to the
   // context access indicator status.
@@ -218,12 +261,14 @@ class GlicKeyedService : public KeyedService {
   std::unique_ptr<GlicScreenshotCapturer> screenshot_capturer_;
   std::unique_ptr<AuthController> auth_controller_;
   std::unique_ptr<GlicActorController> actor_controller_;
-  // Unowned
-  raw_ptr<GlicProfileManager> glic_profile_manager_;
+  std::optional<gfx::Point> previous_position_;
   base::OnceCallbackList<void()> web_client_created_callbacks_;
   // The set of live `GlicPageHandler`s.
   base::flat_set<raw_ptr<GlicPageHandler>> page_handlers_;
   std::unique_ptr<base::MemoryPressureListener> memory_pressure_listener_;
+
+  // Unowned
+  raw_ptr<GlicProfileManager> glic_profile_manager_;
   raw_ptr<contextual_cueing::ContextualCueingService>
       contextual_cueing_service_;
 

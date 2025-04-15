@@ -166,26 +166,31 @@ mojom::ConfigPtr SessionConfigProtoToMojom(::boca::Session* session) {
 std::vector<mojom::IdentifiedActivityPtr> SessionActivityProtoToMojom(
     const std::map<std::string, ::boca::StudentStatus>& activities) {
   std::vector<mojom::IdentifiedActivityPtr> result;
-  for (auto item : activities) {
+  for (auto& item : activities) {
+    auto student_status_detail =
+        mojom::StudentStatusDetail(item.second.state());
+    bool device_active = false;
+    std::string active_tab;
+    std::string connection_code;
     if (auto const device = item.second.devices().begin();
         device != item.second.devices().end()) {
       // Only update state and active tab for the first device now.
       // TODO - crbug.com/403655119: Ideally we should support multi-device. But
       // since now UI only supports single device, always parse the first one to
       // make the behavior deterministic.
-      auto identity_ptr = mojom::IdentifiedActivity::New(
-          item.first,
-          mojom::StudentActivity::New(
-              mojom::StudentStatusDetail(item.second.state()),
-              device->second.state() == ::boca::StudentDevice::ACTIVE,
-              device->second.activity().active_tab().title(),
-              /*is_caption_enabled=*/false,
-              /*is_hand_raised=*/false, mojom::JoinMethod::kRoster,
-              device->second.view_screen_config()
-                  .connection_param()
-                  .connection_code()));
-      result.push_back(std::move(identity_ptr));
+      device_active = device->second.state() == ::boca::StudentDevice::ACTIVE;
+      active_tab = device->second.activity().active_tab().title();
+      connection_code = device->second.view_screen_config()
+                            .connection_param()
+                            .connection_code();
     }
+    auto identity_ptr = mojom::IdentifiedActivity::New(
+        item.first, mojom::StudentActivity::New(
+                        student_status_detail, device_active, active_tab,
+                        /*is_caption_enabled=*/false,
+                        /*is_hand_raised=*/false, mojom::JoinMethod::kRoster,
+                        connection_code));
+    result.push_back(std::move(identity_ptr));
   }
   return result;
 }
@@ -454,7 +459,7 @@ void BocaAppHandler::RemoveStudent(const std::string& id,
   session_client_impl_->RemoveStudent(std::move(request));
 }
 
-void BocaAppHandler::AddStudents(const std::vector<std::string>& ids,
+void BocaAppHandler::AddStudents(const std::vector<mojom::IdentityPtr> students,
                                  AddStudentsCallback callback) {
   auto* session =
       BocaAppClient::Get()->GetSessionManager()->GetCurrentSession();
@@ -470,8 +475,16 @@ void BocaAppHandler::AddStudents(const std::vector<std::string>& ids,
           base::BindOnce(&BocaAppHandler::OnStudentsAdded,
                          weak_ptr_factory_.GetWeakPtr(), std::move(callback),
                          session));
-
-  request->set_student_ids(std::move(ids));
+  std::vector<::boca::UserIdentity> students_list;
+  for (auto& item : students) {
+    ::boca::UserIdentity student;
+    student.set_gaia_id(item->id);
+    student.set_email(item->email);
+    student.set_full_name(item->name);
+    student.set_photo_url(item->photo_url.value_or(GURL()).spec());
+    students_list.push_back(student);
+  }
+  request->set_students(std::move(students_list));
   request->set_student_group_id(GetStudentGroupIdSafe(session));
   session_client_impl_->AddStudents(std::move(request));
 }
@@ -516,6 +529,7 @@ void BocaAppHandler::UpdateCaptionConfig(mojom::CaptionConfigPtr config,
   auto* session =
       BocaAppClient::Get()->GetSessionManager()->GetCurrentSession();
   if (!session || session->session_state() != ::boca::Session::ACTIVE) {
+    VLOG(1) << "[Boca] session inactive, skipping captions update";
     std::move(callback).Run(std::nullopt);
     return;
   }
@@ -525,12 +539,17 @@ void BocaAppHandler::UpdateCaptionConfig(mojom::CaptionConfigPtr config,
           config->session_caption_enabled &&
       GetSessionConfigSafe(session).captions_config().translations_enabled() ==
           config->session_translation_enabled) {
+    VLOG(1) << "[Boca] no config change, skipping captions update. Captions "
+               "enabled: "
+            << config->session_caption_enabled
+            << ", translation enabled: " << config->session_translation_enabled;
     std::move(callback).Run(std::nullopt);
     return;
   }
 
   // Skip caption initialization when disabling captions.
   if (!config->session_caption_enabled) {
+    VLOG(1) << "[Boca] captions disabled, skipping init session captions";
     UpdateCaptionConfigInternal(std::move(config), std::move(callback),
                                 /*can_proceed=*/true);
     return;
@@ -819,6 +838,8 @@ void BocaAppHandler::OnUpdatedCaptionConfig(
         result) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!result.has_value()) {
+    VLOG(1) << "[Boca] captions update session request failed with code "
+            << result.error();
     std::move(callback).Run(mojom::UpdateSessionError::kHTTPError);
     // Update failed. Fallback to the most recent in-memory session.
     if (auto* session =
@@ -831,6 +852,14 @@ void BocaAppHandler::OnUpdatedCaptionConfig(
     return;
   }
   std::move(callback).Run(std::nullopt);
+  VLOG(1) << "[Boca] captions update session result, captions enabled: "
+          << GetSessionConfigSafe(result.value().get())
+                 .captions_config()
+                 .captions_enabled()
+          << ", translation enabled: "
+          << GetSessionConfigSafe(result.value().get())
+                 .captions_config()
+                 .translations_enabled();
   // Trigger a session reload from session response.
   BocaAppClient::Get()->GetSessionManager()->UpdateCurrentSession(
       std::move(result.value()), /*dispatch_event=*/true);
@@ -917,6 +946,7 @@ void BocaAppHandler::UpdateCaptionConfigInternal(
         GetSessionConfigSafe(session).on_task_config());
   }
   request->set_on_task_config(std::move(latest_ontask_config_));
+  VLOG(1) << "[Boca] sending update session request for captions";
   session_client_impl_->UpdateSession(std::move(request));
 }
 }  // namespace ash::boca

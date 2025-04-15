@@ -251,9 +251,8 @@ TEST_F(RegularGridMediatorTest, TestToolbarsNormalModeWithoutWebstates) {
   EXPECT_FALSE(fake_toolbars_mediator_.configuration.cancelSearchButton);
 }
 
-// Tests that `facePileViewControllerForItem` returns an UIViewController when
-// the group is shared.
-TEST_F(RegularGridMediatorTest, FacePileViewControllerForItem) {
+// Tests that `facePileViewForItem` returns an UIView when the group is shared.
+TEST_F(RegularGridMediatorTest, FacePileViewForItem) {
   // Set a saved tab group.
   tab_groups::TabGroupId tab_group_id = tab_groups::TabGroupId::GenerateNew();
   const TabGroup* local_group = browser_->GetWebStateList()->CreateGroup(
@@ -267,13 +266,13 @@ TEST_F(RegularGridMediatorTest, FacePileViewControllerForItem) {
   GridItemIdentifier* group_item_id =
       [GridItemIdentifier groupIdentifier:local_group
                          withWebStateList:browser_->GetWebStateList()];
-  EXPECT_FALSE([mediator_ facePileViewControllerForItem:group_item_id]);
+  EXPECT_EQ(nil, [mediator_ facePileViewForItem:group_item_id]);
 
   // Share the group.
   tab_group_sync_service_->MakeTabGroupShared(
       group.local_group_id().value(), "collaboration",
       tab_groups::TabGroupSyncService::TabGroupSharingCallback());
-  EXPECT_TRUE([mediator_ facePileViewControllerForItem:group_item_id]);
+  EXPECT_NE(nil, [mediator_ facePileViewForItem:group_item_id]);
 }
 
 // Tests that `-activityLabelDataForGroup:` returns the data for a specific tab
@@ -281,6 +280,8 @@ TEST_F(RegularGridMediatorTest, FacePileViewControllerForItem) {
 TEST_F(RegularGridMediatorTest, ActivityLabelDataForGroupAfterStartup) {
   // Create a saved tab group.
   tab_groups::TabGroupId tab_group_id = tab_groups::TabGroupId::GenerateNew();
+  browser_->GetWebStateList()->CreateGroup(
+      {2}, tab_groups::test::CreateTabGroupVisualData(), tab_group_id);
   tab_groups::SavedTabGroup group = tab_groups::test::CreateTestSavedTabGroup();
   group.SetLocalGroupId(tab_group_id);
   tab_group_sync_service_->AddGroup(group);
@@ -290,10 +291,15 @@ TEST_F(RegularGridMediatorTest, ActivityLabelDataForGroupAfterStartup) {
   // Create a fake message.
   collaboration::messaging::PersistentMessage message;
   collaboration::messaging::TabGroupMessageMetadata metadata;
+  metadata.local_tab_group_id = tab_group_id;
+  message.attribution.tab_metadata =
+      std::make_optional(collaboration::messaging::TabMessageMetadata());
+  message.attribution.tab_group_metadata = std::make_optional(metadata);
   metadata.local_tab_group_id = std::make_optional(tab_group_id);
   message.type =
-      collaboration::messaging::PersistentNotificationType::DIRTY_TAB_GROUP;
-  message.attribution.tab_group_metadata = std::make_optional(metadata);
+      collaboration::messaging::PersistentNotificationType::DIRTY_TAB;
+  message.collaboration_event =
+      collaboration::messaging::CollaborationEvent::TAB_UPDATED;
 
   // The activity label data should be nil before the messaging service backend
   // is initialized.
@@ -301,7 +307,12 @@ TEST_F(RegularGridMediatorTest, ActivityLabelDataForGroupAfterStartup) {
   EXPECT_EQ(nil, [mediator_ activityLabelDataForGroup:tab_group_id]);
 
   ON_CALL(messaging_backend_, IsInitialized).WillByDefault(Return(true));
-  ON_CALL(messaging_backend_, GetMessages(_))
+  ON_CALL(
+      messaging_backend_,
+      GetMessagesForGroup(
+          tab_groups::EitherGroupID(tab_group_id),
+          std::make_optional(
+              collaboration::messaging::PersistentNotificationType::DIRTY_TAB)))
       .WillByDefault(Return(std::vector{message}));
 
   // Fake the initialization of the service.
@@ -317,6 +328,15 @@ TEST_F(RegularGridMediatorTest, ActivityLabelDataForGroupAfterStartup) {
       [mediator_
           activityLabelDataForGroup:tab_groups::TabGroupId::GenerateNew()]);
 
+  // Simulate the tab message being removed.
+  ON_CALL(
+      messaging_backend_,
+      GetMessagesForGroup(
+          tab_groups::EitherGroupID(tab_group_id),
+          std::make_optional(
+              collaboration::messaging::PersistentNotificationType::DIRTY_TAB)))
+      .WillByDefault(
+          Return(std::vector<collaboration::messaging::PersistentMessage>{}));
   // Fake the update of the service.
   [mediator_ hidePersistentMessage:message];
 
@@ -330,6 +350,8 @@ TEST_F(RegularGridMediatorTest,
        ActivityLabelDataForGroupAfterDisplayAPICalled) {
   // Create a saved tab group.
   tab_groups::TabGroupId tab_group_id = tab_groups::TabGroupId::GenerateNew();
+  browser_->GetWebStateList()->CreateGroup(
+      {2}, tab_groups::test::CreateTabGroupVisualData(), tab_group_id);
   tab_groups::SavedTabGroup group = tab_groups::test::CreateTestSavedTabGroup();
   group.SetLocalGroupId(tab_group_id);
   tab_group_sync_service_->AddGroup(group);
@@ -367,4 +389,49 @@ TEST_F(RegularGridMediatorTest,
 
   // The activity label data should be nil.
   EXPECT_EQ(nil, [mediator_ activityLabelDataForGroup:tab_group_id]);
+}
+
+// Tests that `-activityLabelDataForGroup:` returns the data for a specific tab
+// group after simulating a tab removed.
+TEST_F(RegularGridMediatorTest, ActivityLabelDataForGroupAfterTabRemoved) {
+  // Create a saved tab group.
+  tab_groups::TabGroupId tab_group_id = tab_groups::TabGroupId::GenerateNew();
+  browser_->GetWebStateList()->CreateGroup(
+      {2}, tab_groups::test::CreateTabGroupVisualData(), tab_group_id);
+  tab_groups::SavedTabGroup group = tab_groups::test::CreateTestSavedTabGroup();
+  group.SetLocalGroupId(tab_group_id);
+  tab_group_sync_service_->AddGroup(group);
+  EXPECT_TRUE(
+      tab_group_sync_service_->GetGroup(group.saved_guid()).has_value());
+
+  ON_CALL(messaging_backend_, IsInitialized).WillByDefault(Return(true));
+
+  // Create a fake message.
+  collaboration::messaging::PersistentMessage message;
+  collaboration::messaging::TabGroupMessageMetadata metadata;
+  metadata.local_tab_group_id = tab_group_id;
+  message.attribution.tab_metadata =
+      std::make_optional(collaboration::messaging::TabMessageMetadata());
+  message.attribution.tab_group_metadata = std::make_optional(metadata);
+  metadata.local_tab_group_id = std::make_optional(tab_group_id);
+  message.type =
+      collaboration::messaging::PersistentNotificationType::TOMBSTONED;
+  message.collaboration_event =
+      collaboration::messaging::CollaborationEvent::TAB_REMOVED;
+
+  // The activity label data should be nil for another group.
+  EXPECT_EQ(nil, [mediator_ activityLabelDataForGroup:tab_group_id]);
+
+  ON_CALL(messaging_backend_,
+          GetMessagesForGroup(
+              tab_groups::EitherGroupID(tab_group_id),
+              std::make_optional(collaboration::messaging::
+                                     PersistentNotificationType::TOMBSTONED)))
+      .WillByDefault(Return(std::vector{message}));
+
+  // Fake the update of the service.
+  [mediator_ hidePersistentMessage:message];
+
+  // The activity label data should be nil.
+  EXPECT_NE(nil, [mediator_ activityLabelDataForGroup:tab_group_id]);
 }

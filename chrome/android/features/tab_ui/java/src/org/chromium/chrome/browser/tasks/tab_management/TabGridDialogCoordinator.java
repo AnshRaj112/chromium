@@ -4,6 +4,8 @@
 
 package org.chromium.chrome.browser.tasks.tab_management;
 
+import static org.chromium.chrome.browser.tasks.tab_management.TabGridDialogProperties.PAGE_KEY_LISTENER;
+
 import android.app.Activity;
 import android.content.res.Resources;
 import android.graphics.Rect;
@@ -34,6 +36,7 @@ import org.chromium.chrome.browser.data_sharing.ui.shared_image_tiles.SharedImag
 import org.chromium.chrome.browser.data_sharing.ui.shared_image_tiles.SharedImageTilesCoordinator;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.tab_ui.ActionConfirmationManager;
 import org.chromium.chrome.browser.tab_ui.RecyclerViewPosition;
 import org.chromium.chrome.browser.tab_ui.TabContentManager;
 import org.chromium.chrome.browser.tab_ui.TabContentManagerThumbnailProvider;
@@ -179,7 +182,6 @@ public class TabGridDialogCoordinator implements TabGridDialogMediator.DialogCon
                 SharedImageTilesConfig config =
                         new SharedImageTilesConfig.Builder(activity)
                                 .setBorderColor(backgroundColor)
-                                .setBackgroundColor(backgroundColor)
                                 .build();
                 mSharedImageTilesCoordinator =
                         new SharedImageTilesCoordinator(
@@ -301,6 +303,20 @@ public class TabGridDialogCoordinator implements TabGridDialogMediator.DialogCon
                 mTabLabeller = null;
             }
         }
+    }
+
+    /** Interface to handle Ctrl+Shift+PageUp or Ctrl+Shift+PageDown key press events. */
+    /* package */ interface TabPageKeyListener {
+        /**
+         * Invoked when a valid key combination is detected.
+         *
+         * @param eventData The {@link TabKeyEventData}.
+         */
+        void onPageKeyEvent(TabKeyEventData eventData);
+    }
+
+    void setPageKeyEvent(TabPageKeyListener listener) {
+        mModel.set(PAGE_KEY_LISTENER, listener::onPageKeyEvent);
     }
 
     @NonNull
@@ -476,6 +492,10 @@ public class TabGridDialogCoordinator implements TabGridDialogMediator.DialogCon
 
     TabGridDialogMediator.DialogController getDialogController() {
         return this;
+    }
+
+    /* package */ PropertyModel getModelForTesting() {
+        return mModel;
     }
 
     @Override

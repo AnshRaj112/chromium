@@ -25,6 +25,7 @@
 #include "components/update_client/configurator.h"
 #include "components/update_client/crx_cache.h"
 #include "components/update_client/patcher.h"
+#include "components/update_client/pipeline_util.h"
 #include "components/update_client/protocol_definition.h"
 #include "components/update_client/task_traits.h"
 #include "components/update_client/update_client_errors.h"
@@ -47,37 +48,14 @@ namespace {
 //
 // All errors shortcut to PatchDone.
 
-base::Value::Dict MakeEvent(
-    base::expected<base::FilePath, CategorizedError> result) {
-  base::Value::Dict event;
-  event.Set("eventtype", protocol_request::kEventPuff);
-  event.Set("eventresult",
-            static_cast<int>(result.has_value()
-                                 ? protocol_request::kEventResultSuccess
-                                 : protocol_request::kEventResultError));
-
-  if (!result.has_value()) {
-    CategorizedError error = result.error();
-    if (error.category_ != ErrorCategory::kNone) {
-      event.Set("errorcat", static_cast<int>(error.category_));
-    }
-    if (error.code_ != 0) {
-      event.Set("errorcode", error.code_);
-    }
-    if (error.extra_ != 0) {
-      event.Set("extracode1", error.extra_);
-    }
-  }
-  return event;
-}
-
 // Runs on the original sequence. Adds events and calls the original callback.
 void PatchDone(
     base::OnceCallback<void(base::expected<base::FilePath, CategorizedError>)>
         callback,
     base::RepeatingCallback<void(base::Value::Dict)> event_adder,
     base::expected<base::FilePath, CategorizedError> result) {
-  event_adder.Run(MakeEvent(result));
+  event_adder.Run(
+      MakeSimpleOperationEvent(result, protocol_request::kEventPuff));
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(std::move(callback), result));
 }
@@ -93,9 +71,9 @@ void CleanUp(
   if (result != puffin::P_OK) {
     base::DeleteFile(new_file);
     std::move(callback).Run(base::unexpected<CategorizedError>(
-        {.category_ = ErrorCategory::kUnpack,
-         .code_ = static_cast<int>(UnpackerError::kDeltaOperationFailure),
-         .extra_ = result}));
+        {.category = ErrorCategory::kUnpack,
+         .code = static_cast<int>(UnpackerError::kDeltaOperationFailure),
+         .extra = result}));
     return;
   }
   std::move(callback).Run(new_file);
@@ -134,8 +112,8 @@ void CacheLookupDone(
         base::BindOnce(IgnoreResult(&base::DeleteFile), patch_file),
         base::BindOnce(&PatchDone, std::move(callback), event_adder,
                        base::unexpected<CategorizedError>(
-                           {.category_ = ErrorCategory::kUnpack,
-                            .code_ = static_cast<int>(cache_result.error())})));
+                           {.category = ErrorCategory::kUnpack,
+                            .code = static_cast<int>(cache_result.error())})));
     return;
   }
   base::ThreadPool::CreateSequencedTaskRunner(kTaskTraits)

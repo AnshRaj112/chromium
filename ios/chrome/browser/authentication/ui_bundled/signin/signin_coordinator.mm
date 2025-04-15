@@ -15,6 +15,7 @@
 #import "ios/chrome/browser/authentication/ui_bundled/signin/fullscreen_signin/coordinator/fullscreen_signin_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/history_sync/history_sync_signin_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/instant_signin/instant_signin_coordinator.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/interruptible_chrome_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/logging/first_run_signin_logger.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_history_sync/signin_and_history_sync_coordinator.h"
@@ -32,11 +33,11 @@ using signin_metrics::PromoAction;
 
 @implementation SigninCoordinator
 
-- (instancetype)initWithBaseViewController:(UIViewController*)viewController
-                                   browser:(Browser*)browser
-                              contextStyle:(SigninContextStyle)contextStyle
-                               accessPoint:
-                                   (signin_metrics::AccessPoint)accessPoint {
+- (SigninCoordinator<InterruptibleChromeCoordinator>*)
+    initWithBaseViewController:(UIViewController*)viewController
+                       browser:(Browser*)browser
+                  contextStyle:(SigninContextStyle)contextStyle
+                   accessPoint:(signin_metrics::AccessPoint)accessPoint {
   self = [super initWithBaseViewController:viewController browser:browser];
   if (self) {
     _contextStyle = contextStyle;
@@ -52,7 +53,7 @@ using signin_metrics::PromoAction;
   registry->RegisterDictionaryPref(prefs::kSigninHasAcceptedManagementDialog);
 }
 
-+ (instancetype)
++ (SigninCoordinator<InterruptibleChromeCoordinator>*)
     instantSigninCoordinatorWithBaseViewController:
         (UIViewController*)viewController
                                            browser:(Browser*)browser
@@ -62,17 +63,22 @@ using signin_metrics::PromoAction;
                                        accessPoint:(signin_metrics::AccessPoint)
                                                        accessPoint
                                        promoAction:(signin_metrics::PromoAction)
-                                                       promoAction {
+                                                       promoAction
+                              continuationProvider:
+                                  (const ChangeProfileContinuationProvider&)
+                                      continuationProvider {
+  CHECK(continuationProvider);
   return [[InstantSigninCoordinator alloc]
       initWithBaseViewController:viewController
                          browser:browser
                         identity:identity
                     contextStyle:contextStyle
                      accessPoint:accessPoint
-                     promoAction:promoAction];
+                     promoAction:promoAction
+            continuationProvider:continuationProvider];
 }
 
-+ (instancetype)
++ (SigninCoordinator<InterruptibleChromeCoordinator>*)
     fullscreenSigninCoordinatorWithBaseViewController:
         (UIViewController*)viewController
                                               browser:(Browser*)browser
@@ -80,21 +86,30 @@ using signin_metrics::PromoAction;
                                              (SigninContextStyle)contextStyle
                                           accessPoint:
                                               (signin_metrics::AccessPoint)
-                                                  accessPoint {
+                                                  accessPoint
+                    changeProfileContinuationProvider:
+                        (const ChangeProfileContinuationProvider&)
+                            changeProfileContinuationProvider {
+  CHECK(changeProfileContinuationProvider);
   return [[FullscreenSigninCoordinator alloc]
-      initWithBaseViewController:viewController
-                         browser:browser
-                  screenProvider:[[SigninScreenProvider alloc] init]
-                    contextStyle:contextStyle
-                     accessPoint:accessPoint];
+             initWithBaseViewController:viewController
+                                browser:browser
+                         screenProvider:[[SigninScreenProvider alloc] init]
+                           contextStyle:contextStyle
+                            accessPoint:accessPoint
+      changeProfileContinuationProvider:changeProfileContinuationProvider];
 }
 
-+ (instancetype)
++ (SigninCoordinator<InterruptibleChromeCoordinator>*)
     upgradeSigninPromoCoordinatorWithBaseViewController:
         (UIViewController*)viewController
                                                 browser:(Browser*)browser
-                                           contextStyle:(SigninContextStyle)
-                                                            contextStyle {
+                                           contextStyle:
+                                               (SigninContextStyle)contextStyle
+                      changeProfileContinuationProvider:
+                          (const ChangeProfileContinuationProvider&)
+                              changeProfileContinuationProvider {
+  CHECK(changeProfileContinuationProvider);
   AccessPoint accessPoint = AccessPoint::kSigninPromo;
   PromoAction promoAction = PromoAction::PROMO_ACTION_NO_SIGNIN_PROMO;
   return [[TwoScreensSigninCoordinator alloc]
@@ -102,25 +117,31 @@ using signin_metrics::PromoAction;
                          browser:browser
                     contextStyle:contextStyle
                      accessPoint:accessPoint
-                     promoAction:promoAction];
+                     promoAction:promoAction
+            continuationProvider:changeProfileContinuationProvider];
 }
 
-+ (instancetype)
++ (SigninCoordinator<InterruptibleChromeCoordinator>*)
     addAccountCoordinatorWithBaseViewController:
         (UIViewController*)viewController
                                         browser:(Browser*)browser
                                    contextStyle:(SigninContextStyle)contextStyle
-                                    accessPoint:(AccessPoint)accessPoint {
+                                    accessPoint:(AccessPoint)accessPoint
+                           continuationProvider:
+                               (const ChangeProfileContinuationProvider&)
+                                   continuationProvider {
+  CHECK(continuationProvider);
   return [[AddAccountSigninCoordinator alloc]
       initWithBaseViewController:viewController
                          browser:browser
                     contextStyle:contextStyle
                      accessPoint:accessPoint
                      promoAction:PromoAction::PROMO_ACTION_NO_SIGNIN_PROMO
-                    signinIntent:AddAccountSigninIntent::kAddAccount];
+                    signinIntent:AddAccountSigninIntent::kAddAccount
+            continuationProvider:continuationProvider];
 }
 
-+ (instancetype)
++ (SigninCoordinator<InterruptibleChromeCoordinator>*)
     primaryAccountReauthCoordinatorWithBaseViewController:
         (UIViewController*)viewController
                                                   browser:(Browser*)browser
@@ -129,17 +150,22 @@ using signin_metrics::PromoAction;
                                               accessPoint:
                                                   (AccessPoint)accessPoint
                                               promoAction:
-                                                  (PromoAction)promoAction {
+                                                  (PromoAction)promoAction
+                                     continuationProvider:
+                                         (const ChangeProfileContinuationProvider&)
+                                             continuationProvider {
+  CHECK(continuationProvider);
   return [[AddAccountSigninCoordinator alloc]
       initWithBaseViewController:viewController
                          browser:browser
                     contextStyle:contextStyle
                      accessPoint:accessPoint
                      promoAction:promoAction
-                    signinIntent:AddAccountSigninIntent::kPrimaryAccountReauth];
+                    signinIntent:AddAccountSigninIntent::kPrimaryAccountReauth
+            continuationProvider:continuationProvider];
 }
 
-+ (instancetype)
++ (SigninCoordinator<InterruptibleChromeCoordinator>*)
     signinAndSyncReauthCoordinatorWithBaseViewController:
         (UIViewController*)viewController
                                                  browser:(Browser*)browser
@@ -148,17 +174,22 @@ using signin_metrics::PromoAction;
                                              accessPoint:
                                                  (AccessPoint)accessPoint
                                              promoAction:
-                                                 (PromoAction)promoAction {
+                                                 (PromoAction)promoAction
+                                    continuationProvider:
+                                        (const ChangeProfileContinuationProvider&)
+                                            continuationProvider {
+  CHECK(continuationProvider);
   return [[AddAccountSigninCoordinator alloc]
       initWithBaseViewController:viewController
                          browser:browser
                     contextStyle:contextStyle
                      accessPoint:accessPoint
                      promoAction:promoAction
-                    signinIntent:AddAccountSigninIntent::kResignin];
+                    signinIntent:AddAccountSigninIntent::kResignin
+            continuationProvider:continuationProvider];
 }
 
-+ (instancetype)
++ (SigninCoordinator<InterruptibleChromeCoordinator>*)
     trustedVaultReAuthenticationCoordinatorWithBaseViewController:
         (UIViewController*)viewController
                                                           browser:
@@ -188,23 +219,27 @@ using signin_metrics::PromoAction;
                      accessPoint:accessPoint];
 }
 
-+ (instancetype)
++ (SigninCoordinator<InterruptibleChromeCoordinator>*)
     consistencyPromoSigninCoordinatorWithBaseViewController:
         (UIViewController*)viewController
                                                     browser:(Browser*)browser
                                                contextStyle:(SigninContextStyle)
                                                                 contextStyle
-                                                accessPoint:(signin_metrics::
-                                                                 AccessPoint)
-                                                                accessPoint {
+                                                accessPoint:
+                                                    (signin_metrics::
+                                                         AccessPoint)accessPoint
+                                       continuationProvider:
+                                           (const ChangeProfileContinuationProvider&)
+                                               continuationProvider {
   return [ConsistencyPromoSigninCoordinator
       coordinatorWithBaseViewController:viewController
                                 browser:browser
                            contextStyle:contextStyle
-                            accessPoint:accessPoint];
+                            accessPoint:accessPoint
+                   continuationProvider:continuationProvider];
 }
 
-+ (instancetype)
++ (SigninCoordinator<InterruptibleChromeCoordinator>*)
     signinAndHistorySyncCoordinatorWithBaseViewController:
         (UIViewController*)viewController
                                                   browser:(Browser*)browser
@@ -217,8 +252,11 @@ using signin_metrics::PromoAction;
                                                   (PromoAction)promoAction
                                       optionalHistorySync:
                                           (BOOL)optionalHistorySync
-                                          fullscreenPromo:
-                                              (BOOL)fullscreenPromo {
+                                          fullscreenPromo:(BOOL)fullscreenPromo
+                                     continuationProvider:
+                                         (const ChangeProfileContinuationProvider&)
+                                             continuationProvider {
+  CHECK(continuationProvider);
   return [[SignInAndHistorySyncCoordinator alloc]
       initWithBaseViewController:viewController
                          browser:browser
@@ -226,17 +264,18 @@ using signin_metrics::PromoAction;
                      accessPoint:accessPoint
                      promoAction:promoAction
              optionalHistorySync:optionalHistorySync
-                 fullscreenPromo:fullscreenPromo];
+                 fullscreenPromo:fullscreenPromo
+            continuationProvider:continuationProvider];
 }
 
-+ (instancetype)accountMenuCoordinatorWithBaseViewController:
-                    (UIViewController*)viewController
-                                                     browser:(Browser*)browser
-                                                contextStyle:
-                                                    (SigninContextStyle)
-                                                        contextStyle
-                                                  anchorView:(UIView*)anchorView
-                                                     fromWeb:(BOOL)fromWeb {
++ (SigninCoordinator<InterruptibleChromeCoordinator>*)
+    accountMenuCoordinatorWithBaseViewController:
+        (UIViewController*)viewController
+                                         browser:(Browser*)browser
+                                    contextStyle:
+                                        (SigninContextStyle)contextStyle
+                                      anchorView:(UIView*)anchorView
+                                         fromWeb:(BOOL)fromWeb {
   return
       [[AccountMenuCoordinator alloc] initWithBaseViewController:viewController
                                                          browser:browser
@@ -245,7 +284,7 @@ using signin_metrics::PromoAction;
                                                          fromWeb:fromWeb];
 }
 
-+ (instancetype)
++ (SigninCoordinator<InterruptibleChromeCoordinator>*)
     historySyncCoordinatorWithBaseViewController:
         (UIViewController*)viewController
                                          browser:(Browser*)browser

@@ -63,6 +63,9 @@ extern const char kAutofillEnableDynamicallyLoadingFieldsForAddressInputName[];
 extern const char
     kAutofillEnableDynamicallyLoadingFieldsForAddressInputDescription[];
 
+extern const char kAutofillEnableFlatRateCardBenefitsFromCurinosName[];
+extern const char kAutofillEnableFlatRateCardBenefitsFromCurinosDescription[];
+
 extern const char kAutofillEnableLogFormEventsToAllParsedFormTypesName[];
 extern const char kAutofillEnableLogFormEventsToAllParsedFormTypesDescription[];
 
@@ -116,6 +119,9 @@ extern const char kAutofillUseRendererIDsDescription[];
 
 extern const char kAutofillVcnEnrollRequestTimeoutName[];
 extern const char kAutofillVcnEnrollRequestTimeoutDescription[];
+
+extern const char kAutofillVcnEnrollStrikeExpiryTimeName[];
+extern const char kAutofillVcnEnrollStrikeExpiryTimeDescription[];
 
 extern const char kBestFeaturesScreenInFirstRunName[];
 extern const char kBestFeaturesScreenInFirstRunDescription[];
@@ -327,9 +333,6 @@ extern const char kInProductHelpDemoModeDescription[];
 extern const char kIOSBrowserEditMenuMetricsName[];
 extern const char kIOSBrowserEditMenuMetricsDescription[];
 
-extern const char kIOSDetectUsernameInUffName[];
-extern const char kIOSDetectUsernameInUffDescription[];
-
 extern const char kIOSDockingPromoName[];
 extern const char kIOSDockingPromoDescription[];
 
@@ -372,11 +375,17 @@ extern const char kIOSQuickDeleteDescription[];
 extern const char kIOSChooseFromDriveName[];
 extern const char kIOSChooseFromDriveDescription[];
 
+extern const char kIOSChooseFromDriveSimulatedClickName[];
+extern const char kIOSChooseFromDriveSimulatedClickDescription[];
+
 extern const char kIOSManageAccountStorageName[];
 extern const char kIOSManageAccountStorageDescription[];
 
 extern const char kIOSSaveToPhotosImprovementsName[];
 extern const char kIOSSaveToPhotosImprovementsDescription[];
+
+extern const char kIOSEnterpriseRealtimeUrlFilteringName[];
+extern const char kIOSEnterpriseRealtimeUrlFilteringDescription[];
 
 extern const char kNewFeedPositioningExperimentName[];
 extern const char kNewFeedPositioningExperimentDescription[];
@@ -842,6 +851,9 @@ extern const char kWebPageAlternativeTextZoomDescription[];
 
 extern const char kWebPageTextZoomIPadName[];
 extern const char kWebPageTextZoomIPadDescription[];
+
+extern const char kWelcomeBackInFirstRunName[];
+extern const char kWelcomeBackInFirstRunDescription[];
 
 extern const char kYoutubeIncognitoName[];
 extern const char kYoutubeIncognitoDescription[];

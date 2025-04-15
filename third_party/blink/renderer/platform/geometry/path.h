@@ -138,19 +138,9 @@ class PLATFORM_EXPORT Path {
   bool IsClosed() const;
   bool IsLine() const;
 
-  // TODO(crbug.com/378688986): convert clients to PathBuilder and remove all
-  // editing (non-const) methods.
-  void MoveTo(const gfx::PointF&);
-  void AddLineTo(const gfx::PointF&);
-  void AddBezierCurveTo(const gfx::PointF& control_point1,
-                        const gfx::PointF& control_point2,
-                        const gfx::PointF& end_point);
-  void CloseSubpath();
-
   const SkPath& GetSkPath() const { return path_; }
 
   void Apply(void* info, PathApplierFunction) const;
-  Path& Transform(const AffineTransform&);
 
   // Utility factories for simple shapes.
   static Path MakeRect(const gfx::RectF&);

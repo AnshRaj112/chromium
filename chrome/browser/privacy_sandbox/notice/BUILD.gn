@@ -39,7 +39,10 @@ source_set("core") {
 
 source_set("interfaces") {
   public = [ "notice_service_interface.h" ]
-  deps = [ ":notice_mojom" ]
+  deps = [
+    ":notice_mojom",
+    "//components/keyed_service/core",
+  ]
 }
 
 source_set("notice") {
@@ -49,7 +52,6 @@ source_set("notice") {
     ":interfaces",
     "//base",
     "//chrome/browser/profiles:profile",
-    "//components/keyed_service/core",
   ]
 
   if (!is_android) {
@@ -86,6 +88,8 @@ test("fuzz_tests") {
 source_set("test_support") {
   testonly = true
   sources = [
+    "mocks/mock_notice_catalog.cc",
+    "mocks/mock_notice_catalog.h",
     "mocks/mock_notice_service.cc",
     "mocks/mock_notice_service.h",
     "mocks/mock_notice_storage.cc",

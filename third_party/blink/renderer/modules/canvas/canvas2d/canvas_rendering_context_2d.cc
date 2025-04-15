@@ -91,6 +91,8 @@
 #include "third_party/blink/renderer/modules/canvas/htmlcanvas/canvas_context_creation_attributes_helpers.h"
 #include "third_party/blink/renderer/platform/fonts/font.h"
 #include "third_party/blink/renderer/platform/geometry/layout_unit.h"
+#include "third_party/blink/renderer/platform/geometry/path.h"
+#include "third_party/blink/renderer/platform/geometry/path_builder.h"
 #include "third_party/blink/renderer/platform/geometry/physical_offset.h"
 #include "third_party/blink/renderer/platform/geometry/stroke_data.h"
 #include "third_party/blink/renderer/platform/graphics/canvas_deferred_paint_record.h"
@@ -109,6 +111,7 @@
 #include "third_party/blink/renderer/platform/graphics/web_graphics_context_3d_provider_util.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/timer.h"
+#include "third_party/blink/renderer/platform/transforms/affine_transform.h"
 #include "third_party/blink/renderer/platform/wtf/hash_table.h"
 #include "third_party/blink/renderer/platform/wtf/key_value_pair.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
@@ -318,9 +321,12 @@ void CanvasRenderingContext2D::ScrollPathIntoViewInternal(const Path& path) {
   }
 
   // Apply transformation and get the bounding rect
-  Path transformed_path = path;
-  transformed_path.Transform(GetState().GetTransform());
-  gfx::RectF bounding_rect = transformed_path.BoundingRect();
+  const AffineTransform& transform = GetState().GetTransform();
+  const Path transformed_path =
+      transform.IsIdentity()
+          ? path
+          : PathBuilder(path).Transform(transform).Finalize();
+  const gfx::RectF bounding_rect = transformed_path.BoundingRect();
 
   // We first map canvas coordinates to layout coordinates.
   PhysicalRect path_rect = PhysicalRect::EnclosingRect(bounding_rect);
@@ -842,17 +848,17 @@ void CanvasRenderingContext2D::OnPageVisibilityChangeWhenPaintable() {
   HTMLCanvasElement* const element = canvas();
 
   bool page_is_visible = element->IsPageVisible();
-  if (element->ResourceProvider()) {
-    element->ResourceProvider()->SetResourceRecyclingEnabled(page_is_visible);
+  CanvasResourceProvider* resource_provider = element->ResourceProvider();
+  if (resource_provider) {
+    resource_provider->SetResourceRecyclingEnabled(page_is_visible);
   }
 
   // Conserve memory.
-  if (element->GetRasterMode() == RasterMode::kGPU) {
-    SetAggressivelyFreeSharedGpuContextResourcesIfPossible(!page_is_visible);
-  }
+  SetAggressivelyFreeSharedGpuContextResourcesIfPossible(!page_is_visible);
 
-  if (features::IsCanvas2DHibernationEnabled() && element->ResourceProvider() &&
-      element->GetRasterMode() == RasterMode::kGPU && !page_is_visible) {
+  if (features::IsCanvas2DHibernationEnabled() && !page_is_visible &&
+      !element->IsHibernating() && resource_provider &&
+      resource_provider->IsAccelerated()) {
     element->GetHibernationHandler()->InitiateHibernationIfNecessary();
   }
 
@@ -994,8 +1000,11 @@ void CanvasRenderingContext2D::UpdateElementAccessibility(const Path& path,
   ax_object_cache->UpdateAXForAllDocuments();
 
   // Get the transformed path.
-  Path transformed_path = path;
-  transformed_path.Transform(GetState().GetTransform());
+  const AffineTransform& transform = GetState().GetTransform();
+  const Path transformed_path =
+      transform.IsIdentity()
+          ? path
+          : PathBuilder(path).Transform(transform).Finalize();
 
   // Add border and padding to the bounding rect.
   PhysicalRect element_rect =

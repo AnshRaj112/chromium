@@ -7,16 +7,15 @@
 
 #include <stdint.h>
 
-#include "content/browser/indexed_db/instance/backing_store.h"
+#include "content/browser/indexed_db/instance/leveldb/backing_store.h"
 
 namespace content::indexed_db {
 
-class FakeTransaction : public BackingStore::Transaction {
+class FakeTransaction : public level_db::BackingStore::Transaction {
  public:
   FakeTransaction(Status phase_two_result,
                   blink::mojom::IDBTransactionMode mode,
-                  base::WeakPtr<BackingStore> backing_store);
-  explicit FakeTransaction(Status phase_two_result);
+                  base::WeakPtr<level_db::BackingStore> backing_store);
 
   FakeTransaction(const FakeTransaction&) = delete;
   FakeTransaction& operator=(const FakeTransaction&) = delete;

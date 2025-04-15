@@ -694,6 +694,8 @@ component("net") {
     "http/http_version.h",
     "http/no_vary_search_cache.cc",
     "http/no_vary_search_cache.h",
+    "http/no_vary_search_cache_storage_file_operations.cc",
+    "http/no_vary_search_cache_storage_file_operations.h",
     "http/partial_data.cc",
     "http/partial_data.h",
     "http/proxy_client_socket.cc",
@@ -1303,6 +1305,9 @@ component("net") {
       "proxy_resolution/proxy_config_service_linux.cc",
       "proxy_resolution/proxy_config_service_linux.h",
     ]
+    if (use_glib) {
+      deps += [ "//ui/base/glib" ]
+    }
   }
 
   if (is_linux || is_chromeos || is_android) {
@@ -2824,6 +2829,7 @@ target(_test_target_type, "net_unittests") {
     "http/http_vary_data_unittest.cc",
     "http/mock_allow_http_auth_preferences.cc",
     "http/mock_allow_http_auth_preferences.h",
+    "http/no_vary_search_cache_storage_file_operations_unittest.cc",
     "http/no_vary_search_cache_unittest.cc",
     "http/test_upload_data_stream_not_allow_http1.cc",
     "http/test_upload_data_stream_not_allow_http1.h",
@@ -3088,6 +3094,7 @@ target(_test_target_type, "net_unittests") {
     "//testing/gtest",
     "//third_party/abseil-cpp:absl",
     "//third_party/anonymous_tokens:anonymous_tokens_tests",
+    "//third_party/perfetto:perfetto_test_support",
     "//third_party/protobuf:protobuf_lite",
     "//third_party/simdutf:simdutf",
     "//third_party/zlib",

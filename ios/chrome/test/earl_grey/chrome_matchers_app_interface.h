@@ -181,6 +181,9 @@
 // Matcher for show tabs button.
 + (id<GREYMatcher>)showTabsButton;
 
+// Returns a matcher for the blue dot on the show tabs button.
++ (id<GREYMatcher>)blueDotOnShowTabsButton;
+
 // Matcher for Add to reading list button.
 + (id<GREYMatcher>)addToReadingListButton;
 
@@ -522,6 +525,15 @@
 // Returns the GREYMatcher for the group cell at `index` in the tab strip.
 + (id<GREYMatcher>)tabStripGroupCellAtIndex:(unsigned int)index;
 
+// Returns a matcher for the blue dot view on the cell at `index` in the tab
+// strip.
++ (id<GREYMatcher>)blueDotOnTabStripCellAtIndex:(unsigned int)index;
+
+// Returns a matcher for the notification dot view on the group cell at `index`
+// in the tab strip.
++ (id<GREYMatcher>)notificationDotOnTabStripGroupCellAtIndex:
+    (unsigned int)index;
+
 // Returns a matcher for the group cell at `index` in the tab groups panel.
 + (id<GREYMatcher>)tabGroupsPanelCellAtIndex:(unsigned int)index;
 
@@ -533,6 +545,14 @@
 // Returns a matcher for the recent activity log cell at `index` in the recent
 // activity in the tab group.
 + (id<GREYMatcher>)tabGroupRecentActivityCellAtIndex:(unsigned int)index;
+
+// Returns a matcher for the activity label on the group cell at `index` in the
+// tab grid.
++ (id<GREYMatcher>)tabGroupActivityLabelOnGroupCellAtIndex:(unsigned int)index;
+
+// Returns a matcher for the activity label on the grid cell at `index` in the
+// tab grid.
++ (id<GREYMatcher>)tabGroupActivityLabelOnGridCellAtIndex:(unsigned int)index;
 
 // Returns the GREYMatcher for the button that closes the tab grid.
 + (id<GREYMatcher>)tabGridDoneButton;
@@ -813,6 +833,13 @@
 
 // Returns the matcher for the back button in the tab group view.
 + (id<GREYMatcher>)tabGroupBackButton;
+
+// Returns the matcher for the activity summary cell in the tab group view.
++ (id<GREYMatcher>)tabGroupActivitySummaryCell;
+
+// Returns the matcher for the close button in the activity summary cell in the
+// tab group view.
++ (id<GREYMatcher>)tabGroupActivitySummaryCellCloseButton;
 
 #pragma mark - Tab Groups Context Menus
 

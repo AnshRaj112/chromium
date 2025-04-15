@@ -76,6 +76,10 @@ BASE_FEATURE(kClientSideDetectionNotificationPrompt,
              "ClientSideDetectionNotificationPrompt",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kClientSideDetectionRedirectChainKillswitch,
+             "ClientSideDetectionRedirectChainKillswitch",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kClientSideDetectionSamplePing,
              "ClientSideDetectionSamplePing",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -157,7 +161,7 @@ BASE_FEATURE(kEnterprisePasswordReuseUiRefresh,
 
 BASE_FEATURE(kEnterpriseRealTimeUrlCheckOnAndroid,
              "EnterpriseRealTimeUrlCheckOnAndroid",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEsbAiStringUpdate,
              "EsbAiStringUpdate",
@@ -285,6 +289,10 @@ constexpr base::FeatureParam<std::string> kRedWarningSurveyDidProceedFilter{
     &kRedWarningSurvey, "RedWarningSurveyDidProceedFilter",
     /*default_value=*/"TRUE,FALSE"};
 
+BASE_FEATURE(kReportNotificationContentDetectionData,
+             "ReportNotificationContentDetectionData",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kSafeBrowsingDailyPhishingReportsLimit,
              "SafeBrowsingDailyPhishingReportsLimit",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -374,6 +382,7 @@ base::Value::List GetFeatureStatusList() {
       &kClientSideDetectionKeyboardPointerLockRequest,
       &kClientSideDetectionKillswitch,
       &kClientSideDetectionNotificationPrompt,
+      &kClientSideDetectionRedirectChainKillswitch,
       &kCreateNotificationsAcceptedClientSafeBrowsingReports,
       &kDelayedWarnings,
       &kDlpRegionalizedEndpoints,
@@ -388,6 +397,7 @@ base::Value::List GetFeatureStatusList() {
       &kLocalIpAddressInEvents,
       &kLocalListsUseSBv5,
       &kOnDeviceNotificationContentDetectionModel,
+      &kReportNotificationContentDetectionData,
       &kSafeBrowsingRemoveCookiesInAuthRequests,
       &kSafetyHubAbusiveNotificationRevocation,
       &kShowWarningsForSuspiciousNotifications,

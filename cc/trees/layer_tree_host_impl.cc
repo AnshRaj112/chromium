@@ -1502,19 +1502,13 @@ DrawResult LayerTreeHostImpl::CalculateRenderPasses(FrameData* frame) {
       }
     } else if (it.state() == EffectTreeLayerListIterator::State::kLayer) {
       LayerImpl* layer = it.current_layer();
-      if (use_layer_context_for_display_ &&
-          layer->GetLayerType() == mojom::LayerType::kVideo) {
-        // For VideoLayerImpl, WillDraw() and DidDraw() have to be called
-        // as a pair because one acquires the provider mutex and the other
-        // releases it.
-        // TODO(zmo): Do not skip video layer's WillDraw() once DidDraw() is
-        // also added back to renderer side for TreesInViz mode.
-      } else if (layer->WillDraw(context.draw_mode, resource_provider_.get())) {
+      if (layer->WillDraw(context.draw_mode, resource_provider_.get())) {
         DCHECK_EQ(active_tree_.get(), layer->layer_tree_impl());
 
-        if (output_frame_data) {
-          frame->will_draw_layers.push_back(layer);
-        }
+        // This is necessary in TreesInViz mode to trigger DidDraw() through
+        // LayerTreeHostImpl::DidDrawAllLayers().
+        frame->will_draw_layers.push_back(layer);
+
         if (layer->may_contain_video()) {
           num_of_layers_with_videos++;
           if (output_frame_data) {
@@ -2059,6 +2053,10 @@ void LayerTreeHostImpl::SetIsLikelyToRequireADraw(
   // for draw tile here, then we will miss telling the scheduler each frame that
   // we intend to draw so it may make worse scheduling decisions.
   is_likely_to_require_a_draw_ = is_likely_to_require_a_draw;
+}
+
+viz::SharedImageFormat LayerTreeHostImpl::GetTileFormat() const {
+  return raster_caps_.tile_format;
 }
 
 TargetColorParams LayerTreeHostImpl::GetTargetColorParams(
@@ -4248,7 +4246,6 @@ LayerTreeHostImpl::CreateRasterBufferProvider() {
   if (!compositor_context_provider) {
     return std::make_unique<ZeroCopyRasterBufferProvider>(
         layer_tree_frame_sink_->shared_image_interface(),
-        raster_caps_.tile_format,
         /*is_software=*/true);
   }
 
@@ -4262,8 +4259,8 @@ LayerTreeHostImpl::CreateRasterBufferProvider() {
 
     return std::make_unique<GpuRasterBufferProvider>(
         compositor_context_provider, worker_context_provider,
-        raster_caps_.tile_format, raster_caps_.tile_overlay_candidate,
-        settings_.max_gpu_raster_tile_size, pending_raster_queries_.get());
+        raster_caps_.tile_overlay_candidate, settings_.max_gpu_raster_tile_size,
+        pending_raster_queries_.get());
   }
 
   bool use_zero_copy = settings_.use_zero_copy;
@@ -4278,7 +4275,6 @@ LayerTreeHostImpl::CreateRasterBufferProvider() {
   if (use_zero_copy) {
     return std::make_unique<ZeroCopyRasterBufferProvider>(
         compositor_context_provider->SharedImageInterface(),
-        raster_caps_.tile_format,
         /*is_software=*/false);
   }
 
@@ -4287,7 +4283,7 @@ LayerTreeHostImpl::CreateRasterBufferProvider() {
   return std::make_unique<OneCopyRasterBufferProvider>(
       GetTaskRunner(), compositor_context_provider, worker_context_provider,
       max_copy_texture_chromium_size, settings_.use_partial_raster,
-      settings_.max_staging_buffer_usage_in_bytes, raster_caps_.tile_format,
+      settings_.max_staging_buffer_usage_in_bytes,
       raster_caps_.tile_overlay_candidate);
 }
 

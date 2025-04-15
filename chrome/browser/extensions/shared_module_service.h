@@ -9,11 +9,14 @@
 
 #include "base/memory/raw_ptr.h"
 #include "base/scoped_observation.h"
-#include "chrome/browser/extensions/install_gate.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_registry_observer.h"
+#include "extensions/browser/install_gate.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/manifest_handlers/shared_module_info.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace content {
 class BrowserContext;

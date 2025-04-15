@@ -93,6 +93,28 @@ GetDeviceRegistrationOutcomeForUMAFromResponse(
   NOTREACHED();
 }
 
+class LocalRecoveryFactorsFactoryImpl
+    : public StandaloneTrustedVaultBackend::LocalRecoveryFactorsFactory {
+ public:
+  LocalRecoveryFactorsFactoryImpl() = default;
+  LocalRecoveryFactorsFactoryImpl(const LocalRecoveryFactorsFactoryImpl&) =
+      delete;
+  ~LocalRecoveryFactorsFactoryImpl() override = default;
+
+  LocalRecoveryFactorsFactoryImpl& operator=(
+      const LocalRecoveryFactorsFactoryImpl&) = delete;
+
+  std::vector<std::unique_ptr<LocalRecoveryFactor>> CreateLocalRecoveryFactors(
+      StandaloneTrustedVaultStorage* storage,
+      const std::optional<CoreAccountInfo>& primary_account) override {
+    std::vector<std::unique_ptr<LocalRecoveryFactor>> local_recovery_factors;
+    local_recovery_factors.emplace_back(
+        std::make_unique<PhysicalDeviceRecoveryFactor>(storage,
+                                                       primary_account));
+    return local_recovery_factors;
+  }
+};
+
 }  // namespace
 
 StandaloneTrustedVaultBackend::PendingTrustedRecoveryMethod::
@@ -175,17 +197,22 @@ StandaloneTrustedVaultBackend::StandaloneTrustedVaultBackend(
                       ? std::make_unique<TrustedVaultThrottlingConnectionImpl>(
                             std::move(connection),
                             storage_.get())
-                      : nullptr) {}
+                      : nullptr),
+      local_recovery_factors_factory_(
+          std::make_unique<LocalRecoveryFactorsFactoryImpl>()) {}
 
 StandaloneTrustedVaultBackend::StandaloneTrustedVaultBackend(
     SecurityDomainId security_domain_id,
     std::unique_ptr<StandaloneTrustedVaultStorage> storage,
     std::unique_ptr<Delegate> delegate,
-    std::unique_ptr<TrustedVaultThrottlingConnection> connection)
+    std::unique_ptr<TrustedVaultThrottlingConnection> connection,
+    std::unique_ptr<LocalRecoveryFactorsFactory> local_recovery_factors_factory)
     : security_domain_id_(security_domain_id),
       storage_(std::move(storage)),
       delegate_(std::move(delegate)),
-      connection_(std::move(connection)) {}
+      connection_(std::move(connection)),
+      local_recovery_factors_factory_(
+          std::move(local_recovery_factors_factory)) {}
 
 StandaloneTrustedVaultBackend::~StandaloneTrustedVaultBackend() = default;
 
@@ -195,10 +222,12 @@ StandaloneTrustedVaultBackend::CreateForTesting(
     SecurityDomainId security_domain_id,
     std::unique_ptr<StandaloneTrustedVaultStorage> storage,
     std::unique_ptr<StandaloneTrustedVaultBackend::Delegate> delegate,
-    std::unique_ptr<TrustedVaultThrottlingConnection> connection) {
+    std::unique_ptr<TrustedVaultThrottlingConnection> connection,
+    std::unique_ptr<LocalRecoveryFactorsFactory>
+        local_recovery_factors_factory) {
   return base::WrapRefCounted(new StandaloneTrustedVaultBackend(
       security_domain_id, std::move(storage), std::move(delegate),
-      std::move(connection)));
+      std::move(connection), std::move(local_recovery_factors_factory)));
 }
 
 void StandaloneTrustedVaultBackend::WriteDegradedRecoverabilityState(
@@ -209,7 +238,7 @@ void StandaloneTrustedVaultBackend::WriteDegradedRecoverabilityState(
       storage_->FindUserVault(primary_account_->gaia);
   *per_user_vault->mutable_degraded_recoverability_state() =
       degraded_recoverability_state;
-  WriteDataToDiskAndNotify();
+  storage_->WriteDataToDisk();
 }
 
 void StandaloneTrustedVaultBackend::OnDegradedRecoverabilityChanged() {
@@ -333,8 +362,8 @@ void StandaloneTrustedVaultBackend::StoreKeys(
         key, per_user_vault->add_vault_key()->mutable_key_material());
   }
 
-  WriteDataToDiskAndNotify();
-  MaybeRegisterDevice();
+  storage_->WriteDataToDisk();
+  MaybeRegisterLocalRecoveryFactors();
 }
 
 void StandaloneTrustedVaultBackend::SetPrimaryAccount(
@@ -353,7 +382,7 @@ void StandaloneTrustedVaultBackend::SetPrimaryAccount(
     if (PersistentAuthErrorWasResolved(previous_refresh_token_error_state,
                                        refresh_token_error_state_)) {
       MaybeProcessPendingTrustedRecoveryMethod();
-      MaybeRegisterDevice();
+      MaybeRegisterLocalRecoveryFactors();
 
       CHECK(degraded_recoverability_handler_);
       degraded_recoverability_handler_->HintDegradedRecoverabilityChanged(
@@ -403,20 +432,7 @@ void StandaloneTrustedVaultBackend::SetPrimaryAccount(
   }
   pending_get_is_recoverability_degraded_.reset();
 
-  const std::optional<TrustedVaultDeviceRegistrationStateForUMA>
-      registration_state = MaybeRegisterDevice();
-
-  if (registration_state.has_value() &&
-      !device_registration_state_recorded_to_uma_) {
-    device_registration_state_recorded_to_uma_ = true;
-    base::UmaHistogramBoolean(
-        "TrustedVault.DeviceRegistered." +
-            GetSecurityDomainNameForUma(security_domain_id_),
-        per_user_vault->local_device_registration_info().device_registered());
-    RecordTrustedVaultDeviceRegistrationState(security_domain_id_,
-                                              *registration_state);
-  }
-
+  MaybeRegisterLocalRecoveryFactors();
   MaybeProcessPendingTrustedRecoveryMethod();
 }
 
@@ -451,7 +467,7 @@ void StandaloneTrustedVaultBackend::UpdateAccountsInCookieJarInfo(
       };
 
   storage_->RemoveUserVaults(should_remove_user_data);
-  WriteDataToDiskAndNotify();
+  storage_->WriteDataToDisk();
 }
 
 bool StandaloneTrustedVaultBackend::MarkLocalKeysAsStale(
@@ -464,7 +480,7 @@ bool StandaloneTrustedVaultBackend::MarkLocalKeysAsStale(
   }
 
   per_user_vault->set_keys_marked_as_stale_by_consumer(true);
-  WriteDataToDiskAndNotify();
+  storage_->WriteDataToDisk();
   return true;
 }
 
@@ -566,13 +582,13 @@ void StandaloneTrustedVaultBackend::ClearLocalDataForAccount(
 
   *per_user_vault = trusted_vault_pb::LocalTrustedVaultPerUser();
   per_user_vault->set_gaia_id(account_info.gaia.ToString());
-  WriteDataToDiskAndNotify();
+  storage_->WriteDataToDisk();
 
   // This codepath invoked as part of sync reset. While sync reset can cause
   // resetting primary account, this is not the case for Chrome OS and Butter
   // mode. Trigger device registration attempt immediately as it can succeed in
   // these cases.
-  MaybeRegisterDevice();
+  MaybeRegisterLocalRecoveryFactors();
 }
 
 std::optional<CoreAccountInfo>
@@ -607,55 +623,57 @@ int StandaloneTrustedVaultBackend::GetLastKeyVersionForTesting(
   return per_user_vault->last_vault_key_version();
 }
 
-void StandaloneTrustedVaultBackend::
-    SetLastRegistrationReturnedLocalDataObsoleteForTesting(
-        const GaiaId& gaia_id) {
-  trusted_vault_pb::LocalTrustedVaultPerUser* per_user_vault =
-      storage_->FindUserVault(gaia_id);
-  DCHECK(per_user_vault);
-  per_user_vault->mutable_local_device_registration_info()
-      ->set_last_registration_returned_local_data_obsolete(true);
-  WriteDataToDiskAndNotify();
-}
-
 bool StandaloneTrustedVaultBackend::HasPendingTrustedRecoveryMethodForTesting()
     const {
   return pending_trusted_recovery_method_.has_value();
 }
 
 void StandaloneTrustedVaultBackend::ResetLocalRecoveryFactors() {
-  local_recovery_factors_.clear();
-  // |storage_| outlives |local_recovery_factors_|.
-  local_recovery_factors_.emplace_back(
-      std::make_unique<PhysicalDeviceRecoveryFactor>(storage_.get(),
-                                                     primary_account_));
+  // |storage_| outlives |local_recovery_factors_|, so passing a raw pointer is
+  // ok.
+  local_recovery_factors_ =
+      local_recovery_factors_factory_->CreateLocalRecoveryFactors(
+          storage_.get(), primary_account_);
 }
 
-std::optional<TrustedVaultDeviceRegistrationStateForUMA>
-StandaloneTrustedVaultBackend::MaybeRegisterDevice() {
+void StandaloneTrustedVaultBackend::MaybeRegisterLocalRecoveryFactors() {
   // TODO(crbug.com/40255601): in case of transient failure this function is
   // likely to be not called until the browser restart; implement retry logic.
   if (!connection_) {
     // Feature disabled.
-    return std::nullopt;
+    return;
   }
 
   if (!primary_account_.has_value()) {
     // Device registration is supported only for |primary_account_|.
-    return std::nullopt;
+    return;
   }
 
-  // TODO(crbug.com/398160323): support all local recovery factors. This will
-  // require a refactoring of how registration outcomes are reported to UMA.
-  // Also, MaybeRegisterDevice() should then be renamed to something more
-  // generic.
-  CHECK_EQ(local_recovery_factors_.size(), 1u);
-  // Unretained because |this| outlives |local_recovery_factors_| (and
-  // destroying |local_recovery_factors_| cancels all callbacks).
-  return local_recovery_factors_[0]->MaybeRegister(
-      connection_.get(),
-      base::BindOnce(&StandaloneTrustedVaultBackend::OnDeviceRegistered,
-                     base::Unretained(this)));
+  const bool should_record_metrics =
+      !device_registration_state_recorded_to_uma_;
+  for (auto& factor : local_recovery_factors_) {
+    // Unretained because |this| outlives |local_recovery_factors_| (and
+    // destroying |local_recovery_factors_| cancels all callbacks).
+    const std::optional<TrustedVaultDeviceRegistrationStateForUMA>
+        registration_state = factor->MaybeRegister(
+            connection_.get(),
+            base::BindOnce(&StandaloneTrustedVaultBackend::OnDeviceRegistered,
+                           base::Unretained(this),
+                           factor->GetRecoveryFactorType()));
+
+    if (registration_state.has_value() && should_record_metrics) {
+      device_registration_state_recorded_to_uma_ = true;
+      base::UmaHistogramBoolean(
+          base::StrCat({"TrustedVault.DeviceRegistered.",
+                        GetLocalRecoveryFactorNameForUma(
+                            factor->GetRecoveryFactorType()),
+                        ".", GetSecurityDomainNameForUma(security_domain_id_)}),
+          factor->IsRegistered());
+      RecordTrustedVaultDeviceRegistrationState(factor->GetRecoveryFactorType(),
+                                                security_domain_id_,
+                                                *registration_state);
+    }
+  }
 }
 
 void StandaloneTrustedVaultBackend::MaybeProcessPendingTrustedRecoveryMethod() {
@@ -679,6 +697,7 @@ void StandaloneTrustedVaultBackend::MaybeProcessPendingTrustedRecoveryMethod() {
 }
 
 void StandaloneTrustedVaultBackend::OnDeviceRegistered(
+    LocalRecoveryFactorType local_recovery_factor_type,
     TrustedVaultRegistrationStatus status,
     int key_version,
     bool had_local_keys) {
@@ -691,7 +710,7 @@ void StandaloneTrustedVaultBackend::OnDeviceRegistered(
   DCHECK(per_user_vault);
 
   RecordTrustedVaultDeviceRegistrationOutcome(
-      security_domain_id_,
+      local_recovery_factor_type, security_domain_id_,
       GetDeviceRegistrationOutcomeForUMAFromResponse(status));
 
   switch (status) {
@@ -709,7 +728,7 @@ void StandaloneTrustedVaultBackend::OnDeviceRegistered(
               GetConstantTrustedVaultKey(),
               per_user_vault->add_vault_key()->mutable_key_material());
           per_user_vault->set_last_vault_key_version(key_version);
-          WriteDataToDiskAndNotify();
+          storage_->WriteDataToDisk();
         }
       }
       break;
@@ -862,12 +881,7 @@ void StandaloneTrustedVaultBackend::
       };
 
   storage_->RemoveUserVaults(should_remove_user_data);
-  WriteDataToDiskAndNotify();
-}
-
-void StandaloneTrustedVaultBackend::WriteDataToDiskAndNotify() {
   storage_->WriteDataToDisk();
-  delegate_->NotifyStateChanged();
 }
 
 }  // namespace trusted_vault

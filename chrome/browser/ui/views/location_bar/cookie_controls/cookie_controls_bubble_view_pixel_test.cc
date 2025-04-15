@@ -102,7 +102,7 @@ class CookieControlsBubbleViewPixelTest
         /*is_incognito_profile=*/false);
 
     cookie_controls_coordinator_ =
-        cookie_controls_icon_->GetCoordinatorForTesting();
+        &cookie_controls_icon_->GetCoordinatorForTesting();
     cookie_controls_coordinator_->SetDisplayNameForTesting(u"example.com");
   }
 
@@ -115,6 +115,7 @@ class CookieControlsBubbleViewPixelTest
       std::vector<content_settings::TrackingProtectionFeature> features) {
     // ShowBubble will initialize the view controller.
     cookie_controls_coordinator_->ShowBubble(
+        browser()->GetBrowserView().toolbar_button_provider(),
         browser()->tab_strip_model()->GetActiveWebContents(),
         controller_.get());
     auto expiration = days_to_expiration

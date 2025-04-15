@@ -184,6 +184,7 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kOverscrollHistoryNavigation);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPartitionedPopinsHeaderPolicyBypass);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPdfEnforcements);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPeriodicBackgroundSync);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kPrefetchPrerenderIntegration);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kFeaturePolicyHeader);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPrefetchBrowserInitiatedTriggers);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPrerender2NewLimitAndScheduler);
@@ -197,7 +198,8 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(
     kPrivateNetworkAccessRespectPreflightResults);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kPrivateNetworkAccessSendPreflights);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kOriginKeyedProcessesByDefault);
-CONTENT_EXPORT BASE_DECLARE_FEATURE(kPushSubscriptionChangeEvent);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kPushSubscriptionChangeEventOnInvalidation);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kPushSubscriptionChangeEventOnResubscribe);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kQueueNavigationsWhileWaitingForCommit);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kReduceSubresourceResponseStartedIPC);
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
@@ -207,6 +209,7 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kRenderDocument);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kRenderDocumentCompositorReuse);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kRestrictThreadPoolInBackground);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSetIsolatesPriority);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kSpareRendererProcessPriority);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kRetryGetVideoCaptureDeviceInfos);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kProcessPerSiteUpToMainFrameThreshold);
 CONTENT_EXPORT extern const base::FeatureParam<int>
@@ -349,6 +352,7 @@ CONTENT_EXPORT extern const base::FeatureParam<std::string>
 
 CONTENT_EXPORT bool IsVideoCaptureServiceEnabledForOutOfProcess();
 CONTENT_EXPORT bool IsVideoCaptureServiceEnabledForBrowserProcess();
+CONTENT_EXPORT bool IsPushSubscriptionChangeEventEnabled();
 
 }  // namespace features
 

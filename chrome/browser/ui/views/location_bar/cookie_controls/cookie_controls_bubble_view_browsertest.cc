@@ -8,6 +8,7 @@
 #include "chrome/browser/privacy_sandbox/tracking_protection_settings_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
 #include "chrome/browser/ui/views/location_bar/cookie_controls/cookie_controls_bubble_coordinator.h"
@@ -78,7 +79,8 @@ class CookieControlsBubbleViewBrowserTest : public InProcessBrowserTest {
                 incognito_profile()),
             /*is_incognito_profile=*/true);
 
-    coordinator_ = std::make_unique<CookieControlsBubbleCoordinator>();
+    coordinator_ =
+        browser()->GetFeatures().cookie_controls_bubble_coordinator();
   }
 
   void TearDownOnMainThread() override {
@@ -95,12 +97,15 @@ class CookieControlsBubbleViewBrowserTest : public InProcessBrowserTest {
 
  protected:
   void ShowBubble() {
-    coordinator_->ShowBubble(active_web_contents(), controller_.get());
+    coordinator_->ShowBubble(
+        browser()->GetBrowserView().toolbar_button_provider(),
+        active_web_contents(), controller_.get());
   }
 
   void ShowIncognitoBubble() {
-    coordinator_->ShowBubble(active_web_contents(),
-                             incognito_controller_.get());
+    coordinator_->ShowBubble(
+        browser()->GetBrowserView().toolbar_button_provider(),
+        active_web_contents(), incognito_controller_.get());
   }
 
   void WaitForBubbleClose() {
@@ -158,7 +163,7 @@ class CookieControlsBubbleViewBrowserTest : public InProcessBrowserTest {
  private:
   base::test::ScopedFeatureList feature_list_;
   std::unique_ptr<net::EmbeddedTestServer> https_server_;
-  std::unique_ptr<CookieControlsBubbleCoordinator> coordinator_;
+  raw_ptr<CookieControlsBubbleCoordinator> coordinator_;
   std::unique_ptr<content_settings::CookieControlsController> controller_;
   std::unique_ptr<content_settings::CookieControlsController>
       incognito_controller_;

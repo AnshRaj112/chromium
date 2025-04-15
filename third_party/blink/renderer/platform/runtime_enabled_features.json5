@@ -391,6 +391,10 @@
       status: "stable",
     },
     {
+      name: "AllowSvgUseToReferenceExternalDocumentRoot",
+      status: "experimental",
+    },
+    {
       name: "AllowSyntheticTimingForCanvasCapture",
       base_feature: "none",
       status: {
@@ -623,6 +627,11 @@
       status: "experimental",
     },
     {
+      name: "BrowserInitiatedAutomaticPictureInPicture",
+      public: true,
+      status: "experimental",
+    },
+    {
       name: "BrowserVerifiedUserActivationKeyboard",
       base_feature: "none",
       public: true,
@@ -720,12 +729,6 @@
       name: "CanvasInterventions",
       browser_process_read_write_access: true,
       base_feature: "none",
-    },
-    {
-      // This allows testing the canvas noise interventions in tests (which in
-      // most cases don't have a CPU). In practice the interventions are only
-      // enabled for GPU-rendered canvases.
-      name: "CanvasInterventionsOnCpuForTesting",
     },
     {
       // https://github.com/Igalia/explainers/blob/main/canvas-formatted-text/html-in-canvas.md
@@ -1145,21 +1148,21 @@
       // queries support in conditions.
       // https://drafts.csswg.org/css-values-5/#if-notation.
       name: "CSSInlineIfForMediaQueries",
-      status: "experimental",
+      status: "stable",
     },
     {
       // CSS if() function for custom properties. Flag is used only for style
       // queries support in conditions.
       // https://drafts.csswg.org/css-values-5/#if-notation.
       name: "CSSInlineIfForStyleQueries",
-      status: "experimental",
+      status: "stable",
     },
     {
       // CSS if() function for custom properties. Flag is used only for supports
       // queries support in conditions.
       // https://drafts.csswg.org/css-values-5/#if-notation.
       name: "CSSInlineIfForSupportsQueries",
-      status: "experimental",
+      status: "stable",
     },
     {
       // https://chromestatus.com/feature/6289894144212992
@@ -1378,8 +1381,12 @@
     },
     {
       name: "CSSShapeFunctionCompositeAnimation",
-      status: "experimental",
+      status: "stable",
       depends_on: ["CSSShapeFunction", "CompositeClipPathAnimation"]
+    },
+    {
+      name: "CSSShapeFunctionOffsetPath",
+      status: "stable",
     },
     {
       // sibling-index() and sibling-count()
@@ -1455,15 +1462,15 @@
       status: "experimental",
     },
     {
-      // https://chromestatus.com/feature/5064894363992064
+      // https://chromestatus.com/feature/4850737974345728
       name: "CSSViewTransitionAutoName",
       status: "experimental",
       depends_on: ["CSSViewTransitionMatchElement"],
     },
     {
-      // https://chromestatus.com/feature/5064894363992064
+      // https://chromestatus.com/feature/5098745710247936
       name: "CSSViewTransitionMatchElement",
-      status: "experimental"
+      status: "stable"
     },
     {
       // Adds the appearance:base-select CSS value which makes <select>
@@ -1749,9 +1756,7 @@
     // IncludeJSCallStacksInCrashReports. https://chromestatus.com/feature/4731248572628992
     {
       name: "DocumentPolicyIncludeJSCallStacksInCrashReports",
-      status: "experimental",
-      base_feature_status: "enabled",
-      copied_from_base_feature_if: "overridden",
+      status: "stable",
     },
     {
       name: "DocumentPolicyNegotiation",
@@ -1796,13 +1801,6 @@
       status: {"Android": "stable"},
     },
     {
-      // Fix for https://crbug.com/40821646. When enabled, it prevents
-      // returning empty position when the position's anchor node is not
-      // a descendant of the anchor's highest editable root.
-      name: "EditableBoundaryAdjustment",
-      status: "stable",
-    },
-    {
       name: "ElementCapture",
       status: {"Android": "", "default": "stable"},
     },
@@ -1817,7 +1815,7 @@
     {
       //See: crbug.com/40771555
       name: "EnterInOpenShadowRoots",
-      status: "stable",
+      status: "test",
     },
     {
       // Experiment with preventing some instances of mutation XSS
@@ -2095,6 +2093,11 @@
     {
       // crbug.com/408309951
       name: "FindNestedAnnotationFix",
+      status: "stable",
+    },
+    {
+      // crbug.com/409358630
+      name: "FindOrphanAnnotationFix",
       status: "stable",
     },
     {
@@ -3569,10 +3572,6 @@
       base_feature: "none",
     },
     {
-      name: "QuickIntensiveWakeUpThrottlingAfterLoading",
-      status: "stable",
-    },
-    {
      // crbug.com/323953913
      // Fix looking for next radio button in the form's scope. This was added
      // in M135 and can be removed after M138.
@@ -3884,6 +3883,10 @@
     },
     {
       // https://wicg.github.io/webcomponents/proposals/Scoped-Custom-Element-Registries
+      // https://github.com/whatwg/html/issues/10854
+      // Spec PRs:
+      // https://github.com/whatwg/html/pull/10869
+      // https://github.com/whatwg/dom/pull/1341
       name: "ScopedCustomElementRegistry",
       status: "experimental",
     },
@@ -4215,6 +4218,10 @@
       status: "experimental",
     },
     {
+      name: "SkipLineBreakItemWhenIsCollapsed",
+      status: "stable",
+    },
+    {
       // If enabled, HTMLPreloadScanner will be skipped.
       name: "SkipPreloadScanning",
       origin_trial_feature_name: "SkipPreloadScanning",
@@ -4262,6 +4269,13 @@
     },
     {
       name: "SoftNavigationHeuristicsExposeFPAndFCP",
+    },
+    {
+      // Whether spatial navigation should use cursor inheritance to exclude
+      // nodes where cursor is inherited. Kill-switch that can be remove once
+      // the change goes through a stable release.
+      name: "SpatNavUsesCursorInheritance",
+      status: "stable",
     },
     {
       name: "SpeakerSelection",
@@ -4398,6 +4412,10 @@
       status: "stable",
     },
     {
+      name: "SvgTransformOnNestedSvgElement",
+      status: "experimental",
+    },
+    {
       name: "SynthesizedKeyboardEventsForAccessibilityActions",
       status: "experimental",
     },
@@ -4469,6 +4487,11 @@
     // For unit tests.
     {
       name: "TestFeatureStable",
+      status: "stable",
+    },
+    {
+      // killswitch for fix in M137
+      name: "TextareaStableResizing",
       status: "stable",
     },
     {
@@ -5045,7 +5068,7 @@
     },
     {
       name: "WebCryptoEd25519",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "WebFontResizeLCP",
@@ -5075,6 +5098,10 @@
     },
     {
       name: "WebGPUAdapterInfoIsFallbackAdapter",
+      status: "stable",
+    },
+    {
+      name: "WebGPUCopyBufferToBufferOverload",
       status: "stable",
     },
     {
@@ -5234,6 +5261,12 @@
       public: true,
       status: "stable",
       base_feature: "none",
+    },
+    {
+      name: "WebXRDepthPerformance",
+      depends_on: ["WebXR"],
+      public: true,
+      status: "experimental",
     },
     {
       name: "WebXREnabledFeatures",

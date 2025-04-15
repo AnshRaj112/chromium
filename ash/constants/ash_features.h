@@ -93,6 +93,8 @@ extern const base::FeatureParam<base::TimeDelta>
     kBocaStudentHeartbeatPeriodicJobIntervalInSeconds;
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kBocaSpotlight);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kBocaNetworkRestriction);
+COMPONENT_EXPORT(ASH_CONSTANTS)
+BASE_DECLARE_FEATURE(kBocaClientTypeForSpeechRecognition);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kCameraSuperResSupported);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kCrosSwitcher);
 COMPONENT_EXPORT(ASH_CONSTANTS) BASE_DECLARE_FEATURE(kBorealisBigGl);
@@ -888,6 +890,10 @@ BASE_DECLARE_FEATURE(kShimlessRMA3pDiagnosticsDevMode);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kShimlessRMA3pDiagnosticsAllowPermissionPolicy);
 COMPONENT_EXPORT(ASH_CONSTANTS)
+BASE_DECLARE_FEATURE(kShimlessRMAHardwareValidationSkip);
+COMPONENT_EXPORT(ASH_CONSTANTS)
+BASE_DECLARE_FEATURE(kShimlessRMADynamicDeviceInfoInputs);
+COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kShortcutStateMachines);
 COMPONENT_EXPORT(ASH_CONSTANTS)
 BASE_DECLARE_FEATURE(kShowBluetoothDebugLogToggle);
@@ -1079,6 +1085,8 @@ COMPONENT_EXPORT(ASH_CONSTANTS)
 bool IsBocaStudentHeartbeatCustomIntervalEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsBocaSpotlightEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsBocaNetworkRestrictionEnabled();
+COMPONENT_EXPORT(ASH_CONSTANTS)
+bool IsBocaClientTypeForSpeechRecognitionEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsBrightnessControlInSettingsEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsCaptureModeEducationEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS)
@@ -1230,6 +1238,7 @@ COMPONENT_EXPORT(ASH_CONSTANTS) bool IsHomeButtonWithTextEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsHostnameSettingEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsInstantHotspotRebrandEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsInputNoiseCancellationUiEnabled();
+COMPONENT_EXPORT(ASH_CONSTANTS) bool IsESimEmptyActivationCodeSupportEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS)
 bool IsInternalServerSideSpeechRecognitionEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS)
@@ -1379,6 +1388,10 @@ COMPONENT_EXPORT(ASH_CONSTANTS) bool IsShimlessRMA3pDiagnosticsEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsShimlessRMA3pDiagnosticsDevModeEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS)
 bool IsShimlessRMA3pDiagnosticsAllowPermissionPolicyEnabled();
+COMPONENT_EXPORT(ASH_CONSTANTS)
+bool IsShimlessRMAHardwareValidationSkipEnabled();
+COMPONENT_EXPORT(ASH_CONSTANTS)
+bool IsShimlessRMADynamicDeviceInfoInputs();
 COMPONENT_EXPORT(ASH_CONSTANTS)
 bool IsShowSharingUserInLauncherContinueSectionEnabled();
 COMPONENT_EXPORT(ASH_CONSTANTS) bool IsSnoopingProtectionEnabled();

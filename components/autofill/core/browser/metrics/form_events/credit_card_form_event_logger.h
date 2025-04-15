@@ -50,6 +50,10 @@ class CreditCardFormEventLogger : public FormEventLoggerBase {
     local_record_type_count_ = local_record_type_count;
   }
 
+  // Called by BnplManager after its suggestion update barrier callback is
+  // triggered and a BNPL suggestion is shown.
+  virtual void OnBnplSuggestionShown();
+
   // Invoked when `suggestions` are successfully fetched.
   // `with_offer` indicates whether an offer is attached to any of the
   // suggestion in the list.
@@ -129,6 +133,11 @@ class CreditCardFormEventLogger : public FormEventLoggerBase {
       AutofillMetrics::PaymentsSigninState state) {
     signin_state_for_metrics_ = state;
   }
+
+  // Logging when a BNPL suggestion was accepted.
+  void OnDidAcceptBnplSuggestion();
+
+  std::optional<CreditCard> GetFilledCreditCardForTesting();
 
  protected:
   // FormEventLoggerBase pure-virtual overrides.
@@ -214,6 +223,18 @@ class CreditCardFormEventLogger : public FormEventLoggerBase {
   // If true, the suggestions shown on BNPL eligible merchant is logged and
   // should not be logged again.
   bool has_logged_suggestions_shown_on_bnpl_eligible_merchant_ = false;
+  // If true, the BNPL suggestion being shown was already logged and should not
+  // be logged again.
+  bool has_logged_bnpl_suggestion_shown_ = false;
+  // If true, the metrics for a BNPL suggestion being accepted were already
+  // logged and should not log again.
+  bool has_logged_bnpl_suggestion_accepted_ = false;
+  // If true, the metrics for a form filled with a BNPL issuer VCN were already
+  // logged and should not log again.
+  bool has_logged_form_filled_with_bnpl_vcn_ = false;
+  // If true, the metrics for a form submitted with a BNPL issuer VCN were
+  // already logged and should not log again.
+  bool has_logged_form_submitted_with_bnpl_vcn_ = false;
 
   CardMetadataLoggingContext metadata_logging_context_;
 
@@ -225,6 +246,9 @@ class CreditCardFormEventLogger : public FormEventLoggerBase {
 
   // Weak references.
   raw_ptr<PersonalDataManager> personal_data_manager_;
+
+  // Present only if a form was filled with a card.
+  std::optional<CreditCard> filled_credit_card_;
 };
 
 }  // namespace autofill_metrics

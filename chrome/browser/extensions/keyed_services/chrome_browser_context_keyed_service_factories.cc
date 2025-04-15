@@ -8,14 +8,16 @@
 #include "chrome/browser/extensions/blocklist_factory.h"
 #include "chrome/browser/extensions/component_loader_factory.h"
 #include "chrome/browser/extensions/corrupted_extension_reinstaller_factory.h"
-#include "chrome/browser/extensions/delayed_install_manager_factory.h"
+#include "chrome/browser/extensions/cws_info_service_factory.h"
 #include "chrome/browser/extensions/error_console/error_console_factory.h"
 #include "chrome/browser/extensions/extension_allowlist_factory.h"
+#include "chrome/browser/extensions/extension_management.h"
 #include "chrome/browser/extensions/extension_web_ui_override_registrar.h"
 #include "chrome/browser/extensions/external_install_manager_factory.h"
 #include "chrome/browser/extensions/external_provider_manager_factory.h"
 #include "chrome/browser/extensions/forced_extensions/install_stage_tracker_factory.h"
 #include "chrome/browser/extensions/install_tracker_factory.h"
+#include "chrome/browser/extensions/install_verifier_factory.h"
 #include "chrome/browser/extensions/pending_extension_manager_factory.h"
 #include "chrome/browser/extensions/permissions/permissions_updater.h"
 #include "chrome/browser/extensions/shared_module_service_factory.h"
@@ -30,15 +32,12 @@
 #if BUILDFLAG(IS_CHROMEOS)
 #include "chrome/browser/chromeos/extensions/component_extension_content_settings/component_extension_content_settings_allowlist_factory.h"
 #endif  // BUILDFLAG(IS_CHROMEOS)
-#include "chrome/browser/extensions/cws_info_service_factory.h"
 #include "chrome/browser/extensions/extension_action_dispatcher.h"
 #include "chrome/browser/extensions/extension_error_controller_factory.h"
 #include "chrome/browser/extensions/extension_garbage_collector_factory.h"
 #include "chrome/browser/extensions/extension_gcm_app_handler.h"
-#include "chrome/browser/extensions/extension_management.h"
 #include "chrome/browser/extensions/extension_sync_service_factory.h"
 #include "chrome/browser/extensions/extension_web_ui_override_registrar.h"
-#include "chrome/browser/extensions/install_verifier_factory.h"
 #include "chrome/browser/extensions/manifest_v2_experiment_manager.h"
 #include "chrome/browser/extensions/menu_manager_factory.h"
 #include "chrome/browser/extensions/permissions/permissions_updater.h"
@@ -57,15 +56,17 @@ void EnsureChromeBrowserContextKeyedServiceFactoriesBuilt() {
   extensions::BlocklistFactory::GetInstance();
   extensions::ComponentLoaderFactory::GetInstance();
   extensions::CorruptedExtensionReinstallerFactory::GetInstance();
-  extensions::DelayedInstallManagerFactory::GetInstance();
+  extensions::CWSInfoServiceFactory::GetInstance();
   extensions::ErrorConsoleFactory::GetInstance();
   extensions::ExtensionAllowlistFactory::GetInstance();
+  extensions::ExtensionManagementFactory::GetInstance();
   extensions::ExtensionUpdaterFactory::GetInstance();
   extensions::ExtensionWebUIOverrideRegistrar::GetFactoryInstance();
   extensions::ExternalInstallManagerFactory::GetInstance();
   extensions::ExternalProviderManagerFactory::GetInstance();
   extensions::InstallStageTrackerFactory::GetInstance();
   extensions::InstallTrackerFactory::GetInstance();
+  extensions::InstallVerifierFactory::GetInstance();
   extensions::PendingExtensionManagerFactory::GetInstance();
   extensions::PermissionsUpdater::EnsureAssociatedFactoryBuilt();
   extensions::SharedModuleServiceFactory::GetInstance();
@@ -79,14 +80,11 @@ void EnsureChromeBrowserContextKeyedServiceFactoriesBuilt() {
 #if BUILDFLAG(IS_CHROMEOS)
   extensions::ComponentExtensionContentSettingsAllowlistFactory::GetInstance();
 #endif  // BUILDFLAG(IS_CHROMEOS)
-  extensions::CWSInfoServiceFactory::GetInstance();
   extensions::ExtensionActionDispatcher::GetFactoryInstance();
   extensions::ExtensionErrorControllerFactory::GetInstance();
   extensions::ExtensionGarbageCollectorFactory::GetInstance();
   extensions::ExtensionGCMAppHandler::GetFactoryInstance();
-  extensions::ExtensionManagementFactory::GetInstance();
   extensions::ChromeExtensionSystemFactory::GetInstance();
-  extensions::InstallVerifierFactory::GetInstance();
   extensions::ManifestV2ExperimentManager::GetFactory();
   extensions::MenuManagerFactory::GetInstance();
 #if BUILDFLAG(ENABLE_PLUGINS)

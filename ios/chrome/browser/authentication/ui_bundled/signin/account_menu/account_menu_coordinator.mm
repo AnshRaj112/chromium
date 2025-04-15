@@ -21,6 +21,7 @@
 #import "ios/chrome/app/change_profile_commands.h"
 #import "ios/chrome/app/profile/profile_state.h"
 #import "ios/chrome/browser/authentication/ui_bundled/authentication_flow/authentication_flow.h"
+#import "ios/chrome/browser/authentication/ui_bundled/continuation.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/account_menu/account_menu_constants.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/account_menu/account_menu_mediator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/account_menu/account_menu_mediator_delegate.h"
@@ -94,7 +95,7 @@
   base::ScopedClosureRunner _activityOverlayCallback;
   // The child signin coordinator if it’s open. It may be presented by the
   // Manage Account’s coordinator view controller.
-  SigninCoordinator* _signinCoordinator;
+  SigninCoordinator<InterruptibleChromeCoordinator>* _signinCoordinator;
   // Clicked view, used to anchor the menu to it when using
   // UIModalPresentationPopover mode
   UIView* _anchorView;
@@ -229,7 +230,7 @@
 }
 
 - (void)didTapManageAccounts {
-  CHECK(!_manageAccountsCoordinator, base::NotFatalUntil::M133);
+  CHECK(!_manageAccountsCoordinator);
   _manageAccountsCoordinator = [[ManageAccountsCoordinator alloc]
       initWithBaseViewController:_navigationController
                          browser:self.browser
@@ -395,7 +396,9 @@
                                                     browser:self.browser
                                                contextStyle:self.contextStyle
                                                 accessPoint:accessPoint
-                                                promoAction:promoAction];
+                                                promoAction:promoAction
+                                       continuationProvider:
+                                           DoNothingContinuationProvider()];
   [self startSigninCoordinatorWithCompletion:nil];
 }
 
@@ -411,7 +414,7 @@
 
 - (void)manageAccountsCoordinatorWantsToBeStopped:
     (ManageAccountsCoordinator*)coordinator {
-  CHECK_EQ(coordinator, _manageAccountsCoordinator, base::NotFatalUntil::M133);
+  CHECK_EQ(coordinator, _manageAccountsCoordinator);
   [self stopManageAccountsCoordinator];
 }
 
@@ -457,7 +460,9 @@
       addAccountCoordinatorWithBaseViewController:baseViewController
                                           browser:self.browser
                                      contextStyle:self.contextStyle
-                                      accessPoint:self.accessPoint];
+                                      accessPoint:self.accessPoint
+                             continuationProvider:
+                                 DoNothingContinuationProvider()];
   [self startSigninCoordinatorWithCompletion:completion];
 }
 

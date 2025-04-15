@@ -40,18 +40,6 @@
 
 namespace blink {
 
-namespace {
-
-bool ShouldReduceScreenSize(const LocalDOMWindow* window) {
-  CHECK(window);
-
-  // TODO(408932088): Take the current state of the window management permission
-  // (`mojom::blink::PermissionName::WINDOW_MANAGEMENT`) into account here.
-  return RuntimeEnabledFeatures::ReduceScreenSizeEnabled();
-}
-
-}  // namespace
-
 Screen::Screen(LocalDOMWindow* window, int64_t display_id)
     : ExecutionContextClient(window), display_id_(display_id) {}
 
@@ -109,7 +97,7 @@ int Screen::height() const {
   if (!DomWindow())
     return 0;
 
-  if (ShouldReduceScreenSize(DomWindow())) {
+  if (ShouldReduceScreenSize()) {
     return DomWindow()->innerHeight();
   }
 
@@ -120,7 +108,7 @@ int Screen::width() const {
   if (!DomWindow())
     return 0;
 
-  if (ShouldReduceScreenSize(DomWindow())) {
+  if (ShouldReduceScreenSize()) {
     return DomWindow()->innerWidth();
   }
 
@@ -128,9 +116,18 @@ int Screen::width() const {
 }
 
 unsigned Screen::colorDepth() const {
-  if (!DomWindow())
-    return 0;
-  return base::saturated_cast<unsigned>(GetScreenInfo().depth);
+  // "If the user agent does not know the color depth or does not want to
+  // return it for privacy considerations, it should return 24."
+  //
+  // https://drafts.csswg.org/cssom-view/#dom-screen-colordepth
+  unsigned unknown_color_depth = 24u;
+
+  if (!DomWindow() || ShouldReduceScreenSize()) {
+    return unknown_color_depth;
+  }
+  return GetScreenInfo().depth == 0
+             ? unknown_color_depth
+             : base::saturated_cast<unsigned>(GetScreenInfo().depth);
 }
 
 unsigned Screen::pixelDepth() const {
@@ -141,7 +138,7 @@ int Screen::availLeft() const {
   if (!DomWindow())
     return 0;
 
-  if (ShouldReduceScreenSize(DomWindow())) {
+  if (ShouldReduceScreenSize()) {
     return 0;
   }
 
@@ -152,7 +149,7 @@ int Screen::availTop() const {
   if (!DomWindow())
     return 0;
 
-  if (ShouldReduceScreenSize(DomWindow())) {
+  if (ShouldReduceScreenSize()) {
     return 0;
   }
 
@@ -163,7 +160,7 @@ int Screen::availHeight() const {
   if (!DomWindow())
     return 0;
 
-  if (ShouldReduceScreenSize(DomWindow())) {
+  if (ShouldReduceScreenSize()) {
     return DomWindow()->innerHeight();
   }
 
@@ -174,7 +171,7 @@ int Screen::availWidth() const {
   if (!DomWindow())
     return 0;
 
-  if (ShouldReduceScreenSize(DomWindow())) {
+  if (ShouldReduceScreenSize()) {
     return DomWindow()->innerWidth();
   }
 
@@ -195,9 +192,16 @@ ExecutionContext* Screen::GetExecutionContext() const {
   return ExecutionContextClient::GetExecutionContext();
 }
 
+bool Screen::ShouldReduceScreenSize() const {
+  // TODO(408932088): Take the current state of the window management permission
+  // (`mojom::blink::PermissionName::WINDOW_MANAGEMENT`) into account here.
+  return RuntimeEnabledFeatures::ReduceScreenSizeEnabled();
+}
+
 bool Screen::isExtended() const {
-  if (!DomWindow())
+  if (!DomWindow() || ShouldReduceScreenSize()) {
     return false;
+  }
   auto* context = GetExecutionContext();
   if (!context->IsFeatureEnabled(
           network::mojom::PermissionsPolicyFeature::kWindowManagement)) {

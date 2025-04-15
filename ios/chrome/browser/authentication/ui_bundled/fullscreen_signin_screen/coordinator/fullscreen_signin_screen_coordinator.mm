@@ -13,7 +13,6 @@
 #import "ios/chrome/browser/authentication/ui_bundled/fullscreen_signin_screen/ui/fullscreen_signin_screen_view_controller.h"
 #import "ios/chrome/browser/authentication/ui_bundled/identity_chooser/identity_chooser_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/identity_chooser/identity_chooser_coordinator_delegate.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin/interruptible_chrome_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_context_style.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_coordinator.h"
@@ -62,7 +61,8 @@
 @property(nonatomic, strong)
     IdentityChooserCoordinator* identityChooserCoordinator;
 // Coordinator to add an identity.
-@property(nonatomic, strong) SigninCoordinator* addAccountSigninCoordinator;
+@property(nonatomic, strong) SigninCoordinator<InterruptibleChromeCoordinator>*
+    addAccountSigninCoordinator;
 @property(nonatomic, assign) BOOL UMAReportingUserChoice;
 
 @end
@@ -71,21 +71,25 @@
   SigninContextStyle _contextStyle;
   signin_metrics::AccessPoint _accessPoint;
   signin_metrics::PromoAction _promoAction;
+  ChangeProfileContinuationProvider _changeProfileContinuationProvider;
 }
 
 @synthesize baseNavigationController = _baseNavigationController;
 
 - (instancetype)
-    initWithBaseNavigationController:
-        (UINavigationController*)navigationController
-                             browser:(Browser*)browser
-                            delegate:(id<FirstRunScreenDelegate>)delegate
-                        contextStyle:(SigninContextStyle)contextStyle
-                         accessPoint:(signin_metrics::AccessPoint)accessPoint
-                         promoAction:(signin_metrics::PromoAction)promoAction {
+     initWithBaseNavigationController:
+         (UINavigationController*)navigationController
+                              browser:(Browser*)browser
+                             delegate:(id<FirstRunScreenDelegate>)delegate
+                         contextStyle:(SigninContextStyle)contextStyle
+                          accessPoint:(signin_metrics::AccessPoint)accessPoint
+                          promoAction:(signin_metrics::PromoAction)promoAction
+    changeProfileContinuationProvider:(const ChangeProfileContinuationProvider&)
+                                          changeProfileContinuationProvider {
   self = [super initWithBaseViewController:navigationController
                                    browser:browser];
   if (self) {
+    CHECK(changeProfileContinuationProvider);
     _baseNavigationController = navigationController;
     _delegate = delegate;
     _UMAReportingUserChoice = kDefaultMetricsReportingCheckboxValue;
@@ -93,9 +97,12 @@
     _accessPoint = accessPoint;
     _promoAction = promoAction;
     _baseNavigationController.presentationController.delegate = self;
+    _changeProfileContinuationProvider = changeProfileContinuationProvider;
   }
   return self;
 }
+
+#pragma mark - ChromeCoordinator
 
 - (void)start {
   [self.browser->GetCommandDispatcher()
@@ -126,14 +133,15 @@
   PrefService* prefService = profile->GetPrefs();
   syncer::SyncService* syncService = SyncServiceFactory::GetForProfile(profile);
   self.mediator = [[FullscreenSigninScreenMediator alloc]
-      initWithAccountManagerService:self.accountManagerService
-              authenticationService:self.authenticationService
-                    identityManager:identityManager
-                   localPrefService:localPrefService
-                        prefService:prefService
-                        syncService:syncService
-                        accessPoint:_accessPoint
-                        promoAction:_promoAction];
+          initWithAccountManagerService:self.accountManagerService
+                  authenticationService:self.authenticationService
+                        identityManager:identityManager
+                       localPrefService:localPrefService
+                            prefService:prefService
+                            syncService:syncService
+                            accessPoint:_accessPoint
+                            promoAction:_promoAction
+      changeProfileContinuationProvider:_changeProfileContinuationProvider];
   self.mediator.consumer = self.viewController;
   self.mediator.delegate = self;
   if (self.mediator.ignoreDismissGesture) {
@@ -145,8 +153,15 @@
 }
 
 - (void)stop {
+  [self stopAnimated:NO];
+}
+
+#pragma mark - StopAnimatedChromeCoordinator
+
+- (void)stopAnimated:(BOOL)animated {
   [self.browser->GetCommandDispatcher()
       stopDispatchingForProtocol:@protocol(TOSCommands)];
+  [self stopAddAccountCoordinator];
   [self stopIdentityChooserCoordinator];
   self.delegate = nil;
   self.viewController = nil;
@@ -155,12 +170,6 @@
   self.accountManagerService = nil;
   self.authenticationService = nil;
   [super stop];
-}
-
-#pragma mark - InterruptibleChromeCoordinator
-
-- (void)interruptAnimated:(BOOL)animated {
-  [self.addAccountSigninCoordinator interruptAnimated:animated];
 }
 
 #pragma mark - UIAdaptivePresentationControllerDelegate
@@ -200,7 +209,9 @@
       addAccountCoordinatorWithBaseViewController:self.viewController
                                           browser:self.browser
                                      contextStyle:_contextStyle
-                                      accessPoint:_accessPoint];
+                                      accessPoint:_accessPoint
+                             continuationProvider:
+                                 _changeProfileContinuationProvider];
   __weak __typeof(self) weakSelf = self;
   self.addAccountSigninCoordinator.signinCompletion =
       ^(SigninCoordinatorResult signinResult,

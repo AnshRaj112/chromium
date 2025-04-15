@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "components/optimization_guide/core/model_execution/model_capability_client.h"
+#include "components/optimization_guide/public/mojom/model_broker.mojom-shared.h"
+#include "components/optimization_guide/public/mojom/model_broker.mojom.h"
+#include "mojo/public/cpp/bindings/receiver.h"
 #ifdef UNSAFE_BUFFERS_BUILD
 // TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
 #pragma allow_unsafe_libc_calls
 #endif
-
-#include "components/optimization_guide/core/model_execution/on_device_model_service_controller.h"
 
 #include <memory>
 #include <optional>
@@ -340,6 +342,15 @@ class OnDeviceModelServiceControllerTest : public testing::Test {
         reason, 1);
   }
 
+  std::string GetResponse(OptimizationGuideModelExecutor::Session& session,
+                          const std::string& prompt) {
+    ResponseHolder response;
+    session.ExecuteModel(PageUrlRequest(prompt),
+                         response.GetStreamingCallback());
+    EXPECT_TRUE(response.GetFinalStatus());
+    return *response.value();
+  }
+
  protected:
   StandardAssets standard_assets_;
   base::test::TaskEnvironment task_environment_{
@@ -367,7 +378,7 @@ TEST_F(OnDeviceModelServiceControllerTest, ScoreBeforeContext) {
 
   base::HistogramTester histogram_tester;
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   base::test::TestFuture<std::optional<float>> score_future;
   session->Score("token", score_future.GetCallback());
   EXPECT_NE(score_future.Get(), std::nullopt);
@@ -378,7 +389,7 @@ TEST_F(OnDeviceModelServiceControllerTest, ScorePresentAfterContext) {
 
   base::HistogramTester histogram_tester;
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   session->AddContext(UserInputRequest("foo"));
 
@@ -392,7 +403,7 @@ TEST_F(OnDeviceModelServiceControllerTest, ScoreAfterExecute) {
 
   base::HistogramTester histogram_tester;
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   session->AddContext(UserInputRequest("foo"));
   session->ExecuteModel(PageUrlRequest("bar"),
@@ -417,7 +428,7 @@ TEST_F(OnDeviceModelServiceControllerTest, BaseModelExecutionSuccess) {
 
   base::HistogramTester histogram_tester;
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   session->ExecuteModel(PageUrlRequest("foo"),
                         response_.GetStreamingCallback());
   ASSERT_TRUE(response_.GetFinalStatus());
@@ -531,7 +542,7 @@ TEST_F(OnDeviceModelServiceControllerTest, AdaptationModelExecutionSuccess) {
       .adaptations = {&compose_asset},
   });
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   session->ExecuteModel(PageUrlRequest("foo"),
                         response_.GetStreamingCallback());
   ASSERT_TRUE(response_.GetFinalStatus());
@@ -726,7 +737,7 @@ TEST_F(OnDeviceModelServiceControllerTest, BaseModelAvailableAfterInit) {
 
   // Model now available.
   session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 }
 
 // Updating the model should not break existing sessions until a new session
@@ -1604,7 +1615,7 @@ TEST_F(OnDeviceModelServiceControllerTest, NoRetractUnsafeContent) {
   });
 
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   // Should fail the configured checks, but not not be retracted.
   fake_settings_.set_execute_result({"unsafe_output"});
@@ -1635,7 +1646,7 @@ TEST_F(OnDeviceModelServiceControllerTest, ReturnsErrorOnServiceDisconnect) {
   Initialize(standard_assets_);
 
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   task_environment_.RunUntilIdle();
 
   fake_launcher_.CrashService();
@@ -1656,7 +1667,7 @@ TEST_F(OnDeviceModelServiceControllerTest, ReturnsErrorOnServiceDisconnect) {
 TEST_F(OnDeviceModelServiceControllerTest, CancelsExecuteOnAddContext) {
   Initialize(standard_assets_);
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   task_environment_.RunUntilIdle();
 
   session->ExecuteModel(PageUrlRequest("foo"),
@@ -1680,7 +1691,7 @@ TEST_F(OnDeviceModelServiceControllerTest, CancelsExecuteOnExecute) {
   auto session = test_controller_->CreateSession(
       kFeature, FailOnRemoteFallback(), logger_.GetWeakPtr(),
       /*config_params=*/std::nullopt);
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   ResponseHolder resp1;
   ResponseHolder resp2;
@@ -1701,7 +1712,7 @@ TEST_F(OnDeviceModelServiceControllerTest, WontStartSessionAfterGpuBlocked) {
   fake_settings_.service_disconnect_reason =
       on_device_model::ServiceDisconnectReason::kGpuBlocked;
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   // Wait for the service to launch, and be shut down.
   task_environment_.RunUntilIdle();
@@ -1861,7 +1872,7 @@ TEST_F(OnDeviceModelServiceControllerTest,
 TEST_F(OnDeviceModelServiceControllerTest, AddContextDisconnectExecute) {
   Initialize(standard_assets_);
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   session->AddContext(UserInputRequest("foo"));
   task_environment_.RunUntilIdle();
 
@@ -1888,7 +1899,7 @@ TEST_F(OnDeviceModelServiceControllerTest, AddContextExecuteDisconnect) {
   auto session = test_controller_->CreateSession(
       kFeature, base::BindRepeating(BadRequestRemote), logger_.GetWeakPtr(),
       /*config_params=*/std::nullopt);
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   session->AddContext(UserInputRequest("foo"));
   task_environment_.RunUntilIdle();
   // Send the text, this won't make it because the service is immediately
@@ -2026,7 +2037,7 @@ TEST_F(OnDeviceModelServiceControllerTest,
   auto session = test_controller_->CreateSession(
       kFeature, CreateExecuteRemoteFn(), logger_.GetWeakPtr(),
       /*config_params=*/std::nullopt);
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   task_environment_.RunUntilIdle();
   fake_launcher_.CrashService();
   session->ExecuteModel(PageUrlRequest("foo"),
@@ -2488,7 +2499,7 @@ TEST_F(OnDeviceModelServiceControllerTest, UsesSessionTopKAndTemperature) {
   auto session = test_controller_->CreateSession(
       kFeature, base::DoNothing(), logger_.GetWeakPtr(),
       SessionConfigParams{.sampling_params = expected_sampling_params});
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   const auto session_sampling_params = session->GetSamplingParams();
   EXPECT_EQ(session_sampling_params.top_k, expected_sampling_params.top_k);
@@ -2519,7 +2530,7 @@ TEST_F(OnDeviceModelServiceControllerTest, TsInterval0) {
       .adaptations = {&standard_assets_.compose},
   });
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   const std::vector<std::string> tokens = {"token1", " token2", " token3",
                                            " token4"};
@@ -2546,7 +2557,7 @@ TEST_F(OnDeviceModelServiceControllerTest, TsInterval1) {
       .adaptations = {&standard_assets_.compose},
   });
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   const std::vector<std::string> tokens = {"token1", " token2", " token3",
                                            " token4"};
@@ -2573,7 +2584,7 @@ TEST_F(OnDeviceModelServiceControllerTest, TsInterval3) {
       .adaptations = {&standard_assets_.compose},
   });
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   const std::vector<std::string> tokens = {"token1",  " token2", " token3",
                                            " token4", " token5", " token6",
@@ -2606,7 +2617,7 @@ TEST_F(OnDeviceModelServiceControllerTest, MinimumSafetyTokens) {
       .adaptations = {&standard_assets_.compose},
   });
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   const std::vector<std::string> tokens = {"token1", " token2", " token3",
                                            " token4"};
@@ -2639,7 +2650,7 @@ TEST_F(OnDeviceModelServiceControllerTest, WaitUntilCompleteToCancel) {
       .adaptations = {&standard_assets_.compose},
   });
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   const std::vector<std::string> tokens = {"safe", " safe", " lang:en=1.0",
                                            " safe", " unsafe"};
@@ -2736,7 +2747,7 @@ TEST_P(OnDeviceModelServiceControllerTsIntervalTest,
   test_controller_->MaybeUpdateSafetyModel(safety_asset.model_info());
 
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   fake_settings_.set_execute_result({
       "some text",
@@ -2966,6 +2977,7 @@ TEST_F(OnDeviceModelServiceControllerTest,
       {});
 
   base::HistogramTester histogram_tester;
+  fake_launcher_.clear_did_launch_service();
 
   FakeBaseModelAsset base_model(WillPassValidationConfig());
   FakeAdaptationAsset compose_asset({.config = UnsafeComposeConfig()});
@@ -2983,12 +2995,13 @@ TEST_F(OnDeviceModelServiceControllerTest,
   task_environment_.FastForwardBy(base::Seconds(10) + base::Milliseconds(1));
 
   // Full validation should never run.
+  EXPECT_FALSE(fake_launcher_.did_launch_service());
   histogram_tester.ExpectTotalCount(
       "OptimizationGuide.ModelExecution.OnDeviceModelValidationResult", 0);
   histogram_tester.ExpectUniqueSample(
       "OptimizationGuide.ModelExecution."
       "OnDeviceModelValidationResultOnValidationStarted",
-      OnDeviceModelValidationResult::kUnknown, 1);
+      OnDeviceModelValidationResult::kUnknown, 2);
 
   EXPECT_TRUE(CreateSession());
 }
@@ -3459,7 +3472,7 @@ TEST_F(OnDeviceModelServiceControllerTest, CloneUsesSessionTopKAndTemperature) {
   auto session = test_controller_->CreateSession(
       kFeature, base::DoNothing(), logger_.GetWeakPtr(),
       SessionConfigParams{.sampling_params = expected_sampling_params});
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   auto clone = session->Clone();
   EXPECT_TRUE(clone);
 
@@ -3539,7 +3552,7 @@ TEST_F(OnDeviceModelServiceControllerTest, ScoreAfterClone) {
 
   base::HistogramTester histogram_tester;
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   session->AddContext(UserInputRequest("foo"));
 
@@ -3552,7 +3565,7 @@ TEST_F(OnDeviceModelServiceControllerTest, ScoreAfterClone) {
 TEST_F(OnDeviceModelServiceControllerTest, AddContextAndClone) {
   Initialize(standard_assets_);
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   session->AddContext(UserInputRequest("foo"));
   auto clone = session->Clone();
 
@@ -3583,7 +3596,7 @@ TEST_F(OnDeviceModelServiceControllerTest, AddContextAndClone) {
 TEST_F(OnDeviceModelServiceControllerTest, CloneBeforeAddContext) {
   Initialize(standard_assets_);
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
 
   // Clone happens before context is added to the parent session.
   auto clone = session->Clone();
@@ -3613,7 +3626,7 @@ TEST_F(OnDeviceModelServiceControllerTest, CloneBeforeAddContext) {
 TEST_F(OnDeviceModelServiceControllerTest, CancelAddContextAndClone) {
   Initialize(standard_assets_);
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   session->AddContext(UserInputRequest("foo"));
   auto clone = session->Clone();
   // Deleting the parent session cancels the context chunk.
@@ -3629,7 +3642,7 @@ TEST_F(OnDeviceModelServiceControllerTest, CancelAddContextAndClone) {
 TEST_F(OnDeviceModelServiceControllerTest, CloneAddContextDisconnectExecute) {
   Initialize(standard_assets_);
   auto session = CreateSession();
-  EXPECT_TRUE(session);
+  ASSERT_TRUE(session);
   session->AddContext(UserInputRequest("foo"));
   auto clone = session->Clone();
   task_environment_.RunUntilIdle();
@@ -3645,6 +3658,72 @@ TEST_F(OnDeviceModelServiceControllerTest, CloneAddContextDisconnectExecute) {
       ("Context: ctx:foo off:0 max:8192\n"
        "Context: execute:foobar off:0 max:1024\n");
   EXPECT_EQ(*response.value(), expected_response);
+}
+
+TEST_F(OnDeviceModelServiceControllerTest, Broker) {
+  mojo::PendingReceiver<mojom::ModelBroker> pending_broker;
+
+  ModelBrokerClient broker_client(
+      pending_broker.InitWithNewPipeAndPassRemote(),
+      CreateSessionArgs(logger_.GetWeakPtr(), FailOnRemoteFallback()));
+  base::test::TestFuture<
+      std::unique_ptr<OptimizationGuideModelExecutor::Session>>
+      session_future;
+  broker_client.CreateSession(mojom::ModelBasedCapabilityKey::kCompose,
+                              std::nullopt, session_future.GetCallback());
+
+  Initialize(standard_assets_);
+  test_controller_->BindBroker(std::move(pending_broker));
+
+  auto session = session_future.Take();
+  ASSERT_TRUE(session);
+
+  ResponseHolder response;
+  session->ExecuteModel(PageUrlRequest("bar"), response.GetStreamingCallback());
+  ASSERT_TRUE(response.GetFinalStatus());
+  EXPECT_EQ(*response.value(), "Context: execute:bar off:0 max:1024\n");
+}
+
+TEST_F(OnDeviceModelServiceControllerTest, Priority) {
+  Initialize(standard_assets_);
+
+  base::HistogramTester histogram_tester;
+  auto session = CreateSession();
+  EXPECT_TRUE(session);
+
+  EXPECT_EQ(GetResponse(*session, "foo"),
+            "Context: execute:foo off:0 max:1024\n");
+
+  session->SetPriority(on_device_model::mojom::Priority::kBackground);
+  EXPECT_EQ(GetResponse(*session, "foo"),
+            "Priority: background\nContext: execute:foo off:0 max:1024\n");
+  EXPECT_EQ(GetResponse(*session, "foo"),
+            "Priority: background\nContext: execute:foo off:0 max:1024\n");
+
+  session->SetPriority(on_device_model::mojom::Priority::kForeground);
+  EXPECT_EQ(GetResponse(*session, "foo"),
+            "Context: execute:foo off:0 max:1024\n");
+}
+
+TEST_F(OnDeviceModelServiceControllerTest, PriorityClone) {
+  Initialize(standard_assets_);
+
+  base::HistogramTester histogram_tester;
+  auto session = CreateSession();
+  EXPECT_TRUE(session);
+
+  EXPECT_EQ(GetResponse(*session, "foo"),
+            "Context: execute:foo off:0 max:1024\n");
+
+  session->SetPriority(on_device_model::mojom::Priority::kBackground);
+  EXPECT_EQ(GetResponse(*session, "foo"),
+            "Priority: background\nContext: execute:foo off:0 max:1024\n");
+
+  auto clone = session->Clone();
+  EXPECT_EQ(GetResponse(*clone, "foo"),
+            "Priority: background\nContext: execute:foo off:0 max:1024\n");
+  EXPECT_EQ(GetResponse(*clone, "foo"),
+            "Priority: background\nContext: execute:foo off:0 max:1024\n");
 }
 
 }  // namespace optimization_guide

@@ -194,7 +194,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebAudio.AudioContextOptions.sampleRateRatio" units="units"
-    expires_after="2025-06-01">
+    expires_after="2025-10-12">
   <owner>mjwilson@chromium.org</owner>
   <owner>hongchan@chromium.org</owner>
   <owner>src/third_party/blink/renderer/modules/webaudio/OWNERS</owner>
@@ -238,6 +238,18 @@ chromium-metrics-reviews@google.com.
     The latency reported from the audio hardware. This number can be dynamic at
     runtime but the metric is collected only once at the first platform audio
     callback after an AudioContext is created.
+  </summary>
+</histogram>
+
+<histogram name="WebAudio.AudioDestination.OutputDeviceStatus"
+    enum="OutputDeviceStatus" expires_after="2025-10-03">
+  <owner>mjwilson@chromium.org</owner>
+  <owner>hongchan@chromium.org</owner>
+  <owner>src/third_party/blink/renderer/modules/webaudio/OWNERS</owner>
+  <summary>
+    Records the status of the selected audio output device at the time a sink is
+    created. This helps understand the reliability and availability of output
+    devices.
   </summary>
 </histogram>
 

@@ -492,6 +492,7 @@
 <translation id="1822995137827688764">부동산 개발</translation>
 <translation id="1824402189105105503">8번째 롤</translation>
 <translation id="1826516787628120939">확인 중</translation>
+<translation id="1832730227369924598">데스크 동기화</translation>
 <translation id="1834452765064623979">건축 및 유지관리</translation>
 <translation id="1838374766361614909">검색어 지우기</translation>
 <translation id="1839331950812095887">생각을 요약하는 몇 개의 단어</translation>
@@ -829,6 +830,7 @@
 <translation id="2413155254802890957">이전 주소</translation>
 <translation id="2413528052993050574">이 서버가 <ph name="DOMAIN" />임을 입증할 수 없으며 서버의 보안 인증서가 취소될 수 있습니다. 서버를 잘못 설정했거나 불법 사용자가 연결을 가로채고 있기 때문일 수 있습니다.</translation>
 <translation id="2414886740292270097">어둡게</translation>
+<translation id="2418292431699242678">관리자가 모든 ChromeOS 기기에서 이전 세션과 현재 세션 간에 다음을 동기화하도록 설정합니다.</translation>
 <translation id="2429716554270894715">패브릭(방수)</translation>
 <translation id="2436186046335138073"><ph name="HANDLER_HOSTNAME" />에서 모든 <ph name="PROTOCOL" /> 링크를 열도록 허용하시겠습니까?</translation>
 <translation id="2436976580469434549">섬유 및 직물 예술</translation>
@@ -1160,6 +1162,7 @@
 <translation id="3037177537145227281">가격 추적</translation>
 <translation id="3037605927509011580">앗, 이런!</translation>
 <translation id="3039406992698062762">가족 여행</translation>
+<translation id="3040636468789770340">쿠키(최근 방문한 웹사이트의 로그인 상태)</translation>
 <translation id="3041176923638368519">카드 혜택 약관 보기</translation>
 <translation id="3041612393474885105">인증서 정보</translation>
 <translation id="3045769629416806687">익스트림 스포츠</translation>
@@ -1670,6 +1673,7 @@
 <translation id="3869939189466884821">로컬 파일이 <ph name="MINUTES" />분 후 삭제됩니다</translation>
 <translation id="3872834068356954457">과학</translation>
 <translation id="3875783148670536197">방법 보기</translation>
+<translation id="387681220560687945">창(창과 탭의 배열 및 구성)</translation>
 <translation id="3879748587602334249">다운로드 관리자</translation>
 <translation id="3880456882942693779">예술 및 엔터테인먼트</translation>
 <translation id="3880589673277376494">인터넷 및 통신</translation>
@@ -3675,7 +3679,7 @@
 <translation id="7388380253839603603">유가 및 차량용 연료</translation>
 <translation id="7388594495505979117">{0,plural, =1{1분 후에 기기가 다시 시작됩니다}other{#분 후에 기기가 다시 시작됩니다}}</translation>
 <translation id="7393161616326137353">어드벤처 게임</translation>
-<translation id="7393475648162498734">결제 시 카드에 사용할 수 있는 리워드 및 혜택을 표시합니다.</translation>
+<translation id="7393475648162498734">결제 과정에서 카드에 적용 가능한 리워드 및 혜택을 표시합니다.</translation>
 <translation id="7393971683644170444">카드 제공업체에 연결 중…</translation>
 <translation id="739728382607845710">결제 핸들러 아이콘</translation>
 <translation id="7399616692258236448">허용한 사이트를 제외한 모든 사이트의 위치 요청이 자동으로 차단됩니다.</translation>
@@ -4736,7 +4740,7 @@
 <translation id="937885410143139026">관리 콘솔로 전송된 데이터</translation>
 <translation id="939736085109172342">새 폴더</translation>
 <translation id="940524522703752213"><ph name="MINUTES" />분 후 <ph name="CLOUD_PROVIDER" />에 파일이 업로드되기 시작합니다</translation>
-<translation id="944578681290094302">결제 시 카드에 사용할 수 있는 리워드 및 혜택을 표시합니다. <ph name="CARD_BENEFIT_HELP_LINK_BEGIN" />카드 혜택 자세히 알아보기<ph name="CARD_BENEFIT_HELP_LINK_END" /></translation>
+<translation id="944578681290094302">결제 과정에서 카드에 적용 가능한 리워드 및 혜택을 표시합니다. <ph name="CARD_BENEFIT_HELP_LINK_BEGIN" />카드 혜택 자세히 알아보기<ph name="CARD_BENEFIT_HELP_LINK_END" /></translation>
 <translation id="945646848072568856">Chrome에서는 사이트가 서드 파티 쿠키를 사용하여 사용자의 탐색 활동을 추적하지 못하도록 사이트를 차단합니다.</translation>
 <translation id="94613679163347541"><ph name="CATEGORY" /> 카테고리를 비교하시겠습니까?</translation>
 <translation id="947370374845726940"><ph name="CREATE_GOOGLE_SITE_FOCUSED_FRIENDLY_MATCH_TEXT" />, Tab을 누른 다음 Enter를 눌러 Google Sites에서 빠르게 새 사이트 만들기</translation>
@@ -4746,6 +4750,7 @@
 <translation id="950736567201356821">상단 3공 펀칭</translation>
 <translation id="950926967802086924">패스키 • Google 비밀번호 관리자</translation>
 <translation id="955429569736351433">VR 허용됨</translation>
+<translation id="955627189349169688"><ph name="BEGIN_LINK" />Chrome 동기화 설정<ph name="END_LINK" />에서 이 정책을 선택 해제할 수 있습니다.</translation>
 <translation id="95721182352849470">노란색 2</translation>
 <translation id="961663415146723894">하단 바인드</translation>
 <translation id="961856697154696964">인터넷 사용 기록 삭제</translation>

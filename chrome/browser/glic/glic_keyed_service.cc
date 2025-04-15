@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "base/check.h"
+#include "base/check_deref.h"
 #include "base/command_line.h"
 #include "base/containers/flat_set.h"
 #include "base/feature_list.h"
@@ -45,12 +46,42 @@
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/common/url_constants.h"
 #include "extensions/browser/guest_view/web_view/web_view_guest.h"
+#include "mojo/public/cpp/bindings/callback_helpers.h"
 #include "third_party/blink/public/common/web_preferences/web_preferences.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 
 namespace glic {
+
+namespace {
+
+std::optional<int> GetOptionalIntPreference(PrefService* prefs,
+                                            std::string_view path) {
+  const PrefService::Preference& pref =
+      CHECK_DEREF(prefs->FindPreference(path));
+  if (pref.IsDefaultValue()) {
+    return std::nullopt;
+  }
+  return pref.GetValue()->GetInt();
+}
+
+// Get the previous position or none if the window has not been dragged before.
+std::optional<gfx::Point> GetPreviousPositionFromPrefs(PrefService* prefs) {
+  if (!prefs) {
+    return std::nullopt;
+  }
+
+  auto x_pos = GetOptionalIntPreference(prefs, prefs::kGlicPreviousPositionX);
+  auto y_pos = GetOptionalIntPreference(prefs, prefs::kGlicPreviousPositionY);
+
+  if (!x_pos.has_value() || !y_pos.has_value()) {
+    return std::nullopt;
+  }
+  return gfx::Point(x_pos.value(), y_pos.value());
+}
+
+}  // namespace
 
 GlicKeyedService::GlicKeyedService(
     Profile* profile,
@@ -81,6 +112,8 @@ GlicKeyedService::GlicKeyedService(
   memory_pressure_listener_ = std::make_unique<base::MemoryPressureListener>(
       FROM_HERE, base::BindRepeating(&GlicKeyedService::OnMemoryPressure,
                                      weak_ptr_factory_.GetWeakPtr()));
+
+  previous_position_ = GetPreviousPositionFromPrefs(profile_->GetPrefs());
 
   // If `--glic-always-open-fre` is present, unset this pref to ensure the FRE
   // is shown for testing convenience.
@@ -134,6 +167,12 @@ void GlicKeyedService::ToggleUI(BrowserWindowInterface* bwi,
 void GlicKeyedService::CloseUI() {
   window_controller_->Shutdown();
   SetContextAccessIndicator(false);
+  if (previous_position_.has_value()) {
+    profile_->GetPrefs()->SetInteger(prefs::kGlicPreviousPositionX,
+                                     previous_position_.value().x());
+    profile_->GetPrefs()->SetInteger(prefs::kGlicPreviousPositionY,
+                                     previous_position_.value().y());
+  }
 }
 
 void GlicKeyedService::FocusUI() {
@@ -150,16 +189,43 @@ void GlicKeyedService::PrepareForOpen() {
   }
 }
 
-void GlicKeyedService::FetchZeroStateSuggestions() {
+void GlicKeyedService::OnZeroStateSuggestionsFetched(
+    mojom::ZeroStateSuggestionsPtr suggestions,
+    mojom::WebClientHandler::GetZeroStateSuggestionsForFocusedTabCallback
+        callback,
+    std::optional<std::vector<std::string>> returned_suggestions) {
+  std::vector<mojom::SuggestionContentPtr> output_suggestions;
+  if (returned_suggestions) {
+    for (const std::string& suggestion_string : returned_suggestions.value()) {
+      output_suggestions.push_back(
+          mojom::SuggestionContent::New(suggestion_string));
+    }
+    suggestions->suggestions = std::move(output_suggestions);
+  }
+
+  std::move(callback).Run(std::move(suggestions));
+}
+
+void GlicKeyedService::FetchZeroStateSuggestions(
+    bool is_first_run,
+    mojom::WebClientHandler::GetZeroStateSuggestionsForFocusedTabCallback
+        callback) {
   auto* active_web_contents = GetFocusedTabData().focus();
+
   if (contextual_cueing_service_ && active_web_contents) {
-    // TODO(crbug.com/405185362): Update callback to pipe to window controller.
-    // TODO(crbug.com/405185362); Reflect true FRE state as this would always
-    // be false otherwise with current design as this won't fetch until user
-    // has accepted the FRE.
+    auto suggestions = mojom::ZeroStateSuggestions::New();
+    suggestions->tab_id = GetTabId(active_web_contents);
+    suggestions->tab_url = active_web_contents->GetLastCommittedURL();
     contextual_cueing_service_->GetContextualGlicZeroStateSuggestions(
-        active_web_contents,
-        /*is_fre=*/false, base::DoNothing());
+        active_web_contents, is_first_run,
+        mojo::WrapCallbackWithDefaultInvokeIfNotRun(
+            base::BindOnce(&GlicKeyedService::OnZeroStateSuggestionsFetched,
+                           GetWeakPtr(), std::move(suggestions),
+                           std::move(callback)),
+            std::nullopt));
+
+  } else {
+    std::move(callback).Run(nullptr);
   }
 }
 
@@ -217,6 +283,25 @@ GlicPageHandler* GlicKeyedService::GetPageHandler(
 base::CallbackListSubscription GlicKeyedService::AddFocusedTabChangedCallback(
     FocusedTabChangedCallback callback) {
   return focused_tab_manager_.AddFocusedTabChangedCallback(callback);
+}
+
+base::CallbackListSubscription
+GlicKeyedService::AddFocusedTabInstanceChangedCallback(
+    FocusedTabInstanceChangedCallback callback) {
+  return focused_tab_manager_.AddFocusedTabInstanceChangedCallback(callback);
+}
+
+base::CallbackListSubscription
+GlicKeyedService::AddFocusedTabOrCandidateInstanceChangedCallback(
+    FocusedTabOrCandidateInstanceChangedCallback callback) {
+  return focused_tab_manager_.AddFocusedTabOrCandidateInstanceChangedCallback(
+      callback);
+}
+
+base::CallbackListSubscription
+GlicKeyedService::AddFocusedTabDataChangedCallback(
+    FocusedTabDataChangedCallback callback) {
+  return focused_tab_manager_.AddFocusedTabDataChangedCallback(callback);
 }
 
 base::CallbackListSubscription
@@ -431,6 +516,14 @@ bool GlicKeyedService::IsActiveWebContents(content::WebContents* contents) {
   }
   return contents == window_controller().GetWebContents() ||
          contents == window_controller().GetFreWebContents();
+}
+
+void GlicKeyedService::SetPosition(const gfx::Point& position) {
+  previous_position_ = position;
+}
+
+std::optional<gfx::Point> GlicKeyedService::GetPreviousPosition() {
+  return previous_position_;
 }
 
 }  // namespace glic

@@ -26,6 +26,18 @@ source_set("impression_limits") {
   ]
 }
 
+source_set("observer_bridge") {
+  sources = [
+    "impression_limit_service_observer_bridge.h",
+    "impression_limit_service_observer_bridge.mm",
+  ]
+  deps = [
+    ":impression_limits",
+    "//ios/third_party/material_components_ios",
+    "//url:url",
+  ]
+}
+
 source_set("unit_tests") {
   testonly = true
   sources = [ "impression_limit_service_unittest.cc" ]
@@ -44,6 +56,7 @@ source_set("unit_tests") {
     "//ios/chrome/browser/content_suggestions/ui_bundled/impression_limits",
     "//ios/chrome/browser/content_suggestions/ui_bundled/shop_card:prefs",
     "//ios/chrome/browser/history/model:model",
+    "//ios/chrome/browser/ntp_tiles/model/tab_resumption:tab_resumption_prefs",
     "//ios/chrome/browser/shared/model/prefs:pref_names",
     "//ios/chrome/browser/shared/model/profile/test:test",
     "//ios/chrome/test:test_support",

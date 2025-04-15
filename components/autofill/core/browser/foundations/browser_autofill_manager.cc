@@ -69,6 +69,7 @@
 #include "components/autofill/core/browser/data_manager/addresses/address_data_manager.h"
 #include "components/autofill/core/browser/data_manager/payments/payments_data_manager.h"
 #include "components/autofill/core/browser/data_manager/personal_data_manager.h"
+#include "components/autofill/core/browser/data_manager/valuables/valuables_data_manager.h"
 #include "components/autofill/core/browser/data_model/addresses/autofill_profile.h"
 #include "components/autofill/core/browser/data_model/addresses/autofill_profile_comparator.h"
 #include "components/autofill/core/browser/data_model/addresses/phone_number.h"
@@ -91,7 +92,7 @@
 #include "components/autofill/core/browser/form_structure.h"
 #include "components/autofill/core/browser/foundations/autofill_client.h"
 #include "components/autofill/core/browser/geo/phone_number_i18n.h"
-#include "components/autofill/core/browser/integrators/autofill_compose_delegate.h"
+#include "components/autofill/core/browser/integrators/compose/autofill_compose_delegate.h"
 #include "components/autofill/core/browser/integrators/optimization_guide/autofill_optimization_guide.h"
 #include "components/autofill/core/browser/logging/log_manager.h"
 #include "components/autofill/core/browser/metrics/autofill_in_devtools_metrics.h"
@@ -106,6 +107,7 @@
 #include "components/autofill/core/browser/metrics/log_event.h"
 #include "components/autofill/core/browser/metrics/payments/card_metadata_metrics.h"
 #include "components/autofill/core/browser/metrics/quality_metrics.h"
+#include "components/autofill/core/browser/metrics/refill_metrics.h"
 #include "components/autofill/core/browser/metrics/suggestions_list_metrics.h"
 #include "components/autofill/core/browser/ml_model/autofill_ai/autofill_ai_model_cache.h"
 #include "components/autofill/core/browser/ml_model/autofill_ai/autofill_ai_model_executor.h"
@@ -123,6 +125,7 @@
 #include "components/autofill/core/browser/suggestions/suggestion_hiding_reason.h"
 #include "components/autofill/core/browser/suggestions/suggestion_type.h"
 #include "components/autofill/core/browser/suggestions/suggestions_context.h"
+#include "components/autofill/core/browser/suggestions/valuables/valuable_suggestion_generator.h"
 #include "components/autofill/core/browser/ui/autofill_external_delegate.h"
 #include "components/autofill/core/browser/ui/payments/bubble_show_options.h"
 #include "components/autofill/core/common/aliases.h"
@@ -155,6 +158,7 @@
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/strings/grit/components_strings.h"
+#include "components/sync/base/features.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -1190,12 +1194,10 @@ void BrowserAutofillManager::GenerateSuggestionsAndMaybeShowUIPhase2(
   std::ignore = GetCachedFormAndField(form.global_id(), field.global_id(),
                                       &form_structure, &autofill_field);
   autofill_metrics::SuggestionRankingContext ranking_context;
-  std::vector<Suggestion> suggestions =
-      GetAvailableAddressAndCreditCardSuggestions(
-          form, form_structure, field, autofill_field, trigger_source,
-          GetPlusAddressOverride(client().GetPlusAddressDelegate(),
-                                 plus_addresses),
-          context, ranking_context);
+  std::vector<Suggestion> suggestions = GetAvailableSuggestions(
+      form, form_structure, field, autofill_field, trigger_source,
+      GetPlusAddressOverride(client().GetPlusAddressDelegate(), plus_addresses),
+      context, ranking_context);
 
   if (context.is_autofill_available &&
       ShouldSuppressSuggestions(context.suppress_reason, log_manager())) {
@@ -1687,7 +1689,7 @@ void BrowserAutofillManager::FillOrPreviewCreditCardForm(
     }
     self.form_filler_->FillOrPreviewForm(
         action_persistence, form, &credit_card, CHECK_DEREF(form_structure),
-        CHECK_DEREF(autofill_field), trigger_source, /*is_refill=*/false);
+        CHECK_DEREF(autofill_field), trigger_source);
   };
 
   // Callback when the credit was feched asynchronously.
@@ -1836,12 +1838,10 @@ void BrowserAutofillManager::OnFocusOnFormFieldImpl(
   // suggestions generated, but only the way suggestions behave when they are
   // accepted. For this reason, checking whether suggestions are available can
   // be done with the `kUnspecified` suggestion trigger source.
-  std::vector<Suggestion> suggestions =
-      GetAvailableAddressAndCreditCardSuggestions(
-          form, form_structure, field, autofill_field,
-          AutofillSuggestionTriggerSource::kUnspecified,
-          /*plus_address_email_override=*/std::nullopt, context,
-          ranking_context);
+  std::vector<Suggestion> suggestions = GetAvailableSuggestions(
+      form, form_structure, field, autofill_field,
+      AutofillSuggestionTriggerSource::kUnspecified,
+      /*plus_address_email_override=*/std::nullopt, context, ranking_context);
   external_delegate_->OnAutofillAvailabilityEvent(
       (context.suppress_reason == SuppressReason::kNotSuppressed &&
        !suggestions.empty())
@@ -2360,7 +2360,7 @@ void BrowserAutofillManager::OnDidFillOrPreviewForm(
         skip_reasons,
     const FillingPayload& filling_payload,
     AutofillTriggerSource trigger_source,
-    bool is_refill) {
+    std::optional<RefillTriggerReason> refill_trigger_reason) {
   NotifyObservers(&Observer::OnFillOrPreviewDataModelForm,
                   form_structure.global_id(), action_persistence,
                   safe_filled_fields, filling_payload);
@@ -2369,16 +2369,22 @@ void BrowserAutofillManager::OnDidFillOrPreviewForm(
   }
   CHECK_EQ(action_persistence, mojom::ActionPersistence::kFill);
 
+  if (refill_trigger_reason) {
+    autofill_metrics::LogNumberOfFieldsModifiedByRefill(
+        *refill_trigger_reason, safe_filled_fields.size());
+  }
   AppendFillLogEvents(form, form_structure, trigger_autofill_field,
-                      safe_field_ids, skip_reasons, filling_payload, is_refill);
-  client().DidFillForm(trigger_source, is_refill);
+                      safe_field_ids, skip_reasons, filling_payload,
+                      refill_trigger_reason.has_value());
+  client().DidFillForm(trigger_source, refill_trigger_reason.has_value());
 
   std::visit(
       base::Overloaded{[&](const AutofillProfile* profile) {
                          LogAndRecordProfileFill(
                              form_structure, trigger_autofill_field,
                              safe_filled_fields, safe_filled_autofill_fields,
-                             *profile, trigger_source, is_refill);
+                             *profile, trigger_source,
+                             refill_trigger_reason.has_value());
                          MaybeShowPlusAddressEmailOverrideNotification(
                              safe_filled_autofill_fields, safe_filled_fields,
                              *profile, form_structure);
@@ -2388,7 +2394,7 @@ void BrowserAutofillManager::OnDidFillOrPreviewForm(
                              form_structure, trigger_autofill_field,
                              safe_filled_fields, safe_filled_autofill_fields,
                              filled_field_ids, safe_field_ids, *credit_card,
-                             trigger_source, is_refill);
+                             trigger_source, refill_trigger_reason.has_value());
                        },
                        [&](const EntityInstance*) {
                          if (AutofillAiDelegate* delegate =
@@ -2640,6 +2646,11 @@ AutofillField* BrowserAutofillManager::GetAutofillField(
     return nullptr;
   }
   return autofill_field;
+}
+
+autofill_metrics::CreditCardFormEventLogger&
+BrowserAutofillManager::GetCreditCardFormEventLogger() {
+  return metrics_->credit_card_form_event_logger;
 }
 
 std::vector<Suggestion> BrowserAutofillManager::GetProfileSuggestions(
@@ -2946,8 +2957,7 @@ bool BrowserAutofillManager::EvaluateAblationStudy(
   return false;
 }
 
-std::vector<Suggestion>
-BrowserAutofillManager::GetAvailableAddressAndCreditCardSuggestions(
+std::vector<Suggestion> BrowserAutofillManager::GetAvailableSuggestions(
     const FormData& form,
     const FormStructure* form_structure,
     const FormFieldData& field,
@@ -2978,14 +2988,32 @@ BrowserAutofillManager::GetAvailableAddressAndCreditCardSuggestions(
 
   std::vector<Suggestion> suggestions;
   if (form_structure && autofill_field) {
-    if (context.filling_product == FillingProduct::kCreditCard) {
-      suggestions = GetCreditCardSuggestions(form, CHECK_DEREF(form_structure),
-                                             field, CHECK_DEREF(autofill_field),
-                                             trigger_source, ranking_context);
-    } else if (context.filling_product == FillingProduct::kAddress) {
-      suggestions = GetProfileSuggestions(
-          form, CHECK_DEREF(form_structure), field, CHECK_DEREF(autofill_field),
-          trigger_source, std::move(plus_address_email_override));
+    switch (context.filling_product) {
+      case FillingProduct::kAddress:
+        suggestions = GetProfileSuggestions(
+            form, *form_structure, field, *autofill_field, trigger_source,
+            std::move(plus_address_email_override));
+        break;
+      case FillingProduct::kCreditCard:
+        suggestions = GetCreditCardSuggestions(form, *form_structure, field,
+                                               *autofill_field, trigger_source,
+                                               ranking_context);
+        break;
+      case FillingProduct::kLoyaltyCard:
+        if (base::FeatureList::IsEnabled(
+                features::kAutofillEnableLoyaltyCardsFilling) &&
+            base::FeatureList::IsEnabled(syncer::kSyncAutofillLoyaltyCard)) {
+          // Only loyalty card numbers filling is supported.
+          if (autofill_field->Type().GetStorableType() ==
+              LOYALTY_MEMBERSHIP_ID) {
+            suggestions = GetLoyaltyCardSuggestions(
+                client().GetValuablesDataManager().GetLoyaltyCards());
+          }
+        }
+        break;
+      default:
+        // Skip other filling products.
+        break;
     }
   }
 

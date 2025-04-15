@@ -1569,6 +1569,14 @@ void DesksController::OnWindowActivating(ActivationReason reason,
   if (!window_desk || window_desk == active_desk_)
     return;
 
+  // If the identified desk is not in the set of current desks (that is, those
+  // that are visible in the mini view), then we ignore the activation. This can
+  // happen in cases when close all is used and the window is on a desk that is
+  // about to go away.
+  if (!HasDesk(window_desk)) {
+    return;
+  }
+
   ActivateDesk(window_desk, DesksSwitchSource::kWindowActivated);
 }
 
@@ -1612,27 +1620,6 @@ void DesksController::OnFirstSessionStarted() {
   current_account_id_ =
       Shell::Get()->session_controller()->GetActiveAccountId();
   desks_restore_util::RestorePrimaryUserDesks();
-
-  // The DeskProfilesDelegate will be available if lacros and desk profiles are
-  // both enabled.
-  desk_profiles_observer_.Reset();
-  if (auto* delegate = Shell::Get()->GetDeskProfilesDelegate()) {
-    desk_profiles_observer_.Observe(delegate);
-  }
-}
-
-void DesksController::OnProfileRemoved(uint64_t profile_id) {
-  auto* delegate = Shell::Get()->GetDeskProfilesDelegate();
-  CHECK(delegate);
-
-  uint64_t primary_profile_id = delegate->GetPrimaryProfileId();
-  for (auto& desk : desks_) {
-    // If this desk's profile has been removed, revert it to the primary user's
-    // profile (which cannot be deleted).
-    if (desk->lacros_profile_id() == profile_id) {
-      desk->SetLacrosProfileId(primary_profile_id);
-    }
-  }
 }
 
 void DesksController::FireMetricsTimerForTesting() {

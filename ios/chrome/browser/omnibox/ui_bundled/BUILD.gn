@@ -45,8 +45,6 @@ source_set("omnibox_suggestion_icon_util") {
 # for why these two targets are separated.
 source_set("omnibox_util") {
   sources = [
-    "omnibox_metrics_helper.h",
-    "omnibox_metrics_helper.mm",
     "omnibox_text_field_delegate.h",
     "omnibox_util.h",
     "omnibox_util.mm",
@@ -107,10 +105,6 @@ source_set("omnibox_internal") {
     "omnibox_consumer.h",
     "omnibox_container_view.h",
     "omnibox_container_view.mm",
-    "omnibox_coordinator.h",
-    "omnibox_coordinator.mm",
-    "omnibox_mediator.h",
-    "omnibox_mediator.mm",
     "omnibox_mutator.h",
     "omnibox_text_field_ios.mm",
     "omnibox_text_field_paste_delegate.h",
@@ -160,6 +154,7 @@ source_set("omnibox_internal") {
     "//ios/chrome/browser/ntp/shared/metrics:home_metrics",
     "//ios/chrome/browser/omnibox/model",
     "//ios/chrome/browser/omnibox/model:ui_bundled_interface",
+    "//ios/chrome/browser/omnibox/public",
     "//ios/chrome/browser/omnibox/public:features",
     "//ios/chrome/browser/omnibox/ui_bundled/popup",
     "//ios/chrome/browser/omnibox/ui_bundled/popup:popup_ui_protocols",
@@ -220,13 +215,16 @@ source_set("omnibox_internal") {
 source_set("test_support") {
   testonly = true
   sources = [
+    "omnibox_coordinator+Testing.h",
     "test_web_location_bar.cc",
     "test_web_location_bar.h",
   ]
   deps = [
+    ":omnibox_internal",
     ":ui_bundled",
     "//base",
     "//components/omnibox/browser:location_bar",
+    "//ios/chrome/browser/omnibox/coordinator",
     "//ios/web/public",
     "//url",
   ]

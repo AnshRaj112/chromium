@@ -6,6 +6,7 @@ package org.chromium.chrome.browser.ntp_customization.feed;
 
 import static org.chromium.chrome.browser.ntp_customization.NtpCustomizationViewProperties.BACK_PRESS_HANDLER;
 import static org.chromium.chrome.browser.ntp_customization.NtpCustomizationViewProperties.FEED_SWITCH_ON_CHECKED_CHANGE_LISTENER;
+import static org.chromium.chrome.browser.ntp_customization.NtpCustomizationViewProperties.IS_FEED_LIST_ITEMS_TITLE_VISIBLE;
 import static org.chromium.chrome.browser.ntp_customization.NtpCustomizationViewProperties.IS_FEED_SWITCH_CHECKED;
 import static org.chromium.chrome.browser.ntp_customization.NtpCustomizationViewProperties.LIST_CONTAINER_VIEW_DELEGATE;
 import static org.chromium.chrome.browser.ntp_customization.feed.FeedSettingsCoordinator.FeedSettingsBottomSheetSection.ACTIVITY;
@@ -29,6 +30,8 @@ import androidx.browser.customtabs.CustomTabsIntent;
 
 import org.chromium.base.ResettersForTesting;
 import org.chromium.chrome.browser.feed.FeedServiceBridge;
+import org.chromium.chrome.browser.feed.FeedUma;
+import org.chromium.chrome.browser.feed.v2.FeedUserActionType;
 import org.chromium.chrome.browser.feed.webfeed.WebFeedBridge;
 import org.chromium.chrome.browser.ntp_customization.BottomSheetDelegate;
 import org.chromium.chrome.browser.ntp_customization.ListContainerViewDelegate;
@@ -63,6 +66,7 @@ public class FeedSettingsMediator {
     private final PrefChangeRegistrar mPrefChangeRegistrar;
     private static PrefService sPrefServiceForTest;
     private static PrefChangeRegistrar sPrefChangeRegistarForTest;
+    private List<Integer> mListItemsContent;
 
     public FeedSettingsMediator(
             PropertyModel containerPropertyModel,
@@ -75,13 +79,17 @@ public class FeedSettingsMediator {
         mFeedSettingsPropertyModel = feedSettingsPropertyModel;
         mProfile = profile;
 
+        mListItemsContent = buildFeedListContent();
         mContainerPropertyModel.set(LIST_CONTAINER_VIEW_DELEGATE, createListDelegate());
         mBottomSheetPropertyModel.set(
                 BACK_PRESS_HANDLER, v -> delegate.backPressOnCurrentBottomSheet());
+        if (mListItemsContent.isEmpty()) {
+            mFeedSettingsPropertyModel.set(IS_FEED_LIST_ITEMS_TITLE_VISIBLE, false);
+        }
+        mFeedSettingsPropertyModel.set(IS_FEED_SWITCH_CHECKED, isFeedTurnedOn());
         mFeedSettingsPropertyModel.set(
                 FEED_SWITCH_ON_CHECKED_CHANGE_LISTENER,
                 (compoundButton, isChecked) -> onFeedSwitchToggled(isChecked));
-        mFeedSettingsPropertyModel.set(IS_FEED_SWITCH_CHECKED, isFeedTurnedOn());
 
         if (sPrefChangeRegistarForTest != null) {
             mPrefChangeRegistrar = sPrefChangeRegistarForTest;
@@ -104,6 +112,8 @@ public class FeedSettingsMediator {
      */
     @VisibleForTesting
     void onFeedSwitchToggled(boolean isChecked) {
+        FeedUma.recordFeedBottomSheetItemsClicked(
+                isChecked ? FeedUserActionType.TAPPED_TURN_ON : FeedUserActionType.TAPPED_TURN_OFF);
         getPrefService().setBoolean(Pref.ARTICLES_LIST_VISIBLE, isChecked);
     }
 
@@ -126,18 +136,7 @@ public class FeedSettingsMediator {
         return new ListContainerViewDelegate() {
             @Override
             public List<Integer> getListItems() {
-                List<Integer> content = new ArrayList<>();
-                if (FeedServiceBridge.isSignedIn()) {
-                    if (WebFeedBridge.isWebFeedEnabled()) {
-                        content.add(ACTIVITY);
-                        content.add(FOLLOWING);
-                        content.add(HIDDEN);
-                    } else {
-                        content.add(ACTIVITY);
-                        content.add(INTERESTS);
-                    }
-                }
-                return content;
+                return mListItemsContent;
             }
 
             @Override
@@ -160,6 +159,23 @@ public class FeedSettingsMediator {
                 return null;
             }
         };
+    }
+
+    /** Returns the content of the list displayed in the feed setting bottom sheet. */
+    @VisibleForTesting
+    List<Integer> buildFeedListContent() {
+        List<Integer> content = new ArrayList<>();
+        if (FeedServiceBridge.isSignedIn()) {
+            if (WebFeedBridge.isWebFeedEnabled()) {
+                content.add(ACTIVITY);
+                content.add(FOLLOWING);
+                content.add(HIDDEN);
+            } else {
+                content.add(ACTIVITY);
+                content.add(INTERESTS);
+            }
+        }
+        return content;
     }
 
     /**
@@ -228,18 +244,22 @@ public class FeedSettingsMediator {
     }
 
     private static void handleActivityClick(View view) {
+        FeedUma.recordFeedBottomSheetItemsClicked(FeedUserActionType.TAPPED_MANAGE_ACTIVITY);
         launchUriActivity(view.getContext(), ACTIVITY_CLICK_URL);
     }
 
     private static void handleFollowingClick(View view) {
+        FeedUma.recordFeedBottomSheetItemsClicked(FeedUserActionType.TAPPED_MANAGE_FOLLOWING);
         launchUriActivity(view.getContext(), FOLLOWING_CLICK_URL);
     }
 
     private static void handleHiddenClick(View view) {
+        FeedUma.recordFeedBottomSheetItemsClicked(FeedUserActionType.TAPPED_MANAGE_HIDDEN);
         launchUriActivity(view.getContext(), HIDDEN_CLICK_URL);
     }
 
     private static void handleInterestsClick(View view) {
+        FeedUma.recordFeedBottomSheetItemsClicked(FeedUserActionType.TAPPED_MANAGE_INTERESTS);
         launchUriActivity(view.getContext(), INTERESTS_CLICK_URL);
     }
 
@@ -283,5 +303,9 @@ public class FeedSettingsMediator {
         sPrefChangeRegistarForTest = prefChangeRegistrar;
         sPrefServiceForTest = prefService;
         ResettersForTesting.register(() -> sPrefServiceForTest = null);
+    }
+
+    void setListItemsContentForTesting(List<Integer> listItemsContent) {
+        mListItemsContent = listItemsContent;
     }
 }

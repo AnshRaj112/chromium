@@ -258,7 +258,7 @@ bool ShowPredictions(const WebDocument& document,
       frame_token = frame->GetLocalFrameToken();
     }
 
-    std::string title = base::StrCat({
+    std::string autofill_info = base::StrCat({
         "overall type: ",
         field.overall_type,
         "\nhtml type: ",
@@ -336,8 +336,8 @@ bool ShowPredictions(const WebDocument& document,
             option_values + delimiter + base::UTF16ToUTF8(select_option.value);
       }
 
-      title = base::StrCat({
-          title,
+      autofill_info = base::StrCat({
+          autofill_info,
           "\naria label: ",
           base::UTF16ToUTF8(truncated_aria_label),
           "\naria description: ",
@@ -353,25 +353,32 @@ bool ShowPredictions(const WebDocument& document,
 
     WebString kAutocomplete = WebString::FromASCII("autocomplete");
     if (element.HasAttribute(kAutocomplete)) {
-      title += "\nautocomplete: " +
-               element.GetAttribute(kAutocomplete).Utf8().substr(0, 100);
+      autofill_info +=
+          "\nautocomplete: " +
+          element.GetAttribute(kAutocomplete).Utf8().substr(0, 100);
     }
 
     // Set the same debug string to an attribute that does not get mangled if
     // Google Translate is triggered for the site. This is useful for
     // automated processing of the data.
-    element.SetAttribute("autofill-information", WebString::FromUTF8(title));
+    element.SetAttribute("autofill-information",
+                         WebString::FromUTF8(autofill_info));
 
     //  If the field has password manager's annotation, add it as well.
     if (element.HasAttribute("pm_parser_annotation")) {
-      title =
-          base::StrCat({title, "\npm_parser_annotation: ",
+      autofill_info =
+          base::StrCat({autofill_info, "\npm_parser_annotation: ",
                         element.GetAttribute("pm_parser_annotation").Utf8()});
     }
 
-    // Set this debug string to the title so that a developer can easily debug
-    // by hovering the mouse over the input field.
-    element.SetAttribute("title", WebString::FromUTF8(title));
+    // Set this debug string so that a developer can easily debug the element.
+    // If the flag is on with parameter :as-title, information will be found as
+    // 'title' in the DOM of the element.
+    bool title_parameter_on =
+        features::test::kAutofillShowTypePredictionsAsTitleParam.Get();
+    if (title_parameter_on) {
+      element.SetAttribute("title", WebString::FromUTF8(autofill_info));
+    }
 
     element.SetAttribute("autofill-prediction",
                          WebString::FromUTF8(field.overall_type));
@@ -862,6 +869,58 @@ void AutofillAgent::FireHostSubmitEvents(const FormData& form_data,
   }
 }
 
+bool AutofillAgent::TryShowPasswordSuggestions(
+    const WebInputElement& input,
+    IsPasswordRequestManuallyTriggered manually_triggered_password_request,
+    base::optional_ref<const PasswordSuggestionRequest> password_request) {
+  bool is_field_empty = input.IsAutofilled() || input.Value().IsEmpty();
+  bool is_password_field = input.FormControlTypeForAutofill() ==
+                           blink::mojom::FormControlType::kInputPassword;
+
+  // Show suggestions empty password fields or for username fields with
+  // matching suggestions - even if non-empty.
+  if (is_password_field && !is_field_empty) {
+    if (auto* autofill_driver = unsafe_autofill_driver()) {
+      autofill_driver->HidePopup();
+      is_popup_possibly_visible_ = false;
+      return false;
+    }
+  }
+
+  if (password_request) {
+    password_autofill_agent_->ShowSuggestions(password_request.value());
+    is_popup_possibly_visible_ = true;
+    return true;
+  }
+  // Beyond this point, the renderer won't be called. Earlier renderer calls may
+  // have shown/suppressed popups, so update visibility & success of this call.
+
+  // Treat the popup as (still) visible if
+  //  - a suggestion was accepted on another field, or if
+  //  - it was already open and no manual request force-closes the popup.
+  is_popup_possibly_visible_ =
+      password_autofill_agent_->HasAcceptedSuggestionOnOtherField(input) ||
+      (is_popup_possibly_visible_ && !manually_triggered_password_request);
+
+  // Call `FormControlType()` instead of `FormControlTypeForAutofill()` to
+  // determine whether the focsed field is *currently* a password field, not
+  // whether it has ever been a password field.
+  bool is_password_field_now = input.FormControlType() ==  // nocheck
+                               blink::mojom::FormControlType::kInputPassword;
+
+  // Return whether the password autofill agent has handled this request. Above,
+  // we already returned true if suggestions were shown. But there are several
+  // cases were the AutofillAgent should not show non-password Autofill:
+  //   a) when the user request password explicitly.
+  //   b) when the focused field is a password field (right now).
+  // Special condition for b: if the autofill agent handles all requests, don't
+  // defer to the password agent either.
+  // TODO: crbug.com/410753794 - Check if an early return works better here.
+  return manually_triggered_password_request        // --> case a.
+         || (is_password_field_now &&               // --> case b.
+             !config_.query_password_suggestions);  // --> case b without PWM.
+}
+
 void AutofillAgent::TextFieldCleared(const WebFormControlElement& element) {
   const WebInputElement input_element = element.DynamicTo<WebInputElement>();
   CHECK(input_element || form_util::IsTextAreaElement(element));
@@ -936,14 +995,18 @@ void AutofillAgent::OnTextFieldValueChanged(
     return;
   }
 
-  if (input_element && password_autofill_agent_->TextDidChangeInTextField(
-                           input_element, form_cache)) {
-    is_popup_possibly_visible_ = true;
-    last_queried_element_ = FieldRef(element);
-    return;
-  }
-
   if (input_element) {
+    std::optional<PasswordSuggestionRequest> password_request =
+        password_autofill_agent_->CreateRequestForChangeInTextField(
+            input_element, form_cache);
+    if (password_request &&
+        TryShowPasswordSuggestions(input_element,
+                                   IsPasswordRequestManuallyTriggered(false),
+                                   password_request.value())) {
+      last_queried_element_ = FieldRef(element);
+      return;
+    }
+
     ShowSuggestions(element,
                     AutofillSuggestionTriggerSource::kTextFieldValueChanged,
                     form_cache);
@@ -1142,13 +1205,29 @@ void AutofillAgent::FieldTypePredictionsAvailable(
     const std::vector<FormDataPredictions>& forms) {
   CHECK(base::FeatureList::IsEnabled(
       features::test::kAutofillShowTypePredictions));
-
   WebDocument document = GetDocument();
   if (!document) {
     return;
   }
   for (const auto& form : forms) {
     ShowPredictions(document, form);
+  }
+}
+
+// For all elements the DOM Node ID will be exposed on the DOM
+// as attribute "dom-node-id".This is done for data collection purposes.
+void AutofillAgent::ExposeDomNodeIDs() {
+  CHECK(base::FeatureList::IsEnabled(features::test::kShowDomNodeIDs));
+  WebDocument document = GetDocument();
+  if (!document) {
+    return;
+  }
+  blink::WebElementCollection all = document.All();
+  for (blink::WebElement element = all.FirstItem(); !element.IsNull();
+       element = all.NextItem()) {
+    element.SetAttribute(
+        "dom-node-id",
+        WebString::FromUTF8(base::NumberToString(element.GetDomNodeId())));
   }
 }
 
@@ -1431,31 +1510,24 @@ void AutofillAgent::ShowSuggestions(
   // TODO(crbug.com/333990908): Test manual fallback on different form types.
   if (auto input_element = element.DynamicTo<WebInputElement>();
       input_element && !IsPlusAddressesManuallyTriggered(trigger_source)) {
-    if (IsPasswordsAutofillManuallyTriggered(trigger_source)) {
-      is_popup_possibly_visible_ = password_autofill_agent_->ShowSuggestions(
-          input_element, trigger_source, form_cache);
-      return;
-    }
-    if (password_generation_agent_ &&
+    // Only manually triggered requests override generation requests.
+    if (!IsPasswordsAutofillManuallyTriggered(trigger_source) &&
+        password_generation_agent_ &&
         password_generation_agent_->ShowPasswordGenerationSuggestions(
             input_element, form_cache)) {
       is_popup_possibly_visible_ = true;
       return;
     }
-    if (password_autofill_agent_->ShowSuggestions(input_element, trigger_source,
-                                                  form_cache)) {
-      is_popup_possibly_visible_ = true;
-      return;
-    }
-
-    // Password field elements should only have suggestions shown by the
-    // password AutofillAgent. We call `FormControlType()` instead of
-    // `FormControlTypeForAutofill()` because we are interested in whether the
-    // field is *currently* a password field, not whether it has ever been a
-    // password field.
-    if (input_element.FormControlType() ==  // nocheck
-            blink::mojom::FormControlType::kInputPassword &&
-        !config_.query_password_suggestions) {
+    const std::optional<PasswordSuggestionRequest> password_request =
+        IsPasswordsAutofillManuallyTriggered(trigger_source)
+            ? password_autofill_agent_->CreateManualFallbackRequest(
+                  input_element, form_cache)
+            : password_autofill_agent_->CreateRequestForDomain(
+                  input_element, trigger_source, form_cache);
+    bool password_agent_handled_request = TryShowPasswordSuggestions(
+        input_element, IsPasswordsAutofillManuallyTriggered(trigger_source),
+        password_request);
+    if (password_agent_handled_request) {
       return;
     }
   }

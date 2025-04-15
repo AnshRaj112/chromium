@@ -5,8 +5,12 @@
 #ifndef CHROME_BROWSER_UI_TABS_SPLIT_TAB_COLLECTION_H_
 #define CHROME_BROWSER_UI_TABS_SPLIT_TAB_COLLECTION_H_
 
-#include "chrome/browser/ui/tabs/split_tab_id.h"
 #include "chrome/browser/ui/tabs/tab_collection.h"
+#include "components/tabs/public/split_tab_id.h"
+
+namespace split_tabs {
+class SplitTabData;
+}
 
 namespace tabs {
 
@@ -15,17 +19,19 @@ enum class SplitTabLayout { kHorizontal, kVertical };
 // A collection for split tabs.
 class SplitTabCollection : public TabCollection {
  public:
-  explicit SplitTabCollection(split_tabs::SplitTabId split_id);
+  explicit SplitTabCollection(split_tabs::SplitTabId split_id,
+                              tabs::SplitTabLayout tab_layout);
   ~SplitTabCollection() override;
   SplitTabCollection(const SplitTabCollection&) = delete;
   SplitTabCollection& operator=(const SplitTabCollection&) = delete;
 
-  // Returns the `split_id_` this collection is associated with.
-  split_tabs::SplitTabId GetSplitTabId() const { return split_id_; }
+  split_tabs::SplitTabData* data() const { return split_tab_data_.get(); }
+
+  // Returns the SplitTabId this collection is associated with.
+  split_tabs::SplitTabId GetSplitTabId() const;
 
  private:
-  // The split identifier of this collection.
-  const split_tabs::SplitTabId split_id_;
+  std::unique_ptr<split_tabs::SplitTabData> split_tab_data_;
 };
 
 }  // namespace tabs

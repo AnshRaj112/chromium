@@ -73,10 +73,6 @@ const base::FeatureParam<int> kIosPasswordFormExtractionRequestsTimeoutMs = {
     &kIosCleanupHangingPasswordFormExtractionRequests,
     /*name=*/"period-ms", /*default_value=*/250};
 
-BASE_FEATURE(kIosDetectUsernameInUff,
-             "IosSaveUsernameInUff",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kIOSImprovePasswordFieldDetectionForFilling,
              "IOSImprovePasswordFieldDetectionForFilling",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -89,10 +85,6 @@ BASE_FEATURE(kIOSProactivePasswordGenerationBottomSheet,
              "kIOSProactivePasswordGenerationBottomSheet",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // IS_IOS
-
-BASE_FEATURE(kLocalStateEnterprisePasswordHashes,
-             "LocalStateEnterprisePasswordHashes",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kPasswordFormGroupedAffiliations,
              "PasswordFormGroupedAffiliations",
@@ -174,10 +166,6 @@ BASE_FEATURE(kLoginDbDeprecationAndroid,
              "LoginDbDeprecationAndroid",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_ANDROID)
-
-BASE_FEATURE(kUseAsyncOsCryptInLoginDatabase,
-             "UseAsyncOsCryptInLoginDatabase",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kUseNewEncryptionMethod,
              "UseNewEncryptionMethod",

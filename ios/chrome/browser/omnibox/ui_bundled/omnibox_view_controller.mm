@@ -521,7 +521,7 @@ using base::UserMetricsAction;
   [self.textField updateTextDirection];
   self.semanticContentAttribute = [self.textField bestSemanticContentAttribute];
 
-  [self.textInputDelegate omniboxViewControllerTextInputModeDidChange:self];
+  [self.mutator onTextInputModeChange];
 }
 
 - (void)updateCachedClipboardState {
@@ -646,7 +646,8 @@ using base::UserMetricsAction;
 
 /// Handles interaction with the thumbnail button. (tap or keyboard delete)
 - (void)didTapThumbnailButton {
-  if (!self.view.thumbnailButton.selected) {
+  if (!self.view.thumbnailButton.selected &&
+      !self.view.thumbnailButton.accessibilityElementIsFocused) {
     self.view.thumbnailButton.selected = YES;
   } else {
     [self.mutator removeThumbnail];
@@ -665,7 +666,7 @@ using base::UserMetricsAction;
 
   if (self.view.thumbnailImage) {
     return l10n_util::GetNSString(IDS_IOS_OMNIBOX_PLACEHOLDER_IMAGE_SEARCH);
-  } else if (self.isSearchOnlyUI) {
+  } else if (self.searchOnlyUI) {
     return l10n_util::GetNSStringF(IDS_IOS_OMNIBOX_PLACEHOLDER_SEARCH_ONLY,
                                    self.searchProviderName);
   } else {

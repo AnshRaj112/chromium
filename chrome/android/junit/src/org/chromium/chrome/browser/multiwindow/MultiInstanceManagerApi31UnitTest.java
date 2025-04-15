@@ -60,7 +60,7 @@ import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.app.tabmodel.TabModelOrchestrator;
-import org.chromium.chrome.browser.app.tabmodel.TabWindowManagerSingleton;
+import org.chromium.chrome.browser.app.tabwindow.TabWindowManagerSingleton;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
@@ -458,7 +458,7 @@ public class MultiInstanceManagerApi31UnitTest {
     }
 
     @Test
-    @EnableFeatures(ChromeFeatureList.MUlTI_INSTANCE_APPLICATION_STATUS_CLEANUP)
+    @EnableFeatures(ChromeFeatureList.MULTI_INSTANCE_APPLICATION_STATUS_CLEANUP)
     public void testAllocInstanceId_removeTaskOnRecentScreen_withoutDestroy() {
         assertEquals(0, allocInstanceIndex(PASSED_ID_INVALID, mActivityTask56));
 
@@ -488,7 +488,7 @@ public class MultiInstanceManagerApi31UnitTest {
     }
 
     @Test
-    @DisableFeatures(ChromeFeatureList.MUlTI_INSTANCE_APPLICATION_STATUS_CLEANUP)
+    @DisableFeatures(ChromeFeatureList.MULTI_INSTANCE_APPLICATION_STATUS_CLEANUP)
     public void testAllocInstanceId_removeTaskOnRecentScreen_withoutDestroy_fixDisabled() {
         assertEquals(0, allocInstanceIndex(PASSED_ID_INVALID, mActivityTask56));
 
@@ -1415,13 +1415,13 @@ public class MultiInstanceManagerApi31UnitTest {
             // If |mTabbedActivityTask63| is alive, verify that its instance was restored in the
             // existing task by bringing it to the foreground.
             verify(mActivityManager).moveTaskToFront(taskId63, 0);
-            verify(mTabbedActivityTask62, never()).startActivity(any(), any());
+            verify(mTabbedActivityTask62, never()).startActivity(any());
             verify(appTask63, never()).finishAndRemoveTask();
         } else {
             // If |mTabbedActivityTask63| is not alive, verify that |mTabbedActivityTask62| starts a
             // new activity and finishes and removes the old task, and does not attempt to bring the
             // old task to the foreground.
-            verify(mTabbedActivityTask62).startActivity(any(), any());
+            verify(mTabbedActivityTask62).startActivity(any());
             verify(appTask63).finishAndRemoveTask();
             verify(mActivityManager, never()).moveTaskToFront(taskId63, 0);
         }

@@ -317,7 +317,7 @@ template("write_build_config") {
         invoker.bypass_platform_checks) {
       args += [ "--bypass-platform-checks" ]
     }
-    if (defined(invoker.is_robolectric) && invoker.is_robolectric) {
+    if (defined(invoker.requires_robolectric) && invoker.requires_robolectric) {
       args += [ "--is-robolectric" ]
     }
 
@@ -1689,16 +1689,14 @@ if (enable_java_templates) {
         depfile = "$target_gen_dir/$target_name.d"
         outputs = [ invoker.output ]
         inputs = [
-                   "$android_sdk/optional/android.test.base.jar",
-                   "$android_sdk/optional/org.apache.http.legacy.jar",
-                   "//third_party/jdk/current/bin/java",
                    _custom_d8_path,
                    _d8_path,
-                   android_sdk_jar,
-                   invoker.build_config,
                  ] + java_paths_for_inputs
         if (defined(invoker.inputs)) {
           inputs += invoker.inputs
+        }
+        if (defined(invoker.build_config)) {
+          inputs += [ invoker.build_config ]
         }
 
         if (!_is_library) {
@@ -1744,10 +1742,6 @@ if (enable_java_templates) {
         }
         if (defined(invoker.input_classes_filearg)) {
           args += [ "--class-inputs-filearg=${invoker.input_classes_filearg}" ]
-
-          # Required for the same reason as unprocessed_jar_path is added to
-          # classpath (see note below).
-          args += [ "--classpath=${invoker.input_classes_filearg}" ]
         }
         if (_input_class_jars != []) {
           inputs += _input_class_jars
@@ -1778,26 +1772,29 @@ if (enable_java_templates) {
           # filtered out via jar_excluded_patterns.
           # Must come first in classpath in order to take precedence over
           # deps that defined the same classes (via jar_excluded_patterns).
-          _rebased_build_config =
-              rebase_path(invoker.build_config, root_build_dir)
           if (defined(invoker.unprocessed_jar_path)) {
             args += [
               "--classpath",
               rebase_path(invoker.unprocessed_jar_path, root_build_dir),
+            ]
+            inputs += [ invoker.unprocessed_jar_path ]
+          }
+          if (_min_sdk_version < 24) {
+            _rebased_build_config =
+                rebase_path(invoker.build_config, root_build_dir)
+            _desugar_dependencies_path =
+                "$target_gen_dir/$target_name.desugardeps"
+            args += [
+              "--desugar-dependencies",
+              rebase_path(_desugar_dependencies_path, root_build_dir),
 
               # Pass the full classpath to find new dependencies that are not in
               # the .desugardeps file.
               "--classpath=@FileArg($_rebased_build_config:deps_info:javac_full_interface_classpath)",
+              "--bootclasspath=@FileArg($_rebased_build_config:android:sdk_jars)",
             ]
-            inputs += [ invoker.unprocessed_jar_path ]
+            inputs += [ android_sdk_jar ]
           }
-          _desugar_dependencies_path =
-              "$target_gen_dir/$target_name.desugardeps"
-          args += [
-            "--desugar-dependencies",
-            rebase_path(_desugar_dependencies_path, root_build_dir),
-            "--bootclasspath=@FileArg($_rebased_build_config:android:sdk_jars)",
-          ]
         }
 
         if (defined(invoker.custom_assertion_handler)) {
@@ -1967,8 +1964,8 @@ if (enable_java_templates) {
         rebase_path(outputs[0], root_build_dir),
         "--chromium-output-dir",
         rebase_path(root_build_dir, root_build_dir),
-        "--direct-classpath-jars=@FileArg($_rebased_build_config:javac:classpath)",
-        "--full-classpath-jars=@FileArg($_rebased_build_config:deps_info:javac_full_classpath)",
+        "--direct-classpath-jars=@FileArg($_rebased_build_config:javac:interface_classpath)",
+        "--full-classpath-jars=@FileArg($_rebased_build_config:deps_info:javac_full_interface_classpath)",
         "--full-classpath-gn-targets=@FileArg($_rebased_build_config:deps_info:javac_full_classpath_targets)",
       ]
       if (auto_add_missing_java_deps) {
@@ -3062,7 +3059,6 @@ if (enable_java_templates) {
     forward_variables_from(invoker, TESTONLY_AND_VISIBILITY)
 
     _build_config = invoker.build_config
-    _chromium_code = invoker.chromium_code
 
     _processor_args = []
     if (defined(invoker.processor_args_javac)) {
@@ -3150,8 +3146,10 @@ if (enable_java_templates) {
         args += [
           "--jar-path=$_rebased_output_jar_path",
           "--java-srcjars=$_rebased_java_srcjars",
-          "--generated-dir=$_rebased_generated_dir",
         ]
+        if (!invoker.use_turbine) {
+          args += [ "--generated-dir=$_rebased_generated_dir" ]
+        }
         inputs += _java_srcjars
       }
       inputs += invoker.source_files + [
@@ -3199,20 +3197,6 @@ if (enable_java_templates) {
       }
 
       if (invoker.use_turbine) {
-        # Prefer direct deps for turbine as much as possible.
-        args += [ "--classpath=@FileArg($_rebased_build_config:javac:interface_classpath)" ]
-      } else {
-        args += [ "--classpath=@FileArg($_rebased_build_config:deps_info:javac_full_interface_classpath)" ]
-      }
-
-      if (invoker.use_turbine) {
-        args += [
-          "--processorpath=@FileArg($_rebased_build_config:javac:processor_classpath)",
-          "--processors=@FileArg($_rebased_build_config:javac:processor_classes)",
-        ]
-      }
-
-      if (invoker.use_turbine) {
         _turbine_jar_path = "//third_party/turbine/cipd/turbine.jar"
         inputs += [ _turbine_jar_path ]
         outputs += [ invoker.generated_jar_path ]
@@ -3221,24 +3205,33 @@ if (enable_java_templates) {
           rebase_path(_turbine_jar_path, root_build_dir),
           "--generated-jar-path",
           rebase_path(invoker.generated_jar_path, root_build_dir),
-        ]
-      }
+          "--processorpath=@FileArg($_rebased_build_config:javac:processor_classpath)",
+          "--processors=@FileArg($_rebased_build_config:javac:processor_classes)",
 
-      # Flag enable_kythe_annotations requires
-      # checkout_android_prebuilts_build_tools=True in .gclient.
-      if (enable_kythe_annotations && !invoker.enable_errorprone) {
-        args += [ "--enable-kythe-annotations" ]
-      }
-      if (_chromium_code) {
-        args += [ "--chromium-code" ]
-        if (treat_warnings_as_errors) {
-          args += [ "--warnings-as-errors" ]
+          # Turbine needs only direct deps.
+          "--classpath=@FileArg($_rebased_build_config:javac:interface_classpath)",
+        ]
+      } else {
+        args += [ "--classpath=@FileArg($_rebased_build_config:deps_info:javac_full_interface_classpath)" ]
+        if (invoker.chromium_code) {
+          args += [ "--chromium-code" ]
+        }
+
+        # Flag enable_kythe_annotations requires
+        # checkout_android_prebuilts_build_tools=True in .gclient.
+        if (enable_kythe_annotations && !invoker.enable_errorprone) {
+          args += [ "--enable-kythe-annotations" ]
         }
       }
-      if (defined(invoker.jar_excluded_patterns)) {
+      if (treat_warnings_as_errors) {
+        args += [ "--warnings-as-errors" ]
+      }
+      if (defined(invoker.jar_excluded_patterns) &&
+          invoker.jar_excluded_patterns != []) {
         args += [ "--jar-info-exclude-globs=${invoker.jar_excluded_patterns}" ]
       }
-      if (defined(invoker.jar_included_patterns)) {
+      if (defined(invoker.jar_included_patterns) &&
+          invoker.jar_included_patterns != []) {
         args += [ "--jar-info-include-globs=${invoker.jar_included_patterns}" ]
       }
 
@@ -3485,8 +3478,8 @@ if (enable_java_templates) {
   #    library via its built .jar rather than including its .java sources.
   #  proguard_enabled: Optional. True to enable ProGuard obfuscation.
   #  proguard_configs: Optional list of additional proguard config file paths.
-  #  is_robolectric: Optional. If True, this is a host side android test binary
-  #    which is allowed to depend on other android targets.
+  #  requires_robolectric: Optional. If True, this is a host side android test
+  #    binary which is allowed to depend on other android targets.
   #  include_java_resources: Optional. If True, include Java (not Android)
   #    resources into final .jar file.
   #  jar_excluded_patterns: Optional list of .class file patterns to exclude
@@ -3561,7 +3554,8 @@ if (enable_java_templates) {
 
     _bypass_platform_checks = defined(invoker.bypass_platform_checks) &&
                               invoker.bypass_platform_checks
-    _is_robolectric = defined(invoker.is_robolectric) && invoker.is_robolectric
+    _requires_robolectric =
+        defined(invoker.requires_robolectric) && invoker.requires_robolectric
 
     if (defined(invoker.sources)) {
       _source_files = invoker.sources
@@ -3679,10 +3673,14 @@ if (enable_java_templates) {
         _host_processed_jar_path =
             "$root_out_dir/lib.java$_target_dir/$_output_name.jar"
       }
+      if (_has_sources) {
+        _javac_jar_path = "$target_out_dir/$_main_target_name.javac.jar"
+        _generated_jar_path =
+            "$target_gen_dir/$_main_target_name.generated.srcjar"
+      }
+
       if (_build_device_jar) {
         _dex_path = "$target_out_dir/$_main_target_name.dex.jar"
-        _enable_desugar =
-            !defined(invoker.enable_desugar) || invoker.enable_desugar
 
         # Build speed optimization: Skip "process device" step if the step
         # would be just a copy and avoid the copy.
@@ -3692,6 +3690,8 @@ if (enable_java_templates) {
             defined(invoker.jar_included_patterns)
         if (!_process_device_jar && _is_prebuilt) {
           _device_processed_jar_path = invoker.jar_path
+        } else if (!_process_device_jar && _has_sources) {
+          _device_processed_jar_path = _javac_jar_path
         } else {
           _device_processed_jar_path =
               "$target_out_dir/$_output_name.processed.jar"
@@ -3707,16 +3707,6 @@ if (enable_java_templates) {
         _final_ijar_path = "$target_out_dir/$_output_name.turbine.jar"
       } else {
         _final_ijar_path = "$target_out_dir/$_output_name.ijar.jar"
-      }
-
-      if (_has_sources) {
-        if (_build_device_jar && !_process_device_jar) {
-          _javac_jar_path = _device_processed_jar_path
-        } else {
-          _javac_jar_path = "$target_out_dir/$_main_target_name.javac.jar"
-        }
-        _generated_jar_path =
-            "$target_gen_dir/$_main_target_name.generated.srcjar"
       }
 
       if (_is_prebuilt) {
@@ -3901,7 +3891,7 @@ if (enable_java_templates) {
 
       supports_android = _supports_android
       requires_android = _requires_android
-      is_robolectric = _is_robolectric
+      requires_robolectric = _requires_robolectric
       bypass_platform_checks = _bypass_platform_checks
 
       if (defined(invoker.resources_package)) {
@@ -3976,7 +3966,8 @@ if (enable_java_templates) {
       if (defined(invoker.resources_package) && _type == "java_library") {
         # TODO(crbug.com/40821816): remove _bypass_platform_checks from the list
         # once all robolectric targets have migrated to robolectric_library.
-        assert(_requires_android || _bypass_platform_checks || _is_robolectric,
+        assert(_requires_android || _bypass_platform_checks ||
+                   _requires_robolectric,
                "Setting resources_package applicable only for " +
                    "android_library(), or robolectric_library(). " +
                    "Target=$target_name")
@@ -4025,7 +4016,7 @@ if (enable_java_templates) {
           source_files = _source_files
           target_sources_file = _target_sources_file
           chromium_code = _chromium_code
-          include_android_sdk = _is_robolectric || _requires_android
+          include_android_sdk = _requires_robolectric || _requires_android
         }
       }
 
@@ -4061,15 +4052,15 @@ if (enable_java_templates) {
           if (source_files != []) {
             target_sources_file = _target_sources_file
           }
-          chromium_code = _chromium_code
-          include_android_sdk = _is_robolectric || _requires_android
+          if (!use_turbine) {
+            chromium_code = _chromium_code
+          }
+          include_android_sdk = _requires_robolectric || _requires_android
         }
       }
       _compile_java_forward_variables = [
         "additional_jar_files",
         "apk_name",
-        "jar_excluded_patterns",
-        "jar_included_patterns",
         "javac_args",
         "processor_args_javac",
       ]
@@ -4094,7 +4085,11 @@ if (enable_java_templates) {
 
       _compile_java_target = "${_main_target_name}__compile_java"
       compile_java_helper(_compile_java_target) {
-        forward_variables_from(invoker, _compile_java_forward_variables)
+        forward_variables_from(invoker,
+                               _compile_java_forward_variables + [
+                                     "jar_excluded_patterns",
+                                     "jar_included_patterns",
+                                   ])
         output_jar_path = _javac_jar_path
         if (!_skip_header_jar) {
           deps = [ ":$_header_target_name" ]
@@ -4203,14 +4198,13 @@ if (enable_java_templates) {
         _validate_target_name = "${target_name}__validate"
         check_for_missing_direct_deps(_validate_target_name) {
           forward_variables_from(invoker, [ "missing_classes_allowlist" ])
-          deps = _unprocessed_jar_deps + _javac_classpath_deps +
-                 [ ":$_build_config_target_name" ]
+          deps = _unprocessed_jar_deps + _header_classpath_deps
           data_deps = _java_validate_deps
           if (defined(_compile_java_errorprone_target)) {
             data_deps += [ ":$_compile_java_errorprone_target" ]
           }
 
-          include_android_sdk = _requires_android || _is_robolectric
+          include_android_sdk = _requires_android || _requires_robolectric
           target_label =
               get_label_info(":${invoker.target_name}", "label_no_toolchain")
           input_jar = _unprocessed_jar_path
@@ -4295,20 +4289,19 @@ if (enable_java_templates) {
                                    "repackage_classes",
                                  ])
           input_class_jars = [ _device_processed_jar_path ]
-          enable_desugar = _enable_desugar
           ignore_desugar_missing_deps = !_enable_bytecode_checks
 
           # There's no value in per-class dexing prebuilts since they never
           # change just one class at a time.
           disable_incremental = _is_prebuilt
           output = _dex_path
-          deps = _process_device_jar_deps
+          deps = _process_device_jar_deps + _unprocessed_jar_deps
 
-          if (enable_desugar) {
-            # Desugaring with D8 requires full classpath.
+          unprocessed_jar_path = _unprocessed_jar_path
+          if (default_min_sdk_version < 24) {
+            # Desugaring with D8 requires classpath for default method desugaring (required until API 24).
             build_config = _build_config
-            unprocessed_jar_path = _unprocessed_jar_path
-            deps += _header_classpath_deps + _unprocessed_jar_deps
+            deps += _header_classpath_deps
           }
 
           is_library = true
@@ -4346,7 +4339,7 @@ if (enable_java_templates) {
           script_name = invoker.wrapper_script_name
         }
         deps = [ ":$_build_config_target_name" ]
-        if (_is_robolectric) {
+        if (_requires_robolectric) {
           # For robolectric tests, we add the sdk stub jars so that classes
           # that reference Android types can be loaded without throwing
           # NoClassDefFoundErrors. The Robolectric sandbox makes these types
@@ -4380,10 +4373,10 @@ if (enable_java_templates) {
 
     # robolectric_library can depend on java_library, so java_library must
     # define __assetres.
-    if ((_is_library || _supports_android || _is_robolectric) &&
+    if ((_is_library || _supports_android || _requires_robolectric) &&
         !defined(_fake_rjava_target)) {
       group("${target_name}__assetres") {
-        if (_supports_android || _is_robolectric) {
+        if (_supports_android || _requires_robolectric) {
           deps = _java_assetres_deps
         }
       }

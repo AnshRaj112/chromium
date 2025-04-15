@@ -15,6 +15,7 @@
 #include "base/check_op.h"
 #include "base/location.h"
 #include "base/memory/scoped_refptr.h"
+#include "base/memory/weak_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/notreached.h"
 #include "base/numerics/checked_math.h"
@@ -108,15 +109,19 @@
 // IWYU pragma: no_include "base/numerics/clamped_math.h"
 
 namespace blink {
+namespace {
+
+bool IsContextProviderValid() {
+  base::WeakPtr<WebGraphicsContext3DProviderWrapper> context_provider_wrapper =
+      SharedGpuContext::ContextProviderWrapper();
+  return context_provider_wrapper &&
+         !context_provider_wrapper->ContextProvider().IsContextLost();
+}
+
+}  // namespace
 
 constexpr char kDefaultFont[] = "10px sans-serif";
 const char BaseRenderingContext2D::kInheritString[] = "inherit";
-
-// After context lost, it waits |kTryRestoreContextInterval| before start the
-// restore the context. This wait needs to be long enough to avoid spamming the
-// GPU process with retry attempts and short enough to provide decent UX. It's
-// currently set to 500ms.
-const base::TimeDelta kTryRestoreContextInterval = base::Milliseconds(500);
 
 BaseRenderingContext2D::BaseRenderingContext2D(
     CanvasRenderingContextHost* canvas,
@@ -266,8 +271,8 @@ void BaseRenderingContext2D::DispatchContextLostEvent(TimerBase*) {
   if (context_lost_mode_ == CanvasRenderingContext::kRealLostContext ||
       context_lost_mode_ == CanvasRenderingContext::kSyntheticLostContext) {
     try_restore_context_attempt_count_ = 0;
-    try_restore_context_event_timer_.StartRepeating(kTryRestoreContextInterval,
-                                                    FROM_HERE);
+    try_restore_context_event_timer_.StartRepeating(
+        try_restore_context_interval_, FROM_HERE);
   }
 }
 
@@ -312,37 +317,36 @@ void BaseRenderingContext2D::TryRestoreContextEvent(TimerBase* timer) {
   DCHECK(context_lost_mode_ !=
          CanvasRenderingContext::kWebGLLoseContextLostContext);
 
-  if (context_lost_mode_ == CanvasRenderingContext::kRealLostContext) {
-    if (SharedGpuContext::IsGpuCompositingEnabled()) {
-      if (!SharedGpuContext::SharedImageInterfaceProvider()) {
-        return;
-      }
-    } else {
-      if (!SharedGpuContext::ContextProviderWrapper()) {
-        return;
-      }
-    }
-  }
-
-  // The GPU context is restored, but the canvas was changed to an invalid size
-  // since the canvas was lost. We can't restore the context until the canvas is
-  // given a valid size.
+  // The canvas was changed to an invalid size since the context was lost. We
+  // can't restore the context until the canvas is given a valid size. Abort
+  // here to avoid creating a shared GPU context we would not use.
   if (!IsValidImageSize(host->Size()) && !host->Size().IsEmpty()) {
     context_lost_mode_ = kInvalidCanvasSize;
     try_restore_context_event_timer_.Stop();
     return;
   }
 
-  RestoreGuard context_is_being_restored(*this);
-  if (GetOrCreateCanvas2DResourceProvider()) {
-    try_restore_context_event_timer_.Stop();
-    DispatchContextRestoredEvent(nullptr);
-    return;
+  // For real context losses, we can only restore if the SharedGpuContext is
+  // ready.
+  if (context_lost_mode_ != CanvasRenderingContext::kRealLostContext ||
+      (SharedGpuContext::IsGpuCompositingEnabled() &&
+       IsContextProviderValid()) ||
+      (!SharedGpuContext::IsGpuCompositingEnabled() &&
+       SharedGpuContext::SharedImageInterfaceProvider())) {
+    RestoreGuard context_is_being_restored(*this);
+    if (GetOrCreateCanvas2DResourceProvider()) {
+      try_restore_context_event_timer_.Stop();
+      DispatchContextRestoredEvent(nullptr);
+      return;
+    }
   }
 
   // Retry up to `kMaxTryRestoreContextAttempts` times before giving up.
   if (++try_restore_context_attempt_count_ > kMaxTryRestoreContextAttempts) {
     try_restore_context_event_timer_.Stop();
+    if (on_restore_failed_callback_for_testing_) {
+      on_restore_failed_callback_for_testing_.Run();
+    }
   }
 }
 
@@ -545,8 +549,7 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
   if (auto* host = GetCanvasRenderingContextHost()) {
     if (snapshot) {
       noised = CanvasInterventionsHelper::MaybeNoiseSnapshot(
-          host->RenderingContext(), GetTopExecutionContext(), snapshot,
-          host->GetRasterMode());
+          host->RenderingContext(), GetTopExecutionContext(), snapshot);
     }
   }
 
@@ -693,29 +696,27 @@ void BaseRenderingContext2D::putImageData(ImageData* data,
 
   // WritePixels (called by PutByteArray) requires that the source and
   // destination pixel formats have the same bytes per pixel.
-  if (GetCanvasRenderingContextHost()) {
-    SkColorType dest_color_type =
-        viz::ToClosestSkColorType(GetSharedImageFormat());
-    if (SkColorTypeBytesPerPixel(dest_color_type) !=
-        SkColorTypeBytesPerPixel(data_pixmap.colorType())) {
-      SkImageInfo converted_info =
-          data_pixmap.info().makeColorType(dest_color_type);
-      SkBitmap converted_bitmap;
-      if (!converted_bitmap.tryAllocPixels(converted_info)) {
-        exception_state.ThrowRangeError("Out of memory in putImageData");
-        return;
-      }
-      if (!converted_bitmap.writePixels(data_pixmap, 0, 0)) {
-        NOTREACHED() << "Failed to convert ImageData with writePixels.";
-      }
-
-      PutByteArray(converted_bitmap.pixmap(), source_rect, dest_offset);
-      if (GetPaintCanvas()) {
-        WillDraw(gfx::RectToSkIRect(dest_rect),
-                 CanvasPerformanceMonitor::DrawType::kImageData);
-      }
+  SkColorType dest_color_type =
+      viz::ToClosestSkColorType(GetSharedImageFormat());
+  if (SkColorTypeBytesPerPixel(dest_color_type) !=
+      SkColorTypeBytesPerPixel(data_pixmap.colorType())) {
+    SkImageInfo converted_info =
+        data_pixmap.info().makeColorType(dest_color_type);
+    SkBitmap converted_bitmap;
+    if (!converted_bitmap.tryAllocPixels(converted_info)) {
+      exception_state.ThrowRangeError("Out of memory in putImageData");
       return;
     }
+    if (!converted_bitmap.writePixels(data_pixmap, 0, 0)) {
+      NOTREACHED() << "Failed to convert ImageData with writePixels.";
+    }
+
+    PutByteArray(converted_bitmap.pixmap(), source_rect, dest_offset);
+    if (GetPaintCanvas()) {
+      WillDraw(gfx::RectToSkIRect(dest_rect),
+               CanvasPerformanceMonitor::DrawType::kImageData);
+    }
+    return;
   }
 
   PutByteArray(data_pixmap, source_rect, dest_offset);

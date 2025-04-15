@@ -89,8 +89,7 @@ const std::unordered_map<char, KeyInfo>& GetKeyInfoMap() {
 
 }  // namespace
 
-TypeTool::TypeTool(mojom::TypeActionPtr action,
-                   base::raw_ref<content::RenderFrame> frame)
+TypeTool::TypeTool(mojom::TypeActionPtr action, content::RenderFrame& frame)
     : frame_(frame), action_(std::move(action)) {}
 
 TypeTool::~TypeTool() = default;
@@ -102,8 +101,12 @@ TypeTool::KeyParams::KeyParams(const KeyParams& other) = default;
 TypeTool::KeyParams TypeTool::GetEnterKeyParams() {
   TypeTool::KeyParams params;
   params.windows_key_code = ui::VKEY_RETURN;
+  params.native_key_code =
+      ui::KeycodeConverter::DomCodeToNativeKeycode(ui::DomCode::ENTER);
   params.dom_code = "Enter";
   params.dom_key = "Enter";
+  params.text = ui::VKEY_RETURN;
+  params.unmodified_text = ui::VKEY_RETURN;
   return params;
 }
 
@@ -153,9 +156,8 @@ std::optional<TypeTool::KeyParams> TypeTool::GetKeyParamsForChar(char c) {
   }
 
   // Set native_key_code (often matches windows_key_code, platform dependent)
-  params.native_key_code = ui::KeycodeConverter::UsbKeycodeToNativeKeycode(
-      ui::KeycodeConverter::DomCodeToUsbKeycode(
-          ui::KeycodeConverter::CodeStringToDomCode(params.dom_code)));
+  params.native_key_code = ui::KeycodeConverter::DomCodeToNativeKeycode(
+      ui::KeycodeConverter::CodeStringToDomCode(params.dom_code));
 
   return params;
 }
@@ -177,10 +179,9 @@ bool TypeTool::CreateAndDispatchKeyEvent(blink::WebInputEvent::Type type,
       frame_->GetWebFrame()->FrameWidget()->HandleInputEvent(
           blink::WebCoalescedInputEvent(key_event, ui::LatencyInfo()));
 
-  if (result == blink::WebInputEventResult::kNotHandled ||
-      result == blink::WebInputEventResult::kHandledSuppressed) {
+  if (result == blink::WebInputEventResult::kHandledSuppressed) {
     DLOG(WARNING) << "Keyboard event (" << type << ") for key "
-                  << key_event.dom_key << " not handled or suppressed.";
+                  << key_event.dom_key << " suppressed.";
     return false;
   }
   return true;
@@ -188,13 +189,11 @@ bool TypeTool::CreateAndDispatchKeyEvent(blink::WebInputEvent::Type type,
 
 bool TypeTool::SimulateKeyPress(TypeTool::KeyParams params) {
   // TODO(crbug.com/402082693): Maybe add slight delay between events?
-  bool overall_success =
-      CreateAndDispatchKeyEvent(blink::WebInputEvent::Type::kKeyDown, params);
+  bool overall_success = CreateAndDispatchKeyEvent(
+      blink::WebInputEvent::Type::kRawKeyDown, params);
 
-  if (!params.text && params.windows_key_code != ui::VKEY_RETURN) {
-    overall_success &=
-        CreateAndDispatchKeyEvent(blink::WebInputEvent::Type::kChar, params);
-  }
+  overall_success &=
+      CreateAndDispatchKeyEvent(blink::WebInputEvent::Type::kChar, params);
 
   overall_success &=
       CreateAndDispatchKeyEvent(blink::WebInputEvent::Type::kKeyUp, params);
@@ -217,8 +216,12 @@ void TypeTool::Execute(ToolFinishedCallback callback) {
   mojom::ToolTargetPtr& target = action_->target;
   CHECK(target);
 
-  int32_t dom_node_id = target->dom_node_id;
-  CHECK(dom_node_id);
+  if (target->is_coordinate()) {
+    NOTIMPLEMENTED() << "Coordinate-based target not yet supported.";
+    std::move(callback).Run(false);
+    return;
+  }
+  int32_t dom_node_id = target->get_dom_node_id();
 
   blink::WebNode node = GetNodeFromId(frame_.get(), dom_node_id);
   if (node.IsNull()) {

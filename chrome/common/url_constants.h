@@ -546,6 +546,10 @@ inline constexpr char kSigninOnDesktopLearnMoreURL[] =
     "https://support.google.com/"
     "chrome?p=settings_sign_in#zippy=sign-in-turn-on-sync";
 
+// The URL for the "Learn more" page for adding a new profile to Chrome.
+inline constexpr char kAddNewProfileOnDesktopLearnMoreURL[] =
+    "https://support.google.com/chrome/?p=add_profile";
+
 // The URL for the "Learn more" page for AI settings for managed users.
 inline constexpr char16_t kAiSettingsLearnMorePageManagedUrl[] =
     u"https://support.google.com/chrome/a?p=generative_ai_settings";
@@ -561,6 +565,16 @@ inline constexpr char kComposeLearnMorePageManagedURL[] =
 // The URL for the "Learn more" links for pages related to History search.
 inline constexpr char kHistorySearchLearnMorePageURL[] =
     "https://support.google.com/chrome?p=ai_history_search";
+
+// The URL for the "Learn more about shortcuts" page for Glic.
+// TODO(crbug.com/409588999): Update this link with the actual link when ready.
+inline constexpr char kGlicKeyboardShortcutLearnMoreURL[] =
+    "https://google.com/";
+
+// The URL for the "Learn more about shortcuts" page for Glic for managed users.
+// TODO(crbug.com/409588999): Update this link with the actual link when ready.
+inline constexpr char kGlicKeyboardShortcutLearnMoreManagedURL[] =
+    "https://google.com/";
 
 // The URL for the "Learn more" links for pages related to History search for
 // managed users.

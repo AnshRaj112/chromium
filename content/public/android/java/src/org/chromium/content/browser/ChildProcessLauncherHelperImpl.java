@@ -44,6 +44,7 @@ import org.chromium.build.annotations.Nullable;
 import org.chromium.content.app.SandboxedProcessService;
 import org.chromium.content.common.ContentSwitchUtils;
 import org.chromium.content_public.browser.ChildProcessImportance;
+import org.chromium.content_public.browser.ContentFeatureList;
 import org.chromium.content_public.browser.ContentFeatureMap;
 import org.chromium.content_public.common.ContentFeatures;
 import org.chromium.content_public.common.ContentSwitches;
@@ -195,11 +196,15 @@ public final class ChildProcessLauncherHelperImpl {
                     if (pid > 0) {
                         sLauncherByPid.put(pid, ChildProcessLauncherHelperImpl.this);
                         if (mRanking != null) {
+                            // TODO(crbug.com/409703175): Set isSpareRenderer once the
+                            // spare renderer information is passed when launching the
+                            // process.
                             mRanking.addConnection(
                                     connection,
                                     /* visible= */ false,
                                     /* frameDepth= */ 1,
                                     /* intersectsViewport= */ false,
+                                    /* isSpareRenderer= */ false,
                                     ChildProcessImportance.MODERATE);
                             if (mBindingManager != null) mBindingManager.rankingChanged();
                         }
@@ -840,18 +845,24 @@ public final class ChildProcessLauncherHelperImpl {
         }
 
         if (mIsSpareRenderer != isSpareRenderer
-                && ChildProcessConnection.supportNotPerceptibleBinding()) {
+                && ChildProcessConnection.supportNotPerceptibleBinding()
+                && ContentFeatureList.sSpareRendererAddNotPerceptibleBinding.getValue()) {
             if (isSpareRenderer) {
                 connection.addNotPerceptibleBinding();
             } else {
                 connection.removeNotPerceptibleBinding();
             }
-            mIsSpareRenderer = isSpareRenderer;
         }
+        mIsSpareRenderer = isSpareRenderer;
 
         if (mRanking != null) {
             mRanking.updateConnection(
-                    connection, visible, frameDepth, intersectsViewport, importance);
+                    connection,
+                    visible,
+                    frameDepth,
+                    intersectsViewport,
+                    isSpareRenderer,
+                    importance);
             if (mBindingManager != null) mBindingManager.rankingChanged();
         }
 

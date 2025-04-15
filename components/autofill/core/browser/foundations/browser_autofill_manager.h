@@ -38,14 +38,13 @@
 #include "components/autofill/core/browser/integrators/fast_checkout/fast_checkout_delegate.h"
 #include "components/autofill/core/browser/integrators/password_form_classification.h"
 #include "components/autofill/core/browser/integrators/plus_addresses/autofill_plus_address_delegate.h"
-#include "components/autofill/core/browser/integrators/touch_to_fill_delegate.h"
+#include "components/autofill/core/browser/integrators/touch_to_fill/touch_to_fill_delegate.h"
 #include "components/autofill/core/browser/metrics/autofill_metrics.h"
 #include "components/autofill/core/browser/metrics/form_events/address_form_event_logger.h"
 #include "components/autofill/core/browser/metrics/form_events/credit_card_form_event_logger.h"
 #include "components/autofill/core/browser/metrics/log_event.h"
 #include "components/autofill/core/browser/payments/amount_extraction_manager.h"
 #include "components/autofill/core/browser/payments/autofill_offer_manager.h"
-#include "components/autofill/core/browser/payments/bnpl_manager.h"
 #include "components/autofill/core/browser/payments/card_unmask_delegate.h"
 #include "components/autofill/core/browser/payments/full_card_request.h"
 #include "components/autofill/core/browser/payments/payments_autofill_client.h"
@@ -83,6 +82,7 @@ struct SuggestionRankingContext;
 
 namespace payments {
 class AmountExtractionManager;
+class BnplManager;
 }  // namespace payments
 
 // Enum for the value patterns metric. Don't renumerate existing value. They are
@@ -205,6 +205,9 @@ class BrowserAutofillManager : public AutofillManager {
   // `safe_filled_fields` is the intersection of `filled_fields` and
   // `safe_fields`. `skip_reasons` tells us for each field (mapped by their
   // IDs), whether the field was skipped for filling or not and why.
+  // TODO(crbug.com/40227071): Remove `filled_field_ids` and `safe_field_ids`.
+  // TODO(crbug.com/40232021): Consider choosing one of `FormData` or
+  // `FormStructure`, and `FormFieldData` or `AutofillField`.
   void OnDidFillOrPreviewForm(
       mojom::ActionPersistence action_persistence,
       const FormData& form,
@@ -218,7 +221,7 @@ class BrowserAutofillManager : public AutofillManager {
           skip_reasons,
       const FillingPayload& filling_payload,
       AutofillTriggerSource trigger_source,
-      bool is_refill);
+      std::optional<RefillTriggerReason> refill_trigger_reason);
 
   // AutofillManager:
   base::WeakPtr<AutofillManager> GetWeakPtr() override;
@@ -288,9 +291,8 @@ class BrowserAutofillManager : public AutofillManager {
       const FormGlobalId& form_id,
       const FieldGlobalId& field_id) const;
 
-  autofill_metrics::CreditCardFormEventLogger& GetCreditCardFormEventLogger() {
-    return metrics_->credit_card_form_event_logger;
-  }
+  virtual autofill_metrics::CreditCardFormEventLogger&
+  GetCreditCardFormEventLogger();
 
  protected:
   // Returns the card image for `credit_card`. If the `credit_card` has a card
@@ -411,6 +413,11 @@ class BrowserAutofillManager : public AutofillManager {
       AutofillSuggestionTriggerSource trigger_source,
       autofill_metrics::SuggestionRankingContext& ranking_context);
 
+  // Returns valuables suggestions depending on the `trigger_autofill_field`
+  // value type.
+  std::vector<Suggestion> GetValuablesSuggestions(
+      const AutofillField& trigger_autofill_field);
+
   // Fills or previews `form` with the information in `credit_card`.
   // `autofill_field` is the field that triggered the filling operation.
   // `trigger_source` is the reason for triggering the filling operation.
@@ -466,7 +473,7 @@ class BrowserAutofillManager : public AutofillManager {
   // regarding the ranking of suggestions and is used for metrics logging.
   // TODO(crbug.com/340494671): Move ablation study fields out of the function
   // and make the context a const ref.
-  std::vector<Suggestion> GetAvailableAddressAndCreditCardSuggestions(
+  std::vector<Suggestion> GetAvailableSuggestions(
       const FormData& form,
       const FormStructure* form_structure,
       const FormFieldData& field,

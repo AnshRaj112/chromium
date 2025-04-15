@@ -45,14 +45,14 @@
 #import "ios/chrome/browser/location_bar/ui_bundled/location_bar_view_controller.h"
 #import "ios/chrome/browser/ntp/model/new_tab_page_tab_helper.h"
 #import "ios/chrome/browser/ntp/model/new_tab_page_util.h"
+#import "ios/chrome/browser/omnibox/coordinator/omnibox_coordinator.h"
+#import "ios/chrome/browser/omnibox/coordinator/popup/omnibox_popup_coordinator.h"
 #import "ios/chrome/browser/omnibox/model/omnibox_position/omnibox_position_browser_agent.h"
 #import "ios/chrome/browser/omnibox/model/omnibox_position/omnibox_state_provider.h"
 #import "ios/chrome/browser/omnibox/ui_bundled/chrome_omnibox_client_ios.h"
 #import "ios/chrome/browser/omnibox/ui_bundled/omnibox_controller_delegate.h"
-#import "ios/chrome/browser/omnibox/ui_bundled/omnibox_coordinator.h"
 #import "ios/chrome/browser/omnibox/ui_bundled/omnibox_focus_delegate.h"
 #import "ios/chrome/browser/omnibox/ui_bundled/omnibox_text_field_ios.h"
-#import "ios/chrome/browser/omnibox/ui_bundled/popup/omnibox_popup_coordinator.h"
 #import "ios/chrome/browser/omnibox/ui_bundled/web_location_bar_impl.h"
 #import "ios/chrome/browser/overlays/model/public/overlay_presenter.h"
 #import "ios/chrome/browser/search_engines/model/template_url_service_factory.h"
@@ -175,10 +175,11 @@ const size_t kMaxURLDisplayChars = 32 * 1024;
   self.viewController.delegate = self;
   // TODO(crbug.com/40670043): Use HandlerForProtocol after commands protocol
   // clean up.
-  self.viewController.dispatcher = static_cast<
-      id<ActivityServiceCommands, ApplicationCommands, LoadQueryCommands,
-         LensCommands, LensOverlayCommands, OmniboxCommands>>(
-      self.browser->GetCommandDispatcher());
+  self.viewController.dispatcher =
+      static_cast<id<ActivityServiceCommands, ApplicationCommands,
+                     BrowserCoordinatorCommands, LoadQueryCommands,
+                     LensCommands, LensOverlayCommands, OmniboxCommands>>(
+          self.browser->GetCommandDispatcher());
   self.viewController.tracker =
       feature_engagement::TrackerFactory::GetForProfile(self.profile);
   self.viewController.voiceSearchEnabled =

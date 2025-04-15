@@ -12545,6 +12545,22 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="GlicPanelUserResizeEnded">
+  <owner>fsenra@google.com</owner>
+  <owner>iwells@google.com</owner>
+  <description>
+    Recorded when the glic panel stops being resized by the user.
+  </description>
+</action>
+
+<action name="GlicPanelUserResizeStarted">
+  <owner>fsenra@google.com</owner>
+  <owner>iwells@google.com</owner>
+  <description>
+    Recorded when the glic panel starts being resized by the user.
+  </description>
+</action>
+
 <action name="GlicResponse">
   <owner>carlosk@chromium.org</owner>
   <owner>harringtond@chromium.org</owner>
@@ -15156,6 +15172,28 @@ should be able to be added at any place in this file.
   <description>
     Reported when an insecure form is submitted anyway despite the warning. iOS
     only.
+  </description>
+</action>
+
+<action name="IOS.MagicStack.ShopCard.PriceTracking.Open">
+  <owner>davidjm@chromium.org</owner>
+  <owner>thegreenfrog@google.com</owner>
+  <owner>gloriafang@google.com</owner>
+  <description>
+    Recorded when the user taps the ShopCard in the Magic Stack (which opens the
+    price tracking URL) when the ShopCard contains a price drop from a user's
+    tracked products.
+  </description>
+</action>
+
+<action name="IOS.MagicStack.ShopCard.Reviews.Open">
+  <owner>davidjm@chromium.org</owner>
+  <owner>thegreenfrog@google.com</owner>
+  <owner>gloriafang@google.com</owner>
+  <description>
+    Recorded when the user taps the ShopCard in the Magic Stack (which opens the
+    product reviews) when the ShopCard contains a reviews for a URL the user
+    recently navigated to.
   </description>
 </action>
 
@@ -31855,6 +31893,13 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="PageInfo.CookiesSubpage.SyncSettingsLinkClicked">
+  <owner>andreydav@google.com</owner>
+  <description>
+    Chrome Sync settings link clicked in Cookies subpage from PageInfo.
+  </description>
+</action>
+
 <action name="PageInfo.ForgetSite.Cleared">
   <owner>olesiamarukhno@google.com</owner>
   <owner>dullweber@chromium.org</owner>
@@ -48418,6 +48463,8 @@ should be able to be added at any place in this file.
       label="For iOSSwipeBackForwardFeature feature"/>
   <suffix name="iOSSwipeToolbarToChangeTabFeature"
       label="For iOSSwipeToolbarToChangeTabFeature feature"/>
+  <suffix name="iOSSwitchAccountsWithNTPAccountParticleDiscFeature"
+      label="For switching accounts via the account particle disc."/>
   <suffix name="iOSTabGridSwipeRightForIncognito"
       label="For iOSTabGridSwipeRightForIncognito feature"/>
   <suffix name="KeyboardAccessoryAddressFilling"
@@ -48456,6 +48503,8 @@ should be able to be added at any place in this file.
       label="For password management bubble after save feature."/>
   <suffix name="PasswordsManagementBubbleDuringSignin"
       label="For password management bubble during signin feature."/>
+  <suffix name="PasswordsSavePrimingPromo"
+      label="For password save priming promo."/>
   <suffix name="PasswordSuggestions" label="For PasswordSuggestions feature."/>
   <suffix name="PasswordsWebAppProfileSwitch"
       label="For PasswordsWebAppProfileSwitch feature."/>
@@ -49271,6 +49320,8 @@ should be able to be added at any place in this file.
   <suffix name="PinnedShowTranslateButton"
       label="Pinned show translate button"/>
   <suffix name="PinnedTaskManagerButton" label="Pinned task manager button"/>
+  <suffix name="SharedTabGroupFeedbackButton"
+      label="Feedback button for the shared tab groups feature"/>
   <suffix name="ShowPerformanceSidePanelButton"
       label="Show performance side panel button"/>
   <suffix name="SidePanelButton" label="Side Panel button"/>
@@ -49284,6 +49335,7 @@ should be able to be added at any place in this file.
   <suffix name="kActionNewIncognitoWindow" label="New incognito window action"/>
   <suffix name="kActionPrint" label="Print action"/>
   <suffix name="kActionQrCodeGenerator" label="QR code generator action"/>
+  <suffix name="kActionRouteMedia" label="Media router action"/>
   <suffix name="kActionSendTabToSelf" label="Send tab to self action"/>
   <suffix name="kActionShowAddressesBubbleOrPage"
       label="Show addresses action"/>
@@ -49393,7 +49445,7 @@ should be able to be added at any place in this file.
 </action-suffix>
 
 <action-suffix separator="." ordering="suffix">
-  <suffix name="AddToBookmark"
+  <suffix name="AddBookmark"
       label="Recorded when the 'Add to bookmarks' option in the context menu
              is selected."/>
   <suffix name="AddToGroup"
@@ -49404,6 +49456,9 @@ should be able to be added at any place in this file.
              is selected."/>
   <suffix name="CloseTab"
       label="Recorded when the 'Close tab' option in the context menu is
+             selected."/>
+  <suffix name="EditBookmark"
+      label="Recorded when the 'Edit bookmark' option in the context menu is
              selected."/>
   <suffix name="SelectTabs"
       label="Recorded when the 'Select tabs' option in the context menu is

@@ -143,12 +143,15 @@ class PhysicalDeviceRecoveryFactorTest : public testing::Test {
             Eq(account_info),
             MatchTrustedVaultKeyAndVersions(GetTrustedVaultKeysWithVersions(
                 vault_keys, last_vault_key_version)),
-            _, Eq(AuthenticationFactorType(LocalPhysicalDevice())), _))
+            _,
+            Eq(AuthenticationFactorTypeAndRegistrationParams(
+                LocalPhysicalDevice())),
+            _))
         .WillOnce(
             [&](const CoreAccountInfo&,
                 const MemberKeysSource& member_keys_source,
                 const SecureBoxPublicKey& device_public_key,
-                AuthenticationFactorType,
+                AuthenticationFactorTypeAndRegistrationParams,
                 TrustedVaultConnection::RegisterAuthenticationFactorCallback
                     callback) {
               device_registration_callback = std::move(callback);
@@ -202,10 +205,13 @@ TEST_F(PhysicalDeviceRecoveryFactorTest, ShouldRegisterDevice) {
           Eq(account_info()),
           MatchTrustedVaultKeyAndVersions(
               GetTrustedVaultKeysWithVersions({kVaultKey}, kLastKeyVersion)),
-          _, Eq(AuthenticationFactorType(LocalPhysicalDevice())), _))
+          _,
+          Eq(AuthenticationFactorTypeAndRegistrationParams(
+              LocalPhysicalDevice())),
+          _))
       .WillOnce([&](const CoreAccountInfo&, const MemberKeysSource&,
                     const SecureBoxPublicKey& device_public_key,
-                    AuthenticationFactorType,
+                    AuthenticationFactorTypeAndRegistrationParams,
                     TrustedVaultConnection::RegisterAuthenticationFactorCallback
                         callback) {
         serialized_public_device_key = device_public_key.ExportToBytes();
@@ -228,6 +234,7 @@ TEST_F(PhysicalDeviceRecoveryFactorTest, ShouldRegisterDevice) {
       .Run(TrustedVaultRegistrationStatus::kSuccess, kLastKeyVersion);
 
   // Now the device should be registered.
+  EXPECT_TRUE(recovery_factor()->IsRegistered());
   trusted_vault_pb::LocalDeviceRegistrationInfo* registration_info =
       GetDeviceRegistrationInfo(account_info());
   EXPECT_TRUE(registration_info->device_registered());
@@ -290,11 +297,14 @@ TEST_F(PhysicalDeviceRecoveryFactorTest,
           Eq(account_info()),
           MatchTrustedVaultKeyAndVersions(
               GetTrustedVaultKeysWithVersions({kVaultKey}, kLastKeyVersion)),
-          _, Eq(AuthenticationFactorType(LocalPhysicalDevice())), _))
+          _,
+          Eq(AuthenticationFactorTypeAndRegistrationParams(
+              LocalPhysicalDevice())),
+          _))
       .WillOnce([&](const CoreAccountInfo&,
                     const MemberKeysSource& member_keys_source,
                     const SecureBoxPublicKey& device_public_key,
-                    AuthenticationFactorType,
+                    AuthenticationFactorTypeAndRegistrationParams,
                     TrustedVaultConnection::RegisterAuthenticationFactorCallback
                         callback) {
         device_registration_callback = std::move(callback);
@@ -342,10 +352,12 @@ TEST_F(PhysicalDeviceRecoveryFactorTest,
   // Mimic device previously registered with some keys.
   StoreKeysAndMimicDeviceRegistration(account_info(), {kVaultKey},
                                       kLastKeyVersion);
+  EXPECT_TRUE(recovery_factor()->IsRegistered());
 
   recovery_factor()->MarkAsNotRegistered();
 
   // Now the device should no longer be registered.
+  EXPECT_FALSE(recovery_factor()->IsRegistered());
   trusted_vault_pb::LocalDeviceRegistrationInfo* registration_info =
       GetDeviceRegistrationInfo(account_info());
   EXPECT_FALSE(registration_info->device_registered());

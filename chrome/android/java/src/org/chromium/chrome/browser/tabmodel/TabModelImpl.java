@@ -6,7 +6,6 @@ package org.chromium.chrome.browser.tabmodel;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -917,12 +916,13 @@ public class TabModelImpl extends TabModelJniBridge {
     protected boolean createTabWithWebContents(
             Tab parent, Profile profile, WebContents webContents, boolean select) {
         return getTabCreator(profile.isOffTheRecord())
-                .createTabWithWebContents(
-                        parent,
-                        webContents,
-                        select
-                                ? TabLaunchType.FROM_RECENT_TABS_FOREGROUND
-                                : TabLaunchType.FROM_RECENT_TABS);
+                        .createTabWithWebContents(
+                                parent,
+                                webContents,
+                                select
+                                        ? TabLaunchType.FROM_RECENT_TABS_FOREGROUND
+                                        : TabLaunchType.FROM_RECENT_TABS)
+                != null;
     }
 
     @Override
@@ -992,9 +992,13 @@ public class TabModelImpl extends TabModelJniBridge {
                         /* addTrustedIntentExtras= */ true);
 
         Activity activity = ContextUtils.activityFromContext(parentTab.getContext());
-        Bundle options = MultiWindowUtils.getOpenInOtherWindowActivityOptions(activity);
 
-        ReparentingTask.from(tab).begin(activity, intent, options, null);
+        ReparentingTask.from(tab)
+                .begin(
+                        activity,
+                        intent,
+                        /* startActivityOptions= */ null,
+                        /* finalizeCallback= */ null);
         return tab;
     }
 
@@ -1030,12 +1034,6 @@ public class TabModelImpl extends TabModelJniBridge {
     @Override
     public void setActive(boolean active) {
         mActive = active;
-    }
-
-    @Override
-    public boolean isTabInTabGroup(@NonNull Tab tab) {
-        TabGroupModelFilter filter = mModelDelegate.getFilter(isIncognito());
-        return filter == null ? false : filter.isTabInTabGroup(tab);
     }
 
     @Override

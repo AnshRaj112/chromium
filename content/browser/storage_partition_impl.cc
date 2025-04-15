@@ -2243,7 +2243,10 @@ void StoragePartitionImpl::OnLocalNetworkAccessPermissionRequired(
   DCHECK(permission_controller);
 
   auto status = permission_controller->GetPermissionStatusForCurrentDocument(
-      blink::PermissionType::LOCAL_NETWORK_ACCESS, rfh);
+      content::PermissionDescriptorUtil::
+          CreatePermissionDescriptorForPermissionType(
+              blink::PermissionType::LOCAL_NETWORK_ACCESS),
+      rfh);
   if (status == blink::mojom::PermissionStatus::GRANTED) {
     std::move(callback).Run(true);
     return;
@@ -2556,7 +2559,10 @@ void StoragePartitionImpl::OnCanSendReportingReports(
   for (auto& origin : origins) {
     bool allowed = permission_controller
                        ->GetPermissionResultForOriginWithoutContext(
-                           blink::PermissionType::BACKGROUND_SYNC, origin)
+                           content::PermissionDescriptorUtil::
+                               CreatePermissionDescriptorForPermissionType(
+                                   blink::PermissionType::BACKGROUND_SYNC),
+                           origin)
                        .status == blink::mojom::PermissionStatus::GRANTED;
     if (allowed) {
       origins_out.push_back(origin);
@@ -2575,7 +2581,10 @@ void StoragePartitionImpl::OnCanSendDomainReliabilityUpload(
   std::move(callback).Run(
       permission_controller
           ->GetPermissionResultForOriginWithoutContext(
-              blink::PermissionType::BACKGROUND_SYNC, origin)
+              content::PermissionDescriptorUtil::
+                  CreatePermissionDescriptorForPermissionType(
+                      blink::PermissionType::BACKGROUND_SYNC),
+              origin)
           .status == blink::mojom::PermissionStatus::GRANTED);
 }
 
@@ -2947,8 +2956,12 @@ void StoragePartitionImpl::DataDeletionHelper::ClearDataOnUIThread(
                 CreateTaskCompletionClosure(TracingDataType::kCookies))));
   }
 
-  // It is not expected to only delete internal interest group data.
+  // It is not expected to only delete internal interest group data, or to
+  // request interest group removal to be extra-thorough w/o asking for
+  // interest group removal.
   DCHECK(!(remove_mask_ & REMOVE_DATA_MASK_INTEREST_GROUPS_INTERNAL) ||
+         remove_mask_ & REMOVE_DATA_MASK_INTEREST_GROUPS);
+  DCHECK(!(remove_mask_ & REMOVE_DATA_MASK_INTEREST_GROUPS_USER_CLEAR) ||
          remove_mask_ & REMOVE_DATA_MASK_INTEREST_GROUPS);
   if (remove_mask_ & REMOVE_DATA_MASK_INTEREST_GROUPS) {
     if (interest_group_manager) {
@@ -2963,6 +2976,7 @@ void StoragePartitionImpl::DataDeletionHelper::ClearDataOnUIThread(
       } else {
         interest_group_manager->DeleteInterestGroupData(
             generic_filter,
+            remove_mask_ & REMOVE_DATA_MASK_INTEREST_GROUPS_USER_CLEAR,
             mojo::WrapCallbackWithDefaultInvokeIfNotRun(
                 CreateTaskCompletionClosure(TracingDataType::kInterestGroups)));
       }

@@ -24,6 +24,7 @@
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
 #include "third_party/blink/renderer/core/fileapi/blob.h"
 #include "third_party/blink/renderer/core/fileapi/file_reader_client.h"
+#include "third_party/blink/renderer/core/frame/web_feature.h"
 #include "third_party/blink/renderer/modules/ai/ai.h"
 #include "third_party/blink/renderer/modules/ai/ai_context_observer.h"
 #include "third_party/blink/renderer/modules/ai/ai_metrics.h"
@@ -205,6 +206,31 @@ ToMojo(AudioBuffer* audio_buffer) {
 }
 
 base::expected<mojom::blink::AILanguageModelPromptContentPtr, DOMException*>
+ToMojo(base::span<uint8_t> audio_bytes, ExecutionContext* execution_context) {
+  // TODO(crbug.com/401010825): Use the file sample rate.
+  scoped_refptr<AudioBus> bus = AudioBus::CreateBusFromInMemoryAudioFile(
+      audio_bytes.data(), audio_bytes.size(),
+      /*mix_to_mono=*/true, /*sample_rate=*/48000);
+  if (!bus) {
+    return base::unexpected(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kDataError, "Missing or invalid audio data."));
+  }
+
+  on_device_model::mojom::blink::AudioDataPtr audio_data =
+      on_device_model::mojom::blink::AudioData::New();
+  audio_data->sample_rate = bus->SampleRate();
+  audio_data->frame_count = bus->length();
+  audio_data->channel_count = bus->NumberOfChannels();
+  CHECK_EQ(audio_data->channel_count, 1);
+  // TODO(crbug.com/382180351): Avoid a copy.
+  audio_data->data = WTF::Vector<float>(bus->length());
+  std::copy_n(bus->Channel(0)->Data(), bus->Channel(0)->length(),
+              audio_data->data.begin());
+  return mojom::blink::AILanguageModelPromptContent::NewAudio(
+      std::move(audio_data));
+}
+
+base::expected<mojom::blink::AILanguageModelPromptContentPtr, DOMException*>
 ToMojo(Blob* blob, ExecutionContext* execution_context) {
   // TODO(crbug.com/382180351): Make blob reading async or alternatively
   // use FileReaderSync instead (fix linker and exception issues).
@@ -224,28 +250,7 @@ ToMojo(Blob* blob, ExecutionContext* execution_context) {
     return base::unexpected(MakeGarbageCollected<DOMException>(
         DOMExceptionCode::kDataError, "Failed to read blob."));
   }
-  // TODO(crbug.com/401010825): Use the file sample rate.
-  scoped_refptr<AudioBus> bus = AudioBus::CreateBusFromInMemoryAudioFile(
-      audio_contents.Data(), audio_contents.DataLength(),
-      /*mix_to_mono=*/true, /*sample_rate=*/48000);
-  if (!bus) {
-    return base::unexpected(MakeGarbageCollected<DOMException>(
-        DOMExceptionCode::kDataError,
-        "Blob contains missing or invalid audio data."));
-  }
-
-  on_device_model::mojom::blink::AudioDataPtr audio_data =
-      on_device_model::mojom::blink::AudioData::New();
-  audio_data->sample_rate = bus->SampleRate();
-  audio_data->frame_count = bus->length();
-  audio_data->channel_count = bus->NumberOfChannels();
-  CHECK_EQ(audio_data->channel_count, 1);
-  // TODO(crbug.com/382180351): Avoid a copy.
-  audio_data->data = WTF::Vector<float>(bus->length());
-  std::copy_n(bus->Channel(0)->Data(), bus->Channel(0)->length(),
-              audio_data->data.begin());
-  return mojom::blink::AILanguageModelPromptContent::NewAudio(
-      std::move(audio_data));
+  return ToMojo(audio_contents.ByteSpan(), execution_context);
 }
 
 base::expected<mojom::blink::AILanguageModelPromptContentPtr, DOMException*>
@@ -273,6 +278,8 @@ ConvertPromptToMojoContent(V8LanguageModelPromptType content_type,
     case V8LanguageModelPromptType::Enum::kText:
       return ToMojo(content->GetAsString());
     case V8LanguageModelPromptType::Enum::kImage:
+      UseCounter::Count(execution_context,
+                        WebFeature::kLanguageModel_Prompt_Input_Image);
       if (content->IsV8ImageBitmapSource()) {
         return ToMojo(content->GetAsV8ImageBitmapSource(), script_state,
                       exception_state);
@@ -280,11 +287,19 @@ ConvertPromptToMojoContent(V8LanguageModelPromptType content_type,
       return base::unexpected(MakeGarbageCollected<DOMException>(
           DOMExceptionCode::kSyntaxError, "Unsupported image content type"));
     case V8LanguageModelPromptType::Enum::kAudio:
+      UseCounter::Count(execution_context,
+                        WebFeature::kLanguageModel_Prompt_Input_Audio);
       switch (content->GetContentType()) {
         case V8LanguageModelPromptContent::ContentType::kAudioBuffer:
           return ToMojo(content->GetAsAudioBuffer());
         case V8LanguageModelPromptContent::ContentType::kBlob:
           return ToMojo(content->GetAsBlob(), execution_context);
+        case V8LanguageModelPromptContent::ContentType::kArrayBuffer:
+          return ToMojo(content->GetAsArrayBuffer()->Content()->ByteSpan(),
+                        execution_context);
+        case V8LanguageModelPromptContent::ContentType::kArrayBufferView:
+          return ToMojo(content->GetAsArrayBufferView()->ByteSpan(),
+                        execution_context);
         default:
           return base::unexpected(MakeGarbageCollected<DOMException>(
               DOMExceptionCode::kSyntaxError,

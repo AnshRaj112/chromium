@@ -19,12 +19,12 @@ dictionary LanguageDetectorDetectOptions {
 };
 
 dictionary LanguageDetectionResult {
-  DOMString? detectedLanguage; // null represents unknown language
+  DOMString detectedLanguage;
   double confidence;
 };
 
 [
-  Exposed=(Window, Worker),
+  Exposed=Window,
   RuntimeEnabled=LanguageDetectionAPI,
   SecureContext
 ]

@@ -5173,8 +5173,7 @@ void WebGLRenderingContextBase::shaderSource(WebGLShader* shader,
   String ascii_string = ReplaceNonASCII(string).Result();
   shader->SetSource(string);
   DCHECK(ascii_string.Is8Bit() && ascii_string.ContainsOnlyASCIIOrEmpty());
-  const GLchar* shader_data =
-      reinterpret_cast<const GLchar*>(ascii_string.Characters8());
+  const GLchar* shader_data = base::as_chars(ascii_string.Span8()).data();
   const GLint shader_length = ascii_string.length();
   ContextGL()->ShaderSource(ObjectOrZero(shader), 1, &shader_data,
                             &shader_length);
@@ -5830,6 +5829,14 @@ void WebGLRenderingContextBase::TexImageHelperHTMLImageElement(
     if (have_svg_image && canvas()) {
       UseCounter::Count(canvas()->GetDocument(), WebFeature::kSVGInWebGL);
     }
+    // If the SVG image doesn't have natural width/height, we need to resolve
+    // against a default object size. This is 300x150 for legacy reasons.
+    // Maybe it should be the resolved destination size?.
+    if (have_svg_image) {
+      SourceImageStatus status;
+      image_for_render = image->GetSourceImageForCanvas(
+          FlushReason::kWebGLTexImage, &status, gfx::SizeF(300, 150));
+    }
     // DrawImageIntoBuffer always respects orientation
     image_for_render = DrawImageIntoBufferForTexImage(
         std::move(image_for_render), image->width(), image->height(),
@@ -6319,14 +6326,6 @@ void WebGLRenderingContextBase::TexImageHelperMediaVideoFrame(
   // unmultiply has been requested or we need to never premultiply for Image
   // creation from a VideoFrame.
 
-#if BUILDFLAG(IS_MAC)
-  // TODO(crbug.com/1180726): Sampling from macOS IOSurfaces requires
-  // GL_ARB_texture_rectangle which is not available in the WebGL context.
-  constexpr bool kAllowZeroCopyImages = false;
-#else
-  constexpr bool kAllowZeroCopyImages = true;
-#endif
-
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX)
   // TODO(crbug.com/1175907): Only TexImage2D seems to work with the GPU path on
   // Android M -- appears to work fine on R, but to avoid regressions in <video>
@@ -6373,7 +6372,7 @@ void WebGLRenderingContextBase::TexImageHelperMediaVideoFrame(
   // Since TexImageStaticBitmapImage() and TexImageGPU() don't know how to
   // handle tagged orientation, we set |prefer_tagged_orientation| to false.
   scoped_refptr<StaticBitmapImage> image = CreateImageFromVideoFrame(
-      std::move(media_video_frame), kAllowZeroCopyImages,
+      std::move(media_video_frame), /*allow_zero_copy_images=*/true,
       image_cache.GetCanvasResourceProvider(dest_rect.size(), format,
                                             alpha_type, color_space),
       video_renderer, dest_rect, /*prefer_tagged_orientation=*/false,
@@ -7612,7 +7611,11 @@ bool WebGLRenderingContextBase::ValidateLocationLength(
     const String& string) {
   const unsigned max_web_gl_location_length = GetMaxWebGLLocationLength();
   if (string.length() > max_web_gl_location_length) {
-    SynthesizeGLError(GL_INVALID_VALUE, function_name, "location length > 256");
+    StringBuilder builder;
+    builder.Append("location length > ");
+    builder.Append(String::Format("%d", max_web_gl_location_length));
+    SynthesizeGLError(GL_INVALID_VALUE, function_name,
+                      builder.ToString().Ascii().c_str());
     return false;
   }
   return true;

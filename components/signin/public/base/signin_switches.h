@@ -34,13 +34,13 @@ COMPONENT_EXPORT(SIGNIN_SWITCHES)
 BASE_DECLARE_FEATURE(kForceSupervisedSigninWithCapabilities);
 
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
-BASE_DECLARE_FEATURE(kHistoryOptInEntryPoints);
+BASE_DECLARE_FEATURE(kHistoryPageHistorySyncPromo);
 
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
-BASE_DECLARE_FEATURE(kHistoryOptInPromoCtaStringVariation);
+BASE_DECLARE_FEATURE(kHistoryPagePromoCtaStringVariation);
 
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
-BASE_DECLARE_FEATURE(kHistoryOptInIph);
+BASE_DECLARE_FEATURE(kHistoryOptInEducationalTip);
 
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 BASE_DECLARE_FEATURE(kSkipCheckForAccountManagementOnSignin);
@@ -111,9 +111,9 @@ BASE_DECLARE_FEATURE(kEnableHistorySyncOptinExpansionPill);
 
 enum class HistorySyncOptinExpansionPillOption {
   kBrowseAcrossDevices,
-  kSyncTabsAndHistory,
+  kSyncHistory,
   kSeeTabsFromOtherDevices,
-  kSyncTabsAndHistoryProfileMenu,
+  kSyncHistoryProfileMenu,
 };
 
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
@@ -168,14 +168,6 @@ BASE_DECLARE_FEATURE(kEnableErrorBadgeOnIdentityDisc);
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 BASE_DECLARE_FEATURE(kEnableASWebAuthenticationSession);
 #endif
-
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
-COMPONENT_EXPORT(SIGNIN_SWITCHES)
-BASE_DECLARE_FEATURE(kBatchUploadDesktop);
-#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
-
-COMPONENT_EXPORT(SIGNIN_SWITCHES)
-bool IsBatchUploadDesktopEnabled();
 
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 BASE_DECLARE_FEATURE(kShowEnterpriseDialogForAllManagedAccountsSignin);

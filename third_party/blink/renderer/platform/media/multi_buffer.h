@@ -16,6 +16,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "base/containers/flat_map.h"
 #include "base/containers/lru_cache.h"
 #include "base/hash/hash.h"
 #include "base/memory/raw_ptr.h"
@@ -129,6 +130,9 @@ class PLATFORM_EXPORT MultiBuffer {
     // Ask the data provider to stop giving us data.
     // It's ok if the effect is not immediate.
     virtual void SetDeferred(bool deferred) = 0;
+
+    // Ask the provider if it has been deferred too long.
+    virtual bool IsStale() const = 0;
 
     // Invalidates this data provider. Used during teardown to stop any pending
     // read events from beginning.
@@ -306,6 +310,8 @@ class PLATFORM_EXPORT MultiBuffer {
   // Stops all existing writers.
   void StopWriters();
 
+  size_t writer_index_size_for_testing() const { return writer_index_.size(); }
+
  protected:
   // Create a new writer at |pos| and return it.
   // Users needs to implemement this method.
@@ -338,7 +344,7 @@ class PLATFORM_EXPORT MultiBuffer {
   void ReleaseBlocks(const std::vector<MultiBufferBlockId>& blocks);
 
   // Figure out what state a writer at |pos| should be in.
-  ProviderState SuggestProviderState(const BlockId& pos) const;
+  ProviderState SuggestProviderState(const BlockId& pos, bool is_stale) const;
 
   // Returns true if a writer at |pos| is colliding with
   // output of another writer.
@@ -370,13 +376,12 @@ class PLATFORM_EXPORT MultiBuffer {
   base::Lock data_lock_;
 
   // Keeps track of readers waiting for data.
-  std::map<MultiBufferBlockId, std::set<raw_ptr<Reader, SetExperimental>>>
-      readers_ ALLOW_DISCOURAGED_TYPE("HashMap lacks key sorting");
+  base::flat_map<MultiBufferBlockId, std::set<raw_ptr<Reader, SetExperimental>>>
+      readers_;
 
   // Keeps track of writers by their position.
   // The writers are owned by this class.
-  std::map<BlockId, std::unique_ptr<DataProvider>> writer_index_
-      ALLOW_DISCOURAGED_TYPE("HashMap lacks key sorting");
+  base::flat_map<BlockId, std::unique_ptr<DataProvider>> writer_index_;
 
   // Gloabally shared LRU, decides which block to free next.
   scoped_refptr<GlobalLRU> lru_;

@@ -1750,9 +1750,7 @@ IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest, AccessibilityAriaRowHeader) {
 }
 
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest, AccessibilityAriaRowText) {
-  // RunAriaTestMinusHtmlMode ensures that the correct object attributes are
-  // set even if html mode is not set.
-  RunAriaTestMinusHtmlMode(FILE_PATH_LITERAL("aria-rowtext.html"));
+  RunAriaTest(FILE_PATH_LITERAL("aria-rowtext.html"));
 }
 
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest, AccessibilityAriaScrollbar) {
@@ -2078,6 +2076,18 @@ IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest, AccessibilityBlockquote) {
 IN_PROC_BROWSER_TEST_P(OnScreenModeDumpAccessibilityTreeTest,
                        AccessibilityOnScreenMode) {
   RunOnScreenTest(FILE_PATH_LITERAL("on-screen-mode.html"));
+}
+
+IN_PROC_BROWSER_TEST_P(OnScreenModeDumpAccessibilityTreeTest,
+                       ContentLeftOfViewPortForOnScreenMode) {
+  RunOnScreenTest(
+      FILE_PATH_LITERAL("content-left-of-view-port-for-on-screen-mode.html"));
+}
+
+IN_PROC_BROWSER_TEST_P(OnScreenModeDumpAccessibilityTreeTest,
+                       ContentWith3ViewPortScrollsForOnScreenMode) {
+  RunOnScreenTest(FILE_PATH_LITERAL(
+      "content-with-3-view-port-scrolls-for-on-screen-mode.html"));
 }
 
 IN_PROC_BROWSER_TEST_P(DumpAccessibilityTreeTest,

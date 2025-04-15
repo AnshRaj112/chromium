@@ -298,7 +298,7 @@ class PLATFORM_EXPORT CanvasResourceProvider
 
   ResourceProviderType GetType() const { return type_; }
 
-  void OnDestroyResource();
+  virtual void OnDestroyResource() {}
 
   virtual void OnAcquireRecyclableCanvasResource() {}
   virtual void OnDestroyRecyclableCanvasResource(
@@ -340,6 +340,8 @@ class PLATFORM_EXPORT CanvasResourceProvider
   virtual bool unused_resources_reclaim_timer_is_running_for_testing() const {
     return false;
   }
+  virtual int NumInflightResourcesForTesting() const { return 0; }
+
   constexpr static base::TimeDelta kUnusedResourceExpirationTime =
       base::Seconds(5);
 
@@ -392,11 +394,6 @@ class PLATFORM_EXPORT CanvasResourceProvider
   void OnMemoryDump(base::trace_event::ProcessMemoryDump*) override;
 
   CanvasResourceHost* resource_host() { return resource_host_; }
-
-  // TODO(crbug.com/352263194): Move these fields inside of
-  // CanvasResourceProviderSharedImage.
-  int num_inflight_resources_ = 0;
-  int max_inflight_resources_ = 0;
 
  private:
   friend class FlushForImageListener;

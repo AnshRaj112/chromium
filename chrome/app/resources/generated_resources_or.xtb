@@ -5980,6 +5980,7 @@
 <translation id="5186381005592669696">ସମର୍ଥିତ ଆପ୍ସ ପାଇଁ ଡିସପ୍ଲେ ଭାଷା କଷ୍ଟମାଇଜ କରନ୍ତୁ</translation>
 <translation id="5186788525428341874">ଆପଣଙ୍କ ସମଗ୍ର ଡିଭାଇସରେ ଶୀଘ୍ର ସାଇନ ଇନ କରିବାକୁ ଆପଣ ଏହି ପାସକୀକୁ ବ୍ୟବହାର କରିପାରିବେ। <ph name="ACCOUNT_NAME" />ର Google Password Managerରେ ଏହା ସେଭ ହୋଇଯିବ।</translation>
 <translation id="5187641678926990264">&amp;ଆପ ଭାବରେ ପୃଷ୍ଠା ଇନଷ୍ଟଲ କରନ୍ତୁ...</translation>
+<translation id="5187671830619031922">ସ୍ପ୍ଲିଟ ଭ୍ୟୁରେ ଟାବ ଯୋଗ କରନ୍ତୁ</translation>
 <translation id="5187826826541650604"><ph name="KEY_NAME" /> (<ph name="DEVICE" />)</translation>
 <translation id="5188242000716462162"><ph name="USER_NAME" /> ଦ୍ୱାରା ସେୟାର କରାଯାଇଥିଲା</translation>
 <translation id="5188648870018555788">ଲୋକେସନ ବ୍ୟବହାର କରନ୍ତୁ। ଲୋକେସନ ଅନୁମତି ଥିବା ChromeOS ଏବଂ Android ଆପ୍ସ, ୱେବସାଇଟ ଓ ସେବାଗୁଡ଼ିକୁ ଆପଣଙ୍କ ଡିଭାଇସର ଲୋକେସନକୁ ବ୍ୟବହାର କରିବା ପାଇଁ ଅନୁମତି ଦିଅନ୍ତୁ। ଲୋକେସନ ସଠିକତା Android ଆପ୍ସ ଏବଂ ସେବାଗୁଡ଼ିକ ପାଇଁ ଅଧିକ ସଠିକ ଲୋକେସନ ପ୍ରଦାନ କରିଥାଏ। ଏହା କରିବା ପାଇଁ Google ପର୍ଯ୍ୟାୟକ୍ରମେ ଡିଭାଇସ ସେନ୍ସର ଏବଂ ୱାୟାରଲେସ ସିଗନାଲଗୁଡ଼ିକ ବିଷୟରେ ଥିବା ସୂଚନାକୁ ଆପଣଙ୍କ ଡିଭାଇସରୁ Crowdsource ୱାୟାରଲେସ ସିଗନାଲ ଲୋକେସନକୁ ପ୍ରକ୍ରିୟାନ୍ୱିତ କରିଥାଏ। ଆପଣଙ୍କୁ ଚିହ୍ନଟ ନକରି ଲୋକେସନ ସଠିକତା ଏବଂ ଲୋକେସନ-ଆଧାରିତ ସେବାଗୁଡ଼ିକୁ ଉନ୍ନତ କରିବା ଏବଂ ୟୁଜରଙ୍କ ଆବଶ୍ୟକତାକୁ ପୂରଣ କରିବା ପାଇଁ Google ଏବଂ ତୃତୀୟ ପକ୍ଷର ବୈଧ ସ୍ୱାର୍ଥ ଆଧାରରେ Googleର ସେବାଗୁଡ଼ିକୁ ଉନ୍ନତ କରିବା, ପ୍ରଦାନ କରିବା ଏବଂ ବଜାୟ ରଖିବା ପାଇଁ ଏଗୁଡ଼ିକୁ ବ୍ୟବହାର କରାଯାଏ। <ph name="BEGIN_LINK1" />ଲୋକେସନକୁ ବ୍ୟବହାର କରିବା ବିଷୟରେ ଅଧିକ ଜାଣନ୍ତୁ<ph name="END_LINK1" /></translation>
@@ -6327,6 +6328,7 @@
 <translation id="5436492226391861498">ପ୍ରକ୍ସି ଟନେଲ୍‍ ପାଇଁ ଅପେକ୍ଷାରତ...</translation>
 <translation id="5436510242972373446"><ph name="SITE_NAME" /> ସର୍ଚ୍ଚ କରନ୍ତୁ:</translation>
 <translation id="5438014818441491616"><ph name="WINDOW_SIDE" /> ୱିଣ୍ଡୋ ବର୍ତ୍ତମାନ <ph name="WINDOW_SIZE_PERCENT" /> ୱାଇଡ, <ph name="PANE_SIDE" /> ପେନ ବର୍ତ୍ତମାନ <ph name="PANE_SIZE_PERCENT" /> ୱାଇଡ।</translation>
+<translation id="5438060324827306856">ଖୋଜନ୍ତୁ &amp;ଏକ୍ସଟେନସନ</translation>
 <translation id="5440425659852470030">ସାଇଡ ପେନେଲ ବନ୍ଦ କରନ୍ତୁ</translation>
 <translation id="544083962418256601">ସର୍ଟକଟ୍‌ ତିଆରି କରନ୍ତୁ...</translation>
 <translation id="5441133529460183413">Chrome ବ୍ରାଉଜରରୁ ୱେବ ଆପ ଇନଷ୍ଟଲ କରାଯାଇଛି</translation>
@@ -11081,6 +11083,7 @@ Voice Match ଆପଣଙ୍କ Assistantକୁ ଆପଣଙ୍କୁ ଚିହ�
 <translation id="8827125715368568315"><ph name="PERMISSION" /> ଏବଂ ଅଧିକ <ph name="COUNT" />ଟିକୁ ବ୍ଲକ୍ କରାଯାଇଛି</translation>
 <translation id="8827289157496676362">ଏକ୍ସଟେନ୍‌ସନ୍ ପିନ୍ କରନ୍ତୁ</translation>
 <translation id="8828933418460119530">DNS ନାମ</translation>
+<translation id="8829979393064090868">ସ୍ପ୍ଲିଟ ଭ୍ୟୁରେ ଟାବ ଯୋଗ କରନ୍ତୁ</translation>
 <translation id="883062543841130884">ପ୍ରତିସ୍ଥାପନଗୁଡ଼ିକ</translation>
 <translation id="8830779999439981481">ଅପଡେଟଗୁଡ଼ିକ ଲାଗୁ କରିବା ପାଇଁ ରିଷ୍ଟାର୍ଟ କରାଯାଉଛି</translation>
 <translation id="8830796635868321089">ସାମ୍ପ୍ରତିକ ପ୍ରକ୍ସି ସେଟିଂସ୍‍ ବ୍ୟବହାର କରି ଅପ୍‌ଡେଟ୍ ଯାଞ୍ଚ ପ୍ରକ୍ରିୟା ବିଫଳ ହେଲା। ଦୟାକରି ଆପଣଙ୍କ <ph name="PROXY_SETTINGS_LINK_START" />ପ୍ରୋକ୍ସି ସେଟିଂସ୍ <ph name="PROXY_SETTINGS_LINK_END" />ଆଡ୍‌ଡଷ୍ଟ କରନ୍ତୁ।</translation>

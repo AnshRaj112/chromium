@@ -9,6 +9,7 @@
 #include "base/base64.h"
 #include "base/hash/sha1.h"
 #include "base/memory/ptr_util.h"
+#include "base/not_fatal_until.h"
 #include "base/trace_event/memory_usage_estimator.h"
 #include "components/sync/base/client_tag_hash.h"
 #include "components/sync/base/deletion_origin.h"
@@ -37,13 +38,13 @@ std::string HashSpecifics(const sync_pb::EntitySpecifics& specifics) {
 std::unique_ptr<ProcessorEntity> ProcessorEntity::CreateNew(
     const std::string& storage_key,
     const ClientTagHash& client_tag_hash,
-    const std::string& id,
+    const std::string& server_id,
     base::Time creation_time) {
-  // Initialize metadata
+  // Initialize metadata.
   sync_pb::EntityMetadata metadata;
   metadata.set_client_tag_hash(client_tag_hash.value());
-  if (!id.empty()) {
-    metadata.set_server_id(id);
+  if (!server_id.empty()) {
+    metadata.set_server_id(server_id);
   }
   metadata.set_sequence_number(0);
   metadata.set_acked_sequence_number(0);
@@ -65,10 +66,10 @@ std::unique_ptr<ProcessorEntity> ProcessorEntity::CreateFromMetadata(
 ProcessorEntity::ProcessorEntity(const std::string& storage_key,
                                  sync_pb::EntityMetadata metadata)
     : storage_key_(storage_key),
-      commit_requested_sequence_number_(metadata.acked_sequence_number()) {
-  DCHECK(metadata.has_client_tag_hash());
-  DCHECK(metadata.has_creation_time());
-  metadata_ = std::move(metadata);
+      metadata_(std::move(metadata)),
+      commit_requested_sequence_number_(metadata_.acked_sequence_number()) {
+  DCHECK(metadata_.has_client_tag_hash());
+  DCHECK(metadata_.has_creation_time());
 }
 
 ProcessorEntity::~ProcessorEntity() = default;
@@ -135,8 +136,6 @@ bool ProcessorEntity::IsUnsynced() const {
   return metadata_.sequence_number() > metadata_.acked_sequence_number();
 }
 
-// TODO(crbug.com/40725000): simplify the API and consider changing
-// RequiresCommitRequest() with IsUnsynced().
 bool ProcessorEntity::RequiresCommitRequest() const {
   return metadata_.sequence_number() > commit_requested_sequence_number_;
 }
@@ -210,7 +209,7 @@ void ProcessorEntity::RecordForcedRemoteUpdate(
     const UpdateResponseData& update,
     sync_pb::EntitySpecifics trimmed_specifics,
     std::optional<sync_pb::UniquePosition> unique_position) {
-  DCHECK(IsUnsynced());
+  CHECK(IsUnsynced(), base::NotFatalUntil::M141);
   // There was a conflict and the server just won it. Explicitly ack all
   // pending commits so they are never enqueued again.
   metadata_.set_acked_sequence_number(metadata_.sequence_number());
@@ -336,14 +335,15 @@ void ProcessorEntity::InitializeCommitRequestData(CommitRequestData* request) {
   request->sequence_number = metadata_.sequence_number();
   request->base_version = metadata_.server_version();
   request->specifics_hash = metadata_.specifics_hash();
-  request->unsynced_time = unsynced_time_;
   commit_requested_sequence_number_ = metadata_.sequence_number();
 }
 
 void ProcessorEntity::ReceiveCommitResponse(const CommitResponseData& data,
                                             bool commit_only) {
-  DCHECK_EQ(metadata_.client_tag_hash(), data.client_tag_hash.value());
-  DCHECK_GT(data.sequence_number, metadata_.acked_sequence_number());
+  CHECK_EQ(metadata_.client_tag_hash(), data.client_tag_hash.value(),
+           base::NotFatalUntil::M141);
+  CHECK_GT(data.sequence_number, metadata_.acked_sequence_number(),
+           base::NotFatalUntil::M141);
   // Version is not valid for commit only types, as it's stripped before being
   // sent to the server, so it cannot behave correctly.
   // Ignore the response if the server responds with an unexpected version.
@@ -365,7 +365,6 @@ void ProcessorEntity::ReceiveCommitResponse(const CommitResponseData& data,
     // If local change was made while server assigned a new id to the entity,
     // update id in cached commit data.
     if (HasCommitData() && commit_data_->id != metadata_.server_id()) {
-      DCHECK(commit_data_->id.empty());
       commit_data_->id = metadata_.server_id();
     }
   }
@@ -378,14 +377,13 @@ void ProcessorEntity::ClearTransientSyncState() {
 }
 
 void ProcessorEntity::IncrementSequenceNumber(base::Time modification_time) {
-  DCHECK(metadata_.has_sequence_number());
+  CHECK(metadata_.has_sequence_number(), base::NotFatalUntil::M141);
   if (!IsUnsynced()) {
     // Update the base specifics hash if this entity wasn't already out of sync.
     metadata_.set_base_specifics_hash(metadata_.specifics_hash());
-    unsynced_time_ = modification_time;
   }
   metadata_.set_sequence_number(metadata_.sequence_number() + 1);
-  DCHECK(IsUnsynced());
+  CHECK(IsUnsynced(), base::NotFatalUntil::M141);
 }
 
 size_t ProcessorEntity::EstimateMemoryUsage() const {

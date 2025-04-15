@@ -1059,8 +1059,8 @@ MLOperand* BuildPool2d(MLGraphBuilder* builder,
   ASSIGN_OR_THROW_AND_RETURN_IF_ERROR(
       webnn::OperandDescriptor output_descriptor,
       webnn::ValidatePool2dAndInferOutput(
-          context_properties, input->Descriptor(),
-          std::move(pool2d_attributes.value()), FromMojoPool2dKind(kind)));
+          context_properties, input->Descriptor(), pool2d_attributes.value(),
+          FromMojoPool2dKind(kind)));
 
   // Create pool2d operator and its output operand. Connect the pool2d operator
   // to its input and output operands.
@@ -1668,14 +1668,6 @@ MLOperand* MLGraphBuilder::input(ScriptState* script_state,
     return nullptr;
   }
 
-  if (!ml_context_->GetProperties().data_type_limits.input.Has(
-          input_operand.value()->DataType())) {
-    exception_state.ThrowTypeError(String(webnn::NotSupportedInputTypeError(
-        input_operand.value()->Name().Utf8(), input_operand.value()->DataType(),
-        ml_context_->GetProperties().data_type_limits.input)));
-    return nullptr;
-  }
-
   return input_operand.value();
 }
 
@@ -1695,10 +1687,11 @@ MLOperand* MLGraphBuilder::constant(ScriptState* script_state,
           FromBlinkDataType(desc->dataType().AsEnum()), desc->shape(),
           webnn::GetErrorLabelPrefix("constant")));
 
+  webnn::OperandDataType data_type = descriptor.data_type();
   if (buffer->IsArrayBufferViewAllowShared()) {
-    if (GetArrayBufferViewType(descriptor.data_type()) !=
+    if (GetArrayBufferViewType(data_type) !=
         buffer->GetAsArrayBufferViewAllowShared().Get()->GetType()) {
-      if (descriptor.data_type() == webnn::OperandDataType::kFloat16 &&
+      if (data_type == webnn::OperandDataType::kFloat16 &&
           buffer->GetAsArrayBufferViewAllowShared().Get()->GetType() ==
               DOMArrayBufferView::ViewType::kTypeUint16) {
         // Passing a Uint16Array when the data type is float16 was supported
@@ -1726,11 +1719,9 @@ MLOperand* MLGraphBuilder::constant(ScriptState* script_state,
     return nullptr;
   }
 
-  if (!ml_context_->GetProperties().data_type_limits.constant.Has(
-          descriptor.data_type())) {
+  if (!ml_context_->GetProperties().data_type_limits.constant.Has(data_type)) {
     exception_state.ThrowTypeError(String(webnn::NotSupportedConstantTypeError(
-        descriptor.data_type(),
-        ml_context_->GetProperties().data_type_limits.constant)));
+        data_type, ml_context_->GetProperties().data_type_limits.constant)));
     return nullptr;
   }
 
@@ -1745,7 +1736,7 @@ MLOperand* MLGraphBuilder::constant(ScriptState* script_state,
           .c_str());
   mojo_base::BigBuffer constant_data = mojo_base::BigBuffer(bytes);
   scoped_trace.AddStep("post mojo message: CreatePendingConstant");
-  remote_->CreatePendingConstant(constant->handle(), descriptor.data_type(),
+  remote_->CreatePendingConstant(constant->handle(), data_type,
                                  std::move(constant_data));
   return constant;
 }
@@ -1874,7 +1865,7 @@ MLOperand* MLGraphBuilder::conv2d(MLOperand* input,
       webnn::OperandDescriptor output_descriptor,
       webnn::ValidateConv2dAndInferOutput(
           ml_context_->GetProperties(), input->Descriptor(),
-          filter->Descriptor(), std::move(conv2d_attributes.value())));
+          filter->Descriptor(), conv2d_attributes.value()));
 
   // Create conv2d operator and its output operand. Connect the conv2d operator
   // to its input and output operands.
@@ -1910,7 +1901,7 @@ MLOperand* MLGraphBuilder::convTranspose2d(
       webnn::OperandDescriptor output_descriptor,
       webnn::ValidateConvTranspose2dAndInferOutput(
           ml_context_->GetProperties(), input->Descriptor(),
-          filter->Descriptor(), std::move(convTranspose2d_attributes.value())));
+          filter->Descriptor(), convTranspose2d_attributes.value()));
 
   // Create convTranspose2d operator and its output operand. Connect the
   // convTranspose2d operator to its input and output operands.
@@ -2028,35 +2019,12 @@ MLOperand* MLGraphBuilder::cast(MLOperand* input,
   THROW_AND_RETURN_IF_ERROR(ValidateGraphBuilderState(), nullptr);
   THROW_AND_RETURN_TYPE_IF_ERROR(ValidateInput(input), nullptr);
 
-  const std::string label = options->label().Utf8();
-
-  if (!ml_context_->GetProperties().data_type_limits.cast_input.Supports(
-          input->Descriptor())) {
-    exception_state.ThrowTypeError(
-        String::FromUTF8(webnn::GetErrorLabelPrefix(label)) +
-        String(NotSupportedInputArgumentError(
-            input->Descriptor(),
-            ml_context_->GetProperties().data_type_limits.cast_input)));
-    return nullptr;
-  }
-
-  const webnn::OperandDataType cast_data_type =
-      FromBlinkDataType(output_data_type.AsEnum());
-
-  if (!ml_context_->GetProperties().data_type_limits.cast_input.data_types.Has(
-          cast_data_type)) {
-    exception_state.ThrowTypeError(
-        String::FromUTF8(webnn::GetErrorLabelPrefix(label)) +
-        String(NotSupportedOpOutputTypeError(
-            cast_data_type, ml_context_->GetProperties()
-                                .data_type_limits.cast_input.data_types)));
-    return nullptr;
-  }
-
   ASSIGN_OR_THROW_AND_RETURN_IF_ERROR(
       webnn::OperandDescriptor output_descriptor,
-      webnn::OperandDescriptor::Create(ml_context_->GetProperties(),
-                                       cast_data_type, input->Shape(), label));
+      webnn::ValidateCastAndInferOutput(
+          ml_context_->GetProperties(), input->Descriptor(),
+          FromBlinkDataType(output_data_type.AsEnum()),
+          options->label().Utf8()));
 
   auto* cast = MakeGarbageCollected<MLOperator>(
       this, blink_mojom::Operation::Tag::kElementWiseUnary, options,
@@ -2136,33 +2104,11 @@ MLOperand* MLGraphBuilder::expand(MLOperand* input,
   THROW_AND_RETURN_IF_ERROR(ValidateGraphBuilderState(), nullptr);
   THROW_AND_RETURN_TYPE_IF_ERROR(ValidateInput(input), nullptr);
 
-  const std::string label = options->label().Utf8();
-
-  const webnn::SupportedTensors& tensor_constraint =
-      ml_context_->GetProperties().data_type_limits.expand_input;
-  if (!tensor_constraint.Supports(input->Descriptor())) {
-    exception_state.ThrowTypeError(
-        String::FromUTF8(webnn::GetErrorLabelPrefix(options->label().Utf8())) +
-        String(NotSupportedInputArgumentError(input->Descriptor(),
-                                              tensor_constraint)));
-    return nullptr;
-  }
-
-  auto output_shape = webnn::BroadcastShapes(input->Shape(), new_shape,
-                                             /*bidirectional=*/false);
-  if (!output_shape) {
-    exception_state.ThrowTypeError(
-        String::FromUTF8(webnn::GetErrorLabelPrefix(label)) +
-        "The input shape is not broadcastable to the new shape.");
-    return nullptr;
-  }
-  CHECK(std::ranges::equal(*output_shape, new_shape));
-
   ASSIGN_OR_THROW_AND_RETURN_IF_ERROR(
       webnn::OperandDescriptor output_descriptor,
-      webnn::OperandDescriptor::Create(ml_context_->GetProperties(),
-                                       input->DataType(), *output_shape,
-                                       label));
+      webnn::ValidateExpandAndInferOutput(ml_context_->GetProperties(),
+                                          input->Descriptor(), new_shape,
+                                          options->label().Utf8()));
 
   auto* expand = MakeGarbageCollected<MLOperator>(
       this, blink_mojom::Operation::Tag::kExpand, options);
@@ -2350,19 +2296,19 @@ MLOperand* MLGraphBuilder::gruCell(MLOperand* input,
   }
   THROW_AND_RETURN_TYPE_IF_ERROR(ValidateInputs(inputs), nullptr);
 
-  auto validated_output = webnn::ValidateGruCellAndInferOutput(
-      ml_context_->GetProperties(), input->Descriptor(), weight->Descriptor(),
-      recurrent_weight->Descriptor(), hidden_state->Descriptor(), hidden_size,
-      ConvertToGruCellAttributes(this, options));
-  if (!validated_output.has_value()) {
-    exception_state.ThrowTypeError(String::FromUTF8(validated_output.error()));
-    return {};
-  }
+  ASSIGN_OR_THROW_AND_RETURN_IF_ERROR(
+      webnn::OperandDescriptor validated_output,
+      webnn::ValidateGruCellAndInferOutput(
+          ml_context_->GetProperties(), input->Descriptor(),
+          weight->Descriptor(), recurrent_weight->Descriptor(),
+          hidden_state->Descriptor(), hidden_size,
+          ConvertToGruCellAttributes(this, options)));
+
   auto* gru_cell =
       MakeGarbageCollected<MLGruCellOperator>(this, hidden_size, options);
 
   MLOperand* output =
-      MLOperand::CreateOutput(this, *std::move(validated_output), gru_cell);
+      MLOperand::CreateOutput(this, std::move(validated_output), gru_cell);
 
   gru_cell->Connect(std::move(inputs), {output});
   return output;
@@ -2699,15 +2645,6 @@ MLOperand* MLGraphBuilder::averagePool2d(MLOperand* input,
   THROW_AND_RETURN_IF_ERROR(ValidateGraphBuilderState(), nullptr);
   THROW_AND_RETURN_TYPE_IF_ERROR(ValidateInput(input), nullptr);
 
-  const std::string label = options->label().Utf8();
-  if (!(input->DataType() == webnn::OperandDataType::kFloat32 ||
-        input->DataType() == webnn::OperandDataType::kFloat16)) {
-    exception_state.ThrowTypeError(
-        String::FromUTF8(webnn::GetErrorLabelPrefix(label)) +
-        "The input data type must be a floating point type.");
-    return nullptr;
-  }
-
   return BuildPool2d(this, blink_mojom::Pool2d::Kind::kAveragePool2d,
                      ml_context_->GetProperties(), input, options,
                      exception_state);
@@ -2718,15 +2655,6 @@ MLOperand* MLGraphBuilder::l2Pool2d(MLOperand* input,
                                     ExceptionState& exception_state) {
   THROW_AND_RETURN_IF_ERROR(ValidateGraphBuilderState(), nullptr);
   THROW_AND_RETURN_TYPE_IF_ERROR(ValidateInput(input), nullptr);
-
-  const std::string label = options->label().Utf8();
-  if (!(input->DataType() == webnn::OperandDataType::kFloat32 ||
-        input->DataType() == webnn::OperandDataType::kFloat16)) {
-    exception_state.ThrowTypeError(
-        String::FromUTF8(webnn::GetErrorLabelPrefix(label)) +
-        "The input data type must be a floating point type.");
-    return nullptr;
-  }
 
   return BuildPool2d(this, blink_mojom::Pool2d::Kind::kL2Pool2d,
                      ml_context_->GetProperties(), input, options,
@@ -3285,7 +3213,7 @@ ScriptPromise<MLGraph> MLGraphBuilder::build(
   base::expected<void, String> validation_result = ValidateGraphBuilderState();
   if (!validation_result.has_value()) {
     exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
-                                      std::move(validation_result.error()));
+                                      validation_result.error());
     return EmptyPromise();
   }
 

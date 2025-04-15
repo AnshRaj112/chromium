@@ -5998,6 +5998,7 @@
 <translation id="5186381005592669696">Приспособување на јазикот на прикажување за поддржаните апликации</translation>
 <translation id="5186788525428341874">Може да го користите овој криптографски клуч за да се најавувате побрзо на вашите уреди. Ќе се зачува во Google Password Manager за <ph name="ACCOUNT_NAME" />.</translation>
 <translation id="5187641678926990264">&amp;Инсталирај страница како апликација…</translation>
+<translation id="5187671830619031922">Додајте картичка во поделениот приказ</translation>
 <translation id="5187826826541650604"><ph name="KEY_NAME" /> (<ph name="DEVICE" />)</translation>
 <translation id="5188242000716462162">Споделено од <ph name="USER_NAME" /></translation>
 <translation id="5188648870018555788">Користење на локацијата. Дозволете апликациите, веб-сајтовите и услугите за ChromeOS и Android со дозвола за локација да ја користат локацијата на уредот. „Прецизност на локација“ обезбедува попрецизна локација за апликациите и услугите за Android. За таа цел, Google повремено обработува податоци за сензорите на уредот и безжичните сигнали од вашиот уред за да ги прибира локациите од безжичните сигнали со колективна соработка. Овие се користат без да ве идентификуваат за да се подобруваат прецизноста на локацијата и локациските услуги, а и да се подобруваат, обезбедуваат и одржуваат услугите на Google според легитимните интереси на Google и трети страни за да се задоволат потребите на корисниците. <ph name="BEGIN_LINK1" />Дознајте повеќе за користењето локација<ph name="END_LINK1" /></translation>
@@ -6345,6 +6346,7 @@
 <translation id="5436492226391861498">Се чека прокси тунел…</translation>
 <translation id="5436510242972373446">Барај <ph name="SITE_NAME" />:</translation>
 <translation id="5438014818441491616">Прозорецот <ph name="WINDOW_SIDE" /> отсега широк <ph name="WINDOW_SIZE_PERCENT" />, окното <ph name="PANE_SIDE" /> отсега широко <ph name="PANE_SIZE_PERCENT" />.</translation>
+<translation id="5438060324827306856">Најдете &amp;екстензии</translation>
 <translation id="5440425659852470030">Затвори ја страничната табла</translation>
 <translation id="544083962418256601">Направи кратенки...</translation>
 <translation id="5441133529460183413">Веб-апликација се инсталираше преку прелистувачот Chrome</translation>
@@ -11107,6 +11109,7 @@
 <translation id="8827125715368568315">Блокирани: <ph name="PERMISSION" /> и уште <ph name="COUNT" /></translation>
 <translation id="8827289157496676362">Закачи екстензија</translation>
 <translation id="8828933418460119530">Име на ДНС</translation>
+<translation id="8829979393064090868">Додајте картичка во поделениот приказ</translation>
 <translation id="883062543841130884">Замени</translation>
 <translation id="8830779999439981481">Се рестартира за да се применат ажурирањата</translation>
 <translation id="8830796635868321089">Проверката за поставувањето не успеа со помош на моменталните поставки за прокси. Приспособете ги <ph name="PROXY_SETTINGS_LINK_START" />поставките за прокси<ph name="PROXY_SETTINGS_LINK_END" />.</translation>
@@ -11550,7 +11553,7 @@
 <translation id="9124084978667228083">{MEMBERS,plural, =1{1 сајт во групата на <ph name="RWS_OWNER" />}one{{MEMBERS} сајт во групата на <ph name="RWS_OWNER" />}other{{MEMBERS} сајта во групата на <ph name="RWS_OWNER" />}}</translation>
 <translation id="9125910124977405374">Отстранете го <ph name="LANGUAGE_NAME" /> од јазиците што автоматски се преведуваат</translation>
 <translation id="9125912770834459638">Вашата организација не ви дозволува да се најавите</translation>
-<translation id="9126149354162942022">Боја на курсор</translation>
+<translation id="9126149354162942022">Боја на курсорот</translation>
 <translation id="9128317794749765148">Поставувањето не може да се заврши</translation>
 <translation id="9128335130883257666">Отворете ја страницата со поставки за <ph name="INPUT_METHOD_NAME" /></translation>
 <translation id="9128870381267983090">Поврзете се на мрежа</translation>

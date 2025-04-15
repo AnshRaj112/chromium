@@ -107,12 +107,6 @@ std::unique_ptr<BrowserAccessibility> BrowserAccessibility::Create(
 
 namespace content {
 
-namespace {
-// The minimum amount of characters that must be typed into a text field before
-// AT will communicate invalid content to the user.
-constexpr int kMinimumCharacterCountForInvalid = 7;
-}  // namespace
-
 using UniqueIdMap = std::unordered_map<int32_t, BrowserAccessibilityAndroid*>;
 // Map from each AXPlatformNode's unique id to its instance.
 base::LazyInstance<UniqueIdMap>::Leaky g_unique_id_map =
@@ -262,15 +256,8 @@ bool BrowserAccessibilityAndroid::IsCollectionItem() const {
 }
 
 bool BrowserAccessibilityAndroid::IsContentInvalid() const {
-  if (HasIntAttribute(ax::mojom::IntAttribute::kInvalidState) &&
-      GetData().GetInvalidState() != ax::mojom::InvalidState::kFalse) {
-    // We will not report content as invalid until a certain number of
-    // characters have been typed to prevent verbose announcements to the user.
-    return (GetSubstringTextContentUTF16(kMinimumCharacterCountForInvalid)
-                .length() > kMinimumCharacterCountForInvalid);
-  }
-
-  return false;
+  return HasIntAttribute(ax::mojom::IntAttribute::kInvalidState) &&
+         GetData().GetInvalidState() != ax::mojom::InvalidState::kFalse;
 }
 
 bool BrowserAccessibilityAndroid::IsDisabledDescendant() const {
@@ -429,11 +416,13 @@ bool BrowserAccessibilityAndroid::IsInterestingOnAndroid() const {
   const BrowserAccessibility* parent = PlatformGetParent();
 
   // Should not read options in a multiselect combobox as it is invisible.
-  // TODO(crbug.com/395134019): We should be able to select options in
-  // aria list box.
+  // Adding IsFocusable() to handle an edge case in crbug.com/395134019 to allow
+  // select options in aria list box. This is also able to handle edge case in
+  // crbug.com/358195473 to not allow TalkBack to read out collapsed
+  // multi-selectable options.
   if (parent && parent->GetRole() == ax::mojom::Role::kListBox &&
       parent->HasState(ax::mojom::State::kMultiselectable) &&
-      GetRole() == ax::mojom::Role::kListBoxOption) {
+      GetRole() == ax::mojom::Role::kListBoxOption && IsFocusable()) {
     return false;
   }
 
@@ -962,11 +951,17 @@ std::u16string BrowserAccessibilityAndroid::GetHint() const {
 
   std::u16string description =
       GetString16Attribute(ax::mojom::StringAttribute::kDescription);
-  if (!description.empty()) {
+  // If the description is the same as tooltip text and is already mapped to
+  // Android tooltip text API, do not map it to Android hint.
+  if (!description.empty() && description != GetTooltipText()) {
     strings.push_back(description);
   }
 
   return base::JoinString(strings, u" ");
+}
+
+std::u16string BrowserAccessibilityAndroid::GetTooltipText() const {
+  return GetString16Attribute(ax::mojom::StringAttribute::kTooltip);
 }
 
 std::u16string BrowserAccessibilityAndroid::GetPaneTitle() const {

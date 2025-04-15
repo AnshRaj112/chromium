@@ -46,6 +46,7 @@
 #include "components/omnibox/browser/actions/omnibox_answer_action.h"
 #include "components/omnibox/browser/actions/omnibox_pedal_provider.h"
 #include "components/omnibox/browser/autocomplete_input.h"
+#include "components/omnibox/browser/autocomplete_match.h"
 #include "components/omnibox/browser/autocomplete_match_type.h"
 #include "components/omnibox/browser/autocomplete_provider.h"
 #include "components/omnibox/browser/autocomplete_provider_client.h"
@@ -757,7 +758,12 @@ void AutocompleteController::Start(const AutocompleteInput& input) {
 void AutocompleteController::StartPrefetch(const AutocompleteInput& input) {
   TRACE_EVENT1("omnibox", "AutocompleteController::StartPrefetch", "text",
                base::UTF16ToUTF8(input.text()));
-
+  if (!OmniboxFieldTrial::IsZeroSuggestPrefetchingEnabledInContext(
+          input.current_page_classification()) &&
+      !omnibox_feature_configs::OmniboxUrlSuggestionsOnFocus::Get()
+           .MostVisitedPrefetchingEnabled()) {
+    return;
+  }
   for (auto provider : providers_) {
     if (!ShouldRunProvider(provider.get())) {
       continue;
@@ -1589,19 +1595,26 @@ bool AutocompleteController::CheckWhetherDefaultMatchChanged(
         internal_result_.default_match()->associated_keyword->keyword;
   }
   // We've gotten async results. Send notification that the default match
-  // updated if fill_into_edit, associated_keyword, or keyword differ.  (The
-  // second can change if we've just started Chrome and the keyword database
-  // finishes loading while processing this request.  The third can change
-  // if we swapped from interpreting the input as a search--which gets
-  // labeled with the default search provider's keyword--to a URL.)
-  // We don't check the URL as that may change for the default match
-  // even though the fill into edit hasn't changed (see SearchProvider
-  // for one case of this).
+  // updated if:
+  //   * fill_into_edit differs.
+  //   * icon_url differs.
+  //   * associated_keyword differs.
+  //     This can change when Chrome starts and the keyword database
+  //     finishes loading while processing this request.
+  //   * keyword differs.
+  //     This can change if the interpretation of the input switches
+  //     between a search, which gets labeled with the default search
+  //     provider's keyword, to a URL.
+  // The URL is NOT checked for changes because it might be updated for the
+  // default match even if fill_into_edit remains the same (see SearchProvider
+  // for an example).
   const bool notify_default_match =
       (last_default_match.has_value() != default_is_valid) ||
       (last_default_match &&
        ((internal_result_.default_match()->fill_into_edit !=
          last_default_match->fill_into_edit) ||
+        (internal_result_.default_match()->icon_url !=
+         last_default_match->icon_url) ||
         (default_associated_keyword != last_default_associated_keyword) ||
         (internal_result_.default_match()->keyword !=
          last_default_match->keyword)));
@@ -1767,11 +1780,16 @@ void AutocompleteController::UpdateKeywordDescriptions(
         const TemplateURL* template_url =
             i->GetTemplateURL(template_url_service_, false);
         if (template_url) {
-          // For extension keywords, just make the description the extension
-          // name -- don't assume that the normal search keyword description
-          // is applicable.
+          // The search keyword description is applied except in these cases:
+          // - For extension keywords, the description is the extension name.
+          // - For contextual search matches, the description indicates the
+          //   alternative UX because they're opened in the side panel.
           i->description = template_url->AdjustedShortNameForLocaleDirection();
-          if (template_url->type() != TemplateURL::OMNIBOX_API_EXTENSION) {
+          if (i->IsContextualSearchSuggestion()) {
+            i->description = l10n_util::GetStringUTF16(
+                IDS_AUTOCOMPLETE_SEARCH_IN_SIDE_PANEL_DESCRIPTION);
+          } else if (template_url->type() !=
+                     TemplateURL::OMNIBOX_API_EXTENSION) {
             i->description = l10n_util::GetStringFUTF16(
                 IDS_AUTOCOMPLETE_SEARCH_DESCRIPTION, i->description);
           }
@@ -1784,6 +1802,22 @@ void AutocompleteController::UpdateKeywordDescriptions(
 
         last_keyword = i->keyword;
       }
+    } else if (i->type == AutocompleteMatchType::NAVSUGGEST &&
+               i->enterprise_search_aggregator_type ==
+                   AutocompleteMatch::EnterpriseSearchAggregatorType::PEOPLE) {
+      if (i->keyword != last_keyword) {
+        const TemplateURL* template_url =
+            i->GetTemplateURL(template_url_service_, false);
+        if (template_url) {
+          i->description_class.emplace_back(ACMatchClassification(
+              (i->description).size(), ACMatchClassification::DIM));
+          // TODO(crbug.com/407610885): Localize the people suggestion metadata.
+          i->description +=
+              u" - " + template_url->AdjustedShortNameForLocaleDirection() +
+              u" People";
+        }
+      }
+      last_keyword = i->keyword;
     } else {
       last_keyword.clear();
     }

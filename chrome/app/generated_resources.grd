@@ -4712,6 +4712,9 @@ are declared in tools/grit/grit_args.gni.
       <message name="IDS_DEV_TOOLS_CONFIRM_ADD_FILE_SYSTEM_MESSAGE" desc="Message displayed in DevTools infobar when user attempts to add file system to DevTools.">
         DevTools requests full access to <ph name="FOLDER_PATH">$1<ex>C:\Projects\foo\</ex></ph>. Make sure you do not expose any sensitive information.
       </message>
+      <message name="IDS_DEV_TOOLS_EDIT_DIRECTORY_PERMISSION_TITLE" desc="Title of dialog asking user to confirm giving read and write access to (files in) a directory using DevTools">
+        Let DevTools edit files?
+      </message>
 
       <!-- DevTools confirm infobar button labels -->
       <message name="IDS_DEV_TOOLS_CONFIRM_ALLOW_BUTTON" desc="Used as an 'Allow' button label.">
@@ -9468,7 +9471,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
         To see a simplified view of this page, go to More Tools > Reading Mode
       </message>
      <message name="IDS_READING_MODE_VOICE_PREVIEW_STRING" desc="Message to be played when a user previews a voice for Read Aloud.">
-        Hi. This is a preview
+        Hi, this is a preview
       </message>
      <message name="IDS_READING_MODE_FONT_LOADING_STRING" desc="Text added to a font name in the Reading Mode font dropdown when the font style hasn't loaded yet.">
          (loading)
@@ -10706,6 +10709,12 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
         <message name="IDS_PASSWORD_MANAGER_IPH_BODY_SAVE_TO_ACCOUNT" desc="Body of the in Product Help shown when the 'Save to account` is selected">
           You can save this password in your Google Account or only on this device
         </message>
+        <message name="IDS_PASSWORDS_SAVE_PRIMING_PROMO_BODY" desc="Body of IPH prompting users to consider saving passwords">
+          Save your passwords securely with Google Chrome - just sign in as normal and we'll do the rest
+        </message>
+        <message name="IDS_PASSWORDS_SAVE_PRIMING_PROMO_SCREENREADER" is_accessibility_with_no_ui="true" desc="Screenreader text for IPH prompting users to consider saving passwords">
+          You can save your passwords securely with Google Chrome - just sign in as normal and we'll do the rest
+        </message>
         <message name="IDS_PASSWORD_MANAGER_IPH_MANAGEMENT_BUBBLE_AFTER_SAVE" desc="Body of the in Product Help shown after saving a password informing the user about the password management bubble">
           To view your password or add a note about it, click the key icon
         </message>
@@ -11480,6 +11489,46 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
       <message name="IDS_ACCNAME_SPLIT_TABS_RESIZE" is_accessibility_with_no_ui="true" desc="Screen reader announcement when the side by side resize handle is focused.">
         Side By Side Resize Handle
       </message>
+      <if expr="not use_titlecase">
+        <message name="IDS_PIN_SPLIT_TAB_TOGGLE" translateable="false" desc="Pins the split tabs button to the toolbar when toggled on.">
+          Open in split view
+        </message>
+        <message name="IDS_SPLIT_TAB_REVERSE_VIEWS" translateable="false" desc="The label for a menu item that swaps the inactive split tab to the other side when clicked.">
+          Reverse views
+        </message>
+        <message name="IDS_SPLIT_TAB_HORIZONTAL_LAYOUT" translateable="false" desc="The label for a menu item that switches the split tab layout from vertical to horizontal when clicked.">
+          Switch to horizontal layout
+        </message>
+        <message name="IDS_SPLIT_TAB_VERTICAL_LAYOUT" translateable="false" desc="The label for a menu item that switches the split tab layout from horizontal to vertical when clicked.">
+          Switch to vertical layout
+        </message>
+        <message name="IDS_SPLIT_TAB_CLOSE" translateable="false" desc="The label for a menu item that closes the inactive split tab when clicked.">
+          Close this view
+        </message>
+        <message name="IDS_SPLIT_TAB_SEPERATE_VIEWS" translateable="false" desc="The label for a menu item that unsplits the split tab when clicked.">
+          Seperate views
+        </message>
+      </if>
+      <if expr="use_titlecase">
+        <message name="IDS_PIN_SPLIT_TAB_TOGGLE" translateable="false" desc="In title case: pins the split tabs button to the toolbar when toggled on.">
+          Open In Split View
+        </message>
+        <message name="IDS_SPLIT_TAB_REVERSE_VIEWS" translateable="false" desc="In title case: the label for a menu item that swaps the inactive split tab to the other side when clicked.">
+          Reverse Views
+        </message>
+        <message name="IDS_SPLIT_TAB_HORIZONTAL_LAYOUT" translateable="false" desc="In title case: the label for a menu item that switches the split tab layout from vertical to horizontal when clicked.">
+          Switch to Horizontal Layout
+        </message>
+        <message name="IDS_SPLIT_TAB_VERTICAL_LAYOUT" translateable="false" desc="In title case: the label for a menu item that switches the split tab layout from horizontal to vertical when clicked.">
+          Switch to Vertical Layout
+        </message>
+        <message name="IDS_SPLIT_TAB_CLOSE" translateable="false" desc="In title case: the label for a menu item that closes the inactive split tab when clicked.">
+          Close This View
+        </message>
+        <message name="IDS_SPLIT_TAB_SEPERATE_VIEWS" translateable="false" desc="In title case: the label for a menu item that unsplits the split tab when clicked.">
+          Seperate Views
+        </message>
+      </if>
 
       <!-- Tab Search -->
       <message name="IDS_TAB_SEARCH_PROMO" desc="Promo UI shown next to the tab search button to encourage it's use.">
@@ -12018,7 +12067,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
               Stop Sharing
             </message>
             <message name ="IDS_DATA_SHARING_MANAGE_ACTIVITY_LOG_OPTION" desc="The Label for the manage flow stop sharing option and confirmation button.">
-              Activity Log
+              Shared Tab Group Activity
             </message>
           <!-- !Data Sharing Owner Manage Flow -->
 
@@ -12164,7 +12213,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
               Stop sharing
             </message>
             <message name ="IDS_DATA_SHARING_MANAGE_ACTIVITY_LOG_OPTION" desc="The Label for the manage flow stop sharing option and confirmation button.">
-              Activity log
+              Shared tab group activity
             </message>
           <!-- !Data Sharing Owner Manage Flow -->
 

@@ -81,8 +81,10 @@ void PushNotificationClientManager::HandleNotificationInteraction(
                                                     .notification.request
                                                     .content.userInfo];
   if (clientId.has_value()) {
-    clients_[clientId.value()]->HandleNotificationInteraction(
-        notification_response);
+    auto it = clients_.find(clientId.value());
+    if (it != clients_.end()) {
+      it->second->HandleNotificationInteraction(notification_response);
+    }
   } else {
     // Safety until all clients have incorporated the appropriate ids into their
     // payload.
@@ -102,8 +104,10 @@ PushNotificationClientManager::HandleNotificationReception(
       mapToPushNotificationClientIdFromUserInfo:user_info];
   std::optional<UIBackgroundFetchResult> client_result;
   if (clientId.has_value()) {
-    client_result =
-        clients_[clientId.value()]->HandleNotificationReception(user_info);
+    auto it = clients_.find(clientId.value());
+    if (it != clients_.end()) {
+      client_result = it->second->HandleNotificationReception(user_info);
+    }
   } else {
     for (auto& client : clients_) {
       client_result = client.second->HandleNotificationReception(user_info);
@@ -159,26 +163,6 @@ PushNotificationClientManager::GetClients() {
 void PushNotificationClientManager::OnSceneActiveForegroundBrowserReady() {
   for (auto& client : clients_) {
     client.second->OnSceneActiveForegroundBrowserReady();
-  }
-}
-
-std::string PushNotificationClientManager::PushNotificationClientIdToString(
-    PushNotificationClientId client_id) {
-  switch (client_id) {
-    case PushNotificationClientId::kCommerce:
-      return kCommerceNotificationKey;
-    case PushNotificationClientId::kContent:
-      return kContentNotificationKey;
-    case PushNotificationClientId::kTips:
-      return kTipsNotificationKey;
-    case PushNotificationClientId::kSports:
-      return kSportsNotificationKey;
-    case PushNotificationClientId::kSafetyCheck:
-      return kSafetyCheckNotificationKey;
-    case PushNotificationClientId::kSendTab:
-      return kSendTabNotificationKey;
-    case PushNotificationClientId::kReminders:
-      return kReminderNotificationKey;
   }
 }
 
@@ -246,4 +230,26 @@ void PushNotificationClientManager::AddAppWidePushNotificationClients() {
     CHECK_EQ(client->GetClientScope(), PushNotificationClientScope::kAppWide);
     AddPushNotificationClient(std::move(client));
   }
+}
+
+PushNotificationClient* PushNotificationClientManager::GetClientForNotification(
+    UNNotification* notification) {
+  std::optional<PushNotificationClientId> clientId = [PushNotificationUtil
+      mapToPushNotificationClientIdFromUserInfo:notification.request.content
+                                                    .userInfo];
+  if (clientId.has_value()) {
+    auto it = clients_.find(clientId.value());
+    if (it != clients_.end()) {
+      return it->second.get();
+    }
+  } else {
+    // Safety until all clients have incorporated the appropriate ids into their
+    // payload.
+    for (auto& it : clients_) {
+      if (it.second->CanHandleNotification(notification)) {
+        return it.second.get();
+      }
+    }
+  }
+  return nullptr;
 }

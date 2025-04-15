@@ -32,6 +32,7 @@
 #import "ios/chrome/browser/shared/public/commands/browser_coordinator_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/signin/model/authentication_service_factory.h"
 #import "ios/chrome/browser/signin/model/identity_manager_factory.h"
 #import "url/gurl.h"
 
@@ -45,8 +46,6 @@
 // Redefine property as readwrite.
 @property(nonatomic, strong, readwrite)
     BrowserContainerViewController* viewController;
-// The handler for the edit menu.
-@property(nonatomic, strong) BrowserEditMenuHandler* browserEditMenuHandler;
 
 @end
 
@@ -69,6 +68,8 @@
   LinkToTextMediator* _linkToTextMediator;
   // The mediator used for the Explain With Gemini feature.
   ExplainWithGeminiMediator* _explainWithGeminiMediator;
+  // The handler for the edit menu.
+  BrowserEditMenuHandler* _browserEditMenuHandler;
 }
 
 #pragma mark - ChromeCoordinator
@@ -97,9 +98,9 @@
   _linkToTextMediator.activityServiceHandler = HandlerForProtocol(
       browser->GetCommandDispatcher(), ActivityServiceCommands);
 
-  self.browserEditMenuHandler = [[BrowserEditMenuHandler alloc] init];
-  self.viewController.browserEditMenuHandler = self.browserEditMenuHandler;
-  self.browserEditMenuHandler.linkToTextDelegate = _linkToTextMediator;
+  _browserEditMenuHandler = [[BrowserEditMenuHandler alloc] init];
+  self.viewController.browserEditMenuHandler = _browserEditMenuHandler;
+  _browserEditMenuHandler.linkToTextDelegate = _linkToTextMediator;
   self.viewController.linkToTextDelegate = _linkToTextMediator;
 
   PrefService* prefService = profile->GetOriginalProfile()->GetPrefs();
@@ -117,8 +118,7 @@
   id<BrowserCoordinatorCommands> browserCommandsHandler =
       HandlerForProtocol(dispatcher, BrowserCoordinatorCommands);
   _partialTranslateMediator.browserHandler = browserCommandsHandler;
-  self.browserEditMenuHandler.partialTranslateDelegate =
-      _partialTranslateMediator;
+  _browserEditMenuHandler.partialTranslateDelegate = _partialTranslateMediator;
 
   TemplateURLService* templateURLService =
       ios::TemplateURLServiceFactory::GetForProfile(profile);
@@ -131,18 +131,20 @@
       HandlerForProtocol(dispatcher, ApplicationCommands);
 
   _searchWithMediator.applicationCommandHandler = applicationCommandsHandler;
-  self.browserEditMenuHandler.searchWithDelegate = _searchWithMediator;
+  _browserEditMenuHandler.searchWithDelegate = _searchWithMediator;
 
   if (ExplainGeminiEditMenuPosition() !=
           PositionForExplainGeminiEditMenu::kDisabled &&
       !incognito) {
     _explainWithGeminiMediator = [[ExplainWithGeminiMediator alloc]
         initWithWebStateList:webStateList
-             identityManager:IdentityManagerFactory::GetForProfile(profile)];
+             identityManager:IdentityManagerFactory::GetForProfile(profile)
+                 authService:AuthenticationServiceFactory::GetForProfile(
+                                 profile)];
 
     _explainWithGeminiMediator.applicationCommandHandler =
         applicationCommandsHandler;
-    self.browserEditMenuHandler.explainWithGeminiDelegate =
+    _browserEditMenuHandler.explainWithGeminiDelegate =
         _explainWithGeminiMediator;
   }
 
@@ -182,7 +184,7 @@
 }
 
 - (id<EditMenuBuilder>)editMenuBuilder {
-  return self.browserEditMenuHandler;
+  return _browserEditMenuHandler;
 }
 
 #pragma mark - EditMenuAlertDelegate

@@ -23,9 +23,9 @@ import org.chromium.chrome.browser.compositor.overlays.strip.reorder.ReorderDele
 import org.chromium.chrome.browser.compositor.overlays.strip.reorder.ReorderDelegate.StripUpdateDelegate;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
+import org.chromium.chrome.browser.tab_ui.ActionConfirmationManager;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabModel;
-import org.chromium.chrome.browser.tasks.tab_management.ActionConfirmationManager;
 import org.chromium.chrome.browser.tasks.tab_management.TabShareUtils;
 import org.chromium.components.tab_group_sync.TabGroupSyncService;
 
@@ -63,6 +63,7 @@ class SourceViewDragDropReorderStrategy extends ReorderStrategyBase {
             View containerView,
             ObservableSupplierImpl<Integer> groupIdToHideSupplier,
             Supplier<Float> tabWidthSupplier,
+            Supplier<Long> lastReorderScrollTimeSupplier,
             @NonNull TabDragSource tabDragSource,
             @NonNull ActionConfirmationManager actionConfirmationManager,
             ReorderStrategy tabStrategy,
@@ -76,7 +77,8 @@ class SourceViewDragDropReorderStrategy extends ReorderStrategyBase {
                 tabGroupModelFilter,
                 containerView,
                 groupIdToHideSupplier,
-                tabWidthSupplier);
+                tabWidthSupplier,
+                lastReorderScrollTimeSupplier);
         mTabDragSource = tabDragSource;
         mActionConfirmationManager = actionConfirmationManager;
         mTabSubStrategy = new TabReorderSubStrategy(tabStrategy);

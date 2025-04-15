@@ -15,6 +15,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
+#include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/string_util.h"
 #include "base/task/single_thread_task_runner.h"
@@ -33,6 +34,7 @@
 #include "chrome/browser/push_messaging/push_messaging_constants.h"
 #include "chrome/browser/push_messaging/push_messaging_features.h"
 #include "chrome/browser/push_messaging/push_messaging_service_factory.h"
+#include "chrome/browser/push_messaging/push_messaging_unsubscribed_entry.h"
 #include "chrome/browser/push_messaging/push_messaging_utils.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/common/buildflags.h"
@@ -243,11 +245,13 @@ void PushMessagingServiceImpl::UnexpectedChange(
                      weak_factory_.GetWeakPtr(), identifier, reason,
                      base::BindOnce(&UnregisterCallbackToClosure,
                                     std::move(completed_closure)));
-  if (base::FeatureList::IsEnabled(features::kPushSubscriptionChangeEvent)) {
+  if (base::FeatureList::IsEnabled(
+          features::kPushSubscriptionChangeEventOnInvalidation)) {
     // Find old subscription and fire a `pushsubscriptionchange` event
     GetPushSubscriptionFromAppIdentifier(
         identifier,
-        base::BindOnce(&PushMessagingServiceImpl::FirePushSubscriptionChange,
+        base::BindOnce(&PushMessagingServiceImpl::
+                           FirePushSubscriptionChangeForAppIdentifier,
                        weak_factory_.GetWeakPtr(), identifier,
                        std::move(unsubscribe_closure),
                        nullptr /* new_subscription */));
@@ -886,18 +890,22 @@ blink::mojom::PermissionStatus PushMessagingServiceImpl::GetPermissionStatus(
     }
   }
 
+  const auto permission_descriptor = content::PermissionDescriptorUtil::
+      CreatePermissionDescriptorForPermissionType(
+          blink::PermissionType::NOTIFICATIONS);
+
   // Because the Push API is tied to Service Workers, many usages of the API
   // won't have an embedding origin at all. Only consider the requesting
   // |origin| when checking whether permission to use the API has been granted.
   if (render_process_id_ != content::ChildProcessHost::kInvalidUniqueID) {
     return profile_->GetPermissionController()->GetPermissionStatusForWorker(
-        blink::PermissionType::NOTIFICATIONS,
+        permission_descriptor,
         content::RenderProcessHost::FromID(render_process_id_),
         url::Origin::Create(origin));
   } else {
     return profile_->GetPermissionController()
         ->GetPermissionResultForOriginWithoutContext(
-            blink::PermissionType::NOTIFICATIONS, url::Origin::Create(origin))
+            permission_descriptor, url::Origin::Create(origin))
         .status;
   }
 }
@@ -1117,6 +1125,9 @@ void PushMessagingServiceImpl::DidSubscribeWithEncryptionInfo(
   }
 
   app_identifier.PersistToPrefs(profile_);
+  PushMessagingUnsubscribedEntry(
+      app_identifier.origin(), app_identifier.service_worker_registration_id())
+      .DeleteFromPrefs(profile_);
 
   IncreasePushSubscriptionCount(1, false /* is_pending */);
 
@@ -1271,8 +1282,41 @@ void PushMessagingServiceImpl::DidClearPushSubscriptionId(
   PushMessagingAppIdentifier app_identifier =
       PushMessagingAppIdentifier::FindByAppId(profile_, app_id);
   bool was_subscribed = !app_identifier.is_null();
-  if (was_subscribed)
+  if (was_subscribed) {
     app_identifier.DeleteFromPrefs(profile_);
+    if (base::FeatureList::IsEnabled(
+            features::kPushSubscriptionChangeEventOnResubscribe)) {
+      switch (reason) {
+        case blink::mojom::PushUnregistrationReason::PERMISSION_REVOKED_ABUSIVE:
+        case blink::mojom::PushUnregistrationReason::PERMISSION_REVOKED:
+        case blink::mojom::PushUnregistrationReason::
+            PERMISSION_REVOKED_DISRUPTIVE:
+          // Store an UnsubscribedEntry for future resubscription.
+          PushMessagingUnsubscribedEntry(
+              app_identifier.origin(),
+              app_identifier.service_worker_registration_id())
+              .PersistToPrefs(profile_);
+          break;
+        case blink::mojom::PushUnregistrationReason::UNKNOWN:
+        case blink::mojom::PushUnregistrationReason::JAVASCRIPT_API:
+        case blink::mojom::PushUnregistrationReason::DELIVERY_UNKNOWN_APP_ID:
+        case blink::mojom::PushUnregistrationReason::DELIVERY_PERMISSION_DENIED:
+        case blink::mojom::PushUnregistrationReason::DELIVERY_NO_SERVICE_WORKER:
+        case blink::mojom::PushUnregistrationReason::GCM_STORE_RESET:
+        case blink::mojom::PushUnregistrationReason::
+            SERVICE_WORKER_UNREGISTERED:
+        case blink::mojom::PushUnregistrationReason::SUBSCRIBE_STORAGE_CORRUPT:
+        case blink::mojom::PushUnregistrationReason::
+            GET_SUBSCRIPTION_STORAGE_CORRUPT:
+        case blink::mojom::PushUnregistrationReason::
+            SERVICE_WORKER_DATABASE_WIPED:
+        case blink::mojom::PushUnregistrationReason::SUBSCRIPTION_EXPIRED:
+        case blink::mojom::PushUnregistrationReason::REFRESH_FINISHED:
+        case blink::mojom::PushUnregistrationReason::NO_APP_LEVEL_PERMISSION:
+          break;
+      }
+    }
+  }
 
   // Run the unsubscribe callback *before* asking the InstanceIDDriver/GCMDriver
   // to unsubscribe, since that's a slow process involving network retries, and
@@ -1353,6 +1397,8 @@ void PushMessagingServiceImpl::SetUnsubscribeCallbackForTesting(
 void PushMessagingServiceImpl::DidDeleteServiceWorkerRegistration(
     const GURL& origin,
     int64_t service_worker_registration_id) {
+  PushMessagingUnsubscribedEntry(origin, service_worker_registration_id)
+      .DeleteFromPrefs(profile_);
   const PushMessagingAppIdentifier& app_identifier =
       PushMessagingAppIdentifier::FindByServiceWorker(
           profile_, origin, service_worker_registration_id);
@@ -1382,6 +1428,8 @@ void PushMessagingServiceImpl::SetServiceWorkerUnregisteredCallbackForTesting(
 // DidDeleteServiceWorkerDatabase methods --------------------------------------
 
 void PushMessagingServiceImpl::DidDeleteServiceWorkerDatabase() {
+  PushMessagingUnsubscribedEntry::DeleteAllFromPrefs(profile_);
+
   std::vector<PushMessagingAppIdentifier> app_identifiers =
       PushMessagingAppIdentifier::GetAll(profile_);
 
@@ -1416,14 +1464,20 @@ void PushMessagingServiceImpl::OnContentSettingChanged(
     const ContentSettingsPattern& secondary_pattern,
     ContentSettingsTypeSet content_type_set) {
   DCHECK(primary_pattern.IsValid());
-  if (!content_type_set.Contains(ContentSettingsType::NOTIFICATIONS))
+  if (!content_type_set.Contains(ContentSettingsType::NOTIFICATIONS)) {
     return;
+  }
 
   std::vector<PushMessagingAppIdentifier> all_app_identifiers =
       PushMessagingAppIdentifier::GetAll(profile_);
 
+  std::vector<PushMessagingUnsubscribedEntry> unsubscribed_entries;
+  if (base::FeatureList::IsEnabled(
+          features::kPushSubscriptionChangeEventOnResubscribe)) {
+    unsubscribed_entries = PushMessagingUnsubscribedEntry::GetAll(profile_);
+  }
   base::RepeatingClosure barrier_closure = base::BarrierClosure(
-      all_app_identifiers.size(),
+      all_app_identifiers.size() + unsubscribed_entries.size(),
       content_setting_changed_callback_for_testing_.is_null()
           ? base::DoNothing()
           : content_setting_changed_callback_for_testing_);
@@ -1452,6 +1506,30 @@ void PushMessagingServiceImpl::OnContentSettingChanged(
     UnexpectedChange(app_identifier,
                      blink::mojom::PushUnregistrationReason::PERMISSION_REVOKED,
                      barrier_closure);
+  }
+
+  base::UmaHistogramCounts1000("PushMessaging.NumUnsubscribedEntries",
+                               unsubscribed_entries.size());
+
+  for (const PushMessagingUnsubscribedEntry& unsubscribed_entry :
+       unsubscribed_entries) {
+    if (!primary_pattern.Matches(unsubscribed_entry.origin())) {
+      barrier_closure.Run();
+      continue;
+    }
+
+    bool user_visible =
+        !base::Contains(origins_requesting_user_visible_requirement_bypass,
+                        unsubscribed_entry.origin());
+
+    if (!IsPermissionSet(unsubscribed_entry.origin(), user_visible)) {
+      barrier_closure.Run();
+      continue;
+    }
+    FirePushSubscriptionChange(
+        unsubscribed_entry.origin(),
+        unsubscribed_entry.service_worker_registration_id(), barrier_closure,
+        nullptr, nullptr);
   }
 }
 
@@ -1533,33 +1611,35 @@ void PushMessagingServiceImpl::GetPushSubscriptionFromAppIdentifierEnd(
 }
 
 void PushMessagingServiceImpl::FirePushSubscriptionChange(
+    const GURL& origin,
+    int64_t service_worker_registration_id,
+    base::OnceClosure completed_closure,
+    blink::mojom::PushSubscriptionPtr new_subscription,
+    blink::mojom::PushSubscriptionPtr old_subscription) {
+  CHECK(features::IsPushSubscriptionChangeEventEnabled());
+
+  // Ensure |completed_closure| is run after this function
+  base::ScopedClosureRunner scoped_closure(std::move(completed_closure));
+
+  profile_->FirePushSubscriptionChangeEvent(
+      origin, service_worker_registration_id, std::move(new_subscription),
+      std::move(old_subscription), base::DoNothing());
+}
+
+void PushMessagingServiceImpl::FirePushSubscriptionChangeForAppIdentifier(
     const PushMessagingAppIdentifier& app_identifier,
     base::OnceClosure completed_closure,
     blink::mojom::PushSubscriptionPtr new_subscription,
     blink::mojom::PushSubscriptionPtr old_subscription) {
-  // Ensure |completed_closure| is run after this function
-  base::ScopedClosureRunner scoped_closure(std::move(completed_closure));
-
-  if (!base::FeatureList::IsEnabled(features::kPushSubscriptionChangeEvent))
-    return;
-
   if (app_identifier.is_null()) {
-    FirePushSubscriptionChangeCallback(
-        app_identifier, blink::mojom::PushEventStatus::UNKNOWN_APP_ID);
+    std::move(completed_closure).Run();
     return;
   }
 
-  profile_->FirePushSubscriptionChangeEvent(
+  FirePushSubscriptionChange(
       app_identifier.origin(), app_identifier.service_worker_registration_id(),
-      std::move(new_subscription), std::move(old_subscription),
-      base::BindOnce(
-          &PushMessagingServiceImpl::FirePushSubscriptionChangeCallback,
-          weak_factory_.GetWeakPtr(), app_identifier));
-}
-
-void PushMessagingServiceImpl::FirePushSubscriptionChangeCallback(
-    const PushMessagingAppIdentifier& app_identifier,
-    blink::mojom::PushEventStatus status) {
+      std::move(completed_closure), std::move(new_subscription),
+      std::move(old_subscription));
 }
 
 void PushMessagingServiceImpl::DidGetSenderIdUnexpectedUnsubscribe(
@@ -1603,9 +1683,10 @@ void PushMessagingServiceImpl::OnAppTerminating() {
 
 void PushMessagingServiceImpl::OnSubscriptionInvalidation(
     const std::string& app_id) {
-  DCHECK(base::FeatureList::IsEnabled(features::kPushSubscriptionChangeEvent))
+  CHECK(base::FeatureList::IsEnabled(
+      features::kPushSubscriptionChangeEventOnInvalidation))
       << "It is not allowed to call this method when "
-         "features::kPushSubscriptionChangeEvent is disabled.";
+         "features::kPushSubscriptionChangeEventOnInvalidation is disabled.";
   PushMessagingAppIdentifier old_app_identifier =
       PushMessagingAppIdentifier::FindByAppId(profile_, app_id);
   if (old_app_identifier.is_null())
@@ -1620,6 +1701,9 @@ void PushMessagingServiceImpl::OnSubscriptionInvalidation(
 void PushMessagingServiceImpl::GetOldSubscription(
     PushMessagingAppIdentifier old_app_identifier,
     const std::string& sender_id) {
+  CHECK(base::FeatureList::IsEnabled(
+      features::kPushSubscriptionChangeEventOnInvalidation));
+
   GetPushSubscriptionFromAppIdentifier(
       old_app_identifier,
       base::BindOnce(&PushMessagingServiceImpl::StartRefresh,
@@ -1631,6 +1715,9 @@ void PushMessagingServiceImpl::StartRefresh(
     PushMessagingAppIdentifier old_app_identifier,
     const std::string& sender_id,
     blink::mojom::PushSubscriptionPtr old_subscription) {
+  CHECK(base::FeatureList::IsEnabled(
+      features::kPushSubscriptionChangeEventOnInvalidation));
+
   // Generate a new app_identifier with the same information, but a different
   // app_id. Expiration time will be overwritten by DoSubscribe, if the flag
   // features::kPushSubscriptionWithExpiration time is enabled
@@ -1706,6 +1793,9 @@ void PushMessagingServiceImpl::DidUpdateSubscription(
     const std::vector<uint8_t>& p256dh,
     const std::vector<uint8_t>& auth,
     blink::mojom::PushRegistrationStatus status) {
+  CHECK(base::FeatureList::IsEnabled(
+      features::kPushSubscriptionChangeEventOnInvalidation));
+
   // TODO(crbug.com/40146635): Currently, if |status| is unsuccessful, the old
   // subscription remains in SW database and preferences and the refresh is
   // aborted. Instead, one should abort the refresh and retry to refresh
@@ -1727,7 +1817,7 @@ void PushMessagingServiceImpl::DidUpdateSubscription(
           ? std::move(invalidation_callback_for_testing_)
           : base::DoNothing();
 
-  FirePushSubscriptionChange(
+  FirePushSubscriptionChangeForAppIdentifier(
       new_app_identifier, std::move(callback),
       blink::mojom::PushSubscription::New(
           endpoint, expiration_time, push_messaging::MakeOptions(sender_id),

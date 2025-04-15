@@ -47,8 +47,8 @@
 #import "ios/chrome/browser/lens_overlay/ui/lens_result_page_view_controller.h"
 #import "ios/chrome/browser/lens_overlay/ui/lens_toolbar_consumer.h"
 #import "ios/chrome/browser/menu/ui_bundled/browser_action_factory.h"
+#import "ios/chrome/browser/omnibox/coordinator/omnibox_coordinator.h"
 #import "ios/chrome/browser/omnibox/ui_bundled/chrome_omnibox_client_ios.h"
-#import "ios/chrome/browser/omnibox/ui_bundled/omnibox_coordinator.h"
 #import "ios/chrome/browser/omnibox/ui_bundled/omnibox_focus_delegate.h"
 #import "ios/chrome/browser/search_engines/model/template_url_service_factory.h"
 #import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
@@ -689,12 +689,12 @@ const base::TimeDelta kSearchWithCameraTooltipHintDelay = base::Seconds(2.0);
                               kBottomSheetDismissed];
       break;
     case SheetDimensionState::kLarge:
-      [self disableSelectionInteraction:NO];
+      [_selectionViewController disableFlyoutMenu:YES];
       break;
     case SheetDimensionState::kConsent:
       break;
     default:
-      [self disableSelectionInteraction:NO];
+      [_selectionViewController disableFlyoutMenu:NO];
       [_mediator defocusOmnibox];
       break;
   }
@@ -1105,7 +1105,7 @@ const base::TimeDelta kSearchWithCameraTooltipHintDelay = base::Seconds(2.0);
 
   // TODO(crbug.com/355179721): Add omnibox focus delegate.
   _omniboxCoordinator.presenterDelegate = _resultViewController;
-  _omniboxCoordinator.isSearchOnlyUI = YES;
+  _omniboxCoordinator.searchOnlyUI = YES;
   [_omniboxCoordinator start];
 
   [_omniboxCoordinator.managedViewController

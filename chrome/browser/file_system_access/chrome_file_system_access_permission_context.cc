@@ -79,11 +79,14 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/tabs/public/tab_features.h"
+#include "chrome/browser/ui/views/file_system_access/file_system_access_page_action_controller.h"
 #include "chrome/browser/web_applications/proto/web_app_install_state.pb.h"
 #include "chrome/browser/web_applications/web_app_install_manager.h"
 #include "chrome/browser/web_applications/web_app_install_manager_observer.h"
 #include "chrome/browser/web_applications/web_app_provider.h"
 #include "chrome/browser/web_applications/web_app_registrar.h"
+#include "components/tabs/public/tab_interface.h"
 #if BUILDFLAG(ENABLE_PLATFORM_APPS)
 #include "extensions/browser/extension_registry.h"  // nogncheck
 #include "extensions/common/extension.h"
@@ -393,7 +396,7 @@ bool ShouldBlockAccessToPath(
     const base::FilePath& path,
     HandleType handle_type,
     std::vector<ChromeFileSystemAccessPermissionContext::BlockPathRule> rules,
-    const std::vector<ChromeFileSystemAccessPermissionContext::BlockedPath>&
+    std::vector<ChromeFileSystemAccessPermissionContext::BlockedPath>
         blocked_paths,
     const base::FilePath& profile_path) {
   DCHECK(!path.empty());
@@ -1871,7 +1874,7 @@ void ChromeFileSystemAccessPermissionContext::CheckPathAgainstBlocklist(
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
       base::BindOnce(&ShouldBlockAccessToPath, path_info.path, handle_type,
-                     extra_rules, std::cref(blocked_paths_),
+                     extra_rules, blocked_paths_,
                      profile_path_override_.value_or(profile_->GetPath())),
       std::move(callback));
 }
@@ -3203,8 +3206,17 @@ void ChromeFileSystemAccessPermissionContext::DoUsageIconUpdate() {
     if (browser->profile() != profile()) {
       continue;
     }
-    browser->window()->UpdatePageActionIcon(
-        PageActionIconType::kFileSystemAccess);
+    if (IsPageActionMigrated(PageActionIconType::kFileSystemAccess)) {
+      tabs::TabInterface* const tab_interface =
+          browser->GetActiveTabInterface();
+      auto* const tab_features = tab_interface->GetTabFeatures();
+      CHECK(tab_features);
+      UpdatePageAction(
+          tab_features->file_system_access_page_action_controller());
+    } else {
+      browser->window()->UpdatePageActionIcon(
+          PageActionIconType::kFileSystemAccess);
+    }
   }
 #endif
 }
@@ -3213,3 +3225,11 @@ base::WeakPtr<ChromeFileSystemAccessPermissionContext>
 ChromeFileSystemAccessPermissionContext::GetWeakPtr() {
   return weak_factory_.GetWeakPtr();
 }
+
+#if !BUILDFLAG(IS_ANDROID)
+void ChromeFileSystemAccessPermissionContext::UpdatePageAction(
+    FileSystemAccessPageActionController* controller) {
+  CHECK(controller);
+  controller->UpdateVisibility();
+}
+#endif

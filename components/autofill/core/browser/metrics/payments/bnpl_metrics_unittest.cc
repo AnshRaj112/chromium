@@ -5,6 +5,7 @@
 #include "components/autofill/core/browser/metrics/payments/bnpl_metrics.h"
 
 #include "base/test/metrics/histogram_tester.h"
+#include "base/time/time.h"
 #include "components/autofill/core/browser/metrics/autofill_metrics_test_base.h"
 #include "components/autofill/core/browser/payments/constants.h"
 #include "components/autofill/core/common/autofill_prefs.h"
@@ -111,6 +112,46 @@ TEST_F(BnplMetricsTest,
       BnplSuggestionNotShownReason::kCheckoutAmountNotSupported, 1);
 }
 
+TEST_F(BnplMetricsTest, LogSelectBnplIssuerDialogResult_Cancelled) {
+  base::HistogramTester histogram_tester;
+  LogSelectBnplIssuerDialogResult(
+      SelectBnplIssuerDialogResult::kCancelButtonClicked);
+  histogram_tester.ExpectUniqueSample(
+      "Autofill.Bnpl.SelectionDialogResult",
+      SelectBnplIssuerDialogResult::kCancelButtonClicked,
+      /*expected_bucket_count=*/1);
+}
+
+TEST_F(BnplMetricsTest, LogSelectBnplIssuerDialogResult_IssuerSelected) {
+  base::HistogramTester histogram_tester;
+  LogSelectBnplIssuerDialogResult(
+      SelectBnplIssuerDialogResult::kIssuerSelected);
+  histogram_tester.ExpectUniqueSample(
+      "Autofill.Bnpl.SelectionDialogResult",
+      SelectBnplIssuerDialogResult::kIssuerSelected,
+      /*expected_bucket_count=*/1);
+}
+
+TEST_P(BnplMetricsTest, LogBnplIssuerSelection) {
+  base::HistogramTester histogram_tester;
+  std::string_view issuer_id = GetBnplIssuerId();
+
+  LogBnplIssuerSelection(issuer_id);
+  histogram_tester.ExpectUniqueSample(
+      "Autofill.Bnpl.SelectionDialogIssuerSelected",
+      GetEnumForIssuerId(issuer_id), /*expected_bucket_count=*/1);
+}
+
+TEST_F(BnplMetricsTest, LogBnplAddedOnUpdateSuggestion) {
+  base::HistogramTester histogram_tester;
+
+  LogBnplFormEvent(BnplFormEvent::kBnplSuggestionShownOnce);
+
+  histogram_tester.ExpectBucketCount("Autofill.FormEvents.CreditCard.Bnpl",
+                                     BnplFormEvent::kBnplSuggestionShownOnce,
+                                     1);
+}
+
 TEST_P(BnplMetricsTest, LogBnplPopupWindowShown) {
   base::HistogramTester histogram_tester;
   std::string_view issuer_id = GetBnplIssuerId();
@@ -156,6 +197,46 @@ TEST_P(BnplMetricsTest, LogBnplPopupWindowResult_UserClosed) {
       BnplFlowResult::kUserClosed, 1);
 }
 
+TEST_P(BnplMetricsTest, LogBnplPopupWindowLatency_Success) {
+  base::HistogramTester histogram_tester;
+  std::string_view issuer_id = GetBnplIssuerId();
+
+  LogBnplPopupWindowLatency(base::Milliseconds(1000), issuer_id,
+                            BnplFlowResult::kSuccess);
+  histogram_tester.ExpectUniqueSample(
+      base::StrCat({"Autofill.Bnpl.PopupWindowLatency.",
+                    GetHistogramSuffixFromIssuerId(issuer_id), ".",
+                    ConvertBnplFlowResultToString(BnplFlowResult::kSuccess)}),
+      1000, 1);
+}
+
+TEST_P(BnplMetricsTest, LogBnplPopupWindowLatency_Failure) {
+  base::HistogramTester histogram_tester;
+  std::string_view issuer_id = GetBnplIssuerId();
+
+  LogBnplPopupWindowLatency(base::Milliseconds(2000), issuer_id,
+                            BnplFlowResult::kFailure);
+  histogram_tester.ExpectUniqueSample(
+      base::StrCat({"Autofill.Bnpl.PopupWindowLatency.",
+                    GetHistogramSuffixFromIssuerId(issuer_id), ".",
+                    ConvertBnplFlowResultToString(BnplFlowResult::kFailure)}),
+      2000, 1);
+}
+
+TEST_P(BnplMetricsTest, LogBnplPopupWindowLatency_UserClosed) {
+  base::HistogramTester histogram_tester;
+  std::string_view issuer_id = GetBnplIssuerId();
+
+  LogBnplPopupWindowLatency(base::Milliseconds(3000), issuer_id,
+                            BnplFlowResult::kUserClosed);
+  histogram_tester.ExpectUniqueSample(
+      base::StrCat(
+          {"Autofill.Bnpl.PopupWindowLatency.",
+           GetHistogramSuffixFromIssuerId(issuer_id), ".",
+           ConvertBnplFlowResultToString(BnplFlowResult::kUserClosed)}),
+      3000, 1);
+}
+
 TEST_P(BnplMetricsTest, LogBnplTosDialogResult_AcceptButtonClicked) {
   base::HistogramTester histogram_tester;
   std::string_view issuer_id = GetBnplIssuerId();
@@ -178,6 +259,15 @@ TEST_P(BnplMetricsTest, LogBnplTosDialogResult_CancelButtonClicked) {
                     GetHistogramSuffixFromIssuerId(issuer_id)}),
       BnplTosDialogResult::kCancelButtonClicked,
       /*expected_bucket_count=*/1);
+}
+
+TEST_F(BnplMetricsTest, LogBnplSelectionDialogShown) {
+  base::HistogramTester histogram_tester;
+
+  LogBnplSelectionDialogShown();
+  histogram_tester.ExpectUniqueSample("Autofill.Bnpl.SelectionDialogShown",
+                                      /*sample=*/true,
+                                      /*expected_bucket_count=*/1);
 }
 
 INSTANTIATE_TEST_SUITE_P(,
@@ -256,6 +346,83 @@ TEST_F(BnplFormEventsMetricsTest, BnplSuggestionsNotShownDueToUrl) {
 
   histogram_tester.ExpectBucketCount("Autofill.FormEvents.CreditCard.Bnpl",
                                      BnplFormEvent::kSuggestionsShownOnce, 0);
+}
+
+TEST_F(BnplFormEventsMetricsTest, SuggestionAccepted) {
+  base::HistogramTester histogram_tester;
+
+  LogBnplFormEvent(BnplFormEvent::kBnplSuggestionAcceptedOnce);
+
+  histogram_tester.ExpectBucketCount(
+      "Autofill.FormEvents.CreditCard.Bnpl",
+      /*sample=*/BnplFormEvent::kBnplSuggestionAcceptedOnce,
+      /*expected_count=*/1);
+}
+
+TEST_F(BnplFormEventsMetricsTest, FormFilledOnceWithAffirm) {
+  base::HistogramTester histogram_tester;
+
+  LogFormFilledWithBnplVcn(kBnplAffirmIssuerId);
+
+  histogram_tester.ExpectBucketCount(
+      "Autofill.FormEvents.CreditCard.Bnpl",
+      /*sample=*/BnplFormEvent::kFormFilledWithAffirmOnce,
+      /*expected_count=*/1);
+}
+
+TEST_F(BnplFormEventsMetricsTest, FormFilledOnceWithZip) {
+  base::HistogramTester histogram_tester;
+
+  LogFormFilledWithBnplVcn(kBnplZipIssuerId);
+
+  histogram_tester.ExpectBucketCount(
+      "Autofill.FormEvents.CreditCard.Bnpl",
+      /*sample=*/BnplFormEvent::kFormFilledWithZipOnce,
+      /*expected_count=*/1);
+}
+
+TEST_F(BnplFormEventsMetricsTest, FormFilledOnceWithAfterpay) {
+  base::HistogramTester histogram_tester;
+
+  LogFormFilledWithBnplVcn(kBnplAfterpayIssuerId);
+
+  histogram_tester.ExpectBucketCount(
+      "Autofill.FormEvents.CreditCard.Bnpl",
+      /*sample=*/BnplFormEvent::kFormFilledWithAfterpayOnce,
+      /*expected_count=*/1);
+}
+
+TEST_F(BnplFormEventsMetricsTest, FormSubmittedOnceWithAffirm) {
+  base::HistogramTester histogram_tester;
+
+  LogFormSubmittedWithBnplVcn(kBnplAffirmIssuerId);
+
+  histogram_tester.ExpectBucketCount(
+      "Autofill.FormEvents.CreditCard.Bnpl",
+      /*sample=*/BnplFormEvent::kFormSubmittedWithAffirmOnce,
+      /*expected_count=*/1);
+}
+
+TEST_F(BnplFormEventsMetricsTest, FormSubmittedOnceWithZip) {
+  base::HistogramTester histogram_tester;
+
+  LogFormSubmittedWithBnplVcn(kBnplZipIssuerId);
+
+  histogram_tester.ExpectBucketCount(
+      "Autofill.FormEvents.CreditCard.Bnpl",
+      /*sample=*/BnplFormEvent::kFormSubmittedWithZipOnce,
+      /*expected_count=*/1);
+}
+
+TEST_F(BnplFormEventsMetricsTest, FormSubmittedOnceWithAfterpay) {
+  base::HistogramTester histogram_tester;
+
+  LogFormSubmittedWithBnplVcn(kBnplAfterpayIssuerId);
+
+  histogram_tester.ExpectBucketCount(
+      "Autofill.FormEvents.CreditCard.Bnpl",
+      /*sample=*/BnplFormEvent::kFormSubmittedWithAfterpayOnce,
+      /*expected_count=*/1);
 }
 
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||

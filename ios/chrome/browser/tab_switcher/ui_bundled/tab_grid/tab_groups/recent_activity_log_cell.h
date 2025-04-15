@@ -12,8 +12,6 @@
 // Represents a log in the recent activity in a shared tab group.
 @interface RecentActivityLogCell : UITableViewCell
 
-// The cell user's avatar view on the leading edge.
-@property(nonatomic, readonly, strong) UIView* avatarView;
 // The cell favicon imageView on the trailing edge.
 @property(nonatomic, readonly, strong) FaviconView* faviconView;
 // The cell title.
@@ -21,8 +19,11 @@
 // The cell detail text.
 @property(nonatomic, readonly, strong) UILabel* descriptionLabel;
 
-// Unique identifier for the cell. Can be `nil`.
+// Unique identifier for the cell.
 @property(nonatomic, readonly) NSString* uniqueIdentifier;
+
+// Sets the avatar for the cell
+- (void)setAvatar:(UIView*)avatar;
 
 @end
 

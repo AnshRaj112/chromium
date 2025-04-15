@@ -1248,7 +1248,7 @@ String HTMLCanvasElement::ToDataURLInternal(const String& mime_type,
     bool noised = false;
     if (readback_type == ReadbackType::kWebExposed) {
       noised = CanvasInterventionsHelper::MaybeNoiseSnapshot(
-          context_, GetExecutionContext(), image_bitmap, GetRasterMode());
+          context_, GetExecutionContext(), image_bitmap);
     }
     std::unique_ptr<ImageDataBuffer> data_buffer =
         ImageDataBuffer::Create(image_bitmap);
@@ -1372,7 +1372,7 @@ void HTMLCanvasElement::toBlob(V8BlobCallback* callback,
     auto intervention_type =
         CanvasInterventionsHelper::CanvasInterventionType::kNone;
     if (CanvasInterventionsHelper::MaybeNoiseSnapshot(
-            context_, GetExecutionContext(), image_bitmap, GetRasterMode())) {
+            context_, GetExecutionContext(), image_bitmap)) {
       intervention_type =
           CanvasInterventionsHelper::CanvasInterventionType::kNoise;
     }
@@ -1986,9 +1986,9 @@ void HTMLCanvasElement::UpdateMemoryUsage() {
 
   if (!IsRenderingContext2D() && !IsWebGL())
     return;
-  if (ResourceProvider()) {
+  if (const CanvasResourceProvider* provider = ResourceProvider()) {
     non_gpu_buffer_count++;
-    if (IsAccelerated()) {
+    if (provider->IsAccelerated()) {
       // The number of internal GPU buffers vary between one (stable
       // non-displayed state) and three (triple-buffered animations).
       // Adding 2 is a pessimistic but relevant estimate.

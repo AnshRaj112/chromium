@@ -1711,15 +1711,6 @@ _BANNED_CPP_FUNCTIONS: Sequence[BanRule] = (
         [_THIRD_PARTY_EXCEPT_BLINK],  # Not an error in third_party folders.
     ),
     BanRule(
-        'set_owned_by_client',
-        ('set_owned_by_client is deprecated.',
-         'views::View already owns the child views by default. This introduces ',
-         'a competing ownership model which makes the code difficult to reason ',
-         'about. See http://crbug.com/1044687 for more details.'),
-        False,
-        (),
-    ),
-    BanRule(
         'RemoveAllChildViewsWithoutDeleting',
         ('RemoveAllChildViewsWithoutDeleting is deprecated.',
          'This method is deemed dangerous as, unless raw pointers are re-added,',
@@ -2476,7 +2467,7 @@ _KNOWN_ROBOTS = set(
   ) | set('%s@skia-corp.google.com.iam.gserviceaccount.com' % s
           for s in ('chromium-internal-autoroll',)
   ) | set('%s@system.gserviceaccount.com' % s
-          for s in ('chrome-screen-ai-releaser',)
+          for s in ('chrome-screen-ai-releaser', 'crash-eng', 'crash')
   ) | set('%s@owners-cleanup-prod.google.com.iam.gserviceaccount.com' % s
           for s in ('swarming-tasks',)
   ) | set('%s@fuchsia-infra.iam.gserviceaccount.com' % s
@@ -7188,6 +7179,21 @@ def CheckTranslationExpectations(input_api, output_api,
     ignore_path = input_api.os_path.join('ui', 'webui', 'resources', 'tools',
                                          'tests')
     grd_files = [p for p in grd_files if ignore_path not in p]
+
+    # Ensure no duplicate basenames.
+    basename_to_src_paths = {}
+    for grd_path in grd_files:
+        basename = input_api.os_path.basename(grd_path)
+        basename_to_src_paths.setdefault(basename, [])
+        basename_to_src_paths[basename].append(grd_path)
+    for src_paths in basename_to_src_paths.values():
+        if len(src_paths) > 1:
+            return [
+                output_api.PresubmitNotifyResult(
+                    'Multiple string files have the same basename. This will result in '
+                    'missing translations. Files: %s'
+                    % ', '.join(src_paths))
+            ]
 
     try:
         translation_helper.get_translatable_grds(

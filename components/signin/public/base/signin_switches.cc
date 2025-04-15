@@ -23,20 +23,20 @@ BASE_FEATURE(kForceSupervisedSigninWithCapabilities,
              "ForceSupervisedSigninWithCapabilities",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Add some history opt-in entry points on Android.
-BASE_FEATURE(kHistoryOptInEntryPoints,
-             "HistoryOptInEntryPoints",
+// Add history sync opt-in promo in the History Page.
+BASE_FEATURE(kHistoryPageHistorySyncPromo,
+             "HistoryPageHistorySyncPromo",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Makes the History Page history opt-in promo use a different CTA String.
-// No-op unless "HistoryOptInEntryPoints" is enabled.
-BASE_FEATURE(kHistoryOptInPromoCtaStringVariation,
-             "HistoryOptInPromoCtaStringVariation",
+// No-op unless "HistoryPageHistorySyncPromo" is enabled.
+BASE_FEATURE(kHistoryPagePromoCtaStringVariation,
+             "HistoryPagePromoCtaStringVariation",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Add history opt-in IPH in settings on Android.
-BASE_FEATURE(kHistoryOptInIph,
-             "HistoryOptInIph",
+// Enables a history sync educational tip in the magic stack on NTP.
+BASE_FEATURE(kHistoryOptInEducationalTip,
+             "HistoryOptInEducationalTip",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Feature to bypass double-checking that signin callers have correctly gotten
@@ -72,12 +72,11 @@ constexpr base::FeatureParam<HistorySyncOptinExpansionPillOption>::Option
     kHistorySyncOptinExpansionPillOptions[] = {
         {HistorySyncOptinExpansionPillOption::kBrowseAcrossDevices,
          "browse-across-devices"},
-        {HistorySyncOptinExpansionPillOption::kSyncTabsAndHistory,
-         "sync-tabs-and-history"},
+        {HistorySyncOptinExpansionPillOption::kSyncHistory, "sync-history"},
         {HistorySyncOptinExpansionPillOption::kSeeTabsFromOtherDevices,
          "see-tabs-from-other-devices"},
-        {HistorySyncOptinExpansionPillOption::kSyncTabsAndHistoryProfileMenu,
-         "sync-tabs-and-history-profile-menu"}};
+        {HistorySyncOptinExpansionPillOption::kSyncHistoryProfileMenu,
+         "sync-history-profile-menu"}};
 
 // Determines the experiment arm of the History Sync Opt-in expansion pill (it
 // can be either a different text or a different action after the pill is
@@ -228,20 +227,6 @@ BASE_FEATURE(kEnableASWebAuthenticationSession,
              "EnableASWebAuthenticationSession",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
-
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
-BASE_FEATURE(kBatchUploadDesktop,
-             "BatchUploadDesktop",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
-
-bool IsBatchUploadDesktopEnabled() {
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
-  return base::FeatureList::IsEnabled(kBatchUploadDesktop);
-#else
-  return false;
-#endif
-}
 
 // Enables showing the enterprise dialog after every signin into a managed
 // account.

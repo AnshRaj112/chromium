@@ -3420,6 +3420,15 @@ static CSSImageSetOptionValue* ConsumeImageSetOption(
   // Type could appear before or after resolution
   CSSImageSetTypeValue* type = ConsumeImageSetType(stream);
   CSSPrimitiveValue* resolution = ConsumeResolution(stream, context);
+  if (resolution && !resolution->GetValueIfKnown().has_value()) {
+    // TODO(crbug.com/410746569): image-set() resolutions as not resolved at
+    // computed value time. That is, the computed resolution is not stored in
+    // ComputedStyle. getComputedStyle() uses StyleImageComputedCSSValueBuilder,
+    // for which a CSSLengthResolver is not available. Instead of return
+    // incorrect values for getComputedStyle() we do not support calc
+    // expressions that rely on relative units or sibling-index() for now.
+    return nullptr;
+  }
   if (!type) {
     type = ConsumeImageSetType(stream);
   }
@@ -7479,8 +7488,11 @@ CSSValue* ConsumeOffsetPath(CSSParserTokenStream& stream,
 
   CSSValue* offset_path = ConsumeRay(stream, context);
   if (!offset_path) {
-    offset_path = ConsumeBasicShape(stream, context, AllowPathValue::kForbid,
-                                    AllowShapeValue::kForbid);
+    offset_path = ConsumeBasicShape(
+        stream, context, AllowPathValue::kForbid,
+        RuntimeEnabledFeatures::CSSShapeFunctionOffsetPathEnabled()
+            ? AllowShapeValue::kAllow
+            : AllowShapeValue::kForbid);
   }
   if (!offset_path) {
     offset_path = ConsumeUrl(stream, context);

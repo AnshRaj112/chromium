@@ -40,7 +40,7 @@ import org.chromium.base.supplier.OneShotCallback;
 import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.IntentHandler;
-import org.chromium.chrome.browser.app.tabmodel.TabWindowManagerSingleton;
+import org.chromium.chrome.browser.app.tabwindow.TabWindowManagerSingleton;
 import org.chromium.chrome.browser.back_press.BackPressManager;
 import org.chromium.chrome.browser.browserservices.intents.WebappConstants;
 import org.chromium.chrome.browser.document.ChromeLauncherActivity;
@@ -369,7 +369,8 @@ public class SearchActivity extends AsyncInitializationActivity
                         /* bottomWindowPaddingSupplier */ () -> 0,
                         /* onLongClickListener= */ null,
                         /* browserControlsStateProvider= */ null,
-                        /* isToolbarPositionCustomizationEnabled= */ false);
+                        /* isToolbarPositionCustomizationEnabled= */ false,
+                        (context, tab, fromAppMenu) -> {});
         mLocationBarCoordinator.setUrlBarFocusable(true);
         mLocationBarCoordinator.setShouldShowMicButtonWhenUnfocused(true);
         mLocationBarCoordinator.getOmniboxStub().addUrlFocusChangeListener(this);

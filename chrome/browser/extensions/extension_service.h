@@ -23,7 +23,6 @@
 #include "build/chromeos_buildflags.h"
 #include "chrome/browser/extensions/blocklist.h"
 #include "chrome/browser/extensions/cws_info_service.h"
-#include "chrome/browser/extensions/delayed_install_manager.h"
 #include "chrome/browser/extensions/extension_management.h"
 #include "chrome/browser/extensions/extension_telemetry_service_verdict_handler.h"
 #include "chrome/browser/extensions/forced_extensions/force_installed_metrics.h"
@@ -36,6 +35,7 @@
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_process_host_creation_observer.h"
 #include "extensions/browser/crx_file_info.h"
+#include "extensions/browser/delayed_install_manager.h"
 #include "extensions/browser/disable_reason.h"
 #include "extensions/browser/extension_host_registry.h"
 #include "extensions/browser/extension_prefs.h"
@@ -202,24 +202,6 @@ class ExtensionService : public ExtensionServiceInterface,
   // Suppresses noisy failures.
   void ReloadExtensionWithQuietFailure(const std::string& extension_id);
 
-  // Uninstalls the specified extension. Callers should only call this method
-  // with extensions that exist. |reason| lets the caller specify why the
-  // extension is uninstalled.
-  // Note: this method synchronously removes the extension from the
-  // set of installed extensions stored in the ExtensionRegistry, but will
-  // asynchronously remove site-related data and the files stored on disk.
-  // Returns true if an uninstall was successfully triggered; this can fail if
-  // the extension cannot be uninstalled (such as a policy force-installed
-  // extension).
-  // |done_callback| is synchronously invoked once the site-related data and the
-  // files stored on disk are removed. If such a callback is not needed, pass in
-  // a null callback (base::NullCallback()).
-  bool UninstallExtension(
-      const std::string& extension_id,
-      UninstallReason reason,
-      std::u16string* error,
-      base::OnceClosure done_callback = base::NullCallback());
-
   // Enables the extension. If the extension is already enabled, does
   // nothing.
   void EnableExtension(const std::string& extension_id);
@@ -248,11 +230,6 @@ class ExtensionService : public ExtensionServiceInterface,
   // extension is added to the Safe Browsing malware blocklist or the Omaha
   // malware blocklist.
   void OnBlocklistStateAdded(const std::string& extension_id);
-
-  // Removes the disable reason and enable the extension if there are no disable
-  // reasons left and is not blocked for another reason.
-  void RemoveDisableReasonAndMaybeEnable(const std::string& extension_id,
-                                         disable_reason::DisableReason reason);
 
   // Performs action based on Omaha attributes for the extension.
   void PerformActionBasedOnOmahaAttributes(const std::string& extension_id,
@@ -295,24 +272,6 @@ class ExtensionService : public ExtensionServiceInterface,
   // |except_ids|. Default extensions are those from the Web Store with
   // |was_installed_by_default| flag.
   void DisableUserExtensionsExcept(const std::vector<std::string>& except_ids);
-
-  // Informs the service that an extension's files are in place for loading.
-  //
-  // |extension|                the extension
-  // |page_ordinal|             the location of the extension in the app
-  //                            launcher
-  // |install_flags|            a bitmask of InstallFlags
-  // |ruleset_install_prefs|    Install prefs needed for the Declarative Net
-  //                            Request API.
-  void OnExtensionInstalled(const Extension* extension,
-                            const syncer::StringOrdinal& page_ordinal,
-                            int install_flags,
-                            base::Value::Dict ruleset_install_prefs = {});
-  void OnExtensionInstalled(const Extension* extension,
-                            const syncer::StringOrdinal& page_ordinal) {
-    OnExtensionInstalled(extension, page_ordinal,
-                         static_cast<int>(kInstallFlagNone));
-  }
 
   // ExtensionHost of background page calls this method right after its renderer
   // main frame has been created.

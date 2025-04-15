@@ -76,6 +76,7 @@ aggregate_vector_icons("omnibox_vector_icons") {
     "offline_pin.icon",
     "page.icon",
     "page_chrome_refresh.icon",
+    "page_spark.icon",
     "pedal.icon",
     "price_tracking_disabled.icon",
     "price_tracking_disabled_refresh.icon",
@@ -354,7 +355,6 @@ static_library("browser") {
 
   deps = [
     "//build:branding_buildflags",
-    "//components/vector_icons",
     "//components/bookmarks/browser",
     "//components/component_updater",
     "//components/dom_distiller/core:core",
@@ -382,6 +382,7 @@ static_library("browser") {
     "//components/url_formatter",
     "//components/variations",
     "//components/variations/net",
+    "//components/vector_icons",
     "//extensions/buildflags",
     "//net",
     "//services/metrics/public/cpp:metrics_cpp",

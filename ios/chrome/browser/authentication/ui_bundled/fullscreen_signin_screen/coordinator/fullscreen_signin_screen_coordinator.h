@@ -5,7 +5,8 @@
 #ifndef IOS_CHROME_BROWSER_AUTHENTICATION_UI_BUNDLED_FULLSCREEN_SIGNIN_SCREEN_COORDINATOR_FULLSCREEN_SIGNIN_SCREEN_COORDINATOR_H_
 #define IOS_CHROME_BROWSER_AUTHENTICATION_UI_BUNDLED_FULLSCREEN_SIGNIN_SCREEN_COORDINATOR_FULLSCREEN_SIGNIN_SCREEN_COORDINATOR_H_
 
-#import "ios/chrome/browser/authentication/ui_bundled/signin/interruptible_chrome_coordinator.h"
+#import "ios/chrome/browser/authentication/ui_bundled/change_profile_continuation_provider.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/stop_animated_chrome_coordinator.h"
 #import "ios/chrome/browser/shared/coordinator/chrome_coordinator/chrome_coordinator.h"
 
 @protocol FirstRunScreenDelegate;
@@ -18,7 +19,7 @@ enum class PromoAction : int;
 // Coordinator responsible for presenting the fullscreen sign-in UI.
 // It is a child coordinator managed by the FullscreenSigninCoordinator.
 @interface FullscreenSigninScreenCoordinator
-    : ChromeCoordinator <InterruptibleChromeCoordinator>
+    : ChromeCoordinator <StopAnimatedChromeCoordinator>
 
 // Initiates a FullscreenSigninScreenCoordinator with `navigationController`,
 // `browser` and `delegate`.
@@ -26,17 +27,22 @@ enum class PromoAction : int;
 // The `contextStyle` is used to customize content on screens.
 // The `accessPoint` and `promoAction` parameters are used for logging.
 - (instancetype)
-    initWithBaseNavigationController:
-        (UINavigationController*)navigationController
-                             browser:(Browser*)browser
-                            delegate:(id<FirstRunScreenDelegate>)delegate
-                        contextStyle:(SigninContextStyle)contextStyle
-                         accessPoint:(signin_metrics::AccessPoint)accessPoint
-                         promoAction:(signin_metrics::PromoAction)promoAction
+     initWithBaseNavigationController:
+         (UINavigationController*)navigationController
+                              browser:(Browser*)browser
+                             delegate:(id<FirstRunScreenDelegate>)delegate
+                         contextStyle:(SigninContextStyle)contextStyle
+                          accessPoint:(signin_metrics::AccessPoint)accessPoint
+                          promoAction:(signin_metrics::PromoAction)promoAction
+    changeProfileContinuationProvider:(const ChangeProfileContinuationProvider&)
+                                          changeProfileContinuationProvider
     NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)initWithBaseViewController:(UIViewController*)viewController
                                    browser:(Browser*)browser NS_UNAVAILABLE;
+
+// Same as `-stop` but the dismissal can be animated.
+- (void)stopAnimated:(BOOL)animated;
 
 @end
 

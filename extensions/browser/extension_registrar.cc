@@ -157,6 +157,7 @@ void ExtensionRegistrar::AddExtension(
   UntrackTerminatedExtension(extension->id());
 
   // Notify the delegate we will add the extension.
+  CHECK(delegate_);
   delegate_->PreAddExtension(extension.get(), old);
 
   if (was_reloading) {
@@ -230,6 +231,16 @@ void ExtensionRegistrar::AddNewOrUpdatedExtension(
   delegate_->OnAddNewOrUpdatedExtension(extension);
 
   FinishInstallation(extension);
+}
+
+void ExtensionRegistrar::OnExtensionInstalled(
+    const Extension* extension,
+    const syncer::StringOrdinal& page_ordinal,
+    int install_flags,
+    base::Value::Dict ruleset_install_prefs) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  delegate_->OnExtensionInstalled(extension, page_ordinal, install_flags,
+                                  std::move(ruleset_install_prefs));
 }
 
 void ExtensionRegistrar::RemoveExtension(const ExtensionId& extension_id,

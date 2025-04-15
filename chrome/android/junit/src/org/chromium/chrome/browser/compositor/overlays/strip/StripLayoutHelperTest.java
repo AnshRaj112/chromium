@@ -112,6 +112,7 @@ import org.chromium.chrome.browser.tab.TabCreationState;
 import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
+import org.chromium.chrome.browser.tab_ui.ActionConfirmationManager;
 import org.chromium.chrome.browser.tabmodel.TabClosureParams;
 import org.chromium.chrome.browser.tabmodel.TabCreator;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
@@ -121,8 +122,7 @@ import org.chromium.chrome.browser.tabmodel.TabModelActionListener;
 import org.chromium.chrome.browser.tabmodel.TabModelActionListener.DialogType;
 import org.chromium.chrome.browser.tabmodel.TabRemover;
 import org.chromium.chrome.browser.tabmodel.TabUngrouper;
-import org.chromium.chrome.browser.tasks.tab_management.ActionConfirmationManager;
-import org.chromium.chrome.browser.tasks.tab_management.ColorPickerUtils;
+import org.chromium.chrome.browser.tasks.tab_management.TabGroupListBottomSheetCoordinatorFactory;
 import org.chromium.chrome.test.util.browser.tabmodel.MockTabModel;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.styles.SemanticColorUtils;
@@ -139,6 +139,7 @@ import org.chromium.components.tab_group_sync.SavedTabGroup;
 import org.chromium.components.tab_group_sync.SavedTabGroupTab;
 import org.chromium.components.tab_group_sync.TabGroupSyncService;
 import org.chromium.components.tab_groups.TabGroupColorId;
+import org.chromium.components.tab_groups.TabGroupColorPickerUtils;
 import org.chromium.ui.base.LocalizationUtils;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.dragdrop.DragDropGlobalState;
@@ -191,6 +192,7 @@ public class StripLayoutHelperTest {
     @Mock private BottomSheetController mBottomSheetController;
     @Mock private MultiInstanceManager mMultiInstanceManager;
     @Mock private ShareDelegate mShareDelegate;
+    @Mock private TabGroupListBottomSheetCoordinatorFactory mBottomSheetCoordinatorFactory;
     @Mock private Tab mTab;
     @Mock private TabCreator mTabCreator;
     @Mock private TabGroupSyncService mTabGroupSyncService;
@@ -316,6 +318,7 @@ public class StripLayoutHelperTest {
         if (mStripLayoutHelper != null) {
             mStripLayoutHelper.setTabAtPositionForTesting(null);
             mStripLayoutHelper.setRunningAnimatorForTesting(null);
+            mStripLayoutHelper.destroyTabContextMenuForTesting();
         }
         mTabDragSource = null;
     }
@@ -2051,6 +2054,29 @@ public class StripLayoutHelperTest {
     }
 
     @Test
+    @EnableFeatures({ChromeFeatureList.TAB_STRIP_CONTEXT_MENU})
+    @Feature("Tab Context Menu")
+    public void testBottomSheet_constructedWithoutDestroyHide() {
+        var tabs = initializeTest_ForTab();
+        setupForContextMenu();
+        when(mModel.getTabById(anyInt())).thenReturn(mTab);
+        when(mTab.getUrl()).thenReturn(URL);
+
+        // Initialize the menu.
+        mStripLayoutHelper.showTabContextMenuForTesting(tabs[0]);
+
+        verify(mBottomSheetCoordinatorFactory, times(1))
+                .create(
+                        eq(mActivity),
+                        eq(mProfile),
+                        any(),
+                        eq(mTabGroupModelFilter),
+                        eq(mBottomSheetController),
+                        eq(true),
+                        eq(false));
+    }
+
+    @Test
     @EnableFeatures(ChromeFeatureList.TAB_STRIP_CONTEXT_MENU)
     @Config(sdk = Build.VERSION_CODES.R)
     public void testOnLongPress_WithDragDrop_OnTab_ContextMenuEnabled() {
@@ -3759,7 +3785,7 @@ public class StripLayoutHelperTest {
         assertTrue(EXPECTED_TITLE, views[0] instanceof StripLayoutGroupTitle);
         StripLayoutGroupTitle groupTitle = ((StripLayoutGroupTitle) views[0]);
         int color =
-                ColorPickerUtils.getTabGroupColorPickerItemColor(
+                TabGroupColorPickerUtils.getTabGroupColorPickerItemColor(
                         mContext, TabGroupColorId.GREY, mIncognito);
         groupTitle.updateTint(color);
 
@@ -4508,7 +4534,8 @@ public class StripLayoutHelperTest {
                 () -> true,
                 mBottomSheetController,
                 mMultiInstanceManager,
-                () -> mShareDelegate);
+                () -> mShareDelegate,
+                mBottomSheetCoordinatorFactory);
     }
 
     private String[] getExpectedAccessibilityDescriptions(int tabIndex) {
@@ -4745,6 +4772,85 @@ public class StripLayoutHelperTest {
         // tabWidth(265) - overlapWidth(28) + inset(16) to +halfTabWidth(132.5) = 253 to 385.5
         int expectedIndex = 2;
         float dropX = 400.f;
+        assertEquals(
+                "Should prepare to drop at index 2.",
+                expectedIndex,
+                mStripLayoutHelper.getTabIndexForTabDrop(dropX));
+    }
+
+    @Test
+    public void testGetTabIndexForTabDrop_FirstHalfOfCollapsedGroupTitle() {
+        // Setup with 3 tabs, make two groups and collapse both groups.
+        initializeTest(false, false, 0, 3);
+        groupTabs(0, 1);
+        groupTabs(1, 2);
+        StripLayoutView[] views = mStripLayoutHelper.getStripLayoutViewsForTesting();
+
+        StripLayoutGroupTitle groupTitle1 = (StripLayoutGroupTitle) views[0];
+        StripLayoutGroupTitle groupTitle2 = (StripLayoutGroupTitle) views[2];
+        StripLayoutTab collapsedTab1 = (StripLayoutTab) views[1];
+        StripLayoutTab collapsedTab2 = (StripLayoutTab) views[3];
+        groupTitle1.setCollapsed(true);
+        groupTitle2.setCollapsed(true);
+        collapsedTab1.setCollapsed(true);
+        collapsedTab2.setCollapsed(true);
+        collapsedTab1.setWidth(TAB_OVERLAP_WIDTH_DP);
+        collapsedTab2.setWidth(TAB_OVERLAP_WIDTH_DP);
+
+        mStripLayoutHelper.onSizeChanged(
+                SCREEN_WIDTH_LANDSCAPE,
+                SCREEN_HEIGHT,
+                false,
+                TIMESTAMP,
+                PADDING_LEFT,
+                PADDING_RIGHT,
+                0f);
+        mStripLayoutHelper.updateLayout(TIMESTAMP);
+
+        // First half of the group title in 2nd position:
+        // firstGroupTitleRightEdge(68) - groupTitleOverlapWidth(4) + 0 to halfGroupTitleWidth(23) =
+        // 64 to 87.
+        int expectedIndex = 1;
+        float dropX = 80.f;
+        assertEquals(
+                "Should prepare to drop at index 1.",
+                expectedIndex,
+                mStripLayoutHelper.getTabIndexForTabDrop(dropX));
+    }
+
+    @Test
+    public void testGetTabIndexForTabDrop_SecondHalfOfCollapsedGroupTitle() {
+        // Setup with 3 tabs, make two groups and collapse both groups.
+        initializeTest(false, false, 0, 3);
+        groupTabs(0, 1);
+        groupTabs(1, 2);
+        StripLayoutView[] views = mStripLayoutHelper.getStripLayoutViewsForTesting();
+        StripLayoutGroupTitle groupTitle1 = (StripLayoutGroupTitle) views[0];
+        StripLayoutGroupTitle groupTitle2 = (StripLayoutGroupTitle) views[2];
+        StripLayoutTab collapsedTab1 = (StripLayoutTab) views[1];
+        StripLayoutTab collapsedTab2 = (StripLayoutTab) views[3];
+        groupTitle1.setCollapsed(true);
+        groupTitle2.setCollapsed(true);
+        collapsedTab1.setCollapsed(true);
+        collapsedTab2.setCollapsed(true);
+        collapsedTab1.setWidth(TAB_OVERLAP_WIDTH_DP);
+        collapsedTab2.setWidth(TAB_OVERLAP_WIDTH_DP);
+
+        mStripLayoutHelper.onSizeChanged(
+                SCREEN_WIDTH_LANDSCAPE,
+                SCREEN_HEIGHT,
+                false,
+                TIMESTAMP,
+                PADDING_LEFT,
+                PADDING_RIGHT,
+                0f);
+        mStripLayoutHelper.updateLayout(TIMESTAMP);
+
+        // First half of the group title in 2nd position:
+        // firstGroupTitleRightEdge(68) - groupTitleOverlapWidth(4) + 0 to halfGroupTitleWidth(23) =
+        // 64 to 87.
+        int expectedIndex = 2;
+        float dropX = 100.f;
         assertEquals(
                 "Should prepare to drop at index 2.",
                 expectedIndex,
@@ -5620,6 +5726,46 @@ public class StripLayoutHelperTest {
                 "Hover card delay for max tab is incorrect.",
                 StripLayoutHelper.MAX_HOVER_CARD_DELAY_MS,
                 mStripLayoutHelper.getHoverCardDelay(MAX_TAB_WIDTH_DP));
+    }
+
+    @Test
+    public void testTabHoverCardViewIsNullMetric() {
+        HistogramWatcher histogramWatcher =
+                HistogramWatcher.newBuilder()
+                        .expectNoRecords(
+                                StripLayoutHelper
+                                        .NULL_TAB_HOVER_CARD_VIEW_SHOW_DELAYED_HISTOGRAM_NAME)
+                        .build();
+
+        initializeTabHoverTest();
+
+        // Create calls on the correct states.
+        mStripLayoutHelper.updateLastHoveredTab(
+                mStripLayoutHelper.getStripLayoutTabsForTesting()[0]);
+        mStripLayoutHelper.clearTabHoverState();
+
+        histogramWatcher.assertExpected(
+                "Shouldn't record any unexpectedly null mTabHoverCardView calls.");
+
+        histogramWatcher =
+                HistogramWatcher.newBuilder()
+                        .expectBooleanRecord(
+                                StripLayoutHelper
+                                        .NULL_TAB_HOVER_CARD_VIEW_SHOW_DELAYED_HISTOGRAM_NAME,
+                                false)
+                        .build();
+
+        // Destroy the instance.
+        mStripLayoutHelper.destroy();
+
+        // Create calls on the incorrect states.
+        mStripLayoutHelper.updateLastHoveredTab(
+                mStripLayoutHelper.getStripLayoutTabsForTesting()[0]);
+
+        // Check histograms.
+        histogramWatcher.assertExpected(
+                "Should record an unexpectedly null mTabHoverCardView during the immediate"
+                        + " ShowTabHoverCardView call.");
     }
 
     @Test

@@ -118,6 +118,9 @@ BASE_FEATURE(kIPHLensOverlayTranslateButtonFeature,
 BASE_FEATURE(kIPHTabAudioMutingFeature,
              "IPH_TabAudioMuting",
              base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kIPHPasswordsSavePrimingPromoFeature,
+             "IPH_PasswordsSavePrimingPromo",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHPasswordsManagementBubbleAfterSaveFeature,
              "IPH_PasswordsManagementBubbleAfterSave",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -687,6 +690,11 @@ BASE_FEATURE(kIPHiOSReminderNotificationsOverflowMenuNewBadgeFeature,
 // enabled.
 BASE_FEATURE(kIPHiOSSettingsInOverflowMenuBubbleFeature,
              "IPH_iOSSettingsInOverflowMenuBubbleFeature",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+// Note: This IPH will only be triggered if
+// `kSeparateProfilesForManagedAccounts` is enabled.
+BASE_FEATURE(kIPHiOSSwitchAccountsWithNTPAccountParticleDiscFeature,
+             "IPH_iOSSwitchAccountsWithNTPAccountParticleDiscFeature",
              base::FEATURE_ENABLED_BY_DEFAULT);
 // Note: Feed swipe IPHs will only be triggered if `kFeedSwipeInProductHelp` is
 // enabled.

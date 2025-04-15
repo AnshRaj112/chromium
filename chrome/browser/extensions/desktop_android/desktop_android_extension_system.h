@@ -90,8 +90,11 @@ class DesktopAndroidExtensionSystem : public ExtensionSystem {
   // KeyedService implementation:
   void Shutdown() override;
 
+  // DO NOT ADD MORE METHODS HERE.
+  // Calling methods directly on DesktopAndroidExtensionSystem results in code
+  // that is not portable between different OSes and is also incompatible with
+  // unit tests (which may use test versions of the ExtensionSystem).
   bool AddExtension(scoped_refptr<Extension> extension, std::string& error);
-  void ReloadExtension(const std::string& extension_id);
 
   const Extension* LoadExtensionFromDirectory(const base::FilePath& file_path);
 

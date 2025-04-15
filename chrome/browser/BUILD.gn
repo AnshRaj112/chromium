@@ -421,6 +421,7 @@ static_library("browser") {
     "download/download_core_service_factory.h",
     "download/download_core_service_impl.cc",
     "download/download_core_service_impl.h",
+    "download/download_crx_util.h",
     "download/download_dialog_types.h",
     "download/download_file_picker.cc",
     "download/download_file_picker.h",
@@ -1343,6 +1344,8 @@ static_library("browser") {
     "push_messaging/push_messaging_service_factory.h",
     "push_messaging/push_messaging_service_impl.cc",
     "push_messaging/push_messaging_service_impl.h",
+    "push_messaging/push_messaging_unsubscribed_entry.cc",
+    "push_messaging/push_messaging_unsubscribed_entry.h",
     "push_messaging/push_messaging_utils.cc",
     "push_messaging/push_messaging_utils.h",
     "reduce_accept_language/reduce_accept_language_factory.cc",
@@ -1753,6 +1756,7 @@ static_library("browser") {
   # Any circular includes must depend on the target
   # "browser_public_dependencies".
   allow_circular_includes_from = [
+    "//chrome/browser/preloading/search_preload:search_preload",
     "//chrome/browser/ai:impl",
     "//chrome/browser/autofill",
     "//chrome/browser/commerce:impl",
@@ -2964,7 +2968,6 @@ static_library("browser") {
       "download/android/service/download_task_scheduler.cc",
       "download/android/service/download_task_scheduler.h",
       "download/android/string_utils.cc",
-      "download/download_crx_util_android.cc",
       "enterprise/reporting/browser_report_generator_android.cc",
       "enterprise/reporting/browser_report_generator_android.h",
       "enterprise/reporting/profile_report_generator_android.cc",
@@ -3115,6 +3118,8 @@ static_library("browser") {
       "password_manager/android/shared_preferences_delegate_android.cc",
       "password_manager/android/shared_preferences_delegate_android.h",
       "payments/android/service_worker_payment_app_bridge.cc",
+      "performance_manager/policies/process_rank_policy_android.cc",
+      "performance_manager/policies/process_rank_policy_android.h",
       "platform_util_android.cc",
       "plugins/plugin_observer_android.cc",
       "plugins/plugin_observer_android.h",
@@ -3680,8 +3685,6 @@ static_library("browser") {
       "download/download_auto_open_policy_handler.cc",
       "download/download_auto_open_policy_handler.h",
       "download/download_commands.cc",
-      "download/download_crx_util.cc",
-      "download/download_crx_util.h",
       "download/download_danger_prompt.cc",
       "download/download_danger_prompt.h",
       "download/download_dir_policy_handler.cc",
@@ -4271,7 +4274,6 @@ static_library("browser") {
       "//chrome/browser/accessibility/tree_fixing:service",
       "//chrome/browser/apps/app_service",
       "//chrome/browser/apps/link_capturing",
-      "//chrome/browser/autofill_ai:util",
       "//chrome/browser/contextual_cueing",
       "//chrome/browser/contextual_cueing:impl",
       "//chrome/browser/enterprise/incognito",
@@ -4439,9 +4441,6 @@ static_library("browser") {
     allow_circular_includes_from += [
       # TODO(crbug.com/40251079): Remove circular dependencies.
       "//chrome/browser/apps/app_service",
-
-      # TODO(crbug.com/366172297): Remove circular dependencies.
-      "//chrome/browser/autofill_ai:util",
 
       # TODO(b/220386256): Remove circular dependency from the browser.
       "//chrome/browser/media/router/discovery/access_code:access_code_sink_service",
@@ -4659,8 +4658,6 @@ static_library("browser") {
       "apps/intent_helper/chromeos_disabled_apps_throttle.h",
       "browser_process_platform_part_ash.cc",
       "browser_process_platform_part_ash.h",
-      "browser_process_platform_part_chromeos.cc",
-      "browser_process_platform_part_chromeos.h",
       "certificate_provider/certificate_provider.h",
       "certificate_provider/certificate_provider_service.cc",
       "certificate_provider/certificate_provider_service.h",
@@ -6779,6 +6776,8 @@ static_library("browser") {
       "enterprise/signin/user_policy_oidc_signin_service.h",
       "enterprise/signin/user_policy_oidc_signin_service_factory.cc",
       "enterprise/signin/user_policy_oidc_signin_service_factory.h",
+      "enterprise/webstore/chrome_web_store_navigation_throttle.cc",
+      "enterprise/webstore/chrome_web_store_navigation_throttle.h",
       "enterprise/webstore/features.cc",
       "enterprise/webstore/features.h",
       "policy/cloud/profile_token_policy_web_signin_service.cc",
@@ -7368,7 +7367,13 @@ static_library("browser") {
     deps += [ "//media/mojo/mojom:remoting" ]
   }
 
+  if (is_android && !enable_desktop_android_extensions) {
+    sources += [ "download/download_crx_util_android.cc" ]
+  }
+
   if (enable_extensions_core) {
+    sources += [ "download/download_crx_util.cc" ]
+
     # Any circular includes must depend on the target
     # "browser_public_dependencies".
     allow_circular_includes_from += [
@@ -8083,6 +8088,13 @@ static_library("browser") {
     ]
   }
 
+  if (enable_extensions_core) {
+    sources += [
+      "supervised_user/supervised_user_extensions_metrics_recorder.cc",
+      "supervised_user/supervised_user_extensions_metrics_recorder.h",
+    ]
+  }
+
   if (enable_extensions) {
     sources += [
       "supervised_user/extension_icon_loader.cc",
@@ -8091,8 +8103,6 @@ static_library("browser") {
       "supervised_user/supervised_user_extensions_delegate_impl.h",
       "supervised_user/supervised_user_extensions_manager.cc",
       "supervised_user/supervised_user_extensions_manager.h",
-      "supervised_user/supervised_user_extensions_metrics_recorder.cc",
-      "supervised_user/supervised_user_extensions_metrics_recorder.h",
     ]
     if (is_chromeos) {
       sources += [

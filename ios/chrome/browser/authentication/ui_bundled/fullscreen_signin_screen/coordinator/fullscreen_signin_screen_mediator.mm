@@ -16,6 +16,9 @@
 #import "components/web_resource/web_resource_pref_names.h"
 #import "google_apis/gaia/gaia_id.h"
 #import "ios/chrome/browser/authentication/ui_bundled/authentication_flow/authentication_flow.h"
+#import "ios/chrome/browser/authentication/ui_bundled/authentication_flow/authentication_flow_request_helper.h"
+#import "ios/chrome/browser/authentication/ui_bundled/change_profile_continuation_provider.h"
+#import "ios/chrome/browser/authentication/ui_bundled/continuation.h"
 #import "ios/chrome/browser/authentication/ui_bundled/enterprise/enterprise_utils.h"
 #import "ios/chrome/browser/authentication/ui_bundled/fullscreen_signin_screen/coordinator/fullscreen_signin_screen_mediator_delegate.h"
 #import "ios/chrome/browser/authentication/ui_bundled/fullscreen_signin_screen/ui/fullscreen_signin_screen_consumer.h"
@@ -43,6 +46,7 @@ enum class SigninScreenState {
 }  // namespace
 
 @interface FullscreenSigninScreenMediator () <
+    AuthenticationFlowRequestHelper,
     IdentityManagerObserverBridgeDelegate> {
 }
 
@@ -74,20 +78,26 @@ enum class SigninScreenState {
       _identityManagerObserver;
   // State of the sign-in screen.
   SigninScreenState _screenState;
+  ChangeProfileContinuationProvider _changeProfileContinuationProvider;
 }
 
 - (instancetype)
-    initWithAccountManagerService:
-        (ChromeAccountManagerService*)accountManagerService
-            authenticationService:(AuthenticationService*)authenticationService
-                  identityManager:(signin::IdentityManager*)identityManager
-                 localPrefService:(PrefService*)localPrefService
-                      prefService:(PrefService*)prefService
-                      syncService:(syncer::SyncService*)syncService
-                      accessPoint:(signin_metrics::AccessPoint)accessPoint
-                      promoAction:(signin_metrics::PromoAction)promoAction {
+        initWithAccountManagerService:
+            (ChromeAccountManagerService*)accountManagerService
+                authenticationService:
+                    (AuthenticationService*)authenticationService
+                      identityManager:(signin::IdentityManager*)identityManager
+                     localPrefService:(PrefService*)localPrefService
+                          prefService:(PrefService*)prefService
+                          syncService:(syncer::SyncService*)syncService
+                          accessPoint:(signin_metrics::AccessPoint)accessPoint
+                          promoAction:(signin_metrics::PromoAction)promoAction
+    changeProfileContinuationProvider:(const ChangeProfileContinuationProvider&)
+                                          changeProfileContinuationProvider {
   self = [super init];
   if (self) {
+    CHECK(changeProfileContinuationProvider);
+    _changeProfileContinuationProvider = changeProfileContinuationProvider;
     CHECK(accountManagerService);
     CHECK(authenticationService);
     CHECK(identityManager);
@@ -172,11 +182,8 @@ enum class SigninScreenState {
             signin::ConsentLevel::kSignin),
         base::NotFatalUntil::M140);
   [self.consumer setUIEnabled:NO];
-  __weak __typeof(self) weakSelf = self;
-  [authenticationFlow
-      startSignInWithCompletion:^(SigninCoordinatorResult result) {
-        [weakSelf authenticationFlowCompletion:result];
-      }];
+  authenticationFlow.requestHelper = self;
+  [authenticationFlow startSignIn];
 }
 
 - (void)cancelSignInScreenWithCompletion:(ProceduralBlock)completion {
@@ -295,10 +302,10 @@ enum class SigninScreenState {
   [self updateConsumerIdentity];
 }
 
-#pragma mark - Private
+#pragma mark - AuthenticationFlowRequestHelper
 
-// Completion for the authentication flow.
-- (void)authenticationFlowCompletion:(SigninCoordinatorResult)result {
+- (void)authenticationFlowDidSignInInSameProfileWithResult:
+    (SigninCoordinatorResult)result {
   [self.consumer setUIEnabled:YES];
   if (result != SigninCoordinatorResultSuccess) {
     return;
@@ -307,6 +314,12 @@ enum class SigninScreenState {
                                addedAccount:self.addedAccount];
   [self.delegate fullscreenSigninScreenMediatorDidFinishSignin:self];
 }
+
+- (ChangeProfileContinuation)authenticationFlowWillChangeProfile {
+  return _changeProfileContinuationProvider.Run();
+}
+
+#pragma mark - Private
 
 - (bool)selectedIdentityIsValid {
   if (self.selectedIdentity) {

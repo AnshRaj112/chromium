@@ -244,6 +244,10 @@ id<GREYMatcher> ShowTabsButton() {
   return [ChromeMatchersAppInterface showTabsButton];
 }
 
+id<GREYMatcher> BlueDotOnShowTabsButton() {
+  return [ChromeMatchersAppInterface blueDotOnShowTabsButton];
+}
+
 id<GREYMatcher> AddToReadingListButton() {
   return [ChromeMatchersAppInterface addToReadingListButton];
 }
@@ -679,6 +683,15 @@ id<GREYMatcher> TabStripGroupCellAtIndex(unsigned int index) {
   return [ChromeMatchersAppInterface tabStripGroupCellAtIndex:index];
 }
 
+id<GREYMatcher> BlueDotOnTabStripCellAtIndex(unsigned int index) {
+  return [ChromeMatchersAppInterface blueDotOnTabStripCellAtIndex:index];
+}
+
+id<GREYMatcher> NotificationDotOnTabStripGroupCellAtIndex(unsigned int index) {
+  return [ChromeMatchersAppInterface
+      notificationDotOnTabStripGroupCellAtIndex:index];
+}
+
 id<GREYMatcher> TabGroupsPanelCellAtIndex(unsigned int index) {
   return [ChromeMatchersAppInterface tabGroupsPanelCellAtIndex:index];
 }
@@ -691,6 +704,16 @@ id<GREYMatcher> TabGroupsPanelCellWithName(NSString* group_name,
 
 id<GREYMatcher> TabGroupRecentActivityCellAtIndex(unsigned int index) {
   return [ChromeMatchersAppInterface tabGroupRecentActivityCellAtIndex:index];
+}
+
+id<GREYMatcher> TabGroupActivityLabelOnGroupCellAtIndex(unsigned int index) {
+  return [ChromeMatchersAppInterface
+      tabGroupActivityLabelOnGroupCellAtIndex:index];
+}
+
+id<GREYMatcher> TabGroupActivityLabelOnGridCellAtIndex(unsigned int index) {
+  return
+      [ChromeMatchersAppInterface tabGroupActivityLabelOnGridCellAtIndex:index];
 }
 
 id<GREYMatcher> TabGridDoneButton() {
@@ -1039,6 +1062,14 @@ id<GREYMatcher> TabGroupOverflowMenuButton() {
 
 id<GREYMatcher> TabGroupBackButton() {
   return [ChromeMatchersAppInterface tabGroupBackButton];
+}
+
+id<GREYMatcher> TabGroupActivitySummaryCell() {
+  return [ChromeMatchersAppInterface tabGroupActivitySummaryCell];
+}
+
+id<GREYMatcher> TabGroupActivitySummaryCellCloseButton() {
+  return [ChromeMatchersAppInterface tabGroupActivitySummaryCellCloseButton];
 }
 
 #pragma mark - Tab Groups Context Menus

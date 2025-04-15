@@ -7,6 +7,7 @@ module viz.mojom;
 import "cc/mojom/element_id.mojom";
 import "cc/mojom/layer_type.mojom";
 import "skia/public/mojom/skcolor4f.mojom";
+import "skia/public/mojom/skpath.mojom";
 import "services/viz/public/mojom/compositing/surface_range.mojom";
 import "ui/gfx/geometry/mojom/geometry.mojom";
 import "ui/gfx/mojom/rrect_f.mojom";
@@ -120,6 +121,8 @@ struct Layer {
   int32 clip_tree_index;
   int32 effect_tree_index;
   int32 scroll_tree_index;
+
+  bool should_check_backface_visibility;
 
   // Extra properties that are specific to a layerImpl type.
   LayerExtra? layer_extra;
@@ -305,7 +308,7 @@ struct EffectNode {
 
   FilterOperations filters;
   FilterOperations backdrop_filters;
-  gfx.mojom.RRectF? backdrop_filter_bounds;
+  skia.mojom.SkPath? backdrop_filter_bounds;
   float backdrop_filter_quality;
 
   // The element id corresponding to the mask to apply to the filtered backdrop

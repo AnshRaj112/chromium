@@ -32,6 +32,9 @@ class SequencedSubscriber<T> {
   next(): Promise<T> {
     return this.getSignal(this.readIndex++).promise;
   }
+  isEmpty(): boolean {
+    return this.readIndex === this.writeIndex;
+  }
   unsubscribe() {
     this.subscriber.unsubscribe();
   }
@@ -295,8 +298,8 @@ class ApiTests extends ApiTestFixtureBase {
 
   async testGetZeroStateSuggestions() {
     assertTrue(!!this.host.getZeroStateSuggestionsForFocusedTab);
-    this.host.getZeroStateSuggestionsForFocusedTab().then(
-        (suggestions) => assertTrue(suggestions.suggestions.length === 0));
+    const suggestions = await this.host.getZeroStateSuggestionsForFocusedTab();
+    assertEquals(0, suggestions.suggestions.length);
   }
 
   async testGetFocusedTabState() {
@@ -318,6 +321,47 @@ class ApiTests extends ApiTestFixtureBase {
         `url=${focus.hasFocus.tabData.url}`);
     assertEquals('Test Page', focus.hasFocus.tabData.title);
     assertFalse(!!focus.hasNoFocus);
+  }
+
+  async testGetFocusedTabStateV2WithNavigation() {
+    // Initial state.
+    assertTrue(!!this.host.getFocusedTabStateV2);
+    const sequence = observeSequence(this.host.getFocusedTabStateV2());
+    const focus = await sequence.next();
+    assertTrue(!!focus.hasFocus);
+    assertTrue(
+        focus.hasFocus.tabData.url.endsWith('glic/test.html'),
+        `url=${focus.hasFocus.tabData.url}`);
+    assertFalse(!!focus.hasNoFocus);
+
+    // After a second navigation occurs.
+    await this.advanceToNextStep();
+    const focus2 = await sequence.next();
+    assertTrue(!!focus2.hasFocus);
+    assertTrue(
+        focus2.hasFocus.tabData.url.endsWith(
+            'scrollable_page_with_content.html'),
+        `url=${focus2.hasFocus.tabData.url}`);
+
+    await this.advanceToNextStep();
+    let focus3 = await sequence.next();
+
+    // After a navigation occurs in a new tab, there could first exist a
+    // transitory states where the focus is not yet available or still previous
+    // page.
+    while (focus3.hasNoFocus ||
+           (!!focus3.hasFocus &&
+            focus3.hasFocus.tabData.url.endsWith(
+                'scrollable_page_with_content.html'))) {
+      focus3 = await sequence.next();
+    }
+
+    // Final state, after the tab is fully loaded.
+    assertTrue(!!focus3.hasFocus);
+    assertTrue(
+        focus3.hasFocus.tabData.url.endsWith('glic/test.html'),
+        `url=${focus3.hasFocus.tabData.url}`);
+    assertFalse(!!focus3.hasNoFocus);
   }
 
   async testGetFocusedTabStateV2BrowserClosed() {
@@ -472,6 +516,19 @@ class ApiTests extends ApiTestFixtureBase {
     await this.host.refreshSignInCookies();
   }
 
+  async testSignInPauseState() {
+    assertTrue(!!this.host.getUserProfileInfo);
+    const profileInfo = await this.host.getUserProfileInfo();
+
+    assertEquals('', profileInfo.displayName);
+    assertEquals('glic-test@example.com', profileInfo.email);
+    assertEquals('', profileInfo.givenName);
+    assertEquals(false, profileInfo.isManaged!);
+    assertTrue((profileInfo.localProfileName?.length ?? 0) > 0);
+
+    await this.advanceToNextStep();
+  }
+
   async testSetContextAccessIndicator() {
     assertTrue(!!this.host.setContextAccessIndicator);
 
@@ -551,6 +608,14 @@ class ApiTests extends ApiTestFixtureBase {
     await this.advanceToNextStep(minSize);
   }
 
+  async testManualResizeChanged() {
+    assertTrue(!!this.host.isManuallyResizing);
+    await observeSequence(this.host.isManuallyResizing()).waitForValue(true);
+
+    await this.advanceToNextStep();
+    await observeSequence(this.host.isManuallyResizing()).waitForValue(false);
+  }
+
   async testOpenOsMediaPermissionSettings() {
     assertTrue(!!this.host.openOsPermissionSettingsMenu);
     this.host.openOsPermissionSettingsMenu('media');
@@ -575,6 +640,53 @@ class ApiTests extends ApiTestFixtureBase {
     assertTrue(!!this.host.getOsMicrophonePermissionStatus);
     assertFalse(await this.host.getOsMicrophonePermissionStatus());
   }
+
+  // Test navigating successfully after client connection.
+  async testNavigateToDifferentClientPage() {
+    // This test function is run twice.
+    const runCount: number = this.testParams;
+
+    const url = new URL(window.location.href);
+    // First time:
+    if (runCount === 0) {
+      url.searchParams.set('foobar', '1');
+      (async () => {
+        await sleep(100);
+        location.href = url.toString();
+      })();
+      return;
+    }
+
+    // Second time:
+    assertEquals(runCount, 1);
+    assertEquals(url.searchParams.get('foobar'), '1');
+  }
+
+  // Test navigating unsuccessfully after client connection.
+  async testNavigateToBadPage() {
+    // This test function is run twice.
+    const runCount: number = this.testParams;
+
+    const url = new URL(window.location.href);
+    // First time:
+    if (runCount === 0) {
+      // Close the panel so that it can be opened again later to trigger
+      // loading the client.
+      await this.host.closePanel!();
+      // A regular web page with no client.
+      url.pathname = '/test_data/page.html';
+      (async () => {
+        await sleep(100);
+        location.href = url.toString();
+      })();
+      return;
+    }
+
+    // Second time:
+    assertEquals(runCount, 1);
+    assertEquals(url.pathname, '/glic/test.html');
+  }
+
 
   private async waitForPanelState(kind: PanelStateKind): Promise<void> {
     assertTrue(!!this.host.getPanelState);
@@ -866,20 +978,21 @@ type ComparableValue = boolean|string|number|undefined|null;
 
 function assertTrue(x: boolean, message?: string): asserts x {
   if (!x) {
-    throw new Error(`assertTrue failed: ${x} is not true. ${message ?? ''}`);
+    throw new Error(`assertTrue failed: '${x}' is not true. ${message ?? ''}`);
   }
 }
 
 function assertFalse(x: boolean, message?: string): asserts x is false {
   if (x) {
-    throw new Error(`assertFalse failed: ${x} is not false. ${message ?? ''}`);
+    throw new Error(
+        `assertFalse failed: '${x}' is not false. ${message ?? ''}`);
   }
 }
 
 function assertEquals(
     a: ComparableValue, b: ComparableValue, message?: string) {
   if (a !== b) {
-    throw new Error(`assertEquals(${a}, ${b}) failed. ${message ?? ''}`);
+    throw new Error(`assertEquals('${a}', '${b}') failed. ${message ?? ''}`);
   }
 }
 

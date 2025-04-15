@@ -46,7 +46,6 @@
 #include "ui/gfx/geometry/quad_f.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/skia_conversions.h"
-#include "ui/gfx/geometry/vector2d_f.h"
 
 namespace blink {
 
@@ -229,11 +228,6 @@ void Path::Apply(void* info, PathApplierFunction function) const {
   }
 }
 
-Path& Path::Transform(const AffineTransform& xform) {
-  path_.transform(xform.ToSkMatrix());
-  return *this;
-}
-
 float Path::length() const {
   float length = 0;
   SkPathMeasure measure(path_, false);
@@ -316,25 +310,6 @@ bool Path::IsClosed() const {
 
 bool Path::IsLine() const {
   return path_.isLine(nullptr);
-}
-
-void Path::MoveTo(const gfx::PointF& point) {
-  path_.moveTo(gfx::PointFToSkPoint(point));
-}
-
-void Path::AddLineTo(const gfx::PointF& point) {
-  path_.lineTo(gfx::PointFToSkPoint(point));
-}
-
-void Path::AddBezierCurveTo(const gfx::PointF& p1,
-                            const gfx::PointF& p2,
-                            const gfx::PointF& ep) {
-  path_.cubicTo(gfx::PointFToSkPoint(p1), gfx::PointFToSkPoint(p2),
-                gfx::PointFToSkPoint(ep));
-}
-
-void Path::CloseSubpath() {
-  path_.close();
 }
 
 Path Path::MakeRect(const gfx::RectF& rect) {

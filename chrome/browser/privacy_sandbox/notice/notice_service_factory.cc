@@ -21,7 +21,7 @@ PrivacySandboxNoticeServiceFactory::GetInstance() {
 
 privacy_sandbox::PrivacySandboxNoticeServiceInterface*
 PrivacySandboxNoticeServiceFactory::GetForProfile(Profile* profile) {
-  return static_cast<privacy_sandbox::PrivacySandboxNoticeService*>(
+  return static_cast<privacy_sandbox::PrivacySandboxNoticeServiceInterface*>(
       GetInstance()->GetServiceForBrowserContext(profile, true));
 }
 
@@ -35,6 +35,6 @@ PrivacySandboxNoticeServiceFactory::BuildServiceInstanceForBrowserContext(
     content::BrowserContext* context) const {
   Profile* profile = Profile::FromBrowserContext(context);
   return std::make_unique<privacy_sandbox::PrivacySandboxNoticeService>(
-      profile, std::make_unique<privacy_sandbox::NoticeCatalog>(),
+      profile, std::make_unique<privacy_sandbox::NoticeCatalogImpl>(),
       std::make_unique<privacy_sandbox::PrivacySandboxNoticeStorage>());
 }

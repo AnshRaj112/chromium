@@ -534,10 +534,6 @@ IN_PROC_BROWSER_TEST_F(SettingsTest, Slider) {
 IN_PROC_BROWSER_TEST_F(SettingsTest, SmartCardReadersPage) {
   RunTest("settings/smart_card_readers_page_test.js", "mocha.run()");
 }
-
-IN_PROC_BROWSER_TEST_F(SettingsTest, SmartCardReaderOriginEntry) {
-  RunTest("settings/smart_card_reader_origin_entry_test.js", "mocha.run()");
-}
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 IN_PROC_BROWSER_TEST_F(SettingsTest, SpeedPage) {
@@ -974,7 +970,13 @@ IN_PROC_BROWSER_TEST_F(SettingsPrivacyGuideTest,
       "runMochaSuite('CompletionFragmentAiSettingsInPrivacyGuideDisabled')");
 }
 
-IN_PROC_BROWSER_TEST_F(SettingsPrivacyGuideTest, AdTopicsFragment) {
+// TODO(crbug.com/410848707): Re-enable this test
+#if BUILDFLAG(IS_MAC)
+#define MAYBE_AdTopicsFragment DISABLED_AdTopicsFragment
+#else
+#define MAYBE_AdTopicsFragment AdTopicsFragment
+#endif
+IN_PROC_BROWSER_TEST_F(SettingsPrivacyGuideTest, MAYBE_AdTopicsFragment) {
   RunTest("settings/privacy_guide_ad_topics_fragment_test.js",
           "runMochaSuite('AdTopicsFragment')");
 }
@@ -1034,6 +1036,8 @@ class SettingsPrivacyPageTest : public SettingsBrowserTest {
             features::kDbdRevampDesktop,
             features::kEnableCertManagementUIV2,
             privacy_sandbox::kPrivacySandboxRelatedWebsiteSetsUi,
+            permissions::features::kPermissionSiteSettingsRadioButton,
+            privacy_sandbox::kFingerprintingProtectionUx,
         },
         {});
     scoped_feature_list2_.InitAndEnableFeatureWithParameters(
@@ -1055,9 +1059,18 @@ class SettingsPrivacyPageTestNoTestingConfig : public SettingsPrivacyPageTest {
     command_line->AppendSwitch("disable-field-trial-config");
   }
 
+ protected:
+  SettingsPrivacyPageTestNoTestingConfig() {
+    scoped_feature_list_.InitWithFeatures(
+        {
+            features::kAutomaticFullscreenContentSetting,
+            permissions::features::kPermissionSiteSettingsRadioButton,
+        },
+        {});
+  }
+
  private:
-  base::test::ScopedFeatureList scoped_feature_list_{
-      features::kAutomaticFullscreenContentSetting};
+  base::test::ScopedFeatureList scoped_feature_list_;
 };
 
 // Tests that the content settings page for Web Printing is not shown by
@@ -1096,9 +1109,10 @@ IN_PROC_BROWSER_TEST_F(SettingsPrivacyPageTest, CookiesSubpage) {
   RunTest("settings/privacy_page_test.js", "runMochaSuite('CookiesSubpage')");
 }
 
-IN_PROC_BROWSER_TEST_F(SettingsPrivacyPageTest, TrackingProtectionSubpage) {
+IN_PROC_BROWSER_TEST_F(SettingsPrivacyPageTest,
+                       IncognitoTrackingProtectionsSubpage) {
   RunTest("settings/privacy_page_test.js",
-          "runMochaSuite('TrackingProtectionSubpage')");
+          "runMochaSuite('IncognitoTrackingProtectionsSubpage')");
 }
 
 IN_PROC_BROWSER_TEST_F(SettingsPrivacyPageTest, AllSitesSubpage) {
@@ -1144,6 +1158,40 @@ IN_PROC_BROWSER_TEST_F(SettingsPrivacyPageTest,
                        DeleteBrowsingDataRevampDisabled) {
   RunTest("settings/privacy_page_test.js",
           "runMochaSuite('DeleteBrowsingDataRevampDisabled')");
+}
+
+class SettingsNotificationsPageTest : public SettingsBrowserTest {
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_{
+      permissions::features::kPermissionSiteSettingsRadioButton};
+};
+
+IN_PROC_BROWSER_TEST_F(SettingsNotificationsPageTest, NotificationsPage) {
+  RunTest("settings/notifications_page_test.js",
+          "runMochaSuite('NotificationsPage')");
+}
+
+IN_PROC_BROWSER_TEST_F(SettingsNotificationsPageTest,
+                       NotificationsPageWithNestedRadioButton) {
+  RunTest("settings/notifications_page_test.js",
+          "runMochaSuite('NotificationsPageWithNestedRadioButton')");
+}
+
+class SettingsGeolocationPageTest : public SettingsBrowserTest {
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_{
+      permissions::features::kPermissionSiteSettingsRadioButton};
+};
+
+IN_PROC_BROWSER_TEST_F(SettingsGeolocationPageTest, GeolocationPage) {
+  RunTest("settings/geolocation_page_test.js",
+          "runMochaSuite('GeolocationPage')");
+}
+
+IN_PROC_BROWSER_TEST_F(SettingsGeolocationPageTest,
+                       GeolocationPageWithNestedRadioButton) {
+  RunTest("settings/geolocation_page_test.js",
+          "runMochaSuite('GeolocationPageWithNestedRadioButton')");
 }
 
 class SettingsPrivacySandboxPageTest : public SettingsBrowserTest {};
@@ -1318,8 +1366,6 @@ class SettingsSecurityPageTest : public SettingsBrowserTest {
     scoped_feature_list_.InitWithFeatures(
         {
             features::kEnableCertManagementUIV2,
-            safe_browsing::kEsbAiStringUpdate,
-            safe_browsing::kPasswordLeakToggleMove,
         },
         {});
   }

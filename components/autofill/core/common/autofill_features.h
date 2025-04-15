@@ -168,18 +168,12 @@ BASE_DECLARE_FEATURE(kAutofillUseFRAddressModel);
 COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillUseINAddressModel);
 COMPONENT_EXPORT(AUTOFILL)
-BASE_DECLARE_FEATURE(kAutofillUseITAddressModel);
-COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillUseNLAddressModel);
-COMPONENT_EXPORT(AUTOFILL)
-BASE_DECLARE_FEATURE(kAutofillUsePLAddressModel);
 COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillUseNegativePatternForAllAttributes);
 COMPONENT_EXPORT(AUTOFILL) BASE_DECLARE_FEATURE(kAutofillModelPredictions);
 COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE_PARAM(bool, kAutofillModelPredictionsAreActive);
-COMPONENT_EXPORT(AUTOFILL)
-BASE_DECLARE_FEATURE(kAutofillOverwritePlaceholdersOnly);
 COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillSkipPreFilledFields);
 COMPONENT_EXPORT(AUTOFILL) BASE_DECLARE_FEATURE(kAutofillPageLanguageDetection);
@@ -359,9 +353,12 @@ extern const base::FeatureParam<std::string>
 COMPONENT_EXPORT(AUTOFILL)
 extern const base::FeatureParam<std::string> kAutofillOverridePredictionsJson;
 COMPONENT_EXPORT(AUTOFILL) BASE_DECLARE_FEATURE(kAutofillServerCommunication);
+COMPONENT_EXPORT(AUTOFILL) BASE_DECLARE_FEATURE(kShowDomNodeIDs);
 COMPONENT_EXPORT(AUTOFILL) BASE_DECLARE_FEATURE(kAutofillShowTypePredictions);
 COMPONENT_EXPORT(AUTOFILL)
 extern const base::FeatureParam<bool> kAutofillShowTypePredictionsVerboseParam;
+COMPONENT_EXPORT(AUTOFILL)
+extern const base::FeatureParam<bool> kAutofillShowTypePredictionsAsTitleParam;
 COMPONENT_EXPORT(AUTOFILL) BASE_DECLARE_FEATURE(kAutofillUploadThrottling);
 
 }  // namespace test

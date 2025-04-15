@@ -82,6 +82,7 @@
 #include "net/url_request/url_request_context_getter.h"
 #include "services/network/accept_ch_frame_interceptor.h"
 #include "services/network/ad_heuristic_cookie_overrides.h"
+#include "services/network/cookie_settings.h"
 #include "services/network/file_opener_for_upload.h"
 #include "services/network/orb/orb_impl.h"
 #include "services/network/public/cpp/client_hints.h"
@@ -100,6 +101,7 @@
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/sri_message_signatures.h"
 #include "services/network/public/mojom/client_security_state.mojom-forward.h"
+#include "services/network/public/mojom/client_security_state.mojom.h"
 #include "services/network/public/mojom/cookie_access_observer.mojom-forward.h"
 #include "services/network/public/mojom/cookie_access_observer.mojom.h"
 #include "services/network/public/mojom/cookie_manager.mojom.h"
@@ -121,6 +123,7 @@
 #include "services/network/ssl_private_key_proxy.h"
 #include "services/network/throttling/scoped_throttling_token.h"
 #include "services/network/trust_tokens/trust_token_request_helper.h"
+#include "services/network/trust_tokens/trust_token_url_loader_interceptor.h"
 #include "services/network/url_loader_factory.h"
 #include "services/network/url_loader_util.h"
 #include "third_party/abseil-cpp/absl/container/inlined_vector.h"
@@ -368,6 +371,10 @@ URLLoader::URLLoader(
       request_id_(request_id),
       keepalive_request_size_(keepalive_request_size),
       keepalive_(request.keepalive),
+      client_security_state_(
+          request.trusted_params
+              ? request.trusted_params->client_security_state.Clone()
+              : nullptr),
       do_not_prompt_for_login_(request.do_not_prompt_for_login),
       receiver_(this, std::move(url_loader_receiver)),
       url_loader_client_(std::move(url_loader_client),
@@ -393,12 +400,11 @@ URLLoader::URLLoader(
       resource_scheduler_client_(context.GetResourceSchedulerClient()),
       keepalive_statistics_recorder_(std::move(keepalive_statistics_recorder)),
       fetch_window_id_(request.fetch_window_id),
-      private_network_access_interceptor_(
-          request,
-          factory_params_->client_security_state.get(),
-          options_),
-      trust_token_helper_factory_(std::move(trust_token_helper_factory)),
-      storage_access_api_status_(request.storage_access_api_status),
+      private_network_access_interceptor_(request,
+                                          GetClientSecurityState(),
+                                          options_),
+      trust_token_interceptor_(TrustTokenUrlLoaderInterceptor::MaybeCreate(
+          std::move(trust_token_helper_factory))),
       shared_dictionary_checker_(std::move(shared_dictionary_checker)),
       origin_access_list_(context.GetOriginAccessList()),
       cookie_observer_(std::move(cookie_observer)),
@@ -638,159 +644,84 @@ void URLLoader::SetUpUpload(
   ProcessOutboundTrustTokenInterceptor(request);
 }
 
-void URLLoader::ProcessOutboundSharedStorageInterceptor() {
-  DCHECK(shared_storage_request_helper_);
-  shared_storage_request_helper_->ProcessOutgoingRequest(*url_request_);
-  ScheduleStart();
-}
-
 void URLLoader::ProcessOutboundTrustTokenInterceptor(
     const ResourceRequest& request) {
+  // If no Trust Token parameters are specified, proceed to the next
+  // interceptor.
   if (!request.trust_token_params) {
     ProcessOutboundSharedStorageInterceptor();
     return;
   }
+  // If trust_token_params exist, the interceptor MUST have been created in the
+  // URLLoader constructor.
+  CHECK(trust_token_interceptor_);
 
-  // Trust token operations other than signing cannot be served from cache
-  // because it needs to send the server the Trust Tokens request header and
-  // get the corresponding response header. It is okay to cache the results in
-  // case subsequent requests are made to the same URL in non-trust-token
-  // settings.
-  if (request.trust_token_params->operation !=
-      mojom::TrustTokenOperationType::kSigning) {
-    url_request_->SetLoadFlags(url_request_->load_flags() |
-                               net::LOAD_BYPASS_CACHE);
-  }
+  // Ask the interceptor if any special load flags are needed.
+  url_request_->SetLoadFlags(url_request_->load_flags() |
+                             trust_token_interceptor_->GetAdditionalLoadFlags(
+                                 request.trust_token_params.value()));
 
-  // Since the request has trust token parameters, |trust_token_helper_factory_|
-  // is guaranteed to be non-null by URLLoader's constructor's contract.
-  DCHECK(trust_token_helper_factory_);
-
-  trust_token_helper_factory_->CreateTrustTokenHelperForRequest(
+  // Delegate the Begin phase of the Trust Token operation to the interceptor.
+  // The interceptor will asynchronously handle helper creation, calling Begin,
+  // and determining the outcome.
+  trust_token_interceptor_->BeginOperation(
+      request.trust_token_params->operation, url_request_->url(),
       url_request_->isolation_info().top_frame_origin().value_or(url::Origin()),
       url_request_->extra_request_headers(), request.trust_token_params.value(),
       url_request_->net_log(),
-      base::BindOnce(&URLLoader::OnDoneConstructingTrustTokenHelper,
-                     weak_ptr_factory_.GetWeakPtr(),
-                     request.trust_token_params->operation));
-}
-
-void URLLoader::OnDoneConstructingTrustTokenHelper(
-    mojom::TrustTokenOperationType operation,
-    TrustTokenStatusOrRequestHelper status_or_helper) {
-  trust_token_operation_ = operation;
-
-  if (trust_token_observer_) {
-    const net::IsolationInfo& isolation_info = url_request_->isolation_info();
-    url::Origin top_frame_origin;
-    if (isolation_info.top_frame_origin()) {
-      top_frame_origin = *isolation_info.top_frame_origin();
-    }
-
-    bool token_operation_unauthorized =
-        status_or_helper.status() ==
-        mojom::TrustTokenOperationStatus::kUnauthorized;
-    switch (operation) {
-      case mojom::TrustTokenOperationType::kIssuance:
-        trust_token_observer_->OnTrustTokensAccessed(
-            mojom::TrustTokenAccessDetails::NewIssuance(
-                mojom::TrustTokenIssuanceDetails::New(
-                    top_frame_origin, url::Origin::Create(url_request_->url()),
-                    token_operation_unauthorized)));
-        break;
-      case mojom::TrustTokenOperationType::kRedemption:
-        trust_token_observer_->OnTrustTokensAccessed(
-            mojom::TrustTokenAccessDetails::NewRedemption(
-                mojom::TrustTokenRedemptionDetails::New(
-                    top_frame_origin, url::Origin::Create(url_request_->url()),
-                    token_operation_unauthorized)));
-        break;
-      case mojom::TrustTokenOperationType::kSigning:
-        trust_token_observer_->OnTrustTokensAccessed(
-            mojom::TrustTokenAccessDetails::NewSigning(
-                mojom::TrustTokenSigningDetails::New(
-                    top_frame_origin, token_operation_unauthorized)));
-        break;
-    }
-  }
-
-  if (!status_or_helper.ok()) {
-    trust_token_status_ = status_or_helper.status();
-
-    // Defer calling NotifyCompleted to make sure the URLLoader
-    // finishes initializing before getting deleted.
-    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE, base::BindOnce(&URLLoader::NotifyCompleted,
-                                  weak_ptr_factory_.GetWeakPtr(),
-                                  net::ERR_TRUST_TOKEN_OPERATION_FAILED));
-
-    if (devtools_observer_ && devtools_request_id()) {
-      mojom::TrustTokenOperationResultPtr operation_result =
-          mojom::TrustTokenOperationResult::New();
-      operation_result->status = *trust_token_status_;
-      operation_result->operation = operation;
-      devtools_observer_->OnTrustTokenOperationDone(
-          devtools_request_id().value(), std::move(operation_result));
-    }
-    return;
-  }
-
-  trust_token_helper_ = status_or_helper.TakeOrCrash();
-  trust_token_helper_->Begin(
-      url_request_->url(),
+      // Provide a getter for the TrustTokenAccessObserver.
+      base::BindOnce(
+          [](base::WeakPtr<URLLoader> weak_ptr)
+              -> mojom::TrustTokenAccessObserver* {
+            return weak_ptr ? weak_ptr->trust_token_observer_.get() : nullptr;
+          },
+          weak_ptr_factory_.GetWeakPtr()),
+      // Provide a getter for the DevTools reporting callback.
+      base::BindOnce(
+          [](base::WeakPtr<URLLoader> weak_ptr)
+              -> base::OnceCallback<void(mojom::TrustTokenOperationResultPtr)> {
+            if (weak_ptr && weak_ptr->devtools_observer_.get() &&
+                weak_ptr->devtools_request_id_) {
+              return base::BindOnce(
+                  &mojom::DevToolsObserver::OnTrustTokenOperationDone,
+                  base::Unretained(weak_ptr->devtools_observer_.get()),
+                  *weak_ptr->devtools_request_id_);
+            }
+            return base::OnceCallback<void(
+                mojom::TrustTokenOperationResultPtr)>();
+          },
+          weak_ptr_factory_.GetWeakPtr()),
       base::BindOnce(&URLLoader::OnDoneBeginningTrustTokenOperation,
                      weak_ptr_factory_.GetWeakPtr()));
 }
 
 void URLLoader::OnDoneBeginningTrustTokenOperation(
-    std::optional<net::HttpRequestHeaders> headers,
-    mojom::TrustTokenOperationStatus status) {
-  trust_token_status_ = status;
-
-  if (trust_token_operation_) {
-    base::UmaHistogramEnumeration(
-        base::StrCat({"Net.TrustTokens.OperationOutcome.",
-                      internal::TrustTokenOperationTypeToString(
-                          *trust_token_operation_)}),
-        status);
-  }
-
-  // In case the operation failed or it succeeded in a manner where the request
-  // does not need to be sent onwards, the DevTools event is emitted from here.
-  // Otherwise the DevTools event is always emitted from
-  // |OnDoneFinalizingTrustTokenOperation|.
-  if (status != mojom::TrustTokenOperationStatus::kOk) {
-    DCHECK(!headers);
-    MaybeSendTrustTokenOperationResultToDevTools();
-  }
-
-  if (status == mojom::TrustTokenOperationStatus::kOk) {
-    DCHECK(headers);
-    for (const auto& header_pair : headers->GetHeaderVector()) {
-      url_request_->SetExtraRequestHeaderByName(
-          header_pair.key, header_pair.value, /*overwrite=*/true);
-    }
-
-    ProcessOutboundSharedStorageInterceptor();
-  } else if (status == mojom::TrustTokenOperationStatus::kAlreadyExists ||
-             status == mojom::TrustTokenOperationStatus::
-                           kOperationSuccessfullyFulfilledLocally) {
-    // The Trust Tokens operation succeeded without needing to send the request;
-    // we return early with an "error" representing this success.
-    //
-    // Here and below, defer calling NotifyCompleted to make sure the URLLoader
+    base::expected<net::HttpRequestHeaders, net::Error> result) {
+  // If `result` does not have a value, the operation failed or completed
+  // locally.
+  if (!result.has_value()) {
+    // Defer calling NotifyCompleted to make sure the URLLoader
     // finishes initializing before getting deleted.
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE,
-        base::BindOnce(
-            &URLLoader::NotifyCompleted, weak_ptr_factory_.GetWeakPtr(),
-            net::ERR_TRUST_TOKEN_OPERATION_SUCCESS_WITHOUT_SENDING_REQUEST));
-  } else {
-    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE, base::BindOnce(&URLLoader::NotifyCompleted,
-                                  weak_ptr_factory_.GetWeakPtr(),
-                                  net::ERR_TRUST_TOKEN_OPERATION_FAILED));
+        base::BindOnce(&URLLoader::NotifyCompleted,
+                       weak_ptr_factory_.GetWeakPtr(), result.error()));
+    return;
   }
+  // Operation succeeded and returned headers to add/overwrite.
+  // Apply the headers provided by the interceptor.
+  for (const auto& header_pair : result->GetHeaderVector()) {
+    url_request_->SetExtraRequestHeaderByName(
+        header_pair.key, header_pair.value, /*overwrite=*/true);
+  }
+  // Trust Token outbound processing is done, proceed to the next interceptor.
+  ProcessOutboundSharedStorageInterceptor();
+}
+
+void URLLoader::ProcessOutboundSharedStorageInterceptor() {
+  DCHECK(shared_storage_request_helper_);
+  shared_storage_request_helper_->ProcessOutgoingRequest(*url_request_);
+  ScheduleStart();
 }
 
 void URLLoader::ScheduleStart() {
@@ -1063,95 +994,15 @@ int URLLoader::ProcessAcceptCHFrameOnConnected(
 }
 
 mojom::URLResponseHeadPtr URLLoader::BuildResponseHead() const {
-  auto response = mojom::URLResponseHead::New();
-
-  response->request_time = url_request_->request_time();
-  response->response_time = url_request_->response_time();
-  response->original_response_time = url_request_->original_response_time();
-  response->headers = url_request_->response_headers();
-  response->parsed_headers =
-      PopulateParsedHeaders(response->headers.get(), url_request_->url());
-
-  url_request_->GetCharset(&response->charset);
-  response->content_length = url_request_->GetExpectedContentSize();
-  url_request_->GetMimeType(&response->mime_type);
-  net::HttpResponseInfo response_info = url_request_->response_info();
-  response->was_fetched_via_spdy = response_info.was_fetched_via_spdy;
-  response->was_alpn_negotiated = response_info.was_alpn_negotiated;
-  response->alpn_negotiated_protocol = response_info.alpn_negotiated_protocol;
-  response->alternate_protocol_usage = response_info.alternate_protocol_usage;
-  response->connection_info = response_info.connection_info;
-  response->remote_endpoint = response_info.remote_endpoint;
-  response->was_fetched_via_cache = url_request_->was_cached();
-  response->is_validated = (response_info.cache_entry_status ==
-                            net::HttpResponseInfo::ENTRY_VALIDATED);
-  response->proxy_chain = url_request_->proxy_chain();
-  response->network_accessed = response_info.network_accessed;
-  response->async_revalidation_requested =
-      response_info.async_revalidation_requested;
-  response->was_in_prefetch_cache =
-      !(url_request_->load_flags() & net::LOAD_PREFETCH) &&
-      response_info.unused_since_prefetch;
-  response->did_use_shared_dictionary = response_info.did_use_shared_dictionary;
-
-  response->was_cookie_in_request = false;
-  for (const auto& cookie_with_access_result :
-       url_request_->maybe_sent_cookies()) {
-    if (cookie_with_access_result.access_result.status.IsInclude()) {
-      // IsInclude() true means the cookie was sent.
-      response->was_cookie_in_request = true;
-      break;
-    }
-  }
-
-  if (is_load_timing_enabled_)
-    url_request_->GetLoadTimingInfo(&response->load_timing);
-
-  if (include_load_timing_internal_info_with_response_) {
-    response->load_timing_internal_info =
-        url_request_->GetLoadTimingInternalInfo();
-  }
-  CHECK(include_load_timing_internal_info_with_response_ ||
-        !response->load_timing_internal_info);
-
-  if (url_request_->ssl_info().cert.get()) {
-    response->cert_status = url_request_->ssl_info().cert_status;
-    if ((options_ & mojom::kURLLoadOptionSendSSLInfoWithResponse) ||
-        (net::IsCertStatusError(url_request_->ssl_info().cert_status) &&
-         (options_ & mojom::kURLLoadOptionSendSSLInfoForCertificateError))) {
-      response->ssl_info = url_request_->ssl_info();
-    }
-  }
-
-  if (request_cookies_.size()) {
-    CHECK(include_request_cookies_with_response_);
-    response->request_cookies = request_cookies_;
-  }
-
-  response->request_start = url_request_->creation_time();
-  response->response_start = base::TimeTicks::Now();
-  response->encoded_data_length = url_request_->GetTotalReceivedBytes();
-  response->auth_challenge_info = url_request_->auth_challenge_info();
-  response->has_range_requested =
-      url_request_->extra_request_headers().HasHeader(
-          net::HttpRequestHeaders::kRange);
-  std::ranges::copy(url_request_->response_info().dns_aliases,
-                    std::back_inserter(response->dns_aliases));
-  // [spec]: https://fetch.spec.whatwg.org/#http-network-or-cache-fetch
-  // 13. Set response’s request-includes-credentials to includeCredentials.
-  response->request_include_credentials = url_request_->allow_credentials();
-
-  response->response_address_space =
+  CHECK(request_cookies_.empty() || include_request_cookies_with_response_);
+  return url_loader_util::BuildResponseHead(
+      *url_request_, request_cookies_,
+      private_network_access_interceptor_.ClientAddressSpace(),
       private_network_access_interceptor_.ResponseAddressSpace().value_or(
-          mojom::IPAddressSpace::kUnknown);
-  response->client_address_space =
-      private_network_access_interceptor_.ClientAddressSpace();
-
-  response->load_with_storage_access = ShouldSetLoadWithStorageAccess();
-  url_request_->GetClientSideContentDecodingTypes(
-      &response->client_side_content_decoding_types);
-
-  return response;
+          mojom::IPAddressSpace::kUnknown),
+      options_, ShouldSetLoadWithStorageAccess(), is_load_timing_enabled_,
+      include_load_timing_internal_info_with_response_,
+      /*response_start=*/base::TimeTicks::Now());
 }
 
 void URLLoader::OnReceivedRedirect(net::URLRequest* url_request,
@@ -1379,9 +1230,9 @@ void URLLoader::OnResponseStarted(net::URLRequest* url_request, int net_error) {
 
   // Parse and remove the Trust Tokens response headers, if any are expected,
   // potentially failing the request if an error occurs.
-  if (response_ && response_->headers && trust_token_helper_) {
+  if (response_ && response_->headers && trust_token_interceptor_) {
     DCHECK(response_);
-    trust_token_helper_->Finalize(
+    trust_token_interceptor_->FinalizeOperation(
         *response_->headers.get(),
         base::BindOnce(&URLLoader::OnDoneFinalizingTrustTokenOperation,
                        weak_ptr_factory_.GetWeakPtr()));
@@ -1392,32 +1243,13 @@ void URLLoader::OnResponseStarted(net::URLRequest* url_request, int net_error) {
   ProcessInboundSharedStorageInterceptorOnResponseStarted();
 }
 
-void URLLoader::OnDoneFinalizingTrustTokenOperation(
-    mojom::TrustTokenOperationStatus status) {
-  trust_token_status_ = status;
-
-  MaybeSendTrustTokenOperationResultToDevTools();
-
-  if (status != mojom::TrustTokenOperationStatus::kOk) {
-    NotifyCompleted(net::ERR_TRUST_TOKEN_OPERATION_FAILED);
+void URLLoader::OnDoneFinalizingTrustTokenOperation(net::Error error) {
+  if (error != net::OK) {
+    NotifyCompleted(error);
     // |this| may have been deleted.
     return;
   }
-
   ProcessInboundSharedStorageInterceptorOnResponseStarted();
-}
-
-void URLLoader::MaybeSendTrustTokenOperationResultToDevTools() {
-  CHECK(trust_token_helper_ && trust_token_status_);
-
-  if (!devtools_observer_ || !devtools_request_id())
-    return;
-
-  mojom::TrustTokenOperationResultPtr operation_result =
-      trust_token_helper_->CollectOperationResultWithStatus(
-          *trust_token_status_);
-  devtools_observer_->OnTrustTokenOperationDone(devtools_request_id().value(),
-                                                std::move(operation_result));
 }
 
 void URLLoader::ContinueOnResponseStarted() {
@@ -2204,8 +2036,9 @@ void URLLoader::NotifyCompleted(int error_code) {
     status.decoded_body_length = total_written_bytes_;
     status.resolve_error_info =
         url_request_->response_info().resolve_error_info;
-    if (trust_token_status_)
-      status.trust_token_operation_status = *trust_token_status_;
+    if (trust_token_interceptor_ && trust_token_interceptor_->status()) {
+      status.trust_token_operation_status = *trust_token_interceptor_->status();
+    }
     status.cors_error_status = cors_error_status_;
 
     if ((options_ & mojom::kURLLoadOptionSendSSLInfoForCertificateError) &&
@@ -2790,10 +2623,7 @@ bool URLLoader::ShouldSetLoadWithStorageAccess() const {
 
   auto determine_storage_access_load_outcome =
       [&]() -> net::cookie_util::ActivateStorageAccessLoadOutcome {
-    if (!url_request_context_->network_delegate()->IsStorageAccessHeaderEnabled(
-            base::OptionalToPtr(
-                url_request_->isolation_info().top_frame_origin()),
-            url_request_->url())) {
+    if (!CookieSettings::IsStorageAccessHeadersEnabled()) {
       return net::cookie_util::ActivateStorageAccessLoadOutcome::
           kFailureHeaderDisabled;
     }
@@ -2824,6 +2654,12 @@ bool URLLoader::ShouldSetLoadWithStorageAccess() const {
       "API.StorageAccessHeader.ActivateStorageAccessLoadOutcome", outcome);
   return outcome ==
          net::cookie_util::ActivateStorageAccessLoadOutcome::kSuccess;
+}
+
+const mojom::ClientSecurityState* URLLoader::GetClientSecurityState() {
+  return url_loader_util::SelectClientSecurityState(
+      factory_params_->client_security_state.get(),
+      client_security_state_.get());
 }
 
 }  // namespace network

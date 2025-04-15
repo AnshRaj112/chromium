@@ -493,7 +493,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Power.AmbientLightOnResume" units="lux"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>bkersten@chromium.org</owner>
   <owner>slangley@chromium.org</owner>
   <summary>
@@ -503,7 +503,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Power.AvgCpuLoad.{ProcessType}" units="%"
-    expires_after="2025-08-10">
+    expires_after="2025-10-12">
   <owner>eseckler@chromium.org</owner>
   <owner>khokhlov@chromium.org</owner>
   <owner>woa-performance@google.com</owner>
@@ -527,22 +527,21 @@ chromium-metrics-reviews@google.com.
   <owner>mqg@chromium.org</owner>
   <owner>chromeos-platform-power@google.com</owner>
   <summary>
-    The level of the backlight as a percentage when the privacy screen is in
-    {PrivacyScreenState} state and the device is powered by {PowerSource}.
-    Sampled every 30 seconds. Chrome OS only.
+    The level of the backlight as a percentage {PrivacyScreenState} when the
+    device is {PowerSource}. Sampled every 30 seconds. Chrome OS only.
   </summary>
   <token key="PrivacyScreenState">
-    <variant name=""
-        summary="All Chrome OS, irrespective of whether privacy screens are
-                 present, or privacy screen state."/>
+    <variant name="" summary=""/>
     <variant name="PrivacyScreenDisabled"
-        summary="Chrome OS with privacy screens only."/>
+        summary="with privacy screens disabled for ChromeOS devices with
+                 privacy screens only"/>
     <variant name="PrivacyScreenEnabled"
-        summary="Chrome OS with privacy screens only."/>
+        summary="with privacy screens enabled for ChromeOS devices with
+                 privacy screens only"/>
   </token>
   <token key="PowerSource">
-    <variant name="OnAC"/>
-    <variant name="OnBattery"/>
+    <variant name="OnAC" summary="on AC"/>
+    <variant name="OnBattery" summary="powered by battery"/>
   </token>
 </histogram>
 
@@ -974,7 +973,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Power.CpuTimeSecondsPerThreadType.{ProcessType}"
-    enum="CpuTimeMetricsThreadType" expires_after="2025-08-10">
+    enum="CpuTimeMetricsThreadType" expires_after="2025-10-12">
   <owner>eseckler@chromium.org</owner>
   <owner>skyostil@chromium.org</owner>
   <owner>woa-performance@google.com</owner>
@@ -1780,7 +1779,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Power.SuspendDelay" units="seconds" expires_after="2025-08-10">
+<histogram name="Power.SuspendDelay" units="seconds" expires_after="2025-10-12">
   <owner>niwa@chromium.org</owner>
   <owner>puthik@chromium.org</owner>
   <owner>chromeos-platform-power@google.com</owner>

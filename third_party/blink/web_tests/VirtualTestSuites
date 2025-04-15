@@ -1103,7 +1103,8 @@
       "external/wpt/FileAPI/BlobURL/cross-partition-worker-creation.https.html",
       "external/wpt/FileAPI/BlobURL/cross-partition-navigation.https.html",
       "external/wpt/storage-access-api/storage-access-beyond-cookies.blobStorage.sub.https.window.html",
-      "external/wpt/storage-access-api/storage-access-beyond-cookies.BlobURLDedicatedWorker.sub.https.tentative.window.html"
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.BlobURLDedicatedWorker.sub.https.tentative.window.html",
+      "external/wpt/html/cross-origin-embedder-policy/blob.https.html"
     ],
     "args": ["--enable-features=BlockCrossPartitionBlobUrlFetching,EnforceNoopenerOnBlobURLNavigation"],
     "expires": "Sep 1, 2025",
@@ -1419,19 +1420,6 @@
     "expires": "Mar 1, 2026"
   },
   {
-    "prefix": "browsing-topics",
-    "owners": ["yaoxia@chromium.org", "weizhong@google.com"],
-    "platforms": ["Linux", "Mac", "Win"],
-    "bases": [
-      "external/wpt/browsing-topics"
-    ],
-    "exclusive_tests": [
-      "external/wpt/browsing-topics"
-    ],
-    "args": ["--enable-features=BrowsingTopics,PrivacySandboxAdsAPIsOverride"],
-    "expires": "Dec 3, 2024"
-  },
-  {
     "prefix": "private-aggregation",
     "platforms": ["Linux"],
     "bases": [
@@ -1477,7 +1465,7 @@
       "http/tests/inspector-protocol/shared-storage"
     ],
     "args": ["--enable-features=SharedStorageAPI,SharedStorageWebLocks,InterestGroupsInSharedStorageWorklet,Fledge,AdInterestGroupAPI,FencedFrames:implementation_type/mparch,PrivacySandboxAdsAPIsOverride,FencedFramesAPIChanges,FencedFramesDefaultMode,SharedStorageAPIEnableWALForDatabase,FencedFramesEnforceFocus,FencedFramesReportEventHeaderChanges,SharedStorageSelectURLSavedQueries,SharedStorageCreateWorkletCustomDataOrigin,SharedStorageTransactionalBatchUpdate"],
-    "expires": "Jan 31, 2025"
+    "expires": "Oct 31, 2025"
   },
   {
     "prefix": "shared-storage-selecturl-limit",
@@ -1490,7 +1478,7 @@
       "external/wpt/shared-storage-selecturl-limit/"
     ],
     "args": ["--enable-features=SharedStorageAPI,FencedFrames:implementation_type/mparch,FencedFramesAPIChanges,FencedFramesDefaultMode,FencedFramesEnforceFocus,PrivacySandboxAdsAPIsOverride,SharedStorageSelectURLLimit:SharedStorageSelectURLBitBudgetPerPageLoad/6/SharedStorageSelectURLBitBudgetPerSitePerPageLoad/3,SharedStorageAPIEnableWALForDatabase,SharedStorageSelectURLSavedQueries,SharedStorageCreateWorkletCustomDataOrigin"],
-    "expires": "Jan 31, 2025"
+    "expires": "Oct 31, 2025"
   },
   "Task tracking tests require UnexposedTaskIds to work, so these tests are run",
   "exclusively with a virtual test suite that never expires.",
@@ -1785,7 +1773,7 @@
     "prefix": "scoped-custom-element-registry-disabled",
     "owners": ["masonf@chromium.org", "dizhangg@chromium.org"],
     "platforms": ["Linux", "Mac", "Win"],
-    "bases": ["external/wpt/custom-elements/scoped-registry"],
+    "bases": ["external/wpt/custom-elements/registries/"],
     "args": ["--disable-blink-features=ScopedCustomElementRegistry"],
     "expires": "Jun 1, 2025"
   },

@@ -12,6 +12,7 @@
 #include "ash/constants/ash_pref_names.h"
 #include "ash/public/cpp/network_config_service.h"
 #include "base/functional/bind.h"
+#include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
@@ -446,6 +447,7 @@ void BocaSessionManager::NotifySessionUpdate() {
   if (IsSessionActive(previous_session_.get()) &&
       !IsSessionActive(current_session_.get())) {
     for (auto& observer : observers_) {
+      VLOG(1) << "[Boca] notifying session ended";
       StartSessionPolling(/*in_session=*/false);
       observer.OnSessionEnded(previous_session_->session_id());
       if (is_producer_) {
@@ -458,6 +460,7 @@ void BocaSessionManager::NotifySessionUpdate() {
   if (!IsSessionActive(previous_session_.get()) &&
       IsSessionActive(current_session_.get())) {
     for (auto& observer : observers_) {
+      VLOG(1) << "[Boca] notifying session started";
       StartSessionPolling(/*in_session=*/true);
       observer.OnSessionStarted(current_session_->session_id(),
                                 current_session_->teacher());
@@ -469,7 +472,7 @@ void BocaSessionManager::NotifySessionUpdate() {
   }
 
   if (IsSessionActive(current_session_.get())) {
-    StartSendingStudentHeartbeatRequests(student_heartbeat_interval_);
+    StartSendingStudentHeartbeatRequests();
   } else {
     StopSendingStudentHeartbeatRequests();
   }
@@ -511,6 +514,7 @@ void BocaSessionManager::NotifyOnTaskUpdate() {
 
 void BocaSessionManager::NotifySessionCaptionConfigUpdate() {
   if (!IsSessionActive(current_session_.get())) {
+    VLOG(1) << "[Boca] no active session, will not notify captions update";
     return;
   }
 
@@ -524,6 +528,10 @@ void BocaSessionManager::NotifySessionCaptionConfigUpdate() {
   // it for user before they realize.
   if (is_producer_ && !is_app_opened_ &&
       current_session_caption_config.captions_enabled()) {
+    VLOG(1) << "[Boca] will not notify captions update, producer: "
+            << is_producer_ << ", app opened: " << is_app_opened_
+            << ", captions enabled: "
+            << current_session_caption_config.captions_enabled();
     return;
   }
 
@@ -532,6 +540,7 @@ void BocaSessionManager::NotifySessionCaptionConfigUpdate() {
 
   if (previous_session_caption_config.SerializeAsString() !=
       current_session_caption_config.SerializeAsString()) {
+    VLOG(1) << "[Boca] notify captions update";
     for (auto& observer : observers_) {
       observer.OnSessionCaptionConfigUpdated(
           kMainStudentGroupName, current_session_caption_config,
@@ -541,6 +550,11 @@ void BocaSessionManager::NotifySessionCaptionConfigUpdate() {
                            : std::string());
     }
     HandleCaptionNotification();
+  } else {
+    VLOG(1) << "[Boca] no captions change, will not notify. Captions enabled: "
+            << current_session_caption_config.captions_enabled()
+            << ", translation enabled: "
+            << current_session_caption_config.translations_enabled();
   }
 }
 
@@ -652,19 +666,23 @@ void BocaSessionManager::HandleCaptionNotification() {
           .captions_enabled());
 }
 
-void BocaSessionManager::StartSendingStudentHeartbeatRequests(
-    base::TimeDelta student_heartbeat_interval) {
+void BocaSessionManager::StartSendingStudentHeartbeatRequests() {
   if (!features::IsBocaStudentHeartbeatEnabled() || is_producer_ ||
-      student_heartbeat_interval == base::Seconds(0)) {
+      student_heartbeat_interval_ == base::Seconds(0)) {
     return;
   }
-  student_heartbeat_timer_.Start(
-      FROM_HERE, student_heartbeat_interval, this,
-      &BocaSessionManager::SendStudentHeartbeatRequest);
+  if (!student_heartbeat_timer_.IsRunning() &&
+      !student_heartbeat_backoff_timer_.IsRunning()) {
+    student_heartbeat_timer_.Start(
+        FROM_HERE, student_heartbeat_interval_, this,
+        &BocaSessionManager::SendStudentHeartbeatRequest);
+  }
 }
 
 void BocaSessionManager::StopSendingStudentHeartbeatRequests() {
-  student_heartbeat_timer_.Stop();
+  if (student_heartbeat_timer_.IsRunning()) {
+    student_heartbeat_timer_.Stop();
+  }
 }
 
 void BocaSessionManager::SendStudentHeartbeatRequest() {
@@ -691,14 +709,17 @@ void BocaSessionManager::OnStudentHeartbeat(
     if ((result.error() >= 500 && result.error() < 600) ||
         result.error() == 429) {
       student_heartbeat_retry_backoff_.InformOfRequest(/*succeeded=*/false);
-      // Reset the timer to use the new backoff interval.
-      StartSendingStudentHeartbeatRequests(
-          student_heartbeat_retry_backoff_.GetTimeUntilRelease());
+      // Stop the repeating student heartbeat timer and start the backoff
+      // oneshot timer.
+      StopSendingStudentHeartbeatRequests();
+      student_heartbeat_backoff_timer_.Start(
+          FROM_HERE, student_heartbeat_retry_backoff_.GetTimeUntilRelease(),
+          this, &BocaSessionManager::SendStudentHeartbeatRequest);
     }
     return;
   }
   student_heartbeat_retry_backoff_.Reset();
-  StartSendingStudentHeartbeatRequests(student_heartbeat_interval_);
+  StartSendingStudentHeartbeatRequests();
 }
 
 void BocaSessionManager::UpdateNetworkRestriction(

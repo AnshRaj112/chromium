@@ -27,7 +27,7 @@ android_library("chrome_test_java_helper") {
     # TODO: This is a test file that's used by another test file
     # BookmarkEditTest.java which is in a different package.
     # We should try to remove this dependency if possible.
-    "src/org/chromium/chrome/browser/bookmarks/BookmarkModelTest.java",
+    "//chrome/browser/bookmarks/android/javatests/src/org/chromium/chrome/browser/bookmarks/BookmarkModelTest.java",
     "src/org/chromium/chrome/browser/browserservices/TrustedWebActivityTestUtil.java",
     "src/org/chromium/chrome/browser/compositor/layouts/MockLayoutHost.java",
     "src/org/chromium/chrome/browser/customtabs/IncognitoCustomTabActivityTestRule.java",
@@ -193,6 +193,7 @@ android_library("chrome_test_java_helper") {
     "//chrome/browser/tabmodel/internal:java",
     "//chrome/browser/tabpersistence:flatbuffer_java",
     "//chrome/browser/tabpersistence:java",
+    "//chrome/browser/tabwindow:java",
     "//chrome/browser/task_manager/internal/android:java_resources",
     "//chrome/browser/thumbnail:java",
     "//chrome/browser/touch_to_fill/autofill/android/internal:java_resources",
@@ -213,6 +214,7 @@ android_library("chrome_test_java_helper") {
     "//chrome/browser/ui/android/layouts:java",
     "//chrome/browser/ui/android/layouts/test:java",
     "//chrome/browser/ui/android/logo:java",
+    "//chrome/browser/ui/android/multiwindow:java",
     "//chrome/browser/ui/android/native_page:java",
     "//chrome/browser/ui/android/night_mode:java",
     "//chrome/browser/ui/android/night_mode:night_mode_java_test_support",
@@ -297,6 +299,7 @@ android_library("chrome_test_java_helper") {
     "//components/externalauth/android:java",
     "//components/favicon/android:java",
     "//components/feature_engagement:feature_engagement_java",
+    "//components/feed/core/v2:feedv2_common_core_java",
     "//components/feed/core/v2:feedv2_core_java",
     "//components/find_in_page/android:java",
     "//components/gcm_driver/android:gcm_driver_java",
@@ -563,36 +566,6 @@ android_library("chrome_test_java_org.chromium.chrome.browser.autofill") {
   ]
 
   deps = [ ":chrome_test_java_helper" ]
-}
-
-android_library("chrome_test_java_org.chromium.chrome.browser.bookmarks") {
-  resources_package = "org.chromium.chrome.test"
-
-  sources = [
-    "//chrome/android/junit/src/org/chromium/chrome/browser/bookmarks/FakeBookmarkModel.java",
-    "//chrome/android/junit/src/org/chromium/chrome/browser/bookmarks/SharedBookmarkModelMocks.java",
-    "src/org/chromium/chrome/browser/bookmarks/AccountBookmarkTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/BookmarkBridgeTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/BookmarkFolderPickerRenderTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/BookmarkOpenerTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/BookmarkPaneTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/BookmarkPersonalizedSigninPromoDismissTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/BookmarkPersonalizedSigninPromoTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/BookmarkSaveFlowTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/BookmarkSearchBoxRowRenderTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/BookmarkSearchBoxRowTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/ImprovedBookmarkFolderViewRenderTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/ImprovedBookmarkRowRenderTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/ImprovedBookmarkSaveFlowRenderTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/ShoppingAccessoryViewRenderTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/bar/BookmarkBarRenderTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/bar/BookmarkBarTest.java",
-  ]
-
-  deps = [
-    ":chrome_test_java_helper",
-    "//chrome/browser/user_education:java",
-  ]
 }
 
 android_library(
@@ -985,7 +958,6 @@ android_library(
     "src/org/chromium/chrome/browser/password_manager/TouchToFillMainFlowIntegrationTest.java",
     "src/org/chromium/chrome/browser/password_manager/VirtualViewStructureInstrumentationTest.java",
     "src/org/chromium/chrome/browser/password_manager/settings/CredentialManagerIntegrationTest.java",
-    "src/org/chromium/chrome/browser/password_manager/settings/PasswordSettingsExportTest.java",
     "src/org/chromium/chrome/browser/password_manager/settings/PasswordSettingsSearchTest.java",
     "src/org/chromium/chrome/browser/password_manager/settings/PasswordSettingsTest.java",
     "src/org/chromium/chrome/browser/password_manager/settings/PasswordSettingsTestHelper.java",
@@ -1255,7 +1227,6 @@ android_library("chrome_test_java_org.chromium.chrome.browser.sync") {
     "src/org/chromium/chrome/browser/sync/UkmTest.java",
     "src/org/chromium/chrome/browser/sync/settings/AccountManagementFragmentTest.java",
     "src/org/chromium/chrome/browser/sync/settings/GoogleServicesSettingsTest.java",
-    "src/org/chromium/chrome/browser/sync/settings/HistoryOptInIphControllerTest.java",
     "src/org/chromium/chrome/browser/sync/settings/IdentityErrorCardPreferenceTest.java",
     "src/org/chromium/chrome/browser/sync/settings/ManageSyncSettingsTest.java",
     "src/org/chromium/chrome/browser/sync/settings/ManageSyncSettingsWithFakeSyncServiceImplTest.java",
@@ -1322,7 +1293,11 @@ android_library("chrome_test_java_org.chromium.chrome.browser.collaboration") {
 
   deps = [
     ":chrome_test_java_helper",
+    "//chrome/android:chrome_all_java",
+    "//chrome/browser/data_sharing:factory_java",
+    "//chrome/browser/data_sharing:internal_library_java",
     "//components/data_sharing/internal:internal_java",
+    "//components/data_sharing/internal:native_test_helper_java",
     "//components/data_sharing/public:public_java",
   ]
 }
@@ -1585,7 +1560,9 @@ java_group("common_unit_test_deps_java") {
     "//chrome/browser/tab:java",
     "//chrome/browser/tabmodel:java",
     "//chrome/browser/tabpersistence:java",
+    "//chrome/browser/tabwindow:java",
     "//chrome/browser/ui/android/ephemeraltab:java",
+    "//chrome/browser/ui/android/multiwindow:java",
     "//chrome/browser/ui/android/omnibox:java",
     "//chrome/browser/ui/android/pdf:java",
     "//chrome/browser/ui/android/theme:java",
@@ -1752,8 +1729,6 @@ android_library("chrome_unit_test_java_various") {
     "src/org/chromium/chrome/browser/IntentFilterUnitTest.java",
     "src/org/chromium/chrome/browser/IntentHandlerNativeTest.java",
     "src/org/chromium/chrome/browser/autofill/AutofillUnitTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/BookmarkToolbarTest.java",
-    "src/org/chromium/chrome/browser/bookmarks/PowerBookmarkUtilsTest.java",
     "src/org/chromium/chrome/browser/crash/LogcatExtractionRunnableTest.java",
     "src/org/chromium/chrome/browser/crash/MinidumpUploadServiceTest.java",
     "src/org/chromium/chrome/browser/crypto/CipherFactoryTest.java",

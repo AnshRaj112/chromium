@@ -74,8 +74,20 @@ class LanguageDetectorCreateTask
     if (options->hasMonitor()) {
       monitor_ = MakeGarbageCollected<AICreateMonitor>(GetExecutionContext(),
                                                        task_runner_);
-      std::ignore = options->monitor()->Invoke(nullptr, monitor_);
+
+      // If an exception is thrown, don't initiate language detection model
+      // download. `AICreateMonitorCallback`'s `Invoke` will automatically
+      // reject the promise with the thrown exception.
+      if (options->monitor()->Invoke(nullptr, monitor_).IsNothing()) {
+        return;
+      }
     }
+
+    AIInterfaceProxy::GetLanguageDetectionModel(
+        GetExecutionContext(),
+        WTF::BindOnce(&LanguageDetectorCreateTask::OnModelLoaded,
+                      WrapPersistent(this))
+            .Then(RejectOnDestruction(resolver)));
   }
 
   void Trace(Visitor* visitor) const override {
@@ -138,23 +150,27 @@ void OnGotStatus(
 ScriptPromise<V8AIAvailability> LanguageDetector::availability(
     ScriptState* script_state,
     ExceptionState& exception_state) {
-  if (!script_state->ContextIsValid()) {
-    exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
-                                      "The execution context is not valid.");
+  if (!ValidateScriptState(script_state, exception_state)) {
     return EmptyPromise();
   }
+
+  // TODO(crbug.com/409848465): Validate and canonicalize
+  // expectedInputLanguages.
 
   ScriptPromiseResolver<V8AIAvailability>* resolver =
       MakeGarbageCollected<ScriptPromiseResolver<V8AIAvailability>>(
           script_state);
   ScriptPromise<V8AIAvailability> promise = resolver->Promise();
-  ExecutionContext* execution_context = ExecutionContext::From(script_state);
+
+  // TODO(402166942): Return unavailable if document is not allowed to use
+  // language detector permission policy.
+
+  ExecutionContext* context = ExecutionContext::From(script_state);
 
   AIInterfaceProxy::GetLanguageDetectionModelStatus(
-      execution_context,
-      WTF::BindOnce(&OnGotStatus, WrapWeakPersistent(execution_context),
-                    WrapPersistent(resolver))
-          .Then(RejectOnDestruction(resolver)));
+      context, WTF::BindOnce(&OnGotStatus, WrapWeakPersistent(context),
+                             WrapPersistent(resolver))
+                   .Then(RejectOnDestruction(resolver)));
 
   return promise;
 }
@@ -164,12 +180,12 @@ ScriptPromise<LanguageDetector> LanguageDetector::create(
     ScriptState* script_state,
     LanguageDetectorCreateOptions* options,
     ExceptionState& exception_state) {
-  // TODO(crbug.com/349927087): Take `options` into account.
-  if (!script_state->ContextIsValid()) {
-    exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
-                                      "The execution context is not valid.");
+  if (!ValidateScriptState(script_state, exception_state)) {
     return EmptyPromise();
   }
+
+  // TODO(crbug.com/409848465): Validate and canonicalize
+  // expectedInputLanguages.
 
   CHECK(options);
   AbortSignal* signal = options->getSignalOr(nullptr);
@@ -177,18 +193,14 @@ ScriptPromise<LanguageDetector> LanguageDetector::create(
     return EmptyPromise();
   }
 
+  // TODO(402166942): Reject if document is not allowed to use language detector
+  // permission policy.
+
   auto* resolver =
       MakeGarbageCollected<ScriptPromiseResolver<LanguageDetector>>(
           script_state);
-  LanguageDetectorCreateTask* create_task =
-      MakeGarbageCollected<LanguageDetectorCreateTask>(script_state, resolver,
-                                                       options);
-
-  AIInterfaceProxy::GetLanguageDetectionModel(
-      ExecutionContext::From(script_state),
-      WTF::BindOnce(&LanguageDetectorCreateTask::OnModelLoaded,
-                    WrapPersistent(create_task))
-          .Then(RejectOnDestruction(resolver)));
+  MakeGarbageCollected<LanguageDetectorCreateTask>(script_state, resolver,
+                                                   options);
 
   return resolver->Promise();
 }
@@ -212,12 +224,12 @@ ScriptPromise<IDLSequence<LanguageDetectionResult>> LanguageDetector::detect(
     const WTF::String& input,
     LanguageDetectorDetectOptions* options,
     ExceptionState& exception_state) {
-  if (!script_state->ContextIsValid()) {
-    exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
-                                      "The execution context is not valid.");
-    return ScriptPromise<IDLSequence<LanguageDetectionResult>>();
+  if (!ValidateScriptState(script_state, exception_state)) {
+    return EmptyPromise();
   }
 
+  // TODO(crbug.com/399693771): This should be a composite signal of the passed
+  // in abort signal and the create abort signal.
   AbortSignal* signal = options->getSignalOr(nullptr);
   if (HandleAbortSignal(signal, script_state, exception_state)) {
     return EmptyPromise();
@@ -243,19 +255,8 @@ ScriptPromise<IDLDouble> LanguageDetector::measureInputUsage(
     const WTF::String& input,
     LanguageDetectorDetectOptions* options,
     ExceptionState& exception_state) {
-  // https://webmachinelearning.github.io/writing-assistance-apis/#measure-ai-model-input-usage
-  //
-  // If modelObject’s relevant global object is a Window whose associated
-  // Document is not fully active, then return a promise rejected with an
-  // "InvalidStateError" DOMException.
-  auto* context = ExecutionContext::From(script_state);
-  if (auto* window = DynamicTo<LocalDOMWindow>(context)) {
-    auto* document = window->document();
-    if (document && !document->IsActive()) {
-      exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
-                                        "The document is not active");
-      return EmptyPromise();
-    }
+  if (!ValidateScriptState(script_state, exception_state)) {
+    return EmptyPromise();
   }
 
   // TODO(crbug.com/399693771): This should be a composite signal of the passed
@@ -284,14 +285,39 @@ double LanguageDetector::inputQuota() const {
 
 HeapVector<Member<LanguageDetectionResult>> LanguageDetector::ConvertResult(
     WTF::Vector<LanguageDetectionModel::LanguagePrediction> predictions) {
-  HeapVector<Member<LanguageDetectionResult>> result;
+  float last_score = 1;
+  float cumulative_confidence = 0;
+
+  HeapVector<Member<LanguageDetectionResult>> results;
   for (const auto& prediction : predictions) {
-    auto* one = MakeGarbageCollected<LanguageDetectionResult>();
-    result.push_back(one);
-    one->setDetectedLanguage(String(prediction.language));
-    one->setConfidence(prediction.score);
+    CHECK_GE(prediction.score, 0);
+    CHECK_LE(prediction.score, 1 - cumulative_confidence);
+    CHECK_LE(prediction.score, last_score);
+    last_score = prediction.score;
+
+    if (prediction.score == 0 || prediction.language == "unknown") {
+      break;
+    }
+    auto* result = MakeGarbageCollected<LanguageDetectionResult>();
+    results.push_back(result);
+    result->setDetectedLanguage(String(prediction.language));
+    result->setConfidence(prediction.score);
+
+    cumulative_confidence += prediction.score;
+
+    if (cumulative_confidence >= 0.99) {
+      break;
+    }
   }
-  return result;
+
+  // Append "und" to end. Set it's confidence so that the total confidences add
+  // up to 1.
+  auto* result = MakeGarbageCollected<LanguageDetectionResult>();
+  results.push_back(result);
+  result->setDetectedLanguage(String("und"));
+  result->setConfidence(1 - cumulative_confidence);
+
+  return results;
 }
 
 void LanguageDetector::OnDetectComplete(

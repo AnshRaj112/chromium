@@ -628,6 +628,35 @@ TEST_F(CookieSettingsTest, IsCookieAccessible_AlwaysAllowCookieNotAffected) {
       net::CookieInclusionStatus::WarningReason::WARN_THIRD_PARTY_PHASEOUT));
 }
 
+TEST_F(CookieSettingsTest, ExplicitSettingNoopWhenCookiesAreAllowed) {
+  GURL top_level_url = GURL(kURL);
+  GURL url = GURL(kOtherURL);
+
+  CookieSettings settings;
+  net::CookieInclusionStatus status;
+  settings.set_block_third_party_cookies(false);
+
+  // Explicit setting.
+  settings.set_content_settings(
+      ContentSettingsType::COOKIES,
+      {CreateSetting(url.host(), top_level_url.host(), CONTENT_SETTING_ALLOW)});
+
+  std::unique_ptr<net::CanonicalCookie> cookie =
+      MakeCanonicalSameSiteNoneCookie("name", kOtherURL);
+
+  EXPECT_TRUE(settings.IsCookieAccessible(
+      *cookie, GURL(kOtherURL), net::SiteForCookies(),
+      url::Origin::Create(GURL(kURL)), net::FirstPartySetMetadata(),
+      net::CookieSettingOverrides(), &status));
+
+  // When cookies are explicitly allowed, no exemption or warning reason should
+  // be attached.
+  EXPECT_EQ(status.exemption_reason(),
+            net::CookieInclusionStatus::ExemptionReason::kNone);
+
+  EXPECT_TRUE(status.warning_reasons().empty());
+}
+
 TEST_P(CookieSettingsTestP,
        GetCookieSettingOverridePreservesSessionOnlySetting) {
   CookieSettings settings;
@@ -2412,38 +2441,46 @@ TEST_F(CookieSettingsTest, GetStorageAccessStatus) {
                  /*matches_opaque_src=*/false}}},
               std::nullopt, origin);
 
-  EXPECT_EQ(settings.GetStorageAccessStatus(
-                url, net::SiteForCookies::FromUrl(url), origin,
-                net::CookieSettingOverrides(), *allowing_permissions_policy),
-            std::nullopt);
+  EXPECT_EQ(
+      settings.GetStorageAccessStatus(url, net::SiteForCookies::FromUrl(url),
+                                      origin, net::CookieSettingOverrides(),
+                                      /*cookie_partition_key=*/std::nullopt,
+                                      *allowing_permissions_policy),
+      std::nullopt);
 
-  EXPECT_EQ(settings.GetStorageAccessStatus(
-                url, net::SiteForCookies::FromUrl(url), origin,
-                net::CookieSettingOverrides(
-                    {net::CookieSettingOverride::kStorageAccessGrantEligible}),
-                *allowing_permissions_policy),
-            std::nullopt);
+  EXPECT_EQ(
+      settings.GetStorageAccessStatus(
+          url, net::SiteForCookies::FromUrl(url), origin,
+          net::CookieSettingOverrides(
+              {net::CookieSettingOverride::kStorageAccessGrantEligible}),
+          /*cookie_partition_key=*/std::nullopt, *allowing_permissions_policy),
+      std::nullopt);
 
-  EXPECT_EQ(settings.GetStorageAccessStatus(
-                url, net::SiteForCookies(), top_frame_origin,
-                net::CookieSettingOverrides(), *allowing_permissions_policy),
-            net::cookie_util::StorageAccessStatus::kNone);
+  EXPECT_EQ(
+      settings.GetStorageAccessStatus(
+          url, net::SiteForCookies(), top_frame_origin,
+          net::CookieSettingOverrides(), /*cookie_partition_key=*/std::nullopt,
+          *allowing_permissions_policy),
+      net::cookie_util::StorageAccessStatus::kNone);
 
-  EXPECT_EQ(settings.GetStorageAccessStatus(
-                url, net::SiteForCookies(), top_frame_origin,
-                net::CookieSettingOverrides(
-                    {net::CookieSettingOverride::kStorageAccessGrantEligible}),
-                *allowing_permissions_policy),
-            net::cookie_util::StorageAccessStatus::kNone);
+  EXPECT_EQ(
+      settings.GetStorageAccessStatus(
+          url, net::SiteForCookies(), top_frame_origin,
+          net::CookieSettingOverrides(
+              {net::CookieSettingOverride::kStorageAccessGrantEligible}),
+          /*cookie_partition_key=*/std::nullopt, *allowing_permissions_policy),
+      net::cookie_util::StorageAccessStatus::kNone);
 
   settings.set_content_settings(
       ContentSettingsType::STORAGE_ACCESS,
       {CreateSetting(kURL, kOtherURL, CONTENT_SETTING_ALLOW)});
 
-  EXPECT_EQ(settings.GetStorageAccessStatus(
-                url, net::SiteForCookies(), top_frame_origin,
-                net::CookieSettingOverrides(), *allowing_permissions_policy),
-            net::cookie_util::StorageAccessStatus::kInactive);
+  EXPECT_EQ(
+      settings.GetStorageAccessStatus(
+          url, net::SiteForCookies(), top_frame_origin,
+          net::CookieSettingOverrides(), /*cookie_partition_key=*/std::nullopt,
+          *allowing_permissions_policy),
+      net::cookie_util::StorageAccessStatus::kInactive);
 
   const std::unique_ptr<network::PermissionsPolicy>
       blocking_permissions_policy =
@@ -2454,25 +2491,56 @@ TEST_F(CookieSettingsTest, GetStorageAccessStatus) {
                  /*matches_all_origins=*/false,
                  /*matches_opaque_src=*/false}}},
               std::nullopt, origin);
+  EXPECT_EQ(
+      settings.GetStorageAccessStatus(
+          url, net::SiteForCookies(), top_frame_origin,
+          net::CookieSettingOverrides(), /*cookie_partition_key=*/std::nullopt,
+          *blocking_permissions_policy),
+      net::cookie_util::StorageAccessStatus::kNone);
+
+  EXPECT_EQ(
+      settings.GetStorageAccessStatus(
+          url, net::SiteForCookies(), top_frame_origin,
+          net::CookieSettingOverrides(
+              {net::CookieSettingOverride::kStorageAccessGrantEligible}),
+          /*cookie_partition_key=*/std::nullopt, *allowing_permissions_policy),
+      net::cookie_util::StorageAccessStatus::kActive);
+
+  EXPECT_EQ(
+      settings.GetStorageAccessStatus(
+          url, net::SiteForCookies(), top_frame_origin,
+          net::CookieSettingOverrides(
+              {net::CookieSettingOverride::
+                   kStorageAccessGrantEligibleViaHeader}),
+          /*cookie_partition_key=*/std::nullopt, *allowing_permissions_policy),
+      net::cookie_util::StorageAccessStatus::kActive);
+
+  net::CookiePartitionKey cookie_partition_key =
+      net::CookiePartitionKey::FromURLForTesting(
+          GURL(kOtherURL),
+          net::CookiePartitionKey::AncestorChainBit::kCrossSite,
+          base::UnguessableToken::Create());
+
   EXPECT_EQ(settings.GetStorageAccessStatus(
                 url, net::SiteForCookies(), top_frame_origin,
-                net::CookieSettingOverrides(), *blocking_permissions_policy),
+                net::CookieSettingOverrides(), cookie_partition_key,
+                *allowing_permissions_policy),
             net::cookie_util::StorageAccessStatus::kNone);
 
   EXPECT_EQ(settings.GetStorageAccessStatus(
                 url, net::SiteForCookies(), top_frame_origin,
                 net::CookieSettingOverrides(
                     {net::CookieSettingOverride::kStorageAccessGrantEligible}),
-                *allowing_permissions_policy),
-            net::cookie_util::StorageAccessStatus::kActive);
+                cookie_partition_key, *allowing_permissions_policy),
+            net::cookie_util::StorageAccessStatus::kNone);
 
   EXPECT_EQ(settings.GetStorageAccessStatus(
                 url, net::SiteForCookies(), top_frame_origin,
                 net::CookieSettingOverrides(
                     {net::CookieSettingOverride::
                          kStorageAccessGrantEligibleViaHeader}),
-                *allowing_permissions_policy),
-            net::cookie_util::StorageAccessStatus::kActive);
+                cookie_partition_key, *allowing_permissions_policy),
+            net::cookie_util::StorageAccessStatus::kNone);
 }
 
 // TODO(crbug.com/382291442): Remove test once feature is launched.
@@ -2503,10 +2571,12 @@ TEST_F(CookieSettingsTest,
                  /*matches_all_origins=*/false,
                  /*matches_opaque_src=*/false}}},
               std::nullopt, url::Origin::Create(url));
-  EXPECT_EQ(settings.GetStorageAccessStatus(
-                url, net::SiteForCookies(), top_frame_origin,
-                net::CookieSettingOverrides(), *blocking_permissions_policy),
-            net::cookie_util::StorageAccessStatus::kInactive);
+  EXPECT_EQ(
+      settings.GetStorageAccessStatus(
+          url, net::SiteForCookies(), top_frame_origin,
+          net::CookieSettingOverrides(), /*cookie_partition_key=*/std::nullopt,
+          *blocking_permissions_policy),
+      net::cookie_util::StorageAccessStatus::kInactive);
 }
 
 TEST_F(CookieSettingsTest,

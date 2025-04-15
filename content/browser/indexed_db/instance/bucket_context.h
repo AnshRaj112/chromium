@@ -24,7 +24,6 @@
 #include "base/timer/timer.h"
 #include "base/trace_event/memory_dump_provider.h"
 #include "components/services/storage/indexed_db/locks/partitioned_lock_manager.h"
-#include "components/services/storage/indexed_db/transactional_leveldb/transactional_leveldb_factory.h"
 #include "components/services/storage/privileged/cpp/bucket_client_info.h"
 #include "components/services/storage/privileged/mojom/indexed_db_client_state_checker.mojom.h"
 #include "components/services/storage/privileged/mojom/indexed_db_control_test.mojom.h"
@@ -52,6 +51,11 @@ class QuotaManagerProxy;
 }
 
 namespace content::indexed_db {
+
+namespace level_db {
+class BackingStore;
+class BackingStoreTest;
+}  // namespace level_db
 
 class BackingStore;
 class BackingStorePreCloseTaskQueue;
@@ -248,10 +252,6 @@ class CONTENT_EXPORT BucketContext
     return file_system_access_context_.get();
   }
 
-  TransactionalLevelDBFactory* transactional_leveldb_factory() {
-    return transactional_leveldb_factory_.get();
-  }
-
   void AddReceiver(
       const storage::BucketClientInfo& client_info,
       mojo::PendingRemote<storage::mojom::IndexedDBClientStateChecker>
@@ -305,9 +305,11 @@ class CONTENT_EXPORT BucketContext
   bool OnMemoryDump(const base::trace_event::MemoryDumpArgs& args,
                     base::trace_event::ProcessMemoryDump* pmd) override;
 
+  bool in_memory() const { return data_path_.empty(); }
+
  private:
   friend BucketContextHandle;
-  friend class BackingStoreTest;
+  friend class level_db::BackingStoreTest;
   friend class DatabaseTest;
   friend class IndexedDBTest;
   friend class TransactionTest;
@@ -385,6 +387,12 @@ class CONTENT_EXPORT BucketContext
   // Records one tick of Metadata during a metadata recording session.
   void RecordInternalsSnapshot();
 
+  // This only exists to ease the transition to a swappable backing store. It
+  // should be removed.
+  level_db::BackingStore* leveldb_backing_store() {
+    return reinterpret_cast<level_db::BackingStore*>(backing_store_.get());
+  }
+
   SEQUENCE_CHECKER(sequence_checker_);
 
   const storage::BucketInfo bucket_info_;
@@ -406,7 +414,6 @@ class CONTENT_EXPORT BucketContext
   ClosingState closing_stage_ = ClosingState::kNotClosing;
   base::OneShotTimer close_timer_;
   std::unique_ptr<PartitionedLockManager> lock_manager_;
-  std::unique_ptr<TransactionalLevelDBFactory> transactional_leveldb_factory_;
   std::unique_ptr<BackingStore> backing_store_;
   scoped_refptr<storage::QuotaManagerProxy> quota_manager_proxy_;
 

@@ -16,11 +16,46 @@ promise_test(async t => {
   const results = await detector.detect('this string is in English');
   // "en" should be highest confidence.
   assert_equals(results[0].detectedLanguage, 'en');
-  // Results should be from high to low confidence.
-  for (let i = 0; i < results.length - 1; i++) {
-    assert_greater_than_equal(results[i].confidence, results[i + 1].confidence);
+
+
+  // The last result should be 'und'.
+  const undResult = results.pop();
+  assert_equals(undResult.detectedLanguage, 'und');
+  assert_greater_than(undResult.confidence, 0);
+
+  let total_confidence_without_und = 0;
+  let last_confidence = 1;
+  for (const {confidence} of results) {
+    assert_greater_than(confidence, 0);
+
+    total_confidence_without_und += confidence;
+
+    // Except for 'und', results should be from high to low confidence.
+    assert_greater_than_equal(last_confidence, confidence);
+    last_confidence = confidence;
   }
+
+  // Confidences, excluding both 'und' and the last non-'und' result, should be
+  // less than 0.99.
+  assert_less_than(
+      total_confidence_without_und - results.at(-1).confidence, 0.99);
+
+  // Confidences, including 'und', should add up to 1.
+  assert_equals(total_confidence_without_und + undResult.confidence, 1);
 }, 'Simple LanguageDetector.detect() call');
+
+promise_test(async t => {
+  const error = new Error('CreateMonitorCallback threw an error');
+  function monitor(m) {
+    m.addEventListener('downloadprogress', e => {
+      assert_unreached(
+          'This should never be reached since monitor throws an error.');
+    });
+    throw error;
+  }
+
+  await promise_rejects_exactly(t, error, LanguageDetector.create({monitor}));
+}, 'If monitor throws an error, LanguageDetector.create() rejects with that error');
 
 promise_test(async t => {
   testMonitor(LanguageDetector.create);

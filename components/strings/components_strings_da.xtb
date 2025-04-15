@@ -492,6 +492,7 @@ Ellers vil det blive blokeret af dine privatlivsindstillinger. Det giver det ind
 <translation id="1822995137827688764">Ejendomsudstykning</translation>
 <translation id="1824402189105105503">Ottende papirrulle</translation>
 <translation id="1826516787628120939">Kontrollerer</translation>
+<translation id="1832730227369924598">Skrivebordssynkronisering</translation>
 <translation id="1834452765064623979">Konstruktion og vedligeholdelse</translation>
 <translation id="1838374766361614909">Ryd søgning</translation>
 <translation id="1839331950812095887">Nogle få ord, der opsummerer dine tanker</translation>
@@ -829,6 +830,7 @@ Ellers vil det blive blokeret af dine privatlivsindstillinger. Det giver det ind
 <translation id="2413155254802890957">Gammel</translation>
 <translation id="2413528052993050574">Denne server kunne ikke bevise, at den er <ph name="DOMAIN" />, da sikkerhedscertifikatet muligvis er blevet tilbagekaldt. Dette kan skyldes en fejlkonfiguration, eller at en hacker har opfanget din forbindelse.</translation>
 <translation id="2414886740292270097">Mørk</translation>
+<translation id="2418292431699242678">Din administrator tillader, at følgende synkroniseres mellem dine tidligere og aktuelle sessioner på alle ChromeOS-enheder:</translation>
 <translation id="2429716554270894715">Stof (vandtæt)</translation>
 <translation id="2436186046335138073">Vil du tillade, at <ph name="HANDLER_HOSTNAME" /> åbner alle <ph name="PROTOCOL" />-links?</translation>
 <translation id="2436976580469434549">Fiber- og tekstilkunst</translation>
@@ -1160,6 +1162,7 @@ Ellers vil det blive blokeret af dine privatlivsindstillinger. Det giver det ind
 <translation id="3037177537145227281">Der holdes øje med prisen</translation>
 <translation id="3037605927509011580">Øv, surt!</translation>
 <translation id="3039406992698062762">Familierejser</translation>
+<translation id="3040636468789770340">Cookies (loginstatus på de websites, du har besøgt for nylig)</translation>
 <translation id="3041176923638368519">Se vilkårene for kortfordele</translation>
 <translation id="3041612393474885105">Certifikatoplysninger</translation>
 <translation id="3045769629416806687">Ekstremsport</translation>
@@ -1670,6 +1673,7 @@ Ellers vil det blive blokeret af dine privatlivsindstillinger. Det giver det ind
 <translation id="3869939189466884821">Dine lokale filer slettes om <ph name="MINUTES" /> minutter</translation>
 <translation id="3872834068356954457">Videnskab</translation>
 <translation id="3875783148670536197">Vis mig hvordan</translation>
+<translation id="387681220560687945">Vinduer (rækkefølge og organisering af vinduer og faner)</translation>
 <translation id="3879748587602334249">Downloadadministrator</translation>
 <translation id="3880456882942693779">Kunst og underholdning</translation>
 <translation id="3880589673277376494">Internet og telekommunikation</translation>
@@ -1848,7 +1852,7 @@ Ellers vil det blive blokeret af dine privatlivsindstillinger. Det giver det ind
 <translation id="4186035307311647330">Hold ikke længere øje med prisen</translation>
 <translation id="4190446002599583608">Søgning i historikken ved hjælp af AI</translation>
 <translation id="4191334393248735295">Længde</translation>
-<translation id="4195459680867822611">Knappen Se tip til Chrome, aktivér for at få flere oplysninger om Chrome-funktioner</translation>
+<translation id="4195459680867822611">Knappen Se tips til Chrome, aktivér for at få flere oplysninger om Chrome-funktioner</translation>
 <translation id="4195643157523330669">Åbn på ny fane</translation>
 <translation id="4196861286325780578">&amp;Annuller fortryd flytning</translation>
 <translation id="4199637363739172710">Ure</translation>
@@ -2079,7 +2083,7 @@ Ellers vil det blive blokeret af dine privatlivsindstillinger. Det giver det ind
 <translation id="4598556348158889687">Administration af lagerplads</translation>
 <translation id="459914240367517409">Webdesign og -udvikling</translation>
 <translation id="4602465984861132303">Bowling</translation>
-<translation id="4607608436550361748">Se tip til Chrome</translation>
+<translation id="4607608436550361748">Se tips til Chrome</translation>
 <translation id="460848736049414407">Blokeret af administrator</translation>
 <translation id="4610279718074907952">Dette website er i en gruppe, der er defineret af <ph name="SET_OWNER" />, og som kan se din aktivitet</translation>
 <translation id="46128681529823442">Fodboldudstyr</translation>
@@ -3784,7 +3788,7 @@ Yderligere oplysninger:
 <translation id="7548892272833184391">Ret forbindelsesfejl</translation>
 <translation id="7549584377607005141">Denne webside kræver data, du tidligere har indtastet, før den kan vises korrekt. Du kan sende disse data igen, men hvis du gør dette, gentager du enhver handling, som denne side tidligere har foretaget.</translation>
 <translation id="7550637293666041147">Brugernavnet for din enhed og dit Chrome-brugernavn</translation>
-<translation id="7552846755917812628">Prøv de følgende tip:</translation>
+<translation id="7552846755917812628">Prøv de følgende tips:</translation>
 <translation id="7554242657529665960">Fra din administrator: "<ph name="ADMIN_MESSAGE" />"</translation>
 <translation id="7554475479213504905">Genindlæs, og vis alligevel</translation>
 <translation id="7554791636758816595">Ny fane</translation>
@@ -4749,6 +4753,7 @@ Yderligere oplysninger:
 <translation id="950736567201356821">Tre huller øverst</translation>
 <translation id="950926967802086924">Adgangsnøgle • Google Adgangskodeadministrator</translation>
 <translation id="955429569736351433">VR er tilladt</translation>
+<translation id="955627189349169688">Du kan fravælge denne politik i <ph name="BEGIN_LINK" />indstillingerne for Chrome-synkronisering<ph name="END_LINK" />.</translation>
 <translation id="95721182352849470">Gul 2</translation>
 <translation id="961663415146723894">Bind nederst</translation>
 <translation id="961856697154696964">Slet browserdata</translation>

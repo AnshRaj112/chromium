@@ -5,8 +5,6 @@
 #ifndef COMPONENTS_COLLABORATION_PUBLIC_COLLABORATION_FLOW_ENTRY_POINT_H_
 #define COMPONENTS_COLLABORATION_PUBLIC_COLLABORATION_FLOW_ENTRY_POINT_H_
 
-#include <string_view>
-
 namespace collaboration {
 
 // Types of entry point to start a join collaboration flow.
@@ -44,7 +42,15 @@ enum class CollaborationServiceShareOrManageEntryPoint {
   kTabGroupItemMenuShare = 8,
   kAndroidShareSheetExtra = 9,
   kDialogToolbarButton = 10,
-  kMaxValue = kDialogToolbarButton,
+  kiOSTabGroupIndicatorShare = 11,
+  kiOSTabGroupIndicatorManage = 12,
+  kiOSTabGridShare = 13,
+  kiOSTabGridManage = 14,
+  kiOSTabStripShare = 15,
+  kiOSTabStripManage = 16,
+  kiOSTabGroupViewShare = 17,
+  kiOSTabGroupViewManage = 18,
+  kMaxValue = kiOSTabGroupViewManage,
 };
 // LINT.ThenChange(//tools/metrics/histograms/metadata/collaboration_service/enums.xml:CollaborationServiceShareOrManageEntryPoint)
 

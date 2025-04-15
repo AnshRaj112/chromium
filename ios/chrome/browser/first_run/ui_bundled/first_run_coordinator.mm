@@ -13,8 +13,10 @@
 #import "base/time/time.h"
 #import "components/metrics/metrics_service.h"
 #import "components/signin/public/base/signin_metrics.h"
+#import "ios/chrome/browser/authentication/ui_bundled/continuation.h"
 #import "ios/chrome/browser/authentication/ui_bundled/fullscreen_signin_screen/coordinator/fullscreen_signin_screen_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/history_sync/history_sync_coordinator.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/interruptible_chrome_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_context_style.h"
 #import "ios/chrome/browser/docking_promo/coordinator/docking_promo_coordinator.h"
@@ -101,11 +103,8 @@ class FirstRunCoordinatorMetricsHelper final {
     base::UmaHistogramEnumeration(first_run::kFirstRunStageHistogram,
                                   first_run::kFirstRunInterrupted);
     ChromeCoordinator* childCoordinator = self.childCoordinator;
-    if ([childCoordinator
-            conformsToProtocol:@protocol(InterruptibleChromeCoordinator)]) {
-      [((id<InterruptibleChromeCoordinator>)childCoordinator)
-          interruptAnimated:NO];
-    }
+    CHECK(![childCoordinator
+        conformsToProtocol:@protocol(InterruptibleChromeCoordinator)]);
     [self stopChildCoordinator];
   }
   [self.baseViewController dismissViewControllerAnimated:YES completion:nil];
@@ -159,14 +158,15 @@ class FirstRunCoordinatorMetricsHelper final {
   switch (type) {
     case kSignIn:
       return [[FullscreenSigninScreenCoordinator alloc]
-          initWithBaseNavigationController:self.navigationController
-                                   browser:self.browser
-                                  delegate:self
-                              contextStyle:SigninContextStyle::kDefault
-                               accessPoint:signin_metrics::AccessPoint::
-                                               kStartPage
-                               promoAction:signin_metrics::PromoAction::
-                                               PROMO_ACTION_NO_SIGNIN_PROMO];
+           initWithBaseNavigationController:self.navigationController
+                                    browser:self.browser
+                                   delegate:self
+                               contextStyle:SigninContextStyle::kDefault
+                                accessPoint:signin_metrics::AccessPoint::
+                                                kStartPage
+                                promoAction:signin_metrics::PromoAction::
+                                                PROMO_ACTION_NO_SIGNIN_PROMO
+          changeProfileContinuationProvider:DoNothingContinuationProvider()];
     case kHistorySync:
       return [[HistorySyncCoordinator alloc]
           initWithBaseNavigationController:self.navigationController

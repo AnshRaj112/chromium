@@ -74,15 +74,14 @@ class PushNotificationClientManager {
   // during application startup.
   void RegisterActionableNotifications();
 
+  // Returns the client that can handle events related to the given
+  // `notification`.
+  PushNotificationClient* GetClientForNotification(
+      UNNotification* notification);
+
   // This function returns a list of `PushNotificationClientId` for the features
   // that support push notifications.
   static std::vector<PushNotificationClientId> GetClients();
-
-  // This function returns a the `client_id`'s string representation which is
-  // used to store the client's push notification permission settings in the
-  // pref service and preference key on the push notification server.
-  static std::string PushNotificationClientIdToString(
-      PushNotificationClientId client_id);
 
   // Signals to client manager that a browser with scene level
   // SceneActivationLevelForegroundActive is ready. Without this

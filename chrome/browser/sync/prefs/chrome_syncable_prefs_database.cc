@@ -38,11 +38,8 @@
 #endif
 
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
-#include "extensions/browser/pref_names.h"  // nogncheck
-#endif
-
-#if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "components/supervised_user/core/common/pref_names.h"
+#include "extensions/browser/pref_names.h"  // nogncheck
 #endif
 
 namespace browser_sync {
@@ -390,6 +387,7 @@ enum {
   kAccessibilityAXTreeFixingEnabled = 100324,
   kTabSearchMigrationComplete = 100325,
   kReadAloudPlaybackMode = 100326,
+  kPinSplitTabButton = 100327,
   // See components/sync_preferences/README.md about adding new entries here.
   // vvvvv IMPORTANT! vvvvv
   // Note to the reviewer: IT IS YOUR RESPONSIBILITY to ensure that new syncable
@@ -546,6 +544,10 @@ constexpr auto kChromeSyncablePrefsAllowlist = base::MakeFixedFlatMap<
      {syncable_prefs_ids::kShowForwardButton, syncer::PREFERENCES,
       sync_preferences::PrefSensitivity::kNone,
       sync_preferences::MergeBehavior::kNone}},
+    {prefs::kPinSplitTabButton,
+     {syncable_prefs_ids::kPinSplitTabButton, syncer::PREFERENCES,
+      sync_preferences::PrefSensitivity::kNone,
+      sync_preferences::MergeBehavior::kNone}},
     {prefs::kPinnedActions,
      {syncable_prefs_ids::kPinnedActions, syncer::PREFERENCES,
       sync_preferences::PrefSensitivity::kNone,
@@ -572,13 +574,11 @@ constexpr auto kChromeSyncablePrefsAllowlist = base::MakeFixedFlatMap<
      {syncable_prefs_ids::kPinnedExtensions, syncer::PREFERENCES,
       sync_preferences::PrefSensitivity::kNone,
       sync_preferences::MergeBehavior::kNone}},
-#endif
-#if BUILDFLAG(ENABLE_EXTENSIONS)
     {prefs::kSupervisedUserApprovedExtensions,
      {syncable_prefs_ids::kSupervisedUserApprovedExtensions,
       syncer::PREFERENCES, sync_preferences::PrefSensitivity::kNone,
       sync_preferences::MergeBehavior::kNone}},
-#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 #if BUILDFLAG(IS_MAC)
     {prefs::kShowFullscreenToolbar,
      {syncable_prefs_ids::kShowFullscreenToolbar, syncer::PREFERENCES,

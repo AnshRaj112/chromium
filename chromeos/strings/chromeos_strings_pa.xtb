@@ -30,6 +30,7 @@
 <translation id="1107856713690040084"><ph name="DEVICE_TYPE" /> ਆਡੀਓ</translation>
 <translation id="1116694919640316211">ਬਾਰੇ</translation>
 <translation id="1118572504348554005">ਅਸੀਂ ਇਸ ਫ਼ਾਰਮ ਰਾਹੀਂ ਪੇਸ਼ ਕੀਤੇ ਵਿਚਾਰ ਨੂੰ ਪਾਰਟਨਰਾਂ ਨਾਲ ਸਾਂਝਾ ਕਰ ਸਕਦੇ ਹਾਂ ਤਾਂ ਜੋ ਤੁਹਾਡੇ ਵੱਲੋਂ ਸਾਨੂੰ ਰਿਪੋਰਟ ਕੀਤੇ ਜਾਣ ਵਾਲੇ ਬੱਗਾਂ ਅਤੇ ਹੋਰ ਸਮੱਸਿਆਵਾਂ ਨੂੰ ਠੀਕ ਕੀਤਾ ਜਾ ਸਕੇ। ਸੰਵੇਦਨਸ਼ੀਲ ਜਾਣਕਾਰੀ ਸ਼ਾਮਲ ਨਾ ਕਰੋ ਜਿਵੇਂ ਕਿ ਪਾਸਵਰਡ।</translation>
+<translation id="1118596190635569417">ਇਸ ਮੀਨੂ ਨੂੰ ਸੱਜੇ ਪਾਸੇ ਵੱਲ ਲੈ ਜਾਓ</translation>
 <translation id="1119403468619527527">ਸਰਲ ਸ਼ਬਦਾਂ ਵਿੱਚ ਸਮਝਣ ਲਈ ਚੁਣੇ ਹੋਏ ਸ਼ਬਦ ਬਹੁਤ ਘੱਟ ਹਨ</translation>
 <translation id="1119447706177454957">ਅੰਦਰੂਨੀ ਗੜਬੜ</translation>
 <translation id="1124772482545689468">ਵਰਤੋਂਕਾਰ</translation>
@@ -249,6 +250,7 @@
 <translation id="1915960750806557358">ਆਪਣੇ ਵਿਚਾਰ ਸਾਂਝੇ ਕਰੋ ਜਾਂ ਆਪਣੀ ਸਮੱਸਿਆ ਦਾ ਵਰਣਨ ਕਰੋ। ਇਹ ਪੱਕਾ ਕਰੋ ਕਿ ਇਸ ਵਿੱਚ ਕੋਈ ਵੀ ਅਜਿਹੀ ਜਾਣਕਾਰੀ ਸ਼ਾਮਲ ਨਾ ਹੋਵੇ ਜੋ ਨਿੱਜੀ, ਸੰਵੇਦਨਸ਼ੀਲ ਜਾਂ ਗੁਪਤ ਹੋਵੇ।</translation>
 <translation id="1923388006036088459">ਐਕਸੈਂਟ ਰੰਗ</translation>
 <translation id="1926611810597212636">ਯੂਨੀਕੋਰਨ</translation>
+<translation id="1944321879609775960">ਸਾਰਾਂਸ਼ ਬਣਾਉਣ ਲਈ, ਆਪਣੇ <ph name="DEVICE_TYPE" /> ਨੂੰ ਮੁੜ-ਸ਼ੁਰੂ ਕਰੋ</translation>
 <translation id="1945403655450283000">Recorder</translation>
 <translation id="1947737735496445907">ਪ੍ਰਿੰਟ ਕੀਤੀ ਗਈ</translation>
 <translation id="1951012854035635156">Assistant</translation>
@@ -346,6 +348,7 @@
 <translation id="2380886658946992094">ਕਨੂੰਨੀ</translation>
 <translation id="2391082728065870591">ਵਿਚਾਰ ਸੰਬੰਧੀ ਰਿਪੋਰਟ ਭੇਜੋ</translation>
 <translation id="2407209115954268704">ਸਿਮ ਦੀ ਲਾਕ ਸਥਿਤੀ</translation>
+<translation id="240798792848608143"><ph name="LANGUAGE_NAME" /> ਵਿੱਚ ਪ੍ਰਤੀਲਿਪੀ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ, ਆਪਣੇ <ph name="DEVICE_TYPE" /> ਨੂੰ ਮੁੜ-ਸ਼ੁਰੂ ਕਰੋ</translation>
 <translation id="241419523391571119">ਜਾਂਚ ਕਰਨ ਲਈ ਢੱਕਣ ਨੂੰ ਮੁੜ-ਖੋਲ੍ਹੋ</translation>
 <translation id="2414660853550118611">ਵਾਲਪੇਪਰ ਬਾਰੇ</translation>
 <translation id="2414886740292270097">ਡਾਰਕ</translation>
@@ -481,6 +484,7 @@
 <translation id="3156846309055100599">ਪੰਨਾ <ph name="PAGE_NUMBER" /> ਸਕੈਨ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...</translation>
 <translation id="315738237743207937">ਕੈਪਟਿਵ ਪੋਰਟਲ ਦਾ ਪਤਾ ਲੱਗਾ</translation>
 <translation id="3160172848211257835"><ph name="BEGIN_LINK1" />ਸਿਸਟਮ ਅਤੇ ਐਪ ਜਾਣਕਾਰੀ<ph name="END_LINK1" /> ਅਤੇ <ph name="BEGIN_LINK2" />ਮਾਪਕ<ph name="END_LINK2" /> ਭੇਜੋ</translation>
+<translation id="3161556797767210144">ਸਾਰਾਂਸ਼ ਅਤੇ ਸਿਰਲੇਖ ਬਣਾਉਣ ਲਈ, ਆਪਣੇ <ph name="DEVICE_TYPE" /> ਨੂੰ ਮੁੜ-ਸ਼ੁਰੂ ਕਰੋ</translation>
 <translation id="3170673040743561620">ਆਪਣੇ ਦਸਤਾਵੇਜ਼ ਨੂੰ ਸਕੈਨਰ 'ਤੇ ਰੱਖੋ</translation>
 <translation id="3174321110679064523">ਸਵੇਰ ਤੋਂ ਰਾਤ ਤੱਕ ਦਾ ਵਾਲਪੇਪਰ</translation>
 <translation id="3178532070248519384">ਐਵਾਂ ਗਾਰਦ</translation>
@@ -573,6 +577,7 @@
 <translation id="3604713164406837697">ਵਾਲਪੇਪਰ ਬਦਲੋ</translation>
 <translation id="360565022852130722">ਵਾਈ-ਫਾਈ ਨੈੱਟਵਰਕ ਕਮਜ਼ੋਰ ਪ੍ਰੋਟੋਕੋਲ WEP 802.1x ਨਾਲ ਸੁਰੱਖਿਅਤ ਹੈ</translation>
 <translation id="3606583719724308068">HTTPS ਵੈੱਬਸਾਈਟਾਂ ਲਈ ਉੱਚ ਵਿਲੰਬਤਾ</translation>
+<translation id="3614639364827854748">ਇਸ ਮੀਨੂ ਨੂੰ ਖੱਬੇ ਪਾਸੇ ਲੈ ਜਾਓ</translation>
 <translation id="361575905210396100">ਤੁਹਾਡੇ ਵਿਚਾਰ ਲਈ ਧੰਨਵਾਦ</translation>
 <translation id="3621072146987826699">ਹਾਥੀ</translation>
 <translation id="3628462041319107639">ਪ੍ਰਤੀਲਿਪੀਕਰਨ ਮਾਡਲ ਨੂੰ ਡਾਊਨਲੋਡ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ…</translation>
@@ -751,6 +756,7 @@
 <translation id="4378373042927530923">ਨੈੱਟਵਰਕ ਤਸ਼ਖੀਸ ਨਹੀਂ ਚੱਲੀ</translation>
 <translation id="4378551569595875038">ਕਨੈਕਟ ਕਰ ਰਿਹਾ ਹੈ...</translation>
 <translation id="4382484599443659549">PDF</translation>
+<translation id="4383322413532809099">ਆਪਣੀ ਰਿਕਾਰਡਿੰਗ ਦੇ ਸਿਰਲੇਖ ਬਣਾਉਣ ਲਈ, ਆਪਣੇ <ph name="DEVICE_TYPE" /> ਨੂੰ ਮੁੜ-ਸ਼ੁਰੂ ਕਰੋ</translation>
 <translation id="4394049700291259645">ਬੰਦ ਕਰੋ</translation>
 <translation id="439429847087949098"><ph name="DEVICE_NAME" /> ਨੂੰ ਮੁੜ-ਸ਼ੁਰੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ</translation>
 <translation id="4395835743215824109">ਕੀ-ਬੋਰਡ ਵਿਉਂਤਬੱਧ ਕਰੋ</translation>
@@ -779,6 +785,7 @@
 <translation id="4486524074141928967">ਤੁਹਾਨੂੰ <ph name="TIME" /> ਵਜੇ 'ਤੇ ਸਾਈਨ-ਆਊਟ ਕਰ ਦਿੱਤਾ ਜਾਵੇਗਾ</translation>
 <translation id="4500722292849917410">ਸ਼ਾਰਟਕੱਟ ਉਪਲਬਧ ਨਹੀਂ। ਸੋਧਕ ਕੁੰਜੀ (ctrl, alt, shift ਜਾਂ <ph name="META_KEY" />) ਦੀ ਵਰਤੋਂ ਕਰ ਕੇ ਨਵਾਂ ਸ਼ਾਰਟਕੱਟ ਦਬਾਓ।</translation>
 <translation id="4500966230243561393">ਇੰਟਰਫ਼ੇਸ ਦਾ ਰੰਗ</translation>
+<translation id="4501302804999678844">ਪ੍ਰਤੀਲਿਪੀ ਬਣਾਉਣ ਲਈ, ਆਪਣੇ <ph name="DEVICE_TYPE" /> ਨੂੰ ਮੁੜ-ਸ਼ੁਰੂ ਕਰੋ</translation>
 <translation id="4503223151711056411">ਖੱਬਾ ਤੀਰ</translation>
 <translation id="4503441351962730761">ਆਧੁਨਿਕ ਕਲਾ</translation>
 <translation id="4507392511610824664">ਚਮਕ ਵਧਾਓ</translation>
@@ -831,6 +838,7 @@
 <translation id="4771607256327216405">ਕੀ-ਬੋਰਡ ਦੀ ਚਮਕ ਵਧਾਓ</translation>
 <translation id="4771923071974529837">ਕੱਲ੍ਹ</translation>
 <translation id="4773299976671772492">ਬੰਦ ਕੀਤਾ</translation>
+<translation id="4777310452073659583">ਪ੍ਰਤੀਲਿਪੀ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ, ਆਪਣੇ <ph name="DEVICE_TYPE" /> ਨੂੰ ਮੁੜ-ਸ਼ੁਰੂ ਕਰੋ</translation>
 <translation id="4778082030331381943">ਐਮਿਥਿਸਟ</translation>
 <translation id="4782311465517282004">ਲਿਖਤ ਨੂੰ ਸਪਰਸ਼ ਕਰਕੇ ਰੱਖਣ ਜਾਂ ਉਸ 'ਤੇ ਸੱਜਾ-ਕਲਿੱਕ ਕਰਨ 'ਤੇ ਪਰਿਭਾਸ਼ਾਵਾਂ, ਅਨੁਵਾਦ, ਜਾਂ ਇਕਾਈ ਰੂਪਾਂਤਰਨ ਪ੍ਰਾਪਤ ਕਰੋ</translation>
 <translation id="4791000909649665275"><ph name="NUMBER" /> ਫ਼ੋਟੋ</translation>
@@ -1696,11 +1704,13 @@
 <translation id="8655295600908251630">ਚੈਨਲ</translation>
 <translation id="8655828773034788261">URL ਸਾਂਝਾ ਕਰੋ:</translation>
 <translation id="8660881923941176839">ਪੌਂਡ</translation>
+<translation id="8669187096858652220">ਟੈਬਾਂ ਦਿਖਾਉਣ ਲਈ ਕਲਿੱਕ ਕਰੋ</translation>
 <translation id="8670574982334489519">ਸੱਜੇ</translation>
 <translation id="8675354002693747642">ਪਹਿਲਾਂ ਤੋਂ ਸਾਂਝੀ ਕੀਤੀ ਗਈ ਕੁੰਜੀ</translation>
 <translation id="8677859815076891398">ਕੋਈ ਐਲਬਮ ਨਹੀਂ ਹੈ। <ph name="LINK_BEGIN" />Google Photos<ph name="LINK_END" /> ਵਿੱਚ ਐਲਬਮ ਬਣਾਓ।</translation>
 <translation id="8682949824227998083">ਰਾਮੇਨ</translation>
 <translation id="8689520252402395106">ਅੱਪਡੇਟ ਦੀ ਪ੍ਰਕਿਰਿਆ ਜਾਰੀ ਰੱਖਣ ਲਈ <ph name="DEVICE_NAME" /> ਦੀ USB ਕੇਬਲ ਨੂੰ ਦੁਬਾਰਾ ਪਾਓ</translation>
+<translation id="8699053192961439771">ਟੈਬਾਂ ਨੂੰ ਸਵੈਚਲਿਤ ਤੌਰ 'ਤੇ ਲੁਕਾਉਣ ਲਈ ਕਲਿੱਕ ਕਰੋ</translation>
 <translation id="8709616837707653427"><ph name="DESC_TEXT" /> ਇਸ ਵਿਸ਼ੇਸ਼ਤਾ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰਨ ਲਈ ਖੱਬੀ ਜਾਂ ਸੱਜੀ ਤੀਰ ਕੁੰਜੀ ਵਰਤੋ।</translation>
 <translation id="8712637175834984815">ਸਮਝ ਲਿਆ</translation>
 <translation id="871560550817059752">ਅਸਫਲ ਰਹੀ - ਸਿਆਹੀ ਖਤਮ ਹੋ ਗਈ ਹੈ</translation>

@@ -31,11 +31,13 @@
 using base::test::ScopedFeatureList;
 using base::test::TestFuture;
 using content::ChildFrameAt;
+using content::EvalJs;
 using content::ExecJs;
 using content::JsReplace;
 using content::RenderFrameHost;
 using content::TestNavigationManager;
 using content::TestNavigationObserver;
+using content::ToRenderFrameHost;
 using content::WebContents;
 using optimization_guide::proto::BrowserAction;
 using optimization_guide::proto::ClickAction;
@@ -46,7 +48,7 @@ namespace actor {
 
 namespace {
 
-constexpr int64_t kNonExistentContentNodeId = 12345;
+constexpr int32_t kNonExistentContentNodeId = 12345;
 
 class ActorToolsTest : public InProcessBrowserTest {
  public:
@@ -95,88 +97,378 @@ class ActorToolsTest : public InProcessBrowserTest {
     return chrome_test_utils::GetActiveWebContents(this);
   }
 
+  RenderFrameHost* main_frame() {
+    return web_contents()->GetPrimaryMainFrame();
+  }
+
   ActorCoordinator& actor_coordinator() { return *actor_coordinator_; }
+
+  std::string GetSelectElementCurrentValue(std::string_view query_selector) {
+    return EvalJs(web_contents(),
+                  JsReplace("document.querySelector($1).value", query_selector))
+        .ExtractString();
+  }
 
  private:
   ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<ActorCoordinator> actor_coordinator_;
 };
 
-// Exercises the basic API to ensure nothing CHECKs or crashes.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, BasicSmokeTest) {
-  const GURL url = embedded_test_server()->GetURL("/blank.html");
+// Basic test to ensure sending a click to an element works.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToElement) {
+  const GURL url =
+      embedded_test_server()->GetURL("/page_with_clickable_element.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // Send a click to the document body.
+  {
+    std::optional<int> body_id = FindContentNodeId(*main_frame(), "body");
+    ASSERT_TRUE(body_id);
+
+    BrowserAction action = MakeClick(body_id.value());
+    TestFuture<bool> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+    EXPECT_EQ("mousedown[BODY#],mouseup[BODY#],click[BODY#]",
+              EvalJs(web_contents(), "mouse_event_log.join(',')"));
+  }
+
+  ASSERT_TRUE(ExecJs(web_contents(), "mouse_event_log = []"));
+
+  // Send a second click to the button.
+  {
+    std::optional<int> button_id =
+        FindContentNodeId(*main_frame(), "button#clickable");
+    ASSERT_TRUE(button_id);
+
+    BrowserAction action = MakeClick(button_id.value());
+    TestFuture<bool> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+    EXPECT_EQ(
+        "mousedown[BUTTON#clickable],mouseup[BUTTON#clickable],click[BUTTON#"
+        "clickable]",
+        EvalJs(web_contents(), "mouse_event_log.join(',')"));
+
+    // Ensure the button's event handler was invoked.
+    EXPECT_EQ(true, EvalJs(web_contents(), "button_clicked"));
+  }
+}
+
+// Sending a click to an element that doesn't exist fails.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_NonExistentElement) {
+  const GURL url =
+      embedded_test_server()->GetURL("/page_with_clickable_element.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
 
   // Use a random node id that doesn't exist.
+  BrowserAction action = MakeClick(kNonExistentContentNodeId);
+  TestFuture<bool> result_fail;
+  actor_coordinator().Act(action, result_fail.GetCallback());
+  // The node id doesn't exist so the tool will return false.
+  EXPECT_FALSE(result_fail.Get());
+
+  // The page should not have received any events.
+  EXPECT_EQ("", EvalJs(web_contents(), "mouse_event_log.join(',')"));
+}
+
+// Sending a click to a disabled element should fail without dispatching events.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_DisabledElement) {
+  const GURL url =
+      embedded_test_server()->GetURL("/page_with_clickable_element.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  std::optional<int> button_id =
+      FindContentNodeId(*main_frame(), "button#disabled");
+  ASSERT_TRUE(button_id);
+
+  BrowserAction action = MakeClick(button_id.value());
+  TestFuture<bool> result_fail;
+  actor_coordinator().Act(action, result_fail.GetCallback());
+  EXPECT_FALSE(result_fail.Get());
+
+  // The page should not have received any events.
+  EXPECT_EQ("", EvalJs(web_contents(), "mouse_event_log.join(',')"));
+}
+
+// Sending a click to an element that's not in the viewport should fail without
+// dispatching events.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_OffscreenElement) {
+  const GURL url =
+      embedded_test_server()->GetURL("/page_with_clickable_element.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  std::optional<int> button_id =
+      FindContentNodeId(*main_frame(), "button#offscreen");
+  ASSERT_TRUE(button_id);
+
+  BrowserAction action = MakeClick(button_id.value());
+  TestFuture<bool> result_fail;
+  actor_coordinator().Act(action, result_fail.GetCallback());
+  EXPECT_FALSE(result_fail.Get());
+
+  // The page should not have received any events.
+  EXPECT_EQ("", EvalJs(web_contents(), "mouse_event_log.join(',')"));
+}
+
+// Basic test of the TypeTool - ensure typed string is entered into an input
+// box.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_TextInput) {
+  const GURL url = embedded_test_server()->GetURL("/input.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  std::string typed_string = "test";
+  std::optional<int> input_id = FindContentNodeId(*main_frame(), "#input");
+  ASSERT_TRUE(input_id);
   BrowserAction action =
-      MakeClick(/*content_node_id=*/kNonExistentContentNodeId);
+      MakeType(input_id.value(), typed_string, /*follow_by_enter=*/true);
 
-  TestFuture<bool> result_fail;
-  actor_coordinator().Act(action, result_fail.GetCallback());
-  // The node id doesn't exist so the tool will return false.
-  EXPECT_FALSE(result_fail.Get());
+  TestFuture<bool> result;
+  actor_coordinator().Act(action, result.GetCallback());
+  EXPECT_TRUE(result.Get());
+
+  EXPECT_EQ(typed_string,
+            EvalJs(web_contents(), "document.getElementById('input').value"));
 }
 
-// Basic test of the TypeTool.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool) {
-  const GURL url = embedded_test_server()->GetURL("/simple.html");
+// TypeTool fails when target is non-existent.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_NonExistentNode) {
+  const GURL url = embedded_test_server()->GetURL("/input.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
 
-  BrowserAction action = MakeType(/*content_node_id=*/kNonExistentContentNodeId,
-                                  /*text=*/"test", /*follow_by_enter=*/true);
+  std::string typed_string = "test";
+  BrowserAction action = MakeType(kNonExistentContentNodeId, typed_string,
+                                  /*follow_by_enter=*/true);
 
-  TestFuture<bool> result_fail;
-  actor_coordinator().Act(action, result_fail.GetCallback());
-  // The node id doesn't exist so the tool will return false.
-  // TODO(crbug.com/402218570): Add function to extract real DOMNodeId from the
-  // test page so we can expect a true click returning here.
-  EXPECT_FALSE(result_fail.Get());
+  TestFuture<bool> result;
+  actor_coordinator().Act(action, result.GetCallback());
+  EXPECT_FALSE(result.Get());
+  EXPECT_EQ("",
+            EvalJs(web_contents(), "document.getElementById('input').value"));
 }
 
-// Basic test of the MouseMoveTool.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, MouseMoveTool) {
-  const GURL url = embedded_test_server()->GetURL("/simple.html");
+// Ensure type tool sends the expected events to an input box.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_Events) {
+  const GURL url = embedded_test_server()->GetURL("/input.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // The log starts empty.
+  ASSERT_EQ("", EvalJs(web_contents(), "input_event_log.join(',')"));
+
+  std::string typed_string = "ab";
+
+  std::optional<int> input_id = FindContentNodeId(*main_frame(), "#input");
+  ASSERT_TRUE(input_id);
+  BrowserAction action =
+      MakeType(input_id.value(), typed_string, /*follow_by_enter=*/true);
+
+  TestFuture<bool> result;
+  actor_coordinator().Act(action, result.GetCallback());
+  EXPECT_TRUE(result.Get());
+
+  EXPECT_EQ(
+      // a
+      "keydown,input,keyup,"
+      // b
+      "keydown,input,keyup,"
+      // enter (causes submit to "click")
+      "keydown,change,click,keyup",
+      EvalJs(web_contents(), "input_event_log.join(',')"));
+}
+
+// Ensure the type tool can be used without text to send an enter key in an
+// input.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_EmptyText) {
+  const GURL url = embedded_test_server()->GetURL("/input.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // The log starts empty.
+  ASSERT_EQ("", EvalJs(web_contents(), "input_event_log.join(',')"));
+
+  std::string typed_string = "";
+
+  std::optional<int> input_id = FindContentNodeId(*main_frame(), "#input");
+  ASSERT_TRUE(input_id);
+  BrowserAction action =
+      MakeType(input_id.value(), typed_string, /*follow_by_enter=*/true);
+
+  TestFuture<bool> result;
+  actor_coordinator().Act(action, result.GetCallback());
+  EXPECT_TRUE(result.Get());
+
+  EXPECT_EQ(
+      // enter (causes submit to "click")
+      "keydown,click,keyup",
+      EvalJs(web_contents(), "input_event_log.join(',')"));
+}
+
+// Ensure the type tool correctly sends the enter key after input if specified.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_FollowByEnter) {
+  const GURL url = embedded_test_server()->GetURL("/input.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // The log starts empty.
+  ASSERT_EQ("", EvalJs(web_contents(), "input_event_log.join(',')"));
+
+  std::optional<int> input_id = FindContentNodeId(*main_frame(), "#input");
+  ASSERT_TRUE(input_id);
+
+  // Send 'a' followed by enter. Ensure the click event is seen.
+  {
+    std::string typed_string = "a";
+    BrowserAction action =
+        MakeType(input_id.value(), typed_string, /*follow_by_enter=*/true);
+
+    TestFuture<bool> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ(
+      // a
+      "keydown,input,keyup,"
+      // enter (causes submit to "click")
+      "keydown,change,click,keyup",
+      EvalJs(web_contents(), "input_event_log.join(',')"));
+
+  ASSERT_TRUE(ExecJs(web_contents(), "input_event_log = []"));
+
+  // Send 'b' without an enter. Ensure the click event is _not_ seen.
+  {
+    std::string typed_string = "b";
+    BrowserAction action =
+        MakeType(input_id.value(), typed_string, /*follow_by_enter=*/false);
+
+    TestFuture<bool> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ(
+      // b
+      "keydown,input,keyup",
+      EvalJs(web_contents(), "input_event_log.join(',')"));
+}
+
+// Test the MouseMove tool fails on a non-existent content node.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, MouseMoveTool_NonExistentNode) {
+  const GURL url = embedded_test_server()->GetURL("/mouse_log.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // Log starts empty.
+  ASSERT_EQ("", EvalJs(web_contents(), "event_log.join(',')"));
 
   // Use a random node id that doesn't exist.
-  BrowserAction action =
-      MakeMouseMove(/*content_node_id=*/kNonExistentContentNodeId);
+  BrowserAction action = MakeMouseMove(kNonExistentContentNodeId);
 
-  TestFuture<bool> result_fail;
-  actor_coordinator().Act(action, result_fail.GetCallback());
-  // The node id doesn't exist so the tool will return false.
-  // TODO(crbug.com/402218570): Add function to extract real DOMNodeId from the
-  // test page so we can expect a true click returning here.
-  EXPECT_FALSE(result_fail.Get());
+  TestFuture<bool> result;
+  actor_coordinator().Act(action, result.GetCallback());
+  EXPECT_FALSE(result.Get());
+}
+
+// Test basic movements using MouseMove tool generates the expected events.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, MouseMoveTool_Events) {
+  const GURL url = embedded_test_server()->GetURL("/mouse_log.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // Log starts empty.
+  ASSERT_EQ("", EvalJs(web_contents(), "event_log.join(',')"));
+
+  // Move mouse over #first DIV
+  {
+    std::optional<int> first_id = FindContentNodeId(*main_frame(), "#first");
+    BrowserAction action = MakeMouseMove(first_id.value());
+
+    TestFuture<bool> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ("mouseenter[DIV#first],mousemove[DIV#first]",
+            EvalJs(web_contents(), "event_log.join(',')"));
+  ASSERT_TRUE(ExecJs(web_contents(), "event_log = []"));
+
+  // Move mouse over #second DIV
+  {
+    std::optional<int> second_id = FindContentNodeId(*main_frame(), "#second");
+    BrowserAction action = MakeMouseMove(second_id.value());
+
+    TestFuture<bool> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ(
+      "mouseleave[DIV#first],mouseenter[DIV#second],mousemove[DIV#second]",
+      EvalJs(web_contents(), "event_log.join(',')"));
+}
+
+// Test mouse move returns failure if a target is offscreen.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, MouseMoveTool_TargetOutsideViewport) {
+  const GURL url = embedded_test_server()->GetURL("/mouse_log.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // Log starts empty.
+  ASSERT_EQ("", EvalJs(web_contents(), "event_log.join(',')"));
+
+  // Move mouse over #offscreen DIV. This should fail since #offscreen is
+  // outside the viewport.
+  {
+    std::optional<int> offscreen_id =
+        FindContentNodeId(*main_frame(), "#offscreen");
+    BrowserAction action = MakeMouseMove(offscreen_id.value());
+
+    TestFuture<bool> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    EXPECT_FALSE(result.Get());
+  }
+
+  // The action should fail without generating any events.
+  EXPECT_EQ("", EvalJs(web_contents(), "event_log.join(',')"));
+
+  // Scroll the element into the viewport.
+  ASSERT_TRUE(ExecJs(web_contents(),
+                     "document.getElementById('offscreen').scrollIntoView()"));
+
+  // Try moving the mouse over #offscreen again. This time it should succeed
+  // since it was scrolled into the viewport.
+  {
+    std::optional<int> offscreen_id =
+        FindContentNodeId(*main_frame(), "#offscreen");
+    BrowserAction action = MakeMouseMove(offscreen_id.value());
+
+    TestFuture<bool> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ("mouseenter[DIV#offscreen],mousemove[DIV#offscreen]",
+            EvalJs(web_contents(), "event_log.join(',')"));
 }
 
 IN_PROC_BROWSER_TEST_F(ActorToolsTest, ScrollTool_ScrollOnPage) {
   const GURL url = embedded_test_server()->GetURL("/scrollable_page.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
 
-  float scroll_offset_y = 50;
+  int scroll_offset_y = 50;
 
   {
     // If no node id is passed, it will scroll the page's viewport.
-    BrowserAction action = MakeScroll(
-        /*content_node_id=*/std::nullopt, /*scroll_offset_x=*/0,
-        scroll_offset_y);
+    BrowserAction action = MakeScroll(/*content_node_id=*/std::nullopt,
+                                      /*scroll_offset_x=*/0, scroll_offset_y);
     TestFuture<bool> result_success;
     actor_coordinator().Act(action, result_success.GetCallback());
     EXPECT_TRUE(result_success.Get());
-    EXPECT_EQ(scroll_offset_y,
-              EvalJs(web_contents(), "window.scrollY").ExtractDouble());
+    EXPECT_EQ(scroll_offset_y, EvalJs(web_contents(), "window.scrollY"));
   }
 
   {
-    BrowserAction action = MakeScroll(
-        /*content_node_id=*/std::nullopt, /*scroll_offset_x=*/0,
-        scroll_offset_y);
+    BrowserAction action = MakeScroll(/*content_node_id=*/std::nullopt,
+                                      /*scroll_offset_x=*/0, scroll_offset_y);
     TestFuture<bool> result_success;
     actor_coordinator().Act(action, result_success.GetCallback());
     EXPECT_TRUE(result_success.Get());
-    EXPECT_EQ(2 * scroll_offset_y,
-              EvalJs(web_contents(), "window.scrollY").ExtractDouble());
+    EXPECT_EQ(2 * scroll_offset_y, EvalJs(web_contents(), "window.scrollY"));
   }
 }
 
@@ -186,15 +478,14 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ScrollTool_FailOnInvalidNodeID) {
 
   // Use a random node id that doesn't exist.
   float scroll_offset_y = 50;
-  BrowserAction action = MakeScroll(
-      /*content_node_id=*/kNonExistentContentNodeId, /*scroll_offset_x=*/0,
-      scroll_offset_y);
+  BrowserAction action = MakeScroll(kNonExistentContentNodeId,
+                                    /*scroll_offset_x=*/0, scroll_offset_y);
 
   TestFuture<bool> result_fail;
   actor_coordinator().Act(action, result_fail.GetCallback());
   EXPECT_FALSE(result_fail.Get());
 
-  EXPECT_EQ(0, EvalJs(web_contents(), "window.scrollY").ExtractDouble());
+  EXPECT_EQ(0, EvalJs(web_contents(), "window.scrollY"));
 }
 
 // Basic test of the NavigateTool.
@@ -428,6 +719,302 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, HistoryTool_ConcurrentNavigations) {
   EXPECT_EQ(child_frame_1->GetLastCommittedURL(), child_frame_1_start_url);
   EXPECT_EQ(child_frame_2->GetLastCommittedURL(), child_frame_2_start_url);
   EXPECT_EQ(web_contents()->GetURL(), main_frame_url);
+}
+
+// Test that the SelectTool can select an ordinary <option> in a <select>
+// element.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_OptionSelected) {
+  const GURL url = embedded_test_server()->GetURL("/select_tool.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const std::string plain_select_id = "#plainSelect";
+  const int32_t plain_select_dom_node_id =
+      FindContentNodeId(*main_frame(), plain_select_id).value();
+
+  ASSERT_EQ(GetSelectElementCurrentValue(plain_select_id), "alpha");
+
+  {
+    BrowserAction select = MakeSelect(plain_select_dom_node_id, "beta");
+    TestFuture<bool> result;
+    actor_coordinator().Act(select, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ(GetSelectElementCurrentValue(plain_select_id), "beta");
+
+  {
+    BrowserAction select = MakeSelect(plain_select_dom_node_id, "gamma");
+    TestFuture<bool> result;
+    actor_coordinator().Act(select, result.GetCallback());
+
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ(GetSelectElementCurrentValue(plain_select_id), "gamma");
+
+  // Test selecting by value. The option with value last has text "omega".
+  {
+    BrowserAction select = MakeSelect(plain_select_dom_node_id, "last");
+    TestFuture<bool> result;
+    actor_coordinator().Act(select, result.GetCallback());
+
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ(GetSelectElementCurrentValue(plain_select_id), "last");
+}
+
+// Test that the SelectTool causes the change and input events to fire on the
+// <select> element.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_Events) {
+  const GURL url = embedded_test_server()->GetURL("/select_tool.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const std::string plain_select_id = "#plainSelect";
+  const int32_t plain_select_dom_node_id =
+      FindContentNodeId(*main_frame(), plain_select_id).value();
+
+  ASSERT_EQ(GetSelectElementCurrentValue(plain_select_id), "alpha");
+  ASSERT_EQ("", EvalJs(web_contents(), "select_event_log.join(',')"));
+
+  {
+    BrowserAction select = MakeSelect(plain_select_dom_node_id, "beta");
+    TestFuture<bool> result;
+    actor_coordinator().Act(select, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+    EXPECT_EQ("input,change",
+              EvalJs(web_contents(), "select_event_log.join(',')"));
+  }
+}
+
+// Test that attempting to select a value that does not exist in the <option>
+// list fails and does not change the current selection.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_NonExistentValueFails) {
+  const GURL url = embedded_test_server()->GetURL("/select_tool.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const std::string plain_select_id = "#plainSelect";
+  int32_t plain_select_dom_node_id =
+      FindContentNodeId(*main_frame(), plain_select_id).value();
+
+  const std::string initial_value =
+      GetSelectElementCurrentValue(plain_select_id);
+  ASSERT_EQ(initial_value, "alpha");
+
+  BrowserAction select =
+      MakeSelect(plain_select_dom_node_id, "nonexistentValue");
+  TestFuture<bool> result;
+  actor_coordinator().Act(select, result.GetCallback());
+  EXPECT_FALSE(result.Get());
+
+  EXPECT_EQ(GetSelectElementCurrentValue(plain_select_id), initial_value);
+}
+
+// Test that attempting to select a value corresponding to a non-<option>
+// element fails. The select tool should only target valid options.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_NonOptionNodeValueFails) {
+  const GURL url = embedded_test_server()->GetURL("/select_tool.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const std::string non_options_select_id = "#nonOptionsSelect";
+  int32_t non_options_select_dom_node_id =
+      FindContentNodeId(*main_frame(), non_options_select_id).value();
+
+  const std::string initial_value =
+      GetSelectElementCurrentValue(non_options_select_id);
+  ASSERT_EQ(initial_value, "alpha");
+
+  // Attempt to select "beta", which is the text of a <span>, not an <option>
+  // value.  Expect the action to fail.
+  {
+    BrowserAction select = MakeSelect(non_options_select_dom_node_id, "beta");
+    TestFuture<bool> result;
+    actor_coordinator().Act(select, result.GetCallback());
+    EXPECT_FALSE(result.Get());
+  }
+
+  // Expect the value to remain unchanged
+  EXPECT_EQ(GetSelectElementCurrentValue(non_options_select_id), initial_value);
+
+  // Attempt to select "gamma", which is the value property of a <button>
+  // element, not an <option> value.  Expect the action to fail.
+  {
+    BrowserAction select = MakeSelect(non_options_select_dom_node_id, "gamma");
+    TestFuture<bool> result;
+    actor_coordinator().Act(select, result.GetCallback());
+    EXPECT_FALSE(result.Get());
+  }
+
+  // Expect the value to remain unchanged
+  EXPECT_EQ(GetSelectElementCurrentValue(non_options_select_id), initial_value);
+
+  // Attempt to select "epsilon". This should succeed as there is an <option>
+  // with value epsilon, despite there also being a <button> with value
+  // "epsilon".
+  {
+    BrowserAction select =
+        MakeSelect(non_options_select_dom_node_id, "epsilon");
+    TestFuture<bool> result;
+    actor_coordinator().Act(select, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+    EXPECT_EQ(GetSelectElementCurrentValue(non_options_select_id), "epsilon");
+  }
+}
+
+// Test that matching option values is case-sensitive.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_ValueIsCaseSensitive) {
+  const GURL url = embedded_test_server()->GetURL("/select_tool.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const std::string plain_select_id = "#plainSelect";
+  int32_t plain_select_dom_node_id =
+      FindContentNodeId(*main_frame(), plain_select_id).value();
+  const std::string initial_value =
+      GetSelectElementCurrentValue(plain_select_id);
+
+  ASSERT_EQ(initial_value, "alpha");
+
+  // Attempt to select "BETA" which has different casing than the option "beta"
+  // Expect the action to fail due to case mismatch.
+  BrowserAction select = MakeSelect(plain_select_dom_node_id, "BETA");
+  TestFuture<bool> result;
+  actor_coordinator().Act(select, result.GetCallback());
+  EXPECT_FALSE(result.Get());
+
+  // The select value should be unchanged.
+  EXPECT_EQ(GetSelectElementCurrentValue(plain_select_id), initial_value);
+}
+
+// Test that attempting to select a disabled <option> fails.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_DisabledOptionFails) {
+  const GURL url = embedded_test_server()->GetURL("/select_tool.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const std::string plain_select_id = "#plainSelect";
+  int32_t plain_select_dom_node_id =
+      FindContentNodeId(*main_frame(), plain_select_id).value();
+  const std::string initial_value =
+      GetSelectElementCurrentValue(plain_select_id);
+
+  ASSERT_EQ(initial_value, "alpha");
+
+  // Attempt to select the value of the disabled option. Expect the action to
+  // fail and the select's value to be unchanged.
+  BrowserAction select = MakeSelect(plain_select_dom_node_id, "disabledOption");
+  TestFuture<bool> result;
+  actor_coordinator().Act(select, result.GetCallback());
+  EXPECT_FALSE(result.Get());
+  EXPECT_EQ(GetSelectElementCurrentValue(plain_select_id), initial_value);
+}
+
+// Test that attempting to select a <option> in a disabled <optgroup> fails.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_DisabledOptGroupFails) {
+  const GURL url = embedded_test_server()->GetURL("/select_tool.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const std::string group_select_id = "#groupedSelect";
+  int32_t plain_select_dom_node_id =
+      FindContentNodeId(*main_frame(), group_select_id).value();
+  const std::string initial_value =
+      GetSelectElementCurrentValue(group_select_id);
+
+  ASSERT_EQ(initial_value, "alpha");
+
+  // Attempt to select the option with value "foobar". The option itself is
+  // enabled but is in a disabled optgroup. Expect the action to fail and the
+  // select's value to be unchanged.
+  BrowserAction select = MakeSelect(plain_select_dom_node_id, "foobar");
+  TestFuture<bool> result;
+  actor_coordinator().Act(select, result.GetCallback());
+  EXPECT_FALSE(result.Get());
+  EXPECT_EQ(GetSelectElementCurrentValue(group_select_id), initial_value);
+}
+
+// Test that attempting to select any option in a disabled <select> element
+// fails.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_DisabledSelectFails) {
+  const GURL url = embedded_test_server()->GetURL("/select_tool.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const std::string disabled_select_id = "#disabledSelect";
+  int32_t disabled_select_dom_node_id =
+      FindContentNodeId(*main_frame(), disabled_select_id).value();
+  const std::string initial_value =
+      GetSelectElementCurrentValue(disabled_select_id);
+
+  ASSERT_EQ(initial_value, "alpha");
+
+  // Attempt to select an otherwise valid option value ("beta"). Expect the
+  // action to fail without affecting the <select>.
+  BrowserAction select = MakeSelect(disabled_select_dom_node_id, "beta");
+  TestFuture<bool> result;
+  actor_coordinator().Act(select, result.GetCallback());
+  EXPECT_FALSE(result.Get());
+  EXPECT_EQ(GetSelectElementCurrentValue(disabled_select_id), initial_value);
+}
+
+// Test that options within <optgroup> elements can be selected.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_GroupedOptionSelected) {
+  const GURL url = embedded_test_server()->GetURL("/select_tool.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const std::string grouped_select_id = "#groupedSelect";
+  int32_t grouped_select_dom_node_id =
+      FindContentNodeId(*main_frame(), grouped_select_id).value();
+
+  ASSERT_EQ(GetSelectElementCurrentValue(grouped_select_id), "alpha");
+
+  // Select an option from the first group
+  {
+    BrowserAction select = MakeSelect(grouped_select_dom_node_id, "gamma");
+    TestFuture<bool> result;
+    actor_coordinator().Act(select, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ(GetSelectElementCurrentValue(grouped_select_id), "gamma");
+
+  // Select an option from the second group
+  {
+    BrowserAction select = MakeSelect(grouped_select_dom_node_id, "b");
+    TestFuture<bool> result;
+    actor_coordinator().Act(select, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ(GetSelectElementCurrentValue(grouped_select_id), "b");
+}
+
+// Test that an option can be selected in a <select> element rendered as a
+// listbox (size attribute > 1).
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_ListboxOptionSelected) {
+  const GURL url = embedded_test_server()->GetURL("/select_tool.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const std::string listbox_select_id = "#listboxSelect";
+  int32_t listbox_select_dom_node_id =
+      FindContentNodeId(*main_frame(), listbox_select_id).value();
+
+  // List box starts with no element selected.
+  ASSERT_EQ(GetSelectElementCurrentValue(listbox_select_id), "");
+
+  {
+    BrowserAction select = MakeSelect(listbox_select_dom_node_id, "beta");
+    TestFuture<bool> result;
+    actor_coordinator().Act(select, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ(GetSelectElementCurrentValue(listbox_select_id), "beta");
+
+  {
+    BrowserAction select = MakeSelect(listbox_select_dom_node_id, "delta");
+    TestFuture<bool> result;
+    actor_coordinator().Act(select, result.GetCallback());
+    EXPECT_TRUE(result.Get());
+  }
+
+  EXPECT_EQ(GetSelectElementCurrentValue(listbox_select_id), "delta");
 }
 
 }  // namespace

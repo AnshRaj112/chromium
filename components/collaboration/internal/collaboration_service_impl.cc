@@ -104,6 +104,8 @@ void CollaborationServiceImpl::StartShareOrManageFlow(
     std::unique_ptr<CollaborationControllerDelegate> delegate,
     const tab_groups::EitherGroupID& either_id,
     CollaborationServiceShareOrManageEntryPoint entry) {
+  metrics::RecordShareOrManageEntryPoint(data_sharing_service_->GetLogger(),
+                                         entry);
   auto it = collaboration_controllers_.find(either_id);
   if (it != collaboration_controllers_.end()) {
     it->second->delegate()->PromoteCurrentScreen();
@@ -308,7 +310,9 @@ CollaborationStatus CollaborationServiceImpl::GetCollaborationStatus() {
   }
 
   // Disable for automotive users.
-  if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_AUTOMOTIVE) {
+  if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_AUTOMOTIVE &&
+      !base::FeatureList::IsEnabled(
+          data_sharing::features::kCollaborationAutomotive)) {
     return CollaborationStatus::kDisabled;
   }
 

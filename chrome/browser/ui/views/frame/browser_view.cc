@@ -236,6 +236,7 @@
 #include "content/public/browser/download_manager.h"
 #include "content/public/browser/keyboard_event_processing_result.h"
 #include "content/public/browser/permission_controller.h"
+#include "content/public/browser/permission_descriptor_util.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/render_widget_host.h"
@@ -427,6 +428,22 @@ void CheckFocusListForCycles(views::View* const start_view) {
 }
 
 #endif  // DCHECK_IS_ON()
+
+void MaybeResetStoredFocusForWebContents(content::WebContents* web_contents) {
+  // In the case that the last focused view of the WebContents is a
+  // ContentsWebView, but not the ContentsWebView hosting the WebContents
+  // itself, we must reset the stored focus to prevent incorrect split-tab
+  // activation behavior when the split-view is swapped in during a tab switch.
+  ChromeWebContentsViewFocusHelper* focus_helper =
+      ChromeWebContentsViewFocusHelper::FromWebContents(web_contents);
+  if (focus_helper) {
+    ContentsWebView* focused_view =
+        views::AsViewClass<ContentsWebView>(focus_helper->GetStoredFocus());
+    if (focused_view && focused_view->web_contents() != web_contents) {
+      focus_helper->ResetStoredFocus();
+    }
+  }
+}
 
 bool GetGestureCommand(ui::GestureEvent* event, int* command) {
   DCHECK(command);
@@ -1485,14 +1502,14 @@ void BrowserView::ShowSplitView() {
       browser_->tab_strip_model()->GetTabAtIndex(active_index)->GetSplit();
 
   CHECK(split_tab_id.has_value());
-  const split_tabs::SplitTabData* split_tab_data =
-      browser_->tab_strip_model()->GetSplitData(split_tab_id.value());
 
-  std::vector<tabs::TabInterface*> split_tabs = split_tab_data->ListTabs();
+  std::vector<tabs::TabModel*> split_tabs =
+      browser_->tab_strip_model()
+          ->GetSplitData(split_tab_id.value())
+          ->ListTabs();
 
-  for (int i = 0; i < static_cast<int>(split_tabs.size()); i++) {
-    multi_contents_view_->SetWebContentsAtIndex(split_tabs[i]->GetContents(),
-                                                i);
+  for (size_t i = 0; tabs::TabModel* tab : split_tabs) {
+    multi_contents_view_->SetWebContentsAtIndex(tab->GetContents(), i++);
   }
   const int first_split_tab_index =
       browser_->tab_strip_model()->GetIndexOfTab(split_tabs[0]);
@@ -1503,6 +1520,33 @@ void BrowserView::ShowSplitView() {
 void BrowserView::HideSplitView() {
   CHECK(multi_contents_view_);
   multi_contents_view_->CloseSplitView();
+}
+
+void BrowserView::UpdateActiveSplitView() {
+  CHECK(multi_contents_view_ && multi_contents_view_->IsInSplitView());
+  const int active_index = browser_->tab_strip_model()->active_index();
+
+  std::optional<split_tabs::SplitTabId> split_tab_id =
+      browser_->tab_strip_model()->GetTabAtIndex(active_index)->GetSplit();
+
+  CHECK(split_tab_id.has_value());
+
+  tabs::TabInterface* first_tab = browser_->tab_strip_model()
+                                      ->GetSplitData(split_tab_id.value())
+                                      ->ListTabs()[0];
+  const int first_split_tab_index =
+      browser_->tab_strip_model()->GetIndexOfTab(first_tab);
+  const int relative_active_position = active_index - first_split_tab_index;
+  multi_contents_view_->SetActiveIndex(relative_active_position);
+}
+
+bool BrowserView::IsTabChangeInSplitView(content::WebContents* old_contents,
+                                         content::WebContents* new_contents) {
+  return multi_contents_view_ && multi_contents_view_->IsInSplitView() &&
+         multi_contents_view_->GetActiveContentsView()->web_contents() ==
+             old_contents &&
+         multi_contents_view_->GetInactiveContentsView()->web_contents() ==
+             new_contents;
 }
 
 void BrowserView::ActivateWebContents(content::WebContents* web_contents) {
@@ -1905,6 +1949,8 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
   DCHECK(new_contents);
   TRACE_EVENT0("ui", "BrowserView::OnActiveTabChanged");
   views::WebView* active_contents_view = GetContentsWebView();
+  bool tab_change_in_split_view =
+      IsTabChangeInSplitView(old_contents, new_contents);
 
   if (old_contents && !old_contents->IsBeingDestroyed()) {
     // We do not store the focus when closing the tab to work-around bug 4633.
@@ -1924,23 +1970,20 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
   // Visibility API under Windows, as ChangeWebContents will briefly hide
   // the WebContents window.
   bool change_tab_contents =
-      active_contents_view->web_contents() != new_contents;
-  if (multi_contents_view_) {
-    change_tab_contents =
-        change_tab_contents &&
-        multi_contents_view_->GetInactiveContentsView()->GetWebContents() !=
-            new_contents;
-  }
+      active_contents_view->web_contents() != new_contents &&
+      !tab_change_in_split_view;
 
 #if BUILDFLAG(IS_MAC)
   // Widget::IsActive is inconsistent between Mac and Aura, so don't check for
   // it on Mac. The check is also unnecessary for Mac, since restoring focus
   // won't activate the widget on that platform.
-  bool will_restore_focus =
-      !browser_->tab_strip_model()->closing_all() && GetWidget()->IsVisible();
-#else
   bool will_restore_focus = !browser_->tab_strip_model()->closing_all() &&
-                            GetWidget()->IsActive() && GetWidget()->IsVisible();
+                            GetWidget()->IsVisible() &&
+                            !tab_change_in_split_view;
+#else
+  bool will_restore_focus =
+      !browser_->tab_strip_model()->closing_all() && GetWidget()->IsActive() &&
+      GetWidget()->IsVisible() && !tab_change_in_split_view;
 #endif
   // Update various elements that are interested in knowing the current
   // WebContents.
@@ -1962,6 +2005,9 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
       loading_bar_->SetWebContents(nullptr);
     }
     active_contents_view->SetWebContents(nullptr);
+    if (multi_contents_view_) {
+      multi_contents_view_->GetInactiveContentsView()->SetWebContents(nullptr);
+    }
     devtools_web_view_->SetWebContents(nullptr);
   }
 
@@ -2017,7 +2063,24 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
     if (loading_bar_) {
       loading_bar_->SetWebContents(new_contents);
     }
-    active_contents_view->SetWebContents(new_contents);
+
+    if (multi_contents_view_) {
+      const tabs::TabInterface* active_tab =
+          tabs::TabInterface::GetFromContents(new_contents);
+      if (active_tab->IsSplit()) {
+        ShowSplitView();
+      } else {
+        if (multi_contents_view_->IsInSplitView()) {
+          HideSplitView();
+        }
+        multi_contents_view_->GetActiveContentsView()->SetWebContents(
+            new_contents);
+      }
+      MaybeResetStoredFocusForWebContents(new_contents);
+    } else {
+      active_contents_view->SetWebContents(new_contents);
+    }
+
     SadTabHelper* sad_tab_helper = SadTabHelper::FromWebContents(new_contents);
     if (sad_tab_helper) {
       sad_tab_helper->ReinstallInWebView();
@@ -2026,6 +2089,8 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
     // The second layout update should be no-op. It will just set the
     // DevTools WebContents.
     UpdateDevToolsForContents(new_contents, true);
+  } else if (tab_change_in_split_view) {
+    UpdateActiveSplitView();
   }
 
   if (will_restore_focus) {
@@ -2044,16 +2109,6 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
   // one subscriber per web contents.
   if (AppUsesBorderlessMode() && !old_contents) {
     SetWindowManagementPermissionSubscriptionForBorderlessMode(new_contents);
-  }
-
-  if (multi_contents_view_) {
-    const tabs::TabInterface* active_tab =
-        tabs::TabInterface::GetFromContents(new_contents);
-    if (active_tab->IsSplit()) {
-      ShowSplitView();
-    } else {
-      HideSplitView();
-    }
   }
 }
 
@@ -2723,7 +2778,10 @@ void BrowserView::UpdateBorderlessModeEnabled() {
               ->GetBrowserContext()
               ->GetPermissionController()
               ->GetPermissionResultForOriginWithoutContext(
-                  blink::PermissionType::WINDOW_MANAGEMENT, origin)
+                  content::PermissionDescriptorUtil::
+                      CreatePermissionDescriptorForPermissionType(
+                          blink::PermissionType::WINDOW_MANAGEMENT),
+                  origin)
               .status;
 
       window_management_permission_granted_ =
@@ -2771,7 +2829,10 @@ void BrowserView::SetWindowManagementPermissionSubscriptionForBorderlessMode(
   UpdateWindowManagementPermission(
       controller
           ->GetPermissionResultForOriginWithoutContext(
-              blink::PermissionType::WINDOW_MANAGEMENT, origin)
+              content::PermissionDescriptorUtil::
+                  CreatePermissionDescriptorForPermissionType(
+                      blink::PermissionType::WINDOW_MANAGEMENT),
+              origin)
           .status);
 
   // It is safe to bind base::Unretained(this) because WebContents is
@@ -5349,7 +5410,7 @@ bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
   if (!bookmark_bar_view_.get()) {
     bookmark_bar_view_ =
         std::make_unique<BookmarkBarView>(browser_.get(), this);
-    bookmark_bar_view_->set_owned_by_client();
+    bookmark_bar_view_->set_owned_by_client(OwnedByClientPassKey());
     bookmark_bar_view_->SetBookmarkBarState(
         browser_->bookmark_bar_state(), BookmarkBar::DONT_ANIMATE_STATE_CHANGE);
     GetBrowserViewLayout()->set_bookmark_bar(bookmark_bar_view_.get());

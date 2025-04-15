@@ -149,6 +149,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &features::kSafetyHubFollowup,
     &features::kSafetyHubLocalPasswordsModule,
     &features::kSafetyHubMagicStack,
+    &features::kSafetyHubUnifiedPasswordsModule,
     &features::kSafetyHubWeakAndReusedPasswords,
     &features::kTaskManagerClank,
     &features::kQuietNotificationPrompts,
@@ -187,6 +188,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kAndroidDumpOnScrollWithoutResource,
     &kAndroidElegantTextHeight,
     &kAndroidKeyboardA11y,
+    &kAndroidMetaClickHistoryNavigation,
     &kAndroidNoVisibleHintForDifferentTLD,
     &kAndroidOmniboxFocusedNewTabPage,
     &kAndroidOpenPdfInlineBackport,
@@ -281,6 +283,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kFullscreenInsetsApiMigration,
     &kFullscreenInsetsApiMigrationOnAutomotive,
     &kGroupNewTabWithParent,
+    &kHeadlessTabModel,
     &kHideTabletToolbarDownloadButton,
     &kHistoryPaneAndroid,
     &kLegacyTabStateDeprecation,
@@ -326,6 +329,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kReadAloudIPHMenuButtonHighlightCCT,
     &kReaderModeAutoDistill,
     &kReaderModeDevEntryPoint,
+    &kReaderModeImprovements,
     &kRecordSuppressionMetrics,
     &kReengagementNotification,
     &kRelatedSearchesAllLanguage,
@@ -341,6 +345,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kSkipIsolatedSplitPreload,
     &kSmallerTabStripTitleLimit,
     &kSuppressToolbarCapturesAtGestureEnd,
+    &kSwapNewTabAndNewTabInGroupAndroid,
     &kTabGroupEntryPointsAndroid,
     &kTabGroupParityBottomSheetAndroid,
     &kToolbarPhoneCleanup,
@@ -520,6 +525,10 @@ BASE_FEATURE(kAndroidElegantTextHeight,
 
 BASE_FEATURE(kAndroidKeyboardA11y,
              "AndroidKeyboardA11y",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kAndroidMetaClickHistoryNavigation,
+             "AndroidMetaClickHistoryNavigation",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAndroidNoVisibleHintForDifferentTLD,
@@ -908,6 +917,10 @@ BASE_FEATURE(kGroupNewTabWithParent,
              "GroupNewTabWithParent",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kHeadlessTabModel,
+             "HeadlessTabModel",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kHistoryPaneAndroid,
              "HistoryPaneAndroid",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1083,6 +1096,10 @@ BASE_FEATURE(kReaderModeDevEntryPoint,
              "ReaderModeDevEntryPoint",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kReaderModeImprovements,
+             "ReaderModeImprovements",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kRecordSuppressionMetrics,
              "RecordSuppressionMetrics",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -1129,6 +1146,10 @@ BASE_FEATURE(kSmallerTabStripTitleLimit,
 
 BASE_FEATURE(kSuppressToolbarCapturesAtGestureEnd,
              "SuppressToolbarCapturesAtGestureEnd",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kSwapNewTabAndNewTabInGroupAndroid,
+             "SwapNewTabAndNewTabInGroupAndroid",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabGroupEntryPointsAndroid,

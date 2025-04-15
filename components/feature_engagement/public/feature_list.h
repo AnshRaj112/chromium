@@ -311,6 +311,9 @@ DEFINE_VARIATION_PARAM(kIPHiOSDownloadAutoDeletionFeature,
                        "IPH_iOSDownloadAutoDeletion");
 DEFINE_VARIATION_PARAM(kIPHiOSSettingsInOverflowMenuBubbleFeature,
                        "IPH_iOSSettingsInOverflowMenuBubbleFeature");
+DEFINE_VARIATION_PARAM(
+    kIPHiOSSwitchAccountsWithNTPAccountParticleDiscFeature,
+    "IPH_iOSSwitchAccountsWithNTPAccountParticleDiscFeature");
 #endif  // BUILDFLAG(IS_IOS)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || \
@@ -356,6 +359,8 @@ DEFINE_VARIATION_PARAM(kIPHLensOverlayTranslateButtonFeature,
                        "IPH_LensOverlayTranslateButton");
 DEFINE_VARIATION_PARAM(kIPHLiveCaptionFeature, "IPH_LiveCaption");
 DEFINE_VARIATION_PARAM(kIPHMerchantTrustFeature, "IPH_MerchantTrust");
+DEFINE_VARIATION_PARAM(kIPHPasswordsSavePrimingPromoFeature,
+                       "IPH_PasswordsSavePrimingPromo");
 DEFINE_VARIATION_PARAM(kIPHPasswordsManagementBubbleAfterSaveFeature,
                        "IPH_PasswordsManagementBubbleAfterSave");
 DEFINE_VARIATION_PARAM(kIPHPasswordsManagementBubbleDuringSigninFeature,

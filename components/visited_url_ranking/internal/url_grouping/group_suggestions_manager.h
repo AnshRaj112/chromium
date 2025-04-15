@@ -14,13 +14,15 @@
 #include "components/visited_url_ranking/public/url_grouping/group_suggestions_service.h"
 #include "components/visited_url_ranking/public/visited_url_ranking_service.h"
 
+class PrefService;
+
 namespace visited_url_ranking {
 
 // Tracks and runs computation of suggestions.
 class GroupSuggestionsManager {
  public:
-  explicit GroupSuggestionsManager(
-      VisitedURLRankingService* visited_url_ranking_service);
+  GroupSuggestionsManager(VisitedURLRankingService* visited_url_ranking_service,
+                          PrefService* pref_service);
   ~GroupSuggestionsManager();
 
   GroupSuggestionsManager(const GroupSuggestionsManager&) = delete;
@@ -50,6 +52,9 @@ class GroupSuggestionsManager {
     GroupSuggestionsService::Scope scope;
   };
 
+  void OnFinishComputeSuggestions(const GroupSuggestionsService::Scope& scope,
+                                  std::optional<GroupSuggestions> suggestions);
+
   void ShowSuggestion(const GroupSuggestionsService::Scope& scope,
                       std::optional<GroupSuggestions> suggestions);
 
@@ -64,7 +69,7 @@ class GroupSuggestionsManager {
   base::RepeatingClosure suggestion_computed_callback_;
 
   std::unique_ptr<GroupSuggestionComputer> suggestion_computer_;
-  GroupSuggestionsTracker suggestion_tracker_;
+  std::unique_ptr<GroupSuggestionsTracker> suggestion_tracker_;
 
   base::WeakPtrFactory<GroupSuggestionsManager> weak_ptr_factory_{this};
 };
