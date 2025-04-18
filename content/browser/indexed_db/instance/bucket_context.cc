@@ -78,7 +78,6 @@
 #include "content/browser/indexed_db/indexed_db_reporting.h"
 #include "content/browser/indexed_db/instance/active_blob_registry.h"
 #include "content/browser/indexed_db/instance/backing_store.h"
-#include "content/browser/indexed_db/instance/backing_store_pre_close_task_queue.h"
 #include "content/browser/indexed_db/instance/bucket_context_handle.h"
 #include "content/browser/indexed_db/instance/connection.h"
 #include "content/browser/indexed_db/instance/database.h"
@@ -110,8 +109,6 @@ namespace {
 // Time after the last connection to a database is closed and when we destroy
 // the backing store.
 const int64_t kBackingStoreGracePeriodSeconds = 2;
-// Total time we let pre-close tasks run.
-const int64_t kRunningPreCloseTasksMaxRunPeriodSeconds = 60;
 
 // This struct facilitates requesting bucket space usage from the quota manager.
 // There have been reports of the callback being passed to the quota manager
@@ -267,7 +264,7 @@ BucketContext::~BucketContext() {
   ResetBackingStore();
 }
 
-void BucketContext::ForceClose(bool doom) {
+void BucketContext::ForceClose(bool doom, const std::string& message) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   is_doomed_ = doom;
@@ -278,21 +275,17 @@ void BucketContext::ForceClose(bool doom) {
     for (const auto& [name, database] : databases_) {
       // Note: We purposefully ignore the result here as force close needs to
       // continue tearing things down anyways.
-      database->ForceCloseAndRunTasks();
+      database->ForceCloseAndRunTasks(SanitizeErrorMessage(message));
     }
     databases_.clear();
-    if (has_blobs_outstanding_) {
-      leveldb_backing_store()->active_blob_registry()->ForceShutdown();
-      has_blobs_outstanding_ = false;
-    }
-
-    // Don't run the preclosing tasks after a ForceClose, whether or not we've
-    // started them.  Compaction in particular can run long and cannot be
-    // interrupted, so it can cause shutdown hangs.
+    has_blobs_outstanding_ = false;
     close_timer_.Stop();
-    if (pre_close_task_queue_) {
-      pre_close_task_queue_->Stop();
-      pre_close_task_queue_.reset();
+    if (backing_store()) {
+      backing_store()->InvalidateBlobReferences();
+      // Don't run the preclosing tasks after a ForceClose, whether or not we've
+      // started them.  Compaction in particular can run long and cannot be
+      // interrupted, so it can cause shutdown hangs.
+      backing_store()->StopPreCloseTasks();
     }
     skip_closing_sequence_ = true;
   }
@@ -351,7 +344,7 @@ BucketContext::StopMetadataRecording() {
 }
 
 int64_t BucketContext::GetInMemorySize() {
-  return backing_store_ ? leveldb_backing_store()->GetInMemorySize() : 0;
+  return backing_store_ ? backing_store_->GetInMemorySize() : 0;
 }
 
 void BucketContext::ReportOutstandingBlobs(bool blobs_outstanding) {
@@ -593,7 +586,7 @@ void BucketContext::GetDatabaseInfo(GetDatabaseInfoCallback callback) {
       blink::mojom::IDBError::New(error.code(), error.message()));
 
   if (s.IsCorruption()) {
-    HandleBackingStoreCorruption(error);
+    HandleBackingStoreCorruption(base::UTF16ToUTF8(error.message()));
   }
 }
 
@@ -622,7 +615,7 @@ void BucketContext::Open(
   if (!backing_store_) {
     FactoryClient(std::move(factory_client)).OnError(error);
     if (s.IsCorruption()) {
-      HandleBackingStoreCorruption(error);
+      HandleBackingStoreCorruption(base::UTF16ToUTF8(error.message()));
     }
     return;
   }
@@ -674,6 +667,7 @@ void BucketContext::DeleteDatabase(
     bool force_close) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   TRACE_EVENT0("IndexedDB", "BucketContext::DeleteDatabase");
+  std::string force_close_message = "The database is deleted.";
 
   {
     Status s;
@@ -690,7 +684,7 @@ void BucketContext::DeleteDatabase(
 
       FactoryClient(std::move(factory_client)).OnError(error);
       if (s.IsCorruption()) {
-        HandleBackingStoreCorruption(error);
+        HandleBackingStoreCorruption(base::UTF16ToUTF8(error.message()));
       }
       return;
     }
@@ -708,7 +702,7 @@ void BucketContext::DeleteDatabase(
         std::make_unique<FactoryClient>(std::move(factory_client)),
         std::move(on_deletion_complete));
     if (force_close) {
-      Status status = database->ForceCloseAndRunTasks();
+      Status status = database->ForceCloseAndRunTasks(force_close_message);
       if (!status.ok()) {
         OnDatabaseError(status, "Error aborting transactions.");
       }
@@ -721,12 +715,13 @@ void BucketContext::DeleteDatabase(
   std::vector<std::u16string> names;
   Status s = backing_store()->GetDatabaseNames(&names);
   if (!s.ok()) {
+    std::string error_message =
+        "Internal error opening backing store for indexedDB.deleteDatabase.";
     DatabaseError error(blink::mojom::IDBException::kUnknownError,
-                        "Internal error opening backing store for "
-                        "indexedDB.deleteDatabase.");
+                        error_message);
     FactoryClient(std::move(factory_client)).OnError(error);
     if (s.IsCorruption()) {
-      HandleBackingStoreCorruption(error);
+      HandleBackingStoreCorruption(error_message);
     }
     return;
   }
@@ -745,7 +740,7 @@ void BucketContext::DeleteDatabase(
       std::make_unique<FactoryClient>(std::move(factory_client)),
       std::move(on_deletion_complete));
   if (force_close) {
-    Status status = database_ptr->ForceCloseAndRunTasks();
+    Status status = database_ptr->ForceCloseAndRunTasks(force_close_message);
     if (!status.ok()) {
       OnDatabaseError(status, "Error aborting transactions.");
     }
@@ -781,14 +776,8 @@ BucketContext* BucketContext::GetReferenceForTesting() {
   return this;
 }
 
-void BucketContext::CompactBackingStoreForTesting() {
-  leveldb_backing_store()->Compact();
-}
-
-void BucketContext::WriteToIndexedDBForTesting(const std::string& key,
-                                               const std::string& value) {
-  leveldb_backing_store()->WriteToIndexedDBForTesting(key, value);  // IN-TEST
-  ForceClose(/*doom=*/true);
+void BucketContext::FlushBackingStoreForTesting() {
+  backing_store()->FlushForTesting();
 }
 
 void BucketContext::BindMockFailureSingletonForTesting(
@@ -809,9 +798,8 @@ void BucketContext::OnHandleCreated() {
   if (closing_stage_ != ClosingState::kNotClosing) {
     closing_stage_ = ClosingState::kNotClosing;
     close_timer_.Stop();
-    if (pre_close_task_queue_) {
-      pre_close_task_queue_->Stop();
-      pre_close_task_queue_.reset();
+    if (backing_store()) {
+      backing_store()->StopPreCloseTasks();
     }
   }
 }
@@ -851,26 +839,19 @@ void BucketContext::StartClosing() {
   // in the mean time.
   DCHECK(!close_timer_.IsRunning());
   closing_stage_ = ClosingState::kPreCloseGracePeriod;
-  close_timer_.Start(
-      FROM_HERE, base::Seconds(kBackingStoreGracePeriodSeconds),
-      base::BindOnce(
-          [](base::WeakPtr<BucketContext> bucket_context) {
-            if (!bucket_context || bucket_context->closing_stage_ !=
-                                       ClosingState::kPreCloseGracePeriod) {
-              return;
-            }
-            bucket_context->StartPreCloseTasks();
-          },
-          weak_factory_.GetWeakPtr()));
+  close_timer_.Start(FROM_HERE, base::Seconds(kBackingStoreGracePeriodSeconds),
+                     base::BindOnce(&BucketContext::StartPreCloseTasks,
+                                    weak_factory_.GetWeakPtr()));
 }
 
 void BucketContext::StartPreCloseTasks() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  DCHECK(closing_stage_ == ClosingState::kPreCloseGracePeriod);
+  if (closing_stage_ != ClosingState::kPreCloseGracePeriod) {
+    return;
+  }
   closing_stage_ = ClosingState::kRunningPreCloseTasks;
 
-  // The callback will run on all early returns in this function.
-  base::ScopedClosureRunner maybe_close_backing_store_runner(base::BindOnce(
+  backing_store()->StartPreCloseTasks(base::BindOnce(
       [](base::WeakPtr<BucketContext> bucket_context) {
         if (!bucket_context || bucket_context->closing_stage_ !=
                                    ClosingState::kRunningPreCloseTasks) {
@@ -879,25 +860,14 @@ void BucketContext::StartPreCloseTasks() {
         bucket_context->CloseNow();
       },
       weak_factory_.GetWeakPtr()));
-
-  std::list<std::unique_ptr<BackingStorePreCloseTaskQueue::PreCloseTask>>
-      tasks = leveldb_backing_store()->GetPreCloseTasks();
-
-  if (!tasks.empty()) {
-    pre_close_task_queue_ = std::make_unique<BackingStorePreCloseTaskQueue>(
-        std::move(tasks), maybe_close_backing_store_runner.Release(),
-        base::Seconds(kRunningPreCloseTasksMaxRunPeriodSeconds),
-        std::make_unique<base::OneShotTimer>());
-    pre_close_task_queue_->Start(
-        base::BindOnce(&level_db::BackingStore::GetCompleteMetadata,
-                       base::Unretained(leveldb_backing_store())));
-  }
 }
 
 void BucketContext::CloseNow() {
   closing_stage_ = ClosingState::kClosed;
   close_timer_.Stop();
-  pre_close_task_queue_.reset();
+  if (backing_store()) {
+    backing_store()->StopPreCloseTasks();
+  }
   QueueRunTasks();
 }
 
@@ -931,20 +901,27 @@ void BucketContext::RemoveBoundReaders(const base::FilePath& path) {
   file_reader_map_.erase(path);
 }
 
-void BucketContext::HandleBackingStoreCorruption(const DatabaseError& error) {
+std::string BucketContext::SanitizeErrorMessage(const std::string& message) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-
   // The message may contain the database path, which may be considered
   // sensitive data, and those strings are passed to the extension, so strip it.
-  std::string sanitized_message = base::UTF16ToUTF8(error.message());
+  std::string sanitized_message = message;
   base::ReplaceSubstringsAfterOffset(&sanitized_message, 0u,
                                      data_path_.AsUTF8Unsafe(), "...");
+  return sanitized_message;
+}
+
+void BucketContext::HandleBackingStoreCorruption(
+    const std::string& error_message) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  auto sanitized_error_message = SanitizeErrorMessage(error_message);
   level_db::BackingStore::RecordCorruptionInfo(data_path_, bucket_locator(),
-                                               sanitized_message);
+                                               sanitized_error_message);
 
   const base::FilePath file_path =
       data_path_.Append(GetLevelDBFileName(bucket_locator()));
-  ForceClose(/*doom=*/false);
+  ForceClose(/*doom=*/false, error_message);
   // In order to successfully delete the corrupted DB, the open handle must
   // first be closed.
   ResetBackingStore();
@@ -960,17 +937,16 @@ void BucketContext::HandleBackingStoreCorruption(const DatabaseError& error) {
 void BucketContext::OnDatabaseError(Status status, const std::string& message) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   DCHECK(!status.ok());
+  const std::string error_message =
+      message.empty() ? status.ToString() : message;
   if (status.IsCorruption()) {
-    DatabaseError error(
-        blink::mojom::IDBException::kUnknownError,
-        base::ASCIIToUTF16(message.empty() ? status.ToString() : message));
-    HandleBackingStoreCorruption(error);
+    HandleBackingStoreCorruption(error_message);
     return;
   }
   if (status.IsIOError()) {
     quota_manager_proxy_->OnClientWriteFailed(bucket_info_.storage_key);
   }
-  ForceClose(/*doom=*/false);
+  ForceClose(/*doom=*/false, error_message);
 }
 
 bool BucketContext::OnMemoryDump(const base::trace_event::MemoryDumpArgs& args,

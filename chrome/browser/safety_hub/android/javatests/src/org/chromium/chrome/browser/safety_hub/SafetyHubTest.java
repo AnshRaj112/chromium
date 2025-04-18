@@ -49,6 +49,7 @@ import androidx.test.filters.LargeTest;
 import androidx.test.filters.MediumTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import org.chromium.base.test.util.DisabledTest;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
 import org.junit.Before;
@@ -123,7 +124,8 @@ public final class SafetyHubTest {
                         ContentSettingsType.MEDIASTREAM_CAMERA, ContentSettingsType.MEDIASTREAM_MIC
                     },
                     0,
-                    0);
+                    0,
+                    PermissionsRevocationType.UNUSED_PERMISSIONS);
 
     private static final PermissionsData PERMISSIONS_DATA_2 =
             PermissionsData.create(
@@ -135,14 +137,23 @@ public final class SafetyHubTest {
                         ContentSettingsType.BACKGROUND_SYNC
                     },
                     0,
-                    0);
+                    0,
+                    PermissionsRevocationType.UNUSED_PERMISSIONS);
 
     private static final PermissionsData PERMISSIONS_DATA_3 =
             PermissionsData.create(
                     "http://example3.com",
                     new int[] {ContentSettingsType.NOTIFICATIONS, ContentSettingsType.GEOLOCATION},
                     0,
-                    0);
+                    0,
+                    PermissionsRevocationType.UNUSED_PERMISSIONS_AND_ABUSIVE_NOTIFICATIONS);
+    private static final PermissionsData PERMISSIONS_DATA_4 =
+            PermissionsData.create(
+                    "http://example4.com",
+                    new int[] {ContentSettingsType.NOTIFICATIONS},
+                    0,
+                    0,
+                    PermissionsRevocationType.DISRUPTIVE_NOTIFICATION_PERMISSIONS);
     private static final NotificationPermissions NOTIFICATION_PERMISSIONS_1 =
             NotificationPermissions.create("http://example1.com", "*", 3);
     private static final NotificationPermissions NOTIFICATION_PERMISSIONS_2 =
@@ -224,11 +235,23 @@ public final class SafetyHubTest {
     @Feature({"RenderTest", "SafetyHubPermissions"})
     public void testPermissionsSubpageAppearance() throws IOException {
         mUnusedPermissionsBridge.setPermissionsDataForReview(
-                new PermissionsData[] {PERMISSIONS_DATA_1, PERMISSIONS_DATA_2, PERMISSIONS_DATA_3});
+                new PermissionsData[] {PERMISSIONS_DATA_1, PERMISSIONS_DATA_2});
         mPermissionsFragmentTestRule.startSettingsActivity();
         mRenderTestRule.render(
                 getRootViewSanitized(R.string.safety_hub_permissions_page_title),
                 "permissions_subpage");
+    }
+
+    @Test
+    @LargeTest
+    @Feature({"RenderTest", "SafetyHubPermissions"})
+    public void testNotificationPermissionsSubpageAppearance() throws IOException {
+        mUnusedPermissionsBridge.setPermissionsDataForReview(
+                new PermissionsData[] {PERMISSIONS_DATA_3, PERMISSIONS_DATA_4});
+        mPermissionsFragmentTestRule.startSettingsActivity();
+        mRenderTestRule.render(
+                getRootViewSanitized(R.string.safety_hub_permissions_page_title),
+                "notification_permissions_subpage");
     }
 
     @Test
@@ -610,6 +633,7 @@ public final class SafetyHubTest {
     @CommandLineFlags.Add({
         ChromeSwitches.FORCE_UPDATE_MENU_UPDATE_TYPE + "=update_available",
     })
+    @DisabledTest(message = "https://crbug.com/411312866")
     public void testUpdateCheckModule() {
         // TODO(crbug.com/324562205): Move the initialization of the SafetyHubFetchService so
         // that there is no dependency on ChromeTabbedActivity.

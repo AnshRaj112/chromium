@@ -112,6 +112,9 @@ void TabModel::OnRemovedFromModel() {
   owning_model_->RemoveObserver(this);
   owning_model_ = nullptr;
 
+  // At this point tab is detached.
+  will_be_detaching_ = false;
+
   // Opener stuff doesn't make sense to transfer between browsers.
   opener_ = nullptr;
   reset_opener_on_active_tab_change_ = false;
@@ -135,7 +138,13 @@ void TabModel::OnReparented(TabCollection* parent,
 }
 
 void TabModel::OnAncestorChanged(base::PassKey<TabCollection> passkey) {
-  UpdateProperties();
+  // Do not update the properties twice during an operation in tab_collection.
+  // `will_be_detaching_` is needed to update properties when a tab is being
+  // removed from the model to differentiate it from an intermediate step of a
+  // move.
+  if (parent_collection_ || will_be_detaching_) {
+    UpdateProperties();
+  }
 }
 
 void TabModel::SetPinned(bool pinned) {
@@ -163,6 +172,7 @@ void TabModel::WillEnterBackground(base::PassKey<TabStripModel>) {
 
 void TabModel::WillDetach(base::PassKey<TabStripModel>,
                           tabs::TabInterface::DetachReason reason) {
+  will_be_detaching_ = true;
   will_detach_callback_list_.Notify(this, reason);
 }
 
@@ -274,15 +284,6 @@ std::optional<tab_groups::TabGroupId> TabModel::GetGroup() const {
   return group_;
 }
 
-bool TabModel::ShouldAcceptMouseEventsWhileWindowInactive() const {
-  return accept_input_when_window_inactive_ > 0;
-}
-
-std::unique_ptr<ScopedAcceptMouseEventsWhileWindowInactive>
-TabModel::AcceptMouseEventsWhileWindowInactive() {
-  return std::make_unique<ScopedAcceptMouseEventsWhileWindowInactiveImpl>(this);
-}
-
 void TabModel::Close() {
   auto* window_interface = GetBrowserWindowInterface();
   auto* tab_strip = window_interface->GetTabStripModel();
@@ -353,19 +354,6 @@ TabModel::ScopedTabModalUIImpl::~ScopedTabModalUIImpl() {
   if (tab_) {
     tab_->showing_modal_ui_ = false;
     tab_->modal_ui_changed_callback_list_.Notify(tab_.get());
-  }
-}
-
-TabModel::ScopedAcceptMouseEventsWhileWindowInactiveImpl::
-    ScopedAcceptMouseEventsWhileWindowInactiveImpl(TabModel* tab)
-    : tab_(tab->weak_factory_.GetWeakPtr()) {
-  ++tab_->accept_input_when_window_inactive_;
-}
-
-TabModel::ScopedAcceptMouseEventsWhileWindowInactiveImpl::
-    ~ScopedAcceptMouseEventsWhileWindowInactiveImpl() {
-  if (tab_) {
-    --tab_->accept_input_when_window_inactive_;
   }
 }
 

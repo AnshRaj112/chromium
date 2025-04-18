@@ -642,6 +642,8 @@
 #include "chrome/browser/enterprise/profile_management/oidc_auth_response_capture_navigation_throttle.h"
 #include "chrome/browser/enterprise/profile_management/profile_management_navigation_throttle.h"
 #include "chrome/browser/enterprise/signin/managed_profile_required_navigation_throttle.h"
+#include "chrome/browser/enterprise/webstore/chrome_web_store_navigation_throttle.h"
+#include "chrome/browser/enterprise/webstore/features.h"
 #include "chrome/browser/ui/webui/app_settings/web_app_settings_navigation_throttle.h"
 #endif
 
@@ -2219,7 +2221,7 @@ std::string ChromeContentBrowserClient::GetSiteDisplayNameForCdmProcess(
   // By default, use the |site_url| spec as the display name.
   std::string name = site_url.spec();
 
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   // If |site_url| wraps a chrome extension ID, we can display the extension
   // name instead, which is more human-readable.
   if (site_url.SchemeIs(extensions::kExtensionScheme)) {
@@ -2230,7 +2232,7 @@ std::string ChromeContentBrowserClient::GetSiteDisplayNameForCdmProcess(
     if (extension)
       name = extension->name();
   }
-#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 
   return name;
 }
@@ -2987,7 +2989,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
 #if BUILDFLAG(IS_CHROMEOS)
         switches::kShortMergeSessionTimeoutForTest,  // For tests only.
 #endif
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
         extensions::switches::kAllowHTTPBackgroundPage,
         extensions::switches::kAllowLegacyExtensionManifests,
         extensions::switches::kDisableExtensionsHttpThrottling,
@@ -3029,7 +3031,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
 
     command_line->CopySwitchesFrom(browser_command_line, kSwitchNames);
   } else if (process_type == switches::kUtilityProcess) {
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
     static const char* const kSwitchNames[] = {
         extensions::switches::kAllowHTTPBackgroundPage,
         extensions::switches::kEnableExperimentalExtensionApis,
@@ -5530,6 +5532,13 @@ ChromeContentBrowserClient::CreateThrottlesForNavigation(
   MaybeAddThrottle(
       ManagedProfileRequiredNavigationThrottle::MaybeCreateThrottleFor(handle),
       &throttles);
+
+  if (base::FeatureList::IsEnabled(
+          enterprise::webstore::kChromeWebStoreNavigationThrottle)) {
+    throttles.push_back(
+        std::make_unique<enterprise_webstore::ChromeWebStoreNavigationThrottle>(
+            handle));
+  }
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || \

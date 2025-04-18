@@ -19,11 +19,13 @@
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
 #include "third_party/blink/renderer/core/frame/frame.h"
 #include "third_party/blink/renderer/core/frame/local_dom_window.h"
+#include "third_party/blink/renderer/core/frame/web_feature.h"
 #include "third_party/blink/renderer/core/inspector/console_message.h"
 #include "third_party/blink/renderer/core/workers/worker_global_scope.h"
 #include "third_party/blink/renderer/platform/graphics/canvas_resource_host.h"
 #include "third_party/blink/renderer/platform/graphics/static_bitmap_image.h"
 #include "third_party/blink/renderer/platform/graphics/unaccelerated_static_bitmap_image.h"
+#include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
 #include "third_party/blink/renderer/platform/runtime_feature_state/runtime_feature_state_override_context.h"
 #include "third_party/blink/renderer/platform/weborigin/security_origin.h"
 #include "third_party/blink/renderer/platform/wtf/casting.h"
@@ -63,6 +65,12 @@ bool ShouldApplyNoise(CanvasRenderingContext* rendering_context,
   if (!execution_context) {
     noise_reason |= CanvasNoiseReason::kNoExecutionContext;
   }
+  // Check if all heuristics have matched so far (excluding whether the feature
+  // is enabled).
+  if (noise_reason == CanvasNoiseReason::kAllConditionsMet) {
+    UseCounter::Count(execution_context,
+                      WebFeature::kCanvasReadbackNoiseMatchesHeuristics);
+  }
   if (execution_context &&
       !execution_context->GetRuntimeFeatureStateOverrideContext()
            ->IsCanvasInterventionsForceEnabled()) {
@@ -98,6 +106,10 @@ String GetDomainFromSecurityOrigin(const SecurityOrigin* security_origin) {
 }
 
 }  // namespace
+
+// static
+const char CanvasInterventionsHelper::kSupplementName[] =
+    "CanvasInterventionsHelper";
 
 // static
 bool CanvasInterventionsHelper::MaybeNoiseSnapshot(
@@ -175,7 +187,35 @@ bool CanvasInterventionsHelper::MaybeNoiseSnapshot(
   UMA_HISTOGRAM_COUNTS_1M(
       "FingerprintingProtection.CanvasNoise.NoisedCanvasSize",
       pixmap_to_noise.width() * pixmap_to_noise.height());
+  UseCounter::Count(execution_context, WebFeature::kCanvasReadbackNoise);
+  auto* helper = CanvasInterventionsHelper::From(execution_context);
+  helper->IncrementNoisedCanvasReadbacks();
 
   return true;
 }
+
+// static
+CanvasInterventionsHelper* CanvasInterventionsHelper::From(
+    ExecutionContext* context) {
+  CanvasInterventionsHelper* helper =
+      Supplement<ExecutionContext>::From<CanvasInterventionsHelper>(context);
+  if (!helper) {
+    helper = MakeGarbageCollected<CanvasInterventionsHelper>(*context);
+    Supplement<ExecutionContext>::ProvideTo(*context, helper);
+  }
+  return helper;
+}
+
+CanvasInterventionsHelper::CanvasInterventionsHelper(
+    ExecutionContext& execution_context)
+    : Supplement<ExecutionContext>(execution_context),
+      ExecutionContextLifecycleObserver(&execution_context) {}
+
+void CanvasInterventionsHelper::ContextDestroyed() {
+  CHECK_GT(num_noised_canvas_readbacks_, 0);
+  UMA_HISTOGRAM_COUNTS_100(
+      "FingerprintingProtection.CanvasNoise.NoisedReadbacksPerContext",
+      num_noised_canvas_readbacks_);
+}
+
 }  // namespace blink

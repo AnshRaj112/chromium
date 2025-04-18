@@ -13,6 +13,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "components/autofill/core/browser/ui/autofill_image_fetcher_base.h"
+#include "components/image_fetcher/core/image_fetcher_types.h"
 
 class GURL;
 
@@ -44,12 +45,16 @@ class AutofillImageFetcher : public AutofillImageFetcherBase {
       base::span<const GURL> image_urls,
       base::span<const AutofillImageFetcherBase::ImageSize> image_sizes_unused)
       override;
-  void FetchPixAccountImages(base::span<const GURL> image_urls) override;
-  const gfx::Image* GetCachedImageForUrl(const GURL& image_url) const override;
+  void FetchPixAccountImagesForURLs(base::span<const GURL> image_urls) override;
+  void FetchValuableImagesForURLs(base::span<const GURL> image_urls) override;
+  const gfx::Image* GetCachedImageForUrl(const GURL& image_url,
+                                         ImageType image_type) const override;
 
   // Subclasses may override this to provide custom handling of a given card art
-  // URL.
-  virtual GURL ResolveCardArtURL(const GURL& card_art_url);
+  // URL for `image_type`. Resolved URLs are used as mapping keys for image
+  // caching.
+  virtual GURL ResolveImageURL(const GURL& card_art_url,
+                               ImageType image_type) const = 0;
 
   // Subclasses may override this to provide custom handling of a fetched card
   // art image. The default behavior is a no-op. The passed-in `card_art_url` is
@@ -81,8 +86,14 @@ class AutofillImageFetcher : public AutofillImageFetcherBase {
       const gfx::Image& card_art_image,
       const image_fetcher::RequestMetadata& metadata);
 
+  void OnValuableImageFetched(const GURL& image_url,
+                              const gfx::Image& valuable_image,
+                              const image_fetcher::RequestMetadata& metadata);
+
  private:
-  void FetchImageForURL(const GURL& image_url);
+  void FetchImageForURL(const GURL& image_url,
+                        ImageType image_type,
+                        image_fetcher::ImageFetcherCallback callback);
 
   // Stores the result of fetching images for card art URLs. It's used to
   // mitigate the issue of inflated failure metrics caused by repeated fetch

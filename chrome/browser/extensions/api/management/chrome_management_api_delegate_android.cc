@@ -7,8 +7,10 @@
 #include "base/notimplemented.h"
 #include "chrome/browser/extensions/extension_management.h"
 #include "chrome/common/extensions/manifest_handlers/app_launch_info.h"
+#include "extensions/browser/api/management/management_api.h"
 #include "extensions/browser/extension_registrar.h"
 #include "extensions/browser/launch_util.h"
+#include "extensions/browser/uninstall_reason.h"
 
 namespace extensions {
 
@@ -40,7 +42,10 @@ ChromeManagementAPIDelegate::SetEnabledFunctionDelegate(
     content::BrowserContext* browser_context,
     const Extension* extension,
     base::OnceCallback<void(bool)> callback) const {
-  NOTIMPLEMENTED();
+  // TODO(crbug.com/410932770): Show a permission dialog. For now, pretend that
+  // the user accepted it.
+  NOTIMPLEMENTED() << "Skipping enable extension dialog";
+  std::move(callback).Run(true);
   return nullptr;
 }
 
@@ -49,7 +54,14 @@ ChromeManagementAPIDelegate::UninstallFunctionDelegate(
     ManagementUninstallFunctionBase* function,
     const Extension* target_extension,
     bool show_programmatic_uninstall_ui) const {
-  NOTIMPLEMENTED();
+  // TODO(crbug.com/410932770): Show an uninstall dialog. For now, just
+  // uninstall the extension.
+  auto* registrar = ExtensionRegistrar::Get(function->browser_context());
+  std::u16string error;
+  registrar->UninstallExtension(target_extension->id(),
+                                UNINSTALL_REASON_MANAGEMENT_API, &error);
+  function->OnExtensionUninstallDialogClosed(/*did_start_uninstall=*/true,
+                                             error);
   return nullptr;
 }
 

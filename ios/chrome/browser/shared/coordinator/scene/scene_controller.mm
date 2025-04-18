@@ -400,7 +400,7 @@ SystemIdentityManager::IteratorResult IdentitiesOnDevice(
 
   // Fetches the Family Link member role asynchronously from KidsManagement API.
   std::unique_ptr<supervised_user::ListFamilyMembersFetcher>
-      _family_members_fetcher;
+      _familyMembersFetcher;
 }
 
 // Navigation View controller for the settings.
@@ -1436,7 +1436,7 @@ SystemIdentityManager::IteratorResult IdentitiesOnDevice(
   // The UI should be stopped before the models they observe are stopped.
   // SigninCoordinator teardown is performed by the `signinCompletion` on
   // termination of async events, do not add additional teardown here.
-  [self.signinCoordinator interruptAnimated:NO];
+  [self interruptSigninCoordinatorAnimated:NO fromExternalTrigger:NO];
   // `self.signinCoordinator.signinCompletion()` was called in the interrupt
   // method. Therefore now `self.signinCoordinator` is now stopped, and
   // `self.signinCoordinator` is now nil.
@@ -1920,7 +1920,7 @@ using UserFeedbackDataCallback =
   // populates the corresponding `UserFeedbackData` property.
   if (!primary_account.IsEmpty()) {
     __weak SceneController* weakSelf = self;
-    _family_members_fetcher = supervised_user::FetchListFamilyMembers(
+    _familyMembersFetcher = supervised_user::FetchListFamilyMembers(
         *identity_manager,
         self.mainInterface.profile->GetSharedURLLoaderFactory(),
         base::BindOnce(&OnListFamilyMembersResponse, primary_account.gaia, data)
@@ -1955,7 +1955,7 @@ using UserFeedbackDataCallback =
                                completion:(UserFeedbackDataCallback)completion {
   // Cancel any list family member requests in progress.
   if (cancelFamilyMembersFetch) {
-    _family_members_fetcher.reset();
+    _familyMembersFetcher.reset();
   }
 
   Browser* browser = self.mainInterface.browser;
@@ -2157,6 +2157,8 @@ using UserFeedbackDataCallback =
                                                          command.contextStyle
                                                       accessPoint:
                                                           command.accessPoint
+                                             prepareChangeProfile:
+                                                 command.prepareChangeProfile
                                              continuationProvider:provider];
       break;
     }
@@ -2309,6 +2311,12 @@ using UserFeedbackDataCallback =
   if (!signin::ShouldPresentWebSignin(self.mainInterface.profile)) {
     return;
   }
+  id<BrowserCoordinatorCommands> browserCoordinatorCommandsHandler =
+      HandlerForProtocol(self.currentInterface.browser->GetCommandDispatcher(),
+                         BrowserCoordinatorCommands);
+  void (^prepareChangeProfile)() = ^() {
+    [browserCoordinatorCommandsHandler closeCurrentTab];
+  };
   ChangeProfileContinuationProvider provider =
       base::BindRepeating(&CreateChangeProfileOpensURLContinuation, url);
   self.signinCoordinator = [SigninCoordinator
@@ -2321,6 +2329,8 @@ using UserFeedbackDataCallback =
                                                   accessPoint:signin_metrics::
                                                                   AccessPoint::
                                                                       kWebSignin
+                                         prepareChangeProfile:
+                                             prepareChangeProfile
                                          continuationProvider:provider];
   if (!self.signinCoordinator) {
     return;
@@ -3985,11 +3995,9 @@ using UserFeedbackDataCallback =
     // `self.signinCoordinator` can be presented on top of the settings, to
     // present the Trusted Vault reauthentication `self.signinCoordinator` has
     // to be closed first.
-    if (self.signinCoordinator) {
-      // If signinCoordinator is already dismissing, completion execution will
-      // happen when it is done animating.
-      [self interruptSigninCoordinatorAnimated:animated];
-    }
+    // If signinCoordinator is already dismissing, completion execution will
+    // happen when it is done animating.
+    [self interruptSigninCoordinatorAnimated:animated fromExternalTrigger:YES];
     UIViewController* presentingViewController =
         self.settingsNavigationController.presentingViewController;
     if (presentingViewController) {
@@ -4001,21 +4009,23 @@ using UserFeedbackDataCallback =
     }
     self.dismissingSettings = NO;
   } else {
-    if (self.signinCoordinator) {
-      // `self.signinCoordinator` can be presented without settings, from the
-      // bookmarks or the recent tabs view.
-      [self interruptSigninCoordinatorAnimated:animated];
-    }
+    // `self.signinCoordinator` can be presented without settings, from the
+    // bookmarks or the recent tabs view.
+    [self interruptSigninCoordinatorAnimated:animated fromExternalTrigger:YES];
     resetAndDismiss();
   }
 }
 
 // Interrupts the sign-in coordinator actions and dismisses its views either
 // with or without animation.
-- (void)interruptSigninCoordinatorAnimated:(BOOL)animated {
-  DCHECK(self.signinCoordinator);
-
-  self.dismissingSigninPromptFromExternalTrigger = YES;
+- (void)interruptSigninCoordinatorAnimated:(BOOL)animated
+                       fromExternalTrigger:(BOOL)external {
+  if (!self.signinCoordinator) {
+    return;
+  }
+  if (external) {
+    self.dismissingSigninPromptFromExternalTrigger = YES;
+  }
   [self.signinCoordinator interruptAnimated:animated];
 }
 
@@ -4577,7 +4587,7 @@ using UserFeedbackDataCallback =
     (PolicyWatcherBrowserAgent*)policyWatcher {
 
   if (self.signinCoordinator) {
-    [self interruptSigninCoordinatorAnimated:YES];
+    [self interruptSigninCoordinatorAnimated:YES fromExternalTrigger:YES];
     UMA_HISTOGRAM_BOOLEAN(
         "Enterprise.BrowserSigninIOS.SignInInterruptedByPolicy", true);
     policyWatcher->SignInUIDismissed();

@@ -926,14 +926,8 @@ For more settings that use data to improve your Chrome experience, go to <ph nam
       <message name="IDS_CSV_DOWNLOAD_DIALOG_POSITIVE_BUTTON_TEXT" desc="The text for the dialog button through which users can initiate password export. The dilog is shown to users who have unmigrated passwords left over in Chrome after Chrome's storage has been deprecated.">
         Export passwords
       </message>
-      <message name="IDS_POST_PASSWORD_MIGRATION_SHEET_TITLE" desc="The title of the post password migration sheet that informs the user that the migration happened." formatter_data="android_java">
-        We changed how passwords are saved on this device
-      </message>
       <message name="IDS_POST_PASSWORD_MIGRATION_SHEET_TITLE_ABOUT_LOCAL_PWD" desc="The title of the post password migration sheet that informs the user that the migration happened. It means that passwords that the user has saved locally on their device are going to be affected by a change Google is making. 'passwords on this device' is important. It indicates that the change affects passwords saved on the device only. This is different to passwords that are saved and synced to the user's Google Account. Please try to keep this distinction as clear as possible." formatter_data="android_java">
         We changed how passwords on this device are saved
-      </message>
-      <message name="IDS_POST_PASSWORD_MIGRATION_SHEET_SUBTITLE" desc="The subtitle of the post password migration sheet." formatter_data="android_java">
-        Your lists of saved passwords for Chrome and <ph name="CHROME_CHANNEL">%1$s<ex>Chrome Dev</ex></ph> were merged. You can still autofill all your saved passwords on both apps.
       </message>
       <message name="IDS_POST_PWD_MIGRATION_SHEET_SUBTITLE_ABOUT_LOCAL_PWD" desc="The subtitle of the post password migration sheet that emphasises on merging local passwords." formatter_data="android_java">
         All passwords saved only to this device for Chrome and <ph name="CHROME_CHANNEL">%1$s<ex>Chrome Dev</ex></ph> were merged. You can autofill all your saved passwords on both apps.
@@ -1771,6 +1765,10 @@ Your Google account may have other forms of browsing history like searches and a
       </message>
       <message name="IDS_SAFETY_HUB_ABUSIVE_NOTIFICATION_PERMISSIONS_SUBLABEL" desc="Description text shown below a site name, when notification permissions were automatically revoked for that site.">
         Notifications <ph name="SEPARATOR">•</ph> Chrome removed these permissions because this site is dangerous
+      </message>
+      <!-- TODO(crbug.com/406473591): Remove translateable="false" and add the final string -->
+      <message name="IDS_SAFETY_HUB_DISRUPTIVE_NOTIFICATION_PERMISSIONS_SUBLABEL"  translateable="false" desc="Description text shown below a site name, when notification permissions were automatically revoked for that site because user isn't interacting with the site but the site is sending a lot of notifications.">
+        Notifications <ph name="SEPARATOR">•</ph> Chrome removed these permissions because this site is disruptive
       </message>
       <message name="IDS_SAFETY_HUB_NOTIFICATIONS_RESET_SNACKBAR" desc="Snackbar text displayed when the user clicks the Unsubscribe button for a site which sends a lot of notifications. Informs the user for which site the notifications were unsubscribed.">
        Unsubscribed from <ph name="SITE_NAME">%1$s<ex>https://example.com:443</ex></ph>. You'll be asked again on your next visit.
@@ -2975,6 +2973,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_TAB_LOADING_DEFAULT_TITLE" desc="The title of a tab when we are still waiting for either the URL or the real title. This generally shows when the page is first loading.">
         Loading…
       </message>
+      <message name="IDS_TAB_SWITCHER_ADD_TO_GROUP_IPH" desc="IPH text to hint the user to try selecting the 'Add to Group' option in the Tab Switcher 3-Dot Menu.">
+        You can now easily add tabs to groups here
+      </message>
 
       <!-- DuplicateDownloadInfoBar -->
       <message name="IDS_DUPLICATE_DOWNLOAD_INFOBAR_TEXT" desc="Prompt text for the confirmation dialog asking whether the user really wants to download a file when there already exists a file with the same name">
@@ -3951,6 +3952,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
       <message name="IDS_MOST_VISITED_ITEM_REMOVED" desc="Text shown when the user removes one of the most visited websites on the new tab page.">
         Item removed
+      </message>
+      <message name="IDS_MOST_VISITED_ADD_NEW" desc="Name of the Tile-like button to add new shortcut by opening the Custom Links Edit Shortcut dialog.">
+        Add new
       </message>
       <message name="IDS_ACCESSIBILITY_GOOGLE_DOODLE" desc="Content description for the Google Doodle (the fun, alternative Google logo) shown on the new tab page.">
         Google doodle: <ph name="DOODLE_DESCRIPTION">%1$s<ex>Einstein’s birthday</ex></ph>
@@ -5081,6 +5085,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_ACCESSIBILITY_OMNIBOX_MOST_VISITED_TILE_NAVIGATE" desc="Announces that interacting with a Tile takes the user to specific website.">
         <ph name="WEBSITE_TITLE">%1$s<ex>Crater Lake National Park (U.S. National Park Service)</ex></ph>: <ph name="WEBSITE_URL">%2$s<ex>https://www.nps.gov/crla</ex></ph>
       </message>
+      <message name="IDS_ACCESSIBILITY_OMNIBOX_MOST_VISITED_TILE_ADD_NEW_SHORTCUT" desc="Announces that interacting with a Tile would open a dialog box to add a new shortcut.">
+        Add new shortcut.
+      </message>
       <message name="IDS_ACCESSIBILITY_OMNIBOX_MOST_VISITED_LIST" desc="Category name of the most visited sites. Announced as: 'amazon.com, 1 of 10 in list Most Visited Sites, 10 items.'">
         Most visited sites
       </message>
@@ -5536,6 +5543,15 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
       <message name="IDS_KEYBOARD_SHORTCUT_NEW_INCOGNITO_TAB" desc="A text label that appears next to a keyboard shortcut to open a new tab in Incognito mode in Chrome. The shortcut description is shown in a system dialog along with all other supported shortcuts. [CHAR_LIMIT=55]">
         Open a new tab in Incognito mode
+      </message>
+       <message name="IDS_KEYBOARD_SHORTCUT_SPECIFIC_TAB" desc="A text label that appears next to the keyboard shortcut that will move the user to a specific tab in the Chrome app. The shortcut description is shown in a system dialog along with all other supported shortcuts. [CHAR_LIMIT=55]">
+        Jump to a specific tab (1–8)
+      </message>
+      <message name="IDS_KEYBOARD_SHORTCUT_LAST_TAB" desc="A text label that appears next to the keyboard shortcut that will move the user to the last tab in the Chrome app. The shortcut description is shown in a system dialog along with all other supported shortcuts. [CHAR_LIMIT=55]">
+        Jump to the last tab
+      </message>
+      <message name="IDS_KEYBOARD_SHORTCUT_TAB_NAVIGATION_GROUP_HEADER" desc="A text label that appears above a list of shortcuts that are related to navigating the tab window. This group is part of several groups of keyboard shortcuts all shown in a dialog.">
+        Tab navigation shortcuts
       </message>
       <message name="IDS_KEYBOARD_SHORTCUT_OPEN_MENU" desc="A text label that appears next to a keyboard shortcut that opens the overflow menu in Chrome. The shortcut description is shown in a system dialog along with all other supported shortcuts. [CHAR_LIMIT=55]">
         Open the menu

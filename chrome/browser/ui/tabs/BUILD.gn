@@ -259,6 +259,7 @@ if (!is_android) {
       "pinned_tab_service_factory.h",
       "split_tab_collection.h",
       "split_tab_data.h",
+      "split_tab_visual_data.h",
       "tab_collection.h",
       "tab_collection_storage.h",
       "tab_renderer_data.h",
@@ -267,6 +268,10 @@ if (!is_android) {
       "tab_utils.h",
       "unpinned_tab_collection.h",
     ]
+
+    if (is_win || is_mac || is_linux || is_chromeos) {
+      sources += [ "inactive_window_mouse_event_controller.h" ]
+    }
 
     public_deps = [
       ":tab_enums",
@@ -306,6 +311,7 @@ if (!is_android) {
       "recent_tabs_sub_menu_model.cc",
       "split_tab_collection.cc",
       "split_tab_data.cc",
+      "split_tab_visual_data.cc",
       "tab_collection.cc",
       "tab_collection_storage.cc",
       "tab_dialog_manager.cc",
@@ -315,6 +321,10 @@ if (!is_android) {
       "tab_utils.cc",
       "unpinned_tab_collection.cc",
     ]
+
+    if (is_win || is_mac || is_linux || is_chromeos) {
+      sources += [ "inactive_window_mouse_event_controller.cc" ]
+    }
 
     deps = [
       ":tab_group",
@@ -446,6 +456,7 @@ if (!is_android) {
     testonly = true
     defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
     sources = [
+      "existing_base_sub_menu_model_browsertest.cc",
       "existing_window_sub_menu_model_browsertest.cc",
       "pinned_tab_codec_browsertest.cc",
       "pinned_tab_service_browsertest.cc",
@@ -503,9 +514,9 @@ if (!is_android) {
   source_set("unit_tests") {
     testonly = true
     sources = [
-      "existing_base_sub_menu_model_unittest.cc",
       "existing_comparison_table_sub_menu_model_unittest.cc",
       "existing_tab_group_sub_menu_model_unittest.cc",
+      "inactive_window_mouse_event_controller_unittest.cc",
       "tab_collection_storage_unittest.cc",
       "tab_collection_unittest.cc",
       "tab_group_deletion_dialog_controller_unittest.cc",

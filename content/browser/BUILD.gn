@@ -137,7 +137,7 @@ source_set("browser") {
     "//components/services/storage/public/mojom",
     "//components/sqlite_proto",
     "//components/system_media_controls",
-    "//components/tracing:startup_tracing",
+    "//components/tracing:tracing_config",
     "//components/ui_devtools",
     "//components/ukm",
     "//components/ukm/debug:util",
@@ -2735,11 +2735,16 @@ source_set("browser") {
 
   if (is_apple) {
     sources += [
-      "child_process_task_port_provider_mac.cc",
-      "child_process_task_port_provider_mac.h",
       "font_access/font_enumeration_data_source_mac.h",
       "font_access/font_enumeration_data_source_mac.mm",
     ]
+
+    if (!(is_ios && target_platform == "tvos")) {
+      sources += [
+        "child_process_task_port_provider_mac.cc",
+        "child_process_task_port_provider_mac.h",
+      ]
+    }
   }
 
   if (is_mac) {
@@ -3238,6 +3243,7 @@ source_set("browser") {
       "android/browser_context_handle.cc",
       "android/browser_startup_controller.cc",
       "android/browser_startup_controller.h",
+      "android/child_process_importance.cc",
       "android/client_data_json_android.cc",
       "android/content_feature_map.cc",
       "android/content_startup_flags.cc",

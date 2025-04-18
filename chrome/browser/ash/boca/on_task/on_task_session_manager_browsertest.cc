@@ -382,6 +382,40 @@ IN_PROC_BROWSER_TEST_F(OnTaskSessionManagerBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(OnTaskSessionManagerBrowserTest,
+                       ShouldNotLockBocaSWAInAppReloadIfLockInProgress) {
+  content::TestNavigationObserver navigation_observer((GURL(kTestUrl1)));
+  navigation_observer.StartWatchingNewWebContents();
+
+  // Start OnTask session, spawn one tab outside the homepage tab and lock the
+  // boca app.
+  GetOnTaskSessionManager()->OnSessionStarted(kSessionId,
+                                              ::boca::UserIdentity());
+  ::boca::Bundle bundle;
+  bundle.add_content_configs()->set_url(kTestUrl1);
+  bundle.set_locked(true);
+  GetOnTaskSessionManager()->OnBundleUpdated(bundle);
+  navigation_observer.Wait();
+
+  // Boca should not be locked before the full countdown, and locked after the
+  // full countdown.
+  Browser* const boca_app_browser = FindBocaSystemWebAppBrowser();
+  ASSERT_THAT(boca_app_browser, NotNull());
+  ASSERT_TRUE(boca_app_browser->IsLockedForOnTask());
+  ASSERT_FALSE(platform_util::IsBrowserLockedFullscreen(boca_app_browser));
+  WaitForLockedModeCountdown();
+  ASSERT_TRUE(platform_util::IsBrowserLockedFullscreen(boca_app_browser));
+  EXPECT_FALSE(chromeos::wm::CanFloatWindow(
+      boca_app_browser->window()->GetNativeWindow()));
+  EXPECT_TRUE(boca_app_browser->window()->IsToolbarVisible());
+
+  // Unlock the Boca app to unblock test teardown that involves browser window
+  // close.
+  bundle.set_locked(false);
+  GetOnTaskSessionManager()->OnBundleUpdated(bundle);
+  EXPECT_FALSE(platform_util::IsBrowserLockedFullscreen(boca_app_browser));
+}
+
+IN_PROC_BROWSER_TEST_F(OnTaskSessionManagerBrowserTest,
                        ShouldApplyOpenNavRestrictionsToTabsOnBundleUpdated) {
   content::TestNavigationObserver navigation_observer((GURL(kTestUrl1)));
   navigation_observer.StartWatchingNewWebContents();
@@ -634,7 +668,7 @@ IN_PROC_BROWSER_TEST_F(OnTaskSessionManagerBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(OnTaskSessionManagerBrowserTest,
-                       ShouldMuteTabsAudioWhenLockOnBundleUpdated) {
+                       ShouldMuteAndUnmuteTabsAudioWhenLockAndUnlock) {
   content::TestNavigationObserver navigation_observer((GURL(kTestUrl1)));
   navigation_observer.StartWatchingNewWebContents();
 
@@ -683,10 +717,10 @@ IN_PROC_BROWSER_TEST_F(OnTaskSessionManagerBrowserTest,
   tab_strip_model->ActivateTabAt(1);
   EXPECT_FALSE(tab_strip_model->GetActiveWebContents()->IsAudioMuted());
 
-  // Tabs in other browsers are muted.
-  EXPECT_TRUE(
+  // Tabs in other browsers are unmuted.
+  EXPECT_FALSE(
       browser_1->tab_strip_model()->GetActiveWebContents()->IsAudioMuted());
-  EXPECT_TRUE(
+  EXPECT_FALSE(
       browser_2->tab_strip_model()->GetActiveWebContents()->IsAudioMuted());
 }
 

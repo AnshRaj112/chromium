@@ -896,6 +896,18 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Storage.FileSystemAccess.ConfirmSensitiveEntryAccessDuration"
+    units="ms" expires_after="2025-10-12">
+  <owner>leimy@chromium.org</owner>
+  <owner>src/content/browser/file_system_access/OWNERS</owner>
+  <summary>
+    Logs the time it takes to execute
+    ChromeFileSystemAccessPermissionContext::ConfirmSensitiveEntryAccess(). This
+    metric will be used to estimate the impact of the performance improvements
+    made to the blocklists check within the method.
+  </summary>
+</histogram>
+
 <histogram name="Storage.FileSystemAccess.FilePathWatcherCallbackError"
     enum="FileSystemAccessWatchWithChangeInfoResult" expires_after="2025-06-27">
   <owner>memmott@chromium.org</owner>
@@ -1243,6 +1255,23 @@ chromium-metrics-reviews@google.com.
   <summary>
     Records the size of the InterestGroup database. Collected prior to database
     maintenance.
+  </summary>
+</histogram>
+
+<histogram
+    name="Storage.InterestGroup.HeaderObserver.CreatedOpaqueOriginForPrefsCheck"
+    enum="Boolean" expires_after="2025-08-10">
+  <owner>caraitto@chromium.org</owner>
+  <owner>pauljensen@chromium.org</owner>
+  <owner>privacy-sandbox-dev@chromium.org</owner>
+  <summary>
+    Tracks whether or not it was necessary to create a new opaque origin to use
+    as the top-frame origin for the call to
+    `ContentBrowserClient::IsInterestGroupAPIAllowed()` when storing headers
+    received from the network service. Recorded every time this check was made.
+    NOTE: This histogram doesn't apply to normal joins, updates, auctions, etc.
+    -- it just applies to checks applied after receiving headers from the
+    network service.
   </summary>
 </histogram>
 

@@ -73,7 +73,7 @@
 #endif
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
-#include "chrome/browser/enterprise/browser_management/management_service_factory.h"
+#include "chrome/browser/extensions/management/management_util.h"
 #endif
 
 namespace extensions {
@@ -83,18 +83,6 @@ namespace extensions {
 BASE_FEATURE(kDisableOffstoreForceInstalledExtensionsInLowTrustEnviroment,
              "DisableOffstoreForceInstalledExtensionsInLowTrustEnviroment",
              base::FEATURE_ENABLED_BY_DEFAULT);
-
-// The highest level of trustworthiness for either platform or browser.
-policy::ManagementAuthorityTrustworthiness GetHighestTrustworthiness(
-    Profile* profile) {
-  policy::ManagementAuthorityTrustworthiness platform_trustworthiness =
-      policy::ManagementServiceFactory::GetForPlatform()
-          ->GetManagementAuthorityTrustworthiness();
-  policy::ManagementAuthorityTrustworthiness browser_trustworthiness =
-      policy::ManagementServiceFactory::GetForProfile(profile)
-          ->GetManagementAuthorityTrustworthiness();
-  return std::max(platform_trustworthiness, browser_trustworthiness);
-}
 #endif
 
 ExtensionManagement::ExtensionManagement(Profile* profile)
@@ -465,7 +453,7 @@ bool ExtensionManagement::IsForceInstalledInLowTrustEnvironment(
     return false;
   }
 
-  return GetHighestTrustworthiness(profile_) <
+  return GetHigherManagementAuthorityTrustworthiness(profile_) <
          policy::ManagementAuthorityTrustworthiness::TRUSTED;
 #else
   return false;
@@ -489,7 +477,7 @@ bool ExtensionManagement::ShouldBlockForceInstalledOffstoreExtension(
     return false;
   }
 
-  return GetHighestTrustworthiness(profile_) <
+  return GetHigherManagementAuthorityTrustworthiness(profile_) <
          policy::ManagementAuthorityTrustworthiness::TRUSTED;
 #else
   return false;
@@ -768,10 +756,10 @@ void ExtensionManagement::Refresh() {
       const base::Value::Dict* subdict = iter.second.GetIfDict();
       if (!subdict)
         continue;
-      if (base::StartsWith(iter.first, schema_constants::kUpdateUrlPrefix,
-                           base::CompareCase::SENSITIVE)) {
-        const std::string& update_url =
-            iter.first.substr(strlen(schema_constants::kUpdateUrlPrefix));
+      std::optional<std::string_view> remainder =
+          base::RemovePrefix(iter.first, schema_constants::kUpdateUrlPrefix);
+      if (remainder) {
+        const std::string update_url(*remainder);
         if (!GURL(update_url).is_valid()) {
           LOG(WARNING) << "Invalid update URL: " << update_url << ".";
           continue;

@@ -36,6 +36,11 @@ import java.util.Optional;
 public class AutofillImageFetcher {
     private static final long REFETCH_DELAY_MS = 5000;
     private static final int MAX_FETCH_ATTEMPTS = 2;
+    // Logs the overall success rate of fetching credit card art images. For a given credit card art
+    // URL, logs "true" if image was fetched, "false" if the image was not fetched after {@link
+    // #MAX_FETCH_ATTEMPTS} attempts.
+    private static final String CREDIT_CARD_ART_OVERALL_SUCCESS_HISTOGRAM =
+            "Autofill.ImageFetcher.CreditCardArt.Result";
 
     private final Map<String, Integer> mFetchAttemptCounter = new HashMap<>();
     private final Map<String, Bitmap> mImagesCache = new HashMap<>();
@@ -58,6 +63,7 @@ public class AutofillImageFetcher {
      * @param imageSizes The list of image sizes that should be fetched for each of the above URLs.
      */
     @CalledByNative
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     void prefetchCardArtImages(
             @JniType("base::span<const GURL>") GURL[] urls, @ImageSize int[] imageSizes) {
         Context context = ContextUtils.getApplicationContext();
@@ -81,6 +87,7 @@ public class AutofillImageFetcher {
      * @param urls The URLs to fetch the images.
      */
     @CalledByNative
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     void prefetchPixAccountImages(@JniType("base::span<const GURL>") GURL[] urls) {
         for (GURL url : urls) {
             if (url == null || !url.isValid()) {
@@ -173,6 +180,9 @@ public class AutofillImageFetcher {
                         url, cardIconSpecs.getWidth(), cardIconSpecs.getHeight());
 
         if (bitmap != null) {
+            RecordHistogram.recordBooleanHistogram(
+                    CREDIT_CARD_ART_OVERALL_SUCCESS_HISTOGRAM, /* sample= */ true);
+
             // When adding new sizes for card icons, check if the corner radius needs to be added as
             // a suffix for caching (crbug.com/1431283).
             mImagesCache.put(
@@ -184,6 +194,8 @@ public class AutofillImageFetcher {
 
         // Image fetching failed, and max retry attempts reached.
         if (mFetchAttemptCounter.getOrDefault(urlToCache.getSpec(), 0) >= MAX_FETCH_ATTEMPTS) {
+            RecordHistogram.recordBooleanHistogram(
+                    CREDIT_CARD_ART_OVERALL_SUCCESS_HISTOGRAM, /* sample= */ false);
             return;
         }
 
@@ -244,21 +256,6 @@ public class AutofillImageFetcher {
         }
 
         return AppCompatResources.getDrawable(context, defaultIconId);
-    }
-
-    /**
-     * Add an image to the in-memory cache of images.
-     *
-     * @param url The URL that should be used as the key for the cache.
-     * @param bitmap The actual image bitmap that should be cached.
-     * @param cardIconSpecs The {@link CardIconSpecs} for the bitmap. This is used for generating
-     *     the URL params.
-     */
-    public void addImageToCacheForTesting(GURL url, Bitmap bitmap, CardIconSpecs cardIconSpecs) {
-        GURL urlToCache =
-                AutofillUiUtils.getFifeIconUrlWithParams(
-                        url, cardIconSpecs.getWidth(), cardIconSpecs.getHeight());
-        mImagesCache.put(urlToCache.getSpec(), bitmap);
     }
 
     /**

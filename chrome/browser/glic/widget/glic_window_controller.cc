@@ -394,6 +394,10 @@ void GlicWindowController::OnWidgetUserResizeEnded() {
   if (GetGlicView()) {
     GetGlicView()->UpdatePrimaryDraggableAreaOnResize();
   }
+
+  if (GetGlicWidget()) {
+    glic_size_ = GetGlicWidget()->GetSize();
+  }
 }
 
 void GlicWindowController::ShowAfterSignIn(base::WeakPtr<Browser> browser) {
@@ -1444,7 +1448,8 @@ void GlicWindowController::Reload() {
     GetFreWebContents()->ReloadFocusedFrame();
   }
   if (contents_) {
-    contents_->web_contents()->ReloadFocusedFrame();
+    contents_->web_contents()->GetController().Reload(
+        content::ReloadType::BYPASSING_CACHE, /*check_for_repost=*/false);
   }
 }
 

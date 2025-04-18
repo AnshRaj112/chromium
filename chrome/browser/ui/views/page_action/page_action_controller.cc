@@ -19,8 +19,11 @@ using PassKey = base::PassKey<PageActionController>;
 
 PageActionController::PageActionController(
     PinnedToolbarActionsModel* pinned_actions_model,
-    PageActionModelFactory* page_action_model_factory)
-    : page_action_model_factory_(page_action_model_factory) {
+    PageActionModelFactory* page_action_model_factory,
+    PageActionMetricsRecorderFactory* page_action_metrics_recorder_factory)
+    : page_action_model_factory_(page_action_model_factory),
+      page_action_metrics_recorder_factory_(
+          page_action_metrics_recorder_factory) {
   if (pinned_actions_model) {
     pinned_actions_observation_.Observe(pinned_actions_model);
   }
@@ -41,10 +44,11 @@ void PageActionController::Initialize(
   for (actions::ActionId id : action_ids) {
     Register(id, tab_interface.IsActivated());
 
-    auto metric_recorder = std::make_unique<PageActionMetricsRecorder>(
-        tab_interface, properties_provider.GetProperties(id),
-        FindPageActionModel(id));
-    metrics_recorders_.push_back(std::move(metric_recorder));
+    std::unique_ptr<PageActionMetricsRecorderInterface> metrics_recorder =
+        CreateMetricsRecorder(tab_interface,
+                              properties_provider.GetProperties(id),
+                              FindPageActionModel(id));
+    metrics_recorders_.push_back(std::move(metrics_recorder));
   }
   if (pinned_actions_observation_.GetSource()) {
     PinnedActionsModelChanged();
@@ -71,7 +75,7 @@ void PageActionController::Hide(actions::ActionId action_id) {
 void PageActionController::ShowSuggestionChip(actions::ActionId action_id,
                                               SuggestionChipConfig config) {
   PageActionModelInterface& model = FindPageActionModel(action_id);
-  model.SetShouldAnimateChip(PassKey(), config.should_animate);
+  model.SetSuggestionChipConfig(PassKey(), config);
   model.SetShowSuggestionChip(PassKey(), /*show=*/true);
 }
 
@@ -199,6 +203,26 @@ std::unique_ptr<PageActionModelInterface> PageActionController::CreateModel(
   } else {
     return std::make_unique<PageActionModel>();
   }
+}
+
+std::unique_ptr<PageActionMetricsRecorderInterface>
+PageActionController::CreateMetricsRecorder(
+    tabs::TabInterface& tab_interface,
+    const PageActionProperties& properties,
+    PageActionModelInterface& model) {
+  if (page_action_metrics_recorder_factory_ != nullptr) {
+    return page_action_metrics_recorder_factory_->Create(tab_interface,
+                                                         properties, model);
+  } else {
+    return std::make_unique<PageActionMetricsRecorder>(tab_interface,
+                                                       properties, model);
+  }
+}
+
+std::ostream& operator<<(std::ostream& os, const SuggestionChipConfig& config) {
+  os << "{ should_animate: " << config.should_animate
+     << ", should_announce_chip: " << config.should_announce_chip << " }";
+  return os;
 }
 
 }  // namespace page_actions

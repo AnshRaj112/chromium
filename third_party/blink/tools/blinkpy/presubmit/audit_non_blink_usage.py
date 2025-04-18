@@ -388,7 +388,7 @@ _CONFIG = [
         ],
         'allowed': [
             # For hashing of k-anonymity keys
-            'crypto::SHA256HashString',
+            'crypto::hash::Sha256',
 
             # Types used to compute k-anonymity keys, also many IG fields are
             # origins and URLs.
@@ -1949,6 +1949,14 @@ _CONFIG = [
     },
     {
         'paths': [
+            'third_party/blink/renderer/modules/ai/',
+        ],
+        'allowed': [
+            'base::MakeFixedFlatSet',
+        ],
+    },
+    {
+        'paths': [
             'third_party/blink/renderer/modules/animationworklet/',
         ],
         'allowed': [
@@ -2352,6 +2360,8 @@ _CONFIG = [
     },
     {
         'paths': [
+            'third_party/blink/renderer/core/annotation/annotation_agent_impl_test.cc'
+            'third_party/blink/renderer/core/editing/markers/glic_marker.cc',
             'third_party/blink/renderer/core/highlight/highlight_style_utils.cc',
         ],
         'allowed': [

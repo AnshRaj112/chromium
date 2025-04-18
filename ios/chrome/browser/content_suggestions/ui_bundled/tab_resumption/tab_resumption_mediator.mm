@@ -150,6 +150,20 @@ bool HasPriceDropDataForTabResumption(
          price_tracking_data->buyable_product().has_title();
 }
 
+bool HasCurrentPriceDataForTabResumption(
+    const std::optional<const commerce::PriceTrackingData>&
+        price_tracking_data) {
+  return price_tracking_data.has_value() &&
+         price_tracking_data->has_buyable_product() &&
+         price_tracking_data->buyable_product().has_current_price() &&
+         price_tracking_data->buyable_product()
+             .current_price()
+             .has_currency_code() &&
+         price_tracking_data->buyable_product()
+             .current_price()
+             .has_amount_micros();
+}
+
 // A Product Detail Page is price trackable if it has a cluster ID.
 bool IsPriceTrackable(const std::optional<const commerce::PriceTrackingData>&
                           price_tracking_data) {
@@ -161,6 +175,16 @@ bool IsPriceTrackable(const std::optional<const commerce::PriceTrackingData>&
 std::u16string GetHostnameFromGURL(const GURL& url) {
   return url_formatter::
       FormatUrlForDisplayOmitSchemePathTrivialSubdomainsAndMobilePrefix(url);
+}
+
+void AddProductImageIfApplicable(
+    const commerce::PriceTrackingData& price_tracking_data,
+    TabResumptionItem* item) {
+  if (price_tracking_data.has_buyable_product() &&
+      price_tracking_data.buyable_product().has_image_url()) {
+    item.shopCardData.productImageURL =
+        price_tracking_data.buyable_product().image_url();
+  }
 }
 
 void ConfigureTabResumptionItemForShopCard(
@@ -197,11 +221,7 @@ void ConfigureTabResumptionItemForShopCard(
         formatter.get(),
         price_tracking_data->product_update().new_price().amount_micros(),
         price_tracking_data->product_update().old_price().amount_micros());
-    if (price_tracking_data->has_buyable_product() &&
-        price_tracking_data->buyable_product().has_image_url()) {
-      item.shopCardData.productImageURL =
-          price_tracking_data->buyable_product().image_url();
-    }
+    AddProductImageIfApplicable(price_tracking_data.value(), item);
     item.shopCardData.accessibilityString = l10n_util::GetNSStringF(
         IDS_IOS_CONTENT_SUGGESTIONS_SHOPCARD_PRICE_DROP_OPEN_TABS_ACCESSIBILITY_LABEL,
         base::SysNSStringToUTF16(item.shopCardData.priceDrop->previous_price),
@@ -222,6 +242,25 @@ void ConfigureTabResumptionItemForShopCard(
     if (info) {
       item.shopCardData.productInfo = std::move(*info);
     }
+
+    if (HasCurrentPriceDataForTabResumption(price_tracking_data)) {
+      std::unique_ptr<payments::CurrencyFormatter> formatter =
+          std::make_unique<payments::CurrencyFormatter>(
+              price_tracking_data->buyable_product()
+                  .current_price()
+                  .currency_code(),
+              GetApplicationContext()->GetApplicationLocale());
+      item.shopCardData.currentPrice = GetFormattedPrice(
+          formatter.get(), price_tracking_data->buyable_product()
+                               .current_price()
+                               .amount_micros());
+    }
+    item.shopCardData.accessibilityString = l10n_util::GetNSStringF(
+        IDS_IOS_CONTENT_SUGGESTIONS_SHOPCARD_TRACK_PRICE_ACCESSIBILITY_LABEL,
+        base::SysNSStringToUTF16(item.tabTitle),
+        base::SysNSStringToUTF16(item.shopCardData.currentPrice),
+        GetHostnameFromGURL(url));
+    AddProductImageIfApplicable(price_tracking_data.value(), item);
   }
 }
 

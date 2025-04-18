@@ -640,6 +640,12 @@ static_library("browser") {
     "lifetime/browser_shutdown.h",
     "lifetime/termination_notification.cc",
     "lifetime/termination_notification.h",
+    "loader/from_gws_navigation_and_keep_alive_request_observer.cc",
+    "loader/from_gws_navigation_and_keep_alive_request_observer.h",
+    "loader/from_gws_navigation_and_keep_alive_request_tracker.cc",
+    "loader/from_gws_navigation_and_keep_alive_request_tracker.h",
+    "loader/from_gws_navigation_and_keep_alive_request_tracker_factory.cc",
+    "loader/from_gws_navigation_and_keep_alive_request_tracker_factory.h",
     "loader/keep_alive_request_tracker.cc",
     "loader/keep_alive_request_tracker.h",
     "login_detection/login_detection_keyed_service.cc",
@@ -2400,7 +2406,7 @@ static_library("browser") {
     "//components/tpcd/metadata/browser:prefs",
     "//components/tracing:background_tracing_metrics_provider",
     "//components/tracing:background_tracing_utils",
-    "//components/tracing:startup_tracing",
+    "//components/tracing:tracing_config",
     "//components/translate/content/browser",
     "//components/translate/core/browser",
     "//components/translate/core/common",
@@ -2980,6 +2986,7 @@ static_library("browser") {
       "enterprise/reporting/reporting_delegate_factory_android.h",
       "enterprise/util/android_enterprise_info.cc",
       "enterprise/util/android_enterprise_info.h",
+      "enterprise/util/data_protection_bridge.cc",
       "feed/android/background_refresh_task.cc",
       "feed/android/background_refresh_task.h",
       "feed/android/feed_image_fetch_client.cc",
@@ -5408,6 +5415,7 @@ static_library("browser") {
       "//chrome/browser/ui/webui/ash/audio",
       "//chrome/browser/ui/webui/ash/bluetooth",
       "//chrome/browser/ui/webui/ash/borealis_installer",
+      "//chrome/browser/ui/webui/ash/borealis_motd",
       "//chrome/browser/ui/webui/ash/cellular_setup",
       "//chrome/browser/ui/webui/ash/cloud_upload",
       "//chrome/browser/ui/webui/ash/crostini_installer",
@@ -5901,6 +5909,7 @@ static_library("browser") {
       "//chrome/browser/ui/webui/ash/arc_power_control",
       "//chrome/browser/ui/webui/ash/assistant_optin",
       "//chrome/browser/ui/webui/ash/borealis_installer",
+      "//chrome/browser/ui/webui/ash/borealis_motd",
       "//chrome/browser/ui/webui/ash/cellular_setup",
       "//chrome/browser/ui/webui/ash/cloud_upload",
       "//chrome/browser/ui/webui/ash/diagnostics_dialog",
@@ -8528,7 +8537,6 @@ static_library("browser_generated_files") {
       "//chrome/browser/ui/webui/access_code_cast:mojo_bindings",
       "//chrome/browser/ui/webui/app_service_internals:mojo_bindings",
       "//chrome/browser/ui/webui/data_sharing:mojo_bindings",
-      "//chrome/browser/ui/webui/discards:mojo_bindings",
       "//chrome/browser/ui/webui/downloads:mojo_bindings",
       "//chrome/browser/ui/webui/new_tab_page:mojo_bindings",
       "//chrome/browser/ui/webui/new_tab_page_third_party:mojo_bindings",
@@ -8552,6 +8560,9 @@ static_library("browser_generated_files") {
       public_deps +=
           [ "//chrome/browser/ui/webui/new_tab_page/foo:mojo_bindings" ]
     }
+  }
+  if (!is_android || is_desktop_android) {
+    public_deps += [ "//chrome/browser/ui/webui/discards:mojo_bindings" ]
   }
 
   if (is_chromeos) {

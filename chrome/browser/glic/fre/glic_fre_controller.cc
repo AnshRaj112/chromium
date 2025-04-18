@@ -55,6 +55,14 @@ void GlicFreController::WebUiStateChanged(mojom::FreWebUiState new_state) {
     webui_state_ = new_state;
     webui_state_callback_list_.Notify(webui_state_);
 
+    // It is possible for the FRE to open directly in an error state. In this
+    // case, we should not record the FRE load time metric if the content is
+    // loaded at a later point.
+    if (new_state == mojom::FreWebUiState::kError ||
+        new_state == mojom::FreWebUiState::kOffline) {
+      show_start_time_ = base::TimeTicks();
+    }
+
     RecordMetricsIfDialogIsShowingAndReady();
   }
 }
@@ -91,24 +99,26 @@ bool GlicFreController::CanShowFreDialog(Browser* browser) {
 void GlicFreController::ShowFreDialog(Browser* browser) {
   CHECK(CanShowFreDialog(browser));
   source_browser_ = browser->AsWeakPtr();
+
   show_start_time_ = base::TimeTicks::Now();
   profile_->GetPrefs()->SetInteger(
       prefs::kGlicCompletedFre,
       static_cast<int>(prefs::FreStatus::kIncomplete));
-  auth_controller_.CheckAuthBeforeShow(
-      AuthController::FallbackBehavior::kShowReauthPage,
-      base::BindOnce(&GlicFreController::ShowFreDialogAfterAuthCheck,
-                     GetWeakPtr(), browser->AsWeakPtr()));
-}
 
-void GlicFreController::ShowFreDialogAfterAuthCheck(
-    base::WeakPtr<Browser> browser,
-    AuthController::BeforeShowResult result) {
-  if (result != AuthController::BeforeShowResult::kReady) {
+  if (auth_controller_.CheckAuthBeforeShowSync(
+          base::BindOnce(&GlicFreController::ShowFreDialogAfterAuthCheck,
+                         GetWeakPtr(), browser->AsWeakPtr()))) {
+    ShowFreDialogAfterAuthCheck(browser->AsWeakPtr());
+  } else {
+    // Sign-in required and handled by AuthController. In this case, do not
+    // record the FRE load time metric.
     show_start_time_ = base::TimeTicks();
     return;
   }
+}
 
+void GlicFreController::ShowFreDialogAfterAuthCheck(
+    base::WeakPtr<Browser> browser) {
   // Abort if the browser was closed, to avoid crashing. Note, the user
   // shouldn't have much chance to close the browser between ShowFreDialog() and
   // ShowFreDialogAfterAuthCheck().
@@ -138,6 +148,7 @@ void GlicFreController::ShowFreDialogAfterAuthCheck(
       base::BindRepeating(&GlicFreController::OnTabShowingModalWillDetach,
                           base::Unretained(this)));
   base::RecordAction(base::UserMetricsAction("Glic.Fre.Shown"));
+  auth_controller_.OnGlicWindowOpened();
 
   // Recording the load latency time when FRE contents were preloaded.
   RecordMetricsIfDialogIsShowingAndReady();
@@ -245,25 +256,15 @@ void GlicFreController::TryPreload() {
   // Callers should not attempt to preload if the widget is showing.
   CHECK(!fre_widget_);
 
-  if (fre_view_) {
+  if (fre_view_ || auth_controller_.RequiresSignIn()) {
     return;
   }
-  auth_controller_.CheckAuthBeforeShow(
-      AuthController::FallbackBehavior::kNone,
-      base::BindOnce(&GlicFreController::TryPreloadAfterAuthCheck,
-                     GetWeakPtr()));
+
+  CreateView();
 }
 
 bool GlicFreController::IsWarmed() const {
   return !!fre_view_;
-}
-
-void GlicFreController::TryPreloadAfterAuthCheck(
-    AuthController::BeforeShowResult result) {
-  if (result != AuthController::BeforeShowResult::kReady) {
-    return;
-  }
-  CreateView();
 }
 
 content::WebContents* GlicFreController::GetWebContents() {
@@ -419,6 +420,14 @@ bool GlicFreController::IsShowingDialog() const {
 gfx::Size GlicFreController::GetFreInitialSize() {
   return gfx::Size(features::kGlicFreInitialWidth.Get(),
                    features::kGlicFreInitialHeight.Get());
+}
+
+void GlicFreController::UpdateFreWidgetSize(const gfx::Size& new_size) {
+  if (!fre_widget_) {
+    return;
+  }
+
+  fre_widget_->SetSize(new_size);
 }
 
 }  // namespace glic

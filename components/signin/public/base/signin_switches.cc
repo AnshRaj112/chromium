@@ -21,7 +21,7 @@ BASE_FEATURE(kCctSignInPrompt,
 // capability `IsSubjectToParentalControls`.
 BASE_FEATURE(kForceSupervisedSigninWithCapabilities,
              "ForceSupervisedSigninWithCapabilities",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Add history sync opt-in promo in the History Page.
 BASE_FEATURE(kHistoryPageHistorySyncPromo,
@@ -38,6 +38,13 @@ BASE_FEATURE(kHistoryPagePromoCtaStringVariation,
 BASE_FEATURE(kHistoryOptInEducationalTip,
              "HistoryOptInEducationalTip",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Determines which text should be shown on the history sync educational tip
+// button. No-op unless HistoryOptInEducationalTip is enabled.
+const base::FeatureParam<int> kHistoryOptInEducationalTipVariation(
+    &kHistoryOptInEducationalTip,
+    "history_opt_in_educational_tip_param",
+    0);
 
 // Feature to bypass double-checking that signin callers have correctly gotten
 // the user to accept account management. This check is slow and not strictly

@@ -2027,12 +2027,12 @@ class BrowserAutofillManagerTestValuables : public BrowserAutofillManagerTest {
 
   void SetLoyaltyCards(const std::vector<LoyaltyCard>& loyalty_cards) {
     valuables_table_.get()->SetLoyaltyCards(loyalty_cards);
-    test_api(client().GetValuablesDataManager()).LoadLoyaltyCards();
+    test_api(valuables_data()).LoadLoyaltyCards();
     web_data_service_helper_->WaitUntilIdle();
   }
 
   ValuablesDataManager& valuables_data() {
-    return client().GetValuablesDataManager();
+    return *client().GetValuablesDataManager();
   }
 
  private:
@@ -6828,6 +6828,8 @@ class BrowserAutofillManagerTest_AutofillAi
         test::GetDriversLicenseEntityInstance());
     webdata_helper_.WaitUntilIdle();
     client().SetUpPrefsAndIdentityForAutofillAi();
+
+    GenerateNewPassportForm(/*autocomplete_unrecognized=*/false);
   }
 
   const FormData& passport_form() const { return passport_form_; }
@@ -6891,16 +6893,22 @@ class BrowserAutofillManagerTest_AutofillAi
     return form.global_id();
   }
 
+  void GenerateNewPassportForm(bool autocomplete_unrecognized) {
+    passport_form_ = test::GetFormData(
+        {.fields = {{.name = u"First name",
+                     .autocomplete_attribute =
+                         autocomplete_unrecognized ? "nonsense" : ""},
+                    {.name = u"Last name"},
+                    {.name = u"Passport number"},
+                    {.name = u"Passport issue date"}}});
+  }
+
  private:
   base::test::ScopedFeatureList feature_list_{
       features::kAutofillAiWithDataSchema};
   AutofillWebDataServiceTestHelper webdata_helper_{
       std::make_unique<EntityTable>()};
-  FormData passport_form_ =
-      test::GetFormData({.fields = {{.name = u"First name"},
-                                    {.name = u"Last name"},
-                                    {.name = u"Passport number"},
-                                    {.name = u"Passport issue date"}}});
+  FormData passport_form_;
 };
 
 // Tests that Autofill AI suggestions are shown.
@@ -6918,6 +6926,20 @@ TEST_F(BrowserAutofillManagerTest_AutofillAi, ShowAutofillAiSuggestions) {
               ElementsAre(Field(&Suggestion::type,
                                 Eq(SuggestionType::kFillAutofillAi))));
 }
+
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+// Tests that no Autofill AI suggestions are shown if the autocomplete attribute
+// is unrecognized.
+TEST_F(BrowserAutofillManagerTest_AutofillAi,
+       NoAutofillAiSuggestionsForAutocompleteUnrecognized) {
+  GenerateNewPassportForm(/*autocomplete_unrecognized=*/true);
+  SeeForm(/*may_run_model=*/false);
+
+  EXPECT_CALL(*client().GetAutofillAiDelegate(), GetSuggestions).Times(0);
+  OnAskForValuesToFill(passport_form(), passport_form().fields().front(),
+                       AutofillSuggestionTriggerSource::kAutofillAi);
+}
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
 // Tests that if a field has an Autofill AI TAG type and the EntityDataManager
 // can serve that TAG type (e.g., PASSPORT_NAME_TAG) but not the specific type

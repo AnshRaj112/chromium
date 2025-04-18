@@ -283,6 +283,7 @@ PaymentsDataManager::~PaymentsDataManager() {
 
 void PaymentsDataManager::Shutdown() {
   sync_observer_.Reset();
+  identity_observer_.Reset();
 }
 
 void PaymentsDataManager::OnAutofillChangedBySync(syncer::DataType data_type) {
@@ -921,7 +922,8 @@ const gfx::Image* PaymentsDataManager::GetCachedCardArtImageForUrl(
   if (!image_fetcher_) {
     return nullptr;
   }
-  return image_fetcher_->GetCachedImageForUrl(card_art_url);
+  return image_fetcher_->GetCachedImageForUrl(
+      card_art_url, AutofillImageFetcherBase::ImageType::kCreditCardArtImage);
 }
 
 base::span<const BnplIssuer> PaymentsDataManager::GetUnlinkedBnplIssuers()
@@ -2143,7 +2145,7 @@ void PaymentsDataManager::OnMaskedBankAccountsRefreshed() {
     updated_urls.emplace_back(display_icon_url);
   }
   if (!updated_urls.empty() && image_fetcher_) {
-    image_fetcher_->FetchPixAccountImages(updated_urls);
+    image_fetcher_->FetchPixAccountImagesForURLs(updated_urls);
   }
 }
 

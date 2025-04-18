@@ -28,7 +28,6 @@ import static org.chromium.ui.test.util.MockitoHelper.doCallback;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
-import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewStub;
 import android.widget.FrameLayout;
@@ -84,6 +83,7 @@ import org.chromium.chrome.browser.tasks.tab_management.TabListCoordinator.TabLi
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeController;
 import org.chromium.chrome.browser.ui.favicon.FaviconHelper;
 import org.chromium.chrome.browser.ui.favicon.FaviconHelperJni;
+import org.chromium.chrome.browser.undo_tab_close_snackbar.UndoBarThrottle;
 import org.chromium.chrome.test.util.browser.tabmodel.MockTabModel;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.widget.gesture.BackPressHandler.BackPressResult;
@@ -143,6 +143,7 @@ public class TabSwitcherPaneCoordinatorUnitTest {
     @Mock private ShareDelegateSupplier mShareDelegateSupplier;
     @Mock private TabBookmarker mTabBookmarker;
     @Mock private BookmarkModel mBookmarkModel;
+    @Mock private UndoBarThrottle mUndoBarThrottle;
 
     private final OneshotSupplierImpl<ProfileProvider> mProfileProviderSupplier =
             new OneshotSupplierImpl<>();
@@ -244,7 +245,8 @@ public class TabSwitcherPaneCoordinatorUnitTest {
                         mEdgeToEdgeSupplier,
                         /* desktopWindowStateManager= */ null,
                         mShareDelegateSupplier,
-                        mTabBookmarkerSupplier);
+                        mTabBookmarkerSupplier,
+                        mUndoBarThrottle);
         watcher.assertExpected();
 
         mCoordinator.initWithNative();
@@ -525,49 +527,5 @@ public class TabSwitcherPaneCoordinatorUnitTest {
                         .getTabGridDialogCoordinatorForTesting()
                         .getModelForTesting()
                         .get(TabGridDialogProperties.PAGE_KEY_LISTENER));
-    }
-
-    @Test
-    public void testOnPageKeyEvent_PageUp() {
-        @TabId int tabId = 1;
-        createTabs(2);
-        TabKeyEventData eventData = new TabKeyEventData(tabId, KeyEvent.KEYCODE_PAGE_UP);
-
-        mCoordinator.onPageKeyEvent(eventData);
-        verify(mTabGroupModelFilter, times(1)).moveRelatedTabs(eq(tabId), anyInt());
-    }
-
-    @Test
-    public void testOnPageKeyEvent_PageDown() {
-        @TabId int tabId = 1;
-        createTabs(2);
-        TabKeyEventData eventData = new TabKeyEventData(tabId, KeyEvent.KEYCODE_PAGE_DOWN);
-
-        mCoordinator.onPageKeyEvent(eventData);
-        verify(mTabGroupModelFilter, times(1)).moveRelatedTabs(eq(tabId), anyInt());
-    }
-
-    @Test
-    public void testOnPageKeyEvent_InvalidTabId() {
-        @TabId int tabId = -1;
-        createTabs(2);
-        TabKeyEventData eventData = new TabKeyEventData(tabId, KeyEvent.KEYCODE_PAGE_UP);
-
-        mCoordinator.onPageKeyEvent(eventData);
-        verify(mTabGroupModelFilter, never()).moveRelatedTabs(anyInt(), anyInt());
-    }
-
-    private void createTabs(int tabCount) {
-        for (int i = 1; i <= tabCount; i++) {
-            MockTab tab = MockTab.createAndInitialize(/* id= */ i, mProfile);
-            when(mTabGroupModelFilter.getTabModel()).thenReturn(mTabModel);
-            addTabToIndex(tab, /* index= */ i - 1);
-        }
-    }
-
-    private void addTabToIndex(MockTab tab, int index) {
-        mTabModel.addTab(
-                tab, index, TabLaunchType.FROM_CHROME_UI, TabCreationState.LIVE_IN_FOREGROUND);
-        when(mTabGroupModelFilter.representativeIndexOf(tab)).thenReturn(index);
     }
 }

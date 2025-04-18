@@ -176,6 +176,7 @@ public abstract class ChromeFeatureList {
     public static final String ANDROID_KEYBOARD_A11Y = "AndroidKeyboardA11y";
     public static final String ANDROID_META_CLICK_HISTORY_NAVIGATION =
             "AndroidMetaClickHistoryNavigation";
+    public static final String ANDROID_NATIVE_PAGES_IN_NEW_TAB = "AndroidNativePagesInNewTab";
     public static final String ANDROID_MINIMAL_UI_LARGE_SCREEN = "AndroidMinimalUiLargeScreen";
     public static final String ANDROID_NO_VISIBLE_HINT_FOR_DIFFERENT_TLD =
             "AndroidNoVisibleHintForDifferentTLD";
@@ -353,6 +354,8 @@ public abstract class ChromeFeatureList {
     public static final String EMPTY_TAB_LIST_ANIMATION_KILL_SWITCH =
             "EmptyTabListAnimationKillSwitch";
     public static final String ENABLE_BATCH_UPLOAD_FROM_SETTINGS = "EnableBatchUploadFromSettings";
+    public static final String ENABLE_SAVE_PACKAGE_FOR_OFF_THE_RECORD =
+            "EnableSavePackageForOffTheRecord";
     public static final String ENABLE_CLIPBOARD_DATA_CONTROLS_ANDROID =
             "EnableClipboardDataControlsAndroid";
     public static final String ENABLE_DISCOUNT_INFO_API = "EnableDiscountInfoApi";
@@ -381,6 +384,8 @@ public abstract class ChromeFeatureList {
     public static final String FULLSCREEN_INSETS_API_MIGRATION_ON_AUTOMOTIVE =
             "FullscreenInsetsApiMigrationOnAutomotive";
     public static final String GRID_TAB_SWITCHER_UPDATE = "GridTabSwitcherUpdate";
+    public static final String GRID_TAB_SWITCHER_SURFACE_COLOR_UPDATE =
+            "GridTabSwitcherSurfaceColorUpdate";
     public static final String GROUP_NEW_TAB_WITH_PARENT = "GroupNewTabWithParent";
     public static final String GROUP_SUGGESTION_SERVICE = "GroupSuggestionService";
     public static final String HASH_PREFIX_REAL_TIME_LOOKUPS =
@@ -586,9 +591,6 @@ public abstract class ChromeFeatureList {
             "TrackingProtectionUserBypassPwaTrigger";
     public static final String TRANSLATE_MESSAGE_UI = "TranslateMessageUI";
     public static final String TRANSLATE_TFLITE = "TFLiteLanguageDetectionEnabled";
-    public static final String
-            UNIFIED_PASSWORD_MANAGER_LOCAL_PASSWORDS_ANDROID_ACCESS_LOSS_WARNING =
-                    "UnifiedPasswordManagerLocalPasswordsAndroidAccessLossWarning";
     public static final String UNIFIED_PASSWORD_MANAGER_LOCAL_PWD_MIGRATION_WARNING =
             "UnifiedPasswordManagerLocalPasswordsMigrationWarning";
     public static final String UNO_PHASE_2_FOLLOW_UP = "UnoPhase2FollowUp";
@@ -611,14 +613,16 @@ public abstract class ChromeFeatureList {
     public static final String XSURFACE_METRICS_REPORTING = "XsurfaceMetricsReporting";
 
     /* Alphabetical: */
+    public static final CachedFlag sAndroidAppIntegration =
+            newCachedFlag(ANDROID_APP_INTEGRATION, true);
     public static final CachedFlag sAndroidAppIntegrationModule =
-            newCachedFlag(ANDROID_APP_INTEGRATION_MODULE, false, true);
+            newCachedFlag(ANDROID_APP_INTEGRATION_MODULE, true);
     public static final CachedFlag sAndroidAppIntegrationMultiDataSource =
             newCachedFlag(ANDROID_APP_INTEGRATION_MULTI_DATA_SOURCE, false);
     public static final CachedFlag sAndroidAppIntegrationV2 =
-            newCachedFlag(ANDROID_APP_INTEGRATION_V2, false, true);
+            newCachedFlag(ANDROID_APP_INTEGRATION_V2, true);
     public static final CachedFlag sAndroidAppIntegrationWithFavicon =
-            newCachedFlag(ANDROID_APP_INTEGRATION_WITH_FAVICON, false, true);
+            newCachedFlag(ANDROID_APP_INTEGRATION_WITH_FAVICON, true);
     public static final CachedFlag sAndroidBottomToolbar =
             newCachedFlag(ANDROID_BOTTOM_TOOLBAR, false, true);
     public static final CachedFlag sAndroidElegantTextHeight =
@@ -630,6 +634,8 @@ public abstract class ChromeFeatureList {
     public static final CachedFlag sAndroidTabSkipSaveTabsKillswitch =
             newCachedFlag(ANDROID_TAB_SKIP_SAVE_TABS_TASK_KILLSWITCH, true, true);
     public static final CachedFlag sAndroidThemeModule = newCachedFlag(ANDROID_THEME_MODULE, false);
+    public static final CachedFlag sAndroidWebAppLaunchHandler =
+            newCachedFlag(ANDROID_WEB_APP_LAUNCH_HANDLER, false);
     public static final CachedFlag sAndroidWindowPopupLargeScreen =
             newCachedFlag(ANDROID_WINDOW_POPUP_LARGE_SCREEN, false);
     public static final CachedFlag sAppSpecificHistory = newCachedFlag(APP_SPECIFIC_HISTORY, true);
@@ -655,7 +661,7 @@ public abstract class ChromeFeatureList {
     public static final CachedFlag sCctAutoTranslate = newCachedFlag(CCT_AUTO_TRANSLATE, true);
     public static final CachedFlag sCctBlockTouchesDuringEnterAnimation =
             newCachedFlag(CCT_BLOCK_TOUCHES_DURING_ENTER_ANIMATION, true);
-    public static final CachedFlag sCCTEphemeralMediaViewerExperiment =
+    public static final CachedFlag sCctEphemeralMediaViewerExperiment =
             newCachedFlag(
                     CCT_EPHEMERAL_MEDIA_VIEWER_EXPERIMENT,
                     /* defaultValue= */ false,
@@ -748,10 +754,7 @@ public abstract class ChromeFeatureList {
     public static final CachedFlag sGridTabSwitcherUpdate =
             newCachedFlag(GRID_TAB_SWITCHER_UPDATE, false);
     public static final CachedFlag sHideTabletToolbarDownloadButton =
-            newCachedFlag(
-                    HIDE_TABLET_TOOLBAR_DOWNLOAD_BUTTON,
-                    /* defaultValue= */ false,
-                    /* defaultValueInTests= */ true);
+            newCachedFlag(HIDE_TABLET_TOOLBAR_DOWNLOAD_BUTTON, true);
     public static final CachedFlag sHistoryPaneAndroid = newCachedFlag(HISTORY_PANE_ANDROID, false);
     public static final CachedFlag sLegacyTabStateDeprecation =
             newCachedFlag(
@@ -845,8 +848,6 @@ public abstract class ChromeFeatureList {
             newCachedFlag(USE_LIBUNWINDSTACK_NATIVE_UNWINDER_ANDROID, true);
     public static final CachedFlag sWebApkMinShellApkVersion =
             newCachedFlag(WEB_APK_MIN_SHELL_APK_VERSION, true);
-    public static final CachedFlag sAndroidAppIntegration =
-            newCachedFlag(ANDROID_APP_INTEGRATION, true);
 
     public static final List<CachedFlag> sFlagsCachedFullBrowser =
             List.of(
@@ -861,6 +862,7 @@ public abstract class ChromeFeatureList {
                     sAndroidTabDeclutterDedupeTabIdsKillSwitch,
                     sAndroidTabSkipSaveTabsKillswitch,
                     sAndroidThemeModule,
+                    sAndroidWebAppLaunchHandler,
                     sAndroidWindowPopupLargeScreen,
                     sAppSpecificHistory,
                     sAsyncNotificationManager,
@@ -873,7 +875,7 @@ public abstract class ChromeFeatureList {
                     sCctAuthTabEnableHttpsRedirects,
                     sCctAutoTranslate,
                     sCctBlockTouchesDuringEnterAnimation,
-                    sCCTEphemeralMediaViewerExperiment,
+                    sCctEphemeralMediaViewerExperiment,
                     sCctEphemeralMode,
                     sCctFreInSameTask,
                     sCctGoogleBottomBar,
@@ -976,7 +978,7 @@ public abstract class ChromeFeatureList {
     public static final MutableFlagWithSafeDefault sAndroidTabDeclutterArchiveAllButActiveTab =
             newMutableFlagWithSafeDefault(ANDROID_TAB_DECLUTTER_ARCHIVE_ALL_BUT_ACTIVE, false);
     public static final MutableFlagWithSafeDefault sAndroidTabDeclutterArchiveDuplicateTabs =
-            newMutableFlagWithSafeDefault(ANDROID_TAB_DECLUTTER_ARCHIVE_DUPLICATE_TABS, false);
+            newMutableFlagWithSafeDefault(ANDROID_TAB_DECLUTTER_ARCHIVE_DUPLICATE_TABS, true);
     public static final MutableFlagWithSafeDefault sAndroidTabDeclutterArchiveTabGroups =
             newMutableFlagWithSafeDefault(ANDROID_TAB_DECLUTTER_ARCHIVE_TAB_GROUPS, false);
     public static final MutableFlagWithSafeDefault sAndroidTabDeclutterRescueKillSwitch =
@@ -1075,7 +1077,7 @@ public abstract class ChromeFeatureList {
                     ANDROID_APP_INTEGRATION_WITH_FAVICON, "schedule_delay_time_ms", 0);
     public static final BooleanCachedFeatureParam sAndroidAppIntegrationWithFaviconUseLargeFavicon =
             newBooleanCachedFeatureParam(
-                    ANDROID_APP_INTEGRATION_WITH_FAVICON, "use_large_favicon", false);
+                    ANDROID_APP_INTEGRATION_WITH_FAVICON, "use_large_favicon", true);
     public static final IntCachedFeatureParam
             sAndroidAppIntegrationWithFaviconZeroStateFaviconNumber =
                     newIntCachedFeatureParam(

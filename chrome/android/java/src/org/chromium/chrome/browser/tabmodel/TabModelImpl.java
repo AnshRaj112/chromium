@@ -88,6 +88,7 @@ public class TabModelImpl extends TabModelJniBridge {
     private int mIndex = INVALID_TAB_INDEX;
 
     private boolean mActive;
+    private boolean mInitializationComplete;
 
     // Undo State Tracking -------------------------------------------------------------------------
 
@@ -103,6 +104,7 @@ public class TabModelImpl extends TabModelJniBridge {
             if (mIndex >= insertIndex) mIndex++;
             assert !tab.isDestroyed() : "Attempting to undo tab that is destroyed.";
             mTabs.add(insertIndex, tab);
+            tab.onAddedToTabModel(mCurrentTabSupplier);
             mTabIdToTabs.put(tab.getId(), tab);
             mTabCountSupplier.set(mTabs.size());
 
@@ -229,9 +231,9 @@ public class TabModelImpl extends TabModelJniBridge {
         super.destroy();
     }
 
-    @Override
-    public void broadcastSessionRestoreComplete() {
-        super.broadcastSessionRestoreComplete();
+    /** Required to be called before this object is ready for most usage. */
+    public void completeInitialization() {
+        mInitializationComplete = true;
 
         // This is to make sure TabModel has a valid index when it has at least one valid Tab after
         // TabState is initialized. Otherwise, TabModel can have an invalid index even though it has
@@ -309,6 +311,7 @@ public class TabModelImpl extends TabModelJniBridge {
                     mIndex++;
                 }
             }
+            tab.onAddedToTabModel(mCurrentTabSupplier);
             mTabIdToTabs.put(tab.getId(), tab);
             mTabCountSupplier.set(mTabs.size());
 
@@ -765,6 +768,11 @@ public class TabModelImpl extends TabModelJniBridge {
         return mActive;
     }
 
+    @Override
+    public boolean isInitializationComplete() {
+        return mInitializationComplete;
+    }
+
     /**
      * Performs the necessary actions to remove this {@link Tab} from this {@link TabModel}. This
      * does not actually destroy the {@link Tab} (see {@link #finalizeTabClosure(Tab)}.
@@ -840,6 +848,7 @@ public class TabModelImpl extends TabModelJniBridge {
         }
 
         mTabs.remove(tab);
+        tab.onRemovedFromTabModel(mCurrentTabSupplier);
         mTabIdToTabs.remove(tab.getId());
         mTabCountSupplier.set(mTabs.size());
 

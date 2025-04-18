@@ -24,6 +24,7 @@ if (is_android) {
 } else if (is_mac) {
   import("//build/config/mac/mac_sdk.gni")
 } else if (is_ios) {
+  import("//build/config/apple/mobile_config.gni")
   import("//build/config/ios/bundle_data_from_filelist.gni")
 }
 
@@ -273,6 +274,7 @@ component("net") {
     "base/proxy_string_util.cc",
     "base/proxy_string_util.h",
     "base/rand_callback.h",
+    "base/reconnect_notifier.h",
     "base/registry_controlled_domains/registry_controlled_domain.cc",
     "base/registry_controlled_domains/registry_controlled_domain.h",
     "base/request_priority.cc",
@@ -448,6 +450,7 @@ component("net") {
     "device_bound_sessions/session_access.h",
     "device_bound_sessions/session_key.cc",
     "device_bound_sessions/session_key.h",
+    "device_bound_sessions/session_usage.h",
     "disk_cache/backend_cleanup_tracker.cc",
     "disk_cache/backend_cleanup_tracker.h",
     "disk_cache/backend_experiment.cc",
@@ -1610,12 +1613,15 @@ component("net") {
     libs = [ "resolv" ]
     frameworks = [
       "CFNetwork.framework",
-      "CoreTelephony.framework",
       "MobileCoreServices.framework",
       "Security.framework",
       "SystemConfiguration.framework",
       "UniformTypeIdentifiers.framework",
     ]
+
+    if (target_platform == "iphoneos") {
+      frameworks += [ "CoreTelephony.framework" ]
+    }
   }
 
   if (is_win) {
@@ -2061,6 +2067,8 @@ static_library("test_support") {
     "http/http_transaction_test_util.h",
     "http/mock_http_cache.cc",
     "http/mock_http_cache.h",
+    "http/no_vary_search_cache_test_utils.cc",
+    "http/no_vary_search_cache_test_utils.h",
     "http/transport_security_state_test_util.cc",
     "http/transport_security_state_test_util.h",
     "log/test_net_log.cc",
@@ -3167,7 +3175,6 @@ target(_test_target_type, "net_unittests") {
     "data/gencerts/",
     "data/pac_file_fetcher_unittest/",
     "data/quic_http_response_cache_data/",
-    "data/quic_http_response_cache_data_with_push/",
     "data/spdy_tests/",
     "data/test.html",
     "data/verify_certificate_chain_unittest/",

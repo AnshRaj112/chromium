@@ -6,6 +6,7 @@
 
 #include "base/android/jni_android.h"
 #include "base/android/jni_array.h"
+#include "base/notimplemented.h"
 #include "chrome/browser/profiles/profile_key_android.h"
 #include "ui/gfx/image/image.h"
 #include "url/android/gurl_android.h"
@@ -40,7 +41,7 @@ void AutofillImageFetcherImpl::FetchCreditCardArtImagesForURLs(
       base::android::ToJavaIntArray(env, image_sizes_vector));
 }
 
-void AutofillImageFetcherImpl::FetchPixAccountImages(
+void AutofillImageFetcherImpl::FetchPixAccountImagesForURLs(
     base::span<const GURL> image_urls) {
   if (image_urls.empty()) {
     return;
@@ -50,8 +51,15 @@ void AutofillImageFetcherImpl::FetchPixAccountImages(
       image_urls);
 }
 
+void AutofillImageFetcherImpl::FetchValuableImagesForURLs(
+    base::span<const GURL> image_urls) {
+  // TODO: crbug.com/393123618 - Implement the API on Android.
+  NOTIMPLEMENTED();
+}
+
 const gfx::Image* AutofillImageFetcherImpl::GetCachedImageForUrl(
-    const GURL& image_url) const {
+    const GURL& image_url,
+    ImageType image_type) const {
   // The images are cached on the Java side on Android.
   return nullptr;
 }

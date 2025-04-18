@@ -13,6 +13,7 @@
 #include "base/containers/flat_map.h"
 #include "base/containers/span.h"
 #include "base/feature_list.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "base/time/time.h"
@@ -334,12 +335,6 @@ TEST_F(FormFillerTest, SkipPreFilledFields) {
            // Value initialized with whitespace-only, expect field to be filled.
            {.role = ADDRESS_HOME_COUNTRY, .value = u" "}}});
   FormsSeen({form});
-
-  FormStructure* form_structure = GetFormStructure(form);
-  form_structure->fields()[0]->set_may_use_prefilled_placeholder(true);
-  form_structure->fields()[1]->set_may_use_prefilled_placeholder(true);
-  form_structure->fields()[3]->set_may_use_prefilled_placeholder(false);
-  form_structure->fields()[4]->set_may_use_prefilled_placeholder(std::nullopt);
 
   std::vector<FormFieldData> filled_fields =
       FillAutofillFormData(form, form.fields().front(), &profile).fields();

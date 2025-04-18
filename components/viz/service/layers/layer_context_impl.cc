@@ -66,7 +66,8 @@ std::unique_ptr<cc::LayerImpl> CreateLayer(LayerContextImpl& context,
       return cc::MirrorLayerImpl::Create(&tree, id);
 
     case cc::mojom::LayerType::kSurface:
-      // TODO(394137303): handle |update_submission_state_callback|.
+      // The callback is triggered in the renderer side during WillDraw(),
+      // and there is no need to do it in viz.
       return cc::SurfaceLayerImpl::Create(&tree, id, base::NullCallback());
 
     case cc::mojom::LayerType::kPicture:
@@ -216,6 +217,7 @@ base::expected<void, std::string> UpdatePropertyTreeNode(
   node.backdrop_filter_bounds = wire.backdrop_filter_bounds;
   node.backdrop_filter_quality = wire.backdrop_filter_quality;
   node.backdrop_mask_element_id = wire.backdrop_mask_element_id;
+  node.mask_filter_info = wire.mask_filter_info;
 
   node.cache_render_surface = wire.cache_render_surface;
   node.double_sided = wire.double_sided;
@@ -406,6 +408,7 @@ base::expected<void, std::string> UpdateLayer(const mojom::Layer& wire,
   layer.SetDrawsContent(wire.is_drawable);
   layer.SetBackgroundColor(wire.background_color);
   layer.SetSafeOpaqueBackgroundColor(wire.safe_opaque_background_color);
+  layer.SetHitTestOpaqueness(wire.hit_test_opaqueness);
   layer.SetElementId(wire.element_id);
   layer.UnionUpdateRect(wire.update_rect);
   layer.SetOffsetToTransformParent(wire.offset_to_transform_parent);

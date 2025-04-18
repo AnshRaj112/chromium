@@ -350,6 +350,12 @@ const base::FeatureParam<bool>
         /*name=*/"AttachProbabilisticRevealTokensOnAllProxiedRequests",
         /*default_value=*/false};
 
+const base::FeatureParam<bool>
+    kProbabilisticRevealTokensAddHeaderToProxiedRequests{
+        &kEnableProbabilisticRevealTokens,
+        /*name=*/"ProbabilisticRevealTokensAddHeaderToProxiedRequests",
+        /*default_value=*/false};
+
 // IP protection experiment configuration settings
 BASE_FEATURE(kEnableIpProtectionProxy,
              "EnableIpPrivacyProxy",
@@ -716,5 +722,11 @@ BASE_FEATURE(kSelfSignedLocalNetworkInterstitial,
 #if BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED)
 BASE_FEATURE(kVerifyQWACs, "VerifyQWACs", base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(CHROME_ROOT_STORE_SUPPORTED)
+
+#if BUILDFLAG(IS_MAC)
+BASE_FEATURE(kIncludeDeprecatedClientCertLookup,
+             "IncludeDeprecatedClientCertLookup",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
 
 }  // namespace net::features

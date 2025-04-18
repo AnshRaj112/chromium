@@ -530,12 +530,24 @@ void AutocompleteResult::SortAndCull(
         }
 #endif
       } else {
-        sections.push_back(std::make_unique<DesktopWebZpsSection>(
-            suggestion_groups_map_, max_suggestions, max_search_suggestions,
-            max_url_suggestions));
-        if (OmniboxFieldTrial::IsStarterPackPageEnabled()) {
-          sections.push_back(std::make_unique<DesktopWebZpsActionsSection>(
-              suggestion_groups_map_));
+        const size_t contextual_zps_limit =
+            omnibox_feature_configs::ContextualSearch::Get()
+                .contextual_zps_limit;
+        sections.push_back(std::make_unique<DesktopWebURLZpsSection>(
+            suggestion_groups_map_, max_url_suggestions));
+        sections.push_back(std::make_unique<DesktopWebSearchZpsSection>(
+            suggestion_groups_map_, max_search_suggestions,
+            contextual_zps_limit));
+        if (omnibox_feature_configs::ContextualSearch::Get()
+                .starter_pack_page) {
+          if (omnibox_feature_configs::ContextualSearch::Get().actions_at_top) {
+            sections.insert(sections.begin(),
+                            std::make_unique<DesktopWebZpsActionsSection>(
+                                suggestion_groups_map_));
+          } else {
+            sections.push_back(std::make_unique<DesktopWebZpsActionsSection>(
+                suggestion_groups_map_));
+          }
         }
 #if BUILDFLAG(ENABLE_EXTENSIONS)
         if (base::FeatureList::IsEnabled(

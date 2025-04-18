@@ -31,6 +31,7 @@
 #include "base/command_line.h"
 #include "base/containers/adapters.h"
 #include "base/containers/contains.h"
+#include "base/containers/extend.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/span.h"
 #include "base/containers/to_vector.h"
@@ -1114,22 +1115,13 @@ void BrowserAutofillManager::OnAskForValuesToFillImpl(
   const FormFieldData& field = CHECK_DEREF(form.FindFieldByGlobalId(field_id));
   external_delegate_->OnQuery(form, field, caret_bounds, trigger_source,
                               /*update_datalist=*/true);
-
-  std::vector<Suggestion> autofill_ai_suggestions;
-  if (AutofillAiDelegate* delegate = client().GetAutofillAiDelegate()) {
-    autofill_ai_suggestions =
-        delegate->GetSuggestions(form.global_id(), field.global_id());
-  }
-
-  GenerateSuggestionsAndMaybeShowUIPhase1(form, field, trigger_source,
-                                          std::move(autofill_ai_suggestions));
+  GenerateSuggestionsAndMaybeShowUIPhase1(form, field, trigger_source);
 }
 
 void BrowserAutofillManager::GenerateSuggestionsAndMaybeShowUIPhase1(
     const FormData& form,
     const FormFieldData& field,
-    AutofillSuggestionTriggerSource trigger_source,
-    std::vector<Suggestion> autofill_ai_suggestions) {
+    AutofillSuggestionTriggerSource trigger_source) {
   FormStructure* form_structure = nullptr;
   AutofillField* autofill_field = nullptr;
   const AutofillPlusAddressDelegate* plus_address_delegate =
@@ -1160,8 +1152,7 @@ void BrowserAutofillManager::GenerateSuggestionsAndMaybeShowUIPhase1(
 
   auto generate_suggestions_and_maybe_show_ui_phase2 = base::BindOnce(
       &BrowserAutofillManager::GenerateSuggestionsAndMaybeShowUIPhase2,
-      weak_ptr_factory_.GetWeakPtr(), form, field, trigger_source,
-      std::move(autofill_ai_suggestions), context);
+      weak_ptr_factory_.GetWeakPtr(), form, field, trigger_source, context);
 
   if (context.field_is_relevant_for_plus_addresses) {
     client().GetPlusAddressDelegate()->GetAffiliatedPlusAddresses(
@@ -1179,7 +1170,6 @@ void BrowserAutofillManager::GenerateSuggestionsAndMaybeShowUIPhase2(
     const FormData& form,
     const FormFieldData& field,
     AutofillSuggestionTriggerSource trigger_source,
-    std::vector<Suggestion> autofill_ai_suggestions,
     SuggestionsContext context,
     std::vector<std::string> plus_addresses) {
   OnGenerateSuggestionsCallback callback = base::BindOnce(
@@ -1204,19 +1194,19 @@ void BrowserAutofillManager::GenerateSuggestionsAndMaybeShowUIPhase2(
     if (context.suppress_reason == SuppressReason::kAblation) {
       CHECK(suggestions.empty());
       client().GetSingleFieldFillRouter().CancelPendingQueries();
-      std::move(callback).Run(/*show_suggestions=*/true, std::move(suggestions),
-                              std::nullopt);
+      std::move(callback).Run(/*show_suggestions=*/true, {}, std::nullopt);
     }
     return;
   }
   AutofillAiDelegate* delegate = client().GetAutofillAiDelegate();
   if (form_structure && autofill_field &&
-      MayPerformAutofillAiAction(client(), AutofillAiAction::kFilling) &&
+      !context.do_not_generate_autofill_suggestions &&
       GetFieldsFillableByAutofillAi(*form_structure, client())
-          .contains(autofill_field->global_id())) {
-    std::move(callback).Run(/*show_suggestions=*/true,
-                            std::move(autofill_ai_suggestions),
-                            /*ranking_context=*/std::nullopt);
+          .contains(field.global_id())) {
+    std::move(callback).Run(
+        /*show_suggestions=*/true,
+        delegate->GetSuggestions(form.global_id(), field.global_id()),
+        /*ranking_context=*/std::nullopt);
     return;
   } else if (suggestions.empty() && delegate &&
              delegate->ShouldDisplayIph(form.global_id(), field.global_id()) &&
@@ -2396,11 +2386,12 @@ void BrowserAutofillManager::OnDidFillOrPreviewForm(
                              filled_field_ids, safe_field_ids, *credit_card,
                              trigger_source, refill_trigger_reason.has_value());
                        },
-                       [&](const EntityInstance*) {
+                       [&](const EntityInstance* entity) {
                          if (AutofillAiDelegate* delegate =
                                  client().GetAutofillAiDelegate()) {
                            delegate->OnDidFillSuggestion(
-                               form_structure, trigger_autofill_field,
+                               entity->guid(), form_structure,
+                               trigger_autofill_field,
                                driver().GetPageUkmSourceId());
                          }
                        }},
@@ -2971,10 +2962,9 @@ std::vector<Suggestion> BrowserAutofillManager::GetAvailableSuggestions(
   }
 
   if (context.should_show_mixed_content_warning) {
-    Suggestion warning_suggestion(
-        l10n_util::GetStringUTF16(IDS_AUTOFILL_WARNING_MIXED_FORM));
-    warning_suggestion.type = SuggestionType::kMixedFormMessage;
-    return {warning_suggestion};
+    return {
+        Suggestion(l10n_util::GetStringUTF16(IDS_AUTOFILL_WARNING_MIXED_FORM),
+                   SuggestionType::kMixedFormMessage)};
   }
 
   if (!context.is_autofill_available ||
@@ -2987,34 +2977,33 @@ std::vector<Suggestion> BrowserAutofillManager::GetAvailableSuggestions(
   }
 
   std::vector<Suggestion> suggestions;
-  if (form_structure && autofill_field) {
-    switch (context.filling_product) {
-      case FillingProduct::kAddress:
-        suggestions = GetProfileSuggestions(
-            form, *form_structure, field, *autofill_field, trigger_source,
-            std::move(plus_address_email_override));
-        break;
-      case FillingProduct::kCreditCard:
-        suggestions = GetCreditCardSuggestions(form, *form_structure, field,
-                                               *autofill_field, trigger_source,
-                                               ranking_context);
-        break;
-      case FillingProduct::kLoyaltyCard:
-        if (base::FeatureList::IsEnabled(
-                features::kAutofillEnableLoyaltyCardsFilling) &&
-            base::FeatureList::IsEnabled(syncer::kSyncAutofillLoyaltyCard)) {
-          // Only loyalty card numbers filling is supported.
-          if (autofill_field->Type().GetStorableType() ==
-              LOYALTY_MEMBERSHIP_ID) {
-            suggestions = GetLoyaltyCardSuggestions(
-                client().GetValuablesDataManager().GetLoyaltyCards());
+  switch (context.filling_product) {
+    case FillingProduct::kAddress:
+      suggestions = GetProfileSuggestions(
+          form, *form_structure, field, *autofill_field, trigger_source,
+          std::move(plus_address_email_override));
+      break;
+    case FillingProduct::kCreditCard:
+      suggestions = GetCreditCardSuggestions(form, *form_structure, field,
+                                             *autofill_field, trigger_source,
+                                             ranking_context);
+      break;
+    case FillingProduct::kLoyaltyCard:
+      if (base::FeatureList::IsEnabled(
+              features::kAutofillEnableLoyaltyCardsFilling) &&
+          base::FeatureList::IsEnabled(syncer::kSyncAutofillLoyaltyCard)) {
+        // Only loyalty card numbers filling is supported.
+        if (autofill_field->Type().GetStorableType() == LOYALTY_MEMBERSHIP_ID) {
+          if (ValuablesDataManager* manager =
+                  client().GetValuablesDataManager()) {
+            suggestions = GetLoyaltyCardSuggestions(manager->GetLoyaltyCards());
           }
         }
-        break;
-      default:
-        // Skip other filling products.
-        break;
-    }
+      }
+      break;
+    default:
+      // Skip other filling products.
+      break;
   }
 
   if (EvaluateAblationStudy(suggestions, CHECK_DEREF(autofill_field),
@@ -3022,35 +3011,39 @@ std::vector<Suggestion> BrowserAutofillManager::GetAvailableSuggestions(
     return {};
   }
 
-  // TODO(crbug.com/380367784): Figure out how verified identity attributes
-  // (e.g. email addresses) rank compared to other sources.
   if (const IdentityCredentialDelegate* identity_credential_delegate =
           client().GetIdentityCredentialDelegate()) {
-    std::vector<Suggestion> verified_profiles =
-        identity_credential_delegate->GetVerifiedAutofillSuggestions(
-            *autofill_field);
-    suggestions.insert(suggestions.end(), verified_profiles.begin(),
-                       verified_profiles.end());
+    // Only <input autocomplete="email"> fields are considered.
+    if (std::optional<AutocompleteParsingResult> autocomplete =
+            ParseAutocompleteAttribute(
+                autofill_field->autocomplete_attribute());
+        autocomplete && autocomplete->field_type == HtmlFieldType::kEmail) {
+      std::vector<Suggestion> verified_suggestions =
+          identity_credential_delegate->GetVerifiedAutofillSuggestions(
+              FieldType::EMAIL_ADDRESS);
+      // Insert verified suggestions above unverified ones.
+      // TODO(crbug.com/380367784): figure out what to do when both verified
+      // and unverified suggestions point to the same email address.
+      suggestions.insert(suggestions.begin(), verified_suggestions.begin(),
+                         verified_suggestions.end());
+    }
   }
 
+  // Don't provide credit card suggestions for non-secure pages, but do provide
+  // them for secure pages with passive mixed content (see implementation of
+  // IsContextSecure).
   if (suggestions.empty() ||
-      context.filling_product != FillingProduct::kCreditCard) {
+      context.filling_product != FillingProduct::kCreditCard ||
+      context.is_context_secure) {
     return suggestions;
   }
-  // Don't provide credit card suggestions for non-secure pages, but do
-  // provide them for secure pages with passive mixed content (see
-  // implementation of IsContextSecure).
-  if (!context.is_context_secure) {
-    // Replace the suggestion content with a warning message explaining why
-    // Autofill is disabled for a website. The string is different if the
-    // credit card autofill HTTP warning experiment is enabled.
-    Suggestion warning_suggestion(
-        l10n_util::GetStringUTF16(IDS_AUTOFILL_WARNING_INSECURE_CONNECTION));
-    warning_suggestion.type =
-        SuggestionType::kInsecureContextPaymentDisabledMessage;
-    suggestions.assign(1, warning_suggestion);
-  }
-  return suggestions;
+
+  // Replace the suggestion content with a warning message explaining why
+  // Autofill is disabled for a website. The string is different if the credit
+  // card autofill HTTP warning experiment is enabled.
+  return {Suggestion(
+      l10n_util::GetStringUTF16(IDS_AUTOFILL_WARNING_INSECURE_CONNECTION),
+      SuggestionType::kInsecureContextPaymentDisabledMessage)};
 }
 
 autofill_metrics::FormEventLoggerBase*

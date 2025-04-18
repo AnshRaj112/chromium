@@ -10,6 +10,7 @@
 #include "chrome/browser/ui/views/page_action/page_action_model_observer.h"
 #include "chrome/browser/ui/views/page_action/test_support/fake_tab_interface.h"
 #include "chrome/browser/ui/views/page_action/test_support/mock_page_action_model.h"
+#include "chrome/browser/ui/views/page_action/test_support/noop_page_action_metrics_recorder.h"
 #include "chrome/browser/ui/views/page_action/test_support/test_page_action_properties_provider.h"
 #include "chrome/test/base/testing_profile.h"
 #include "content/public/test/browser_task_environment.h"
@@ -41,6 +42,14 @@ class MockPageActionObserver : public PageActionObserver {
               (override));
   MOCK_METHOD(void,
               OnPageActionIconHidden,
+              (const PageActionState&),
+              (override));
+  MOCK_METHOD(void,
+              OnPageActionChipShown,
+              (const PageActionState&),
+              (override));
+  MOCK_METHOD(void,
+              OnPageActionChipHidden,
               (const PageActionState&),
               (override));
 };
@@ -75,11 +84,11 @@ using MockPageActionModelFactory =
 
 class PageActionObserverTest : public ::testing::Test {
  public:
-  PageActionObserverTest() : tab_(&profile_) {}
+  PageActionObserverTest() : tab_(nullptr) {}
 
   void SetUp() override {
-    controller_ =
-        std::make_unique<PageActionController>(nullptr, &model_factory_);
+    controller_ = std::make_unique<PageActionController>(
+        nullptr, &model_factory_, &metrics_factory_);
     controller_->Initialize(tab_, {kTestPageActionId},
                             TestPageActionPropertiesProvider(kTestProperties));
   }
@@ -89,11 +98,10 @@ class PageActionObserverTest : public ::testing::Test {
   MockPageActionModelFactory& factory() { return model_factory_; }
 
  private:
-  content::BrowserTaskEnvironment task_environment_;
   MockPageActionObserver observer_;
-  TestingProfile profile_;
   FakeTabInterface tab_;
   MockPageActionModelFactory model_factory_;
+  NoopPageActionMetricsRecorderFactory metrics_factory_;
   std::unique_ptr<PageActionController> controller_;
 };
 
@@ -122,6 +130,57 @@ TEST_F(PageActionObserverTest, OnPageActionIconHidden) {
 
   // Further change notifications shouldn't trigger the event anymore.
   EXPECT_CALL(observer(), OnPageActionIconHidden(testing::_)).Times(0);
+  model.NotifyChanged();
+}
+
+TEST_F(PageActionObserverTest, OnPageActionChipShown) {
+  NotifierPageActionModel& model = factory().Get(kTestPageActionId);
+  ON_CALL(model, GetVisible()).WillByDefault(testing::Return(true));
+  ON_CALL(model, GetShowSuggestionChip()).WillByDefault(testing::Return(false));
+  observer().RegisterAsPageActionObserver(controller());
+
+  ON_CALL(model, GetShowSuggestionChip()).WillByDefault(testing::Return(true));
+  EXPECT_CALL(observer(), OnPageActionChipShown(testing::_)).Times(1);
+  EXPECT_CALL(observer(), OnPageActionChipHidden(testing::_)).Times(0);
+  model.NotifyChanged();
+
+  // Further change notifications shouldn't trigger the event anymore.
+  EXPECT_CALL(observer(), OnPageActionChipShown(testing::_)).Times(0);
+  EXPECT_CALL(observer(), OnPageActionChipHidden(testing::_)).Times(0);
+  model.NotifyChanged();
+}
+
+TEST_F(PageActionObserverTest, OnPageActionChipHidden) {
+  NotifierPageActionModel& model = factory().Get(kTestPageActionId);
+  ON_CALL(model, GetVisible()).WillByDefault(testing::Return(true));
+  ON_CALL(model, GetShowSuggestionChip()).WillByDefault(testing::Return(true));
+  observer().RegisterAsPageActionObserver(controller());
+
+  ON_CALL(model, GetShowSuggestionChip()).WillByDefault(testing::Return(false));
+  EXPECT_CALL(observer(), OnPageActionChipHidden(testing::_)).Times(1);
+  EXPECT_CALL(observer(), OnPageActionChipShown(testing::_)).Times(0);
+  model.NotifyChanged();
+
+  // Further change notifications shouldn't trigger the event anymore.
+  EXPECT_CALL(observer(), OnPageActionChipShown(testing::_)).Times(0);
+  EXPECT_CALL(observer(), OnPageActionChipHidden(testing::_)).Times(0);
+  model.NotifyChanged();
+}
+
+TEST_F(PageActionObserverTest,
+       OnPageActionChipVisibilityConsidersIconVisibility) {
+  NotifierPageActionModel& model = factory().Get(kTestPageActionId);
+  ON_CALL(model, GetVisible()).WillByDefault(testing::Return(false));
+  ON_CALL(model, GetShowSuggestionChip()).WillByDefault(testing::Return(true));
+  observer().RegisterAsPageActionObserver(controller());
+
+  ON_CALL(model, GetVisible()).WillByDefault(testing::Return(true));
+  EXPECT_CALL(observer(), OnPageActionChipShown(testing::_)).Times(1);
+  model.NotifyChanged();
+
+  ON_CALL(model, GetVisible()).WillByDefault(testing::Return(false));
+  // Further change notifications shouldn't trigger the event anymore.
+  EXPECT_CALL(observer(), OnPageActionChipHidden(testing::_)).Times(1);
   model.NotifyChanged();
 }
 

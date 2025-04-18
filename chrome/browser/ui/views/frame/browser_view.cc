@@ -48,9 +48,6 @@
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service_factory.h"
 #include "chrome/browser/platform_util.h"
-#include "chrome/browser/privacy_sandbox/privacy_sandbox_queue_manager.h"
-#include "chrome/browser/privacy_sandbox/privacy_sandbox_service.h"
-#include "chrome/browser/privacy_sandbox/privacy_sandbox_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_attributes_entry.h"
 #include "chrome/browser/profiles/profile_avatar_icon_util.h"
@@ -93,6 +90,7 @@
 #include "chrome/browser/ui/sync/one_click_signin_links_delegate_impl.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/shared_tab_group_feedback_controller.h"
 #include "chrome/browser/ui/tabs/split_tab_data.h"
+#include "chrome/browser/ui/tabs/split_tab_visual_data.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -989,19 +987,12 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
 
   SetProperty(views::kElementIdentifierKey, kBrowserViewElementId);
 
+  // Add any legal notices required for the user to the queue.
+  QueueLegalAndPrivacyNotices(browser_->profile());
+
   // Not all browsers do feature promos. Conditionally create one (or don't) for
   // this browser window.
   feature_promo_controller_ = CreateUserEducationResources(this);
-
-// Startup notices are queued here. Order of notices shown is defined by
-// show_after_ and blocked_by_ lists passed to QueueRequiredNotice() calls to
-// the product_messaging_controller. These calls usually live within individual
-// services. Queue is kicked off a frame or two later.
-  if (auto* privacy_sandbox_service =
-          PrivacySandboxServiceFactory::GetForProfile(browser_->profile())) {
-    privacy_sandbox_service->GetPrivacySandboxNoticeQueueManager()
-        .MaybeQueueNotice();
-  }
 
   browser_->tab_strip_model()->AddObserver(this);
   immersive_mode_controller_ = chrome::CreateImmersiveModeController(this);
@@ -1055,8 +1046,11 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
   views::View* contents_view;
   if (base::FeatureList::IsEnabled(features::kSideBySide)) {
     auto multi_contents_view = std::make_unique<MultiContentsView>(
-        this, base::BindRepeating(&BrowserView::ActivateWebContents,
-                                  base::Unretained(this)));
+        this,
+        base::BindRepeating(&BrowserView::ActivateWebContents,
+                            base::Unretained(this)),
+        base::BindRepeating(&BrowserView::OnSplitTabResize,
+                            base::Unretained(this)));
     multi_contents_view_ =
         contents_container->AddChildView(std::move(multi_contents_view));
     multi_contents_view_->SetID(VIEW_ID_TAB_CONTAINER);
@@ -1502,11 +1496,10 @@ void BrowserView::ShowSplitView() {
       browser_->tab_strip_model()->GetTabAtIndex(active_index)->GetSplit();
 
   CHECK(split_tab_id.has_value());
+  split_tabs::SplitTabData* split_data =
+      browser_->tab_strip_model()->GetSplitData(split_tab_id.value());
 
-  std::vector<tabs::TabModel*> split_tabs =
-      browser_->tab_strip_model()
-          ->GetSplitData(split_tab_id.value())
-          ->ListTabs();
+  std::vector<tabs::TabModel*> split_tabs = split_data->ListTabs();
 
   for (size_t i = 0; tabs::TabModel* tab : split_tabs) {
     multi_contents_view_->SetWebContentsAtIndex(tab->GetContents(), i++);
@@ -1515,6 +1508,10 @@ void BrowserView::ShowSplitView() {
       browser_->tab_strip_model()->GetIndexOfTab(split_tabs[0]);
   const int relative_active_position = active_index - first_split_tab_index;
   multi_contents_view_->SetActiveIndex(relative_active_position);
+
+  // Update visual information for the split.
+  multi_contents_view_->UpdateSplitRatio(
+      split_data->visual_data()->split_ratio());
 }
 
 void BrowserView::HideSplitView() {
@@ -3850,7 +3847,7 @@ void BrowserView::OnSplitTabCreated(
     std::vector<std::pair<tabs::TabInterface*, int>> tabs,
     split_tabs::SplitTabId split_id,
     SplitTabAddReason reason,
-    tabs::SplitTabLayout tab_layout) {
+    split_tabs::SplitTabVisualData visual_data) {
   const tabs::TabInterface* active_tab =
       browser_->tab_strip_model()->GetActiveTab();
   if (active_tab->IsSplit()) {
@@ -3869,6 +3866,20 @@ void BrowserView::OnSplitTabRemoved(
 
   if (is_split_active) {
     HideSplitView();
+  }
+}
+
+void BrowserView::OnSplitTabVisualsChanged(
+    split_tabs::SplitTabId split_id,
+    split_tabs::SplitTabVisualData old_visual_data,
+    split_tabs::SplitTabVisualData new_visual_data) {
+  const tabs::TabInterface* active_tab =
+      browser_->tab_strip_model()->GetActiveTab();
+
+  if (active_tab->GetSplit() == split_id) {
+    if (new_visual_data.split_ratio() != old_visual_data.split_ratio()) {
+      multi_contents_view_->UpdateSplitRatio(new_visual_data.split_ratio());
+    }
   }
 }
 
@@ -3949,6 +3960,16 @@ void BrowserView::CloseAllTabsStopped(TabStripModel* tab_strip_model,
         }));
   } else {
     contents_web_view_->GetWebContentsCloseHandler()->CloseAllTabsCanceled();
+  }
+}
+
+void BrowserView::OnSplitTabResize(double start_ratio) {
+  const tabs::TabInterface* active_tab =
+      browser_->tab_strip_model()->GetActiveTab();
+
+  if (active_tab->GetSplit().has_value()) {
+    browser_->tab_strip_model()->UpdateSplitRatio(
+        active_tab->GetSplit().value(), start_ratio);
   }
 }
 

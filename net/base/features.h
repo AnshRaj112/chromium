@@ -373,6 +373,11 @@ NET_EXPORT extern const base::FeatureParam<std::string>
 NET_EXPORT extern const base::FeatureParam<bool>
     kAttachProbabilisticRevealTokensOnAllProxiedRequests;
 
+// If true, probabilistic reveal tokens header will be added to proxied
+// requests.
+NET_EXPORT extern const base::FeatureParam<bool>
+    kProbabilisticRevealTokensAddHeaderToProxiedRequests;
+
 // Enables custom proxy configuration for the IP Protection experimental proxy.
 NET_EXPORT BASE_DECLARE_FEATURE(kEnableIpProtectionProxy);
 
@@ -730,6 +735,15 @@ NET_EXPORT BASE_DECLARE_FEATURE(kSelfSignedLocalNetworkInterstitial);
 // If enabled, server certificates that successfully verify and that identify
 // as QWACs will be verified against the 1-QWAC specification as well.
 NET_EXPORT BASE_DECLARE_FEATURE(kVerifyQWACs);
+#endif
+
+#if BUILDFLAG(IS_MAC)
+// If enabled, includes deprecated APIs for looking up client certificates on
+// macOS. This is disabled by default and is available as an emergency kill
+// switch.
+// TODO(crbug.com/40233280): This will reach stable in M137 (May 2025). Remove
+// this flag sometime after August 2025.
+NET_EXPORT BASE_DECLARE_FEATURE(kIncludeDeprecatedClientCertLookup);
 #endif
 
 }  // namespace net::features

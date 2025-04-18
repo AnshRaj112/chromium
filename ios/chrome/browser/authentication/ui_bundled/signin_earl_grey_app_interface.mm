@@ -151,16 +151,17 @@
 
 + (void)signinWithFakeManagedIdentityInPersonalProfile:
     (FakeSystemIdentity*)identity {
-  CHECK(AreSeparateProfilesForManagedAccountsEnabled());
   CHECK(IsIdentityManaged(identity).value_or(NO));
   if (![self isIdentityAdded:identity]) {
     // For convenience, add the identity, if it was not added yet.
     [self addFakeIdentity:identity withUnknownCapabilities:NO];
   }
 
-  GetApplicationContext()
-      ->GetAccountProfileMapper()
-      ->MakePersonalProfileManagedWithGaiaID(GaiaId(identity.gaiaID));
+  if (AreSeparateProfilesForManagedAccountsEnabled()) {
+    GetApplicationContext()
+        ->GetAccountProfileMapper()
+        ->MakePersonalProfileManagedWithGaiaID(GaiaId(identity.gaiaID));
+  }
 
   ProfileIOS* profile = chrome_test_util::GetOriginalProfile();
   AuthenticationService* authenticationService =
@@ -229,6 +230,10 @@
 
 + (BOOL)areSeparateProfilesForManagedAccountsEnabled {
   return AreSeparateProfilesForManagedAccountsEnabled();
+}
+
++ (BOOL)isIdentityDiscAccountMenuEnabled {
+  return IsIdentityDiscAccountMenuEnabled();
 }
 
 @end

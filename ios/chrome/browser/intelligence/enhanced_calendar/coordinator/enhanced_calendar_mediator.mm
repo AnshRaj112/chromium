@@ -65,7 +65,9 @@ constexpr std::string kCalendarEventDescriptionTemplate = "{}\n\n{} {}\n{} {}";
 }
 
 - (void)disconnect {
-  // TODO(crbug.com/405195613): Cancel any in-flight requests.
+  // Cancel any in-flight requests.
+  _enhancedCalendarService.reset();
+  _enhancedCalendarServiceImpl.reset();
 }
 
 - (void)startEnhancedCalendarRequest {
@@ -105,6 +107,7 @@ constexpr std::string kCalendarEventDescriptionTemplate = "{}\n\n{} {}\n{} {}";
     (ai::mojom::EnhancedCalendarResponseResultPtr)responseResult {
   // Present the "add to calendar" UI with default values if the response is an
   // error.
+  // TODO (crbug.com/410809676) : Handle dismissing the UI.
   if (responseResult->is_error()) {
     [_delegate presentAddToCalendar:self config:_enhancedCalendarConfig];
     return;

@@ -244,6 +244,7 @@
 #include "services/network/public/cpp/not_implemented_url_loader_factory.h"
 #include "services/network/public/cpp/permissions_policy/permissions_policy.h"
 #include "services/network/public/cpp/permissions_policy/permissions_policy_declaration.h"
+#include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/simple_url_loader.h"
 #include "services/network/public/cpp/web_sandbox_flags.h"
 #include "services/network/public/mojom/cookie_access_observer.mojom.h"
@@ -6888,6 +6889,13 @@ bool RenderFrameHostImpl::AncestorsAllowSameSiteNoneCookiesOverride(
     }
   }
   return true;
+}
+
+void RenderFrameHostImpl::OnKeepAliveRequestCreated(
+    const network::ResourceRequest& resource_request) {
+  if (delegate_) {
+    delegate_->OnKeepAliveRequestCreated(resource_request, this);
+  }
 }
 
 #if BUILDFLAG(IS_ANDROID)
@@ -16413,7 +16421,9 @@ void RenderFrameHostImpl::SendBeforeUnload(
     // The following `is_eligible_for_avoid_unnecessary_beforeunload` flag is
     // used to allow synchronous continuation of navigation if the value of
     // kAvoidUnnecessaryBeforeUnloadCheckSyncMode is either
-    // kWithSendBeforeUnload or kWithoutSendBeforeUnload.
+    // kWithSendBeforeUnload or kWithoutSendBeforeUnload (To understand these
+    // modes, please refer to the code comment of the
+    // `AvoidUnnecessaryBeforeUnloadCheckSyncMode` enum in the header file).
     //
     // The following `can_be_in_navigate_to_pending_entry` flag is used to
     // investigate whether it is safe to do so, by checking whether the CHECK
@@ -16432,6 +16442,19 @@ void RenderFrameHostImpl::SendBeforeUnload(
             features::AvoidUnnecessaryBeforeUnloadCheckSyncMode::
                 kDumpWithoutCrashing) &&
         frame_tree()->controller().in_navigate_to_pending_entry();
+
+    base::TimeTicks beforeunload_end_time_for_legacy = base::TimeTicks::Now();
+
+    if (is_eligible_for_avoid_unnecessary_beforeunload &&
+        IsAvoidUnnecessaryBeforeUnloadCheckSyncEnabledFor(
+            features::AvoidUnnecessaryBeforeUnloadCheckSyncMode::
+                kWithSendBeforeUnload)) {
+      std::move(before_unload_closure)
+          .Run(/*proceed=*/true, send_before_unload_start_time_,
+               beforeunload_end_time_for_legacy);
+      return;
+    }
+
     // Use a high-priority task to continue the navigation. This is safe as it
     // happens early in the navigation flow and shouldn't race with any other
     // tasks associated with this navigation.
@@ -16464,7 +16487,8 @@ void RenderFrameHostImpl::SendBeforeUnload(
                   }
                 },
                 std::move(before_unload_closure),
-                send_before_unload_start_time_, base::TimeTicks::Now(),
+                send_before_unload_start_time_,
+                beforeunload_end_time_for_legacy,
                 frame_tree()->controller().GetWeakPtr(),
                 can_be_in_navigate_to_pending_entry));
     return;

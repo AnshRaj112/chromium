@@ -299,6 +299,7 @@ class ApiTests extends ApiTestFixtureBase {
   async testGetZeroStateSuggestions() {
     assertTrue(!!this.host.getZeroStateSuggestionsForFocusedTab);
     const suggestions = await this.host.getZeroStateSuggestionsForFocusedTab();
+    assertTrue(!!suggestions);
     assertEquals(0, suggestions.suggestions.length);
   }
 
@@ -347,12 +348,13 @@ class ApiTests extends ApiTestFixtureBase {
     let focus3 = await sequence.next();
 
     // After a navigation occurs in a new tab, there could first exist a
-    // transitory states where the focus is not yet available or still previous
-    // page.
+    // transitory states where the focus is not yet available, is empty, or
+    // still previous page.
     while (focus3.hasNoFocus ||
            (!!focus3.hasFocus &&
-            focus3.hasFocus.tabData.url.endsWith(
-                'scrollable_page_with_content.html'))) {
+            (focus3.hasFocus.tabData.url === '' ||
+             focus3.hasFocus.tabData.url.endsWith(
+                 'scrollable_page_with_content.html')))) {
       focus3 = await sequence.next();
     }
 

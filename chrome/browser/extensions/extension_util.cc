@@ -53,8 +53,7 @@
 #include "chrome/browser/ui/webui/extensions/extension_icon_source.h"
 #endif
 
-namespace extensions {
-namespace util {
+namespace extensions::util {
 
 namespace {
 
@@ -270,7 +269,7 @@ base::Value::Dict GetExtensionInfo(const Extension* extension) {
   GURL icon = extensions::ExtensionIconSource::GetIconURL(
       extension, extension_misc::EXTENSION_ICON_SMALLISH,
       ExtensionIconSet::Match::kBigger,
-      false);  // Not grayscale.
+      /*grayscale=*/false);
   dict.Set("icon", icon.spec());
 
   return dict;
@@ -355,5 +354,4 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
                                 false);
 }
 
-}  // namespace util
-}  // namespace extensions
+} // namespace extensions::util

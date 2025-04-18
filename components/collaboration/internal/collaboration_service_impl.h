@@ -42,7 +42,6 @@ class CollaborationServiceImpl : public CollaborationService,
       tab_groups::TabGroupSyncService* tab_group_sync_service,
       data_sharing::DataSharingService* data_sharing_service,
       signin::IdentityManager* identity_manager,
-      syncer::SyncService* sync_service,
       PrefService* profile_prefs);
   ~CollaborationServiceImpl() override;
 
@@ -51,8 +50,7 @@ class CollaborationServiceImpl : public CollaborationService,
   void AddObserver(CollaborationService::Observer* observer) override;
   void RemoveObserver(CollaborationService::Observer* observer) override;
   void StartJoinFlow(std::unique_ptr<CollaborationControllerDelegate> delegate,
-                     const GURL& url,
-                     CollaborationServiceJoinEntryPoint entry) override;
+                     const GURL& url) override;
   void StartShareOrManageFlow(
       std::unique_ptr<CollaborationControllerDelegate> delegate,
       const tab_groups::EitherGroupID& either_id,
@@ -63,6 +61,7 @@ class CollaborationServiceImpl : public CollaborationService,
       CollaborationServiceLeaveOrDeleteEntryPoint entry) override;
   void CancelAllFlows(base::OnceCallback<void()> finish_callback) override;
   ServiceStatus GetServiceStatus() override;
+  void OnSyncServiceInitialized(syncer::SyncService* sync_service) override;
   data_sharing::MemberRole GetCurrentUserRoleForGroup(
       const data_sharing::GroupId& group_id) override;
   std::optional<data_sharing::GroupData> GetGroupData(
@@ -71,6 +70,11 @@ class CollaborationServiceImpl : public CollaborationService,
                    base::OnceCallback<void(bool)> callback) override;
   void LeaveGroup(const data_sharing::GroupId& group_id,
                   base::OnceCallback<void(bool)> callback) override;
+  bool ShouldInterceptNavigationForShareURL(const GURL& url) override;
+  void HandleShareURLNavigationIntercepted(
+      const GURL& url,
+      std::unique_ptr<data_sharing::ShareURLInterceptionContext> context,
+      CollaborationServiceJoinEntryPoint entry) override;
 
   // SyncServiceObserver implementation.
   void OnStateChanged(syncer::SyncService* sync) override;
@@ -132,7 +136,7 @@ class CollaborationServiceImpl : public CollaborationService,
   const raw_ptr<signin::IdentityManager> identity_manager_;
 
   // Service providing information about sync.
-  const raw_ptr<syncer::SyncService> sync_service_;
+  raw_ptr<syncer::SyncService> sync_service_;
 
   const raw_ptr<PrefService> profile_prefs_;
 

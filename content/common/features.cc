@@ -186,7 +186,7 @@ BASE_FEATURE(kFedCmFlexibleFields,
 // and account labels features.
 BASE_FEATURE(kFedCmUseOtherAccountAndLabelsNewSyntax,
              "FedCmUseOtherAccountAndLabelsNewSyntax",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables sending SameSite=Lax cookies in credentialed FedCM requests
 // (accounts endpoint, ID assertion endpoint and disconnect endpoint).
@@ -278,7 +278,7 @@ BASE_FEATURE(kGroupNIKByJoiningOrigin,
 // https://crbug.com/369342694.
 BASE_FEATURE(kRemoveRendererProcessLimit,
              "RemoveRendererProcessLimit",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // A feature flag for the memory-backed code cache.
 BASE_FEATURE(kInMemoryCodeCache,

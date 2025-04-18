@@ -553,7 +553,8 @@ const gfx::VectorIcon& AutocompleteMatch::GetVectorIcon(
     case Type::SEARCH_SUGGEST:
       return IsTrendSuggestion() ? omnibox::kTrendingUpChromeRefreshIcon
              : (IsContextualSearchSuggestion() &&
-                OmniboxFieldTrial::IsStarterPackPageEnabled())
+                omnibox_feature_configs::ContextualSearch::Get()
+                    .contextual_zero_suggest_lens_fulfillment)
                  ? omnibox::kPageSparkIcon
                  : vector_icons::kSearchChromeRefreshIcon;
 

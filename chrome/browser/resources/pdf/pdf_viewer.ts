@@ -314,6 +314,20 @@ export class PdfViewerElement extends PdfViewerBaseElement {
         10));
   }
 
+  // <if expr="enable_pdf_ink2">
+  override willUpdate(changedProperties: PropertyValues<this>) {
+    super.willUpdate(changedProperties);
+
+    const changedPrivateProperties =
+        changedProperties as Map<PropertyKey, unknown>;
+    if (changedPrivateProperties.has('pdfInk2Enabled_') &&
+        this.pdfInk2Enabled_) {
+      // Set the viewport when PdfInk2 is enabled, if this happens after init().
+      Ink2Manager.getInstance().setViewport(this.viewport);
+    }
+  }
+  // </if>
+
   override updated(changedProperties: PropertyValues<this>) {
     super.updated(changedProperties);
 
@@ -845,6 +859,11 @@ export class PdfViewerElement extends PdfViewerBaseElement {
 
     assert(this.currentController);
     this.currentController.viewportChanged();
+    // <if expr="enable_pdf_ink2">
+    if (this.pdfInk2Enabled_) {
+      Ink2Manager.getInstance().viewportChanged();
+    }
+    // </if>
   }
 
   override handleStrings(strings: LoadTimeDataRaw) {
@@ -1489,6 +1508,10 @@ export class PdfViewerElement extends PdfViewerBaseElement {
   }
 
   // <if expr="enable_pdf_ink2">
+  protected isInTextAnnotationMode_(): boolean {
+    return this.annotationMode_ === AnnotationMode.TEXT;
+  }
+
   /**
    * @return Whether the Ink bottom toolbar should be shown. It should never be
    *     shown if the Ink side panel is shown.

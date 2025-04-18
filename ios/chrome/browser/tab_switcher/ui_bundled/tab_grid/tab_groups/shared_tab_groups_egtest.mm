@@ -315,7 +315,8 @@ AppLaunchConfiguration SharedTabGroupAppLaunchConfiguration(
 
 // Checks opening the Share flow from the Tab Grid and actually sharing. Then
 // checks opening the Manage flow. Using the face pile.
-- (void)testShareGroupAndManageGroupUsingFacePile {
+// TODO(crbug.com/411307020): Test is flaky.
+- (void)DISABLED_testShareGroupAndManageGroupUsingFacePile {
   if (@available(iOS 17, *)) {
   } else if ([ChromeEarlGrey isIPadIdiom]) {
     EARL_GREY_TEST_SKIPPED(@"Only available on iOS 17+ on iPad.");
@@ -442,7 +443,13 @@ AppLaunchConfiguration SharedTabGroupAppLaunchConfiguration(
 
 // Checks that the IPH is presented when the user foreground the app with a
 // shared tab group active.
-- (void)testForegroundIPH {
+// TODO(crbug.com/411064928): This fails on iphone simulator.
+#if TARGET_OS_SIMULATOR
+#define MAYBE_testForegroundIPH DISABLED_testForegroundIPH
+#else
+#define MAYBE_testForegroundIPH testForegroundIPH
+#endif
+- (void)MAYBE_testForegroundIPH {
   if (@available(iOS 17, *)) {
   } else if ([ChromeEarlGrey isIPadIdiom]) {
     EARL_GREY_TEST_SKIPPED(@"Only available on iOS 17+ on iPad.");

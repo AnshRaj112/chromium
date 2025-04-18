@@ -203,12 +203,15 @@ std::vector<wgpu::FeatureName> GetRequiredFeatures(
 #endif
   };
 
-#if BUILDFLAG(IS_ANDROID)
   if (backend_type == wgpu::BackendType::Vulkan) {
+#if BUILDFLAG(IS_ANDROID)
     features.push_back(wgpu::FeatureName::StaticSamplers);
     features.push_back(wgpu::FeatureName::YCbCrVulkanSamplers);
+#endif
+    features.push_back(wgpu::FeatureName::DawnDeviceAllocatorControl);
   }
-#elif BUILDFLAG(IS_WIN)
+
+#if BUILDFLAG(IS_WIN)
   if (backend_type == wgpu::BackendType::D3D11) {
     features.push_back(wgpu::FeatureName::D3D11MultithreadProtected);
   }
@@ -684,7 +687,18 @@ bool DawnSharedContext::Initialize(
   cache_desc.functionUserdata = this;
   cache_desc.nextInChain = &toggles_desc;
 
+  wgpu::DawnDeviceAllocatorControl allocator_desc;
   wgpu::DeviceDescriptor descriptor;
+  if (backend_type == wgpu::BackendType::Vulkan) {
+    // Use a 256kb heap block size in the Vulkan backend to minimize
+    // fragmentation.
+    allocator_desc.allocatorHeapBlockSize = 256 * 1024;
+    allocator_desc.nextInChain = &cache_desc;
+    descriptor.nextInChain = &allocator_desc;
+  } else {
+    descriptor.nextInChain = &cache_desc;
+  }
+
   descriptor.SetUncapturedErrorCallback(
       [](const wgpu::Device&, wgpu::ErrorType type, wgpu::StringView message,
          DawnSharedContext* state) {
@@ -702,7 +716,6 @@ bool DawnSharedContext::Initialize(
         }
       },
       this);
-  descriptor.nextInChain = &cache_desc;
 
   std::vector<wgpu::FeatureName> features =
       GetRequiredFeatures(backend_type, adapter_);
@@ -1000,9 +1013,10 @@ wgpu::Instance DawnContextProvider::GetInstance() const {
 
 bool DawnContextProvider::InitializeGraphiteContext(
     const skgpu::graphite::ContextOptions& context_options) {
-  // Both GpuMain and CompositorGpuThread share the same
-  // GraphiteSharedContext. If GraphiteSharedContext has been created, just
-  // use it.
+  // When is_thread_safe is true, both GpuMain and CompositorGpuThread share the
+  // same GraphiteSharedContext. If GraphiteSharedContext has been created, just
+  // use it. When is_thread_safe is false, graphite_shared_context is hold in
+  // DawnContextProvider.
   if (dawn_shared_context_->GetGraphiteSharedContext()) {
     return true;
   }
@@ -1019,33 +1033,31 @@ bool DawnContextProvider::InitializeGraphiteContext(
   std::unique_ptr<skgpu::graphite::Context> graphite_context =
       skgpu::graphite::ContextFactory::MakeDawn(backend_context,
                                                 context_options);
-
   if (!graphite_context) {
     return false;
   }
 
-  if (features::IsGraphiteContextThreadSafe()) {
+  bool is_thread_safe = features::IsGraphiteContextThreadSafe();
+  std::unique_ptr<GraphiteSharedContext> graphite_shared_context =
+      std::make_unique<GraphiteSharedContext>(std::move(graphite_context),
+                                              is_thread_safe);
+
+  if (is_thread_safe) {
     CHECK(dawn_shared_context_);
-    std::unique_ptr<GraphiteSharedContext> graphite_shared_context =
-        std::make_unique<GraphiteSharedContext>(std::move(graphite_context),
-                                                /*is_thread_safe=*/true);
     // DawnSharedContext owns GraphiteSharedContext.
     dawn_shared_context_->SetGraphiteSharedContext(
         std::move(graphite_shared_context));
-
-    // TODO(crbug.com/407874799): Return false for now. The feature is
-    // incomplete. Do not enable kGraphiteContextIsThreadSafe.
-    return false;
   } else {
-    graphite_context_ = std::move(graphite_context);
-    return !!graphite_context_;
+    graphite_shared_context_ = std::move(graphite_shared_context);
   }
+
+  return true;
 }
 
 void DawnContextProvider::SetCachingInterface(
     std::unique_ptr<webgpu::DawnCachingInterface> caching_interface) {
   CHECK(dawn_shared_context_->HasOneRef());
-  CHECK(!graphite_context_);
+  CHECK(!graphite_shared_context_);
   dawn_shared_context_->SetCachingInterface(std::move(caching_interface));
 }
 
@@ -1066,7 +1078,15 @@ std::optional<error::ContextLostReason> DawnContextProvider::GetResetStatus()
 }
 
 GraphiteSharedContext* DawnContextProvider::GetGraphiteSharedContext() const {
-  return dawn_shared_context_->GetGraphiteSharedContext();
+  if (features::IsGraphiteContextThreadSafe()) {
+    // Both threads shares the same GraphiteSharedContext. DawnSharedContext
+    // owns GraphiteSharedContext
+    return dawn_shared_context_->GetGraphiteSharedContext();
+  } else {
+    // Each DawnContextProvider owns its own GraphiteSharedContext and
+    // graphite::context
+    return graphite_shared_context_.get();
+  }
 }
 
 }  // namespace gpu

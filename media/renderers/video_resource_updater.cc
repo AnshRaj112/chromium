@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include <algorithm>
+#include <array>
 #include <string>
 #include <vector>
 
@@ -446,9 +447,11 @@ class VideoResourceUpdater::FrameResource {
   }
 
   // Only called for a software resource.
-  base::span<uint8_t> pixels() {
+  SkPixmap pixmap() {
     CHECK(is_software());
-    return mapping_->GetMemoryForPlane(0);
+    return mapping_->GetSkPixmapForPlane(
+        /*plane_index=*/0,
+        SkImageInfo::MakeN32Premul(gfx::SizeToSkISize(size())));
   }
 
   // Accessors for resource identifiers provided at construction time.
@@ -953,13 +956,8 @@ void VideoResourceUpdater::TransferRGBPixelsToPaintCanvas(
 
   CHECK(software_resource->is_software());
   DCHECK_EQ(software_resource->format(), viz::SinglePlaneFormat::kBGRA_8888);
-  // We know the format is RGBA_8888 or BGRA_8888 from check above.
-  auto info =
-      SkImageInfo::MakeN32Premul(gfx::SizeToSkISize(software_resource->size()));
-
   SkBitmap sk_bitmap;
-  sk_bitmap.installPixels(info, software_resource->pixels().data(),
-                          info.minRowBytes());
+  sk_bitmap.installPixels(software_resource->pixmap());
   // This is software path, so |canvas| and |video_frame| are always
   // backed by software.
   cc::SkiaPaintCanvas canvas(sk_bitmap);
@@ -1047,7 +1045,7 @@ bool VideoResourceUpdater::WriteYUVPixelsForAllPlanesToTexture(
 
   CHECK(!resource->is_software());
   auto yuv_si_format = resource->format();
-  SkPixmap pixmaps[SkYUVAInfo::kMaxPlanes] = {};
+  std::array<SkPixmap, SkYUVAInfo::kMaxPlanes> pixmaps = {};
   for (int plane_index = 0; plane_index < yuv_si_format.NumberOfPlanes();
        ++plane_index) {
     std::vector<VideoFrame::Plane> frame_planes =
@@ -1177,7 +1175,7 @@ bool VideoResourceUpdater::WriteYUVPixelsForAllPlanesToTexture(
   SkYUVAInfo::PlaneConfig plane_config = ToSkYUVAPlaneConfig(yuv_si_format);
   SkYUVAInfo::Subsampling subsampling = ToSkYUVASubsampling(yuv_si_format);
   SkYUVAInfo info(resource_size, plane_config, subsampling, color_space);
-  auto yuv_pixmap = SkYUVAPixmaps::FromExternalPixmaps(info, pixmaps);
+  auto yuv_pixmap = SkYUVAPixmaps::FromExternalPixmaps(info, pixmaps.data());
 
   auto* ri = RasterInterface();
   ri->WaitSyncTokenCHROMIUM(resource->sync_token().GetConstData());

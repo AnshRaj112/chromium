@@ -116,7 +116,6 @@ import org.chromium.components.tab_group_sync.SavedTabGroup;
 import org.chromium.components.tab_group_sync.TabGroupSyncService;
 import org.chromium.components.tab_group_sync.TriggerSource;
 import org.chromium.components.tab_groups.TabGroupColorId;
-import org.chromium.components.tab_groups.TabGroupColorPickerUtils;
 import org.chromium.ui.base.LocalizationUtils;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.modaldialog.ModalDialogManager;
@@ -3221,9 +3220,7 @@ public class StripLayoutHelper
             StripLayoutGroupTitle groupTitle, @TabGroupColorId int newColor) {
         if (groupTitle == null) return;
 
-        groupTitle.updateTint(
-                TabGroupColorPickerUtils.getTabGroupColorPickerItemColor(
-                        mContext, newColor, mIncognito));
+        groupTitle.updateTint(newColor);
         updateGroupTitleBitmapIfNeeded(groupTitle);
     }
 
@@ -4514,13 +4511,14 @@ public class StripLayoutHelper
             // Adjust by a half tab-width so that we target the nearest tab gap.
             float startX = StripLayoutUtils.adjustXForTabDrop(currX, mCachedTabWidthSupplier);
 
-            // 3. Mark the "interacting" view. This is not the DnD dragged tab, but rather the tab
+            // 3. Mark the "interacting" view. This is not the DnD dragged view, but rather the view
             // in the strip that is currently being hovered by the DnD drag.
-            StripLayoutTab hoveredTab = getTabAtPosition(startX);
-            if (hoveredTab == null) hoveredTab = mStripTabs[mStripTabs.length - 1];
+            StripLayoutView hoveredView =
+                    getViewAtPositionX(startX, /* includeGroupTitles= */ true);
+            if (hoveredView == null) hoveredView = mStripViews[mStripViews.length - 1];
 
             // 4. Start reorder - prepare strip to indicate drop target.
-            startReorderMode(startX, /* y= */ 0.f, hoveredTab, ReorderType.DRAG_ONTO_STRIP);
+            startReorderMode(startX, /* y= */ 0.f, hoveredView, ReorderType.DRAG_ONTO_STRIP);
         }
     }
 

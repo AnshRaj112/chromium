@@ -194,13 +194,6 @@ ExtensionService::ExtensionService(
       extension_prefs_(extension_prefs),
       blocklist_(blocklist),
       allowlist_(ExtensionAllowlist::Get(profile)),
-      safe_browsing_verdict_handler_(extension_prefs,
-                                     ExtensionRegistry::Get(profile),
-                                     this),
-      extension_telemetry_service_verdict_handler_(
-          extension_prefs,
-          ExtensionRegistry::Get(profile),
-          this),
       registry_(ExtensionRegistry::Get(profile)),
       pending_extension_manager_(PendingExtensionManager::Get(profile)),
       external_provider_manager_(ExternalProviderManager::Get(profile)),
@@ -212,9 +205,14 @@ ExtensionService::ExtensionService(
       extension_registrar_delegate_(
           std::make_unique<ChromeExtensionRegistrarDelegate>(profile_)),
       extension_registrar_(ExtensionRegistrar::Get(profile)),
+      safe_browsing_verdict_handler_(extension_prefs,
+                                     registry_,
+                                     extension_registrar_),
+      extension_telemetry_service_verdict_handler_(extension_prefs,
+                                                   registry_,
+                                                   extension_registrar_),
       omaha_attributes_handler_(extension_prefs,
-                                ExtensionRegistry::Get(profile),
-                                this,
+                                registry_,
                                 extension_registrar_),
       force_installed_tracker_(registry_, profile_),
       force_installed_metrics_(registry_, profile_, &force_installed_tracker_),
@@ -406,7 +404,7 @@ void ExtensionService::LoadExtensionsFromCommandLineFlag(
         t(path_list, FILE_PATH_LITERAL(","));
     while (t.GetNext()) {
       std::string extension_id;
-      UnpackedInstaller::Create(this)->LoadFromCommandLine(
+      UnpackedInstaller::Create(profile_)->LoadFromCommandLine(
           base::FilePath(t.token_piece()), &extension_id,
           false /*only-allow-apps*/);
       if (switch_name == switches::kDisableExtensionsExcept) {
@@ -420,8 +418,9 @@ void ExtensionService::LoadExtensionsFromCommandLineFlag(
 void ExtensionService::LoadSigninProfileTestExtension(const std::string& path) {
   base::SysInfo::CrashIfChromeOSNonTestImage();
   std::string extension_id;
-  const bool installing = UnpackedInstaller::Create(this)->LoadFromCommandLine(
-      base::FilePath(path), &extension_id, false /*only-allow-apps*/);
+  const bool installing =
+      UnpackedInstaller::Create(profile_)->LoadFromCommandLine(
+          base::FilePath(path), &extension_id, false /*only-allow-apps*/);
   CHECK(installing);
   CHECK_EQ(extension_id, extension_misc::kSigninProfileTestExtensionId)
       << extension_id
@@ -461,23 +460,6 @@ void ExtensionService::PerformActionBasedOnExtensionTelemetryServiceVerdicts(
   error_controller_->ShowErrorIfNeeded();
 }
 
-void ExtensionService::OnGreylistStateRemoved(const std::string& extension_id) {
-  extension_registrar_->OnGreylistStateRemoved(extension_id);
-}
-
-void ExtensionService::OnGreylistStateAdded(const std::string& extension_id,
-                                            BitMapBlocklistState new_state) {
-  extension_registrar_->OnGreylistStateAdded(extension_id, new_state);
-}
-
-void ExtensionService::OnBlocklistStateRemoved(
-    const std::string& extension_id) {
-  extension_registrar_->OnBlocklistStateRemoved(extension_id);
-}
-
-void ExtensionService::OnBlocklistStateAdded(const std::string& extension_id) {
-  extension_registrar_->OnBlocklistStateAdded(extension_id);
-}
 
 void ExtensionService::EnableExtension(const std::string& extension_id) {
   CHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
@@ -504,14 +486,6 @@ void ExtensionService::DisableExtensionWithRawReasons(
   auto passkey = ExtensionPrefs::DisableReasonRawManipulationPasskey();
   extension_registrar_->DisableExtensionWithRawReasons(passkey, extension_id,
                                                       disable_reasons);
-}
-
-void ExtensionService::DisableExtensionWithSource(
-    const Extension* source_extension,
-    const ExtensionId& extension_id,
-    disable_reason::DisableReason disable_reason) {
-  extension_registrar_->DisableExtensionWithSource(
-      source_extension, extension_id, disable_reason);
 }
 
 void ExtensionService::DisableUserExtensionsExcept(
@@ -742,11 +716,6 @@ void ExtensionService::UnloadExtension(const std::string& extension_id,
   extension_registrar_->RemoveExtension(extension_id, reason);
 }
 
-void ExtensionService::RemoveComponentExtension(
-    const std::string& extension_id) {
-  extension_registrar_->RemoveComponentExtension(extension_id);
-}
-
 void ExtensionService::UnloadAllExtensionsForTest() {
   UnloadAllExtensionsInternal();
 }
@@ -770,10 +739,6 @@ void ExtensionService::SetReadyAndNotifyListeners() {
 
 void ExtensionService::AddExtension(const Extension* extension) {
   extension_registrar_->AddExtension(extension);
-}
-
-void ExtensionService::AddComponentExtension(const Extension* extension) {
-  extension_registrar_->AddComponentExtension(extension);
 }
 
 void ExtensionService::OnExtensionManagementSettingsChanged() {
@@ -821,10 +786,6 @@ const Extension* ExtensionService::GetPendingExtensionUpdate(
   return delayed_install_manager_->GetPendingExtensionUpdate(id);
 }
 
-void ExtensionService::TerminateExtension(const std::string& extension_id) {
-  extension_registrar_->TerminateExtension(extension_id);
-}
-
 void ExtensionService::DidCreateMainFrameForBackgroundPage(
     ExtensionHost* host) {
   extension_registrar_->DidCreateMainFrameForBackgroundPage(host);
@@ -842,8 +803,8 @@ void ExtensionService::OnExtensionHostRenderProcessGone(
   // that other handlers of this notification will still have
   // access to the Extension and ExtensionHost.
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-      FROM_HERE, base::BindOnce(&ExtensionService::TerminateExtension,
-                                AsExtensionServiceWeakPtr(),
+      FROM_HERE, base::BindOnce(&ExtensionRegistrar::TerminateExtension,
+                                extension_registrar_->GetWeakPtr(),
                                 extension_host->extension_id()));
 }
 

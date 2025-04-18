@@ -129,6 +129,9 @@ public class TileGroup implements MostVisitedSites.Observer {
          */
         TileInteractionDelegate createInteractionDelegate(Tile tile, View view);
 
+        /** Returns a delegate to handle Custom Tile modifications. */
+        CustomTileModificationDelegate getCustomTileModificationDelegate();
+
         /**
          * Returns a callback to be invoked when the icon for the provided tile is loaded. It will
          * be responsible for triggering the visual refresh.
@@ -153,6 +156,34 @@ public class TileGroup implements MostVisitedSites.Observer {
          * @param removeRunnable The {@link Runnable} to be executed when tile is removed.
          */
         void setOnRemoveRunnable(Runnable removeRunnable);
+    }
+
+    /** Delegate for handling interactions with custom tiles. Not tied to a particular Tile. */
+    public interface CustomTileModificationDelegate {
+        /**
+         * Opens the Custom Tile Edit Dialog (as "Add shortcut") to add a new Custom Tile. If add
+         * proceeds and is successful,refreshes the MVT.
+         */
+        void add();
+
+        /**
+         * Searches for an existing Most Visited Tile matching {@param suggestion}. If found,
+         * attempts to creates a Custom Tile from it. If successful, refreshes the MVT.
+         */
+        void convert(@Nullable SiteSuggestion suggestion);
+
+        /**
+         * Searches for an existing Custom Tile matching {@param suggestion}. If found, attempts to
+         * remove it. If successful, refreshes the MVT.
+         */
+        void remove(SiteSuggestion suggestion);
+
+        /**
+         * Searches for an existing Custom Tile matching {@param suggestion}. If found, opens the
+         * Custom Tile Edit Dialog (as "Edit shortcut"). If edit proceeds and is successful,
+         * refreshes the MVT.
+         */
+        void edit(SiteSuggestion suggestion);
     }
 
     /**
@@ -189,6 +220,7 @@ public class TileGroup implements MostVisitedSites.Observer {
     private final Delegate mTileGroupDelegate;
     private final Observer mObserver;
     private final TileRenderer mTileRenderer;
+    private final CustomTileModificationDelegate mCustomTileModificationDelegate;
     // Used in TileInteractionDelegateImpl.
     private final int mPrerenderDelay;
 
@@ -240,6 +272,11 @@ public class TileGroup implements MostVisitedSites.Observer {
                 }
 
                 @Override
+                public CustomTileModificationDelegate getCustomTileModificationDelegate() {
+                    return mCustomTileModificationDelegate;
+                }
+
+                @Override
                 public Runnable createIconLoadCallback(Tile tile) {
                     // TODO(dgn): We could save on fetches by avoiding a new one when there is one
                     // pending for the same URL, and applying the result to all matched URLs.
@@ -276,6 +313,7 @@ public class TileGroup implements MostVisitedSites.Observer {
         mTileRenderer = tileRenderer;
         mOfflineModelObserver = new OfflineModelObserver(offlinePageBridge);
         mUiDelegate.addDestructionObserver(mOfflineModelObserver);
+        mCustomTileModificationDelegate = new CustomTileModificationDelegateImpl();
 
         mPrerenderDelay =
                 ChromeFeatureList.getFieldTrialParamByFeatureAsInt(
@@ -394,10 +432,9 @@ public class TileGroup implements MostVisitedSites.Observer {
         SparseArray<List<Tile>> newSites = createEmptyTileData();
         for (int i = 0; i < mPendingTiles.size(); ++i) {
             SiteSuggestion suggestion = mPendingTiles.get(i);
-            Tile tile = findTile(suggestion);
-            if (tile == null) {
+            if (findTile(suggestion) == null) {
+                // Don't reuse the Tile found, since index might change.
                 dataChanged = true;
-                tile = new Tile(suggestion, i);
             }
 
             List<Tile> sectionTiles = newSites.get(suggestion.sectionType);
@@ -406,10 +443,10 @@ public class TileGroup implements MostVisitedSites.Observer {
                 newSites.append(suggestion.sectionType, sectionTiles);
             }
 
-            // This is not supposed to happen but does. See https://crbug.com/703628
-            if (findTile(suggestion.url, sectionTiles) != null) continue;
+            // Duplicate should not exist but they may. See https://crbug.com/703628
+            if (findTileByUrl(suggestion.url, sectionTiles) != null) continue;
 
-            sectionTiles.add(tile);
+            sectionTiles.add(new Tile(suggestion, i));
         }
 
         mTileSections = newSites;
@@ -448,7 +485,7 @@ public class TileGroup implements MostVisitedSites.Observer {
      * @param tiles The section to search in, represented by the contained list of tiles.
      * @return A tile matching the provided URL and section, or {@code null} if none is found.
      */
-    private Tile findTile(GURL url, @Nullable List<Tile> tiles) {
+    private Tile findTileByUrl(GURL url, @Nullable List<Tile> tiles) {
         if (tiles == null) return null;
         for (Tile tile : tiles) {
             if (tile.getUrl().equals(url)) return tile;
@@ -668,39 +705,17 @@ public class TileGroup implements MostVisitedSites.Observer {
 
         @Override
         public void pinItem() {
-            @Nullable Tile tile = findTile(mSuggestion);
-            if (tile == null) return;
-
-            GURL url = tile.getUrl();
-            assignCustomLinkAndUpdateOnSuccess(url, tile.getTitle(), url);
+            mCustomTileModificationDelegate.convert(mSuggestion);
         }
 
         @Override
         public void unpinItem() {
-            @Nullable Tile tile = findTile(mSuggestion);
-            if (tile == null) return;
-
-            // Unlike removeItem(), don't run {@link mOnRemoveRunnable}.
-
-            // On success, onSiteSuggestionsAvailable() triggers.
-            mHavePendingCustomLinkUpdate = true;
-            if (!mTileGroupDelegate.deleteCustomLink(tile.getUrl())) {
-                mHavePendingCustomLinkUpdate = false;
-            }
+            mCustomTileModificationDelegate.remove(mSuggestion);
         }
 
         @Override
         public void editItem() {
-            @Nullable Tile tile = findTile(mSuggestion);
-            if (tile == null) return;
-
-            CustomTileEditCoordinator customTileEditCoordinator =
-                    mTileGroupDelegate.createCustomTileEditCoordinator(tile);
-            customTileEditCoordinator.show(
-                    (String name, GURL url) -> {
-                        return assignCustomLinkAndUpdateOnSuccess(tile.getUrl(), name, url);
-                    },
-                    mTileGroupDelegate::hasCustomLink);
+            mCustomTileModificationDelegate.edit(mSuggestion);
         }
 
         @Override
@@ -765,6 +780,60 @@ public class TileGroup implements MostVisitedSites.Observer {
             boolean isCustomLink = (mSuggestion.source == TileSource.CUSTOM_LINKS);
             return isCustomLink == matchIsCustomLink;
         }
+    }
+
+    private class CustomTileModificationDelegateImpl implements CustomTileModificationDelegate {
+        public CustomTileModificationDelegateImpl() {}
+
+        // CustomTileModificationDelegate implementation.
+        @Override
+        public void add() {
+            CustomTileEditCoordinator customTileEditCoordinator =
+                    mTileGroupDelegate.createCustomTileEditCoordinator(/* originalTile= */ null);
+            customTileEditCoordinator.show(
+                    this::addCustomLinkAndUpdateOnSuccess, mTileGroupDelegate::hasCustomLink);
+        }
+
+        @Override
+        public void convert(@Nullable SiteSuggestion suggestion) {
+            @Nullable Tile tile = findTile(suggestion);
+            if (tile == null) return;
+
+            GURL url = tile.getUrl();
+            assignCustomLinkAndUpdateOnSuccess(url, tile.getTitle(), url);
+        }
+
+        @Override
+        public void remove(SiteSuggestion suggestion) {
+            @Nullable Tile tile = findTile(suggestion);
+            if (tile == null) return;
+
+            deleteCustomLinkAndUpdateOnSuccess(tile.getUrl());
+        }
+
+        @Override
+        public void edit(SiteSuggestion suggestion) {
+            @Nullable Tile tile = findTile(suggestion);
+            if (tile == null) return;
+
+            CustomTileEditCoordinator customTileEditCoordinator =
+                    mTileGroupDelegate.createCustomTileEditCoordinator(tile);
+            customTileEditCoordinator.show(
+                    (String name, GURL url) -> {
+                        return assignCustomLinkAndUpdateOnSuccess(tile.getUrl(), name, url);
+                    },
+                    mTileGroupDelegate::hasCustomLink);
+        }
+
+        private boolean addCustomLinkAndUpdateOnSuccess(String name, GURL url) {
+            // On success, onSiteSuggestionsAvailable() triggers.
+            mHavePendingCustomLinkUpdate = true;
+            boolean success = mTileGroupDelegate.addCustomLink(name, url);
+            if (!success) {
+                mHavePendingCustomLinkUpdate = false;
+            }
+            return success;
+        }
 
         private boolean assignCustomLinkAndUpdateOnSuccess(
                 GURL keyUrl, String name, @Nullable GURL url) {
@@ -775,6 +844,14 @@ public class TileGroup implements MostVisitedSites.Observer {
                 mHavePendingCustomLinkUpdate = false;
             }
             return success;
+        }
+
+        private void deleteCustomLinkAndUpdateOnSuccess(GURL url) {
+            // On success, onSiteSuggestionsAvailable() triggers.
+            mHavePendingCustomLinkUpdate = true;
+            if (!mTileGroupDelegate.deleteCustomLink(url)) {
+                mHavePendingCustomLinkUpdate = false;
+            }
         }
     }
 

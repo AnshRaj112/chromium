@@ -48,6 +48,15 @@ enum class FreStatus {
   kMaxValue = kIncomplete
 };
 
+enum class RolloutEligibility {
+  kMinValue = 0,
+
+  kNotEligible = kMinValue,
+  kEligibleTieredRollout = 1,
+
+  kMaxValue = kEligibleTieredRollout,
+};
+
 // Boolean pref that determines if the glic button in tabstrip is pinned.
 inline constexpr char kGlicPinnedToTabstrip[] = "glic.pinned_to_tabstrip";
 
@@ -58,6 +67,10 @@ inline constexpr char kGlicMicrophoneEnabled[] = "glic.microphone_enabled";
 // Boolean pref that enables or disables tab context for Glic.
 inline constexpr char kGlicTabContextEnabled[] = "glic.tab_context_enabled";
 
+// Integer pref that determines the rollout eligibility for the user profile.
+// Values are from the RolloutEligibility enum.
+inline constexpr char kGlicRolloutEligibility[] = "glic.rollout_eligibility";
+
 // Integer pref that determines the Fre status for user profile. Values are from
 // the FreStatus enum.
 inline constexpr char kGlicCompletedFre[] = "glic.completed_fre";
@@ -65,10 +78,6 @@ inline constexpr char kGlicCompletedFre[] = "glic.completed_fre";
 // Time pref that records the last time a user dismissed the Glic window.
 inline constexpr char kGlicWindowLastDismissedTime[] =
     "glic.window.last_dimissed_time";
-
-// Integer prefs for the top right corner of the previous window position.
-inline constexpr char kGlicPreviousPositionX[] = "glic.previous_bounds.x";
-inline constexpr char kGlicPreviousPositionY[] = "glic.previous_bounds.y";
 
 void RegisterProfilePrefs(PrefRegistrySimple* registry);
 void RegisterLocalStatePrefs(PrefRegistrySimple* registry);

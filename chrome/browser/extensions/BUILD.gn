@@ -232,6 +232,8 @@ source_set("extensions") {
     "extension_special_storage_policy.h",
     "extension_tab_util.cc",
     "extension_tab_util.h",
+    "extension_telemetry_service_verdict_handler.cc",
+    "extension_telemetry_service_verdict_handler.h",
     "extension_ui_util.cc",
     "extension_ui_util.h",
     "extension_util.cc",
@@ -291,8 +293,12 @@ source_set("extensions") {
     "load_error_reporter.h",
     "managed_installation_mode.h",
     "managed_toolbar_pin_mode.h",
+    "management/management_util.cc",
+    "management/management_util.h",
     "manifest_check_level.h",
     "mv2_experiment_stage.h",
+    "omaha_attributes_handler.cc",
+    "omaha_attributes_handler.h",
     "pack_extension_job.cc",
     "pack_extension_job.h",
     "pending_extension_manager.cc",
@@ -316,6 +322,8 @@ source_set("extensions") {
     "preference/preference_helpers.h",
     "profile_util.cc",
     "profile_util.h",
+    "safe_browsing_verdict_handler.cc",
+    "safe_browsing_verdict_handler.h",
     "scoped_active_install.cc",
     "scoped_active_install.h",
     "settings_api_helpers.cc",
@@ -329,6 +337,8 @@ source_set("extensions") {
     "startup_helper.cc",
     "startup_helper.h",
     "system_display/display_info_provider.h",
+    "unpacked_installer.cc",
+    "unpacked_installer.h",
     "updater/chrome_extension_downloader_factory.cc",
     "updater/chrome_extension_downloader_factory.h",
     "updater/chrome_update_client_config.cc",
@@ -700,8 +710,6 @@ source_set("extensions") {
       "extension_sync_service_factory.h",
       "extension_sync_util.cc",
       "extension_sync_util.h",
-      "extension_telemetry_service_verdict_handler.cc",
-      "extension_telemetry_service_verdict_handler.h",
       "extension_uninstall_dialog.cc",
       "extension_uninstall_dialog.h",
       "extension_view.h",
@@ -730,20 +738,14 @@ source_set("extensions") {
       "mv2_deprecation_impact_checker.h",
       "navigation_extension_enabler.cc",
       "navigation_extension_enabler.h",
-      "omaha_attributes_handler.cc",
-      "omaha_attributes_handler.h",
       "permissions/site_permissions_helper.cc",
       "permissions/site_permissions_helper.h",
-      "safe_browsing_verdict_handler.cc",
-      "safe_browsing_verdict_handler.h",
       "sync_bundle.cc",
       "sync_bundle.h",
       "tab_helper.cc",
       "tab_helper.h",
       "theme_installed_infobar_delegate.cc",
       "theme_installed_infobar_delegate.h",
-      "unpacked_installer.cc",
-      "unpacked_installer.h",
       "warning_badge_service.cc",
       "warning_badge_service.h",
       "warning_badge_service_factory.cc",
@@ -988,6 +990,7 @@ source_set("extensions") {
       "//device/bluetooth",
       "//device/fido",
       "//extensions:extensions_resources",
+      "//extensions/browser/api:extensions_api_client",
       "//extensions/browser/api/content_settings:content_settings",
       "//extensions/browser/api/system_display:display_info_provider",
       "//extensions/browser/api/virtual_keyboard_private:virtual_keyboard_delegate",
@@ -1530,6 +1533,8 @@ static_library("test_support") {
     "chrome_test_extension_loader.h",
     "extension_management_test_util.cc",
     "extension_management_test_util.h",
+    "load_error_waiter.cc",
+    "load_error_waiter.h",
     "mock_extension_special_storage_policy.cc",
     "mock_extension_special_storage_policy.h",
   ]
@@ -1543,12 +1548,6 @@ static_library("test_support") {
     "//extensions:test_support",
     "//testing/gmock",
   ]
-
-  if (is_android) {
-    sources += [ "chrome_test_extension_loader_android.cc" ]
-  } else {
-    sources += [ "chrome_test_extension_loader_non_android.cc" ]
-  }
 
   if (enable_extensions) {
     sources += [
@@ -1564,8 +1563,6 @@ static_library("test_support") {
       "external_testing_loader.h",
       "fake_crx_installer.cc",
       "fake_crx_installer.h",
-      "load_error_waiter.cc",
-      "load_error_waiter.h",
       "menu_manager_test_observer.cc",
       "menu_manager_test_observer.h",
       "mock_crx_installer.cc",

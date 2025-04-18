@@ -48,8 +48,24 @@ bool IsValidRange(const RangeInFlatTree* range) {
   // An attached range may have !IsCollapsed but converting to EphemeralRange
   // results in IsCollapsed. For an example, see
   // AnnotationAgentImplTest.ScrollIntoViewCollapsedRange.
-  return range && range->IsConnected() && !range->IsCollapsed() &&
-         !range->ToEphemeralRange().IsCollapsed();
+  bool is_valid = range && range->IsConnected() && !range->IsCollapsed() &&
+                  !range->ToEphemeralRange().IsCollapsed();
+
+  if (is_valid) {
+    // TODO(crbug.com/410033683): Temporary to work around a crash.
+    // DocumentMarkers work on EphemeralRange (i.e. not FlatTree) so when we try
+    // to add a marker in ProcessAttachmentFinished, a well-ordered range in a
+    // flat tree may become invalid due to slotted elements. DocumentMarkers
+    // should maybe work on FlatTree types but for now just invalidate this
+    // case.
+    Position start = ToPositionInDOMTree(range->StartPosition());
+    Position end = ToPositionInDOMTree(range->EndPosition());
+    if (start > end) {
+      return false;
+    }
+  }
+
+  return is_valid;
 }
 
 // There are several cases where text isn't visible/presented to the user but
@@ -146,6 +162,19 @@ bool ShouldUseIsValidRangeAndMarkable(mojom::blink::AnnotationType type) {
 // use a smooth (animated) scroll. For longer distances, the scroll will be
 // instant.
 int kGlicSmoothScrollThreshold = 7000;
+
+std::optional<DocumentMarker::MarkerTypes> GetMarkerTypesForAnnotationType(
+    mojom::blink::AnnotationType annotation_type) {
+  switch (annotation_type) {
+    case mojom::blink::AnnotationType::kSharedHighlight:
+    case mojom::blink::AnnotationType::kUserNote:
+      return DocumentMarker::MarkerTypes::TextFragment();
+    case mojom::blink::AnnotationType::kGlic:
+      return DocumentMarker::MarkerTypes::Glic();
+    case mojom::blink::AnnotationType::kTextFinder:
+      return std::nullopt;
+  }
+}
 
 }  // namespace
 
@@ -263,8 +292,11 @@ void AnnotationAgentImpl::Remove() {
       frame->GetDocument()->UpdateStyleAndLayout(
           DocumentUpdateReason::kFindInPage);
 
-      document->Markers().RemoveMarkersInRange(
-          dom_range, DocumentMarker::MarkerTypes::TextFragment());
+      std::optional<DocumentMarker::MarkerTypes> marker_types =
+          GetMarkerTypesForAnnotationType(type_);
+      if (marker_types.has_value()) {
+        document->Markers().RemoveMarkersInRange(dom_range, *marker_types);
+      }
     }
   }
 
@@ -440,12 +472,26 @@ void AnnotationAgentImpl::ProcessAttachmentFinished() {
     Document* document = attached_range_->StartPosition().GetDocument();
     DCHECK(document);
 
-    // TextFinder type is used only to determine whether a given text can be
-    // found in the page, it should have no side-effects.
-    if (type_ != mojom::blink::AnnotationType::kTextFinder) {
-      document->Markers().AddTextFragmentMarker(dom_range);
-      document->Markers().MergeOverlappingMarkers(
-          DocumentMarker::kTextFragment);
+    switch (type_) {
+      case mojom::blink::AnnotationType::kUserNote:
+      case mojom::blink::AnnotationType::kSharedHighlight: {
+        document->Markers().AddTextFragmentMarker(dom_range);
+        document->Markers().MergeOverlappingMarkers(
+            DocumentMarker::kTextFragment);
+        break;
+      }
+      case mojom::blink::AnnotationType::kGlic: {
+        document->Markers().AddGlicMarker(dom_range);
+        // TODO(crbug.com/407967372): Should only start the animation after the
+        // annotated target is scrolled into the viewport.
+        document->Markers().StartGlicMarkerAnimation();
+        break;
+      }
+      case mojom::blink::AnnotationType::kTextFinder: {
+        // TextFinder type is used only to determine whether a given text can be
+        // found in the page, it should have no side-effects.
+        break;
+      }
     }
 
     if (type_ != mojom::blink::AnnotationType::kUserNote) {

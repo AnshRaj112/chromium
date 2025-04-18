@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "enterprise_search_aggregator_provider.h"
+#include "components/omnibox/browser/enterprise_search_aggregator_provider.h"
 
 #include <memory>
 #include <string>
@@ -14,6 +14,7 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/task_environment.h"
 #include "base/test/test_future.h"
@@ -246,7 +247,7 @@ const std::string kGoodJsonResponseImageUrls = base::StringPrintf(
                 }
               ],
               "displayPhoto": {
-                "url": "https://lh3.googleusercontent.com/some/path"
+                "url": "https://lh3.googleusercontent.com/some/path-s100"
               }
             }
           },
@@ -766,7 +767,7 @@ TEST_F(EnterpriseSearchAggregatorProviderTest, ParseAndModifyImageUrls) {
   EXPECT_EQ(matches[0].contents, u"www.google.com/?q=john%40example.com");
   EXPECT_EQ(matches[0].description, u"John Doe");
   EXPECT_EQ(matches[0].image_url,
-            GURL("https://lh3.googleusercontent.com/some/path=s64"));
+            GURL("https://lh3.googleusercontent.com/some/path-s100=s64"));
 
   EXPECT_EQ(matches[1].contents, u"www.google.com/?q=john2%40example.com");
   EXPECT_EQ(matches[1].description, u"John Doe2");

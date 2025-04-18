@@ -52,7 +52,7 @@ class GURL;
 @property(nonatomic, assign) const GURL& productURL;
 
 // Product favicon image.
-@property(nonatomic, assign) UIImage* faviconImage;
+@property(nonatomic, strong) UIImage* faviconImage;
 
 // Product image.
 @property(nonatomic, strong) NSData* productImage;
@@ -65,6 +65,9 @@ class GURL;
 // short term ProductInfo will be acquired from OptimizationGuide on demand API
 // and passed to price tracking API.
 @property(nonatomic, assign) std::optional<commerce::ProductInfo> productInfo;
+
+// Current price of the product the ShopCard displays.
+@property(nonatomic, copy) NSString* currentPrice;
 
 @end
 

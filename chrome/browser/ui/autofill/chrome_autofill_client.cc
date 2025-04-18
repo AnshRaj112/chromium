@@ -441,10 +441,10 @@ PersonalDataManager& ChromeAutofillClient::GetPersonalDataManager() {
       web_contents()->GetBrowserContext()));
 }
 
-ValuablesDataManager& ChromeAutofillClient::GetValuablesDataManager() {
+ValuablesDataManager* ChromeAutofillClient::GetValuablesDataManager() {
   Profile* profile =
       Profile::FromBrowserContext(web_contents()->GetBrowserContext());
-  return CHECK_DEREF(ValuablesDataManagerFactory::GetForProfile(profile));
+  return ValuablesDataManagerFactory::GetForProfile(profile);
 }
 
 EntityDataManager* ChromeAutofillClient::GetEntityDataManager() {
@@ -746,6 +746,13 @@ void ChromeAutofillClient::ShowAutofillSettings(
       case SuggestionType::kManageCreditCard:
       case SuggestionType::kManageIban:
         chrome::ShowSettingsSubPage(browser, chrome::kPaymentsSubPage);
+        return;
+      case SuggestionType::kManageLoyaltyCard:
+        CHECK(base::FeatureList::IsEnabled(
+            features::kAutofillEnableLoyaltyCardsFilling));
+        static constexpr std::string_view kValuableManagementUrl =
+            "https://wallet.google.com/wallet/passes";
+        ShowSingletonTab(browser, GURL(kValuableManagementUrl));
         return;
       default:
         NOTREACHED();

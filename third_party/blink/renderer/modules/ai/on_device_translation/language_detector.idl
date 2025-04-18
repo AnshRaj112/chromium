@@ -34,7 +34,8 @@ interface LanguageDetector {
     CallWith=ScriptState,
     RaisesException
   ]
-  static Promise<AIAvailability> availability();
+  static Promise<Availability> availability(
+    optional LanguageDetectorCreateCoreOptions options = {});
 
   [
     MeasureAs=LanguageDetector_Create,

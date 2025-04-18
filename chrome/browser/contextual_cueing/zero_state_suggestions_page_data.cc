@@ -15,7 +15,9 @@
 #include "components/optimization_guide/core/optimization_guide_common.mojom.h"
 #include "components/optimization_guide/core/optimization_guide_logger.h"
 #include "components/optimization_guide/core/optimization_guide_util.h"
+#include "components/optimization_guide/proto/contextual_cueing_metadata.pb.h"
 #include "components/optimization_guide/proto/features/zero_state_suggestions.pb.h"
+#include "components/optimization_guide/proto/hints.pb.h"
 #include "content/public/browser/web_contents.h"
 
 namespace contextual_cueing {
@@ -69,10 +71,16 @@ void ZeroStateSuggestionsPageData::FetchSuggestions(
     GlicSuggestionsCallback callback) {
   begin_time_ = base::TimeTicks::Now();
 
+  // Request for page already in flight - just notify when it comes back.
+  if (suggestions_request_) {
+    suggestions_callbacks_.AddUnsafe(std::move(callback));
+    return;
+  }
+
   suggestions_request_ = optimization_guide::proto::
       ZeroStateSuggestionsRequest::default_instance();
   suggestions_request_->set_is_fre(is_fre);
-  suggestions_callback_ = std::move(callback);
+  suggestions_callbacks_.AddUnsafe(std::move(callback));
   RequestSuggestionsIfComplete();
 }
 
@@ -104,13 +112,34 @@ void ZeroStateSuggestionsPageData::RequestSuggestionsIfComplete() {
     return;
   }
 
-  if (!has_page_context) {
-    std::move(suggestions_callback_).Run(std::nullopt);
+  content::WebContents* web_contents =
+      content::WebContents::FromRenderFrameHost(&(page().GetMainDocument()));
+  optimization_guide::OptimizationMetadata metadata;
+  auto decision = optimization_guide_keyed_service_->CanApplyOptimization(
+      web_contents->GetLastCommittedURL(),
+      optimization_guide::proto::GLIC_ZERO_STATE_SUGGESTIONS, &metadata);
+  auto suggestions_metadata = metadata.ParsedMetadata<
+      optimization_guide::proto::GlicZeroStateSuggestionsMetadata>();
+  if (decision == optimization_guide::OptimizationGuideDecision::kTrue &&
+      suggestions_metadata &&
+      !suggestions_metadata->contextual_suggestions_eligible()) {
+    suggestions_callbacks_.Notify(std::nullopt);
     return;
   }
 
-  content::WebContents* web_contents =
-      content::WebContents::FromRenderFrameHost(&page().GetMainDocument());
+  if (suggestions_metadata &&
+      !suggestions_metadata->contextual_suggestions().empty()) {
+    std::vector<std::string> suggestions(
+        suggestions_metadata->contextual_suggestions().begin(),
+        suggestions_metadata->contextual_suggestions().end());
+    suggestions_callbacks_.Notify(suggestions);
+    return;
+  }
+
+  if (!has_page_context) {
+    suggestions_callbacks_.Notify(std::nullopt);
+    return;
+  }
 
   optimization_guide::proto::PageContext* page_context =
       suggestions_request_->mutable_page_context();
@@ -153,7 +182,7 @@ void ZeroStateSuggestionsPageData::OnModelExecutionResponse(
                            "suggestions after %ld ms. Error: %d",
                            suggestions_duration.InMilliseconds(),
                            static_cast<int>(result.response.error().error())));
-    std::move(suggestions_callback_).Run(std::nullopt);
+    suggestions_callbacks_.Notify(std::nullopt);
     return;
   }
 
@@ -169,7 +198,7 @@ void ZeroStateSuggestionsPageData::OnModelExecutionResponse(
           optimization_guide::proto::ZeroStateSuggestionsResponse>(
           result.response.value());
   if (!response) {
-    std::move(suggestions_callback_).Run(std::nullopt);
+    suggestions_callbacks_.Notify(std::nullopt);
     return;
   }
 
@@ -182,7 +211,7 @@ void ZeroStateSuggestionsPageData::OnModelExecutionResponse(
         base::StringPrintf("ZeroStateSuggestionsPageData: Suggestion %d: %s",
                            i + 1, response->suggestions(i).label()));
   }
-  std::move(suggestions_callback_).Run(suggestions);
+  suggestions_callbacks_.Notify(suggestions);
 }
 
 PAGE_USER_DATA_KEY_IMPL(ZeroStateSuggestionsPageData);

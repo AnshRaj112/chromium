@@ -717,7 +717,7 @@ void ClientSideDetectionHost::MaybeStartPreClassification(
   }
 
   // Cancel any ongoing on device sessions.
-  csd_service_->ResetOnDeviceSession();
+  csd_service_->ResetOnDeviceSession(/*inquiry_complete=*/false);
 
   // If we navigate away and there currently is a pending phishing report
   // request we have to cancel it to make sure we don't display an interstitial
@@ -1211,7 +1211,6 @@ void ClientSideDetectionHost::MaybeInquireOnDeviceForScamDetection(
       verdict->llama_forced_trigger_info().intelligent_scan();
 
   if (IsEnhancedProtectionEnabled(*delegate_->GetPrefs()) &&
-      csd_service_->IsOnDeviceModelAvailable() &&
       (is_keyboard_lock_requested || is_intelligent_scan_requested)) {
     if (is_keyboard_lock_requested &&
         did_match_high_confidence_allowlist.has_value() &&
@@ -1219,6 +1218,27 @@ void ClientSideDetectionHost::MaybeInquireOnDeviceForScamDetection(
       IntelligentScanInfo intelligent_scan_info;
       intelligent_scan_info.set_no_info_reason(
           IntelligentScanInfo::ALLOWLISTED);
+      *verdict->mutable_intelligent_scan_info() =
+          std::move(intelligent_scan_info);
+      MaybeGetAccessToken(std::move(verdict),
+                          did_match_high_confidence_allowlist);
+      return;
+    }
+
+    bool on_device_model_available = csd_service_->IsOnDeviceModelAvailable();
+
+    base::UmaHistogramBoolean(
+        "SBClientPhishing.IsOnDeviceModelAvailableAtInquiryTime",
+        on_device_model_available);
+
+    if (!on_device_model_available) {
+      // When the model is not available at the time of inquiry, we want to log
+      // the current status of the model fetch.
+      csd_service_->LogOnDeviceModelEligibilityReason();
+
+      IntelligentScanInfo intelligent_scan_info;
+      intelligent_scan_info.set_no_info_reason(
+          IntelligentScanInfo::ON_DEVICE_MODEL_UNAVAILABLE);
       *verdict->mutable_intelligent_scan_info() =
           std::move(intelligent_scan_info);
       MaybeGetAccessToken(std::move(verdict),
@@ -1323,8 +1343,10 @@ void ClientSideDetectionHost::MaybeShowPhishingWarning(
         ->set_network_result(response_code.value());
   }
 
-  if (base::FeatureList::IsEnabled(
-          kClientSideDetectionBrandAndIntentForScamDetection) &&
+  if ((base::FeatureList::IsEnabled(
+           kClientSideDetectionBrandAndIntentForScamDetection) ||
+       base::FeatureList::IsEnabled(
+           kClientSideDetectionLlamaForcedTriggerInfoForScamDetection)) &&
       IsEnhancedProtectionEnabled(*delegate_->GetPrefs()) &&
       intelligent_scan_verdict.has_value()) {
     base::UmaHistogramExactLinear("SBClientPhishing.IntelligentScanVerdict",

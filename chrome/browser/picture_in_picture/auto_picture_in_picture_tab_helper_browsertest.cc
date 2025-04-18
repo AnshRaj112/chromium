@@ -826,7 +826,7 @@ class BrowserInitiatedAutoPictureInPictureBrowserTest
 
   std::vector<base::test::FeatureRef> GetEnabledFeatures() override {
     auto features =
-        AutoPictureInPictureTabHelperBrowserTest::GetEnabledFeatures();
+        AutoPictureInPictureWithVideoPlaybackBrowserTest::GetEnabledFeatures();
     features.push_back(
         blink::features::kBrowserInitiatedAutomaticPictureInPicture);
     return features;

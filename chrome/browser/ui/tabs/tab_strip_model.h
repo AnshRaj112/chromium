@@ -53,12 +53,13 @@ class WebContents;
 
 namespace split_tabs {
 class SplitTabData;
+class SplitTabVisualData;
+enum class SplitTabLayout;
 }
 
 namespace tabs {
 class TabStripCollection;
 class TabGroupTabCollection;
-enum class SplitTabLayout;
 }
 
 class TabGroupModelFactory {
@@ -559,16 +560,24 @@ class TabStripModel : public TabGroupController {
 
   // Updates the layout for the tabs with `split_id` and notifies observers.
   void UpdateSplitLayout(split_tabs::SplitTabId split_id,
-                         tabs::SplitTabLayout tab_layout);
+                         split_tabs::SplitTabLayout tab_layout);
+
+  // Updates the ratio for the tabs with `split_id` and notifies observers.
+  void UpdateSplitRatio(split_tabs::SplitTabId split_id,
+                        double start_content_ratio);
 
   // Reverses the order of tabs with `split_id`.
   void SwapTabsInSplit(split_tabs::SplitTabId split_id);
+
+  // Replaces the active tab with `split_id` with the tab at `replace_index`.
+  void ReplaceActiveTabInSplit(split_tabs::SplitTabId split_id,
+                               int replace_index);
 
   // Create a new split view with the active tab and add the set of tabs pointed
   // to by |indices| to it. Reorders the tabs so they are contiguous. |indices|
   // must be sorted in ascending order.
   split_tabs::SplitTabId AddToNewSplit(const std::vector<int> indices,
-                                       tabs::SplitTabLayout tab_layout);
+                                       split_tabs::SplitTabLayout tab_layout);
 
   // Create a new tab group and add the set of tabs pointed to be |indices| to
   // it. Pins all of the tabs if any of them were pinned, and reorders the tabs
@@ -953,8 +962,10 @@ class TabStripModel : public TabGroupController {
   std::vector<int> GetSelectedPinnedTabs();
   std::vector<int> GetSelectedUnpinnedTabs();
 
-  split_tabs::SplitTabId AddToSplitImpl(std::vector<int> indices,
-                                        tabs::SplitTabLayout tab_layout);
+  split_tabs::SplitTabId AddToSplitImpl(
+      split_tabs::SplitTabId split_id,
+      std::vector<int> indices,
+      split_tabs::SplitTabVisualData visual_data);
 
   void RemoveSplitImpl(split_tabs::SplitTabId split_id);
 
@@ -1106,7 +1117,13 @@ class TabStripModel : public TabGroupController {
   std::vector<std::pair<tabs::TabInterface*, int>> GetTabsAndIndicesInSplit(
       split_tabs::SplitTabId split_id);
 
-  bool InsertionBreaksSplitContiguity(int index);
+  // Returns [start, end) where the leftmost tab in the split has index start
+  // and the rightmost tab in the split has index end - 1.
+  gfx::Range GetIndexRangeOfSplit(split_tabs::SplitTabId split_id);
+
+  // If inserting at `index` breaks a split, returns its id, otherwise nullopt.
+  std::optional<split_tabs::SplitTabId> InsertionBreaksSplitContiguity(
+      int index);
 
   // Helper to determine if moving a block of tabs from `start_index` with block
   // size `length` to `final_index` breaks contiguity.

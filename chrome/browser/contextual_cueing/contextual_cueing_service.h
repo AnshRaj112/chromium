@@ -10,6 +10,7 @@
 #include "base/containers/lru_cache.h"
 #include "base/containers/queue.h"
 #include "base/memory/weak_ptr.h"
+#include "base/sequence_checker.h"
 #include "base/time/time.h"
 #include "chrome/browser/contextual_cueing/contextual_cueing_enums.h"
 #include "chrome/browser/contextual_cueing/nudge_cap_tracker.h"
@@ -22,6 +23,7 @@
 class GURL;
 class OptimizationGuideKeyedService;
 class PrefService;
+class TemplateURLService;
 
 namespace content {
 class WebContents;
@@ -46,7 +48,8 @@ class ContextualCueingService
           page_content_extraction_service,
       OptimizationGuideKeyedService* optimization_guide_keyed_service,
       predictors::LoadingPredictor* loading_predictor,
-      PrefService* pref_service);
+      PrefService* pref_service,
+      TemplateURLService* template_url_service);
   ~ContextualCueingService() override;
 
   // Reports a page load happened to `url`, and is used to keep track of quiet
@@ -105,6 +108,10 @@ class ContextualCueingService
   // Returns true if nudge should not be shown due to the backoff rule.
   bool IsNudgeBlockedByBackoffRule() const;
 
+  // Returns true if the given url is of a page type eligible for contextual
+  // suggestions.
+  bool IsPageTypeEligibleForContextualSuggestions(GURL url) const;
+
   // Tracker to limit the number of nudges shown over a certain duration.
   NudgeCapTracker recent_nudge_tracker_;
 
@@ -112,8 +119,11 @@ class ContextualCueingService
   // user). This count resets to 0 if nudge is clicked on by the user.
   int dismiss_count_ = 0;
 
-  // The last time the cueing nudge was dismissed.
-  std::optional<base::Time> backoff_end_time_;
+  // The end of the backoff period triggered by the last nudge dismissal.
+  std::optional<base::TimeTicks> dismiss_backoff_end_time_;
+
+  // The end of the backoff period triggered by the last shown nudge.
+  std::optional<base::TimeTicks> shown_backoff_end_time_;
 
   // A counter for how many subsequent page load events will be prevented from
   // showing a nudge. This is to limit the frequency at which consecutive page
@@ -133,8 +143,12 @@ class ContextualCueingService
 
   raw_ptr<PrefService> pref_service_ = nullptr;
 
+  raw_ptr<TemplateURLService> template_url_service_ = nullptr;
+
   // Stores model execution url to save look up time.
   GURL mes_url_;
+
+  SEQUENCE_CHECKER(sequence_checker_);
 
   base::WeakPtrFactory<ContextualCueingService> weak_ptr_factory_{this};
 };

@@ -86,10 +86,8 @@ public class TabGroupListBottomSheetRowMediatorUnitTest {
                 new TabGroupListBottomSheetRowMediator(
                         mSavedTabGroup,
                         mTabGroupModelFilter,
-                        mTabGroupSyncService,
-                        mDataSharingService,
-                        mCollaborationService,
                         mFaviconResolver,
+                        mTabGroupSyncService,
                         mOnClickRunnable,
                         mTabs);
     }

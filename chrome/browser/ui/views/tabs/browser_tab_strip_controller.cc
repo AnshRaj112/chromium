@@ -6,6 +6,7 @@
 
 #include <limits>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include "base/command_line.h"
@@ -32,6 +33,7 @@
 #include "chrome/browser/ui/tab_ui_helper.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_utils.h"
 #include "chrome/browser/ui/tabs/split_tab_data.h"
+#include "chrome/browser/ui/tabs/split_tab_visual_data.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_group_deletion_dialog_controller.h"
@@ -960,21 +962,25 @@ void BrowserTabStripController::OnSplitTabCreated(
     std::vector<std::pair<tabs::TabInterface*, int>> tabs,
     split_tabs::SplitTabId split_id,
     TabStripModelObserver::SplitTabAddReason reason,
-    tabs::SplitTabLayout tab_layout) {
-  for (const auto& tab_pair : tabs) {
-    int index = tab_pair.second;
-    tabstrip_->SetSplit(index, split_id);
-  }
+    split_tabs::SplitTabVisualData visual_data) {
+  std::vector<int> split_indices;
+  std::transform(
+      tabs.begin(), tabs.end(), std::back_inserter(split_indices),
+      [](const std::pair<tabs::TabInterface*, int>& p) { return p.second; });
+
+  tabstrip_->SetSplit(split_indices, split_id);
 }
 
 void BrowserTabStripController::OnSplitTabRemoved(
     std::vector<std::pair<tabs::TabInterface*, int>> tabs,
     split_tabs::SplitTabId split_id,
     SplitTabRemoveReason reason) {
-  for (const auto& tab_pair : tabs) {
-    int index = tab_pair.second;
-    tabstrip_->SetSplit(index, std::nullopt);
-  }
+  std::vector<int> split_indices;
+  std::transform(
+      tabs.begin(), tabs.end(), std::back_inserter(split_indices),
+      [](const std::pair<tabs::TabInterface*, int>& p) { return p.second; });
+
+  tabstrip_->SetSplit(split_indices, std::nullopt);
 }
 
 BrowserNonClientFrameView* BrowserTabStripController::GetFrameView() {

@@ -36,6 +36,8 @@ class BookmarksPageHandler : public side_panel::mojom::BookmarksPageHandler,
   void CreateFolder(const std::string& folder_id,
                     const std::string& title,
                     CreateFolderCallback callback) override;
+  void DropBookmarks(const std::string& folder_id,
+                     DropBookmarksCallback callback) override;
   void ExecuteOpenInNewTabCommand(
       const std::vector<int64_t>& node_ids,
       side_panel::mojom::ActionSource source) override;
@@ -119,8 +121,6 @@ class BookmarksPageHandler : public side_panel::mojom::BookmarksPageHandler,
       scoped_bookmark_merged_service_observation_{this};
 };
 
-std::string GetFolderSidePanelIDForTesting(
-    const BookmarkMergedSurfaceService& merged_surface_bookmarks,
-    const BookmarkParentFolder& folder);
+std::string GetFolderSidePanelIDForTesting(const BookmarkParentFolder& folder);
 
 #endif  // CHROME_BROWSER_UI_WEBUI_SIDE_PANEL_BOOKMARKS_BOOKMARKS_PAGE_HANDLER_H_

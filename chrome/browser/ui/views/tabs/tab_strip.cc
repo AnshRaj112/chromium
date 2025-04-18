@@ -1312,14 +1312,23 @@ void TabStrip::OnGroupClosed(const tab_groups::TabGroupId& group) {
   tab_container_->OnGroupClosed(group);
 }
 
-void TabStrip::SetSplit(int split_index,
+void TabStrip::SetSplit(std::vector<int> split_indices,
                         std::optional<split_tabs::SplitTabId> split_id) {
-  tab_at(split_index)->SetSplit(split_id);
+  for (const int split_index : split_indices) {
+    Tab* tab = tab_at(split_index);
+    tab->SetSplit(split_id);
 
-  // If a split is removed an the tab no longer has the mouse hovered, hide any
-  // hover effects.
-  if (!split_id.has_value() && !tab_at(split_index)->mouse_hovered()) {
-    HideHover(tab_at(split_index), TabStyle::HideHoverStyle::kGradual);
+    // If a split is removed an the tab no longer has the mouse hovered, hide
+    // any hover effects.
+    if (!split_id.has_value() && !tab->mouse_hovered()) {
+      HideHover(tab, TabStyle::HideHoverStyle::kImmediate);
+    }
+  }
+
+  // After all split IDs have been set, update the insets on split tabs so they
+  // have less padding between them.
+  for (const int split_index : split_indices) {
+    tab_at(split_index)->UpdateInsets();
   }
 
   InvalidateLayout();

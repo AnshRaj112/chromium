@@ -4,6 +4,8 @@
 
 package org.chromium.chrome.browser.tasks.tab_management;
 
+import static org.chromium.chrome.browser.tasks.tab_management.TabKeyEventHandler.onPageKeyEvent;
+
 import android.app.Activity;
 import android.content.res.Resources;
 import android.os.Build;
@@ -39,6 +41,7 @@ import org.chromium.chrome.browser.tabmodel.TabCreatorManager;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.theme.ThemeColorProvider;
 import org.chromium.chrome.browser.toolbar.bottom.BottomControlsCoordinator;
+import org.chromium.chrome.browser.undo_tab_close_snackbar.UndoBarThrottle;
 import org.chromium.chrome.tab_ui.R;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.widget.scrim.ScrimManager;
@@ -80,6 +83,7 @@ public class TabGroupUiCoordinator implements TabGroupUiMediator.ResetHandler, T
     private final ModalDialogManager mModalDialogManager;
     private final ObservableSupplierImpl<Token> mCurrentTabGroupId = new ObservableSupplierImpl<>();
     private final ThemeColorProvider mThemeColorProvider;
+    private final UndoBarThrottle mUndoBarThrottle;
 
     private @Nullable PropertyModelChangeProcessor mModelChangeProcessor;
     private @Nullable TabGridDialogCoordinator mTabGridDialogCoordinator;
@@ -103,7 +107,8 @@ public class TabGroupUiCoordinator implements TabGroupUiMediator.ResetHandler, T
             @NonNull TabCreatorManager tabCreatorManager,
             @NonNull OneshotSupplier<LayoutStateProvider> layoutStateProviderSupplier,
             @NonNull ModalDialogManager modalDialogManager,
-            @NonNull ThemeColorProvider themeColorProvider) {
+            @NonNull ThemeColorProvider themeColorProvider,
+            UndoBarThrottle undoBarThrottle) {
         try (TraceEvent e = TraceEvent.scoped("TabGroupUiCoordinator.constructor")) {
             mActivity = activity;
             mBrowserControlsStateProvider = browserControlsStateProvider;
@@ -130,6 +135,7 @@ public class TabGroupUiCoordinator implements TabGroupUiMediator.ResetHandler, T
             mTabContentManager = tabContentManager;
             mModalDialogManager = modalDialogManager;
             mThemeColorProvider = themeColorProvider;
+            mUndoBarThrottle = undoBarThrottle;
             parentView.addView(mToolbarView);
         }
     }
@@ -162,7 +168,14 @@ public class TabGroupUiCoordinator implements TabGroupUiMediator.ResetHandler, T
                         mScrimManager,
                         mActionConfirmationSupplier.get(),
                         mModalDialogManager,
-                        /* desktopWindowStateManager= */ null);
+                        /* desktopWindowStateManager= */ null,
+                        mUndoBarThrottle);
+        mTabGridDialogCoordinator.setPageKeyEvent(
+                event ->
+                        onPageKeyEvent(
+                                event,
+                                currentTabGroupModelFilterSupplier.get(),
+                                /* moveSingleTab= */ true));
         return mTabGridDialogCoordinator;
     }
 

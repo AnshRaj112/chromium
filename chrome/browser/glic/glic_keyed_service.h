@@ -245,6 +245,9 @@ class GlicKeyedService : public KeyedService {
           GetZeroStateSuggestionsForFocusedTabCallback callback,
       std::optional<std::vector<std::string>> returned_suggestions);
 
+  void FinishPreload(Profile* profile, bool should_preload);
+  void FinishPreloadFre(Profile* profile, bool should_preload);
+
   // List of callbacks to be notified when the client requests a change to the
   // context access indicator status.
   base::RepeatingCallbackList<void(bool)>
@@ -261,7 +264,7 @@ class GlicKeyedService : public KeyedService {
   std::unique_ptr<GlicScreenshotCapturer> screenshot_capturer_;
   std::unique_ptr<AuthController> auth_controller_;
   std::unique_ptr<GlicActorController> actor_controller_;
-  std::optional<gfx::Point> previous_position_;
+  std::optional<gfx::Point> previous_position_ = std::nullopt;
   base::OnceCallbackList<void()> web_client_created_callbacks_;
   // The set of live `GlicPageHandler`s.
   base::flat_set<raw_ptr<GlicPageHandler>> page_handlers_;

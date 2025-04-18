@@ -9,14 +9,13 @@
 #include <string_view>
 
 #include "components/optimization_guide/proto/features/actions_data.pb.h"
+#include "ui/gfx/geometry/point.h"
 
 namespace content {
 class RenderFrameHost;
 }  // namespace content
 
 namespace actor {
-
-inline constexpr char kActorTestDataPath[] = "chrome/test/data/actor";
 
 optimization_guide::proto::BrowserAction MakeClick(int content_node_id);
 optimization_guide::proto::BrowserAction MakeHistoryBack();
@@ -34,6 +33,9 @@ optimization_guide::proto::BrowserAction MakeScroll(
     std::optional<int> content_node_id,
     float scroll_offset_x,
     float scroll_offset_y);
+optimization_guide::proto::BrowserAction MakeDragAndRelease(
+    const gfx::Point& from_point,
+    const gfx::Point& to_point);
 
 // Returns the DOMNodeId of the node matched by the given CSS query selector.
 std::optional<int> FindContentNodeId(content::RenderFrameHost& rfh,

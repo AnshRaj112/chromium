@@ -28,9 +28,15 @@ public class NtpCustomizationViewProperties {
     public static final PropertyModel.WritableObjectPropertyKey<ListContainerViewDelegate>
             LIST_CONTAINER_VIEW_DELEGATE = new PropertyModel.WritableObjectPropertyKey<>();
 
+    /** The feed section subtitle in the main bottom sheet. */
+    public static final PropertyModel.WritableIntPropertyKey
+            MAIN_BOTTOM_SHEET_FEED_SECTION_SUBTITLE = new PropertyModel.WritableIntPropertyKey();
+
     /** The keys to bind a {@link BottomSheetListContainerView}. */
     public static final PropertyKey[] LIST_CONTAINER_KEYS =
-            new PropertyKey[] {LIST_CONTAINER_VIEW_DELEGATE};
+            new PropertyKey[] {
+                LIST_CONTAINER_VIEW_DELEGATE, MAIN_BOTTOM_SHEET_FEED_SECTION_SUBTITLE
+            };
 
     /** The click listener to handle back button clicks in the bottom sheet. */
     public static final PropertyModel.WritableObjectPropertyKey<View.OnClickListener>
@@ -45,6 +51,9 @@ public class NtpCustomizationViewProperties {
             FEED_SWITCH_ON_CHECKED_CHANGE_LISTENER =
                     new PropertyModel.WritableObjectPropertyKey<>();
 
+    public static final PropertyModel.WritableObjectPropertyKey<View.OnClickListener>
+            LEARN_MORE_BUTTON_CLICK_LISTENER = new PropertyModel.WritableObjectPropertyKey<>();
+
     public static final PropertyModel.WritableBooleanPropertyKey IS_FEED_SWITCH_CHECKED =
             new PropertyModel.WritableBooleanPropertyKey();
 
@@ -55,6 +64,7 @@ public class NtpCustomizationViewProperties {
             new PropertyKey[] {
                 FEED_SWITCH_ON_CHECKED_CHANGE_LISTENER,
                 IS_FEED_SWITCH_CHECKED,
-                IS_FEED_LIST_ITEMS_TITLE_VISIBLE
+                IS_FEED_LIST_ITEMS_TITLE_VISIBLE,
+                LEARN_MORE_BUTTON_CLICK_LISTENER
             };
 }

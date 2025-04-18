@@ -17,6 +17,7 @@
 #include "base/i18n/rtl.h"
 #include "base/lazy_instance.h"
 #include "base/memory/raw_ptr.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
 #include "ui/accessibility/accessibility_features.h"
@@ -513,23 +514,6 @@ const ui::AXSelection ViewAXPlatformNodeDelegate::GetUnignoredSelection()
   selection.focus_offset =
       data.GetIntAttribute(ax::mojom::IntAttribute::kTextSelEnd);
   selection.focus_affinity = ax::mojom::TextAffinity::kDownstream;
-  return selection;
-}
-
-const ui::AXSelection ViewAXPlatformNodeDelegate::GetHypertextSelection()
-    const {
-  const ui::AXSelection& selection = GetUnignoredSelection();
-  // In Views, the selection is purely used for textfields, and therefore the
-  // does not need to be adjusted away from leaf node endpoints for
-  // text/hypertext interfaces.
-#if DCHECK_IS_ON()
-  if (selection.anchor_offset != ax::mojom::kNoSelectionOffset) {
-    DCHECK_EQ(data_.id, selection.anchor_object_id);
-    DCHECK_EQ(data_.id, selection.focus_object_id);
-    DCHECK(data_.IsAtomicTextField());
-  }
-#endif
-
   return selection;
 }
 

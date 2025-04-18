@@ -1245,6 +1245,10 @@ void BackingStore::TearDown(base::WaitableEvent* signal_on_destruction) {
   db()->leveldb_state()->RequestDestruction(signal_on_destruction);
 }
 
+void BackingStore::InvalidateBlobReferences() {
+  active_blob_registry()->ForceShutdown();
+}
+
 Status BackingStore::AnyDatabaseContainsBlobs(bool* blobs_exist) {
   std::vector<std::u16string> names;
   Status status = GetDatabaseNames(&names);
@@ -2134,7 +2138,7 @@ Status BackingStore::RenameIndex(
   return Status::OK();
 }
 
-void BackingStore::Compact() {
+void BackingStore::FlushForTesting() {
 #if DCHECK_IS_ON()
   DCHECK(initialized_);
 #endif
@@ -2851,8 +2855,7 @@ void BackingStore::CleanRecoveryJournalIgnoreReturn() {
   CleanUpBlobJournal(RecoveryBlobJournalKey::Encode());
 }
 
-std::list<std::unique_ptr<BackingStorePreCloseTaskQueue::PreCloseTask>>
-BackingStore::GetPreCloseTasks() {
+void BackingStore::StartPreCloseTasks(base::OnceClosure on_done) {
   std::list<std::unique_ptr<BackingStorePreCloseTaskQueue::PreCloseTask>> tasks;
   if (ShouldRunTombstoneSweeper()) {
     tasks.push_back(std::make_unique<LevelDbTombstoneSweeper>(db_->db()));
@@ -2861,7 +2864,21 @@ BackingStore::GetPreCloseTasks() {
   if (ShouldRunCompaction()) {
     tasks.push_back(std::make_unique<IndexedDBCompactionTask>(db_->db()));
   }
-  return tasks;
+
+  pre_close_task_queue_ = std::make_unique<BackingStorePreCloseTaskQueue>(
+      std::move(tasks), std::move(on_done),
+      // Total time we let pre-close tasks run.
+      base::Seconds(60),
+      base::BindOnce(&BackingStore::GetCompleteMetadata,
+                     base::Unretained(this)));
+  pre_close_task_queue_->Start();
+}
+
+void BackingStore::StopPreCloseTasks() {
+  if (pre_close_task_queue_) {
+    pre_close_task_queue_->Stop();
+    pre_close_task_queue_.reset();
+  }
 }
 
 bool BackingStore::ShouldRunTombstoneSweeper() {
@@ -4096,13 +4113,6 @@ BackingStore::Transaction::OpenIndexCursor(
   }
 
   return cursor;
-}
-
-void BackingStore::WriteToIndexedDBForTesting(const std::string& key,
-                                              const std::string& value) {
-  std::string value_copy = value;
-  Status s(db_->Put(key, &value_copy));
-  CHECK(s.ok()) << s.ToString();
 }
 
 bool BackingStore::IsBlobCleanupPending() {

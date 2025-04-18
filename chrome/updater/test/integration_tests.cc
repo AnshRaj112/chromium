@@ -1544,6 +1544,7 @@ class IntegrationMetainstallerTest
   }
 
   void TearDown() override {
+    ExpectInstallEvent(*test_server_, kUpdaterAppId);
     ASSERT_NO_FATAL_FAILURE(Install({kEnableCecaExperimentSwitch}));
     ASSERT_NO_FATAL_FAILURE(ExpectUninstallPing(test_server_.get()));
     ASSERT_NO_FATAL_FAILURE(Uninstall());
@@ -1576,7 +1577,6 @@ TEST_P(IntegrationMetainstallerTest, UIAndPings) {
             .extra_code1 = 0,
         }));
   }
-  ExpectInstallEvent(*test_server_, kUpdaterAppId);
   ASSERT_NO_FATAL_FAILURE(InstallUpdaterAndApp(
       kAppId, /*is_silent_install=*/appname().empty(),
       /*tag=*/
@@ -1600,6 +1600,7 @@ class IntegrationMetainstallerLangTest
   }
 
   void TearDown() override {
+    ExpectInstallEvent(*test_server_, kUpdaterAppId);
     ASSERT_NO_FATAL_FAILURE(Install({kEnableCecaExperimentSwitch}));
     ASSERT_NO_FATAL_FAILURE(ExpectUninstallPing(test_server_.get()));
     ASSERT_NO_FATAL_FAILURE(Uninstall());
@@ -1618,7 +1619,6 @@ INSTANTIATE_TEST_SUITE_P(IntegrationMetainstallerLangTestCases,
                          ::testing::Values("en", "de", "ar", "hi"));
 
 TEST_P(IntegrationMetainstallerLangTest, Test) {
-  ExpectInstallEvent(*test_server_, kUpdaterAppId);
   ASSERT_NO_FATAL_FAILURE(InstallUpdaterAndApp(
       kAppId, /*is_silent_install=*/false,
       /*tag=*/

@@ -5487,14 +5487,20 @@ class SideBySideTabDragControllerTest
   base::test::ScopedFeatureList scoped_feature_list_{features::kSideBySide};
 };
 
-IN_PROC_BROWSER_TEST_F(SideBySideTabDragControllerTest, DragBetweenSplitTab) {
+// Flaky. https://crbug.com/40748225
+#if BUILDFLAG(IS_MAC)
+#define MAYBE_DragBetweenSplitTab DISABLED_DragBetweenSplitTab
+#else
+#define MAYBE_DragBetweenSplitTab DragBetweenSplitTab
+#endif
+IN_PROC_BROWSER_TEST_F(SideBySideTabDragControllerTest,
+                       MAYBE_DragBetweenSplitTab) {
   TabStrip* const tab_strip = GetTabStripForBrowser(browser());
 
   AddTabs(browser(), 2);
 
   split_tabs::SplitTabId id = split_tabs::SplitTabId::GenerateNew();
-  tab_strip->SetSplit(0, id);
-  tab_strip->SetSplit(1, id);
+  tab_strip->SetSplit({0, 1}, id);
   StopAnimating(tab_strip);
 
   Tab* const last_split_tab = tab_strip->tab_at(1);
@@ -5516,19 +5522,23 @@ IN_PROC_BROWSER_TEST_F(SideBySideTabDragControllerTest, DragBetweenSplitTab) {
   EXPECT_TRUE(IsTabInSplit(2));
 }
 
+// Flaky. https://crbug.com/40748225
+#if BUILDFLAG(IS_MAC)
+#define MAYBE_DragBetweenMultipleSplitTabs DISABLED_DragBetweenMultipleSplitTabs
+#else
+#define MAYBE_DragBetweenMultipleSplitTabs DragBetweenMultipleSplitTabs
+#endif
 IN_PROC_BROWSER_TEST_F(SideBySideTabDragControllerTest,
-                       DragBetweenMultipleSplitTabs) {
+                       MAYBE_DragBetweenMultipleSplitTabs) {
   TabStrip* const tab_strip = GetTabStripForBrowser(browser());
 
   AddTabs(browser(), 4);
 
   split_tabs::SplitTabId first_id = split_tabs::SplitTabId::GenerateNew();
-  tab_strip->SetSplit(0, first_id);
-  tab_strip->SetSplit(1, first_id);
+  tab_strip->SetSplit({0, 1}, first_id);
 
   split_tabs::SplitTabId second_id = split_tabs::SplitTabId::GenerateNew();
-  tab_strip->SetSplit(2, second_id);
-  tab_strip->SetSplit(3, second_id);
+  tab_strip->SetSplit({2, 3}, second_id);
 
   StopAnimating(tab_strip);
 

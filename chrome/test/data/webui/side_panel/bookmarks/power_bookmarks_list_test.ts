@@ -159,8 +159,12 @@ suite('General', () => {
               powerBookmarksList.getKeyboardNavigationServiceforTesting()
                   .getElementsForTesting()
                   .map((el: HTMLElement) => el.id)),
-          JSON.stringify(
-              ['bookmark-1', 'bookmark-5', 'bookmark-4', 'bookmark-3']));
+          JSON.stringify([
+            'bookmark-SIDE_PANEL_BOOKMARK_BAR_ID',
+            'bookmark-5',
+            'bookmark-4',
+            'bookmark-3',
+          ]));
 
       bookmarksApi.callbackRouterRemote.onBookmarkNodeAdded({
         id: '999',
@@ -171,6 +175,7 @@ suite('General', () => {
         children: null,
         dateAdded: null,
         dateLastUsed: null,
+        unmodifiable: false,
       });
       await microtasksFinished();
       await flushTasks();
@@ -181,7 +186,7 @@ suite('General', () => {
                   .getElementsForTesting()
                   .map((el: HTMLElement) => el.id)),
           JSON.stringify([
-            'bookmark-1',
+            'bookmark-SIDE_PANEL_BOOKMARK_BAR_ID',
             'bookmark-5',
             'bookmark-999',
             'bookmark-4',
@@ -197,8 +202,12 @@ suite('General', () => {
               powerBookmarksList.getKeyboardNavigationServiceforTesting()
                   .getElementsForTesting()
                   .map((el: HTMLElement) => el.id)),
-          JSON.stringify(
-              ['bookmark-1', 'bookmark-5', 'bookmark-4', 'bookmark-3']));
+          JSON.stringify([
+            'bookmark-SIDE_PANEL_BOOKMARK_BAR_ID',
+            'bookmark-5',
+            'bookmark-4',
+            'bookmark-3',
+          ]));
 
       bookmarksApi.callbackRouterRemote.onBookmarkNodesRemoved(['4']);
       await flushTasks();
@@ -209,7 +218,11 @@ suite('General', () => {
               powerBookmarksList.getKeyboardNavigationServiceforTesting()
                   .getElementsForTesting()
                   .map((el: HTMLElement) => el.id)),
-          JSON.stringify(['bookmark-1', 'bookmark-5', 'bookmark-3']));
+          JSON.stringify([
+            'bookmark-SIDE_PANEL_BOOKMARK_BAR_ID',
+            'bookmark-5',
+            'bookmark-3',
+          ]));
     });
 
     test('RebuildsKeyboardNavigationMoved', async () => {
@@ -220,8 +233,12 @@ suite('General', () => {
               powerBookmarksList.getKeyboardNavigationServiceforTesting()
                   .getElementsForTesting()
                   .map((el: HTMLElement) => el.id)),
-          JSON.stringify(
-              ['bookmark-1', 'bookmark-5', 'bookmark-4', 'bookmark-3']));
+          JSON.stringify([
+            'bookmark-SIDE_PANEL_BOOKMARK_BAR_ID',
+            'bookmark-5',
+            'bookmark-4',
+            'bookmark-3',
+          ]));
 
       const movedBookmark = FOLDERS[1]!.children![2]!.children![0]!;
       assertTrue(!!movedBookmark);
@@ -241,7 +258,7 @@ suite('General', () => {
                   .getElementsForTesting()
                   .map((el: HTMLElement) => el.id)),
           JSON.stringify([
-            'bookmark-1',
+            'bookmark-SIDE_PANEL_BOOKMARK_BAR_ID',
             'bookmark-5',
             'bookmark-6',
             'bookmark-4',
@@ -253,7 +270,7 @@ suite('General', () => {
       const bookmarks = getBookmarks(powerBookmarksList);
       assertEquals(4, bookmarks.length);
       // All folders should come first
-      assertEquals('1', bookmarks[0]!.id);
+      assertEquals('SIDE_PANEL_BOOKMARK_BAR_ID', bookmarks[0]!.id);
       assertEquals('5', bookmarks[1]!.id);
       // Newest URL should come next
       assertEquals('4', bookmarks[2]!.id);
@@ -349,6 +366,7 @@ suite('General', () => {
         children: null,
         dateAdded: null,
         dateLastUsed: null,
+        unmodifiable: false,
       });
       await flushTasks();
 
@@ -381,6 +399,7 @@ suite('General', () => {
         children: null,
         dateAdded: null,
         dateLastUsed: null,
+        unmodifiable: false,
       });
       await flushTasks();
 
@@ -399,6 +418,7 @@ suite('General', () => {
         children: null,
         dateAdded: null,
         dateLastUsed: null,
+        unmodifiable: false,
       });
       await flushTasks();
 
@@ -412,6 +432,7 @@ suite('General', () => {
         children: null,
         dateAdded: null,
         dateLastUsed: null,
+        unmodifiable: false,
       });
       await flushTasks();
 
@@ -440,6 +461,7 @@ suite('General', () => {
         children: null,
         dateAdded: null,
         dateLastUsed: null,
+        unmodifiable: false,
       });
       await flushTasks();
 
@@ -458,6 +480,7 @@ suite('General', () => {
         children: null,
         dateAdded: null,
         dateLastUsed: null,
+        unmodifiable: false,
       });
       await flushTasks();
 
@@ -475,6 +498,7 @@ suite('General', () => {
         children: null,
         dateAdded: null,
         dateLastUsed: null,
+        unmodifiable: false,
       });
       await flushTasks();
 
@@ -518,6 +542,7 @@ suite('General', () => {
         children: null,
         dateAdded: null,
         dateLastUsed: null,
+        unmodifiable: false,
       });
       await flushTasks();
 
@@ -696,7 +721,8 @@ suite('General', () => {
 
       flush();
 
-      const bookmarksBarFolderElement = getCrUrlListItemElementWithId('1');
+      const bookmarksBarFolderElement =
+          getCrUrlListItemElementWithId('SIDE_PANEL_BOOKMARK_BAR_ID');
       assertTrue(!!bookmarksBarFolderElement);
       assertEquals(0, bookmarksBarFolderElement.imageUrls.length);
 
@@ -829,7 +855,7 @@ suite('General', () => {
       assertFalse(isHidden(footer));
 
       // Opening an empty folder.
-      await openBookmark('1');
+      await openBookmark('SIDE_PANEL_BOOKMARK_BAR_ID');
 
       assertFalse(isHidden(search));
       assertTrue(isHidden(labels));

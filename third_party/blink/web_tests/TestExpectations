@@ -520,7 +520,6 @@ crbug.com/1186753 virtual/threaded-prefer-compositing/fast/scroll-snap/snaps-aft
 crbug.com/841567 virtual/threaded-prefer-compositing/fast/scrolling/overflow-scrollability.html [ Failure Pass Timeout ]
 
 crbug.com/915926 fast/events/touch/multi-touch-user-gesture.html [ Failure Pass ]
-crbug.com/1462758 fast/events/touch/touch-event-range-input.html [ Failure Pass ]
 
 # New OffscreenCanvas Tests that are breaking LayoutTest
 
@@ -7112,6 +7111,8 @@ crbug.com/396359045 editing/selection/update-selection-on-node-insertion.html [ 
 # Disable test temporarily to allow DevTools change to pass
 crbug.com/1294251 http/tests/devtools/elements/styles-3/styles-add-invalid-property.js [ Failure Pass Timeout ]
 
+crbug.com/411169291 virtual/view-transition-mpa-serialization/external/wpt/css/css-view-transitions/view-transition-types-mutable-no-document-element-crashtest.html [ Failure Skip Timeout ]
+
 # Failures on Mac13 2023-05-18
 crbug.com/1446039 [ Debug Mac13 ] external/wpt/webtransport/streams-close.https.any.html [ Failure Pass ]
 [ Debug Mac13 ] jquery/traversing.html [ Skip Timeout ]
@@ -9066,9 +9067,6 @@ crbug.com/405231143 [ Win11-arm64 ] external/wpt/clear-site-data/clear-cache-par
 
 crbug.com/403071968 external/wpt/css/css-images/gradient/gradient-infinity-003.html [ Failure ]
 
-# Gardener 2025-03-31
-crbug.com/407374335 [ Debug ] virtual/scalefactor200/external/wpt/largest-contentful-paint/animated/observe-cross-origin-tao-animated-image.tentative.html [ Failure Pass ]
-
 # Gardener 2025-04-02
 crbug.com/407865639 external/wpt/css/css-grid/grid-extrinsically-sized-mutations.html [ Failure Pass ]
 
@@ -9091,3 +9089,6 @@ crbug.com/42202153 external/wpt/wasm/jsapi/global/type.tentative.any.html [ Fail
 crbug.com/42202153 external/wpt/wasm/jsapi/global/type.tentative.any.worker.html [ Failure Pass ]
 crbug.com/42202153 external/wpt/wasm/jsapi/tag/type.tentative.any.html [ Failure Pass ]
 crbug.com/42202153 external/wpt/wasm/jsapi/tag/type.tentative.any.worker.html [ Failure Pass ]
+
+crbug.com/411529366 [ Mac ] external/wpt/nav-tracking-mitigations/stateful-client-bounce.sub.https.html [ Failure Pass ]
+crbug.com/411529366 [ Mac ] external/wpt/nav-tracking-mitigations/stateless-client-bounce.sub.https.html [ Failure Pass ]

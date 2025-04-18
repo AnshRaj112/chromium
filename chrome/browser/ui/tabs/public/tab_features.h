@@ -14,6 +14,7 @@
 #include "chrome/common/buildflags.h"
 
 class ChromeAutofillAiClient;
+class FromGWSNavigationAndKeepAliveRequestObserver;
 class LensOverlayController;
 class LensSearchController;
 class PinnedTranslateActionListener;
@@ -100,6 +101,8 @@ namespace tabs {
 
 class TabInterface;
 class TabDialogManager;
+
+class InactiveWindowMouseEventController;
 
 // This class owns the core controllers for features that are scoped to a given
 // tab. It can be subclassed by tests to perform dependency injection.
@@ -207,6 +210,10 @@ class TabFeatures {
 
   PwaInstallPageActionController* pwa_install_page_action_controller() {
     return pwa_install_page_action_controller_.get();
+  }
+
+  InactiveWindowMouseEventController* inactive_window_mouse_event_controller() {
+    return inactive_window_mouse_event_controller_.get();
   }
 
   // Called exactly once to initialize features.
@@ -327,6 +334,12 @@ class TabFeatures {
 
   std::unique_ptr<memory_saver::MemorySaverChipController>
       memory_saver_chip_controller_;
+
+  std::unique_ptr<InactiveWindowMouseEventController>
+      inactive_window_mouse_event_controller_;
+
+  std::unique_ptr<FromGWSNavigationAndKeepAliveRequestObserver>
+      from_gws_navigation_and_keep_alive_request_observer_;
 
   // Must be the last member.
   base::WeakPtrFactory<TabFeatures> weak_factory_{this};

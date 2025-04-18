@@ -182,6 +182,14 @@ const char kAndroidMetaClickHistoryNavigationDescription[] =
     "window) on forward/back history navigation arrows";
 #endif  // BUILDFLAG(IS_ANDROID)
 
+#if BUILDFLAG(IS_ANDROID)
+const char kAndroidNativePagesInNewTabName[] =
+    "Open downloads, history and bookmarks in new tab";
+const char kAndroidNativePagesInNewTabDescription[] =
+    "Open downloads, history, bookmarks in new tab instead of clobbering "
+    "existing tab";
+#endif  // BUILDFLAG(IS_ANDROID)
+
 #if BUILDFLAG(IS_CHROMEOS)
 const char kIgnoreDeviceFlexArcEnabledPolicyName[] =
     "Ignore VPN Apps Enabling on ChromeOS Flex";
@@ -322,10 +330,9 @@ const char kCssMasonryLayoutDescription[] =
     "Enable experimental CSS Masonry Layout implementation. Simple layouts "
     "with masonry in the block direction are supported. Subgrid, "
     "fragmentation, and out-of-flow items are not supported yet. The syntax to "
-    "use CSS Masonry is `display: masonry` and masonry-specific properties "
-    "must be used (i.e. `masonry-template-tracks`, `masonry-track-start`, "
-    "`masonry-track-end`). More details on masonry syntax can be found at "
-    "https://tabatkins.github.io/specs/css-masonry/#masonry-model.";
+    "use CSS Masonry is `display: masonry` together with grid properties (i.e. "
+    "`grid-column`, `grid-row`, etc.). More details on masonry syntax can be "
+    "found at https://www.w3.org/TR/css-grid-3/#masonry-model.";
 
 const char kCssTextBoxTrimName[] = "CSS text-box-trim";
 const char kCssTextBoxTrimDescription[] =
@@ -1235,13 +1242,6 @@ const char kImprovedSettingsUIOnDesktopDescription[] =
     "Enables redesign of signin settings and better signin errors in "
     "chrome://settings.";
 
-const char kIsSecurePaymentConfirmationAvailableAPIName[] =
-    "isSecurePaymentConfirmationAvailable API";
-const char kIsSecurePaymentConfirmationAvailableAPIDescription[] =
-    "Enables the PaymentRequest.isSecurePaymentConfirmationAvailable web API, "
-    "which allows for more ergonomic feature detection of Secure Payment "
-    "Confirmation";
-
 const char kEnableAutofillAddressSavePromptName[] =
     "Autofill Address Save Prompts";
 const char kEnableAutofillAddressSavePromptDescription[] =
@@ -1938,14 +1938,6 @@ const char kExtensionManifestV2DeprecationUnsupportedName[] =
 const char kExtensionManifestV2DeprecationUnsupportedDescription[] =
     "Displays a warning that affected MV2 extensions were turned off due to "
     "the Manifest V2 deprecation and cannot be re-enabled.";
-
-const char kWebAuthFlowInBrowserTabName[] =
-    "Web Authentication Flow in Browser Tab";
-const char kWebAuthFlowInBrowserTabDescription[] =
-    "Web authentication flows to be displayed in a Browser Tab instead of an "
-    "App Window. The flows are used via the Chrome Extension API, using "
-    "`chrome.identity` functions. Browser Tab can be displayed either in a New "
-    "Tab or a Popup Window via the feature parameters.";
 
 const char kCWSInfoFastCheckName[] = "CWS Info Fast Check";
 const char kCWSInfoFastCheckDescription[] =
@@ -2895,6 +2887,22 @@ const char kOmniboxSearchAggregatorName[] = "Omnibox search aggregator";
 const char kOmniboxSearchAggregatorDescription[] =
     "Enables omnibox suggestions from the search aggregator provider";
 
+const char kOmniboxContextualSearchActionsAtTopName[] =
+    "Omnibox contextual search actions at top";
+const char kOmniboxContextualSearchActionsAtTopDescription[] =
+    "Enables overriding the placement of contextual search actions in the "
+    "omnibox popup.";
+
+const char kOmniboxContextualSearchOnFocusSuggestionsName[] =
+    "Omnibox contextual search on focus suggestions";
+const char kOmniboxContextualSearchOnFocusSuggestionsDescription[] =
+    "Enables omnibox contextual search suggestions in zero prefix suggest.";
+
+const char kOmniboxContextualSuggestionsName[] =
+    "Omnibox contextual suggestions";
+const char kOmniboxContextualSuggestionsDescription[] =
+    "Enables omnibox contextual suggestions.";
+
 const char kOmniboxFocusTriggersWebAndSRPZeroSuggestName[] =
     "Omnibox on-focus suggestions on web and SRP";
 const char kOmniboxFocusTriggersWebAndSRPZeroSuggestDescription[] =
@@ -3340,6 +3348,16 @@ const char kDeviceBoundSessionAccessObserverSharedRemoteDescription[] =
     "Enables the optimization of reducing unnecessary IPC for cloning "
     "DeviceBoundSessionAccessObserver.";
 
+#if BUILDFLAG(IS_ANDROID)
+const char kBackgroundCompactMessageName[] = "Enable Background Compaction";
+const char kBackgroundCompactDescription[] =
+    "Compact memory for all tabs while chrome is backgrounded";
+const char kRunningCompactMessageName[] = "Enable Running Compaction";
+const char kRunningCompactDescription[] =
+    "Compact memory tabs that haven't been used in a while while chrome "
+    "is running.";
+#endif
+
 #if BUILDFLAG(SKIA_BUILD_RUST_PNG)
 const char kRustyPngName[] = "Rust-based PNG image handling";
 const char kRustyPngDescription[] =
@@ -3610,6 +3628,13 @@ const char kDynamicSearchUpdateAnimationDescription[] =
     "animations are preempted. Shortened animation durations configurable "
     "(unit: milliseconds).";
 
+const char kSecurePaymentConfirmationAvailabilityAPIName[] =
+    "securePaymentConfirmationAvailability API";
+const char kSecurePaymentConfirmationAvailabilityAPIDescription[] =
+    "Enables the PaymentRequest.securePaymentConfirmationAvailability web API, "
+    "which allows for more ergonomic feature detection of Secure Payment "
+    "Confirmation";
+
 const char kSecurePaymentConfirmationBrowserBoundKeysName[] =
     "Secure Payment Confirmation Browser Bound Key";
 const char kSecurePaymentConfirmationBrowserBoundKeysDescription[] =
@@ -3827,6 +3852,11 @@ const char kTabGroupSyncServiceDesktopMigrationName[] =
     "Tab Group Sync Service Desktop Migration";
 const char kTabGroupSyncServiceDesktopMigrationDescription[] =
     "Enables use of the TabGroupSyncService. This is a backend only change.";
+
+const char kTabGroupShorcutsId[] = "tab-group-shortcuts";
+const char kTabGroupShorcutsName[] = "Tab Group Keyboard Shortcuts";
+const char kTabGroupShorcutsDescription[] =
+    "Adds a few keyboard shortcuts for some tab group interactions.";
 
 const char kTabHoverCardImagesName[] = "Tab Hover Card Images";
 const char kTabHoverCardImagesDescription[] =
@@ -4423,7 +4453,7 @@ const char kAndroidPdfAssistContentDescription[] =
 
 const char kAndroidSurfaceColorUpdateName[] = "Android surface color update.";
 const char kAndroidSurfaceColorUpdateDescription[] =
-    "If enabled, updates the android surface colors.";
+    "If enabled, updates the android surface colors for toolbar/omnibox.";
 
 const char kAndroidTabDeclutterName[] = "Android Tab Declutter";
 const char kAndroidTabDeclutterDescription[] =
@@ -4763,6 +4793,11 @@ const char kFullscreenInsetsApiMigrationOnAutomotiveDescription[] =
     "Migration from View#setSystemUiVisibility to WindowInsetsController on "
     "automotive.";
 
+const char kGridTabSwitcherSurfaceColorUpdateName[] =
+    "Grid tab switcher surface color update";
+const char kGridTabSwitcherSurfaceColorUpdateDescription[] =
+    "Enables grid tab switcher surface color update";
+
 const char kGtsCloseTabAnimationName[] =
     "Grid tab switcher close tab animation";
 const char kGtsCloseTabAnimationDescription[] =
@@ -4931,6 +4966,11 @@ const char kRelatedSearchesSwitchName[] =
 const char kRelatedSearchesSwitchDescription[] =
     "Enables requesting related searches suggestions.";
 
+const char kForceOffTextAutosizingName[] =
+    "Force off heuristics for inflating text sizes on devices with small "
+    "screens.";
+const char kForceOffTextAutosizingDescription[] = "Disable text autosizing.";
+
 const char kRightEdgeGoesForwardGestureNavName[] =
     "RightEdgeGoesForwardGestureNav";
 const char kRightEdgeGoesForwardGestureNavDescription[] =
@@ -5063,15 +5103,6 @@ const char kUseHardwareBufferUsageFlagsFromVulkanName[] =
     "Use recommended AHardwareBuffer usage flags from Vulkan";
 const char kUseHardwareBufferUsageFlagsFromVulkanDescription[] =
     "Allows querying recommended AHardwareBuffer usage flags from Vulkan API";
-
-const char kUnifiedPasswordManagerLocalPasswordsAndroidAccessLossWarningName[] =
-    "Access loss warning for unmigrated password manager users";
-const char
-    kUnifiedPasswordManagerLocalPasswordsAndroidAccessLossWarningDescription[] =
-        "Chrome password manager users who are not enrolled into the new "
-        "experience of storing local passwords in GMSCore will be warned via "
-        "various communication channels about data/feature access loss unless "
-        "they upgrade GMSCore.";
 
 const char kUpdateMenuBadgeName[] = "Force show update menu badge";
 const char kUpdateMenuBadgeDescription[] =
@@ -5389,12 +5420,6 @@ const char kNtpMostRelevantTabResumptionModuleName[] =
     "NTP Most Relevant Tab Resumption Module";
 const char kNtpMostRelevantTabResumptionModuleDescription[] =
     "Shows the Most Relevant Tab Resumption Module on the New Tab Page.";
-
-const char kNtpMostRelevantTabResumptionModuleDeviceIconName[] =
-    "NTP Most Relevant Tab Resumption Module with Device Icon";
-const char kNtpMostRelevantTabResumptionModuleDeviceIconDescription[] =
-    "Shows the device icon instead of device name on Most Relevant Tab "
-    "Resumption Module on the New Tab Page.";
 
 const char kNtpMiddleSlotPromoDismissalName[] =
     "NTP Middle Slot Promo Dismissal";
@@ -6740,6 +6765,12 @@ const char kExperimentalAccessibilityManifestV3Name[] =
 const char kExperimentalAccessibilityManifestV3Description[] =
     "Experimental migration of accessibility features from extension manifest "
     "v2 to v3. Likely to break accessibility access while experimental.";
+
+const char kAccessibilityManifestV3AccessibilityCommonName[] =
+    "Changes accessibility common extension manifest v2 to v3.";
+const char kAccessibilityManifestV3AccessibilityCommonDescription[] =
+    "Experimental migration of accessibility common extension from manifest v2 "
+    "to v3.";
 
 const char kAccessibilityManifestV3BrailleImeName[] =
     "Changes accessibility extension Braille IME manifest v2 to v3.";
@@ -8312,6 +8343,10 @@ const char kHistoryPageHistorySyncPromoName[] =
 const char kHistoryPageHistorySyncPromoDescription[] =
     "Add a history sync opt-in promo in the History Page for signed-in users "
     "that are not syncing history & tabs.";
+
+const char kHistoryOptInEducationalTipName[] = "History sync educational tip";
+const char kHistoryOptInEducationalTipDescription[] =
+    "Enables a history sync promo in the magic stack on NTP";
 
 const char kWebSerialOverBluetoothName[] = "Enable Web Serial over Bluetooth";
 const char kWebSerialOverBluetoothDescription[] =

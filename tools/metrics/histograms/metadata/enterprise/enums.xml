@@ -2222,6 +2222,7 @@ chromium-metrics-reviews@google.com.
   <int value="1352" label="DeviceLoginScreenFaceGazeEnabled"/>
   <int value="1353" label="EnterpriseLogoUrlForBrowser"/>
   <int value="1354" label="EnterpriseCustomLabelForBrowser"/>
+  <int value="1355" label="DefaultSmartCardConnectSetting"/>
 </enum>
 
 <enum name="EnterprisePoliciesSources">
@@ -2632,6 +2633,9 @@ chromium-metrics-reviews@google.com.
     (Obsolete) A new extension request is added and uploaded with ERP.
   </int>
   <int value="6" label="kTriggerManual">User upload report manually</int>
+  <int value="7" label="kTriggerSecurity">
+    Triggered by a security reporting trigger
+  </int>
 </enum>
 
 <enum name="SecondaryGoogleAccountUsagePolicyFetchStatus">

@@ -113,21 +113,9 @@ class ExtensionServiceInterface {
   // extension has been loaded.
   virtual void AddExtension(const Extension* extension) = 0;
 
-  // Check if we have preferences for the component extension and, if not or if
-  // the stored version differs, install the extension (without requirements
-  // checking) before calling AddExtension.
-  // TODO(crbug.com/408454704): Delete this method. Callers should use
-  // ExtensionRegistrar directly.
-  virtual void AddComponentExtension(const Extension* extension) = 0;
-
   // Unload the specified extension.
   virtual void UnloadExtension(const std::string& extension_id,
                                UnloadedExtensionReason reason) = 0;
-
-  // Remove the specified component extension.
-  // TODO(crbug.com/408454704): Delete this method. Callers should use
-  // ExtensionRegistrar directly.
-  virtual void RemoveComponentExtension(const std::string& extension_id) = 0;
 
   // Whether a user is able to disable a given extension.
   virtual bool UserCanDisableInstalledExtension(
@@ -170,9 +158,7 @@ class ExtensionService : public ExtensionServiceInterface,
   //
   void UnloadExtension(const std::string& extension_id,
                        UnloadedExtensionReason reason) override;
-  void RemoveComponentExtension(const std::string& extension_id) override;
   void AddExtension(const Extension* extension) override;
-  void AddComponentExtension(const Extension* extension) override;
   const Extension* GetPendingExtensionUpdate(
       const std::string& extension_id) const override;
   bool FinishDelayedInstallationIfReady(const std::string& extension_id,
@@ -206,31 +192,6 @@ class ExtensionService : public ExtensionServiceInterface,
   // nothing.
   void EnableExtension(const std::string& extension_id);
 
-  // Takes Safe Browsing and Omaha blocklist states into account and decides
-  // whether to remove greylist disabled reason. Called when a greylisted
-  // state is removed from the Safe Browsing blocklist or Omaha blocklist. Also
-  // clears all acknowledged states if the greylist disabled reason is removed.
-  void OnGreylistStateRemoved(const std::string& extension_id);
-
-  // Takes acknowledged blocklist states into account and decides whether to
-  // disable the greylisted extension. Called when a new greylisted state is
-  // added to the Safe Browsing blocklist or Omaha blocklist.
-  void OnGreylistStateAdded(const std::string& extension_id,
-                            BitMapBlocklistState new_state);
-
-  // Takes Safe Browsing and Omaha malware blocklist states into account and
-  // decides whether to remove the extension from the blocklist and reload it.
-  // Called when a blocklisted extension is removed from the Safe Browsing
-  // malware blocklist or Omaha malware blocklist. Also clears the acknowledged
-  // state if the extension is reloaded.
-  void OnBlocklistStateRemoved(const std::string& extension_id);
-
-  // Takes acknowledged malware blocklist state into account and decides whether
-  // to add the extension to the blocklist and unload it. Called when the
-  // extension is added to the Safe Browsing malware blocklist or the Omaha
-  // malware blocklist.
-  void OnBlocklistStateAdded(const std::string& extension_id);
-
   // Performs action based on Omaha attributes for the extension.
   void PerformActionBasedOnOmahaAttributes(const std::string& extension_id,
                                            const base::Value::Dict& attributes);
@@ -260,14 +221,6 @@ class ExtensionService : public ExtensionServiceInterface,
       const ExtensionId& extension_id,
       const base::flat_set<int>& disable_reasons);
 
-  // Same as |DisableExtension|, but assumes that the request to disable
-  // |extension_id| originates from |source_extension| when evaluating whether
-  // the extension can be disabled. Please see |ExtensionMayModifySettings|
-  // for details.
-  void DisableExtensionWithSource(const Extension* source_extension,
-                                  const ExtensionId& extension_id,
-                                  disable_reason::DisableReason disable_reason);
-
   // Disable non-default and non-managed extensions with ids not in
   // |except_ids|. Default extensions are those from the Web Store with
   // |was_installed_by_default| flag.
@@ -276,11 +229,6 @@ class ExtensionService : public ExtensionServiceInterface,
   // ExtensionHost of background page calls this method right after its renderer
   // main frame has been created.
   void DidCreateMainFrameForBackgroundPage(ExtensionHost* host);
-
-  // Unloads the given extension and marks the extension as terminated. This
-  // doesn't notify the user that the extension was terminated, if such a
-  // notification is desired the calling code is responsible for doing that.
-  void TerminateExtension(const std::string& extension_id);
 
   // Returns whether a user is able to disable a given extension or if that is
   // not possible (for instance, extension was enabled by policy).
@@ -413,11 +361,6 @@ class ExtensionService : public ExtensionServiceInterface,
 
   raw_ptr<ExtensionAllowlist> allowlist_ = nullptr;
 
-  SafeBrowsingVerdictHandler safe_browsing_verdict_handler_;
-
-  ExtensionTelemetryServiceVerdictHandler
-      extension_telemetry_service_verdict_handler_;
-
   // Sets of enabled/disabled/terminated/blocklisted extensions. Not owned.
   raw_ptr<ExtensionRegistry> registry_ = nullptr;
 
@@ -461,6 +404,13 @@ class ExtensionService : public ExtensionServiceInterface,
 
   // Helper to register and unregister extensions.
   raw_ptr<ExtensionRegistrar> extension_registrar_ = nullptr;
+
+  // Needs `extension_registrar_` during construction.
+  SafeBrowsingVerdictHandler safe_browsing_verdict_handler_;
+
+  // Needs `extension_registrar_` during construction.
+  ExtensionTelemetryServiceVerdictHandler
+      extension_telemetry_service_verdict_handler_;
 
   // Needs `extension_registrar_` during construction.
   OmahaAttributesHandler omaha_attributes_handler_;

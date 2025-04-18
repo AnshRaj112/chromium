@@ -7,7 +7,6 @@
 #include <memory>
 
 #include "base/check.h"
-#include "base/check_deref.h"
 #include "base/command_line.h"
 #include "base/containers/flat_set.h"
 #include "base/feature_list.h"
@@ -54,35 +53,6 @@
 
 namespace glic {
 
-namespace {
-
-std::optional<int> GetOptionalIntPreference(PrefService* prefs,
-                                            std::string_view path) {
-  const PrefService::Preference& pref =
-      CHECK_DEREF(prefs->FindPreference(path));
-  if (pref.IsDefaultValue()) {
-    return std::nullopt;
-  }
-  return pref.GetValue()->GetInt();
-}
-
-// Get the previous position or none if the window has not been dragged before.
-std::optional<gfx::Point> GetPreviousPositionFromPrefs(PrefService* prefs) {
-  if (!prefs) {
-    return std::nullopt;
-  }
-
-  auto x_pos = GetOptionalIntPreference(prefs, prefs::kGlicPreviousPositionX);
-  auto y_pos = GetOptionalIntPreference(prefs, prefs::kGlicPreviousPositionY);
-
-  if (!x_pos.has_value() || !y_pos.has_value()) {
-    return std::nullopt;
-  }
-  return gfx::Point(x_pos.value(), y_pos.value());
-}
-
-}  // namespace
-
 GlicKeyedService::GlicKeyedService(
     Profile* profile,
     signin::IdentityManager* identity_manager,
@@ -112,8 +82,6 @@ GlicKeyedService::GlicKeyedService(
   memory_pressure_listener_ = std::make_unique<base::MemoryPressureListener>(
       FROM_HERE, base::BindRepeating(&GlicKeyedService::OnMemoryPressure,
                                      weak_ptr_factory_.GetWeakPtr()));
-
-  previous_position_ = GetPreviousPositionFromPrefs(profile_->GetPrefs());
 
   // If `--glic-always-open-fre` is present, unset this pref to ensure the FRE
   // is shown for testing convenience.
@@ -167,12 +135,6 @@ void GlicKeyedService::ToggleUI(BrowserWindowInterface* bwi,
 void GlicKeyedService::CloseUI() {
   window_controller_->Shutdown();
   SetContextAccessIndicator(false);
-  if (previous_position_.has_value()) {
-    profile_->GetPrefs()->SetInteger(prefs::kGlicPreviousPositionX,
-                                     previous_position_.value().x());
-    profile_->GetPrefs()->SetInteger(prefs::kGlicPreviousPositionY,
-                                     previous_position_.value().y());
-  }
 }
 
 void GlicKeyedService::FocusUI() {
@@ -465,30 +427,16 @@ base::CallbackListSubscription GlicKeyedService::AddWebClientCreatedCallback(
 void GlicKeyedService::TryPreload() {
   CHECK(glic_profile_manager_);
 
-  Profile* profile = profile_;
-  bool should_preload = glic_profile_manager_->ShouldPreloadForProfile(profile);
-
-  if (base::FeatureList::IsEnabled(features::kGlicWarming) && profile &&
-      GlicEnabling::IsEnabledAndConsentForProfile(profile)) {
-    base::UmaHistogramBoolean("Glic.ShouldPreload", should_preload);
-  }
-
-  if (!should_preload) {
-    return;
-  }
-
-  window_controller_->Preload();
+  glic_profile_manager_->ShouldPreloadForProfile(
+      profile_, base::BindOnce(&GlicKeyedService::FinishPreload, GetWeakPtr()));
 }
 
 void GlicKeyedService::TryPreloadFre() {
   CHECK(glic_profile_manager_);
 
-  Profile* profile = profile_;
-  if (!glic_profile_manager_->ShouldPreloadFreForProfile(profile)) {
-    return;
-  }
-
-  window_controller_->PreloadFre();
+  glic_profile_manager_->ShouldPreloadFreForProfile(
+      profile_,
+      base::BindOnce(&GlicKeyedService::FinishPreloadFre, GetWeakPtr()));
 }
 
 void GlicKeyedService::Reload() {
@@ -524,6 +472,27 @@ void GlicKeyedService::SetPosition(const gfx::Point& position) {
 
 std::optional<gfx::Point> GlicKeyedService::GetPreviousPosition() {
   return previous_position_;
+}
+
+void GlicKeyedService::FinishPreload(Profile* profile, bool should_preload) {
+  if (base::FeatureList::IsEnabled(features::kGlicWarming) && profile &&
+      GlicEnabling::IsEnabledAndConsentForProfile(profile)) {
+    base::UmaHistogramBoolean("Glic.ShouldPreload", should_preload);
+  }
+
+  if (!should_preload) {
+    return;
+  }
+
+  window_controller_->Preload();
+}
+
+void GlicKeyedService::FinishPreloadFre(Profile* profile, bool should_preload) {
+  if (!should_preload) {
+    return;
+  }
+
+  window_controller_->PreloadFre();
 }
 
 }  // namespace glic

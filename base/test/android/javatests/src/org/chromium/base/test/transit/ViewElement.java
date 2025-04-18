@@ -4,12 +4,20 @@
 
 package org.chromium.base.test.transit;
 
+import static org.hamcrest.core.Is.is;
+
 import android.view.View;
+
+import androidx.test.espresso.Espresso;
+import androidx.test.espresso.ViewAction;
+import androidx.test.espresso.ViewInteraction;
+import androidx.test.espresso.action.ViewActions;
 
 import org.hamcrest.Matcher;
 
 import org.chromium.base.test.transit.ViewConditions.DisplayedCondition;
 import org.chromium.base.test.transit.ViewConditions.NotDisplayedAnymoreCondition;
+import org.chromium.base.test.util.ForgivingClickAction;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 
@@ -21,9 +29,11 @@ import org.chromium.build.annotations.Nullable;
  *
  * <p>Generates ENTER and EXIT Conditions for the ConditionalState to ensure the ViewElement is in
  * the right state.
+ *
+ * @param <ViewT> the type of the View.
  */
 @NullMarked
-public class ViewElement extends Element<View> {
+public class ViewElement<ViewT extends View> extends Element<ViewT> {
 
     /**
      * Minimum percentage of the View that needs to be displayed for a ViewElement's enter
@@ -33,10 +43,10 @@ public class ViewElement extends Element<View> {
      */
     public static final int MIN_DISPLAYED_PERCENT = 90;
 
-    private final ViewSpec mViewSpec;
+    private final ViewSpec<ViewT> mViewSpec;
     private final Options mOptions;
 
-    ViewElement(ViewSpec viewSpec, Options options) {
+    ViewElement(ViewSpec<ViewT> viewSpec, Options options) {
         super(
                 "VE/"
                         + (options.mElementId != null
@@ -54,7 +64,7 @@ public class ViewElement extends Element<View> {
     }
 
     @Override
-    public ConditionWithResult<View> createEnterCondition() {
+    public ConditionWithResult<ViewT> createEnterCondition() {
         Matcher<View> viewMatcher = mViewSpec.getViewMatcher();
         DisplayedCondition.Options conditionOptions =
                 DisplayedCondition.newOptions()
@@ -63,14 +73,14 @@ public class ViewElement extends Element<View> {
                         .withDisplayingAtLeast(mOptions.mDisplayedPercentageRequired)
                         .withSettleTimeMs(mOptions.mInitialSettleTimeMs)
                         .build();
-        return new DisplayedCondition(viewMatcher, conditionOptions);
+        return new DisplayedCondition<>(viewMatcher, mViewSpec.getViewClass(), conditionOptions);
     }
 
     /**
      * Create a {@link DisplayedCondition} like the enter Condition, but also waiting for the View
      * to settle (no changes to its rect coordinates) for 1 second.
      */
-    public ConditionWithResult<View> createSettleCondition() {
+    public ConditionWithResult<ViewT> createSettleCondition() {
         Matcher<View> viewMatcher = mViewSpec.getViewMatcher();
         DisplayedCondition.Options conditionOptions =
                 DisplayedCondition.newOptions()
@@ -79,7 +89,7 @@ public class ViewElement extends Element<View> {
                         .withDisplayingAtLeast(mOptions.mDisplayedPercentageRequired)
                         .withSettleTimeMs(1000)
                         .build();
-        return new DisplayedCondition(viewMatcher, conditionOptions);
+        return new DisplayedCondition<>(viewMatcher, mViewSpec.getViewClass(), conditionOptions);
     }
 
     @Override
@@ -89,6 +99,47 @@ public class ViewElement extends Element<View> {
         } else {
             return null;
         }
+    }
+
+    /** Start an Espresso interaction with this View. */
+    private ViewInteraction onView() {
+        View view = get();
+        return Espresso.onView(is(view));
+    }
+
+    /** Trigger an Espresso action on this View. */
+    public Transition.Trigger performTrigger(ViewAction action) {
+        return () -> onView().perform(action);
+    }
+
+    /**
+     * Trigger an Espresso click on this View.
+     *
+     * <p>Requires it to be >90% displayed.
+     */
+    public Transition.Trigger clickTrigger() {
+        return performTrigger(ViewActions.click());
+    }
+
+    /**
+     * Trigger an Espresso click on this View.
+     *
+     * <p>Does not require the View to be > 90% displayed like {@link #clickTrigger()}.
+     *
+     * <p>TODO(crbug.com/411140394): Rename clickTrigger() to strictClickTrigger() and rename this
+     * to clickTrigger().
+     */
+    public Transition.Trigger forgivingClickTrigger() {
+        return performTrigger(ForgivingClickAction.forgivingClick());
+    }
+
+    /**
+     * Trigger an Espresso long click on this View.
+     *
+     * <p>Requires it to be >90% displayed.
+     */
+    public Transition.Trigger longClickTrigger() {
+        return performTrigger(ViewActions.longClick());
     }
 
     /** Extra options for declaring ViewElements. */

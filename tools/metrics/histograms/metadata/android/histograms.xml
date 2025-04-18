@@ -697,6 +697,17 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Android.Automotive.UiScalingFactor" units="%"
+    expires_after="2025-08-01">
+  <owner>twellington@chromium.org</owner>
+  <owner>clhager@google.com</owner>
+  <summary>
+    Records the scaling factor applied to the UI on an automotive device. This
+    value is recorded once per activity start as a percentage, with 134% being
+    the default scale-up.
+  </summary>
+</histogram>
+
 <histogram name="Android.BackgroundRestrictions.IsBackgroundRestricted"
     enum="Boolean" expires_after="2023-04-30">
   <owner>shaktisahu@chromium.org</owner>
@@ -2522,6 +2533,22 @@ chromium-metrics-reviews@google.com.
     Android U. This means we can confirm the package name was passed by the
     defined host app. Emitted upon launching the tabbed Chrome Activity via View
     Intent.
+  </summary>
+</histogram>
+
+<histogram name="Android.Intent.IntentLaunchFromTabCreation" enum="Boolean"
+    expires_after="2026-02-24">
+  <owner>nafisabedin@google.com</owner>
+  <owner>mthiesse@chromium.org</owner>
+  <owner>yfriedman@chromium.org</owner>
+  <summary>
+    Records whether a tab was created due to an external app to launch an intent
+    for an external app.
+
+    The false counts, and thus the PDF, for this metric is not meaningful.
+    Instead, utilize the true counts with another such as
+    MobileStartup.LaunchCause.EXTERNAL_VIEW_INTENT as the denominator to
+    determine the proportion of redirects.
   </summary>
 </histogram>
 
@@ -5185,19 +5212,6 @@ chromium-metrics-reviews@google.com.
     <variant name="ExternalProtocol" summary="external protocol"/>
     <variant name="InternalProtocol" summary="internal protocol"/>
   </token>
-</histogram>
-
-<histogram name="Android.TabOpenedForRedirect" enum="Boolean"
-    expires_after="2026-02-24">
-  <owner>nafisabedin@google.com</owner>
-  <owner>mthiesse@chromium.org</owner>
-  <owner>yfriedman@chromium.org</owner>
-  <summary>
-    Records whether the tab was opened by an external app only to redirect to
-    another external app. This indicates that Chrome came from the background,
-    or was started, to act as an intermediate link redirector between the two
-    apps.
-  </summary>
 </histogram>
 
 <histogram name="Android.TabStrip.NullTabHoverCardView.ShowDelayed"

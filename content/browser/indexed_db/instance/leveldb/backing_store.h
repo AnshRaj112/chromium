@@ -371,17 +371,15 @@ class CONTENT_EXPORT BackingStore : public indexed_db::BackingStore,
 
   void OnTransactionComplete(bool tombstone_threshold_exceeded);
 
-  // Virtual for testing.
-  virtual void Compact();
-
   static bool RecordCorruptionInfo(const base::FilePath& path_base,
                                    const storage::BucketLocator& bucket_locator,
                                    const std::string& message);
 
   // BackingStore:
   void TearDown(base::WaitableEvent* signal_on_destruction) override;
-  std::list<std::unique_ptr<BackingStorePreCloseTaskQueue::PreCloseTask>>
-  GetPreCloseTasks() override;
+  void InvalidateBlobReferences() override;
+  void StartPreCloseTasks(base::OnceClosure on_done) override;
+  void StopPreCloseTasks() override;
   // Creates a new database in the backing store. `metadata` is an in-out param.
   // The `name` and `version` fields are inputs, while the `id` and
   // `max_object_store_id` fields are outputs.
@@ -506,6 +504,7 @@ class CONTENT_EXPORT BackingStore : public indexed_db::BackingStore,
       bool* exists) override;
 
   uintptr_t GetIdentifierForMemoryDump() override;
+  void FlushForTesting() override;
 
   // Fill in the provided list with existing database names.
   Status GetDatabaseNames(std::vector<std::u16string>* names) override;
@@ -526,9 +525,7 @@ class CONTENT_EXPORT BackingStore : public indexed_db::BackingStore,
 
   const std::string& origin_identifier() { return origin_identifier_; }
 
-  // Gets the total size of blobs and the database for in-memory backing
-  // stores.
-  int64_t GetInMemorySize() const;
+  int64_t GetInMemorySize() const override;
 
 #if DCHECK_IS_ON()
   int NumBlobFilesDeletedForTesting() { return num_blob_files_deleted_; }
@@ -542,8 +539,6 @@ class CONTENT_EXPORT BackingStore : public indexed_db::BackingStore,
   void SetExecuteJournalCleaningOnNoTransactionsForTesting() {
     execute_journal_cleaning_on_no_txns_ = true;
   }
-  void WriteToIndexedDBForTesting(const std::string& key,
-                                  const std::string& value);
 
   const LevelDBCleanupScheduler& GetLevelDBCleanupSchedulerForTesting() const {
     return level_db_cleanup_scheduler_;
@@ -720,6 +715,8 @@ class CONTENT_EXPORT BackingStore : public indexed_db::BackingStore,
 #if DCHECK_IS_ON()
   bool initialized_ = false;
 #endif
+
+  std::unique_ptr<BackingStorePreCloseTaskQueue> pre_close_task_queue_;
 
   base::WeakPtrFactory<BackingStore> weak_factory_{this};
 };

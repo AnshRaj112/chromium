@@ -1962,8 +1962,10 @@ bool WebGLRenderingContextBase::CopyRenderingResultsFromDrawingBuffer(
     }
     gpu::raster::RasterInterface* raster_interface =
         shared_context_wrapper->ContextProvider().RasterInterface();
+    gpu::SyncToken sync_token;
     auto client_si =
-        resource_provider->GetBackingClientSharedImageForOverwrite();
+        resource_provider->GetBackingClientSharedImageForExternalWrite(
+            &sync_token, gpu::SharedImageUsageSet());
     if (!client_si) {
       return false;
     }
@@ -1972,9 +1974,15 @@ bool WebGLRenderingContextBase::CopyRenderingResultsFromDrawingBuffer(
     // CopyToPlatformTexture is done correctly. See crbug.com/794706.
     raster_interface->Flush();
 
-    return GetDrawingBuffer()->CopyToPlatformMailbox(
-        raster_interface, client_si->mailbox(), gfx::Point(0, 0),
-        gfx::Rect(drawing_buffer_->Size()), source_buffer);
+    std::optional<gpu::SyncToken> external_sync_token =
+        GetDrawingBuffer()->CopyToPlatformSharedImage(
+            raster_interface, client_si, sync_token, gfx::Point(0, 0),
+            gfx::Rect(drawing_buffer_->Size()), source_buffer);
+
+    if (external_sync_token) {
+      resource_provider->EndExternalWrite(external_sync_token.value());
+    }
+    return external_sync_token.has_value();
   }
 
   // As the resource provider is not accelerated, we don't need an accelerated
@@ -8619,7 +8627,10 @@ String WebGLRenderingContextBase::EnsureNotNull(const String& text) const {
 
 WebGLRenderingContextBase::LRUCanvasResourceProviderCache::
     LRUCanvasResourceProviderCache(wtf_size_t capacity, CacheType type)
-    : type_(type), resource_providers_(capacity) {}
+    : capacity_(capacity),
+      type_(type),
+      resource_providers_(capacity),
+      requested_formats_(capacity) {}
 
 CanvasResourceProvider* WebGLRenderingContextBase::
     LRUCanvasResourceProviderCache::GetCanvasResourceProvider(
@@ -8628,13 +8639,13 @@ CanvasResourceProvider* WebGLRenderingContextBase::
         SkAlphaType alpha_type,
         const gfx::ColorSpace& color_space) {
   wtf_size_t i;
-  for (i = 0; i < resource_providers_.size(); ++i) {
+  for (i = 0; i < capacity_; ++i) {
     CanvasResourceProvider* resource_provider = resource_providers_[i].get();
     if (!resource_provider)
       break;
-
     if (resource_provider->Size() != size ||
-        resource_provider->GetSharedImageFormat() != format ||
+        (resource_provider->GetSharedImageFormat() != format &&
+         requested_formats_[i] != format) ||
         resource_provider->GetAlphaType() != alpha_type ||
         resource_provider->GetColorSpace() != color_space) {
       continue;
@@ -8662,8 +8673,9 @@ CanvasResourceProvider* WebGLRenderingContextBase::
 
   if (!temp)
     return nullptr;
-  i = std::min(resource_providers_.size() - 1, i);
+  i = std::min(capacity_ - 1, i);
   resource_providers_[i] = std::move(temp);
+  requested_formats_[i] = format;
 
   CanvasResourceProvider* resource_provider = resource_providers_[i].get();
   BubbleToFront(i);
@@ -8672,8 +8684,10 @@ CanvasResourceProvider* WebGLRenderingContextBase::
 
 void WebGLRenderingContextBase::LRUCanvasResourceProviderCache::BubbleToFront(
     wtf_size_t idx) {
-  for (wtf_size_t i = idx; i > 0; --i)
+  for (wtf_size_t i = idx; i > 0; --i) {
     resource_providers_[i].swap(resource_providers_[i - 1]);
+    std::swap(requested_formats_[i], requested_formats_[i - 1]);
+  }
 }
 
 namespace {

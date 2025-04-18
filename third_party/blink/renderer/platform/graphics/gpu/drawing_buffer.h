@@ -279,11 +279,13 @@ class PLATFORM_EXPORT DrawingBuffer : public cc::TextureLayerClient,
                              const gfx::Rect& src_rect,
                              SourceDrawingBuffer);
 
-  bool CopyToPlatformMailbox(gpu::raster::RasterInterface*,
-                             gpu::Mailbox dst_mailbox,
-                             const gfx::Point& dst_texture_offset,
-                             const gfx::Rect& src_sub_rectangle,
-                             SourceDrawingBuffer src_buffer);
+  std::optional<gpu::SyncToken> CopyToPlatformSharedImage(
+      gpu::raster::RasterInterface*,
+      const scoped_refptr<gpu::ClientSharedImage>& dst_shared_image,
+      const gpu::SyncToken& dst_sync_token,
+      const gfx::Point& dst_texture_offset,
+      const gfx::Rect& src_sub_rectangle,
+      SourceDrawingBuffer src_buffer);
 
   bool CopyToVideoFrame(
       WebGraphicsContext3DVideoFramePool* frame_pool,
@@ -450,10 +452,11 @@ class PLATFORM_EXPORT DrawingBuffer : public cc::TextureLayerClient,
       scoped_refptr<gpu::ClientSharedImage>,
       const gpu::SyncToken&,
       SkAlphaType alpha_type)>;
-  bool CopyToPlatformInternal(gpu::InterfaceBase* dst_interface,
-                              bool dst_is_unpremul_gl,
-                              SourceDrawingBuffer src_buffer,
-                              CopyFunctionRef copy_function);
+  std::optional<gpu::SyncToken> CopyToPlatformInternal(
+      gpu::InterfaceBase* dst_interface,
+      bool dst_is_unpremul_gl,
+      SourceDrawingBuffer src_buffer,
+      CopyFunctionRef copy_function);
 
   enum ClearOption { kClearOnlyMultisampledFBO, kClearAllFBOs };
 

@@ -1028,7 +1028,8 @@ public class ChromeTabbedActivity extends ChromeActivity {
                         getCompositorViewHolderSupplier(),
                         getShareDelegateSupplier(),
                         mTabBookmarkerSupplier,
-                        tabGroupCreationUiFlow);
+                        tabGroupCreationUiFlow,
+                        mUndoBarPopupController);
         if (didFinishNativeInitialization()) {
             result.first.initWithNative();
         }
@@ -1138,7 +1139,8 @@ public class ChromeTabbedActivity extends ChromeActivity {
                             bookmarkClickHandler,
                             /* customTabsBackClickHandler= */ null,
                             archivedTabCountSupplier,
-                            mTabModelNotificationDotManager.getNotificationDotObservableSupplier());
+                            mTabModelNotificationDotManager.getNotificationDotObservableSupplier(),
+                            mUndoBarPopupController);
 
             // TODO(crbug.com/40828084): Fix this assert which is tripping on unrelated
             // tests.
@@ -1317,13 +1319,18 @@ public class ChromeTabbedActivity extends ChromeActivity {
             if (ChromeFeatureList.isEnabled(ChromeFeatureList.GROUP_SUGGESTION_SERVICE)) {
                 mSuggestionEventObserver =
                         new SuggestionEventObserver(mTabModelSelector, mHubManagerSupplier);
-                mGroupSuggestionsPromotionCoordinator =
-                        new GroupSuggestionsPromotionCoordinator(
-                                this,
-                                mRootUiCoordinator.getBottomSheetController(),
-                                mTabModelSelector
-                                        .getTabGroupModelFilterProvider()
-                                        .getTabGroupModelFilter(false));
+                if (ChromeFeatureList.getFieldTrialParamByFeatureAsBoolean(
+                        ChromeFeatureList.GROUP_SUGGESTION_SERVICE,
+                        GroupSuggestionsPromotionCoordinator.CREATE_SUGGESTIONS_PROMOTION_UI_PARAM,
+                        true)) {
+                    mGroupSuggestionsPromotionCoordinator =
+                            new GroupSuggestionsPromotionCoordinator(
+                                    this,
+                                    mRootUiCoordinator.getBottomSheetController(),
+                                    mTabModelSelector
+                                            .getTabGroupModelFilterProvider()
+                                            .getTabGroupModelFilter(false));
+                }
             }
         }
     }
@@ -2361,8 +2368,7 @@ public class ChromeTabbedActivity extends ChromeActivity {
     private boolean maybeLaunchDraggedTabGroupInWindow(@NonNull TabGroupMetadata tabGroupMetadata) {
         if (mMultiInstanceManager == null) return false;
 
-        mMultiInstanceManager.moveTabGroupToWindow(
-                this, tabGroupMetadata, /* atIndex= */ 0, /* onFinishedRunnable= */ null);
+        mMultiInstanceManager.moveTabGroupToWindow(this, tabGroupMetadata, /* atIndex= */ 0);
         return true;
     }
 
@@ -4026,17 +4032,20 @@ public class ChromeTabbedActivity extends ChromeActivity {
     protected void applyThemeOverlays() {
         // Apply the theme overlay before applying dynamic colors in the super's call. The order
         // ensures the color attributes for dynamic colors are not overridden by the overlay.
+        boolean useThemeModule = false;
         if (ThemeModuleUtils.isEnabled()) {
             int themeModuleOverlay = ThemeModuleUtils.getProviderInstance().getThemeOverlay();
             if (themeModuleOverlay != 0) {
+                useThemeModule = true;
                 applySingleThemeOverlay(themeModuleOverlay);
             }
         }
 
-        super.applyThemeOverlays();
+        if (!useThemeModule) {
+            applySingleThemeOverlay(R.style.HubToolbarActionButtonStyleOverlay_Baseline);
+        }
 
-        // Theme overlay for the Hub buttons
-        applySingleThemeOverlay(R.style.HubToolbarActionButtonStyleOverlay_Baseline);
+        super.applyThemeOverlays();
     }
 
     /**
@@ -4161,5 +4170,9 @@ public class ChromeTabbedActivity extends ChromeActivity {
                                 mLayoutManager, /* animate= */ false, runnable),
                 wrappedSelector,
                 mLayoutStateProviderSupplier);
+    }
+
+    public UndoBarController getUndoBarControllerForTesting() {
+        return mUndoBarPopupController;
     }
 }

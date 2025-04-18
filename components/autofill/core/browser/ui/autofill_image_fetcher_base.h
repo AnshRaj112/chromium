@@ -39,6 +39,13 @@ namespace autofill {
 // Android does not need an intermediate class.
 class AutofillImageFetcherBase {
  public:
+  // The types of images supported by the `AutofillImageFetcher` API.
+  enum class ImageType {
+    kCreditCardArtImage,
+    kPixAccountImage,
+    kValuableImage,
+  };
+
   // Different sizes in which we show the credit card / bank account art images.
   // GENERATED_JAVA_ENUM_PACKAGE: org.chromium.components.autofill
   enum class ImageSize {
@@ -49,26 +56,35 @@ class AutofillImageFetcherBase {
 
   virtual ~AutofillImageFetcherBase() = default;
 
-  //  TODO (crbug.com/1478931): The implementation classes should own the
-  //  fetched images, and define the callback to handle the images.
-  //
   // Once invoked, the image fetcher starts fetching images asynchronously based
   // on the urls. `image_urls` is a span of urls that needs to be downloaded. If
   // an image has already been fetched, it won't be fetched again. `image_sizes`
-  // is the different sizes in which each image_url should be downloaded.
+  // is the different sizes in which each image_url should be downloaded. This
+  // method is intended for credit card art images because of the image
+  // post-processing applied to the downloaded icons.
   virtual void FetchCreditCardArtImagesForURLs(
       base::span<const GURL> image_urls,
       base::span<const ImageSize> image_sizes) = 0;
 
   // Fetches images for the `image_urls`, treats them according to Pix image
   // specifications, and caches them in memory.
-  virtual void FetchPixAccountImages(base::span<const GURL> image_urls) = 0;
+  virtual void FetchPixAccountImagesForURLs(
+      base::span<const GURL> image_urls) = 0;
+
+  // Once invoked, the image fetcher starts fetching images asynchronously based
+  // on the urls. `image_urls` is a span of urls that needs to be downloaded. If
+  // an image has already been fetched, it won't be fetched again. This method
+  // is intended for valuable images because of the image post-processing
+  // applied to the downloaded icons.
+  virtual void FetchValuableImagesForURLs(
+      base::span<const GURL> image_urls) = 0;
 
   // Returns the cached image for the `image_url` if it was fetched locally to
   // the client. If the image is not present in the cache, this function will
   // return a `nullptr`.
   virtual const gfx::Image* GetCachedImageForUrl(
-      const GURL& image_url) const = 0;
+      const GURL& image_url,
+      ImageType image_type) const = 0;
 
 #if BUILDFLAG(IS_ANDROID)
   // Return the owned AutofillImageFetcher Java object. It is created if it
