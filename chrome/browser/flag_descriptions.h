@@ -3062,6 +3062,9 @@ extern const char kAllowAllSitesToInitiateMirroringDescription[];
 extern const char kAXTreeFixingName[];
 extern const char kAXTreeFixingDescription[];
 
+extern const char kBrowserInitiatedAutomaticPictureInPictureName[];
+extern const char kBrowserInitiatedAutomaticPictureInPictureDescription[];
+
 extern const char kDialMediaRouteProviderName[];
 extern const char kDialMediaRouteProviderDescription[];
 extern const char kDelayMediaSinkDiscoveryName[];
@@ -4416,9 +4419,6 @@ extern const char kWifiConnectMacAddressRandomizationDescription[];
 
 extern const char kWifiConcurrencyName[];
 extern const char kWifiConcurrencyDescription[];
-
-extern const char kWifiDirectName[];
-extern const char kWifiDirectDescription[];
 
 extern const char kWindowSplittingName[];
 extern const char kWindowSplittingDescription[];

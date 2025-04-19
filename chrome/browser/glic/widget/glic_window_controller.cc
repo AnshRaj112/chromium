@@ -19,6 +19,7 @@
 #include "chrome/browser/glic/glic_pref_names.h"
 #include "chrome/browser/glic/glic_profile_manager.h"
 #include "chrome/browser/glic/host/glic.mojom.h"
+#include "chrome/browser/glic/host/host.h"
 #include "chrome/browser/glic/host/webui_contents_container.h"
 #include "chrome/browser/glic/resources/grit/glic_browser_resources.h"
 #include "chrome/browser/glic/widget/browser_conditions.h"
@@ -43,6 +44,8 @@
 #include "content/public/browser/web_contents.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/ui_base_types.h"
+#include "ui/display/display.h"
+#include "ui/display/display_finder.h"
 #include "ui/display/screen.h"
 #include "ui/events/event_observer.h"
 #include "ui/views/controls/webview/webview.h"
@@ -398,6 +401,8 @@ void GlicWindowController::OnWidgetUserResizeEnded() {
   if (GetGlicWidget()) {
     glic_size_ = GetGlicWidget()->GetSize();
   }
+
+  glic_window_animator_->ResetLastTargetSize();
 }
 
 void GlicWindowController::ShowAfterSignIn(base::WeakPtr<Browser> browser) {
@@ -595,6 +600,10 @@ void GlicWindowController::WebUiStateChanged(mojom::WebUiState new_state) {
   }
 }
 
+Host& GlicWindowController::host() const {
+  return glic_service_->host();
+}
+
 bool GlicWindowController::AcceleratorPressed(
     const ui::Accelerator& accelerator) {
   if (accelerator.key_code() == ui::VKEY_ESCAPE) {
@@ -659,11 +668,8 @@ void GlicWindowController::Show(Browser* browser,
 
   glic_service_->metrics()->set_show_start_time(base::TimeTicks::Now());
 
-  if (!contents_) {
-    CreateContents();
-  }
-
-  glic_service_->NotifyWindowIntentToShow();
+  host().CreateContents();
+  host().NotifyWindowIntentToShow();
 
   SetupGlicWidget(browser);
 
@@ -725,7 +731,7 @@ void GlicWindowController::SetupGlicWidget(Browser* browser) {
   }
 
   // Immediately hook up the WebView to the WebContents.
-  GetGlicView()->SetWebContents(contents_->web_contents());
+  GetGlicView()->SetWebContents(host().webui_contents());
 }
 
 void GlicWindowController::SetupGlicWidgetAccessibilityText() {
@@ -756,29 +762,30 @@ gfx::Rect GlicWindowController::GetInitialBounds(Browser* browser) {
     return GetInitialAttachedBounds(*browser);
   }
 
-  std::optional<gfx::Point> previous_position =
-      glic_service_->GetPreviousPosition();
+  gfx::Size target_size = GetLastRequestedSizeClamped();
 
-  if (browser && !previous_position.has_value()) {
-    return GetInitialDetachedBoundsFromBrowser(*browser);
-  }
-
-  // Get the default detached position.
-  gfx::Size widget_size = GetLastRequestedSizeClamped();
-
+  MaybeResetPreviousPosition(target_size);
   // Use the previous position if there is one.
-  if (previous_position.has_value()) {
-    return {previous_position.value(), widget_size};
+  if (previous_position_.has_value()) {
+    return {previous_position_.value(), target_size};
   }
 
+  if (browser) {
+    return GetInitialDetachedBoundsFromBrowser(*browser, target_size);
+  }
+  return GetInitialDetachedBoundsNoBrowser(target_size);
+}
+
+gfx::Rect GlicWindowController::GetInitialDetachedBoundsNoBrowser(
+    const gfx::Size& target_size) {
   // Get the default position offset equal distances from the top right corner
   // of the work area (which excludes system UI such as the taskbar).
   display::Display display = GetDisplayForOpeningDetached();
   gfx::Point top_right = display.work_area().top_right();
   int initial_x =
-      top_right.x() - widget_size.width() - kDefaultDetachedTopRightDistance;
+      top_right.x() - target_size.width() - kDefaultDetachedTopRightDistance;
   int initial_y = top_right.y() + kDefaultDetachedTopRightDistance;
-  return {{initial_x, initial_y}, widget_size};
+  return {{initial_x, initial_y}, target_size};
 }
 
 gfx::Rect GlicWindowController::GetInitialAttachedBounds(Browser& browser) {
@@ -802,8 +809,8 @@ gfx::Rect GlicWindowController::GetInitialAttachedBounds(Browser& browser) {
 }
 
 gfx::Rect GlicWindowController::GetInitialDetachedBoundsFromBrowser(
-    Browser& browser) {
-  gfx::Size widget_size = GetLastRequestedSizeClamped();
+    Browser& browser,
+    const gfx::Size& target_size) {
   gfx::Rect display_bounds = GetDisplayForOpeningDetached().work_area();
   gfx::Point origin = display_bounds.top_right();
 
@@ -816,15 +823,15 @@ gfx::Rect GlicWindowController::GetInitialDetachedBoundsFromBrowser(
   // If glic can't fit to the right of the browser,
   // set the origin so the top right of glic meets the bottom left of the glic
   // button.
-  if (display_bounds.right() - browser_bounds.right() > widget_size.width()) {
+  if (display_bounds.right() - browser_bounds.right() > target_size.width()) {
     origin = glic_button_inset_bounds.bottom_right();
   } else {
     origin =
-        gfx::Point(glic_button_inset_bounds.x() - widget_size.width() -
+        gfx::Point(glic_button_inset_bounds.x() - target_size.width() -
                        kInitialPositionBuffer,
                    glic_button_inset_bounds.bottom() + kInitialPositionBuffer);
   }
-  return {origin, widget_size};
+  return {origin, target_size};
 }
 
 void GlicWindowController::StartAttachedAnimation(GlicButton* glic_button) {
@@ -933,13 +940,6 @@ GlicView* GlicWindowController::GetGlicView() {
 
 views::Widget* GlicWindowController::GetGlicWidget() {
   return glic_widget_.get();
-}
-
-content::WebContents* GlicWindowController::GetWebContents() {
-  if (!contents_) {
-    return nullptr;
-  }
-  return contents_->web_contents();
 }
 
 content::WebContents* GlicWindowController::GetFreWebContents() {
@@ -1104,7 +1104,7 @@ void GlicWindowController::CloseInternal(
 
   // If the default location is not being used save the final position since it
   // may have moved without a drag event.
-  if (glic_service_->GetPreviousPosition().has_value()) {
+  if (previous_position_.has_value()) {
     SaveWidgetPosition();
   }
 
@@ -1174,8 +1174,36 @@ void GlicWindowController::CloseAndReopenDetached(
 }
 
 void GlicWindowController::SaveWidgetPosition() {
-  gfx::Rect bounds = GetGlicWidget()->GetWindowBoundsInScreen();
-  glic_service_->SetPosition(bounds.origin());
+  previous_position_ = GetGlicWidget()->GetWindowBoundsInScreen().origin();
+}
+
+void GlicWindowController::MaybeResetPreviousPosition(
+    const gfx::Size& target_size) {
+  if (!previous_position_.has_value()) {
+    return;
+  }
+
+  const std::vector<display::Display>& displays =
+      display::Screen::GetScreen()->GetAllDisplays();
+
+  // Reset the saved position if more than 20% of the widget is not visible.
+  constexpr float offset = .2;
+  constexpr float inset[4][2]{
+      {offset, offset},          // top-left inset
+      {1 - offset, offset},      // top-right inset
+      {offset, 1 - offset},      // bottom-left inset
+      {1 - offset, 1 - offset},  // bottom-right inset
+  };
+
+  for (const auto& i : inset) {
+    gfx::Point p = previous_position_.value();
+    p.set_x(p.x() + target_size.width() * i[0]);
+    p.set_y(p.y() + target_size.height() * i[1]);
+    if (display::FindDisplayContainingPoint(displays, p) == displays.end()) {
+      previous_position_.reset();
+      return;
+    }
+  }
 }
 
 void GlicWindowController::ShowTitleBarContextMenuAt(gfx::Point event_loc) {
@@ -1431,9 +1459,9 @@ GlicWindowController::AddWindowActivationChangedCallback(
 }
 
 void GlicWindowController::Preload() {
-  if (!contents_) {
-    CreateContents();
-    contents_->web_contents()->Resize(GetInitialBounds(nullptr));
+  if (!host().contents_container()) {
+    host().CreateContents();
+    host().webui_contents()->Resize(GetInitialBounds(nullptr));
   }
 }
 
@@ -1447,14 +1475,14 @@ void GlicWindowController::Reload() {
   if (GetFreWebContents()) {
     GetFreWebContents()->ReloadFocusedFrame();
   }
-  if (contents_) {
-    contents_->web_contents()->GetController().Reload(
-        content::ReloadType::BYPASSING_CACHE, /*check_for_repost=*/false);
+  if (auto* webui_contents = host().webui_contents()) {
+    webui_contents->GetController().Reload(content::ReloadType::BYPASSING_CACHE,
+                                           /*check_for_repost=*/false);
   }
 }
 
 bool GlicWindowController::IsWarmed() const {
-  return !!contents_;
+  return !!host().contents_container();
 }
 
 base::WeakPtr<GlicWindowController> GlicWindowController::GetWeakPtr() {
@@ -1464,7 +1492,6 @@ base::WeakPtr<GlicWindowController> GlicWindowController::GetWeakPtr() {
 void GlicWindowController::Shutdown() {
   // Hide first, then clean up (but do not animate).
   ForceClose();
-  contents_.reset();
   fre_controller_->Shutdown();
   window_activation_callback_list_.Notify(false);
 }
@@ -1508,12 +1535,6 @@ void GlicWindowController::MaybeAdjustSizeForDisplay(bool animate) {
           base::DoNothing());
     }
   }
-}
-
-void GlicWindowController::CreateContents() {
-  contents_ = std::make_unique<WebUIContentsContainer>(profile_, this);
-  glic::GlicProfileManager::GetInstance()->OnLoadingClientForService(
-      glic_service_);
 }
 
 void GlicWindowController::SetWindowState(State new_state) {

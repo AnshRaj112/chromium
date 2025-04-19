@@ -57,7 +57,6 @@
 #include "chrome/browser/extensions/manifest_v2_experiment_manager.h"
 #include "chrome/browser/extensions/mv2_experiment_stage.h"
 #include "chrome/browser/extensions/omaha_attributes_handler.h"
-#include "chrome/browser/extensions/pending_extension_manager.h"
 #include "chrome/browser/extensions/permissions/permissions_updater.h"
 #include "chrome/browser/extensions/profile_util.h"
 #include "chrome/browser/extensions/unpacked_installer.h"
@@ -96,6 +95,7 @@
 #include "extensions/browser/external_install_info.h"
 #include "extensions/browser/install_flag.h"
 #include "extensions/browser/management_policy.h"
+#include "extensions/browser/pending_extension_manager.h"
 #include "extensions/browser/pref_names.h"
 #include "extensions/browser/process_map.h"
 #include "extensions/browser/renderer_startup_helper.h"
@@ -127,8 +127,6 @@ using content::BrowserThread;
 using extensions::mojom::ManifestLocation;
 
 namespace extensions {
-
-using LoadErrorBehavior = ExtensionRegistrar::LoadErrorBehavior;
 
 namespace {
 
@@ -430,14 +428,12 @@ void ExtensionService::LoadSigninProfileTestExtension(const std::string& path) {
 #endif
 
 void ExtensionService::ReloadExtension(const std::string& extension_id) {
-  extension_registrar_->ReloadExtension(extension_id,
-                                        LoadErrorBehavior::kNoisy);
+  extension_registrar_->ReloadExtension(extension_id);
 }
 
 void ExtensionService::ReloadExtensionWithQuietFailure(
     const std::string& extension_id) {
-  extension_registrar_->ReloadExtension(extension_id,
-                                        LoadErrorBehavior::kQuiet);
+  extension_registrar_->ReloadExtensionWithQuietFailure(extension_id);
 }
 
 void ExtensionService::PerformActionBasedOnOmahaAttributes(

@@ -4,6 +4,8 @@
 
 #include "components/visited_url_ranking/internal/url_grouping/tab_event_tracker_impl.h"
 
+#include "components/visited_url_ranking/public/features.h"
+
 namespace visited_url_ranking {
 
 namespace {
@@ -12,9 +14,14 @@ const base::TimeDelta kSelectionTimeWindow = base::Minutes(10);
 
 }  // namespace
 
+const char TabEventTrackerImpl::kAndroidNativeNewTabPageURL[] =
+    "chrome-native://newtab/";
+
 TabEventTrackerImpl::TabEventTrackerImpl(
     OnNewEventCallback on_new_event_callback)
-    : on_new_event_callback_(on_new_event_callback) {}
+    : on_new_event_callback_(on_new_event_callback),
+      tab_switcher_trigger_only_(
+          features::kGroupSuggestionEnableTabSwitcherOnly.Get()) {}
 TabEventTrackerImpl::~TabEventTrackerImpl() = default;
 
 TabEventTrackerImpl::TabSelection::TabSelection(
@@ -25,19 +32,25 @@ TabEventTrackerImpl::TabSelection::TabSelection(
 TabEventTrackerImpl::TabSelection::~TabSelection() = default;
 
 void TabEventTrackerImpl::DidAddTab(int tab_id, int tab_launch_type) {
-  on_new_event_callback_.Run();
+  if (!tab_switcher_trigger_only_) {
+    on_new_event_callback_.Run();
+  }
 }
 
 void TabEventTrackerImpl::DidSelectTab(int tab_id,
+                                       const GURL& url,
                                        TabSelectionType tab_selection_type,
                                        int last_tab_id) {
-  if (tab_selection_type != TabSelectionType::kFromUser ||
-      last_tab_id == tab_id) {
+  if ((tab_selection_type != TabSelectionType::kFromUser &&
+       tab_selection_type != TabSelectionType::kFromOmnibox) ||
+      last_tab_id == tab_id || url.spec() == kAndroidNativeNewTabPageURL) {
     return;
   }
   tab_id_selection_map_[tab_id].emplace_back(tab_id, tab_selection_type,
                                              base::Time::Now());
-  on_new_event_callback_.Run();
+  if (!tab_switcher_trigger_only_) {
+    on_new_event_callback_.Run();
+  }
 }
 
 void TabEventTrackerImpl::WillCloseTab(int tab_id) {
@@ -58,10 +71,16 @@ void TabEventTrackerImpl::DidMoveTab(int tab_id,
                                      int current_index) {}
 
 void TabEventTrackerImpl::OnPageLoadFinished(int tab_id) {
-  on_new_event_callback_.Run();
+  if (!tab_switcher_trigger_only_) {
+    on_new_event_callback_.Run();
+  }
 }
 
-void TabEventTrackerImpl::DidEnterTabSwitcher() {}
+void TabEventTrackerImpl::DidEnterTabSwitcher() {
+  if (tab_switcher_trigger_only_) {
+    on_new_event_callback_.Run();
+  }
+}
 
 int TabEventTrackerImpl::GetSelectedCount(int tab_id) const {
   if (!closing_tabs_.contains(tab_id) &&

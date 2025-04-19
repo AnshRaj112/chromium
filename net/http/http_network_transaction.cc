@@ -1326,19 +1326,8 @@ int HttpNetworkTransaction::BuildRequestHeaders(
 
   if (features::kIpPrivacyAddHeaderToProxiedRequests.Get() &&
       proxy_info_.is_for_ip_protection()) {
-    CHECK(!proxy_info_.is_direct() || features::kIpPrivacyDirectOnly.Get());
     if (!proxy_info_.is_direct()) {
       request_headers_.SetHeader("IP-Protection", "1");
-    }
-  }
-
-  if (features::kProbabilisticRevealTokensAddHeaderToProxiedRequests.Get() &&
-      !proxy_info_.is_direct()) {
-    if (std::optional<std::string> maybe_prt_header_value =
-            proxy_info_.PRTHeaderValue();
-        maybe_prt_header_value.has_value()) {
-      request_headers_.SetHeader("Sec-Probabilistic-Reveal-Token",
-                                 std::move(maybe_prt_header_value.value()));
     }
   }
 

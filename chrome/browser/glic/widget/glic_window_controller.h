@@ -16,7 +16,6 @@
 #include "base/scoped_observation.h"
 #include "base/scoped_observation_traits.h"
 #include "chrome/browser/glic/glic_enabling.h"
-#include "chrome/browser/glic/host/auth_controller.h"
 #include "chrome/browser/glic/host/glic.mojom.h"
 #include "chrome/browser/glic/host/glic_web_client_access.h"
 #include "chrome/browser/profiles/profile.h"
@@ -45,11 +44,11 @@ class GlicEnabling;
 class GlicWidget;
 class GlicKeyedService;
 class GlicView;
-class WebUIContentsContainer;
 class GlicWindowAnimator;
 class ScopedGlicButtonIndicator;
 class GlicFreController;
 class GlicButton;
+class Host;
 enum class AttachChangeReason;
 
 // This class owns and manages the glic window. This class has the same lifetime
@@ -229,9 +228,6 @@ class GlicWindowController : public views::WidgetObserver,
   // Returns the widget that backs the glic window.
   views::Widget* GetGlicWidget();
 
-  // Returns the WebContents hosted in the glic window, or nullptr if none.
-  content::WebContents* GetWebContents();
-
   // Returns the WebContents used for the first-run experience, or nullptr if
   // none.
   content::WebContents* GetFreWebContents();
@@ -277,8 +273,8 @@ class GlicWindowController : public views::WidgetObserver,
 
  private:
   FRIEND_TEST_ALL_PREFIXES(GlicWindowControllerUiTest, TestInitialBounds);
-  FRIEND_TEST_ALL_PREFIXES(GlicWindowControllerWithPreviousPostionUiTest,
-                           TestInitialBounds);
+
+  Host& host() const;
 
   // ui::AcceleratorTarget
   bool AcceleratorPressed(const ui::Accelerator& accelerator) override;
@@ -299,10 +295,17 @@ class GlicWindowController : public views::WidgetObserver,
 
   gfx::Rect GetInitialBounds(Browser* browser);
 
-  // Get the default detached bounds relative to browser.
-  gfx::Rect GetInitialDetachedBoundsFromBrowser(Browser& browser);
+  // Return the default detached bounds which are just below the tab strip
+  // button on the active browser.
+  gfx::Rect GetInitialDetachedBoundsFromBrowser(Browser& browser,
+                                                const gfx::Size& target_size);
 
-  // Get the default bounds when attached to the browser.
+  // Return the default detached bounds when there is no active browser. The
+  // position is relative to the top right of the current display.
+  gfx::Rect GetInitialDetachedBoundsNoBrowser(const gfx::Size& target_size);
+
+  // Return the default bounds when attached to the browser which cover the tab
+  // strip button on the active browser.
   gfx::Rect GetInitialAttachedBounds(Browser& browser);
 
   // Creates the glic view, waits for the web client to initialize, and then
@@ -349,6 +352,10 @@ class GlicWindowController : public views::WidgetObserver,
 
   // Save the top-right corner position for re-opening.
   void SaveWidgetPosition();
+
+  // Clear the previous position if the widget would not be on an existing
+  // display when shown.
+  void MaybeResetPreviousPosition(const gfx::Size& target_size);
 
   // Determines the correct position for the glic window when attached to a
   // browser window. The top right of the widget should be placed here.
@@ -404,9 +411,6 @@ class GlicWindowController : public views::WidgetObserver,
   // display workspace, but only if it's different than the current target size.
   void MaybeAdjustSizeForDisplay(bool animate);
 
-  // Warms the web client and sets `contents_`.
-  void CreateContents();
-
   // Modifies `state_` to the given new state.
   void SetWindowState(State new_state);
 
@@ -424,9 +428,6 @@ class GlicWindowController : public views::WidgetObserver,
   base::RepeatingCallbackList<void(bool)> window_activation_callback_list_;
 
   const raw_ptr<Profile> profile_;
-  // Keep profile alive as long as the glic web contents. This object should be
-  // destroyed when the profile needs to be destroyed.
-  std::unique_ptr<WebUIContentsContainer> contents_;
 
   // Contains the glic webview.
   std::unique_ptr<GlicWidget> glic_widget_;
@@ -480,6 +481,8 @@ class GlicWindowController : public views::WidgetObserver,
   // opening the glic window may not actually load the client, there's no
   // guarantee that this value is sent to the web client.
   std::optional<mojom::InvocationSource> opening_source_;
+
+  std::optional<gfx::Point> previous_position_ = std::nullopt;
 
   std::unique_ptr<ScopedGlicButtonIndicator> scoped_glic_button_indicator_;
 

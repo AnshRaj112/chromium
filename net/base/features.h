@@ -373,11 +373,6 @@ NET_EXPORT extern const base::FeatureParam<std::string>
 NET_EXPORT extern const base::FeatureParam<bool>
     kAttachProbabilisticRevealTokensOnAllProxiedRequests;
 
-// If true, probabilistic reveal tokens header will be added to proxied
-// requests.
-NET_EXPORT extern const base::FeatureParam<bool>
-    kProbabilisticRevealTokensAddHeaderToProxiedRequests;
-
 // Enables custom proxy configuration for the IP Protection experimental proxy.
 NET_EXPORT BASE_DECLARE_FEATURE(kEnableIpProtectionProxy);
 
@@ -566,10 +561,6 @@ NET_EXPORT BASE_DECLARE_FEATURE(kThirdPartyPartitionedStorageAllowedByDefault);
 
 // Enables a more efficient implementation of SpdyHeadersToHttpResponse().
 NET_EXPORT BASE_DECLARE_FEATURE(kSpdyHeadersToHttpResponseUseBuilder);
-
-// Enables receiving ECN bit by UDP sockets in Chrome, and reporting the counts
-// to QUIC servers via ACK frames.
-NET_EXPORT BASE_DECLARE_FEATURE(kReportEcn);
 
 // Enables using the new ALPS codepoint to negotiate application settings for
 // HTTP2.

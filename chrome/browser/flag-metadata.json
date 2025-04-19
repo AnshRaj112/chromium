@@ -1177,6 +1177,11 @@
     "expiry_milestone": 140
   },
   {
+    "name": "browser-initiated-automatic-picture-in-picture",
+    "owners": [ "bkeen@google.com", "media-dev@chromium.org" ],
+    "expiry_milestone": 150
+  },
+  {
     "name": "browsing-data-model-clank",
     "owners": [
       "alimariam@google.com",
@@ -2971,7 +2976,7 @@
   {
     "name": "enable-desktop-pwas-scope-extensions",
     "owners": [ "luhua@microsoft.com", "pwa-team@google.com" ],
-    "expiry_milestone": 135
+    "expiry_milestone": 138
   },
   {
     "name": "enable-desktop-pwas-sub-apps",
@@ -9955,11 +9960,6 @@
     "name": "wifi-connect-mac-address-randomization",
     "owners": [ "jsiuda@chromium.org", "chromeos-wifi-team@chromium.org" ],
     "expiry_milestone": 130
-  },
-  {
-    "name": "wifi-direct",
-    "owners": [ "jiajunz@google.com", "cros-device-enablement@google.com" ],
-    "expiry_milestone": 135
   },
   {
     "name": "windows-system-tracing",

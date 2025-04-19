@@ -1393,11 +1393,11 @@ const FeatureEntry::FeatureParam kOmniboxSearchAggregatorDemoParams[] = {
     {"icon_url", "https://gstatic.com/vertexaisearch/favicon.png"},
     {"search_url",
      "https://vertexaisearch.cloud.google.com/home/cid/"
-     "f6cd931b-d10e-475f-b424-6270982c15f6?q={searchTerms}"},
+     "8e21c7cd-cbfe-4162-baf4-3381fc43546e?q={searchTerms}"},
     {"suggest_url",
-     "https://discoveryengine.googleapis.com/v1alpha/projects/121968733869/"
+     "https://discoveryengine.googleapis.com/v1alpha/projects/977834784893/"
      "locations/global/collections/default_collection/engines/"
-     "neuravibeapp_1738849257936/completionConfig:completeQuery"}};
+     "neuravibeenterprisesearch_1732204320742/completionConfig:completeQuery"}};
 const FeatureEntry::FeatureVariation kOmniboxSearchAggregatorVariations[] = {
     {"prod", kOmniboxSearchAggregatorProdParams,
      std::size(kOmniboxSearchAggregatorProdParams), nullptr},
@@ -3788,6 +3788,9 @@ const FeatureEntry::FeatureParam kGroupSuggestionEnableSameOriginOnly[] = {
     {"group_suggestion_enable_similar_source", "false"},
     {"group_suggestion_enable_same_origin", "true"},
 };
+const FeatureEntry::FeatureParam kGroupSuggestionEnableTabSwitcherOnly[] = {
+    {"group_suggestion_enable_tab_switcher_only", "true"},
+};
 const FeatureEntry::FeatureVariation kGroupSuggestionVariations[] = {
     {"Recently Opened Only", kGroupSuggestionEnableRecentlyOpenedOnly,
      std::size(kGroupSuggestionEnableRecentlyOpenedOnly), nullptr},
@@ -3797,6 +3800,8 @@ const FeatureEntry::FeatureVariation kGroupSuggestionVariations[] = {
      std::size(kGroupSuggestionEnableSimilarSourceOnly), nullptr},
     {"Same Origin Only", kGroupSuggestionEnableSameOriginOnly,
      std::size(kGroupSuggestionEnableSameOriginOnly), nullptr},
+    {"Tab Switcher Only", kGroupSuggestionEnableTabSwitcherOnly,
+     std::size(kGroupSuggestionEnableTabSwitcherOnly), nullptr},
 };
 
 #if BUILDFLAG(ENABLE_COMPOSE)
@@ -4985,9 +4990,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"wifi-concurrency", flag_descriptions::kWifiConcurrencyName,
      flag_descriptions::kWifiConcurrencyDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kWifiConcurrency)},
-    {"wifi-direct", flag_descriptions::kWifiDirectName,
-     flag_descriptions::kWifiDirectDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kWifiDirect)},
     {"disable-dns-proxy", flag_descriptions::kDisableDnsProxyName,
      flag_descriptions::kDisableDnsProxyDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kDisableDnsProxy)},
@@ -9463,6 +9465,13 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kDocumentPictureInPictureAnimateResizeDescription,
      kOsDesktop,
      FEATURE_VALUE_TYPE(media::kDocumentPictureInPictureAnimateResize)},
+
+    {"browser-initiated-automatic-picture-in-picture",
+     flag_descriptions::kBrowserInitiatedAutomaticPictureInPictureName,
+     flag_descriptions::kBrowserInitiatedAutomaticPictureInPictureDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(
+         blink::features::kBrowserInitiatedAutomaticPictureInPicture)},
 
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) ||
         // BUILDFLAG(IS_CHROMEOS)

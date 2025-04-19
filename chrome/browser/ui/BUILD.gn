@@ -343,6 +343,7 @@ static_library("ui") {
     "//chrome/browser:fedcm_clickthrough_rate_metadata_proto",
     "//chrome/browser:font_pref",
     "//chrome/browser:global_features",
+    "//chrome/browser/affiliations",
     "//chrome/browser/autofill",
     "//chrome/browser/bitmap_fetcher",
     "//chrome/browser/breadcrumbs",
@@ -1699,6 +1700,7 @@ static_library("ui") {
       "//chrome/browser/background:background",
       "//chrome/browser/browsing_data:constants",
       "//chrome/browser/contextual_cueing",
+      "//chrome/browser/privacy_sandbox",
 
       # TODO(crbug.com/370804668i): Remove the dependency when chrome/browser/serial
       # gets modularized.
@@ -1783,6 +1785,7 @@ static_library("ui") {
       "//chrome/browser/ui/webui/cr_components/theme_color_picker",
       "//chrome/browser/ui/webui/new_tab_footer",
       "//chrome/browser/ui/webui/new_tab_footer:impl",
+      "//chrome/browser/ui/webui/privacy_sandbox",
       "//chrome/browser/ui/webui/searchbox",
       "//chrome/browser/ui/webui/settings",
       "//chrome/browser/ui/webui/settings:impl",
@@ -3930,8 +3933,6 @@ static_library("ui") {
       "views/controls/site_icon_text_and_origin_view.h",
       "views/controls/subpage_view.cc",
       "views/controls/subpage_view.h",
-      "views/controls/text_with_controls_view.cc",
-      "views/controls/text_with_controls_view.h",
       "views/data_sharing/account_card_view.cc",
       "views/data_sharing/account_card_view.h",
       "views/data_sharing/collaboration_controller_delegate_desktop.cc",

@@ -6,10 +6,12 @@
 
 #include <vector>
 
+#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/observer_list.h"
 #include "chrome/browser/privacy_sandbox/notice/notice.mojom-forward.h"
 #include "chrome/browser/privacy_sandbox/notice/notice_service_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 
 namespace privacy_sandbox {
 
@@ -33,6 +35,10 @@ class DesktopViewManager {
         std::optional<notice::mojom::PrivacySandboxNotice> next_id) {}
   };
 
+  // Triggered by the WebUI handler once an event occurs on a |notice|.
+  void OnEventOccurred(notice::mojom::PrivacySandboxNotice notice,
+                       notice::mojom::PrivacySandboxNoticeEvent event);
+
   // Accessors
   std::vector<notice::mojom::PrivacySandboxNotice> GetPendingNoticesToShow();
 
@@ -45,10 +51,18 @@ class DesktopViewManager {
   friend class DesktopViewManagerTest;
 
   // Performs necessary checks to determine if a new view should be created.
-  void MaybeCreateView();
+  void MaybeCreateView(
+      BrowserWindowInterface* browser,
+      base::OnceCallback<void(BrowserWindowInterface*,
+                              notice::mojom::PrivacySandboxNotice)> show);
 
   // Notifies open views to close.
   void CloseAllOpenViews();
+
+  // If the event taken isn't a shown event, notifies open views to advance to
+  // the next step. If the next step doesn't exist, all open views will be
+  // notified to close.
+  void MaybeAdvanceAllOpenViews(notice::mojom::PrivacySandboxNoticeEvent event);
 
   base::ObserverList<Observer>::Unchecked observers_;
   raw_ptr<PrivacySandboxNoticeServiceInterface> notice_service_;

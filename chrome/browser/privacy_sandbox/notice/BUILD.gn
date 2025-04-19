@@ -67,7 +67,9 @@ if (!is_android) {
     deps = [
       ":core",
       ":interfaces",
+      ":notice_mojom",
       "//base",
+      "//chrome/browser/ui/browser_window:browser_window",
     ]
   }
 }
@@ -141,5 +143,30 @@ source_set("unit_tests") {
   if (!is_android) {
     sources += [ "desktop_view_manager_unittest.cc" ]
     deps += [ ":desktop_view_manager" ]
+  }
+}
+
+source_set("browser_tests") {
+  testonly = true
+  sources = [ "notice_service_browsertest.cc" ]
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  deps = [
+    ":core",
+    ":interfaces",
+    ":notice",
+    "//chrome/browser",
+    "//chrome/browser/profiles:profile",
+    "//chrome/test:test_support",
+    "//content/test:test_support",
+    "//testing/gmock",
+    "//testing/gtest",
+  ]
+
+  if (is_android) {
+    deps += [ "//chrome/test:test_support_ui_android" ]
+  }
+
+  if (!is_android) {
+    deps += [ "//chrome/test:test_support_ui" ]
   }
 }

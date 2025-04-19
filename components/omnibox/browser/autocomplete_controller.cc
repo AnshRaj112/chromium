@@ -1767,6 +1767,7 @@ void AutocompleteController::UpdateKeywordDescriptions(
   }
 
   std::u16string last_keyword;
+  bool last_contextual = false;
   for (auto i(result->begin()); i != result->end(); ++i) {
     if (AutocompleteMatch::IsSearchType(i->type)) {
       if (AutocompleteMatchHasCustomDescription(*i) ||
@@ -1776,7 +1777,8 @@ void AutocompleteController::UpdateKeywordDescriptions(
       i->description.clear();
       i->description_class.clear();
       DCHECK(!i->keyword.empty());
-      if (i->keyword != last_keyword) {
+      bool is_contextual = i->IsContextualSearchSuggestion();
+      if (i->keyword != last_keyword || is_contextual != last_contextual) {
         const TemplateURL* template_url =
             i->GetTemplateURL(template_url_service_, false);
         if (template_url) {
@@ -1785,7 +1787,7 @@ void AutocompleteController::UpdateKeywordDescriptions(
           // - For contextual search matches, the description indicates the
           //   alternative UX because they're opened in the side panel.
           i->description = template_url->AdjustedShortNameForLocaleDirection();
-          if (i->IsContextualSearchSuggestion()) {
+          if (is_contextual) {
             i->description = l10n_util::GetStringUTF16(
                 IDS_AUTOCOMPLETE_SEARCH_IN_SIDE_PANEL_DESCRIPTION);
           } else if (template_url->type() !=
@@ -1801,6 +1803,7 @@ void AutocompleteController::UpdateKeywordDescriptions(
 #endif
 
         last_keyword = i->keyword;
+        last_contextual = is_contextual;
       }
     } else if (i->type == AutocompleteMatchType::NAVSUGGEST &&
                i->enterprise_search_aggregator_type ==
@@ -2016,16 +2019,14 @@ void AutocompleteController::UpdateShownInSession(AutocompleteResult* result) {
   }
 
   for (auto& match : *result) {
-    // TODO(crbug.com/402519775): Compute this based on the other "ZPS shown in
-    // session" data listed below.
-    match.zero_prefix_suggestions_shown_in_session =
-        result->num_zero_prefix_suggestions_shown_in_session() > 0;
-
     const auto [zero_prefix_search_shown, zero_prefix_url_shown] =
         result->suggestions_shown_in_session(/*is_zero_suggest=*/true);
     match.zero_prefix_search_suggestions_shown_in_session =
         zero_prefix_search_shown;
     match.zero_prefix_url_suggestions_shown_in_session = zero_prefix_url_shown;
+
+    match.zero_prefix_suggestions_shown_in_session =
+        zero_prefix_search_shown || zero_prefix_url_shown;
 
     const auto [typed_search_shown, typed_url_shown] =
         result->suggestions_shown_in_session(/*is_zero_suggest=*/false);

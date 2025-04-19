@@ -1831,9 +1831,9 @@
       status: "stable",
     },
     {
-      //See: crbug.com/40771555
+      // See: crbug.com/40771555
       name: "EnterInOpenShadowRoots",
-      status: "test",
+      status: "stable",
     },
     {
       // Experiment with preventing some instances of mutation XSS
@@ -4763,6 +4763,12 @@
         "Android": "stable",
         "default": "",
       },
+    },
+    {
+      // This flag uses the original DOM text for input when the password
+      // echo is enabled to create the offset_map.
+      name: "UseOriginalDomOffsetsForOffsetMap",
+      status: "stable",
     },
     {
       name: "UsePositionForPointInFlexibleBoxWithSingleChildElement",

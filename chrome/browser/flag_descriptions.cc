@@ -5218,6 +5218,12 @@ const char kAXTreeFixingDescription[] =
     "is experimental and may cause breaking changes to users of assistive "
     "technology.";
 
+const char kBrowserInitiatedAutomaticPictureInPictureName[] =
+    "Browser initiated automatic picture in picture";
+const char kBrowserInitiatedAutomaticPictureInPictureDescription[] =
+    "When enabled, allows the browser to automatically enter picture in "
+    "picture when a series of conditions are met.";
+
 const char kDialMediaRouteProviderName[] =
     "Allow cast device discovery with DIAL protocol";
 const char kDialMediaRouteProviderDescription[] =
@@ -7496,10 +7502,6 @@ const char kWifiConcurrencyName[] = "WiFi Concurrency";
 const char kWifiConcurrencyDescription[] =
     "When enabled, it uses new WiFi concurrency Shill APIs to start station "
     "WiFi and tethering.";
-
-const char kWifiDirectName[] = "Wifi Direct";
-const char kWifiDirectDescription[] =
-    "Enables the WiFi direct functionalities in ChromeOS";
 
 const char kWindowSplittingName[] = "CrOS Labs - Window splitting";
 const char kWindowSplittingDescription[] =

@@ -189,7 +189,7 @@ std::optional<std::string> IpProtectionCoreImpl::GetProbabilisticRevealToken(
 }
 
 bool IpProtectionCoreImpl::IsProbabilisticRevealTokenAvailable() {
-  return ipp_prt_manager_->IsTokenAvailable();
+  return (ipp_prt_manager_ && ipp_prt_manager_->IsTokenAvailable());
 }
 
 IpProtectionTokenManager*

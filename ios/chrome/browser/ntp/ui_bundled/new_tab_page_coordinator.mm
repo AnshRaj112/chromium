@@ -30,6 +30,9 @@
 #import "ios/chrome/app/profile/profile_state.h"
 #import "ios/chrome/app/profile/profile_state_observer.h"
 #import "ios/chrome/browser/authentication/ui_bundled/enterprise/enterprise_utils.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/account_menu/account_menu_constants.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/interruptible_chrome_coordinator.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/signin_coordinator.h"
 #import "ios/chrome/browser/bubble/ui_bundled/bubble_view_controller_presenter.h"
 #import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_collection_utils.h"
 #import "ios/chrome/browser/content_suggestions/ui_bundled/content_suggestions_coordinator.h"
@@ -264,8 +267,8 @@
   TabGroupIndicatorCoordinator* _tabGroupIndicatorCoordinator;
   // Indicates whether the fakebox was tapped as part of an omnibox focus event.
   BOOL _fakeboxTapped;
-  // Whether the account menu is displayed on top of this NTP.
-  BOOL _showAccountMenuInProgress;
+  // The account menu coordinator.
+  SigninCoordinator<InterruptibleChromeCoordinator>* _accountMenuCoordinator;
   // Whether the signin menu is displayed on top of this NTP.
   BOOL _showSigninCommandInProgress;
 }
@@ -307,7 +310,7 @@
   [sceneState addObserver:self];
 
   // Configures incognito NTP if user is in incognito mode.
-  if (self.profile->IsOffTheRecord()) {
+  if (self.isOffTheRecord) {
     DCHECK(!self.incognitoViewController);
     UrlLoadingBrowserAgent* URLLoader =
         UrlLoadingBrowserAgent::FromBrowser(self.browser);
@@ -371,7 +374,7 @@
   SceneState* sceneState = self.browser->GetSceneState();
   [sceneState removeObserver:self];
 
-  if (self.profile->IsOffTheRecord()) {
+  if (self.isOffTheRecord) {
     self.incognitoViewController = nil;
     self.started = NO;
     return;
@@ -400,6 +403,7 @@
   self.feedHeaderViewController = nil;
   [self.feedTopSectionCoordinator stop];
   self.feedTopSectionCoordinator = nil;
+  [_accountMenuCoordinator interruptAnimated:NO];
 
   self.NTPMetricsRecorder = nil;
 
@@ -479,7 +483,7 @@
 }
 
 - (void)reload {
-  if (self.profile->IsOffTheRecord()) {
+  if (self.isOffTheRecord) {
     return;
   }
   [self.contentSuggestionsCoordinator refresh];
@@ -504,7 +508,7 @@
 }
 
 - (void)constrainNamedGuideForFeedIPH {
-  if (self.profile->IsOffTheRecord()) {
+  if (self.isOffTheRecord) {
     return;
   }
   [LayoutGuideCenterForBrowser(self.browser)
@@ -547,7 +551,7 @@
 }
 
 - (BOOL)isFakeboxPinned {
-  if (self.profile->IsOffTheRecord()) {
+  if (self.isOffTheRecord) {
     return YES;
   }
   return self.NTPViewController.isFakeboxPinned;
@@ -823,7 +827,7 @@
 
 - (UIViewController*)viewController {
   DCHECK(self.started);
-  if (self.profile->IsOffTheRecord()) {
+  if (self.isOffTheRecord) {
     return self.incognitoViewController;
   } else {
     return self.containerViewController;
@@ -854,7 +858,7 @@
 }
 
 - (void)identityDiscWasTapped:(UIView*)identityDisc {
-  if (_showAccountMenuInProgress || _showSigninCommandInProgress) {
+  if (_accountMenuCoordinator || _showSigninCommandInProgress) {
     // Double tap, or tap before dismissing of the previous one is complete.
     return;
   }
@@ -869,15 +873,7 @@
     [handler showSettingsFromViewController:self.baseViewController];
   } else if (isSignedIn) {
     if (IsIdentityDiscAccountMenuEnabled()) {
-      _showAccountMenuInProgress = YES;
-      __weak __typeof(self) weakSelf = self;
-      [handler showAccountMenuWithAnchorView:identityDisc
-                        skipIfUINotAvailable:NO
-                                     fromWeb:NO
-                                  completion:^{
-                                    [weakSelf showAccountMenuDidFinish];
-                                  }];
-
+      [self showAccountMenu:identityDisc fromWeb:NO];
     } else {
       [handler showSettingsFromViewController:self.baseViewController];
     }
@@ -1089,7 +1085,7 @@
                                   feed::FeedSyncPromo::kShowDisableToast];
     return;
   }
-  if (_showAccountMenuInProgress || _showSigninCommandInProgress) {
+  if (_accountMenuCoordinator || _showSigninCommandInProgress) {
     return;
   }
   BOOL hasUserIdentities = [self hasIdentitiesOnDevice];
@@ -1524,6 +1520,22 @@
 
 #pragma mark - Private
 
+- (void)showAccountMenu:(UIView*)identityDisc fromWeb:(BOOL)fromWeb {
+  _accountMenuCoordinator = [SigninCoordinator
+      accountMenuCoordinatorWithBaseViewController:self.NTPViewController
+                                           browser:self.browser
+                                      contextStyle:SigninContextStyle::kDefault
+                                        anchorView:identityDisc
+                                       accessPoint:AccountMenuAccessPoint::
+                                                       kWeb];
+  __typeof(self) weakSelf = self;
+  _accountMenuCoordinator.signinCompletion =
+      ^(SigninCoordinatorResult, id<SystemIdentity>) {
+        [weakSelf showAccountMenuDidFinish];
+      };
+  [_accountMenuCoordinator start];
+}
+
 - (bool)hasIdentitiesOnDevice {
   return !IdentityManagerFactory::GetForProfile(self.profile)
               ->GetAccountsOnDevice()
@@ -1533,8 +1545,9 @@
 // Update the state, to take into account that the account menu coordinator is
 // stopped.
 - (void)showAccountMenuDidFinish {
-  CHECK(_showAccountMenuInProgress, base::NotFatalUntil::M135);
-  _showAccountMenuInProgress = NO;
+  CHECK(_accountMenuCoordinator, base::NotFatalUntil::M135);
+  [_accountMenuCoordinator stop];
+  _accountMenuCoordinator = nil;
 }
 
 // Update the state, to take into account that the signin coordinator
@@ -1667,7 +1680,7 @@
   self.visible = visible;
   self.NTPViewController.NTPVisible = visible;
 
-  if (!self.profile->IsOffTheRecord()) {
+  if (!self.isOffTheRecord) {
     if (visible) {
       self.didAppearTime = base::TimeTicks::Now();
 

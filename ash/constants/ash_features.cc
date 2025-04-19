@@ -576,6 +576,12 @@ BASE_FEATURE(kCryptohomeRecoveryByDefaultForEnterprise,
              "CryptohomeRecoveryByDefaultForEnterprise",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Controls whether should set demo app window's parent to
+// `kShellWindowId_AlwaysOnTopWallpaperContainer` when attract loop is playing.
+BASE_FEATURE(kDemoModeAppResetWindowContainer,
+             "DemoModeAppResetWindowContainer",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 // Controls whether use a demo account (consumer account) to login Demo mode
 // session.
 BASE_FEATURE(kDemoModeSignIn,
@@ -3200,10 +3206,6 @@ BASE_FEATURE(kWifiConcurrency,
              "WifiConcurrency",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Control whether the WiFi Direct is enabled. When enabled, it will allow
-// the nearby share feature to utilize WiFi P2P for sharing data.
-BASE_FEATURE(kWifiDirect, "WiFiDirect", base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Controls whether to enable the syncing of deletes of Wi-Fi configurations.
 // This only controls sending delete events to the Chrome Sync server.
 BASE_FEATURE(kWifiSyncAllowDeletes,
@@ -3565,6 +3567,10 @@ bool IsCrossDeviceFeatureSuiteAllowed() {
 
 bool IsCrosSwitcherEnabled() {
   return base::FeatureList::IsEnabled(kCrosSwitcher);
+}
+
+bool IsDemoModeAppResetWindowContainerEnable() {
+  return base::FeatureList::IsEnabled(kDemoModeAppResetWindowContainer);
 }
 
 bool IsDemoModeSignInEnabled() {
@@ -4743,10 +4749,6 @@ bool IsWelcomeTourV3Enabled() {
 
 bool IsWifiConcurrencyEnabled() {
   return base::FeatureList::IsEnabled(kWifiConcurrency);
-}
-
-bool IsWifiDirectEnabled() {
-  return base::FeatureList::IsEnabled(kWifiDirect);
 }
 
 bool IsWifiSyncAndroidEnabled() {

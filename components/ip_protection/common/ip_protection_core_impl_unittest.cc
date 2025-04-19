@@ -874,6 +874,18 @@ TEST_F(IpProtectionCoreImplTest, GetPrtReturnsNulloptWhenNoManager) {
 }
 
 TEST_F(IpProtectionCoreImplTest,
+       IsProbabilisticRevealTokenAvailableReturnsFalseWhenNoManager) {
+  auto core = std::make_unique<IpProtectionCoreImpl>(
+      /*masked_domain_list_manager=*/nullptr,
+      /*ip_protection_proxy_config_manager=*/nullptr,
+      std::map<ProxyLayer, std::unique_ptr<IpProtectionTokenManager>>(),
+      /*probabilistic_reveal_token_registry=*/nullptr,
+      /*ipp_prt_manager=*/nullptr,
+      /*is_ip_protection_enabled=*/true, /*ip_protection_incognito=*/true);
+  EXPECT_FALSE(core->IsProbabilisticRevealTokenAvailable());
+}
+
+TEST_F(IpProtectionCoreImplTest,
        RequestShouldNotIncludePRTWhenFeatureDisabled) {
   FakeProbabilisticRevealTokenRegistry ipp_prt_registry;
   GURL example_com = GURL("https://example.com");
