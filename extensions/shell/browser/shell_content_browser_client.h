@@ -144,6 +144,7 @@ class ShellContentBrowserClient : public content::ContentBrowserClient {
       content::BrowserContext* browser_context,
       const url::Origin& origin,
       bool is_for_isolated_world,
+      bool is_for_service_worker,
       network::mojom::URLLoaderFactoryParams* factory_params) override;
   base::FilePath GetSandboxedStorageServiceDataDirectory() override;
   std::string GetUserAgent() override;
@@ -158,7 +159,7 @@ class ShellContentBrowserClient : public content::ContentBrowserClient {
   // Appends command line switches for a renderer process.
   void AppendRendererSwitches(base::CommandLine* command_line);
 
-  // Returns the extension or app associated with |site_instance| or NULL.
+  // Returns the extension or app associated with `site_instance` or NULL.
   const Extension* GetExtension(content::SiteInstance* site_instance);
 
   // Owned by content::BrowserMainLoop.

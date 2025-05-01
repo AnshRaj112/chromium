@@ -80,7 +80,6 @@
 #include "chrome/browser/enterprise/reporting/legacy_tech/legacy_tech_service.h"
 #include "chrome/browser/enterprise/reporting/prefs.h"
 #include "chrome/browser/enterprise/util/managed_browser_utils.h"
-#include "chrome/browser/extensions/chrome_extension_cookies.h"
 #include "chrome/browser/external_protocol/external_protocol_handler.h"
 #include "chrome/browser/favicon/favicon_utils.h"
 #include "chrome/browser/first_party_sets/first_party_sets_navigation_throttle.h"
@@ -678,6 +677,7 @@
 
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 #include "chrome/browser/extensions/chrome_content_browser_client_extensions_part.h"
+#include "chrome/browser/extensions/chrome_extension_cookies.h"
 #include "extensions/browser/api/web_request/web_request_api.h"
 #include "extensions/browser/extension_navigation_throttle.h"
 #include "extensions/browser/extension_protocols.h"
@@ -808,6 +808,7 @@
 #endif  // BUILDFLAG(OS_LEVEL_GEOLOCATION_PERMISSION_SUPPORTED)
 
 #if BUILDFLAG(IS_ANDROID)
+#include "chrome/browser/contextmenu/context_menu_features.h"
 #include "chrome/browser/feed/feed_service_factory.h"
 #include "chrome/browser/safe_browsing/advanced_protection_status_manager_android.h"
 #include "components/feed/feed_feature_list.h"
@@ -1664,6 +1665,8 @@ void ChromeContentBrowserClient::RegisterProfilePrefs(
   registry->RegisterBooleanPref(
       prefs::kServiceWorkerToControlSrcdocIframeEnabled, true);
   registry->RegisterBooleanPref(prefs::kReduceAcceptLanguageEnabled, true);
+  registry->RegisterBooleanPref(policy::policy_prefs::kBuiltInAIAPIsEnabled,
+                                true);
 }
 
 // static
@@ -2241,6 +2244,7 @@ void ChromeContentBrowserClient::OverrideURLLoaderFactoryParams(
     content::BrowserContext* browser_context,
     const url::Origin& origin,
     bool is_for_isolated_world,
+    bool is_for_service_worker,
     network::mojom::URLLoaderFactoryParams* factory_params) {
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   if (ChromeContentBrowserClientExtensionsPart::AreExtensionsDisabledForProfile(
@@ -2249,7 +2253,8 @@ void ChromeContentBrowserClient::OverrideURLLoaderFactoryParams(
   }
 
   ChromeContentBrowserClientExtensionsPart::OverrideURLLoaderFactoryParams(
-      browser_context, origin, is_for_isolated_world, factory_params);
+      browser_context, origin, is_for_isolated_world, is_for_service_worker,
+      factory_params);
 #endif
 }
 
@@ -2321,7 +2326,7 @@ bool ChromeContentBrowserClient::HasCustomSchemeHandler(
 
 bool ChromeContentBrowserClient::HasWebRequestAPIProxy(
     content::BrowserContext* browser_context) {
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   const auto* web_request_api =
       extensions::BrowserContextKeyedAPIFactory<extensions::WebRequestAPI>::Get(
           browser_context);
@@ -2668,7 +2673,6 @@ void ChromeContentBrowserClient::CheckGetAllScreensMediaAllowed(
     content::RenderFrameHost* render_frame_host,
     base::OnceCallback<void(bool)> callback) {
   capture_policy::CheckGetAllScreensMediaAllowed(
-      render_frame_host->GetBrowserContext(),
       render_frame_host->GetMainFrame()->GetLastCommittedOrigin().GetURL(),
       std::move(callback));
 }
@@ -3011,6 +3015,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
 #endif
         switches::kEnableNetBenchmarking,
         switches::kExtensionAiDataCollection,
+        switches::kExtensionExperimentalActor,
 #if BUILDFLAG(IS_CHROMEOS)
         chromeos::switches::
             kTelemetryExtensionPwaOriginOverrideForTesting,  // For tests only.
@@ -3087,6 +3092,8 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
   if (!performance_manager::ShouldPreReadDllInChild()) {
     command_line->AppendSwitch(switches::kNoPreReadMainDll);
   }
+
+  base::TimeTicks::MaybeAddHighResolutionTimeTicksSwitch(command_line);
 #endif
 
   ThreadProfilerConfiguration::Get()->AppendCommandLineSwitchForChildProcess(
@@ -3746,7 +3753,8 @@ bool ChromeContentBrowserClient::IsFullCookieAccessAllowed(
     content::BrowserContext* browser_context,
     content::WebContents* web_contents,
     const GURL& url,
-    const blink::StorageKey& storage_key) {
+    const blink::StorageKey& storage_key,
+    net::CookieSettingOverrides overrides) {
   Profile* profile = Profile::FromBrowserContext(browser_context);
   scoped_refptr<content_settings::CookieSettings> cookie_settings =
       CookieSettingsFactory::GetForProfile(profile);
@@ -3755,8 +3763,7 @@ bool ChromeContentBrowserClient::IsFullCookieAccessAllowed(
   }
   return cookie_settings->IsFullCookieAccessAllowed(
       url, storage_key.ToNetSiteForCookies(),
-      url::Origin::Create(storage_key.top_level_site().GetURL()),
-      cookie_settings->SettingOverridesForStorage());
+      url::Origin::Create(storage_key.top_level_site().GetURL()), overrides);
 }
 
 void ChromeContentBrowserClient::GrantCookieAccessDueToHeuristic(
@@ -4725,6 +4732,10 @@ void ChromeContentBrowserClient::OverrideWebPreferences(
 
   web_prefs->prefers_default_scrollbar_styles =
       prefs->GetBoolean(prefs::kPrefersDefaultScrollbarStyles);
+#if BUILDFLAG(IS_ANDROID)
+  web_prefs->always_show_context_menu_on_touch =
+      base::FeatureList::IsEnabled(::features::kContextMenuEmptySpace);
+#endif
 }
 
 bool ChromeContentBrowserClientParts::OverrideWebPreferencesAfterNavigation(
@@ -6516,13 +6527,14 @@ void InitializeFileURLLoaderFactoryForExtension(
 }
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 void AddChromeSchemeFactories(
     int render_process_id,
     content::RenderFrameHost* frame_host,
     content::WebContents* web_contents,
     const extensions::Extension* extension,
     ChromeContentBrowserClient::NonNetworkURLLoaderFactoryMap* factories) {
+#if BUILDFLAG(ENABLE_EXTENSIONS)
   Profile* profile =
       Profile::FromBrowserContext(web_contents->GetBrowserContext());
   InstantService* instant_service =
@@ -6540,6 +6552,7 @@ void AddChromeSchemeFactories(
                            frame_host, chrome::kChromeSearchScheme,
                            /*allowed_hosts=*/base::flat_set<std::string>()));
   }
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
   extensions::ExtensionWebContentsObserver* web_observer =
       extensions::ExtensionWebContentsObserver::GetForWebContents(web_contents);
@@ -6578,7 +6591,7 @@ void AddChromeSchemeFactories(
                            std::move(allowed_webui_hosts)));
   }
 }
-#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 }  // namespace
 
 void ChromeContentBrowserClient::
@@ -6587,12 +6600,12 @@ void ChromeContentBrowserClient::
         int render_frame_id,
         const std::optional<url::Origin>& request_initiator_origin,
         NonNetworkURLLoaderFactoryMap* factories) {
-#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(ENABLE_EXTENSIONS) || \
+#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(ENABLE_EXTENSIONS_CORE) || \
     !BUILDFLAG(IS_ANDROID)
   content::RenderFrameHost* frame_host =
       RenderFrameHost::FromID(render_process_id, render_frame_id);
   WebContents* web_contents = WebContents::FromRenderFrameHost(frame_host);
-#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(ENABLE_EXTENSIONS) || \
+#endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(ENABLE_EXTENSIONS_CORE) || \
         // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -6635,8 +6648,9 @@ void ChromeContentBrowserClient::
       content::RenderProcessHost::FromID(render_process_id)
           ->GetBrowserContext();
   if (ChromeContentBrowserClientExtensionsPart::AreExtensionsDisabledForProfile(
-          browser_context))
+          browser_context)) {
     return;
+  }
 
   factories->emplace(extensions::kExtensionScheme,
                      extensions::CreateExtensionURLLoaderFactory(
@@ -6662,14 +6676,12 @@ void ChromeContentBrowserClient::
         render_process_id, browser_context, extension, factories);
   }
 
-#if BUILDFLAG(ENABLE_EXTENSIONS)
   // This logic should match
   // ChromeExtensionWebContentsObserver::RenderFrameCreated.
   if (web_contents) {
     AddChromeSchemeFactories(render_process_id, frame_host, web_contents,
                              extension, factories);
   }
-#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 }
 
@@ -6784,7 +6796,7 @@ ChromeContentBrowserClient::
 
 bool ChromeContentBrowserClient::WillInterceptWebSocket(
     content::RenderFrameHost* frame) {
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   if (!frame) {
     return false;
   }
@@ -6812,7 +6824,7 @@ void ChromeContentBrowserClient::CreateWebSocket(
     const std::optional<std::string>& user_agent,
     mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
         handshake_client) {
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   // TODO(crbug.com/40195467): Request w/o a frame also should be proxied.
   if (!frame) {
     return;
@@ -6836,7 +6848,7 @@ void ChromeContentBrowserClient::WillCreateWebTransport(
     mojo::PendingRemote<network::mojom::WebTransportHandshakeClient>
         handshake_client,
     WillCreateWebTransportCallback callback) {
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   // TODO(crbug.com/40195467): Add a unit test which calls
   // ChromeContentBrowserClient::WillCreateWebTransport() with invalid process
@@ -6875,7 +6887,7 @@ bool ChromeContentBrowserClient::WillCreateRestrictedCookieManager(
     int routing_id,
     mojo::PendingReceiver<network::mojom::RestrictedCookieManager>* receiver) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-#if BUILDFLAG(ENABLE_EXTENSIONS)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   if (origin.scheme() == extensions::kExtensionScheme) {
     DCHECK_EQ(network::mojom::RestrictedCookieManagerRole::SCRIPT, role);
     extensions::ChromeExtensionCookies::Get(browser_context)
@@ -8740,12 +8752,12 @@ void ChromeContentBrowserClient::NotifyMultiCaptureStateChanged(
 }
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
-bool ChromeContentBrowserClient::ShouldEnableDips(
+bool ChromeContentBrowserClient::ShouldEnableBtm(
     content::BrowserContext* browser_context) {
-  return ShouldBrowserContextEnableDips(browser_context);
+  return ShouldBrowserContextEnableBtm(browser_context);
 }
 
-bool ShouldBrowserContextEnableDips(content::BrowserContext* browser_context) {
+bool ShouldBrowserContextEnableBtm(content::BrowserContext* browser_context) {
   Profile* profile = Profile::FromBrowserContext(browser_context);
   Profile* result = GetHumanProfileSelections().ApplyProfileSelection(profile);
   CHECK(!result || result == profile)
@@ -8753,7 +8765,7 @@ bool ShouldBrowserContextEnableDips(content::BrowserContext* browser_context) {
   return result == profile;
 }
 
-void ChromeContentBrowserClient::OnDipsServiceCreated(
+void ChromeContentBrowserClient::OnBtmServiceCreated(
     content::BrowserContext* browser_context,
     content::BtmService* btm_service) {
   // Create BtmBrowserSigninDetector.
@@ -8761,18 +8773,18 @@ void ChromeContentBrowserClient::OnDipsServiceCreated(
   btm::StatefulBounceCounter::CreateFor(btm_service);
 }
 
-static_assert(content::ContentBrowserClient::kDefaultDipsRemoveMask ==
+static_assert(content::ContentBrowserClient::kDefaultBtmRemoveMask ==
                   (chrome_browsing_data_remover::FILTERABLE_DATA_TYPES &
                    ((content::BrowsingDataRemover::DATA_TYPE_CONTENT_END << 1) -
                     1)),
-              "kDefaultDipsRemoveMask must contain all the entries of "
+              "kDefaultBtmRemoveMask must contain all the entries of "
               "FILTERABLE_DATA_TYPES that are known in //content");
 
-uint64_t ChromeContentBrowserClient::GetDipsRemoveMask() {
+uint64_t ChromeContentBrowserClient::GetBtmRemoveMask() {
   return chrome_browsing_data_remover::FILTERABLE_DATA_TYPES;
 }
 
-bool ChromeContentBrowserClient::ShouldDipsDeleteInteractionRecords(
+bool ChromeContentBrowserClient::ShouldBtmDeleteInteractionRecords(
     uint64_t remove_mask) {
   return remove_mask & chrome_browsing_data_remover::DATA_TYPE_HISTORY;
 }

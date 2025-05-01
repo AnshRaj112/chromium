@@ -117,7 +117,7 @@ class GraphBuilderTflite final {
                ::tflite::TensorType data_type,
                base::span<const int32_t> dimensions,
                std::optional<std::string> name = std::nullopt,
-               bool has_quantize_params = false);
+               QuantizateParametersOffset = 0);
     ~TensorInfo();
 
     // Copyable and movable.
@@ -130,7 +130,7 @@ class GraphBuilderTflite final {
     ::tflite::TensorType data_type;
     std::vector<int32_t> dimensions;
     std::optional<std::string> name;
-    bool has_quantize_params;
+    QuantizateParametersOffset quantize_params;
   };
 
   // Serialize tensor for input, constant and output operand and return the
@@ -702,13 +702,31 @@ class GraphBuilderTflite final {
 
   bool RequiresFloat32Precision(const mojom::Operation& op);
 
-  // Check if conv2d's inputs and outputs are quantized tensors and matches
-  // fusion criteria required by TFLite, if so we can remove the
+  // Check if inputs and outputs are quantized tensors and matches
+  // op specific fusion criteria required by TFLite, if so we can remove the
   // preceding `dequantizeLinear` and subsequent `quantizeLinear`.
   std::optional<TensorInfo> CanFuseQuantizeAndGetOutput(
-      const mojom::Conv2d& conv2d);
+    const mojom::Conv2d& conv2d);
+  std::optional<TensorInfo> CanFuseQuantizeAndGetOutput(
+      const mojom::Concat& concat);
+  std::optional<TensorInfo> CanFuseQuantizeAndGetOutput(
+      const mojom::ElementWiseBinary& binary);
+  std::optional<TensorInfo> CanFuseQuantizeAndGetOutput(
+      const mojom::Transpose& transpose);
+  std::optional<TensorInfo> CanFuseQuantizeAndGetOutput(
+      const mojom::Tanh& tanh);
+  std::optional<TensorInfo> CanFuseQuantizeAndGetOutput(
+      const mojom::Sigmoid& sigmoid);
+  std::optional<TensorInfo> CanFuseQuantizeAndGetOutput(
+      const mojom::LeakyRelu& leaky_relu);
+  // Helper for activation operations to check if specific fusion criteria
+  // required by TFLite are met and return next quantizeLinear operation id
+  // if so.
+  // This is shared by `tanh`, `sigmoid` and `leakyRelu`.
+  template <typename OpType>
+  std::optional<size_t> CanFuseQuantizeForActivationOperation(const OpType& op);
   bool IsDequantizeOutput(uint64_t operand_id);
-  //   Get the dequantize op by its output operand id.
+  // Get the dequantize op by its output operand id.
   const mojom::DequantizeLinear& GetDequantizeOp(uint64_t operand_id);
   const mojom::QuantizeLinear& GetQuantizeOp(size_t operation_index);
   // Try to serialize `dequantize_linear`'s input with quantization params and
@@ -724,6 +742,19 @@ class GraphBuilderTflite final {
   std::optional<size_t> IsNextOpQuantize(
       uint64_t output_operand_id,
       SupportedDataTypes supported_quantized_types);
+  // Check if the input is dequantized from (u)int8, and its scale and zero
+  // point are scalar values.
+  //
+  // Used by DQ->op->Q fusion to satisfy XNNPACK delegate's validation in
+  // `CheckTensorFloat32OrQUInt8Type`.
+  bool IsInts8AndScalarScale(const mojom::DequantizeLinear& dequantize_linear);
+
+  bool IsSerializedWithMismatchQuantizeParameters(
+      uint64_t operand_id,
+      QuantizateParametersOffset quantize_params);
+
+  bool AreConstantOperandsEqual(uint64_t lhs_operand_id,
+                                uint64_t rhs_operand_id);
 
   // No further methods may be called on this class after calling this method
   // because the buffer of `buffer_` is now owned by the detached buffer.
@@ -803,7 +834,16 @@ class GraphBuilderTflite final {
   // Tracks dequantizeLinear operations to be lazily serialized.
   base::flat_map<uint64_t, std::pair<size_t, bool>>
       lazy_serialized_dequantize_operations_;
+
   base::flat_set<size_t> quantize_ops_to_skip_;
+
+  // Mapping of the offset to scale_operand_id and zero_point_operand_id.
+  // Because there is no way to retrieve the underlying data from the flatbuffer
+  // offset, we store mapping to constant operands to check when encountering
+  // Q->DQ, whether their quantization params match.
+  base::flat_map<QuantizateParametersOffset::offset_type,
+                 std::pair<uint64_t, uint64_t>>
+      quantize_param_data_;
 };
 
 }  // namespace tflite

@@ -359,7 +359,7 @@ BASE_FEATURE(kAutofillPaymentsFieldSwapping,
 // will affect many correctness metrics.
 BASE_FEATURE(kAutofillRecordCorrectionOfSelectElements,
              "AutofillRecordCorrectionOfSelectElements",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When enabled, chrome will support home and work addresses from account.
 // TODO: crbug.com/397940269 - Clean up when launched.
@@ -408,6 +408,12 @@ BASE_FEATURE(kAutofillIncludeUrlInCrowdsourcing,
              "AutofillIncludeUrlInCrowdsourcing",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// If enabled, the new suggestion generation logic is used.
+// TODO(crbug.com/409962888): Remove once launched.
+BASE_FEATURE(kAutofillNewSuggestionGeneration,
+             "AutofillNewSuggestionGeneration",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, we start forwarding submissions with source
 // DOM_MUTATION_AFTER_AUTOFILL, even for non-password forms.
 BASE_FEATURE(kAutofillAcceptDomMutationAfterAutofillSubmission,
@@ -427,6 +433,13 @@ BASE_FEATURE(kAutofillFixFormTracking,
 // TODO(crbug.com/40281981): Remove when launched.
 BASE_FEATURE(kAutofillUseSubmittedFormInHtmlSubmission,
              "AutofillUseSubmittedFormInHtmlSubmission",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// If enabled, the ordering for rationalization and sectioning is the same for
+// server and heuristic predictions.
+// TODO(crbug.com/408497919): Remove when launched.
+BASE_FEATURE(kAutofillUnifyRationalizationAndSectioningOrder,
+             "AutofillUnifyRationalizationAndSectioningOrder",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Replaces blink::WebFormElementObserver usage in FormTracker by updated logic
@@ -490,9 +503,10 @@ BASE_FEATURE(kAutofillReplaceCachedWebElementsByRendererIds,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables using a custom address model for France, overriding the legacy one.
+// TODO(crbug.com/347859030): Delete after M139.
 BASE_FEATURE(kAutofillUseFRAddressModel,
              "AutofillUseFRAddressModel",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables using a custom address model for India, overriding the legacy one.
 BASE_FEATURE(kAutofillUseINAddressModel,

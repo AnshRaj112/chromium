@@ -54,10 +54,12 @@
 #import "ios/chrome/browser/app_store_rating/ui_bundled/app_store_rating_scene_agent.h"
 #import "ios/chrome/browser/app_store_rating/ui_bundled/features.h"
 #import "ios/chrome/browser/appearance/ui_bundled/appearance_customization.h"
+#import "ios/chrome/browser/authentication/ui_bundled/account_menu/account_menu_constants.h"
+#import "ios/chrome/browser/authentication/ui_bundled/account_menu/account_menu_coordinator.h"
+#import "ios/chrome/browser/authentication/ui_bundled/account_menu/account_menu_coordinator_delegate.h"
 #import "ios/chrome/browser/authentication/ui_bundled/authentication_flow/authentication_flow.h"
 #import "ios/chrome/browser/authentication/ui_bundled/change_profile/change_profile_load_url.h"
 #import "ios/chrome/browser/authentication/ui_bundled/continuation.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin/account_menu/account_menu_constants.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/features.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/promo/signin_fullscreen_promo_scene_agent.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
@@ -366,7 +368,8 @@ SystemIdentityManager::IteratorResult IdentitiesOnDevice(
 
 }  // namespace
 
-@interface SceneController () <HistoryCoordinatorDelegate,
+@interface SceneController () <AccountMenuCoordinatorDelegate,
+                               HistoryCoordinatorDelegate,
                                IncognitoInterstitialCoordinatorDelegate,
                                PasswordCheckupCoordinatorDelegate,
                                PolicyWatcherBrowserAgentObserving,
@@ -403,6 +406,7 @@ SystemIdentityManager::IteratorResult IdentitiesOnDevice(
   // Fetches the Family Link member role asynchronously from KidsManagement API.
   std::unique_ptr<supervised_user::ListFamilyMembersFetcher>
       _familyMembersFetcher;
+  AccountMenuCoordinator* _accountMenuCoordinator;
 }
 
 // Navigation View controller for the settings.
@@ -858,6 +862,12 @@ SystemIdentityManager::IteratorResult IdentitiesOnDevice(
 
 #pragma mark - private
 
+- (void)stopAccountMenu {
+  [_accountMenuCoordinator stop];
+  _accountMenuCoordinator.delegate = nil;
+  _accountMenuCoordinator = nil;
+}
+
 - (void)handleURLContextsToOpen {
   if (self.sceneState.URLContextsToOpen.count == 0) {
     return;
@@ -1014,14 +1024,7 @@ SystemIdentityManager::IteratorResult IdentitiesOnDevice(
 // Stops the signin coordinator.
 // TODO(crbug.com/381444097): always use the animated.
 - (void)stopSigninCoordinatorAnimated:(BOOL)animated {
-  if ([self.signinCoordinator
-          conformsToProtocol:@protocol(StopAnimatedChromeCoordinator)]) {
-    [base::apple::ObjCCastStrict<
-        SigninCoordinator<StopAnimatedChromeCoordinator>>(
-        self.signinCoordinator) stopAnimated:animated];
-  } else {
-    [self.signinCoordinator stop];
-  }
+  [self.signinCoordinator stopAnimated:animated];
   self.signinCoordinator = nil;
 }
 
@@ -1444,10 +1447,7 @@ SystemIdentityManager::IteratorResult IdentitiesOnDevice(
 
 - (void)teardownUI {
   // The UI should be stopped before the models they observe are stopped.
-  [self interruptSigninCoordinatorAnimated:NO fromExternalTrigger:NO];
-  // `self.signinCoordinator.signinCompletion()` was called in the interrupt
-  // method. Therefore now `self.signinCoordinator` is now stopped, and
-  // `self.signinCoordinator` is now nil.
+  [self stopSigninCoordinatorAnimated:NO fromExternalTrigger:NO];
   DCHECK(!self.signinCoordinator)
       << base::SysNSStringToUTF8([self.signinCoordinator description]);
 
@@ -1467,6 +1467,8 @@ SystemIdentityManager::IteratorResult IdentitiesOnDevice(
 
   [_mainCoordinator stop];
   _mainCoordinator = nil;
+
+  [self stopAccountMenu];
 
   _incognitoWebStateObserver.reset();
   _mainWebStateObserver.reset();
@@ -2231,7 +2233,8 @@ using UserFeedbackDataCallback =
   [self startSigninCoordinatorWithCompletion:command.completion];
 }
 
-- (void)showAccountMenuFromAccessPoint:(AccountMenuAccessPoint)accessPoint {
+- (void)showAccountMenuFromAccessPoint:(AccountMenuAccessPoint)accessPoint
+                                   URL:(const GURL&)url {
   if (![self isTabAvailableToPresentViewController]) {
     return;
   }
@@ -2240,65 +2243,16 @@ using UserFeedbackDataCallback =
       << base::SysNSStringToUTF8([self.signinCoordinator description]);
   Browser* browser = self.mainInterface.browser;
   UIViewController* baseViewController = self.mainInterface.viewController;
-  SigninCoordinator<InterruptibleChromeCoordinator>* accountMenuCoordinator =
-      [SigninCoordinator
-          accountMenuCoordinatorWithBaseViewController:baseViewController
-                                               browser:browser
-                                          contextStyle:SigninContextStyle::
-                                                           kDefault
-                                            anchorView:nil
-                                           accessPoint:AccountMenuAccessPoint::
-                                                           kWeb];
-  self.signinCoordinator = accountMenuCoordinator;
+  _accountMenuCoordinator = [[AccountMenuCoordinator alloc]
+      initWithBaseViewController:baseViewController
+                         browser:browser
+                      anchorView:nil
+                     accessPoint:AccountMenuAccessPoint::kWeb
+                             URL:url];
+  _accountMenuCoordinator.delegate = self;
   // TODO(crbug.com/336719423): Record signin metrics based on the
   // selected action from the account switcher.
-  [self startSigninCoordinatorWithCompletion:nil];
-}
-
-- (void)
-    showTrustedVaultReauthForFetchKeysFromViewController:
-        (UIViewController*)viewController
-                                        securityDomainID:
-                                            (trusted_vault::SecurityDomainId)
-                                                securityDomainID
-                                                 trigger:
-                                                     (syncer::
-                                                          TrustedVaultUserActionTriggerForUMA)
-                                                         trigger
-                                             accessPoint:
-                                                 (signin_metrics::AccessPoint)
-                                                     accessPoint {
-  [self
-      showTrustedVaultDialogFromViewController:viewController
-                                        intent:
-                                            SigninTrustedVaultDialogIntentFetchKeys
-                              securityDomainID:securityDomainID
-                                       trigger:trigger
-                                   accessPoint:accessPoint];
-}
-
-- (void)
-    showTrustedVaultReauthForDegradedRecoverabilityFromViewController:
-        (UIViewController*)viewController
-                                                     securityDomainID:
-                                                         (trusted_vault::
-                                                              SecurityDomainId)
-                                                             securityDomainID
-                                                              trigger:
-                                                                  (syncer::
-                                                                       TrustedVaultUserActionTriggerForUMA)
-                                                                      trigger
-                                                          accessPoint:
-                                                              (signin_metrics::
-                                                                   AccessPoint)
-                                                                  accessPoint {
-  [self
-      showTrustedVaultDialogFromViewController:viewController
-                                        intent:
-                                            SigninTrustedVaultDialogIntentDegradedRecoverability
-                              securityDomainID:securityDomainID
-                                       trigger:trigger
-                                   accessPoint:accessPoint];
+  [_accountMenuCoordinator start];
 }
 
 - (void)showWebSigninPromoFromViewController:
@@ -2476,6 +2430,11 @@ using UserFeedbackDataCallback =
   UISceneActivationRequestOptions* options =
       [[UISceneActivationRequestOptions alloc] init];
   options.requestingScene = self.sceneState.scene;
+
+  ProfileIOS* profile = self.sceneState.profileState.profile;
+  if (profile) {
+    AttachProfileNameToActivity(userActivity, profile->GetProfileName());
+  }
 
   if (self.mainInterface) {
     PrefService* prefs = self.mainInterface.profile->GetPrefs();
@@ -3933,38 +3892,6 @@ using UserFeedbackDataCallback =
 
 #pragma mark - Sign In UI presentation
 
-// Show trusted vault dialog.
-// `intent` Dialog to present.
-// `trigger` UI elements where the trusted vault reauth has been triggered.
-- (void)
-    showTrustedVaultDialogFromViewController:(UIViewController*)viewController
-                                      intent:
-                                          (SigninTrustedVaultDialogIntent)intent
-                            securityDomainID:(trusted_vault::SecurityDomainId)
-                                                 securityDomainID
-                                     trigger:
-                                         (syncer::
-                                              TrustedVaultUserActionTriggerForUMA)
-                                             trigger
-                                 accessPoint:
-                                     (signin_metrics::AccessPoint)accessPoint {
-  DCHECK(!self.signinCoordinator)
-      << "self.signinCoordinator: "
-      << base::SysNSStringToUTF8([self.signinCoordinator description]);
-  Browser* mainBrowser = self.mainInterface.browser;
-  self.signinCoordinator = [SigninCoordinator
-      trustedVaultReAuthenticationCoordinatorWithBaseViewController:
-          viewController
-                                                            browser:mainBrowser
-                                                             intent:intent
-                                                   securityDomainID:
-                                                       securityDomainID
-                                                            trigger:trigger
-                                                        accessPoint:
-                                                            accessPoint];
-  [self startSigninCoordinatorWithCompletion:nil];
-}
-
 // Close Settings, or Signin or the 3rd-party intents Incognito interstitial.
 - (void)closePresentedViews:(BOOL)animated
                  completion:(ProceduralBlock)completion {
@@ -3998,7 +3925,7 @@ using UserFeedbackDataCallback =
     // to be closed first.
     // If signinCoordinator is already dismissing, completion execution will
     // happen when it is done animating.
-    [self interruptSigninCoordinatorAnimated:animated fromExternalTrigger:YES];
+    [self stopSigninCoordinatorAnimated:animated fromExternalTrigger:YES];
     UIViewController* presentingViewController =
         self.settingsNavigationController.presentingViewController;
     if (presentingViewController) {
@@ -4012,17 +3939,15 @@ using UserFeedbackDataCallback =
   } else {
     // `self.signinCoordinator` can be presented without settings, from the
     // bookmarks or the recent tabs view.
-    [self interruptSigninCoordinatorAnimated:animated fromExternalTrigger:YES];
+    [self stopSigninCoordinatorAnimated:animated fromExternalTrigger:YES];
     resetAndDismiss();
   }
 }
 
-// Interrupts the sign-in coordinator actions and dismisses its views either
+// Stops the sign-in coordinator actions and dismisses its views either
 // with or without animation.
-// TODO(crbug.com/381444097): Rename to `stopSigninCoordinatorAnimated` when the
-// InterruptibleChromeCoordinator protocol is removed.
-- (void)interruptSigninCoordinatorAnimated:(BOOL)animated
-                       fromExternalTrigger:(BOOL)external {
+- (void)stopSigninCoordinatorAnimated:(BOOL)animated
+                  fromExternalTrigger:(BOOL)external {
   if (!self.signinCoordinator) {
     return;
   }
@@ -4030,32 +3955,13 @@ using UserFeedbackDataCallback =
     self.dismissingSigninPromptFromExternalTrigger = YES;
   }
 
-  if ([self.signinCoordinator
-          conformsToProtocol:@protocol(InterruptibleChromeCoordinator)]) {
-    [base::apple::ObjCCastStrict<
-        SigninCoordinator<InterruptibleChromeCoordinator>>(
-        self.signinCoordinator) interruptAnimated:animated];
-  } else {
-    CHECK([self.signinCoordinator
-        conformsToProtocol:@protocol(StopAnimatedChromeCoordinator)]);
-    [base::apple::ObjCCastStrict<
-        SigninCoordinator<StopAnimatedChromeCoordinator>>(
-        self.signinCoordinator) stopAnimated:animated];
-    SigninCoordinatorCompletionCallback signinCompletion =
-        self.signinCoordinator.signinCompletion;
-    self.signinCoordinator.signinCompletion = nil;
-    if (signinCompletion) {
-      // The signin completion is not expected to be called during
-      // `stopAnimated`. However, a child of `self.signinCoordinator` that
-      // implements `InterruptibleChromeCoordinator` can request its owner to be
-      // stopped in its own `signinCompletion`. Thus, this case need to be
-      // considered during the migration away InterruptibleChromeCoordinator.
-      // TODO(crbug.com/381444097): replace the `if` by a check when there are
-      // no more `InterruptibleChromeCoordinator`s.
-      signinCompletion(SigninCoordinatorResultInterrupted, nil);
-    }
-    self.signinCoordinator = nil;
-  }
+  [self.signinCoordinator stopAnimated:animated];
+  SigninCoordinatorCompletionCallback signinCompletion =
+      self.signinCoordinator.signinCompletion;
+  self.signinCoordinator.signinCompletion = nil;
+  CHECK(signinCompletion, base::NotFatalUntil::M142);
+  signinCompletion(SigninCoordinatorResultInterrupted, nil);
+  self.signinCoordinator = nil;
 }
 
 // Starts the sign-in coordinator with a default cleanup completion.
@@ -4616,7 +4522,7 @@ using UserFeedbackDataCallback =
     (PolicyWatcherBrowserAgent*)policyWatcher {
 
   if (self.signinCoordinator) {
-    [self interruptSigninCoordinatorAnimated:YES fromExternalTrigger:YES];
+    [self stopSigninCoordinatorAnimated:YES fromExternalTrigger:YES];
     UMA_HISTOGRAM_BOOLEAN(
         "Enterprise.BrowserSigninIOS.SignInInterruptedByPolicy", true);
     policyWatcher->SignInUIDismissed();
@@ -4644,6 +4550,16 @@ using UserFeedbackDataCallback =
 
 - (void)closeHistory {
   [self closeHistoryWithCompletion:nil];
+}
+
+#pragma mark - AccountMenuCoordinatorDelegate
+
+// Update the state, to take into account that the account menu coordinator is
+// stopped.
+- (void)accountMenuCoordinatorWantsToBeStopped:
+    (AccountMenuCoordinator*)coordinator {
+  CHECK_EQ(_accountMenuCoordinator, coordinator, base::NotFatalUntil::M140);
+  [self stopAccountMenu];
 }
 
 @end

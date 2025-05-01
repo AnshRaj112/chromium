@@ -90,6 +90,7 @@
 #include "url/gurl.h"
 
 #if BUILDFLAG(ENABLE_PDF_INK2)
+#include "base/files/file_path.h"
 #include "pdf/pdf_ink_brush.h"
 #include "pdf/pdf_ink_metrics_handler.h"
 #include "pdf/pdf_ink_module_client.h"
@@ -395,8 +396,7 @@ class FakePdfHost : public pdf::mojom::PdfHost {
 
 }  // namespace
 
-class PdfViewWebPluginWithoutInitializeTest
-    : public testing::TestWithParam<bool> {
+class PdfViewWebPluginWithoutInitializeTest : public testing::Test {
  protected:
   // Custom deleter for `plugin_`. PdfViewWebPlugin must be destroyed by
   // PdfViewWebPlugin::Destroy() instead of its destructor.
@@ -1952,7 +1952,9 @@ TEST_F(PdfViewWebPluginTest, HighlightTextFragments) {
   plugin_->OnMessage(message);
 }
 
-class PdfViewWebPluginWithDocInfoTest : public PdfViewWebPluginTest {
+class PdfViewWebPluginWithDocInfoTest
+    : public PdfViewWebPluginTest,
+      public testing::WithParamInterface<bool> {
  public:
   void SetUp() override {
     PdfViewWebPluginTest::SetUp();
@@ -2787,8 +2789,27 @@ TEST_F(PdfViewWebPluginPrintPreviewTest,
 }
 
 #if BUILDFLAG(ENABLE_PDF_INK2)
-class PdfViewWebPluginInkTest : public PdfViewWebPluginTest {
+class PdfViewWebPluginInkTest
+    : public PdfViewWebPluginTest,
+      public testing::WithParamInterface<InkTestVariation> {
+ public:
+  void SetUp() override {
+    // Feature and parameters need to be initialized first as it impacts plugin
+    // setup in PdfViewWebPluginTest::SetUp().
+    feature_list_.InitAndEnableFeatureWithParameters(
+        chrome_pdf::features::kPdfInk2,
+        {{features::kPdfInk2TextAnnotations.name,
+          base::ToString(UseTextAnnotations())},
+         {features::kPdfInk2TextHighlighting.name,
+          base::ToString(UseTextHighlighting())}});
+
+    PdfViewWebPluginTest::SetUp();
+  }
+
  protected:
+  bool UseTextAnnotations() const { return GetParam().use_text_annotations; }
+  bool UseTextHighlighting() const { return GetParam().use_text_highlighting; }
+
   void SetUpWithTrivialInkStrokes() {
     // Set up the engine so the plugin can draw strokes. The exact strokes do
     // not matter.
@@ -2822,18 +2843,101 @@ class PdfViewWebPluginInkTest : public PdfViewWebPluginTest {
         Thumbnail(page_size, /*device_pixel_ratio=*/1));
   }
 
+  void TestInProgressDraw(base::FilePath::StringViewType expected_filename,
+                          const gfx::PointF& start_position,
+                          const gfx::PointF& end_position) {
+    plugin_->set_in_paint_for_testing(true);
+    constexpr gfx::Rect kScreenRect(kCanvasSize);
+    constexpr gfx::SizeF kPageSizeInPoints(
+        kCanvasSize.width() * kUnitConversionFactorPixelsToPoints,
+        kCanvasSize.height() * kUnitConversionFactorPixelsToPoints);
+    ON_CALL(*engine_ptr_, GetPageContentsRect)
+        .WillByDefault(Return(kScreenRect));
+    ON_CALL(*engine_ptr_, GetPageSizeInPoints)
+        .WillByDefault(Return(kPageSizeInPoints));
+    ON_CALL(*engine_ptr_, GetThumbnailSize)
+        .WillByDefault(Return(gfx::Size(50, 50)));
+    ON_CALL(*engine_ptr_, IsPageVisible).WillByDefault(Return(true));
+
+    UpdatePluginGeometry(/*device_scale=*/1.0f, kScreenRect);
+
+    // The canvas starts blank.
+    canvas_.DrawColor(SK_ColorWHITE);
+    plugin_->Paint(canvas_.sk_canvas(), kScreenRect);
+    SkBitmap blank_bitmap =
+        GenerateExpectedBitmapForPaint(kScreenRect, SK_ColorWHITE);
+    EXPECT_TRUE(cc::MatchesBitmap(canvas_.GetBitmap(), blank_bitmap,
+                                  cc::ExactPixelComparator()));
+
+    // Start to draw a stroke.  There should not be a call to apply the stroke
+    // until drawing is finished.
+    EXPECT_CALL(*engine_ptr_, ApplyStroke(_, _, _)).Times(0);
+    // The final imaging for a stroke saved to a PDF should match what was final
+    // drawn result when it was in-progress.
+    TestSendInputEvent(
+        MouseEventBuilder().CreateLeftClickAtPosition(start_position).Build(),
+        blink::WebInputEventResult::kHandledApplication);
+    TestSendInputEvent(
+        MouseEventBuilder()
+            .SetType(blink::WebInputEvent::Type::kMouseMove)
+            .SetPosition(end_position)
+            .SetButton(blink::WebPointerProperties::Button::kLeft)
+            .Build(),
+        blink::WebInputEventResult::kHandledApplication);
+
+    // Draw the canvas for the in-progress stroke.
+    plugin_->Paint(canvas_.sk_canvas(), kScreenRect);
+    const base::FilePath stroked_image_png_file =
+        GetInkTestDataFilePath(expected_filename);
+    EXPECT_TRUE(MatchesPngFile(canvas_.GetBitmap().asImage().get(),
+                               stroked_image_png_file));
+
+    // Finish the stroke.  After a stroke is finished there is nothing more to
+    // be drawn by PdfInkModule, as the completed stroke is provided by a
+    // callback to be applied to a PDF page.
+    testing::Mock::VerifyAndClearExpectations(engine_ptr_);
+    EXPECT_CALL(*engine_ptr_, ApplyStroke(/*page_index=*/0, InkStrokeId(0), _));
+    TestSendInputEvent(
+        MouseEventBuilder().CreateLeftMouseUpAtPosition(end_position).Build(),
+        blink::WebInputEventResult::kHandledApplication);
+
+    // Updating of `PdfViewWebPlugin::snapshot_` does not happen automatically
+    // on the invalidate call, but later after the tasks PaintManager posted
+    // have a chance to run.  This means painting uses the last snapshot, which
+    // does not include the last Ink stroke.  This results in the most recent
+    // stroke disappearing, causing a flash for the user unless the snapshot
+    // from the most recent stroke is reused.
+    plugin_->Paint(canvas_.sk_canvas(), kScreenRect);
+    EXPECT_TRUE(MatchesPngFile(canvas_.GetBitmap().asImage().get(),
+                               stroked_image_png_file));
+    EXPECT_TRUE(plugin_->HasInkInputsSnapshotForTesting());
+
+    // Simulate how the snapshot eventually gets updated, after all necessary
+    // tasks that normally happen from the PaintManager finally complete.  That
+    // results in a blank canvas here for this test, as PdfViewWebPlugin no
+    // longer uses the last Ink rendering snapshot for painting, and
+    // ApplyStroke() was mocked out so there is nothing to draw from the PDF
+    // engine.
+    plugin_->UpdateSnapshot(CreateSkiaImageForTesting(
+        plugin_->GetPluginRectForTesting().size(), SK_ColorWHITE));
+    plugin_->Paint(canvas_.sk_canvas(), kScreenRect);
+    EXPECT_TRUE(cc::MatchesBitmap(canvas_.GetBitmap(), blank_bitmap,
+                                  cc::ExactPixelComparator()));
+    EXPECT_FALSE(plugin_->HasInkInputsSnapshotForTesting());
+  }
+
  private:
-  base::test::ScopedFeatureList feature_list_{features::kPdfInk2};
+  base::test::ScopedFeatureList feature_list_;
 };
 
-TEST_F(PdfViewWebPluginInkTest, Invalidate) {
+TEST_P(PdfViewWebPluginInkTest, Invalidate) {
   plugin_->set_in_paint_for_testing(true);
   EXPECT_EQ(0u, plugin_->deferred_invalidates_for_testing().size());
   SetUpWithTrivialInkStrokes();
   EXPECT_EQ(3u, plugin_->deferred_invalidates_for_testing().size());
 }
 
-TEST_F(PdfViewWebPluginInkTest, LoadV2InkPathsForPageAndUpdateShapeActive) {
+TEST_P(PdfViewWebPluginInkTest, LoadV2InkPathsForPageAndUpdateShapeActive) {
   const std::map<InkModeledShapeId, ink::PartitionedMesh> kEmptyMap;
   const std::map<InkModeledShapeId, ink::PartitionedMesh> kMap0{
       {InkModeledShapeId(0), ink::PartitionedMesh()},
@@ -2872,7 +2976,7 @@ TEST_F(PdfViewWebPluginInkTest, LoadV2InkPathsForPageAndUpdateShapeActive) {
       /*active=*/false);
 }
 
-TEST_F(PdfViewWebPluginInkTest, SendThumbnailUpdatesInkThumbnail) {
+TEST_P(PdfViewWebPluginInkTest, SendThumbnailUpdatesInkThumbnail) {
   SetUpWithTrivialInkStrokes();
 
   EXPECT_CALL(*client_ptr_, PostMessage)
@@ -2907,7 +3011,7 @@ TEST_F(PdfViewWebPluginInkTest, SendThumbnailUpdatesInkThumbnail) {
   SendThumbnail(/*message_id=*/"foo", /*page_size=*/{50, 25});
 }
 
-TEST_F(PdfViewWebPluginInkTest, SendThumbnailWithNoStrokes) {
+TEST_P(PdfViewWebPluginInkTest, SendThumbnailWithNoStrokes) {
   EXPECT_CALL(*client_ptr_, PostMessage)
       .WillOnce([](const base::Value::Dict& dict) {
         auto expected = base::test::ParseJsonDict(R"({
@@ -2926,7 +3030,7 @@ TEST_F(PdfViewWebPluginInkTest, SendThumbnailWithNoStrokes) {
   SendThumbnail(/*message_id=*/"foo", /*page_size=*/{50, 25});
 }
 
-TEST_F(PdfViewWebPluginInkTest, UpdateCursor) {
+TEST_P(PdfViewWebPluginInkTest, UpdateCursor) {
   UpdatePluginGeometryWithoutWaiting(2.0f, {0, 0, 20, 20});
 
   ON_CALL(*engine_ptr_, HandleInputEvent)
@@ -2957,21 +3061,21 @@ TEST_F(PdfViewWebPluginInkTest, UpdateCursor) {
   EXPECT_EQ(ui::mojom::CursorType::kPointer, cursor.type());
 }
 
-TEST_F(PdfViewWebPluginInkTest, GetPageSizeInPoints) {
+TEST_P(PdfViewWebPluginInkTest, GetPageSizeInPoints) {
   SetUpWithTrivialInkStrokes();
   EXPECT_EQ(gfx::SizeF(75.0f, 37.5f),
             plugin_->ink_module_client_for_testing()->GetPageSizeInPoints(
                 /*page_index=*/0));
 }
 
-TEST_F(PdfViewWebPluginInkTest, GetThumbnailSize) {
+TEST_P(PdfViewWebPluginInkTest, GetThumbnailSize) {
   SetUpWithTrivialInkStrokes();
   EXPECT_EQ(gfx::Size(50, 25),
             plugin_->ink_module_client_for_testing()->GetThumbnailSize(
                 /*page_index=*/0));
 }
 
-TEST_F(PdfViewWebPluginInkTest, GetZoom) {
+TEST_P(PdfViewWebPluginInkTest, GetZoom) {
   // Demonstrate that default zoom is identity.
   EXPECT_EQ(1.0f, plugin_->ink_module_client_for_testing()->GetZoom());
 
@@ -3001,7 +3105,7 @@ TEST_F(PdfViewWebPluginInkTest, GetZoom) {
   EXPECT_EQ(2.5f, plugin_->ink_module_client_for_testing()->GetZoom());
 }
 
-TEST_F(PdfViewWebPluginInkTest, RequestThumbnail) {
+TEST_P(PdfViewWebPluginInkTest, RequestThumbnail) {
   EXPECT_CALL(*engine_ptr_, RequestThumbnail)
       .WillOnce([](int page_index, float device_pixel_ratio,
                    SendThumbnailCallback send_callback) {
@@ -3020,7 +3124,7 @@ TEST_F(PdfViewWebPluginInkTest, RequestThumbnail) {
   EXPECT_EQ(1.0f, thumbnail.device_pixel_ratio());
 }
 
-TEST_F(PdfViewWebPluginInkTest, AddUpdateDiscardStroke) {
+TEST_P(PdfViewWebPluginInkTest, AddUpdateDiscardStroke) {
   const PdfInkBrush kBrush(PdfInkBrush::Type::kPen, SK_ColorRED, /*size=*/4.0f);
   constexpr InkStrokeId kStrokeId(1);
   constexpr int kPageIndex = 0;
@@ -3043,7 +3147,7 @@ TEST_F(PdfViewWebPluginInkTest, AddUpdateDiscardStroke) {
                                                           kStrokeId);
 }
 
-TEST_F(PdfViewWebPluginInkTest, VisiblePageIndexFromPoint) {
+TEST_P(PdfViewWebPluginInkTest, VisiblePageIndexFromPoint) {
   ON_CALL(*engine_ptr_, GetPageContentsRect)
       .WillByDefault([](int page_index) -> gfx::Rect {
         // Uniform 80x180 page sizes, with a `kVerticalEmptySpace` gap above
@@ -3120,7 +3224,7 @@ TEST_F(PdfViewWebPluginInkTest, VisiblePageIndexFromPoint) {
   EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(kPageBelowLast));
 }
 
-TEST_F(PdfViewWebPluginInkTest, AnnotationModeSetsFormAndClearsText) {
+TEST_P(PdfViewWebPluginInkTest, AnnotationModeSetsFormAndClearsText) {
   EXPECT_CALL(*engine_ptr_, SetFormHighlight(false));
   EXPECT_CALL(*engine_ptr_, ClearTextSelection());
 
@@ -3134,86 +3238,12 @@ TEST_F(PdfViewWebPluginInkTest, AnnotationModeSetsFormAndClearsText) {
   EXPECT_FALSE(plugin_->IsInAnnotationMode());
 }
 
-TEST_F(PdfViewWebPluginInkTest, DrawInProgressStroke) {
-  plugin_->set_in_paint_for_testing(true);
-  constexpr gfx::Rect kScreenRect(kCanvasSize);
-  constexpr gfx::SizeF kPageSizeInPoints(
-      kCanvasSize.width() * kUnitConversionFactorPixelsToPoints,
-      kCanvasSize.height() * kUnitConversionFactorPixelsToPoints);
-  ON_CALL(*engine_ptr_, GetPageContentsRect).WillByDefault(Return(kScreenRect));
-  ON_CALL(*engine_ptr_, GetPageSizeInPoints)
-      .WillByDefault(Return(kPageSizeInPoints));
-  ON_CALL(*engine_ptr_, GetThumbnailSize)
-      .WillByDefault(Return(gfx::Size(50, 50)));
-  ON_CALL(*engine_ptr_, IsPageVisible).WillByDefault(Return(true));
-
-  UpdatePluginGeometry(/*device_scale=*/1.0f, kScreenRect);
-
-  // The canvas starts blank.
-  canvas_.DrawColor(SK_ColorWHITE);
-  plugin_->Paint(canvas_.sk_canvas(), kScreenRect);
-  SkBitmap blank_bitmap =
-      GenerateExpectedBitmapForPaint(kScreenRect, SK_ColorWHITE);
-  EXPECT_TRUE(cc::MatchesBitmap(canvas_.GetBitmap(), blank_bitmap,
-                                cc::ExactPixelComparator()));
-
-  // Start to draw a stroke.  There should not be a call to apply the stroke
-  // until drawing is finished.
-  EXPECT_CALL(*engine_ptr_, ApplyStroke(_, _, _)).Times(0);
+TEST_P(PdfViewWebPluginInkTest, DrawInProgressStroke) {
   plugin_->OnMessage(CreateSetAnnotationModeMessageForTesting(/*enable=*/true));
-  // The final imaging for a stroke saved to a PDF should match what was final
-  // drawn result when it was in-progress.
-  TestSendInputEvent(
-      MouseEventBuilder().CreateLeftClickAtPosition({95, 85}).Build(),
-      blink::WebInputEventResult::kHandledApplication);
-  static constexpr gfx::PointF kStrokeEndingPosition(50, 45);
-  TestSendInputEvent(MouseEventBuilder()
-                         .SetType(blink::WebInputEvent::Type::kMouseMove)
-                         .SetPosition(kStrokeEndingPosition)
-                         .SetButton(blink::WebPointerProperties::Button::kLeft)
-                         .Build(),
-                     blink::WebInputEventResult::kHandledApplication);
-
-  // Draw the canvas for the in-progress stroke.
-  plugin_->Paint(canvas_.sk_canvas(), kScreenRect);
-  const base::FilePath stroked_image_png_file =
-      GetInkTestDataFilePath(FILE_PATH_LITERAL("diagonal_stroke.png"));
-  EXPECT_TRUE(MatchesPngFile(canvas_.GetBitmap().asImage().get(),
-                             stroked_image_png_file));
-
-  // Finish the stroke.  After a stroke is finished there is nothing more to
-  // be drawn by PdfInkModule, as the completed stroke is provided by a
-  // callback to be applied to a PDF page.
-  testing::Mock::VerifyAndClearExpectations(engine_ptr_);
-  EXPECT_CALL(*engine_ptr_, ApplyStroke(/*page_index=*/0, InkStrokeId(0), _));
-  TestSendInputEvent(MouseEventBuilder()
-                         .CreateLeftMouseUpAtPosition(kStrokeEndingPosition)
-                         .Build(),
-                     blink::WebInputEventResult::kHandledApplication);
-
-  // Updating of `PdfViewWebPlugin::snapshot_` does not happen automatically
-  // on the invalidate call, but later after the tasks PaintManager posted have
-  // a chance to run.  This means painting uses the last snapshot, which does
-  // not include the last Ink stroke.  This results in the most recent stroke
-  // disappearing, causing a flash for the user unless the snapshot from the
-  // most recent stroke is reused.
-  plugin_->Paint(canvas_.sk_canvas(), kScreenRect);
-  EXPECT_TRUE(MatchesPngFile(canvas_.GetBitmap().asImage().get(),
-                             stroked_image_png_file));
-  EXPECT_TRUE(plugin_->HasInkInputsSnapshotForTesting());
-
-  // Simulate how the snapshot eventually gets updated, after all necessary
-  // tasks that normally happen from the PaintManager finally complete.  That
-  // results in a blank canvas here for this test, as PdfViewWebPlugin no
-  // longer uses the last Ink rendering snapshot for painting, and
-  // ApplyStroke() was mocked out so there is nothing to draw from the PDF
-  // engine.
-  plugin_->UpdateSnapshot(CreateSkiaImageForTesting(
-      plugin_->GetPluginRectForTesting().size(), SK_ColorWHITE));
-  plugin_->Paint(canvas_.sk_canvas(), kScreenRect);
-  EXPECT_TRUE(cc::MatchesBitmap(canvas_.GetBitmap(), blank_bitmap,
-                                cc::ExactPixelComparator()));
-  EXPECT_FALSE(plugin_->HasInkInputsSnapshotForTesting());
+  TestInProgressDraw(
+      /*expected_filename=*/FILE_PATH_LITERAL("diagonal_stroke.png"),
+      /*start_position=*/gfx::PointF(95, 85),
+      /*end_position=*/gfx::PointF(50, 45));
 }
 
 class PdfViewWebPluginInk2SaveTest : public PdfViewWebPluginSaveTest {
@@ -3272,7 +3302,7 @@ TEST_F(PdfViewWebPluginInk2SaveTest, AnnotationInEditMode) {
 
 using PdfViewWebPluginInkMetricTest = PdfViewWebPluginInkTest;
 
-TEST_F(PdfViewWebPluginInkMetricTest, LoadedWithoutV2InkAnnotations) {
+TEST_P(PdfViewWebPluginInkMetricTest, LoadedWithoutV2InkAnnotations) {
   base::HistogramTester histograms;
 
   EXPECT_CALL(*engine_ptr_, ContainsV2InkPath(_))
@@ -3283,7 +3313,7 @@ TEST_F(PdfViewWebPluginInkMetricTest, LoadedWithoutV2InkAnnotations) {
                                 PDFLoadedWithV2InkAnnotations::kFalse, 1);
 }
 
-TEST_F(PdfViewWebPluginInkMetricTest, LoadedWithV2InkAnnotations) {
+TEST_P(PdfViewWebPluginInkMetricTest, LoadedWithV2InkAnnotations) {
   base::HistogramTester histograms;
 
   EXPECT_CALL(*engine_ptr_, ContainsV2InkPath(_))
@@ -3294,7 +3324,7 @@ TEST_F(PdfViewWebPluginInkMetricTest, LoadedWithV2InkAnnotations) {
                                 PDFLoadedWithV2InkAnnotations::kTrue, 1);
 }
 
-TEST_F(PdfViewWebPluginInkMetricTest, LoadedWithV2InkAnnotationsTimeout) {
+TEST_P(PdfViewWebPluginInkMetricTest, LoadedWithV2InkAnnotationsTimeout) {
   base::HistogramTester histograms;
   EXPECT_CALL(*engine_ptr_, ContainsV2InkPath(_))
       .WillOnce(Return(PDFLoadedWithV2InkAnnotations::kUnknown));
@@ -3328,6 +3358,13 @@ TEST_F(PdfViewWebPluginPrintPreviewInkMetricTest,
   // Preview.
   histograms.ExpectTotalCount(kPdfLoadedWithV2InkAnnotationsMetric, 0);
 }
+
+INSTANTIATE_TEST_SUITE_P(All,
+                         PdfViewWebPluginInkTest,
+                         testing::ValuesIn(GetAllInkTestVariations()));
+INSTANTIATE_TEST_SUITE_P(All,
+                         PdfViewWebPluginInkMetricTest,
+                         testing::ValuesIn(GetAllInkTestVariations()));
 #endif  // BUILDFLAG(ENABLE_PDF_INK2)
 
 }  // namespace chrome_pdf

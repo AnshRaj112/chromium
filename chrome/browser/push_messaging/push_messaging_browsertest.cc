@@ -3129,6 +3129,10 @@ IN_PROC_BROWSER_TEST_F(PushSubscriptionChangeEventOnResubscribeTest,
 
   histogram_tester_.ExpectBucketCount("PushMessaging.NumUnsubscribedEntries", 1,
                                       1);
+  histogram_tester_.ExpectBucketCount(
+      "PushMessaging."
+      "PushSubscriptionChangeForNotificationPermissionChangeFired",
+      1, 1);
 
   EXPECT_EQ("permission status - granted",
             RunScript("pushManagerPermissionState()"));
@@ -3203,6 +3207,10 @@ IN_PROC_BROWSER_TEST_F(PushSubscriptionChangeEventOnResubscribeTest,
 
   histogram_tester_.ExpectBucketCount("PushMessaging.NumUnsubscribedEntries", 1,
                                       1);
+  histogram_tester_.ExpectBucketCount(
+      "PushMessaging."
+      "PushSubscriptionChangeForNotificationPermissionChangeFired",
+      1, 1);
 
   EXPECT_EQ("permission status - granted",
             RunScript("pushManagerPermissionState()"));
@@ -3276,6 +3284,10 @@ IN_PROC_BROWSER_TEST_F(PushSubscriptionChangeEventOnResubscribeTest,
 
   histogram_tester_.ExpectBucketCount("PushMessaging.NumUnsubscribedEntries", 1,
                                       1);
+  histogram_tester_.ExpectBucketCount(
+      "PushMessaging."
+      "PushSubscriptionChangeForNotificationPermissionChangeFired",
+      1, 1);
 
   EXPECT_EQ("permission status - granted",
             RunScript("pushManagerPermissionState()"));
@@ -3305,6 +3317,95 @@ IN_PROC_BROWSER_TEST_F(PushSubscriptionChangeEventOnResubscribeTest,
   // Now the unsubscribed entry should have been deleted.
   EXPECT_THAT(PushMessagingUnsubscribedEntry::GetAll(GetBrowser()->profile()),
               IsEmpty());
+}
+
+IN_PROC_BROWSER_TEST_F(PushSubscriptionChangeEventOnResubscribeTest,
+                       NotFiredForWildcardContentSettingRegranted) {
+  ASSERT_EQ("ok - service worker registered",
+            RunScript("registerServiceWorker()"));
+  ASSERT_EQ("manifest removed", RunScript("removeManifest()"));
+
+  {
+    base::RunLoop run_loop;
+    push_service()->SetContentSettingChangedCallbackForTesting(
+        run_loop.QuitClosure());
+    HostContentSettingsMapFactory::GetForProfile(GetBrowser()->profile())
+        ->SetContentSettingCustomScope(ContentSettingsPattern::Wildcard(),
+                                       ContentSettingsPattern::Wildcard(),
+                                       ContentSettingsType::NOTIFICATIONS,
+                                       CONTENT_SETTING_ALLOW);
+    run_loop.Run();
+  }
+
+  ASSERT_NO_FATAL_FAILURE(EndpointToToken(
+      RunScript("documentSubscribePush()").ExtractString(), true, nullptr));
+
+  EXPECT_EQ("true - subscribed", RunScript("hasSubscription()"));
+
+  EXPECT_EQ("permission status - granted",
+            RunScript("pushManagerPermissionState()"));
+
+  ASSERT_EQ("false - is not controlled", RunScript("isControlled()"));
+  LoadTestPage();  // Reload to become controlled.
+  ASSERT_EQ("true - is controlled", RunScript("isControlled()"));
+
+  PushMessagingAppIdentifier app_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(0LL);
+
+  {
+    base::RunLoop run_loop;
+    push_service()->SetContentSettingChangedCallbackForTesting(
+        run_loop.QuitClosure());
+    HostContentSettingsMapFactory::GetForProfile(GetBrowser()->profile())
+        ->SetContentSettingCustomScope(ContentSettingsPattern::Wildcard(),
+                                       ContentSettingsPattern::Wildcard(),
+                                       ContentSettingsType::NOTIFICATIONS,
+                                       CONTENT_SETTING_BLOCK);
+    run_loop.Run();
+  }
+
+  EXPECT_EQ("permission status - denied",
+            RunScript("pushManagerPermissionState()"));
+  EXPECT_EQ("false - not subscribed", RunScript("hasSubscription()"));
+
+  // There should be one unsubscribed entry.
+  EXPECT_THAT(PushMessagingUnsubscribedEntry::GetAll(GetBrowser()->profile()),
+              ElementsAre(Property(&PushMessagingUnsubscribedEntry::origin,
+                                   app_identifier.origin())));
+
+  {
+    base::RunLoop run_loop;
+    push_service()->SetContentSettingChangedCallbackForTesting(
+        run_loop.QuitClosure());
+    HostContentSettingsMapFactory::GetForProfile(GetBrowser()->profile())
+        ->SetContentSettingCustomScope(ContentSettingsPattern::Wildcard(),
+                                       ContentSettingsPattern::Wildcard(),
+                                       ContentSettingsType::NOTIFICATIONS,
+                                       CONTENT_SETTING_ALLOW);
+    run_loop.Run();
+  }
+
+  EXPECT_EQ("permission status - granted",
+            RunScript("pushManagerPermissionState()"));
+
+  // The unsubscribed entry should not be deleted.
+  EXPECT_THAT(PushMessagingUnsubscribedEntry::GetAll(GetBrowser()->profile()),
+              ElementsAre(Property(&PushMessagingUnsubscribedEntry::origin,
+                                   app_identifier.origin())));
+
+  EXPECT_EQ("false - not subscribed", RunScript("hasSubscription()"));
+
+  // The `pushsubscriptionchange` event should not have been fired. Since it's
+  // difficult to deterministically check that that didn't happen, we instead
+  // rely on UMA metrics.
+  histogram_tester_.ExpectUniqueSample(
+      "PushMessaging."
+      "PushSubscriptionChangeForNotificationPermissionChangeFired",
+      0, 3);
+  histogram_tester_.ExpectBucketCount("PushMessaging.NumUnsubscribedEntries", 1,
+                                      0);
+  histogram_tester_.ExpectBucketCount("PushMessaging.NumUnsubscribedEntries", 0,
+                                      3);
 }
 
 class PushSubscriptionChangeEventOnResubscribeWithAutoResubscribeTest
@@ -3360,6 +3461,10 @@ IN_PROC_BROWSER_TEST_F(
 
   histogram_tester_.ExpectBucketCount("PushMessaging.NumUnsubscribedEntries", 1,
                                       1);
+  histogram_tester_.ExpectBucketCount(
+      "PushMessaging."
+      "PushSubscriptionChangeForNotificationPermissionChangeFired",
+      1, 1);
 
   EXPECT_EQ("permission status - granted",
             RunScript("pushManagerPermissionState()"));

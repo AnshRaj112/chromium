@@ -568,21 +568,45 @@
 			<key>Type</key>
 			<string>PSToggleSwitchSpecifier</string>
 			<key>Title</key>
-                        <string>Enable Reader Mode HTML override</string>
-			<key>Key</key>
-			<string>ForceReaderModeDebugHTMLOverride</string>
-			<key>DefaultValue</key>
-			<false/>
-                </dict>
-		<dict>
-			<key>Type</key>
-			<string>PSToggleSwitchSpecifier</string>
-			<key>Title</key>
 			<string>Enable AI Prototyping Menu</string>
 			<key>Key</key>
 			<string>EnableAIPrototypingMenu</string>
 			<key>DefaultValue</key>
 			<false/>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSMultiValueSpecifier</string>
+			<key>Title</key>
+			<string>Forced Tips Notification</string>
+			<key>Key</key>
+			<string>ForcedTipsNotificationType</string>
+			<key>DefaultValue</key>
+			<integer>0</integer>
+			<key>Values</key>
+			<array>
+				<integer>0</integer>
+				<integer>1</integer>
+				<integer>2</integer>
+				<integer>3</integer>
+				<integer>5</integer>
+				<integer>6</integer>
+				<integer>7</integer>
+				<integer>8</integer>
+				<integer>9</integer>
+			</array>
+			<key>Titles</key>
+			<array>
+				<string>Unset</string>
+				<string>Default Browser</string>
+				<string>Whats New</string>
+				<string>Sign In</string>
+				<string>Set Up List</string>
+				<string>Docking</string>
+				<string>Omnibox Position</string>
+				<string>Lens</string>
+				<string>Enhanced Safe Browsing</string>
+			</array>
 		</dict>
 		<dict>
 			<key>Type</key>

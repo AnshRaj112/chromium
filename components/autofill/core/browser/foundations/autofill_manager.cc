@@ -16,6 +16,8 @@
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/task/thread_pool.h"
+#include "base/types/optional_ref.h"
+#include "base/types/zip.h"
 #include "components/autofill/core/browser/country_type.h"
 #include "components/autofill/core/browser/crowdsourcing/autofill_crowdsourcing_encoding.h"
 #include "components/autofill/core/browser/data_model/payments/credit_card.h"
@@ -110,8 +112,9 @@ bool CachedFormNeedsUpdate(const FormData& live_form,
     return true;
   }
 
-  for (size_t i = 0; i < cached_form.field_count(); ++i) {
-    if (!cached_form.field(i)->SameFieldAs(live_form.fields()[i])) {
+  for (auto [cached_field, live_field] :
+       base::zip(cached_form.fields(), live_form.fields())) {
+    if (!cached_field->SameFieldAs(live_field)) {
       return true;
     }
   }
@@ -386,7 +389,8 @@ void AutofillManager::OnAskForValuesToFill(
     const FormData& form,
     const FieldGlobalId& field_id,
     const gfx::Rect& caret_bounds,
-    AutofillSuggestionTriggerSource trigger_source) {
+    AutofillSuggestionTriggerSource trigger_source,
+    base::optional_ref<const PasswordSuggestionRequest> password_request) {
   if (!IsValidFormData(form)) {
     return;
   }

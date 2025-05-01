@@ -64,6 +64,14 @@
 #include "third_party/blink/public/mojom/worker/shared_worker_info.mojom.h"
 #include "third_party/blink/public/mojom/worker/worker_content_settings_proxy.mojom.h"
 
+namespace {
+
+// TODO(crbug.com/400473072): revisit the duration.
+// Also, we may want to use the same constant we use for service workers.
+constexpr base::TimeDelta kSharedWorkerDestructionDelay = base::Seconds(30);
+
+}  // namespace
+
 namespace content {
 
 // RAII helper class for talking to SharedWorkerDevToolsManager.
@@ -318,7 +326,7 @@ void SharedWorkerHost::Start(
       instance_.url(), std::move(options),
       mojo::Clone(content_security_policies_),
       std::move(outside_fetch_client_settings_object),
-      instance_.same_site_cookies()));
+      instance_.same_site_cookies(), instance_.extended_lifetime()));
 
   auto renderer_preferences = blink::RendererPreferences();
   GetContentClient()->browser()->UpdateRendererPreferencesForWorker(
@@ -472,7 +480,8 @@ SharedWorkerHost::CreateNetworkFactoryParamsForSubresources() {
           mojo::Clone(worker_client_security_state_),
           /*debug_tag=*/
           "SharedWorkerHost::CreateNetworkFactoryForSubresource",
-          instance_.DoesRequireCrossSiteRequestForCookies());
+          instance_.DoesRequireCrossSiteRequestForCookies(),
+          /*is_for_service_worker=*/false);
   return factory_params;
 }
 
@@ -937,6 +946,21 @@ void SharedWorkerHost::OnClientConnectionLost() {
       break;
     }
   }
+  if (instance_.extended_lifetime()) {
+    if (!clients_.empty()) {  // Early return.
+      return;
+    }
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE,
+        base::BindOnce(&SharedWorkerHost::DestructIfNoClients,
+                       weak_factory_.GetWeakPtr()),
+        kSharedWorkerDestructionDelay);
+    return;
+  }
+  DestructIfNoClients();
+}
+
+void SharedWorkerHost::DestructIfNoClients() {
   // If there are no clients left, then it's cleanup time.
   if (clients_.empty()) {
     Destruct();

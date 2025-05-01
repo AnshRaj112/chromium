@@ -81,6 +81,9 @@ chromium-metrics-reviews@google.com.
       summary="message shown along with a disabled and grayed-out virtual
                card suggestion in the autofill suggestion list indicating
                that the merchant has opted-out of accepting virtual cards."/>
+  <variant name="IPH_AutofillEnableLoyaltyCards"
+      summary="toast educating users about the possibility of autofilling
+               loyalty cards"/>
   <variant name="IPH_AutofillExternalAccountProfileSuggestion"
       summary="message shown along with the externally created (e.g. in
                Google Pay) profile suggestion option in the Autofill dropdown"/>
@@ -322,6 +325,10 @@ chromium-metrics-reviews@google.com.
                on iOS"/>
   <variant name="IPH_iOSPromoNonModalShareDefaultBrowser"
       summary="showing the non-modal Default Browser Promo from share on iOS"/>
+  <variant name="IPH_iOSPromoNonModalSigninBookmark"
+      summary="showing the non-modal sign-in promo for add a bookmark."/>
+  <variant name="IPH_iOSPromoNonModalSigninPassword"
+      summary="showing the non-modal sign-in promo for save a password."/>
   <variant name="IPH_iOSPromoNonModalUrlPasteDefaultBrowser"
       summary="showing the non-modal Default Browser Promo from omnibox paste
                on iOS"/>
@@ -365,6 +372,8 @@ chromium-metrics-reviews@google.com.
   <variant name="IPH_iOSTabGridSwipeRightForIncognito"
       summary="the full screen IPH for left swipe on regular tab grid to
                browse in incognito"/>
+  <variant name="IPH_iOSWelcomeBackFeature"
+      summary="shows returning users features they may be interested in"/>
   <variant name="IPH_KeyboardAccessoryAddressFilling"
       summary="address autofill suggestions"/>
   <variant name="IPH_KeyboardAccessoryPasswordFilling"
@@ -406,6 +415,8 @@ chromium-metrics-reviews@google.com.
                during signin flows"/>
   <variant name="IPH_PasswordsSavePrimingPromo"
       summary="prompting users to consider saving passwords in the browser"/>
+  <variant name="IPH_PasswordsSaveRecoveryPromo"
+      summary="prompting users to reconsider saving passwords in the browser"/>
   <variant name="IPH_PasswordSuggestions"
       summary="the Autofill password suggestions on iOS"/>
   <variant name="IPH_PasswordsWebAppProfileSwitch"
@@ -722,7 +733,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="InProductHelp.Gestural.DismissalReason.iOS"
-    enum="InProductHelpDismissalReason" expires_after="2025-08-17">
+    enum="InProductHelpDismissalReason" expires_after="2025-10-19">
   <owner>ginnyhuang@chromium.org</owner>
   <owner>adamta@google.com</owner>
   <summary>
@@ -754,7 +765,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="InProductHelp.ShownTime.{IPHFeature}" units="ms"
-    expires_after="2025-08-17">
+    expires_after="2025-10-19">
   <owner>lpromero@google.com</owner>
   <owner>gambard@chromium.org</owner>
   <summary>
@@ -767,7 +778,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="InProductHelp.ShownTime2.{IPHFeature}" units="ms"
-    expires_after="2025-08-24">
+    expires_after="2025-10-26">
   <owner>gayane@google.com</owner>
   <owner>lpromero@google.com</owner>
   <owner>gambard@chromium.org</owner>

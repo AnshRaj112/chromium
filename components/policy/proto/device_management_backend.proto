@@ -2432,7 +2432,7 @@ message OSReport {
   repeated AntiVirusProduct antivirus_info = 13;
 
   // A string contains the ID of installed hotfix system updates. Windows only.
-  optional string hotfixes = 14;
+  repeated string hotfixes = 14;
 
   // The machine GUID of the device, Windows only. This field contains PII.
   optional string machine_guid = 15;
@@ -2519,8 +2519,8 @@ message ChromeProfileReportRequest {
   enum ReportType {
     UNKNOWN = 0;
     PROFILE_REPORT = 1;
-    PROFILE_SIGNALS = 2;
-    PROFILE_REPORT_WITH_SIGNALS = 3;
+    PROFILE_SECURITY_SIGNALS = 2;
+    PROFILE_REPORT_WITH_SECURITY_SIGNALS = 3;
   }
 
   // The type of report that is being sent.

@@ -241,8 +241,18 @@ IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, ReadAloudHighlight) {
                    "mocha.run()");
 }
 
-IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, WordBoundariesUsedForSpeech) {
+IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, NodeStore) {
+  RunSidePanelTest("side_panel/read_anything/node_store_test.js",
+                   "mocha.run()");
+}
+
+IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, WordBoundaries) {
   RunSidePanelTest("side_panel/read_anything/word_boundaries_test.js",
+                   "mocha.run()");
+}
+
+IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, WordBoundariesUsedForSpeech) {
+  RunSidePanelTest("side_panel/read_anything/word_boundaries_speech_test.js",
                    "mocha.run()");
 }
 
@@ -268,6 +278,11 @@ IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, WordHighlighting) {
 
 IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, HighlightToggle) {
   RunSidePanelTest("side_panel/read_anything/highlight_toggle_test.js",
+                   "mocha.run()");
+}
+
+IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, Highlighter) {
+  RunSidePanelTest("side_panel/read_anything/highlighter_test.js",
                    "mocha.run()");
 }
 

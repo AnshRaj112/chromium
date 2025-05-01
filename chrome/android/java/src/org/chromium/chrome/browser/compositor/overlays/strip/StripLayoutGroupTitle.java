@@ -348,7 +348,8 @@ public class StripLayoutGroupTitle extends StripLayoutView {
         // Initialize the shared image tiles coordinator if it doesn't exist.
         if (mSharedImageTilesCoordinator == null) {
             mSharedImageTilesConfigBuilder =
-                    SharedImageTilesConfig.Builder.createThumbnail(mContext, mColorId);
+                    SharedImageTilesConfig.Builder.createForTabGroupColorContext(
+                            mContext, mColorId);
             mSharedImageTilesCoordinator =
                     new SharedImageTilesCoordinator(
                             mContext,
@@ -506,5 +507,17 @@ public class StripLayoutGroupTitle extends StripLayoutView {
      */
     public ViewResourceAdapter getAvatarResourceForTesting() {
         return mAvatarResource;
+    }
+
+    /**
+     * {@return The keyboard focus ring's offset (how far it is outside the group indicator) in px}
+     */
+    public int getKeyboardFocusRingOffset() {
+        return TabUiThemeUtil.getFocusRingOffset(mContext);
+    }
+
+    /** {@return The width of the keyboard focus ring stroke in px} */
+    public int getKeyboardFocusRingWidth() {
+        return TabUiThemeUtil.getLineWidth(mContext);
     }
 }

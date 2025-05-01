@@ -7,14 +7,22 @@
 
 #include <vector>
 
+#include "components/autofill/core/browser/data_manager/valuables/valuables_data_manager.h"
 #include "components/autofill/core/browser/data_model/valuables/loyalty_card.h"
 #include "components/autofill/core/browser/suggestions/suggestion.h"
+#include "url/gurl.h"
 
 namespace autofill {
 
-// Generates suggestions for given `loyalty_cards`.
+// Generates loyalty card suggestions for given `origin`. Loyalty cards are
+// extracted from the `valuables_manager`.
+//
+// The suggestions are generated in the extracted order of cards. If any of
+// loyalty card merchant domains match the given `url`, the respective
+// suggestions are moved to the top.
 std::vector<Suggestion> GetLoyaltyCardSuggestions(
-    base::span<const LoyaltyCard> loyalty_cards);
+    const ValuablesDataManager& valuables_manager,
+    const GURL& url);
 
 }  // namespace autofill
 

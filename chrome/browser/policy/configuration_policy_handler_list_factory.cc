@@ -69,6 +69,7 @@
 #include "components/bookmarks/managed/managed_bookmarks_policy_handler.h"
 #include "components/browsing_data/core/pref_names.h"
 #include "components/certificate_transparency/pref_names.h"
+#include "components/collaboration/public/pref_names.h"
 #include "components/commerce/core/pref_names.h"
 #include "components/component_updater/pref_names.h"
 #include "components/content_settings/core/browser/cookie_settings_policy_handler.h"
@@ -230,12 +231,12 @@
 
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 #include "chrome/browser/extensions/policy_handlers.h"
+#include "extensions/browser/pref_names.h"
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/browser/extensions/api/messaging/native_messaging_policy_handler.h"
 #include "chrome/browser/extensions/extension_management_constants.h"
-#include "extensions/browser/pref_names.h"
 #include "extensions/common/manifest.h"
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
@@ -416,9 +417,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::BOOLEAN },
   { key::kPolicyTestPageEnabled,
     policy_prefs::kPolicyTestPageEnabled,
-    base::Value::Type::BOOLEAN},
-  { key::kZstdContentEncodingEnabled,
-    prefs::kZstdContentEncodingEnabled,
     base::Value::Type::BOOLEAN},
   { key::kQRCodeGeneratorEnabled,
     prefs::kQRCodeGeneratorEnabled,
@@ -1164,9 +1162,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kClassManagementEnabled,
     ash::prefs::kClassManagementToolsAvailabilitySetting,
     base::Value::Type::STRING},
-  { key::kClassManagementSendingContentEnabled,
-    ash::prefs::kClassManagementToolsSendingContentEligibilitySetting,
-    base::Value::Type::BOOLEAN},
   { key::kClassManagementCaptionsEnabled,
     ash::prefs::kClassManagementToolsCaptionEligibilitySetting,
     base::Value::Type::BOOLEAN},
@@ -1948,6 +1943,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kProfileSeparationDomainExceptionList,
     prefs::kProfileSeparationDomainExceptionList,
     base::Value::Type::LIST },
+  { key::kProfileSeparationSettings,
+    prefs::kProfileSeparationSettings,
+    base::Value::Type::INTEGER },
   { key::kLiveTranslateEnabled,
     prefs::kLiveTranslateEnabled,
     base::Value::Type::BOOLEAN },
@@ -2161,10 +2159,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kKioskActiveWiFiCredentialsScopeChangeEnabled,
     prefs::kKioskActiveWiFiCredentialsScopeChangeEnabled,
     base::Value::Type::BOOLEAN },
-  // TODO(b/329064666): Remove this pref once the pivot to IWAs is complete.
-  { key::kGetDisplayMediaSetSelectAllScreensAllowedForUrls,
-    capture_policy::kManagedAccessToGetAllScreensMediaAllowedForUrls,
-    base::Value::Type::LIST },
   { key::kKioskChromeAppsForceAllowed,
     prefs::kKioskChromeAppsForceAllowed,
     base::Value::Type::BOOLEAN },
@@ -2398,6 +2392,20 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kReduceAcceptLanguageEnabled,
     prefs::kReduceAcceptLanguageEnabled,
     base::Value::Type::BOOLEAN },
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_FUCHSIA)
+  { key::kBuiltInAIAPIsEnabled,
+    policy_prefs::kBuiltInAIAPIsEnabled,
+    base::Value::Type::BOOLEAN },
+#endif  // BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_FUCHSIA)
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+  { key::kNTPFooterThemeAttributionEnabled,
+    prefs::kNTPFooterThemeAttributionEnabled,
+    base::Value::Type::BOOLEAN },
+  { key::kNTPFooterManagementNoticeEnabled,
+    prefs::kNTPFooterManagementNoticeEnabled,
+    base::Value::Type::BOOLEAN },
+#endif // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+
 };
 // clang-format on
 
@@ -2813,11 +2821,14 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
           key::kBrowserContextAwareAccessSignalsAllowlist,
           enterprise_connectors::kBrowserContextAwareAccessSignalsAllowlistPref,
           chrome_schema));
-  handlers->AddHandler(std::make_unique<SimpleDeprecatingPolicyHandler>(
-      std::make_unique<ManagedAccountRestrictionsPolicyHandler>(chrome_schema),
-      std::make_unique<SimplePolicyHandler>(key::kProfileSeparationSettings,
-                                            prefs::kProfileSeparationSettings,
-                                            base::Value::Type::INTEGER)));
+  handlers->AddHandler(
+      std::make_unique<SingleDeprecatedPolicyToMultipleNewPolicyHandler>(
+          std::make_unique<ManagedAccountRestrictionsPolicyHandler>(
+              chrome_schema),
+          std::vector<std::string>{
+              key::kProfileSeparationSettings,
+              key::kProfileSeparationDataMigrationSettings,
+              key::kProfileSeparationDomainExceptionList}));
 
   handlers->AddHandler(std::make_unique<SimpleDeprecatingPolicyHandler>(
       std::make_unique<SimplePolicyHandler>(
@@ -3239,8 +3250,6 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
   handlers->AddHandler(
       std::make_unique<extensions::ExtensionSettingsPolicyHandler>(
           chrome_schema));
-#endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
-#if BUILDFLAG(ENABLE_EXTENSIONS)
   handlers->AddHandler(std::make_unique<extensions::ExtensionListPolicyHandler>(
       key::kExtensionInstallAllowlist,
       extensions::pref_names::kInstallAllowList, false));
@@ -3248,6 +3257,8 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
       std::make_unique<extensions::ExtensionInstallBlockListPolicyHandler>());
   handlers->AddHandler(
       std::make_unique<extensions::ExtensionInstallForceListPolicyHandler>());
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+#if BUILDFLAG(ENABLE_EXTENSIONS)
   handlers->AddHandler(
       std::make_unique<extensions::ExtensionURLPatternListPolicyHandler>(
           key::kExtensionInstallSources,
@@ -3384,6 +3395,12 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
 #endif  // BUILDFLAG(IS_CHROMEOS)
   handlers->AddHandler(std::make_unique<GenAiDefaultSettingsPolicyHandler>(
       std::move(gen_ai_default_policies)));
+
+  handlers->AddHandler(std::make_unique<CloudUserOnlyPolicyHandler>(
+      std::make_unique<SimplePolicyHandler>(
+          key::kTabGroupSharingSettings,
+          collaboration::prefs::kSharedTabGroupsManagedAccountSetting,
+          base::Value::Type::INTEGER)));
 
 #if BUILDFLAG(IS_CHROMEOS)
   handlers->AddHandler(std::make_unique<SimpleDeprecatingPolicyHandler>(

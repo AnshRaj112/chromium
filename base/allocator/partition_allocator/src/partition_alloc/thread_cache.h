@@ -9,7 +9,6 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <optional>
 
 #include "partition_alloc/build_config.h"
 #include "partition_alloc/buildflags.h"
@@ -17,6 +16,7 @@
 #include "partition_alloc/partition_alloc-inl.h"
 #include "partition_alloc/partition_alloc_base/compiler_specific.h"
 #include "partition_alloc/partition_alloc_base/component_export.h"
+#include "partition_alloc/partition_alloc_base/cxx_wrapper/optional.h"
 #include "partition_alloc/partition_alloc_base/thread_annotations.h"
 #include "partition_alloc/partition_alloc_base/time/time.h"
 #include "partition_alloc/partition_alloc_config.h"
@@ -29,7 +29,7 @@
 #include "partition_alloc/partition_tls.h"
 
 #if PA_BUILDFLAG(PA_ARCH_CPU_X86_64) && PA_BUILDFLAG(HAS_64_BIT_POINTERS)
-#include <algorithm>
+#include "partition_alloc/partition_alloc_base/cxx_wrapper/algorithm.h"
 #endif
 
 namespace partition_alloc {
@@ -176,7 +176,8 @@ class PA_COMPONENT_EXPORT(PARTITION_ALLOC) ThreadCacheRegistry {
   bool is_purging_configured_ = false;
 
   uint16_t largest_active_bucket_index_ =
-      internal::BucketIndexLookup::GetIndex(kThreadCacheDefaultSizeThreshold);
+      internal::BucketIndexLookup::GetIndexForNeutralBuckets(
+          kThreadCacheDefaultSizeThreshold);
 };
 
 constexpr ThreadCacheRegistry::ThreadCacheRegistry() = default;
@@ -366,7 +367,9 @@ class PA_COMPONENT_EXPORT(PARTITION_ALLOC) ThreadCache {
       kThreadCacheDefaultSizeThreshold;
   static constexpr size_t kLargeSizeThreshold = kThreadCacheLargeSizeThreshold;
   static constexpr uint16_t kBucketCount =
-      internal::BucketIndexLookup::GetIndex(kThreadCacheLargeSizeThreshold) + 1;
+      internal::BucketIndexLookup::GetIndexForNeutralBuckets(
+          kThreadCacheLargeSizeThreshold) +
+      1;
   static_assert(
       kBucketCount < internal::kNumBuckets,
       "Cannot have more cached buckets than what the allocator supports");

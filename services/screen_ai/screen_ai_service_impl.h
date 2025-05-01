@@ -98,9 +98,6 @@ class ScreenAIService : public mojom::ScreenAIServiceFactory,
       InitializeOCRCallback callback) override;
 
   // mojom::ScreenAIServiceFactory:
-  void ShutDownIfNoClients() override;
-
-  // mojom::ScreenAIServiceFactory:
   void BindShutdownHandler(
       mojo::PendingRemote<mojom::ScreenAIServiceShutdownHandler>
           shutdown_handler) override;
@@ -128,19 +125,14 @@ class ScreenAIService : public mojom::ScreenAIServiceFactory,
       const SkBitmap& image);
 
   void OcrReceiverDisconnected();
+  void MceReceiverDisconnected();
 
-  // Calls `ShutDownIfNoClients` after a short delay.
-  void CheckIdleStateAfterDelay();
-
-  // Returns a boolean pointer that should be set to true, when the task is
-  // finished. If it's not done before the timer goes off, it is assumed that
-  // the library is not responsive and process is terminated.
-  bool* StartProcessNotResponsiveKillTimer(bool request_is_ocr);
+  void ShutDownOnIdle();
 
   // Last time the feature is used. A null value means never, it is set when the
   // feature is initialized, and each time it is used.
   base::TimeTicks ocr_last_used_;
-  base::TimeTicks main_content_extraction_last_used_;
+  base::TimeTicks mce_last_used_;
 
   std::unique_ptr<base::RepeatingTimer> idle_checking_timer_;
 
@@ -169,6 +161,9 @@ class ScreenAIService : public mojom::ScreenAIServiceFactory,
   // extractors.
   mojo::ReceiverSet<mojom::Screen2xMainContentExtractor>
       screen2x_main_content_extractors_;
+
+  // Task runner used to monitor unresponsiveness.
+  scoped_refptr<base::SequencedTaskRunner> background_task_runner_;
 
   base::WeakPtrFactory<ScreenAIService> weak_ptr_factory_{this};
 };

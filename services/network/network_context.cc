@@ -86,6 +86,7 @@
 #include "net/http/http_auth_preferences.h"
 #include "net/http/http_auth_scheme.h"
 #include "net/http/http_cache.h"
+#include "net/http/http_network_layer.h"
 #include "net/http/http_network_session.h"
 #include "net/http/http_request_headers.h"
 #include "net/http/http_server_properties.h"
@@ -102,6 +103,7 @@
 #include "net/url_request/url_request_context.h"
 #include "net/url_request/url_request_context_builder.h"
 #include "services/network/brokered_client_socket_factory.h"
+#include "services/network/connection_change_observer.h"
 #include "services/network/cookie_manager.h"
 #include "services/network/data_remover_util.h"
 #include "services/network/device_bound_session_manager.h"
@@ -1016,7 +1018,9 @@ void NetworkContext::ResetURLLoaderFactories() {
   std::vector<PrefetchMatchingURLLoaderFactory*> factories;
   factories.reserve(url_loader_factories_.size());
   for (const auto& factory : url_loader_factories_) {
-    factories.push_back(factory.get());
+    if (!factory->ShouldIgnoreFactoryReset()) {
+      factories.push_back(factory.get());
+    }
   }
   for (auto* factory : factories) {
     factory->ClearBindings();
@@ -1057,6 +1061,15 @@ void NetworkContext::OnRCMDisconnect(
   auto it = restricted_cookie_managers_.find(rcm);
   CHECK(it != restricted_cookie_managers_.end(), base::NotFatalUntil::M130);
   restricted_cookie_managers_.erase(it);
+}
+
+void NetworkContext::RemoveConnectionChangeObserver(
+    const net::ConnectionChangeNotifier::Observer* observer) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  auto it = connection_change_observers_.find(observer);
+  if (it != connection_change_observers_.end()) {
+    connection_change_observers_.erase(it);
+  }
 }
 
 void NetworkContext::OnComputedFirstPartySetMetadata(
@@ -2269,13 +2282,19 @@ void NetworkContext::PreconnectSockets(
                                        user_agent);
   request_info.traffic_annotation = traffic_annotation;
 
-  // TODO(crbug.com/406022435): Add initialization of reconnect related
-  // things.
-  if (keepalive_config.has_value()) {
+  if (keepalive_config.has_value() || reconnect_event_observer.is_valid()) {
     request_info.connection_management_config =
         net::ConnectionManagementConfig();
     request_info.connection_management_config->keep_alive_config =
         keepalive_config;
+    if (reconnect_event_observer.is_valid()) {
+      auto change_observer = std::make_unique<ConnectionChangeObserver>(
+          std::move(reconnect_event_observer), this);
+
+      request_info.connection_management_config->connection_change_observer =
+          change_observer.get();
+      connection_change_observers_.insert(std::move(change_observer));
+    }
   }
 
   switch (credentials_mode) {
@@ -2898,10 +2917,11 @@ URLRequestContextOwner NetworkContext::MakeURLRequestContext(
         base::FeatureList::IsEnabled(network::features::kSharedZstd));
   }
 
-  builder.SetCreateHttpTransactionFactoryCallback(
-      base::BindOnce([](net::HttpNetworkSession* session)
+  builder.SetWrapHttpNetworkLayerCallback(
+      base::BindOnce([](std::unique_ptr<net::HttpNetworkLayer> network_layer)
                          -> std::unique_ptr<net::HttpTransactionFactory> {
-        return std::make_unique<ThrottlingNetworkTransactionFactory>(session);
+        return std::make_unique<ThrottlingNetworkTransactionFactory>(
+            std::move(network_layer));
       }));
 
   builder.set_host_mapping_rules(

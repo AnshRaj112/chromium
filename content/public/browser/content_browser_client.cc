@@ -62,6 +62,7 @@
 #include "media/mojo/mojom/media_service.mojom.h"
 #include "mojo/public/cpp/bindings/message.h"
 #include "net/base/isolation_info.h"
+#include "net/cookies/cookie_setting_override.h"
 #include "net/cookies/site_for_cookies.h"
 #include "net/ssl/client_cert_identity.h"
 #include "net/ssl/client_cert_store.h"
@@ -242,6 +243,7 @@ void ContentBrowserClient::OverrideURLLoaderFactoryParams(
     BrowserContext* browser_context,
     const url::Origin& origin,
     bool is_for_isolated_world,
+    bool is_for_service_worker,
     network::mojom::URLLoaderFactoryParams* factory_params) {}
 
 void ContentBrowserClient::GetAdditionalViewSourceSchemes(
@@ -698,7 +700,8 @@ bool ContentBrowserClient::IsFullCookieAccessAllowed(
     content::BrowserContext* browser_context,
     content::WebContents* web_contents,
     const GURL& url,
-    const blink::StorageKey& storage_key) {
+    const blink::StorageKey& storage_key,
+    net::CookieSettingOverrides overrides) {
   return true;
 }
 
@@ -1833,15 +1836,15 @@ void ContentBrowserClient::NotifyMultiCaptureStateChanged(
     const std::string& label,
     MultiCaptureChanged state) {}
 
-bool ContentBrowserClient::ShouldEnableDips(BrowserContext* browser_context) {
+bool ContentBrowserClient::ShouldEnableBtm(BrowserContext* browser_context) {
   return true;
 }
 
-uint64_t ContentBrowserClient::GetDipsRemoveMask() {
-  return kDefaultDipsRemoveMask;
+uint64_t ContentBrowserClient::GetBtmRemoveMask() {
+  return kDefaultBtmRemoveMask;
 }
 
-bool ContentBrowserClient::ShouldDipsDeleteInteractionRecords(
+bool ContentBrowserClient::ShouldBtmDeleteInteractionRecords(
     uint64_t remove_mask) {
   return remove_mask & BrowsingDataRemover::DATA_TYPE_COOKIES;
 }

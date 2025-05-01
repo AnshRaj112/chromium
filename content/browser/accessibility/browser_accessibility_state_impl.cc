@@ -59,16 +59,14 @@ const char kAXModeBundleFormControls[] = "form-controls";
 
 // A holder of a ScopedModeCollection targeting a specific BrowserContext or
 // WebContents. The collection is bound to the lifetime of the target.
-class ModeCollectionForTarget : public base::SupportsUserData::Data {
+class ModeCollectionForTarget : public base::SupportsUserData::Data,
+                                public ScopedModeCollection::Delegate {
  public:
-  ModeCollectionForTarget(
-      base::SupportsUserData* target,
-      ScopedModeCollection::OnModeChangedCallback on_mode_changed)
-      : scoped_mode_collection_(base::BindRepeating(
-            &ModeCollectionForTarget::OnModeChangedForTarget,
-            base::Unretained(this),  // Safe because `this` owns the collection.
-            base::Unretained(target),  // `target` outlives `this`.
-            std::move(on_mode_changed))) {}
+  using OnModeChangedCallback =
+      base::RepeatingCallback<void(ui::AXMode old_mode, ui::AXMode new_mode)>;
+  ModeCollectionForTarget(base::SupportsUserData* target,
+                          OnModeChangedCallback on_mode_changed)
+      : target_(target), on_mode_changed_(std::move(on_mode_changed)) {}
   ModeCollectionForTarget(const ModeCollectionForTarget&) = delete;
   ModeCollectionForTarget& operator=(const ModeCollectionForTarget&) = delete;
 
@@ -111,21 +109,21 @@ class ModeCollectionForTarget : public base::SupportsUserData::Data {
         target->GetUserData(&ModeCollectionForTarget::kUserDataKey));
   }
 
-  void OnModeChangedForTarget(
-      base::SupportsUserData* target,
-      base::RepeatingCallback<void(ui::AXMode, ui::AXMode)> impl_callback,
-      ui::AXMode old_mode,
-      ui::AXMode new_mode) {
+  void OnModeChanged(ui::AXMode old_mode, ui::AXMode new_mode) override {
     // If the collection is no longer bound to the target, the target is in the
     // process of being destroyed. Ignore changes when this is the case.
-    if (auto* const collection = FromTarget(target); collection) {
-      std::move(impl_callback).Run(old_mode, new_mode);
+    if (auto* const collection = FromTarget(target_); collection) {
+      on_mode_changed_.Run(old_mode, new_mode);
     }
   }
 
+  ui::AXMode FilterModeFlags(ui::AXMode mode) override { return mode; }
+
   static const int kUserDataKey = 0;
 
-  ScopedModeCollection scoped_mode_collection_;
+  raw_ptr<base::SupportsUserData> target_;
+  OnModeChangedCallback on_mode_changed_;
+  ScopedModeCollection scoped_mode_collection_{*this};
 };
 
 // static
@@ -133,6 +131,9 @@ const int ModeCollectionForTarget::kUserDataKey;
 
 // Returns a subset of `mode` for delivery to a WebContents.
 ui::AXMode FilterAccessibilityModeInvariants(ui::AXMode mode) {
+  // kFromPlatform is never sent to WebContents.
+  CHECK(!mode.has_mode(ui::AXMode::kFromPlatform));
+
   // Strip kLabelImages if kExtendedProperties is absent.
   // TODO(grt): kLabelImages is a feature of //chrome. Find a way to
   // achieve this filtering without teaching //content about it. Perhaps via
@@ -188,30 +189,29 @@ BrowserAccessibilityStateImpl::Create() {
 }
 #endif
 
-BrowserAccessibilityStateImpl::BrowserAccessibilityStateImpl()
-    : BrowserAccessibilityState(),
-      ax_platform_(*this),
-      scoped_modes_for_process_(base::BindRepeating(
-          &BrowserAccessibilityStateImpl::OnModeChangedForProcess,
-          base::Unretained(this))) {
+BrowserAccessibilityStateImpl::BrowserAccessibilityStateImpl() {
   DCHECK_EQ(g_instance, nullptr);
   g_instance = this;
 
   bool disallow_changes = false;
   ui::AXMode initial_mode;
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kDisableRendererAccessibility)) {
+  auto& command_line = *base::CommandLine::ForCurrentProcess();
+
+  if (command_line.HasSwitch(
+          switches::kDisablePlatformAccessibilityIntegration)) {
+    SetActivationFromPlatformEnabled(/*enabled=*/false);
+  }
+
+  if (command_line.HasSwitch(switches::kDisableRendererAccessibility)) {
     disallow_changes = true;
-  } else if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-                 switches::kForceRendererAccessibility)) {
+  } else if (command_line.HasSwitch(switches::kForceRendererAccessibility)) {
 #if BUILDFLAG(IS_WIN)
-    std::string ax_mode_bundle = base::WideToUTF8(
-        base::CommandLine::ForCurrentProcess()->GetSwitchValueNative(
+    std::string ax_mode_bundle =
+        base::WideToUTF8(command_line.GetSwitchValueNative(
             switches::kForceRendererAccessibility));
 #else
-    std::string ax_mode_bundle =
-        base::CommandLine::ForCurrentProcess()->GetSwitchValueNative(
-            switches::kForceRendererAccessibility);
+    std::string ax_mode_bundle = command_line.GetSwitchValueNative(
+        switches::kForceRendererAccessibility);
 #endif
 
     if (ax_mode_bundle.empty()) {
@@ -232,11 +232,15 @@ BrowserAccessibilityStateImpl::BrowserAccessibilityStateImpl()
     }
   }
 
+  if (::features::IsAccessibilityOnScreenAXModeEnabled()) {
+    initial_mode |= ui::kAXModeOnScreen;
+  }
+
   // Create an initial process-wide ScopedAccessibilityMode whether any flags
   // are enabled or not. Always creating a ScopedAccessibilityMode
   // (even if it holds a mode with all flags off) allows us to avoid null
   // checks elsewhere, thereby simplifying other logic.
-  process_accessibility_mode_ = CreateScopedModeForProcess(initial_mode);
+  forced_accessibility_mode_ = CreateScopedModeForProcess(initial_mode);
 
   UMA_HISTOGRAM_BOOLEAN("Accessibility.ManuallyEnabled",
                         !initial_mode.is_mode_off());
@@ -378,8 +382,9 @@ void BrowserAccessibilityStateImpl::OnUserInputEvent() {
                                   now - accessibility_enabled_time_);
 
       accessibility_disabled_time_ = now;
-      // TODO(aleventhal): prefer making a11y dormant for new page loads.
-      SetProcessMode(ui::AXMode());
+
+      // TODO(accessibility) Reimplement by making a11y dormant as opposed to
+      // turning off flags, which leads to thrashing.
     }
   }
 }
@@ -393,6 +398,19 @@ bool BrowserAccessibilityStateImpl::IsAXModeChangeAllowed() const {
   return allow_ax_mode_changes_;
 }
 
+void BrowserAccessibilityStateImpl::SetActivationFromPlatformEnabled(
+    bool enabled) {
+  if (activation_from_platform_enabled_ == enabled) {
+    return;
+  }
+  activation_from_platform_enabled_ = enabled;
+  scoped_modes_for_process_.Recompute(MakePassKey());
+}
+
+bool BrowserAccessibilityStateImpl::IsActivationFromPlatformEnabled() {
+  return activation_from_platform_enabled_;
+}
+
 void BrowserAccessibilityStateImpl::NotifyWebContentsPreferencesChanged()
     const {
   for (WebContentsImpl* wc : WebContentsImpl::GetAllWebContents()) {
@@ -400,61 +418,10 @@ void BrowserAccessibilityStateImpl::NotifyWebContentsPreferencesChanged()
   }
 }
 
-void BrowserAccessibilityStateImpl::AddAccessibilityModeFlags(ui::AXMode mode) {
-  // Update process_accessibility_mode_ via SetProcessMode so that the remainder
-  // of processing is identical to when AXPlatformNode::NotifyAddAXModeFlags()
-  // is called -- it will defer to AXPlatform::SetMode() to update the global
-  // set of flags. AXPlatform, itself, defers to its Delegate, which is this
-  // instance. This ensures that calls to AddAccessibilityModeFlags() and direct
-  // calls to AXPlatformNode::NotifyAddAXModeFlags() down in //ui each follow
-  // the same codepath to set the global mode flags, notify observers, dispatch
-  // to WebContents, and record metrics.
-  SetProcessMode(process_accessibility_mode_->mode() | mode);
-}
-
-void BrowserAccessibilityStateImpl::RemoveAccessibilityModeFlags(
-    ui::AXMode mode) {
-  SetProcessMode(process_accessibility_mode_->mode() & ~mode);
-}
-
 base::CallbackListSubscription
 BrowserAccessibilityStateImpl::RegisterFocusChangedCallback(
     FocusChangedCallback callback) {
   return focus_changed_callbacks_.Add(std::move(callback));
-}
-
-// Returns the effective mode for the process, taking all process-wide scopers
-// into account.
-ui::AXMode BrowserAccessibilityStateImpl::GetProcessMode() {
-  return GetAccessibilityMode();
-}
-
-// Replaces the scoper that backs the legacy process-wide mode with one applying
-// `new_mode`.
-void BrowserAccessibilityStateImpl::SetProcessMode(ui::AXMode new_mode) {
-  if (!allow_ax_mode_changes_) {
-    return;
-  }
-
-  if (!new_mode.is_mode_off()) {
-    // Unless the mode is being turned off, setting accessibility flags is
-    // generally caused by accessibility API call, so we should also reset the
-    // auto-disable accessibility code.
-    OnAccessibilityApiUsage();
-  }
-
-  const ui::AXMode previous_mode = GetAccessibilityMode();
-  if (new_mode == previous_mode) {
-    return;
-  }
-
-  process_accessibility_mode_ = CreateScopedModeForProcess(new_mode);
-
-  // If the AXMode changes, there's a good chance an assistive technology was
-  // activated. Allow platforms that must perform special detection to update
-  // their notion of which tech is running. The platform-specific implementation
-  // is responsible for calling `OnAssistiveTechFound()` in response.
-  RefreshAssistiveTech();
 }
 
 void BrowserAccessibilityStateImpl::OnAccessibilityApiUsage() {
@@ -497,9 +464,24 @@ BrowserAccessibilityStateImpl::CreateScopedModeForProcess(ui::AXMode mode) {
   return scoped_modes_for_process_.Add(mode);
 }
 
-void BrowserAccessibilityStateImpl::OnModeChangedForProcess(
-    ui::AXMode old_mode,
-    ui::AXMode new_mode) {
+// This ScopedModeCollection::Delegate override is called by
+// scoped_modes_for_process_ when the effective mode for the collection of
+// scopers targeting the process changes.
+void BrowserAccessibilityStateImpl::OnModeChanged(ui::AXMode old_mode,
+                                                  ui::AXMode new_mode) {
+  // If the AXMode changes, there's a good chance an assistive technology was
+  // activated. Allow platforms that must perform special detection to update
+  // their notion of which tech is running. The platform-specific implementation
+  // is responsible for calling `OnAssistiveTechFound()` in response.
+  RefreshAssistiveTech();
+
+  if (!new_mode.is_mode_off()) {
+    // Unless the mode is being turned off, setting accessibility flags is
+    // generally caused by accessibility API call, so we should also reset the
+    // auto-disable accessibility code.
+    OnAccessibilityApiUsage();
+  }
+
   ui::RecordAccessibilityModeHistograms(ui::AXHistogramPrefix::kNone, new_mode,
                                         old_mode);
 
@@ -554,10 +536,25 @@ void BrowserAccessibilityStateImpl::OnModeChangedForProcess(
   }
 }
 
+// This ScopedModeCollection::Delegate override is called by
+// scoped_modes_for_process_ when recomputing the effective mode for the
+// collection of scopers targeting the process.
+ui::AXMode BrowserAccessibilityStateImpl::FilterModeFlags(ui::AXMode mode) {
+  if (activation_from_platform_enabled_) {
+    // Allow mode changes with `kFromPlatform`, but filter out that one bit.
+    // It need not be sent to renderers.
+    return mode & ~ui::AXMode(ui::AXMode::kFromPlatform);
+  }
+  // Otherwise, ignore any mode change with `kFromPlatform`.
+  return mode.has_mode(ui::AXMode::kFromPlatform) ? ui::AXMode() : mode;
+}
+
 std::unique_ptr<ScopedAccessibilityMode>
 BrowserAccessibilityStateImpl::CreateScopedModeForBrowserContext(
     BrowserContext* browser_context,
     ui::AXMode mode) {
+  // kFromPlatform is only permissible for process-wide scopers.
+  CHECK(!mode.has_mode(ui::AXMode::kFromPlatform));
   return ModeCollectionForTarget::Add(
       browser_context,
       &BrowserAccessibilityStateImpl::OnModeChangedForBrowserContext, this,
@@ -589,6 +586,8 @@ std::unique_ptr<ScopedAccessibilityMode>
 BrowserAccessibilityStateImpl::CreateScopedModeForWebContents(
     WebContents* web_contents,
     ui::AXMode mode) {
+  // kFromPlatform is only permissible for process-wide scopers.
+  CHECK(!mode.has_mode(ui::AXMode::kFromPlatform));
   return ModeCollectionForTarget::Add(
       web_contents, &BrowserAccessibilityStateImpl::OnModeChangedForWebContents,
       this, mode);

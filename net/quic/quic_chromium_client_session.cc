@@ -1641,6 +1641,15 @@ void QuicChromiumClientSession::OnStreamClosed(quic::QuicStreamId stream_id) {
   quic::QuicSpdyClientSessionBase::OnStreamClosed(stream_id);
 }
 
+bool QuicChromiumClientSession::ShouldKeepConnectionAlive() const {
+  // `quic::QuicSpdyClientSessionBase::ShouldKeepConnectionAlive` returns true
+  // when we have an outstanding request in flight. We want to send PINGs when
+  // there is an outstanding request or if `enable_periodic_ping_` has been
+  // set to keep the connection alive when idle.
+  return enable_periodic_ping_ ||
+         quic::QuicSpdyClientSessionBase::ShouldKeepConnectionAlive();
+}
+
 void QuicChromiumClientSession::OnCanCreateNewOutgoingStream(
     bool unidirectional) {
   while (CanOpenNextOutgoingBidirectionalStream() &&
@@ -4066,6 +4075,10 @@ QuicChromiumClientSession::GetConnectTiming() {
 
 quic::ParsedQuicVersion QuicChromiumClientSession::GetQuicVersion() const {
   return connection()->version();
+}
+
+void QuicChromiumClientSession::SendPing() {
+  return connection()->SendPing();
 }
 
 const std::set<std::string>&

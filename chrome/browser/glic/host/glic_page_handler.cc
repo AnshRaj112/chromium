@@ -325,12 +325,6 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
 
     state->browser_is_open = browser_is_open_calculator_.IsOpen();
 
-#if BUILDFLAG(IS_MAC)
-    state->open_os_settings_api_is_allowed = true;
-#else
-    state->open_os_settings_api_is_allowed = false;
-#endif
-
     state->always_detached_mode = GlicWindowController::AlwaysDetached();
 
     state->enable_act_in_focused_tab =
@@ -353,7 +347,7 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   }
 
   void WebClientInitializeFailed() override {
-    glic_service_->window_controller().WebClientInitializeFailed();
+    glic_service_->host().WebClientInitializeFailed(this);
   }
 
   void WebClientInitialized() override {
@@ -418,10 +412,6 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     glic_service_->ResizePanel(size, duration, std::move(callback));
   }
 
-  void EnableDragResize(bool enabled) override {
-    glic_service_->window_controller().EnableDragResize(enabled);
-  }
-
   void GetContextFromFocusedTab(
       glic::mojom::GetTabContextOptionsPtr options,
       GetContextFromFocusedTabCallback callback) override {
@@ -433,6 +423,8 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
                        ActInFocusedTabCallback callback) override {
     glic_service_->ActInFocusedTab(action_proto, *options, std::move(callback));
   }
+
+  void StopActorTask() override { glic_service_->StopActorTask(); }
 
   void CaptureScreenshot(CaptureScreenshotCallback callback) override {
     glic_service_->CaptureScreenshot(std::move(callback));
@@ -550,7 +542,8 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
         base::UTF16ToUTF8(entry->GetLocalProfileName());
     policy::ManagementService* management_service =
         policy::ManagementServiceFactory::GetForProfile(profile_);
-    result->is_managed = management_service && management_service->IsManaged();
+    result->is_managed =
+        management_service && management_service->IsAccountManaged();
     std::move(callback).Run(std::move(result));
   }
 
@@ -597,7 +590,6 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   }
 
   void OpenOsPermissionSettingsMenu(ContentSettingsType type) override {
-#if BUILDFLAG(IS_MAC)
     if (type != ContentSettingsType::MEDIASTREAM_MIC &&
         type != ContentSettingsType::GEOLOCATION) {
       // This will terminate the render process.
@@ -608,10 +600,6 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     }
     system_permission_settings::OpenSystemSettings(
         page_handler_->webui_contents(), type);
-#else
-    mojo::ReportBadMessage(
-        "OpenOsPermissionSettingsMenu not supported on this platform.");
-#endif
   }
 
   void GetOsMicrophonePermissionStatus(
@@ -678,8 +666,18 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
           "without the GlicZeroStateSuggestions feature enabled.");
       return;
     }
-    glic_service_->FetchZeroStateSuggestions(is_fre.value_or(false),
-                                             std::move(callback));
+    glic_service_->FetchZeroStateSuggestions(
+        is_fre.value_or(false),
+        base::BindOnce(
+            [](GetZeroStateSuggestionsForFocusedTabCallback callback,
+               base::TimeTicks start,
+               glic::mojom::ZeroStateSuggestionsPtr suggestions) {
+              base::UmaHistogramTimes(
+                  "Glic.Api.FetchZeroStateSuggestionsLatency",
+                  base::TimeTicks::Now() - start);
+              std::move(callback).Run(std::move(suggestions));
+            },
+            std::move(callback), base::TimeTicks::Now()));
   }
 
   void OnOsPermissionSettingChanged(ContentSettingsType content_type,
@@ -803,7 +801,7 @@ void GlicPageHandler::WebviewCommitted(const GURL& url) {
   // out.
   if (url.DomainIs("login.corp.google.com") ||
       url.DomainIs("accounts.google.com")) {
-    GetGlicService()->window_controller().LoginPageCommitted();
+    GetGlicService()->host().LoginPageCommitted(this);
   }
 }
 
@@ -836,6 +834,10 @@ void GlicPageHandler::ResizeWidget(const gfx::Size& size,
                                    base::TimeDelta duration,
                                    ResizeWidgetCallback callback) {
   GetGlicService()->ResizePanel(size, duration, std::move(callback));
+}
+
+void GlicPageHandler::EnableDragResize(bool enabled) {
+  GetGlicService()->window_controller().EnableDragResize(enabled);
 }
 
 void GlicPageHandler::WebUiStateChanged(glic::mojom::WebUiState new_state) {

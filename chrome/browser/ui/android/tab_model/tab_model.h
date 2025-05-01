@@ -135,10 +135,32 @@ class TabModel {
     // in the background. Use FROM_REPARENTING above to open the re-parented tab
     // in the foreground.
     FROM_REPARENTING_BACKGROUND,
+    // From history navigation (back / forward) when opening a new tab/window in
+    // the background.
+    FROM_HISTORY_NAVIGATION_BACKGROUND,
+    // From history navigation (back / forward) when opening a new tab/window in
+    // the foreground.
+    FROM_HISTORY_NAVIGATION_FOREGROUND,
     // Must be last.
     SIZE
   };
-  // LINT.ThenChange(//tools/metrics/histograms/metadata/new_tab_page/enums.xml:TabLaunchType)
+  // When adding a new TabLaunchType, make sure to update the following files.
+  // Some of the files have multiple switch cases for TabLaunchType, so make
+  // sure to update all of them! Note that there are likely other files that
+  // need to be updated depending on the desired side-effects of the new
+  // TabLaunchType.
+  //
+  // Long term, this would ideally be refactored to a traits system such that
+  // the different types of side-effects are canonically defined, and listed
+  // explicitly for each TabLaunchType in a single location.
+  // clang-format off
+  // LINT.ThenChange(
+  //   //tools/metrics/histograms/metadata/new_tab_page/enums.xml:TabLaunchType,
+  //   //chrome/android/java/src/org/chromium/chrome/browser/tabmodel/ChromeTabCreator.java,
+  //   //chrome/browser/tabpersistence/android/java/src/org/chromium/chrome/browser/tabpersistence/flatbuffer/tab_state_common.fbs,
+  //   //chrome/browser/tabpersistence/android/java/src/org/chromium/chrome/browser/tabpersistence/FlatBufferTabStateSerializer.java
+  // )
+  // clang-format on
 
   // Various ways tabs can be selected.
   // Values must be numbered from 0 and can't have gaps.

@@ -1232,6 +1232,7 @@ component("base") {
       "message_loop/message_pump_android.h",
       "os_compat_android.cc",
       "os_compat_android.h",
+      "power_monitor/energy_monitor_android.h",
       "process/process_android.cc",
       "profiler/native_unwinder_android_map_delegate.h",
       "profiler/native_unwinder_android_memory_regions_map.h",
@@ -2259,16 +2260,14 @@ component("base") {
         "message_loop/message_pump_io_ios.cc",
         "message_loop/message_pump_io_ios.h",
       ]
-    } else if (use_blink) {
-      sources += [
-        "message_loop/message_pump_io_ios_libdispatch.cc",
-        "message_loop/message_pump_io_ios_libdispatch.h",
-      ]
     } else {
       sources += [
         "message_loop/message_pump_kqueue.cc",
         "message_loop/message_pump_kqueue.h",
       ]
+      if (use_blink) {
+        frameworks += [ "BrowserEngineCore.framework" ]
+      }
     }
 
     if (ios_stack_profiler_enabled) {
@@ -2568,6 +2567,24 @@ rust_static_library("rust_logger") {
     # TODO(collinbaker): determine how to handle these cxx bindings-induced
     # circular dependencies more robustly.
     "//base/allocator/partition_allocator:raw_ptr",
+
+    # Needed because logging/rust_logger.rs contains:
+    #   include!("base/logging/rust_log_integration.h");
+    # rust_log_integration.h ends up transitively #including
+    # debug/debugging_buildflags.h, which is a generated header that needs to
+    # be written first.
+    #
+    # Technically it would be more correct to depend on :base, which is the
+    # target for rust_log_integration.h, but that's not possible due to circular
+    # dependencies.
+    #
+    # Note if this is removed the build may still work by accident because
+    # debug/debugging_buildflags.h still ends up being generated through a
+    # dependency chain via :logging_log_severity_bindgen. But we should not
+    # rely on that.
+    #
+    # See also https://crbug.com/406267472.
+    ":debugging_buildflags",
   ]
   visibility = [ ":base" ]
   sources = [ "logging/rust_logger.rs" ]
@@ -4093,8 +4110,6 @@ test("base_unittests") {
     }
     if (is_cronet_build || target_platform == "tvos") {
       sources += [ "message_loop/message_pump_io_ios_unittest.cc" ]
-    } else if (use_blink) {
-      sources += [ "message_loop/message_pump_io_ios_libdispatch_unittest.cc" ]
     } else {
       sources += [ "message_loop/message_pump_kqueue_unittest.cc" ]
     }
@@ -5395,9 +5410,7 @@ if (is_android) {
     ]
 
     sources = [
-      "test/android/java/src/org/chromium/base/multidex/ChromiumMultiDexInstaller.java",
       "test/android/javatests/src/org/chromium/base/test/ActivityFinisher.java",
-      "test/android/javatests/src/org/chromium/base/test/BaseActivityTestRule.java",
       "test/android/javatests/src/org/chromium/base/test/BaseChromiumAndroidJUnitRunner.java",
       "test/android/javatests/src/org/chromium/base/test/BaseJUnit4ClassRunner.java",
       "test/android/javatests/src/org/chromium/base/test/LoadNative.java",
@@ -5449,6 +5462,7 @@ if (is_android) {
       "test/android/javatests/src/org/chromium/base/test/util/InMemorySharedPreferencesContext.java",
       "test/android/javatests/src/org/chromium/base/test/util/IntegrationTest.java",
       "test/android/javatests/src/org/chromium/base/test/util/JniMocker.java",
+      "test/android/javatests/src/org/chromium/base/test/util/KeyUtils.java",
       "test/android/javatests/src/org/chromium/base/test/util/LooperUtils.java",
       "test/android/javatests/src/org/chromium/base/test/util/Manual.java",
       "test/android/javatests/src/org/chromium/base/test/util/MaxAndroidSdkLevel.java",
@@ -5469,6 +5483,12 @@ if (is_android) {
       "test/android/javatests/src/org/chromium/base/test/util/ViewActionOnDescendant.java",
       "test/android/javatests/src/org/chromium/base/test/util/ViewPrinter.java",
     ]
+    if (!is_cronet_for_aosp_build) {
+      sources += [
+        "test/android/java/src/org/chromium/base/multidex/ChromiumMultiDexInstaller.java",
+        "test/android/javatests/src/org/chromium/base/test/BaseActivityTestRule.java",
+      ]
+    }
     if (use_clang_coverage) {
       mergeable_android_manifests = [
         "test/android/javatests/AndroidManifest_NativeCoverageListener.xml",

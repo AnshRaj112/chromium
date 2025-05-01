@@ -293,8 +293,7 @@ class DatabaseTest : public ::testing::Test {
 
     bucket_context_->InitBackingStoreIfNeeded(true);
     db_ = bucket_context_->AddDatabase(
-        u"db", std::make_unique<Database>(u"db", *bucket_context_,
-                                          Database::Identifier()));
+        u"db", std::make_unique<Database>(u"db", *bucket_context_));
   }
 
   void TearDown() override { db_ = nullptr; }
@@ -669,8 +668,10 @@ class DatabaseOperationTest : public DatabaseTest {
     transaction_ = request_.connection()->CreateVersionChangeTransaction(
         transaction_id, /*scope=*/std::set<int64_t>(),
         std::make_unique<FakeTransaction>(
-            commit_success_, blink::mojom::IDBTransactionMode::VersionChange,
-            *bucket_context_->backing_store()));
+            commit_success_,
+            db_->backing_store_db()->CreateTransaction(
+                blink::mojom::IDBTransactionDurability::Relaxed,
+                blink::mojom::IDBTransactionMode::VersionChange)));
 
     std::vector<PartitionedLockManager::PartitionedLockRequest> lock_requests =
         {{GetDatabaseLockId(db_->metadata().name),
@@ -700,10 +701,10 @@ class DatabaseOperationTest : public DatabaseTest {
     const auto& object_store_parameters =
         database_parameters.object_store_parameters;
     const int64_t store_id = object_store_parameters.object_store_id;
-    Status status = db_->CreateObjectStoreOperation(
+    Status status = transaction_->BackingStoreTransaction()->CreateObjectStore(
         store_id, object_store_parameters.name,
         object_store_parameters.key_path,
-        object_store_parameters.auto_increment, transaction_);
+        object_store_parameters.auto_increment);
     EXPECT_TRUE(status.ok()) << status.ToString();
     EXPECT_EQ(1u, db_->metadata().object_stores.size());
 
@@ -713,10 +714,10 @@ class DatabaseOperationTest : public DatabaseTest {
     const bool has_index =
         (index_id != blink::IndexedDBIndexMetadata::kInvalidId);
     if (has_index) {
-      status = db_->CreateIndexOperation(
+      status = transaction_->BackingStoreTransaction()->CreateIndex(
           store_id, index_parameters.index_id, index_parameters.name,
           index_parameters.key_path, index_parameters.unique,
-          index_parameters.multi_entry, transaction_);
+          index_parameters.multi_entry);
     }
     EXPECT_TRUE(status.ok()) << status.ToString();
 
@@ -816,9 +817,9 @@ class DatabaseOperationTest : public DatabaseTest {
 TEST_F(DatabaseOperationTest, CreateObjectStore) {
   EXPECT_EQ(0ULL, db_->metadata().object_stores.size());
   const int64_t store_id = 1001;
-  Status s =
-      db_->CreateObjectStoreOperation(store_id, u"store", IndexedDBKeyPath(),
-                                      /*auto_increment=*/false, transaction_);
+  Status s = transaction_->BackingStoreTransaction()->CreateObjectStore(
+      store_id, u"store", IndexedDBKeyPath(),
+      /*auto_increment=*/false);
   EXPECT_TRUE(s.ok());
   transaction_->SetCommitFlag();
   transaction_ = nullptr;
@@ -830,15 +831,15 @@ TEST_F(DatabaseOperationTest, CreateObjectStore) {
 TEST_F(DatabaseOperationTest, CreateIndex) {
   EXPECT_EQ(0ULL, db_->metadata().object_stores.size());
   const int64_t store_id = 1001;
-  Status s =
-      db_->CreateObjectStoreOperation(store_id, u"store", IndexedDBKeyPath(),
-                                      /*auto_increment=*/false, transaction_);
+  Status s = transaction_->BackingStoreTransaction()->CreateObjectStore(
+      store_id, u"store", IndexedDBKeyPath(),
+      /*auto_increment=*/false);
   EXPECT_TRUE(s.ok());
   EXPECT_EQ(1ULL, db_->metadata().object_stores.size());
   const int64_t index_id = 2002;
-  s = db_->CreateIndexOperation(store_id, index_id, u"index",
-                                IndexedDBKeyPath(), /*unique=*/false,
-                                /*multi_entry=*/false, transaction_);
+  s = transaction_->BackingStoreTransaction()->CreateIndex(
+      store_id, index_id, u"index", IndexedDBKeyPath(), /*unique=*/false,
+      /*multi_entry=*/false);
   EXPECT_TRUE(s.ok());
   EXPECT_EQ(
       1ULL,
@@ -867,9 +868,9 @@ class DatabaseOperationAbortTest : public DatabaseOperationTest {
 TEST_F(DatabaseOperationAbortTest, CreateObjectStore) {
   EXPECT_EQ(0ULL, db_->metadata().object_stores.size());
   const int64_t store_id = 1001;
-  Status s =
-      db_->CreateObjectStoreOperation(store_id, u"store", IndexedDBKeyPath(),
-                                      /*auto_increment=*/false, transaction_);
+  Status s = transaction_->BackingStoreTransaction()->CreateObjectStore(
+      store_id, u"store", IndexedDBKeyPath(),
+      /*auto_increment=*/false);
   EXPECT_TRUE(s.ok());
   EXPECT_EQ(1ULL, db_->metadata().object_stores.size());
   db_ = nullptr;
@@ -882,15 +883,15 @@ TEST_F(DatabaseOperationAbortTest, CreateObjectStore) {
 TEST_F(DatabaseOperationAbortTest, CreateIndex) {
   EXPECT_EQ(0ULL, db_->metadata().object_stores.size());
   const int64_t store_id = 1001;
-  Status s =
-      db_->CreateObjectStoreOperation(store_id, u"store", IndexedDBKeyPath(),
-                                      /*auto_increment=*/false, transaction_);
+  Status s = transaction_->BackingStoreTransaction()->CreateObjectStore(
+      store_id, u"store", IndexedDBKeyPath(),
+      /*auto_increment=*/false);
   EXPECT_TRUE(s.ok());
   EXPECT_EQ(1ULL, db_->metadata().object_stores.size());
   const int64_t index_id = 2002;
-  s = db_->CreateIndexOperation(store_id, index_id, u"index",
-                                IndexedDBKeyPath(), /*unique=*/false,
-                                /*multi_entry=*/false, transaction_);
+  s = transaction_->BackingStoreTransaction()->CreateIndex(
+      store_id, index_id, u"index", IndexedDBKeyPath(), /*unique=*/false,
+      /*multi_entry=*/false);
   EXPECT_TRUE(s.ok());
   EXPECT_EQ(
       1ULL,
@@ -906,9 +907,9 @@ TEST_F(DatabaseOperationTest, CreatePutDelete) {
   EXPECT_EQ(0ULL, db_->metadata().object_stores.size());
   const int64_t store_id = 1001;
 
-  Status s =
-      db_->CreateObjectStoreOperation(store_id, u"store", IndexedDBKeyPath(),
-                                      /*auto_increment=*/false, transaction_);
+  Status s = transaction_->BackingStoreTransaction()->CreateObjectStore(
+      store_id, u"store", IndexedDBKeyPath(),
+      /*auto_increment=*/false);
   EXPECT_TRUE(s.ok());
   EXPECT_EQ(1ULL, db_->metadata().object_stores.size());
 
@@ -931,7 +932,7 @@ TEST_F(DatabaseOperationTest, CreatePutDelete) {
   s = db_->PutOperation(std::move(put_params), transaction_);
   EXPECT_TRUE(s.ok());
 
-  s = db_->DeleteObjectStoreOperation(store_id, transaction_);
+  s = transaction_->BackingStoreTransaction()->DeleteObjectStore(store_id);
   EXPECT_TRUE(s.ok());
 
   EXPECT_EQ(0ULL, db_->metadata().object_stores.size());
@@ -1682,9 +1683,9 @@ TEST_F(DatabaseOperationTest, ObjectStoreGetAllKeysWithInvalidObjectStoreId) {
 TEST_F(DatabaseOperationTest, IndexGetAllKeysWithInvalidIndexId) {
   // Create an object store.
   ASSERT_EQ(0u, db_->metadata().object_stores.size());
-  Status status = db_->CreateObjectStoreOperation(
+  Status status = transaction_->BackingStoreTransaction()->CreateObjectStore(
       kTestObjectStoreId, u"store", IndexedDBKeyPath(),
-      /*auto_increment=*/false, transaction_);
+      /*auto_increment=*/false);
   ASSERT_TRUE(status.ok()) << status.ToString();
   ASSERT_EQ(1u, db_->metadata().object_stores.size());
 

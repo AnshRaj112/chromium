@@ -9,6 +9,8 @@
 #include <optional>
 #include <vector>
 
+#include "base/callback_list.h"
+#include "base/cancelable_callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/scoped_observation.h"
@@ -26,6 +28,7 @@
 #include "components/optimization_guide/proto/model_execution.pb.h"
 #include "components/optimization_guide/proto/model_quality_service.pb.h"
 #include "components/optimization_guide/proto/models.pb.h"
+#include "components/optimization_guide/public/mojom/model_broker.mojom.h"
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/android/scoped_java_ref.h"
@@ -36,9 +39,17 @@ namespace content {
 class BrowserContext;
 }  // namespace content
 
+namespace contextual_cueing {
+class ZeroStateSuggestionsPageData;
+}  // namespace contextual_cueing
+
 namespace download {
 class BackgroundDownloadService;
 }  // namespace download
+
+namespace on_device_internals {
+class PageHandler;
+}
 
 namespace optimization_guide {
 class ChromeHintsManager;
@@ -106,6 +117,10 @@ class OptimizationGuideKeyedService
   base::android::ScopedJavaLocalRef<jobject> GetJavaObject();
 #endif
 
+  // Allow models to be subscribed via the broker.
+  void BindModelBroker(
+      mojo::PendingReceiver<optimization_guide::mojom::ModelBroker> receiver);
+
   // optimization_guide::OptimizationGuideDecider implementation:
   void RegisterOptimizationTypes(
       const std::vector<optimization_guide::proto::OptimizationType>&
@@ -152,6 +167,11 @@ class OptimizationGuideKeyedService
   optimization_guide::OnDeviceModelEligibilityReason
   GetOnDeviceModelEligibility(
       optimization_guide::ModelBasedCapabilityKey feature) override;
+  void GetOnDeviceModelEligibilityAsync(
+      optimization_guide::ModelBasedCapabilityKey feature,
+      base::OnceCallback<
+          void(optimization_guide::OnDeviceModelEligibilityReason)> callback)
+      override;
   std::optional<optimization_guide::SamplingParamsConfig>
   GetSamplingParamsConfig(
       optimization_guide::ModelBasedCapabilityKey feature) override;
@@ -237,8 +257,9 @@ class OptimizationGuideKeyedService
   friend class BrowserView;
   friend class ChromeBrowserMainExtraPartsOptimizationGuide;
   friend class ChromeBrowsingDataRemoverDelegate;
+  friend class contextual_cueing::ZeroStateSuggestionsPageData;
   friend class HintsFetcherBrowserTest;
-  friend class OnDeviceInternalsPageHandler;
+  friend class on_device_internals::PageHandler;
   friend class OptimizationGuideInternalsUI;
   friend class OptimizationGuideMessageHandler;
   friend class OptimizationGuideWebContentsObserver;
@@ -256,10 +277,6 @@ class OptimizationGuideKeyedService
   friend class optimization_guide::android::OptimizationGuideBridge;
 #endif  // BUILDFLAG(IS_ANDROID)
 
-  // Evaluates and records the device performance class to local state prefs.
-  static void DeterminePerformanceClass(
-      base::WeakPtr<optimization_guide::OnDeviceModelComponentStateManager>
-          on_device_component_state_manager);
   static void RegisterPerformanceClassSyntheticTrial(
       optimization_guide::OnDeviceModelPerformanceClass perf_class);
 
@@ -332,6 +349,18 @@ class OptimizationGuideKeyedService
       optimization_guide::UserVisibleFeatureKey feature,
       std::string_view feature_name);
 
+  // Ensures the performance class will be up to date and available when
+  // `complete` runs.
+  void EnsurePerformanceClassAvailable(base::OnceClosure complete);
+
+  // Called when performance class has finished updating.
+  void PerformanceClassUpdated();
+
+  void FinishGetOnDeviceModelEligibility(
+      optimization_guide::ModelBasedCapabilityKey feature,
+      base::OnceCallback<
+          void(optimization_guide::OnDeviceModelEligibilityReason)> callback);
+
   raw_ptr<content::BrowserContext> browser_context_;
 
   // The store of hints.
@@ -385,6 +414,19 @@ class OptimizationGuideKeyedService
 
   // Used to observe profile initialization event.
   base::ScopedObservation<Profile, ProfileObserver> profile_observation_{this};
+
+  enum class PerformanceClassState {
+    kNotSet,
+    kComputing,
+    kComplete,
+  };
+  PerformanceClassState performance_class_state_ =
+      PerformanceClassState::kNotSet;
+
+  // Callbacks waiting for performance class to finish computing.
+  base::OnceClosureList performance_class_callbacks_;
+
+  base::WeakPtrFactory<OptimizationGuideKeyedService> weak_factory_{this};
 };
 
 #endif  // CHROME_BROWSER_OPTIMIZATION_GUIDE_OPTIMIZATION_GUIDE_KEYED_SERVICE_H_

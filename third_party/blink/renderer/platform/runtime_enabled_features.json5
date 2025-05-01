@@ -322,51 +322,83 @@
     {
       name: "AIPromptAPI",
       public: true,
-      status: "test",
-      implied_by: ["AIPromptAPIForWebPlatform", "AIPromptAPIMultimodalInput", "AIPromptAPIStructuredOutput"],
+      status: "experimental",
+      implied_by: ["AIPromptAPIForWebPlatform", "AIPromptAPIMultimodalInput"],
     },
     {
       name: "AIPromptAPIForExtension",
       public: true,
       origin_trial_feature_name: "AIPromptAPIForExtension",
       origin_trial_allows_third_party: true,
-      status: "test",
+      status: "experimental",
       base_feature_status: "enabled",
       copied_from_base_feature_if: "overridden",
     },
     {
       name: "AIPromptAPIForWebPlatform",
       public: true,
-      status: "test",
+      status: "experimental",
+    },
+    {
+      name: "AIPromptAPIForWorkers",
+      public: true,
+      status: "experimental",
     },
     {
       name: "AIPromptAPIMultimodalInput",
       public: true,
-      status: "test",
+      status: "experimental",
     },
     {
       name: "AIPromptAPIStructuredOutput",
-      public: true,
-      status: "test",
+      origin_trial_feature_name: "AIPromptAPIForExtension",
+      origin_trial_allows_third_party: true,
+      status: "experimental",
+      base_feature_status: "enabled",
+      copied_from_base_feature_if: "overridden",
+      implied_by: ["AIPromptAPI"],
     },
     {
       name: "AIRewriterAPI",
       public: true,
-      status: "test",
+      status: "experimental",
+      origin_trial_feature_name: "AIRewriterAPI",
+      origin_trial_allows_third_party: true,
+      base_feature_status: "enabled",
+      copied_from_base_feature_if: "overridden",
+    },
+    {
+      name: "AIRewriterAPIForWorkers",
+      public: true,
+      status: "experimental",
     },
     {
       name: "AISummarizationAPI",
       public: true,
-      status: "test",
+      status: "experimental",
       origin_trial_feature_name: "AISummarizationAPI",
       origin_trial_allows_third_party: true,
       base_feature_status: "enabled",
       copied_from_base_feature_if: "overridden",
     },
     {
+      name: "AISummarizationAPIForWorkers",
+      public: true,
+      status: "experimental",
+    },
+    {
       name: "AIWriterAPI",
       public: true,
-      status: "test",
+      status: "experimental",
+      origin_trial_feature_name: "AIWriterAPI",
+      origin_trial_allows_third_party: true,
+      base_feature_status: "enabled",
+      copied_from_base_feature_if: "overridden",
+    },
+    {
+      name: "AIWriterAPIForWorkers",
+      public: true,
+      status: "experimental",
     },
     {
       name: "AllowContentInitiatedDataUrlNavigations",
@@ -397,7 +429,7 @@
     },
     {
       name: "AllowSvgUseToReferenceExternalDocumentRoot",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "AllowSyntheticTimingForCanvasCapture",
@@ -652,7 +684,7 @@
     },
     {
       name: "BuiltInAIAPI",
-      status: "test",
+      status: "experimental",
       base_feature_status: "enabled",
       // A origin trial is feature is required for the build to success.
       // The feature reuses the AISummarizationAPI. Any other origin trial
@@ -711,6 +743,12 @@
       origin_trial_feature_name: "Canvas2dMesh",
       origin_trial_allows_third_party: true,
       status: "test",
+    },
+    {
+      // https://github.com/WICG/canvas-place-element/blob/main/README.md
+      name: "CanvasElementDrawImage",
+      status: "experimental",
+      implied_by: ["CanvasPlaceElement"],
     },
     {
       name: "CanvasFloatingPoint",
@@ -780,7 +818,7 @@
     },
     {
       name: "CapturedSurfaceResolution",
-      status: { "Win": "stable", "Mac": "stable", "ChromeOS": "experimental", "default": ""},
+      status: { "Win": "stable", "Mac": "stable", "ChromeOS": "stable", "default": ""},
     },
     {
       name: "CaptureHandle",
@@ -857,6 +895,10 @@
       // Support ClipboardItemData of Promise<DOMString> type according to spec
       // https://w3c.github.io/clipboard-apis/#typedefdef-clipboarditemdata
       name: "ClipboardItemWithDOMStringSupport",
+      status: "stable",
+    },
+    {
+      name: "ClipPathNestedRasterOptimization",
       status: "stable",
     },
     {
@@ -1350,6 +1392,10 @@
       status: "stable",
     },
     {
+      name: "CSSScrollDirectionContainerQueries",
+      status: "test",
+    },
+    {
       // https://drafts.csswg.org/css-scroll-snap-2#scroll-initial-target
       name: "CSSScrollInitialTarget",
       status: "stable",
@@ -1385,7 +1431,8 @@
       // Flag for supporting scroll-state() and container-type: scroll-state
       // Implied by supporting at least one of the scroll-state query features.
       name: "CSSScrollStateContainerQueries",
-      implied_by: ["CSSStickyContainerQueries", "CSSSnapContainerQueries", "CSSScrollableContainerQueries"],
+      implied_by: ["CSSStickyContainerQueries", "CSSSnapContainerQueries",
+                   "CSSScrollableContainerQueries", "CSSScrollDirectionContainerQueries"],
     },
     {
       name: "CSSSelectorFragmentAnchor",
@@ -1501,8 +1548,18 @@
       depends_on: ["SelectParserRelaxation"],
     },
     {
-      // If a node within a customizable <select> doesn't obey the content model, an Issue is reported to DevTools so that web authors get more context on why this can impact the accessibility behavior of the <select>.
+      // If a node within a customizable <select> doesn't obey the content
+      // model, an Issue is reported to DevTools so that web authors get more
+      // context on why this can impact the accessibility behavior of the
+      // <select>. Shipped in M138, flag can be removed M140.
       name: "CustomizableSelectElementAccessibilityIssues",
+      status: "stable",
+      depends_on: ["CustomizableSelect"],
+    },
+    {
+      // appearance:base-select for <select multiple> and <select size=n>
+      // https://issues.chromium.org/issues/357649033
+      name: "CustomizableSelectInPage",
       status: "experimental",
       depends_on: ["CustomizableSelect"],
     },
@@ -1827,6 +1884,11 @@
       status: "stable",
     },
     {
+      // crbug.com/40118302
+      name: "EmptyReferenceFilterInvalidation",
+      status: "stable",
+    },
+    {
       name: "EnforceAnonymityExposure",
       status: "stable",
     },
@@ -1918,6 +1980,11 @@
     {
       name: "FastPositionIterator",
       // Not enabled due to a RTL issue. crbug.com/1421016.
+    },
+    {
+      // crbug.com/414112253
+      name: "FastSelectionSync",
+      status: "stable",
     },
     {
       name: "FedCm",
@@ -2138,6 +2205,7 @@
     },
     {
       name: "FledgeBiddingAndAuctionServerAPIMultiSeller",
+      status: "stable",
     },
     {
       name: "FledgeClickiness",
@@ -2214,10 +2282,6 @@
       // The associated base feature is defined in
       // ui/native_theme/native_theme_features.cc.
       base_feature: "none",
-    },
-    {
-      name: "FluentScrollbarUsesNinePatchTrack",
-      status: "stable",
     },
     {
       name: "Focusgroup",
@@ -2317,10 +2381,11 @@
     {
       name: "GetAllScreensMedia",
       depends_on: ["GetDisplayMedia"],
-      origin_trial_feature_name: "GetAllScreensMedia",
-      origin_trial_os: ["chromeos"],
       public: true,
-      status: "test",
+      status: {
+        "ChromeOS": "stable",
+        "default": "test",
+      },
     },
     {
       name: "GetComputedStyleOutsideFlatTree",
@@ -2343,6 +2408,12 @@
     {
       name: "GroupEffect",
       status: "test",
+    },
+    {
+      // Enables Skipping children for invisible select elements containing
+      // non-editable node while calculating end of paragraph.
+      name: "HandleDeletionAtStartAndEndBoundaryContainingHiddenElement",
+      status: "stable",
     },
     {
       name: "HandwritingRecognition",
@@ -2481,12 +2552,6 @@
       name: "ImportMapIntegrity",
       status: "stable"
     },
-    // This ensures that list element tag is included in extended selection.
-    // https://crbug.com/40658772
-    {
-      name: "IncludeListElementTagInExtendedSelection",
-      status: "stable",
-    },
     // This ensures that table tag is included in extended selection.
     // https://crbug.com/40833812
     {
@@ -2613,6 +2678,14 @@
       status: "stable",
     },
     {
+      name: "JavaScriptCompileHintsPerFunctionMagicRuntime",
+      status: "experimental",
+      origin_trial_feature_name: "JavaScriptCompileHintsPerFunctionMagic",
+    },
+    {
+      name: "JavaScriptSourcePhaseImports",
+    },
+    {
       name: "KeyboardAccessibleTooltip",
       status: "experimental",
       base_feature: "none",
@@ -2654,14 +2727,20 @@
       copied_from_base_feature_if: "overridden",
     },
     {
+      name: "LanguageDetectionAPIForWorkers",
+      public: true,
+      status: "experimental",
+    },
+    {
       name: "LayoutFlexNewRowAlgorithm",
       status: "stable",
     },
     {
-      name: "LayoutIgnoreMarginsForSticky",
+      name: "LayoutFlexNewStretch",
+      status: "stable",
     },
     {
-      name: "LayoutImageRevalidationCheckForSvgImages",
+      name: "LayoutIgnoreMarginsForSticky",
     },
     {
       name: "LayoutJustifySelfForBlocks",
@@ -2675,6 +2754,9 @@
       name: "LayoutNGShapeCache",
       status: "stable",
       base_feature: "LayoutNGShapeCache",
+    },
+    {
+      name: "LayoutReplacedReturnExplicitDefaultNaturalSize",
     },
     {
       name: "LayoutStretch",
@@ -2711,8 +2793,23 @@
       base_feature: "none",
     },
     {
+      name: "LineBreakEarlyReturn",
+      status: "stable",
+    },
+    {
       name: "ListItemWithCounterSetNotSetExplicitValue",
       status: "stable",
+    },
+    {
+      name: "ListOwnerMustHaveCSSBox",
+      status: "stable",
+    },
+    // Enables Local Network Access Permission Policy. Does nothing without
+    // also enabling network::features::kLocalNetworkAccessChecks. See
+    // https://crbug.com/394009026.
+    {
+      name: "LocalNetworkAccessPermissionPolicy",
+      status: "experimental",
     },
     {
       name: "LockedMode",
@@ -3625,6 +3722,12 @@
       depends_on: ["ReduceUserAgentMinorVersion"],
       status: {"Android": "stable"},
     },
+    // If enabled, the platform version in User-Agent Data will be removed.
+    // This feature is limited to Linux only.
+    {
+      name: "ReduceUserAgentDataLinuxPlatformVersion",
+      status: {"Linux": "experimental"},
+    },
     // If enabled, the minor version of the User-Agent string will be reduced.
     // This User-Agent Reduction feature has been enabled starting from M101,
     // but we still keep this flag for future phase tests.
@@ -3711,6 +3814,7 @@
       // ChromeStatus: https://chromestatus.com/feature/5207202081800192
       name: "RenderBlockingFullFrameRate",
       copied_from_base_feature_if: "overridden",
+      origin_trial_feature_name: "RenderBlockingFullFrameRate",
       status: "test",
     },
     {
@@ -3770,6 +3874,10 @@
     },
     {
       name: "RestrictGetBoundingClientRectForHiddenSVGElements",
+      status: "stable",
+    },
+    {
+      name: "RestrictTabFocusForHiddenSVGElements",
       status: "stable",
     },
     {
@@ -4015,6 +4123,7 @@
     },
     {
       name: "SecurePaymentConfirmationBrowserBoundKeys",
+      status: "experimental",
     },
     {
       name: "SecurePaymentConfirmationDebug",
@@ -4143,6 +4252,12 @@
       base_feature: "WebSerialAPI",
     },
     {
+      // Kill-switch for crbug.com/40791925.
+      // Added in M138, and it can be removed in M140.
+      name: "SerializeCdataAsTextInHTMLDocuments",
+      status: "stable",
+    },
+    {
       name: "SerializeViewTransitionStateInSPA",
     },
     {
@@ -4215,6 +4330,13 @@
       base_feature: "none",
     },
     {
+      // If enabled, SharedWorker supports extendedLifetime
+      // https://github.com/whatwg/html/issues/10997
+      name: "SharedWorkerExtendedLifetime",
+      origin_trial_feature_name: "SharedWorkerExtendedLifetime",
+      origin_trial_allows_third_party: true,
+    },
+    {
       name: "SignatureBasedInlineIntegrity",
       status: "experimental",
     },
@@ -4238,12 +4360,6 @@
     {
       name: "SkipLineBreakItemWhenIsCollapsed",
       status: "stable",
-    },
-    {
-      // If enabled, HTMLPreloadScanner will be skipped.
-      name: "SkipPreloadScanning",
-      origin_trial_feature_name: "SkipPreloadScanning",
-      base_feature: "SkipPreloadScanning",
     },
     {
       // Skips the browser touch event filter, ensuring that events that reach
@@ -4423,15 +4539,19 @@
     },
     {
       name: "SvgInlineRootPixelSnappingScaleAdjustment",
-      status: "stable",
+      status: "test",
     },
     {
       name: "SvgNoPixelSnappingScaleAdjustment",
       status: "stable",
     },
     {
-      name: "SvgTransformOnNestedSvgElement",
+      name: "SvgScriptElementAsyncAttribute",
       status: "experimental",
+    },
+    {
+      name: "SvgTransformOnNestedSvgElement",
+      status: "stable",
     },
     {
       name: "SynthesizedKeyboardEventsForAccessibilityActions",
@@ -4654,7 +4774,7 @@
     },
     {
       name: "TranslationAPI",
-      status: "test",
+      status: "experimental",
       origin_trial_feature_name: "TranslationAPI",
       origin_trial_allows_third_party: true,
       base_feature_status: "enabled",
@@ -4662,8 +4782,13 @@
       implied_by: ["TranslationAPIV1"],
     },
     {
+      name: "TranslationAPIForWorkers",
+      public: true,
+      status: "experimental",
+    },
+    {
       name: "TranslationAPIV1",
-      status: "test",
+      status: "experimental",
       copied_from_base_feature_if: "overridden",
     },
     {
@@ -4790,6 +4915,13 @@
       status: "stable",
     },
     {
+      // For invalidation set tracking, we build a map from style rules to
+      // their containing sheets. When this flag is enabled, we use that same
+      // map for the Selector Stats feature.
+      name: "UseStyleRuleMapForSelectorStats",
+      status: "stable",
+    },
+    {
       name: "UseUndoStepElementDispatchBeforeInput",
       status: "stable",
     },
@@ -4812,7 +4944,10 @@
     },
     {
       name: "VideoFrameMetadataBackgroundBlur",
-      public: true,
+      status: "experimental",
+    },
+    {
+      name: "VideoFrameMetadataRtpTimestamp",
       status: "experimental",
     },
     {
@@ -4996,13 +5131,6 @@
       name: "WebAuthenticationChallengeUrl",
       status: "experimental",
     },
-    // Enables the PublicKeyCredential.getClientCapabilities() static method.
-    // https://w3c.github.io/webauthn/#sctn-getClientCapabilities
-    // Enabled by default on M133. Remove flag on or after M136.
-    {
-      name: "WebAuthenticationClientCapabilities",
-      status: "stable",
-    },
     // https://w3c.github.io/webauthn/#dom-clientcapability-conditionalcreate
     {
       name: "WebAuthenticationConditionalCreate",
@@ -5014,6 +5142,8 @@
     {
       name: "WebAuthenticationImmediateGet",
       status: "experimental",
+      base_feature: "none",
+      public: true,
     },
     // Methods for deserializing WebAuthn requests from JSON/serializing
     // responses into JSON.
@@ -5221,12 +5351,14 @@
       name: "WebPrinting",
       status: {"Android": "", "default": "test"},
     },
-    // WebShare is enabled by default on Android.
+    // WebShare is enabled by default on Android (non-WebView), Win, ChromeOS, and Mac.
+    // This is done in chrome/renderer/chrome_content_renderer_client.cc to prevent
+    // making the API available to Linux and WebView. Ideally we would set the status
+    // below to "stable" once we can do so without significant test expectation duplication.
     {
       name: "WebShare",
       public: true,
       status: "test",
-      base_feature: "none",
     },
     {
       name: "WebSocketStream",
@@ -5391,10 +5523,8 @@
       status: "experimental",
       implied_by: ["DesktopPWAsAdditionalWindowingControls"],
     },
-    // Flag guard for change to XML parser to merge adjacent CDATA sections.
-    // See https://crrev.com/c/4790343.
     {
-      name: "XMLParserMergeAdjacentCDataSections",
+      name: "XMLSerializerConsistentDefaultNsDeclMatching",
       status: "stable",
     },
     {

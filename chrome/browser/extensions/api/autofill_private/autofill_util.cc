@@ -80,9 +80,11 @@ autofill_private::AddressRecordType ConvertProfileRecordType(
     case autofill::AutofillProfile::RecordType::kLocalOrSyncable:
       return autofill_private::AddressRecordType::kLocalOrSyncable;
     case autofill::AutofillProfile::RecordType::kAccount:
-    case autofill::AutofillProfile::RecordType::kAccountHome:
-    case autofill::AutofillProfile::RecordType::kAccountWork:
       return autofill_private::AddressRecordType::kAccount;
+    case autofill::AutofillProfile::RecordType::kAccountHome:
+      return autofill_private::AddressRecordType::kAccountHome;
+    case autofill::AutofillProfile::RecordType::kAccountWork:
+      return autofill_private::AddressRecordType::kAccountWork;
   }
   NOTREACHED();
 }
@@ -244,18 +246,25 @@ autofill_private::IbanEntry IbanToIbanEntry(const autofill::Iban& iban) {
   return iban_entry;
 }
 
-std::string PayOverTimeIssuerToIconResourceIdString(const std::string& issuer) {
-  static constexpr auto kPayOverTimeIssuerToResourceIdStringMap =
-      base::MakeFixedFlatMap<std::string_view, std::string_view>(
-          {{autofill::kBnplAffirmIssuerId,
-            "chrome://theme/IDR_AUTOFILL_AFFIRM_LINKED"},
-           {autofill::kBnplZipIssuerId,
-            "chrome://theme/IDR_AUTOFILL_ZIP_LINKED"}});
-
-  auto it = kPayOverTimeIssuerToResourceIdStringMap.find(issuer);
-  return it != kPayOverTimeIssuerToResourceIdStringMap.end()
-             ? std::string(it->second)
-             : "chrome://theme/IDR_AUTOFILL_METADATA_BNPL_GENERIC";
+std::pair<std::string, std::string> PayOverTimeIssuerToIconResourceIdString(
+    autofill::BnplIssuer::IssuerId issuer) {
+  switch (issuer) {
+    case autofill::BnplIssuer::IssuerId::kBnplAffirm:
+      return std::pair<std::string, std::string>(
+          "chrome://theme/IDR_AUTOFILL_AFFIRM_LINKED",
+          "chrome://theme/IDR_AUTOFILL_AFFIRM_LINKED_DARK");
+    case autofill::BnplIssuer::IssuerId::kBnplZip:
+      return std::pair<std::string, std::string>(
+          "chrome://theme/IDR_AUTOFILL_ZIP_LINKED",
+          "chrome://theme/IDR_AUTOFILL_ZIP_LINKED_DARK");
+    // TODO(crbug.com/408268581): Handle Afterpay issuer enum value when adding
+    // Afterpay to the BNPL flow.
+    case autofill::BnplIssuer::IssuerId::kBnplAfterpay:
+      return std::pair<std::string, std::string>(
+          "chrome://theme/IDR_AUTOFILL_METADATA_BNPL_GENERIC",
+          "chrome://theme/IDR_AUTOFILL_METADATA_BNPL_GENERIC");
+  }
+  NOTREACHED();
 }
 
 autofill_private::PayOverTimeIssuerEntry BnplIssuerToPayOverTimeIssuerEntry(
@@ -264,12 +273,16 @@ autofill_private::PayOverTimeIssuerEntry BnplIssuerToPayOverTimeIssuerEntry(
 
   autofill_private::PayOverTimeIssuerEntry issuer_entry;
 
-  issuer_entry.issuer_id = issuer.issuer_id();
+  issuer_entry.issuer_id =
+      autofill::ConvertToBnplIssuerIdString(issuer.issuer_id());
   issuer_entry.instrument_id =
       base::NumberToString(issuer.payment_instrument()->instrument_id());
   issuer_entry.display_name = base::UTF16ToUTF8(issuer.GetDisplayName());
-  issuer_entry.image_src =
+
+  std::pair<std::string, std::string> issuer_icons =
       PayOverTimeIssuerToIconResourceIdString(issuer.issuer_id());
+  issuer_entry.image_src = std::move(issuer_icons.first);
+  issuer_entry.image_src_dark = std::move(issuer_icons.second);
 
   return issuer_entry;
 }

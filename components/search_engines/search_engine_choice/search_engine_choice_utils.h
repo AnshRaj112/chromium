@@ -57,6 +57,8 @@ inline constexpr char kSearchEngineChoiceRepromptWildcardHistogram[] =
     "Search.ChoiceReprompt.Wildcard";
 inline constexpr char kSearchEngineChoiceRepromptSpecificCountryHistogram[] =
     "Search.ChoiceReprompt.SpecificCountry";
+inline constexpr char kSearchEngineChoiceCompletedOnMonthHistogram[] =
+    "Search.ChoiceCompletedOnMonth.OnProfileLoad";
 
 // These values are persisted to logs. Entries should not be renumbered and
 // numeric values should never be reused.
@@ -310,6 +312,10 @@ void SetChoiceCompletionMetadata(PrefService& prefs,
 // has been made.
 std::optional<base::Time> GetChoiceScreenCompletionTimestamp(
     PrefService& prefs);
+
+void ClearSearchEngineChoiceInvalidation(PrefService& prefs);
+
+bool IsSearchEngineChoiceInvalid(PrefService& prefs);
 
 #if !BUILDFLAG(IS_ANDROID)
 // Returns the engine marketing snippet string resource id or -1 if the snippet

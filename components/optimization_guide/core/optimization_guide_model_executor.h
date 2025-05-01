@@ -250,8 +250,12 @@ class OptimizationGuideModelExecutor {
     // be merged with data provided to an ExecuteModel() call and be available
     // for use in later prompt templates based on the request. Calling this will
     // cancel any ongoing executions and invoke their 'callback' methods with
-    // the 'kCancelled' error.
-    virtual void SetInput(MultimodalMessage request) = 0;
+    // the 'kCancelled' error. `callback` will be called with either the number
+    // of tokens processed from `request` or an error.
+    using SetInputCallback = base::OnceCallback<void(
+        base::expected<size_t, OptimizationGuideModelExecutionError>)>;
+    virtual void SetInput(MultimodalMessage request,
+                          SetInputCallback callback) = 0;
 
     // Adds context to this session. This will be saved for future Execute()
     // calls. Calling multiple times will replace previous calls to
@@ -277,11 +281,11 @@ class OptimizationGuideModelExecutor {
         const google::protobuf::MessageLite& request_metadata,
         OptimizationGuideModelExecutionResultStreamingCallback callback) = 0;
 
-    // A JSON schema is provided to define structured output requirements for
+    // A consstraint is provided to define structured output requirements for
     // the response.
-    virtual void ExecuteModelWithResponseJsonSchema(
+    virtual void ExecuteModelWithResponseConstraint(
         const google::protobuf::MessageLite& request_metadata,
-        const std::optional<std::string>& response_json_schema,
+        on_device_model::mojom::ResponseConstraintPtr constraint,
         OptimizationGuideModelExecutionResultStreamingCallback callback) = 0;
 
     // Call `GetSizeInTokens()` from the model to get the size of the given text

@@ -558,11 +558,12 @@ void ChromePaymentsAutofillClient::CloseAutofillProgressDialog(
 }
 
 void ChromePaymentsAutofillClient::ShowCardUnmaskOtpInputDialog(
+    CreditCard::RecordType card_type,
     const CardUnmaskChallengeOption& challenge_option,
     base::WeakPtr<OtpUnmaskDelegate> delegate) {
   card_unmask_otp_input_dialog_controller_ =
-      std::make_unique<CardUnmaskOtpInputDialogControllerImpl>(challenge_option,
-                                                               delegate);
+      std::make_unique<CardUnmaskOtpInputDialogControllerImpl>(
+          card_type, challenge_option, delegate);
   card_unmask_otp_input_dialog_controller_->ShowDialog(
       base::BindOnce(&CreateAndShowOtpInputDialog,
                      card_unmask_otp_input_dialog_controller_->GetWeakPtr(),
@@ -973,12 +974,12 @@ void ChromePaymentsAutofillClient::DismissSelectBnplIssuerDialog() {
   }
 }
 
-bool ChromePaymentsAutofillClient::IsTabModalPopup() const {
+bool ChromePaymentsAutofillClient::IsTabModalPopupDeprecated() const {
 #if !BUILDFLAG(IS_ANDROID)
   tabs::TabInterface* const tab_interface =
       tabs::TabInterface::MaybeGetFromContents(web_contents());
-  return tab_interface &&
-         tab_interface->GetBrowserWindowInterface()->IsTabModalPopup();
+  return tab_interface && tab_interface->GetBrowserWindowInterface()
+                              ->IsTabModalPopupDeprecated();
 #else
   return false;
 #endif  // !BUILDFLAG(IS_ANDROID)

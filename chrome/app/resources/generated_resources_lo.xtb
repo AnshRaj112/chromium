@@ -83,7 +83,6 @@
 <translation id="1053898984916097744">ເຮັດສິ່ງໃໝ່ໆ ຫຼື ຮັບຄວາມຊ່ວຍເຫຼືອໃນລະຫວ່າງຂັ້ນຕອນການເຮັດວຽກ.</translation>
 <translation id="1054048317165655285">ເຮັດສຳເລັດການຕັ້ງຄ່າໃນໂທລະສັບຂອງທ່ານ</translation>
 <translation id="1054153489933238809">ເປີດຮູບ&amp;ເດີມຢູ່ໃນແຖບໃໝ່</translation>
-<translation id="1054187194995068149">ສະບາຍດີ. ນີ້ແມ່ນຕົວຢ່າງ</translation>
 <translation id="1054502481659725522">ແອັບ, ເວັບໄຊ ແລະ ບໍລິການລະບົບສາມາດໃຊ້ສະຖານທີ່ຂອງທ່ານໄດ້</translation>
 <translation id="1055274863771110134">{NUM_WEEKS,plural, =1{ອັບເດດ <ph name="DEVICE_TYPE" /> ພາຍໃນ 1 ອາທິດ}other{ອັບເດດ <ph name="DEVICE_TYPE" /> ພາຍໃນ {NUM_WEEKS} ອາທິດ}}</translation>
 <translation id="1055606969515662982">ໃຊ້ຣີໂໝດເພື່ອຢຸດການສົ່ງສັນຍານ</translation>
@@ -4556,6 +4555,7 @@
 <translation id="4139326893730851150">ອັບເດດເຟີມແວ</translation>
 <translation id="4142052906269098341">ປົດລັອກ <ph name="DEVICE_TYPE" /> ຂອງທ່ານດ້ວຍໂທລະສັບຂອງທ່ານ. <ph name="LINK_BEGIN" />ສຶກສາເພີ່ມເຕີມ<ph name="LINK_END" /></translation>
 <translation id="4143606504420684845">ສຳຫຼວດວິທີທີ່ AI ຊ່ວຍສ້າງປະສົບການໃນການໃຊ້ຂອງທ່ານ ແລະ ຊ່ວຍໃຫ້ມີຂໍ້ມູນປະກອບການຕັດສິນໃຈກ່ຽວກັບຄວາມເປັນສ່ວນຕົວຂອງທ່ານ</translation>
+<translation id="4143754025452944766">ທ່ານຍັງສາມາດເລືອກລຶບສ່ວນຂະຫຍາຍຂອງບັນຊີອອກຈາກອຸປະກອນນີ້ີ້ໄດ້.</translation>
 <translation id="4146026355784316281">ເປີດ​ກັບ​ຕົວ​ເບິ່ງ​ລະ​ບົບ​ທຸກ​ຄັ້ງ</translation>
 <translation id="4146785383423576110">ຣີເຊັດ ແລະ ອະນາໄມ</translation>
 <translation id="4147099377280085053">ເລືອກຕາຕະລາງອັກສອນນູນ</translation>

@@ -18,12 +18,14 @@
 #include "chrome/browser/extensions/extension_allowlist.h"
 #include "chrome/browser/extensions/extension_assets_manager.h"
 #include "chrome/browser/extensions/extension_disabled_ui.h"
+#include "chrome/browser/extensions/extension_management.h"
 #include "chrome/browser/extensions/extension_special_storage_policy.h"
 #include "chrome/browser/extensions/external_install_manager.h"
 #include "chrome/browser/extensions/install_verifier.h"
 #include "chrome/browser/extensions/installed_loader.h"
 #include "chrome/browser/extensions/permissions/permissions_updater.h"
 #include "chrome/browser/extensions/profile_util.h"
+#include "chrome/browser/extensions/unpacked_installer.h"
 #include "chrome/browser/extensions/updater/extension_updater.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/webui/favicon_source.h"
@@ -48,11 +50,6 @@
 #include "extensions/common/permissions/permission_set.h"
 #include "extensions/common/permissions/permissions_data.h"
 
-#if BUILDFLAG(ENABLE_EXTENSIONS)
-#include "chrome/browser/extensions/unpacked_installer.h"
-#include "chrome/browser/ui/webui/theme_source.h"
-#endif
-
 #if BUILDFLAG(IS_CHROMEOS)
 #include "chrome/browser/ash/fileapi/file_system_backend.h"
 #include "content/public/browser/storage_partition.h"
@@ -60,15 +57,13 @@
 #endif
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
-#include "chrome/browser/extensions/extension_management.h"
 #include "chrome/browser/extensions/extension_sync_service.h"
+#include "chrome/browser/ui/webui/theme_source.h"
 #endif
 
 using extensions::mojom::ManifestLocation;
 
 namespace extensions {
-
-using LoadErrorBehavior = ExtensionRegistrar::LoadErrorBehavior;
 
 namespace {
 
@@ -256,10 +251,10 @@ void ChromeExtensionRegistrarDelegate::PostUninstallExtension(
   DataDeleter::StartDeleting(profile_, extension.get(), subtask_done_callback);
 }
 
-void ChromeExtensionRegistrarDelegate::LoadExtensionForReload(
+void ChromeExtensionRegistrarDelegate::DoLoadExtensionForReload(
     const ExtensionId& extension_id,
     const base::FilePath& path,
-    ExtensionRegistrar::LoadErrorBehavior load_error_behavior) {
+    bool load_error_behavior_noisy) {
   // If we're reloading a component extension, use the component extension
   // loader's reloader.
   if (component_loader_->Exists(extension_id)) {
@@ -274,24 +269,28 @@ void ChromeExtensionRegistrarDelegate::LoadExtensionForReload(
   if (installed_extension && installed_extension->extension_manifest.get()) {
     InstalledLoader(profile_).Load(*installed_extension, false);
   } else {
-#if BUILDFLAG(ENABLE_EXTENSIONS)
     // Otherwise, the extension is unpacked (location LOAD). We must load it
     // from the path.
     CHECK(!path.empty()) << "ExtensionRegistrar should never ask to load an "
                             "unknown extension with no path";
     scoped_refptr<UnpackedInstaller> unpacked_installer =
         UnpackedInstaller::Create(profile_);
-    unpacked_installer->set_be_noisy_on_failure(load_error_behavior ==
-                                                LoadErrorBehavior::kNoisy);
+    unpacked_installer->set_be_noisy_on_failure(load_error_behavior_noisy);
     unpacked_installer->set_completion_callback(base::BindOnce(
         &ChromeExtensionRegistrarDelegate::OnUnpackedReloadFailure,
         weak_factory_.GetWeakPtr()));
     unpacked_installer->Load(path);
-#else
-    // TODO(crbug.com/398299722): Port UnpackedInstaller to desktop Android.
-    NOTIMPLEMENTED() << "UnpackedInstaller not yet supported on Android";
-#endif
   }
+}
+void ChromeExtensionRegistrarDelegate::LoadExtensionForReload(
+    const ExtensionId& extension_id,
+    const base::FilePath& path) {
+  DoLoadExtensionForReload(extension_id, path, true);
+}
+void ChromeExtensionRegistrarDelegate::LoadExtensionForReloadWithQuietFailure(
+    const ExtensionId& extension_id,
+    const base::FilePath& path) {
+  DoLoadExtensionForReload(extension_id, path, false);
 }
 
 void ChromeExtensionRegistrarDelegate::ShowExtensionDisabledError(
@@ -375,16 +374,12 @@ void ChromeExtensionRegistrarDelegate::OnExtensionInstalled(
 
       pending_extension_manager->Remove(id);
 
-// TODO(crbug.com/394876083): Enable the following code on desktop Android
-// when ExtensionManagement is ported to desktop Android.
-#if BUILDFLAG(ENABLE_EXTENSIONS)
       ExtensionManagement* management =
           ExtensionManagementFactory::GetForBrowserContext(profile_);
       LOG(WARNING) << "ShouldAllowInstall() returned false for " << id
                    << " of type " << extension->GetType() << " and update URL "
                    << management->GetEffectiveUpdateURL(*extension).spec()
                    << "; not installing";
-#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
       // Delete the extension directory since we're not going to
       // load it.
@@ -420,9 +415,6 @@ void ChromeExtensionRegistrarDelegate::OnExtensionInstalled(
     disable_reasons.erase(disable_reason::DISABLE_UNSUPPORTED_REQUIREMENT);
   }
 
-// TODO(crbug.com/394876083): Enable the following code on desktop Android
-// when ExtensionManagement is ported to desktop Android.
-#if BUILDFLAG(ENABLE_EXTENSIONS)
   // Check if the extension was disabled because of the minimum version
   // requirements from enterprise policy, and satisfies it now.
   if (ExtensionManagementFactory::GetForBrowserContext(profile_)
@@ -430,7 +422,6 @@ void ChromeExtensionRegistrarDelegate::OnExtensionInstalled(
     // And remove the corresponding disable reason.
     disable_reasons.erase(disable_reason::DISABLE_UPDATE_REQUIRED_BY_POLICY);
   }
-#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
   if (install_flags & kInstallFlagIsBlocklistedForMalware) {
     // Installation of a blocklisted extension can happen from sync, policy,

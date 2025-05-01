@@ -89,9 +89,16 @@ found in the LICENSE file.
       <message name="IDS_GLIC_STATUS_ICON_MENU_SHOW" translateable="false" desc="This is the menu item for showing the glic UI.">
         Open glic
       </message>
-      <message name="IDS_GLIC_STATUS_ICON_MENU_CUSTOMIZE_KEYBOARD_SHORTCUT" translateable="false" desc="This is the menu item for customizing the keyboard shortcut.">
-        Customize keyboard shortcut
-      </message>
+      <if expr="is_win or is_linux">
+        <message name="IDS_GLIC_STATUS_ICON_MENU_CUSTOMIZE_KEYBOARD_SHORTCUT" translateable="false" desc="This is the menu item for customizing the keyboard shortcut.">
+          Customize keyboard shortcut
+        </message>
+      </if>
+      <if expr="is_macosx">
+        <message name="IDS_GLIC_STATUS_ICON_MENU_CUSTOMIZE_KEYBOARD_SHORTCUT" translateable="false" desc="This is the menu item for customizing the keyboard shortcut.">
+          Customize Keyboard Shortcut...
+        </message>
+      </if>
       <if expr="is_macosx">
         <message name="IDS_GLIC_STATUS_ICON_MENU_REMOVE_ICON" translateable="false" desc="This is the menu item for removing the glic icon from the menu bar.">
           Disable glic in menu bar
@@ -203,6 +210,12 @@ found in the LICENSE file.
       </message>
       <message name="IDS_SETTINGS_GLIC_KEYBOARD_SHORTCUT_LEARN_MORE_LABEL" translateable="false" desc="Label for the 'Learn more' link in the sublabel describing the keyboard shortcut.">
         Learn more about shortcuts
+      </message>
+      <message name="IDS_SETTINGS_GLIC_NAVIGATION_SHORTCUT" translateable="false" desc="Name of the navigation shortcut setting.">
+        Navigation shortcut
+      </message>
+      <message name="IDS_SETTINGS_GLIC_NAVIGATION_SHORTCUT_SUBLABEL" translateable="false" desc="Sublabel describing the keyboard shortcut navigate between Chrome and Glic.">
+        To leave or return to Glic, use keyboard shortcut
       </message>
       <message name="IDS_SETTINGS_GLIC_DATA_LOCATION_TOGGLE" translateable="false" desc="Name of the 'enable location sharing' setting.">
         Location

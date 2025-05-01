@@ -8,6 +8,9 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "extensions/browser/extension_registrar.h"
+#include "extensions/buildflags/buildflags.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 class Profile;
 
@@ -48,10 +51,11 @@ class ChromeExtensionRegistrarDelegate : public ExtensionRegistrar::Delegate {
   void PreUninstallExtension(scoped_refptr<const Extension> extension) override;
   void PostUninstallExtension(scoped_refptr<const Extension> extension,
                               base::OnceClosure done_callback) override;
-  void LoadExtensionForReload(
+  void LoadExtensionForReload(const ExtensionId& extension_id,
+                              const base::FilePath& path) override;
+  void LoadExtensionForReloadWithQuietFailure(
       const ExtensionId& extension_id,
-      const base::FilePath& path,
-      ExtensionRegistrar::LoadErrorBehavior load_error_behavior) override;
+      const base::FilePath& path) override;
   void ShowExtensionDisabledError(const Extension* extension,
                                   bool is_remote_install) override;
   bool CanEnableExtension(const Extension* extension) override;
@@ -70,6 +74,11 @@ class ChromeExtensionRegistrarDelegate : public ExtensionRegistrar::Delegate {
   // (e.g., due to an upgrade).
   void CheckPermissionsIncrease(const Extension* extension,
                                 bool is_extension_loaded);
+
+  // Given an extension ID and/or path, loads that extension as a reload.
+  void DoLoadExtensionForReload(const ExtensionId& extension_id,
+                                const base::FilePath& path,
+                                bool load_error_behavior_noisy);
 
   // Helper that updates the active extension list used for crash reporting.
   void UpdateActiveExtensionsInCrashReporter();

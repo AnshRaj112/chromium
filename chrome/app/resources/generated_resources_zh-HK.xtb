@@ -83,7 +83,6 @@
 <translation id="1053898984916097744">開始新工作，或在過程中取得協助。</translation>
 <translation id="1054048317165655285">在手機上完成設定</translation>
 <translation id="1054153489933238809">在新分頁中開啟原始圖片(&amp;I)</translation>
-<translation id="1054187194995068149">你好，呢個係預覽畫面</translation>
 <translation id="1054502481659725522">應用程式、網站和系統服務可使用你的位置</translation>
 <translation id="1055274863771110134">{NUM_WEEKS,plural, =1{請在 1 星期內更新 <ph name="DEVICE_TYPE" />}other{請在 {NUM_WEEKS} 星期內更新 <ph name="DEVICE_TYPE" />}}</translation>
 <translation id="1055606969515662982">使用遙控器停止投放</translation>
@@ -4551,6 +4550,7 @@
 <translation id="4139326893730851150">韌體更新</translation>
 <translation id="4142052906269098341">使用手機解鎖 <ph name="DEVICE_TYPE" />。<ph name="LINK_BEGIN" />瞭解詳情<ph name="LINK_END" /></translation>
 <translation id="4143606504420684845">探索 AI 如何塑造你的使用體驗，以及就你的私隱權作出明智選擇</translation>
+<translation id="4143754025452944766">你也可以選擇從這部裝置移除帳戶擴充程式。</translation>
 <translation id="4146026355784316281">一律使用系統檢視器開啟</translation>
 <translation id="4146785383423576110">重設並清理</translation>
 <translation id="4147099377280085053">選取點字表</translation>

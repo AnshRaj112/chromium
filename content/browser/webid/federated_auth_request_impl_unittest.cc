@@ -925,6 +925,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
         "Ken R. Example",            // name
         "Ken",                       // given_name
         GURL(),                      // picture
+        "(650) 312-3223",            // phone number
+        "kenr",                      // username
         std::vector<std::string>(),  // login_hints
         std::vector<std::string>(),  // domain_hints
         std::vector<std::string>()   // labels
@@ -953,6 +955,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
         "Ken R. Example",            // name
         "Ken",                       // given_name
         GURL(),                      // picture
+        "(650) 312-3223",            // phone number
+        "kenr",                      // username
         kLoginHints,                 // login_hints
         std::vector<std::string>(),  // domain_hints
         std::vector<std::string>()   // labels
@@ -966,6 +970,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
             "Ken R. Example",            // name
             "Ken",                       // given_name
             GURL(),                      // picture
+            "(650) 312-3223",            // phone number
+            "kenr",                      // username
             std::vector<std::string>(),  // login_hints
             kDomainHintVector,           // domain_hints
             std::vector<std::string>()   // labels
@@ -978,6 +984,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
                         "Nicolas P",                 // name
                         "Nicolas",                   // given_name
                         GURL(),                      // picture
+                        "(650) 312-3223",            // phone number
+                        "npm",                       // username
                         std::vector<std::string>(),  // login_hints
                         std::vector<std::string>(),  // domain_hints
                         std::vector<std::string>(),  // labels
@@ -991,6 +999,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
                         "Zachary T",                 // name
                         "Zach",                      // given_name
                         GURL(),                      // picture
+                        "(650) 312-3223",            // phone number
+                        "tanz",                      // username
                         std::vector<std::string>(),  // login_hints
                         std::vector<std::string>(),  // domain_hints
                         std::vector<std::string>(),  // labels
@@ -1004,6 +1014,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
                              "Nicolas P",                 // name
                              "Nicolas",                   // given_name
                              GURL(),                      // picture
+                             "(650) 312-3223",            // phone number
+                             "npm",                       // username
                              std::vector<std::string>(),  // login_hints
                              std::vector<std::string>(),  // domain_hints
                              std::vector<std::string>(),  // labels
@@ -1017,6 +1029,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
                              "Peter K",                   // name
                              "Peter",                     // given_name
                              GURL(),                      // picture
+                             "(650) 312-3223",            // phone number
+                             "peter",                     // username
                              std::vector<std::string>(),  // login_hints
                              std::vector<std::string>(),  // domain_hints
                              std::vector<std::string>(),  // labels
@@ -1030,6 +1044,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
                              "Zachary T",                 // name
                              "Zach",                      // given_name
                              GURL(),                      // picture
+                             "(650) 312-3223",            // phone number
+                             "zacht",                     // username
                              std::vector<std::string>(),  // login_hints
                              std::vector<std::string>(),  // domain_hints
                              std::vector<std::string>(),  // labels
@@ -1044,6 +1060,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
             "Nicolas P",                 // name
             "Nicolas",                   // given_name
             GURL(),                      // picture
+            "(650) 312-3223",            // phone number
+            "npm",                       // username
             kNicolasHints,               // login_hints
             kDomainHintVector,           // domain_hints
             std::vector<std::string>(),  // labels
@@ -1057,6 +1075,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
             "Peter K",                   // name
             "Peter",                     // given_name
             GURL(),                      // picture
+            "(650) 312-3223",            // phone number
+            "peterk",                    // username
             kPeterHints,                 // login_hints
             std::vector<std::string>(),  // domain_hints
             kLabelVector,                // labels
@@ -1070,6 +1090,8 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
             "Zachary T",                 // name
             "Zach",                      // given_name
             GURL(),                      // picture
+            "(650) 312-3223",            // phone number
+            "zacht",                     // username
             kZachHints,                  // login_hints
             kTwoDomainHints,             // domain_hints
             std::vector<std::string>(),  // labels
@@ -1731,9 +1753,6 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
   }
 
   void ExpectSuccessfulActiveFlow() {
-    base::test::ScopedFeatureList list;
-    list.InitAndEnableFeature(features::kFedCmButtonMode);
-
     test_permission_delegate_
         ->idp_signin_statuses_[OriginFromString(kProviderUrlFull)] = false;
 
@@ -5137,8 +5156,6 @@ TEST_F(FederatedAuthRequestImplTest, TooManyRequestsDifferentIdP) {
 
 TEST_F(FederatedAuthRequestImplTest,
        ActiveModeTooManyRequestsWithNewPassiveFlow) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
   base::RunLoop ukm_loop;
   ukm_recorder()->SetOnAddEntryCallback(FedCmEntry::kEntryName,
                                         ukm_loop.QuitClosure());
@@ -5193,8 +5210,6 @@ TEST_F(FederatedAuthRequestImplTest,
 
 TEST_F(FederatedAuthRequestImplTest,
        ActiveModeTooManyRequestsWithNewActiveFlow) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
   base::RunLoop ukm_loop;
   ukm_recorder()->SetOnAddEntryCallback(FedCmEntry::kEntryName,
                                         ukm_loop.QuitClosure());
@@ -5386,9 +5401,6 @@ TEST_F(FederatedAuthRequestImplTest, AccountsSortedWithTimestamps) {
 }
 
 TEST_F(FederatedAuthRequestImplTest, AccountLabelMultipleAccountsNoMatch) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAuthz);
-
   RequestParameters parameters = kDefaultRequestParameters;
   const RequestExpectations expectations = {
       RequestTokenStatus::kError,
@@ -5418,9 +5430,6 @@ TEST_F(FederatedAuthRequestImplTest, AccountLabelMultipleAccountsNoMatch) {
 }
 
 TEST_F(FederatedAuthRequestImplTest, AccountLabelMultipleAccountsOneMatch) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAuthz);
-
   RequestParameters parameters = kDefaultRequestParameters;
 
   MockConfiguration configuration = kConfigurationValid;
@@ -5969,28 +5978,9 @@ TEST_F(FederatedAuthRequestImplTest, IdTokenInvalidContentType) {
   ExpectStatusMetrics(TokenStatus::kIdTokenInvalidContentType);
 }
 
-// Test that the implementation ignores the fields parameter when AuthZ is
-// disabled.
-TEST_F(FederatedAuthRequestImplTest, ScopeGetsIgnoredWhenAuthzIsDisabled) {
-  base::test::ScopedFeatureList list;
-  list.InitAndDisableFeature(features::kFedCmAuthz);
-
-  RequestParameters parameters = kDefaultRequestParameters;
-  parameters.identity_providers[0].fields = {"non_default_field"};
-
-  RunAuthTest(parameters, kExpectationSuccess, kConfigurationValid);
-
-  // We expect the metadata file to be fetched when fields is []
-  // but AuthZ is disabled.
-  EXPECT_TRUE(DidFetch(FetchedEndpoint::CLIENT_METADATA));
-}
-
 // Test successful AuthZ request that returns tokens without opening
 // pop-up windows.
 TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestNoPopUpWindow) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAuthz);
-
   RequestParameters parameters = kDefaultRequestParameters;
   parameters.identity_providers[0].fields = {"non_default_field"};
 
@@ -6010,10 +6000,7 @@ TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestNoPopUpWindow) {
 // windows.
 TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestWithPopUpWindow) {
   base::test::ScopedFeatureList list;
-  list.InitWithFeatures(
-      /*enabled_features=*/{features::kFedCmAuthz,
-                            features::kFedCmMetricsEndpoint},
-      /*disabled_features=*/{});
+  list.InitAndEnableFeature(features::kFedCmMetricsEndpoint);
 
   RequestParameters parameters = kDefaultRequestParameters;
   parameters.identity_providers[0].fields = {"non_default_field"};
@@ -6084,9 +6071,6 @@ TEST_F(FederatedAuthRequestImplTest, SuccessfulAuthZRequestWithPopUpWindow) {
 
 // Test the continuation popup calling close().
 TEST_F(FederatedAuthRequestImplTest, ContinuationPopupCallingClose) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAuthz);
-
   RequestParameters parameters = kDefaultRequestParameters;
 
   MockConfiguration config = kConfigurationValid;
@@ -6144,9 +6128,6 @@ TEST_F(FederatedAuthRequestImplTest, ContinuationPopupCallingClose) {
 // windows.
 TEST_F(FederatedAuthRequestImplTest,
        FailsLoadingAContinueOnForADifferentOrigin) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAuthz);
-
   RequestParameters parameters = kDefaultRequestParameters;
   parameters.identity_providers[0].fields = {"non_default_field"};
 
@@ -6182,9 +6163,6 @@ TEST_F(FederatedAuthRequestImplTest,
 
 // Test metrics for a request with parameters.
 TEST_F(FederatedAuthRequestImplTest, RequestWithParameters) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAuthz);
-
   RequestParameters parameters = kDefaultRequestParameters;
   parameters.identity_providers[0].params_json = "{\"foo\", \"bar\"}";
 
@@ -6197,9 +6175,6 @@ TEST_F(FederatedAuthRequestImplTest, RequestWithParameters) {
 
 // Test metrics for a request with parameters and scopes.
 TEST_F(FederatedAuthRequestImplTest, RequestWithParametersAndScopes) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAuthz);
-
   RequestParameters parameters = kDefaultRequestParameters;
   parameters.identity_providers[0].fields = {"non_default_field"};
   parameters.identity_providers[0].params_json = "{\"foo\", \"bar\"}";
@@ -6225,9 +6200,6 @@ TEST_F(FederatedAuthRequestImplTest,
 
 // Test active flow failure outside of user activation.
 TEST_F(FederatedAuthRequestImplTest, ActiveFlowRequiresUserActivation) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
-
   test_permission_delegate_
       ->idp_signin_statuses_[OriginFromString(kProviderUrlFull)] = false;
 
@@ -6251,9 +6223,6 @@ TEST_F(FederatedAuthRequestImplTest, ActiveFlowRequiresUserActivation) {
 
 // Test the active flow request fails without delay if IdP config is wrong.
 TEST_F(FederatedAuthRequestImplTest, ActiveFlowWellKnownNotInList) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
-
   RequestExpectations request_not_in_list = {
       RequestTokenStatus::kError,
       FederatedAuthRequestResult::kConfigNotInWellKnown,
@@ -6284,9 +6253,6 @@ TEST_F(FederatedAuthRequestImplTest, ActiveFlowWellKnownNotInList) {
 }
 
 TEST_F(FederatedAuthRequestImplTest, ActiveFlowWithUnknownLoginStatus) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
-
   url::Origin kIdpOrigin = OriginFromString(kProviderUrlFull);
   MockConfiguration configuration = kConfigurationValid;
   configuration.idp_info[kProviderUrlFull].accounts_response.parse_status =
@@ -6317,9 +6283,6 @@ TEST_F(FederatedAuthRequestImplTest, ActiveFlowWithUnknownLoginStatus) {
 
 // Test that active flow can skip the mismatch UI.
 TEST_F(FederatedAuthRequestImplTest, ActiveFlowSkipsMismatchUI) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
-
   test_permission_delegate_
       ->idp_signin_statuses_[OriginFromString(kProviderUrlFull)] = true;
   MockConfiguration configuration = kConfigurationValid;
@@ -6354,9 +6317,6 @@ TEST_F(FederatedAuthRequestImplTest, ActiveFlowShowsLoadingUI) {
 
 // Test dismissing a active flow through the loading UI.
 TEST_F(FederatedAuthRequestImplTest, ActiveFlowDismissLoadingUI) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
-
   static_cast<TestRenderFrameHost*>(web_contents()->GetPrimaryMainFrame())
       ->SimulateUserActivation();
 
@@ -6384,8 +6344,6 @@ TEST_F(FederatedAuthRequestImplTest, CloseModalDialogView) {
 }
 
 TEST_F(FederatedAuthRequestImplTest, GetDisclosureFieldsEmpty) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAuthz);
   // An unknown field is being requested.
   EXPECT_THAT(GetDisclosureFields({"address"}), ElementsAre());
   // Nothing is requested.
@@ -6393,8 +6351,6 @@ TEST_F(FederatedAuthRequestImplTest, GetDisclosureFieldsEmpty) {
 }
 
 TEST_F(FederatedAuthRequestImplTest, GetDisclosureFields) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAuthz);
   // When no fields are passed, we use the default.
   EXPECT_THAT(federated_auth_request_impl_->GetDisclosureFields(
                   *NewIDPWithFields(std::nullopt)),
@@ -6405,7 +6361,7 @@ TEST_F(FederatedAuthRequestImplTest, GetDisclosureFields) {
   // When a superset of the supported fields is passed, we should mediate the
   // supported fields.
   EXPECT_THAT(
-      GetDisclosureFields({"name", "email", "picture", "locale", "phone"}),
+      GetDisclosureFields({"name", "email", "picture", "locale", "tel"}),
       ElementsAre(Field::kName, Field::kEmail, Field::kPicture));
 }
 
@@ -6416,7 +6372,7 @@ TEST_F(FederatedAuthRequestImplTest,
   // When a superset of the supported fields is passed, we should mediate the
   // supported fields.
   EXPECT_THAT(
-      GetDisclosureFields({"name", "email", "picture", "locale", "phone"}),
+      GetDisclosureFields({"name", "email", "picture", "locale", "tel"}),
       ElementsAre(Field::kName, Field::kEmail, Field::kPicture,
                   Field::kPhoneNumber));
 }
@@ -6426,24 +6382,12 @@ TEST_F(FederatedAuthRequestImplTest,
   base::test::ScopedFeatureList list;
   list.InitAndDisableFeature(features::kFedCmAlternativeIdentifiers);
   // We should only support the new identifiers if the flag is enabled
-  EXPECT_THAT(GetDisclosureFields({"username", "phone"}), ElementsAre());
+  EXPECT_THAT(GetDisclosureFields({"username", "tel"}), ElementsAre());
 }
 TEST_F(FederatedAuthRequestImplTest, GetDisclosureFieldsSubsetOfDefault) {
-  base::test::ScopedFeatureList list;
-  list.InitWithFeatures({features::kFedCmAuthz, features::kFedCmFlexibleFields},
-                        {});
   // Subsets of the default fields should work.
   EXPECT_THAT(GetDisclosureFields({"name", "locale"}),
               ElementsAre(Field::kName));
-}
-
-TEST_F(FederatedAuthRequestImplTest, GetDisclosureFieldsWithoutFeatureEnabled) {
-  // Assert that we always mediate the default fields when the kFedCmAuthz flag
-  // is not enabled.
-  base::test::ScopedFeatureList list;
-  list.InitAndDisableFeature(features::kFedCmAuthz);
-  EXPECT_THAT(GetDisclosureFields({"locale"}),
-              ElementsAre(Field::kName, Field::kEmail, Field::kPicture));
 }
 
 class FederatedAuthRequestImplNewTabTest : public FederatedAuthRequestImplTest {
@@ -7370,9 +7314,6 @@ TEST_F(FederatedAuthRequestImplTest, DomainHintAddAccount) {
 
 // Test that auto re-authn works in active mode.
 TEST_F(FederatedAuthRequestImplTest, AutoReauthnInActiveMode) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
-
   // Pretend the sharing permission has been granted for this account.
   EXPECT_CALL(
       *test_permission_delegate_,
@@ -7413,9 +7354,6 @@ TEST_F(FederatedAuthRequestImplTest, AutoReauthnInActiveMode) {
 // Test that IdP claimed SignUp takes precedence over browser observed SignIn.
 TEST_F(FederatedAuthRequestImplTest,
        IdPClaimedSignUpTakesPrecedenceOverBrowserObservedSignIn) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
-
   // Pretend the sharing permission has been granted for all accounts.
   EXPECT_CALL(
       *test_permission_delegate_,
@@ -7453,9 +7391,6 @@ TEST_F(FederatedAuthRequestImplTest,
 // Test that IdP claimed SignIn does not affect browser observed SignUp.
 TEST_F(FederatedAuthRequestImplTest,
        IdPClaimedSignInDoesNotAffectBrowserObservedSignUp) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
-
   // Pretend the sharing permission has NOT been granted for any account.
   EXPECT_CALL(
       *test_permission_delegate_,
@@ -7491,9 +7426,6 @@ TEST_F(FederatedAuthRequestImplTest,
 // third-party cookies access.
 TEST_F(FederatedAuthRequestImplTest,
        IdPClaimedSignInAffectsBrowserObservedSignUpWith3PCAccess) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
-
   // Pretend the sharing permission has NOT been granted for any account.
   EXPECT_CALL(
       *test_permission_delegate_,
@@ -7548,9 +7480,6 @@ TEST_F(FederatedAuthRequestImplTest, ActiveFlowNotAffectedByEmbargo) {
 
 // Test dismissing UI in active flow does not trigger embargo.
 TEST_F(FederatedAuthRequestImplTest, ActiveFlowNotAffectEmbargo) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmButtonMode);
-
   base::RunLoop ukm_loop;
   ukm_recorder()->SetOnAddEntryCallback(FedCmEntry::kEntryName,
                                         ukm_loop.QuitClosure());
@@ -7739,9 +7668,6 @@ TEST_F(FederatedAuthRequestImplTest, FailureDialogImmediateDismiss) {
 }
 
 TEST_F(FederatedAuthRequestImplTest, UseOtherAccountAccountOrder) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmUseOtherAccount);
-
   MockConfiguration configuration = kConfigurationValid;
   configuration.accounts_dialog_action = AccountsDialogAction::kAddAccount;
 
@@ -7797,9 +7723,6 @@ TEST_F(FederatedAuthRequestImplTest, UseOtherAccountAccountOrder) {
 // Tests that when use a different account is used and multiple accounts are
 // logged in at once, all the new accounts are part of the new_accounts().
 TEST_F(FederatedAuthRequestImplTest, UseOtherAccountMultipleNewAccounts) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmUseOtherAccount);
-
   MockConfiguration configuration = kConfigurationValid;
   configuration.accounts_dialog_action = AccountsDialogAction::kAddAccount;
   auto dialog_controller =
@@ -7851,8 +7774,6 @@ TEST_F(FederatedAuthRequestImplTest, UseOtherAccountMultipleNewAccounts) {
 }
 
 TEST_F(FederatedAuthRequestImplTest, UseOtherAccountNoNewAccount) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmUseOtherAccount);
   MockConfiguration configuration = kConfigurationValid;
   configuration.accounts_dialog_action = AccountsDialogAction::kAddAccount;
   auto dialog_controller =
@@ -7891,8 +7812,6 @@ TEST_F(FederatedAuthRequestImplTest, UseOtherAccountNoNewAccount) {
 }
 
 TEST_F(FederatedAuthRequestImplTest, UseOtherAccountThenClose) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmUseOtherAccount);
   MockConfiguration configuration = kConfigurationValid;
   configuration.accounts_dialog_action = AccountsDialogAction::kAddAccount;
   auto dialog_controller =

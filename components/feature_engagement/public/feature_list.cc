@@ -69,6 +69,7 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHKeyboardAccessoryPaymentOfferFeature,
     &kIPHLowUserEngagementDetectorFeature,
     &kIPHMicToolbarFeature,
+    &kIPHMenuAddToGroup,
     &kIPHPageInfoFeature,
     &kIPHPageInfoStoreInfoFeature,
     &kIPHPageZoomFeature,
@@ -94,6 +95,7 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHTabGroupsSurfaceFeature,
     &kIPHTabGroupsSurfaceOnHideFeature,
     &kIPHTabGroupSyncOnStripFeature,
+    &kIPHTabSwitcherAddToGroup,
     &kIPHTabSwitcherButtonFeature,
     &kIPHTabSwitcherButtonSwitchIncognitoFeature,
     &kIPHTranslateMenuButtonFeature,
@@ -151,6 +153,8 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHiOSPromoNonModalUrlPasteDefaultBrowserFeature,
     &kIPHiOSPromoNonModalAppSwitcherDefaultBrowserFeature,
     &kIPHiOSPromoNonModalShareDefaultBrowserFeature,
+    &kIPHiOSPromoNonModalSigninPasswordFeature,
+    &kIPHiOSPromoNonModalSigninBookmarkFeature,
     &kIPHiOSPromoPasswordManagerWidgetFeature,
     &kIPHiOSPullToRefreshFeature,
     &kIPHiOSReplaceSyncPromosWithSignInPromos,
@@ -179,12 +183,14 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHiOSReminderNotificationsOverflowMenuNewBadgeFeature,
     &kIPHiOSSettingsInOverflowMenuBubbleFeature,
     &kIPHiOSSwitchAccountsWithNTPAccountParticleDiscFeature,
+    &kIPHiOSWelcomeBackFeature,
 #endif  // BUILDFLAG(IS_IOS)
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || \
     BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
     &kEsbDownloadRowPromoFeature,
 #endif
+    &kIPHAutofillEnableLoyaltyCardsFeature,
     &kIPHBatterySaverModeFeature,
     &kIPHCompanionSidePanelFeature,
     &kIPHCompanionSidePanelRegionSearchFeature,
@@ -213,6 +219,7 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHMerchantTrustFeature,
     &kIPHTabAudioMutingFeature,
     &kIPHPasswordsSavePrimingPromoFeature,
+    &kIPHPasswordsSaveRecoveryPromoFeature,
     &kIPHPasswordsManagementBubbleAfterSaveFeature,
     &kIPHPasswordsManagementBubbleDuringSigninFeature,
     &kIPHPasswordsWebAppProfileSwitchFeature,

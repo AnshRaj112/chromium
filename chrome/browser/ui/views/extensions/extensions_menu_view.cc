@@ -494,6 +494,15 @@ void ExtensionsMenuView::OnToolbarPinnedActionsChanged() {
   }
 }
 
+base::flat_set<raw_ptr<ExtensionMenuItemView, CtnExperimental>>
+ExtensionsMenuView::extensions_menu_items_for_testing() {
+  return extensions_menu_items_;
+}
+
+views::Button* ExtensionsMenuView::manage_extensions_button_for_testing() {
+  return manage_extensions_button_;
+}
+
 // static
 base::AutoReset<bool> ExtensionsMenuView::AllowInstancesForTesting() {
   return base::AutoReset<bool>(&g_allow_testing_dialogs, true);

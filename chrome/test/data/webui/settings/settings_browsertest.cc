@@ -47,7 +47,8 @@ class SettingsBrowserTest : public WebUIMochaBrowserTest {
 #if !BUILDFLAG(IS_CHROMEOS)
             toast_features::kToastRefinements,
 #endif
-            privacy_sandbox::kPrivacySandboxRelatedWebsiteSetsUi},
+            privacy_sandbox::kPrivacySandboxRelatedWebsiteSetsUi,
+            privacy_sandbox::kFingerprintingProtectionUx},
         /*disabled_features=*/{});
     set_test_loader_host(chrome::kChromeUISettingsHost);
   }
@@ -256,6 +257,11 @@ IN_PROC_BROWSER_TEST_F(SettingsTest, IdleLoad) {
   RunTest("settings/idle_load_test.js", "mocha.run()");
 }
 
+IN_PROC_BROWSER_TEST_F(SettingsTest, IncognitoTrackingProtectionsPageTest) {
+  RunTest("settings/incognito_tracking_protections_page_test.js",
+          "runMochaSuite('IncognitoTrackingProtectionsPageTest')");
+}
+
 #if !BUILDFLAG(IS_CHROMEOS)
 IN_PROC_BROWSER_TEST_F(SettingsTest, ImportDataDialog) {
   RunTest("settings/import_data_dialog_test.js", "mocha.run()");
@@ -354,7 +360,116 @@ IN_PROC_BROWSER_TEST_F(SettingsTest, PrefUtils) {
 
 #if BUILDFLAG(ENABLE_GLIC)
 IN_PROC_BROWSER_TEST_F(SettingsTest, GlicSettingsPage) {
-  RunTest("settings/glic_page_test.js", "mocha.run()");
+  RunTest("settings/glic_page_test.js", "runMochaSuite('GlicPage Default')");
+}
+
+class SettingsGlicPageLearnMoreTest : public SettingsBrowserTest {
+ public:
+  SettingsGlicPageLearnMoreTest() {
+    scoped_feature_list_.InitWithFeaturesAndParameters(
+        {{features::kGlicLearnMoreURLConfig,
+          {
+              {"glic-shortcuts-learn-more-url", "https://google.com/"},
+          }}},
+        /*disabled_features=*/{});
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(SettingsGlicPageLearnMoreTest,
+                       GlicSettingsLearnMoreEnabled) {
+  RunTest("settings/glic_page_test.js",
+          "runMochaSuite('GlicPage LearnMoreEnabled')");
+}
+
+class SettingsGlicPageHeaderLearnMoreTest : public SettingsBrowserTest {
+ public:
+  SettingsGlicPageHeaderLearnMoreTest() {
+    scoped_feature_list_.InitWithFeaturesAndParameters(
+        {{features::kGlicLearnMoreURLConfig,
+          {
+              {"glic-settings-page-learn-more-url", "https://google.com/"},
+          }}},
+        /*disabled_features=*/{});
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(SettingsGlicPageHeaderLearnMoreTest,
+                       GlicSettingsHeaderLearnMoreEnabled) {
+  RunTest("settings/glic_page_test.js",
+          "runMochaSuite('GlicPage HeaderLearnMoreEnabled')");
+}
+
+class SettingsGlicPageLauncherToggleLearnMoreTest : public SettingsBrowserTest {
+ public:
+  SettingsGlicPageLauncherToggleLearnMoreTest() {
+    scoped_feature_list_.InitWithFeaturesAndParameters(
+        {{features::kGlicLearnMoreURLConfig,
+          {
+              {"glic-shortcuts-launcher-toggle-learn-more-url",
+               "https://google.com/"},
+          }}},
+        /*disabled_features=*/{});
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(SettingsGlicPageLauncherToggleLearnMoreTest,
+                       GlicSettingsLauncherToggleLearnMoreEnabled) {
+  RunTest("settings/glic_page_test.js",
+          "runMochaSuite('GlicPage LauncherToggleLearnMoreEnabled')");
+}
+
+class SettingsGlicPageLocationToggleLearnMoreTest : public SettingsBrowserTest {
+ public:
+  SettingsGlicPageLocationToggleLearnMoreTest() {
+    scoped_feature_list_.InitWithFeaturesAndParameters(
+        {{features::kGlicLearnMoreURLConfig,
+          {
+              {"glic-shortcuts-location-toggle-learn-more-url",
+               "https://google.com/"},
+          }}},
+        /*disabled_features=*/{});
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(SettingsGlicPageLocationToggleLearnMoreTest,
+                       GlicSettingsLocationToggleLearnMoreEnabled) {
+  RunTest("settings/glic_page_test.js",
+          "runMochaSuite('GlicPage LocationToggleLearnMoreEnabled')");
+}
+
+class SettingsGlicPageTabAccessToggleLearnMoreTest
+    : public SettingsBrowserTest {
+ public:
+  SettingsGlicPageTabAccessToggleLearnMoreTest() {
+    scoped_feature_list_.InitWithFeaturesAndParameters(
+        {{features::kGlicLearnMoreURLConfig,
+          {
+              {"glic-shortcuts-tab-access-toggle-learn-more-url",
+               "https://google.com/"},
+          }}},
+        /*disabled_features=*/{});
+  }
+
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+IN_PROC_BROWSER_TEST_F(SettingsGlicPageTabAccessToggleLearnMoreTest,
+                       GlicSettingsTabAccessToggleLearnMoreEnabled) {
+  RunTest("settings/glic_page_test.js",
+          "runMochaSuite('GlicPage TabAccessToggleLearnMoreEnabled')");
 }
 #endif
 
@@ -738,10 +853,6 @@ IN_PROC_BROWSER_TEST_F(SettingsCookiesPageTest, ExceptionsList) {
 IN_PROC_BROWSER_TEST_F(SettingsCookiesPageTest, TrackingProtectionSettings) {
   RunTest("settings/cookies_page_test.js",
           "runMochaSuite('TrackingProtectionSettings')");
-}
-
-IN_PROC_BROWSER_TEST_F(SettingsCookiesPageTest, ActSettings) {
-  RunTest("settings/cookies_page_test.js", "runMochaSuite('ActSettings')");
 }
 
 // Test with --enable-pixel-output-in-tests enabled, required by fingerprint

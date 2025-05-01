@@ -31,6 +31,7 @@
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_group_action_type.h"
 #import "ios/chrome/browser/toolbar/ui_bundled/tab_groups/tab_group_indicator_features_utils.h"
 #import "ios/chrome/common/ui/colors/semantic_color_names.h"
+#import "ios/chrome/common/ui/elements/gradient_view.h"
 #import "ios/chrome/common/ui/util/constraints_ui_util.h"
 #import "ios/chrome/grit/ios_strings.h"
 #import "ui/base/l10n/l10n_util_mac.h"
@@ -38,16 +39,25 @@
 using tab_groups::SharingState;
 
 namespace {
+// Animation.
+constexpr CGFloat kSwipeAnimationDuration = 0.1;
+
 // Background.
 constexpr CGFloat kBackgroundAlpha = 0.6;
 
-// Top toolbar
-constexpr CGFloat kTopToolbarHeight = 44;
-constexpr CGFloat kTopStackViewSpacing = 10;
+// Top toolbar.
+constexpr CGFloat kTopToolbarHeight = 58;
 constexpr CGFloat kTopToolbarMargin = 16;
 
+// Bottom toolbar.
+constexpr CGFloat kGradientHeight = 86;
+
 // Button.
-constexpr CGFloat kPlusImageSize = 20;
+constexpr CGFloat kButtonSpacing = 10;
+constexpr CGFloat kLegacyMenuImageSize = 20;
+constexpr CGFloat kCloseImageSize = 12.5;
+constexpr CGFloat kMenuImageSize = 16;
+constexpr CGFloat kButtonDiameter = 26;
 
 // Animation.
 constexpr CGFloat kTranslationCompletion = 0;
@@ -67,9 +77,44 @@ constexpr CGFloat kContainerMultiplier = 0.8;
 constexpr CGFloat kContainerCornerRadius = 24;
 constexpr CGFloat kContainerBackgroundAlpha = 0.8;
 
+// Returns a button to be added to the top toolbar.
+UIButton* TopToolbarButton(NSString* symbol_name,
+                           UIAction* action,
+                           CGFloat image_size) {
+  CHECK(IsContainedTabGroupEnabled());
+  UIBackgroundConfiguration* background_configuration =
+      [UIBackgroundConfiguration clearConfiguration];
+  background_configuration.visualEffect = [UIBlurEffect
+      effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialDark];
+
+  UIButtonConfiguration* configuration =
+      [UIButtonConfiguration plainButtonConfiguration];
+  configuration.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
+  configuration.baseForegroundColor = UIColor.whiteColor;
+  configuration.background = background_configuration;
+  configuration.image = DefaultSymbolWithConfiguration(
+      symbol_name, [UIImageSymbolConfiguration
+                       configurationWithPointSize:image_size
+                                           weight:UIImageSymbolWeightBold
+                                            scale:UIImageSymbolScaleMedium]);
+  ExtendedTouchTargetButton* button =
+      [ExtendedTouchTargetButton buttonWithConfiguration:configuration
+                                           primaryAction:action];
+  button.minimumDiameter = kButtonDiameter + kButtonSpacing;
+  button.translatesAutoresizingMaskIntoConstraints = NO;
+
+  [NSLayoutConstraint activateConstraints:@[
+    [button.heightAnchor constraintEqualToConstant:kButtonDiameter],
+    [button.widthAnchor constraintEqualToAnchor:button.heightAnchor],
+  ]];
+
+  return button;
+}
+
 }  // namespace
 
 @interface TabGroupViewController () <TabGridToolbarsGridDelegate,
+                                      UIGestureRecognizerDelegate,
                                       UINavigationBarDelegate>
 @end
 
@@ -111,10 +156,21 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   SharingState _sharingState;
   // The bottom toolbar.
   TabGridBottomToolbar* _bottomToolbar;
+  // Gradient displayed at the bottom to show that there are other tabs below.
+  UIView* _bottomGradient;
+  // The button containing the facepile.
+  UIButton* _facePileContainer;
   // The face pile view that displays the share button or the face pile.
   UIView* _facePileView;
+  // Constraints for the container on narrow vs large windows.
+  NSArray<NSLayoutConstraint*>* _narrowWidthConstraints;
+  NSArray<NSLayoutConstraint*>* _largeWidthConstraints;
   // Container for the content of the ViewController.
   UIView* _container;
+  // The background of the container, for animations.
+  UIView* _containerBackground;
+  // The gesture recognizer to swipe to dismiss the tab group view.
+  UIPanGestureRecognizer* _swipeDownGestureRecognizer;
 }
 
 #pragma mark - Public
@@ -148,6 +204,8 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
 - (void)contentWillAppearAnimated:(BOOL)animated {
   [self.view layoutIfNeeded];
   [_gridViewController contentWillAppearAnimated:YES];
+  // To be able to handle keyboard shortcuts.
+  [self becomeFirstResponder];
 }
 
 - (void)prepareForPresentation {
@@ -155,7 +213,16 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
 
   [self contentWillAppearAnimated:YES];
 
-  _navigationBar.alpha = 0;
+  // Provide a change for the top/bottom toolbar to react to the real content
+  // size of the collection view.
+  [self gridViewControllerDidScroll];
+
+  if (IsContainedTabGroupEnabled()) {
+    _topToolbar.alpha = 0;
+    _containerBackground.alpha = 0;
+  } else {
+    _navigationBar.alpha = 0;
+  }
   _gridViewController.view.alpha = 0;
   CGPoint center = [_gridViewController.view convertPoint:self.view.center
                                                  fromView:self.view];
@@ -165,10 +232,17 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
 }
 
 - (void)animateTopElementsPresentation {
-  _navigationBar.alpha = 1;
+  if (IsContainedTabGroupEnabled()) {
+    _topToolbar.alpha = 1;
+  } else {
+    _navigationBar.alpha = 1;
+  }
 }
 
 - (void)animateGridPresentation {
+  if (IsContainedTabGroupEnabled()) {
+    _containerBackground.alpha = 1;
+  }
   _gridViewController.view.alpha = 1;
   [_gridViewController resetVisibleCellsCenterAndScale];
 }
@@ -218,8 +292,12 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
 }
 
 - (void)gridViewControllerDidScroll {
-  [_bottomToolbar
-      setScrollViewScrolledToEdge:self.gridViewController.scrolledToBottom];
+  if (IsContainedTabGroupEnabled()) {
+    _bottomGradient.hidden = self.gridViewController.scrolledToBottom;
+  } else {
+    [_bottomToolbar
+        setScrollViewScrolledToEdge:self.gridViewController.scrolledToBottom];
+  }
   _topToolbarBackground.hidden = self.gridViewController.scrolledToTop;
 }
 
@@ -231,11 +309,34 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   self.view.accessibilityViewIsModal = YES;
   self.view.backgroundColor = UIColor.clearColor;
 
+  if (IsContainedTabGroupEnabled()) {
+    _swipeDownGestureRecognizer =
+        [[UIPanGestureRecognizer alloc] initWithTarget:self
+                                                action:@selector(handlePan:)];
+    _swipeDownGestureRecognizer.delegate = self;
+    _swipeDownGestureRecognizer.cancelsTouchesInView = NO;
+    [self.view addGestureRecognizer:_swipeDownGestureRecognizer];
+  }
+
   if (!UIAccessibilityIsReduceTransparencyEnabled()) {
     _blurView = [[UIVisualEffectView alloc] initWithEffect:nil];
     _blurView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:_blurView];
     AddSameConstraints(self.view, _blurView);
+  }
+
+  if (IsContainedTabGroupEnabled()) {
+    // Add it after the blur to be sure the tap goes through.
+    UIButton* backgroundButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [backgroundButton addTarget:self
+                         action:@selector(didTapCloseButton)
+               forControlEvents:UIControlEventTouchUpInside];
+    // The background is not selectable by voice over as there is an explicit
+    // close button.
+    backgroundButton.accessibilityElementsHidden = YES;
+    backgroundButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:backgroundButton];
+    AddSameConstraints(backgroundButton, self.view);
   }
 
   [self fadeBlurIn];
@@ -245,10 +346,29 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   [self.view addSubview:_container];
 
   if (IsContainedTabGroupEnabled()) {
-    _container.backgroundColor =
+    _containerBackground = [[UIView alloc] init];
+    _containerBackground.translatesAutoresizingMaskIntoConstraints = NO;
+    _containerBackground.backgroundColor =
         [UIColor.blackColor colorWithAlphaComponent:kContainerBackgroundAlpha];
+    [_container addSubview:_containerBackground];
+    AddSameConstraints(_container, _containerBackground);
+
     _container.layer.cornerRadius = kContainerCornerRadius;
     _container.layer.masksToBounds = YES;
+
+    _narrowWidthConstraints = @[
+      [self.view.trailingAnchor
+          constraintEqualToAnchor:_container.trailingAnchor
+                         constant:kContainerMargin],
+      [self.view.leadingAnchor constraintEqualToAnchor:_container.leadingAnchor
+                                              constant:-kContainerMargin],
+    ];
+    _largeWidthConstraints = @[
+      [_container.widthAnchor constraintEqualToAnchor:self.view.widthAnchor
+                                           multiplier:kContainerMultiplier],
+    ];
+
+    [self updateContainerConstraints];
 
     [NSLayoutConstraint activateConstraints:@[
       [self.view.centerXAnchor
@@ -257,11 +377,6 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
           constraintEqualToAnchor:_container.centerYAnchor],
       [_container.heightAnchor constraintEqualToAnchor:self.view.heightAnchor
                                             multiplier:kContainerMultiplier],
-      [self.view.trailingAnchor
-          constraintEqualToAnchor:_container.trailingAnchor
-                         constant:kContainerMargin],
-      [self.view.leadingAnchor constraintEqualToAnchor:_container.leadingAnchor
-                                              constant:-kContainerMargin],
     ]];
   } else {
     AddSameConstraints(self.view, _container);
@@ -270,6 +385,14 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   if (IsContainedTabGroupEnabled()) {
     _topToolbar = [self configuredTopToolbar];
     [_container addSubview:_topToolbar];
+
+    _facePileContainer = [self configuredFacePileContainer];
+    if (_facePileView) {
+      CHECK(_topToolbarButtonsStackView);
+      [_topToolbarButtonsStackView insertArrangedSubview:_facePileContainer
+                                                 atIndex:0];
+    }
+    [self updateFacePileAccessibilityLabel];
 
     [NSLayoutConstraint activateConstraints:@[
       [_topToolbar.topAnchor constraintEqualToAnchor:_container.topAnchor],
@@ -310,13 +433,29 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   }
 
   // Add the toolbar after the grid to make sure it is above it.
+  if (IsContainedTabGroupEnabled()) {
+    _bottomGradient =
+        [[GradientView alloc] initWithTopColor:UIColor.clearColor
+                                   bottomColor:UIColor.blackColor];
+    _bottomGradient.translatesAutoresizingMaskIntoConstraints = NO;
+    _bottomGradient.userInteractionEnabled = NO;
+    [_container addSubview:_bottomGradient];
+    AddSameConstraintsToSides(
+        _container, _bottomGradient,
+        LayoutSides::kBottom | LayoutSides::kLeading | LayoutSides::kTrailing);
+    [_bottomGradient.heightAnchor constraintEqualToConstant:kGradientHeight]
+        .active = YES;
+
+    // Hide the default background of the bottom toolbar.
+    [_bottomToolbar setScrollViewScrolledToEdge:YES];
+  }
   [self configureBottomToolbar];
 
   if (@available(iOS 17, *)) {
     [self registerForTraitChanges:@[ UITraitVerticalSizeClass.class ]
-                       withAction:@selector(updateGridInsets)];
+                       withAction:@selector(sizeClassDidChange)];
     [self registerForTraitChanges:@[ UITraitHorizontalSizeClass.class ]
-                       withAction:@selector(updateGridInsets)];
+                       withAction:@selector(sizeClassDidChange)];
   }
 }
 
@@ -340,7 +479,7 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
           self.traitCollection.verticalSizeClass ||
       previousTraitCollection.horizontalSizeClass !=
           self.traitCollection.horizontalSizeClass) {
-    [self updateGridInsets];
+    [self sizeClassDidChange];
   }
 }
 #endif
@@ -399,6 +538,7 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   _gridViewController.shared = _sharingState != SharingState::kNotShared;
   if (IsContainedTabGroupEnabled()) {
     _menuButton.menu = [self configuredTabGroupMenu];
+    [self updateFacePileAccessibilityLabel];
   } else {
     [self configureNavigationBarItems];
   }
@@ -409,7 +549,12 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
     return;
   }
 
-  if (_facePileView.superview == self.view) {
+  if (IsContainedTabGroupEnabled()) {
+    if (_facePileView.superview == _facePileContainer) {
+      [_facePileView removeFromSuperview];
+    }
+    [_facePileContainer removeFromSuperview];
+  } else {
     [_facePileView removeFromSuperview];
   }
 
@@ -420,7 +565,13 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   }
 
   if (IsContainedTabGroupEnabled()) {
-    [_topToolbarButtonsStackView insertArrangedSubview:_facePileView atIndex:0];
+    if (!_facePileContainer) {
+      return;
+    }
+    [self updateFacePileContainer:_facePileContainer
+                     withFacePile:_facePileView];
+    [_topToolbarButtonsStackView insertArrangedSubview:_facePileContainer
+                                               atIndex:0];
   } else {
     [self configureNavigationBarItems];
   }
@@ -460,14 +611,9 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
 
 // Returns the menu button, configured.
 - (UIButton*)configuredMenuButton {
-  UIImage* threeDotImage =
-      DefaultSymbolWithPointSize(kMenuSymbol, kPlusImageSize);
-  UIButtonConfiguration* configuration =
-      [UIButtonConfiguration plainButtonConfiguration];
-  configuration.image = threeDotImage;
+  CHECK(IsContainedTabGroupEnabled());
 
-  UIButton* button = [UIButton buttonWithConfiguration:configuration
-                                         primaryAction:nil];
+  UIButton* button = TopToolbarButton(kMenuSymbol, nil, kMenuImageSize);
   button.showsMenuAsPrimaryAction = YES;
   button.menu = [self configuredTabGroupMenu];
   button.accessibilityIdentifier = kTabGroupOverflowMenuButtonIdentifier;
@@ -477,14 +623,30 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   return button;
 }
 
+// Returns the UIButton container for the facepile.
+- (UIButton*)configuredFacePileContainer {
+  UIButtonConfiguration* facePileContainerConfiguration =
+      [UIButtonConfiguration plainButtonConfiguration];
+  facePileContainerConfiguration.cornerStyle =
+      UIButtonConfigurationCornerStyleCapsule;
+  __weak __typeof(self) weakSelf = self;
+  UIButton* container = [UIButton
+      buttonWithConfiguration:facePileContainerConfiguration
+                primaryAction:[UIAction actionWithHandler:^(UIAction* action) {
+                  [weakSelf didTapFacePileButton];
+                }]];
+  container.accessibilityIdentifier = kTabGroupFacePileButtonIdentifier;
+  [self updateFacePileContainer:container withFacePile:_facePileView];
+  return container;
+}
+
 // Returns the stack view containing the top toolbar buttons.
 - (UIStackView*)configuredTopToolbarStackView {
   CHECK(IsContainedTabGroupEnabled());
   UIStackView* stackView = [[UIStackView alloc] init];
   stackView.translatesAutoresizingMaskIntoConstraints = NO;
   stackView.alignment = UIStackViewAlignmentCenter;
-  stackView.distribution = UIStackViewDistributionFill;
-  stackView.spacing = kTopStackViewSpacing;
+  stackView.spacing = kButtonSpacing;
 
   if (_facePileView) {
     [stackView addArrangedSubview:_facePileView];
@@ -497,12 +659,11 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   UIAction* closeAction = [UIAction actionWithHandler:^(UIAction* action) {
     [weakSelf didTapCloseButton];
   }];
-  UIButtonConfiguration* closeConfiguration =
-      [UIButtonConfiguration plainButtonConfiguration];
-  closeConfiguration.image =
-      DefaultSymbolWithPointSize(kXMarkSymbol, kPlusImageSize);
-  UIButton* closeButton = [UIButton buttonWithConfiguration:closeConfiguration
-                                              primaryAction:closeAction];
+
+  UIButton* closeButton =
+      TopToolbarButton(kXMarkSymbol, closeAction, kCloseImageSize);
+  closeButton.accessibilityLabel = l10n_util::GetNSString(IDS_CLOSE);
+
   [stackView addArrangedSubview:closeButton];
 
   return stackView;
@@ -567,7 +728,7 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   UINavigationItem* navigationItem = [[UINavigationItem alloc] init];
 
   UIImage* threeDotImage =
-      DefaultSymbolWithPointSize(kMenuSymbol, kPlusImageSize);
+      DefaultSymbolWithPointSize(kMenuSymbol, kLegacyMenuImageSize);
   UIBarButtonItem* menuItem =
       [[UIBarButtonItem alloc] initWithImage:threeDotImage
                                         menu:[self configuredTabGroupMenu]];
@@ -618,7 +779,7 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
     navigationItem.rightBarButtonItems = buttons;
   } else {
     UIImage* plusImage =
-        DefaultSymbolWithPointSize(kPlusSymbol, kPlusImageSize);
+        DefaultSymbolWithPointSize(kPlusSymbol, kLegacyMenuImageSize);
     UIBarButtonItem* plusItem =
         [[UIBarButtonItem alloc] initWithImage:plusImage
                                          style:UIBarButtonItemStylePlain
@@ -639,6 +800,11 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   dotView.translatesAutoresizingMaskIntoConstraints = NO;
   dotView.layer.cornerRadius = kDotSize / 2;
   dotView.backgroundColor = _groupColor;
+
+  [NSLayoutConstraint activateConstraints:@[
+    [dotView.heightAnchor constraintEqualToConstant:kDotSize],
+    [dotView.widthAnchor constraintEqualToAnchor:dotView.heightAnchor],
+  ]];
 
   return dotView;
 }
@@ -686,8 +852,6 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
         constraintEqualToAnchor:titleView.trailingAnchor],
     [_titleLabel.topAnchor constraintEqualToAnchor:titleView.topAnchor],
     [_titleLabel.bottomAnchor constraintEqualToAnchor:titleView.bottomAnchor],
-    [_coloredDotView.heightAnchor constraintEqualToConstant:kDotSize],
-    [_coloredDotView.widthAnchor constraintEqualToConstant:kDotSize],
   ]];
 
   if (IsContainedTabGroupEnabled()) {
@@ -917,11 +1081,18 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   // Shows the confirmation to ungroup the current group (keep the tab) and
   // close the view. Do nothing when a user cancels the action.
   if (IsTabGroupSyncEnabled()) {
-    [_handler
-        showTabGroupConfirmationForAction:TabGroupActionType::kUngroupTabGroup
-                                    group:_tabGroup->GetWeakPtr()
-                         sourceButtonItem:_navigationBar.topItem
-                                              .rightBarButtonItems[0]];
+    if (IsContainedTabGroupEnabled()) {
+      [_handler
+          showTabGroupConfirmationForAction:TabGroupActionType::kUngroupTabGroup
+                                      group:_tabGroup->GetWeakPtr()
+                                 sourceView:_menuButton];
+    } else {
+      [_handler
+          showTabGroupConfirmationForAction:TabGroupActionType::kUngroupTabGroup
+                                      group:_tabGroup->GetWeakPtr()
+                           sourceButtonItem:_navigationBar.topItem
+                                                .rightBarButtonItems[0]];
+    }
     return;
   }
 
@@ -940,11 +1111,18 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   if (IsTabGroupSyncEnabled()) {
     // Shows the confirmation to delete the tabs, delete the current group and
     // close the view. Do nothing when a user cancels the action.
-    [_handler
-        showTabGroupConfirmationForAction:TabGroupActionType::kDeleteTabGroup
-                                    group:_tabGroup->GetWeakPtr()
-                         sourceButtonItem:_navigationBar.topItem
-                                              .rightBarButtonItems[0]];
+    if (IsContainedTabGroupEnabled()) {
+      [_handler
+          showTabGroupConfirmationForAction:TabGroupActionType::kDeleteTabGroup
+                                      group:_tabGroup->GetWeakPtr()
+                                 sourceView:_menuButton];
+    } else {
+      [_handler
+          showTabGroupConfirmationForAction:TabGroupActionType::kDeleteTabGroup
+                                      group:_tabGroup->GetWeakPtr()
+                           sourceButtonItem:_navigationBar.topItem
+                                                .rightBarButtonItems[0]];
+    }
     return;
   }
 
@@ -958,11 +1136,18 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   CHECK(_gridViewController.shared);
   CHECK_EQ(_sharingState, SharingState::kSharedAndOwned);
 
-  [_handler
-      startLeaveOrDeleteSharedGroup:_tabGroup->GetWeakPtr()
-                          forAction:TabGroupActionType::kDeleteSharedTabGroup
-                   sourceButtonItem:_navigationBar.topItem
-                                        .rightBarButtonItems[0]];
+  if (IsContainedTabGroupEnabled()) {
+    [_handler
+        startLeaveOrDeleteSharedGroup:_tabGroup->GetWeakPtr()
+                            forAction:TabGroupActionType::kDeleteSharedTabGroup
+                           sourceView:_menuButton];
+  } else {
+    [_handler
+        startLeaveOrDeleteSharedGroup:_tabGroup->GetWeakPtr()
+                            forAction:TabGroupActionType::kDeleteSharedTabGroup
+                     sourceButtonItem:_navigationBar.topItem
+                                          .rightBarButtonItems[0]];
+  }
 }
 
 // Leaves the shared group and closes the view.
@@ -971,11 +1156,24 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   CHECK(_gridViewController.shared);
   CHECK_EQ(_sharingState, SharingState::kShared);
 
-  [_handler
-      startLeaveOrDeleteSharedGroup:_tabGroup->GetWeakPtr()
-                          forAction:TabGroupActionType::kLeaveSharedTabGroup
-                   sourceButtonItem:_navigationBar.topItem
-                                        .rightBarButtonItems[0]];
+  if (IsContainedTabGroupEnabled()) {
+    [_handler
+        startLeaveOrDeleteSharedGroup:_tabGroup->GetWeakPtr()
+                            forAction:TabGroupActionType::kLeaveSharedTabGroup
+                           sourceView:_menuButton];
+  } else {
+    [_handler
+        startLeaveOrDeleteSharedGroup:_tabGroup->GetWeakPtr()
+                            forAction:TabGroupActionType::kLeaveSharedTabGroup
+                     sourceButtonItem:_navigationBar.topItem
+                                          .rightBarButtonItems[0]];
+  }
+}
+
+// Called when the size class changed.
+- (void)sizeClassDidChange {
+  [self updateGridInsets];
+  [self updateContainerConstraints];
 }
 
 // Updates the safe area inset of the grid based on this VC safe areas and the
@@ -1003,6 +1201,47 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   _gridViewController.contentInsets = safeAreaInsets;
 }
 
+// Updates the constraints of the container based on the size class.
+- (void)updateContainerConstraints {
+  if (!IsContainedTabGroupEnabled()) {
+    return;
+  }
+  BOOL isNarrowWidth =
+      self.traitCollection.horizontalSizeClass ==
+          UIUserInterfaceSizeClassCompact &&
+      self.traitCollection.verticalSizeClass == UIUserInterfaceSizeClassRegular;
+  if (isNarrowWidth) {
+    [NSLayoutConstraint deactivateConstraints:_largeWidthConstraints];
+    [NSLayoutConstraint activateConstraints:_narrowWidthConstraints];
+  } else {
+    [NSLayoutConstraint deactivateConstraints:_narrowWidthConstraints];
+    [NSLayoutConstraint activateConstraints:_largeWidthConstraints];
+  }
+}
+
+// Updates the facepile accessibility label based on sharing state.
+- (void)updateFacePileAccessibilityLabel {
+  if (_sharingState == SharingState::kNotShared) {
+    _facePileContainer.accessibilityLabel =
+        l10n_util::GetNSString(IDS_IOS_SHARED_GROUP_SHARE_GROUP);
+  } else {
+    _facePileContainer.accessibilityLabel =
+        l10n_util::GetNSString(IDS_IOS_SHARED_GROUP_MANAGE_GROUP);
+  }
+}
+
+// Updates the `facePileContainer` by adding the `facePile` to it.
+- (void)updateFacePileContainer:(UIButton*)facePileContainer
+                   withFacePile:(UIView*)facePile {
+  if (!facePile) {
+    return;
+  }
+  facePile.userInteractionEnabled = NO;
+  facePile.translatesAutoresizingMaskIntoConstraints = NO;
+  [facePileContainer addSubview:facePile];
+  AddSameConstraints(facePile, facePileContainer);
+}
+
 // Starts managing the shared group.
 - (void)manageGroup {
   CHECK(_gridViewController.shared);
@@ -1014,6 +1253,76 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
   CHECK(!_gridViewController.shared);
   CHECK(_shareAvailable);
   [_handler showShareForGroup:_tabGroup->GetWeakPtr()];
+}
+
+// Called when the gesture recognizer has an update.
+- (void)handlePan:(UIPanGestureRecognizer*)gesture {
+  CGFloat translation = [gesture translationInView:self.view].y;
+  translation = MAX(0, translation);
+  switch (gesture.state) {
+    case UIGestureRecognizerStateBegan:
+      _gridViewController.collectionView.bounces = NO;
+      break;
+    case UIGestureRecognizerStateChanged: {
+      _container.transform = CGAffineTransformMakeTranslation(0, translation);
+      break;
+    }
+    case UIGestureRecognizerStateEnded: {
+      CGFloat velocity = [gesture velocityInView:self.view].y;
+      _gridViewController.collectionView.bounces = YES;
+      __weak UIView* container = _container;
+      __weak __typeof(self) weakSelf = self;
+      if (translation + velocity > _container.bounds.size.height / 2) {
+        CGFloat endPosition =
+            (self.view.bounds.size.height + _container.bounds.size.height) /
+            2.0;
+        [UIView animateWithDuration:kSwipeAnimationDuration
+            animations:^{
+              container.transform =
+                  CGAffineTransformMakeTranslation(0, endPosition);
+            }
+            completion:^(BOOL finished) {
+              [weakSelf didTapCloseButton];
+            }];
+      } else {
+        [UIView animateWithDuration:kSwipeAnimationDuration
+                         animations:^{
+                           container.transform = CGAffineTransformIdentity;
+                         }];
+      }
+      break;
+    }
+    default:
+      _gridViewController.collectionView.bounces = YES;
+      _container.transform = CGAffineTransformIdentity;
+      break;
+  }
+}
+
+#pragma mark - UIGestureRecognizerDelegate
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer*)gestureRecognizer
+       shouldReceiveTouch:(UITouch*)touch {
+  CGPoint location = [touch locationInView:_container];
+  CGRect gridFrame = _container.bounds;
+  // Only consider touches in the grid, not on the top toolbar.
+  gridFrame.origin.y += kTopToolbarHeight;
+  gridFrame.size.height -= kTopToolbarHeight;
+
+  if (!CGRectContainsPoint(gridFrame, location)) {
+    return YES;
+  }
+
+  BOOL collectionViewScrolled =
+      _gridViewController.collectionView.contentOffset.y ==
+      -_gridViewController.collectionView.adjustedContentInset.top;
+  return collectionViewScrolled;
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer*)gestureRecognizer
+    shouldRecognizeSimultaneouslyWithGestureRecognizer:
+        (UIGestureRecognizer*)otherGestureRecognizer {
+  return YES;
 }
 
 #pragma mark - UIResponder
@@ -1029,9 +1338,15 @@ constexpr CGFloat kContainerBackgroundAlpha = 0.8;
 }
 
 - (void)keyCommand_close {
-  _backButtonTapped = YES;
   base::RecordAction(base::UserMetricsAction("MobileKeyCommandClose"));
-  [_handler hideTabGroup];
+  [self didTapCloseButton];
+}
+
+#pragma mark - UIAccessibilityAction
+
+- (BOOL)accessibilityPerformEscape {
+  [self didTapCloseButton];
+  return YES;
 }
 
 #pragma mark - GridViewDelegate

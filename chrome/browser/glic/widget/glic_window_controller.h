@@ -18,11 +18,16 @@
 #include "chrome/browser/glic/glic_enabling.h"
 #include "chrome/browser/glic/host/glic.mojom.h"
 #include "chrome/browser/glic/host/glic_web_client_access.h"
+#include "chrome/browser/glic/host/host.h"
+#include "chrome/browser/glic/widget/application_hotkey_delegate.h"
+#include "chrome/browser/glic/widget/glic_modal_manager.h"
+#include "chrome/browser/glic/widget/glic_window_hotkey_delegate.h"
+#include "chrome/browser/glic/widget/local_hotkey_manager.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "content/public/browser/web_contents.h"
-#include "ui/base/accelerators/accelerator.h"
 #include "ui/base/interaction/element_tracker.h"
+#include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_observer.h"
 
 class Browser;
@@ -50,6 +55,7 @@ class GlicFreController;
 class GlicButton;
 class Host;
 enum class AttachChangeReason;
+class GlicModalManager;
 
 // This class owns and manages the glic window. This class has the same lifetime
 // as the GlicKeyedService, so it exists if and only if the profile exists.
@@ -58,7 +64,8 @@ enum class AttachChangeReason;
 // window is open |attached_browser_| indicates if the window is attached or
 // standalone. See |IsAttached|
 class GlicWindowController : public views::WidgetObserver,
-                             public ui::AcceleratorTarget {
+                             public Host::Observer,
+                             public Host::Delegate {
  public:
   // Observes the state of the glic window.
   class StateObserver : public base::CheckedObserver {
@@ -136,6 +143,9 @@ class GlicWindowController : public views::WidgetObserver,
   // Close the panel but keep the glic WebContents alive in the background.
   void Close();
 
+  // Used when the native window is closed directly.
+  void CloseWithReason(views::Widget::ClosedReason reason);
+
   // Sets the audio ducking status.  Returns true if the operation succeeded.
   bool SetAudioDucking(bool enabled);
 
@@ -154,7 +164,9 @@ class GlicWindowController : public views::WidgetObserver,
   // could attach to a browser window when a drag ends.
   void HandleWindowDragWithOffset(gfx::Vector2d mouse_offset);
 
-  const mojom::PanelState& GetPanelState() const { return panel_state_; }
+  // Host::Delegate implementation.
+  const mojom::PanelState& GetPanelState() const override;
+
   void AddStateObserver(StateObserver* observer);
   void RemoveStateObserver(StateObserver* observer);
 
@@ -205,12 +217,6 @@ class GlicWindowController : public views::WidgetObserver,
   // profile is deleted or if the browser shuts down.
   base::WeakPtr<GlicWindowController> GetWeakPtr();
 
-  void WebClientInitializeFailed();
-  // The webview reached a login page.
-  void LoginPageCommitted();
-  void SetWebClient(GlicWebClientAccess* web_client);
-  GlicWebClientAccess* web_client() const { return web_client_; }
-
   // views::WidgetObserver implementation, monitoring the glic window widget.
   void OnWidgetActivationChanged(views::Widget* widget, bool active) override;
   void OnWidgetDestroyed(views::Widget* widget) override;
@@ -226,7 +232,7 @@ class GlicWindowController : public views::WidgetObserver,
   void ResizeFinished();
 
   // Returns the widget that backs the glic window.
-  views::Widget* GetGlicWidget();
+  GlicWidget* GetGlicWidget();
 
   // Returns the WebContents used for the first-run experience, or nullptr if
   // none.
@@ -247,7 +253,6 @@ class GlicWindowController : public views::WidgetObserver,
   //   * ClosingToReopenDetached
   enum class State {
     kClosed,
-    kOpenAnimation,
     kWaitingForGlicToLoad,
     kOpen,
     kDetaching,
@@ -271,16 +276,14 @@ class GlicWindowController : public views::WidgetObserver,
 
   bool IsDragging() { return in_move_loop_; }
 
+  void ShowGlicModal(std::u16string label);
+
  private:
   FRIEND_TEST_ALL_PREFIXES(GlicWindowControllerUiTest, TestInitialBounds);
+  FRIEND_TEST_ALL_PREFIXES(GlicWindowControllerWithPreviousPostionUiTest,
+                           TestInitialBounds);
 
   Host& host() const;
-
-  // ui::AcceleratorTarget
-  bool AcceleratorPressed(const ui::Accelerator& accelerator) override;
-  bool CanHandleAccelerators() const override;
-
-  void AddAccelerators();
 
   // Sets the floating attributes of the glic window.
   //
@@ -297,8 +300,9 @@ class GlicWindowController : public views::WidgetObserver,
 
   // Return the default detached bounds which are just below the tab strip
   // button on the active browser.
-  gfx::Rect GetInitialDetachedBoundsFromBrowser(Browser& browser,
-                                                const gfx::Size& target_size);
+  std::optional<gfx::Rect> GetInitialDetachedBoundsFromBrowser(
+      Browser* browser,
+      const gfx::Size& target_size);
 
   // Return the default detached bounds when there is no active browser. The
   // position is relative to the top right of the current display.
@@ -318,19 +322,15 @@ class GlicWindowController : public views::WidgetObserver,
 
   void SetupGlicWidget(Browser* browser);
   void SetupGlicWidgetAccessibilityText();
-  void StartAttachedAnimation(GlicButton* glic_button);
 
-  // This sends a message to glic to get ready to show. This will eventually
-  // result in the callback GlicLoaded().
-  void WaitForGlicToLoad();
-  void GlicLoaded(mojom::OpenPanelInfoPtr open_info);
-
-  // Called when the open animation is finished.
-  void OpenAnimationFinished();
+  // Host::Observer implementation.
+  void WebClientInitializeFailed() override;
+  void LoginPageCommitted() override;
+  void ClientReadyToShow(const mojom::OpenPanelInfo& open_info) override;
 
   // Called once glic is completely loaded and any animations have finished.
   // This is the end of the opening process and |state_| will be set to kOpen.
-  void GlicLoadedAndAnimationDone();
+  void GlicLoadedAndReadyToDisplay();
 
   void SetDraggingAreasAndWatchForMouseEvents();
 
@@ -365,8 +365,8 @@ class GlicWindowController : public views::WidgetObserver,
   // TODO(crbug.com/410629338): Reimplement attachment.
   void AttachToBrowser(Browser& browser, AttachChangeReason reason);
 
-  // Clamp the mouse drag offsets to keep glic within the visible region.
-  gfx::Vector2d GetClampedMouseDragOffset(const gfx::Vector2d& mouse_offset);
+  // Keep part of glic window within the visible region.
+  void AdjustPositionIfNeeded();
 
   // Handles end-of-drag:
   //  - If glic is within attachment distance of a browser window's glic button,
@@ -465,9 +465,6 @@ class GlicWindowController : public views::WidgetObserver,
   // window, or standalone. That is tracked by this member.
   raw_ptr<Browser> attached_browser_ = nullptr;
 
-  // Set to true when glic is ready.
-  bool glic_loaded_ = false;
-
   base::ObserverList<StateObserver> state_observers_;
 
   mojom::WebUiState webui_state_ = mojom::WebUiState::kUninitialized;
@@ -490,8 +487,14 @@ class GlicWindowController : public views::WidgetObserver,
 
   std::unique_ptr<WindowFinder> window_finder_;
 
+  std::unique_ptr<GlicModalManager> glic_modal_manager_;
+
+  std::unique_ptr<LocalHotkeyManager> application_hotkey_manager_;
+  std::unique_ptr<LocalHotkeyManager> glic_window_hotkey_manager_;
+
   raw_ptr<GlicKeyedService> glic_service_;  // Owns this.
   raw_ptr<GlicEnabling> enabling_;
+  base::ScopedObservation<Host, Host::Observer> host_observation_{this};
 
   base::WeakPtrFactory<GlicWindowController> weak_ptr_factory_{this};
 };

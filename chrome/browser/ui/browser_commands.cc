@@ -79,7 +79,7 @@
 #include "chrome/browser/ui/find_bar/find_bar.h"
 #include "chrome/browser/ui/find_bar/find_bar_controller.h"
 #include "chrome/browser/ui/intent_picker_tab_helper.h"
-#include "chrome/browser/ui/lens/lens_overlay_controller.h"
+#include "chrome/browser/ui/lens/lens_search_controller.h"
 #include "chrome/browser/ui/location_bar/location_bar.h"
 #include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
 #include "chrome/browser/ui/qrcode_generator/qrcode_generator_bubble_controller.h"
@@ -96,12 +96,15 @@
 #include "chrome/browser/ui/tabs/organization/tab_organization_service_factory.h"
 #include "chrome/browser/ui/tabs/organization/tab_organization_session.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_utils.h"
+#include "chrome/browser/ui/tabs/split_tab_visual_data.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/user_education/browser_user_education_interface.h"
+#include "chrome/browser/ui/views/side_panel/side_panel_entry.h"
+#include "chrome/browser/ui/views/side_panel/side_panel_ui.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
 #include "chrome/browser/ui/web_applications/web_app_launch_utils.h"
 #include "chrome/browser/ui/web_applications/web_app_tabbed_utils.h"
@@ -1249,6 +1252,16 @@ void GroupTab(Browser* browser) {
       TabStripModel::ContextMenuCommand::CommandToggleGrouped);
 }
 
+void NewSplitTab(Browser* browser) {
+  TabStripModel* const tab_strip_model = browser->tab_strip_model();
+  const int active_index = tab_strip_model->active_index();
+  tab_strip_model->delegate()->AddTabAt(
+      GURL(chrome::kChromeUISplitViewNewTabPageURL), active_index + 1, true,
+      tab_strip_model->GetTabGroupForTab(active_index));
+  tab_strip_model->AddToNewSplit({active_index},
+                                 split_tabs::SplitTabLayout::kVertical);
+}
+
 void AddNewTabToGroup(Browser* browser) {
   if (!browser->tab_strip_model()->SupportsTabGroups()) {
     return;
@@ -2331,10 +2344,10 @@ void ExecLensOverlay(Browser* browser) {
       browser->tab_strip_model()->GetActiveWebContents();
   CHECK(web_contents);
 
-  LensOverlayController* const controller =
-      LensOverlayController::GetController(web_contents);
+  LensSearchController* const controller =
+      LensSearchController::FromTabWebContents(web_contents);
   CHECK(controller);
-  controller->ShowUI(lens::LensOverlayInvocationSource::kAppMenu);
+  controller->OpenLensOverlay(lens::LensOverlayInvocationSource::kAppMenu);
   browser->window()->NotifyNewBadgeFeatureUsed(lens::features::kLensOverlay);
 }
 

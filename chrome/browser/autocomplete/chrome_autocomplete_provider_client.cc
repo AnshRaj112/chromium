@@ -37,6 +37,7 @@
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/sync/sync_service_factory.h"
+#include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/ui/browser_command_controller.h"
 #include "chrome/browser/ui/browser_finder.h"
@@ -62,6 +63,7 @@
 #include "components/omnibox/common/omnibox_features.h"
 #include "components/optimization_guide/machine_learning_tflite_buildflags.h"
 #include "components/prefs/pref_service.h"
+#include "components/saved_tab_groups/public/tab_group_sync_service.h"
 #include "components/signin/public/identity_manager/accounts_in_cookie_jar_info.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/sync/service/sync_service.h"
@@ -95,6 +97,7 @@
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/lens/lens_overlay_controller.h"
+#include "chrome/browser/ui/lens/lens_search_controller.h"
 #include "chrome/browser/ui/tabs/public/tab_features.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/ui_features.h"
@@ -130,15 +133,39 @@ constexpr auto kChromeSettingsSubPages = std::to_array<base::cstring_view>({
     chrome::kImportDataSubPage,
     chrome::kManageProfileSubPage,
     chrome::kPeopleSubPage,
-#endif
+#endif  // !BUILDFLAG(IS_CHROMEOS)
 });
-#endif  // BUILDFLAG(IS_ANDROID)
+
+content::WebContents* GetWebContents(
+    const ChromeAutocompleteProviderClient::WebContentsGetter&
+        web_contents_getter) {
+  return web_contents_getter ? web_contents_getter.Run() : nullptr;
+}
+
+LensOverlayController* GetLensOverlayController(
+    content::WebContents* web_contents) {
+  return web_contents ? LensOverlayController::FromTabWebContents(web_contents)
+                      : nullptr;
+}
+
+LensSearchController* GetLensSearchController(
+    content::WebContents* web_contents) {
+  return web_contents ? LensSearchController::FromTabWebContents(web_contents)
+                      : nullptr;
+}
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 }  // namespace
 
 ChromeAutocompleteProviderClient::ChromeAutocompleteProviderClient(
     Profile* profile)
+    : ChromeAutocompleteProviderClient(profile, base::NullCallback()) {}
+
+ChromeAutocompleteProviderClient::ChromeAutocompleteProviderClient(
+    Profile* profile,
+    WebContentsGetter web_contents_getter)
     : profile_(profile),
+      web_contents_getter_(std::move(web_contents_getter)),
       scheme_classifier_(profile),
       url_consent_helper_(
           unified_consent::UrlKeyedDataCollectionConsentHelper::
@@ -377,6 +404,11 @@ ChromeAutocompleteProviderClient::GetProviderStateService() const {
   return ProviderStateServiceFactory::GetForProfile(profile_);
 }
 
+tab_groups::TabGroupSyncService*
+ChromeAutocompleteProviderClient::GetTabGroupSyncService() const {
+  return tab_groups::TabGroupSyncServiceFactory::GetForProfile(profile_);
+}
+
 bool ChromeAutocompleteProviderClient::IsOffTheRecord() const {
   return profile_->IsOffTheRecord();
 }
@@ -508,15 +540,11 @@ bool ChromeAutocompleteProviderClient::IsHistoryEmbeddingsSettingVisible()
 base::CallbackListSubscription
 ChromeAutocompleteProviderClient::GetLensSuggestInputsWhenReady(
     LensOverlaySuggestInputsCallback callback) const {
-// TODO(crbug.com/408513470): This is a temporary prototype solution. Long term,
-//  `BrowserList::GetInstance()->GetLastActive()` shouldn't be used.
 #if !BUILDFLAG(IS_ANDROID)
-  if (Browser* browser = BrowserList::GetInstance()->GetLastActive()) {
-    CHECK(browser->GetActiveTabInterface());
-    return browser->GetActiveTabInterface()
-        ->GetTabFeatures()
-        ->lens_overlay_controller()
-        ->GetLensSuggestInputsWhenReady(std::move(callback));
+  if (auto* lens_overlay_controller =
+          GetLensOverlayController(GetWebContents(web_contents_getter_))) {
+    return lens_overlay_controller->GetLensSuggestInputsWhenReady(
+        std::move(callback));
   }
 #endif  // !BUILDFLAG(IS_ANDROID)
   std::move(callback).Run(std::nullopt);
@@ -526,22 +554,6 @@ ChromeAutocompleteProviderClient::GetLensSuggestInputsWhenReady(
 base::WeakPtr<AutocompleteProviderClient>
 ChromeAutocompleteProviderClient::GetWeakPtr() {
   return weak_ptr_factory_.GetWeakPtr();
-}
-
-bool ChromeAutocompleteProviderClient::StrippedURLsAreEqual(
-    const GURL& url1,
-    const GURL& url2,
-    const AutocompleteInput* input) const {
-  AutocompleteInput empty_input;
-  if (!input)
-    input = &empty_input;
-  const TemplateURLService* template_url_service = GetTemplateURLService();
-  return AutocompleteMatch::GURLToStrippedGURL(
-             url1, *input, template_url_service, std::u16string(),
-             /*keep_search_intent_params=*/false) ==
-         AutocompleteMatch::GURLToStrippedGURL(
-             url2, *input, template_url_service, std::u16string(),
-             /*keep_search_intent_params=*/false);
 }
 
 void ChromeAutocompleteProviderClient::OpenSharingHub() {
@@ -596,26 +608,23 @@ bool ChromeAutocompleteProviderClient::OpenJourneys(const std::string& query) {
 }
 
 void ChromeAutocompleteProviderClient::OpenLensOverlay(bool show) {
-// TODO(crbug.com/408513470): This is a temporary prototype solution. Long term,
-//  `BrowserList::GetInstance()->GetLastActive()` shouldn't be used.
 #if !BUILDFLAG(IS_ANDROID)
-  if (Browser* browser = BrowserList::GetInstance()->GetLastActive()) {
-    CHECK(browser->GetActiveTabInterface());
-    // TODO(crbug.com/402497756): For prototyping, reusing the existing
-    // omnibox entry point. However, for production, create a new invocation
-    // source for this new entry point.
-    if (show) {
-      browser->GetActiveTabInterface()
-          ->GetTabFeatures()
-          ->lens_overlay_controller()
-          ->ShowUI(lens::LensOverlayInvocationSource::kOmnibox);
-    } else {
-      browser->GetActiveTabInterface()
-          ->GetTabFeatures()
-          ->lens_overlay_controller()
-          ->StartContextualizationWithoutOverlay(
-              lens::LensOverlayInvocationSource::kOmnibox);
+  if (show) {
+    if (auto* lens_search_controller =
+            GetLensSearchController(GetWebContents(web_contents_getter_))) {
+      // TODO(crbug.com/402497756): For prototyping, reusing the existing
+      // omnibox entry point. However, for production, create a new invocation
+      // source for this new entry point.
+      lens_search_controller->OpenLensOverlay(
+          lens::LensOverlayInvocationSource::kOmnibox);
     }
+    return;
+  }
+
+  if (auto* lens_overlay_controller =
+          GetLensOverlayController(GetWebContents(web_contents_getter_))) {
+    lens_overlay_controller->StartContextualizationWithoutOverlay(
+        lens::LensOverlayInvocationSource::kOmnibox);
   }
 #endif  // !BUILDFLAG(IS_ANDROID)
 }
@@ -624,16 +633,11 @@ void ChromeAutocompleteProviderClient::IssueContextualSearchRequest(
       const GURL& destination_url,
       AutocompleteMatchType::Type match_type,
       bool is_zero_prefix_suggestion) {
-// TODO(crbug.com/408513470): This is a temporary prototype solution. Long term,
-//  `BrowserList::GetInstance()->GetLastActive()` shouldn't be used.
 #if !BUILDFLAG(IS_ANDROID)
-  if (Browser* browser = BrowserList::GetInstance()->GetLastActive()) {
-    CHECK(browser->GetActiveTabInterface());
-    browser->GetActiveTabInterface()
-        ->GetTabFeatures()
-        ->lens_overlay_controller()
-        ->IssueContextualSearchRequest(
-            destination_url, match_type, is_zero_prefix_suggestion);
+  if (auto* lens_overlay_controller =
+          GetLensOverlayController(GetWebContents(web_contents_getter_))) {
+    lens_overlay_controller->IssueContextualSearchRequest(
+        destination_url, match_type, is_zero_prefix_suggestion);
   }
 #endif  // !BUILDFLAG(IS_ANDROID)
 }

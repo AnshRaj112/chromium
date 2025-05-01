@@ -10,6 +10,7 @@
 
 #include "base/functional/bind.h"
 #include "base/metrics/user_metrics.h"
+#include "base/notreached.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "chrome/browser/feature_engagement/tracker_factory.h"
@@ -26,6 +27,7 @@
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/chrome_pages.h"
+#include "chrome/browser/ui/feature_first_run/autofill_ai_first_run_dialog.h"
 #include "chrome/browser/ui/performance_controls/performance_controls_metrics.h"
 #include "chrome/browser/ui/singleton_tabs.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/most_recent_shared_tab_update_store.h"
@@ -271,19 +273,49 @@ void MaybeRegisterChromeFeaturePromos(
           feature_engagement::kIPHAutofillAiOptInFeature,
           autofill::PopupViewViews::kAutofillAiOptInIphElementId,
           IDS_AUTOFILL_AI_OPT_IN_IPH_BODY,
-          IDS_AUTOFILL_AI_OPT_IN_IPH_GO_TO_SETTINGS,
+          [&]() {
+            int index =
+                feature_engagement::kAutofillIphCTAVariationsStringValue.Get();
+            if (index < 0 ||
+                index > base::to_underlying(
+                            autofill::features::
+                                AutofillIphCTAVariationsStringVarations::
+                                    kMaxValue)) {
+              return IDS_AUTOFILL_AI_OPT_IN_IPH_SEE_HOW;
+            }
+            switch (static_cast<autofill::features::
+                                    AutofillIphCTAVariationsStringVarations>(
+                index)) {
+              case autofill::features::AutofillIphCTAVariationsStringVarations::
+                  kSeeHow:
+                return IDS_AUTOFILL_AI_OPT_IN_IPH_SEE_HOW;
+              case autofill::features::AutofillIphCTAVariationsStringVarations::
+                  kTryIt:
+                return IDS_AUTOFILL_AI_OPT_IN_IPH_TRY_IT;
+              case autofill::features::AutofillIphCTAVariationsStringVarations::
+                  kTurnOn:
+                return IDS_AUTOFILL_AI_OPT_IN_IPH_TURN_ON;
+            }
+          }(),
           base::BindRepeating(
               [](ui::ElementContext ctx,
                  user_education::FeaturePromoHandle promo_handle) {
-                auto* browser = chrome::FindBrowserWithUiElementContext(ctx);
+                auto* const browser =
+                    chrome::FindBrowserWithUiElementContext(ctx);
                 if (!browser) {
                   return;
                 }
-                chrome::ShowSettingsSubPage(browser,
-                                            chrome::kAutofillAiSubPage);
+                TabStripModel* const tab_strip_model =
+                    browser->tab_strip_model();
+                if (!tab_strip_model) {
+                  return;
+                }
+                content::WebContents* const web_contents =
+                    tab_strip_model->GetActiveWebContents();
+                feature_first_run::ShowAutofillAiFirstRunDialog(web_contents);
               }))
           .SetCustomActionIsDefault(true)
-          .SetCustomActionDismissText(IDS_AUTOFILL_AI_OPT_IN_IPH_CLOSE)
+          .SetCustomActionDismissText(IDS_AUTOFILL_AI_OPT_IN_IPH_MAYBE_LATER)
           .SetBubbleTitleText(IDS_AUTOFILL_AI_OPT_IN_IPH_TITLE)
           .SetBubbleArrow(HelpBubbleArrow::kTopRight)
           .AddPreconditionExemption(kUserNotActivePrecondition)
@@ -388,6 +420,21 @@ void MaybeRegisterChromeFeaturePromos(
           .SetMetadata(
               131, "jkeitel@google.com",
               "Triggered after first creation of a plus address on Desktop.")));
+
+  // TODO(crbug.com/404437008): Update with final IPH strings.
+  // kIPHAutofillEnableLoyaltyCardsFeature:
+  registry.RegisterFeature(std::move(
+      FeaturePromoSpecification::CreateForToastPromo(
+          feature_engagement::kIPHAutofillEnableLoyaltyCardsFeature,
+          autofill::PopupViewViews::kAutofillEnableLoyaltyCardsElementId,
+          IDS_AUTOFILL_IPH_LOYALTY_CARD_SUGGESTION_BODY,
+          IDS_AUTOFILL_IPH_LOYALTY_CARD_SUGGESTION_SCREENREADER,
+          FeaturePromoSpecification::AcceleratorInfo())
+          .SetBubbleTitleText(IDS_AUTOFILL_IPH_LOYALTY_CARD_SUGGESTION_TITLE)
+          .SetBubbleArrow(HelpBubbleArrow::kLeftCenter)
+          .SetMetadata(
+              137, "vizcay@google.com",
+              "Triggered after loyalty card autofill suggestions are shown.")));
 
   // kIPHDesktopPwaInstallFeature:
   registry.RegisterFeature(
@@ -615,13 +662,25 @@ void MaybeRegisterChromeFeaturePromos(
 #else
           kToolbarAvatarButtonElementId,
 #endif
-          IDS_PASSWORDS_SAVE_PRIMING_PROMO_BODY,
+          IDS_PASSWORDS_SAVE_PRIMING_PROMO_BODY_TEMPLATE,
           IDS_PASSWORDS_SAVE_PRIMING_PROMO_SCREENREADER,
           FeaturePromoSpecification::AcceleratorInfo())
           .SetMetadata(
               137, "dfried@chromium.org",
               "Triggered when the user navigates a page with an eligible login "
               "form, and they have no saved passwords.")));
+
+  // kIPHPasswordsSavePrimingPromo:
+  registry.RegisterFeature(
+      std::move(FeaturePromoSpecification::CreateForToastPromo(
+                    feature_engagement::kIPHPasswordsSaveRecoveryPromoFeature,
+                    kPasswordsOmniboxKeyIconElementId,
+                    IDS_PASSWORDS_SAVE_RECOVERY_PROMO_BODY,
+                    IDS_PASSWORDS_SAVE_RECOVERY_PROMO_SCREENREADER,
+                    FeaturePromoSpecification::AcceleratorInfo())
+                    .SetMetadata(137, "dfried@chromium.org",
+                                 "Triggered when the user logs into a page "
+                                 "they have blocklisted")));
 
   // kIPHPasswordsManagementBubbleAfterSaveFeature:
   registry.RegisterFeature(std::move(

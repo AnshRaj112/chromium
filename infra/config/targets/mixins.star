@@ -1198,19 +1198,6 @@ targets.mixin(
 )
 
 targets.mixin(
-    name = "ios_runtime_cache_16_4",
-    generate_pyl_entry = False,
-    swarming = targets.swarming(
-        named_caches = [
-            swarming.cache(
-                name = "runtime_ios_16_4",
-                path = "Runtime-ios-16.4",
-            ),
-        ],
-    ),
-)
-
-targets.mixin(
     name = "ios_runtime_cache_17_5",
     generate_pyl_entry = False,
     swarming = targets.swarming(
@@ -1741,6 +1728,24 @@ targets.mixin(
 )
 
 targets.mixin(
+    name = "mac_arm64_apple_m3_retina_gpu_stable",
+    # We always need this entry to be generated since it is used by
+    # //content/test/gpu/find_bad_machines.py.
+    generate_pyl_entry = targets.IGNORE_UNUSED,
+    swarming = targets.swarming(
+        dimensions = {
+            "cpu": "arm64",
+            "gpu": "apple:m3",
+            "mac_model": "Mac15,3",
+            "os": "Mac-15.4.1",
+            "pool": "chromium.tests.gpu",
+            "display_attached": "1",
+            "hidpi": "1",
+        },
+    ),
+)
+
+targets.mixin(
     name = "mac_beta_arm64",
     generate_pyl_entry = False,
     swarming = targets.swarming(
@@ -1767,7 +1772,7 @@ targets.mixin(
     swarming = targets.swarming(
         dimensions = {
             "cpu": "arm64",
-            "os": "Mac-14",
+            "os": "Mac-14|Mac-15",
         },
     ),
 )
@@ -1780,7 +1785,7 @@ targets.mixin(
     swarming = targets.swarming(
         dimensions = {
             "cpu": "x86-64",
-            "os": "Mac-14",
+            "os": "Mac-14|Mac-15",
         },
     ),
 )
@@ -2563,5 +2568,13 @@ targets.mixin(
     name = "xctest",
     args = [
         "--xctest",
+    ],
+)
+
+targets.mixin(
+    name = "force-main-user",
+    generate_pyl_entry = False,
+    args = [
+        "--force-main-user",
     ],
 )

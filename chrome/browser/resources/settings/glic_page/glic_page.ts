@@ -17,12 +17,10 @@ import type {CrShortcutInputElement} from 'chrome://resources/cr_components/cr_s
 import {HelpBubbleMixin} from 'chrome://resources/cr_components/help_bubble/help_bubble_mixin.js';
 import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
 import {assert} from 'chrome://resources/js/assert.js';
-import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {OpenWindowProxyImpl} from 'chrome://resources/js/open_window_proxy.js';
 import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
-import {getAiLearnMoreUrl} from '../ai_page/ai_learn_more_url_util.js';
-import {AiEnterpriseFeaturePrefName, AiPageActions} from '../ai_page/constants.js';
+import {AiPageActions} from '../ai_page/constants.js';
 import type {SettingsToggleButtonElement} from '../controls/settings_toggle_button.js';
 import type {MetricsBrowserProxy} from '../metrics_browser_proxy.js';
 import {MetricsBrowserProxyImpl} from '../metrics_browser_proxy.js';
@@ -81,11 +79,6 @@ export class SettingsGlicPageElement extends SettingsGlicPageElementBase {
           value: 0,
         },
       },
-
-      enterprisePref_: {
-        type: Object,
-        computed: `computePref(prefs.${AiEnterpriseFeaturePrefName.COMPARE})`,
-      },
     };
   }
 
@@ -97,7 +90,6 @@ export class SettingsGlicPageElement extends SettingsGlicPageElementBase {
   private metricsBrowserProxy_: MetricsBrowserProxy =
       MetricsBrowserProxyImpl.getInstance();
   declare private tabAccessToggleExpanded_: boolean;
-  declare private enterprisePref_: chrome.settingsPrivate.PrefObject;
 
   override async connectedCallback() {
     super.connectedCallback();
@@ -215,16 +207,32 @@ export class SettingsGlicPageElement extends SettingsGlicPageElementBase {
         this.i18n('glicActivityButtonUrl'));
   }
 
-  private getLearnMoreUrl_(): string {
-    return getAiLearnMoreUrl(
-        this.enterprisePref_,
-        loadTimeData.getString('glicKeyboardShortcutLearnMoreUrl'),
-        loadTimeData.getString('glicKeyboardShortcutLearnMoreManagedUrl'));
-  }
-
-  private onLearnMoreClick_() {
+  private onShortcutsLearnMoreClick_() {
     this.metricsBrowserProxy_.recordAction(
         AiPageActions.GLIC_SHORTCUTS_LEARN_MORE_CLICKED);
+  }
+
+  private onLauncherToggleLearnMoreClick_() {
+    this.metricsBrowserProxy_.recordAction(
+        AiPageActions.GLIC_SHORTCUTS_LAUNCHER_TOGGLE_LEARN_MORE_CLICKED);
+  }
+
+  private onLocationToggleLearnMoreClick_() {
+    this.metricsBrowserProxy_.recordAction(
+        AiPageActions.GLIC_SHORTCUTS_LOCATION_TOGGLE_LEARN_MORE_CLICKED);
+  }
+
+  private onTabAccessToggleLearnMoreClick_() {
+    this.metricsBrowserProxy_.recordAction(
+        AiPageActions.GLIC_SHORTCUTS_TAB_ACCESS_TOGGLE_LEARN_MORE_CLICKED);
+  }
+
+  private onSettingsPageLearnMoreClick_(event: Event) {
+    this.metricsBrowserProxy_.recordAction(
+        AiPageActions.GLIC_COLLAPSED_LEARN_MORE_CLICKED);
+    // Prevent navigation to the Glic page if only the learn more link was
+    // clicked.
+    event.stopPropagation();
   }
 }
 

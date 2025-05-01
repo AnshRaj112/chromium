@@ -98,17 +98,14 @@
 #include "components/chromeos_camera/mojo_jpeg_encode_accelerator_service.h"
 #include "components/chromeos_camera/mojo_mjpeg_decode_accelerator_service.h"
 
-#if BUILDFLAG(USE_CHROMEOS_MEDIA_ACCELERATION)
+#if BUILDFLAG(USE_LINUX_VIDEO_ACCELERATION)
 #include "chromeos/ash/experiences/arc/video_accelerator/gpu_arc_video_decode_accelerator.h"
-#if BUILDFLAG(USE_VAAPI) || BUILDFLAG(USE_V4L2_CODEC)
 #include "chromeos/ash/experiences/arc/video_accelerator/gpu_arc_video_decoder.h"
-#endif
 #include "chromeos/ash/experiences/arc/video_accelerator/gpu_arc_video_encode_accelerator.h"
 #include "chromeos/ash/experiences/arc/video_accelerator/gpu_arc_video_protected_buffer_allocator.h"
 #include "chromeos/ash/experiences/arc/video_accelerator/protected_buffer_manager.h"
 #include "chromeos/ash/experiences/arc/video_accelerator/protected_buffer_manager_proxy.h"
-#endif  // BUILDFLAG(USE_CHROMEOS_MEDIA_ACCELERATION)
-
+#endif  // BUILDFLAG(USE_LINUX_VIDEO_ACCELERATION)
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_WIN)
@@ -349,10 +346,10 @@ GpuServiceImpl::GpuServiceImpl(
           features::kClearGrShaderDiskCacheOnInvalidPrefix)) {
   DCHECK(!io_runner_->BelongsToCurrentThread());
 
-#if BUILDFLAG(IS_CHROMEOS) && BUILDFLAG(USE_CHROMEOS_MEDIA_ACCELERATION)
+#if BUILDFLAG(IS_CHROMEOS) && BUILDFLAG(USE_LINUX_VIDEO_ACCELERATION)
   protected_buffer_manager_ = new arc::ProtectedBufferManager();
 #endif  // BUILDFLAG(IS_CHROMEOS) &&
-        // BUILDFLAG(USE_CHROMEOS_MEDIA_ACCELERATION)
+        // BUILDFLAG(USE_LINUX_VIDEO_ACCELERATION)
 
 #if BUILDFLAG(ENABLE_VULKAN)
   if (vulkan_implementation_) {
@@ -650,6 +647,11 @@ void GpuServiceImpl::InitializeWithHostInternal(
   shutdown_event_ = shutdown_event;
 
   mojo::Remote<mojom::GpuHost> gpu_host(std::move(pending_gpu_host));
+
+#if BUILDFLAG(IS_LINUX)
+  gpu_extra_info_.is_gmb_nv12_supported = IsGMBNV12Supported();
+#endif
+
   gpu_host->DidInitialize(gpu_info_, gpu_feature_info_,
                           gpu_info_for_hardware_gpu_,
                           gpu_feature_info_for_hardware_gpu_, gpu_extra_info_);
@@ -756,7 +758,7 @@ void GpuServiceImpl::RecordLogMessage(int severity,
 }
 
 #if BUILDFLAG(IS_CHROMEOS)
-#if BUILDFLAG(USE_CHROMEOS_MEDIA_ACCELERATION)
+#if BUILDFLAG(USE_LINUX_VIDEO_ACCELERATION)
 void GpuServiceImpl::CreateArcVideoDecodeAccelerator(
     mojo::PendingReceiver<arc::mojom::VideoDecodeAccelerator> vda_receiver) {
   DCHECK(io_runner_->BelongsToCurrentThread());
@@ -858,7 +860,7 @@ void GpuServiceImpl::CreateArcProtectedBufferManagerOnMainThread(
           protected_buffer_manager_),
       std::move(pbm_receiver));
 }
-#endif  // BUILDFLAG(USE_CHROMEOS_MEDIA_ACCELERATION)
+#endif  // BUILDFLAG(USE_LINUX_VIDEO_ACCELERATION)
 
 void GpuServiceImpl::CreateJpegDecodeAccelerator(
     mojo::PendingReceiver<chromeos_camera::mojom::MjpegDecodeAccelerator>
@@ -1546,6 +1548,31 @@ bool GpuServiceImpl::OnBeginFrameDerivedImpl(const BeginFrameArgs& args) {
                                       base::Unretained(this), args));
   return true;
 }
+
+#if BUILDFLAG(IS_LINUX)
+bool GpuServiceImpl::IsGMBNV12Supported() {
+  auto buffer_format = gfx::BufferFormat::YUV_420_BIPLANAR;
+  auto buffer_usage = gfx::BufferUsage::GPU_READ_CPU_READ_WRITE;
+
+  if (!IsNativeBufferSupported(buffer_format, buffer_usage)) {
+    return false;
+  }
+  auto size = gfx::Size(2, 2);
+
+  // Note that |gmb_id| and |client_id| does not matter here as this is the
+  // first GMB which will created and immediately destroyed.
+  auto gmb_id = gfx::GpuMemoryBufferId(
+      static_cast<int>(gpu::MappableSIClientGmbId::kGpuServiceImpl));
+  auto client_id = gpu::kMappableSIClientId;
+  auto gmb_handle = gpu_memory_buffer_factory_->CreateGpuMemoryBuffer(
+      gmb_id, size, /*framebuffer_size=*/size, buffer_format, buffer_usage,
+      client_id, gpu::kNullSurfaceHandle);
+
+  // Destroy the gmb_handle since it will be no longer needed.
+  DestroyGpuMemoryBuffer(gmb_id, client_id);
+  return !gmb_handle.is_null();
+}
+#endif
 
 void GpuServiceImpl::OnBeginFrameSourcePausedChanged(bool paused) {}
 

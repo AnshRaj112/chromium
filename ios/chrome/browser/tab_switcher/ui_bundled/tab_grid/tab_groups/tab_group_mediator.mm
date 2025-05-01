@@ -64,7 +64,8 @@ using tab_groups::SharingState;
 namespace {
 
 // The preferred size in points for the avatar icons.
-constexpr CGFloat kFacePileAvatarSize = 24;
+constexpr CGFloat kLegacyFacePileAvatarSize = 24;
+constexpr CGFloat kFacePileAvatarSize = 26;
 // The preferred size in points for the avatar icon in the activity label.
 constexpr CGFloat kActivityLabelAvatarSize = 16;
 
@@ -419,29 +420,7 @@ constexpr CGFloat kActivityLabelAvatarSize = 16;
 - (void)closeItemWithIdentifier:(GridItemIdentifier*)identifier {
   CHECK_EQ(identifier.type, GridItemType::kTab);
   web::WebStateID webStateID = identifier.tabSwitcherItem.identifier;
-  if (_tabGroup->range().count() > 1 || ![self isShared] ||
-      !_collaborationService) {
-    [self closeItemWithID:webStateID];
-    return;
-  }
-
-  data_sharing::MemberRole userRole = tab_groups::utils::GetUserRoleForGroup(
-      _tabGroup.get(), _tabGroupSyncService, _collaborationService);
-
-  switch (userRole) {
-    case data_sharing::MemberRole::kOwner:
-      [self.tabGroupDelegate tabGroupMediatorCloseLastTabAsOwner:self
-                                               lastTabIdentifier:webStateID];
-      break;
-    case data_sharing::MemberRole::kMember:
-      [self.tabGroupDelegate tabGroupMediatorCloseLastTabAsMember:self
-                                                lastTabIdentifier:webStateID];
-      break;
-    case data_sharing::MemberRole::kInvitee:
-    case data_sharing::MemberRole::kFormerMember:
-    case data_sharing::MemberRole::kUnknown:
-      NOTREACHED();
-  }
+  [self closeItemWithID:webStateID];
 }
 
 #pragma mark - TabCollectionDragDropHandler override
@@ -666,6 +645,7 @@ constexpr CGFloat kActivityLabelAvatarSize = 16;
   if (newGroup.local_group_id() != _tabGroup->tab_group_id()) {
     return;
   }
+  [self updateTabGroupSharingState];
   [self updateFacePileUI];
 }
 
@@ -724,7 +704,11 @@ constexpr CGFloat kActivityLabelAvatarSize = 16;
       [[ShareKitFacePileConfiguration alloc] init];
   config.collabID = base::SysUTF8ToNSString(savedCollabID.value());
   config.showsEmptyState = YES;
-  config.avatarSize = kFacePileAvatarSize;
+  if (IsContainedTabGroupEnabled()) {
+    config.avatarSize = kFacePileAvatarSize;
+  } else {
+    config.avatarSize = kLegacyFacePileAvatarSize;
+  }
   [_groupConsumer setFacePileView:_shareKitService->FacePileView(config)];
 }
 

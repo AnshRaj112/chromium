@@ -66,6 +66,7 @@ export interface PageElementTypes {
   desktopScreenshot: HTMLButtonElement;
   desktopScreenshotImg: HTMLImageElement;
   desktopScreenshotErrorReason: HTMLSpanElement;
+  panelScreenshot: HTMLButtonElement;
   createTabInBackground: HTMLInputElement;
   canAttachCheckbox: HTMLInputElement;
   scrollToDocumentId: HTMLSpanElement;
@@ -75,6 +76,7 @@ export interface PageElementTypes {
   scrollToTextFragmentTextStart: HTMLInputElement;
   scrollToTextFragmentTextEnd: HTMLInputElement;
   scrollToTextFragmentSearchStart: HTMLSelectElement;
+  scrollToNode: HTMLSelectElement;
   scrollToBn: HTMLButtonElement;
   fileDrop: HTMLDivElement;
   fileDropList: HTMLDivElement;

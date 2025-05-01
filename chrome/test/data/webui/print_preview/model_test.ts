@@ -170,7 +170,6 @@ suite('ModelTest', function() {
       layout: true,
       color: false,
       mediaSize: testDestination.capabilities!.printer.media_size!.option[1]!,
-      mediaType: testDestination.capabilities!.printer.media_type!.option[1],
       margins: MarginsType.CUSTOM,
       customMargins: {
         marginTop: 100,
@@ -213,7 +212,6 @@ suite('ModelTest', function() {
       isScalingDisabled: false,
       fitToPageScaling: 100,
       pageCount: 3,
-      isFromArc: false,
       title: 'title',
     };
     model.pageSize = new Size(612, 792);
@@ -248,8 +246,6 @@ suite('ModelTest', function() {
 
     const expectedDefaultTicketObject: PrintTicket = {
       mediaSize: testDestination.capabilities!.printer.media_size!.option[0]!,
-      mediaType: testDestination.capabilities!.printer.media_type!.option[0]!
-                     .vendor_id,
       pageCount: 3,
       landscape: false,
       color: testDestination.getNativeColorModel(true),
@@ -281,9 +277,6 @@ suite('ModelTest', function() {
     const newTicket = model.createPrintTicket(testDestination, false, false);
     const expectedNewTicketObject: PrintTicket = {
       mediaSize: testDestination.capabilities!.printer.media_size!.option[1]!,
-      borderless: false,
-      mediaType: testDestination.capabilities!.printer.media_type!.option[1]!
-                     .vendor_id,
       pageCount: 1,
       landscape: true,
       color: testDestination.getNativeColorModel(false),

@@ -25,6 +25,7 @@ import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.base.supplier.Supplier;
+import org.chromium.chrome.browser.bookmarks.TabBookmarker;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
 import org.chromium.chrome.browser.collaboration.CollaborationServiceFactory;
 import org.chromium.chrome.browser.data_sharing.DataSharingServiceFactory;
@@ -34,6 +35,7 @@ import org.chromium.chrome.browser.data_sharing.ui.shared_image_tiles.SharedImag
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.layouts.LayoutStateProvider;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.share.ShareDelegate;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab_ui.ActionConfirmationManager;
 import org.chromium.chrome.browser.tab_ui.TabContentManager;
@@ -84,6 +86,8 @@ public class TabGroupUiCoordinator implements TabGroupUiMediator.ResetHandler, T
     private final ObservableSupplierImpl<Token> mCurrentTabGroupId = new ObservableSupplierImpl<>();
     private final ThemeColorProvider mThemeColorProvider;
     private final UndoBarThrottle mUndoBarThrottle;
+    private final ObservableSupplier<TabBookmarker> mTabBookmarkerSupplier;
+    private final Supplier<ShareDelegate> mShareDelegateSupplier;
 
     private @Nullable PropertyModelChangeProcessor mModelChangeProcessor;
     private @Nullable TabGridDialogCoordinator mTabGridDialogCoordinator;
@@ -108,7 +112,9 @@ public class TabGroupUiCoordinator implements TabGroupUiMediator.ResetHandler, T
             @NonNull OneshotSupplier<LayoutStateProvider> layoutStateProviderSupplier,
             @NonNull ModalDialogManager modalDialogManager,
             @NonNull ThemeColorProvider themeColorProvider,
-            UndoBarThrottle undoBarThrottle) {
+            UndoBarThrottle undoBarThrottle,
+            ObservableSupplier<TabBookmarker> tabBookmarkerSupplier,
+            Supplier<ShareDelegate> shareDelegateSupplier) {
         try (TraceEvent e = TraceEvent.scoped("TabGroupUiCoordinator.constructor")) {
             mActivity = activity;
             mBrowserControlsStateProvider = browserControlsStateProvider;
@@ -136,6 +142,8 @@ public class TabGroupUiCoordinator implements TabGroupUiMediator.ResetHandler, T
             mModalDialogManager = modalDialogManager;
             mThemeColorProvider = themeColorProvider;
             mUndoBarThrottle = undoBarThrottle;
+            mTabBookmarkerSupplier = tabBookmarkerSupplier;
+            mShareDelegateSupplier = shareDelegateSupplier;
             parentView.addView(mToolbarView);
         }
     }
@@ -169,7 +177,9 @@ public class TabGroupUiCoordinator implements TabGroupUiMediator.ResetHandler, T
                         mActionConfirmationSupplier.get(),
                         mModalDialogManager,
                         /* desktopWindowStateManager= */ null,
-                        mUndoBarThrottle);
+                        mUndoBarThrottle,
+                        mTabBookmarkerSupplier,
+                        mShareDelegateSupplier);
         mTabGridDialogCoordinator.setPageKeyEvent(
                 event ->
                         onPageKeyEvent(
@@ -245,7 +255,7 @@ public class TabGroupUiCoordinator implements TabGroupUiMediator.ResetHandler, T
                 DataSharingService dataSharingService =
                         DataSharingServiceFactory.getForProfile(profile);
                 sharedImageTilesConfigBuilder =
-                        new SharedImageTilesConfig.Builder(mActivity)
+                        SharedImageTilesConfig.Builder.createForButton(mActivity)
                                 .setIconSizeDp(R.dimen.tab_strip_shared_image_tiles_size);
                 sharedImageTilesCoordinator =
                         new SharedImageTilesCoordinator(
@@ -302,7 +312,8 @@ public class TabGroupUiCoordinator implements TabGroupUiMediator.ResetHandler, T
      */
     @Override
     public void resetStripWithListOfTabs(List<Tab> tabs) {
-        mTabStripCoordinator.resetWithListOfTabs(tabs, false);
+        mTabStripCoordinator.resetWithListOfTabs(
+                tabs, /* tabGroupSyncIds= */ null, /* quickMode= */ false);
 
         mCurrentTabGroupId.set(tabs == null || tabs.isEmpty() ? null : tabs.get(0).getTabGroupId());
         if (mTabBubbler != null) {

@@ -398,6 +398,7 @@ class PaymentsAutofillClient : public RiskDataLoader {
 
   // Show the OTP unmask dialog to accept user-input OTP value.
   virtual void ShowCardUnmaskOtpInputDialog(
+      CreditCard::RecordType card_type,
       const CardUnmaskChallengeOption& challenge_option,
       base::WeakPtr<OtpUnmaskDelegate> delegate);
 
@@ -577,7 +578,7 @@ class PaymentsAutofillClient : public RiskDataLoader {
   virtual void DismissSelectBnplIssuerDialog();
 
   // Checks if the browser popup is a tab modal popup.
-  virtual bool IsTabModalPopup() const;
+  virtual bool IsTabModalPopupDeprecated() const;
 };
 
 }  // namespace payments

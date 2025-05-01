@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/chrome_build.gni")
 import("//build/config/ui.gni")
-import("//build/util/branding.gni")
 import("//components/signin/features.gni")
 
 assert(is_win || is_mac || is_linux || is_chromeos || is_android)
@@ -126,6 +126,7 @@ source_set("impl") {
     ":autofill",
     "//chrome/browser:browser_process",
     "//chrome/browser/autofill",
+    "//chrome/browser/plus_addresses",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/sync",
     "//chrome/browser/ui:browser_element_identifiers",
@@ -237,6 +238,7 @@ source_set("unit_tests") {
     "//chrome/browser/accessibility:utils",
     "//chrome/browser/autofill",
     "//chrome/browser/autofill:test_support",
+    "//chrome/browser/plus_addresses",
     "//chrome/browser/sync",
     "//chrome/browser/ui",
     "//chrome/browser/ui:browser_element_identifiers",
@@ -444,6 +446,7 @@ if (!is_android) {
       "//chrome/browser",
       "//chrome/browser/autofill",
       "//chrome/browser/autofill:test_support",
+      "//chrome/browser/plus_addresses",
       "//chrome/browser/sync",
       "//chrome/browser/ui",
       "//chrome/test:test_support",

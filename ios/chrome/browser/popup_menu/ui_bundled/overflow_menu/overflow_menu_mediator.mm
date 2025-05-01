@@ -342,8 +342,8 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
   [self updateModel];
 }
 
-- (void)setIsIncognito:(BOOL)isIncognito {
-  _isIncognito = isIncognito;
+- (void)setIncognito:(BOOL)incognito {
+  _incognito = incognito;
   [self updateModel];
 }
 
@@ -743,6 +743,8 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
 }
 
 - (OverflowMenuAction*)openReaderModeAction {
+  // TODO(crbug.com/409935686): Dynamically update the Reader mode overflow menu
+  // string to "Exit Reader Mode" if Reader mode is already enabled.
   __weak __typeof(self) weakSelf = self;
   return [self
       createOverflowMenuActionWithNameID:IDS_IOS_TOOLS_MENU_READER_MODE
@@ -753,7 +755,7 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
                          accessibilityID:kToolsMenuOpenReaderMode
                             hideItemText:nil
                                  handler:^{
-                                   [weakSelf startReaderMode];
+                                   [weakSelf toggleReaderMode];
                                  }];
 }
 
@@ -1882,7 +1884,7 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
     case overflow_menu::Destination::Bookmarks:
       return self.bookmarksDestination;
     case overflow_menu::Destination::History:
-      return (self.isIncognito) ? nil : self.historyDestination;
+      return (self.incognito) ? nil : self.historyDestination;
     case overflow_menu::Destination::ReadingList:
       // Set badges if necessary.
       if (self.engagementTracker &&
@@ -1897,7 +1899,7 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
     case overflow_menu::Destination::Downloads:
       return self.downloadsDestination;
     case overflow_menu::Destination::RecentTabs:
-      return self.isIncognito ? nil : self.recentTabsDestination;
+      return self.incognito ? nil : self.recentTabsDestination;
     case overflow_menu::Destination::SiteInfo:
       return ([self currentWebPageSupportsSiteInfo]) ? self.siteInfoDestination
                                                      : nil;
@@ -2054,7 +2056,7 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
       return self.readLaterAction;
     case overflow_menu::ActionType::ClearBrowsingData:
       // Showing the Clear Browsing Data Action would be confusing in incognito.
-      return (self.isIncognito) ? nil : self.clearBrowsingDataAction;
+      return (self.incognito) ? nil : self.clearBrowsingDataAction;
     case overflow_menu::ActionType::Translate:
       return self.translateAction;
     case overflow_menu::ActionType::DesktopSite:
@@ -2358,10 +2360,10 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
       showSetTabReminderUI:SetTabReminderEntryPoint::kOverflowMenu];
 }
 
-// Opens the Reader mode UI.
-- (void)startReaderMode {
+// Opens or closes the Reader mode UI.
+- (void)toggleReaderMode {
   [self dismissMenu];
-  [self.readerModeHandler showReaderMode];
+  [self.readerModeHandler toggleReaderMode];
 }
 
 #pragma mark - Destinations Handlers
@@ -2420,8 +2422,8 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
 - (void)openDownloads {
   [self dismissMenu];
   profile_metrics::BrowserProfileType type =
-      self.isIncognito ? profile_metrics::BrowserProfileType::kIncognito
-                       : profile_metrics::BrowserProfileType::kRegular;
+      self.incognito ? profile_metrics::BrowserProfileType::kIncognito
+                     : profile_metrics::BrowserProfileType::kRegular;
   UmaHistogramEnumeration("Download.OpenDownloadsFromMenu.PerProfileType",
                           type);
   [self.browserCoordinatorHandler showDownloadsFolder];
@@ -2461,8 +2463,8 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
 
   [self dismissMenu];
   profile_metrics::BrowserProfileType type =
-      self.isIncognito ? profile_metrics::BrowserProfileType::kIncognito
-                       : profile_metrics::BrowserProfileType::kRegular;
+      self.incognito ? profile_metrics::BrowserProfileType::kIncognito
+                     : profile_metrics::BrowserProfileType::kRegular;
   UmaHistogramEnumeration("Settings.OpenSettingsFromMenu.PerProfileType", type);
   [self.applicationHandler
       showSettingsFromViewController:self.baseViewController

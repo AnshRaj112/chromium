@@ -8,6 +8,7 @@
 
 import {PanelStateKind, ScrollToErrorReason, WebClientMode} from '/glic/glic_api/glic_api.js';
 import type {GlicBrowserHost, GlicHostRegistry, GlicWebClient, Observable, OpenPanelInfo, PanelOpeningData, ScrollToError, Subscriber} from '/glic/glic_api/glic_api.js';
+import {ObservableValue} from '/glic/observable.js';
 
 import {createGlicHostRegistryOnLoad} from './api_boot.js';
 
@@ -70,6 +71,8 @@ class WebClient implements GlicWebClient {
   host?: GlicBrowserHost;
   firstOpened = Promise.withResolvers<void>();
   initializedPromise = Promise.withResolvers<void>();
+  onNotifyPanelWasClosed: () => void = () => {};
+  panelOpenState = ObservableValue.withValue<boolean>(false);
 
   async initialize(glicBrowserHost: GlicBrowserHost): Promise<void> {
     this.host = glicBrowserHost;
@@ -78,12 +81,18 @@ class WebClient implements GlicWebClient {
 
   async notifyPanelWillOpen(_panelOpeningData: PanelOpeningData):
       Promise<OpenPanelInfo> {
+    this.panelOpenState.assignAndSignal(true);
     this.firstOpened.resolve();
 
     const openPanelInfo: OpenPanelInfo = {
       startingMode: WebClientMode.TEXT,
     };
     return openPanelInfo;
+  }
+
+  async notifyPanelWasClosed(): Promise<void> {
+    this.onNotifyPanelWasClosed();
+    this.panelOpenState.assignAndSignal(false);
   }
 
   waitForFirstOpen(): Promise<void> {
@@ -108,13 +117,22 @@ class ApiTestFixtureBase {
   testParams: any;
   constructor(protected testStepper: TestStepper) {}
 
+  // Return to the C++ side, and wait for it to call ContinueJsTest() to
+  // continue execution in the JS test. Optionally, pass data to the C++ side.
+  advanceToNextStep(data?: any): Promise<void> {
+    return this.testStepper.nextStep(data);
+  }
+
   // Sets up the web client. This is called when the web contents loads,
   // before `ExecuteJsTest()`.
   async setUpClient() {
+    this.setUpWithClient(this.createWebClient());
+  }
+
+  async setUpWithClient(client: WebClient) {
     const registry = await glicHostRegistry.promise;
-    const webClient = this.createWebClient();
-    registry.registerWebClient(webClient);
-    this.clientValue = webClient;
+    this.clientValue = client;
+    await registry.registerWebClient(client);
     assertTrue(!!this.clientValue);
   }
 
@@ -146,12 +164,6 @@ class ApiTests extends ApiTestFixtureBase {
     await this.client.waitForFirstOpen();
   }
 
-  // Return to the C++ side, and wait for it to call ContinueJsTest() to
-  // continue execution in the JS test. Optionally, pass data to the C++ side.
-  private advanceToNextStep(data?: any): Promise<void> {
-    return this.testStepper.nextStep(data);
-  }
-
   // WARNING: Remember to update chrome/browser/glic/host/glic_api_uitest.cc
   // if you add a new test!
 
@@ -165,6 +177,8 @@ class ApiTests extends ApiTestFixtureBase {
     }
     await this.advanceToNextStep(allNames);
   }
+
+  async testRequestHeader() {}
 
   async testCreateTab() {
     assertTrue(!!this.host.createTab);
@@ -210,7 +224,12 @@ class ApiTests extends ApiTestFixtureBase {
 
   async testClosePanel() {
     assertTrue(!!this.host.closePanel);
+
+    // Close the panel, and verify notifyPanelWasClosed is called.
+    const closedPromise = Promise.withResolvers<void>();
+    this.client.onNotifyPanelWasClosed = closedPromise.resolve;
     await this.host.closePanel();
+    await waitFor(closedPromise.promise);
   }
 
   async testAttachPanel() {
@@ -494,11 +513,18 @@ class ApiTests extends ApiTestFixtureBase {
   async testGetOsHotkeyState() {
     assertTrue(!!this.host.getOsHotkeyState);
     const osHotkeyState = observeSequence(this.host.getOsHotkeyState());
-    const initialHotkeyState = await osHotkeyState.next();
-    assertEquals('<Ctrl>-<G>', initialHotkeyState.hotkey);
+    let hotkeyState = await osHotkeyState.next();
+    const isMac = /Mac/.test(navigator.platform);
+    let expectedHotkey = isMac ? '<⌃>-<G>' : '<Ctrl>-<G>';
+    assertEquals(expectedHotkey, hotkeyState.hotkey);
     await this.advanceToNextStep();
-    const changedState = await osHotkeyState.next();
-    assertEquals('<Ctrl>-<Shift>-<1>', changedState.hotkey);
+    hotkeyState = await osHotkeyState.next();
+    expectedHotkey = isMac ? '<⌃>-<⇧>-<1>' : '<Ctrl>-<Shift>-<1>';
+    assertEquals(expectedHotkey, hotkeyState.hotkey);
+    await this.advanceToNextStep();
+    hotkeyState = await osHotkeyState.next();
+    expectedHotkey = '';
+    assertEquals(expectedHotkey, hotkeyState.hotkey);
   }
 
   async testGetUserProfileInfo() {
@@ -541,6 +567,39 @@ class ApiTests extends ApiTestFixtureBase {
     assertTrue(!!this.host.setAudioDucking);
 
     await this.host.setAudioDucking(true);
+  }
+
+  async testGetDisplayMedia() {
+    async function waitForFirstFrame(track: MediaStreamVideoTrack):
+        Promise<boolean> {
+      const processor = new MediaStreamTrackProcessor({track});
+      const reader = processor.readable.getReader();
+
+      try {
+        const result = await reader.read();
+        if (result.done) {
+          throw new Error('Track ended before a frame could be read.');
+        }
+        const frame = result.value;  // This is a VideoFrame
+        frame.close();
+        return true;
+      } finally {
+        reader.releaseLock();
+      }
+    }
+
+    // The client should be able to use getDisplayMedia() to capture the glic
+    // window.
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false,
+      preferCurrentTab: true,
+    } as any);
+    const videoTracks = stream.getVideoTracks();
+    assertTrue(videoTracks.length > 0);
+    const track = videoTracks[0] as MediaStreamVideoTrack;
+    assertTrue(!!track);
+    assertTrue(await waitForFirstFrame(track));
   }
 
   async testMetrics() {
@@ -618,6 +677,22 @@ class ApiTests extends ApiTestFixtureBase {
     await observeSequence(this.host.isManuallyResizing()).waitForValue(false);
   }
 
+  async testResizeWindowTooSmall() {
+    assertTrue(!!this.host.resizeWindow);
+    await this.host.resizeWindow(0, 0);
+  }
+
+  async testResizeWindowTooLarge() {
+    assertTrue(!!this.host.resizeWindow);
+    await this.host.resizeWindow(2000, 2000);
+  }
+
+  async testResizeWindowWithinBounds() {
+    assertTrue(!!this.host.resizeWindow);
+    assertTrue(!!this.testParams);
+    await this.host.resizeWindow(this.testParams.width, this.testParams.height);
+  }
+
   async testOpenOsMediaPermissionSettings() {
     assertTrue(!!this.host.openOsPermissionSettingsMenu);
     this.host.openOsPermissionSettingsMenu('media');
@@ -626,11 +701,6 @@ class ApiTests extends ApiTestFixtureBase {
   async testOpenOsGeoPermissionSettings() {
     assertTrue(!!this.host.openOsPermissionSettingsMenu);
     this.host.openOsPermissionSettingsMenu('geolocation');
-  }
-
-  async testIncompatiblePermissionWithOsPermissionSettings() {
-    assertTrue(!!this.host.openOsPermissionSettingsMenu);
-    this.host.openOsPermissionSettingsMenu('notifications');
   }
 
   async testGetOsMicrophonePermissionStatusAllowed() {
@@ -717,7 +787,8 @@ class ApiTestWithoutOpen extends ApiTestFixtureBase {
   }
 }
 
-type InitFailureType = 'error'|'timeout'|'none'|'reloadAfterInitialize';
+type InitFailureType = 'error'|'timeout'|'none'|'reloadAfterInitialize'|
+    'navigateToSorryPageBeforeInitialize'|'navigateToSorryPageAfterInitialize';
 
 // A web client that can fail initialize.
 class WebClientThatFailsInitialize extends WebClient {
@@ -736,6 +807,17 @@ class WebClientThatFailsInitialize extends WebClient {
     if (this.failWith === 'reloadAfterInitialize') {
       sleep(500).then(() => location.reload());
     }
+    if (this.failWith === 'navigateToSorryPageBeforeInitialize') {
+      location.href = '/sorry/index.html';
+      return sleep(5000);
+    }
+    if (this.failWith === 'navigateToSorryPageAfterInitialize') {
+      sleep(500).then(() => {
+        location.href = '/sorry/index.html';
+      });
+    }
+    // This initialization is sometimes skipped depending on the type of desired
+    // failure detected above
     return super.initialize(glicBrowserHost);
   }
 }
@@ -754,22 +836,25 @@ class ApiTestFailsToInitialize extends ApiTestFixtureBase {
   // testParams when `createWebClient()` is called.
   override async setUpClient() {}
 
-  async testInitializeFailsWindowClosed() {
-    // Failing initialize will tear down this web contents. Deferring that here
-    // so that our test can exit cleanly.
+  // Runs ApiTestFixtureBase.setUpClient() after 100 ms, and returns
+  // immediately. This allows the test to exit cleanly before the web contents
+  // is torn down.
+  deferredSetUpClient() {
     sleep(100).then(() => super.setUpClient());
   }
 
+  async testInitializeFailsWindowClosed() {
+    this.deferredSetUpClient();
+  }
+
   async testInitializeFailsWindowOpen() {
-    // Failing initialize will tear down this web contents. Deferring that here
-    // so that our test can exit cleanly.
-    sleep(100).then(() => super.setUpClient());
+    this.deferredSetUpClient();
   }
 
   async testReload() {
     // First run.
     if (this.getTestParams().failWith === 'reloadAfterInitialize') {
-      sleep(100).then(() => super.setUpClient());
+      this.deferredSetUpClient();
       return;
     }
 
@@ -778,12 +863,47 @@ class ApiTestFailsToInitialize extends ApiTestFixtureBase {
     await this.client.waitForFirstOpen();
   }
 
-  async testInitializeFailsAfterReload() {
-    sleep(100).then(() => super.setUpClient());
+  async testSorryPageBeforeInitialize() {
+    this.deferredSetUpClient();
   }
 
+  async testSorryPageAfterInitialize() {
+    this.deferredSetUpClient();
+  }
+
+  async testInitializeFailsAfterReload() {
+    this.deferredSetUpClient();
+  }
+  // Skips the setup entirely.
+  async testNoClientCreated() {}
+  // Skips the bootstrap as well. The test name "testNoBootstrap" is handled
+  // specially.
+  async testNoBootstrap() {}
   async testInitializeTimesOut() {
     await super.setUpClient();
+  }
+
+  // Tests notifyPanelWillOpen() returning after the panel is closed and then
+  // reopened.
+  async testCloseAndOpenWhileOpening() {
+    const openSignal = Promise.withResolvers<void>();
+    class WebClientThatOpensSlowly extends WebClient {
+      override async notifyPanelWillOpen(): Promise<OpenPanelInfo> {
+        this.panelOpenState.assignAndSignal(true);
+        await openSignal.promise;
+        return {
+          startingMode: WebClientMode.TEXT,
+        };
+      }
+    }
+    await this.setUpWithClient(new WebClientThatOpensSlowly());
+    const panelOpenState = observeSequence(this.client.panelOpenState);
+    panelOpenState.waitForValue(true);
+    await this.host.closePanel!();
+    panelOpenState.waitForValue(false);
+    await this.advanceToNextStep();
+    openSignal.resolve();
+    await panelOpenState.waitForValue(true);
   }
 }
 
@@ -957,8 +1077,10 @@ async function improveStackTrace(stack: string) {
 }
 
 async function main() {
-  console.info('api_test waiting for GlicHostRegistry');
-  glicHostRegistry.resolve(await createGlicHostRegistryOnLoad());
+  if (getTestName() !== 'testNoBootstrap') {
+    console.info('api_test waiting for GlicHostRegistry');
+    glicHostRegistry.resolve(await createGlicHostRegistryOnLoad());
+  }
 
   // If no test is selected, load a client that does nothing.
   // This is present because test.html is used as a dummy test client in
@@ -1002,6 +1124,19 @@ function sleep(timeoutMs: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, timeoutMs);
   });
+}
+
+// Waits for a promise to resolve. If the timeout is reached first, throws an
+// exception. Note this is useful because if the test times out in the normal
+// way, we do not receive a very useful error.
+async function waitFor<T>(value: Promise<T>, timeoutMs = 5000): Promise<T> {
+  const timeoutResult = Symbol();
+  const result =
+      await Promise.race([value, sleep(timeoutMs).then(() => timeoutResult)]);
+  if (result === timeoutResult) {
+    throw new Error(`Timed out while waiting`);
+  }
+  return value;
 }
 
 main();

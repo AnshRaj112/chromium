@@ -206,7 +206,7 @@ enum class AccessPoint : int {
   // Access point for the IOS Set Up List on the NTP.
   kSetUpList = 51,
   // Access point for the local password migration warning on Android.
-  kPasswordMigrationWarningAndroid = 52,
+  // Deprecated: kPasswordMigrationWarningAndroid = 52,
   // Access point for the Save to Photos feature on iOS.
   kSaveToPhotosIos = 53,
   // Access point for the Chrome Signin Intercept Bubble.
@@ -628,6 +628,10 @@ void LogSigninWithAccountType(SigninAccountType account_type);
 // completion events are automatically logged when the primary account state
 // changes, see `signin::PrimaryAccountMutator`.
 void LogSyncOptInStarted(AccessPoint access_point);
+
+// Logs a sync opt-in offered event (`Signin.SyncOptIn.Offered` histogram)
+// and its associated access point.
+void LogSyncOptInOffered(AccessPoint access_point);
 
 // Logs that the sync settings were opened at the end of the sync opt-in flow,
 // and the associated access points.

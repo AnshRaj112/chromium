@@ -181,7 +181,7 @@ bool TipsNotificationClient::HandleNotificationInteraction(
 void TipsNotificationClient::HandleNotificationInteraction(
     TipsNotificationType type) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  Browser* browser = GetSceneLevelForegroundActiveBrowser();
+  Browser* browser = GetActiveForegroundBrowser();
   CHECK(browser);
   id<ApplicationCommands> application_handler =
       HandlerForProtocol(browser->GetCommandDispatcher(), ApplicationCommands);
@@ -255,6 +255,7 @@ void TipsNotificationClient::OnSceneActiveForegroundBrowserReady(
     base::OnceClosure closure) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   UpdateProvisionalAllowed();
+  forced_type_ = ForcedTipsNotificationType();
   if (user_type_ == TipsNotificationUserType::kUnknown &&
       !CanSendReactivation()) {
     ClassifyUser();
@@ -345,6 +346,11 @@ void TipsNotificationClient::MaybeRequestNotification(
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if ((!permitted_ && !CanSendReactivation()) || DismissLimitReached()) {
     std::move(completion).Run();
+    return;
+  }
+
+  if (forced_type_.has_value()) {
+    RequestNotification(forced_type_.value(), std::move(completion));
     return;
   }
 
@@ -464,7 +470,7 @@ bool TipsNotificationClient::ShouldSendDefaultBrowser() {
 
 bool TipsNotificationClient::ShouldSendWhatsNew() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  Browser* browser = GetSceneLevelForegroundActiveBrowser();
+  Browser* browser = GetActiveForegroundBrowser();
   if (!browser) {
     return false;
   }
@@ -474,7 +480,7 @@ bool TipsNotificationClient::ShouldSendWhatsNew() {
 
 bool TipsNotificationClient::ShouldSendSignin() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  Browser* browser = GetSceneLevelForegroundActiveBrowser();
+  Browser* browser = GetActiveForegroundBrowser();
   if (!browser) {
     return false;
   }
@@ -487,7 +493,7 @@ bool TipsNotificationClient::ShouldSendSignin() {
 }
 
 bool TipsNotificationClient::ShouldSendSetUpListContinuation() {
-  Browser* browser = GetSceneLevelForegroundActiveBrowser();
+  Browser* browser = GetActiveForegroundBrowser();
   if (!browser) {
     return false;
   }
@@ -509,7 +515,7 @@ bool TipsNotificationClient::ShouldSendSetUpListContinuation() {
 
 bool TipsNotificationClient::ShouldSendDocking() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  Browser* browser = GetSceneLevelForegroundActiveBrowser();
+  Browser* browser = GetActiveForegroundBrowser();
   if (!browser) {
     return false;
   }
@@ -533,7 +539,7 @@ bool TipsNotificationClient::ShouldSendOmniboxPosition() {
 bool TipsNotificationClient::ShouldSendLens() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   // Early return if Lens is not available or disabled by policy.
-  Browser* browser = GetSceneLevelForegroundActiveBrowser();
+  Browser* browser = GetActiveForegroundBrowser();
   if (!browser) {
     return false;
   }
@@ -555,7 +561,7 @@ bool TipsNotificationClient::ShouldSendLens() {
 
 bool TipsNotificationClient::ShouldSendEnhancedSafeBrowsing() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  Browser* browser = GetSceneLevelForegroundActiveBrowser();
+  Browser* browser = GetActiveForegroundBrowser();
   if (!browser) {
     return false;
   }
@@ -566,7 +572,7 @@ bool TipsNotificationClient::ShouldSendEnhancedSafeBrowsing() {
 
 bool TipsNotificationClient::IsSceneLevelForegroundActive() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  return GetSceneLevelForegroundActiveBrowser() != nullptr;
+  return GetActiveForegroundBrowser() != nullptr;
 }
 
 void TipsNotificationClient::ShowUIForNotificationType(
@@ -780,11 +786,13 @@ bool TipsNotificationClient::CanSendReactivation() {
     return false;
   }
 
-  return local_state_->GetInteger(kReactivationNotificationsCanceledCount) < 2;
+  return local_state_->GetInteger(kReactivationNotificationsCanceledCount) <
+             2 ||
+         forced_type_.has_value();
 }
 
 void TipsNotificationClient::UpdateProvisionalAllowed() {
-  Browser* browser = GetSceneLevelForegroundActiveBrowser();
+  Browser* browser = GetActiveForegroundBrowser();
   CHECK(browser);
   provisional_allowed_ = [PushNotificationUtil
       provisionalAllowedByPolicyForProfile:browser->GetProfile()];

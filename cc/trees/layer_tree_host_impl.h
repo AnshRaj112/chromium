@@ -177,6 +177,10 @@ class CC_EXPORT LayerTreeHostImpl : public TileManagerClient,
     // Indicates if this frame has a save directive which will add copy requests
     // for render passes in the Viz process.
     bool has_view_transition_save_directive = false;
+    // Indicates if this frame had any copy requests, and is used to ensure
+    // that we clear pending copy requests after drawing a frame and request
+    // a new tree commit.
+    bool has_copy_requests = false;
   };
 
   // A struct of data for a single UIResource, including the backing
@@ -802,7 +806,9 @@ class CC_EXPORT LayerTreeHostImpl : public TileManagerClient,
     return paint_worklet_painter_.get();
   }
 
-  void QueueImageDecode(int request_id, const DrawImage& image);
+  void QueueImageDecode(int request_id,
+                        const DrawImage& image,
+                        bool speculative);
   std::vector<std::pair<int, bool>> TakeCompletedImageDecodeRequests();
   // Returns mutator events to be handled by BeginMainFrame.
   std::unique_ptr<MutatorEvents> TakeMutatorEvents();
@@ -891,6 +897,8 @@ class CC_EXPORT LayerTreeHostImpl : public TileManagerClient,
       const gfx::RectF& rect);
 
   void UpdateChildLocalSurfaceId();
+
+  void ReturnResource(viz::ReturnedResource returned_resource);
 
  protected:
   LayerTreeHostImpl(

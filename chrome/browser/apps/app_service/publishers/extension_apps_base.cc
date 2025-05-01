@@ -163,7 +163,6 @@ AppPtr ExtensionAppsBase::CreateAppImpl(const extensions::Extension* extension,
 
   const extensions::ManagementPolicy* policy =
       extensions::ExtensionSystem::Get(profile())->management_policy();
-  DCHECK(policy);
   app->allow_uninstall = policy->UserMayModifySettings(extension, nullptr) &&
                          !policy->MustRemainInstalled(extension, nullptr);
   app->allow_close = true;

@@ -3855,32 +3855,14 @@ void StyleEngine::RecalcTransitionPseudoStyle() {
 
   ViewTransitionUtils::ForEachTransition(
       *document_, [&](ViewTransition& transition) {
-        Element* scope = transition.Scope();
-        if (!scope) {
-          scope = document_->documentElement();
-        }
-        if (!scope || !scope->InActiveDocument()) {
-          return;
-        }
-
-        // TODO(crbug.com/405117185): Use only the v-t-names inside the scope.
-        scope->RecalcTransitionPseudoTreeStyle(view_transition_names_);
+        transition.RecalcTransitionPseudoTreeStyle();
       });
 }
 
 void StyleEngine::RebuildTransitionPseudoLayoutTrees() {
   ViewTransitionUtils::ForEachTransition(
       *document_, [&](ViewTransition& transition) {
-        Element* scope = transition.Scope();
-        if (!scope) {
-          scope = document_->documentElement();
-        }
-        if (!scope || !scope->InActiveDocument()) {
-          return;
-        }
-
-        // TODO(crbug.com/405117185): Use only the v-t-names inside the scope.
-        scope->RebuildTransitionPseudoLayoutTree(view_transition_names_);
+        transition.RebuildTransitionPseudoLayoutTree();
       });
 }
 
@@ -4750,7 +4732,9 @@ void RevisitStyleRulesForInspector(const RuleFeatureSet& features,
 
 }  // namespace
 
-void StyleEngine::RevisitStyleSheetForInspector(StyleSheetContents* contents) {
+void StyleEngine::RevisitStyleSheetForInspector(
+    StyleSheetContents* contents,
+    const RuleFeatureSet* features) const {
   // We need to revisit the sheet twice, once with the global rule set and
   // once with the sheet's associated rule set.
   // The global rule set contains the rule invalidation data we're currently
@@ -4760,9 +4744,8 @@ void StyleEngine::RevisitStyleSheetForInspector(StyleSheetContents* contents) {
   InvalidationSetToSelectorMap::StyleSheetContentsScope contents_scope(
       contents);
   RevisitStyleRulesForInspector(GetRuleFeatureSet(), contents->ChildRules());
-  if (contents->HasRuleSet()) {
-    RevisitStyleRulesForInspector(contents->GetRuleSet().Features(),
-                                  contents->ChildRules());
+  if (features) {
+    RevisitStyleRulesForInspector(*features, contents->ChildRules());
   }
 }
 

@@ -6,6 +6,7 @@
 
 #include "base/barrier_closure.h"
 #include "base/files/file_util.h"
+#include "base/memory/ref_counted.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool.h"
 #include "chrome/browser/devtools/devtools_window.h"
@@ -13,23 +14,29 @@
 #include "chrome/browser/extensions/api/developer_private/developer_private_event_router.h"
 #include "chrome/browser/extensions/api/developer_private/extension_info_generator.h"
 #include "chrome/browser/extensions/api/developer_private/profile_info_generator.h"
+#include "chrome/browser/extensions/chrome_zipfile_installer.h"
 #include "chrome/browser/extensions/crx_installer.h"
 #include "chrome/browser/extensions/devtools_util.h"
+#include "chrome/browser/extensions/extension_management.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/permissions/permissions_updater.h"
 #include "chrome/browser/extensions/permissions/scripting_permissions_modifier.h"
 #include "chrome/browser/extensions/updater/extension_updater.h"
+#include "chrome/browser/extensions/webstore_reinstaller.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/supervised_user/supervised_user_browser_utils.h"
 #include "chrome/browser/ui/chrome_select_file_policy.h"
 #include "chrome/browser/ui/safety_hub/menu_notification_service_factory.h"
 #include "chrome/grit/generated_resources.h"
 #include "content/public/common/drop_data.h"
+#include "extensions/browser/disable_reason.h"
+#include "extensions/browser/extension_file_task_runner.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registrar.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/file_highlighter.h"
+#include "extensions/browser/management_policy.h"
 #include "extensions/browser/path_util.h"
 #include "extensions/browser/permissions_manager.h"
 #include "extensions/browser/ui_util.h"
@@ -40,17 +47,15 @@
 #include "ui/base/clipboard/file_info.h"
 #include "ui/base/l10n/l10n_util.h"
 
-#if !BUILDFLAG(IS_ANDROID)
-#include "chrome/browser/extensions/chrome_zipfile_installer.h"
+#if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/browser/extensions/install_verifier.h"
 #include "chrome/browser/extensions/manifest_v2_experiment_manager.h"
 #include "chrome/browser/extensions/permissions/site_permissions_helper.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "extensions/browser/extension_file_task_runner.h"
 #include "extensions/browser/ui_util.h"
-#endif  // !BUILDFLAG(IS_ANDROID)
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
 namespace extensions {
 
@@ -96,7 +101,7 @@ GURL ConvertHostToUrl(const std::string& host) {
       {url::kHttpScheme, url::kStandardSchemeSeparator, host, "/"}));
 }
 
-#if !BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(ENABLE_EXTENSIONS)
 // Runs the install verifier for all extensions that are enabled, disabled, or
 // terminated.
 void PerformVerificationCheck(content::BrowserContext* context) {
@@ -119,7 +124,7 @@ void PerformVerificationCheck(content::BrowserContext* context) {
     InstallVerifier::Get(context)->VerifyAllExtensions();
   }
 }
-#endif  // !BUILDFLAG(IS_ANDROID)
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
 std::string GetETldPlusOne(const GURL& site) {
   DCHECK(site.is_valid());
@@ -409,7 +414,7 @@ DeveloperPrivateGetProfileConfigurationFunction::Run() {
   developer::ProfileInfo info =
       CreateProfileInfo(Profile::FromBrowserContext(browser_context()));
 
-#if !BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(ENABLE_EXTENSIONS)
   // If this is called from the chrome://extensions page, we use this as a
   // heuristic that it's a good time to verify installs. We do this on startup,
   // but there's a chance that it failed erroneously, so it's good to double-
@@ -417,7 +422,7 @@ DeveloperPrivateGetProfileConfigurationFunction::Run() {
   if (source_context_type() == mojom::ContextType::kWebUi) {
     PerformVerificationCheck(browser_context());
   }
-#endif  // !BUILDFLAG(IS_ANDROID)
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
   return RespondNow(WithArguments(info.ToValue()));
 }
@@ -538,7 +543,7 @@ DeveloperPrivateUpdateExtensionConfigurationFunction::Run() {
   }
 // TODO(crbug.com/392777363): Enable this code when toolbars are supported on
 // desktop Android.
-#if !BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(ENABLE_EXTENSIONS)
   if (update.show_access_requests_in_toolbar) {
     SitePermissionsHelper(Profile::FromBrowserContext(browser_context()))
         .SetShowAccessRequestsInToolbar(
@@ -558,7 +563,7 @@ DeveloperPrivateUpdateExtensionConfigurationFunction::Run() {
                                                  !is_action_pinned);
     }
   }
-#endif  // !BUILDFLAG(IS_ANDROID)
+#endif  // BUILDFLAG(ENABLE_EXTENSIONS)
 
   return RespondNow(NoArguments());
 }
@@ -590,16 +595,12 @@ DeveloperPrivateInstallDroppedFileFunction::Run() {
   }
 
   if (MatchesExtension(file, FILE_PATH_LITERAL(".zip"))) {
-#if BUILDFLAG(IS_ANDROID)
-    return RespondNow(Error("zip file is not yet supported on android"));
-#else
     ExtensionRegistrar* registrar = ExtensionRegistrar::Get(browser_context());
     ZipFileInstaller::Create(
         GetExtensionFileTaskRunner(),
         MakeRegisterInExtensionServiceCallback(browser_context()))
         ->InstallZipFileToUnpackedExtensionsDir(
             file.path, registrar->unpacked_install_directory());
-#endif  // BUILDFLAG(IS_ANDROID)
   } else {
     auto prompt = std::make_unique<ExtensionInstallPrompt>(web_contents);
     scoped_refptr<CrxInstaller> crx_installer =
@@ -1420,6 +1421,63 @@ ExtensionFunction::ResponseAction DeveloperPrivateOpenDevToolsFunction::Run() {
       web_contents));  // Not through direct user gesture.
 #endif                 // BUILDFLAG(ENABLE_EXTENSIONS)
   return RespondNow(NoArguments());
+}
+
+DeveloperPrivateRepairExtensionFunction::
+    ~DeveloperPrivateRepairExtensionFunction() = default;
+
+ExtensionFunction::ResponseAction
+DeveloperPrivateRepairExtensionFunction::Run() {
+  std::optional<developer::RepairExtension::Params> params =
+      developer::RepairExtension::Params::Create(args());
+  EXTENSION_FUNCTION_VALIDATE(params);
+  const Extension* extension = GetExtensionById(params->extension_id);
+  if (!extension) {
+    return RespondNow(Error(kNoSuchExtensionError));
+  }
+
+  if (!ExtensionPrefs::Get(browser_context())
+           ->HasDisableReason(extension->id(),
+                              disable_reason::DISABLE_CORRUPTED)) {
+    return RespondNow(Error(kCannotRepairHealthyExtension));
+  }
+
+  ManagementPolicy* management_policy =
+      ExtensionSystem::Get(browser_context())->management_policy();
+  // If content verifier would repair this extension independently, then don't
+  // allow repair from here. This applies to policy extensions.
+  // Also note that if we let |reinstaller| continue with the repair, this would
+  // have uninstalled the extension but then we would have failed to reinstall
+  // it for policy check (see PolicyCheck::Start()).
+  if (management_policy->ShouldRepairIfCorrupted(extension)) {
+    return RespondNow(Error(kCannotRepairPolicyExtension));
+  }
+
+  content::WebContents* web_contents = GetSenderWebContents();
+  if (!web_contents) {
+    return RespondNow(Error(kCouldNotFindWebContentsError));
+  }
+
+  ExtensionManagement* extension_management =
+      ExtensionManagementFactory::GetForBrowserContext(browser_context());
+  if (!extension_management->UpdatesFromWebstore(*extension)) {
+    return RespondNow(Error(kCannotRepairNonWebstoreExtension));
+  }
+
+  auto reinstaller = base::MakeRefCounted<WebstoreReinstaller>(
+      web_contents, params->extension_id,
+      base::BindOnce(
+          &DeveloperPrivateRepairExtensionFunction::OnReinstallComplete, this));
+  reinstaller->BeginReinstall();
+
+  return RespondLater();
+}
+
+void DeveloperPrivateRepairExtensionFunction::OnReinstallComplete(
+    bool success,
+    const std::string& error,
+    webstore_install::Result result) {
+  Respond(success ? NoArguments() : Error(error));
 }
 
 }  // namespace api

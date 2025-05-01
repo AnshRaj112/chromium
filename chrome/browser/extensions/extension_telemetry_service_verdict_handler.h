@@ -8,6 +8,9 @@
 #include "base/memory/raw_ptr.h"
 #include "chrome/browser/extensions/blocklist.h"
 #include "extensions/browser/extension_registry.h"
+#include "extensions/buildflags/buildflags.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace extensions {
 class ExtensionPrefs;
@@ -40,7 +43,7 @@ class ExtensionTelemetryServiceVerdictHandler {
   // possible that the action is already performed for a verdict, in this case,
   // nothing is done.
   //
-  // |state_map| represents the converted blocklist states from verdicts. For
+  // `state_map` represents the converted blocklist states from verdicts. For
   // each state, the following action is performed:
   // MALWARE - Unloads the extension and adds it to the Extension Telemetry
   // service malware blocklist.

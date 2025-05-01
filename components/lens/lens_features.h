@@ -77,6 +77,14 @@ BASE_DECLARE_FEATURE(kLensSearchSidePanelNewFeedback);
 COMPONENT_EXPORT(LENS_FEATURES)
 BASE_DECLARE_FEATURE(kLensOverlayRecontextualizeOnQuery);
 
+// Enables the Lens overlay simplified selection flow.
+COMPONENT_EXPORT(LENS_FEATURES)
+BASE_DECLARE_FEATURE(kLensOverlayCornerSliders);
+
+// Enables the protected error page in the Lens side panel.
+COMPONENT_EXPORT(LENS_FEATURES)
+BASE_DECLARE_FEATURE(kLensSearchProtectedPage);
+
 // The base URL for Lens.
 COMPONENT_EXPORT(LENS_FEATURES)
 extern const base::FeatureParam<std::string> kHomepageURLForLens;
@@ -800,6 +808,18 @@ extern bool IsLensSearchSidePanelNewFeedbackEnabled();
 // Whether to recontextualize on each query.
 COMPONENT_EXPORT(LENS_FEATURES)
 bool ShouldLensOverlayRecontextualizeOnQuery();
+
+// Whether to enable corner sliders for keyboard control.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern bool AreLensOverlayCornerSlidersEnabled();
+
+// The timeout for performing a region search after a slider change event.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern int GetLensOverlaySliderChangedTimeout();
+
+// Whether the protected page for the side panel is enabled.
+COMPONENT_EXPORT(LENS_FEATURES)
+bool IsLensSearchProtectedPageEnabled();
 
 }  // namespace lens::features
 #endif  // COMPONENTS_LENS_LENS_FEATURES_H_

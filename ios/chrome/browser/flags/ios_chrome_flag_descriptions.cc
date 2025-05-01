@@ -215,6 +215,11 @@ const char kBestFeaturesScreenInFirstRunDescription[] =
     "When enabled, displays the BestFeatures screen in the First Run sequence. "
     "Screen can be displayed either before or after the DB promo.";
 
+const char kBestOfAppFREName[] = "Display Best of App view in the FRE";
+const char kBestOfAppFREDescription[] =
+    "When enabled, displays some views during the FRE highlighting the best "
+    "features in the app.";
+
 const char kBlueDotOnToolsMenuButtonName[] =
     "Show blue dot promo on tools menu button";
 const char kBlueDotOnToolsMenuButtonDescription[] =
@@ -560,6 +565,10 @@ const char kIdentityConfirmationSnackbarName[] =
 const char kIdentityConfirmationSnackbarDescription[] =
     "When enabled, the identity confirmation snackbar will show on startup.";
 
+const char kImportPasswordsFromSafariName[] = "Import Passwords From Safari";
+const char kImportPasswordsFromSafariDescription[] =
+    "When enabled, allows users to import passwords from Safari.";
+
 const char kIndicateIdentityErrorInOverflowMenuName[] =
     "Indicate Identity Error in Overflow Menu";
 const char kIndicateIdentityErrorInOverflowMenuDescription[] =
@@ -656,11 +665,12 @@ const char kIOSProactivePasswordGenerationBottomSheetDescription[] =
     "Enables the display of the proactive password generation bottom sheet on "
     "IOS.";
 
-const char kIOSPromptSearchEngineChoiceAfterDeviceRestoreName[] =
-    "Prompt the search engine choice after device restore";
-const char kIOSPromptSearchEngineChoiceAfterDeviceRestoreDescription[] =
-    "The dialog is triggered when opening Chrome if there is no external "
-    "intent.";
+const char kInvalidateSearchEngineChoiceOnDeviceRestoreDetectionName[] =
+    "Invalidate search engine choice after device restore";
+const char kInvalidateSearchEngineChoiceOnDeviceRestoreDetectionDescription[] =
+    "When enabled, search engine choices made before backup & restore will not "
+    "be considered valid on the restored device, leading to the choice screen "
+    "potentially retriggering.";
 
 const char kIOSQuickDeleteName[] = "Quick Delete for iOS";
 const char kIOSQuickDeleteDescription[] =
@@ -672,11 +682,6 @@ const char kIOSEnterpriseRealtimeUrlFilteringName[] =
 const char kIOSEnterpriseRealtimeUrlFilteringDescription[] =
     "When enabled, Enterprise admins can block navigations to urls matching "
     "rules defined by their organization.";
-
-const char kNewFeedPositioningExperimentName[] =
-    "New Personalized Feed Positioning for iOS";
-const char kNewFeedPositioningExperimentDescription[] =
-    "Positions the most visited tiles based on user frequency.";
 
 const char kNewShareExtensionName[] = "New Share Extension for iOS";
 const char kNewShareExtensionDescription[] =
@@ -1166,6 +1171,10 @@ const char kReaderModeDistillerHeuristicDescription[] =
     "Enables Reader Mode distillation heuristic that triggers Reader Mode UI "
     "entry point if available";
 
+const char kReaderModeName[] = "Enables Reader Mode";
+const char kReaderModeDescription[] =
+    "Enables Reader Mode UI and entry points.";
+
 const char kRefactorToolbarsSizeName[] = "Refactor toolbars size";
 const char kRefactorToolbarsSizeDescription[] =
     "When enabled, the toolbars size does not use broadcaster but observers.";
@@ -1259,7 +1268,7 @@ const char kSeparateProfilesForManagedAccountsName[] =
     "Put each managed account into its own profile";
 const char kSeparateProfilesForManagedAccountsDescription[] =
     "If enabled, each managed account will be assigned to its own separate "
-    "profile. Requires #use-account-list-from-identity-manager";
+    "profile.";
 
 const char kSharedHighlightingIOSName[] = "Enable Shared Highlighting features";
 const char kSharedHighlightingIOSDescription[] =
@@ -1306,6 +1315,11 @@ const char kNTPBackgroundCustomizationName[] =
     "Enable background customization menu on the NTP";
 const char kNTPBackgroundCustomizationDescription[] =
     "When enabled, the background customization menu is available on the NTP.";
+
+const char kNtpAlphaBackgroundCollectionsName[] =
+    "Enable alpha background collections";
+const char kNtpAlphaBackgroundCollectionsDescription[] =
+    "When enabled, the alpha background collections are available on the NTP.";
 
 const char kSpotlightNeverRetainIndexName[] = "Don't retain spotlight index";
 const char kSpotlightNeverRetainIndexDescription[] =
@@ -1409,6 +1423,12 @@ const char kUpdatedFRESequenceName[] =
 const char kUpdatedFRESequenceDescription[] =
     "Updates the sequence of the FRE screens to show the DB promo first, "
     "remove the Sin-In & Sync screens, or both.";
+
+const char kUseFeedEligibilityServiceName[] =
+    "[iOS] Use the new feed eligibility service";
+const char kUseFeedEligibilityServiceDescription[] =
+    "Use the new eligibility service to handle whether the Discover "
+    "feed is displayed on NTP";
 
 const char kWaitThresholdMillisecondsForCapabilitiesApiName[] =
     "Maximum wait time (in seconds) for a response from the Account "

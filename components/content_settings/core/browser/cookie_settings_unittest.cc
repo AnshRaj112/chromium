@@ -741,10 +741,28 @@ TEST_F(CookieSettingsTest, TestThirdPartyCookiePhaseout) {
 }
 
 TEST_F(CookieSettingsTest, CookiesAllowThirdParty) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(
+      privacy_sandbox::kTrackingProtectionContentSettingFor3pcb);
   EXPECT_TRUE(cookie_settings_->IsFullCookieAccessAllowed(
       kBlockedSite, kFirstPartySiteForCookies,
       /*top_frame_origin=*/std::nullopt, net::CookieSettingOverrides()));
   EXPECT_FALSE(cookie_settings_->IsCookieSessionOnly(kBlockedSite));
+
+  // Cookies should get blocked when override is applied.
+  net::CookieSettingOverrides cookie_setting_overrides(
+      {net::CookieSettingOverride::kForceDisableThirdPartyCookies});
+  EXPECT_FALSE(cookie_settings_->IsFullCookieAccessAllowed(
+      kBlockedSite, kFirstPartySiteForCookies,
+      /*top_frame_origin=*/std::nullopt, cookie_setting_overrides));
+
+  // Cookies should be blocked when both `kForceEnable...` and
+  // `kForceDisable...` overrides are present.
+  cookie_setting_overrides.Put(
+      net::CookieSettingOverride::kForceEnableThirdPartyCookies);
+  EXPECT_FALSE(cookie_settings_->IsFullCookieAccessAllowed(
+      kBlockedSite, kFirstPartySiteForCookies,
+      /*top_frame_origin=*/std::nullopt, cookie_setting_overrides));
 }
 
 TEST_F(CookieSettingsTest, CookiesExplicitBlockSingleThirdParty) {
@@ -791,13 +809,6 @@ TEST_P(AreThirdPartyCookiesLimited, FalseWhenAll3pcsBlockedInModeB) {
   prefs_.SetBoolean(prefs::kTrackingProtection3pcdEnabled, true);
   prefs_.SetBoolean(prefs::kBlockAll3pcToggleEnabled, true);
   EXPECT_FALSE(cookie_settings_->AreThirdPartyCookiesLimited());
-}
-
-TEST_P(AreThirdPartyCookiesLimited,
-       TrueWhenCookieControlsModePrefSetToLimited) {
-  prefs_.SetInteger(prefs::kCookieControlsMode,
-                    static_cast<int>(CookieControlsMode::kLimited));
-  EXPECT_TRUE(cookie_settings_->AreThirdPartyCookiesLimited());
 }
 
 TEST_P(AreThirdPartyCookiesLimited,
@@ -1184,6 +1195,16 @@ TEST_F(CookieSettingsTest, CookiesThirdPartyBlockedAllSitesAllowed) {
             cookie_settings_->IsFullCookieAccessAllowed(
                 kHttpsSite, kBlockedSiteForCookies,
                 /*top_frame_origin=*/std::nullopt, cookie_setting_overrides));
+
+  // Adding override should unblock third-party cookies.
+  cookie_setting_overrides.Put(
+      net::CookieSettingOverride::kForceEnableThirdPartyCookies);
+  EXPECT_TRUE(cookie_settings_->IsFullCookieAccessAllowed(
+      kFirstPartySite, kBlockedSiteForCookies,
+      /*top_frame_origin=*/std::nullopt, cookie_setting_overrides));
+  EXPECT_TRUE(cookie_settings_->IsFullCookieAccessAllowed(
+      kHttpsSite, kBlockedSiteForCookies,
+      /*top_frame_origin=*/std::nullopt, cookie_setting_overrides));
 }
 
 TEST_F(CookieSettingsTest, CookiesBlockEverything) {

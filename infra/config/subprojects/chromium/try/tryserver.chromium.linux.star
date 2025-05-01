@@ -552,6 +552,7 @@ try_.builder(
             "testing/xvfb\\.py",
             "third_party/wayland/.+",
             "third_party/wayland-protocols/.+",
+            "third_party/weston/.+",
             "ui/ozone/platform/wayland/.+",
             "ui/views/widget/.+test.+",
         ],
@@ -1103,8 +1104,13 @@ try_.gpu.optional_tests_builder(
         browser_config = targets.browser_config.RELEASE,
         os_type = targets.os_type.LINUX,
     ),
+    pool = "luci.chromium.gpu.try",
+    builderless = True,
+    ssd = None,
+    free_space = None,
     contact_team_email = "chrome-gpu-infra@google.com",
     main_list_view = "try",
+    max_concurrent_builds = 7,
     tryjob = try_.job(
         location_filters = [
             # Inclusion filters.

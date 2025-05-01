@@ -13,14 +13,14 @@ import android.view.View.OnLongClickListener;
 import android.widget.ImageButton;
 
 import androidx.annotation.ColorInt;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.OneShotCallback;
 import org.chromium.base.supplier.OneshotSupplier;
 import org.chromium.base.supplier.Supplier;
+import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsVisibilityManager;
 import org.chromium.chrome.browser.browser_controls.BrowserStateBrowserControlsVisibilityDelegate;
 import org.chromium.chrome.browser.device.DeviceClassManager;
@@ -62,9 +62,9 @@ import org.chromium.ui.resources.ResourceManager;
 import org.chromium.ui.util.TokenHolder;
 
 import java.util.List;
-import java.util.function.BooleanSupplier;
 
 /** A coordinator for the top toolbar component. */
+@NullMarked
 public class TopToolbarCoordinator implements Toolbar {
 
     /** Observes toolbar URL expansion progress change. */
@@ -82,6 +82,7 @@ public class TopToolbarCoordinator implements Toolbar {
     }
 
     private final ToolbarLayout mToolbarLayout;
+    private final View mLocationBarView;
     private final ObservableSupplierImpl<Tracker> mTrackerSupplier;
 
     private OptionalBrowsingModeButtonController mOptionalButtonController;
@@ -89,15 +90,15 @@ public class TopToolbarCoordinator implements Toolbar {
     private MenuButtonCoordinator mMenuButtonCoordinator;
     private @Nullable ReloadButtonCoordinator mReloadButtonCoordinator;
     private @Nullable final BackButtonCoordinator mBackButtonCoordinator;
-    private ObservableSupplier<AppMenuButtonHelper> mAppMenuButtonHelperSupplier;
+    private @Nullable ObservableSupplier<AppMenuButtonHelper> mAppMenuButtonHelperSupplier;
     private ObservableSupplier<TabModelSelector> mTabModelSelectorSupplier;
 
-    /** Null until {@link #initializeWithNative} is called. * */
+    /** Null until {@link #initializeWithNative} is called. */
     private @Nullable TabStripTransitionCoordinator mTabStripTransitionCoordinator;
 
     private ToolbarControlContainer mControlContainer;
     private Supplier<ResourceManager> mResourceManagerSupplier;
-    private TopToolbarOverlayCoordinator mOverlayCoordinator;
+    private @Nullable TopToolbarOverlayCoordinator mOverlayCoordinator;
 
     /**
      * The observer manager will receive all types of toolbar color change updates from toolbar
@@ -105,8 +106,8 @@ public class TopToolbarCoordinator implements Toolbar {
      */
     private ToolbarColorObserverManager mToolbarColorObserverManager;
 
-    private IncognitoStateProvider mIncognitoStateProvider;
-    private IncognitoStateObserver mIncognitoStateObserver;
+    private @Nullable IncognitoStateProvider mIncognitoStateProvider;
+    private @Nullable IncognitoStateObserver mIncognitoStateObserver;
 
     private TabObscuringHandler mTabObscuringHandler;
     private @Nullable DesktopWindowStateManager mDesktopWindowStateManager;
@@ -116,9 +117,13 @@ public class TopToolbarCoordinator implements Toolbar {
     /** Token used to block the tab strip transition when find in page toolbar is showing. */
     private int mFindToolbarToken = TokenHolder.INVALID_TOKEN;
 
+    private int mIndexOfLocationBarInToolbar;
+
     /**
      * Creates a new {@link TopToolbarCoordinator}.
      *
+     * @param reloadButtonCoordinator Component that encapsulates interactions with a reload button.
+     *     It only presents on tablet.
      * @param controlContainer The {@link ToolbarControlContainer} for the containing activity.
      * @param toolbarLayout The {@link ToolbarLayout}.
      * @param toolbarDataProvider The provider for toolbar data.
@@ -134,8 +139,6 @@ public class TopToolbarCoordinator implements Toolbar {
      * @param homepageEnabledSupplier Supplier of whether Home button is enabled.
      * @param resourceManagerSupplier A supplier of a resource manager for native textures.
      * @param historyDelegate Delegate used to display navigation history.
-     * @param partnerHomepageEnabledSupplier A supplier of a boolean indicating that partner
-     *     homepage is enabled.
      * @param initializeWithIncognitoColors Whether the toolbar should be initialized with incognito
      *     colors.
      * @param constraintsSupplier Supplier for browser controls constraints.
@@ -148,8 +151,6 @@ public class TopToolbarCoordinator implements Toolbar {
      * @param tabStripTransitionDelegateSupplier Supplier for the {@link
      *     TabStripTransitionDelegate}.
      * @param onLongClickListener OnLongClickListener for the toolbar.
-     * @param reloadButtonCoordinator Component that encapsulates interactions with a reload button.
-     *     It only presents on tablet.
      */
     public TopToolbarCoordinator(
             ToolbarControlContainer controlContainer,
@@ -167,7 +168,6 @@ public class TopToolbarCoordinator implements Toolbar {
             ObservableSupplier<Boolean> homepageEnabledSupplier,
             Supplier<ResourceManager> resourceManagerSupplier,
             HistoryDelegate historyDelegate,
-            BooleanSupplier partnerHomepageEnabledSupplier,
             boolean initializeWithIncognitoColors,
             ObservableSupplier<Integer> constraintsSupplier,
             ObservableSupplier<Boolean> compositorInMotionSupplier,
@@ -201,6 +201,8 @@ public class TopToolbarCoordinator implements Toolbar {
         mNtpLoadingSupplier = new ObservableSupplierImpl<>();
         mTabStripTransitionDelegateSupplier = tabStripTransitionDelegateSupplier;
         mToolbarLayout.setOnLongClickListener(onLongClickListener);
+        mLocationBarView = mToolbarLayout.findViewById(R.id.location_bar);
+        mIndexOfLocationBarInToolbar = mToolbarLayout.indexOfChild(mLocationBarView);
 
         ImageButton reloadButton = mControlContainer.findViewById(R.id.refresh_button);
         if (reloadButton != null) {
@@ -210,10 +212,8 @@ public class TopToolbarCoordinator implements Toolbar {
                             ignoreCache -> {
                                 var omniboxStub = getLocationBar().getOmniboxStub();
                                 if (omniboxStub != null) {
-                                    getLocationBar()
-                                            .getOmniboxStub()
-                                            .setUrlBarFocus(
-                                                    false, null, OmniboxFocusReason.UNFOCUS);
+                                    omniboxStub.setUrlBarFocus(
+                                            false, null, OmniboxFocusReason.UNFOCUS);
                                 }
                                 tabController.stopOrReloadCurrentTab(ignoreCache);
                             },
@@ -224,6 +224,7 @@ public class TopToolbarCoordinator implements Toolbar {
 
         controlContainer.setPostInitializationDependencies(
                 this,
+                toolbarLayout,
                 initializeWithIncognitoColors,
                 constraintsSupplier,
                 toolbarDataProvider::getTab,
@@ -237,7 +238,6 @@ public class TopToolbarCoordinator implements Toolbar {
                 mMenuButtonCoordinator,
                 tabSwitcerButtonCoordinator,
                 historyDelegate,
-                partnerHomepageEnabledSupplier,
                 userEducationHelper,
                 mTrackerSupplier,
                 progressBar,
@@ -284,7 +284,8 @@ public class TopToolbarCoordinator implements Toolbar {
             ObservableSupplier<Tab> tabSupplier,
             BrowserControlsVisibilityManager browserControlsVisibilityManager,
             TopUiThemeColorProvider topUiThemeColorProvider,
-            ObservableSupplier<Integer> bottomToolbarControlsOffsetSupplier) {
+            ObservableSupplier<Integer> bottomToolbarControlsOffsetSupplier,
+            ObservableSupplier<Boolean> suppressToolbarSceneLayerSupplier) {
         assert mTabModelSelectorSupplier.get() != null;
         mTrackerSupplier.set(TrackerFactory.getTrackerForProfile(profile));
         mToolbarLayout.setTabCountSupplier(
@@ -309,6 +310,7 @@ public class TopToolbarCoordinator implements Toolbar {
                             mResourceManagerSupplier,
                             topUiThemeColorProvider,
                             bottomToolbarControlsOffsetSupplier,
+                            suppressToolbarSceneLayerSupplier,
                             LayoutType.BROWSING
                                     | LayoutType.SIMPLE_ANIMATION
                                     | LayoutType.TAB_SWITCHER,
@@ -354,7 +356,7 @@ public class TopToolbarCoordinator implements Toolbar {
     /**
      * @param toolbarColorObserver The observer that observes toolbar color change.
      */
-    public void setToolbarColorObserver(@NonNull ToolbarColorObserver toolbarColorObserver) {
+    public void setToolbarColorObserver(ToolbarColorObserver toolbarColorObserver) {
         mToolbarColorObserverManager.setToolbarColorObserver(toolbarColorObserver);
     }
 
@@ -385,6 +387,7 @@ public class TopToolbarCoordinator implements Toolbar {
     }
 
     /** Cleans up any code as necessary. */
+    @SuppressWarnings("NullAway")
     public void destroy() {
         if (mOverlayCoordinator != null) {
             mOverlayCoordinator.destroy();
@@ -440,11 +443,10 @@ public class TopToolbarCoordinator implements Toolbar {
     /**
      * @return The wrapper for the browsing mode toolbar's menu button.
      */
-    public MenuButton getMenuButtonWrapper() {
+    public @Nullable MenuButton getMenuButtonWrapper() {
         return mMenuButtonCoordinator.getMenuButton();
     }
 
-    @Nullable
     @Override
     public ToolbarProgressBar getProgressBar() {
         return mToolbarLayout.getProgressBar();
@@ -735,7 +737,7 @@ public class TopToolbarCoordinator implements Toolbar {
     }
 
     /** Returns the {@link OptionalBrowsingModeButtonController}. */
-    public OptionalBrowsingModeButtonController getOptionalButtonControllerForTesting() {
+    public @Nullable OptionalBrowsingModeButtonController getOptionalButtonControllerForTesting() {
         return mOptionalButtonController;
     }
 
@@ -745,7 +747,7 @@ public class TopToolbarCoordinator implements Toolbar {
     }
 
     /** Returns the {@link TabStripTransitionCoordinator}. */
-    public TabStripTransitionCoordinator getTabStripTransitionCoordinator() {
+    public @Nullable TabStripTransitionCoordinator getTabStripTransitionCoordinator() {
         return mTabStripTransitionCoordinator;
     }
 
@@ -757,6 +759,21 @@ public class TopToolbarCoordinator implements Toolbar {
     @Override
     public boolean isBrowsingModeToolbarVisible() {
         return mToolbarLayout.getVisibility() == View.VISIBLE;
+    }
+
+    @Override
+    public View removeLocationBarView() {
+        assert mToolbarLayout instanceof ToolbarPhone
+                : "Location bar removal logic is only supported on phones";
+        mToolbarLayout.removeView(mLocationBarView);
+        return mLocationBarView;
+    }
+
+    @Override
+    public void restoreLocationBarView() {
+        assert mToolbarLayout instanceof ToolbarPhone
+                : "Location bar restore logic is only supported on phones";
+        mToolbarLayout.addView(mLocationBarView, mIndexOfLocationBarInToolbar);
     }
 
     public void onTransitionStart() {

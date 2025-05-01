@@ -10,6 +10,7 @@
 
 #include "base/compiler_specific.h"
 #include "base/feature_list.h"
+#include "base/metrics/histogram_functions.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_binding_for_core.h"
 #include "third_party/blink/renderer/core/core_probe_sink.h"
 #include "third_party/blink/renderer/core/execution_context/execution_context.h"
@@ -158,16 +159,26 @@ void AdTracker::WillExecuteScript(ExecutionContext* execution_context,
     // don't need to keep track of scripts in ad contexts. However, two scripts
     // with identical text content can be assigned the same ID.
     String fake_url = GenerateFakeUrlFromScriptId(script_id);
+    std::optional<AdScriptIdentifier> ancestor_ad_script;
     if (IsKnownAdScript(execution_context, fake_url)) {
       is_ad = true;
-    } else if (IsAdScriptInStack(StackType::kBottomAndTop)) {
-      AppendToKnownAdScripts(*execution_context, fake_url);
+    } else if (IsAdScriptInStackHelper(StackType::kBottomAndTop,
+                                       &ancestor_ad_script)) {
+      AppendToKnownAdScripts(*execution_context, fake_url, ancestor_ad_script);
+      MaybeLinkKnownAdScriptToAncestor(execution_context, v8_context, fake_url,
+                                       script_id);
       is_ad = true;
     }
   }
 
-  if (!should_track_with_id)
+  if (!should_track_with_id) {
     is_ad = IsKnownAdScript(execution_context, script_url);
+    if (is_ad && !IsKnownAdExecutionContext(execution_context) &&
+        !script_url.empty()) {
+      MaybeLinkKnownAdScriptToAncestor(execution_context, v8_context,
+                                       script_url, script_id);
+    }
+  }
 
   stack_frame_is_ad_.push_back(is_ad);
   if (is_ad) {
@@ -249,7 +260,9 @@ bool AdTracker::CalculateIfAdSubresource(
   }
 
   // Check if any executing script is an ad.
-  known_ad = known_ad || IsAdScriptInStack(StackType::kBottomAndTop);
+  std::optional<AdScriptIdentifier> ancestor_ad_script;
+  known_ad = known_ad || IsAdScriptInStackHelper(StackType::kBottomAndTop,
+                                                 &ancestor_ad_script);
 
   // If it is a script marked as an ad and it's not in an ad context, append it
   // to the known ad script set. We don't need to keep track of ad scripts in ad
@@ -257,7 +270,8 @@ bool AdTracker::CalculateIfAdSubresource(
   // ad script by IsKnownAdScript.
   if (resource_type == ResourceType::kScript && known_ad &&
       !is_ad_execution_context) {
-    AppendToKnownAdScripts(*execution_context, request_url.GetString());
+    AppendToKnownAdScripts(*execution_context, request_url.GetString(),
+                           ancestor_ad_script);
   }
 
   return known_ad;
@@ -266,7 +280,7 @@ bool AdTracker::CalculateIfAdSubresource(
 void AdTracker::DidCreateAsyncTask(probe::AsyncTaskContext* task_context) {
   DCHECK(task_context);
   std::optional<AdScriptIdentifier> id;
-  if (IsAdScriptInStack(StackType::kBottomAndTop, &id)) {
+  if (IsAdScriptInStackHelper(StackType::kBottomAndTop, &id)) {
     task_context->SetAdTask(id);
   }
 }
@@ -294,6 +308,26 @@ void AdTracker::DidFinishAsyncTask(probe::AsyncTaskContext* task_context) {
 }
 
 bool AdTracker::IsAdScriptInStack(
+    StackType stack_type,
+    Vector<AdScriptIdentifier>* out_ad_script_ancestry) {
+  std::optional<AdScriptIdentifier> out_ad_script;
+
+  std::optional<AdScriptIdentifier>* out_ad_script_ptr =
+      out_ad_script_ancestry ? &out_ad_script : nullptr;
+
+  bool is_ad_script_in_stack =
+      IsAdScriptInStackHelper(stack_type, out_ad_script_ptr);
+
+  if (out_ad_script.has_value()) {
+    CHECK(out_ad_script_ancestry);
+    CHECK(is_ad_script_in_stack);
+    *out_ad_script_ancestry = GetAncestryChain(out_ad_script.value());
+  }
+
+  return is_ad_script_in_stack;
+}
+
+bool AdTracker::IsAdScriptInStackHelper(
     StackType stack_type,
     std::optional<AdScriptIdentifier>* out_ad_script) {
   // First check if async tasks are running, as `bottom_most_async_ad_script_`
@@ -350,8 +384,8 @@ bool AdTracker::IsKnownAdScriptForCheckedContext(
     const String& url,
     std::optional<AdScriptIdentifier>* out_ad_script) {
   DCHECK(!IsKnownAdExecutionContext(&execution_context));
-  auto it = known_ad_scripts_.find(&execution_context);
-  if (it == known_ad_scripts_.end()) {
+  auto it = context_known_ad_scripts_.find(&execution_context);
+  if (it == context_known_ad_scripts_.end()) {
     return false;
   }
 
@@ -379,17 +413,88 @@ bool AdTracker::IsKnownAdScriptForCheckedContext(
 }
 
 // This is a separate function for testing purposes.
-void AdTracker::AppendToKnownAdScripts(ExecutionContext& execution_context,
-                                       const String& url) {
+void AdTracker::AppendToKnownAdScripts(
+    ExecutionContext& execution_context,
+    const String& url,
+    const std::optional<AdScriptIdentifier>& ancestor_ad_script) {
   DCHECK(!url.empty());
-  auto add_result =
-      known_ad_scripts_.insert(&execution_context, HashSet<String>());
-  add_result.stored_value->value.insert(url);
+  auto add_result = context_known_ad_scripts_.insert(
+      &execution_context, KnownAdScriptsAndAncestor());
+
+  KnownAdScriptsAndAncestor& known_ad_scripts_and_ancestor =
+      add_result.stored_value->value;
+
+  // While technically the same script URL can be loaded by different ancestors,
+  // we track only the first association for simplicity.
+  known_ad_scripts_and_ancestor.insert(url, ancestor_ad_script);
+}
+
+void AdTracker::MaybeLinkKnownAdScriptToAncestor(
+    ExecutionContext* execution_context,
+    const v8::Local<v8::Context>& v8_context,
+    const String& script_name,
+    int script_id) {
+  DCHECK(!script_name.empty());
+  auto it = context_known_ad_scripts_.find(execution_context);
+  DCHECK(it != context_known_ad_scripts_.end());
+
+  // Skip linking if the current script has no script ID. This avoids
+  // introducing cycles within the `ancestor_ad_scripts_` graph.
+  if (script_id == v8::Message::kNoScriptIdInfo) {
+    return;
+  }
+
+  const HashMap<String, std::optional<AdScriptIdentifier>>&
+      known_ad_scripts_and_ancestor = it->value;
+
+  auto known_ad_script_it = known_ad_scripts_and_ancestor.find(script_name);
+  DCHECK(known_ad_script_it != known_ad_scripts_and_ancestor.end());
+
+  const std::optional<AdScriptIdentifier>& ancestor_ad_script =
+      known_ad_script_it->value;
+
+  // If `ancestor_ad_script` is present for the given `script_name`, it implies
+  // that the current script (`script_name`/`script_id`) was loaded transitively
+  // from `ancestor_ad_script`. In such cases, we link them.
+  if (ancestor_ad_script.has_value()) {
+    AdScriptIdentifier current_ad_script =
+        AdScriptIdentifier(GetDebuggerIdForContext(v8_context), script_id);
+
+    ancestor_ad_scripts_.insert(current_ad_script, ancestor_ad_script.value());
+  }
+}
+
+Vector<AdScriptIdentifier> AdTracker::GetAncestryChain(
+    const AdScriptIdentifier& ad_script) {
+  Vector<AdScriptIdentifier> ancestry_chain = {ad_script};
+
+  // Limits the ancestry chain length to protect against potential cycles in the
+  // ancestry graph (though unexpected).
+  constexpr size_t kMaxScriptAncestrySize = 50;
+  bool max_size_reached = false;
+
+  auto ancestor_it = ancestor_ad_scripts_.find(ancestry_chain.back());
+  while (ancestor_it != ancestor_ad_scripts_.end()) {
+    ancestry_chain.push_back(ancestor_it->value);
+
+    if (ancestry_chain.size() >= kMaxScriptAncestrySize) {
+      max_size_reached = true;
+      break;
+    }
+
+    ancestor_it = ancestor_ad_scripts_.find(ancestry_chain.back());
+  }
+
+  base::UmaHistogramBoolean(
+      "Navigation.IframeCreated.AdTracker.MaxScriptAncestrySizeReached",
+      max_size_reached);
+
+  return ancestry_chain;
 }
 
 void AdTracker::Trace(Visitor* visitor) const {
   visitor->Trace(local_root_);
-  visitor->Trace(known_ad_scripts_);
+  visitor->Trace(context_known_ad_scripts_);
 }
 
 }  // namespace blink

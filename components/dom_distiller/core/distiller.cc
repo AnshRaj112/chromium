@@ -40,8 +40,7 @@ DistillerFactoryImpl::DistillerFactoryImpl(
 
 DistillerFactoryImpl::~DistillerFactoryImpl() = default;
 
-std::unique_ptr<Distiller> DistillerFactoryImpl::CreateDistillerForUrl(
-    const GURL& unused) {
+std::unique_ptr<Distiller> DistillerFactoryImpl::CreateDistiller() {
   // This default implementation has the same behavior for all URLs.
   std::unique_ptr<DistillerImpl> distiller(new DistillerImpl(
       *distiller_url_fetcher_factory_, dom_distiller_options_));
@@ -62,15 +61,6 @@ DistillerImpl::DistillerImpl(
 
 DistillerImpl::~DistillerImpl() {
   DCHECK(destruction_allowed_);
-}
-
-bool DistillerImpl::DoesFetchImages() {
-// Only iOS makes use of the fetched image data.
-#if BUILDFLAG(IS_IOS)
-  return true;
-#else
-  return false;
-#endif
 }
 
 void DistillerImpl::SetMaxNumPagesInArticle(size_t max_num_pages) {
@@ -257,7 +247,7 @@ void DistillerImpl::MaybeFetchImage(int page_num,
   DCHECK(started_pages_index_.find(page_num) != started_pages_index_.end());
   DistilledPageData* page_data = GetPageAtIndex(started_pages_index_[page_num]);
 
-  if (!DoesFetchImages()) {
+  if (!distiller_page_->ShouldFetchOfflineData()) {
     DistilledPageProto_Image* image =
         page_data->distilled_page_proto->data.add_image();
     image->set_name(image_id);

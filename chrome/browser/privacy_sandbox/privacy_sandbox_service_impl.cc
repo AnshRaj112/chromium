@@ -36,7 +36,6 @@
 #include "chrome/browser/user_education/user_education_service_factory.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/webui_url_constants.h"
-#include "chromeos/components/mgs/managed_guest_session_utils.h"
 #include "components/browsing_topics/browsing_topics_service.h"
 #include "components/browsing_topics/common/common_types.h"
 #include "components/browsing_topics/common/semantic_tree.h"
@@ -61,8 +60,6 @@
 #include "net/base/schemeful_site.h"
 #include "net/first_party_sets/first_party_set_entry.h"
 #include "net/first_party_sets/global_first_party_sets.h"
-#include "privacy_sandbox_countries_impl.h"
-#include "privacy_sandbox_service_impl.h"
 #include "third_party/blink/public/common/features.h"
 #include "ui/base/l10n/l10n_util.h"
 
@@ -74,6 +71,7 @@
 #if BUILDFLAG(IS_CHROMEOS)
 #include "chrome/browser/profiles/profiles_state.h"
 #include "chromeos/components/kiosk/kiosk_utils.h"
+#include "chromeos/components/mgs/managed_guest_session_utils.h"
 #endif
 
 namespace {
@@ -163,6 +161,9 @@ bool IsRegularProfile(profile_metrics::BrowserProfileType profile_type) {
 
 // Returns the text contents of the Topics Consent dialog.
 std::string GetTopicsConfirmationText() {
+  // TODO(crbug.com/413388209): Update the LEARN_MORE_LINK to use a newer
+  // version of the text and remove
+  // `IDS_PRIVACY_SANDBOX_M1_CONSENT_LEARN_MORE_LINK`
   std::vector<int> string_ids = {
       IDS_PRIVACY_SANDBOX_M1_CONSENT_TITLE,
       IDS_PRIVACY_SANDBOX_M1_CONSENT_DESCRIPTION_1,
@@ -1005,18 +1006,21 @@ void PrivacySandboxServiceImpl::PromptActionOccurred(PromptAction action,
 }
 
 #if !BUILDFLAG(IS_ANDROID)
-void PrivacySandboxServiceImpl::PromptOpenedForBrowser(Browser* browser,
-                                                       views::Widget* widget) {
+void PrivacySandboxServiceImpl::PromptOpenedForBrowser(
+    BrowserWindowInterface* browser,
+    views::Widget* widget) {
   DCHECK(!browsers_to_open_prompts_.count(browser));
   browsers_to_open_prompts_[browser] = widget;
 }
 
-void PrivacySandboxServiceImpl::PromptClosedForBrowser(Browser* browser) {
+void PrivacySandboxServiceImpl::PromptClosedForBrowser(
+    BrowserWindowInterface* browser) {
   DCHECK(browsers_to_open_prompts_.count(browser));
   browsers_to_open_prompts_.erase(browser);
 }
 
-bool PrivacySandboxServiceImpl::IsPromptOpenForBrowser(Browser* browser) {
+bool PrivacySandboxServiceImpl::IsPromptOpenForBrowser(
+    BrowserWindowInterface* browser) {
   return browsers_to_open_prompts_.count(browser);
 }
 

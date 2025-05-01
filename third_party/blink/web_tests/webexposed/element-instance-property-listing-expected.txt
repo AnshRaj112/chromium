@@ -538,6 +538,7 @@ html element canvas
     property configureHighDynamicRange
     property getContext
     property height
+    property layoutSubtree
     property toBlob
     property toDataURL
     property transferControlToOffscreen
@@ -2216,6 +2217,7 @@ svg element rect
     property x
     property y
 svg element script
+    property async
     property href
     property type
 svg element set

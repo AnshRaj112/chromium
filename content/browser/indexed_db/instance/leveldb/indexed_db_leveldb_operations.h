@@ -43,6 +43,10 @@ std::string CONTENT_EXPORT
 ReadCorruptionInfo(const base::FilePath& path_base,
                    const storage::BucketLocator& bucket_locator);
 
+bool RecordCorruptionInfo(const base::FilePath& path_base,
+                          const storage::BucketLocator& bucket_locator,
+                          const std::string& message);
+
 // Was able to use LevelDB to read the data w/o error, but the data read was not
 // in the expected format.
 Status CONTENT_EXPORT InternalInconsistencyStatus();
@@ -156,8 +160,7 @@ template <typename DBOrTransaction>
                                    const std::string& encoded_primary_key,
                                    bool* exists);
 
-template <typename Transaction>
-[[nodiscard]] Status GetNewDatabaseId(Transaction* transaction,
+[[nodiscard]] Status GetNewDatabaseId(LevelDBDirectTransaction* transaction,
                                       int64_t* new_id);
 
 [[nodiscard]] bool CheckObjectStoreAndMetaDataType(

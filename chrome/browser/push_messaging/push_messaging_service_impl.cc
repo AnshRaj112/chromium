@@ -832,12 +832,21 @@ void PushMessagingServiceImpl::SubscribeFromDocument(
                      render_frame_id));
 }
 
+void PushMessagingServiceImpl::SetSubscribeFromWorkerCallback(
+    base::RepeatingCallback<void(int64_t)> callback) {
+  subscribe_from_worker_callback_ = callback;
+}
+
 void PushMessagingServiceImpl::SubscribeFromWorker(
     const GURL& requesting_origin,
     int64_t service_worker_registration_id,
     int render_process_id,
     blink::mojom::PushSubscriptionOptionsPtr options,
     RegisterCallback register_callback) {
+  if (subscribe_from_worker_callback_) {
+    subscribe_from_worker_callback_->Run(service_worker_registration_id);
+  }
+
   render_process_id_ = render_process_id;
   PushMessagingAppIdentifier app_identifier =
       PushMessagingAppIdentifier::FindByServiceWorker(
@@ -1473,7 +1482,10 @@ void PushMessagingServiceImpl::OnContentSettingChanged(
 
   std::vector<PushMessagingUnsubscribedEntry> unsubscribed_entries;
   if (base::FeatureList::IsEnabled(
-          features::kPushSubscriptionChangeEventOnResubscribe)) {
+          features::kPushSubscriptionChangeEventOnResubscribe) &&
+      // We don't want to trigger the event to possibly multiple service workers
+      // and origins if the user changed a wildcard setting.
+      primary_pattern.MatchesSingleOrigin()) {
     unsubscribed_entries = PushMessagingUnsubscribedEntry::GetAll(profile_);
   }
   base::RepeatingClosure barrier_closure = base::BarrierClosure(
@@ -1511,6 +1523,7 @@ void PushMessagingServiceImpl::OnContentSettingChanged(
   base::UmaHistogramCounts1000("PushMessaging.NumUnsubscribedEntries",
                                unsubscribed_entries.size());
 
+  int num_fired = 0;
   for (const PushMessagingUnsubscribedEntry& unsubscribed_entry :
        unsubscribed_entries) {
     if (!primary_pattern.Matches(unsubscribed_entry.origin())) {
@@ -1526,11 +1539,18 @@ void PushMessagingServiceImpl::OnContentSettingChanged(
       barrier_closure.Run();
       continue;
     }
+
     FirePushSubscriptionChange(
         unsubscribed_entry.origin(),
         unsubscribed_entry.service_worker_registration_id(), barrier_closure,
         nullptr, nullptr);
+    ++num_fired;
   }
+
+  base::UmaHistogramCounts100(
+      "PushMessaging."
+      "PushSubscriptionChangeForNotificationPermissionChangeFired",
+      num_fired);
 }
 
 void PushMessagingServiceImpl::UnexpectedUnsubscribe(

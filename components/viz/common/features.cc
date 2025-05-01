@@ -73,8 +73,8 @@ BASE_FEATURE(kUseFrameIntervalDecider,
 );
 
 #if BUILDFLAG(IS_ANDROID)
-BASE_FEATURE(kUseFrameIntervalDeciderNewAndroidFeatures,
-             "UseFrameIntervalDeciderNewAndroidFeatures",
+BASE_FEATURE(kUseFrameIntervalDeciderAdaptiveFrameRate,
+             "UseFrameIntervalDeciderAdaptiveFrameRate",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
@@ -253,6 +253,15 @@ const base::FeatureParam<int> kCALayerNewLimitManyVideos{&kCALayerNewLimit,
 BASE_FEATURE(kVSyncAlignedPresent,
              "VSyncAlignedPresent",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Present the frame at next VSync only if this frame handles interaction or
+// animation as described in kTargetForVSync. Three finch experiment groups for
+// kVSyncAlignedPresent.
+constexpr const char kTargetForVSyncAllFrames[] = "AllFrames";
+constexpr const char kTargetForVSyncAnimation[] = "Animation";
+constexpr const char kTargetForVSyncInteraction[] = "Interaction";
+const base::FeatureParam<std::string> kTargetForVSync{
+    &kVSyncAlignedPresent, "Target", kTargetForVSyncAllFrames};
 #endif
 
 BASE_FEATURE(kAllowUndamagedNonrootRenderPassToSkip,
@@ -262,6 +271,11 @@ BASE_FEATURE(kAllowUndamagedNonrootRenderPassToSkip,
 #else
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
+
+// If enabled, complex occluders are generated for quads with rounded corners,
+BASE_FEATURE(kComplexOccluderForQuadsWithRoundedCorners,
+             "ComplexOccluderForQuadsWithRoundedCorners",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Allow SurfaceAggregator to merge render passes when they contain quads that
 // require overlay (e.g. protected video). See usage in |EmitSurfaceContent|.
@@ -523,6 +537,12 @@ int MaxOverlaysConsidered() {
 
 bool ShouldOnBeginFrameThrottleVideo() {
   return base::FeatureList::IsEnabled(features::kOnBeginFrameThrottleVideo);
+}
+
+bool IsComplexOccluderForQuadsWithRoundedCornersEnabled() {
+  static bool enabled = base::FeatureList::IsEnabled(
+      features::kComplexOccluderForQuadsWithRoundedCorners);
+  return enabled;
 }
 
 bool ShouldDrawImmediatelyWhenInteractive() {

@@ -14,13 +14,10 @@ import android.view.View;
 import androidx.test.espresso.Espresso;
 import androidx.test.espresso.UiController;
 import androidx.test.espresso.ViewAction;
-import androidx.test.espresso.ViewInteraction;
-import androidx.test.espresso.action.ViewActions;
 
 import org.hamcrest.Matcher;
 import org.hamcrest.StringDescription;
 
-import org.chromium.base.test.util.ForgivingClickAction;
 import org.chromium.base.test.util.ViewPrinter;
 import org.chromium.build.annotations.NullMarked;
 
@@ -120,48 +117,29 @@ public class ViewSpec<ViewT extends View> {
         return mMatcherDescription;
     }
 
-    /** Start an Espresso interaction with a displayed View that matches this ViewSpec's Matcher. */
-    public ViewInteraction onView() {
-        return Espresso.onView(mViewMatcher);
-    }
-
-    /** Perform an Espresso ViewAction on a displayed View that matches this ViewSpec's Matcher. */
-    public ViewInteraction perform(ViewAction action) {
-        return onView().perform(action);
-    }
-
-    /** Perform an Espresso click() on a displayed View that matches this ViewSpec's Matcher. */
-    public ViewInteraction click() {
-        return onView().perform(ViewActions.click());
-    }
-
-    /** Perform an Espresso click() on a View that matches this ViewSpec's Matcher. */
-    public ViewInteraction forgivingClick() {
-        return onView().perform(ForgivingClickAction.forgivingClick());
-    }
-
     /**
      * Print the whole View hierarchy that contains the View matched to this ViewElement.
      *
      * <p>For debugging.
      */
     public void printFromRoot() {
-        perform(
-                new ViewAction() {
-                    @Override
-                    public Matcher<View> getConstraints() {
-                        return instanceOf(View.class);
-                    }
+        Espresso.onView(mViewMatcher)
+                .perform(
+                        new ViewAction() {
+                            @Override
+                            public Matcher<View> getConstraints() {
+                                return instanceOf(View.class);
+                            }
 
-                    @Override
-                    public String getDescription() {
-                        return "print the View hierarchy for debugging";
-                    }
+                            @Override
+                            public String getDescription() {
+                                return "print the View hierarchy for debugging";
+                            }
 
-                    @Override
-                    public void perform(UiController uiController, View view) {
-                        ViewPrinter.printView(view.getRootView());
-                    }
-                });
+                            @Override
+                            public void perform(UiController uiController, View view) {
+                                ViewPrinter.printView(view.getRootView());
+                            }
+                        });
     }
 }

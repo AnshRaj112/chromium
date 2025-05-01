@@ -338,7 +338,8 @@ void BlockLayoutAlgorithm::SetupRelayoutData(
   column_spanner_path_ = previous.column_spanner_path_;
 
   if (relayout_type == kRelayoutIgnoringLineClamp) {
-    line_clamp_data_.data.state = LineClampData::kDontTruncate;
+    line_clamp_data_.data.state = LineClampData::kDisabled;
+    line_clamp_data_.ignore_line_clamp = true;
   } else if (relayout_type == kRelayoutWithLineClampBlockSize) {
     line_clamp_data_.data.state = LineClampData::kClampByLines;
     line_clamp_data_.data.lines_until_clamp =
@@ -350,9 +351,6 @@ void BlockLayoutAlgorithm::SetupRelayoutData(
     line_clamp_data_.data.lines_until_clamp =
         line_clamp_data_.initial_lines_until_clamp =
             previous.line_clamp_data_.initial_lines_until_clamp;
-  } else if (previous.line_clamp_data_.data.state ==
-             LineClampData::kDontTruncate) {
-    line_clamp_data_.data.state = LineClampData::kDontTruncate;
   }
 
   if (relayout_type == kRelayoutForTextBoxTrim) {
@@ -1507,12 +1505,45 @@ void BlockLayoutAlgorithm::HandleOutOfFlowPositioned(
     static_offset.inline_offset += CalculateOutOfFlowStaticInlineLevelOffset(
         Style(), origin_bfc_offset, GetExclusionSpace(),
         ChildAvailableSize().inline_size);
-  }
 
-  container_builder_.AddOutOfFlowChildCandidate(
-      child, static_offset, LogicalStaticPosition::kInlineStart,
-      LogicalStaticPosition::kBlockStart, LogicalStaticPosition::kBlock,
-      line_clamp_data_.ShouldHideForPaint());
+    container_builder_.AddOutOfFlowChildCandidate(
+        child, static_offset, LogicalStaticPosition::kInlineStart,
+        LogicalStaticPosition::kBlockStart, LogicalStaticPosition::kBlock,
+        line_clamp_data_.ShouldHideForPaint());
+  } else {
+    WritingDirectionMode parent_writing_direction =
+        GetConstraintSpace().GetWritingDirection();
+    auto inline_axis_edge = InlineStaticPositionEdge(
+        child, /*justify_items_style=*/&Style(), parent_writing_direction);
+    // 'align-items' doesn't apply in block layout, so don't apply it to OOF
+    // items.
+    auto block_axis_edge = BlockStaticPositionEdge(
+        child, /*align_items_style=*/nullptr, parent_writing_direction);
+
+    // The alignment container for block OOF elements is a zero-thickness line
+    // in the inline direction. As such, we need to adjust the inline static
+    // position offset for end/center alignment to ensure the OOF ends up
+    // aligned correctly within its alignment container. The block offset will
+    // not change.
+    //
+    // https://drafts.csswg.org/css-position-3/#staticpos-rect
+    LayoutUnit available_inline_size = ChildAvailableSize().inline_size;
+    switch (inline_axis_edge) {
+      case LogicalStaticPosition::InlineEdge::kInlineCenter:
+        static_offset.inline_offset += available_inline_size / 2;
+        break;
+      case LogicalStaticPosition::InlineEdge::kInlineEnd:
+        static_offset.inline_offset += available_inline_size;
+        break;
+      case LogicalStaticPosition::InlineEdge::kInlineStart:
+        // The static position is already correct in this case.
+        break;
+    }
+
+    container_builder_.AddOutOfFlowChildCandidate(
+        child, static_offset, inline_axis_edge, block_axis_edge,
+        LogicalStaticPosition::kBlock, line_clamp_data_.ShouldHideForPaint());
+  }
 }
 
 void BlockLayoutAlgorithm::HandleFloat(

@@ -157,7 +157,8 @@ class SyncServiceImpl : public SyncService,
   DataTypeDownloadStatus GetDownloadStatusFor(DataType type) const override;
   void GetTypesWithUnsyncedData(
       DataTypeSet requested_types,
-      base::OnceCallback<void(DataTypeSet)> callback) const override;
+      base::OnceCallback<void(absl::flat_hash_map<DataType, size_t>)> callback)
+      const override;
   void GetLocalDataDescriptions(
       DataTypeSet types,
       base::OnceCallback<void(std::map<DataType, LocalDataDescription>)>
@@ -189,7 +190,6 @@ class SyncServiceImpl : public SyncService,
   // SyncAuthManager::Delegate implementation.
   void SyncAuthAccountStateChanged() override;
   void SyncAuthCredentialsChanged() override;
-  GaiaId SyncAuthGetLastSyncingGaiaId() override;
 
   // SyncServiceCrypto::Delegate implementation.
   void CryptoStateChanged() override;

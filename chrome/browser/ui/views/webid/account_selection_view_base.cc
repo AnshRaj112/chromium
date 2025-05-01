@@ -284,7 +284,9 @@ void AccountHoverButton::SetDisabledOpacity() {
   }
 
   title()->SetEnabledColor(ui::kColorLabelForegroundDisabled);
-  subtitle()->SetEnabledColor(ui::kColorLabelForegroundDisabled);
+  if (subtitle()) {
+    subtitle()->SetEnabledColor(ui::kColorLabelForegroundDisabled);
+  }
 }
 
 bool AccountHoverButton::HasDisabledOpacity() {
@@ -295,6 +297,10 @@ void AccountHoverButton::ReplaceSecondaryViewWithSpinner() {
   has_spinner_ = true;
   static_cast<AccountHoverButtonSecondaryView*>(secondary_view())
       ->ReplaceWithSpinner();
+}
+
+void AccountHoverButton::SetCallbackForTesting(PressedCallback callback) {
+  callback_ = std::move(callback);
 }
 
 AccountSelectionViewBase::AccountSelectionViewBase(

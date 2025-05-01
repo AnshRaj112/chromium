@@ -116,7 +116,7 @@ class ReportScheduler {
 
   ReportTrigger GetActiveTriggerForTesting() const;
 
-  void SetReportUploaderForTesting(std::unique_ptr<ReportUploader> uploader);
+  void QueueReportUploaderForTesting(std::unique_ptr<ReportUploader> uploader);
   Delegate* GetDelegateForTesting();
 
   void OnDMTokenUpdated();
@@ -127,8 +127,9 @@ class ReportScheduler {
   // Observes CloudReportingEnabled policy.
   void RegisterPrefObserver();
 
-  // Handles kCloudReportingEnabled policy value change, including the first
-  // policy value check during startup.
+  // Handles policy value changes for both kCloudReportingEnabled and
+  // kUserSecuritySignalsReporting, including the first policy value check
+  // during startup.
   void OnReportEnabledPrefChanged();
 
   // Stops the periodic timer and the update observer.
@@ -194,6 +195,8 @@ class ReportScheduler {
 
   std::string reporting_pref_name_;
   ReportType full_report_type_;
+
+  std::vector<std::unique_ptr<ReportUploader>> report_uploaders_for_test_;
 
   base::OnceClosure on_manual_report_uploaded_;
 

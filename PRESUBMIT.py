@@ -144,6 +144,9 @@ class BanRule:
     # expression that will be matched against the path of the file being checked
     # relative to the root of the source tree.
     excluded_paths: Optional[Sequence[str]] = None
+    # If True, surfaces any violation as a Gerrit comment on the CL after
+    # running the CQ.
+    surface_as_gerrit_lint: Optional[bool] = None
 
 
 _BANNED_JAVA_IMPORTS : Sequence[BanRule] = (
@@ -316,6 +319,7 @@ _BANNED_JAVA_FUNCTIONS : Sequence[BanRule] = (
           r'^infra/', # This is permitted in infra/ folder.
           r'^tools/', # This is permitted in tools/ folder.
         ],
+        surface_as_gerrit_lint=True,
     ),
 )
 
@@ -2052,6 +2056,14 @@ _BANNED_CPP_FUNCTIONS: Sequence[BanRule] = (
         treat_as_error=False,
     ),
     BanRule(
+        pattern='#pragma allow_unsafe_buffers',
+        explanation=
+        ('Do not use allow_unsafe_buffers to write new unsafe code. Use only '
+         'when enabling unsafe buffers checks under a new uncovered path.',
+        ),
+        treat_as_error=False,
+    ),
+    BanRule(
         pattern=r'UNSAFE_BUFFERS(',
         explanation=
         ('Try to avoid using UNSAFE_BUFFERS() if at all possible. Otherwise, '
@@ -2219,6 +2231,7 @@ _BANNED_CPP_FUNCTIONS: Sequence[BanRule] = (
           r'^infra/', # This is permitted in infra/ folder.
           r'^tools/', # This is permitted in tools/ folder.
         ],
+        surface_as_gerrit_lint=True,
     ),
 )
 
@@ -2988,8 +3001,7 @@ def _GetMessageForMatchingType(input_api, affected_file, line_number, line,
 
 def CheckNoBannedFunctions(input_api, output_api):
     """Make sure that banned functions are not used."""
-    warnings = []
-    errors = []
+    results= []
 
     def IsExcludedFile(affected_file, excluded_paths):
         if not excluded_paths:
@@ -3019,13 +3031,27 @@ def CheckNoBannedFunctions(input_api, output_api):
         if IsExcludedFile(affected_file, ban_rule.excluded_paths):
             return
 
-        problems = _GetMessageForMatchingType(input_api, f, line_num, line,
-                                              ban_rule)
-        if problems:
+        message = _GetMessageForMatchingType(input_api, f, line_num, line,
+                                             ban_rule)
+        if message:
+            result_loc = []
+            if ban_rule.surface_as_gerrit_lint:
+                result_loc.append(output_api.PresubmitResultLocation(
+                    file_path=affected_file.LocalPath(),
+                    start_line=line_num,
+                    end_line=line_num,
+                ))
             if ban_rule.treat_as_error is not None and ban_rule.treat_as_error:
-                errors.extend(problems)
+                results.append(
+                    output_api.PresubmitError('A banned function was used.\n' +
+                                              '\n'.join(message),
+                                              locations=result_loc))
+
             else:
-                warnings.extend(problems)
+                results.append(
+                    output_api.PresubmitPromptWarning('A banned function was used.\n' +
+                                                      '\n'.join(message),
+                                                      locations=result_loc))
 
     file_filter = lambda f: f.LocalPath().endswith(('.java'))
     for f in input_api.AffectedFiles(file_filter=file_filter):
@@ -3088,17 +3114,8 @@ def CheckNoBannedFunctions(input_api, output_api):
             for ban_rule in _BANNED_MOJOM_PATTERNS:
                 CheckForMatch(f, line_num, line, ban_rule)
 
+    return results
 
-    result = []
-    if (warnings):
-        result.append(
-            output_api.PresubmitPromptWarning('Banned functions were used.\n' +
-                                              '\n'.join(warnings)))
-    if (errors):
-        result.append(
-            output_api.PresubmitError('Banned functions were used.\n' +
-                                      '\n'.join(errors)))
-    return result
 
 def _CheckAndroidNoBannedImports(input_api, output_api):
     """Make sure that banned java imports are not used."""
@@ -3513,6 +3530,12 @@ def CheckNoProductIconsAddedToPublicRepo(input_api, output_api):
     """Heuristically identifies product icons based on their file name and reminds
     contributors not to add them to the Chromium repository.
     """
+
+    if input_api.change.RepositoryRoot().endswith('clank'):
+      # TODO(crbug.com/414435241): Change check to compute whether change
+      # belongs to internal repository instead of relying on string matching.
+      return []
+
     errors = []
     files_to_check = [r'.*google.*\.png$|.*google.*\.svg$|.*google.*\.icon$']
     file_filter = lambda f: input_api.FilterSourceFile(
@@ -5968,6 +5991,7 @@ def ChecksAndroidSpecificOnCommit(input_api, output_api):
     """Groups commit checks that target android code."""
     results = []
     results.extend(_CheckAndroidXmlStyle(input_api, output_api, False))
+    results.extend(_CheckAndroidNullAwayAnnotatedClasses(input_api, output_api))
     return results
 
 # TODO(chrishall): could we additionally match on any path owned by
@@ -7627,6 +7651,8 @@ def _CheckAndroidNullAwayAnnotatedClasses(input_api, output_api):
         files_to_check=[r'.*\.java$'])
 
     for f in input_api.AffectedSourceFiles(_FilterFile):
+        if f.Action() != 'A':
+            continue
         for line in f.NewContents():
             if nullmarked_annotation.search(line):
                 break
@@ -7637,7 +7663,7 @@ def _CheckAndroidNullAwayAnnotatedClasses(input_api, output_api):
 
     if missing_annotation_errors:
         results.append(
-            output_api.PresubmitPromptWarning(
+            output_api.PresubmitError(
                 """
 Please add @NullMarked and fix the NullAway warnings in the following files
 (see https://chromium.googlesource.com/chromium/src/+/main/styleguide/java/nullaway.md):

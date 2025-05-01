@@ -15,6 +15,7 @@
 #include "chrome/browser/signin/signin_promo_util.h"
 #include "chrome/browser/signin/signin_ui_util.h"
 #include "chrome/browser/sync/sync_service_factory.h"
+#include "chrome/common/pref_names.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
@@ -186,16 +187,6 @@ class ShowPromoTest : public testing::Test {
   scoped_refptr<const extensions::Extension> extension_;
 };
 
-TEST_F(ShowPromoTest, DoNotShowAddressSignInPromoWithoutImprovedBrowserSignin) {
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitWithFeatures(
-      /*enabled_features=*/{},
-      /*disabled_features=*/{switches::kImprovedSigninUIOnDesktop});
-
-  EXPECT_FALSE(ShouldShowAddressSignInPromo(*profile(),
-                                            autofill::test::StandardProfile()));
-}
-
 TEST_F(ShowPromoTest, DoNotShowBookmarkSignInPromoWithoutExplicitSignIn) {
   base::test::ScopedFeatureList feature_list;
   feature_list.InitWithFeatures(
@@ -310,8 +301,7 @@ class ShowSigninPromoTestWithFeatureFlags : public ShowPromoTest {
     ShowPromoTest::SetUp();
     feature_list_.InitWithFeatures(
         /*enabled_features=*/
-        {switches::kImprovedSigninUIOnDesktop,
-         switches::kSyncEnableBookmarksInTransportMode,
+        {switches::kSyncEnableBookmarksInTransportMode,
          switches::kEnableExtensionsExplicitBrowserSignin},
         /*disabled_features=*/{});
     ON_CALL(*sync_service(), GetDataTypesForTransportOnlyMode())
@@ -773,6 +763,8 @@ class SyncPromoIdentityPillManagerTest : public testing::Test {
 
   Profile& profile() { return *profile_.get(); }
 
+  PrefService& local_state() { return *local_state_.Get(); }
+
  private:
   ScopedTestingLocalState local_state_;
   network::TestURLLoaderFactory url_loader_factory_;
@@ -783,40 +775,52 @@ class SyncPromoIdentityPillManagerTest : public testing::Test {
 };
 
 TEST_F(SyncPromoIdentityPillManagerTest, MaxShownCount) {
-  const AccountInfo account = MakeAccountAvailable("test@email.com");
+  MakeAccountAvailable("test@email.com");
   const int max_shown_count = 10;
-  SyncPromoIdentityPillManager manager(max_shown_count, /*max_used_count=*/1);
+  SyncPromoIdentityPillManager manager(profile(), max_shown_count,
+                                       /*max_used_count=*/1);
 
   for (int i = 0; i < max_shown_count; ++i) {
     // The promo should be shown if the shown count is below the max.
-    EXPECT_TRUE(manager.ShouldShowPromo(profile()));
-    manager.RecordPromoShown(profile());
+    EXPECT_TRUE(manager.ShouldShowPromo());
+    manager.RecordPromoShown();
   }
 
   // The promo should not be shown if the shown count is at the max.
-  EXPECT_FALSE(manager.ShouldShowPromo(profile()));
+  EXPECT_FALSE(manager.ShouldShowPromo());
 }
 
 TEST_F(SyncPromoIdentityPillManagerTest, MaxUsedCount) {
-  const AccountInfo account = MakeAccountAvailable("test@email.com");
+  MakeAccountAvailable("test@email.com");
   const int max_used_count = 5;
-  SyncPromoIdentityPillManager manager(/*max_shown_count=*/10, max_used_count);
+  SyncPromoIdentityPillManager manager(profile(), /*max_shown_count=*/10,
+                                       max_used_count);
 
   for (int i = 0; i < max_used_count; ++i) {
     // The promo should be shown if the used count is below the max.
-    EXPECT_TRUE(manager.ShouldShowPromo(profile()));
-    manager.RecordPromoUsed(profile());
+    EXPECT_TRUE(manager.ShouldShowPromo());
+    manager.RecordPromoUsed();
   }
 
   // The promo should not be shown if the used count is at the max.
-  EXPECT_FALSE(manager.ShouldShowPromo(profile()));
+  EXPECT_FALSE(manager.ShouldShowPromo());
 }
 
 TEST_F(SyncPromoIdentityPillManagerTest, ShouldNotShowPromoIfNoAccount) {
-  SyncPromoIdentityPillManager manager(/*max_shown_count=*/10,
+  SyncPromoIdentityPillManager manager(profile(), /*max_shown_count=*/10,
                                        /*max_used_count=*/2);
-  EXPECT_FALSE(manager.ShouldShowPromo(profile()));
+  EXPECT_FALSE(manager.ShouldShowPromo());
 }
+
+TEST_F(SyncPromoIdentityPillManagerTest,
+       ShouldNotShowPromoIfPromotionsDisabled) {
+  local_state().SetBoolean(prefs::kPromotionsEnabled, false);
+  MakeAccountAvailable("test@email.com");
+  SyncPromoIdentityPillManager manager(profile(), /*max_shown_count=*/10,
+                                       /*max_used_count=*/2);
+  EXPECT_FALSE(manager.ShouldShowPromo());
+}
+
 #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
 }  // namespace signin

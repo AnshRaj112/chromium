@@ -146,11 +146,8 @@ class PlatformNotificationServiceTest : public testing::Test {
   }
 
   content::PlatformNotificationContext* GetPlatformNotificationContext(
-      std::string origin_host) {
-    auto storage_partition_config = content::StoragePartitionConfig::Create(
-        profile_.get(), origin_host, /*partition_name=*/"",
-        /*in_memory=*/false);
-    return profile_->GetStoragePartition(storage_partition_config, true)
+      GURL origin) {
+    return profile_->GetStoragePartitionForUrl(origin)
         ->GetPlatformNotificationContext();
   }
 
@@ -413,7 +410,7 @@ TEST_F(PlatformNotificationServiceTest, NextPersistentNotificationId) {
 }
 
 TEST_F(PlatformNotificationServiceTest,
-       ProposedDisruptiveNotificationRevocationMetrics) {
+       ProposedDisruptiveNotificationRevocationMetricsPersistent) {
   GURL url("https://chrome.test/");
   const int kDailyNotificationCount = 4;
 
@@ -450,89 +447,40 @@ TEST_F(PlatformNotificationServiceTest,
 }
 
 TEST_F(PlatformNotificationServiceTest,
-       FalsePositiveDisruptiveNotificationRevocationMetrics) {
+       ProposedDisruptiveNotificationRevocationMetricsNonPersistent) {
   GURL url("https://chrome.test/");
   const int kDailyNotificationCount = 4;
 
   HostContentSettingsMap* hcsm =
       HostContentSettingsMapFactory::GetForProfile(profile_.get());
   base::Value::Dict dict;
-  dict.Set(safety_hub::kRevokedStatusDictKeyStr, safety_hub::kFalsePositiveStr);
-  dict.Set(safety_hub::kSiteEngagementStr, 1.0);
-  dict.Set(safety_hub::kDailyNotificationCountStr, kDailyNotificationCount);
-  dict.Set(safety_hub::kHasReportedMetricsStr, true);
-  dict.Set(safety_hub::kTimestampStr,
-           base::TimeToValue(base::Time::Now() - base::Days(3)));
-  hcsm->SetWebsiteSettingCustomScope(
-      ContentSettingsPattern::FromURLNoWildcard(url),
-      ContentSettingsPattern::Wildcard(),
-      ContentSettingsType::REVOKED_DISRUPTIVE_NOTIFICATION_PERMISSIONS,
-      base::Value(std::move(dict)));
-
-  site_engagement::SiteEngagementService::Get(profile_.get())
-      ->ResetBaseScoreForURL(url, 5.0);
-
-  PlatformNotificationData data;
-  data.title = u"My notification's title";
-  data.body = u"Hello, world!";
-
-  service()->DisplayPersistentNotification(kNotificationId,
-                                           GURL() /* service_worker_scope */,
-                                           url, data, NotificationResources());
-
-  EXPECT_EQ(1u, GetNotificationCountForType(
-                    NotificationHandler::Type::WEB_PERSISTENT));
-  // Check that the correct metric is reported.
-  EXPECT_EQ(1u,
-            recorder_
-                ->GetEntriesByName(
-                    "SafetyHub.DisruptiveNotificationRevocations.FalsePositive")
-                .size());
-}
-
-TEST_F(PlatformNotificationServiceTest,
-       ProposedDisruptiveNotificationRevocationMetricsFalsePositive) {
-  GURL url("https://chrome.test/");
-  const int kDailyNotificationCount = 4;
-
-  HostContentSettingsMap* hcsm =
-      HostContentSettingsMapFactory::GetForProfile(profile_.get());
-  base::Value::Dict dict;
-  dict.Set(safety_hub::kRevokedStatusDictKeyStr, safety_hub::kFalsePositiveStr);
+  dict.Set(safety_hub::kRevokedStatusDictKeyStr, safety_hub::kProposedStr);
   dict.Set(safety_hub::kSiteEngagementStr, 0.0);
   dict.Set(safety_hub::kDailyNotificationCountStr, kDailyNotificationCount);
-  dict.Set(safety_hub::kTimestampStr,
-           base::TimeToValue(base::Time::Now() - base::Days(3)));
+  auto constraint =
+      content_settings::ContentSettingConstraints(base::Time::Now());
+  constraint.set_lifetime(base::Days(30));
   hcsm->SetWebsiteSettingCustomScope(
       ContentSettingsPattern::FromURLNoWildcard(url),
       ContentSettingsPattern::Wildcard(),
       ContentSettingsType::REVOKED_DISRUPTIVE_NOTIFICATION_PERMISSIONS,
-      base::Value(std::move(dict)));
-
-  site_engagement::SiteEngagementService::Get(profile_.get())
-      ->ResetBaseScoreForURL(url, 5.0);
+      base::Value(std::move(dict)), constraint);
 
   PlatformNotificationData data;
   data.title = u"My notification's title";
   data.body = u"Hello, world!";
 
-  service()->DisplayPersistentNotification(kNotificationId,
-                                           GURL() /* service_worker_scope */,
-                                           url, data, NotificationResources());
+  service()->DisplayNotification(kNotificationId, url,
+                                 /*document_url=*/GURL(), data,
+                                 NotificationResources());
 
   EXPECT_EQ(1u, GetNotificationCountForType(
-                    NotificationHandler::Type::WEB_PERSISTENT));
-
-  // Check that the correct metrics are reported.
+                    NotificationHandler::Type::WEB_NON_PERSISTENT));
+  // Check that the correct metric is reported.
   EXPECT_EQ(1u, recorder_
                     ->GetEntriesByName(
                         "SafetyHub.DisruptiveNotificationRevocations.Proposed")
                     .size());
-  EXPECT_EQ(1u,
-            recorder_
-                ->GetEntriesByName(
-                    "SafetyHub.DisruptiveNotificationRevocations.FalsePositive")
-                .size());
 }
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -934,10 +882,9 @@ TEST_F(PlatformNotificationServiceTest_ReportNotificationContentDetectionData,
   GURL origin("https://example.com");
   NotificationDatabaseData notification_database_data;
   notification_database_data.origin = origin;
-  GetPlatformNotificationContext(origin.host())
-      ->WriteNotificationData(notification_id, kFakeServiceWorkerRegistrationId,
-                              origin, notification_database_data,
-                              base::DoNothing());
+  GetPlatformNotificationContext(origin)->WriteNotificationData(
+      notification_id, kFakeServiceWorkerRegistrationId, origin,
+      notification_database_data, base::DoNothing());
   base::RunLoop().RunUntilIdle();
   // Update `NotificationDatabase` entry with metadata.
   Notification notification = message_center::Notification(
@@ -958,7 +905,7 @@ TEST_F(PlatformNotificationServiceTest_ReportNotificationContentDetectionData,
   // Read and check the entry from `NotificationDatabase`.
   NotificationDatabaseData data =
       ReadNotificationDataAndRecordInteractionSynchronous(
-          GetPlatformNotificationContext(origin.host()),
+          GetPlatformNotificationContext(origin),
           base::NumberToString(notification_id), origin);
   ASSERT_TRUE(
       data.serialized_metadata.contains(safe_browsing::kMetadataDictionaryKey));

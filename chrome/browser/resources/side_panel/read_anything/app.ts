@@ -20,13 +20,17 @@ import {getCss} from './app.css.js';
 import {getHtml} from './app.html.js';
 import {AppStyleUpdater} from './app_style_updater.js';
 import type {SettingsPrefs} from './common.js';
-import {getCurrentSpeechRate, isHtmlElementVisible, isWhitespace, minOverflowLengthToScroll, playFromSelectionTimeout} from './common.js';
+import {getCurrentSpeechRate, minOverflowLengthToScroll, playFromSelectionTimeout} from './common.js';
 import type {LanguageToastElement} from './language_toast.js';
+import {NodeStore} from './node_store.js';
+import {ReadAloudHighlighter} from './read_aloud/highlighter.js';
+import {WordBoundaries} from './read_aloud/word_boundaries.js';
+import type {WordBoundaryState} from './read_aloud/word_boundaries.js';
 import {ReadAnythingLogger, TimeFrom} from './read_anything_logger.js';
 import type {ReadAnythingToolbarElement} from './read_anything_toolbar.js';
 import type {SpeechBrowserProxy} from './speech_browser_proxy.js';
 import {SpeechBrowserProxyImpl} from './speech_browser_proxy.js';
-import {areVoicesEqual, AVAILABLE_GOOGLE_TTS_LOCALES, convertLangOrLocaleForVoicePackManager, convertLangOrLocaleToExactVoicePackLocale, convertLangToAnAvailableLangIfPresent, createInitialListOfEnabledLanguages, doesLanguageHaveNaturalVoices, EXTENSION_RESPONSE_TIMEOUT_MS, getFilteredVoiceList, getNaturalVoiceOrDefault, getVoicePackConvertedLangIfExists, isEspeak, isGoogle, isNatural, isVoicePackStatusError, isVoicePackStatusSuccess, mojoVoicePackStatusToVoicePackStatusEnum, VoiceClientSideStatusCode, VoicePackServerStatusErrorCode, VoicePackServerStatusSuccessCode} from './voice_language_util.js';
+import {areVoicesEqual, AVAILABLE_GOOGLE_TTS_LOCALES, convertLangOrLocaleForVoicePackManager, convertLangOrLocaleToExactVoicePackLocale, convertLangToAnAvailableLangIfPresent, createInitialListOfEnabledLanguages, doesLanguageHaveNaturalVoices, EXTENSION_RESPONSE_TIMEOUT_MS, getFilteredVoiceList, getNaturalVoiceOrDefault, getVoicePackConvertedLangIfExists, isGoogle, isNatural, isVoicePackStatusError, isVoicePackStatusSuccess, mojoVoicePackStatusToVoicePackStatusEnum, VoiceClientSideStatusCode, VoicePackServerStatusErrorCode, VoicePackServerStatusSuccessCode} from './voice_language_util.js';
 import type {VoicePackStatus} from './voice_language_util.js';
 import {VoiceNotificationManager} from './voice_notification_manager.js';
 
@@ -39,49 +43,11 @@ interface UtteranceSettings {
   rate: number;
 }
 
-export const previousReadHighlightClass = 'previous-read-highlight';
-export const currentReadHighlightClass = 'current-read-highlight';
-const parentOfHighlightClass = 'parent-of-highlight';
-
 const linkDataAttribute = 'link';
-
-// Characters that should be ignored for word highlighting when not accompanied
-// by other characters.
-const IGNORED_HIGHLIGHT_CHARACTERS_REGEX: RegExp = /^[.,!?'"(){}\[\]]+$/;
 
 // The maximum speech length that should be used with remote voices
 // due to a TTS engine bug with voices timing out on too-long text.
-export const MAX_SPEECH_LENGTH_FOR_REMOTE_VOICES: number = 175;
-
-// This corresponds to what would be more than a 2 second delay between
-// sentences.
-export const MAX_SPEECH_LENGTH_FOR_WORD_BOUNDARIES: number = 250;
-
-// Punctuation that is reasonable to splice audio on if text is too long.
-const SPLICEABLE_PUNCTUATION_ARRAY = [',', '(', ')', '-', '[', ']', '{', '}'];
-
-
-// A two-way map where each key is unique and each value is unique. The keys are
-// DOM nodes and the values are numbers, representing AXNodeIDs.
-class TwoWayMap<K, V> extends Map<K, V> {
-  #reverseMap: Map<V, K>;
-  constructor() {
-    super();
-    this.#reverseMap = new Map();
-  }
-  override set(key: K, value: V) {
-    super.set(key, value);
-    this.#reverseMap.set(value, key);
-    return this;
-  }
-  keyFrom(value: V) {
-    return this.#reverseMap.get(value);
-  }
-  override clear() {
-    super.clear();
-    this.#reverseMap.clear();
-  }
-}
+export const MAX_SPEECH_LENGTH: number = 175;
 
 export enum PauseActionSource {
   DEFAULT,
@@ -89,14 +55,6 @@ export enum PauseActionSource {
   VOICE_PREVIEW,
   VOICE_SETTINGS_CHANGE,
   ENGINE_INTERRUPT,
-}
-
-export enum WordBoundaryMode {
-  // Used if word boundaries are not supported (i.e. we haven't received enough
-  // information to determine if word boundaries are supported.)
-  BOUNDARIES_NOT_SUPPORTED,
-  NO_BOUNDARIES,
-  BOUNDARY_DETECTED,
 }
 
 export interface SpeechPlayingState {
@@ -127,25 +85,6 @@ export interface SpeechPlayingState {
   isSpeechBeingRepositioned: boolean;
 }
 
-export interface WordBoundaryState {
-  mode: WordBoundaryMode;
-  // The charIndex of the last word boundary index retrieved by the "Boundary"
-  // event. Default is 0.
-  previouslySpokenIndex: number;
-  // Is only non-zero if the current state has already resumed speech on a
-  // word boundary. e.g. If we interrupted speech for the segment
-  // "This is a sentence" at "is," so the next segment spoken is "is a
-  // sentence," if we attempt to interrupt speech again at "a." This helps us
-  // keep track of the correct index in the overall granularity string- not
-  // just the correct index within the current string.
-  // Default is 0.
-  speechUtteranceStartIndex: number;
-  // If we have to break a string because the text is too long, we need to
-  // offset future word boundaries within this utterance by this offset so
-  // that they appear in the correct locations.
-  tooLongTextOffset: number;
-}
-
 export interface AppElement {
   $: {
     toolbar: ReadAnythingToolbarElement,
@@ -154,14 +93,6 @@ export interface AppElement {
     containerParent: HTMLElement,
     languageToast: LanguageToastElement,
   };
-}
-
-function isInvalidHighlightForWordHighlighting(textToHighlight: string|
-                                               undefined): boolean {
-  // If a highlight is just white space or punctuation, we can skip
-  // highlighting.
-  return !textToHighlight || textToHighlight === '' ||
-      IGNORED_HIGHLIGHT_CHARACTERS_REGEX.test(textToHighlight);
 }
 
 export class AppElement extends AppElementBase {
@@ -201,25 +132,6 @@ export class AppElement extends AppElementBase {
   private startTime = Date.now();
   private constructorTime: number;
 
-  // Maps a DOM node to the AXNodeID that was used to create it. DOM nodes and
-  // AXNodeIDs are unique, so this is a two way map where either DOM node or
-  // AXNodeID can be used to access the other.
-  private domNodeToAxNodeIdMap_: TwoWayMap<Node, number> = new TwoWayMap();
-  // Key: a DOM node that's already been read aloud
-  // Value: the index offset at which this node's text begins within its parent
-  // text. For reading aloud we sometimes split up nodes so the speech sounds
-  // more natural. When that text is then selected we need to pass the correct
-  // index down the pipeline, so we store that info here.
-  private highlightedNodeToOffsetInParent: Map<Node, number> = new Map();
-  // IDs of the text nodes that are hidden when images are hidden. This is
-  // usually the figcaption elements which we want to keep distilled for quick
-  // turnaround when enabling/disabling images, but we don't want read aloud to
-  // read out text that's not showing, so keep track of which nodes are not
-  // showing.
-  private hiddenImageNodesIds_: Set<number> = new Set();
-  private imageNodeIdsToFetch_: Set<number> = new Set();
-
-  private allowAutoScroll_ = true;
   private scrollingOnSelection_ = false;
   protected accessor hasContent_ = false;
   protected accessor emptyStateImagePath_: string|undefined;
@@ -227,7 +139,6 @@ export class AppElement extends AppElementBase {
   protected accessor emptyStateHeading_: string|undefined;
   protected accessor emptyStateSubheading_ = '';
 
-  private previousHighlights_: HTMLElement[] = [];
   private previousRootId_?: number;
 
   private isReadAloudEnabled_: boolean;
@@ -309,6 +220,9 @@ export class AppElement extends AppElementBase {
   private logger_: ReadAnythingLogger = ReadAnythingLogger.getInstance();
   private styleUpdater_: AppStyleUpdater;
   private speech_: SpeechBrowserProxy;
+  private highlighter_: ReadAloudHighlighter;
+  private wordBoundaries_: WordBoundaries;
+  private nodeStore_: NodeStore;
   protected accessor settingsPrefs_: SettingsPrefs = {
     letterSpacing: 0,
     lineSpacing: 0,
@@ -331,13 +245,6 @@ export class AppElement extends AppElementBase {
   };
 
   private accessor imagesEnabled: boolean = false;
-
-  wordBoundaryState: WordBoundaryState = {
-    mode: WordBoundaryMode.BOUNDARIES_NOT_SUPPORTED,
-    speechUtteranceStartIndex: 0,
-    previouslySpokenIndex: 0,
-    tooLongTextOffset: 0,
-  };
 
   // If the node id of the first text node that should be used by Read Aloud
   // has been set. This is null if the id has not been set.
@@ -370,6 +277,10 @@ export class AppElement extends AppElementBase {
     this.styleUpdater_ = new AppStyleUpdater(this);
     this.notificationManager_ = VoiceNotificationManager.getInstance();
     this.speech_ = SpeechBrowserProxyImpl.getInstance();
+    this.highlighter_ = ReadAloudHighlighter.getInstance();
+    this.wordBoundaries_ = WordBoundaries.getInstance();
+    this.nodeStore_ = NodeStore.getInstance();
+    this.nodeStore_.clear();
     ColorChangeUpdater.forDocument().start();
   }
 
@@ -405,7 +316,7 @@ export class AppElement extends AppElementBase {
       this.hasContent_ = false;
       this.firstUtteranceSpoken_ = false;
       this.firstTextNodeSetForReadAloud = null;
-      this.domNodeToAxNodeIdMap_.clear();
+      this.nodeStore_.clearDomNodes();
       this.clearReadAloudState();
 
       this.speech_.setOnVoicesChanged(this.onVoicesChanged.bind(this));
@@ -444,9 +355,9 @@ export class AppElement extends AppElementBase {
       // Only send this selection to the main panel if it is different than the
       // current main panel selection.
       const mainPanelAnchor =
-          this.domNodeToAxNodeIdMap_.keyFrom(chrome.readingMode.startNodeId);
+          this.nodeStore_.getDomNode(chrome.readingMode.startNodeId);
       const mainPanelFocus =
-          this.domNodeToAxNodeIdMap_.keyFrom(chrome.readingMode.endNodeId);
+          this.nodeStore_.getDomNode(chrome.readingMode.endNodeId);
       if (!mainPanelAnchor || !mainPanelAnchor.contains(selection.anchorNode) ||
           !mainPanelFocus || !mainPanelFocus.contains(selection.focusNode) ||
           selection.anchorOffset !== chrome.readingMode.startOffset ||
@@ -460,7 +371,7 @@ export class AppElement extends AppElementBase {
         // If speech is resumed, this won't be restored.
         // TODO: crbug.com/40927698 - Restore the previous highlight after
         // speech is resumed after a selection.
-        this.clearHighlightFormatting_();
+        this.highlighter_.clearHighlightFormatting();
       }
     };
 
@@ -473,7 +384,7 @@ export class AppElement extends AppElementBase {
       // and we should re-enable autoscroll if the highlights are now
       // visible.
       if (this.speechPlayingState.isSpeechActive) {
-        this.allowAutoScroll_ = this.areHighlightsOnScreen();
+        this.highlighter_.updateAutoScroll();
       }
     };
 
@@ -535,45 +446,10 @@ export class AppElement extends AppElementBase {
     chrome.readingMode.onTtsEngineInstalled = () => {
       this.onTtsEngineInstalled();
     };
-  }
 
-  private clearHighlightFormatting_() {
-    const elements =
-        this.shadowRoot?.querySelectorAll('.' + currentReadHighlightClass);
-    if (elements) {
-      elements.forEach(el => el.classList.remove(currentReadHighlightClass));
-    }
-
-    this.previousHighlights_.forEach((element) => {
-      if (element) {
-        element.classList.remove(previousReadHighlightClass);
-      }
-    });
-    this.previousHighlights_ = [];
-  }
-
-  private getOffsetInAncestor(node: Node): number {
-    if (this.highlightedNodeToOffsetInParent.has(node)) {
-      return this.highlightedNodeToOffsetInParent.get(node)!;
-    }
-
-    return 0;
-  }
-
-  private getHighlightedAncestorId_(node: Node): number|undefined {
-    if (!node.parentElement || !node.parentNode) {
-      return undefined;
-    }
-
-    let ancestor;
-    if (node.parentElement.classList.contains(parentOfHighlightClass)) {
-      ancestor = node.parentNode;
-    } else if (node.parentElement.parentElement?.classList.contains(
-                   parentOfHighlightClass)) {
-      ancestor = node.parentNode.parentNode;
-    }
-
-    return ancestor ? this.domNodeToAxNodeIdMap_.get(ancestor) : undefined;
+    chrome.readingMode.onNodeWillBeDeleted = (nodeId: number) => {
+      this.onNodeWillBeDeleted(nodeId);
+    };
   }
 
   private buildSubtree_(nodeId: number): Node {
@@ -629,14 +505,14 @@ export class AppElement extends AppElementBase {
     for (const [attr, val] of dataAttributes) {
       element.dataset[attr] = val;
     }
-    this.domNodeToAxNodeIdMap_.set(element, nodeId);
+    this.nodeStore_.setDomNode(element, nodeId);
     const direction = chrome.readingMode.getTextDirection(nodeId);
     if (direction) {
       element.setAttribute('dir', direction);
     }
 
     if (element.nodeName === 'CANVAS') {
-      this.imageNodeIdsToFetch_.add(nodeId);
+      this.nodeStore_.addImageToFetch(nodeId);
       const altText = chrome.readingMode.getAltText(nodeId);
       element.setAttribute('alt', altText);
       element.style.display = chrome.readingMode.imagesEnabled ? '' : 'none';
@@ -684,7 +560,7 @@ export class AppElement extends AppElementBase {
 
     const textContent = chrome.readingMode.getTextContent(nodeId);
     const textNode = document.createTextNode(textContent);
-    this.domNodeToAxNodeIdMap_.set(textNode, nodeId);
+    this.nodeStore_.setDomNode(textNode, nodeId);
     const isOverline = chrome.readingMode.isOverline(nodeId);
     const shouldBold = chrome.readingMode.shouldBold(nodeId);
 
@@ -736,18 +612,15 @@ export class AppElement extends AppElementBase {
 
     // This shouldn't happen. If it does, there is likely a bug, so log it so
     // we can monitor it.
-    if (this.speechPlayingState.isAudioCurrentlyPlaying) {
+    if (this.speechPlayingState.isSpeechActive) {
       console.error(
-          'updateContent called while audio is currently playing. ',
+          'updateContent called while speech is active. ',
           'There may be a bug.');
       this.logger_.logSpeechStopSource(
           chrome.readingMode.unexpectedUpdateContentStopSource);
     }
-    const hadSpeechBeenTriggered =
-        this.speechPlayingState.hasSpeechBeenTriggered;
-    const hadWordBoundaries =
-        this.wordBoundaryState.mode === WordBoundaryMode.BOUNDARY_DETECTED;
-    const previousWordBoundaryState = {...this.wordBoundaryState};
+    const previousSpeechPlayingState = {...this.speechPlayingState};
+    const previousWordBoundaryState = {...this.wordBoundaries_.state};
 
     this.speech_.cancel();
     this.clearReadAloudState();
@@ -756,7 +629,7 @@ export class AppElement extends AppElementBase {
     // Remove all children from container. Use `replaceChildren` rather than
     // setting `innerHTML = ''` in order to remove all listeners, too.
     container.replaceChildren();
-    this.domNodeToAxNodeIdMap_.clear();
+    this.nodeStore_.clearDomNodes();
 
     // Construct a dom subtree starting with the display root and append it to
     // the container. The display root may be invalid if there are no content
@@ -774,7 +647,7 @@ export class AppElement extends AppElementBase {
     const node = this.buildSubtree_(rootId);
     // If there is no text or images in the tree, do not proceed. The empty
     // state container will show instead.
-    if (!node.textContent && this.imageNodeIdsToFetch_.size === 0) {
+    if (!node.textContent && !this.nodeStore_.hasImagesToFetch()) {
       // Sometimes the controller thinks there will be content and redraws
       // without showing the empty page, but we end up not actually having any
       // content and also not showing the empty page sometimes. In this case,
@@ -805,31 +678,23 @@ export class AppElement extends AppElementBase {
 
     // If the previous reading position still exists and we haven't reached the
     // end of speech, keep that spot.
-    if (hadSpeechBeenTriggered) {
+    if (previousSpeechPlayingState.hasSpeechBeenTriggered) {
       this.setPreviousReadingPositionIfExists_(
-          hadWordBoundaries, previousWordBoundaryState);
+          previousWordBoundaryState, previousSpeechPlayingState);
     }
   }
 
   private setPreviousReadingPositionIfExists_(
-      hadWordBoundaries: boolean,
-      previousWordBoundaryState: WordBoundaryState) {
+      previousWordBoundaryState: WordBoundaryState,
+      previousSpeechPlayingState: SpeechPlayingState) {
     if (this.lastReadingId_ === null || this.lastReadingOffset_ === null) {
       return;
     }
 
-    if (this.domNodeToAxNodeIdMap_.keyFrom(this.lastReadingId_)) {
-      this.speechPlayingState = {
-        ...this.speechPlayingState,
-        hasSpeechBeenTriggered: true,
-      };
+    if (this.nodeStore_.getDomNode(this.lastReadingId_)) {
       this.movePlaybackToNode_(this.lastReadingId_, this.lastReadingOffset_);
-      // If there were word boundaries before the content was updated and we can
-      // restore the reading position, restore the word boundary state so that
-      // we can restore the specific word we stopped on.
-      if (hadWordBoundaries) {
-        this.wordBoundaryState = {...previousWordBoundaryState};
-      }
+      this.speechPlayingState = {...previousSpeechPlayingState};
+      this.wordBoundaries_.state = {...previousWordBoundaryState};
       // Since we're setting the reading position after a content update when
       // we're paused, redraw the highlight after moving the traversal state to
       // the right spot above.
@@ -842,7 +707,7 @@ export class AppElement extends AppElementBase {
 
   async onImageDownloaded(nodeId: number) {
     const data = chrome.readingMode.getImageBitmap(nodeId);
-    const element = this.domNodeToAxNodeIdMap_.keyFrom(nodeId);
+    const element = this.nodeStore_.getDomNode(nodeId);
     if (data && element && element instanceof HTMLCanvasElement) {
       element.width = data.width;
       element.height = data.height;
@@ -874,11 +739,7 @@ export class AppElement extends AppElementBase {
       return;
     }
 
-    for (const nodeId of this.imageNodeIdsToFetch_) {
-      chrome.readingMode.requestImageData(nodeId);
-    }
-
-    this.imageNodeIdsToFetch_.clear();
+    this.nodeStore_.fetchImages();
   }
 
   getSelection(): any {
@@ -895,8 +756,8 @@ export class AppElement extends AppElementBase {
     const endNodeId = chrome.readingMode.endNodeId;
     let startOffset = chrome.readingMode.startOffset;
     let endOffset = chrome.readingMode.endOffset;
-    let startNode = this.domNodeToAxNodeIdMap_.keyFrom(startNodeId);
-    let endNode = this.domNodeToAxNodeIdMap_.keyFrom(endNodeId);
+    let startNode = this.nodeStore_.getDomNode(startNodeId);
+    let endNode = this.nodeStore_.getDomNode(endNodeId);
     if (!startNode || !endNode) {
       return;
     }
@@ -970,20 +831,16 @@ export class AppElement extends AppElementBase {
       return;
     }
 
-    const originallyHadHighlights =
-        this.shadowRoot
-            .querySelectorAll<HTMLElement>('.' + currentReadHighlightClass)
-            .length > 0;
-
+    const originallyHadHighlights = this.highlighter_.hasCurrentHighlights();
     const selector = this.shouldShowLinks() ? 'span[data-link]' : 'a';
     const elements = this.shadowRoot.querySelectorAll(selector);
 
     for (const elem of elements) {
       assert(elem instanceof HTMLElement, 'link is not an HTMLElement');
-      const nodeId = this.domNodeToAxNodeIdMap_.get(elem);
+      const nodeId = this.nodeStore_.getAxId(elem);
       assert(nodeId !== undefined, 'link node id is undefined');
       const replacement = this.buildSubtree_(nodeId);
-      this.replaceElement(elem, replacement);
+      this.nodeStore_.replaceDomNode(elem, replacement);
     }
 
     // Rehighlight the current granularity text after links have been
@@ -1002,7 +859,7 @@ export class AppElement extends AppElementBase {
 
     this.imagesEnabled = chrome.readingMode.imagesEnabled;
     if (this.imagesEnabled) {
-      this.hiddenImageNodesIds_.clear();
+      this.nodeStore_.clearHiddenImageNodes();
     }
     // There is some strange issue where the HTML css application does not work
     // on canvases.
@@ -1024,10 +881,10 @@ export class AppElement extends AppElementBase {
     // Do this asynchronously so we don't block the UI on large pages.
     await new Promise(() => {
       setTimeout(() => {
-        const id = this.domNodeToAxNodeIdMap_.get(node);
+        const id = this.nodeStore_.getAxId(node);
         if (node.nodeType === Node.TEXT_NODE) {
           if (id) {
-            this.hiddenImageNodesIds_.add(id);
+            this.nodeStore_.hideImageNode(id);
           }
           return;
         }
@@ -1037,10 +894,9 @@ export class AppElement extends AppElementBase {
         const startTreeWalker =
             document.createTreeWalker(node, NodeFilter.SHOW_ALL);
         while (startTreeWalker.nextNode()) {
-          const id =
-              this.domNodeToAxNodeIdMap_.get(startTreeWalker.currentNode);
+          const id = this.nodeStore_.getAxId(startTreeWalker.currentNode);
           if (id) {
-            this.hiddenImageNodesIds_.add(id);
+            this.nodeStore_.hideImageNode(id);
           }
         }
       });
@@ -1316,8 +1172,8 @@ export class AppElement extends AppElementBase {
   // getVoices, but we ensure that the alternative voice does not match
   // the previously unavailable voice as an extra measure. This method should
   // only be called when speech synthesis returns an error.
-  getAlternativeVoice(unavailableVoice: SpeechSynthesisVoice|
-                      undefined): SpeechSynthesisVoice|undefined {
+  getAlternativeVoice(unavailableVoice: SpeechSynthesisVoice|undefined):
+      SpeechSynthesisVoice|undefined {
     const newVoice = this.defaultVoice();
 
     // If the default voice is not the same as the original, unavailable voice,
@@ -1401,18 +1257,6 @@ export class AppElement extends AppElementBase {
             {...this.localeToDisplayName_, [langLower]: langDisplayName};
       }
     }
-  }
-
-  private replaceElement(current: HTMLElement, replacer: Node) {
-    const nodeId = this.domNodeToAxNodeIdMap_.get(current);
-    assert(
-        nodeId !== undefined,
-        'trying to replace an element that doesn\'t exist');
-    // Update map.
-    this.domNodeToAxNodeIdMap_.delete(current);
-    this.domNodeToAxNodeIdMap_.set(replacer, nodeId);
-    // Replace element in DOM.
-    current.replaceWith(replacer);
   }
 
   protected onPreviewVoice_(
@@ -1531,9 +1375,9 @@ export class AppElement extends AppElementBase {
     };
 
     this.speech_.cancel();
-    this.resetPreviousHighlight_();
+    this.highlighter_.resetPreviousHighlight();
     // Reset the word boundary index whenever we move the granularity position.
-    this.resetToDefaultWordBoundaryState();
+    this.wordBoundaries_.resetToDefaultState();
     chrome.readingMode.movePositionToNextGranularity();
 
     if (!this.highlightAndPlayMessage()) {
@@ -1550,9 +1394,10 @@ export class AppElement extends AppElementBase {
     // This must be called BEFORE calling
     // chrome.readingMode.movePositionToPreviousGranularity so we can accurately
     // determine what's currently being highlighted.
-    this.resetPreviousHighlightAndRemoveCurrentHighlight();
+    this.highlighter_.removeCurrentHighlight();
+    this.highlighter_.resetPreviousHighlight();
     // Reset the word boundary index whenever we move the granularity position.
-    this.resetToDefaultWordBoundaryState();
+    this.wordBoundaries_.resetToDefaultState();
     chrome.readingMode.movePositionToPreviousGranularity();
 
     if (!this.highlightAndPlayMessage(/*isInterrupted=*/ false,
@@ -1575,14 +1420,12 @@ export class AppElement extends AppElementBase {
       let playedFromSelection = false;
       if (hasSelection) {
         this.speech_.cancel();
-        this.resetToDefaultWordBoundaryState();
+        this.wordBoundaries_.resetToDefaultState();
         playedFromSelection = this.playFromSelection();
       }
 
       if (!playedFromSelection) {
-        if (pausedFromButton &&
-            this.wordBoundaryState.mode !==
-                WordBoundaryMode.BOUNDARY_DETECTED) {
+        if (pausedFromButton && !this.wordBoundaries_.hasBoundaries()) {
           // If word boundaries aren't supported for the given voice, we should
           // still continue to use synth.resume, as this is preferable to
           // restarting the current message.
@@ -1618,8 +1461,7 @@ export class AppElement extends AppElementBase {
       // If the current read highlight has been cleared from a call to
       // updateContent, such as via a preference change, rehighlight the nodes
       // after a pause.
-      if (!playedFromSelection &&
-          !container.querySelector('.' + currentReadHighlightClass)) {
+      if (!playedFromSelection) {
         this.highlightCurrentGranularity(chrome.readingMode.getCurrentText());
       }
 
@@ -1690,17 +1532,17 @@ export class AppElement extends AppElementBase {
   } {
     const {anchorNode, anchorOffset, focusNode, focusOffset} =
         this.getSelection();
-    let anchorNodeId = this.domNodeToAxNodeIdMap_.get(anchorNode);
-    let focusNodeId = this.domNodeToAxNodeIdMap_.get(focusNode);
+    let anchorNodeId = this.nodeStore_.getAxId(anchorNode);
+    let focusNodeId = this.nodeStore_.getAxId(focusNode);
     let adjustedAnchorOffset = anchorOffset;
     let adjustedFocusOffset = focusOffset;
     if (!anchorNodeId) {
-      anchorNodeId = this.getHighlightedAncestorId_(anchorNode);
-      adjustedAnchorOffset += this.getOffsetInAncestor(anchorNode);
+      anchorNodeId = this.highlighter_.getAncestorId(anchorNode);
+      adjustedAnchorOffset += this.highlighter_.getOffsetInAncestor(anchorNode);
     }
     if (!focusNodeId) {
-      focusNodeId = this.getHighlightedAncestorId_(focusNode);
-      adjustedFocusOffset += this.getOffsetInAncestor(focusNode);
+      focusNodeId = this.highlighter_.getAncestorId(focusNode);
+      adjustedFocusOffset += this.highlighter_.getOffsetInAncestor(focusNode);
     }
     return {
       anchorNodeId: anchorNodeId,
@@ -1745,18 +1587,18 @@ export class AppElement extends AppElementBase {
     // Clear the selection so we don't keep trying to play from the same
     // selection every time they press play.
     selection.removeAllRanges();
+
     // Iterate through the page from the beginning until we get to the
     // selection. This is so clicking previous works before the selection and
     // so the previous highlights are properly set.
     chrome.readingMode.resetGranularityIndex();
-
     // Iterate through the nodes asynchronously so that we can show the spinner
     // in the toolbar while we move up to the selection.
     setTimeout(() => {
       this.movePlaybackToNode_(startingNodeId, startingOffset);
       // Set everything to previous and then play the next granularity, which
       // includes the selection.
-      this.resetPreviousHighlight_();
+      this.highlighter_.resetPreviousHighlight();
       if (!this.highlightAndPlayMessage()) {
         this.onSpeechFinished();
       }
@@ -1807,7 +1649,7 @@ export class AppElement extends AppElementBase {
       return false;
     }
 
-    if (axNodeIds.every(id => this.hiddenImageNodesIds_.has(id))) {
+    if (this.nodeStore_.areNodesAllHidden(axNodeIds)) {
       return this.skipCurrentPosition_(isInterrupted, isMovingBackward);
     }
 
@@ -1826,20 +1668,15 @@ export class AppElement extends AppElementBase {
     // If we're resuming a previously interrupted message, use word
     // boundaries (if available) to resume at the beginning of the current
     // word.
-    if (isInterrupted &&
-        this.wordBoundaryState.mode === WordBoundaryMode.BOUNDARY_DETECTED) {
-      const substringIndex = this.wordBoundaryState.previouslySpokenIndex +
-          this.wordBoundaryState.speechUtteranceStartIndex;
-      this.wordBoundaryState.previouslySpokenIndex = 0;
-      this.wordBoundaryState.speechUtteranceStartIndex = substringIndex;
+    if (isInterrupted && this.wordBoundaries_.hasBoundaries()) {
       const utteranceTextForWordBoundary =
-          utteranceText.substring(substringIndex);
+          utteranceText.substring(this.wordBoundaries_.getResumeBoundary());
       // If we paused right at the end of the sentence, no need to speak the
       // ending punctuation.
-      if (isInvalidHighlightForWordHighlighting(
+      if (this.highlighter_.isInvalidHighlightForWordHighlighting(
               utteranceTextForWordBoundary.trim())) {
-        chrome.readingMode.movePositionToNextGranularity();
-        return this.highlightAndPlayMessage(isInterrupted, isMovingBackward);
+        this.wordBoundaries_.resetToDefaultState();
+        return this.skipCurrentPosition_(isInterrupted, isMovingBackward);
       } else {
         this.playText(utteranceTextForWordBoundary);
       }
@@ -1871,70 +1708,26 @@ export class AppElement extends AppElementBase {
       this.lastReadingOffset_ =
           chrome.readingMode.getCurrentTextStartIndex(this.lastReadingId_);
     }
-    const highlightGranularity = this.getEffectiveHighlightingGranularity_();
-    switch (highlightGranularity) {
-      case chrome.readingMode.noHighlighting:
-      // Even without highlighting, we may still need to calculate the sentence
-      // highlight, so that it's visible as soon as the user turns on sentence
-      // highlighting. The highlight will not be visible, since the highlight
-      // color in this case will be transparent. However, we don't need to
-      // recalculate the sentence highlights sometimes, such as during word
-      // boundary events when sentence highlighting is used, since these
-      // highlights have already been calculated.
-      case chrome.readingMode.sentenceHighlighting:
-        if (shouldUpdateSentenceHighlight) {
-          this.highlightCurrentSentence(axNodeIds, scrollIntoView);
-        }
-        break;
-      case chrome.readingMode.wordHighlighting:
-        this.highlightCurrentWord();
-        break;
-      case chrome.readingMode.phraseHighlighting:
-        this.highlightCurrentPhrase();
-        break;
-      case chrome.readingMode.autoHighlighting:
-      default:
-        // This cannot happen, but ensures the switch statement is exhaustive.
-        assert(false, 'invalid value for effective highlight');
-    }
+    this.highlighter_.highlightCurrentGranularity(
+        axNodeIds, scrollIntoView, shouldUpdateSentenceHighlight,
+        this.selectedVoice_);
   }
 
   // Gets the accessible text boundary for the given string.
   getAccessibleTextLength(utteranceText: string): number {
-    const maxSpeechLength = this.selectedVoice_?.localService ?
-        MAX_SPEECH_LENGTH_FOR_WORD_BOUNDARIES :
-        MAX_SPEECH_LENGTH_FOR_REMOTE_VOICES;
+    // Splicing on commas won't work for all locales, but since this is a
+    // simple strategy for splicing text in languages that do use commas
+    // that reduces the need for calling getAccessibleBoundary.
+    // TODO(crbug.com/40927698): Investigate if we can utilize comma splices
+    // directly in the utils methods called by #getAccessibleBoundary.
+    const lastCommaIndex =
+        utteranceText.substring(0, MAX_SPEECH_LENGTH).lastIndexOf(', ');
 
-    // Splicing on punctuation won't work for all locales, but since this is a
-    // simple strategy for splicing text in languages that do use these
-    // characters that reduces the need for calling getAccessibleBoundary.
-    // Since these characters will be searched for in-order, they should
-    // be listed in priority order for most likely to be a reasonable splice.
-    // TODO: crub.com/1474951 - Investigate if we can utilize comma splices
-    // and splices on other punctuation directly in the utils methods called by
-    // #getAccessibleBoundary.
-    for (const punctuationString of SPLICEABLE_PUNCTUATION_ARRAY) {
-      let utteranceSubstring = utteranceText.substring(0, maxSpeechLength);
-      let lastPunctuationIndex =
-          utteranceSubstring.lastIndexOf(punctuationString);
-
-      // If we're not in a valid splicing position, try to find another
-      // instance of the current punctuation in the string before moving
-      // on to the next punctuation.
-      while (!this.isValidSplicePosition(
-          lastPunctuationIndex, punctuationString, utteranceSubstring,
-          maxSpeechLength)) {
-        utteranceSubstring = utteranceText.substring(0, lastPunctuationIndex);
-        lastPunctuationIndex =
-            utteranceSubstring.lastIndexOf(punctuationString);
-      }
-
-      // To prevent infinite looping, only use the lastCommaIndex if it's not
-      // the first character. Otherwise, use getAccessibleBoundary to prevent
-      // repeatedly splicing on the first comma of the same substring.
-      if (lastPunctuationIndex > 0) {
-        return lastPunctuationIndex;
-      }
+    // To prevent infinite looping, only use the lastCommaIndex if it's not the
+    // first character. Otherwise, use getAccessibleBoundary to prevent
+    // repeatedly splicing on the first comma of the same substring.
+    if (lastCommaIndex > 0) {
+      return lastCommaIndex;
     }
 
     // TODO: crbug.com/40927698 - getAccessibleBoundary breaks on the nearest
@@ -1942,49 +1735,19 @@ export class AppElement extends AppElementBase {
     // it would be preferable to break on the punctuation so the pause in
     // speech sounds more natural.
     return chrome.readingMode.getAccessibleBoundary(
-        utteranceText, maxSpeechLength);
-  }
-
-  // crbug.com/400786507- If we can't find a better permanent solution for
-  // long delays between sentences, we should look into using
-  // phrase highlighting and / or other i18n libraries here to reduce
-  // duplication and make this more robust.
-  private isValidSplicePosition(
-      splicePosition: number, spliceCharacter: string, utteranceText: string,
-      maxSpeechLength: number): boolean {
-    if (spliceCharacter !== ',' && spliceCharacter !== '-') {
-      return true;
-    }
-
-    if (splicePosition > 0 && splicePosition < maxSpeechLength) {
-      const previousChar = utteranceText.charAt(splicePosition - 1);
-      const nextChar = utteranceText.charAt(splicePosition + 1);
-      // We shouldn't splice on hyphens between two non-whitespace characters.
-      // e.g. twenty-five or 10-4
-      if (spliceCharacter === '-' && !isWhitespace(previousChar) &&
-          !isWhitespace(nextChar)) {
-        return false;
-      }
-
-      // If the previous and next characters are both numbers, don't splice
-      // here to avoid splicing on numbers like 10,000.
-      if (!isNaN(parseInt(previousChar)) && !isNaN(parseInt(nextChar))) {
-        return false;
-      }
-    }
-    return true;
+        utteranceText, MAX_SPEECH_LENGTH);
   }
 
   private playText(utteranceText: string) {
     // This check is needed due limits of TTS audio for remote voices. See
     // crbug.com/1176078 for more details.
-    // This check is also needed for local voices on Windows, Linux, and Mac
-    // to reduce the delay between sentences. See crbug.com/395909372.
     // Since the TTS bug only impacts remote voices, no need to check for
     // maximum text length if we're using a local voice. If we do somehow
     // attempt to speak text that's too long, this will be able to be handled
     // by listening for a text-too-long error in message.onerror.
-    const isTextTooLong = this.isTextTooLong(utteranceText.length);
+    const isTextTooLong = this.selectedVoice_?.localService ?
+        false :
+        utteranceText.length > MAX_SPEECH_LENGTH;
     const endBoundary = isTextTooLong ?
         this.getAccessibleTextLength(utteranceText) :
         utteranceText.length;
@@ -2006,7 +1769,7 @@ export class AppElement extends AppElementBase {
       // the sentence granularity level, so we'll retrieve these boundaries in
       // message.onEnd instead.
       if (event.name === 'word') {
-        this.updateBoundary(event.charIndex);
+        this.wordBoundaries_.updateBoundary(event.charIndex, event.charLength);
 
         // No need to update the highlight on word boundary events if
         // highlighting is off or if sentence highlighting is used.
@@ -2042,20 +1805,6 @@ export class AppElement extends AppElementBase {
 
     message.onend = () => {
       if (isTextTooLong) {
-        // If we've had to splice the text because it was too long, we
-        // should offset word boundary highlights by how long the previous
-        // part of the text segment was. Otherwise, highlights will always
-        // show on the first part of the segment.
-        // e.g. with the phrase "This is a long sentence." if we splice the
-        // sentence into "This is a long" and "sentence," when we speak
-        // "sentence," we need to offset the highlight by the length of
-        // "This is a long" to ensure that "sentence" is highlighted and "This"
-        // is not.
-        this.wordBoundaryState = {
-          ...this.wordBoundaryState,
-          tooLongTextOffset:
-              this.wordBoundaryState.tooLongTextOffset + endBoundary,
-        };
         // Since our previous utterance was too long, continue speaking pieces
         // of the current utterance until the utterance is complete. The
         // entire utterance is highlighted, so there's no need to update
@@ -2067,7 +1816,7 @@ export class AppElement extends AppElementBase {
       // Now that we've finiished reading this utterance, update the
       // Granularity state to point to the next one Reset the word boundary
       // index whenever we move the granularity position.
-      this.resetToDefaultWordBoundaryState();
+      this.wordBoundaries_.resetToDefaultState();
       chrome.readingMode.movePositionToNextGranularity();
       // Continue speaking with the next block of text.
       if (!this.highlightAndPlayMessage()) {
@@ -2187,56 +1936,12 @@ export class AppElement extends AppElementBase {
     this.stopSpeech(PauseActionSource.DEFAULT);
   }
 
-  updateBoundary(charIndex: number) {
-    this.wordBoundaryState.previouslySpokenIndex =
-        charIndex + this.wordBoundaryState.tooLongTextOffset;
-    this.wordBoundaryState.mode = WordBoundaryMode.BOUNDARY_DETECTED;
-  }
-
-  resetToDefaultWordBoundaryState(
-      possibleWordBoundarySupportChange: boolean = false) {
-    this.wordBoundaryState = {
-      previouslySpokenIndex: 0,
-      // If a boundary has been detected, the mode should be reset to
-      // NO_BOUNDARIES instead of BOUNDARIES_NOT_SUPPORTED because we know
-      // word boundaries are supported- we just need to clear the current
-      // boundary state. This allows us to highlight the next word at the
-      // start of a sentence when playback state changes. However, if there's
-      // been a change that potentially impacts if word boundaries are
-      // supported (such as changing the voice), we should reset to
-      // BOUNDARIES_NOT_SUPPORTED because we don't know yet if word boundaries
-      // are supported for this voice.
-      mode: ((this.wordBoundaryState.mode ===
-              WordBoundaryMode.BOUNDARY_DETECTED) &&
-             !possibleWordBoundarySupportChange) ?
-          WordBoundaryMode.NO_BOUNDARIES :
-          WordBoundaryMode.BOUNDARIES_NOT_SUPPORTED,
-      speechUtteranceStartIndex: 0,
-      tooLongTextOffset: 0,
-    };
-  }
-
-
-  isTextTooLong(textLength: number): boolean {
-    const maxSpeechLength = this.selectedVoice_?.localService ?
-        MAX_SPEECH_LENGTH_FOR_WORD_BOUNDARIES :
-        MAX_SPEECH_LENGTH_FOR_REMOTE_VOICES;
-
-    if (!chrome.readingMode.isChromeOsAsh && this.selectedVoice_ &&
-        isNatural(this.selectedVoice_)) {
-      return textLength > maxSpeechLength;
-    }
-
-    return this.selectedVoice_?.localService ? false :
-                                               textLength > maxSpeechLength;
-  }
-
   private extractTextOf(axNodeIds: number[]): string {
     let utteranceText: string = '';
     for (const nodeId of axNodeIds) {
       const startIndex = chrome.readingMode.getCurrentTextStartIndex(nodeId);
       const endIndex = chrome.readingMode.getCurrentTextEndIndex(nodeId);
-      const element = this.domNodeToAxNodeIdMap_.keyFrom(nodeId);
+      const element = this.nodeStore_.getDomNode(nodeId);
       if (!element || startIndex < 0 || endIndex < 0) {
         continue;
       }
@@ -2250,130 +1955,6 @@ export class AppElement extends AppElementBase {
     return utteranceText;
   }
 
-  highlightCurrentWord() {
-    this.highlightCurrentWordOrPhrase_(false);
-  }
-
-  highlightCurrentPhrase() {
-    this.highlightCurrentWordOrPhrase_(true);
-  }
-
-  // TODO: crbug.com/301131238 - Verify all edge cases.
-  private highlightCurrentWordOrPhrase_(highlightPhrases: boolean) {
-    // Word highlights can be called quite frequently which can create some
-    // misordering, so just make sure we've cleared the prior current word
-    // highlight before showing the next one.
-    this.resetCurrentHighlight();
-    this.resetPreviousHighlight_();
-    const index = this.wordBoundaryState.speechUtteranceStartIndex +
-        this.wordBoundaryState.previouslySpokenIndex;
-    const highlightNodes =
-        chrome.readingMode.getHighlightForCurrentSegmentIndex(
-            index, highlightPhrases);
-    let anyHighlighted: boolean = false;
-    for (const highlightNode of highlightNodes) {
-      const nodeId = highlightNode.nodeId;
-      const highlightLength: number = highlightNode.length;
-      const highlightStartIndex = highlightNode.start;
-      const endIndex = highlightStartIndex + highlightLength;
-      const element = this.domNodeToAxNodeIdMap_.keyFrom(nodeId);
-      if (!element ||
-          isInvalidHighlightForWordHighlighting(
-              element.textContent?.substring(highlightStartIndex, endIndex)
-                  .trim())) {
-        continue;
-      }
-      anyHighlighted = true;
-      this.highlightCurrentText_(
-          highlightStartIndex, endIndex, element as HTMLElement);
-    }
-    if (anyHighlighted) {
-      // Only scroll if at least one node was highlighted.
-      this.scrollHighlightIntoView();
-    }
-  }
-
-  highlightCurrentSentence(
-      nextTextIds: number[], scrollIntoView: boolean = true) {
-    if (nextTextIds.length === 0) {
-      return;
-    }
-
-    this.resetPreviousHighlight_();
-    for (const nodeId of nextTextIds) {
-      const element = this.domNodeToAxNodeIdMap_.keyFrom(nodeId) as HTMLElement;
-      if (!element) {
-        continue;
-      }
-      const start = chrome.readingMode.getCurrentTextStartIndex(nodeId);
-      const end = chrome.readingMode.getCurrentTextEndIndex(nodeId);
-      if ((start < 0) || (end < 0)) {
-        // If the start or end index is invalid, don't use this node.
-        continue;
-      }
-      this.highlightCurrentText_(start, end, element);
-    }
-
-    if (!scrollIntoView) {
-      return;
-    }
-
-    this.scrollHighlightIntoView();
-  }
-
-  private scrollHighlightIntoView() {
-    if (!this.allowAutoScroll_) {
-      if (!this.areHighlightsOnScreen()) {
-        return;
-      }
-
-      // If we scrolled away from the current highlights but speech has
-      // caught up with the new scrolled position, resume autoscrolling.
-      this.allowAutoScroll_ = true;
-    }
-
-    // Ensure all the current highlights are in view.
-    // TODO: crbug.com/40927698 - Handle if the highlight is longer than the
-    // full height of the window (e.g. when font size is very large). Possibly
-    // using word boundaries to know when we've reached the bottom of the
-    // window and need to scroll so the rest of the current highlight is
-    // showing.
-    assert(this.shadowRoot);
-    const currentHighlights = this.shadowRoot.querySelectorAll<HTMLElement>(
-        '.' + currentReadHighlightClass);
-    if (!currentHighlights || !currentHighlights.length) {
-      return;
-    }
-    const firstHighlight = currentHighlights.item(0);
-    const lastHighlight = currentHighlights.item(currentHighlights.length - 1);
-    const highlightBottom = lastHighlight.getBoundingClientRect().bottom;
-    const highlightTop = firstHighlight.getBoundingClientRect().top;
-    const highlightHeight = highlightBottom - highlightTop;
-    if (highlightHeight > (window.innerHeight / 2)) {
-      // If the bottom of the highlight would be offscreen if we center it,
-      // scroll the first highlight to the top instead of centering it.
-      firstHighlight.scrollIntoView({block: 'start'});
-    } else if ((highlightBottom > window.innerHeight) || (highlightTop < 0)) {
-      // Otherwise center the current highlight if part of it would be cut
-      // off.
-      firstHighlight.scrollIntoView({block: 'center'});
-    }
-  }
-
-  private areHighlightsOnScreen(): boolean {
-    assert(this.shadowRoot);
-    const currentHighlights = this.shadowRoot.querySelectorAll<HTMLElement>(
-        '.' + currentReadHighlightClass);
-    if (!currentHighlights || !currentHighlights.length) {
-      return false;
-    }
-
-    const firstHighlight = currentHighlights.item(0);
-    const lastHighlight = currentHighlights.item(currentHighlights.length - 1);
-    return isHtmlElementVisible(firstHighlight) ||
-        isHtmlElementVisible(lastHighlight);
-  }
-
   private defaultUtteranceSettings(): UtteranceSettings {
     const lang = this.speechSynthesisLanguage;
 
@@ -2385,55 +1966,6 @@ export class AppElement extends AppElementBase {
       volume: 1,
       pitch: 1,
     };
-  }
-
-  // The following results in
-  // <span>
-  //   <span class="previous-read-highlight"> prefix text </span>
-  //   <span class="current-read-highlight"> highlighted text </span>
-  //   suffix text
-  // </span>
-  private highlightCurrentText_(
-      highlightStart: number, highlightEnd: number,
-      currentNode: HTMLElement): void {
-    const parentOfHighlight = document.createElement('span');
-    parentOfHighlight.classList.add(parentOfHighlightClass);
-
-    // First pull out any text within this node before the highlighted
-    // section. Since it's already been highlighted, we fade it out.
-    const highlightPrefix =
-        currentNode.textContent!.substring(0, highlightStart);
-    if (highlightPrefix.length > 0) {
-      const prefixNode = document.createElement('span');
-      prefixNode.classList.add(previousReadHighlightClass);
-      prefixNode.textContent = highlightPrefix;
-      this.previousHighlights_.push(prefixNode);
-      parentOfHighlight.appendChild(prefixNode);
-    }
-
-    // Then get the section of text to highlight and mark it for
-    // highlighting.
-    const readingHighlight = document.createElement('span');
-    readingHighlight.classList.add(currentReadHighlightClass);
-    const textNode = document.createTextNode(
-        currentNode.textContent!.substring(highlightStart, highlightEnd));
-    readingHighlight.appendChild(textNode);
-    this.highlightedNodeToOffsetInParent.set(textNode, highlightStart);
-    parentOfHighlight.appendChild(readingHighlight);
-
-    // Finally, append the rest of the text for this node that has yet to be
-    // highlighted.
-    const highlightSuffix = currentNode.textContent!.substring(highlightEnd);
-    if (highlightSuffix.length > 0) {
-      const suffixNode = document.createTextNode(highlightSuffix);
-      this.highlightedNodeToOffsetInParent.set(suffixNode, highlightEnd);
-      parentOfHighlight.appendChild(suffixNode);
-    }
-
-    // Replace the current node in the tree with the split up version of the
-    // node.
-    this.previousHighlights_.push(readingHighlight);
-    this.replaceElement(currentNode, parentOfHighlight);
   }
 
   private onSpeechFinished() {
@@ -2458,57 +1990,8 @@ export class AppElement extends AppElementBase {
       isSpeechBeingRepositioned: false,
     };
 
-    this.clearHighlightFormatting_();
-    this.resetToDefaultWordBoundaryState();
-  }
-
-  private getEffectiveHighlightingGranularity_(): number {
-    // Parse all of the conditions that control highlighting and return the
-    // effective highlighting granularity.
-    const highlight = chrome.readingMode.highlightGranularity;
-
-    if (highlight === chrome.readingMode.noHighlighting ||
-        highlight === chrome.readingMode.sentenceHighlighting) {
-      return highlight;
-    }
-
-    if (this.wordBoundaryState.mode ===
-            WordBoundaryMode.BOUNDARIES_NOT_SUPPORTED ||
-        isEspeak(this.selectedVoice_)) {
-      // Fall back where word highlighting is not possible. Since espeak
-      // boundaries are different than Google TTS word boundaries, fall back
-      // to sentence boundaries in that case too.
-      return chrome.readingMode.sentenceHighlighting;
-    }
-
-    const currentSpeechRate: number = getCurrentSpeechRate();
-
-    if (!chrome.readingMode.isPhraseHighlightingEnabled) {
-      // Choose sentence highlighting for fast voices.
-      if (currentSpeechRate > 1.2 &&
-          highlight === chrome.readingMode.autoHighlighting) {
-        return chrome.readingMode.sentenceHighlighting;
-      }
-
-      // In other cases where phrase highilghting is off, choose word
-      // highlighting.
-      return chrome.readingMode.wordHighlighting;
-    }
-
-    // TODO: crbug.com/364327601 - Check that the language of the page should
-    // be English for phrase highlighting.
-    if (highlight === chrome.readingMode.autoHighlighting) {
-      if (currentSpeechRate <= 0.8) {
-        return chrome.readingMode.wordHighlighting;
-      } else if (currentSpeechRate >= 2.0) {
-        return chrome.readingMode.sentenceHighlighting;
-      } else {
-        return chrome.readingMode.phraseHighlighting;
-      }
-    }
-
-    // In other cases, return what the user selected (i.e. word/phrase).
-    return highlight;
+    this.highlighter_.clearHighlightFormatting();
+    this.wordBoundaries_.resetToDefaultState();
   }
 
   protected onSelectVoice_(
@@ -2530,7 +2013,7 @@ export class AppElement extends AppElementBase {
     // voice pack and use the same TTS engine, therefore, we don't need
     // to reset the word boundary state.
     if (!localesAreIdentical) {
-      this.resetToDefaultWordBoundaryState(
+      this.wordBoundaries_.resetToDefaultState(
           /*possibleWordBoundarySupportChange=*/ true);
     }
 
@@ -2592,46 +2075,6 @@ export class AppElement extends AppElementBase {
     if (playSpeechOnChange) {
       this.playSpeech();
     }
-  }
-
-  // This must be called BEFORE calling
-  // chrome.readingMode.movePositionToPreviousGranularity so we can accurately
-  // determine what's currently being highlighted.
-  private resetPreviousHighlightAndRemoveCurrentHighlight() {
-    this.removeCurrentHighlight();
-    this.resetPreviousHighlight_();
-  }
-
-  // Resets formatting on the current highlight, including previous highlight
-  // formatting.
-  private removeCurrentHighlight() {
-    // The most recent highlight could have been spread across multiple
-    // segments so clear the formatting for all of the segments.
-    for (let i = 0; i < chrome.readingMode.getCurrentText().length; i++) {
-      const lastElement = this.previousHighlights_.pop();
-      if (lastElement) {
-        lastElement.classList.remove(currentReadHighlightClass);
-      }
-    }
-  }
-
-  // Resets the current highlight. Does not change how this element will
-  // be considered for previous highlighting.
-  private resetCurrentHighlight() {
-    const elements =
-        this.shadowRoot?.querySelectorAll('.' + currentReadHighlightClass);
-    elements?.forEach(element => {
-      element.classList.remove(currentReadHighlightClass);
-    });
-  }
-
-  private resetPreviousHighlight_() {
-    this.previousHighlights_.forEach((element) => {
-      if (element) {
-        element.classList.add(previousReadHighlightClass);
-        element.classList.remove(currentReadHighlightClass);
-      }
-    });
   }
 
   restoreSettingsFromPrefs() {
@@ -2808,6 +2251,19 @@ export class AppElement extends AppElementBase {
 
   onTtsEngineInstalled() {
     this.waitingForNewEngine_ = true;
+  }
+
+  onNodeWillBeDeleted(nodeId: number) {
+    const deletedNode = this.nodeStore_.getDomNode(nodeId) as ChildNode;
+    if (deletedNode) {
+      this.nodeStore_.removeDomNode(deletedNode);
+      deletedNode.remove();
+    }
+    const root = this.nodeStore_.getDomNode(chrome.readingMode.rootId);
+    if (this.hasContent_ && !root?.textContent) {
+      this.hasContent_ = false;
+      chrome.readingMode.onNoTextContent();
+    }
   }
 
   languageChanged() {

@@ -499,7 +499,8 @@ public class RootUiCoordinator
                         activityThemeColorSupplier,
                         isTablet,
                         shouldAllowThemingInNightMode(),
-                        shouldAllowBrightThemeColors());
+                        shouldAllowBrightThemeColors(),
+                        shouldAllowThemingOnTablets());
 
         mStatusBarColorController =
                 new StatusBarColorController(
@@ -1147,8 +1148,8 @@ public class RootUiCoordinator
 
     /**
      * @return Whether the {@link MerchantTrustSignalsCoordinator} should be initialized in the
-     * context of this coordinator's UI.
-     **/
+     *     context of this coordinator's UI.
+     */
     protected boolean shouldInitializeMerchantTrustSignals() {
         return false;
     }
@@ -1485,7 +1486,8 @@ public class RootUiCoordinator
                             mOverviewColorSupplier,
                             mReadAloudControllerSupplier,
                             getDesktopWindowStateManager(),
-                            getMultiInstanceManager());
+                            getMultiInstanceManager(),
+                            mTabBookmarkerSupplier);
             if (!mSupportsAppMenuSupplier.getAsBoolean()) {
                 mToolbarManager.getToolbar().disableMenuButton();
             }
@@ -1706,6 +1708,14 @@ public class RootUiCoordinator
 
     /** Whether the top toolbar theme color provider should allow bright theme colors. */
     protected boolean shouldAllowBrightThemeColors() {
+        return false;
+    }
+
+    /**
+     * Whether the top toolbar theme color provider should allow using a web page theme on large
+     * form-factors.
+     */
+    protected boolean shouldAllowThemingOnTablets() {
         return false;
     }
 

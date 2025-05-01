@@ -15,6 +15,9 @@
 #include "chrome/browser/buildflags.h"
 #include "chrome/browser/dom_distiller/dom_distiller_service_factory.h"
 #include "chrome/browser/navigation_predictor/navigation_predictor.h"
+#include "chrome/browser/optimization_guide/model_execution/chrome_on_device_model_service_controller.h"
+#include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
+#include "chrome/browser/optimization_guide/optimization_guide_keyed_service_factory.h"
 #include "chrome/browser/password_manager/chrome_password_manager_client.h"
 #include "chrome/browser/predictors/lcp_critical_path_predictor/lcp_critical_path_predictor_host.h"
 #include "chrome/browser/predictors/network_hints_handler_impl.h"
@@ -40,6 +43,7 @@
 #include "components/live_caption/pref_names.h"
 #include "components/no_state_prefetch/browser/no_state_prefetch_contents.h"
 #include "components/no_state_prefetch/browser/no_state_prefetch_processor_impl.h"
+#include "components/optimization_guide/public/mojom/model_broker.mojom.h"
 #include "components/performance_manager/embedder/binders.h"
 #include "components/performance_manager/embedder/performance_manager_registry.h"
 #include "components/prefs/pref_service.h"
@@ -380,6 +384,18 @@ void BindScreen2xMainContentExtractor(
 }
 #endif
 
+void BindModelBroker(
+    content::RenderFrameHost* frame_host,
+    mojo::PendingReceiver<optimization_guide::mojom::ModelBroker> receiver) {
+  content::BrowserContext* browser_context = frame_host->GetBrowserContext();
+  Profile* profile = Profile::FromBrowserContext(browser_context);
+  OptimizationGuideKeyedService* optimization_guide_service =
+      OptimizationGuideKeyedServiceFactory::GetForProfile(profile);
+  if (optimization_guide_service) {
+    optimization_guide_service->BindModelBroker(std::move(receiver));
+  }
+}
+
 }  // namespace
 
 void PopulateChromeFrameBinders(
@@ -415,6 +431,9 @@ void PopulateChromeFrameBinders(
   map->Add<translate::mojom::ContentTranslateDriver>(
       base::BindRepeating(&translate::BindContentTranslateDriver));
 
+  map->Add<optimization_guide::mojom::ModelBroker>(
+      base::BindRepeating(&BindModelBroker));
+
   if (!base::FeatureList::IsEnabled(blink::features::kLanguageDetectionAPI)) {
     // When the feature is enabled, the driver is bound by
     // browser_interface_binders.cc to make it available to JS execution
@@ -448,8 +467,6 @@ void PopulateChromeFrameBinders(
     map->Add<payments::mojom::PaymentRequest>(base::BindRepeating(
         &ForwardToJavaFrame<payments::mojom::PaymentRequest>));
   }
-  map->Add<blink::mojom::ShareService>(base::BindRepeating(
-      &ForwardToJavaWebContents<blink::mojom::ShareService>));
 
 #if BUILDFLAG(ENABLE_UNHANDLED_TAP)
   map->Add<blink::mojom::UnhandledTapNotifier>(
@@ -476,10 +493,12 @@ void PopulateChromeFrameBinders(
 #endif
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC)
-  if (base::FeatureList::IsEnabled(features::kWebShare)) {
     map->Add<blink::mojom::ShareService>(
         base::BindRepeating(&ShareServiceImpl::Create));
-  }
+#endif
+#if BUILDFLAG(IS_ANDROID)
+    map->Add<blink::mojom::ShareService>(base::BindRepeating(
+        &ForwardToJavaWebContents<blink::mojom::ShareService>));
 #endif
 
   map->Add<network_hints::mojom::NetworkHintsHandler>(

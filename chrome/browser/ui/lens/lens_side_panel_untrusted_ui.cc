@@ -4,17 +4,15 @@
 
 #include "chrome/browser/ui/lens/lens_side_panel_untrusted_ui.h"
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
 
 #include "base/strings/strcat.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/lens/lens_overlay_controller.h"
+#include "chrome/browser/ui/lens/lens_overlay_side_panel_coordinator.h"
 #include "chrome/browser/ui/lens/lens_overlay_theme_utils.h"
+#include "chrome/browser/ui/lens/lens_search_controller.h"
 #include "chrome/browser/ui/webui/searchbox/lens_searchbox_handler.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/branded_strings.h"
@@ -45,10 +43,16 @@ LensSidePanelUntrustedUI::LensSidePanelUntrustedUI(content::WebUI* web_ui)
                                   IDS_LENS_OVERLAY_TOAST_DISMISS_MESSAGE);
   html_source->AddLocalizedString(
       "networkErrorPageTopLine",
-      IDS_SIDE_PANEL_COMPANION_ERROR_PAGE_FIRST_LINE);
+      IDS_SIDE_PANEL_LENS_OVERLAY_GENERIC_ERROR_PAGE_FIRST_LINE);
   html_source->AddLocalizedString(
       "networkErrorPageBottomLine",
-      IDS_SIDE_PANEL_COMPANION_ERROR_PAGE_SECOND_LINE);
+      IDS_SIDE_PANEL_LENS_OVERLAY_GENERIC_ERROR_PAGE_SECOND_LINE);
+  html_source->AddLocalizedString(
+      "protectedErrorPageTopLine",
+      IDS_SIDE_PANEL_LENS_OVERLAY_PROTECTED_PAGE_ERROR_FIRST_LINE);
+  html_source->AddLocalizedString(
+      "protectedErrorPageBottomLine",
+      IDS_SIDE_PANEL_LENS_OVERLAY_PROTECTED_PAGE_ERROR_SECOND_LINE);
   html_source->AddLocalizedString(
       "searchboxGhostLoaderHintTextPrimaryDefault",
       lens::features::ShouldUseAltLoadingHintWeb()
@@ -177,9 +181,16 @@ void LensSidePanelUntrustedUI::BindInterface(
   help_bubble_handler_factory_receiver_.Bind(std::move(receiver));
 }
 
+LensSearchController& LensSidePanelUntrustedUI::GetLensSearchController() {
+  LensSearchController* controller =
+      LensSearchController::FromWebUIWebContents(web_ui()->GetWebContents());
+  CHECK(controller);
+  return *controller;
+}
+
 LensOverlayController& LensSidePanelUntrustedUI::GetLensOverlayController() {
   LensOverlayController* controller =
-      LensOverlayController::GetController(web_ui()->GetWebContents());
+      LensOverlayController::FromWebUIWebContents(web_ui()->GetWebContents());
   CHECK(controller);
   return *controller;
 }
@@ -187,11 +198,12 @@ LensOverlayController& LensSidePanelUntrustedUI::GetLensOverlayController() {
 void LensSidePanelUntrustedUI::CreateSidePanelPageHandler(
     mojo::PendingReceiver<lens::mojom::LensSidePanelPageHandler> receiver,
     mojo::PendingRemote<lens::mojom::LensSidePanelPage> page) {
-  LensOverlayController& controller = GetLensOverlayController();
+  LensSearchController& controller = GetLensSearchController();
 
   // Once the interface is bound, we want to connect this instance with the
-  // appropriate instance of LensOverlayController.
-  controller.BindSidePanel(std::move(receiver), std::move(page));
+  // appropriate instance of LensOverlaySidePanelCoordinator.
+  controller.lens_overlay_side_panel_coordinator()->BindSidePanel(
+      std::move(receiver), std::move(page));
 }
 
 void LensSidePanelUntrustedUI::CreateGhostLoaderPage(

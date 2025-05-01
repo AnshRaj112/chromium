@@ -18,7 +18,6 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabState;
 import org.chromium.chrome.browser.ui.native_page.NativePage;
 import org.chromium.chrome.browser.ui.theme.BrandedColorScheme;
-import org.chromium.components.browser_ui.styles.ChromeColors;
 import org.chromium.ui.util.ColorUtils;
 
 /**
@@ -40,6 +39,9 @@ public class TopUiThemeColorProvider extends ThemeColorProvider {
     /** Whether bright theme colors are allowed. */
     private final boolean mAllowBrightThemeColors;
 
+    /** Whether tab theming is allowed on large screens */
+    private final boolean mAllowThemingOnTablets;
+
     /** Whether or not the default color is used. */
     private boolean mIsDefaultColorUsed;
 
@@ -51,6 +53,7 @@ public class TopUiThemeColorProvider extends ThemeColorProvider {
      * @param allowThemingInNightMode Whether the tab theme should be used when the device is in
      *     night mode.
      * @param allowBrightThemeColors Whether the tab allows bright theme colors.
+     * @param allowThemingOnTablets Whether the tab them should be used on large form-factors.
      */
     public TopUiThemeColorProvider(
             Context context,
@@ -58,7 +61,8 @@ public class TopUiThemeColorProvider extends ThemeColorProvider {
             Supplier<Integer> activityThemeColorSupplier,
             boolean isTablet,
             boolean allowThemingInNightMode,
-            boolean allowBrightThemeColors) {
+            boolean allowBrightThemeColors,
+            boolean allowThemingOnTablets) {
         super(context);
         mContext = context;
         mTabObserver =
@@ -77,6 +81,7 @@ public class TopUiThemeColorProvider extends ThemeColorProvider {
         mIsTablet = isTablet;
         mAllowThemingInNightMode = allowThemingInNightMode;
         mAllowBrightThemeColors = allowBrightThemeColors;
+        mAllowThemingOnTablets = allowThemingOnTablets;
     }
 
     /**
@@ -119,7 +124,7 @@ public class TopUiThemeColorProvider extends ThemeColorProvider {
         // This method is used not only for the current tab but also for
         // any given tab. Therefore it should not alter any class state.
         if (!isUsingTabThemeColor(tab, themeColor)) {
-            themeColor = ChromeColors.getDefaultThemeColor(mContext, tab.isIncognito());
+            themeColor = SurfaceColorUpdateUtils.getDefaultThemeColor(mContext, tab.isIncognito());
             if (isThemingAllowed(tab)) {
                 int customThemeColor = mActivityThemeColorSupplier.get();
                 if (customThemeColor != TabState.UNSPECIFIED_THEME_COLOR) {
@@ -144,12 +149,14 @@ public class TopUiThemeColorProvider extends ThemeColorProvider {
     /**
      * The default background color used for {@link Tab} if the associate web content doesn't
      * specify a background color.
+     *
      * @param tab {@link Tab} object to get the background color for.
      * @return The background color of {@link Tab}.
      */
     public int getBackgroundColor(Tab tab) {
         // This method makes it easy to mock, test-friendly.
-        return ThemeUtils.getBackgroundColor(tab);
+        return SurfaceColorUpdateUtils.getDefaultThemeColor(
+                tab.getContext(), tab.isIncognitoBranded());
     }
 
     /**
@@ -170,9 +177,10 @@ public class TopUiThemeColorProvider extends ThemeColorProvider {
     private boolean isThemingAllowed(Tab tab) {
         boolean disallowDueToNightMode =
                 !mAllowThemingInNightMode && ColorUtils.inNightMode(tab.getContext());
+        final boolean isEligibleFormFactor = mAllowThemingOnTablets || !mIsTablet;
 
         return tab.isThemingAllowed()
-                && !mIsTablet
+                && isEligibleFormFactor
                 && !disallowDueToNightMode
                 && !tab.isNativePage()
                 && !tab.isIncognito();

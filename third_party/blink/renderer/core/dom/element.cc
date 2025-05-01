@@ -250,6 +250,7 @@
 #include "third_party/blink/renderer/platform/wtf/casting.h"
 #include "third_party/blink/renderer/platform/wtf/hash_functions.h"
 #include "third_party/blink/renderer/platform/wtf/text/atomic_string.h"
+#include "third_party/blink/renderer/platform/wtf/text/strcat.h"
 #include "third_party/blink/renderer/platform/wtf/text/string_builder.h"
 #include "third_party/blink/renderer/platform/wtf/text/text_position.h"
 #include "ui/accessibility/ax_mode.h"
@@ -490,11 +491,10 @@ void EnqueueAutofocus(Element& element) {
     window->AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
         mojom::ConsoleMessageSource::kSecurity,
         mojom::ConsoleMessageLevel::kError,
-        String::Format(
-            "Blocked autofocusing on a <%s> element because the element's "
-            "frame "
-            "is sandboxed and the 'allow-scripts' permission is not set.",
-            element.TagQName().ToString().Ascii().c_str())));
+        WTF::StrCat({"Blocked autofocusing on a <",
+                     element.TagQName().ToString(),
+                     "> element because the element's frame is sandboxed and "
+                     "the 'allow-scripts' permission is not set."})));
     return;
   }
 
@@ -508,9 +508,9 @@ void EnqueueAutofocus(Element& element) {
     window->AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
         mojom::ConsoleMessageSource::kSecurity,
         mojom::ConsoleMessageLevel::kError,
-        String::Format("Blocked autofocusing on a <%s> element in a "
-                       "cross-origin subframe.",
-                       element.TagQName().ToString().Ascii().c_str())));
+        WTF::StrCat({"Blocked autofocusing on a <",
+                     element.TagQName().ToString(),
+                     "> element in a cross-origin subframe."})));
     return;
   }
 
@@ -561,25 +561,6 @@ const AtomicString& V8ShadowRootModeToString(V8ShadowRootMode::Enum mode) {
   return keywords::kClosed;
 }
 
-bool IsInsideLayoutSVGHiddenContainer(const LayoutObject* object) {
-  if (!RuntimeEnabledFeatures::
-          RestrictGetBoundingClientRectForHiddenSVGElementsEnabled()) {
-    return false;
-  }
-
-  for (; object; object = object->Parent()) {
-    // Check if the Element's LayoutObject or any ancestor is a
-    // LayoutSVGHiddenContainer
-    if (object->IsSVGHiddenContainer()) {
-      return true;
-    }
-
-    if (IsA<LayoutSVGRoot>(*object)) {
-      break;
-    }
-  }
-  return false;
-}
 }  // namespace
 
 Element::Element(const QualifiedName& tag_name,
@@ -670,7 +651,10 @@ const HeapVector<Member<Node>> Element::ReadingFlowChildren() const {
     }
   }
   // Add all non-reading flow items at the end of the reading flow.
-  for (Node& child : FlatTreeTraversal::ChildrenOf(*this)) {
+  // We use LayoutTreeBuilder traversal to make sure all pseudo elements
+  // (including scroll markers) are accounted for.
+  for (Node* child = LayoutTreeBuilderTraversal::FirstChild(*this); child;
+       child = LayoutTreeBuilderTraversal::NextSibling(*child)) {
     // TODO(dizhangg) this check is O(n^2)
     if (!children.Contains(child)) {
       children.push_back(child);
@@ -1594,6 +1578,34 @@ bool Element::InterestLost(Element& interest_target) {
 }
 
 void Element::DefaultEventHandler(Event& event) {
+  if (GetInterestState() != Element::InterestState::kNoInterest) [[unlikely]] {
+    CHECK(RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
+        GetDocument().GetExecutionContext()));
+    if (auto* keyboard_event = DynamicTo<KeyboardEvent>(event);
+        keyboard_event && event.type() == event_type_names::kKeydown) {
+      const int modifiers =
+          keyboard_event->GetModifiers() & blink::WebInputEvent::kKeyModifiers;
+      auto* target = InterestTargetElement();
+      if (GetInterestState() == Element::InterestState::kPartialInterest &&
+          keyboard_event->key() == keywords::kArrowUp &&
+          modifiers == WebInputEvent::kAltKey) {
+        // Hitting the hotkey (Alt-UpArrow) on an invoker that has partial
+        // interest causes interest to be "upgraded" to full interest. It also
+        // focuses the first focusable element within the target.
+        ChangeInterestState(target, InterestState::kFullInterest);
+        if (Element* first_focusable = target->GetFocusDelegate()) {
+          first_focusable->Focus();
+        }
+        event.SetDefaultHandled();
+        return;
+      } else if (keyboard_event->key() == keywords::kEscape && !modifiers) {
+        if (GainOrLoseInterest(this, target, InterestState::kNoInterest)) {
+          event.SetDefaultHandled();
+          return;
+        }
+      }
+    }
+  }
   ContainerNode::DefaultEventHandler(event);
 }
 
@@ -2816,8 +2828,14 @@ void Element::ClientQuads(Vector<gfx::QuadF>& quads) const {
     // TODO(pdr): ObjectBoundingBox does not include stroke and the spec is not
     // clear (see: https://github.com/w3c/svgwg/issues/339, crbug.com/529734).
     // If stroke is desired, we can update this to use AbsoluteQuads, below.
-    if (IsA<SVGGraphicsElement>(svg_element) &&
-        !IsInsideLayoutSVGHiddenContainer(element_layout_object)) {
+    if (const auto* svg_graphics_element =
+            DynamicTo<SVGGraphicsElement>(this)) {
+      if (RuntimeEnabledFeatures::
+              RestrictGetBoundingClientRectForHiddenSVGElementsEnabled() &&
+          svg_graphics_element->IsNonRendered(element_layout_object)) {
+        return;
+      }
+
       quads.push_back(element_layout_object->LocalToAbsoluteQuad(
           gfx::QuadF(element_layout_object->ObjectBoundingBox())));
     }
@@ -7260,11 +7278,48 @@ bool Element::IsKeyboardFocusableScroller(
   return true;
 }
 
+// TODO(crbug.com/326681249): Should `tabindex` take precedence?
+bool Element::IsInPartialInterestPopover() const {
+  if (!RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
+          GetDocument().GetExecutionContext())) {
+    return false;
+  }
+  for (const ContainerNode* node = this; node;
+       node = FlatTreeTraversal::Parent(*node)) {
+    auto* element = DynamicTo<Element>(node);
+    if (!element) {
+      continue;
+    }
+    Element* invoker = element->GetInterestInvoker();
+    if (!invoker) {
+      continue;
+    }
+    // At this point, we are at the target of an interest invoker. Return true
+    // if this is an open popover and it has partial interest. False otherwise.
+    if (auto* html_element = DynamicTo<HTMLElement>(element);
+        html_element && html_element->popoverOpen() &&
+        invoker->GetInterestState() == InterestState::kPartialInterest) {
+      DCHECK_EQ(invoker->InterestTargetElement(), html_element);
+      return true;
+    }
+    return false;
+  }
+  return false;
+}
+
 bool Element::IsKeyboardFocusableSlow(UpdateBehavior update_behavior) const {
   FocusableState focusable_state = Element::IsFocusableState(update_behavior);
   if (focusable_state == FocusableState::kNotFocusable) {
     return false;
   }
+
+  // Interest invoker targets with partial interest aren't keyboard focusable.
+  if (IsInPartialInterestPopover()) {
+    CHECK(RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
+        GetDocument().GetExecutionContext()));
+    return false;
+  }
+
   // If the element has a tabindex, then that determines keyboard
   // focusability.
   if (HasElementFlag(ElementFlags::kTabIndexWasSetExplicitly)) {
@@ -7865,8 +7920,8 @@ void Element::setOuterHTML(const String& html,
   if (!parent) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kNoModificationAllowedError,
-        "This element's parent is of type '" + p->nodeName() +
-            "', which is not an element node.");
+        WTF::StrCat({"This element's parent is of type '", p->nodeName(),
+                     "', which is not an element node."}));
     return;
   }
 
@@ -7938,9 +7993,9 @@ Node* Element::InsertAdjacent(const String& where,
 
   exception_state.ThrowDOMException(
       DOMExceptionCode::kSyntaxError,
-      "The value provided ('" + where +
-          "') is not one of 'beforeBegin', 'afterBegin', "
-          "'beforeEnd', or 'afterEnd'.");
+      WTF::StrCat({"The value provided ('", where,
+                   "') is not one of 'beforeBegin', 'afterBegin', "
+                   "'beforeEnd', or 'afterEnd'."}));
   return nullptr;
 }
 
@@ -8073,9 +8128,9 @@ static Node* ContextNodeForInsertion(const String& where,
   }
   exception_state.ThrowDOMException(
       DOMExceptionCode::kSyntaxError,
-      "The value provided ('" + where +
-          "') is not one of 'beforeBegin', 'afterBegin', "
-          "'beforeEnd', or 'afterEnd'.");
+      WTF::StrCat({"The value provided ('", where,
+                   "') is not one of 'beforeBegin', 'afterBegin', "
+                   "'beforeEnd', or 'afterEnd'."}));
   return nullptr;
 }
 
@@ -8935,7 +8990,7 @@ PseudoElement* Element::CreatePseudoElementIfNeeded(
     return nullptr;
   }
 
-  if (pseudo_id == kPseudoIdBackdrop) {
+  if (pseudo_id == kPseudoIdBackdrop && IsInTopLayer()) {
     GetDocument().AddToTopLayer(pseudo_element, this);
   }
 
@@ -8971,6 +9026,11 @@ PseudoElement* Element::GetPseudoElement(
 bool Element::HasViewTransitionGroupChildren() const {
   ElementRareDataVector* data = GetElementRareData();
   return data && data->HasViewTransitionGroupPseudoElement();
+}
+
+bool Element::HasScrollButtonOrMarkerGroupPseudos() const {
+  ElementRareDataVector* data = GetElementRareData();
+  return data && data->HasScrollButtonOrMarkerGroupPseudos();
 }
 
 Element* Element::GetStyledPseudoElement(
@@ -9297,7 +9357,11 @@ bool Element::CanGeneratePseudoElement(PseudoId pseudo_id) const {
     auto is_option_in_appearance_base_select = [](const Element* e) {
       if (const auto* option = DynamicTo<HTMLOptionElement>(e)) {
         if (const HTMLSelectElement* select = option->OwnerSelectElement()) {
-          return select->IsAppearanceBasePicker();
+          if (select->UsesMenuList()) {
+            return select->IsAppearanceBasePicker();
+          } else {
+            return select->IsAppearanceBase();
+          }
         }
       }
       return false;
@@ -10757,9 +10821,6 @@ void Element::ScheduleInterestGainedTask(InterestState new_state) {
 }
 
 void Element::ScheduleInterestLostTask() {
-  // This should be called on an interest invoker only.
-  auto* target = InterestTargetElement();
-  CHECK(target);
   const ComputedStyle* style =
       ComputedStyle::NullifyEnsured(GetComputedStyle());
   if (!style) {
@@ -10782,7 +10843,8 @@ void Element::ScheduleInterestLostTask() {
           [](Element* invoker, Element* target) {
             GainOrLoseInterest(invoker, target, InterestState::kNoInterest);
           },
-          WrapWeakPersistent(this), WrapWeakPersistent(target)),
+          WrapWeakPersistent(this),
+          WrapWeakPersistent(InterestTargetElement())),
       base::Seconds(hide_delay_seconds)));
 }
 
@@ -10802,14 +10864,14 @@ Element* Element::GetInterestInvoker() const {
 }
 
 Element::InterestState Element::GetInterestState() {
-  CHECK(RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
-      GetDocument().GetExecutionContext()));
-
+  if (!RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
+          GetDocument().GetExecutionContext())) {
+    return InterestState::kNoInterest;
+  }
   auto* invoker_data = GetInvokerData();
   if (!invoker_data) {
     return InterestState::kNoInterest;
   }
-  CHECK(InterestTargetElement());
   return invoker_data->GetInterestState();
 }
 
@@ -10885,13 +10947,14 @@ void Element::HandleInterestTargetHoverOrFocus(InterestTargetSource source) {
   } else {
     DCHECK(source == InterestTargetSource::kDeHover ||
            source == InterestTargetSource::kBlurElementChain);
-    if (invoker_data && invoker_data->GetInterestState() !=
-                            InterestState::kNoInterest) [[unlikely]] {
-      // This is an active interest invoker which was just de-hovered or
-      // blurred. Cancel any pending InterestGained tasks, and schedule an
-      // InterestLost task if needed.
+    if (invoker_data) [[unlikely]] {
+      // This is an interest invoker which was just de-hovered or blurred.
+      // Cancel any pending InterestGained tasks, and (if the invoker already
+      // has interest) schedule an InterestLost task.
       invoker_data->CancelInterestGainedTask();
-      ScheduleInterestLostTask();
+      if (invoker_data->GetInterestState() != InterestState::kNoInterest) {
+        ScheduleInterestLostTask();
+      }
     }
     if (upstream_invoker) [[unlikely]] {
       // This is the target of an interest invoker, which was just de-hovered or

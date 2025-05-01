@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "chrome/browser/ui/browser_element_identifiers.h"
+#include "chrome/browser/ui/tabs/test/tab_strip_interactive_test_mixin.h"
 #include "chrome/browser/ui/views/tabs/tab.h"
 #include "chrome/browser/ui/views/tabs/tab_strip.h"
 #include "chrome/test/base/in_process_browser_test.h"
@@ -26,7 +27,8 @@ constexpr char kDocumentWithTitle[] = "/title3.html";
 
 }  // namespace
 
-class TabStripInteractiveUiTest : public InteractiveBrowserTest {
+class TabStripInteractiveUiTest
+    : public TabStripInteractiveTestMixin<InteractiveBrowserTest> {
  public:
   ~TabStripInteractiveUiTest() override = default;
 
@@ -43,21 +45,6 @@ class TabStripInteractiveUiTest : public InteractiveBrowserTest {
   void TearDownOnMainThread() override {
     EXPECT_TRUE(embedded_test_server()->ShutdownAndWaitUntilComplete());
     InteractiveBrowserTest::TearDownOnMainThread();
-  }
-
-  MultiStep FinishTabstripAnimations() {
-    return Steps(WaitForShow(kTabStripElementId),
-                 WithView(kTabStripElementId, [](TabStrip* tab_strip) {
-                   tab_strip->StopAnimating(true);
-                 }));
-  }
-
-  auto HoverTabAt(int index) {
-    const char kTabToHover[] = "Tab to hover";
-    return Steps(
-        FinishTabstripAnimations(),
-        NameDescendantViewByType<Tab>(kTabStripElementId, kTabToHover, index),
-        MoveMouseTo(kTabToHover));
   }
 };
 
@@ -87,20 +74,14 @@ IN_PROC_BROWSER_TEST_F(TabStripInteractiveUiTest, SelectionAndDeselection) {
       NavigateWebContents(kFirstTabContents, test_url),
       AddInstrumentedTab(kSecondTabContents, test_url),
       AddInstrumentedTab(kThirdTabContents, test_url),
-      SelectTab(kTabStripElementId, 0), HoverTabAt(1), Do([]() {
-        const int accelerator_key =
+      SelectTab(kTabStripElementId, 0), HoverTabAt(1),
+      ClickMouse(ui_controls::LEFT, /*release =*/true,
 #if BUILDFLAG(IS_MAC)
-            ui_controls::AcceleratorState::kCommand;
+                 ui_controls::AcceleratorState::kCommand
 #else
-            ui_controls::AcceleratorState::kControl;
+                 ui_controls::AcceleratorState::kControl
 #endif
-        ui_controls::SendMouseEvents(ui_controls::LEFT,
-                                     ui_controls::MouseButtonState::DOWN,
-                                     accelerator_key);
-        ui_controls::SendMouseEvents(ui_controls::LEFT,
-                                     ui_controls::MouseButtonState::UP,
-                                     accelerator_key);
-      }),
+                 ),
       HoverTabAt(2),
       PollState(
           kTabSelectedState,

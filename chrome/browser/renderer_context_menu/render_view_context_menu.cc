@@ -96,6 +96,7 @@
 #include "chrome/browser/ui/exclusive_access/keyboard_lock_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_entry_point_controller.h"
+#include "chrome/browser/ui/lens/lens_search_controller.h"
 #include "chrome/browser/ui/passwords/ui_utils.h"
 #include "chrome/browser/ui/profiles/profile_colors_util.h"
 #include "chrome/browser/ui/profiles/profile_view_utils.h"
@@ -4395,7 +4396,7 @@ void RenderViewContextMenu::OpenLensOverlayWithPreselectedRegion(
   auto scaled_region_bounds =
       gfx::ScaleToEnclosedRect(region_bounds, 1.f / device_scale_factor);
   LensOverlayController* const controller =
-      LensOverlayController::GetController(source_web_contents_);
+      LensOverlayController::FromTabWebContents(source_web_contents_);
   CHECK(controller);
   controller->ShowUIWithPendingRegion(
       lens::LensOverlayInvocationSource::kContentAreaContextMenuImage,
@@ -4427,10 +4428,10 @@ void RenderViewContextMenu::ExecRegionSearch(
       lens::RecordAmbientSearchQuery(
           lens::AmbientSearchEntryPoint::
               CONTEXT_MENU_SEARCH_REGION_WITH_LENS_OVERLAY);
-      LensOverlayController* const controller =
-          LensOverlayController::GetController(embedder_web_contents_);
+      LensSearchController* const controller =
+          LensSearchController::FromTabWebContents(embedder_web_contents_);
       CHECK(controller);
-      controller->ShowUI(
+      controller->OpenLensOverlay(
           lens::LensOverlayInvocationSource::kContentAreaContextMenuPage);
       return;
     }
@@ -4559,8 +4560,7 @@ void RenderViewContextMenu::ExecReloadPackagedApp() {
   DCHECK(platform_app);
   DCHECK(platform_app->is_platform_app());
 
-  extensions::ExtensionSystem::Get(browser_context_)
-      ->extension_service()
+  extensions::ExtensionRegistrar::Get(browser_context_)
       ->ReloadExtension(platform_app->id());
 }
 

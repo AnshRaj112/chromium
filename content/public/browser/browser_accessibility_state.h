@@ -47,7 +47,10 @@ class CONTENT_EXPORT BrowserAccessibilityState {
   // WebContents (colloquially referred to as the "target" of the scoper).
   // Creation and deletion of a scoper will each result in recomputation of the
   // effective accessibility mode for its target. If the effective mode changes,
-  // WebContentses associated with the target will be notified.
+  // WebContentses associated with the target will be notified. Calls that are
+  // made in response to signals from the platform accessibility integration
+  // (e.g., enabling accessibility when VoiceOver is detected) must include the
+  // `AXMode::kFromPlatform` flag in addition to other flags.
   virtual std::unique_ptr<ScopedAccessibilityMode> CreateScopedModeForProcess(
       ui::AXMode mode) = 0;
   virtual std::unique_ptr<ScopedAccessibilityMode>
@@ -56,20 +59,6 @@ class CONTENT_EXPORT BrowserAccessibilityState {
   virtual std::unique_ptr<ScopedAccessibilityMode>
   CreateScopedModeForWebContents(WebContents* web_contents,
                                  ui::AXMode mode) = 0;
-
-  // Note: Prefer the three methods above to add/remove mode flags, as they
-  // allow callers to do so without interfering with other controllers of
-  // accessibility. The methods below effectively modify a single
-  // `ScopedAccessibilityMode` instance targeting the whole process, and put
-  // callers at risk of stepping on one another.
-
-  // DEPRECATED. Adds the given accessibility mode flags to the process,
-  // impacting all WebContents.
-  virtual void AddAccessibilityModeFlags(ui::AXMode mode) = 0;
-
-  // DEPRECATED. Remove the given accessibility mode flags from the current
-  // accessibility mode bitmap.
-  virtual void RemoveAccessibilityModeFlags(ui::AXMode mode) = 0;
 
   // Some platforms have a strong signal indicating the presence of a
   // screen reader and can call in to let us know when one has
@@ -95,6 +84,14 @@ class CONTENT_EXPORT BrowserAccessibilityState {
   // want to ensure that the AXMode is not changed after a certain point.
   virtual void SetAXModeChangeAllowed(bool allow) = 0;
   virtual bool IsAXModeChangeAllowed() const = 0;
+
+  // Enables or disables activation of accessibility from interactions with the
+  // platform's accessibility integration. Such activations are disabled by
+  // default in tests; specifically, mode changes via calls to
+  // `CreateScopedModeForProcess()` are ignored when the `AXMode` contains the
+  // `AXMode::kFromPlatform` flag.
+  virtual void SetActivationFromPlatformEnabled(bool enabled) = 0;
+  virtual bool IsActivationFromPlatformEnabled() = 0;
 
   // Notifies web contents that preferences have changed.
   virtual void NotifyWebContentsPreferencesChanged() const = 0;

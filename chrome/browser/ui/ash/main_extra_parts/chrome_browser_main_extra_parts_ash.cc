@@ -212,7 +212,8 @@ void ChromeBrowserMainExtraPartsAsh::PreProfileInit() {
   ash::NetworkConnect::Initialize(network_connect_delegate_.get());
 
   cast_config_controller_media_router_ =
-      std::make_unique<CastConfigControllerMediaRouter>();
+      std::make_unique<CastConfigControllerMediaRouter>(
+          g_browser_process->GetFeatures()->application_locale_storage());
 
   // This controller MUST be initialized before the UI (AshShellInit) is
   // constructed. The video conferencing views will observe and have their own
@@ -380,9 +381,7 @@ void ChromeBrowserMainExtraPartsAsh::PreProfileInit() {
           g_browser_process->GetFeatures()->application_locale_storage(),
           g_browser_process->shared_url_loader_factory());
 
-  if (base::FeatureList::IsEnabled(ash::features::kReadaheadForLogin)) {
-    login_readahead_performer_.emplace(ash::SessionManagerClient::Get());
-  }
+  login_readahead_performer_.emplace(ash::SessionManagerClient::Get());
 }
 
 void ChromeBrowserMainExtraPartsAsh::PostProfileInit(Profile* profile,
@@ -452,7 +451,8 @@ void ChromeBrowserMainExtraPartsAsh::PostProfileInit(Profile* profile,
 
   if (ash::features::IsGraduationEnabled()) {
     graduation_manager_ =
-        std::make_unique<ash::graduation::GraduationManagerImpl>();
+        std::make_unique<ash::graduation::GraduationManagerImpl>(
+            g_browser_process->GetFeatures()->application_locale_storage());
   }
 
   browser_controller_ = std::make_unique<ash::BrowserControllerImpl>();

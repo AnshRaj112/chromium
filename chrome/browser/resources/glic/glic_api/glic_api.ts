@@ -180,6 +180,11 @@ export declare interface GlicBrowserHost {
       (params: ActInFocusedTabParams): Promise<ActInFocusedTabResult>;
 
   /**
+   * Stops an actor task in the browser if one exists. No-op otherwise.
+   */
+  stopActorTask?(): void;
+
+  /**
    * Requests the host to capture a screenshot. The choice of the screenshot
    * target is made by the host, possibly allowing the user to choose between a
    * desktop, window or arbitrary region.
@@ -399,10 +404,10 @@ export declare interface GlicBrowserHost {
 
   /**
    * Opens the OS permission settings page for the given permission type.
-   * Supports `media` for microphone and `geolocation` for location. This
-   * function is available when running on Mac.
+   * Supports `media` for microphone and `geolocation` for location.
+   * @throws {Error} if the permission type is not supported.
    */
-  openOsPermissionSettingsMenu?(permission: string): void;
+  openOsPermissionSettingsMenu?(permission: OsPermissionType): void;
 
   /**
    * Get the status of the OS Microphone permission currently granted to Chrome.
@@ -426,6 +431,8 @@ export declare interface GlicBrowserHost {
   getZeroStateSuggestionsForFocusedTab?
       (is_first_run?: boolean): Promise<ZeroStateSuggestions>;
 }
+/** Fields of interest from the system settings page. */
+export type OsPermissionType = 'media'|'geolocation';
 
 /** Fields of interest from the Glic settings page. */
 export enum SettingsPageField {
@@ -578,7 +585,12 @@ export declare interface PanelOpeningData {
    * The state of the panel as it's being opened.
    */
   panelState?: PanelState;
-  /** Indicates the entry point used to trigger the opening of the panel. */
+  /**
+   * Indicates the entry point used to trigger the opening of the panel.
+   * In the event the web client's page is reloaded, the new web client will
+   * receive a notifyPanelWillOpen call with the same invocation source as
+   * before, even though the user did not, for example, click a button again.
+   */
   invocationSource?: InvocationSource;
 }
 
@@ -936,9 +948,12 @@ export declare interface ScrollToSelector {
   exactText?: ScrollToTextSelector;
 
   /**
-   * Text fragment selector, see ScrollToTextFragmentSelector for more details
+   * Text fragment selector, see ScrollToTextFragmentSelector for more details.
    */
   textFragment?: ScrollToTextFragmentSelector;
+
+  /** Node selector, see ScrollToNodeSelector for more details. */
+  node?: ScrollToNodeSelector;
 }
 
 /**
@@ -977,6 +992,20 @@ export declare interface ScrollToTextFragmentSelector {
    * in components/optimization_guide/proto/features/common_quality_data.proto.
    */
   searchRangeStartNodeId?: number;
+}
+
+/**
+ * scrollTo() selector to select all text inside a specific node (corresponding
+ * to the provided nodeId). documentId must also be specified in ScrollToParams
+ * when this selector is used.
+ */
+export declare interface ScrollToNodeSelector {
+  /**
+   * Value should be obtained from common_ancestor_dom_node_id in
+   * ContentAttributes (see
+   * components/optimization_guide/proto/features/common_quality_data.proto)
+   */
+  nodeId: number;
 }
 
 /** Error type used for scrollTo(). */
@@ -1068,7 +1097,7 @@ export declare interface UserProfileInfo {
   localProfileName?: string;
   /** The profile email. */
   email: string;
-  /** Whether the profile or the browser is managed. */
+  /** Whether the profile's signed-in account is a managed account. */
   isManaged?: boolean;
 }
 
@@ -1151,6 +1180,7 @@ export interface BackwardsCompatibleTypes {
   webClient: GlicWebClient;
   webPageData: WebPageData;
   openSettingsOptions: OpenSettingsOptions;
+  osPermissionType: OsPermissionType;
   zeroStateSuggestions: ZeroStateSuggestions;
 }
 

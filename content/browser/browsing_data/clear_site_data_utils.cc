@@ -89,8 +89,7 @@ class SiteDataClearer : public BrowsingDataRemover::Observer {
               BrowsingDataFilterBuilder::Mode::kDelete));
       cookie_filter_builder->AddRegisterableDomain(domain);
       cookie_filter_builder->SetCookiePartitionKeyCollection(
-          net::CookiePartitionKeyCollection::FromOptional(
-              cookie_partition_key_));
+          net::CookiePartitionKeyCollection(cookie_partition_key_));
       cookie_filter_builder->SetPartitionedCookiesOnly(
           partitioned_state_allowed_only_);
       if (storage_partition_config_.has_value()) {
@@ -143,6 +142,14 @@ class SiteDataClearer : public BrowsingDataRemover::Observer {
 
     if (clear_site_data_types_.Has(ClearSiteDataType::kCache)) {
       remove_mask |= BrowsingDataRemover::DATA_TYPE_CACHE;
+    }
+
+    if (clear_site_data_types_.Has(ClearSiteDataType::kPrefetchCache)) {
+      remove_mask |= BrowsingDataRemover::DATA_TYPE_PREFETCH_CACHE;
+    }
+
+    if (clear_site_data_types_.Has(ClearSiteDataType::kPrerenderCache)) {
+      remove_mask |= BrowsingDataRemover::DATA_TYPE_PRERENDER_CACHE;
     }
 
     if (remove_mask) {

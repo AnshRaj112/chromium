@@ -4,6 +4,7 @@
 
 #include "components/update_client/request_sender.h"
 
+#include <optional>
 #include <utility>
 
 #include "base/base64.h"
@@ -113,7 +114,8 @@ void RequestSender::SendInternal() {
         FROM_HERE,
         base::BindOnce(&RequestSender::SendInternalComplete, this,
                        static_cast<int>(ProtocolError::URL_FETCHER_FAILED),
-                       std::string(), std::string(), std::string(), 0));
+                       std::string(), std::string(), std::string(),
+                       std::string(), 0));
     return;
   }
   network_fetcher_->PostRequest(
@@ -128,6 +130,7 @@ void RequestSender::SendInternalComplete(
     const std::string& response_body,
     const std::string& response_etag,
     const std::string& response_cup_server_proof,
+    const std::string& response_cookie,
     int retry_after_sec) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   VLOG(2) << "Omaha response received: " << response_body;
@@ -174,10 +177,11 @@ void RequestSender::OnResponseStarted(int response_code,
 
 void RequestSender::OnNetworkFetcherComplete(
     const GURL& original_url,
-    std::unique_ptr<std::string> response_body,
+    std::optional<std::string> response_body,
     int net_error,
     const std::string& header_etag,
     const std::string& xheader_cup_server_proof,
+    const std::string& header_cookie,
     int64_t xheader_retry_after_sec) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
@@ -200,8 +204,9 @@ void RequestSender::OnNetworkFetcherComplete(
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE,
       base::BindOnce(&RequestSender::SendInternalComplete, this, error,
-                     response_body ? *response_body : std::string(),
-                     header_etag, xheader_cup_server_proof, retry_after_sec));
+                     std::move(response_body).value_or(std::string()),
+                     header_etag, xheader_cup_server_proof, header_cookie,
+                     retry_after_sec));
 }
 
 void RequestSender::HandleSendError(int error, int retry_after_sec) {

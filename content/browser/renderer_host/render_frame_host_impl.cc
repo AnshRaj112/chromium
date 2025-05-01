@@ -1178,9 +1178,6 @@ bool CoopSuppressOpener(const RenderFrameHostImpl* opener) {
   switch (opener->GetMainFrame()->cross_origin_opener_policy().value) {
     case network::mojom::CrossOriginOpenerPolicyValue::kUnsafeNone:
     case network::mojom::CrossOriginOpenerPolicyValue::kSameOriginAllowPopups:
-    case network::mojom::CrossOriginOpenerPolicyValue::kRestrictProperties:
-    case network::mojom::CrossOriginOpenerPolicyValue::
-        kRestrictPropertiesPlusCoep:
     case network::mojom::CrossOriginOpenerPolicyValue::kNoopenerAllowPopups:
       return false;
 
@@ -1688,96 +1685,102 @@ void RecordNavigationTraceEventsAndMetrics(
   log_trace_event_and_uma(top_level_trace_event_name, track1, timeline.start,
                           timeline.finish, /*histogram_name=*/"Total");
 
-  // It's possible that there was no CommitNavigation IPC sent. This can happen
-  // for synchronous renderer commits (e.g., renderer-initiated same-document
-  // navigations), where browser only finds out about the navigation from the
-  // DidCommit IPC and creates a NavigationRequest at that time, as well as for
-  // page activations (e.g., restoring from back-forward cache). In those cases,
-  // breaking the navigation down into finer-grained slices is not yet supported
-  // and potentially less useful, so just return early after logging a top-level
-  // event for the navigation above.
-  //
-  // TODO(crbug.com/409589669): Record a better renderer-side start time for
-  // synchronous renderer commits and create an additional tracing slice for the
-  // renderer-side work involved in synchronous navigations.
-  if (timeline.commit_ipc_sent.is_null()) {
-    return;
-  }
+  if (!timeline.begin_navigation.is_null()) {
+    // Most navigations (other than synchronous renderer commits) go through
+    // BeginNavigation and the phases below. This includes page activations like
+    // bfcache and prerender, which do not send commit IPCs.
 
-  // Record Start -> {BeforeUnloadPhase1} -> NavigationRequest.
-  if (!timeline.beforeunload_phase1_start.is_null()) {
-    log_trace_event_and_uma("StartToBeforeUnloadPhase1", track1, timeline.start,
-                            timeline.beforeunload_phase1_start);
-    log_trace_event_and_uma("BeforeUnloadPhase1", track1,
-                            timeline.beforeunload_phase1_start,
-                            timeline.beforeunload_phase1_end);
-    log_trace_event_and_uma("BeforeUnloadPhase1ToNavigationRequestCreation",
-                            track1, timeline.beforeunload_phase1_end,
-                            timeline.navigation_request_creation);
-  } else {
-    log_trace_event_and_uma("StartToNavigationRequestCreation", track1,
-                            timeline.start,
-                            timeline.navigation_request_creation);
-  }
-
-  // Record NavigationRequest -> {BeforeUnloadPhase2} -> BeginNavigation.
-  if (!timeline.beforeunload_phase2_start.is_null()) {
-    log_trace_event_and_uma("NavigationRequestToBeforeUnloadPhase2", track1,
-                            timeline.navigation_request_creation,
-                            timeline.beforeunload_phase2_start);
-    log_trace_event_and_uma("BeforeUnloadPhase2", track1,
-                            timeline.beforeunload_phase2_start,
-                            timeline.beforeunload_phase2_end);
-    log_trace_event_and_uma("BeforeUnloadPhase2ToBeginNavigation", track1,
-                            timeline.beforeunload_phase2_end,
-                            timeline.begin_navigation);
-  } else {
-    log_trace_event_and_uma("NavigationRequestToBeginNavigation", track1,
-                            timeline.navigation_request_creation,
-                            timeline.begin_navigation);
-  }
-
-  // For navigations that don't use a URLLoader, such as about:blank
-  // navigations, record a single interval from BeginNavigation to sending the
-  // CommitNavigation IPC, which will include choosing the target SiteInstance
-  // WillCommitWithoutUrlLoader throttle processing, etc. Do the same for
-  // navigations that encounter an error and never see a response from the
-  // loader. Otherwise, break down the URL loading into several finer-grained
-  // intervals.
-  if (timeline.loader_start.is_null() || timeline.receive_response.is_null()) {
-    log_trace_event_and_uma("BeginNavigationToCommit", track1,
-                            timeline.begin_navigation,
-                            timeline.commit_ipc_sent);
-  } else {
-    log_trace_event_and_uma("BeginNavigationToLoaderStart", track1,
-                            timeline.begin_navigation, timeline.loader_start);
-    log_trace_event_and_uma("LoaderStartToReceiveResponse", track1,
-                            timeline.loader_start, timeline.receive_response);
-
-    // Generate the nested loader events contained within
-    // LoaderStartToReceiveResponse. `loader_fetch_start` can be earlier than
-    // `loader_start` when Prefetch or Prerendering is enabled. Don't record
-    // metrics or traces in such cases to avoid skewing the data.
-    if (timeline.loader_start <= timeline.loader_fetch_start) {
-      log_trace_event_and_uma("LoaderStartToFetchStart", track1,
-                              timeline.loader_start,
-                              timeline.loader_fetch_start);
-      log_trace_event_and_uma("FetchStartToReceiveHeaders", track1,
-                              timeline.loader_fetch_start,
-                              timeline.loader_receive_headers);
-      // TODO(alexmos): add events for redirects when they are present.
-      log_trace_event_and_uma("ReceiveHeadersToReceiveResponse", track1,
-                              timeline.loader_receive_headers,
-                              timeline.receive_response);
+    // Record Start -> {BeforeUnloadPhase1} -> NavigationRequest.
+    if (!timeline.beforeunload_phase1_start.is_null()) {
+      log_trace_event_and_uma("StartToBeforeUnloadPhase1", track1,
+                              timeline.start,
+                              timeline.beforeunload_phase1_start);
+      log_trace_event_and_uma("BeforeUnloadPhase1", track1,
+                              timeline.beforeunload_phase1_start,
+                              timeline.beforeunload_phase1_end);
+      log_trace_event_and_uma("BeforeUnloadPhase1ToNavigationRequestCreation",
+                              track1, timeline.beforeunload_phase1_end,
+                              timeline.navigation_request_creation);
+    } else {
+      log_trace_event_and_uma("StartToNavigationRequestCreation", track1,
+                              timeline.start,
+                              timeline.navigation_request_creation);
     }
 
-    log_trace_event_and_uma("ReceiveResponseToCommit", track1,
-                            timeline.receive_response,
-                            timeline.commit_ipc_sent);
+    // Record NavigationRequest -> {BeforeUnloadPhase2} -> BeginNavigation.
+    if (!timeline.beforeunload_phase2_start.is_null()) {
+      log_trace_event_and_uma("NavigationRequestToBeforeUnloadPhase2", track1,
+                              timeline.navigation_request_creation,
+                              timeline.beforeunload_phase2_start);
+      log_trace_event_and_uma("BeforeUnloadPhase2", track1,
+                              timeline.beforeunload_phase2_start,
+                              timeline.beforeunload_phase2_end);
+      log_trace_event_and_uma("BeforeUnloadPhase2ToBeginNavigation", track1,
+                              timeline.beforeunload_phase2_end,
+                              timeline.begin_navigation);
+    } else {
+      log_trace_event_and_uma("NavigationRequestToBeginNavigation", track1,
+                              timeline.navigation_request_creation,
+                              timeline.begin_navigation);
+    }
+
+    // For navigations that don't use a URLLoader, such as about:blank
+    // navigations, record a single interval from BeginNavigation to sending the
+    // CommitNavigation IPC, which will include choosing the target SiteInstance
+    // WillCommitWithoutUrlLoader throttle processing, etc. Do the same for
+    // navigations that encounter an error and never see a response from the
+    // loader. Otherwise, break down the URL loading into several finer-grained
+    // intervals.
+    if (timeline.loader_start.is_null() ||
+        timeline.receive_response.is_null()) {
+      log_trace_event_and_uma("BeginNavigationToCommit", track1,
+                              timeline.begin_navigation,
+                              timeline.commit_ipc_sent);
+    } else {
+      log_trace_event_and_uma("BeginNavigationToLoaderStart", track1,
+                              timeline.begin_navigation, timeline.loader_start);
+      log_trace_event_and_uma("LoaderStartToReceiveResponse", track1,
+                              timeline.loader_start, timeline.receive_response);
+
+      // Generate the nested loader events contained within
+      // LoaderStartToReceiveResponse. `loader_fetch_start` can be earlier than
+      // `loader_start` when Prefetch or Prerendering is enabled. Don't record
+      // metrics or traces in such cases to avoid skewing the data.
+      if (timeline.loader_start <= timeline.loader_fetch_start) {
+        log_trace_event_and_uma("LoaderStartToFetchStart", track1,
+                                timeline.loader_start,
+                                timeline.loader_fetch_start);
+        log_trace_event_and_uma("FetchStartToReceiveHeaders", track1,
+                                timeline.loader_fetch_start,
+                                timeline.loader_receive_headers);
+        // TODO(alexmos): add events for redirects when they are present.
+        log_trace_event_and_uma("ReceiveHeadersToReceiveResponse", track1,
+                                timeline.loader_receive_headers,
+                                timeline.receive_response);
+      }
+
+      log_trace_event_and_uma("ReceiveResponseToCommit", track1,
+                              timeline.receive_response,
+                              timeline.commit_ipc_sent);
+    }
+
+    log_trace_event_and_uma("CommitToDidCommit", track1,
+                            timeline.commit_ipc_sent,
+                            timeline.did_commit_ipc_received);
+  } else {
+    // Navigations without a `begin_navigation` timestamp are synchronous
+    // renderer commits, like same-document navigations and the synchronous
+    // about:blank commit.
+    // TODO(crbug.com/409589669): The `timeline.start` value is currently set to
+    // `renderer_commit_ipc_received` in `DidCommitNavigationInternal`, making
+    // `StartToSyncRendererCommit` zero sized. Move the start time earlier.
+    log_trace_event_and_uma("StartToSyncRendererCommit", track1, timeline.start,
+                            timeline.renderer_commit_ipc_received);
+    log_trace_event_and_uma("CommitToDidCommit", track1,
+                            timeline.renderer_commit_ipc_received,
+                            timeline.did_commit_ipc_received);
   }
 
-  log_trace_event_and_uma("CommitToDidCommit", track1, timeline.commit_ipc_sent,
-                          timeline.did_commit_ipc_received);
   // Generate a nested slice for the renderer side of the navigation commit,
   // contained within CommitToDidCommit.
   log_trace_event_and_uma("RendererCommitToDidCommit", track1,
@@ -2585,10 +2588,10 @@ RenderFrameHostImpl::RenderFrameHostImpl(
   // 1) Their opener in RenderFrameHostImpl::CreateNewWindow().
   // 2) Their navigation in RenderFrameHostImpl::DidCommitNavigationInternal().
   virtual_browsing_context_group_ = CrossOriginOpenerPolicyAccessReportManager::
-      GetNewVirtualBrowsingContextGroup();
+      NextVirtualBrowsingContextGroup();
   soap_by_default_virtual_browsing_context_group_ =
       CrossOriginOpenerPolicyAccessReportManager::
-          GetNewVirtualBrowsingContextGroup();
+          NextVirtualBrowsingContextGroup();
 
   // IdleManager should be unique per RenderFrame to provide proper isolation
   // of overrides.
@@ -8534,7 +8537,7 @@ bool RenderFrameHostImpl::Reload() {
 }
 
 void RenderFrameHostImpl::SendAccessibilityEventsToManager(
-    const ui::AXUpdatesAndEvents& details) {
+    ui::AXUpdatesAndEvents& details) {
   if (!browser_accessibility_manager_) {
     return;
   }
@@ -9833,12 +9836,12 @@ void RenderFrameHostImpl::CreateNewWindow(
   int popup_virtual_browsing_context_group =
       params->opener_suppressed
           ? CrossOriginOpenerPolicyAccessReportManager::
-                GetNewVirtualBrowsingContextGroup()
+                NextVirtualBrowsingContextGroup()
           : top_level_opener->virtual_browsing_context_group();
   int popup_soap_by_default_virtual_browsing_context_group =
       params->opener_suppressed
           ? CrossOriginOpenerPolicyAccessReportManager::
-                GetNewVirtualBrowsingContextGroup()
+                NextVirtualBrowsingContextGroup()
           : top_level_opener->soap_by_default_virtual_browsing_context_group();
 
   // If the opener is suppressed or script access is disallowed, we should
@@ -9937,9 +9940,14 @@ void RenderFrameHostImpl::CreateNewWindow(
       new_main_rfh->GetDevToolsFrameToken(), wait_for_debugger,
       new_main_rfh->GetDocumentToken(),
       new_main_rfh->policy_container_host()->CreatePolicyContainerForBlink(),
+      // TODO(crbug.com/412965095): Now that the CoopRelatedGroup no longer
+      // exists, replace BrowsingContextGroupInfo by a single token. In the
+      // meantime, just pass the BrowsingInstanceToken as a CoopGroupToken so
+      // that we do not send an empty token.
       blink::BrowsingContextGroupInfo(
           new_main_rfh->GetSiteInstance()->browsing_instance_token(),
-          new_main_rfh->GetSiteInstance()->coop_related_group_token()),
+          /*coop_related_group_token=*/new_main_rfh->GetSiteInstance()
+              ->browsing_instance_token()),
       delegate_->GetColorProviderColorMaps(),
       std::move(partitioned_popin_params), /*widget_screen_rect=*/std::nullopt,
       /*window_screen_rect=*/std::nullopt);
@@ -15316,6 +15324,9 @@ bool RenderFrameHostImpl::DidCommitNavigationInternal(
 
     // TODO(crbug.com/40150370): Do not use |params| to get the values,
     // depend on values known at commit time instead.
+    // TODO(crbug.com/409589669): `actual_navigation_start` should be set to an
+    // earlier timestamp from the renderer process, rather than the time that
+    // the renderer process begins the commit.
     navigation_request = CreateNavigationRequestForSynchronousRendererCommit(
         params->url, params->origin, params->initiator_base_url,
         params->referrer.Clone(), params->transition,
@@ -15641,14 +15652,11 @@ void RenderFrameHostImpl::DidCommitNewDocument(
   TakeNewDocumentPropertiesFromNavigation(navigation_request);
 
   // Set embedded documents' cross-origin-opener-policy from their top level:
-  //  - Use top level's policy if they are same-origin or the policy is
-  //    restrict-properties
+  //  - Use top level's policy if they are same-origin.
   //  - Use the default policy otherwise.
   // This COOP value is not used to enforce anything on this frame, but will be
   // inherited to every local-scheme document created from them.
   // It will also be inherited by the initial empty document from its opener.
-  // TODO(crbug.com/40266995): Always inherit COOP since it's now tied
-  // to an origin that set it.
 
   // TODO(crbug.com/40092527) Computing and assigning the
   // cross-origin-opener-policy of an embedded frame should be done in
@@ -15656,19 +15664,11 @@ void RenderFrameHostImpl::DidCommitNewDocument(
   // possible because we need the origin for the computation. The linked bug
   // moves the origin computation earlier in the navigation request, which will
   // enable the move to |NavigationRequest::ComputePoliciesToCommit|.
-
-  // TODO(crbug.com/40879437): See if the above is possible after we
-  // bundle the COOP origin.
   if (parent_) {
     const network::CrossOriginOpenerPolicy& top_level_coop =
         GetMainFrame()->cross_origin_opener_policy();
     if (GetMainFrame()->GetLastCommittedOrigin().IsSameOriginWith(
-            params.origin) ||
-        network::IsRelatedToCoopRestrictProperties(top_level_coop.value) ||
-        (top_level_coop.value ==
-             network::mojom::CrossOriginOpenerPolicyValue::kUnsafeNone &&
-         network::IsRelatedToCoopRestrictProperties(
-             top_level_coop.report_only_value))) {
+            params.origin)) {
       policy_container_host_->set_cross_origin_opener_policy(top_level_coop);
     } else {
       policy_container_host_->set_cross_origin_opener_policy(
@@ -16126,10 +16126,15 @@ void RenderFrameHostImpl::SendCommitNavigation(
   CHECK(!commit_params->browsing_context_group_info.has_value());
   if (is_main_frame() &&
       navigation_request->browsing_context_group_swap().ShouldSwap()) {
+    // TODO(crbug.com/412965095): Now that the CoopRelatedGroup no longer
+    // exists, replace BrowsingContextGroupInfo by a single token. In the
+    // meantime, just pass the BrowsingInstanceToken as a CoopGroupToken so that
+    // we do not send an empty token.
     commit_params->browsing_context_group_info =
         blink::BrowsingContextGroupInfo(
             GetSiteInstance()->browsing_instance_token(),
-            GetSiteInstance()->coop_related_group_token());
+            /*coop_related_group_token=*/GetSiteInstance()
+                ->browsing_instance_token());
   }
 
   auto* cookie_deprecation_label_manager =
@@ -16209,10 +16214,15 @@ void RenderFrameHostImpl::SendCommitFailedNavigation(
   CHECK(!commit_params->browsing_context_group_info.has_value());
   if (is_main_frame() &&
       navigation_request->browsing_context_group_swap().ShouldSwap()) {
+    // TODO(crbug.com/412965095): Now that the CoopRelatedGroup no longer
+    // exists, replace BrowsingContextGroupInfo by a single token. In the
+    // meantime, just pass the BrowsingInstanceToken as a CoopGroupToken so that
+    // we do not send an empty token.
     commit_params->browsing_context_group_info =
         blink::BrowsingContextGroupInfo(
             GetSiteInstance()->browsing_instance_token(),
-            GetSiteInstance()->coop_related_group_token());
+            /*coop_related_group_token=*/GetSiteInstance()
+                ->browsing_instance_token());
   }
 
   {

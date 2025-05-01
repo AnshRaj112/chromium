@@ -221,7 +221,7 @@ class EntityInstance final {
                  base::Uuid guid,
                  std::string nickname,
                  base::Time date_modified,
-                 int use_count,
+                 size_t use_count,
                  base::Time use_date);
 
   EntityInstance(const EntityInstance&);
@@ -232,6 +232,16 @@ class EntityInstance final {
 
   // Transparent less-than relation based on the the GUID.
   struct CompareByGuid;
+
+  // Comparator that returns the entity with the higher frecency score.
+  struct RankingOrder {
+   public:
+    explicit RankingOrder(base::Time now);
+    bool operator()(const EntityInstance& lhs, const EntityInstance& rhs) const;
+
+   private:
+    const base::Time now_;
+  };
 
   // Comparator that ranks instances by their priority for import on form
   // submission.

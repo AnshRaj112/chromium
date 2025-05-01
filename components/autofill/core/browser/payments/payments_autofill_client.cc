@@ -118,6 +118,7 @@ void PaymentsAutofillClient::CloseAutofillProgressDialog(
     base::OnceClosure no_interactive_authentication_callback) {}
 
 void PaymentsAutofillClient::ShowCardUnmaskOtpInputDialog(
+    CreditCard::RecordType card_type,
     const CardUnmaskChallengeOption& challenge_option,
     base::WeakPtr<OtpUnmaskDelegate> delegate) {}
 
@@ -253,7 +254,7 @@ void PaymentsAutofillClient::ShowSelectBnplIssuerDialog(
 
 void PaymentsAutofillClient::DismissSelectBnplIssuerDialog() {}
 
-bool PaymentsAutofillClient::IsTabModalPopup() const {
+bool PaymentsAutofillClient::IsTabModalPopupDeprecated() const {
   return false;
 }
 

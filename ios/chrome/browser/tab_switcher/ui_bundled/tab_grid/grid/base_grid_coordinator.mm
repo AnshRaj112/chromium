@@ -6,6 +6,7 @@
 
 #import "base/check.h"
 #import "base/strings/sys_string_conversions.h"
+#import "components/collaboration/public/collaboration_flow_type.h"
 #import "components/collaboration/public/collaboration_service.h"
 #import "components/feature_engagement/public/feature_constants.h"
 #import "components/feature_engagement/public/tracker.h"
@@ -42,6 +43,8 @@
 #import "ios/web/public/web_state.h"
 #import "ui/base/l10n/l10n_util.h"
 
+using collaboration::FlowType;
+using collaboration::IOSCollaborationControllerDelegate;
 using ResultCallback =
     collaboration::CollaborationControllerDelegate::ResultCallback;
 using collaboration::CollaborationControllerDelegate;
@@ -257,6 +260,7 @@ using collaboration::CollaborationControllerDelegate;
 
   [_tabGroupCoordinator stop];
   _tabGroupCoordinator = nil;
+  self.mediator.baseDelegate = nil;
 }
 
 - (void)showTabGroupCreationForTabs:
@@ -335,6 +339,7 @@ using collaboration::CollaborationControllerDelegate;
                                     group:
                                         (base::WeakPtr<const TabGroup>)tabGroup
                          sourceButtonItem:(UIBarButtonItem*)sourceButtonItem {
+  CHECK(!IsContainedTabGroupEnabled());
   if (!tabGroup) {
     return;
   }
@@ -387,6 +392,7 @@ using collaboration::CollaborationControllerDelegate;
 - (void)startLeaveOrDeleteSharedGroup:(base::WeakPtr<const TabGroup>)group
                             forAction:(TabGroupActionType)actionType
                      sourceButtonItem:(UIBarButtonItem*)sourceButtonItem {
+  CHECK(!IsContainedTabGroupEnabled());
   __weak __typeof(self) weakSelf = self;
   base::OnceCallback<void(ResultCallback)> completionCallback =
       base::BindOnce(^(ResultCallback resultCallback) {
@@ -499,6 +505,7 @@ using collaboration::CollaborationControllerDelegate;
   _tabGroupCoordinator.modeHolder = self.modeHolder;
 
   [_tabGroupCoordinator start];
+  self.mediator.baseDelegate = _tabGroupCoordinator;
 }
 
 // Combines two arrays of inactive items into one. The `primaryInactiveItems`
@@ -583,10 +590,11 @@ using collaboration::CollaborationControllerDelegate;
     return;
   }
 
-  std::unique_ptr<collaboration::IOSCollaborationControllerDelegate> delegate =
-      std::make_unique<collaboration::IOSCollaborationControllerDelegate>(
+  std::unique_ptr<IOSCollaborationControllerDelegate> delegate =
+      std::make_unique<IOSCollaborationControllerDelegate>(
           browser, self.baseViewController,
-          TabGroupServiceFactory::GetForProfile(browser->GetProfile()));
+          TabGroupServiceFactory::GetForProfile(browser->GetProfile()),
+          FlowType::kLeaveOrDelete);
   delegate->SetLeaveOrDeleteConfirmationCallback(std::move(completionCallback));
 
   collaboration::CollaborationServiceLeaveOrDeleteEntryPoint entryPoint =

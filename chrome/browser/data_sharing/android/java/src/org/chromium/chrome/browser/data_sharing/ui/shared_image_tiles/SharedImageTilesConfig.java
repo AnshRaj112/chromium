@@ -98,20 +98,32 @@ public class SharedImageTilesConfig {
             this.mIconSizeDp = R.dimen.shared_image_tiles_icon_height;
             this.mBorderSizeDp = R.dimen.shared_image_tiles_icon_border;
             this.mTextPaddingDp = R.dimen.shared_image_tiles_text_padding;
-            this.mTextColor = SemanticColorUtils.getDefaultTextColorAccent1(context);
+            this.mTextColor = SemanticColorUtils.getDefaultTextColor(context);
             this.mBorderColor = SemanticColorUtils.getDefaultBgColor(context);
             this.mBackgroundColor = SemanticColorUtils.getColorPrimaryContainer(context);
-            this.mTextStyle = R.style.TextAppearance_TextAccentMediumThick_Primary;
+            this.mTextStyle = R.style.TextAppearance_TextAccentMediumThick;
         }
 
         /**
-         * Creates a builder with preset values for a tab group thumbnail.
+         * Creates a builder with preset values for a button.
+         *
+         * @param context The Android context.
+         * @return A builder instance configured for a button.
+         */
+        public static Builder createForButton(Context context) {
+            return new Builder(context)
+                    .setTextColor(SemanticColorUtils.getDefaultTextColorAccent1(context))
+                    .setTextStyle(R.style.TextAppearance_TextAccentMediumThick_Primary);
+        }
+
+        /**
+         * Creates a builder with preset values for being drawn on a tab group color.
          *
          * @param context The Android context.
          * @param tabGroupColorId The color id of the tab group.
-         * @return A builder instance configured for a tab group thumbnail.
+         * @return A builder instance configured for a tab group favicon.
          */
-        public static Builder createThumbnail(
+        public static Builder createForTabGroupColorContext(
                 Context context, @TabGroupColorId int tabGroupColorId) {
             return new Builder(context)
                     .setIconSizeDp(R.dimen.small_shared_image_tiles_icon_height)

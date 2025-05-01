@@ -72,6 +72,11 @@
 #include "ui/views/controls/menu/menu_item_view.h"
 #include "url/gurl.h"
 
+#if BUILDFLAG(IS_MAC)
+#include "chrome/browser/ui/browser_commands_mac.h"
+#include "chrome/browser/ui/fullscreen_util_mac.h"
+#endif  // BUILDFLAG(IS_MAC)
+
 namespace {
 DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kPrimaryTabPageElementId);
 }  // namespace
@@ -183,6 +188,19 @@ IN_PROC_BROWSER_TEST_F(AppMenuModelInteractiveTest,
       EnsurePresent(AppMenuModel::kCastTitleItem));
 }
 
+#if BUILDFLAG(IS_MAC)
+IN_PROC_BROWSER_TEST_F(AppMenuModelInteractiveTest,
+                       ShowAppMenuInImmersiveFullscreen) {
+  chrome::SetAlwaysShowToolbarInFullscreenForTesting(browser(), false);
+  ASSERT_TRUE(!fullscreen_utils::IsAlwaysShowToolbarEnabled(browser()));
+  ui_test_utils::ToggleFullscreenModeAndWait(browser());
+  chrome::RevealToolbarForTesting(browser());
+  RunTestSequence(WaitForShow(kToolbarAppMenuButtonElementId),
+                  PressButton(kToolbarAppMenuButtonElementId),
+                  WaitForShow(AppMenuModel::kMoreToolsMenuItem));
+}
+#endif  // BUILDFLAG(IS_MAC)
+
 namespace {
 
 enum ExtensionsTestMode {
@@ -220,8 +238,8 @@ class AppMenuModelExtensionsInteractiveTest
         {
           "name": "an extension",
           "version": "1.0",
-          "manifest_version": 2,
-          "browser_action": {}
+          "manifest_version": 3,
+          "action": {}
         }
       )";
       extensions::TestExtensionDir dir;

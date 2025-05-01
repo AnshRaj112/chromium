@@ -31,6 +31,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/trace_event/trace_event.h"
 #include "base/values.h"
+#include "components/omnibox/browser/autocomplete_enums.h"
 #include "components/omnibox/browser/autocomplete_input.h"
 #include "components/omnibox/browser/autocomplete_match.h"
 #include "components/omnibox/browser/autocomplete_match_classification.h"
@@ -478,8 +479,7 @@ bool DocumentProvider::IsInputLikelyURL(const AutocompleteInput& input) {
 void DocumentProvider::Start(const AutocompleteInput& input,
                              bool minimal_changes) {
   TRACE_EVENT0("omnibox", "DocumentProvider::Start");
-  Stop(true, false);
-
+  Stop(AutocompleteStopReason::kClobbered);
   // Perform various checks - feature is enabled, user is allowed to use the
   // feature, we're not under backoff, etc.
   if (!IsDocumentProviderAllowed(input))
@@ -517,12 +517,16 @@ void DocumentProvider::Run() {
               base::Unretained(this) /* this owns SimpleURLLoader */));
 }
 
-void DocumentProvider::Stop(bool clear_cached_results,
-                            bool due_to_user_inactivity) {
+void DocumentProvider::Stop(AutocompleteStopReason stop_reason) {
   TRACE_EVENT0("omnibox", "DocumentProvider::Stop");
-  AutocompleteProvider::Stop(clear_cached_results, due_to_user_inactivity);
+  AutocompleteProvider::Stop(stop_reason);
 
   debouncer_->CancelRequest();
+
+  if (auto* remote_suggestions_service =
+          client_->GetRemoteSuggestionsService(/*create_if_necessary=*/false)) {
+    remote_suggestions_service->StopCreatingDocumentSuggestionsRequest();
+  }
 
   // If the request was sent, then log its duration and that it was invalidated.
   if (loader_) {
@@ -541,11 +545,6 @@ void DocumentProvider::Stop(bool clear_cached_results,
   if (!time_run_invoked_.is_null()) {
     LogTotalTime(time_run_invoked_, true);
     time_run_invoked_ = base::TimeTicks();
-  }
-
-  if (auto* remote_suggestions_service =
-          client_->GetRemoteSuggestionsService(/*create_if_necessary=*/false)) {
-    remote_suggestions_service->StopCreatingDocumentSuggestionsRequest();
   }
 }
 

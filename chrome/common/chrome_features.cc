@@ -7,6 +7,7 @@
 #include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/strings/string_split.h"
+#include "base/time/time.h"
 #include "build/branding_buildflags.h"
 #include "build/build_config.h"
 #include "chrome/common/chrome_switches.h"
@@ -256,6 +257,13 @@ BASE_FEATURE(kDesktopPWAsTabStripSettings,
              "DesktopPWAsTabStripSettings",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Allows fullscreen to claim whole display area when in windowing mode
+#if BUILDFLAG(IS_ANDROID)
+BASE_FEATURE(kDisplayEdgeToEdgeFullscreen,
+             "DisplayEdgeToEdgeFullscreen",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+#endif
+
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 // Controls whether Chrome Apps are supported. See https://crbug.com/1221251.
 // If the feature is disabled, Chrome Apps continue to work. If enabled, Chrome
@@ -308,6 +316,9 @@ BASE_FEATURE(kGlic, "Glic", base::FEATURE_DISABLED_BY_DEFAULT);
 // Controls whether the actor component of Glic is enabled.
 BASE_FEATURE(kGlicActor, "GlicActor", base::FEATURE_DISABLED_BY_DEFAULT);
 
+const base::FeatureParam<base::TimeDelta> kGlicActorActorObservationDelay{
+    &kGlicActor, "glic-actor-observation-delay", base::Seconds(3)};
+
 // Controls whether the Glic feature is always detached.
 BASE_FEATURE(kGlicDetached, "GlicDetached", base::FEATURE_ENABLED_BY_DEFAULT);
 
@@ -340,6 +351,9 @@ const base::FeatureParam<int> kGlicMinLoadingTimeMs{
 const base::FeatureParam<int> kGlicMaxLoadingTimeMs{
     &kGlic, "glic-max-loading-time-ms", 15000};
 
+const base::FeatureParam<int> kGlicReloadMaxLoadingTimeMs{
+    &kGlic, "glic-reload-max-loading-time-ms", 30000};
+
 const base::FeatureParam<int> kGlicInitialWidth{&kGlic, "glic-initial-width",
                                                 352};
 const base::FeatureParam<int> kGlicInitialHeight{&kGlic, "glic-initial-height",
@@ -363,6 +377,24 @@ BASE_FEATURE(kGlicURLConfig,
 const base::FeatureParam<std::string> kGlicGuestURL{&kGlicURLConfig,
                                                     "glic-guest-url", ""};
 
+BASE_FEATURE_PARAM(std::string,
+                   kGlicUserStatusUrl,
+                   &kGlicUserStatusCheck,
+                   "glic-user-status-url",
+                   "");
+
+BASE_FEATURE_PARAM(base::TimeDelta,
+                   kGlicUserStatusRequestDelay,
+                   &kGlicUserStatusCheck,
+                   "glic-user-status-request-delay",
+                   base::Hours(23));
+
+BASE_FEATURE_PARAM(std::string,
+                   kGeminiOAuth2Scope,
+                   &kGlicUserStatusCheck,
+                   "glic-user-status-oauth2-scope",
+                   "");
+
 BASE_FEATURE(kGlicFreURLConfig,
              "GlicFreURLConfig",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -370,6 +402,35 @@ BASE_FEATURE_PARAM(std::string,
                    kGlicFreURL,
                    &kGlicFreURLConfig,
                    "glic-fre-url",
+                   "");
+
+BASE_FEATURE(kGlicLearnMoreURLConfig,
+             "GlicLearnMoreURLConfig",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE_PARAM(std::string,
+                   kGlicShortcutsLearnMoreURL,
+                   &kGlicLearnMoreURLConfig,
+                   "glic-shortcuts-learn-more-url",
+                   "");
+BASE_FEATURE_PARAM(std::string,
+                   kGlicLauncherToggleLearnMoreURL,
+                   &kGlicLearnMoreURLConfig,
+                   "glic-shortcuts-launcher-toggle-learn-more-url",
+                   "");
+BASE_FEATURE_PARAM(std::string,
+                   kGlicLocationToggleLearnMoreURL,
+                   &kGlicLearnMoreURLConfig,
+                   "glic-shortcuts-location-toggle-learn-more-url",
+                   "");
+BASE_FEATURE_PARAM(std::string,
+                   kGlicTabAccessToggleLearnMoreURL,
+                   &kGlicLearnMoreURLConfig,
+                   "glic-shortcuts-tab-access-toggle-learn-more-url",
+                   "");
+BASE_FEATURE_PARAM(std::string,
+                   kGlicSettingsPageLearnMoreURL,
+                   &kGlicLearnMoreURLConfig,
+                   "glic-settings-page-learn-more-url",
                    "");
 
 BASE_FEATURE(kGlicCSPConfig,
@@ -429,6 +490,16 @@ BASE_FEATURE(kGlicSizingFitWindow,
 
 BASE_FEATURE(kGlicWarming, "GlicWarming", base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Controls the amount of time from the GlicButtonController scheduling
+// preload to the start of preloading (if preloading is possible).
+const base::FeatureParam<int> kGlicWarmingDelayMs{
+    &kGlicWarming, "glic-warming-delay-ms", 30 * 1000};
+
+// Adds noise to the warming delay. The effective delay is increased by a
+// random positive number of milliseconds between 0 and kGlicWarmingJitterMs.
+const base::FeatureParam<int> kGlicWarmingJitterMs{
+    &kGlicWarming, "glic-warming-jitter-ms", 10 * 1000};
+
 BASE_FEATURE(kGlicFreWarming,
              "GlicFreWarming",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -444,6 +515,10 @@ const base::FeatureParam<std::string> kGlicTieredRolloutAllowedGroup{
     &kGlicTieredRollout, "glic-tiered-rollout-allowed-group", ""};
 
 BASE_FEATURE(kGlicRollout, "GlicRollout", base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kGlicUserStatusCheck,
+             "GlicUserStatusCheck",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
 BASE_FEATURE(kTabstripComboButton,
@@ -792,12 +867,6 @@ BASE_FEATURE(kImmersiveFullscreen,
              "ImmersiveFullscreen",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Moves the tab strip into the titlebar. kImmersiveFullscreen must be enabled
-// for this feature to have an effect.
-BASE_FEATURE(kImmersiveFullscreenTabs,
-             "ImmersiveFullscreenTabs",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables immersive fullscreen mode for PWA windows. PWA windows will use
 // immersive fullscreen mode if and only if both this and kImmersiveFullscreen
 // are enabled. PWA windows currently do not use ImmersiveFullscreenTabs even if
@@ -829,11 +898,6 @@ BASE_FEATURE(kIncompatibleApplicationsWarning,
              "IncompatibleApplicationsWarning",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
-
-// Prevents the installation of non-allowlisted Isolated Web Apps.
-BASE_FEATURE(kIsolatedWebAppAllowlist,
-             "IsolatedWebAppAllowlist",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables Isolated Web App Developer Mode, which allows developers to
 // install untrusted Isolated Web Apps.
@@ -930,14 +994,6 @@ constexpr base::FeatureParam<int> kLinuxLowMemoryMonitorCriticalLevel{
 BASE_FEATURE(kListWebAppsSwitch,
              "ListWebAppsSwitch",
              base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
-
-#if BUILDFLAG(IS_MAC)
-// If enabled, emails links directly instead of going through the macOS share
-// extension system. Speculative fix for https://crbug.com/356643975.
-BASE_FEATURE(kMacDirectEmailShare,
-             "DirectEmailShare",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -1579,16 +1635,6 @@ BASE_FEATURE(kWebAppManifestIconUpdating,
 BASE_FEATURE(kWebAppManifestPolicyAppIdentityUpdate,
              "WebAppManifestPolicyAppIdentityUpdate",
              base::FEATURE_ENABLED_BY_DEFAULT);
-
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS)
-// Enables Web Share (navigator.share)
-BASE_FEATURE(kWebShare, "WebShare", base::FEATURE_ENABLED_BY_DEFAULT);
-#endif
-
-#if BUILDFLAG(IS_MAC)
-// Enables Web Share (navigator.share) for macOS
-BASE_FEATURE(kWebShare, "WebShare", base::FEATURE_ENABLED_BY_DEFAULT);
-#endif
 
 // Restricts the WebUI scripts able to use the generated code cache according to
 // embedder-specified heuristics.

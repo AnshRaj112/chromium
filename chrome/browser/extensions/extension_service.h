@@ -48,7 +48,7 @@
 #include "extensions/common/extension_id.h"
 #include "extensions/common/manifest.h"
 
-static_assert(BUILDFLAG(ENABLE_EXTENSIONS));
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 class BlocklistedExtensionSyncServiceTest;
 class Profile;
@@ -92,7 +92,7 @@ class ExtensionServiceInterface {
 
   // Attempts finishing installation of an update for an extension with the
   // specified id, when installation of that extension was previously delayed.
-  // |install_immediately| - Whether the extension should be installed if it's
+  // `install_immediately` - Whether the extension should be installed if it's
   //     currently in use.
   // Returns whether the extension installation was finished.
   virtual bool FinishDelayedInstallationIfReady(const std::string& extension_id,
@@ -108,14 +108,6 @@ class ExtensionServiceInterface {
   // TODO(akalin): Remove this method (and others) once we refactor
   // themes sync to not use it directly.
   virtual void CheckForUpdatesSoon() = 0;
-
-  // Adds |extension| to this ExtensionService and notifies observers that the
-  // extension has been loaded.
-  virtual void AddExtension(const Extension* extension) = 0;
-
-  // Unload the specified extension.
-  virtual void UnloadExtension(const std::string& extension_id,
-                               UnloadedExtensionReason reason) = 0;
 
   // Whether a user is able to disable a given extension.
   virtual bool UserCanDisableInstalledExtension(
@@ -136,7 +128,7 @@ class ExtensionService : public ExtensionServiceInterface,
                          public ExtensionHostRegistry::Observer,
                          public ProfileManagerObserver {
  public:
-  // Constructor stores pointers to |profile| and |extension_prefs| but
+  // Constructor stores pointers to `profile` and `extension_prefs` but
   // ownership remains at caller.
   ExtensionService(Profile* profile,
                    const base::CommandLine* command_line,
@@ -156,9 +148,6 @@ class ExtensionService : public ExtensionServiceInterface,
 
   // ExtensionServiceInterface implementation.
   //
-  void UnloadExtension(const std::string& extension_id,
-                       UnloadedExtensionReason reason) override;
-  void AddExtension(const Extension* extension) override;
   const Extension* GetPendingExtensionUpdate(
       const std::string& extension_id) const override;
   bool FinishDelayedInstallationIfReady(const std::string& extension_id,
@@ -177,21 +166,6 @@ class ExtensionService : public ExtensionServiceInterface,
   // KeyedService two-phase shutdown.
   void Shutdown();
 
-  // Reloads the specified extension, sending the onLaunched() event to it if it
-  // currently has any window showing.
-  // Allows noisy failures.
-  // NOTE: Reloading an extension can invalidate |extension_id| and Extension
-  // pointers for the given extension. Consider making a copy of |extension_id|
-  // first and retrieving a new Extension pointer afterwards.
-  void ReloadExtension(const std::string& extension_id);
-
-  // Suppresses noisy failures.
-  void ReloadExtensionWithQuietFailure(const std::string& extension_id);
-
-  // Enables the extension. If the extension is already enabled, does
-  // nothing.
-  void EnableExtension(const std::string& extension_id);
-
   // Performs action based on Omaha attributes for the extension.
   void PerformActionBasedOnOmahaAttributes(const std::string& extension_id,
                                            const base::Value::Dict& attributes);
@@ -201,34 +175,10 @@ class ExtensionService : public ExtensionServiceInterface,
   void PerformActionBasedOnExtensionTelemetryServiceVerdicts(
       const Blocklist::BlocklistStateMap& blocklist_state_map);
 
-  // Disables the extension. If the extension is already disabled, just adds
-  // the incoming disable reason(s). If the extension cannot be disabled (due to
-  // policy), does nothing.
-  void DisableExtension(const ExtensionId& extension_id,
-                        disable_reason::DisableReason disable_reason);
-  void DisableExtension(const ExtensionId& extension_id,
-                        const DisableReasonSet& disable_reasons);
-
-  // Any code which needs to write unknown reasons should use the
-  // methods below, which operate on raw integers. This is needed for scenarios
-  // like Sync where unknown reasons can be synced from newer versions of the
-  // browser to older versions. The methods above will trigger undefined
-  // behavior when unknown values are casted to DisableReason while constructing
-  // DisableReasonSet. Most code should use the methods above. We want to limit
-  // the usage of the method below, so it is guarded by a passkey.
-  void DisableExtensionWithRawReasons(
-      ExtensionPrefs::DisableReasonRawManipulationPasskey,
-      const ExtensionId& extension_id,
-      const base::flat_set<int>& disable_reasons);
-
   // Disable non-default and non-managed extensions with ids not in
-  // |except_ids|. Default extensions are those from the Web Store with
-  // |was_installed_by_default| flag.
+  // `except_ids`. Default extensions are those from the Web Store with
+  // `was_installed_by_default` flag.
   void DisableUserExtensionsExcept(const std::vector<std::string>& except_ids);
-
-  // ExtensionHost of background page calls this method right after its renderer
-  // main frame has been created.
-  void DidCreateMainFrameForBackgroundPage(ExtensionHost* host);
 
   // Returns whether a user is able to disable a given extension or if that is
   // not possible (for instance, extension was enabled by policy).
@@ -272,12 +222,12 @@ class ExtensionService : public ExtensionServiceInterface,
   void GreylistExtensionForTest(const std::string& extension_id,
                                 const BitMapBlocklistState& state);
 
+  void UninstallMigratedExtensionsForTest();
+
 #if defined(UNIT_TEST)
   void FinishInstallationForTest(const Extension* extension) {
     extension_registrar_->FinishInstallation(extension);
   }
-
-  void UninstallMigratedExtensionsForTest() { UninstallMigratedExtensions(); }
 
   void ProfileMarkedForPermanentDeletionForTest() {
     OnProfileMarkedForPermanentDeletion(profile_);
@@ -336,9 +286,6 @@ class ExtensionService : public ExtensionServiceInterface,
   // Called when the initial extensions load has completed.
   void OnInstalledExtensionsLoaded();
 
-  // Uninstall extensions that have been migrated to component extensions.
-  void UninstallMigratedExtensions();
-
   // Called when the Developer Mode preference is changed:
   // - Disables unpacked extensions if developer mode is OFF.
   // - Re-enables unpacked extensions if developer mode is ON and there are no
@@ -367,7 +314,7 @@ class ExtensionService : public ExtensionServiceInterface,
   // Hold the set of pending extensions. Not owned.
   raw_ptr<PendingExtensionManager> pending_extension_manager_ = nullptr;
 
-  // Manages external providers. Not ownedd.
+  // Manages external providers. Not owned.
   raw_ptr<ExternalProviderManager> external_provider_manager_ = nullptr;
 
   // Signaled when all extensions are loaded.

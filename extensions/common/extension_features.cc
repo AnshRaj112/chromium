@@ -66,6 +66,10 @@ BASE_FEATURE(kCheckingNoExtensionIdInExtensionIpcs,
 
 BASE_FEATURE(kDeferResetURLLoaderFactories,
              "DeferResetURLLoaderFactories",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kSkipResetServiceWorkerURLLoaderFactories,
+             "SkipResetServiceWorkerURLLoaderFactories",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEnableWebHidInWebView,
@@ -104,10 +108,6 @@ const base::FeatureParam<std::string> kExtensionManifestV2ExceptionListParam(
 BASE_FEATURE(kAllowLegacyMV2Extensions,
              "AllowLegacyMV2Extensions",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kExtensionSourceUrlEnforcement,
-             "ExtensionSourceUrlEnforcement",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kExtensionWARForRedirect,
              "ExtensionWARForRedirect",

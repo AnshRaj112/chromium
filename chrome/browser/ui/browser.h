@@ -872,6 +872,8 @@ class Browser : public TabStripModelObserver,
       BrowserDidCloseCallback callback) override;
   views::View* TopContainer() override;
   bool IsMinimized() const override;
+  bool IsVisibleOnScreen() const override;
+  bool IsVisible() const override;
   base::WeakPtr<BrowserWindowInterface> GetWeakPtr() override;
   views::View* LensOverlayView() override;
   base::CallbackListSubscription RegisterActiveTabDidChange(
@@ -893,11 +895,14 @@ class Browser : public TabStripModelObserver,
   web_app::AppBrowserController* GetAppBrowserController() override;
   std::vector<tabs::TabInterface*> GetAllTabInterfaces() override;
   Browser* GetBrowserForMigrationOnly() override;
-  bool IsTabModalPopup() const override;
+  void ActivateWindow() override;
+  bool IsTabModalPopupDeprecated() const override;
+  bool CanShowCallToAction() const override;
+  std::unique_ptr<ScopedWindowCallToAction> ShowCallToAction() override;
 
   // Called by BrowserView.
-  void set_is_tab_modal_popup(bool is_tab_modal_popup) {
-    is_tab_modal_popup_ = is_tab_modal_popup;
+  void set_is_tab_modal_popup_deprecated(bool is_tab_modal_popup_deprecated) {
+    is_tab_modal_popup_deprecated_ = is_tab_modal_popup_deprecated;
   }
 
   // Called by BrowserView on active change for the browser.
@@ -970,6 +975,17 @@ class Browser : public TabStripModelObserver,
 
     // Change is the result of a force show reason
     BOOKMARK_BAR_STATE_CHANGE_FORCE_SHOW,
+  };
+
+  // Tracks whether a tabstrip call to action UI is showing.
+  class ScopedWindowCallToActionImpl : public ScopedWindowCallToAction {
+   public:
+    explicit ScopedWindowCallToActionImpl(Browser* browser);
+    ~ScopedWindowCallToActionImpl() override;
+
+   private:
+    // Owns this.
+    base::WeakPtr<Browser> browser_;
   };
 
   explicit Browser(const CreateParams& params);
@@ -1511,9 +1527,11 @@ class Browser : public TabStripModelObserver,
   // shortly (after a PostTask).
   bool is_delete_scheduled_ = false;
 
+  // Do not use this. Instead, create a views::Widget and use helpers like
+  // TabDialogManager.
   // If true, the browser window was created as a tab modal pop-up. This is
-  // determined by the NavigateParams::is_tab_modal_popup.
-  bool is_tab_modal_popup_ = false;
+  // determined by the NavigateParams::is_tab_modal_popup_deprecated.
+  bool is_tab_modal_popup_deprecated_ = false;
 
 #if defined(USE_AURA)
   std::unique_ptr<OverscrollPrefManager> overscroll_pref_manager_;
@@ -1546,6 +1564,8 @@ class Browser : public TabStripModelObserver,
   std::optional<ui::PlatformSessionWindowData> platform_session_data_ =
       std::nullopt;
 #endif
+  // Tracks whether a modal UI is showing.
+  bool showing_call_to_action_ = false;
 
   // The following factory is used for chrome update coalescing.
   base::WeakPtrFactory<Browser> chrome_updater_factory_{this};

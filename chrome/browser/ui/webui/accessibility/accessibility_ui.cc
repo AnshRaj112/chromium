@@ -100,6 +100,8 @@ static const char kWidget[] = "widget";
 static const char kBrowser[] = "browser";
 static const char kCopyTree[] = "copyTree";
 static const char kHTML[] = "html";
+static const char kLockedPlatformModes[] = "lockedPlatformModes";
+static const char kIsolate[] = "isolate";
 static const char kLocked[] = "locked";
 static const char kNative[] = "native";
 static const char kPage[] = "page";
@@ -182,20 +184,24 @@ bool ShouldHandleAccessibilityRequestCallback(const std::string& path) {
 
 void HandleAccessibilityRequestCallback(
     content::BrowserContext* current_context,
+    ui::AXMode initial_process_mode,
     const std::string& path,
     content::WebUIDataSource::GotDataCallback callback) {
   DCHECK(ShouldHandleAccessibilityRequestCallback(path));
 
+  auto& browser_accessibility_state =
+      *content::BrowserAccessibilityState::GetInstance();
   base::Value::Dict data;
   PrefService* pref = Profile::FromBrowserContext(current_context)->GetPrefs();
-  ui::AXMode mode =
-      content::BrowserAccessibilityState::GetInstance()->GetAccessibilityMode();
+  ui::AXMode mode = browser_accessibility_state.GetAccessibilityMode();
   bool native = mode.has_mode(ui::AXMode::kNativeAPIs);
   bool web = mode.has_mode(ui::AXMode::kWebContents);
   bool text = mode.has_mode(ui::AXMode::kInlineTextBoxes);
-  bool extendedProperties = mode.has_mode(ui::AXMode::kExtendedProperties);
+  bool extended_properties = mode.has_mode(ui::AXMode::kExtendedProperties);
   bool html = mode.has_mode(ui::AXMode::kHTML);
   bool pdf_printing = mode.has_mode(ui::AXMode::kPDFPrinting);
+  bool allow_platform_activation =
+      browser_accessibility_state.IsActivationFromPlatformEnabled();
 
   // The "native" and "web" flags are disabled if
   // --disable-renderer-accessibility is set.
@@ -205,11 +211,33 @@ void HandleAccessibilityRequestCallback(
   // The "text", "extendedProperties" and "html" flags are only
   // meaningful if "web" is enabled.
   data.Set(kText, text);
-  data.Set(kExtendedProperties, extendedProperties);
+  data.Set(kExtendedProperties, extended_properties);
   data.Set(kHTML, html);
 
   // The "pdfPrinting" flag is independent of the others.
   data.Set(kPDFPrinting, pdf_printing);
+
+  // Identify the mode checkboxes that were turned on via platform API
+  // interactions and therefore cannot be unchecked unless the #isolate checkbox
+  // is checked.
+  data.Set(
+      kLockedPlatformModes,
+      base::Value::Dict()
+          .Set(kNative,
+               allow_platform_activation && native &&
+                   initial_process_mode.has_mode(ui::AXMode::kNativeAPIs))
+          .Set(kWeb,
+               allow_platform_activation && web &&
+                   initial_process_mode.has_mode(ui::AXMode::kWebContents))
+          .Set(kText,
+               allow_platform_activation && text &&
+                   initial_process_mode.has_mode(ui::AXMode::kInlineTextBoxes))
+          .Set(kExtendedProperties, allow_platform_activation &&
+                                        extended_properties &&
+                                        initial_process_mode.has_mode(
+                                            ui::AXMode::kExtendedProperties))
+          .Set(kHTML, allow_platform_activation &&
+                          initial_process_mode.has_mode(ui::AXMode::kHTML)));
 
   std::string pref_api_type =
       pref->GetString(prefs::kShownAccessibilityApiType);
@@ -235,9 +263,9 @@ void HandleAccessibilityRequestCallback(
   }
   data.Set(kApiTypeField, pref_api_type);
 
-  bool is_mode_locked = !content::BrowserAccessibilityState::GetInstance()
-                             ->IsAXModeChangeAllowed();
-  data.Set(kLocked, is_mode_locked);
+  data.Set(kIsolate, !allow_platform_activation);
+
+  data.Set(kLocked, !browser_accessibility_state.IsAXModeChangeAllowed());
 
   base::Value::List page_list;
   std::unique_ptr<content::RenderWidgetHostIterator> widget_iter(
@@ -272,7 +300,7 @@ void HandleAccessibilityRequestCallback(
 
     base::Value::Dict descriptor = BuildTargetDescriptor(rvh);
     descriptor.Set(kNative, native);
-    descriptor.Set(kExtendedProperties, extendedProperties);
+    descriptor.Set(kExtendedProperties, extended_properties);
     descriptor.Set(kWeb, web);
     page_list.Append(std::move(descriptor));
   }
@@ -363,8 +391,8 @@ class AccessibilityUiModes
     return *FromWebContents(web_contents);
   }
 
-  // Sets or clears `flags` (as per `enabled`) for all tabs in the browser
-  // process for the lifetime of the accessibility UI page.
+  // Sets flags for all tabs in the browser process for the lifetime of the
+  // accessibility UI page.
   void SetModeForProcess(uint32_t flags, bool enabled) {
     if (process_accessibility_mode_) {
       ui::AXMode mode = process_accessibility_mode_->mode();
@@ -546,14 +574,18 @@ AccessibilityUI::AccessibilityUI(content::WebUI* web_ui)
       content::WebUIDataSource::CreateAndAdd(
           browser_context, chrome::kChromeUIAccessibilityHost);
 
+  // The process-wide accessibility mode when the UI page is initially launched.
+  ui::AXMode initial_process_mode =
+      content::BrowserAccessibilityState::GetInstance()->GetAccessibilityMode();
+
   // Add required resources.
   html_source->UseStringsJs();
   html_source->AddResourcePaths(kAccessibilityResources);
   html_source->SetDefaultResource(IDR_ACCESSIBILITY_ACCESSIBILITY_HTML);
   html_source->SetRequestFilter(
       base::BindRepeating(&ShouldHandleAccessibilityRequestCallback),
-      base::BindRepeating(&HandleAccessibilityRequestCallback,
-                          browser_context));
+      base::BindRepeating(&HandleAccessibilityRequestCallback, browser_context,
+                          initial_process_mode));
   html_source->OverrideContentSecurityPolicy(
       network::mojom::CSPDirectiveName::TrustedTypes,
       "trusted-types parse-html-subset sanitize-inner-html;");
@@ -691,14 +723,19 @@ void AccessibilityUIMessageHandler::ToggleAccessibilityForWebContents(
 
 void AccessibilityUIMessageHandler::SetGlobalFlag(
     const base::Value::List& args) {
+  auto& browser_accessibility_state =
+      *content::BrowserAccessibilityState::GetInstance();
   const base::Value::Dict& data = args[0].GetDict();
   const std::string flag_name = CheckJSValue(data.FindString(kFlagNameField));
   bool enabled = *data.FindBool(kEnabledField);
 
   AllowJavascript();
+  if (flag_name == kIsolate) {
+    browser_accessibility_state.SetActivationFromPlatformEnabled(!enabled);
+    return;
+  }
   if (flag_name == kLocked) {
-    content::BrowserAccessibilityState::GetInstance()->SetAXModeChangeAllowed(
-        !enabled);
+    browser_accessibility_state.SetAXModeChangeAllowed(!enabled);
     return;
   }
 
@@ -735,15 +772,6 @@ void AccessibilityUIMessageHandler::SetGlobalFlag(
 
   AccessibilityUiModes::GetInstance(web_ui()->GetWebContents())
       .SetModeForProcess(new_mode.flags(), enabled);
-
-  // It's possible that the user is trying to remove a global flag that was set
-  // outside of chrome://accessibility. Modify the process-wide state
-  // accordingly. Note that this change will persist beyond the lifetime of
-  // chrome://accessibility.
-  if (!enabled) {
-    content::BrowserAccessibilityState::GetInstance()
-        ->RemoveAccessibilityModeFlags(new_mode);
-  }
 }
 
 void AccessibilityUIMessageHandler::SetGlobalString(

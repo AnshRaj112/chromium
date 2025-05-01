@@ -81,7 +81,8 @@
 #endif
 
 #define IDC_OPEN_IN_PWA_WINDOW          34053
-#define IDC_MOVE_TAB_TO_NEW_WINDOW          34054
+#define IDC_MOVE_TAB_TO_NEW_WINDOW      34054
+#define IDC_NEW_SPLIT_TAB               34055
 
 // Web app window commands
 #define IDC_COPY_URL                    34060
@@ -468,6 +469,7 @@
 #define IDC_BOOKMARK_BAR_REMOVE_FROM_BOOKMARKS_BAR 51020
 #define IDC_BOOKMARK_BAR_TOGGLE_SHOW_TAB_GROUPS 51021
 #define IDC_BOOKMARK_BAR_MOVE 51022
+#define IDC_BOOKMARK_BAR_OPEN_SPLIT_VIEW 51023
 
 // Context menu items for Sharing
 #define IDC_CONTENT_CONTEXT_SHARING_CLICK_TO_CALL_SINGLE_DEVICE 51030
@@ -576,9 +578,6 @@
 
 // Glic button context menu and tabstrip context menu
 #define IDC_GLIC_TOGGLE_PIN 53320
-
-// Glic focus navigation
-#define IDC_GLIC_TOGGLE_FOCUS 53325
 
 // NOTE: The last valid command value is 57343 (0xDFFF)
 // See http://msdn.microsoft.com/en-us/library/t2zechd4(VS.71).aspx

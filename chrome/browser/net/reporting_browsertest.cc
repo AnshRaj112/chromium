@@ -208,13 +208,9 @@ class ReportingBrowserTestMoreContextData : public BaseReportingBrowserTest {
   ~ReportingBrowserTestMoreContextData() override = default;
 
   void SetUp() override {
-    if (GetParam()) {
-      scoped_feature_list_.InitAndEnableFeature(
-          blink::features::kCrashReportingAPIMoreContextData);
-    } else {
-      scoped_feature_list_.InitAndDisableFeature(
-          blink::features::kCrashReportingAPIMoreContextData);
-    }
+    scoped_feature_list_.InitWithFeatureState(
+        blink::features::kCrashReportingAPIMoreContextData,
+        /*enabled=*/GetParam());
     BaseReportingBrowserTest::SetUp();
   }
 
@@ -630,10 +626,12 @@ IN_PROC_BROWSER_TEST_P(ReportingBrowserTest, MAYBE_CrashReport) {
   EXPECT_TRUE(NavigateToURL(contents, main_url));
 
   // Simulate a crash on the page.
-  content::ScopedAllowRendererCrashes allow_renderer_crashes(contents);
+  content::RenderProcessHostWatcher crash_observer(
+      contents, content::RenderProcessHostWatcher::WATCH_FOR_PROCESS_EXIT);
   contents->GetController().LoadURL(GURL(blink::kChromeUICrashURL),
                                     content::Referrer(),
                                     ui::PAGE_TRANSITION_TYPED, std::string());
+  crash_observer.Wait();
 
   upload_response()->WaitForRequest();
   base::Value::List response =

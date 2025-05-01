@@ -7587,7 +7587,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
         You can also ask things like “summarize”
       </message>
       <message name="IDS_GOOGLE_SEARCH_BOX_CONTEXTUAL_ERROR_TEXT" desc="The error text displayed in the overlay contextual searchbox ghost loader. It is meant to inform the user that they can still ask questions about the page even though suggestions were failed to be generated.">
-        No suggested questions available
+        No suggestions available. Try asking your own question about this page.
       </message>
       <message name="IDS_GOOGLE_SEARCH_BOX_CONTEXTUAL_LOADING_HINT_PRIMARY_ALT" desc="The hint text displayed in the overlay contextual searchbox ghost loader. It is meant to inform the user that suggestions are still being generated.">
         Generating suggestions…
@@ -8794,6 +8794,11 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Got extensions? <ph name="BEGIN_LINK">&lt;a href="chrome://extensions"&gt;</ph>Manage your extensions<ph name="END_LINK">&lt;/a&gt;</ph> in one easy place.
       </message>
 
+      <!-- New Tab Footer -->
+      <message name="IDS_NEW_TAB_FOOTER_NAME" desc="The name of the New Tab Footer feature, a UI that may show at the bottom of the New Tab Page." translateable="false">
+        New Tab Footer
+      </message>
+
       <!-- Star View menu -->
       <if expr="use_titlecase">
         <message name="IDS_STAR_VIEW_MENU_ADD_BOOKMARK" desc="The item label of the menu triggered from the star icon in the location bar for adding a bookmark.">
@@ -9015,10 +9020,10 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Save to a folder in your Google Account?
       </message>
       <message name="IDS_BOOKMARKS_MOVE_TO_ACCOUNT_DIALOG_SUBTITLE" desc="Subtitle for the dialog that offers the user to move a bookmark from their device to their signed-in account.">
-        This bookmark is saved only to this device. If you save it to <ph name="ACCOUNT_FOLDER">$1<ex>Account Bookmarks</ex></ph>, this bookmark will also be saved in your account.
+        This bookmark is saved only to this device. If you save it to “<ph name="ACCOUNT_FOLDER">$1<ex>Account Bookmarks</ex></ph>”, this bookmark will also be saved in your account.
       </message>
       <message name="IDS_BOOKMARKS_MOVE_TO_ACCOUNT_DIALOG_FOLDER_SUBTITLE" desc="Subtitle for the dialog that offers the user to move a bookmark folder from their device to their signed-in account.">
-        This folder is saved only to this device. If you save it to <ph name="ACCOUNT_FOLDER">$1<ex>Account Bookmarks</ex></ph>, this folder will also be saved in your account.
+        This folder is saved only to this device. If you save it to “<ph name="ACCOUNT_FOLDER">$1<ex>Account Bookmarks</ex></ph>”, this folder will also be saved in your account.
       </message>
       <message name="IDS_BOOKMARKS_MOVE_TO_ACCOUNT_DIALOG_OK_BUTTON_LABEL" desc="OK button label for the dialog that offers the user to move a bookmark from their device to their signed-in account.">
         Save in account
@@ -9027,10 +9032,10 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Save to a folder only on this device?
       </message>
       <message name="IDS_BOOKMARKS_MOVE_TO_DEVICE_DIALOG_SUBTITLE" desc="Subtitle for the dialog that offers the user to move a bookmark from their signed-in account to their device.">
-        <ph name="LOCAL_FOLDER">$1<ex>Local Bookmarks</ex></ph> is saved only to this device. If you move this bookmark to <ph name="LOCAL_FOLDER">$1<ex>Local Bookmarks</ex></ph>, you’ll no longer get it on your other devices.
+        “<ph name="LOCAL_FOLDER">$1<ex>Local Bookmarks</ex></ph>” is saved only to this device. If you move this bookmark to “<ph name="LOCAL_FOLDER">$1<ex>Local Bookmarks</ex></ph>”, you’ll no longer get it on your other devices.
       </message>
       <message name="IDS_BOOKMARKS_MOVE_TO_DEVICE_DIALOG_FOLDER_SUBTITLE" desc="Subtitle for the dialog that offers the user to move a bookmark folder from their signed-in account to their device.">
-        <ph name="LOCAL_FOLDER">$1<ex>Local Bookmarks</ex></ph> is saved only to this device. If you move this folder to <ph name="LOCAL_FOLDER">$1<ex>Local Bookmarks</ex></ph>, you’ll no longer get it on your other devices.
+        “<ph name="LOCAL_FOLDER">$1<ex>Local Bookmarks</ex></ph>” is saved only to this device. If you move this folder to “<ph name="LOCAL_FOLDER">$1<ex>Local Bookmarks</ex></ph>”, you’ll no longer get it on your other devices.
       </message>
       <message name="IDS_BOOKMARKS_MOVE_TO_DEVICE_DIALOG_OK_BUTTON_LABEL" desc="OK button label for the dialog that offers the user to move a bookmark from their signed-in account to their device.">
         Save to device
@@ -9819,11 +9824,11 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_SPLIT_VIEW_NTP_TITLE" desc="The title of the split view new tab page.">
         Choose a tab to add to split view
       </message>
-      <message name="IDS_SPLIT_VIEW_NTP_MEDIA_HEADING" desc="The header for the media tab list in the split view new tab page.">
-        Audio and Video
-      </message>
       <message name="IDS_SPLIT_VIEW_NTP_OPEN_HEADING" desc="The header for the open tab list in the split view new tab page.">
         Open Tabs
+      </message>
+      <message name="IDS_SPLIT_VIEW_NTP_TAB_TITLE" desc="The title of the split view new tab page as displayed in the tab strip.">
+        Choose a tab
       </message>
 
       <!-- Strings for experimental AI promo -->
@@ -10709,11 +10714,26 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
         <message name="IDS_PASSWORD_MANAGER_IPH_BODY_SAVE_TO_ACCOUNT" desc="Body of the in Product Help shown when the 'Save to account` is selected">
           You can save this password in your Google Account or only on this device
         </message>
-        <message name="IDS_PASSWORDS_SAVE_PRIMING_PROMO_BODY" desc="Body of IPH prompting users to consider saving passwords">
-          Save your passwords securely with Google Chrome - just sign in as normal and we'll do the rest
+        <message name="IDS_PASSWORDS_SAVE_PRIMING_PROMO_BODY_TEMPLATE" is_accessibility_with_no_ui="true" desc="Placeholder for string to be shown for IPH prompting users to consider saving passwords">
+          <ph name="message">$1<ex>Use Google Password Manager to sign in faster</ex></ph>
+        </message>
+        <message name="IDS_PASSWORDS_SAVE_PRIMING_PROMO_BODY_SIGNED_IN" desc="Body of IPH prompting users to consider saving passwords">
+          Use Google Password Manager to sign in faster to sites from any of your devices
+        </message>
+        <message name="IDS_PASSWORDS_SAVE_PRIMING_PROMO_BODY_NOT_SIGNED_IN" desc="Body of IPH prompting users to consider saving passwords">
+          To save strong passwords with Google Password Manager, sign in to Chrome
         </message>
         <message name="IDS_PASSWORDS_SAVE_PRIMING_PROMO_SCREENREADER" is_accessibility_with_no_ui="true" desc="Screenreader text for IPH prompting users to consider saving passwords">
-          You can save your passwords securely with Google Chrome - just sign in as normal and we'll do the rest
+          You can save passwords with Google Password Manager when you are signed in to Chrome
+        </message>
+        <message name="IDS_PASSWORDS_SAVE_RECOVERY_PROMO_BODY" desc="Body of IPH prompting users to reconsider saving passwords">
+          To save your password to Google Password Manager, click the key
+        </message>
+        <message name="IDS_PASSWORDS_SAVE_RECOVERY_PROMO_SCREENREADER" is_accessibility_with_no_ui="true" desc="Screenreader text for IPH prompting users to reconsider saving passwords">
+          To save your password to Google Password Manager, the Password Manager icon in the Location Bar
+        </message>
+        <message name="IDS_PASSWORD_MANAGER_TOOLTIP_BLOCKED" desc="Text for the 'Manage Passwords' when the user has blocked saving passwords for this site">
+          Never for this site
         </message>
         <message name="IDS_PASSWORD_MANAGER_IPH_MANAGEMENT_BUBBLE_AFTER_SAVE" desc="Body of the in Product Help shown after saving a password informing the user about the password management bubble">
           To view your password or add a note about it, click the key icon
@@ -11505,7 +11525,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
         <message name="IDS_SPLIT_TAB_CLOSE" translateable="false" desc="The label for a menu item that closes the inactive split tab when clicked.">
           Close this view
         </message>
-        <message name="IDS_SPLIT_TAB_SEPERATE_VIEWS" translateable="false" desc="The label for a menu item that unsplits the split tab when clicked.">
+        <message name="IDS_SPLIT_TAB_SEPARATE_VIEWS" translateable="false" desc="The label for a menu item that unsplits the split tab when clicked.">
           Seperate views
         </message>
       </if>
@@ -11525,7 +11545,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
         <message name="IDS_SPLIT_TAB_CLOSE" translateable="false" desc="In title case: the label for a menu item that closes the inactive split tab when clicked.">
           Close This View
         </message>
-        <message name="IDS_SPLIT_TAB_SEPERATE_VIEWS" translateable="false" desc="In title case: the label for a menu item that unsplits the split tab when clicked.">
+        <message name="IDS_SPLIT_TAB_SEPARATE_VIEWS" translateable="false" desc="In title case: the label for a menu item that unsplits the split tab when clicked.">
           Seperate Views
         </message>
       </if>
@@ -11947,6 +11967,12 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
       <!-- Tab Group Editor Bubble -->
       <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_TITLE_ACCESSIBLE_NAME" desc="The accessible name of the tab-group-title textfield.">
           Tab-group title
+      </message>
+      <message name="IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_FACE_PILE_ACCESSIBLE_NAME" desc="The accessible name of face pile bubbles [ICU Syntax]">
+          {MEMBER_COUNT, plural,
+            =1 {# member in the group}
+            other {# members in the group}
+          }
       </message>
       <if expr="not use_titlecase">
         <message name="IDS_TAB_GROUP_HEADER_CXMENU_NEW_TAB_IN_GROUP" desc="The label of the tab group header context menu item for adding a new tab into the current group.">
@@ -12393,6 +12419,9 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
         </message>
         <message name ="IDS_DATA_SHARING_GET_GROUP_PREVIEW_ARIA_LABEL" desc="Aria label for the group preview card.">
           View more details about <ph name="GROUP_NAME">$1<ex>vacation group</ex></ph>
+        </message>
+        <message name ="IDS_DATA_SHARING_PREVIEW_A11Y_NAME" desc="The accessibility name the data sharing preview dialog">
+          Join tab group
         </message>
       <!-- /Data Sharing Preview Dialog -->
 
@@ -12894,15 +12923,21 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
           Learn more about access requests.
         </message>
 
-        <!-- Extension upload to account dialog -->
-        <message name="IDS_EXTENSIONS_MOVE_TO_ACCOUNT_DIALOG_TITLE" desc="Title of the dialog triggers the upload of a local extension to the signed in user's account.">
-          Save this extension in your Google Account?
+        <!-- Upload to account dialog -->
+        <message name="IDS_UPLOAD_MOVE_TO_ACCOUNT_DIALOG_TITLE" desc="Title for the dialog that offers the user to move a piece of data from their device to their signed-in account.">
+          Save in your Google Account?
         </message>
         <message name="IDS_EXTENSIONS_MOVE_TO_ACCOUNT_DIALOG_SUBTITLE" desc="Subtitle of the dialog triggers the upload of a local extension to the signed in user's account.">
           "<ph name="NAME">$1<ex>Google Cast</ex></ph>" is saved only to this device. To use it on your other devices, save it in your account.
         </message>
+        <message name="IDS_BOOKMARK_UPLOAD_MOVE_TO_ACCOUNT_DIALOG_SUBTITLE" desc="Subtitle for the upload dialog that offers the user to move a bookmark from their device to their signed-in account.">
+          "<ph name="LOCAL_BOOKMARK">$1<ex>Local Bookmark</ex></ph>" is saved only to this device. To use it on your other devices, save it in your account.
+        </message>
         <message name="IDS_EXTENSIONS_MOVE_TO_ACCOUNT_DIALOG_OK_BUTTON_LABEL" desc="Text of the button that triggers the upload of a local extension to the signed in user's account in the extension upload dialog.">
           Save in account
+        </message>
+        <message name="IDS_BOOKMARK_MOVE_TO_ACCOUNT_ICON_TOOLTIP" desc="Button shown against a bookmark or bookmark folder that’s saved only to the user’s device. The user can click the button to save this item in their signed-in Google Account.">
+          Save in your Google Account
         </message>
 
         <!-- Reset Profile Settings strings -->
@@ -14141,9 +14176,6 @@ This can include information about installed software, files, your browser, the 
         <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_TITLE"  desc="This is the title of an error message dialog that appears when the user opens the Chrome Profile Menu and chooses 'Sign out of Chrome'. The error message appears when the user has saved some data (like a password or payment method) to Chrome, but Chrome wasn't able to save the data to the user's Google Account due to a sign-in error; but, the data has been saved locally to Chrome. This title is before the 'Chrome needs to verify it’s you before some data can be saved in your Google Account and used on all your devices. If you sign out, this data will stay on this device.' string. The tone should be cautionary.">
           Some data isn’t saved in your account yet
         </message>
-        <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_SIGNOUT_BUTTON" desc="This string is found on a button that lets the user sign out of Chrome when the user taps it. It is on an error message dialog that appears when the user opens the Chrome Profile Menu and chooses 'Sign out of Chrome'. The error message appears when the user has saved some data (like a password or payment method) to Chrome, but Chrome wasn't able to save the data to the user's Google Account due to a sign-in error; but, the data has been saved locally to Chrome. This text is a verb and is short for the longer phrase 'Sign out of Chrome anyway.'">
-          Sign out anyway
-        </message>
         <message name="IDS_CHROME_SIGNOUT_CONFIRMATION_PROMPT_DELETE_AND_SIGNOUT_BUTTON" desc="This string is found on a button that lets the user sign out of Chrome when the user taps it. It is on an error message dialog that appears when the user opens the Chrome Profile Menu and chooses 'Sign out of Chrome'. The error message appears when the user has saved some data (like a password or payment method) to Chrome, but Chrome wasn't able to save the data to the user's Google Account due to a network error; but, the data has been saved locally to Chrome. This text is a verb and is short for the longer phrase 'Delete data and sign out of Chrome anyway.'">
           Delete and sign out
         </message>
@@ -14447,23 +14479,11 @@ Please help our engineers fix this problem. Tell us what happened right before y
       <message name="IDS_SYNC_ERROR_USER_MENU_TITLE" desc="Title of the sync/signin error header of desktop user menu.">
         Sync isn't working
       </message>
-      <message name="IDS_SYNC_ERROR_PASSWORDS_USER_MENU_TITLE" desc="Title of the sync/signin error header of desktop user menu for the case where the error only affects sync-ed passwords..">
-        Password sync isn't working
-      </message>
       <message name="IDS_SYNC_ERROR_PASSWORDS_USER_MENU_ERROR_DESCRIPTION" desc="Error description of the sync/signin error header of desktop user menu.">
         Verify it's you to use and save passwords in your account, <ph name="ACCOUNT_EMAIL">$1<ex>elisa.beckett@gmail.com</ex></ph>
       </message>
-      <message name="IDS_SYNC_ERROR_PASSWORDS_USER_MENU_TITLE_SIGNED_IN_ONLY" desc="Title of the sync/signin error header of desktop user menu. Shown for users who are signed-in but not syncing.">
-        To continue saving passwords in your Google Account, verify it’s you
-      </message>
-      <message name="IDS_SYNC_ERROR_RECOVERABILITY_DEGRADED_FOR_EVERYTHING_USER_MENU_TITLE" desc="Title of a sync error header of desktop user menu that prompts the user to add recovery options.">
-        Make sure you can always access your sync data
-      </message>
       <message name="IDS_SYNC_ERROR_RECOVERABILITY_DEGRADED_FOR_PASSWORDS_USER_MENU_ERROR_DESCRIPTION" desc="Error description of a sync error header of desktop user menu that prompts the user to add recovery options.">
         Verify it's you to make sure you can always use the passwords in your account, <ph name="ACCOUNT_EMAIL">$1<ex>elisa.beckett@gmail.com</ex></ph>
-      </message>
-      <message name="IDS_SYNC_ERROR_RECOVERABILITY_DEGRADED_FOR_PASSWORDS_USER_MENU_TITLE" desc="Title of a sync error header of desktop user menu that prompts the user to add recovery options.">
-        Make sure you can always access your saved passwords
       </message>
       <message name="IDS_SYNC_NEEDS_VERIFICATION_BUBBLE_VIEW_TITLE" desc="Title in the sync error bubble view/notification for the case where sync needs to verify the user.">
         Sync needs to verify it's you
@@ -16111,10 +16131,10 @@ Please help our engineers fix this problem. Tell us what happened right before y
         </message>
       </if>
       <message name="IDS_GROUP_AX_LABEL_UNNAMED_GROUP_FORMAT" desc="Spoken by screen readers when a tab group header that has not been named by the user gets focused but is not visually rendered. Example: 'Unnamed group - Google Search and 3 other tabs - Expanded'">
-        Unnamed group - <ph name="GROUP_CONTENTS">$2<ex>Google Search and 3 other tabs</ex></ph> - <ph name="COLLAPSED_STATE">$1</ph>
+       <ph name="SHARE_STATE">$1<ex>Shared</ex></ph> unnamed group - <ph name="GROUP_CONTENTS">$2<ex>Google Search and 3 other tabs</ex></ph> - <ph name="COLLAPSED_STATE">$3</ph>
       </message>
       <message name="IDS_GROUP_AX_LABEL_NAMED_GROUP_FORMAT" desc="Spoken by screen readers when a tab group header that has been named by the user gets focused but is not visually rendered. Example: 'Group MyGroupName - Google Search and 3 other tabs - Collapsed'">
-        Group <ph name="GROUP_NAME">$2</ph> - <ph name="GROUP_CONTENTS">$3<ex>Google Search and 3 other tabs</ex></ph> - <ph name="COLLAPSED_STATE">$1</ph>
+       <ph name="SHARE_STATE">$1<ex>Shared</ex></ph> group <ph name="GROUP_NAME">$2</ph> - <ph name="GROUP_CONTENTS">$3<ex>Google Search and 3 other tabs</ex></ph> - <ph name="COLLAPSED_STATE">$4</ph>
       </message>
       <message name="IDS_GROUP_AX_LABEL_COLLAPSED" desc="Used as part of the accessibility label text of a group header for a collapsed tab group.">
         Collapsed
@@ -18828,6 +18848,12 @@ Please help our engineers fix this problem. Tell us what happened right before y
   </message>
   <message name="IDS_CHROME_NO_LONGER_SHOW_WARNINGS_NOTIFICATION_BODY" desc="The body for the notification sent by Chrome informing the user that their decision to never show warnings for the url has been applied.">
     Chrome will stop flagging notifications from this site as spam
+  </message>
+  <message name="IDS_CHROME_NO_LONGER_SHOW_WARNINGS_NOTIFICATION_TITLE_NEW" desc="The title for the notification sent by Chrome informing the user that their decision to never show warnings for the url has been applied.">
+    Notifications allowed from <ph name="DOMAIN">$1<ex>example.com</ex></ph>
+  </message>
+  <message name="IDS_CHROME_NO_LONGER_SHOW_WARNINGS_NOTIFICATION_BODY_NEW" desc="The body for the notification sent by Chrome informing the user that their decision to never show warnings for the url has been applied and they may report their notification contents to Google.">
+    Help improve spam protection by sending notification content and the site's URL to Google.
   </message>
 
      <!-- Merchant Trust IPH strings -->

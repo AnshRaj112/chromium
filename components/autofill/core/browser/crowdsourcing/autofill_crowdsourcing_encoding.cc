@@ -403,8 +403,7 @@ void EncodeFormFieldsForUpload(
       for (const std::u16string& format_string : it->second.format_strings) {
         DCHECK(data_util::IsValidDateFormat(format_string));
         auto* added_format_string = added_field->add_format_string();
-        added_format_string->set_type(
-            AutofillUploadContents_Field_FormatString_Type_DATE);
+        added_format_string->set_type(FormatString_Type_DATE);
         added_format_string->set_format_string(
             base::UTF16ToUTF8(format_string));
       }
@@ -688,7 +687,7 @@ base::flat_set<FormSignature> GetFormsForWhichToRunAiModel(
       forms.push_back(queried_form_signatures[i]);
     }
   }
-  return base::MakeFlatSet<FormSignature>(std::move(forms));
+  return base::flat_set<FormSignature>(std::move(forms));
 }
 
 }  // namespace
@@ -916,9 +915,16 @@ void ProcessServerPredictionsQueryResponse(
             field_suggestion->password_requirements());
       }
       if (field_suggestion->has_format_string()) {
-        field->set_format_string_unless_overruled(
-            base::UTF8ToUTF16(field_suggestion->format_string()),
-            AutofillField::FormatStringSource::kServer);
+        switch (field_suggestion->format_string().type()) {
+          case FormatString_Type_DATE:
+            field->set_format_string_unless_overruled(
+                base::UTF8ToUTF16(
+                    field_suggestion->format_string().format_string()),
+                AutofillField::FormatStringSource::kServer);
+            break;
+          default:
+            break;
+        }
       }
       ++field_rank_map[field->GetFieldSignature()];
 

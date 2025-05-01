@@ -1263,7 +1263,9 @@ IN_PROC_BROWSER_TEST_F(SavePackageDeepScanningBrowserTest, Blocked) {
             enterprise_connectors::ContentAnalysisRequest::SAVE_AS_DOWNLOAD);
 
   // The blocking response should trigger a security event.
+  base::RunLoop validator_run_loop;
   enterprise_connectors::test::EventReportValidator validator(client());
+  validator.SetDoneClosure(validator_run_loop.QuitClosure());
   std::set<std::string> mimetypes = {"text/plain"};
   validator.ExpectSensitiveDataEvent(
       /*url*/ url.spec(),
@@ -1299,6 +1301,7 @@ IN_PROC_BROWSER_TEST_F(SavePackageDeepScanningBrowserTest, Blocked) {
   base::ScopedAllowBlockingForTesting allow_blocking;
   EXPECT_FALSE(base::PathExists(main_file));
   EXPECT_FALSE(base::PathExists(extra_files_dir));
+  validator_run_loop.Run();
 }
 
 IN_PROC_BROWSER_TEST_F(SavePackageDeepScanningBrowserTest, KeepAfterWarning) {
@@ -1377,7 +1380,11 @@ IN_PROC_BROWSER_TEST_F(SavePackageDeepScanningBrowserTest, KeepAfterWarning) {
 
   // Keeping the save package will generate a second warning event, complete the
   // download and move the file to its final destination.
-  validator.ExpectSensitiveDataEvent(
+
+  base::RunLoop validator_warn_run_loop;
+  enterprise_connectors::test::EventReportValidator validator_warn(client());
+  validator_warn.SetDoneClosure(validator_warn_run_loop.QuitClosure());
+  validator_warn.ExpectSensitiveDataEvent(
       /*url*/ url.spec(),
       /*tab_url*/ url.spec(),
       /*source*/ "",
@@ -1411,6 +1418,7 @@ IN_PROC_BROWSER_TEST_F(SavePackageDeepScanningBrowserTest, KeepAfterWarning) {
   EXPECT_TRUE(base::PathExists(main_file));
   EXPECT_TRUE(base::ContentsEqual(GetTestFilePath(), main_file));
   EXPECT_FALSE(base::PathExists(extra_files_dir));
+  validator_warn_run_loop.Run();
 }
 
 IN_PROC_BROWSER_TEST_F(SavePackageDeepScanningBrowserTest,

@@ -7,6 +7,8 @@ package org.chromium.chrome.browser.customtabs.content;
 import android.text.TextUtils;
 
 import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider;
+import org.chromium.chrome.browser.browserservices.ui.controller.CurrentPageVerifier;
+import org.chromium.chrome.browser.browserservices.ui.controller.Verifier;
 import org.chromium.chrome.browser.customtabs.CustomTabAuthUrlHeuristics;
 import org.chromium.chrome.browser.customtabs.CustomTabObserver;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -22,14 +24,20 @@ public class DefaultCustomTabIntentHandlingStrategy implements CustomTabIntentHa
     private final CustomTabActivityTabProvider mTabProvider;
     private final CustomTabActivityNavigationController mNavigationController;
     private final CustomTabObserver mCustomTabObserver;
+    private final Verifier mVerifier;
+    private final CurrentPageVerifier mCurrentPageVerfier;
 
     public DefaultCustomTabIntentHandlingStrategy(
             CustomTabActivityTabProvider tabProvider,
             CustomTabActivityNavigationController navigationController,
-            CustomTabObserver customTabObserver) {
+            CustomTabObserver customTabObserver,
+            Verifier verifier,
+            CurrentPageVerifier currentPageVerfier) {
         mTabProvider = tabProvider;
         mNavigationController = navigationController;
         mCustomTabObserver = customTabObserver;
+        mVerifier = verifier;
+        mCurrentPageVerfier = currentPageVerfier;
     }
 
     @Override
@@ -49,8 +57,15 @@ public class DefaultCustomTabIntentHandlingStrategy implements CustomTabIntentHa
         CustomTabAuthUrlHeuristics.recordUrlParamsHistogram(intentDataProvider.getUrlToLoad());
         CustomTabAuthUrlHeuristics.recordRedirectUriSchemeHistogram(intentDataProvider);
 
-        if (ChromeFeatureList.isEnabled(ChromeFeatureList.ANDROID_WEB_APP_LAUNCH_HANDLER)) {
-            handleLaunch(intentDataProvider, true);
+        if (ChromeFeatureList.isEnabled(ChromeFeatureList.ANDROID_WEB_APP_LAUNCH_HANDLER)
+                && intentDataProvider.isTrustedWebActivity()) {
+            WebAppLaunchHandler launchHandler =
+                    WebAppLaunchHandler.create(
+                            mVerifier,
+                            mCurrentPageVerfier,
+                            mNavigationController,
+                            mTabProvider.getTab().getWebContents());
+            launchHandler.handleInitialIntent(intentDataProvider);
         }
     }
 
@@ -84,21 +99,6 @@ public class DefaultCustomTabIntentHandlingStrategy implements CustomTabIntentHa
         mNavigationController.navigate(params, intentDataProvider.getIntent());
     }
 
-    private void handleLaunch(
-            BrowserServicesIntentDataProvider intentDataProvider, boolean isInitialIntent) {
-        WebAppLaunchHandler launchHandler =
-                new WebAppLaunchHandler(
-                        intentDataProvider.getLaunchHandlerClientMode(),
-                        intentDataProvider.getUrlToLoad(),
-                        intentDataProvider.getClientPackageName());
-
-        if (launchHandler.getStartNewNavigation() && !isInitialIntent) {
-            loadUrl(intentDataProvider);
-        }
-
-        launchHandler.notifyLaunchQueue(mTabProvider.getTab().getWebContents());
-    }
-
     private void loadUrl(BrowserServicesIntentDataProvider intentDataProvider) {
         String url = intentDataProvider.getUrlToLoad();
         if (TextUtils.isEmpty(url)) return;
@@ -117,8 +117,15 @@ public class DefaultCustomTabIntentHandlingStrategy implements CustomTabIntentHa
 
     @Override
     public void handleNewIntent(BrowserServicesIntentDataProvider intentDataProvider) {
-        if (ChromeFeatureList.isEnabled(ChromeFeatureList.ANDROID_WEB_APP_LAUNCH_HANDLER)) {
-            handleLaunch(intentDataProvider, false);
+        if (ChromeFeatureList.isEnabled(ChromeFeatureList.ANDROID_WEB_APP_LAUNCH_HANDLER)
+                && intentDataProvider.isTrustedWebActivity()) {
+            WebAppLaunchHandler launchHandler =
+                    WebAppLaunchHandler.create(
+                            mVerifier,
+                            mCurrentPageVerfier,
+                            mNavigationController,
+                            mTabProvider.getTab().getWebContents());
+            launchHandler.handleNewIntent(intentDataProvider);
         } else {
             loadUrl(intentDataProvider);
         }

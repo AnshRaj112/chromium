@@ -5,7 +5,10 @@
 #ifndef CHROME_BROWSER_EXTENSIONS_EXTENSION_UI_UTIL_H_
 #define CHROME_BROWSER_EXTENSIONS_EXTENSION_UI_UTIL_H_
 
+#include "extensions/buildflags/buildflags.h"
 #include "url/gurl.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 namespace content {
 class BrowserContext;
@@ -35,8 +38,8 @@ bool CanDisplayInAppLauncher(const Extension* extension,
 bool ShouldDisplayInNewTabPage(const Extension* extension,
                                content::BrowserContext* context);
 
-// If |url| is an extension URL, returns the name of the associated extension,
-// with whitespace collapsed. Otherwise, returns empty string. |context| is used
+// If `url` is an extension URL, returns the name of the associated extension,
+// with whitespace collapsed. Otherwise, returns empty string. `context` is used
 // to get at the extension registry.
 std::u16string GetEnabledExtensionNameForUrl(const GURL& url,
                                              content::BrowserContext* context);

@@ -741,6 +741,7 @@ class CrossbenchTest(object):
     self.options = options
     self.isolated_out_dir = isolated_out_dir
     self.network = self._get_network_arg(options.passthrough_args)
+    self.probe = self._get_probe_arg(options.passthrough_args)
     if self.options.luci_chromium:
       # In luci.chromium the Chrome and driver are in the user path.
       self.browser = '--browser=%s' % get_abs_user_path('chrome')
@@ -751,7 +752,7 @@ class CrossbenchTest(object):
       browser_arg = _get_browser_arg(options.passthrough_args)
       self.is_android = _is_android(browser_arg)
       self._find_browser(browser_arg)
-      self.driver_path_arg = self._find_chromedriver(browser_arg)
+      self.driver_path_arg = self._find_chromedriver()
 
   def _get_network_arg(self, args):
     if _arg := _get_arg(args, '--network='):
@@ -760,6 +761,9 @@ class CrossbenchTest(object):
       return self._create_fileserver_network(_arg)
     if _get_arg(args, '--wpr'):
       return self._create_wpr_network(args)
+    if self.options.benchmarks.startswith('motionmark'):
+      # TODO(crbug.com/413452730): Enable local file server in all platforms.
+      return []
     if ((self.options.benchmarks in self.BENCHMARK_FILESERVERS)
         and not (self.options.benchmarks.startswith('speedometer')
                  and sys.platform == 'darwin')):
@@ -767,6 +771,14 @@ class CrossbenchTest(object):
       arg = '--fileserver'
       args.append(arg)
       return self._create_fileserver_network(arg)
+    return []
+
+  def _get_probe_arg(self, args):
+    if _arg := _get_arg(args, '--probe='):
+      return [_arg]
+    if self.options.benchmarks.startswith('motionmark'):
+      # Take a screenshot because of crbug.com/414806161.
+      return ['--probe=screenshot']
     return []
 
   def _create_fileserver_network(self, arg):
@@ -825,15 +837,8 @@ class CrossbenchTest(object):
       assert hasattr(possible_browser, 'local_executable')
       self.browser = self.CHROME_BROWSER % possible_browser.local_executable
 
-  def _find_chromedriver(self, browser_arg):
-    browser_arg = browser_arg.lower()
-    if browser_arg == 'release_x64':
-      path = '../Release_x64'
-    elif self.is_android:
-      path = 'clang_x64'
-    else:
-      path = '.'
-
+  def _find_chromedriver(self):
+    path = 'clang_x64' if self.is_android else '.'
     abspath = pathlib.Path(path).absolute()
     if ((driver_path := (abspath / 'chromedriver')).exists()
         or (driver_path := (abspath / 'chromedriver.exe')).exists()):
@@ -855,10 +860,10 @@ class CrossbenchTest(object):
     return default_args
 
   def _generate_command_list(self, benchmark, benchmark_args, working_dir):
-    return (['vpython3'] + [self.options.executable] + [benchmark] +
+    return (['vpython3', '-Xutf8'] + [self.options.executable] + [benchmark] +
             ['--env-validation=throw'] + [self.OUTDIR % working_dir] +
             [self.browser] + benchmark_args + self.driver_path_arg +
-            self.network + self._get_default_args())
+            self.network + self.probe + self._get_default_args())
 
   def execute_benchmark(self,
                         benchmark,

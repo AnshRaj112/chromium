@@ -26,10 +26,20 @@ chromium-metrics-reviews@google.com.
     enum="ActInFocusedTabErrorReason" expires_after="2026-01-15">
   <owner>carlosk@chromium.org</owner>
   <owner>harringtond@chromium.org</owner>
-  <owner>chasej@chromium.org</owner>
+  <owner>bokan@chromium.org</owner>
   <summary>
     Recorded whenever the glic web client receives an error reason from the
     browser when attempting to act.
+  </summary>
+</histogram>
+
+<histogram name="Glic.Api.FetchZeroStateSuggestionsLatency" units="ms"
+    expires_after="2026-01-15">
+  <owner>sophiechang@chromium.org</owner>
+  <owner>jeffreycohen@google.com</owner>
+  <summary>
+    Records the latency of fetching zero state suggestions whenever the glic web
+    client requests zero state suggestions from Chrome.
   </summary>
 </histogram>
 
@@ -84,6 +94,7 @@ chromium-metrics-reviews@google.com.
     <variant name="SetTabContextPermissionState"/>
     <variant name="SetWindowDraggableAreas"/>
     <variant name="ShowProfilePicker"/>
+    <variant name="StopActorTask"/>
     <variant name="WebClientCreated"/>
     <variant name="WebClientInitialized"/>
   </token>
@@ -91,7 +102,7 @@ chromium-metrics-reviews@google.com.
 
 </histogram>
 
-<histogram name="Glic.AttachToBrowser" enum="GlicAttachChangeReason"
+<histogram name="Glic.AttachedToBrowser" enum="GlicAttachChangeReason"
     expires_after="2026-01-15">
   <owner>dullweber@chromium.org</owner>
   <owner>erikchen@chromium.org</owner>
@@ -147,6 +158,20 @@ chromium-metrics-reviews@google.com.
   <summary>
     Records the time taken for content to load after the FRE window appears.
   </summary>
+</histogram>
+
+<histogram name="Glic.Host.WebClientState.{Event}"
+    enum="GlicDetailedWebClientState" expires_after="2026-01-15">
+  <owner>harringtond@chromium.org</owner>
+  <owner>carlosk@chromium.org</owner>
+  <summary>Records the web client state according to the host. {Event}</summary>
+  <token key="Event">
+    <variant name="AtOneMinute"
+        summary="Recorded one minute after loading the webview."/>
+    <variant name="OnCommit" summary="Recorded before commit on the webview."/>
+    <variant name="OnDestroy"
+        summary="Recorded before the webview is destroyed."/>
+  </token>
 </histogram>
 
 <histogram name="Glic.Metrics.Error" enum="GlicMetricsError"

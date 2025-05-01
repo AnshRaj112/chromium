@@ -11,7 +11,6 @@
 
 #include "base/barrier_callback.h"
 #include "base/memory/weak_ptr.h"
-#include "base/time/time.h"
 #include "components/autofill/core/browser/ui/autofill_image_fetcher_base.h"
 #include "components/image_fetcher/core/image_fetcher_types.h"
 
@@ -78,11 +77,9 @@ class AutofillImageFetcher : public AutofillImageFetcherBase {
   AutofillImageFetcher();
 
   // Called when an image is fetched. If the fetch was unsuccessful,
-  // `card_art_image` will be an empty gfx::Image(). If the original URL was
-  // invalid, `fetch_image_request_timestamp` will also be null.
+  // `card_art_image` will be an empty gfx::Image().
   void OnCardArtImageFetched(
       const GURL& card_art_url,
-      const std::optional<base::TimeTicks>& fetch_image_request_timestamp,
       const gfx::Image& card_art_image,
       const image_fetcher::RequestMetadata& metadata);
 
@@ -95,11 +92,8 @@ class AutofillImageFetcher : public AutofillImageFetcherBase {
                         ImageType image_type,
                         image_fetcher::ImageFetcherCallback callback);
 
-  // Stores the result of fetching images for card art URLs. It's used to
-  // mitigate the issue of inflated failure metrics caused by repeated fetch
-  // attempts.
-  std::map<std::string, bool> url_to_image_fetch_result_map_;
-
+  // Keeps track of the number of fetch attempts for a given URL.
+  std::map<GURL, int> fetch_attempt_counter_;
   // An in-memory image cache which stores post-processed images.
   std::map<GURL, std::unique_ptr<gfx::Image>> cached_images_;
 };

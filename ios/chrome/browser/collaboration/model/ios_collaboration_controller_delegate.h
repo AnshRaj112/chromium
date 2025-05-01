@@ -25,13 +25,16 @@ class TabGroupService;
 
 namespace collaboration {
 
+enum class FlowType;
+
 // iOS implementation of CollaborationControllerDelegate.
 class IOSCollaborationControllerDelegate
     : public CollaborationControllerDelegate {
  public:
   IOSCollaborationControllerDelegate(Browser* browser,
                                      UIViewController* base_view_controller,
-                                     TabGroupService* tab_group_service);
+                                     TabGroupService* tab_group_service,
+                                     FlowType flow_type);
 
   IOSCollaborationControllerDelegate(
       const IOSCollaborationControllerDelegate&) = delete;
@@ -81,6 +84,10 @@ class IOSCollaborationControllerDelegate
  private:
   using PreviewItemsCallBack =
       base::OnceCallback<void(NSArray<ShareKitPreviewItem*>*)>;
+
+  // Common implementation of `ShowLeaveDialog:` and `ShowDeleteDialog:`.
+  void ShowLeaveOrDeleteDialog(const tab_groups::EitherGroupID& either_id,
+                               ResultCallback result);
 
   // Called when the authentication ui flow is complete.
   void OnAuthenticationComplete(ResultCallback result,
@@ -135,10 +142,16 @@ class IOSCollaborationControllerDelegate
   // Returns the join group image displayed in the join flow.
   UIImage* JoinGroupImage(NSArray<ShareKitPreviewItem*>* preview_items);
 
+  // Presents the scrim view.
+  void AddScrimView();
+
   raw_ptr<ShareKitService> share_kit_service_;
   raw_ptr<FaviconLoader> favicon_loader_;
   raw_ptr<Browser> browser_;
   std::unique_ptr<TabGroupFaviconsGridConfigurator> favicons_grid_configurator_;
+
+  // Collaboration flow that initiated this delegate.
+  FlowType flow_type_;
 
   __weak UIViewController* base_view_controller_;
   NSString* session_id_ = nil;

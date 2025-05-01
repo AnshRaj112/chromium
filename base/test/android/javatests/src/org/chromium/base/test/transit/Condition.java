@@ -20,6 +20,7 @@ import org.chromium.build.annotations.MonotonicNonNull;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -286,6 +287,18 @@ public abstract class Condition {
     }
 
     /**
+     * {@link #checkWithSuppliers()} should return this as a convenience method to compare Objects
+     * (including Strings).
+     */
+    public static ConditionStatus whetherEquals(Object expected, Object actual) {
+        return whether(
+                Objects.equals(expected, actual),
+                "Expected: \"%s\"; Actual: \"%s\"",
+                expected,
+                actual);
+    }
+
+    /**
      * {@link #checkWithSuppliers()} should return this when it does not have information to check
      * the Condition yet.
      *
@@ -319,6 +332,16 @@ public abstract class Condition {
     public static ConditionStatus fulfilledOrAwaiting(
             boolean isFulfilled, String message, Object... args) {
         return fulfilledOrAwaiting(isFulfilled, String.format(message, args));
+    }
+
+    /** Waits for one or more Conditions using a Transition. */
+    public static CarryOn waitFor(Condition... conditions) {
+        return waitFor(TransitionOptions.DEFAULT, conditions);
+    }
+
+    /** Waits for one or more Conditions using a Transition with {@link TransitionOptions}. */
+    public static CarryOn waitFor(TransitionOptions options, Condition... conditions) {
+        return CarryOn.pickUp(CarryOn.fromConditions(conditions), options, /* trigger= */ null);
     }
 
     /** Runs |trigger| and waits for one or more Conditions using a Transition. */

@@ -468,12 +468,15 @@ bool PaymentsDataManager::ShouldShowBnplSettings() const {
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
     BUILDFLAG(IS_CHROMEOS)
   // Check `kAutofillEnableBuyNowPayLater` only if the user has seen a BNPL
-  // suggestion before to avoid unnecessary feature flag checks. Ensures that
-  // only relevant sessions are included in BNPL related A/B experiments.
-  // Otherwise, users that navigate to the settings page can enroll in the
-  // experiment, with very little guarantee they will actually use the BNPL
-  // feature.
-  return IsAutofillHasSeenBnplPrefEnabled() &&
+  // suggestion before, or there are already linked issuers present, to avoid
+  // unnecessary feature flag checks. The linked issuer check is due to the fact
+  // that users can link BNPL issuers outside of Chrome - these users should be
+  // considered as part of the experiment and be able to see the toggle and
+  // their issuers on the settings page. Otherwise, users that navigate to the
+  // settings page can enroll in the experiment, with very little guarantee they
+  // will actually use the BNPL feature.
+  return (IsAutofillHasSeenBnplPrefEnabled() ||
+          !linked_bnpl_issuers_.empty()) &&
          base::FeatureList::IsEnabled(features::kAutofillEnableBuyNowPayLater);
 #else
   return false;
@@ -2208,9 +2211,15 @@ void PaymentsDataManager::CacheIfLinkedBnplPaymentInstrument(
     return;
   }
 
-  linked_bnpl_issuers_.emplace_back(payment_instrument.instrument_id(),
-                                    bnpl_issuer_details.issuer_id(),
-                                    std::move(eligible_price_ranges));
+  // `GetSupportedBnplIssuerIds` is already called to filter out any unknown
+  // issuer IDs that might be returned by the payment server. This ensures that
+  // only issuer IDs with a corresponding BnplIssuer::IssuerId enum value are
+  // processed, thus guaranteeing that `ConvertToBnplIssuerIdEnum` will not
+  // encounter an unknown value and hit the NOTREACHED().
+  linked_bnpl_issuers_.emplace_back(
+      payment_instrument.instrument_id(),
+      ConvertToBnplIssuerIdEnum(bnpl_issuer_details.issuer_id()),
+      std::move(eligible_price_ranges));
 }
 
 void PaymentsDataManager::CacheIfEwalletPaymentInstrument(
@@ -2282,8 +2291,14 @@ void PaymentsDataManager::CacheIfBnplPaymentInstrumentCreationOption(
     return;
   }
 
-  unlinked_bnpl_issuers_.emplace_back(std::nullopt, bnpl_issuer.issuer_id(),
-                                      std::move(eligible_price_ranges));
+  // `GetSupportedBnplIssuerIds` is already called to filter out any unknown
+  // issuer IDs that might be returned by the payment server. This ensures that
+  // only issuer IDs with a corresponding BnplIssuer::IssuerId enum value are
+  // processed, thus guaranteeing that `ConvertToBnplIssuerIdEnum` will not
+  // encounter an unknown value and hit the NOTREACHED().
+  unlinked_bnpl_issuers_.emplace_back(
+      std::nullopt, ConvertToBnplIssuerIdEnum(bnpl_issuer.issuer_id()),
+      std::move(eligible_price_ranges));
 }
 
 bool PaymentsDataManager::HasEligibleCurrencyPriceRangeForBnplIssuer(

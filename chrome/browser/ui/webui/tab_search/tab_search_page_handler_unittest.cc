@@ -23,6 +23,8 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/test/mock_browser_window_interface.h"
 #include "chrome/browser/ui/tabs/organization/tab_declutter_controller.h"
+#include "chrome/browser/ui/tabs/split_tab_data.h"
+#include "chrome/browser/ui/tabs/split_tab_visual_data.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_utils.h"
 #include "chrome/browser/ui/tabs/test_tab_strip_model_delegate.h"
@@ -32,6 +34,7 @@
 #include "chrome/browser/ui/webui/metrics_reporter/mock_metrics_reporter.h"
 #include "chrome/browser/ui/webui/tab_search/tab_search.mojom-forward.h"
 #include "chrome/browser/ui/webui/tab_search/tab_search_ui.h"
+#include "chrome/browser/ui/webui/webui_embedding_context.h"
 #include "chrome/test/base/browser_with_test_window_test.h"
 #include "chrome/test/base/test_browser_window.h"
 #include "chrome/test/base/testing_profile_manager.h"
@@ -40,6 +43,8 @@
 #include "components/tab_groups/tab_group_color.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tab_groups/tab_group_visual_data.h"
+#include "components/tabs/public/split_tab_id.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/test/navigation_simulator.h"
 #include "content/public/test/test_web_ui.h"
 #include "content/public/test/web_contents_tester.h"
@@ -173,6 +178,7 @@ class TabSearchPageHandlerTest : public BrowserWithTestWindowTest {
     web_contents_ = content::WebContents::Create(
         content::WebContents::CreateParams(profile()));
     web_ui_.set_web_contents(web_contents_.get());
+    webui::SetBrowserWindowInterface(web_contents_.get(), browser());
     profile2_ = profile_manager()->CreateTestingProfile(
         "testing_profile2", nullptr, std::u16string(), 0,
         GetTestingFactories());
@@ -182,7 +188,7 @@ class TabSearchPageHandlerTest : public BrowserWithTestWindowTest {
         false);
     browser4_ = CreateTestBrowser(profile2(), false);
     browser5_ = CreateTestBrowser(profile1(), true);
-    BrowserList::SetLastActive(browser1());
+    browser1()->DidBecomeActive();
     webui_controller_ = std::make_unique<TabSearchUI>(web_ui());
     handler_ = std::make_unique<TestTabSearchPageHandler>(
         page_.BindAndGetRemote(), web_ui(), webui_controller_.get());
@@ -260,7 +266,6 @@ class TabSearchPageHandlerTest : public BrowserWithTestWindowTest {
 
     std::unique_ptr<Browser> browser =
         CreateBrowser(profile, type, false, window.get());
-    BrowserList::SetLastActive(browser.get());
     // Self deleting.
     new TestBrowserWindowOwner(std::move(window));
     return browser;
@@ -1287,6 +1292,43 @@ TEST_F(TabSearchPageHandlerDeclutterTest, TabDuplicateURLChanges) {
           content::WebContents::CreateParams(testing_profile())));
   EXPECT_EQ(handler()->duplicate_tabs_for_testing()[duplicate_tabs_url].size(),
             3u);
+}
+
+TEST_F(TabSearchPageHandlerTest, ReplaceActiveSplitTab) {
+  std::unique_ptr<content::WebContents> test_web_contents(
+      content::WebContentsTester::CreateTestWebContents(
+          content::WebContents::CreateParams(profile())));
+  AddTab(browser(), GURL(kTabUrl1));
+  AddTab(browser(), GURL(kTabUrl2));
+  AddTab(browser(), GURL(kTabUrl3));
+  TabStripModel* tab_strip_model = browser()->tab_strip_model();
+  const split_tabs::SplitTabId split_id = tab_strip_model->AddToNewSplit(
+      {1}, split_tabs::SplitTabLayout::kVertical);
+
+  const split_tabs::SplitTabData* split_data =
+      tab_strip_model->GetSplitData(split_id);
+  const std::vector<tabs::TabInterface*> tabs_in_split = split_data->ListTabs();
+  EXPECT_EQ(tabs_in_split.size(), 2u);
+  EXPECT_EQ(kTabUrl3, tabs_in_split[0]->GetContents()->GetURL().spec());
+  EXPECT_EQ(kTabUrl2, tabs_in_split[1]->GetContents()->GetURL().spec());
+
+  EXPECT_FALSE(tab_strip_model->GetTabAtIndex(2)->IsSplit());
+  const int32_t replacement_tab_id =
+      tab_strip_model->GetTabAtIndex(2)->GetHandle().raw_value();
+  handler()->ReplaceActiveSplitTab(replacement_tab_id);
+
+  const split_tabs::SplitTabData* split_data_after_replacement =
+      tab_strip_model->GetSplitData(split_id);
+  const std::vector<tabs::TabInterface*> tabs_in_split_after_replacement =
+      split_data_after_replacement->ListTabs();
+  EXPECT_EQ(tabs_in_split_after_replacement.size(), 2u);
+  EXPECT_EQ(kTabUrl1,
+            tabs_in_split_after_replacement[0]->GetContents()->GetURL().spec());
+  EXPECT_EQ(kTabUrl2,
+            tabs_in_split_after_replacement[1]->GetContents()->GetURL().spec());
+
+  EXPECT_CALL(page_, TabUpdated(_)).Times(3);
+  EXPECT_CALL(page_, TabsRemoved(_)).Times(2);
 }
 
 }  // namespace

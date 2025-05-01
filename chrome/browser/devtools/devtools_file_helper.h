@@ -13,7 +13,7 @@
 
 #include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
-#include "base/memory/ref_counted.h"
+#include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/uuid.h"
 #include "chrome/browser/devtools/devtools_file_watcher.h"
@@ -26,7 +26,7 @@ class Profile;
 namespace base {
 class FilePath;
 class SequencedTaskRunner;
-}
+}  // namespace base
 
 class DevToolsFileHelper {
  public:
@@ -190,6 +190,12 @@ class DevToolsFileHelper {
   void AddUserConfirmedFileSystem(const std::string& type,
                                   const base::FilePath& path,
                                   bool allowed);
+  void ConnectMissingAutomaticFileSystem(
+      const std::string& file_system_path,
+      const base::Uuid& file_system_uuid,
+      const HandlePermissionsCallback& handle_permissions_callback,
+      ConnectCallback connect_callback,
+      bool directory_exists);
   void ConnectUserConfirmedAutomaticFileSystem(
       ConnectCallback connect_callback,
       const std::string& file_system_path,

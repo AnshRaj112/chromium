@@ -72,7 +72,9 @@ public class TabManagementDelegateImpl implements TabManagementDelegate {
             @NonNull OneshotSupplier<LayoutStateProvider> layoutStateProviderSupplier,
             @NonNull ModalDialogManager modalDialogManager,
             @NonNull ThemeColorProvider themeColorProvider,
-            UndoBarThrottle undoBarThrottle) {
+            UndoBarThrottle undoBarThrottle,
+            @NonNull ObservableSupplier<TabBookmarker> tabBookmarkerSupplier,
+            @NonNull Supplier<ShareDelegate> shareDelegateSupplier) {
         return new TabGroupUiCoordinator(
                 activity,
                 parentView,
@@ -87,7 +89,9 @@ public class TabManagementDelegateImpl implements TabManagementDelegate {
                 layoutStateProviderSupplier,
                 modalDialogManager,
                 themeColorProvider,
-                undoBarThrottle);
+                undoBarThrottle,
+                tabBookmarkerSupplier,
+                shareDelegateSupplier);
     }
 
     @Override
@@ -116,8 +120,10 @@ public class TabManagementDelegateImpl implements TabManagementDelegate {
             @NonNull ObservableSupplier<CompositorViewHolder> compositorViewHolderSupplier,
             @NonNull ObservableSupplier<ShareDelegate> shareDelegateSupplier,
             @NonNull ObservableSupplier<TabBookmarker> tabBookmarkerSupplier,
-            @NonNull TabGroupCreationUiFlow tabGroupCreationUiFlow,
-            UndoBarThrottle undoBarThrottle) {
+            @NonNull TabGroupCreationUiDelegate tabGroupCreationUiDelegate,
+            UndoBarThrottle undoBarThrottle,
+            @NonNull LazyOneshotSupplier<HubManager> hubManagerSupplier,
+            @NonNull Supplier<TabGroupUiActionHandler> tabGroupUiActionHandlerSupplier) {
         // TODO(crbug.com/40946413): Consider making this an activity scoped singleton and possibly
         // hosting it in CTA/HubProvider.
         TabSwitcherPaneCoordinatorFactory factory =
@@ -140,7 +146,9 @@ public class TabManagementDelegateImpl implements TabManagementDelegate {
                         edgeToEdgeSupplier,
                         shareDelegateSupplier,
                         tabBookmarkerSupplier,
-                        undoBarThrottle);
+                        undoBarThrottle,
+                        () -> hubManagerSupplier.get().getPaneManager(),
+                        tabGroupUiActionHandlerSupplier);
         OneshotSupplierImpl<Profile> profileSupplier = new OneshotSupplierImpl<>();
         Handler handler = new Handler();
         profileProviderSupplier.onAvailable(
@@ -165,7 +173,7 @@ public class TabManagementDelegateImpl implements TabManagementDelegate {
                                 userEducationHelper,
                                 edgeToEdgeSupplier,
                                 compositorViewHolderSupplier,
-                                tabGroupCreationUiFlow)
+                                tabGroupCreationUiDelegate)
                         : new TabSwitcherPane(
                                 activity,
                                 ContextUtils.getAppSharedPreferences(),
@@ -181,7 +189,7 @@ public class TabManagementDelegateImpl implements TabManagementDelegate {
                                 userEducationHelper,
                                 edgeToEdgeSupplier,
                                 compositorViewHolderSupplier,
-                                tabGroupCreationUiFlow);
+                                tabGroupCreationUiDelegate);
         return Pair.create(pane, pane);
     }
 
@@ -213,7 +221,7 @@ public class TabManagementDelegateImpl implements TabManagementDelegate {
     }
 
     @Override
-    public TabGroupCreationUiFlow createTabGroupCreationUiFlow(
+    public TabGroupCreationUiDelegate createTabGroupCreationUiFlow(
             @NonNull Context context,
             @NonNull ModalDialogManager modalDialogManager,
             @NonNull OneshotSupplier<HubManager> hubManagerSupplier,
@@ -221,7 +229,7 @@ public class TabManagementDelegateImpl implements TabManagementDelegate {
         ObservableSupplierImpl<PaneManager> paneManagerSupplier = new ObservableSupplierImpl<>();
         hubManagerSupplier.onAvailable(
                 hubManager -> paneManagerSupplier.set(hubManager.getPaneManager()));
-        return new TabGroupCreationUiFlow(
+        return new TabGroupCreationUiDelegate(
                 context,
                 () -> modalDialogManager,
                 paneManagerSupplier,

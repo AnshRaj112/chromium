@@ -9,6 +9,9 @@
 
 #include "base/files/file_path.h"
 #include "base/memory/raw_ptr.h"
+#include "extensions/buildflags/buildflags.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 class Profile;
 
@@ -53,7 +56,7 @@ class InstalledLoader {
   void LoadAllExtensions(Profile* profile);
 
   // Record a histogram using the PermissionMessage enum values for each
-  // permission in |e|.
+  // permission in `extension`.
   // NOTE: If this is ever called with high frequency, the implementation may
   // need to be made more efficient.
   static void RecordPermissionMessagesHistogram(

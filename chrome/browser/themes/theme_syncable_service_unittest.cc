@@ -290,7 +290,7 @@ class ThemeSyncableServiceTest : public testing::Test,
     extensions::ExtensionPrefs::Get(profile_.get())
         ->AddGrantedPermissions(theme_extension_->id(),
                                 extensions::PermissionSet());
-    service->AddExtension(theme_extension_.get());
+    registrar->AddExtension(theme_extension_);
     extensions::ExtensionRegistry* registry =
         extensions::ExtensionRegistry::Get(profile_.get());
     ASSERT_EQ(1u, registry->enabled_extensions().size());
@@ -965,7 +965,7 @@ class RealThemeSyncableServiceTest
         extensions::mojom::ManifestLocation::kInternal, kCustomThemeUrl);
     extensions::ExtensionPrefs::Get(profile())->AddGrantedPermissions(
         theme_extension_->id(), extensions::PermissionSet());
-    service_->AddExtension(theme_extension_.get());
+    registrar()->AddExtension(theme_extension_);
     ASSERT_EQ(1u, extensions::ExtensionRegistry::Get(profile())
                       ->enabled_extensions()
                       .size());
@@ -3817,8 +3817,8 @@ TEST_F(ThemeSyncableServiceTestForThemeExtension,
        ShouldNotRemoveThemeExtensionUponSignoutIfPreexisting) {
   // Theme extension pre-exists but is disabled.
   InstallExtension();
-  service_->DisableExtension(kCustomThemeId,
-                             extensions::disable_reason::DISABLE_USER_ACTION);
+  registrar()->DisableExtension(
+      kCustomThemeId, {extensions::disable_reason::DISABLE_USER_ACTION});
   ASSERT_TRUE(extension_registry_->GetExtensionById(
       kCustomThemeId, extensions::ExtensionRegistry::EVERYTHING));
   ASSERT_FALSE(theme_service()->UsingExtensionTheme());

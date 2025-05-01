@@ -30,6 +30,8 @@ class MockBrowserWindowInterface : public BrowserWindowInterface {
   MOCK_METHOD(bool, IsAttemptingToCloseBrowser, (), (const, override));
   MOCK_METHOD(views::View*, TopContainer, (), (override));
   MOCK_METHOD(bool, IsMinimized, (), (const, override));
+  MOCK_METHOD(bool, IsVisibleOnScreen, (), (const, override));
+  MOCK_METHOD(bool, IsVisible, (), (const, override));
   MOCK_METHOD(base::WeakPtr<BrowserWindowInterface>,
               GetWeakPtr,
               (),
@@ -77,11 +79,12 @@ class MockBrowserWindowInterface : public BrowserWindowInterface {
               (),
               (override));
   MOCK_METHOD(Browser*, GetBrowserForMigrationOnly, (), (override));
+  MOCK_METHOD(void, ActivateWindow, (), (override));
   MOCK_METHOD(void,
               SetWebContentsBlocked,
               (content::WebContents*, bool),
               (override));
-  MOCK_METHOD(bool, IsTabModalPopup, (), (const, override));
+  MOCK_METHOD(bool, IsTabModalPopupDeprecated, (), (const, override));
 
   // PageNavigator methods
   MOCK_METHOD(content::WebContents*,
@@ -89,6 +92,12 @@ class MockBrowserWindowInterface : public BrowserWindowInterface {
               (const content::OpenURLParams& params,
                base::OnceCallback<void(content::NavigationHandle&)>
                    navigation_handle_callback),
+              (override));
+
+  MOCK_METHOD(bool, CanShowCallToAction, (), (const, override));
+  MOCK_METHOD(std::unique_ptr<ScopedWindowCallToAction>,
+              ShowCallToAction,
+              (),
               (override));
 };
 

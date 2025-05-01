@@ -32,6 +32,7 @@ import androidx.recyclerview.widget.RecyclerView.ViewHolder;
 import org.chromium.base.Callback;
 import org.chromium.base.SysUtils;
 import org.chromium.base.TimeUtils.UptimeMillisTimer;
+import org.chromium.base.Token;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.ValueChangedCallback;
 import org.chromium.base.metrics.RecordHistogram;
@@ -45,19 +46,23 @@ import org.chromium.chrome.browser.bookmarks.TabBookmarker;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
 import org.chromium.chrome.browser.collaboration.CollaborationServiceFactory;
 import org.chromium.chrome.browser.data_sharing.DataSharingTabManager;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.profiles.ProfileProvider;
 import org.chromium.chrome.browser.share.ShareDelegate;
 import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.tab.TabId;
 import org.chromium.chrome.browser.tab_ui.ActionConfirmationManager;
 import org.chromium.chrome.browser.tab_ui.RecyclerViewPosition;
 import org.chromium.chrome.browser.tab_ui.TabContentManager;
 import org.chromium.chrome.browser.tab_ui.TabSwitcherCustomViewManager;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabList;
+import org.chromium.chrome.browser.tasks.tab_management.TabGridContextMenuCoordinator.ShowTabListEditor;
 import org.chromium.chrome.browser.tasks.tab_management.TabGridDialogMediator.DialogController;
 import org.chromium.chrome.browser.tasks.tab_management.TabGridItemLongPressOrchestrator.CancelLongPressTabItemEventListener;
 import org.chromium.chrome.browser.tasks.tab_management.TabListCoordinator.TabListMode;
+import org.chromium.chrome.browser.tasks.tab_management.TabListEditorCoordinator.TabListEditorController;
 import org.chromium.chrome.browser.tasks.tab_management.TabListMediator.GridCardOnClickListenerProvider;
 import org.chromium.chrome.browser.tasks.tab_management.TabSwitcherMessageManager.MessageUpdateObserver;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeController;
@@ -78,6 +83,7 @@ import org.chromium.ui.modelutil.PropertyModelChangeProcessor;
 import org.chromium.ui.widget.ViewRectProvider;
 
 import java.util.List;
+import java.util.Set;
 
 /** Coordinator for a {@link TabSwitcherPaneBase}'s UI. */
 public class TabSwitcherPaneCoordinator implements BackPressHandler {
@@ -153,7 +159,7 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
     private final ObservableSupplier<TabBookmarker> mTabBookmarkerSupplier;
     private final Runnable mOnTabGroupCreation;
     private final Callback<TabGroupModelFilter> mOnFilterChange = this::onFilterChange;
-    private @Nullable TabSwitcherContextMenuCoordinator mContextMenuCoordinator;
+    private @Nullable TabGridContextMenuCoordinator mContextMenuCoordinator;
     private @Nullable TabGroupListBottomSheetCoordinator mTabGroupListBottomSheetCoordinator;
 
     /** Lazily initialized when shown. */
@@ -288,7 +294,9 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
                                                 actionConfirmationManager,
                                                 mModalDialogManager,
                                                 desktopWindowStateManager,
-                                                undoBarThrottle);
+                                                undoBarThrottle,
+                                                tabBookmarkerSupplier,
+                                                shareDelegateSupplier);
                                 mTabGridDialogCoordinator.setPageKeyEvent(
                                         event ->
                                                 onPageKeyEvent(
@@ -482,7 +490,8 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
         // Quick mode being false here ensures the selected tab's thumbnail gets updated. With Hub
         // the TabListCoordinator no longer triggers thumbnail captures so this shouldn't guard
         // against the large amount of work that is used to.
-        mTabListCoordinator.resetWithListOfTabs(tabs, /* quickMode= */ false);
+        mTabListCoordinator.resetWithListOfTabs(
+                tabs, /* tabGroupSyncIds= */ null, /* quickMode= */ false);
         mMessageManager.afterReset(tabs == null ? 0 : tabs.size());
         mTabListOnScrollListener.postUpdate(mTabListCoordinator.getContainerView());
         if (mTabGroupLabeller != null) {
@@ -534,9 +543,7 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
 
     /** Returns whether the TabListEditor needs a clean up. */
     public boolean doesTabListEditorNeedCleanup() {
-        @Nullable
-        TabListEditorCoordinator.TabListEditorController controller =
-                mMediator.getTabListEditorController();
+        @Nullable TabListEditorController controller = mMediator.getTabListEditorController();
         return controller != null && controller.needsCleanUp();
     }
 
@@ -654,19 +661,29 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
 
     @VisibleForTesting
     CancelLongPressTabItemEventListener onLongPressOnTabCard(
-            TabSwitcherContextMenuCoordinator contextMenuCoordinator,
-            int tabId,
+            TabGridContextMenuCoordinator tabGridContextMenuCoordinator,
+            TabListGroupMenuCoordinator tabListGroupMenuCoordinator,
+            @TabId int tabId,
             @Nullable View cardView) {
         TabGroupModelFilter filter = mTabGroupModelFilterSupplier.get();
         @Nullable Tab tab = filter.getTabModel().getTabById(tabId);
-        if (tab != null && tab.getTabGroupId() == null && cardView != null) {
-            ViewRectProvider viewRectProvider =
-                    new ViewRectProvider(cardView, TabGridViewRectUpdater::new);
-            contextMenuCoordinator.showMenu(viewRectProvider, tabId);
-            RecordUserAction.record("TabSwitcher.ContextMenu");
-            return contextMenuCoordinator::dismiss;
+        if (tab == null
+                || cardView == null
+                || !ChromeFeatureList.sTabGroupParityBottomSheetAndroid.isEnabled()) {
+            return null;
         }
-        return null;
+
+        ViewRectProvider viewRectProvider =
+                new ViewRectProvider(cardView, TabGridViewRectUpdater::new);
+        Token groupId = tab.getTabGroupId();
+        if (groupId != null) {
+            tabListGroupMenuCoordinator.showMenuWithIcons(viewRectProvider, groupId);
+            return tabListGroupMenuCoordinator::dismiss;
+        } else {
+            tabGridContextMenuCoordinator.showMenu(viewRectProvider, tabId);
+            RecordUserAction.record("TabSwitcher.ContextMenu");
+            return tabGridContextMenuCoordinator::dismiss;
+        }
     }
 
     private boolean isTabGridDialogVisible() {
@@ -721,7 +738,11 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
 
     private CancelLongPressTabItemEventListener onLongPressOnTabCard(
             int tabId, @Nullable View cardView) {
-        return onLongPressOnTabCard(mContextMenuCoordinator, tabId, cardView);
+        return onLongPressOnTabCard(
+                mContextMenuCoordinator,
+                mTabListCoordinator.getTabListGroupMenuCoordinator(),
+                tabId,
+                cardView);
     }
 
     private void onEdgeToEdgeControllerChanged(
@@ -803,20 +824,29 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
                         mActivity,
                         profile,
                         tabGroupId -> tabGroupCreationDialogManager.showDialog(tabGroupId, filter),
+                        /* tabMovedCallback= */ null,
                         filter,
                         mBottomSheetController,
-                        /* showNewGroupRow= */ true,
+                        /* supportsShowNewGroup= */ true,
                         /* destroyOnHide= */ false);
 
-        TabBookmarker tabBookmarker = mTabBookmarkerSupplier.get();
+        ShowTabListEditor showTabListEditor =
+                tabId -> {
+                    mTabListEditorManager.showTabListEditor();
+                    TabListEditorController tabListEditorController =
+                            mTabListEditorManager.getControllerSupplier().get();
+                    if (tabListEditorController != null) {
+                        tabListEditorController.selectTabs(Set.of(tabId));
+                    }
+                };
         mContextMenuCoordinator =
-                TabSwitcherContextMenuCoordinator.createContextMenuCoordinator(
+                TabGridContextMenuCoordinator.createContextMenuCoordinator(
                         mActivity,
-                        tabBookmarker,
+                        mTabBookmarkerSupplier,
                         filter,
                         mTabGroupListBottomSheetCoordinator,
                         tabGroupCreationDialogManager,
                         mShareDelegateSupplier,
-                        mTabListEditorManager);
+                        showTabListEditor);
     }
 }

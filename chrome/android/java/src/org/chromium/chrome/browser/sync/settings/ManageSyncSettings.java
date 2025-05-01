@@ -280,16 +280,13 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
                             findPreference(PREF_IDENTITY_ERROR_CARD_PREFERENCE);
             identityErrorCardPreference.initialize(profile, this);
 
-            if (ChromeFeatureList.isEnabled(ChromeFeatureList.ENABLE_BATCH_UPLOAD_FROM_SETTINGS)) {
-                mBatchUploadCardPreference =
-                        (BatchUploadCardPreference)
-                                findPreference(PREF_BATCH_UPLOAD_CARD_PREFERENCE);
-                mBatchUploadCardPreference.initialize(
-                        getActivity(),
-                        profile,
-                        ((ModalDialogManagerHolder) getActivity()).getModalDialogManager());
-                mBatchUploadCardPreference.setSnackbarManagerSupplier(mSnackbarManagerSupplier);
-            }
+            mBatchUploadCardPreference =
+                    (BatchUploadCardPreference) findPreference(PREF_BATCH_UPLOAD_CARD_PREFERENCE);
+            mBatchUploadCardPreference.initialize(
+                    getActivity(),
+                    profile,
+                    ((ModalDialogManagerHolder) getActivity()).getModalDialogManager());
+            mBatchUploadCardPreference.setSnackbarManagerSupplier(mSnackbarManagerSupplier);
 
             if (mSyncService.isSyncDisabledByEnterprisePolicy()) {
                 ChromeBasePreference settingsSyncDisabledByAdministrator =
@@ -306,12 +303,14 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
             mSyncTypeSwitchPreferencesMap.put(
                     UserSelectableType.BOOKMARKS,
                     findPreference(PREF_ACCOUNT_SECTION_BOOKMARKS_TOGGLE));
+
             // HISTORY and TABS are bundled in the same switch in the new settings panel.
-            mSyncTypeSwitchPreferencesMap.put(
-                    UserSelectableType.HISTORY,
-                    findPreference(PREF_ACCOUNT_SECTION_HISTORY_TOGGLE));
-            mSyncTypeSwitchPreferencesMap.put(
-                    UserSelectableType.TABS, findPreference(PREF_ACCOUNT_SECTION_HISTORY_TOGGLE));
+            ChromeSwitchPreference historyAndTabsToggle =
+                    (ChromeSwitchPreference) findPreference(PREF_ACCOUNT_SECTION_HISTORY_TOGGLE);
+            mSyncTypeSwitchPreferencesMap.put(UserSelectableType.HISTORY, historyAndTabsToggle);
+            mSyncTypeSwitchPreferencesMap.put(UserSelectableType.TABS, historyAndTabsToggle);
+            historyAndTabsToggle.setViewId(R.id.history_and_tabs_toggle);
+
             ChromeSwitchPreference passwordsToggle =
                     (ChromeSwitchPreference) findPreference(PREF_ACCOUNT_SECTION_PASSWORDS_TOGGLE);
             mSyncTypeSwitchPreferencesMap.put(UserSelectableType.PASSWORDS, passwordsToggle);
@@ -570,9 +569,7 @@ public class ManageSyncSettings extends ChromeBaseSettingsFragment
         super.onResume();
         // This is necessary to refresh the batch upload card if the user leaves Chrome open on the
         // settings screen, changes their screen lock settings, and then returns to Chrome.
-        if (mShouldReplaceSyncSettingsWithAccountSettings
-                && ChromeFeatureList.isEnabled(
-                        ChromeFeatureList.ENABLE_BATCH_UPLOAD_FROM_SETTINGS)) {
+        if (mShouldReplaceSyncSettingsWithAccountSettings) {
             mBatchUploadCardPreference.hideBatchUploadCardAndUpdate();
         }
         updateSyncPreferences();

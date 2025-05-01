@@ -7,9 +7,16 @@
 
 #include <vector>
 
+#include "chrome/browser/privacy_sandbox/notice/mocks/mock_desktop_view_manager.h"
 #include "chrome/browser/privacy_sandbox/notice/notice.mojom-forward.h"
 #include "chrome/browser/privacy_sandbox/notice/notice_service_interface.h"
 #include "testing/gmock/include/gmock/gmock.h"
+
+namespace content {
+class BrowserContext;
+}
+
+class KeyedService;
 
 namespace privacy_sandbox {
 
@@ -37,7 +44,21 @@ class MockPrivacySandboxNoticeService
               ((std::pair<notice::mojom::PrivacySandboxNotice, SurfaceType>),
                notice::mojom::PrivacySandboxNoticeEvent),
               (override));
+
+#if !BUILDFLAG(IS_ANDROID)
+  MOCK_METHOD(DesktopViewManagerInterface*,
+              GetDesktopViewManager,
+              (),
+              (override));
+#endif  // !BUILDFLAG(IS_ANDROID)
+ private:
+#if !BUILDFLAG(IS_ANDROID)
+  std::unique_ptr<MockDesktopViewManager> mock_desktop_view_manager_;
+#endif  // !BUILDFLAG(IS_ANDROID)
 };
+
+std::unique_ptr<KeyedService> BuildMockPrivacySandboxNoticeService(
+    content::BrowserContext* context);
 
 }  // namespace privacy_sandbox
 

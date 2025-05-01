@@ -60,8 +60,8 @@ source_set("common") {
   defines = [ "MEDIA_GPU_IMPLEMENTATION" ]
   sources = [
     "chromeos_status.h",
-    "default_video_frame_converter.cc",
-    "default_video_frame_converter.h",
+    "dmabuf_video_frame_converter.cc",
+    "dmabuf_video_frame_converter.h",
     "dmabuf_video_frame_pool.cc",
     "dmabuf_video_frame_pool.h",
     "frame_registry.cc",
@@ -195,6 +195,7 @@ source_set("video_frame_utils") {
   deps = [
     "//base",
     "//build/config/linux/libdrm",
+    "//components/viz/common:shared_image_format",
     "//gpu/ipc/common:common",
     "//media",
     "//media/gpu:buffer_validation",

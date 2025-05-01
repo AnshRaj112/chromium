@@ -233,11 +233,11 @@ BASE_FEATURE(kOmniboxAssistantVoiceSearch,
 // loads http://example.com. When this feature is enabled, it should load
 // https://example.com instead, with fallback to http://example.com if
 // necessary.
-// TODO(crbug.com/375004882): This feature is now superseded by HTTPS-Upgrades
-// and will be removed in the near future.
+// TODO(crbug.com/375004882): On non-iOS platforms, this feature is now
+// superseded by HTTPS-Upgrades and will be removed in the near future.
 BASE_FEATURE(kDefaultTypedNavigationsToHttps,
              "OmniboxDefaultTypedNavigationsToHttps",
-             DISABLED);
+             enable_if(IS_IOS));
 
 // Override the delay to create a spare renderer when the omnibox is focused
 // on Android.
@@ -404,6 +404,9 @@ BASE_FEATURE(kSuppressIntermediateACUpdatesOnLowEndDevices,
 // (Android only) Show the search feature in the hub.
 BASE_FEATURE(kAndroidHubSearch, "AndroidHubSearch", ENABLED);
 
+// (Android only) Show tab groups via the search feature in the hub.
+BASE_FEATURE(kAndroidHubSearchTabGroups, "AndroidHubSearchTabGroups", DISABLED);
+
 // When enabled, delay focusTab to prioritize navigation
 // (https://crbug.com/374852568).
 BASE_FEATURE(kPostDelayedTaskFocusTab, "PostDelayedTaskFocusTab", ENABLED);
@@ -425,6 +428,7 @@ static jlong JNI_OmniboxFeatureMap_GetNativeMap(JNIEnv* env) {
       &kRetainOmniboxOnFocus,
       &kJumpStartOmnibox,
       &kAndroidHubSearch,
+      &kAndroidHubSearchTabGroups,
       &kPostDelayedTaskFocusTab};
   static base::NoDestructor<base::android::FeatureMap> kFeatureMap(
       kFeaturesExposedToJava);

@@ -8,6 +8,7 @@
 #import "base/functional/callback.h"
 #import "base/functional/callback_helpers.h"
 #import "base/strings/sys_string_conversions.h"
+#import "components/collaboration/public/collaboration_flow_type.h"
 #import "components/collaboration/public/collaboration_service.h"
 #import "components/collaboration/public/service_status.h"
 #import "components/saved_tab_groups/public/saved_tab_group.h"
@@ -80,15 +81,17 @@ const CGFloat kFaviconSize = 16.0;
 const CGFloat kScrimOpacity = 0.3;
 
 // Maximum delay to return preview items.
-constexpr base::TimeDelta kFetchPreviewItemsTimeDelay = base::Seconds(15);
+constexpr base::TimeDelta kFetchPreviewItemsTimeDelay = base::Seconds(5);
 
 }  // namespace
 
 IOSCollaborationControllerDelegate::IOSCollaborationControllerDelegate(
     Browser* browser,
     UIViewController* base_view_controller,
-    TabGroupService* tab_group_service)
+    TabGroupService* tab_group_service,
+    FlowType flow_type)
     : browser_(browser),
+      flow_type_(flow_type),
       base_view_controller_(base_view_controller),
       tab_group_service_(tab_group_service) {
   CHECK(browser_);
@@ -114,18 +117,14 @@ IOSCollaborationControllerDelegate::~IOSCollaborationControllerDelegate() {}
 void IOSCollaborationControllerDelegate::PrepareFlowUI(
     base::OnceCallback<void()> exit_callback,
     ResultCallback result) {
-  // TODO(crbug.com/399584431): Improve the design of the spinner/scrim.
-  scrim_view_ = [[UIView alloc] init];
-  scrim_view_.backgroundColor = [UIColor colorWithWhite:0 alpha:kScrimOpacity];
-  UIActivityIndicatorView* activity_view = [[UIActivityIndicatorView alloc]
-      initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
-  activity_view.translatesAutoresizingMaskIntoConstraints = NO;
-  [scrim_view_ addSubview:activity_view];
-  AddSameCenterConstraints(scrim_view_, activity_view);
-  [activity_view startAnimating];
-  scrim_view_.translatesAutoresizingMaskIntoConstraints = NO;
-  [base_view_controller_.view addSubview:scrim_view_];
-  AddSameConstraints(base_view_controller_.view, scrim_view_);
+  switch (flow_type_) {
+    case FlowType::kJoin:
+    case FlowType::kShareOrManage:
+      AddScrimView();
+      break;
+    case FlowType::kLeaveOrDelete:
+      break;
+  }
   std::move(result).Run(CollaborationControllerDelegate::Outcome::kSuccess);
 }
 
@@ -310,15 +309,13 @@ void IOSCollaborationControllerDelegate::ShowManageDialog(
 void IOSCollaborationControllerDelegate::ShowLeaveDialog(
     const tab_groups::EitherGroupID& either_id,
     ResultCallback result) {
-  CHECK(leave_or_delete_confirmation_callback_);
-  std::move(leave_or_delete_confirmation_callback_).Run(std::move(result));
+  ShowLeaveOrDeleteDialog(either_id, std::move(result));
 }
 
 void IOSCollaborationControllerDelegate::ShowDeleteDialog(
     const tab_groups::EitherGroupID& either_id,
     ResultCallback result) {
-  CHECK(leave_or_delete_confirmation_callback_);
-  std::move(leave_or_delete_confirmation_callback_).Run(std::move(result));
+  ShowLeaveOrDeleteDialog(either_id, std::move(result));
 }
 
 void IOSCollaborationControllerDelegate::PromoteTabGroup(
@@ -387,6 +384,27 @@ void IOSCollaborationControllerDelegate::ShareGroupAndGenerateLink(
 void IOSCollaborationControllerDelegate::SetLeaveOrDeleteConfirmationCallback(
     base::OnceCallback<void(ResultCallback)> callback) {
   leave_or_delete_confirmation_callback_ = std::move(callback);
+}
+
+#pragma mark - Private
+
+void IOSCollaborationControllerDelegate::ShowLeaveOrDeleteDialog(
+    const tab_groups::EitherGroupID& either_id,
+    ResultCallback result) {
+  CHECK(leave_or_delete_confirmation_callback_);
+
+  auto final_result = base::BindOnce(
+      [](base::WeakPtr<IOSCollaborationControllerDelegate> weak_this,
+         ResultCallback inner_result, Outcome outcome) {
+        if (weak_this && outcome == Outcome::kSuccess) {
+          weak_this->AddScrimView();
+        }
+        std::move(inner_result).Run(outcome);
+      },
+      weak_ptr_factory_.GetWeakPtr(), std::move(result));
+
+  std::move(leave_or_delete_confirmation_callback_)
+      .Run(std::move(final_result));
 }
 
 void IOSCollaborationControllerDelegate::OnAuthenticationComplete(
@@ -659,6 +677,22 @@ UIImage* IOSCollaborationControllerDelegate::JoinGroupImage(
                                                      preview_items);
   [favicons_grid layoutIfNeeded];
   return ImageFromView(favicons_grid, nil, UIEdgeInsetsZero);
+}
+
+void IOSCollaborationControllerDelegate::AddScrimView() {
+  CHECK(!scrim_view_);
+  // TODO(crbug.com/399584431): Improve the design of the spinner/scrim.
+  scrim_view_ = [[UIView alloc] init];
+  scrim_view_.backgroundColor = [UIColor colorWithWhite:0 alpha:kScrimOpacity];
+  UIActivityIndicatorView* activity_view = [[UIActivityIndicatorView alloc]
+      initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+  activity_view.translatesAutoresizingMaskIntoConstraints = NO;
+  [scrim_view_ addSubview:activity_view];
+  AddSameCenterConstraints(scrim_view_, activity_view);
+  [activity_view startAnimating];
+  scrim_view_.translatesAutoresizingMaskIntoConstraints = NO;
+  [base_view_controller_.view addSubview:scrim_view_];
+  AddSameConstraints(base_view_controller_.view, scrim_view_);
 }
 
 }  // namespace collaboration

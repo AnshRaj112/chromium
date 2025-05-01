@@ -178,7 +178,8 @@ are exported to translation interchange files (e.g. XMB files), etc.
         ('depdir=', 'depfile=', 'assert-file-list=', 'help',
          'output-all-resource-defines', 'no-output-all-resource-defines',
          'no-replace-ellipsis', 'depend-on-stamp', 'css-minifier=',
-         'write-only-new=', 'allowlist-support', 'brotli='))
+         'write-only-new=', 'allowlist-support', 'brotli=',
+         'translate-genders'))
     for (key, val) in own_opts:
       if key == '-a':
         assert_output_files.append(val)
@@ -326,7 +327,10 @@ are exported to translation interchange files (e.g. XMB files), etc.
     base_dir = util.dirname(output_node.GetOutputFilename())
 
     formatter = GetFormatter(output_node.GetType())
-    formatted = formatter(node, output_node.GetLanguage(), output_dir=base_dir)
+    formatted = formatter(node,
+                          output_node.GetLanguage(),
+                          output_node.GetGender(),
+                          output_dir=base_dir)
     # NB: Formatters may be generators or return lists.  The writelines API
     # accepts iterables as a shortcut to calling write directly.  That means
     # you can pass strings (iteration yields characters), but not bytes (as
@@ -447,7 +451,9 @@ are exported to translation interchange files (e.g. XMB files), etc.
     if warnings:
       self.VerboseOut(warnings)
     if self.res.UberClique().HasMissingTranslations():
-      print(self.res.UberClique().missing_translations_)
+      print(
+          f'missing translations: {self.res.UberClique().missing_translations_}'
+      )
       sys.exit(-1)
 
 

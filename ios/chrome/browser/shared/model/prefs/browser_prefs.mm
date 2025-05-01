@@ -16,6 +16,7 @@
 #import "components/breadcrumbs/core/breadcrumbs_status.h"
 #import "components/browser_sync/sync_to_signin_migration.h"
 #import "components/browsing_data/core/pref_names.h"
+#import "components/collaboration/public/pref_names.h"
 #import "components/commerce/core/pref_names.h"
 #import "components/component_updater/component_updater_service.h"
 #import "components/component_updater/installer_policies/autofill_states_component_installer.h"
@@ -133,15 +134,6 @@
 
 namespace {
 
-// Deprecated 05/2024.
-constexpr char kSyncCachedTrustedVaultAutoUpgradeDebugInfo[] =
-    "sync.cached_trusted_vault_auto_upgrade_debug_info";
-
-// Deprecated 05/2024.
-inline constexpr char kAutologinEnabled[] = "autologin.enabled";
-inline constexpr char kReverseAutologinRejectedEmailList[] =
-    "reverse_autologin.rejected_email_list";
-
 // Deprecated 06/2024.
 constexpr char kObsoletePasswordsPerAccountPrefMigrationDone[] =
     "sync.passwords_per_account_pref_migration_done";
@@ -193,6 +185,9 @@ inline constexpr char kIosParcelTrackingPolicyEnabled[] =
 // Deprecated 04/2025.
 inline constexpr char kMixedContentAutoupgradeEnabled[] =
     "ios.mixed_content_autoupgrade_enabled";
+
+// Deprecated 04/2025.
+inline constexpr char kAutologinEnabled[] = "autologin.enabled";
 
 // Migrates a boolean pref from source to target PrefService.
 void MigrateBooleanPref(std::string_view pref_name,
@@ -660,6 +655,7 @@ void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
 
 void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   autofill::prefs::RegisterProfilePrefs(registry);
+  collaboration::prefs::RegisterProfilePrefs(registry);
   commerce::RegisterPrefs(registry);
   dom_distiller::DistilledPagePrefs::RegisterProfilePrefs(registry);
   enterprise::RegisterIdentifiersProfilePrefs(registry);
@@ -909,8 +905,6 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterDictionaryPref(
       prefs::kContentNotificationsEnrollmentEligibility);
 
-  registry->RegisterStringPref(kSyncCachedTrustedVaultAutoUpgradeDebugInfo, "");
-
   // Registers the Home customization visibility prefs.
   registry->RegisterBooleanPref(prefs::kHomeCustomizationMostVisitedEnabled,
                                 true);
@@ -1008,10 +1002,6 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterTimePref(prefs::kIosSyncInfobarErrorLastDismissedTimestamp,
                              base::Time());
 
-  // Deprecated 05/2024.
-  registry->RegisterBooleanPref(kAutologinEnabled, true);
-  registry->RegisterListPref(kReverseAutologinRejectedEmailList);
-
   // Deprecated 09/2024 (migrated to localState prefs).
   registry->RegisterBooleanPref(prefs::kIncognitoInterstitialEnabled, false);
 
@@ -1052,6 +1042,9 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   // Deprecated 02/2025 (migrated to localState prefs).
   registry->RegisterIntegerPref(
       prefs::kNTPHomeCustomizationNewBadgeImpressionCount, 0);
+
+  // Deprecated 04/2025.
+  registry->RegisterBooleanPref(kAutologinEnabled, false);
 }
 
 // This method should be periodically pruned of year+ old migrations.
@@ -1102,13 +1095,6 @@ void MigrateObsoleteProfilePrefs(PrefService* prefs) {
 
   // Check MigrateDeprecatedAutofillPrefs() to see if this is safe to remove.
   autofill::prefs::MigrateDeprecatedAutofillPrefs(prefs);
-
-  // Added 05/2024.
-  prefs->ClearPref(kSyncCachedTrustedVaultAutoUpgradeDebugInfo);
-
-  // Added 05/2024.
-  prefs->ClearPref(kAutologinEnabled);
-  prefs->ClearPref(kReverseAutologinRejectedEmailList);
 
   // Added 06/2024.
   MigrateIntegerPrefFromLocalStatePrefsToProfilePrefs(
@@ -1254,13 +1240,13 @@ void MigrateObsoleteProfilePrefs(PrefService* prefs) {
   MigrateBooleanFromUserDefaultsToProfilePrefs(
       @"SyncDisabledAlertShown", policy::policy_prefs::kSyncDisabledAlertShown,
       prefs);
+
+  // Added 04/2025.
+  prefs->ClearPref(kAutologinEnabled);
 }
 
 void MigrateObsoleteUserDefault() {
   NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-
-  // Added 05/2024.
-  [defaults removeObjectForKey:@"lastSignificantUserEventVideo"];
 
   // Added 06/2024.
   [defaults removeObjectForKey:@"TimestampAppLastOpenedViaFirstPartyIntent"];

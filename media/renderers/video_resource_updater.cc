@@ -753,8 +753,13 @@ void VideoResourceUpdater::CopyHardwareResource(
   auto* ri = RasterInterface();
   // Wait on sync tokens for both source (video frame) and destination (shared
   // image).
-  ri->WaitSyncTokenCHROMIUM(video_frame->acquire_sync_token().GetConstData());
-  ri->WaitSyncTokenCHROMIUM(hardware_resource->sync_token().GetConstData());
+  std::unique_ptr<gpu::RasterScopedAccess> src_ri_access =
+      shared_image->BeginRasterAccess(ri, video_frame->acquire_sync_token(),
+                                      /*readonly=*/true);
+  std::unique_ptr<gpu::RasterScopedAccess> dst_ri_access =
+      hardware_resource->shared_image()->BeginRasterAccess(
+          ri, hardware_resource->sync_token(),
+          /*readonly=*/false);
 
   ri->CopySharedImage(
       shared_image->mailbox(), hardware_resource->shared_image()->mailbox(),
@@ -762,9 +767,10 @@ void VideoResourceUpdater::CopyHardwareResource(
       output_resource_size.width(), output_resource_size.height());
 
   // Wait (if the existing token isn't null) and replace it with a new one.
-  WaitAndReplaceSyncTokenClient client(ri);
+  WaitAndReplaceSyncTokenClient client(ri, std::move(src_ri_access));
   gpu::SyncToken sync_token = video_frame->UpdateReleaseSyncToken(&client);
   hardware_resource->UpdateSyncToken(sync_token);
+  gpu::RasterScopedAccess::EndAccess(std::move(dst_ri_access));
 
   auto transferable_resource = viz::TransferableResource::MakeGpu(
       hardware_resource->shared_image(), GL_TEXTURE_2D,
@@ -1015,7 +1021,10 @@ bool VideoResourceUpdater::WriteRGBPixelsToTexture(
 
   // Copy pixels into texture.
   auto* ri = RasterInterface();
-  ri->WaitSyncTokenCHROMIUM(hardware_resource->sync_token().GetConstData());
+  std::unique_ptr<gpu::RasterScopedAccess> ri_access =
+      hardware_resource->shared_image()->BeginRasterAccess(
+          ri, hardware_resource->sync_token(),
+          /*readonly=*/false);
 
   auto color_type =
       viz::ToClosestSkColorType(resource_format, /*plane_index=*/0);
@@ -1027,8 +1036,8 @@ bool VideoResourceUpdater::WriteRGBPixelsToTexture(
       /*dst_y_offset=*/0, hardware_resource->shared_image()->GetTextureTarget(),
       pixmap);
 
-  gpu::SyncToken ri_sync_token;
-  ri->GenUnverifiedSyncTokenCHROMIUM(ri_sync_token.GetData());
+  gpu::SyncToken ri_sync_token =
+      gpu::RasterScopedAccess::EndAccess(std::move(ri_access));
   hardware_resource->UpdateSyncToken(ri_sync_token);
 
   return true;
@@ -1178,12 +1187,14 @@ bool VideoResourceUpdater::WriteYUVPixelsForAllPlanesToTexture(
   auto yuv_pixmap = SkYUVAPixmaps::FromExternalPixmaps(info, pixmaps.data());
 
   auto* ri = RasterInterface();
-  ri->WaitSyncTokenCHROMIUM(resource->sync_token().GetConstData());
+  std::unique_ptr<gpu::RasterScopedAccess> ri_access =
+      resource->shared_image()->BeginRasterAccess(ri, resource->sync_token(),
+                                                  /*readonly=*/false);
 
   ri->WritePixelsYUV(resource->shared_image()->mailbox(), yuv_pixmap);
 
-  gpu::SyncToken ri_sync_token;
-  ri->GenUnverifiedSyncTokenCHROMIUM(ri_sync_token.GetData());
+  gpu::SyncToken ri_sync_token =
+      gpu::RasterScopedAccess::EndAccess(std::move(ri_access));
   resource->UpdateSyncToken(ri_sync_token);
 
   return true;

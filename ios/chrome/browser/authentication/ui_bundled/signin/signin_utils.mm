@@ -6,6 +6,7 @@
 
 #import "base/barrier_closure.h"
 #import "base/command_line.h"
+#import "base/functional/bind.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/time/time.h"
 #import "base/version.h"
@@ -54,6 +55,7 @@
 #import "ios/chrome/browser/signin/model/system_identity.h"
 #import "ios/chrome/browser/sync/model/sync_service_factory.h"
 #import "net/base/network_change_notifier.h"
+#import "third_party/abseil-cpp/absl/container/flat_hash_map.h"
 
 namespace {
 
@@ -68,6 +70,7 @@ namespace {
 // risking accessing a dangling pointer to a C++ object.
 void SwitchToProfileSynchronously(const std::string& profile_name,
                                   __weak SceneState* weak_scene_state,
+                                  ChangeProfileReason reason,
                                   ChangeProfileContinuation continuation) {
   if (SceneState* scene_state = weak_scene_state) {
     id<ChangeProfileCommands> change_profile_handler = HandlerForProtocol(
@@ -76,6 +79,7 @@ void SwitchToProfileSynchronously(const std::string& profile_name,
 
     [change_profile_handler changeProfile:profile_name
                                  forScene:scene_state
+                                   reason:reason
                              continuation:std::move(continuation)];
   }
 }
@@ -133,16 +137,19 @@ bool ShouldSwitchProfileAtSignout(AuthenticationService* authentication_service,
 // when the change completes.
 void SwitchToProfile(Browser* browser,
                      const std::string& profile_name,
+                     ChangeProfileReason reason,
                      ChangeProfileContinuation continuation) {
   __weak SceneState* weak_scene_state = browser->GetSceneState();
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-      FROM_HERE, base::BindOnce(&SwitchToProfileSynchronously, profile_name,
-                                weak_scene_state, std::move(continuation)));
+      FROM_HERE,
+      base::BindOnce(&SwitchToProfileSynchronously, profile_name,
+                     weak_scene_state, reason, std::move(continuation)));
 }
 
 // Post an asynchronous request to switch from a managed profile to the
 // personal profile, running `continuation` when the change completes.
 void SwitchToPersonalProfile(Browser* browser,
+                             ChangeProfileReason reason,
                              ChangeProfileContinuation continuation) {
   ProfileManagerIOS* profile_manager =
       GetApplicationContext()->GetProfileManager();
@@ -150,7 +157,17 @@ void SwitchToPersonalProfile(Browser* browser,
       profile_manager->GetProfileAttributesStorage()->GetPersonalProfileName();
   CHECK(profile_manager->HasProfileWithName(personal_profile_name));
 
-  SwitchToProfile(browser, personal_profile_name, std::move(continuation));
+  SwitchToProfile(browser, personal_profile_name, reason,
+                  std::move(continuation));
+}
+
+syncer::DataTypeSet DataCountsMapToDataTypeSet(
+    absl::flat_hash_map<syncer::DataType, size_t> type_counts) {
+  syncer::DataTypeSet types;
+  for (const auto& [type, count] : type_counts) {
+    types.Put(type);
+  }
+  return types;
 }
 
 }  // namespace
@@ -492,7 +509,8 @@ void ProfileSignoutRequest::Run(Browser* browser) && {
   }
 
   std::move(prepare_callback_).Run(/*will_change_profile=*/true);
-  SwitchToPersonalProfile(browser, std::move(continuation));
+  SwitchToPersonalProfile(browser, ChangeProfileReason::kManagedAccountSignOut,
+                          std::move(continuation));
 }
 
 void MultiProfileSignOutForProfile(
@@ -519,18 +537,20 @@ void MultiProfileSignOutForProfile(
           BrowserList::BrowserType::kRegular);
 
   // Only call `signout_completion_closure` after all browsers have switched to
-  // the personal profile
+  // the personal profile.
   base::RepeatingClosure barrier = base::BarrierClosure(
       browser_list.size(), std::move(signout_completion_closure));
 
-  // Sign the user out in all browsers
+  // Sign the user out in all browsers.
   for (Browser* browser : browser_list) {
     ChangeProfileContinuation continuation =
         CreateChangeProfileSignoutContinuation(
             signout_source, /*force_snackbar_over_toolbar=*/false,
             /*should_record_metrics=*/false, /*snackbar_message =*/nil,
             base::IgnoreArgs<SceneState*>(barrier));
-    SwitchToPersonalProfile(browser, std::move(continuation));
+    SwitchToPersonalProfile(browser,
+                            ChangeProfileReason::kManagedAccountSignOut,
+                            std::move(continuation));
   }
 }
 
@@ -549,8 +569,9 @@ void FetchUnsyncedDataForSignOutOrProfileSwitching(
     UnsyncedDataForSignoutOrProfileSwitchingCallback callback) {
   constexpr syncer::DataTypeSet kDataTypesToQuery =
       syncer::TypesRequiringUnsyncedDataCheckOnSignout();
-  sync_service->GetTypesWithUnsyncedData(kDataTypesToQuery,
-                                         std::move(callback));
+  sync_service->GetTypesWithUnsyncedData(
+      kDataTypesToQuery,
+      base::BindOnce(&DataCountsMapToDataTypeSet).Then(std::move(callback)));
 }
 
 }  // namespace signin

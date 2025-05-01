@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
 
 #include "components/omnibox/browser/featured_search_provider.h"
 
@@ -295,7 +291,8 @@ TEST_F(FeaturedSearchProviderTest, StarterPackExpansion) {
   RunTest(typing_scheme_cases);
 }
 
-TEST_F(FeaturedSearchProviderTest, StarterPackExpansionRelevance) {
+// TODO(crbug.com/413598265): Fix flaky test.
+TEST_F(FeaturedSearchProviderTest, FLAKY_StarterPackExpansionRelevance) {
   base::test::ScopedFeatureList features;
   features.InitWithFeatures(
       {omnibox::kStarterPackExpansion,

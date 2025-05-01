@@ -48,7 +48,7 @@ CreditCardFormEventLogger::~CreditCardFormEventLogger() = default;
 
 void CreditCardFormEventLogger::OnBnplSuggestionShown() {
   if (!has_logged_bnpl_suggestion_shown_) {
-    LogBnplFormEvent(BnplFormEvent::kBnplSuggestionShownOnce);
+    LogBnplFormEvent(BnplFormEvent::kBnplSuggestionShown);
     has_logged_bnpl_suggestion_shown_ = true;
   }
 }
@@ -152,7 +152,7 @@ void CreditCardFormEventLogger::OnDidShowSuggestions(
   if (!has_logged_suggestions_shown_on_bnpl_eligible_merchant_ &&
       IsEligibleForBnpl(
           owner_->client().GetLastCommittedPrimaryMainFrameURL())) {
-    LogBnplFormEvent(BnplFormEvent::kSuggestionsShownOnce);
+    LogBnplFormEvent(BnplFormEvent::kSuggestionsShown);
     has_logged_suggestions_shown_on_bnpl_eligible_merchant_ = true;
   }
 }
@@ -504,7 +504,8 @@ void CreditCardFormEventLogger::OnDidFillFormFillingSuggestion(
         // flows.
         if (credit_card.is_bnpl_card()) {
           if (!has_logged_form_filled_with_bnpl_vcn_) {
-            LogFormFilledWithBnplVcn(credit_card.issuer_id());
+            LogFormFilledWithBnplVcn(
+                autofill::ConvertToBnplIssuerIdEnum(credit_card.issuer_id()));
             has_logged_form_filled_with_bnpl_vcn_ = true;
           }
         } else {
@@ -590,7 +591,7 @@ void CreditCardFormEventLogger::LogCardUnmaskAuthenticationPromptCompleted(
 
 void CreditCardFormEventLogger::OnDidAcceptBnplSuggestion() {
   if (!has_logged_bnpl_suggestion_accepted_) {
-    LogBnplFormEvent(BnplFormEvent::kBnplSuggestionAcceptedOnce);
+    LogBnplFormEvent(BnplFormEvent::kBnplSuggestionAccepted);
     has_logged_bnpl_suggestion_accepted_ = true;
   }
 }
@@ -686,7 +687,8 @@ void CreditCardFormEventLogger::LogFormSubmitted(const FormStructure& form) {
     // influencing other VCN metrics, as these represent distinct user flows.
     if (filled_credit_card_->is_bnpl_card()) {
       if (!has_logged_form_submitted_with_bnpl_vcn_) {
-        LogFormSubmittedWithBnplVcn(filled_credit_card_->issuer_id());
+        LogFormSubmittedWithBnplVcn(autofill::ConvertToBnplIssuerIdEnum(
+            filled_credit_card_->issuer_id()));
         has_logged_form_submitted_with_bnpl_vcn_ = true;
       }
     } else {

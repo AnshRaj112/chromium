@@ -118,6 +118,13 @@ namespace {
 // The amount of vertical padding in dips the separator should have to
 // prevent menu items from being visually too close to each other.
 constexpr int kSeparatorPadding = 8;
+// The width of the tab group editor bubble.
+constexpr int kDialogWidth = 240;
+// The default size of icons that are displayed in the tab group editor bubble.
+static constexpr int kDefaultIconSize = 20;
+// The maximum number of times we will show the footer section with the learn
+// more link.
+constexpr int kFooterDisplayLimit = 5;
 
 int GetHorizontalSpacing() {
   return ChromeLayoutProvider::Get()->GetDistanceMetric(
@@ -137,12 +144,6 @@ gfx::Insets GetControlInsets() {
              ? gfx::Insets::VH(5 * vertical_spacing / 4, horizontal_spacing)
              : gfx::Insets::VH(vertical_spacing, horizontal_spacing);
 }
-
-constexpr int kDialogWidth = 240;
-static constexpr int kDefaultIconSize = 20;
-// The maximum number of times we will show the footer section with the learn
-// more link.
-constexpr int kFooterDisplayLimit = 5;
 
 std::unique_ptr<views::LabelButton> CreateMenuItem(
     int button_id,
@@ -288,7 +289,7 @@ TabGroupEditorBubbleView::TabGroupEditorBubbleView(
   RebuildMenuContents();
 
   // Add a separator for the delete menu item and footer v2 enabled.
-  if (IsGroupSaved() && ShouldShowSavedFooter()) {
+  if (CanSaveGroups() && ShouldShowSavedFooter()) {
     PrefService* pref_service = browser_->profile()->GetPrefs();
     saved_tab_group_prefs::IncrementLearnMoreFooterShownCountPref(pref_service);
   }
@@ -792,7 +793,8 @@ void TabGroupEditorBubbleView::ShareOrManagePressed() {
       const_cast<Browser*>(browser_.get()));
   service->StartShareOrManageFlow(
       std::move(delegate), group_,
-      collaboration::CollaborationServiceShareOrManageEntryPoint::kUnknown);
+      collaboration::CollaborationServiceShareOrManageEntryPoint::
+          kDesktopGroupEditorShareOrManageButton);
 
   bool is_group_shared = IsGroupShared();
   if (!is_group_shared) {

@@ -7,8 +7,10 @@ use serde_json::{json, Value};
 
 use crate::{
     earley::{lexerspec::LexerSpec, Grammar},
-    lark::lark_regex_quote,
+    regex_to_lark,
 };
+
+pub use crate::earley::ValidationResult;
 
 /// This represents a collection of grammars, with a designated
 /// "start" grammar at first position.
@@ -343,7 +345,7 @@ impl GrammarWithLexer {
     }
 
     pub fn from_regex(rx: &str) -> Self {
-        let rx = lark_regex_quote(rx);
+        let rx = regex_to_lark(rx, "");
         let mut r = Self::from_lark(format!("start: /{}/", rx));
         r.name = Some("regex".to_string());
         r

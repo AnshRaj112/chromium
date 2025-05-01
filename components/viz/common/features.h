@@ -56,7 +56,7 @@ VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kUseDrmBlackFullscreenOptimization);
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kUseFrameIntervalDecider);
 #if BUILDFLAG(IS_ANDROID)
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(
-    kUseFrameIntervalDeciderNewAndroidFeatures);
+    kUseFrameIntervalDeciderAdaptiveFrameRate);
 #endif
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kTemporalSkipOverlaysWithRootCopyOutputRequests);
@@ -92,6 +92,10 @@ VIZ_COMMON_EXPORT extern const base::FeatureParam<int>
 
 #if BUILDFLAG(IS_MAC)
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kVSyncAlignedPresent);
+VIZ_COMMON_EXPORT extern const base::FeatureParam<std::string> kTargetForVSync;
+VIZ_COMMON_EXPORT extern const char kTargetForVSyncAllFrames[];
+VIZ_COMMON_EXPORT extern const char kTargetForVSyncAnimation[];
+VIZ_COMMON_EXPORT extern const char kTargetForVSyncInteraction[];
 #endif
 
 VIZ_COMMON_EXPORT BASE_DECLARE_FEATURE(kAllowUndamagedNonrootRenderPassToSkip);
@@ -157,6 +161,7 @@ VIZ_COMMON_EXPORT bool UseWebViewNewInvalidateHeuristic();
 VIZ_COMMON_EXPORT bool UseSurfaceLayerForVideo();
 VIZ_COMMON_EXPORT int MaxOverlaysConsidered();
 VIZ_COMMON_EXPORT bool ShouldOnBeginFrameThrottleVideo();
+VIZ_COMMON_EXPORT bool IsComplexOccluderForQuadsWithRoundedCornersEnabled();
 VIZ_COMMON_EXPORT bool ShouldDrawImmediatelyWhenInteractive();
 VIZ_COMMON_EXPORT bool IsVSyncAlignedPresentEnabled();
 VIZ_COMMON_EXPORT bool ShouldLogFrameQuadInfo();

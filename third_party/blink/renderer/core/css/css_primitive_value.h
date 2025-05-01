@@ -441,9 +441,6 @@ class CORE_EXPORT CSSPrimitiveValue : public CSSValue {
   // Returns Double Value including infinity, -infinity, and NaN.
   double GetDoubleValueWithoutClamping() const;
 
-  float GetFloatValue() const { return GetValue<float>(); }
-  int GetIntValue() const { return GetValue<int>(); }
-
   template <typename T>
     requires std::integral<T> || std::floating_point<T>
   inline T ConvertTo(const CSSLengthResolver& length_resolver) const {
@@ -496,11 +493,6 @@ class CORE_EXPORT CSSPrimitiveValue : public CSSValue {
   bool IsResolvableLength() const;
 
  private:
-  template <typename T>
-  inline T GetValue() const {
-    return ClampTo<T>(GetDoubleValue());
-  }
-
   bool InvolvesLayout() const;
   const CSSMathExpressionNode* ToMathExpressionNode() const;
 };

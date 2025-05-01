@@ -8,7 +8,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import static org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutTab.FOLIO_FOOT_LENGTH_DP;
+import static org.chromium.chrome.browser.tasks.tab_management.TabUiThemeUtil.FOLIO_FOOT_LENGTH_DP;
 
 import android.content.Context;
 import android.graphics.Rect;
@@ -27,7 +27,9 @@ import org.junit.runner.RunWith;
 import org.robolectric.annotation.Config;
 
 import org.chromium.base.test.BaseRobolectricTestRunner;
+import org.chromium.base.test.util.Features;
 import org.chromium.chrome.R;
+import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.ui.theme.ChromeSemanticColorUtils;
 import org.chromium.components.browser_ui.styles.ChromeColors;
 import org.chromium.components.browser_ui.styles.SemanticColorUtils;
@@ -145,6 +147,26 @@ public class StripLayoutTabTest {
                 "Incognito inactive tab should match the placeholder color.",
                 expectedColor,
                 mIncognitoTab.getTint(false, false));
+    }
+
+    @Test
+    @Features.EnableFeatures(ChromeFeatureList.ANDROID_SURFACE_COLOR_UPDATE)
+    public void testGetTint_SurfaceColorUpdate() {
+        @ColorInt int expectedColor;
+
+        // Normal active tab color.
+        expectedColor = SemanticColorUtils.getColorSurfaceContainerHigh(mContext);
+        assertEquals(
+                "Normal active folio should match the Surface-0 color.",
+                expectedColor,
+                mNormalTab.getTint(true, false));
+
+        // Incognito active tab color.
+        expectedColor = mContext.getColor(R.color.toolbar_background_primary_dark);
+        assertEquals(
+                "Incognito active folio should match the baseline color.",
+                expectedColor,
+                mIncognitoTab.getTint(true, false));
     }
 
     @Test

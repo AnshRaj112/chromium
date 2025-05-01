@@ -22,14 +22,14 @@
 #include "content/public/browser/interest_group_manager.h"
 #include "net/base/schemeful_site.h"
 
-#if !BUILDFLAG(IS_ANDROID)
-#include "chrome/browser/privacy_sandbox/privacy_sandbox_queue_manager.h"
-#endif  // !BUILDFLAG(IS_ANDROID)
-
-class Browser;
+class BrowserWindowInterface;
 
 namespace views {
 class Widget;
+}
+
+namespace privacy_sandbox {
+class PrivacySandboxQueueManager;
 }
 
 // Service which encapsulates logic related to displaying and controlling the
@@ -249,12 +249,12 @@ class PrivacySandboxService : public KeyedService {
 #if !BUILDFLAG(IS_ANDROID)
   // Informs the service that a Privacy Sandbox prompt has been opened
   // or closed for |browser|.
-  virtual void PromptOpenedForBrowser(Browser* browser,
+  virtual void PromptOpenedForBrowser(BrowserWindowInterface* browser,
                                       views::Widget* widget) = 0;
-  virtual void PromptClosedForBrowser(Browser* browser) = 0;
+  virtual void PromptClosedForBrowser(BrowserWindowInterface* browser) = 0;
 
   // Returns whether a Privacy Sandbox prompt is currently open for |browser|.
-  virtual bool IsPromptOpenForBrowser(Browser* browser) = 0;
+  virtual bool IsPromptOpenForBrowser(BrowserWindowInterface* browser) = 0;
 
   virtual privacy_sandbox::PrivacySandboxQueueManager&
   GetPrivacySandboxNoticeQueueManager() = 0;

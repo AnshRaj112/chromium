@@ -38,7 +38,7 @@ public class StripLayoutUtils {
     public static final float TAB_GROUP_BOTTOM_INDICATOR_WIDTH_OFFSET = 27.f;
     static final float MIN_TAB_WIDTH_DP = 108.f;
     public static final float MAX_TAB_WIDTH_DP = TabUiThemeUtil.getMaxTabStripTabWidthDp();
-    static final float TAB_OVERLAP_WIDTH_DP = 28.f;
+    public static final float TAB_OVERLAP_WIDTH_DP = 28.f;
 
     // Animation Constants.
     public static final int ANIM_TAB_MOVE_MS = 125;
@@ -97,15 +97,15 @@ public class StripLayoutUtils {
      * @param modelFilter The {@link TabGroupModelFilter} that holds the given group.
      * @param tabModel The {@link TabModel} that holds the give tab.
      * @param stripTab The {@link StripLayoutTab}
-     * @return Whether the given tab is at the last position in any group.
+     * @return Whether the given tab is at a non-last position in any group.
      */
-    public static boolean isTabAtLastPositionInGroup(
+    public static boolean isNonTrailingTabInGroup(
             TabGroupModelFilter modelFilter, TabModel tabModel, StripLayoutTab stripTab) {
         Tab tab = tabModel.getTabById(stripTab.getTabId());
         if (modelFilter.isTabInTabGroup(tab)) {
             List<Tab> relatedTabs = modelFilter.getRelatedTabList(tab.getId());
             Tab lastTab = relatedTabs.get(relatedTabs.size() - 1);
-            return tab.getId() == lastTab.getId();
+            return tab.getId() != lastTab.getId();
         }
         return false;
     }

@@ -143,7 +143,7 @@ void ReadAnythingAppModel::Reset(std::vector<ui::AXNodeID> content_node_ids) {
   display_node_ids_.clear();
   distillation_in_progress_ = false;
   requires_post_process_selection_ = false;
-  selection_from_action_ = false;
+  selections_from_reading_mode_ = 0;
   ResetSelection();
 }
 
@@ -173,7 +173,8 @@ bool ReadAnythingAppModel::PostProcessSelection() {
     return display_node_ids_.contains(start_.id) &&
            display_node_ids_.contains(end_.id);
   };
-  const bool need_to_draw = !selection_from_action_ && has_selection() &&
+  const bool need_to_draw = (selections_from_reading_mode_ == 0) &&
+                            has_selection() &&
                             !selection_in_distilled_content();
   const bool was_empty = is_empty();
 
@@ -530,6 +531,13 @@ void ReadAnythingAppModel::AccessibilityEventReceived(
     tree_infos_.emplace(
         tree_id, std::make_unique<AXTreeInfo>(
                      std::make_unique<ui::AXTreeManager>(std::move(new_tree))));
+    // If we previously received UKM source info for this tree_id, set the
+    // UKM source now that the tree information has been added to tree_infos_.
+    if (tree_id == active_tree_id_ && pending_ukm_sources_.count(tree_id) > 0) {
+      ukm::SourceId ukm_source_id = pending_ukm_sources_[tree_id];
+      pending_ukm_sources_.erase(tree_id);
+      SetUkmSourceId(ukm_source_id);
+    }
   }
 
   // If a tree update on the active tree is received while distillation is in
@@ -604,6 +612,21 @@ ukm::SourceId ReadAnythingAppModel::GetUkmSourceId() const {
   return ukm::kInvalidSourceId;
 }
 
+void ReadAnythingAppModel::SetUkmSourceIdForTree(const ui::AXTreeID& tree,
+                                                 ukm::SourceId ukm_source_id) {
+  // We may receive an OnActiveAXTreeIDChanged event on a tree before we've
+  // received an AccessibilityEventReceived event adding the tree to
+  // tree_infos_. When this happens, we should keep track of the ukm_source_id,
+  // and later, if the tree is added to tree_infos_ while it's still active,
+  // we can try again to set the ukm source.
+  if (!base::Contains(tree_infos_, active_tree_id_)) {
+    pending_ukm_sources_[tree] = ukm_source_id;
+    return;
+  }
+
+  SetUkmSourceId(ukm_source_id);
+}
+
 void ReadAnythingAppModel::SetUkmSourceId(ukm::SourceId ukm_source_id) {
   if (!base::Contains(tree_infos_, active_tree_id_)) {
     return;
@@ -661,7 +684,7 @@ void ReadAnythingAppModel::AdjustTextSize(int increment) {
 }
 
 void ReadAnythingAppModel::ResetTextSize() {
-  SetFontSize(1.0f);
+  SetFontSize(2.0f);
 }
 
 void ReadAnythingAppModel::OnScroll(bool on_selection,
@@ -692,43 +715,6 @@ void ReadAnythingAppModel::OnScroll(bool on_selection,
   }
   base::UmaHistogramEnumeration("Accessibility.ReadAnything.ScrollEvent",
                                 event);
-}
-
-void ReadAnythingAppModel::OnSelection(ax::mojom::EventFrom event_from) {
-  // If event_from is kUser, the user selected text on the main web page.
-  // If event_from is kAction, the user selected text in RM and the main web
-  // page was updated with that selection.
-  // Edgecases:
-  // 1. For selections in PDFs coming from the main pane or from the side
-  // panel, event_from is set to kNone.
-  // 2. When the user clicks and drags the cursor to highlight text on a
-  // webpage, such that the anchor node and offset stays the same and the focus
-  // node and/or offset changes, the first few selection events have event_from
-  // kUser, but the subsequent selection events have event_from kPage. This is
-  // the way UserActivationState is implemented. To detect this case, compare
-  // the new selection to the saved selection. If the anchor is the same, update
-  // the selection in RM.
-  bool is_click_and_drag_selection = false;
-  if (ContainsTree(active_tree_id_)) {
-    ui::AXSerializableTree* tree = GetTreeFromId(active_tree_id_);
-    if (!tree) {
-      return;
-    }
-    ui::AXSelection selection = tree->GetUnignoredSelection();
-    const SelectionEndpoint anchor(selection,
-                                   SelectionEndpoint::Source::kAnchor);
-    const SelectionEndpoint focus(selection, SelectionEndpoint::Source::kFocus);
-    is_click_and_drag_selection = (anchor == start_ && focus != end_) ||
-                                  (anchor == end_ && focus != start_);
-  }
-  if (event_from == ax::mojom::EventFrom::kUser ||
-      event_from == ax::mojom::EventFrom::kAction ||
-      (event_from == ax::mojom::EventFrom::kPage &&
-       is_click_and_drag_selection) ||
-      is_pdf_) {
-    requires_post_process_selection_ = true;
-    selection_from_action_ = event_from == ax::mojom::EventFrom::kAction;
-  }
 }
 
 void ReadAnythingAppModel::SetActiveTreeId(ui::AXTreeID active_tree_id) {
@@ -843,12 +829,12 @@ void ReadAnythingAppModel::ProcessNonGeneratedEvents(
       case ax::mojom::Event::kTooltipClosed:
       case ax::mojom::Event::kTooltipOpened:
       case ax::mojom::Event::kTreeChanged:
-        if (!features::IsReadAnythingReadAloudEnabled()) {
           break;
-        }
-        [[fallthrough]];
       case ax::mojom::Event::kValueChanged:
-        if (!features::IsReadAnythingReadAloudEnabled()) {
+        // After the user finishes typing something we wait for a timer and
+        // redraw to capture the input.
+        if (event.event_from == ax::mojom::EventFrom::kUser &&
+            event.event_intents.size() > 0) {
           reset_draw_timer_ = true;
         }
         break;
@@ -884,7 +870,7 @@ void ReadAnythingAppModel::ProcessGeneratedEvents(
   for (const auto& event : event_generator) {
     switch (event.event_params->event) {
       case ui::AXEventGenerator::Event::DOCUMENT_SELECTION_CHANGED:
-        OnSelection(event.event_params->event_from);
+        requires_post_process_selection_ = true;
         break;
       case ui::AXEventGenerator::Event::DOCUMENT_TITLE_CHANGED:
         if (!features::IsReadAnythingReadAloudEnabled() ||
@@ -932,20 +918,8 @@ void ReadAnythingAppModel::ProcessGeneratedEvents(
           }
         }
         break;
-      // After the user finishes typing something we wait for a timer and redraw
-      // to capture the input. For some reason, scrolling pdfs sends editable
-      // text changed events, which is not what we want, so only redraw if it's
-      // not a pdf.
-      // TODO(crbug.com//40927698): Determine why these events are generated
-      // for PDF scrolling, and if there's a need to differentiate actual pdf
-      // edits.
-      case ui::AXEventGenerator::Event::EDITABLE_TEXT_CHANGED:
-        if (features::IsReadAnythingReadAloudEnabled() && !is_pdf_) {
-          reset_draw_timer_ = true;
-          break;
-        }
-        [[fallthrough]];
       // Audit these events e.g. to trigger distillation.
+      case ui::AXEventGenerator::Event::EDITABLE_TEXT_CHANGED:
       case ui::AXEventGenerator::Event::NONE:
       case ui::AXEventGenerator::Event::ACCESS_KEY_CHANGED:
       case ui::AXEventGenerator::Event::ACTIVE_DESCENDANT_CHANGED:

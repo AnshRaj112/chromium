@@ -40,6 +40,7 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_canvas_font_variant_caps.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_canvas_text_rendering.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_texture_format.h"
+#include "third_party/blink/renderer/core/canvas_interventions/canvas_interventions_enums.h"
 #include "third_party/blink/renderer/core/canvas_interventions/canvas_interventions_helper.h"
 #include "third_party/blink/renderer/core/css/properties/computed_style_utils.h"
 #include "third_party/blink/renderer/core/css/style_change_reason.h"
@@ -110,6 +111,19 @@
 
 namespace blink {
 namespace {
+
+wgpu::TextureFormat AsDawnType(const viz::SharedImageFormat& format) {
+  // NOTE: Canvas2D can be only RGBA_8888, BGRA_8888, or F16.
+  if (format == viz::SinglePlaneFormat::kRGBA_8888) {
+    return wgpu::TextureFormat::RGBA8Unorm;
+  } else if (format == viz::SinglePlaneFormat::kBGRA_8888) {
+    return wgpu::TextureFormat::BGRA8Unorm;
+  } else if (format == viz::SinglePlaneFormat::kRGBA_F16) {
+    return wgpu::TextureFormat::RGBA16Float;
+  } else {
+    return wgpu::TextureFormat::Undefined;
+  }
+}
 
 bool IsContextProviderValid() {
   base::WeakPtr<WebGraphicsContext3DProviderWrapper> context_provider_wrapper =
@@ -1213,7 +1227,12 @@ void BaseRenderingContext2D::DrawTextInternal(
     location.set_x(location.x() / ClampTo<float>(width / font_width));
   }
 
-  SetTriggerForCanvasIntervention();
+  // Only fill and stroke are used for DrawTextInternal.
+  AddTriggersForCanvasIntervention(
+      paint_type == CanvasRenderingContext2DState::kFillPaintType
+          ? CanvasOperationType::kFillText
+          : CanvasOperationType::kStrokeText);
+
   Draw<OverdrawOp::kNone>(
       [font, text = std::move(text), direction, bidi_override, location,
        run_start, run_end, canvas, text_painter](
@@ -1459,8 +1478,7 @@ UniqueFontSelector* BaseRenderingContext2D::GetFontSelector() const {
 }
 
 V8GPUTextureFormat BaseRenderingContext2D::getTextureFormat() const {
-  return FromDawnEnum(
-      AsDawnType(viz::ToClosestSkColorType(GetSharedImageFormat())));
+  return FromDawnEnum(AsDawnType(GetSharedImageFormat()));
 }
 
 GPUTexture* BaseRenderingContext2D::transferToGPUTexture(
@@ -1572,8 +1590,7 @@ GPUTexture* BaseRenderingContext2D::transferToGPUTexture(
     return nullptr;
   }
 
-  wgpu::TextureFormat dawn_format =
-      AsDawnType(viz::ToClosestSkColorType(client_si->format()));
+  wgpu::TextureFormat dawn_format = AsDawnType(client_si->format());
   wgpu::TextureDescriptor desc = {
       .usage = tex_usage,
       .size = {base::checked_cast<uint32_t>(client_si->size().width()),

@@ -101,11 +101,11 @@
   return info.gaia.ToNSString();
 }
 
-+ (NSString*)primaryAccountEmailWithConsent:(signin::ConsentLevel)consentLevel {
++ (NSString*)primaryAccountEmail {
   ProfileIOS* profile = chrome_test_util::GetOriginalProfile();
   CoreAccountInfo info =
       IdentityManagerFactory::GetForProfile(profile)->GetPrimaryAccountInfo(
-          consentLevel);
+          signin::ConsentLevel::kSignin);
 
   return base::SysUTF8ToNSString(info.email);
 }
@@ -142,11 +142,7 @@
     // For convenience, add the identity, if it was not added yet.
     [self addFakeIdentity:identity withUnknownCapabilities:NO];
   }
-  ProfileIOS* profile = chrome_test_util::GetOriginalProfile();
-  AuthenticationService* authenticationService =
-      AuthenticationServiceFactory::GetForProfile(profile);
-  authenticationService->SignIn(identity,
-                                signin_metrics::AccessPoint::kSettings);
+  chrome_test_util::SignIn(identity);
 }
 
 + (void)signinWithFakeManagedIdentityInPersonalProfile:
@@ -163,14 +159,6 @@
         ->MakePersonalProfileManagedWithGaiaID(GaiaId(identity.gaiaID));
   }
 
-  ProfileIOS* profile = chrome_test_util::GetOriginalProfile();
-  AuthenticationService* authenticationService =
-      AuthenticationServiceFactory::GetForProfile(profile);
-  authenticationService->SignIn(identity,
-                                signin_metrics::AccessPoint::kSettings);
-}
-
-+ (void)signInWithoutHistorySyncWithFakeIdentity:(FakeSystemIdentity*)identity {
   chrome_test_util::SignIn(identity);
 }
 
@@ -219,6 +207,14 @@
       SyncServiceFactory::GetForProfile(chrome_test_util::GetOriginalProfile())
           ->GetUserSettings();
   return settings->GetSelectedTypes().Has(type) ? YES : NO;
+}
+
++ (void)setUseFakeResponsesForProfileSeparationPolicyRequests {
+  chrome_test_util::SetUseFakeResponsesForProfileSeparationPolicyRequests();
+}
+
++ (void)clearUseFakeResponsesForProfileSeparationPolicyRequests {
+  chrome_test_util::ClearUseFakeResponsesForProfileSeparationPolicyRequests();
 }
 
 + (void)setPolicyResponseForNextProfileSeparationPolicyRequest:

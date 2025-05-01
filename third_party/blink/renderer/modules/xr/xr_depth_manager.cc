@@ -8,9 +8,11 @@
 
 #include "base/trace_event/trace_event.h"
 #include "third_party/blink/renderer/modules/xr/xr_cpu_depth_information.h"
+#include "third_party/blink/renderer/modules/xr/xr_frame.h"
 #include "third_party/blink/renderer/modules/xr/xr_session.h"
 #include "third_party/blink/renderer/platform/bindings/exception_code.h"
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
+#include "ui/gfx/geometry/transform.h"
 
 namespace {
 
@@ -63,12 +65,18 @@ void XRDepthManager::ProcessDepthInformation(
 
 XRCPUDepthInformation* XRDepthManager::GetCpuDepthInformation(
     const XRFrame* xr_frame,
+    const gfx::Transform& ref_space_from_mojo,
     ExceptionState& exception_state) {
   DVLOG(2) << __func__;
 
   if (usage_ != device::mojom::XRDepthUsage::kCPUOptimized) {
     exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
                                       kInvalidUsageMode);
+    return nullptr;
+  }
+
+  // If we've reached this point, we belong to the same session as the frame.
+  if (!xr_frame->session()->IsDepthActive()) {
     return nullptr;
   }
 
@@ -79,18 +87,25 @@ XRCPUDepthInformation* XRDepthManager::GetCpuDepthInformation(
   EnsureData();
 
   return MakeGarbageCollected<XRCPUDepthInformation>(
-      xr_frame, depth_data_->size, depth_data_->norm_texture_from_norm_view,
+      xr_frame, ref_space_from_mojo, depth_data_->view_geometry,
+      depth_data_->size, depth_data_->norm_texture_from_norm_view,
       depth_data_->raw_value_to_meters, data_format_, data_);
 }
 
 XRWebGLDepthInformation* XRDepthManager::GetWebGLDepthInformation(
     const XRFrame* xr_frame,
+    const gfx::Transform& ref_space_from_mojo,
     ExceptionState& exception_state) {
   DVLOG(2) << __func__;
 
   if (usage_ != device::mojom::XRDepthUsage::kGPUOptimized) {
     exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,
                                       kInvalidUsageMode);
+    return nullptr;
+  }
+
+  // If we've reached this point, we belong to the same session as the frame.
+  if (!xr_frame->session()->IsDepthActive()) {
     return nullptr;
   }
 

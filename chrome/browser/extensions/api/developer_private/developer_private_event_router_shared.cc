@@ -12,6 +12,8 @@
 #include "base/values.h"
 #include "chrome/browser/extensions/api/developer_private/profile_info_generator.h"
 #include "chrome/browser/extensions/error_console/error_console.h"
+#include "chrome/browser/extensions/extension_allowlist.h"
+#include "chrome/browser/extensions/extension_management.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/extensions/api/developer_private.h"
 #include "chrome/common/pref_names.h"
@@ -27,6 +29,7 @@
 #include "extensions/browser/service_worker/worker_id.h"
 #include "extensions/browser/uninstall_reason.h"
 #include "extensions/browser/warning_service.h"
+#include "extensions/common/command.h"
 #include "extensions/common/extension_id.h"
 
 namespace extensions {
@@ -60,6 +63,10 @@ DeveloperPrivateEventRouterShared::DeveloperPrivateEventRouterShared(
   extension_prefs_observation_.Observe(ExtensionPrefs::Get(profile));
   warning_service_observation_.Observe(WarningService::Get(profile));
   permissions_manager_observation_.Observe(PermissionsManager::Get(profile));
+  extension_management_observation_.Observe(
+      ExtensionManagementFactory::GetForBrowserContext(profile));
+  extension_allowlist_observer_.Observe(ExtensionAllowlist::Get(profile));
+  command_service_observation_.Observe(CommandService::Get(profile));
 
   pref_change_registrar_.Init(profile->GetPrefs());
   // The unretained is safe, since the PrefChangeRegistrar unregisters the
@@ -227,6 +234,35 @@ void DeveloperPrivateEventRouterShared::OnExtensionPermissionsUpdated(
     PermissionsManager::UpdateReason reason) {
   BroadcastItemStateChanged(developer::EventType::kPermissionsChanged,
                             extension.id());
+}
+
+void DeveloperPrivateEventRouterShared::OnExtensionManagementSettingsChanged() {
+  base::Value::List args;
+  args.Append(CreateProfileInfo(profile_).ToValue());
+
+  auto event = std::make_unique<Event>(
+      events::DEVELOPER_PRIVATE_ON_PROFILE_STATE_CHANGED,
+      developer::OnProfileStateChanged::kEventName, std::move(args));
+  event_router_->BroadcastEvent(std::move(event));
+}
+
+void DeveloperPrivateEventRouterShared::OnExtensionAllowlistWarningStateChanged(
+    const ExtensionId& extension_id,
+    bool show_warning) {
+  BroadcastItemStateChanged(developer::EventType::kPrefsChanged, extension_id);
+}
+
+void DeveloperPrivateEventRouterShared::OnExtensionCommandAdded(
+    const ExtensionId& extension_id,
+    const Command& added_command) {
+  BroadcastItemStateChanged(developer::EventType::kCommandAdded, extension_id);
+}
+
+void DeveloperPrivateEventRouterShared::OnExtensionCommandRemoved(
+    const ExtensionId& extension_id,
+    const Command& removed_command) {
+  BroadcastItemStateChanged(developer::EventType::kCommandRemoved,
+                            extension_id);
 }
 
 void DeveloperPrivateEventRouterShared::OnProfilePrefChanged() {

@@ -67,6 +67,11 @@ const base::FeatureParam<int> kAndroidSpareRendererMemoryThreshold{
     &kAndroidWarmUpSpareRendererWithTimeout, "spare_renderer_memory_threshold",
     1077};
 
+// Kill the spare renderer when the browser goes to the background to free
+// resources.
+const base::FeatureParam<bool> kAndroidSpareRendererKillWhenBackgrounded{
+    &kAndroidWarmUpSpareRendererWithTimeout, "kill_when_backgrounded", false};
+
 // Launches the audio service on the browser startup.
 BASE_FEATURE(kAudioServiceLaunchOnStartup,
              "AudioServiceLaunchOnStartup",
@@ -101,12 +106,6 @@ BASE_FEATURE(kBackgroundFetch,
 // Enable using the BackForwardCache.
 BASE_FEATURE(kBackForwardCache,
              "BackForwardCache",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Allows pages that created a MediaSession service to stay eligible for the
-// back/forward cache.
-BASE_FEATURE(kBackForwardCacheMediaSessionService,
-             "BackForwardCacheMediaSessionService",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Set a time limit for the page to enter the cache. Disabling this prevents
@@ -290,13 +289,6 @@ BASE_FEATURE(kBtm, "DIPS", base::FEATURE_ENABLED_BY_DEFAULT);
 // |kBtm| feature flag).
 BASE_FEATURE(kBtmTtl, "DIPSTtl", base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Set whether BTM persists its database to disk.
-const base::FeatureParam<bool> kBtmPersistedDatabaseEnabled{
-    &kBtm, "persist_database", true};
-
-// Set whether BTM performs deletion.
-const base::FeatureParam<bool> kBtmDeletionEnabled{&kBtm, "delete", true};
-
 // Set the time period that Chrome will wait for before clearing storage for a
 // site after it performs some action (e.g. bouncing the user or using storage)
 // without user interaction.
@@ -365,11 +357,6 @@ BASE_FEATURE(kWebContentsDiscard,
              "WebContentsDiscard",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables the Origin Trial of Document-Isolation-Policy.
-BASE_FEATURE(kDocumentIsolationPolicyOriginTrial,
-             "DocumentIsolationPolicyOriginTrial",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enable drawing under System Bars within DisplayCutout.
 BASE_FEATURE(kDrawCutoutEdgeToEdge,
              "DrawCutoutEdgeToEdge",
@@ -408,39 +395,17 @@ BASE_FEATURE(kEnsureExistingRendererAlive,
 // We enable it here by default to support use in origin trials.
 BASE_FEATURE(kFedCm, "FedCm", base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables the "Use a different account" button in the FedCM account chooser to
-// log in to another IDP account, if the IDP opts in.
-BASE_FEATURE(kFedCmUseOtherAccount,
-             "FedCmUseOtherAccount",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Support usernames and phone numbers to identify users, instead of
 // (or in addition to) names and emails.
 BASE_FEATURE(kFedCmAlternativeIdentifiers,
              "FedCmAlternativeIdentifiers",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables usage of the FedCM Authz API.
-// Note that actual exposure of the API to web content is controlled by
-// the flag in RuntimeEnabledFeatures on the blink side. See also the use
-// of kSetOnlyIfOverridden in content/child/runtime_features.cc. We enable
-// it here by default to support use in origin trials and web platform tests.
-BASE_FEATURE(kFedCmAuthz, "FedCmAuthz", base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables RPs to enhance autofill with federated accounts fetched by the FedCM
 // API.
 BASE_FEATURE(kFedCmAutofill,
              "FedCmAutofill",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables usage of the FedCM ButtonMode feature.
-// Note that actual exposure of the API to web content is controlled by
-// the flag in RuntimeEnabledFeatures on the blink side. See also the use
-// of kSetOnlyIfOverridden in content/child/runtime_features.cc. We enable
-// it here by default to support use in origin trials.
-BASE_FEATURE(kFedCmButtonMode,
-             "FedCmButtonMode",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables cooldown on ignore in FedCM API.
 BASE_FEATURE(kFedCmCooldownOnIgnore,
@@ -986,12 +951,14 @@ BASE_FEATURE(
     "ServiceWorkerStaticRouterRaceNetworkRequestPerformanceImprovement",
     base::FEATURE_DISABLED_BY_DEFAULT);
 
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 // Run video capture service in the Browser process as opposed to a dedicated
 // utility process.
 BASE_FEATURE(kRunVideoCaptureServiceInBrowserProcess,
              "RunVideoCaptureServiceInBrowserProcess",
              base::FEATURE_DISABLED_BY_DEFAULT
 );
+#endif
 
 // Update scheduler settings using resourced on ChromeOS.
 BASE_FEATURE(kSchedQoSOnResourcedForChrome,
@@ -1447,6 +1414,14 @@ BASE_FEATURE(kSonomaAccessibilityActivationRefinements,
 
 #endif  // BUILDFLAG(IS_MAC)
 
+#if BUILDFLAG(IS_ANDROID)
+// Disables WebAuthn on Android Auto. Default enabled in M137, remove in or
+// after M140.
+BASE_FEATURE(kWebauthnDisabledOnAuto,
+             "WebAuthenticationDisabledOnAuto",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(IS_ANDROID)
+
 // Default amount of days after which the global navigation capturing IPH
 // guardrails are cleared from storage.
 const base::FeatureParam<int> kNavigationCapturingIPHGuardrailStorageDuration{
@@ -1480,7 +1455,7 @@ enum class VideoCaptureServiceConfiguration {
 };
 
 VideoCaptureServiceConfiguration GetVideoCaptureServiceConfiguration() {
-#if BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
   return VideoCaptureServiceConfiguration::kEnabledForBrowserProcess;
 #else
   return base::FeatureList::IsEnabled(

@@ -7,12 +7,17 @@ package org.chromium.chrome.browser.tabbed_mode;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
+import static org.chromium.chrome.browser.tab.Tab.INVALID_TAB_ID;
+
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
@@ -26,7 +31,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.Callback;
 import org.chromium.base.CommandLine;
+import org.chromium.base.Log;
 import org.chromium.base.ResettersForTesting;
+import org.chromium.base.Token;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.lifetime.Destroyable;
 import org.chromium.base.metrics.RecordHistogram;
@@ -117,6 +124,7 @@ import org.chromium.chrome.browser.omnibox.UrlFocusChangeListener;
 import org.chromium.chrome.browser.pdf.PdfPageIphController;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+import org.chromium.chrome.browser.privacy.settings.PrivacySettings;
 import org.chromium.chrome.browser.privacy_sandbox.ActivityTypeMapper;
 import org.chromium.chrome.browser.privacy_sandbox.PrivacySandboxBridge;
 import org.chromium.chrome.browser.privacy_sandbox.PrivacySandboxDialogController;
@@ -137,6 +145,7 @@ import org.chromium.chrome.browser.tab.RequestDesktopUtils;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabAssociatedApp;
 import org.chromium.chrome.browser.tab.TabFavicon;
+import org.chromium.chrome.browser.tab.TabId;
 import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncControllerImpl;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncFeatures;
@@ -212,6 +221,8 @@ import java.util.function.Function;
 
 /** A {@link RootUiCoordinator} variant that controls tabbed-mode specific UI. */
 public class TabbedRootUiCoordinator extends RootUiCoordinator {
+    // The tag length is restricted to be at most 20 characters.
+    private static final String TAG = "TabbedRootUiCoord";
     private static boolean sDisableTopControlsAnimationForTesting;
     private final RootUiTabObserver mRootUiTabObserver;
     private TabbedSystemUiCoordinator mSystemUiCoordinator;
@@ -263,6 +274,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
     private @NonNull ObservableSupplier<BookmarkManagerOpener> mBookmarkManagerOpenerSupplier;
     private @NonNull AdvancedProtectionCoordinator mAdvancedProtectionCoordinator;
     private final @NonNull KeyboardFocusRowManager mKeyboardFocusRowManager;
+    private CharSequence mApplicationLabel;
 
     // Activity tab observer that updates the current tab used by various UI components.
     private class RootUiTabObserver extends ActivityTabTabObserver {
@@ -273,8 +285,13 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
         }
 
         @Override
-        public void onObservingDifferentTab(Tab tab, boolean hint) {
+        public void onObservingDifferentTab(Tab tab) {
             swapToTab(tab);
+        }
+
+        @Override
+        public void onTitleUpdated(Tab tab) {
+            setActivityTitle(tab);
         }
 
         private void swapToTab(Tab tab) {
@@ -290,6 +307,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                 swipeHandler.setNavigationCoordinator(mHistoryNavigationCoordinator);
                 swipeHandler.setBrowserControls(mBrowserControlsManager);
             }
+            setActivityTitle(tab);
         }
 
         @Override
@@ -531,6 +549,16 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                         getTabObscuringHandler(),
                         () -> mToolbarManager // Gets current value of mToolbarManager
                         );
+
+        try {
+            PackageManager packageManager = mActivity.getPackageManager();
+            ApplicationInfo applicationInfo =
+                    packageManager.getApplicationInfo(mActivity.getPackageName(), 0);
+            mApplicationLabel = packageManager.getApplicationLabel(applicationInfo);
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "Error getting application info", e);
+            mApplicationLabel = "";
+        }
     }
 
     @Override
@@ -674,9 +702,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                         mContextualSearchManagerSupplier,
                         getBottomSheetController(),
                         mToolbarManager.getLocationBar().getOmniboxSuggestionsVisualState(),
-                        mManualFillingComponentSupplier
-                                .get()
-                                .getAccessorySheetVisualStateProvider(),
+                        mManualFillingComponentSupplier,
                         mOverviewColorSupplier,
                         mInsetObserver,
                         mEdgeToEdgeManager.getEdgeToEdgeSystemBarColorHelper());
@@ -768,7 +794,8 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
         super.onFinishNativeInitialization();
         assert mLayoutManager != null;
 
-        mAdvancedProtectionCoordinator = new AdvancedProtectionCoordinator(mWindowAndroid);
+        mAdvancedProtectionCoordinator =
+                new AdvancedProtectionCoordinator(mWindowAndroid, PrivacySettings.class);
 
         UmaSessionStats.registerSyntheticFieldTrial(
                 "AndroidNavigationMode",
@@ -1418,9 +1445,19 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
 
     private DataSharingTabGroupsDelegate createDataSharingTabGroupsDelegate() {
         return new DataSharingTabGroupsDelegate() {
-
             @Override
-            public void openTabGroupWithTabId(int tabId) {
+            public void openTabGroup(@Nullable Token tabGroupId) {
+                TabGroupModelFilter filter =
+                        mTabModelSelectorSupplier
+                                .get()
+                                .getTabGroupModelFilterProvider()
+                                .getTabGroupModelFilter(false);
+                @TabId int rootId = filter.getRootIdFromTabGroupId(tabGroupId);
+                if (rootId == INVALID_TAB_ID) {
+                    // TODO(crbug.com/396019438): Try to switch windows.
+                    return;
+                }
+
                 // Due to crbug.com/396159718 (see also crbug.com/395847973) it was possible to
                 // reach this method without the tab switcher being open. For now this will
                 // remain as a safegaurd against bugs as internally it will noop if the tab switcher
@@ -1430,7 +1467,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                         mLayoutManager,
                         /* animate= */ false,
                         () -> {
-                            mTabSwitcherSupplier.get().requestOpenTabGroupDialog(tabId);
+                            mTabSwitcherSupplier.get().requestOpenTabGroupDialog(rootId);
                         });
             }
 
@@ -1768,5 +1805,28 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
 
     /* package */ KeyboardFocusRowManager getKeyboardFocusRowManagerForTesting() {
         return mKeyboardFocusRowManager;
+    }
+
+    private void setActivityTitle(Tab tab) {
+        // Do not update title after Activity destruction.
+        if (mActivity == null) {
+            return;
+        }
+
+        String tabTitle = tab == null ? "" : tab.getTitle();
+        if (TextUtils.isEmpty(mApplicationLabel)) {
+            if (TextUtils.isEmpty(tabTitle)) {
+                mActivity.setTitle("Application");
+                Log.w(TAG, "Both application label and tab title are missing.");
+            } else {
+                mActivity.setTitle(tabTitle);
+            }
+        } else {
+            if (TextUtils.isEmpty(tabTitle)) {
+                mActivity.setTitle(mApplicationLabel);
+            } else {
+                mActivity.setTitle(mApplicationLabel + ": " + tabTitle);
+            }
+        }
     }
 }

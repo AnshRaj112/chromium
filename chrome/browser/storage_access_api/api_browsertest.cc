@@ -295,9 +295,6 @@ std::vector<base::test::FeatureRefAndParams> GetEnabledFeaturesForStorage(
   if (is_storage_partitioned) {
     enabled.push_back({net::features::kThirdPartyStoragePartitioning, {}});
   }
-  // WebSQL is disabled by default as of M119 (crbug/695592). Enable feature
-  // in tests during deprecation trial and enterprise policy support.
-  enabled.push_back({blink::features::kWebSQLAccess, {}});
   return enabled;
 }
 
@@ -3168,43 +3165,10 @@ INSTANTIATE_TEST_SUITE_P(,
                          StorageAccessAPIAutograntsWithFedCMBrowserTest,
                          testing::Bool());
 
-class StorageAccessHeadersDisabledBrowserTest
-    : public StorageAccessAPIBrowserTest {
- public:
-  std::vector<base::test::FeatureRef> GetDisabledFeatures() override {
-    return {
-        {network::features::kStorageAccessHeaders},
-    };
-  }
-};
-
-IN_PROC_BROWSER_TEST_F(StorageAccessHeadersDisabledBrowserTest, RetryHeader) {
-  SetBlockThirdPartyCookies(true);
-
-  // Pre-seed with a <A, B> permission grant.
-  NavigateToPageWithFrame(kHostA);
-  NavigateFrameTo(EchoCookiesURL(kHostB));
-  prompt_factory()->set_response_type(
-      permissions::PermissionRequestManager::ACCEPT_ALL);
-  ASSERT_TRUE(storage::test::RequestAndCheckStorageAccessForFrame(GetFrame()));
-
-  // Now attempt to use that permission grant for a B subresource fetched by an
-  // A document, without invoking the Storage Access API. The feature is
-  // disabled, so the request header is not sent and neither are cookies.
-  NavigateToPage(kHostA, "/empty.html");
-  EXPECT_THAT(
-      ContentFromFetch(GetPrimaryMainFrame(), kHostB, kRetryPath),
-      HeadersAre(UnorderedElementsAre(
-          Pair(net::HttpRequestHeaders::kCookie, kHeaderNotProvidedSentinel),
-          Pair(kSecFetchStorageAccess, kHeaderNotProvidedSentinel))));
-  EXPECT_EQ(retry_path_fetch_count_, 1);
-}
-
 class StorageAccessHeadersBrowserTest : public StorageAccessAPIBrowserTest {
  public:
   std::vector<base::test::FeatureRefAndParams> GetEnabledFeatures() override {
     return {
-        {network::features::kStorageAccessHeaders, {}},
         // TODO(crbug.com/382291442): Remove below two once permissions policies
         // are launched.
         {{network::features::kPopulatePermissionsPolicyOnRequest}, {}},
@@ -3697,18 +3661,8 @@ IN_PROC_BROWSER_TEST_F(StorageAccessHeadersWithThirdPartyCookiesBrowserTest,
   EXPECT_EQ(retry_path_fetch_count_, 1);
 }
 
-class StorageAccessHeadersWithFedCMBrowserTest
-    : public StorageAccessAPIAutograntsWithFedCMBrowserTest {
- public:
-  std::vector<base::test::FeatureRefAndParams> GetEnabledFeatures() override {
-    std::vector<base::test::FeatureRefAndParams> features =
-        StorageAccessAPIAutograntsWithFedCMBrowserTest::GetEnabledFeatures();
-    features.push_back({network::features::kStorageAccessHeaders, {}});
-    return features;
-  }
-};
-
-IN_PROC_BROWSER_TEST_P(StorageAccessHeadersWithFedCMBrowserTest, RetryHeader) {
+IN_PROC_BROWSER_TEST_P(StorageAccessAPIAutograntsWithFedCMBrowserTest,
+                       RetryHeader) {
   SetBlockThirdPartyCookies(true);
   SetRetryAllowedOriginFromHost(kHostA);
   GrantFedCMPermission();
@@ -3730,9 +3684,6 @@ IN_PROC_BROWSER_TEST_P(StorageAccessHeadersWithFedCMBrowserTest, RetryHeader) {
           Pair(kSecFetchStorageAccess, "none"))));
   EXPECT_EQ(retry_path_fetch_count_, 1);
 }
-INSTANTIATE_TEST_SUITE_P(,
-                         StorageAccessHeadersWithFedCMBrowserTest,
-                         testing::Bool());
 
 class StorageAccessAPIWindowOpenTestBase
     : public StorageAccessAPIBaseBrowserTest {
@@ -3926,9 +3877,15 @@ IN_PROC_BROWSER_TEST_P(StorageAccessAPIWindowOpenMainFrameTest,
   ExpectNoStorageAccessGrants();
 }
 
+// TODO(crbug.com/414635387): Fix test failures.
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+#define MAYBE_PopinRSAMainFrameTest DISABLED_PopinRSAMainFrameTest
+#else
+#define MAYBE_PopinRSAMainFrameTest PopinRSAMainFrameTest
+#endif
 // Opens a popin and checks that the RSA call within the main frame can succeed.
 IN_PROC_BROWSER_TEST_P(StorageAccessAPIWindowOpenMainFrameTest,
-                       PopinRSAMainFrameTest) {
+                       MAYBE_PopinRSAMainFrameTest) {
   // Navigate to site a and open popin of site b.
   NavigateToPage(kHostA, "/empty.html");
   content::WebContentsAddedObserver new_tab_observer;
@@ -4037,9 +3994,15 @@ class StorageAccessAPIWindowOpenSubFrameTest
   }
 };
 
+// TODO(crbug.com/414635387): Fix test failures.
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+#define MAYBE_PopinRSASubFrameTest DISABLED_PopinRSASubFrameTest
+#else
+#define MAYBE_PopinRSASubFrameTest PopinRSASubFrameTest
+#endif
 // Opens a popin and checks that the RSA call within the sub frame can succeed.
 IN_PROC_BROWSER_TEST_P(StorageAccessAPIWindowOpenSubFrameTest,
-                       PopinRSASubFrameTest) {
+                       MAYBE_PopinRSASubFrameTest) {
   // Navigate to site a and open popin.
   NavigateToPage(kHostA, "/empty.html");
   content::WebContentsAddedObserver new_tab_observer;

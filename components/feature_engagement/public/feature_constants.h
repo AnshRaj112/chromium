@@ -65,6 +65,9 @@ extern const base::FeatureParam<std::string>
     kIPHLensOverlayUrlPathMatchAllowPatterns;
 COMPONENT_EXPORT(FEATURE_ENGAGEMENT_FEATURE_CONSTANTS)
 extern const base::FeatureParam<std::string>
+    kIPHLensOverlayUrlForceAllowedUrlMatchPatterns;
+COMPONENT_EXPORT(FEATURE_ENGAGEMENT_FEATURE_CONSTANTS)
+extern const base::FeatureParam<std::string>
     kIPHLensOverlayUrlPathMatchBlockPatterns;
 COMPONENT_EXPORT(FEATURE_ENGAGEMENT_FEATURE_CONSTANTS)
 extern const base::FeatureParam<base::TimeDelta> kIPHLensOverlayDelayTime;
@@ -73,6 +76,7 @@ FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHLiveCaptionFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHMerchantTrustFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHTabAudioMutingFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHPasswordsSavePrimingPromoFeature);
+FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHPasswordsSaveRecoveryPromoFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(
     kIPHPasswordsManagementBubbleAfterSaveFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(
@@ -114,6 +118,7 @@ FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHProfileSwitchFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHWebUiHelpBubbleTestFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHPriceTrackingInSidePanelFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHBackNavigationMenuFeature);
+FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHAutofillEnableLoyaltyCardsFeature);
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) ||
         // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
 
@@ -180,6 +185,7 @@ FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHKeyboardAccessoryPaymentFillingFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHKeyboardAccessoryPaymentOfferFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHLowUserEngagementDetectorFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHMicToolbarFeature);
+FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHMenuAddToGroup);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHPageInfoFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHPageInfoStoreInfoFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHPageZoomFeature);
@@ -208,6 +214,7 @@ FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHTabGroupsRemoteGroupFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHTabGroupsSurfaceFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHTabGroupsSurfaceOnHideFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHTabGroupSyncOnStripFeature);
+FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHTabSwitcherAddToGroup);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHTabSwitcherButtonFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHTabSwitcherButtonSwitchIncognitoFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHTranslateMenuButtonFeature);
@@ -272,6 +279,8 @@ FEATURE_CONSTANTS_DECLARE_FEATURE(
     kIPHiOSPromoNonModalAppSwitcherDefaultBrowserFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(
     kIPHiOSPromoNonModalShareDefaultBrowserFeature);
+FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHiOSPromoNonModalSigninPasswordFeature);
+FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHiOSPromoNonModalSigninBookmarkFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHiOSPromoPasswordManagerWidgetFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHiOSPullToRefreshFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHiOSReplaceSyncPromosWithSignInPromos);
@@ -306,6 +315,7 @@ FEATURE_CONSTANTS_DECLARE_FEATURE(
     kIPHiOSSwitchAccountsWithNTPAccountParticleDiscFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHiOSFeedSwipeStaticFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHiOSFeedSwipeAnimatedFeature);
+FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHiOSWelcomeBackFeature);
 
 // A feature flag to enable and parametrize the sliding window of time for a
 // user's eligibility to be shown a default browser promo. This is not an FET
@@ -338,6 +348,9 @@ FEATURE_CONSTANTS_DECLARE_FEATURE(
     kIPHAutofillExternalAccountProfileSuggestionFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHAutofillHomeWorkProfileSuggestionFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHAutofillAiOptInFeature);
+COMPONENT_EXPORT(FEATURE_ENGAGEMENT_FEATURE_CONSTANTS)
+extern const base::FeatureParam<int> kAutofillIphCTAVariationsStringValue;
+COMPONENT_EXPORT(FEATURE_ENGAGEMENT_FEATURE_CONSTANTS)
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHAutofillVirtualCardCVCSuggestionFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHAutofillVirtualCardSuggestionFeature);
 FEATURE_CONSTANTS_DECLARE_FEATURE(kIPHCookieControlsFeature);

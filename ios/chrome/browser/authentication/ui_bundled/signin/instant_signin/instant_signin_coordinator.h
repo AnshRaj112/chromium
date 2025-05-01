@@ -6,7 +6,6 @@
 #define IOS_CHROME_BROWSER_AUTHENTICATION_UI_BUNDLED_SIGNIN_INSTANT_SIGNIN_INSTANT_SIGNIN_COORDINATOR_H_
 
 #import "ios/chrome/browser/authentication/ui_bundled/change_profile_continuation_provider.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin/interruptible_chrome_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_coordinator.h"
 
 namespace signin_metrics {
@@ -22,8 +21,7 @@ enum class PromoAction;
 // * one selected by the identity chooser that gets immediately opened, if the
 // device has identities, or
 // * otherwise, one obtained through the add account dialog.
-@interface InstantSigninCoordinator
-    : SigninCoordinator <InterruptibleChromeCoordinator>
+@interface InstantSigninCoordinator : SigninCoordinator
 
 - (instancetype)initWithBaseViewController:(UIViewController*)viewController
                                    browser:(Browser*)browser

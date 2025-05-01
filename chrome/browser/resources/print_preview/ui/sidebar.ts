@@ -15,7 +15,6 @@ import './duplex_settings.js';
 import './header.js';
 import './layout_settings.js';
 import './media_size_settings.js';
-import './media_type_settings.js';
 import './margins_settings.js';
 import './more_settings.js';
 import './other_options_settings.js';
@@ -97,14 +96,6 @@ export class PrintPreviewSidebarElement extends PrintPreviewSidebarElementBase {
         computed: 'computeControlsDisabled_(state)',
       },
 
-      maxSheets: Number,
-
-      sheetCount_: {
-        type: Number,
-        computed: 'computeSheetCount_(' +
-            'settings.pages.*, settings.duplex.*, settings.copies.*)',
-      },
-
       firstLoad_: {
         type: Boolean,
         value: true,
@@ -144,8 +135,6 @@ export class PrintPreviewSidebarElement extends PrintPreviewSidebarElementBase {
   declare private firstLoad_: boolean;
   declare private isInAppKioskMode_: boolean;
   declare private settingsExpandedByUser_: boolean;
-  declare maxSheets: number;
-  declare private sheetCount_: number;
   declare private shouldShowMoreSettings_: boolean;
 
   /**
@@ -171,17 +160,6 @@ export class PrintPreviewSidebarElement extends PrintPreviewSidebarElementBase {
    */
   private computeControlsDisabled_(): boolean {
     return this.state !== State.READY;
-  }
-
-  /**
-   * @return The number of sheets that will be printed.
-   */
-  private computeSheetCount_(): number {
-    let sheets = (this.getSettingValue('pages') as number[]).length;
-    if (this.getSettingValue('duplex')) {
-      sheets = Math.ceil(sheets / 2);
-    }
-    return sheets * (this.getSettingValue('copies') as number);
   }
 
   /**

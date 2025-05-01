@@ -1,5 +1,6 @@
 include_rules = [
   "+ios/chrome/browser/toolbar/ui_bundled",
+  "+ios/chrome/browser/browser_view",
   "+ios/chrome/browser/bubble/public",
   "+ios/chrome/browser/bubble/ui_bundled",
   "+ios/chrome/browser/context_menu/ui_bundled/link_preview",
@@ -70,8 +71,5 @@ specific_include_rules = {
   # TODO(crbug.com/41259428): Remove this exception.
   "^new_tab_page_controller\.mm$": [
     "+ios/web/web_state/ui/crw_swipe_recognizer_provider.h",
-  ],
-  "new_tab_page_coordinator\.mm": [
-    "+ios/chrome/browser/authentication/ui_bundled/signin/interruptible_chrome_coordinator.h",
   ],
 }

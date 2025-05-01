@@ -128,7 +128,8 @@ development and testing purposes.
 
 ## Setting up the build
 
-Chromium uses [Ninja](https://ninja-build.org) as its main build tool along with
+Chromium uses [Siso](https://pkg.go.dev/go.chromium.org/infra/build/siso#section-readme)
+as its main build tool along with
 a tool called [GN](https://gn.googlesource.com/gn/+/main/docs/quick_start.md)
 to generate `.ninja` files. You can create any number of *build directories*
 with different configurations. To create a build directory, run:
@@ -137,7 +138,7 @@ with different configurations. To create a build directory, run:
 $ gn gen out/Default
 ```
 
-* You only have to run this once for each new build directory, Ninja will
+* You only have to run this once for each new build directory, Siso will
   update the build files as needed.
 * You can replace `Default` with another name, but
   it should be a subdirectory of `out`.
@@ -166,29 +167,32 @@ Chromium's build can be sped up significantly by using a remote execution system
 compatible with [REAPI](https://github.com/bazelbuild/remote-apis). This allows
 you to benefit from remote caching and executing many build actions in parallel
 on a shared cluster of workers.
+Chromium's build uses a client developed by Google called
+[Siso](https://pkg.go.dev/go.chromium.org/infra/build/siso#section-readme)
+to remotely execute build actions.
 
+To get started, you need access to an REAPI-compatible backend.
+
+The following instructions assume that you received an invitation from Google
+to use Chromium's RBE service and were granted access to it.
 For contributors who have
 [tryjob access](https://www.chromium.org/getting-involved/become-a-committer/#try-job-access)
 , please ask a Googler to email accounts@chromium.org on your behalf to access
-RBE backend paid by Google. Note that reclient for external contributors is a
-best-effort process. We do not guarantee when you will be invited. Reach out to
-[reclient-users@chromium.org](https://groups.google.com/a/chromium.org/g/reclient-users)
-if you have any questions about reclient usage.
+RBE backend paid by Google. Note that remote execution for external
+contributors is a best-effort process. We do not guarantee when you will be
+invited.
 
-To get started, you need access to an REAPI-compatible backend. The following
-instructions assume that you received an invitation from Google to use
-Chromium's RBE service and were granted access to it. However, you are welcome
+For others who have no access to Google's RBE backends, you are welcome
 to use any of the
 [other compatible backends](https://github.com/bazelbuild/remote-apis#servers),
 in which case you will have to adapt the following instructions regarding the
 authentication method, instance name, etc. to work with your backend.
 
-Chromium's build uses a client developed by Google called
-[Siso](https://pkg.go.dev/go.chromium.org/infra/build/siso#section-readme)
-to remotely execute build actions. If you would like to use `siso` with RBE,
+If you would like to use `siso` with Google's RBE,
 you'll first need to:
 
 1. Run `siso login` and login with your authorized account.
+If it is blocked in OAuth2 flow, run `gcloud auth login` instead.
 
 Next, you'll have to specify your `rbe_instance` in your `.gclient`
 configuration to use the correct one for Chromium contributors:
@@ -218,6 +222,7 @@ solutions = [
 And run `gclient sync`. This will regenerate the config files in
 `build/config/siso/backend_config/backend.star` to use the `rbe_instance`
 that you just added to your `.gclient` file.
+
 If `rbe_instance` is not owned by Google, you may need to create your
 own `backend.star`. See
 [build/config/siso/backend_config/README.md](../../build/config/siso/backend_config/README.md).
@@ -226,19 +231,18 @@ Then, add the following GN args to your `args.gn`:
 
 ```
 use_remoteexec = true
-use_reclient = false
 use_siso = true
 ```
 
+If `args.gn` contains `use_reclient=true`, drop it or replace it with
+`use_reclient=false`.
+
 That's it. Remember to always use `autoninja` for building Chromium as described
-below, instead of directly invoking `ninja`.
+below, instead of directly invoking `siso` or `ninja`.
 
-#### Disable NaCl
-
-By default, the build includes support for
-[Native Client (NaCl)](https://developer.chrome.com/native-client), but
-most of the time you won't need it. You can set the GN argument
-`enable_nacl=false` and it won't be built.
+Reach out to
+[build@chromium.org](https://groups.google.com/a/chromium.org/g/build)
+if you have any questions about remote execution usage.
 
 #### Include fewer debug symbols
 
@@ -341,23 +345,23 @@ mode, with the GN arg `is_official_build = true`.
 
 ## Build Chromium
 
-Build Chromium (the "chrome" target) with Ninja using the command:
+Build Chromium (the "chrome" target) with Siso or Ninja using the command:
 
 ```shell
 $ autoninja -C out/Default chrome
 ```
 
 (`autoninja` is a wrapper that automatically provides optimal values for the
-arguments passed to `ninja`.)
+arguments passed to `siso` or `ninja`.)
 
 You can get a list of all of the other build targets from GN by running `gn ls
-out/Default` from the command line. To compile one, pass the GN label to Ninja
-with no preceding "//" (so, for `//chrome/test:unit_tests` use `autoninja -C
-out/Default chrome/test:unit_tests`).
+out/Default` from the command line. To compile one, pass the GN label to
+Siso/Ninja with no preceding "//" (so, for `//chrome/test:unit_tests` use
+`autoninja -C out/Default chrome/test:unit_tests`).
 
 ## Compile a single file
 
-Ninja supports a special [syntax `^`][ninja hat syntax] to compile a single object file specyfing
+Siso/Ninja supports a special [syntax `^`][ninja hat syntax] to compile a single object file specifying
 the source file. For example, `autoninja -C out/Default ../../base/logging.cc^`
 compiles `obj/base/base/logging.o`.
 

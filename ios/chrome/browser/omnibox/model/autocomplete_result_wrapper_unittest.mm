@@ -47,7 +47,7 @@ class AutocompleteResultWrapperTest : public PlatformTest {
         /*view=*/nullptr, std::move(omnibox_client));
     wrapper_ = [[AutocompleteResultWrapper alloc]
         initWithOmniboxClient:omnibox_controller_->client()];
-    wrapper_.isIncognito = NO;
+    wrapper_.incognito = NO;
     wrapper_.templateURLService =
         search_engines_test_environment_.template_url_service();
     wrapper_.delegate = _fake_autocomplete_wrapper_delegate;
@@ -63,7 +63,7 @@ class AutocompleteResultWrapperTest : public PlatformTest {
 
   ~AutocompleteResultWrapperTest() override { [wrapper_ disconnect]; }
 
-  base::test::TaskEnvironment task_environment_;
+  web::WebTaskEnvironment task_environment_;
 
   AutocompleteResultWrapper* wrapper_;
   search_engines::SearchEnginesTestEnvironment search_engines_test_environment_;

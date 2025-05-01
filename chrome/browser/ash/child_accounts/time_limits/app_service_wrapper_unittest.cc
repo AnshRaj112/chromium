@@ -107,12 +107,11 @@ class AppServiceWrapperTest : public ::testing::Test {
     base::CommandLine::ForCurrentProcess()->AppendSwitch(
         switches::kDisableDefaultApps);
 
-    extensions::TestExtensionSystem* extension_system(
-        static_cast<extensions::TestExtensionSystem*>(
-            extensions::ExtensionSystem::Get(&profile_)));
-    extension_service_ = extension_system->CreateExtensionService(
+    auto* extension_system(static_cast<extensions::TestExtensionSystem*>(
+        extensions::ExtensionSystem::Get(&profile_)));
+    auto* extension_service = extension_system->CreateExtensionService(
         base::CommandLine::ForCurrentProcess(), base::FilePath(), false);
-    extension_service_->Init();
+    extension_service->Init();
 
     web_app::test::AwaitStartWebAppProviderAndSubsystems(&profile_);
 
@@ -155,7 +154,7 @@ class AppServiceWrapperTest : public ::testing::Test {
     if (app_id.app_type() == apps::AppType::kChromeApp) {
       scoped_refptr<extensions::Extension> ext =
           CreateExtension(app_id.app_id(), app_name, url.value());
-      extension_service_->AddExtension(ext.get());
+      extensions::ExtensionRegistrar::Get(&profile_)->AddExtension(ext.get());
       task_environment_.RunUntilIdle();
       return;
     }
@@ -198,7 +197,7 @@ class AppServiceWrapperTest : public ::testing::Test {
 
     if (app_id.app_type() == apps::AppType::kChromeApp ||
         app_id.app_type() == apps::AppType::kWeb) {
-      extension_service_->UnloadExtension(
+      extensions::ExtensionRegistrar::Get(&profile_)->RemoveExtension(
           app_id.app_id(), extensions::UnloadedExtensionReason::UNINSTALL);
       task_environment_.RunUntilIdle();
       return;
@@ -227,12 +226,13 @@ class AppServiceWrapperTest : public ::testing::Test {
 
     if (app_id.app_type() == apps::AppType::kChromeApp ||
         app_id.app_type() == apps::AppType::kWeb) {
+      auto* registrar = extensions::ExtensionRegistrar::Get(&profile_);
       if (disabled) {
-        extension_service_->DisableExtension(
+        registrar->DisableExtension(
             app_id.app_id(),
-            extensions::disable_reason::DISABLE_BLOCKED_BY_POLICY);
+            {extensions::disable_reason::DISABLE_BLOCKED_BY_POLICY});
       } else {
-        extension_service_->EnableExtension(app_id.app_id());
+        registrar->EnableExtension(app_id.app_id());
       }
       task_environment_.RunUntilIdle();
       return;
@@ -246,8 +246,6 @@ class AppServiceWrapperTest : public ::testing::Test {
   TestingProfile profile_;
   apps::AppServiceTest app_service_test_;
   ArcAppTest arc_test_;
-
-  raw_ptr<extensions::ExtensionService> extension_service_ = nullptr;
 
   AppServiceWrapper tested_wrapper_{&profile_};
   MockListener test_listener_;

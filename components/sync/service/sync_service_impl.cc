@@ -1211,18 +1211,16 @@ void SyncServiceImpl::OnConfigureDone(
 
   DVLOG(1) << "SyncServiceImpl::OnConfigureDone called with status: "
            << result.status;
-  // The possible status values:
-  //    ABORT - Configuration was aborted. This is not an error, if
-  //            initiated by user.
-  //    OK - Some or all types succeeded.
-
-  // First handle the abort case.
-  if (result.status == DataTypeManager::ABORTED) {
-    DVLOG(0) << "SyncServiceImpl sync configuration aborted";
-    return;
+  switch (result.status) {
+    case DataTypeManager::ABORTED:
+      // Configuration was aborted. This is not an error, if initiated by user.
+      DVLOG(0) << "SyncServiceImpl sync configuration aborted";
+      return;
+    case DataTypeManager::OK:
+      // Some or all types succeeded.
+      break;
   }
 
-  DCHECK_EQ(DataTypeManager::OK, result.status);
   base::UmaHistogramBoolean("Sync.ConfigureDataTypeManager.Finished",
                             is_first_time_sync_configure_);
 
@@ -1230,6 +1228,10 @@ void SyncServiceImpl::OnConfigureDone(
   // enabled, and yet we still think we require a passphrase for decryption.
   DCHECK(!user_settings_->IsPassphraseRequiredForPreferredDataTypes() ||
          user_settings_->IsEncryptedDatatypePreferred());
+
+  if (result.sync_mode == SyncMode::kFull) {
+    sync_prefs_.SetFirstSyncCompletedInFullSyncMode();
+  }
 
   DVLOG(2) << "Notify observers OnConfigureDone";
   NotifyObservers();
@@ -1321,12 +1323,6 @@ void SyncServiceImpl::SyncAuthCredentialsChanged() {
 
   DVLOG(2) << "Notify observers on credentials changed";
   NotifyObservers();
-}
-
-GaiaId SyncServiceImpl::SyncAuthGetLastSyncingGaiaId() {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  return GaiaId(sync_client_->GetPrefService()->GetString(
-      prefs::kGoogleServicesLastSyncingGaiaId));
 }
 
 void SyncServiceImpl::CryptoStateChanged() {
@@ -1639,7 +1635,7 @@ void SyncServiceImpl::ConfigureDataTypeManager(
            << static_cast<int>(reason);
 
   ConfigureContext configure_context;
-  configure_context.authenticated_account_id = GetAccountInfo().account_id;
+  configure_context.authenticated_gaia_id = GetAccountInfo().gaia;
   configure_context.previously_syncing_gaia_id_info =
       DeterminePreviouslySyncingGaiaIdInfoForMetrics();
   configure_context.cache_guid = engine_->GetCacheGuid();
@@ -1669,7 +1665,7 @@ void SyncServiceImpl::ConfigureDataTypeManager(
     }
   }
 
-  DCHECK(!configure_context.authenticated_account_id.empty() ||
+  DCHECK(!configure_context.authenticated_gaia_id.empty() ||
          IsLocalSyncEnabled());
   DCHECK(!configure_context.cache_guid.empty());
   DCHECK_NE(configure_context.reason, CONFIGURE_REASON_UNKNOWN);
@@ -2136,6 +2132,7 @@ void SyncServiceImpl::StopAndClear(ResetEngineReason reset_engine_reason) {
   // If the migration didn't finish before StopAndClear() was called, mark it as
   // done so it doesn't trigger again if the user signs in later.
   sync_prefs_.MarkPartialSyncToSigninMigrationFullyDone();
+  sync_prefs_.ClearFirstSyncCompletedInFullSyncMode();
 
   if (reset_engine_reason == ResetEngineReason::kNotSignedIn) {
     sync_prefs_.ClearCachedPersistentAuthErrorForMetrics();
@@ -2249,14 +2246,27 @@ SyncServiceImpl::DeterminePreviouslySyncingGaiaIdInfoForMetrics() const {
     return PreviouslySyncingGaiaIdInfoForMetrics::kUnspecified;
   }
 
-  const std::optional<GaiaId> previously_syncing_gaia_id_if_known =
-      auth_manager_->GetPreviouslySyncingGaiaIdIfKnown();
-
-  if (!previously_syncing_gaia_id_if_known.has_value()) {
-    return PreviouslySyncingGaiaIdInfoForMetrics::kNotEnoughInformationToTell;
+  // If a configuration cycle already completed in full-sync mode, return
+  // `kUnspecified` because this field is used to record metrics that are
+  // relevant immediately when the user turns sync on. Later
+  // reconfigurations, such as when the user toggles sync settings, should be
+  // excluded from metrics.
+  if (sync_prefs_.IsFirstSyncCompletedInFullSyncMode()) {
+    return PreviouslySyncingGaiaIdInfoForMetrics::kUnspecified;
   }
 
-  if (previously_syncing_gaia_id_if_known->empty()) {
+  // Depending on whether sync the feature is currently on or not, the gaia ID
+  // corresponding to the previous user is stored in one pref or another. That's
+  // because `kGoogleServicesLastSyncingGaiaId` is updated early, as soon as
+  // the sync consent is granted, and before the notification reaches
+  // SyncServiceImpl.
+  const GaiaId previously_syncing_gaia_id = GaiaId(
+      HasSyncConsent() ? sync_client_->GetPrefService()->GetString(
+                             prefs::kGoogleServicesSecondLastSyncingGaiaId)
+                       : sync_client_->GetPrefService()->GetString(
+                             prefs::kGoogleServicesLastSyncingGaiaId));
+
+  if (previously_syncing_gaia_id.empty()) {
     // It is known that no previous gaia ID existed that turned sync on.
     return PreviouslySyncingGaiaIdInfoForMetrics::
         kSyncFeatureNeverPreviouslyTurnedOn;
@@ -2264,7 +2274,7 @@ SyncServiceImpl::DeterminePreviouslySyncingGaiaIdInfoForMetrics() const {
 
   const GaiaId current_gaia_id = GetAccountInfo().gaia;
 
-  return current_gaia_id == *previously_syncing_gaia_id_if_known
+  return current_gaia_id == previously_syncing_gaia_id
              ? PreviouslySyncingGaiaIdInfoForMetrics::
                    kCurrentGaiaIdMatchesPreviousWithSyncFeatureOn
              : PreviouslySyncingGaiaIdInfoForMetrics::
@@ -2301,15 +2311,16 @@ void SyncServiceImpl::OnSetupInProgressHandleDestroyed() {
 
 void SyncServiceImpl::GetTypesWithUnsyncedData(
     DataTypeSet requested_types,
-    base::OnceCallback<void(DataTypeSet)> callback) const {
+    base::OnceCallback<void(absl::flat_hash_map<DataType, size_t>)> callback)
+    const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   // This should only be called in transport-only mode.
   CHECK(!IsSyncFeatureEnabled(), base::NotFatalUntil::M138);
   // TODO(crbug.com/40901755): Consider changing this to always guarantee an
   // asynchronous behavior, rather than invoking the callback synchronously in
   // rare cases.
-  return data_type_manager_->GetTypesWithUnsyncedData(requested_types,
-                                                      std::move(callback));
+  data_type_manager_->GetTypesWithUnsyncedData(requested_types,
+                                               std::move(callback));
 }
 
 void SyncServiceImpl::GetLocalDataDescriptions(

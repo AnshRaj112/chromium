@@ -437,13 +437,18 @@ android_library("cronet_impl_common_java") {
     _generated_impl_version_java,
   ]
 
+  # Note: This target should not depend on //base:base_java as base
+  # is only bundled within the native_impl jar. Which means that
+  # if this target depends on base then we'll have to export the
+  # native_impl jar to all users of the fallback impl too.
+  assert_no_deps = [ "//base:base_java" ]
+
   # Adding deps here won't include those deps in the cronet_impl_common_java.jar.
   # Please add to cronet_impl_common_java_deps_to_package instead.
   deps = [
     ":cronet_api_java",
     ":cronet_shared_java",
     ":impl_version",
-    "//base:base_java",
     "//third_party/androidx:androidx_annotation_annotation_experimental_java",
     "//third_party/androidx:androidx_annotation_annotation_java",
   ]
@@ -483,6 +488,7 @@ android_library("cronet_impl_platform_java") {
     ":cronet_impl_common_java",
     ":cronet_impl_java_util_java",
     ":cronet_shared_java",
+    ":httpengine_native_provider_java",
     "//base:metrics_ScopedSysTraceEvent_java",
     "//net/android:net_thread_stats_uid_java",
     "//third_party/android_deps:com_google_code_findbugs_jsr305_java",
@@ -1156,7 +1162,6 @@ android_resources("cronet_test_apk_resources") {
     # TODO(crbug.com/40283951): Modify quicroot.pem to become a build time copy of
     # net/data/ssl/certificates/cronet-quic-chain.pem.
     "test/res/raw/quicroot.pem",
-    "test/res/values/cronet-test-rule-configuration.xml",
     "test/res/values/strings.xml",
     "test/res/xml/network_security_config.xml",
   ]
@@ -1371,6 +1376,7 @@ android_library("cronet_javatests") {
     "test/javatests/src/org/chromium/net/TestNetworkQualityRttListener.java",
     "test/javatests/src/org/chromium/net/TestNetworkQualityThroughputListener.java",
     "test/javatests/src/org/chromium/net/UrlResponseInfoTest.java",
+    "test/javatests/src/org/chromium/net/ZstdTest.java",
     "test/javatests/src/org/chromium/net/apihelpers/ContentTypeParametersParserTest.java",
     "test/javatests/src/org/chromium/net/apihelpers/UploadDataProvidersTest.java",
     "test/javatests/src/org/chromium/net/httpflags/BaseFeatureTest.java",
@@ -2062,6 +2068,7 @@ action("cronet_gn2bp_aosp_feedback_loop") {
             ]
   _stamp_path = "$target_gen_dir/$target_name.stamp"
   args = [
+    "--wait-for-presubmit-verified",
     "--stamp",
     rebase_path(_stamp_path, root_build_dir),
   ]

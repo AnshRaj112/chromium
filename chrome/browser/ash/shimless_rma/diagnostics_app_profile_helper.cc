@@ -24,7 +24,6 @@
 #include "chrome/browser/ash/shimless_rma/diagnostics_app_profile_helper_constants.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/extensions/crx_installer.h"
-#include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/web_applications/isolated_web_apps/commands/install_isolated_web_app_command.h"
@@ -43,6 +42,7 @@
 #include "components/webapps/common/web_app_id.h"
 #include "content/public/browser/service_worker_context.h"
 #include "extensions/browser/crx_file_info.h"
+#include "extensions/browser/extension_registrar.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/extension_util.h"
@@ -85,20 +85,9 @@ std::optional<url::Origin>& GetInstalledDiagnosticsAppOriginInternal() {
   return *g_origin;
 }
 
-extensions::ExtensionService* GetExtensionService(
-    content::BrowserContext* context) {
-  CHECK(context);
-  auto* system = extensions::ExtensionSystem::Get(context);
-  CHECK(system);
-  auto* service = system->extension_service();
-  CHECK(service);
-  return service;
-}
-
 void DisableAllExtensions(content::BrowserContext* context) {
   auto* registry = extensions::ExtensionRegistry::Get(context);
   CHECK(registry);
-  auto* service = GetExtensionService(context);
 
   std::vector<std::string> ids;
   for (const auto& extension : registry->enabled_extensions()) {
@@ -108,9 +97,11 @@ void DisableAllExtensions(content::BrowserContext* context) {
     ids.push_back(extension->id());
   }
 
+  auto* registrar = extensions::ExtensionRegistrar::Get(context);
+  CHECK(registrar);
   for (const auto& id : ids) {
-    service->DisableExtension(id,
-                              extensions::disable_reason::DISABLE_USER_ACTION);
+    registrar->DisableExtension(
+        id, {extensions::disable_reason::DISABLE_USER_ACTION});
   }
 }
 
@@ -343,10 +334,12 @@ void OnExtensionInstalled(
     state->permission_message = base::UTF16ToUTF8(message);
   }
 
-  GetExtensionService(state->context)->EnableExtension(extension->id());
+  extensions::ExtensionRegistrar::Get(state->context)
+      ->EnableExtension(extension->id());
   // Reload the extension to make sure old service worker are cleaned. This is
   // important when the extension has already been installed to the profile.
-  GetExtensionService(state->context)->ReloadExtension(extension->id());
+  extensions::ExtensionRegistrar::Get(state->context)
+      ->ReloadExtension(extension->id());
 
   GURL script_url = extension->GetResourceURL(
       extensions::BackgroundInfo::GetBackgroundServiceWorkerScript(extension));

@@ -101,7 +101,6 @@ public class CustomTabAppMenuPropertiesDelegate extends AppMenuPropertiesDelegat
                 decorView,
                 null,
                 bookmarkModelSupplier,
-                null,
                 readAloudControllerSupplier);
         mVerifier = verifier;
         mUiType = uiType;
@@ -275,6 +274,16 @@ public class CustomTabAppMenuPropertiesDelegate extends AppMenuPropertiesDelegat
                 prepareReadAloudMenuItem(menu, currentTab);
             } else {
                 menu.findItem(R.id.readaloud_menu_id).setVisible(false);
+            }
+
+            MenuItem startPriceTrackingMenuItem = menu.findItem(R.id.enable_price_tracking_menu_id);
+            MenuItem stopPriceTrackingMenuItem = menu.findItem(R.id.disable_price_tracking_menu_id);
+            startPriceTrackingMenuItem.setVisible(false);
+            stopPriceTrackingMenuItem.setVisible(false);
+            if (ChromeFeatureList.sCctAdaptiveButton.isEnabled()) {
+                // TODO(crbug.com/391931899): Also check the dev-controlled flag
+                updatePriceTrackingMenuItemRow(
+                        startPriceTrackingMenuItem, stopPriceTrackingMenuItem, currentTab);
             }
 
             boolean showOpenWith = currentTab.isNativePage() && currentTab.getNativePage().isPdf();

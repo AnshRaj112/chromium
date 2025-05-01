@@ -2,16 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #ifndef THIRD_PARTY_BLINK_RENDERER_PLATFORM_FONTS_SHAPING_SHAPE_RESULT_VIEW_H_
 #define THIRD_PARTY_BLINK_RENDERER_PLATFORM_FONTS_SHAPING_SHAPE_RESULT_VIEW_H_
 
 #include "base/containers/span.h"
 #include "third_party/blink/renderer/platform/fonts/shaping/glyph_data.h"
+#include "third_party/blink/renderer/platform/fonts/shaping/glyph_data_range.h"
+#include "third_party/blink/renderer/platform/fonts/shaping/glyph_offset_array.h"
 #include "third_party/blink/renderer/platform/fonts/shaping/shape_result.h"
 #include "third_party/blink/renderer/platform/fonts/simple_font_data.h"
 #include "third_party/blink/renderer/platform/geometry/layout_unit.h"
@@ -123,7 +120,6 @@ class PLATFORM_EXPORT ShapeResultView final
   unsigned StartIndex() const { return start_index_ + char_index_offset_; }
   unsigned EndIndex() const { return StartIndex() + num_characters_; }
   unsigned NumCharacters() const { return num_characters_; }
-  unsigned NumGlyphs() const { return num_glyphs_; }
   float Width() const { return width_; }
   LayoutUnit SnappedWidth() const { return LayoutUnit::FromFloatCeil(width_); }
   TextDirection Direction() const {
@@ -132,6 +128,8 @@ class PLATFORM_EXPORT ShapeResultView final
   bool IsLtr() const { return blink::IsLtr(Direction()); }
   bool IsRtl() const { return blink::IsRtl(Direction()); }
   bool HasVerticalOffsets() const { return has_vertical_offsets_; }
+
+  unsigned NumGlyphs() const;
   HeapHashSet<Member<const SimpleFontData>> UsedFonts() const;
 
   unsigned PreviousSafeToBreakOffset(unsigned index) const;
@@ -185,7 +183,7 @@ class PLATFORM_EXPORT ShapeResultView final
       return const_reverse_iterator(begin());
     }
     const HarfBuzzRunGlyphData& GlyphAt(unsigned index) const {
-      return *(range_.begin() + index);
+      return *(UNSAFE_TODO(range_.begin() + index));
     }
     template <bool has_non_zero_glyph_offsets>
     GlyphOffsetArray::iterator<has_non_zero_glyph_offsets> GetGlyphOffsets()
@@ -271,8 +269,8 @@ class PLATFORM_EXPORT ShapeResultView final
  private:
   void PopulateRunInfoParts(const Segment& segment);
 
-  // Populates |parts_[]| and accumulates |num_characters_|, |num_glyphs_| and
-  // |width_| from runs in |result|.
+  // Populates `parts_` and accumulates `num_characters_`, and `width_` from
+  // runs in `result`.
   template <class ShapeResultType>
   void PopulateRunInfoParts(const ShapeResultType& result,
                             const Segment& segment);
@@ -304,11 +302,9 @@ class PLATFORM_EXPORT ShapeResultView final
 
   const unsigned start_index_;
 
-  // Note: Once |RunInfoPart| populated, |num_characters_|, |num_glyphs_| and
-  // |width_| are immutable.
+  // Once `parts_` is populated `width_` and `num_characters_` are immutable.
   float width_ = 0;
-  unsigned num_characters_ = 0;
-  unsigned num_glyphs_ : 30;
+  unsigned num_characters_ : 30 = 0;
 
   // Overall direction for the TextRun, dictates which order each individual
   // sub run (represented by RunInfo structs in the m_runs vector) can

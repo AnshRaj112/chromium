@@ -12,18 +12,20 @@ import android.graphics.Color;
 import androidx.annotation.ColorInt;
 import androidx.annotation.ColorRes;
 import androidx.annotation.DimenRes;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.color.MaterialColors;
 
+import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
+import org.chromium.chrome.browser.theme.SurfaceColorUpdateUtils;
 import org.chromium.components.browser_ui.styles.SemanticColorUtils;
 import org.chromium.ui.util.ColorUtils;
 import org.chromium.ui.util.ValueUtils;
 import org.chromium.ui.util.XrUtils;
 
 /** Util class to handle various color operations shared between hub classes. */
+@NullMarked
 public final class HubColors {
     private static final String TAG = "HubColors";
     private static final int[][] SELECTED_AND_NORMAL_STATES =
@@ -46,9 +48,11 @@ public final class HubColors {
 
         switch (colorScheme) {
             case HubColorScheme.DEFAULT:
-                return SemanticColorUtils.getDefaultBgColor(context);
+                return SurfaceColorUpdateUtils.getGridTabSwitcherBackgroundColor(
+                        context, /* isIncognito= */ false);
             case HubColorScheme.INCOGNITO:
-                return ContextCompat.getColor(context, R.color.default_bg_color_dark);
+                return SurfaceColorUpdateUtils.getGridTabSwitcherBackgroundColor(
+                        context, /* isIncognito= */ true);
             default:
                 assert false;
                 return Color.TRANSPARENT;
@@ -84,12 +88,37 @@ public final class HubColors {
 
     /** Returns the color selected icons should use per the given color scheme. */
     public static @ColorInt int getSelectedIconColor(
+            Context context, @HubColorScheme int colorScheme, boolean isGtsUpdateEnabled) {
+        switch (colorScheme) {
+            case HubColorScheme.DEFAULT:
+                if (isGtsUpdateEnabled) {
+                    return SemanticColorUtils.getDefaultIconColor(context);
+                } else {
+                    return SemanticColorUtils.getDefaultIconColorAccent1(context);
+                }
+            case HubColorScheme.INCOGNITO:
+                if (isGtsUpdateEnabled) {
+                    return ContextCompat.getColor(context, R.color.default_icon_color_light);
+                } else {
+                    return ContextCompat.getColor(
+                            context, R.color.default_control_color_active_dark);
+                }
+
+            default:
+                assert false;
+                return Color.TRANSPARENT;
+        }
+    }
+
+    /** Returns the color selected tab item selector should use per the given color scheme. */
+    public static @ColorInt int geTabItemSelectorColor(
             Context context, @HubColorScheme int colorScheme) {
         switch (colorScheme) {
             case HubColorScheme.DEFAULT:
-                return SemanticColorUtils.getDefaultIconColorAccent1(context);
+                return SemanticColorUtils.getColorSurfaceBright(context);
             case HubColorScheme.INCOGNITO:
-                return ContextCompat.getColor(context, R.color.default_control_color_active_dark);
+                return ContextCompat.getColor(
+                        context, R.color.pane_switcher_selected_tab_incognito);
             default:
                 assert false;
                 return Color.TRANSPARENT;
@@ -162,12 +191,25 @@ public final class HubColors {
         }
     }
 
+    /** Returns the hub pane switcher background color as per the given color scheme. */
+    public static @ColorInt int getPaneSwitcherBackgroundColor(
+            Context context, @HubColorScheme int colorScheme) {
+        switch (colorScheme) {
+            case HubColorScheme.DEFAULT:
+                return SemanticColorUtils.getColorSurfaceContainer(context);
+            case HubColorScheme.INCOGNITO:
+                return ContextCompat.getColor(context, R.color.pane_switcher_background_incognito);
+            default:
+                assert false;
+                return Color.TRANSPARENT;
+        }
+    }
+
     public static ColorStateList getActionButtonColor(Context context, @ColorInt int color) {
         @DimenRes int disabledAlpha = R.dimen.default_disabled_alpha;
         return generateDisabledAndNormalStatesColorStateList(context, color, disabledAlpha);
     }
 
-    @NonNull
     private static ColorStateList generateDisabledAndNormalStatesColorStateList(
             Context context, int color, int disabledAlpha) {
         Resources resources = context.getResources();

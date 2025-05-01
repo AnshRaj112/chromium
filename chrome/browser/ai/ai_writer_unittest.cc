@@ -136,7 +136,7 @@ class AIWriterTest : public AITestUtils::AITestBase {
                         callback) {
               AITestUtils::CheckWritingAssistanceApiRequest(
                   request_metadata, kSharedContextString, kContextString,
-                  *AIWriter::ToProtoOptions(options), kInputString);
+                  *AIWriter::ToProtoOptions(options), "", kInputString);
               callback.Run(CreateExecutionResult("Result text",
                                                  /*is_complete=*/true));
             }));
@@ -183,9 +183,11 @@ class AIWriterTest : public AITestUtils::AITestBase {
 TEST_F(AIWriterTest, CanCreateDefaultOptions) {
   SetupMockOptimizationGuideKeyedService();
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibility(_))
-      .WillOnce(testing::Return(
-          optimization_guide::OnDeviceModelEligibilityReason::kSuccess));
+              GetOnDeviceModelEligibilityAsync(_, _))
+      .WillOnce([](auto feature, auto callback) {
+        std::move(callback).Run(
+            optimization_guide::OnDeviceModelEligibilityReason::kSuccess);
+      });
   base::MockCallback<AIManager::CanCreateWriterCallback> callback;
   EXPECT_CALL(callback,
               Run(blink::mojom::ModelAvailabilityCheckResult::kAvailable));
@@ -195,9 +197,11 @@ TEST_F(AIWriterTest, CanCreateDefaultOptions) {
 TEST_F(AIWriterTest, CanCreateIsLanguagesSupported) {
   SetupMockOptimizationGuideKeyedService();
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibility(_))
-      .WillRepeatedly(testing::Return(
-          optimization_guide::OnDeviceModelEligibilityReason::kSuccess));
+              GetOnDeviceModelEligibilityAsync(_, _))
+      .WillOnce([](auto feature, auto callback) {
+        std::move(callback).Run(
+            optimization_guide::OnDeviceModelEligibilityReason::kSuccess);
+      });
   auto options = GetDefaultOptions();
   options->output_language = AILanguageCode::New("en");
   options->expected_input_languages =
@@ -251,12 +255,12 @@ TEST_F(AIWriterTest, CreateWriterModelNotEligible) {
               const std::optional<optimization_guide::SessionConfigParams>&
                   config_params) { return nullptr; }));
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibility(_))
-      .WillOnce(testing::Invoke(
-          [&](optimization_guide::ModelBasedCapabilityKey feature) {
-            return optimization_guide::OnDeviceModelEligibilityReason::
-                kModelNotEligible;
-          }));
+              GetOnDeviceModelEligibilityAsync(_, _))
+      .WillOnce([](auto feature, auto callback) {
+        std::move(callback).Run(
+            optimization_guide::OnDeviceModelEligibilityReason::
+                kModelNotEligible);
+      });
 
   MockCreateWriterClient mock_create_writer_client;
   base::RunLoop run_loop;
@@ -297,13 +301,13 @@ TEST_F(AIWriterTest, CreateWriterRetryAfterConfigNotAvailableForFeature) {
           }));
 
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibility(_))
-      .WillOnce(testing::Invoke(
-          [&](optimization_guide::ModelBasedCapabilityKey feature) {
-            // Returning kConfigNotAvailableForFeature should trigger retry.
-            return optimization_guide::OnDeviceModelEligibilityReason::
-                kConfigNotAvailableForFeature;
-          }));
+              GetOnDeviceModelEligibilityAsync(_, _))
+      .WillOnce([](auto feature, auto callback) {
+        // Returning kConfigNotAvailableForFeature should trigger retry.
+        std::move(callback).Run(
+            optimization_guide::OnDeviceModelEligibilityReason::
+                kConfigNotAvailableForFeature);
+      });
 
   optimization_guide::OnDeviceModelAvailabilityObserver* availability_observer =
       nullptr;
@@ -317,7 +321,7 @@ TEST_F(AIWriterTest, CreateWriterRetryAfterConfigNotAvailableForFeature) {
             run_loop_for_add_observer.Quit();
           }));
 
-  EXPECT_CALL(session_, GetContextSizeInTokens(_, _))
+  EXPECT_CALL(session_, GetExecutionInputSizeInTokens(_, _))
       .WillOnce(testing::Invoke(
           [&](optimization_guide::MultimodalMessageReadView request_metadata,
               optimization_guide::OptimizationGuideModelSizeInTokenCallback
@@ -368,13 +372,13 @@ TEST_F(AIWriterTest, CreateWriterAbortAfterConfigNotAvailableForFeature) {
                   config_params) { return nullptr; }));
 
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibility(_))
-      .WillOnce(testing::Invoke(
-          [&](optimization_guide::ModelBasedCapabilityKey feature) {
-            // Returning kConfigNotAvailableForFeature should trigger retry.
-            return optimization_guide::OnDeviceModelEligibilityReason::
-                kConfigNotAvailableForFeature;
-          }));
+              GetOnDeviceModelEligibilityAsync(_, _))
+      .WillOnce([](auto feature, auto callback) {
+        // Returning kConfigNotAvailableForFeature should trigger retry.
+        std::move(callback).Run(
+            optimization_guide::OnDeviceModelEligibilityReason::
+                kConfigNotAvailableForFeature);
+      });
 
   optimization_guide::OnDeviceModelAvailabilityObserver* availability_observer =
       nullptr;
@@ -417,7 +421,7 @@ TEST_F(AIWriterTest, CreateWriterContextLimitExceededError) {
   SetupMockOptimizationGuideKeyedService();
   SetupMockSession();
 
-  EXPECT_CALL(session_, GetContextSizeInTokens(_, _))
+  EXPECT_CALL(session_, GetExecutionInputSizeInTokens(_, _))
       .WillOnce(testing::Invoke(
           [](optimization_guide::MultimodalMessageReadView request_metadata,
              optimization_guide::OptimizationGuideModelSizeInTokenCallback
@@ -482,6 +486,8 @@ TEST_F(AIWriterTest, WriteWithOptions) {
 TEST_F(AIWriterTest, InputLimitExceededError) {
   SetupMockOptimizationGuideKeyedService();
   SetupMockSession();
+  auto writer_remote = GetAIWriterRemote();
+
   EXPECT_CALL(session_, GetExecutionInputSizeInTokens(_, _))
       .WillOnce(testing::Invoke(
           [](optimization_guide::MultimodalMessageReadView request_metadata,
@@ -490,8 +496,6 @@ TEST_F(AIWriterTest, InputLimitExceededError) {
             std::move(callback).Run(
                 blink::mojom::kWritingAssistanceMaxInputTokenSize + 1);
           }));
-
-  auto writer_remote = GetAIWriterRemote();
   AITestUtils::MockModelStreamingResponder mock_responder;
   base::RunLoop run_loop;
   EXPECT_CALL(mock_responder, OnError(_))
@@ -519,7 +523,7 @@ TEST_F(AIWriterTest, ModelExecutionError) {
                      callback) {
             AITestUtils::CheckWritingAssistanceApiRequest(
                 request_metadata, kSharedContextString, kContextString,
-                *GetDefaultExpectedOptions(), kInputString);
+                *GetDefaultExpectedOptions(), "", kInputString);
             callback.Run(CreateExecutionErrorResult(
                 optimization_guide::OptimizationGuideModelExecutionError::
                     FromModelExecutionError(
@@ -556,7 +560,7 @@ TEST_F(AIWriterTest, WriteMultipleResponse) {
                      callback) {
             AITestUtils::CheckWritingAssistanceApiRequest(
                 request_metadata, kSharedContextString, kContextString,
-                *GetDefaultExpectedOptions(), kInputString);
+                *GetDefaultExpectedOptions(), "", kInputString);
 
             callback.Run(
                 CreateExecutionResult("Result ", /*is_complete=*/false));
@@ -595,7 +599,7 @@ TEST_F(AIWriterTest, MultipleWrite) {
                      callback) {
             AITestUtils::CheckWritingAssistanceApiRequest(
                 request_metadata, kSharedContextString, kContextString,
-                *GetDefaultExpectedOptions(), kInputString);
+                *GetDefaultExpectedOptions(), "", kInputString);
             callback.Run(CreateExecutionResult("Result text",
                                                /*is_complete=*/true));
           }))
@@ -606,7 +610,7 @@ TEST_F(AIWriterTest, MultipleWrite) {
                      callback) {
             AITestUtils::CheckWritingAssistanceApiRequest(
                 request_metadata, kSharedContextString, "test context 2",
-                *GetDefaultExpectedOptions(), "input string 2");
+                *GetDefaultExpectedOptions(), "", "input string 2");
             callback.Run(CreateExecutionResult("Result text 2",
                                                /*is_complete=*/true));
           }));
@@ -664,7 +668,7 @@ TEST_F(AIWriterTest, ResponderDisconnected) {
                       callback) {
             AITestUtils::CheckWritingAssistanceApiRequest(
                 request_metadata, kSharedContextString, kContextString,
-                *GetDefaultExpectedOptions(), kInputString);
+                *GetDefaultExpectedOptions(), "", kInputString);
             streaming_callback = std::move(callback);
             run_loop_for_callback.Quit();
           }));
@@ -700,7 +704,7 @@ TEST_F(AIWriterTest, WriterDisconnected) {
                       callback) {
             AITestUtils::CheckWritingAssistanceApiRequest(
                 request_metadata, kSharedContextString, kContextString,
-                *GetDefaultExpectedOptions(), kInputString);
+                *GetDefaultExpectedOptions(), "", kInputString);
             streaming_callback = std::move(callback);
             run_loop_for_callback.Quit();
           }));
@@ -738,13 +742,13 @@ TEST_F(AIWriterTest, MeasureUsage) {
   uint64_t expected_usage = 100;
   SetupMockOptimizationGuideKeyedService();
   SetupMockSession();
+  auto writer_remote = GetAIWriterRemote();
+
   EXPECT_CALL(session_, GetExecutionInputSizeInTokens(_, _))
       .WillOnce(testing::Invoke(
           [&](optimization_guide::MultimodalMessageReadView request_metadata,
               optimization_guide::OptimizationGuideModelSizeInTokenCallback
                   callback) { std::move(callback).Run(expected_usage); }));
-
-  auto writer_remote = GetAIWriterRemote();
   base::test::TestFuture<std::optional<uint64_t>> future;
   writer_remote->MeasureUsage(kInputString, kContextString,
                               future.GetCallback());
@@ -754,13 +758,13 @@ TEST_F(AIWriterTest, MeasureUsage) {
 TEST_F(AIWriterTest, MeasureUsageFails) {
   SetupMockOptimizationGuideKeyedService();
   SetupMockSession();
+  auto writer_remote = GetAIWriterRemote();
+
   EXPECT_CALL(session_, GetExecutionInputSizeInTokens(_, _))
       .WillOnce(testing::Invoke(
           [&](optimization_guide::MultimodalMessageReadView request_metadata,
               optimization_guide::OptimizationGuideModelSizeInTokenCallback
                   callback) { std::move(callback).Run(std::nullopt); }));
-
-  auto writer_remote = GetAIWriterRemote();
   base::test::TestFuture<std::optional<uint64_t>> future;
   writer_remote->MeasureUsage(kInputString, kContextString,
                               future.GetCallback());

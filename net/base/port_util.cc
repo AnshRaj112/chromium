@@ -8,12 +8,18 @@
 #include <set>
 
 #include "base/containers/fixed_flat_map.h"
+#include "base/containers/flat_set.h"
+#include "base/feature_list.h"
 #include "base/lazy_instance.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/no_destructor.h"
 #include "base/notreached.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
+#include "net/base/features.h"
+#include "net/base/parse_number.h"
 #include "url/url_constants.h"
 
 namespace net {
@@ -121,6 +127,34 @@ constexpr int kAllowablePorts[] = {};
 
 int g_scoped_allowable_port = 0;
 
+using PortSet = base::flat_set<int>;
+
+PortSet* g_restricted_abuse_ports() {
+  static base::NoDestructor<PortSet> restricted_abuse_ports;
+  return restricted_abuse_ports.get();
+}
+
+void InitializeRestrictedAbusePorts() {
+  g_restricted_abuse_ports()->clear();
+  if (base::FeatureList::IsEnabled(features::kRestrictAbusePorts)) {
+    const std::string ports_string = features::kPortsToRestrictForAbuse.Get();
+    PortSet::container_type ports;
+    for (const auto& port_string :
+         base::SplitStringPiece(ports_string, ",", base::TRIM_WHITESPACE,
+                                base::SPLIT_WANT_NONEMPTY)) {
+      int port;
+      if (net::ParseInt32(port_string, net::ParseIntFormat::STRICT_NON_NEGATIVE,
+                          &port)) {
+        ports.push_back(port);
+      } else {
+        DLOG(ERROR) << "Ignoring invalid port for kPortsToRestrictForAbuse: "
+                    << port_string;
+      }
+    }
+    *g_restricted_abuse_ports() = PortSet(std::move(ports));
+  }
+}
+
 }  // namespace
 
 bool IsPortValid(int port) {
@@ -145,6 +179,16 @@ bool IsPortAllowedForScheme(int port, std::string_view url_scheme) {
   for (int restricted_port : kRestrictedPorts) {
     if (restricted_port == port)
       return false;
+  }
+
+  if (base::FeatureList::IsEnabled(features::kRestrictAbusePorts)) {
+    if (g_restricted_abuse_ports()->empty()) {
+      InitializeRestrictedAbusePorts();
+    }
+
+    if (g_restricted_abuse_ports()->contains(port)) {
+      return false;
+    }
   }
 
   return true;

@@ -1149,6 +1149,10 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   // Returns the current state of "interest" in an element that is an interest
   // invoker.
   InterestState GetInterestState();
+  // Returns true if this element is (inclusively) contained within an open
+  // popover that is the target of an interest invoker that has partial
+  // interest.
+  bool IsInPartialInterestPopover() const;
 
   // The implementations of |innerText()| and |GetInnerTextWithoutUpdate()| are
   // found in "element_inner_text.cc".
@@ -1230,6 +1234,10 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
 
   // Returns true if this element has ::view-transition-group children.
   bool HasViewTransitionGroupChildren() const;
+
+  // Returns true if this element contains any ::scroll-button or
+  // ::scroll-marker-group pseudos.
+  bool HasScrollButtonOrMarkerGroupPseudos() const;
 
   bool PseudoElementStylesAffectCounters() const;
 

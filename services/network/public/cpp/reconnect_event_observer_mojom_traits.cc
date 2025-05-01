@@ -10,6 +10,42 @@
 
 namespace mojo {
 
+bool EnumTraits<network::mojom::NetworkChangeEvent, net::NetworkChangeEvent>::
+    FromMojom(network::mojom::NetworkChangeEvent event_type,
+              net::NetworkChangeEvent* out) {
+  switch (event_type) {
+    case network::mojom::NetworkChangeEvent::kConnected:
+      *out = net::NetworkChangeEvent::kConnected;
+      return true;
+    case network::mojom::NetworkChangeEvent::kSoonToDisconnect:
+      *out = net::NetworkChangeEvent::kSoonToDisconnect;
+      return true;
+    case network::mojom::NetworkChangeEvent::kDisconnected:
+      *out = net::NetworkChangeEvent::kDisconnected;
+      return true;
+    case network::mojom::NetworkChangeEvent::kDefaultNetworkChanged:
+      *out = net::NetworkChangeEvent::kDefaultNetworkChanged;
+      return true;
+  }
+  return false;
+}
+
+network::mojom::NetworkChangeEvent EnumTraits<
+    network::mojom::NetworkChangeEvent,
+    net::NetworkChangeEvent>::ToMojom(net::NetworkChangeEvent event_type) {
+  switch (event_type) {
+    case net::NetworkChangeEvent::kConnected:
+      return network::mojom::NetworkChangeEvent::kConnected;
+    case net::NetworkChangeEvent::kSoonToDisconnect:
+      return network::mojom::NetworkChangeEvent::kSoonToDisconnect;
+    case net::NetworkChangeEvent::kDisconnected:
+      return network::mojom::NetworkChangeEvent::kDisconnected;
+    case net::NetworkChangeEvent::kDefaultNetworkChanged:
+      return network::mojom::NetworkChangeEvent::kDefaultNetworkChanged;
+  }
+  NOTREACHED();
+}
+
 // static
 bool StructTraits<network::mojom::ConnectionKeepAliveConfigDataView,
                   net::ConnectionKeepAliveConfig>::
@@ -24,6 +60,7 @@ bool StructTraits<network::mojom::ConnectionKeepAliveConfigDataView,
 
   out->ping_interval_in_seconds = data.ping_interval_in_seconds();
   out->idle_timeout_in_seconds = data.idle_timeout_in_seconds();
+  out->enable_connection_keep_alive = data.enable_connection_keep_alive();
   return true;
 }
 

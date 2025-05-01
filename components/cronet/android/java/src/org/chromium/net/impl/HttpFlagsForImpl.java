@@ -4,7 +4,8 @@
 
 package org.chromium.net.impl;
 
-import org.chromium.base.ContextUtils;
+import android.content.Context;
+
 import org.chromium.net.httpflags.HttpFlagsLoader;
 import org.chromium.net.httpflags.ResolvedFlags;
 
@@ -16,19 +17,13 @@ import org.chromium.net.httpflags.ResolvedFlags;
  * means that the cronet version used to fetch which flags applies changes correspondingly.
  */
 public final class HttpFlagsForImpl {
-
     /**
      * Fetches and caches the available httpflags for the current impl depending on its version.
      *
      * <p>Never returns null: if HTTP flags were not loaded, will return an empty set of flags.
-     *
-     * <p>Can only be called after the application-wide context has been initialized. See
-     * ContextUtils#initApplicationContext
      */
-    public static ResolvedFlags getHttpFlags() {
+    public static ResolvedFlags getHttpFlags(Context context) {
         return HttpFlagsLoader.getHttpFlags(
-                ContextUtils.getApplicationContext(),
-                ImplVersion.getCronetVersion(),
-                /* isLoadedFromApi= */ false);
+                context, ImplVersion.getCronetVersion(), /* isLoadedFromApi= */ false);
     }
 }

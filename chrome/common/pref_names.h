@@ -2108,6 +2108,15 @@ inline constexpr char kBrowserSuppressDefaultBrowserPrompt[] =
 inline constexpr char kDefaultBrowserPromptRefreshStudyGroup[] =
     "browser.default_browser_prompt_refresh_study_group";
 
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+// The time at which the default-PDF-viewer infobar was last shown.
+inline constexpr char kPdfInfoBarLastShown[] = "browser.pdf_infobar_last_shown";
+
+// How many times the default-PDF-viewer infobar has been shown.
+inline constexpr char kPdfInfoBarTimesShown[] =
+    "browser.pdf_infobar_times_shown";
+#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
+
 // A collection of position, size, and other data relating to the browser
 // window to restore on startup.
 inline constexpr char kBrowserWindowPlacement[] = "browser.window_placement";
@@ -2454,6 +2463,8 @@ inline constexpr char kNtpWallpaperSearchHistory[] =
 // panel across NTP tabs. Incremented at most once per NTP tab.
 inline constexpr char kSeedColorChangeCount[] =
     "colorpicker.SeedColorChangeCount";
+// Whether the NTP footer is visible.
+inline constexpr char kNtpFooterVisible[] = "NewTabPage.FooterVisible";
 #endif  // BUILDFLAG(IS_ANDROID)
 
 // A private RSA key for ADB handshake.
@@ -4106,10 +4117,6 @@ inline constexpr char kHoverCardMemoryUsageEnabled[] =
 inline constexpr char kCompressionDictionaryTransportEnabled[] =
     "net.compression_dictionary_transport_enabled";
 
-// Boolean that specifies whether Zstd Content-Encoding is enabled.
-inline constexpr char kZstdContentEncodingEnabled[] =
-    "net.zstd_content_encoding_enabled";
-
 // Boolean that specifies whether Happy Eyeballs V3 is enabled.
 inline constexpr char kHappyEyeballsV3Enabled[] =
     "net.happy_eyeballs_v3_enabled";
@@ -4215,9 +4222,21 @@ inline constexpr char kEnterpriseCustomLabelForProfile[] =
 inline constexpr char kEnterpriseProfileBadgeToolbarSettings[] =
     "enterprise.profile_badging.toolbar_settings";
 
+// Boolean value that determine whether the management notice on the NTP footer
+// is enabled. This is false when disabled by the
+// `NTPFooterTManagementNoticeEnabled` policy.
+inline constexpr char kNTPFooterManagementNoticeEnabled[] =
+    "ntp_footer.settings.management_notice";
+
+// Boolean value that determine whether the NTP theme attribution on the NTP
+// footer is enabled. This is false when disabled by the
+// `NTPFooterThemeAttributionEnabled` policy.
+inline constexpr char kNTPFooterThemeAttributionEnabled[] =
+    "ntp_footer.settings.theme_attribution";
+
 #if BUILDFLAG(IS_ANDROID)
-// An integer count of how many account-level breached credentials were detected
-// by GMSCore.
+// An integer count of how many account-level breached credentials were
+// detected by GMSCore.
 inline constexpr char kBreachedCredentialsCount[] =
     "profile.safety_hub_breached_credentials_count";
 #endif  // BUILDFLAG(IS_ANDROID)

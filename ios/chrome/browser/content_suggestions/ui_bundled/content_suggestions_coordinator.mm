@@ -486,16 +486,15 @@ using segmentation_platform::TipIdentifier;
     [moduleMediators addObject:_tipsMediator];
   }
 
-  if (!_mostVisitedTilesMediator.inMagicStack) {
-    ContentSuggestionsViewController* viewController =
-        [[ContentSuggestionsViewController alloc] init];
-    viewController.audience = self;
-    viewController.urlLoadingBrowserAgent =
-        UrlLoadingBrowserAgent::FromBrowser(self.browser);
-    viewController.contentSuggestionsMetricsRecorder =
-        self.contentSuggestionsMetricsRecorder;
-    self.contentSuggestionsViewController = viewController;
-  }
+  ContentSuggestionsViewController* viewController =
+      [[ContentSuggestionsViewController alloc] init];
+  viewController.audience = self;
+  viewController.urlLoadingBrowserAgent =
+      UrlLoadingBrowserAgent::FromBrowser(self.browser);
+  viewController.contentSuggestionsMetricsRecorder =
+      self.contentSuggestionsMetricsRecorder;
+  self.contentSuggestionsViewController = viewController;
+
   BOOL isSetupListEnabled = set_up_list_utils::IsSetUpListActive(
       GetApplicationContext()->GetLocalState(), prefs);
   if (isSetupListEnabled) {
@@ -513,7 +512,8 @@ using segmentation_platform::TipIdentifier;
                             sceneState:self.browser->GetSceneState()
                  isDefaultSearchEngine:isDefaultSearchEngine
                    segmentationService:_segmentationService
-        deviceSwitcherResultDispatcher:_deviceSwitcherResultDispatcher];
+        deviceSwitcherResultDispatcher:_deviceSwitcherResultDispatcher
+                  priceTrackingEnabled:IsPriceTrackingEnabled(self.profile)];
     if (IsSegmentedDefaultBrowserPromoEnabled()) {
       [_setUpListMediator retrieveUserSegment];
     }

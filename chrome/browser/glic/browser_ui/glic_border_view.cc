@@ -84,6 +84,16 @@ gfx::Insets GetContentsBorderInsets(BrowserView& browser_view) {
 }
 }  // namespace
 
+GlicBorderView::Factory* GlicBorderView::Factory::factory_ = nullptr;
+
+std::unique_ptr<GlicBorderView> GlicBorderView::Factory::Create(
+    Browser* browser) {
+  if (factory_) [[unlikely]] {
+    return factory_->CreateBorderView(browser);
+  }
+  return base::WrapUnique(new GlicBorderView(browser, /*tester=*/nullptr));
+}
+
 class GlicBorderView::BorderViewUpdater {
  public:
   explicit BorderViewUpdater(Browser* browser, GlicBorderView* border_view)
@@ -215,10 +225,7 @@ class GlicBorderView::BorderViewUpdater {
   }
 
   bool IsGlicWindowShowing() const {
-    auto* service =
-        GlicKeyedServiceFactory::GetGlicKeyedService(browser_->GetProfile());
-    CHECK(service);
-    return service->window_controller().IsShowing();
+    return border_view_->GetGlicService()->window_controller().IsShowing();
   }
 
   bool IsTabInCurrentWindow(const content::WebContents* tab) const {
@@ -283,9 +290,10 @@ class GlicBorderView::BorderViewUpdater {
   std::list<std::string> border_update_reasons_;
 };
 
-GlicBorderView::GlicBorderView(Browser* browser)
+GlicBorderView::GlicBorderView(Browser* browser, std::unique_ptr<Tester> tester)
     : updater_(std::make_unique<BorderViewUpdater>(browser, this)),
       creation_time_(base::TimeTicks::Now()),
+      tester_(std::move(tester)),
       theme_service_(ThemeServiceFactory::GetForProfile(browser->GetProfile())),
       browser_(browser) {
   auto* gpu_data_manager = content::GpuDataManager::GetInstance();
@@ -600,6 +608,12 @@ void GlicBorderView::ResetEmphasisAndReplay() {
     SCOPED_CRASH_KEY_NUMBER("crbug-398319435", "first_rampdown",
                             TimeTicksToMicroseconds(first_ramp_down_frame_));
     base::debug::DumpWithoutCrashing();
+
+    // Gracefully handling the crash case in b/398319435 by
+    // closing(minimizing) the glic window.
+    // TODO(b/413442838): Add tests to reproduce the dump without crash and
+    // validate the solution.
+    GetGlicService()->window_controller().Close();
     return;
   }
   CHECK(compositor_->HasObserver(this));
@@ -701,6 +715,13 @@ base::TimeTicks GlicBorderView::GetCreationTime() const {
 bool GlicBorderView::ForceSimplifiedShader() const {
   return base::FeatureList::IsEnabled(features::kGlicForceSimplifiedBorder) ||
          !has_hardware_acceleration_;
+}
+
+GlicKeyedService* GlicBorderView::GetGlicService() const {
+  auto* service =
+      GlicKeyedServiceFactory::GetGlicKeyedService(browser_->GetProfile());
+  CHECK(service);
+  return service;
 }
 
 BEGIN_METADATA(GlicBorderView)

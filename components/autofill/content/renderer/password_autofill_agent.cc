@@ -33,6 +33,7 @@
 #include "base/strings/to_string.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
+#include "base/types/zip.h"
 #include "build/build_config.h"
 #include "components/autofill/content/common/mojom/autofill_driver.mojom.h"
 #include "components/autofill/content/renderer/form_autofill_util.h"
@@ -993,13 +994,13 @@ void PasswordAutofillAgent::FillField(
   DoFillField(input_element, value, GetFieldFlags(suggestion_source));
 }
 
-void PasswordAutofillAgent::SubmitChangePasswordForm(
+void PasswordAutofillAgent::FillChangePasswordForm(
     FieldRendererId password_element_id,
     FieldRendererId new_password_element_id,
     FieldRendererId confirm_password_element_id,
     const std::u16string& old_password,
     const std::u16string& new_password,
-    SubmitChangePasswordFormCallback callback) {
+    FillChangePasswordFormCallback callback) {
   WebInputElement last_element;
 
   auto filling_tasks = {
@@ -1020,16 +1021,34 @@ void PasswordAutofillAgent::SubmitChangePasswordForm(
   }
 
   if (!last_element) {
+    std::move(callback).Run(std::nullopt);
     return;
   }
   std::optional<FormData> form_data = GetFormDataFromWebForm(
       last_element.GetOwningFormForAutofill(), /*form_cache=*/{});
   if (!form_data) {
+    std::move(callback).Run(std::nullopt);
     return;
   }
 
-  last_element.DispatchSimulatedEnter();
   std::move(callback).Run(*form_data);
+}
+
+void PasswordAutofillAgent::SubmitFormWithEnter(
+    FieldRendererId field,
+    SubmitFormWithEnterCallback callback) {
+  WebFormControlElement form_control =
+      form_util::GetFormControlByRendererId(field);
+  WebInputElement input_element = form_control.DynamicTo<WebInputElement>();
+
+  if (!input_element) {
+    std::move(callback).Run(false);
+    return;
+  }
+
+  // TODO(crbug.com/407488221): Check if form can be submitted with Enter.
+  input_element.DispatchSimulatedEnter();
+  std::move(callback).Run(true);
 }
 
 void PasswordAutofillAgent::DoPreviewField(WebInputElement input,
@@ -2251,10 +2270,8 @@ PasswordAutofillAgent::ExtractFormStructureInfo(const FormData& form_data) {
   result.renderer_id = form_data.renderer_id();
   result.fields.resize(form_data.fields().size());
 
-  for (size_t i = 0; i < form_data.fields().size(); ++i) {
-    const FormFieldData& form_field = form_data.fields()[i];
-
-    FormFieldInfo& field_info = result.fields[i];
+  for (auto [form_field, field_info] :
+       base::zip(form_data.fields(), result.fields)) {
     field_info.renderer_id = form_field.renderer_id();
     field_info.form_control_type = form_field.form_control_type();
     field_info.autocomplete_attribute = form_field.autocomplete_attribute();
@@ -2279,10 +2296,8 @@ bool PasswordAutofillAgent::WasFormStructureChanged(
   if (form_info.fields.size() != cached_form_info.fields.size())
     return true;
 
-  for (size_t i = 0; i < form_info.fields.size(); ++i) {
-    const FormFieldInfo& form_field = form_info.fields[i];
-    const FormFieldInfo& cached_form_field = cached_form_info.fields[i];
-
+  for (auto [form_field, cached_form_field] :
+       base::zip(form_info.fields, cached_form_info.fields)) {
     if (form_field.renderer_id != cached_form_field.renderer_id) {
       return true;
     }

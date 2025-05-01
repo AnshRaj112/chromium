@@ -275,6 +275,11 @@ inline constexpr char kRelatedWebsiteSetsLearnMoreURL[] =
     "third-party-cookies%2Callow-related-sites-to-access-your-activity%2Cabout-"
     "embedded-content";
 
+// "Learn more" URL for Incognito tracking protections.
+// TODO(crbug.com/408036586): Update learn more URL when finalized
+inline constexpr char kIncognitoTrackingProtectionsLearnMoreUrl[] =
+    "https://support.google.com/chrome?p=incognito_tracking_protections";
+
 // Url to a blogpost about Flash deprecation.
 inline constexpr char kFlashDeprecationLearnMoreURL[] =
     "https://blog.chromium.org/2017/07/so-long-and-thanks-for-all-flash.html";
@@ -307,6 +312,16 @@ inline constexpr char kGoogleAccountChooserURL[] =
 // URL of the Google Account page showing the known user devices.
 inline constexpr char kGoogleAccountDeviceActivityURL[] =
     "https://myaccount.google.com/device-activity?utm_source=chrome";
+
+// URL of the Google Account home address page.
+inline constexpr char kGoogleAccountHomeAddressURL[] =
+    "https://myaccount.google.com/address/"
+    "home?utm_source=chrome&utm_campaign=manage_addresses";
+
+// URL of the Google Account work address page.
+inline constexpr char kGoogleAccountWorkAddressURL[] =
+    "https://myaccount.google.com/address/"
+    "work?utm_source=chrome&utm_campaign=manage_addresses";
 
 // URL of the two factor authentication setup required intersitial.
 inline constexpr char kGoogleTwoFactorIntersitialURL[] =
@@ -565,16 +580,6 @@ inline constexpr char kComposeLearnMorePageManagedURL[] =
 // The URL for the "Learn more" links for pages related to History search.
 inline constexpr char kHistorySearchLearnMorePageURL[] =
     "https://support.google.com/chrome?p=ai_history_search";
-
-// The URL for the "Learn more about shortcuts" page for Glic.
-// TODO(crbug.com/409588999): Update this link with the actual link when ready.
-inline constexpr char kGlicKeyboardShortcutLearnMoreURL[] =
-    "https://google.com/";
-
-// The URL for the "Learn more about shortcuts" page for Glic for managed users.
-// TODO(crbug.com/409588999): Update this link with the actual link when ready.
-inline constexpr char kGlicKeyboardShortcutLearnMoreManagedURL[] =
-    "https://google.com/";
 
 // The URL for the "Learn more" links for pages related to History search for
 // managed users.

@@ -41,6 +41,8 @@
 #include "components/optimization_guide/core/optimization_guide_features.h"
 #include "components/optimization_guide/core/optimization_guide_model_executor.h"
 #include "components/optimization_guide/core/optimization_guide_switches.h"
+#include "components/policy/core/common/policy_pref_names.h"
+#include "components/prefs/pref_service.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/common/page_visibility_state.h"
@@ -169,7 +171,7 @@ void OnSessionCreated(
   }
 
   if (initial_request.has_value()) {
-    session->GetContextSizeInTokens(
+    session->GetExecutionInputSizeInTokens(
         initial_request.value().read(),
         base::BindOnce(
             [](AIContextBoundObjectSet& context_bound_object_set,
@@ -331,6 +333,13 @@ bool AIManager::IsLanguagesSupported(
          is_language_supported(output);
 }
 
+bool AIManager::IsBuiltInAIAPIsEnabledByPolicy() {
+  PrefService* prefs =
+      Profile::FromBrowserContext(browser_context_)->GetPrefs();
+  return !prefs->HasPrefPath(policy::policy_prefs::kBuiltInAIAPIsEnabled) ||
+         prefs->GetBoolean(policy::policy_prefs::kBuiltInAIAPIsEnabled);
+}
+
 void AIManager::AddReceiver(
     mojo::PendingReceiver<blink::mojom::AIManager> receiver) {
   receivers_.Add(this, std::move(receiver));
@@ -339,6 +348,11 @@ void AIManager::AddReceiver(
 void AIManager::CanCreateLanguageModel(
     blink::mojom::AILanguageModelCreateOptionsPtr options,
     CanCreateLanguageModelCallback callback) {
+  if (!IsBuiltInAIAPIsEnabledByPolicy()) {
+    std::move(callback).Run(blink::mojom::ModelAvailabilityCheckResult::
+                                kUnavailableEnterprisePolicyDisabled);
+    return;
+  }
   on_device_model::Capabilities capabilities;
   if (options && options->expected_inputs.has_value()) {
     capabilities = GetExpectedCapabilities(options->expected_inputs.value());
@@ -526,6 +540,11 @@ void AIManager::CreateLanguageModel(
 void AIManager::CanCreateSummarizer(
     blink::mojom::AISummarizerCreateOptionsPtr options,
     CanCreateSummarizerCallback callback) {
+  if (!IsBuiltInAIAPIsEnabledByPolicy()) {
+    std::move(callback).Run(blink::mojom::ModelAvailabilityCheckResult::
+                                kUnavailableEnterprisePolicyDisabled);
+    return;
+  }
   if (options && !IsLanguagesSupported(options->expected_input_languages,
                                        options->expected_context_languages,
                                        options->output_language)) {
@@ -549,17 +568,19 @@ void AIManager::CreateSummarizer(
         blink::mojom::AIManagerCreateClientError::kUnsupportedLanguage);
     return;
   }
-  // TODO(crbug.com/398888519): For Summarizer, any context is not set as
-  // `input_context_substitutions` in the optimization guide model config,
-  // which makes it unable to calculate the context token size. Passing in
-  // std::nullopt would prevent unnecessary calculate calls to be made. Consider
-  // updating the model config, or use `SessionImpl::GetSizeInTokens()` instead.
+  std::optional<optimization_guide::MultimodalMessage> initial_request;
+  if (options->shared_context.has_value() &&
+      !options->shared_context.value().empty()) {
+    optimization_guide::proto::SummarizeRequest request;
+    request.set_context(options->shared_context.value());
+    initial_request = optimization_guide::MultimodalMessage(request);
+  }
   auto callback = base::BindOnce(
       &OnSessionCreated<AISummarizer, blink::mojom::AISummarizer,
                         blink::mojom::AIManagerCreateSummarizerClient,
                         blink::mojom::AISummarizerCreateOptionsPtr>,
       std::ref(context_bound_object_set_), std::move(options),
-      /*initial_request=*/std::nullopt);
+      std::move(initial_request));
   CreateWritingAssistanceSessionTask<
       blink::mojom::AIManagerCreateSummarizerClient>::
       CreateAndStart(browser_context_,
@@ -617,6 +638,11 @@ void AIManager::GetLanguageModelParams(
 
 void AIManager::CanCreateWriter(blink::mojom::AIWriterCreateOptionsPtr options,
                                 CanCreateWriterCallback callback) {
+  if (!IsBuiltInAIAPIsEnabledByPolicy()) {
+    std::move(callback).Run(blink::mojom::ModelAvailabilityCheckResult::
+                                kUnavailableEnterprisePolicyDisabled);
+    return;
+  }
   if (options && !IsLanguagesSupported(options->expected_input_languages,
                                        options->expected_context_languages,
                                        options->output_language)) {
@@ -665,6 +691,11 @@ void AIManager::CreateWriter(
 void AIManager::CanCreateRewriter(
     blink::mojom::AIRewriterCreateOptionsPtr options,
     CanCreateRewriterCallback callback) {
+  if (!IsBuiltInAIAPIsEnabledByPolicy()) {
+    std::move(callback).Run(blink::mojom::ModelAvailabilityCheckResult::
+                                kUnavailableEnterprisePolicyDisabled);
+    return;
+  }
   if (options && !IsLanguagesSupported(options->expected_input_languages,
                                        options->expected_context_languages,
                                        options->output_language)) {
@@ -740,9 +771,23 @@ void AIManager::CanCreateSession(
     return;
   }
 
+  service->GetOnDeviceModelEligibilityAsync(
+      capability, base::BindOnce(&AIManager::FinishCanCreateSession,
+                                 weak_factory_.GetWeakPtr(), capability,
+                                 capabilities, std::move(callback)));
+}
+
+void AIManager::FinishCanCreateSession(
+    optimization_guide::ModelBasedCapabilityKey capability,
+    on_device_model::Capabilities capabilities,
+    CanCreateLanguageModelCallback callback,
+    optimization_guide::OnDeviceModelEligibilityReason eligibility) {
+  OptimizationGuideKeyedService* service =
+      OptimizationGuideKeyedServiceFactory::GetForProfile(
+          Profile::FromBrowserContext(browser_context_));
+
   // If the `OptimizationGuideKeyedService` cannot create new session, return
   // the reason.
-  auto eligibility = service->GetOnDeviceModelEligibility(capability);
   if (eligibility !=
       optimization_guide::OnDeviceModelEligibilityReason::kSuccess) {
     std::move(callback).Run(

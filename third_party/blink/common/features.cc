@@ -441,6 +441,10 @@ BASE_FEATURE(kCheckHTMLParserBudgetLessOften,
              "CheckHTMLParserBudgetLessOften",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kClearSiteDataPrefetchPrerenderCache,
+             "ClearSiteDataPrefetchPrerenderCache",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enable legacy `dpr` client hint.
 BASE_FEATURE(kClientHintsDPR_DEPRECATED,
              "ClientHintsDPR_DEPRECATED",
@@ -748,7 +752,7 @@ BASE_FEATURE_ENUM_PARAM(
 // window's top-level site.
 BASE_FEATURE(kEnforceNoopenerOnBlobURLNavigation,
              "EnforceNoopenerOnBlobURLNavigation",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEventTimingIgnorePresentationTimeFromUnexpectedFrameSource,
              "EventTimingIgnorePresentationTimeFromUnexpectedFrameSource",
@@ -1667,6 +1671,10 @@ BASE_FEATURE(kLCPPPrefetchSubresource,
              "LCPPPrefetchSubresource",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kLCPPPrefetchSubresourceAsync,
+             "LCPPPrefetchSubresourceAsync",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kHttpDiskCachePrewarming,
              "HttpDiskCachePrewarming",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -2374,6 +2382,11 @@ BASE_FEATURE(kScriptStreaming,
 // Enables script streaming for non-http scripts.
 BASE_FEATURE(kScriptStreamingForNonHTTP,
              "ScriptStreamingForNonHTTP",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables sending Sec-Purpose: "prefetch" header for rel="prefetch".
+BASE_FEATURE(kSecPurposePrefetchHeaderRelPrefetch,
+             "SecPurposePrefetchHeaderRelPrefetch",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kSelectiveInOrderScript,

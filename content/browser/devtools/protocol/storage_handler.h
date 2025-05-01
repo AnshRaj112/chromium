@@ -21,6 +21,7 @@
 #include "content/browser/interest_group/interest_group_manager_impl.h"
 #include "content/browser/renderer_host/frame_tree_node.h"
 #include "content/browser/shared_storage/shared_storage_runtime_manager.h"
+#include "content/public/browser/global_routing_id.h"
 #include "storage/browser/quota/quota_manager.h"
 #include "third_party/blink/public/common/shared_storage/shared_storage_utils.h"
 
@@ -215,15 +216,27 @@ class StorageHandler
       attribution_reporting::mojom::StoreSourceResult) override;
   void OnTriggerHandled(std::optional<uint64_t> cleared_debug_key,
                         const CreateReportResult&) override;
+  void OnReportSent(const AttributionReport&,
+                    bool is_debug_report,
+                    const SendResult&) override;
 
   void NotifySharedStorageAccessed(
-      const base::Time& access_time,
+      base::Time access_time,
       blink::SharedStorageAccessScope scope,
       SharedStorageRuntimeManager::SharedStorageObserverInterface::AccessMethod
           method,
-      FrameTreeNodeId main_frame_id,
+      GlobalRenderFrameHostId main_frame_id,
       const std::string& owner_origin,
       const SharedStorageEventParams& params);
+  void NotifySharedStorageWorkletOperationExecutionFinished(
+      base::Time finished_time,
+      base::TimeDelta execution_time,
+      SharedStorageRuntimeManager::SharedStorageObserverInterface::AccessMethod
+          method,
+      int operation_id,
+      int worklet_id,
+      GlobalRenderFrameHostId main_frame_id,
+      const std::string& owner_origin);
 
   void NotifyCacheStorageListChanged(
       const storage::BucketLocator& bucket_locator);

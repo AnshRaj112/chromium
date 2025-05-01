@@ -43,6 +43,8 @@
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_features.h"
 #include "net/cookies/canonical_cookie.h"
+#include "net/cookies/cookie_access_result.h"
+#include "net/cookies/cookie_setting_override.h"
 #include "services/metrics/public/cpp/ukm_builders.h"
 #include "services/metrics/public/cpp/ukm_recorder.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
@@ -295,51 +297,6 @@ std::set<std::string> BtmRedirectContext::AllSitesWithUserActivationOrAuthn()
   return sites;
 }
 
-std::map<std::string, std::pair<GURL, bool>>
-BtmRedirectContext::GetRedirectHeuristicURLs(
-    const GURL& first_party_url,
-    base::optional_ref<std::set<std::string>> allowed_sites,
-    bool require_current_interaction) const {
-  std::map<std::string, std::pair<GURL, bool>>
-      sites_to_url_and_current_interaction;
-
-  std::set<std::string> sites_with_current_interaction =
-      AllSitesWithUserActivationOrAuthn();
-
-  const std::string& first_party_site = GetSiteForBtm(first_party_url);
-  for (const auto& redirect : redirects_) {
-    const GURL& url = redirect->redirecting_url.url;
-    const std::string& site = redirect->site;
-
-    // The redirect heuristic does not apply for first-party cookie access.
-    if (site == first_party_site) {
-      continue;
-    }
-
-    // Check the list of allowed sites, if provided.
-    if (allowed_sites.has_value() && !allowed_sites->contains(site)) {
-      continue;
-    }
-
-    // Check for a current interaction, if the flag requires it.
-    if (require_current_interaction &&
-        !sites_with_current_interaction.contains(site)) {
-      continue;
-    }
-
-    // Add the url to the map, but do not override a previous current
-    // interaction.
-    auto& [prev_url, had_current_interaction] =
-        sites_to_url_and_current_interaction[site];
-    if (prev_url.is_empty() || !had_current_interaction) {
-      prev_url = url;
-      had_current_interaction = sites_with_current_interaction.contains(site);
-    }
-  }
-
-  return sites_to_url_and_current_interaction;
-}
-
 base::span<const BtmRedirectInfoPtr>
 BtmRedirectContext::GetServerRedirectsSinceLastPrimaryPageChange() const {
   size_t index = size();
@@ -580,14 +537,18 @@ void Populate3PcExceptions(BrowserContext* browser_context,
   const blink::StorageKey final_url_key =
       blink::StorageKey::CreateFirstParty(url::Origin::Create(final_url));
   ContentBrowserClient* browser_client = GetContentClient()->browser();
+  net::CookieSettingOverrides overrides({
+      net::CookieSettingOverride::kStorageAccessGrantEligible,
+      net::CookieSettingOverride::kTopLevelStorageAccessGrantEligible,
+  });
   for (BtmRedirectInfoPtr& redirect : redirects) {
     redirect->has_3pc_exception =
         browser_client->IsFullCookieAccessAllowed(browser_context, web_contents,
                                                   redirect->redirecting_url.url,
-                                                  initial_url_key) ||
+                                                  initial_url_key, overrides) ||
         browser_client->IsFullCookieAccessAllowed(browser_context, web_contents,
                                                   redirect->redirecting_url.url,
-                                                  final_url_key);
+                                                  final_url_key, overrides);
   }
 }
 }  // namespace btm

@@ -16,6 +16,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import android.app.Activity;
 import android.view.Gravity;
@@ -39,7 +40,10 @@ import org.mockito.quality.Strictness;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowLooper;
 
+import org.chromium.base.Token;
+import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
+import org.chromium.base.supplier.Supplier;
 import org.chromium.base.task.TaskTraits;
 import org.chromium.base.task.test.ShadowPostTask;
 import org.chromium.base.task.test.ShadowPostTask.TestImpl;
@@ -51,10 +55,12 @@ import org.chromium.chrome.browser.app.tabmodel.ArchivedTabModelOrchestrator;
 import org.chromium.chrome.browser.back_press.BackPressManager;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
+import org.chromium.chrome.browser.hub.PaneManager;
 import org.chromium.chrome.browser.tab.TabArchiveSettings;
 import org.chromium.chrome.browser.tab_ui.OnTabSelectingListener;
 import org.chromium.chrome.browser.tab_ui.TabContentManager;
 import org.chromium.chrome.browser.tabmodel.TabCreator;
+import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorBase;
@@ -64,14 +70,25 @@ import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeController;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.components.browser_ui.edge_to_edge.EdgeToEdgePadAdjuster;
 import org.chromium.components.browser_ui.widget.gesture.BackPressHandler;
+import org.chromium.components.tab_group_sync.SavedTabGroup;
+import org.chromium.components.tab_group_sync.SavedTabGroupTab;
+import org.chromium.components.tab_group_sync.TabGroupSyncService;
+import org.chromium.components.tab_group_sync.TabGroupUiActionHandler;
 import org.chromium.ui.base.TestActivity;
 import org.chromium.ui.modaldialog.ModalDialogManager;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /** Tests for {@link TabListMediator}. */
 @Batch(Batch.UNIT_TESTS)
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(shadows = {ShadowPostTask.class})
 public class ArchivedTabsDialogCoordinatorUnitTest {
+    private static final Token TAB_GROUP_ID = Token.createRandom();
+    private static final String TAB_GROUP_ID_STRING = TAB_GROUP_ID.toString();
+
     @Rule public MockitoRule mMockitoRule = MockitoJUnit.rule().strictness(Strictness.LENIENT);
 
     @Rule
@@ -96,6 +113,10 @@ public class ArchivedTabsDialogCoordinatorUnitTest {
     @Mock private ModalDialogManager mModalDialogManager;
     @Mock private RecyclerView mRecyclerView;
     @Mock private EdgeToEdgeController mEdgeToEdgeController;
+    @Mock private TabGroupSyncService mTabGroupSyncService;
+    @Mock private Supplier<PaneManager> mPaneManagerSupplier;
+    @Mock private Supplier<TabGroupUiActionHandler> mTabGroupUiActionHandlerSupplier;
+    @Mock private ObservableSupplier<TabGroupModelFilter> mCurrentTabGroupModelFilterSupplier;
 
     private Activity mActivity;
     private ArchivedTabsDialogCoordinator mCoordinator;
@@ -140,7 +161,11 @@ public class ArchivedTabsDialogCoordinatorUnitTest {
                         mTabArchiveSettings,
                         mModalDialogManager,
                         /* desktopWindowStateManager= */ null,
-                        mEdgeToEdgeSupplier);
+                        mEdgeToEdgeSupplier,
+                        mTabGroupSyncService,
+                        mPaneManagerSupplier,
+                        mTabGroupUiActionHandlerSupplier,
+                        mCurrentTabGroupModelFilterSupplier);
         mCoordinator.setTabListEditorCoordinatorForTesting(mTabListEditorCoordinator);
         recyclerView = new TabListRecyclerView(mActivity, null);
         recyclerView.setId(R.id.tab_list_recycler_view);
@@ -180,6 +205,7 @@ public class ArchivedTabsDialogCoordinatorUnitTest {
     public void testShow() {
         mCoordinator.show(mOnTabSelectingListener);
         verify(mRootView).addView(any());
+        verify(mTabListEditorController).show(any(), eq(Collections.emptyList()), eq(null));
         verify(mTabListEditorController).setNavigationProvider(any());
         verify(mTabListEditorController).setToolbarTitle("0 inactive tabs");
         verify(mBackPressManager).addHandler(any(), eq(BackPressHandler.Type.ARCHIVED_TABS_DIALOG));
@@ -191,6 +217,21 @@ public class ArchivedTabsDialogCoordinatorUnitTest {
         doReturn(2).when(mArchivedTabModel).getCount();
         mCoordinator.updateTitle();
         verify(mTabListEditorController).setToolbarTitle("2 inactive tabs");
+    }
+
+    @Test
+    @EnableFeatures(ChromeFeatureList.ANDROID_TAB_DECLUTTER_ARCHIVE_TAB_GROUPS)
+    public void testShowWithSyncedTabGroups() {
+        List<String> tabGroupSyncIds = new ArrayList<>(List.of(TAB_GROUP_ID_STRING));
+        SavedTabGroup savedTabGroup = new SavedTabGroup();
+        SavedTabGroupTab savedTabGroupTab = new SavedTabGroupTab();
+        savedTabGroup.savedTabs = new ArrayList<>(List.of(savedTabGroupTab));
+        savedTabGroup.archivalTimeMs = System.currentTimeMillis();
+        when(mTabGroupSyncService.getAllGroupIds()).thenReturn(new String[] {TAB_GROUP_ID_STRING});
+        when(mTabGroupSyncService.getGroup(TAB_GROUP_ID_STRING)).thenReturn(savedTabGroup);
+
+        mCoordinator.show(mOnTabSelectingListener);
+        verify(mTabListEditorController).show(any(), eq(tabGroupSyncIds), eq(null));
     }
 
     @Test

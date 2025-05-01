@@ -10,6 +10,7 @@
 #import "base/strings/sys_string_conversions.h"
 #import "base/uuid.h"
 #import "components/collaboration/public/collaboration_flow_entry_point.h"
+#import "components/collaboration/public/collaboration_flow_type.h"
 #import "components/collaboration/public/collaboration_service.h"
 #import "components/strings/grit/components_strings.h"
 #import "components/tab_groups/tab_group_visual_data.h"
@@ -28,6 +29,8 @@
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/shared_tab_group_last_tab_closed_alert_command.h"
+#import "ios/chrome/browser/shared/public/commands/shared_tab_group_last_tab_closed_alert_commands.h"
 #import "ios/chrome/browser/shared/public/commands/snackbar_commands.h"
 #import "ios/chrome/browser/shared/public/commands/tab_grid_commands.h"
 #import "ios/chrome/browser/shared/public/commands/tab_groups_commands.h"
@@ -54,6 +57,8 @@
 #import "ui/base/l10n/l10n_util_mac.h"
 
 using collaboration::CollaborationServiceShareOrManageEntryPoint;
+using collaboration::FlowType;
+using collaboration::IOSCollaborationControllerDelegate;
 using ResultCallback =
     collaboration::CollaborationControllerDelegate::ResultCallback;
 using collaboration::CollaborationControllerDelegate;
@@ -268,14 +273,29 @@ using collaboration::CollaborationControllerDelegate;
   [_alertCoordinator start];
 }
 
+- (void)showAlertForLastTabRemovedFromGroup:(const TabGroup*)group
+                                      tabID:(web::WebStateID)itemID
+                                    closing:(BOOL)closing {
+  UIView* sourceView = self.tabStripViewController.closedTabGroupView;
+  SharedTabGroupLastTabAlertCommand* command =
+      [[SharedTabGroupLastTabAlertCommand alloc]
+               initWithTabID:itemID
+                     browser:self.browser
+                       group:group
+          baseViewController:self.baseViewController
+                  sourceView:sourceView
+                     closing:closing];
+  self.tabStripViewController.closedTabGroupView = nil;
+
+  id<SharedTabGroupLastTabAlertCommands> lastTabAlertHandler =
+      HandlerForProtocol(self.browser->GetCommandDispatcher(),
+                         SharedTabGroupLastTabAlertCommands);
+  [lastTabAlertHandler showLastTabInSharedGroupAlert:command];
+}
+
 - (void)showTabGroupConfirmationForAction:(TabGroupActionType)actionType
                                 groupItem:(TabGroupItem*)tabGroupItem
                                sourceView:(UIView*)sourceView {
-  if (actionType == TabGroupActionType::kLeaveOrKeepSharedTabGroup ||
-      actionType == TabGroupActionType::kDeleteOrKeepSharedTabGroup) {
-    sourceView = self.tabStripViewController.closedTabGroupView;
-  }
-
   _tabGroupConfirmationCoordinator = [[TabGroupConfirmationCoordinator alloc]
       initWithBaseViewController:self.baseViewController
                          browser:self.browser
@@ -285,20 +305,6 @@ using collaboration::CollaborationControllerDelegate;
   __weak TabStripCoordinator* weakSelf = self;
   _tabGroupConfirmationCoordinator.primaryAction = ^{
     [weakSelf takeActionForActionType:actionType tabGroupItem:tabGroupItem];
-  };
-  _tabGroupConfirmationCoordinator.secondaryAction = ^{
-    switch (actionType) {
-      case TabGroupActionType::kUngroupTabGroup:
-      case TabGroupActionType::kDeleteTabGroup:
-      case TabGroupActionType::kLeaveSharedTabGroup:
-      case TabGroupActionType::kDeleteSharedTabGroup:
-        NOTREACHED();
-
-      case TabGroupActionType::kLeaveOrKeepSharedTabGroup:
-      case TabGroupActionType::kDeleteOrKeepSharedTabGroup:
-        [weakSelf replaceLastTabByNewTabInGroup:tabGroupItem];
-        break;
-    }
   };
   _tabGroupConfirmationCoordinator.dismissAction = ^{
     [weakSelf clearLeaveOrDeleteCompletion];
@@ -393,10 +399,11 @@ using collaboration::CollaborationControllerDelegate;
     return;
   }
 
-  std::unique_ptr<collaboration::IOSCollaborationControllerDelegate> delegate =
-      std::make_unique<collaboration::IOSCollaborationControllerDelegate>(
+  std::unique_ptr<IOSCollaborationControllerDelegate> delegate =
+      std::make_unique<IOSCollaborationControllerDelegate>(
           browser, self.baseViewController,
-          TabGroupServiceFactory::GetForProfile(browser->GetProfile()));
+          TabGroupServiceFactory::GetForProfile(browser->GetProfile()),
+          FlowType::kLeaveOrDelete);
   delegate->SetLeaveOrDeleteConfirmationCallback(std::move(completionCallback));
 
   collaboration::CollaborationServiceLeaveOrDeleteEntryPoint entryPoint =
@@ -477,15 +484,12 @@ using collaboration::CollaborationControllerDelegate;
     case TabGroupActionType::kLeaveSharedTabGroup:
       [self runLeaveOrDeleteCompletion];
       break;
-    case TabGroupActionType::kLeaveOrKeepSharedTabGroup:
-      [_mediator leaveSharedGroup:tabGroupItem];
-      break;
     case TabGroupActionType::kDeleteSharedTabGroup:
       [self runLeaveOrDeleteCompletion];
       break;
     case TabGroupActionType::kDeleteOrKeepSharedTabGroup:
-      [_mediator deleteSharedGroup:tabGroupItem];
-      break;
+    case TabGroupActionType::kLeaveOrKeepSharedTabGroup:
+      NOTREACHED();
   }
 
   [_tabGroupConfirmationCoordinator stop];
@@ -518,10 +522,11 @@ using collaboration::CollaborationControllerDelegate;
     return;
   }
 
-  std::unique_ptr<collaboration::CollaborationControllerDelegate> delegate =
-      std::make_unique<collaboration::IOSCollaborationControllerDelegate>(
+  std::unique_ptr<CollaborationControllerDelegate> delegate =
+      std::make_unique<IOSCollaborationControllerDelegate>(
           browser, self.baseViewController,
-          TabGroupServiceFactory::GetForProfile(self.profile));
+          TabGroupServiceFactory::GetForProfile(self.profile),
+          FlowType::kShareOrManage);
   collaborationService->StartShareOrManageFlow(
       std::move(delegate), tabGroup->tab_group_id(), entryPoint);
 }

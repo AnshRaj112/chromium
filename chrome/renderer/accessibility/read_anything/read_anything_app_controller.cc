@@ -480,6 +480,10 @@ void ReadAnythingAppController::OnNodeWillBeDeleted(ui::AXTree* tree,
   ui::AXNodeID node_id = CHECK_DEREF(node).id();
   if (model_.display_node_ids().contains(node_id)) {
     displayed_nodes_pending_deletion_.insert(node_id);
+    if (IsReadAloudEnabled() && !read_aloud_model_.speech_playing()) {
+      ExecuteJavaScript("chrome.readingMode.onNodeWillBeDeleted(" +
+                        base::ToString(node_id) + ")");
+    }
   }
 }
 
@@ -488,10 +492,9 @@ void ReadAnythingAppController::OnNodeDeleted(ui::AXTree* tree,
   if (displayed_nodes_pending_deletion_.contains(node_id)) {
     displayed_nodes_pending_deletion_.erase(node_id);
 
-    // If speech is playing, we don't want to redraw because this can disrupt
-    // speech.
-    if (features::IsReadAnythingReadAloudEnabled() &&
-        read_aloud_model_.speech_playing()) {
+    // Instead of redrawing everything, we inform the webui that the node is
+    // being deleted and it will adjust on that side. See OnNodeWillBeDeleted.
+    if (IsReadAloudEnabled()) {
       return;
     }
 
@@ -524,10 +527,15 @@ void ReadAnythingAppController::AccessibilityEventReceived(
       read_aloud_model_.speech_playing());
   // From this point onward, `updates` and `events` should not be accessed.
 
-  if (tree_id != model_.active_tree_id()) {
+  if (tree_id != model_.active_tree_id() ||
+      read_aloud_model_.speech_playing()) {
     return;
   }
 
+  SendEventUpdates();
+}
+
+void ReadAnythingAppController::SendEventUpdates() {
   if (model_.requires_distillation()) {
     Distill(/*for_training_data=*/false);
   }
@@ -561,6 +569,13 @@ void ReadAnythingAppController::AccessibilityLocationChangesReceived(
 void ReadAnythingAppController::AccessibilityLocationChangesReceived(
     const ui::AXTreeID& tree_id,
     ui::AXLocationAndScrollUpdates& details) {
+  // AccessibilityLocationChangesReceived causes some unexpected crashes and
+  // AXNode behavior. Therefore, flag-guard this behind the
+  // IsReadAnythingDocsIntegration flag, since these changes were initially
+  // added to support Google Docs. See crbug.com/411776559.
+  if (!features::IsReadAnythingDocsIntegrationEnabled()) {
+    return;
+  }
   // If the AccessibilityLocationChangesReceived callback happens after
   // the current active tree has been destroyed, do nothing.
   DUMP_WILL_BE_CHECK(model_.active_tree_id() != ui::AXTreeIDUnknown());
@@ -601,7 +616,7 @@ void ReadAnythingAppController::OnActiveAXTreeIDChanged(
   post_user_entry_draw_timer_->Stop();
 
   model_.SetActiveTreeId(tree_id);
-  model_.SetUkmSourceId(ukm_source_id);
+  model_.SetUkmSourceIdForTree(tree_id, ukm_source_id);
   model_.set_is_pdf(is_pdf);
 
   if (IsReadAloudEnabled() && read_aloud_model_.speech_playing()) {
@@ -801,10 +816,11 @@ bool ReadAnythingAppController::PostProcessSelection() {
   }
   // Skip drawing the selection in the side panel if the selection originally
   // came from there.
-  if (!model_.selection_from_action()) {
+  if (model_.unprocessed_selections_from_reading_mode() == 0) {
     DrawSelection();
+  } else {
+    model_.decrement_selections_from_reading_mode();
   }
-  model_.set_selection_from_action(false);
   return did_draw;
 }
 
@@ -1254,7 +1270,7 @@ std::string ReadAnythingAppController::GetLanguage(
 std::u16string ReadAnythingAppController::GetTextContent(
     ui::AXNodeID ax_node_id) const {
   ui::AXNode* ax_node = model_.GetAXNode(ax_node_id);
-  DCHECK(ax_node);
+  CHECK(ax_node);
 
   return a11y::GetTextContent(ax_node, IsGoogleDocs(), model_.is_pdf());
 }
@@ -1689,7 +1705,7 @@ double ReadAnythingAppController::GetLetterSpacingValue(
 void ReadAnythingAppController::OnSelectionChange(ui::AXNodeID anchor_node_id,
                                                   int anchor_offset,
                                                   ui::AXNodeID focus_node_id,
-                                                  int focus_offset) const {
+                                                  int focus_offset) {
   DCHECK_NE(model_.active_tree_id(), ui::AXTreeIDUnknown());
   // Prevent link clicks while distillation is in progress, as it means that
   // the tree may have changed in an unexpected way.
@@ -1704,6 +1720,7 @@ void ReadAnythingAppController::OnSelectionChange(ui::AXNodeID anchor_node_id,
   // clears the selection, so we should tell the main page to clear too.
   if ((anchor_offset == focus_offset) && (anchor_node_id == focus_node_id)) {
     if (model_.has_selection()) {
+      model_.increment_selections_from_reading_mode();
       OnCollapseSelection();
     }
     return;
@@ -1739,12 +1756,21 @@ void ReadAnythingAppController::OnSelectionChange(ui::AXNodeID anchor_node_id,
     return;
   }
 
+  model_.increment_selections_from_reading_mode();
   page_handler_->OnSelectionChange(model_.active_tree_id(), anchor_node_id,
                                    anchor_offset, focus_node_id, focus_offset);
 }
 
 void ReadAnythingAppController::OnCollapseSelection() const {
-  page_handler_->OnCollapseSelection();
+  if (model_.is_pdf()) {
+    // CollapseSelection does nothing in pdfs, so just set an empty selection
+    // instead.
+    page_handler_->OnSelectionChange(
+        model_.active_tree_id(), model_.start_node_id(), model_.start_offset(),
+        model_.start_node_id(), model_.start_offset());
+  } else {
+    page_handler_->OnCollapseSelection();
+  }
 }
 void ReadAnythingAppController::ResetGranularityIndex() {
   read_aloud_model_.ResetGranularityIndex();
@@ -1752,7 +1778,7 @@ void ReadAnythingAppController::ResetGranularityIndex() {
 void ReadAnythingAppController::InitAXPositionWithNode(
     const ui::AXNodeID& starting_node_id) {
   ui::AXNode* ax_node = model_.GetAXNode(starting_node_id);
-  read_aloud_model_.InitAXPositionWithNode(ax_node);
+  read_aloud_model_.InitAXPositionWithNode(ax_node, model_.active_tree_id());
 }
 
 std::vector<ui::AXNodeID> ReadAnythingAppController::GetCurrentText() {
@@ -1866,11 +1892,8 @@ void ReadAnythingAppController::ShouldShowUI() {
 void ReadAnythingAppController::OnSpeechPlayingStateChanged(
     bool is_speech_active) {
   read_aloud_model_.set_speech_playing(is_speech_active);
-  if (!is_speech_active && model_.requires_distillation()) {
-    // TODO: b/40927698 - Do something smarter than completely re-distilling
-    // when the update is small. Right now this resets the speech position to
-    // the beginning which is annoying if the page is mostly the same.
-    Distill(/*for_training_data=*/false);
+  if (!is_speech_active) {
+    SendEventUpdates();
   }
 }
 

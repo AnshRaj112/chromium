@@ -94,7 +94,6 @@ abstract class ReorderStrategyBase implements ReorderStrategy {
      *
      * @param stripViews The list of {@link StripLayoutView}.
      * @param groupTitles The list of {@link StripLayoutGroupTitle}.
-     * @param stripTabs The list of {@link StripLayoutTab}.
      * @param interactingTab The tab to move out of group.
      * @param groupTitleToAnimate The title of the group the interacting tab is attempting to move
      *     out of.Used for animation. Null if animation is not needed.
@@ -189,7 +188,7 @@ abstract class ReorderStrategyBase implements ReorderStrategy {
     protected void setTrailingMarginForView(
             StripLayoutView stripView,
             StripLayoutGroupTitle[] groupTitles,
-            boolean isInteracting,
+            boolean shouldHaveTrailingMargin,
             @NonNull List<Animator> animationList) {
         final StripLayoutGroupTitle groupTitle;
         if (stripView instanceof StripLayoutTab stripTab) {
@@ -200,33 +199,7 @@ abstract class ReorderStrategyBase implements ReorderStrategy {
             groupTitle = (StripLayoutGroupTitle) stripView;
         }
 
-        setTrailingMarginForView(
-                stripView,
-                groupTitle,
-                shouldHaveTrailingMargin(stripView, isInteracting),
-                animationList);
-    }
-
-    private boolean shouldHaveTrailingMargin(
-            StripLayoutView interactingView, boolean isInteracting) {
-        // Skip applying trailing margin for grouped views (like expanded group titles or tabs) when
-        // merging on drop is not allowed.
-        if (!TabDragSource.canMergeIntoGroupOnDrop() && isInteracting) {
-            boolean isExpandedGroupTitleHovered =
-                    interactingView instanceof StripLayoutGroupTitle
-                            && !interactingView.isCollapsed();
-            boolean isNonTrailingTabInGroupHovered = false;
-            if (interactingView instanceof StripLayoutTab stripTab) {
-                // Only tabs that are not the last in their group are treated as "in group" for
-                // margin rules.
-                isNonTrailingTabInGroupHovered =
-                        !StripLayoutUtils.isTabAtLastPositionInGroup(
-                                mTabGroupModelFilter, mModel, stripTab);
-            }
-            // Do not apply trailing margin if the hovered view is part of an expanded group.
-            return !isExpandedGroupTitleHovered && !isNonTrailingTabInGroupHovered;
-        }
-        return isInteracting;
+        setTrailingMarginForView(stripView, groupTitle, shouldHaveTrailingMargin, animationList);
     }
 
     /**
@@ -250,9 +223,10 @@ abstract class ReorderStrategyBase implements ReorderStrategy {
         if (stripView.getTrailingMargin() == trailingMargin) return;
 
         // Update group title bottom indicator width if needed.
-        if (groupTitle != null
-                && !groupTitle.isCollapsed()
-                && TabDragSource.canMergeIntoGroupOnDrop()) {
+        boolean isExpandedGroup = groupTitle != null && !groupTitle.isCollapsed();
+        boolean shouldAnimateBottomIndicator =
+                !shouldHaveTrailingMargin || TabDragSource.canMergeIntoGroupOnDrop();
+        if (isExpandedGroup && shouldAnimateBottomIndicator) {
             float startWidth = groupTitle.getBottomIndicatorWidth();
             float endWidth =
                     StripLayoutUtils.calculateBottomIndicatorWidth(
@@ -291,7 +265,10 @@ abstract class ReorderStrategyBase implements ReorderStrategy {
         //  don't use trailing margins to demarcate tab group bounds.
         for (int i = 0; i < stripViews.length; i++) {
             setTrailingMarginForView(
-                    stripViews[i], groupTitles, /* isInteracting= */ false, animationList);
+                    stripViews[i],
+                    groupTitles,
+                    /* shouldHaveTrailingMargin= */ false,
+                    animationList);
         }
         mScrollDelegate.setReorderStartMargin(/* newStartMargin= */ 0.f);
     }
@@ -332,8 +309,7 @@ abstract class ReorderStrategyBase implements ReorderStrategy {
             StripLayoutGroupTitle[] groupTitles,
             StripLayoutView interactingView,
             List<Animator> animationList) {
-
-        // 2. Animate offsets back to 0, reattach the container, and clear the margins.
+        // Animate offsets back to 0, reattach the container, and clear the margins.
         mAnimationHost.finishAnimationsAndPushTabUpdates();
         // interactingView may be null if reordering for external view drag drop.
         if (interactingView != null) {

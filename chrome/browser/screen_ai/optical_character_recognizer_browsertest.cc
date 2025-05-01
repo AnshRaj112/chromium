@@ -38,6 +38,10 @@
 
 namespace {
 
+// LINT.IfChange(kServiceIdleCheckingDelay)
+constexpr base::TimeDelta kServiceIdleCheckingDelay = base::Seconds(3);
+// LINT.ThenChange(//services/screen_ai/screen_ai_service_impl.cc:kIdleCheckingDelay)
+
 using ::testing::ElementsAre;
 using ::testing::Field;
 using ::testing::IsEmpty;
@@ -88,14 +92,13 @@ void WaitForDisconnecting(screen_ai::ScreenAIServiceRouter* router,
     std::move(callback).Run();
     return;
   }
-  router->ShutDownIfNoClientsForTesting();
 
   // Wait more...
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
       FROM_HERE,
       base::BindOnce(&WaitForDisconnecting, router, std::move(callback),
                      remaining_tries - 1),
-      base::Milliseconds(200));
+      kServiceIdleCheckingDelay);
 }
 
 // bool: PDF OCR service enabled.
@@ -360,21 +363,21 @@ IN_PROC_BROWSER_TEST_P(OpticalCharacterRecognizerTest, PerformOCR_Simple) {
   histograms.ExpectBucketCount("Accessibility.ScreenAI.OCR.LinesCount",
                                expected_lines_count, expected_calls);
 
-  int image_size = bitmap.width() * bitmap.height();
   histograms.ExpectTotalCount("Accessibility.ScreenAI.OCR.ImageSize10M",
                               expected_calls);
   histograms.ExpectBucketCount("Accessibility.ScreenAI.OCR.ImageSize10M",
-                               image_size, expected_calls);
+                               bitmap.width() * bitmap.height(),
+                               expected_calls);
 
   // Expect measured latency, but we don't know how long it taskes to process.
   // So we just check the total count of the expected bucket determined by the
-  // image size.
-  EXPECT_GT(500 * 500, image_size);
-  histograms.ExpectTotalCount("Accessibility.ScreenAI.OCR.Latency.Small",
-                              expected_calls);
-  histograms.ExpectTotalCount("Accessibility.ScreenAI.OCR.Latency.Medium", 0);
-  histograms.ExpectTotalCount("Accessibility.ScreenAI.OCR.Latency.Large", 0);
-  histograms.ExpectTotalCount("Accessibility.ScreenAI.OCR.Latency.XLarge", 0);
+  // image dimensions, with threshold 2048 for each dimension.
+  EXPECT_GE(2048, bitmap.width());
+  EXPECT_GE(2048, bitmap.height());
+  histograms.ExpectTotalCount(
+      "Accessibility.ScreenAI.OCR.Latency.NotDownsampled", expected_calls);
+  histograms.ExpectTotalCount("Accessibility.ScreenAI.OCR.Latency.Downsampled",
+                              0);
 
   // PDF Specific metrics should not be recorded as the client type is test.
   histograms.ExpectTotalCount("Accessibility.ScreenAI.OCR.LinesCount.PDF", 0);
@@ -465,6 +468,8 @@ IN_PROC_BROWSER_TEST_P(OpticalCharacterRecognizerTest,
                             perform_ocr_future.GetCallback());
           }));
 
+  ASSERT_TRUE(perform_ocr_future.Wait());
+
 #if BUILDFLAG(USE_FAKE_SCREEN_AI)
   EXPECT_THAT(perform_ocr_future.Get()->lines, IsEmpty());
 #else
@@ -495,9 +500,9 @@ IN_PROC_BROWSER_TEST_P(OpticalCharacterRecognizerTest,
     ASSERT_TRUE(router->IsProcessRunningForTesting());
   }
 
-  // Trigger service shut down and wait for disconnecting.
+  // Wait for shut down due to being idle.
   base::test::TestFuture<void> future;
-  WaitForDisconnecting(router, future.GetCallback(), /*remaining_tries=*/10);
+  WaitForDisconnecting(router, future.GetCallback(), /*remaining_tries=*/2);
   ASSERT_TRUE(future.Wait());
   ASSERT_FALSE(router->IsProcessRunningForTesting());
 
@@ -539,7 +544,7 @@ IN_PROC_BROWSER_TEST_P(OpticalCharacterRecognizerTest,
   ASSERT_TRUE(init_future.Wait());
   ASSERT_TRUE(init_future.Get<bool>());
 
-  ocr->DisconnectForTesting();
+  ocr->DisconnectAnnotator();
 
   // Perform OCR and get VisualAnnotation.
   SkBitmap bitmap = LoadImageFromTestFile(
@@ -553,7 +558,7 @@ IN_PROC_BROWSER_TEST_P(OpticalCharacterRecognizerTest,
   ASSERT_FALSE(perform_future.Get<mojom::VisualAnnotationPtr>()->lines.empty());
 #endif
 
-  ocr->DisconnectForTesting();
+  ocr->DisconnectAnnotator();
 
   // Perform OCR and get AxTreeUpdate.
   base::test::TestFuture<const ui::AXTreeUpdate&> perform_future2;

@@ -73,8 +73,9 @@ class PredictionBasedPermissionUiSelector
   std::optional<bool> WasSelectorDecisionHeldback() override;
 
  private:
-  FRIEND_TEST_ALL_PREFIXES(PredictionBasedPermissionUiSelectorTest,
-                           GetPredictionTypeToUse);
+  FRIEND_TEST_ALL_PREFIXES(
+      PredictionBasedPermissionUiExpectedPredictionSourceTest,
+      GetPredictionTypeToUse);
   FRIEND_TEST_ALL_PREFIXES(PredictionBasedPermissionUiSelectorTest,
                            GetPredictionTypeToUseTFLite);
   FRIEND_TEST_ALL_PREFIXES(PredictionBasedPermissionUiSelectorTest,
@@ -107,9 +108,6 @@ class PredictionBasedPermissionUiSelector
       permissions::PredictionRequestFeatures features,
       permissions::RequestType request_type,
       std::unique_ptr<content_extraction::InnerTextResult> result);
-
-  void OnModelExecutionComplete(
-      const std::optional<permissions::GeneratePredictionsResponse>& result);
 
   bool ShouldHoldBack(bool is_on_device, permissions::RequestType request_type);
 

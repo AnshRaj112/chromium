@@ -76,6 +76,7 @@
 #include "extensions/browser/updater/extension_update_data.h"
 #include "extensions/browser/updater/manifest_fetch_data.h"
 #include "extensions/browser/updater/request_queue_impl.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_builder.h"
 #include "extensions/common/extension_urls.h"
@@ -108,6 +109,8 @@
 #include "components/user_manager/scoped_user_manager.h"
 #include "components/user_manager/user_manager_impl.h"
 #endif
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 using base::Time;
 using content::BrowserThread;
@@ -211,10 +214,11 @@ class StubExtensionRegistrarDelegate : public ExtensionRegistrar::Delegate {
                               base::OnceClosure done_callback) override {}
   void ShowExtensionDisabledError(const Extension* extension,
                                   bool is_remote_install) override {}
-  void LoadExtensionForReload(
+  void LoadExtensionForReload(const ExtensionId& extension_id,
+                              const base::FilePath& path) override {}
+  void LoadExtensionForReloadWithQuietFailure(
       const ExtensionId& extension_id,
-      const base::FilePath& path,
-      ExtensionRegistrar::LoadErrorBehavior load_error_behavior) override {}
+      const base::FilePath& path) override {}
   bool CanEnableExtension(const Extension* extension) override { return true; }
   bool CanDisableExtension(const Extension* extension) override { return true; }
   void GrantActivePermissions(const Extension* extension) override {}

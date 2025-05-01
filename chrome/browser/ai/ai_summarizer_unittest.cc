@@ -183,9 +183,11 @@ class AISummarizerTest : public AITestUtils::AITestBase {
 TEST_F(AISummarizerTest, CanCreateDefaultOptions) {
   SetupMockOptimizationGuideKeyedService();
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibility(_))
-      .WillOnce(testing::Return(
-          optimization_guide::OnDeviceModelEligibilityReason::kSuccess));
+              GetOnDeviceModelEligibilityAsync(_, _))
+      .WillOnce([](auto feature, auto callback) {
+        std::move(callback).Run(
+            optimization_guide::OnDeviceModelEligibilityReason::kSuccess);
+      });
   base::MockCallback<AIManager::CanCreateSummarizerCallback> callback;
   EXPECT_CALL(callback,
               Run(blink::mojom::ModelAvailabilityCheckResult::kAvailable));
@@ -196,9 +198,11 @@ TEST_F(AISummarizerTest, CanCreateDefaultOptions) {
 TEST_F(AISummarizerTest, CanCreateIsLanguagesSupported) {
   SetupMockOptimizationGuideKeyedService();
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibility(_))
-      .WillRepeatedly(testing::Return(
-          optimization_guide::OnDeviceModelEligibilityReason::kSuccess));
+              GetOnDeviceModelEligibilityAsync(_, _))
+      .WillOnce([](auto feature, auto callback) {
+        std::move(callback).Run(
+            optimization_guide::OnDeviceModelEligibilityReason::kSuccess);
+      });
   auto options = GetDefaultOptions();
   options->output_language = AILanguageCode::New("en");
   options->expected_input_languages =
@@ -255,12 +259,12 @@ TEST_F(AISummarizerTest, CreateSummarizerModelNotEligible) {
               const std::optional<optimization_guide::SessionConfigParams>&
                   config_params) { return nullptr; }));
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibility(_))
-      .WillOnce(testing::Invoke(
-          [&](optimization_guide::ModelBasedCapabilityKey feature) {
-            return optimization_guide::OnDeviceModelEligibilityReason::
-                kModelNotEligible;
-          }));
+              GetOnDeviceModelEligibilityAsync(_, _))
+      .WillOnce([](auto feature, auto callback) {
+        std::move(callback).Run(
+            optimization_guide::OnDeviceModelEligibilityReason::
+                kModelNotEligible);
+      });
 
   MockCreateSummarizerClient mock_create_summarizer_client;
   base::RunLoop run_loop;
@@ -303,13 +307,13 @@ TEST_F(AISummarizerTest,
           }));
 
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibility(_))
-      .WillOnce(testing::Invoke(
-          [&](optimization_guide::ModelBasedCapabilityKey feature) {
-            // Returning kConfigNotAvailableForFeature should trigger retry.
-            return optimization_guide::OnDeviceModelEligibilityReason::
-                kConfigNotAvailableForFeature;
-          }));
+              GetOnDeviceModelEligibilityAsync(_, _))
+      .WillOnce([](auto feature, auto callback) {
+        // Returning kConfigNotAvailableForFeature should trigger retry.
+        std::move(callback).Run(
+            optimization_guide::OnDeviceModelEligibilityReason::
+                kConfigNotAvailableForFeature);
+      });
 
   optimization_guide::OnDeviceModelAvailabilityObserver* availability_observer =
       nullptr;
@@ -321,6 +325,15 @@ TEST_F(AISummarizerTest,
               optimization_guide::OnDeviceModelAvailabilityObserver* observer) {
             availability_observer = observer;
             run_loop_for_add_observer.Quit();
+          }));
+
+  EXPECT_CALL(session_, GetExecutionInputSizeInTokens(_, _))
+      .WillOnce(testing::Invoke(
+          [&](optimization_guide::MultimodalMessageReadView request_metadata,
+              optimization_guide::OptimizationGuideModelSizeInTokenCallback
+                  callback) {
+            std::move(callback).Run(
+                blink::mojom::kWritingAssistanceMaxInputTokenSize);
           }));
 
   mojo::Remote<blink::mojom::AISummarizer> summarizer_remote;
@@ -356,6 +369,37 @@ TEST_F(AISummarizerTest,
   run_loop.Run();
 }
 
+TEST_F(AISummarizerTest, CreateSummarizerContextLimitExceededError) {
+  SetupMockOptimizationGuideKeyedService();
+  SetupMockSession();
+
+  EXPECT_CALL(session_, GetExecutionInputSizeInTokens(_, _))
+      .WillOnce(testing::Invoke(
+          [](optimization_guide::MultimodalMessageReadView request_metadata,
+             optimization_guide::OptimizationGuideModelSizeInTokenCallback
+                 callback) {
+            std::move(callback).Run(
+                blink::mojom::kWritingAssistanceMaxInputTokenSize + 1);
+          }));
+
+  MockCreateSummarizerClient mock_create_summarizer_client;
+  base::RunLoop run_loop;
+  EXPECT_CALL(mock_create_summarizer_client, OnError(_))
+      .WillOnce(testing::Invoke([&](blink::mojom::AIManagerCreateClientError
+                                        error) {
+        ASSERT_EQ(
+            error,
+            blink::mojom::AIManagerCreateClientError::kInitialInputTooLarge);
+        run_loop.Quit();
+      }));
+
+  mojo::Remote<blink::mojom::AIManager> ai_manager = GetAIManagerRemote();
+  ai_manager->CreateSummarizer(
+      mock_create_summarizer_client.BindNewPipeAndPassRemote(),
+      GetDefaultOptions());
+  run_loop.Run();
+}
+
 TEST_F(AISummarizerTest,
        CreateSummarizerAbortAfterConfigNotAvailableForFeature) {
   SetupMockOptimizationGuideKeyedService();
@@ -367,13 +411,13 @@ TEST_F(AISummarizerTest,
                   config_params) { return nullptr; }));
 
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibility(_))
-      .WillOnce(testing::Invoke(
-          [&](optimization_guide::ModelBasedCapabilityKey feature) {
-            // Returning kConfigNotAvailableForFeature should trigger retry.
-            return optimization_guide::OnDeviceModelEligibilityReason::
-                kConfigNotAvailableForFeature;
-          }));
+              GetOnDeviceModelEligibilityAsync(_, _))
+      .WillOnce([](auto feature, auto callback) {
+        // Returning kConfigNotAvailableForFeature should trigger retry.
+        std::move(callback).Run(
+            optimization_guide::OnDeviceModelEligibilityReason::
+                kConfigNotAvailableForFeature);
+      });
 
   optimization_guide::OnDeviceModelAvailabilityObserver* availability_observer =
       nullptr;
@@ -454,6 +498,8 @@ TEST_F(AISummarizerTest, SummarizeWithOptions) {
 TEST_F(AISummarizerTest, InputLimitExceededError) {
   SetupMockOptimizationGuideKeyedService();
   SetupMockSession();
+  auto summarizer_remote = GetAISummarizerRemote();
+
   EXPECT_CALL(session_, GetExecutionInputSizeInTokens(_, _))
       .WillOnce(testing::Invoke(
           [](optimization_guide::MultimodalMessageReadView request_metadata,
@@ -462,8 +508,6 @@ TEST_F(AISummarizerTest, InputLimitExceededError) {
             std::move(callback).Run(
                 blink::mojom::kWritingAssistanceMaxInputTokenSize + 1);
           }));
-
-  auto summarizer_remote = GetAISummarizerRemote();
   AITestUtils::MockModelStreamingResponder mock_responder;
   base::RunLoop run_loop;
   EXPECT_CALL(mock_responder, OnError(_))
@@ -710,13 +754,13 @@ TEST_F(AISummarizerTest, MeasureUsage) {
   uint64_t expected_usage = 100;
   SetupMockOptimizationGuideKeyedService();
   SetupMockSession();
+  auto summarizer_remote = GetAISummarizerRemote();
+
   EXPECT_CALL(session_, GetExecutionInputSizeInTokens(_, _))
       .WillOnce(testing::Invoke(
           [&](optimization_guide::MultimodalMessageReadView request_metadata,
               optimization_guide::OptimizationGuideModelSizeInTokenCallback
                   callback) { std::move(callback).Run(expected_usage); }));
-
-  auto summarizer_remote = GetAISummarizerRemote();
   base::test::TestFuture<std::optional<uint64_t>> future;
   summarizer_remote->MeasureUsage(kInputString, kContextString,
                                   future.GetCallback());
@@ -726,13 +770,13 @@ TEST_F(AISummarizerTest, MeasureUsage) {
 TEST_F(AISummarizerTest, MeasureUsageFails) {
   SetupMockOptimizationGuideKeyedService();
   SetupMockSession();
+  auto summarizer_remote = GetAISummarizerRemote();
+
   EXPECT_CALL(session_, GetExecutionInputSizeInTokens(_, _))
       .WillOnce(testing::Invoke(
           [&](optimization_guide::MultimodalMessageReadView request_metadata,
               optimization_guide::OptimizationGuideModelSizeInTokenCallback
                   callback) { std::move(callback).Run(std::nullopt); }));
-
-  auto summarizer_remote = GetAISummarizerRemote();
   base::test::TestFuture<std::optional<uint64_t>> future;
   summarizer_remote->MeasureUsage(kInputString, kContextString,
                                   future.GetCallback());

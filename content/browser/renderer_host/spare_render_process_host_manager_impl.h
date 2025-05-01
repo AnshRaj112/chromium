@@ -15,9 +15,14 @@
 #include "base/timer/timer.h"
 #include "components/performance_manager/scenario_api/performance_scenario_observer.h"
 #include "content/common/content_export.h"
+#include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/process_allocation_context.h"
 #include "content/public/browser/render_process_host_observer.h"
 #include "content/public/browser/spare_render_process_host_manager.h"
+
+#if BUILDFLAG(IS_ANDROID)
+#include "base/android/application_status_listener.h"
+#endif
 
 namespace content {
 
@@ -31,14 +36,15 @@ class RenderProcessHost;
 // LINT.IfChange(SpareRendererDispatchResult)
 enum class SpareRendererDispatchResult {
   kUsed = 0,
-  kTimeout,
-  kOverridden,
-  kDestroyedNotEnabled,
-  kDestroyedProcessLimit,
-  kProcessExited,
-  kProcessHostDestroyed,
-  kMemoryPressure,
-  kMaxValue = kMemoryPressure
+  kTimeout = 1,
+  kOverridden = 2,
+  kDestroyedNotEnabled = 3,
+  kDestroyedProcessLimit = 4,
+  kProcessExited = 5,
+  kProcessHostDestroyed = 6,
+  kMemoryPressure = 7,
+  kKillAfterBackgrounded = 8,
+  kMaxValue = kKillAfterBackgrounded
 };
 // LINT.ThenChange(//tools/metrics/histograms/metadata/browser/enums.xml:SpareRendererDispatchResult)
 
@@ -57,7 +63,8 @@ enum class NoSpareRendererReason {
   kProcessHostDestroyed = 7,
   kNotYetCreatedFirstLaunch = 8,
   kNotYetCreatedAfterWarmup = 9,
-  kMaxValue = kNotYetCreatedAfterWarmup
+  kOnceBackgrounded = 10,
+  kMaxValue = kOnceBackgrounded
 };
 // LINT.ThenChange(//tools/metrics/histograms/metadata/browser/enums.xml:NoSpareRendererReason)
 
@@ -145,6 +152,8 @@ class CONTENT_EXPORT SpareRenderProcessHostManagerImpl
 
   void SetIsBrowserIdleForTesting(bool is_browser_idle);
 
+  bool HasSpareRenderer() { return !spare_rphs_.empty(); }
+
  private:
   // Release ownership of a spare renderer. Called when the spare has either
   // been 1) claimed to be used in a navigation or 2) shutdown somewhere else.
@@ -194,6 +203,16 @@ class CONTENT_EXPORT SpareRenderProcessHostManagerImpl
   // Records heartbeat metrics for the spare RPHs. Called every 2 minutes.
   void OnMetricsHeartbeatTimerFired();
 
+#if BUILDFLAG(IS_ANDROID)
+  void OnApplicationStateChange(base::android::ApplicationState state);
+#endif
+
+  // Checks various conditions that could prevent an embedder from using the
+  // spare.
+  std::optional<ContentBrowserClient::SpareProcessRefusedByEmbedderReason>
+  DoesEmbedderAllowSpareUsage(BrowserContext* browser_context,
+                              SiteInstanceImpl* site_instance);
+
   base::MemoryPressureListener memory_pressure_listener_;
 
   // If this timer is running, then the system is under memory pressure.
@@ -234,6 +253,12 @@ class CONTENT_EXPORT SpareRenderProcessHostManagerImpl
   bool is_browser_idle_ = true;
 
   base::RepeatingTimer metrics_heartbeat_timer_;
+
+#if BUILDFLAG(IS_ANDROID)
+  std::unique_ptr<base::android::ApplicationStatusListener>
+      app_status_listener_;
+  bool is_app_backgroud_;
+#endif
 };
 
 }  // namespace content

@@ -6,11 +6,13 @@
 #define CHROME_RENDERER_ACTOR_TYPE_TOOL_H_
 
 #include <cstdint>
+#include <string>
 
 #include "base/memory/raw_ref.h"
 #include "chrome/common/actor.mojom.h"
 #include "chrome/renderer/actor/tool_base.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
+#include "third_party/blink/public/platform/web_input_event_result.h"
 
 namespace blink {
 class WebNode;
@@ -28,7 +30,9 @@ class TypeTool : public ToolBase {
   TypeTool(mojom::TypeActionPtr action, content::RenderFrame& frame);
   ~TypeTool() override;
 
+  // actor::ToolBase
   void Execute(ToolFinishedCallback callback) override;
+  std::string DebugString() const override;
 
  private:
   // Structure to hold all necessary parameters for generating keyboard events
@@ -52,8 +56,9 @@ class TypeTool : public ToolBase {
 
   KeyParams GetEnterKeyParams();
   std::optional<KeyParams> GetKeyParamsForChar(char c);
-  bool CreateAndDispatchKeyEvent(blink::WebInputEvent::Type type,
-                                 KeyParams key_params);
+  blink::WebInputEventResult CreateAndDispatchKeyEvent(
+      blink::WebInputEvent::Type type,
+      KeyParams key_params);
   bool SimulateKeyPress(TypeTool::KeyParams params);
 
   // Attempts to prepare the target element based on the TypeMode.

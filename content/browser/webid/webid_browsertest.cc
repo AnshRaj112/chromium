@@ -502,9 +502,6 @@ class WebIdIdPRegistryBrowserTest : public WebIdBrowserTest {
 class WebIdAuthzBrowserTest : public WebIdBrowserTest {
  public:
   void SetUpCommandLine(base::CommandLine* command_line) override {
-    scoped_feature_list_.InitWithFeatures(
-        {features::kFedCmButtonMode, features::kFedCmAuthz}, {});
-
     command_line->AppendSwitch(switches::kIgnoreCertificateErrors);
   }
 };
@@ -1899,7 +1896,6 @@ IN_PROC_BROWSER_TEST_F(WebIdBrowserTest,
 class WebIdModeBrowserTest : public WebIdBrowserTest {
  public:
   void SetUpCommandLine(base::CommandLine* command_line) override {
-    scoped_feature_list_.InitAndEnableFeature(features::kFedCmButtonMode);
     command_line->AppendSwitch(switches::kIgnoreCertificateErrors);
   }
 };
@@ -1918,10 +1914,6 @@ class WebIdDelegationBrowserTest : public WebIdBrowserTest {
     std::vector<base::test::FeatureRef> features;
     features.push_back(features::kFedCm);
     features.push_back(features::kFedCmDelegation);
-    // Needs the fields API
-    features.push_back(features::kFedCmAuthz);
-    // Intended to be used in Active mode
-    features.push_back(features::kFedCmButtonMode);
     // Needs to reconcile well with the IdP Registration and Multi-IdP API
     features.push_back(features::kFedCmIdPRegistration);
     features.push_back(features::kFedCmMultipleIdentityProviders);
@@ -2064,6 +2056,23 @@ IN_PROC_BROWSER_TEST_F(WebIdDelegationBrowserTest, ConditionalMediation) {
   MockIdentityRequestDialogController* controller = mock.get();
   test_browser_client_->SetIdentityRequestDialogController(std::move(mock));
 
+  base::RunLoop modal_loop;
+  auto configURL = BaseIdpUrl();
+  EXPECT_CALL(*controller, ShowAccountsDialog)
+      .WillOnce(
+          ::testing::WithArg<6>([&modal_loop, &configURL](auto on_selected) {
+            std::move(on_selected)
+                .Run(GURL(configURL),
+                     /*account_id=*/"not_real_account",
+                     /*is_sign_in=*/true);
+
+            modal_loop.Quit();
+
+            return true;
+          }));
+
+  EXPECT_CALL(*controller, ShowLoadingDialog).WillOnce(Return(true));
+
   base::RunLoop run_loop;
   SetVcIssuanceConfigDetails(&run_loop);
 
@@ -2078,7 +2087,7 @@ IN_PROC_BROWSER_TEST_F(WebIdDelegationBrowserTest, ConditionalMediation) {
           format: 'vc+sd-jwt',
           fields: ['name'],
           configURL: ')" +
-                       BaseIdpUrl() + R"(',
+                       configURL + R"(',
           clientId: 'client_id_1',
           nonce: '12345',
         }],
@@ -2107,8 +2116,13 @@ IN_PROC_BROWSER_TEST_F(WebIdDelegationBrowserTest, ConditionalMediation) {
 
   auto account = (*suggestions)[0];
   source->NotifyAutofillSuggestionAccepted(
-      account->identity_provider->idp_metadata.config_url, account->id);
+      account->identity_provider->idp_metadata.config_url, account->id,
+      /*show_modal=*/true, base::NullCallback());
 
+  // Wait for the user to accept the prompt.
+  modal_loop.Run();
+
+  // Verify that the token is correct.
   auto public_key = sdjwt::ExportPublicKey(*private_key_);
   EXPECT_TRUE(public_key);
 
@@ -2128,10 +2142,7 @@ IN_PROC_BROWSER_TEST_F(WebIdDelegationBrowserTest, ConditionalMediation) {
 class WebIdMetricsBrowserTest : public WebIdBrowserTest {
  public:
   void SetUpCommandLine(base::CommandLine* command_line) override {
-    scoped_feature_list_.InitWithFeatures(
-        {features::kFedCmMetricsEndpoint, features::kFedCmButtonMode,
-         features::kFedCmAuthz},
-        {});
+    scoped_feature_list_.InitAndEnableFeature(features::kFedCmMetricsEndpoint);
     command_line->AppendSwitch(switches::kIgnoreCertificateErrors);
   }
 

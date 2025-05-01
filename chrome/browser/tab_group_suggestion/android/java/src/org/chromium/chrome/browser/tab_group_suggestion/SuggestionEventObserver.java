@@ -6,8 +6,6 @@ package org.chromium.chrome.browser.tab_group_suggestion;
 
 import static org.chromium.build.NullUtil.assumeNonNull;
 
-import androidx.annotation.NonNull;
-
 import org.chromium.base.Callback;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.OneshotSupplierImpl;
@@ -25,17 +23,19 @@ import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorTabObserver;
 import org.chromium.components.visited_url_ranking.url_grouping.GroupSuggestionsService;
 import org.chromium.components.visited_url_ranking.url_grouping.TabSelectionType;
-import org.chromium.url.GURL;
+import org.chromium.content_public.browser.NavigationController;
+import org.chromium.content_public.browser.NavigationHandle;
+import org.chromium.content_public.browser.NavigationHistory;
 
 /** Observer for events that are relevant to TabGroup suggestion triggering or calculation. */
 @NullMarked
 public class SuggestionEventObserver {
 
-    private final @NonNull TabModel mTabModel;
-    private final @NonNull GroupSuggestionsService mGroupSuggestionsService;
-    private final @NonNull Callback<Boolean> mHubVisibilityObserver = this::onHubVisibilityChanged;
-    private final @NonNull TabModelSelectorTabObserver mTabObserver;
-    private final @NonNull TabModelObserver mTabModelObserver =
+    private final TabModel mTabModel;
+    private final GroupSuggestionsService mGroupSuggestionsService;
+    private final Callback<Boolean> mHubVisibilityObserver = this::onHubVisibilityChanged;
+    private final TabModelSelectorTabObserver mTabObserver;
+    private final TabModelObserver mTabModelObserver =
             new TabModelObserver() {
                 @Override
                 public void didSelectTab(Tab tab, int type, int lastId) {
@@ -90,28 +90,53 @@ public class SuggestionEventObserver {
 
     private @Nullable ObservableSupplier<Boolean> mHubVisibilitySupplier;
     private @Nullable ObservableSupplier<Pane> mFocusedPaneSupplier;
-    // The event observer will not populate any signal when in observation mode. Currently it's only
-    // blocking the very first navigation after startup.
-    private boolean mSeenFirstPageLoad = true;
 
     /** Creates the observer. */
     public SuggestionEventObserver(
-            @NonNull TabModelSelector tabModelSelector,
-            @NonNull OneshotSupplierImpl<HubManager> hubManagerSupplier) {
+            TabModelSelector tabModelSelector, OneshotSupplierImpl<HubManager> hubManagerSupplier) {
         mTabModel = tabModelSelector.getModel(false);
         mTabObserver =
                 new TabModelSelectorTabObserver(tabModelSelector) {
                     @Override
-                    public void onPageLoadFinished(Tab tab, GURL url) {
-                        if (tab.isIncognitoBranded() || mSeenFirstPageLoad) {
-                            mSeenFirstPageLoad = false;
+                    public void onDidFinishNavigationInPrimaryMainFrame(
+                            Tab tab, NavigationHandle navigationHandle) {
+                        NavigationController controller =
+                                navigationHandle.getWebContents().getNavigationController();
+                        if (tab.isIncognitoBranded() || controller == null) {
                             return;
                         }
-                        mGroupSuggestionsService.onPageLoadFinished(tab.getId());
+                        NavigationHistory history = controller.getNavigationHistory();
+                        if (history == null) {
+                            return;
+                        }
+                        int transitionType =
+                                history.getEntryAtIndex(history.getCurrentEntryIndex())
+                                        .getTransition();
+                        mGroupSuggestionsService.onDidFinishNavigation(tab.getId(), transitionType);
                     }
                 };
         mGroupSuggestionsService =
                 GroupSuggestionsServiceFactory.getForProfile(assumeNonNull(mTabModel.getProfile()));
+        mTabModel
+                .getCurrentTabSupplier()
+                .addSyncObserverAndCallIfNonNull(
+                        new Callback<@Nullable Tab>() {
+                            @Override
+                            public void onResult(@Nullable Tab tab) {
+                                assumeNonNull(tab);
+                                mGroupSuggestionsService.didSelectTab(
+                                        tab.getId(),
+                                        tab.getUrl(),
+                                        TabSelectionType.FROM_NEW_TAB,
+                                        Tab.INVALID_TAB_ID);
+
+                                // TODO(crbug.com/389129271): Get rid of redundant cast after
+                                // https://github.com/uber/NullAway/issues/1155 is fixed.
+                                mTabModel
+                                        .getCurrentTabSupplier()
+                                        .removeObserver((Callback<@Nullable Tab>) this);
+                            }
+                        });
         mTabModel.addObserver(mTabModelObserver);
         hubManagerSupplier.runSyncOrOnAvailable(
                 hubManager -> {
@@ -132,7 +157,7 @@ public class SuggestionEventObserver {
         }
     }
 
-    public @NonNull TabModelSelectorTabObserver getTabModelSelectorTabObserverForTesting() {
+    public TabModelSelectorTabObserver getTabModelSelectorTabObserverForTesting() {
         return mTabObserver;
     }
 

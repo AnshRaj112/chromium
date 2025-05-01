@@ -123,6 +123,7 @@ source_set("browser") {
     "//components/offline_pages/buildflags",
     "//components/offline_pages/core/request_header",
     "//components/optimization_guide/core:features",
+    "//components/optimization_guide/public/mojom",
     "//components/os_crypt/sync",
     "//components/payments/content/icon",
     "//components/payments/mojom",
@@ -1166,8 +1167,6 @@ source_set("browser") {
     "gpu/gpu_internals_ui.h",
     "gpu/gpu_main_thread_factory.cc",
     "gpu/gpu_main_thread_factory.h",
-    "gpu/gpu_memory_buffer_manager_singleton.cc",
-    "gpu/gpu_memory_buffer_manager_singleton.h",
     "gpu/gpu_process_host.cc",
     "gpu/gpu_process_host.h",
     "gpu/gpu_process_host_receiver_bindings.cc",
@@ -1244,6 +1243,8 @@ source_set("browser") {
     "interest_group/dwa_auction_metrics.h",
     "interest_group/for_debugging_only_report_util.cc",
     "interest_group/for_debugging_only_report_util.h",
+    "interest_group/group_by_origin_key.cc",
+    "interest_group/group_by_origin_key.h",
     "interest_group/header_direct_from_seller_signals.cc",
     "interest_group/header_direct_from_seller_signals.h",
     "interest_group/interest_group_auction.cc",
@@ -2071,9 +2072,6 @@ source_set("browser") {
     "screenlock_monitor/screenlock_monitor_device_source.h",
     "screenlock_monitor/screenlock_monitor_source.cc",
     "screenlock_monitor/screenlock_monitor_source.h",
-    "security/coop/coop_related_group.cc",
-    "security/coop/coop_related_group.h",
-    "security/coop/coop_swap_result.h",
     "security/coop/cross_origin_isolation_mode.h",
     "security/coop/cross_origin_opener_policy_access_report_manager.cc",
     "security/coop/cross_origin_opener_policy_access_report_manager.h",
@@ -2862,8 +2860,6 @@ source_set("browser") {
       "renderer_host/popup_menu_helper_ios.mm",
       "renderer_host/render_widget_host_view_ios.h",
       "renderer_host/render_widget_host_view_ios.mm",
-      "renderer_host/render_widget_host_view_ios_uiview.h",
-      "renderer_host/render_widget_host_view_ios_uiview.mm",
       "renderer_host/web_menu_runner_ios.h",
       "renderer_host/web_menu_runner_ios.mm",
       "speech/tts_ios.mm",
@@ -2885,6 +2881,8 @@ source_set("browser") {
         "date_time_chooser/ios/date_time_chooser_util.mm",
         "date_time_chooser/ios/date_time_chooser_view_controller.h",
         "date_time_chooser/ios/date_time_chooser_view_controller.mm",
+        "renderer_host/render_widget_host_view_ios_uiview.h",
+        "renderer_host/render_widget_host_view_ios_uiview.mm",
       ]
       frameworks += [ "BrowserEngineKit.framework" ]
     } else {
@@ -2892,6 +2890,8 @@ source_set("browser") {
         "child_process_launcher_helper_tvos.mm",
         "renderer_host/render_widget_host_view_tvos.h",
         "renderer_host/render_widget_host_view_tvos.mm",
+        "renderer_host/render_widget_host_view_tvos_uiview.h",
+        "renderer_host/render_widget_host_view_tvos_uiview.mm",
       ]
     }
 

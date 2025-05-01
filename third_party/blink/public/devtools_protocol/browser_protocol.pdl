@@ -1079,6 +1079,19 @@ experimental domain Audits
       # The value of the property rule property that failed to parse
       optional string propertyValue
 
+  type UserReidentificationIssueType extends string
+    enum
+      BlockedFrameNavigation
+      BlockedSubresource
+
+  # This issue warns about uses of APIs that may be considered misuse to
+  # re-identify users.
+  type UserReidentificationIssueDetails extends object
+    properties
+      UserReidentificationIssueType type
+      # Applies to BlockedFrameNavigation and BlockedSubresource issue types.
+      optional AffectedRequest request
+
   # A unique identifier for the type of issue. Each type may use one of the
   # optional fields in InspectorIssueDetails to convey more specific
   # information about the kind of issue.
@@ -1109,6 +1122,7 @@ experimental domain Audits
       SharedDictionaryIssue
       SelectElementAccessibilityIssue
       SRIMessageSignatureIssue
+      UserReidentificationIssue
 
   # This struct holds a list of optional fields with additional information
   # specific to the kind of issue. When adding a new issue code, please also
@@ -1139,6 +1153,7 @@ experimental domain Audits
       optional SharedDictionaryIssueDetails sharedDictionaryIssueDetails
       optional SelectElementAccessibilityIssueDetails selectElementAccessibilityIssueDetails
       optional SRIMessageSignatureIssueDetails sriMessageSignatureIssueDetails
+      optional UserReidentificationIssueDetails userReidentificationIssueDetails
 
   # A unique id for a DevTools inspector issue. Allows other entities (e.g.
   # exceptions, CDP message, console messages, etc.) to reference an issue.
@@ -8455,6 +8470,7 @@ domain Page
 
   # All Permissions Policy features. This enum should match the one defined
   # in services/network/public/cpp/permissions_policy/permissions_policy_features.json5.
+  # LINT.IfChange(PermissionsPolicyFeature)
   experimental type PermissionsPolicyFeature extends string
     enum
       accelerometer
@@ -8521,6 +8537,7 @@ domain Page
       keyboard-map
       language-detector
       local-fonts
+      local-network-access
       magnetometer
       media-playback-while-not-visible
       microphone
@@ -8534,6 +8551,7 @@ domain Page
       private-state-token-redemption
       publickey-credentials-create
       publickey-credentials-get
+      record-ad-auction-events
       rewriter
       run-ad-auction
       screen-wake-lock
@@ -8558,6 +8576,7 @@ domain Page
       window-management
       writer
       xr-spatial-tracking
+  # LINT.ThenChange(//services/network/public/cpp/permissions_policy/permissions_policy_features.json5:PermissionsPolicy)
 
   # Reason for a permissions policy feature to be disabled.
   experimental type PermissionsPolicyBlockReason extends string
@@ -9186,13 +9205,15 @@ domain Page
       # Recommendation for manifest's id attribute to match current id computed from start_url
       optional string recommendedId
 
-  experimental command getAdScriptId
+  experimental command getAdScriptAncestryIds
     parameters
       FrameId frameId
     returns
-      # Identifies the bottom-most script which caused the frame to be labelled
-      # as an ad. Only sent if frame is labelled as an ad and id is available.
-      optional AdScriptId adScriptId
+      # The ancestry chain of ad script identifiers leading to this frame's
+      # creation, ordered from the most immediate script (in the frame creation
+      # stack) to more distant ancestors (that created the immediately preceding
+      # script). Only sent if frame is labelled as an ad and ids are available.
+      array of AdScriptId adScriptAncestryIds
 
   # Returns present frame tree structure.
   command getFrameTree
@@ -9804,6 +9825,8 @@ domain Page
   # closed.
   event javascriptDialogClosed
     parameters
+      # Frame id.
+      experimental FrameId frameId
       # Whether dialog was confirmed.
       boolean result
       # User input in case of prompt.
@@ -9815,6 +9838,8 @@ domain Page
     parameters
       # Frame url.
       string url
+      # Frame id.
+      experimental FrameId frameId
       # Message that will be displayed by the dialog.
       string message
       # Dialog type.
@@ -10656,6 +10681,19 @@ experimental domain Storage
       # storage.
       integer bytesUsed
 
+  # Represents a dictionary object passed in as privateAggregationConfig to
+  # run or selectURL.
+  type SharedStoragePrivateAggregationConfig extends object
+    properties
+      # The chosen aggregation service deployment.
+      optional string aggregationCoordinatorOrigin
+      # The context ID provided.
+      optional string contextId
+      # Configures the maximum size allowed for filtering IDs.
+      integer filteringIdMaxBytes
+      # The limit on the number of contributions in the final report.
+      optional integer maxContributions
+
   # Pair of reporting metadata details for a candidate URL for `selectURL()`.
   type SharedStorageReportingMetadata extends object
     properties
@@ -10675,44 +10713,61 @@ experimental domain Storage
   type SharedStorageAccessParams extends object
     properties
       # Spec of the module script URL.
-      # Present only for SharedStorageAccessType.documentAddModule.
+      # Present only for SharedStorageAccessMethods: addModule and
+      # createWorklet.
       optional string scriptSourceUrl
+      # String denoting "context-origin", "script-origin", or a custom
+      # origin to be used as the worklet's data origin.
+      # Present only for SharedStorageAccessMethod: createWorklet.
+      optional string dataOrigin
       # Name of the registered operation to be run.
-      # Present only for SharedStorageAccessType.documentRun and
-      # SharedStorageAccessType.documentSelectURL.
+      # Present only for SharedStorageAccessMethods: run and selectURL.
       optional string operationName
+      # Whether or not to keep the worket alive for future run or selectURL
+      # calls.
+      # Present only for SharedStorageAccessMethods: run and selectURL.
+      optional boolean keepAlive
+      # Configures the private aggregation options.
+      # Present only for SharedStorageAccessMethods: run and selectURL.
+      optional SharedStoragePrivateAggregationConfig privateAggregationConfig
       # The operation's serialized data in bytes (converted to a string).
-      # Present only for SharedStorageAccessType.documentRun and
-      # SharedStorageAccessType.documentSelectURL.
+      # Present only for SharedStorageAccessMethods: run and selectURL.
+      # TODO(crbug.com/401011862): Consider updating this parameter to binary.
       optional string serializedData
       # Array of candidate URLs' specs, along with any associated metadata.
-      # Present only for SharedStorageAccessType.documentSelectURL.
+      # Present only for SharedStorageAccessMethod: selectURL.
       optional array of SharedStorageUrlWithMetadata urlsWithMetadata
+      # Spec of the URN:UUID generated for a selectURL call.
+      # Present only for SharedStorageAccessMethod: selectURL.
+      optional string urnUuid
       # Key for a specific entry in an origin's shared storage.
-      # Present only for SharedStorageAccessType.documentSet,
-      # SharedStorageAccessType.documentAppend,
-      # SharedStorageAccessType.documentDelete,
-      # SharedStorageAccessType.workletSet,
-      # SharedStorageAccessType.workletAppend,
-      # SharedStorageAccessType.workletDelete,
-      # SharedStorageAccessType.workletGet,
-      # SharedStorageAccessType.headerSet,
-      # SharedStorageAccessType.headerAppend, and
-      # SharedStorageAccessType.headerDelete.
+      # Present only for SharedStorageAccessMethods: set, append, delete, and
+      # get.
       optional string key
       # Value for a specific entry in an origin's shared storage.
-      # Present only for SharedStorageAccessType.documentSet,
-      # SharedStorageAccessType.documentAppend,
-      # SharedStorageAccessType.workletSet,
-      # SharedStorageAccessType.workletAppend,
-      # SharedStorageAccessType.headerSet, and
-      # SharedStorageAccessType.headerAppend.
+      # Present only for SharedStorageAccessMethods: set and append.
       optional string value
       # Whether or not to set an entry for a key if that key is already present.
-      # Present only for SharedStorageAccessType.documentSet,
-      # SharedStorageAccessType.workletSet, and
-      # SharedStorageAccessType.headerSet.
+      # Present only for SharedStorageAccessMethod: set.
       optional boolean ignoreIfPresent
+      # If the method is called on a worklet, or as part of
+      # a worklet script, it will have an ID for the associated worklet.
+      # Present only for SharedStorageAccessMethods: addModule, createWorklet,
+      # run, selectURL, and any other SharedStorageAccessMethod when the
+      # SharedStorageAccessScope is worklet.
+      optional string workletId
+      # Name of the lock to be acquired, if present.
+      # Optionally present only for SharedStorageAccessMethods: batchUpdate,
+      # set, append, delete, and clear.
+      optional string withLock
+      # If the method has been called as part of a batchUpdate, then this
+      # number identifies the batch to which it belongs.
+      # Optionally present only for SharedStorageAccessMethods:
+      # batchUpdate (required), set, append, delete, and clear.
+      optional string batchUpdateId
+      # Number of modifier methods sent in batch.
+      # Present only for SharedStorageAccessMethod: batchUpdate.
+      optional integer batchSize
 
   type StorageBucketsDurability extends string
     enum
@@ -11165,6 +11220,11 @@ experimental domain Storage
       number limit
       number maxEventStates
 
+  experimental type AttributionReportingNamedBudgetDef extends object
+    properties
+      string name
+      integer budget
+
   experimental type AttributionReportingSourceRegistration extends object
     properties
       Network.TimeSinceEpoch time
@@ -11187,6 +11247,9 @@ experimental domain Storage
       AttributionReportingAggregatableDebugReportingConfig aggregatableDebugReportingConfig
       optional AttributionScopesData scopesData
       integer maxEventLevelReports
+      array of AttributionReportingNamedBudgetDef namedBudgets
+      boolean debugReporting
+      number eventLevelEpsilon
 
   experimental type AttributionReportingSourceRegistrationResult extends string
     enum
@@ -11249,6 +11312,11 @@ experimental domain Storage
       optional UnsignedInt64AsBase10 dedupKey
       AttributionReportingFilterPair filters
 
+  experimental type AttributionReportingNamedBudgetCandidate extends object
+    properties
+      optional string name
+      AttributionReportingFilterPair filters
+
   experimental type AttributionReportingTriggerRegistration extends object
     properties
       AttributionReportingFilterPair filters
@@ -11264,6 +11332,7 @@ experimental domain Storage
       optional string triggerContextId
       AttributionReportingAggregatableDebugReportingConfig aggregatableDebugReportingConfig
       array of string scopes
+      array of AttributionReportingNamedBudgetCandidate namedBudgets
 
   experimental type AttributionReportingEventLevelResult extends string
     enum
@@ -11310,6 +11379,28 @@ experimental domain Storage
       AttributionReportingTriggerRegistration registration
       AttributionReportingEventLevelResult eventLevel
       AttributionReportingAggregatableResult aggregatable
+
+  experimental type AttributionReportingReportResult extends string
+    enum
+      # A network request was attempted for the report.
+      sent
+      # No request was attempted because of browser policy.
+      prohibited
+      # No request was attempted because of an error in report assembly,
+      # e.g. the aggregation service was unavailable.
+      failedToAssemble
+      # No request was attempted because the report's expiry passed.
+      expired
+
+  experimental event attributionReportingReportSent
+    parameters
+      string url
+      object body
+      AttributionReportingReportResult result
+      # If result is `sent`, populated with net/HTTP status.
+      optional integer netError
+      optional string netErrorName
+      optional integer httpStatusCode
 
   # A single Related Website Set object.
   experimental type RelatedWebsiteSet extends object
@@ -13301,6 +13392,27 @@ experimental domain BluetoothEmulation
       connection
       discovery
 
+  # Indicates the various types of characteristic write.
+  type CharacteristicWriteType extends string
+    enum
+      write-default-deprecated
+      write-with-response
+      write-without-response
+
+  # Indicates the various types of characteristic operation.
+  type CharacteristicOperationType extends string
+    enum
+      read
+      write
+      subscribe-to-notifications
+      unsubscribe-from-notifications
+
+  # Indicates the various types of descriptor operation.
+  type DescriptorOperationType extends string
+    enum
+      read
+      write
+
   # Stores the manufacturer data
   type ManufacturerData extends object
     properties
@@ -13385,6 +13497,30 @@ experimental domain BluetoothEmulation
       GATTOperationType type
       integer code
 
+  # Simulates the response from the characteristic with |characteristicId| for a
+  # characteristic operation of |type|. The |code| value follows the Error
+  # Codes from Bluetooth Core Specification Vol 3 Part F 3.4.1.1 Error Response.
+  # The |data| is expected to exist when simulating a successful read operation
+  # response.
+  command simulateCharacteristicOperationResponse
+    parameters
+      string characteristicId
+      CharacteristicOperationType type
+      integer code
+      optional binary data
+
+  # Simulates the response from the descriptor with |descriptorId| for a
+  # descriptor operation of |type|. The |code| value follows the Error
+  # Codes from Bluetooth Core Specification Vol 3 Part F 3.4.1.1 Error Response.
+  # The |data| is expected to exist when simulating a successful read operation
+  # response.
+  command simulateDescriptorOperationResponse
+    parameters
+      string descriptorId
+      DescriptorOperationType type
+      integer code
+      optional binary data
+
   # Adds a service with |serviceUuid| to the peripheral with |address|.
   command addService
     parameters
@@ -13437,3 +13573,22 @@ experimental domain BluetoothEmulation
     parameters
       string address
       GATTOperationType type
+
+  # Event for when a characteristic operation of |type| to the characteristic
+  # respresented by |characteristicId| happened. |data| and |writeType| is
+  # expected to exist when |type| is write.
+  event characteristicOperationReceived
+    parameters
+      string characteristicId
+      CharacteristicOperationType type
+      optional binary data
+      optional CharacteristicWriteType writeType
+
+  # Event for when a descriptor operation of |type| to the descriptor
+  # respresented by |descriptorId| happened. |data| is expected to exist when
+  # |type| is write.
+  event descriptorOperationReceived
+    parameters
+      string descriptorId
+      CharacteristicOperationType type
+      optional binary data

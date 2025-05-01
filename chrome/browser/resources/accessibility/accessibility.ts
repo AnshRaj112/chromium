@@ -22,6 +22,7 @@ enum AxMode {
   PDF_PRINTING = 1 << 7,
   PDF_OCR = 1 << 8,
   ANNOTATE_MAIN_NODE = 1 << 9,
+  FROM_PLATFORM = 1 << 10,
 }
 
 interface Data {
@@ -70,6 +71,7 @@ interface InitData {
   supportedApiTypes: string[];
   apiType: string;
   locked: boolean;
+  isolate: boolean;
 
   html: boolean;
   native: boolean;
@@ -77,6 +79,14 @@ interface InitData {
   extendedProperties: boolean;
   text: boolean;
   web: boolean;
+
+  lockedPlatformModes: {
+    native: boolean,
+    web: boolean,
+    html: boolean,
+    extendedProperties: boolean,
+    text: boolean,
+  };
 }
 
 type RequestType = 'showOrRefreshTree';
@@ -242,12 +252,15 @@ function requestEvents(data: PageData, element: HTMLElement) {
 function initialize() {
   const data = requestData();
 
-  bindCheckbox('native', data.native);
-  bindCheckbox('web', data.web);
-  bindCheckbox('text', data.text);
-  bindCheckbox('extendedProperties', data.extendedProperties);
-  bindCheckbox('html', data.html);
+  bindCheckbox('native', data.native, data.lockedPlatformModes.native);
+  bindCheckbox('web', data.web, data.lockedPlatformModes.web);
+  bindCheckbox('text', data.text, data.lockedPlatformModes.text);
+  bindCheckbox(
+      'extendedProperties', data.extendedProperties,
+      data.lockedPlatformModes.extendedProperties);
+  bindCheckbox('html', data.html, data.lockedPlatformModes.html);
   bindDropdown('apiType', data.supportedApiTypes, data.apiType);
+  bindCheckbox('isolate', data.isolate);
   bindCheckbox('locked', data.locked);
 
   getRequiredElement('pages').textContent = '';
@@ -296,9 +309,23 @@ function initialize() {
   addWebUiListener('startOrStopEvents', startOrStopEvents);
 }
 
-function bindCheckbox(name: string, value: boolean) {
+function bindCheckbox(name: string, value: boolean, disable?: boolean) {
   const checkbox = getRequiredElement<HTMLInputElement>(name);
   checkbox.checked = value;
+  if (disable) {
+    checkbox.disabled = true;
+    const label = document.querySelector('label:has(#' + name + ')');
+    if (label) {
+      label.setAttribute(
+          'title',
+          'Forced on because of an interaction with an assistive technology, ' +
+              'application or platform feature.\n' +
+              'To uncheck, use the below checkbox labeled, ' +
+              '"Suppress automatic accessibility enablement..."');
+      label.classList.add('disabled');
+    }
+    return;
+  }
   checkbox.addEventListener('change', function() {
     browserProxy.setGlobalFlag(name, checkbox.checked);
     document.location.reload();
@@ -394,6 +421,8 @@ function formatRow(
     row.appendChild(createModeElement(
         AxMode.ANNOTATE_MAIN_NODE, pageData, 'extendedProperties',
         /* readOnly= */ true));
+    // AxMode.FROM_PLATFORM is unconditionally filtered out and is therefore
+    // never presented to renderers or the user.
   } else {
     const siteInfo = document.createElement('span');
     siteInfo.appendChild(formatValue(data, 'name'));

@@ -90,6 +90,12 @@ BASE_DECLARE_FEATURE(kCheckingNoExtensionIdInExtensionIpcs);
 // registrations in flight, to avoid disrupting the worker(s) registration(s).
 BASE_DECLARE_FEATURE(kDeferResetURLLoaderFactories);
 
+// If enabled, `ResetURLLoaderFactories()` will not reset extensions'
+// service workers URLLoaderFactories used for fetching scripts and
+// sub-resources. This avoids disrupting the worker(s) registration(s)
+// when they are in flight.
+BASE_DECLARE_FEATURE(kSkipResetServiceWorkerURLLoaderFactories);
+
 // If enabled, <webview>s will be allowed to request permission from an
 // embedding Chrome App to request access to Human Interface Devices.
 BASE_DECLARE_FEATURE(kEnableWebHidInWebView);
@@ -125,9 +131,6 @@ extern const base::FeatureParam<std::string>
 // This will be removed once the ExtensionManifestV2Availability enterprise
 // policy is no longer supported.
 BASE_DECLARE_FEATURE(kAllowLegacyMV2Extensions);
-
-// IsValidSourceUrl enforcement for ExtensionHostMsg_OpenChannelToExtension IPC.
-BASE_DECLARE_FEATURE(kExtensionSourceUrlEnforcement);
 
 // Controls whether server-side redirects are subject to extensions' web
 // accessible resource restrictions.

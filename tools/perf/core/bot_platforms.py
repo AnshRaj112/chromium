@@ -540,6 +540,10 @@ _CROSSBENCH_PIXEL9 = frozenset([
     ]),
 ])
 
+_CROSSBENCH_ANDROID_BYRA = frozenset([
+    _crossbench_speedometer3_1(arguments=['--fileserver', '--debug']),
+])
+
 _CROSSBENCH_TANGOR = frozenset([
     _crossbench_loadline_tablet(arguments=[
         '--cool-down-threshold=moderate',
@@ -658,6 +662,7 @@ _MAC_M2_PRO_BENCHMARK_CONFIGS = PerfSuite(OFFICIAL_BENCHMARK_CONFIGS).Remove([
     'speedometer2-minorms',
     'speedometer3-minorms',
 ])
+_MAC_M3_PRO_BENCHMARK_CONFIGS = PerfSuite([])
 
 _WIN_10_BENCHMARK_CONFIGS = PerfSuite(OFFICIAL_BENCHMARK_CONFIGS).Remove([
     'v8.runtime_stats.top_25',
@@ -767,6 +772,15 @@ _ANDROID_PIXEL_TANGOR_BENCHMARK_CONFIGS = PerfSuite(
         _GetBenchmarkConfig('speedometer2-minorms'),
         _GetBenchmarkConfig('speedometer3-minorms')
     ])
+# Android Desktop (AL)
+_ANDROID_BYRA_BENCHMARK_CONFIGS = PerfSuite([
+    # Byra will also run the crossbench variant to ensure that both legacy and
+    # crossbench work.
+    _GetBenchmarkConfig('speedometer3'),
+    _GetBenchmarkConfig('rendering.mobile'),
+    _GetBenchmarkConfig('rendering.desktop'),
+])
+
 _CHROMEOS_KEVIN_FYI_BENCHMARK_CONFIGS = PerfSuite(
     [_GetBenchmarkConfig('rendering.desktop')])
 _FUCHSIA_PERF_SMARTDISPLAY_BENCHMARK_CONFIGS = PerfSuite([
@@ -844,7 +858,12 @@ MAC_M2_PRO = PerfPlatform('mac-m2-pro-perf',
                           20,
                           'mac',
                           crossbench=_CROSSBENCH_BENCHMARKS_ALL)
-
+MAC_M3_PRO = PerfPlatform('mac-m3-pro-perf',
+                          'Mac M3 PRO ARM',
+                          _MAC_M3_PRO_BENCHMARK_CONFIGS,
+                          4,
+                          'mac',
+                          crossbench=_CROSSBENCH_BENCHMARKS_ALL)
 # Win
 WIN_10_LOW_END = PerfPlatform(
     'win-10_laptop_low_end-perf',
@@ -935,6 +954,14 @@ WIN_ARM64_SNAPDRAGON_ELITE = PerfPlatform(
     is_fyi=True)
 
 # Android
+ANDROID_BYRA = PerfPlatform(name='android-byra-perf',
+                            description='AL Byra',
+                            num_shards=7,
+                            benchmark_configs=_ANDROID_BYRA_BENCHMARK_CONFIGS,
+                            platform_os='android',
+                            executables=None,
+                            crossbench=_CROSSBENCH_ANDROID_BYRA)
+
 ANDROID_PIXEL4 = PerfPlatform('android-pixel4-perf',
                               'Android R',
                               _ANDROID_PIXEL4_BENCHMARK_CONFIGS,

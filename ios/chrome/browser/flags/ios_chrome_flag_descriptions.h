@@ -126,6 +126,9 @@ extern const char kAutofillVcnEnrollStrikeExpiryTimeDescription[];
 extern const char kBestFeaturesScreenInFirstRunName[];
 extern const char kBestFeaturesScreenInFirstRunDescription[];
 
+extern const char kBestOfAppFREName[];
+extern const char kBestOfAppFREDescription[];
+
 extern const char kBlueDotOnToolsMenuButtonName[];
 extern const char kBlueDotOnToolsMenuButtonDescription[];
 
@@ -324,6 +327,9 @@ extern const char kIdentityDiscAccountMenuDescription[];
 extern const char kIdentityConfirmationSnackbarName[];
 extern const char kIdentityConfirmationSnackbarDescription[];
 
+extern const char kImportPasswordsFromSafariName[];
+extern const char kImportPasswordsFromSafariDescription[];
+
 extern const char kIndicateIdentityErrorInOverflowMenuName[];
 extern const char kIndicateIdentityErrorInOverflowMenuDescription[];
 
@@ -366,8 +372,9 @@ extern const char kIOSPasswordBottomSheetAutofocusDescription[];
 extern const char kIOSProactivePasswordGenerationBottomSheetName[];
 extern const char kIOSProactivePasswordGenerationBottomSheetDescription[];
 
-extern const char kIOSPromptSearchEngineChoiceAfterDeviceRestoreName[];
-extern const char kIOSPromptSearchEngineChoiceAfterDeviceRestoreDescription[];
+extern const char kInvalidateSearchEngineChoiceOnDeviceRestoreDetectionName[];
+extern const char
+    kInvalidateSearchEngineChoiceOnDeviceRestoreDetectionDescription[];
 
 extern const char kIOSQuickDeleteName[];
 extern const char kIOSQuickDeleteDescription[];
@@ -386,9 +393,6 @@ extern const char kIOSSaveToPhotosImprovementsDescription[];
 
 extern const char kIOSEnterpriseRealtimeUrlFilteringName[];
 extern const char kIOSEnterpriseRealtimeUrlFilteringDescription[];
-
-extern const char kNewFeedPositioningExperimentName[];
-extern const char kNewFeedPositioningExperimentDescription[];
 
 extern const char kNewShareExtensionName[];
 extern const char kNewShareExtensionDescription[];
@@ -685,6 +689,9 @@ extern const char kReaderModeDistillerDescription[];
 extern const char kReaderModeDistillerHeuristicName[];
 extern const char kReaderModeDistillerHeuristicDescription[];
 
+extern const char kReaderModeName[];
+extern const char kReaderModeDescription[];
+
 // Title and description for the flag to refactor the toolbarsSize.
 extern const char kRefactorToolbarsSizeName[];
 extern const char kRefactorToolbarsSizeDescription[];
@@ -771,6 +778,9 @@ extern const char kSignInButtonNoAvatarDescription[];
 extern const char kNTPBackgroundCustomizationName[];
 extern const char kNTPBackgroundCustomizationDescription[];
 
+extern const char kNtpAlphaBackgroundCollectionsName[];
+extern const char kNtpAlphaBackgroundCollectionsDescription[];
+
 extern const char kSpotlightNeverRetainIndexName[];
 extern const char kSpotlightNeverRetainIndexDescription[];
 
@@ -830,6 +840,9 @@ extern const char kTabResumptionImagesDescription[];
 
 extern const char kUpdatedFRESequenceName[];
 extern const char kUpdatedFRESequenceDescription[];
+
+extern const char kUseFeedEligibilityServiceName[];
+extern const char kUseFeedEligibilityServiceDescription[];
 
 extern const char kWaitThresholdMillisecondsForCapabilitiesApiName[];
 extern const char kWaitThresholdMillisecondsForCapabilitiesApiDescription[];

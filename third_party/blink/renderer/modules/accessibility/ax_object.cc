@@ -948,6 +948,23 @@ Node* AXObject::GetParentNodeForComputeParent(AXObjectCacheImpl& cache,
 
   Node* parent = nullptr;
 
+  // ::scroll-button and ::scroll-marker-group elements have a node parent that
+  // is the originating element. However, they are constructed as siblings of
+  // the originating element. This matches the layout relationship. So, for
+  // these specific elements, use the layout parent's node.
+  if ((node->IsScrollButtonPseudoElement() ||
+       node->IsScrollMarkerGroupPseudoElement()) &&
+      node->GetLayoutObject()) {
+    LayoutObject* parent_object = node->GetLayoutObject()->Parent();
+    // Find the nearest non-anonymous layout object ancestor.
+    while (parent_object && parent_object->IsAnonymous()) {
+      parent_object = parent_object->Parent();
+    }
+    if (parent_object) {
+      parent = parent_object->GetNode();
+    }
+  }
+
   // Use LayoutTreeBuilderTraversal::Parent(), which handles pseudo content.
   // This can return nullptr for a node that is never visited by
   // LayoutTreeBuilderTraversal's child traversal. For example, while an element
@@ -2589,6 +2606,10 @@ void AXObject::SerializeUnignoredAttributes(ui::AXNodeData* node_data,
       node_data->AddIntListAttribute(
           ax::mojom::blink::IntListAttribute::kControlsIds,
           {static_cast<int32_t>(listbox->AXObjectID())});
+    } else if (AXObject* scroller = GetControlsForOverflowNavigation()) {
+      node_data->AddIntListAttribute(
+          ax::mojom::blink::IntListAttribute::kControlsIds,
+          {static_cast<int32_t>(scroller->AXObjectID())});
     }
   }
 
@@ -2940,6 +2961,22 @@ AXObject* AXObject::GetControlsListboxForTextfieldCombobox() const {
   }
 
   return listbox_candidate;
+}
+
+AXObject* AXObject::GetControlsForOverflowNavigation() const {
+  if (!GetElement()) {
+    return nullptr;
+  }
+  if (!GetElement()->IsScrollButtonPseudoElement() &&
+      !GetElement()->IsScrollMarkerGroupPseudoElement()) {
+    return nullptr;
+  }
+
+  // The parent element of a ::scroll-button(*) or a ::scroll-marker-group
+  // is the originating scrolling container element which is scrolled
+  // (i.e. controlled) when you interact with these pseudo-element controls.
+  // https://www.w3.org/TR/css-overflow-5/#scroll-navigation
+  return AXObjectCache().Get(GetElement()->parentElement());
 }
 
 const AtomicString& AXObject::GetRoleStringForSerialization(
@@ -3952,7 +3989,7 @@ bool AXObject::ComputeIsInertViaStyle(const ComputedStyle* style,
       if (ignored_reasons) {
         if (!RuntimeEnabledFeatures::CSSInertEnabled()) {
           // With CSSInert disabled, the inert attribute causes the style to be
-          // IsInert. With CSSInert enabled, the inert attribute instead has
+          // IsHTMLInert. With CSSInert enabled, the inert attribute instead has
           // a UA style rule that sets the interactivity property, which
           // cascades along interactivity declarations from other sources, so it
           // does not make sense to look for InertRoot() separately. The
@@ -3969,8 +4006,7 @@ bool AXObject::ComputeIsInertViaStyle(const ComputedStyle* style,
             return true;
           }
         }
-        if (style->IsInert() &&
-            style->Interactivity() == EInteractivity::kAuto) {
+        if (style->IsHTMLInert()) {
           // HTML inertness is either forced by a modal dialog or a fullscreen
           // element (see AdjustStyleForInert).
           Document& document = GetNode()->GetDocument();

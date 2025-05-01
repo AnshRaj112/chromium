@@ -171,17 +171,30 @@ void RecordRecoveryKeyStoreURLFetchResponse(
 }
 
 void RecordTrustedVaultDownloadKeysStatus(
+    LocalRecoveryFactorType local_recovery_factor_type,
     SecurityDomainId security_domain_id,
     TrustedVaultDownloadKeysStatusForUMA status) {
   base::UmaHistogramEnumeration(
-      "TrustedVault.DownloadKeysStatus." +
-          GetSecurityDomainNameForUma(security_domain_id),
+      base::StrCat(
+          {"TrustedVault.DownloadKeysStatus.",
+           GetLocalRecoveryFactorNameForUma(local_recovery_factor_type), ".",
+           GetSecurityDomainNameForUma(security_domain_id)}),
       status);
 }
 
 void RecordTrustedVaultDownloadKeysStatus(
     TrustedVaultDownloadKeysStatusForUMA status) {
-  RecordTrustedVaultDownloadKeysStatus(SecurityDomainId::kChromeSync, status);
+  RecordTrustedVaultDownloadKeysStatus(LocalRecoveryFactorType::kPhysicalDevice,
+                                       SecurityDomainId::kChromeSync, status);
+}
+
+void RecordTrustedVaultRecoverKeysOutcome(
+    SecurityDomainId security_domain_id,
+    TrustedVaultRecoverKeysOutcomeForUMA status) {
+  base::UmaHistogramEnumeration(
+      base::StrCat({"TrustedVault.RecoverKeysOutcome.",
+                    GetSecurityDomainNameForUma(security_domain_id)}),
+      status);
 }
 
 void RecordTrustedVaultFileReadStatus(SecurityDomainId security_domain_id,
@@ -233,6 +246,10 @@ std::string GetLocalRecoveryFactorNameForUma(
   switch (local_recovery_factor_type) {
     case LocalRecoveryFactorType::kPhysicalDevice:
       return "PhysicalDevice";
+#if BUILDFLAG(IS_MAC)
+    case LocalRecoveryFactorType::kICloudKeychain:
+      return "ICloudKeychain";
+#endif
       // If adding a new value, also update the variants for
       // LocalRecoveryFactorType in
       // tools/metrics/histograms/metadata/trusted_vault/histograms.xml.

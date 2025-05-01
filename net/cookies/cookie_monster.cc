@@ -45,6 +45,7 @@
 #include "net/cookies/cookie_monster.h"
 
 #include <algorithm>
+#include <array>
 #include <functional>
 #include <list>
 #include <map>
@@ -320,7 +321,7 @@ typedef struct ChangeCausePair_struct {
   CookieChangeCause cause;
   bool notify;
 } ChangeCausePair;
-const ChangeCausePair kChangeCauseMapping[] = {
+constexpr auto kChangeCauseMapping = std::to_array<ChangeCausePair>({
     // DELETE_COOKIE_EXPLICIT
     {CookieChangeCause::EXPLICIT, true},
     // DELETE_COOKIE_OVERWRITE
@@ -352,7 +353,8 @@ const ChangeCausePair kChangeCauseMapping[] = {
     // DELETE_COOKIE_ALIAS
     {CookieChangeCause::EVICTED, false},
     // DELETE_COOKIE_LAST_ENTRY
-    {CookieChangeCause::EXPLICIT, false}};
+    {CookieChangeCause::EXPLICIT, false},
+});
 
 bool IsCookieEligibleForEviction(CookiePriority current_priority_level,
                                  bool protect_secure_cookies,
@@ -483,9 +485,7 @@ CookieMonster::CookieMonster(scoped_refptr<PersistentCookieStore> store,
       store_(std::move(store)),
       last_access_threshold_(last_access_threshold),
       last_statistic_record_time_(base::Time::Now()) {
-  cookieable_schemes_.insert(
-      cookieable_schemes_.begin(), kDefaultCookieableSchemes,
-      UNSAFE_TODO(kDefaultCookieableSchemes + kDefaultCookieableSchemesCount));
+  cookieable_schemes_ = GetDefaultCookieableSchemes();
   net_log_.BeginEvent(NetLogEventType::COOKIE_STORE_ALIVE, [&] {
     return NetLogCookieMonsterConstructorParams(store_ != nullptr);
   });
@@ -654,7 +654,7 @@ void CookieMonster::DeleteMatchingCookiesAsync(
 }
 
 void CookieMonster::SetCookieableSchemes(
-    const std::vector<std::string>& schemes,
+    std::vector<std::string> schemes,
     SetCookieableSchemesCallback callback) {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
 
@@ -665,7 +665,7 @@ void CookieMonster::SetCookieableSchemes(
     return;
   }
 
-  cookieable_schemes_ = schemes;
+  cookieable_schemes_ = std::move(schemes);
   MaybeRunCookieCallback(std::move(callback), true);
 }
 
@@ -679,10 +679,10 @@ void CookieMonster::SetPersistSessionCookies(bool persist_session_cookies) {
   persist_session_cookies_ = persist_session_cookies;
 }
 
-const char* const CookieMonster::kDefaultCookieableSchemes[] = {"http", "https",
-                                                                "ws", "wss"};
-const int CookieMonster::kDefaultCookieableSchemesCount =
-    std::size(kDefaultCookieableSchemes);
+// static
+std::vector<std::string> CookieMonster::GetDefaultCookieableSchemes() {
+  return std::vector<std::string>{"http", "https", "ws", "wss"};
+}
 
 CookieChangeDispatcher& CookieMonster::GetChangeDispatcher() {
   return change_dispatcher_;
@@ -1989,7 +1989,7 @@ void CookieMonster::InternalDeleteCookie(CookieMap::iterator it,
       << "InternalDeleteCookie()"
       << ", cause:" << deletion_cause << ", cc: " << cc->DebugString();
 
-  ChangeCausePair mapping = UNSAFE_TODO(kChangeCauseMapping[deletion_cause]);
+  ChangeCausePair mapping = kChangeCauseMapping[deletion_cause];
   if (deletion_cause != DELETE_COOKIE_DONT_RECORD) {
     net_log_.AddEvent(NetLogEventType::COOKIE_STORE_COOKIE_DELETED,
                       [&](NetLogCaptureMode capture_mode) {
@@ -2047,7 +2047,7 @@ void CookieMonster::InternalDeletePartitionedCookie(
       << "InternalDeletePartitionedCookie()"
       << ", cause:" << deletion_cause << ", cc: " << cc->DebugString();
 
-  ChangeCausePair mapping = UNSAFE_TODO(kChangeCauseMapping[deletion_cause]);
+  ChangeCausePair mapping = kChangeCauseMapping[deletion_cause];
   if (deletion_cause != DELETE_COOKIE_DONT_RECORD) {
     net_log_.AddEvent(NetLogEventType::COOKIE_STORE_COOKIE_DELETED,
                       [&](NetLogCaptureMode capture_mode) {

@@ -1209,6 +1209,14 @@ bool Browser::IsMinimized() const {
   return window_->IsMinimized();
 }
 
+bool Browser::IsVisibleOnScreen() const {
+  return window_->IsVisibleOnScreen();
+}
+
+bool Browser::IsVisible() const {
+  return window_->IsVisible();
+}
+
 base::WeakPtr<BrowserWindowInterface> Browser::GetWeakPtr() {
   return AsWeakPtr();
 }
@@ -1296,8 +1304,20 @@ Browser* Browser::GetBrowserForMigrationOnly() {
   return this;
 }
 
-bool Browser::IsTabModalPopup() const {
-  return is_tab_modal_popup_;
+void Browser::ActivateWindow() {
+  window_->Activate();
+}
+
+bool Browser::IsTabModalPopupDeprecated() const {
+  return is_tab_modal_popup_deprecated_;
+}
+
+bool Browser::CanShowCallToAction() const {
+  return !showing_call_to_action_;
+}
+
+std::unique_ptr<ScopedWindowCallToAction> Browser::ShowCallToAction() {
+  return std::make_unique<ScopedWindowCallToActionImpl>(this);
 }
 
 void Browser::DidBecomeActive() {
@@ -1328,6 +1348,15 @@ void Browser::SetLockedForOnTask(bool locked) {
 #endif
 
 void Browser::OnWindowClosing() {
+  // There may be situations where async tasks, such as
+  // UnloadController::ProcessPendingTabs, may call into OnWindowClosing() after
+  // deletion has already been scheduled and closed notifications have been
+  // propagated. No-op in such cases to avoid duplicating browser-closed
+  // handling.
+  if (is_delete_scheduled_) {
+    return;
+  }
+
   if (const auto closing_status = HandleBeforeClose();
       closing_status != BrowserClosingStatus::kPermitted) {
     BrowserList::NotifyBrowserCloseCancelled(this, closing_status);
@@ -2810,6 +2839,11 @@ void Browser::SetWebContentsBlocked(content::WebContents* web_contents,
     // Removal of tabs from the TabStripModel can cause observer callbacks to
     // invoke this method. The WebContents may no longer exist in the
     // TabStripModel.
+    // If the WebContents has a DevTools window,
+    // the call is meant for the DevTools area.
+    if (DevToolsWindow::AsDevToolsWindow(web_contents)) {
+      window_->SetDevToolsScrimVisibility(blocked);
+    }
     return;
   }
 
@@ -3835,4 +3869,15 @@ BackgroundContents* Browser::CreateBackgroundContents(
       std::string());  // No extra headers.
 
   return contents;
+}
+
+Browser::ScopedWindowCallToActionImpl::ScopedWindowCallToActionImpl(
+    Browser* browser)
+    : browser_(browser->weak_factory_.GetWeakPtr()) {
+  DCHECK(!browser_->showing_call_to_action_);
+  browser_->showing_call_to_action_ = true;
+}
+
+Browser::ScopedWindowCallToActionImpl::~ScopedWindowCallToActionImpl() {
+  browser_->showing_call_to_action_ = false;
 }

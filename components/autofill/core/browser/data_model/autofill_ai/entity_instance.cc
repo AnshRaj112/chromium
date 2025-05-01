@@ -245,7 +245,7 @@ EntityInstance::EntityInstance(
     base::Uuid guid,
     std::string nickname,
     base::Time date_modified,
-    int use_count,
+    size_t use_count,
     base::Time use_date)
     : type_(type),
       attributes_(std::move(attributes)),
@@ -442,6 +442,33 @@ EntityInstance::EntityMergeability EntityInstance::GetEntityMergeability(
   }
 
   return {std::move(mergeable_attributes), is_subset};
+}
+
+EntityInstance::RankingOrder::RankingOrder(base::Time now) : now_(now) {}
+
+bool EntityInstance::RankingOrder::operator()(const EntityInstance& lhs,
+                                              const EntityInstance& rhs) const {
+  // At days_since_last_use = 0, use_count = 0, the score is -1.
+  // As days_since_last_use increases, the score becomes more negative.
+  // As use_count increases, the score approaches 0.
+  auto get_ranking_score = [&](const EntityInstance& entity) {
+    int days_since_last_use = std::max(0, (now_ - entity.use_date()).InDays());
+    // The numerator punishes old usages, since as days_since_last_use
+    // grows, the score becomes smaller (note the negative sign). The
+    // denominator softens this penalty by making it smaller the more often a
+    // user has used an entity.
+    return -log(static_cast<double>(days_since_last_use) + 2) /
+           log(entity.use_count() + 2);
+  };
+
+  const double lhs_score = get_ranking_score(lhs);
+  const double rhs_score = get_ranking_score(rhs);
+
+  const double kEpsilon = 0.00001;
+  if (std::fabs(lhs_score - rhs_score) > kEpsilon) {
+    return lhs_score > rhs_score;
+  }
+  return lhs.use_date() > rhs.use_date();
 }
 
 }  // namespace autofill

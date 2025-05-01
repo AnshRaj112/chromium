@@ -9,7 +9,6 @@
 #include <sstream>
 
 #include "base/check_op.h"
-#include "base/containers/to_vector.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_forward.h"
 #include "base/notimplemented.h"
@@ -301,7 +300,7 @@ void AILanguageModel::InitializeContextWithInitialPrompts(
   context_ = std::make_unique<Context>(max_token, std::move(initial_prompts));
 
   // Begin processing the initial prompts immediately.
-  session_->SetInput(context_->MakeRequest(session_->GetCapabilities()));
+  session_->SetInput(context_->MakeRequest(session_->GetCapabilities()), {});
 
   std::move(callback).Run(TakePendingRemote(), GetLanguageModelInstanceInfo());
 }
@@ -357,7 +356,7 @@ void AILanguageModel::ModelExecutionCallback(
 void AILanguageModel::PromptGetInputSizeCompletion(
     mojo::RemoteSetElementId responder_id,
     Context::ContextItem current_item,
-    const std::optional<std::string>& response_json_schema,
+    on_device_model::mojom::ResponseConstraintPtr constraint,
     std::optional<uint32_t> result) {
   if (!session_) {
     // If the session is destroyed before this callback is invoked, we should
@@ -396,9 +395,9 @@ void AILanguageModel::PromptGetInputSizeCompletion(
       session_->GetCapabilities();
   MultimodalMessage request = context_->MakeRequest(capabilities);
   AddCurrentRequest(request, current_item, capabilities);
-  session_->SetInput(std::move(request));
-  session_->ExecuteModelWithResponseJsonSchema(
-      PromptApiRequest(), response_json_schema,
+  session_->SetInput(std::move(request), {});
+  session_->ExecuteModelWithResponseConstraint(
+      PromptApiRequest(), std::move(constraint),
       base::BindRepeating(&AILanguageModel::ModelExecutionCallback,
                           weak_ptr_factory_.GetWeakPtr(),
                           std::move(current_item), responder_id));
@@ -406,7 +405,7 @@ void AILanguageModel::PromptGetInputSizeCompletion(
 
 void AILanguageModel::Prompt(
     std::vector<blink::mojom::AILanguageModelPromptPtr> prompts,
-    const std::optional<std::string>& response_json_schema,
+    on_device_model::mojom::ResponseConstraintPtr constraint,
     mojo::PendingRemote<blink::mojom::ModelStreamingResponder>
         pending_responder) {
   if (!session_) {
@@ -431,7 +430,7 @@ void AILanguageModel::Prompt(
       request.read(),
       base::BindOnce(&AILanguageModel::PromptGetInputSizeCompletion,
                      weak_ptr_factory_.GetWeakPtr(), responder_id,
-                     std::move(item), response_json_schema));
+                     std::move(item), std::move(constraint)));
 }
 
 void AILanguageModel::Fork(
@@ -490,7 +489,7 @@ AILanguageModel::GetLanguageModelInstanceInfo() {
       context_->max_tokens(), context_->current_tokens(),
       blink::mojom::AILanguageModelSamplingParams::New(
           session_sampling_params.top_k, session_sampling_params.temperature),
-      base::ToVector(input_types));
+      std::move(input_types).extract());
 }
 
 void AILanguageModel::MeasureInputUsage(

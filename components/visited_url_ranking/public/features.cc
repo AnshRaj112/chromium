@@ -93,7 +93,7 @@ constexpr base::FeatureParam<std::string>
     kVisitedURLRankingDeduplicationExcludedPrefixes{
         &kVisitedURLRankingDeduplication,
         /*name=*/"url_deduplication_excluded_prefixes",
-        /*default_value=*/"www."};
+        /*default_value=*/"www.; login.corp.; myaccount.; accounts.;"};
 
 BASE_FEATURE(kVisitedURLRankingDecorations,
              "VisitedURLRankingDecorations",
@@ -175,5 +175,10 @@ constexpr base::FeatureParam<bool> kGroupSuggestionEnableTabSwitcherOnly{
     &kGroupSuggestionService,
     /*name=*/"group_suggestion_enable_tab_switcher_only",
     /*default_value=*/false};
+
+constexpr base::FeatureParam<bool> kGroupSuggestionTriggerCalculationOnPageLoad{
+    &kGroupSuggestionService,
+    /*name=*/"group_suggestion_trigger_calculation_on_page_load",
+    /*default_value=*/true};
 
 }  // namespace visited_url_ranking::features

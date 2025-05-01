@@ -12,6 +12,7 @@
 @protocol AutocompleteSuggestion;
 @class OmniboxAutocompleteController;
 class OmniboxController;
+@protocol OmniboxFocusDelegate;
 @protocol OmniboxTextControllerDelegate;
 @class OmniboxTextFieldIOS;
 class OmniboxViewIOS;
@@ -21,6 +22,9 @@ class OmniboxViewIOS;
 
 /// Delegate of the omnibox text controller.
 @property(nonatomic, weak) id<OmniboxTextControllerDelegate> delegate;
+
+/// Omnibox focus delegate.
+@property(nonatomic, weak) id<OmniboxFocusDelegate> focusDelegate;
 
 /// Controller of autocomplete.
 @property(nonatomic, weak)
@@ -32,6 +36,7 @@ class OmniboxViewIOS;
 /// Temporary initializer, used during the refactoring. crbug.com/390409559
 - (instancetype)initWithOmniboxController:(OmniboxController*)omniboxController
                            omniboxViewIOS:(OmniboxViewIOS*)omniboxViewIOS
+                            inLensOverlay:(BOOL)inLensOverlay
     NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;
 
@@ -111,6 +116,33 @@ class OmniboxViewIOS;
 /// Sets the currently previewed autocomplete suggestion.
 - (void)previewSuggestion:(id<AutocompleteSuggestion>)suggestion
             isFirstUpdate:(BOOL)isFirstUpdate;
+
+/// Notifies of scroll event.
+- (void)onScroll;
+
+/// Hides the keyboard.
+- (void)hideKeyboard;
+
+/// Refines omnibox content with `text`.
+- (void)refineWithText:(const std::u16string&)text;
+
+#pragma mark - Private event
+// Events that are private. Removed from header after refactoring
+// (crbug.com/390409559). Since these methods should be private, comments are in
+// the implementation file.
+
+- (void)setCaretPos:(NSUInteger)caretPos;
+
+- (void)startAutocompleteAfterEdit;
+
+- (void)setWindowText:(const std::u16string&)text
+             caretPos:(size_t)caretPos
+    startAutocomplete:(BOOL)startAutocomplete
+    notifyTextChanged:(BOOL)notifyTextChanged;
+
+- (void)updateAutocompleteIfTextChanged:(const std::u16string&)userText
+                         autocompletion:
+                             (const std::u16string&)inlineAutocomplete;
 
 @end
 

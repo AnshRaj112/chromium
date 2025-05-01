@@ -58,6 +58,7 @@ import org.chromium.components.data_sharing.configs.DataSharingPreviewDetailsCon
 import org.chromium.components.data_sharing.configs.DataSharingRuntimeDataConfig;
 import org.chromium.components.data_sharing.configs.DataSharingStringConfig;
 import org.chromium.components.data_sharing.configs.DataSharingUiConfig;
+import org.chromium.components.data_sharing.configs.DataSharingUiConfig.DataSharingUserAction;
 import org.chromium.components.tab_group_sync.LocalTabGroupId;
 import org.chromium.components.tab_group_sync.SavedTabGroup;
 import org.chromium.components.tab_group_sync.SavedTabGroupTab;
@@ -436,18 +437,10 @@ public class DataSharingTabManager {
     /**
      * Switch the view to a currently opened tab group.
      *
-     * @param tabId The tab id of the first tab in the group.
+     * @param group The copy of the sync group. May not be part of the current tab model.
      */
     void switchToTabGroup(SavedTabGroup group) {
-        TabGroupModelFilter filter =
-                mTabModelSelectorSupplier
-                        .get()
-                        .getTabGroupModelFilterProvider()
-                        .getTabGroupModelFilter(false);
-        assumeNonNull(filter);
-        int rootId = filter.getRootIdFromTabGroupId(assumeNonNull(group.localId).tabGroupId);
-        assert rootId != Tab.INVALID_TAB_ID;
-        mDataSharingTabGroupsDelegate.openTabGroupWithTabId(rootId);
+        mDataSharingTabGroupsDelegate.openTabGroup(assumeNonNull(group.localId).tabGroupId);
     }
 
     /**
@@ -574,7 +567,7 @@ public class DataSharingTabManager {
      */
     public @Nullable String showShareDialog(
             Activity activity,
-            String tabGroupDisplayName,
+            @Nullable String tabGroupDisplayName,
             SavedTabGroup existingGroup,
             DataSharingCreateUiConfig.CreateCallback createCallback) {
         assumeNonNull(mDataSharingService);
@@ -842,6 +835,12 @@ public class DataSharingTabManager {
                     public void onClickOpenChromeCustomTab(Context context, GURL url) {
                         mDataSharingTabGroupsDelegate.openUrlInChromeCustomTab(context, url);
                     }
+
+                    @Override
+                    public void recordUserActionClicks(
+                            @DataSharingUserAction int dataSharingUserAction) {
+                        DataSharingMetrics.recordUserActionClicks(dataSharingUserAction);
+                    }
                 };
         DataSharingUiConfig.Builder commonConfig =
                 new DataSharingUiConfig.Builder()
@@ -894,15 +893,24 @@ public class DataSharingTabManager {
                         collaborationId,
                         assumeNonNull(existingGroup.syncId),
                         manageSharingCallback);
+
+        Runnable showFullActivityRunnable =
+                () -> {
+                    mDataSharingTabGroupsDelegate.openUrlInChromeCustomTab(
+                            activity, new GURL(ACTIVITY_LOGS_URL));
+                };
         RecentActivityListCoordinator recentActivityListCoordinator =
                 new RecentActivityListCoordinator(
+                        collaborationId,
                         activity,
                         mBottomSheetControllerSupplier.get(),
                         mMessagingBackendService,
+                        tabGroupSyncService,
                         new DataSharingFaviconProvider(activity, mProfile, mBulkFaviconUtil),
                         avatarProvider,
-                        recentActivityActionHandler);
-        recentActivityListCoordinator.requestShowUI(collaborationId);
+                        recentActivityActionHandler,
+                        showFullActivityRunnable);
+        recentActivityListCoordinator.requestShowUI();
     }
 
     /**

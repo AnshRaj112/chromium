@@ -9,7 +9,7 @@
 
 #include "base/auto_reset.h"
 #include "base/check_is_test.h"
-#include "base/containers/to_vector.h"
+#include "base/containers/flat_set.h"
 #include "base/files/file_path.h"
 #include "base/notreached.h"
 #include "base/uuid.h"
@@ -302,7 +302,8 @@ void BookmarkMergedSurfaceService::Move(const bookmarks::BookmarkNode* node,
   // like to move their bookmark to a different storage.
   CHECK(browser);
   ShowBookmarkAccountStorageMoveDialog(
-      browser, node, new_parent.as_non_permanent_folder(), index);
+      browser, node, new_parent.as_non_permanent_folder(), index,
+      BookmarkAccountStorageMoveDialogType::kDownloadOrUpload);
 }
 
 void BookmarkMergedSurfaceService::LoadForTesting(
@@ -543,9 +544,10 @@ void BookmarkMergedSurfaceService::BookmarkNodeRemoved(
     BookmarkParentFolder parent_folder =
         BookmarkParentFolder::FromFolderNode(node);
     base::flat_set<const BookmarkNode*> removed_nodes =
-        base::MakeFlatSet<const BookmarkNode*>(base::ToVector(
+        base::MakeFlatSet<const BookmarkNode*>(
             node->children(),
-            [](const auto& bookmark_node) { return bookmark_node.get(); }));
+            /*comp=*/{},
+            [](const auto& bookmark_node) { return bookmark_node.get(); });
     for (auto& observer : observers_) {
       observer.BookmarkNodesRemoved(parent_folder, removed_nodes);
     }

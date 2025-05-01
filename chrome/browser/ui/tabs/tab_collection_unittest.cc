@@ -47,10 +47,12 @@ class TabCollectionBaseTest : public ::testing::Test {
 
   TabStripModel* GetTabStripModel() { return tab_strip_model_.get(); }
 
-  tabs::TabModel* GetTabInCollectionStorage(tabs::TabCollectionStorage* storage,
-                                            size_t index) {
+  tabs::TabInterface* GetTabInCollectionStorage(
+      tabs::TabCollectionStorage* storage,
+      size_t index) {
     const auto& child = storage->GetChildren().at(index);
-    const auto tab_ptr = std::get_if<std::unique_ptr<tabs::TabModel>>(&child);
+    const auto tab_ptr =
+        std::get_if<std::unique_ptr<tabs::TabInterface>>(&child);
     return tab_ptr ? tab_ptr->get() : nullptr;
   }
 
@@ -69,8 +71,8 @@ class TabCollectionBaseTest : public ::testing::Test {
   }
 
   // Adds a tab to the end of a collection.
-  tabs::TabModel* AppendTab(tabs::TabCollection* collection,
-                            std::unique_ptr<tabs::TabModel> tab) {
+  tabs::TabInterface* AppendTab(tabs::TabCollection* collection,
+                                std::unique_ptr<tabs::TabInterface> tab) {
     return collection->AddTab(std::move(tab), collection->ChildCount());
   }
 
@@ -205,13 +207,13 @@ TEST_F(PinnedTabCollectionTest, RemoveOperation) {
   tab_model_one_ptr->set_will_be_detaching_for_testing(true);
 
   // Remove `tab_model_one` from the collection.
-  auto removed_tab_model =
+  auto removed_tab =
       pinned_collection_instance->MaybeRemoveTab(tab_model_one_ptr);
-  EXPECT_FALSE(removed_tab_model->IsPinned());
-  EXPECT_FALSE(removed_tab_model->GetParentCollectionForTesting());
+  EXPECT_EQ(tab_model_one_ptr, removed_tab.get());
+  EXPECT_FALSE(tab_model_one_ptr->IsPinned());
+  EXPECT_FALSE(tab_model_one_ptr->GetParentCollectionForTesting());
 
   EXPECT_EQ(pinned_collection_instance->ChildCount(), 4ul);
-  EXPECT_EQ(removed_tab_model.get(), tab_model_one_ptr);
 }
 
 TEST_F(PinnedTabCollectionTest, CollectionOperations) {
@@ -224,8 +226,8 @@ TEST_F(PinnedTabCollectionTest, CollectionOperations) {
   std::unique_ptr<tabs::TabCollection> collection =
       std::make_unique<tabs::SplitTabCollection>(
           split_tabs::SplitTabId::GenerateNew(),
-          split_tabs::SplitTabVisualData(
-              split_tabs::SplitTabLayout::kHorizontal, 0.5));
+          split_tabs::SplitTabVisualData(split_tabs::SplitTabLayout::kVertical,
+                                         0.5));
   tabs::TabCollection* collection_ptr = collection.get();
   EXPECT_EQ(pinned_collection_instance->GetIndexOfCollection(collection_ptr),
             std::nullopt);
@@ -316,12 +318,11 @@ TEST_F(TabGroupTabCollectionTest, RemoveOperation) {
   tab_model_one_ptr->set_will_be_detaching_for_testing(true);
 
   // Remove `tab_model_one` from the collection.
-  auto removed_tab_model =
-      grouped_collection->MaybeRemoveTab(tab_model_one_ptr);
-  EXPECT_FALSE(removed_tab_model->group().has_value());
-  EXPECT_FALSE(removed_tab_model->GetParentCollectionForTesting());
+  auto removed_tab = grouped_collection->MaybeRemoveTab(tab_model_one_ptr);
+  EXPECT_EQ(tab_model_one_ptr, removed_tab.get());
+  EXPECT_FALSE(tab_model_one_ptr->group().has_value());
+  EXPECT_FALSE(tab_model_one_ptr->GetParentCollectionForTesting());
   EXPECT_EQ(grouped_collection->ChildCount(), 4ul);
-  EXPECT_EQ(removed_tab_model.get(), tab_model_one_ptr);
 }
 
 class SplitTabCollectionTest : public TabCollectionBaseTest {
@@ -329,7 +330,7 @@ class SplitTabCollectionTest : public TabCollectionBaseTest {
   SplitTabCollectionTest() {
     split_collection_ = std::make_unique<tabs::SplitTabCollection>(
         split_tabs::SplitTabId::GenerateNew(),
-        split_tabs::SplitTabVisualData(split_tabs::SplitTabLayout::kHorizontal,
+        split_tabs::SplitTabVisualData(split_tabs::SplitTabLayout::kVertical,
                                        0.5));
   }
   SplitTabCollectionTest(const SplitTabCollectionTest&) = delete;
@@ -407,11 +408,11 @@ TEST_F(SplitTabCollectionTest, RemoveOperation) {
   tab_model_one_ptr->set_will_be_detaching_for_testing(true);
 
   // Remove `tab_model_one` from the collection.
-  auto removed_tab_model = split_collection->MaybeRemoveTab(tab_model_one_ptr);
-  EXPECT_FALSE(removed_tab_model->GetSplit().has_value());
-  EXPECT_FALSE(removed_tab_model->GetParentCollectionForTesting());
+  auto removed_tab = split_collection->MaybeRemoveTab(tab_model_one_ptr);
+  EXPECT_EQ(tab_model_one_ptr, removed_tab.get());
+  EXPECT_FALSE(tab_model_one_ptr->GetSplit().has_value());
+  EXPECT_FALSE(tab_model_one_ptr->GetParentCollectionForTesting());
   EXPECT_EQ(split_collection->ChildCount(), 3ul);
-  EXPECT_EQ(removed_tab_model.get(), tab_model_one_ptr);
 }
 
 class UnpinnedTabCollectionTest : public TabCollectionBaseTest {
@@ -526,7 +527,7 @@ TEST_F(UnpinnedTabCollectionTest, RemoveOperation) {
 
   // Remove the tab
   tab_model_one_ptr->set_will_be_detaching_for_testing(true);
-  std::unique_ptr<tabs::TabModel> removed_tab =
+  std::unique_ptr<tabs::TabInterface> removed_tab =
       unpinned_collection->MaybeRemoveTab(tab_model_one_ptr);
   EXPECT_EQ(removed_tab.get(), tab_model_one_ptr);
   EXPECT_EQ(unpinned_collection->ChildCount(), 6ul);
@@ -698,14 +699,14 @@ TEST_F(TabStripCollectionTest, SplitOperations) {
               unpinned_collection->GetTabCollectionStorageForTesting(), 2));
 
   auto createSplitAtIndices = [tab_strip_collection](std::vector<int> indices) {
-    std::vector<tabs::TabModel*> tabs;
+    std::vector<tabs::TabInterface*> tabs;
     for (int i : indices) {
       tabs.push_back(tab_strip_collection->GetTabAtIndexRecursive(i));
     }
     split_tabs::SplitTabId split_id = split_tabs::SplitTabId::GenerateNew();
     tab_strip_collection->CreateSplit(
         split_id, tabs,
-        split_tabs::SplitTabVisualData(split_tabs::SplitTabLayout::kHorizontal,
+        split_tabs::SplitTabVisualData(split_tabs::SplitTabLayout::kVertical,
                                        0.5));
     return std::tuple{
         tabs, tab_strip_collection->GetSplitTabCollection(split_id), split_id};
@@ -909,7 +910,7 @@ TEST_F(TabStripCollectionTest, RecursiveRemoveTabAtIndex) {
               unpinned_collection->GetTabCollectionStorageForTesting(), 2ul));
 
   // Remove a pinned tab.
-  tabs::TabModel* tab_to_check =
+  tabs::TabInterface* tab_to_check =
       tab_strip_collection->GetTabAtIndexRecursive(2ul);
   EXPECT_EQ(tab_to_check,
             tab_strip_collection->RemoveTabAtIndexRecursive(2).get());
@@ -1043,7 +1044,7 @@ TEST_F(TabStripCollectionTest, UpdateProperties) {
           std::make_unique<tabs::SplitTabCollection>(
               split_tabs::SplitTabId::GenerateNew(),
               split_tabs::SplitTabVisualData(
-                  split_tabs::SplitTabLayout::kHorizontal, 0.5)),
+                  split_tabs::SplitTabLayout::kVertical, 0.5)),
           unpinned_collection->ChildCount());
   AppendTab(split_collection, std::make_unique<tabs::TabModel>(
                                   MakeWebContents(), GetTabStripModel()));

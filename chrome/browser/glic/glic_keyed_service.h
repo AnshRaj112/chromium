@@ -76,8 +76,6 @@ class GlicKeyedService : public KeyedService {
   // manager.
   void CloseUI();
 
-  void FocusUI();
-
   // The user has performed an action suggesting that they made open the UI
   // soon.
   void PrepareForOpen();
@@ -195,6 +193,8 @@ class GlicKeyedService : public KeyedService {
       const std::vector<uint8_t>& action_proto,
       const mojom::GetTabContextOptions& options,
       mojom::WebClientHandler::ActInFocusedTabCallback callback);
+
+  void StopActorTask();
 
   void CaptureScreenshot(
       glic::mojom::WebClientHandler::CaptureScreenshotCallback callback);

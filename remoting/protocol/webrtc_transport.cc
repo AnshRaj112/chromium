@@ -44,7 +44,7 @@
 #include "third_party/webrtc/api/peer_connection_interface.h"
 #include "third_party/webrtc/api/rtc_event_log/rtc_event_log_factory.h"
 #include "third_party/webrtc/api/video_codecs/builtin_video_decoder_factory.h"
-#include "third_party/webrtc_overrides/task_queue_factory.h"
+#include "third_party/webrtc_overrides/environment.h"
 
 #if !defined(NDEBUG)
 #include "base/command_line.h"
@@ -284,7 +284,7 @@ class WebrtcTransport::PeerConnectionWrapper
     pcf_deps.network_thread = worker_thread;
     pcf_deps.worker_thread = worker_thread;
     pcf_deps.signaling_thread = webrtc::Thread::Current();
-    pcf_deps.task_queue_factory = CreateWebRtcTaskQueueFactory();
+    pcf_deps.env = WebRtcEnvironment();
     pcf_deps.event_log_factory = std::make_unique<webrtc::RtcEventLogFactory>();
     pcf_deps.adm = audio_module_;
     pcf_deps.audio_encoder_factory =
@@ -763,10 +763,6 @@ void WebrtcTransport::Close(ErrorCode error,
 void WebrtcTransport::ApplySessionOptions(const SessionOptions& options) {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
   session_options_ = options;
-  std::optional<std::string> video_codec = options.Get("Video-Codec");
-  if (video_codec) {
-    preferred_video_codec_ = *video_codec;
-  }
 }
 
 void WebrtcTransport::OnAudioTransceiverCreated(
@@ -807,11 +803,6 @@ void WebrtcTransport::OnLocalSessionDescriptionCreated(
 
   SdpMessage sdp_message(description_sdp);
   UpdateCodecParameters(&sdp_message, /*incoming=*/false);
-  if (preferred_video_codec_.empty()) {
-    sdp_message.PreferVideoCodec("VP8");
-  } else {
-    sdp_message.PreferVideoCodec(preferred_video_codec_);
-  }
   description_sdp = sdp_message.ToString();
   webrtc::SdpParseError parse_error;
   description = webrtc::CreateSessionDescription(description->GetType(),

@@ -34,6 +34,7 @@ import org.chromium.chrome.browser.bookmarks.BookmarkUtils;
 import org.chromium.chrome.browser.contextmenu.ChromeContextMenuItem.Item;
 import org.chromium.chrome.browser.contextmenu.ContextMenuCoordinator.ListItemType;
 import org.chromium.chrome.browser.download.DownloadUtils;
+import org.chromium.chrome.browser.enterprise.util.DataProtectionBridge;
 import org.chromium.chrome.browser.ephemeraltab.EphemeralTabCoordinator;
 import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
 import org.chromium.chrome.browser.firstrun.FirstRunStatus;
@@ -626,9 +627,11 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
             copyImageToClipboard();
         } else if (itemId == R.id.contextmenu_copy_link_address) {
             recordContextMenuSelection(ContextMenuUma.Action.COPY_LINK_ADDRESS);
-            mItemDelegate.onSaveToClipboard(
-                    mParams.getUnfilteredLinkUrl().getSpec(),
-                    TabContextMenuItemDelegate.ClipboardType.LINK_URL);
+            copyLinkUrlIfAllowedByPolicy(
+                    () ->
+                            mItemDelegate.onSaveToClipboard(
+                                    mParams.getUnfilteredLinkUrl().getSpec(),
+                                    TabContextMenuItemDelegate.ClipboardType.LINK_URL));
         } else if (itemId == R.id.contextmenu_call) {
             recordContextMenuSelection(ContextMenuUma.Action.CALL);
             mItemDelegate.onCall(mParams.getLinkUrl());
@@ -646,19 +649,29 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
         } else if (itemId == R.id.contextmenu_copy) {
             if (MailTo.isMailTo(mParams.getLinkUrl().getSpec())) {
                 recordContextMenuSelection(ContextMenuUma.Action.COPY_EMAIL_ADDRESS);
-                mItemDelegate.onSaveToClipboard(
+                copyLinkTextIfAllowedByPolicy(
                         MailTo.parse(mParams.getLinkUrl().getSpec()).getTo(),
-                        TabContextMenuItemDelegate.ClipboardType.LINK_URL);
+                        () ->
+                                mItemDelegate.onSaveToClipboard(
+                                        MailTo.parse(mParams.getLinkUrl().getSpec()).getTo(),
+                                        TabContextMenuItemDelegate.ClipboardType.LINK_URL));
             } else if (UrlUtilities.isTelScheme(mParams.getLinkUrl())) {
                 recordContextMenuSelection(ContextMenuUma.Action.COPY_PHONE_NUMBER);
-                mItemDelegate.onSaveToClipboard(
+                copyLinkTextIfAllowedByPolicy(
                         UrlUtilities.getTelNumber(mParams.getLinkUrl()),
-                        TabContextMenuItemDelegate.ClipboardType.LINK_URL);
+                        () ->
+                                mItemDelegate.onSaveToClipboard(
+                                        UrlUtilities.getTelNumber(mParams.getLinkUrl()),
+                                        TabContextMenuItemDelegate.ClipboardType.LINK_URL));
             }
         } else if (itemId == R.id.contextmenu_copy_link_text) {
             recordContextMenuSelection(ContextMenuUma.Action.COPY_LINK_TEXT);
-            mItemDelegate.onSaveToClipboard(
-                    mParams.getLinkText(), TabContextMenuItemDelegate.ClipboardType.LINK_TEXT);
+            copyLinkTextIfAllowedByPolicy(
+                    mParams.getLinkText(),
+                    () ->
+                            mItemDelegate.onSaveToClipboard(
+                                    mParams.getLinkText(),
+                                    TabContextMenuItemDelegate.ClipboardType.LINK_TEXT));
         } else if (itemId == R.id.contextmenu_save_image) {
             recordContextMenuSelection(ContextMenuUma.Action.SAVE_IMAGE);
             if (mIsDownloadRestrictedByPolicy) {
@@ -822,6 +835,24 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
         return mItemDelegate.getWebContents().getTopLevelNativeWindow();
     }
 
+    private void copyLinkUrlIfAllowedByPolicy(Runnable copyIfAllowedRunnable) {
+        DataProtectionBridge.verifyCopyUrlIsAllowedByPolicy(
+                mParams.getUnfilteredLinkUrl().getSpec(),
+                mItemDelegate.getWebContents().getMainFrame(),
+                (isAllowed) -> {
+                    if (isAllowed) copyIfAllowedRunnable.run();
+                });
+    }
+
+    private void copyLinkTextIfAllowedByPolicy(String text, Runnable copyIfAllowedRunnable) {
+        DataProtectionBridge.verifyCopyTextIsAllowedByPolicy(
+                text,
+                mItemDelegate.getWebContents().getMainFrame(),
+                (isAllowed) -> {
+                    if (isAllowed) copyIfAllowedRunnable.run();
+                });
+    }
+
     private void shareHighlighting() {
         ShareParams linkShareParams =
                 new ShareParams.Builder(
@@ -845,7 +876,14 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
     /** Copy the image, that triggered the current context menu, to system clipboard. */
     private void copyImageToClipboard() {
         mNativeDelegate.retrieveImageForShare(
-                ContextMenuImageFormat.ORIGINAL, mItemDelegate::onSaveImageToClipboard);
+                ContextMenuImageFormat.ORIGINAL,
+                (Uri uri) ->
+                        DataProtectionBridge.verifyCopyImageIsAllowedByPolicy(
+                                uri.getPath(),
+                                mItemDelegate.getWebContents().getMainFrame(),
+                                (isAllowed) -> {
+                                    if (isAllowed) mItemDelegate.onSaveImageToClipboard(uri);
+                                }));
     }
 
     /**

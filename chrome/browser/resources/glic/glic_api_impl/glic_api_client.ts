@@ -224,31 +224,27 @@ class GlicBrowserHostImpl implements GlicBrowserHost {
     this.fitWindow = state.fitWindow;
 
     if (!state.enableScrollTo) {
-      (this as GlicBrowserHost).scrollTo = undefined;
+      this.scrollTo = undefined;
     }
 
     if (!state.enableActInFocusedTab) {
-      (this as GlicBrowserHost).actInFocusedTab = undefined;
+      this.actInFocusedTab = undefined;
+      this.stopActorTask = undefined;
     }
 
     if (!state.enableDragToResizePanel) {
-      (this as GlicBrowserHost).enableDragResize = undefined;
-    }
-
-    if (!state.openOsSettingsApiIsAllowed) {
-      (this as GlicBrowserHost).openOsPermissionSettingsMenu = undefined;
+      this.enableDragResize = undefined;
     }
 
     if (state.alwaysDetachedMode) {
-      (this as GlicBrowserHost).attachPanel = undefined;
-      (this as GlicBrowserHost).detachPanel = undefined;
-      (this as GlicBrowserHost).canAttachPanel = undefined;
-      (this as GlicBrowserHost).getPanelState = undefined;
+      this.attachPanel = undefined;
+      this.detachPanel = undefined;
+      this.canAttachPanel = undefined;
+      this.getPanelState = undefined;
     }
 
     if (!state.enableZeroStateSuggestions) {
-      (this as GlicBrowserHost).getZeroStateSuggestionsForFocusedTab =
-          undefined;
+      this.getZeroStateSuggestionsForFocusedTab = undefined;
     }
   }
 
@@ -331,6 +327,10 @@ class GlicBrowserHostImpl implements GlicBrowserHost {
         'glicBrowserActInFocusedTab', {actInFocusedTabParams});
     return convertActInFocusedTabResultFromPrivate(
         context.actInFocusedTabResult);
+  }
+
+  stopActorTask?(): void {
+    this.sender.requestNoResponse('glicBrowserStopActorTask', undefined);
   }
 
   async resizeWindow(

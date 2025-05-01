@@ -5,6 +5,7 @@
 #include "chrome/browser/ui/views/commerce/price_insights_page_action_view_controller.h"
 
 #include "chrome/browser/ui/actions/chrome_action_id.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/commerce/commerce_ui_tab_helper.h"
 #include "chrome/browser/ui/tabs/public/tab_features.h"
 #include "chrome/browser/ui/views/commerce/price_insights_icon_view.h"
@@ -36,6 +37,7 @@ void PriceInsightsPageActionViewController::UpdatePageActionIcon() {
     // cleared.
     page_action_controller->HideSuggestionChip(kActionCommercePriceInsights);
     page_action_controller->Hide(kActionCommercePriceInsights);
+    scoped_window_call_to_action_ptr_.reset();
     return;
   }
 
@@ -45,6 +47,13 @@ void PriceInsightsPageActionViewController::UpdatePageActionIcon() {
           PageActionIconType::kPriceInsights)) {
     return;
   }
+
+  if (!tab_interface_->GetBrowserWindowInterface()->CanShowCallToAction()) {
+    return;
+  }
+
+  scoped_window_call_to_action_ptr_ =
+      tab_interface_->GetBrowserWindowInterface()->ShowCallToAction();
 
   PriceInsightsIconLabelType label_type =
       tab_helper->GetPriceInsightsIconLabelTypeForPage();

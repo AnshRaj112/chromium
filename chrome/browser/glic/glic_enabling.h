@@ -9,6 +9,7 @@
 #include "base/functional/callback.h"
 #include "base/scoped_observation.h"
 #include "base/types/expected.h"
+#include "chrome/browser/glic/glic_user_status_fetcher.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 
@@ -77,6 +78,9 @@ class GlicEnabling : public signin::IdentityManager::Observer {
   // Same as IsReadyForProfile, but returns a more detailed state.
   static mojom::ProfileReadyState GetProfileReadyState(Profile* profile);
 
+  // Whether the profile is in the glic tiered rollout population.
+  static bool IsEligibleForGlicTieredRollout(Profile* profile);
+
   // The settings page is shown when:
   // * Flags are enabled
   // * The profile is eligible (regular, non-incognito, non-guest, etc.)
@@ -109,6 +113,10 @@ class GlicEnabling : public signin::IdentityManager::Observer {
   // otherwise.
   bool HasConsented();
 
+  void SetGlicUserStatusUrlForTest(const GURL& test_url) {
+    glic_user_status_fetcher_->SetGlicUserStatusUrlForTest(test_url);
+  }
+
   // This is called anytime IsAllowed() might return a different value.
   using EnableChangedCallback = base::RepeatingClosure;
   base::CallbackListSubscription RegisterAllowedChanged(
@@ -135,6 +143,8 @@ class GlicEnabling : public signin::IdentityManager::Observer {
   void OnExtendedAccountInfoUpdated(const AccountInfo& info) override;
   void OnExtendedAccountInfoRemoved(const AccountInfo& info) override;
   void OnRefreshTokensLoaded() override;
+  void OnRefreshTokenUpdatedForAccount(
+      const CoreAccountInfo& account_info) override;
   void OnRefreshTokenRemovedForAccount(
       const CoreAccountId& account_id) override;
 
@@ -148,8 +158,13 @@ class GlicEnabling : public signin::IdentityManager::Observer {
       signin_metrics::SourceForRefreshTokenOperation token_operation_source)
       override;
 
+  void OnIdentityManagerShutdown(
+      signin::IdentityManager* identity_manager) override;
+
   void UpdateEnabledStatus();
   void UpdateConsentStatus();
+
+  void UpdateUserStatus(const signin::PrimaryAccountChangeEvent& event_details);
 
   raw_ptr<Profile> profile_;
   raw_ptr<ProfileAttributesStorage> profile_attributes_storage_;
@@ -162,6 +177,7 @@ class GlicEnabling : public signin::IdentityManager::Observer {
   OnShowSettingsPageChangeCallbackList
       show_settings_page_changed_callback_list_;
   PrefChangeRegistrar pref_registrar_;
+  std::unique_ptr<GlicUserStatusFetcher> glic_user_status_fetcher_;
   base::ScopedObservation<signin::IdentityManager,
                           signin::IdentityManager::Observer>
       identity_manager_observation_{this};

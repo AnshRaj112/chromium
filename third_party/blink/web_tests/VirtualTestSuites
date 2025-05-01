@@ -629,6 +629,15 @@
     "args": ["--isolated-context-origins=https://web-platform.test"],
     "expires": "never"
   },
+  {
+    "prefix": "inspector-protocol-direct-sockets",
+    "owners": ["vkrot@google.com"],
+    "platforms": ["Linux"],
+    "bases": ["http/tests/inspector-protocol/network/direct-sockets"],
+    "exclusive_tests": "ALL",
+    "args": ["--isolated-context-origins=https://devtools.oopif.test"],
+    "expires": "never"
+  },
 
   "The Wasm code cache test requires access to V8 internals, so only the",
   "virtual test should be run. Additionally the tiering budget is reduced to",
@@ -1107,11 +1116,12 @@
       "external/wpt/storage-access-api/storage-access-beyond-cookies.blobStorage.sub.https.window.html",
       "external/wpt/storage-access-api/storage-access-beyond-cookies.BlobURLDedicatedWorker.sub.https.tentative.window.html",
       "external/wpt/html/cross-origin-embedder-policy/blob.https.html",
-      "external/wpt/storage-access-api/storage-access-beyond-cookies.thirdPartyBlobStorage.sub.https.window.html"
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.thirdPartyBlobStorage.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.BlobURLSharedWorker.sub.https.tentative.window.html"
     ],
-    "args": ["--enable-features=BlockCrossPartitionBlobUrlFetching,EnforceNoopenerOnBlobURLNavigation"],
+    "args": ["--disable-features=BlockCrossPartitionBlobUrlFetching,EnforceNoopenerOnBlobURLNavigation"],
     "expires": "Sep 1, 2025",
-    "owners": ["janiceliu@chromium.org"]
+    "owners": ["awillia@chromium.org"]
   },
 
   {
@@ -1466,7 +1476,7 @@
     ],
     "args": [
       "--enable-privacy-sandbox-ads-apis",
-      "--enable-features=FencedFramesDefaultMode,AggregationServiceMultipleCloudProviders:allowlist/https%3A%2F%2Fweb-platform.test%3A8444,FencedFramesEnforceFocus,PrivateAggregationApiContributionMerging,PrivateAggregationApiMaxContributions"
+      "--enable-features=FencedFramesDefaultMode,AggregationServiceMultipleCloudProviders:allowlist/https%3A%2F%2Fweb-platform.test%3A8444,FencedFramesEnforceFocus,PrivateAggregationApiContributionMerging,PrivateAggregationApiMaxContributions,PrivateAggregationApiErrorReporting"
     ],
     "owners": ["alexmt@chromium.org", "dmcardle@chromium.org"],
     "expires": "Jul 1, 2025"
@@ -1475,15 +1485,17 @@
     "prefix": "private-aggregation-developer-mode",
     "platforms": ["Linux"],
     "bases": [
-      "wpt_internal/private-aggregation"
+      "wpt_internal/private-aggregation",
+      "http/tests/inspector-protocol/private-aggregation"
     ],
     "exclusive_tests": [
-      "wpt_internal/private-aggregation"
+      "wpt_internal/private-aggregation",
+      "http/tests/inspector-protocol/private-aggregation"
     ],
     "args": [
       "--enable-privacy-sandbox-ads-apis",
       "--private-aggregation-developer-mode",
-      "--enable-features=FencedFramesDefaultMode,AggregationServiceMultipleCloudProviders:allowlist/https%3A%2F%2Fweb-platform%2Etest%3A8444%2Chttps%3A%2F%2Fwww1%2Eweb-platform%2Etest%3A8444,PrivateAggregationApiBundledEnhancements,PrivateAggregationApiMultipleCloudProviders,PrivateAggregationApiContributionMerging,PrivateAggregationApiMaxContributions,FencedFramesLocalUnpartitionedDataAccess,ExemptUrlFromNetworkRevocationForTesting"
+      "--enable-features=FencedFramesDefaultMode,AggregationServiceMultipleCloudProviders:allowlist/https%3A%2F%2Fweb-platform%2Etest%3A8444%2Chttps%3A%2F%2Fwww1%2Eweb-platform%2Etest%3A8444%2Chttps%3A%2F%2F127.0.0.1%3A8443,PrivateAggregationApiBundledEnhancements,PrivateAggregationApiMultipleCloudProviders,PrivateAggregationApiContributionMerging,PrivateAggregationApiMaxContributions,PrivateAggregationApiErrorReporting,FencedFramesLocalUnpartitionedDataAccess,ExemptUrlFromNetworkRevocationForTesting"
     ],
     "owners": ["alexmt@chromium.org", "dmcardle@chromium.org"],
     "expires": "Jul 1, 2025"
@@ -1628,14 +1640,6 @@
     "args": ["--enable-features=ThreadedPreloadScanner,PrecompileInlineScripts"],
     "expires": "Dec 5, 2025"
   },
-  {
-    "prefix": "coop-restrict-properties",
-    "owners": ["clamy@chromium.org", "arichiv@chromium.org"],
-    "platforms": ["Linux", "Mac", "Win"],
-    "bases": [ "external/wpt/html/cross-origin-opener-policy/tentative/restrict-properties" ],
-    "args": ["--enable-features=CoopRestrictProperties"],
-    "expires": "Jul 1, 2025"
-  },
   "These tests require the experimental speculative prefetch feature, and",
   "requires extra switches to enable content implementation of speculation",
   "rules prefetch.",
@@ -1649,7 +1653,7 @@
     ],
     "exclusive_tests": "ALL",
     "args": [
-      "--enable-features=PrefetchUseContentRefactor:block_until_head_timeout_eager_prefetch/0,PrefetchCookieIndices,CookieIndicesHeader",
+      "--enable-features=PrefetchUseContentRefactor:block_until_head_timeout_eager_prefetch/0,PrefetchCookieIndices,CookieIndicesHeader,ClearSiteDataPrefetchPrerenderCache",
       "--disable-features=PrefetchServiceWorker",
       "--bypass-prefetch-proxy-for-host=not-web-platform.test"
     ],
@@ -1665,7 +1669,7 @@
     ],
     "exclusive_tests": "ALL",
     "args": [
-      "--enable-features=PrefetchUseContentRefactor:block_until_head_timeout_eager_prefetch/0,PrefetchCookieIndices,CookieIndicesHeader,Prerender2FallbackPrefetchSpecRules,PrefetchServiceWorker",
+      "--enable-features=PrefetchUseContentRefactor:block_until_head_timeout_eager_prefetch/0,PrefetchCookieIndices,CookieIndicesHeader,Prerender2FallbackPrefetchSpecRules,PrefetchServiceWorker,ClearSiteDataPrefetchPrerenderCache",
       "--bypass-prefetch-proxy-for-host=not-web-platform.test"
     ],
     "expires": "Oct 1, 2025"
@@ -1680,7 +1684,7 @@
     ],
     "exclusive_tests": "ALL",
     "args": [
-      "--enable-features=SharedStorageAPI,PrivacySandboxAdsAPIsOverride,Prerender2AllowActivationInBackground,LCPTimingPredictorPrerender2",
+      "--enable-features=SharedStorageAPI,PrivacySandboxAdsAPIsOverride,Prerender2AllowActivationInBackground,LCPTimingPredictorPrerender2,ClearSiteDataPrefetchPrerenderCache",
       "--disable-features=KeepAliveInBrowserMigration,Prerender2FallbackPrefetchSpecRules"
     ],
     "owners": ["nhiroki@chromium.org", "yoichio@chromium.org"],
@@ -1716,7 +1720,7 @@
     ],
     "exclusive_tests": "ALL",
     "args": [
-      "--enable-features=PrefetchUseContentRefactor:block_until_head_timeout_eager_prefetch/0,PrefetchCookieIndices,CookieIndicesHeader,Prerender2FallbackPrefetchSpecRules",
+      "--enable-features=PrefetchUseContentRefactor:block_until_head_timeout_eager_prefetch/0,PrefetchCookieIndices,CookieIndicesHeader,Prerender2FallbackPrefetchSpecRules,ClearSiteDataPrefetchPrerenderCache",
       "--disable-features=PrefetchServiceWorker",
       "--bypass-prefetch-proxy-for-host=not-web-platform.test",
       "--disable-threaded-compositing", "--disable-threaded-animation"
@@ -1807,7 +1811,7 @@
   },
   {
     "prefix": "scoped-custom-element-registry-disabled",
-    "owners": ["masonf@chromium.org", "dizhangg@chromium.org"],
+    "owners": ["masonf@chromium.org", "tgivens@microsoft.com"],
     "platforms": ["Linux", "Mac", "Win"],
     "bases": ["external/wpt/custom-elements/registries/"],
     "args": ["--disable-blink-features=ScopedCustomElementRegistry"],
@@ -2186,6 +2190,10 @@
       "external/wpt/webnn/conformance_tests/pooling.https.any.html?gpu",
       "external/wpt/webnn/conformance_tests/pow.https.any.html?gpu",
       "external/wpt/webnn/conformance_tests/prelu.https.any.html?gpu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.html?gpu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.serviceworker.html?gpu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.sharedworker.html?gpu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.worker.html?gpu",
       "external/wpt/webnn/conformance_tests/quantizeLinear.https.any.html?gpu",
       "external/wpt/webnn/conformance_tests/reciprocal.https.any.html?gpu",
       "external/wpt/webnn/conformance_tests/reduce_l1.https.any.html?gpu",
@@ -2439,6 +2447,10 @@
       "external/wpt/webnn/conformance_tests/pooling.https.any.html?cpu",
       "external/wpt/webnn/conformance_tests/pow.https.any.html?cpu",
       "external/wpt/webnn/conformance_tests/prelu.https.any.html?cpu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.html?cpu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.serviceworker.html?cpu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.sharedworker.html?cpu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.worker.html?cpu",
       "external/wpt/webnn/conformance_tests/quantizeLinear.https.any.html?cpu",
       "external/wpt/webnn/conformance_tests/reciprocal.https.any.html?cpu",
       "external/wpt/webnn/conformance_tests/reduce_l1.https.any.html?cpu",
@@ -2688,6 +2700,10 @@
       "external/wpt/webnn/conformance_tests/pooling.https.any.html?npu",
       "external/wpt/webnn/conformance_tests/pow.https.any.html?npu",
       "external/wpt/webnn/conformance_tests/prelu.https.any.html?npu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.html?npu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.serviceworker.html?npu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.sharedworker.html?npu",
+      "external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.worker.html?npu",
       "external/wpt/webnn/conformance_tests/quantizeLinear.https.any.html?npu",
       "external/wpt/webnn/conformance_tests/reciprocal.https.any.html?npu",
       "external/wpt/webnn/conformance_tests/reduce_l1.https.any.html?npu",
@@ -2984,6 +3000,14 @@
     "owners": ["jarhar@chromium.org", "dom-dev@google.com"]
   },
   {
+    "prefix": "customizable-select-in-page-disabled",
+    "platforms": ["Linux"],
+    "bases": [],
+    "args": ["--disable-features=CustomizableSelectInPage", "--enable-features=CustomizableSelect"],
+    "expires": "Aug 1, 2025",
+    "owners": ["jarhar@chromium.org", "dom-dev@google.com"]
+  },
+  {
     "prefix": "input-closes-select",
     "platforms": ["Linux"],
     "bases": [
@@ -3019,11 +3043,10 @@
     "exclusive_tests": ["external/wpt/css/css-gaps"],
     "platforms": ["Linux"],
     "bases": [
-      "external/wpt/css/css-multicol/animation",
-      "external/wpt/css/css-multicol/parsing",
+      "external/wpt/css/css-multicol",
       "external/wpt/web-animations/animation-model/animation-types",
       "animations/interpolation/webkit-column-rule-color-interpolation.html",
-      "fast/multicol/change-column-rule.html",
+      "fast/multicol",
       "external/wpt/web-animations/responsive/to-color-change.html",
       "external/wpt/css/css-typed-om/the-stylepropertymap/properties/column-rule-color.html",
       "external/wpt/css/css-animations/responsive/column-rule-color-001.html",
@@ -3048,25 +3071,6 @@
       "--disable-blink-features=CSSLineClamp"
     ],
     "owners": ["abotella@igalia.com"]
-  },
-  {
-    "prefix": "skip-preload-scanning",
-    "platforms": [
-      "Linux",
-      "Mac",
-      "Win"
-    ],
-    "bases": [
-      "http/tests/skip-preload-scanning"
-    ],
-    "exclusive_tests": "ALL",
-    "args": [
-      "--enable-features=SkipPreloadScanning"
-    ],
-    "expires": "Jan 14, 2025",
-    "owners": [
-      "alexnj@chromium.org"
-    ]
   },
   {
     "prefix": "expect-no-linked-resources",
@@ -4160,23 +4164,6 @@
     "owners": ["masonf@chromium.org", "stephanie.zhang@microsoft.com", "sajos@microsoft.com"]
   },
   {
-    "prefix": "document-isolation-policy",
-    "platforms": [
-      "Linux"
-    ],
-    "bases": [
-      "external/wpt/html/document-isolation-policy"
-    ],
-    "exclusive_tests": "ALL",
-    "args": [
-      "--enable-features=DocumentIsolationPolicy"
-    ],
-    "expires": "Nov 16, 2024",
-    "owners": [
-      "clamy@chromium.org"
-    ]
-  },
-  {
     "prefix": "css-relative-currentcolor-disabled",
     "platforms": ["Linux"],
     "bases": [
@@ -4392,6 +4379,17 @@
       "--disable-features=DelegatesFocusTextControlFix"
     ],
     "expires": "Jul 1, 2025"
+  },
+  {
+    "prefix": "sec-purpose-prefetch-rel-prefetch-enabled",
+    "owners": ["stevenwei@microsoft.com"],
+    "platforms": ["Mac", "Win", "Linux"],
+    "bases": ["external/wpt/preload/prefetch-headers.https.html"],
+    "exclusive_tests": "ALL",
+    "args": [
+      "--enable-features=SecPurposePrefetchHeaderRelPrefetch"
+    ],
+    "expires": "Aug 1, 2025"
   }
 
 ]
