@@ -30,6 +30,12 @@ PrivacySandboxNoticeService::PrivacySandboxNoticeService(
   CHECK(desktop_view_manager_);
 #endif  // !BUILDFLAG(IS_ANDROID)
 
+  // Refresh fulfillment status for all notices at service initialization.
+  for (auto& [_, notice] : catalog_->GetNoticeMap()) {
+    CHECK(notice);
+    notice->RefreshFulfillmentStatus(*notice_storage_);
+  }
+
   EmitStartupHistograms();
 }
 
@@ -46,11 +52,12 @@ void PrivacySandboxNoticeService::EventOccurred(
     PrivacySandboxNoticeEvent event) {
   notice_storage()->RecordEvent(notice_id, event);
 
-  auto notice_ptr = catalog_->GetNoticeMap().find(notice_id);
-  CHECK(notice_ptr != catalog_->GetNoticeMap().end());
-  CHECK(notice_ptr->second != nullptr);
+  Notice* notice = catalog_->GetNotice(notice_id);
+  CHECK(notice);
 
-  notice_ptr->second->UpdateTargetApiResults(event);
+  // Refresh fulfillment status after an event has occurred.
+  notice->RefreshFulfillmentStatus(*notice_storage());
+  notice->UpdateTargetApiResults(event);
 }
 
 // TODO(crbug.com/392612108): Implement this function.

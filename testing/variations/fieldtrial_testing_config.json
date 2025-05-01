@@ -3581,6 +3581,22 @@
             ]
         }
     ],
+    "CCTPredictiveBackGesture": [
+        {
+            "platforms": [
+                "android"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "CCTPredictiveBackGesture"
+                    ],
+                    "min_os_version": "16.0.0"
+                }
+            ]
+        }
+    ],
     "CCTPrewarmTab": [
         {
             "platforms": [
@@ -3882,6 +3898,24 @@
                     "name": "Enabled",
                     "enable_features": [
                         "CanvasTextNg"
+                    ]
+                }
+            ]
+        }
+    ],
+    "CastStreamingHardwareHevc": [
+        {
+            "platforms": [
+                "chromeos",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "CastStreamingHardwareHevc"
                     ]
                 }
             ]
@@ -9555,6 +9589,24 @@
             ]
         }
     ],
+    "FieldRankServerClassification": [
+        {
+            "platforms": [
+                "android",
+                "android_webview",
+                "chromeos",
+                "ios",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "FieldRankServerClassification_Experiment_20250422"
+                }
+            ]
+        }
+    ],
     "FingerprintingProtectionFilter": [
         {
             "platforms": [
@@ -11498,6 +11550,36 @@
             ]
         }
     ],
+    "IOSFeedCUI1Refinements": [
+        {
+            "platforms": [
+                "ios"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "EnableCUI1Refinements"
+                    ]
+                }
+            ]
+        }
+    ],
+    "IOSFeedCUI3NextPageAppFlow": [
+        {
+            "platforms": [
+                "ios"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "EnableCUI3NextPageAppFlow"
+                    ]
+                }
+            ]
+        }
+    ],
     "IOSFollowUIUpdate": [
         {
             "platforms": [
@@ -12345,6 +12427,25 @@
                     },
                     "enable_features": [
                         "IgnoreDuplicateNavs"
+                    ]
+                }
+            ]
+        }
+    ],
+    "ImageDescriptionsAlternativeRouting": [
+        {
+            "platforms": [
+                "android",
+                "chromeos",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "ImageDescriptionsAlternativeRouting"
                     ]
                 }
             ]
@@ -15476,6 +15577,24 @@
                     "name": "EnablePWAIconAndTitleInNativeNotificationsWin",
                     "enable_features": [
                         "AppSpecificNotifications"
+                    ]
+                }
+            ]
+        }
+    ],
+    "PWANavigationCapturingV2ChromeOS": [
+        {
+            "platforms": [
+                "chromeos"
+            ],
+            "experiments": [
+                {
+                    "name": "EnabledSettingOffByDefault",
+                    "params": {
+                        "link_capturing_state": "reimpl_default_off"
+                    },
+                    "enable_features": [
+                        "PwaNavigationCapturing"
                     ]
                 }
             ]
@@ -22086,6 +22205,36 @@
             ]
         }
     ],
+    "SingleCACertVerificationPhase1": [
+        {
+            "platforms": [
+                "chromeos"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "SingleCACertVerificationPhase1"
+                    ]
+                }
+            ]
+        }
+    ],
+    "SingleCACertVerificationPhase2": [
+        {
+            "platforms": [
+                "chromeos"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "SingleCACertVerificationPhase2"
+                    ]
+                }
+            ]
+        }
+    ],
     "SingleNTPRemoveExtraNTPs": [
         {
             "platforms": [
@@ -22876,24 +23025,6 @@
                     },
                     "enable_features": [
                         "GroupSuggestionService"
-                    ]
-                }
-            ]
-        }
-    ],
-    "TabGroupSyncAutoOpenOffByDefault": [
-        {
-            "platforms": [
-                "android"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "params": {
-                        "auto_open_synced_tab_groups": "false"
-                    },
-                    "enable_features": [
-                        "TabGroupSyncAndroid"
                     ]
                 }
             ]

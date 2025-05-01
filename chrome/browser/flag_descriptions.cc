@@ -2185,6 +2185,14 @@ const char kCastStreamingHardwareH264Description[] =
     "supported by the platform. If disabled, hardware H.264 encoding will "
     "never be used.";
 
+const char kCastStreamingHardwareHevcName[] =
+    "Toggle hardware accelerated HEVC video encoding for Cast Streaming";
+const char kCastStreamingHardwareHevcDescription[] =
+    "The default is to allow hardware HEVC encoding when recommended for the "
+    "platform. If enabled, hardware HEVC encoding will always be allowed when "
+    "supported by the platform. If disabled, hardware HEVC encoding will "
+    "never be used.";
+
 const char kCastStreamingHardwareVp8Name[] =
     "Toggle hardware accelerated VP8 video encoding for Cast Streaming";
 const char kCastStreamingHardwareVp8Description[] =
@@ -4341,12 +4349,6 @@ const char kUsePassthroughCommandDecoderName[] =
 const char kUsePassthroughCommandDecoderDescription[] =
     "Use chrome passthrough command decoder instead of validating command "
     "decoder.";
-
-const char kUseIDNA2008NonTransitionalName[] =
-    "Enable IDNA 2008 Non-Transitional Mode";
-const char kUseIDNA2008NonTransitionalDescription[] =
-    "Enables IDNA 2008 in Non-Transitional Mode in URL processing, allowing "
-    "deviation characters in domain names.";
 
 const char kEnablePasswordSharingName[] = "Enables password sharing";
 const char kEnablePasswordSharingDescription[] =

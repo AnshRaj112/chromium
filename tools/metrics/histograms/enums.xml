@@ -105,7 +105,7 @@ uploading your change for review.  These are checked by presubmit scripts.
   <int value="0" label="Native APIs"/>
   <int value="1" label="Web Contents"/>
   <int value="2" label="Inline Text Boxes"/>
-  <int value="3" label="Screen Reader"/>
+  <int value="3" label="Extended Properties"/>
   <int value="4" label="HTML"/>
   <int value="5" label="HTML Metadata"/>
   <int value="6" label="Label images"/>
@@ -113,6 +113,7 @@ uploading your change for review.  These are checked by presubmit scripts.
   <int value="8" label="PDF OCR"/>
   <int value="9" label="Annotate Main Node"/>
   <int value="10" label="From Platform"/>
+  <int value="11" label="Screen Reader"/>
 </enum>
 
 <enum name="AccountManagerAccountAdditionSource">
@@ -10744,6 +10745,7 @@ from previous Chrome versions.
   <int value="-1390005994" label="AppCache:disabled"/>
   <int value="-1389948505" label="InitialNavigationEntry:disabled"/>
   <int value="-1388956102" label="OmniboxTouchDownTriggerForPrefetch:disabled"/>
+  <int value="-1388933740" label="CastStreamingHardwareHevc:enabled"/>
   <int value="-1388817073" label="OmniboxReverseAnswers:disabled"/>
   <int value="-1388546778" label="WebAppManifestImmediateUpdating:disabled"/>
   <int value="-1388233453"
@@ -17679,7 +17681,6 @@ from previous Chrome versions.
   <int value="1275507565" label="OfflinePagesRenovations:enabled"/>
   <int value="1276120671" label="AutofillEnableOfferNotification:enabled"/>
   <int value="1276209777" label="ntp-switch-to-existing-tab"/>
-  <int value="1276257375" label="UseIDNA2008NonTransitional:disabled"/>
   <int value="1277167761" label="EnableTouchscreensInDiagnosticsApp:enabled"/>
   <int value="1277386636" label="QueryInOmnibox:disabled"/>
   <int value="1277695608" label="AIWriterAPI:disabled"/>
@@ -17751,6 +17752,7 @@ from previous Chrome versions.
   <int value="1295005331" label="SupportPepperVideoDecoderDevAPI:enabled"/>
   <int value="1295669314" label="OmniboxOnClobberFocusTypeOnContent:enabled"/>
   <int value="1295688198" label="ClipboardHistoryRefresh:enabled"/>
+  <int value="1295868587" label="CastStreamingHardwareHevc:disabled"/>
   <int value="1295887301" label="ShowNtpAtStartupAndroid:disabled"/>
   <int value="1296474231" label="SafetyHubAndroidSurvey:disabled"/>
   <int value="1296512860" label="AndroidAppIntegrationV2:disabled"/>
@@ -18229,7 +18231,6 @@ from previous Chrome versions.
   <int value="1472042346" label="ClickToCall:enabled"/>
   <int value="1472060209" label="OmniboxSteadyStateTextStyle:disabled"/>
   <int value="1472719830" label="IgnoreDeviceFlexArcEnabledPolicy:enabled"/>
-  <int value="1472798894" label="UseIDNA2008NonTransitional:enabled"/>
   <int value="1472938299" label="WellKnownChangePassword:disabled"/>
   <int value="1473379096" label="NearbySharingReceiveWifiCredentials:disabled"/>
   <int value="1473838479" label="EnableVirtualKeyboardMdUi:disabled"/>

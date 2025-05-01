@@ -149,7 +149,6 @@
 #include "components/plus_addresses/features.h"
 #include "components/power_bookmarks/core/power_bookmark_features.h"
 #include "components/privacy_sandbox/privacy_sandbox_features.h"
-#include "components/reading_list/features/reading_list_switches.h"
 #include "components/remote_cocoa/app_shim/features.h"
 #include "components/safe_browsing/core/common/features.h"
 #include "components/saved_tab_groups/public/features.h"
@@ -5587,6 +5586,11 @@ const FeatureEntry kFeatureEntries[] = {
          switches::kCastStreamingForceEnableHardwareH264,
          switches::kCastStreamingForceDisableHardwareH264)},
 
+    {"cast-streaming-hardware-hevc",
+     flag_descriptions::kCastStreamingHardwareHevcName,
+     flag_descriptions::kCastStreamingHardwareHevcDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(media::kCastStreamingHardwareHevc)},
+
     {"cast-streaming-hardware-vp8",
      flag_descriptions::kCastStreamingHardwareVp8Name,
      flag_descriptions::kCastStreamingHardwareVp8Description, kOsDesktop,
@@ -9710,11 +9714,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"omit-cors-client-cert", flag_descriptions::kOmitCorsClientCertName,
      flag_descriptions::kOmitCorsClientCertDescription, kOsAll,
      FEATURE_VALUE_TYPE(network::features::kOmitCorsClientCert)},
-
-    {"use-idna2008-non-transitional",
-     flag_descriptions::kUseIDNA2008NonTransitionalName,
-     flag_descriptions::kUseIDNA2008NonTransitionalDescription, kOsAll,
-     FEATURE_VALUE_TYPE(url::kUseIDNA2008NonTransitional)},
 
 #if BUILDFLAG(IS_CHROMEOS)
     {"always-enable-hdcp", flag_descriptions::kAlwaysEnableHdcpName,

@@ -299,11 +299,11 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'src_internal_revision': 'f968a67f8ed26827ecdbf84d5cb239dc600692f8',
+  'src_internal_revision': '3348efef2d6b3acc7dbef225a80e47940f3a07fa',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and whatever else without interference from each other.
-  'skia_revision': '64df5d636ac13123a9582887b72b385129f4846d',
+  'skia_revision': '18540538bceb7446632e69ef4df353f4056d177f',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
@@ -315,7 +315,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling SwiftShader
   # and whatever else without interference from each other.
-  'swiftshader_revision': 'fefba0024aa6cecf17fb26fe44c0f59aa1c59734',
+  'swiftshader_revision': '9dd03f2e4b037fdd9caad8d10c7d9b7c8bde4998',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
@@ -327,7 +327,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Fuchsia sdk
   # and whatever else without interference from each other.
-  'fuchsia_version': 'version:27.20250424.2.1',
+  'fuchsia_version': 'version:27.20250501.3.1',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling google-toolbox-for-mac
   # and whatever else without interference from each other.
@@ -375,11 +375,11 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling catapult
   # and whatever else without interference from each other.
-  'catapult_revision': '1591e813b66e04a5b9d9e8fc5d94e74ef4effaa1',
+  'catapult_revision': 'fbbc01ef64ef84d0e573ffc71567c590b9a36f8d',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling CrossBench
   # and whatever else without interference from each other.
-  'crossbench_revision': 'd76b1d0c71576fc907b06db38b5033963e80f341',
+  'crossbench_revision': '432abe567705755d4e4c1c7b97074167f8fe3b45',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling libFuzzer
   # and whatever else without interference from each other.
@@ -395,7 +395,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling devtools-frontend
   # and whatever else without interference from each other.
-  'devtools_frontend_revision': '05169297ed7aa726ef9b91787618a99f77644404',
+  'devtools_frontend_revision': '2913fd53b564f165b5cb6fb74141a06fdec9eb2c',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling libprotobuf-mutator
   # and whatever else without interference from each other.
@@ -531,7 +531,7 @@ vars = {
 
   # If you change this, also update the libc++ revision in
   # //buildtools/deps_revisions.gni.
-  'libcxx_revision':       '62724eb55f2ad7389088265952b1bb62cb89c73b',
+  'libcxx_revision':       'f034fd5662d033c281ab6a9b45164066ddd18809',
 
   # GN CIPD package version.
   'gn_version': 'git_revision:487f8353f15456474437df32bb186187b0940b45',
@@ -841,143 +841,143 @@ deps = {
     'objects': [
       {
         # The Android libclang_rt.builtins libraries are currently only included in the Linux clang package.
-        'object_name': 'Linux_x64/clang-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '2cccd3a5b04461f17a2e78d2f8bd18b448443a9dd4d6dfac50e8e84b4d5176f1',
-        'size_bytes': 54914604,
-        'generation': 1745271343199398,
+        'object_name': 'Linux_x64/clang-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': 'dee83e0a8b35564c277a7902a7872a77f4170b4380f9053acd3e1cb9a502a69c',
+        'size_bytes': 55555048,
+        'generation': 1746105739973602,
         'condition': '(host_os == "linux" or checkout_android) and non_git_source',
       },
       {
-        'object_name': 'Linux_x64/clang-tidy-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': 'f0e7dae567266055c9cfa2fba5b3dafa311dc86955f5a3f7a4047ce3096e7b27',
-        'size_bytes': 13559360,
-        'generation': 1745271343282399,
+        'object_name': 'Linux_x64/clang-tidy-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': 'bb8684fb985a35cc680bda9161735c409e6409106497f4ec0253ff9e07dd6912',
+        'size_bytes': 13555996,
+        'generation': 1746105739988254,
         'condition': 'host_os == "linux" and checkout_clang_tidy and non_git_source',
       },
       {
-        'object_name': 'Linux_x64/clangd-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': 'd87ec8e9cd959cf5d12e0de2970f4a88a67f9884467dac5285813d02bbe50bcb',
-        'size_bytes': 13767836,
-        'generation': 1745271343386108,
+        'object_name': 'Linux_x64/clangd-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': '5074d634984fa526b868126ead41c013de337edf36b369422005cb4a0edb95dc',
+        'size_bytes': 13762680,
+        'generation': 1746105740081588,
         'condition': 'host_os == "linux" and checkout_clangd and non_git_source',
       },
       {
-        'object_name': 'Linux_x64/llvm-code-coverage-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '08f9cdbdc1e3f78dfb11aa9815727e8af0cf8f2b9c9a0e3749ceb4d3584fc900',
-        'size_bytes': 2293720,
-        'generation': 1745271343569971,
+        'object_name': 'Linux_x64/llvm-code-coverage-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': 'fa46a9d107f515d0a16c41ae5751a2a4be7be34a550f315a1506fcfb17327936',
+        'size_bytes': 2294512,
+        'generation': 1746105740273331,
         'condition': 'host_os == "linux" and checkout_clang_coverage_tools and non_git_source',
       },
       {
-        'object_name': 'Linux_x64/llvmobjdump-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '4b9c20478c015a03a44842d0bc24a9bd01a87890c76c4496577843ea31a21ed1',
-        'size_bytes': 5702536,
-        'generation': 1745271343407073,
+        'object_name': 'Linux_x64/llvmobjdump-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': '4041ca56834653e78338f50aa6590c8160bc6b522bdcddbd533027d9116e4994',
+        'size_bytes': 5694452,
+        'generation': 1746105740224915,
         'condition': '((checkout_linux or checkout_mac or checkout_android) and host_os == "linux") and non_git_source',
       },
       {
-        'object_name': 'Mac/clang-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '159cc811ee2882098086a426e83cb6744ff59d422d005a54630bc519e782d154',
-        'size_bytes': 51986012,
-        'generation': 1745271345031799,
+        'object_name': 'Mac/clang-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': '5ee059eddd55064d3e638b83db4c7843f5448bb74c62c474b5f5652a5631cb85',
+        'size_bytes': 51962684,
+        'generation': 1746105741728605,
         'condition': 'host_os == "mac" and host_cpu == "x64"',
       },
       {
-        'object_name': 'Mac/clang-mac-runtime-library-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': 'ef380bc751dc8b137e294ac1aca295f3e49eb57b938ab011c38c70271d8582fc',
-        'size_bytes': 988872,
-        'generation': 1745271352425938,
+        'object_name': 'Mac/clang-mac-runtime-library-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': '8482f9c688466057de438a15ff01d62ea1f0e2b709f3e7a470cdd452c81da731',
+        'size_bytes': 989704,
+        'generation': 1746105749642530,
         'condition': 'checkout_mac and not host_os == "mac"',
       },
       {
-        'object_name': 'Mac/clang-tidy-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '75907ac8d2ab310fd7272715c5d98cd4382dbd0b867872aa9216cede48c274d5',
-        'size_bytes': 13609872,
-        'generation': 1745271345094426,
+        'object_name': 'Mac/clang-tidy-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': 'e23d1a41409e2637f662cb9306d3269ea1c4f41ae1aa70f14369b6463de95c03',
+        'size_bytes': 13610744,
+        'generation': 1746105741733748,
         'condition': 'host_os == "mac" and host_cpu == "x64" and checkout_clang_tidy',
       },
       {
-        'object_name': 'Mac/clangd-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': 'e2bcab0b3961fdc7a63286cf7a98397026ff1b5143d34c8a50844b26a7b023c6',
-        'size_bytes': 14998604,
-        'generation': 1745271345196743,
+        'object_name': 'Mac/clangd-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': '6921b4b53cdf8bc80fcad184e229c4f38a49463390016eed65f12fa547f24950',
+        'size_bytes': 14998636,
+        'generation': 1746105741782145,
         'condition': 'host_os == "mac" and host_cpu == "x64" and checkout_clangd',
       },
       {
-        'object_name': 'Mac/llvm-code-coverage-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '6e4c8ed691948981d799f4af747288cdd5e90ae873dc36ada66726ad3e6caef1',
-        'size_bytes': 2262400,
-        'generation': 1745271345385127,
+        'object_name': 'Mac/llvm-code-coverage-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': '0b41a82139b4a107f1a2a149d438b600685cbab5c0f81c8d0459f2711503460b',
+        'size_bytes': 2263096,
+        'generation': 1746105741945685,
         'condition': 'host_os == "mac" and host_cpu == "x64" and checkout_clang_coverage_tools',
       },
       {
-        'object_name': 'Mac_arm64/clang-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '3d437a643cc5838963254a39ab0528f49f2b65cd4dba2c80e628ad88eb419536',
-        'size_bytes': 43999512,
-        'generation': 1745271353863965,
+        'object_name': 'Mac_arm64/clang-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': '99c31f2e700274ade6b25205597510a5c665f17dd9ddaa03b89c9659ec387fd4',
+        'size_bytes': 43999184,
+        'generation': 1746105751053626,
         'condition': 'host_os == "mac" and host_cpu == "arm64"',
       },
       {
-        'object_name': 'Mac_arm64/clang-tidy-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '0b4150c9e699e1e904495807aff48d2e5396527bf775d6597818dd4f73a9c38f',
-        'size_bytes': 11776260,
-        'generation': 1745271353927359,
+        'object_name': 'Mac_arm64/clang-tidy-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': '78280eb8dceeaa330fb53ec8249c740db0f369f3b6d6857c65337dc5a21b3160',
+        'size_bytes': 11773472,
+        'generation': 1746105751166820,
         'condition': 'host_os == "mac" and host_cpu == "arm64" and checkout_clang_tidy',
       },
       {
-        'object_name': 'Mac_arm64/clangd-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '9fcd151cfffa01e6befe3760b9bc91d645135c79449dc378af4cb2fe0187150c',
-        'size_bytes': 12041956,
-        'generation': 1745271354010497,
+        'object_name': 'Mac_arm64/clangd-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': 'f2de67c31e6ce01485b4cc0a76567809319021c4523609b93ab1804252f95ddc',
+        'size_bytes': 12044048,
+        'generation': 1746105751239361,
         'condition': 'host_os == "mac" and host_cpu == "arm64" and checkout_clangd',
       },
       {
-        'object_name': 'Mac_arm64/llvm-code-coverage-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '1e62752ef5fd9d425699ed44098d5a0eec3be3f827990470aa9f9199d34a2fb8',
-        'size_bytes': 1975116,
-        'generation': 1745271354276821,
+        'object_name': 'Mac_arm64/llvm-code-coverage-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': 'a2c44380d13276f1c3393abff82e8d397c893a912b157bea44b0006bd35fe618',
+        'size_bytes': 1974668,
+        'generation': 1746105751515503,
         'condition': 'host_os == "mac" and host_cpu == "arm64" and checkout_clang_coverage_tools',
       },
       {
-        'object_name': 'Win/clang-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': 'd53230dbb7db57ddcda5a8377b5dd8388deee9ff2766617d54c6159c51e806be',
-        'size_bytes': 47036964,
-        'generation': 1745271363166454,
+        'object_name': 'Win/clang-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': '9362a0993354be586748f4148493e2b9cc63a898aa85fea301f2de0e60ecbd93',
+        'size_bytes': 47049060,
+        'generation': 1746105761436952,
         'condition': 'host_os == "win"',
       },
       {
-        'object_name': 'Win/clang-tidy-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': 'c6022f5923be5afc1685723a2383fcd8f9334cc6ee097ce3c71963de6ded0764',
-        'size_bytes': 13415856,
-        'generation': 1745271363272778,
+        'object_name': 'Win/clang-tidy-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': 'c55a73aa688dfa2e6195b1dc233079504f1ed9a95c8e8a92582add133bb8a240',
+        'size_bytes': 13414380,
+        'generation': 1746105761440911,
         'condition': 'host_os == "win" and checkout_clang_tidy',
       },
       {
-        'object_name': 'Win/clang-win-runtime-library-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '555a34dd110a5fe3f7578745e9f0074cc341e550bed4ec5888accffb0200a7bb',
-        'size_bytes': 2483656,
-        'generation': 1745271370423782,
+        'object_name': 'Win/clang-win-runtime-library-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': 'c42cfa237dbd6841d61013051de739775fe0ae3187ff5fecc7ed243de2941da6',
+        'size_bytes': 2484424,
+        'generation': 1746105769629959,
         'condition': 'checkout_win and not host_os == "win"',
       },
       {
-        'object_name': 'Win/clangd-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '66aafde760608c4c0de94a3947a179db8c8f93c8e474e3081b4401287abe4ee4',
-        'size_bytes': 13838692,
-        'generation': 1745271363368641,
+        'object_name': 'Win/clangd-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': 'fcf5bfeccbca8a2445d579093c9d7da87dff142b223f24f25d87f6e2e6e15c50',
+        'size_bytes': 13840260,
+        'generation': 1746105761501287,
        'condition': 'host_os == "win" and checkout_clangd',
       },
       {
-        'object_name': 'Win/llvm-code-coverage-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': '6944dc39b33dca3bb8f219ffb221e3f345fe56a5fa0447c60ea6a2894ae72687',
-        'size_bytes': 2373032,
-        'generation': 1745271363562596,
+        'object_name': 'Win/llvm-code-coverage-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': '1a5e31c5e69ea7b84fdfbff27024670cf2eec538c68fc4213a5bcf576263b0ca',
+        'size_bytes': 2370540,
+        'generation': 1746105761636379,
         'condition': 'host_os == "win" and checkout_clang_coverage_tools',
       },
       {
-        'object_name': 'Win/llvmobjdump-llvmorg-21-init-9266-g09006611-1.tar.xz',
-        'sha256sum': 'e8b3e9f7cd7512edc7c05a12e818386cdb8d43bea9affbf0bf4db83a553092a5',
-        'size_bytes': 5684140,
-        'generation': 1745271363450942,
+        'object_name': 'Win/llvmobjdump-llvmorg-21-init-9266-g09006611-2.tar.xz',
+        'sha256sum': '3ac42a8e816d1fa89594bfe882d033b6c351551b055b9d78867a2b3d24ac2451',
+        'size_bytes': 5698696,
+        'generation': 1746105761558030,
         'condition': '(checkout_linux or checkout_mac or checkout_android) and host_os == "win"',
       },
     ]
@@ -1484,7 +1484,7 @@ deps = {
     'packages': [
       {
         'package': 'chromium/chrome/test/data/variations/cipd',
-        'version': 't6OEiJwO4GHUzNYxsQ2TFE-X8bOKC9txraBfKTS-ZgwC',
+        'version': '1hWgXjeuq5_AXO1K4SGn1keNIeUqQX-nQPUEw5RpT7AC',
       },
     ],
     'dep_type': 'cipd',
@@ -1495,7 +1495,7 @@ deps = {
 
   'src/clank': {
     'url': Var('chrome_git') + '/clank/internal/apps.git' + '@' +
-    'b8e94f74cdf17fd4bad068bed25f841a4b566dce',
+    'cf2696520f55b32bb1d564c7ac4a919f1bb088f9',
     'condition': 'checkout_android and checkout_src_internal',
   },
 
@@ -1654,7 +1654,7 @@ deps = {
     'packages': [
       {
           'package': 'chromium/third_party/androidx',
-          'version': 'DGv8hAr3K2Qyh0okP6syAJbvPRKjP0EMD6DLlEl-NK4C',
+          'version': 'OTqAtIcTpLVGYC7A3jKFS76H8p3ZxFXUdRs8ied0oioC',
       },
     ],
     'condition': 'checkout_android and non_git_source',
@@ -2249,7 +2249,7 @@ deps = {
       'packages': [
           {
               'package': 'chromium/third_party/kotlinc',
-              'version': 'YASKBvUSO-m2borC3V_hGLsRTyOSnHl2J0BaCmINZkUC',
+              'version': 'DMzAXJeHsmdOETLSEAYTfnPUX4VvhvmX2__q71V_Ia8C',
           },
       ],
       'condition': 'checkout_android and non_git_source',
@@ -2535,7 +2535,7 @@ deps = {
     Var('pdfium_git') + '/pdfium.git' + '@' +  Var('pdfium_revision'),
 
   'src/third_party/perfetto':
-    Var('chromium_git') + '/external/github.com/google/perfetto.git' + '@' + 'ed0bcb0f5a956cb4aad00d150851f07496cb23b0',
+    Var('chromium_git') + '/external/github.com/google/perfetto.git' + '@' + '8b05347d12a45a10fd30a8fb342ae88a0cbab167',
 
   'src/base/tracing/test/data': {
     'bucket': 'perfetto',
@@ -2903,7 +2903,7 @@ deps = {
     Var('chromium_git') + '/webpagereplay.git' + '@' + Var('webpagereplay_revision'),
 
   'src/third_party/webrtc':
-    Var('webrtc_git') + '/src.git' + '@' + '66bd178791affb96dcb5c1f2490274169df8fdaa',
+    Var('webrtc_git') + '/src.git' + '@' + 'd0a295c96fb8b1d13d3600d840ce16482ade8ec1',
 
   # Wuffs' canonical repository is at github.com/google/wuffs, but we use
   # Skia's mirror of Wuffs, the same as in upstream Skia's DEPS file.
@@ -3036,7 +3036,7 @@ deps = {
     'packages': [
       {
         'package': 'chromeos_internal/apps/help_app/app',
-        'version': 'LWuxptBdO36vG41keA0GwZOQ8BgpGQx-0Ax445mWveMC',
+        'version': 'TOSfOgKftMp4eYe-Z1na-w-p_w_yF-EN0P0eDJ939kYC',
       },
     ],
     'condition': 'checkout_chromeos and checkout_src_internal',
@@ -3080,7 +3080,7 @@ deps = {
     'packages': [
       {
         'package': 'chromeos_internal/apps/projector_app/app',
-        'version': 'QVt1v5LHQIXnDJe2TvJ4AJQmOJKJFUtzDcTm3yqg0FsC',
+        'version': 'cZykto-pfbypWwv9jopiUTZREUKSKWy8x0xXjkSB5L8C',
       },
     ],
     'condition': 'checkout_chromeos and checkout_src_internal',
@@ -3107,7 +3107,7 @@ deps = {
       'packages': [
           {
               'package': 'chromium/third_party/android_deps/autorolled',
-              'version': 'I4KwXm_DsdqDHlwWP2Ym6Qecv-6fM6c1Kt5u277RCoAC',
+              'version': 'nb19wuIgamdmcgMY_6xHCGH3ph_tLVHkHYH33tKbup4C',
           },
       ],
       'condition': 'checkout_android and non_git_source',
@@ -4409,13 +4409,13 @@ deps = {
 
   'src/chrome/app/theme/default_100_percent/google_chrome': {
       'url': Var('chrome_git') + '/chrome/theme/default_100_percent/google_chrome.git' + '@' +
-        '81b2baa33cbd50d608e82337459af222ec5facc2',
+        'f7076a8d790a8320dcf4bcbfdd32f274aa336272',
       'condition': 'checkout_src_internal',
   },
 
   'src/chrome/app/theme/default_200_percent/google_chrome': {
       'url': Var('chrome_git') + '/chrome/theme/default_200_percent/google_chrome.git' + '@' +
-        '9281aea99f0b40313cefd6bd6fe6636fc31f402f',
+        '8f547f69a829954c5f63a450e9d1fb9110b24efc',
       'condition': 'checkout_src_internal',
   },
 
@@ -4623,7 +4623,7 @@ deps = {
 
   'src/components/optimization_guide/internal': {
       'url': Var('chrome_git') + '/chrome/components/optimization_guide.git' + '@' +
-        '976b8f41d35f356dd01e2dc99e317dbafb032477',
+        '051dbeeb2e4db53c73926be4a03e7fed578b7da5',
       'condition': 'checkout_src_internal',
   },
 
@@ -4689,7 +4689,7 @@ deps = {
 
   'src/ios_internal':  {
       'url': Var('chrome_git') + '/chrome/ios_internal.git' + '@' +
-        'e82bd56d69ca3919d547f78ca8f417e4b8ef7ffc',
+        '2d073f6df1a21493e69780e1d6b7c713e95f5642',
       'condition': 'checkout_ios and checkout_src_internal',
   },
 
@@ -5093,7 +5093,6 @@ hooks = [
     'action': [ 'python3',
                 'src/third_party/depot_tools/download_from_google_storage.py',
                 '--no_resume',
-                '--no_auth',
                 '--bucket', 'chromium-browser-clang/ciopfs',
                 '-s', 'src/build/ciopfs.sha1',
     ]
@@ -5174,7 +5173,6 @@ hooks = [
     'action': [ 'python3',
                 'src/third_party/depot_tools/download_from_google_storage.py',
                 '--no_resume',
-                '--no_auth',
                 '--bucket', 'chromium-browser-clang',
                 '-s', 'src/tools/clang/dsymutil/bin/dsymutil.arm64.sha1',
                 '-o', 'src/tools/clang/dsymutil/bin/dsymutil',
@@ -5187,7 +5185,6 @@ hooks = [
     'action': [ 'python3',
                 'src/third_party/depot_tools/download_from_google_storage.py',
                 '--no_resume',
-                '--no_auth',
                 '--bucket', 'chromium-browser-clang',
                 '-s', 'src/tools/clang/dsymutil/bin/dsymutil.x64.sha1',
                 '-o', 'src/tools/clang/dsymutil/bin/dsymutil',
@@ -5202,7 +5199,6 @@ hooks = [
     'action': [ 'python3',
                 'src/third_party/depot_tools/download_from_google_storage.py',
                 '--no_resume',
-                '--no_auth',
                 '--bucket', 'chromium-browser-clang/rc',
                 '-s', 'src/build/toolchain/win/rc/win/rc.exe.sha1',
     ],
@@ -5214,7 +5210,6 @@ hooks = [
     'action': [ 'python3',
                 'src/third_party/depot_tools/download_from_google_storage.py',
                 '--no_resume',
-                '--no_auth',
                 '--bucket', 'chromium-browser-clang/rc',
                 '-s', 'src/build/toolchain/win/rc/mac/rc.sha1',
     ],
@@ -5226,7 +5221,6 @@ hooks = [
     'action': [ 'python3',
                 'src/third_party/depot_tools/download_from_google_storage.py',
                 '--no_resume',
-                '--no_auth',
                 '--bucket', 'chromium-browser-clang/rc',
                 '-s', 'src/build/toolchain/win/rc/linux64/rc.sha1',
     ]
@@ -5240,7 +5234,6 @@ hooks = [
                 '--no_resume',
                 '--directory',
                 '--recursive',
-                '--no_auth',
                 '--num_threads=16',
                 '--bucket', 'chromium-apache-win32',
                 'src/third_party/apache-win32',
