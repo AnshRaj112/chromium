@@ -138,9 +138,17 @@ class LanguageDetectorCreateTask
       return;
     }
 
-    LocalDOMWindow* const window = LocalDOMWindow::From(GetScriptState());
+    ScriptState* script_state = GetScriptState();
+    ExecutionContext* context = ExecutionContext::From(script_state);
+    LocalDOMWindow* const window = LocalDOMWindow::From(script_state);
 
-    if (RequiresUserActivation(result) &&
+    // The Language Detector API is only available within a window or extension
+    // service worker context. User activation is not consumed by workers, as
+    // they lack the ability to do so.
+    CHECK(window != nullptr || context->IsServiceWorkerGlobalScope());
+
+    if (!context->IsServiceWorkerGlobalScope() &&
+        RequiresUserActivation(result) &&
         !LocalFrame::ConsumeTransientUserActivation(window->GetFrame())) {
       GetResolver()->RejectWithDOMException(
           DOMExceptionCode::kNotAllowedError,
@@ -168,7 +176,8 @@ class LanguageDetectorCreateTask
     }
 
     std::optional<Vector<String>> expected_input_languages;
-    if (options_->hasExpectedInputLanguages()) {
+    if (options_->hasExpectedInputLanguages() &&
+        !options_->expectedInputLanguages().empty()) {
       expected_input_languages = GetBestFitLanguages(
           kSupportedLanguages, options_->expectedInputLanguages());
       if (!expected_input_languages.has_value()) {

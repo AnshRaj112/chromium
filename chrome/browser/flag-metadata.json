@@ -326,6 +326,11 @@
     "expiry_milestone": 142
   },
   {
+    "name": "android-tab-declutter-performance-improvements",
+    "owners": [ "wylieb@google.com", "clank-tab-dev@google.com" ],
+    "expiry_milestone": 140
+  },
+  {
     "name": "android-theme-module",
     "owners": [
       "wenyufu@chromium.org"
@@ -3336,16 +3341,6 @@
       "rizvis@google.com",
       "bcl@google.com"
     ],
-    "expiry_milestone": 140
-  },
-  {
-    "name": "enable-follow-IPH-exp-params",
-    "owners": [ "sczs@chromium.org", "tinazwang@chromium.org" ],
-    "expiry_milestone": 130
-  },
-  {
-    "name": "enable-follow-ui-update",
-    "owners": [ "huitingyu@chromium.org", "bling-get-set-up@google.com" ],
     "expiry_milestone": 140
   },
   {
@@ -9845,12 +9840,6 @@
     "name": "web-feed-feedback-reroute",
     "owners": ["zekunjiang@chromium.org", "tinazwang@chromium.org", "chrome-with-friends@google.com"],
     "expiry_milestone": 122
-  },
-  {
-    "name": "web-feed-ios",
-    "owners": [ "adamta@chromium.org", "bling-get-set-up@google.com" ],
-    // Long expiry to allow us to disable Follow remotely.
-    "expiry_milestone": 150
   },
   {
     "name": "web-feed-onboarding",

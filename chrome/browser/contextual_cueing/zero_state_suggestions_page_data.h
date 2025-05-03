@@ -47,7 +47,7 @@ class ZeroStateSuggestionsPageData
   ~ZeroStateSuggestionsPageData() override;
 
   // Initiates page content extraction.
-  void InitiatePageContentExtraction(bool has_first_contentful_paint);
+  void InitiatePageContentExtraction();
 
   // Explicitly fetch suggestions for this page.
   void FetchSuggestions(bool is_fre, GlicSuggestionsCallback callback);
@@ -86,10 +86,6 @@ class ZeroStateSuggestionsPageData
   // Send out suggestions request, if all necessary fetches are complete.
   void RequestSuggestionsIfComplete();
 
-  // Return suggestions result by invoking `suggestions_callbacks_`, if all
-  // necessary fetches are complete.
-  void ProcessSuggestionsIfComplete();
-
   // If `optimization_metadata_` contains everything necessary to determine a
   // suggestions result, run `suggestions_callbacks_` to return those
   // suggestions. This method itself also returns true if suggestions are sent
@@ -98,11 +94,14 @@ class ZeroStateSuggestionsPageData
 
   // Called when a zero state suggestions server response is received.
   void OnModelExecutionResponse(
+      base::TimeTicks mes_begin_time,
       optimization_guide::OptimizationGuideModelExecutionResult result,
       std::unique_ptr<optimization_guide::ModelQualityLogEntry> log_entry);
 
-  // Tracks the status of inner text and annotated page content fetches, which
-  // are needed in `RequestSuggestionsIfComplete()`.
+  // Tracks the status of fetches needed in `RequestSuggestionsIfComplete()`:
+  // 1. inner text
+  // 2. annotated page content
+  // 3. optimization metadata
   bool content_extraction_initiated_ = false;
   base::TimeTicks page_context_begin_time_;
   // Tracks if `this` has logged to page context extraction duration histogram.
@@ -112,16 +111,9 @@ class ZeroStateSuggestionsPageData
   bool annotated_page_content_done_ = false;
   std::optional<optimization_guide::AIPageContentResult>
       annotated_page_content_;
-
-  // Tracks the status of fetches for on-demand optimization metadata, and
-  // suggestions from model execution service, which are needed for
-  // `ProcessSuggestionsIfComplete()`.
   bool optimization_metadata_done_ = false;
   optimization_guide::OptimizationGuideDecision optimization_decision_;
   optimization_guide::OptimizationMetadata optimization_metadata_;
-  bool mes_suggestions_done_ = false;
-  std::unique_ptr<optimization_guide::OptimizationGuideModelExecutionResult>
-      mes_suggestions_result_;
 
   // Tracks the state for a request.
   base::TimeTicks begin_time_;

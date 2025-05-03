@@ -92,6 +92,7 @@ import org.chromium.chrome.browser.compositor.layouts.components.CompositorButto
 import org.chromium.chrome.browser.compositor.layouts.components.CompositorButton.ButtonType;
 import org.chromium.chrome.browser.compositor.layouts.components.TintedCompositorButton;
 import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutView.StripLayoutViewOnClickHandler;
+import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutView.StripLayoutViewOnKeyboardFocusHandler;
 import org.chromium.chrome.browser.compositor.overlays.strip.TabStripIphController.IphType;
 import org.chromium.chrome.browser.compositor.overlays.strip.reorder.ReorderDelegate;
 import org.chromium.chrome.browser.compositor.overlays.strip.reorder.ReorderDelegate.ReorderType;
@@ -181,6 +182,7 @@ public class StripLayoutHelperTest {
     @Mock private StripTabHoverCardView mTabHoverCardView;
     @Mock private Profile mProfile;
     @Mock private StripLayoutViewOnClickHandler mClickHandler;
+    @Mock private StripLayoutViewOnKeyboardFocusHandler mKeyboardFocusHandler;
     @Mock private TabDragSource mTabDragSource;
     @Mock private WindowAndroid mWindowAndroid;
     @Mock private LayerTitleCache mLayerTitleCache;
@@ -1466,6 +1468,7 @@ public class StripLayoutHelperTest {
                         24.f,
                         24.f,
                         mClickHandler,
+                        mKeyboardFocusHandler,
                         R.drawable.btn_tab_close_normal,
                         0f);
         closeButton.setOpacity(1.f);
@@ -1502,6 +1505,7 @@ public class StripLayoutHelperTest {
                         24.f,
                         24.f,
                         mClickHandler,
+                        mKeyboardFocusHandler,
                         R.drawable.btn_tab_close_normal,
                         0f);
         closeButton.setOpacity(1.f);
@@ -1698,6 +1702,25 @@ public class StripLayoutHelperTest {
 
         // Assert: scroller position is not modified.
         assertEquals(1000, mStripLayoutHelper.getScrollerForTesting().getFinalX());
+    }
+
+    @Test
+    public void testScroll_onKeyboardFocus() {
+        // Arrange: Initialize tabs with last tab selected.
+        initializeTest(false, true, 11, 12);
+
+        // Set screen width to 800dp and scroll selected tab to view.
+        mStripLayoutHelper.onSizeChanged(
+                SCREEN_WIDTH, SCREEN_HEIGHT, false, TIMESTAMP, PADDING_LEFT, PADDING_RIGHT, 0f);
+        StripLayoutTab tabToFocus = mStripLayoutHelper.getStripLayoutTabsForTesting()[0];
+
+        // Set keyboard focus state of the last tab, as if we focus looped around.
+        tabToFocus.setKeyboardFocused(true);
+
+        // Complete animations.
+        mStripLayoutHelper.finishScrollForTesting();
+
+        assertEquals(0.0, mStripLayoutHelper.getScrollOffset(), EPSILON);
     }
 
     @Test
@@ -4112,6 +4135,44 @@ public class StripLayoutHelperTest {
 
         // Now switch to a different tab model.
         mStripLayoutHelper.tabModelSelected(false);
+
+        // Assert that the hover card view is closed and the last hovered tab is null.
+        verify(mTabHoverCardView, times(1)).hide();
+        assertNull(mStripLayoutHelper.getLastHoveredTab());
+    }
+
+    @Test
+    public void testClickingClearsTabHoverState() {
+        // Initialize hover card, then hover on a tab.
+        initializeTabHoverTest();
+        StripLayoutTab hoveredTab = mStripLayoutHelper.getStripLayoutTabsForTesting()[0];
+        mStripLayoutHelper.updateLastHoveredTab(hoveredTab);
+
+        // Now click on the tab that's originating the hovercard.
+        mStripLayoutHelper.click(1000L, hoveredTab.getDrawX() + 1, hoveredTab.getDrawY() + 1, 0);
+
+        // Assert that the hover card view is closed and the last hovered tab is null.
+        verify(mTabHoverCardView, times(1)).hide();
+        assertNull(mStripLayoutHelper.getLastHoveredTab());
+    }
+
+    @Test
+    @EnableFeatures(ChromeFeatureList.TAB_STRIP_CONTEXT_MENU)
+    public void testRightClickingClearsTabHoverState() {
+        // Initialize hover card, then hover on a tab.
+        initializeTabHoverTest();
+        StripLayoutTab hoveredTab = mStripLayoutHelper.getStripLayoutTabsForTesting()[0];
+        mStripLayoutHelper.updateLastHoveredTab(hoveredTab);
+
+        // Set up things necessary for right-click.
+        setupForIndividualTabContextMenu();
+
+        // Now right-click on the tab that's originating the hovercard.
+        mStripLayoutHelper.click(
+                1000L,
+                hoveredTab.getDrawX() + 1,
+                hoveredTab.getDrawY() + 1,
+                MotionEvent.BUTTON_SECONDARY);
 
         // Assert that the hover card view is closed and the last hovered tab is null.
         verify(mTabHoverCardView, times(1)).hide();

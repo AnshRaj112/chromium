@@ -36,7 +36,6 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabObscuringHandler;
 import org.chromium.chrome.browser.tabmodel.IncognitoStateProvider;
 import org.chromium.chrome.browser.tabmodel.IncognitoStateProvider.IncognitoStateObserver;
-import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.theme.ThemeColorProvider;
 import org.chromium.chrome.browser.theme.TopUiThemeColorProvider;
 import org.chromium.chrome.browser.toolbar.R;
@@ -91,7 +90,6 @@ public class TopToolbarCoordinator implements Toolbar {
     private @Nullable ReloadButtonCoordinator mReloadButtonCoordinator;
     private @Nullable final BackButtonCoordinator mBackButtonCoordinator;
     private @Nullable ObservableSupplier<AppMenuButtonHelper> mAppMenuButtonHelperSupplier;
-    private ObservableSupplier<TabModelSelector> mTabModelSelectorSupplier;
 
     /** Null until {@link #initializeWithNative} is called. */
     private @Nullable TabStripTransitionCoordinator mTabStripTransitionCoordinator;
@@ -114,6 +112,8 @@ public class TopToolbarCoordinator implements Toolbar {
     private OneshotSupplier<TabStripTransitionDelegate> mTabStripTransitionDelegateSupplier;
     private ObservableSupplierImpl<Boolean> mNtpLoadingSupplier;
 
+    private ObservableSupplier<Integer> mTabCountSupplier;
+
     /** Token used to block the tab strip transition when find in page toolbar is showing. */
     private int mFindToolbarToken = TokenHolder.INVALID_TOKEN;
 
@@ -135,7 +135,8 @@ public class TopToolbarCoordinator implements Toolbar {
      * @param normalThemeColorProvider The {@link ThemeColorProvider} for normal mode.
      * @param browsingModeMenuButtonCoordinator Root component for app menu.
      * @param appMenuButtonHelperSupplier For specific handling of the app menu button.
-     * @param tabModelSelectorSupplier Supplier of the {@link TabModelSelector}.
+     * @param tabCountSupplier Supplier of {@link
+     *     org.chromium.chrome.browser.toolbar.CustomTabCount}.
      * @param homepageEnabledSupplier Supplier of whether Home button is enabled.
      * @param resourceManagerSupplier A supplier of a resource manager for native textures.
      * @param historyDelegate Delegate used to display navigation history.
@@ -163,8 +164,8 @@ public class TopToolbarCoordinator implements Toolbar {
             ThemeColorProvider normalThemeColorProvider,
             MenuButtonCoordinator browsingModeMenuButtonCoordinator,
             ObservableSupplier<AppMenuButtonHelper> appMenuButtonHelperSupplier,
-            ToggleTabStackButtonCoordinator tabSwitcerButtonCoordinator,
-            ObservableSupplier<TabModelSelector> tabModelSelectorSupplier,
+            ToggleTabStackButtonCoordinator tabSwitcherButtonCoordinator,
+            ObservableSupplier<Integer> tabCountSupplier,
             ObservableSupplier<Boolean> homepageEnabledSupplier,
             Supplier<ResourceManager> resourceManagerSupplier,
             HistoryDelegate historyDelegate,
@@ -179,7 +180,7 @@ public class TopToolbarCoordinator implements Toolbar {
             OneshotSupplier<TabStripTransitionDelegate> tabStripTransitionDelegateSupplier,
             @Nullable OnLongClickListener onLongClickListener,
             ToolbarProgressBar progressBar,
-            ObservableSupplier<Tab> tabSupplier,
+            ObservableSupplier<@Nullable Tab> tabSupplier,
             @Nullable BackButtonCoordinator backButtonCoordinator) {
         mToolbarLayout = toolbarLayout;
         mMenuButtonCoordinator = browsingModeMenuButtonCoordinator;
@@ -192,7 +193,7 @@ public class TopToolbarCoordinator implements Toolbar {
                         mToolbarLayout,
                         () -> toolbarDataProvider.getTab());
         mResourceManagerSupplier = resourceManagerSupplier;
-        mTabModelSelectorSupplier = tabModelSelectorSupplier;
+        mTabCountSupplier = tabCountSupplier;
         mToolbarColorObserverManager = new ToolbarColorObserverManager();
         mToolbarLayout.setToolbarColorObserver(mToolbarColorObserverManager);
         mTabObscuringHandler = tabObscuringHandler;
@@ -236,7 +237,7 @@ public class TopToolbarCoordinator implements Toolbar {
                 toolbarDataProvider,
                 tabController,
                 mMenuButtonCoordinator,
-                tabSwitcerButtonCoordinator,
+                tabSwitcherButtonCoordinator,
                 historyDelegate,
                 userEducationHelper,
                 mTrackerSupplier,
@@ -281,15 +282,13 @@ public class TopToolbarCoordinator implements Toolbar {
             OnClickListener bookmarkClickHandler,
             OnClickListener customTabsBackClickHandler,
             LayoutManager layoutManager,
-            ObservableSupplier<Tab> tabSupplier,
+            ObservableSupplier<@Nullable Tab> tabSupplier,
             BrowserControlsVisibilityManager browserControlsVisibilityManager,
             TopUiThemeColorProvider topUiThemeColorProvider,
             ObservableSupplier<Integer> bottomToolbarControlsOffsetSupplier,
             ObservableSupplier<Boolean> suppressToolbarSceneLayerSupplier) {
-        assert mTabModelSelectorSupplier.get() != null;
         mTrackerSupplier.set(TrackerFactory.getTrackerForProfile(profile));
-        mToolbarLayout.setTabCountSupplier(
-                mTabModelSelectorSupplier.get().getCurrentModelTabCountSupplier());
+        mToolbarLayout.setTabCountSupplier(mTabCountSupplier);
         getLocationBar().updateVisualsForState();
         mToolbarLayout.setBookmarkClickHandler(bookmarkClickHandler);
         mToolbarLayout.setCustomTabCloseClickHandler(customTabsBackClickHandler);
@@ -408,8 +407,8 @@ public class TopToolbarCoordinator implements Toolbar {
         if (mAppMenuButtonHelperSupplier != null) {
             mAppMenuButtonHelperSupplier = null;
         }
-        if (mTabModelSelectorSupplier != null) {
-            mTabModelSelectorSupplier = null;
+        if (mTabCountSupplier != null) {
+            mTabCountSupplier = null;
         }
         if (mControlContainer != null) {
             mControlContainer = null;

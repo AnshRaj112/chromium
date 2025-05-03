@@ -5,6 +5,7 @@
 #include "services/on_device_model/public/cpp/test_support/fake_service.h"
 
 #include <string>
+#include <variant>
 
 #include "base/check.h"
 #include "base/containers/span.h"
@@ -13,6 +14,8 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/to_string.h"
+#include "services/on_device_model/ml/chrome_ml_audio_buffer.h"
+#include "services/on_device_model/ml/chrome_ml_types.h"
 #include "services/on_device_model/public/mojom/on_device_model.mojom-shared.h"
 #include "third_party/re2/src/re2/re2.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -28,19 +31,41 @@ std::string ReadFile(base::File& file) {
   return std::string(base::as_string_view(base::as_chars(map.bytes())));
 }
 
+std::string Placeholder(ml::Token token) {
+  switch (token) {
+    case ml::Token::kEnd:
+      return "E";
+    case ml::Token::kModel:
+      return "M";
+    case ml::Token::kSystem:
+      return "S";
+    case ml::Token::kUser:
+      return "U";
+  }
+}
+
 std::string OnDeviceInputToString(const mojom::Input& input,
                                   const Capabilities& capabilities) {
   std::ostringstream oss;
   for (const auto& piece : input.pieces) {
-    if (std::holds_alternative<std::string>(piece)) {
+    if (std::holds_alternative<ml::Token>(piece)) {
+      oss << Placeholder(std::get<ml::Token>(piece));
+    } else if (std::holds_alternative<std::string>(piece)) {
       oss << std::get<std::string>(piece);
-    }
-    if (std::holds_alternative<SkBitmap>(piece)) {
+    } else if (std::holds_alternative<SkBitmap>(piece)) {
       if (capabilities.Has(CapabilityFlags::kImageInput)) {
         oss << "<image>";
       } else {
         oss << "<unsupported>";
       }
+    } else if (std::holds_alternative<ml::AudioBuffer>(piece)) {
+      if (capabilities.Has(CapabilityFlags::kAudioInput)) {
+        oss << "<audio>";
+      } else {
+        oss << "<unsupported>";
+      }
+    } else {
+      oss << "<unknown>";
     }
   }
   return oss.str();
@@ -180,10 +205,13 @@ void FakeOnDeviceSession::GenerateImpl(
     remote->OnResponse(std::move(chunk));
   }
 
+  int output_token_count = 0;
   if (settings_->model_execute_result.empty()) {
     for (const auto& context : context_) {
+      std::string text = CtxToString(*context, capabilities_);
+      output_token_count += text.size();
       auto chunk = mojom::ResponseChunk::New();
-      chunk->text = "Context: " + CtxToString(*context, capabilities_) + "\n";
+      chunk->text = "Context: " + text + "\n";
       remote->OnResponse(std::move(chunk));
     }
     if (options->top_k > 1) {
@@ -195,12 +223,14 @@ void FakeOnDeviceSession::GenerateImpl(
     }
   } else {
     for (const auto& text : settings_->model_execute_result) {
+      output_token_count += text.size();
       auto chunk = mojom::ResponseChunk::New();
       chunk->text = text;
       remote->OnResponse(std::move(chunk));
     }
   }
   auto summary = mojom::ResponseSummary::New();
+  summary->output_token_count = output_token_count;
   remote->OnComplete(std::move(summary));
 }
 

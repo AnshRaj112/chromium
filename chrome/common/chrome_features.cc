@@ -357,7 +357,7 @@ const base::FeatureParam<int> kGlicReloadMaxLoadingTimeMs{
 const base::FeatureParam<int> kGlicInitialWidth{&kGlic, "glic-initial-width",
                                                 352};
 const base::FeatureParam<int> kGlicInitialHeight{&kGlic, "glic-initial-height",
-                                                 48};
+                                                 86};
 
 const base::FeatureParam<int> kGlicFreInitialWidth{
     &kGlic, "glic-fre-initial-width", 512};
@@ -518,6 +518,10 @@ BASE_FEATURE(kGlicRollout, "GlicRollout", base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGlicUserStatusCheck,
              "GlicUserStatusCheck",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kGlicClosedCaptioning,
+             "GlicClosedCaptioning",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
@@ -821,11 +825,6 @@ BASE_FEATURE(kHttpsFirstDialogUi,
              "HttpsFirstDialogUi",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables the new interstitial UI for HTTPS-First Mode.
-BASE_FEATURE(kHttpsFirstModeInterstitialAugust2024Refresh,
-             "HttpsFirstModeInterstitialAugust2024Refresh",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Kill switch for crbug.com/1414633.
 BASE_FEATURE(kHttpsFirstModeForAdvancedProtectionUsers,
              "HttpsOnlyModeForAdvancedProtectionUsers",
@@ -1072,7 +1071,7 @@ BASE_FEATURE(kOverridePrefetchOnSingleton,
 // Skips requesting the Parent Access Code for reauth.
 BASE_FEATURE(kSkipParentAccessCodeForReauth,
              "SkipParentAccessCodeForReauth",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enable support for "Plugin VMs" on Chrome OS.
 BASE_FEATURE(kPluginVm, "PluginVm", base::FEATURE_DISABLED_BY_DEFAULT);

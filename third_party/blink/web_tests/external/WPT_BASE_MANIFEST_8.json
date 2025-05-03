@@ -2783,6 +2783,13 @@
     },
     "css-grid": {
      "abspos": {
+      "abspos-in-flexbox-in-grid-crash.html": [
+       "a2f71fb78e7f6fd82ea539e3af6c76d36f21e134",
+       [
+        null,
+        {}
+       ]
+      ],
       "positioned-grid-items-crash.html": [
        "228a6264df77fe82587a4116f231ff09537c8372",
        [
@@ -4900,6 +4907,13 @@
     "css-tables": {
      "absolute-crash.html": [
       "d45582560760c03163d3dc941e4aca6b0f03c588",
+      [
+       null,
+       {}
+      ]
+     ],
+     "colspan-zero-crash.html": [
+      "a50586a5bfa7551724b838a0438339a34b4930fb",
       [
        null,
        {}
@@ -134430,191 +134444,215 @@
        ]
       ]
      },
-     "tentative": {
-      "multicol": {
-       "multicol-gap-decorations-001.html": [
-        "c3752156c7d54f6620ade9715b4562582c6135f6",
+     "multicol": {
+      "multicol-gap-decorations-001.html": [
+       "c3752156c7d54f6620ade9715b4562582c6135f6",
+       [
+        null,
         [
-         null,
          [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-001-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-002.html": [
-        "0b632fa94ace20a253f5f56079d29adbb7997135",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-002-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-003.html": [
-        "2f2473fd04686283e120abd29b5f273da40c3ef3",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-003-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-004.html": [
-        "0dcbeef4df82f4d9dc6e2ed2215ee2fa39773052",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-004-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-005.html": [
-        "daa65e904e71ee62c83ba2a16933d13311328539",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-005-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-006.html": [
-        "64b3b007ab5f6282c95bb79a39a3bcf89d10de88",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-006-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-007.html": [
-        "1f23ed7f7ca34602f4310627edb5ae96885028b8",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-007-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-008.html": [
-        "ed299b5d9f68e8560d99cdd58fcc9b3830929117",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-008-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-009.html": [
-        "b00c6a70f8abf9894e548d9e40882e396ed5b1f0",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-009-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-010.html": [
-        "61bb4a9b93314bb7d96a90b98f67b175a4cf86c6",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-010-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-011.html": [
-        "cf588ded41ea3e811c241984ec8909e5fbcf14be",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-011-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-012.html": [
-        "078b810cf8e608b16dd2a898136f4ce757325ed9",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-012-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-013.html": [
-        "d4170084f066688fd136b2abeb40da03b1243816",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-013-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
-       ],
-       "multicol-gap-decorations-014.html": [
-        "1dcd393d99aa19021684e42e9f835e17281fc6a4",
-        [
-         null,
-         [
-          [
-           "/css/css-gaps/tentative/multicol/multicol-gap-decorations-014-ref.html",
-           "=="
-          ]
-         ],
-         {}
-        ]
+          "/css/css-gaps/multicol/multicol-gap-decorations-001-ref.html",
+          "=="
+         ]
+        ],
+        {}
        ]
-      }
+      ],
+      "multicol-gap-decorations-002.html": [
+       "0b632fa94ace20a253f5f56079d29adbb7997135",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-002-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-003.html": [
+       "2f2473fd04686283e120abd29b5f273da40c3ef3",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-003-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-004.html": [
+       "0dcbeef4df82f4d9dc6e2ed2215ee2fa39773052",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-004-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-005.html": [
+       "daa65e904e71ee62c83ba2a16933d13311328539",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-005-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-006.html": [
+       "64b3b007ab5f6282c95bb79a39a3bcf89d10de88",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-006-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-007.html": [
+       "1f23ed7f7ca34602f4310627edb5ae96885028b8",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-007-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-008.html": [
+       "ed299b5d9f68e8560d99cdd58fcc9b3830929117",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-008-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-009.html": [
+       "b00c6a70f8abf9894e548d9e40882e396ed5b1f0",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-009-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-010.html": [
+       "61bb4a9b93314bb7d96a90b98f67b175a4cf86c6",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-010-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-011.html": [
+       "cf588ded41ea3e811c241984ec8909e5fbcf14be",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-011-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-012.html": [
+       "078b810cf8e608b16dd2a898136f4ce757325ed9",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-012-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-013.html": [
+       "d4170084f066688fd136b2abeb40da03b1243816",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-013-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-014.html": [
+       "1dcd393d99aa19021684e42e9f835e17281fc6a4",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-014-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-015.html": [
+       "65af5112097f1a2d2d80ee5779fe5e5adc8b58a6",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-015-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "multicol-gap-decorations-016.html": [
+       "da205e0b88bf7f8d8ca0988a54f6ac1237bc1669",
+       [
+        null,
+        [
+         [
+          "/css/css-gaps/multicol/multicol-gap-decorations-016-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ]
      }
     },
     "css-grid": {
@@ -138420,6 +138458,19 @@
         [
          [
           "/css/css-grid/reference/fr-unit-ref.html",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "grid-auto-fit-with-calc.html": [
+       "4b655c1e1218923f2ddeb75293dfc87f5ce1c8a8",
+       [
+        null,
+        [
+         [
+          "/css/reference/ref-filled-green-100px-square-only.html",
           "=="
          ]
         ],
@@ -143841,6 +143892,19 @@
       ],
       "line-names-014.html": [
        "fe1d5d46633568287d502c09e0ae1d30c74d1658",
+       [
+        null,
+        [
+         [
+          "/css/reference/ref-filled-green-100px-square.xht",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "line-names-015.html": [
+       "6f5479abf8932d1e8da9950c339b3c8a2314960b",
        [
         null,
         [
@@ -226006,6 +226070,45 @@
         {}
        ]
       ],
+      "stacking-context-002.html": [
+       "ff1d06dcc11ff445abc8ecaebe305836aa6ab14f",
+       [
+        null,
+        [
+         [
+          "/css/reference/ref-filled-green-100px-square.xht",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "stacking-context-003.html": [
+       "6852722ed79183119f2a3fb142077b9e7c638e91",
+       [
+        null,
+        [
+         [
+          "/css/reference/ref-filled-green-100px-square.xht",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
+      "stacking-context-004.html": [
+       "6d7ec896736db0dc813a6e80ac4c75b7066e12e0",
+       [
+        null,
+        [
+         [
+          "/css/reference/ref-filled-green-100px-square.xht",
+          "=="
+         ]
+        ],
+        {}
+       ]
+      ],
       "translate-fill-box.html": [
        "8892d63327964cf1e9c16a3febaecf5af4d1cceb",
        [
@@ -257957,6 +258060,19 @@
        }
       ]
      ],
+     "snapshot-containing-block-static-iframe.html": [
+      "1903b9cacbd334c3d0d6be4e7083cb1ced9d9b92",
+      [
+       null,
+       [
+        [
+         "/css/css-view-transitions/snapshot-containing-block-static-iframe-ref.html",
+         "=="
+        ]
+       ],
+       {}
+      ]
+     ],
      "snapshot-containing-block-static.html": [
       "fcea95e6efdb5d156a3c940faeef3928a3640910",
       [
@@ -258203,6 +258319,19 @@
        [
         [
          "/css/css-view-transitions/view-transition-name-removed-mid-transition-ref.html",
+         "=="
+        ]
+       ],
+       {}
+      ]
+     ],
+     "view-transition-name-stacking-context-dynamic.html": [
+      "1a908e6f65949a0874bb8dc107156c0db22f783a",
+      [
+       null,
+       [
+        [
+         "/css/reference/ref-filled-green-100px-square-only.html",
          "=="
         ]
        ],
@@ -269695,6 +269824,19 @@
        [
         [
          "/css/css-writing-modes/orthogonal-containing-block-height-changes-ref.html",
+         "=="
+        ]
+       ],
+       {}
+      ]
+     ],
+     "orthogonal-dynamic-size-001.html": [
+      "add7f1fc2aa8ac0ecaa6452c6a171c9781e9fd83",
+      [
+       null,
+       [
+        [
+         "/css/reference/ref-filled-green-100px-square.xht",
          "=="
         ]
        ],
@@ -307421,7 +307563,7 @@
        ]
       ],
       "lengths-1.html": [
-       "896f08d111907e62a23a146299ab20a8a5260c09",
+       "224bedc1efc1149ad0cad381fbd3a43e398d4e06",
        [
         null,
         [
@@ -319593,7 +319735,7 @@
     "language_detection": {
      "resources": {
       "iframe-helper.html": [
-       "fe07de3f8abac59ddbd6ccfd706a5e69c5b8b4c4",
+       "35ba852558725ecf4adb9af92e4bc0abb1cf8c38",
        []
       ],
       "util.js": [
@@ -349723,65 +349865,71 @@
        []
       ]
      },
-     "tentative": {
-      "multicol": {
-       "multicol-gap-decorations-001-ref.html": [
-        "834c96ccd397fbc41abcfb80dbd298094cb929b1",
-        []
-       ],
-       "multicol-gap-decorations-002-ref.html": [
-        "d132f0ca6770be13d87ee66fb033f2f498d0e37b",
-        []
-       ],
-       "multicol-gap-decorations-003-ref.html": [
-        "cd26da243891f05c83c5d1eea17c747dcf390f05",
-        []
-       ],
-       "multicol-gap-decorations-004-ref.html": [
-        "002b1f2b594cf791b6d66613f48128e915517e01",
-        []
-       ],
-       "multicol-gap-decorations-005-ref.html": [
-        "6543021c97934a217568e567ac005166f7a9c0a0",
-        []
-       ],
-       "multicol-gap-decorations-006-ref.html": [
-        "4cb56d207fef4f801ec2063828103712267c030e",
-        []
-       ],
-       "multicol-gap-decorations-007-ref.html": [
-        "09973ddc690a899be9fb321e603b7831bfeb22a7",
-        []
-       ],
-       "multicol-gap-decorations-008-ref.html": [
-        "d49c2f50f1909d5b04be07798e62448d9b82ab72",
-        []
-       ],
-       "multicol-gap-decorations-009-ref.html": [
-        "124bf7eaeb1779d067d84f1c30560f45763add7c",
-        []
-       ],
-       "multicol-gap-decorations-010-ref.html": [
-        "9582ab4103d197d25823ed75dc8cafa83e0b1a7c",
-        []
-       ],
-       "multicol-gap-decorations-011-ref.html": [
-        "3387918d399cdbd3b39364ebe954a2a204a5145c",
-        []
-       ],
-       "multicol-gap-decorations-012-ref.html": [
-        "9fb5e85e920812d259e057c7538d35db56659b05",
-        []
-       ],
-       "multicol-gap-decorations-013-ref.html": [
-        "8e426d8ed32b25248e602e063e69678ca94b5e09",
-        []
-       ],
-       "multicol-gap-decorations-014-ref.html": [
-        "9d9674bd476896f0f1b03ec6835b069c97d9c8e5",
-        []
-       ]
-      }
+     "multicol": {
+      "multicol-gap-decorations-001-ref.html": [
+       "834c96ccd397fbc41abcfb80dbd298094cb929b1",
+       []
+      ],
+      "multicol-gap-decorations-002-ref.html": [
+       "d132f0ca6770be13d87ee66fb033f2f498d0e37b",
+       []
+      ],
+      "multicol-gap-decorations-003-ref.html": [
+       "cd26da243891f05c83c5d1eea17c747dcf390f05",
+       []
+      ],
+      "multicol-gap-decorations-004-ref.html": [
+       "002b1f2b594cf791b6d66613f48128e915517e01",
+       []
+      ],
+      "multicol-gap-decorations-005-ref.html": [
+       "6543021c97934a217568e567ac005166f7a9c0a0",
+       []
+      ],
+      "multicol-gap-decorations-006-ref.html": [
+       "4cb56d207fef4f801ec2063828103712267c030e",
+       []
+      ],
+      "multicol-gap-decorations-007-ref.html": [
+       "09973ddc690a899be9fb321e603b7831bfeb22a7",
+       []
+      ],
+      "multicol-gap-decorations-008-ref.html": [
+       "d49c2f50f1909d5b04be07798e62448d9b82ab72",
+       []
+      ],
+      "multicol-gap-decorations-009-ref.html": [
+       "124bf7eaeb1779d067d84f1c30560f45763add7c",
+       []
+      ],
+      "multicol-gap-decorations-010-ref.html": [
+       "9582ab4103d197d25823ed75dc8cafa83e0b1a7c",
+       []
+      ],
+      "multicol-gap-decorations-011-ref.html": [
+       "3387918d399cdbd3b39364ebe954a2a204a5145c",
+       []
+      ],
+      "multicol-gap-decorations-012-ref.html": [
+       "9fb5e85e920812d259e057c7538d35db56659b05",
+       []
+      ],
+      "multicol-gap-decorations-013-ref.html": [
+       "8e426d8ed32b25248e602e063e69678ca94b5e09",
+       []
+      ],
+      "multicol-gap-decorations-014-ref.html": [
+       "9d9674bd476896f0f1b03ec6835b069c97d9c8e5",
+       []
+      ],
+      "multicol-gap-decorations-015-ref.html": [
+       "2fee77be84c105e2f1001d13152883c5a7dea6e4",
+       []
+      ],
+      "multicol-gap-decorations-016-ref.html": [
+       "8b2458fccce5a190c2c804b7e552dc0d85a8849a",
+       []
+      ]
      }
     },
     "css-grid": {
@@ -373761,6 +373909,10 @@
       "c219fb1edd4c24f29760aef7e18332f7362accf7",
       []
      ],
+     "snapshot-containing-block-static-iframe-ref.html": [
+      "188cefecd3d9b225b594e5604aeb68774762d442",
+      []
+     ],
      "snapshot-containing-block-static-ref.html": [
       "0bff68efb23da1a7bf2189f8bcea4a936faeba94",
       []
@@ -380114,28 +380266,32 @@
      "d062affc1848e3f315ef4f7e1d30319545bc7992",
      []
     ],
+    "create.disabled-by-permissions-policy.https.sub.html.headers": [
+     "9847d173eb6278152c83f719914f604375b4d151",
+     []
+    ],
     "create.tentative.https-expected.txt": [
      "8f895920f230fcbd8d88acd15f66e96435164f2b",
      []
     ],
     "dc-types.ts": [
-     "30284e7fad68ea31854bef5e1a47364b11e46d19",
+     "83168f8a343469d479c5a11736e6e1e5ae35f6b1",
      []
     ],
     "digital-credentials-static-methods.tentative.https-expected.txt": [
      "5c4a3b206c3f733dc0fe3e9255e7698d30f4b028",
      []
     ],
-    "disabled-by-permissions-policy.https.sub.html.headers": [
-     "02a76b7c3f289bed45a44e7c949b4792fd798dbc",
-     []
-    ],
     "enabled-on-self-origin-by-permissions-policy.https.sub.html.headers": [
-     "1207d9e29a111a46b920d27dd3188bae1e6cf8f4",
+     "4de358e6a4404c94768441ee20cfc9e7f6191b06",
      []
     ],
     "get-user-activation.https-expected.txt": [
      "e2b5eb3187e9f105c30917c736fb982bc0622c34",
+     []
+    ],
+    "get.disabled-by-permissions-policy.https.sub.html.headers": [
+     "5672154a42328b467a7cbf9e1ad94f3b2e7842d8",
      []
     ],
     "get.tentative.https-expected.txt": [
@@ -380144,7 +380300,7 @@
     ],
     "support": {
      "helper.js": [
-      "71022432652c19ccb7272b02f723dcf748d9e7b3",
+      "5a9cda347888a2527ac059e332d6ad14331dc7ef",
       []
      ],
      "iframe.html": [
@@ -384092,7 +384248,7 @@
       []
      ],
      "event-timing-test-utils.js": [
-      "7bd9782000f40d9f96d8c7074337e6dbaa7aaeeb",
+      "59c78ebf39c8a8e0f31aafa1eccd0809bea54376",
       []
      ],
      "slow-image.py": [
@@ -389119,6 +389275,10 @@
     "math": {
      "axisheight5000-verticalarrow14000.woff": [
       "70f366a3d0b7ec891fc4041584a1ddea55b0bc42",
+      []
+     ],
+     "css-units.woff": [
+      "0957a2fc973700ac5bff6586bc60721b7d4142da",
       []
      ],
      "fraction-axisheight7000-rulethickness1000.woff": [
@@ -404436,6 +404596,10 @@
         ]
        }
       },
+      "contextmenu-historical-expected.txt": [
+       "10865492d6207f036540c7b8afb3da356cc88189",
+       []
+      ],
       "the-details-element": {
        "DIR_METADATA": [
         "046f6842c1e56777436c0afd14e837d3df0a0e25",
@@ -406431,6 +406595,10 @@
        ],
        "checked-indeterminate.window-expected.txt": [
         "15e63a9a7ad831ff201eb05ee60f1c6b2ce189ee",
+        []
+       ],
+       "enabled-expected.txt": [
+        "c77ec3d51f4634e556853656c1426a2640be9fb5",
         []
        ],
        "focus-iframe.html": [
@@ -413067,7 +413235,7 @@
        []
       ],
       "lengths-1-ref.html": [
-       "9fca6f49632ca080ee1b2a32a9ce2d251241dfcc",
+       "74c1397ce62593293b1444dfd52c959856a9060e",
        []
       ],
       "mathbackground-001-notref.html": [
@@ -413403,6 +413571,10 @@
     "tools": {
      "axisheight.py": [
       "7640c4f789cc0248f450b2491b70da3510167c1f",
+      []
+     ],
+     "css-units.py": [
+      "cdf06bb77445c9b8fd2c2464d9725513b4eb3e35",
       []
      ],
      "fractions.py": [
@@ -416565,6 +416737,10 @@
     "resources": {
      "autoplay.js": [
       "56780cf6dc05879731bff0bbb1486c51b0b4141b",
+      []
+     ],
+     "digital-credentials-create.html": [
+      "aafd436282e8b740c713aaeeb6d28c0ab60cc324",
       []
      ],
      "digital-credentials-get.html": [
@@ -424040,7 +424216,7 @@
       ],
       "resources": {
        "property-reflection-helper.js": [
-        "79f1bd7f7483fd53d80fe4e0c824a80987656dfe",
+        "88b7f743831acbfd41ed4ae6a782733bde9875a6",
         []
        ]
       }
@@ -424939,11 +425115,11 @@
      ],
      "resources": {
       "authenticate.py": [
-       "ea0c546afffb5ab7701557ce9d7bf54aa8fbc95a",
+       "b2ca9c450e07278f654a54c868d42c90520451c1",
        []
       ],
       "basic-service-worker.js": [
-       "18432ed62eddb209488a5dd00f39e9c77e071498",
+       "17fccd448d2412287515f6176b0731189eb8eede",
        []
       ],
       "conditional-status.py": [
@@ -424951,7 +425127,7 @@
        []
       ],
       "cookies.py": [
-       "54aaabee70e697283fddd5016358b0775bf9d0a6",
+       "1b56c674c0b6643ab1485500276582805ac8ec62",
        []
       ],
       "counting-executor.py": [
@@ -424971,7 +425147,7 @@
        []
       ],
       "prefetch_nvs_hint.py": [
-       "223135dc8b82ea8f32b7abab8e1e3ed0d77d0bbd",
+       "f4ecb004bc1d6ec9e1eaa3199cd6d0bc54734afd",
        []
       ],
       "random_redirect.py": [
@@ -424999,7 +425175,7 @@
        []
       ],
       "utils.sub.js": [
-       "a90459fdf03822446dc445b294e974587e507717",
+       "d4efc2dc7dce21e1da25842aceda4c3fc50227da",
        []
       ]
      },
@@ -425790,6 +425966,10 @@
      "9ab6e1284ad50d2982ea1f6fc78d7a519e796460",
      []
     ],
+    "WEB_FEATURES.yml": [
+     "d10bbe4a7d7012c197805bc997044989779d23ea",
+     []
+    ],
     "idlharness.any-expected.txt": [
      "3060a81cbfe2a6c31336bf3c133918fe31f16e2b",
      []
@@ -425806,6 +425986,12 @@
      "3060a81cbfe2a6c31336bf3c133918fe31f16e2b",
      []
     ],
+    "piping": {
+     "WEB_FEATURES.yml": [
+      "8cf3517baf08a4611d43a4b0c8d1763835ef19fa",
+      []
+     ]
+    },
     "readable-byte-streams": {
      "WEB_FEATURES.yml": [
       "a35508fc0dc65d5fcbf785289c5bd05674de7b32",
@@ -425845,6 +426031,10 @@
      ]
     },
     "readable-streams": {
+     "WEB_FEATURES.yml": [
+      "ad2cb549631fd2b1ab480db217c345d79998c215",
+      []
+     ],
      "async-iterator.any-expected.txt": [
       "662f60d6e62130331fde429a9c077bbe00e5c5f8",
       []
@@ -425862,6 +426052,10 @@
       []
      ],
      "crashtests": {
+      "WEB_FEATURES.yml": [
+       "b5dbd1ff4199707f1ef59f40a7f5194ec8e5fa4a",
+       []
+      ],
       "empty.js": [
        "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
        []
@@ -426035,6 +426229,10 @@
      ]
     },
     "transform-streams": {
+     "WEB_FEATURES.yml": [
+      "f39dc16de4c73144c772133264f2691855fa2e4e",
+      []
+     ],
      "cancel.any-expected.txt": [
       "f425b736f85440aa22d924a6b89791ad85019322",
       []
@@ -426101,6 +426299,12 @@
      ],
      "reentrant-strategies.any.worker-expected.txt": [
       "5fac42d581c0f94aae85aa6979a7dbfa16301320",
+      []
+     ]
+    },
+    "writable-streams": {
+     "WEB_FEATURES.yml": [
+      "8cf3517baf08a4611d43a4b0c8d1763835ef19fa",
       []
      ]
     }
@@ -437604,7 +437808,7 @@
       []
      ],
      "matchDepthViewValues.js": [
-      "597f9734d3fe66c2600c291a643a6d70ec908a25",
+      "697f4deb8ffce83d29dfc0dde36ee4e6c8ec1e87",
       []
      ],
      "pauseResumeTests.js": [
@@ -466221,10 +466425,13 @@
    "ai": {
     "language_detection": {
      "detector-iframe.https.html": [
-      "ddcf82bec684024f855217c649bb2da6cbd1f577",
+      "9dc39d44a007934715b181c0025cc885db33264e",
       [
        null,
-       {}
+       {
+        "testdriver": true,
+        "timeout": "long"
+       }
       ]
      ],
      "detector-locale.https.window.js": [
@@ -466267,7 +466474,7 @@
       ]
      ],
      "detector.https.window.js": [
-      "b0255bc552b0d2f7c71f8567bab9e0102702cd4c",
+      "379b87415347a1980209fb471d9b1ccb78ccd032",
       [
        "ai/language_detection/detector.https.window.html",
        {
@@ -488871,6 +489078,24 @@
       {}
      ]
     ],
+    "serviceworker_cookiechange_eventhandler_already_expired.https.any.js": [
+     "c40fdbeb6f108db1ea6e100c833a03c3fedbfc19",
+     [
+      "cookie-store/serviceworker_cookiechange_eventhandler_already_expired.https.any.serviceworker.html",
+      {
+       "script_metadata": [
+        [
+         "title",
+         "Cookie Store API: cookiechange event in ServiceWorker with already-expired cookie."
+        ],
+        [
+         "global",
+         "serviceworker"
+        ]
+       ]
+      }
+     ]
+    ],
     "serviceworker_cookiechange_eventhandler_mismatched_subscription.https.any.js": [
      "30d8d70940dae248b3b5cba030056daac78b32a6",
      [
@@ -488898,6 +489123,24 @@
         [
          "title",
          "Cookie Store API: cookiechange event in ServiceWorker with multiple subscriptions"
+        ],
+        [
+         "global",
+         "serviceworker"
+        ]
+       ]
+      }
+     ]
+    ],
+    "serviceworker_cookiechange_eventhandler_no_change.https.any.js": [
+     "fb2e2db7381fea7cbd3463576e126e1581a32d97",
+     [
+      "cookie-store/serviceworker_cookiechange_eventhandler_no_change.https.any.serviceworker.html",
+      {
+       "script_metadata": [
+        [
+         "title",
+         "Cookie Store API: cookiechange event in ServiceWorker with already-expired cookie."
         ],
         [
          "global",
@@ -528304,7 +528547,7 @@
      ],
      "tree-counting": {
       "calc-sibling-function-in-shadow-dom.html": [
-       "92fb6ce3351b9c37b3616445b4f83969a5f30b63",
+       "ca8eb560ba13c8849a468442cc242a68398bbb9f",
        [
         null,
         {}
@@ -528339,7 +528582,7 @@
        ]
       ],
       "sibling-function-invalidation.html": [
-       "3c75c78530dca4cfb30dfc0c17c0ad2049cfb087",
+       "74f4995f5f72413330e577a3a4c72ce095479225",
        [
         null,
         {}
@@ -529482,7 +529725,7 @@
       ]
      ],
      "view-transition-types-mutable-no-document-element-crashtest.html": [
-      "f1940c398695989d6cc569ffb25a03a83be1d064",
+      "d5c0abd652cd3c673a71979a458df8183ab057ba",
       [
        null,
        {}
@@ -529503,7 +529746,7 @@
       ]
      ],
      "window-resize-aborts-transition-before-ready.html": [
-      "3c4ba37b26b0dff7f4e0d79ef55dd95f1a375ce1",
+      "09e6e6cc1c9c003237c280bf2612109f3b7f379f",
       [
        null,
        {
@@ -529512,7 +529755,7 @@
       ]
      ],
      "window-resize-aborts-transition.html": [
-      "8d61a3e3c53998cf612ff544895cd0f34f96a6e8",
+      "966f23c0fdf98ba31fbfa8ce627460a50fa10b0b",
       [
        null,
        {
@@ -537061,8 +537304,26 @@
     ]
    },
    "digital-credentials": {
-    "allow-attribute.https.html": [
-     "667b84bc704c23602b481538ea16f6f77f801902",
+    "allow-attribute-with-create.https.html": [
+     "4b1e96fec4cb62d336d3c1358a7c9781e6657f8d",
+     [
+      null,
+      {
+       "testdriver": true
+      }
+     ]
+    ],
+    "allow-attribute-with-get.https.html": [
+     "15601d891f25c4c2d75dad2260d1b45a26a9344d",
+     [
+      null,
+      {
+       "testdriver": true
+      }
+     ]
+    ],
+    "create.disabled-by-permissions-policy.https.sub.html": [
+     "52db2373f09596b01e2df28fdf14e34e540d3777",
      [
       null,
       {
@@ -537071,7 +537332,7 @@
      ]
     ],
     "create.tentative.https.html": [
-     "299a240ced17f11c8d5249d65b54e873fe3362b3",
+     "3e17d5b0853b38b36cb640ee665a12c398eb4ed3",
      [
       null,
       {
@@ -537080,7 +537341,7 @@
      ]
     ],
     "default-permissions-policy.https.sub.html": [
-     "742a94ec4eb8ff079b1b24f17179962818fb3868",
+     "8041e25d33bd302fb6bcbf37f7111a00f5907fe2",
      [
       null,
       {
@@ -537095,7 +537356,16 @@
       {}
      ]
     ],
-    "disabled-by-permissions-policy.https.sub.html": [
+    "enabled-on-self-origin-by-permissions-policy.https.sub.html": [
+     "261ebb0ce705329cf7fe54fa50cbb6e20179fe0c",
+     [
+      null,
+      {
+       "testdriver": true
+      }
+     ]
+    ],
+    "get.disabled-by-permissions-policy.https.sub.html": [
      "c32f73aa309b64e5785d67b3565077a8ac6b8424",
      [
       null,
@@ -537104,26 +537374,8 @@
       }
      ]
     ],
-    "enabled-on-self-origin-by-permissions-policy.https.sub.html": [
-     "d530f4920a395b0a612964a32b60fec65833054e",
-     [
-      null,
-      {
-       "testdriver": true
-      }
-     ]
-    ],
-    "get-user-activation.https.html": [
-     "fbf2099dad37443c4522e3a838ab962f2c260004",
-     [
-      null,
-      {
-       "testdriver": true
-      }
-     ]
-    ],
     "get.tentative.https.html": [
-     "a090e1b14321bd31ea3e1d5470bbe9442a99dd08",
+     "b04a6e3a713e26f759cc62d81a6a439ea69e189e",
      [
       null,
       {
@@ -537144,6 +537396,15 @@
     ],
     "non-fully-active.https.html": [
      "3c09b132daf76ec719cadf2fc741d60a2a8d0df2",
+     [
+      null,
+      {
+       "testdriver": true
+      }
+     ]
+    ],
+    "user-activation.https.html": [
+     "facaf7bddbbd419801a9ffa470f4bb5bbc1ab07c",
      [
       null,
       {
@@ -561494,7 +561755,7 @@
      ]
     ],
     "interactionid-orphan-pointerup.html": [
-     "9c4a0ecf584e83f3efa531c19be82aecfaa42917",
+     "e08142f11bce202d852a93e88c4f33ac69c11e96",
      [
       null,
       {
@@ -638942,6 +639203,21 @@
         }
        ]
       ],
+      "tab-table-caption.html": [
+       "a26c8f0e7ed83827a385de5e351b2d90a4fad47b",
+       [
+        "html/interaction/focus/tab-table-caption.html?caption-side=bottom",
+        {
+         "testdriver": true
+        }
+       ],
+       [
+        "html/interaction/focus/tab-table-caption.html?caption-side=top",
+        {
+         "testdriver": true
+        }
+       ]
+      ],
       "tabindex-focus-flag.html": [
        "93fdb19a592ff632405c338256082043ae608002",
        [
@@ -648214,7 +648490,7 @@
        },
        "customizable-select-in-page": {
         "customizable-select-in-page-keyboard-behavior.tentative.html": [
-         "24e6e39ea48236fc7b72604860913247b5f5f05c",
+         "7040105c096d4b9f3512bf1cbbec7dfa05f5dd77",
          [
           null,
           {
@@ -648894,8 +649170,18 @@
          {}
         ]
        ],
+       "dialog-closedby-bounds-clicking.html": [
+        "584d4b306446c50c9d0c7c0a58849f9250b27956",
+        [
+         null,
+         {
+          "testdriver": true,
+          "timeout": "long"
+         }
+        ]
+       ],
        "dialog-closedby-corner-cases.html": [
-        "e25b9533b905f52decdcde07992ee587e41ca7c6",
+        "06a9084415410e208ea3d75bcf04547aad829072",
         [
          null,
          {
@@ -648915,7 +649201,7 @@
         ]
        ],
        "dialog-closedby.html": [
-        "50d600219d202cb0e4df33fde899b287dc9a3edf",
+        "b67bc80765aded1bf376d967ebce989b2861cf12",
         [
          null,
          {
@@ -654464,14 +654750,14 @@
       ],
       "processing-model-1": {
        "col-span-limits.html": [
-        "a4a425b9c1f70926c77ad3eb1b8a8a87a4655de9",
+        "2a1ac80e65ad37a0e15ca383e67889b79f2308d0",
         [
          null,
          {}
         ]
        ],
        "span-limits.html": [
-        "cdfa61bbcdc06ea62b80d042440d55fb0c89a186",
+        "798639b387562a54965d5283673a50773c2a3c49",
         [
          null,
          {
@@ -667875,7 +668161,14 @@
        ]
       ],
       "lengths-2.html": [
-       "942611a8dada4dae5fcc133ff01993226c6941df",
+       "af5cae1368832d6f40d2cd68b73be1b0fb5e4385",
+       [
+        null,
+        {}
+       ]
+      ],
+      "lengths-vi-vb-units.html": [
+       "a01fd13b98fbc1c03ab087169d7f7c7919779ec6",
        [
         null,
         {}
@@ -708658,6 +708951,15 @@
         }
        ]
       ],
+      "property-reflection-idl-setters.html": [
+       "74f2e670915f894b2cc4d8b0443028900c0154c3",
+       [
+        null,
+        {
+         "testdriver": true
+        }
+       ]
+      ],
       "property-reflection-imperative-setup.html": [
        "44039295169999ce58f0b8904da6c64e718704f2",
        [
@@ -711909,7 +712211,7 @@
      "tentative": {
       "service-worker": {
        "basic.sub.https.html": [
-        "bee8e2ff1f4515afa805fa37e86f25effe66c22e",
+        "98e089bcc660f24ba3e82425e2b23ef928a0f08a",
         [
          "speculation-rules/prefetch/tentative/service-worker/basic.sub.https.html?origin=cross-site&sw=fetch-handler",
          {
@@ -737509,7 +737811,7 @@
      ]
     ],
     "viewport-segments-env-variables.https.html": [
-     "6004398b2ce20ca0580380b6bc570f6bf8108683",
+     "dce6757d49a39059d67433e1663813ce56b093eb",
      [
       null,
       {
@@ -737518,7 +737820,7 @@
      ]
     ],
     "viewport-segments-segments-property.https.html": [
-     "e6c9d8b4e169ad061ae7aef5ca270894dbb1db2c",
+     "653e2bcb2530ef0bd86712981726f2df71ac093f",
      [
       null,
       {
@@ -766052,7 +766354,7 @@
       ]
      ],
      "dequantizeLinear.https.any.js": [
-      "900bb57bacfd379bc81a24b1ec622d914a3e5455",
+      "7f1ed15cc4a36aba360daebda56a44da32620a5b",
       [
        "webnn/conformance_tests/dequantizeLinear.https.any.html?cpu",
        {
@@ -835139,7 +835441,7 @@
        },
        "uninstall": {
         "invalid.py": [
-         "54fbb22cf5ebeb1cc633835ae8a1bb5523313d3d",
+         "228f0e57e52f67cd777fa1c7df96a22df4880235",
          [
           null,
           {}

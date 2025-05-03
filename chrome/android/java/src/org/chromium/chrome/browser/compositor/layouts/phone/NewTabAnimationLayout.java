@@ -49,6 +49,7 @@ import org.chromium.chrome.browser.layouts.EventFilter;
 import org.chromium.chrome.browser.layouts.LayoutStateProvider;
 import org.chromium.chrome.browser.layouts.LayoutType;
 import org.chromium.chrome.browser.layouts.scene_layer.SceneLayer;
+import org.chromium.chrome.browser.ntp.NewTabPage;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabContextMenuData;
 import org.chromium.chrome.browser.tab.TabId;
@@ -57,6 +58,7 @@ import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.tab_ui.TabContentManager;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
+import org.chromium.chrome.browser.toolbar.CustomTabCount;
 import org.chromium.chrome.browser.toolbar.ToolbarManager;
 import org.chromium.chrome.browser.toolbar.ToolbarPositionController;
 import org.chromium.chrome.browser.toolbar.top.ToggleTabStackButton;
@@ -119,6 +121,7 @@ public class NewTabAnimationLayout extends Layout {
     private Runnable mAnimationRunnable;
     private Runnable mTimeoutRunnable;
     private Callback<Boolean> mVisibilityObserver;
+    private CustomTabCount mCustomTabCount;
     private @TabId int mNextTabId = Tab.INVALID_TAB_ID;
     private boolean mSkipForceAnimationToFinish;
 
@@ -156,6 +159,7 @@ public class NewTabAnimationLayout extends Layout {
         mToolbarManager = toolbarManager;
         mBrowserControlsManager = browserControlsManager;
         mScrimVisibilitySupplier = scrimVisibilitySupplier;
+        mCustomTabCount = mToolbarManager.getCustomTabCount();
     }
 
     @Override
@@ -277,22 +281,33 @@ public class NewTabAnimationLayout extends Layout {
         @Nullable Tab oldTab = mTabModelSelector.getTabById(sourceId);
 
         if (background && oldTab != null) {
+            Context context = getContext();
             boolean isRegularNtp =
                     (oldTab.getUrl() != null)
                             && UrlUtilities.isNtpUrl(oldTab.getUrl())
                             && !oldTab.isIncognitoBranded();
+
             @Nullable TabContextMenuData data = TabContextMenuData.getForTab(oldTab);
-            @Nullable Point point = data == null ? null : data.getLastTriggeringTouchPositionDp();
-            final @Px int x;
-            final @Px int y;
-            if (point != null) {
-                Context context = getContext();
-                x = ViewUtils.dpToPx(context, point.x);
-                y = ViewUtils.dpToPx(context, point.y);
+            int defaultX = Math.round(mAnimationHostView.getWidth() / 2f);
+            int defaultY = Math.round(mAnimationHostView.getHeight() / 2f);
+            @Nullable Point point;
+            @Px int x;
+            @Px int y;
+            if (isRegularNtp) {
+                point = ((NewTabPage) oldTab.getNativePage()).getLastTouchPosition();
+                x = point.x != -1 ? point.x : defaultX;
+                y = point.y != -1 ? point.y : defaultY;
             } else {
-                x = Math.round(originX);
-                y = Math.round(originY);
+                point = data == null ? null : data.getLastTriggeringTouchPositionDp();
+                if (point != null) {
+                    x = ViewUtils.dpToPx(context, point.x);
+                    y = ViewUtils.dpToPx(context, point.y);
+                } else {
+                    x = defaultX;
+                    y = defaultY;
+                }
             }
+
             ObservableSupplier<Boolean> visibilitySupplier =
                     data != null && !isRegularNtp
                             ? data.getTabContextMenuVisibilitySupplier()
@@ -645,6 +660,7 @@ public class NewTabAnimationLayout extends Layout {
                                         mAnimationHostView,
                                         false);
         int prevTabCount = mTabModelSelector.getModel(isIncognito).getCount() - 1;
+        mCustomTabCount.set(prevTabCount);
         @ColorInt
         int toolbarColor =
                 isRegularNtp
@@ -669,17 +685,6 @@ public class NewTabAnimationLayout extends Layout {
                 compositorViewRect.top,
                 mToolbarManager.getNtpTransitionPercentage());
 
-        // TODO(crbug.com/40282469): Get correct x and y for the NTP.
-        final int originX;
-        final int originY;
-        if (isRegularNtp || (x == 0 && y == 0)) {
-            originX = Math.round(mAnimationHostView.getWidth() / 2f);
-            originY = Math.round(mAnimationHostView.getHeight() / 2f);
-        } else {
-            originX = x;
-            originY = y;
-        }
-
         // {@link View#INVISIBLE} is needed to generate the geometry information.
         mBackgroundHostView.setVisibility(View.INVISIBLE);
         mAnimationHostView.addView(mBackgroundHostView);
@@ -697,10 +702,18 @@ public class NewTabAnimationLayout extends Layout {
                                     animationTab,
                                     mScrimVisibilitySupplier,
                                     this::forceNewTabAnimationToFinish);
-                    mTabCreatedBackgroundAnimation =
-                            mBackgroundHostView.getAnimatorSet(originX, originY);
+                    mTabCreatedBackgroundAnimation = mBackgroundHostView.getAnimatorSet(x, y);
                     mTabCreatedBackgroundAnimation.addListener(
                             new AnimatorListenerAdapter() {
+                                @Override
+                                public void onAnimationStart(Animator animation) {
+                                    // Release custom tab count as soon as the animation starts to
+                                    // avoid showing the old tab count if the user decides to scroll
+                                    // up during AnimationType.NTP_PARTIAL_SCROLL or
+                                    // AnimationType.NTP_FULL_SCROLL.
+                                    mCustomTabCount.release();
+                                }
+
                                 @Override
                                 public void onAnimationEnd(Animator animation) {
                                     interruptor.destroy();
@@ -722,6 +735,7 @@ public class NewTabAnimationLayout extends Layout {
                     mHandler.removeCallbacks(mAnimationRunnable);
                     mAnimationRunnable = null;
                     mTabCreatedBackgroundAnimation = null;
+                    mCustomTabCount.release();
                     browserControlsVisibilityDelegate.releasePersistentShowingToken(token);
                     mAnimationHostView.removeView(mBackgroundHostView);
                     if (mVisibilityObserver != null) {

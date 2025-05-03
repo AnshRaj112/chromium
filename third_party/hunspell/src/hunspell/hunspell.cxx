@@ -137,7 +137,7 @@ private:
   std::vector<HashMgr*> m_HMgrs;
   SuggestMgr* pSMgr;
 #ifndef HUNSPELL_CHROME_CLIENT // We are using BDict instead.
-  char* affixpath;
+  std::string affixpath;
 #endif
   std::string encoding;
   struct cs_info* csconv;
@@ -188,14 +188,12 @@ private:
 #ifdef HUNSPELL_CHROME_CLIENT
 HunspellImpl::HunspellImpl(base::span<const unsigned char> bdict_data) {
 #else
-HunspellImpl::HunspellImpl(const char* affpath, const char* dpath, const char* key) {
+HunspellImpl::HunspellImpl(const char* affpath, const char* dpath, const char* key)
+  : affixpath(affpath) {
 #endif
   csconv = NULL;
   utf8 = 0;
   complexprefixes = 0;
-#ifndef HUNSPELL_CHROME_CLIENT
-  affixpath = mystrdup(affpath);
-#endif
 
 #ifdef HUNSPELL_CHROME_CLIENT
   bdict_reader = new hunspell::BDictReader;
@@ -216,7 +214,7 @@ HunspellImpl::HunspellImpl(const char* affpath, const char* dpath, const char* k
 
   /* get the preferred try string and the dictionary */
   /* encoding from the Affix Manager for that dictionary */
-  char* try_string = pAMgr->get_try_string();
+  std::string try_string = pAMgr->get_try_string();
   encoding = pAMgr->get_encoding();
   langnum = pAMgr->get_langnum();
   utf8 = pAMgr->get_utf8();
@@ -231,8 +229,6 @@ HunspellImpl::HunspellImpl(const char* affpath, const char* dpath, const char* k
 #else
   pSMgr = new SuggestMgr(try_string, MAXSUGGESTION, pAMgr);
 #endif
-  if (try_string)
-    free(try_string);
 }
 
 HunspellImpl::~HunspellImpl() {
@@ -249,19 +245,13 @@ HunspellImpl::~HunspellImpl() {
 #ifdef HUNSPELL_CHROME_CLIENT
     if (bdict_reader) delete bdict_reader;
     bdict_reader = NULL;
-#else
-  if (affixpath)
-    free(affixpath);
-  affixpath = NULL;
 #endif
 }
 
 #ifndef HUNSPELL_CHROME_CLIENT
 // load extra dictionaries
 int HunspellImpl::add_dic(const char* dpath, const char* key) {
-  if (!affixpath)
-    return 1;
-  m_HMgrs.push_back(new HashMgr(dpath, affixpath, key));
+  m_HMgrs.push_back(new HashMgr(dpath, affixpath.c_str(), key));
   return 0;
 }
 #endif
@@ -764,7 +754,10 @@ bool HunspellImpl::spell_internal(const std::string& word, int* info, std::strin
         // to recognize dictionary words with wordbreak
         if (found2 > 0 && (found2 < wl - plen))
             found = found2;
-        if (!spell(scw.substr(found + plen)))
+        std::string substring(scw.substr(found + plen));
+        if (word == substring) // that's broken, cannot complete spelling
+          continue;
+        if (!spell(substring))
           continue;
         std::string suffix(scw.substr(found));
         scw.resize(found);
@@ -816,15 +809,12 @@ bool HunspellImpl::spell_internal(const std::string& word, int* info, std::strin
 }
 
 struct hentry* HunspellImpl::checkword(const std::string& w, int* info, std::string* root) {
-  std::string w2;
-  const char* word;
-  int len;
+  std::string word;
 
   // remove IGNORE characters from the string
-  clean_ignore(w2, w);
+  clean_ignore(word, w);
 
-  word = w2.c_str();
-  len = w2.size();
+  int len = word.size();
 
   if (!len)
     return NULL;
@@ -832,24 +822,22 @@ struct hentry* HunspellImpl::checkword(const std::string& w, int* info, std::str
 #ifdef HUNSPELL_CHROME_CLIENT
   // We need to check if the word length is valid to make coverity (Event
   // fixed_size_dest: Possible overrun of N byte fixed size buffer) happy.
-  if ((utf8 && strlen(word) >= MAXWORDUTF8LEN) || (!utf8 && strlen(word) >= MAXWORDLEN))
+  if ((utf8 && word.size() >= MAXWORDUTF8LEN) || (!utf8 && word.size() >= MAXWORDLEN))
     return NULL;
 #endif
 
   // word reversing wrapper for complex prefixes
   if (complexprefixes) {
     if (utf8)
-      reverseword_utf(w2);
+      reverseword_utf(word);
     else
-      reverseword(w2);
+      reverseword(word);
   }
-
-  word = w2.c_str();
 
   // look word in hash table
   struct hentry* he = NULL;
   for (size_t i = 0; (i < m_HMgrs.size()) && !he; ++i) {
-    he = m_HMgrs[i]->lookup(word);
+    he = m_HMgrs[i]->lookup(word.c_str());
 
     // check forbidden and onlyincompound words
     if ((he) && (he->astr) && (pAMgr) &&
@@ -880,8 +868,8 @@ struct hentry* HunspellImpl::checkword(const std::string& w, int* info, std::str
 
   // check with affixes
   if (!he && pAMgr) {
-    // try stripping off affixes */
-    he = pAMgr->affix_check(word, len, 0);
+    // try stripping off affixes
+    he = pAMgr->affix_check(word, 0, len, 0);
 
     // check compound restriction and onlyupcase
     if (he && he->astr &&
@@ -914,7 +902,7 @@ struct hentry* HunspellImpl::checkword(const std::string& w, int* info, std::str
       he = pAMgr->compound_check(word, 0, 0, 100, 0, NULL, (hentry**)&rwords, 0, 0, info);
       // LANG_hu section: `moving rule' with last dash
       if ((!he) && (langnum == LANG_hu) && (word[len - 1] == '-')) {
-        std::string dup(word, len - 1);
+        std::string dup(word, 0, len - 1);
         he = pAMgr->compound_check(dup, -5, 0, 100, 0, NULL, (hentry**)&rwords, 1, 0, info);
       }
       // end of LANG specific region
@@ -1980,9 +1968,7 @@ namespace {
       *slst = NULL;
       return 0;
     } else {
-      *slst = (char**)malloc(sizeof(char*) * items.size());
-      if (!*slst)
-        return 0;
+      *slst = new char*[items.size()];
       for (size_t i = 0; i < items.size(); ++i)
         (*slst)[i] = mystrdup(items[i].c_str());
     }
@@ -2016,8 +2002,8 @@ int HunspellImpl::suffix_suggest(char*** slst, const char* root_word) {
 void HunspellImpl::free_list(char*** slst, int n) {
   if (slst && *slst) {
     for (int i = 0; i < n; i++)
-      free((*slst)[i]);
-    free(*slst);
+      delete[] (*slst)[i];
+    delete[] *slst;
     *slst = NULL;
   }
 }

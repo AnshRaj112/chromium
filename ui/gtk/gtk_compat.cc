@@ -17,6 +17,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "ui/gfx/color_palette.h"
 #include "ui/gtk/gtk_stubs.h"
+#include "ui/gtk/ime_compat_check.h"
 
 namespace gtk {
 
@@ -123,6 +124,16 @@ bool LoadGtk4() {
 }
 
 bool LoadGtkImpl() {
+  // If GTK3 or GTK4 is somehow already loaded, then the preloaded library must
+  // be used, because GTK3 and GTK4 have conflicting symbols and cannot be
+  // loaded simultaneously.
+  if (dlopen("libgtk-3.so.0", RTLD_LAZY | RTLD_GLOBAL | RTLD_NOLOAD)) {
+    return LoadGtk3();
+  }
+  if (dlopen("libgtk-4.so.1", RTLD_LAZY | RTLD_GLOBAL | RTLD_NOLOAD)) {
+    return LoadGtk4();
+  }
+
   auto* cmd = base::CommandLine::ForCurrentProcess();
   unsigned int gtk_version;
   if (!base::StringToUint(cmd->GetSwitchValueASCII(kGtkVersionFlag),
@@ -139,8 +150,17 @@ bool LoadGtkImpl() {
     // RPM-based distributions that are supported.
     gtk_version = 4;
   }
-  // Prefer GTK3 for non-GNOME desktops as the GTK4 ecosystem is still immature.
-  return gtk_version == 4 ? LoadGtk4() || LoadGtk3() : LoadGtk3() || LoadGtk4();
+  // Default to GTK4 on GNOME except when IME is detected to be incompatible.
+  // Allow the command line switch to override this.
+  return gtk_version == 4 &&
+#if defined(OZONE_PLATFORM_X11)
+                 (cmd->HasSwitch(kGtkVersionFlag) ||
+                  CheckGtk4X11ImeCompatibility())
+#else
+                 true
+#endif
+             ? LoadGtk4() || LoadGtk3()
+             : LoadGtk3() || LoadGtk4();
 }
 
 gfx::Insets InsetsFromGtkBorder(const GtkBorder& border) {

@@ -68,6 +68,7 @@ import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.tab_ui.TabContentManager;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
+import org.chromium.chrome.browser.toolbar.CustomTabCount;
 import org.chromium.chrome.browser.toolbar.ToolbarManager;
 import org.chromium.chrome.browser.toolbar.top.ToggleTabStackButton;
 import org.chromium.ui.base.TestActivity;
@@ -94,6 +95,7 @@ public class NewTabAnimationLayoutUnitTest {
 
     @Mock private CompositorViewHolder mCompositorViewHolder;
     @Mock private ToolbarManager mToolbarManager;
+    @Mock private CustomTabCount mCustomTabCount;
     @Mock private BrowserControlsManager mBrowserControlsManager;
     @Mock private BrowserStateBrowserControlsVisibilityDelegate mBrowserControlsVisibilityDelegate;
     @Mock private SceneLayer.Natives mSceneLayerJni;
@@ -159,6 +161,7 @@ public class NewTabAnimationLayoutUnitTest {
         when(mNewTab.getId()).thenReturn(NEW_TAB_ID);
         when(mBrowserControlsManager.getBrowserVisibilityDelegate())
                 .thenReturn(mBrowserControlsVisibilityDelegate);
+        when(mToolbarManager.getCustomTabCount()).thenReturn(mCustomTabCount);
         mCompositorViewHolderSupplier.set(mCompositorViewHolder);
         mScrimVisibilitySupplier.set(false);
         when(mLayoutTab.isInitFromHostNeeded()).thenReturn(true);
@@ -195,6 +198,8 @@ public class NewTabAnimationLayoutUnitTest {
         when(mAnimationHostView.findViewById(R.id.tab_switcher_button))
                 .thenReturn(mTabSwitcherButton);
         when(mAnimationHostView.findViewById(R.id.toolbar)).thenReturn(mToolbar);
+        when(mAnimationHostView.getWidth()).thenReturn(40);
+        when(mAnimationHostView.getHeight()).thenReturn(40);
         mNewTabAnimationLayout.onFinishNativeInitialization();
     }
 
@@ -338,8 +343,8 @@ public class NewTabAnimationLayoutUnitTest {
                 CURRENT_TAB_ID,
                 /* newIsIncognito= */ false,
                 /* background= */ true,
-                /* originX= */ -1f,
-                /* originY= */ -1f);
+                /* originX= */ 0f,
+                /* originY= */ 0f);
 
         layoutTabs = mNewTabAnimationLayout.getLayoutTabsToRender();
         assertEquals(1, layoutTabs.length);

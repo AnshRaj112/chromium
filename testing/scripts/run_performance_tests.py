@@ -39,7 +39,7 @@ $ ./run_tests ScriptsSmokeTest.testRunPerformanceTests
 """
 
 import argparse
-from collections import OrderedDict
+from collections import deque, OrderedDict
 import datetime
 import json
 import os
@@ -741,7 +741,6 @@ class CrossbenchTest(object):
     self.options = options
     self.isolated_out_dir = isolated_out_dir
     self.network = self._get_network_arg(options.passthrough_args)
-    self.probe = self._get_probe_arg(options.passthrough_args)
     if self.options.luci_chromium:
       # In luci.chromium the Chrome and driver are in the user path.
       self.browser = '--browser=%s' % get_abs_user_path('chrome')
@@ -771,14 +770,6 @@ class CrossbenchTest(object):
       arg = '--fileserver'
       args.append(arg)
       return self._create_fileserver_network(arg)
-    return []
-
-  def _get_probe_arg(self, args):
-    if _arg := _get_arg(args, '--probe='):
-      return [_arg]
-    if self.options.benchmarks.startswith('motionmark'):
-      # Take a screenshot because of crbug.com/414806161.
-      return ['--probe=screenshot']
     return []
 
   def _create_fileserver_network(self, arg):
@@ -863,7 +854,7 @@ class CrossbenchTest(object):
     return (['vpython3', '-Xutf8'] + [self.options.executable] + [benchmark] +
             ['--env-validation=throw'] + [self.OUTDIR % working_dir] +
             [self.browser] + benchmark_args + self.driver_path_arg +
-            self.network + self.probe + self._get_default_args())
+            self.network + self._get_default_args())
 
   def execute_benchmark(self,
                         benchmark,
@@ -900,6 +891,17 @@ class CrossbenchTest(object):
             pathlib.Path(output_paths.benchmark_path) / 'output',
             pathlib.Path(output_paths.perf_results), display_name,
             self.STORY_LABEL, self.options.results_label)
+      elif os.path.exists(output_paths.logs):
+        # To avoid printing too large log file, we print the last 100 lines.
+        bottom_of_log = deque(maxlen=100)
+        with open(output_paths.logs, 'r') as handle:
+          for line in handle:
+            if line.strip():
+              bottom_of_log.append(line.replace('\n', ''))
+        print(f'The last 100 lines of {output_paths.logs}:')
+        while bottom_of_log:
+          print(f'    {bottom_of_log.popleft()}')
+        print('See the complete logs in the CAS Outputs')
     except Exception:  # pylint: disable=broad-except
       print('The following exception may have prevented the code from '
             'outputing structured test results and perf results output:')

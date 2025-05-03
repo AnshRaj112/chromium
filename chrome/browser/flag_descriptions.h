@@ -1353,9 +1353,6 @@ extern const char kHttpsFirstBalancedModeDescription[];
 extern const char kHttpsFirstDialogUiName[];
 extern const char kHttpsFirstDialogUiDescription[];
 
-extern const char kHttpsFirstModeInterstitialAugust2024RefreshName[];
-extern const char kHttpsFirstModeInterstitialAugust2024RefreshDescription[];
-
 extern const char kHttpsFirstModeIncognitoName[];
 extern const char kHttpsFirstModeIncognitoDescription[];
 
@@ -2648,6 +2645,9 @@ extern const char kAndroidTabDeclutterArchiveDuplicateTabsDescription[];
 
 extern const char kAndroidTabDeclutterArchiveTabGroupsName[];
 extern const char kAndroidTabDeclutterArchiveTabGroupsDescription[];
+
+extern const char kAndroidTabDeclutterPerformanceImprovementsName[];
+extern const char kAndroidTabDeclutterPerformanceImprovementsDescription[];
 
 extern const char kAndroidThemeModuleName[];
 extern const char kAndroidThemeModuleDescription[];

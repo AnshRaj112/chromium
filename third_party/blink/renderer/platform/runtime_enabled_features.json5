@@ -28,11 +28,10 @@
     //   name: "ExampleFeature",
     //   status: {"Android": "stable", "Win": "experimental"},
     // }
-    // "ExampleFeature" will be stable on Android/WebView/WebLayer, experimental
+    // "ExampleFeature" will be stable on Android/WebView, experimental
     // on Windows and not enabled on any other platform.
     //
-    // Note that the Android status key implies Chrome for Android, WebView and
-    // WebLayer.
+    // Note that the Android status key implies Chrome for Android and WebView.
     //
     // "stable" features listed here should be rare, as anything which we've
     // shipped stable can have its runtime flag removed soon after.
@@ -342,7 +341,6 @@
     {
       name: "AIPromptAPIForWorkers",
       public: true,
-      status: "experimental",
     },
     {
       name: "AIPromptAPIMultimodalInput",
@@ -370,7 +368,6 @@
     {
       name: "AIRewriterAPIForWorkers",
       public: true,
-      status: "experimental",
     },
     {
       name: "AISummarizationAPI",
@@ -384,7 +381,6 @@
     {
       name: "AISummarizationAPIForWorkers",
       public: true,
-      status: "experimental",
     },
     {
       name: "AIWriterAPI",
@@ -398,7 +394,6 @@
     {
       name: "AIWriterAPIForWorkers",
       public: true,
-      status: "experimental",
     },
     {
       name: "AllowContentInitiatedDataUrlNavigations",
@@ -745,9 +740,9 @@
       status: "test",
     },
     {
-      // https://github.com/WICG/canvas-place-element/blob/main/README.md
+      // https://github.com/WICG/html-in-canvas/blob/main/README.md
       name: "CanvasElementDrawImage",
-      status: "experimental",
+      status: "test",
       implied_by: ["CanvasPlaceElement"],
     },
     {
@@ -774,9 +769,9 @@
       base_feature: "none",
     },
     {
-      // https://github.com/Igalia/explainers/blob/main/canvas-formatted-text/html-in-canvas.md
+      // https://github.com/WICG/html-in-canvas/blob/main/README.md
       name: "CanvasPlaceElement",
-      status: "experimental",
+      status: "test",
     },
     {
       // https://chromestatus.com/feature/5066778773028864
@@ -1172,7 +1167,7 @@
       // Include custom properties in CSSComputedStyleDeclaration::item/length.
       // https://crbug.com/949807
       name: "CSSEnumeratedCustomProperties",
-      status: "test",
+      status: "stable",
     },
     {
       name: "CSSExponentialFunctions",
@@ -2601,18 +2596,18 @@
       status: "experimental",
     },
     {
-      // Makes the HTML parser close <select> tags before inserting <input>
-      // tags to match the old parser behavior. This is shipping with the
-      // initial release of SelectParserRelaxation in order to de-risk it, but
-      // we could consider disabling this in future releases of we want to
-      // support authors who want to put <input>s in <select>s.
-      name: "InputClosesSelect",
-      status: "stable",
-      depends_on: ["SelectParserRelaxation"],
-    },
-    {
       name: "InputEventConstructorThrows",
       status: "stable",
+    },
+    {
+      // The HTML parser inserts a </select> end tag before inserting <input>
+      // when parsing inside of a <select> tag. We want to allow <input> inside
+      // <select>, but it isn't web compatible enough. This flag allows <input>
+      // inside <select> but only if there is another open tag in between the
+      // <input> and the <select>, like <select><div><input>.
+      name: "InputInSelect",
+      status: "experimental",
+      depends_on: ["SelectParserRelaxation"],
     },
     {
       name: "InputMultipleFieldsUI",
@@ -2729,7 +2724,6 @@
     {
       name: "LanguageDetectionAPIForWorkers",
       public: true,
-      status: "experimental",
     },
     {
       name: "LayoutFlexNewRowAlgorithm",
@@ -2980,6 +2974,10 @@
         "Win": "stable",
         "default": "experimental",
       },
+    },
+    {
+      name: "MenuElements",
+      status: "test",
     },
     {
       name: "MessagePortCloseEvent",
@@ -4439,10 +4437,6 @@
       name: "SpeculationRulesPrefetchWithSubresources",
     },
     {
-      name: "SpeculationRulesTag",
-      status: "stable",
-    },
-    {
       // Enables to run prerendering for new tabs (e.g., target="_blank").
       // See https://crbug.com/1350676.
       name: "SpeculationRulesTargetHint",
@@ -4789,7 +4783,6 @@
     {
       name: "TranslationAPIForWorkers",
       public: true,
-      status: "experimental",
     },
     {
       name: "TranslationAPIV1",
@@ -5262,8 +5255,20 @@
       public: true,
     },
     {
+      name: "WebGLOnWebGPU",
+      status: "experimental",
+    },
+    {
       name: "WebGPUAdapterInfoIsFallbackAdapter",
       status: "stable",
+    },
+    {
+      // Launch feature flag for WebGPU Compatibility Mode
+      // https://chromestatus.com/feature/6436406437871616
+      name: "WebGPUCompatibilityMode",
+      status: "experimental",
+      // Also enabled as part of all experimental WebGPU features.
+      implied_by: ["WebGPUExperimentalFeatures"],
     },
     {
       name: "WebGPUCopyBufferToBufferOverload",
@@ -5288,8 +5293,9 @@
       // https://chromestatus.com/feature/5154347661656064
       name: "WebGPUFeatureLevel",
       status: "experimental",
-      // Also enabled as part of all experimental WebGPU features.
-      implied_by: ["WebGPUExperimentalFeatures"],
+      // Also enabled as part of all experimental WebGPU features and
+      // as part of Compatibility Mode.
+      implied_by: ["WebGPUExperimentalFeatures", "WebGPUCompatibilityMode"],
     },
     {
       name: "WebHID",

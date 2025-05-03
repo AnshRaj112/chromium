@@ -78,11 +78,11 @@
 
 AffEntry::~AffEntry() {
   if (opts & aeLONGCOND)
-    free(c.l.conds2);
+    delete[] c.l.conds2;
   if (morphcode && !(opts & aeALIASM))
-    free(morphcode);
+    delete[] morphcode;
   if (contclass && !(opts & aeALIASF))
-    free(contclass);
+    delete[] contclass;
 }
 
 PfxEntry::PfxEntry(AffixMgr* pmgr)
@@ -210,7 +210,8 @@ inline int PfxEntry::test_condition(const std::string& s) {
 }
 
 // check if this prefix entry matches
-struct hentry* PfxEntry::checkword(const char* word,
+struct hentry* PfxEntry::checkword(const std::string& word,
+                                   int start,
                                    int len,
                                    char in_compound,
                                    const FLAG needflag) {
@@ -228,7 +229,7 @@ struct hentry* PfxEntry::checkword(const char* word,
     // back any characters that would have been stripped
 
     std::string tmpword(strip);
-    tmpword.append(word + appnd.size(), tmpl);
+    tmpword.append(word, start + appnd.size(), tmpl);
 
     // now make sure all of the conditions on characters
     // are met.  Please see the appendix at the end of
@@ -259,7 +260,7 @@ struct hentry* PfxEntry::checkword(const char* word,
 
       // if ((opts & aeXPRODUCT) && in_compound) {
       if ((opts & aeXPRODUCT)) {
-        he = pmyMgr->suffix_check(tmpword.c_str(), tmpl, aeXPRODUCT, this,
+        he = pmyMgr->suffix_check(tmpword, 0, tmpl, aeXPRODUCT, this,
                                   FLAG_NULL, needflag, in_compound);
         if (he)
           return he;
@@ -271,6 +272,7 @@ struct hentry* PfxEntry::checkword(const char* word,
 
 // check if this prefix entry matches
 struct hentry* PfxEntry::check_twosfx(const std::string& word,
+                                      int start,
                                       int len,
                                       char in_compound,
                                       const FLAG needflag) {
@@ -287,7 +289,7 @@ struct hentry* PfxEntry::check_twosfx(const std::string& word,
     // back any characters that would have been stripped
 
     std::string tmpword(strip);
-    tmpword.append(word, appnd.size());
+    tmpword.append(word, start + appnd.size());
 
     // now make sure all of the conditions on characters
     // are met.  Please see the appendix at the end of
@@ -306,7 +308,7 @@ struct hentry* PfxEntry::check_twosfx(const std::string& word,
 
       if ((opts & aeXPRODUCT) && (in_compound != IN_CPD_BEGIN)) {
         // hash entry of root word or NULL
-        struct hentry* he = pmyMgr->suffix_check_twosfx(tmpword, tmpl, aeXPRODUCT, this,
+        struct hentry* he = pmyMgr->suffix_check_twosfx(tmpword, 0, tmpl, aeXPRODUCT, this,
                                                         needflag);
         if (he)
           return he;
@@ -317,7 +319,8 @@ struct hentry* PfxEntry::check_twosfx(const std::string& word,
 }
 
 // check if this prefix entry matches
-std::string PfxEntry::check_twosfx_morph(const char* word,
+std::string PfxEntry::check_twosfx_morph(const std::string& word,
+                                         int start,
                                          int len,
                                          char in_compound,
                                          const FLAG needflag) {
@@ -334,7 +337,7 @@ std::string PfxEntry::check_twosfx_morph(const char* word,
     // back any characters that would have been stripped
 
     std::string tmpword(strip);
-    tmpword.append(word + appnd.size());
+    tmpword.append(word, start + appnd.size());
 
     // now make sure all of the conditions on characters
     // are met.  Please see the appendix at the end of
@@ -352,7 +355,7 @@ std::string PfxEntry::check_twosfx_morph(const char* word,
       // ross checked combined with a suffix
 
       if ((opts & aeXPRODUCT) && (in_compound != IN_CPD_BEGIN)) {
-        result = pmyMgr->suffix_check_twosfx_morph(tmpword.c_str(), tmpl,
+        result = pmyMgr->suffix_check_twosfx_morph(tmpword, 0, tmpl,
                                                    aeXPRODUCT,
                                                    this, needflag);
       }
@@ -362,7 +365,8 @@ std::string PfxEntry::check_twosfx_morph(const char* word,
 }
 
 // check if this prefix entry matches
-std::string PfxEntry::check_morph(const char* word,
+std::string PfxEntry::check_morph(const std::string& word,
+                                  int start,
                                   int len,
                                   char in_compound,
                                   const FLAG needflag) {
@@ -381,7 +385,7 @@ std::string PfxEntry::check_morph(const char* word,
     // back any characters that would have been stripped
 
     std::string tmpword(strip);
-    tmpword.append(word + appnd.size());
+    tmpword.append(word, start + appnd.size());
 
     // now make sure all of the conditions on characters
     // are met.  Please see the appendix at the end of
@@ -418,11 +422,10 @@ std::string PfxEntry::check_morph(const char* word,
               result.append(HENTRY_DATA2(he));
             } else {
               // return with debug information
-              char* flag = pmyMgr->encode_flag(getFlag());
+              std::string flag = pmyMgr->encode_flag(getFlag());
               result.push_back(MSEP_FLD);
               result.append(MORPH_FLAG);
               result.append(flag);
-              free(flag);
             }
             result.push_back(MSEP_REC);
           }
@@ -435,7 +438,7 @@ std::string PfxEntry::check_morph(const char* word,
       // ross checked combined with a suffix
 
       if ((opts & aeXPRODUCT) && (in_compound != IN_CPD_BEGIN)) {
-        std::string st = pmyMgr->suffix_check_morph(tmpword.c_str(), tmpl, aeXPRODUCT, this,
+        std::string st = pmyMgr->suffix_check_morph(tmpword, 0, tmpl, aeXPRODUCT, this,
                                                     FLAG_NULL, needflag);
         if (!st.empty()) {
           result.append(st);
@@ -612,7 +615,8 @@ inline int SfxEntry::test_condition(const char* st, const char* beg) {
 }
 
 // see if this suffix is present in the word
-struct hentry* SfxEntry::checkword(const char* word,
+struct hentry* SfxEntry::checkword(const std::string& word,
+                                   int start,
                                    int len,
                                    int optflags,
                                    PfxEntry* ppfx,
@@ -643,7 +647,7 @@ struct hentry* SfxEntry::checkword(const char* word,
     // back any characters that would have been stripped or
     // or null terminating the shorter string
 
-    std::string tmpstring(word, tmpl);
+    std::string tmpstring(word, start, tmpl);
     if (strip.size()) {
       tmpstring.append(strip);
     }
@@ -661,7 +665,7 @@ struct hentry* SfxEntry::checkword(const char* word,
 
     if (test_condition(endword, tmpword)) {
 #ifdef SZOSZABLYA_POSSIBLE_ROOTS
-      fprintf(stdout, "%s %s %c\n", word, tmpword, aflag);
+      fprintf(stdout, "%s %s %c\n", word.c_str() + start, tmpword, aflag);
 #endif
       if ((he = pmyMgr->lookup(tmpword)) != NULL) {
         do {
@@ -694,6 +698,7 @@ struct hentry* SfxEntry::checkword(const char* word,
 
 // see if two-level suffix is present in the word
 struct hentry* SfxEntry::check_twosfx(const std::string& word,
+                                      int start,
                                       int len,
                                       int optflags,
                                       PfxEntry* ppfx,
@@ -719,7 +724,7 @@ struct hentry* SfxEntry::check_twosfx(const std::string& word,
     // back any characters that would have been stripped or
     // or null terminating the shorter string
 
-    std::string tmpword(word);
+    std::string tmpword(word, start);
     tmpword.resize(tmpl);
     tmpword.append(strip);
     tmpl += strip.size();
@@ -739,13 +744,13 @@ struct hentry* SfxEntry::check_twosfx(const std::string& word,
       if (ppfx) {
         // handle conditional suffix
         if ((contclass) && TESTAFF(contclass, ep->getFlag(), contclasslen))
-          he = pmyMgr->suffix_check(tmpword.c_str(), tmpl, 0, NULL,
+          he = pmyMgr->suffix_check(tmpword, 0, tmpl, 0, NULL,
                                     (FLAG)aflag, needflag, IN_CPD_NOT);
         else
-          he = pmyMgr->suffix_check(tmpword.c_str(), tmpl, optflags, ppfx,
+          he = pmyMgr->suffix_check(tmpword, 0, tmpl, optflags, ppfx,
                                     (FLAG)aflag, needflag, IN_CPD_NOT);
       } else {
-        he = pmyMgr->suffix_check(tmpword.c_str(), tmpl, 0, NULL,
+        he = pmyMgr->suffix_check(tmpword, 0, tmpl, 0, NULL,
                                   (FLAG)aflag, needflag, IN_CPD_NOT);
       }
       if (he)
@@ -756,7 +761,8 @@ struct hentry* SfxEntry::check_twosfx(const std::string& word,
 }
 
 // see if two-level suffix is present in the word
-std::string SfxEntry::check_twosfx_morph(const char* word,
+std::string SfxEntry::check_twosfx_morph(const std::string& word,
+                                         int start,
                                          int len,
                                          int optflags,
                                          PfxEntry* ppfx,
@@ -784,7 +790,7 @@ std::string SfxEntry::check_twosfx_morph(const char* word,
     // back any characters that would have been stripped or
     // or null terminating the shorter string
 
-    std::string tmpword(word);
+    std::string tmpword(word, start);
     tmpword.resize(tmpl);
     tmpword.append(strip);
     tmpl += strip.size();
@@ -803,7 +809,7 @@ std::string SfxEntry::check_twosfx_morph(const char* word,
       if (ppfx) {
         // handle conditional suffix
         if ((contclass) && TESTAFF(contclass, ep->getFlag(), contclasslen)) {
-          std::string st = pmyMgr->suffix_check_morph(tmpword.c_str(), tmpl, 0, NULL, aflag,
+          std::string st = pmyMgr->suffix_check_morph(tmpword, 0, tmpl, 0, NULL, aflag,
                                                       needflag);
           if (!st.empty()) {
             if (ppfx->getMorph()) {
@@ -814,7 +820,7 @@ std::string SfxEntry::check_twosfx_morph(const char* word,
             mychomp(result);
           }
         } else {
-          std::string st = pmyMgr->suffix_check_morph(tmpword.c_str(), tmpl, optflags, ppfx, aflag,
+          std::string st = pmyMgr->suffix_check_morph(tmpword, 0, tmpl, optflags, ppfx, aflag,
                                                       needflag);
           if (!st.empty()) {
             result.append(st);
@@ -822,7 +828,7 @@ std::string SfxEntry::check_twosfx_morph(const char* word,
           }
         }
       } else {
-        std::string st = pmyMgr->suffix_check_morph(tmpword.c_str(), tmpl, 0, NULL, aflag, needflag);
+        std::string st = pmyMgr->suffix_check_morph(tmpword, 0, tmpl, 0, NULL, aflag, needflag);
         if (!st.empty()) {
           result.append(st);
           mychomp(result);

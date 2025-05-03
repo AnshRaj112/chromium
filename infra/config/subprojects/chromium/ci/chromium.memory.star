@@ -11,6 +11,7 @@ load("//lib/builders.star", "builders", "cpu", "gardener_rotations", "os", "siso
 load("//lib/ci.star", "ci")
 load("//lib/consoles.star", "consoles")
 load("//lib/gn_args.star", "gn_args")
+load("//lib/html.star", "linkify")
 load("//lib/targets.star", "targets")
 load("//lib/xcode.star", "xcode")
 
@@ -1055,8 +1056,16 @@ ci.builder(
     siso_project = None,
 )
 
+_WEB_TESTS_LINK = "https://chromium.googlesource.com/chromium/src/+/HEAD/docs/testing/web_tests.md"
+
 ci.builder(
-    name = "WebKit Linux ASAN",
+    name = "linux-blink-asan-rel",
+    description_html = "Runs {} with address-sanitized binaries.".format(
+        linkify(
+            _WEB_TESTS_LINK,
+            "web (platform) tests",
+        ),
+    ),
     builder_spec = builder_config.builder_spec(
         gclient_config = builder_config.gclient_config(
             config = "chromium",
@@ -1119,13 +1128,23 @@ ci.builder(
         },
     ),
     console_view_entry = consoles.console_view_entry(
-        category = "linux|webkit",
+        category = "linux|blink",
         short_name = "asn",
     ),
 )
 
 ci.builder(
-    name = "WebKit Linux Leak",
+    name = "linux-blink-leak-rel",
+    description_html = "Runs {} with {} enabled.".format(
+        linkify(
+            _WEB_TESTS_LINK,
+            "web (platform) tests",
+        ),
+        linkify(
+            "https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/controller/blink_leak_detector.h",
+            "DOM leak detection",
+        ),
+    ),
     builder_spec = builder_config.builder_spec(
         gclient_config = builder_config.gclient_config(
             config = "chromium",
@@ -1184,13 +1203,19 @@ ci.builder(
         },
     ),
     console_view_entry = consoles.console_view_entry(
-        category = "linux|webkit",
+        category = "linux|blink",
         short_name = "lk",
     ),
 )
 
 ci.builder(
-    name = "WebKit Linux MSAN",
+    name = "linux-blink-msan-rel",
+    description_html = "Runs {} with memory-sanitized binaries.".format(
+        linkify(
+            _WEB_TESTS_LINK,
+            "web (platform) tests",
+        ),
+    ),
     builder_spec = builder_config.builder_spec(
         gclient_config = builder_config.gclient_config(
             config = "chromium",
@@ -1263,7 +1288,7 @@ ci.builder(
         },
     ),
     console_view_entry = consoles.console_view_entry(
-        category = "linux|webkit",
+        category = "linux|blink",
         short_name = "msn",
     ),
 )

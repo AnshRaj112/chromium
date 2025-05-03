@@ -86,6 +86,7 @@ chromium-metrics-reviews@google.com.
     <variant name="ResizeWindow"/>
     <variant name="ScrollTo"/>
     <variant name="SetAudioDucking"/>
+    <variant name="SetClosedCaptioningState"/>
     <variant name="SetContextAccessIndicator"/>
     <variant name="SetLocationPermissionState"/>
     <variant name="SetMicrophonePermissionState"/>
@@ -147,6 +148,20 @@ chromium-metrics-reviews@google.com.
     fre has been completed and glic is enabled and pinned to the tabstrip. The
     entry point is not shown if fre is completed and glic is either disabled or
     unpinned from the tabstrip.
+  </summary>
+</histogram>
+
+<histogram name="Glic.Focus.Settings.Shortcut.Customized" enum="BooleanEnabled"
+    expires_after="2026-01-15">
+  <owner>bryantchandler@chromium.org</owner>
+  <owner>iwells@google.com</owner>
+  <summary>
+    After the user modifies the glic focus shortcut, logs a boolean that
+    reflects whether a shortcut is set.
+
+    Note: When setting a shortcut, 'disabled' will always be logged, then
+    'enabled'. This is because the edit process first clears the existing value.
+    If the shortcut is cleared, only a single 'disabled' log entry is generated.
   </summary>
 </histogram>
 

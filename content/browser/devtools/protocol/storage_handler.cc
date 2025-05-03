@@ -349,73 +349,6 @@ class StorageHandler::IndexedDBObserver
   mojo::Receiver<storage::mojom::IndexedDBObserver> receiver_;
 };
 
-// Observer that listens on the UI thread for shared storage notifications and
-// informs the StorageHandler on the UI thread for origins of interest.
-// Created and used exclusively on the UI thread.
-// TODO(crbug.com/401011862): Investigate whether a separate observer class is
-// still necessary, or whether `StorageHandler` could now implement
-// `content::SharedStorageRuntimeManager::SharedStorageObserverInterface`
-// directly.
-class StorageHandler::SharedStorageObserver
-    : content::SharedStorageRuntimeManager::SharedStorageObserverInterface {
- public:
-  explicit SharedStorageObserver(StorageHandler* owner_storage_handler)
-      : owner_(owner_storage_handler) {
-    DCHECK_CURRENTLY_ON(BrowserThread::UI);
-    auto* manager = owner_->GetSharedStorageRuntimeManager();
-    DCHECK(manager);
-    scoped_observation_.Observe(manager);
-  }
-
-  SharedStorageObserver(const SharedStorageObserver&) = delete;
-  SharedStorageObserver& operator=(const SharedStorageObserver&) = delete;
-
-  ~SharedStorageObserver() override { DCHECK_CURRENTLY_ON(BrowserThread::UI); }
-
-  // content::SharedStorageObserverInterface
-
-  // TODO(crbug.com/401011862): Update this and all other shared storage
-  // notifications to filter by frames, so that only the handlers in the
-  // relevant frame subtrees receive notifications.
-  void OnSharedStorageAccessed(
-      base::Time access_time,
-      blink::SharedStorageAccessScope scope,
-      AccessMethod method,
-      GlobalRenderFrameHostId main_frame_id,
-      const std::string& owner_origin,
-      const SharedStorageEventParams& params) override {
-    DCHECK_CURRENTLY_ON(BrowserThread::UI);
-    owner_->NotifySharedStorageAccessed(access_time, scope, method,
-                                        main_frame_id, owner_origin, params);
-  }
-
-  void OnUrnUuidGenerated(const GURL& urn_uuid) override {}
-
-  void OnConfigPopulated(
-      const std::optional<FencedFrameConfig>& config) override {}
-
-  void OnWorkletOperationExecutionFinished(
-      base::Time finished_time,
-      base::TimeDelta execution_time,
-      AccessMethod method,
-      int operation_id,
-      int worklet_id,
-      GlobalRenderFrameHostId main_frame_id,
-      const std::string& owner_origin) override {
-    DCHECK_CURRENTLY_ON(BrowserThread::UI);
-    owner_->NotifySharedStorageWorkletOperationExecutionFinished(
-        finished_time, execution_time, method, operation_id, worklet_id,
-        main_frame_id, owner_origin);
-  }
-
- private:
-  raw_ptr<StorageHandler> const owner_;
-  base::ScopedObservation<
-      content::SharedStorageRuntimeManager,
-      content::SharedStorageRuntimeManager::SharedStorageObserverInterface>
-      scoped_observation_{this};
-};
-
 class StorageHandler::QuotaManagerObserver
     : storage::mojom::QuotaManagerObserver {
  public:
@@ -518,7 +451,7 @@ Response StorageHandler::Disable() {
   indexed_db_observer_.reset();
   quota_override_handle_.reset();
   SetInterestGroupTracking(false);
-  shared_storage_observer_.reset();
+  SetSharedStorageTracking(false);
   quota_manager_observer_.reset();
   ResetAttributionReporting();
   return Response::Success();
@@ -1478,12 +1411,18 @@ void StorageHandler::ClearSharedStorageEntries(
 
 Response StorageHandler::SetSharedStorageTracking(bool enable) {
   if (enable) {
-    if (!GetSharedStorageRuntimeManager()) {
+    auto* manager = GetSharedStorageRuntimeManager();
+    if (!manager) {
       return Response::ServerError("Shared storage is disabled.");
     }
-    shared_storage_observer_ = std::make_unique<SharedStorageObserver>(this);
+    // Only enable tracking if this handler is associated with a main render
+    // frame host, and if tracking isn't already enabled.
+    if (frame_host_ && frame_host_->IsOutermostMainFrame() &&
+        !shared_storage_observation_.IsObserving()) {
+      shared_storage_observation_.Observe(manager);
+    }
   } else {
-    shared_storage_observer_.reset();
+    shared_storage_observation_.Reset();
   }
   return Response::Success();
 }
@@ -1516,6 +1455,16 @@ void StorageHandler::ResetSharedStorageBudget(
           std::move(callback)));
 }
 
+GlobalRenderFrameHostId StorageHandler::AssociatedMainFrameId() const {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  return frame_host_ ? frame_host_->GetGlobalId() : GlobalRenderFrameHostId();
+}
+
+bool StorageHandler::ShouldReceiveAllReports() const {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  return false;
+}
+
 namespace {
 
 std::string GetFrameTokenFromGlobalRenderFrameHostId(
@@ -1526,7 +1475,7 @@ std::string GetFrameTokenFromGlobalRenderFrameHostId(
 
 }  // namespace
 
-void StorageHandler::NotifySharedStorageAccessed(
+void StorageHandler::OnSharedStorageAccessed(
     base::Time access_time,
     blink::SharedStorageAccessScope scope,
     SharedStorageRuntimeManager::SharedStorageObserverInterface::AccessMethod
@@ -1709,7 +1658,11 @@ void StorageHandler::NotifySharedStorageAccessed(
       std::move(protocol_params));
 }
 
-void StorageHandler::NotifySharedStorageWorkletOperationExecutionFinished(
+void StorageHandler::OnUrnUuidGenerated(const GURL& urn_uuid) {}
+void StorageHandler::OnConfigPopulated(
+    const std::optional<FencedFrameConfig>& config) {}
+
+void StorageHandler::OnWorkletOperationExecutionFinished(
     base::Time finished_time,
     base::TimeDelta execution_time,
     SharedStorageRuntimeManager::SharedStorageObserverInterface::AccessMethod

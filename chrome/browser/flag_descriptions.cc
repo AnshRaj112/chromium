@@ -2360,12 +2360,6 @@ const char kHttpsFirstBalancedModeDescription[] =
 const char kHttpsFirstDialogUiName[] = "Dialog UI for HTTPS-First Modes";
 const char kHttpsFirstDialogUiDescription[] = "Use a dialog-based UI for HFM";
 
-const char kHttpsFirstModeInterstitialAugust2024RefreshName[] =
-    "Use the new interstitial for HTTPS-First Modes";
-const char kHttpsFirstModeInterstitialAugust2024RefreshDescription[] =
-    "Use the new interstitial with updated text and icons for HTTPS-First "
-    "Modes";
-
 const char kHttpsFirstModeIncognitoName[] = "HTTPS-First Mode in Incognito";
 const char kHttpsFirstModeIncognitoDescription[] =
     "Enable HTTPS-First Mode in Incognito as default setting.";
@@ -4530,6 +4524,11 @@ const char kAndroidTabDeclutterArchiveTabGroupsName[] =
     "Archive all inactive tab groups.";
 const char kAndroidTabDeclutterArchiveTabGroupsDescription[] =
     "Enables auto-archival of inactive tab groups and their inactive tabs.";
+
+const char kAndroidTabDeclutterPerformanceImprovementsName[] =
+    "Android Tab Declutter performance improvements";
+const char kAndroidTabDeclutterPerformanceImprovementsDescription[] =
+    "Enables performance improvements to the android tab declutter process.";
 
 const char kAndroidThemeModuleName[] = "Android Theme Module";
 const char kAndroidThemeModuleDescription[] =

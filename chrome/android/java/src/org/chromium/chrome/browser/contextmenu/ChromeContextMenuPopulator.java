@@ -363,8 +363,8 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                     boolean showNewLabel = shouldTriggerEphemeralTabHelpUi();
                     boolean isDataUrl =
                             mParams.getUrl().getScheme().equals(UrlConstants.DATA_SCHEME);
-                    if (!(mMode == ContextMenuMode.CUSTOM_TAB && isDataUrl)) {
-                        // Do not show the item if CCT opens data: url as it could potentially
+                    if (!isDataUrl) {
+                        // Do not show the item if BrApp/CCT opens data: url as it could potentially
                         // cause a security issue.
                         linkGroup.add(createListItem(Item.OPEN_IN_EPHEMERAL_TAB, showNewLabel));
                         mShowEphemeralTabNewLabel = showNewLabel;
@@ -733,7 +733,10 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                     .get()
                     .share(
                             linkShareParams,
-                            new ChromeShareExtras.Builder().setSaveLastUsed(true).build(),
+                            new ChromeShareExtras.Builder()
+                                    .setSaveLastUsed(true)
+                                    .setRenderFrameHost(mNativeDelegate.getRenderFrameHost())
+                                    .build(),
                             ShareOrigin.CONTEXT_MENU);
         } else if (itemId == R.id.contextmenu_read_later) {
             recordContextMenuSelection(ContextMenuUma.Action.READ_LATER);
@@ -755,7 +758,10 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                     .get()
                     .share(
                             shareParams,
-                            new ChromeShareExtras.Builder().setShareDirectly(true).build(),
+                            new ChromeShareExtras.Builder()
+                                    .setShareDirectly(true)
+                                    .setRenderFrameHost(mNativeDelegate.getRenderFrameHost())
+                                    .build(),
                             ShareOrigin.CONTEXT_MENU);
         } else if (itemId == R.id.contextmenu_search_with_google_lens) {
             recordContextMenuSelection(ContextMenuUma.Action.SEARCH_WITH_GOOGLE_LENS);
@@ -921,6 +927,8 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                                             .setImageSrcUrl(mParams.getSrcUrl())
                                             .setContentUrl(mParams.getPageUrl())
                                             .setDetailedContentType(detailedContentType)
+                                            .setRenderFrameHost(
+                                                    mNativeDelegate.getRenderFrameHost())
                                             .build(),
                                     ShareOrigin.CONTEXT_MENU);
                 });

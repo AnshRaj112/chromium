@@ -24,13 +24,14 @@ import {getCurrentSpeechRate, minOverflowLengthToScroll, playFromSelectionTimeou
 import type {LanguageToastElement} from './language_toast.js';
 import {NodeStore} from './node_store.js';
 import {ReadAloudHighlighter} from './read_aloud/highlighter.js';
+import {VoicePackController} from './read_aloud/voice_pack_controller.js';
 import {WordBoundaries} from './read_aloud/word_boundaries.js';
 import type {WordBoundaryState} from './read_aloud/word_boundaries.js';
 import {ReadAnythingLogger, TimeFrom} from './read_anything_logger.js';
 import type {ReadAnythingToolbarElement} from './read_anything_toolbar.js';
 import type {SpeechBrowserProxy} from './speech_browser_proxy.js';
 import {SpeechBrowserProxyImpl} from './speech_browser_proxy.js';
-import {areVoicesEqual, AVAILABLE_GOOGLE_TTS_LOCALES, convertLangOrLocaleForVoicePackManager, convertLangOrLocaleToExactVoicePackLocale, convertLangToAnAvailableLangIfPresent, createInitialListOfEnabledLanguages, doesLanguageHaveNaturalVoices, EXTENSION_RESPONSE_TIMEOUT_MS, getFilteredVoiceList, getNaturalVoiceOrDefault, getVoicePackConvertedLangIfExists, isGoogle, isNatural, isVoicePackStatusError, isVoicePackStatusSuccess, mojoVoicePackStatusToVoicePackStatusEnum, VoiceClientSideStatusCode, VoicePackServerStatusErrorCode, VoicePackServerStatusSuccessCode} from './voice_language_util.js';
+import {areVoicesEqual, AVAILABLE_GOOGLE_TTS_LOCALES, convertLangOrLocaleForVoicePackManager, convertLangOrLocaleToExactVoicePackLocale, convertLangToAnAvailableLangIfPresent, doesLanguageHaveNaturalVoices, getNaturalVoiceOrDefault, getVoicePackConvertedLangIfExists, isNatural, isVoicePackStatusError, isVoicePackStatusSuccess, mojoVoicePackStatusToVoicePackStatusEnum, VoiceClientSideStatusCode, VoicePackServerStatusErrorCode, VoicePackServerStatusSuccessCode} from './voice_language_util.js';
 import type {VoicePackStatus} from './voice_language_util.js';
 import {VoiceNotificationManager} from './voice_notification_manager.js';
 
@@ -112,11 +113,10 @@ export class AppElement extends AppElementBase {
     return {
       speechPlayingState: {type: Object},
       imagesEnabled: {type: Boolean, reflect: true},
-      enabledLangs: {type: Array},
+      enabledLangs_: {type: Array},
       settingsPrefs_: {type: Object},
       selectedVoice_: {type: Object},
       availableVoices_: {type: Array},
-      voiceStatusLocalState_: {type: Object},
       previewVoicePlaying_: {type: Object},
       localeToDisplayName_: {type: Object},
       hasContent_: {type: Boolean},
@@ -150,13 +150,6 @@ export class AppElement extends AppElementBase {
   // visual feedback that a voice is about to be spoken.
   private accessor speechEngineLoaded_: boolean = true;
 
-  // The extension is responsible for installing the Natural voices. We need to
-  // keep track of whether the extension is being responsive. If not, the
-  // extension is probably not downloaded and we'll let the user know. This
-  // handle is a reference to the callback that will be invoked if the extension
-  // does not respond in a timely manner.
-  private speechExtensionResponseCallbackHandle_?: number;
-
   // Sometimes distillations are queued up while distillation is happening so
   // when the current distillation finishes, we re-distill immediately. In that
   // case we shouldn't allow playing speech until the next distillation to avoid
@@ -178,51 +171,29 @@ export class AppElement extends AppElementBase {
   // The set of languages currently enabled for use by Read Aloud. This
   // includes user-enabled languages and auto-downloaded languages. The former
   // are stored in preferences. The latter are not.
-  accessor enabledLangs: string[] = [];
-
-  // These are languages that don't exist when restoreEnabledLanguagesFromPref()
-  // is first called when the engine is getting set up. We need to disable
-  // unavailable languages, but since it's possible that these languages may
-  // become available once the TTS engine finishes setting up after
-  // onTtsEngineInstalled() is called, we want to save them so they can be
-  // used as soon as they are available.
-  // This can happen when a natural voice is installed (e.g. Danish) when
-  // there isn't an equivalent system voice.
-  possiblyDisabledLangs: string[] = [];
+  protected accessor enabledLangs_: string[] = [];
 
   // All possible available voices for the current speech engine.
   protected accessor availableVoices_: SpeechSynthesisVoice[] = [];
-  // The set of languages found in availableVoices.
-  private availableLangs_: string[] = [];
   // If a preview is playing, this is set to the voice the preview is playing.
   // Otherwise, this is undefined.
   protected accessor previewVoicePlaying_: SpeechSynthesisVoice|undefined;
 
   protected accessor localeToDisplayName_: {[locale: string]: string} = {};
 
-  // Our local representation of the status of voice pack downloads and
-  // availability
-  private accessor voiceStatusLocalState_:
-      {[language: string]: VoiceClientSideStatusCode} = {};
-
-  // Cache of responses from LanguagePackManager
-  private voicePackInstallStatusServerResponses_:
-      {[language: string]: VoicePackStatus} = {};
-
-  // Set of languages of the browser and/or of the pages navigated to that we
-  // need to download Natural voices for automatically
-  private languagesForVoiceDownloads: Set<string> = new Set();
-
   // Metrics captured for logging.
   private playSessionStartTime: number = -1;
 
-  private notificationManager_: VoiceNotificationManager;
+  private notificationManager_ = VoiceNotificationManager.getInstance();
   private logger_: ReadAnythingLogger = ReadAnythingLogger.getInstance();
   private styleUpdater_: AppStyleUpdater;
-  private speech_: SpeechBrowserProxy;
-  private highlighter_: ReadAloudHighlighter;
-  private wordBoundaries_: WordBoundaries;
-  private nodeStore_: NodeStore;
+  private speech_: SpeechBrowserProxy = SpeechBrowserProxyImpl.getInstance();
+  private highlighter_: ReadAloudHighlighter =
+      ReadAloudHighlighter.getInstance();
+  private wordBoundaries_: WordBoundaries = WordBoundaries.getInstance();
+  private nodeStore_: NodeStore = NodeStore.getInstance();
+  private voicePackController_: VoicePackController =
+      VoicePackController.getInstance();
   protected accessor settingsPrefs_: SettingsPrefs = {
     letterSpacing: 0,
     lineSpacing: 0,
@@ -275,11 +246,6 @@ export class AppElement extends AppElementBase {
     this.isReadAloudEnabled_ = chrome.readingMode.isReadAloudEnabled;
     this.speechSynthesisLanguage = chrome.readingMode.baseLanguageForSpeech;
     this.styleUpdater_ = new AppStyleUpdater(this);
-    this.notificationManager_ = VoiceNotificationManager.getInstance();
-    this.speech_ = SpeechBrowserProxyImpl.getInstance();
-    this.highlighter_ = ReadAloudHighlighter.getInstance();
-    this.wordBoundaries_ = WordBoundaries.getInstance();
-    this.nodeStore_ = NodeStore.getInstance();
     this.nodeStore_.clear();
     ColorChangeUpdater.forDocument().start();
   }
@@ -289,7 +255,7 @@ export class AppElement extends AppElementBase {
     // Even though disconnectedCallback isn't always called reliably in prod,
     // it is called in tests, and the speech extension timeout can cause
     // flakiness.
-    this.cancelSpeechExtensionResponseTimeout();
+    this.voicePackController_.stopWaitingForSpeechExtension();
   }
 
   override connectedCallback() {
@@ -308,7 +274,7 @@ export class AppElement extends AppElementBase {
     this.showLoading();
 
     if (this.isReadAloudEnabled_) {
-      VoiceNotificationManager.getInstance().addListener(this.$.languageToast);
+      this.notificationManager_.addListener(this.$.languageToast);
 
       // Clear state. We don't do this in disconnectedCallback because that's
       // not always reliabled called.
@@ -724,16 +690,6 @@ export class AppElement extends AppElementBase {
     }
   }
 
-  private sendGetVoicePackInfoRequest(langOrLocale: string) {
-    const langOrLocaleForPackManager =
-        convertLangOrLocaleForVoicePackManager(langOrLocale);
-    if (langOrLocaleForPackManager) {
-      this.setSpeechExtensionResponseTimeout();
-      chrome.readingMode.sendGetVoicePackInfoRequest(
-          langOrLocaleForPackManager);
-    }
-  }
-
   private loadImages_() {
     if (!chrome.readingMode.imagesFeatureEnabled) {
       return;
@@ -908,8 +864,7 @@ export class AppElement extends AppElementBase {
   }
 
   updateVoicePackStatus(lang: string, status: string) {
-    // This is called when the extension responds, so let's cancel the timer.
-    this.cancelSpeechExtensionResponseTimeout();
+    this.voicePackController_.stopWaitingForSpeechExtension();
 
     if (!lang) {
       return;
@@ -918,43 +873,14 @@ export class AppElement extends AppElementBase {
     const newVoicePackStatus = mojoVoicePackStatusToVoicePackStatusEnum(status);
 
     // Keep the server responses
-    this.setVoicePackServerStatus_(lang, newVoicePackStatus);
+    this.voicePackController_.setServerStatus(lang, newVoicePackStatus);
 
     // Update application state
     this.updateApplicationState(lang, newVoicePackStatus);
 
-    if (isVoicePackStatusError(newVoicePackStatus)) {
-      // On ChromeOS, disable the associated language if there are no other
-      // Google voices for it. Otherwise, only disable it if there are no
-      // voices at all for this language.
-      const availableVoicesForLang = this.getVoices_().filter(
-          v => getVoicePackConvertedLangIfExists(v.lang) === lang);
-      if (!availableVoicesForLang.length ||
-          (chrome.readingMode.isChromeOsAsh &&
-           !availableVoicesForLang.some(voice => isGoogle(voice)))) {
-        chrome.readingMode.onLanguagePrefChange(lang, false);
-        this.enabledLangs = this.enabledLangs.filter(
-            enabledLang =>
-                getVoicePackConvertedLangIfExists(enabledLang) !== lang);
-      }
-    }
-  }
-
-
-  // Schedules a timer that will notify the user if the speech extension is
-  // unresponsive. Only schedules a new timer if there is none pending.
-  private setSpeechExtensionResponseTimeout() {
-    if (this.speechExtensionResponseCallbackHandle_ === undefined) {
-      this.speechExtensionResponseCallbackHandle_ = setTimeout(
-          () => this.notificationManager_.onNoEngineConnection(),
-          EXTENSION_RESPONSE_TIMEOUT_MS);
-    }
-  }
-
-  private cancelSpeechExtensionResponseTimeout() {
-    if (this.speechExtensionResponseCallbackHandle_ !== undefined) {
-      clearTimeout(this.speechExtensionResponseCallbackHandle_);
-      this.speechExtensionResponseCallbackHandle_ = undefined;
+    if (isVoicePackStatusError(newVoicePackStatus) &&
+        this.voicePackController_.disableLangIfNoVoices(lang)) {
+      this.enabledLangs_ = this.voicePackController_.getEnabledLangs();
     }
   }
 
@@ -966,18 +892,7 @@ export class AppElement extends AppElementBase {
 
       switch (newStatusCode) {
         case VoicePackServerStatusSuccessCode.NOT_INSTALLED:
-          // Install the voice if it's not currently installed and it's marked
-          // as a language that should be installed
-          if (this.languagesForVoiceDownloads.has(lang)) {
-            // Don't re-send install request if it's already been sent
-            if (this.getVoicePackLocalStatus_(lang) !==
-                VoiceClientSideStatusCode.SENT_INSTALL_REQUEST) {
-              this.forceInstallRequest(lang, /* isRetry = */ false);
-            }
-          } else {
-            this.setVoicePackLocalStatus(
-                lang, VoiceClientSideStatusCode.NOT_INSTALLED);
-          }
+          this.voicePackController_.triggerInstall(lang);
           break;
         case VoicePackServerStatusSuccessCode.INSTALLING:
           // Do nothing- we mark our local state as installing when we send the
@@ -987,7 +902,7 @@ export class AppElement extends AppElementBase {
         case VoicePackServerStatusSuccessCode.INSTALLED:
           // Force a refresh of the voices list since we might not get an update
           // the voices have changed.
-          this.getVoices_(true);
+          this.getVoices_(/*forceRefresh=*/ true);
           this.autoSwitchVoice_(lang);
 
           // Some languages may require a download from the voice pack
@@ -997,15 +912,16 @@ export class AppElement extends AppElementBase {
           // Even though the voice may be installed on disk, it still may not be
           // available to the speechSynthesis API. Check whether to mark the
           // voice as AVAILABLE or INSTALLED_AND_UNAVAILABLE
-          const voicesForLanguageAreAvailable = this.availableVoices_.some(
-              voice =>
-                  ((isNatural(voice) || !languageHasNaturalVoices) &&
-                   getVoicePackConvertedLangIfExists(voice.lang) === lang));
+          const voicesForLanguageAreAvailable =
+              this.voicePackController_.getAvailableVoices().some(
+                  voice =>
+                      ((isNatural(voice) || !languageHasNaturalVoices) &&
+                       getVoicePackConvertedLangIfExists(voice.lang) === lang));
 
           // If natural voices are currently available for the language or the
           // language does not support natural voices, set the status to
           // available. Otherwise, set the status to install and unavailabled.
-          this.setVoicePackLocalStatus(
+          this.voicePackController_.setLocalStatus(
               lang,
               voicesForLanguageAreAvailable ?
                   VoiceClientSideStatusCode.AVAILABLE :
@@ -1024,11 +940,11 @@ export class AppElement extends AppElementBase {
         case VoicePackServerStatusErrorCode.WRONG_ID:
         case VoicePackServerStatusErrorCode.NEED_REBOOT:
         case VoicePackServerStatusErrorCode.UNSUPPORTED_PLATFORM:
-          this.setVoicePackLocalStatus(
+          this.voicePackController_.setLocalStatus(
               lang, VoiceClientSideStatusCode.ERROR_INSTALLING);
           break;
         case VoicePackServerStatusErrorCode.ALLOCATION:
-          this.setVoicePackLocalStatus(
+          this.voicePackController_.setLocalStatus(
               lang, VoiceClientSideStatusCode.INSTALL_ERROR_ALLOCATION);
           break;
         default:
@@ -1037,22 +953,22 @@ export class AppElement extends AppElementBase {
       }
     } else {
       // Couldn't parse the response
-      this.setVoicePackLocalStatus(
+      this.voicePackController_.setLocalStatus(
           lang, VoiceClientSideStatusCode.ERROR_INSTALLING);
     }
   }
 
   protected onLanguageMenuOpen_() {
-    VoiceNotificationManager.getInstance().removeListener(this.$.languageToast);
+    this.notificationManager_.removeListener(this.$.languageToast);
   }
 
   protected onLanguageMenuClose_() {
-    VoiceNotificationManager.getInstance().addListener(this.$.languageToast);
+    this.notificationManager_.addListener(this.$.languageToast);
   }
 
   onVoicesChanged() {
     if (this.waitingForNewEngine_) {
-      this.enabledLangs.forEach(lang => {
+      this.enabledLangs_.forEach(lang => {
         this.installVoicePackIfPossible(
             lang,
             /* onlyInstallExactGoogleLocaleMatch=*/ true,
@@ -1062,32 +978,21 @@ export class AppElement extends AppElementBase {
       return;
     }
 
-    const previousSize = this.availableVoices_.length;
+    const hadAvailableVoices = this.voicePackController_.hasAvailableVoices();
     // Get a new list of voices. This should be done before we call
     // refreshVoicePackStatuses();
-    this.getVoices_(/*refresh =*/ true);
+    this.getVoices_(/*forceRefresh=*/ true);
 
     // TODO: crbug.com/390435037 - Simplify logic around loading voices and
     // language availability, especially around the new TTS engine.
 
-    // If we disabled a language during startup because it wasn't yet available,
-    // we should re-enable it once it's available. This can happen if we enable
-    // a language with natural voices but no system voices. This only needs to
-    // happen on non-ChromeOS, since we're only installing the new engine
-    // outside of ChromeOS.
-    this.possiblyDisabledLangs.filter(disabledLang => {
-      const isNowAvailable = this.availableLangs_.some(
-          lang =>
-              lang.toLocaleLowerCase() === disabledLang.toLocaleLowerCase());
-      if (isNowAvailable && !chrome.readingMode.isChromeOsAsh) {
-        this.enabledLangs.push(disabledLang);
-        chrome.readingMode.onLanguagePrefChange(disabledLang, true);
-      }
+    // <if expr="not is_chromeos">
+    if (this.voicePackController_.enableNowAvailableLangs()) {
+      this.enabledLangs_ = this.voicePackController_.getEnabledLangs();
+    }
+    // </if>
 
-      return !isNowAvailable;
-    });
-
-    if (!previousSize && this.availableVoices_.length) {
+    if (!hadAvailableVoices && this.voicePackController_.hasAvailableVoices()) {
       // If we go from having no available voices to having voices available,
       // restore voice settings from preferences.
       this.restoreEnabledLanguagesFromPref();
@@ -1097,9 +1002,11 @@ export class AppElement extends AppElementBase {
     // If voice was selected automatically and not by the user, check if
     // there's a higher quality voice available now.
     if (!this.currentVoiceIsUserChosen_()) {
-      const naturalVoicesForLang = this.availableVoices_.filter(
-          voice => isNatural(voice) &&
-              voice.lang.startsWith(chrome.readingMode.baseLanguageForSpeech));
+      const naturalVoicesForLang =
+          this.voicePackController_.getAvailableVoices().filter(
+              voice => isNatural(voice) &&
+                  voice.lang.startsWith(
+                      chrome.readingMode.baseLanguageForSpeech));
 
       if (naturalVoicesForLang) {
         this.selectedVoice_ = naturalVoicesForLang[0];
@@ -1109,13 +1016,12 @@ export class AppElement extends AppElementBase {
 
     // Now that the voice list has changed, refresh the VoicePackStatuses in
     // case a language has been uninstalled.
-    this.refreshVoicePackStatuses();
+    this.voicePackController_.refreshVoicePackStatuses();
 
     // If the selected voice is now unavailable, such as after an uninstall,
     // reselect a new voice.
     if (this.selectedVoice_ &&
-        !this.availableVoices_.some(
-            voice => areVoicesEqual(voice, this.selectedVoice_))) {
+        !this.voicePackController_.isVoiceAvailable(this.selectedVoice_)) {
       this.selectedVoice_ = undefined;
     }
 
@@ -1147,13 +1053,13 @@ export class AppElement extends AppElementBase {
     // First try to choose a voice only from currently enabled locales for this
     // language.
     const voicesForCurrentEnabledLocale = voicesForLanguage.filter(
-        v => this.enabledLangs.includes(v.lang.toLowerCase()));
+        v => this.voicePackController_.isLangEnabled(v.lang));
     if (!voicesForCurrentEnabledLocale ||
         !voicesForCurrentEnabledLocale.length) {
       // If there's no enabled locales for this language, check for any other
       // voices for enabled locales.
       const allVoicesForEnabledLocales = allPossibleVoices.filter(
-          v => this.enabledLangs.includes(v.lang.toLowerCase()));
+          v => this.voicePackController_.isLangEnabled(v.lang));
       if (!allVoicesForEnabledLocales.length) {
         // If there are no voices for the enabled locales, or no enabled
         // locales at all, we can't select a voice. So return undefined so we
@@ -1215,48 +1121,13 @@ export class AppElement extends AppElementBase {
     return undefined;
   }
 
-  private getVoices_(refresh: boolean = false): SpeechSynthesisVoice[] {
-    if (!this.availableVoices_.length || refresh) {
-      this.availableVoices_ = getFilteredVoiceList(this.speech_.getVoices());
-      this.availableLangs_ =
-          [...new Set(this.availableVoices_.map(({lang}) => lang))];
-
-      this.populateDisplayNamesForLocaleCodes();
+  private getVoices_(forceRefresh: boolean = false): SpeechSynthesisVoice[] {
+    if (this.voicePackController_.refreshAvailableVoices(forceRefresh)) {
+      this.availableVoices_ = this.voicePackController_.getAvailableVoices();
+      this.localeToDisplayName_ =
+          this.voicePackController_.getDisplayNamesForLocaleCodes();
     }
     return this.availableVoices_;
-  }
-
-  private refreshVoicePackStatuses() {
-    for (const lang of Object.keys(
-             this.voicePackInstallStatusServerResponses_)) {
-      this.sendGetVoicePackInfoRequest(lang);
-    }
-  }
-
-  private populateDisplayNamesForLocaleCodes() {
-    this.localeToDisplayName_ = {};
-
-    AVAILABLE_GOOGLE_TTS_LOCALES.forEach((lang) => {
-      this.maybeAddDisplayName(lang);
-    });
-
-
-    // Get any remaining display names for languages of available voices.
-    for (const {lang} of this.availableVoices_) {
-      this.maybeAddDisplayName(lang);
-    }
-  }
-
-  private maybeAddDisplayName(lang: string) {
-    const langLower = lang.toLowerCase();
-    if (!(langLower in this.localeToDisplayName_)) {
-      const langDisplayName =
-          chrome.readingMode.getDisplayNameForLocale(langLower, langLower);
-      if (langDisplayName) {
-        this.localeToDisplayName_ =
-            {...this.localeToDisplayName_, [langLower]: langDisplayName};
-      }
-    }
   }
 
   protected onPreviewVoice_(
@@ -1909,7 +1780,8 @@ export class AppElement extends AppElementBase {
     // SpeechSynthesisUtterance lang.
     if (error.error === 'language-unavailable') {
       const possibleNewLanguage = convertLangToAnAvailableLangIfPresent(
-          this.speechSynthesisLanguage, this.availableLangs_,
+          this.speechSynthesisLanguage,
+          this.voicePackController_.getAvailableLangs(),
           /* allowCurrentLanguageIfExists */ false);
       if (possibleNewLanguage) {
         this.speechSynthesisLanguage = possibleNewLanguage;
@@ -2024,7 +1896,8 @@ export class AppElement extends AppElementBase {
     event.preventDefault();
     event.stopPropagation();
     const toggledLanguage = event.detail.language;
-    const currentlyEnabled = this.enabledLangs.includes(toggledLanguage);
+    const currentlyEnabled =
+        this.voicePackController_.isLangEnabled(toggledLanguage);
 
     if (!currentlyEnabled) {
       this.autoSwitchVoice_(toggledLanguage);
@@ -2032,21 +1905,15 @@ export class AppElement extends AppElementBase {
           toggledLanguage, /* onlyInstallExactGoogleLocaleMatch=*/ true,
           /* retryIfPreviousInstallFailed= */ true);
     } else {
-      // If the language has been deselected, remove the language from the
-      // list of language packs to download
-      const langCodeForVoicePackManager =
-          convertLangOrLocaleForVoicePackManager(toggledLanguage);
-      if (langCodeForVoicePackManager) {
-        this.notificationManager_.onCancelDownload(langCodeForVoicePackManager);
-        this.languagesForVoiceDownloads.delete(langCodeForVoicePackManager);
-        // Uninstall the Natural voice when a language is deselected.
-        chrome.readingMode.sendUninstallVoiceRequest(
-            langCodeForVoicePackManager);
-      }
+      this.voicePackController_.uninstall(toggledLanguage);
     }
-    this.enabledLangs = currentlyEnabled ?
-        this.enabledLangs.filter(lang => lang !== toggledLanguage) :
-        [...this.enabledLangs, toggledLanguage];
+
+    const updateEnabledLangs = currentlyEnabled ?
+        this.voicePackController_.disableLang(toggledLanguage) :
+        this.voicePackController_.enableLang(toggledLanguage);
+    if (updateEnabledLangs) {
+      this.enabledLangs_ = this.voicePackController_.getEnabledLangs();
+    }
 
     chrome.readingMode.onLanguagePrefChange(toggledLanguage, !currentlyEnabled);
 
@@ -2104,53 +1971,16 @@ export class AppElement extends AppElementBase {
     // refresh the list of voices and available langs
     this.getVoices_();
 
-    const storedLanguagesPref: string[] =
-        chrome.readingMode.getLanguagesEnabledInPref();
-    const browserOrPageBaseLang = chrome.readingMode.baseLanguageForSpeech;
-    this.speechSynthesisLanguage = browserOrPageBaseLang;
+    this.speechSynthesisLanguage = chrome.readingMode.baseLanguageForSpeech;
+    this.enabledLangs_ =
+        this.voicePackController_.getInitialListOfEnabledLanguages(
+            this.defaultVoice()?.lang);
 
-    this.enabledLangs = createInitialListOfEnabledLanguages(
-        browserOrPageBaseLang, storedLanguagesPref, this.availableLangs_,
-        this.defaultVoice()?.lang);
-
-    // Only update the unavailable languages in prefs if there are any
-    // available languages. Otherwise, we should wait until the available
-    // languages are updated to do this.
-    if (this.availableLangs_ && this.availableLangs_.length) {
-      this.alignPreferencesWithEnabledLangs_(storedLanguagesPref);
-    }
-
-    for (const lang of this.enabledLangs) {
+    for (const lang of this.enabledLangs_) {
       this.installVoicePackIfPossible(
           lang, /* onlyInstallExactGoogleLocaleMatch=*/ true,
           /* retryIfPreviousInstallFailed= */ false);
     }
-  }
-
-  private alignPreferencesWithEnabledLangs_(languagesInPref: string[]) {
-    // If a stored language doesn't have a match in the enabled languages
-    // list, disable the original preference. If a particular locale becomes
-    // unavailable between reading mode sessions, we may enable a different
-    // locale instead, and the now unavailable locale can never be removed
-    // by the user, so remove it here and save the newly enabled locale. For
-    // example if the user previously enabled 'pt-pt' and now it is
-    // unavailable, createInitialListOfEnabledLanguages above will enable
-    // 'pt-br' instead if it is available. Thus we should remove 'pt-pt' from
-    // preferences here and add 'pt-br' below.
-    languagesInPref.forEach(storedLanguage => {
-      if (!this.enabledLangs.includes(storedLanguage)) {
-        chrome.readingMode.onLanguagePrefChange(storedLanguage, false);
-
-        // Keep track of these languages in case they become available
-        // after the TTS engine extension is installed.
-        if (!chrome.readingMode.isChromeOsAsh) {
-          this.possiblyDisabledLangs.push(storedLanguage);
-        }
-      }
-    });
-    this.enabledLangs.forEach(
-        enabledLanguage =>
-            chrome.readingMode.onLanguagePrefChange(enabledLanguage, true));
   }
 
   private currentVoiceIsUserChosen_(): boolean {
@@ -2188,10 +2018,8 @@ export class AppElement extends AppElementBase {
         this.defaultVoice();
 
     // Enable the locale for the preferred voice for this language.
-    if (this.selectedVoice_ &&
-        !this.enabledLangs.includes(this.selectedVoice_.lang.toLowerCase())) {
-      this.enabledLangs =
-          [...this.enabledLangs, this.selectedVoice_.lang.toLowerCase()];
+    if (this.voicePackController_.enableLang(this.selectedVoice_?.lang)) {
+      this.enabledLangs_ = this.voicePackController_.getEnabledLangs();
     }
   }
 
@@ -2284,8 +2112,8 @@ export class AppElement extends AppElementBase {
   private autoSwitchVoice_(lang: string) {
     // Only enable this language if it has available voices and is the current
     // language. Otherwise switch to a default voice if nothing is selected.
-    const availableLang =
-        convertLangToAnAvailableLangIfPresent(lang, this.availableLangs_);
+    const availableLang = convertLangToAnAvailableLangIfPresent(
+        lang, this.voicePackController_.getAvailableLangs());
     const speechSynthesisBaseLang = this.speechSynthesisLanguage.split('-')[0];
     if (!availableLang ||
         (speechSynthesisBaseLang &&
@@ -2306,14 +2134,14 @@ export class AppElement extends AppElementBase {
     // If there are no Google TTS locales for this language then enable the
     // first available locale for this language.
     if (!localeToEnable) {
-      localeToEnable =
-          this.availableLangs_.find(l => l.startsWith(availableLang));
+      localeToEnable = this.voicePackController_.getAvailableLangs().find(
+          l => l.startsWith(availableLang));
     }
 
     // Enable the locales so we can select a voice for the given language and
     // show it in the voice menu.
-    if (localeToEnable && !this.enabledLangs.includes(localeToEnable)) {
-      this.enabledLangs = [...this.enabledLangs, localeToEnable.toLowerCase()];
+    if (this.voicePackController_.enableLang(localeToEnable)) {
+      this.enabledLangs_ = this.voicePackController_.getEnabledLangs();
     }
     this.selectPreferredVoice();
   }
@@ -2341,61 +2169,18 @@ export class AppElement extends AppElementBase {
     }
 
     const langCodeForVoicePackManager = convertLangOrLocaleForVoicePackManager(
-        langOrLocale, this.enabledLangs, this.availableLangs_);
+        langOrLocale, this.voicePackController_.getEnabledLangs(),
+        this.voicePackController_.getAvailableLangs());
 
     if (!langCodeForVoicePackManager) {
       this.autoSwitchVoice_(langOrLocale);
       return;
     }
 
-    const statusForLang =
-        this.voicePackInstallStatusServerResponses_[langCodeForVoicePackManager];
-
-    if (!statusForLang) {
-      if (retryIfPreviousInstallFailed) {
-        this.forceInstallRequest(
-            langCodeForVoicePackManager, /* isRetry = */ false);
-      } else {
-        this.languagesForVoiceDownloads.add(langCodeForVoicePackManager);
-        // Inquire if the voice pack is downloaded. If not, it'll trigger a
-        // download when we get the response in updateVoicePackStatus().
-        this.sendGetVoicePackInfoRequest(langCodeForVoicePackManager);
-      }
-      return;
-    }
-
-    // If we send an install request for this language, we'll auto switch
-    // voices after it installs.
-    if (isVoicePackStatusSuccess(statusForLang) &&
-        statusForLang.code === VoicePackServerStatusSuccessCode.NOT_INSTALLED) {
-      this.languagesForVoiceDownloads.add(langCodeForVoicePackManager);
-      // Inquire if the voice pack is downloaded. If not, it'll trigger a
-      // download when we get the response in updateVoicePackStatus().
-      this.sendGetVoicePackInfoRequest(langCodeForVoicePackManager);
-    } else if (
-        retryIfPreviousInstallFailed && isVoicePackStatusError(statusForLang)) {
-      this.languagesForVoiceDownloads.add(langCodeForVoicePackManager);
-
-      // If the previous install attempt failed (e.g. due to no internet
-      // connection), the PackManager sends a failure for subsequent GetInfo
-      // requests. Therefore, we need to bypass our normal flow of calling
-      // GetInfo to see if the voice is available to install, and just call
-      // sendInstallVoicePackRequest directly
-      this.forceInstallRequest(
-          langCodeForVoicePackManager, /* isRetry = */ true);
-    } else {
+    if (!this.voicePackController_.requestInstall(
+            langCodeForVoicePackManager, retryIfPreviousInstallFailed)) {
       this.autoSwitchVoice_(langCodeForVoicePackManager);
     }
-  }
-
-  private forceInstallRequest(
-      langCodeForVoicePackManager: string, isRetry: boolean) {
-    this.setVoicePackLocalStatus(
-        langCodeForVoicePackManager,
-        isRetry ? VoiceClientSideStatusCode.SENT_INSTALL_REQUEST_ERROR_RETRY :
-                  VoiceClientSideStatusCode.SENT_INSTALL_REQUEST);
-
-    chrome.readingMode.sendInstallVoicePackRequest(langCodeForVoicePackManager);
   }
 
   protected onKeyDown_(e: KeyboardEvent) {
@@ -2409,56 +2194,8 @@ export class AppElement extends AppElementBase {
     }
   }
 
-  getVoicePackStatusForTesting(lang: string):
-      {server: VoicePackStatus, client: VoiceClientSideStatusCode} {
-    const server = this.getVoicePackServerStatus_(lang);
-    const client = this.getVoicePackLocalStatus_(lang);
-    assert(server);
-    assert(client);
-    return {server, client};
-  }
-
-  private getVoicePackServerStatus_(lang: string): VoicePackStatus|undefined {
-    const voicePackLanguage = getVoicePackConvertedLangIfExists(lang);
-    return this.voicePackInstallStatusServerResponses_[voicePackLanguage];
-  }
-
-  private getVoicePackLocalStatus_(lang: string): VoiceClientSideStatusCode
-      |undefined {
-    const voicePackLanguage = getVoicePackConvertedLangIfExists(lang);
-    return this.voiceStatusLocalState_[voicePackLanguage];
-  }
-
-  setVoicePackLocalStatus(lang: string, status: VoiceClientSideStatusCode) {
-    const possibleVoicePackLanguage =
-        convertLangOrLocaleForVoicePackManager(lang);
-    const voicePackLanguage =
-        possibleVoicePackLanguage ? possibleVoicePackLanguage : lang;
-    const oldStatus = this.voiceStatusLocalState_[voicePackLanguage];
-    this.voiceStatusLocalState_ = {
-      ...this.voiceStatusLocalState_,
-      [voicePackLanguage]: status,
-    };
-
-    // No need for notifications for non-Google TTS languages.
-    if ((possibleVoicePackLanguage !== undefined) && (oldStatus !== status)) {
-      this.notificationManager_.onVoiceStatusChange(
-          voicePackLanguage, status, this.availableVoices_);
-    }
-  }
-
   resetVoiceForTesting() {
     this.selectedVoice_ = undefined;
-  }
-
-  private setVoicePackServerStatus_(lang: string, status: VoicePackStatus) {
-    // Convert the language string to ensure consistency across
-    // languages and locales when setting the status.
-    const voicePackLanguage = getVoicePackConvertedLangIfExists(lang);
-    this.voicePackInstallStatusServerResponses_ = {
-      ...this.voicePackInstallStatusServerResponses_,
-      [voicePackLanguage]: status,
-    };
   }
 }
 

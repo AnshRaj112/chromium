@@ -6,6 +6,7 @@ package org.chromium.chrome.browser.touch_to_fill.payments;
 
 import android.content.Context;
 
+import org.chromium.build.annotations.NullMarked;
 import org.chromium.chrome.browser.autofill.AutofillImageFetcher;
 import org.chromium.chrome.browser.autofill.PersonalDataManager;
 import org.chromium.chrome.browser.touch_to_fill.common.BottomSheetFocusHelper;
@@ -18,6 +19,7 @@ import java.util.List;
  * This component allows to select a payment method to be filled into a form. It acts as a 1-tap
  * surface (bottom sheet) and is meant to be shown while the keyboard is suppressed.
  */
+@NullMarked
 interface TouchToFillPaymentMethodComponent {
     /** This delegate is called when the TouchToFillPaymentMethod component is interacted with. */
     interface Delegate {
@@ -81,13 +83,13 @@ interface TouchToFillPaymentMethodComponent {
      * @param shouldShowScanCreditCard A boolean that conveys whether 'ScanCreditCard' should be
      *     shown.
      */
-    void showSheet(
+    void showCreditCards(
             List<PersonalDataManager.CreditCard> cards,
             List<AutofillSuggestion> suggestions,
             boolean shouldShowScanCreditCard);
 
     /** Displays a new IBAN bottom sheet. */
-    void showSheet(List<PersonalDataManager.Iban> ibans);
+    void showIbans(List<PersonalDataManager.Iban> ibans);
 
     /** Hides the bottom sheet if shown. */
     void hideSheet();

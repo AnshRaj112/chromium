@@ -57,10 +57,28 @@ pkg_config_script = "//build/config/linux/pkg-config.py"
 pkg_config_args = []
 
 common_pkg_config_args = []
+
+# Chrome OS uses custom pkg_config wrappers that require absolute paths as inputs.
+# See https://chromium-review.googlesource.com/c/chromium/src/+/6506002
+_pkg_config_requires_abs_path =
+    pkg_config != "" ||
+    (current_toolchain == host_toolchain && host_pkg_config != "")
+
+# Chrome-adjacent repos might be using different sysroot versions (e.g. ANGLE).
+_enable_cache =
+    !_pkg_config_requires_abs_path && defined(build_with_chromium) &&
+    build_with_chromium && sysroot != ""
+
 if (sysroot != "") {
-  _rebased_sysroot = rebase_path(sysroot, root_build_dir)
-  _cached_results = read_file("cached_results.scope", "scope")
-  _cached_results = _cached_results.data
+  if (_pkg_config_requires_abs_path) {
+    _rebased_sysroot = rebase_path(sysroot)
+  } else {
+    _rebased_sysroot = rebase_path(sysroot, root_build_dir)
+  }
+  if (_enable_cache) {
+    _cached_results = read_file("cached_results.scope", "scope")
+    _cached_results = _cached_results.data
+  }
 
   # Pass the sysroot if we're using one (it requires the CPU arch also).
   common_pkg_config_args += [
@@ -95,15 +113,11 @@ if (host_pkg_config != "") {
   host_pkg_config_args = pkg_config_args
 }
 
-# Chrome-adjacent repos might be using different sysroot versions (e.g. ANGLE, chromeos).
-# ChromeOS sets build_with_chromium, but uses custom sysroots.
-_enable_cache = build_with_chromium && target_os != "chromeos" && sysroot != ""
-
 template("pkg_config") {
   assert(defined(invoker.packages),
          "Variable |packages| must be defined to be a list in pkg_config.")
   config(target_name) {
-    if (host_toolchain == current_toolchain) {
+    if (current_toolchain == host_toolchain) {
       _cache_args = host_pkg_config_args + invoker.packages
     } else {
       _cache_args = pkg_config_args + invoker.packages
@@ -163,10 +177,14 @@ template("pkg_config") {
     }
     cflags = pkgresult[1]
 
-    foreach(include, pkgresult[0]) {
+    foreach(_path, pkgresult[0]) {
+      if (_pkg_config_requires_abs_path && (use_sysroot || use_remoteexec)) {
+        _path = rebase_path(_path, root_build_dir)
+      }
+
       # We want the system include paths to use -isystem instead of -I to
       # suppress warnings in those headers.
-      cflags += [ "-isystem$include" ]
+      cflags += [ "-isystem$_path" ]
     }
 
     if (!defined(invoker.ignore_libs) || !invoker.ignore_libs) {

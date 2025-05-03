@@ -96,11 +96,11 @@ class SuggestMgr {
   SuggestMgr& operator=(const SuggestMgr&);
 
  private:
-  char* ckey;
+  std::string ckey;
   size_t ckeyl;
   std::vector<w_char> ckey_utf;
 
-  char* ctry;
+  std::string ctry;
   size_t ctryl;
   std::vector<w_char> ctry_utf;
   bool lang_with_dash_usage;
@@ -117,9 +117,9 @@ class SuggestMgr {
 
  public:
 #ifdef HUNSPELL_CHROME_CLIENT
-  SuggestMgr(hunspell::BDictReader* reader, const char * tryme, int maxn, AffixMgr *aptr);
+  SuggestMgr(hunspell::BDictReader* reader, const std::string& tryme, int maxn, AffixMgr *aptr);
 #else
-  SuggestMgr(const char* tryme, unsigned int maxn, AffixMgr* aptr);
+  SuggestMgr(const std::string& tryme, unsigned int maxn, AffixMgr* aptr);
 #endif
   ~SuggestMgr();
 
@@ -183,7 +183,7 @@ class SuggestMgr {
   int leftcommonsubstring(const char* s1, const char* s2);
   int commoncharacterpositions(const char* s1, const char* s2, int* is_swap);
   void bubblesort(char** rwd, char** rwd2, int* rsc, int n);
-  void lcs(const char* s, const char* s2, int* l1, int* l2, char** result);
+  char* lcs(const char* s, const char* s2, int* l1, int* l2);
   int lcslen(const char* s, const char* s2);
   int lcslen(const std::string& s, const std::string& s2);
   std::string suggest_hentry_gen(hentry* rv, const char* pattern);

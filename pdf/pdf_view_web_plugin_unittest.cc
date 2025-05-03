@@ -359,6 +359,11 @@ class FakePdfViewWebPluginClient : public PdfViewWebPlugin::Client {
               (override));
 #if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
   MOCK_METHOD(void,
+              GetOcrMaxImageDimension,
+              (base::OnceCallback<void(uint32_t)> callback),
+              (override));
+
+  MOCK_METHOD(void,
               PerformOcr,
               (const SkBitmap& image,
                base::OnceCallback<void(screen_ai::mojom::VisualAnnotationPtr)>
@@ -2843,6 +2848,20 @@ class PdfViewWebPluginInkTest
         Thumbnail(page_size, /*device_pixel_ratio=*/1));
   }
 
+  // Helper method to test PageIndexFromPoint() and VisiblePageIndexFromPoint().
+  // If `expected_visible`, then VisiblePageIndexFromPoint() should have a page
+  // index of `expected_page_index`, otherwise -1.
+  void TestPageIndexFromPoint(const gfx::PointF& point,
+                              int expected_page_index,
+                              bool expected_visible) {
+    PdfInkModuleClient* ink_module_client =
+        plugin_->ink_module_client_for_testing();
+    EXPECT_EQ(expected_page_index,
+              ink_module_client->PageIndexFromPoint(point));
+    EXPECT_EQ(expected_visible ? expected_page_index : -1,
+              ink_module_client->VisiblePageIndexFromPoint(point));
+  }
+
   void TestInProgressDraw(base::FilePath::StringViewType expected_filename,
                           const gfx::PointF& start_position,
                           const gfx::PointF& end_position) {
@@ -3061,11 +3080,30 @@ TEST_P(PdfViewWebPluginInkTest, UpdateCursor) {
   EXPECT_EQ(ui::mojom::CursorType::kPointer, cursor.type());
 }
 
+TEST_P(PdfViewWebPluginInkTest, ClearSelection) {
+  EXPECT_CALL(*engine_ptr_, ClearTextSelection);
+  plugin_->ink_module_client_for_testing()->ClearSelection();
+}
+
+TEST_P(PdfViewWebPluginInkTest, ExtendSelectionByPoint) {
+  EXPECT_CALL(*engine_ptr_, ExtendSelectionByPoint(gfx::PointF(10.5f, 20.1f)));
+  plugin_->ink_module_client_for_testing()->ExtendSelectionByPoint(
+      gfx::PointF(10.5f, 20.1f));
+}
+
 TEST_P(PdfViewWebPluginInkTest, GetPageSizeInPoints) {
   SetUpWithTrivialInkStrokes();
   EXPECT_EQ(gfx::SizeF(75.0f, 37.5f),
             plugin_->ink_module_client_for_testing()->GetPageSizeInPoints(
                 /*page_index=*/0));
+}
+
+TEST_P(PdfViewWebPluginInkTest, GetSelectionRects) {
+  const std::vector<gfx::Rect> selection_rects = {gfx::Rect(10, 20, 30, 40)};
+  ON_CALL(*engine_ptr_, GetSelectionRects)
+      .WillByDefault(Return(selection_rects));
+  EXPECT_THAT(plugin_->ink_module_client_for_testing()->GetSelectionRects(),
+              ElementsAre(gfx::Rect(10, 20, 30, 40)));
 }
 
 TEST_P(PdfViewWebPluginInkTest, GetThumbnailSize) {
@@ -3147,7 +3185,7 @@ TEST_P(PdfViewWebPluginInkTest, AddUpdateDiscardStroke) {
                                                           kStrokeId);
 }
 
-TEST_P(PdfViewWebPluginInkTest, VisiblePageIndexFromPoint) {
+TEST_P(PdfViewWebPluginInkTest, PageIndexFromPoint) {
   ON_CALL(*engine_ptr_, GetPageContentsRect)
       .WillByDefault([](int page_index) -> gfx::Rect {
         // Uniform 80x180 page sizes, with a `kVerticalEmptySpace` gap above
@@ -3185,43 +3223,54 @@ TEST_P(PdfViewWebPluginInkTest, VisiblePageIndexFromPoint) {
         return page_index >= 0 && page_index <= 1;
       });
 
-  PdfInkModuleClient* ink_module_client =
-      plugin_->ink_module_client_for_testing();
-  EXPECT_EQ(-1,
-            ink_module_client->VisiblePageIndexFromPoint(kScreenTopLeftCorner));
-  EXPECT_EQ(0,
-            ink_module_client->VisiblePageIndexFromPoint(kPage0TopLeftCorner));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(
-                    kPage0OutsideTopLeftCorner));
-  EXPECT_EQ(
-      0, ink_module_client->VisiblePageIndexFromPoint(kPage0BottomRightCorner));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(
-                    kPage0OutsideBottomRightCorner));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(kPage0Page1Gap));
-  EXPECT_EQ(1, ink_module_client->VisiblePageIndexFromPoint(kPage1Top));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(kPage12Middle));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(kPage12Bottom));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(kPageBelowLast));
+  TestPageIndexFromPoint(kScreenTopLeftCorner, -1, /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage0TopLeftCorner, 0, /*expected_visible=*/true);
+  TestPageIndexFromPoint(kPage0OutsideTopLeftCorner, -1,
+                         /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage0BottomRightCorner, 0, true);
+  TestPageIndexFromPoint(kPage0OutsideBottomRightCorner, -1,
+                         /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage0Page1Gap, -1, /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage1Top, 1, /*expected_visible=*/true);
+  TestPageIndexFromPoint(kPage12Middle, 12, /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage12Bottom, 12, /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPageBelowLast, -1, /*expected_visible=*/false);
 
   // Change the visible page to the last page.
   ON_CALL(*engine_ptr_, IsPageVisible)
       .WillByDefault([](int page_index) -> bool { return page_index == 12; });
 
-  EXPECT_EQ(-1,
-            ink_module_client->VisiblePageIndexFromPoint(kScreenTopLeftCorner));
-  EXPECT_EQ(-1,
-            ink_module_client->VisiblePageIndexFromPoint(kPage0TopLeftCorner));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(
-                    kPage0OutsideTopLeftCorner));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(
-                    kPage0BottomRightCorner));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(
-                    kPage0OutsideBottomRightCorner));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(kPage0Page1Gap));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(kPage1Top));
-  EXPECT_EQ(12, ink_module_client->VisiblePageIndexFromPoint(kPage12Middle));
-  EXPECT_EQ(12, ink_module_client->VisiblePageIndexFromPoint(kPage12Bottom));
-  EXPECT_EQ(-1, ink_module_client->VisiblePageIndexFromPoint(kPageBelowLast));
+  TestPageIndexFromPoint(kScreenTopLeftCorner, -1, /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage0TopLeftCorner, 0, /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage0OutsideTopLeftCorner, -1,
+                         /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage0BottomRightCorner, 0,
+                         /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage0OutsideBottomRightCorner, -1,
+                         /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage0Page1Gap, -1, /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage1Top, 1, /*expected_visible=*/false);
+  TestPageIndexFromPoint(kPage12Middle, 12, /*expected_visible=*/true);
+  TestPageIndexFromPoint(kPage12Bottom, 12, /*expected_visible=*/true);
+  TestPageIndexFromPoint(kPageBelowLast, -1, /*expected_visible=*/false);
+}
+
+TEST_P(PdfViewWebPluginInkTest, IsSelectableTextOrLinkArea) {
+  ON_CALL(*engine_ptr_, IsSelectableTextOrLinkArea(gfx::PointF(10.1f, 10.2f)))
+      .WillByDefault(Return(true));
+  EXPECT_TRUE(
+      plugin_->ink_module_client_for_testing()->IsSelectableTextOrLinkArea(
+          gfx::PointF(10.1f, 10.2f)));
+  EXPECT_FALSE(
+      plugin_->ink_module_client_for_testing()->IsSelectableTextOrLinkArea(
+          gfx::PointF(20.1f, 20.2f)));
+}
+
+TEST_P(PdfViewWebPluginInkTest, OnTextOrLinkAreaClick) {
+  EXPECT_CALL(*engine_ptr_, OnTextOrLinkAreaClick(gfx::PointF(1.1f, 2.2f),
+                                                  /*click_count=*/2));
+  plugin_->ink_module_client_for_testing()->OnTextOrLinkAreaClick(
+      gfx::PointF(1.1f, 2.2f), /*click_count=*/2);
 }
 
 TEST_P(PdfViewWebPluginInkTest, AnnotationModeSetsFormAndClearsText) {
@@ -3244,6 +3293,73 @@ TEST_P(PdfViewWebPluginInkTest, DrawInProgressStroke) {
       /*expected_filename=*/FILE_PATH_LITERAL("diagonal_stroke.png"),
       /*start_position=*/gfx::PointF(95, 85),
       /*end_position=*/gfx::PointF(50, 45));
+}
+
+class PdfViewWebPluginInkTextHighlightTest : public PdfViewWebPluginInkTest {
+ public:
+  static constexpr gfx::PointF kStartTextPosition{55.0f, 60.0f};
+  static constexpr gfx::PointF kEndTextPosition{75.0f, 65.0f};
+
+  // Sets up test expectations for clicking on `kStartTextPosition` and moving
+  // to `kEndTextPosition` with a mouse.
+  void SetUpMouseDownMoveTextTestExpectations() {
+    // The start position and end position are in screen coordinates, while the
+    // values passed to and returned from PDFiumEngine are in device
+    // coordinates.
+    EXPECT_CALL(*engine_ptr_, OnTextOrLinkAreaClick(gfx::PointF(5, 60), 1));
+    EXPECT_CALL(*engine_ptr_, ExtendSelectionByPoint(gfx::PointF(25, 65)));
+    std::vector<gfx::Rect> mock_selection_rects = {gfx::Rect(5, 60, 20, 5)};
+    ON_CALL(*engine_ptr_, GetSelectionRects())
+        .WillByDefault(Return(mock_selection_rects));
+    ON_CALL(*engine_ptr_, IsSelectableTextOrLinkArea(_))
+        .WillByDefault(Return(true));
+  }
+};
+
+TEST_P(PdfViewWebPluginInkTextHighlightTest, SelectionDoesNotChange) {
+  constexpr gfx::Rect kScreenRect(kCanvasSize);
+  ON_CALL(*engine_ptr_, GetPageContentsRect).WillByDefault(Return(kScreenRect));
+  UpdatePluginGeometry(/*device_scale=*/1.0f, kScreenRect);
+
+  // Enter annotation mode and select the highlighter.
+  plugin_->OnMessage(CreateSetAnnotationModeMessageForTesting(/*enable=*/true));
+  TestAnnotationBrushMessageParams message_params{/*color_r=*/240,
+                                                  /*color_g=*/133,
+                                                  /*color_b=*/0, /*size=*/4.5};
+  plugin_->OnMessage(CreateSetAnnotationBrushMessageForTesting(
+      "highlighter", &message_params));
+
+  SetUpMouseDownMoveTextTestExpectations();
+  TestSendInputEvent(
+      MouseEventBuilder().CreateLeftClickAtPosition(kStartTextPosition).Build(),
+      blink::WebInputEventResult::kHandledApplication);
+  TestSendInputEvent(MouseEventBuilder()
+                         .SetType(blink::WebInputEvent::Type::kMouseMove)
+                         .SetPosition(kEndTextPosition)
+                         .SetButton(blink::WebPointerProperties::Button::kLeft)
+                         .Build(),
+                     blink::WebInputEventResult::kHandledApplication);
+
+  EXPECT_CALL(*client_ptr_, TextSelectionChanged(_, _, _)).Times(0);
+
+  plugin_->SetSelectedText("text");
+}
+
+TEST_P(PdfViewWebPluginInkTextHighlightTest, DrawInProgressTextHighlight) {
+  // Enter annotation mode and select the highlighter.
+  plugin_->OnMessage(CreateSetAnnotationModeMessageForTesting(/*enable=*/true));
+  TestAnnotationBrushMessageParams message_params{/*color_r=*/240,
+                                                  /*color_g=*/133,
+                                                  /*color_b=*/0, /*size=*/4.5};
+  plugin_->OnMessage(CreateSetAnnotationBrushMessageForTesting(
+      "highlighter", &message_params));
+
+  SetUpMouseDownMoveTextTestExpectations();
+
+  TestInProgressDraw(
+      /*expected_filename=*/FILE_PATH_LITERAL("text_highlight_stroke.png"),
+      /*start_position=*/gfx::PointF(55, 60),
+      /*end_position=*/gfx::PointF(75, 65));
 }
 
 class PdfViewWebPluginInk2SaveTest : public PdfViewWebPluginSaveTest {
@@ -3365,6 +3481,10 @@ INSTANTIATE_TEST_SUITE_P(All,
 INSTANTIATE_TEST_SUITE_P(All,
                          PdfViewWebPluginInkMetricTest,
                          testing::ValuesIn(GetAllInkTestVariations()));
+INSTANTIATE_TEST_SUITE_P(
+    All,
+    PdfViewWebPluginInkTextHighlightTest,
+    testing::ValuesIn(GetInkTestVariationsWithTextHighlighting()));
 #endif  // BUILDFLAG(ENABLE_PDF_INK2)
 
 }  // namespace chrome_pdf

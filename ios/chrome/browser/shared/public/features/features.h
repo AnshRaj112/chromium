@@ -489,10 +489,6 @@ BASE_DECLARE_FEATURE(kIOSManageAccountStorage);
 // Use IsFeedBackgroundRefreshEnabled() instead of this constant directly.
 BASE_DECLARE_FEATURE(kEnableFeedBackgroundRefresh);
 
-// Feature flag to enable the Following feed in the NTP.
-// Use IsWebChannelsEnabled() instead of this constant directly.
-BASE_DECLARE_FEATURE(kEnableWebChannels);
-
 // Feature flag to deprecate the "Discover / Follow" toggle from the header of
 // the feed. When this feature is enabled, there would not be a separate
 // following feed.
@@ -501,9 +497,6 @@ bool ShouldDeprecateFeedHeader();
 
 // Feature flag to disable the feed.
 BASE_DECLARE_FEATURE(kEnableFeedAblation);
-
-// Feature flag to enable the Follow UI update.
-BASE_DECLARE_FEATURE(kEnableFollowUIUpdate);
 
 // Content Push Notifications Variations.
 extern const char kContentPushNotificationsExperimentType[];
@@ -1088,5 +1081,8 @@ BASE_DECLARE_FEATURE(kBestOfAppFRE);
 // Whether the feature to highlight the app's features during the FRE is
 // enabled.
 bool IsBestOfAppFREEnabled();
+
+// Whether the Guided Tour variant of `kBestOfAppFRE` is enabled.
+bool IsBestOfAppGuidedTourEnabled();
 
 #endif  // IOS_CHROME_BROWSER_SHARED_PUBLIC_FEATURES_FEATURES_H_

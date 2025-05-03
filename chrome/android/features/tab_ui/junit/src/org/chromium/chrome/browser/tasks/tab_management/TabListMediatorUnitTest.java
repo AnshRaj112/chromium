@@ -244,6 +244,12 @@ public class TabListMediatorUnitTest {
     private static final Token TAB_GROUP_ID = new Token(829L, 283L);
     private static final String SYNC_GROUP_ID1 = "sync_group_id1";
     private static final @TabGroupColorId int SYNC_GROUP_COLOR1 = TabGroupColorId.BLUE;
+    private static final TabListEditorItemSelectionId ITEM1_ID =
+            TabListEditorItemSelectionId.createTabId(TAB1_ID);
+    private static final TabListEditorItemSelectionId ITEM2_ID =
+            TabListEditorItemSelectionId.createTabId(TAB2_ID);
+    private static final TabListEditorItemSelectionId ITEM3_ID =
+            TabListEditorItemSelectionId.createTabId(TAB3_ID);
 
     public static final PropertyKey[] TAB_GRID_SELECTABLE_KEYS =
             new PropertyKey[] {
@@ -329,7 +335,7 @@ public class TabListMediatorUnitTest {
     @Mock TemplateUrlService mTemplateUrlService;
     @Mock PriceWelcomeMessageController mPriceWelcomeMessageController;
     @Mock ShoppingPersistedTabData mShoppingPersistedTabData;
-    @Mock SelectionDelegate<Integer> mSelectionDelegate;
+    @Mock SelectionDelegate<TabListEditorItemSelectionId> mSelectionDelegate;
     @Mock ModalDialogManager mModalDialogManager;
     @Mock ActionConfirmationManager mActionConfirmationManager;
     @Mock DataSharingTabManager mDataSharingTabManager;
@@ -471,6 +477,9 @@ public class TabListMediatorUnitTest {
         doReturn(mOpenGroupActionListener)
                 .when(mGridCardOnClickListenerProvider)
                 .openTabGridDialog(any(Tab.class));
+        doReturn(mOpenGroupActionListener)
+                .when(mGridCardOnClickListenerProvider)
+                .openTabGridDialog(anyString());
         doNothing().when(mActivity).registerComponentCallbacks(mComponentCallbacksCaptor.capture());
         doReturn(mGridLayoutManager).when(mRecyclerView).getLayoutManager();
         doReturn(TabListCoordinator.GRID_LAYOUT_SPAN_COUNT_COMPACT)
@@ -3941,9 +3950,9 @@ public class TabListMediatorUnitTest {
 
     @Test
     public void testSelectableUpdates_withoutRelated() {
-        when(mSelectionDelegate.isItemSelected(TAB1_ID)).thenReturn(true);
-        when(mSelectionDelegate.isItemSelected(TAB2_ID)).thenReturn(false);
-        when(mSelectionDelegate.isItemSelected(TAB3_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM1_ID)).thenReturn(true);
+        when(mSelectionDelegate.isItemSelected(ITEM2_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM3_ID)).thenReturn(false);
         mMediator =
                 new TabListMediator(
                         mActivity,
@@ -3968,7 +3977,7 @@ public class TabListMediatorUnitTest {
         mMediator.registerOrientationListener(mGridLayoutManager);
         mMediator.initWithNative(mProfile);
         initAndAssertAllProperties();
-        when(mSelectionDelegate.isItemSelected(TAB1_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM1_ID)).thenReturn(false);
         Tab tab3 = prepareTab(TAB3_ID, TAB3_TITLE, TAB3_URL);
         List<Tab> tabs = new ArrayList<>(Arrays.asList(mTab1, mTab2, tab3));
         mMediator.resetWithListOfTabs(tabs, null, false);
@@ -3986,9 +3995,9 @@ public class TabListMediatorUnitTest {
 
     @Test
     public void testSelectableUpdates_withRelated() {
-        when(mSelectionDelegate.isItemSelected(TAB1_ID)).thenReturn(true);
-        when(mSelectionDelegate.isItemSelected(TAB2_ID)).thenReturn(false);
-        when(mSelectionDelegate.isItemSelected(TAB3_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM1_ID)).thenReturn(true);
+        when(mSelectionDelegate.isItemSelected(ITEM2_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM3_ID)).thenReturn(false);
         mMediator =
                 new TabListMediator(
                         mActivity,
@@ -4014,7 +4023,7 @@ public class TabListMediatorUnitTest {
         mMediator.initWithNative(mProfile);
         initAndAssertAllProperties();
         Tab tab3 = prepareTab(TAB3_ID, TAB3_TITLE, TAB3_URL);
-        when(mSelectionDelegate.isItemSelected(TAB1_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM1_ID)).thenReturn(false);
         List<Tab> tabs = new ArrayList<>(Arrays.asList(mTab1, mTab2, tab3));
         mMediator.resetWithListOfTabs(tabs, null, false);
         assertThat(mModelList.size(), equalTo(3));
@@ -4031,9 +4040,9 @@ public class TabListMediatorUnitTest {
 
     @Test
     public void testSelectableUpdates_onReset() {
-        when(mSelectionDelegate.isItemSelected(TAB1_ID)).thenReturn(true);
-        when(mSelectionDelegate.isItemSelected(TAB2_ID)).thenReturn(false);
-        when(mSelectionDelegate.isItemSelected(TAB3_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM1_ID)).thenReturn(true);
+        when(mSelectionDelegate.isItemSelected(ITEM2_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM3_ID)).thenReturn(false);
         mMediator =
                 new TabListMediator(
                         mActivity,
@@ -4069,16 +4078,16 @@ public class TabListMediatorUnitTest {
         when(mTabGroupModelFilter.isTabInTabGroup(tab4)).thenReturn(true);
         when(mTabGroupModelFilter.isTabInTabGroup(tab3)).thenReturn(false);
         List<Tab> tabs = Arrays.asList(mTab1, mTab2, tab3);
-        when(mSelectionDelegate.isItemSelected(TAB1_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM1_ID)).thenReturn(false);
         mMediator.resetWithListOfTabs(tabs, null, false);
         assertThat(mModelList.size(), equalTo(3));
         assertThat(mModelList.get(0).model.get(TabProperties.IS_SELECTED), equalTo(false));
         assertThat(mModelList.get(1).model.get(TabProperties.IS_SELECTED), equalTo(false));
         assertThat(mModelList.get(2).model.get(TabProperties.IS_SELECTED), equalTo(false));
 
-        when(mSelectionDelegate.isItemSelected(TAB1_ID)).thenReturn(true);
-        when(mSelectionDelegate.isItemSelected(TAB2_ID)).thenReturn(true);
-        when(mSelectionDelegate.isItemSelected(TAB3_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM1_ID)).thenReturn(true);
+        when(mSelectionDelegate.isItemSelected(ITEM2_ID)).thenReturn(true);
+        when(mSelectionDelegate.isItemSelected(ITEM3_ID)).thenReturn(false);
         ThumbnailFetcher fetcher1 = mModelList.get(0).model.get(TabProperties.THUMBNAIL_FETCHER);
         ThumbnailFetcher fetcher2 = mModelList.get(1).model.get(TabProperties.THUMBNAIL_FETCHER);
         ThumbnailFetcher fetcher3 = mModelList.get(2).model.get(TabProperties.THUMBNAIL_FETCHER);
@@ -4454,9 +4463,9 @@ public class TabListMediatorUnitTest {
 
     @Test
     public void setTabActionState_UnbindsPropertiesCorrectly() {
-        when(mSelectionDelegate.isItemSelected(TAB1_ID)).thenReturn(true);
-        when(mSelectionDelegate.isItemSelected(TAB2_ID)).thenReturn(false);
-        when(mSelectionDelegate.isItemSelected(TAB3_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM1_ID)).thenReturn(true);
+        when(mSelectionDelegate.isItemSelected(ITEM2_ID)).thenReturn(false);
+        when(mSelectionDelegate.isItemSelected(ITEM3_ID)).thenReturn(false);
         mMediator =
                 new TabListMediator(
                         mActivity,
@@ -4805,6 +4814,22 @@ public class TabListMediatorUnitTest {
         // Assert that the tab group has been removed from the model list and archive status reset.
         assertEquals(TAB, mModelList.get(0).model.get(CARD_TYPE));
         verify(mTabGroupSyncService).updateArchivalStatus(eq(SYNC_GROUP_ID1), eq(false));
+    }
+
+    @Test
+    public void sendsOpenGroupSignalCorrectly_SavedTabGroupType() {
+        List<Tab> tabs = Arrays.asList(mTab1);
+        List<String> syncIds = new ArrayList<>(Arrays.asList(SYNC_GROUP_ID1));
+        mMediator.setDefaultGridCardSize(new Size(100, 200));
+
+        mMediator.resetWithListOfTabs(tabs, syncIds, false);
+        mModelList
+                .get(0)
+                .model
+                .get(TabProperties.TAB_CLICK_LISTENER)
+                .run(mItemView1, mModelList.get(0).model.get(TabProperties.TAB_GROUP_SYNC_ID));
+
+        verify(mOpenGroupActionListener).run(mItemView1, SYNC_GROUP_ID1);
     }
 
     private void setUpTabGroupCardDescriptionString() {

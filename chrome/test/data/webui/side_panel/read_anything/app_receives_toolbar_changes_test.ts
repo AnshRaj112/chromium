@@ -4,9 +4,8 @@
 
 import 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 
-import {BrowserProxy} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 import type {AppElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
-import {SpeechBrowserProxyImpl, ToolbarEvent, VoiceClientSideStatusCode, WordBoundaries} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import {BrowserProxy, SpeechBrowserProxyImpl, ToolbarEvent, VoiceClientSideStatusCode, VoicePackController, WordBoundaries} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 import {assertArrayEquals, assertEquals, assertFalse, assertNotEquals, assertTrue} from 'chrome-untrusted://webui-test/chai_assert.js';
 import {hasStyle, microtasksFinished} from 'chrome-untrusted://webui-test/test_util.js';
 
@@ -20,6 +19,7 @@ suite('AppReceivesToolbarChanges', () => {
   let app: AppElement;
   let speech: TestSpeechBrowserProxy;
   let metrics: TestMetricsBrowserProxy;
+  let voicePackController: VoicePackController;
 
   function containerLetterSpacing(): number {
     return +window.getComputedStyle(app.$.container)
@@ -83,6 +83,8 @@ suite('AppReceivesToolbarChanges', () => {
     const readingMode = new FakeReadingMode();
     chrome.readingMode = readingMode as unknown as typeof chrome.readingMode;
     metrics = mockMetrics();
+    voicePackController = new VoicePackController();
+    VoicePackController.setInstance(voicePackController);
     app = await createApp();
   });
 
@@ -169,28 +171,28 @@ suite('AppReceivesToolbarChanges', () => {
     test('enabled languages are added', () => {
       const firstLanguage = 'en-us';
       emitLanguageToggle(firstLanguage);
-      assertTrue(app.enabledLangs.includes(firstLanguage));
-      assertTrue(chrome.readingMode.getLanguagesEnabledInPref()
-        .includes(firstLanguage));
+      assertTrue(voicePackController.isLangEnabled(firstLanguage));
+      assertTrue(chrome.readingMode.getLanguagesEnabledInPref().includes(
+          firstLanguage));
 
       const secondLanguage = 'fr';
       emitLanguageToggle(secondLanguage);
-      assertTrue(app.enabledLangs.includes(secondLanguage));
-      assertTrue(chrome.readingMode.getLanguagesEnabledInPref()
-        .includes(secondLanguage));
+      assertTrue(voicePackController.isLangEnabled(secondLanguage));
+      assertTrue(chrome.readingMode.getLanguagesEnabledInPref().includes(
+          secondLanguage));
     });
 
     test('disabled languages are removed', () => {
       const firstLanguage = 'en-us';
       emitLanguageToggle(firstLanguage);
-      assertTrue(app.enabledLangs.includes(firstLanguage));
-      assertTrue(chrome.readingMode.getLanguagesEnabledInPref()
-        .includes(firstLanguage));
+      assertTrue(voicePackController.isLangEnabled(firstLanguage));
+      assertTrue(chrome.readingMode.getLanguagesEnabledInPref().includes(
+          firstLanguage));
 
       emitLanguageToggle(firstLanguage);
-      assertFalse(app.enabledLangs.includes(firstLanguage));
-      assertFalse(chrome.readingMode.getLanguagesEnabledInPref()
-        .includes(firstLanguage));
+      assertFalse(voicePackController.isLangEnabled(firstLanguage));
+      assertFalse(chrome.readingMode.getLanguagesEnabledInPref().includes(
+          firstLanguage));
     });
 
     suite('with language downloading enabled', () => {
@@ -214,7 +216,7 @@ suite('AppReceivesToolbarChanges', () => {
 
             assertEquals(lang, sentInstallRequestFor);
             assertEquals(
-                app.getVoicePackStatusForTesting(lang).client,
+                voicePackController.getLocalStatus(lang),
                 VoiceClientSideStatusCode.SENT_INSTALL_REQUEST_ERROR_RETRY);
           });
 

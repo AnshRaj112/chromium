@@ -567,7 +567,12 @@ void SerializeLayer(LayerImpl& layer,
   wire.scroll_tree_index = layer.scroll_tree_index();
   wire.should_check_backface_visibility =
       layer.should_check_backface_visibility();
-  wire.filter_quality = layer.GetFilterQuality();
+  if (layer.HasAnyRarePropertySet()) {
+    auto rare_properties = viz::mojom::RareProperties::New();
+    rare_properties->filter_quality = layer.GetFilterQuality();
+    wire.rare_properties = std::move(rare_properties);
+  }
+  wire.may_contain_video = layer.may_contain_video();
   switch (layer.GetLayerType()) {
     case mojom::LayerType::kMirror: {
       auto mirror_layer_extra = viz::mojom::MirrorLayerExtra::New();
@@ -997,11 +1002,12 @@ void VizLayerContext::UpdateDisplayTile(
     PictureLayerImpl& layer,
     const Tile& tile,
     viz::ClientResourceProvider& resource_provider,
-    viz::RasterContextProvider& context_provider) {
+    viz::RasterContextProvider& context_provider,
+    bool update_damage) {
   const Tile* tiles[] = {&tile};
   if (auto tiling = SerializeTiling(layer, *tile.tiling(), tiles,
                                     resource_provider, context_provider)) {
-    service_->UpdateDisplayTiling(std::move(tiling));
+    service_->UpdateDisplayTiling(std::move(tiling), update_damage);
   }
 }
 

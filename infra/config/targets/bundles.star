@@ -1650,10 +1650,16 @@ targets.bundle(
 targets.bundle(
     name = "chromium_gtests_for_linux_wayland_mutter",
     targets = [
+        "browser_tests",
         "content_browsertests",
         "interactive_ui_tests",
     ],
     per_test_modifications = {
+        "browser_tests": targets.mixin(
+            swarming = targets.swarming(
+                shards = 8,
+            ),
+        ),
         "content_browsertests": targets.mixin(
             swarming = targets.swarming(
                 shards = 8,
@@ -2112,7 +2118,7 @@ targets.bundle(
         "mac_specific_chromium_gtests",
     ],
     mixins = [
-        "mac_14_vm_optional",
+        "mac_15_vm_optional",
     ],
 )
 
@@ -5469,7 +5475,7 @@ targets.bundle(
         targets.bundle(
             targets = "ios_common_tests",
             mixins = [
-                "mac_14_vm_optional",
+                "mac_15_vm_optional",
             ],
             variants = [
                 "SIM_IPHONE_14_PLUS_17_5",
@@ -5505,7 +5511,7 @@ targets.bundle(
         targets.bundle(
             targets = "ios_screen_size_dependent_tests",
             mixins = [
-                "mac_14_vm_optional",
+                "mac_15_vm_optional",
             ],
             variants = [
                 "SIM_IPAD_PRO_6TH_GEN_17_5",
@@ -5555,7 +5561,7 @@ targets.bundle(
         targets.bundle(
             targets = "ios_screen_size_dependent_tests",
             mixins = [
-                "mac_14_vm_optional",
+                "mac_15_vm_optional",
             ],
             variants = [
                 "SIM_IPAD_AIR_5TH_GEN_17_5",
@@ -5578,7 +5584,7 @@ targets.bundle(
         targets.bundle(
             targets = "ios_common_tests",
             mixins = [
-                "mac_14_vm_optional",
+                "mac_15_vm_optional",
             ],
             variants = [
                 "SIM_IPHONE_14_17_5",

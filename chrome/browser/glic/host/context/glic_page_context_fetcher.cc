@@ -162,20 +162,6 @@ void GlicPageContextFetcher::Fetch(
     inner_text_done_ = true;
   }
 
-  // Get the media context if we'll have somewhere to store it.
-  if (auto* media_integration =
-          options.include_annotated_page_content
-              ? GlicMediaIntegration::GetFor(web_contents())
-              : nullptr) {
-    media_integration->ComputeContext(
-        web_contents(),
-        /*max_size_bytes_=*/20000,
-        base::BindOnce(&GlicPageContextFetcher::ReceivedMediaContext,
-                       GetWeakPtr()));
-  } else {
-    media_context_done_ = true;
-  }
-
   pdf_done_ = true;  // Will not fetch PDF contents by default.
   if (options.include_pdf) {
     bool is_pdf_document =
@@ -183,10 +169,11 @@ void GlicPageContextFetcher::Fetch(
     pdf::PDFDocumentHelper* pdf_helper =
         pdf::PDFDocumentHelper::MaybeGetForWebContents(web_contents());
     RecordPdfRequestState(is_pdf_document, /*pdf_found=*/pdf_helper != nullptr);
-    if (is_pdf_document && pdf_helper) {
+    // GetPdfBytes() is not safe before IsDocumentLoadComplete() = true.
+    if (is_pdf_document && pdf_helper && pdf_helper->IsDocumentLoadComplete()) {
       pdf_origin_ = pdf_helper->render_frame_host().GetLastCommittedOrigin();
       pdf_helper->GetPdfBytes(
-          options.pdf_size_limit,
+          options_.pdf_size_limit,
           base::BindOnce(&GlicPageContextFetcher::ReceivedPdfBytes,
                          GetWeakPtr()));
       pdf_done_ = false;  // Will fetch PDF contents.
@@ -218,13 +205,6 @@ void GlicPageContextFetcher::ReceivedPdfBytes(
   pdf_done_ = true;
   pdf_status_ = status;
   pdf_bytes_ = pdf_bytes;
-  RunCallbackIfComplete();
-}
-
-void GlicPageContextFetcher::ReceivedMediaContext(
-    const std::string& media_context) {
-  media_context_done_ = true;
-  media_context_ = media_context;
   RunCallbackIfComplete();
 }
 
@@ -303,10 +283,9 @@ void GlicPageContextFetcher::ReceivedAnnotatedPageContent(
 
 void GlicPageContextFetcher::RunCallbackIfComplete() {
   // Continue only if the primary page changed or work is complete.
-  bool work_complete =
-      (screenshot_done_ && inner_text_done_ && annotated_page_content_done_ &&
-       pdf_done_ && media_context_done_) ||
-      primary_page_changed_;
+  bool work_complete = (screenshot_done_ && inner_text_done_ &&
+                        annotated_page_content_done_ && pdf_done_) ||
+                       primary_page_changed_;
   if (!work_complete) {
     return;
   }
@@ -344,26 +323,31 @@ void GlicPageContextFetcher::RunCallbackIfComplete() {
     if (pdf_status_) {
       auto pdf_document_data = mojom::PdfDocumentData::New();
       pdf_document_data->origin = pdf_origin_;
-      pdf_document_data->pdf_data = std::move(pdf_bytes_);
+
+      // Warning!: `pdf_bytes_` can be larger than pdf_size_limit.
+      // `pdf_size_limit` applies to the original PDF size, but the PDF is
+      // re-serialized and returned, so it is not identical to the original.
       pdf_document_data->size_limit_exceeded =
           *pdf_status_ ==
-          pdf::mojom::PdfListener_GetPdfBytesStatus::kSizeLimitExceeded;
+              pdf::mojom::PdfListener_GetPdfBytesStatus::kSizeLimitExceeded ||
+          pdf_bytes_.size() > options_.pdf_size_limit;
+      if (!pdf_document_data->size_limit_exceeded) {
+        pdf_document_data->pdf_data = std::move(pdf_bytes_);
+      }
+
       tab_context->pdf_document_data = std::move(pdf_document_data);
     }
 
     if (annotated_page_content_result_) {
       auto annotated_page_data = mojom::AnnotatedPageData::New();
 
-      if (media_context_.length() > 0) {
+      if (auto* media_integration =
+              GlicMediaIntegration::GetFor(web_contents())) {
         optimization_guide::proto::ContentNode* media_node =
             annotated_page_content_result_->proto.mutable_root_node()
                 ->add_children_nodes();
-        media_node->mutable_content_attributes()->set_attribute_type(
-            optimization_guide::proto::CONTENT_ATTRIBUTE_TEXT);
-        media_node->mutable_content_attributes()
-            ->mutable_text_data()
-            ->set_text_content(std::move(media_context_));
-        media_context_.clear();
+
+        media_integration->AppendContext(web_contents(), media_node);
       }
 
       annotated_page_data->annotated_page_content =
