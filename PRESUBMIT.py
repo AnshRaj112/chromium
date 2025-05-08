@@ -762,6 +762,7 @@ _BANNED_CPP_FUNCTIONS: Sequence[BanRule] = (
             '^services/cert_verifier/',
             '^components/certificate_transparency/',
             '^components/media_router/common/providers/cast/certificate/',
+            '^components/trusted_vault/',
             # gRPC provides some C++ libraries that use std::shared_ptr<>.
             '^chromeos/ash/services/libassistant/grpc/',
             '^chromecast/cast_core/grpc',
@@ -967,6 +968,7 @@ _BANNED_CPP_FUNCTIONS: Sequence[BanRule] = (
             r'android_webview/browser/ip_protection/.*',
             r'chrome/browser/ip_protection/.*',
             r'components/ip_protection/.*',
+            r'net/quic/dedicated_web_transport_http3_client\.cc',
 
             # Needed to use MediaPipe API.
             r'components/media_effects/.*\.cc',
@@ -1236,7 +1238,7 @@ _BANNED_CPP_FUNCTIONS: Sequence[BanRule] = (
     ),
     BanRule(
         # Ban everything except specifically allowlisted constructs.
-        pattern=r'/std::ranges::(?!' + '|'.join((
+        pattern=r'/std::ranges::(?!(?:' + '|'.join((
             # From https://en.cppreference.com/w/cpp/ranges:
             # Range access
             'begin',
@@ -1419,7 +1421,11 @@ _BANNED_CPP_FUNCTIONS: Sequence[BanRule] = (
             'distance',
             'next',
             'prev',
-        )) + r')\w+',
+            # Require a word boundary at the end of negative lookahead
+            # assertion, e.g. to ensure that even though `view` is allowed (and
+            # should not match this regex), `views` is still treated as
+            # disallowed (and matches the regex).
+        )) + r')\b)\w+',
         explanation=(
             'Use of range views and associated helpers is banned in Chrome. '
             'If you need this functionality, please contact cxx@chromium.org.',
@@ -2391,10 +2397,12 @@ _KNOWN_ROBOTS = set() | set('%s@appspot.gserviceaccount.com' % s for s in (
                 for s in ('swarming-tasks', )) | set(
                     '%s@fuchsia-infra.iam.gserviceaccount.com' % s
                     for s in ('global-integration-try-builder',
-                              'global-integration-ci-builder')) | set(
-                                  '%s@prod.google.com' % s for s in (
-                                      'chops-security-borg',
-                                      'chops-security-cronjobs-cpesuggest'))
+                              'global-integration-ci-builder')
+                ) | set('%s@prod.google.com' % s for s in (
+                    'chops-security-borg',
+                    'chops-security-cronjobs-cpesuggest')) | set(
+                        '%s@chromeos-release-bot.iam.gserviceaccount.com' % s
+                        for s in ('chromeos-ci-release', ))
 
 _INVALID_GRD_FILE_LINE = [(r'<file lang=.* path=.*',
                            'Path should come before lang in GRD files.')]

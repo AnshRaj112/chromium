@@ -64,11 +64,6 @@ interface FinishTextAnnotationMessage {
   type: 'finishTextAnnotation';
   data: TextAnnotation;
 }
-
-interface AnnotationFontsMessage {
-  type: 'getTextAnnotFontNames';
-  data: string[];
-}
 // </if>
 
 /**
@@ -111,6 +106,7 @@ export interface ContentController {
   save(requestType: SaveRequestType): Promise<{
     fileName: string,
     dataToSave: ArrayBuffer,
+    bypassSaveFileForTesting?: boolean,
     editModeForTesting?: boolean,
   }|null>;
 
@@ -227,23 +223,6 @@ export class PluginController implements ContentController {
     return this.postMessageWithReply_({
       type: 'getAnnotationBrush',
       brushType,
-    });
-  }
-
-  getTextAnnotFontNames(): Promise<AnnotationFontsMessage> {
-    // TODO(crbug.com/402546154): Use backend reply instead of dropping it
-    // on the ground and returning dummy data once the backend is in place.
-    this.postMessageWithReply_({
-      type: 'getTextAnnotFontNames',
-    });
-    return Promise.resolve({
-      type: 'getTextAnnotFontNames',
-      data: [
-        'Roboto',
-        'Serif',
-        'Sans',
-        'Monospace',
-      ],
     });
   }
 

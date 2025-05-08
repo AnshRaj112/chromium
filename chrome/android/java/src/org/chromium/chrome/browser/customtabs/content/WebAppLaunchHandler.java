@@ -4,10 +4,15 @@
 
 package org.chromium.chrome.browser.customtabs.content;
 
+import static androidx.browser.trusted.LaunchHandlerClientMode.AUTO;
 import static androidx.browser.trusted.LaunchHandlerClientMode.FOCUS_EXISTING;
 import static androidx.browser.trusted.LaunchHandlerClientMode.NAVIGATE_EXISTING;
 import static androidx.browser.trusted.LaunchHandlerClientMode.NAVIGATE_NEW;
+import static androidx.browser.trusted.TrustedWebActivityIntentBuilder.EXTRA_FILE_HANDLING_DATA;
 
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.net.Uri;
 import android.text.TextUtils;
 
@@ -18,10 +23,14 @@ import org.jni_zero.JNINamespace;
 import org.jni_zero.JniType;
 import org.jni_zero.NativeMethods;
 
+import org.chromium.base.Log;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider;
 import org.chromium.chrome.browser.browserservices.ui.controller.CurrentPageVerifier;
 import org.chromium.chrome.browser.browserservices.ui.controller.Verifier;
+import org.chromium.chrome.browser.customtabs.content.WebAppLaunchHandlerHistogram.ClientModeAction;
+import org.chromium.chrome.browser.customtabs.content.WebAppLaunchHandlerHistogram.FailureReasonAction;
+import org.chromium.chrome.browser.customtabs.content.WebAppLaunchHandlerHistogram.FileHandlingAction;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.WebContents;
 
@@ -34,13 +43,13 @@ import java.util.List;
  */
 @JNINamespace("webapps")
 public class WebAppLaunchHandler {
-
-    public static final @ClientMode int DEFAULT_CLIENT_MODE = NAVIGATE_EXISTING;
-
+    private static final String TAG = WebAppLaunchHandler.class.getSimpleName();
+    private static final @ClientMode int DEFAULT_CLIENT_MODE = NAVIGATE_EXISTING;
     private final WebContents mWebContents;
     private final CustomTabActivityNavigationController mNavigationController;
     private final Verifier mVerifier;
-    private final CurrentPageVerifier mCurrentPageVerfier;
+    private final CurrentPageVerifier mCurrentPageVerifier;
+    private final Activity mActivity;
 
     /**
      * Retrieves the ClientMode enum value from a given AndroidX enum. Defaults to
@@ -72,20 +81,23 @@ public class WebAppLaunchHandler {
             Verifier verifier,
             CurrentPageVerifier currentPageVerifier,
             CustomTabActivityNavigationController navigationController,
-            WebContents webContents) {
+            WebContents webContents,
+            Activity activity) {
         return new WebAppLaunchHandler(
-                verifier, currentPageVerifier, navigationController, webContents);
+                verifier, currentPageVerifier, navigationController, webContents, activity);
     }
 
     private WebAppLaunchHandler(
             Verifier verifier,
             CurrentPageVerifier currentPageVerifier,
             CustomTabActivityNavigationController navigationController,
-            WebContents webContents) {
+            WebContents webContents,
+            Activity activity) {
         mWebContents = webContents;
         mNavigationController = navigationController;
         mVerifier = verifier;
-        mCurrentPageVerfier = currentPageVerifier;
+        mCurrentPageVerifier = currentPageVerifier;
+        mActivity = activity;
     }
 
     /**
@@ -103,8 +115,15 @@ public class WebAppLaunchHandler {
             String packageName,
             @Nullable FileHandlingData fileHandlingData) {
         List<Uri> fileUris = null;
-        if (fileHandlingData != null) {
+        if (fileHandlingData != null && !fileHandlingData.uris.isEmpty()) {
+            if (fileHandlingData.uris.size() == 1) {
+                WebAppLaunchHandlerHistogram.logFileHandling(FileHandlingAction.SINGLE_FILE);
+            } else {
+                WebAppLaunchHandlerHistogram.logFileHandling(FileHandlingAction.MULTIPLE_FILES);
+            }
             fileUris = fileHandlingData.uris;
+        } else {
+            WebAppLaunchHandlerHistogram.logFileHandling(FileHandlingAction.NO_FILES);
         }
 
         return new WebAppLaunchParams(newNavigationStarted, targetUrl, packageName, fileUris);
@@ -121,6 +140,8 @@ public class WebAppLaunchHandler {
      *     data.
      */
     public void handleInitialIntent(BrowserServicesIntentDataProvider intentDataProvider) {
+        WebAppLaunchHandlerHistogram.logClientMode(ClientModeAction.INITIAL_INTENT);
+
         WebAppLaunchParams launchParams =
                 getLaunchParams(
                         /* newNavigationStarted= */ true,
@@ -143,9 +164,16 @@ public class WebAppLaunchHandler {
      *     data.
      */
     public void handleNewIntent(BrowserServicesIntentDataProvider intentDataProvider) {
-        @ClientMode int clientMode = getClientMode(intentDataProvider.getLaunchHandlerClientMode());
+        @ClientMode int clientModeFromIntent = intentDataProvider.getLaunchHandlerClientMode();
+        recordClientMode(clientModeFromIntent);
+        @ClientMode int clientMode = getClientMode(clientModeFromIntent);
 
-        if (clientMode != NAVIGATE_NEW) {
+        if (clientMode == NAVIGATE_NEW) {
+            launchNewIntent(
+                    intentDataProvider.getUrlToLoad(),
+                    intentDataProvider.getClientPackageName(),
+                    intentDataProvider.getFileHandlingData());
+        } else {
             boolean startNavigation =
                     clientMode == NAVIGATE_EXISTING
                             && !TextUtils.isEmpty(intentDataProvider.getUrlToLoad());
@@ -166,13 +194,77 @@ public class WebAppLaunchHandler {
         }
     }
 
+    private void recordClientMode(@ClientMode int clientMode) {
+        switch (clientMode) {
+            case NAVIGATE_EXISTING:
+                WebAppLaunchHandlerHistogram.logClientMode(ClientModeAction.MODE_NAVIGATE_EXISTING);
+                break;
+            case FOCUS_EXISTING:
+                WebAppLaunchHandlerHistogram.logClientMode(ClientModeAction.MODE_FOCUS_EXISTING);
+                break;
+            case NAVIGATE_NEW:
+                WebAppLaunchHandlerHistogram.logClientMode(ClientModeAction.MODE_NAVIGATE_NEW);
+                break;
+            case AUTO:
+                WebAppLaunchHandlerHistogram.logClientMode(ClientModeAction.MODE_AUTO);
+                break;
+        }
+    }
+
+    /**
+     * Launches a new instance of TWA in a separate task. In order to support navigate-new client
+     * mode we need to support several running instances of the same TWA app simultaneously in
+     * separate tasks. If client_mode is navigate-new we will resend an intent with action VIEW to
+     * create one more running instance of the TWA app. We achieve it adding FLAG_ACTIVITY_NEW_TASK
+     * and FLAG_ACTIVITY_MULTIPLE_TASK to the new intent
+     *
+     * @param targetUrl The URL the web app was launched with
+     * @param packageName Chrome will take a package name from the TWA session to ensure the intent
+     *     is sent to the application it is received from
+     * @param fileData The list of file URIs, if the web app was launched by opening one or multiple
+     *     files
+     */
+    private void launchNewIntent(String targetUrl, String packageName, FileHandlingData fileData) {
+        if (packageName == null) {
+            return;
+        }
+
+        Intent newIntent = new Intent();
+        newIntent.setAction(Intent.ACTION_VIEW);
+        newIntent.setData(Uri.parse(targetUrl));
+        newIntent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
+        newIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        newIntent.setPackage(packageName);
+
+        /* This method can be called for file handling intent as well. In this case we need to send
+        a file data extras as well. Also we need to grant file permissions */
+        if (fileData != null && !fileData.uris.isEmpty()) {
+            for (Uri uri : fileData.uris) {
+                mActivity.grantUriPermission(
+                        packageName,
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            }
+            newIntent.putExtra(EXTRA_FILE_HANDLING_DATA, fileData.toBundle());
+        }
+
+        try {
+            mActivity.startActivity(newIntent);
+        } catch (ActivityNotFoundException exception) {
+            Log.w(TAG, "Couldn't start new activity in a separate task.");
+        }
+    }
+
     private void maybeNotifyLaunchQueue(WebAppLaunchParams launchParams) {
 
         if (!launchParams.newNavigationStarted) {
             // Check if the URL of the current page is in the web app scope.
             // Launch params should not be sent to a not verified origin.
-            CurrentPageVerifier.VerificationState state = mCurrentPageVerfier.getState();
+            CurrentPageVerifier.VerificationState state = mCurrentPageVerifier.getState();
             if (state == null || state.status != CurrentPageVerifier.VerificationStatus.SUCCESS) {
+                WebAppLaunchHandlerHistogram.logFailureReason(
+                        FailureReasonAction.CURRENT_PAGE_VERIFICATION_FAILED);
                 return;
             }
         }
@@ -181,7 +273,11 @@ public class WebAppLaunchHandler {
                 .verify(launchParams.targetUrl)
                 .then(
                         (verified) -> {
-                            if (!verified) return;
+                            if (!verified) {
+                                WebAppLaunchHandlerHistogram.logFailureReason(
+                                        FailureReasonAction.TARGET_URL_VERIFICATION_FAILED);
+                                return;
+                            }
                             WebAppLaunchHandlerJni.get()
                                     .notifyLaunchQueue(
                                             mWebContents,

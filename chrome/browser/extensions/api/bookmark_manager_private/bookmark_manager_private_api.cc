@@ -38,6 +38,7 @@
 #include "chrome/browser/renderer_host/chrome_navigation_ui_data.h"
 #include "chrome/browser/ui/bookmarks/bookmark_drag_drop.h"
 #include "chrome/browser/ui/bookmarks/bookmark_ui_operations_helper.h"
+#include "chrome/browser/ui/bookmarks/bookmark_utils_desktop.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_navigator.h"
@@ -92,11 +93,14 @@ namespace SortChildren = api::bookmark_manager_private::SortChildren;
 namespace StartDrag = api::bookmark_manager_private::StartDrag;
 namespace OpenInNewTab = api::bookmark_manager_private::OpenInNewTab;
 namespace OpenInNewWindow = api::bookmark_manager_private::OpenInNewWindow;
+namespace OpenInNewTabGroup = api::bookmark_manager_private::OpenInNewTabGroup;
 
 namespace {
 
 constexpr char kBookmarkNodesNotFoundFromIdListError[] =
     "Could not find bookmark nodes with given ids: [*]";
+
+constexpr char kInvalidBrowserError[] = "Can't find a valid browser";
 
 // Returns a single bookmark node from the argument ID.
 // This returns nullptr in case of failure.
@@ -653,10 +657,7 @@ BookmarkManagerPrivateOpenInNewTabFunction::RunOnReady() {
 
   ExtensionTabUtil::OpenTabParams options;
   options.url = node->url().spec();
-  if (params->params.has_value()) {
-    options.active = params->params.value().active;
-    options.split = params->params.value().split;
-  }
+  options.active = params->active;
   options.bookmark_id = node->id();
 
   auto result =
@@ -737,6 +738,36 @@ BookmarkManagerPrivateOpenInNewWindowFunction::RunOnReady() {
 
     first_tab = false;
   }
+
+  return NoArguments();
+}
+
+ExtensionFunction::ResponseValue
+BookmarkManagerPrivateOpenInNewTabGroupFunction::RunOnReady() {
+  std::optional<OpenInNewTabGroup::Params> params =
+      OpenInNewTabGroup::Params::Create(args());
+  if (!params) {
+    return BadMessage();
+  }
+
+  Browser* browser = ChromeExtensionFunctionDetails(this)
+                         .GetCurrentWindowController()
+                         ->GetBrowser();
+  if (!browser) {
+    return Error(kInvalidBrowserError);
+  }
+
+  BookmarkModel* model =
+      BookmarkModelFactory::GetForBrowserContext(browser->profile());
+  std::vector<raw_ptr<const BookmarkNode, VectorExperimental>> nodes;
+  if (!GetNodesFromVector(model, params->id_list, &nodes)) {
+    return Error(kBookmarkNodesNotFoundFromIdListError,
+                 base::JoinString(params->id_list, ", "));
+  }
+
+  chrome::OpenAllIfAllowed(browser, nodes,
+                           WindowOpenDisposition::NEW_BACKGROUND_TAB,
+                           chrome::OpenAllBookmarksContext::kInGroup);
 
   return NoArguments();
 }

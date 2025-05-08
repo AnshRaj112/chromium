@@ -943,6 +943,10 @@ export declare interface ScrollToParams {
    * specified, we verify that the currently focused tab's document matches the
    * ID, and throw an error if doesn't. If not specified, the implementation
    * will use the main frame of the currently focused tab without verification.
+   *
+   * Note: documentId is being migrated to become a required param and the
+   * client will soon throw a NotSupported error (behind a flag currently) when
+   * not specified.
    */
   documentId?: string;
 }
@@ -1050,6 +1054,11 @@ export enum ScrollToErrorReason {
    *  The search range starting from DOMNodeId did not result in a valid range.
    */
   SEARCH_RANGE_INVALID = 6,
+
+  /**
+   * Tab context permission was disabled.
+   */
+  TAB_CONTEXT_PERMISSION_DISABLED = 7,
 }
 
 /**

@@ -6176,6 +6176,10 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="5549" label="SelectMultipleShowPopup"/>
   <int value="5550" label="SharedWorkerExtendedLifetimeFeatureEnabled"/>
   <int value="5551" label="SharedWorkerExtendedLifetimeIsTrue"/>
+  <int value="5552" label="EditContextTextFormatUpdateAddListener"/>
+  <int value="5553" label="EditContextTextFormatUpdateFireEvent"/>
+  <int value="5554"
+      label="EditContextTextFormatUpdateTextFormatThicknessOrStyleNotNone"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom:WebFeature) -->
@@ -8192,6 +8196,8 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="331" label="TextUnderlineOffset"/>
   <int value="332" label="WindowManagement"/>
   <int value="333" label="Requestclose"/>
+  <int value="334" label="Uint8arrayBase64Hex"/>
+  <int value="335" label="LineBreak"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/public/mojom/use_counter/metrics/webdx_feature.mojom:WebDXFeature) -->

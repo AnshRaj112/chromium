@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "base/test/bind.h"
-#include "components/optimization_guide/content/browser/page_context_eligibility.h"
-#include "components/optimization_guide/content/browser/page_context_eligibility_api.h"
 #ifdef UNSAFE_BUFFERS_BUILD
 // TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
 #pragma allow_unsafe_libc_calls
@@ -14,6 +11,8 @@
 // web browser, but allow for inspection and modification of internal state of
 // LensOverlayController and other business-logic classes.
 
+#include "chrome/browser/ui/lens/lens_overlay_controller.h"
+
 #include <memory>
 
 #include "base/base64url.h"
@@ -22,6 +21,7 @@
 #include "base/memory/raw_ptr_exclusion.h"
 #include "base/path_service.h"
 #include "base/strings/string_util.h"
+#include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/metrics/user_action_tester.h"
 #include "base/test/protobuf_matchers.h"
@@ -61,7 +61,6 @@
 #include "chrome/browser/ui/hats/hats_service_factory.h"
 #include "chrome/browser/ui/hats/mock_hats_service.h"
 #include "chrome/browser/ui/lens/lens_overlay_colors.h"
-#include "chrome/browser/ui/lens/lens_overlay_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_entry_point_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_gen204_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_query_controller.h"
@@ -86,6 +85,7 @@
 #include "chrome/browser/ui/views/side_panel/side_panel_coordinator.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_entry_id.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_util.h"
+#include "chrome/browser/ui/webui/feedback/feedback_dialog.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/extensions/api/pdf_viewer_private.h"
 #include "chrome/test/base/in_process_browser_test.h"
@@ -101,6 +101,8 @@
 #include "components/lens/lens_overlay_side_panel_menu_option.h"
 #include "components/lens/lens_overlay_side_panel_result.h"
 #include "components/lens/proto/server/lens_overlay_response.pb.h"
+#include "components/optimization_guide/content/browser/page_context_eligibility.h"
+#include "components/optimization_guide/content/browser/page_context_eligibility_api.h"
 #include "components/permissions/test/permission_request_observer.h"
 #include "components/prefs/pref_service.h"
 #include "components/sessions/content/session_tab_helper.h"
@@ -528,6 +530,74 @@ class LensOverlayControllerFake : public lens::TestLensOverlayController {
                                         sync_service,
                                         theme_service) {}
 
+  void BindOverlay(mojo::PendingReceiver<lens::mojom::LensPageHandler> receiver,
+                   mojo::PendingRemote<lens::mojom::LensPage> page) override {
+    // Reset the receiver to close any existing connection.
+    fake_overlay_page_receiver_.reset();
+    fake_overlay_page_.overlay_page_.reset();
+
+    // Set up the fake overlay page to intercept the mojo call.
+    fake_overlay_page_.overlay_page_.Bind(std::move(page));
+    LensOverlayController::BindOverlay(
+        std::move(receiver),
+        fake_overlay_page_receiver_.BindNewPipeAndPassRemote());
+  }
+
+  bool IsScreenshotPossible(content::RenderWidgetHostView*) override {
+    return is_screenshot_possible_;
+  }
+
+  void FlushForTesting() { fake_overlay_page_receiver_.FlushForTesting(); }
+
+  LensOverlayPageFake fake_overlay_page_;
+  bool is_screenshot_possible_ = true;
+  mojo::Receiver<lens::mojom::LensPage> fake_overlay_page_receiver_{
+      &fake_overlay_page_};
+};
+
+class LensSearchControllerFake : public lens::TestLensSearchController {
+ public:
+  explicit LensSearchControllerFake(tabs::TabInterface* tab)
+      : lens::TestLensSearchController(tab) {}
+
+  ~LensSearchControllerFake() override { ResetPageContextEligibilityAPI(); }
+
+  // Sets the context eligibility of the page and creates the new API.
+  void SetContextEligible(bool eligible) {
+    is_context_eligible_ = eligible;
+    CreatePageContextEligibilityAPI();
+  }
+
+  // Helper function to force the fake query controller to return errors in its
+  // responses to full image requests. This should be called before ShowUI.
+  void SetFullImageRequestShouldReturnError() {
+    full_image_request_should_return_error_ = true;
+  }
+
+  void SetOcrResponseWords(const std::vector<std::string>& words) {
+    ocr_response_words_ = words;
+  }
+
+  std::string GetLastSearchUrl() { return last_search_url_; }
+
+ protected:
+  std::unique_ptr<LensOverlayController> CreateLensOverlayController(
+      tabs::TabInterface* tab,
+      LensSearchController* lens_search_controller,
+      variations::VariationsClient* variations_client,
+      signin::IdentityManager* identity_manager,
+      PrefService* pref_service,
+      syncer::SyncService* sync_service,
+      ThemeService* theme_service) override {
+    // Set browser color scheme to light mode for consistency.
+    theme_service->SetBrowserColorScheme(
+        ThemeService::BrowserColorScheme::kLight);
+
+    return std::make_unique<LensOverlayControllerFake>(
+        tab, lens_search_controller, variations_client, identity_manager,
+        pref_service, sync_service, theme_service);
+  }
+
   std::unique_ptr<lens::LensOverlayQueryController> CreateLensQueryController(
       lens::LensOverlayFullImageResponseCallback full_image_callback,
       lens::LensOverlayUrlResponseCallback url_callback,
@@ -546,7 +616,7 @@ class LensOverlayControllerFake : public lens::TestLensOverlayController {
         std::make_unique<lens::TestLensOverlayQueryController>(
             full_image_callback,
             base::BindRepeating(
-                &LensOverlayControllerFake::RecordUrlResponseCallback,
+                &LensSearchControllerFake::RecordUrlResponseCallback,
                 base::Unretained(this)),
             interaction_callback, suggest_inputs_callback,
             thumbnail_created_callback, upload_progress_callback,
@@ -571,80 +641,6 @@ class LensOverlayControllerFake : public lens::TestLensOverlayController {
     return fake_query_controller;
   }
 
-  void BindOverlay(mojo::PendingReceiver<lens::mojom::LensPageHandler> receiver,
-                   mojo::PendingRemote<lens::mojom::LensPage> page) override {
-    // Reset the receiver to close any existing connection.
-    fake_overlay_page_receiver_.reset();
-    fake_overlay_page_.overlay_page_.reset();
-
-    // Set up the fake overlay page to intercept the mojo call.
-    fake_overlay_page_.overlay_page_.Bind(std::move(page));
-    LensOverlayController::BindOverlay(
-        std::move(receiver),
-        fake_overlay_page_receiver_.BindNewPipeAndPassRemote());
-  }
-
-  bool IsScreenshotPossible(content::RenderWidgetHostView*) override {
-    return is_screenshot_possible_;
-  }
-
-  // Helper function to force the fake query controller to return errors in its
-  // responses to full image requests. This should be called before ShowUI.
-  void SetFullImageRequestShouldReturnError() {
-    full_image_request_should_return_error_ = true;
-  }
-
-  // A url response callback that records the url sent to the callback.
-  void RecordUrlResponseCallback(lens::proto::LensOverlayUrlResponse response) {
-    last_search_url_ = response.url();
-    if (!url_callback_.is_null()) {
-      url_callback_.Run(response);
-    }
-  }
-
-  void FlushForTesting() { fake_overlay_page_receiver_.FlushForTesting(); }
-
-  std::string last_search_url_;
-  std::vector<std::string> ocr_response_words_;
-  LensOverlayPageFake fake_overlay_page_;
-  lens::LensOverlayUrlResponseCallback url_callback_;
-  bool full_image_request_should_return_error_ = false;
-  bool is_screenshot_possible_ = true;
-  mojo::Receiver<lens::mojom::LensPage> fake_overlay_page_receiver_{
-      &fake_overlay_page_};
-};
-
-class LensSearchControllerFake : public lens::TestLensSearchController {
- public:
-  explicit LensSearchControllerFake(tabs::TabInterface* tab)
-      : lens::TestLensSearchController(tab) {}
-
-  ~LensSearchControllerFake() override { ResetPageContextEligibilityAPI(); }
-
-  // Sets the context eligibility of the page and creates the new API.
-  void SetContextEligible(bool eligible) {
-    is_context_eligible_ = eligible;
-    CreatePageContextEligibilityAPI();
-  }
-
- protected:
-  std::unique_ptr<LensOverlayController> CreateLensOverlayController(
-      tabs::TabInterface* tab,
-      LensSearchController* lens_search_controller,
-      variations::VariationsClient* variations_client,
-      signin::IdentityManager* identity_manager,
-      PrefService* pref_service,
-      syncer::SyncService* sync_service,
-      ThemeService* theme_service) override {
-    // Set browser color scheme to light mode for consistency.
-    theme_service->SetBrowserColorScheme(
-        ThemeService::BrowserColorScheme::kLight);
-
-    return std::make_unique<LensOverlayControllerFake>(
-        tab, lens_search_controller, variations_client, identity_manager,
-        pref_service, sync_service, theme_service);
-  }
-
   std::unique_ptr<lens::LensOverlaySidePanelCoordinator>
   CreateLensOverlaySidePanelCoordinator() override {
     return std::make_unique<lens::TestLensOverlaySidePanelCoordinator>(this);
@@ -661,10 +657,10 @@ class LensSearchControllerFake : public lens::TestLensSearchController {
     page_context_eligibility_api_->IsPageContextEligible =
         is_context_eligible_
             ? [](const std::string& host, const std::string& path,
-                 std::vector<
-                     optimization_guide::FrameMetadata>) { return true; }
+                 const std::vector<
+                     optimization_guide::FrameMetadata>&) { return true; }
             : [](const std::string& host, const std::string& path,
-                 std::vector<optimization_guide::FrameMetadata>) {
+                 const std::vector<optimization_guide::FrameMetadata>&) {
                 return false;
               };
 
@@ -681,6 +677,18 @@ class LensSearchControllerFake : public lens::TestLensSearchController {
     page_context_eligibility_api_.reset();
   }
 
+  // A url response callback that records the url sent to the callback.
+  void RecordUrlResponseCallback(lens::proto::LensOverlayUrlResponse response) {
+    last_search_url_ = response.url();
+    if (!url_callback_.is_null()) {
+      url_callback_.Run(response);
+    }
+  }
+
+  std::vector<std::string> ocr_response_words_;
+  std::string last_search_url_;
+  lens::LensOverlayUrlResponseCallback url_callback_;
+  bool full_image_request_should_return_error_ = false;
   bool is_context_eligible_ = true;
   std::unique_ptr<optimization_guide::PageContextEligibilityAPI>
       page_context_eligibility_api_;
@@ -1971,8 +1979,9 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
   auto* controller = GetLensOverlayController();
   ASSERT_EQ(controller->state(), State::kOff);
 
-  // Set the full image request to return an error.
-  auto* fake_controller = static_cast<LensOverlayControllerFake*>(controller);
+  // Set the full image request to return an error via the search controller.
+  auto* fake_controller =
+      static_cast<LensSearchControllerFake*>(GetLensSearchController());
   ASSERT_TRUE(fake_controller);
   fake_controller->SetFullImageRequestShouldReturnError();
 
@@ -2030,9 +2039,9 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
   auto* controller = GetLensOverlayController();
   ASSERT_EQ(controller->state(), State::kOff);
 
-  // Set the full image request to return an error.
-  auto* fake_controller = static_cast<LensOverlayControllerFake*>(controller);
-  ASSERT_TRUE(fake_controller);
+  // Set the full image request to return an error via the search controller.
+  auto* fake_controller =
+      static_cast<LensSearchControllerFake*>(GetLensSearchController());
   fake_controller->SetFullImageRequestShouldReturnError();
 
   // Showing UI should change the state to screenshot and eventually to overlay.
@@ -4953,8 +4962,9 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
   auto* controller = GetLensOverlayController();
   ASSERT_EQ(controller->state(), State::kOff);
 
-  auto* fake_controller = static_cast<LensOverlayControllerFake*>(controller);
-  ASSERT_TRUE(fake_controller);
+  auto* fake_search_controller =
+      static_cast<LensSearchControllerFake*>(GetLensSearchController());
+  ASSERT_TRUE(fake_search_controller);
 
   // Showing UI should change the state to screenshot and eventually to overlay.
   // When the overlay is bound, it should start the query flow which returns a
@@ -5068,8 +5078,8 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
 
   std::string search_url_vsrid;
   EXPECT_TRUE(net::GetValueForKeyInQuery(
-      GURL(fake_controller->last_search_url_), kLensRequestQueryParameter,
-      &search_url_vsrid));
+      GURL(fake_search_controller->GetLastSearchUrl()),
+      kLensRequestQueryParameter, &search_url_vsrid));
   EXPECT_EQ(EncodeRequestId(
                 fake_query_controller->last_semantic_event_gen204_request_id()
                     .value()),
@@ -5161,6 +5171,45 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
   // Expect a new tab to be opened.
   EXPECT_EQ(tabs + 1, browser()->tab_strip_model()->count());
   EXPECT_EQ(0u, observer.dispatched_events().size());
+}
+
+IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
+                       FeedbackRequestedOpensFeedbackUI) {
+  WaitForPaint();
+
+  // State should start in off.
+  auto* controller = GetLensOverlayController();
+  ASSERT_EQ(controller->state(), State::kOff);
+
+  // Showing UI should change the state to screenshot and eventually to overlay.
+  OpenLensOverlay(LensOverlayInvocationSource::kAppMenu);
+  ASSERT_EQ(controller->state(), State::kScreenshot);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&]() { return controller->state() == State::kOverlay; }));
+  ASSERT_TRUE(content::WaitForLoadStop(GetOverlayWebContents()));
+
+  // Open the side panel.
+  controller->OpenSidePanelForTesting();
+  ASSERT_TRUE(content::WaitForLoadStop(
+      controller->GetSidePanelWebContentsForTesting()));
+
+  // Get the coordinator.
+  auto* coordinator = controller->results_side_panel_coordinator();
+  ASSERT_TRUE(coordinator);
+
+  base::HistogramTester histogram_tester;
+
+  ASSERT_FALSE(FeedbackDialog::GetInstanceForTest());
+  coordinator->RequestSendFeedback();
+
+// ChromeOS opens its own feedback dialog.
+#if !BUILDFLAG(IS_CHROMEOS)
+  // Wait for the feedback dialog to appear instead of a new tab.
+  ASSERT_TRUE(base::test::RunUntil(
+      []() { return FeedbackDialog::GetInstanceForTest() != nullptr; }));
+#endif  // !BUILDFLAG(IS_CHROMEOS)
+
+  histogram_tester.ExpectTotalCount("Feedback.RequestSource", 1);
 }
 
 class LensOverlayControllerBrowserStartQueryFlowOptimization
@@ -5488,6 +5537,14 @@ IN_PROC_BROWSER_TEST_P(LensOverlayControllerBrowserPDFTest,
   auto* controller = GetLensOverlayController();
   ASSERT_EQ(controller->state(), State::kOff);
 
+  const GURL expected_file_url =
+      GURL("file:///test.pdf#page=3:~:text=text1&text=text2");
+
+  // Open the PDF document and wait for it to finish loading.
+  const GURL url = embedded_test_server()->GetURL(kPdfDocument);
+  content::RenderFrameHost* extension_host = LoadPdfGetExtensionHost(url);
+  ASSERT_TRUE(extension_host);
+
   // Open the overlay.
   OpenLensOverlay(LensOverlayInvocationSource::kAppMenu);
   ASSERT_EQ(controller->state(), State::kScreenshot);
@@ -5504,13 +5561,18 @@ IN_PROC_BROWSER_TEST_P(LensOverlayControllerBrowserPDFTest,
   uint32_t page_number = 3;
   int tabs = browser()->tab_strip_model()->count();
   controller->results_side_panel_coordinator()->SetLatestPageUrlWithResponse(
-      GURL("file:///test.pdf"));
+      expected_file_url);
+  ui_test_utils::AllBrowserTabAddedWaiter add_tab;
   controller->results_side_panel_coordinator()->OnScrollToMessage(
       text_fragments, page_number);
 
-  // Expect a new tab to be opened.
+  // Verify the new tab has the URL.
+  content::WebContents* new_tab = add_tab.Wait();
+  content::WaitForLoadStop(new_tab);
+  EXPECT_EQ(new_tab->GetLastCommittedURL(), expected_file_url);
+
+  // Expect one new tab to have opened.
   EXPECT_EQ(tabs + 1, browser()->tab_strip_model()->count());
-  EXPECT_EQ(0u, observer.dispatched_events().size());
 }
 
 // This test is wrapped in this BUILDFLAG block because the fallback region
@@ -6597,9 +6659,10 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
 
   // Setup fake text in the OCR response. Included 0 words from the DOM to
   // ensure the similarity score is still recorded when its 0.
-  auto* fake_controller = static_cast<LensOverlayControllerFake*>(controller);
-  fake_controller->ocr_response_words_ = {"BLAH.", "   random   - ", " ,no] ",
-                                          "RANDOM", "\n\npuppies.\n"};
+  auto* fake_controller =
+      static_cast<LensSearchControllerFake*>(GetLensSearchController());
+  fake_controller->SetOcrResponseWords(
+      {"BLAH.", "   random   - ", " ,no] ", "RANDOM", "\n\npuppies.\n"});
 
   // Open the overlay.
   OpenLensOverlay(LensOverlayInvocationSource::kAppMenu);
@@ -6747,9 +6810,10 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
   // Setup fake text in the OCR response. Included 4 words on the DOM, and 1
   // not, to make a similarity score of 0.8. Also include some random characters
   // to make sure they are ignored.
-  auto* fake_controller = static_cast<LensOverlayControllerFake*>(controller);
-  fake_controller->ocr_response_words_ = {"The.", "   below   - ", " ,are] ",
-                                          "RANDOM", "\n\n\nCharacters.\n"};
+  auto* fake_controller =
+      static_cast<LensSearchControllerFake*>(GetLensSearchController());
+  fake_controller->SetOcrResponseWords(
+      {"The.", "   below   - ", " ,are] ", "RANDOM", "\n\n\nCharacters.\n"});
 
   // Open the overlay.
   OpenLensOverlay(LensOverlayInvocationSource::kAppMenu);

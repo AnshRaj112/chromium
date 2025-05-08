@@ -265,17 +265,14 @@ void AddMaterialChromeColorMixer(ui::ColorProvider* provider,
   mixer[kColorAppMenuChipInkDropHover] = {ui::kColorSysStateHoverOnSubtle};
   mixer[kColorAppMenuChipInkDropRipple] = {ui::kColorSysStateRipplePrimary};
   mixer[kColorAvatarButtonHighlightDefault] = {ui::kColorSysTonalContainer};
-  mixer[kColorAvatarButtonHighlightDefaultForeground] = {
-      ui::kColorSysOnTonalContainer};
-  mixer[kColorAvatarButtonHighlightNormal] = {kColorToolbar};
   mixer[kColorAvatarButtonHighlightSyncPaused] = {
       kColorAvatarButtonHighlightDefault};
   mixer[kColorAvatarButtonHighlightSigninPaused] = {
       kColorAvatarButtonHighlightDefault};
-  mixer[kColorAvatarButtonHighlightExplicitText] = {
-      kColorAvatarButtonHighlightDefault};
   mixer[kColorAvatarButtonHighlightSyncError] = {ui::kColorSysErrorContainer};
   mixer[kColorAvatarButtonHighlightIncognito] = {ui::kColorSysBaseContainer};
+  mixer[kColorAvatarButtonHighlightDefaultForeground] = {
+      ui::kColorSysOnTonalContainer};
   mixer[kColorAvatarButtonHighlightNormalForeground] = {
       ui::kColorSysOnSurfaceSecondary};
   mixer[kColorAvatarButtonHighlightSyncErrorForeground] = {

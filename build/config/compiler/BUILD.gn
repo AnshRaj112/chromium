@@ -512,7 +512,13 @@ config("compiler") {
   # Linux-specific compiler flags setup.
   # ------------------------------------
   if (use_icf && (!is_apple || use_lld)) {
-    ldflags += [ "-Wl,--icf=all" ]
+    if (is_fuchsia) {
+      # TODO(crbug.com/415810137): A temporary workaround to avoid crashing
+      # blink on fuchsia.
+      ldflags += [ "-Wl,--icf=safe" ]
+    } else {
+      ldflags += [ "-Wl,--icf=all" ]
+    }
   }
 
   if (is_linux || is_chromeos) {
@@ -1727,7 +1733,6 @@ config("clang_warning_suppression") {
         rebase_path(clang_warning_suppression_file, root_build_dir)
     inputs = [ clang_warning_suppression_file ]
     cflags = [
-      "-Xclang",
       "--warning-suppression-mappings=" + from_build_root,
     ]
   }

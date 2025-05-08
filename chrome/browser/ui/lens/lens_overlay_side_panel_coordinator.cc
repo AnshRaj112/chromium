@@ -409,6 +409,10 @@ void LensOverlaySidePanelCoordinator::GetIsContextualSearchbox(
   GetLensOverlayController()->GetIsContextualSearchbox(std::move(callback));
 }
 
+void LensOverlaySidePanelCoordinator::RequestSendFeedback() {
+  GetLensOverlayController()->FeedbackRequestedByEvent(ui::EF_NONE);
+}
+
 void LensOverlaySidePanelCoordinator::OnScrollToMessage(
     const std::vector<std::string>& text_fragments,
     uint32_t pdf_page_number) {
@@ -433,8 +437,8 @@ void LensOverlaySidePanelCoordinator::OnScrollToMessage(
       pdf_extension_util::DispatchShouldUpdateViewportEvent(
           web_contents->GetPrimaryMainFrame(),
           latest_page_url_with_viewport_params);
+      return;
     }
-    return;
   }
 #endif  // BUILDFLAG(ENABLE_PDF)
 

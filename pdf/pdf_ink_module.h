@@ -356,7 +356,7 @@ class PdfInkModule {
                           int click_count,
                           base::TimeTicks timestamp);
   bool ContinueTextHighlight(const gfx::PointF& position);
-  bool FinishTextHighlight();
+  bool FinishTextHighlight(const gfx::PointF& position);
 
   // Returns a highlighter stroke that matches the position and size of
   // `selection_rect`. `selection_rect` must be in screen coordinates.
@@ -388,7 +388,6 @@ class PdfInkModule {
   void HandleAnnotationUndoMessage(const base::Value::Dict& message);
   void HandleFinishTextAnnotationMessage(const base::Value::Dict& message);
   void HandleGetAnnotationBrushMessage(const base::Value::Dict& message);
-  void HandleGetTextAnnotFontNamesMessage(const base::Value::Dict& message);
   void HandleSetAnnotationBrushMessage(const base::Value::Dict& message);
   void HandleSetAnnotationModeMessage(const base::Value::Dict& message);
   void HandleStartTextAnnotationMessage(const base::Value::Dict& message);
@@ -420,6 +419,13 @@ class PdfInkModule {
   TextHighlightState& text_highlight_state() {
     return std::get<TextHighlightState>(current_tool_state_);
   }
+
+  // Returns true when the user is using a highlighter over selectable text at
+  // `position`.
+  //
+  // - Only returns true when the text highlighting feature is enabled.
+  bool IsHighlightingTextAtPosition(const DrawingStrokeState& state,
+                                    const gfx::PointF& position) const;
 
   // Returns the current brush. Must be in a drawing stroke state.
   PdfInkBrush& GetDrawingBrush();
@@ -455,7 +461,13 @@ class PdfInkModule {
   void ApplyUndoRedoDiscards(
       const PdfInkUndoRedoModel::DiscardedDrawCommands& discards);
 
+  // Sets the cursor to a drawing/erasing brush cursor when necessary.
   void MaybeSetCursor();
+
+  // Handles setting the cursor only for mousemove events at `position`. This
+  // differs from `MaybeSetCursor()` in that it may also set the cursor to an
+  // I-beam for text highlighting.
+  void MaybeSetCursorOnMouseMove(const gfx::PointF& position);
 
   // Returns whether the drawing brush was set or not.
   bool MaybeSetDrawingBrush();
@@ -493,6 +505,8 @@ class PdfInkModule {
   // Handles the callback for PDF thumbnail generation requests. Sends
   // `thumbnail` to the WebUI.
   void OnGotThumbnail(int page_index, Thumbnail thumbnail);
+
+  void SendContentFocusedMessage();
 
   const raw_ref<PdfInkModuleClient> client_;
 

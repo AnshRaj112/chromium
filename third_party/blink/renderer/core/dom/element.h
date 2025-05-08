@@ -750,13 +750,21 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
     return CouldHaveAttributeWithPrecomputedFilter(
         FilterForAttribute(attribute_name));
   }
+  bool CouldHaveClass(const AtomicString& class_name) const {
+    return CouldHaveClassWithPrecomputedFilter(FilterForString(class_name));
+  }
 
-  // A variant of CouldHaveAttribute() that allows you to compute
+  // A variant of CouldHave{Attribute,Class}() that allows you to compute
   // the filter ahead-of-time; useful if you want to test many elements
-  // against the same attribute name.
-  static uint32_t FilterForAttribute(const QualifiedName& attribute_name) {
-    unsigned hash = attribute_name.LocalNameUpper().Hash();
-    uint32_t filter = 0;
+  // against the same attribute/class name.
+  using TinyBloomFilter = uint32_t;
+  static TinyBloomFilter FilterForAttribute(
+      const QualifiedName& attribute_name) {
+    return FilterForString(attribute_name.LocalNameUpper());
+  }
+  static TinyBloomFilter FilterForString(const AtomicString& str) {
+    unsigned hash = str.Hash();
+    TinyBloomFilter filter = 0;
     // Build a 32-bit Bloom filter, with k=2. We extract the two
     // (5-bit) hashes that we need from non-overlapping parts of the
     // (24-bit) String hash, which should be independent.
@@ -764,11 +772,16 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
     filter |= 1u << ((hash >> 5) & 31);
     return filter;
   }
-  bool CouldHaveAttributeWithPrecomputedFilter(uint32_t filter) const {
-    return (attribute_bloom_ & filter) == filter;
+  bool CouldHaveAttributeWithPrecomputedFilter(TinyBloomFilter filter) const {
+    return (attribute_or_class_bloom_ & filter) == filter;
+  }
+  bool CouldHaveClassWithPrecomputedFilter(TinyBloomFilter filter) const {
+    return (attribute_or_class_bloom_ & filter) == filter;
   }
 #if DCHECK_IS_ON()
-  uint32_t AttributeBloomFilterForDebug() const { return attribute_bloom_; }
+  TinyBloomFilter AttributeOrClassBloomFilterForDebug() const {
+    return attribute_or_class_bloom_;
+  }
 #endif
 
   // Step 5 of https://dom.spec.whatwg.org/#concept-node-clone
@@ -1126,12 +1139,32 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   // wasn't triggered by this invoker, this will return nullptr.)
   HTMLElement* GetOpenPopoverTarget() const;
 
+  // Represents the current state of an interest invoker.
+  enum class InterestState {
+    // No interest.
+    kNoInterest,
+    // This is a transient interest state, used for an interest invoker pointing
+    // to a popover that has been activated via keyboard focus. It potentially
+    // has partial interest, but that can only be determined once the popover
+    // actually opens, so that focusability can be tested. Once the popover is
+    // open, the invoker's interest_state will be updated to one of the other
+    // states. It can actually get to any of the states:
+    //  - partial interest if there are focusable elements
+    //  - full interest otherwise
+    //  - no interest if the showPopover is cancelled for any reason
+    kPotentialPartialInterest,
+    // Invoker has partial interest (for sure).
+    kPartialInterest,
+    // Invoker has full interest.
+    kFullInterest,
+  };
+
   // Implementation of the `interesttarget` feature. These are called on the
   // element with the `interesttarget` attribute, and not on the target itself.
   // These are called when interest is actually gained or lost on the element,
   // e.g. after any hover-delays. They return true if the event was *not*
   // cancelled, and the action was performed.
-  bool InterestGained(Element& interest_target);
+  bool InterestGained(Element& interest_target, InterestState new_state);
   bool InterestLost(Element& interest_target);
   // Returns the target of the `interesttarget` attribute, if any, and only if
   // the element supports this attribute. For example, `interesttarget` is not
@@ -1140,11 +1173,6 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   // Returns the active interest invoker for which this element is the target,
   // or nullptr otherwise.
   Element* GetInterestInvoker() const;
-  enum class InterestState {
-    kNoInterest,
-    kPartialInterest,
-    kFullInterest,
-  };
   // Returns the current state of "interest" in an element that is an interest
   // invoker.
   InterestState GetInterestState();
@@ -1152,6 +1180,19 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   // popover that is the target of an interest invoker that has partial
   // interest.
   bool IsInPartialInterestPopover() const;
+  // Used in some situations (e.g. mobile device context menu activation) to
+  // immediately show interest in an element, ignoring any show delays that may
+  // be set on the element. If the element is not an interest invoker, nothing
+  // happens.
+  void ShowInterestNow();
+
+  // Returns true if any of its (non-inclusive) flat tree descendants is
+  // keyboard focusable. Note that this is quite slow, since it traverses the
+  // entire subtree, and calls `IsKeyboardFocusableSlow()` on each element.
+  // See the comment next to IsFocusable() above for a description of
+  // update_behavior.
+  bool ContainsKeyboardFocusableElementsSlow(
+      UpdateBehavior update_behavior) const;
 
   // The implementations of |innerText()| and |GetInnerTextWithoutUpdate()| are
   // found in "element_inner_text.cc".
@@ -1598,10 +1639,12 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
 
   InvokerData& EnsureInvokerData();
   InvokerData* GetInvokerData() const;
+  void ChangeInterestState(Element* target, InterestState new_state);
 
   void RemoveInterestInvokerTargetData();
   InterestInvokerTargetData& EnsureInterestInvokerTargetData();
   InterestInvokerTargetData* GetInterestInvokerTargetData() const;
+  static String GetPartialInterestTargetActivationHotkey();
 
   void DefaultEventHandler(Event&) override;
 
@@ -2171,7 +2214,6 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   // These schedule interest gained/lost events, for `interesttarget` invokers.
   void ScheduleInterestGainedTask(InterestState);
   void ScheduleInterestLostTask();
-  void ChangeInterestState(Element* target, InterestState new_state);
   static bool GainOrLoseInterest(Element* invoker,
                                  Element* target,
                                  InterestState new_state);
@@ -2233,11 +2275,12 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   subtle::UncompressedMember<const ComputedStyle> computed_style_;
   Member<ElementData> element_data_;
 
-  // A tiny Bloom filter for which attribute names we have; saves going to
-  // ElementData if the attribute doesn't exist. May have false positives,
-  // of course. We do not currently update this when attributes are removed,
-  // only when they are added. Attribute _values_ are not part of this filter.
-  uint32_t attribute_bloom_ = 0;
+  // A tiny Bloom filter for which attribute names and class names we have;
+  // saves going to ElementData if the attribute/class doesn't exist. May have
+  // false positives, of course. We do not currently update this when
+  // attributes/classes are removed, only when they are added. Attribute
+  // _values_ are not part of this filter, except for the values of class="".
+  uint32_t attribute_or_class_bloom_ = 0;
 };
 
 template <>

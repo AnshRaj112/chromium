@@ -1381,21 +1381,6 @@ See your search engine’s instructions for deleting your search history, if app
       <message name="IDS_IOS_CONTENT_NOTIFICATIONS_SPORTS_SETTINGS_TOGGLE_TITLE" desc="The label for the notification settings item title for sports notifications.">
         Sports
       </message>
-      <message name="IDS_IOS_CONTENT_NOTIFICATION_FULL_PAGE_PROMO_PRIMARY_BUTTON_TEXT" desc="Text for the Notifications promo secondary button.">
-          Turn on notifications..
-      </message>
-      <message name="IDS_IOS_CONTENT_NOTIFICATION_FULL_PAGE_PROMO_SECONDARY_BUTTON_TEXT" desc="Text for the Notifications promo secondary button.">
-          No thanks
-      </message>
-      <message name="IDS_IOS_CONTENT_NOTIFICATION_FULL_PAGE_PROMO_SUBTITLE" desc="Text for the Notifications promo subtitle.">
-          Receive notificarions for news, sports and more based on your interest
-      </message>
-      <message name="IDS_IOS_CONTENT_NOTIFICATION_FULL_PAGE_PROMO_TERTIARY_BUTTON_TEXT" desc="Text for the Notifications promo tertiary button.">
-          Remind me later
-      </message>
-      <message name="IDS_IOS_CONTENT_NOTIFICATION_FULL_PAGE_PROMO_TITLE" desc="Text for the Notifications promo title.">
-          Get content that matters to you
-      </message>
       <message name="IDS_IOS_CONTENT_NOTIFICATION_SNACKBAR_ACTION_MANAGE" desc="Text for the Chrome content notifications confirmation snackbar action.">
         Manage
       </message>
@@ -2252,7 +2237,7 @@ See your search engine’s instructions for deleting your search history, if app
        Choose what to do with the existing browsing data on this device.
       </message>
       <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_ACCOUNT_KEEP_BROWSING_DATA_DISABLED_DESCRIPTION" desc="Message displayed on the managed profile creation screen in a table view item telling the user that their existing browsing data will not be available in the managed profile, but will be available after they signout from it, or sign in with personal account.">
-       Existing browsing data won't be moved to your work account. You can still use it by signing out of your managed account.
+       Your existing browsing data will be kept separate. To use it, sign out of your managed account.
       </message>
       <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_ACCOUNT_KEEP_BROWSING_DATA_LABEL" desc="Message displayed on the managed profile creation screen in a table view item asking the user if they want to keep their existing browsing data separate from the managed profile they will create.">
        Keep data separate?
@@ -2261,7 +2246,7 @@ See your search engine’s instructions for deleting your search history, if app
        No
       </message>
       <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_ACCOUNT_KEEP_BROWSING_DATA_SEPARATE_PAGE_SUBTITLE" desc="Message displayed on a screen where the user is asked what they want to do with their existing browsing data.">
-      Choose what to do with the existing browsing data on this device, like passwords, history, and more.
+       Choose what to do with the existing browsing data on this device, like tabs, history, and passwords.
       </message>
       <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_ACCOUNT_KEEP_BROWSING_DATA_SEPARATE_SUBTITLE" desc="Message displayed on the managed profile creation screen in a table view item telling the user that they will bring their existing browsing data separate in the managed profile they will create.">
        You can still use your existing browsing data on this device. To use it, sign out of your managed account.
@@ -2273,13 +2258,13 @@ See your search engine’s instructions for deleting your search history, if app
        Yes
       </message>
       <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_ACCOUNT_MANAGEMENT_DISCLAIMER" desc="Message displayed in the secondary button on a screen where the user is asked to create a work profile.">
-       The account <ph name="USER_EMAIL">$1</ph> is managed by <ph name="HOSTED_DOMAIN">$2</ph>, which can view some information. <ph name="BEGIN_LINK">BEGIN_LINK</ph>Learn more<ph name="END_LINK">END_LINK</ph>
+       The account <ph name="USER_EMAIL">$1</ph> is managed by <ph name="HOSTED_DOMAIN">$2</ph>, which may be able to view some information. <ph name="BEGIN_LINK">BEGIN_LINK</ph>Learn more<ph name="END_LINK">END_LINK</ph>
       </message>
-      <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_ACCOUNT_MERGE_BROWSING_DATA_SUBTITLE" translateable="false" desc="Message displayed on the managed profile creation screen in a table view item telling the user that they will be keeping their existing browsing data separate from the managed profile they will create.">
-       ***Existing browsing data will be moved to your profile, where you’re signed in as <ph name="USER_EMAIL">$1</ph>. Your organization may be able to view this data.***
+      <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_ACCOUNT_MERGE_BROWSING_DATA_SUBTITLE" desc="Message displayed on the managed profile creation screen in a table view item telling the user that they will be keeping their existing browsing data separate from the managed profile they will create.">
+       You can use existing browsing data when you’re signed in as <ph name="USER_EMAIL">$1</ph>. Your organization may be able to view this data.
       </message>
-      <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_ACCOUNT_MERGE_BROWSING_DATA_TITLE" translateable="false" desc="Message displayed on the managed profile creation screen in a table view item telling the user that they will be keeping their existing browsing data separate from the managed profile they will create.">
-       ***No, move it to my managed profile***
+      <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_ACCOUNT_MERGE_BROWSING_DATA_TITLE" desc="Message displayed on the managed profile creation screen in a table view item telling the user that they will be keeping their existing browsing data separate from the managed profile they will create.">
+       No, merge data
       </message>
       <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_CANCEL" meaning="Button label to avoid using a managed profile" desc="Message displayed in the secondary button on a screen where the user is asked to create a work profile.">
        Cancel
@@ -2306,7 +2291,7 @@ See your search engine’s instructions for deleting your search history, if app
         Managed Account
       </message>
       <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_SUBTITLE" desc="Message displayed in the secondary button on a screen where the user is asked to create a work profile.">
-        Signing in with your managed account helps you separate browsing related to your organization, like tabs, passwords, and history.
+        Signing in with your managed account helps you separate browsing related to your organization, like tabs, history, and passwords.
       </message>
       <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_TITLE" desc="Message displayed in the secondary button on a screen where the user is asked to create a work profile.">
        A separate space for work
@@ -2452,6 +2437,12 @@ See your search engine’s instructions for deleting your search history, if app
       <message name="IDS_IOS_FIRST_RUN_DEFAULT_BROWSER_SCREEN_SECOND_STEP" desc="Text of the row indicating the second step of setting the default browser [iOS only]">
         Tap <ph name="BEGIN_BOLD">BEGIN_BOLD</ph>Default Browser App<ph name="END_BOLD">END_BOLD</ph>
       </message>
+      <message name="IDS_IOS_FIRST_RUN_GUIDED_TOUR_NTP_IPH_TEXT" desc="Text of the Guided Tour IPH for the NTP step focusing on the tab grid." meaning="Title-cased">
+          Your open tabs and groups
+    </message>
+      <message name="IDS_IOS_FIRST_RUN_GUIDED_TOUR_NTP_IPH_TITLE" desc="Title of the Guided Tour IPH for the NTP step focusing on the tab grid." meaning="Title-cased">
+          See and manage everything you have open
+    </message>
       <message name="IDS_IOS_FIRST_RUN_GUIDED_TOUR_PROMPT_BUTTON_TITLE" desc="Title of the button for the user to start the First Run Guided Tour." meaning="Title-cased">
       Show me around
     </message>
@@ -6208,6 +6199,9 @@ While in Incognito, sites can't use cookies to see your browsing activity across
       <message name="IDS_IOS_SIGN_IN_AGAIN" desc="Title displayed when there is an authentication failure in sign-in and the user needs to attempt to sign in again. [Length: 20em] [iOS only]">
         Sign in again
       </message>
+      <message name="IDS_IOS_SIGN_IN_BUTTON_ACCESSIBILITY_LABEL" desc="The content description for a toolbar button displaying the signed-in button. Tapping on this button opens the sign-in sheet [iOS only].">
+        Sign in options.
+      </message>
       <message name="IDS_IOS_SIGN_IN_DISMISS" desc="Title displayed when there is an unknown failure in sign-in and the user needs to attempt to sign in again. [Length: 20em] [iOS only]">
        Dismiss
       </message>
@@ -6324,6 +6318,12 @@ While in Incognito, sites can't use cookies to see your browsing activity across
       </message>
       <message name="IDS_IOS_SWIPE_RIGHT_TO_INCOGNITO_IPH_VOICEOVER" desc="The voice over announcement for the full screen in-product help for swipe right to see incognito tabs on regular tabs grid.">
         You can scroll left to browse in Incognito.
+      </message>
+      <message name="IDS_IOS_SWITCH_ACCOUNTS_IPH_ACCESSIBILITY_LABEL" desc="Screen reader of the IPH message to inform the user that they can switch accounts via the account menu. [iOS only]">
+        To switch between accounts, tap your account icon
+      </message>
+      <message name="IDS_IOS_SWITCH_ACCOUNTS_IPH_MESSAGE" desc="The IPH message to inform the user that they can switch accounts via the account menu. [iOS only]">
+        You can easily switch between accounts
       </message>
       <message name="IDS_IOS_SWITCH_CLEARS_DATA_DIALOG_TITLE_WITH_MANAGED_ACCOUNT" desc="The switch dialog title. This is the new dialog that is used when the user have a managed account (other than gmail account) [iOS only].">
         Switch accounts? Unsaved account data will be deleted.
@@ -6888,6 +6888,9 @@ While in Incognito, sites can't use cookies to see your browsing activity across
       </message>
       <message name="IDS_IOS_TOOLS_MENU_HELP_URL" translateable="false">
         https://support.google.com/chrome/?p=chrome_help&amp;hl=[GRITLANGCODE]&amp;ios=1
+      </message>
+      <message name="IDS_IOS_TOOLS_MENU_HIDE_READER_MODE" desc="The iOS menu item for closing the Reader Mode UI displayed for the current page. [iOS only]" meaning="[Length: 16em] [iOS only] This is a feature name in title case.">
+        Hide Reader Mode
       </message>
       <message name="IDS_IOS_TOOLS_MENU_HISTORY" desc="The Tools menu item for opening the navigation history menu" meaning="[Length: 16em] [iOS only] This is a feature name in title case.">
         History

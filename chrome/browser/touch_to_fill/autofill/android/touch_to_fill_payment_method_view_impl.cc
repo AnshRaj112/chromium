@@ -10,10 +10,12 @@
 #include "base/android/jni_string.h"
 #include "base/android/scoped_java_ref.h"
 #include "base/containers/to_vector.h"
+#include "base/notimplemented.h"
 #include "base/strings/string_util.h"
 #include "chrome/browser/autofill/android/personal_data_manager_android.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/touch_to_fill/autofill/android/touch_to_fill_payment_method_view_controller.h"
+#include "components/autofill/core/browser/data_model/valuables/loyalty_card.h"
 #include "components/autofill/core/browser/suggestions/suggestion.h"
 #include "components/autofill/core/browser/ui/autofill_resource_utils.h"
 #include "components/autofill/core/common/autofill_features.h"
@@ -24,6 +26,7 @@
 
 // Must come after all headers that specialize FromJniType() / ToJniType().
 #include "chrome/browser/touch_to_fill/autofill/android/internal/jni/TouchToFillPaymentMethodViewBridge_jni.h"
+#include "components/autofill/android/main_autofill_jni_headers/LoyaltyCard_jni.h"
 
 namespace autofill {
 
@@ -139,6 +142,28 @@ bool TouchToFillPaymentMethodViewImpl::ShowIbans(
   }
   Java_TouchToFillPaymentMethodViewBridge_showIbans(env, java_object_,
                                                     std::move(ibans_array));
+  return true;
+}
+
+bool TouchToFillPaymentMethodViewImpl::ShowLoyaltyCards(
+    TouchToFillPaymentMethodViewController* controller,
+    base::span<const LoyaltyCard> loyalty_cards_to_suggest) {
+  JNIEnv* env = base::android::AttachCurrentThread();
+  if (!IsReadyToShow(controller, env)) {
+    return false;
+  }
+
+  std::vector<base::android::ScopedJavaLocalRef<jobject>> loyalty_cards_array;
+  loyalty_cards_array.reserve(loyalty_cards_to_suggest.size());
+  for (const LoyaltyCard& loyalty_card : loyalty_cards_to_suggest) {
+    loyalty_cards_array.push_back(Java_LoyaltyCard_Constructor(
+        env, *loyalty_card.id(), loyalty_card.merchant_name(),
+        loyalty_card.program_name(), loyalty_card.program_logo(),
+        loyalty_card.loyalty_card_number(), loyalty_card.merchant_domains()));
+  }
+  Java_TouchToFillPaymentMethodViewBridge_showLoyaltyCards(
+      env, java_object_, std::move(loyalty_cards_array));
+
   return true;
 }
 

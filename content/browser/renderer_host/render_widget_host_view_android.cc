@@ -15,6 +15,8 @@
 #include "base/auto_reset.h"
 #include "base/command_line.h"
 #include "base/compiler_specific.h"
+#include "base/debug/crash_logging.h"
+#include "base/debug/dump_without_crashing.h"
 #include "base/feature_list.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
@@ -207,6 +209,29 @@ blink::mojom::RecordContentToVisibleTimeRequestPtr
 TakeContentToVisibleTimeRequest(RenderWidgetHostImpl* host) {
   return host->GetVisibleTimeRequestTrigger().TakeRequest();
 }
+
+class ScopedLatencyHistogram {
+ public:
+  ScopedLatencyHistogram(input::AndroidInputHelper& input_helper,
+                         const ui::MotionEventAndroid& event)
+      : event_processing_time_(base::TimeTicks::Now()),
+        input_helper_(input_helper),
+        event_(event) {}
+  void DoNotEmitHistograms() { emit_histogrmams_ = false; }
+  ~ScopedLatencyHistogram() {
+    if (!emit_histogrmams_) {
+      return;
+    }
+    input_helper_->ComputeEventLatencyOSTouchHistograms(*event_,
+                                                        event_processing_time_);
+  }
+
+ private:
+  base::TimeTicks event_processing_time_;
+  const raw_ref<input::AndroidInputHelper> input_helper_;
+  const raw_ref<const ui::MotionEventAndroid> event_;
+  bool emit_histogrmams_ = true;
+};
 
 }  // namespace
 
@@ -765,6 +790,13 @@ void RenderWidgetHostViewAndroid::NotifyContextMenuInsetsObservers(
       ->GetMainFrame()
       ->GetPage()
       .NotifyContextMenuInsetsObservers(safe_area);
+}
+
+void RenderWidgetHostViewAndroid::ShowInterestInElement(int nodeID) {
+  // TODO(crbug.com/326681249): This only works if the link is in the main frame
+  // for this tab. Need to find a way to pass the frame back and forth to the
+  // browser, so this can work in iframes.
+  host()->frame_tree()->GetMainFrame()->GetPage().ShowInterestInElement(nodeID);
 }
 
 viz::SurfaceId RenderWidgetHostViewAndroid::GetFallbackSurfaceIdForTesting()
@@ -1464,7 +1496,7 @@ bool RenderWidgetHostViewAndroid::OnTouchEvent(
   if (!host() || !host()->delegate())
     return false;
 
-  input_helper_->ComputeEventLatencyOSTouchHistograms(event);
+  ScopedLatencyHistogram latency_histogram(*input_helper_, event);
 
   // Receiving any other touch event before the double-tap timeout expires
   // cancels opening the spellcheck menu.
@@ -1494,6 +1526,14 @@ bool RenderWidgetHostViewAndroid::OnTouchEvent(
     return true;
   }
 
+  if (is_sequence_overscrolling_) {
+    // TODO(407571917): Remove crash keys after investigation.
+    SCOPED_CRASH_KEY_STRING1024(
+        "crbug407571917", "event_type",
+        base::NumberToString(static_cast<int>(event.GetAction())));
+    base::debug::DumpWithoutCrashing();
+  }
+
   // In case input transfer to Viz is supported, let `input_transfer_handler_`
   // request the transfer on touch down, we are not expecting to receive the
   // entire sequence until the touch cancel. Any events that might end up on
@@ -1506,6 +1546,9 @@ bool RenderWidgetHostViewAndroid::OnTouchEvent(
   // Browser is now handling.
   if (input_transfer_handler_) {
     if (input_transfer_handler_->OnTouchEvent(event)) {
+      if (event.GetAction() == ui::MotionEvent::Action::DOWN) {
+        latency_histogram.DoNotEmitHistograms();
+      }
       return true;
     } else if (event.GetAction() == ui::MotionEvent::Action::DOWN) {
       // Stop any ongoing fling on VizCompositorThread if the new input sequence
@@ -1763,23 +1806,22 @@ void RenderWidgetHostViewAndroid::CopyFromSurface(
           },
           std::move(callback)),
       /*capture_exact_surface_id=*/false,
-      viz::CopyOutputRequest::IpcPriority::kDefault);
+      /*ipc_delay=*/base::TimeDelta());
 }
 
 void RenderWidgetHostViewAndroid::CopyFromExactSurface(
     const gfx::Rect& src_rect,
     const gfx::Size& output_size,
     base::OnceCallback<void(const SkBitmap&)> callback) {
-  CopyFromExactSurfaceWithIpcPriority(
-      src_rect, output_size, std::move(callback),
-      viz::CopyOutputRequest::IpcPriority::kDefault);
+  CopyFromExactSurfaceWithIpcDelay(src_rect, output_size, std::move(callback),
+                                   /*ipc_delay=*/base::TimeDelta());
 }
 
-void RenderWidgetHostViewAndroid::CopyFromExactSurfaceWithIpcPriority(
+void RenderWidgetHostViewAndroid::CopyFromExactSurfaceWithIpcDelay(
     const gfx::Rect& src_rect,
     const gfx::Size& output_size,
     base::OnceCallback<void(const SkBitmap&)> callback,
-    CopyOutputIpcPriority ipc_priority) {
+    base::TimeDelta ipc_delay) {
   CHECK(IsSurfaceAvailableForCopy())
       << "To copy the exact surface, it must be available for copy (embedded "
          "via the browser).";
@@ -1792,7 +1834,7 @@ void RenderWidgetHostViewAndroid::CopyFromExactSurfaceWithIpcPriority(
           [](base::OnceCallback<void(const SkBitmap&)> callback,
              const SkBitmap& bitmap) { std::move(callback).Run(bitmap); },
           std::move(callback)),
-      /*capture_exact_surface_id=*/true, ipc_priority);
+      /*capture_exact_surface_id=*/true, ipc_delay);
 }
 
 void RenderWidgetHostViewAndroid::EnsureSurfaceSynchronizedForWebTest() {

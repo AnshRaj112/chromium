@@ -153,7 +153,9 @@ id<GREYMatcher> EnhancedSafeBrowsingInfobarButtonMatcher() {
   if ([self
           isRunningTest:@selector(testRestoreToWarningPagePreservesHistory)] ||
       [self isRunningTest:@selector(testMalwarePage)] ||
-      [self isRunningTest:@selector(testProceedingPastMalwareWarning)]) {
+      [self isRunningTest:@selector(testProceedingPastMalwareWarning)] ||
+      [self
+          isRunningTest:@selector(testProceedingPastMalwareWarningReported)]) {
     config.additional_args.push_back(std::string(
         "--disable-features=SafeBrowsingHashPrefixRealTimeLookups"));
   } else {
@@ -172,6 +174,7 @@ id<GREYMatcher> EnhancedSafeBrowsingInfobarButtonMatcher() {
     config.additional_args.push_back(
         base::StrCat({"<dict><key>", kEnrollmentTokenPolicyName,
                       "</key><string>", kEnrollmentToken, "</string></dict>"}));
+    config.relaunch_policy = ForceRelaunchByKilling;
   }
 
   config.additional_args.push_back(

@@ -54,7 +54,6 @@
 #include "chrome/browser/ui/webui/metrics_handler.h"
 #include "chrome/browser/ui/webui/plural_string_handler.h"
 #include "chrome/browser/ui/webui/sanitized_image_source.h"
-#include "chrome/browser/ui/webui/search_engine_choice/icon_utils.h"
 #include "chrome/browser/ui/webui/settings/about_handler.h"
 #include "chrome/browser/ui/webui/settings/accessibility_main_handler.h"
 #include "chrome/browser/ui/webui/settings/appearance_handler.h"
@@ -527,6 +526,10 @@ SettingsUI::SettingsUI(content::WebUI* web_ui)
   html_source->AddBoolean("isFingerprintingProtectionUxEnabled", fpp_ux);
   html_source->AddBoolean("enableIncognitoTrackingProtections",
                           ipp_ux || fpp_ux);
+  html_source->AddBoolean(
+      "isIpProtectionDisabledForEnterprise",
+      TrackingProtectionSettingsFactory::GetForProfile(profile)
+          ->IsIpProtectionDisabledForEnterprise());
 
   // Performance
   AddSettingsPageUIHandler(std::make_unique<PerformanceHandler>());
@@ -578,10 +581,13 @@ SettingsUI::SettingsUI(content::WebUI* web_ui)
   bool show_glic = false;
 
 #if BUILDFLAG(ENABLE_GLIC)
-  show_glic = glic::GlicEnabling::ShouldShowSettingsPage(profile);
+  auto glic_enablement = glic::GlicEnabling::EnablementForProfile(profile);
+  show_glic = glic_enablement.ShouldShowSettingsPage();
   html_source->AddBoolean("showGlicSettings", show_glic);
+  html_source->AddBoolean("glicDisallowedByAdmin",
+                          glic_enablement.DisallowedByAdmin());
 
-  if (glic::GlicEnabling::IsProfileEligible(profile)) {
+  if (glic_enablement.IsProfileEligible()) {
     AddSettingsPageUIHandler(std::make_unique<GlicHandler>());
 
     auto* glic_service = glic::GlicKeyedService::Get(profile);
@@ -855,11 +861,13 @@ void SettingsUI::UpdateShowGlicState() {
   // FRE. Propagate this state to the WebUI value used to display the settings
   // page.
   Profile* profile = Profile::FromWebUI(web_ui());
-  bool glic_enabled = glic::GlicEnabling::ShouldShowSettingsPage(profile);
+  auto enablement = glic::GlicEnabling::EnablementForProfile(profile);
+  const bool show_glic = enablement.ShouldShowSettingsPage();
 
   base::Value::Dict update;
-  update.Set("showGlicSettings", glic_enabled);
-  if (glic_enabled) {
+  update.Set("showGlicSettings", show_glic);
+  update.Set("glicDisallowedByAdmin", enablement.DisallowedByAdmin());
+  if (show_glic) {
     update.Set("showAdvancedFeaturesMainControl", true);
   }
 

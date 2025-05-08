@@ -51,7 +51,7 @@ int GenerateNextDisplayTreeId() {
 cc::LayerTreeSettings GetDisplayTreeSettings(bool draw_mode_is_gpu) {
   cc::LayerTreeSettings settings;
   settings.use_layer_lists = true;
-  settings.is_display_tree = true;
+  settings.trees_in_viz_in_viz_process = true;
   settings.display_tree_draw_mode_is_gpu = draw_mode_is_gpu;
   return settings;
 }
@@ -235,7 +235,8 @@ base::expected<void, std::string> UpdatePropertyTreeNode(
   node.subtree_has_copy_request = wire.subtree_has_copy_request;
   node.is_fast_rounded_corner = wire.is_fast_rounded_corner;
   node.may_have_backdrop_effect = wire.may_have_backdrop_effect;
-  node.has_2d_scale_transform = wire.has_2d_scale_transform;
+  node.needs_effect_for_2d_scale_transform =
+      wire.needs_effect_for_2d_scale_transform;
 
   return base::ok();
 }
@@ -452,6 +453,8 @@ base::expected<void, std::string> UpdateLayer(const mojom::Layer& wire,
   layer.SetShouldCheckBackfaceVisibility(wire.should_check_backface_visibility);
   if (wire.rare_properties) {
     layer.SetFilterQuality(wire.rare_properties->filter_quality);
+    layer.SetDynamicRangeLimit(wire.rare_properties->dynamic_range_limit);
+    layer.SetCaptureBounds(wire.rare_properties->capture_bounds);
   }
   layer.SetMayContainVideo(wire.may_contain_video);
 
@@ -1306,6 +1309,8 @@ base::expected<void, std::string> LayerContextImpl::DoUpdateDisplayTree(
   layers.set_source_frame_number(update->source_frame_number);
   layers.set_trace_id(
       cc::BeginMainFrameTraceId::FromUnsafeValue(update->trace_id));
+  layers.set_primary_main_frame_item_sequence_number(
+      update->primary_main_frame_item_sequence_number);
   layers.SetDeviceViewportRect(update->device_viewport);
 
   if (update->page_scale_factor <= 0 || update->min_page_scale_factor <= 0 ||

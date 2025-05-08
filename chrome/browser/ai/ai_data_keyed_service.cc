@@ -143,6 +143,7 @@ void GetAIPageContentWithActionableElementsForModelPrototyping(
 
   auto options = optimization_guide::DefaultAIPageContentOptions();
   options->enable_experimental_actionable_data = true;
+  options->include_geometry = true;
   optimization_guide::OnAIPageContentDone callback = base::BindOnce(
       &OnGotAIPageContentWithActionableElementsForModelPrototyping,
       std::move(continue_callback));
@@ -933,6 +934,15 @@ void AiDataKeyedService::ExecuteAction(
                      weak_factory_.GetWeakPtr(), std::move(callback), task_id_,
                      tab_id_));
 #endif  // BUILDFLAG(ENABLE_GLIC)
+}
+
+bool AiDataKeyedService::IsActorCoordinatorActingOnTab(
+    const content::WebContents* tab) const {
+#if BUILDFLAG(ENABLE_GLIC)
+  return actor_coordinator_ && actor_coordinator_->HasTaskForTab(tab);
+#else
+  return false;
+#endif
 }
 
 #if BUILDFLAG(ENABLE_GLIC)

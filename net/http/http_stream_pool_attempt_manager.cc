@@ -848,6 +848,12 @@ HttpStreamPool::AttemptManager::CalculateMultiplexedSessionCreationInitiator() {
   return MultiplexedSessionCreationInitiator::kUnknown;
 }
 
+void HttpStreamPool::AttemptManager::SetOnCompleteCallbackForTesting(
+    base::OnceClosure callback) {
+  CHECK(on_complete_callback_for_testing_.is_null());
+  on_complete_callback_for_testing_ = std::move(callback);
+}
+
 void HttpStreamPool::AttemptManager::StartInternal(Job* job) {
   RestrictAllowedProtocols(job->allowed_alpns());
   UpdateTcpBasedAttemptState();
@@ -904,6 +910,9 @@ void HttpStreamPool::AttemptManager::
 }
 
 void HttpStreamPool::AttemptManager::ProcessServiceEndpointChanges() {
+  CHECK(!is_failing_);
+  CHECK(service_endpoint_request_);
+
   // The order of the following checks is important, see the following comments.
   // TODO(crbug.com/383606724): Figure out a better design and algorithms to
   // handle attempts and existing sessions.
@@ -1414,6 +1423,8 @@ void HttpStreamPool::AttemptManager::HandleFinalError(int error) {
   CHECK(!final_error_to_notify_jobs_.has_value());
   final_error_to_notify_jobs_ = error;
   is_failing_ = true;
+  service_endpoint_request_.reset();
+
   net_log_.AddEvent(
       NetLogEventType::HTTP_STREAM_POOL_ATTEMPT_MANAGER_NOTIFY_FAILURE, [&] {
         base::Value::Dict dict = GetStatesAsNetLogParams();
@@ -1666,19 +1677,8 @@ void HttpStreamPool::AttemptManager::HandleQuicSessionReady(
     StreamSocketCloseReason refresh_group_reason) {
   CHECK(!is_failing_);
   CHECK(!quic_attempt_);
-  // TODO(crbug.com/415127271): Remove debug alias and change CHECK to DCHECK
-  // once we identify why this doesn't always hold.
-  bool is_ip_based_pooling_enabled = IsIpBasedPoolingEnabled();
-  bool is_alternative_service_enabled = IsAlternativeServiceEnabled();
-  bool requires_h1 = RequiresHTTP11();
-  QuicChromiumClientSession* quic_session =
-      quic_session_pool()->FindExistingSession(
-          quic_session_alias_key().session_key(),
-          quic_session_alias_key().destination());
-  base::debug::Alias(&is_ip_based_pooling_enabled);
-  base::debug::Alias(&is_alternative_service_enabled);
-  base::debug::Alias(&requires_h1);
-  base::debug::Alias(quic_session);
+  // TODO(crbug.com/415488524): Change to DCHECK once we confirm the bug is
+  // fixed.
   CHECK(CanUseExistingQuicSession());
 
   TRACE_EVENT_INSTANT("net.stream", "AttemptManager::QuicSessionReady", track_);
@@ -2070,6 +2070,11 @@ void HttpStreamPool::AttemptManager::MaybeComplete() {
   CHECK(limit_ignoring_jobs_.empty());
   CHECK(ip_based_pooling_disabling_jobs_.empty());
   CHECK(alternative_service_disabling_jobs_.empty());
+
+  if (on_complete_callback_for_testing_) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, std::move(on_complete_callback_for_testing_));
+  }
 
   group_->OnAttemptManagerComplete();
   // `this` is deleted.

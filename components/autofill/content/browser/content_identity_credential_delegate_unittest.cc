@@ -57,7 +57,7 @@ IdentityRequestAccountPtr CreateTestAccount() {
   scoped_refptr<content::IdentityProviderData> identity_provider_data =
       base::MakeRefCounted<content::IdentityProviderData>(
           "idp.example", metadata, client, blink::mojom::RpContext::kSignIn,
-          disclosures, false);
+          blink::mojom::Format::kSdJwt, disclosures, false);
 
   account->identity_provider = identity_provider_data;
 
@@ -243,7 +243,8 @@ TEST_F(ContentIdentityCredentialDelegateTest, GetSuggestionsForPassword) {
       base::MakeRefCounted<content::IdentityProviderData>(
           "idp.example", metadata,
           content::ClientMetadata((GURL()), (GURL()), (GURL()), (gfx::Image())),
-          blink::mojom::RpContext::kSignIn, disclosures, false);
+          blink::mojom::RpContext::kSignIn, blink::mojom::Format::kSdJwt,
+          disclosures, false);
 
   account->identity_provider = identity_provider;
   std::vector<IdentityRequestAccountPtr> accounts = {account};
@@ -258,6 +259,15 @@ TEST_F(ContentIdentityCredentialDelegateTest, GetSuggestionsForPassword) {
   EXPECT_EQ(suggestion.main_text.value, u"john@email.com");
   EXPECT_EQ(suggestion.labels.size(), 1ul);
   EXPECT_EQ(suggestion.minor_texts.size(), 0ul);
+
+  // Expect the payload to be populated properly.
+  Suggestion::IdentityCredentialPayload payload =
+      suggestion.GetPayload<Suggestion::IdentityCredentialPayload>();
+  EXPECT_EQ(payload.account_id, "id");
+  EXPECT_EQ(payload.config_url, GURL("https://idp.example"));
+
+  // Expect no field to be available in the payload for PASSWORD.
+  EXPECT_TRUE(payload.fields.empty());
 }
 
 }  // namespace

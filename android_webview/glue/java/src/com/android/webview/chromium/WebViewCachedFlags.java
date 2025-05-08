@@ -139,8 +139,14 @@ public class WebViewCachedFlags {
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     public WebViewCachedFlags(
             SharedPreferences prefs, Map<String, @DefaultState Integer> defaults) {
-        mOverrideEnabled = prefs.getStringSet(CACHED_ENABLED_FLAGS_PREF, Collections.emptySet());
-        mOverrideDisabled = prefs.getStringSet(CACHED_DISABLED_FLAGS_PREF, Collections.emptySet());
+        // TODO(crbug.com/414342590): Remove the call to HashSet constructor once the migration code
+        // is removed.
+        mOverrideEnabled =
+                new HashSet<>(
+                        prefs.getStringSet(CACHED_ENABLED_FLAGS_PREF, Collections.emptySet()));
+        mOverrideDisabled =
+                new HashSet<>(
+                        prefs.getStringSet(CACHED_DISABLED_FLAGS_PREF, Collections.emptySet()));
         SharedPreferences.Editor editor = prefs.edit();
         cleanUpOldManualExperiments(prefs, editor);
         editor.remove(CACHED_ENABLED_FLAGS_PREF).remove(CACHED_DISABLED_FLAGS_PREF).apply();

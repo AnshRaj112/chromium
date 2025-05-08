@@ -18,6 +18,7 @@
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/process/process.h"
 #include "base/strings/stringprintf.h"
 #include "base/system/sys_info.h"
@@ -46,11 +47,6 @@
 namespace screen_ai {
 
 namespace {
-
-// Maximum image dimension that OCR service processes. Images with width or
-// height larger than this threshold are downsampled before processing.
-// TODO(crbug.com/413318481): Get this threshold from the library.
-constexpr int kMaxOcrDimension = 2048;
 
 // How often it would be checked that the service is idle and can be shutdown.
 // LINT.IfChange(kIdleCheckingDelay)
@@ -266,9 +262,6 @@ ScreenAIService::ScreenAIService(
       base::BindRepeating(&ScreenAIService::OcrReceiverDisconnected,
                           weak_ptr_factory_.GetWeakPtr()));
   model_data_holder_ = std::make_unique<ModelDataHolder>();
-  idle_checking_timer_ = std::make_unique<base::RepeatingTimer>();
-  idle_checking_timer_->Start(FROM_HERE, kIdleCheckingDelay, this,
-                              &ScreenAIService::ShutDownOnIdle);
 
   background_task_runner_ = base::ThreadPool::CreateSequencedTaskRunner(
       {base::TaskPriority::BEST_EFFORT,
@@ -350,6 +343,7 @@ void ScreenAIService::InitializeMainContentExtraction(
 
   std::move(callback).Run(true);
   mce_last_used_ = base::TimeTicks::Now();
+  StartShutDownOnIdleTimer();
 }
 
 void ScreenAIService::InitializeOCR(
@@ -380,6 +374,9 @@ void ScreenAIService::InitializeOCR(
     return;
   }
 
+  max_ocr_dimension_ = library_->GetMaxImageDimension();
+  CHECK(max_ocr_dimension_);
+
   // This interface should be created only once.
   CHECK(!ocr_receiver_.is_bound());
 
@@ -387,6 +384,7 @@ void ScreenAIService::InitializeOCR(
 
   std::move(callback).Run(true);
   ocr_last_used_ = base::TimeTicks::Now();
+  StartShutDownOnIdleTimer();
 }
 
 void ScreenAIService::BindShutdownHandler(
@@ -437,7 +435,8 @@ ScreenAIService::PerformOcrAndRecordMetrics(const SkBitmap& image) {
         "Accessibility.ScreenAI.OCR.Failed.ClientType", client_type);
   }
 
-  if (image.width() > kMaxOcrDimension || image.height() > kMaxOcrDimension) {
+  int max_dimension = base::checked_cast<int>(max_ocr_dimension_);
+  if (image.width() > max_dimension || image.height() > max_dimension) {
     base::UmaHistogramEnumeration(
         "Accessibility.ScreenAI.OCR.Downsampled.ClientType", client_type);
   }
@@ -446,9 +445,7 @@ ScreenAIService::PerformOcrAndRecordMetrics(const SkBitmap& image) {
                             result.has_value());
   base::UmaHistogramCounts100("Accessibility.ScreenAI.OCR.LinesCount",
                               lines_count);
-  base::UmaHistogramCounts10M("Accessibility.ScreenAI.OCR.ImageSize10M",
-                              image.width() * image.height());
-  if (image.width() < kMaxOcrDimension && image.height() < kMaxOcrDimension) {
+  if (image.width() < max_dimension && image.height() < max_dimension) {
     base::UmaHistogramTimes("Accessibility.ScreenAI.OCR.Latency.NotDownsampled",
                             elapsed_time);
   } else {
@@ -514,7 +511,8 @@ void ScreenAIService::MceReceiverDisconnected() {
 
 void ScreenAIService::GetMaxImageDimension(
     GetMaxImageDimensionCallback callback) {
-  std::move(callback).Run(kMaxOcrDimension);
+  CHECK(max_ocr_dimension_);
+  std::move(callback).Run(max_ocr_dimension_);
 }
 
 void ScreenAIService::PerformOcrAndReturnAnnotation(
@@ -671,6 +669,14 @@ ui::AXNodeID ScreenAIService::ComputeMainNodeForTesting(
     const ui::AXTree* tree,
     const std::vector<ui::AXNodeID>& content_node_ids) {
   return ComputeMainNode(tree, content_node_ids);
+}
+
+void ScreenAIService::StartShutDownOnIdleTimer() {
+  if (!idle_checking_timer_) {
+    idle_checking_timer_ = std::make_unique<base::RepeatingTimer>();
+    idle_checking_timer_->Start(FROM_HERE, kIdleCheckingDelay, this,
+                                &ScreenAIService::ShutDownOnIdle);
+  }
 }
 
 void ScreenAIService::ShutDownOnIdle() {

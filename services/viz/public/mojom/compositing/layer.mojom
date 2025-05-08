@@ -16,6 +16,7 @@ import "ui/gfx/mojom/mask_filter_info.mojom";
 import "ui/gfx/mojom/rrect_f.mojom";
 import "services/viz/public/mojom/compositing/copy_output_request.mojom";
 import "services/viz/public/mojom/compositing/filter_operations.mojom";
+import "services/viz/public/mojom/compositing/region_capture_bounds.mojom";
 import "services/viz/public/mojom/compositing/resource_id.mojom";
 import "services/viz/public/mojom/compositing/subtree_capture_id.mojom";
 import "services/viz/public/mojom/compositing/transferable_resource.mojom";
@@ -24,8 +25,21 @@ import "ui/gfx/mojom/transform.mojom";
 
 // Some properties on the Layer are rarely set, and so are bundled
 // under a single optional field.
+// NOTE: This struct's default values should be kept in sync with those of the
+// C++-level RareProperties struct.
+// TODO(crbug.com/408008599): Enforce this via struct_traits.
 struct RareProperties {
-  cc.mojom.FilterQuality filter_quality;
+  cc.mojom.FilterQuality filter_quality = cc.mojom.FilterQuality.kLow;
+
+  // NOTE: Instances of this struct are initialized by reading the
+  // corresponding instances of the C++-level struct, and thus no explicit
+  // default value is needed here.
+  cc.mojom.DynamicRangeLimit dynamic_range_limit;
+
+  // The bounds of elements marked for potential region capture, stored in
+  // the coordinate space of this layer.
+  // NOTE: This field has no explicitly-set default value in the C++ struct.
+  RegionCaptureBounds capture_bounds;
 };
 
 // Extra fields in a cc::MirrorLayerImpl that has been added to a tree or
@@ -385,9 +399,9 @@ struct EffectNode {
   // True if a backdrop effect may be present on this effect (and therefore
   // any side-effects on ancestors should be taken into account).
   bool may_have_backdrop_effect;
-  // Whether this effect is related to a non-identity 2D scale transform (and no
-  // other transform).
-  bool has_2d_scale_transform;
+  // Whether this effect is triggered by a non-identity 2D scale transform
+  // (and no other transform).
+  bool needs_effect_for_2d_scale_transform;
 
   // The CopyOutputRequests that have been made for this node.
   array<CopyOutputRequest> copy_output_requests;

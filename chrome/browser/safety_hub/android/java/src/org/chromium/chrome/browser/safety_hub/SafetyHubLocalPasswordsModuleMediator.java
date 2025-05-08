@@ -176,7 +176,11 @@ public class SafetyHubLocalPasswordsModuleMediator
                 return new SafetyHubLocalPasswordsUnavailableAllPasswordsModuleHelper(
                         context, mModuleDelegate);
             case ModuleType.NO_SAVED_PASSWORDS:
-                return new SafetyHubLocalPasswordsNoPasswordsModuleHelper(context, mModuleDelegate);
+                return new SafetyHubNoSavedPasswordsModuleHelper(
+                        context,
+                        mModuleDelegate,
+                        /* noAccountPasswords= */ false,
+                        /* noLocalPasswords= */ true);
             case ModuleType.HAS_COMPROMISED_PASSWORDS:
                 return new SafetyHubCompromisedPasswordsModuleHelper(
                         context,
@@ -188,13 +192,19 @@ public class SafetyHubLocalPasswordsModuleMediator
                 return new SafetyHubNoCompromisedPasswordsModuleHelper(
                         context, mModuleDelegate, /* account= */ null, /* unifiedModule= */ false);
             case ModuleType.HAS_WEAK_PASSWORDS:
-                return new SafetyHubLocalPasswordsHasWeakPasswordsModuleHelper(
-                        context, mModuleDelegate, mLocalPasswordsDataSource.getWeakPasswordCount());
-            case ModuleType.HAS_REUSED_PASSWORDS:
-                return new SafetyHubLocalPasswordsHasReusedPasswordsModuleHelper(
+                return new SafetyHubWeakPasswordsModuleHelper(
                         context,
                         mModuleDelegate,
-                        mLocalPasswordsDataSource.getReusedPasswordCount());
+                        /* accountWeakPasswordsCount= */ 0,
+                        mLocalPasswordsDataSource.getWeakPasswordCount(),
+                        /* unifiedModule= */ false);
+            case ModuleType.HAS_REUSED_PASSWORDS:
+                return new SafetyHubReusedPasswordsModuleHelper(
+                        context,
+                        mModuleDelegate,
+                        /* accountReusedPasswordsCount= */ 0,
+                        mLocalPasswordsDataSource.getReusedPasswordCount(),
+                        /* unifiedModule= */ false);
             default:
                 throw new IllegalArgumentException();
         }

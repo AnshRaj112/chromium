@@ -77,6 +77,7 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHPreviewsOmniboxUIFeature,
     &kIPHReadAloudAppMenuFeature,
     &kIPHReadAloudExpandedPlayerFeature,
+    &kIPHReadAloudPlaybackModeFeature,
     &kIPHReadLaterContextMenuFeature,
     &kIPHReadLaterAppMenuBookmarkThisPageFeature,
     &kIPHReadLaterAppMenuBookmarksFeature,
@@ -209,6 +210,7 @@ const base::Feature* const kAllFeatures[] = {
 #if BUILDFLAG(ENABLE_EXTENSIONS)
     &kIPHExtensionsMenuFeature,
     &kIPHExtensionsRequestAccessButtonFeature,
+    &kIPHExtensionsZeroStatePromoFeature,
 #endif
     &kIPHFocusHelpBubbleScreenReaderPromoFeature,
     &kIPHGMCCastStartStopFeature,

@@ -6,6 +6,7 @@
 
 #include "ash/public/cpp/system_notification_builder.h"
 #include "base/containers/fixed_flat_set.h"
+#include "base/metrics/histogram_functions.h"
 #include "base/no_destructor.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/extensions/extension_service.h"
@@ -29,85 +30,134 @@ BASE_FEATURE(kAllowChromeAppsInKioskSessions,
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 namespace {
-// TODO(crbug.com/413912653): Split the allowlists per context.
-constexpr auto kUserInstalledAllowlist = base::MakeFixedFlatSet<
-    std::string_view>(
+constexpr auto kCommonAllowlist = base::MakeFixedFlatSet<std::string_view>(
     {"aakfkoilmhehmmadlkedfbcelkbamdkj", "aepgaekjheajlcifmpjcnpbjcencoefn",
      "afoipjmffplafpbfjopglheidddioiai", "afpnehpifljbjjplppeplamalioanmio",
-     "anjihnbmjbbpofafpmklejenkgnjfcdi", "aoijoapjiidlaapoinclpjkmpaeckiff",
-     "aphendncpdekdkepekckjkiloclamieb", "baifnloidiaigliddpkifgokjemcbcei",
-     "bajigdlccokpmeadnhpfhpehdefbgaen", "bbkieeoaobjflkeakhemifofdbbfhnic",
-     "bhfbomkadeplbpgfmiihpglmenahkmao", "bikbageiaongkigeijiahadjbcgindbj",
-     "bnkchehofckdmggiknjidlamlpokbodf", "bpmgmelggoioalpijejanjhbjkfeehbg",
-     "cahbpjmendhigemdnlifkfmdhnipbdil", "cajomgbhgfomgakdejohnkomlblhhlmo",
-     "cdebpoondplobcgjepkgplleeeeojmpa", "cdgdgmknjolkacdiheibdjmidfkooodf",
-     "cedlmaejgblmkmnddjikaagkhbfonihp", "cgpnjolncgemfdgbfokgdbmhpondgjmm",
-     "coomdpjcngcbdefihidllngfemgnmlhh", "dcfnglblnliiebcjiffpnecdkjnomjbl",
-     "demfodeljeofljmbplgpcncaebjmboog", "demlnppodlnndiacjgbijdjnnnoninak",
-     "deokbmklnlnlikckmachjjhgnidefhhg", "dgmhhjhnkhlmooconggnbjhlmpkpliij",
-     "djkbhkgnbiknnlinckcclejmjkddokhl", "djobiocnmcaeodjcdhbhjgjndhiadgod",
-     "eaghkdkaebflfmmhidgnldnncfpknpne", "ealfhldampafeomimeidejkicmipkgkh",
-     "eblkmenpohbbmbelfaggegpjfjokihke", "ecgoodkkapeinahfgidbfknincokmhdg",
-     "efadkfcohfppfffgblnflcakfhfdjiig", "ejbidlmioeopgmjieecjihnlgacicoie",
-     "ejoilaclhpbfooagcjdkkmklhjipgmll", "ekiflcmfallbndjhecchfcipbaajdfhl",
-     "ekigfkofdacepchbgkogfedfapdekjgp", "emejfeljcemojhhcmobdeflgjabpafip",
-     "emlbfhdjchamibhjgcokeipljabljheo", "enfpdhommpcbfiojillmflopkkjbcjmf",
-     "faidilipbonmepcjdkhjfencfaaccgic", "famkiocmnjimafojaajdngnidmgnacme",
-     "fecgcoakonfhepcppcbddeefeoekhbah", "fenegagmedfckampfgjbeoflcpcpdppc",
-     "ffhbnjlppmbnhahkbkcjgapgfinabjgb", "fhohelmkloeoheiminpldlhkdfcmjbfm",
-     "fjdejbdegplidjpkgcblpdibepibfifg", "fmfiolcdkhopmhgjbmlgpfcpfbeneope",
-     "fnbgnnegegboidihpleofgakpegcidim", "fooeehkjmkcohfidagefenolegldgmpp",
-     "gbfihfamagomeondkhooeamjajjadpio", "geopjmggmojbcnjlkcnfbgdniomaioif",
-     "gfajignjkjbleogeegcgjimnkooihmdm", "ggaabodlngcnbdcpkfacegoacchkalmn",
-     "ggddmkhlbkollcjopbnkbbhnikncfena", "gjenjmcioeobmpllaeopaoibabhgcohi",
-     "glcdffonolecglhbodpaeijkhgdfkbon", "gnddkmpjjjcimefninepfmmddpgaaado",
-     "gnogkjfeajjnafijfmffnkgenhnkdnfp", "gpgnoonhefbmngkiafpedbligiiekfcp",
-     "haiffjcadagjlijoggckpgfnoeiflnem", "hanegekdenjamflmdgcbjlobfkijeblp",
-     "hclmbafbgpncekjmadbbcpekilflmkfg", "hgdemhjioannjiccnfgmllghllhpncpm",
-     "hginjgofkfbdfpkjcchdklbkkdbigpna", "hhcgnlnhaapiekdelngjichnccjfkbnc",
-     "hkmlofdlheebfpgfcmgbdjddnoniccno", "hmpdelcfcndndcoldocpdmakeabbihgb",
-     "hnlanngibjpmdolooednhkedmfbdbmhc", "hpdnjcbgolagabfgcgjpicbknmgefakl",
-     "hplnogolijklhfbbfogccgickedplpeo", "iedihkacboebiliakaicmedjmajmjiep",
-     "ighapdcohmkppihdjdejlbkolhbgnlfm", "ihlmfpkjommgamcgofmdmojpeolimlfe",
-     "iiaffmacblgjekhogmghdjfflchkjmmg", "iilndnicahkogiklibnnibmmeikacnfo",
-     "iinmojhiolplpndeijdkfoghkokbfadb", "iiopclfeneoimifgocjnhcjpjgaojhho",
-     "ijdoledcajbpfbkiafmmimjhmkmdppjo", "ikgemedabaijdochaempgdpfebllgfcc",
-     "iknkgipmikbpldmppngljbedofgmanfm", "inaonhfifmcnldmdnlbnfpikjndebkbj",
-     "jfhndkehlkceadabhedbcclclbclhnbh", "jgafcpolgeedpieaadaeeaoanackiina",
-     "jglaiblkoeelgfdabnhpcpdnodjonclf", "jjkgijommndbjlekbalbbiiidnigcgfl",
-     "jjlhmikmcgmheddmlfeckndcedkmcpng", "jjnejapcbafplbdkbombhmmjnafplkon",
-     "jjoncgfekjbknjfejfonaochdpdedbka", "jnnkgopblccifpnkfpfkmdafjebjlhcc",
-     "jnojnnofimbdpeihiddafgagckdlnlpe", "jpmngkkdajjfkdknhbifjbglkckbklee",
-     "kahkblckpdgogkogmfhfnldpjhdpfiia", "kdbdkbbfhghbggpjmpapmobihghkdmkh",
-     "kdndmepchimlohdcdkokdddpbnniijoa", "kenkpdjcfppbccchillfdjkjnejjgand",
-     "kflikliicodcopdhibchdfaninnhbalf", "kfllildicglifipmhpnlmpfbkdponghk",
-     "khpfeaanjngmcnplbdlpegiifgpfgdco", "khplkoflcklpnlofodhlnjeiodbmejoe",
-     "kjceddihhogmglodncbmpembbclhnpda", "kljahdaehfmgddhnibkikcjfppjcjjcn",
-     "kmfbmibhlikajdfjbddlolmdkkbiephg", "lbfgjakkeeccemhonnolnmglmfmccaag",
-     "lemoeliioheohdcoogohonkamhloahbb", "likeoemlchnioaoaklldmcnilhhpjamo",
-     "lknebpkncfibkhjkimejlgppnjgemobn", "lmhpnmjggoibofacnookchiemlihmjdd",
-     "lnnghenlbgaeloipgjlafjhlccipbpnm", "maegcedffmoidlccpjahiglkaacbncnn",
-     "mclaaifjbcglkbdhdkaamamplpjoabih", "mdmkkicfmmkgmpkmkdikhlbggogpicma",
-     "medpmkohocjidlghgmnnkpfigfpddaok", "mhbelemjphdecdagmmengimkkiefmcej",
-     "mhfhafklkbgalhbdihiccegaldefdigp", "mhjpnpdhahbahbjedoihlganncneknfo",
-     "millmignkmpaolllendlllaibmeehohd", "mkjgggeeejocddadcegdhcchhmemokcn",
-     "mndakpenoffnhdmpcpnajekhpbonggeo", "mpjaajdhcmmkeikfdgffdpdjncdnmhmk",
-     "ncjnakhgkcldedboafigaailhldnellf", "ndlolfeihajiaklmehdnajjoblphkppd",
-     "nenolmmehjhaggnamcglapjjdofcojao", "nghoaommfphpdlipedlebgcnmphedhdb",
-     "ngiaihbicdcdflfkhilnaaeobnchggkk", "nhebofpemjfflnkmaneaopjickpliokk",
-     "njofdhegeeccijokfiijflbfajgjclch", "oanbapfpojpdpjppgcmdhcjehacnccbm",
-     "ocnncjgbkiomppnchhbmmcpblifejpco", "odcalbcbcmnepllckjhdndgmolpnddjo",
-     "oefoedhdllfdpfpjhhccdiglflemnfdb", "oflckobdemeldmjddmlbaiaookhhcngo",
-     "ofmlpkdeaopippomdfamngkpnbagkdem", "ogmfbebknnapidhhefcdgmoafjeblnjo",
-     "okaiidkcbkpimeiebofglgpobdafmmeb", "ondpjadajoodngapikdebdcnjcjkeecc",
-     "opalidednimmhdfbcpdmoihhpkahgkak", "pdgbdkbnajhamggjjlhlapedeolflpgm",
-     "pdpgalakpabfiiadeiimoolhemoleaeg", "pgolnnkmmlpbnhfcfbephcnkooejbcep",
-     "pifpopligmljinioeacaccciabhbbpjo", "plhmjahmpikllpphfaoopdhnkbpffccm",
-     "pnclfbefcgmenbbbpljbhbdacgkgkjlh", "ppkfnjlimknmjoaemnpidmdlfchhehel"});
+     "ahpbemfdnadmigmdjhebofmeaonbpfmc", "anjihnbmjbbpofafpmklejenkgnjfcdi",
+     "aoijoapjiidlaapoinclpjkmpaeckiff", "aphendncpdekdkepekckjkiloclamieb",
+     "baifnloidiaigliddpkifgokjemcbcei", "bajigdlccokpmeadnhpfhpehdefbgaen",
+     "bbkieeoaobjflkeakhemifofdbbfhnic", "bhfbomkadeplbpgfmiihpglmenahkmao",
+     "bikbageiaongkigeijiahadjbcgindbj", "bnkchehofckdmggiknjidlamlpokbodf",
+     "bpmgmelggoioalpijejanjhbjkfeehbg", "cahbpjmendhigemdnlifkfmdhnipbdil",
+     "cajomgbhgfomgakdejohnkomlblhhlmo", "cdebpoondplobcgjepkgplleeeeojmpa",
+     "cdgdgmknjolkacdiheibdjmidfkooodf", "cedlmaejgblmkmnddjikaagkhbfonihp",
+     "cgpnjolncgemfdgbfokgdbmhpondgjmm", "coomdpjcngcbdefihidllngfemgnmlhh",
+     "dcfnglblnliiebcjiffpnecdkjnomjbl", "demfodeljeofljmbplgpcncaebjmboog",
+     "demlnppodlnndiacjgbijdjnnnoninak", "deokbmklnlnlikckmachjjhgnidefhhg",
+     "dgmhhjhnkhlmooconggnbjhlmpkpliij", "djkbhkgnbiknnlinckcclejmjkddokhl",
+     "djobiocnmcaeodjcdhbhjgjndhiadgod", "eaghkdkaebflfmmhidgnldnncfpknpne",
+     "ealfhldampafeomimeidejkicmipkgkh", "eblkmenpohbbmbelfaggegpjfjokihke",
+     "ecgoodkkapeinahfgidbfknincokmhdg", "efadkfcohfppfffgblnflcakfhfdjiig",
+     "ejbidlmioeopgmjieecjihnlgacicoie", "ejoilaclhpbfooagcjdkkmklhjipgmll",
+     "ekiflcmfallbndjhecchfcipbaajdfhl", "ekigfkofdacepchbgkogfedfapdekjgp",
+     "emejfeljcemojhhcmobdeflgjabpafip", "emlbfhdjchamibhjgcokeipljabljheo",
+     "enfpdhommpcbfiojillmflopkkjbcjmf", "faidilipbonmepcjdkhjfencfaaccgic",
+     "famkiocmnjimafojaajdngnidmgnacme", "fecgcoakonfhepcppcbddeefeoekhbah",
+     "fenegagmedfckampfgjbeoflcpcpdppc", "ffhbnjlppmbnhahkbkcjgapgfinabjgb",
+     "fhohelmkloeoheiminpldlhkdfcmjbfm", "fjdejbdegplidjpkgcblpdibepibfifg",
+     "fmfiolcdkhopmhgjbmlgpfcpfbeneope", "fnbgnnegegboidihpleofgakpegcidim",
+     "fooeehkjmkcohfidagefenolegldgmpp", "gbfihfamagomeondkhooeamjajjadpio",
+     "geopjmggmojbcnjlkcnfbgdniomaioif", "gfajignjkjbleogeegcgjimnkooihmdm",
+     "ggaabodlngcnbdcpkfacegoacchkalmn", "ggddmkhlbkollcjopbnkbbhnikncfena",
+     "gjenjmcioeobmpllaeopaoibabhgcohi", "glcdffonolecglhbodpaeijkhgdfkbon",
+     "gnddkmpjjjcimefninepfmmddpgaaado", "gnogkjfeajjnafijfmffnkgenhnkdnfp",
+     "gpgnoonhefbmngkiafpedbligiiekfcp", "haiffjcadagjlijoggckpgfnoeiflnem",
+     "hanegekdenjamflmdgcbjlobfkijeblp", "hclmbafbgpncekjmadbbcpekilflmkfg",
+     "hgdemhjioannjiccnfgmllghllhpncpm", "hginjgofkfbdfpkjcchdklbkkdbigpna",
+     "hhcgnlnhaapiekdelngjichnccjfkbnc", "hkmlofdlheebfpgfcmgbdjddnoniccno",
+     "hmpdelcfcndndcoldocpdmakeabbihgb", "hnlanngibjpmdolooednhkedmfbdbmhc",
+     "hpdnjcbgolagabfgcgjpicbknmgefakl", "hplnogolijklhfbbfogccgickedplpeo",
+     "iedihkacboebiliakaicmedjmajmjiep", "ighapdcohmkppihdjdejlbkolhbgnlfm",
+     "ihlmfpkjommgamcgofmdmojpeolimlfe", "iiaffmacblgjekhogmghdjfflchkjmmg",
+     "iilndnicahkogiklibnnibmmeikacnfo", "iinmojhiolplpndeijdkfoghkokbfadb",
+     "iiopclfeneoimifgocjnhcjpjgaojhho", "ijdoledcajbpfbkiafmmimjhmkmdppjo",
+     "ikgemedabaijdochaempgdpfebllgfcc", "iknkgipmikbpldmppngljbedofgmanfm",
+     "inaonhfifmcnldmdnlbnfpikjndebkbj", "jfhndkehlkceadabhedbcclclbclhnbh",
+     "jgafcpolgeedpieaadaeeaoanackiina", "jglaiblkoeelgfdabnhpcpdnodjonclf",
+     "jjkgijommndbjlekbalbbiiidnigcgfl", "jjlhmikmcgmheddmlfeckndcedkmcpng",
+     "jjnejapcbafplbdkbombhmmjnafplkon", "jjoncgfekjbknjfejfonaochdpdedbka",
+     "jnnkgopblccifpnkfpfkmdafjebjlhcc", "jnojnnofimbdpeihiddafgagckdlnlpe",
+     "jpmngkkdajjfkdknhbifjbglkckbklee", "kahkblckpdgogkogmfhfnldpjhdpfiia",
+     "kdbdkbbfhghbggpjmpapmobihghkdmkh", "kdndmepchimlohdcdkokdddpbnniijoa",
+     "kenkpdjcfppbccchillfdjkjnejjgand", "kflikliicodcopdhibchdfaninnhbalf",
+     "kfllildicglifipmhpnlmpfbkdponghk", "khpfeaanjngmcnplbdlpegiifgpfgdco",
+     "khplkoflcklpnlofodhlnjeiodbmejoe", "kjceddihhogmglodncbmpembbclhnpda",
+     "kljahdaehfmgddhnibkikcjfppjcjjcn", "kmfbmibhlikajdfjbddlolmdkkbiephg",
+     "lbfgjakkeeccemhonnolnmglmfmccaag", "lemoeliioheohdcoogohonkamhloahbb",
+     "likeoemlchnioaoaklldmcnilhhpjamo", "lknebpkncfibkhjkimejlgppnjgemobn",
+     "lmhpnmjggoibofacnookchiemlihmjdd", "lnnghenlbgaeloipgjlafjhlccipbpnm",
+     "maegcedffmoidlccpjahiglkaacbncnn", "mclaaifjbcglkbdhdkaamamplpjoabih",
+     "mdmkkicfmmkgmpkmkdikhlbggogpicma", "medpmkohocjidlghgmnnkpfigfpddaok",
+     "mhbelemjphdecdagmmengimkkiefmcej", "mhfhafklkbgalhbdihiccegaldefdigp",
+     "mhjpnpdhahbahbjedoihlganncneknfo", "millmignkmpaolllendlllaibmeehohd",
+     "mkjgggeeejocddadcegdhcchhmemokcn", "mndakpenoffnhdmpcpnajekhpbonggeo",
+     "mpjaajdhcmmkeikfdgffdpdjncdnmhmk", "ncjnakhgkcldedboafigaailhldnellf",
+     "ndlolfeihajiaklmehdnajjoblphkppd", "nenolmmehjhaggnamcglapjjdofcojao",
+     "nghoaommfphpdlipedlebgcnmphedhdb", "ngiaihbicdcdflfkhilnaaeobnchggkk",
+     "nhebofpemjfflnkmaneaopjickpliokk", "njofdhegeeccijokfiijflbfajgjclch",
+     "oanbapfpojpdpjppgcmdhcjehacnccbm", "ocnncjgbkiomppnchhbmmcpblifejpco",
+     "odcalbcbcmnepllckjhdndgmolpnddjo", "oefoedhdllfdpfpjhhccdiglflemnfdb",
+     "oflckobdemeldmjddmlbaiaookhhcngo", "ofmlpkdeaopippomdfamngkpnbagkdem",
+     "ogmfbebknnapidhhefcdgmoafjeblnjo", "okaiidkcbkpimeiebofglgpobdafmmeb",
+     "ondpjadajoodngapikdebdcnjcjkeecc", "opalidednimmhdfbcpdmoihhpkahgkak",
+     "pdgbdkbnajhamggjjlhlapedeolflpgm", "pdpgalakpabfiiadeiimoolhemoleaeg",
+     "pgolnnkmmlpbnhfcfbephcnkooejbcep", "pifpopligmljinioeacaccciabhbbpjo",
+     "plhmjahmpikllpphfaoopdhnkbpffccm", "pnclfbefcgmenbbbpljbhbdacgkgkjlh",
+     "ppkfnjlimknmjoaemnpidmdlfchhehel"});
 
-// TODO(crbug.com/383754553): Add the finalised list only in M138 builds.
+constexpr auto kUserInstalledAllowlist = base::flat_set<std::string_view>();
+
 constexpr auto kKioskSessionAllowlist =
-    base::MakeFixedFlatSet<std::string_view>({""});
+    base::MakeFixedFlatSet<std::string_view>(
+        {"adbijfidmjidmkkpiglnfkflcoblkfmn", "adpfhflbokfdhnfakijgjkpkjegncbpl",
+         "agkggapglfgffelalcfgbjmhkaljnbmn", "alhlkpgheiefedomljbenmkpconkffhk",
+         "amdpebpoiccejfcnocgebkidfmkcdfei", "aoebmljacknghkklaholjkflllbghhnj",
+         "bgldcjbajnkfkephalfogfgklkgjnjeo", "bhcnmihmgdljpnnoobnbdmdjhmfgcpio",
+         "bloholppicibpgbagaebcaagiikicjbn", "cafpcfibibiomlehdnmabchhekeifbgb",
+         "cdomppfkcljjopjijjdchhjfioljaeph", "cgihdamofndnjjlglmcaabdafhmoconf",
+         "ckmkndfplnldgohnnkhmeokbmedpdbjl", "clbgknjcblogheibmcbbdlpkollmgofh",
+         "cmhiajbopgbagidplpiaclnpglmhbhka", "cpbpbhkfonocjjamhjeabdihibkoajlc",
+         "dakemaookmhkdfgcgebakflmhgdhille", "dakmgckkclepfbfeldlgenikiobflcne",
+         "ddhhodggehedggajomidnmgchfnbeold", "dfjigmapgofdlgieniibjdcddlaafick",
+         "dinalfjmfmjkdnkgbbjncgchmghijpgl", "ealpglkmnpenllgjjgdojoemohidefdm",
+         "edhlcbaemfhpoblalbdgeegmaddjdcae", "edpaojhfdnnebhmmhdlpnpomoaopfjod",
+         "efdahhfldoeikfglgolhibmdidbnpneo", "emlbcjpcbepfnhpkiidenlnfdjbghmpg",
+         "fammfnbkkollpklfkachppebochgakjg", "fcichhfeoaikaoldkncmggipmpcbgffg",
+         "fdlpibjfnlhnmeckjjhfiejfdghkmkdm", "gbecpjnejcnafnkgfciepngjcndodann",
+         "gbgncgdjjnelalecmmkimnlgfpmbihog", "gcefeoeohcoeoofmehgjfipjiepodlhg",
+         "gdehbmmmjkddbonbmknngoigkleicpec", "genfdmkliekafjhadcpnhefgicceohhd",
+         "gmdgbdlpbnhiogedlhmdiceocbgcbpgi", "gobhocmdcdpfebockbogdfhnebgmemnf",
+         "hadonmdpeimgfpmmmeldbmjiknnbfdhk", "hbcogfhdhehbfnedbbboiiddpkkjjnio",
+         "hbfbekdejbpmnpilhdnfokjehnianfeb", "hblfbmjdaalalhifaajnnodlkiloengc",
+         "hchdcamjekgapahefjapegmaapggeafe", "hebfpdlglfmneladiogocbflmbjneeoh",
+         "hgkaljnpgngpcgnaonmbdgaolefknaaj", "hhbmmipodfklmbmiaegcbmbfmmfbngnf",
+         "hjbkdjhfdcinjcljfbealemkioalnfao", "ibboejlnnenbhpjfpgoglholgpdjjeff",
+         "icfpencnfmadodjpbbdipkkkljmamine", "iflkfmkmpafjfdkkokpkjpjmiogkdjjl",
+         "igknghlgndjihblholjbbhjbcfilkilb", "ilehifjdadbblbcnciiggmcbmobkikcb",
+         "jamdkebjilnlfjndffcnekbipcfkhmem", "jcgamccimilnfjpbkbadommjcaplmfod",
+         "jefdfinffojbalcgpkigjjijghmllgil", "jiecdjmgkgmgmbonhifblhfaaecnomcj",
+         "jifdnnnegbhoagepoobbmajnpkmcbjig", "jjlmjgfhdijljijikefhmgmhbchnkmnm",
+         "jmiabaaccndlngedakcjbpbgokhgcpfd", "jnlegeoomaehdodfmpmlflpjapebjjjl",
+         "jnlhnplbndpohngdfjhmdinlpofclhdp", "kacodfanpfkedlelnagnbgfbaabjfddn",
+         "kbkcdgjhbdlplagmlcpafgamnapneoba", "kcdfcljkllboedjeoaicmmabopnnaoaa",
+         "kdffphekpginklcnoefcelkjclbjnbmi", "kedeaijhpgoggdafoabafeldkoolemig",
+         "kgoklcfigmpofpbkdglgbhfgpjdjgppl", "kjbdapadhmcgplddmcggjkhacdnpjmod",
+         "kpjcmnnhdgonbhjnfhebgapnkicknmpp", "lfemdemifjedlccfbhpocnicmjlcgmce",
+         "lgpjgoglfmjggeggfelogaboagbcaklg", "lmdoekjmofbfghllkonahbfdcckmgjlf",
+         "lnokaenamkoojjbhehhpggplknlbejmi", "mbkamiddebohpehiafofidepfffpffln",
+         "mfejnceblfpkdodajfohmjimcbipnhhh", "mfgkakkfpnhfmnipnbehiglkjijancnk",
+         "mhboapffkffmmcggindghkakhdhmjcje", "mhdohnfjdghnpjmhnlodibcnjlaeinap",
+         "mkgbgfehlfaioaejpaedngdohcpdpbpd", "nanoidlkencgghkphophigbmnohnbbcb",
+         "nclhjadnjgfjocbnfmlcfnagnieialof", "nddaogoljagaikdogplnajkdggkfmgei",
+         "ngpbnegpinocjhpnppjeppllflpgafkk", "nhlaojpmboioihghmmdbhgcbjgmcicdk",
+         "nickmpjdfebcopckkfjmflblnmijbiom", "nloplhgjobaomjdppnbcdjfgbefifbdo",
+         "obgbgecgadcagmhnanalmklenjajimld", "oblnbnkmblikfegpcngkcbppphcenhjj",
+         "ocljbfllcpgnlnnaommbmaphaagjmkmj", "odjaaghiehpobimgdjjfofmablbaleem",
+         "ofaokfiblaffkgcapcilcehdhlidehcd", "olaaocfpicpjiocmoklnbfpdlbglbadp",
+         "omkghcboodpimaoimdkmigofhjcpmpeb", "omlplbdgdcpaaknjnkodikcklbkhefoh",
+         "oopdabjckchhklpldcdjllmedcdnbdio", "pjdhfcpflabeafmgdpgdfdejbhkdcgja",
+         "pjicdfmcmiihceiefbmioikgkcicochj", "plebdlehcdhfkmidnmfpolcifjngmdck",
+         "pmcgpdpmlgkeociebbpdbppimbeheoli"});
 
 // The std::unordered_set<std::string_view> type has complex constructors and
 // for static variables it would require an exit-time destructor. For these
@@ -116,6 +166,38 @@ constexpr auto kKioskSessionAllowlist =
 // because the allowlist are always valid while Chrome is running.
 static base::NoDestructor<std::unordered_set<std::string>> testAllowlistedApps;
 
+// This enum lists the possible outcomes of the deprecation checks performed
+// during the launch of a ChromeApp.
+//
+// These values are persisted to logs and the values match the entries of
+// `enum ChromeAppDeprecationLaunchOutcome` in
+// `tools/metrics/histograms/metadata/apps/enums.xml`.
+// Entries should not be renumbered and numeric values should never be reused.
+// LINT.IfChange(ChromeAppDeprecationLaunchOutcome)
+enum class DeprecationCheckOutcome {
+  kUserInstalledAllowedByFlag = 0,
+  kUserInstalledAllowedByAllowlist = 1,
+  kUserInstalledBlocked = 2,
+  kKioskModeAllowedByFlag = 3,
+  kKioskModeAllowedByAllowlist = 4,
+  kKioskModeAllowedByAdminPolicy = 5,
+  kKioskModeBlocked = 6,
+  kManagedAllowedByFlag = 7,
+  kManagedAllowedByAllowlist = 8,
+  kManagedAllowedByAdminPolicy = 9,
+  kManagedBlocked = 10,
+  kAllowedNotChromeApp = 11,
+  kAllowedDefault = 12,
+  kBlockedDefault = 13,
+  kMaxValue = kBlockedDefault
+};
+// LINT.ThenChange(//tools/metrics/histograms/metadata/apps/enums.xml:ChromeAppDeprecationLaunchOutcome)
+
+void ReportMetric(DeprecationCheckOutcome outcome) {
+  base::UmaHistogramEnumeration("Apps.AppLaunch.ChromeAppsDeprecationCheck",
+                                outcome);
+}
+
 static bool fakeKioskSessionForTesting = false;
 
 enum class AllowlistContext { UserInstalled, KioskSession };
@@ -123,11 +205,12 @@ enum class AllowlistContext { UserInstalled, KioskSession };
 bool IsAllowlisted(std::string_view app_id, AllowlistContext context) {
   switch (context) {
     case AllowlistContext::UserInstalled:
-      return kUserInstalledAllowlist.contains(app_id) ||
+      return kCommonAllowlist.contains(app_id) ||
+             kUserInstalledAllowlist.contains(app_id) ||
              testAllowlistedApps->contains(app_id.data());
     case AllowlistContext::KioskSession:
-      return kKioskSessionAllowlist.contains(app_id) ||
-             kUserInstalledAllowlist.contains(app_id) ||
+      return kCommonAllowlist.contains(app_id) ||
+             kKioskSessionAllowlist.contains(app_id) ||
              testAllowlistedApps->contains(app_id.data());
   }
 }
@@ -171,14 +254,17 @@ DeprecationStatus HandleUserInstalledApp(const extensions::Extension& app,
                                          Profile* profile) {
   // TODO(crbug.com/379261516): Block the execution in M139.
   if (IsAllowlisted(app.id(), AllowlistContext::UserInstalled)) {
+    ReportMetric(DeprecationCheckOutcome::kUserInstalledAllowedByAllowlist);
     return DeprecationStatus::kLaunchAllowed;
   }
 
   if (base::FeatureList::IsEnabled(kAllowUserInstalledChromeApps)) {
     ShowNotification(app, profile);
+    ReportMetric(DeprecationCheckOutcome::kUserInstalledAllowedByFlag);
     return DeprecationStatus::kLaunchAllowed;
   }
 
+  ReportMetric(DeprecationCheckOutcome::kUserInstalledBlocked);
   return DeprecationStatus::kLaunchBlocked;
 }
 
@@ -186,17 +272,21 @@ DeprecationStatus HandleKioskSessionApp(const extensions::Extension& app,
                                         Profile* profile) {
   // TODO(crbug.com/379262711): Block the execution in M151.
   if (IsAllowlisted(app.id(), AllowlistContext::KioskSession)) {
+    ReportMetric(DeprecationCheckOutcome::kKioskModeAllowedByAllowlist);
     return DeprecationStatus::kLaunchAllowed;
   }
 
   if (profile->GetPrefs()->GetBoolean(prefs::kKioskChromeAppsForceAllowed)) {
+    ReportMetric(DeprecationCheckOutcome::kKioskModeAllowedByAdminPolicy);
     return DeprecationStatus::kLaunchAllowed;
   }
 
   if (base::FeatureList::IsEnabled(kAllowChromeAppsInKioskSessions)) {
+    ReportMetric(DeprecationCheckOutcome::kKioskModeAllowedByFlag);
     return DeprecationStatus::kLaunchAllowed;
   }
 
+  ReportMetric(DeprecationCheckOutcome::kKioskModeBlocked);
   return DeprecationStatus::kLaunchBlocked;
 }
 }  // namespace
@@ -207,6 +297,7 @@ DeprecationStatus HandleDeprecation(std::string_view app_id, Profile* profile) {
           app_id.data());
 
   if (!app || !app->is_app()) {
+    ReportMetric(DeprecationCheckOutcome::kAllowedNotChromeApp);
     return DeprecationStatus::kLaunchAllowed;
   }
 
@@ -218,6 +309,7 @@ DeprecationStatus HandleDeprecation(std::string_view app_id, Profile* profile) {
     return HandleUserInstalledApp(*app, profile);
   }
 
+  ReportMetric(DeprecationCheckOutcome::kAllowedDefault);
   return DeprecationStatus::kLaunchAllowed;
 }
 
@@ -229,8 +321,8 @@ void ResetAllowlistForTesting() {
   testAllowlistedApps->clear();
 }
 
-void SetKioskSessionForTesting() {
-  fakeKioskSessionForTesting = true;
+void SetKioskSessionForTesting(bool value) {
+  fakeKioskSessionForTesting = value;
 }
 
 }  // namespace apps::chrome_app_deprecation

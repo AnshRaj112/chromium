@@ -23,7 +23,6 @@
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
 #include "base/no_destructor.h"
-#include "base/notimplemented.h"
 #include "base/path_service.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
@@ -134,9 +133,7 @@
 
 #if BUILDFLAG(IS_IOS)
 #include "components/permissions/bluetooth_delegate_impl.h"
-#if !BUILDFLAG(IS_IOS_TVOS)
 #include "content/shell/browser/bluetooth/shell_bluetooth_delegate_impl_client.h"
-#endif
 #endif
 
 #if BUILDFLAG(IS_WIN)
@@ -693,16 +690,11 @@ void ShellContentBrowserClient::OpenURL(
           ->web_contents());
 }
 
-std::vector<std::unique_ptr<NavigationThrottle>>
-ShellContentBrowserClient::CreateThrottlesForNavigation(
+void ShellContentBrowserClient::CreateThrottlesForNavigation(
     NavigationThrottleRegistry& registry) {
-  std::vector<std::unique_ptr<NavigationThrottle>> empty_throttles;
   if (create_throttles_for_navigation_callback_) {
-    // TODO(https://crbug.com/412524375): NavigationThrottleRegistry migration.
-    return create_throttles_for_navigation_callback_.Run(
-        &registry.GetNavigationHandle());
+    create_throttles_for_navigation_callback_.Run(registry);
   }
-  return empty_throttles;
 }
 
 std::unique_ptr<LoginDelegate> ShellContentBrowserClient::CreateLoginDelegate(
@@ -845,16 +837,11 @@ ShellContentBrowserClient::GetNetworkContextsParentDirectory() {
 
 #if BUILDFLAG(IS_IOS)
 BluetoothDelegate* ShellContentBrowserClient::GetBluetoothDelegate() {
-#if !BUILDFLAG(IS_IOS_TVOS)
   if (!bluetooth_delegate_) {
     bluetooth_delegate_ = std::make_unique<permissions::BluetoothDelegateImpl>(
         std::make_unique<ShellBluetoothDelegateImplClient>());
   }
   return bluetooth_delegate_.get();
-#else
-  TVOS_NOT_YET_IMPLEMENTED();
-  return nullptr;
-#endif
 }
 #endif
 

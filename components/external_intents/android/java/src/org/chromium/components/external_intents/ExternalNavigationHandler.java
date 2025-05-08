@@ -1546,6 +1546,11 @@ public class ExternalNavigationHandler {
             Intent targetIntent,
             GURL browserFallbackUrl,
             MutableBoolean canLaunchExternalFallbackResult) {
+
+        if (debug() && ExternalIntentsFeatures.NAVIGATION_CAPTURE_REFACTOR_ANDROID.isEnabled()) {
+            Log.i(TAG, "Navigation Capture refactor feature enabled");
+        }
+
         sanitizeQueryIntentActivitiesIntent(targetIntent);
 
         // Any subsequent navigations should cancel the existing dialog.
@@ -1828,12 +1833,6 @@ public class ExternalNavigationHandler {
         // Intent Selectors allow intents to bypass the intent filter and potentially send apps URIs
         // they were not expecting to handle. https://crbug.com/1254422
         intent.setSelector(null);
-
-        // Intent schemes should be normalized to lower case. https://crbug.com/401823929
-        if (ExternalIntentsFeatures.LOWER_CASE_INTENT_SCHEMES.isEnabled()
-                && intent.getData() != null) {
-            intent.setDataAndType(intent.getData().normalizeScheme(), intent.getType());
-        }
     }
 
     /**

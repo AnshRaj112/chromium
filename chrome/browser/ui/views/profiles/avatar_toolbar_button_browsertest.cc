@@ -14,6 +14,7 @@
 #include "base/scoped_observation.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/bind.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/with_feature_override.h"
 #include "base/time/time.h"
@@ -1465,6 +1466,7 @@ class AvatarToolbarButtonHistorySyncOptinClickBrowserTest
 #endif
 IN_PROC_BROWSER_TEST_P(AvatarToolbarButtonHistorySyncOptinClickBrowserTest,
                        MAYBE_CollapsesOnClickAndTriggersProfileMenuStartup) {
+  base::HistogramTester histogram_tester;
   AvatarToolbarButton* avatar = GetAvatarToolbarButton(browser());
   // Normal state.
   ASSERT_TRUE(avatar->GetText().empty());
@@ -1479,9 +1481,25 @@ IN_PROC_BROWSER_TEST_P(AvatarToolbarButtonHistorySyncOptinClickBrowserTest,
   EXPECT_EQ(
       avatar->GetText(),
       l10n_util::GetStringUTF16(GetParam().expected_history_sync_message_id));
+  // `Signin.SyncOptIn.IdentityPill.Shown` should be recorded with the correct
+  // access point.
+  histogram_tester.ExpectBucketCount(
+      "Signin.SyncOptIn.IdentityPill.Shown",
+      signin_metrics::AccessPoint::kHistorySyncOptinExpansionPillOnStartup,
+      /*expected_count=*/1);
+  histogram_tester.ExpectBucketCount(
+      "Signin.SyncOptIn.IdentityPill.Shown",
+      signin_metrics::AccessPoint::kHistorySyncOptinExpansionPillOnInactivity,
+      /*expected_count=*/0);
   // The button action should be overridden.
   EXPECT_TRUE(avatar->HasExplicitButtonAction());
+  histogram_tester.ExpectTotalCount(
+      "Signin.SyncOptIn.IdentityPill.DurationBeforeClick",
+      /*expected_count=*/0);
   Click(avatar);
+  histogram_tester.ExpectTotalCount(
+      "Signin.SyncOptIn.IdentityPill.DurationBeforeClick",
+      /*expected_count=*/1);
   auto* coordinator = ProfileMenuCoordinator::FromBrowser(browser());
   ASSERT_NE(coordinator, nullptr);
   EXPECT_TRUE(coordinator->IsShowing());
@@ -1516,6 +1534,7 @@ IN_PROC_BROWSER_TEST_P(AvatarToolbarButtonHistorySyncOptinClickBrowserTest,
 #endif
 IN_PROC_BROWSER_TEST_P(AvatarToolbarButtonHistorySyncOptinClickBrowserTest,
                        MAYBE_CollapsesOnClickAndTriggersProfileMenuInactivity) {
+  base::HistogramTester histogram_tester;
   AvatarToolbarButton* avatar = GetAvatarToolbarButton(browser());
   // Normal state.
   ASSERT_TRUE(avatar->GetText().empty());
@@ -1530,6 +1549,16 @@ IN_PROC_BROWSER_TEST_P(AvatarToolbarButtonHistorySyncOptinClickBrowserTest,
   EXPECT_EQ(
       avatar->GetText(),
       l10n_util::GetStringUTF16(GetParam().expected_history_sync_message_id));
+  // `Signin.SyncOptIn.IdentityPill.Shown` should be recorded with the correct
+  // access point.
+  histogram_tester.ExpectBucketCount(
+      "Signin.SyncOptIn.IdentityPill.Shown",
+      signin_metrics::AccessPoint::kHistorySyncOptinExpansionPillOnStartup,
+      /*expected_count=*/1);
+  histogram_tester.ExpectBucketCount(
+      "Signin.SyncOptIn.IdentityPill.Shown",
+      signin_metrics::AccessPoint::kHistorySyncOptinExpansionPillOnInactivity,
+      /*expected_count=*/0);
   EXPECT_TRUE(avatar->HasExplicitButtonAction());
   avatar->TriggerTimeoutForTesting(AvatarDelayType::kHistorySyncOptin);
   // The button comes back to the normal state.
@@ -1543,9 +1572,25 @@ IN_PROC_BROWSER_TEST_P(AvatarToolbarButtonHistorySyncOptinClickBrowserTest,
   EXPECT_EQ(
       avatar->GetText(),
       l10n_util::GetStringUTF16(GetParam().expected_history_sync_message_id));
+  // `Signin.SyncOptIn.IdentityPill.Shown` should be recorded with the correct
+  // access point.
+  histogram_tester.ExpectBucketCount(
+      "Signin.SyncOptIn.IdentityPill.Shown",
+      signin_metrics::AccessPoint::kHistorySyncOptinExpansionPillOnStartup,
+      /*expected_count=*/1);
+  histogram_tester.ExpectBucketCount(
+      "Signin.SyncOptIn.IdentityPill.Shown",
+      signin_metrics::AccessPoint::kHistorySyncOptinExpansionPillOnInactivity,
+      /*expected_count=*/1);
   // The button action should be overridden.
   EXPECT_TRUE(avatar->HasExplicitButtonAction());
+  histogram_tester.ExpectTotalCount(
+      "Signin.SyncOptIn.IdentityPill.DurationBeforeClick",
+      /*expected_count=*/0);
   Click(avatar);
+  histogram_tester.ExpectTotalCount(
+      "Signin.SyncOptIn.IdentityPill.DurationBeforeClick",
+      /*expected_count=*/1);
   auto* coordinator = ProfileMenuCoordinator::FromBrowser(browser());
   ASSERT_NE(coordinator, nullptr);
   EXPECT_TRUE(coordinator->IsShowing());
@@ -1627,6 +1672,97 @@ IN_PROC_BROWSER_TEST_P(AvatarToolbarButtonHistorySyncOptinClickBrowserTest,
   EXPECT_EQ(
       avatar->GetText(),
       l10n_util::GetStringUTF16(GetParam().expected_history_sync_message_id));
+}
+
+// TODO(crbug.com/331746545): Check the flaky test issue on Windows.
+#if BUILDFLAG(IS_WIN)
+#define MAYBE_TriggersAndCollapsesConsistentlyAcrossMultipleBrowsers \
+  DISABLED_TriggersAndCollapsesConsistentlyAcrossMultipleBrowsers
+#else
+#define MAYBE_TriggersAndCollapsesConsistentlyAcrossMultipleBrowsers \
+  TriggersAndCollapsesConsistentlyAcrossMultipleBrowsers
+#endif
+IN_PROC_BROWSER_TEST_P(
+    AvatarToolbarButtonHistorySyncOptinClickBrowserTest,
+    MAYBE_TriggersAndCollapsesConsistentlyAcrossMultipleBrowsers) {
+  base::HistogramTester histogram_tester;
+  Profile* profile = browser()->profile();
+  Browser* browser_1 = browser();
+  AvatarToolbarButton* avatar_1 = GetAvatarToolbarButton(browser_1);
+  // Normal state.
+  ASSERT_TRUE(avatar_1->GetText().empty());
+  const std::u16string account_name(u"Account name");
+  const AccountInfo account_info =
+      SigninWithImage(/*email=*/u"test@gmail.com", account_name);
+  ASSERT_EQ(avatar_1->GetText(), l10n_util::GetStringFUTF16(
+                                     IDS_AVATAR_BUTTON_GREETING, account_name));
+  avatar_1->TriggerTimeoutForTesting(AvatarDelayType::kNameGreeting);
+
+  // The greeting should be followed by the history sync opt-in.
+  EXPECT_EQ(
+      avatar_1->GetText(),
+      l10n_util::GetStringUTF16(GetParam().expected_history_sync_message_id));
+  // Open the second browser before the history sync opt-in collapses.
+  Browser* browser_2 = CreateBrowser(profile);
+  AvatarToolbarButton* avatar_2 = GetAvatarToolbarButton(browser_2);
+  // The history sync opt-in should be shown in the second browser as well.
+  EXPECT_EQ(
+      avatar_2->GetText(),
+      l10n_util::GetStringUTF16(GetParam().expected_history_sync_message_id));
+  // `Signin.SyncOptIn.IdentityPill.Shown` histogram should be recorded only
+  // once.
+  histogram_tester.ExpectBucketCount(
+      "Signin.SyncOptIn.IdentityPill.Shown",
+      signin_metrics::AccessPoint::kHistorySyncOptinExpansionPillOnStartup,
+      /*expected_count=*/1);
+  histogram_tester.ExpectBucketCount(
+      "Signin.SyncOptIn.IdentityPill.Shown",
+      signin_metrics::AccessPoint::kHistorySyncOptinExpansionPillOnInactivity,
+      /*expected_count=*/0);
+  avatar_1->TriggerTimeoutForTesting(AvatarDelayType::kHistorySyncOptin);
+  // The button in both browsers comes back to the normal state.
+  EXPECT_TRUE(avatar_1->GetText().empty());
+  EXPECT_TRUE(avatar_2->GetText().empty());
+
+  // Simulate inactivity for enough time to trigger the new session.
+  RunTestSequence(
+      SetLastActive(user_education::features::GetIdleTimeBetweenSessions()));
+  // The history sync opt-in entry point should be shown again after the
+  // inactivity period (in both browsers).
+  EXPECT_EQ(
+      avatar_1->GetText(),
+      l10n_util::GetStringUTF16(GetParam().expected_history_sync_message_id));
+  EXPECT_EQ(
+      avatar_2->GetText(),
+      l10n_util::GetStringUTF16(GetParam().expected_history_sync_message_id));
+  // Open the third browser before the history sync opt-in collapses.
+  Browser* browser_3 = CreateBrowser(profile);
+  AvatarToolbarButton* avatar_3 = GetAvatarToolbarButton(browser_3);
+  // The history sync opt-in should be shown in the third browser as well.
+  EXPECT_EQ(
+      avatar_3->GetText(),
+      l10n_util::GetStringUTF16(GetParam().expected_history_sync_message_id));
+  // `Signin.SyncOptIn.IdentityPill.Shown` histogram should be recorded only
+  // once.
+  histogram_tester.ExpectBucketCount(
+      "Signin.SyncOptIn.IdentityPill.Shown",
+      signin_metrics::AccessPoint::kHistorySyncOptinExpansionPillOnStartup,
+      /*expected_count=*/1);
+  histogram_tester.ExpectBucketCount(
+      "Signin.SyncOptIn.IdentityPill.Shown",
+      signin_metrics::AccessPoint::kHistorySyncOptinExpansionPillOnInactivity,
+      /*expected_count=*/1);
+  // Clicking the button on any browser should collapse the history sync opt-in
+  // in all browsers.
+  Click(avatar_2);
+  // `Signin.SyncOptIn.IdentityPill.DurationBeforeClick` histogram should be
+  // recorded only once.
+  histogram_tester.ExpectTotalCount(
+      "Signin.SyncOptIn.IdentityPill.DurationBeforeClick",
+      /*expected_count=*/1);
+  EXPECT_TRUE(avatar_1->GetText().empty());
+  EXPECT_TRUE(avatar_2->GetText().empty());
+  EXPECT_TRUE(avatar_3->GetText().empty());
 }
 
 INSTANTIATE_TEST_SUITE_P(HistorySyncOptinExpansionPillOptions,

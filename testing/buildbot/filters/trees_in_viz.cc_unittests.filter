@@ -42,25 +42,9 @@
 -LayerTreeHostImplTest.ScrollCheckerboardsIncompleteRecording/CommitToActiveTree
 -LayerTreeHostImplTest.ScrollCheckerboardsIncompleteRecording/CommitToPendingTree
 
-# TODO(crbug.com/401566971) implement ThrottleDecider updates for TreesInViz mode.
--OccludedSurfaceThrottlingLayerTreeHostImplTest.ThrottleOccludedSurface/CommitToActiveTree
--OccludedSurfaceThrottlingLayerTreeHostImplTest.ThrottleOccludedSurface/CommitToPendingTree
-
 # TODO(crbug.com/401567193) LayerImpl WillDraw and DidDraw implementation for TreesInViz mode.
--LayerTreeHostImplTest.WillDrawNotCalledOnOccludedLayer/CommitToActiveTree
--LayerTreeHostImplTest.WillDrawNotCalledOnOccludedLayer/CommitToPendingTree
 -LayerTreeHostImplTest.WillDrawReturningFalseDoesNotCall/CommitToActiveTree
 -LayerTreeHostImplTest.WillDrawReturningFalseDoesNotCall/CommitToPendingTree
--LayerTreeHostImplTest.DidDrawCalledOnAllLayers/CommitToActiveTree
--LayerTreeHostImplTest.DidDrawCalledOnAllLayers/CommitToPendingTree
--LayerTreeHostImplTest.DidDrawNotCalledOnHiddenLayer/CommitToActiveTree
--LayerTreeHostImplTest.DidDrawNotCalledOnHiddenLayer/CommitToPendingTree
--LayerTreeHostImplTest.ForcedDrawToSoftwareDeviceSkipsUnsupportedLayers/CommitToActiveTree
--LayerTreeHostImplTest.ForcedDrawToSoftwareDeviceSkipsUnsupportedLayers/CommitToPendingTree
-
-# TODO(crbug.com/401568010) Investigate LayerTreeHostImplTest.LayersFreeTextures
--LayerTreeHostImplTest.LayersFreeTextures/CommitToActiveTree
--LayerTreeHostImplTest.LayersFreeTextures/CommitToPendingTree
 
 # TODO (crbug.com/404940328) Fix LayerTreeHostTestInvisibleLayersSkipRenderPass
 -LayerTreeHostTestInvisibleLayersSkipRenderPass.RunSingleThread_DelegatingRenderer
@@ -115,9 +99,6 @@
 
 # TODO(crbug.com/406010462) View transition requests are lost between cc and viz
 -LayerTreeHostTestDamagePropagatesFromViewTransitionSurface.RunMultiThread_DelegatingRenderer
-
-# TODO(crbug.com/408053792) Implement Tiling removal in TileDisplayLayerImpl
--LayerTreeHostTestCrispUpAfterPinchEnds.RunMultiThread_DelegatingRenderer
 
 # TODO(crbug.com/404813701) Triage cc_unittests failures using non layer list mode
 -All/LayerTreeHostCopyRequestTestDeleteSharedImage.Test/SkiaGL_MultiThreaded

@@ -56,8 +56,12 @@ export enum TextAlignment {
 export enum TextStyle {
   BOLD = 'bold',
   ITALIC = 'italic',
-  UNDERLINE = 'underline',
-  STRIKETHROUGH = 'strikethrough',
+}
+
+export enum TextTypeface {
+  SANS_SERIF = 'sans-serif',
+  SERIF = 'serif',
+  MONOSPACE = 'monospace',
 }
 
 export type TextStyles = {
@@ -65,7 +69,7 @@ export type TextStyles = {
 };
 
 export interface TextAttributes {
-  typeface: string;
+  typeface: TextTypeface;
   size: number;
   color: Color;
   alignment: TextAlignment;

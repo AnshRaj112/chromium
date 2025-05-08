@@ -75,10 +75,6 @@ std::string CtxToString(const mojom::AppendOptions& input,
                         const Capabilities& capabilities) {
   std::string suffix;
   std::string context = OnDeviceInputToString(*input.input, capabilities);
-  if (input.token_offset > 0) {
-    context.erase(context.begin(), context.begin() + input.token_offset);
-  }
-  suffix += " off:" + base::NumberToString(input.token_offset);
   if (input.max_tokens > 0) {
     if (input.max_tokens < context.size()) {
       context.resize(input.max_tokens);
@@ -205,6 +201,19 @@ void FakeOnDeviceSession::GenerateImpl(
     remote->OnResponse(std::move(chunk));
   }
 
+  if (options->constraint) {
+    const auto& constraint = *options->constraint;
+    auto chunk = mojom::ResponseChunk::New();
+    if (constraint.is_json_schema()) {
+      chunk->text = "Constraint: json " + constraint.get_json_schema() + "\n";
+    } else if (constraint.is_regex()) {
+      chunk->text = "Constraint: regex " + constraint.get_regex() + "\n";
+    } else {
+      chunk->text = "Constraint: unknown\n";
+    }
+    remote->OnResponse(std::move(chunk));
+  }
+
   int output_token_count = 0;
   if (settings_->model_execute_result.empty()) {
     for (const auto& context : context_) {
@@ -212,13 +221,6 @@ void FakeOnDeviceSession::GenerateImpl(
       output_token_count += text.size();
       auto chunk = mojom::ResponseChunk::New();
       chunk->text = "Context: " + text + "\n";
-      remote->OnResponse(std::move(chunk));
-    }
-    if (options->top_k > 1) {
-      auto chunk = mojom::ResponseChunk::New();
-      chunk->text += "TopK: " + base::NumberToString(*options->top_k) +
-                     ", Temp: " + base::NumberToString(*options->temperature) +
-                     "\n";
       remote->OnResponse(std::move(chunk));
     }
   } else {
@@ -245,8 +247,7 @@ void FakeOnDeviceSession::AppendImpl(
       OnDeviceInputToString(*options->input, capabilities_).size());
   uint32_t max_tokens =
       options->max_tokens > 0 ? options->max_tokens : input_tokens;
-  uint32_t token_offset = options->token_offset;
-  uint32_t tokens_processed = std::min(input_tokens - token_offset, max_tokens);
+  uint32_t tokens_processed = std::min(input_tokens, max_tokens);
   context_.emplace_back(std::move(options));
   if (client) {
     client->OnComplete(tokens_processed);
@@ -353,6 +354,11 @@ void FakeTsModel::DetectLanguage(const std::string& text,
                                  DetectLanguageCallback callback) {
   CHECK(has_language_model_);
   std::move(callback).Run(DummyDetectLanguage(text));
+}
+
+void FakeTsModel::Clone(
+    mojo::PendingReceiver<mojom::TextSafetySession> session) {
+  StartSession(std::move(session));
 }
 
 FakeTsHolder::FakeTsHolder() = default;

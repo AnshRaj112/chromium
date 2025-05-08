@@ -61,9 +61,6 @@
 #include "chrome/browser/ui/tabs/organization/tab_organization_service.h"
 #include "chrome/browser/ui/tabs/organization/tab_organization_service_factory.h"
 #include "chrome/browser/ui/tabs/organization/tab_organization_session.h"
-#include "chrome/browser/ui/tabs/split_tab_collection.h"
-#include "chrome/browser/ui/tabs/split_tab_data.h"
-#include "chrome/browser/ui/tabs/split_tab_visual_data.h"
 #include "chrome/browser/ui/tabs/tab_change_type.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group.h"
@@ -93,7 +90,10 @@
 #include "components/reading_list/core/reading_list_model.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tab_groups/tab_group_visual_data.h"
+#include "components/tabs/public/split_tab_collection.h"
+#include "components/tabs/public/split_tab_data.h"
 #include "components/tabs/public/split_tab_id.h"
+#include "components/tabs/public/split_tab_visual_data.h"
 #include "components/tabs/public/tab_interface.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "components/webapps/common/web_app_id.h"
@@ -421,7 +421,7 @@ gfx::Range TabStripModel::InsertDetachedTabGroupAt(
   CHECK(!group_model_->ContainsTabGroup(group->collection_->GetTabGroupId()));
 
   // Notify tab is added to model.
-  for (tabs::TabInterface* tab : group->collection_->GetTabsRecursive()) {
+  for (tabs::TabInterface* tab : *(group->collection_)) {
     static_cast<tabs::TabModel*>(tab)->OnAddedToModel(this);
   }
 
@@ -525,7 +525,7 @@ std::unique_ptr<DetachedTabGroup> TabStripModel::DetachTabGroupImpl(
   group_model_->RemoveTabGroup(group_id, base::PassKey<TabStripModel>());
 
   // Notify tab is removed from model
-  for (tabs::TabInterface* tab : group_collection->GetTabsRecursive()) {
+  for (tabs::TabInterface* tab : *group_collection) {
     static_cast<tabs::TabModel*>(tab)->OnRemovedFromModel();
   }
 
@@ -564,7 +564,7 @@ gfx::Range TabStripModel::InsertDetachedTabGroupImpl(
       detached_group->collection_->GetTabGroupId();
   tabs::TabGroupTabCollection* group_collection =
       detached_group->collection_.get();
-  for (tabs::TabInterface* tab : group_collection->GetTabsRecursive()) {
+  for (const tabs::TabInterface* tab : *group_collection) {
     delegate()->WillAddWebContents(tab->GetContents());
   }
 
@@ -593,7 +593,7 @@ gfx::Range TabStripModel::InsertDetachedTabGroupImpl(
 
   ValidateTabStripModel();
 
-  for (tabs::TabInterface* tab : group_collection->GetTabsRecursive()) {
+  for (tabs::TabInterface* tab : *group_collection) {
     static_cast<tabs::TabModel*>(tab)->DidInsert(
         base::PassKey<TabStripModel>());
   }
@@ -898,11 +898,12 @@ WebContents* TabStripModel::GetWebContentsAt(int index) const {
 }
 
 int TabStripModel::GetIndexOfWebContents(const WebContents* contents) const {
-  std::vector<tabs::TabInterface*> tabs = contents_data_->GetTabsRecursive();
-  for (size_t i = 0; i < tabs.size(); i++) {
-    if (tabs[i]->GetContents() == contents) {
-      return i;
+  int index = 0;
+  for (const tabs::TabInterface* tab : *this) {
+    if (tab->GetContents() == contents) {
+      return index;
     }
+    index++;
   }
   return kNoTab;
 }
@@ -984,7 +985,7 @@ void TabStripModel::CloseWebContentsAt(int index, uint32_t close_types) {
 }
 
 bool TabStripModel::TabsNeedLoadingUI() const {
-  for (tabs::TabInterface* tab : contents_data_->GetTabsRecursive()) {
+  for (const tabs::TabInterface* tab : *this) {
     if (tab->GetContents()->ShouldShowLoadingUI()) {
       return true;
     }
@@ -1948,9 +1949,9 @@ bool TabStripModel::IsContextMenuCommandEnabled(
       return SupportsTabGroups();
 
     case CommandAddToSplit:
-    case CommandRemoveSplit: {
+    case CommandSwapWithActiveSplit:
+    case CommandArrangeSplit:
       return true;
-    }
 
     case CommandRemoveFromGroup:
       return SupportsTabGroups();
@@ -2194,12 +2195,21 @@ void TabStripModel::ExecuteContextMenuCommand(int context_index,
       break;
     }
 
-    case CommandRemoveSplit: {
+    case CommandSwapWithActiveSplit: {
       CHECK(base::FeatureList::IsEnabled(features::kSideBySide));
       std::optional<split_tabs::SplitTabId> split_id =
-          GetTabAtIndex(context_index)->GetSplit();
+          GetTabAtIndex(active_index())->GetSplit();
       CHECK(split_id.has_value());
-      RemoveSplit(split_id.value());
+
+      // TODO(crbug.com/414667744): Ensure this doesn't close the tab leaving
+      // the split.
+      ReplaceActiveTabInSplit(split_id.value(), context_index);
+      break;
+    }
+
+    case CommandArrangeSplit: {
+      // Do nothing. The submenu's delegate will invoke the correct subcommand
+      // later.
       break;
     }
 
@@ -2665,7 +2675,7 @@ std::optional<int> TabStripModel::GetNextExpandedActiveTab(
 }
 
 void TabStripModel::ForgetAllOpeners() {
-  for (tabs::TabInterface* tab : contents_data_->GetTabsRecursive()) {
+  for (tabs::TabInterface* tab : *this) {
     static_cast<tabs::TabModel*>(tab)->set_opener(nullptr);
   }
 }
@@ -3313,7 +3323,7 @@ void TabStripModel::AddToNewGroupImpl(
   }
 
   DCHECK([&]() {
-    for (tabs::TabInterface* tab : contents_data_->GetTabsRecursive()) {
+    for (const tabs::TabInterface* tab : *this) {
       if (tab->GetGroup() == new_group) {
         return false;
       }
@@ -4104,9 +4114,8 @@ void TabStripModel::SetSitesMuted(const std::vector<int>& indices,
 void TabStripModel::FixOpeners(int index) {
   tabs::TabModel* old_tab = GetTabModelAtIndex(index);
   tabs::TabInterface* new_opener = old_tab ? old_tab->opener() : nullptr;
-  std::vector<tabs::TabInterface*> tabs = contents_data_->GetTabsRecursive();
 
-  for (tabs::TabInterface* tab : tabs) {
+  for (tabs::TabInterface* tab : *this) {
     auto* tab_model = static_cast<tabs::TabModel*>(tab);
     if (tab_model->opener() != old_tab) {
       continue;
@@ -4119,7 +4128,7 @@ void TabStripModel::FixOpeners(int index) {
   // Sanity check that none of the tabs' openers refer |old_tab| or
   // themselves.
   DCHECK([&]() {
-    return std::none_of(tabs.begin(), tabs.end(), [&](tabs::TabInterface* tab) {
+    return std::none_of(begin(), end(), [&](tabs::TabInterface* tab) {
       tabs::TabInterface* opener = static_cast<tabs::TabModel*>(tab)->opener();
       return opener == old_tab || opener == tab;
     });
@@ -4456,9 +4465,8 @@ TabStripModel::GetTabsAndIndicesInSplit(split_tabs::SplitTabId split_id) {
   // All the tabs in a split should be contiguous. Instead of using
   // GetIndexOfTab multiple times, call it on the first tab, then increment by
   // one for each subsequent tab.
-  std::vector<tabs::TabInterface*> tabs = split->GetTabsRecursive();
-  for (size_t index = GetIndexOfTab(tabs[0]);
-       tabs::TabInterface* split_tab : tabs) {
+  for (size_t index = GetIndexOfTab(split->GetTabAtIndexRecursive(0));
+       tabs::TabInterface* split_tab : *split) {
     split_tabs_with_indices.emplace_back(split_tab, index++);
   }
 
@@ -4473,9 +4481,8 @@ gfx::Range TabStripModel::GetIndexRangeOfSplit(
     return gfx::Range();
   }
 
-  std::vector<tabs::TabInterface*> tabs = split->GetTabsRecursive();
-  size_t start = GetIndexOfTab(tabs[0]);
-  return gfx::Range(start, start + tabs.size());
+  size_t start = GetIndexOfTab(split->GetTabAtIndexRecursive(0));
+  return gfx::Range(start, start + split->TabCountRecursive());
 }
 
 TabStripModel::ScopedTabStripModalUIImpl::ScopedTabStripModalUIImpl(

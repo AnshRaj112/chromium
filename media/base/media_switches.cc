@@ -944,6 +944,8 @@ BASE_FEATURE(kFailUrlProvisionFetcherForTesting,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables hardware secure decryption if supported by hardware and CDM.
+// NOTE: This feature is experimental and not officially supported. Users may
+// encounter issues; enabling is discouraged.
 // TODO(xhwang): Currently this is only used for development of new features.
 // Apply this to Android and ChromeOS as well where hardware secure decryption
 // is already available.
@@ -1721,10 +1723,11 @@ bool IsSystemLoopbackAsAecReferenceEnabled() {
 std::optional<base::TimeDelta> GetAecAddedDelay() {
 #if BUILDFLAG(CHROME_WIDE_ECHO_CANCELLATION) && \
     (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
-  return base::Milliseconds(kAddedProcessingDelay.Get());
-#else
-  return std::nullopt;
+  if (IsSystemLoopbackAsAecReferenceEnabled()) {
+    return base::Milliseconds(kAddedProcessingDelay.Get());
+  }
 #endif
+  return std::nullopt;
 }
 
 bool IsSystemEchoCancellationEnforced() {

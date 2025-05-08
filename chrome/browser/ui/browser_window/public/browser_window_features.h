@@ -32,7 +32,6 @@ class TabStripModel;
 class TranslateBubbleController;
 class ToastController;
 class ToastService;
-class DataSharingOpenGroupHelper;
 class DownloadToolbarUIController;
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
@@ -80,7 +79,7 @@ class SendTabToSelfToolbarBubbleController;
 }  // namespace send_tab_to_self
 
 namespace tabs_api::mojom {
-class TabStripController;
+class TabStripService;
 }
 
 // This class owns the core controllers for features that are scoped to a given
@@ -197,10 +196,6 @@ class BrowserWindowFeatures {
     return extension_side_panel_manager_.get();
   }
 
-  DataSharingOpenGroupHelper* data_sharing_open_group_helper() {
-    return data_sharing_open_group_helper_.get();
-  }
-
   DownloadToolbarUIController* download_toolbar_ui_controller() {
     return download_toolbar_ui_controller_.get();
   }
@@ -286,8 +281,6 @@ class BrowserWindowFeatures {
   std::unique_ptr<extensions::ExtensionSidePanelManager>
       extension_side_panel_manager_;
 
-  std::unique_ptr<DataSharingOpenGroupHelper> data_sharing_open_group_helper_;
-
   std::unique_ptr<media_router::CastBrowserController> cast_browser_controller_;
 
   std::unique_ptr<DownloadToolbarUIController> download_toolbar_ui_controller_;
@@ -317,7 +310,7 @@ class BrowserWindowFeatures {
       cookie_controls_bubble_coordinator_;
 
   // This is an experimental API that interacts with the TabStripModel.
-  std::unique_ptr<tabs_api::mojom::TabStripController> tab_strip_controller_;
+  std::unique_ptr<tabs_api::mojom::TabStripService> tab_strip_service_;
 };
 
 #endif  // CHROME_BROWSER_UI_BROWSER_WINDOW_PUBLIC_BROWSER_WINDOW_FEATURES_H_

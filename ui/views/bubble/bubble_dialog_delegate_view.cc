@@ -460,8 +460,9 @@ BubbleDialogDelegate::BubbleDialogDelegate(View* anchor_view,
 
   RegisterWidgetInitializedCallback(base::BindOnce(
       [](BubbleDialogDelegate* bubble_delegate) {
-        // Update the frame colors, once the frame is initialized.
-        bubble_delegate->UpdateFrameColors();
+        // Call the theme callback to make sure the initial theme is picked up
+        // by the BubbleDialogDelegate.
+        bubble_delegate->UpdateFrameColor();
       },
       this));
 
@@ -572,7 +573,7 @@ BubbleDialogDelegate::CreateNonClientFrameView(Widget* widget) {
   border->SetColor(background_color());
 
   if (GetParams().round_corners) {
-    border->SetCornerRadius(GetCornerRadius());
+    border->set_rounded_corners(gfx::RoundedCornersF(GetCornerRadius()));
   }
 
   frame->SetBubbleBorder(std::move(border));
@@ -706,6 +707,17 @@ void BubbleDialogDelegate::SetHighlightedButton(Button* highlighted_button) {
   highlighted_button_tracker_.SetView(highlighted_button);
   if (visible) {
     UpdateHighlightedButton(true);
+  }
+}
+
+void BubbleDialogDelegate::SetBackgroundColor(ui::ColorVariant color) {
+  if (color_ == color) {
+    return;
+  }
+
+  color_ = color;
+  if (GetWidget()) {
+    UpdateFrameColor();
   }
 }
 
@@ -1115,14 +1127,14 @@ void BubbleDialogDelegate::SetSubtitleAllowCharacterBreak(bool allow) {
   }
 }
 
-void BubbleDialogDelegate::UpdateFrameColors() {
+void BubbleDialogDelegate::UpdateFrameColor() {
+  View* const contents_view = GetContentsView();
+  DCHECK(contents_view);
+
   BubbleFrameView* frame_view = GetBubbleFrameView();
   if (frame_view) {
     frame_view->SetBackgroundColor(background_color());
   }
-
-  View* const contents_view = GetContentsView();
-  CHECK(contents_view);
 
   // When there's an opaque layer, the bubble border background won't show
   // through, so explicitly paint a background color.

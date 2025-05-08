@@ -95,6 +95,7 @@
 #include "ui/base/ime/mojom/virtual_keyboard_types.mojom.h"
 #include "ui/base/mojom/window_show_state.mojom-forward.h"
 #include "ui/base/ui_base_types.h"
+#include "ui/base/window_open_disposition.h"
 #include "ui/color/color_provider_key.h"
 #include "ui/color/color_provider_source_observer.h"
 #include "ui/gfx/geometry/size.h"
@@ -651,6 +652,7 @@ class CONTENT_EXPORT WebContentsImpl
   bool IsInPreviewMode() const override;
   void WillActivatePreviewPage() override;
   void ActivatePreviewPage() override;
+  WindowOpenDisposition GetOriginalWindowOpenDisposition() const override;
 
   // Implementation of PageNavigator.
   WebContents* OpenURL(const OpenURLParams& params,
@@ -1065,7 +1067,7 @@ class CONTENT_EXPORT WebContentsImpl
       bool is_outermost_main_frame_navigation) override;
   const blink::UserAgentOverride& GetUserAgentOverride(
       FrameTree& frame_tree) override;
-  std::vector<std::unique_ptr<NavigationThrottle>> CreateThrottlesForNavigation(
+  void CreateThrottlesForNavigation(
       NavigationThrottleRegistry& registry) override;
   std::vector<std::unique_ptr<CommitDeferringCondition>>
   CreateDeferringConditionsForNavigationCommit(
@@ -1292,6 +1294,10 @@ class CONTENT_EXPORT WebContentsImpl
   void StateOnOverscrollTransfer(
       const viz::FrameSinkId& frame_sink_id,
       blink::mojom::DidOverscrollParamsPtr params) override;
+  void RendererInputResponsivenessChanged(
+      const viz::FrameSinkId& frame_sink_id,
+      bool is_responsive,
+      std::optional<base::TimeTicks> ack_timeout_ts) override;
 
   // Invoked before a form repost warning is shown.
   void NotifyBeforeFormRepostWarningShow() override;
@@ -1491,6 +1497,9 @@ class CONTENT_EXPORT WebContentsImpl
   // Called by WebContentsAndroid to send the context menu insets over to
   // the RenderWidgetHostView, and on to the Page.
   void SetContextMenuInsets(gfx::Rect);
+  // Called by WebContentsAndroid to instruct the web contents to "show
+  // interest" in the referenced element.
+  void ShowInterestInElement(int nodeID);
 #endif
 
   // Notify observers that the viewport fit value changed. This is called by
@@ -2735,6 +2744,11 @@ class CONTENT_EXPORT WebContentsImpl
 
   // Whether this contents represents a window initially opened as a new popup.
   bool is_popup_{false};
+
+  // The window open disposition that was originally requested
+  // when this WebContents was created.
+  WindowOpenDisposition original_window_open_disposition_ =
+      WindowOpenDisposition::UNKNOWN;
 
   // If this window was opened as a new partitioned popin this will contain the
   // properties needed to setup partitioning which aligns with the opener.

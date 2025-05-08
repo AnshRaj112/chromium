@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-
 #include "chrome/renderer/accessibility/read_anything/read_anything_app_model.h"
 
 #include <cstddef>
@@ -208,10 +207,20 @@ bool ReadAnythingAppModel::PostProcessSelection() {
     return need_to_draw;
   }
 
-  // The main panel selection contains content outside of the distilled content.
-  // Find the selected nodes to display instead of the distilled content.
-  if (const ui::AXNode *node = GetAXNode(start_.id), *end = GetAXNode(end_.id);
-      !node->IsInvisibleOrIgnored() && !end->IsInvisibleOrIgnored()) {
+  const ui::AXNode* node = GetAXNode(start_.id);
+  const ui::AXNode* end = GetAXNode(end_.id);
+  DUMP_WILL_BE_CHECK(node && end);
+  if (!node || !end) {
+    // Fail gracefully if the returned nodes are ever missing.
+    // This should never happen given that the AXSelection object is retrieved
+    // from the active tree.
+    return false;
+  }
+
+  // The main panel selection contains content outside of the distilled
+  // content. Find the selected nodes to display instead of the distilled
+  // content.
+  if (!node->IsInvisibleOrIgnored() && !end->IsInvisibleOrIgnored()) {
     // Add all ancestor ids of start node, including the start node itself.
     for (base::queue<ui::AXNode*> ancestors =
              node->GetAncestorsCrossingTreeBoundaryAsQueue();
@@ -358,6 +367,10 @@ void ReadAnythingAppModel::ComputeDisplayNodeIdsForDistilledTree() {
   }
 }
 
+ui::AXSerializableTree* ReadAnythingAppModel::GetActiveTree() const {
+  return GetTreeFromId(active_tree_id_);
+}
+
 ui::AXSerializableTree* ReadAnythingAppModel::GetTreeFromId(
     const ui::AXTreeID& tree_id) const {
   // If the tree id is unknown or not associated with a tree, fail gracefully,
@@ -375,6 +388,10 @@ ui::AXSerializableTree* ReadAnythingAppModel::GetTreeFromId(
 
 bool ReadAnythingAppModel::ContainsTree(const ui::AXTreeID& tree_id) const {
   return base::Contains(tree_infos_, tree_id);
+}
+
+bool ReadAnythingAppModel::ContainsActiveTree() const {
+  return ContainsTree(active_tree_id_);
 }
 
 void ReadAnythingAppModel::SetUrlInformationCallback(
@@ -536,6 +553,22 @@ void ReadAnythingAppModel::AccessibilityEventReceived(
     }
   }
 
+  if (may_use_child_for_active_tree_) {
+    // If this is the original root tree id, set it back to the active tree
+    // in case there has been a delay in receiving valid accessibility tree
+    // updates.
+    if (root_tree_id_ == tree_id) {
+      SetRootTreeId(root_tree_id_);
+    } else if (active_tree_id_ != ui::AXTreeIDUnknown() &&
+               active_tree_id_ != tree_id &&
+               child_tree_ids_.find(tree_id) != child_tree_ids_.end()) {
+      // If read aloud is searching for a child tree to distill and this tree id
+      // matches one of the possible child ids, set the active tree to this tree
+      // so that it can be distilled.
+      SetActiveTreeId(tree_id);
+    }
+  }
+
   // If a tree update on the active tree is received while distillation is in
   // progress, cache updates that are received but do not yet unserialize them.
   // Drawing must be done on the same tree that was sent to the distiller,
@@ -550,11 +583,10 @@ void ReadAnythingAppModel::AccessibilityEventReceived(
         timer_since_tree_changed_for_data_collection_.Reset();
       }
       return;
-    } else {
-      // We need to unserialize old updates before we can unserialize the new
-      // ones.
-      UnserializePendingUpdates(tree_id);
     }
+    // We need to unserialize old updates before we can unserialize the new
+    // ones.
+    UnserializePendingUpdates(tree_id);
     UnserializeUpdates(updates, tree_id);
     ProcessNonGeneratedEvents(events);
   } else {
@@ -713,7 +745,26 @@ void ReadAnythingAppModel::OnScroll(bool on_selection,
                                 event);
 }
 
+void ReadAnythingAppModel::SetRootTreeId(ui::AXTreeID root_tree_id) {
+  root_tree_id_ = root_tree_id;
+  SetActiveTreeId(root_tree_id);
+
+  // Whenever reading mode receives a signal of a new active tree id, clear
+  // previous attempts to search for a valid child tree on the active tree in
+  // case the new active tree is distillable.
+  may_use_child_for_active_tree_ = false;
+  child_tree_ids_.clear();
+}
+
 void ReadAnythingAppModel::SetActiveTreeId(ui::AXTreeID active_tree_id) {
+  // Unserialize any updates on the previous active tree;
+  // Otherwise, this can cause tree inconsistency issues if reading mode later
+  // incorrectly receives updates from the old tree.
+  if (active_tree_id_ != active_tree_id &&
+      active_tree_id_ != ui::AXTreeIDUnknown() && ContainsActiveTree()) {
+    UnserializePendingUpdates(active_tree_id_);
+  }
+
   active_tree_id_ = std::move(active_tree_id);
   // If data collection mode for screen2x is enabled, begin
   // `timer_since_page_load_for_data_collection_` from here. This is a
@@ -1066,4 +1117,25 @@ const std::set<ui::AXNodeID>* ReadAnythingAppModel::GetCurrentlyVisibleNodes()
     const {
   return selection_node_ids_.empty() ? &display_node_ids()
                                      : &selection_node_ids_;
+}
+
+void ReadAnythingAppModel::AllowChildTreeForActiveTree(bool use_child_tree) {
+  may_use_child_for_active_tree_ = use_child_tree;
+
+  if (!may_use_child_for_active_tree_) {
+    child_tree_ids_.clear();
+  }
+
+  ui::AXSerializableTree* active_tree = GetTreeFromId(active_tree_id_);
+  if (!active_tree) {
+    return;
+  }
+  std::set<ui::AXTreeID> child_ids = active_tree->GetAllChildTreeIds();
+  if (!child_ids.size()) {
+    return;
+  }
+
+  // Store all the possible child tree ids that could be used as the active
+  // tree if they have distillable content.
+  child_tree_ids_.insert(child_ids.begin(), child_ids.end());
 }

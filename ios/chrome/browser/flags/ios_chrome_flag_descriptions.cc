@@ -511,6 +511,11 @@ const char kAnimatedDefaultBrowserPromoInFREName[] =
 const char kAnimatedDefaultBrowserPromoInFREDescription[] =
     "When enabled, the Default Browser Promo in the FRE will be animated.";
 
+const char kFeedbackIncludeGWSVariationsName[] =
+    "Include GWS variations in feedback";
+const char kFeedbackIncludeGWSVariationsDescription[] =
+    "Includes GWS variations in Chrome feedback reports.";
+
 const char kFullscreenImprovementName[] = "Improve fullscreen";
 const char kFullscreenImprovementDescription[] =
     "When enabled, fullscreen should have a better stability.";
@@ -581,6 +586,12 @@ extern const char kIOSEnableDeleteAllSavedCredentialsName[] =
     "Enable delete all saved credentials in PWM";
 extern const char kIOSEnableDeleteAllSavedCredentialsDescription[] =
     "When enabled, the delete all data button in PWM will be presented.";
+
+const char kIOSEnablePasswordManagerTrustedVaultWidgetName[] =
+    "Enable password settings encryption error widget";
+const char kIOSEnablePasswordManagerTrustedVaultWidgetDescription[] =
+    "Display a widget in the password management settings page in case of a "
+    "password encryption error.";
 
 extern const char kIOSEnableRealtimeEventReportingName[] =
     "Enable realtime event reporting on iOS";
@@ -715,15 +726,15 @@ const char kIOSStartTimeStartupRemediationsDescription[] =
     "Enables potential remediations for startup regressions caused by the "
     "reduction of Bling Start time from 6 hours to 4.";
 
-const char kIOSTipsNotificationsName[] = "Tips Notifications";
-const char kIOSTipsNotificationsDescription[] =
-    "Enables Notifications with content to help new users get the most out of "
-    "the app.";
-
 const char kIOSReactivationNotificationsName[] = "Reactivation Notifications";
 const char kIOSReactivationNotificationsDescription[] =
     "Enables a feature to send provisional notifications of interest to new"
     "users and encourage them to return to the app.";
+
+const char kIOSExpandedTipsName[] = "Expanded Tips Notifications";
+const char kIOSExpandedTipsDescription[] =
+    "Enables a feature that adds several new Tips Notifications that can be "
+    "sent.";
 
 const char kIOSProvidesAppNotificationSettingsName[] =
     "IOS Provides App Notification Settings";
@@ -1391,10 +1402,6 @@ const char kTabGridNewTransitionsDescription[] =
     "When enabled, the new Tab Grid to Browser (and vice versa) transitions"
     "are used.";
 
-const char kTabGroupsIPadName[] = "Enable Tab Groups on iPad";
-const char kTabGroupsIPadDescription[] =
-    "When enabled, tab groups can be created and edited on iPad.";
-
 const char kTabResumptionName[] = "Enable Tab Resumption";
 const char kTabResumptionDescription[] =
     "When enabled, offer users with a quick shortcut to resume the last synced "
@@ -1451,6 +1458,12 @@ extern const char kWelcomeBackInFirstRunName[] = "Enable Welcome Back screen";
 extern const char kWelcomeBackInFirstRunDescription[] =
     "When enabled, returning users will see the Welcome Back screen after the "
     "First Run sequence.";
+
+extern const char kWidgetsForMultiprofileName[] =
+    "Enable Widgets for multiprofile";
+extern const char kWidgetsForMultiprofileDescription[] =
+    "When enabled, returning users will see the new per-account widget "
+    "implementation";
 
 const char kYoutubeIncognitoName[] =
     "Enable the opening of links from Youtube incognito in Chrome incognito";

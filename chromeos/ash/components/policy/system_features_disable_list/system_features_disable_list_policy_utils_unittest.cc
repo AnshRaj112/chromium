@@ -8,11 +8,11 @@
 
 #include "base/functional/callback_helpers.h"
 #include "base/test/scoped_feature_list.h"
+#include "chromeos/ash/components/policy/device_local_account/device_local_account_type.h"
 #include "chromeos/ash/components/settings/cros_settings.h"
 #include "chromeos/ash/components/settings/fake_cros_settings_provider.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "components/account_id/account_id.h"
-#include "components/policy/core/common/device_local_account_type.h"
 #include "components/policy/core/common/policy_pref_names.h"
 #include "components/policy/core/common/system_features_disable_list_constants.h"
 #include "components/prefs/pref_registry_simple.h"
@@ -28,29 +28,6 @@ namespace {
 constexpr char kUserEmail[] = "user@example.com";
 constexpr GaiaId::Literal kUserGaiaId("user123");
 constexpr char kMGSAccountId[] = "mgs123";
-
-// Test delegate for MGS scenarios, returning public session type in functions
-// called during UserManager::Initialize(). NOTE:
-// GetDeviceLocalAccountUserType() unconditionally returns
-// UserType::kPublicAccount.
-// TODO(278643115): Remove this override when no longer necessary.
-class MgsAsPublicSessionFakeDelegate
-    : public user_manager::FakeUserManagerDelegate {
- public:
-  MgsAsPublicSessionFakeDelegate() = default;
-  ~MgsAsPublicSessionFakeDelegate() override = default;
-
-  // user_manager::UserManagerImpl::Delegate:
-  std::optional<user_manager::UserType> GetDeviceLocalAccountUserType(
-      std::string_view email) override {
-    const auto mgs_user_id = policy::GenerateDeviceLocalAccountUserId(
-        kMGSAccountId, DeviceLocalAccountType::kPublicSession);
-    if (email == mgs_user_id) {
-      return user_manager::UserType::kPublicAccount;
-    }
-    return std::nullopt;
-  }
-};
 
 }  // namespace
 
@@ -73,13 +50,7 @@ class SystemFeaturesDisableListPolicyUtilsTest : public testing::Test {
     cros_settings_->AddSettingsProvider(std::move(provider));
 
     user_manager::UserManagerImpl::RegisterPrefs(local_state_.registry());
-    // TODO(414768321): Share pref registration with prod code in
-    // SystemFeaturesDisableListPolicyHandler.
-    local_state_.registry()->RegisterListPref(
-        policy_prefs::kSystemFeaturesDisableList);
-    local_state_.registry()->RegisterStringPref(
-        policy_prefs::kSystemFeaturesDisableMode,
-        kSystemFeaturesDisableModeBlocked);
+    RegisterDisabledSystemFeaturesPrefs(local_state_.registry());
 
     // Register users
     const auto user_account_id =
@@ -93,8 +64,8 @@ class SystemFeaturesDisableListPolicyUtilsTest : public testing::Test {
                                                         mgs_user_id);
 
     user_manager_ = std::make_unique<user_manager::UserManagerImpl>(
-        std::make_unique<MgsAsPublicSessionFakeDelegate>(), &local_state_,
-        cros_settings_.get());
+        std::make_unique<user_manager::FakeUserManagerDelegate>(),
+        &local_state_, cros_settings_.get());
     user_manager_->Initialize();
 
     user_manager_->SetUserPolicyStatus(user_account_id,

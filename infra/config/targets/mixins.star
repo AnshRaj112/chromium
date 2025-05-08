@@ -822,6 +822,7 @@ targets.mixin(
     ],
     android_args = [
         targets.magic_args.GPU_TELEMETRY_NO_ROOT_FOR_UNROOTED_DEVICES,
+        targets.magic_args.ANDROID_DESKTOP_TELEMETRY_REMOTE,
         # See crbug.com/333414298 for context on why this is necessary.
         "--initial-find-device-attempts=3",
     ],
@@ -1211,18 +1212,6 @@ targets.mixin(
 )
 
 targets.mixin(
-    name = "ios_runtime_cache_18_0",
-    swarming = targets.swarming(
-        named_caches = [
-            swarming.cache(
-                name = "runtime_ios_18_0",
-                path = "Runtime-ios-18.0",
-            ),
-        ],
-    ),
-)
-
-targets.mixin(
     name = "ios_runtime_cache_18_1",
     generate_pyl_entry = False,
     swarming = targets.swarming(
@@ -1237,7 +1226,6 @@ targets.mixin(
 
 targets.mixin(
     name = "ios_runtime_cache_18_2",
-    generate_pyl_entry = False,
     swarming = targets.swarming(
         named_caches = [
             swarming.cache(
@@ -2402,8 +2390,8 @@ targets.mixin(
     swarming = targets.swarming(
         dimensions = {
             "display_attached": "1",
-            "gpu": "10de:2184-31.0.15.4601",
-            "os": "Windows-10-19045",
+            "gpu": "10de:2184-32.0.15.7602",
+            "os": "Windows-11-26100",
             "pool": "chromium.tests.gpu",
         },
     ),

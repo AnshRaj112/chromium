@@ -52,6 +52,7 @@
 #include "third_party/blink/renderer/core/dom/node_traversal.h"
 #include "third_party/blink/renderer/core/events/keyboard_event.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
+#include "third_party/blink/renderer/core/html/custom/custom_element.h"
 #include "third_party/blink/renderer/core/html/forms/form_controller.h"
 #include "third_party/blink/renderer/core/html/forms/form_data.h"
 #include "third_party/blink/renderer/core/html/forms/html_button_element.h"
@@ -129,11 +130,27 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
       if (record->type() == "childList") {
         CheckAddedNodes(record);
         CheckRemovedNodes(record);
-      } else if ((record->type() == "attributes") &&
-                 (record->attributeName() == html_names::kTabindexAttr ||
-                  record->attributeName() ==
-                      html_names::kContenteditableAttr)) {
-        AddDescendantDisallowedErrorToNode(*record->target());
+      } else if (record->type() == "attributes") {
+        if (record->attributeName() == html_names::kTabindexAttr ||
+            record->attributeName() == html_names::kContenteditableAttr) {
+          AddDescendantDisallowedErrorToNode(*record->target());
+        } else if ((RuntimeEnabledFeatures::
+                        SelectAccessibilityReparentInputEnabled() ||
+                    RuntimeEnabledFeatures::
+                        SelectAccessibilityNestedInputEnabled()) &&
+                   record->attributeName() == html_names::kTypeAttr) {
+          if (auto* input = DynamicTo<HTMLInputElement>(record->target())) {
+            if (input->IsTextField()) {
+              select_->AddDescendantTextInput(input);
+            } else {
+              select_->RemoveDescendantTextInput(input);
+              // If the type attribute was changed in a way that makes the
+              // <input> no longer an allowed descendant, then we should emit an
+              // error.
+              AddDescendantDisallowedErrorToNode(*input);
+            }
+          }
+        }
       }
     }
   }
@@ -156,6 +173,7 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
       if (IsWhitespaceOrEmpty(*descendant)) {
         continue;
       }
+      MaybeAddDescendantTextInput(descendant);
       AddDescendantDisallowedErrorToNode(*descendant);
       // Check the added node's descendants, if any.
       TraverseNodeDescendants(descendant);
@@ -172,6 +190,7 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
       if (IsWhitespaceOrEmpty(*descendant)) {
         continue;
       }
+      MaybeRemoveDescendantTextInput(descendant);
       if (!IsAllowedInteractiveElement(*descendant)) {
         select_->DecreaseContentModelViolationCount();
       }
@@ -179,6 +198,7 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
       for (Node* nested_descendant = NodeTraversal::FirstWithin(*descendant);
            nested_descendant; nested_descendant = NodeTraversal::Next(
                                   *nested_descendant, descendant)) {
+        MaybeRemoveDescendantTextInput(descendant);
         if (!IsWhitespaceOrEmpty(*nested_descendant) &&
             !IsAllowedInteractiveElement(*nested_descendant)) {
           select_->DecreaseContentModelViolationCount();
@@ -191,7 +211,28 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
     for (Node* descendant = NodeTraversal::FirstWithin(*node); descendant;
          descendant = NodeTraversal::Next(*descendant, node)) {
       if (!IsWhitespaceOrEmpty(*descendant)) {
+        MaybeAddDescendantTextInput(descendant);
         AddDescendantDisallowedErrorToNode(*descendant);
+      }
+    }
+  }
+
+  void MaybeAddDescendantTextInput(Node* node) {
+    if (RuntimeEnabledFeatures::SelectAccessibilityReparentInputEnabled() ||
+        RuntimeEnabledFeatures::SelectAccessibilityNestedInputEnabled()) {
+      if (auto* input = DynamicTo<HTMLInputElement>(node);
+          input && input->IsTextField()) {
+        select_->AddDescendantTextInput(input);
+      }
+    }
+  }
+
+  void MaybeRemoveDescendantTextInput(Node* node) {
+    if (RuntimeEnabledFeatures::SelectAccessibilityReparentInputEnabled() ||
+        RuntimeEnabledFeatures::SelectAccessibilityNestedInputEnabled()) {
+      if (auto* input = DynamicTo<HTMLInputElement>(node);
+          input && input->IsTextField()) {
+        select_->RemoveDescendantTextInput(input);
       }
     }
   }
@@ -281,7 +322,7 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
            "navigating by keyboard or using assistive technology.";
   }
 
-  bool IsAllowedInteractiveElement(const Node& node) {
+  bool IsAllowedInteractiveElement(Node& node) {
     if (IsA<HTMLButtonElement>(node)) {
       // The <button> must have a parent (not being inserted as a child of
       // `HTMLSelectedContentElement`) and must be the first child of the
@@ -289,6 +330,21 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
       const Node* parent = node.parentNode();
       return parent && IsA<HTMLSelectElement>(*parent) &&
              !ElementTraversal::PreviousSibling(node);
+    }
+    if (RuntimeEnabledFeatures::SelectAccessibilityReparentInputEnabled() ||
+        RuntimeEnabledFeatures::SelectAccessibilityNestedInputEnabled()) {
+      // <select>s are allowed to have one <input> before the options. We should
+      // probably find a way to figure out if the <input> is actually placed
+      // before the <option>s or not.
+
+      if (auto* input = DynamicTo<HTMLInputElement>(node)) {
+        if (input->IsTextField()) {
+          select_->AddDescendantTextInput(input);
+        }
+        if (input == select_->FirstDescendantTextInput()) {
+          return true;
+        }
+      }
     }
     // If the node isn't a <button> but it is an interactive element, we return
     // false as interactive elements are disallowed.
@@ -337,7 +393,8 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
   }
 
   SelectElementAccessibilityIssueReason CheckForIssue(const Node& descendant) {
-    if (descendant.getNodeType() == Node::kCommentNode) {
+    if (descendant.getNodeType() == Node::kCommentNode ||
+        IsAutonomousCustomElement(descendant)) {
       return SelectElementAccessibilityIssueReason::kValidChild;
     }
     // Get the parent of the descendant.
@@ -370,7 +427,8 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
         (IsAllowedPhrasingContent(*parent) && !IsA<HTMLSpanElement>(*parent))) {
       return CheckDescedantOfOption(descendant);
     }
-    if (IsA<HTMLDivElement>(*parent) || IsA<HTMLSpanElement>(*parent)) {
+    if (IsA<HTMLDivElement>(*parent) || IsA<HTMLSpanElement>(*parent) ||
+        IsAutonomousCustomElement(*parent)) {
       return TraverseAncestorsAndCheckDescendant(descendant);
     }
     if ((IsA<HTMLNoScriptElement>(*parent) || IsA<HTMLScriptElement>(*parent) ||
@@ -396,6 +454,14 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
   }
 
   bool IsAllowedDescendantOfSelect(const Node& descendant, const Node& parent) {
+    if (RuntimeEnabledFeatures::SelectAccessibilityReparentInputEnabled() ||
+        RuntimeEnabledFeatures::SelectAccessibilityNestedInputEnabled()) {
+      // <select>s are allowed to have one text <input>, although it should be
+      // placed before any of the <option>s.
+      if (select_->FirstDescendantTextInput() == descendant) {
+        return true;
+      }
+    }
     // <button> has to be the first direct descendant of the <select>.
     return (IsA<HTMLButtonElement>(descendant) &&
             IsA<HTMLSelectElement>(parent) &&
@@ -432,7 +498,8 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
   SelectElementAccessibilityIssueReason CheckDescedantOfOption(
       const Node& descendant) {
     if (!IsA<HTMLDivElement>(descendant) &&
-        !IsAllowedPhrasingContent(descendant)) {
+        !IsAllowedPhrasingContent(descendant) &&
+        !IsAutonomousCustomElement(descendant)) {
       return SelectElementAccessibilityIssueReason::
           kNonPhrasingContentOptionChild;
     }
@@ -541,6 +608,17 @@ class SelectDescendantsObserver : public MutationObserver::Delegate {
           return !html_element->IsInteractiveContent();
         }
         return element->IsSVGElement();
+      }
+    }
+    return false;
+  }
+
+  bool IsAutonomousCustomElement(const Node& node) {
+    if (node.IsCustomElement()) {
+      if (auto* element = DynamicTo<Element>(node)) {
+        if (CustomElement::IsValidName(element->localName())) {
+          return true;
+        }
       }
     }
     return false;
@@ -1861,6 +1939,7 @@ void HTMLSelectElement::Trace(Visitor* visitor) const {
   visitor->Trace(last_on_change_option_);
   visitor->Trace(suggested_option_);
   visitor->Trace(descendant_selectedcontents_);
+  visitor->Trace(descendant_text_inputs_);
   visitor->Trace(select_type_);
   visitor->Trace(descendants_observer_);
   HTMLFormControlElementWithState::Trace(visitor);
@@ -2280,6 +2359,33 @@ void HTMLSelectElement::SelectedContentElementRemoved(
     (*descendant_selectedcontents_.begin())
         ->CloneContentsFromOptionElement(SelectedOption());
   }
+}
+
+void HTMLSelectElement::AddDescendantTextInput(HTMLInputElement* input) {
+  CHECK(RuntimeEnabledFeatures::SelectAccessibilityReparentInputEnabled() ||
+        RuntimeEnabledFeatures::SelectAccessibilityNestedInputEnabled());
+  CHECK(input->IsTextField());
+  descendant_text_inputs_.Add(input);
+  input->SetFirstAncestorSelectElement(this);
+}
+
+void HTMLSelectElement::RemoveDescendantTextInput(HTMLInputElement* input) {
+  CHECK(RuntimeEnabledFeatures::SelectAccessibilityReparentInputEnabled() ||
+        RuntimeEnabledFeatures::SelectAccessibilityNestedInputEnabled());
+  descendant_text_inputs_.Remove(input);
+  input->SetFirstAncestorSelectElement(nullptr);
+}
+
+HTMLInputElement* HTMLSelectElement::FirstDescendantTextInput() const {
+  if (descendant_text_inputs_.IsEmpty()) {
+    return nullptr;
+  }
+  HTMLInputElement* first_input = *descendant_text_inputs_.begin();
+  if (!first_input->isConnected() || !first_input->IsTextField() ||
+      Traversal<HTMLSelectElement>::FirstAncestor(*first_input) != this) {
+    return nullptr;
+  }
+  return first_input;
 }
 
 HTMLSelectElement::SelectAutofillPreviewElement*

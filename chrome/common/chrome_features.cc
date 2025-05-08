@@ -477,6 +477,10 @@ BASE_FEATURE(kGlicDebugWebview,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGlicScrollTo, "GlicScrollTo", base::FEATURE_DISABLED_BY_DEFAULT);
+// Controls whether we enforce that documentId (a currently optional parameter)
+// is set (and fail the request if it's not).
+const base::FeatureParam<bool> kGlicScrollToEnforceDocumentId{
+    &kGlicScrollTo, "glic-scroll-to-enforce-document-id", false};
 
 // Controls whether the Glic UI container can be resized by the user
 BASE_FEATURE(kGlicUserResize,
@@ -523,6 +527,14 @@ BASE_FEATURE(kGlicUserStatusCheck,
 BASE_FEATURE(kGlicClosedCaptioning,
              "GlicClosedCaptioning",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kGlicPageContextEligibility,
+             "GlicPageContextEligibility",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+const base::FeatureParam<bool> kGlicPageContextEligibilityAllowNoMetadata{
+    &kGlicPageContextEligibility,
+    "glic-page-context-eligibility-allow-no-metadata", true};
+
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
 BASE_FEATURE(kTabstripComboButton,
@@ -874,20 +886,6 @@ BASE_FEATURE(kImmersiveFullscreenPWAs,
              "ImmersiveFullscreenPWAs",
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_MAC)
-
-#if BUILDFLAG(IS_CHROMEOS)
-// Enables scraping of password-expiry information during SAML login flow, which
-// can lead to an in-session flow for changing SAML password if it has expired.
-// This is safe to enable by default since it does not cause the password-expiry
-// information to be stored, or any user-visible change - in order for anything
-// to happen, the domain administrator has to intentionally send this extra
-// info in the SAML response, and enable the InSessionPasswordChange policy.
-// So, this feature is just for disabling the scraping code if it causes
-// any unforeseen issues.
-BASE_FEATURE(kInSessionPasswordChange,
-             "InSessionPasswordChange",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-#endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(IS_WIN)
 // A feature that controls whether Chrome warns about incompatible applications.

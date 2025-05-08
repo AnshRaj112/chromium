@@ -277,6 +277,9 @@ class ServiceWorkerTaskQueue
       const GURL& service_worker_scope,
       int64_t service_worker_version_id,
       int thread_id);
+  // Called when the extension renderer process that was running an extension
+  // Service Worker has exited.
+  void RenderProcessForWorkerExited(const WorkerId& worker_id);
 
   // Returns the current activation token for an extension, if the extension
   // is currently activated. Returns std::nullopt if the extension isn't
@@ -376,6 +379,13 @@ class ServiceWorkerTaskQueue
     // `extension_id` has notified the task queue that the render worker thread
     // is preparing to terminate.
     virtual void DidStopServiceWorkerContext(const ExtensionId& extension_id) {}
+
+    // Called when UntrackServiceWorkerState() is invoked for a worker
+    // associated with `scope` (because it's stopping or has stopped).
+    // This notification occurs even if the worker is a sub-scope worker and
+    // does not result in altering the ServiceWorkerTaskQueue's tracking state
+    // for the primary extension service worker.
+    virtual void UntrackServiceWorkerState(const GURL& scope) {}
 
     // Called when a service worker registered for the extension with the
     // `extension_id` has been unregistered in the //content layer.

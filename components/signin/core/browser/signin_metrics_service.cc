@@ -188,6 +188,7 @@ void MaybeRecordWebSigninToChromeSigninTimes(
     case signin_metrics::AccessPoint::
         kHistorySyncOptinExpansionPillOnInactivity:
     case signin_metrics::AccessPoint::kHistorySyncEducationalTip:
+    case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
       return;
   }
 
@@ -343,6 +344,11 @@ void SigninMetricsService::OnErrorStateOfRefreshTokenUpdatedForAccount(
 #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
   return;
+}
+
+void SigninMetricsService::Shutdown() {
+  identity_manager_scoped_observation_.Reset();
+  KeyedService::Shutdown();
 }
 
 void SigninMetricsService::HandleSyncErrors(

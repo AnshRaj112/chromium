@@ -9,6 +9,7 @@
 #include "net/base/features.h"
 #include "net/base/net_errors.h"
 #include "net/http/http_stream_pool.h"
+#include "net/http/http_stream_pool_attempt_manager.h"
 #include "net/http/http_stream_pool_group.h"
 #include "net/http/http_stream_pool_job.h"
 #include "net/log/net_log_with_source.h"
@@ -97,12 +98,14 @@ FakeServiceEndpointResolver::FakeServiceEndpointResolver() = default;
 
 FakeServiceEndpointResolver::~FakeServiceEndpointResolver() = default;
 
-FakeServiceEndpointRequest* FakeServiceEndpointResolver::AddFakeRequest() {
+base::WeakPtr<FakeServiceEndpointRequest>
+FakeServiceEndpointResolver::AddFakeRequest() {
   std::unique_ptr<FakeServiceEndpointRequest> request =
       std::make_unique<FakeServiceEndpointRequest>();
-  FakeServiceEndpointRequest* raw_request = request.get();
+  base::WeakPtr<FakeServiceEndpointRequest> weak_request =
+      request->weak_ptr_factory_.GetWeakPtr();
   requests_.emplace_back(std::move(request));
-  return raw_request;
+  return weak_request;
 }
 
 void FakeServiceEndpointResolver::OnShutdown() {}
@@ -278,9 +281,10 @@ HttpStreamKey GroupIdToHttpStreamKey(
                        group_id.disable_cert_network_fetches());
 }
 
-void WaitForAttemptManagerComplete(HttpStreamPool::Group& group) {
+void WaitForAttemptManagerComplete(
+    HttpStreamPool::AttemptManager* attempt_manager) {
   base::RunLoop run_loop;
-  group.SetOnAttemptManagerCompleteCallbackForTesting(run_loop.QuitClosure());
+  attempt_manager->SetOnCompleteCallbackForTesting(run_loop.QuitClosure());
   run_loop.Run();
 }
 

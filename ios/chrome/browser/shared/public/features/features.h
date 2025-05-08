@@ -523,9 +523,6 @@ extern const char kDeliveredNAUMaxPerSession[];
 // Feature flag to enable a more stable fullscreen.
 BASE_DECLARE_FEATURE(kFullscreenImprovement);
 
-// Feature flag to enable Tab Groups on iPad.
-BASE_DECLARE_FEATURE(kTabGroupsIPad);
-
 // Whether the Tab Groups should be enabled in the Grid.
 bool IsTabGroupInGridEnabled();
 
@@ -722,36 +719,6 @@ const base::TimeDelta TabResumptionForXDevicesTimeThreshold();
 // foreground inactive state after opening an external app.
 BASE_DECLARE_FEATURE(kInactiveNavigationAfterAppLaunchKillSwitch);
 
-// Feature flag to enable Tips Notifications.
-BASE_DECLARE_FEATURE(kIOSTipsNotifications);
-
-// Feature param to specify how much time should elapse before a Tip
-// notification should trigger for an unclassified user.
-extern const char kIOSTipsNotificationsUnknownTriggerTimeParam[];
-// Feature param to specify how much time should elapse before a Tip
-// notification should trigger, for an "Active Seeker" user.
-extern const char kIOSTipsNotificationsActiveSeekerTriggerTimeParam[];
-// Feature param to specify how much time should elapse before a Tip
-// notification should trigger, for a "Less Engaged" user.
-extern const char kIOSTipsNotificationsLessEngagedTriggerTimeParam[];
-
-// Feature param containing a bitfield to specify which notifications should be
-// enabled. Bits are assigned based on the enum `TipsNotificationType`.
-extern const char kIOSTipsNotificationsEnabledParam[];
-
-// Feature param containing an integer that chooses from a few options for
-// the order that the notifications would be sent in.
-extern const char kIOSTipsNotificationsOrderParam[];
-
-// Feature param containing an integer that configures the
-// `TipsNotificationClient` to stop requesting notifications if the user
-// dismisses this number of notifications in a row. Setting this to zero will
-// disable this limit.
-extern const char kIOSTipsNotificationsDismissLimitParam[];
-
-// Helper for whether Tips Notifications are enabled.
-bool IsIOSTipsNotificationsEnabled();
-
 // Convenience method for determining if Pinned Tabs is enabled.
 // The Pinned Tabs feature is fully enabled on iPhone and disabled on iPad.
 bool IsPinnedTabsEnabled();
@@ -830,6 +797,10 @@ BASE_DECLARE_FEATURE(kSeparateProfilesForManagedAccounts);
 // DO NOT CHECK DIRECTLY, use AreSeparateProfilesForManagedAccountsEnabled()!
 BASE_DECLARE_FEATURE(kSeparateProfilesForManagedAccountsKillSwitch);
 
+// Feature flag to have widgets per account.
+// DO NOT CHECK DIRECTLY, use IsWidgetsForMultiprofileEnabled().
+BASE_DECLARE_FEATURE(kWidgetsForMultiprofile);
+
 // Feature to control resyncing the omaha ping timer on foregrounding.
 BASE_DECLARE_FEATURE(kOmahaResyncTimerOnForeground);
 
@@ -891,6 +862,16 @@ extern const char kIOSReactivationNotificationsOrderParam[];
 // Returns whether `kIOSReactivationNotifications` is enabled.
 bool IsIOSReactivationNotificationsEnabled();
 
+// Feature flag to enable Expanded Tips.
+BASE_DECLARE_FEATURE(kIOSExpandedTips);
+
+// Feature param containing a comma separated list of integers that represent
+// cases of the `TipsNotificationType` enum.
+extern const char kIOSExpandedTipsOrderParam[];
+
+// Returns whether `kIOSExpandTips` is enabled.
+bool IsIOSExpandedTipsEnabled();
+
 // Feature flag to show an alert to the user when only provisiona notifications
 // are allowed.
 BASE_DECLARE_FEATURE(kProvisionalNotificationAlert);
@@ -929,16 +910,8 @@ bool IOSPasskeysM2Enabled();
 // with the current Profile, rather than using a single global manager. This
 // flag is disabled by default while the refactor is ongoing.
 //
-// TODO(crbug.com/407594420): Enable this by default once the
-// multi-Profile push notification refactor is code complete. It will then
-// serve as a killswitch to revert to the legacy (non-Profile-aware) behavior if
-// issues arise.
+// DO NOT CHECK DIRECTLY, use IsMultiProfilePushNotificationHandlingEnabled()!
 BASE_DECLARE_FEATURE(kIOSPushNotificationMultiProfile);
-
-// Returns true if Profile-specific push notification handling logic is
-// enabled via the kIOSPushNotificationMultiProfile feature
-// flag.
-bool IsIOSMultiProfilePushNotificationHandlingEnabled();
 
 extern const char kFullscreenTransitionSlower[];
 extern const char kFullscreenTransitionDefaultSpeed[];
@@ -1084,5 +1057,11 @@ bool IsBestOfAppFREEnabled();
 
 // Whether the Guided Tour variant of `kBestOfAppFRE` is enabled.
 bool IsBestOfAppGuidedTourEnabled();
+
+// Feature flag to include GWS variations in feedback.
+BASE_DECLARE_FEATURE(kFeedbackIncludeGWSVariations);
+
+// Whether the feature to include GWS variations in feedback is enabled.
+bool IsFeedbackIncludeGWSVariationsEnabled();
 
 #endif  // IOS_CHROME_BROWSER_SHARED_PUBLIC_FEATURES_FEATURES_H_

@@ -6,8 +6,8 @@ import {assert} from 'chrome://resources/js/assert.js';
 import {PromiseResolver} from 'chrome://resources/js/promise_resolver.js';
 
 import type {AnnotationBrush, Color, Point, TextAnnotation, TextAttributes, TextBoxRect, TextStyles} from './constants.js';
-import {AnnotationBrushType, TextAlignment, TextStyle} from './constants.js';
-import {PluginController} from './controller.js';
+import {AnnotationBrushType, TextAlignment, TextStyle, TextTypeface} from './constants.js';
+import {PluginController, PluginControllerEventType} from './controller.js';
 import type {Viewport} from './viewport.js';
 
 export interface ViewportParams {
@@ -30,9 +30,7 @@ export function colorsEqual(color1: Color, color2: Color): boolean {
 }
 
 export function stylesEqual(style1: TextStyles, style2: TextStyles): boolean {
-  return style1.bold === style2.bold && style1.italic === style2.italic &&
-      style1.underline === style2.underline &&
-      style1.strikethrough === style2.strikethrough;
+  return style1.bold === style2.bold && style1.italic === style2.italic;
 }
 
 export class Ink2Manager extends EventTarget {
@@ -42,15 +40,13 @@ export class Ink2Manager extends EventTarget {
   private annotations_: Map<number, Map<number, TextAnnotation>> = new Map();
   // The attributes selected by the user for new annotations.
   private attributes_: TextAttributes = {
-    typeface: '',
+    typeface: TextTypeface.SANS_SERIF,
     size: 12,
     color: {r: 0, g: 0, b: 0},
     alignment: TextAlignment.LEFT,
     styles: {
       [TextStyle.BOLD]: false,
       [TextStyle.ITALIC]: false,
-      [TextStyle.UNDERLINE]: false,
-      [TextStyle.STRIKETHROUGH]: false,
     },
   };
   private brushResolver_: PromiseResolver<void>|null = null;
@@ -58,7 +54,6 @@ export class Ink2Manager extends EventTarget {
   // user is editing. Null if the user is not editing an annotation or is
   // creating a new annotation using |attributes_|.
   private existingAnnotationAttributes_: TextAttributes|null = null;
-  private fontNamesResolver_: PromiseResolver<string[]>|null = null;
   private pageNumber_: number = -1;
   private pluginController_: PluginController = PluginController.getInstance();
   private viewport_: Viewport|null = null;
@@ -224,20 +219,7 @@ export class Ink2Manager extends EventTarget {
     this.setAnnotationBrushInPlugin_();
   }
 
-  getTextAnnotationFontNames(): Promise<string[]> {
-    if (this.fontNamesResolver_ === null) {
-      this.fontNamesResolver_ = new PromiseResolver();
-      this.pluginController_.getTextAnnotFontNames().then(fontsMessage => {
-        assert(this.fontNamesResolver_);
-        this.fontNamesResolver_.resolve(fontsMessage.data);
-        assert(fontsMessage.data.length > 0);
-        this.setTextTypeface(fontsMessage.data[0]!);
-      });
-    }
-    return this.fontNamesResolver_.promise;
-  }
-
-  setTextTypeface(typeface: string) {
+  setTextTypeface(typeface: TextTypeface) {
     const current = this.getCurrentTextAttributes();
     if (current.typeface === typeface) {
       return;
@@ -304,7 +286,7 @@ export class Ink2Manager extends EventTarget {
    * Updates the stored annotation and notifies the plugin of the new or
    * modified annotation.
    */
-  commitTextAnnotation(annotation: TextAnnotation) {
+  commitTextAnnotation(annotation: TextAnnotation, edited: boolean) {
     annotation.textBoxRect = this.screenToPageCoordinates_(
         annotation.pageNumber, annotation.textBoxRect);
 
@@ -324,6 +306,15 @@ export class Ink2Manager extends EventTarget {
     }
     this.pluginController_.finishTextAnnotation(annotation);
     this.existingAnnotationAttributes_ = null;
+
+    if (edited) {
+      // Using PluginController's event target to dispatch this event, even
+      // though it originates here, because PluginController dispatches this
+      // event for normal ink strokes and this way clients only need to listen
+      // on one instance.
+      this.pluginController_.getEventTarget().dispatchEvent(
+          new CustomEvent(PluginControllerEventType.FINISH_INK_STROKE));
+    }
   }
 
   /**

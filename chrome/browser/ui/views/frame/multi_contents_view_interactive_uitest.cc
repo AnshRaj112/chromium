@@ -6,8 +6,6 @@
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
-#include "chrome/browser/ui/tabs/split_tab_collection.h"
-#include "chrome/browser/ui/tabs/split_tab_visual_data.h"
 #include "chrome/browser/ui/tabs/test/split_tabs_interactive_test_mixin.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -16,6 +14,8 @@
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/interaction/interactive_browser_test.h"
+#include "components/tabs/public/split_tab_collection.h"
+#include "components/tabs/public/split_tab_visual_data.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "third_party/blink/public/common/input/web_mouse_event.h"
@@ -293,7 +293,7 @@ IN_PROC_BROWSER_TEST_F(MultiContentsViewUiTest,
 }
 
 IN_PROC_BROWSER_TEST_F(MultiContentsViewUiTest,
-                       ResizeDoubleClickSwapsSplitViews) {
+                       ResizeMouseDoubleClickSwapsSplitViews) {
   using MultiContentsViewSwapObserver =
       views::test::PollingViewObserver<bool, MultiContentsView>;
   DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(MultiContentsViewSwapObserver,
@@ -333,6 +333,62 @@ IN_PROC_BROWSER_TEST_F(MultiContentsViewUiTest,
         release_event.SetClickCount(2);
         resize_area->OnMousePressed(press_event);
         resize_area->OnMouseReleased(release_event);
+      }),
+      // Verify the web contents in the split have swapped and the active index
+      // is correct.
+      PollView(kMultiContentsViewSwapObserver,
+               MultiContentsView::kMultiContentsViewElementId,
+               [&](const MultiContentsView* multi_contents_view) -> bool {
+                 bool first_web_contents_set =
+                     multi_contents_view->start_contents_view_for_testing()
+                         ->GetWebContents()
+                         ->GetVisibleURL() == GURL(chrome::kChromeUINewTabURL);
+                 bool second_web_contents_set =
+                     multi_contents_view->end_contents_view_for_testing()
+                         ->GetWebContents()
+                         ->GetVisibleURL() ==
+                     GURL(chrome::kChromeUISettingsURL);
+                 return first_web_contents_set && second_web_contents_set;
+               }),
+      WaitForState(kMultiContentsViewSwapObserver, true), CheckTabIsActive(1),
+      CheckActiveContentsHasFocus());
+}
+
+IN_PROC_BROWSER_TEST_F(MultiContentsViewUiTest,
+                       ResizeGestureDoubleTapSwapsSplitViews) {
+  using MultiContentsViewSwapObserver =
+      views::test::PollingViewObserver<bool, MultiContentsView>;
+  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(MultiContentsViewSwapObserver,
+                                      kMultiContentsViewSwapObserver);
+  DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kWebContentsId);
+  RunTestSequence(
+      // Create a split view with and verify web contents are as expected and
+      // the active index is correct.
+      InstrumentTab(kWebContentsId),
+      NavigateWebContents(kWebContentsId, GURL(chrome::kChromeUINewTabURL)),
+      CreateTabsAndEnterSplitView(), Check([&]() {
+        return multi_contents_view()
+                   ->start_contents_view_for_testing()
+                   ->GetWebContents()
+                   ->GetVisibleURL() == GURL(chrome::kChromeUISettingsURL);
+      }),
+      Check([&]() {
+        return multi_contents_view()
+                   ->end_contents_view_for_testing()
+                   ->GetWebContents()
+                   ->GetVisibleURL() == GURL(chrome::kChromeUINewTabURL);
+      }),
+      CheckResult([this]() { return tab_strip_model()->active_index(); }, 0),
+      // Simulate a double press gesture event on the resize area to trigger the
+      // split tabs to swap.
+      Do([&]() {
+        auto* resize_area = multi_contents_view()->resize_area_for_testing();
+        gfx::Point center(resize_area->width() / 2, resize_area->height() / 2);
+        ui::GestureEventDetails details(ui::EventType::kGestureTap);
+        details.set_tap_count(2);
+        ui::GestureEvent gesture_event(center.x(), center.y(), ui::EF_NONE,
+                                       ui::EventTimeForNow(), details);
+        resize_area->OnGestureEvent(&gesture_event);
       }),
       // Verify the web contents in the split have swapped and the active index
       // is correct.

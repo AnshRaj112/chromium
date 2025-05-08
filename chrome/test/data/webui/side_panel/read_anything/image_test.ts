@@ -5,7 +5,7 @@ import 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js'
 
 import type {CrIconButtonElement} from '//resources/cr_elements/cr_icon_button/cr_icon_button.js';
 import type {AppElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
-import {IMAGES_TOGGLE_BUTTON_ID, SpeechBrowserProxyImpl, VoicePackController} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import {IMAGES_TOGGLE_BUTTON_ID, SpeechBrowserProxyImpl, SpeechController, VoicePackController} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome-untrusted://webui-test/chai_assert.js';
 import {microtasksFinished} from 'chrome-untrusted://webui-test/test_util.js';
 
@@ -45,6 +45,7 @@ suite('Images', () => {
     speech = new TestSpeechBrowserProxy();
     SpeechBrowserProxyImpl.setInstance(speech);
     VoicePackController.setInstance(new VoicePackController());
+    SpeechController.setInstance(new SpeechController());
 
     // Override chrome.readingMode.requestImageData to avoid the cross-process
     // hop.
@@ -134,7 +135,7 @@ suite('Images', () => {
 
   suite('with read aloud,', () => {
     setup(() => {
-      setupBasicSpeech(app, speech);
+      setupBasicSpeech(speech);
     });
 
     test('image captions are read aloud when showing', () => {

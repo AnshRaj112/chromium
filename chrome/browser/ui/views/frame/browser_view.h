@@ -125,6 +125,10 @@ namespace glic {
 class GlicBorderView;
 }  // namespace glic
 
+namespace new_tab_footer {
+class NewTabFooterWebView;
+}  // namespace new_tab_footer
+
 ///////////////////////////////////////////////////////////////////////////////
 // BrowserView
 //
@@ -304,6 +308,10 @@ class BrowserView : public BrowserWindow,
 #endif
 
   ScrimView* window_scrim_view() { return window_scrim_view_; }
+
+  new_tab_footer::NewTabFooterWebView* new_tab_footer_web_view() const {
+    return new_tab_footer_web_view_;
+  }
 
   base::WeakPtr<BrowserView> GetAsWeakPtr() {
     return weak_ptr_factory_.GetWeakPtr();
@@ -1284,6 +1292,11 @@ class BrowserView : public BrowserWindow,
 
   // The view that contains all visible WebContents.
   raw_ptr<MultiContentsView> multi_contents_view_ = nullptr;
+
+  // The view that shows a footer at the bottom of the contents
+  // container on new tab pages.
+  raw_ptr<new_tab_footer::NewTabFooterWebView> new_tab_footer_web_view_ =
+      nullptr;
 
   // The scrim view that covers the content area when a tab-modal dialog is
   // open.

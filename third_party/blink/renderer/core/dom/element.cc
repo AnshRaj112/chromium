@@ -1283,7 +1283,8 @@ FrozenArray<Element>* Element::GetElementArrayAttribute(
   // be in non-ancestor shadow trees. We don't want to leak references into
   // those scopes, so retarget the elements.
   if (RuntimeEnabledFeatures::ShadowRootReferenceTargetEnabled(
-          GetExecutionContext()) && elements) {
+          GetExecutionContext()) &&
+      elements) {
     std::transform(elements->begin(), elements->end(), elements->begin(),
                    [this](Element* element) {
                      return &this->GetTreeScope().Retarget(*element);
@@ -1546,7 +1547,8 @@ HTMLElement* Element::GetOpenPopoverTarget() const {
   return popover;
 }
 
-bool Element::InterestGained(Element& interest_target) {
+bool Element::InterestGained(Element& interest_target,
+                             InterestState new_state) {
   CHECK(RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
       GetDocument().GetExecutionContext()));
   CHECK(IsInTreeScope());
@@ -1557,6 +1559,17 @@ bool Element::InterestGained(Element& interest_target) {
   if (interest_event->defaultPrevented()) {
     return false;
   }
+
+  // This is now the target's interest invoker
+  CHECK(!interest_target.GetInterestInvoker());
+  interest_target.EnsureElementRareData()
+      .EnsureInterestInvokerTargetData()
+      .setInterestInvoker(this);
+  ChangeInterestState(&interest_target, new_state);
+  DCHECK(!GetDocument().CurrentInterestTargetElements().Contains(this));
+  GetDocument().CurrentInterestTargetElements().insert(this);
+
+  // If the target is a popover, invoke it.
   if (auto* popover = DynamicTo<HTMLElement>(interest_target);
       popover && popover->PopoverType() != PopoverValueType::kNone) {
     if (popover->IsPopoverReady(PopoverTriggerAction::kShow,
@@ -1580,6 +1593,17 @@ bool Element::InterestLost(Element& interest_target) {
   if (lose_interest_event->defaultPrevented()) {
     return false;
   }
+
+  // If the target still thinks this invoker is its invoker, remove it.
+  if (auto* targets_invoker = interest_target.GetInterestInvoker();
+      targets_invoker && targets_invoker == this) {
+    interest_target.EnsureElementRareData().RemoveInterestInvokerTargetData();
+    ChangeInterestState(&interest_target, InterestState::kNoInterest);
+    DCHECK(GetDocument().CurrentInterestTargetElements().Contains(this));
+    GetDocument().CurrentInterestTargetElements().erase(this);
+  }
+
+  // If the target is a popover, hide it.
   if (auto* popover = DynamicTo<HTMLElement>(interest_target);
       popover && popover->PopoverType() != PopoverValueType::kNone) {
     if (popover->IsPopoverReady(PopoverTriggerAction::kHide,
@@ -1595,8 +1619,25 @@ bool Element::InterestLost(Element& interest_target) {
   return true;
 }
 
+// static
+// This should return a string that describes the hot-key implemented below in
+// Element::DefaultEventHandler.
+String Element::GetPartialInterestTargetActivationHotkey() {
+#if BUILDFLAG(IS_MAC)
+  // On a Mac, the "Alt" key is denoted with the symbol ⌥, for "Option". The
+  // most typical display uses the ↑ for the up arrow. So this text resolves
+  // to "⌥↑".
+  return u"\u2325\u2191";
+#else
+  // Other operating systems use "Alt" for the alt key, even in most other
+  // languages. And ⬆️ is more often used for the up arrow. So this text
+  // resolves to "Alt + ⬆️".
+  return u"Alt + \u2b06\ufe0f";
+#endif
+}
+
 void Element::DefaultEventHandler(Event& event) {
-  if (GetInterestState() != Element::InterestState::kNoInterest) [[unlikely]] {
+  if (GetInterestState() != InterestState::kNoInterest) [[unlikely]] {
     CHECK(RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
         GetDocument().GetExecutionContext()));
     if (auto* keyboard_event = DynamicTo<KeyboardEvent>(event);
@@ -1604,12 +1645,15 @@ void Element::DefaultEventHandler(Event& event) {
       const int modifiers =
           keyboard_event->GetModifiers() & blink::WebInputEvent::kKeyModifiers;
       auto* target = InterestTargetElement();
-      if (GetInterestState() == Element::InterestState::kPartialInterest &&
+      DCHECK_NE(GetInterestState(), InterestState::kPotentialPartialInterest);
+      if (GetInterestState() == InterestState::kPartialInterest &&
           keyboard_event->key() == keywords::kArrowUp &&
           modifiers == WebInputEvent::kAltKey) {
-        // Hitting the hotkey (Alt-UpArrow) on an invoker that has partial
-        // interest causes interest to be "upgraded" to full interest. It also
-        // focuses the first focusable element within the target.
+        // Hitting the hotkey (Alt/Option-UpArrow) on an invoker that has
+        // partial interest causes interest to be "upgraded" to full interest.
+        // It also focuses the first focusable element within the target.
+        // NOTE: this hotkey must be kept in sync with the string description
+        // returned by `GetPartialInterestTargetActivationHotkey()`.
         ChangeInterestState(target, InterestState::kFullInterest);
         if (Element* first_focusable = target->GetFocusDelegate()) {
           first_focusable->Focus();
@@ -3283,6 +3327,9 @@ void Element::ClassAttributeChanged(const AtomicString& new_class_string) {
     GetElementData()->SetClass(new_class_string);
   }
   const SpaceSplitString& new_classes = GetElementData()->ClassNames();
+  for (const AtomicString& class_name : new_classes) {
+    attribute_or_class_bloom_ |= FilterForString(class_name);
+  }
   GetDocument().GetStyleEngine().ClassChangedForElement(old_classes,
                                                         new_classes, *this);
 }
@@ -3354,9 +3401,11 @@ void Element::ParserSetAttributes(
           ShareableElementData::CreateWithAttributes(attribute_vector);
     }
 
-    attribute_bloom_ = 0;
+    // NOTE: AttributeChanged() will add back the class names (if any),
+    // so it is safe to reset the filter here.
+    attribute_or_class_bloom_ = 0;
     for (const Attribute& attribute : attribute_vector) {
-      attribute_bloom_ |= FilterForAttribute(attribute.GetName());
+      attribute_or_class_bloom_ |= FilterForAttribute(attribute.GetName());
     }
   }
 
@@ -5418,7 +5467,7 @@ ShadowRoot& Element::CreateAndAttachShadowRoot(ShadowRootMode type,
     }
   }
   EnsureElementRareData().SetShadowRoot(*shadow_root);
-  shadow_root->SetParentOrShadowHostNode(this);
+  shadow_root->SetShadowHostNode(this);
   shadow_root->SetParentTreeScope(GetTreeScope());
   shadow_root->InsertedInto(*this);
 
@@ -6681,7 +6730,7 @@ void Element::RemoveAttributeInternal(wtf_size_t index,
     DidRemoveAttribute(name, value_being_removed);
   }
 
-  // TODO(sesse): Consider recalculating attribute_bloom_ filter here,
+  // TODO(sesse): Consider recalculating attribute_or_class_bloom_ filter here,
   // so that it reflects the removal (but beware of pathological cases
   // where removing all attributes send us into O(n²)).
 }
@@ -6689,7 +6738,7 @@ void Element::RemoveAttributeInternal(wtf_size_t index,
 void Element::AppendAttributeInternal(const QualifiedName& name,
                                       const AtomicString& value,
                                       AttributeModificationReason reason) {
-  attribute_bloom_ |= FilterForAttribute(name);
+  attribute_or_class_bloom_ |= FilterForAttribute(name);
 
   if (reason !=
       AttributeModificationReason::kBySynchronizationOfLazyAttribute) {
@@ -7260,6 +7309,21 @@ bool Element::CanBeKeyboardFocusableScroller(
   return IsScrollableNode(this);
 }
 
+bool Element::ContainsKeyboardFocusableElementsSlow(
+    UpdateBehavior update_behavior) const {
+  for (const Node* node = FlatTreeTraversal::FirstChild(*this); node;
+       node = FlatTreeTraversal::Next(*node, this)) {
+    auto* element = DynamicTo<Element>(node);
+    if (!element) {
+      continue;
+    }
+    if (element->IsKeyboardFocusableSlow(update_behavior)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // This can be slow, because it can require a tree walk. It might be
 // a good idea to cache this bit on the element to avoid having to
 // recompute it. That would require marking that bit dirty whenever
@@ -7276,15 +7340,9 @@ bool Element::IsKeyboardFocusableScroller(
     return true;
   }
 
-  for (Node* node = FlatTreeTraversal::FirstChild(*this); node;
-       node = FlatTreeTraversal::Next(*node, this)) {
-    if (Element* element = DynamicTo<Element>(node)) {
-      if (element->IsKeyboardFocusableSlow(update_behavior)) {
-        return false;
-      }
-    }
-  }
-  return true;
+  // If the scroller already contains something focusable, then we return false,
+  // since it's not a "special" keyboard focusable scroller.
+  return !ContainsKeyboardFocusableElementsSlow(update_behavior);
 }
 
 // TODO(crbug.com/326681249): Should `tabindex` take precedence?
@@ -7314,6 +7372,15 @@ bool Element::IsInPartialInterestPopover() const {
     return false;
   }
   return false;
+}
+
+void Element::ShowInterestNow() {
+  Element* target = InterestTargetElement();
+  LOG(ERROR) << "Interest in element " << this << ", with target " << target;
+  if (!target) {
+    return;
+  }
+  GainOrLoseInterest(this, target, InterestState::kFullInterest);
 }
 
 bool Element::IsKeyboardFocusableSlow(UpdateBehavior update_behavior) const {
@@ -7400,7 +7467,7 @@ FocusableState Element::SupportsFocus(UpdateBehavior update_behavior) const {
   }
   if (HasElementFlag(ElementFlags::kTabIndexWasSetExplicitly) ||
       IsRootEditableElementWithCounting(*this) ||
-      IsScrollControlPseudoElement() || SupportsSpatialNavigationFocus()) {
+      IsScrollMarkerPseudoElement() || SupportsSpatialNavigationFocus()) {
     return FocusableState::kFocusable;
   }
   if (CanBeKeyboardFocusableScroller(update_behavior)) {
@@ -9355,7 +9422,7 @@ const ComputedStyle* Element::StyleForSearchTextPseudoElement(
 
 bool Element::CanGeneratePseudoElement(PseudoId pseudo_id) const {
   if (pseudo_id == kPseudoIdViewTransition) {
-    return !!ViewTransitionUtils::GetTransition(*this);
+    return !!ViewTransitionUtils::GetTransition(*this) && !!GetComputedStyle();
   }
   if (pseudo_id == kPseudoIdFirstLetter && IsSVGElement()) {
     return false;
@@ -10189,7 +10256,7 @@ void Element::CloneAttributesFrom(const Element& other) {
     setNonce(other.nonce());
   }
 
-  attribute_bloom_ = other.attribute_bloom_;
+  attribute_or_class_bloom_ = other.attribute_or_class_bloom_;
 }
 
 void Element::CreateUniqueElementData() {
@@ -10734,6 +10801,9 @@ bool Element::GainOrLoseInterest(Element* invoker,
   // gained or lost. Fire the event and run any default actions.
   switch (new_state) {
     case InterestState::kPartialInterest:
+      NOTREACHED() << "Partial interest should never be gained directly";
+
+    case InterestState::kPotentialPartialInterest:
     case InterestState::kFullInterest:
       if (Element* existing_invoker = target->GetInterestInvoker()) {
         // We're gaining interest, but the target already has an active interest
@@ -10766,36 +10836,11 @@ bool Element::GainOrLoseInterest(Element* invoker,
           }
         }
       }
-      if (!invoker->InterestGained(*target)) {
-        return false;  // event was cancelled.
-      }
-      // This is now the target's interest invoker
-      CHECK(!target->GetInterestInvoker());
-      target->EnsureElementRareData()
-          .EnsureInterestInvokerTargetData()
-          .setInterestInvoker(invoker);
-      invoker->ChangeInterestState(target, new_state);
-      DCHECK(!invoker->GetDocument().CurrentInterestTargetElements().Contains(
-          invoker));
-      invoker->GetDocument().CurrentInterestTargetElements().insert(invoker);
-      break;
+      return invoker->InterestGained(*target, new_state);
 
     case InterestState::kNoInterest:
-      if (!invoker->InterestLost(*target)) {
-        return false;  // event was cancelled.
-      }
-      // If the target still thinks this invoker is its invoker, remove it.
-      if (auto* targets_invoker = target->GetInterestInvoker();
-          targets_invoker && targets_invoker == invoker) {
-        target->EnsureElementRareData().RemoveInterestInvokerTargetData();
-        invoker->ChangeInterestState(target, InterestState::kNoInterest);
-        DCHECK(invoker->GetDocument().CurrentInterestTargetElements().Contains(
-            invoker));
-        invoker->GetDocument().CurrentInterestTargetElements().erase(invoker);
-      }
-      break;
+      return invoker->InterestLost(*target);
   }
-  return true;
 }
 
 void Element::ScheduleInterestGainedTask(InterestState new_state) {
@@ -10867,7 +10912,7 @@ Element* Element::GetInterestInvoker() const {
     return nullptr;
   }
   DCHECK_EQ(invoker->InterestTargetElement(), this);
-  DCHECK_NE(invoker->GetInterestState(), Element::InterestState::kNoInterest);
+  DCHECK_NE(invoker->GetInterestState(), InterestState::kNoInterest);
   DCHECK_EQ(invoker->InterestTargetElement(), this);
   return invoker;
 }
@@ -10937,6 +10982,8 @@ void Element::HandleInterestTargetHoverOrFocus(InterestTargetSource source) {
       // invoker for this element.
       auto* upstream_data = upstream_invoker->GetInvokerData();
       upstream_data->CancelInterestLostTask();
+      DCHECK_NE(upstream_data->GetInterestState(),
+                InterestState::kPotentialPartialInterest);
       if (upstream_data->GetInterestState() ==
           InterestState::kPartialInterest) {
         // Hovering (or focusing, if the developer allowed that) triggers full
@@ -10945,13 +10992,17 @@ void Element::HandleInterestTargetHoverOrFocus(InterestTargetSource source) {
                                               InterestState::kFullInterest);
       }
     }
-    if (InterestTargetElement()) [[unlikely]] {
+    if (auto* target = InterestTargetElement()) [[unlikely]] {
       // This is an interest invoker that was just hovered or focused. Schedule
       // an InterestGained task, with a new state of "full interest" (for
-      // hover), or "partial interest" (for focus).
-      ScheduleInterestGainedTask(source == InterestTargetSource::kHover
-                                     ? InterestState::kFullInterest
-                                     : InterestState::kPartialInterest);
+      // hover), or "potential partial interest" (for focus).
+      auto* target_popover = DynamicTo<HTMLElement>(target);
+      bool might_need_partial_interest =
+          source == InterestTargetSource::kFocusElementChain &&
+          target_popover && target_popover->HasPopoverAttribute();
+      ScheduleInterestGainedTask(might_need_partial_interest
+                                     ? InterestState::kPotentialPartialInterest
+                                     : InterestState::kFullInterest);
     }
   } else {
     DCHECK(source == InterestTargetSource::kDeHover ||

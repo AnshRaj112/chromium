@@ -469,8 +469,12 @@ FederatedAuthRequestImpl::FetchData::~FetchData() = default;
 FederatedAuthRequestImpl::IdentityProviderGetInfo::IdentityProviderGetInfo(
     blink::mojom::IdentityProviderRequestOptionsPtr provider,
     blink::mojom::RpContext rp_context,
-    blink::mojom::RpMode rp_mode)
-    : provider(std::move(provider)), rp_context(rp_context), rp_mode(rp_mode) {}
+    blink::mojom::RpMode rp_mode,
+    std::optional<blink::mojom::Format> format)
+    : provider(std::move(provider)),
+      rp_context(rp_context),
+      rp_mode(rp_mode),
+      format(format) {}
 
 FederatedAuthRequestImpl::IdentityProviderGetInfo::~IdentityProviderGetInfo() =
     default;
@@ -485,6 +489,7 @@ FederatedAuthRequestImpl::IdentityProviderGetInfo::operator=(
   provider = other.provider->Clone();
   rp_context = other.rp_context;
   rp_mode = other.rp_mode;
+  format = other.format;
   return *this;
 }
 
@@ -493,12 +498,14 @@ FederatedAuthRequestImpl::IdentityProviderInfo::IdentityProviderInfo(
     IdpNetworkRequestManager::Endpoints endpoints,
     IdentityProviderMetadata metadata,
     blink::mojom::RpContext rp_context,
-    blink::mojom::RpMode rp_mode)
+    blink::mojom::RpMode rp_mode,
+    std::optional<blink::mojom::Format> format)
     : provider(provider->Clone()),
       endpoints(std::move(endpoints)),
       metadata(std::move(metadata)),
       rp_context(rp_context),
-      rp_mode(rp_mode) {}
+      rp_mode(rp_mode),
+      format(format) {}
 
 FederatedAuthRequestImpl::IdentityProviderInfo::~IdentityProviderInfo() =
     default;
@@ -511,6 +518,7 @@ FederatedAuthRequestImpl::IdentityProviderInfo::IdentityProviderInfo(
   rp_context = other.rp_context;
   rp_mode = other.rp_mode;
   data = other.data;
+  format = other.format;
 }
 
 FederatedAuthRequestImpl::FederatedAuthRequestImpl(
@@ -1018,9 +1026,11 @@ void FederatedAuthRequestImpl::RequestToken(
       blink::mojom::RpContext rp_context = idp_get_params_ptr->context;
       blink::mojom::RpMode rp_mode = idp_get_params_ptr->mode;
       const GURL& idp_config_url = idp_ptr->config->config_url;
+      std::optional<blink::mojom::Format> format =
+          IsFedCmDelegationEnabled() ? idp_ptr->format : std::nullopt;
       token_request_get_infos_.emplace(
-          idp_config_url,
-          IdentityProviderGetInfo(std::move(idp_ptr), rp_context, rp_mode));
+          idp_config_url, IdentityProviderGetInfo(std::move(idp_ptr),
+                                                  rp_context, rp_mode, format));
     }
   }
   if (any_idp_has_parameters || any_idp_has_custom_scopes) {
@@ -1296,7 +1306,8 @@ void FederatedAuthRequestImpl::OnAllConfigAndWellKnownFetched(
             get_info_it->second.provider, std::move(fetch_result.endpoints),
             fetch_result.metadata ? std::move(*fetch_result.metadata)
                                   : IdentityProviderMetadata(),
-            get_info_it->second.rp_context, get_info_it->second.rp_mode);
+            get_info_it->second.rp_context, get_info_it->second.rp_mode,
+            get_info_it->second.format);
 
     if (fetch_result.error) {
       const FederatedProviderFetcher::FetchError& fetch_error =
@@ -1412,27 +1423,6 @@ void FederatedAuthRequestImpl::OnClientMetadataResponseReceived(
 
   // TODO(yigu): Clean up the client metadata related errors for metrics and
   // console logs.
-  if (!idp_info->metadata.brand_background_color &&
-      idp_info->metadata.brand_text_color) {
-    idp_info->metadata.brand_text_color = std::nullopt;
-    render_frame_host().AddMessageToConsole(
-        blink::mojom::ConsoleMessageLevel::kWarning,
-        "The FedCM text color is ignored because background color was not "
-        "provided");
-  }
-  if (idp_info->metadata.brand_background_color &&
-      idp_info->metadata.brand_text_color) {
-    float text_contrast_ratio = color_utils::GetContrastRatio(
-        *idp_info->metadata.brand_background_color,
-        *idp_info->metadata.brand_text_color);
-    if (text_contrast_ratio < color_utils::kMinimumReadableContrastRatio) {
-      idp_info->metadata.brand_text_color = std::nullopt;
-      render_frame_host().AddMessageToConsole(
-          blink::mojom::ConsoleMessageLevel::kWarning,
-          "The FedCM text color is ignored because it does not contrast enough "
-          "with the provided background color");
-    }
-  }
   FetchAccountPicturesAndBrandIcons(std::move(idp_info), std::move(accounts),
                                     std::move(client_metadata));
 }
@@ -1535,8 +1525,10 @@ void FederatedAuthRequestImpl::OnFetchDataForIdpSucceeded(
       ClientMetadata{client_metadata.terms_of_service_url,
                      client_metadata.privacy_policy_url,
                      client_metadata.brand_icon_url, rp_brand_icon},
-      idp_info->rp_context, disclosure_fields,
+      idp_info->rp_context, idp_info->format, disclosure_fields,
       /*has_login_status_mismatch=*/false);
+  idp_info->client_matches_top_frame_origin =
+      client_metadata.client_matches_top_frame_origin;
   for (auto& account : accounts) {
     account->identity_provider = idp_info->data;
   }
@@ -1843,9 +1835,7 @@ void FederatedAuthRequestImpl::MaybeShowAccountsDialog() {
   // so invocations after this method should assume that the members may have
   // been cleaned up.
   if (!request_dialog_controller_->ShowAccountsDialog(
-          std::move(content::RelyingPartyData(
-              GetTopFrameOriginForDisplay(GetEmbeddingOrigin()))),
-          idp_data_for_display_, accounts_,
+          CreateRpData(), idp_data_for_display_, accounts_,
           identity_selection_type_ == kExplicit ? SignInMode::kExplicit
                                                 : SignInMode::kAuto,
           rp_mode_, new_accounts_,
@@ -1933,9 +1923,7 @@ void FederatedAuthRequestImpl::NotifyAutofillSuggestionAccepted(
   // probably refactor the API to support this use case, rather than overload
   // an unintended use.
   if (!request_dialog_controller_->ShowAccountsDialog(
-          std::move(content::RelyingPartyData(
-              GetTopFrameOriginForDisplay(GetEmbeddingOrigin()))),
-          idp_data_for_display_, {}, SignInMode::kExplicit,
+          CreateRpData(), idp_data_for_display_, {}, SignInMode::kExplicit,
           blink::mojom::RpMode::kActive, selected,
           base::BindOnce(&FederatedAuthRequestImpl::OnAccountSelected,
                          weak_ptr_factory_.GetWeakPtr()),
@@ -2016,7 +2004,8 @@ void FederatedAuthRequestImpl::OnIdpMismatch(
   idp_info->data = base::MakeRefCounted<IdentityProviderData>(
       idp_for_display, idp_info->metadata,
       ClientMetadata{GURL(), GURL(), GURL(), gfx::Image()},
-      idp_info->rp_context, GetDisclosureFields(*idp_info->provider),
+      idp_info->rp_context, idp_info->format,
+      GetDisclosureFields(*idp_info->provider),
       /*has_login_status_mismatch=*/true);
   idp_infos_[idp_config_url] = std::move(idp_info);
 
@@ -2963,8 +2952,9 @@ void FederatedAuthRequestImpl::ProcessSdJwt(const GURL& config_url,
 
   for (const auto& json : sd_jwt->disclosures) {
     data_decoder::DataDecoder::ParseJsonIsolated(
-        json, base::BindOnce(&FederatedAuthRequestImpl::OnDisclosureParsed,
-                             weak_ptr_factory_.GetWeakPtr(), callback, json));
+        json.value(),
+        base::BindOnce(&FederatedAuthRequestImpl::OnDisclosureParsed,
+                       weak_ptr_factory_.GetWeakPtr(), callback, json.value()));
   }
 }
 
@@ -2984,7 +2974,7 @@ void FederatedAuthRequestImpl::OnDisclosureParsed(
     return;
   }
 
-  disclosures_.push_back({disclosure->name, json});
+  disclosures_.push_back({disclosure->name, sdjwt::JSONString(json)});
   cb.Run();
 }
 
@@ -3921,6 +3911,23 @@ bool FederatedAuthRequestImpl::FilterAccountsWithDomainHint(
   }
   fedcm_metrics_->RecordNumMatchingAccounts(accounts_remaining, "DomainHint");
   return IsFedCmShowFilteredAccountsEnabled() || accounts_remaining > 0u;
+}
+
+RelyingPartyData FederatedAuthRequestImpl::CreateRpData() const {
+  // We want to show the iframe origin if any IDP requests it.
+  bool show_iframe_origin = false;
+  for (const auto& entry : idp_infos_) {
+    if (!entry.second->client_matches_top_frame_origin.value_or(true)) {
+      show_iframe_origin = true;
+      break;
+    }
+  }
+  std::string iframe_origin;
+  if (show_iframe_origin) {
+    iframe_origin = FormatOriginForDisplay(origin());
+  }
+  return RelyingPartyData(GetTopFrameOriginForDisplay(GetEmbeddingOrigin()),
+                          iframe_origin);
 }
 
 }  // namespace content

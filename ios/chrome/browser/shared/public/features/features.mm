@@ -501,12 +501,10 @@ BASE_FEATURE(kFullscreenImprovement,
              "FullscreenImprovement",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kTabGroupsIPad, "TabGroupsIPad", base::FEATURE_ENABLED_BY_DEFAULT);
-
 bool IsTabGroupInGridEnabled() {
   if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET) {
     if (@available(iOS 17, *)) {
-      return base::FeatureList::IsEnabled(kTabGroupsIPad);
+      return true;
     }
     return false;
   }
@@ -833,25 +831,6 @@ BASE_FEATURE(kInactiveNavigationAfterAppLaunchKillSwitch,
              "kInactiveNavigationAfterAppLaunchKillSwitch",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kIOSTipsNotifications,
-             "IOSTipsNotifications",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-const char kIOSTipsNotificationsUnknownTriggerTimeParam[] =
-    "unknown_trigger_time";
-const char kIOSTipsNotificationsActiveSeekerTriggerTimeParam[] =
-    "active_seeker_trigger_time";
-const char kIOSTipsNotificationsLessEngagedTriggerTimeParam[] =
-    "less_engaged_trigger_time";
-const char kIOSTipsNotificationsEnabledParam[] = "enabled";
-const char kIOSTipsNotificationsOrderParam[] = "tips_notifications_order";
-const char kIOSTipsNotificationsDismissLimitParam[] =
-    "tips_notifications_dismiss_limit";
-
-bool IsIOSTipsNotificationsEnabled() {
-  return base::FeatureList::IsEnabled(kIOSTipsNotifications);
-}
-
 bool IsPinnedTabsEnabled() {
   return ui::GetDeviceFormFactor() != ui::DEVICE_FORM_FACTOR_TABLET;
 }
@@ -1026,6 +1005,15 @@ bool IsIOSReactivationNotificationsEnabled() {
   return base::FeatureList::IsEnabled(kIOSReactivationNotifications);
 }
 
+BASE_FEATURE(kIOSExpandedTips,
+             "IOSExpandedTips",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+const char kIOSExpandedTipsOrderParam[] = "expanded_tips_order";
+
+bool IsIOSExpandedTipsEnabled() {
+  return base::FeatureList::IsEnabled(kIOSExpandedTips);
+}
+
 BASE_FEATURE(kProvisionalNotificationAlert,
              "ProvisionalNotificationAlert",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1062,9 +1050,7 @@ bool FRESignInSecondaryActionLabelUpdate() {
   return base::FeatureList::IsEnabled(kFRESignInSecondaryActionLabelUpdate);
 }
 
-BASE_FEATURE(kIOSPasskeysM2,
-             "IOSPasskeysM2",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kIOSPasskeysM2, "IOSPasskeysM2", base::FEATURE_ENABLED_BY_DEFAULT);
 
 bool IOSPasskeysM2Enabled() {
   return base::FeatureList::IsEnabled(kIOSPasskeysM2);
@@ -1072,11 +1058,7 @@ bool IOSPasskeysM2Enabled() {
 
 BASE_FEATURE(kIOSPushNotificationMultiProfile,
              "IOSPushNotificationMultiProfile",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-bool IsIOSMultiProfilePushNotificationHandlingEnabled() {
-  return base::FeatureList::IsEnabled(kIOSPushNotificationMultiProfile);
-}
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 const char kFullscreenTransitionSlower[] = "SlowFullscreenTransitionSpeed";
 const char kFullscreenTransitionDefaultSpeed[] =
@@ -1286,4 +1268,12 @@ bool IsBestOfAppFREEnabled() {
 bool IsBestOfAppGuidedTourEnabled() {
   return base::GetFieldTrialParamValueByFeature(kBestOfAppFRE, "variant") ==
          "4";
+}
+
+BASE_FEATURE(kFeedbackIncludeGWSVariations,
+             "FeedbackIncludeGWSVariations",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool IsFeedbackIncludeGWSVariationsEnabled() {
+  return base::FeatureList::IsEnabled(kFeedbackIncludeGWSVariations);
 }

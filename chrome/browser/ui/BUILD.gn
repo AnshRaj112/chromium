@@ -81,8 +81,6 @@ static_library("ui") {
     "passwords/ui_utils.h",
     "passwords/well_known_change_password_navigation_throttle.cc",
     "passwords/well_known_change_password_navigation_throttle.h",
-    "plus_addresses/plus_address_creation_controller.h",
-    "plus_addresses/plus_address_creation_view.h",
     "profiles/profile_error_dialog.cc",
     "profiles/profile_error_dialog.h",
     "recently_audible_helper.cc",
@@ -421,6 +419,8 @@ static_library("ui") {
     "//chrome/browser/ui/page_action:icon_type",
     "//chrome/browser/ui/page_info",
     "//chrome/browser/ui/page_info:impl",
+    "//chrome/browser/ui/plus_addresses",
+    "//chrome/browser/ui/plus_addresses:impl",
     "//chrome/browser/ui/prefs",
     "//chrome/browser/ui/prefs:impl",
     "//chrome/browser/ui/safety_hub",
@@ -869,14 +869,6 @@ static_library("ui") {
       "android/passwords/all_passwords_bottom_sheet_view_impl.h",
       "android/passwords/credential_leak_dialog_view_android.cc",
       "android/passwords/credential_leak_dialog_view_android.h",
-      "android/plus_addresses/all_plus_addresses_bottom_sheet_controller.cc",
-      "android/plus_addresses/all_plus_addresses_bottom_sheet_controller.h",
-      "android/plus_addresses/all_plus_addresses_bottom_sheet_view.cc",
-      "android/plus_addresses/all_plus_addresses_bottom_sheet_view.h",
-      "android/plus_addresses/plus_address_creation_controller_android.cc",
-      "android/plus_addresses/plus_address_creation_controller_android.h",
-      "android/plus_addresses/plus_address_creation_view_android.cc",
-      "android/plus_addresses/plus_address_creation_view_android.h",
       "android/safe_browsing/password_reuse_dialog_view_android.cc",
       "android/safe_browsing/password_reuse_dialog_view_android.h",
       "android/simple_message_box_android.cc",
@@ -888,6 +880,7 @@ static_library("ui") {
       "android/tab_model/android_live_tab_context.h",
       "android/tab_model/android_live_tab_context_wrapper.cc",
       "android/tab_model/android_live_tab_context_wrapper.h",
+      "android/tab_model/tab_list_interface.h",
       "android/tab_model/tab_model.cc",
       "android/tab_model/tab_model.h",
       "android/tab_model/tab_model_jni_bridge.cc",
@@ -907,6 +900,14 @@ static_library("ui") {
       "android/webid/account_selection_view_android.cc",
       "android/webid/account_selection_view_android.h",
       "browser_otr_state_android.cc",
+      "plus_addresses/android/all_plus_addresses_bottom_sheet_controller.cc",
+      "plus_addresses/android/all_plus_addresses_bottom_sheet_controller.h",
+      "plus_addresses/android/all_plus_addresses_bottom_sheet_view.cc",
+      "plus_addresses/android/all_plus_addresses_bottom_sheet_view.h",
+      "plus_addresses/android/plus_address_creation_controller_android.cc",
+      "plus_addresses/android/plus_address_creation_controller_android.h",
+      "plus_addresses/android/plus_address_creation_view_android.cc",
+      "plus_addresses/android/plus_address_creation_view_android.h",
       "screen_capture_notification_ui_stub.cc",
       "webui/feed_internals/feed_internals_ui.cc",
       "webui/feed_internals/feed_internals_ui.h",
@@ -1512,8 +1513,6 @@ static_library("ui") {
       "webui/profile_internals/profile_internals_ui.h",
       "webui/sanitized_image_source.cc",
       "webui/sanitized_image_source.h",
-      "webui/search_engine_choice/icon_utils.cc",
-      "webui/search_engine_choice/icon_utils.h",
       "webui/search_engine_choice/search_engine_choice_handler.cc",
       "webui/search_engine_choice/search_engine_choice_handler.h",
       "webui/search_engine_choice/search_engine_choice_ui.cc",
@@ -1843,7 +1842,6 @@ static_library("ui") {
       "//components/saved_tab_groups/internal",
       "//components/saved_tab_groups/internal:tab_group_sync_bridge",
       "//components/saved_tab_groups/public",
-      "//components/search_engines:generate_search_engine_icons",
       "//components/search_provider_logos",
       "//components/services/app_service",
       "//components/supervised_user/core/common",
@@ -1943,6 +1941,7 @@ static_library("ui") {
       # TODO(crbug.com/382237520): Remove this once NTP code is modularized.
       "//chrome/browser/ui/lens:impl",
 
+      "//chrome/browser/ui/webui/new_tab_footer:impl",
       "//chrome/browser/ui/signin:impl",
       "//chrome/browser/ui/webui/commerce:impl",
       "//chrome/browser/ui/webui/signin:signin_impl",
@@ -1969,6 +1968,13 @@ static_library("ui") {
       # TODO(358538886): find_bar/find_bar_platform_helper_mac.mm includes //c/b/ui/browser.h
       # and //c/b/ui/tabs/tab_strip_model.h which causes a circular dependency with //c/b/ui.
       allow_circular_includes_from += [ "//chrome/browser/ui/find_bar:impl" ]
+    }
+
+    if (is_win && is_chrome_branded) {
+      sources += [
+        "startup/installer_downloader/installer_downloader_infobar_delegate.cc",
+        "startup/installer_downloader/installer_downloader_infobar_delegate.h",
+      ]
     }
 
     if (use_ozone && !is_chromeos) {
@@ -2593,7 +2599,6 @@ static_library("ui") {
       "//chromeos/ash/experiences/arc/video_accelerator:protected_native_pixmap_query_client",
       "//chromeos/ash/experiences/system_web_apps/types",
       "//chromeos/ash/resources",
-      "//chromeos/ash/services/assistant:lib",
       "//chromeos/ash/services/assistant/public/cpp",
       "//chromeos/ash/services/assistant/public/mojom",
       "//chromeos/ash/services/assistant/public/proto",
@@ -3548,6 +3553,7 @@ static_library("ui") {
       "//chrome/browser:titlebar_config",
       "//chrome/browser/win:mica_titlebar",
       "//chrome/browser/win/conflicts:module_info",
+      "//chrome/browser/win/installer_downloader:prefs",
       "//chrome/credential_provider/common:common_constants",
       "//chrome/services/util_win/public/mojom:mojom",
       "//components/lens",
@@ -3672,11 +3678,9 @@ static_library("ui") {
   if (toolkit_views) {
     sources += [
       "bubble_anchor_util.h",
-      "plus_addresses/plus_address_creation_controller_desktop.h",
-      "plus_addresses/plus_address_error_dialog.cc",
-      "plus_addresses/plus_address_error_dialog.h",
-      "plus_addresses/plus_address_menu_model.cc",
-      "plus_addresses/plus_address_menu_model.h",
+      "plus_addresses/views/plus_address_creation_controller_desktop.cc",
+      "plus_addresses/views/plus_address_creation_dialog_delegate.cc",
+      "plus_addresses/views/plus_address_creation_dialog_delegate.h",
       "send_tab_to_self/send_tab_to_self_bubble.h",
       "send_tab_to_self/send_tab_to_self_toolbar_icon_controller.cc",
       "send_tab_to_self/send_tab_to_self_toolbar_icon_controller.h",
@@ -3783,8 +3787,10 @@ static_library("ui") {
       "views/autofill/payments/payments_window_user_consent_dialog_view.h",
       "views/autofill/payments/promo_code_label_button.cc",
       "views/autofill/payments/promo_code_label_button.h",
-      "views/autofill/payments/save_and_fill_dialog_views.cc",
-      "views/autofill/payments/save_and_fill_dialog_views.h",
+      "views/autofill/payments/save_and_fill_dialog.cc",
+      "views/autofill/payments/save_and_fill_dialog.h",
+      "views/autofill/payments/save_and_fill_view_desktop.cc",
+      "views/autofill/payments/save_and_fill_view_desktop.h",
       "views/autofill/payments/save_card_bubble_views.cc",
       "views/autofill/payments/save_card_bubble_views.h",
       "views/autofill/payments/save_card_manage_cards_bubble_views.cc",
@@ -3949,8 +3955,6 @@ static_library("ui") {
       "views/data_sharing/collaboration_controller_delegate_desktop.h",
       "views/data_sharing/data_sharing_bubble_controller.cc",
       "views/data_sharing/data_sharing_bubble_controller.h",
-      "views/data_sharing/data_sharing_open_group_helper.cc",
-      "views/data_sharing/data_sharing_open_group_helper.h",
       "views/data_sharing/data_sharing_utils.cc",
       "views/data_sharing/data_sharing_utils.h",
       "views/desktop_capture/desktop_media_content_pane_view.cc",
@@ -4563,9 +4567,6 @@ static_library("ui") {
       "views/permissions/permission_prompt_quiet_icon.cc",
       "views/permissions/permission_prompt_quiet_icon.h",
       "views/permissions/permission_prompt_style.h",
-      "views/plus_addresses/plus_address_creation_controller_desktop.cc",
-      "views/plus_addresses/plus_address_creation_dialog_delegate.cc",
-      "views/plus_addresses/plus_address_creation_dialog_delegate.h",
       "views/profiles/avatar_toolbar_button.cc",
       "views/profiles/avatar_toolbar_button.h",
       "views/profiles/avatar_toolbar_button_delegate.cc",
@@ -5727,6 +5728,7 @@ static_library("ui") {
     ]
     deps += [
       "//chrome/browser/actor",
+      "//chrome/browser/ai:ai",
       "//chrome/browser/background/glic",
       "//chrome/browser/glic",
       "//chrome/browser/glic:impl",
@@ -5837,6 +5839,7 @@ source_set("ui_features") {
     "//extensions/buildflags",
   ]
   deps = [
+    "//components/search",
     "//components/webui/flags",
     "//ui/base:features",
   ]

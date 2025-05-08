@@ -294,6 +294,9 @@ extern const char kForceStartupSigninPromoDescription[];
 extern const char kAnimatedDefaultBrowserPromoInFREName[];
 extern const char kAnimatedDefaultBrowserPromoInFREDescription[];
 
+extern const char kFeedbackIncludeGWSVariationsName[];
+extern const char kFeedbackIncludeGWSVariationsDescription[];
+
 extern const char kFullscreenImprovementName[];
 extern const char kFullscreenImprovementDescription[];
 
@@ -335,6 +338,9 @@ extern const char kIOSDockingPromoDescription[];
 
 extern const char kIOSEnableDeleteAllSavedCredentialsName[];
 extern const char kIOSEnableDeleteAllSavedCredentialsDescription[];
+
+extern const char kIOSEnablePasswordManagerTrustedVaultWidgetName[];
+extern const char kIOSEnablePasswordManagerTrustedVaultWidgetDescription[];
 
 extern const char kIOSEnableRealtimeEventReportingName[];
 extern const char kIOSEnableRealtimeEventReportingDescription[];
@@ -412,11 +418,11 @@ extern const char kIOSStartTimeBrowserBackgroundRemediationsDescription[];
 extern const char kIOSStartTimeStartupRemediationsName[];
 extern const char kIOSStartTimeStartupRemediationsDescription[];
 
-extern const char kIOSTipsNotificationsName[];
-extern const char kIOSTipsNotificationsDescription[];
-
 extern const char kIOSReactivationNotificationsName[];
 extern const char kIOSReactivationNotificationsDescription[];
+
+extern const char kIOSExpandedTipsName[];
+extern const char kIOSExpandedTipsDescription[];
 
 extern const char kIOSProvidesAppNotificationSettingsName[];
 extern const char kIOSProvidesAppNotificationSettingsDescription[];
@@ -820,9 +826,6 @@ extern const char kEnableLensContextMenuUnifiedExperienceDescription[];
 extern const char kTabGridNewTransitionsName[];
 extern const char kTabGridNewTransitionsDescription[];
 
-extern const char kTabGroupsIPadName[];
-extern const char kTabGroupsIPadDescription[];
-
 extern const char kTabResumptionName[];
 extern const char kTabResumptionDescription[];
 
@@ -855,6 +858,9 @@ extern const char kWebPageTextZoomIPadDescription[];
 
 extern const char kWelcomeBackInFirstRunName[];
 extern const char kWelcomeBackInFirstRunDescription[];
+
+extern const char kWidgetsForMultiprofileName[];
+extern const char kWidgetsForMultiprofileDescription[];
 
 extern const char kYoutubeIncognitoName[];
 extern const char kYoutubeIncognitoDescription[];

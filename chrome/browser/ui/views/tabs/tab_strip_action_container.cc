@@ -75,6 +75,10 @@ constexpr char kDeclutterTriggerBucketedCTRName[] =
 
 #if BUILDFLAG(ENABLE_GLIC)
 constexpr int kLargeSpaceBetweenButtons = 6;
+#if !BUILDFLAG(IS_MAC)
+constexpr int kLargeSpaceBetweenSeparatorRight = 8;
+constexpr int kLargeSpaceBetweenSeparatorLeft = 2;
+#endif  // !BUILDFLAG(IS_MAC)
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
 }  // namespace
@@ -284,6 +288,12 @@ TabStripActionContainer::TabStripActionContainer(
 
     separator->SetColorId(kColorTabDividerFrameActive);
 
+    gfx::Insets margin;
+    margin.set_left_right(kLargeSpaceBetweenSeparatorLeft,
+                          kLargeSpaceBetweenSeparatorRight);
+
+    separator->SetProperty(views::kMarginsKey, margin);
+
     subscriptions_.push_back(browser_window_interface->RegisterDidBecomeActive(
         base::BindRepeating(&TabStripActionContainer::DidBecomeActive,
                             base::Unretained(this))));
@@ -453,6 +463,7 @@ void TabStripActionContainer::OnGlicButtonClicked() {
   }
 
   ExecuteHideTabStripNudge(glic_button_);
+  glic_button_->SetText(std::u16string());
 }
 
 void TabStripActionContainer::OnGlicButtonDismissed() {

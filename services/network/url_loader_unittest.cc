@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
-
 #include "services/network/url_loader.h"
 
 #include <stdint.h>
 
+#include <algorithm>
 #include <limits>
 #include <list>
 #include <memory>
@@ -29,6 +25,7 @@
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/escape.h"
@@ -99,6 +96,7 @@
 #include "net/url_request/url_request_job.h"
 #include "net/url_request/url_request_test_job.h"
 #include "net/url_request/url_request_test_util.h"
+#include "services/network/cookie_settings.h"
 #include "services/network/file_opener_for_upload.h"
 #include "services/network/observer_wrapper.h"
 #include "services/network/public/cpp/cors/origin_access_list.h"
@@ -118,6 +116,7 @@
 #include "services/network/public/mojom/url_loader.mojom.h"
 #include "services/network/resource_scheduler/resource_scheduler_client.h"
 #include "services/network/shared_dictionary/shared_dictionary_access_checker.h"
+#include "services/network/shared_resource_checker.h"
 #include "services/network/shared_storage/shared_storage_header_utils.h"
 #include "services/network/shared_storage/shared_storage_request_helper.h"
 #include "services/network/shared_storage/shared_storage_test_url_loader_network_observer.h"
@@ -248,7 +247,7 @@ class URLRequestMultipleWritesJob : public net::URLRequestJob {
       std::string packet = packets_.front();
       packets_.pop_front();
       CHECK_GE(buf_size, static_cast<int>(packet.length()));
-      memcpy(buf->data(), packet.c_str(), packet.length());
+      buf->span().copy_prefix_from(base::as_byte_span(packet));
       result = packet.length();
     }
 
@@ -328,7 +327,7 @@ class URLRequestEternalSyncReadsJob : public net::URLRequestJob {
   int ReadRawData(net::IOBuffer* buf, int buf_size) override {
     DCHECK_GT(buf_size, 0);
     if (fill_entire_buffer_) {
-      memset(buf->data(), 'a', buf_size);
+      std::ranges::fill(buf->first(base::checked_cast<size_t>(buf_size)), 'a');
       return buf_size;
     }
 
@@ -417,7 +416,7 @@ class URLRequestSimulatedCacheJob : public net::URLRequestJob {
 
     // Pretend this is the entire network stack, which has sent the buffer
     // to some worker thread to be written to disk.
-    memset(buf->data(), 'a', buf_size);
+    std::ranges::fill(buf->first(base::checked_cast<size_t>(buf_size)), 'a');
     *simulated_cache_dest_ = buf;
 
     // The network stack will not report the read result until the write
@@ -672,6 +671,8 @@ struct URLLoaderOptions {
       mojo::PendingRemote<mojom::URLLoaderClient> url_loader_client) {
     DCHECK(!used);
     used = true;
+    shared_resource_checker =
+        std::make_unique<SharedResourceChecker>(cookie_settings);
     return std::make_unique<URLLoader>(
         context, std::move(delete_callback), std::move(url_loader_receiver),
         options, request, std::move(url_loader_client),
@@ -685,7 +686,8 @@ struct URLLoaderOptions {
         ObserverWrapper(std::move(url_loader_network_observer)),
         ObserverWrapper(std::move(devtools_observer)),
         ObserverWrapper(std::move(device_bound_session_observer)),
-        std::move(accept_ch_frame_observer), shared_storage_writable_eligible);
+        std::move(accept_ch_frame_observer), shared_storage_writable_eligible,
+        *shared_resource_checker);
   }
 
   int32_t options = mojom::kURLLoadOptionNone;
@@ -711,6 +713,8 @@ struct URLLoaderOptions {
   mojo::PendingRemote<mojom::AcceptCHFrameObserver> accept_ch_frame_observer =
       mojo::NullRemote();
   bool shared_storage_writable_eligible = false;
+  CookieSettings cookie_settings;
+  std::unique_ptr<SharedResourceChecker> shared_resource_checker;
 
  private:
   bool used = false;

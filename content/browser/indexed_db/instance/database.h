@@ -11,7 +11,6 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -44,7 +43,6 @@ class BucketContext;
 class Connection;
 class DatabaseCallbacks;
 class Transaction;
-struct IndexedDBValue;
 enum class CursorType;
 
 // This class maps to a single IDB database:
@@ -79,8 +77,7 @@ class CONTENT_EXPORT Database {
 
   const list_set<Connection*>& connections() const { return connections_; }
 
-  enum class RunTasksResult { kDone, kError, kCanBeDestroyed };
-  std::tuple<RunTasksResult, Status> RunTasks();
+  Status RunTasks();
   void RegisterAndScheduleTransaction(Transaction* transaction);
 
   // The database object (this object) must be kept alive for the duration of
@@ -114,23 +111,6 @@ class CONTENT_EXPORT Database {
                       std::unique_ptr<blink::IndexedDBKeyRange> key_range,
                       indexed_db::CursorType cursor_type,
                       blink::mojom::IDBDatabase::GetCallback callback,
-                      Transaction* transaction);
-
-  struct CONTENT_EXPORT PutOperationParams {
-    PutOperationParams();
-
-    PutOperationParams(const PutOperationParams&) = delete;
-    PutOperationParams& operator=(const PutOperationParams&) = delete;
-
-    ~PutOperationParams();
-    int64_t object_store_id;
-    IndexedDBValue value;
-    std::unique_ptr<blink::IndexedDBKey> key;
-    blink::mojom::IDBPutMode put_mode;
-    blink::mojom::IDBTransaction::PutCallback callback;
-    std::vector<blink::IndexedDBIndexKeys> index_keys;
-  };
-  Status PutOperation(std::unique_ptr<PutOperationParams> params,
                       Transaction* transaction);
 
   Status SetIndexKeysOperation(
@@ -212,6 +192,8 @@ class CONTENT_EXPORT Database {
     }
     connections_.insert(connection);
   }
+
+  bool CanBeDestroyed();
 
  protected:
   friend class Transaction;
@@ -299,8 +281,6 @@ class CONTENT_EXPORT Database {
   // This can only be called when the given connection is closed and no longer
   // has any transaction objects.
   void ConnectionClosed(Connection* connection);
-
-  bool CanBeDestroyed();
 
   std::vector<PartitionedLockManager::PartitionedLockRequest>
   BuildLockRequestsFromTransaction(Transaction* transaction) const;

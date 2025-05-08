@@ -942,7 +942,7 @@ class MockAmountExtractionManager : public payments::AmountExtractionManager {
       : AmountExtractionManager(test_manager) {
     ON_CALL(*static_cast<MockAutofillOptimizationGuide*>(
                 test_manager->client().GetAutofillOptimizationGuide()),
-            IsUrlEligibleForCheckoutAmountSearchForIssuerId)
+            IsUrlEligibleForBnplIssuer)
         .WillByDefault(Return(true));
   }
 
@@ -3205,11 +3205,8 @@ TEST_F(BrowserAutofillManagerTest,
 }
 
 // Tests that when focusing on an autofilled field, the user gets field-by-field
-// filling suggestions without prefix matching, if AutofillAddressFieldSwapping
-// is enabled.
+// filling suggestions without prefix matching.
 TEST_F(BrowserAutofillManagerTest, GetProfileSuggestions_FieldSwapping) {
-  base::test::ScopedFeatureList scoped_feature_list{
-      features::kAutofillAddressFieldSwapping};
   FormData form =
       test::GetFormData({.fields = {{.role = NAME_FULL,
                                      .value = u"Full Name",
@@ -5292,6 +5289,26 @@ TEST_F(BrowserAutofillManagerTest, DontSaveCvcInAutocompleteHistory) {
         test_fields[i].expected_field_type != CREDIT_CARD_VERIFICATION_CODE);
   }
 }
+// Test that autofilled loyalty card fields are forced to !should_autocomplete.
+TEST_F(BrowserAutofillManagerTest,
+       DontSaveAutofilledLoyaltyCardsInAutocompleteHistory) {
+  FormData form_seen_by_ahm;
+  EXPECT_CALL(single_field_fill_router(), OnWillSubmitForm(_, _, true))
+      .WillOnce(SaveArg<0>(&form_seen_by_ahm));
+
+  // Set up form.
+  FormData form = test::GetFormData({.fields = {
+                                         {.role = LOYALTY_MEMBERSHIP_ID},
+                                     }});
+  manager().AddSeenForm(form, {LOYALTY_MEMBERSHIP_ID});
+  // Mark the loyalty card field as autofilled.
+  test_api(form).field(0).set_is_autofilled(true);
+  test_api(form).field(0).set_value(u"LOYALTYCARDNUMBER");
+
+  FormSubmitted(form);
+  ASSERT_EQ(form.fields().size(), form_seen_by_ahm.fields().size());
+  EXPECT_FALSE(test_api(form_seen_by_ahm).field(0).should_autocomplete());
+}
 
 TEST_F(BrowserAutofillManagerTest, DontOfferToSavePaymentsCard) {
   FormData form;
@@ -6331,8 +6348,7 @@ class BrowserAutofillManagerTestPageLanguageDetection
  public:
   BrowserAutofillManagerTestPageLanguageDetection() {
     scoped_features_.InitWithFeatures(
-        /*enabled_features=*/{features::kAutofillPageLanguageDetection,
-                              features::kAutofillFixValueSemantics},
+        /*enabled_features=*/{features::kAutofillPageLanguageDetection},
         /*disabled_features=*/{});
   }
 

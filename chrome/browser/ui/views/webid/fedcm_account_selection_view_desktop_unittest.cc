@@ -303,8 +303,8 @@ class FedCmAccountSelectionViewDesktopTest : public ChromeViewsTestBase {
     return base::MakeRefCounted<content::IdentityProviderData>(
         /*idp_for_display=*/"", content::IdentityProviderMetadata(),
         content::ClientMetadata(GURL(), GURL(), GURL(), gfx::Image()),
-        blink::mojom::RpContext::kSignIn, disclosure_fields,
-        has_login_status_mismatch);
+        blink::mojom::RpContext::kSignIn, /*format=*/std::nullopt,
+        disclosure_fields, has_login_status_mismatch);
   }
 
   IdentityRequestAccountPtr CreateAccount(
@@ -356,7 +356,8 @@ class FedCmAccountSelectionViewDesktopTest : public ChromeViewsTestBase {
             blink::mojom::RpMode rp_mode,
             const std::vector<IdentityRequestAccountPtr>& new_accounts =
                 std::vector<IdentityRequestAccountPtr>()) {
-    controller.Show(content::RelyingPartyData(kTopFrameEtldPlusOne),
+    controller.Show(content::RelyingPartyData(kTopFrameEtldPlusOne,
+                                              /*iframe_for_display=*/""),
                     {idp_data_}, accounts, sign_in_mode, rp_mode, new_accounts);
   }
 
@@ -415,8 +416,9 @@ class FedCmAccountSelectionViewDesktopTest : public ChromeViewsTestBase {
       blink::mojom::RpMode rp_mode) {
     auto controller = std::make_unique<TestFedCmAccountSelectionView>(
         delegate_.get(), tab_interface_.get(), this);
-    controller->Show(content::RelyingPartyData(kTopFrameEtldPlusOne), idp_list,
-                     accounts, sign_in_mode, rp_mode,
+    controller->Show(content::RelyingPartyData(kTopFrameEtldPlusOne,
+                                               /*iframe_for_display=*/""),
+                     idp_list, accounts, sign_in_mode, rp_mode,
                      /*new_accounts=*/std::vector<IdentityRequestAccountPtr>());
     return controller;
   }

@@ -33,7 +33,7 @@
 #include "chrome/browser/glic/host/host.h"
 #include "chrome/browser/glic/host/webui_contents_container.h"
 #include "chrome/browser/glic/widget/glic_widget.h"
-#include "chrome/browser/glic/widget/glic_window_controller.h"
+#include "chrome/browser/glic/widget/glic_window_controller_impl.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_attributes_storage.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -85,10 +85,10 @@ GlicKeyedService::GlicKeyedService(
       metrics_(std::make_unique<GlicMetrics>(profile, enabling_.get())),
       host_(std::make_unique<Host>(profile)),
       window_controller_(
-          std::make_unique<GlicWindowController>(profile,
-                                                 identity_manager,
-                                                 this,
-                                                 enabling_.get())),
+          std::make_unique<GlicWindowControllerImpl>(profile,
+                                                     identity_manager,
+                                                     this,
+                                                     enabling_.get())),
       focused_tab_manager_(profile, *window_controller_),
       screenshot_capturer_(std::make_unique<GlicScreenshotCapturer>()),
       auth_controller_(std::make_unique<AuthController>(profile,
@@ -154,6 +154,16 @@ void GlicKeyedService::ToggleUI(BrowserWindowInterface* bwi,
   window_controller_->Toggle(bwi, prevent_close, source);
 }
 
+void GlicKeyedService::OpenFreDialogInNewTab(BrowserWindowInterface* bwi) {
+  // Glic may be disabled for certain user profiles (the user is browsing in
+  // incognito or guest mode, policy, etc). In those cases, the entry points to
+  // this method should already have been removed.
+  CHECK(GlicEnabling::IsEnabledForProfile(profile_));
+
+  glic_profile_manager_->SetActiveGlic(this);
+  window_controller_->fre_controller()->OpenFreDialogInNewTab(bwi);
+}
+
 void GlicKeyedService::CloseUI() {
   window_controller_->Shutdown();
   host().Shutdown();
@@ -208,6 +218,11 @@ void GlicKeyedService::FetchZeroStateSuggestions(
   } else {
     std::move(callback).Run(nullptr);
   }
+}
+
+GlicWindowController& GlicKeyedService::window_controller() {
+  CHECK(window_controller_);
+  return *window_controller_.get();
 }
 
 void GlicKeyedService::GuestAdded(content::WebContents* guest_contents) {
@@ -384,6 +399,17 @@ void GlicKeyedService::StopActorTask() {
   }
 
   actor_controller_->StopTask();
+}
+
+bool GlicKeyedService::IsActorCoordinatorActingOnTab(
+    const content::WebContents* tab) const {
+  return actor_controller_ &&
+         actor_controller_->IsActorCoordinatorActingOnTab(tab);
+}
+
+actor::ActorCoordinator& GlicKeyedService::GetActorCoordinatorForTesting() {
+  CHECK(actor_controller_);
+  return actor_controller_->GetActorCoordinatorForTesting();  // IN-TEST
 }
 
 void GlicKeyedService::CaptureScreenshot(

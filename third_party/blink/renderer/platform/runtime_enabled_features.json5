@@ -589,6 +589,10 @@
       copied_from_base_feature_if: "overridden",
     },
     {
+      name: "BackForwardCacheRestorationPerformanceEntry",
+      status: "experimental",
+    },
+    {
       name: "BackForwardCacheUpdateNotRestoredReasonsName",
       status: "stable",
     },
@@ -1061,6 +1065,11 @@
       status: "stable",
     },
     {
+      // Enables alignment properties for block and inline out-of-flow elements.
+      name: "CSSAlignBlockAndInlineOutOfFlows",
+      status: "stable",
+    },
+    {
       // Remember the scroll offset of the default anchor when initially
       // displaying an anchor-positioned element, and when it switches position
       // options (`position-try-fallbacks`), also known as an anchor
@@ -1153,11 +1162,6 @@
       // https://drafts.csswg.org/css-images-4/#cross-fade-function
       name: "CSSCrossFade",
       status: "experimental",
-    },
-    {
-      // crbug.com/392927981
-      name: "CssDecoratingBoxPseudoFix",
-      status: "stable",
     },
     {
       name: "CSSDynamicRangeLimit",
@@ -2032,15 +2036,6 @@
       base_feature: "none",
     },
     {
-      name: "FedCmWithStorageAccessAPI",
-      depends_on: ["FedCm"],
-      base_feature_status: "enabled",
-      browser_process_read_access: true,
-      origin_trial_feature_name: "FedCmWithStorageAccessAPI",
-      copied_from_base_feature_if: "overridden",
-      status: "stable",
-    },
-    {
       name: "FencedFrames",
       base_feature: "none",
       // This helps enable and expose the <fencedframe> element, but note that
@@ -2289,10 +2284,6 @@
       status: {"Android": "", "default": "stable"},
     },
     {
-      name: "FontationsFontBackend",
-      status: "stable",
-    },
-    {
       name: "FontFamilyPostscriptMatchingCTMigration",
     },
     {
@@ -2509,6 +2500,16 @@
       origin_trial_feature_name: "HTMLInterestTargetAttribute",
       origin_trial_allows_third_party: true,
     },
+    // Enables the "context menu item only" behavior mode for the
+    // `interesttarget` API. In this mode, the context menu is displayed in the
+    // "normal" location, but an additional line item is added to the menu which
+    // allows the user to show interest. This is enabled by default, but depends
+    // on HTMLInterestTargetAttribute.
+    {
+      name: "HTMLInterestTargetContextMenuItemOnly",
+      status: "stable",
+      depends_on: ["HTMLInterestTargetAttribute"],
+    },
     {
       // A flag, just for local testing to make the
       // HTML parser yield more often and take longer to resume.
@@ -2522,7 +2523,7 @@
     },
     {
       name: "IgnoreLetterSpacingInCursiveScripts",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "ImageDataPixelFormat",
@@ -2647,6 +2648,12 @@
       status: "experimental",
     },
     {
+      name: "IntegrityPolicyScript",
+      status: "stable",
+      base_feature: "none",
+      public: true,
+    },
+    {
       name: "InterestGroupsInSharedStorageWorklet",
       public: true,
       status: "stable",
@@ -2726,6 +2733,14 @@
       public: true,
     },
     {
+      // LayoutBox::PhysicalLocation() to return a truly visual offset - the
+      // offset of its first fragment relatively to the first fragment of its
+      // containing block, also when block-fragmented (used to be in the
+      // "stitched" flow-thread coordinate space).
+      name: "LayoutBoxVisualLocation",
+      status: "experimental",
+    },
+    {
       name: "LayoutFlexNewRowAlgorithm",
       status: "stable",
     },
@@ -2737,7 +2752,7 @@
       name: "LayoutIgnoreMarginsForSticky",
     },
     {
-      name: "LayoutJustifySelfForBlocks",
+      name: "LayoutIsAnonymousBlockFix",
       status: "stable",
     },
     {
@@ -2755,10 +2770,6 @@
     {
       name: "LayoutStretch",
       status: "experimental",
-    },
-    {
-      name: "LayoutWebkitBoxTreeFix",
-      status: "stable",
     },
     {
       name: "LazyInitializeMediaControls",
@@ -3786,12 +3797,6 @@
       name: "RemoveDataUrlInSvgUse",
       status: "stable",
     },
-    // Remove a node if it's selected fully even though it has children. See
-    // https://crbug.com/331074432
-    {
-      name: "RemoveNodeHavingChildrenIfFullySelected",
-      status: "stable",
-    },
     {
       // crbug.com/41047725
       name: "RemovePlaceholderBRForDisplayInline",
@@ -3834,7 +3839,7 @@
       // composited pixel alignment issues. See
       // https://crbug.com/40084005
       name: "RenderSurfaceFor2DScaleTransform",
-      status: "stable",
+      status: "experimental",
     },
     {
       name: "ReportEventTimingAtVisibilityChange",
@@ -3901,10 +3906,6 @@
     },
     {
       name: "RTCDataChannelPriority",
-      status: "experimental",
-    },
-    {
-      name: "RTCEncodedAudioFrameAbsCaptureTime",
       status: "experimental",
     },
     {
@@ -4140,6 +4141,23 @@
       base_feature: "none",
     },
     {
+      // Implements improved accessibility mappings for having an <input>
+      // inside of a <select> by keeping the child <input> in the a11y tree at
+      // the same place that its at in the DOM tree, but automatically setting
+      // up a controls relationship to the menu list popup.
+      name: "SelectAccessibilityNestedInput",
+      status: "test",
+      depends_on: ["CustomizableSelect"],
+    },
+    {
+      // Implements improved accessibility mappings for having an <input>
+      // inside of a <select> by reparenting the child <input> in the
+      // accessibility tree to be a sibling of the menu list popup.
+      name: "SelectAccessibilityReparentInput",
+      status: "test",
+      depends_on: ["CustomizableSelect"],
+    },
+    {
       // SelectAudioOutput API
       // https://chromestatus.com/feature/5164535504437248
       name: "SelectAudioOutput",
@@ -4153,7 +4171,6 @@
       // select option colors. https://issues.chromium.org/issues/40788356
       // This is shipping in M136 and can be removed in M138
       name: "SelectColorsRemoveImportant",
-      status: "stable",
     },
     {
       // The selectedcontentelement attribute is for connecting select elements
@@ -4627,6 +4644,12 @@
       status: "experimental",
     },
     {
+      // crbug.com/341564372
+      name: "TextareaMultipleIfcs",
+      status: "experimental",
+      depends_on: ["FastSelectionSync", "TextareaLineEndingsAsBr"],
+    },
+    {
       // killswitch for fix in M137
       name: "TextareaStableResizing",
       status: "stable",
@@ -4729,6 +4752,14 @@
     {
       name: "TouchDragAndContextMenu",
       implied_by: ["TouchDragOnShortPress"],
+      base_feature: "none",
+      public: true,
+    },
+    // This feature enables drag and drop using touch input devices. Replaces
+    // the old "--enable-touch-drag-drop" and "--disable-touch-drag-drop"
+    // switches.
+    {
+      name: "TouchDragAndDrop",
       base_feature: "none",
       public: true,
     },
@@ -4888,12 +4919,6 @@
       },
     },
     {
-      // This flag uses the original DOM text for input when the password
-      // echo is enabled to create the offset_map.
-      name: "UseOriginalDomOffsetsForOffsetMap",
-      status: "stable",
-    },
-    {
       name: "UsePositionForPointInFlexibleBoxWithSingleChildElement",
       status: "stable",
     },
@@ -4971,11 +4996,7 @@
     },
     {
       name: "ViewportSegments",
-      status: "experimental",
-      public: true,
-      base_feature_status: "enabled",
-      copied_from_base_feature_if: "overridden",
-      origin_trial_feature_name: "FoldableAPIs",
+      status: "stable",
     },
     {
       name: "ViewTransitionDisableSnapBrowserControlsOnHidden",

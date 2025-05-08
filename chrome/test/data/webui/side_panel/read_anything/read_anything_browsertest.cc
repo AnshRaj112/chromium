@@ -191,11 +191,6 @@ IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, LanguageChanged) {
                    "mocha.run()");
 }
 
-IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, VoiceSelection) {
-  RunSidePanelTest("side_panel/read_anything/voice_selection_test.js",
-                   "mocha.run()");
-}
-
 IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, Prefs) {
   RunSidePanelTest("side_panel/read_anything/prefs_test.js", "mocha.run()");
 }
@@ -210,7 +205,8 @@ IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, ToolbarOverflow) {
                    "mocha.run()");
 }
 
-IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, LinksToggledIntegration) {
+IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest,
+                       DISABLED_LinksToggledIntegration) {
   RunSidePanelTest("side_panel/read_anything/links_toggled_integration_test.js",
                    "mocha.run()");
 }
@@ -293,6 +289,16 @@ IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, VoicePackController) {
 
 IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, VoicePackModel) {
   RunSidePanelTest("side_panel/read_anything/voice_pack_model_test.js",
+                   "mocha.run()");
+}
+
+IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, SpeechController) {
+  RunSidePanelTest("side_panel/read_anything/speech_controller_test.js",
+                   "mocha.run()");
+}
+
+IN_PROC_BROWSER_TEST_F(ReadAnythingMochaTest, SpeechModel) {
+  RunSidePanelTest("side_panel/read_anything/speech_model_test.js",
                    "mocha.run()");
 }
 

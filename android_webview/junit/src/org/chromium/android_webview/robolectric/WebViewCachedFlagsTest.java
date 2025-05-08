@@ -8,6 +8,7 @@ import androidx.test.filters.SmallTest;
 
 import com.android.webview.chromium.WebViewCachedFlags;
 
+import org.chromium.android_webview.common.AwFeatures;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -106,5 +107,30 @@ public class WebViewCachedFlagsTest {
         Assert.assertEquals(
                 Set.of("Foo", "Bar"),
                 sharedPrefs.getStringSet(CACHED_DISABLED_FLAGS_PREF, Set.of()));
+    }
+
+    @Test
+    @Feature({"AndroidWebView"})
+    @SmallTest
+    public void manualFlagsAreMigrated() {
+        InMemorySharedPreferences sharedPrefs = new InMemorySharedPreferences();
+        sharedPrefs
+                .edit()
+                .putBoolean("useWebViewResourceContext", true)
+                .putBoolean("defaultWebViewPartitionedCookiesState", true)
+                .putBoolean("webViewUseStartupTasksLogic", true)
+                .apply();
+        WebViewCachedFlags cachedFlags = new WebViewCachedFlags(sharedPrefs, Map.of());
+
+        // The flags should be enabled if the prefs were present.
+        Assert.assertTrue(
+                cachedFlags.isCachedFeatureEnabled(AwFeatures.WEBVIEW_SEPARATE_RESOURCE_CONTEXT));
+        Assert.assertTrue(cachedFlags.isCachedFeatureEnabled(AwFeatures.WEBVIEW_DISABLE_CHIPS));
+        Assert.assertTrue(
+                cachedFlags.isCachedFeatureEnabled(AwFeatures.WEBVIEW_USE_STARTUP_TASKS_LOGIC));
+        // Check that we removed the old prefs.
+        Assert.assertFalse(sharedPrefs.contains("useWebViewResourceContext"));
+        Assert.assertFalse(sharedPrefs.contains("defaultWebViewPartitionedCookiesState"));
+        Assert.assertFalse(sharedPrefs.contains("webViewUseStartupTasksLogic"));
     }
 }

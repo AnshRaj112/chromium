@@ -662,8 +662,7 @@ void AwContentBrowserClient::OverrideWebPreferences(
       (delegate) ? delegate->isModalContextMenu() : false;
 }
 
-std::vector<std::unique_ptr<content::NavigationThrottle>>
-AwContentBrowserClient::CreateThrottlesForNavigation(
+void AwContentBrowserClient::CreateThrottlesForNavigation(
     content::NavigationThrottleRegistry& registry) {
   // We allow intercepting only navigations within main frames. This
   // is used to post onPageStarted. We handle shouldOverrideUrlLoading
@@ -675,8 +674,10 @@ AwContentBrowserClient::CreateThrottlesForNavigation(
     // NavigationThrottles that don't delay or cancel navigations (e.g.
     // throttles that are only observing callbacks without affecting navigation
     // behavior) should be added before MetricsNavigationThrottle.
-    registry.AddThrottle(page_load_metrics::MetricsNavigationThrottle::Create(
-        &navigation_handle));
+    // TODO(https://crbug.com/412524375): This assumption is fragile. This
+    // should be cared by adding an attribute flag to
+    // NavigationThrottleRegistry::AddThrottle().
+    page_load_metrics::MetricsNavigationThrottle::CreateAndAdd(registry);
   }
   // Use Synchronous mode for the navigation interceptor, since this class
   // doesn't actually call into an arbitrary client, it just posts a task to
@@ -711,8 +712,6 @@ AwContentBrowserClient::CreateThrottlesForNavigation(
           &navigation_handle, urlClassifier));
     }
   }
-
-  return {};
 }
 
 std::unique_ptr<content::PrefetchServiceDelegate>

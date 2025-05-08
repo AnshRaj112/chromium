@@ -37,15 +37,6 @@ source_set("content_world_header") {
   sources = [ "content_world.h" ]
 }
 
-compile_ts("frame_id") {
-  sources = [ "resources/frame_id.ts" ]
-
-  deps = [
-    ":gcrweb",
-    ":util_scripts",
-  ]
-}
-
 compile_ts("util_scripts") {
   sources = [ "resources/utils.ts" ]
 }
@@ -61,6 +52,8 @@ compile_ts("error_reporting") {
 # compiled TypeScript to be used as a dependency by other TypeScript targets.
 compile_ts("gcrweb") {
   sources = [ "resources/gcrweb.ts" ]
+
+  deps = [ ":util_scripts" ]
 }
 
 optimize_js("gcrweb_js") {

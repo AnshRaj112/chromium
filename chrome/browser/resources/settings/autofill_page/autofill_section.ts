@@ -251,6 +251,32 @@ export class SettingsAutofillSectionElement extends
     this.autofillManager_.saveAddress(event.detail);
   }
 
+  private isAccountHomeAddress_(address: chrome.autofillPrivate.AddressEntry) {
+    return address.metadata?.recordType ===
+        chrome.autofillPrivate.AddressRecordType.ACCOUNT_HOME;
+  }
+
+  private isAccountWorkAddress_(address: chrome.autofillPrivate.AddressEntry) {
+    return address.metadata?.recordType ===
+        chrome.autofillPrivate.AddressRecordType.ACCOUNT_WORK;
+  }
+
+  private isAccountHomeOrWorkAddress_(
+      address: chrome.autofillPrivate.AddressEntry) {
+    return this.isAccountHomeAddress_(address) ||
+        this.isAccountWorkAddress_(address);
+  }
+
+  private onAccountHomeAddressClick_() {
+    OpenWindowProxyImpl.getInstance().openUrl(
+        this.i18n('googleAccountHomeAddressUrl'));
+  }
+
+  private onAccountWorkAddressClick_() {
+    OpenWindowProxyImpl.getInstance().openUrl(
+        this.i18n('googleAccountWorkAddressUrl'));
+  }
+
   private isCloudOffVisible_(
       address: chrome.autofillPrivate.AddressEntry,
       accountInfo: chrome.autofillPrivate.AccountInfo|null): boolean {

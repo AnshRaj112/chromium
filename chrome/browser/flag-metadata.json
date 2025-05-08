@@ -301,13 +301,18 @@
     "expiry_milestone": 138
   },
   {
-    "name": "android-surface-color-update",
-    "owners": [ "jtanaristy@google.com", "wenyufu@google.com" ],
-    "expiry_milestone": 140
+    "name": "android-progress-bar-visual-update",
+    "owners": ["agazal@google.com", "peilinwang@google.com", "clank-app-team@google.com"],
+    "expiry_milestone": 170
   },
   {
-    "name": "android-tab-declutter",
-    "owners": [ "wylieb@google.com", "clank-tab-dev@google.com" ],
+    "name": "android-sms-otp-filling",
+    "owners": ["kazinova@google.com", "vasilii@chromium.org", "chrome-password-manager-team@google.com"],
+    "expiry_milestone": 145
+  },
+  {
+    "name": "android-surface-color-update",
+    "owners": [ "jtanaristy@google.com", "wenyufu@google.com" ],
     "expiry_milestone": 140
   },
   {
@@ -326,6 +331,11 @@
     "expiry_milestone": 142
   },
   {
+    "name": "android-tab-declutter-auto-delete",
+    "owners": [ "wylieb@google.com", "clank-tab-dev@google.com" ],
+    "expiry_milestone": 145
+  },
+  {
     "name": "android-tab-declutter-performance-improvements",
     "owners": [ "wylieb@google.com", "clank-tab-dev@google.com" ],
     "expiry_milestone": 140
@@ -336,6 +346,14 @@
       "wenyufu@chromium.org"
     ],
     "expiry_milestone": 142
+  },
+  {
+    "name": "android-window-management-web-api",
+    "owners": [
+      "renkens@google.com",
+      "cros-web-apps-team@google.com"
+    ],
+    "expiry_milestone": 145
   },
   {
     "name": "animate-suggestions-list-appearance",
@@ -960,6 +978,11 @@
       "//ui/accessibility/OWNERS"
     ],
     "expiry_milestone": 132
+  },
+  {
+    "name": "batch-tab-restore",
+    "owners": [ "ckitagawa@google.com", "clank-tab-dev@google.com" ],
+    "expiry_milestone": 150
   },
   {
     "name": "batch-upload-desktop",
@@ -1724,6 +1747,11 @@
     "expiry_milestone": 135
   },
   {
+    "name": "contextual-search-box-uses-contextual-search-provider",
+    "owners": [ "mahmadi@chromium.org", "niharm@chromium.org", "orinj@chromium.org", "chrome-desktop-search@google.com"],
+    "expiry_milestone": 150
+  },
+  {
     "name": "contextual-search-debug",
     "owners": [ "//chrome/android/java/src/org/chromium/chrome/browser/contextualsearch/OWNERS" ],
     // This is used to enable debugging of server and backend code.
@@ -2194,8 +2222,9 @@
   },
   {
     "name": "disable-instance-limit",
-    "owners": [ "asriniva@google.com", "clank-large-form-factors@google.com"],
-    "expiry_milestone": 137
+    "owners": [ "skavuluru@google.com", "clank-large-form-factors@google.com", "gurmeetk@google.com" ],
+    // The study is extended and now includes XR devices.
+    "expiry_milestone": 145
   },
   {
     "name": "disable-javascript-harmony-shipping",
@@ -3059,17 +3088,17 @@
   {
     "name": "enable-desktop-pwas-tab-strip",
     "owners": [ "pwa-team@google.com" ],
-    "expiry_milestone": 140
+    "expiry_milestone": 150
   },
   {
     "name": "enable-desktop-pwas-tab-strip-customizations",
     "owners": [ "cros-web-apps-core@google.com", "pwa-team@google.com" ],
-    "expiry_milestone": 140
+    "expiry_milestone": 150
   },
   {
     "name": "enable-desktop-pwas-tab-strip-settings",
     "owners": [ "pwa-team@google.com" ],
-    "expiry_milestone": 132
+    "expiry_milestone": 150
   },
   {
     "name": "enable-disco-feed-endpoint",
@@ -3875,6 +3904,11 @@
     "expiry_milestone": -1
   },
   {
+    "name": "enable-password-manager-trusted-vault-widget",
+    "owners": [ "ylahodiuk@google.com", "rgod@google.com" ],
+    "expiry_milestone": 142
+  },
+  {
     "name": "enable-pending-mode-passwords-promo",
     "owners": [
       "uno-desktop@google.com",
@@ -3917,6 +3951,11 @@
     "name": "enable-phone-hub-call-notification",
     "owners": [ "jonmann@chromium.org", "nayebi@chromium.org" ],
     "expiry_milestone": 125
+  },
+  {
+    "name": "enable-pix-account-linking",
+    "owners": [ "vishwasuppoor@google.com", "chrome-payments-team@google.com", "payments-autofill-team@google.com" ],
+    "expiry_milestone": 143
   },
   {
     "name": "enable-pix-payments",
@@ -5126,6 +5165,11 @@
     "expiry_milestone": 138
   },
   {
+    "name": "fwupd-developer-mode",
+    "owners": [ "rishabhagr@chromium.org" ],
+    "expiry_milestone": 145
+  },
+  {
     "name": "game-dashboard-game-pwas",
     "owners": [
       "gdomergue@google.com",
@@ -5277,6 +5321,11 @@
       "//chrome/browser/ui/hats/OWNERS"
     ],
     "expiry_milestone": 126
+  },
+  {
+    "name": "hdr-agtm",
+    "owners": [ "ccameron@chromium.org", "fgalligan@chromium.org" ],
+    "expiry_milestone": 170
   },
   {
     "name": "headless-tab-model",
@@ -5510,14 +5559,6 @@
     "expiry_milestone": 140
   },
   {
-    "name": "improved-settings-ui-on-desktop",
-    "owners": [
-      "uno-desktop@google.com",
-      "//components/signin/OWNERS"
-    ],
-    "expiry_milestone": 136
-  },
-  {
     "name": "in-product-help-demo-mode-choice",
     "owners": [ "dtrainor@chromium.org", "nyquist@chromium.org" ],
     // This flag is used by teams as they develop in-product help integrations,
@@ -5642,6 +5683,11 @@
     "name": "ios-enable-delete-all-saved-credentials",
     "owners": ["mxlg@google.com", "bling-transactions@google.com"],
     "expiry_milestone": 137
+  },
+  {
+    "name": "ios-expanded-tips",
+    "owners": ["scottyoder@google.com", "bwwilliams@google.com", "bling-get-set-up@google.com"],
+    "expiry_milestone": 142
   },
   {
     "name": "ios-interruptible-coordinator-always-dismissed",
@@ -5815,11 +5861,6 @@
     "name": "ios-start-time-startup-remediations",
     "owners": [ "hiramahmood@google.com", "bling-get-set-up@chromium.org"],
     "expiry_milestone": 136
-  },
-  {
-    "name": "ios-tips-notifications",
-    "owners": ["scottyoder@google.com", "bling-get-set-up@google.com"],
-    "expiry_milestone": 135
   },
   {
     "name": "ios-welcome-back-screen",
@@ -5999,6 +6040,11 @@
     "name": "launcher-system-info-answer-cards",
     "owners": ["laurencom@chromium.org", "chenjih@google.com"],
     "expiry_milestone": 130
+  },
+  {
+    "name": "left-click-opens-tab-group-bubble",
+    "owners": [ "dpenning@chromium.org" ],
+    "expiry_milestone": 137
   },
   {
     "name": "left-hand-side-activity-indicators",
@@ -7415,7 +7461,7 @@
   {
     "name": "pdf-xfa-forms",
     "owners": [ "thestig@chromium.org", "//pdf/OWNERS" ],
-    "expiry_milestone": 135
+    "expiry_milestone": 140
   },
   {
     "name": "permission-element",
@@ -7458,6 +7504,14 @@
       "drmasquatch@chromium.org"
     ],
     "expiry_milestone": 130
+  },
+  {
+    "name": "pinned-tab-toast-on-close",
+    "owners": [
+      "dljames@chromium.org",
+      "top-chrome-desktop-ui@google.com"
+    ],
+    "expiry_milestone": 150
   },
   {
     "name": "platform-keys-changes-wave-1",
@@ -8954,11 +9008,6 @@
     "expiry_milestone": 140
   },
   {
-    "name": "sync-webauthn-credentials",
-    "owners": [ "chrome-webauthn@google.com" ],
-    "expiry_milestone": 136
-  },
-  {
     "name": "sys-ui-holdback-drive-integration",
     "owners": ["newcomer@chromium.org"],
     "expiry_milestone": 135
@@ -9013,6 +9062,11 @@
     "name": "tab-group-entry-points-android",
     "owners": [ "mfiaz@google.com", "clank-tab-dev@google.com" ],
     "expiry_milestone": 143
+  },
+  {
+    "name": "tab-group-home",
+    "owners": [ "chrome-shopping-eng@google.com" ],
+    "expiry_milestone": 146
   },
   {
     "name": "tab-group-indicator",
@@ -9192,6 +9246,14 @@
     "name": "third-party-profile-management",
     "owners": [ "igorruvinov@chromium.org", "ydago@chromium.org", "zmin@chromium.org" ],
     "expiry_milestone": 135
+  },
+  {
+    "name": "three-button-password-save-dialog",
+    "owners": [
+      "cjgrant@chromium.org",
+      "dfried@chromium.org"
+    ],
+    "expiry_milestone": 145
   },
   {
     "name": "throttle-main-thread-to-60hz",
@@ -10017,6 +10079,11 @@
     "name": "whats-new-ios-m116",
     "owners": [ "cheickcisse@google.com", "bling-flags@google.com" ],
     "expiry_milestone": 122
+  },
+  {
+    "name": "widgets-for-multiprofile",
+    "owners": [ "fedegermi@google.com", "olivierrobin@chromium.org" ],
+    "expiry_milestone": 143
   },
   {
     "name": "wifi-concurrency",

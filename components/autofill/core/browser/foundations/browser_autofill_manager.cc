@@ -123,6 +123,7 @@
 #include "components/autofill/core/browser/studies/autofill_experiments.h"
 #include "components/autofill/core/browser/suggestions/addresses/address_suggestion_generator.h"
 #include "components/autofill/core/browser/suggestions/payments/payments_suggestion_generator.h"
+#include "components/autofill/core/browser/suggestions/single_fields/iban_suggestion_generator.h"
 #include "components/autofill/core/browser/suggestions/suggestion.h"
 #include "components/autofill/core/browser/suggestions/suggestion_hiding_reason.h"
 #include "components/autofill/core/browser/suggestions/suggestion_type.h"
@@ -144,6 +145,7 @@
 #include "components/autofill/core/common/autofill_regexes.h"
 #include "components/autofill/core/common/autofill_util.h"
 #include "components/autofill/core/common/credit_card_number_validation.h"
+#include "components/autofill/core/common/dense_set.h"
 #include "components/autofill/core/common/form_data.h"
 #include "components/autofill/core/common/form_data_predictions.h"
 #include "components/autofill/core/common/form_field_data.h"
@@ -174,6 +176,7 @@ namespace autofill {
 using FillingProductSet = DenseSet<FillingProduct>;
 
 using mojom::SubmissionSource;
+using payments::AmountExtractionManager;
 
 namespace {
 
@@ -609,6 +612,13 @@ void MaybeImportFromSubmittedForm(AutofillClient& client,
         CREDIT_CARD_VERIFICATION_CODE) {
       // However, if Autofill has recognized a field as CVC, that shouldn't be
       // saved.
+      fields_for_autocomplete.back().set_should_autocomplete(false);
+    }
+
+    if (autofill_field->Type().GetStorableType() == LOYALTY_MEMBERSHIP_ID &&
+        autofill_field->is_autofilled()) {
+      // Only store loyalty cards values in Autocomplete if they were filled
+      // manually.
       fields_for_autocomplete.back().set_should_autocomplete(false);
     }
     const std::u16string& value = autofill_field->value_for_import();
@@ -1127,8 +1137,10 @@ void BrowserAutofillManager::OnAskForValuesToFillImpl(
   }
   // Suggestion generators lifespan should be limited to only when they are
   // needed.
-  CHECK(suggestion_generators_.empty());
+  suggestion_generators_.clear();
   // TODO(crbug.com/409962888): Populate `suggestion_generators_` here.
+  suggestion_generators_.emplace_back(
+      std::make_unique<IbanSuggestionGenerator>());
 
   SuggestionsContext context = BuildSuggestionsContext(
       form, form_structure, field, autofill_field, trigger_source);
@@ -1188,6 +1200,12 @@ void BrowserAutofillManager::OnIndividualSuggestionsGenerated(
   // TODO(crbug.com/409962888): Add logic to discard/merge
   // `returned_suggestions` into a single list.
   std::vector<Suggestion> suggestions;
+  for (const auto& [filling_product, filling_suggestions] :
+       returned_suggestions) {
+    suggestions.insert(suggestions.end(), filling_suggestions.begin(),
+                       filling_suggestions.end());
+  }
+
   OnGenerateSuggestionsComplete(form, field, trigger_source, context, true,
                                 suggestions, std::nullopt);
   // Suggestion generators lifespan should be limited to only when they are
@@ -1542,15 +1560,26 @@ void BrowserAutofillManager::OnGenerateSuggestionsComplete(
   // When a user interacts with the credit card form on the merchant checkout
   // pages, `this` checks `amount_extraction_manager_` if amount extraction
   // should happen, and if so, triggers amount extraction.
-  if (autofill_field &&
-      amount_extraction_manager_->ShouldTriggerAmountExtraction(
-          context,
-          ShouldSuppressSuggestions(context.suppress_reason, log_manager()),
-          !suggestions.empty(), autofill_field->Type().GetStorableType())) {
-    if (payments::BnplManager* bnpl_manager = GetPaymentsBnplManager()) {
-      bnpl_manager->NotifyOfSuggestionGeneration(trigger_source);
+  if (autofill_field) {
+    const DenseSet<AmountExtractionManager::EligibleFeature> eligible_features =
+        amount_extraction_manager_->GetEligibleFeatures(
+            context,
+            ShouldSuppressSuggestions(context.suppress_reason, log_manager()),
+            !suggestions.empty(), autofill_field->Type().GetStorableType());
+
+    if (!eligible_features.empty()) {
+      for (AmountExtractionManager::EligibleFeature eligible_feature :
+           eligible_features) {
+        switch (eligible_feature) {
+          case AmountExtractionManager::EligibleFeature::kBnpl:
+            GetPaymentsBnplManager()->NotifyOfSuggestionGeneration(
+                trigger_source);
+            continue;
+        }
+        NOTREACHED();
+      }
+      amount_extraction_manager_->TriggerCheckoutAmountExtraction();
     }
-    amount_extraction_manager_->TriggerCheckoutAmountExtraction();
   }
 
   if (show_suggestions) {
@@ -1697,10 +1726,15 @@ void BrowserAutofillManager::UndoAutofill(
   if (!form_structure) {
     return;
   }
-  // This will apply the undo operation and return information about the
-  // operation being undone, for metric purposes.
-  FillingProduct filling_product = form_filler_->UndoAutofill(
-      action_persistence, form, *form_structure, trigger_field);
+  const AutofillField* autofill_trigger_field =
+      form_structure->GetFieldById(trigger_field.global_id());
+  if (!autofill_trigger_field) {
+    return;
+  }
+
+  FillingProduct filling_product = autofill_trigger_field->filling_product();
+  form_filler_->UndoAutofill(action_persistence, form, *form_structure,
+                             trigger_field, filling_product);
 
   // The remaining logic is only relevant for filling.
   if (action_persistence != mojom::ActionPersistence::kPreview) {
@@ -2624,18 +2658,6 @@ void BrowserAutofillManager::MaybeShowPlusAddressEmailOverrideNotification(
     return;
   }
 
-  // TODO: crbug.com/40227496 - Remove `email_field` when
-  // `kAutofillFixValueSemantics` is launched.
-  const FormFieldData* email_field = nullptr;
-  if (auto it = std::ranges::find(safe_filled_fields,
-                                  email_autofill_field->global_id(),
-                                  &FormFieldData::global_id);
-      it != safe_filled_fields.end()) {
-    email_field = *it;
-  } else {
-    return;
-  }
-
   const std::u16string original_email =
       original_profile->GetRawInfo(EMAIL_ADDRESS);
   // Note that the filled `profile` could have been updated with a plus
@@ -2658,15 +2680,14 @@ void BrowserAutofillManager::MaybeShowPlusAddressEmailOverrideNotification(
         base::BindOnce(&BrowserAutofillManager::OnEmailOverrideUndone,
                        weak_ptr_factory_.GetWeakPtr(), original_email,
                        form_structure.global_id(),
-                       email_autofill_field->global_id(), *email_field));
+                       email_autofill_field->global_id()));
   }
 }
 
 void BrowserAutofillManager::OnEmailOverrideUndone(
     const std::u16string& original_email,
     const FormGlobalId& form_id,
-    const FieldGlobalId& field_id,
-    const FormFieldData& field_after_last_autofill) {
+    const FieldGlobalId& field_id) {
   base::RecordAction(
       base::UserMetricsAction("PlusAddresses.FillAddressSuggestionUndone"));
   FormStructure* form_structure = nullptr;
@@ -2680,21 +2701,11 @@ void BrowserAutofillManager::OnEmailOverrideUndone(
     return;
   }
 
-  const FormFieldData* field_with_latest_known_filled_value = autofill_field;
-  if (!base::FeatureList::IsEnabled(features::kAutofillFixValueSemantics)) {
-    // The cached field's value is the field's initial value, but we want the
-    // value the field currently has in the DOM. The `field_after_last_autofill`
-    // is the best approximation of that we have at hand.
-    // TODO: crbug.com/40227496 - Remove when `kAutofillFixValueSemantics` is
-    // launched, because then `AutofillField` has the current value.
-    field_with_latest_known_filled_value = &field_after_last_autofill;
-  }
-
   // Fill the address profile's original email.
   form_filler_->FillOrPreviewField(
       mojom::ActionPersistence::kFill, mojom::FieldActionType::kReplaceAll,
-      *field_with_latest_known_filled_value, autofill_field, original_email,
-      FillingProduct::kAddress, EMAIL_ADDRESS);
+      *autofill_field, autofill_field, original_email, FillingProduct::kAddress,
+      EMAIL_ADDRESS);
 }
 
 std::unique_ptr<FormStructure> BrowserAutofillManager::ValidateSubmittedForm(
@@ -2766,7 +2777,7 @@ std::vector<Suggestion> BrowserAutofillManager::GetProfileSuggestions(
   // filling suggestions should be shown so that the user could easily correct
   // values to something present in different stored addresses.
   SuggestionType current_suggestion_type =
-      (trigger_field.is_autofilled() && IsAddressFieldSwappingEnabled())
+      trigger_field.is_autofilled()
           ? SuggestionType::kAddressFieldByFieldFilling
           : SuggestionType::kAddressEntry;
 

@@ -1278,7 +1278,7 @@ prefs when the profile is loaded.  -->
 </histogram>
 
 <histogram name="Signin.ExplicitSigninMigration" enum="ExplicitSigninMigration"
-    expires_after="2025-08-31">
+    expires_after="2025-11-02">
   <owner>droger@chromium.org</owner>
   <owner>rsult@google.com</owner>
   <summary>
@@ -1451,7 +1451,7 @@ prefs when the profile is loaded.  -->
 </histogram>
 
 <histogram name="Signin.HistoryAlreadyOptedInAccessPoint.{ConsentLevel}"
-    enum="SigninAccessPoint" expires_after="2025-08-31">
+    enum="SigninAccessPoint" expires_after="2025-11-02">
   <owner>treib@google.com</owner>
   <owner>rsult@google.com</owner>
   <owner>droger@chromium.org</owner>
@@ -1468,7 +1468,7 @@ prefs when the profile is loaded.  -->
 </histogram>
 
 <histogram name="Signin.HistoryOptInState.{ConsentLevel}" enum="BooleanOptedIn"
-    expires_after="2025-08-31">
+    expires_after="2025-11-02">
   <owner>treib@google.com</owner>
   <owner>rsult@google.com</owner>
   <owner>droger@chromium.org</owner>
@@ -1526,7 +1526,7 @@ prefs when the profile is loaded.  -->
 </histogram>
 
 <histogram name="Signin.IdentityConfirmationSnackbarDecision"
-    enum="IdentityConfirmationSnackbarDecision" expires_after="2025-09-01">
+    enum="IdentityConfirmationSnackbarDecision" expires_after="2025-11-02">
   <owner>jlebel@chromium.org</owner>
   <owner>jood@google.com</owner>
   <owner>treib@chromium.org</owner>
@@ -1805,6 +1805,18 @@ prefs when the profile is loaded.  -->
     When switching accounts, records whether the old and/or the new account were
     managed. Recorded independently of whether the account switch involved a
     profile switch.
+  </summary>
+</histogram>
+
+<histogram name="Signin.IOSAuthenticationServiceInitializationOutcome"
+    enum="IOSProfileInitializationOutcome" expires_after="2026-03-01">
+  <owner>jlebel@chromium.org</owner>
+  <owner>treib@chromium.org</owner>
+  <owner>chrome-signin-mobile-team@google.com</owner>
+  <summary>
+    Records the outcome of profile initialzation done by AuthenticationService,
+    which happens whenever a profile is loaded (i.e. on browser startup, plus
+    whenever the user switches accounts/profiles).
   </summary>
 </histogram>
 
@@ -2327,7 +2339,7 @@ should be kept to monitor/debug signin Multilogin issues-->
   </summary>
 </histogram>
 
-<histogram name="Signin.Promo.{Action}.ImpressionsUntil.{AccessPoint}"
+<histogram name="Signin.Promo.ImpressionsUntil.{Action}.{AccessPoint}"
     units="impressions" expires_after="2026-04-18">
   <owner>myuu@google.com</owner>
   <owner>chrome-signin-mobile-team@google.com</owner>
@@ -2571,7 +2583,7 @@ OAuth Multilogin call. -->
 
 <histogram
     name="Signin.ShowSigninCoordinatorWhenAlreadyPresent.{View}AccessPoint"
-    enum="SigninAccessPoint" expires_after="2025-08-03">
+    enum="SigninAccessPoint" expires_after="2025-11-02">
   <owner>arthurmilchior@chromium.org</owner>
   <owner>chrome-signin-team@google.com</owner>
   <owner>msarda@chromium.org</owner>
@@ -2843,8 +2855,8 @@ kept as long as profile signout is possible -->
   <summary>Track how a profile gets signed out.</summary>
 </histogram>
 
-<histogram name="Signin.SSOAuth.GetIdentities.ErrorCode" enum="ErrSecOSStatus"
-    expires_after="2026-03-02">
+<histogram name="Signin.SSOAuth.GetIdentities.ErrorCode"
+    enum="MacSecurityFrameworkOSStatus" expires_after="2026-03-02">
   <owner>jlebel@chromium.org</owner>
   <owner>chrome-signin-team@google.com</owner>
   <summary>
@@ -3044,6 +3056,29 @@ kept as long as profile signout is possible -->
     original access point associated with this event. This is recorded when the
     user chooses to opt-in, whether they chose to proceed with the default
     settings or to open the sync settings first.
+  </summary>
+</histogram>
+
+<histogram name="Signin.SyncOptIn.IdentityPill.DurationBeforeClick" units="ms"
+    expires_after="2026-01-12">
+  <owner>ernn@google.com</owner>
+  <owner>chrome-signin-team@google.com</owner>
+  <summary>
+    Records the time between the history sync opt-in identity pill promo is
+    opened and the user interacts with it (clicks on it). If the user doesn't
+    click the identity pill, the histogram should not be recorded.
+  </summary>
+</histogram>
+
+<histogram name="Signin.SyncOptIn.IdentityPill.Shown" enum="SigninAccessPoint"
+    expires_after="2026-01-12">
+  <owner>ernn@google.com</owner>
+  <owner>chrome-signin-team@google.com</owner>
+  <summary>
+    Counts the number of times the history sync opt-in identity pill was shown.
+
+    Note: This is only recorded for `kHistorySyncOptinExpansionPill*` access
+    points.
   </summary>
 </histogram>
 

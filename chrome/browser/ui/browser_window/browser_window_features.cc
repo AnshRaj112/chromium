@@ -33,14 +33,13 @@
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_utils.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/session_service_tab_group_sync_observer.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/shared_tab_group_feedback_controller.h"
-#include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_controller_impl.h"
+#include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_service_impl.h"
 #include "chrome/browser/ui/toasts/toast_controller.h"
 #include "chrome/browser/ui/toasts/toast_features.h"
 #include "chrome/browser/ui/toasts/toast_service.h"
 #include "chrome/browser/ui/toolbar/chrome_labs/chrome_labs_utils.h"
 #include "chrome/browser/ui/toolbar/pinned_toolbar/tab_search_toolbar_button_controller.h"
 #include "chrome/browser/ui/ui_features.h"
-#include "chrome/browser/ui/views/data_sharing/data_sharing_open_group_helper.h"
 #include "chrome/browser/ui/views/download/bubble/download_toolbar_ui_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
@@ -169,8 +168,8 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
   tab_strip_model_ = browser->GetTabStripModel();
 
   if (base::FeatureList::IsEnabled(features::kTabStripBrowserApi)) {
-    tab_strip_controller_ =
-        std::make_unique<TabStripControllerImpl>(browser, tab_strip_model_);
+    tab_strip_service_ =
+        std::make_unique<TabStripServiceImpl>(browser, tab_strip_model_);
   }
 
   memory_saver_bubble_controller_ =
@@ -235,18 +234,8 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
     }
   }
 
-  if ((browser->is_type_normal() || browser->is_type_app()) &&
-      base::FeatureList::IsEnabled(toast_features::kToastFramework)) {
+  if (browser->is_type_normal() || browser->is_type_app()) {
     toast_service_ = std::make_unique<ToastService>(browser);
-  }
-
-  collaboration::CollaborationService* service =
-      collaboration::CollaborationServiceFactory::GetForProfile(
-          browser->profile());
-  if (service && service->GetServiceStatus().IsAllowedToJoin() &&
-      tab_groups::IsTabGroupSyncServiceDesktopMigrationEnabled()) {
-    data_sharing_open_group_helper_ =
-        std::make_unique<DataSharingOpenGroupHelper>(browser);
   }
 }
 
@@ -331,6 +320,10 @@ void BrowserWindowFeatures::TearDownPreBrowserViewDestruction() {
 #if BUILDFLAG(ENABLE_GLIC)
   glic_button_controller_.reset();
 #endif
+
+  if (download_toolbar_ui_controller_) {
+    download_toolbar_ui_controller_->TearDownPreBrowserViewDestruction();
+  }
 
   // TODO(crbug.com/346148093): This logic should not be gated behind a
   // conditional.

@@ -773,13 +773,6 @@ public class WebsitePermissionsFetcherTest {
                         /* isEmbargoed= */ false));
         websitePreferenceBridge.addContentSettingException(
                 new ContentSettingException(
-                        ContentSettingsType.INSECURE_PRIVATE_NETWORK,
-                        ORIGIN,
-                        ContentSettingValues.DEFAULT,
-                        ProviderType.PREF_PROVIDER,
-                        /* isEmbargoed= */ false));
-        websitePreferenceBridge.addContentSettingException(
-                new ContentSettingException(
                         ContentSettingsType.JAVASCRIPT_JIT,
                         ORIGIN,
                         ContentSettingValues.DEFAULT,

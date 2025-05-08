@@ -36,7 +36,7 @@ BASE_FEATURE(kAutofillDedupeFormSubmission,
 
 BASE_FEATURE(kAutofillDynamicallyLoadsFieldsForAddressInput,
              "AutofillDynamicallyLoadsFieldsForAddressInput",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // LINT.IfChange(autofill_fix_post_filling_payment_sheet)
 BASE_FEATURE(kAutofillFixPaymentSheetSpam,
@@ -60,6 +60,10 @@ BASE_FEATURE(kAutofillPaymentsSheetV2Ios,
 
 BASE_FEATURE(kAutofillPaymentsSheetV3Ios,
              "AutofillPaymentsSheetV3Ios",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kAutofillRefillForFormsIos,
+             "AutofillRefillForFormsIos",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAutofillStickyInfobarIos,

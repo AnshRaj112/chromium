@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 import 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 
-import {BrowserProxy, SpeechBrowserProxyImpl, VoicePackController} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import {BrowserProxy, SpeechBrowserProxyImpl, SpeechController, VoicePackController} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 import type {AppElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 import {assertEquals, assertFalse, assertTrue} from 'chrome-untrusted://webui-test/chai_assert.js';
 import {microtasksFinished} from 'chrome-untrusted://webui-test/test_util.js';
@@ -55,7 +55,7 @@ suite('UpdateContent', () => {
         .addText(textNodeIds[3]!, /* parentId= */ 8, texts[3]!)
         .build(readingMode);
 
-    setupBasicSpeech(app, speech);
+    setupBasicSpeech(speech);
   });
 
   test('playable if done with distillation', async () => {
@@ -75,7 +75,7 @@ suite('UpdateContent', () => {
   });
 
   test('logs speech stop if called while speech active', async () => {
-    app.speechPlayingState.isSpeechActive = true;
+    SpeechController.getInstance().setIsSpeechActive(true);
     app.updateContent();
     await microtasksFinished();
 

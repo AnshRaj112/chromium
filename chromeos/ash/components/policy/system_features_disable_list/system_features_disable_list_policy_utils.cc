@@ -13,6 +13,12 @@
 
 namespace policy {
 
+void RegisterDisabledSystemFeaturesPrefs(PrefRegistrySimple* registry) {
+  registry->RegisterListPref(policy_prefs::kSystemFeaturesDisableList);
+  registry->RegisterStringPref(policy_prefs::kSystemFeaturesDisableMode,
+                               kSystemFeaturesDisableModeBlocked);
+}
+
 bool IsDisabledAppsModeHidden(const PrefService& local_state) {
   const bool is_disabled_apps_mode_hidden_pref =
       local_state.GetString(policy::policy_prefs::kSystemFeaturesDisableMode) ==
@@ -40,8 +46,13 @@ bool IsDisabledAppsModeHidden(const PrefService& local_state) {
       user_manager::UserManager::Get();
 
   const user_manager::User* active_user = user_manager->GetActiveUser();
-  DUMP_WILL_BE_CHECK(active_user);
-  DUMP_WILL_BE_CHECK(active_user->is_managed());
+  if (!active_user) {
+    return false;
+  }
+
+  if (!active_user->is_managed()) {
+    return false;
+  }
 
   // For Managed Guest Sessions (MGS): Behavior remains determined by the
   // SystemFeaturesDisableMode pref's current value.

@@ -516,6 +516,10 @@
     "META": {"sizes": {"includes": [10]}},
     "includes": [4440],
   },
+  "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/new_tab_shared/resources.grd": {
+    "META": {"sizes": {"includes": [10]}},
+    "includes": [4450],
+  },
   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/omnibox/resources.grd": {
     "META": {"sizes": {"includes": [30]}},
     "includes": [4460],
@@ -703,6 +707,10 @@
   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/whats_new/resources.grd": {
     "META": {"sizes": {"includes": [10]}},
     "includes": [5200],
+  },
+  "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/chromeos/floating_workspace/resources.grd": {
+    "META": {"sizes": {"includes": [10],}},
+    "includes": [5210],
   },
   # END chrome/ WebUI resources section
 
@@ -1508,6 +1516,10 @@
   "<(SHARED_INTERMEDIATE_DIR)/third_party/blink/public/strings/permission_element_generated_strings.grd": {
     "META": {"sizes": {"messages": [2000],}},
     "messages": [10080],
+  },
+
+  "third_party/search_engines_data/resources/search_engines_scaled_resources.grd": {
+    "structures": [10100],
   }
 
   # END "everything else" section.

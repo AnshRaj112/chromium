@@ -52,6 +52,7 @@ chromium-metrics-reviews@google.com.
   <int value="13" label="Corrupted local device registration"/>
   <int value="14" label="Aborted"/>
   <int value="15" label="Network error"/>
+  <int value="16" label="Key proof verification is not supported"/>
 </enum>
 
 <!-- LINT.ThenChange(/components/trusted_vault/trusted_vault_histograms.h:TrustedVaultDownloadKeysStatus) -->
@@ -128,6 +129,7 @@ chromium-metrics-reviews@google.com.
       label="Attempting registration while having persistent authentication
              error (deprecated)"/>
   <int value="6" label="Already registered V1"/>
+  <int value="7" label="Registration with constant key isn't supported"/>
 </enum>
 
 <!-- LINT.ThenChange(/components/trusted_vault/trusted_vault_histograms.h:TrustedVaultRecoveryFactorRegistrationState) -->

@@ -234,7 +234,6 @@
 #include "components/content_settings/core/browser/content_settings_utils.h"
 #include "components/content_settings/core/browser/cookie_settings.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
-#include "components/content_settings/core/browser/private_network_settings.h"
 #include "components/content_settings/core/common/content_settings.h"
 #include "components/content_settings/core/common/content_settings_types.h"
 #include "components/content_settings/core/common/cookie_settings_base.h"
@@ -422,6 +421,7 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/resource/resource_bundle.h"
+#include "ui/base/ui_base_features.h"
 #include "ui/color/color_provider.h"
 #include "ui/color/color_provider_key.h"
 #include "ui/gfx/color_utils.h"
@@ -1668,6 +1668,8 @@ void ChromeContentBrowserClient::RegisterProfilePrefs(
   registry->RegisterBooleanPref(prefs::kReduceAcceptLanguageEnabled, true);
   registry->RegisterBooleanPref(policy::policy_prefs::kBuiltInAIAPIsEnabled,
                                 true);
+  registry->RegisterBooleanPref(
+      prefs::kClearWindowNameForNewBrowsingContextGroup, true);
 }
 
 // static
@@ -3212,6 +3214,7 @@ ChromeContentBrowserClient::AllowServiceWorker(
     const GURL& scope,
     const net::SiteForCookies& site_for_cookies,
     const std::optional<url::Origin>& top_frame_origin,
+    const blink::StorageKey& storage_key,
     const GURL& script_url,
     content::BrowserContext* context) {
   DCHECK(context);
@@ -3235,7 +3238,8 @@ ChromeContentBrowserClient::AllowServiceWorker(
   scoped_refptr<content_settings::CookieSettings> cookie_settings =
       CookieSettingsFactory::GetForProfile(profile);
   return embedder_support::AllowServiceWorker(
-      scope, site_for_cookies, top_frame_origin, cookie_settings.get(),
+      scope, site_for_cookies, top_frame_origin, storage_key,
+      cookie_settings.get(),
       HostContentSettingsMapFactory::GetForProfile(profile));
 }
 
@@ -3360,14 +3364,15 @@ void ChromeContentBrowserClient::AllowWorkerFileSystem(
     const GURL& url,
     content::BrowserContext* browser_context,
     const std::vector<content::GlobalRenderFrameHostId>& render_frames,
+    const blink::StorageKey& storage_key,
     base::OnceCallback<void(bool)> callback) {
   // An empty list is passed for render_frames here since we manually notify
   // PageSpecificContentSettings that the file system was accessed below.
   scoped_refptr<content_settings::CookieSettings> cookie_settings =
       CookieSettingsFactory::GetForProfile(
           Profile::FromBrowserContext(browser_context));
-  bool allow =
-      embedder_support::AllowWorkerFileSystem(url, {}, cookie_settings.get());
+  bool allow = embedder_support::AllowWorkerFileSystem(
+      url, {}, cookie_settings.get(), storage_key);
 #if BUILDFLAG(ENABLE_GUEST_VIEW)
   GuestPermissionRequestHelper(url, render_frames, std::move(callback), allow);
 #else
@@ -3436,33 +3441,37 @@ void ChromeContentBrowserClient::FileSystemAccessed(
 bool ChromeContentBrowserClient::AllowWorkerIndexedDB(
     const GURL& url,
     content::BrowserContext* browser_context,
-    const std::vector<content::GlobalRenderFrameHostId>& render_frames) {
+    const std::vector<content::GlobalRenderFrameHostId>& render_frames,
+    const blink::StorageKey& storage_key) {
   scoped_refptr<content_settings::CookieSettings> cookie_settings =
       CookieSettingsFactory::GetForProfile(
           Profile::FromBrowserContext(browser_context));
-  return embedder_support::AllowWorkerIndexedDB(url, render_frames,
-                                                cookie_settings.get());
+  return embedder_support::AllowWorkerIndexedDB(
+      url, render_frames, cookie_settings.get(), storage_key);
 }
 
 bool ChromeContentBrowserClient::AllowWorkerCacheStorage(
     const GURL& url,
     content::BrowserContext* browser_context,
-    const std::vector<content::GlobalRenderFrameHostId>& render_frames) {
+    const std::vector<content::GlobalRenderFrameHostId>& render_frames,
+    const blink::StorageKey& storage_key) {
   scoped_refptr<content_settings::CookieSettings> cookie_settings =
       CookieSettingsFactory::GetForProfile(
           Profile::FromBrowserContext(browser_context));
-  return embedder_support::AllowWorkerCacheStorage(url, render_frames,
-                                                   cookie_settings.get());
+  return embedder_support::AllowWorkerCacheStorage(
+      url, render_frames, cookie_settings.get(), storage_key);
 }
 
 bool ChromeContentBrowserClient::AllowWorkerWebLocks(
     const GURL& url,
     content::BrowserContext* browser_context,
-    const std::vector<content::GlobalRenderFrameHostId>& render_frames) {
+    const std::vector<content::GlobalRenderFrameHostId>& render_frames,
+    const blink::StorageKey& storage_key) {
   scoped_refptr<content_settings::CookieSettings> cookie_settings =
       CookieSettingsFactory::GetForProfile(
           Profile::FromBrowserContext(browser_context));
-  return embedder_support::AllowWorkerWebLocks(url, cookie_settings.get());
+  return embedder_support::AllowWorkerWebLocks(url, cookie_settings.get(),
+                                               storage_key);
 }
 
 ChromeContentBrowserClient::AllowWebBluetoothResult
@@ -4766,12 +4775,12 @@ void ChromeContentBrowserClient::OverrideWebPreferences(
       prefs->GetBoolean(prefs::kWebXRImmersiveArEnabled);
 #endif
 
+  web_prefs->touch_drag_drop_enabled =
+      base::FeatureList::IsEnabled(features::kTouchDragAndDrop);
+
   for (auto& parts : extra_parts_) {
     parts->OverrideWebPreferences(web_contents, main_frame_site, web_prefs);
   }
-
-  // TODO(crbug.com/395838064): Cleanup WebSQL WebPreference.
-  web_prefs->databases_enabled = false;
 
   web_prefs->prefers_default_scrollbar_styles =
       prefs->GetBoolean(prefs::kPrefersDefaultScrollbarStyles);
@@ -5388,18 +5397,19 @@ void ChromeContentBrowserClient::RemovePresentationObserver(
   }
 }
 
-std::vector<std::unique_ptr<content::NavigationThrottle>>
-ChromeContentBrowserClient::CreateThrottlesForNavigation(
+void ChromeContentBrowserClient::CreateThrottlesForNavigation(
     content::NavigationThrottleRegistry& registry) {
-  // MetricsNavigationThrottle requires that it runs before NavigationThrottles
-  // that may delay or cancel navigations, so only NavigationThrottles that
-  // don't delay or cancel navigations (e.g. throttles that are only observing
-  // callbacks without affecting navigation behavior) should be added before
-  // MetricsNavigationThrottle.
   content::NavigationHandle& handle = registry.GetNavigationHandle();
   if (handle.IsInMainFrame()) {
-    registry.AddThrottle(
-        page_load_metrics::MetricsNavigationThrottle::Create(&handle));
+    // MetricsNavigationThrottle requires that it runs before
+    // NavigationThrottles that may delay or cancel navigations, so only
+    // NavigationThrottles that don't delay or cancel navigations (e.g.
+    // throttles that are only observing callbacks without affecting navigation
+    // behavior) should be added before MetricsNavigationThrottle.
+    // TODO(https://crbug.com/412524375): This assumption is fragile. This
+    // should be cared by adding an attribute flag to
+    // NavigationThrottleRegistry::AddThrottle().
+    page_load_metrics::MetricsNavigationThrottle::CreateAndAdd(registry);
   }
 
 #if BUILDFLAG(IS_ANDROID)
@@ -5760,8 +5770,6 @@ ChromeContentBrowserClient::CreateThrottlesForNavigation(
   registry.MaybeAddThrottle(
       web_app::IsolatedWebAppThrottle::MaybeCreateThrottleFor(&handle));
 #endif  // !BUILDFLAG(IS_ANDROID)
-
-  return {};
 }
 
 std::vector<std::unique_ptr<content::CommitDeferringCondition>>
@@ -7823,7 +7831,7 @@ void ChromeContentBrowserClient::GetMediaDeviceIDSalt(
           Profile::FromBrowserContext(browser_context));
   bool allowed = cookie_settings->IsFullCookieAccessAllowed(
                      url, site_for_cookies, top_frame_origin,
-                     cookie_settings->SettingOverridesForStorage()) ||
+                     net::CookieSettingOverrides()) ||
                  (tracking_protection->IsTrackingProtection3pcdEnabled() &&
                   !tracking_protection->AreAllThirdPartyCookiesBlocked());
   ChromeBrowsingDataModelDelegate::BrowsingDataAccessed(
@@ -8014,30 +8022,12 @@ content::ContentBrowserClient::PrivateNetworkRequestPolicyOverride
 ChromeContentBrowserClient::ShouldOverridePrivateNetworkRequestPolicy(
     content::BrowserContext* browser_context,
     const url::Origin& origin) {
-  // The host content settings map might no be null for some irregular profiles,
-  // e.g. the System Profile.
-  if (HostContentSettingsMap* service =
-          HostContentSettingsMapFactory::GetForProfile(browser_context)) {
-    if (content_settings::ShouldAllowInsecurePrivateNetworkRequests(service,
-                                                                    origin)) {
-      return content::ContentBrowserClient::
-          PrivateNetworkRequestPolicyOverride::kForceAllow;
-    }
-  }
-
 #if BUILDFLAG(IS_ANDROID)
   if (base::android::BuildInfo::GetInstance()->is_automotive()) {
     return content::ContentBrowserClient::PrivateNetworkRequestPolicyOverride::
         kBlockInsteadOfWarn;
   }
 #endif
-
-  Profile* profile = Profile::FromBrowserContext(browser_context);
-  if (profile->GetPrefs()->GetBoolean(
-          prefs::kManagedPrivateNetworkAccessRestrictionsEnabled)) {
-    return content::ContentBrowserClient::PrivateNetworkRequestPolicyOverride::
-        kBlockInsteadOfWarn;
-  }
 
   return content::ContentBrowserClient::PrivateNetworkRequestPolicyOverride::
       kDefault;
@@ -8546,7 +8536,7 @@ bool ChromeContentBrowserClient::AreDeprecatedAutomaticBeaconCredentialsAllowed(
           Profile::FromBrowserContext(browser_context));
   return cookie_settings->IsFullCookieAccessAllowed(
       destination_url, net::SiteForCookies(), top_frame_origin,
-      cookie_settings->SettingOverridesForStorage());
+      net::CookieSettingOverrides());
 }
 
 bool ChromeContentBrowserClient::
@@ -8612,14 +8602,15 @@ bool ChromeContentBrowserClient::CanBackForwardCachedPageReceiveCookieChanges(
     content::BrowserContext& browser_context,
     const GURL& url,
     const net::SiteForCookies& site_for_cookies,
-    const std::optional<url::Origin>& top_frame_origin,
-    const net::CookieSettingOverrides overrides) {
+    const url::Origin& top_frame_origin,
+    const net::CookieSettingOverrides overrides,
+    base::optional_ref<const net::CookiePartitionKey> cookie_partition_key) {
   scoped_refptr<content_settings::CookieSettings> cookie_settings =
       CookieSettingsFactory::GetForProfile(
           Profile::FromBrowserContext(&browser_context));
   CHECK(cookie_settings);
   return cookie_settings->IsFullCookieAccessAllowed(
-      url, site_for_cookies, top_frame_origin, overrides);
+      url, site_for_cookies, top_frame_origin, overrides, cookie_partition_key);
 }
 
 void ChromeContentBrowserClient::GetCloudIdentifiers(
@@ -8687,6 +8678,23 @@ bool ChromeContentBrowserClient::ShouldReduceAcceptLanguage(
           ->FindPreference(prefs::kReduceAcceptLanguageEnabled);
 
   if (pref && pref->IsManaged() && pref->GetValue()->is_bool()) {
+    return pref->GetValue()->GetBool();
+  }
+  return true;
+}
+
+// TODO(crbug.com/40133611): ladan@ - Remove this method and its refrencesonce
+// ClearWindowNameForNewBrowsingContextGroup policy is removed.
+bool ChromeContentBrowserClient::
+    IsClearWindowNameForNewBrowsingContextGroupAllowed(
+        content::BrowserContext* browser_context) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  const PrefService::Preference* pref =
+      Profile::FromBrowserContext(browser_context)
+          ->GetPrefs()
+          ->FindPreference(prefs::kClearWindowNameForNewBrowsingContextGroup);
+
+  if (pref != nullptr && pref->IsManaged() && pref->GetValue()->is_bool()) {
     return pref->GetValue()->GetBool();
   }
   return true;

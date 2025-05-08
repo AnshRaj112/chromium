@@ -28,12 +28,24 @@
 // defined.
 #include "absl/base/config.h"
 
+// GCC15 warns that <ciso646> is deprecated in C++17 and suggests using
+// <version> instead, even though <version> is not available in C++17 mode prior
+// to GCC9.
+#if defined(__has_include)
+#if __has_include(<version>)
+#define ABSL_INTERNAL_VERSION_HEADER_AVAILABLE 1
+#endif
+#endif
+
 // For feature testing and determining which headers can be included.
-#if ABSL_INTERNAL_CPLUSPLUS_LANG >= 202002L
+#if ABSL_INTERNAL_CPLUSPLUS_LANG >= 202002L || \
+    ABSL_INTERNAL_VERSION_HEADER_AVAILABLE
 #include <version>
 #else
 #include <ciso646>
 #endif
+
+#undef ABSL_INTERNAL_VERSION_HEADER_AVAILABLE
 
 #include <algorithm>
 #include <array>
@@ -53,6 +65,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
@@ -78,14 +91,6 @@
 
 #if defined(__cpp_lib_filesystem) && __cpp_lib_filesystem >= 201703L
 #include <filesystem>  // NOLINT
-#endif
-
-#ifdef ABSL_HAVE_STD_STRING_VIEW
-#include <string_view>
-#endif
-
-#ifdef __ARM_ACLE
-#include <arm_acle.h>
 #endif
 
 namespace absl {
@@ -632,8 +637,6 @@ H AbslHashValue(
       WeaklyMixedInteger{str.size()});
 }
 
-#ifdef ABSL_HAVE_STD_STRING_VIEW
-
 // Support std::wstring_view, std::u16string_view and std::u32string_view.
 template <typename Char, typename H,
           typename = absl::enable_if_t<std::is_same<Char, wchar_t>::value ||
@@ -644,8 +647,6 @@ H AbslHashValue(H hash_state, std::basic_string_view<Char> str) {
       H::combine_contiguous(std::move(hash_state), str.data(), str.size()),
       WeaklyMixedInteger{str.size()});
 }
-
-#endif  // ABSL_HAVE_STD_STRING_VIEW
 
 #if defined(__cpp_lib_filesystem) && __cpp_lib_filesystem >= 201703L && \
     (!defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) ||        \
@@ -1081,8 +1082,7 @@ class ABSL_DLL MixingHashState : public HashStateBase<MixingHashState> {
   };
 
   static constexpr uint64_t kMul =
-  sizeof(size_t) == 4 ? uint64_t{0xcc9e2d51}
-                      : uint64_t{0xdcb22ca68cb134ed};
+   uint64_t{0xdcb22ca68cb134ed};
 
   template <typename T>
   using IntegralFastPath =
@@ -1140,10 +1140,9 @@ class ABSL_DLL MixingHashState : public HashStateBase<MixingHashState> {
       MixingHashState hash_state, WeaklyMixedInteger value) {
     // Some transformation for the value is needed to make an empty
     // string/container change the mixing hash state.
-    // Seed() is most likely already in a register.
-    // TODO(b/384509507): experiment with using kMul or last 31 bits of kMul.
-    // See https://godbolt.org/z/6cM77s3PW for ideas.
-    return MixingHashState{hash_state.state_ + (Seed() + value.value)};
+    // We use constant smaller than 8 bits to make compiler use
+    // `add` with an immediate operand with 1 byte value.
+    return MixingHashState{hash_state.state_ + (0x57 + value.value)};
   }
 
   template <typename CombinerT>

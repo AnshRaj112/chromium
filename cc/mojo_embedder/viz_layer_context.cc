@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "base/check.h"
+#include "base/check_deref.h"
 #include "base/containers/contains.h"
 #include "base/containers/span.h"
 #include "base/notreached.h"
@@ -191,7 +192,8 @@ void ComputePropertyTreeNodeUpdate(
       old_node->lcd_text_disallowed_by_backdrop_filter ==
           new_node.lcd_text_disallowed_by_backdrop_filter &&
       old_node->may_have_backdrop_effect == new_node.may_have_backdrop_effect &&
-      old_node->has_2d_scale_transform == new_node.has_2d_scale_transform &&
+      old_node->needs_effect_for_2d_scale_transform ==
+          new_node.needs_effect_for_2d_scale_transform &&
       copy_requests.empty()) {
     return;
   }
@@ -233,7 +235,8 @@ void ComputePropertyTreeNodeUpdate(
   wire->subtree_has_copy_request = new_node.subtree_has_copy_request;
   wire->is_fast_rounded_corner = new_node.is_fast_rounded_corner;
   wire->may_have_backdrop_effect = new_node.may_have_backdrop_effect;
-  wire->has_2d_scale_transform = new_node.has_2d_scale_transform;
+  wire->needs_effect_for_2d_scale_transform =
+      new_node.needs_effect_for_2d_scale_transform;
 
   container.push_back(std::move(wire));
 }
@@ -570,6 +573,11 @@ void SerializeLayer(LayerImpl& layer,
   if (layer.HasAnyRarePropertySet()) {
     auto rare_properties = viz::mojom::RareProperties::New();
     rare_properties->filter_quality = layer.GetFilterQuality();
+    rare_properties->dynamic_range_limit = layer.GetDynamicRangeLimit();
+
+    // NOTE: If the layer's RareProperties is present, then `capture_bounds()`
+    // is guaranteed to be non-null.
+    rare_properties->capture_bounds = CHECK_DEREF(layer.capture_bounds());
     wire.rare_properties = std::move(rare_properties);
   }
   wire.may_contain_video = layer.may_contain_video();
@@ -907,6 +915,8 @@ void VizLayerContext::UpdateDisplayTreeFrom(
   update->begin_frame_args = tree.CurrentBeginFrameArgs();
   update->source_frame_number = tree.source_frame_number();
   update->trace_id = tree.trace_id().value();
+  update->primary_main_frame_item_sequence_number =
+      tree.primary_main_frame_item_sequence_number();
   update->page_scale_factor = tree.page_scale_factor()->Current(true);
   update->min_page_scale_factor = tree.min_page_scale_factor();
   update->max_page_scale_factor = tree.max_page_scale_factor();

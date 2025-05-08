@@ -4,27 +4,28 @@
 
 package org.chromium.chrome.browser.customtabs.content;
 
+import static android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK;
+import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.robolectric.Shadows.shadowOf;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Looper;
 
-import androidx.browser.customtabs.CustomTabsSessionToken;
 import androidx.browser.trusted.FileHandlingData;
 import androidx.browser.trusted.LaunchHandlerClientMode;
-import androidx.browser.trusted.TrustedWebActivityIntentBuilder;
-import androidx.test.core.app.ApplicationProvider;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -40,13 +41,9 @@ import org.chromium.base.Promise;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Batch;
 import org.chromium.base.test.util.Features;
-import org.chromium.chrome.browser.LaunchIntentDispatcher;
-import org.chromium.chrome.browser.browserservices.intents.SessionHolder;
 import org.chromium.chrome.browser.browserservices.ui.controller.CurrentPageVerifier;
 import org.chromium.chrome.browser.browserservices.ui.controller.Verifier;
 import org.chromium.chrome.browser.customtabs.CustomTabIntentDataProvider;
-import org.chromium.chrome.browser.customtabs.CustomTabsConnection;
-import org.chromium.chrome.browser.customtabs.CustomTabsIntentTestUtils;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.url.JUnitTestGURLs;
@@ -66,15 +63,15 @@ public class WebAppLaunchHandlerTest {
     public static final String OTHER_URL = JUnitTestGURLs.EXAMPLE_URL.getSpec();
     public static final String CONTENT_URI = "content://com.a.b.c/a";
     public static final String TEST_PACKAGE_NAME = "com.test";
-    private FileHandlingData mFileHandlingData =
-            new FileHandlingData(Arrays.asList(Uri.parse(CONTENT_URI)));
-    private String[] mExpectedFileList = new String[] {CONTENT_URI};
+    private FileHandlingData mFileHandlingData;
+    private String[] mExpectedFileList = new String[0];
 
     @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
     @Mock WebContents mWebContentsMock;
     @Mock CustomTabActivityNavigationController mNavigationControllerMock;
     @Mock Verifier mVerifierMock;
-    @Mock CurrentPageVerifier mCurrentPageVerfierMock;
+    @Mock CurrentPageVerifier mCurrentPageVerifierMock;
+    @Mock Activity mActivityMock;
     @Mock WebAppLaunchHandler.Natives mWebAppLaunchHandlerJniMock;
 
     @Before
@@ -82,7 +79,7 @@ public class WebAppLaunchHandlerTest {
         WebAppLaunchHandlerJni.setInstanceForTesting(mWebAppLaunchHandlerJniMock);
 
         when(mVerifierMock.verify(any())).thenReturn(Promise.fulfilled(true));
-        when(mCurrentPageVerfierMock.getState())
+        when(mCurrentPageVerifierMock.getState())
                 .thenReturn(
                         new CurrentPageVerifier.VerificationState(
                                 "", "", CurrentPageVerifier.VerificationStatus.SUCCESS));
@@ -110,9 +107,10 @@ public class WebAppLaunchHandlerTest {
     private WebAppLaunchHandler createWebAppLaunchHandler() {
         return WebAppLaunchHandler.create(
                 mVerifierMock,
-                mCurrentPageVerfierMock,
+                mCurrentPageVerifierMock,
                 mNavigationControllerMock,
-                mWebContentsMock);
+                mWebContentsMock,
+                mActivityMock);
     }
 
     private CustomTabIntentDataProvider createIntentDataProvider(
@@ -120,9 +118,7 @@ public class WebAppLaunchHandlerTest {
         CustomTabIntentDataProvider dataProvider = mock(CustomTabIntentDataProvider.class);
         when(dataProvider.getLaunchHandlerClientMode()).thenReturn(clientMode);
         when(dataProvider.getUrlToLoad()).thenReturn(url);
-
         when(dataProvider.getClientPackageName()).thenReturn(TEST_PACKAGE_NAME);
-
         when(dataProvider.getFileHandlingData()).thenReturn(mFileHandlingData);
         return dataProvider;
     }
@@ -151,7 +147,7 @@ public class WebAppLaunchHandlerTest {
             verify(mNavigationControllerMock, times(1))
                     .navigate(argThat(params -> url.equals(params.getUrl())), any());
         } else {
-            verify(mNavigationControllerMock, times(0)).navigate(any(), any());
+            verifyNoInteractions(mNavigationControllerMock);
         }
 
         if (expectedNotifyQueue) {
@@ -163,10 +159,13 @@ public class WebAppLaunchHandlerTest {
                             eq(url),
                             eq(TEST_PACKAGE_NAME),
                             eq(mExpectedFileList));
+            verifyNoInteractions(mActivityMock);
         } else {
             verify(mWebAppLaunchHandlerJniMock, times(0))
                     .notifyLaunchQueue(any(), anyBoolean(), eq(url), any(), any());
         }
+
+        if (clientMode != LaunchHandlerClientMode.NAVIGATE_NEW) verifyNoInteractions(mActivityMock);
     }
 
     @Test
@@ -257,7 +256,7 @@ public class WebAppLaunchHandlerTest {
 
     @Test
     public void currentPageVerifierFailed() {
-        when(mCurrentPageVerfierMock.getState())
+        when(mCurrentPageVerifierMock.getState())
                 .thenReturn(
                         new CurrentPageVerifier.VerificationState(
                                 "", "", CurrentPageVerifier.VerificationStatus.FAILURE));
@@ -274,9 +273,9 @@ public class WebAppLaunchHandlerTest {
     }
 
     @Test
-    public void noFilePath() {
-        mFileHandlingData = null;
-        mExpectedFileList = new String[0];
+    public void filePath() {
+        mFileHandlingData = new FileHandlingData(Arrays.asList(Uri.parse(CONTENT_URI)));
+        mExpectedFileList = new String[] {CONTENT_URI};
         doTestHandleIntent(
                 LaunchHandlerClientMode.AUTO,
                 INITIAL_URL,
@@ -310,70 +309,87 @@ public class WebAppLaunchHandlerTest {
                 /* expectedNotifyQueue= */ true);
     }
 
-    void doTestClientModeStartNewTask(Integer clientMode, int startActivityExpectedCallsNumber) {
-        final String exampleUrl = "https://www.example.com";
+    void doTestNavigateNewInitialIntent(Integer clientMode) {
+        CustomTabIntentDataProvider dataProvider =
+                createIntentDataProvider(clientMode, INITIAL_URL);
+        WebAppLaunchHandler launchHandler = createWebAppLaunchHandler();
+        launchHandler.handleInitialIntent(dataProvider);
+        shadowOf(Looper.getMainLooper()).idle();
 
-        Context context = ApplicationProvider.getApplicationContext();
-        Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(context, exampleUrl);
+        verifyNoInteractions(mActivityMock);
+        verifyNoInteractions(mNavigationControllerMock);
+        verify(mWebAppLaunchHandlerJniMock, times(1))
+                .notifyLaunchQueue(any(), anyBoolean(), any(), any(), any());
+    }
 
-        // If a custom tab intent has a client mode it will be resent with flags to start a new task
-        Activity mockActivity = mock(Activity.class);
+    void doTestNavigateNewNewIntent(Integer clientMode, int expectedStartActivityTimes) {
 
-        if (clientMode != null) {
-            intent.putExtra(
-                    TrustedWebActivityIntentBuilder.EXTRA_LAUNCH_HANDLER_CLIENT_MODE, clientMode);
+        CustomTabIntentDataProvider dataProvider = createIntentDataProvider(clientMode, OTHER_URL);
+        WebAppLaunchHandler launchHandler = createWebAppLaunchHandler();
+        launchHandler.handleNewIntent(dataProvider);
+        shadowOf(Looper.getMainLooper()).idle();
+
+        if (expectedStartActivityTimes == 0) {
+            verifyNoInteractions(mActivityMock);
+        } else {
+            verify(mActivityMock, times(expectedStartActivityTimes))
+                    .startActivity(
+                            argThat(
+                                    params -> {
+                                        if (params == null
+                                                || params.getData() == null
+                                                || params.getAction() == null) {
+                                            return false;
+                                        }
+                                        return Objects.equals(
+                                                        params.getAction(), Intent.ACTION_VIEW)
+                                                && OTHER_URL.equals(params.getData().toString())
+                                                && (params.getFlags() & FLAG_ACTIVITY_MULTIPLE_TASK)
+                                                        != 0
+                                                && (params.getFlags() & FLAG_ACTIVITY_NEW_TASK)
+                                                        != 0;
+                                    }));
         }
 
-        CustomTabsSessionToken sessionToken =
-                CustomTabsSessionToken.getSessionTokenFromIntent(intent);
-        SessionHolder<CustomTabsSessionToken> session = new SessionHolder<>(sessionToken);
-        CustomTabsConnection.getInstance().newSession(sessionToken);
-        CustomTabsConnection.getInstance()
-                .overridePackageNameForSessionForTesting(session, "com.test_package");
-        LaunchIntentDispatcher.dispatchToCustomTabActivity(mockActivity, intent);
-
-        verify(mockActivity, times(startActivityExpectedCallsNumber))
-                .startActivity(
-                        argThat(
-                                params -> {
-                                    if (params == null
-                                            || params.getData() == null
-                                            || params.getAction() == null) {
-                                        return false;
-                                    }
-                                    return Objects.equals(params.getAction(), Intent.ACTION_VIEW)
-                                            && exampleUrl.equals(intent.getData().toString())
-                                            && (params.getFlags()
-                                                            & Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
-                                                    != 0
-                                            && (params.getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                    != 0;
-                                }));
+        final int expectedOtherTimes = expectedStartActivityTimes == 0 ? 1 : 0;
+        verify(mNavigationControllerMock, times(expectedOtherTimes)).navigate(any(), any());
+        verify(mWebAppLaunchHandlerJniMock, times(expectedOtherTimes))
+                .notifyLaunchQueue(any(), anyBoolean(), eq(OTHER_URL), any(), any());
+        verify(mWebAppLaunchHandlerJniMock, times(1))
+                .notifyLaunchQueue(any(), anyBoolean(), eq(INITIAL_URL), any(), any());
     }
 
     @Test
     public void navigateNewStartNewTask() {
-        doTestClientModeStartNewTask(
-                LaunchHandlerClientMode.NAVIGATE_NEW, /* startActivityExpectedCallsNumber= */ 1);
+        doTestNavigateNewInitialIntent(LaunchHandlerClientMode.NAVIGATE_NEW);
+        doTestNavigateNewNewIntent(
+                LaunchHandlerClientMode.NAVIGATE_NEW, /* expectedStartActivityTimes= */ 1);
     }
 
     @Test
-    public void navigateNewStartNewTask_noClientMode() {
-        doTestClientModeStartNewTask(
-                /* clientMode= */ null, /* startActivityExpectedCallsNumber= */ 0);
+    public void navigateNewStartNewTask_autoClientMode() {
+        doTestNavigateNewInitialIntent(LaunchHandlerClientMode.AUTO);
+        doTestNavigateNewNewIntent(
+                LaunchHandlerClientMode.AUTO, /* expectedStartActivityTimes= */ 0);
     }
 
     @Test
     public void navigateNewStartNewTask_anotherClientMode() {
-        doTestClientModeStartNewTask(
-                LaunchHandlerClientMode.NAVIGATE_EXISTING,
-                /* startActivityExpectedCallsNumber= */ 0);
+        doTestNavigateNewInitialIntent(LaunchHandlerClientMode.NAVIGATE_EXISTING);
+        doTestNavigateNewNewIntent(
+                LaunchHandlerClientMode.NAVIGATE_EXISTING, /* expectedStartActivityTimes= */ 0);
     }
 
     @Test
-    @Features.DisableFeatures({ChromeFeatureList.ANDROID_WEB_APP_LAUNCH_HANDLER})
-    public void navigateNewStartNewTask_featureIsDisabled() {
-        doTestClientModeStartNewTask(
-                LaunchHandlerClientMode.NAVIGATE_NEW, /* startActivityExpectedCallsNumber= */ 0);
+    public void navigateNewStartNewTask_fileData() {
+        doTestNavigateNewInitialIntent(LaunchHandlerClientMode.NAVIGATE_NEW);
+
+        mFileHandlingData = new FileHandlingData(Arrays.asList(Uri.parse(CONTENT_URI)));
+        mExpectedFileList = new String[] {CONTENT_URI};
+        doTestNavigateNewNewIntent(
+                LaunchHandlerClientMode.NAVIGATE_NEW, /* expectedStartActivityTimes= */ 1);
+        verify(mActivityMock, times(1))
+                .grantUriPermission(
+                        eq(TEST_PACKAGE_NAME), eq(mFileHandlingData.uris.get(0)), anyInt());
     }
 }

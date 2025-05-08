@@ -868,6 +868,7 @@ class CC_EXPORT LayerTreeHostImpl : public TileManagerClient,
   DroppedFrameCounter* dropped_frame_counter_for_testing() {
     return &dropped_frame_counter_;
   }
+  FrameSorter* frame_sorter_for_testing() { return &frame_sorter_; }
 
   // Returns true if the client is currently compositing synchronously.
   bool IsInSynchronousComposite() const;
@@ -1052,7 +1053,6 @@ class CC_EXPORT LayerTreeHostImpl : public TileManagerClient,
   std::unique_ptr<InputDelegateForCompositor> input_delegate_;
 
   const LayerTreeSettings settings_;
-  const bool use_layer_context_for_display_;
   const bool use_layer_context_for_animations_;
 
   // This is set to true only if:
@@ -1082,7 +1082,7 @@ class CC_EXPORT LayerTreeHostImpl : public TileManagerClient,
   raw_ptr<LayerTreeFrameSink> layer_tree_frame_sink_ = nullptr;
 
   // Valid when we have a LayerTreeFrameSink and
-  // `use_layer_context_for_display_` is true. This object pushes updates to a
+  // `trees_in_viz_in_client_process_` is true. This object pushes updates to a
   // remote display tree.
   std::unique_ptr<LayerContext> layer_context_;
 
@@ -1259,7 +1259,8 @@ class CC_EXPORT LayerTreeHostImpl : public TileManagerClient,
   PresentationTimeCallbackBuffer presentation_time_callbacks_;
 
   // `compositor_frame_reporting_controller_` has a dependency on
-  // `dropped_frame_counter_` so it must be declared last and deleted first;
+  // `dropped_frame_counter_` so it must be declared last and deleted first.
+  FrameSorter frame_sorter_;
   std::unique_ptr<CompositorFrameReportingController>
       compositor_frame_reporting_controller_;
   FrameSequenceTrackerCollection frame_trackers_;

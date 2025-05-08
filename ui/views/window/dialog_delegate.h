@@ -117,7 +117,7 @@ class AutofillProgressDialogViews;
 class BnplTosDialog;
 class CardUnmaskOtpInputDialogViews;
 class EditAddressProfileView;
-class SaveAndFillDialogViews;
+class SaveAndFillDialog;
 class WebauthnDialogView;
 
 namespace payments {
@@ -300,16 +300,12 @@ class VIEWS_EXPORT DialogDelegate : public WidgetDelegate {
   ~DialogDelegate() override;
 
   // Creates a widget at a default location.
-  // There are two variant of this method. The newer one is the unique_ptr
-  // method, which simply takes ownership of the WidgetDelegate and passes it to
-  // the created Widget. When using the unique_ptr version, it is required that
-  // delegate->owned_by_widget(). Unless you have a good reason, you should use
-  // this variant.
+  // The correct approach is for the client to own the WidgetDelegate via a
+  // unique_ptr, and for the client to own the Widget via a unique_ptr (see
+  // CLIENT_OWNS_WIDGET), and to pass the WidgetDelegate as a raw_ptr.
   //
-  // If !delegate->owned_by_widget() *or* if your WidgetDelegate subclass has a
-  // custom override of WidgetDelegate::DeleteDelegate, use the raw pointer
-  // variant instead, and please talk to one of the //ui/views owners about
-  // your use case.
+  // The unique_ptr variant is deprecated and requires calling
+  // WidgetDelegate::SetOwnedByWidget().
   static Widget* CreateDialogWidget(std::unique_ptr<WidgetDelegate> delegate,
                                     gfx::NativeWindow context,
                                     gfx::NativeView parent);
@@ -758,7 +754,7 @@ class VIEWS_EXPORT DialogDelegateView : public DialogDelegate, public View {
   friend class ::autofill::BnplTosDialog;
   friend class ::autofill::CardUnmaskOtpInputDialogViews;
   friend class ::autofill::EditAddressProfileView;
-  friend class ::autofill::SaveAndFillDialogViews;
+  friend class ::autofill::SaveAndFillDialog;
   friend class ::autofill::WebauthnDialogView;
   friend class ::autofill::payments::PaymentsWindowUserConsentDialogView;
   friend class ::autofill::payments::SelectBnplIssuerDialog;

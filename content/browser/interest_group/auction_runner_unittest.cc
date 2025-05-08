@@ -409,7 +409,6 @@ const auction_worklet::mojom::PrivateAggregationRequestPtr
                         /*bucket=*/1,
                         /*value=*/2,
                         /*filtering_id=*/std::nullopt)),
-            blink::mojom::AggregationServiceMode::kDefault,
             blink::mojom::DebugModeDetails::New());
 
 const auction_worklet::mojom::PrivateAggregationRequestPtr
@@ -423,7 +422,6 @@ const auction_worklet::mojom::PrivateAggregationRequestPtr
                                 kBelowKAnonThreshold),
                         /*value=*/0,
                         /*filtering_id=*/std::nullopt)),
-            blink::mojom::AggregationServiceMode::kDefault,
             blink::mojom::DebugModeDetails::New());
 
 const auction_worklet::mojom::PrivateAggregationRequestPtr
@@ -435,7 +433,6 @@ const auction_worklet::mojom::PrivateAggregationRequestPtr
                         /*bucket=*/3,
                         /*value=*/4,
                         /*filtering_id=*/std::nullopt)),
-            blink::mojom::AggregationServiceMode::kDefault,
             blink::mojom::DebugModeDetails::New());
 
 const auction_worklet::mojom::PrivateAggregationRequestPtr
@@ -447,7 +444,6 @@ const auction_worklet::mojom::PrivateAggregationRequestPtr
                         /*bucket=*/5,
                         /*value=*/6,
                         /*filtering_id=*/std::nullopt)),
-            blink::mojom::AggregationServiceMode::kDefault,
             blink::mojom::DebugModeDetails::New());
 
 const auction_worklet::mojom::PrivateAggregationRequestPtr
@@ -459,7 +455,6 @@ const auction_worklet::mojom::PrivateAggregationRequestPtr
                         /*bucket=*/7,
                         /*value=*/8,
                         /*filtering_id=*/std::nullopt)),
-            blink::mojom::AggregationServiceMode::kDefault,
             blink::mojom::DebugModeDetails::New());
 
 // gTest helper to allow both finalized and non-finalized requests to be
@@ -485,7 +480,6 @@ bool RequestsEqual(
 
   return request->contribution->get_histogram_contribution() ==
              finalized->contribution &&
-         request->aggregation_mode == finalized->aggregation_mode &&
          request->debug_mode_details == finalized->debug_mode_details;
 }
 bool RequestsEqual(
@@ -1598,7 +1592,6 @@ BuildPrivateAggregationRequest(
           NewHistogramContribution(
               blink::mojom::AggregatableReportHistogramContribution::New(
                   bucket, value, filtering_id)),
-      blink::mojom::AggregationServiceMode::kDefault,
       std::move(debug_mode_details));
 }
 
@@ -1636,7 +1629,6 @@ BuildPrivateAggregationForEventRequest(
   return auction_worklet::mojom::PrivateAggregationRequest::New(
       auction_worklet::mojom::AggregatableReportContribution::
           NewForEventContribution(contribution.Clone()),
-      blink::mojom::AggregationServiceMode::kDefault,
       blink::mojom::DebugModeDetails::New());
 }
 
@@ -1649,7 +1641,6 @@ BuildFinalizedPrivateAggregationErrorEventRequest(
   return auction_worklet::mojom::FinalizedPrivateAggregationRequest::New(
       blink::mojom::AggregatableReportHistogramContribution::New(bucket, value,
                                                                  filtering_id),
-      blink::mojom::AggregationServiceMode::kDefault,
       blink::mojom::DebugModeDetails::New(), error_event);
 }
 
@@ -1670,7 +1661,6 @@ BuildPrivateAggregationForScaledBaseValue(
   return auction_worklet::mojom::PrivateAggregationRequest::New(
       auction_worklet::mojom::AggregatableReportContribution::
           NewForEventContribution(contribution.Clone()),
-      blink::mojom::AggregationServiceMode::kDefault,
       blink::mojom::DebugModeDetails::New());
 }
 
@@ -1844,12 +1834,14 @@ class MockTrustedSignalsCacheImpl : public TrustedSignalsCacheImpl {
     std::set<std::string> interest_group_names;
     std::set<std::string> keys;
     base::Value::Dict additional_params;
+    std::optional<std::string> buyer_tkv_signals;
 
     bool operator<(const BiddingPartitionInfo& other) const {
       return std::tie(partition_id, interest_group_names, keys,
-                      additional_params) <
+                      additional_params, buyer_tkv_signals) <
              std::tie(other.partition_id, other.interest_group_names,
-                      other.keys, other.additional_params);
+                      other.keys, other.additional_params,
+                      other.buyer_tkv_signals);
     }
   };
 
@@ -2011,7 +2003,10 @@ class MockTrustedSignalsCacheImpl : public TrustedSignalsCacheImpl {
         for (const auto& partition : compression_group.second) {
           partitions.emplace_back(BiddingPartitionInfo{
               partition.partition_id, *partition.interest_group_names,
-              *partition.keys, partition.additional_params->Clone()});
+              *partition.keys, partition.additional_params->Clone(),
+              partition.buyer_tkv_signals == nullptr
+                  ? std::nullopt
+                  : std::make_optional(*partition.buyer_tkv_signals)});
         }
         request_info.compression_groups.emplace(compression_group.first,
                                                 std::move(partitions));
@@ -2385,6 +2380,9 @@ class AuctionRunnerTest : public RenderViewHostTestHarness,
     for (const auto& kv : per_buyer_experiment_group_id_) {
       auction_config.per_buyer_experiment_group_ids[kv.first] = kv.second;
     }
+
+    auction_config.non_shared_params.per_buyer_tkv_signals =
+        per_buyer_tkv_signals_;
 
     auction_config.non_shared_params.all_buyers_group_limit =
         all_buyers_group_limit_;
@@ -3858,6 +3856,7 @@ class AuctionRunnerTest : public RenderViewHostTestHarness,
   std::optional<uint16_t> seller_experiment_group_id_;
   std::optional<uint16_t> all_buyer_experiment_group_id_;
   std::map<url::Origin, uint16_t> per_buyer_experiment_group_id_;
+  base::flat_map<url::Origin, std::string> per_buyer_tkv_signals_;
   uint16_t all_buyers_group_limit_ = std::numeric_limits<std::uint16_t>::max();
   std::optional<base::flat_map<std::string, double>>
       all_buyers_priority_signals_;
@@ -27972,6 +27971,112 @@ TEST_P(AuctionRunnerTrustedSignalsTest,
   AddDefaultBidder1SignalsResult();
   AddDefaultBidder2SignalsResult();
 
+  RunAuctionAndWait(kSellerUrl, std::move(bidders));
+  EXPECT_EQ(GURL("https://ad1.com/"), result_.ad_descriptor->url);
+}
+
+// Test that `buyer_tkv_signals` is respected in the case of trusted KVv2
+// bidding signals. This test completely depends on the checks in
+// MockTrustedSignalsCache that exactly the expected signals requests were made
+// to the cache.
+TEST_P(AuctionRunnerTrustedSignalsTest, TrustedSignalsKVv2BuyerTKVSignals) {
+  // Only KVv2 request contains contextual data which is buyer_tkv_signals for
+  // bidding signals.
+  if (!UsingKVv2Signals()) {
+    return;
+  }
+
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      blink::features::kFledgeTrustedSignalsKVv2ContextualData);
+
+  per_buyer_tkv_signals_[kBidder1] = "signals";
+  auction_worklet::AddJavascriptResponse(
+      &url_loader_factory_, kBidder1Url,
+      MakeConstBidScript(1, "https://ad1.com/"));
+  auction_worklet::AddJavascriptResponse(&url_loader_factory_, kSellerUrl,
+                                         kMinimumDecisionScript);
+
+  std::vector<StorageInterestGroup> bidders;
+  bidders.emplace_back(MakeInterestGroup(
+      kBidder1, kBidder1Name, kBidder1Url, kBidder1TrustedSignalsUrl,
+      {"k1", "k2"}, GURL("https://ad1.com"), /*ad_component_urls=*/std::nullopt,
+      coordinator_origin_));
+
+  auto bidder1_request_info = DefaultBidder1SignalsRequestInfo();
+  bidder1_request_info.compression_groups[0][0].buyer_tkv_signals = "signals";
+  // The actual response doesn't matter - this test depends on the logic in
+  // MockTrustedSignalsCache to verify all the expected requests were sent, with
+  // the correct parameters.
+  AddBiddingSignalsCacheResult(std::move(bidder1_request_info),
+                               MakeBidder1CompressionGroupMap());
+
+  RunAuctionAndWait(kSellerUrl, std::move(bidders));
+  EXPECT_EQ(GURL("https://ad1.com/"), result_.ad_descriptor->url);
+}
+
+// Test that `buyer_tkv_signals` set with bidder2 will not show up in the
+// request of bidder1's trusted KVv2 bidding signals. This test completely
+// depends on the checks in MockTrustedSignalsCache that exactly the expected
+// signals requests were made to the cache.
+TEST_P(AuctionRunnerTrustedSignalsTest,
+       TrustedSignalsKVv2BuyerTKVSignalsWithWrongBuyer) {
+  // Only KVv2 request contains contextual data which is buyer_tkv_signals for
+  // bidding signals.
+  if (!UsingKVv2Signals()) {
+    return;
+  }
+
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      blink::features::kFledgeTrustedSignalsKVv2ContextualData);
+
+  // Set up per_buyer_tkv_signals with only bidder2's origin and "signals" will
+  // not show up in bidder1's bidding signals request.
+  per_buyer_tkv_signals_[kBidder2] = "signals";
+  auction_worklet::AddJavascriptResponse(
+      &url_loader_factory_, kBidder1Url,
+      MakeConstBidScript(1, "https://ad1.com/"));
+  auction_worklet::AddJavascriptResponse(&url_loader_factory_, kSellerUrl,
+                                         kMinimumDecisionScript);
+
+  std::vector<StorageInterestGroup> bidders;
+  bidders.emplace_back(MakeInterestGroup(
+      kBidder1, kBidder1Name, kBidder1Url, kBidder1TrustedSignalsUrl,
+      {"k1", "k2"}, GURL("https://ad1.com"), /*ad_component_urls=*/std::nullopt,
+      coordinator_origin_));
+
+  AddDefaultBidder1SignalsResult();
+  RunAuctionAndWait(kSellerUrl, std::move(bidders));
+  EXPECT_EQ(GURL("https://ad1.com/"), result_.ad_descriptor->url);
+}
+
+// When the feature is disabled, ensure `buyer_tkv_signals` is not included in
+// bidder1's bidding signals request even have the correct bidder origin. This
+// test completely depends on the checks in MockTrustedSignalsCache that exactly
+// the expected signals requests were made to the cache.
+TEST_P(AuctionRunnerTrustedSignalsTest,
+       TrustedSignalsKVv2BuyerTKVSignalsFeatureDisabled) {
+  // Only KVv2 request contains contextual data which is buyer_tkv_signals for
+  // bidding signals.
+  if (!UsingKVv2Signals()) {
+    return;
+  }
+
+  per_buyer_tkv_signals_[kBidder1] = "signals";
+  auction_worklet::AddJavascriptResponse(
+      &url_loader_factory_, kBidder1Url,
+      MakeConstBidScript(1, "https://ad1.com/"));
+  auction_worklet::AddJavascriptResponse(&url_loader_factory_, kSellerUrl,
+                                         kMinimumDecisionScript);
+
+  std::vector<StorageInterestGroup> bidders;
+  bidders.emplace_back(MakeInterestGroup(
+      kBidder1, kBidder1Name, kBidder1Url, kBidder1TrustedSignalsUrl,
+      {"k1", "k2"}, GURL("https://ad1.com"), /*ad_component_urls=*/std::nullopt,
+      coordinator_origin_));
+
+  AddDefaultBidder1SignalsResult();
   RunAuctionAndWait(kSellerUrl, std::move(bidders));
   EXPECT_EQ(GURL("https://ad1.com/"), result_.ad_descriptor->url);
 }

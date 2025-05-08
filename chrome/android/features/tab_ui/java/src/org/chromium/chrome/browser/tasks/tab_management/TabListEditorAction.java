@@ -20,11 +20,14 @@ import org.chromium.base.Token;
 import org.chromium.base.lifetime.Destroyable;
 import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tasks.tab_management.TabUiMetricsHelper.TabListEditorExitMetricGroups;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.browser_ui.widget.selectable_list.SelectionDelegate;
+import org.chromium.components.tab_group_sync.SavedTabGroup;
+import org.chromium.components.tab_group_sync.TabGroupSyncService;
 import org.chromium.ui.modelutil.PropertyModel;
 
 import java.lang.annotation.Retention;
@@ -221,10 +224,12 @@ public abstract class TabListEditorAction {
      * Processes the selected tabs from the selection list this includes related tabs if {@link
      * #editorSupportsActionOnRelatedTabs()} is true.
      *
-     * @param tabs a list of tabs from getTabsFromSelection().
+     * @param tabs A list of tabs from getTabsFromSelection().
+     * @param tabGroupSyncIds A list of tab group sync ids representing {@link SavedTabGroups} that
+     *     are selected as indicated in the {@link SelectionDelegate}.
      * @return Whether an action was performed without an error.
      */
-    public abstract boolean performAction(List<Tab> tabs);
+    public abstract boolean performAction(List<Tab> tabs, List<String> tabGroupSyncIds);
 
     /**
      * @return Whether to hide the editor after tabking the action.
@@ -247,6 +252,7 @@ public abstract class TabListEditorAction {
                 obs.preProcessSelectedTabs(tabs);
             }
         }
+        List<String> tabGroupSyncIds = getTabGroupSyncIdsFromSelection();
         // When hiding by action it is expected that syncRecyclerViewPosition() is called before the
         // action occurs. This is because an action may remove tabs so it needs to sync position
         // before the removal of items occurs to ensure the positions match correctly for
@@ -254,7 +260,7 @@ public abstract class TabListEditorAction {
         if (shouldHideEditorAfterAction()) {
             mActionDelegate.syncRecyclerViewPosition();
         }
-        if (!performAction(tabs)) {
+        if (!performAction(tabs, tabGroupSyncIds)) {
             return false;
         }
 
@@ -343,6 +349,18 @@ public abstract class TabListEditorAction {
                 : getTabsFromSelection();
     }
 
+    private List<String> getTabGroupSyncIdsFromSelection() {
+        List<String> tabGroupSyncIds = new ArrayList<>();
+        for (TabListEditorItemSelectionId itemId : mSelectionDelegate.getSelectedItems()) {
+            // Only items of type syncId representing a {@link SavedTabGroup} are considered.
+            // Regular tabs or other representations of tab groups will be ignored.
+            if (itemId.isTabGroupSyncId()) {
+                tabGroupSyncIds.add(itemId.getTabGroupSyncId());
+            }
+        }
+        return tabGroupSyncIds;
+    }
+
     protected void setDestroyable(Destroyable destroyable) {
         mModel.set(DESTROYABLE, destroyable);
     }
@@ -365,8 +383,6 @@ public abstract class TabListEditorAction {
             TabGroupModelFilter tabGroupModelFilter, List<TabListEditorItemSelectionId> itemIds) {
         int tabCount = 0;
         for (TabListEditorItemSelectionId itemId : itemIds) {
-            // Only items of type tabId representing a tab are considered. Synced tab groups
-            // represented by a syncId will be ignored.
             if (itemId.isTabId()) {
                 Tab tab = tabGroupModelFilter.getTabModel().getTabById(itemId.getTabId());
                 // TODO(crbug.com/41495189): Find out how we can have a tab ID that is no longer
@@ -379,6 +395,17 @@ public abstract class TabListEditorAction {
                 } else {
                     tabCount++;
                 }
+            } else if (itemId.isTabGroupSyncId()) {
+                TabGroupSyncService tabGroupSyncService =
+                        TabGroupSyncServiceFactory.getForProfile(
+                                tabGroupModelFilter.getTabModel().getProfile());
+                SavedTabGroup savedTabGroup =
+                        tabGroupSyncService.getGroup(itemId.getTabGroupSyncId());
+                if (savedTabGroup != null) {
+                    tabCount += savedTabGroup.savedTabs.size();
+                }
+            } else {
+                assert false : "Unexpected itemId type.";
             }
         }
         return tabCount;

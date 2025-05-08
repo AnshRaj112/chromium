@@ -68,10 +68,10 @@
  * SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <ctype.h>
+#include <cstdlib>
+#include <cstring>
+#include <cstdio>
+#include <cctype>
 
 #include "affentry.hxx"
 #include "csutil.hxx"
@@ -99,7 +99,8 @@ std::string PfxEntry::add(const char* word, size_t len) {
   std::string result;
   if ((len > strip.size() || (len == 0 && pmyMgr->get_fullstrip())) &&
       (len >= numconds) && test_condition(word) &&
-      (!strip.size() || (strncmp(word, strip.c_str(), strip.size()) == 0))) {
+      (strip.empty() ||
+      (len >= strip.size() && strncmp(word, strip.c_str(), strip.size()) == 0))) {
     /* we have a match so add prefix */
     result.assign(appnd);
     result.append(word + strip.size());
@@ -174,7 +175,7 @@ inline int PfxEntry::test_condition(const std::string& s) {
         }
       /* FALLTHROUGH */
       default: {
-        if (s[st] == *p) {
+        if (st < s.size() && s[st] == *p) {
           ++st;
           p = nextchar(p);
           if ((opts & aeUTF8) && (s[st - 1] & 0x80)) {  // multibyte
@@ -241,7 +242,7 @@ struct hentry* PfxEntry::checkword(const std::string& word,
 
     if (test_condition(tmpword)) {
       tmpl += strip.size();
-      if ((he = pmyMgr->lookup(tmpword.c_str())) != NULL) {
+      if ((he = pmyMgr->lookup(tmpword.c_str(), tmpword.size())) != NULL) {
         do {
           if (TESTAFF(he->astr, aflag, he->alen) &&
               // forbid single prefixes with needaffix flag
@@ -289,7 +290,7 @@ struct hentry* PfxEntry::check_twosfx(const std::string& word,
     // back any characters that would have been stripped
 
     std::string tmpword(strip);
-    tmpword.append(word, start + appnd.size());
+    tmpword.append(word, start + appnd.size(), tmpl);
 
     // now make sure all of the conditions on characters
     // are met.  Please see the appendix at the end of
@@ -337,7 +338,7 @@ std::string PfxEntry::check_twosfx_morph(const std::string& word,
     // back any characters that would have been stripped
 
     std::string tmpword(strip);
-    tmpword.append(word, start + appnd.size());
+    tmpword.append(word, start + appnd.size(), tmpl);
 
     // now make sure all of the conditions on characters
     // are met.  Please see the appendix at the end of
@@ -385,7 +386,7 @@ std::string PfxEntry::check_morph(const std::string& word,
     // back any characters that would have been stripped
 
     std::string tmpword(strip);
-    tmpword.append(word, start + appnd.size());
+    tmpword.append(word, start + appnd.size(), tmpl);
 
     // now make sure all of the conditions on characters
     // are met.  Please see the appendix at the end of
@@ -398,7 +399,7 @@ std::string PfxEntry::check_morph(const std::string& word,
     if (test_condition(tmpword)) {
       tmpl += strip.size();
       struct hentry* he;  // hash entry of root word or NULL
-      if ((he = pmyMgr->lookup(tmpword.c_str())) != NULL) {
+      if ((he = pmyMgr->lookup(tmpword.c_str(), tmpword.size())) != NULL) {
         do {
           if (TESTAFF(he->astr, aflag, he->alen) &&
               // forbid single prefixes with needaffix flag
@@ -468,9 +469,9 @@ std::string SfxEntry::add(const char* word, size_t len) {
   /* make sure all conditions match */
   if ((len > strip.size() || (len == 0 && pmyMgr->get_fullstrip())) &&
       (len >= numconds) && test_condition(word + len, word) &&
-      (!strip.size() ||
-       (strcmp(word + len - strip.size(), strip.c_str()) == 0))) {
-    result.assign(word);
+      (strip.empty() ||
+       (len >= strip.size() && strcmp(word + len - strip.size(), strip.c_str()) == 0))) {
+    result.assign(word, len);
     /* we have a match so add suffix */
     result.replace(len - strip.size(), std::string::npos, appnd);
   }
@@ -648,7 +649,7 @@ struct hentry* SfxEntry::checkword(const std::string& word,
     // or null terminating the shorter string
 
     std::string tmpstring(word, start, tmpl);
-    if (strip.size()) {
+    if (!strip.empty()) {
       tmpstring.append(strip);
     }
 
@@ -667,7 +668,7 @@ struct hentry* SfxEntry::checkword(const std::string& word,
 #ifdef SZOSZABLYA_POSSIBLE_ROOTS
       fprintf(stdout, "%s %s %c\n", word.c_str() + start, tmpword, aflag);
 #endif
-      if ((he = pmyMgr->lookup(tmpword)) != NULL) {
+      if ((he = pmyMgr->lookup(tmpstring.c_str(), tmpstring.size())) != NULL) {
         do {
           // check conditional suffix (enabled by prefix)
           if ((TESTAFF(he->astr, aflag, he->alen) ||

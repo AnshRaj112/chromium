@@ -661,12 +661,30 @@ class ApiTests extends ApiTestFixtureBase {
 
   async testScrollToFindsText() {
     assertTrue(!!this.host.scrollTo);
+    assertTrue(!!this.host.setTabContextPermissionState);
+    await this.host.setTabContextPermissionState(true);
     await this.host.scrollTo(
         {selector: {exactText: {text: 'Test Page'}}, highlight: true});
   }
 
+  async testScrollToFindsTextNoTabContextPermission() {
+    assertTrue(!!this.host.scrollTo);
+    try {
+      await this.host.scrollTo(
+          {selector: {exactText: {text: 'Abracadabra'}}, highlight: true});
+    } catch (e) {
+      assertEquals(
+          ScrollToErrorReason.TAB_CONTEXT_PERMISSION_DISABLED,
+          (e as ScrollToError).reason);
+      return;
+    }
+    assertTrue(false, 'scrollTo should have thrown an error');
+  }
+
   async testScrollToNoMatchFound() {
     assertTrue(!!this.host.scrollTo);
+    assertTrue(!!this.host.setTabContextPermissionState);
+    await this.host.setTabContextPermissionState(true);
     try {
       await this.host.scrollTo(
           {selector: {exactText: {text: 'Abracadabra'}}, highlight: true});
@@ -725,13 +743,47 @@ class ApiTests extends ApiTestFixtureBase {
 
   async testResizeWindowTooLarge() {
     assertTrue(!!this.host.resizeWindow);
-    await this.host.resizeWindow(2000, 2000);
+    await this.host.resizeWindow(20000, 20000);
   }
 
   async testResizeWindowWithinBounds() {
     assertTrue(!!this.host.resizeWindow);
     assertTrue(!!this.testParams);
     await this.host.resizeWindow(this.testParams.width, this.testParams.height);
+  }
+
+  async testGetContextFromFocusedTabWithIneligiblePage() {
+    assertTrue(!!this.host.getContextFromFocusedTab);
+    await this.host.setTabContextPermissionState(true);
+
+    try {
+      await this.host.getContextFromFocusedTab?.({
+        innerText: true,
+        viewportScreenshot: true,
+        annotatedPageContent: true,
+        maxMetaTags: 32,
+        pdfData: true,
+      });
+    } catch (e) {
+      assertEquals(
+          'tabContext failed: page context ineligible', (e as Error).message);
+      return;
+    }
+    assertTrue(false, 'getContextFromFocusedTab should have thrown an error');
+  }
+
+  async testGetContextFromFocusedTabWithEligiblePage() {
+    await this.host.setTabContextPermissionState(true);
+
+    const result = await this.host.getContextFromFocusedTab?.({
+      innerText: true,
+      viewportScreenshot: true,
+      annotatedPageContent: true,
+      maxMetaTags: 32,
+      pdfData: true,
+    });
+
+    assertTrue(!!result);
   }
 
   async testOpenOsMediaPermissionSettings() {

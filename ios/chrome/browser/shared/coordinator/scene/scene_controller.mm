@@ -91,6 +91,8 @@
 #import "ios/chrome/browser/incognito_interstitial/ui_bundled/incognito_interstitial_coordinator_delegate.h"
 #import "ios/chrome/browser/incognito_reauth/ui_bundled/incognito_reauth_scene_agent.h"
 #import "ios/chrome/browser/infobars/model/infobar_manager_impl.h"
+#import "ios/chrome/browser/intelligence/features/features.h"
+#import "ios/chrome/browser/intelligence/glic/coordinator/glic_promo_scene_agent.h"
 #import "ios/chrome/browser/intents/model/user_activity_browser_agent.h"
 #import "ios/chrome/browser/lens/ui_bundled/lens_entrypoint.h"
 #import "ios/chrome/browser/lens_overlay/coordinator/lens_overlay_availability.h"
@@ -182,6 +184,7 @@
 #import "ios/chrome/browser/start_surface/ui_bundled/start_surface_recent_tab_browser_agent.h"
 #import "ios/chrome/browser/start_surface/ui_bundled/start_surface_scene_agent.h"
 #import "ios/chrome/browser/start_surface/ui_bundled/start_surface_util.h"
+#import "ios/chrome/browser/sync/model/sync_service_factory.h"
 #import "ios/chrome/browser/tab_insertion/model/tab_insertion_browser_agent.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/tab_grid_coordinator.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/tab_grid_coordinator_delegate.h"
@@ -1335,7 +1338,19 @@ SystemIdentityManager::IteratorResult IdentitiesOnDevice(
                            initWithPromosManager:promosManager]];
 
   if (IsFullscreenSigninPromoManagerMigrationEnabled()) {
-    [sceneState addAgent:[[SigninFullscreenPromoSceneAgent alloc]
+    [sceneState
+        addAgent:
+            [[SigninFullscreenPromoSceneAgent alloc]
+                initWithPromosManager:promosManager
+                          authService:authService
+                      identityManager:IdentityManagerFactory::GetForProfile(
+                                          profile)
+                          syncService:SyncServiceFactory::GetForProfile(profile)
+                          prefService:prefService]];
+  }
+
+  if (IsPageActionMenuEnabled()) {
+    [sceneState addAgent:[[GLICPromoSceneAgent alloc]
                              initWithPromosManager:promosManager]];
   }
 }
@@ -2152,112 +2167,10 @@ using UserFeedbackDataCallback =
     return;
   }
   Browser* mainBrowser = self.mainInterface.browser;
-
-  switch (command.operation) {
-    case AuthenticationOperation::kPrimaryAccountReauth:
-      self.signinCoordinator = [SigninCoordinator
-          primaryAccountReauthCoordinatorWithBaseViewController:
-              baseViewController
-                                                        browser:mainBrowser
-                                                   contextStyle:
-                                                       command.contextStyle
-
-                                                    accessPoint:command
-                                                                    .accessPoint
-                                                    promoAction:command
-                                                                    .promoAction
-                                           continuationProvider:
-                                               command
-                                                   .changeProfileContinuationProvider];
-      break;
-    case AuthenticationOperation::kResignin:
-      self.signinCoordinator = [SigninCoordinator
-          signinAndSyncReauthCoordinatorWithBaseViewController:
-              baseViewController
-                                                       browser:mainBrowser
-                                                  contextStyle:command
-                                                                   .contextStyle
-                                                   accessPoint:command
-                                                                   .accessPoint
-                                                   promoAction:command
-                                                                   .promoAction
-                                          continuationProvider:
-                                              command
-                                                  .changeProfileContinuationProvider];
-      break;
-    case AuthenticationOperation::kSigninOnly: {
-      auto& provider = command.changeProfileContinuationProvider;
-      self.signinCoordinator = [SigninCoordinator
-          consistencyPromoSigninCoordinatorWithBaseViewController:
-              baseViewController
-                                                          browser:mainBrowser
-                                                     contextStyle:
-                                                         command.contextStyle
-                                                      accessPoint:
-                                                          command.accessPoint
-                                             prepareChangeProfile:
-                                                 command.prepareChangeProfile
-                                             continuationProvider:provider];
-      break;
-    }
-    case AuthenticationOperation::kAddAccount:
-      self.signinCoordinator = [SigninCoordinator
-          addAccountCoordinatorWithBaseViewController:baseViewController
+  self.signinCoordinator =
+      [SigninCoordinator signinCoordinatorWithCommand:command
                                               browser:mainBrowser
-                                         contextStyle:command.contextStyle
-                                          accessPoint:command.accessPoint
-                                 continuationProvider:
-                                     command.changeProfileContinuationProvider];
-      break;
-    case AuthenticationOperation::kForcedSigninAndSync:
-      self.signinCoordinator = [SigninCoordinator
-          fullscreenSigninCoordinatorWithBaseViewController:baseViewController
-                                                    browser:mainBrowser
-                                               contextStyle:command.contextStyle
-                                                accessPoint:command.accessPoint
-                          changeProfileContinuationProvider:
-                              command.changeProfileContinuationProvider];
-      break;
-    case AuthenticationOperation::kInstantSignin:
-      self.signinCoordinator = [SigninCoordinator
-          instantSigninCoordinatorWithBaseViewController:baseViewController
-                                                 browser:mainBrowser
-                                                identity:command.identity
-                                            contextStyle:command.contextStyle
-                                             accessPoint:command.accessPoint
-                                             promoAction:command.promoAction
-                                    continuationProvider:
-                                        command
-                                            .changeProfileContinuationProvider];
-      break;
-    case AuthenticationOperation::kSheetSigninAndHistorySync: {
-      auto& provider = command.changeProfileContinuationProvider;
-      self.signinCoordinator = [SigninCoordinator
-          signinAndHistorySyncCoordinatorWithBaseViewController:
-              baseViewController
-                                                        browser:mainBrowser
-                                                   contextStyle:
-                                                       command.contextStyle
-                                                    accessPoint:command
-                                                                    .accessPoint
-                                                    promoAction:command
-                                                                    .promoAction
-                                            optionalHistorySync:
-                                                command.optionalHistorySync
-                                                fullscreenPromo:
-                                                    command.fullScreenPromo
-                                           continuationProvider:provider];
-      break;
-    }
-    case AuthenticationOperation::kHistorySync:
-      self.signinCoordinator = [SigninCoordinator
-          historySyncCoordinatorWithBaseViewController:baseViewController
-                                               browser:mainBrowser
-                                          contextStyle:command.contextStyle
-                                           accessPoint:command.accessPoint
-                                           promoAction:command.promoAction];
-      break;
-  }
+                                   baseViewController:baseViewController];
   [self startSigninCoordinatorWithCompletion:command.completion];
 }
 

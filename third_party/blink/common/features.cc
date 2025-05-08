@@ -2149,26 +2149,6 @@ BASE_FEATURE(kPrerender2EarlyDocumentLifecycleUpdate,
              "Prerender2EarlyDocumentLifecycleUpdate",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kPrerender2WarmUpCompositor,
-             "Prerender2WarmUpCompositor",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-const base::FeatureParam<Prerender2WarmUpCompositorTriggerPoint>::Option
-    prerender2_warm_up_compositor_trigger_point[] = {
-        {Prerender2WarmUpCompositorTriggerPoint::kDidCommitLoad,
-         "did_commit_load"},
-        {Prerender2WarmUpCompositorTriggerPoint::
-             kDidDispatchDOMContentLoadedEvent,
-         "did_dispatch_dom_content_loaded_event"},
-        {Prerender2WarmUpCompositorTriggerPoint::kDidFinishLoad,
-         "did_finish_load"},
-};
-BASE_FEATURE_ENUM_PARAM(Prerender2WarmUpCompositorTriggerPoint,
-                        kPrerender2WarmUpCompositorTriggerPoint,
-                        &kPrerender2WarmUpCompositor,
-                        "trigger_point",
-                        Prerender2WarmUpCompositorTriggerPoint::kDidCommitLoad,
-                        &prerender2_warm_up_compositor_trigger_point);
-
 // Enable limiting previews loading hints to specific resource types.
 BASE_FEATURE(kPreviewsResourceLoadingHintsSpecificResourceTypes,
              "PreviewsResourceLoadingHintsSpecificResourceTypes",
@@ -2840,6 +2820,10 @@ BASE_FEATURE(kWebUSBTransferSizeLimit,
 BASE_FEATURE(kWebviewAccelerateSmallCanvases,
              "WebviewAccelerateSmallCanvases",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kNoReferrerForPreloadFromSubresource,
+             "NoReferrerForPreloadFromSubresource",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When adding new features or constants for features, please keep the features
 // sorted by identifier name (e.g. `kAwesomeFeature`), and the constants for

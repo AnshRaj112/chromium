@@ -21,6 +21,7 @@
 #import "ios/chrome/browser/safety_check_notifications/model/safety_check_notification_client.h"
 #import "ios/chrome/browser/send_tab_to_self/model/send_tab_push_notification_client.h"
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
+#import "ios/chrome/browser/shared/model/profile/features.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/utils/first_run_util.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
@@ -34,7 +35,7 @@ PushNotificationClientManager::PushNotificationClientManager(
     : task_runner_(std::move(task_runner)), profile_(profile) {
   CHECK(task_runner_);
   CHECK(profile_);
-  CHECK(IsIOSMultiProfilePushNotificationHandlingEnabled());
+  CHECK(IsMultiProfilePushNotificationHandlingEnabled());
 
   AddPerProfilePushNotificationClients();
 }
@@ -46,7 +47,7 @@ PushNotificationClientManager::PushNotificationClientManager(
 
   AddAppWidePushNotificationClients();
 
-  if (!IsIOSMultiProfilePushNotificationHandlingEnabled()) {
+  if (!IsMultiProfilePushNotificationHandlingEnabled()) {
     AddPerProfilePushNotificationClients();
   }
 }
@@ -140,15 +141,10 @@ void PushNotificationClientManager::RegisterActionableNotifications() {
 std::vector<PushNotificationClientId>
 PushNotificationClientManager::GetClients() {
   std::vector<PushNotificationClientId> client_ids = {
-      PushNotificationClientId::kCommerce};
+      PushNotificationClientId::kCommerce, PushNotificationClientId::kTips};
   if (IsContentNotificationExperimentEnabled()) {
     client_ids.push_back(PushNotificationClientId::kContent);
     client_ids.push_back(PushNotificationClientId::kSports);
-  }
-  if (IsIOSTipsNotificationsEnabled() ||
-      (IsFirstRunRecent(base::Days(28)) &&
-       IsIOSReactivationNotificationsEnabled())) {
-    client_ids.push_back(PushNotificationClientId::kTips);
   }
   if (IsSafetyCheckNotificationsEnabled()) {
     client_ids.push_back(PushNotificationClientId::kSafetyCheck);
@@ -171,7 +167,7 @@ void PushNotificationClientManager::AddPerProfilePushNotificationClients() {
   if (optimization_guide::features::IsPushNotificationsEnabled()) {
     std::unique_ptr<CommercePushNotificationClient> client;
 
-    if (IsIOSMultiProfilePushNotificationHandlingEnabled()) {
+    if (IsMultiProfilePushNotificationHandlingEnabled()) {
       CHECK(profile_);
 
       client = std::make_unique<CommercePushNotificationClient>(profile_);
@@ -188,7 +184,7 @@ void PushNotificationClientManager::AddPerProfilePushNotificationClients() {
   if (IsContentNotificationExperimentEnabled()) {
     std::unique_ptr<ContentNotificationClient> client;
 
-    if (IsIOSMultiProfilePushNotificationHandlingEnabled()) {
+    if (IsMultiProfilePushNotificationHandlingEnabled()) {
       CHECK(profile_);
 
       client = std::make_unique<ContentNotificationClient>(profile_);
@@ -203,7 +199,7 @@ void PushNotificationClientManager::AddPerProfilePushNotificationClients() {
   }
 
   if (IsSafetyCheckNotificationsEnabled()) {
-    if (IsIOSMultiProfilePushNotificationHandlingEnabled() && profile_) {
+    if (IsMultiProfilePushNotificationHandlingEnabled() && profile_) {
       // Pass profile and task runner for multi-profile handling.
       auto client = std::make_unique<SafetyCheckNotificationClient>(
           profile_, task_runner_);
@@ -225,7 +221,7 @@ void PushNotificationClientManager::AddPerProfilePushNotificationClients() {
           send_tab_to_self::kSendTabToSelfIOSPushNotifications)) {
     std::unique_ptr<SendTabPushNotificationClient> client;
 
-    if (IsIOSMultiProfilePushNotificationHandlingEnabled()) {
+    if (IsMultiProfilePushNotificationHandlingEnabled()) {
       CHECK(profile_);
 
       client = std::make_unique<SendTabPushNotificationClient>(profile_);
@@ -240,7 +236,7 @@ void PushNotificationClientManager::AddPerProfilePushNotificationClients() {
 
     // Additionally, add Reminder client if STTS reminders are also enabled.
     if (IsSendTabIOSPushNotificationsEnabledWithTabReminders() &&
-        IsIOSMultiProfilePushNotificationHandlingEnabled()) {
+        IsMultiProfilePushNotificationHandlingEnabled()) {
       CHECK(profile_);
 
       std::unique_ptr<ReminderNotificationClient> reminder_client =
@@ -256,13 +252,9 @@ void PushNotificationClientManager::AddPerProfilePushNotificationClients() {
 
 // Adds clients that operate app-wide.
 void PushNotificationClientManager::AddAppWidePushNotificationClients() {
-  if (IsIOSTipsNotificationsEnabled() ||
-      (IsFirstRunRecent(base::Days(28)) &&
-       IsIOSReactivationNotificationsEnabled())) {
-    auto client = std::make_unique<TipsNotificationClient>();
-    CHECK_EQ(client->GetClientScope(), PushNotificationClientScope::kAppWide);
-    AddPushNotificationClient(std::move(client));
-  }
+  auto client = std::make_unique<TipsNotificationClient>();
+  CHECK_EQ(client->GetClientScope(), PushNotificationClientScope::kAppWide);
+  AddPushNotificationClient(std::move(client));
 }
 
 PushNotificationClient* PushNotificationClientManager::GetClientForNotification(

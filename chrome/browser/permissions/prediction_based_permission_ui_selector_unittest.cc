@@ -17,10 +17,12 @@
 #include "chrome/test/base/testing_profile.h"
 #include "components/content_settings/core/common/pref_names.h"
 #include "components/permissions/features.h"
+#include "components/permissions/permission_request_data.h"
 #include "components/permissions/permission_uma_util.h"
 #include "components/permissions/permission_util.h"
 #include "components/permissions/prediction_service/prediction_common.h"
 #include "components/permissions/request_type.h"
+#include "components/permissions/resolvers/content_setting_permission_resolver.h"
 #include "components/permissions/test/mock_permission_request.h"
 #include "components/prefs/pref_service.h"
 #include "components/safe_browsing/core/common/safe_browsing_prefs.h"
@@ -229,7 +231,7 @@ TEST_F(PredictionBasedPermissionUiSelectorTest,
 // This test verifies that `GetPredictionRequestProto` does not crash if
 // `kPermissionsAIv1` is enabled.
 #if !BUILDFLAG(IS_ANDROID)
-TEST_F(PredictionBasedPermissionUiSelectorTest, GetPredictionTypeToUseTFLite) {
+TEST_F(PredictionBasedPermissionUiSelectorTest, GetPredictionTypeToUseCpssV1) {
   // Disable msbb.
   profile()->GetPrefs()->SetBoolean(
       unified_consent::prefs::kUrlKeyedAnonymizedDataCollectionEnabled, false);
@@ -242,15 +244,19 @@ TEST_F(PredictionBasedPermissionUiSelectorTest, GetPredictionTypeToUseTFLite) {
 
   PredictionBasedPermissionUiSelector prediction_selector(profile());
 
-  EXPECT_EQ(PredictionSource::USE_ONDEVICE_TFLITE,
+  EXPECT_EQ(PredictionSource::kOnDeviceCpssV1Model,
             prediction_selector.GetPredictionTypeToUse(
                 permissions::RequestType::kNotifications));
 
-  auto decided = [](ContentSetting, bool, bool) {};
+  auto decided =
+      [](ContentSetting, bool, bool,
+         const std::unique_ptr<permissions::PermissionRequestData>&) {};
   permissions::PermissionRequest permission_request(
-      GURL("http://example.com/"), permissions::RequestType::kGeolocation,
-      /* user_gesture=*/true, base::BindRepeating(decided),
-      /* delete_callback */ base::NullCallback());
+      std::make_unique<permissions::PermissionRequestData>(
+          std::make_unique<permissions::ContentSettingPermissionResolver>(
+              ContentSettingsType::GEOLOCATION),
+          /*user_gesture=*/true, GURL("http://example.com/")),
+      base::BindRepeating(decided), /*delete_callback=*/base::NullCallback());
 
   permissions::PredictionRequestFeatures features =
       prediction_selector.BuildPredictionRequestFeatures(&permission_request);
@@ -279,24 +285,39 @@ INSTANTIATE_TEST_SUITE_P(
          /*enabled_features=*/{BASIC_CPSS_FEATURES},
          /*disabled_features=*/
          {permissions::features::kPermissionDedicatedCpssSettingAndroid},
-         /*expected_prediction_source=*/PredictionSource::USE_ONDEVICE_TFLITE},
+         /*expected_prediction_source=*/PredictionSource::kOnDeviceCpssV1Model},
         {/*test_name=*/"UseServerSideOnAndroid",
          /*enabled_features=*/
          {BASIC_CPSS_FEATURES,
           permissions::features::kPermissionDedicatedCpssSettingAndroid},
          /*disabled_features=*/{},
-         /*expected_prediction_source=*/PredictionSource::USE_SERVER_SIDE},
+         /*expected_prediction_source=*/
+         PredictionSource::kServerSideCpssV3Model},
 #else
         {/*test_name=*/"UseServerSideOnDesktop",
          /*enabled_features=*/{BASIC_CPSS_FEATURES},
          /*disabled_features=*/{},
-         /*expected_prediction_source=*/PredictionSource::USE_SERVER_SIDE},
+         /*expected_prediction_source=*/
+         PredictionSource::kServerSideCpssV3Model},
         {/*test_name=*/"UsePermissionsAiv1OnDesktop",
          /*enabled_features=*/
          {BASIC_CPSS_FEATURES, permissions::features::kPermissionsAIv1},
          /*disabled_features=*/{},
          /*expected_prediction_source=*/
-         PredictionSource::USE_ONDEVICE_AI_AND_SERVER_SIDE},
+         PredictionSource::kOnDeviceAiv1AndServerSideModel},
+        {/*test_name=*/"UsePermissionsAiv3OnDesktop",
+         /*enabled_features=*/
+         {BASIC_CPSS_FEATURES, permissions::features::kPermissionsAIv3},
+         /*disabled_features=*/{},
+         /*expected_prediction_source=*/
+         PredictionSource::kOnDeviceAiv3AndServerSideModel},
+        {/*test_name=*/"UsePermissionsAiv3OverAiv1OnDesktop",
+         /*enabled_features=*/
+         {BASIC_CPSS_FEATURES, permissions::features::kPermissionsAIv1,
+          permissions::features::kPermissionsAIv3},
+         /*disabled_features=*/{},
+         /*expected_prediction_source=*/
+         PredictionSource::kOnDeviceAiv3AndServerSideModel},
 #endif
     }),
     /*name_generator=*/
@@ -334,7 +355,7 @@ TEST_F(PredictionBasedPermissionUiSelectorTest, HoldbackHistogramTest) {
              "0"}}},
       },
       {});
-  prediction_selector.tflite_model_holdback_probability_ = 0;
+  prediction_selector.cpss_v1_model_holdback_probability_ = 0;
 
   EXPECT_EQ(false, prediction_selector.ShouldHoldBack(
                        /*is_on_device=*/true,
@@ -385,7 +406,7 @@ TEST_F(PredictionBasedPermissionUiSelectorTest, HoldbackHistogramTest) {
              "1"}}},
       },
       {});
-  prediction_selector.tflite_model_holdback_probability_ = 1;
+  prediction_selector.cpss_v1_model_holdback_probability_ = 1;
 
   EXPECT_EQ(true, prediction_selector.ShouldHoldBack(
                       /*is_on_device=*/true,

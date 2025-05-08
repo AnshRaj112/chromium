@@ -54,6 +54,7 @@
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/cursor/cursor.h"
+#include "ui/base/cursor/mojom/cursor_type.mojom.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/point_conversions.h"
 #include "ui/gfx/geometry/point_f.h"
@@ -302,6 +303,12 @@ void PdfInkModule::OnGotThumbnail(int page_index, Thumbnail thumbnail) {
       /*is_ink=*/false, thumbnail.TakeData(), thumbnail.image_size()));
 }
 
+void PdfInkModule::SendContentFocusedMessage() {
+  base::Value::Dict message;
+  message.Set("type", "contentFocused");
+  client_->PostMessage(std::move(message));
+}
+
 PdfInkModule::PageInkStrokeIterator PdfInkModule::GetVisibleStrokesIterator() {
   return PageInkStrokeIterator(strokes_);
 }
@@ -313,11 +320,7 @@ bool PdfInkModule::HandleInputEvent(const blink::WebInputEvent& event) {
 
   switch (event.GetType()) {
     case blink::WebInputEvent::Type::kMouseDown: {
-      // TODO(crbug.com/377733396): Send a content focused message for certain
-      // non-mouse inputs, too.
-      base::Value::Dict message;
-      message.Set("type", "contentFocused");
-      client_->PostMessage(std::move(message));
+      SendContentFocusedMessage();
       return OnMouseDown(static_cast<const blink::WebMouseEvent&>(event));
     }
     case blink::WebInputEvent::Type::kMouseUp:
@@ -326,6 +329,7 @@ bool PdfInkModule::HandleInputEvent(const blink::WebInputEvent& event) {
       return OnMouseMove(static_cast<const blink::WebMouseEvent&>(event));
     // Touch and pen input events are blink::WebTouchEvent instances.
     case blink::WebInputEvent::Type::kTouchStart:
+      SendContentFocusedMessage();
       return OnTouchStart(static_cast<const blink::WebTouchEvent&>(event));
     case blink::WebInputEvent::Type::kTouchEnd:
       return OnTouchEnd(static_cast<const blink::WebTouchEvent&>(event));
@@ -347,8 +351,6 @@ bool PdfInkModule::OnMessage(const base::Value::Dict& message) {
            &PdfInkModule::HandleFinishTextAnnotationMessage},
           {"getAnnotationBrush",
            &PdfInkModule::HandleGetAnnotationBrushMessage},
-          {"getTextAnnotFontNames",
-           &PdfInkModule::HandleGetTextAnnotFontNamesMessage},
           {"setAnnotationBrush",
            &PdfInkModule::HandleSetAnnotationBrushMessage},
           {"setAnnotationMode", &PdfInkModule::HandleSetAnnotationModeMessage},
@@ -367,6 +369,10 @@ bool PdfInkModule::OnMessage(const base::Value::Dict& message) {
 }
 
 void PdfInkModule::OnGeometryChanged() {
+  // If the highlighter tool is selected, and zooming moves the cursor onto
+  // text, the cursor should be an I-beam, but it will instead be the drawing
+  // cursor until a mousemove event occurs. There is not a way to get the new
+  // mouse position on geometry change.
   MaybeSetCursor();
 }
 
@@ -447,17 +453,16 @@ bool PdfInkModule::OnMouseDown(const blink::WebMouseEvent& event) {
       CHECK(mouse_up_result);
     }
 
-    if (features::kPdfInk2TextHighlighting.Get() &&
-        state.brush_type == PdfInkBrush::Type::kHighlighter &&
-        client_->IsSelectableTextOrLinkArea(position)) {
+    if (IsHighlightingTextAtPosition(state, position)) {
       return StartTextHighlight(position, event.ClickCount(),
                                 event.TimeStamp());
     }
+
+    return StartStroke(position, event.TimeStamp(),
+                       ink::StrokeInput::ToolType::kMouse);
   }
-  return is_drawing_stroke()
-             ? StartStroke(position, event.TimeStamp(),
-                           ink::StrokeInput::ToolType::kMouse)
-             : StartEraseStroke(position, ink::StrokeInput::ToolType::kMouse);
+
+  return StartEraseStroke(position, ink::StrokeInput::ToolType::kMouse);
 }
 
 bool PdfInkModule::OnMouseUp(const blink::WebMouseEvent& event) {
@@ -467,11 +472,11 @@ bool PdfInkModule::OnMouseUp(const blink::WebMouseEvent& event) {
     return false;
   }
 
+  gfx::PointF position = event.PositionInWidget();
   if (features::kPdfInk2TextHighlighting.Get() && is_text_highlighting()) {
-    return FinishTextHighlight();
+    return FinishTextHighlight(position);
   }
 
-  gfx::PointF position = event.PositionInWidget();
   return is_drawing_stroke()
              ? FinishStroke(position, event.TimeStamp(),
                             ink::StrokeInput::ToolType::kMouse)
@@ -481,10 +486,8 @@ bool PdfInkModule::OnMouseUp(const blink::WebMouseEvent& event) {
 bool PdfInkModule::OnMouseMove(const blink::WebMouseEvent& event) {
   CHECK(enabled());
 
-  // TODO(crbug.com/342445982): Set the cursor for hovering over text with the
-  // highlighter brush while not drawing.
-
   gfx::PointF position = event.PositionInWidget();
+
   bool still_interacting_with_ink =
       event.GetModifiers() & blink::WebInputEvent::kLeftButtonDown;
   if (still_interacting_with_ink) {
@@ -504,6 +507,7 @@ bool PdfInkModule::OnMouseMove(const blink::WebMouseEvent& event) {
   // that now, and compensate by synthesizing a mouse-up input event at the
   // last known input position.  Intentionally do not use `position`.
   if (is_drawing_stroke()) {
+    MaybeSetCursorOnMouseMove(position);
     DrawingStrokeState& state = drawing_stroke_state();
     if (!state.input_last_event.has_value()) {
       // Ignore when not drawing.
@@ -769,7 +773,10 @@ bool PdfInkModule::FinishStroke(const gfx::PointF& position,
   state.page_index = -1;
   state.input_last_event.reset();
 
-  if (MaybeSetDrawingBrush()) {
+  bool set_drawing_brush = MaybeSetDrawingBrush();
+  if (IsHighlightingTextAtPosition(state, position)) {
+    client_->UpdateInkCursor(ui::mojom::CursorType::kIBeam);
+  } else if (set_drawing_brush) {
     MaybeSetCursor();
   }
 
@@ -981,7 +988,7 @@ bool PdfInkModule::ContinueTextHighlight(const gfx::PointF& position) {
   return true;
 }
 
-bool PdfInkModule::FinishTextHighlight() {
+bool PdfInkModule::FinishTextHighlight(const gfx::PointF& position) {
   CHECK(is_text_highlighting());
 
   auto& highlight_strokes = text_highlight_state().highlight_strokes;
@@ -1015,6 +1022,10 @@ bool PdfInkModule::FinishTextHighlight() {
   drawing_stroke_state().brush_type = PdfInkBrush::Type::kHighlighter;
 
   client_->ClearSelection();
+
+  if (!client_->IsSelectableTextOrLinkArea(position)) {
+    MaybeSetCursor();
+  }
   return true;
 }
 
@@ -1292,12 +1303,6 @@ void PdfInkModule::HandleSetAnnotationModeMessage(
   MaybeSetCursor();
 }
 
-void PdfInkModule::HandleGetTextAnnotFontNamesMessage(
-    const base::Value::Dict& message) {
-  // TODO(crbug.com/409439509): Fill in this method. For now, just create it
-  // so the backend doesn't CHECK when it's sent from the frontend.
-}
-
 void PdfInkModule::HandleStartTextAnnotationMessage(
     const base::Value::Dict& message) {
   // TODO(crbug.com/409439509): Fill in this method. For now, just create it
@@ -1308,6 +1313,14 @@ void PdfInkModule::HandleFinishTextAnnotationMessage(
     const base::Value::Dict& message) {
   // TODO(crbug.com/409439509): Fill in this method. For now, just create it
   // so the backend doesn't CHECK when it's sent from the frontend.
+}
+
+bool PdfInkModule::IsHighlightingTextAtPosition(
+    const DrawingStrokeState& state,
+    const gfx::PointF& position) const {
+  return features::kPdfInk2TextHighlighting.Get() &&
+         state.brush_type == PdfInkBrush::Type::kHighlighter &&
+         client_->IsSelectableTextOrLinkArea(position);
 }
 
 PdfInkBrush& PdfInkModule::GetDrawingBrush() {
@@ -1606,7 +1619,6 @@ void PdfInkModule::MaybeSetCursor() {
   }
 
   if (features::kPdfInk2TextHighlighting.Get() && is_text_highlighting()) {
-    // TODO(crbug.com/342445982): Set the cursor for text highlighting.
     return;
   }
 
@@ -1628,6 +1640,25 @@ void PdfInkModule::MaybeSetCursor() {
   gfx::Point hotspot(bitmap.width() / 2, bitmap.height() / 2);
   client_->UpdateInkCursor(
       ui::Cursor::NewCustom(std::move(bitmap), std::move(hotspot)));
+}
+
+void PdfInkModule::MaybeSetCursorOnMouseMove(const gfx::PointF& position) {
+  if (!features::kPdfInk2TextHighlighting.Get()) {
+    return;
+  }
+
+  CHECK(is_drawing_stroke());
+  if (drawing_stroke_state().brush_type != PdfInkBrush::Type::kHighlighter ||
+      !client_->IsSelectableTextOrLinkArea(position)) {
+    if (client_->GetCursor().type() == ui::mojom::CursorType::kIBeam) {
+      MaybeSetCursor();
+    }
+    return;
+  }
+
+  if (client_->GetCursor().type() != ui::mojom::CursorType::kIBeam) {
+    client_->UpdateInkCursor(ui::mojom::CursorType::kIBeam);
+  }
 }
 
 PdfInkModule::DrawingStrokeState::DrawingStrokeState() = default;

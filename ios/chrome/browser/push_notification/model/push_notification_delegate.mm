@@ -33,7 +33,8 @@
 #import "ios/chrome/browser/content_notification/model/content_notification_settings_action.h"
 #import "ios/chrome/browser/content_notification/model/content_notification_util.h"
 #import "ios/chrome/browser/push_notification/model/constants.h"
-#import "ios/chrome/browser/push_notification/model/provisional_push_notification_util.h"
+#import "ios/chrome/browser/push_notification/model/provisional_push_notification_service.h"
+#import "ios/chrome/browser/push_notification/model/provisional_push_notification_service_factory.h"
 #import "ios/chrome/browser/push_notification/model/push_notification_account_context_manager.h"
 #import "ios/chrome/browser/push_notification/model/push_notification_client_id.h"
 #import "ios/chrome/browser/push_notification/model/push_notification_client_manager.h"
@@ -53,6 +54,7 @@
 #import "ios/chrome/browser/shared/model/browser/browser_provider.h"
 #import "ios/chrome/browser/shared/model/browser/browser_provider_interface.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
+#import "ios/chrome/browser/shared/model/profile/features.h"
 #import "ios/chrome/browser/shared/model/profile/profile_attributes_ios.h"
 #import "ios/chrome/browser/shared/model/profile/profile_attributes_storage_ios.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
@@ -191,7 +193,7 @@ void RecordPushNotificationTargetProfileHandlingResult(
 // directly from a ProfileIOS object. Returns nullptr if the manager cannot be
 // retrieved.
 PushNotificationClientManager* GetClientManagerForProfile(ProfileIOS* profile) {
-  CHECK(IsIOSMultiProfilePushNotificationHandlingEnabled());
+  CHECK(IsMultiProfilePushNotificationHandlingEnabled());
 
   if (!profile) {
     RecordClientManagerAccessFailure(PushNotificationClientManagerFailurePoint::
@@ -224,9 +226,9 @@ PushNotificationClientManager* GetClientManagerForProfile(ProfileIOS* profile) {
 // specific reasons for failure to UMA.
 //
 // Note: This function should only be called when
-// `IsIOSMultiProfilePushNotificationHandlingEnabled()` is true.
+// `IsMultiProfilePushNotificationHandlingEnabled()` is true.
 std::string GetProfileNameFromUserInfo(NSDictionary* user_info) {
-  CHECK(IsIOSMultiProfilePushNotificationHandlingEnabled());
+  CHECK(IsMultiProfilePushNotificationHandlingEnabled());
 
   ProfileManagerIOS* profile_manager =
       GetApplicationContext()->GetProfileManager();
@@ -313,7 +315,7 @@ using ClientManagerCallback =
 // Profiles loaded outside MainController.
 void OnProfileLoadedForClientManager(ClientManagerCallback original_callback,
                                      ProfileIOS* profile_after_load) {
-  CHECK(IsIOSMultiProfilePushNotificationHandlingEnabled());
+  CHECK(IsMultiProfilePushNotificationHandlingEnabled());
 
   if (!profile_after_load) {
     RecordClientManagerAccessFailure(PushNotificationClientManagerFailurePoint::
@@ -337,7 +339,7 @@ void OnProfileLoadedForClientManager(ClientManagerCallback original_callback,
 // the Profile-specific lookup or load fails.
 void GetClientManagerForUserInfo(NSDictionary* user_info,
                                  ClientManagerCallback callback) {
-  CHECK(IsIOSMultiProfilePushNotificationHandlingEnabled());
+  CHECK(IsMultiProfilePushNotificationHandlingEnabled());
 
   BOOL hasProfileKey = (user_info[kOriginatingProfileNameKey] != nil);
   BOOL hasGaiaKey = (user_info[kOriginatingGaiaIDKey] != nil);
@@ -428,6 +430,12 @@ void HandleNotificationInteractionAfterProfileSwitch(
   }
 
   client_manager->HandleNotificationInteraction(response);
+
+  // Also allow the app-scoped clients the opportunity to handle interactions.
+  GetApplicationContext()
+      ->GetPushNotificationService()
+      ->GetPushNotificationClientManager()
+      ->HandleNotificationInteraction(response);
 }
 
 // Creates a `ChangeProfileContinuation` callback bound with the original
@@ -492,7 +500,7 @@ void ProcessIncomingNotification(
     NSDictionary* user_info,
     PushNotificationClientManagerFailurePoint failure_point,
     void (^completion_block)(UIBackgroundFetchResult result)) {
-  CHECK(IsIOSMultiProfilePushNotificationHandlingEnabled());
+  CHECK(IsMultiProfilePushNotificationHandlingEnabled());
 
   ClientManagerCallback manager_ready_callback =
       base::BindOnce(&OnClientManagerReadyForReception, user_info,
@@ -575,7 +583,7 @@ void ProcessIncomingNotification(
                                          completionHandler:completionHandler];
       };
 
-  if (IsIOSMultiProfilePushNotificationHandlingEnabled()) {
+  if (IsMultiProfilePushNotificationHandlingEnabled()) {
     ProcessIncomingNotification(
         userInfo,
         PushNotificationClientManagerFailurePoint::kWillPresentNotification,
@@ -589,7 +597,7 @@ void ProcessIncomingNotification(
 - (void)userNotificationCenter:(UNUserNotificationCenter*)center
     openSettingsForNotification:(UNNotification*)notification {
   __weak __typeof(self) weakSelf = self;
-  if (IsIOSMultiProfilePushNotificationHandlingEnabled()) {
+  if (IsMultiProfilePushNotificationHandlingEnabled()) {
     std::string profileName =
         GetProfileNameFromUserInfo(notification.request.content.userInfo);
     if (!profileName.empty()) {
@@ -635,7 +643,7 @@ void ProcessIncomingNotification(
     }
   };
 
-  if (IsIOSMultiProfilePushNotificationHandlingEnabled()) {
+  if (IsMultiProfilePushNotificationHandlingEnabled()) {
     ProcessIncomingNotification(userInfo,
                                 PushNotificationClientManagerFailurePoint::
                                     kWillProcessIncomingRemoteNotification,
@@ -656,7 +664,7 @@ void ProcessIncomingNotification(
     return;
   }
 
-  if (IsIOSMultiProfilePushNotificationHandlingEnabled()) {
+  if (IsMultiProfilePushNotificationHandlingEnabled()) {
     PushNotificationClientManager* clientManager =
         GetClientManagerForProfile(profile);
 
@@ -854,7 +862,7 @@ void ProcessIncomingNotification(
     block();
   }
 
-  if (IsIOSMultiProfilePushNotificationHandlingEnabled()) {
+  if (IsMultiProfilePushNotificationHandlingEnabled()) {
     if (!sceneState || !sceneState.profileState.profile) {
       return;
     }
@@ -998,12 +1006,10 @@ void ProcessIncomingNotification(
     GetApplicationContext()->GetPushNotificationService()->SetPreference(
         gaiaID, PushNotificationClientId::kSendTab, true);
   } else {
-    [ProvisionalPushNotificationUtil
-        enrollUserToProvisionalNotificationsForClientIds:
-            {PushNotificationClientId::kSendTab}
-                             clientEnabledForProvisional:YES
-                                         withAuthService:authService
-                                   deviceInfoSyncService:deviceInfoSyncService];
+    ProvisionalPushNotificationServiceFactory::GetForProfile(profile)
+        ->EnrollUserToProvisionalNotifications(
+            ProvisionalPushNotificationService::ClientIdState::kEnabled,
+            {PushNotificationClientId::kSendTab});
   }
 }
 
@@ -1028,8 +1034,9 @@ void ProcessIncomingNotification(
   DCHECK_GE(_appState.initStage,
             AppInitStage::kBrowserObjectsForBackgroundHandlers);
 
-  if (IsIOSMultiProfilePushNotificationHandlingEnabled()) {
+  if (IsMultiProfilePushNotificationHandlingEnabled()) {
     [self handleProfileSpecificNotificationResponse:response];
+    return;
   }
 
   // Notifications are intentionally passed on to the `appWideClientManager`
@@ -1056,12 +1063,16 @@ void ProcessIncomingNotification(
 // retrieval, or switch initiation are logged to UMA for monitoring.
 - (void)handleProfileSpecificNotificationResponse:
     (UNNotificationResponse*)response {
-  CHECK(IsIOSMultiProfilePushNotificationHandlingEnabled());
+  CHECK(IsMultiProfilePushNotificationHandlingEnabled());
 
   std::string profileName = GetProfileNameFromUserInfo(
       response.notification.request.content.userInfo);
 
   if (profileName.empty()) {
+    // No profile name was found, so allow app-wide clients the opportunity to
+    // handle interactions.
+    self.appWideClientManager->HandleNotificationInteraction(response);
+
     RecordClientManagerAccessFailure(PushNotificationClientManagerFailurePoint::
                                          kHandleInteractionInvalidProfileName);
 
@@ -1120,7 +1131,7 @@ void ProcessIncomingNotification(
                         profileName:(std::string_view)profileName {
   SceneState* sceneState = self.foregroundActiveScene;
   CHECK(sceneState);
-  CHECK(IsIOSMultiProfilePushNotificationHandlingEnabled());
+  CHECK(IsMultiProfilePushNotificationHandlingEnabled());
 
   id<ChangeProfileCommands> handler =
       HandlerForProtocol(_appState.appCommandDispatcher, ChangeProfileCommands);

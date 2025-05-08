@@ -77,12 +77,12 @@
 #include "csutil.hxx"
 
 RepList::RepList(int n) {
-  dat.reserve(n);
+  dat.reserve(std::min(n, 16384));
 }
 
 RepList::~RepList() {
-  for (size_t i = 0, pos = dat.size(); i < pos; ++i) {
-    delete dat[i];
+  for (auto& i : dat) {
+    delete i;
   }
 }
 
@@ -107,8 +107,6 @@ int RepList::find(const char* word) {
 
 std::string RepList::replace(const size_t wordlen, int ind, bool atstart) {
   int type = atstart ? 1 : 0;
-  if (ind < 0)
-    return std::string();
   if (wordlen == dat[ind]->pattern.size())
     type = atstart ? 3 : 2;
   while (type && dat[ind]->outstrings[type].empty())
@@ -175,22 +173,45 @@ int RepList::add(const std::string& in_pat1, const std::string& pat2) {
 bool RepList::conv(const std::string& in_word, std::string& dest) {
   dest.clear();
 
-  size_t wordlen = in_word.size();
+  const size_t wordlen = in_word.size();
   const char* word = in_word.c_str();
 
   bool change = false;
   for (size_t i = 0; i < wordlen; ++i) {
     int n = find(word + i);
-    std::string l = replace(wordlen - i, n, i == 0);
-    if (!l.empty()) {
-      dest.append(l);
-      i += dat[n]->pattern.size() - 1;
-      change = true;
-    } else {
+
+    bool empty = n < 0;
+    if (empty) {
       dest.push_back(word[i]);
+      continue;
     }
+
+    std::string l = replace(wordlen - i, n, i == 0);
+    if (l.empty()) {
+      dest.push_back(word[i]);
+      continue;
+    }
+
+    dest.append(l);
+    if (!dat[n]->pattern.empty()) {
+      i += dat[n]->pattern.size() - 1;
+    }
+    change = true;
   }
 
   return change;
 }
 
+bool RepList::check_against_breaktable(const std::vector<std::string>& breaktable) const {
+  for (const auto i : dat) {
+    for (auto& outstring : i->outstrings) {
+      for (const auto& str : breaktable) {
+        if (outstring.find(str) != std::string::npos) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}

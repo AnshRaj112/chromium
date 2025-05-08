@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import {hexToColor, Ink2Manager, TEXT_COLORS, TextAlignment, TextStyle} from 'chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/pdf_viewer_wrapper.js';
+import {hexToColor, Ink2Manager, PluginController, PluginControllerEventType, TEXT_COLORS, TextAlignment, TextBoxState, TextStyle, TextTypeface} from 'chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/pdf_viewer_wrapper.js';
 import type {TextAnnotation} from 'chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/pdf_viewer_wrapper.js';
 import {isVisible, microtasksFinished} from 'chrome://webui-test/test_util.js';
 
@@ -11,8 +11,6 @@ import {assertDeepEquals, getRequiredElement, setupTestViewportAndMockPluginForI
 // Set up a dummy viewport so that we can get a predictable initial state.
 const {viewport, mockPlugin} = setupTestViewportAndMockPluginForInk();
 const manager = Ink2Manager.getInstance();
-// Initialize a typeface, since this starts out empty.
-manager.setTextTypeface('Roboto');
 const textbox = document.createElement('ink-text-box');
 document.body.appendChild(textbox);
 
@@ -24,12 +22,10 @@ function initializeBox(
         text: existing ? 'Hello World' : '',
         textAttributes: {
           size: 12,
-          typeface: 'Roboto',
+          typeface: TextTypeface.SANS_SERIF,
           styles: {
             [TextStyle.BOLD]: false,
             [TextStyle.ITALIC]: false,
-            [TextStyle.UNDERLINE]: false,
-            [TextStyle.STRIKETHROUGH]: false,
           },
           alignment: TextAlignment.LEFT,
           color: hexToColor(TEXT_COLORS[0]!.color),
@@ -114,7 +110,7 @@ chrome.test.runTests([
     // Initial state
     chrome.test.assertEq('12px', textboxStyles.getPropertyValue('font-size'));
     chrome.test.assertEq(
-        'Roboto', textboxStyles.getPropertyValue('font-family'));
+        'sans-serif', textboxStyles.getPropertyValue('font-family'));
     chrome.test.assertEq('400', textboxStyles.getPropertyValue('font-weight'));
     chrome.test.assertEq(
         'normal', textboxStyles.getPropertyValue('font-style'));
@@ -128,7 +124,7 @@ chrome.test.runTests([
     // Confirm updating styles in the manager updates the style of the textbox.
     // Each type of update should independently trigger a change.
     // Typeface
-    manager.setTextTypeface('Serif');
+    manager.setTextTypeface(TextTypeface.SERIF);
     await microtasksFinished();
     chrome.test.assertEq(
         'serif', textboxStyles.getPropertyValue('font-family'));
@@ -142,15 +138,11 @@ chrome.test.runTests([
     manager.setTextStyles({
       [TextStyle.BOLD]: true,
       [TextStyle.ITALIC]: true,
-      [TextStyle.UNDERLINE]: true,
-      [TextStyle.STRIKETHROUGH]: false,
     });
     await microtasksFinished();
     chrome.test.assertEq('700', textboxStyles.getPropertyValue('font-weight'));
     chrome.test.assertEq(
         'italic', textboxStyles.getPropertyValue('font-style'));
-    chrome.test.assertTrue(textboxStyles.getPropertyValue('text-decoration')
-                               .includes('underline'));
 
     // Color
     const newColor = hexToColor(TEXT_COLORS[1]!.color);
@@ -165,13 +157,11 @@ chrome.test.runTests([
     chrome.test.assertEq('right', textboxStyles.getPropertyValue('text-align'));
 
     // Reset everything for later tests.
-    manager.setTextTypeface('Roboto');
+    manager.setTextTypeface(TextTypeface.SANS_SERIF);
     manager.setTextSize(12);
     manager.setTextStyles({
       [TextStyle.BOLD]: false,
       [TextStyle.ITALIC]: false,
-      [TextStyle.UNDERLINE]: false,
-      [TextStyle.STRIKETHROUGH]: false,
     });
     manager.setTextColor(hexToColor(TEXT_COLORS[0]!.color));
     manager.setTextAlignment(TextAlignment.LEFT);
@@ -411,12 +401,10 @@ chrome.test.runTests([
       pageNumber: 0,
       textAttributes: {
         size: 12,
-        typeface: 'Roboto',
+        typeface: TextTypeface.SANS_SERIF,
         styles: {
           [TextStyle.BOLD]: false,
           [TextStyle.ITALIC]: false,
-          [TextStyle.UNDERLINE]: false,
-          [TextStyle.STRIKETHROUGH]: false,
         },
         alignment: TextAlignment.LEFT,
         color: hexToColor(TEXT_COLORS[0]!.color),
@@ -458,13 +446,13 @@ chrome.test.runTests([
 
     // Any modifications to font are an edit.
     chrome.test.assertTrue(isVisible(textbox));
-    manager.setTextTypeface('Monospace');
+    manager.setTextTypeface(TextTypeface.MONOSPACE);
     await microtasksFinished();
-    testAnnotation.textAttributes.typeface = 'Monospace';
+    testAnnotation.textAttributes.typeface = TextTypeface.MONOSPACE;
     startNewAnnotationAndVerifyMessage();
     await microtasksFinished();
     // Reset expectation.
-    testAnnotation.textAttributes.typeface = 'Roboto';
+    testAnnotation.textAttributes.typeface = TextTypeface.SANS_SERIF;
 
     // If all the text is deleted, there is also no commit message.
     chrome.test.assertTrue(isVisible(textbox));
@@ -508,6 +496,75 @@ chrome.test.runTests([
 
     // Reset for future tests.
     document.body.appendChild(textbox);
+
+    chrome.test.succeed();
+  },
+
+  async function testCloseAndEvents() {
+    let textBoxStates: TextBoxState[] = [];
+    textbox.addEventListener('state-changed', e => {
+      textBoxStates.push((e as CustomEvent<TextBoxState>).detail);
+    });
+
+    let finishInkStrokeEvents = 0;
+    PluginController.getInstance().getEventTarget().addEventListener(
+        PluginControllerEventType.FINISH_INK_STROKE, () => {
+          finishInkStrokeEvents++;
+        });
+
+    // Initialize to a 100x100 box at 400, 300.
+    initializeBox(100, 100, 400, 300);
+    await microtasksFinished();
+    chrome.test.assertTrue(isVisible(textbox));
+    assertDeepEquals([TextBoxState.NEW], textBoxStates);
+
+    // When a new box has no edits, commitTextAnnotation() will not trigger a
+    // plugin message or a PluginControllerEventType.FINISH_INK_STROKE event.
+    mockPlugin.clearMessages();
+    textbox.commitTextAnnotation();
+    await microtasksFinished();
+    chrome.test.assertFalse(isVisible(textbox));
+    chrome.test.assertEq(
+        undefined, mockPlugin.findMessage('finishTextAnnotation'));
+    chrome.test.assertEq(0, finishInkStrokeEvents);
+    assertDeepEquals([TextBoxState.NEW, TextBoxState.INACTIVE], textBoxStates);
+
+    // When text is edited, commitTextAnnotation() will trigger a plugin message
+    // and a PluginControllerEventType.FINISH_INK_STROKE event.
+    textBoxStates = [];
+    initializeBox(100, 100, 400, 300);
+    await microtasksFinished();
+    chrome.test.assertTrue(isVisible(textbox));
+    assertDeepEquals([TextBoxState.NEW], textBoxStates);
+    textbox.$.textbox.value = 'Hello';
+    textbox.$.textbox.dispatchEvent(new CustomEvent('input'));
+    await microtasksFinished();
+    assertDeepEquals([TextBoxState.NEW, TextBoxState.EDITED], textBoxStates);
+
+    textbox.commitTextAnnotation();
+    await microtasksFinished();
+    chrome.test.assertFalse(isVisible(textbox));
+    chrome.test.assertTrue(
+        mockPlugin.findMessage('finishTextAnnotation') !== undefined);
+    chrome.test.assertEq(1, finishInkStrokeEvents);
+    assertDeepEquals(
+        [TextBoxState.NEW, TextBoxState.EDITED, TextBoxState.INACTIVE],
+        textBoxStates);
+
+    // When existing text is not edited, commitTextAnnotation() will trigger a
+    // plugin message but no PluginControllerEventType.FINISH_INK_STROKE event.
+    textBoxStates = [];
+    initializeBox(100, 100, 400, 300, true);
+    await microtasksFinished();
+    chrome.test.assertTrue(isVisible(textbox));
+    assertDeepEquals([TextBoxState.NEW], textBoxStates);
+    textbox.commitTextAnnotation();
+    await microtasksFinished();
+    chrome.test.assertFalse(isVisible(textbox));
+    chrome.test.assertTrue(
+        mockPlugin.findMessage('finishTextAnnotation') !== undefined);
+    chrome.test.assertEq(1, finishInkStrokeEvents);
+    assertDeepEquals([TextBoxState.NEW, TextBoxState.INACTIVE], textBoxStates);
 
     chrome.test.succeed();
   },

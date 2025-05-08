@@ -64,6 +64,17 @@ constexpr char kTestForceCloseMessage[] =
 
 // Contains a record's keys and value that tests use to populate the database.
 struct TestIDBRecord {
+  TestIDBRecord(IndexedDBKey primary_key,
+                const IndexedDBValue& value,
+                std::optional<IndexedDBKey> index_key)
+      : primary_key(primary_key), value(value.Clone()), index_key(index_key) {}
+
+  TestIDBRecord(const TestIDBRecord& other) {
+    primary_key = other.primary_key;
+    value = other.value.Clone();
+    index_key = other.index_key;
+  }
+
   IndexedDBKey primary_key;
   IndexedDBValue value;
   // Optional. Tests may skip index creation.
@@ -693,8 +704,8 @@ class DatabaseOperationTest : public DatabaseTest {
   // After setup, calls `Database::GetAllOperation` with `get_all_parameters`.
   // Verifies that the results match `expected_results`.
   void TestGetAll(
-      const TestDatabaseParameters& database_parameters,
-      const TestGetAllParameters& get_all_parameters,
+      TestDatabaseParameters database_parameters,
+      TestGetAllParameters get_all_parameters,
       base::span<const blink::mojom::IDBRecordPtr> expected_results) {
     // Create the object store.
     ASSERT_EQ(0u, db_->metadata().object_stores.size());
@@ -737,16 +748,12 @@ class DatabaseOperationTest : public DatabaseTest {
 
       // Set in-flight memory to a reasonably large number to prevent underflow
       // in `PutOperation`
-      transaction_->in_flight_memory() += 1000;
+      transaction_->in_flight_memory_ += 1000;
 
-      auto put_params = std::make_unique<Database::PutOperationParams>();
-      put_params->object_store_id = store_id;
-      put_params->value = record.value;
-      put_params->key = std::make_unique<IndexedDBKey>(record.primary_key);
-      put_params->put_mode = blink::mojom::IDBPutMode::AddOnly;
-      put_params->callback = callback.Get();
-      put_params->index_keys = std::move(index_keys);
-      status = db_->PutOperation(std::move(put_params), transaction_);
+      status = transaction_->DoPut(
+          store_id, record.value.Clone(), record.primary_key,
+          blink::mojom::IDBPutMode::AddOnly, std::move(index_keys),
+          callback.Get(), transaction_);
       EXPECT_TRUE(status.ok()) << status.ToString();
     }
 
@@ -913,23 +920,16 @@ TEST_F(DatabaseOperationTest, CreatePutDelete) {
   EXPECT_TRUE(s.ok());
   EXPECT_EQ(1ULL, db_->metadata().object_stores.size());
 
-  IndexedDBValue value("value1", {});
-  std::unique_ptr<IndexedDBKey> key(std::make_unique<IndexedDBKey>("key"));
-  std::vector<IndexedDBIndexKeys> index_keys;
   base::MockCallback<blink::mojom::IDBTransaction::PutCallback> callback;
 
   // Set in-flight memory to a reasonably large number to prevent underflow in
   // `PutOperation`
-  transaction_->in_flight_memory() += 1000;
+  transaction_->in_flight_memory_ += 1000;
 
-  auto put_params = std::make_unique<Database::PutOperationParams>();
-  put_params->object_store_id = store_id;
-  put_params->value = value;
-  put_params->key = std::move(key);
-  put_params->put_mode = blink::mojom::IDBPutMode::AddOnly;
-  put_params->callback = callback.Get();
-  put_params->index_keys = index_keys;
-  s = db_->PutOperation(std::move(put_params), transaction_);
+  s = transaction_->DoPut(
+      store_id, IndexedDBValue("value1", {}), IndexedDBKey("key"),
+      blink::mojom::IDBPutMode::AddOnly, std::vector<IndexedDBIndexKeys>(),
+      callback.Get(), transaction_);
   EXPECT_TRUE(s.ok());
 
   s = transaction_->BackingStoreTransaction()->DeleteObjectStore(store_id);
@@ -1737,9 +1737,9 @@ TEST_F(DatabaseOperationTest,
     const std::string primary_key = base::StringPrintf("key%zu", i);
     const std::string value = base::StringPrintf("value%zu", i);
 
-    database_records.push_back({IndexedDBKey{primary_key},
-                                {value, /*external_objects=*/{}},
-                                /*index_key=*/std::nullopt});
+    database_records.emplace_back(IndexedDBKey{primary_key},
+                                  IndexedDBValue{value, {}},
+                                  /*index_key=*/std::nullopt);
 
     expected_results.emplace_back(
         blink::mojom::IDBRecord::New(IndexedDBKey{primary_key},

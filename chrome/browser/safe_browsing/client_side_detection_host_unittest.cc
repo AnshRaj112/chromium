@@ -490,6 +490,30 @@ class ClientSideDetectionHostTestBase : public ChromeRenderViewHostTestHarness {
     feature_list_.InitWithFeatures(enabled_features, disabled_features);
   }
 
+  std::string GetRequestTypeName(
+      ClientSideDetectionType client_side_detection_type) {
+    switch (client_side_detection_type) {
+      case safe_browsing::ClientSideDetectionType::
+          CLIENT_SIDE_DETECTION_TYPE_UNSPECIFIED:
+        return "Unknown";
+      case safe_browsing::ClientSideDetectionType::FORCE_REQUEST:
+        return "ForceRequest";
+      case safe_browsing::ClientSideDetectionType::
+          NOTIFICATION_PERMISSION_PROMPT:
+        return "NotificationPermissionPrompt";
+      case safe_browsing::ClientSideDetectionType::TRIGGER_MODELS:
+        return "TriggerModel";
+      case safe_browsing::ClientSideDetectionType::KEYBOARD_LOCK_REQUESTED:
+        return "KeyboardLockRequested";
+      case safe_browsing::ClientSideDetectionType::POINTER_LOCK_REQUESTED:
+        return "PointerLockRequested";
+      case safe_browsing::ClientSideDetectionType::VIBRATION_API:
+        return "VibrationApi";
+      case safe_browsing::ClientSideDetectionType::FULLSCREEN_API:
+        return "FullscreenApi";
+    }
+  }
+
  protected:
   std::unique_ptr<ClientSideDetectionHost> csd_host_;
   std::unique_ptr<NiceMock<MockClientSideDetectionService>> csd_service_;
@@ -2368,6 +2392,7 @@ class ClientSideDetectionHostScamDetectionTest
           llama_forced_trigger_info.add_llama_trigger_rule_infos();
       llama_trigger_rule_info->set_llama_trigger_rule_id(28);
       llama_trigger_rule_info->set_intelligent_scan(intelligent_scan);
+      llama_forced_trigger_info.set_trigger_url(cache_expression);
       llama_forced_trigger_info.set_intelligent_scan(intelligent_scan);
       response.mutable_llama_forced_trigger_info()->Swap(
           &llama_forced_trigger_info);
@@ -2485,17 +2510,33 @@ class ClientSideDetectionHostScamDetectionTest
       histogram_tester_.ExpectUniqueSample(
           "SBClientPhishing.IsOnDeviceModelAvailableAtInquiryTime",
           is_on_device_model_available.value(), 1);
+      histogram_tester_.ExpectUniqueSample(
+          "SBClientPhishing.IsOnDeviceModelAvailableAtInquiryTime." +
+              GetRequestTypeName(expected_request_type),
+          is_on_device_model_available.value(), 1);
     } else {
       histogram_tester_.ExpectTotalCount(
           "SBClientPhishing.IsOnDeviceModelAvailableAtInquiryTime", 0);
+      histogram_tester_.ExpectTotalCount(
+          "SBClientPhishing.IsOnDeviceModelAvailableAtInquiryTime." +
+              GetRequestTypeName(expected_request_type),
+          0);
     }
     if (model_has_successful_response.has_value()) {
       histogram_tester_.ExpectUniqueSample(
           "SBClientPhishing.OnDeviceModelHasSuccessfulResponse",
           model_has_successful_response.value(), 1);
+      histogram_tester_.ExpectUniqueSample(
+          "SBClientPhishing.OnDeviceModelHasSuccessfulResponse." +
+              GetRequestTypeName(expected_request_type),
+          model_has_successful_response.value(), 1);
     } else {
       histogram_tester_.ExpectTotalCount(
           "SBClientPhishing.OnDeviceModelHasSuccessfulResponse", 0);
+      histogram_tester_.ExpectTotalCount(
+          "SBClientPhishing.OnDeviceModelHasSuccessfulResponse." +
+              GetRequestTypeName(expected_request_type),
+          0);
     }
     if (intelligent_scan_verdict.has_value()) {
       histogram_tester_.ExpectUniqueSample(
@@ -2510,6 +2551,7 @@ class ClientSideDetectionHostScamDetectionTest
   void VerifyForcedTriggerScamDetectionHistograms(
       bool force_request,
       bool has_llama_forced_trigger_info,
+      bool intelligent_scan,
       std::optional<bool> redirect_chain_contains_llama_forced_trigger_info) {
     histogram_tester_.ExpectBucketCount("SBClientPhishing.RTLookupForceRequest",
                                         force_request, 1);
@@ -2520,6 +2562,17 @@ class ClientSideDetectionHostScamDetectionTest
       histogram_tester_.ExpectBucketCount(
           "SBClientPhishing.RedirectChainContainsForcedTriggerInfo",
           *redirect_chain_contains_llama_forced_trigger_info, 1);
+    }
+
+    if (has_llama_forced_trigger_info) {
+      histogram_tester_.ExpectBucketCount(
+          "SBClientPhishing.LlamaForcedTriggerInfo.IntelligentScan",
+          intelligent_scan, 1);
+      histogram_tester_.ExpectBucketCount(
+          "SBClientPhishing.LlamaForcedTriggerInfo.LlamaTriggerRuleInfosSize",
+          1, 1);
+      histogram_tester_.ExpectBucketCount(
+          "SBClientPhishing.LlamaForcedTriggerInfo.LlamaTriggerRuleId", 28, 1);
     }
   }
 
@@ -2843,7 +2896,8 @@ TEST_F(ClientSideDetectionHostScamDetectionTest,
   SetSendClientReportPhishingRequestCallback(
       /*has_expected_brand_and_intent=*/true,
       /*expected_no_info_reason=*/std::nullopt,
-      /*expected_llama_forced_trigger_info_trigger_url=*/example_url_.spec(),
+      /*expected_llama_forced_trigger_info_trigger_url=*/
+      example_url_.GetContent(),
       /*returned_is_phishing=*/false,
       /*returned_intelligent_scan_verdict=*/
       IntelligentScanVerdict::INTELLIGENT_SCAN_VERDICT_SAFE);
@@ -2864,6 +2918,7 @@ TEST_F(ClientSideDetectionHostScamDetectionTest,
       IntelligentScanVerdict::INTELLIGENT_SCAN_VERDICT_SAFE);
   VerifyForcedTriggerScamDetectionHistograms(
       /*force_request=*/true, /*has_llama_forced_trigger_info=*/true,
+      /*intelligent_scan=*/true,
       /*redirect_chain_contains_llama_forced_trigger_info=*/std::nullopt);
 }
 
@@ -2888,7 +2943,8 @@ TEST_F(ClientSideDetectionHostScamDetectionTest,
   SetSendClientReportPhishingRequestCallback(
       /*has_expected_brand_and_intent=*/false,
       /*expected_no_info_reason=*/std::nullopt,
-      /*expected_llama_forced_trigger_info_trigger_url=*/example_url_.spec(),
+      /*expected_llama_forced_trigger_info_trigger_url=*/
+      example_url_.GetContent(),
       /*returned_is_phishing=*/false,
       /*returned_intelligent_scan_verdict=*/
       IntelligentScanVerdict::INTELLIGENT_SCAN_VERDICT_SAFE);
@@ -2911,6 +2967,7 @@ TEST_F(ClientSideDetectionHostScamDetectionTest,
       IntelligentScanVerdict::INTELLIGENT_SCAN_VERDICT_SAFE);
   VerifyForcedTriggerScamDetectionHistograms(
       /*force_request=*/true, /*has_llama_forced_trigger_info=*/true,
+      /*intelligent_scan=*/false,
       /*redirect_chain_contains_llama_forced_trigger_info=*/std::nullopt);
 }
 
@@ -2957,6 +3014,7 @@ TEST_F(
       IntelligentScanVerdict::INTELLIGENT_SCAN_VERDICT_SAFE);
   VerifyForcedTriggerScamDetectionHistograms(
       /*force_request=*/true, /*has_llama_forced_trigger_info=*/false,
+      /*intelligent_scan=*/false,
       /*redirect_chain_contains_llama_forced_trigger_info=*/std::nullopt);
 }
 
@@ -3007,7 +3065,7 @@ TEST_F(
       /*has_expected_brand_and_intent=*/true,
       /*expected_no_info_reason=*/std::nullopt,
       /*expected_llama_forced_trigger_info_trigger_url=*/
-      first_url_redirect.spec(),
+      first_url_redirect.GetContent(),
       /*returned_is_phishing=*/false,
       /*returned_intelligent_scan_verdict=*/
       IntelligentScanVerdict::INTELLIGENT_SCAN_VERDICT_SAFE);
@@ -3028,6 +3086,7 @@ TEST_F(
       IntelligentScanVerdict::INTELLIGENT_SCAN_VERDICT_SAFE);
   VerifyForcedTriggerScamDetectionHistograms(
       /*force_request=*/true, /*has_llama_forced_trigger_info=*/true,
+      /*intelligent_scan=*/true,
       /*redirect_chain_contains_llama_forced_trigger_info=*/true);
 }
 
@@ -3100,6 +3159,7 @@ TEST_F(ClientSideDetectionHostScamDetectionTest,
   VerifyForcedTriggerScamDetectionHistograms(
       /*force_request=*/true,
       /*has_llama_forced_trigger_info=*/false,
+      /*intelligent_scan=*/false,
       /*redirect_chain_contains_llama_forced_trigger_info=*/false);
 }
 
@@ -3177,6 +3237,7 @@ TEST_F(
   VerifyForcedTriggerScamDetectionHistograms(
       /*force_request=*/true,
       /*has_llama_forced_trigger_info=*/false,
+      /*intelligent_scan=*/true,
       /*redirect_chain_contains_llama_forced_trigger_info=*/std::nullopt);
 }
 
@@ -3299,7 +3360,8 @@ TEST_F(
   SetSendClientReportPhishingRequestCallback(
       /*has_expected_brand_and_intent=*/true,
       /*expected_no_info_reason=*/std::nullopt,
-      /*expected_llama_forced_trigger_info_trigger_url=*/example_url_.spec(),
+      /*expected_llama_forced_trigger_info_trigger_url=*/
+      example_url_.GetContent(),
       /*returned_is_phishing=*/false,
       /*returned_intelligent_scan_verdict=*/
       IntelligentScanVerdict::SCAM_EXPERIMENT_VERDICT_2);
@@ -3330,6 +3392,7 @@ TEST_F(
       IntelligentScanVerdict::SCAM_EXPERIMENT_VERDICT_2);
   VerifyForcedTriggerScamDetectionHistograms(
       /*force_request=*/true, /*has_llama_forced_trigger_info=*/true,
+      /*intelligent_scan=*/true,
       /*redirect_chain_contains_llama_forced_trigger_info=*/std::nullopt);
 }
 
@@ -3352,7 +3415,8 @@ TEST_F(
   SetSendClientReportPhishingRequestCallback(
       /*has_expected_brand_and_intent=*/true,
       /*expected_no_info_reason=*/std::nullopt,
-      /*expected_llama_forced_trigger_info_trigger_url=*/example_url_.spec(),
+      /*expected_llama_forced_trigger_info_trigger_url=*/
+      example_url_.GetContent(),
       /*returned_is_phishing=*/false,
       /*returned_intelligent_scan_verdict=*/
       IntelligentScanVerdict::SCAM_EXPERIMENT_VERDICT_2);
@@ -3377,6 +3441,7 @@ TEST_F(
       IntelligentScanVerdict::SCAM_EXPERIMENT_VERDICT_2);
   VerifyForcedTriggerScamDetectionHistograms(
       /*force_request=*/true, /*has_llama_forced_trigger_info=*/true,
+      /*intelligent_scan=*/true,
       /*redirect_chain_contains_llama_forced_trigger_info=*/std::nullopt);
 }
 

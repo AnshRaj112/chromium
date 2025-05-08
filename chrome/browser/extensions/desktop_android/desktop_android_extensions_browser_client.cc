@@ -10,6 +10,8 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/extensions/api/management/chrome_management_api_delegate.h"
 #include "chrome/browser/extensions/api/runtime/chrome_runtime_api_delegate.h"
+#include "chrome/browser/extensions/api/storage/managed_value_store_cache.h"
+#include "chrome/browser/extensions/api/storage/sync_value_store_cache.h"
 #include "chrome/browser/extensions/chrome_extension_system_factory.h"
 #include "chrome/browser/extensions/chrome_extension_web_contents_observer.h"
 #include "chrome/browser/extensions/chrome_extensions_browser_api_provider.h"
@@ -19,7 +21,9 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_selections.h"
+#include "components/signin/core/browser/signin_header_helper.h"
 #include "components/update_client/update_client.h"
+#include "components/value_store/value_store_factory.h"
 #include "components/version_info/version_info.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_task_traits.h"
@@ -39,6 +43,7 @@
 #include "extensions/browser/updater/scoped_extension_updater_keep_alive.h"
 #include "extensions/browser/url_request_util.h"
 #include "extensions/common/features/feature_channel.h"
+#include "google_apis/gaia/gaia_urls.h"
 #include "services/network/public/mojom/url_loader.mojom.h"
 
 using content::BrowserContext;
@@ -80,6 +85,38 @@ class DesktopAndroidExtensionsAPIClient : public ExtensionsAPIClient {
   ManagementAPIDelegate* CreateManagementAPIDelegate() const override {
     // `ManagementAPI` owns the object.
     return new ChromeManagementAPIDelegate;
+  }
+
+  // The following code is used to support chrome.storage api for sync
+  // and managed mode, until ChromeExtensionAPIClient is ported for
+  // desktop android.
+  void AddAdditionalValueStoreCaches(
+      content::BrowserContext* context,
+      const scoped_refptr<value_store::ValueStoreFactory>& factory,
+      SettingsChangedCallback observer,
+      std::map<settings_namespace::Namespace,
+               raw_ptr<ValueStoreCache, CtnExperimental>>* caches) override {
+    // Add support for chrome.storage.sync.
+    (*caches)[settings_namespace::SYNC] =
+        new SyncValueStoreCache(factory, observer, context->GetPath());
+
+    // Add support for chrome.storage.managed.
+    (*caches)[settings_namespace::MANAGED] = new ManagedValueStoreCache(
+        *Profile::FromBrowserContext(context), factory, observer);
+  }
+
+  // The following code is used to support chrome.webRequest api for
+  // CalculateOnHeadersReceivedDelta(), until ChromeExtensionAPIClient is ported
+  // for desktop android.
+  bool ShouldHideResponseHeader(const GURL& url,
+                                const std::string& header_name) const override {
+    // Gaia may send a OAUth2 authorization code in the Dice response header,
+    // which could allow an extension to generate a refresh token for the
+    // account.
+    return url.host_piece() ==
+               GaiaUrls::GetInstance()->gaia_url().host_piece() &&
+           base::CompareCaseInsensitiveASCII(header_name,
+                                             signin::kDiceResponseHeader) == 0;
   }
 
  private:

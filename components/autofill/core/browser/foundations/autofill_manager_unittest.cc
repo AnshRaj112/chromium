@@ -242,10 +242,8 @@ TEST_F(AutofillManagerTest, UpdateAndRemoveSameForms) {
 // so many properties of forms that may change, the test only covers a small
 // fraction:
 // - Events: OnFormsSeen(), OnTextFieldValueChanged(), OnFocusOnFormField()
-// - Properties: AutofillField::value(ValueSemantics::kCurrent)
+// - Properties: AutofillField::value()
 TEST_F(AutofillManagerTest, FormCacheUpdatesValue) {
-  base::test::ScopedFeatureList scoped_feature_list(
-      features::kAutofillFixValueSemantics);
   EXPECT_CALL(manager(), ShouldParseForms)
       .Times(AtLeast(0))
       .WillRepeatedly(Return(true));
@@ -259,7 +257,7 @@ TEST_F(AutofillManagerTest, FormCacheUpdatesValue) {
     if (!cached_form || cached_form->fields().empty()) {
       return std::nullopt;
     }
-    return cached_form->fields()[0]->value(ValueSemantics::kCurrent);
+    return cached_form->fields()[0]->value();
   };
 
   EXPECT_EQ(current_cached_value(), std::nullopt);
@@ -306,8 +304,7 @@ TEST_F(AutofillManagerTest, FormCacheUpdatesValue) {
 TEST_F(AutofillManagerTest, ObserverReceiveCalls) {
   base::test::ScopedFeatureList feature_list;
   feature_list.InitWithFeatures(
-      /*enabled_features=*/{features::kAutofillPageLanguageDetection,
-                            features::kAutofillFixValueSemantics},
+      /*enabled_features=*/{features::kAutofillPageLanguageDetection},
       /*disabled_features=*/{});
 
   std::vector<FormData> forms = CreateTestForms(2);

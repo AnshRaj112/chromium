@@ -906,7 +906,7 @@ static bool AnyAttributeMatches(Element& element,
     DCHECK(element.CouldHaveAttribute(selector_attr))
         << element << " should have contained attribute " << selector_attr
         << ", Bloom bits on element are "
-        << element.AttributeBloomFilterForDebug();
+        << element.AttributeOrClassBloomFilterForDebug();
 #endif
 
     if (AttributeValueMatches(attribute_item, match, selector_value,
@@ -960,6 +960,16 @@ ALWAYS_INLINE bool SelectorChecker::CheckOne(
     case CSSSelector::kUniversalTag:
       return MatchesUniversalTagName(element, selector.TagQName());
     case CSSSelector::kClass:
+      if (!element.CouldHaveClass(selector.Value())) {
+#if DCHECK_IS_ON()
+        DCHECK(!element.HasClass() ||
+               !element.ClassNames().Contains(selector.Value()))
+            << element << " should have matched class " << selector.Value()
+            << ", Bloom bits on element are "
+            << element.AttributeOrClassBloomFilterForDebug();
+#endif
+        return false;
+      }
       return element.HasClass() &&
              element.ClassNames().Contains(selector.Value());
     case CSSSelector::kId:
@@ -1867,7 +1877,9 @@ bool SelectorChecker::CheckPseudoClass(const SelectorCheckingContext& context,
       DCHECK(RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
           element.GetDocument().GetExecutionContext()));
       return element.GetInterestState() ==
-             Element::InterestState::kPartialInterest;
+                 Element::InterestState::kPartialInterest ||
+             element.GetInterestState() ==
+                 Element::InterestState::kPotentialPartialInterest;
     case CSSSelector::kPseudoTargetOfInterest: {
       DCHECK(RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
           element.GetDocument().GetExecutionContext()));
@@ -1882,8 +1894,10 @@ bool SelectorChecker::CheckPseudoClass(const SelectorCheckingContext& context,
       Element* invoker = element.GetInterestInvoker();
       DCHECK(!invoker || invoker->GetInterestState() !=
                              Element::InterestState::kNoInterest);
-      return invoker && invoker->GetInterestState() ==
-                            Element::InterestState::kPartialInterest;
+      return invoker && (invoker->GetInterestState() ==
+                             Element::InterestState::kPartialInterest ||
+                         invoker->GetInterestState() ==
+                             Element::InterestState::kPotentialPartialInterest);
     }
     case CSSSelector::kPseudoHasSlotted:
       DCHECK(RuntimeEnabledFeatures::CSSPseudoHasSlottedEnabled());

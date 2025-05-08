@@ -165,7 +165,7 @@ class BrowserAutofillManager : public AutofillManager {
       FieldType field_type_used_to_build_suggestion,
       const std::string& profile_used_guid);
 
-  // Calls UndoAutofillImpl and logs metrics. Virtual for testing.
+  // Calls FormFiller::UndoAutofill and logs metrics. Virtual for testing.
   virtual void UndoAutofill(mojom::ActionPersistence action_persistence,
                             const FormData& form,
                             const FormFieldData& trigger_field);
@@ -550,8 +550,7 @@ class BrowserAutofillManager : public AutofillManager {
   // email override.
   void OnEmailOverrideUndone(const std::u16string& original_email,
                              const FormGlobalId& form_id,
-                             const FieldGlobalId& field_id,
-                             const FormFieldData& field_after_last_autofill);
+                             const FieldGlobalId& field_id);
 
   // The function receives a the list of `suggestions` from
   // `GenerateSuggestionsAndMaybeShowUIPhase2` and displays them if

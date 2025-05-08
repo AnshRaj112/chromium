@@ -140,6 +140,7 @@ import org.chromium.chrome.browser.toolbar.bottom.ScrollingBottomViewResourceFra
 import org.chromium.chrome.browser.toolbar.extensions.ExtensionToolbarManager;
 import org.chromium.chrome.browser.toolbar.home_button.HomeButtonCoordinator;
 import org.chromium.chrome.browser.toolbar.load_progress.LoadProgressCoordinator;
+import org.chromium.chrome.browser.toolbar.menu_button.MenuButton;
 import org.chromium.chrome.browser.toolbar.menu_button.MenuButtonCoordinator;
 import org.chromium.chrome.browser.toolbar.menu_button.MenuButtonState;
 import org.chromium.chrome.browser.toolbar.optional_button.ButtonDataProvider;
@@ -227,6 +228,8 @@ public class ToolbarManager
     private final BrowserControlsStateProvider.Observer mBrowserControlsObserver;
     private final FullscreenManager.Observer mFullscreenObserver;
     private final ObservableSupplierImpl<Boolean> mHomepageEnabledSupplier =
+            new ObservableSupplierImpl<>();
+    private final ObservableSupplierImpl<Boolean> mHomepageNonNtpSupplier =
             new ObservableSupplierImpl<>();
     private final ObservableSupplier<Boolean> mOmniboxFocusStateSupplier;
     private final ObservableSupplierImpl<Boolean> mIsNtpShowingSupplier =
@@ -339,6 +342,8 @@ public class ToolbarManager
     private final ObservableSupplier<TabBookmarker> mTabBookmarkerSupplier;
     private final ObservableSupplierImpl<Boolean> mBackPressStateSupplier =
             new ObservableSupplierImpl<>();
+    private final ObservableSupplierImpl<Boolean> mToolbarNavControlsEnabledSupplier =
+            new ObservableSupplierImpl<>(true);
 
     private boolean mIsDestroyed;
 
@@ -443,6 +448,14 @@ public class ToolbarManager
         private @BackGestureEventSwipeEdge int mInitialEdge;
         private boolean mIsInProgress;
         private final CallbackController mCallbackController = new CallbackController();
+
+        @Override
+        public boolean invokeBackActionOnEscape() {
+            // Escape key presses should not navigate back in tab history. We do not also implement
+            // a custom {@link BackPressHandler#handleEscPress()} since we don't want anything to
+            // happen and for the manager to move to the next priority handler.
+            return false;
+        }
 
         @Override
         public int handleBackPress() {
@@ -1000,6 +1013,7 @@ public class ToolbarManager
                             this::back,
                             browsingModeThemeColorProvider,
                             mActivityTabProvider,
+                            mToolbarNavControlsEnabledSupplier,
                             historyDelegate);
         }
 
@@ -1514,9 +1528,7 @@ public class ToolbarManager
                             mInTabSwitcherTransition = true;
                             mLocationBarModel.updateForNonStaticLayout();
                             mToolbar.setTabSwitcherMode(false);
-                            if (mBackButtonCoordinator != null) {
-                                mBackButtonCoordinator.setTabSwitcherMode(false);
-                            }
+                            mToolbarNavControlsEnabledSupplier.set(true);
                             mIsTabSwitcherFinishedShowingSupplier.set(false);
                             updateButtonStatus();
                         }
@@ -1701,10 +1713,8 @@ public class ToolbarManager
     private void updateForLayout(@LayoutType int layoutType) {
         if (layoutType == LayoutType.TAB_SWITCHER) {
             mLocationBarModel.updateForNonStaticLayout();
-            mToolbar.setTabSwitcherMode(layoutType == LayoutType.TAB_SWITCHER);
-            if (mBackButtonCoordinator != null) {
-                mBackButtonCoordinator.setTabSwitcherMode(true);
-            }
+            mToolbar.setTabSwitcherMode(true);
+            mToolbarNavControlsEnabledSupplier.set(false);
             updateButtonStatus();
         }
         mIsTabSwitcherFinishedShowingSupplier.set(
@@ -1737,6 +1747,7 @@ public class ToolbarManager
                         mTabSwitcherButtonCoordinator,
                         mCustomTabCount,
                         mHomepageEnabledSupplier,
+                        mHomepageNonNtpSupplier,
                         mCompositorViewHolder::getResourceManager,
                         historyDelegate,
                         initializeWithIncognitoColors,
@@ -1750,11 +1761,13 @@ public class ToolbarManager
                         onLongClickListener,
                         progressBar,
                         mActivityTabProvider,
+                        mToolbarNavControlsEnabledSupplier,
                         mBackButtonCoordinator);
 
         mHomepageStateListener =
                 () -> {
                     mHomepageEnabledSupplier.set(HomepageManager.getInstance().isHomepageEnabled());
+                    mHomepageNonNtpSupplier.set(HomepageManager.getInstance().isHomepageNonNtp());
                 };
 
         HomepageManager.getInstance().addListener(mHomepageStateListener);
@@ -2160,7 +2173,9 @@ public class ToolbarManager
 
     @Override
     public @Nullable View getMenuButtonView() {
-        return mMenuButtonCoordinator.getMenuButton().getImageButton();
+        MenuButton button = mMenuButtonCoordinator.getMenuButton();
+        if (button == null) return null;
+        return button.getImageButton();
     }
 
     /**

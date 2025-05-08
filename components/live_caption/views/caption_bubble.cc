@@ -43,6 +43,7 @@
 #include "ui/events/event.h"
 #include "ui/gfx/animation/slide_animation.h"
 #include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/paint_vector_icon.h"
 #include "ui/menus/simple_menu_model.h"
@@ -278,7 +279,7 @@ class CaptionBubbleFrameView : public views::BubbleFrameView {
         buttons_(buttons) {
     auto border = std::make_unique<views::BubbleBorder>(
         views::BubbleBorder::FLOAT, views::BubbleBorder::DIALOG_SHADOW);
-    border->SetCornerRadius(kCornerRadiusDip);
+    border->set_rounded_corners(gfx::RoundedCornersF(kCornerRadiusDip));
     views::BubbleFrameView::SetBubbleBorder(std::move(border));
   }
 
@@ -981,7 +982,7 @@ void CaptionBubble::OnThemeChanged() {
   }
 
   // Call this after SetCaptionButtonStyle(), not before, since
-  // SetCaptionButtonStyle() calls set_background_color(), which
+  // SetCaptionButtonStyle() calls SetBackgroundColor(), which
   // OnThemeChanged() will trigger a read of.
   views::BubbleDialogDelegateView::OnThemeChanged();
 }
@@ -1490,7 +1491,7 @@ void CaptionBubble::SetBackgroundColor() {
                                           &background_color, color_provider);
   }
 
-  set_background_color(background_color);
+  views::BubbleDialogDelegateView::SetBackgroundColor(background_color);
   GetWidget()->SetColorModeOverride(ui::ColorProviderKey::ColorMode::kDark);
 }
 

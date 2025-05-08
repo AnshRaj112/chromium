@@ -948,6 +948,11 @@ GURL WebContentsImpl::GetPartitionedPopinEmbedderOriginImpl() const {
   return partitioned_popin_opener_properties_->top_frame_origin.GetURL();
 }
 
+WindowOpenDisposition WebContentsImpl::GetOriginalWindowOpenDisposition()
+    const {
+  return original_window_open_disposition_;
+}
+
 void WebContents::SetScreenOrientationDelegate(
     ScreenOrientationDelegate* delegate) {
   ScreenOrientationProvider::SetDelegate(delegate);
@@ -2512,6 +2517,13 @@ void WebContentsImpl::SetContextMenuInsets(gfx::Rect safe_area) {
   OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::SetContextMenuInsets");
   if (auto* rwhv = GetRenderWidgetHostView()) {
     rwhv->NotifyContextMenuInsetsObservers(safe_area);
+  }
+}
+
+void WebContentsImpl::ShowInterestInElement(int nodeID) {
+  OPTIONAL_TRACE_EVENT0("content", "WebContentsImpl::ShowInterestInElement");
+  if (auto* rwhv = GetRenderWidgetHostView()) {
+    rwhv->ShowInterestInElement(nodeID);
   }
 }
 
@@ -5012,10 +5024,11 @@ FrameTree* WebContentsImpl::CreateNewWindow(
   }
 
   // TODO(crbug.com/40202416): Support a way for MPArch guests to support this.
-  if (delegate_ && delegate_->IsWebContentsCreationOverridden(
-                       source_site_instance, params.window_container_type,
-                       opener->GetLastCommittedURL(), params.frame_name,
-                       params.target_url)) {
+  if (delegate_ &&
+      delegate_->IsWebContentsCreationOverridden(
+          opener, source_site_instance, params.window_container_type,
+          opener->GetLastCommittedURL(), params.frame_name,
+          params.target_url)) {
     auto* web_contents_impl =
         static_cast<WebContentsImpl*>(delegate_->CreateCustomWebContents(
             opener, source_site_instance, is_new_browsing_instance,
@@ -5131,6 +5144,9 @@ FrameTree* WebContentsImpl::CreateNewWindow(
       params.disposition == WindowOpenDisposition::NEW_POPUP;
   SetPartitionedPopinOpenerOnNewWindowIfNeeded(new_contents_impl, params,
                                                opener);
+
+  // Sets the newly created WebContents WindowOpenDisposition.
+  new_contents_impl->original_window_open_disposition_ = params.disposition;
 
   // If the new frame has a name, make sure any SiteInstances that can find
   // this named frame have proxies for it.  Must be called after
@@ -7408,6 +7424,26 @@ void WebContentsImpl::StateOnOverscrollTransfer(
   iter->second->DidOverscroll(std::move(params));
 }
 
+void WebContentsImpl::RendererInputResponsivenessChanged(
+    const viz::FrameSinkId& frame_sink_id,
+    bool is_responsive,
+    std::optional<base::TimeTicks> ack_timeout_ts) {
+  auto iter = created_widgets_.find(frame_sink_id);
+  // This adds a safeguard against race condition where a RenderWidgetHostImpl
+  // is being destroyed & removed from |created_widgets_|, but Viz may still
+  // send a mojo call referencing it.
+  if (iter == created_widgets_.end()) {
+    return;
+  }
+
+  if (is_responsive) {
+    iter->second->RendererIsResponsive();
+  } else {
+    CHECK(ack_timeout_ts.has_value());
+    iter->second->OnInputEventAckTimeout(*ack_timeout_ts);
+  }
+}
+
 void WebContentsImpl::DidNavigateMainFramePreCommit(
     NavigationHandle* navigation_handle,
     bool navigation_is_within_page) {
@@ -9498,13 +9534,12 @@ bool WebContentsImpl::IsHidden() {
   return GetPageVisibilityState() == PageVisibilityState::kHidden;
 }
 
-std::vector<std::unique_ptr<NavigationThrottle>>
-WebContentsImpl::CreateThrottlesForNavigation(
+void WebContentsImpl::CreateThrottlesForNavigation(
     NavigationThrottleRegistry& registry) {
   OPTIONAL_TRACE_EVENT1("content",
                         "WebContentsImpl::CreateThrottlesForNavigation",
                         "navigation", registry.GetNavigationHandle());
-  return GetContentClient()->browser()->CreateThrottlesForNavigation(registry);
+  GetContentClient()->browser()->CreateThrottlesForNavigation(registry);
 }
 
 std::vector<std::unique_ptr<CommitDeferringCondition>>

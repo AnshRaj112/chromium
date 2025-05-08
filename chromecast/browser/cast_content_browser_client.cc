@@ -509,16 +509,6 @@ void CastContentBrowserClient::OverrideWebPreferences(
   prefs->viewport_style = blink::mojom::ViewportStyle::kTelevision;
 #endif  // BUILDFLAG(IS_ANDROID)
 
-  // Disable WebSQL databases by default.
-  prefs->databases_enabled = false;
-  if (web_contents) {
-    chromecast::CastWebContents* cast_web_contents =
-        chromecast::CastWebContents::FromWebContents(web_contents);
-    if (cast_web_contents && cast_web_contents->is_websql_enabled()) {
-      prefs->databases_enabled = true;
-    }
-  }
-
   prefs->preferred_color_scheme =
       static_cast<blink::mojom::PreferredColorScheme>(
           CastBrowserProcess::GetInstance()->pref_service()->GetInteger(
@@ -809,8 +799,7 @@ CastContentBrowserClient::CreateCrashHandlerHost(
 }
 #endif  // BUILDFLAG(IS_ANDROID)
 
-std::vector<std::unique_ptr<content::NavigationThrottle>>
-CastContentBrowserClient::CreateThrottlesForNavigation(
+void CastContentBrowserClient::CreateThrottlesForNavigation(
     content::NavigationThrottleRegistry& registry) {
   if (chromecast::IsFeatureEnabled(kEnableGeneralAudienceBrowsing)) {
     registry.AddThrottle(
@@ -818,8 +807,6 @@ CastContentBrowserClient::CreateThrottlesForNavigation(
             &registry.GetNavigationHandle(),
             general_audience_browsing_service_.get()));
   }
-
-  return {};
 }
 
 void CastContentBrowserClient::RegisterNonNetworkSubresourceURLLoaderFactories(

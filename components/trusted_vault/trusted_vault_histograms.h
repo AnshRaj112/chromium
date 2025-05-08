@@ -36,7 +36,8 @@ enum class TrustedVaultRecoveryFactorRegistrationStateForUMA {
   // TrustedVaultRecoveryFactorRegistrationOutcomeForUMA.
   kDeprecatedAttemptingRegistrationWithPersistentAuthError = 5,
   kAlreadyRegisteredV1 = 6,
-  kMaxValue = kAlreadyRegisteredV1,
+  kRegistrationWithConstantKeyNotSupported = 7,
+  kMaxValue = kRegistrationWithConstantKeyNotSupported,
 };
 // TODO(crbug.com/369980730): this is used in internals, replace usages with the
 // version above and delete this alias.
@@ -100,7 +101,8 @@ enum class TrustedVaultDownloadKeysStatusForUMA {
   kCorruptedLocalDeviceRegistration = 13,
   kAborted = 14,
   kNetworkError = 15,
-  kMaxValue = kNetworkError
+  kKeyProofVerificationNotSupported = 16,
+  kMaxValue = kKeyProofVerificationNotSupported
 };
 // LINT.ThenChange(/tools/metrics/histograms/metadata/trusted_vault/enums.xml:TrustedVaultDownloadKeysStatus)
 

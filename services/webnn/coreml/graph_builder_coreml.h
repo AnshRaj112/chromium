@@ -24,6 +24,7 @@
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
 #include "services/webnn/public/mojom/webnn_error.mojom-forward.h"
 #include "services/webnn/public/mojom/webnn_graph.mojom.h"
+#include "third_party/abseil-cpp/absl/container/flat_hash_map.h"
 #include "third_party/coremltools/mlmodel/format/MIL.pb.h"
 #include "third_party/coremltools/mlmodel/format/Model.pb.h"
 
@@ -100,7 +101,10 @@ class GraphBuilderCoreml {
     [[nodiscard]] const OperandInfo& GetOperandInfo(OperandId operand_id) const;
 
     const base::FilePath ml_package_dir;
-    std::map<OperandId, OperandInfo> id_to_operand_info_map;
+    // `std::unique_ptr` is used for values to provide pointer stabiliy for
+    // `GetOperandInfo`.
+    absl::flat_hash_map<OperandId, std::unique_ptr<OperandInfo>>
+        id_to_operand_info_map;
   };
 
   // Factory method that creates a GraphBuilderCoreml, builds and serializes the
@@ -184,13 +188,13 @@ class GraphBuilderCoreml {
     base::expected<void, mojom::ErrorPtr> WeightItemFinalize(size_t byte_size);
 
     base::File weights_file_;
-    OperandId current_offset_ = 0;
+    uint64_t current_offset_ = 0;
     uint32_t num_of_weights_ = 0;
     base::TimeDelta weights_write_time_;
     bool has_error_ = false;
     bool finalized_ = false;
     // Maps operand IDs to offsets in the weight file.
-    base::flat_map<OperandId, OperandId> constant_offsets_;
+    base::flat_map<OperandId, uint64_t> constant_offsets_;
   };
 
   GraphBuilderCoreml(
@@ -572,7 +576,8 @@ class GraphBuilderCoreml {
   const base::FilePath& ml_package_dir() const {
     return result_->ml_package_dir;
   }
-  std::map<OperandId, OperandInfo>& id_to_operand_info_map() const {
+  absl::flat_hash_map<OperandId, std::unique_ptr<OperandInfo>>&
+  id_to_operand_info_map() const {
     return result_->id_to_operand_info_map;
   }
 

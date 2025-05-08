@@ -159,7 +159,8 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
   struct IdentityProviderGetInfo {
     IdentityProviderGetInfo(blink::mojom::IdentityProviderRequestOptionsPtr,
                             blink::mojom::RpContext rp_context,
-                            blink::mojom::RpMode rp_mode);
+                            blink::mojom::RpMode rp_mode,
+                            std::optional<blink::mojom::Format> format);
     ~IdentityProviderGetInfo();
     IdentityProviderGetInfo(const IdentityProviderGetInfo&);
     IdentityProviderGetInfo& operator=(const IdentityProviderGetInfo& other);
@@ -167,6 +168,7 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
     blink::mojom::IdentityProviderRequestOptionsPtr provider;
     blink::mojom::RpContext rp_context{blink::mojom::RpContext::kSignIn};
     blink::mojom::RpMode rp_mode{blink::mojom::RpMode::kPassive};
+    std::optional<blink::mojom::Format> format;
   };
 
   struct IdentityProviderInfo {
@@ -174,7 +176,8 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
                          IdpNetworkRequestManager::Endpoints,
                          IdentityProviderMetadata,
                          blink::mojom::RpContext rp_context,
-                         blink::mojom::RpMode rp_mode);
+                         blink::mojom::RpMode rp_mode,
+                         std::optional<blink::mojom::Format> format);
     ~IdentityProviderInfo();
     IdentityProviderInfo(const IdentityProviderInfo&);
 
@@ -184,8 +187,12 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
     bool has_failing_idp_signin_status{false};
     blink::mojom::RpContext rp_context{blink::mojom::RpContext::kSignIn};
     blink::mojom::RpMode rp_mode{blink::mojom::RpMode::kPassive};
+    std::optional<blink::mojom::Format> format;
     IdentityProviderDataPtr data;
     gfx::Image decoded_idp_brand_icon;
+    // nullopt if the server did not send a value or if the FedCmIframeOrigin
+    // flag is not enabled.
+    std::optional<bool> client_matches_top_frame_origin;
   };
 
   struct IdentityProviderLoginUrlInfo {
@@ -517,6 +524,8 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
 
   RpMode GetRpMode() const { return rp_mode_; }
 
+  RelyingPartyData CreateRpData() const;
+
   std::unique_ptr<IdpNetworkRequestManager> network_manager_;
   std::unique_ptr<IdentityRequestDialogController> request_dialog_controller_;
 
@@ -688,7 +697,7 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
 
   // A list of discloures that were parsed in the token response, when
   // the token's format is "vc+sd-jwt".
-  std::vector<std::pair<std::string, std::string>> disclosures_;
+  std::vector<std::pair<std::string, content::sdjwt::JSONString>> disclosures_;
 
   base::WeakPtrFactory<FederatedAuthRequestImpl> weak_ptr_factory_{this};
 };

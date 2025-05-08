@@ -74,11 +74,6 @@ bool AXPlatform::IsScreenReaderActive() {
   return IsScreenReader(active_assistive_tech_);
 }
 
-void AXPlatform::NotifyAccessibilityApiUsage() {
-  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
-  delegate_->OnAccessibilityApiUsage();
-}
-
 bool AXPlatform::IsCaretBrowsingEnabled() {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
   return caret_browsing_enabled_;
@@ -147,12 +142,69 @@ void AXPlatform::OnUiaProviderRequested(bool uia_provider_enabled) {
 }
 #endif  // BUILDFLAG(IS_WIN)
 
-#if BUILDFLAG(IS_LINUX)
-void AXPlatform::OnExtendedPropertiesUsed() {
+#if BUILDFLAG(IS_WIN)
+void AXPlatform::OnScreenReaderHoneyPotQueried() {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
-  delegate_->OnExtendedPropertiesUsed();
+  // We used to trust this as a signal that a screen reader is running, but it's
+  // been abused. Now only enable accessibility if we detect that the name is
+  // also used. Do not do the same for location and role, as the Windows Text
+  // Services Framework (MSTSF) has been known to check the role of each new
+  // window; see https://crbug.com/416429182.
+  if (screen_reader_honeypot_queried_) {
+    return;
+  }
+  screen_reader_honeypot_queried_ = true;
+  if (is_name_used_) {
+    OnPropertiesUsedInWebContent();
+  }
 }
-#endif  // BUILDFLAG(IS_LINUX)
+#endif  // BUILDFLAG(IS_WIN)
+
+void AXPlatform::OnMinimalPropertiesUsed(bool is_name_used) {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+  delegate_->OnMinimalPropertiesUsed();
+#if BUILDFLAG(IS_WIN)
+  // See OnScreenReaderHoneyPotQueried, above.
+  if (!is_name_used || is_name_used_) {
+    return;
+  }
+  is_name_used_ = true;
+  if (screen_reader_honeypot_queried_) {
+    OnPropertiesUsedInWebContent();
+    return;
+  }
+#endif
+}
+
+void AXPlatform::OnPropertiesUsedInBrowserUI() {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+  delegate_->OnPropertiesUsedInBrowserUI();
+}
+
+void AXPlatform::OnPropertiesUsedInWebContent() {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+  delegate_->OnPropertiesUsedInWebContent();
+}
+
+void AXPlatform::OnInlineTextBoxesUsedInWebContent() {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+  delegate_->OnInlineTextBoxesUsedInWebContent();
+}
+
+void AXPlatform::OnExtendedPropertiesUsedInWebContent() {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+  delegate_->OnExtendedPropertiesUsedInWebContent();
+}
+
+void AXPlatform::OnHTMLAttributesUsed() {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+  delegate_->OnHTMLAttributesUsed();
+}
+
+void AXPlatform::OnActionFromAssistiveTech() {
+  DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
+  delegate_->OnActionFromAssistiveTech();
+}
 
 void AXPlatform::DetachFromThreadForTesting() {
   DETACH_FROM_THREAD(thread_checker_);

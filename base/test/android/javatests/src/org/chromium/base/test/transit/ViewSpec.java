@@ -72,6 +72,15 @@ public class ViewSpec<ViewT extends View> {
         return viewSpec(allViewMatchers);
     }
 
+    /** Create a ViewSpec for a descendant of this ViewSpec that matches multiple Matchers<View>. */
+    @SafeVarargs
+    public final <ChildViewT extends View> ViewSpec<ChildViewT> descendant(
+            Class<ChildViewT> viewClass, Matcher<View>... viewMatchers) {
+        Matcher<View>[] allViewMatchers = Arrays.copyOf(viewMatchers, viewMatchers.length + 1);
+        allViewMatchers[viewMatchers.length] = isDescendantOfA(mViewMatcher);
+        return viewSpec(viewClass, allViewMatchers);
+    }
+
     /** Creates a ViewSpec that matches this ViewSpec _and_ another Matcher<View>. */
     public final ViewSpec<View> and(Matcher<View> viewMatcher) {
         return viewSpec(viewMatcher, mViewMatcher);
@@ -93,7 +102,17 @@ public class ViewSpec<ViewT extends View> {
         // states by their description. Espresso Matcher descriptions are not stable: the integer
         // resource ids are translated when a View is provided. See examples in
         // https://crbug.com/41494895#comment7.
-        mMatcherDescription = StringDescription.toString(mViewMatcher);
+        mMatcherDescription = removeResolvedIds(StringDescription.toString(mViewMatcher));
+    }
+
+    private static String removeResolvedIds(String matcherDescription) {
+        // Replace:
+        // "VE/view.getId() is <2130773232/org.chromium.chrome.tests:id/hub_toolbar>"
+        // with:
+        // "VE/view.getId() is <2130773232>"
+
+        // Generated ids have at least 8 digits, since they are >= 0xffffff (16777215)
+        return matcherDescription.replaceAll("<([0-9]{8,})/.*>", "<$1>");
     }
 
     /**

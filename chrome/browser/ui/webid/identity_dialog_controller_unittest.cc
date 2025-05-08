@@ -169,7 +169,8 @@ class IdentityDialogControllerTest : public ChromeRenderViewHostTestHarness {
         base::MakeRefCounted<content::IdentityProviderData>(
             kIdpEtldPlusOne, content::IdentityProviderMetadata(),
             content::ClientMetadata(GURL(), GURL(), GURL(), gfx::Image()),
-            blink::mojom::RpContext::kSignIn, kDefaultPermissions,
+            blink::mojom::RpContext::kSignIn, /*format=*/std::nullopt,
+            kDefaultPermissions,
             /*has_login_status_mismatch=*/false);
     for (auto& account : accounts) {
       account->identity_provider = idp_data;
@@ -184,7 +185,9 @@ class IdentityDialogControllerTest : public ChromeRenderViewHostTestHarness {
     accounts_ = CreateAccount();
     IdentityProviderDataPtr idp_data = CreateIdentityProviderData(accounts_);
     controller.ShowAccountsDialog(
-        content::RelyingPartyData(kTopFrameEtldPlusOne), {idp_data}, accounts_,
+        content::RelyingPartyData(kTopFrameEtldPlusOne,
+                                  /*iframe_for_display=*/""),
+        {idp_data}, accounts_,
         content::IdentityRequestAccount::SignInMode::kExplicit, rp_mode,
         /*new_accounts=*/std::vector<IdentityRequestAccountPtr>(),
         /*on_selected=*/base::DoNothing(), /*on_add_account=*/base::DoNothing(),

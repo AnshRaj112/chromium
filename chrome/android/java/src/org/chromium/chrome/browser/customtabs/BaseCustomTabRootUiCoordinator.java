@@ -81,6 +81,7 @@ import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.readaloud.ReadAloudIphController;
 import org.chromium.chrome.browser.reengagement.ReengagementNotificationController;
 import org.chromium.chrome.browser.searchwidget.SearchActivityClientImpl;
+import org.chromium.chrome.browser.segmentation_platform.ContextualPageActionController;
 import org.chromium.chrome.browser.share.ShareDelegate;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
 import org.chromium.chrome.browser.signin.services.SigninPreferencesManager;
@@ -413,7 +414,9 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
                     new CustomTabToolbarButtonsCoordinator(
                             toolbar,
                             mIntentDataProvider.get(),
-                            params -> mToolbarCoordinator.get().onCustomButtonClick(params));
+                            params -> mToolbarCoordinator.get().onCustomButtonClick(params),
+                            mMinimizeDelegateSupplier.get(),
+                            mFeatureOverridesManagerSupplier.get());
 
             super.initializeToolbar();
 
@@ -567,6 +570,14 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
         return mCustomTabHistoryIphController;
     }
 
+    public ContextualPageActionController getContextualPageActionController() {
+        return mAdaptiveToolbarUiCoordinator.getContextualPageActionController();
+    }
+
+    public void runPriceInsightsAction() {
+        mAdaptiveToolbarUiCoordinator.runPriceInsightsAction();
+    }
+
     @Override
     public int getControlContainerHeightResource() {
         return R.dimen.custom_tabs_control_container_height;
@@ -701,6 +712,7 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
                             mActivityTabProvider,
                             mWebAppThemeColorProvider.get(),
                             intentDataProvider,
+                            getScrimManager(),
                             (tab) -> {
                                 Intent fullHistoryIntent = new Intent(Intent.ACTION_MAIN);
                                 fullHistoryIntent.setClass(mActivity, ChromeLauncherActivity.class);

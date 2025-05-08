@@ -645,6 +645,12 @@ chromium-metrics-reviews@google.com.
   <int value="143" label="WebSettingsCompat.setHasEnrolledInstrumentEnabled"/>
   <int value="144" label="WebSettingsCompat.getHasEnrolledInstrumentEnabled"/>
   <int value="145" label="WebViewBuilder"/>
+  <int value="146" label="WebSettingsCompat.setIncludeCookiesOnIntercept"/>
+  <int value="147" label="WebSettingsCompat.getIncludeCookiesOnIntercept"/>
+  <int value="148"
+      label="ServiceWorkerWebSettingsCompat.setIncludeCookiesOnIntercept"/>
+  <int value="149"
+      label="ServiceWorkerWebSettingsCompat.getIncludeCookiesOnIntercept"/>
 <!-- LINT.ThenChange(/android_webview/support_library/java/src/org/chromium/support_lib_glue/SupportLibWebViewChromiumFactory.java:ApiCall) -->
 
 </enum>
@@ -958,11 +964,12 @@ chromium-metrics-reviews@google.com.
   <int value="4" label="START_STICKY"/>
 </enum>
 
-<enum name="DragDropTabResult">
+<enum name="DragDropResult">
   <summary>
     SUCCESS is recorded during ACTION_DRAG_ENDED. The rest enums are all for
     failed drops, which are recorded in ACTION_DROP. Also see
-    Android.DragDrop.Tab.FromStrip.Result
+    Android.DragDrop.Tab.FromStrip.Result and
+    Android.DragDrop.TabGroup.FromStrip.Result.
   </summary>
   <int value="0" label="SUCCESS"/>
   <int value="1" label="IGNORED_TOOLBAR"/>
@@ -971,10 +978,13 @@ chromium-metrics-reviews@google.com.
   <int value="4" label="IGNORED_SAME_INSTANCE"/>
   <int value="5" label="ERROR_TAB_NOT_FOUND"/>
   <int value="6" label="IGNORED_MAX_INSTANCES"/>
+  <int value="7" label="IGNORED_MHTML_TAB"/>
 </enum>
 
 <enum name="DragDropType">
-  <summary>See Android.DragDrop.Tab.Type</summary>
+  <summary>
+    See Android.DragDrop.Tab.Type and Android.DragDrop.TabGroup.Type
+  </summary>
   <int value="0" label="TAB_STRIP_TO_TAB_STRIP"/>
   <int value="1" label="TAB_STRIP_TO_CONTENT"/>
   <int value="2" label="TAB_STRIP_TO_NEW_INSTANCE"/>

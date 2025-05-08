@@ -53,7 +53,12 @@ BASE_FEATURE(kTabGroupsSaveNudgeDelay,
 
 BASE_FEATURE(kSeparateLocalAndAccountSearchEngines,
              "SeparateLocalAndAccountSearchEngines",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_CHROMEOS)
+             base::FEATURE_DISABLED_BY_DEFAULT
+#else
+             base::FEATURE_ENABLED_BY_DEFAULT
+#endif  // BUILDFLAG(IS_CHROMEOS)
+);
 
 BASE_FEATURE(kReplaceSyncPromosWithSignInPromos,
              "ReplaceSyncPromosWithSignInPromos",
@@ -112,21 +117,27 @@ BASE_FEATURE(kMigrateAccountPrefs,
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_IOS) || BUILDFLAG(IS_ANDROID)
 
+// Enabled by default, intended as a kill switch.
+BASE_FEATURE(kSyncReadingListBatchUploadSelectedItems,
+             "SyncReadingListBatchUploadSelectedItems",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 BASE_FEATURE(kSeparateLocalAndAccountThemes,
              "SeparateLocalAndAccountThemes",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_CHROMEOS)
+             base::FEATURE_DISABLED_BY_DEFAULT
+#else
+             base::FEATURE_ENABLED_BY_DEFAULT
+#endif  // BUILDFLAG(IS_CHROMEOS)
+);
 
 BASE_FEATURE(kThemesBatchUpload,
              "ThemesBatchUpload",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kSyncIncreaseNudgeDelayForSingleClient,
              "SyncIncreaseNudgeDelayForSingleClient",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kMoveThemePrefsToSpecifics,
-             "MoveThemePrefsToSpecifics",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_ANDROID)
 BASE_FEATURE(kWebApkBackupAndRestoreBackend,
@@ -139,10 +150,6 @@ BASE_FEATURE(kSyncEnablePasswordsSyncErrorMessageAlternative,
              "SyncEnablePasswordsSyncErrorMessageAlternative",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_ANDROID)
-
-BASE_FEATURE(kSyncSimulateBookmarksPingPongForTesting,
-             "SyncSimulateBookmarksPingPongForTesting",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_IOS)
 BASE_FEATURE(kSyncTrustedVaultInfobarImprovements,

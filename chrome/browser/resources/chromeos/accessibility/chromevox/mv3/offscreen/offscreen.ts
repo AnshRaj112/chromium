@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import {EarconEngine} from '../background/earcon_engine.js';
 import {InternalKeyEvent} from '../common/internal_key_event.js';
 import {OffscreenCommandType} from '../common/offscreen_command_type.js';
 
@@ -81,13 +82,15 @@ class OffscreenClipboardHandler {
   }
 
   private handleMessageFromServiceWorker_(
-      message: any|undefined, sendResponse: SendResponse) {
+      message: any|undefined, sendResponse: SendResponse): boolean {
     switch (message['command']) {
       case OffscreenCommandType.ON_CLIPBOARD_DATA_CHANGED:
         const forceRead = message['forceRead'] as boolean;
         this.onClipboardDataChanged_(sendResponse, forceRead);
         break;
     }
+    // Returns false as the response is not asynchronous and the callback does
+    // not need to be kept alive.
     return false;
   }
 
@@ -140,5 +143,55 @@ class OffscreenClipboardHandler {
   }
 }
 
+class OffscreenSpeechSynthesis {
+  static instance?: OffscreenSpeechSynthesis;
+
+  constructor() {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        chrome.runtime.sendMessage(
+            undefined, {command: OffscreenCommandType.ON_VOICES_CHANGED});
+      };
+    }
+
+    chrome.runtime.onMessage.addListener(
+        (message: any|undefined, _sender: MessageSender,
+         sendResponse: SendResponse) =>
+            this.handleMessageFromServiceWorker_(message, sendResponse));
+  }
+
+  private handleMessageFromServiceWorker_(
+      message: any|undefined, sendResponse: SendResponse): boolean {
+    switch (message['command']) {
+      case OffscreenCommandType.SHOULD_SET_DEFAULT_VOICE:
+        this.shouldSetDefaultVoice_(sendResponse);
+        break;
+    }
+    // Returns false as the response is not asynchronous and the callback does
+    // not need to be kept alive.
+    return false;
+  }
+
+  static init(): void {
+    if (OffscreenSpeechSynthesis.instance) {
+      throw 'Error: trying to create two instances of singleton ' +
+          'OffscreenSpeechSynthesis.';
+    }
+    OffscreenSpeechSynthesis.instance = new OffscreenSpeechSynthesis();
+  }
+
+  // If the SpeechSynthesis API is not available it indicates we are
+  // in chromecast and the default voice must be set.
+  private shouldSetDefaultVoice_(sendResponse: SendResponse): void {
+    if (!window.speechSynthesis) {
+      sendResponse(true);
+      return;
+    }
+    sendResponse(false);
+  }
+}
+
 OffscreenBackgroundKeyboardHandler.init();
 OffscreenClipboardHandler.init();
+OffscreenSpeechSynthesis.init();
+EarconEngine.init();

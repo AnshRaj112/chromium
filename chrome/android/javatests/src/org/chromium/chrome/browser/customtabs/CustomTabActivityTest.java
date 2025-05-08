@@ -99,6 +99,7 @@ import org.chromium.base.ApplicationStatus.ActivityStateListener;
 import org.chromium.base.BuildInfo;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.IntentUtils;
+import org.chromium.base.ObserverList;
 import org.chromium.base.ServiceLoaderUtil;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.library_loader.LibraryLoader;
@@ -136,6 +137,7 @@ import org.chromium.chrome.browser.compositor.layouts.Layout;
 import org.chromium.chrome.browser.contextmenu.ContextMenuCoordinator;
 import org.chromium.chrome.browser.customtabs.CustomTabActivityLifecycleUmaTracker.ClientIdentifierType;
 import org.chromium.chrome.browser.customtabs.CustomTabsIntentTestUtils.OnFinishedForTest;
+import org.chromium.chrome.browser.customtabs.content.CustomTabActivityNavigationController;
 import org.chromium.chrome.browser.customtabs.content.CustomTabActivityNavigationController.FinishReason;
 import org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabBaseStrategy;
 import org.chromium.chrome.browser.customtabs.features.partialcustomtab.PartialCustomTabDisplayManager;
@@ -147,6 +149,7 @@ import org.chromium.chrome.browser.flags.ChromeSwitches;
 import org.chromium.chrome.browser.history.BrowsingHistoryBridge;
 import org.chromium.chrome.browser.history.HistoryItem;
 import org.chromium.chrome.browser.history.TestBrowsingHistoryObserver;
+import org.chromium.chrome.browser.lifecycle.InflationObserver;
 import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
 import org.chromium.chrome.browser.page_load_metrics.PageLoadMetrics;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
@@ -178,6 +181,7 @@ import org.chromium.chrome.test.util.browser.contextmenu.ContextMenuUtils;
 import org.chromium.components.browser_ui.widget.CoordinatorLayoutForPointer;
 import org.chromium.components.browser_ui.widget.TintedDrawable;
 import org.chromium.components.browser_ui.widget.gesture.BackPressHandler;
+import org.chromium.components.browser_ui.widget.gesture.OnSystemNavigationObserver;
 import org.chromium.components.content_settings.CookieControlsMode;
 import org.chromium.components.embedder_support.util.Origin;
 import org.chromium.components.page_info.PageInfoController;
@@ -560,7 +564,7 @@ public class CustomTabActivityTest {
     @Feature({"UiCatalogue"})
     @DisabledTest(message = "https://crbug.com/40898152")
     public void testMultipleActionButtons() throws TimeoutException {
-        Bitmap expectedIcon1 = createVectorDrawableBitmap(R.drawable.ic_content_copy_black, 48, 48);
+        Bitmap expectedIcon1 = createVectorDrawableBitmap(R.drawable.ic_content_copy, 48, 48);
         Bitmap expectedIcon2 =
                 createVectorDrawableBitmap(R.drawable.ic_email_googblue_36dp, 48, 48);
         Intent intent = createMinimalCustomTabIntent();
@@ -1254,6 +1258,55 @@ public class CustomTabActivityTest {
         assertEquals(1, history.size());
         assertEquals(mTestPage, history.get(0).getUrl().getSpec());
         histograms.pollInstrumentationThreadUntilSatisfied();
+    }
+
+    /** Tests that we don't leak the tab when finishing early. */
+    @Test
+    @SmallTest
+    @EnableFeatures({ChromeFeatureList.CCT_EARLY_NAV})
+    public void testEarlyFinish() throws Exception {
+        CallbackHelper helper = new CallbackHelper();
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    ApplicationStatus.registerStateListenerForAllActivities(
+                            new ActivityStateListener() {
+                                @Override
+                                public void onActivityStateChange(
+                                        Activity activity, @ActivityState int state) {
+                                    if (!(activity instanceof CustomTabActivity)) return;
+                                    if (state == ActivityState.CREATED) {
+                                        ((CustomTabActivity) activity)
+                                                .getLifecycleDispatcher()
+                                                .register(
+                                                        new InflationObserver() {
+                                                            @Override
+                                                            public void onPreInflationStartup() {
+                                                                activity.finish();
+                                                            }
+
+                                                            @Override
+                                                            public void onPostInflationStartup() {}
+                                                        });
+                                    }
+                                    if (state == ActivityState.DESTROYED) {
+                                        Assert.assertTrue(
+                                                ((CustomTabActivity) activity)
+                                                        .getActivityTab()
+                                                        .isDestroyed());
+                                        helper.notifyCalled();
+                                    }
+                                }
+                            });
+                });
+
+        CustomTabsConnection connection = CustomTabsTestUtils.warmUpAndWait();
+        Context context = ApplicationProvider.getApplicationContext();
+        Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(context, mTestPage);
+        final var token = SessionHolder.getSessionHolderFromIntent(intent);
+        Assert.assertTrue(connection.newSession(token.getSessionAsCustomTab()));
+        mCustomTabActivityTestRule.launchActivity(intent);
+
+        helper.waitForNext();
     }
 
     /** Tests that calling warmup() is optional without prerendering. */
@@ -2817,6 +2870,27 @@ public class CustomTabActivityTest {
                             "Tab should not be navigated when tab handler fails without recover",
                             ChromeTabUtils.getUrlStringOnUiThread(getActivity().getActivityTab()),
                             is(mTestPage2));
+                });
+    }
+
+    @Test
+    @SmallTest
+    @Features.EnableFeatures({ChromeFeatureList.CCT_PREDICTIVE_BACK_GESTURE})
+    public void
+            testBackPressManagerAddsSystemNavigationObserver_WhenPredictiveBackGestureIsSupported() {
+        CustomTabActivityNavigationController.enablePredictiveBackGestureForTesting();
+        Context context = getInstrumentation().getTargetContext().getApplicationContext();
+        Intent intent = CustomTabsIntentTestUtils.createMinimalCustomTabIntent(context, mTestPage);
+        mCustomTabActivityTestRule.startCustomTabActivityWithIntent(intent);
+
+        ObserverList<OnSystemNavigationObserver> onSystemNavigationObservers =
+                getActivity().getBackPressManagerForTesting().getObserverListForTesting();
+
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    Assert.assertTrue(
+                            onSystemNavigationObservers.hasObserver(
+                                    getActivity().getCustomTabActivityNavigationController()));
                 });
     }
 

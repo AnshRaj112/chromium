@@ -7,10 +7,10 @@
 
 #import "base/memory/weak_ptr.h"
 #import "base/timer/timer.h"
-#import "components/prefs/pref_service.h"
 #import "ios/chrome/browser/dom_distiller/model/distiller_service.h"
 #import "ios/chrome/browser/dom_distiller/model/distiller_viewer.h"
 #import "ios/chrome/browser/reader_mode/model/constants.h"
+#import "ios/chrome/browser/reader_mode/model/reader_mode_content_delegate.h"
 #import "ios/web/public/web_state_observer.h"
 #import "ios/web/public/web_state_user_data.h"
 
@@ -19,11 +19,11 @@
 
 // Observes changes to the web state to perform reader mode operations.
 class ReaderModeTabHelper : public web::WebStateObserver,
-                            public web::WebStateUserData<ReaderModeTabHelper> {
+                            public web::WebStateUserData<ReaderModeTabHelper>,
+                            public ReaderModeContentDelegate {
  public:
   ReaderModeTabHelper(web::WebState* web_state,
-                      DistillerService* distiller_service,
-                      PrefService* prefs);
+                      DistillerService* distiller_service);
   ReaderModeTabHelper(const ReaderModeTabHelper&) = delete;
   ReaderModeTabHelper& operator=(const ReaderModeTabHelper&) = delete;
 
@@ -54,11 +54,19 @@ class ReaderModeTabHelper : public web::WebStateObserver,
   // web::WebStateObserver overrides:
   void DidStartNavigation(web::WebState* web_state,
                           web::NavigationContext* navigation_context) override;
+  void DidFinishNavigation(web::WebState* web_state,
+                           web::NavigationContext* navigation_context) override;
   void PageLoaded(
       web::WebState* web_state,
       web::PageLoadCompletionStatus load_completion_status) override;
   void WebStateDestroyed(web::WebState* web_state) override;
   void WasHidden(web::WebState* web_state) override;
+
+  // ReaderModeContentDelegate overrides:
+  void ReaderModeContentDidCancelRequest(
+      ReaderModeContentTabHelper* reader_mode_content_tab_helper,
+      NSURLRequest* request,
+      web::WebStatePolicyDecider::RequestInfo request_info) override;
 
   // Trigger the heuristic to determine reader mode eligibility.
   void TriggerReaderModeHeuristic();
@@ -94,7 +102,6 @@ class ReaderModeTabHelper : public web::WebStateObserver,
 
   raw_ptr<web::WebState> web_state_ = nullptr;
   raw_ptr<DistillerService> distiller_service_;
-  raw_ptr<PrefService> pref_service_;
 
   std::unique_ptr<DistillerViewer> distiller_viewer_;
 

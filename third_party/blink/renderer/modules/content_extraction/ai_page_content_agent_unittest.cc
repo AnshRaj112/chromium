@@ -3325,7 +3325,7 @@ TEST_F(AIPageContentAgentTest, LabelWithForSibling) {
   CheckContainerNode(label);
   ASSERT_TRUE(label.content_attributes->node_interaction_info);
   EXPECT_TRUE(label.content_attributes->node_interaction_info->is_clickable);
-  EXPECT_EQ(label.content_attributes->node_interaction_info->for_dom_node_id,
+  EXPECT_EQ(label.content_attributes->label_for_dom_node_id,
             input.content_attributes->dom_node_id);
 }
 
@@ -3355,7 +3355,7 @@ TEST_F(AIPageContentAgentTest, LabelWithForDescendant) {
   CheckFormControlNode(input, mojom::blink::FormControlType::kInputCheckbox);
   ASSERT_TRUE(input.content_attributes->node_interaction_info);
   EXPECT_TRUE(input.content_attributes->node_interaction_info->is_clickable);
-  EXPECT_EQ(label.content_attributes->node_interaction_info->for_dom_node_id,
+  EXPECT_EQ(label.content_attributes->label_for_dom_node_id,
             input.content_attributes->dom_node_id);
 
   CheckTextNode(*label.children_nodes[1], "Check me!");
@@ -3637,6 +3637,52 @@ TEST_F(AIPageContentAgentTest, DisabledOption) {
   const auto& cherry = *options.at(1);
   EXPECT_EQ(cherry.value, "cherry");
   EXPECT_TRUE(cherry.disabled);
+}
+
+TEST_F(AIPageContentAgentTest, AriaRole) {
+  frame_test_helpers::LoadHTMLString(
+      helper_.LocalMainFrame(),
+      R"HTML(
+      <body>
+        <div role="button"></div>
+      </body>
+      )HTML",
+      url_test_helpers::ToKURL("http://foobar.com"));
+
+  GetAIPageContentWithActionableElements();
+  const auto& root = ContentRootNode();
+  ASSERT_EQ(root.children_nodes.size(), 1u);
+
+  const auto& button = *root.children_nodes.at(0);
+  ASSERT_TRUE(button.content_attributes->node_interaction_info);
+  EXPECT_TRUE(button.content_attributes->node_interaction_info->is_clickable);
+  EXPECT_EQ(button.content_attributes->aria_role,
+            ax::mojom::blink::Role::kButton);
+}
+
+TEST_F(AIPageContentAgentTest, LabelNotActionable) {
+  frame_test_helpers::LoadHTMLString(
+      helper_.LocalMainFrame(),
+      R"HTML(
+        <body>
+          <input type='checkbox' id='myCheckbox' />
+          <label for='myCheckbox' style='pointer-events: none;'>Check me!</label>
+        </body>
+      )HTML",
+      url_test_helpers::ToKURL("http://foobar.com"));
+
+  GetAIPageContentWithActionableElements();
+  const auto& root = ContentRootNode();
+  ASSERT_EQ(root.children_nodes.size(), 2u);
+
+  const auto& button = *root.children_nodes.at(0);
+  ASSERT_TRUE(button.content_attributes->node_interaction_info);
+  EXPECT_TRUE(button.content_attributes->node_interaction_info->is_clickable);
+
+  const auto& label = *root.children_nodes.at(1);
+  EXPECT_FALSE(label.content_attributes->node_interaction_info);
+  EXPECT_EQ(*label.content_attributes->label_for_dom_node_id,
+            button.content_attributes->dom_node_id);
 }
 
 }  // namespace

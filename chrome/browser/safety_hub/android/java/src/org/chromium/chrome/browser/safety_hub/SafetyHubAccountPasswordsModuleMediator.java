@@ -76,8 +76,11 @@ public class SafetyHubAccountPasswordsModuleMediator
                 return new SafetyHubAccountPasswordsUnavailableAllPasswordsModuleHelper(
                         context, mModuleDelegate);
             case ModuleType.NO_SAVED_PASSWORDS:
-                return new SafetyHubAccountPasswordsNoPasswordsModuleHelper(
-                        context, mModuleDelegate);
+                return new SafetyHubNoSavedPasswordsModuleHelper(
+                        context,
+                        mModuleDelegate,
+                        /* noAccountPasswords= */ true,
+                        /* noLocalPasswords= */ false);
             case ModuleType.HAS_COMPROMISED_PASSWORDS:
                 return new SafetyHubCompromisedPasswordsModuleHelper(
                         context,
@@ -92,15 +95,19 @@ public class SafetyHubAccountPasswordsModuleMediator
                         mAccountPasswordsDataSource.getAccountEmail(),
                         /* unifiedModule= */ false);
             case ModuleType.HAS_WEAK_PASSWORDS:
-                return new SafetyHubAccountPasswordsHasWeakPasswordsModuleHelper(
+                return new SafetyHubWeakPasswordsModuleHelper(
                         context,
                         mModuleDelegate,
-                        mAccountPasswordsDataSource.getWeakPasswordCount());
+                        mAccountPasswordsDataSource.getWeakPasswordCount(),
+                        /* localWeakPasswordsCount= */ 0,
+                        /* unifiedModule= */ false);
             case ModuleType.HAS_REUSED_PASSWORDS:
-                return new SafetyHubAccountPasswordsHasReusedPasswordsModuleHelper(
+                return new SafetyHubReusedPasswordsModuleHelper(
                         context,
                         mModuleDelegate,
-                        mAccountPasswordsDataSource.getReusedPasswordCount());
+                        mAccountPasswordsDataSource.getReusedPasswordCount(),
+                        /* localReusedPasswordsCount= */ 0,
+                        /* unifiedModule= */ false);
             case ModuleType.UNAVAILABLE_COMPROMISED_NO_WEAK_REUSED_PASSWORDS:
                 return new SafetyHubAccountPasswordsUnavailableCompromisedPasswordsModuleHelper(
                         context, mModuleDelegate);

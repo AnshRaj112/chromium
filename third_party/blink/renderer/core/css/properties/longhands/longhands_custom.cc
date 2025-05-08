@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "base/numerics/clamped_math.h"
+#include "third_party/blink/public/strings/grit/blink_strings.h"
 #include "third_party/blink/renderer/core/css/basic_shape_functions.h"
 #include "third_party/blink/renderer/core/css/css_anchor_query_enums.h"
 #include "third_party/blink/renderer/core/css/css_axis_value.h"
@@ -81,6 +82,7 @@
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
+#include "third_party/blink/renderer/platform/text/platform_locale.h"
 #include "third_party/blink/renderer/platform/text/quotes_data.h"
 
 // Implementations of methods in Longhand subclasses that aren't generated.
@@ -2151,7 +2153,8 @@ const CSSValue* ClipPath::CSSValueFromComputedStyleInternal(
     }
     if (operation->GetType() == ClipPathOperation::kReference) {
       AtomicString url = To<ReferenceClipPathOperation>(operation)->Url();
-      return MakeGarbageCollected<cssvalue::CSSURIValue>(CSSUrlData(url));
+      return MakeGarbageCollected<cssvalue::CSSURIValue>(
+          *MakeGarbageCollected<CSSUrlData>(url));
     }
   }
   return CSSIdentifierValue::Create(CSSValueID::kNone);
@@ -2939,6 +2942,11 @@ const CSSValue* ParseContentValue(CSSParserTokenStream& stream,
           stream.Peek().Id())) {
     return css_parsing_utils::ConsumeIdent(stream);
   }
+  if (context.GetMode() == kUASheetMode &&
+      css_parsing_utils::IdentMatches<
+          CSSValueID::kInternalPartialInterestContent>(stream.Peek().Id())) {
+    return css_parsing_utils::ConsumeIdent(stream);
+  }
 
   CSSValueList* values = CSSValueList::CreateSpaceSeparated();
   CSSValueList* outer_list = CSSValueList::CreateSlashSeparated();
@@ -3082,9 +3090,23 @@ void Content::ApplyValue(StyleResolverState& state,
   ComputedStyleBuilder& builder = state.StyleBuilder();
   if (auto* identifier_value = DynamicTo<CSSIdentifierValue>(value)) {
     DCHECK(identifier_value->GetValueID() == CSSValueID::kNormal ||
-           identifier_value->GetValueID() == CSSValueID::kNone);
+           identifier_value->GetValueID() == CSSValueID::kNone ||
+           identifier_value->GetValueID() ==
+               CSSValueID::kInternalPartialInterestContent);
     if (identifier_value->GetValueID() == CSSValueID::kNone) {
       builder.SetContent(MakeGarbageCollected<NoneContentData>());
+    } else if (identifier_value->GetValueID() ==
+                   CSSValueID::kInternalPartialInterestContent &&
+               RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
+                   state.GetDocument().GetExecutionContext())) {
+      String hint_text = state.GetDocument().GetCachedLocale().QueryString(
+          IDS_PARTIAL_INTEREST_TARGET_ACTIVATION_HINT,
+          Element::GetPartialInterestTargetActivationHotkey());
+      auto* content =
+          MakeGarbageCollected<TextContentData>("{" + hint_text + "}");
+      auto* alt_content = MakeGarbageCollected<AltTextContentData>(hint_text);
+      content->SetNext(alt_content);
+      builder.SetContent(content);
     } else {
       builder.SetContent(nullptr);
     }
@@ -6976,7 +6998,8 @@ const CSSValue* OffsetPath::CSSValueFromComputedStyleInternal(
         To<ReferenceOffsetPathOperation>(*operation);
     CSSValueList* list = CSSValueList::CreateSpaceSeparated();
     AtomicString url = reference_operation.Url();
-    list->Append(*MakeGarbageCollected<cssvalue::CSSURIValue>(CSSUrlData(url)));
+    list->Append(*MakeGarbageCollected<cssvalue::CSSURIValue>(
+        *MakeGarbageCollected<CSSUrlData>(url)));
     CoordBox coord_box = reference_operation.GetCoordBox();
     if (coord_box != CoordBox::kBorderBox) {
       list->Append(*CSSIdentifierValue::Create(coord_box));

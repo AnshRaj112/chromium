@@ -10,7 +10,6 @@
 #include "base/test/task_environment.h"
 #include "base/test/test_future.h"
 #include "mojo/public/cpp/bindings/remote.h"
-#include "mojo/public/cpp/test_support/test_utils.h"
 #include "services/on_device_model/fake/fake_chrome_ml_api.h"
 #include "services/on_device_model/fake/on_device_model_fake.h"
 #include "services/on_device_model/ml/chrome_ml_types.h"
@@ -225,25 +224,6 @@ TEST_F(OnDeviceModelServiceTest, PerSessionSamplingParams) {
                           "Context: more\n", "Context: cheddar\n"));
 }
 
-TEST_F(OnDeviceModelServiceTest, GenerateWithSamplingParamsIsNotAllowed) {
-  auto model = LoadModel();
-
-  TestResponseHolder response;
-  mojo::Remote<mojom::Session> session;
-  model->StartSession(session.BindNewPipeAndPassReceiver(), nullptr);
-  session->Append(MakeInput("cheese"), {});
-
-  // Sampling params should be passed at session creation, not to Generate().
-  auto generate_options = mojom::GenerateOptions::New();
-  generate_options->top_k = 2;
-  generate_options->temperature = 0.8;
-
-  mojo::test::BadMessageObserver bad_message_observer;
-  session->Generate(std::move(generate_options), response.BindRemote());
-  EXPECT_THAT(bad_message_observer.WaitForBadMessage(),
-              testing::HasSubstr("deprecated"));
-}
-
 TEST_F(OnDeviceModelServiceTest, CloneContextAndContinue) {
   auto model = LoadModel();
 
@@ -380,16 +360,15 @@ TEST_F(OnDeviceModelServiceTest, AppendWithTokenLimits) {
 
   ContextClientWaiter client2;
   auto offset_input = MakeInput("big cheese");
-  offset_input->token_offset = 4;
   session->Append(std::move(offset_input), client2.BindRemote());
-  EXPECT_EQ(client2.WaitForCompletion(), 6);
+  EXPECT_EQ(client2.WaitForCompletion(), 10);
 
   session->Append(MakeInput("cheddar"), {});
   session->Generate(mojom::GenerateOptions::New(), response.BindRemote());
   response.WaitForCompletion();
 
   EXPECT_THAT(response.responses(),
-              ElementsAre("Context: big \n", "Context: cheese\n",
+              ElementsAre("Context: big \n", "Context: big cheese\n",
                           "Context: cheddar\n"));
 }
 
@@ -557,40 +536,6 @@ TEST_F(OnDeviceModelServiceTest, AppendWithTokens) {
                                                 "Context: User: bye\n"));
 }
 
-TEST_F(OnDeviceModelServiceTest, AppendWithImagesAdaptation) {
-  auto model = LoadModel();
-  auto params = mojom::LoadAdaptationParams::New();
-  params->enable_image_input = true;
-  auto adaptation = LoadAdaptationWithParams(*model, std::move(params));
-
-  mojo::Remote<mojom::Session> session;
-  auto session_params = mojom::SessionParams::New();
-  session_params->capabilities.Put(CapabilityFlags::kImageInput);
-  adaptation->StartSession(session.BindNewPipeAndPassReceiver(),
-                           std::move(session_params));
-
-  std::vector<ml::InputPiece> pieces;
-  pieces.push_back("bleu");
-
-  SkBitmap moldy_cheese;
-  moldy_cheese.allocPixels(
-      SkImageInfo::Make(63, 42, kRGBA_8888_SkColorType, kOpaque_SkAlphaType),
-      0);
-  moldy_cheese.eraseColor(SK_ColorBLUE);
-  pieces.push_back(moldy_cheese);
-
-  pieces.push_back("cheese");
-
-  session->Append(MakeInput(std::move(pieces)), {});
-
-  TestResponseHolder response;
-  session->Generate(mojom::GenerateOptions::New(), response.BindRemote());
-  response.WaitForCompletion();
-
-  EXPECT_THAT(response.responses(),
-              ElementsAre("Context: bleu[Bitmap of size 63x42]cheese\n"));
-}
-
 TEST_F(OnDeviceModelServiceTest, AppendWithImages) {
   auto model = LoadModel();
   mojo::Remote<mojom::Session> session;
@@ -661,6 +606,34 @@ TEST_F(OnDeviceModelServiceTest, ClassifyTextSafety) {
   EXPECT_THAT(resp1->class_scores, ElementsAre(0.8, 0.8));
   ASSERT_TRUE(resp2);
   EXPECT_THAT(resp2->class_scores, ElementsAre(0.2, 0.2));
+}
+
+TEST_F(OnDeviceModelServiceTest, CloneTextSafety) {
+  FakeFile ts_data("fake_ts_data");
+  FakeFile ts_sp_model("fake_ts_sp_model");
+  TextSafetyLoaderParams params;
+  params.ts_paths.emplace();
+  params.ts_paths->data = ts_data.Path();
+  params.ts_paths->sp_model = ts_sp_model.Path();
+  mojo::Remote<mojom::TextSafetyModel> model;
+  service()->LoadTextSafetyModel(LoadTextSafetyParams(params),
+                                 model.BindNewPipeAndPassReceiver());
+
+  mojo::Remote<mojom::TextSafetySession> session;
+  model->StartSession(session.BindNewPipeAndPassReceiver());
+  {
+    base::test::TestFuture<mojom::SafetyInfoPtr> future;
+    session->ClassifyTextSafety("unsafe text", future.GetCallback());
+    EXPECT_THAT(future.Take()->class_scores, ElementsAre(0.8, 0.8));
+  }
+
+  mojo::Remote<mojom::TextSafetySession> clone;
+  session->Clone(clone.BindNewPipeAndPassReceiver());
+  {
+    base::test::TestFuture<mojom::SafetyInfoPtr> future;
+    clone->ClassifyTextSafety("unsafe text", future.GetCallback());
+    EXPECT_THAT(future.Take()->class_scores, ElementsAre(0.8, 0.8));
+  }
 }
 
 TEST_F(OnDeviceModelServiceTest, PerformanceHint) {

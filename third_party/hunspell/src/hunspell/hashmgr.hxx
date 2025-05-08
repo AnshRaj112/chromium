@@ -71,7 +71,7 @@
 #ifndef HASHMGR_HXX_
 #define HASHMGR_HXX_
 
-#include <stdio.h>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -140,11 +140,12 @@ class HashMgr {
 #endif
   ~HashMgr();
 
-  struct hentry* lookup(const char*) const;
-  int hash(const char*) const;
+  struct hentry* lookup(const char* word, size_t len) const;
+  int hash(const char* word, size_t len) const;
   struct hentry* walk_hashtable(int& col, struct hentry* hp) const;
 
   int add(const std::string& word);
+  int add_with_flags(const std::string& word, const std::string& flags, const std::string& desc);
   int add_with_affix(const std::string& word, const std::string& pattern);
   int remove(const std::string& word);
   int decode_flags(unsigned short** result, const std::string& flags, FileMgr* af) const;
@@ -212,9 +213,9 @@ class HashMgr {
                                   int captype);
   bool parse_aliasm(const std::string& line, FileMgr* af);
   bool parse_reptable(const std::string& line, FileMgr* af);
-  int remove_forbidden_flag(const std::string& word);
+  void remove_forbidden_flag(const std::string& word);
   void free_table();
-  void free_flag(unsigned short* astr, short alen);
+  void free_flag(unsigned short* astr, int alen);
 };
 
 #endif

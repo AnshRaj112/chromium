@@ -215,26 +215,18 @@ public class TabUiThemeProvider {
      */
     public static @ColorInt int getTabGridDialogBackgroundColor(
             Context context, boolean isIncognito) {
-        if (isIncognito) {
-            return context.getColor(R.color.incognito_tab_grid_dialog_background_color);
-        } else {
-            return ContextCompat.getColor(context, R.color.tab_grid_dialog_bg_color);
-        }
+        return SurfaceColorUpdateUtils.getTabGridDialogBackgroundColor(context, isIncognito);
     }
 
     private static @ColorInt int getTabGridDialogUngroupBarBackgroundColor(
             Context context, boolean isIncognito, boolean isTabHovered) {
-        if (isIncognito) {
-            return context.getColor(
-                    isTabHovered
-                            ? R.color.incognito_tab_grid_dialog_ungroup_bar_bg_hovered_color
-                            : R.color.incognito_tab_grid_dialog_background_color);
-        } else {
-            return MaterialColors.getColor(
-                    context,
-                    isTabHovered ? org.chromium.chrome.R.attr.colorPrimary : R.attr.colorSurface,
-                    TAG);
+        if (isTabHovered) {
+            return isIncognito
+                    ? context.getColor(
+                            R.color.incognito_tab_grid_dialog_ungroup_bar_bg_hovered_color)
+                    : SemanticColorUtils.getColorPrimary(context);
         }
+        return getTabGridDialogBackgroundColor(context, isIncognito);
     }
 
     private static @ColorInt int getTabGridDialogUngroupBarTextColor(
@@ -357,7 +349,7 @@ public class TabUiThemeProvider {
     public static @ColorInt int getTabSelectionToolbarBackground(
             Context context, boolean isIncognito, @CreationMode int creationMode) {
         if (creationMode == CreationMode.DIALOG) {
-            return ContextCompat.getColor(context, R.color.tab_grid_dialog_bg_color);
+            return getTabGridDialogBackgroundColor(context, isIncognito);
         }
         return SurfaceColorUpdateUtils.getGridTabSwitcherBackgroundColor(context, isIncognito);
     }
@@ -572,5 +564,20 @@ public class TabUiThemeProvider {
         return showFavicon
                 ? SemanticColorUtils.getColorSurfaceBright(context)
                 : SemanticColorUtils.getColorSurfaceContainerLow(context);
+    }
+
+    /**
+     * Returns the color used by dialogs as background.
+     *
+     * @param context {@link Context} used to retrieve color.
+     * @param isIncognito Whether the color is used for incognito mode.
+     * @return The color for the dialog background.
+     */
+    public static @ColorInt int getColorPickerDialogBackgroundColor(
+            Context context, boolean isIncognito) {
+        return isIncognito
+                ? ContextCompat.getColor(
+                        context, R.color.tab_group_color_picker_selection_bg_incognito)
+                : SemanticColorUtils.getDialogBgColor(context);
     }
 }

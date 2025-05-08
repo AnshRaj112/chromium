@@ -41,6 +41,23 @@ export class VoicePackModel {
   // need to download Natural voices for automatically
   private languagesForVoiceDownloads_: Set<string> = new Set();
 
+  // When a new TTS Engine extension is loaded into reading mode, we want to try
+  // to install new natural voices from it. However, the new engine isn't ready
+  // until it calls onvoiceschanged, so set this and wait for that call to
+  // request the install.
+  private waitingForNewEngine_ = false;
+
+  private currentVoice_: SpeechSynthesisVoice|null = null;
+  private currentLanguage_: string = '';
+
+  getWaitingForNewEngine(): boolean {
+    return this.waitingForNewEngine_;
+  }
+
+  setWaitingForNewEngine(waitingForNewEngine: boolean): void {
+    this.waitingForNewEngine_ = waitingForNewEngine;
+  }
+
   addLanguageForDownload(lang: string): void {
     this.languagesForVoiceDownloads_.add(lang);
   }
@@ -61,8 +78,8 @@ export class VoicePackModel {
     this.enabledLangs_.add(lang);
   }
 
-  disableLang(lang: string): boolean {
-    return this.enabledLangs_.delete(lang);
+  disableLang(lang: string): void {
+    this.enabledLangs_.delete(lang);
   }
 
   getAvailableLangs(): Set<string> {
@@ -115,5 +132,21 @@ export class VoicePackModel {
 
   getServerLanguages(): string[] {
     return Array.from(this.voicePackInstallStatusServerResponses_.keys());
+  }
+
+  getCurrentVoice(): SpeechSynthesisVoice|null {
+    return this.currentVoice_ || null;
+  }
+
+  setCurrentVoice(voice: SpeechSynthesisVoice|null): void {
+    this.currentVoice_ = voice;
+  }
+
+  getCurrentLanguage(): string {
+    return this.currentLanguage_;
+  }
+
+  setCurrentLanguage(language: string): void {
+    this.currentLanguage_ = language;
   }
 }

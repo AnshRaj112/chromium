@@ -10,9 +10,11 @@
 #include "base/state_transitions.h"
 #include "base/strings/escape.h"
 #include "chrome/browser/glic/glic_keyed_service.h"
+#include "chrome/browser/glic/glic_pref_names.h"
 #include "chrome/browser/glic/host/glic.mojom.h"
 #include "chrome/common/chrome_features.h"
 #include "components/optimization_guide/content/browser/page_content_proto_provider.h"
+#include "components/prefs/pref_service.h"
 #include "components/shared_highlighting/core/common/text_fragment.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
@@ -102,6 +104,13 @@ void GlicAnnotationManager::ScrollTo(
   // selector will set `node_id`.
   CHECK(text_fragment.has_value() || node_id.has_value());
 
+  if (!service_->profile()->GetPrefs()->GetBoolean(
+          prefs::kGlicTabContextEnabled)) {
+    std::move(callback).Run(
+        mojom::ScrollToErrorReason::kTabContextPermissionDisabled);
+    return;
+  }
+
   auto focused_tab_data = service_->GetFocusedTabData();
   content::Page* focused_primary_page = nullptr;
   if (focused_tab_data.focus()) {
@@ -134,10 +143,18 @@ void GlicAnnotationManager::ScrollTo(
         annotation_agent_container_->remote.BindNewPipeAndPassReceiver());
   }
 
+  // The caller currently only enforces if the documentId is set when DOMNodeId
+  // selector parameters are set. If this is configured to be true, we will
+  // always check that the documentId is set, and fail otherwise.
+  const bool fail_without_document_id =
+      features::kGlicScrollToEnforceDocumentId.Get();
+  if (fail_without_document_id && !params->document_id) {
+    std::move(callback).Run(glic::mojom::ScrollToErrorReason::kNotSupported);
+    return;
+  }
+
   // Verifies that the document_id parameter (if set) refers to the primary
   // document in the currently focused tab.
-  // TODO(crbug.com/404564333): We should eventually enforce that this is
-  // always set.
   if (params->document_id) {
     // We only support scrolling the currently focused tab's main frame.
     content::RenderFrameHost& rfh = focused_primary_page->GetMainDocument();
@@ -188,18 +205,26 @@ GlicAnnotationManager::AnnotationTask::AnnotationTask(
                                       std::move(agent_host_pending_receiver)),
       scroll_to_callback_(std::move(callback)),
       page_(page.GetWeakPtr()) {
+  GlicKeyedService* service = annotation_manager_->service_;
+  CHECK(service);
   // Using base::Unretained is safe here because `this` owns the subscription.
   tab_change_subscription_ =
-      annotation_manager_->service_->AddFocusedTabChangedCallback(
-          base::BindRepeating(&AnnotationTask::OnFocusedTabChanged,
-                              base::Unretained(this)));
+      service->AddFocusedTabChangedCallback(base::BindRepeating(
+          &AnnotationTask::OnFocusedTabChanged, base::Unretained(this)));
 
   // Using base::Unretained is safe because `this` owns the receiver.
   annotation_agent_host_receiver_.set_disconnect_handler(base::BindOnce(
       &AnnotationTask::RemoteDisconnected, base::Unretained(this)));
 
   // Listens to the panel-closing notification.
-  annotation_manager_->service_->window_controller().AddStateObserver(this);
+  service->window_controller().AddStateObserver(this);
+
+  pref_change_registrar_.Init(service->profile()->GetPrefs());
+  // base::Unretained is safe because `this` owns `pref_change_registrar_`.
+  pref_change_registrar_.Add(
+      prefs::kGlicTabContextEnabled,
+      base::BindRepeating(&AnnotationTask::OnTabContextPermissionChanged,
+                          base::Unretained(this)));
 }
 
 GlicAnnotationManager::AnnotationTask::~AnnotationTask() {
@@ -272,6 +297,25 @@ void GlicAnnotationManager::AnnotationTask::ResetConnections() {
   tab_change_subscription_ = base::CallbackListSubscription();
   content::WebContentsObserver::Observe(nullptr);
   annotation_manager_->service_->window_controller().RemoveStateObserver(this);
+  pref_change_registrar_.Reset();
+}
+
+void GlicAnnotationManager::AnnotationTask::FailTaskOrDropAnnotation(
+    mojom::ScrollToErrorReason reason) {
+  switch (state_) {
+    case State::kRunning: {
+      FailTask(reason);
+      break;
+    }
+    case State::kActive: {
+      DropAnnotation();
+      break;
+    }
+    case State::kFailed:
+    case State::kInactive: {
+      NOTREACHED();
+    }
+  }
 }
 
 void GlicAnnotationManager::AnnotationTask::DidFinishAttachment(
@@ -328,19 +372,17 @@ void GlicAnnotationManager::AnnotationTask::PanelStateChanged(
   if (panel_state.kind != mojom::PanelState_Kind::kHidden) {
     return;
   }
-  switch (state_) {
-    case State::kRunning: {
-      FailTask(mojom::ScrollToErrorReason::kFocusedTabChangedOrNavigated);
-      break;
-    }
-    case State::kActive: {
-      DropAnnotation();
-      break;
-    }
-    case State::kFailed:
-    case State::kInactive: {
-      break;
-    }
+  FailTaskOrDropAnnotation(
+      mojom::ScrollToErrorReason::kFocusedTabChangedOrNavigated);
+}
+
+void GlicAnnotationManager::AnnotationTask::OnTabContextPermissionChanged(
+    const std::string& pref_name) {
+  CHECK_EQ(pref_name, prefs::kGlicTabContextEnabled);
+  if (!annotation_manager_->service_->profile()->GetPrefs()->GetBoolean(
+          prefs::kGlicTabContextEnabled)) {
+    FailTaskOrDropAnnotation(
+        mojom::ScrollToErrorReason::kTabContextPermissionDisabled);
   }
 }
 
