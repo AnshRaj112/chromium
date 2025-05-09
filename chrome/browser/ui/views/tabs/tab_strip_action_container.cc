@@ -35,7 +35,7 @@
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/gfx/animation/tween.h"
 #include "ui/views/accessibility/view_accessibility.h"
-#include "ui/views/layout/box_layout.h"
+#include "ui/views/layout/flex_layout.h"
 #include "ui/views/mouse_watcher.h"
 #include "ui/views/mouse_watcher_view_host.h"
 #include "ui/views/view_class_properties.h"
@@ -205,7 +205,10 @@ void TabStripActionContainer::TabStripNudgeAnimationSession::MarkAnimationDone(
     opacity_animation_done_ = true;
   }
 
-  if (expansion_animation_done_ && opacity_animation_done_) {
+  bool opacity_animation_running =
+      opacity_animation_done_ || !is_opacity_animated_;
+
+  if (expansion_animation_done_ && opacity_animation_running) {
     if (on_animation_ended_) {
       std::move(on_animation_ended_).Run();
     }
@@ -283,7 +286,7 @@ TabStripActionContainer::TabStripActionContainer(
 #if !BUILDFLAG(IS_MAC)
     std::unique_ptr<views::Separator> separator =
         std::make_unique<views::Separator>();
-    separator->SetBorderRadius(TabStyle::Get()->GetSeparatorMargins().right());
+    separator->SetBorderRadius(TabStyle::Get()->GetSeparatorCornerRadius());
     separator->SetPreferredSize(TabStyle::Get()->GetSeparatorSize());
 
     separator->SetColorId(kColorTabDividerFrameActive);
@@ -305,13 +308,11 @@ TabStripActionContainer::TabStripActionContainer(
 #endif  // !BUILDFLAG(IS_MAC)
   }
 #endif  // BUILDFLAG(ENABLE_GLIC)
-
-  auto* const layout_manager =
-      SetLayoutManager(std::make_unique<views::BoxLayout>());
-  layout_manager->set_main_axis_alignment(
-      views::BoxLayout::MainAxisAlignment::kStart);
-  layout_manager->set_cross_axis_alignment(
-      views::BoxLayout::CrossAxisAlignment::kCenter);
+  SetLayoutManager(std::make_unique<views::FlexLayout>())
+      ->SetOrientation(views::LayoutOrientation::kHorizontal)
+      .SetMainAxisAlignment(views::LayoutAlignment::kStart)
+      .SetCrossAxisAlignment(views::LayoutAlignment::kCenter)
+      .SetCollapseMargins(false);
 }
 
 TabStripActionContainer::~TabStripActionContainer() {

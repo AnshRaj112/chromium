@@ -3564,17 +3564,18 @@ IN_PROC_BROWSER_TEST_P(
   const TabStyle* tab_style = TabStyle::Get();
   // We must ensure that we set the bounds of the browser window such that it is
   // wide enough to allow the tab strip to expand to accommodate this tab.
-  browser()->window()->SetBounds(
-      gfx::Rect(0, 0, tab_style->GetStandardWidth() * 5, 400));
+  browser()->window()->SetBounds(gfx::Rect(
+      0, 0, tab_style->GetStandardWidth(/*is_split*/ false) * 5, 400));
 
   const int tab_strip_width = tab_strip->width();
   ASSERT_TRUE(PressInputAtCenter(tab_strip->tab_at(1)));
   ASSERT_TRUE(DragInputToCenter(
-      tab_strip->tab_at(1), gfx::Vector2d(tab_style->GetStandardWidth(), 0)));
+      tab_strip->tab_at(1),
+      gfx::Vector2d(tab_style->GetStandardWidth(/*is_split*/ false), 0)));
   BrowserView::GetBrowserViewForBrowser(browser())
       ->GetWidget()
       ->LayoutRootViewIfNecessary();
-  EXPECT_EQ(tab_strip_width + tab_style->GetStandardWidth(),
+  EXPECT_EQ(tab_strip_width + tab_style->GetStandardWidth(/*is_split*/ false),
             tab_strip->width());
   ASSERT_TRUE(ReleaseInput());
 }
@@ -5500,7 +5501,7 @@ IN_PROC_BROWSER_TEST_F(SideBySideTabDragControllerTest,
   AddTabs(browser(), 2);
 
   split_tabs::SplitTabId id = split_tabs::SplitTabId::GenerateNew();
-  tab_strip->SetSplit({0, 1}, id);
+  tab_strip->OnSplitCreated({0, 1}, id);
   StopAnimating(tab_strip);
 
   Tab* const last_split_tab = tab_strip->tab_at(1);
@@ -5535,10 +5536,10 @@ IN_PROC_BROWSER_TEST_F(SideBySideTabDragControllerTest,
   AddTabs(browser(), 4);
 
   split_tabs::SplitTabId first_id = split_tabs::SplitTabId::GenerateNew();
-  tab_strip->SetSplit({0, 1}, first_id);
+  tab_strip->OnSplitCreated({0, 1}, first_id);
 
   split_tabs::SplitTabId second_id = split_tabs::SplitTabId::GenerateNew();
-  tab_strip->SetSplit({2, 3}, second_id);
+  tab_strip->OnSplitCreated({2, 3}, second_id);
 
   StopAnimating(tab_strip);
 

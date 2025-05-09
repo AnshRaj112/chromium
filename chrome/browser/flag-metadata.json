@@ -348,6 +348,11 @@
     "expiry_milestone": 142
   },
   {
+    "name": "android-web-app-launch-handler",
+    "owners": [ "sselyvon@google.com", "tkachenkoo@google.com", "cros-web-apps-team@google.com" ],
+    "expiry_milestone": 145
+  },
+  {
     "name": "android-window-management-web-api",
     "owners": [
       "renkens@google.com",
@@ -2281,6 +2286,14 @@
     "expiry_milestone": 145
   },
   {
+    "name": "discount-autofill",
+    "owners": [
+      "jennycho@google.com",
+      "promotions-eng@google.com"
+    ],
+    "expiry_milestone": 150
+  },
+  {
     "name": "discount-on-navigation",
     "owners": [
       "meiliang@chromium.org",
@@ -2533,7 +2546,7 @@
   },
   {
     "name": "enable-accessibility-manage-broadcast-recevier-on-background",
-    "owners": [ "avvall@google.com", "elabadysayed@google.com", "//ui/accessibility/OWNERS" ],
+    "owners": ["elabadysayed@google.com", "//ui/accessibility/OWNERS" ],
     "expiry_milestone": 145
   },
   {
@@ -9365,6 +9378,15 @@
       "builtin-ai@chromium.org"
     ],
     "expiry_milestone": 142
+  },
+  {
+    "name": "trees-in-viz",
+    "owners": [
+      "zmo@chromium.org",
+      "vmiura@chromium.org",
+      "chrome-gpu-team@google.com"
+    ],
+    "expiry_milestone": 144
   },
   {
     "name": "ui-debug-tools",

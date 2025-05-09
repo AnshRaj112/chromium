@@ -698,7 +698,7 @@ bool LocalFrame::DetachImpl(FrameDetachType type) {
       GetDocument());
 
   loader_.DispatchUnloadEventAndFillOldDocumentInfoIfNeeded(
-      type == FrameDetachType::kSwap);
+      type != FrameDetachType::kRemove);
   if (evict_cached_session_storage_on_freeze_or_unload_) {
     // Evicts the cached data of Session Storage to avoid reusing old data in
     // the cache after the session storage has been modified by another renderer
@@ -2812,6 +2812,10 @@ void LocalFrame::SetHadUserInteraction(bool had_user_interaction) {
       had_user_interaction);
 
   GetFrameScheduler()->SetHadUserActivation(had_user_interaction);
+}
+
+void LocalFrame::SetStorageAccessApiStatus(net::StorageAccessApiStatus status) {
+  GetLocalFrameHostRemote().SetStorageAccessApiStatus(status);
 }
 
 namespace {

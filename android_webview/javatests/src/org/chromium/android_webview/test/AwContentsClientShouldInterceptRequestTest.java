@@ -39,7 +39,9 @@ import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.base.test.util.TestFileUtil;
+import org.chromium.base.ThreadUtils;
 import org.chromium.components.embedder_support.util.WebResourceResponseInfo;
+import org.chromium.content_public.browser.test.util.WebContentsUtils;
 import org.chromium.net.test.util.TestWebServer;
 import org.chromium.net.test.util.WebServer;
 
@@ -222,6 +224,8 @@ public class AwContentsClientShouldInterceptRequestTest extends AwParameterizedT
 
         int callCount = mShouldInterceptRequestHelper.getCallCount();
         mActivityTestRule.loadUrlAsync(mAwContents, pageWithLinkUrl);
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> WebContentsUtils.simulateEndOfPaintHolding(mAwContents.getWebContents()));
         mShouldInterceptRequestHelper.waitForCallback(callCount);
         Assert.assertEquals(
                 false,
@@ -469,8 +473,8 @@ public class AwContentsClientShouldInterceptRequestTest extends AwParameterizedT
     }
 
     private static class SlowWebResourceResponseInfo extends WebResourceResponseInfo {
-        private CallbackHelper mReadStartedCallbackHelper = new CallbackHelper();
-        private CountDownLatch mLatch = new CountDownLatch(1);
+        private final CallbackHelper mReadStartedCallbackHelper = new CallbackHelper();
+        private final CountDownLatch mLatch = new CountDownLatch(1);
 
         public SlowWebResourceResponseInfo(String mimeType, String encoding, InputStream data) {
             super(mimeType, encoding, data);
@@ -1064,8 +1068,8 @@ public class AwContentsClientShouldInterceptRequestTest extends AwParameterizedT
             return null;
         }
 
-        private CountDownLatch mReady;
-        private CountDownLatch mWait;
+        private final CountDownLatch mReady;
+        private final CountDownLatch mWait;
     }
 
     @Test
@@ -1931,5 +1935,48 @@ public class AwContentsClientShouldInterceptRequestTest extends AwParameterizedT
                 "We should have seen at least all the requests for html pages.",
                 mShouldInterceptRequestHelper.getUrls().size() >= 1 + parallelRequestCount);
         mContentsClient.getOnPageFinishedHelper().waitForCallback(onPageFinishedCallCount);
+    }
+
+    @Test
+    @SmallTest
+    @Feature({"AndroidWebView"})
+    public void testTimingHistogramEmitted() throws Throwable {
+        String syncGetUrl = mWebServer.getResponseUrl("/intercept_me");
+        String aboutPageUrl = addAboutPageToTestServer(mWebServer);
+        AwActivityTestRule.enableJavaScriptOnUiThread(mAwContents);
+        HistogramWatcher.Builder builder =
+                HistogramWatcher.newBuilder()
+                        .expectAnyRecord(
+                                "Android.WebView.IoThreadClientOnUrlLoaderTime.RequestSetup")
+                        .expectAnyRecord(
+                                "Android.WebView.IoThreadClientOnUrlLoaderTime.RequestDone")
+                        .allowExtraRecordsForHistogramsAbove();
+
+        // No intercept
+        try (HistogramWatcher histogramExpectation = builder.build()) {
+            mActivityTestRule.loadUrlSync(
+                    mAwContents, mContentsClient.getOnPageFinishedHelper(), aboutPageUrl);
+        }
+
+        // Intercept
+        mShouldInterceptRequestHelper.enqueueHtmlResponseForUrl(syncGetUrl, "hello, world", null);
+        try (HistogramWatcher histogramExpectation = builder.build()) {
+            mActivityTestRule.loadUrlSync(
+                    mAwContents, mContentsClient.getOnPageFinishedHelper(), syncGetUrl);
+        }
+
+        // Bad input stream
+        mShouldInterceptRequestHelper.enqueueResponseForUrlWithStream(
+                syncGetUrl, "text/html", "UTF-8", ThrowingInputStream::new);
+        try (HistogramWatcher histogramExpectation = builder.build()) {
+            mActivityTestRule.loadUrlSync(
+                    mAwContents, mContentsClient.getOnPageFinishedHelper(), aboutPageUrl);
+        }
+
+        String redirectUrl = mWebServer.setRedirect("/redirect", aboutPageUrl);
+        try (HistogramWatcher histogramExpectation = builder.build()) {
+            mActivityTestRule.loadUrlSync(
+                    mAwContents, mContentsClient.getOnPageFinishedHelper(), redirectUrl);
+        }
     }
 }

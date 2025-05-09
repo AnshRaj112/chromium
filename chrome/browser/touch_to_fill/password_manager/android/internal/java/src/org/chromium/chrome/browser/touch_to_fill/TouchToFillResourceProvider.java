@@ -9,10 +9,12 @@ import androidx.annotation.DrawableRes;
 /**
  * Provides functions that choose the correct resource id for touch-to-fill UI. Needed to
  * differentiate upstream and downstream resources. This exists to ensure all implementations of
- * TouchToFillResourceProviderImpl provide the same set of methods.
+ * TouchToFillResourceProviderImpl provide the same set of methods. Please use the
+ * org.chromium.chrome.browser.touch_to_fill.common.TouchToFillResourceProvider instead.
  *
  * <p>TODO(wnwen): Remove this once downstream no longer depends on it.
  */
+@Deprecated
 public interface TouchToFillResourceProvider {
     /**
      * Returns the drawable id to be displayed as a bottom sheet header image.

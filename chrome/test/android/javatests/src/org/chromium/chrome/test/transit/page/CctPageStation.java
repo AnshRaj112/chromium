@@ -5,7 +5,6 @@
 package org.chromium.chrome.test.transit.page;
 
 import org.chromium.base.test.transit.Element;
-import org.chromium.base.test.transit.Elements;
 import org.chromium.chrome.browser.customtabs.CustomTabActivity;
 import org.chromium.content_public.browser.WebContents;
 
@@ -29,7 +28,6 @@ public class CctPageStation extends BasePageStation<CustomTabActivity> {
         }
     }
 
-    protected boolean mIsNativePage;
     public Element<WebContents> webContentsElement;
 
     public static Builder newBuilder() {
@@ -40,18 +38,11 @@ public class CctPageStation extends BasePageStation<CustomTabActivity> {
         super(CustomTabActivity.class, builder);
 
         // isNativePage is optional and defaults to false
-        mIsNativePage = builder.mIsNativePage;
-    }
-
-    @Override
-    public void declareElements(Elements.Builder elements) {
-        super.declareElements(elements);
-
-        if (!mIsNativePage) {
+        if (!builder.mIsNativePage) {
             webContentsElement =
-                    elements.declareEnterConditionAsElement(
+                    declareEnterConditionAsElement(
                             new WebContentsPresentCondition(loadedTabElement));
-            elements.declareEnterCondition(new FrameInfoUpdatedCondition(webContentsElement));
+            declareEnterCondition(new FrameInfoUpdatedCondition(webContentsElement));
         }
     }
 }

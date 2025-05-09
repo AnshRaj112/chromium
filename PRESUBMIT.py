@@ -1284,7 +1284,8 @@ _BANNED_CPP_FUNCTIONS: Sequence[BanRule] = (
             'common_range',
             'viewable_range',
             'constant_range',
-            # Banned: Views
+            # Views
+            'subrange',
             # Banned: Range factories
             # Banned: Range adaptors
             # Incidentally listed on
@@ -2335,6 +2336,7 @@ _GENERIC_PYDEPS_FILES = [
     'build/android/resource_sizes.pydeps',
     'build/android/test_runner.pydeps',
     'build/android/test_wrapper/logdog_wrapper.pydeps',
+    'build/fuchsia/test/component_storage_test.pydeps',
     'build/protoc_java.pydeps',
     'chrome/android/monochrome/scripts/monochrome_python_tests.pydeps',
     'chrome/test/chromedriver/log_replay/client_replay_unittest.pydeps',

@@ -53,8 +53,10 @@ import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.Pair;
 import android.util.Size;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
@@ -984,7 +986,10 @@ public class TabListMediatorUnitTest {
                 .get(1)
                 .model
                 .get(TabProperties.TAB_CLICK_LISTENER)
-                .run(mItemView2, mModelList.get(1).model.get(TabProperties.TAB_ID));
+                .run(
+                        mItemView2,
+                        mModelList.get(1).model.get(TabProperties.TAB_ID),
+                        /* triggeringMotionEvent= */ null);
 
         verify(mGridCardOnClickListenerProvider)
                 .onTabSelecting(mModelList.get(1).model.get(TabProperties.TAB_ID), true);
@@ -999,9 +1004,13 @@ public class TabListMediatorUnitTest {
                 .get(0)
                 .model
                 .get(TabProperties.TAB_CLICK_LISTENER)
-                .run(mItemView1, mModelList.get(0).model.get(TabProperties.TAB_ID));
+                .run(
+                        mItemView1,
+                        mModelList.get(0).model.get(TabProperties.TAB_ID),
+                        /* triggeringMotionEvent= */ null);
 
-        verify(mOpenGroupActionListener).run(mItemView1, TAB1_ID);
+        verify(mOpenGroupActionListener)
+                .run(mItemView1, TAB1_ID, /* triggeringMotionEvent= */ null);
     }
 
     @Test
@@ -1013,9 +1022,13 @@ public class TabListMediatorUnitTest {
                 .get(0)
                 .model
                 .get(TabProperties.TAB_CLICK_LISTENER)
-                .run(mItemView1, mModelList.get(0).model.get(TabProperties.TAB_ID));
+                .run(
+                        mItemView1,
+                        mModelList.get(0).model.get(TabProperties.TAB_ID),
+                        /* triggeringMotionEvent= */ null);
 
-        verify(mOpenGroupActionListener).run(mItemView1, TAB1_ID);
+        verify(mOpenGroupActionListener)
+                .run(mItemView1, TAB1_ID, /* triggeringMotionEvent= */ null);
     }
 
     @Test
@@ -1026,7 +1039,10 @@ public class TabListMediatorUnitTest {
                 .model
                 .get(TabProperties.TAB_ACTION_BUTTON_DATA)
                 .tabActionListener
-                .run(mItemView2, mModelList.get(1).model.get(TabProperties.TAB_ID));
+                .run(
+                        mItemView2,
+                        mModelList.get(1).model.get(TabProperties.TAB_ID),
+                        /* triggeringMotionEvent= */ null);
 
         TabClosureParams params = TabClosureParams.closeTab(mTab2).allowUndo(true).build();
         verify(mTabRemover)
@@ -1048,6 +1064,31 @@ public class TabListMediatorUnitTest {
     }
 
     @Test
+    public void sendsCloseSignalCorrectly_TriggeringMotionEventFromMouse_DisallowUndo() {
+        mMediator.setActionOnAllRelatedTabsForTesting(false);
+        mModelList
+                .get(1)
+                .model
+                .get(TabProperties.TAB_ACTION_BUTTON_DATA)
+                .tabActionListener
+                .run(
+                        mItemView2,
+                        mModelList.get(1).model.get(TabProperties.TAB_ID),
+                        TabUiTestHelper.createMouseMotionEvent(
+                                /* downTime= */ SystemClock.uptimeMillis(),
+                                /* eventTime= */ SystemClock.uptimeMillis() + 200,
+                                MotionEvent.ACTION_UP,
+                                /* x= */ 0,
+                                /* y= */ 0));
+
+        verify(mTabRemover)
+                .closeTabs(
+                        eq(TabClosureParams.closeTab(mTab2).allowUndo(false).build()),
+                        /* allowDialog= */ eq(true),
+                        /* listener= */ any());
+    }
+
+    @Test
     public void sendsCloseSignalCorrectly_ActionOnAllRelatedTabs() {
         mMediator.setActionOnAllRelatedTabsForTesting(true);
         mModelList
@@ -1055,7 +1096,10 @@ public class TabListMediatorUnitTest {
                 .model
                 .get(TabProperties.TAB_ACTION_BUTTON_DATA)
                 .tabActionListener
-                .run(mItemView2, mModelList.get(1).model.get(TabProperties.TAB_ID));
+                .run(
+                        mItemView2,
+                        mModelList.get(1).model.get(TabProperties.TAB_ID),
+                        /* triggeringMotionEvent= */ null);
 
         verify(mTabRemover)
                 .closeTabs(
@@ -1073,7 +1117,10 @@ public class TabListMediatorUnitTest {
                 .model
                 .get(TabProperties.TAB_ACTION_BUTTON_DATA)
                 .tabActionListener
-                .run(mItemView2, mModelList.get(1).model.get(TabProperties.TAB_ID));
+                .run(
+                        mItemView2,
+                        mModelList.get(1).model.get(TabProperties.TAB_ID),
+                        /* triggeringMotionEvent= */ null);
 
         verify(mTabRemover)
                 .closeTabs(
@@ -3986,7 +4033,11 @@ public class TabListMediatorUnitTest {
 
         when(mTabGroupModelFilter.isTabInTabGroup(mTab2)).thenReturn(false);
         ThumbnailFetcher fetcher2 = mModelList.get(1).model.get(TabProperties.THUMBNAIL_FETCHER);
-        mModelList.get(1).model.get(TabProperties.TAB_CLICK_LISTENER).run(mItemView2, TAB2_ID);
+        mModelList
+                .get(1)
+                .model
+                .get(TabProperties.TAB_CLICK_LISTENER)
+                .run(mItemView2, TAB2_ID, /* triggeringMotionEvent= */ null);
         assertThat(mModelList.get(1).model.get(TabProperties.IS_SELECTED), equalTo(true));
         assertEquals(fetcher2, mModelList.get(1).model.get(TabProperties.THUMBNAIL_FETCHER));
     }
@@ -4029,7 +4080,11 @@ public class TabListMediatorUnitTest {
 
         when(mTabGroupModelFilter.isTabInTabGroup(mTab2)).thenReturn(true);
         ThumbnailFetcher fetcher2 = mModelList.get(1).model.get(TabProperties.THUMBNAIL_FETCHER);
-        mModelList.get(1).model.get(TabProperties.TAB_CLICK_LISTENER).run(mItemView2, TAB2_ID);
+        mModelList
+                .get(1)
+                .model
+                .get(TabProperties.TAB_CLICK_LISTENER)
+                .run(mItemView2, TAB2_ID, /* triggeringMotionEvent= */ null);
         assertThat(mModelList.get(1).model.get(TabProperties.IS_SELECTED), equalTo(true));
         assertNotEquals(fetcher2, mModelList.get(1).model.get(TabProperties.THUMBNAIL_FETCHER));
     }
@@ -4800,7 +4855,10 @@ public class TabListMediatorUnitTest {
                 .model
                 .get(TabProperties.TAB_ACTION_BUTTON_DATA)
                 .tabActionListener
-                .run(mItemView1, mModelList.get(0).model.get(TabProperties.TAB_GROUP_SYNC_ID));
+                .run(
+                        mItemView1,
+                        mModelList.get(0).model.get(TabProperties.TAB_GROUP_SYNC_ID),
+                        /* triggeringMotionEvent= */ null);
 
         // Assert that the tab group has been removed from the model list and archive status reset.
         assertEquals(TAB, mModelList.get(0).model.get(CARD_TYPE));
@@ -4818,9 +4876,13 @@ public class TabListMediatorUnitTest {
                 .get(0)
                 .model
                 .get(TabProperties.TAB_CLICK_LISTENER)
-                .run(mItemView1, mModelList.get(0).model.get(TabProperties.TAB_GROUP_SYNC_ID));
+                .run(
+                        mItemView1,
+                        mModelList.get(0).model.get(TabProperties.TAB_GROUP_SYNC_ID),
+                        /* triggeringMotionEvent= */ null);
 
-        verify(mOpenGroupActionListener).run(mItemView1, SYNC_GROUP_ID1);
+        verify(mOpenGroupActionListener)
+                .run(mItemView1, SYNC_GROUP_ID1, /* triggeringMotionEvent= */ null);
     }
 
     @Test
@@ -4869,7 +4931,10 @@ public class TabListMediatorUnitTest {
                 .get(0)
                 .model
                 .get(TabProperties.TAB_CLICK_LISTENER)
-                .run(mItemView1, mModelList.get(0).model.get(TabProperties.TAB_GROUP_SYNC_ID));
+                .run(
+                        mItemView1,
+                        mModelList.get(0).model.get(TabProperties.TAB_GROUP_SYNC_ID),
+                        /* triggeringMotionEvent= */ null);
         assertThat(mModelList.get(0).model.get(TabProperties.IS_SELECTED), equalTo(true));
     }
 

@@ -41,10 +41,6 @@ const AppElementBase = WebUiListenerMixinLit(CrLitElement);
 
 const linkDataAttribute = 'link';
 
-// The maximum speech length that should be used with remote voices
-// due to a TTS engine bug with voices timing out on too-long text.
-export const MAX_SPEECH_LENGTH: number = 175;
-
 export interface AppElement {
   $: {
     toolbar: ReadAnythingToolbarElement,
@@ -131,9 +127,6 @@ export class AppElement extends AppElementBase implements
 
   protected accessor localeToDisplayName_: {[locale: string]: string} = {};
 
-  // Metrics captured for logging.
-  private playSessionStartTime: number = -1;
-
   private notificationManager_ = VoiceNotificationManager.getInstance();
   private logger_: ReadAnythingLogger = ReadAnythingLogger.getInstance();
   private styleUpdater_: AppStyleUpdater;
@@ -210,7 +203,6 @@ export class AppElement extends AppElementBase implements
       this.hasContent_ = false;
       this.firstTextNodeSetForReadAloud = null;
       this.nodeStore_.clearDomNodes();
-      this.clearReadAloudState();
     }
 
     this.settingsPrefs_ = {
@@ -490,7 +482,7 @@ export class AppElement extends AppElementBase implements
     this.hasContent_ = false;
     if (this.isReadAloudEnabled_) {
       this.speech_.cancel();
-      this.clearReadAloudState();
+      this.speechController_.clearReadAloudState();
     }
   }
 
@@ -514,7 +506,7 @@ export class AppElement extends AppElementBase implements
     const previousWordBoundaryState = {...this.wordBoundaries_.state};
 
     this.speech_.cancel();
-    this.clearReadAloudState();
+    this.speechController_.clearReadAloudState();
     const container = this.$.container;
 
     // Remove all children from container. Use `replaceChildren` rather than
@@ -894,11 +886,10 @@ export class AppElement extends AppElementBase implements
 
   protected onPlayPauseClick_() {
     if (this.speechController_.isSpeechActive()) {
-      this.logSpeechPlaySession_();
       this.speechController_.stopSpeech(PauseActionSource.BUTTON_CLICK);
     } else {
-      this.playSessionStartTime = Date.now();
       this.playSpeech();
+      this.speechController_.onPlay();
     }
   }
 
@@ -919,12 +910,16 @@ export class AppElement extends AppElementBase implements
     this.previewVoicePlaying_ = this.speechController_.getPreviewVoicePlaying();
   }
 
-  onPause() {
-    // Restore links if they're enabled when speech pauses. Don't restore links
-    // if it's paused from a non-pause button (e.g. voice previews) so the links
-    // don't flash off and on.
-    if (chrome.readingMode.linksEnabled &&
-        this.speechController_.isPausedFromButton()) {
+  onStop() {
+    if (!chrome.readingMode.linksEnabled) {
+      return;
+    }
+
+    // Restore links if they're enabled when speech pauses via button click or
+    // when it finishes the page.
+    const pauseSource = this.speechController_.getPauseSource();
+    if ((pauseSource === PauseActionSource.BUTTON_CLICK) ||
+        pauseSource === PauseActionSource.SPEECH_FINISHED) {
       this.updateLinks_();
     }
   }
@@ -944,16 +939,6 @@ export class AppElement extends AppElementBase implements
     this.resetSpeechPostSettingChange_();
   }
 
-  private logSpeechPlaySession_() {
-    // Don't log a playback session just in case something has gotten out of
-    // sync and we call stopSpeech before playSpeech.
-    if (this.playSessionStartTime > 0) {
-      this.logger_.logSpeechPlaySession(
-          this.playSessionStartTime, this.selectedVoice_);
-      this.playSessionStartTime = -1;
-    }
-  }
-
   protected playNextGranularity_() {
     this.speechController_.setIsSpeechBeingRepositioned(true);
 
@@ -964,7 +949,7 @@ export class AppElement extends AppElementBase implements
     chrome.readingMode.movePositionToNextGranularity();
 
     if (!this.highlightAndPlayMessage()) {
-      this.onSpeechFinished();
+      this.speechController_.onSpeechFinished();
     }
   }
 
@@ -982,7 +967,7 @@ export class AppElement extends AppElementBase implements
 
     if (!this.highlightAndPlayMessage(/*isInterrupted=*/ false,
                                       /*isMovingBackward=*/ true)) {
-      this.onSpeechFinished();
+      this.speechController_.onSpeechFinished();
     }
   }
 
@@ -1014,7 +999,7 @@ export class AppElement extends AppElementBase implements
           if (!this.highlightAndPlayInterruptedMessage()) {
             // Ensure we're updating Read Aloud state if there's no text to
             // speak.
-            this.onSpeechFinished();
+            this.speechController_.onSpeechFinished();
           }
         }
       }
@@ -1061,7 +1046,7 @@ export class AppElement extends AppElementBase implements
             this.firstTextNodeSetForReadAloud);
         if (!this.highlightAndPlayMessage()) {
           // Ensure we're updating Read Aloud state if there's no text to speak.
-          this.onSpeechFinished();
+          this.speechController_.onSpeechFinished();
         }
       }
     }
@@ -1143,7 +1128,7 @@ export class AppElement extends AppElementBase implements
       // includes the selection.
       this.highlighter_.resetPreviousHighlight();
       if (!this.highlightAndPlayMessage()) {
-        this.onSpeechFinished();
+        this.speechController_.onSpeechFinished();
       }
     }, playFromSelectionTimeout);
 
@@ -1220,31 +1205,6 @@ export class AppElement extends AppElementBase implements
     return this.highlightAndPlayMessage(isInterrupted, isMovingBackward);
   }
 
-  // Gets the accessible text boundary for the given string.
-  getAccessibleTextLength(utteranceText: string): number {
-    // Splicing on commas won't work for all locales, but since this is a
-    // simple strategy for splicing text in languages that do use commas
-    // that reduces the need for calling getAccessibleBoundary.
-    // TODO(crbug.com/40927698): Investigate if we can utilize comma splices
-    // directly in the utils methods called by #getAccessibleBoundary.
-    const lastCommaIndex =
-        utteranceText.substring(0, MAX_SPEECH_LENGTH).lastIndexOf(', ');
-
-    // To prevent infinite looping, only use the lastCommaIndex if it's not the
-    // first character. Otherwise, use getAccessibleBoundary to prevent
-    // repeatedly splicing on the first comma of the same substring.
-    if (lastCommaIndex > 0) {
-      return lastCommaIndex;
-    }
-
-    // TODO: crbug.com/40927698 - getAccessibleBoundary breaks on the nearest
-    // word boundary, but if there's some type of punctuation (such as a comma),
-    // it would be preferable to break on the punctuation so the pause in
-    // speech sounds more natural.
-    return chrome.readingMode.getAccessibleBoundary(
-        utteranceText, MAX_SPEECH_LENGTH);
-  }
-
   private playText(utteranceText: string) {
     // This check is needed due limits of TTS audio for remote voices. See
     // crbug.com/1176078 for more details.
@@ -1252,12 +1212,9 @@ export class AppElement extends AppElementBase implements
     // maximum text length if we're using a local voice. If we do somehow
     // attempt to speak text that's too long, this will be able to be handled
     // by listening for a text-too-long error in message.onerror.
-    const isTextTooLong = this.selectedVoice_?.localService ?
-        false :
-        utteranceText.length > MAX_SPEECH_LENGTH;
-    const endBoundary = isTextTooLong ?
-        this.getAccessibleTextLength(utteranceText) :
-        utteranceText.length;
+    const isTextTooLong = this.speechController_.isTextTooLong(utteranceText);
+    const endBoundary = this.speechController_.getUtteranceEndBoundary(
+        utteranceText, isTextTooLong);
     this.playTextWithBoundaries(utteranceText, isTextTooLong, endBoundary);
   }
 
@@ -1290,7 +1247,7 @@ export class AppElement extends AppElementBase implements
       chrome.readingMode.movePositionToNextGranularity();
       // Continue speaking with the next block of text.
       if (!this.highlightAndPlayMessage()) {
-        this.onSpeechFinished();
+        this.speechController_.onSpeechFinished();
       }
     };
 
@@ -1323,7 +1280,8 @@ export class AppElement extends AppElementBase implements
       // this is still preferable to no speech.
       this.speech_.cancel();
       this.playTextWithBoundaries(
-          utteranceText, true, this.getAccessibleTextLength(utteranceText));
+          utteranceText, true,
+          this.speechController_.getUtteranceEndBoundary(utteranceText, true));
       return;
     }
     if (error.error === 'invalid-argument') {
@@ -1372,24 +1330,6 @@ export class AppElement extends AppElementBase implements
       }
     }
     return utteranceText;
-  }
-
-  private onSpeechFinished() {
-    this.logger_.logSpeechStopSource(
-        chrome.readingMode.contentFinishedStopSource);
-    this.clearReadAloudState();
-
-    // Show links when speech finishes playing.
-    if (chrome.readingMode.linksEnabled) {
-      this.updateLinks_();
-    }
-    this.logSpeechPlaySession_();
-  }
-
-  private clearReadAloudState() {
-    this.speechController_.reset();
-    this.highlighter_.clearHighlightFormatting();
-    this.wordBoundaries_.resetToDefaultState();
   }
 
   protected onSelectVoice_(

@@ -12184,6 +12184,7 @@ from previous Chrome versions.
   <int value="-705464246" label="ChromeCartDomBasedHeuristics:enabled"/>
   <int value="-705212373" label="IncognitoNtpRevamp:disabled"/>
   <int value="-704459022" label="ContinuousSearch:enabled"/>
+  <int value="-704335590" label="TreesInViz:disabled"/>
   <int value="-704232562" label="UseMonitorColorSpace:enabled"/>
   <int value="-704105887"
       label="(Obsolete) EnforceAshExtensionKeeplist:enabled"/>
@@ -12860,6 +12861,7 @@ from previous Chrome versions.
   <int value="-441972413" label="OobeJellyModal:disabled"/>
   <int value="-441840790" label="TailoredSecurityUpdatedMessages:disabled"/>
   <int value="-441139232" label="ExcludeDisplayInMirrorMode:enabled"/>
+  <int value="-439110184" label="AndroidWebAppLaunchHandler:disabled"/>
   <int value="-438529902" label="CaptivePortalErrorPage:enabled"/>
   <int value="-438379844" label="SwapSideVolumeButtonsForOrientation:enabled"/>
   <int value="-438348502" label="LogUrlScoringSignals:disabled"/>
@@ -13423,6 +13425,7 @@ from previous Chrome versions.
   <int value="-229995076" label="AltClickAndSixPackCustomization:disabled"/>
   <int value="-228933177" label="ToastFramework:disabled"/>
   <int value="-228847300" label="OmniboxLimitKeywordModeSuggestions:disabled"/>
+  <int value="-227487160" label="TreesInViz:enabled"/>
   <int value="-227261557" label="CrosSodaConchLanguages:enabled"/>
   <int value="-226826278" label="ForceEnableFastCheckoutCapabilities:disabled"/>
   <int value="-226715863" label="SHA1ServerSignature:enabled"/>
@@ -14433,6 +14436,7 @@ from previous Chrome versions.
   <int value="155977192" label="EnableFileManagerFormatDialog:disabled"/>
   <int value="156285060" label="UseMultipleOverlays:disabled"/>
   <int value="156345797" label="BorealisZinkGlDriver:enabled"/>
+  <int value="156657549" label="DiscountAutofill:enabled"/>
   <int value="157217034" label="enable-tab-for-desktop-share"/>
   <int value="157318016" label="AutomaticTabDiscarding:enabled"/>
   <int value="158490417" label="PhoneHubCameraRoll:enabled"/>
@@ -16259,6 +16263,7 @@ from previous Chrome versions.
   <int value="852703179" label="OptimizeNetworkBuffers:enabled"/>
   <int value="852931300"
       label="NewTabPageAndroidTriggerForPrerender2:disabled"/>
+  <int value="853278133" label="AndroidWebAppLaunchHandler:enabled"/>
   <int value="853279705"
       label="DesktopPWAsAdditionalWindowingControls:disabled"/>
   <int value="853695274" label="ForestFeature:disabled"/>
@@ -17752,6 +17757,7 @@ from previous Chrome versions.
   <int value="1425103276" label="SharedHighlightingV2:enabled"/>
   <int value="1425425055" label="WiFiDirect:disabled"/>
   <int value="1426588012" label="WebXRLayers:enabled"/>
+  <int value="1427040726" label="DiscountAutofill:disabled"/>
   <int value="1427427985"
       label="CacheControlNoStoreEnterBackForwardCache:enabled"/>
   <int value="1427683927"

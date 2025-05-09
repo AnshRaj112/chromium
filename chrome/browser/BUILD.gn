@@ -295,6 +295,8 @@ static_library("browser") {
     "chrome_content_browser_client.h",
     "chrome_content_browser_client_binder_policies.cc",
     "chrome_content_browser_client_binder_policies.h",
+    "chrome_content_browser_client_navigation_throttles.cc",
+    "chrome_content_browser_client_navigation_throttles.h",
     "chrome_content_browser_client_parts.h",
     "chrome_content_browser_client_receiver_bindings.cc",
     "chrome_resource_bundle_helper.cc",
@@ -1405,7 +1407,6 @@ static_library("browser") {
     "segmentation_platform/segmentation_platform_service_factory.h",
     "segmentation_platform/ukm_database_client.cc",
     "segmentation_platform/ukm_database_client.h",
-    "send_tab_to_self/receiving_ui_handler.h",
     "send_tab_to_self/send_tab_to_self_client_service.cc",
     "send_tab_to_self/send_tab_to_self_client_service.h",
     "send_tab_to_self/send_tab_to_self_client_service_factory.cc",
@@ -1991,6 +1992,7 @@ static_library("browser") {
     "//chrome/browser/search_engine_choice",
     "//chrome/browser/search_engine_choice:impl",
     "//chrome/browser/search_engines",
+    "//chrome/browser/send_tab_to_self",
     "//chrome/browser/share",
     "//chrome/browser/sharing:buildflags",
     "//chrome/browser/signin",
@@ -2588,7 +2590,7 @@ static_library("browser") {
     "//ui/webui",
   ]
 
-  if (is_win) {
+  if (is_win && is_chrome_branded) {
     deps += [ "//chrome/browser/win/installer_downloader" ]
   }
 
@@ -2862,6 +2864,8 @@ static_library("browser") {
       "android/tab_browser_controls_constraints_helper.h",
       "android/tab_favicon.cc",
       "android/tab_favicon.h",
+      "android/tab_interface_holder_android.cc",
+      "android/tab_interface_holder_android.h",
       "android/tab_printer.cc",
       "android/tab_printer.h",
       "android/tab_web_contents_delegate_android.cc",
@@ -4350,6 +4354,7 @@ static_library("browser") {
       "//chrome/browser/ui/media_router:impl",
       "//chrome/browser/ui/page_action:icon_type",
       "//chrome/browser/ui/privacy_sandbox",
+      "//chrome/browser/ui/send_tab_to_self",
 
       # TODO(413315837): Remove this dependency when chrome/browser/privacy_sandbox
       # gets modularized.
@@ -4369,6 +4374,8 @@ static_library("browser") {
       "//chrome/browser/ui/tabs:tab_model_impl",
       "//chrome/browser/ui/tabs:tab_strip",
       "//chrome/browser/ui/tabs:tab_strip_impl",
+      "//chrome/browser/ui/tabs/tab_group_home",
+      "//chrome/browser/ui/tabs/tab_group_home:impl",
       "//chrome/browser/ui/tabs/tab_strip_api:impl",
       "//chrome/browser/ui/toasts",
       "//chrome/browser/ui/toasts/api:toasts",
@@ -8435,6 +8442,7 @@ static_library("browser_public_dependencies") {
     "//services/network/public/mojom",
     "//services/screen_ai/buildflags",
     "//sql",
+    "//ui/lottie",
   ]
   if (is_android) {
     public_deps += [
@@ -8478,7 +8486,6 @@ static_library("browser_public_dependencies") {
       "//third_party/lens_server_proto:lens_overlay_proto",
       "//third_party/nearby:encrypted_metadata_proto",
       "//third_party/nearby:rpc_resources_proto",
-      "//ui/lottie",
     ]
   }
   if (is_win) {

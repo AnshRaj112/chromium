@@ -439,6 +439,13 @@
       base_feature: "none",
     },
     {
+      // Kill switch for https://crbug.com/415834974 which changes anchor
+      // positioning adjustments to occur even in cases where there is no
+      // scrollable overflow.
+      name: "AnchorPositionAdjustmentWithoutOverflow",
+      status: "stable",
+    },
+    {
       name: "AndroidDownloadableFontsMatching",
       base_feature: "none",
       public: true,
@@ -745,7 +752,7 @@
     },
     {
       // https://github.com/WICG/html-in-canvas/blob/main/README.md
-      name: "CanvasElementDrawImage",
+      name: "CanvasElementDrawElement",
       status: "test",
       implied_by: ["CanvasPlaceElement"],
     },
@@ -1875,6 +1882,11 @@
       status: {"Android": "stable"},
     },
     {
+      // crbug.com/341564372
+      name: "EditingFastRichReplace",
+      status: "stable",
+    },
+    {
       name: "ElementCapture",
       status: {"Android": "", "default": "stable"},
     },
@@ -2635,7 +2647,6 @@
     {
       // Improved support for debugging CSSNestedDeclarations.
       name: "InspectorGhostRules",
-      status: "stable",
     },
     {
       name: "InstalledApp",
@@ -3199,6 +3210,10 @@
       status: "experimental",
     },
     {
+      name: "OptimizeHTMLElementUrls",
+      status: "experimental",
+    },
+    {
       // This flag makes the <option> element's label attribute render the
       // contents of the label attribute even if it is only whitespace in order
       // to match the spec and firefox. It also stops stripping/simplifying
@@ -3466,6 +3481,14 @@
       public: true,
       base_feature_status: "enabled",
       copied_from_base_feature_if: "overridden",
+    },
+    {
+      // Tracking bug for the implementation: crbug.com/352249547
+      // This flag adds having the option to show an icon in the Permission
+      // element, if developers want to.
+      // The flag will enable us to land the feature over multiple CLs, and will
+      // be enabled after the feature has been fully implemented.
+      name: "PermissionElementIcon",
     },
     {
       name: "Permissions",
@@ -3798,6 +3821,12 @@
       status: "stable",
     },
     {
+      // This feature was shipped in M138, so this flag can be removed in M140.
+      // See https://issues.chromium.org/issues/415911524.
+      name: "RemoveNodeDetermineNodeFullySelected",
+      status: "stable",
+    },
+    {
       // crbug.com/41047725
       name: "RemovePlaceholderBRForDisplayInline",
       status: "stable",
@@ -3839,7 +3868,7 @@
       // composited pixel alignment issues. See
       // https://crbug.com/40084005
       name: "RenderSurfaceFor2DScaleTransform",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "ReportEventTimingAtVisibilityChange",
@@ -4642,6 +4671,7 @@
       // crbug.com/341564372
       name: "TextareaLineEndingsAsBr",
       status: "experimental",
+      depends_on: ["EditingFastRichReplace"],
     },
     {
       // crbug.com/341564372

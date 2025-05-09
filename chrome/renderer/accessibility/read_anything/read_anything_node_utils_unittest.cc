@@ -24,6 +24,43 @@ TEST_F(ReadAnythingNodeUtilsTest,
   EXPECT_FALSE(a11y::IsTextForReadAnything(nullptr, false, false));
 }
 
+TEST_F(ReadAnythingNodeUtilsTest,
+       IsTextForReadAnything_ReturnsTrueOnListMarker) {
+  static constexpr ui::AXNodeID kId = 2;
+  ui::AXNodeData data = test::TextNode(kId, u"Just regular text.");
+  data.role = ax::mojom::Role::kListMarker;
+  ui::AXTree tree;
+  ui::AXNode node(&tree, nullptr, kId, 0);
+  node.SetData(std::move(data));
+  EXPECT_TRUE(a11y::IsTextForReadAnything(&node, false, false));
+}
+
+TEST_F(ReadAnythingNodeUtilsTest,
+       IsTextForReadAnything_ReturnsFalseWithHtmlTag) {
+  static constexpr ui::AXNodeID kId = 2;
+  ui::AXNodeData data = test::TextNode(kId, u"Text in HTML");
+  // Explicitly set the html tag to an empty string.
+  data.AddStringAttribute(ax::mojom::StringAttribute::kHtmlTag, "p");
+
+  ui::AXTree tree;
+  ui::AXNode node(&tree, nullptr, kId, 0);
+  node.SetData(std::move(data));
+  EXPECT_FALSE(a11y::IsTextForReadAnything(&node, false, false));
+}
+
+TEST_F(ReadAnythingNodeUtilsTest,
+       IsTextForReadAnything_ReturnsTrueWithEmptyHtmlTag) {
+  static constexpr ui::AXNodeID kId = 2;
+  ui::AXNodeData data = test::TextNode(kId, u"Sentence");
+  // Explicitly set the html tag to an empty string.
+  data.AddStringAttribute(ax::mojom::StringAttribute::kHtmlTag, "");
+
+  ui::AXTree tree;
+  ui::AXNode node(&tree, nullptr, kId, 0);
+  node.SetData(std::move(data));
+  EXPECT_TRUE(a11y::IsTextForReadAnything(&node, false, false));
+}
+
 TEST_F(ReadAnythingNodeUtilsTest, GetTextContent_PDF_FiltersReturnCharacters) {
   const std::u16string sentence =
       u"Hello, this is\n a sentence \r with line breaks.";
@@ -75,6 +112,49 @@ TEST_F(ReadAnythingNodeUtilsTest,
   EXPECT_NE(text.find('\r'), std::string::npos);
 }
 
+TEST_F(ReadAnythingNodeUtilsTest, IsIgnored_ReturnsTrueWhenAXNodeIsIgnored) {
+  static constexpr ui::AXNodeID kId = 2;
+  ui::AXNodeData data = test::TextNode(kId);
+  data.role = ax::mojom::Role::kNone;
+  ui::AXTree tree;
+  ui::AXNode node(&tree, nullptr, kId, 0);
+  node.SetData(std::move(data));
+
+  EXPECT_TRUE(node.IsIgnored());
+  // The node should be ignored regardless of whether it is a PDF.
+  EXPECT_TRUE(a11y::IsIgnored(&node, /*is_pdf=*/false));
+  EXPECT_TRUE(a11y::IsIgnored(&node, /*is_pdf=*/true));
+}
+
+TEST_F(ReadAnythingNodeUtilsTest, IsIgnored_ControlElementsIgnored) {
+  const std::u16string sentence = u"One day more!";
+
+  static constexpr ui::AXNodeID kId = 2;
+  ui::AXNodeData control_not_text_field_data = test::TextNode(kId, sentence);
+  control_not_text_field_data.role = ax::mojom::Role::kSpinButton;
+
+  ui::AXNodeData text_field_data = test::TextNode(kId, sentence);
+  text_field_data.role = ax::mojom::Role::kTextField;
+
+  ui::AXNodeData select_data = test::TextNode(kId, sentence);
+  select_data.role = ax::mojom::Role::kRadioGroup;
+
+  ui::AXTree tree;
+  ui::AXNode node(&tree, nullptr, kId, 0);
+
+  // Control nodes are ignored.
+  node.SetData(std::move(control_not_text_field_data));
+  EXPECT_TRUE(a11y::IsIgnored(&node, false));
+
+  // Text field nodes are not ignored.
+  node.SetData(std::move(text_field_data));
+  EXPECT_FALSE(a11y::IsIgnored(&node, false));
+
+  // Select field nodes are ignored
+  node.SetData(std::move(select_data));
+  EXPECT_TRUE(a11y::IsIgnored(&node, false));
+}
+
 TEST_F(ReadAnythingNodeUtilsTest, IsSuperscript) {
   const std::u16string sentence =
       u"This is a superscript: <sup>superscript</sup>";
@@ -87,4 +167,105 @@ TEST_F(ReadAnythingNodeUtilsTest, IsSuperscript) {
   data.SetTextPosition(ax::mojom::TextPosition::kSuperscript);
   node.SetData(std::move(data));
   EXPECT_TRUE(a11y::IsSuperscript(&node));
+}
+
+TEST_F(ReadAnythingNodeUtilsTest, GetHtmlTag_ReturnsDivForTextField) {
+  const std::u16string sentence1 =
+      u"Why do you write like it\'s going out of style?";
+  const std::u16string sentence2 =
+      u"Why do you write like you\'re running out of time?";
+
+  ui::AXNodeData data_with_html_tag = test::TextNode(2, sentence1);
+  data_with_html_tag.AddStringAttribute(ax::mojom::StringAttribute::kHtmlTag,
+                                        "p");
+  data_with_html_tag.role = ax::mojom::Role::kTextField;
+
+  ui::AXNodeData data_with_no_html_tag = test::TextNode(2, sentence2);
+  data_with_no_html_tag.AddStringAttribute(ax::mojom::StringAttribute::kHtmlTag,
+                                           "");
+  data_with_no_html_tag.role = ax::mojom::Role::kTextField;
+
+  ui::AXTree tree;
+  ui::AXNode node(&tree, nullptr, 2, 0);
+  node.SetData(std::move(data_with_html_tag));
+  EXPECT_EQ(a11y::GetHtmlTag(&node, false, false), "div");
+
+  node.SetData(std::move(data_with_no_html_tag));
+  EXPECT_EQ(a11y::GetHtmlTag(&node, false, false), "div");
+}
+
+TEST_F(ReadAnythingNodeUtilsTest, GetHtmlTag_ReturnsHeadingTag) {
+  const std::u16string sentence1 = u"Heading 1";
+  const std::u16string sentence2 = u"Heading 2";
+
+  ui::AXNodeData heading_data = test::TextNode(2, sentence1);
+  heading_data.AddIntAttribute(ax::mojom::IntAttribute::kHierarchicalLevel, 1);
+  heading_data.role = ax::mojom::Role::kHeading;
+
+  ui::AXTree tree;
+  ui::AXNode node(&tree, nullptr, 2, 0);
+  node.SetData(std::move(heading_data));
+  EXPECT_EQ(a11y::GetHtmlTag(&node, false, false), "h1");
+
+  heading_data.AddIntAttribute(ax::mojom::IntAttribute::kHierarchicalLevel, 2);
+  node.SetData(std::move(heading_data));
+  EXPECT_EQ(a11y::GetHtmlTag(&node, false, false), "h2");
+}
+
+TEST_F(ReadAnythingNodeUtilsTest, GetHtmlTag_MarkElementReturnsBold) {
+  const std::u16string sentence = u"Mark element";
+
+  ui::AXNodeData data = test::TextNode(2, sentence);
+  data.AddStringAttribute(ax::mojom::StringAttribute::kHtmlTag, "mark");
+
+  ui::AXTree tree;
+  ui::AXNode node(&tree, nullptr, 2, 0);
+  node.SetData(std::move(data));
+  EXPECT_EQ(a11y::GetHtmlTag(&node, false, false), "b");
+}
+
+TEST_F(ReadAnythingNodeUtilsTest, GetHtmlTag_ReturnsHtmlTagForDocs) {
+  const std::u16string sentence = u"Google docs document";
+
+  ui::AXNodeData data = test::TextNode(2, sentence);
+  data.AddStringAttribute(ax::mojom::StringAttribute::kHtmlTag, "svg");
+
+  ui::AXTree tree;
+  ui::AXNode node(&tree, nullptr, 2, 0);
+  node.SetData(std::move(data));
+
+  // SVG elements should be changed to div tags for Docs.
+  EXPECT_EQ(a11y::GetHtmlTag(&node, /* is_pdf= */ false, /* is_docs= */ true),
+            "div");
+
+  // Paragraphs with the g tag should be changed to the p tag for Docs.
+  data.AddStringAttribute(ax::mojom::StringAttribute::kHtmlTag, "g");
+  data.role = ax::mojom::Role::kParagraph;
+  node.SetData(std::move(data));
+  EXPECT_EQ(a11y::GetHtmlTag(&node, /* is_pdf= */ false, /* is_docs= */ true),
+            "p");
+}
+
+TEST_F(ReadAnythingNodeUtilsTest, GetHtmlTag_ReturnsExpectedTag) {
+  const std::u16string sentence = u"Tomorrow is another day";
+
+  ui::AXNodeData data = test::TextNode(2, sentence);
+  data.AddStringAttribute(ax::mojom::StringAttribute::kHtmlTag, "p");
+
+  ui::AXTree tree;
+  ui::AXNode node(&tree, nullptr, 2, 0);
+  node.SetData(std::move(data));
+  EXPECT_EQ(a11y::GetHtmlTag(&node, false, false), "p");
+
+  data.AddStringAttribute(ax::mojom::StringAttribute::kHtmlTag, "b");
+  node.SetData(std::move(data));
+  EXPECT_EQ(a11y::GetHtmlTag(&node, false, false), "b");
+
+  data.AddStringAttribute(ax::mojom::StringAttribute::kHtmlTag, "head");
+  node.SetData(std::move(data));
+  EXPECT_EQ(a11y::GetHtmlTag(&node, false, false), "head");
+
+  data.AddStringAttribute(ax::mojom::StringAttribute::kHtmlTag, "img");
+  node.SetData(std::move(data));
+  EXPECT_EQ(a11y::GetHtmlTag(&node, false, false), "img");
 }

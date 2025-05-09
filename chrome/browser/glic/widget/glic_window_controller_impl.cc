@@ -1009,12 +1009,9 @@ void GlicWindowControllerImpl::Close() {
 
 void GlicWindowControllerImpl::CloseInternal(
     std::optional<mojom::InvocationSource> reopen_detached_source) {
-  if (state_ == State::kCloseAnimation || state_ == State::kClosed) {
+  if (state_ == State::kClosed) {
     return;
   }
-
-  // The widget may have moved without a drag event so save the final position.
-  SaveWidgetPosition();
 
   const bool reopen_detached = state_ == State::kClosingToReopenDetached;
   DCHECK(!reopen_detached || reopen_detached_source.has_value());
@@ -1024,16 +1021,7 @@ void GlicWindowControllerImpl::CloseInternal(
     glic_window_animator_->SetGlicWebViewVisibility(false);
   }
 
-  if (attached_browser_) {
-    SetWindowState(State::kCloseAnimation);
-    GlicButton* glic_button = GetGlicButton(*attached_browser_);
-    glic_window_animator_->RunCloseAnimation(
-        glic_button, base::BindOnce(&GlicWindowControllerImpl::CloseFinish,
-                                    weak_ptr_factory_.GetWeakPtr(),
-                                    reopen_detached, reopen_detached_source));
-  } else {
     CloseFinish(reopen_detached, reopen_detached_source);
-  }
 }
 
 void GlicWindowControllerImpl::CloseFinish(
@@ -1042,6 +1030,10 @@ void GlicWindowControllerImpl::CloseFinish(
   if (state_ == State::kClosed) {
     return;
   }
+
+  // Save the widge position on close so we can restore in the same position.
+  SaveWidgetPosition();
+
   glic_window_animator_.reset();
   glic_service_->metrics()->OnGlicWindowClose();
   base::UmaHistogramEnumeration("Glic.PanelWebUiState.FinishState2",
@@ -1322,7 +1314,7 @@ bool GlicWindowControllerImpl::IsActive() {
 }
 
 bool GlicWindowControllerImpl::IsShowing() const {
-  return !(state_ == State::kClosed || state_ == State::kCloseAnimation);
+  return !(state_ == State::kClosed);
 }
 
 bool GlicWindowControllerImpl::IsPanelOrFreShowing() const {

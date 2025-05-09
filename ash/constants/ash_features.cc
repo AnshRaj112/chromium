@@ -112,10 +112,6 @@ BASE_FEATURE(kAudioSelectionImprovement,
              "AudioSelectionImprovement",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables the Audio URL that is designed to help user debug or troubleshoot
-// common issues on ChromeOS.
-BASE_FEATURE(kAudioUrl, "AudioUrl", base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Enables the Auto Night Light feature which sets the default schedule type to
 // sunset-to-sunrise until the user changes it to something else. This feature
 // is not exposed to the end user, and is enabled only via cros_config for
@@ -286,6 +282,11 @@ BASE_FEATURE(kBocaClientTypeForSpeechRecognition,
 // on ChromeOS.
 BASE_FEATURE(kBocaAdjustCaptionBubbleOnExpand,
              "BocaAdjustCaptionBubbleOnExpand",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables or disables keeping the Boca SWA open when the session is ended.
+BASE_FEATURE(kBocaKeepSWAOpenOnSessionEnded,
+             "BocaKeepSWAOpenOnSessionEnded",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables or disables enforcing sequential execution for Boca Session load.
@@ -3518,6 +3519,10 @@ bool IsBocaClientTypeForSpeechRecognitionEnabled() {
 
 bool IsBocaAdjustCaptionBubbleOnExpandEnabled() {
   return base::FeatureList::IsEnabled(kBocaAdjustCaptionBubbleOnExpand);
+}
+
+bool IsBocaKeepSWAOpenOnSessionEndedEnabled() {
+  return base::FeatureList::IsEnabled(kBocaKeepSWAOpenOnSessionEnded);
 }
 
 bool IsBocaSequentialSessionLoadEnabled() {

@@ -13,7 +13,6 @@ import android.util.Pair;
 import android.view.View;
 
 import org.chromium.base.test.transit.Element;
-import org.chromium.base.test.transit.Elements;
 import org.chromium.base.test.transit.SimpleConditions;
 import org.chromium.base.test.transit.ViewElement;
 import org.chromium.chrome.R;
@@ -41,17 +40,8 @@ public class RegularNewTabPageStation extends PageStation {
 
     protected <T extends RegularNewTabPageStation> RegularNewTabPageStation(Builder<T> builder) {
         super(builder.withIncognito(false).withExpectedUrlSubstring(UrlConstants.NTP_URL));
-    }
 
-    public static Builder<RegularNewTabPageStation> newBuilder() {
-        return new Builder<>(RegularNewTabPageStation::new);
-    }
-
-    @Override
-    public void declareElements(Elements.Builder elements) {
-        super.declareElements(elements);
-
-        elements.declareElementFactory(
+        declareElementFactory(
                 mActivityElement,
                 delayedElements -> {
                     if (mActivityElement.get().isTablet()) {
@@ -61,17 +51,21 @@ public class RegularNewTabPageStation extends PageStation {
                     }
                 });
 
-        logoElement = elements.declareView(viewSpec(withId(R.id.search_provider_logo)));
-        searchBoxElement = elements.declareView(viewSpec(withId(R.id.search_box)));
+        logoElement = declareView(viewSpec(withId(R.id.search_provider_logo)));
+        searchBoxElement = declareView(viewSpec(withId(R.id.search_box)));
 
         nativePageElement =
-                elements.declareEnterConditionAsElement(
+                declareEnterConditionAsElement(
                         new NativePageCondition<>(NewTabPage.class, loadedTabElement));
-        elements.declareEnterCondition(
+        declareEnterCondition(
                 SimpleConditions.uiThreadCondition(
                         "Regular NTP is loaded",
                         nativePageElement,
                         nativePage -> whether(nativePage.isLoadedForTests())));
+    }
+
+    public static Builder<RegularNewTabPageStation> newBuilder() {
+        return new Builder<>(RegularNewTabPageStation::new);
     }
 
     /** Opens the app menu by pressing the toolbar "..." button */

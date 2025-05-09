@@ -10,9 +10,9 @@
 
 namespace {
 
-const uint64_t kDefaultId = 0;
+inline constexpr uint64_t kDefaultId = 0;
 inline constexpr char kDefaultSsid[] = "not_set";
-const WifiCredentialsAttachment::SecurityType kDefaultSecurityType =
+inline constexpr WifiCredentialsAttachment::SecurityType kDefaultSecurityType =
     sharing::mojom::WifiCredentialsMetadata::SecurityType::kWpaPsk;
 
 }  // namespace

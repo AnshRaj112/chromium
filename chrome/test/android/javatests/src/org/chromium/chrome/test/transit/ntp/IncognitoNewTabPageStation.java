@@ -14,7 +14,6 @@ import android.util.Pair;
 import android.view.View;
 
 import org.chromium.base.test.transit.Element;
-import org.chromium.base.test.transit.Elements;
 import org.chromium.base.test.transit.SimpleConditions;
 import org.chromium.base.test.transit.ViewElement;
 import org.chromium.chrome.R;
@@ -39,28 +38,22 @@ public class IncognitoNewTabPageStation extends PageStation {
     protected <T extends IncognitoNewTabPageStation> IncognitoNewTabPageStation(
             Builder<T> builder) {
         super(builder.withIncognito(true).withExpectedUrlSubstring(UrlConstants.NTP_URL));
-    }
 
-    public static Builder<IncognitoNewTabPageStation> newBuilder() {
-        return new Builder<>(IncognitoNewTabPageStation::new);
-    }
-
-    @Override
-    public void declareElements(Elements.Builder elements) {
-        super.declareElements(elements);
-
-        urlBarElement = elements.declareView(URL_BAR);
-        iconElement = elements.declareView(viewSpec(withId(R.id.new_tab_incognito_icon)));
-        goneIncognitoTextElement =
-                elements.declareView(viewSpec(withText("You’ve gone Incognito")));
+        urlBarElement = declareView(URL_BAR);
+        iconElement = declareView(viewSpec(withId(R.id.new_tab_incognito_icon)));
+        goneIncognitoTextElement = declareView(viewSpec(withText("You’ve gone Incognito")));
         nativePageElement =
-                elements.declareEnterConditionAsElement(
+                declareEnterConditionAsElement(
                         new NativePageCondition<>(IncognitoNewTabPage.class, loadedTabElement));
-        elements.declareEnterCondition(
+        declareEnterCondition(
                 SimpleConditions.uiThreadCondition(
                         "Incognito NTP is loaded",
                         nativePageElement,
                         nativePage -> whether(nativePage.isLoadedForTests())));
+    }
+
+    public static Builder<IncognitoNewTabPageStation> newBuilder() {
+        return new Builder<>(IncognitoNewTabPageStation::new);
     }
 
     /** Opens the app menu by pressing the toolbar "..." button */

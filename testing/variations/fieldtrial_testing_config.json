@@ -2085,27 +2085,6 @@
             ]
         }
     ],
-    "AutofillI18nNLAddressModel": [
-        {
-            "platforms": [
-                "android",
-                "android_webview",
-                "chromeos",
-                "ios",
-                "linux",
-                "mac",
-                "windows"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "AutofillUseNLAddressModel"
-                    ]
-                }
-            ]
-        }
-    ],
     "AutofillImproveAddressFieldSwapping": [
         {
             "platforms": [
@@ -2270,27 +2249,6 @@
                     "name": "Enabled",
                     "enable_features": [
                         "AutofillPageLanguageDetection"
-                    ]
-                }
-            ]
-        }
-    ],
-    "AutofillParseEmailLabelAndPlaceholder": [
-        {
-            "platforms": [
-                "android",
-                "android_webview",
-                "chromeos",
-                "ios",
-                "linux",
-                "mac",
-                "windows"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "AutofillParseEmailLabelAndPlaceholder"
                     ]
                 }
             ]
@@ -11934,6 +11892,21 @@
             ]
         }
     ],
+    "IOSPartitionAllocMemoryReclaimer": [
+        {
+            "platforms": [
+                "ios"
+            ],
+            "experiments": [
+                {
+                    "name": "Disabled",
+                    "disable_features": [
+                        "PartitionAllocMemoryReclaimer"
+                    ]
+                }
+            ]
+        }
+    ],
     "IOSPasskeysM2": [
         {
             "platforms": [
@@ -17429,7 +17402,7 @@
                 {
                     "name": "Enabled",
                     "enable_features": [
-                        "NoSamePageFragmentPreloadingAnchorTracking"
+                        "PreloadingNoSamePageFragmentAnchorTracking"
                     ]
                 }
             ]
@@ -19707,6 +19680,25 @@
                     },
                     "enable_features": [
                         "RestrictAbusePorts"
+                    ]
+                }
+            ]
+        }
+    ],
+    "RestrictAbusePortsOnLocalhost": [
+        {
+            "platforms": [
+                "android",
+                "android_webview"
+            ],
+            "experiments": [
+                {
+                    "name": "RestrictAbusePortsOnLocalhost",
+                    "params": {
+                        "localhost_restrict_ports": "30987,30988,30989"
+                    },
+                    "enable_features": [
+                        "RestrictAbusePortsOnLocalhost"
                     ]
                 }
             ]
@@ -23928,7 +23920,6 @@
                 "android",
                 "android_webview",
                 "android_weblayer",
-                "chromeos",
                 "fuchsia",
                 "ios",
                 "linux",

@@ -15,6 +15,7 @@ import androidx.annotation.StringRes;
 import org.chromium.base.FeatureList;
 import org.chromium.base.ObserverList;
 import org.chromium.base.supplier.Supplier;
+import org.chromium.build.annotations.Contract;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.tab.Tab;
@@ -29,7 +30,7 @@ import org.chromium.ui.modelutil.PropertyModel;
 @NullMarked
 public abstract class BaseButtonDataProvider implements ButtonDataProvider, OnClickListener {
     protected final ButtonDataImpl mButtonData;
-    protected final Supplier<Tab> mActiveTabSupplier;
+    protected final Supplier<@Nullable Tab> mActiveTabSupplier;
 
     private final ObserverList<ButtonDataObserver> mObservers = new ObserverList<>();
     private final @Nullable ModalDialogManager mModalDialogManager;
@@ -53,11 +54,9 @@ public abstract class BaseButtonDataProvider implements ButtonDataProvider, OnCl
      * @param adaptiveButtonVariant Enum value of {@link AdaptiveToolbarButtonVariant}, used for
      *     metrics.
      * @param tooltipTextResId String to show as a tooltip when the button is hovered over.
-     * @param showBackgroundHighlight Whether to use a custom background drawable to handle
-     *     highlight and focus UI states.
      */
     public BaseButtonDataProvider(
-            Supplier<Tab> activeTabSupplier,
+            Supplier<@Nullable Tab> activeTabSupplier,
             @Nullable ModalDialogManager modalDialogManager,
             Drawable buttonDrawable,
             String contentDescription,
@@ -65,8 +64,7 @@ public abstract class BaseButtonDataProvider implements ButtonDataProvider, OnCl
             boolean supportsTinting,
             @Nullable IphCommandBuilder iphCommandBuilder,
             @AdaptiveToolbarButtonVariant int adaptiveButtonVariant,
-            @StringRes int tooltipTextResId,
-            boolean showBackgroundHighlight) {
+            @StringRes int tooltipTextResId) {
         mActiveTabSupplier = activeTabSupplier;
         mModalDialogManager = modalDialogManager;
         if (mModalDialogManager != null) {
@@ -103,8 +101,7 @@ public abstract class BaseButtonDataProvider implements ButtonDataProvider, OnCl
                         /* iphCommandBuilder= */ iphCommandBuilder,
                         /* isEnabled= */ true,
                         adaptiveButtonVariant,
-                        tooltipTextResId,
-                        showBackgroundHighlight);
+                        tooltipTextResId);
     }
 
     /**
@@ -115,6 +112,7 @@ public abstract class BaseButtonDataProvider implements ButtonDataProvider, OnCl
      * @return whether the button should be shown for the current tab.
      */
     @CallSuper
+    @Contract("null -> false")
     protected boolean shouldShowButton(@Nullable Tab tab) {
         if (tab == null) return false;
 

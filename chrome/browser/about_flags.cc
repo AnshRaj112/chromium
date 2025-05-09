@@ -8960,6 +8960,10 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(
          blink::features::kPrerender2EarlyDocumentLifecycleUpdate)},
 
+    {"trees-in-viz", flag_descriptions::kTreesInVizName,
+     flag_descriptions::kTreesInVizDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kTreesInViz)},
+
 #if BUILDFLAG(IS_ANDROID)
     {"prerender2-new-tab-page-android",
      flag_descriptions::kPrerender2ForNewTabPageAndroidName,
@@ -12395,6 +12399,17 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kPinnedTabToastOnCloseDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(toast_features::kPinnedTabToastOnClose)},
 #endif  // !BUILDFLAG(IS_ANDROID)
+
+    {"discount-autofill", commerce::flag_descriptions::kDiscountAutofillName,
+     commerce::flag_descriptions::kDiscountAutofillDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(commerce::kDiscountAutofill)},
+
+#if BUILDFLAG(IS_ANDROID)
+    {"android-web-app-launch-handler",
+     flag_descriptions::kAndroidWebAppLaunchHandler,
+     flag_descriptions::kAndroidWebAppLaunchHandlerDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(features::kAndroidWebAppLaunchHandler)},
+#endif  // BUILDFLAG(IS_ANDROID)
 
     // Add new entries above this line.
 

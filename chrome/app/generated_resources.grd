@@ -630,6 +630,9 @@ are declared in tools/grit/grit_args.gni.
           <message name="IDS_CONTENT_CONTEXT_OPENLINKOFFTHERECORD" desc="The name of the open a link in Incognito window command">
             Open link in inco&amp;gnito window
           </message>
+          <message name="IDS_CONTENT_CONTEXT_OPENLINKSPLITVIEW" translateable="false" desc="The name of the open a link in split view command">
+            Open link in split view
+          </message>
           <message name="IDS_CONTENT_CONTEXT_OPENLINKINPROFILES" desc="The name of the open a link as a different user context menu">
             Open link as
           </message>
@@ -938,6 +941,9 @@ are declared in tools/grit/grit_args.gni.
           <!-- Also update IDS_CONTENT_CONTEXT_OPENLINKOFFTHERECORD_INAPP in google_chrome_strings.grd and chromium_strings.grd. -->
           <message name="IDS_CONTENT_CONTEXT_OPENLINKOFFTHERECORD" desc="In Title Case: The name of the open a link in Incognito window command">
             Open Link in Inco&amp;gnito Window
+          </message>
+          <message name="IDS_CONTENT_CONTEXT_OPENLINKSPLITVIEW" translateable="false" desc="The name of the open a link in split view command">
+            Open Link in Split View
           </message>
           <message name="IDS_CONTENT_CONTEXT_OPENLINKINPROFILES" desc="In Title Case: The name of the open a link as a different user context menu">
             Open Link as
@@ -11535,7 +11541,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
           Close this view
         </message>
         <message name="IDS_SPLIT_TAB_SEPARATE_VIEWS" translateable="false" desc="The label for a menu item that unsplits the split tab when clicked.">
-          Seperate views
+          Separate views
         </message>
       </if>
       <if expr="use_titlecase">
@@ -11555,7 +11561,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
           Close This View
         </message>
         <message name="IDS_SPLIT_TAB_SEPARATE_VIEWS" translateable="false" desc="In title case: the label for a menu item that unsplits the split tab when clicked.">
-          Seperate Views
+          Separate Views
         </message>
       </if>
 
@@ -17543,9 +17549,8 @@ Please help our engineers fix this problem. Tell us what happened right before y
         Google Password Manager
       </message>
 
-      <!-- WebAuthn Ambient UI -->
-      <!-- TODO(crbug.com/358119268): Remove translateable property when the strings are final. -->
-      <message name="IDS_WEBAUTHN_AMBIENT_BUBBLE_TITLE" desc="The title of a bubble that displays passkeys or passwords for signing in to a given site." translateable="false">
+      <!-- WebAuthn passkey / password selector UIs -->
+      <message name="IDS_WEBAUTHN_SIGN_IN_TO_WEBSITE_DIALOG_TITLE" desc="The title of a bubble that displays passkeys or passwords for signing in to a given site.">
         Sign in to <ph name="RP_ID">$1<ex>webauthn.io</ex></ph>
       </message>
 

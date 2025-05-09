@@ -17,8 +17,12 @@ import {VoicePackController} from './voice_pack_controller.js';
 import {WordBoundaries} from './word_boundaries.js';
 import type {WordBoundaryState} from './word_boundaries.js';
 
+// The maximum speech length that should be used with remote voices
+// due to a TTS engine bug with voices timing out on too-long text.
+export const MAX_SPEECH_LENGTH: number = 175;
+
 export interface SpeechListener {
-  onPause(): void;
+  onStop(): void;
   onIsSpeechActiveChange(): void;
   onIsAudioCurrentlyPlayingChange(): void;
   onEngineStateChange(): void;
@@ -39,6 +43,7 @@ export class SpeechController {
 
   constructor() {
     // Send over the initial state.
+    this.clearReadAloudState();
     this.isSpeechActiveChanged(this.isSpeechActive());
   }
 
@@ -151,6 +156,10 @@ export class SpeechController {
     chrome.readingMode.preprocessTextForSpeech();
   }
 
+  onPlay() {
+    this.model_.setPlaySessionStartTime(Date.now());
+  }
+
   stopSpeech(pauseSource: PauseActionSource) {
     this.setIsSpeechActive(false);
     this.setIsAudioCurrentlyPlaying(false);
@@ -166,13 +175,14 @@ export class SpeechController {
     // synth.pause() and synth.resume() for speech to resume from where it left
     // off.
     if (this.isPausedFromButton()) {
+      this.logSpeechPlaySession_();
       this.speech_.pause();
     } else {
       // Canceling clears all the Utterances that are queued up via synth.play()
       this.speech_.cancel();
     }
 
-    this.listeners_.forEach(l => l.onPause());
+    this.listeners_.forEach(l => l.onStop());
   }
 
   setOnSpeechSynthesisUtteranceStart(message: SpeechSynthesisUtterance) {
@@ -286,6 +296,21 @@ export class SpeechController {
     }
   }
 
+  onSpeechFinished() {
+    this.clearReadAloudState();
+    this.model_.setPauseSource(PauseActionSource.SPEECH_FINISHED);
+    this.listeners_.forEach(l => l.onStop());
+    this.logger_.logSpeechStopSource(
+        chrome.readingMode.contentFinishedStopSource);
+    this.logSpeechPlaySession_();
+  }
+
+  clearReadAloudState() {
+    this.reset();
+    this.highlighter_.clearHighlightFormatting();
+    this.wordBoundaries_.resetToDefaultState();
+  }
+
   setPreviousReadingPositionIfExists(
       previousWordBoundaryState: WordBoundaryState,
       previousSpeechPlayingState: SpeechPlayingState) {
@@ -343,6 +368,39 @@ export class SpeechController {
         axNodeIds, scrollIntoView, shouldUpdateSentenceHighlight);
   }
 
+  isTextTooLong(text: string): boolean {
+    return !this.voicePackController_.getCurrentVoice()?.localService &&
+        text.length > MAX_SPEECH_LENGTH;
+  }
+
+  getUtteranceEndBoundary(text: string, isTextTooLong: boolean): number {
+    return isTextTooLong ? this.getAccessibleTextLength_(text) : text.length;
+  }
+
+  // Gets the accessible text boundary for the given string.
+  private getAccessibleTextLength_(text: string): number {
+    // Splicing on commas won't work for all locales, but since this is a
+    // simple strategy for splicing text in languages that do use commas
+    // that reduces the need for calling getAccessibleBoundary.
+    // TODO(crbug.com/40927698): Investigate if we can utilize comma splices
+    // directly in the utils methods called by #getAccessibleBoundary.
+    const lastCommaIndex =
+        text.substring(0, MAX_SPEECH_LENGTH).lastIndexOf(', ');
+
+    // To prevent infinite looping, only use the lastCommaIndex if it's not the
+    // first character. Otherwise, use getAccessibleBoundary to prevent
+    // repeatedly splicing on the first comma of the same substring.
+    if (lastCommaIndex > 0) {
+      return lastCommaIndex;
+    }
+
+    // TODO: crbug.com/40927698 - getAccessibleBoundary breaks on the nearest
+    // word boundary, but if there's some type of punctuation (such as a comma),
+    // it would be preferable to break on the punctuation so the pause in
+    // speech sounds more natural.
+    return chrome.readingMode.getAccessibleBoundary(text, MAX_SPEECH_LENGTH);
+  }
+
   private isSpeechActiveChanged(isSpeechActive: boolean) {
     this.listeners_.forEach(l => l.onIsSpeechActiveChange());
     chrome.readingMode.onSpeechPlayingStateChanged(isSpeechActive);
@@ -352,6 +410,15 @@ export class SpeechController {
     message.lang = chrome.readingMode.baseLanguageForSpeech;
     message.rate = getCurrentSpeechRate();
     this.speech_.speak(message);
+  }
+
+  private logSpeechPlaySession_() {
+    const startTime = this.model_.getPlaySessionStartTime();
+    if (startTime) {
+      this.logger_.logSpeechPlaySession(
+          startTime, this.voicePackController_.getCurrentVoice());
+      this.model_.setPlaySessionStartTime(null);
+    }
   }
 
   static getInstance(): SpeechController {

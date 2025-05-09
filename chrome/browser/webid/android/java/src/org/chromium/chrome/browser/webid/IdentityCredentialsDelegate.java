@@ -7,10 +7,8 @@ package org.chromium.chrome.browser.webid;
 import android.app.Activity;
 
 import org.chromium.base.Promise;
-import org.chromium.base.ServiceLoaderUtil;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
-import org.chromium.content.browser.webid.DigitalCredentialsCreationDelegate;
 
 @NullMarked
 public class IdentityCredentialsDelegate {
@@ -42,12 +40,9 @@ public class IdentityCredentialsDelegate {
         return presentationDelegate.get(window, origin, request);
     }
 
-    public Promise<String> create(Activity window, String origin, String request) {
-        DigitalCredentialsCreationDelegate delegateImpl =
-                ServiceLoaderUtil.maybeCreate(DigitalCredentialsCreationDelegate.class);
-        if (delegateImpl != null) {
-            return delegateImpl.create(window, origin, request);
-        }
-        return Promise.rejected();
+    public Promise<DigitalCredential> create(Activity window, String origin, String request) {
+        DigitalCredentialsCreationDelegate creationDelegate =
+                new DigitalCredentialsCreationDelegate();
+        return creationDelegate.create(window, origin, request);
     }
 }

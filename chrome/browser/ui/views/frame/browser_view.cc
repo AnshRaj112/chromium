@@ -123,6 +123,7 @@
 #include "chrome/browser/ui/views/frame/contents_layout_manager.h"
 #include "chrome/browser/ui/views/frame/immersive_mode_controller.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
 #include "chrome/browser/ui/views/frame/native_browser_frame.h"
 #include "chrome/browser/ui/views/frame/scrim_view.h"
 #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
@@ -1524,7 +1525,7 @@ void BrowserView::HideSplitView() {
   multi_contents_view_->CloseSplitView();
 }
 
-void BrowserView::UpdateActiveSplitView() {
+void BrowserView::UpdateActiveTabInSplitView() {
   CHECK(multi_contents_view_ && multi_contents_view_->IsInSplitView());
   const int active_index = browser_->tab_strip_model()->active_index();
 
@@ -1550,7 +1551,7 @@ void BrowserView::SwapTabsInActiveSplit() {
       browser_->tab_strip_model()->GetTabAtIndex(active_index)->GetSplit();
 
   CHECK(split_tab_id.has_value());
-  browser_->tab_strip_model()->SwapTabsInSplit(split_tab_id.value());
+  browser_->tab_strip_model()->ReverseTabsInSplit(split_tab_id.value());
 }
 
 bool BrowserView::IsTabChangeInSplitView(content::WebContents* old_contents,
@@ -2113,7 +2114,7 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
     // DevTools WebContents.
     UpdateDevToolsForContents(new_contents, true);
   } else if (tab_change_in_split_view) {
-    UpdateActiveSplitView();
+    UpdateActiveTabInSplitView();
   }
 
   if (will_restore_focus) {
@@ -3598,11 +3599,11 @@ views::View* BrowserView::GetLensOverlayView() {
 }
 
 DownloadBubbleUIController* BrowserView::GetDownloadBubbleUIController() {
-    if (auto* download_controller =
-            browser_->GetFeatures().download_toolbar_ui_controller()) {
-      return download_controller->bubble_controller();
-    }
-    return nullptr;
+  if (auto* download_controller =
+          browser_->GetFeatures().download_toolbar_ui_controller()) {
+    return download_controller->bubble_controller();
+  }
+  return nullptr;
 }
 
 void BrowserView::ConfirmBrowserCloseWithPendingDownloads(
@@ -3649,6 +3650,14 @@ bool BrowserView::PreHandleMouseEvent(const blink::WebMouseEvent& event) {
     return multi_contents_view_->PreHandleMouseEvent(event);
   }
   return false;
+}
+
+void BrowserView::PreHandleDragUpdate(const content::DropData& drop_data,
+                                      const gfx::PointF& point) {
+  if (multi_contents_view_) {
+    multi_contents_view_->drop_target_controller().OnWebContentsDragUpdate(
+        drop_data, point);
+  }
 }
 
 content::KeyboardEventProcessingResult BrowserView::PreHandleKeyboardEvent(
@@ -3909,12 +3918,15 @@ void BrowserView::OnSplitTabRemoved(
     std::vector<std::pair<tabs::TabInterface*, int>> tabs,
     split_tabs::SplitTabId split_id,
     SplitTabRemoveReason reason) {
-  const bool is_split_active = std::any_of(
-      tabs.begin(), tabs.end(), [](std::pair<tabs::TabInterface*, int>& tab) {
-        return tab.first->IsActivated();
-      });
+  CHECK(multi_contents_view_);
+  content::WebContents* active_web_contents =
+      multi_contents_view_->GetActiveContentsView()->web_contents();
 
-  if (is_split_active) {
+  if (std::any_of(tabs.begin(), tabs.end(),
+                  [active_web_contents](
+                      const std::pair<tabs::TabInterface*, int>& pair) {
+                    return pair.first->GetContents() == active_web_contents;
+                  })) {
     HideSplitView();
   }
 }

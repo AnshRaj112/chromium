@@ -14,7 +14,6 @@ import org.chromium.base.test.transit.ConditionStatus;
 import org.chromium.base.test.transit.ConditionStatusWithResult;
 import org.chromium.base.test.transit.ConditionWithResult;
 import org.chromium.base.test.transit.Element;
-import org.chromium.base.test.transit.Elements;
 import org.chromium.base.test.transit.Facility;
 import org.chromium.base.test.transit.Station;
 import org.chromium.base.test.transit.Transition;
@@ -146,14 +145,7 @@ public class BasePageStation<HostActivity extends ChromeActivity> extends Statio
     }
 
     protected final boolean mIncognito;
-    protected final boolean mIsEntryPoint;
-    protected final int mNumTabsBeingOpened;
-    protected final int mNumTabsBeingSelected;
-    protected final Tab mTabAlreadySelected;
-    protected final String mExpectedUrlSubstring;
-    protected final String mExpectedTitle;
     public Element<Tab> activityTabElement;
-    protected Supplier<Tab> mSelectedTabSupplier;
     public Element<Tab> loadedTabElement;
 
     protected <T extends BasePageStation<HostActivity>> BasePageStation(
@@ -163,87 +155,74 @@ public class BasePageStation<HostActivity extends ChromeActivity> extends Statio
         // incognito is optional and defaults to false
         mIncognito = builder.mIncognito == null ? false : builder.mIncognito;
 
-        // isEntryPoint is optional and defaults to false
-        mIsEntryPoint = builder.mIsEntryPoint;
-
         // mNumTabsBeingOpened is required
         assert builder.mNumTabsBeingOpened != null
                 : "PageStation.Builder needs withIsOpeningTabs() or initFrom()";
-        mNumTabsBeingOpened = builder.mNumTabsBeingOpened;
 
         // mNumTabsBeingSelected is required
         assert builder.mNumTabsBeingSelected != null
                 : "PageStation.Builder needs withIsSelectingTabs(), withTabAlreadySelected() or"
                         + " initFrom()";
-        mNumTabsBeingSelected = builder.mNumTabsBeingSelected;
 
         // Pages must have an already selected tab, or be selecting a tab.
-        mTabAlreadySelected = builder.mTabAlreadySelected;
-        assert mIsEntryPoint || (mTabAlreadySelected != null) != (mNumTabsBeingSelected != 0)
+        assert builder.mIsEntryPoint
+                        || (builder.mTabAlreadySelected != null)
+                                != (builder.mNumTabsBeingSelected != 0)
                 : String.format(
                         "mTabAlreadySelected=%s mNumTabsBeingSelected=%s",
-                        mTabAlreadySelected, mNumTabsBeingSelected);
-
-        // URL substring is optional.
-        mExpectedUrlSubstring = builder.mExpectedUrlSubstring;
-
-        // title is optional
-        mExpectedTitle = builder.mExpectedTitle;
+                        builder.mTabAlreadySelected, builder.mNumTabsBeingSelected);
 
         if (builder.mFacilities != null) {
             for (Facility<T> facility : builder.mFacilities) {
                 addInitialFacility(facility);
             }
         }
-    }
 
-    @Override
-    public void declareElements(Elements.Builder elements) {
-        super.declareElements(elements);
-
-        if (mNumTabsBeingOpened > 0) {
-            elements.declareEnterCondition(
-                    new TabAddedCondition(mNumTabsBeingOpened, mActivityElement));
+        if (builder.mNumTabsBeingOpened > 0) {
+            declareEnterCondition(
+                    new TabAddedCondition<>(builder.mNumTabsBeingOpened, mActivityElement));
         }
 
-        if (mIsEntryPoint) {
+        // isEntryPoint is optional and defaults to false
+        if (builder.mIsEntryPoint) {
             // In entry points we just match the first ActivityTab we see, instead of waiting for
             // callbacks.
             activityTabElement =
-                    elements.declareEnterConditionAsElement(
-                            new AnyActivityTabCondition(mActivityElement));
+                    declareEnterConditionAsElement(new AnyActivityTabCondition<>(mActivityElement));
         } else {
-            if (mNumTabsBeingSelected > 0) {
+            Supplier<Tab> mSelectedTabSupplier;
+            if (builder.mNumTabsBeingSelected > 0) {
                 // The last tab of N opened is the Tab that mSelectedTabSupplier will supply.
-                TabSelectedCondition tabSelectedCondition =
-                        new TabSelectedCondition(mNumTabsBeingSelected, mActivityElement);
-                elements.declareEnterCondition(tabSelectedCondition);
+                TabSelectedCondition<HostActivity> tabSelectedCondition =
+                        new TabSelectedCondition<>(builder.mNumTabsBeingSelected, mActivityElement);
+                declareEnterCondition(tabSelectedCondition);
                 mSelectedTabSupplier = tabSelectedCondition;
             } else {
                 // The Tab already created and provided to the constructor is the one that is
                 // expected to be the activityTab.
-                mSelectedTabSupplier = () -> mTabAlreadySelected;
+                mSelectedTabSupplier = () -> builder.mTabAlreadySelected;
             }
             // Only returns the tab when it is the activityTab.
             activityTabElement =
-                    elements.declareEnterConditionAsElement(
-                            new CorrectActivityTabCondition(
+                    declareEnterConditionAsElement(
+                            new CorrectActivityTabCondition<>(
                                     mActivityElement, mSelectedTabSupplier));
         }
         loadedTabElement =
-                elements.declareEnterConditionAsElement(
+                declareEnterConditionAsElement(
                         new PageLoadedCondition(activityTabElement, mIncognito));
 
-        elements.declareEnterCondition(new PageInteractableOrHiddenCondition(loadedTabElement));
+        declareEnterCondition(new PageInteractableOrHiddenCondition(loadedTabElement));
 
-        if (mExpectedUrlSubstring != null) {
-            elements.declareEnterCondition(
-                    new PageUrlContainsCondition(mExpectedUrlSubstring, loadedTabElement));
+        // URL substring is optional.
+        if (builder.mExpectedUrlSubstring != null) {
+            declareEnterCondition(
+                    new PageUrlContainsCondition(builder.mExpectedUrlSubstring, loadedTabElement));
         }
 
-        if (mExpectedTitle != null) {
-            elements.declareEnterCondition(
-                    new PageTitleCondition(mExpectedTitle, loadedTabElement));
+        // title is optional
+        if (builder.mExpectedTitle != null) {
+            declareEnterCondition(new PageTitleCondition(builder.mExpectedTitle, loadedTabElement));
         }
     }
 

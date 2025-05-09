@@ -42,15 +42,17 @@ if (is_nacl) {
   import("//build/config/nacl/config.gni")
 }
 
-lld_path = ""
+# Normally, clang will find the correct LLD binary to invoke without needing
+# -B to be passed. For cases where this does not give the correct result,
+# we allow lld_path to be specified.
+default_lld_path = ""
 if (!is_clang) {
-  declare_args() {
-    # This allows overriding the location of lld.
-    lld_path = rebase_path("$clang_base_path/bin", root_build_dir)
-  }
-} else {
-  # clang looks for lld next to it, no need for -B.
-  lld_path = ""
+  default_lld_path = "$clang_base_path/bin"
+}
+
+declare_args() {
+  # This allows overriding the location of lld.
+  lld_path = default_lld_path
 }
 
 declare_args() {
@@ -391,7 +393,7 @@ config("compiler") {
     if (use_lld) {
       ldflags += [ "-fuse-ld=lld" ]
       if (lld_path != "") {
-        ldflags += [ "-B$lld_path" ]
+        ldflags += [ "-B" + rebase_path(lld_path, root_build_dir) ]
       }
     }
 
@@ -512,13 +514,7 @@ config("compiler") {
   # Linux-specific compiler flags setup.
   # ------------------------------------
   if (use_icf && (!is_apple || use_lld)) {
-    if (is_fuchsia) {
-      # TODO(crbug.com/415810137): A temporary workaround to avoid crashing
-      # blink on fuchsia.
-      ldflags += [ "-Wl,--icf=safe" ]
-    } else {
-      ldflags += [ "-Wl,--icf=all" ]
-    }
+    ldflags += [ "-Wl,--icf=all" ]
   }
 
   if (is_linux || is_chromeos) {
@@ -629,6 +625,13 @@ config("compiler") {
     if (is_linux && use_lld && !llvm_android_mainline && current_cpu != "arm" &&
         default_toolchain != "//build/toolchain/cros:target") {
       cflags += [ "-Wa,--crel,--allow-experimental-crel" ]
+    }
+
+    # TODO(crbug.com/413427035): Remove once
+    # https://github.com/llvm/llvm-project/pull/136867/ is landed.
+    if (!is_win && !llvm_android_mainline &&
+        default_toolchain != "//build/toolchain/cros:target") {
+      cflags += [ "-fextend-variable-liveness=none" ]
     }
   }
 
@@ -1212,14 +1215,23 @@ config("compiler_cpu_abi") {
     # CPU architecture. We may or may not be doing a cross compile now, so for
     # simplicity we always explicitly set the architecture.
     if (current_cpu == "x64") {
-      cflags += [
-        "-m64",
-        "-msse3",
-      ]
-      ldflags += [ "-m64" ]
+      if (is_clang && !is_android && !is_nacl && !is_fuchsia &&
+          !is_chromeos_device) {
+        cflags += [ "--target=x86_64-unknown-linux-gnu" ]
+        ldflags += [ "--target=x86_64-unknown-linux-gnu" ]
+      } else {
+        cflags += [ "-m64" ]
+        ldflags += [ "-m64" ]
+      }
+      cflags += [ "-msse3" ]
     } else if (current_cpu == "x86") {
-      cflags += [ "-m32" ]
-      ldflags += [ "-m32" ]
+      if (is_clang && !is_android && !is_nacl && !is_chromeos_device) {
+        cflags += [ "--target=i386-unknown-linux-gnu" ]
+        ldflags += [ "--target=i386-unknown-linux-gnu" ]
+      } else {
+        cflags += [ "-m32" ]
+        ldflags += [ "-m32" ]
+      }
       if (!is_nacl) {
         cflags += [
           "-mfpmath=sse",
@@ -1480,8 +1492,16 @@ config("compiler_cpu_abi") {
       }
     } else if (current_cpu == "ppc64") {
       if (current_os == "aix") {
-        cflags += [ "-maix64" ]
-        ldflags += [ "-maix64" ]
+        if (is_clang) {
+          cflags += [ "--target=powerpc64-ibm-aix" ]
+          ldflags += [ "--target=powerpc64-ibm-aix" ]
+        } else {
+          cflags += [ "-maix64" ]
+          ldflags += [ "-maix64" ]
+        }
+      } else if (is_clang) {
+        cflags += [ "--target=powerpc64le-unknown-linux-gnu" ]
+        ldflags += [ "--target=powerpc64le-unknown-linux-gnu" ]
       } else {
         cflags += [ "-m64" ]
         ldflags += [ "-m64" ]
@@ -1502,6 +1522,10 @@ config("compiler_cpu_abi") {
         "-mcmodel=medium",
       ]
     } else if (current_cpu == "s390x") {
+      if (is_clang) {
+        cflags += [ "--target=s390x-unknown-linux-gnu" ]
+        ldflags += [ "--target=s390x-unknown-linux-gnu" ]
+      }
       cflags += [ "-m64" ]
       ldflags += [ "-m64" ]
     }

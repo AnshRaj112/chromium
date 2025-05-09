@@ -509,7 +509,7 @@ class TabStrip::TabDragContextImpl : public TabDragContext,
     constexpr int kHorizontalMoveThreshold = 16;  // DIPs.
 
     double ratio = static_cast<double>(tab_strip_->GetInactiveTabWidth()) /
-                   TabStyle::Get()->GetStandardWidth();
+                   TabStyle::Get()->GetStandardWidth(/*is_split=*/false);
     return base::ClampRound(ratio * kHorizontalMoveThreshold);
   }
 
@@ -1120,7 +1120,7 @@ void TabStrip::AddTabsAt(
     std::vector<std::pair<int, TabRendererData>> tabs_datas) {
   std::vector<TabContainer::TabInsertionParams> tabs_params;
 
-  for (auto tab_data : tabs_datas) {
+  for (const auto& tab_data : tabs_datas) {
     const int model_index = tab_data.first;
     CHECK(IsValidModelIndex(model_index))
         << "Attempted to add a tab with an invalid model index.";
@@ -1317,17 +1317,21 @@ void TabStrip::OnGroupClosed(const tab_groups::TabGroupId& group) {
   tab_container_->OnGroupClosed(group);
 }
 
-void TabStrip::SetSplit(std::vector<int> split_indices,
-                        std::optional<split_tabs::SplitTabId> split_id) {
+void TabStrip::OnSplitCreated(const std::vector<int>& split_indices,
+                              split_tabs::SplitTabId split_id) {
   for (const int split_index : split_indices) {
     tab_at(split_index)->SetSplit(split_id);
   }
 
-  if (split_id.has_value()) {
-    tab_container_->OnSplitCreated(split_indices);
-  } else {
-    tab_container_->OnSplitRemoved(split_indices);
+  tab_container_->OnSplitCreated(split_indices);
+}
+
+void TabStrip::OnSplitRemoved(const std::vector<int>& split_indices) {
+  for (const int split_index : split_indices) {
+    tab_at(split_index)->SetSplit(std::nullopt);
   }
+
+  tab_container_->OnSplitRemoved(split_indices);
 }
 
 bool TabStrip::ShouldDrawStrokes() const {

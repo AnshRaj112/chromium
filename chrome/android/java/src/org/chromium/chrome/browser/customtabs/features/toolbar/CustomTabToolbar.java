@@ -375,7 +375,6 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
 
         posParams.availableWidth -= locationBarMinWidth;
 
-        mCloseButtonPosition = mIntentDataProvider.getCloseButtonPosition();
         if (mCloseButton == null && mIntentDataProvider.isCloseButtonEnabled()) {
             layoutInflater.inflate(R.layout.custom_tab_close_button, this, true);
             mCloseButton = findViewById(R.id.close_button);
@@ -792,9 +791,7 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
      * <p>This is only used when CCTToolbarRefactor is enabled.
      */
     private void prepareMinimizeButton() {
-        if (!mMinimizeButtonEnabled) return;
-
-        if (isInMultiWindowMode()) {
+        if (isInMultiWindowMode() || !mMinimizeButtonEnabled) {
             if (mMinimizeButton != null) {
                 mMinimizeButton.setVisibility(GONE);
             }

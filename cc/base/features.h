@@ -83,10 +83,6 @@ CC_BASE_EXPORT BASE_DECLARE_FEATURE(kClearCanvasResourcesInBackground);
 // to when tracing is enabled.
 CC_BASE_EXPORT BASE_DECLARE_FEATURE(kMetricsTracingCalculationReduction);
 
-// When enabled we will submit the 'CopySharedImage' in one call and not batch
-// it up into 4MiB increments.
-CC_BASE_EXPORT BASE_DECLARE_FEATURE(kNonBatchedCopySharedImage);
-
 // Currently there is a race between OnBeginFrames from the GPU process and
 // input arriving from the Browser process. Due to this we can start to produce
 // a frame while scrolling without any input events. Late arriving events are
@@ -251,6 +247,17 @@ CC_BASE_EXPORT extern const base::FeatureParam<int>
 // layer trees by default; the caller can explicitly opt into enabled or
 // disabled if need be to override this.
 CC_BASE_EXPORT BASE_DECLARE_FEATURE(kUseLayerListsByDefault);
+
+// When enabled, the default programmatic scroll animation curve can be
+// overridden with extra params.
+CC_BASE_EXPORT BASE_DECLARE_FEATURE(kProgrammaticScrollAnimationOverride);
+// Extra params to override the programmatic scroll animation.
+CC_BASE_EXPORT BASE_DECLARE_FEATURE_PARAM(double, kCubicBezierX1);
+CC_BASE_EXPORT BASE_DECLARE_FEATURE_PARAM(double, kCubicBezierY1);
+CC_BASE_EXPORT BASE_DECLARE_FEATURE_PARAM(double, kCubicBezierX2);
+CC_BASE_EXPORT BASE_DECLARE_FEATURE_PARAM(double, kCubicBezierY2);
+CC_BASE_EXPORT BASE_DECLARE_FEATURE_PARAM(base::TimeDelta,
+                                          kMaxAnimtionDuration);
 
 }  // namespace features
 

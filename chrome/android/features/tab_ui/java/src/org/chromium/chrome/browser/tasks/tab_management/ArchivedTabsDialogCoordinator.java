@@ -11,12 +11,14 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.app.Activity;
+import android.content.Context;
 import android.content.res.Resources;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.style.ForegroundColorSpan;
 import android.util.Size;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -182,8 +184,8 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
      * dialog when no archived tabs remain.
      */
     private final Callback<Integer> mTabCountObserver =
-            (count) -> {
-                if (count == 0 && !ArchivedTabsDialogCoordinator.this.mIsOpeningLastTab) {
+            (tabCount) -> {
+                if (tabCount == 0 && !ArchivedTabsDialogCoordinator.this.mIsOpeningLastItem) {
                     // Post task to allow the last tab to be unregistered.
                     PostTask.postTask(
                             TaskTraits.UI_DEFAULT,
@@ -194,7 +196,7 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
             };
 
     /** Used to override the default tab click behavior to restore/open the tab. */
-    private final GridCardOnClickListenerProvider mGridCardOnCLickListenerProvider =
+    private final GridCardOnClickListenerProvider mGridCardOnClickListenerProvider =
             new GridCardOnClickListenerProvider() {
                 @Nullable
                 @Override
@@ -207,12 +209,20 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
                 public TabActionListener openTabGridDialog(@NonNull String syncId) {
                     return new TabActionListener() {
                         @Override
-                        public void run(View view, int tabId) {
+                        public void run(
+                                View view, int tabId, @Nullable MotionEvent triggeringMotionEvent) {
                             // Intentional no-op.
                         }
 
                         @Override
-                        public void run(View view, String syncId) {
+                        public void run(
+                                View view,
+                                String syncId,
+                                @Nullable MotionEvent triggeringMotionEvent) {
+                            SavedTabGroup savedTabGroup = mTabGroupSyncService.getGroup(syncId);
+                            mIsOpeningLastItem =
+                                    getArchivedTabCount() == savedTabGroup.savedTabs.size();
+
                             TabSwitcherPaneBase tabSwitcherPaneBase =
                                     (TabSwitcherPaneBase)
                                             mPaneManagerSupplier
@@ -241,7 +251,7 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
 
                 @Override
                 public void onTabSelecting(int tabId, boolean fromActionButton) {
-                    mIsOpeningLastTab = mArchivedTabModel.getCount() == 1;
+                    mIsOpeningLastItem = getArchivedTabCount() == 1;
                     Tab tab = mArchivedTabModel.getTabById(tabId);
                     mArchivedTabModelOrchestrator
                             .getTabArchiver()
@@ -351,7 +361,7 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
     private OnTabSelectingListener mOnTabSelectingListener;
     private PropertyModel mIphMessagePropertyModel;
     private int mSnackbarOverrideToken;
-    private boolean mIsOpeningLastTab;
+    private boolean mIsOpeningLastItem;
     private boolean mIsShowing;
 
     /**
@@ -505,7 +515,7 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
         }
 
         mOnTabSelectingListener = onTabSelectingListener;
-        mArchivedTabModel.getTabCountSupplier().addObserver(mTabCountObserver);
+        mArchivedTabModelOrchestrator.getTabCountSupplier().addObserver(mTabCountObserver);
         mUndoBarController.initialize();
 
         TabListEditorController controller = mTabListEditorCoordinator.getController();
@@ -640,7 +650,7 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
         controller.setLifecycleObserver(null);
         mBackPressManager.removeHandler(mTabListEditorCoordinator.getController());
         mTabArchiveSettings.removeObserver(mTabArchiveSettingsObserver);
-        mArchivedTabModel.getTabCountSupplier().removeObserver(mTabCountObserver);
+        mArchivedTabModelOrchestrator.getTabCountSupplier().removeObserver(mTabCountObserver);
         mSnackbarOverrideToken = TokenHolder.INVALID_TOKEN;
         mIsShowing = false;
         mTabSwitcherRecyclerView.get().setBlockTouchInput(false);
@@ -667,7 +677,7 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
 
     @VisibleForTesting
     void updateTitle() {
-        int numInactiveTabs = mArchivedTabModel.getCount();
+        int numInactiveTabs = getArchivedTabCount();
         String title =
                 mActivity
                         .getResources()
@@ -696,7 +706,7 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
                         mSnackbarManager,
                         /* bottomSheetController= */ null,
                         TabProperties.TabActionState.CLOSABLE,
-                        mGridCardOnCLickListenerProvider,
+                        mGridCardOnClickListenerProvider,
                         mModalDialogManager,
                         mDesktopWindowStateManager,
                         /* edgeToEdgeSupplier= */ null,
@@ -757,6 +767,10 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
                 });
     }
 
+    private int getArchivedTabCount() {
+        return mArchivedTabModelOrchestrator.getTabCountSupplier().get();
+    }
+
     private void restoreArchivedTabs(List<Tab> tabs) {
         mArchivedTabModelOrchestrator
                 .getTabArchiver()
@@ -782,34 +796,41 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
 
     private void updateIphPropertyModel() {
         if (mIphMessagePropertyModel == null) return;
+        mIphMessagePropertyModel.set(
+                MessageCardViewProperties.DESCRIPTION_TEXT,
+                getIphDescription(mActivity, mTabArchiveSettings));
+    }
 
-        int archiveTimeDeltaDays = mTabArchiveSettings.getArchiveTimeDeltaDays();
-        int autoDeleteTimeDeletaDays = mTabArchiveSettings.getAutoDeleteTimeDeltaDays();
+    @VisibleForTesting
+    public static CharSequence getIphDescription(
+            Context context, TabArchiveSettings tabArchiveSettings) {
+        int archiveTimeDeltaDays = tabArchiveSettings.getArchiveTimeDeltaDays();
+        int autoDeleteTimeDeletaDays = tabArchiveSettings.getAutoDeleteTimeDeltaDays();
         String settingsTitle =
-                mActivity.getString(R.string.archived_tab_iph_card_subtitle_settings_title);
+                context.getString(R.string.archived_tab_iph_card_subtitle_settings_title);
         // The auto-delete section is blank when the feature param is disabled.
         String autoDeleteTitle =
-                mTabArchiveSettings.isAutoDeleteEnabled()
-                        ? mActivity.getString(
+                tabArchiveSettings.isAutoDeleteEnabled()
+                        ? context.getString(
                                 R.string.archived_tab_iph_card_subtitle_autodelete_section,
                                 autoDeleteTimeDeletaDays)
                         : "";
         String description =
-                mActivity.getString(
+                context.getString(
                         R.string.archived_tab_iph_card_subtitle,
                         archiveTimeDeltaDays,
                         autoDeleteTitle,
                         settingsTitle);
+
         SpannableString ss = new SpannableString(description);
         ForegroundColorSpan fcs =
-                new ForegroundColorSpan(SemanticColorUtils.getDefaultTextColorAccent1(mActivity));
+                new ForegroundColorSpan(SemanticColorUtils.getDefaultTextColorAccent1(context));
         ss.setSpan(
                 fcs,
                 description.indexOf(settingsTitle),
                 description.indexOf(settingsTitle) + settingsTitle.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-
-        mIphMessagePropertyModel.set(MessageCardViewProperties.DESCRIPTION_TEXT, ss);
+        return ss;
     }
 
     private List<String> getTabGroupSyncIds() {
@@ -857,7 +878,7 @@ public class ArchivedTabsDialogCoordinator implements SnackbarManager.SnackbarMa
     }
 
     GridCardOnClickListenerProvider getGridCardOnClickListenerProviderForTesting() {
-        return mGridCardOnCLickListenerProvider;
+        return mGridCardOnClickListenerProvider;
     }
 
     /** Returns the Edge to edge pad adjuster. */

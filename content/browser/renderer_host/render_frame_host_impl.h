@@ -2662,6 +2662,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
       std::vector<blink::mojom::DraggableRegionPtr> regions) override;
   void NotifyDocumentInteractive() override;
   void OnFirstContentfulPaint() override;
+  void SetStorageAccessApiStatus(net::StorageAccessApiStatus status) override;
 
   void ReportNoBinderForInterface(const std::string& error);
 
@@ -3262,6 +3263,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // popin from impacting partitioning).
   // See https://explainers-by-googlers.github.io/partitioned-popins/
   bool ShouldPartitionAsPopin() const override;
+
+  bool DoesDocumentHaveStorageAccess() override;
 
   void SimulateDiscardShutdownKeepAliveTimeoutForTesting();
 
@@ -3953,12 +3956,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // Validates whether we can commit |url| and |origin| for a navigation or a
   // document.open() URL update.
   // A return value of true means that the URL & origin can be committed.
-  bool ValidateURLAndOrigin(
-      const GURL& url,
-      const url::Origin& origin,
-      bool is_same_document_navigation,
-      NavigationRequest* navigation_request,
-      std::string origin_calculation_debug_info = std::string());
+  bool ValidateURLAndOrigin(const GURL& url,
+                            const url::Origin& origin,
+                            bool is_same_document_navigation,
+                            NavigationRequest* navigation_request);
 
   // The actual implementation of committing a navigation in the browser
   // process. Called by the DidCommitProvisionalLoad IPC handler.
@@ -4129,8 +4130,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
   void LogCannotCommitUrlCrashKeys(const GURL& url,
                                    const url::Origin& origin,
                                    bool is_same_document_navigation,
-                                   NavigationRequest* navigation_request,
-                                   std::string& origin_calculation_debug_info);
+                                   NavigationRequest* navigation_request);
   void LogCannotCommitOriginCrashKeys(const GURL& url,
                                       const url::Origin& origin,
                                       const ProcessLock& process_lock,
@@ -4269,10 +4269,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
   void ReportBlockingCrossPartitionBlobURL(
       const GURL& blocked_url,
       std::optional<blink::mojom::PartitioningBlobURLInfo> info);
-
-  // This runs when fetches to cross-partition, same-origin Blob URL checks for
-  // storage access
-  bool DoesDocumentHaveStorageAccess();
 
   // For frames and main thread worklets we use a navigation-associated
   // interface and bind `receiver` to a `BlobURLStore` instance, which

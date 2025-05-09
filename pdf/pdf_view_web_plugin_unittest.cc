@@ -3333,9 +3333,10 @@ TEST_P(PdfViewWebPluginInkTextHighlightTest, SelectionDoesNotChange) {
 
   // Enter annotation mode and select the highlighter.
   plugin_->OnMessage(CreateSetAnnotationModeMessageForTesting(/*enable=*/true));
-  TestAnnotationBrushMessageParams message_params{/*color_r=*/240,
-                                                  /*color_g=*/133,
-                                                  /*color_b=*/0, /*size=*/4.5};
+  TestAnnotationBrushMessageParams message_params{/*color_r=*/0xF0,
+                                                  /*color_g=*/0x85,
+                                                  /*color_b=*/0x00,
+                                                  /*size=*/4.5f};
   plugin_->OnMessage(CreateSetAnnotationBrushMessageForTesting(
       "highlighter", &message_params));
 
@@ -3353,14 +3354,20 @@ TEST_P(PdfViewWebPluginInkTextHighlightTest, SelectionDoesNotChange) {
   EXPECT_CALL(*client_ptr_, TextSelectionChanged(_, _, _)).Times(0);
 
   plugin_->SetSelectedText("text");
+
+  EXPECT_CALL(pdf_host_, SelectionChanged(_, _, _, _)).Times(0);
+
+  plugin_->SelectionChanged({-10, -20, 30, 40}, {50, 60, 70, 80});
+  pdf_receiver_.FlushForTesting();
 }
 
 TEST_P(PdfViewWebPluginInkTextHighlightTest, DrawInProgressTextHighlight) {
   // Enter annotation mode and select the highlighter.
   plugin_->OnMessage(CreateSetAnnotationModeMessageForTesting(/*enable=*/true));
-  TestAnnotationBrushMessageParams message_params{/*color_r=*/240,
-                                                  /*color_g=*/133,
-                                                  /*color_b=*/0, /*size=*/4.5};
+  TestAnnotationBrushMessageParams message_params{/*color_r=*/0xF0,
+                                                  /*color_g=*/0x85,
+                                                  /*color_b=*/0x00,
+                                                  /*size=*/4.5f};
   plugin_->OnMessage(CreateSetAnnotationBrushMessageForTesting(
       "highlighter", &message_params));
 

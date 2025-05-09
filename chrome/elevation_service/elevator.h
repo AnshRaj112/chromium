@@ -24,7 +24,7 @@ struct EncryptFlags {
   bool use_latest_key = false;
 };
 
-constexpr IID kTestElevatorClsid = {
+inline constexpr IID kTestElevatorClsid = {
     0x416C51AC,
     0x4DEF,
     0x43CA,
@@ -40,10 +40,10 @@ inline constexpr char kFakeReencryptForTestingSwitch[] =
 
 namespace internal {
 
-constexpr uint32_t kFlagUseLatestKey = 1 << 23;
+inline constexpr uint32_t kFlagUseLatestKey = 1 << 23;
 
 // Update this each time a new flag is added.
-constexpr uint32_t kMaxFlag = kFlagUseLatestKey;
+inline constexpr uint32_t kMaxFlag = kFlagUseLatestKey;
 
 // A static assert verifies the flags can always fit into 24 bits.
 static_assert((kMaxFlag & 0xFFFFFF) == kMaxFlag);

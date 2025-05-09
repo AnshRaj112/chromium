@@ -30,10 +30,13 @@ import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.VectorDrawable;
+import android.os.SystemClock;
 import android.util.Size;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewStub;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -41,6 +44,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.IdRes;
+import androidx.annotation.Nullable;
 import androidx.core.widget.ImageViewCompat;
 import androidx.test.annotation.UiThreadTest;
 import androidx.test.filters.MediumTest;
@@ -210,13 +214,14 @@ public class TabListViewHolderTest {
     private TabListMediator.TabActionListener mMockCloseListener =
             new TabListMediator.TabActionListener() {
                 @Override
-                public void run(View view, int tabId) {
+                public void run(View view, int tabId, @Nullable MotionEvent triggeringMotionEvent) {
                     mCloseClicked.set(true);
                     mCloseTabId.set(tabId);
                 }
 
                 @Override
-                public void run(View view, String syncId) {}
+                public void run(
+                        View view, String syncId, @Nullable MotionEvent triggeringMotionEvent) {}
             };
     private AtomicBoolean mCloseClicked = new AtomicBoolean();
     private AtomicInteger mCloseTabId = new AtomicInteger();
@@ -224,13 +229,14 @@ public class TabListViewHolderTest {
     private TabListMediator.TabActionListener mMockSelectedListener =
             new TabListMediator.TabActionListener() {
                 @Override
-                public void run(View view, int tabId) {
+                public void run(View view, int tabId, @Nullable MotionEvent triggeringMotionEvent) {
                     mSelectClicked.set(true);
                     mSelectTabId.set(tabId);
                 }
 
                 @Override
-                public void run(View view, String syncId) {}
+                public void run(
+                        View view, String syncId, @Nullable MotionEvent triggeringMotionEvent) {}
             };
     private AtomicBoolean mSelectClicked = new AtomicBoolean();
     private AtomicInteger mSelectTabId = new AtomicInteger();
@@ -238,13 +244,14 @@ public class TabListViewHolderTest {
     private TabListMediator.TabActionListener mMockCreateGroupButtonListener =
             new TabListMediator.TabActionListener() {
                 @Override
-                public void run(View view, int tabId) {
+                public void run(View view, int tabId, @Nullable MotionEvent triggeringMotionEvent) {
                     mCreateGroupButtonClicked.set(true);
                     mCreateGroupTabId.set(tabId);
                 }
 
                 @Override
-                public void run(View view, String syncId) {}
+                public void run(
+                        View view, String syncId, @Nullable MotionEvent triggeringMotionEvent) {}
             };
     private AtomicBoolean mCreateGroupButtonClicked = new AtomicBoolean();
     private AtomicInteger mCreateGroupTabId = new AtomicInteger();
@@ -639,6 +646,64 @@ public class TabListViewHolderTest {
         mGridModel.set(TabProperties.THUMBNAIL_FETCHER, mMockThumbnailFetcher);
         assertThat(thumbnail.getDrawable(), instanceOf(BitmapDrawable.class));
         Assert.assertEquals(2, mThumbnailFetchedCount.get());
+    }
+
+    @Test
+    @MediumTest
+    @UiThreadTest
+    public void testCloseButtonClick() {
+        ImageView gridActionButton = mTabGridView.findViewById(R.id.action_button);
+        Assert.assertFalse(mCloseClicked.get());
+
+        gridActionButton.performClick();
+
+        Assert.assertTrue(mCloseClicked.get());
+        Assert.assertEquals(TAB1_ID, mCloseTabId.get());
+    }
+
+    @Test
+    @MediumTest
+    @UiThreadTest
+    public void testCloseButtonPeripheralClick() {
+        // Setup
+        ImageView gridActionButton = mTabGridView.findViewById(R.id.action_button);
+        Assert.assertFalse(mCloseClicked.get());
+
+        // Act: peripheral click is intercepted by an OnTouchListener, so we should dispatch
+        // MotionEvents to simulate a click.
+        long motionDownTime = SystemClock.uptimeMillis();
+        gridActionButton.dispatchTouchEvent(
+                TabUiTestHelper.createMouseMotionEvent(
+                        motionDownTime,
+                        /* eventTime= */ motionDownTime,
+                        MotionEvent.ACTION_DOWN,
+                        /* x= */ 0.0f,
+                        /* y= */ 0.0f));
+        gridActionButton.dispatchTouchEvent(
+                TabUiTestHelper.createMouseMotionEvent(
+                        motionDownTime,
+                        /* eventTime= */ motionDownTime + 200,
+                        MotionEvent.ACTION_UP,
+                        /* x= */ 0.0f,
+                        /* y= */ 0.0f));
+
+        // Assert
+        Assert.assertTrue(mCloseClicked.get());
+        Assert.assertEquals(TAB1_ID, mCloseTabId.get());
+    }
+
+    @Test
+    @MediumTest
+    @UiThreadTest
+    public void testCloseButtonA11yClick() {
+        ImageView gridActionButton = mTabGridView.findViewById(R.id.action_button);
+        Assert.assertFalse(mCloseClicked.get());
+
+        gridActionButton.performAccessibilityAction(
+                AccessibilityNodeInfo.ACTION_CLICK, /* arguments= */ null);
+
+        Assert.assertTrue(mCloseClicked.get());
+        Assert.assertEquals(TAB1_ID, mCloseTabId.get());
     }
 
     @Test

@@ -9,7 +9,6 @@ import static androidx.test.espresso.matcher.ViewMatchers.withText;
 
 import static org.chromium.base.test.transit.ViewSpec.viewSpec;
 
-import org.chromium.base.test.transit.Elements;
 import org.chromium.base.test.transit.ViewElementMatchesCondition;
 import org.chromium.base.test.transit.ViewSpec;
 import org.chromium.chrome.browser.hub.PaneId;
@@ -24,6 +23,13 @@ public class RegularTabSwitcherStation extends TabSwitcherStation {
 
     public RegularTabSwitcherStation(boolean regularTabsExist, boolean incognitoTabsExist) {
         super(/* isIncognito= */ false, regularTabsExist, incognitoTabsExist);
+
+        assert regularTabsButtonElement != null;
+        declareEnterCondition(
+                new ViewElementMatchesCondition(regularTabsButtonElement, isSelected()));
+        if (!mRegularTabsExist) {
+            declareView(EMPTY_STATE_TEXT);
+        }
     }
 
     /**
@@ -40,17 +46,6 @@ public class RegularTabSwitcherStation extends TabSwitcherStation {
         return PaneId.TAB_SWITCHER;
     }
 
-    @Override
-    public void declareElements(Elements.Builder elements) {
-        super.declareElements(elements);
-        assert regularTabsButtonElement != null;
-        elements.declareEnterCondition(
-                new ViewElementMatchesCondition(regularTabsButtonElement, isSelected()));
-        if (!mRegularTabsExist) {
-            elements.declareView(EMPTY_STATE_TEXT);
-        }
-    }
-
     /** Open a new tab using the New Tab action button. */
     public RegularNewTabPageStation openNewTab() {
         recheckActiveConditions();
@@ -62,5 +57,10 @@ public class RegularTabSwitcherStation extends TabSwitcherStation {
                         .build();
 
         return travelToSync(page, newTabButtonElement.getClickTrigger());
+    }
+
+    public ArchiveMessageCardFacility expectArchiveMessageCard() {
+        return enterFacilitySync(
+                new ArchiveMessageCardFacility(/* tabSwitcherStation= */ this), null);
     }
 }
