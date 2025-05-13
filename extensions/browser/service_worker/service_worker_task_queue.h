@@ -156,7 +156,7 @@ class ServiceWorkerTaskQueue
   // Browser process worker state of an activated extension.
   enum class BrowserState {
     // Initial state, not started.
-    kInitial,
+    kNotStarted,
     // Worker has completed starting at least once (i.e. has seen
     // DidStartWorkerForScope).
     kStarted,
@@ -185,12 +185,16 @@ class ServiceWorkerTaskQueue
 
     void SetWorkerId(const WorkerId& worker_id,
                      ProcessManager* process_manager);
-    void ResetWorkerId() { worker_id_.reset(); }
     void SetBrowserState(BrowserState browser_state) {
       browser_state_ = browser_state;
     }
     void SetRendererState(RendererState renderer_state) {
       renderer_state_ = renderer_state;
+    }
+    void Reset() {
+      worker_id_.reset();
+      browser_state_ = BrowserState::kNotStarted;
+      renderer_state_ = RendererState::kNotActive;
     }
 
     bool ready() const;
@@ -201,7 +205,7 @@ class ServiceWorkerTaskQueue
     const std::optional<WorkerId>& worker_id() const { return worker_id_; }
 
    private:
-    BrowserState browser_state_ = BrowserState::kInitial;
+    BrowserState browser_state_ = BrowserState::kNotStarted;
     RendererState renderer_state_ = RendererState::kNotActive;
 
     // Contains the worker's WorkerId associated with this WorkerState, once we

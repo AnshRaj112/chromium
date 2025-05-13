@@ -1397,8 +1397,8 @@ const FeatureEntry::FeatureParam kOmniboxSearchAggregatorAlternateParams[] = {
      "locations/global/collections/default_collection/engines/"
      "neuravibeblendedsearch_1727383849310/completionConfig:completeQuery"}};
 const FeatureEntry::FeatureParam kOmniboxSearchAggregatorDemoParams[] = {
-    {"name", "NeuraVibe"},
-    {"shortcut", "nv"},
+    {"name", "Neuravibe"},
+    {"shortcut", "neura"},
     {"icon_url", "https://gstatic.com/vertexaisearch/favicon.png"},
     {"search_url",
      "https://vertexaisearch.cloud.google.com/home/cid/"
@@ -2480,18 +2480,32 @@ const FeatureEntry::FeatureParam
         {"mode", features::kPredictionTypeTimeBased},
         {"latency", features::kPredictionTypeDefaultTime}};
 const FeatureEntry::FeatureParam
-    kResamplingScrollEventsPredictionFramesBasedEnabled[] = {
+    kResamplingScrollEventsPredictionFramesBasedEnabledV1[] = {
         {"mode", features::kPredictionTypeFramesBased},
-        {"latency", features::kPredictionTypeDefaultFramesRatio}};
+        {"latency", features::kPredictionTypeDefaultFramesVariation1}};
+const FeatureEntry::FeatureParam
+    kResamplingScrollEventsPredictionFramesBasedEnabledV2[] = {
+        {"mode", features::kPredictionTypeFramesBased},
+        {"latency", features::kPredictionTypeDefaultFramesVariation2}};
+const FeatureEntry::FeatureParam
+    kResamplingScrollEventsPredictionFramesBasedEnabledV3[] = {
+        {"mode", features::kPredictionTypeFramesBased},
+        {"latency", features::kPredictionTypeDefaultFramesVariation3}};
 const FeatureEntry::FeatureVariation
     kResamplingScrollEventsExperimentalPredictionVariations[] = {
         {features::kPredictionTypeTimeBased,
          kResamplingScrollEventsPredictionTimeBasedEnabled,
          std::size(kResamplingScrollEventsPredictionTimeBasedEnabled), nullptr},
-        {features::kPredictionTypeFramesBased,
-         kResamplingScrollEventsPredictionFramesBasedEnabled,
-         std::size(kResamplingScrollEventsPredictionFramesBasedEnabled),
-         nullptr}};
+        {"frames 0.25", kResamplingScrollEventsPredictionFramesBasedEnabledV1,
+         std::size(kResamplingScrollEventsPredictionFramesBasedEnabledV1),
+         nullptr},
+        {"frames 0.375", kResamplingScrollEventsPredictionFramesBasedEnabledV2,
+         std::size(kResamplingScrollEventsPredictionFramesBasedEnabledV2),
+         nullptr},
+        {"frames 0.5", kResamplingScrollEventsPredictionFramesBasedEnabledV3,
+         std::size(kResamplingScrollEventsPredictionFramesBasedEnabledV3),
+         nullptr},
+};
 
 const FeatureEntry::FeatureParam
     kShowWarningsForSuspiciousNotificationsScoreThreshold70[] = {
@@ -6627,13 +6641,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(omnibox_feature_configs::ContextualSearch::
                             kContextualSearchBoxUsesContextualSearchProvider)},
 
-    {"omnibox-contextual-search-actions-at-top",
-     flag_descriptions::kOmniboxContextualSearchActionsAtTopName,
-     flag_descriptions::kOmniboxContextualSearchActionsAtTopDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(omnibox_feature_configs::ContextualSearch::
-                            kOmniboxContextualSearchActionsAtTop)},
-
     {"omnibox-contextual-search-on-focus-suggestions",
      flag_descriptions::kOmniboxContextualSearchOnFocusSuggestionsName,
      flag_descriptions::kOmniboxContextualSearchOnFocusSuggestionsDescription,
@@ -6643,13 +6650,6 @@ const FeatureEntry kFeatureEntries[] = {
              kOmniboxContextualSearchOnFocusSuggestions,
          kOmniboxContextualSearchOnFocusSuggestionsVariations,
          "OmniboxContextualSearchOnFocusSuggestions")},
-
-    {"omnibox-contextual-search-single-lens-action",
-     flag_descriptions::kOmniboxContextualSearchSingleLensActionName,
-     flag_descriptions::kOmniboxContextualSearchSingleLensActionDescription,
-     kOsDesktop,
-     FEATURE_VALUE_TYPE(omnibox_feature_configs::ContextualSearch::
-                            kOmniboxContextualSearchSingleLensAction)},
 
     {"omnibox-contextual-suggestions",
      flag_descriptions::kOmniboxContextualSuggestionsName,
@@ -9675,6 +9675,15 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kReduceTransferSizeUpdatedIPCDescription, kOsAll,
      FEATURE_VALUE_TYPE(network::features::kReduceTransferSizeUpdatedIPC)},
 
+#if BUILDFLAG(IS_LINUX)
+    {"reduce-user-agent-data-linux-platform-version",
+     flag_descriptions::kReduceUserAgentDataLinuxPlatformVersionName,
+     flag_descriptions::kReduceUserAgentDataLinuxPlatformVersionDescription,
+     kOsLinux,
+     FEATURE_VALUE_TYPE(
+         blink::features::kReduceUserAgentDataLinuxPlatformVersion)},
+#endif  // BUILDFLAG(IS_LINUX)
+
 #if BUILDFLAG(IS_CHROMEOS)
     {"enable-variable-refresh-rate",
      flag_descriptions::kEnableVariableRefreshRateName,
@@ -10747,6 +10756,13 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAndroidTabDeclutterAutoDeleteName,
      flag_descriptions::kAndroidTabDeclutterAutoDeleteDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kAndroidTabDeclutterAutoDelete)},
+
+    {"android-tab-declutter-auto-delete-kill-switch",
+     flag_descriptions::kAndroidTabDeclutterAutoDeleteKillSwitchName,
+     flag_descriptions::kAndroidTabDeclutterAutoDeleteKillSwitchDescription,
+     kOsAndroid,
+     FEATURE_VALUE_TYPE(
+         chrome::android::kAndroidTabDeclutterAutoDeleteKillSwitch)},
 
     {"android-tab-declutter-performance-improvements",
      flag_descriptions::kAndroidTabDeclutterPerformanceImprovementsName,
@@ -12410,6 +12426,12 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kAndroidWebAppLaunchHandlerDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(features::kAndroidWebAppLaunchHandler)},
 #endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_WIN)
+    {"ui-automation-provider", flag_descriptions::kUiaProviderName,
+     flag_descriptions::kUiaProviderDescription, kOsWin,
+     FEATURE_VALUE_TYPE(features::kUiaProvider)},
+#endif
 
     // Add new entries above this line.
 

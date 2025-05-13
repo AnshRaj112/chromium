@@ -20,7 +20,7 @@ import org.chromium.build.annotations.CheckDiscard;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.omnibox.R;
-import org.chromium.chrome.browser.omnibox.suggestions.SelectionController;
+import org.chromium.chrome.browser.omnibox.suggestions.SimpleSelectionController;
 import org.chromium.chrome.browser.util.KeyNavigationUtil;
 import org.chromium.components.browser_ui.widget.RoundedCornerOutlineProvider;
 
@@ -42,8 +42,8 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
     public final ActionChipsView actionChipsView;
     public final RoundedCornerOutlineProvider decorationIconOutline;
     private final List<ImageView> mActionButtons;
+    private final SimpleSelectionController mActionButtonsHighlighter;
     private Optional<Runnable> mOnFocusViaSelectionListener = Optional.empty();
-    private @Nullable SelectionController mActionButtonsHighlighter;
 
     /**
      * Constructs a new suggestion view and inflates supplied layout as the contents view.
@@ -85,6 +85,12 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
         contentView.setLayoutParams(
                 LayoutParams.forViewType(LayoutParams.SuggestionViewType.CONTENT));
         addView(contentView);
+
+        mActionButtonsHighlighter =
+                new SimpleSelectionController(
+                        this::highlightActionButton,
+                        0,
+                        SimpleSelectionController.Mode.SATURATING_WITH_SENTINEL);
     }
 
     /**
@@ -101,14 +107,7 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
             decreaseActionButtonsCount(desiredViewCount);
         }
 
-        mActionButtonsHighlighter = null;
-        if (desiredViewCount > 0) {
-            mActionButtonsHighlighter =
-                    new SelectionController(
-                            this::highlightActionButton,
-                            desiredViewCount - 1,
-                            SelectionController.Mode.SATURATING_WITH_SENTINEL);
-        }
+        mActionButtonsHighlighter.setItemCount(desiredViewCount);
     }
 
     /**
@@ -123,9 +122,8 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
      *
      * @param buttonIndex the index of an action button
      * @param isSelected whether to apply hairline
-     * @return the highlight state of the specified action button.
      */
-    private boolean highlightActionButton(int buttonIndex, boolean isHighlighted) {
+    private void highlightActionButton(int buttonIndex, boolean isHighlighted) {
         mActionButtons
                 .get(buttonIndex)
                 .setForeground(
@@ -133,7 +131,6 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
                                 ? AppCompatResources.getDrawable(
                                         getContext(), R.drawable.hairline_circle)
                                 : null);
-        return isHighlighted;
     }
 
     /**
@@ -173,8 +170,7 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
         // navigation.
         if (actionChipsView.onKeyDown(keyCode, event)) return true;
         if (KeyNavigationUtil.isEnter(event)) {
-            if (mActionButtonsHighlighter != null
-                    && !mActionButtonsHighlighter.isParkedAtSentinel()) {
+            if (!mActionButtonsHighlighter.isParkedAtSentinel()) {
                 OptionalInt selection = mActionButtonsHighlighter.getPosition();
                 return mActionButtons.get(selection.getAsInt()).performClick();
             }
@@ -185,16 +181,11 @@ public class BaseSuggestionView<T extends View> extends SuggestionLayout {
         if (keyCode == KeyEvent.KEYCODE_TAB) {
             if (!event.isShiftPressed()) {
                 // Pass the TAB key to Action Buttons, then to Action Chips.
-                if (mActionButtonsHighlighter != null
-                        && mActionButtonsHighlighter.advanceForward()) {
-                    return true;
-                }
-                return super_onKeyDown(keyCode, event);
+                return mActionButtonsHighlighter.advanceForward()
+                        || super_onKeyDown(keyCode, event);
             } else {
                 // Pass the TAB key to Action Chips, then to Action Buttons.
-                if (super_onKeyDown(keyCode, event)) return true;
-                return (mActionButtonsHighlighter != null
-                        && mActionButtonsHighlighter.advanceBack());
+                return super_onKeyDown(keyCode, event) || mActionButtonsHighlighter.advanceBack();
             }
         }
 

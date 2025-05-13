@@ -256,14 +256,13 @@ RevokedPermissionsService::RevokedPermissionsResult::Clone() const {
 }
 
 void RevokedPermissionsService::RevokedPermissionsResult::AddRevokedPermission(
-    const PermissionsData& permissions_data) {
+    PermissionsData permissions_data) {
   revoked_permissions_.push_back(std::move(permissions_data));
 }
 
-std::list<PermissionsData>
+const std::list<PermissionsData>&
 RevokedPermissionsService::RevokedPermissionsResult::GetRevokedPermissions() {
-  std::list<PermissionsData> result(revoked_permissions_);
-  return result;
+  return revoked_permissions_;
 }
 
 std::set<ContentSettingsPattern>
@@ -350,7 +349,7 @@ void RevokedPermissionsService::TabHelper::PrimaryPageChanged(
     content::Page& page) {
   Profile* profile =
       Profile::FromBrowserContext(web_contents()->GetBrowserContext());
-  DisruptiveNotificationPermissionsManager::CheckForFalsePositive(
+  DisruptiveNotificationPermissionsManager::MaybeReportFalsePositive(
       profile, page.GetMainDocument().GetLastCommittedURL(),
       DisruptiveNotificationPermissionsManager::FalsePositiveReason::kPageVisit,
       page.GetMainDocument().GetPageUkmSourceId());
@@ -449,7 +448,7 @@ RevokedPermissionsService::RevokedPermissionsService(
   }
 
   if (base::FeatureList::IsEnabled(
-          safe_browsing::kSafetyHubDisruptiveNotificationRevocation)) {
+          features::kSafetyHubDisruptiveNotificationRevocation)) {
     disruptive_notification_manager_ =
         std::make_unique<DisruptiveNotificationPermissionsManager>(
             hcsm(),
@@ -876,8 +875,8 @@ RevokedPermissionsService::GetRevokedPermissions() {
       }
       permissions_data.revocation_type =
           PermissionsRevocationType::kUnusedPermissionsAndAbusiveNotifications;
-    } else if (safety_hub_util::IsUrlRevokedDisruptiveNotification(hcsm(),
-                                                                   url)) {
+    } else if (DisruptiveNotificationPermissionsManager::
+                   IsUrlRevokedDisruptiveNotification(hcsm(), url)) {
       // If the origin has a revoked disruptive notification, add
       // `NOTIFICATIONS` to the list of revoked permissions.
       CHECK(disruptive_notification_manager_);

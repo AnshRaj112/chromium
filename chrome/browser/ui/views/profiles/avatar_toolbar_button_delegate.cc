@@ -510,7 +510,8 @@ class ShowIdentityNameStateProvider : public StateProvider,
 
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
 class HistorySyncOptinCoordinator : public base::SupportsUserData::Data,
-                                    public StateManagerObserver {
+                                    public StateManagerObserver,
+                                    public signin::IdentityManager::Observer {
  public:
   static HistorySyncOptinCoordinator& GetOrCreateForProfile(Profile& profile) {
     HistorySyncOptinCoordinator* coordinator =
@@ -593,6 +594,22 @@ class HistorySyncOptinCoordinator : public base::SupportsUserData::Data,
     }
   }
 
+  // IdentityManager::Observer:
+  void OnPrimaryAccountChanged(
+      const signin::PrimaryAccountChangeEvent& event) override {
+    if (event.GetEventTypeFor(signin::ConsentLevel::kSync) ==
+        signin::PrimaryAccountChangeEvent::Type::kSet) {
+      // Needed to prevent the promo from showing when it is already triggered
+      // and the user turns on sync from a different entry point (e.g.
+      // settings).
+      Collapse();
+    }
+  }
+
+  void OnIdentityManagerShutdown(signin::IdentityManager*) override {
+    identity_manager_observation_.Reset();
+  }
+
  private:
   constexpr static const void* const kHistorySyncOptinCoordinatorKey =
       &kHistorySyncOptinCoordinatorKey;
@@ -609,6 +626,8 @@ class HistorySyncOptinCoordinator : public base::SupportsUserData::Data,
                 // This is safe because `HistorySyncOptinCoordinator`
                 // owns `CallbackListSubscription`.
                 base::Unretained(this)));
+    identity_manager_observation_.Observe(
+        IdentityManagerFactory::GetForProfile(&profile));
   }
 
   void Trigger(signin_metrics::AccessPoint access_point) {
@@ -708,6 +727,10 @@ class HistorySyncOptinCoordinator : public base::SupportsUserData::Data,
   // Callbacks to be triggered when the history sync opt-in state (`triggered_`)
   // changes.
   base::RepeatingCallbackList<void()> state_changed_callbacks;
+
+  base::ScopedObservation<signin::IdentityManager,
+                          signin::IdentityManager::Observer>
+      identity_manager_observation_{this};
 };
 
 class HistorySyncOptinStateProvider : public StateProvider {
@@ -1685,6 +1708,7 @@ AvatarToolbarButtonDelegate::GetTextAndColor(
                                            guest_window_count));
       text = l10n_util::GetPluralStringFUTF16(IDS_AVATAR_BUTTON_GUEST,
                                               guest_window_count);
+      color = color_provider->GetColor(kColorAvatarButtonHighlightNormal);
       break;
     }
     case ButtonState::kManagement: {
@@ -1780,13 +1804,13 @@ SkColor AvatarToolbarButtonDelegate::GetHighlightTextColor(
     case ButtonState::kPassphraseError:
     case ButtonState::kSyncPaused:
     case ButtonState::kExplicitTextShowing:
-    case ButtonState::kGuestSession:
     case ButtonState::kShowIdentityName:
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
     case ButtonState::kHistorySyncOptin:
 #endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
       return color_provider->GetColor(
           kColorAvatarButtonHighlightDefaultForeground);
+    case ButtonState::kGuestSession:
     case ButtonState::kNormal:
       return color_provider->GetColor(
           kColorAvatarButtonHighlightNormalForeground);
@@ -1919,6 +1943,7 @@ ui::ImageModel AvatarToolbarButtonDelegate::GetAvatarIcon(
 bool AvatarToolbarButtonDelegate::ShouldPaintBorder() const {
   switch (state_manager_->GetButtonActiveState()) {
     case ButtonState::kGuestSession:
+      return true;
     case ButtonState::kShowIdentityName:
     case ButtonState::kNormal:
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)

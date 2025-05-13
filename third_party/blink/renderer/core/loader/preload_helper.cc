@@ -601,7 +601,8 @@ void PreloadHelper::ModulePreloadIfNeeded(
       modulator->TaskRunner()->PostTask(
           FROM_HERE,
           WTF::BindOnce(&SingleModuleClient::NotifyModuleLoadFinished,
-                        WrapPersistent(client), nullptr));
+                        WrapPersistent(client), nullptr,
+                        ModuleImportPhase::kEvaluation));
     }
     return;
   }
@@ -675,7 +676,8 @@ void PreloadHelper::ModulePreloadIfNeeded(
                          params.referrer_policy,
                          mojom::blink::FetchPriorityHint::kAuto,
                          RenderBlockingBehavior::kNonBlocking),
-      Referrer::NoReferrer(), TextPosition::MinimumPosition());
+      Referrer::NoReferrer(), TextPosition::MinimumPosition(),
+      ModuleImportPhase::kEvaluation);
 
   // Step 13. "Fetch a modulepreload module script graph given url, destination,
   // settings object, and options. Wait until the algorithm asynchronously
@@ -790,6 +792,10 @@ void PreloadHelper::LoadLinksFromHeader(
     const base::UnguessableToken* recursive_prefetch_token) {
   if (header_value.empty())
     return;
+
+  base::UmaHistogramEnumeration("Blink.LinkHeader.LoadLinksFromHeaderMode",
+                                mode);
+
   LinkHeaderSet header_set(header_value);
   for (auto& header : header_set) {
     if (!header.Valid() || header.Url().empty() || header.Rel().empty()) {

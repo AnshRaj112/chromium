@@ -15,10 +15,10 @@ source_set("lens") {
     "lens_overlay_entry_point_controller.h",
     "lens_overlay_gen204_controller.h",
     "lens_overlay_image_helper.h",
-    "lens_searchbox_controller.h",
     "lens_overlay_side_panel_navigation_throttle.h",
     "lens_overlay_untrusted_ui.h",
     "lens_search_controller.h",
+    "lens_searchbox_controller.h",
     "lens_side_panel_untrusted_ui.h",
   ]
   friend = [
@@ -75,7 +75,10 @@ source_set("lens") {
   ]
 
   if (enable_pdf) {
-    public_deps += [ "//pdf/mojom" ]
+    public_deps += [
+      "//components/pdf/browser",
+      "//pdf/mojom",
+    ]
   }
 }
 
@@ -232,12 +235,14 @@ source_set("browser_tests") {
     "//chrome/browser/themes",
     "//chrome/browser/ui",
     "//chrome/browser/ui:browser_element_identifiers",
+    "//chrome/browser/ui:ui_features",
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/exclusive_access",
     "//chrome/browser/ui/find_bar",
     "//chrome/browser/ui/hats",
     "//chrome/browser/ui/hats:test_support",
     "//chrome/browser/ui/tabs:tabs_public",
+    "//chrome/browser/ui/views/page_action",
     "//chrome/browser/ui/views/side_panel",
     "//chrome/test:test_support",
     "//chrome/test:test_support_ui",

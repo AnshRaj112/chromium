@@ -8,6 +8,7 @@
 #include <string>
 
 #include "base/supports_user_data.h"
+#include "chrome/browser/glic/media/glic_media_page_cache.h"
 
 namespace content {
 class Page;
@@ -20,7 +21,8 @@ struct SpeechRecognitionResult;
 
 namespace glic {
 
-class GlicMediaContext : public base::SupportsUserData::Data {
+class GlicMediaContext : public base::SupportsUserData::Data,
+                         public GlicMediaPageCache::Entry {
  public:
   // Get or create for the current page for `web_contents`, or null if either
   // `web_contents` is null or it has no page.
@@ -30,11 +32,12 @@ class GlicMediaContext : public base::SupportsUserData::Data {
   ~GlicMediaContext() override;
 
   void OnResult(const media::SpeechRecognitionResult&);
-  const std::string& GetContext() const;
+  std::string GetContext() const;
 
  private:
   raw_ptr<content::Page> page_ = nullptr;
   std::string text_context_;
+  std::string most_recent_nonfinal_;
 };
 
 }  // namespace glic

@@ -1831,18 +1831,11 @@ void Browser::TabStripEmpty() {
   instant_controller_.reset();
 }
 
-void Browser::OnSplitTabCreated(
-    std::vector<std::pair<tabs::TabInterface*, int>> tabs,
-    split_tabs::SplitTabId split_id,
-    SplitTabAddReason reason,
-    split_tabs::SplitTabVisualData visual_data) {
-  UpdateBookmarkBarState(BOOKMARK_BAR_STATE_CHANGE_SPLIT_TAB_CHANGE);
-}
-void Browser::OnSplitTabRemoved(
-    std::vector<std::pair<tabs::TabInterface*, int>> tabs,
-    split_tabs::SplitTabId split_id,
-    SplitTabRemoveReason reason) {
-  UpdateBookmarkBarState(BOOKMARK_BAR_STATE_CHANGE_SPLIT_TAB_CHANGE);
+void Browser::OnSplitTabChanged(const SplitTabChange& change) {
+  if (change.type == SplitTabChange::Type::kAdded ||
+      change.type == SplitTabChange::Type::kRemoved) {
+    UpdateBookmarkBarState(BOOKMARK_BAR_STATE_CHANGE_SPLIT_TAB_CHANGE);
+  }
 }
 
 void Browser::SetTopControlsShownRatio(content::WebContents* web_contents,
@@ -1910,6 +1903,10 @@ bool Browser::PreHandleMouseEvent(content::WebContents* source,
 void Browser::PreHandleDragUpdate(const content::DropData& drop_data,
                                   const gfx::PointF& client_pt) {
   window()->PreHandleDragUpdate(drop_data, client_pt);
+}
+
+void Browser::PreHandleDragExit() {
+  window()->PreHandleDragExit();
 }
 
 content::KeyboardEventProcessingResult Browser::PreHandleKeyboardEvent(

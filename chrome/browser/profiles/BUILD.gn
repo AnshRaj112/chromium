@@ -241,6 +241,7 @@ source_set("profiles_extra_parts_impl") {
     "//chrome/browser/plus_addresses",
     "//chrome/browser/prefs",
     "//chrome/browser/preloading/search_preload",
+    "//chrome/browser/privacy_sandbox/notice:factory",
     "//chrome/browser/reading_list",
     "//chrome/browser/regional_capabilities",
     "//chrome/browser/safe_browsing",
@@ -294,6 +295,7 @@ source_set("profiles_extra_parts_impl") {
       "//chrome/browser/commerce/merchant_viewer:merchant_viewer_data_manager",
       "//chrome/browser/fast_checkout",
       "//components/commerce/core:merchant_signal_db_proto",
+      "//components/payments/content/browser_binding:browser_bound_keys_deleter_factory",
     ]
   } else {
     deps += [

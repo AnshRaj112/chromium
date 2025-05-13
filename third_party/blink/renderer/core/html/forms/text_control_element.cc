@@ -66,6 +66,7 @@
 #include "third_party/blink/renderer/platform/bindings/exception_state.h"
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
+#include "third_party/blink/renderer/platform/wtf/text/strcat.h"
 #include "third_party/blink/renderer/platform/wtf/text/string_builder.h"
 
 namespace blink {
@@ -377,9 +378,9 @@ void TextControlElement::setRangeText(const String& replacement,
   if (start > end) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kIndexSizeError,
-        "The provided start value (" + String::Number(start) +
-            ") is larger than the provided end value (" + String::Number(end) +
-            ").");
+        WTF::StrCat({"The provided start value (", String::Number(start),
+                     ") is larger than the provided end value (",
+                     String::Number(end), ")."}));
     return;
   }
   if (OpenShadowRoot())
@@ -917,17 +918,24 @@ bool TextControlElement::IsPlaceholderBreakElement(const Node* node) {
              shadow_element_names::kIdPlaceholderBreak;
 }
 
-void TextControlElement::AddPlaceholderBreakElementIfNecessary() {
+void TextControlElement::AdjustPlaceholderBreakElement() {
   HTMLElement* inner_editor = InnerEditorElement();
   if (inner_editor->GetLayoutObject() &&
       inner_editor->GetLayoutObject()->Style()->ShouldCollapseBreaks()) {
     return;
   }
-  const Node* last_child = inner_editor->lastChild();
+  Node* last_child = inner_editor->lastChild();
   if (RuntimeEnabledFeatures::TextareaLineEndingsAsBrEnabled() &&
-      IsA<HTMLBRElement>(last_child) &&
-      !IsPlaceholderBreakElement(last_child)) {
-    inner_editor->AppendChild(CreatePlaceholderBreakElement());
+      IsA<HTMLBRElement>(last_child)) {
+    if (!IsPlaceholderBreakElement(last_child)) {
+      inner_editor->AppendChild(CreatePlaceholderBreakElement());
+    } else if (IsPlaceholderBreakElement(last_child->previousSibling())) {
+      // Some editing commands removes the placeholder break, and this removal
+      // operation is recorded to UndoStack. If an undo is executed, the
+      // placeholder break is added back even if another placeholder break
+      // exists.
+      last_child->remove();
+    }
     return;
   }
   auto* last_child_text_node = DynamicTo<Text>(last_child);
@@ -968,7 +976,7 @@ void TextControlElement::SetInnerEditorValue(const String& value) {
 
   // Add a placeholder <br> so that we can put the caret at the next line of
   // the last newline.
-  AddPlaceholderBreakElementIfNecessary();
+  AdjustPlaceholderBreakElement();
 
   if (text_is_changed && GetLayoutObject()) {
     if (AXObjectCache* cache = GetDocument().ExistingAXObjectCache())

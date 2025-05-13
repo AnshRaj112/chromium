@@ -56,6 +56,7 @@ import org.chromium.ui.util.ColorUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -223,6 +224,11 @@ public class InstantMessageDelegateImpl implements InstantMessageDelegate {
         }
     }
 
+    @Override
+    public void hideInstantaneousMessage(Set<String> messageIds) {
+        // TODO(crbug.com/416264627): Implement this.
+    }
+
     private @Nullable AttachedWindowInfo getAttachedWindowInfo(
             InstantMessage message, boolean fallbackToLastFocusedWindow) {
         if (mAttachList.size() == 0) {
@@ -369,7 +375,6 @@ public class InstantMessageDelegateImpl implements InstantMessageDelegate {
                     if (mTabGroupSyncService.getGroup(syncId) == null) return;
 
                     dataSharingTabManager.createOrManageFlow(
-                            activity,
                             EitherGroupId.createSyncId(syncId),
                             CollaborationServiceShareOrManageEntryPoint.ANDROID_MESSAGE,
                             /* createGroupFinishedCallback= */ null);

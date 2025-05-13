@@ -97,7 +97,7 @@ ImageResourceContent* StyleFetchedImage::CachedImage() const {
 
 CSSValue* StyleFetchedImage::CssValue() const {
   return MakeGarbageCollected<CSSImageValue>(
-      *url_data_->MakeAbsolute(), const_cast<StyleFetchedImage*>(this));
+      *url_data_->MakeComputed(), const_cast<StyleFetchedImage*>(this));
 }
 
 CSSValue* StyleFetchedImage::ComputedCSSValue(const ComputedStyle&,
@@ -255,7 +255,7 @@ scoped_refptr<Image> StyleFetchedImage::GetImage(
 
 bool StyleFetchedImage::KnownToBeOpaque(const Document&,
                                         const ComputedStyle&) const {
-  return image_->GetImage()->CurrentFrameKnownToBeOpaque();
+  return image_->GetImage()->IsOpaque();
 }
 
 void StyleFetchedImage::LoadDeferredImage(const Document& document) {

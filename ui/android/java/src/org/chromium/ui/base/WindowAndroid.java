@@ -42,12 +42,12 @@ import org.chromium.base.ActivityState;
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.Callback;
 import org.chromium.base.ContextUtils;
-import org.chromium.base.LifetimeAssert;
 import org.chromium.base.Log;
 import org.chromium.base.ObserverList;
 import org.chromium.base.PackageManagerUtils;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.UnownedUserDataHost;
+import org.chromium.base.lifetime.LifetimeAssert;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.task.PostTask;
@@ -112,11 +112,11 @@ public class WindowAndroid
     private final ImmutableWeakReference<Context> mContextRef;
 
     // We track all animations over content and provide a drawing placeholder for them.
-    private HashSet<Animator> mAnimationsOverContent = new HashSet<>();
+    private final HashSet<Animator> mAnimationsOverContent = new HashSet<>();
     private @Nullable View mAnimationPlaceholderView;
 
     /** A mechanism for observing and updating the application window's bottom inset. */
-    private ApplicationViewportInsetSupplier mApplicationBottomInsetSupplier =
+    private final ApplicationViewportInsetSupplier mApplicationBottomInsetSupplier =
             new ApplicationViewportInsetSupplier();
 
     private @Nullable AndroidPermissionDelegate mPermissionDelegate;
@@ -186,7 +186,8 @@ public class WindowAndroid
         default void onActivityDestroyed() {}
     }
 
-    private ObserverList<ActivityStateObserver> mActivityStateObservers = new ObserverList<>();
+    private final ObserverList<ActivityStateObserver> mActivityStateObservers =
+            new ObserverList<>();
 
     /** An interface to notify listeners of the changes in selection handles state. */
     public interface SelectionHandlesObserver {
@@ -195,7 +196,7 @@ public class WindowAndroid
     }
 
     private boolean mSelectionHandlesActive;
-    private ObserverList<SelectionHandlesObserver> mSelectionHandlesObservers =
+    private final ObserverList<SelectionHandlesObserver> mSelectionHandlesObservers =
             new ObserverList<>();
 
     private final boolean mAllowChangeRefreshRate;

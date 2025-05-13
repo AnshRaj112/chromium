@@ -514,9 +514,7 @@ BASE_FEATURE(kGlicWarmMultiple,
 
 BASE_FEATURE(kGlicTieredRollout,
              "GlicTieredRollout",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-const base::FeatureParam<std::string> kGlicTieredRolloutAllowedGroup{
-    &kGlicTieredRollout, "glic-tiered-rollout-allowed-group", ""};
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGlicRollout, "GlicRollout", base::FEATURE_DISABLED_BY_DEFAULT);
 
@@ -1151,6 +1149,60 @@ BASE_FEATURE(kSafetyHubThreeDotDetails,
              "SafetyHubThreeDotDetails",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kSafetyHubDisruptiveNotificationRevocation,
+             "SafetyHubDisruptiveNotificationRevocation",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+constexpr base::FeatureParam<bool>
+    kSafetyHubDisruptiveNotificationRevocationShadowRun{
+        &kSafetyHubDisruptiveNotificationRevocation,
+        /*name=*/"shadow_run", /*default_value=*/true};
+
+constexpr base::FeatureParam<int>
+    kSafetyHubDisruptiveNotificationRevocationMinNotificationCount{
+        &kSafetyHubDisruptiveNotificationRevocation,
+        /*name=*/"min_notification_count", /*default_value=*/3};
+
+constexpr base::FeatureParam<double>
+    kSafetyHubDisruptiveNotificationRevocationMaxEngagementScore{
+        &kSafetyHubDisruptiveNotificationRevocation,
+        /*name=*/"max_engagement_score", /*default_value=*/0.0};
+
+constexpr base::FeatureParam<int>
+    kSafetyHubDisruptiveNotificationRevocationNotificationTimeoutSeconds{
+        &kSafetyHubDisruptiveNotificationRevocation,
+        /*name=*/"notification_timeout_seconds",
+        /*default_value=*/7 * 24 * 3600};
+
+constexpr base::FeatureParam<int>
+    kSafetyHubDisruptiveNotificationRevocationMinFalsePositiveCooldown{
+        &kSafetyHubDisruptiveNotificationRevocation,
+        /*name=*/"min_false_positive_cooldown", /*default_value=*/0};
+
+constexpr base::FeatureParam<int>
+    kSafetyHubDisruptiveNotificationRevocationMaxFalsePositivePeriod{
+        &kSafetyHubDisruptiveNotificationRevocation,
+        /*name=*/"max_false_positive_period", /*default_value=*/14};
+
+// TODO(crbug.com/406472515): Site engagement score increase on navigation
+// happens at the same time as us detecting the navigation. If the score delta
+// is 0, the initial navigation won't trigger marking the site as false
+// positive.
+constexpr base::FeatureParam<double>
+    kSafetyHubDisruptiveNotificationRevocationMinSiteEngagementScoreDelta{
+        &kSafetyHubDisruptiveNotificationRevocation,
+        /*name=*/"min_engagement_score_delta", /*default_value=*/0.0};
+
+constexpr base::FeatureParam<int>
+    kSafetyHubDisruptiveNotificationRevocationUserRegrantWaitingPeriod{
+        &kSafetyHubDisruptiveNotificationRevocation,
+        /*name=*/"user_regrant_waiting_period", /*default_value=*/7};
+
+constexpr base::FeatureParam<int>
+    kSafetyHubDisruptiveNotificationRevocationWaitingForMetricsDays{
+        &kSafetyHubDisruptiveNotificationRevocation,
+        /*name=*/"waiting_for_metrics_days", /*default_value=*/7};
+
 #if BUILDFLAG(IS_ANDROID)
 // Enables Safety Hub card in magic stack.
 BASE_FEATURE(kSafetyHubMagicStack,
@@ -1675,7 +1727,7 @@ BASE_FEATURE(kSupportsRtcWakeOver24Hours,
 // go/cros-eventbasedlogcollection-dd.
 BASE_FEATURE(kEventBasedLogUpload,
              "EventBasedLogUpload",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // A feature to enable periodic log upload migration. This includes using new
 // mechanism for collecting, exporting and uploading logs. See
@@ -1688,6 +1740,11 @@ BASE_FEATURE(kPeriodicLogUploadMigration,
 // go/teachers-on-chromeos-data.
 BASE_FEATURE(kK12AgeClassificationMetricsProvider,
              "K12AgeClassificationMetricsProvider",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// A feature to enable periodic log class management enabled policy.
+BASE_FEATURE(kClassManagementEnabledMetricsProvider,
+             "ClassManagementEnabledMetricsProvider",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_CHROMEOS)
 

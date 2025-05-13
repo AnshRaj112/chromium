@@ -150,6 +150,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &features::kSafetyHubAndroidOrganicSurvey,
     &features::kSafetyHubAndroidSurvey,
     &features::kSafetyHubAndroidSurveyV2,
+    &features::kSafetyHubDisruptiveNotificationRevocation,
     &features::kSafetyHubFollowup,
     &features::kSafetyHubLocalPasswordsModule,
     &features::kSafetyHubMagicStack,
@@ -203,6 +204,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kAndroidTabDeclutterArchiveDuplicateTabs,
     &kAndroidTabDeclutterArchiveTabGroups,
     &kAndroidTabDeclutterAutoDelete,
+    &kAndroidTabDeclutterAutoDeleteKillSwitch,
     &kAndroidTabDeclutterDedupeTabIdsKillSwitch,
     &kAndroidTabDeclutterRescueKillswitch,
     &kAndroidTabDeclutterPerformanceImprovements,
@@ -413,7 +415,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &privacy_sandbox::kTrackingProtectionUserBypassPwaTrigger,
     &safe_browsing::kHashPrefixRealTimeLookups,
     &safe_browsing::kReportNotificationContentDetectionData,
-    &safe_browsing::kSafetyHubDisruptiveNotificationRevocation,
     &safe_browsing::kShowWarningsForSuspiciousNotifications,
     &segmentation_platform::features::kAndroidAppIntegrationModule,
     &segmentation_platform::features::kContextualPageActions,
@@ -572,6 +573,10 @@ BASE_FEATURE(kAndroidTabDeclutterArchiveTabGroups,
 
 BASE_FEATURE(kAndroidTabDeclutterAutoDelete,
              "AndroidTabDeclutterAutoDelete",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kAndroidTabDeclutterAutoDeleteKillSwitch,
+             "AndroidTabDeclutterAutoDeleteKillSwitch",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAndroidTabDeclutterDedupeTabIdsKillSwitch,
@@ -1200,7 +1205,7 @@ BASE_FEATURE(kTabStripContextMenuAndroid,
 
 BASE_FEATURE(kTabStripGroupDragDropAndroid,
              "TabStripGroupDragDropAndroid",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabStripGroupReorderAndroid,
              "TabStripGroupReorderAndroid",
@@ -1208,7 +1213,7 @@ BASE_FEATURE(kTabStripGroupReorderAndroid,
 
 BASE_FEATURE(kTabStripLayoutOptimization,
              "TabStripLayoutOptimization",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabStripTransitionInDesktopWindow,
              "TabStripTransitionInDesktopWindow",

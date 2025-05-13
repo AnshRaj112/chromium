@@ -16,6 +16,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
+#include "base/test/scoped_run_loop_timeout.h"
 #include "base/test/test_future.h"
 #include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
@@ -89,7 +90,9 @@ void WaitForStatus(scoped_refptr<screen_ai::OpticalCharacterRecognizer> ocr,
 void WaitForDisconnecting(screen_ai::ScreenAIServiceRouter* router,
                           base::OnceCallback<void()> callback,
                           int remaining_tries) {
-  if (!router->IsProcessRunningForTesting() || !remaining_tries) {
+  if (!router->IsProcessRunningForTesting(
+          screen_ai::ScreenAIServiceRouter::Service::kOCR) ||
+      !remaining_tries) {
     std::move(callback).Run();
     return;
   }
@@ -486,18 +489,21 @@ IN_PROC_BROWSER_TEST_P(OpticalCharacterRecognizerTest,
 
   // Init OCR once and verify service availability.
   ASSERT_TRUE(CreateAndInitOCR(mojom::OcrClientType::kTest));
-  ASSERT_TRUE(router->IsProcessRunningForTesting());
+  ASSERT_TRUE(router->IsProcessRunningForTesting(
+      screen_ai::ScreenAIServiceRouter::Service::kOCR));
 
   // Release it and wait for shutdown due to being idle.
   ocr().reset();
   base::test::TestFuture<void> future;
   WaitForDisconnecting(router, future.GetCallback(), /*remaining_tries=*/2);
   ASSERT_TRUE(future.Wait());
-  ASSERT_FALSE(router->IsProcessRunningForTesting());
+  ASSERT_FALSE(router->IsProcessRunningForTesting(
+      screen_ai::ScreenAIServiceRouter::Service::kOCR));
 
   // Init OCR again.
   ASSERT_TRUE(CreateAndInitOCR(mojom::OcrClientType::kTest));
-  ASSERT_TRUE(router->IsProcessRunningForTesting());
+  ASSERT_TRUE(router->IsProcessRunningForTesting(
+      screen_ai::ScreenAIServiceRouter::Service::kOCR));
 
   // Perform OCR.
   SkBitmap bitmap = LoadImageFromTestFile(
@@ -650,9 +656,9 @@ INSTANTIATE_TEST_SUITE_P(All,
                          OpticalCharacterRecognizerResultsTest,
                          testing::ValuesIn(kTestFilenames));
 
-// TODO(https://crbug.com/408145905): Flaky and failing on mac-osxbeta-rel and
-// Linux Tests (dbg)(1).
-#if BUILDFLAG(IS_MAC) || (BUILDFLAG(IS_LINUX) && !defined(NDEBUG))
+// This test is slow and most probably failing on debug builds and ASAN builds
+// which are slower than the other tests.
+#if !defined(NDEBUG) || defined(ADDRESS_SANITIZER)
 #define MAYBE_PerformOCRLargeImage DISABLED_PerformOCRLargeImage
 #else
 #define MAYBE_PerformOCRLargeImage PerformOCRLargeImage
@@ -661,6 +667,9 @@ IN_PROC_BROWSER_TEST_F(OpticalCharacterRecognizerResultsTest,
                        MAYBE_PerformOCRLargeImage) {
   base::HistogramTester histograms;
 
+  // Since this test processes a huge image, it can be slow and overrun the
+  // timeout.
+  base::test::ScopedDisableRunLoopTimeout disable_timeout;
   base::ScopedAllowBlockingForTesting allow_blocking;
 
   ASSERT_TRUE(CreateAndInitOCR());

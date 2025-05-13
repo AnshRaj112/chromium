@@ -310,6 +310,7 @@ class CONTENT_EXPORT WebContentsDelegate {
                                    const blink::WebMouseEvent& event);
   virtual void PreHandleDragUpdate(const DropData& drop_data,
                                    const gfx::PointF& client_pt) {}
+  virtual void PreHandleDragExit() {}
 
   // Allows delegates to handle keyboard events before sending to the renderer.
   // See enum for description of return values.
@@ -652,10 +653,6 @@ class CONTENT_EXPORT WebContentsDelegate {
   // delegate doesn't provide a size, the current WebContentsView's size will be
   // used.
   virtual gfx::Size GetSizeForNewRenderView(WebContents* web_contents);
-
-  // Returns true if the WebContents is never user-visible, thus the renderer
-  // never needs to produce pixels for display.
-  virtual bool IsNeverComposited(WebContents* web_contents);
 
   // Askss |guest_web_contents| to perform the same. If this returns true, the
   // default behavior is suppressed.

@@ -129,6 +129,25 @@ class AITestUtils {
     mojo::Receiver<blink::mojom::AILanguageModelAppendClient> receiver_{this};
   };
 
+  class FakeMonitor {
+   public:
+    mojo::PendingRemote<blink::mojom::ModelDownloadProgressObserver>
+    BindNewPipeAndPassRemote();
+
+    void ExpectReceivedUpdate(uint64_t expected_downloaded_bytes,
+                              uint64_t expected_total_bytes);
+
+    // Same as `ExpectReceivedUpdate` except it normalizes
+    // `expected_downloaded_bytes` and `expected_total_bytes`.
+    void ExpectReceivedNormalizedUpdate(uint64_t expected_downloaded_bytes,
+                                        uint64_t expected_total_bytes);
+
+    void ExpectNoUpdate();
+
+   private:
+    AITestUtils::MockModelDownloadProgressMonitor mock_monitor_;
+  };
+
   class FakeComponent {
    public:
     FakeComponent(std::string id, uint64_t total_bytes);
@@ -186,14 +205,12 @@ class AITestUtils {
     mojo::Remote<blink::mojom::AIManager> GetAIManagerRemote();
     size_t GetAIManagerContextBoundObjectSetSize();
     size_t GetAIManagerDownloadProgressObserversSize();
-    void MockDownloadProgressUpdate(uint64_t downloaded_bytes,
-                                    uint64_t total_bytes);
 
     raw_ptr<MockOptimizationGuideKeyedService>
         mock_optimization_guide_keyed_service_;
     testing::NiceMock<optimization_guide::MockSession> session_;
+    AITestUtils::MockComponentUpdateService component_update_service_;
 
-   private:
     std::unique_ptr<AIManager> ai_manager_;
   };
 

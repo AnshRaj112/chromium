@@ -220,7 +220,7 @@ public class StripLayoutHelperTest {
 
     // TODO(crbug.com/369736293): Verify usages and remove duplicate implementations of
     // `TestTabModel` for tab model.
-    private TestTabModel mModel = spy(new TestTabModel());
+    private final TestTabModel mModel = spy(new TestTabModel());
     private StripLayoutHelper mStripLayoutHelper;
     private boolean mIncognito;
     private static final String[] TEST_TAB_TITLES = {"Tab 1", "Tab 2", "Tab 3", "", null};
@@ -2605,7 +2605,6 @@ public class StripLayoutHelperTest {
                 "Tab outline should not show.", mStripLayoutHelper.shouldShowTabOutline(tabs[1]));
         assertFalse(
                 "Tab outline should not show.", mStripLayoutHelper.shouldShowTabOutline(tabs[2]));
-        XrUtils.resetXrDeviceForTesting();
     }
 
     @Test
@@ -3189,7 +3188,6 @@ public class StripLayoutHelperTest {
                 expectedEndWidth,
                 groupTitle.getBottomIndicatorWidth(),
                 0.5f);
-        XrUtils.resetXrDeviceForTesting();
     }
 
     private float calculateExpectedBottomIndicatorWidth(
@@ -4988,7 +4986,6 @@ public class StripLayoutHelperTest {
         // Act and verify the broadcast is sent.
         onLongPress_OffTab();
         verify(mWindowAndroid, times(1)).sendBroadcast(any());
-        XrUtils.resetXrDeviceForTesting();
     }
 
     @Test

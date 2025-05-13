@@ -242,21 +242,16 @@ bool DownloadProtectionService::MaybeCheckClientDownload(
   CHECK(!settings.has_value());
 #endif
 
-  if (delegate_->ShouldCheckClientDownload(item)) {
+  if (delegate_->MayCheckClientDownload(item)) {
     CheckClientDownload(item, std::move(callback), /*password=*/std::nullopt);
     return true;
   }
 
 #if !BUILDFLAG(IS_ANDROID)
   if (settings.has_value()) {
-    Profile* profile = Profile::FromBrowserContext(
-        content::DownloadItemUtils::GetBrowserContext(item));
-    bool safe_browsing_enabled =
-        profile && IsSafeBrowsingEnabled(*profile->GetPrefs());
     DCHECK(report_only_scan);
-    DCHECK(!safe_browsing_enabled);
-    // Since this branch implies that Safe Browsing is disabled, the pre-deep
-    // scanning DownloadCheckResult is considered UNKNOWN.
+    // Since this branch implies that CheckClientDownload was not called, the
+    // pre-deep scanning DownloadCheckResult is considered UNKNOWN.
     UploadForDeepScanning(
         std::make_unique<DownloadItemMetadata>(item), std::move(callback),
         DownloadItemWarningData::DeepScanTrigger::TRIGGER_POLICY,
@@ -320,7 +315,8 @@ void DownloadProtectionService::CheckDownloadUrl(
 bool DownloadProtectionService::IsSupportedDownload(
     download::DownloadItem& item,
     const base::FilePath& target_path) const {
-  return delegate_->IsSupportedDownload(item, target_path);
+  return delegate_->IsSupportedDownload(item, target_path) !=
+         MayCheckDownloadResult::kMayNotCheckDownload;
 }
 
 void DownloadProtectionService::CheckPPAPIDownloadRequest(

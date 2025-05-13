@@ -39,6 +39,7 @@
 #include "chrome/browser/glic/test_support/glic_test_util.h"
 #include "chrome/browser/glic/test_support/interactive_glic_test.h"
 #include "chrome/browser/glic/widget/glic_window_controller.h"
+#include "chrome/browser/media/audio_ducker.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service_factory.h"
 #include "chrome/browser/permissions/system/mock_platform_handle.h"
@@ -679,6 +680,36 @@ IN_PROC_BROWSER_TEST_F(GlicApiTest, testCreateTabInBackground) {
       InProcessBrowserTest::browser()->tab_strip_model()->GetActiveTab();
   ASSERT_THAT(active_tab->GetContents()->GetURL().spec(),
               testing::EndsWith("#foreground"));
+}
+
+IN_PROC_BROWSER_TEST_F(GlicApiTest, testCreateTabByClickingOnLink) {
+  RunTestSequence(OpenGlicWindow(GlicWindowMode::kDetached,
+                                 GlicInstrumentMode::kHostAndContents),
+                  CheckTabCount(1));
+  content::RenderFrameHost* guest_frame = FindGlicGuestMainFrame();
+  ExecuteJsTest();
+  ASSERT_TRUE(base::test::RunUntil([&]() {
+    return InProcessBrowserTest::browser()->tab_strip_model()->GetTabCount() ==
+           2;
+  })) << "Timed out waiting for tab count to increase. Tab count = "
+      << InProcessBrowserTest::browser()->tab_strip_model()->GetTabCount();
+  // The guest frame shouldn't change.
+  ASSERT_EQ(guest_frame, FindGlicGuestMainFrame());
+
+  // This test is a regression test for b/416464184.
+  // Audio ducking should still work after clicking a link.
+  AudioDucker* audio_ducker =
+      AudioDucker::GetForPage(FindGlicGuestMainFrame()->GetPage());
+  ASSERT_TRUE(audio_ducker);
+  ASSERT_EQ(audio_ducker->GetAudioDuckingState(),
+            AudioDucker::AudioDuckingState::kDucking);
+
+  ContinueJsTest();
+
+  ASSERT_TRUE(base::test::RunUntil([&]() {
+    return audio_ducker->GetAudioDuckingState() ==
+           AudioDucker::AudioDuckingState::kNoDucking;
+  }));
 }
 
 IN_PROC_BROWSER_TEST_F(GlicApiTestWithOneTab, testOpenGlicSettingsPage) {

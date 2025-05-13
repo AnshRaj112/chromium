@@ -1261,8 +1261,9 @@ static_library("browser") {
     "privacy/privacy_metrics_service.h",
     "privacy/privacy_metrics_service_factory.cc",
     "privacy/privacy_metrics_service_factory.h",
+
+    # TODO(crbug.com/408801109) Remove this once the privacy_sandbox_service_factory is moved to chrome/browser/prviacy_sandbox/BUILD.
     "privacy_sandbox/notice/notice_service_factory.cc",
-    "privacy_sandbox/notice/notice_service_factory.h",
     "privacy_sandbox/privacy_sandbox_notice_confirmation.cc",
     "privacy_sandbox/privacy_sandbox_notice_confirmation.h",
     "privacy_sandbox/privacy_sandbox_policy_handler.cc",
@@ -1418,7 +1419,6 @@ static_library("browser") {
     "serial/serial_blocklist.cc",
     "serial/serial_blocklist.h",
     "serial/serial_chooser_context.cc",
-    "serial/serial_chooser_context.h",
     "serial/serial_chooser_context_factory.cc",
     "serial/serial_chooser_context_factory.h",
     "serial/serial_chooser_histograms.h",
@@ -1830,6 +1830,9 @@ static_library("browser") {
     # be removed.
     "//chrome/browser/ui/cookie_controls:impl",
 
+    # TODO(417228688): Remove this dependency when chrome/browser/serial get modularized.
+    "//chrome/browser/ui/serial:impl",
+
     # TODO(crbug.com/40110173): Eliminate usages of browser.h from Media Router.
     "//chrome/browser/media/router",
 
@@ -1855,6 +1858,10 @@ static_library("browser") {
     # TODO(crbug.com/413572035): Remove once c/b/{metrics,signin,webdata_services}
     # get fully modularized.
     "//chrome/browser/plus_addresses:impl",
+
+    # TODO(crbug.com/364667551): includes //c/b/about_flags.h and other sources
+    # from //chrome/browser/ui/webui, which are not modularized yet.
+    "//chrome/browser/ui/webui/about",
   ]
 
   public_deps = [
@@ -1993,6 +2000,7 @@ static_library("browser") {
     "//chrome/browser/search_engine_choice:impl",
     "//chrome/browser/search_engines",
     "//chrome/browser/send_tab_to_self",
+    "//chrome/browser/serial",
     "//chrome/browser/share",
     "//chrome/browser/sharing:buildflags",
     "//chrome/browser/signin",
@@ -2042,6 +2050,12 @@ static_library("browser") {
     "//chrome/browser/ui/prefs:impl",
     "//chrome/browser/ui/safety_hub",
     "//chrome/browser/ui/safety_hub:impl",
+    "//chrome/browser/ui/search_engines",
+
+    # TODO(417228688): Remove this dependency when both chrome/browser/serial and
+    # chrome/browser/profiles/profile_manager.h get modularized.
+    "//chrome/browser/ui/serial",
+    "//chrome/browser/ui/serial:impl",
     "//chrome/browser/ui/startup:startup_tab",
     "//chrome/browser/ui/tab_contents",
     "//chrome/browser/ui/tab_contents:impl",
@@ -2049,6 +2063,7 @@ static_library("browser") {
     "//chrome/browser/ui/tabs/tab_group_home:constants",
     "//chrome/browser/ui/webui",
     "//chrome/browser/ui/webui:configs",
+    "//chrome/browser/ui/webui/about",
     "//chrome/browser/ui/webui/bluetooth_internals",
     "//chrome/browser/ui/webui/bluetooth_internals:mojo_bindings",
     "//chrome/browser/ui/webui/internal_debug_pages_disabled",
@@ -2864,8 +2879,8 @@ static_library("browser") {
       "android/tab_browser_controls_constraints_helper.h",
       "android/tab_favicon.cc",
       "android/tab_favicon.h",
-      "android/tab_interface_holder_android.cc",
-      "android/tab_interface_holder_android.h",
+      "android/tab_interface_android.cc",
+      "android/tab_interface_android.h",
       "android/tab_printer.cc",
       "android/tab_printer.h",
       "android/tab_web_contents_delegate_android.cc",
@@ -3185,6 +3200,8 @@ static_library("browser") {
       "readaloud/android/read_aloud_features.cc",
       "readaloud/android/synthetic_trial.cc",
       "readaloud/android/synthetic_trial.h",
+      "safe_browsing/android/notification_content_detection_manager_android.cc",
+      "safe_browsing/android/notification_content_detection_manager_android.h",
       "safe_browsing/android/password_reuse_controller_android.cc",
       "safe_browsing/android/password_reuse_controller_android.h",
       "safe_browsing/android/safe_browsing_referring_app_bridge_android.cc",
@@ -4307,7 +4324,6 @@ static_library("browser") {
       "//chrome/browser/apps/link_capturing",
       "//chrome/browser/contextual_cueing",
       "//chrome/browser/contextual_cueing:impl",
-      "//chrome/browser/enterprise/incognito",
       "//chrome/browser/error_reporting",
       "//chrome/browser/feedback:feedback_enum",
       "//chrome/browser/hid",
@@ -4355,6 +4371,7 @@ static_library("browser") {
       "//chrome/browser/ui/page_action:icon_type",
       "//chrome/browser/ui/privacy_sandbox",
       "//chrome/browser/ui/send_tab_to_self",
+      "//chrome/browser/ui/webui/access_code_cast",
 
       # TODO(413315837): Remove this dependency when chrome/browser/privacy_sandbox
       # gets modularized.
@@ -4376,6 +4393,7 @@ static_library("browser") {
       "//chrome/browser/ui/tabs:tab_strip_impl",
       "//chrome/browser/ui/tabs/tab_group_home",
       "//chrome/browser/ui/tabs/tab_group_home:impl",
+      "//chrome/browser/ui/tabs/tab_strip_api",
       "//chrome/browser/ui/tabs/tab_strip_api:impl",
       "//chrome/browser/ui/toasts",
       "//chrome/browser/ui/toasts/api:toasts",
@@ -4562,6 +4580,10 @@ static_library("browser") {
       "//chrome/browser/ui/tabs/tab_strip_api:impl",
       "//chrome/browser/ui/bookmarks:impl",
       "//chrome/browser/ui/promos:impl",
+
+      # TODO(crbug.com/364667551): It includes
+      # //c/b/signin/identity_manager_factory.h.
+      "//chrome/browser/ui/webui/access_code_cast",
     ]
 
     #!is_android
@@ -4630,6 +4652,7 @@ static_library("browser") {
 
       deps += [
         "//chrome/browser/shortcuts",
+        "//chrome/browser/ui/webui/app_home",
         "//chrome/browser/ui/webui/signin:profile",
         "//chrome/browser/ui/webui/signin:profile_impl",
       ]
@@ -4805,6 +4828,8 @@ static_library("browser") {
       "metrics/chromeos_metrics_provider.h",
       "metrics/chromeos_system_profile_provider.cc",
       "metrics/chromeos_system_profile_provider.h",
+      "metrics/class_management_enabled_metrics_provider.cc",
+      "metrics/class_management_enabled_metrics_provider.h",
       "metrics/cros_healthd_metrics_provider.cc",
       "metrics/cros_healthd_metrics_provider.h",
       "metrics/cros_pre_consent_metrics_manager.cc",
@@ -7437,6 +7462,8 @@ static_library("browser") {
     # Any circular includes must depend on the target
     # "browser_public_dependencies".
     allow_circular_includes_from += [
+      "//chrome/browser/extensions:chrome_extensions_browser_client",
+
       # Has dependencies on signin code in //chrome/browser.
       "//chrome/browser/extensions/api/browsing_data",
 
@@ -7444,12 +7471,14 @@ static_library("browser") {
       "//chrome/browser/extensions/api/notifications",
     ]
     public_deps += [
+      "//chrome/browser/extensions:chrome_extensions_browser_client",
       "//chrome/browser/extensions/api",
       "//chrome/browser/extensions/api:api_registration",
       "//chrome/browser/extensions/keyed_services:keyed_service_factories",
       "//extensions/browser",
     ]
     deps += [
+      "//chrome/browser/enterprise/incognito",
       "//chrome/browser/extensions/api/browsing_data",
 
       # This dependency should be removed when //chrome/browser/notifications
@@ -7633,7 +7662,6 @@ static_library("browser") {
       "//chrome/browser/apps/platform_apps/api",
       "//chrome/browser/controlled_frame",
       "//chrome/browser/extensions",
-      "//chrome/browser/extensions:chrome_extensions_browser_client",
       "//chrome/browser/ui/tabs:tab_strip_model_observer",
       "//ui/base/mojom:ui_base_types",
     ]
@@ -7650,7 +7678,6 @@ static_library("browser") {
       "//chrome/browser/apps/platform_apps/api",
 
       "//chrome/browser/extensions",
-      "//chrome/browser/extensions:chrome_extensions_browser_client",
 
       # TODO(crbug.com/40761673): Remove cycles and simplify all dependencies.
       "//chrome/browser/web_applications/extensions",
@@ -7711,8 +7738,6 @@ static_library("browser") {
       # They should be removed.
       "extensions/desktop_android/desktop_android_extension_host_delegate.cc",
       "extensions/desktop_android/desktop_android_extension_host_delegate.h",
-      "extensions/desktop_android/desktop_android_extensions_browser_client.cc",
-      "extensions/desktop_android/desktop_android_extensions_browser_client.h",
     ]
 
     deps += [
@@ -8556,6 +8581,7 @@ static_library("browser_generated_files") {
     "//chrome/browser/v8_compile_hints/proto",
     "//chrome/browser/web_applications/mojom:mojom_web_apps_enum",
     "//components/data_sharing/data_sharing_internals/webui:mojo_bindings",
+    "//components/webui/chrome_urls/mojom:mojo_bindings",
   ]
   if (is_android) {
     public_deps += [
@@ -8578,6 +8604,7 @@ static_library("browser_generated_files") {
       "//chrome/browser/support_tool:support_tool_proto",
       "//chrome/browser/sync_file_system/drive_backend:sync_file_system_drive_proto",
       "//chrome/browser/ui:webui_name_variants",
+      "//chrome/browser/ui/tabs/tab_strip_api:mojom",
       "//chrome/browser/ui/webui/access_code_cast:mojo_bindings",
       "//chrome/browser/ui/webui/app_service_internals:mojo_bindings",
       "//chrome/browser/ui/webui/data_sharing:mojo_bindings",

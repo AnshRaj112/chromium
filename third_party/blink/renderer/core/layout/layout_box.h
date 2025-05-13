@@ -455,14 +455,8 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
   // IE extensions. Used to calculate offsetWidth/Height. Overridden by inlines
   // (LayoutFlow) to return the remaining width on a given line (and the height
   // of a single line).
-  LayoutUnit OffsetWidth() const final {
-    NOT_DESTROYED();
-    return Size().width;
-  }
-  LayoutUnit OffsetHeight() const final {
-    NOT_DESTROYED();
-    return Size().height;
-  }
+  LayoutUnit OffsetWidth() const final;
+  LayoutUnit OffsetHeight() const final;
 
   bool UsesOverlayScrollbars() const;
 
@@ -750,6 +744,8 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
     return rare_data_ ? rare_data_->spanner_placeholder_.Get() : nullptr;
   }
 
+  bool IsValidColumnSpanner() const final;
+
   bool MapToVisualRectInAncestorSpaceInternal(
       const LayoutBoxModelObject* ancestor,
       TransformState&,
@@ -854,7 +850,7 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
   PhysicalRect ClippingRect(const PhysicalOffset& location) const;
 
   void ImageChanged(WrappedImagePtr, CanDeferInvalidation) override;
-  ResourcePriority ComputeResourcePriority() const final;
+  ResourcePriority ComputeResourcePriority() const override;
 
   PositionWithAffinity PositionForPointInFragments(const PhysicalOffset&) const;
 
@@ -916,6 +912,8 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
   // TODO(crbug.com/40855022): Get rid of the parameter.
   virtual PhysicalOffset PhysicalLocation(
       const LayoutBox* location_container = nullptr) const;
+
+  PhysicalRect BoundingBoxRelativeToFirstFragment() const override;
 
   bool HasSelfVisualOverflow() const {
     NOT_DESTROYED();

@@ -445,6 +445,8 @@ bool g_allow_injecting_javascript = false;
 
 const char kDotGoogleDotCom[] = ".google.com";
 
+const char kCrashReportingGroupName[] = "crash-reporting";
+
 using RoutingIDFrameMap =
     absl::flat_hash_map<GlobalRenderFrameHostId, RenderFrameHostImpl*>;
 base::LazyInstance<RoutingIDFrameMap>::DestructorAtExit g_routing_id_frame_map =
@@ -4171,7 +4173,8 @@ bool RenderFrameHostImpl::CreateRenderFrame(
     const std::optional<blink::FrameToken>& previous_frame_token,
     const std::optional<blink::FrameToken>& opener_frame_token,
     const std::optional<blink::FrameToken>& parent_frame_token,
-    const std::optional<blink::FrameToken>& previous_sibling_frame_token) {
+    const std::optional<blink::FrameToken>& previous_sibling_frame_token,
+    const std::optional<base::UnguessableToken>& navigation_metrics_token) {
   TRACE_EVENT0("navigation", "RenderFrameHostImpl::CreateRenderFrame");
   DCHECK(!IsRenderFrameLive()) << "Creating frame twice";
 
@@ -4205,6 +4208,7 @@ bool RenderFrameHostImpl::CreateRenderFrame(
       params->associated_interface_provider_remote
           .InitWithNewEndpointAndPassReceiver());
   params->document_token = document_associated_data_->token();
+  params->navigation_metrics_token = navigation_metrics_token;
 
   // If this is a new RenderFrameHost for a frame that has already committed a
   // document, we don't have a policy container yet. Indeed, in that case, this
@@ -15774,9 +15778,16 @@ void RenderFrameHostImpl::TakeNewDocumentPropertiesFromNavigation(
   if (GURL::SchemeIsCryptographic(origin.scheme()) &&
       navigation_request->response() &&
       navigation_request->response()->parsed_headers->reporting_endpoints) {
+    base::flat_map<std::string, std::string> endpoints =
+        navigation_request->response()
+            ->parsed_headers->reporting_endpoints.value();
+    if (base::FeatureList::IsEnabled(
+            blink::features::kOverrideCrashReportingEndpoint) &&
+        endpoints.find(kCrashReportingGroupName) != endpoints.end()) {
+      crash_reporting_group_ = kCrashReportingGroupName;
+    }
     GetStoragePartition()->GetNetworkContext()->SetDocumentReportingEndpoints(
-        GetReportingSource(), origin, isolation_info_,
-        *(navigation_request->response()->parsed_headers->reporting_endpoints));
+        GetReportingSource(), origin, isolation_info_, endpoints);
   }
 
   // We move the PolicyContainerHost of |navigation_request| into the
@@ -15901,7 +15912,7 @@ void RenderFrameHostImpl::MaybeGenerateCrashReport(
 
   // Send the crash report to the Reporting API.
   GetProcess()->GetStoragePartition()->GetNetworkContext()->QueueReport(
-      /*type=*/"crash", /*group=*/"default", last_committed_url_,
+      /*type=*/"crash", crash_reporting_group_, last_committed_url_,
       GetReportingSource(), isolation_info_.network_anonymization_key(),
       std::move(body));
 }

@@ -1694,14 +1694,8 @@ extern const char kOmniboxSearchAggregatorDescription[];
 extern const char kContextualSearchBoxUsesContextualSearchProviderName[];
 extern const char kContextualSearchBoxUsesContextualSearchProviderDescription[];
 
-extern const char kOmniboxContextualSearchActionsAtTopName[];
-extern const char kOmniboxContextualSearchActionsAtTopDescription[];
-
 extern const char kOmniboxContextualSearchOnFocusSuggestionsName[];
 extern const char kOmniboxContextualSearchOnFocusSuggestionsDescription[];
-
-extern const char kOmniboxContextualSearchSingleLensActionName[];
-extern const char kOmniboxContextualSearchSingleLensActionDescription[];
 
 extern const char kOmniboxContextualSuggestionsName[];
 extern const char kOmniboxContextualSuggestionsDescription[];
@@ -2373,6 +2367,11 @@ extern const char kUnsafeWebGPUDescription[];
 extern const char kForceHighPerformanceGPUName[];
 extern const char kForceHighPerformanceGPUDescription[];
 
+#if BUILDFLAG(IS_WIN)
+extern const char kUiaProviderName[];
+extern const char kUiaProviderDescription[];
+#endif
+
 extern const char kUiPartialSwapName[];
 extern const char kUiPartialSwapDescription[];
 
@@ -2579,6 +2578,11 @@ extern const char kReduceAcceptLanguageDescription[];
 extern const char kReduceTransferSizeUpdatedIPCName[];
 extern const char kReduceTransferSizeUpdatedIPCDescription[];
 
+#if BUILDFLAG(IS_LINUX)
+extern const char kReduceUserAgentDataLinuxPlatformVersionName[];
+extern const char kReduceUserAgentDataLinuxPlatformVersionDescription[];
+#endif  // #if BUILDFLAG(IS_LINUX)
+
 extern const char kResetAudioSelectionImprovementPrefName[];
 extern const char kResetAudioSelectionImprovementPrefDescription[];
 
@@ -2669,6 +2673,9 @@ extern const char kAndroidSurfaceColorUpdateDescription[];
 
 extern const char kAndroidTabDeclutterAutoDeleteName[];
 extern const char kAndroidTabDeclutterAutoDeleteDescription[];
+
+extern const char kAndroidTabDeclutterAutoDeleteKillSwitchName[];
+extern const char kAndroidTabDeclutterAutoDeleteKillSwitchDescription[];
 
 extern const char kAndroidTabDeclutterArchiveAllButActiveTabName[];
 extern const char kAndroidTabDeclutterArchiveAllButActiveTabDescription[];

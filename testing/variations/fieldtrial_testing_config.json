@@ -440,22 +440,6 @@
             ]
         }
     ],
-    "AndroidAutofillLazyFrameworkWrapper": [
-        {
-            "platforms": [
-                "android",
-                "android_webview"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "AndroidAutofillLazyFrameworkWrapper"
-                    ]
-                }
-            ]
-        }
-    ],
     "AndroidBookmarkBar": [
         {
             "platforms": [
@@ -1550,6 +1534,28 @@
                     },
                     "enable_features": [
                         "AutoSpeculationRules"
+                    ]
+                }
+            ]
+        }
+    ],
+    "AutocompleteControllerMetricsOptimization": [
+        {
+            "platforms": [
+                "android_webview",
+                "android",
+                "chromeos_lacros",
+                "chromeos",
+                "ios",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "AutocompleteControllerMetricsOptimization"
                     ]
                 }
             ]
@@ -10006,8 +10012,25 @@
                         "GlicDevelopmentCookies",
                         "GlicFreURLConfig",
                         "GlicKeyboardShortcutNewBadge",
+                        "GlicLearnMoreURLConfig",
                         "GlicURLConfig",
                         "IPH_GlicPromo"
+                    ]
+                }
+            ]
+        }
+    ],
+    "GlicTieredRollout": [
+        {
+            "platforms": [
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "GlicTieredRollout"
                     ]
                 }
             ]
@@ -13231,6 +13254,24 @@
             ]
         }
     ],
+    "LegacyKeyRepeatSynthesis": [
+        {
+            "platforms": [
+                "windows",
+                "mac",
+                "linux",
+                "chromeos"
+            ],
+            "experiments": [
+                {
+                    "name": "Disabled",
+                    "disable_features": [
+                        "LegacyKeyRepeatSynthesis"
+                    ]
+                }
+            ]
+        }
+    ],
     "LegacyTabStateDeprecation": [
         {
             "platforms": [
@@ -13708,6 +13749,21 @@
                     "name": "Enabled",
                     "enable_features": [
                         "MacAccessibilityAPIMigration"
+                    ]
+                }
+            ]
+        }
+    ],
+    "MacICloudKeychainRecoveryFactor": [
+        {
+            "platforms": [
+                "mac"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "EnableICloudKeychainRecoveryFactor"
                     ]
                 }
             ]
@@ -14579,6 +14635,21 @@
                     "name": "Enabled",
                     "enable_features": [
                         "NewContentForCheckerboardedScrolls"
+                    ]
+                }
+            ]
+        }
+    ],
+    "NimbleCollisionAvoidanceV1": [
+        {
+            "platforms": [
+                "ios"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "NotificationCollisionManagement"
                     ]
                 }
             ]
@@ -16511,7 +16582,7 @@
                         "hats_survey_ukm_id": "1027171324",
                         "ppm_survey_segment_name1": "Linux",
                         "ppm_survey_uniform_sample": "true",
-                        "probability": "0.88",
+                        "probability": "0.088",
                         "survey": "performance-ppm"
                     },
                     "enable_features": [
@@ -16535,7 +16606,7 @@
                         "ppm_survey_segment_name1": "Mac, up to 8 GB",
                         "ppm_survey_segment_name2": "Mac, over 8 GB",
                         "ppm_survey_uniform_sample": "true",
-                        "probability": "0.88",
+                        "probability": "0.088",
                         "survey": "performance-ppm"
                     },
                     "enable_features": [
@@ -16561,7 +16632,7 @@
                         "ppm_survey_segment_name2": "Windows, 4-8 GB",
                         "ppm_survey_segment_name3": "Windows, over 8 GB",
                         "ppm_survey_uniform_sample": "true",
-                        "probability": "0.88",
+                        "probability": "0.088",
                         "survey": "performance-ppm"
                     },
                     "enable_features": [
@@ -18894,7 +18965,8 @@
                 {
                     "name": "Enabled_Dogfood",
                     "enable_features": [
-                        "ReadAloudAudioOverviews"
+                        "ReadAloudAudioOverviews",
+                        "ReadAloudAudioOverviewsFeedback"
                     ]
                 }
             ]
@@ -19211,6 +19283,21 @@
                     "enable_features": [
                         "ReduceSubresourceResponseStartedIPC",
                         "UkmReduceAddEntryIPC"
+                    ]
+                }
+            ]
+        }
+    ],
+    "ReduceUserAgentDataLinuxPlatformVersion": [
+        {
+            "platforms": [
+                "linux"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "ReduceUserAgentDataLinuxPlatformVersion"
                     ]
                 }
             ]
@@ -23129,6 +23216,21 @@
             ]
         }
     ],
+    "TabStripLayoutOptimization": [
+        {
+            "platforms": [
+                "android"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "TabStripLayoutOptimization"
+                    ]
+                }
+            ]
+        }
+    ],
     "TabstripComboButton": [
         {
             "platforms": [
@@ -23142,7 +23244,7 @@
                 {
                     "name": "Enabled",
                     "params": {
-                        "has_background": "false"
+                        "tab_search_toolbar_button": "true"
                     },
                     "enable_features": [
                         "TabstripComboButton"
@@ -24738,6 +24840,29 @@
                     "name": "VulkanV2",
                     "enable_features": [
                         "VulkanV2"
+                    ]
+                }
+            ]
+        }
+    ],
+    "WaitForLateScrollEvents": [
+        {
+            "platforms": [
+                "android",
+                "android_webview",
+                "chromeos",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "DeadlineRatio0_5",
+                    "params": {
+                        "deadline_ratio": "0.5"
+                    },
+                    "enable_features": [
+                        "WaitForLateScrollEvents"
                     ]
                 }
             ]

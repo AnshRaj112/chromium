@@ -56,6 +56,11 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
 // API. See https://crbug.com/400432195.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCrashReportingAPIMoreContextData);
 
+// Enables crash reports to be sent to the `crash-endpoint` group as specified
+// in the `Reporting-Endpoints` response header.
+// See https://github.com/WICG/crash-reporting/issues/24 for more details.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kOverrideCrashReportingEndpoint);
+
 // Feature for allowing page into back/forward cache when datapipe has been
 // drained as bytes consumer for fetch requests.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
@@ -1828,8 +1833,6 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebRtcH264WithOpenH264FFmpeg);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebRtcHideLocalIpsWithMdns);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebRtcIgnoreUnspecifiedColorSpace);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebRtcUseMinMaxVEADimensions);
-
-BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebSQLAccess);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kWebUSBTransferSizeLimit);
 

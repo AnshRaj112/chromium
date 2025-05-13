@@ -243,6 +243,9 @@ public final class ProductionSupportedFlagList {
                 AutofillFeatures.AUTOFILL_ACCEPT_DOM_MUTATION_AFTER_AUTOFILL_SUBMISSION,
                 "Accepts DOM_MUTATION_AFTER_AUTOFILL submissions detected on password forms."),
         Flag.baseFeature(
+                AutofillFeatures.AUTOFILL_AND_PASSWORDS_IN_SAME_SURFACE,
+                "Changes how password requests are passed to the embedder. Ideally a noop."),
+        Flag.baseFeature(
                 AutofillFeatures.AUTOFILL_BETTER_LOCAL_HEURISTIC_PLACEHOLDER_SUPPORT,
                 "Treats placeholders as a separate signal for Autofill local heuristics"),
         Flag.baseFeature(
@@ -276,6 +279,14 @@ public final class ProductionSupportedFlagList {
                 AutofillFeatures.AUTOFILL_ENABLE_LOYALTY_CARDS_FILLING,
                 "When enabled, Autofill will offer support for filling the user's loyalty cards"
                         + " stored in Google Wallet."),
+        Flag.baseFeature(
+                AutofillFeatures.AUTOFILL_ENABLE_LOYALTY_CARDS_FILLING,
+                "When enabled, Autofill will offer support for filling the user's loyalty cards"
+                        + " stored in Google Wallet."),
+        Flag.baseFeature(
+                AutofillFeatures.AUTOFILL_ENABLE_EMAIL_OR_LOYALTY_CARDS_FILLING,
+                "When enabled, Autofill will offer support for Autofill suggestions on fields "
+                        + "requesting email or loyalty card values."),
         Flag.baseFeature(
                 AutofillFeatures.AUTOFILL_PAGE_LANGUAGE_DETECTION,
                 "Enables Autofill to retrieve the page language for form parsing."),

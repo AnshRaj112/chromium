@@ -38,7 +38,7 @@ public class ChromePickerAdapter extends PickerAdapter implements ProfileDataCac
     private final Profile mProfile;
 
     // The profile data cache to consult when figuring out the signed in user.
-    private ProfileDataCache mProfileDataCache;
+    private final ProfileDataCache mProfileDataCache;
 
     // Whether an observer for ProfileDataCache has been registered.
     private boolean mObserving;
@@ -114,8 +114,8 @@ public class ChromePickerAdapter extends PickerAdapter implements ProfileDataCac
             return coreAccountInfo.getEmail();
         }
         final @Nullable CoreAccountInfo defaultCoreAccountInfo =
-                AccountUtils.getDefaultCoreAccountInfoIfFulfilled(
-                        AccountManagerFacadeProvider.getInstance().getCoreAccountInfos());
+                AccountUtils.getDefaultAccountIfFulfilled(
+                        AccountManagerFacadeProvider.getInstance().getAccounts());
         return defaultCoreAccountInfo != null ? defaultCoreAccountInfo.getEmail() : null;
     }
 

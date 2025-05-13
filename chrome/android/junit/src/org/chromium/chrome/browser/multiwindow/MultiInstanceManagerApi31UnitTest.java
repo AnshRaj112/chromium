@@ -103,7 +103,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1093,7 +1092,6 @@ public class MultiInstanceManagerApi31UnitTest {
         verify(mMultiInstanceManager, times(1))
                 .moveAndReparentTabToNewWindow(
                         any(), eq(INVALID_WINDOW_ID), eq(true), eq(false), eq(true));
-        XrUtils.resetXrDeviceForTesting();
     }
 
     @Test
@@ -1123,7 +1121,6 @@ public class MultiInstanceManagerApi31UnitTest {
                 .moveAndReparentTabToNewWindow(
                         any(), eq(INVALID_WINDOW_ID), eq(true), eq(false), eq(true));
         verify(mMultiInstanceManager, times(1)).openNewWindow(any());
-        XrUtils.resetXrDeviceForTesting();
     }
 
     @Test
@@ -1195,7 +1192,6 @@ public class MultiInstanceManagerApi31UnitTest {
         verify(mMultiInstanceManager, times(0))
                 .moveAndReparentTabToNewWindow(
                         eq(mTab1), eq(INVALID_WINDOW_ID), eq(false), eq(true), eq(true));
-        XrUtils.resetXrDeviceForTesting();
     }
 
     @Test
@@ -1245,7 +1241,6 @@ public class MultiInstanceManagerApi31UnitTest {
                         eq(mTab1), eq(NON_EXISTENT_INSTANCE_ID), eq(false), eq(true), eq(false));
         verify(mMultiInstanceManager, times(0))
                 .reparentTabToRunningActivity(any(), eq(mTab1), eq(0));
-        XrUtils.resetXrDeviceForTesting();
     }
 
     @Test
@@ -1280,7 +1275,6 @@ public class MultiInstanceManagerApi31UnitTest {
 
         verify(mMultiInstanceManager, times(1))
                 .closeInstance(anyInt(), eq(MultiWindowUtils.INVALID_TASK_ID));
-        XrUtils.resetXrDeviceForTesting();
     }
 
     @Test
@@ -1554,9 +1548,9 @@ public class MultiInstanceManagerApi31UnitTest {
 
         // Setup.
         mMultiInstanceManager.mTestBuildInstancesList = true;
-        LinkedHashMap<Integer, String> tabIdsToUrls =
-                new LinkedHashMap<>(
-                        Map.ofEntries(
+        ArrayList<Map.Entry<Integer, String>> tabIdsToUrls =
+                new ArrayList<>(
+                        List.of(
                                 Map.entry(1, "https://www.amazon.com"),
                                 Map.entry(2, "https://www.youtube.com"),
                                 Map.entry(3, "https://www.facebook.com")));

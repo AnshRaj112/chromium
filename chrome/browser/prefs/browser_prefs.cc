@@ -208,6 +208,7 @@
 #endif
 
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+#include "chrome/browser/extensions/activity_log/activity_log.h"
 #include "chrome/browser/extensions/commands/command_service.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/extension_web_ui.h"
@@ -221,7 +222,6 @@
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 #include "chrome/browser/accessibility/animation_policy_prefs.h"
 #include "chrome/browser/apps/platform_apps/shortcut_manager.h"
-#include "chrome/browser/extensions/activity_log/activity_log.h"
 #include "chrome/browser/extensions/api/tabs/tabs_api.h"
 #include "chrome/browser/extensions/preinstalled_apps.h"
 #include "chrome/browser/ui/extensions/settings_api_bubble_helpers.h"
@@ -1100,6 +1100,12 @@ constexpr char kObsoleteLocalPasswordMigrationWarningPrefsVersion[] =
 inline constexpr char kManagedPrivateNetworkAccessRestrictionsEnabled[] =
     "managed_private_network_access_restrictions_enabled";
 
+#if BUILDFLAG(IS_ANDROID)
+// Deprecated 05/2025.
+inline constexpr char kWipedWebAPkDataForMigration[] =
+    "sync.wiped_web_apk_data_for_migration";
+#endif  // BUILDFLAG(IS_ANDROID)
+
 // Register local state used only for migration (clearing or moving to a new
 // key).
 void RegisterLocalStatePrefsForMigration(PrefRegistrySimple* registry) {
@@ -1549,6 +1555,11 @@ void RegisterProfilePrefsForMigration(
   // Deprecated 05/2025
   registry->RegisterBooleanPref(kManagedPrivateNetworkAccessRestrictionsEnabled,
                                 false);
+
+  // Deprecated 05/2025.
+#if BUILDFLAG(IS_ANDROID)
+  registry->RegisterBooleanPref(kWipedWebAPkDataForMigration, false);
+#endif  // BUILDFLAG(IS_ANDROID)
 }
 
 }  // namespace
@@ -1988,6 +1999,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
 #endif
 
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+  extensions::ActivityLog::RegisterProfilePrefs(registry);
   extensions::PermissionsManager::RegisterProfilePrefs(registry);
   extensions::ExtensionPrefs::RegisterProfilePrefs(registry);
   extensions::RuntimeAPI::RegisterPrefs(registry);
@@ -2000,7 +2012,6 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
   RegisterAnimationPolicyPrefs(registry);
-  extensions::ActivityLog::RegisterProfilePrefs(registry);
   extensions::AudioAPI::RegisterUserPrefs(registry);
   // TODO(devlin): This would be more inline with the other calls here if it
   // were nested in either a class or separate namespace with a simple
@@ -2299,6 +2310,8 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   registry->RegisterIntegerPref(prefs::kLensOverlayStartCount, 0);
 
   registry->RegisterDictionaryPref(prefs::kReportingEndpoints);
+
+  registry->RegisterBooleanPref(prefs::kViewSourceLineWrappingEnabled, false);
 }
 
 void RegisterUserProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
@@ -2839,6 +2852,11 @@ void MigrateObsoleteProfilePrefs(PrefService* profile_prefs,
 
   // Added 05/2025
   profile_prefs->ClearPref(kManagedPrivateNetworkAccessRestrictionsEnabled);
+
+#if BUILDFLAG(IS_ANDROID)
+  // Added 05/2025.
+  profile_prefs->ClearPref(kWipedWebAPkDataForMigration);
+#endif  // BUILDFLAG(IS_ANDROID)
 
   // Please don't delete the following line. It is used by PRESUBMIT.py.
   // END_MIGRATE_OBSOLETE_PROFILE_PREFS

@@ -66,6 +66,7 @@ import org.chromium.ui.modelutil.PropertyModel;
 @Config(manifest = Config.NONE)
 public class ArchivedTabsMessageServiceUnitTest {
     private static final int TIME_DELTA_DAYS = 10;
+    private static final int INITIAL_TAB_COUNT = 0;
 
     @Rule public MockitoRule mMockitoRule = MockitoJUnit.rule().strictness(Strictness.LENIENT);
 
@@ -93,15 +94,16 @@ public class ArchivedTabsMessageServiceUnitTest {
     @Mock private Supplier<PaneManager> mPaneManagerSupplier;
     @Mock private Supplier<TabGroupUiActionHandler> mTabGroupUiActionHandlerSupplier;
     @Mock private ObservableSupplier<TabGroupModelFilter> mCurrentTabGroupModelFilterSupplier;
-    @Captor private ArgumentCaptor<TabArchiveSettings.Observer> mTabArchiveSettingsObserver;
+    @Captor private ArgumentCaptor<TabArchiveSettings.Observer> mTabArchiveSettingsObserverCaptor;
 
     private Activity mActivity;
     private ViewGroup mRootView;
     private ArchivedTabsMessageService mArchivedTabsMessageService;
-    private ObservableSupplierImpl<Integer> mTabCountSupplier = new ObservableSupplierImpl<>();
-    private ObservableSupplierImpl<TabListCoordinator> mTabListCoordinatorSupplier =
+    private final ObservableSupplierImpl<Integer> mTabCountSupplier =
+            new ObservableSupplierImpl<>(INITIAL_TAB_COUNT);
+    private final ObservableSupplierImpl<TabListCoordinator> mTabListCoordinatorSupplier =
             new ObservableSupplierImpl<>();
-    private ObservableSupplierImpl<EdgeToEdgeController> mEdgeToEdgeSupplier =
+    private final ObservableSupplierImpl<EdgeToEdgeController> mEdgeToEdgeSupplier =
             new ObservableSupplierImpl<>();
 
     @Before
@@ -110,7 +112,7 @@ public class ArchivedTabsMessageServiceUnitTest {
         mRootView = new FrameLayout(mActivity);
 
         doReturn(TIME_DELTA_DAYS).when(mTabArchiveSettings).getArchiveTimeDeltaDays();
-        doReturn(mTabCountSupplier).when(mArchivedTabModel).getTabCountSupplier();
+        doReturn(mTabCountSupplier).when(mArchivedTabModelOrchestrator).getTabCountSupplier();
         mTabListCoordinatorSupplier.set(mTabListCoordinator);
     }
 
@@ -148,7 +150,7 @@ public class ArchivedTabsMessageServiceUnitTest {
         mArchivedTabsMessageService
                 .getArchivedTabModelOrchestratorObserverForTesting()
                 .onTabModelCreated(mArchivedTabModel);
-        verify(mTabArchiveSettings).addObserver(mTabArchiveSettingsObserver.capture());
+        verify(mTabArchiveSettings).addObserver(mTabArchiveSettingsObserverCaptor.capture());
     }
 
     @Test
@@ -157,14 +159,12 @@ public class ArchivedTabsMessageServiceUnitTest {
         PropertyModel customCardPropertyModel =
                 mArchivedTabsMessageService.getCustomCardModelForTesting();
 
-        doReturn(1).when(mArchivedTabModel).getCount();
         mTabCountSupplier.set(1);
         assertEquals(1, customCardPropertyModel.get(NUMBER_OF_ARCHIVED_TABS));
         assertEquals(10, customCardPropertyModel.get(ARCHIVE_TIME_DELTA_DAYS));
         verify(mMessageObserver, times(1))
                 .messageReady(eq(MessageType.ARCHIVED_TABS_MESSAGE), any());
 
-        doReturn(0).when(mArchivedTabModel).getCount();
         mTabCountSupplier.set(0);
         assertEquals(0, customCardPropertyModel.get(NUMBER_OF_ARCHIVED_TABS));
         assertEquals(10, customCardPropertyModel.get(ARCHIVE_TIME_DELTA_DAYS));
@@ -178,12 +178,10 @@ public class ArchivedTabsMessageServiceUnitTest {
         PropertyModel customCardPropertyModel =
                 mArchivedTabsMessageService.getCustomCardModelForTesting();
 
-        doReturn(12).when(mArchivedTabModel).getCount();
         mTabCountSupplier.set(12);
         assertEquals(12, customCardPropertyModel.get(NUMBER_OF_ARCHIVED_TABS));
         assertEquals(10, customCardPropertyModel.get(ARCHIVE_TIME_DELTA_DAYS));
 
-        doReturn(8).when(mArchivedTabModel).getCount();
         verify(mMessageObserver, times(1))
                 .messageReady(eq(MessageType.ARCHIVED_TABS_MESSAGE), any());
         mTabCountSupplier.set(8);
@@ -196,7 +194,7 @@ public class ArchivedTabsMessageServiceUnitTest {
 
         // After invalidating the previous message, a new message should be sent.
         mArchivedTabsMessageService.maybeInvalidatePreviouslySentMessage();
-        mArchivedTabsMessageService.maybeSendMessageToQueue();
+        mArchivedTabsMessageService.maybeSendMessageToQueue(8);
         verify(mMessageObserver, times(2))
                 .messageReady(eq(MessageType.ARCHIVED_TABS_MESSAGE), any());
         verify(mMessageObserver, times(1)).messageInvalidate(MessageType.ARCHIVED_TABS_MESSAGE);
@@ -220,7 +218,7 @@ public class ArchivedTabsMessageServiceUnitTest {
                 mArchivedTabsMessageService.getCustomCardModelForTesting();
 
         doReturn(15).when(mTabArchiveSettings).getArchiveTimeDeltaDays();
-        mTabArchiveSettingsObserver.getValue().onSettingChanged();
+        mTabArchiveSettingsObserverCaptor.getValue().onSettingChanged();
         assertEquals(15, customCardPropertyModel.get(ARCHIVE_TIME_DELTA_DAYS));
     }
 
@@ -230,7 +228,7 @@ public class ArchivedTabsMessageServiceUnitTest {
         assertTrue(mTabCountSupplier.hasObservers());
 
         mArchivedTabsMessageService.destroy();
-        verify(mTabArchiveSettings).removeObserver(mTabArchiveSettingsObserver.getValue());
+        verify(mTabArchiveSettings).removeObserver(mTabArchiveSettingsObserverCaptor.getValue());
         verify(mArchivedTabsDialogCoordinator).destroy();
         verify(mTabListCoordinator).removeTabListItemSizeChangedObserver(any());
         assertFalse(mTabCountSupplier.hasObservers());
@@ -244,12 +242,10 @@ public class ArchivedTabsMessageServiceUnitTest {
         PropertyModel customCardPropertyModel =
                 mArchivedTabsMessageService.getCustomCardModelForTesting();
 
-        doReturn(12).when(mArchivedTabModel).getCount();
         mTabCountSupplier.set(12);
         assertEquals(12, customCardPropertyModel.get(NUMBER_OF_ARCHIVED_TABS));
         assertEquals(10, customCardPropertyModel.get(ARCHIVE_TIME_DELTA_DAYS));
 
-        doReturn(8).when(mArchivedTabModel).getCount();
         verify(mMessageObserver).messageReady(eq(MessageType.ARCHIVED_TABS_MESSAGE), any());
         mTabCountSupplier.set(8);
         doReturn(true)

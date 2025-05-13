@@ -117,6 +117,7 @@ void ComputePropertyTreeNodeUpdate(
   wire->will_change_transform = new_node.will_change_transform;
   wire->visible_frame_element_id = new_node.visible_frame_element_id;
   wire->damage_reasons_bit_mask = new_node.damage_reasons().ToEnumBitmask();
+  wire->moved_by_safe_area_bottom = new_node.moved_by_safe_area_bottom;
   container.push_back(std::move(wire));
 }
 
@@ -338,6 +339,7 @@ std::vector<viz::mojom::StickyPositionNodeDataPtr> SerializeStickyPositionData(
         data.constraints.scroll_container_relative_sticky_box_rect;
     wire->scroll_container_relative_containing_block_rect =
         data.constraints.scroll_container_relative_containing_block_rect;
+    wire->pixel_snap_offset = data.constraints.pixel_snap_offset;
     wire->nearest_node_shifting_sticky_box =
         data.nearest_node_shifting_sticky_box;
     wire->nearest_node_shifting_containing_block =

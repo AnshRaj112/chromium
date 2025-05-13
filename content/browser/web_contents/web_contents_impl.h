@@ -1120,6 +1120,7 @@ class CONTENT_EXPORT WebContentsImpl
   bool PreHandleMouseEvent(const blink::WebMouseEvent& event) override;
   void PreHandleDragUpdate(const DropData& drop_data,
                            const gfx::PointF& client_pt);
+  void PreHandleDragExit();
   KeyboardEventProcessingResult PreHandleKeyboardEvent(
       const input::NativeWebKeyboardEvent& event) override;
   bool HandleMouseEvent(const blink::WebMouseEvent& event) override;
@@ -1207,7 +1208,9 @@ class CONTENT_EXPORT WebContentsImpl
   bool CreateRenderViewForRenderManager(
       RenderViewHost* render_view_host,
       const std::optional<blink::FrameToken>& opener_frame_token,
-      RenderFrameProxyHost* proxy_host) override;
+      RenderFrameProxyHost* proxy_host,
+      const std::optional<base::UnguessableToken>& navigation_metrics_token)
+      override;
   void ReattachOuterDelegateIfNeeded() override;
   void CreateRenderWidgetHostViewForRenderManager(
       RenderViewHost* render_view_host) override;
@@ -2255,6 +2258,10 @@ class CONTENT_EXPORT WebContentsImpl
   // the latter might cause RenderViewHost's destructor to call us and we might
   // use the observer list then.
   WebContentsObserverList observers_;
+
+  // True if the WebContents is never user-visible, thus the renderer need never
+  // produce pixels for display.
+  bool is_never_composited_ = false;
 
   // True if this tab was opened by another window. This is true even if the tab
   // is opened with "noopener", and won't be unset if the opener is closed.

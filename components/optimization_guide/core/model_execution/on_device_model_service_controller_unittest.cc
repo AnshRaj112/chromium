@@ -428,6 +428,43 @@ TEST_F(OnDeviceModelServiceControllerTest, TokenLimitsCapped) {
   EXPECT_EQ(limits.max_output_tokens, 17u);
 }
 
+TEST_F(OnDeviceModelServiceControllerTest, CacheWeightExecutionSuccess) {
+  // TODO(crbug.com/400998489): Cache files are experimental for now. Stop
+  // setting this feature flag once that's no longer the case.
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeatureWithParameters(
+      features::kOptimizationGuideOnDeviceModel,
+      {{"on_device_model_force_cpu_backend", "true"},
+       {"on_device_model_topk", "1"},
+       {"on_device_model_temperature", "0"}});
+
+  FakeBaseModelAsset base_model_with_cache({
+      .cache_weight = 1015,
+  });
+
+  Initialize(InitializeParams{
+      .base_model = &base_model_with_cache,
+      .safety = &standard_assets_.safety,
+      .language = &standard_assets_.language,
+      .adaptations = {&standard_assets_.compose},
+  });
+  auto session = CreateSession();
+  ASSERT_TRUE(session);
+  session->ExecuteModel(PageUrlRequest("foo"),
+                        response_.GetStreamingCallback());
+  ASSERT_TRUE(response_.GetFinalStatus());
+  EXPECT_EQ(*response_.value(),
+            "Cache weight: 1015\nContext: execute:foo max:1024\n");
+
+  // If we destroy all sessions and wait long enough, everything should idle out
+  // and the service should get terminated.
+  session.reset();
+  task_environment_.FastForwardBy(features::GetOnDeviceModelIdleTimeout() +
+                                  base::Seconds(1));
+  task_environment_.RunUntilIdle();
+  EXPECT_FALSE(fake_launcher_.is_service_running());
+}
+
 TEST_F(OnDeviceModelServiceControllerTest, AdaptationModelExecutionSuccess) {
   FakeAdaptationAsset compose_asset({
       .config = SimpleComposeConfig(),
@@ -2399,6 +2436,7 @@ TEST_F(OnDeviceModelServiceControllerTest, UsesSessionTopKAndTemperature) {
   EXPECT_TRUE(response_.value());
   const std::vector<std::string> partial_responses = {
       "Context: execute:foo max:1024\n",
+      "TopK: 3, Temp: 2\n",
   };
   EXPECT_EQ(*response_.value(), ConcatResponses(partial_responses));
   EXPECT_THAT(response_.partials(), ElementsAreArray(partial_responses));
@@ -3458,6 +3496,7 @@ TEST_F(OnDeviceModelServiceControllerTest, CloneUsesSessionTopKAndTemperature) {
   EXPECT_TRUE(response_.value());
   const std::vector<std::string> partial_responses = {
       "Context: execute:foo max:1024\n",
+      "TopK: 3, Temp: 2\n",
   };
   EXPECT_EQ(*response_.value(), ConcatResponses(partial_responses));
   EXPECT_THAT(response_.partials(), ElementsAreArray(partial_responses));

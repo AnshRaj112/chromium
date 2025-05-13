@@ -20,6 +20,16 @@ constexpr auto enabled_by_default_desktop_only =
     base::FEATURE_ENABLED_BY_DEFAULT;
 #endif
 
+BASE_FEATURE(AutocompleteControllerMetricsOptimization::
+                 kAutocompleteControllerMetricsOptimization,
+             "AutocompleteControllerMetricsOptimization",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+AutocompleteControllerMetricsOptimization::
+    AutocompleteControllerMetricsOptimization() {
+  enabled =
+      base::FeatureList::IsEnabled(kAutocompleteControllerMetricsOptimization);
+}
+
 // TODO(manukh): Enabled by default in m120. Clean up 12/5 when after m121
 //   branch cut.
 // static
@@ -72,20 +82,8 @@ BASE_FEATURE(ContextualSearch::kOmniboxContextualSearchOnFocusSuggestions,
              "OmniboxContextualSearchOnFocusSuggestions",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(ContextualSearch::kOmniboxContextualSearchActionsAtTop,
-             "OmniboxContextualSearchActionsAtTop",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(ContextualSearch::kOmniboxContextualSearchSingleLensAction,
-             "OmniboxContextualSearchSingleLensAction",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(ContextualSearch::kContextualSearchBoxUsesContextualSearchProvider,
              "ContextualSearchBoxUsesContextualSearchProvider",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(ContextualSearch::kContextualSearchUseVerticalBar,
-             "ContextualSearchUseVerticalBar",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 ContextualSearch::ContextualSearch() {
@@ -112,14 +110,8 @@ ContextualSearch::ContextualSearch() {
                                     "Limit", 3)
                 .Get()
           : 0;
-  actions_at_top =
-      base::FeatureList::IsEnabled(kOmniboxContextualSearchActionsAtTop);
-  single_lens_action =
-      base::FeatureList::IsEnabled(kOmniboxContextualSearchSingleLensAction);
   csb_uses_csp = base::FeatureList::IsEnabled(
       kContextualSearchBoxUsesContextualSearchProvider);
-  use_vertical_bar =
-      base::FeatureList::IsEnabled(kContextualSearchUseVerticalBar);
 }
 
 ContextualSearch::ContextualSearch(const ContextualSearch&) = default;
@@ -130,6 +122,12 @@ ContextualSearch::~ContextualSearch() = default;
 bool ContextualSearch::IsContextualSearchEnabled() const {
   return contextual_zps_limit > 0;
 }
+
+BASE_FEATURE(MiaZPS::kOmniboxMiaZPS,
+             "OmniboxMiaZPS",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+MiaZPS::MiaZPS() : enabled(base::FeatureList::IsEnabled(kOmniboxMiaZPS)) {}
 
 DocumentProvider::DocumentProvider() {
   enabled = base::FeatureList::IsEnabled(omnibox::kDocumentProvider);

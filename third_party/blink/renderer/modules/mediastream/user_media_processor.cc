@@ -111,8 +111,8 @@ const char* MediaStreamRequestResultToString(MediaStreamRequestResult value) {
       return "FAILED_DUE_TO_SHUTDOWN";
     case MediaStreamRequestResult::KILL_SWITCH_ON:
       return "KILL_SWITCH_ON";
-    case MediaStreamRequestResult::SYSTEM_PERMISSION_DENIED:
-      return "SYSTEM_PERMISSION_DENIED";
+    case MediaStreamRequestResult::PERMISSION_DENIED_BY_SYSTEM:
+      return "PERMISSION_DENIED_BY_SYSTEM";
     case MediaStreamRequestResult::DEVICE_IN_USE:
       return "DEVICE_IN_USE";
     case MediaStreamRequestResult::REQUEST_CANCELLED:
@@ -120,10 +120,9 @@ const char* MediaStreamRequestResultToString(MediaStreamRequestResult value) {
     case MediaStreamRequestResult::START_TIMEOUT:
       return "START_TIMEOUT";
     case MediaStreamRequestResult::NUM_MEDIA_REQUEST_RESULTS:
-      return "NUM_MEDIA_REQUEST_RESULTS";
-    default:
-      NOTREACHED();
+      break;
   }
+  NOTREACHED();
 }
 
 void SendLogMessage(const std::string& message) {
@@ -254,6 +253,8 @@ Vector<blink::VideoInputDeviceCapabilities> ToVideoInputDeviceCapabilities(
 
 String ErrorCodeToString(MediaStreamRequestResult result) {
   switch (result) {
+    case MediaStreamRequestResult::OK:
+      return "OK";
     case MediaStreamRequestResult::PERMISSION_DENIED:
       return "Permission denied";
     case MediaStreamRequestResult::PERMISSION_DISMISSED:
@@ -279,8 +280,8 @@ String ErrorCodeToString(MediaStreamRequestResult result) {
     case MediaStreamRequestResult::FAILED_DUE_TO_SHUTDOWN:
       return "Failed due to shutdown";
     case MediaStreamRequestResult::KILL_SWITCH_ON:
-      return "";
-    case MediaStreamRequestResult::SYSTEM_PERMISSION_DENIED:
+      return "Killswitch on";
+    case MediaStreamRequestResult::PERMISSION_DENIED_BY_SYSTEM:
       return "Permission denied by system";
     case MediaStreamRequestResult::DEVICE_IN_USE:
       return "Device in use";
@@ -288,9 +289,12 @@ String ErrorCodeToString(MediaStreamRequestResult result) {
       return "Request was cancelled";
     case MediaStreamRequestResult::START_TIMEOUT:
       return "Timeout starting video source";
-    default:
-      NOTREACHED();
+    case MediaStreamRequestResult::CONSTRAINT_NOT_SATISFIED:
+      return "Constraint not satisfied";
+    case MediaStreamRequestResult::NUM_MEDIA_REQUEST_RESULTS:
+      break;  // Not a valid enum value.
   }
+  NOTREACHED();
 }
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_FUCHSIA)
@@ -2166,7 +2170,7 @@ bool UserMediaProcessor::RemoveLocalSource(MediaStreamSource* source) {
     auto error = MediaStreamAudioSource::From(source)->ErrorCode();
     switch (error.value_or(AudioSourceErrorCode::kUnknown)) {
       case AudioSourceErrorCode::kSystemPermissions:
-        result = MediaStreamRequestResult::SYSTEM_PERMISSION_DENIED;
+        result = MediaStreamRequestResult::PERMISSION_DENIED_BY_SYSTEM;
         message = "System Permssions prevented access to audio capture device";
         break;
       case AudioSourceErrorCode::kDeviceInUse:

@@ -2700,6 +2700,8 @@ Called by update_net_error_codes.py.-->
   <int value="134" label="Revoked disruptive notification permissions"/>
   <int value="135" label="Local network access"/>
   <int value="136" label="On-device languages downloaded by site"/>
+  <int value="137" label="Translator API languages initialized by site"/>
+  <int value="138" label="Suspicious notification ids"/>
 </enum>
 
 <!-- LINT.ThenChange(//components/content_settings/core/browser/content_settings_uma_util.cc:kHistogramValue) -->
@@ -2750,9 +2752,9 @@ Called by update_net_error_codes.py.-->
   <int value="41" label="Save page"/>
   <int value="42" label="Share page"/>
   <int value="43" label="Print page"/>
-  <int value="44" label="Navigate back"/>
-  <int value="45" label="Navigate forward"/>
-  <int value="46" label="Reload page"/>
+  <int value="44" label="(Obsolete) Navigate back"/>
+  <int value="45" label="(Obsolete) Navigate forward"/>
+  <int value="46" label="(Obsolete) Reload page"/>
   <int value="47" label="Inspect"/>
 </enum>
 
@@ -2955,6 +2957,7 @@ to ensure that the crash string is shown properly on the user-facing crash UI.
   <int value="35" label="RESULT_CODE_NORMAL_EXIT_UPGRADE_RELAUNCHED"/>
   <int value="36" label="RESULT_CODE_NORMAL_EXIT_PACK_EXTENSION_SUCCESS"/>
   <int value="37" label="RESULT_CODE_SYSTEM_RESOURCE_EXHAUSTED"/>
+  <int value="38" label="RESULT_CODE_NORMAL_EXIT_AUTO_DE_ELEVATED"/>
   <int value="131" label="SIGQUIT"/>
   <int value="132" label="SIGILL"/>
   <int value="133" label="SIGTRAP"/>
@@ -8965,6 +8968,8 @@ from previous Chrome versions.
   <int value="-1931102691" label="EducationalTipModule:disabled"/>
   <int value="-1930720286" label="nacl-debug-mask"/>
   <int value="-1930656203" label="TabGroupSyncForceOff:disabled"/>
+  <int value="-1930555429"
+      label="AndroidTabDeclutterAutoDeleteKillSwitch:disabled"/>
   <int value="-1930487223"
       label="EnableFrameSinkDesktopCapturerInCrd:disabled"/>
   <int value="-1928198763" label="enable-async-dns"/>
@@ -10238,6 +10243,7 @@ from previous Chrome versions.
   <int value="-1446625028" label="CrostiniUsbAllowUnsupported:enabled"/>
   <int value="-1446427484" label="FilesSearchV2:disabled"/>
   <int value="-1446425986" label="ProtectSyncCredentialOnReauth:disabled"/>
+  <int value="-1445312295" label="UiaProvider:enabled"/>
   <int value="-1444550831" label="AndroidWindowPopupLargeScreen:disabled"/>
   <int value="-1444051091" label="ash-disable-night-light"/>
   <int value="-1443796945" label="OfflinePagesSharing:disabled"/>
@@ -11673,6 +11679,8 @@ from previous Chrome versions.
   <int value="-898653891" label="UseClientGmbInterface:disabled"/>
   <int value="-898594349" label="ash-enable-stable-overview-order"/>
   <int value="-898499262" label="ImprovedA2HS:enabled"/>
+  <int value="-898344488"
+      label="AndroidTabDeclutterAutoDeleteKillSwitch:enabled"/>
   <int value="-898005938" label="disable-pinch-virtual-viewport"/>
   <int value="-897994913"
       label="OmniboxUIExperimentRevealSteadyStateUrlPathQueryAndRefOnHover:enabled"/>
@@ -12008,6 +12016,7 @@ from previous Chrome versions.
   <int value="-765417607" label="KeyboardLockPrompt:disabled"/>
   <int value="-764463072" label="WebViewMixedContentAutoupgrades:disabled"/>
   <int value="-764363697" label="OmniboxForceAllowedToBeDefault:disabled"/>
+  <int value="-764164329" label="UiaProvider:disabled"/>
   <int value="-763900417" label="CCTModuleUseIntentExtras:enabled"/>
   <int value="-763759697" label="enable-audio-support-for-desktop-share"/>
   <int value="-763730918" label="CCTTargetTranslateLanguage:disabled"/>
@@ -14292,6 +14301,8 @@ from previous Chrome versions.
   <int value="106235373" label="LauncherSystemInfoAnswerCards:enabled"/>
   <int value="106596969" label="HideIncognitoMediaMetadata:disabled"/>
   <int value="106744400" label="OmniboxModernizeVisualUpdate:enabled"/>
+  <int value="106789059"
+      label="ReduceUserAgentDataLinuxPlatformVersion:disabled"/>
   <int value="106840653" label="mus"/>
   <int value="107358678" label="GalleryAppPdfEditNotification:enabled"/>
   <int value="107900612" label="ChromeHomePersistentIph:disabled"/>
@@ -15189,6 +15200,8 @@ from previous Chrome versions.
   <int value="436980707" label="ContextualSearchForceCaption:enabled"/>
   <int value="437371666"
       label="AutofillEnableCardInfoRuntimeRetrieval:enabled"/>
+  <int value="438220199"
+      label="ReduceUserAgentDataLinuxPlatformVersion:enabled"/>
   <int value="438307192" label="FirstPartySets:disabled"/>
   <int value="438398886"
       label="AutofillEnableStickyManualFallbackForCards:enabled"/>
@@ -20132,6 +20145,8 @@ from previous Chrome versions.
   <int value="14" label="Kill Switch On (NotAllowedError)"/>
   <int value="15" label="Permission Denied By System (NotAllowedError)"/>
   <int value="16" label="Device In Use (NotReadableError)"/>
+  <int value="17" label="Request cancelled (?)"/>
+  <int value="18" label="Start timeout (AbortError)"/>
 </enum>
 
 <enum name="MediaStreamType">

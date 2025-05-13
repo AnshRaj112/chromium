@@ -108,15 +108,7 @@ id<GREYMatcher> ManagedProfileCreationDataMigrationDisabledSubtitleMatcher() {
 // Tests that signing in from a signed out state with a managed account
 // shows the enterprise onboarding only the first time and that by default
 // existing browsing data is kept separate from the managed profile.
-// TODO(crbug.com/411035267): Fix this flaky test on simulator.
-#if TARGET_OS_SIMULATOR
-#define MAYBE_testSigninWithManagedAccountFromUnsignedStateSeparateData \
-  FLAKY_testSigninWithManagedAccountFromUnsignedStateSeparateData
-#else
-#define MAYBE_testSigninWithManagedAccountFromUnsignedStateSeparateData \
-  testSigninWithManagedAccountFromUnsignedStateSeparateData
-#endif
-- (void)MAYBE_testSigninWithManagedAccountFromUnsignedStateSeparateData {
+- (void)testSigninWithManagedAccountFromUnsignedStateSeparateData {
   // Separate profiles are only available in iOS 17+.
   if (!@available(iOS 17, *)) {
     return;
@@ -194,7 +186,7 @@ id<GREYMatcher> ManagedProfileCreationDataMigrationDisabledSubtitleMatcher() {
              @"Profile name should be changed");
 
   // Sign out - that should cause a switch back to the personal profile.
-  [SigninEarlGreyUI signOut];
+  SignoutFromAccountMenu();
   NSString* personalProfileName = [ChromeEarlGrey currentProfileName];
   GREYAssert([personalProfileName isEqualToString:originalProfileName],
              @"Profile name should be the personal one");
@@ -218,15 +210,7 @@ id<GREYMatcher> ManagedProfileCreationDataMigrationDisabledSubtitleMatcher() {
 // shows the enterprise onboarding only the first time. And if the user
 // decides to keep their existing data into the managed profile, the existing
 // profile is converted.
-// TODO(crbug.com/411035267): Fix this flaky test on simulator.
-#if TARGET_OS_SIMULATOR
-#define MAYBE_testSigninWithManagedAccountFromUnsignedStateConvertsProfile \
-  FLAKY_testSigninWithManagedAccountFromUnsignedStateConvertsProfile
-#else
-#define MAYBE_testSigninWithManagedAccountFromUnsignedStateConvertsProfile \
-  testSigninWithManagedAccountFromUnsignedStateConvertsProfile
-#endif
-- (void)MAYBE_testSigninWithManagedAccountFromUnsignedStateConvertsProfile {
+- (void)testSigninWithManagedAccountFromUnsignedStateConvertsProfile {
   // Separate profiles are only available in iOS 17+.
   if (!@available(iOS 17, *)) {
     return;
@@ -307,7 +291,7 @@ id<GREYMatcher> ManagedProfileCreationDataMigrationDisabledSubtitleMatcher() {
              @"Profile name should be unchanged");
 
   // Sign out - this should cause a switch back to the personal profile.
-  [SigninEarlGreyUI signOut];
+  SignoutFromAccountMenu();
   NSString* personalProfileName = [ChromeEarlGrey currentProfileName];
   GREYAssert(![personalProfileName isEqualToString:newProfileName],
              @"Profile name should be the personal one");

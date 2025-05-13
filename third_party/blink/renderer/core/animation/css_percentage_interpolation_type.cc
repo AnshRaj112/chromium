@@ -5,6 +5,7 @@
 #include "third_party/blink/renderer/core/animation/css_percentage_interpolation_type.h"
 
 #include "third_party/blink/renderer/core/animation/number_property_functions.h"
+#include "third_party/blink/renderer/core/animation/tree_counting_checker.h"
 #include "third_party/blink/renderer/core/css/css_numeric_literal_value.h"
 #include "third_party/blink/renderer/core/css/resolver/style_builder.h"
 #include "third_party/blink/renderer/core/css/resolver/style_resolver.h"
@@ -84,17 +85,19 @@ InterpolationValue CSSPercentageInterpolationType::MaybeConvertInherit(
 InterpolationValue CSSPercentageInterpolationType::MaybeConvertValue(
     const CSSValue& value,
     const StyleResolverState& state,
-    ConversionCheckers&) const {
+    ConversionCheckers& conversion_checkers) const {
   const auto* primitive_value = DynamicTo<CSSPrimitiveValue>(value);
   if (!primitive_value || !primitive_value->IsPercentage()) {
     return nullptr;
   }
-  // TODO(crbug.com/415626999): Create a TreeCountingChecker for sibling-index()
-  // and sibling-count() if necessary.
   // TODO(crbug.com/415572412): Create a LengthUnitsChecker for relative units
   // if necessary.
+  const CSSLengthResolver& length_resolver = state.CssToLengthConversionData();
+  if (primitive_value->IsElementDependent()) {
+    conversion_checkers.push_back(TreeCountingChecker::Create(length_resolver));
+  }
   return CreatePercentageValue(
-      primitive_value->ComputePercentage(state.CssToLengthConversionData()));
+      primitive_value->ComputePercentage(length_resolver));
 }
 
 InterpolationValue

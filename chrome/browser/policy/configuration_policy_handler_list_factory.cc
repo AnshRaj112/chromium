@@ -958,11 +958,13 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kDefaultGeolocationSetting,
     prefs::kManagedDefaultGeolocationSetting,
     base::Value::Type::INTEGER },
-#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN) \
-     || BUILDFLAG(IS_MAC)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   { key::kMandatoryExtensionsForIncognitoNavigation,
     prefs::kMandatoryExtensionsForIncognitoNavigation,
     base::Value::Type::LIST },
+#endif // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN) \
+     || BUILDFLAG(IS_MAC)
   { key::kRequireOnlineRevocationChecksForLocalAnchors,
     prefs::kCertRevocationCheckingRequiredLocalAnchors,
     base::Value::Type::BOOLEAN },
@@ -2390,8 +2392,8 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::BOOLEAN },
 #endif  // BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_FUCHSIA)
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
-  { key::kNTPFooterThemeAttributionEnabled,
-    prefs::kNTPFooterThemeAttributionEnabled,
+  { key::kNTPFooterExtensionAttributionEnabled,
+    prefs::kNTPFooterExtensionAttributionEnabled,
     base::Value::Type::BOOLEAN },
   { key::kNTPFooterManagementNoticeEnabled,
     prefs::kNTPFooterManagementNoticeEnabled,

@@ -80,7 +80,7 @@ public class StatusMediator
     private boolean mPageIsOffline;
     private boolean mShowStatusIconWhenUrlFocused;
     private boolean mIsSecurityViewShown;
-    private boolean mIsTablet;
+    private final boolean mIsTablet;
 
     private int mUrlMinWidth;
     private int mSeparatorMinWidth;
@@ -94,10 +94,10 @@ public class StatusMediator
     private @StringRes int mSecurityIconDescriptionRes;
     private @ColorRes int mNavigationIconTintRes;
 
-    private Context mContext;
+    private final Context mContext;
 
-    private LocationBarDataProvider mLocationBarDataProvider;
-    private UrlBarEditingTextStateProvider mUrlBarEditingTextStateProvider;
+    private final LocationBarDataProvider mLocationBarDataProvider;
+    private final UrlBarEditingTextStateProvider mUrlBarEditingTextStateProvider;
 
     private final PermissionDialogController mPermissionDialogController;
     private final Handler mPermissionTaskHandler = new Handler();
@@ -112,7 +112,7 @@ public class StatusMediator
 
     private float mUrlFocusPercent;
 
-    private int mPermissionIconDisplayTimeoutMs = PERMISSION_ICON_DEFAULT_DISPLAY_TIMEOUT_MS;
+    private final int mPermissionIconDisplayTimeoutMs = PERMISSION_ICON_DEFAULT_DISPLAY_TIMEOUT_MS;
 
     private @Nullable CookieControlsBridge mCookieControlsBridge;
     private boolean mCookieControlsVisible;
@@ -124,6 +124,7 @@ public class StatusMediator
     private Drawable mDefaultStatusBackgroundIncognito;
     private Drawable mVerboseStatusBackground;
     private Drawable mVerboseStatusBackgroundIncognito;
+    private boolean mHideStatusIconForSecureOrigins;
 
     /**
      * @param model The {@link PropertyModel} for this mediator.
@@ -245,7 +246,13 @@ public class StatusMediator
             updateVerboseStatusTextVisibility();
             updateLocationBarIcon(IconTransitionType.CROSSFADE);
             updateColorTheme();
+            updateVisibilityForOriginSecurity();
         }
+    }
+
+    void setHideStatusIconForSecureOrigins(boolean hideStatusIconForSecureOrigins) {
+        mHideStatusIconForSecureOrigins = hideStatusIconForSecureOrigins;
+        updateVisibilityForOriginSecurity();
     }
 
     /** Specify minimum width of the separator field. */
@@ -950,5 +957,11 @@ public class StatusMediator
                 DrawableUtils.getIconBackground(context, /* isIncognito= */ false, size, size);
         mDefaultStatusBackgroundIncognito =
                 DrawableUtils.getIconBackground(context, /* isIncognito= */ true, size, size);
+    }
+
+    private void updateVisibilityForOriginSecurity() {
+        setShowStatusView(
+                !mHideStatusIconForSecureOrigins
+                        || mPageSecurityLevel != ConnectionSecurityLevel.SECURE);
     }
 }

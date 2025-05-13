@@ -357,6 +357,10 @@
       implied_by: ["AIPromptAPI"],
     },
     {
+      name: "AIProofreadingAPI",
+      status: "test",
+    },
+    {
       name: "AIRewriterAPI",
       public: true,
       status: "experimental",
@@ -704,6 +708,7 @@
         "AIWriterAPI",
         "LanguageDetectionAPI",
         "TranslationAPI",
+        "AIProofreadingAPI",
       ]
     },
     {
@@ -752,7 +757,7 @@
     },
     {
       // https://github.com/WICG/html-in-canvas/blob/main/README.md
-      name: "CanvasElementDrawElement",
+      name: "CanvasDrawElement",
       status: "test",
       implied_by: ["CanvasPlaceElement"],
     },
@@ -1099,11 +1104,6 @@
       status: "stable",
     },
     {
-      // Support anchor-size() values in inset and margin properties.
-      name: "CSSAnchorSizeInsetsMargins",
-      status: "stable",
-    },
-    {
       // Whether <image> values are allowed as counter style <symbol>
       name: "CSSAtRuleCounterStyleImageSymbols",
     },
@@ -1248,10 +1248,6 @@
       depends_on: ["CSSLineClamp"],
     },
     {
-      name: "CSSLogicalOverflow",
-      status: "stable",
-    },
-    {
       name: "CSSMarkerNestedPseudoElement",
       status: "stable",
     },
@@ -1354,23 +1350,8 @@
       depends_on: ["CSSReadingFlow"],
     },
     {
-      // https://drafts.csswg.org/css-color-5/#relative-colors
-      name: "CSSRelativeColor",
-      status: "stable",
-    },
-    {
       // crbug.com/359616070
       name: "CSSRelativeColorLateResolveAlways",
-      status: "stable",
-    },
-    {
-      // crbug.com/365818844
-      name: "CSSRelativeColorPreserveNone",
-      status: "stable",
-    },
-    {
-      // crbug.com/325309578
-      name: "CSSRelativeColorSupportsCurrentcolor",
       status: "stable",
     },
     {
@@ -1392,10 +1373,6 @@
       // https://github.com/w3c/csswg-drafts/issues/7348
       name: "CSSScopeImport",
       status: "experimental",
-    },
-    {
-      name: "CSSScrollableContainerQueries",
-      status: "stable",
     },
     {
       name: "CSSScrollDirectionContainerQueries",
@@ -1434,13 +1411,6 @@
       status: "test",
     },
     {
-      // Flag for supporting scroll-state() and container-type: scroll-state
-      // Implied by supporting at least one of the scroll-state query features.
-      name: "CSSScrollStateContainerQueries",
-      implied_by: ["CSSStickyContainerQueries", "CSSSnapContainerQueries",
-                   "CSSScrollableContainerQueries", "CSSScrollDirectionContainerQueries"],
-    },
-    {
       name: "CSSSelectorFragmentAnchor",
       status: "experimental",
       base_feature: "CssSelectorFragmentAnchor",
@@ -1469,16 +1439,8 @@
       status: "experimental",
     },
     {
-      name: "CSSSnapContainerQueries",
-      status: "stable",
-    },
-    {
       // Explainer: https://drafts.csswg.org/css-values/#round-func
       name: "CSSSteppedValueFunctions",
-      status: "stable",
-    },
-    {
-      name: "CSSStickyContainerQueries",
       status: "stable",
     },
     {
@@ -1883,6 +1845,11 @@
     },
     {
       // crbug.com/341564372
+      name: "EditingFastDelete",
+      status: "stable",
+    },
+    {
+      // crbug.com/341564372
       name: "EditingFastRichReplace",
       status: "stable",
     },
@@ -2274,6 +2241,17 @@
       status: "stable",
     },
     {
+      name: "FlexWrapBalance",
+      status: "test",
+    },
+    {
+      // Don't create LayoutMultiColumnFlowThread objects, or any of the other
+      // legacy multicol objects.
+      name: "FlowThreadLess",
+      depends_on: ["LayoutBoxVisualLocation"],
+      status: "stable",
+    },
+    {
       name: "FluentOverlayScrollbars",
       // The associated base feature is defined in
       // ui/native_theme/native_theme_features.cc.
@@ -2522,6 +2500,15 @@
       status: "stable",
       depends_on: ["HTMLInterestTargetAttribute"],
     },
+    // If this flag is enabled, the "partial interest" concept for the
+    // `interesttarget` API is not used. When an interest invoker is focused,
+    // the target immediately gets full interest, regardless of whether it
+    // contains focusable content. This is primarily to test the behavior with
+    // users, to see which is the best.
+    {
+      name: "HTMLInterestTargetNoPartialInterest",
+      depends_on: ["HTMLInterestTargetAttribute"],
+    },
     {
       // A flag, just for local testing to make the
       // HTML parser yield more often and take longer to resume.
@@ -2532,6 +2519,10 @@
     {
       name: "HTMLSelectElementShowPicker",
       status: "stable",
+    },
+    {
+      name: "ICUCapitalization",
+      status: "experimental",
     },
     {
       name: "IgnoreLetterSpacingInCursiveScripts",
@@ -2749,7 +2740,7 @@
       // containing block, also when block-fragmented (used to be in the
       // "stitched" flow-thread coordinate space).
       name: "LayoutBoxVisualLocation",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "LayoutFlexNewRowAlgorithm",
@@ -2820,12 +2811,13 @@
       name: "ListOwnerMustHaveCSSBox",
       status: "stable",
     },
-    // Enables Local Network Access Permission Policy. Does nothing without
-    // also enabling network::features::kLocalNetworkAccessChecks. See
-    // https://crbug.com/394009026.
     {
       name: "LocalNetworkAccessPermissionPolicy",
-      status: "experimental",
+      base_feature: "none",
+      // No status because this blink runtime feature doesn't work by itself.
+      // It's controlled by network::features::kLocalNetworkAccessChecks which
+      // needs to be enabled to make the whole feature work (see
+      // crbug.com/394009026).
     },
     {
       name: "LockedMode",
@@ -4027,11 +4019,6 @@
       status: "stable",
     },
     {
-      // See crbug.com/41321247
-      name: "ScheduleSelectionChangeOnBackspace",
-      status: "stable",
-    },
-    {
       // https://wicg.github.io/webcomponents/proposals/Scoped-Custom-Element-Registries
       // https://github.com/whatwg/html/issues/10854
       // Spec PRs:
@@ -4096,6 +4083,10 @@
     {
       name: "ScrollEndEvents",
       status: "stable",
+    },
+    {
+      name: "ScrollIntoViewNearest",
+      status: "experimental"
     },
     // TODO(355460994): Remove after M129.
     // scroll into root frame didn't take scrollbar and borders into account,

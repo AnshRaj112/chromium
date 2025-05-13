@@ -273,6 +273,10 @@ tabs::TabFeatures* TabModel::GetTabFeatures() {
   return tab_features_.get();
 }
 
+const tabs::TabFeatures* TabModel::GetTabFeatures() const {
+  return tab_features_.get();
+}
+
 bool TabModel::IsPinned() const {
   return pinned_;
 }
@@ -296,10 +300,6 @@ void TabModel::Close() {
   const int tab_idx = tab_strip->GetIndexOfTab(this);
   CHECK(tab_idx != TabStripModel::kNoTab);
   tab_strip->CloseWebContentsAt(tab_idx, TabCloseTypes::CLOSE_NONE);
-}
-
-TabInterface* TabModel::GetTabInterface() {
-  return this;
 }
 
 void TabModel::OnTabStripModelChanged(

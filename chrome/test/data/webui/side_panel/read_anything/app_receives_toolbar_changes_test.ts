@@ -5,7 +5,7 @@
 import 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 
 import type {AppElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
-import {BrowserProxy, SpeechBrowserProxyImpl, SpeechController, ToolbarEvent, VoiceClientSideStatusCode, VoicePackController, WordBoundaries} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import {BrowserProxy, SpeechBrowserProxyImpl, SpeechController, ToolbarEvent, VoicePackController, WordBoundaries} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 import {assertArrayEquals, assertEquals, assertFalse, assertNotEquals, assertTrue} from 'chrome-untrusted://webui-test/chai_assert.js';
 import {hasStyle, microtasksFinished} from 'chrome-untrusted://webui-test/test_util.js';
 
@@ -197,51 +197,6 @@ suite('AppReceivesToolbarChanges', () => {
       assertFalse(chrome.readingMode.getLanguagesEnabledInPref().includes(
           firstLanguage));
     });
-
-    suite('with language downloading enabled', () => {
-      let sentInstallRequestFor: string;
-
-      setup(() => {
-        sentInstallRequestFor = '';
-        // Monkey patch sendInstallVoicePackRequest() to spy on the method
-        chrome.readingMode.sendInstallVoicePackRequest = (language) => {
-          sentInstallRequestFor = language;
-        };
-      });
-
-      test(
-          'when previous language install failed, directly installs lang ' +
-              'without usual protocol of sending status request first',
-          () => {
-            const lang = 'en-us';
-            app.updateVoicePackStatus(lang, 'kOther');
-            emitLanguageToggle(lang);
-
-            assertEquals(lang, sentInstallRequestFor);
-            assertEquals(
-                voicePackController.getLocalStatus(lang),
-                VoiceClientSideStatusCode.SENT_INSTALL_REQUEST_ERROR_RETRY);
-          });
-
-      test(
-          'when there is no status for lang, directly sends install request',
-          () => {
-            emitLanguageToggle('en-us');
-
-            assertEquals('en-us', sentInstallRequestFor);
-          });
-
-
-      test(
-          'when language status is uninstalled, does not directly install lang',
-          () => {
-            const lang = 'en-us';
-            app.updateVoicePackStatus(lang, 'kNotInstalled');
-            emitLanguageToggle(lang);
-
-            assertEquals('', sentInstallRequestFor);
-          });
-    });
   });
 
   test('on speech rate change speech rate updated', () => {
@@ -270,12 +225,7 @@ suite('AppReceivesToolbarChanges', () => {
   });
 
   suite('play/pause', () => {
-    let propagatedActiveState: boolean;
-
     setup(() => {
-      chrome.readingMode.onSpeechPlayingStateChanged = isSpeechActive => {
-        propagatedActiveState = isSpeechActive;
-      };
       app.updateContent();
       return microtasksFinished();
     });
@@ -285,22 +235,11 @@ suite('AppReceivesToolbarChanges', () => {
       return microtasksFinished();
     }
 
-    test('by default is paused', () => {
-      assertFalse(speechController.isSpeechActive());
-      assertFalse(!!propagatedActiveState);
-      assertFalse(speechController.hasSpeechBeenTriggered());
-
-      // isSpeechTreeInitialized is set in updateContent
-      assertTrue(speechController.isSpeechTreeInitialized());
-    });
-
-
     test('on first click starts speech', async () => {
       await emitPlayPause();
       assertTrue(speechController.isSpeechActive());
       assertTrue(speechController.isSpeechTreeInitialized());
       assertTrue(speechController.hasSpeechBeenTriggered());
-      assertTrue(propagatedActiveState);
     });
 
     test('on second click stops speech', async () => {
@@ -310,7 +249,6 @@ suite('AppReceivesToolbarChanges', () => {
       assertFalse(speechController.isSpeechActive());
       assertTrue(speechController.isSpeechTreeInitialized());
       assertTrue(speechController.hasSpeechBeenTriggered());
-      assertFalse(propagatedActiveState);
     });
 
     suite('on keyboard k pressed', () => {
@@ -325,7 +263,6 @@ suite('AppReceivesToolbarChanges', () => {
         await microtasksFinished();
 
         assertTrue(speechController.isSpeechActive());
-        assertTrue(propagatedActiveState);
         assertEquals(0, metrics.getCallCount('recordSpeechStopSource'));
       });
 
@@ -335,7 +272,6 @@ suite('AppReceivesToolbarChanges', () => {
         await microtasksFinished();
 
         assertFalse(speechController.isSpeechActive());
-        assertFalse(propagatedActiveState);
         assertEquals(
             chrome.readingMode.keyboardShortcutStopSource,
             await metrics.whenCalled('recordSpeechStopSource'));
@@ -443,45 +379,15 @@ suite('AppReceivesToolbarChanges', () => {
       app.updateContent();
     });
 
-    function emitNextGranularity() {
-      emitEvent(app, ToolbarEvent.NEXT_GRANULARITY);
-    }
-
-    function emitPreviousGranularity() {
-      emitEvent(app, ToolbarEvent.PREVIOUS_GRANULARITY);
-    }
-
-    test('next propagates change', () => {
-      let movedToNext = false;
-      chrome.readingMode.movePositionToNextGranularity = () => {
-        movedToNext = true;
-      };
-
-      emitNextGranularity();
-
-      assertTrue(movedToNext);
-    });
-
     test('next highlights text', () => {
-      emitNextGranularity();
+      emitEvent(app, ToolbarEvent.NEXT_GRANULARITY);
       const currentHighlight =
           app.$.container.querySelector('.current-read-highlight');
       assertTrue(!!currentHighlight!.textContent);
     });
 
-    test('previous propagates change', () => {
-      let movedToPrevious: boolean = false;
-      chrome.readingMode.movePositionToPreviousGranularity = () => {
-        movedToPrevious = true;
-      };
-
-      emitPreviousGranularity();
-
-      assertTrue(movedToPrevious);
-    });
-
     test('previous highlights text', () => {
-      emitPreviousGranularity();
+      emitEvent(app, ToolbarEvent.PREVIOUS_GRANULARITY);
       const currentHighlight =
           app.$.container.querySelector('.current-read-highlight');
       assertTrue(!!currentHighlight!.textContent);

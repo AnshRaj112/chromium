@@ -68,6 +68,7 @@ chromium-metrics-reviews@google.com.
     <variant name="AttachPanel"/>
     <variant name="CaptureScreenshot"/>
     <variant name="ClosePanel"/>
+    <variant name="ClosePanelAndShutdown"/>
     <variant name="CreateTab"/>
     <variant name="DetachPanel"/>
     <variant name="EnableDragResize"/>
@@ -662,6 +663,17 @@ chromium-metrics-reviews@google.com.
     the focused tab. Records an enum sample that answers a) is the main document
     a PDF (based on its MIME type) and b) were PDF contents actually found
     within the web page (only if Chrome's PDF plugin is actually active).
+  </summary>
+</histogram>
+
+<histogram name="Glic.TieredRolloutEnablementStatus"
+    enum="GlicTieredRolloutEnablementStatus" expires_after="2026-01-15">
+  <owner>sophiechang@chromium.org</owner>
+  <owner>dewittj@chromium.org</owner>
+  <summary>
+    Records whether the Glic-eligible profiles are enabled for tiered rollout.
+    Emitted in every UMA record from the current session (at the time the record
+    is finalized), but only if there is at least one Glic-eligible profile.
   </summary>
 </histogram>
 

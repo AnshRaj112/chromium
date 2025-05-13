@@ -328,7 +328,7 @@ RenderViewHostImpl::RenderViewHostImpl(
       "Navigation.RenderViewHostConstructor");
   TRACE_EVENT("navigation", "RenderViewHostImpl::RenderViewHostImpl",
               ChromeTrackEvent::kRenderViewHost, *this);
-  TRACE_EVENT_BEGIN("navigation", "RenderViewHost",
+  TRACE_EVENT_BEGIN("navigation.debug", "RenderViewHost",
                     perfetto::Track::FromPointer(this),
                     "render_view_host_when_created", this);
 
@@ -390,7 +390,7 @@ RenderViewHostImpl::~RenderViewHostImpl() {
     frame_tree_->UnregisterRenderViewHost(render_view_host_map_id_, this);
 
   // Corresponds to the TRACE_EVENT_BEGIN in RenderViewHostImpl's constructor.
-  TRACE_EVENT_END("navigation", perfetto::Track::FromPointer(this));
+  TRACE_EVENT_END("navigation.debug", perfetto::Track::FromPointer(this));
 }
 
 RenderViewHostDelegate* RenderViewHostImpl::GetDelegate() {
@@ -411,7 +411,8 @@ void RenderViewHostImpl::DisallowReuse() {
 bool RenderViewHostImpl::CreateRenderView(
     const std::optional<blink::FrameToken>& opener_frame_token,
     int proxy_route_id,
-    bool window_was_opened_by_another_window) {
+    bool window_was_opened_by_another_window,
+    const std::optional<base::UnguessableToken>& navigation_metrics_token) {
   TRACE_EVENT0("renderer_host,navigation",
                "RenderViewHostImpl::CreateRenderView");
   DCHECK(!IsRenderViewLive()) << "Creating view twice";
@@ -456,6 +457,7 @@ bool RenderViewHostImpl::CreateRenderView(
   params->devtools_main_frame_token =
       frame_tree_node->current_frame_host()->devtools_frame_token();
   DCHECK_EQ(&frame_tree_node->frame_tree(), frame_tree_);
+  params->navigation_metrics_token = navigation_metrics_token;
 
   if (frame_tree_->is_prerendering() ||
       frame_tree_->page_delegate()->IsPageInPreviewMode()) {
@@ -761,10 +763,6 @@ void RenderViewHostImpl::SetBackgroundOpaque(bool opaque) {
 
 bool RenderViewHostImpl::IsMainFrameActive() {
   return is_active();
-}
-
-bool RenderViewHostImpl::IsNeverComposited() {
-  return GetDelegate()->IsNeverComposited();
 }
 
 blink::web_pref::WebPreferences

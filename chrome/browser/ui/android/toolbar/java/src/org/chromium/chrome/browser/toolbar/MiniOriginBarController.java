@@ -38,9 +38,9 @@ public class MiniOriginBarController implements Observer {
     private final ObservableSupplierImpl<Boolean> mSuppressToolbarSceneLayerSupplier;
     private final BrowserControlsSizer mBrowserControlsSizer;
     private boolean mShowMiniOriginBar;
-    private int mDefaultLocationBarGravity;
+    private final int mDefaultLocationBarGravity;
     private boolean mOriginBarClickedInSession;
-    private TouchEventObserver mTouchEventObserver;
+    private final TouchEventObserver mTouchEventObserver;
 
     /**
      * @param locationBar LocationBar instance used to change the presentation of e.g. the UrlBar
@@ -108,6 +108,7 @@ public class MiniOriginBarController implements Observer {
         mShowMiniOriginBar = showMiniOriginBar;
         mLocationBar.setShowOriginOnly(mShowMiniOriginBar);
         mLocationBar.setUrlBarUsesSmallText(mShowMiniOriginBar);
+        mLocationBar.setHideStatusIconForSecureOrigins(mShowMiniOriginBar);
         mSuppressToolbarSceneLayerSupplier.set(mShowMiniOriginBar);
         mControlContainer.toggleLocationBarOnlyMode(mShowMiniOriginBar);
 

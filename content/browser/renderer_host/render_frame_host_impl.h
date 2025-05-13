@@ -770,7 +770,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
       const std::optional<blink::FrameToken>& previous_frame_token,
       const std::optional<blink::FrameToken>& opener_frame_token,
       const std::optional<blink::FrameToken>& parent_frame_token,
-      const std::optional<blink::FrameToken>& previous_sibling_frame_token);
+      const std::optional<blink::FrameToken>& previous_sibling_frame_token,
+      const std::optional<base::UnguessableToken>& navigation_metrics_token);
 
   // Deletes the RenderFrame in the renderer process.
   // Postcondition: |IsPendingDeletion()| is true.
@@ -5510,6 +5511,12 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // in the renderer process with a sequential value to guarantee that each
   // nonce returned is unique.
   base::Uuid base_auction_nonce_;
+
+  // The default group for crash reports is `default`. However, if
+  // `Reporting-Endpoints` response header specifies `crash-reporting`, crash
+  // reports will be grouped under `crash-reporting`.
+  // See for https://github.com/WICG/crash-reporting/issues/24 more details.
+  std::string crash_reporting_group_ = "default";
 
   base::OnceClosure on_process_before_unload_completed_for_testing_;
 

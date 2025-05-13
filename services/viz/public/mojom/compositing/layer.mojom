@@ -189,7 +189,8 @@ struct StickyPositionNodeData {
   // Must be a valid index into the scroll tree.
   int32 scroll_ancestor;
 
-  // Additional fields derived from StickyPositionScrollingConstraints.
+  // Additional fields derived from StickyPositionConstraint (which itself is
+  // populated from StickyPositionScrollingConstraints).
   bool is_anchored_left;
   bool is_anchored_right;
   bool is_anchored_top;
@@ -201,6 +202,7 @@ struct StickyPositionNodeData {
   gfx.mojom.RectF constraint_box_rect;
   gfx.mojom.RectF scroll_container_relative_sticky_box_rect;
   gfx.mojom.RectF scroll_container_relative_containing_block_rect;
+  gfx.mojom.Vector2dF pixel_snap_offset;
   int32 nearest_node_shifting_sticky_box;
   int32 nearest_node_shifting_containing_block;
   gfx.mojom.Vector2dF total_sticky_box_sticky_offset;
@@ -279,6 +281,11 @@ struct TransformNode {
   // cc::DamageReasonsSet bit mask tracking the damage reasons for changes to
   // this node.
   uint64 damage_reasons_bit_mask;
+
+  // Used by the compositor to determine which layers need to be repositioned by
+  // the compositor as a result of safe area inset bottom before Blink
+  // repositions the fixed layers.
+  bool moved_by_safe_area_bottom;
 };
 
 // Details about a new or updated node within a clip property tree.

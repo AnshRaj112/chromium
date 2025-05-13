@@ -30,6 +30,7 @@ mojom("mojom_platform") {
     "ai/ai_common.mojom",
     "ai/ai_language_model.mojom",
     "ai/ai_manager.mojom",
+    "ai/ai_proofreader.mojom",
     "ai/ai_rewriter.mojom",
     "ai/ai_summarizer.mojom",
     "ai/ai_writer.mojom",
@@ -56,6 +57,7 @@ mojom("mojom_platform") {
     "close_watcher/close_listener.mojom",
     "commit_result/commit_result.mojom",
     "compute_pressure/web_pressure_manager.mojom",
+    "compute_pressure/web_pressure_update.mojom",
     "confidence_level.mojom",
     "content_extraction/ai_page_content.mojom",
     "content_extraction/inner_html.mojom",
@@ -185,6 +187,7 @@ mojom("mojom_platform") {
     "permissions_policy/document_policy_feature.mojom",
     "permissions_policy/policy_disposition.mojom",
     "permissions_policy/policy_value.mojom",
+    "persistent_renderer_prefs.mojom",
     "picture_in_picture/picture_in_picture.mojom",
     "picture_in_picture_window_options/picture_in_picture_window_options.mojom",
     "plugins/plugin_registry.mojom",
@@ -1738,6 +1741,7 @@ mojom("mojom_modules") {
         {
           mojom = "blink.mojom.IDBIndexKeys"
           cpp = "::blink::IndexedDBIndexKeys"
+          move_only = true
         },
 
         {
@@ -1748,6 +1752,7 @@ mojom("mojom_modules") {
         {
           mojom = "blink.mojom.IDBKey"
           cpp = "::blink::IndexedDBKey"
+          move_only = true
         },
 
         {
@@ -1758,6 +1763,7 @@ mojom("mojom_modules") {
         {
           mojom = "blink.mojom.IDBKeyRange"
           cpp = "::blink::IndexedDBKeyRange"
+          move_only = true
         },
 
         {

@@ -54,6 +54,10 @@ BASE_FEATURE(kUnoForAuto, "UnoForAuto", base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kUseHostedDomainForManagementCheckOnSignin,
              "UseHostedDomainForManagementCheckOnSignin",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kMakeAccountsAvailableInIdentityManager,
+             "MakeAccountsAvailableInIdentityManager",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
@@ -179,19 +183,6 @@ BASE_FEATURE(kInterceptBubblesDismissibleByAvatarButton,
              "InterceptBubblesDismissibleByAvatarButton",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kImprovedSettingsUIOnDesktop,
-             "ImprovedSettingsUIOnDesktop",
-#if BUILDFLAG(IS_CHROMEOS)
-             base::FEATURE_DISABLED_BY_DEFAULT
-#else
-             base::FEATURE_ENABLED_BY_DEFAULT
-#endif
-);
-
-bool IsImprovedSettingsUIOnDesktopEnabled() {
-  return base::FeatureList::IsEnabled(kImprovedSettingsUIOnDesktop);
-}
-
 BASE_FEATURE(kEnableSnackbarInSettings,
              "EnableSnackbarInSettings",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -216,7 +207,7 @@ BASE_FEATURE(kEnableErrorBadgeOnIdentityDisc,
 
 BASE_FEATURE(kEnableASWebAuthenticationSession,
              "EnableASWebAuthenticationSession",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 // Enables showing the enterprise dialog after every signin into a managed

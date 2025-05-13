@@ -609,7 +609,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="HttpCache.IsNoStore{Type}" enum="Boolean"
-    expires_after="2025-09-07">
+    expires_after="2025-11-09">
   <owner>bashi@chromium.org</owner>
   <owner>blink-network-stack@google.com</owner>
   <summary>
@@ -2549,7 +2549,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Net.HttpAuthTarget" enum="HttpAuthTarget"
-    expires_after="2025-09-07">
+    expires_after="2025-11-09">
   <owner>mpdenton@chromium.org</owner>
   <owner>src/net/OWNERS</owner>
   <summary>
@@ -3223,24 +3223,6 @@ chromium-metrics-reviews@google.com.
   </token>
 </histogram>
 
-<histogram name="Net.HttpStreamPool.JobCreateToResumeTime2.{Result}" units="ms"
-    expires_after="2025-09-14">
-  <owner>bashi@chromium.org</owner>
-  <owner>blink-network-stack@google.com</owner>
-  <summary>
-    Time from when an HttpStreamPool::Job is created to when the job is resumed.
-    This is the time the job was paused to wait for a failing AttemptManager.
-    Recorded for each job that has a result upon destruction of the job.
-  </summary>
-  <token key="Result">
-    <variant name="Failure" summary="Job failed"/>
-    <variant name="H1" summary="Job succeeded with HTTP/1.1"/>
-    <variant name="H2" summary="Job succeeded with HTTP/2"/>
-    <variant name="H3" summary="Job succeeded with HTTP/3"/>
-    <variant name="Unknown" summary="Job succeeded with unknown next protocol"/>
-  </token>
-</histogram>
-
 <histogram name="Net.HttpStreamPool.JobErrorCode" enum="NetErrorCodes"
     expires_after="2025-09-14">
   <owner>bashi@chromium.org</owner>
@@ -3278,7 +3260,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Net.HttpStreamPool.SwitchesToPoolPostTaskTime" units="ms"
-    expires_after="2025-07-27">
+    expires_after="2025-11-09">
   <owner>bashi@chromium.org</owner>
   <owner>blink-network-stack@google.com</owner>
   <summary>
@@ -3518,8 +3500,31 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram
+    name="Net.NetworkTransaction.DuplicateRequestInterval{HostType}{MainFrame}"
+    units="ms" expires_after="2025-08-14">
+  <owner>ricea@chromium.org</owner>
+  <owner>src/net/OWNERS</owner>
+  <summary>
+    When an HTTP(S) request with a GET method is sent to the network within 10
+    seconds of another GET request with an identical URL, records the time
+    interval between the first request and the second.
+
+    Recorded once per duplicate request, but only when the
+    &quot;LogDuplicateRequests&quot; feature is enabled.
+  </summary>
+  <token key="HostType">
+    <variant name=""/>
+    <variant name=".GoogleHost"/>
+  </token>
+  <token key="MainFrame">
+    <variant name=""/>
+    <variant name=".MainFrame"/>
+  </token>
+</histogram>
+
+<histogram
     name="Net.NetworkTransaction.GenerateProxyAuthTokenBlocked{HostType}.{Protocol}"
-    enum="Boolean" expires_after="2025-09-07">
+    enum="Boolean" expires_after="2025-11-09">
   <owner>bashi@chromium.org</owner>
   <owner>src/net/OWNERS</owner>
   <summary>
@@ -3548,7 +3553,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Net.NetworkTransaction.GenerateServerAuthTokenBlocked{HostType}.{Protocol}"
-    enum="Boolean" expires_after="2025-09-07">
+    enum="Boolean" expires_after="2025-11-09">
   <owner>bashi@chromium.org</owner>
   <owner>src/net/OWNERS</owner>
   <summary>
@@ -3577,7 +3582,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Net.NetworkTransaction.InitializeStreamBlocked{HostType}.{Protocol}"
-    enum="Boolean" expires_after="2025-09-07">
+    enum="Boolean" expires_after="2025-11-09">
   <owner>bashi@chromium.org</owner>
   <owner>src/net/OWNERS</owner>
   <summary>
@@ -3590,7 +3595,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Net.NetworkTransaction.InitializeStreamBlockTime{HostType}.{Protocol}"
-    units="ms" expires_after="2025-09-07">
+    units="ms" expires_after="2025-11-09">
   <owner>bashi@chromium.org</owner>
   <owner>src/net/OWNERS</owner>
   <summary>
@@ -5763,7 +5768,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Net.QuicSession.SessionKeyMismatch.MismatchedFieldCombination{HostType}"
-    enum="QuicSessionKeyMismatchedFieldCombination" expires_after="2025-09-07">
+    enum="QuicSessionKeyMismatchedFieldCombination" expires_after="2025-11-09">
   <owner>suzukikeita@chromium.org</owner>
   <owner>blink-network-stack@google.com</owner>
   <summary>
@@ -5777,7 +5782,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Net.QuicSession.SessionKeyMismatch.MismatchedField{HostType}"
-    enum="QuicSessionKeyMismatchedField" expires_after="2025-09-07">
+    enum="QuicSessionKeyMismatchedField" expires_after="2025-11-09">
   <owner>suzukikeita@chromium.org</owner>
   <owner>blink-network-stack@google.com</owner>
   <summary>
@@ -5790,7 +5795,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Net.QuicSession.SessionKeyMismatch.TotalMismatchedField{HostType}"
-    units="count" expires_after="2025-09-07">
+    units="count" expires_after="2025-11-09">
   <owner>suzukikeita@chromium.org</owner>
   <owner>blink-network-stack@google.com</owner>
   <summary>
@@ -5803,7 +5808,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Net.QuicSession.SessionKeyMismatch{HostType}"
-    enum="QuicSessionKeyPartialMatchResult" expires_after="2025-09-07">
+    enum="QuicSessionKeyPartialMatchResult" expires_after="2025-11-09">
   <owner>suzukikeita@chromium.org</owner>
   <owner>blink-network-stack@google.com</owner>
   <summary>
@@ -6162,7 +6167,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Net.QuicSessionAttempt.CompleteTime.{SuccessOrFailure}"
-    units="ms" expires_after="2025-07-27">
+    units="ms" expires_after="2025-11-09">
   <owner>bashi@chromium.org</owner>
   <owner>blink-network-stack@google.com</owner>
   <summary>
@@ -6590,7 +6595,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Net.SessionCreate.GoogleSearch.Preconnect2.Quic.CompletionResult{JobType}"
-    enum="NetErrorCodes" expires_after="2025-07-27">
+    enum="NetErrorCodes" expires_after="2025-11-09">
   <owner>suzukikeita@chromium.org</owner>
   <owner>blink-network-stack@google.com</owner>
   <summary>
@@ -6714,7 +6719,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Net.SharedDictionaryManagerOnDisk.TotalDictionarySizeKBWhenAdded"
-    units="KB" expires_after="2025-06-29">
+    units="KB" expires_after="2025-11-09">
   <owner>horo@chromium.org</owner>
   <owner>src/net/extras/shared_dictionary/OWNERS</owner>
   <summary>
@@ -6726,7 +6731,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Net.SharedDictionaryOnDisk.OpenEntryLatency.{SuccessOrFailure}"
-    units="ms" expires_after="2025-09-07">
+    units="ms" expires_after="2025-11-09">
   <owner>horo@chromium.org</owner>
   <owner>src/net/extras/shared_dictionary/OWNERS</owner>
   <summary>
@@ -6737,7 +6742,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Net.SharedDictionaryOnDisk.ReadDataLatency.{SuccessOrFailure}"
-    units="ms" expires_after="2025-09-07">
+    units="ms" expires_after="2025-11-09">
   <owner>horo@chromium.org</owner>
   <owner>src/net/extras/shared_dictionary/OWNERS</owner>
   <summary>
@@ -6758,7 +6763,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Net.SharedDictionaryStorageOnDisk.MetadataReadTime.{Result}"
-    units="ms" expires_after="2025-09-07">
+    units="ms" expires_after="2025-11-09">
   <owner>horo@chromium.org</owner>
   <owner>src/net/extras/shared_dictionary/OWNERS</owner>
   <summary>
@@ -6795,7 +6800,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Net.SharedDictionaryStore.{MethodName}.Error"
-    enum="SharedDictionaryStoreError" expires_after="2025-09-07">
+    enum="SharedDictionaryStoreError" expires_after="2025-11-09">
   <owner>horo@chromium.org</owner>
   <owner>src/net/extras/shared_dictionary/OWNERS</owner>
   <summary>
@@ -6821,7 +6826,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Net.SharedDictionaryTransaction.AbortedWhileReadingDictionary.{SuccessOrFailure}"
-    units="ms" expires_after="2025-09-07">
+    units="ms" expires_after="2025-11-09">
   <owner>horo@chromium.org</owner>
   <owner>src/net/extras/shared_dictionary/OWNERS</owner>
   <summary>
@@ -6835,7 +6840,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Net.SharedDictionaryTransaction.DictionaryReadLatency.{SuccessOrFailure}"
-    units="ms" expires_after="2025-09-07">
+    units="ms" expires_after="2025-11-09">
   <owner>horo@chromium.org</owner>
   <owner>src/net/extras/shared_dictionary/OWNERS</owner>
   <summary>
@@ -6864,7 +6869,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Net.SharedDictionaryUsedByResponseWhenAvailable2.MainFrame.{ConnectionType}.{CertState}"
-    enum="Boolean" expires_after="2025-09-07">
+    enum="Boolean" expires_after="2025-11-09">
   <owner>horo@chromium.org</owner>
   <owner>src/net/extras/shared_dictionary/OWNERS</owner>
   <summary>
@@ -7540,10 +7545,21 @@ chromium-metrics-reviews@google.com.
     not included in the original request during URLLoader to handle a
     connection. It is time just before the OnAcceptCHFrameReceived() IPC call
     until the IPC callback is called. Refer
-    URLLoader::ProcessAcceptCHFrameOnConnected() for details.
+    AcceptCHFrameInterceptor::OnConnected() for details.
 
     Note: The metrics is reported from all clients. Some of clients may not have
     high resolution timer that can send metrics with microseconds precision.
+  </summary>
+</histogram>
+
+<histogram name="Net.URLLoader.AcceptCH.RunObserverCall" enum="Boolean"
+    expires_after="2025-11-12">
+  <owner>yyanagisawa@chromium.org</owner>
+  <owner>chrome-loading@google.com</owner>
+  <summary>
+    Records if the received the ACCEPT_CH frame should be checked by the
+    observer. It is recorded only if the received header has the ACCEPT_CH
+    frame. Refer AcceptCHFrameInterceptor::OnConnected() for details.
   </summary>
 </histogram>
 
@@ -7557,7 +7573,7 @@ chromium-metrics-reviews@google.com.
     that were not included in the original request during URLLoader to handle a
     connection. It is time just before the OnAcceptCHFrameReceived() IPC call
     until the IPC callback is called. Refer
-    URLLoader::ProcessAcceptCHFrameOnConnected() for details.
+    AcceptCHFrameInterceptor::OnConnected() for details.
   </summary>
 </histogram>
 

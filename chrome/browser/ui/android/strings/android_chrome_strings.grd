@@ -3112,15 +3112,6 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_CONTEXTMENU_PRINT_PAGE" desc="This string is shown in the context menu for printing the current page. [CHAR_LIMIT=30]">
         Print
       </message>
-      <message name="IDS_CONTEXTMENU_BACK" desc="This string is shown in the context menu for going to the previous page in history. [CHAR_LIMIT=30]">
-        Back
-      </message>
-      <message name="IDS_CONTEXTMENU_FORWARD" desc="This string is shown in the context menu for going to the next page in history. [CHAR_LIMIT=30]">
-        Forward
-      </message>
-      <message name="IDS_CONTEXTMENU_RELOAD" desc="This string is shown in the context menu for reloading the current page. [CHAR_LIMIT=30]">
-        Reload
-      </message>
       <message name="IDS_CONTEXTMENU_OPEN_IN_OTHER_WINDOW" desc="Context sensitive menu item to open the selected link in the other window. [CHAR_LIMIT=30]">
         Open in other window
       </message>
@@ -4777,7 +4768,7 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
 
       <!-- Account bookmarks strings -->
-      <message name="IDS_LOCAL_BOOKMARKS_SECTION_HEADER" desc="The section header of local top-level bookmark folders.">
+      <message name="IDS_LOCAL_BOOKMARKS_SECTION_HEADER" desc="This string appears on a page of saved bookmarks. It is the heading for a category. The categories indicate where a bookmark is saved: in this string, the bookmarks are saved locally on the user's device. This is a shortened version of the noun phrase: 'Bookmarks that are only on your device'. If your language permits it, you can omit 'Bookmarks' because it is already at the top of the page." meaning="Bookmarks that are only on your device">
         Only on this device
       </message>
       <message name="IDS_ACCOUNT_BOOKMARKS_SECTION_HEADER" desc="The section header of account top-level bookmark folders.">
@@ -5575,7 +5566,7 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
         Open a new tab in Incognito mode
       </message>
        <message name="IDS_KEYBOARD_SHORTCUT_SPECIFIC_TAB" desc="A text label that appears next to the keyboard shortcut that will move the user to a specific tab in the Chrome app. The shortcut description is shown in a system dialog along with all other supported shortcuts. [CHAR_LIMIT=55]">
-        Jump to a specific tab (1–8)
+        Jump to a specific tab (1&#8211;8)
       </message>
       <message name="IDS_KEYBOARD_SHORTCUT_LAST_TAB" desc="A text label that appears next to the keyboard shortcut that will move the user to the last tab in the Chrome app. The shortcut description is shown in a system dialog along with all other supported shortcuts. [CHAR_LIMIT=55]">
         Jump to the last tab
@@ -5681,9 +5672,6 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
 
       <!-- Custom Context Menu Informations -->
-      <message name="IDS_CONTEXTMENU_PAGE_NAVIGATION_TITLE" desc="The title of a context menu tab when the item pressed contains more than one type. This indicates that all the actions are related to navigating between the pages.">
-        PAGE NAVIGATION
-      </message>
       <message name="IDS_CONTEXTMENU_PAGE_TITLE" desc="The title of a context menu tab when the item pressed contains more than one type. This indicates that all the actions are related to the page.">
         PAGE
       </message>

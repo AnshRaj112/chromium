@@ -450,8 +450,7 @@ inline constexpr char kNetworkPredictionOptions[] =
 inline constexpr char kPreinstalledAppsInstallState[] =
     "default_apps_install_state";
 
-#if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || \
-    BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 // A list of extensions ids that have to be allowed to run in Incognito by the
 // user in order to use Incognito mode.
 inline constexpr char kMandatoryExtensionsForIncognitoNavigation[] =
@@ -1371,11 +1370,10 @@ inline constexpr char kNonSyncingBrowserColorSchemeDoNotUse[] =
 
 // SkColor used to theme the browser for Chrome Refresh. The value
 // SK_ColorTRANSPARENT means the user color has not been set.
-// Note: In the process of migration. Please use `GetThemePrefNameInMigration()`
-// instead. See crbug.com/356148174.
-inline constexpr char kUserColorDoNotUse[] = "browser.theme.user_color";
-inline constexpr char kNonSyncingUserColorDoNotUse[] =
-    "browser.theme.user_color2";
+// Use `kUserColor` only.
+inline constexpr char kDeprecatedUserColorDoNotUse[] =
+    "browser.theme.user_color";
+inline constexpr char kUserColor[] = "browser.theme.user_color2";
 
 // Enum tracking the color variant preference for the browser.
 // Note: In the process of migration. Please use `GetThemePrefNameInMigration()`
@@ -1995,6 +1993,11 @@ inline constexpr char kNetworkAnnotationBlocklist[] =
 // reports to be sent to.
 inline constexpr char kReportingEndpoints[] =
     "enterprise_reporting.reporting_endpoints";
+
+// A boolean indicating if the "Line wrap" checkbox on view source pages should
+// be prepopulated.
+inline constexpr char kViewSourceLineWrappingEnabled[] =
+    "view_source.line_wrapping_enabled";
 
 #if BUILDFLAG(IS_CHROMEOS)
 // The state of the SkyVault migration of local files to the cloud.
@@ -4221,11 +4224,11 @@ inline constexpr char kEnterpriseProfileBadgeToolbarSettings[] =
 inline constexpr char kNTPFooterManagementNoticeEnabled[] =
     "ntp_footer.settings.management_notice";
 
-// Boolean value that determine whether the NTP theme attribution on the NTP
-// footer is enabled. This is false when disabled by the
-// `NTPFooterThemeAttributionEnabled` policy.
-inline constexpr char kNTPFooterThemeAttributionEnabled[] =
-    "ntp_footer.settings.theme_attribution";
+// Boolean value that determines whether the NTP extension attribution on the
+// NTP footer is enabled. This is false when disabled by the
+// `NTPFooterExtensionAttributionEnabled` policy.
+inline constexpr char kNTPFooterExtensionAttributionEnabled[] =
+    "ntp_footer.settings.extension_attribution";
 
 #if BUILDFLAG(IS_ANDROID)
 // An integer count of how many account-level breached credentials were

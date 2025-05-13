@@ -112,7 +112,7 @@ public class LocationBarCoordinator
     private UrlBarCoordinator mUrlCoordinator;
     private AutocompleteCoordinator mAutocompleteCoordinator;
     private StatusCoordinator mStatusCoordinator;
-    private WindowAndroid mWindowAndroid;
+    private final WindowAndroid mWindowAndroid;
     private LocationBarMediator mLocationBarMediator;
     private View mUrlBar;
     private @Nullable View mDeleteButton;
@@ -539,6 +539,11 @@ public class LocationBarCoordinator
     @Override
     public void setUrlBarUsesSmallText(boolean useSmallText) {
         mUrlCoordinator.setUseSmallText(useSmallText);
+    }
+
+    @Override
+    public void setHideStatusIconForSecureOrigins(boolean hideStatusIconForSecureOrigins) {
+        mStatusCoordinator.setHideStatusIconForSecureOrigins(hideStatusIconForSecureOrigins);
     }
 
     // AutocompleteDelegate implementation.

@@ -48,6 +48,38 @@ AITestUtils::MockLanguageModelAppendClient::BindNewPipeAndPassRemote() {
   return receiver_.BindNewPipeAndPassRemote();
 }
 
+mojo::PendingRemote<blink::mojom::ModelDownloadProgressObserver>
+AITestUtils::FakeMonitor::BindNewPipeAndPassRemote() {
+  return mock_monitor_.BindNewPipeAndPassRemote();
+}
+
+void AITestUtils::FakeMonitor::ExpectReceivedUpdate(
+    uint64_t expected_downloaded_bytes,
+    uint64_t expected_total_bytes) {
+  base::RunLoop download_progress_run_loop;
+  EXPECT_CALL(mock_monitor_, OnDownloadProgressUpdate(testing::_, testing::_))
+      .WillOnce(
+          testing::Invoke([&](uint64_t downloaded_bytes, uint64_t total_bytes) {
+            EXPECT_EQ(downloaded_bytes, expected_downloaded_bytes);
+            EXPECT_EQ(total_bytes, expected_total_bytes);
+            download_progress_run_loop.Quit();
+          }));
+  download_progress_run_loop.Run();
+}
+
+void AITestUtils::FakeMonitor::ExpectReceivedNormalizedUpdate(
+    uint64_t expected_downloaded_bytes,
+    uint64_t expected_total_bytes) {
+  ExpectReceivedUpdate(AIUtils::NormalizeModelDownloadProgress(
+                           expected_downloaded_bytes, expected_total_bytes),
+                       AIUtils::kNormalizedDownloadProgressMax);
+}
+
+void AITestUtils::FakeMonitor::ExpectNoUpdate() {
+  EXPECT_CALL(mock_monitor_, OnDownloadProgressUpdate(testing::_, testing::_))
+      .Times(0);
+}
+
 AITestUtils::FakeComponent::FakeComponent(std::string id, uint64_t total_bytes)
     : id_(std::move(id)), total_bytes_(total_bytes) {}
 
@@ -87,8 +119,8 @@ AITestUtils::AITestBase::~AITestBase() = default;
 
 void AITestUtils::AITestBase::SetUp() {
   ChromeRenderViewHostTestHarness::SetUp();
-  ai_manager_ =
-      std::make_unique<AIManager>(main_rfh()->GetBrowserContext(), main_rfh());
+  ai_manager_ = std::make_unique<AIManager>(
+      main_rfh()->GetBrowserContext(), &component_update_service_, main_rfh());
 }
 
 void AITestUtils::AITestBase::TearDown() {
@@ -157,13 +189,6 @@ size_t AITestUtils::AITestBase::GetAIManagerDownloadProgressObserversSize() {
 
 size_t AITestUtils::AITestBase::GetAIManagerContextBoundObjectSetSize() {
   return ai_manager_->GetContextBoundObjectSetSizeForTesting();
-}
-
-void AITestUtils::AITestBase::MockDownloadProgressUpdate(
-    uint64_t downloaded_bytes,
-    uint64_t total_bytes) {
-  ai_manager_->SendDownloadProgressUpdateForTesting(downloaded_bytes,
-                                                    total_bytes);
 }
 
 // static

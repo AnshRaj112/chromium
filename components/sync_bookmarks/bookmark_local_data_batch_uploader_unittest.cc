@@ -12,10 +12,14 @@
 #include "base/test/test_future.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/browser/bookmark_node.h"
+#include "components/bookmarks/common/bookmark_pref_names.h"
 #include "components/bookmarks/test/test_bookmark_client.h"
+#include "components/prefs/pref_registry_simple.h"
+#include "components/prefs/testing_pref_service.h"
 #include "components/signin/public/base/signin_switches.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/sync/service/local_data_description.h"
+#include "components/sync/test/test_matchers.h"
 #include "components/sync_bookmarks/switches.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -25,57 +29,12 @@
 namespace sync_bookmarks {
 namespace {
 
+using ::syncer::IsEmptyLocalDataDescription;
+using ::syncer::MatchesLocalDataDescription;
+using ::syncer::MatchesLocalDataItemModel;
 using ::testing::_;
 using ::testing::ElementsAre;
-using ::testing::Eq;
-using ::testing::ExplainMatchResult;
-using ::testing::Field;
 using ::testing::IsEmpty;
-using ::testing::VariantWith;
-
-// Checks whether the item matches a syncer::LocalDataItemModel.
-MATCHER_P4(MatchesLocalDataItemModel, id, icon, title, subtitle, "") {
-  return ExplainMatchResult(Field(&syncer::LocalDataItemModel::id, id), arg,
-                            result_listener) &&
-         ExplainMatchResult(Field(&syncer::LocalDataItemModel::icon, icon), arg,
-                            result_listener) &&
-         ExplainMatchResult(Field(&syncer::LocalDataItemModel::title, title),
-                            arg, result_listener) &&
-         ExplainMatchResult(
-             Field(&syncer::LocalDataItemModel::subtitle, subtitle), arg,
-             result_listener);
-}
-
-// Checks whether the description matches a syncer::LocalDataDescription.
-MATCHER_P5(MatchesLocalDataDescription,
-           type,
-           local_data_models,
-           item_count,
-           domains,
-           domain_count,
-           "") {
-  return ExplainMatchResult(Field(&syncer::LocalDataDescription::type, type),
-                            arg, result_listener) &&
-         ExplainMatchResult(
-             Field(&syncer::LocalDataDescription::local_data_models,
-                   local_data_models),
-             arg, result_listener) &&
-         ExplainMatchResult(
-             Field(&syncer::LocalDataDescription::item_count, item_count), arg,
-             result_listener) &&
-         ExplainMatchResult(
-             Field(&syncer::LocalDataDescription::domains, domains), arg,
-             result_listener) &&
-         ExplainMatchResult(
-             Field(&syncer::LocalDataDescription::domain_count, domain_count),
-             arg, result_listener);
-}
-
-MATCHER(IsEmptyLocalDataDescription, "") {
-  return ExplainMatchResult(
-      MatchesLocalDataDescription(_, IsEmpty(), Eq(0u), IsEmpty(), Eq(0u)), arg,
-      result_listener);
-}
 
 MATCHER_P2(MatchesTitleAndUrl, title, url, "") {
   if (!arg->is_url()) {
@@ -97,11 +56,15 @@ MATCHER_P2(MatchesTitleAndUrl, title, url, "") {
 
 class BookmarkLocalDataBatchUploaderTest : public ::testing::Test {
  public:
-  BookmarkLocalDataBatchUploaderTest() = default;
+  BookmarkLocalDataBatchUploaderTest() {
+    pref_service_.registry()->RegisterBooleanPref(
+        bookmarks::prefs::kEditBookmarksEnabled, true);
+  }
 
   ~BookmarkLocalDataBatchUploaderTest() override = default;
 
   bookmarks::BookmarkModel* bookmark_model() { return bookmark_model_.get(); }
+  PrefService* pref_service() { return &pref_service_; }
 
  private:
   base::test::ScopedFeatureList feature_list_{
@@ -109,10 +72,11 @@ class BookmarkLocalDataBatchUploaderTest : public ::testing::Test {
   const std::unique_ptr<bookmarks::BookmarkModel> bookmark_model_ =
       std::make_unique<bookmarks::BookmarkModel>(
           std::make_unique<bookmarks::TestBookmarkClient>());
+  TestingPrefServiceSimple pref_service_;
 };
 
 TEST_F(BookmarkLocalDataBatchUploaderTest, LocalDescriptionEmptyIfNullModel) {
-  BookmarkLocalDataBatchUploader uploader(nullptr);
+  BookmarkLocalDataBatchUploader uploader(nullptr, pref_service());
   base::test::TestFuture<syncer::LocalDataDescription> description;
 
   uploader.GetLocalDataDescription(description.GetCallback());
@@ -122,7 +86,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest, LocalDescriptionEmptyIfNullModel) {
 
 TEST_F(BookmarkLocalDataBatchUploaderTest,
        LocalDescriptionEmptyIfModelNotLoaded) {
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
   base::test::TestFuture<syncer::LocalDataDescription> description;
 
   uploader.GetLocalDataDescription(description.GetCallback());
@@ -136,7 +100,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest,
   feature_list.InitAndDisableFeature(
       switches::kSyncEnableBookmarksInTransportMode);
   bookmark_model()->LoadEmptyForTest();
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
   base::test::TestFuture<syncer::LocalDataDescription> description;
 
   uploader.GetLocalDataDescription(description.GetCallback());
@@ -150,7 +114,22 @@ TEST_F(BookmarkLocalDataBatchUploaderTest,
   ASSERT_FALSE(bookmark_model()->account_bookmark_bar_node());
   bookmark_model()->AddURL(bookmark_model()->bookmark_bar_node(), /*index=*/0,
                            u"Local", GURL("http://local.com/"));
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
+  base::test::TestFuture<syncer::LocalDataDescription> description;
+
+  uploader.GetLocalDataDescription(description.GetCallback());
+
+  EXPECT_THAT(description.Get(), IsEmptyLocalDataDescription());
+}
+
+TEST_F(BookmarkLocalDataBatchUploaderTest,
+       LocalDescriptionEmptyIfEditBookmarksDislabed) {
+  pref_service()->SetBoolean(bookmarks::prefs::kEditBookmarksEnabled, false);
+  bookmark_model()->LoadEmptyForTest();
+  bookmark_model()->CreateAccountPermanentFolders();
+  bookmark_model()->AddURL(bookmark_model()->bookmark_bar_node(), /*index=*/0,
+                           u"Local", GURL("http://local.com/"));
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
   base::test::TestFuture<syncer::LocalDataDescription> description;
 
   uploader.GetLocalDataDescription(description.GetCallback());
@@ -167,7 +146,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest, LocalDescriptionOnlyHasLocalData) {
   bookmark_model()->AddURL(bookmark_model()->account_bookmark_bar_node(),
                            /*index=*/0, u"Account",
                            GURL("http://account.com/"));
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
   base::test::TestFuture<syncer::LocalDataDescription> description;
 
   uploader.GetLocalDataDescription(description.GetCallback());
@@ -196,7 +175,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest,
   bookmark_model()->AddURL(bookmark_model()->account_bookmark_bar_node(),
                            /*index=*/0, u"Account",
                            GURL("http://account.com/"));
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
   base::test::TestFuture<syncer::LocalDataDescription> description;
 
   uploader.GetLocalDataDescription(description.GetCallback());
@@ -214,7 +193,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest,
   bookmark_model()->CreateAccountPermanentFolders();
   const bookmarks::BookmarkNode* folder = bookmark_model()->AddFolder(
       bookmark_model()->bookmark_bar_node(), /*index=*/0, u"folder");
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
   base::test::TestFuture<syncer::LocalDataDescription> description;
 
   uploader.GetLocalDataDescription(description.GetCallback());
@@ -253,7 +232,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest, LocalDescriptionFolderNesting) {
       bookmark_model()->AddURL(bookmark_model()->bookmark_bar_node(),
                                /*index=*/1, u"l1_url", GURL("http://l1.com/"));
 
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
   base::test::TestFuture<syncer::LocalDataDescription> description;
 
   uploader.GetLocalDataDescription(description.GetCallback());
@@ -288,7 +267,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest, LocalDescriptionHasSortedDomains) {
   const bookmarks::BookmarkNode* bookmark_b =
       bookmark_model()->AddURL(bookmark_model()->bookmark_bar_node(),
                                /*index=*/0, u"A", GURL("http://b.com"));
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
   base::test::TestFuture<syncer::LocalDataDescription> description;
 
   uploader.GetLocalDataDescription(description.GetCallback());
@@ -323,7 +302,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest, LocalDescriptionHasNoManagedUrls) {
   model->CreateAccountPermanentFolders();
   model->AddURL(managed_node, /*index=*/0, u"Managed",
                 GURL("http://managed.com"));
-  BookmarkLocalDataBatchUploader uploader(model.get());
+  BookmarkLocalDataBatchUploader uploader(model.get(), pref_service());
   base::test::TestFuture<syncer::LocalDataDescription> description;
 
   uploader.GetLocalDataDescription(description.GetCallback());
@@ -332,7 +311,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest, LocalDescriptionHasNoManagedUrls) {
 }
 
 TEST_F(BookmarkLocalDataBatchUploaderTest, MigrationNoOpsIfNullModel) {
-  BookmarkLocalDataBatchUploader uploader(nullptr);
+  BookmarkLocalDataBatchUploader uploader(nullptr, pref_service());
 
   uploader.TriggerLocalDataMigration();
 
@@ -340,7 +319,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest, MigrationNoOpsIfNullModel) {
 }
 
 TEST_F(BookmarkLocalDataBatchUploaderTest, MigrationNoOpsIfModelNotLoaded) {
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
 
   uploader.TriggerLocalDataMigration();
 
@@ -354,7 +333,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest, MigrationNoOpsIfTransportModeOff) {
   bookmark_model()->LoadEmptyForTest();
   bookmark_model()->AddURL(bookmark_model()->bookmark_bar_node(),
                            /*index=*/0, u"Local", GURL("http://local.com/"));
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
 
   uploader.TriggerLocalDataMigration();
 
@@ -370,7 +349,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest,
   ASSERT_FALSE(bookmark_model()->account_bookmark_bar_node());
   bookmark_model()->AddURL(bookmark_model()->bookmark_bar_node(),
                            /*index=*/0, u"Local", GURL("http://local.com/"));
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
 
   uploader.TriggerLocalDataMigration();
 
@@ -378,6 +357,50 @@ TEST_F(BookmarkLocalDataBatchUploaderTest,
               ElementsAre(MatchesTitleAndUrl(u"Local", "http://local.com/")));
   EXPECT_THAT(bookmark_model()->mobile_node()->children(), IsEmpty());
   EXPECT_THAT(bookmark_model()->other_node()->children(), IsEmpty());
+}
+
+TEST_F(BookmarkLocalDataBatchUploaderTest,
+       FullMigrationNoOpsIfEditBookmarksDisalbed) {
+  pref_service()->SetBoolean(bookmarks::prefs::kEditBookmarksEnabled, false);
+  bookmark_model()->LoadEmptyForTest();
+  bookmark_model()->CreateAccountPermanentFolders();
+  bookmark_model()->AddURL(bookmark_model()->bookmark_bar_node(),
+                           /*index=*/0, u"Local", GURL("http://local.com/"));
+  ASSERT_THAT(bookmark_model()->account_bookmark_bar_node()->children(),
+              IsEmpty());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
+
+  uploader.TriggerLocalDataMigration();
+
+  EXPECT_THAT(bookmark_model()->bookmark_bar_node()->children(),
+              ElementsAre(MatchesTitleAndUrl(u"Local", "http://local.com/")));
+  EXPECT_THAT(bookmark_model()->mobile_node()->children(), IsEmpty());
+  EXPECT_THAT(bookmark_model()->other_node()->children(), IsEmpty());
+  EXPECT_THAT(bookmark_model()->account_bookmark_bar_node()->children(),
+              IsEmpty());
+}
+
+TEST_F(BookmarkLocalDataBatchUploaderTest,
+       PartialMigrationNoOpsIfEditBookmarksDisalbed) {
+  pref_service()->SetBoolean(bookmarks::prefs::kEditBookmarksEnabled, false);
+  bookmark_model()->LoadEmptyForTest();
+  bookmark_model()->CreateAccountPermanentFolders();
+  const bookmarks::BookmarkNode* local_node = bookmark_model()->AddURL(
+      bookmark_model()->bookmark_bar_node(),
+      /*index=*/0, u"Local", GURL("http://local.com/"));
+  ASSERT_THAT(bookmark_model()->account_bookmark_bar_node()->children(),
+              IsEmpty());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
+
+  uploader.TriggerLocalDataMigrationForItems(
+      {syncer::LocalDataItemModel::DataId(local_node->id())});
+
+  EXPECT_THAT(bookmark_model()->bookmark_bar_node()->children(),
+              ElementsAre(MatchesTitleAndUrl(u"Local", "http://local.com/")));
+  EXPECT_THAT(bookmark_model()->mobile_node()->children(), IsEmpty());
+  EXPECT_THAT(bookmark_model()->other_node()->children(), IsEmpty());
+  EXPECT_THAT(bookmark_model()->account_bookmark_bar_node()->children(),
+              IsEmpty());
 }
 
 // Note: Most of the merging logic is verified in the unit tests for
@@ -391,7 +414,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest, FullMigrationUploadsLocalBookmarks) {
   bookmark_model()->AddURL(bookmark_model()->account_bookmark_bar_node(),
                            /*index=*/0, u"Account",
                            GURL("http://account.com/"));
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
 
   uploader.TriggerLocalDataMigration();
 
@@ -420,7 +443,7 @@ TEST_F(BookmarkLocalDataBatchUploaderTest,
   bookmark_model()->AddURL(bookmark_model()->account_bookmark_bar_node(),
                            /*index=*/0, u"Account",
                            GURL("http://account.com/"));
-  BookmarkLocalDataBatchUploader uploader(bookmark_model());
+  BookmarkLocalDataBatchUploader uploader(bookmark_model(), pref_service());
 
   uploader.TriggerLocalDataMigrationForItems(
       {syncer::LocalDataItemModel::DataId(local_node1->id())});

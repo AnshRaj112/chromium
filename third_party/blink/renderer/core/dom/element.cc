@@ -46,6 +46,7 @@
 #include "third_party/blink/renderer/bindings/core/v8/v8_aria_notification_options.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_check_visibility_options.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_pointer_lock_options.h"
+#include "third_party/blink/renderer/bindings/core/v8/v8_scroll_container.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_scroll_into_view_options.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_scroll_to_options.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_shadow_root_init.h"
@@ -1856,8 +1857,14 @@ void Element::scrollIntoViewWithOptions(const ScrollIntoViewOptions* options) {
   mojom::blink::ScrollIntoViewParamsPtr params =
       scroll_into_view_util::CreateScrollIntoViewParams(*options,
                                                         *GetComputedStyle());
+  Element* container = nullptr;
+  if (options->hasContainer() &&
+      options->container() == V8ScrollContainer::Enum::kNearest) {
+    container = this;
+    GetDocument().CountUse(WebFeature::kScrollIntoViewContainerNearest);
+  }
 
-  ScrollIntoViewNoVisualUpdate(std::move(params));
+  ScrollIntoViewNoVisualUpdate(std::move(params), container);
 }
 
 // TODO(crbug.com/385129957): This only searches up to the nearest scroll
@@ -3234,7 +3241,8 @@ void Element::AttributeChanged(const AttributeModificationParams& params) {
     }
   } else if (name == html_names::kClassAttr) {
     if (params.old_value == params.new_value &&
-        params.reason != AttributeModificationReason::kByMoveToNewDocument) {
+        params.reason != AttributeModificationReason::kByMoveToNewDocument &&
+        params.reason != AttributeModificationReason::kByCloning) {
       return;
     }
     ClassAttributeChanged(params.new_value);
@@ -7399,7 +7407,6 @@ bool Element::IsInPartialInterestPopover() const {
 
 void Element::ShowInterestNow() {
   Element* target = InterestTargetElement();
-  LOG(ERROR) << "Interest in element " << this << ", with target " << target;
   if (!target) {
     return;
   }
@@ -10269,17 +10276,21 @@ void Element::CloneAttributesFrom(const Element& other) {
     element_data_ = other.element_data_->MakeUniqueCopy();
   }
 
+  // Since we're going through the list of attributes now, we use the
+  // opportunity to recreate the Bloom filter; in particular, it may
+  // be different from the source's Bloom filter if it came from a document
+  // with different quirks mode setting.
+  attribute_or_class_bloom_ = 0;
   for (const Attribute& attr : element_data_->Attributes()) {
     AttributeChanged(
         AttributeModificationParams(attr.GetName(), g_null_atom, attr.Value(),
                                     AttributeModificationReason::kByCloning));
+    attribute_or_class_bloom_ |= FilterForAttribute(attr.GetName());
   }
 
   if (other.nonce() != g_null_atom) {
     setNonce(other.nonce());
   }
-
-  attribute_or_class_bloom_ = other.attribute_or_class_bloom_;
 }
 
 void Element::CreateUniqueElementData() {
@@ -11022,7 +11033,9 @@ void Element::HandleInterestTargetHoverOrFocus(InterestTargetSource source) {
       auto* target_popover = DynamicTo<HTMLElement>(target);
       bool might_need_partial_interest =
           source == InterestTargetSource::kFocusElementChain &&
-          target_popover && target_popover->HasPopoverAttribute();
+          target_popover && target_popover->HasPopoverAttribute() &&
+          !RuntimeEnabledFeatures::HTMLInterestTargetNoPartialInterestEnabled(
+              GetExecutionContext());
       ScheduleInterestGainedTask(might_need_partial_interest
                                      ? InterestState::kPotentialPartialInterest
                                      : InterestState::kFullInterest);

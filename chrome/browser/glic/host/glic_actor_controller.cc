@@ -13,6 +13,8 @@
 #include "chrome/browser/actor/actor_coordinator.h"
 #include "chrome/browser/glic/host/context/glic_page_context_fetcher.h"
 #include "chrome/browser/glic/host/glic.mojom.h"
+#include "chrome/common/actor.mojom.h"
+#include "chrome/common/actor/action_result.h"
 #include "chrome/common/chrome_features.h"
 #include "components/optimization_guide/proto/features/actions_data.pb.h"
 #include "components/tabs/public/tab_interface.h"
@@ -145,8 +147,8 @@ void GlicActorController::OnActionFinished(
     FocusedTabData focused_tab_data,
     const mojom::GetTabContextOptions& options,
     mojom::WebClientHandler::ActInFocusedTabCallback callback,
-    bool action_succeeded) const {
-  if (!action_succeeded) {
+    actor::mojom::ActionResultPtr result) const {
+  if (!actor::IsOk(*result)) {
     PostTaskForActCallback(std::move(callback),
                            mojom::ActInFocusedTabErrorReason::kTargetNotFound);
     return;
@@ -167,18 +169,7 @@ void GlicActorController::GetContextFromFocusedTab(
   // with GlicKeyedService::GetContextFromFocusedTab(). It's not clear yet if
   // the same permission checks, etc. should apply here.
 
-  auto fetcher = std::make_unique<glic::GlicPageContextFetcher>();
-  fetcher->Fetch(
-      focused_tab_data, options,
-      base::BindOnce(
-          // Bind `fetcher` to the callback to keep it in scope until it
-          // returns.
-          [](std::unique_ptr<glic::GlicPageContextFetcher> fetcher,
-             mojom::WebClientHandler::GetContextFromFocusedTabCallback callback,
-             mojom::GetContextResultPtr result) {
-            std::move(callback).Run(std::move(result));
-          },
-          std::move(fetcher), std::move(callback)));
+  GlicPageContextFetcher::Fetch(focused_tab_data, options, std::move(callback));
 }
 
 base::WeakPtr<const GlicActorController> GlicActorController::GetWeakPtr()

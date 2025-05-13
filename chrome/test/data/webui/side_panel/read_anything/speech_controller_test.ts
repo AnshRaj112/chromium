@@ -13,7 +13,6 @@ import {TestSpeechBrowserProxy} from './test_speech_browser_proxy.js';
 suite('SpeechController', () => {
   let speech: TestSpeechBrowserProxy;
   let speechController: SpeechController;
-  let onStop: boolean;
   let isSpeechActiveChanged: boolean;
   let isAudioCurrentlyPlayingChanged: boolean;
   let onPreviewVoicePlaying: boolean;
@@ -31,14 +30,9 @@ suite('SpeechController', () => {
     SpeechBrowserProxyImpl.setInstance(speech);
     isSpeechActiveChanged = false;
     isAudioCurrentlyPlayingChanged = false;
-    onStop = false;
     onPreviewVoicePlaying = false;
     onEngineStateChange = false;
     const speechListener = {
-      onStop() {
-        onStop = true;
-      },
-
       onIsSpeechActiveChange() {
         isSpeechActiveChanged = true;
       },
@@ -54,6 +48,7 @@ suite('SpeechController', () => {
       onPreviewVoicePlaying() {
         onPreviewVoicePlaying = true;
       },
+      onSpeechRateChange() {},
     };
 
     const voicePackController = new VoicePackController();
@@ -79,7 +74,6 @@ suite('SpeechController', () => {
 
     assertTrue(isSpeechActiveChanged);
     assertTrue(isAudioCurrentlyPlayingChanged);
-    assertFalse(onStop);
     assertNotEquals(state, speechController.getState());
     assertTrue(speechController.isSpeechActive());
     assertTrue(speechController.isSpeechTreeInitialized());
@@ -105,7 +99,6 @@ suite('SpeechController', () => {
 
     assertTrue(isSpeechActiveChanged);
     assertTrue(isAudioCurrentlyPlayingChanged);
-    assertFalse(onStop);
     assertFalse(speechController.isSpeechActive());
     assertFalse(speechController.isSpeechTreeInitialized());
     assertEquals(PauseActionSource.DEFAULT, speechController.getPauseSource());
@@ -266,7 +259,7 @@ suite('SpeechController', () => {
     });
 
     test('with no node id does nothing', () => {
-      speechController.initializeSpeechTree(null);
+      speechController.initializeSpeechTree();
 
       assertFalse(!!initAxPositionWithNode);
       assertFalse(startedPreprocess);
@@ -302,7 +295,7 @@ suite('SpeechController', () => {
 
     speechController.stopSpeech(source);
 
-    assertTrue(onStop);
+    assertTrue(isSpeechActiveChanged);
     assertFalse(speechController.isSpeechActive());
     assertFalse(speechController.isAudioCurrentlyPlaying());
     assertEquals(source, speechController.getPauseSource());
@@ -312,8 +305,7 @@ suite('SpeechController', () => {
 
   test('stopSpeech with button click logs play session', () => {
     const source = PauseActionSource.BUTTON_CLICK;
-    speechController.onPlay();
-    speechController.setIsSpeechActive(true);
+    speechController.onPlayPauseToggle(null, 'New phone who dis?');
 
     speechController.stopSpeech(source);
     assertEquals(1, metrics.getCallCount('recordSpeechPlaybackLength'));
@@ -330,7 +322,7 @@ suite('SpeechController', () => {
 
     speechController.stopSpeech(source);
 
-    assertTrue(onStop);
+    assertTrue(isSpeechActiveChanged);
     assertFalse(speechController.isSpeechActive());
     assertFalse(speechController.isAudioCurrentlyPlaying());
     assertEquals(source, speechController.getPauseSource());
@@ -346,7 +338,6 @@ suite('SpeechController', () => {
 
     speechController.onSpeechInterrupted();
 
-    assertFalse(onStop);
     assertTrue(speechController.isAudioCurrentlyPlaying());
     assertTrue(speechController.isSpeechActive());
     assertTrue(speechController.isSpeechBeingRepositioned());
@@ -358,7 +349,6 @@ suite('SpeechController', () => {
 
     speechController.onSpeechInterrupted();
 
-    assertTrue(onStop);
     assertEquals(
         PauseActionSource.ENGINE_INTERRUPT, speechController.getPauseSource());
     assertFalse(speechController.isAudioCurrentlyPlaying());
@@ -368,15 +358,55 @@ suite('SpeechController', () => {
         chrome.readingMode.engineInterruptStopSource,
         await metrics.whenCalled('recordSpeechStopSource'));
   });
+
   test('onSpeechFinished', () => {
-    speechController.onPlay();
-    speechController.setIsSpeechActive(true);
+    speechController.onPlayPauseToggle(null, 'New phone who dis?');
 
     speechController.onSpeechFinished();
 
-    assertTrue(onStop);
+    assertTrue(isSpeechActiveChanged);
     assertEquals(1, metrics.getCallCount('recordSpeechPlaybackLength'));
     assertEquals(1, metrics.getCallCount('recordSpeechStopSource'));
     assertFalse(speechController.isSpeechActive());
+  });
+
+  test('playNextGranularity propagates change', () => {
+    let movedToNext = false;
+    chrome.readingMode.getCurrentText = () => [];
+    chrome.readingMode.movePositionToNextGranularity = () => {
+      movedToNext = true;
+    };
+
+    speechController.playNextGranularity();
+
+    assertTrue(movedToNext);
+  });
+
+  test('playPreviousGranularity propagates change', () => {
+    let movedToPrevious: boolean = false;
+    chrome.readingMode.getCurrentText = () => [];
+    chrome.readingMode.movePositionToPreviousGranularity = () => {
+      movedToPrevious = true;
+    };
+
+    speechController.playPreviousGranularity();
+
+    assertTrue(movedToPrevious);
+  });
+
+  test('onHighlightGranularityChange', async () => {
+    const granularity1 = chrome.readingMode.noHighlighting;
+    const granularity2 = chrome.readingMode.wordHighlighting;
+
+    speechController.onHighlightGranularityChange(granularity1);
+    assertEquals(granularity1, chrome.readingMode.highlightGranularity);
+    assertEquals(
+        granularity1, await metrics.whenCalled('recordHighlightGranularity'));
+
+    metrics.reset();
+    speechController.onHighlightGranularityChange(granularity2);
+    assertEquals(granularity2, chrome.readingMode.highlightGranularity);
+    assertEquals(
+        granularity2, await metrics.whenCalled('recordHighlightGranularity'));
   });
 });

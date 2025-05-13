@@ -134,7 +134,7 @@ class AndroidHubNonZPSSection : public Section {
 // - up to 15 + `max_related_queries` + `max_trending_queries` suggestions
 //   total.
 //  - up to 1 clipboard suggestion.
-//  - up to 15 personalized suggestions.
+//  - up to 15 MIA or personalized suggestions.
 //  - up to 5 trending search suggestions.
 class AndroidNTPZpsSection : public ZpsSectionWithLocalHistory {
  public:
@@ -168,7 +168,7 @@ class AndroidWebZpsSection : public ZpsSectionWithMVTiles {
 // Section expressing the Desktop ZPS limits and grouping for the NTP.
 // - up to 8 suggestions total or 7 total if the ZPS IPH is enabled (the 8th
 // suggestion being the IPH).
-//  - up to 8 personalized suggestions.
+//  - up to 8 MIA or personalized suggestions.
 //  - up to 8 trending search suggestions.
 class DesktopNTPZpsSection : public ZpsSectionWithLocalHistory {
  public:
@@ -240,12 +240,6 @@ class DesktopWebSearchZpsSection : public Section {
                                       size_t contextual_search_limit);
 };
 
-// A section to follow contextual search matches with the advert actions.
-class DesktopWebZpsActionsSection : public ZpsSection {
- public:
-  explicit DesktopWebZpsActionsSection(omnibox::GroupConfigMap& group_configs);
-};
-
 // Section expressing the Desktop ZPS limits and grouping for the Lens
 // contextual searchbox.
 // - up to 8 suggestions total.
@@ -285,7 +279,7 @@ class DesktopNonZpsSection : public Section {
 // Section expressing the iPhone ZPS limits and grouping for the NTP.
 // - up to `total_count` suggestions total.
 //  - up to 1 clipboard suggestion.
-//  - up to `psuggest_count` personalized suggestions.
+//  - up to `psuggest_count` MIA or personalized suggestions.
 //  - up to `max_trending_queries` trending suggestions.
 class IOSNTPZpsSection : public ZpsSectionWithLocalHistory {
  public:
@@ -328,7 +322,7 @@ class IOSLensMultimodalZpsSection : public ZpsSection {
 // Section expressing the iPad ZPS limits and grouping for the NTP.
 // - up to 10 suggestions total.
 //  - up to 1 clipboard suggestion.
-//  - up to 10 personalized suggestions.
+//  - up to 10 MIA or personalized suggestions.
 class IOSIpadNTPZpsSection : public ZpsSectionWithLocalHistory {
  public:
   explicit IOSIpadNTPZpsSection(size_t trends_count,

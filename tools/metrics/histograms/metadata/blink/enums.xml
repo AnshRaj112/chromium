@@ -6185,6 +6185,28 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="5557" label="IntegrityPolicyInServiceWorkerResponse"/>
   <int value="5558" label="EditContextTextFormatUnderlineStyle"/>
   <int value="5559" label="EditContextTextFormatUnderlineThickness"/>
+  <int value="5560" label="Proofreader_IncludeCorrectionTypes"/>
+  <int value="5561" label="Proofreader_IncludeCorrectionExplanations"/>
+  <int value="5562" label="Proofreader_ExpectedInputLanguages"/>
+  <int value="5563" label="Proofreader_CorrectionExplanationLanguage"/>
+  <int value="5564" label="Proofreader_Destroy"/>
+  <int value="5565" label="Proofreader_Proofread"/>
+  <int value="5566" label="Proofreader_Availability"/>
+  <int value="5567" label="Proofreader_Create"/>
+  <int value="5568" label="DataUrlDedicatedWorker"/>
+  <int value="5569" label="DataUrlSharedWorker"/>
+  <int value="5570" label="V8WebGLRenderingContextWebGPU_GetExtension_Method"/>
+  <int value="5571"
+      label="V8WebGLRenderingContextWebGPU_GetSupportedExtensions_Method"/>
+  <int value="5572" label="V8WebGL2RenderingContextWebGPU_GetExtension_Method"/>
+  <int value="5573"
+      label="V8WebGL2RenderingContextWebGPU_GetSupportedExtensions_Method"/>
+  <int value="5574" label="CredentialsGetImmediateMediationPasswordSuccess"/>
+  <int value="5575" label="CredentialsGetImmediateMediationPublicKeySuccess"/>
+  <int value="5576" label="CredentialsGetImmediateMediationFailure"/>
+  <int value="5577" label="ClearSiteData"/>
+  <int value="5578" label="ScrollIntoViewContainerNearest"/>
+  <int value="5579" label="PopoverShown"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom:WebFeature) -->
@@ -6707,9 +6729,10 @@ Called by update_permissions_policy_enum.py.-->
 </enum>
 
 <enum name="FedCmUserAction">
-  <int value="0" label="User signed in"/>
+  <int value="0" label="Deprecated: User signed in"/>
   <int value="1" label="User ignored the UI"/>
   <int value="2" label="User closed the UI"/>
+  <int value="3" label="User signed in"/>
 </enum>
 
 <enum name="FedCmUserInfoStatus">
@@ -6896,6 +6919,19 @@ Called by update_permissions_policy_enum.py.-->
   <int value="1" label="keyboardLock() requested for a subset of keys"/>
   <int value="2" label="keyboardUnlock()"/>
 </enum>
+
+<!-- LINT.IfChange(LoadLinksFromHeaderMode) -->
+
+<enum name="LoadLinksFromHeaderMode">
+  <int value="0" label="Document before commit"/>
+  <int value="1" label="Document after commit without viewport"/>
+  <int value="2" label="Document after commit with viewport"/>
+  <int value="3" label="Document after load completed"/>
+  <int value="4" label="Subresource from memory cache"/>
+  <int value="5" label="Subresource not from memory cache"/>
+</enum>
+
+<!-- LINT.ThenChange(//third_party/blink/renderer/core/loader/preload_helper.h:LoadLinksFromHeaderMode) -->
 
 <!-- LINT.IfChange(MappedCSSProperties) -->
 
@@ -8206,6 +8242,7 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="336" label="OverflowClip"/>
   <int value="337" label="LightDark"/>
   <int value="338" label="Requestidlecallback"/>
+  <int value="339" label="ClearSiteData"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/public/mojom/use_counter/metrics/webdx_feature.mojom:WebDXFeature) -->

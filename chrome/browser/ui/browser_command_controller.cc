@@ -261,6 +261,35 @@ BrowserCommandController::BrowserCommandController(Browser* browser)
       base::BindRepeating(
           &BrowserCommandController::UpdateCommandsForFullscreenMode,
           base::Unretained(this)));
+#endif  //! BUILDFLAG(IS_MAC)
+
+#if BUILDFLAG(ENABLE_GLIC)
+  if (glic::GlicEnabling::IsEnabledByFlags()) {
+    auto* glic_service =
+        glic::GlicKeyedServiceFactory::GetGlicKeyedService(profile());
+    if (glic_service) {
+      glic_enabling_subscription_ = std::make_unique<
+          base::CallbackListSubscription>(
+
+          glic_service->enabling().RegisterAllowedChanged(base::BindRepeating(
+              &BrowserCommandController::UpdateCommandsForEnableGlicChanged,
+              base::Unretained(this))));
+    }
+  }
+#endif  // BUILDFLAG(ENABLE_GLIC)
+
+#if BUILDFLAG(ENABLE_GLIC)
+  if (glic::GlicEnabling::IsEnabledByFlags()) {
+    auto* service =
+        glic::GlicKeyedServiceFactory::GetGlicKeyedService(profile());
+    if (service) {
+      glic_window_activation_subscription_ =
+          service->window_controller().AddWindowActivationChangedCallback(
+              base::BindRepeating(
+                  &BrowserCommandController::GlicWindowActivationChanged,
+                  base::Unretained(this)));
+    }
+  }
 #endif
 
   InitCommandState();
@@ -285,6 +314,7 @@ BrowserCommandController::~BrowserCommandController() {
   }
   profile_pref_registrar_.RemoveAll();
   local_pref_registrar_.RemoveAll();
+  glic_enabling_subscription_.reset();
   browser_->tab_strip_model()->RemoveObserver(this);
 }
 
@@ -383,6 +413,12 @@ void BrowserCommandController::LoadingStateChanged(bool is_loading,
                                                    bool force) {
   UpdateReloadStopState(is_loading, force);
 }
+
+#if BUILDFLAG(ENABLE_GLIC)
+void BrowserCommandController::GlicWindowActivationChanged(bool active) {
+  UpdateGlicState();
+}
+#endif
 
 void BrowserCommandController::FindBarVisibilityChanged() {
   // Block find command updates in locked fullscreen mode unless the instance is
@@ -1556,8 +1592,7 @@ void BrowserCommandController::InitCommandState() {
   // Glic commands.
   command_updater_.UpdateCommandEnabled(
       IDC_GLIC_TOGGLE_PIN, glic::GlicEnabling::IsProfileEligible(profile()));
-  command_updater_.UpdateCommandEnabled(
-      IDC_OPEN_GLIC, glic::GlicEnabling::IsEnabledForProfile(profile()));
+  UpdateGlicState();
 #endif
 
   // Initialize other commands whose state changes based on various conditions.
@@ -2015,6 +2050,20 @@ void BrowserCommandController::UpdatePrintingState() {
 #endif
 }
 
+#if BUILDFLAG(ENABLE_GLIC)
+void BrowserCommandController::UpdateGlicState() {
+  if (glic::GlicEnabling::IsEnabledByFlags()) {
+    auto* service =
+        glic::GlicKeyedServiceFactory::GetGlicKeyedService(profile());
+    if (service) {
+      command_updater_.UpdateCommandEnabled(
+          IDC_OPEN_GLIC, glic::GlicEnabling::IsEnabledForProfile(profile()) &&
+                             !service->window_controller().IsShowing());
+    }
+  }
+}
+#endif
+
 void BrowserCommandController::UpdateSaveAsState() {
   if (is_locked_fullscreen_) {
     return;
@@ -2157,6 +2206,13 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
   if (auto* const action = FindAction(action_id)) {
     action->SetEnabled(enabled);
   }
+}
+
+void BrowserCommandController::UpdateCommandsForEnableGlicChanged() {
+#if BUILDFLAG(ENABLE_GLIC)
+  command_updater_.UpdateCommandEnabled(
+      IDC_OPEN_GLIC, glic::GlicEnabling::IsEnabledForProfile(profile()));
+#endif  //  BUILDFLAG(ENABLE_GLIC)
 }
 
 BrowserWindow* BrowserCommandController::window() {

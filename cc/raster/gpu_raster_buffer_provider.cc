@@ -104,13 +104,9 @@ void GpuRasterBufferProvider::RasterBufferImpl::Playback(
 
   viz::RasterContextProvider::ScopedRasterContextLock scoped_context(
       client_->worker_context_provider_, url.possibly_invalid_spec().c_str());
-  gpu::raster::RasterInterface* ri =
-      client_->worker_context_provider_->RasterInterface();
   PlaybackOnWorkerThread(raster_source, raster_full_rect, raster_dirty_rect,
                          new_content_id, transform, playback_settings, url);
 
-  backing_->mailbox_sync_token =
-      viz::ClientResourceProvider::GenerateSyncTokenHelper(ri);
   backing_->returned_sync_token = gpu::SyncToken();
 }
 
@@ -327,6 +323,7 @@ void GpuRasterBufferProvider::RasterBufferImpl::RasterizeSource(
   gpu::raster::RasterInterface* ri =
       client_->worker_context_provider_->RasterInterface();
   bool mailbox_needs_clear = false;
+  std::unique_ptr<gpu::RasterScopedAccess> ri_access;
   if (!backing_->shared_image()) {
     DCHECK(!backing_->returned_sync_token.HasData());
     auto* sii = client_->sii_.get();
@@ -343,9 +340,13 @@ void GpuRasterBufferProvider::RasterBufferImpl::RasterizeSource(
     }
     backing_->CreateSharedImage(sii, flags, "GpuRasterTile");
     mailbox_needs_clear = true;
-    ri->WaitSyncTokenCHROMIUM(sii->GenUnverifiedSyncToken().GetConstData());
+    ri_access = backing_->shared_image()->BeginRasterAccess(
+        ri, sii->GenUnverifiedSyncToken(),
+        /*readonly=*/false);
   } else {
-    ri->WaitSyncTokenCHROMIUM(backing_->returned_sync_token.GetConstData());
+    ri_access = backing_->shared_image()->BeginRasterAccess(
+        ri, backing_->returned_sync_token,
+        /*readonly=*/false);
   }
 
   // Assume legacy MSAA if sample count is positive.
@@ -390,6 +391,8 @@ void GpuRasterBufferProvider::RasterBufferImpl::RasterizeSource(
       playback_settings.raster_inducing_scroll_offsets,
       const_cast<RasterSource*>(raster_source)->max_op_size_hint());
   ri->EndRasterCHROMIUM();
+  backing_->mailbox_sync_token =
+      gpu::RasterScopedAccess::EndAccess(std::move(ri_access));
 }
 
 }  // namespace cc

@@ -253,6 +253,7 @@
 #include "components/optimization_guide/machine_learning_tflite_buildflags.h"
 #include "components/password_manager/content/browser/password_manager_log_router_factory.h"
 #include "components/password_manager/content/browser/password_requirements_service_factory.h"
+#include "components/payments/content/browser_binding/browser_bound_keys_deleter_factory.h"
 #include "components/payments/content/has_enrolled_instrument_query_factory.h"
 #include "components/permissions/features.h"
 #include "components/policy/content/policy_blocklist_service.h"
@@ -324,6 +325,7 @@
 #include "chrome/browser/new_tab_page/promos/promo_service_factory.h"
 #include "chrome/browser/passage_embeddings/passage_embeddings_coordinator_factory.h"
 #include "chrome/browser/payments/payment_request_display_manager_factory.h"
+#include "chrome/browser/prefs/persistent_renderer_prefs_manager_factory.h"
 #include "chrome/browser/privacy_sandbox/privacy_sandbox_survey_desktop_controller_factory.h"
 #include "chrome/browser/profile_resetter/reset_report_uploader_factory.h"
 #include "chrome/browser/screen_ai/screen_ai_service_router_factory.h"
@@ -1108,6 +1110,9 @@ void ChromeBrowserMainExtraPartsProfiles::
 #if !BUILDFLAG(IS_ANDROID)
   PasswordStatusCheckServiceFactory::GetInstance();
 #endif
+#if BUILDFLAG(IS_ANDROID)
+  payments::BrowserBoundKeyDeleterFactory::GetInstance();
+#endif
   payments::HasEnrolledInstrumentQueryFactory::GetInstance();
 #if !BUILDFLAG(IS_ANDROID)
   payments::PaymentRequestDisplayManagerFactory::GetInstance();
@@ -1121,6 +1126,7 @@ void ChromeBrowserMainExtraPartsProfiles::
   PermissionActionsHistoryFactory::GetInstance();
   PermissionDecisionAutoBlockerFactory::GetInstance();
 #if !BUILDFLAG(IS_ANDROID)
+  PersistentRendererPrefsManagerFactory::GetInstance();
   PinnedTabServiceFactory::GetInstance();
   PinnedToolbarActionsModelFactory::GetInstance();
 #endif

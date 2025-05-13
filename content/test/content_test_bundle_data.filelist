@@ -3350,6 +3350,16 @@ data/accessibility/html/canvas-fallback-expected-mac.txt
 data/accessibility/html/canvas-fallback-expected-uia-win.txt
 data/accessibility/html/canvas-fallback-expected-win.txt
 data/accessibility/html/canvas-fallback.html
+data/accessibility/html/canvas-interactive-fallback-expected-android-assist-data.txt
+data/accessibility/html/canvas-interactive-fallback-expected-android-external.txt
+data/accessibility/html/canvas-interactive-fallback-expected-android.txt
+data/accessibility/html/canvas-interactive-fallback-expected-auralinux.txt
+data/accessibility/html/canvas-interactive-fallback-expected-blink.txt
+data/accessibility/html/canvas-interactive-fallback-expected-fuchsia.txt
+data/accessibility/html/canvas-interactive-fallback-expected-mac.txt
+data/accessibility/html/canvas-interactive-fallback-expected-uia-win.txt
+data/accessibility/html/canvas-interactive-fallback-expected-win.txt
+data/accessibility/html/canvas-interactive-fallback.html
 data/accessibility/html/canvas.html
 data/accessibility/html/caption-expected-android-assist-data.txt
 data/accessibility/html/caption-expected-android-external.txt
@@ -7398,6 +7408,8 @@ data/gpu/webgpu-import-video.html
 data/gpu/webgpu-stress-request-device-and-remove-loop.html
 data/gpu/webgpu-unittest-utils.js
 data/gpu/webgpu-unittest-worker.js
+data/gpu/webrtc/codec_loopback.html
+data/gpu/webrtc/webrtc_common.js
 data/gpu/worker-webgl-raf-after-gpu-crash.html
 data/green.html
 data/gtk_key_bindings_test_gtkrc

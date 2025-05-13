@@ -318,6 +318,36 @@ FilterOperations StyleBuilderConverter::ConvertOffscreenFilterOperations(
   return FilterOperationResolver::CreateOffscreenFilterOperations(value, font);
 }
 
+StyleFlexWrapData StyleBuilderConverter::ConvertFlexWrapData(
+    StyleResolverState&,
+    const CSSValue& value) {
+  bool is_balanced = false;
+  FlexWrapMode wrap_mode = FlexWrapMode::kNowrap;
+  auto process = [&is_balanced, &wrap_mode](const CSSValue& value) {
+    const CSSIdentifierValue& identifier = To<CSSIdentifierValue>(value);
+    if (identifier.GetValueID() == CSSValueID::kBalance) {
+      is_balanced = true;
+    } else {
+      wrap_mode = identifier.ConvertTo<FlexWrapMode>();
+    }
+  };
+
+  if (auto* list = DynamicTo<CSSValueList>(value)) {
+    for (const auto& entry : *list) {
+      process(*entry);
+    }
+  } else {
+    process(value);
+  }
+
+  // Coerce the wrapping value if balanced.
+  if (is_balanced && wrap_mode == FlexWrapMode::kNowrap) {
+    wrap_mode = FlexWrapMode::kWrap;
+  }
+
+  return StyleFlexWrapData(wrap_mode, is_balanced);
+}
+
 static FontDescription::GenericFamilyType ConvertGenericFamily(
     CSSValueID value_id) {
   switch (value_id) {
@@ -2641,7 +2671,8 @@ StyleColor ResolveColorValueImpl(const CSSValue& value,
         MakeGarbageCollected<StyleColor::UnresolvedRelativeColor>(
             origin_color, relative_color_value->ColorInterpolationSpace(),
             relative_color_value->Channel0(), relative_color_value->Channel1(),
-            relative_color_value->Channel2(), relative_color_value->Alpha());
+            relative_color_value->Channel2(), relative_color_value->Alpha(),
+            context.length_resolver);
     // https://drafts.csswg.org/css-color-5/#resolving-rcs
     // If the origin color is resolvable at computed-value time, the relative
     // color function should be resolved at computed-value time as well.

@@ -142,6 +142,12 @@ BASE_FEATURE(kAutofillAiWithDataSchema,
 const base::FeatureParam<int> kAutofillAiWithDataSchemaServerExperimentId{
     &kAutofillAiWithDataSchema, "autofill_ai_server_experiment_id", 0};
 
+// Guards the refactoring to allow showing Autofill and Password suggestions in
+// the same surface instead of being mutually exclusive.
+BASE_FEATURE(kAutofillAndPasswordsInSameSurface,
+             "AutofillAndPasswordsInSameSurface",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Same as `kAutofillAddressUserPerceptionSurvey` but for credit card forms.
 BASE_FEATURE(kAutofillCreditCardUserPerceptionSurvey,
              "AutofillCreditCardUserPerceptionSurvey",
@@ -253,6 +259,13 @@ BASE_FEATURE(kAutofillEnableLabelPrecedenceForTurkishAddresses,
 // TODO(crbug.com/395831853): Remove once launched.
 BASE_FEATURE(kAutofillEnableLoyaltyCardsFilling,
              "AutofillEnableLoyaltyCardsFilling",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// When enabled, Autofill will display joined email and loyalty card Autofill
+// suggestions.
+// TODO(crbug.com/416664590): Remove once launched.
+BASE_FEATURE(kAutofillEnableEmailOrLoyaltyCardsFilling,
+             "AutofillEnableEmailOrLoyaltyCardsFilling",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // When enabled, extracts <input type=date>, which may be filled by Autofill AI.

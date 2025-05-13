@@ -58,6 +58,10 @@ BASE_FEATURE(kCrashReportingAPIMoreContextData,
              "CrashReportingAPIMoreContextData",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kOverrideCrashReportingEndpoint,
+             "OverrideCrashReportingEndpoint",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kLowerHighResolutionTimerThreshold,
              "LowerHighResolutionTimerThreshold",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -2807,9 +2811,6 @@ BASE_FEATURE(kWebRtcUseMinMaxVEADimensions,
              base::FEATURE_DISABLED_BY_DEFAULT
 #endif
 );
-
-// Allow access to WebSQL APIs.
-BASE_FEATURE(kWebSQLAccess, "kWebSQLAccess", base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Kill switch for https://crbug.com/338955051.
 BASE_FEATURE(kWebUSBTransferSizeLimit,

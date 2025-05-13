@@ -909,6 +909,10 @@ void ChromeBrowsingDataRemoverDelegate::RemoveEmbedderData(
 
 #if !BUILDFLAG(IS_ANDROID)
     host_content_settings_map_->ClearSettingsForOneTypeWithPredicate(
+        ContentSettingsType::INITIALIZED_TRANSLATIONS, delete_begin_,
+        delete_end_, website_settings_filter);
+
+    host_content_settings_map_->ClearSettingsForOneTypeWithPredicate(
         ContentSettingsType::INTENT_PICKER_DISPLAY, delete_begin_, delete_end_,
         website_settings_filter);
 
@@ -927,6 +931,10 @@ void ChromeBrowsingDataRemoverDelegate::RemoveEmbedderData(
     host_content_settings_map_->ClearSettingsForOneTypeWithPredicate(
         ContentSettingsType::ARE_SUSPICIOUS_NOTIFICATIONS_ALLOWLISTED_BY_USER,
         delete_begin_, delete_end_, website_settings_filter);
+
+    host_content_settings_map_->ClearSettingsForOneTypeWithPredicate(
+        ContentSettingsType::SUSPICIOUS_NOTIFICATION_IDS, delete_begin_,
+        delete_end_, website_settings_filter);
 
     PermissionDecisionAutoBlockerFactory::GetForProfile(profile_)
         ->RemoveEmbargoAndResetCounts(filter);

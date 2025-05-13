@@ -2953,21 +2953,10 @@ const char kContextualSearchBoxUsesContextualSearchProviderDescription[] =
     "Enables the contextual search box to use the ContextualSearchProvider "
     "instead of the ZeroSuggestProvider as the source for suggestions.";
 
-const char kOmniboxContextualSearchActionsAtTopName[] =
-    "Omnibox contextual search actions at top";
-const char kOmniboxContextualSearchActionsAtTopDescription[] =
-    "Enables overriding the placement of contextual search actions in the "
-    "omnibox popup.";
-
 const char kOmniboxContextualSearchOnFocusSuggestionsName[] =
     "Omnibox contextual search on focus suggestions";
 const char kOmniboxContextualSearchOnFocusSuggestionsDescription[] =
     "Enables omnibox contextual search suggestions in zero prefix suggest.";
-
-const char kOmniboxContextualSearchSingleLensActionName[] =
-    "Omnibox contextual search single lens action";
-const char kOmniboxContextualSearchSingleLensActionDescription[] =
-    "Enables single action UX for contextual search in the omnibox popup";
 
 const char kOmniboxContextualSuggestionsName[] =
     "Omnibox contextual suggestions";
@@ -3520,6 +3509,13 @@ const char kReduceTransferSizeUpdatedIPCDescription[] =
     "When enabled, the network service will send TransferSizeUpdatedIPC IPC "
     "only when DevTools is attached or the request is for an ad request.";
 
+#if BUILDFLAG(IS_LINUX)
+const char kReduceUserAgentDataLinuxPlatformVersionName[] =
+    "Reduce Linux platform version Client Hint";
+const char kReduceUserAgentDataLinuxPlatformVersionDescription[] =
+    "Set platform version Client Hint on Linux to empty string.";
+#endif  // BUILDFLAG(IS_LINUX)
+
 #if BUILDFLAG(IS_ANDROID)
 const char kReplaceSyncPromosWithSignInPromosName[] =
     "Replace all sync-related UI with sign-in ones";
@@ -4064,6 +4060,12 @@ const char kForceHighPerformanceGPUDescription[] =
     "Forces use of high performance GPU if available. Warning: this flag may "
     "increase power consumption leading to shorter battery time.";
 
+#if BUILDFLAG(IS_WIN)
+const char kUiaProviderName[] = "UI Automation";
+const char kUiaProviderDescription[] =
+    "Enables native support of the UI Automation provider.";
+#endif
+
 const char kUiPartialSwapName[] = "Partial swap";
 const char kUiPartialSwapDescription[] = "Sets partial swap behavior.";
 
@@ -4555,6 +4557,11 @@ const char kAndroidTabDeclutterAutoDeleteName[] =
     "Android Tab Declutter Auto Deletion";
 const char kAndroidTabDeclutterAutoDeleteDescription[] =
     "Enables auto-deletion of inactive tabs.";
+
+const char kAndroidTabDeclutterAutoDeleteKillSwitchName[] =
+    "Android Tab Declutter Auto Delete Kill Switch";
+const char kAndroidTabDeclutterAutoDeleteKillSwitchDescription[] =
+    "Kill switch for auto delete archived tabs.";
 
 const char kAndroidTabDeclutterArchiveAllButActiveTabName[] =
     "Archive all tabs except active";

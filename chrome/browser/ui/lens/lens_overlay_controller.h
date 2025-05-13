@@ -79,18 +79,15 @@ class WebUI;
 }  // namespace content
 
 namespace lens {
+class LensOverlayEventHandler;
 class LensOverlayQueryController;
 class LensOverlaySidePanelCoordinator;
 class LensPermissionBubbleController;
 class LensSearchboxController;
-class LensOverlayEventHandler;
+class LensSearchContextualizationController;
 struct SearchQuery;
 class SidePanelInUse;
 }  // namespace lens
-
-namespace optimization_guide {
-struct AIPageContentResult;
-}  // namespace optimization_guide
 
 namespace signin {
 class IdentityManager;
@@ -119,19 +116,6 @@ class LensSearchController;
 enum class SidePanelEntryHideReason;
 
 extern void* kLensOverlayPreselectionWidgetIdentifier;
-
-// Callback type alias for page content bytes retrieved. Multiple pieces and
-// types of content may be retrieved and returned in `page_contents`.
-// `primary_content_type` is the main type used in the request flow and used to
-// determine request params and whether updated requests need to be sent.
-// `pdf_page_count` is the number of pages in the document being retrieved, not
-// necessarily the number of pages in `bytes`. For example, if the document is a
-// PDF, `pdf_page_count` is the number of pages in the PDF, while `bytes` could
-// be empty because the PDF is too large.
-using PageContentRetrievedCallback =
-    base::OnceCallback<void(std::vector<lens::PageContent> page_contents,
-                            lens::MimeType primary_content_type,
-                            std::optional<uint32_t> pdf_page_count)>;
 
 // Manages all state associated with the lens overlay.
 // This class is not thread safe. It should only be used from the browser
@@ -310,10 +294,10 @@ class LensOverlayController : public lens::mojom::LensPageHandler,
   void TriggerCopy();
 
   // Returns true if the overlay is open and covering the current active tab.
-  bool IsOverlayShowing();
+  bool IsOverlayShowing() const;
 
   // Returns true if the overlay is showing or is in live page mode.
-  bool IsOverlayActive();
+  bool IsOverlayActive() const;
 
   // Returns true if the overlay is in the process of initializing.
   bool IsOverlayInitializing();
@@ -474,11 +458,6 @@ class LensOverlayController : public lens::mojom::LensPageHandler,
   const std::vector<lens::mojom::CenterRotatedBoxPtr>&
   GetSignificantRegionBoxesForTesting() {
     return initialization_data_->significant_region_boxes_;
-  }
-
-  lens::LensPermissionBubbleController*
-  get_lens_permission_bubble_controller_for_testing() {
-    return permission_bubble_controller_.get();
   }
 
   views::Widget* get_preselection_widget_for_testing() {
@@ -797,20 +776,7 @@ class LensOverlayController : public lens::mojom::LensPageHandler,
       lens::MimeType primary_content_type,
       std::optional<uint32_t> page_count);
 
-  // Tries to fetch the underlying page content bytes to use for
-  // contextualization. If page content can not be retrieved, the callback will
-  // be run with no bytes.
-  void GetPageContextualization(PageContentRetrievedCallback callback);
-
 #if BUILDFLAG(ENABLE_PDF)
-  // Receives the PDF bytes from the IPC call to the PDF renderer and stores
-  // them in initialization data. `pdf_page_count` is passed to the partial PDF
-  // text fetch to be used to determine when to stop fetching.
-  void OnPdfBytesReceived(PageContentRetrievedCallback callback,
-                          pdf::mojom::PdfListener::GetPdfBytesStatus status,
-                          const std::vector<uint8_t>& bytes,
-                          uint32_t pdf_page_count);
-
   // Fetches the visible page index from the PDF renderer and then starts the
   // process of fetching the text from the PDF to be used for suggest signals.
   void FetchVisiblePageIndexAndGetPartialPdfText(uint32_t page_count);
@@ -824,47 +790,6 @@ class LensOverlayController : public lens::mojom::LensPageHandler,
                                  uint32_t total_characters_retrieved,
                                  const std::u16string& page_text);
 #endif  // BUILDFLAG(ENABLE_PDF)
-
-  // Gets the inner HTML for contextualization if flag enabled. Otherwise skip
-  // to MaybeGetInnerText().
-  void MaybeGetInnerHtml(std::vector<lens::PageContent> page_contents,
-                         content::RenderFrameHost* render_frame_host,
-                         PageContentRetrievedCallback callback);
-
-  // Callback for when the inner HTML is retrieved from the underlying page.
-  // Calls MaybeGetInnerText().
-  void OnInnerHtmlReceived(std::vector<lens::PageContent> page_contents,
-                           content::RenderFrameHost* render_frame_host,
-                           PageContentRetrievedCallback callback,
-                           const std::optional<std::string>& result);
-
-  // Gets the inner text for contextualization if flag enabled. Otherwise skip
-  // to MaybeGetAnnotatedPageContent().
-  void MaybeGetInnerText(std::vector<lens::PageContent> page_contents,
-                         content::RenderFrameHost* render_frame_host,
-                         PageContentRetrievedCallback callback);
-
-  // Callback for when the inner text is retrieved from the underlying page.
-  // Calls MaybeGetAnnotatedPageContent().
-  void OnInnerTextReceived(
-      std::vector<lens::PageContent> page_contents,
-      content::RenderFrameHost* render_frame_host,
-      PageContentRetrievedCallback callback,
-      std::unique_ptr<content_extraction::InnerTextResult> result);
-
-  // Gets the annotated page content for contextualization if flag enabled.
-  // Otherwise run the callback with the HTML and/or innerText.
-  void MaybeGetAnnotatedPageContent(
-      std::vector<lens::PageContent> page_contents,
-      content::RenderFrameHost* render_frame_host,
-      PageContentRetrievedCallback callback);
-
-  // Callback for when the annotated page content is retrieved. Runs the
-  // callback with the HTML, innerText, and/or annotated page content.
-  void OnAnnotatedPageContentReceived(
-      std::vector<lens::PageContent> page_contents,
-      PageContentRetrievedCallback callback,
-      std::optional<optimization_guide::AIPageContentResult> apc);
 
   // Creates the mojo bounding boxes for the significant regions.
   std::vector<lens::mojom::CenterRotatedBoxPtr> ConvertSignificantRegionBoxes(
@@ -1021,15 +946,6 @@ class LensOverlayController : public lens::mojom::LensPageHandler,
   // Called when the associated tab will enter the background.
   void TabWillEnterBackground(tabs::TabInterface* tab);
 
-  // Called when the tab's WebContents is discarded.
-  void WillDiscardContents(tabs::TabInterface* tab,
-                           content::WebContents* old_contents,
-                           content::WebContents* new_contents);
-
-  // Called when the tab will be removed from the window.
-  void WillDetach(tabs::TabInterface* tab,
-                  tabs::TabInterface::DetachReason reason);
-
   // Suggest a name for the save as image feature incorporating the hostname of
   // the page. Protocol, TLD, etc are not taken into consideration. Duplicate
   // names get automatic suffixes.
@@ -1162,6 +1078,10 @@ class LensOverlayController : public lens::mojom::LensPageHandler,
   // Shorthand to grab the LensSearchboxController for this instance of Lens.
   lens::LensSearchboxController* GetLensSearchboxController();
 
+  // Shorthand to grab the LensSearchContextualizationController for this
+  // instance of Lens.
+  lens::LensSearchContextualizationController* GetContextualizationController();
+
   // Owns the LensSearchController which owns this class
   raw_ptr<tabs::TabInterface> tab_;
 
@@ -1178,10 +1098,6 @@ class LensOverlayController : public lens::mojom::LensPageHandler,
   // Tracks the state of the overlay when it is backgrounded. This is the state
   // that the overlay will return to when the tab is foregrounded.
   State backgrounded_state_ = State::kOff;
-
-  // Controller for showing the page screenshot permission bubble.
-  std::unique_ptr<lens::LensPermissionBubbleController>
-      permission_bubble_controller_;
 
   // The assembly data needed for the overlay to be created and shown.
   std::unique_ptr<OverlayInitializationData> initialization_data_;
@@ -1240,9 +1156,6 @@ class LensOverlayController : public lens::mojom::LensPageHandler,
   // Query controller. Owned by the search controller, guaranteed to be alive
   // until the overlay is closed.
   raw_ptr<lens::LensOverlayQueryController> lens_overlay_query_controller_;
-
-  // Holds subscriptions for TabInterface callbacks.
-  std::vector<base::CallbackListSubscription> tab_subscriptions_;
 
   // The callbacks pending the handshake to complete so the Lens suggest inputs
   // can be retrieved.

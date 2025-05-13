@@ -3232,7 +3232,7 @@ void WebContentsImpl::AttachInnerWebContents(
   // calls below will just early return.
   inner_render_manager->InitRenderView(
       inner_main_frame->GetSiteInstance()->group(), inner_render_view_host,
-      nullptr);
+      /*proxy=*/nullptr, /*navigation_metrics_token=*/std::nullopt);
   if (!inner_render_manager->GetRenderWidgetHostView()) {
     inner_web_contents_impl->CreateRenderWidgetHostViewForRenderManager(
         inner_render_view_host);
@@ -3346,7 +3346,7 @@ void WebContentsImpl::AttachGuestPage(
   // call below will just early return.
   inner_render_manager->InitRenderView(
       inner_main_frame->GetSiteInstance()->group(), inner_render_view_host,
-      /*proxy=*/nullptr);
+      /*proxy=*/nullptr, /*navigation_metrics_token=*/std::nullopt);
 
   // If we are reusing the RenderViewHost and it doesn't already have a
   // RenderWidgetHostView, we need to create one if this is the main frame.
@@ -3912,6 +3912,7 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params,
   renderer_preferences_.uses_platform_autofill =
       params.initially_use_platform_autofill;
 
+  is_never_composited_ = params.is_never_composited;
   is_in_preview_mode_ = params.preview_mode;
   creator_location_ = params.creator_location;
 #if BUILDFLAG(IS_ANDROID)
@@ -4017,8 +4018,9 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params,
   if (params.desired_renderer_state ==
       CreateParams::kInitializeAndWarmupRendererProcess) {
     if (!GetRenderManager()->current_frame_host()->IsRenderFrameLive()) {
-      GetRenderManager()->InitRenderView(site_instance->group(),
-                                         GetRenderViewHost(), nullptr);
+      GetRenderManager()->InitRenderView(
+          site_instance->group(), GetRenderViewHost(), /*proxy=*/nullptr,
+          /*navigation_metrics_token=*/std::nullopt);
     }
   }
 
@@ -4232,6 +4234,12 @@ void WebContentsImpl::PreHandleDragUpdate(const DropData& drop_data,
                                           const gfx::PointF& client_pt) {
   if (delegate_) {
     delegate_->PreHandleDragUpdate(drop_data, client_pt);
+  }
+}
+
+void WebContentsImpl::PreHandleDragExit() {
+  if (delegate_) {
+    delegate_->PreHandleDragExit();
   }
 }
 
@@ -8979,10 +8987,7 @@ void WebContentsImpl::ClearFocusedElement() {
 }
 
 bool WebContentsImpl::IsNeverComposited() {
-  if (!delegate_) {
-    return false;
-  }
-  return delegate_->IsNeverComposited(this);
+  return is_never_composited_;
 }
 
 RenderViewHostDelegateView* WebContentsImpl::GetDelegateView() {
@@ -10348,7 +10353,8 @@ void WebContentsImpl::ReattachOuterDelegateIfNeeded() {
 bool WebContentsImpl::CreateRenderViewForRenderManager(
     RenderViewHost* render_view_host,
     const std::optional<blink::FrameToken>& opener_frame_token,
-    RenderFrameProxyHost* proxy_host) {
+    RenderFrameProxyHost* proxy_host,
+    const std::optional<base::UnguessableToken>& navigation_metrics_token) {
   TRACE_EVENT1("browser,navigation",
                "WebContentsImpl::CreateRenderViewForRenderManager",
                "render_view_host", render_view_host);
@@ -10366,7 +10372,8 @@ bool WebContentsImpl::CreateRenderViewForRenderManager(
   // TODO(crbug.com/40166243): Given MPArch, should we pass
   // opened_by_another_window_ for non primary FrameTrees?
   if (!rvh_impl->CreateRenderView(opener_frame_token, proxy_routing_id,
-                                  opened_by_another_window_)) {
+                                  opened_by_another_window_,
+                                  navigation_metrics_token)) {
     return false;
   }
 

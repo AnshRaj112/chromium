@@ -27,6 +27,14 @@ namespace syncer {
 class SyncService;
 }  // namespace syncer
 
+// Completes the post-signin actions. In most cases the action is showing a
+// snackbar confirming sign-in with `identity` and an undo button to sign out
+// the user.
+void CompletePostSignInActions(PostSignInActionSet post_signin_actions,
+                               id<SystemIdentity> identity,
+                               Browser* browser,
+                               signin_metrics::AccessPoint access_point);
+
 // Callback called the profile switching succeeded (`success` is true) or failed
 // (`success` is false).
 // If `success is true:
@@ -97,13 +105,18 @@ using OnProfileSwitchCompletion =
                          sceneState:(SceneState*)sceneState
                              reason:(ChangeProfileReason)reason
                       requestHelper:
-                          (id<AuthenticationFlowRequestHelper>)requestHelper;
+                          (id<AuthenticationFlowRequestHelper>)requestHelper
+                  postSignInActions:(PostSignInActionSet)postSignInActions
+                        accessPoint:(signin_metrics::AccessPoint)accessPoint;
 
 // Switches to the profile with `profileName`, for `sceneIdentifier`.
 - (void)switchToProfileWithName:(const std::string&)profileName
                      sceneState:(SceneState*)sceneState
                          reason:(ChangeProfileReason)reason
-      changeProfileContinuation:(ChangeProfileContinuation)continuation;
+      changeProfileContinuation:(ChangeProfileContinuation)continuation
+              postSignInActions:(PostSignInActionSet)postSignInActions
+                   withIdentity:(id<SystemIdentity>)identity
+                    accessPoint:(signin_metrics::AccessPoint)accessPoint;
 
 // Converts the personal profile to a managed one and attaches `identity` to it.
 - (void)makePersonalProfileManagedWithIdentity:(id<SystemIdentity>)identity;
@@ -126,14 +139,6 @@ using OnProfileSwitchCompletion =
                     mergeBrowsingDataByDefault:(BOOL)mergeBrowsingDataByDefault
          browsingDataMigrationDisabledByPolicy:
              (BOOL)browsingDataMigrationDisabledByPolicy;
-
-// Completes the post-signin actions. In most cases the action is showing a
-// snackbar confirming sign-in with `identity` and an undo button to sign out
-// the user.
-- (void)completePostSignInActions:(PostSignInActionSet)postSignInActions
-                     withIdentity:(id<SystemIdentity>)identity
-                          browser:(Browser*)browser
-                      accessPoint:(signin_metrics::AccessPoint)accessPoint;
 
 // Shows `error` to the user and calls `callback` on dismiss.
 - (void)showAuthenticationError:(NSError*)error

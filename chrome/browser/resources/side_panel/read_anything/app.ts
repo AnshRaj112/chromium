@@ -19,13 +19,13 @@ import {getCss} from './app.css.js';
 import {getHtml} from './app.html.js';
 import {AppStyleUpdater} from './app_style_updater.js';
 import type {SettingsPrefs} from './common.js';
-import {minOverflowLengthToScroll, playFromSelectionTimeout} from './common.js';
+import {minOverflowLengthToScroll} from './common.js';
 import type {LanguageToastElement} from './language_toast.js';
 import {NodeStore} from './node_store.js';
 import {ReadAloudHighlighter} from './read_aloud/highlighter.js';
 import {SpeechController} from './read_aloud/speech_controller.js';
 import type {SpeechListener} from './read_aloud/speech_controller.js';
-import {PauseActionSource, SpeechEngineState} from './read_aloud/speech_model.js';
+import {PauseActionSource} from './read_aloud/speech_model.js';
 import {VoicePackController} from './read_aloud/voice_pack_controller.js';
 import type {VoiceLanguageListener} from './read_aloud/voice_pack_controller.js';
 import {WordBoundaries} from './read_aloud/word_boundaries.js';
@@ -33,8 +33,6 @@ import {ReadAnythingLogger, TimeFrom} from './read_anything_logger.js';
 import type {ReadAnythingToolbarElement} from './read_anything_toolbar.js';
 import type {SpeechBrowserProxy} from './speech_browser_proxy.js';
 import {SpeechBrowserProxyImpl} from './speech_browser_proxy.js';
-import {doesLanguageHaveNaturalVoices, getVoicePackConvertedLangIfExists, isNatural, isVoicePackStatusError, isVoicePackStatusSuccess, mojoVoicePackStatusToVoicePackStatusEnum, VoiceClientSideStatusCode, VoicePackServerStatusErrorCode, VoicePackServerStatusSuccessCode} from './voice_language_util.js';
-import type {VoicePackStatus} from './voice_language_util.js';
 import {VoiceNotificationManager} from './voice_notification_manager.js';
 
 const AppElementBase = WebUiListenerMixinLit(CrLitElement);
@@ -152,18 +150,12 @@ export class AppElement extends AppElementBase implements
 
   private accessor imagesEnabled: boolean = false;
 
-  // If the node id of the first text node that should be used by Read Aloud
-  // has been set. This is null if the id has not been set.
-  firstTextNodeSetForReadAloud: number|null = null;
-
   constructor() {
     super();
     this.constructorTime = Date.now();
     this.logger_.logTimeFrom(
         TimeFrom.APP, this.startTime, this.constructorTime);
     this.isReadAloudEnabled_ = chrome.readingMode.isReadAloudEnabled;
-    this.voicePackController_.setCurrentLanguage(
-        chrome.readingMode.baseLanguageForSpeech);
     this.styleUpdater_ = new AppStyleUpdater(this);
     this.nodeStore_.clear();
     ColorChangeUpdater.forDocument().start();
@@ -201,7 +193,6 @@ export class AppElement extends AppElementBase implements
       // not always reliabled called.
       this.speech_.cancel();
       this.hasContent_ = false;
-      this.firstTextNodeSetForReadAloud = null;
       this.nodeStore_.clearDomNodes();
     }
 
@@ -303,7 +294,7 @@ export class AppElement extends AppElementBase implements
 
     chrome.readingMode.updateVoicePackStatus =
         (lang: string, status: string) => {
-          this.updateVoicePackStatus(lang, status);
+          this.voicePackController_.updateVoicePackStatus(lang, status);
         };
 
     chrome.readingMode.showLoading = () => {
@@ -315,7 +306,7 @@ export class AppElement extends AppElementBase implements
     };
 
     chrome.readingMode.restoreSettingsFromPrefs = () => {
-      this.restoreSettingsFromPrefs();
+      this.restoreSettingsFromPrefs_();
     };
 
     chrome.readingMode.languageChanged = () => {
@@ -323,7 +314,7 @@ export class AppElement extends AppElementBase implements
     };
 
     chrome.readingMode.onLockScreen = () => {
-      this.onLockScreen();
+      this.speechController_.onLockScreen();
     };
 
     chrome.readingMode.onTtsEngineInstalled = () => {
@@ -436,10 +427,7 @@ export class AppElement extends AppElementBase implements
     // node id to call InitAXPosition in playSpeech. If it's not saved here,
     // we have to retrieve it through a DOM search such as createTreeWalker,
     // which can be computationally expensive.
-    if (!this.firstTextNodeSetForReadAloud) {
-      this.firstTextNodeSetForReadAloud = nodeId;
-      this.speechController_.initializeSpeechTree(nodeId);
-    }
+    this.speechController_.initializeSpeechTree(nodeId);
 
     const textContent = chrome.readingMode.getTextContent(nodeId);
     const textNode = document.createTextNode(textContent);
@@ -472,6 +460,15 @@ export class AppElement extends AppElementBase implements
     this.hasContent_ = false;
   }
 
+  isEmptyState(): boolean {
+    // In rare cases it is possible for hasContent_ to be false but the loading
+    // screen to be shown without ever terminating, such as when reading mode
+    // receives bad selection data. When this happens, reading mode needs to
+    // check whether or not the empty state is currently showing, not whether
+    // or not there is content.
+    return this.emptyStateImagePath_ === './images/empty_state.svg';
+  }
+
   showLoading() {
     this.emptyStateImagePath_ = '//resources/images/throbber_small.svg';
     this.emptyStateDarkImagePath_ =
@@ -489,10 +486,6 @@ export class AppElement extends AppElementBase implements
   // TODO: crbug.com/40927698 - Handle focus changes for speech, including
   // updating speech state.
   updateContent() {
-    // Each time we rebuild the subtree, we should clear the node id of the
-    // first text node.
-    this.firstTextNodeSetForReadAloud = null;
-
     // This shouldn't happen. If it does, there is likely a bug, so log it so
     // we can monitor it.
     if (this.speechController_.isSpeechActive()) {
@@ -537,7 +530,20 @@ export class AppElement extends AppElementBase implements
       // send that info back to the controller.
       if (this.hasContent_) {
         this.hasContent_ = false;
-        chrome.readingMode.onNoTextContent();
+        chrome.readingMode.onNoTextContent(/* previouslyHadContent*/ true);
+      } else if (!this.isEmptyState()) {
+        // If no text content is found but reading mode is not showing the
+        // empty state, signal back to the renderer that this is the case.
+        // This is possible when the AXTree returns bad selection data and
+        // reading mode believes it has selected content to distll but
+        // nothing valid is selected. This can cause the loading screen
+        // to never switch to the empty state.
+        // TODO: crbug.com/411198154- Longer term, once reading mode and read
+        // aloud traversal is more in line, the renderer should be able to call
+        // showEmpty directly, rather than signaling to the WebUI to update
+        // content and then WebUI signaling back to the renderer that there is
+        // no text content.
+        chrome.readingMode.onNoTextContent(/* previouslyHadContent*/ false);
       }
       return;
     }
@@ -760,101 +766,6 @@ export class AppElement extends AppElementBase implements
     chrome.readingMode.onScrolledToBottom();
   }
 
-  updateVoicePackStatus(lang: string, status: string) {
-    this.voicePackController_.stopWaitingForSpeechExtension();
-
-    if (!lang) {
-      return;
-    }
-
-    const newVoicePackStatus = mojoVoicePackStatusToVoicePackStatusEnum(status);
-
-    // Keep the server responses
-    this.voicePackController_.setServerStatus(lang, newVoicePackStatus);
-
-    // Update application state
-    this.updateApplicationState(lang, newVoicePackStatus);
-
-    if (isVoicePackStatusError(newVoicePackStatus)) {
-      this.voicePackController_.disableLangIfNoVoices(lang);
-    }
-  }
-
-  // Store client side voice pack state and trigger side effects
-  private updateApplicationState(
-      lang: string, newVoicePackStatus: VoicePackStatus) {
-    if (isVoicePackStatusSuccess(newVoicePackStatus)) {
-      const newStatusCode = newVoicePackStatus.code;
-
-      switch (newStatusCode) {
-        case VoicePackServerStatusSuccessCode.NOT_INSTALLED:
-          this.voicePackController_.triggerInstall(lang);
-          break;
-        case VoicePackServerStatusSuccessCode.INSTALLING:
-          // Do nothing- we mark our local state as installing when we send the
-          // request. Locally, we may time out a slow request and mark it as
-          // errored, and we don't want to overwrite that state here.
-          break;
-        case VoicePackServerStatusSuccessCode.INSTALLED:
-          // Force a refresh of the voices list since we might not get an update
-          // the voices have changed.
-          this.voicePackController_.refreshAvailableVoices(
-              /*forceRefresh=*/ true);
-          this.voicePackController_.autoSwitchVoice(lang);
-
-          // Some languages may require a download from the voice pack
-          // but may not have associated natural voices.
-          const languageHasNaturalVoices = doesLanguageHaveNaturalVoices(lang);
-
-          // Even though the voice may be installed on disk, it still may not be
-          // available to the speechSynthesis API. Check whether to mark the
-          // voice as AVAILABLE or INSTALLED_AND_UNAVAILABLE
-          const voicesForLanguageAreAvailable =
-              this.voicePackController_.getAvailableVoices().some(
-                  voice =>
-                      ((isNatural(voice) || !languageHasNaturalVoices) &&
-                       getVoicePackConvertedLangIfExists(voice.lang) === lang));
-
-          // If natural voices are currently available for the language or the
-          // language does not support natural voices, set the status to
-          // available. Otherwise, set the status to install and unavailabled.
-          this.voicePackController_.setLocalStatus(
-              lang,
-              voicesForLanguageAreAvailable ?
-                  VoiceClientSideStatusCode.AVAILABLE :
-                  VoiceClientSideStatusCode.INSTALLED_AND_UNAVAILABLE);
-          break;
-        default:
-          // This ensures the switch statement is exhaustive
-          return newStatusCode satisfies never;
-      }
-    } else if (isVoicePackStatusError(newVoicePackStatus)) {
-      this.voicePackController_.autoSwitchVoice(lang);
-      const newStatusCode = newVoicePackStatus.code;
-
-      switch (newStatusCode) {
-        case VoicePackServerStatusErrorCode.OTHER:
-        case VoicePackServerStatusErrorCode.WRONG_ID:
-        case VoicePackServerStatusErrorCode.NEED_REBOOT:
-        case VoicePackServerStatusErrorCode.UNSUPPORTED_PLATFORM:
-          this.voicePackController_.setLocalStatus(
-              lang, VoiceClientSideStatusCode.ERROR_INSTALLING);
-          break;
-        case VoicePackServerStatusErrorCode.ALLOCATION:
-          this.voicePackController_.setLocalStatus(
-              lang, VoiceClientSideStatusCode.INSTALL_ERROR_ALLOCATION);
-          break;
-        default:
-          // This ensures the switch statement is exhaustive
-          return newStatusCode satisfies never;
-      }
-    } else {
-      // Couldn't parse the response
-      this.voicePackController_.setLocalStatus(
-          lang, VoiceClientSideStatusCode.ERROR_INSTALLING);
-    }
-  }
-
   protected onLanguageMenuOpen_() {
     this.notificationManager_.removeListener(this.$.languageToast);
   }
@@ -885,16 +796,23 @@ export class AppElement extends AppElementBase implements
   }
 
   protected onPlayPauseClick_() {
-    if (this.speechController_.isSpeechActive()) {
-      this.speechController_.stopSpeech(PauseActionSource.BUTTON_CLICK);
-    } else {
-      this.playSpeech();
-      this.speechController_.onPlay();
-    }
+    this.speechController_.onPlayPauseToggle(
+        this.getSelection(), this.$.container.textContent);
   }
 
   onIsSpeechActiveChange(): void {
     this.isSpeechActive_ = this.speechController_.isSpeechActive();
+    if (!chrome.readingMode.linksEnabled) {
+      return;
+    }
+
+    // Restore links if they're enabled when speech pauses via button click or
+    // when it finishes the page.
+    const pauseSource = this.speechController_.getPauseSource();
+    if ((pauseSource === PauseActionSource.BUTTON_CLICK) ||
+        pauseSource === PauseActionSource.SPEECH_FINISHED) {
+      this.updateLinks_();
+    }
   }
 
   onIsAudioCurrentlyPlayingChange(): void {
@@ -910,18 +828,8 @@ export class AppElement extends AppElementBase implements
     this.previewVoicePlaying_ = this.speechController_.getPreviewVoicePlaying();
   }
 
-  onStop() {
-    if (!chrome.readingMode.linksEnabled) {
-      return;
-    }
-
-    // Restore links if they're enabled when speech pauses via button click or
-    // when it finishes the page.
-    const pauseSource = this.speechController_.getPauseSource();
-    if ((pauseSource === PauseActionSource.BUTTON_CLICK) ||
-        pauseSource === PauseActionSource.SPEECH_FINISHED) {
-      this.updateLinks_();
-    }
+  onSpeechRateChange(): void {
+    this.resetSpeechPostSettingChange_();
   }
 
   onEnabledLangsChange(): void {
@@ -940,116 +848,17 @@ export class AppElement extends AppElementBase implements
   }
 
   protected playNextGranularity_() {
-    this.speechController_.setIsSpeechBeingRepositioned(true);
-
-    this.speech_.cancel();
-    this.highlighter_.resetPreviousHighlight();
-    // Reset the word boundary index whenever we move the granularity position.
-    this.wordBoundaries_.resetToDefaultState();
-    chrome.readingMode.movePositionToNextGranularity();
-
-    if (!this.highlightAndPlayMessage()) {
-      this.speechController_.onSpeechFinished();
-    }
+    this.speechController_.playNextGranularity();
   }
 
   protected playPreviousGranularity_() {
-    this.speechController_.setIsSpeechBeingRepositioned(true);
-    this.speech_.cancel();
-    // This must be called BEFORE calling
-    // chrome.readingMode.movePositionToPreviousGranularity so we can accurately
-    // determine what's currently being highlighted.
-    this.highlighter_.removeCurrentHighlight();
-    this.highlighter_.resetPreviousHighlight();
-    // Reset the word boundary index whenever we move the granularity position.
-    this.wordBoundaries_.resetToDefaultState();
-    chrome.readingMode.movePositionToPreviousGranularity();
-
-    if (!this.highlightAndPlayMessage(/*isInterrupted=*/ false,
-                                      /*isMovingBackward=*/ true)) {
-      this.speechController_.onSpeechFinished();
-    }
+    this.speechController_.playPreviousGranularity();
   }
 
   playSpeech() {
     const container = this.$.container;
-    const {anchorNode, anchorOffset, focusNode, focusOffset} =
-        this.getSelection();
-    const hasSelection =
-        anchorNode !== focusNode || anchorOffset !== focusOffset;
-    if (this.speechController_.hasSpeechBeenTriggered() &&
-        !this.speechController_.isSpeechActive()) {
-      const pausedFromButton = this.speechController_.isPausedFromButton();
-
-      let playedFromSelection = false;
-      if (hasSelection) {
-        this.speech_.cancel();
-        this.wordBoundaries_.resetToDefaultState();
-        playedFromSelection = this.playFromSelection();
-      }
-
-      if (!playedFromSelection) {
-        if (pausedFromButton && !this.wordBoundaries_.hasBoundaries()) {
-          // If word boundaries aren't supported for the given voice, we should
-          // still continue to use synth.resume, as this is preferable to
-          // restarting the current message.
-          this.speech_.resume();
-        } else {
-          this.speech_.cancel();
-          if (!this.highlightAndPlayInterruptedMessage()) {
-            // Ensure we're updating Read Aloud state if there's no text to
-            // speak.
-            this.speechController_.onSpeechFinished();
-          }
-        }
-      }
-
-      this.speechController_.setIsSpeechActive(true);
-      this.speechController_.setIsSpeechBeingRepositioned(false);
-
-      // Hide links when speech resumes. We only hide links when the page was
-      // paused from the play/pause button.
-      if (chrome.readingMode.linksEnabled && pausedFromButton) {
-        // Toggle links and ensure that the new nodes are also highlighted.
-        this.updateLinks_(
-            /* shouldRehiglightCurrentNodes= */ !playedFromSelection);
-      }
-
-      // If the current read highlight has been cleared from a call to
-      // updateContent, such as via a preference change, rehighlight the nodes
-      // after a pause.
-      if (!playedFromSelection) {
-        this.speechController_.highlightCurrentGranularity(
-            chrome.readingMode.getCurrentText());
-      }
-
-      return;
-    }
-    if (container.textContent) {
-      // Log that we're playing speech on a new page, but not when resuming.
-      // This helps us compare how many reading mode pages are opened with
-      // speech played and without speech played. Counting resumes would
-      // inflate the speech played number.
-      this.logger_.logNewPage(/*speechPlayed=*/ true);
-      this.speechController_.setIsSpeechActive(true);
-      this.speechController_.setHasSpeechBeenTriggered(true);
-      this.speechController_.setIsSpeechBeingRepositioned(false);
-
-      // Hide links when speech begins playing.
-      if (chrome.readingMode.linksEnabled) {
-        this.updateLinks_();
-      }
-
-      const playedFromSelection = hasSelection && this.playFromSelection();
-      if (!playedFromSelection && this.firstTextNodeSetForReadAloud) {
-        this.speechController_.initializeSpeechTree(
-            this.firstTextNodeSetForReadAloud);
-        if (!this.highlightAndPlayMessage()) {
-          // Ensure we're updating Read Aloud state if there's no text to speak.
-          this.speechController_.onSpeechFinished();
-        }
-      }
-    }
+    this.speechController_.playSpeech(
+        this.getSelection(), container.textContent);
   }
 
   private getSelectedIds(): {
@@ -1080,258 +889,6 @@ export class AppElement extends AppElementBase implements
     };
   }
 
-  playFromSelection(): boolean {
-    const selection = this.getSelection();
-    if (!this.firstTextNodeSetForReadAloud || !selection) {
-      return false;
-    }
-
-    const anchorNodeId = chrome.readingMode.startNodeId;
-    const anchorOffset = chrome.readingMode.startOffset;
-    const focusNodeId = chrome.readingMode.endNodeId;
-    const focusOffset = chrome.readingMode.endOffset;
-
-    // If only one of the ids is present, use that one.
-    let startingNodeId: number|undefined =
-        anchorNodeId ? anchorNodeId : focusNodeId;
-    let startingOffset = anchorNodeId ? anchorOffset : focusOffset;
-    // If both are present, start with the node that is sooner in the page.
-    if (anchorNodeId && focusNodeId) {
-      if (anchorNodeId === focusNodeId) {
-        startingOffset = Math.min(anchorOffset, focusOffset);
-      } else {
-        const pos =
-            selection.anchorNode.compareDocumentPosition(selection.focusNode);
-        const focusIsFirst = pos === Node.DOCUMENT_POSITION_PRECEDING;
-        startingNodeId = focusIsFirst ? focusNodeId : anchorNodeId;
-        startingOffset = focusIsFirst ? focusOffset : anchorOffset;
-      }
-    }
-
-    if (!startingNodeId) {
-      return false;
-    }
-
-    // Clear the selection so we don't keep trying to play from the same
-    // selection every time they press play.
-    selection.removeAllRanges();
-
-    // Iterate through the page from the beginning until we get to the
-    // selection. This is so clicking previous works before the selection and
-    // so the previous highlights are properly set.
-    chrome.readingMode.resetGranularityIndex();
-    // Iterate through the nodes asynchronously so that we can show the spinner
-    // in the toolbar while we move up to the selection.
-    setTimeout(() => {
-      this.speechController_.movePlaybackToNode(startingNodeId, startingOffset);
-      // Set everything to previous and then play the next granularity, which
-      // includes the selection.
-      this.highlighter_.resetPreviousHighlight();
-      if (!this.highlightAndPlayMessage()) {
-        this.speechController_.onSpeechFinished();
-      }
-    }, playFromSelectionTimeout);
-
-    return true;
-  }
-
-  highlightAndPlayInterruptedMessage(): boolean {
-    return this.highlightAndPlayMessage(/* isInterrupted = */ true);
-  }
-
-  // Play text of these axNodeIds. When finished, read and highlight to read the
-  // following text.
-  // TODO: crbug.com/1474951 - Investigate using AXRange.GetText to get text
-  // between start node / end nodes and their offsets.
-  highlightAndPlayMessage(
-      isInterrupted: boolean = false,
-      isMovingBackward: boolean = false): boolean {
-    // getCurrentText gets the AX Node IDs of text that should be spoken and
-    // highlighted.
-    const axNodeIds: number[] = chrome.readingMode.getCurrentText();
-
-    // If there aren't any valid ax node ids returned by getCurrentText,
-    // speech should stop.
-    if (axNodeIds.length === 0) {
-      return false;
-    }
-
-    if (this.nodeStore_.areNodesAllHidden(axNodeIds)) {
-      return this.skipCurrentPosition_(isInterrupted, isMovingBackward);
-    }
-
-    const utteranceText = this.extractTextOf(axNodeIds);
-    // If node ids were returned but they don't exist in the Reading Mode panel,
-    // there's been a mismatch between Reading Mode and Read Aloud. In this
-    // case, we should move to the next Read Aloud node and attempt to continue
-    // playing. TODO: crbug.com/332694565 - This fallback should never be
-    // needed, but it is. Investigate root cause of Read Aloud / Reading Mode
-    // mismatch. Additionally, the TTS engine may not like attempts to speak
-    // whitespace, so move to the next utterance in that case.
-    if (!utteranceText || utteranceText.trim().length === 0) {
-      return this.skipCurrentPosition_(isInterrupted, isMovingBackward);
-    }
-
-    // If we're resuming a previously interrupted message, use word
-    // boundaries (if available) to resume at the beginning of the current
-    // word.
-    if (isInterrupted && this.wordBoundaries_.hasBoundaries()) {
-      const utteranceTextForWordBoundary =
-          utteranceText.substring(this.wordBoundaries_.getResumeBoundary());
-      // If we paused right at the end of the sentence, no need to speak the
-      // ending punctuation.
-      if (this.highlighter_.isInvalidHighlightForWordHighlighting(
-              utteranceTextForWordBoundary.trim())) {
-        this.wordBoundaries_.resetToDefaultState();
-        return this.skipCurrentPosition_(isInterrupted, isMovingBackward);
-      } else {
-        this.playText(utteranceTextForWordBoundary);
-      }
-    } else {
-      this.playText(utteranceText);
-    }
-
-    this.speechController_.highlightCurrentGranularity(axNodeIds);
-    return true;
-  }
-
-  private skipCurrentPosition_(
-      isInterrupted: boolean, isMovingBackward: boolean): boolean {
-    if (isMovingBackward) {
-      chrome.readingMode.movePositionToPreviousGranularity();
-    } else {
-      chrome.readingMode.movePositionToNextGranularity();
-    }
-    return this.highlightAndPlayMessage(isInterrupted, isMovingBackward);
-  }
-
-  private playText(utteranceText: string) {
-    // This check is needed due limits of TTS audio for remote voices. See
-    // crbug.com/1176078 for more details.
-    // Since the TTS bug only impacts remote voices, no need to check for
-    // maximum text length if we're using a local voice. If we do somehow
-    // attempt to speak text that's too long, this will be able to be handled
-    // by listening for a text-too-long error in message.onerror.
-    const isTextTooLong = this.speechController_.isTextTooLong(utteranceText);
-    const endBoundary = this.speechController_.getUtteranceEndBoundary(
-        utteranceText, isTextTooLong);
-    this.playTextWithBoundaries(utteranceText, isTextTooLong, endBoundary);
-  }
-
-  private playTextWithBoundaries(
-      utteranceText: string, isTextTooLong: boolean, endBoundary: number) {
-    const message =
-        new SpeechSynthesisUtterance(utteranceText.substring(0, endBoundary));
-
-    message.onerror = (error) => {
-      this.handleSpeechSynthesisError(error, utteranceText);
-    };
-
-    this.speechController_.setOnBoundary(message);
-    this.speechController_.setOnSpeechSynthesisUtteranceStart(message);
-
-    message.onend = () => {
-      if (isTextTooLong) {
-        // Since our previous utterance was too long, continue speaking pieces
-        // of the current utterance until the utterance is complete. The
-        // entire utterance is highlighted, so there's no need to update
-        // highlighting until the utterance substring is an acceptable size.
-        this.playText(utteranceText.substring(endBoundary));
-        return;
-      }
-
-      // Now that we've finiished reading this utterance, update the
-      // Granularity state to point to the next one Reset the word boundary
-      // index whenever we move the granularity position.
-      this.wordBoundaries_.resetToDefaultState();
-      chrome.readingMode.movePositionToNextGranularity();
-      // Continue speaking with the next block of text.
-      if (!this.highlightAndPlayMessage()) {
-        this.speechController_.onSpeechFinished();
-      }
-    };
-
-    this.speechController_.speakMessage(message);
-  }
-
-  handleSpeechSynthesisError(
-      error: SpeechSynthesisErrorEvent, utteranceText: string) {
-    // We can't be sure that the engine has loaded at this point, but
-    // if there's an error, we want to ensure we keep the play buttons
-    // to prevent trapping users in a state where they can no longer play
-    // Read Aloud, as this is preferable to a long delay before speech
-    // with no feedback.
-    this.speechController_.setEngineState(SpeechEngineState.LOADED);
-
-    if (error.error === 'interrupted') {
-      this.speechController_.onSpeechInterrupted();
-      return;
-    }
-
-    // Log a speech error. We aren't concerned with logging an interrupted
-    // error, since that can be triggered from play / pause.
-    this.logger_.logSpeechError(error.error);
-
-    if (error.error === 'text-too-long') {
-      // This is unlikely to happen, as the length limit on most voices
-      // is quite long. However, if we do hit a limit, we should just use
-      // the accessible text length boundaries to shorten the text. Even
-      // if this gives a much smaller sentence than TTS would have supported,
-      // this is still preferable to no speech.
-      this.speech_.cancel();
-      this.playTextWithBoundaries(
-          utteranceText, true,
-          this.speechController_.getUtteranceEndBoundary(utteranceText, true));
-      return;
-    }
-    if (error.error === 'invalid-argument') {
-      // invalid-argument can be triggered when the rate, pitch, or volume
-      // is not supported by the synthesizer. Since we're only setting the
-      // speech rate, update the speech rate to the WebSpeech default of 1.
-      chrome.readingMode.onSpeechRateChange(1);
-      this.resetSpeechPostSettingChange_();
-      return;
-    }
-
-    // When we hit an error, stop speech to clear all utterances, update the
-    // button state, and highlighting in order to give visual feedback that
-    // something went wrong.
-    // TODO: crbug.com/40927698 - Consider showing an error message.
-    this.logger_.logSpeechStopSource(chrome.readingMode.engineErrorStopSource);
-    this.speechController_.stopSpeech(PauseActionSource.DEFAULT);
-
-    // No appropriate voice is available for the language designated in
-    // SpeechSynthesisUtterance lang.
-    if (error.error === 'language-unavailable') {
-      this.voicePackController_.onLanguageUnavailableError();
-    }
-
-    // The voice designated in SpeechSynthesisUtterance voice attribute
-    // is not available.
-    if (error.error === 'voice-unavailable') {
-      this.voicePackController_.onVoiceUnavailableError();
-    }
-  }
-
-  private extractTextOf(axNodeIds: number[]): string {
-    let utteranceText: string = '';
-    for (const nodeId of axNodeIds) {
-      const startIndex = chrome.readingMode.getCurrentTextStartIndex(nodeId);
-      const endIndex = chrome.readingMode.getCurrentTextEndIndex(nodeId);
-      const element = this.nodeStore_.getDomNode(nodeId);
-      if (!element || startIndex < 0 || endIndex < 0) {
-        continue;
-      }
-      const content = chrome.readingMode.getTextContent(nodeId).substring(
-          startIndex, endIndex);
-      if (content) {
-        // Add all of the text from the current nodes into a single utterance.
-        utteranceText += content;
-      }
-    }
-    return utteranceText;
-  }
-
   protected onSelectVoice_(
       event: CustomEvent<{selectedVoice: SpeechSynthesisVoice}>) {
     event.preventDefault();
@@ -1353,51 +910,18 @@ export class AppElement extends AppElementBase implements
   protected onVoiceLanguageToggle_(event: CustomEvent<{language: string}>) {
     event.preventDefault();
     event.stopPropagation();
-    const toggledLanguage = event.detail.language;
-    const currentlyEnabled =
-        this.voicePackController_.isLangEnabled(toggledLanguage);
-
-    if (!currentlyEnabled) {
-      this.voicePackController_.autoSwitchVoice(toggledLanguage);
-      this.voicePackController_.installVoicePackIfPossible(
-          toggledLanguage, /* onlyInstallExactGoogleLocaleMatch=*/ true,
-          /* retryIfPreviousInstallFailed= */ true);
-      this.voicePackController_.enableLang(toggledLanguage);
-    } else {
-      this.voicePackController_.uninstall(toggledLanguage);
-      this.voicePackController_.disableLang(toggledLanguage);
-    }
-
-    chrome.readingMode.onLanguagePrefChange(toggledLanguage, !currentlyEnabled);
-
-    if (!currentlyEnabled && !this.selectedVoice_) {
-      // If there were no enabled languages (and thus no selected voice),
-      // select a voice.
-      this.voicePackController_.getCurrentVoiceOrDefault();
-    }
+    this.voicePackController_.onLanguageToggle(event.detail.language);
   }
 
   protected resetSpeechPostSettingChange_() {
-    // Don't call stopSpeech() if the speech tree hasn't been initialized or
-    // if speech hasn't been triggered yet.
-    if (!this.speechController_.isSpeechTreeInitialized() ||
-        !this.speechController_.hasSpeechBeenTriggered()) {
-      return;
-    }
-
-    const playSpeechOnChange = this.speechController_.isSpeechActive();
-
-    // Cancel the queued up Utterance using the old speech settings
-    this.speechController_.stopSpeech(PauseActionSource.VOICE_SETTINGS_CHANGE);
-
     // If speech was playing when a setting was changed, continue playing
     // speech
-    if (playSpeechOnChange) {
+    if (this.speechController_.onSpeechSettingsChange()) {
       this.playSpeech();
     }
   }
 
-  restoreSettingsFromPrefs() {
+  private restoreSettingsFromPrefs_() {
     if (this.isReadAloudEnabled_) {
       this.voicePackController_.restoreFromPrefs();
     }
@@ -1447,28 +971,9 @@ export class AppElement extends AppElementBase implements
   }
 
   protected onHighlightChange_(event: CustomEvent<{data: number}>) {
-    // Handler for HIGHLIGHT_CHANGE.
-    const changedHighlight = event.detail.data;
-    chrome.readingMode.onHighlightGranularityChanged(changedHighlight);
+    this.speechController_.onHighlightGranularityChange(event.detail.data);
     // Apply highlighting changes to the DOM.
     this.styleUpdater_.setHighlight();
-
-    // Rehighlight the new granularity.
-    if (changedHighlight !== chrome.readingMode.noHighlighting) {
-      this.speechController_.highlightCurrentGranularity(
-          chrome.readingMode.getCurrentText());
-    }
-
-    // Log these highlight granularity changes when the phrase menu is shown.
-    // (Toggles are already logged in the toolbar.)
-    this.logger_.logHighlightGranularity(changedHighlight);
-  }
-
-  // If the screen is locked during speech, we should stop speaking.
-  onLockScreen() {
-    if (this.speechController_.isSpeechActive()) {
-      this.speechController_.stopSpeech(PauseActionSource.DEFAULT);
-    }
   }
 
   onNodeWillBeDeleted(nodeId: number) {
@@ -1480,19 +985,13 @@ export class AppElement extends AppElementBase implements
     const root = this.nodeStore_.getDomNode(chrome.readingMode.rootId);
     if (this.hasContent_ && !root?.textContent) {
       this.hasContent_ = false;
-      chrome.readingMode.onNoTextContent();
+      chrome.readingMode.onNoTextContent(/*previouslyHadContent*/ true);
     }
   }
 
   languageChanged() {
-    this.voicePackController_.setCurrentLanguage(
-        chrome.readingMode.baseLanguageForSpeech);
     this.$.toolbar.updateFonts();
-    // Don't check for Google locales when the language has changed.
-    this.voicePackController_.installVoicePackIfPossible(
-        chrome.readingMode.baseLanguageForSpeech,
-        /* onlyInstallExactGoogleLocaleMatch=*/ false,
-        /* retryIfPreviousInstallFailed= */ false);
+    this.voicePackController_.onPageLanguageChanged();
   }
 
   protected computeIsReadAloudPlayable(): boolean {

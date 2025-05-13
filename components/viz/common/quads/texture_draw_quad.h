@@ -35,7 +35,6 @@ class VIZ_COMMON_EXPORT TextureDrawQuad : public DrawQuad {
               const gfx::Rect& visible_rect,
               bool needs_blending,
               ResourceId resource_id,
-              bool premultiplied,
               const gfx::PointF& top_left,
               const gfx::PointF& bottom_right,
               SkColor4f background,
@@ -48,7 +47,6 @@ class VIZ_COMMON_EXPORT TextureDrawQuad : public DrawQuad {
               const gfx::Rect& visible_rect,
               bool needs_blending,
               ResourceId resource_id,
-              bool premultiplied,
               const gfx::PointF& top_left,
               const gfx::PointF& bottom_right,
               SkColor4f background,
@@ -69,10 +67,6 @@ class VIZ_COMMON_EXPORT TextureDrawQuad : public DrawQuad {
   // True if this quad contains a video frame from VideoResourceUpdater instead
   // of canvas or webgl content.
   bool is_video_frame : 1;
-
-  // True if this quad is a stream video texture. This mostly affects overlay
-  // creation (e.g. color space, protection type).
-  bool is_stream_video : 1;
 
   // If true we will treat the alpha in the texture as 1. This works like rgbx
   // and not like blend mode 'kSrc' which would copy the alpha.

@@ -1303,8 +1303,6 @@ bool CSSParserFastPaths::IsValidKeywordPropertyAndValue(
       return value_id == CSSValueID::kNormal ||
              value_id == CSSValueID::kBreakWord ||
              value_id == CSSValueID::kAnywhere;
-    case CSSPropertyID::kInternalOverflowBlock:
-    case CSSPropertyID::kInternalOverflowInline:
     case CSSPropertyID::kOverflowBlock:
     case CSSPropertyID::kOverflowInline:
     case CSSPropertyID::kOverflowX:
@@ -1556,9 +1554,6 @@ bool CSSParserFastPaths::IsValidKeywordPropertyAndValue(
              value_id == CSSValueID::kRowReverse ||
              value_id == CSSValueID::kColumn ||
              value_id == CSSValueID::kColumnReverse;
-    case CSSPropertyID::kFlexWrap:
-      return value_id == CSSValueID::kNowrap || value_id == CSSValueID::kWrap ||
-             value_id == CSSValueID::kWrapReverse;
     case CSSPropertyID::kFieldSizing:
       return value_id == CSSValueID::kFixed || value_id == CSSValueID::kContent;
     case CSSPropertyID::kHyphens:
@@ -1752,8 +1747,6 @@ CSSBitset CSSParserFastPaths::handled_by_keyword_fast_paths_properties_{{
     CSSPropertyID::kGapRulePaintOrder,
     CSSPropertyID::kHyphens,
     CSSPropertyID::kImageRendering,
-    CSSPropertyID::kInternalOverflowBlock,
-    CSSPropertyID::kInternalOverflowInline,
     CSSPropertyID::kInterpolateSize,
     CSSPropertyID::kListStylePosition,
     CSSPropertyID::kMaskType,
@@ -1822,7 +1815,6 @@ CSSBitset CSSParserFastPaths::handled_by_keyword_fast_paths_properties_{{
     CSSPropertyID::kColumnFill,
     CSSPropertyID::kColumnWrap,
     CSSPropertyID::kFlexDirection,
-    CSSPropertyID::kFlexWrap,
     CSSPropertyID::kFontKerning,
     CSSPropertyID::kFontOpticalSizing,
     CSSPropertyID::kFontSynthesisWeight,

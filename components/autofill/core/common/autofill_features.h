@@ -54,6 +54,8 @@ COMPONENT_EXPORT(AUTOFILL)
 extern const base::FeatureParam<int>
     kAutofillAiWithDataSchemaServerExperimentId;
 COMPONENT_EXPORT(AUTOFILL)
+BASE_DECLARE_FEATURE(kAutofillAndPasswordsInSameSurface);
+COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillCreditCardUserPerceptionSurvey);
 COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillAddressUserDeclinedSuggestionSurvey);
@@ -95,6 +97,8 @@ COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillEnableLabelPrecedenceForTurkishAddresses);
 COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillEnableLoyaltyCardsFilling);
+COMPONENT_EXPORT(AUTOFILL)
+BASE_DECLARE_FEATURE(kAutofillEnableEmailOrLoyaltyCardsFilling);
 COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillEnableSupportForHomeAndWork);
 COMPONENT_EXPORT(AUTOFILL)

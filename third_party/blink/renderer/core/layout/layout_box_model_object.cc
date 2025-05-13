@@ -136,7 +136,7 @@ void LayoutBoxModelObject::StyleWillChange(StyleDifference diff,
     ObjectPaintInvalidator(*this).SlowSetPaintingLayerNeedsRepaint();
   }
 
-  if (Style()) {
+  if (!RuntimeEnabledFeatures::FlowThreadLessEnabled() && Style()) {
     LayoutFlowThread* flow_thread = FlowThreadContainingBlock();
     if (flow_thread && flow_thread != this) {
       flow_thread->FlowThreadDescendantStyleWillChange(this, diff, new_style);
@@ -235,9 +235,12 @@ void LayoutBoxModelObject::StyleDidChange(StyleDifference diff,
   }
 
   if (old_style && Parent()) {
-    if (LayoutFlowThread* flow_thread = FlowThreadContainingBlock()) {
-      if (flow_thread != this) {
-        flow_thread->FlowThreadDescendantStyleDidChange(this, diff, *old_style);
+    if (!RuntimeEnabledFeatures::FlowThreadLessEnabled()) {
+      if (LayoutFlowThread* flow_thread = FlowThreadContainingBlock()) {
+        if (flow_thread != this) {
+          flow_thread->FlowThreadDescendantStyleDidChange(this, diff,
+                                                          *old_style);
+        }
       }
     }
 
@@ -347,6 +350,18 @@ void LayoutBoxModelObject::DestroyLayer() {
   // Removing a layer may affect existence of the LocalBorderBoxProperties, so
   // we need to ensure that we update paint properties.
   SetNeedsPaintPropertyUpdate();
+}
+
+LayoutUnit LayoutBoxModelObject::OffsetWidth() const {
+  NOT_DESTROYED();
+  DCHECK(RuntimeEnabledFeatures::LayoutBoxVisualLocationEnabled());
+  return BoundingBoxRelativeToFirstFragment().size.width;
+}
+
+LayoutUnit LayoutBoxModelObject::OffsetHeight() const {
+  NOT_DESTROYED();
+  DCHECK(RuntimeEnabledFeatures::LayoutBoxVisualLocationEnabled());
+  return BoundingBoxRelativeToFirstFragment().size.height;
 }
 
 bool LayoutBoxModelObject::HasSelfPaintingLayer() const {

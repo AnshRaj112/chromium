@@ -336,6 +336,11 @@
     "expiry_milestone": 145
   },
   {
+    "name": "android-tab-declutter-auto-delete-kill-switch",
+    "owners": [ "hitarthkothari@google.com", "ckitagawa@google.com", "clank-tab-dev@google.com" ],
+    "expiry_milestone": 145
+  },
+  {
     "name": "android-tab-declutter-performance-improvements",
     "owners": [ "wylieb@google.com", "clank-tab-dev@google.com" ],
     "expiry_milestone": 140
@@ -4042,7 +4047,7 @@
   {
     "name": "enable-resampling-scroll-events-experimental-prediction",
     "owners": [ "input-dev@chromium.org" ],
-    "expiry_milestone": 95
+    "expiry_milestone": 140
   },
   {
     "name": "enable-retail-coupons",
@@ -6920,17 +6925,7 @@
     "expiry_milestone": 125
   },
   {
-    "name": "omnibox-contextual-search-actions-at-top",
-    "owners": [ "mahmadi@chromium.org", "orinj@chromium.org", "chrome-desktop-search@google.com"],
-    "expiry_milestone": 150
-  },
-  {
     "name": "omnibox-contextual-search-on-focus-suggestions",
-    "owners": [ "mahmadi@chromium.org", "orinj@chromium.org", "chrome-desktop-search@google.com"],
-    "expiry_milestone": 150
-  },
-  {
-    "name": "omnibox-contextual-search-single-lens-action",
     "owners": [ "mahmadi@chromium.org", "orinj@chromium.org", "chrome-desktop-search@google.com"],
     "expiry_milestone": 150
   },
@@ -7246,7 +7241,7 @@
   },
   {
     "name": "optimization-guide-enable-dogfood-logging",
-    "owners": [ "isherman@chromium.org", "curranmax@chromium.org", "chrome-intelligence-core@google.com" ],
+    "owners": [ "spelchat@chromium.org", "curranmax@chromium.org", "chrome-intelligence-core@google.com" ],
     // This flag is used in regular manual QA and should not be removed.
     "expiry_milestone": -1
   },
@@ -8093,6 +8088,11 @@
     "name": "reduce-transfer-size-updated-ipc",
     "owners": [ "horo@chromium.org", "net-dev@chromium.org"],
     "expiry_milestone": 130
+  },
+  {
+    "name": "reduce-user-agent-data-linux-platform-version",
+    "owners": [ "bershanskyi@gmail.com", "miketaylr@chromium.org", "victortan@chromium.org" ],
+    "expiry_milestone": 150
   },
   {
     "name": "reengagement-notification",
@@ -9387,6 +9387,14 @@
       "chrome-gpu-team@google.com"
     ],
     "expiry_milestone": 144
+  },
+  {
+    "name": "ui-automation-provider",
+    "owners": [
+      "benjamin.beaudry@microsoft.com",
+      "//ui/accessibility/OWNERS"
+    ],
+    "expiry_milestone": 150
   },
   {
     "name": "ui-debug-tools",

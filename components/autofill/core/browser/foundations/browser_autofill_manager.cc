@@ -118,8 +118,10 @@
 #include "components/autofill/core/browser/payments/bnpl_manager.h"
 #include "components/autofill/core/browser/payments/constants.h"
 #include "components/autofill/core/browser/payments/credit_card_access_manager.h"
+#include "components/autofill/core/browser/payments/iban_manager.h"
 #include "components/autofill/core/browser/permissions/autofill_ai/autofill_ai_permission_utils.h"
 #include "components/autofill/core/browser/single_field_fillers/autocomplete/autocomplete_history_manager.h"
+#include "components/autofill/core/browser/single_field_fillers/payments/merchant_promo_code_manager.h"
 #include "components/autofill/core/browser/studies/autofill_experiments.h"
 #include "components/autofill/core/browser/suggestions/addresses/address_suggestion_generator.h"
 #include "components/autofill/core/browser/suggestions/payments/payments_suggestion_generator.h"
@@ -162,7 +164,6 @@
 #include "components/signin/public/base/consent_level.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/strings/grit/components_strings.h"
-#include "components/sync/base/features.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -1458,15 +1459,39 @@ void BrowserAutofillManager::GenerateSuggestionsAndMaybeShowUIPhase2(
       std::move(plus_address_suggestions));
 
   if (should_offer_single_field_form_fill) {
-    client().GetSingleFieldFillRouter().OnGetSingleFieldSuggestions(
-        form_structure, field, autofill_field, client(),
-        base::BindOnce(
-            [](base::OnceCallback<void(std::vector<Suggestion>)> callback,
-               FieldGlobalId field_id,
-               const std::vector<Suggestion>& suggestions) {
-              std::move(callback).Run(suggestions);
-            },
-            std::move(on_single_field_suggestions_callback)));
+    // Generating single field suggestions.
+    auto on_suggestions_returned = base::BindOnce(
+        [](base::OnceCallback<void(std::vector<Suggestion>)> callback,
+           FieldGlobalId field_id, const std::vector<Suggestion>& suggestions) {
+          std::move(callback).Run(suggestions);
+        },
+        std::move(on_single_field_suggestions_callback));
+    if (form_structure && autofill_field &&
+        client().GetPaymentsAutofillClient()->GetMerchantPromoCodeManager() &&
+        client()
+            .GetPaymentsAutofillClient()
+            ->GetMerchantPromoCodeManager()
+            ->OnGetSingleFieldSuggestions(*form_structure, field,
+                                          *autofill_field, client(),
+                                          on_suggestions_returned)) {
+      return;
+    }
+    if (autofill_field &&
+        client().GetPaymentsAutofillClient()->GetIbanManager() &&
+        client()
+            .GetPaymentsAutofillClient()
+            ->GetIbanManager()
+            ->OnGetSingleFieldSuggestions(field, *autofill_field, client(),
+                                          on_suggestions_returned)) {
+      return;
+    }
+    if (client().GetAutocompleteHistoryManager()->OnGetSingleFieldSuggestions(
+            field, client(), on_suggestions_returned)) {
+      return;
+    }
+
+    client().GetAutocompleteHistoryManager()->CancelPendingQueries();
+    std::move(on_suggestions_returned).Run(field.global_id(), {});
   } else {
     std::move(on_single_field_suggestions_callback)
         .Run(/*single_field_suggestions=*/{});
@@ -3088,8 +3113,7 @@ std::vector<Suggestion> BrowserAutofillManager::GetAvailableSuggestions(
       break;
     case FillingProduct::kLoyaltyCard:
       if (base::FeatureList::IsEnabled(
-              features::kAutofillEnableLoyaltyCardsFilling) &&
-          base::FeatureList::IsEnabled(syncer::kSyncAutofillLoyaltyCard)) {
+              features::kAutofillEnableLoyaltyCardsFilling)) {
         // Only loyalty card numbers filling is supported.
         if (autofill_field->Type().GetStorableType() == LOYALTY_MEMBERSHIP_ID) {
           if (ValuablesDataManager* valuables_manager =

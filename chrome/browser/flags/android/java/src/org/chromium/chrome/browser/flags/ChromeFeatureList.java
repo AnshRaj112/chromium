@@ -185,7 +185,8 @@ public abstract class ChromeFeatureList {
             "AndroidOmniboxFocusedNewTabPage";
     public static final String ANDROID_OPEN_PDF_INLINE_BACKPORT = "AndroidOpenPdfInlineBackport";
     public static final String ANDROID_PDF_ASSIST_CONTENT = "AndroidPdfAssistContent";
-    public static final String ANDROID_PROGRESS_BAR_VISUAL_UPDATE = "AndroidProgressBarVisualUpdate";
+    public static final String ANDROID_PROGRESS_BAR_VISUAL_UPDATE =
+            "AndroidProgressBarVisualUpdate";
     public static final String ANDROID_SURFACE_COLOR_UPDATE = "AndroidSurfaceColorUpdate";
     public static final String ANDROID_TAB_DECLUTTER_ARCHIVE_ALL_BUT_ACTIVE =
             "AndroidTabDeclutterArchiveAllButActiveTab";
@@ -194,6 +195,8 @@ public abstract class ChromeFeatureList {
     public static final String ANDROID_TAB_DECLUTTER_ARCHIVE_TAB_GROUPS =
             "AndroidTabDeclutterArchiveTabGroups";
     public static final String ANDROID_TAB_DECLUTTER_AUTO_DELETE = "AndroidTabDeclutterAutoDelete";
+    public static final String ANDROID_TAB_DECLUTTER_AUTO_DELETE_KILL_SWITCH =
+            "AndroidTabDeclutterAutoDeleteKillSwitch";
     public static final String ANDROID_TAB_DECLUTTER_DEDUPE_TAB_IDS_KILL_SWITCH =
             "AndroidTabDeclutterDedupeTabIdsKillSwitch";
     public static final String ANDROID_TAB_DECLUTTER_PERFORMANCE_IMPROVEMENTS =
@@ -491,7 +494,8 @@ public abstract class ChromeFeatureList {
     public static final String QUIET_NOTIFICATION_PROMPTS = "QuietNotificationPrompts";
     public static final String READALOUD = "ReadAloud";
     public static final String READALOUD_AUDIO_OVERVIEWS = "ReadAloudAudioOverviews";
-    public static final String READALOUD_AUDIO_OVERVIEWS_FEEDBACK = "ReadAloudAudioOverviewsFeedback";
+    public static final String READALOUD_AUDIO_OVERVIEWS_FEEDBACK =
+            "ReadAloudAudioOverviewsFeedback";
     public static final String READALOUD_BACKGROUND_PLAYBACK = "ReadAloudBackgroundPlayback";
     public static final String READALOUD_IN_MULTI_WINDOW = "ReadAloudInMultiWindow";
     public static final String READALOUD_IN_OVERFLOW_MENU_IN_CCT = "ReadAloudInOverflowMenuInCCT";
@@ -846,7 +850,7 @@ public abstract class ChromeFeatureList {
     public static final CachedFlag sTabStripLayoutOptimization =
             newCachedFlag(
                     TAB_STRIP_LAYOUT_OPTIMIZATION,
-                    /* defaultValue= */ true,
+                    /* defaultValue= */ false,
                     /* defaultValueInTests= */ true);
     public static final CachedFlag sTabWindowManagerReportIndicesMismatch =
             newCachedFlag(TAB_WINDOW_MANAGER_REPORT_INDICES_MISMATCH, true);
@@ -1001,6 +1005,8 @@ public abstract class ChromeFeatureList {
             newMutableFlagWithSafeDefault(ANDROID_TAB_DECLUTTER_ARCHIVE_TAB_GROUPS, false);
     public static final MutableFlagWithSafeDefault sAndroidTabDeclutterAutoDelete =
             newMutableFlagWithSafeDefault(ANDROID_TAB_DECLUTTER_AUTO_DELETE, false);
+    public static final MutableFlagWithSafeDefault sAndroidTabDeclutterAutoDeleteKillSwitch =
+            newMutableFlagWithSafeDefault(ANDROID_TAB_DECLUTTER_AUTO_DELETE_KILL_SWITCH, true);
     public static final MutableFlagWithSafeDefault sAndroidTabDeclutterPerformanceImprovements =
             newMutableFlagWithSafeDefault(ANDROID_TAB_DECLUTTER_PERFORMANCE_IMPROVEMENTS, false);
     public static final MutableFlagWithSafeDefault sAndroidTabDeclutterRescueKillSwitch =
@@ -1494,13 +1500,10 @@ public abstract class ChromeFeatureList {
             sAndroidNativePagesInNewTabRecentTabsEnabled =
                     sAndroidNativePagesInNewTab.newBooleanParam(
                             "android_native_pages_in_new_tab_recent_tabs_enabled", true);
-    public static final MutableBooleanParamWithSafeDefault sAndroidTabDeclutterAutoDeleteEnabled =
-            sAndroidTabDeclutterAutoDelete.newBooleanParam(
-                    "android_tab_declutter_auto_delete_enabled", false);
     public static final MutableIntParamWithSafeDefault
             sAndroidTabDeclutterAutoDeleteTimeDeltaHours =
                     sAndroidTabDeclutterAutoDelete.newIntParam(
-                            "android_tab_declutter_auto_delete_time_delta_hours", 60 * 24);
+                            "android_tab_declutter_auto_delete_time_delta_hours", 90 * 24);
     public static final MutableBooleanParamWithSafeDefault
             sDisableBottomControlsStackerYOffsetDispatching =
                     sBottomBrowserControlsRefactor.newBooleanParam(

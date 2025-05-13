@@ -10,8 +10,8 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "chrome/browser/lens/core/mojom/geometry.mojom.h"
-#include "chrome/browser/ui/lens/lens_overlay_query_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_controller.h"
+#include "chrome/browser/ui/lens/lens_overlay_query_controller.h"
 #include "components/lens/lens_overlay_dismissal_source.h"
 #include "components/lens/lens_overlay_invocation_source.h"
 #include "components/omnibox/browser/autocomplete_match_type.h"
@@ -26,7 +26,9 @@ class GURL;
 namespace lens {
 class LensOverlayGen204Controller;
 class LensOverlaySidePanelCoordinator;
+class LensPermissionBubbleController;
 class LensSearchboxController;
+class LensSearchContextualizationController;
 }  // namespace lens
 
 namespace variations {
@@ -92,7 +94,7 @@ class LensSearchController {
 
   // Convenience method for calling OpenLensOverlayWithPendingRegion, that will
   // convert the bounds into a CenterRotated Box to pass to the overlay.
-  void OpenLensOverlayWithPendingRegion(
+  void OpenLensOverlayWithPendingRegionFromBounds(
       lens::LensOverlayInvocationSource invocation_source,
       const gfx::Rect& tab_bounds,
       const gfx::Rect& view_bounds,
@@ -137,6 +139,7 @@ class LensSearchController {
 
   // Returns the LensOverlayController.
   LensOverlayController* lens_overlay_controller();
+  const LensOverlayController* lens_overlay_controller() const;
 
   // Returns the LensOverlayQueryController.
   lens::LensOverlayQueryController* lens_overlay_query_controller();
@@ -149,11 +152,20 @@ class LensSearchController {
 
   optimization_guide::PageContextEligibility* page_context_eligibility();
 
+  // Returns the LensSearchContextualizationController.
+  lens::LensSearchContextualizationController*
+  lens_search_contextualization_controller();
+
   // Testing function for setting the page context eligibility API for this
   // controller.
   void set_page_context_eligibility_for_testing(
       optimization_guide::PageContextEligibility* page_context_eligibility) {
     page_context_eligibility_ = page_context_eligibility;
+  }
+
+  lens::LensPermissionBubbleController*
+  get_lens_permission_bubble_controller_for_testing() {
+    return lens_permission_bubble_controller_.get();
   }
 
  protected:
@@ -191,10 +203,15 @@ class LensSearchController {
   virtual std::unique_ptr<lens::LensOverlaySidePanelCoordinator>
   CreateLensOverlaySidePanelCoordinator();
 
-  // Override these methods to be able to track calls made to the side panel
-  // coordinator.
+  // Override these methods to be able to track calls made to the searchbox
+  // controller.
   virtual std::unique_ptr<lens::LensSearchboxController>
   CreateLensSearchboxController();
+
+  // Override these methods to be able to track calls made to the
+  // contextualization controller.
+  virtual std::unique_ptr<lens::LensSearchContextualizationController>
+  CreateLensSearchContextualizationController();
 
   // Called by the Lens overlay when it has finished opening and has moved to
   // the kOverlay state. This is how this class knows it can move into kActive
@@ -223,6 +240,11 @@ class LensSearchController {
     // One or more Lens features are active on this tab.
     kActive,
 
+    // The UI has been made inactive / backgrounded and is hidden. This differs
+    // from kSuspended as the overlay and web view are not freed and could be
+    // immediately reshown.
+    kBackground,
+
     // The controller is in the process of closing all dependencies and cleaning
     // up. Will soon be kOff.
     kClosing,
@@ -240,6 +262,14 @@ class LensSearchController {
   // CreateLensQueryController method.
   std::unique_ptr<lens::LensOverlayQueryController> CreateLensQueryController(
       lens::LensOverlayInvocationSource invocation_source);
+
+  // Runs the eligibility checks necessary for Lens to open on this tab. If the
+  // user has not granted permission to use Lens on this tab, the permission
+  // request will be shown and callback will be called after the user accepts.
+  // Returns true if the checks pass and its safe to open Lens, false otherwise.
+  bool RunLensEligibilityChecks(
+      lens::LensOverlayInvocationSource invocation_source,
+      base::RepeatingClosure permission_granted_callback);
 
   // Callback used by the query controller to notify the search controller of
   // the response to the initial image upload request.
@@ -273,6 +303,21 @@ class LensSearchController {
   // the progress of the page content upload.
   void HandlePageContentUploadProgress(uint64_t position, uint64_t total);
 
+  // Called when the associated tab enters the foreground.
+  void TabForegrounded(tabs::TabInterface* tab);
+
+  // Called when the associated tab will enter the background.
+  void TabWillEnterBackground(tabs::TabInterface* tab);
+
+  // Called when the tab's WebContents is discarded.
+  void WillDiscardContents(tabs::TabInterface* tab,
+                           content::WebContents* old_contents,
+                           content::WebContents* new_contents);
+
+  // Called when the tab will be removed from the window.
+  void WillDetach(tabs::TabInterface* tab,
+                  tabs::TabInterface::DetachReason reason);
+
   // Whether the LensSearchController has been initialized. Meaning, all the
   // dependencies have been initialized and the controller is ready to use.
   bool initialized_ = false;
@@ -284,6 +329,9 @@ class LensSearchController {
   // duration of a Lens feature being active on this tab.
   std::unique_ptr<lens::LensOverlayQueryController>
       lens_overlay_query_controller_;
+
+  std::unique_ptr<lens::LensPermissionBubbleController>
+      lens_permission_bubble_controller_;
 
   // The overlay controller for the Lens Search feature on this tab.
   std::unique_ptr<LensOverlayController> lens_overlay_controller_;
@@ -301,6 +349,13 @@ class LensSearchController {
   // TODO(crbug.com/413138792): Hook up this controller to handle searchbox
   // interactions, without a dependency on the overlay controller.
   std::unique_ptr<lens::LensSearchboxController> lens_searchbox_controller_;
+
+  // The contextualization controller for the Lens Search feature on this tab.
+  std::unique_ptr<lens::LensSearchContextualizationController>
+      lens_contextualization_controller_;
+
+  // Holds subscriptions for TabInterface callbacks.
+  std::vector<base::CallbackListSubscription> tab_subscriptions_;
 
   // The page context eligibility API if it has been fetched. Can be nullptr.
   raw_ptr<optimization_guide::PageContextEligibility> page_context_eligibility_;

@@ -3296,12 +3296,15 @@
     },
     {
       name: "flex-wrap",
-      property_methods: ["CSSValueFromComputedStyleInternal", "InitialValue"],
+      property_methods: ["InitialValue", "ParseSingleValue", "CSSValueFromComputedStyleInternal"],
       field_group: "*",
-      field_template: "keyword",
+      field_template: "external",
+      include_paths: ["third_party/blink/renderer/core/style/style_flex_wrap_data.h"],
+      default_value: "StyleFlexWrapData(FlexWrapMode::kNowrap)",
+      type_name: "StyleFlexWrapData",
+      converter: "ConvertFlexWrapData",
       typedom_types: ["Keyword"],
-      keywords: ["nowrap", "wrap", "wrap-reverse"],
-      default_value: "nowrap",
+      keywords: ["nowrap", "wrap", "wrap-reverse", "balance"],
       valid_for_permission_element: true,
       invalidate: ["layout", "paint"],
     },
@@ -4468,16 +4471,8 @@
         name: "overflow",
         resolver: "inline",
       },
-      runtime_flag: "CSSLogicalOverflow",
       // See comment on overflow-x.
       supports_incremental_style: false,
-    },
-    {
-      name: "-internal-overflow-inline",
-      logical_property_group: {
-        name: "overflow",
-        resolver: "inline",
-      },
     },
     {
       name: "overflow-block",
@@ -4485,16 +4480,8 @@
         name: "overflow",
         resolver: "block",
       },
-      runtime_flag: "CSSLogicalOverflow",
       // See comment on overflow-x.
       supports_incremental_style: false,
-    },
-    {
-      name: "-internal-overflow-block",
-      logical_property_group: {
-        name: "overflow",
-        resolver: "block",
-      },
     },
     {
       name: "overflow-clip-margin",

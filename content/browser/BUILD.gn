@@ -462,6 +462,8 @@ source_set("browser") {
     "ai/echo_ai_language_model.h",
     "ai/echo_ai_manager_impl.cc",
     "ai/echo_ai_manager_impl.h",
+    "ai/echo_ai_proofreader.cc",
+    "ai/echo_ai_proofreader.h",
     "ai/echo_ai_rewriter.cc",
     "ai/echo_ai_rewriter.h",
     "ai/echo_ai_summarizer.cc",
@@ -2405,8 +2407,12 @@ source_set("browser") {
     "webid/digital_credentials/digital_identity_request_impl.h",
     "webid/fake_identity_request_dialog_controller.cc",
     "webid/fake_identity_request_dialog_controller.h",
+    "webid/fedcm_mappers.cc",
+    "webid/fedcm_mappers.h",
     "webid/fedcm_metrics.cc",
     "webid/fedcm_metrics.h",
+    "webid/fedcm_url_computations.cc",
+    "webid/fedcm_url_computations.h",
     "webid/federated_auth_autofill_source.cc",
     "webid/federated_auth_disconnect_request.cc",
     "webid/federated_auth_disconnect_request.h",
@@ -2545,6 +2551,8 @@ source_set("browser") {
       "compute_pressure/web_contents_pressure_manager_proxy.cc",
       "compute_pressure/web_contents_pressure_manager_proxy.h",
     ]
+
+    deps += [ "//services/device/public/cpp/compute_pressure" ]
   }
 
   if (use_viz_debugger) {

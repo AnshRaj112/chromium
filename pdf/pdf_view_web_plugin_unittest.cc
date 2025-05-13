@@ -95,7 +95,6 @@
 #include "pdf/pdf_ink_metrics_handler.h"
 #include "pdf/pdf_ink_module_client.h"
 #include "pdf/test/pdf_ink_test_helpers.h"
-#include "pdf/test/test_helpers.h"
 #include "third_party/ink/src/ink/strokes/stroke.h"
 #endif
 
@@ -200,10 +199,9 @@ SkBitmap GenerateExpectedBitmapForPaint(const gfx::Rect& expected_clipped_rect,
 }
 
 base::Value::Dict GenerateShowSearchifyInProgressMessage(bool show) {
-  base::Value::Dict message;
-  message.Set("type", "showSearchifyInProgress");
-  message.Set("show", show);
-  return message;
+  return base::Value::Dict()
+      .Set("type", "showSearchifyInProgress")
+      .Set("show", show);
 }
 
 class MockHeaderVisitor : public blink::WebHTTPHeaderVisitor {
@@ -1500,10 +1498,9 @@ TEST_F(PdfViewWebPluginTest, HandleViewportMessageScrollRightToLeft) {
 TEST_F(PdfViewWebPluginTest, HandleSetBackgroundColorMessage) {
   ASSERT_NE(SK_ColorGREEN, plugin_->GetBackgroundColor());
 
-  base::Value::Dict message;
-  message.Set("type", "setBackgroundColor");
-  message.Set("color", static_cast<double>(SK_ColorGREEN));
-  plugin_->OnMessage(message);
+  plugin_->OnMessage(base::Value::Dict()
+                         .Set("type", "setBackgroundColor")
+                         .Set("color", static_cast<double>(SK_ColorGREEN)));
 
   EXPECT_EQ(SK_ColorGREEN, plugin_->GetBackgroundColor());
 }
@@ -1512,9 +1509,9 @@ TEST_F(PdfViewWebPluginTest, HandleSetPresentationModeMessage) {
   EXPECT_FALSE(engine_ptr_->IsReadOnly());
   plugin_->set_cursor_type_for_testing(ui::mojom::CursorType::kIBeam);
 
-  base::Value::Dict message;
-  message.Set("type", "setPresentationMode");
-  message.Set("enablePresentationMode", true);
+  auto message = base::Value::Dict()
+                     .Set("type", "setPresentationMode")
+                     .Set("enablePresentationMode", true);
   plugin_->OnMessage(message);
 
   // After entering presentation mode, PDFiumEngine is read-only and the cursor
@@ -1838,15 +1835,14 @@ TEST_F(PdfViewWebPluginTest, NotifyNumberOfFindResultsChanged) {
 }
 
 TEST_F(PdfViewWebPluginTest, OnDocumentLoadComplete) {
-  base::Value::Dict metadata;
-  metadata.Set("fileSize", "0 B");
-  metadata.Set("linearized", false);
-  metadata.Set("pageSize", "Varies");
-  metadata.Set("canSerializeDocument", true);
-
-  base::Value::Dict message;
-  message.Set("type", "metadata");
-  message.Set("metadataData", std::move(metadata));
+  auto message =
+      base::Value::Dict()
+          .Set("type", "metadata")
+          .Set("metadataData", base::Value::Dict()
+                                   .Set("fileSize", "0 B")
+                                   .Set("linearized", false)
+                                   .Set("pageSize", "Varies")
+                                   .Set("canSerializeDocument", true));
 
   EXPECT_CALL(*client_ptr_, PostMessage);
   EXPECT_CALL(*client_ptr_, PostMessage(Eq(std::ref(message))));
@@ -1936,25 +1932,21 @@ TEST_F(PdfViewWebPluginTest, OnSearchifyStartedMoreThanOnce) {
 }
 
 TEST_F(PdfViewWebPluginTest, OnHasSearchifyText) {
-  base::Value::Dict message;
-  message.Set("type", "setHasSearchifyText");
+  auto message = base::Value::Dict().Set("type", "setHasSearchifyText");
 
   EXPECT_CALL(*client_ptr_, PostMessage(Eq(std::ref(message))));
   plugin_->OnHasSearchifyText();
 }
 
 TEST_F(PdfViewWebPluginTest, HighlightTextFragments) {
-  base::Value::List fragments;
-  fragments.Append("hello-,world");
-  fragments.Append("world,-hello");
-
-  base::Value::Dict message;
-  message.Set("type", "highlightTextFragments");
-  message.Set("textFragments", std::move(fragments));
-
   EXPECT_CALL(*engine_ptr_, HighlightTextFragments(
                                 ElementsAre("hello-,world", "world,-hello")));
-  plugin_->OnMessage(message);
+
+  plugin_->OnMessage(base::Value::Dict()
+                         .Set("type", "highlightTextFragments")
+                         .Set("textFragments", base::Value::List()
+                                                   .Append("hello-,world")
+                                                   .Append("world,-hello")));
 }
 
 class PdfViewWebPluginWithDocInfoTest
@@ -1980,29 +1972,25 @@ class PdfViewWebPluginWithDocInfoTest
     }
 
     base::Value::List GetBookmarks() override {
-      // Create `bookmark1` which navigates to an in-doc position. This bookmark
-      // will be in the top-level bookmark list.
-      base::Value::Dict bookmark1;
-      bookmark1.Set("title", "Bookmark 1");
-      bookmark1.Set("page", 2);
-      bookmark1.Set("x", 10);
-      bookmark1.Set("y", 20);
-      bookmark1.Set("zoom", 2.0);
-
       // Create `bookmark2` which navigates to a web page. This bookmark will be
       // a child of `bookmark1`.
-      base::Value::Dict bookmark2;
-      bookmark2.Set("title", "Bookmark 2");
-      bookmark2.Set("uri", "test.com");
+      auto bookmark2 =
+          base::Value::Dict().Set("title", "Bookmark 2").Set("uri", "test.com");
 
-      base::Value::List children_of_bookmark1;
-      children_of_bookmark1.Append(std::move(bookmark2));
-      bookmark1.Set("children", std::move(children_of_bookmark1));
+      // Create `bookmark1` which navigates to an in-doc position. This bookmark
+      // will be in the top-level bookmark list.
+      auto bookmark1 =
+          base::Value::Dict()
+              .Set("title", "Bookmark 1")
+              .Set("page", 2)
+              .Set("x", 10)
+              .Set("y", 20)
+              .Set("zoom", 2.0)
+              .Set("children",
+                   base::Value::List().Append(std::move(bookmark2)));
 
       // Create the top-level bookmark list.
-      base::Value::List bookmarks;
-      bookmarks.Append(std::move(bookmark1));
-      return bookmarks;
+      return base::Value::List().Append(std::move(bookmark1));
     }
 
     std::optional<gfx::Size> GetUniformPageSizePoints() override {
@@ -2052,68 +2040,51 @@ class PdfViewWebPluginWithDocInfoTest
   };
 
   static base::Value::Dict CreateExpectedAttachmentsResponse() {
-    base::Value::List attachments;
-    {
-      base::Value::Dict attachment;
-      attachment.Set("name", "attachment1.txt");
-      attachment.Set("size", 13);
-      attachment.Set("readable", true);
-      attachments.Append(std::move(attachment));
-    }
-    {
-      base::Value::Dict attachment;
-      attachment.Set("name", "attachment2.pdf");
-      attachment.Set("size", 0);
-      attachment.Set("readable", false);
-      attachments.Append(std::move(attachment));
-    }
-    {
-      base::Value::Dict attachment;
-      attachment.Set("name", "attachment3.mov");
-      attachment.Set("size", -1);
-      attachment.Set("readable", true);
-      attachments.Append(std::move(attachment));
-    }
-
-    base::Value::Dict message;
-    message.Set("type", "attachments");
-    message.Set("attachmentsData", std::move(attachments));
-    return message;
+    return base::Value::Dict()
+        .Set("type", "attachments")
+        .Set("attachmentsData", base::Value::List()
+                                    .Append(base::Value::Dict()
+                                                .Set("name", "attachment1.txt")
+                                                .Set("size", 13)
+                                                .Set("readable", true))
+                                    .Append(base::Value::Dict()
+                                                .Set("name", "attachment2.pdf")
+                                                .Set("size", 0)
+                                                .Set("readable", false))
+                                    .Append(base::Value::Dict()
+                                                .Set("name", "attachment3.mov")
+                                                .Set("size", -1)
+                                                .Set("readable", true)));
   }
 
   static base::Value::Dict CreateExpectedBookmarksResponse(
       base::Value::List bookmarks) {
-    base::Value::Dict message;
-    message.Set("type", "bookmarks");
-    message.Set("bookmarksData", std::move(bookmarks));
-    return message;
+    return base::Value::Dict()
+        .Set("type", "bookmarks")
+        .Set("bookmarksData", std::move(bookmarks));
   }
 
   static base::Value::Dict CreateExpectedMetadataResponse() {
-    base::Value::Dict metadata;
-    metadata.Set("version", "1.7");
-    metadata.Set("fileSize", "13 B");
-    metadata.Set("linearized", true);
-
-    metadata.Set("title", "Title");
-    metadata.Set("author", "Author");
-    metadata.Set("subject", "Subject");
-    metadata.Set("keywords", "Keywords");
-    metadata.Set("creator", "Creator");
-    metadata.Set("producer", "Producer");
-    metadata.Set("creationDate",
-                 "5/4/21, 4:12:13\xE2\x80\xAF"
-                 "AM");
-    metadata.Set("modDate",
-                 "6/4/21, 8:16:17\xE2\x80\xAF"
-                 "AM");
-    metadata.Set("pageSize", "13.89 × 16.67 in (portrait)");
-    metadata.Set("canSerializeDocument", true);
-
-    base::Value::Dict message;
-    message.Set("type", "metadata");
-    message.Set("metadataData", std::move(metadata));
-    return message;
+    return base::Value::Dict()
+        .Set("type", "metadata")
+        .Set("metadataData", base::Value::Dict()
+                                 .Set("version", "1.7")
+                                 .Set("fileSize", "13 B")
+                                 .Set("linearized", true)
+                                 .Set("title", "Title")
+                                 .Set("author", "Author")
+                                 .Set("subject", "Subject")
+                                 .Set("keywords", "Keywords")
+                                 .Set("creator", "Creator")
+                                 .Set("producer", "Producer")
+                                 .Set("creationDate",
+                                      "5/4/21, 4:12:13\xE2\x80\xAF"
+                                      "AM")
+                                 .Set("modDate",
+                                      "6/4/21, 8:16:17\xE2\x80\xAF"
+                                      "AM")
+                                 .Set("pageSize", "13.89 × 16.67 in (portrait)")
+                                 .Set("canSerializeDocument", true));
   }
 
   void SetUpClient() override {
@@ -2309,27 +2280,27 @@ class PdfViewWebPluginSaveInBlocksTest : public PdfViewWebPluginTest {
       uint32_t offset,
       uint32_t block_size,
       std::string token) {
-    base::Value::Dict dict;
-    dict.Set("type", "getSaveDataBlock");
-    dict.Set("saveRequestType", static_cast<int>(request_type));
-    dict.Set("offset", static_cast<int>(offset));
-    dict.Set("blockSize", static_cast<int>(block_size));
-    dict.Set("token", token);
-    return dict;
+    return base::Value::Dict()
+        .Set("type", "getSaveDataBlock")
+        .Set("saveRequestType", static_cast<int>(request_type))
+        .Set("offset", static_cast<int>(offset))
+        .Set("blockSize", static_cast<int>(block_size))
+        .Set("token", token);
   }
 
   void ExpectResponse(base::span<const uint8_t> data,
                       uint32_t offset,
                       uint32_t block_size,
                       std::string token) {
-    base::Value value(base::Value::Type::DICT);
-    value.GetDict().Set("type", "saveDataBlock");
-    value.GetDict().Set("token", token);
-    value.GetDict().Set("dataToSave",
-                        base::Value(data.subspan(offset, block_size)));
-    value.GetDict().Set("totalFileSize",
-                        base::Value(static_cast<int>(data.size())));
-    EXPECT_CALL(*client_ptr_, PostMessage(base::test::IsJson(value)));
+    auto data_to_save = data.subspan(offset, block_size);
+    base::BlobStorage data_to_save_blob(data_to_save.begin(),
+                                        data_to_save.end());
+    auto dict = base::Value::Dict()
+                    .Set("type", "saveDataBlock")
+                    .Set("token", std::move(token))
+                    .Set("dataToSave", std::move(data_to_save_blob))
+                    .Set("totalFileSize", static_cast<int>(data.size()));
+    EXPECT_CALL(*client_ptr_, PostMessage(base::test::IsJson(dict)));
   }
 
   void SetUpClient() override {
@@ -2423,9 +2394,8 @@ TEST_F(PdfViewWebPluginSaveInBlocksTest, ReleaseSaveBuffer) {
                                    0, 0, "token-1"));
   EXPECT_FALSE(plugin_->IsSaveDataBufferEmptyForTesting());
 
-  base::Value::Dict message;
-  message.Set("type", "releaseSaveInBlockBuffers");
-  plugin_->OnMessage(message);
+  plugin_->OnMessage(
+      base::Value::Dict().Set("type", "releaseSaveInBlockBuffers"));
   EXPECT_TRUE(plugin_->IsSaveDataBufferEmptyForTesting());
 
   pdf_receiver_.FlushForTesting();
@@ -2840,9 +2810,9 @@ class PdfViewWebPluginInkTest
   }
 
   void SendThumbnail(std::string_view message_id, const gfx::SizeF& page_size) {
-    base::Value::Dict reply;
-    reply.Set("type", "getThumbnailReply");
-    reply.Set("messageId", message_id);
+    auto reply = base::Value::Dict()
+                     .Set("type", "getThumbnailReply")
+                     .Set("messageId", message_id);
     plugin_->SendThumbnailForTesting(
         std::move(reply), /*page_index=*/0,
         Thumbnail(page_size, /*device_pixel_ratio=*/1));
@@ -3307,6 +3277,9 @@ TEST_P(PdfViewWebPluginInkTest, DrawInProgressStroke) {
 
 class PdfViewWebPluginInkTextHighlightTest : public PdfViewWebPluginInkTest {
  public:
+  static constexpr TestAnnotationBrushMessageParams kLightGreenBrushParams{
+      SkColorSetRGB(0x34, 0xA8, 0x53),
+      /*size=*/4.5};
   static constexpr gfx::PointF kStartTextPosition{55.0f, 60.0f};
   static constexpr gfx::PointF kEndTextPosition{75.0f, 65.0f};
 
@@ -3316,8 +3289,10 @@ class PdfViewWebPluginInkTextHighlightTest : public PdfViewWebPluginInkTest {
     // The start position and end position are in screen coordinates, while the
     // values passed to and returned from PDFiumEngine are in device
     // coordinates.
-    EXPECT_CALL(*engine_ptr_, OnTextOrLinkAreaClick(gfx::PointF(5, 60), 1));
-    EXPECT_CALL(*engine_ptr_, ExtendSelectionByPoint(gfx::PointF(25, 65)));
+    EXPECT_CALL(*engine_ptr_,
+                OnTextOrLinkAreaClick(gfx::PointF(5.0f, 60.0f), 1));
+    EXPECT_CALL(*engine_ptr_,
+                ExtendSelectionByPoint(gfx::PointF(25.0f, 65.0f)));
     std::vector<gfx::Rect> mock_selection_rects = {gfx::Rect(5, 60, 20, 5)};
     ON_CALL(*engine_ptr_, GetSelectionRects())
         .WillByDefault(Return(mock_selection_rects));
@@ -3333,12 +3308,8 @@ TEST_P(PdfViewWebPluginInkTextHighlightTest, SelectionDoesNotChange) {
 
   // Enter annotation mode and select the highlighter.
   plugin_->OnMessage(CreateSetAnnotationModeMessageForTesting(/*enable=*/true));
-  TestAnnotationBrushMessageParams message_params{/*color_r=*/0xF0,
-                                                  /*color_g=*/0x85,
-                                                  /*color_b=*/0x00,
-                                                  /*size=*/4.5f};
   plugin_->OnMessage(CreateSetAnnotationBrushMessageForTesting(
-      "highlighter", &message_params));
+      "highlighter", &kLightGreenBrushParams));
 
   SetUpMouseDownMoveTextTestExpectations();
   TestSendInputEvent(
@@ -3364,19 +3335,15 @@ TEST_P(PdfViewWebPluginInkTextHighlightTest, SelectionDoesNotChange) {
 TEST_P(PdfViewWebPluginInkTextHighlightTest, DrawInProgressTextHighlight) {
   // Enter annotation mode and select the highlighter.
   plugin_->OnMessage(CreateSetAnnotationModeMessageForTesting(/*enable=*/true));
-  TestAnnotationBrushMessageParams message_params{/*color_r=*/0xF0,
-                                                  /*color_g=*/0x85,
-                                                  /*color_b=*/0x00,
-                                                  /*size=*/4.5f};
   plugin_->OnMessage(CreateSetAnnotationBrushMessageForTesting(
-      "highlighter", &message_params));
+      "highlighter", &kLightGreenBrushParams));
 
   SetUpMouseDownMoveTextTestExpectations();
 
   TestInProgressDraw(
       /*expected_filename=*/FILE_PATH_LITERAL("text_highlight_stroke.png"),
-      /*start_position=*/gfx::PointF(55, 60),
-      /*end_position=*/gfx::PointF(75, 65));
+      /*start_position=*/gfx::PointF(55.0f, 60.0f),
+      /*end_position=*/gfx::PointF(75.0f, 65.0f));
 }
 
 class PdfViewWebPluginInk2SaveTest : public PdfViewWebPluginSaveTest {
