@@ -1312,7 +1312,7 @@
     "bases": [
       "external/wpt/html/semantics/the-button-element/interest-target"
     ],
-    "args": ["--enable-blink-features=HTMLInterestTargetNoPartialInterest"],
+    "args": ["--enable-blink-features=HTMLInterestTargetNoPartialInterest,HTMLInterestTargetAttribute"],
     "expires": "Dec 1, 2025"
   },
   {
@@ -1809,6 +1809,15 @@
     "exclusive_tests": "ALL",
     "args": ["--enable-features=FedCmIdPregistration"],
     "owners": ["npm@chromium.org", "cbiesinger@chromium.org", "goto@chromium.org"],
+    "expires": "Aug 1, 2025"
+  },
+  {
+    "prefix": "fedcm-accounts-push",
+    "owners": ["ekovac@chromium.org", "web-identity-eng@google.com"],
+    "platforms": ["Linux", "Mac", "Win"],
+    "bases": ["external/wpt/fedcm/fedcm-accounts-push/"],
+    "exclusive_tests": "ALL",
+    "args": ["--enable-features=FedCmLightweightMode"],
     "expires": "Aug 1, 2025"
   },
   {
@@ -4328,8 +4337,8 @@
       "--disable-features=PreloadLinkRelDataUrls"
     ],
     "expires": "Jul 3, 2025"
-   },
-   {
+  },
+  {
     "prefix": "delegates-focus-text-control-disabled",
     "owners": ["dizhangg@google.com"],
     "platforms": ["Linux", "Mac", "Win"],
@@ -4342,15 +4351,50 @@
     "expires": "Jul 1, 2025"
   },
   {
-    "prefix": "sec-purpose-prefetch-rel-prefetch-enabled",
-    "owners": ["stevenwei@microsoft.com"],
-    "platforms": ["Mac", "Win", "Linux"],
-    "bases": ["external/wpt/preload/prefetch-headers.https.html"],
-    "exclusive_tests": "ALL",
-    "args": [
-      "--enable-features=SecPurposePrefetchHeaderRelPrefetch"
+    "prefix": "force-allow-storage-access",
+    "owners": ["arichiv@chromium.org", "cfredric@chromium.org"],
+    "platforms": ["Android", "Fuchsia", "Linux", "Mac", "Win"],
+    "bases": [
+      "external/wpt/partitioned-popins/partitioned-popins.localStorage.tentative.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.BlobURLDedicatedWorker.sub.https.tentative.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.BlobURLSharedWorker.sub.https.tentative.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.BroadcastChannel.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.SharedWorker.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.blobStorage.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.caches.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.estimate.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.getDirectory.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.indexedDB.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.localStorage.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.locks.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.none.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.sessionStorage.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.thirdPartyBlobStorage.sub.https.window.html",
+      "external/wpt/storage-access-api/storage-access-beyond-cookies.unpartitioned.sub.https.window.html"
     ],
-    "expires": "Aug 1, 2025"
+    "args": [
+      "--enable-features=ForceAllowStorageAccess"
+    ],
+    "expires": "May 14, 2026"
+  },
+  {
+    "prefix": "javascript-source-phase-imports",
+    "owners": ["lpardosixtos@microsoft.com"],
+    "platforms": ["Linux", "Win"],
+    "bases": [
+      "external/wpt/wasm/webapi/esm-integration/script-src-allows-source-phase-wasm.tentative.html",
+      "external/wpt/wasm/webapi/esm-integration/source-phase.tentative.html",
+      "external/wpt/wasm/webapi/esm-integration/source-phase-blocked-by-csp.tentative.html",
+      "external/wpt/wasm/webapi/esm-integration/source-phase-preload.tentative.html",
+      "external/wpt/wasm/webapi/esm-integration/wasm-import-wasm-export.tentative.html",
+      "external/wpt/wasm/webapi/esm-integration/worker-import-source-phase.tentative.html",
+      "external/wpt/wasm/webapi/esm-integration/worklet-import-source-phase.tentative.https.html",
+      "wpt_internal/js/source-phase-imports/invalid-module-types-throw.html"
+    ],
+    "args": [
+      "--enable-features=JavaScriptSourcePhaseImports"
+    ],
+    "expires": "Apr 4, 2026"
   }
 
 ]

@@ -281,6 +281,7 @@ class LayerTreeHostImplTestBase : public testing::Test,
     did_request_impl_side_invalidation_ = true;
   }
   void NotifyImageDecodeRequestFinished(int request_id,
+                                        bool speculative,
                                         bool decode_succeeded) override {}
   void DidPresentCompositorFrameOnImplThread(
       uint32_t frame_token,
@@ -6649,7 +6650,8 @@ TEST_P(LayerTreeHostImplTest, WillDrawReturningFalseDoesNotCall) {
 
   DrawFrame();
   EXPECT_TRUE(layer->will_draw_returned_true());
-  EXPECT_TRUE(layer->append_quads_called());
+  EXPECT_EQ(layer->append_quads_called(),
+            !host_impl_->GetSettings().TreesInVizInClientProcess());
   EXPECT_TRUE(layer->did_draw_called());
 
   host_impl_->SetViewportDamage(gfx::Rect(10, 10));

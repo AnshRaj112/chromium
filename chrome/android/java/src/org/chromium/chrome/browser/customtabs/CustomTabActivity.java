@@ -32,6 +32,7 @@ import org.chromium.base.ActivityState;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.IntentUtils;
 import org.chromium.base.Log;
+import org.chromium.base.TimeUtils;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.task.PostTask;
@@ -42,6 +43,7 @@ import org.chromium.chrome.browser.LaunchIntentDispatcher;
 import org.chromium.chrome.browser.app.metrics.LaunchCauseMetrics;
 import org.chromium.chrome.browser.auxiliary_search.AuxiliarySearchController;
 import org.chromium.chrome.browser.auxiliary_search.AuxiliarySearchControllerFactory;
+import org.chromium.chrome.browser.auxiliary_search.AuxiliarySearchMetrics;
 import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider.CustomTabsUiType;
 import org.chromium.chrome.browser.browserservices.intents.SessionHolder;
 import org.chromium.chrome.browser.customtabs.content.CustomTabActivityNavigationController.FinishReason;
@@ -261,6 +263,10 @@ public class CustomTabActivity extends BaseCustomTabActivity {
                                     mTabModelProfileSupplier.get(),
                                     null,
                                     AuxiliarySearchController.AuxiliarySearchHostType.CUSTOM_TAB);
+            if (mAuxiliarySearchController != null) {
+                AuxiliarySearchMetrics.recordTimeToCreateControllerInCustomTab(
+                        TimeUtils.elapsedRealtimeMillis() - getOnCreateTimestampMs());
+            }
         }
     }
 
@@ -269,8 +275,8 @@ public class CustomTabActivity extends BaseCustomTabActivity {
         super.onPause();
 
         if (mAuxiliarySearchController != null) {
-            mAuxiliarySearchController.donateCustomTabs(
-                    getCustomTabActivityTabProvider().getTab().getTimestampMillis());
+            Tab tab = getCustomTabActivityTabProvider().getTab();
+            mAuxiliarySearchController.donateCustomTabs(tab.getUrl(), tab.getTimestampMillis());
         }
     }
 
@@ -298,7 +304,10 @@ public class CustomTabActivity extends BaseCustomTabActivity {
     }
 
     @Override
-    public boolean onOptionsItemSelected(int itemId, @Nullable Bundle menuItemData) {
+    public boolean onOptionsItemSelected(
+            int itemId,
+            @Nullable Bundle menuItemData,
+            @Nullable MotionEvent triggeringMotionEvent) {
         int menuIndex =
                 CustomTabAppMenuPropertiesDelegate.getIndexOfMenuItemFromBundle(menuItemData);
         if (menuIndex >= 0) {
@@ -312,11 +321,12 @@ public class CustomTabActivity extends BaseCustomTabActivity {
             return true;
         }
 
-        return super.onOptionsItemSelected(itemId, menuItemData);
+        return super.onOptionsItemSelected(itemId, menuItemData, triggeringMotionEvent);
     }
 
     @Override
-    public boolean onMenuOrKeyboardAction(int id, boolean fromMenu) {
+    public boolean onMenuOrKeyboardAction(
+            int id, boolean fromMenu, @Nullable MotionEvent triggeringMotionEvent) {
         if (id == R.id.bookmark_this_page_id) {
             mTabBookmarkerSupplier.get().addOrEditBookmark(getActivityTab());
             RecordUserAction.record("MobileMenuAddToBookmarks");
@@ -362,7 +372,7 @@ public class CustomTabActivity extends BaseCustomTabActivity {
             }
             return true;
         }
-        return super.onMenuOrKeyboardAction(id, fromMenu);
+        return super.onMenuOrKeyboardAction(id, fromMenu, triggeringMotionEvent);
     }
 
     @Override

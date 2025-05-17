@@ -8,6 +8,7 @@ import "cc/mojom/element_id.mojom";
 import "cc/mojom/hit_test_opaqueness.mojom";
 import "cc/mojom/layer_type.mojom";
 import "cc/mojom/paint_flags.mojom";
+import "cc/mojom/ui_resource_id.mojom";
 import "skia/public/mojom/skcolor4f.mojom";
 import "skia/public/mojom/skpath.mojom";
 import "services/viz/public/mojom/compositing/surface_range.mojom";
@@ -84,7 +85,6 @@ struct SurfaceLayerExtra {
 // Extra fields in a cc::TextureLayerImpl that has been added to a tree or
 // modified in some interesting way since a prior tree update.
 struct TextureLayerExtra {
-  bool premultiplied_alpha;
   bool blend_background_color;
   bool force_texture_to_opaque;
   gfx.mojom.PointF uv_top_left;
@@ -92,10 +92,80 @@ struct TextureLayerExtra {
   TransferableResource? transferable_resource;
 };
 
+// Extra fields in a cc::ScrollbarLayerImplBase that has been added
+// to a tree or modified in some interesting way since a prior tree update.
+struct ScrollbarLayerBaseExtra {
+  cc.mojom.ElementId scroll_element_id;
+  bool is_overlay_scrollbar;
+  bool is_web_test;
+  float thumb_thickness_scale_factor;
+  float current_pos;
+  float clip_layer_length;
+  float scroll_layer_length;
+  bool is_horizontal_orientation;
+  bool is_left_side_vertical_scrollbar;
+  float vertical_adjust;
+  bool has_find_in_page_tickmarks;
+};
+
+// Extra fields in a cc::NinePatchThumbScrollbarLayerImpl that has been added
+// to a tree or modified in some interesting way since a prior tree update.
+struct NinePatchThumbScrollbarLayerExtra {
+  ScrollbarLayerBaseExtra scrollbar_base_extra;
+
+  int32 thumb_thickness;
+  int32 thumb_length;
+  int32 track_start;
+  int32 track_length;
+  gfx.mojom.Size image_bounds;
+  gfx.mojom.Rect aperture;
+  cc.mojom.UIResourceId thumb_ui_resource_id;
+  cc.mojom.UIResourceId track_and_buttons_ui_resource_id;
+};
+
+// Extra fields in a cc::PaintedScrollbarLayerImpl that has been added
+// to a tree or modified in some interesting way since a prior tree update.
+struct PaintedScrollbarLayerExtra {
+  ScrollbarLayerBaseExtra scrollbar_base_extra;
+
+  float internal_contents_scale;
+  gfx.mojom.Size internal_content_bounds;
+  bool jump_on_track_click;
+  bool supports_drag_snap_back;
+  int32 thumb_thickness;
+  int32 thumb_length;
+  gfx.mojom.Rect back_button_rect;
+  gfx.mojom.Rect forward_button_rect;
+  gfx.mojom.Rect track_rect;
+  skia.mojom.SkColor4f? thumb_color;
+  bool uses_nine_patch_track_and_buttons;
+  gfx.mojom.Size track_and_buttons_image_bounds;
+  gfx.mojom.Rect track_and_buttons_aperture;
+  float painted_opacity;
+  cc.mojom.UIResourceId track_and_buttons_ui_resource_id;
+  cc.mojom.UIResourceId thumb_ui_resource_id;
+};
+
+// Extra fields in a cc::SolidColorScrollbarLayerImpl that has been added
+// to a tree or modified in some interesting way since a prior tree update.
+struct SolidColorScrollbarLayerExtra {
+  ScrollbarLayerBaseExtra scrollbar_base_extra;
+
+  int32 thumb_thickness;
+  int32 track_start;
+  skia.mojom.SkColor4f color;
+};
+
 // Extra properties that are specific to a LayerImpl type.
 union LayerExtra {
   // Extra properties that are specific to MirrorLayerImpl.
   MirrorLayerExtra mirror_layer_extra;
+  // Extra properties that are specific to NinePatchThumbScrollbarLayerImpl.
+  NinePatchThumbScrollbarLayerExtra nine_patch_thumb_scrollbar_layer_extra;
+  // Extra properties that are specific to PaintedScrollbarLayerImpl.
+  PaintedScrollbarLayerExtra painted_scrollbar_layer_extra;
+  // Extra properties that are specific to SolidColorScrollbarLayerImpl.
+  SolidColorScrollbarLayerExtra solid_color_scrollbar_layer_extra;
   // Extra properties that are specific to SurfaceLayerImpl.
   SurfaceLayerExtra surface_layer_extra;
   // Extra properties that are specific to TextureLayerImpl.
@@ -151,7 +221,7 @@ struct Layer {
   // Optional stable identifier that may be referenced in property trees and
   // animations. Identifies a client-side object which can be represented by
   // multiple layers over time but only by a single layer at once.
-  cc.mojom.ElementId? element_id;
+  cc.mojom.ElementId element_id;
 
   // Current cumulative dirty rect for the layer since last update, in layer
   // space.
@@ -238,7 +308,7 @@ struct TransformNode {
 
   // The stable ElementId of the client-side object to which this transform node
   // applies.
-  cc.mojom.ElementId? element_id;
+  cc.mojom.ElementId element_id;
 
   // Actual transformation parameters for this node. See cc::TransformNode.
   gfx.mojom.Transform local;
@@ -276,7 +346,7 @@ struct TransformNode {
   // The stable ElementId of the client-side object (e.g. document, in Blink)
   // corresponding to this node, if this node corresponds to the root of a
   // visible frame.
-  cc.mojom.ElementId? visible_frame_element_id;
+  cc.mojom.ElementId visible_frame_element_id;
 
   // cc::DamageReasonsSet bit mask tracking the damage reasons for changes to
   // this node.
@@ -332,7 +402,7 @@ struct EffectNode {
 
   // The stable ElementId of the client-side object to which this effect node
   // applies.
-  cc.mojom.ElementId? element_id;
+  cc.mojom.ElementId element_id;
 
   // The opacity of drawn layers associated with this effect node.
   float opacity;
@@ -368,7 +438,7 @@ struct EffectNode {
 
   // The element id corresponding to the mask to apply to the filtered backdrop
   // image.
-  cc.mojom.ElementId? backdrop_mask_element_id;
+  cc.mojom.ElementId backdrop_mask_element_id;
 
   // The mask filter information applied to this effect node. The coordinates of
   // in the mask info is in the space of the transform node associated with this
@@ -438,7 +508,7 @@ struct ScrollNode {
 
   // The stable ElementId of the scrollable client-side object to which this
   // scroll node applies.
-  cc.mojom.ElementId? element_id;
+  cc.mojom.ElementId element_id;
 
   // Flags specifying the behavior of scrolls on this node.
   bool max_scroll_offset_affected_by_page_scale;

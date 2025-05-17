@@ -69,6 +69,7 @@ public class AutocompleteMatch {
     private final int mType;
     private final Set<Integer> mSubtypes;
     private final boolean mIsSearchType;
+    private final int /* SuggestTemplateInfo.IconType */ mIconType;
     private String mDisplayText;
     private final List<MatchClassification> mDisplayTextClassifications;
     private String mDescription;
@@ -97,6 +98,7 @@ public class AutocompleteMatch {
             int nativeType,
             Set<Integer> subtypes,
             boolean isSearchType,
+            int iconType,
             int transition,
             String displayText,
             List<MatchClassification> displayTextClassifications,
@@ -125,6 +127,7 @@ public class AutocompleteMatch {
         mType = nativeType;
         mSubtypes = subtypes;
         mIsSearchType = isSearchType;
+        mIconType = iconType;
         mTransition = transition;
         mDisplayText = displayText;
         mDisplayTextClassifications = displayTextClassifications;
@@ -163,6 +166,7 @@ public class AutocompleteMatch {
             int nativeType,
             int[] nativeSubtypes,
             boolean isSearchType,
+            int iconType,
             int transition,
             String contents,
             int[] contentClassificationOffsets,
@@ -205,6 +209,7 @@ public class AutocompleteMatch {
                         nativeType,
                         subtypes,
                         isSearchType,
+                        iconType,
                         transition,
                         contents,
                         contentClassifications,
@@ -402,6 +407,10 @@ public class AutocompleteMatch {
         return mAdditionalText;
     }
 
+    public /* SuggestTemplateInfo.IconType */ int getIconType() {
+        return mIconType;
+    }
+
     /**
      * @return The image data for the image clipbaord suggestion. This data has already been
      *     validated in C++ and is safe to use in the browser process.
@@ -498,7 +507,8 @@ public class AutocompleteMatch {
                 .setTransition(mTransition)
                 .setGroupId(mGroupId)
                 .setIsSearchType(mIsSearchType)
-                .setAllowedToBeDefaultMatch(mAllowedToBeDefaultMatch);
+                .setAllowedToBeDefaultMatch(mAllowedToBeDefaultMatch)
+                .setIconType(mIconType);
 
         if (!TextUtils.isEmpty(mFillIntoEdit)) {
             builder.setFillIntoEdit(mFillIntoEdit);
@@ -557,6 +567,7 @@ public class AutocompleteMatch {
                 input.getType(),
                 new ArraySet(input.getSubtypeList()),
                 input.getIsSearchType(),
+                input.getIconType(),
                 input.getTransition(),
                 input.getDisplayText(),
                 displayTextClassifications,

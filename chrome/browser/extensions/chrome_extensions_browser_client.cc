@@ -25,12 +25,14 @@
 #include "chrome/browser/extensions/activity_log/activity_action_constants.h"
 #include "chrome/browser/extensions/activity_log/activity_actions.h"
 #include "chrome/browser/extensions/activity_log/activity_log.h"
+#include "chrome/browser/extensions/api/chrome_extensions_api_client.h"
 #include "chrome/browser/extensions/api/preference/cookie_controls_mode_transformer.h"
 #include "chrome/browser/extensions/api/preference/network_prediction_transformer.h"
 #include "chrome/browser/extensions/api/preference/privacy_sandbox_transformer.h"
 #include "chrome/browser/extensions/api/preference/protected_content_enabled_transformer.h"
 #include "chrome/browser/extensions/api/proxy/proxy_pref_transformer.h"
 #include "chrome/browser/extensions/api/runtime/chrome_runtime_api_delegate.h"
+#include "chrome/browser/extensions/chrome_component_extension_resource_manager.h"
 #include "chrome/browser/extensions/chrome_content_browser_client_extensions_part.h"
 #include "chrome/browser/extensions/chrome_extension_system_factory.h"
 #include "chrome/browser/extensions/chrome_extension_web_contents_observer.h"
@@ -42,14 +44,18 @@
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/favicon/favicon_util.h"
 #include "chrome/browser/extensions/pref_mapping.h"
+#include "chrome/browser/extensions/updater/chrome_update_client_config.h"
 #include "chrome/browser/extensions/user_script_listener.h"
 #include "chrome/browser/external_protocol/external_protocol_handler.h"
 #include "chrome/browser/media/webrtc/media_device_salt_service_factory.h"
 #include "chrome/browser/net/system_network_context_manager.h"
 #include "chrome/browser/prefetch/pref_names.h"
+#include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
+#include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_selections.h"
+#include "chrome/browser/task_manager/web_contents_tags.h"
 #include "chrome/browser/ui/webui/chrome_web_ui_controller_factory.h"
 #include "chrome/browser/usb/usb_chooser_context.h"
 #include "chrome/browser/usb/usb_chooser_context_factory.h"
@@ -86,6 +92,7 @@
 #include "extensions/common/extension_id.h"
 #include "extensions/common/extension_urls.h"
 #include "extensions/common/features/feature_channel.h"
+#include "extensions/common/mojom/view_type.mojom-shared.h"
 #include "extensions/common/permissions/permission_set.h"
 #include "ipc/ipc_message.h"
 #include "url/gurl.h"
@@ -104,13 +111,39 @@
 #include "extensions/browser/updater/null_extension_cache.h"
 #endif
 
+#if BUILDFLAG(FULL_SAFE_BROWSING)
+#include "chrome/browser/safe_browsing/chrome_password_reuse_detection_manager_client.h"
+#include "chrome/browser/safe_browsing/extension_telemetry/declarative_net_request_action_signal.h"
+#include "chrome/browser/safe_browsing/extension_telemetry/declarative_net_request_signal.h"
+#include "chrome/browser/safe_browsing/extension_telemetry/extension_telemetry_service.h"
+#include "chrome/browser/safe_browsing/extension_telemetry/extension_telemetry_service_factory.h"
+#include "chrome/browser/safe_browsing/extension_telemetry/remote_host_contacted_signal.h"
+#include "chrome/browser/safe_browsing/extension_telemetry/tabs_execute_script_signal.h"
+#include "components/safe_browsing/core/common/features.h"
+#endif
+
 namespace extensions {
 
 namespace {
 
+constexpr std::string_view kCrxUrlPath = "/service/update2/crx";
+constexpr std::string_view kJsonUrlPath = "/service/update2/json";
+
 // If true, the extensions client will behave as though there is always a
 // new chrome update.
 bool g_did_chrome_update_for_testing = false;
+
+class UpdaterKeepAlive : public ScopedExtensionUpdaterKeepAlive {
+ public:
+  UpdaterKeepAlive(Profile* profile, ProfileKeepAliveOrigin origin)
+      : profile_keep_alive_(profile, origin) {}
+  UpdaterKeepAlive(const UpdaterKeepAlive&) = delete;
+  UpdaterKeepAlive& operator=(const UpdaterKeepAlive&) = delete;
+  ~UpdaterKeepAlive() override = default;
+
+ private:
+  ScopedProfileKeepAlive profile_keep_alive_;
+};
 
 bool ShouldLogExtensionAction(content::BrowserContext* browser_context,
                               const ExtensionId& extension_id) {
@@ -170,7 +203,10 @@ bool RegisterTransformers() {
 }  // namespace
 
 ChromeExtensionsBrowserClient::ChromeExtensionsBrowserClient()
-    : event_router_forwarder_(base::MakeRefCounted<EventRouterForwarder>()) {
+    : resource_manager_(
+          std::make_unique<ChromeComponentExtensionResourceManager>()),
+      api_client_(std::make_unique<ChromeExtensionsAPIClient>()),
+      event_router_forwarder_(base::MakeRefCounted<EventRouterForwarder>()) {
   AddAPIProvider(std::make_unique<CoreExtensionsBrowserAPIProvider>());
   AddAPIProvider(std::make_unique<ChromeExtensionsBrowserAPIProvider>());
   // This ensures transformers are only registered once. This is required
@@ -183,6 +219,10 @@ ChromeExtensionsBrowserClient::ChromeExtensionsBrowserClient()
 }
 
 ChromeExtensionsBrowserClient::~ChromeExtensionsBrowserClient() = default;
+
+void ChromeExtensionsBrowserClient::StartTearDown() {
+  user_script_listener_->StartTearDown();
+}
 
 bool ChromeExtensionsBrowserClient::IsShuttingDown() {
   return g_browser_process->IsShuttingDown();
@@ -446,6 +486,11 @@ ChromeExtensionsBrowserClient::CreateRuntimeAPIDelegate(
   return std::make_unique<ChromeRuntimeAPIDelegate>(context);
 }
 
+const ComponentExtensionResourceManager*
+ChromeExtensionsBrowserClient::GetComponentExtensionResourceManager() {
+  return resource_manager_.get();
+}
+
 void ChromeExtensionsBrowserClient::BroadcastEventToRenderers(
     events::HistogramValue histogram_value,
     const std::string& event_name,
@@ -496,20 +541,62 @@ void ChromeExtensionsBrowserClient::ClearBackForwardCache() {
   ExtensionTabUtil::ClearBackForwardCache();
 }
 
+void ChromeExtensionsBrowserClient::AttachExtensionTaskManagerTag(
+    content::WebContents* web_contents,
+    mojom::ViewType view_type) {
+  switch (view_type) {
+    case mojom::ViewType::kAppWindow:
+    case mojom::ViewType::kComponent:
+    case mojom::ViewType::kExtensionBackgroundPage:
+    case mojom::ViewType::kExtensionPopup:
+    case mojom::ViewType::kOffscreenDocument:
+    case mojom::ViewType::kExtensionSidePanel:
+      // These are the only types that are tracked by the ExtensionTag.
+      task_manager::WebContentsTags::CreateForExtension(web_contents,
+                                                        view_type);
+      return;
+
+    case mojom::ViewType::kBackgroundContents:
+    case mojom::ViewType::kExtensionGuest:
+    case mojom::ViewType::kTabContents:
+    case mojom::ViewType::kDeveloperTools:
+      // Those types are tracked by other tags:
+      // BACKGROUND_CONTENTS --> task_manager::BackgroundContentsTag.
+      // GUEST --> ChromeGuestViewManagerDelegate.
+      // PANEL --> task_manager::PanelTag.
+      // TAB_CONTENTS --> task_manager::TabContentsTag.
+      // DEVELOPER_TOOLS --> task_manager::DevToolsTag.
+      // These tags are created and attached to the web_contents in other
+      // locations, and they must be ignored here.
+      return;
+
+    case mojom::ViewType::kInvalid:
+      NOTREACHED();
+  }
+}
+
 scoped_refptr<update_client::UpdateClient>
 ChromeExtensionsBrowserClient::CreateUpdateClient(
     content::BrowserContext* context) {
-  // TODO(crbug.com/415033270): Move the code from util to here, since this is
-  // the only caller.
-  return util::CreateUpdateClient(context);
+  std::optional<GURL> override_url;
+  GURL update_url = extension_urls::GetWebstoreUpdateUrl();
+  if (update_url != extension_urls::GetDefaultWebstoreUpdateUrl()) {
+    if (update_url.path() == kCrxUrlPath) {
+      override_url = update_url.GetWithEmptyPath().Resolve(kJsonUrlPath);
+    } else {
+      override_url = update_url;
+    }
+  }
+  return update_client::UpdateClientFactory(
+      ChromeUpdateClientConfig::Create(context, override_url));
 }
 
 std::unique_ptr<ScopedExtensionUpdaterKeepAlive>
 ChromeExtensionsBrowserClient::CreateUpdaterKeepAlive(
     content::BrowserContext* context) {
-  // TODO(crbug.com/415033270): Move the code from util to here, since this is
-  // the only caller.
-  return util::CreateUpdaterKeepAlive(context);
+  return std::make_unique<UpdaterKeepAlive>(
+      Profile::FromBrowserContext(context),
+      ProfileKeepAliveOrigin::kExtensionUpdater);
 }
 
 bool ChromeExtensionsBrowserClient::IsActivityLoggingEnabled(
@@ -553,6 +640,15 @@ network::mojom::NetworkContext*
 ChromeExtensionsBrowserClient::GetSystemNetworkContext() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   return g_browser_process->system_network_context_manager()->GetContext();
+}
+
+UserScriptListener* ChromeExtensionsBrowserClient::GetUserScriptListener() {
+  return user_script_listener_.get();
+}
+
+void ChromeExtensionsBrowserClient::SignalContentScriptsLoaded(
+    content::BrowserContext* context) {
+  user_script_listener_->OnScriptsLoaded(context);
 }
 
 bool ChromeExtensionsBrowserClient::ShouldSchemeBypassNavigationChecks(
@@ -602,10 +698,84 @@ bool ChromeExtensionsBrowserClient::IsValidTabId(
                                       web_contents);
 }
 
-// static
-void ChromeExtensionsBrowserClient::set_did_chrome_update_for_testing(
-    bool did_update) {
-  g_did_chrome_update_for_testing = did_update;
+bool ChromeExtensionsBrowserClient::IsExtensionTelemetryServiceEnabled(
+    content::BrowserContext* context) const {
+  // TODO(crbug.com/417279245): Add extensions safe browsing to desktop Android.
+#if BUILDFLAG(FULL_SAFE_BROWSING)
+  auto* telemetry_service =
+      safe_browsing::ExtensionTelemetryServiceFactory::GetForProfile(
+          Profile::FromBrowserContext(context));
+  return telemetry_service && telemetry_service->enabled();
+#else
+  return false;
+#endif
+}
+
+void ChromeExtensionsBrowserClient::NotifyExtensionApiTabExecuteScript(
+    content::BrowserContext* context,
+    const ExtensionId& extension_id,
+    const std::string& code) const {
+  // TODO(crbug.com/417279245): Add extensions safe browsing to desktop Android.
+#if BUILDFLAG(FULL_SAFE_BROWSING)
+  auto* telemetry_service =
+      safe_browsing::ExtensionTelemetryServiceFactory::GetForProfile(
+          Profile::FromBrowserContext(context));
+  if (!telemetry_service || !telemetry_service->enabled()) {
+    return;
+  }
+
+  auto signal = std::make_unique<safe_browsing::TabsExecuteScriptSignal>(
+      extension_id, code);
+  telemetry_service->AddSignal(std::move(signal));
+#endif
+}
+
+void ChromeExtensionsBrowserClient::NotifyExtensionApiDeclarativeNetRequest(
+    content::BrowserContext* context,
+    const ExtensionId& extension_id,
+    const std::vector<api::declarative_net_request::Rule>& rules) const {
+  // TODO(crbug.com/417279245): Add extensions safe browsing to desktop Android.
+#if BUILDFLAG(FULL_SAFE_BROWSING)
+  auto* telemetry_service =
+      safe_browsing::ExtensionTelemetryServiceFactory::GetForProfile(
+          Profile::FromBrowserContext(context));
+  if (!telemetry_service || !telemetry_service->enabled()) {
+    return;
+  }
+
+  // The telemetry service will consume and release the signal object inside the
+  // `AddSignal()` call.
+  auto signal = std::make_unique<safe_browsing::DeclarativeNetRequestSignal>(
+      extension_id, rules);
+  telemetry_service->AddSignal(std::move(signal));
+#endif
+}
+
+void ChromeExtensionsBrowserClient::
+    NotifyExtensionDeclarativeNetRequestRedirectAction(
+        content::BrowserContext* context,
+        const ExtensionId& extension_id,
+        const GURL& request_url,
+        const GURL& redirect_url) const {
+  // TODO(crbug.com/417279245): Add extensions safe browsing to desktop Android.
+#if BUILDFLAG(FULL_SAFE_BROWSING)
+  auto* telemetry_service =
+      safe_browsing::ExtensionTelemetryServiceFactory::GetForProfile(
+          Profile::FromBrowserContext(context));
+  if (!telemetry_service || !telemetry_service->enabled() ||
+      !base::FeatureList::IsEnabled(
+          safe_browsing::
+              kExtensionTelemetryDeclarativeNetRequestActionSignal)) {
+    return;
+  }
+
+  // The telemetry service will consume and release the signal object inside the
+  // `AddSignal()` call.
+  auto signal = safe_browsing::DeclarativeNetRequestActionSignal::
+      CreateDeclarativeNetRequestRedirectActionSignal(extension_id, request_url,
+                                                      redirect_url);
+  telemetry_service->AddSignal(std::move(signal));
+#endif
 }
 
 bool ChromeExtensionsBrowserClient::IsUsbDeviceAllowedByPolicy(
@@ -740,6 +910,14 @@ void ChromeExtensionsBrowserClient::AddAPIActionOrEventToActivityLog(
   AddActionToExtensionActivityLog(browser_context, action);
 }
 
+void ChromeExtensionsBrowserClient::CreatePasswordReuseDetectionManager(
+    content::WebContents* web_contents) const {
+  // TODO(crbug.com/417279245): Add extensions safe browsing to desktop Android.
+#if BUILDFLAG(FULL_SAFE_BROWSING)
+  ChromePasswordReuseDetectionManagerClient::CreateForWebContents(web_contents);
+#endif
+}
+
 media_device_salt::MediaDeviceSaltService*
 ChromeExtensionsBrowserClient::GetMediaDeviceSaltService(
     content::BrowserContext* context) {
@@ -757,6 +935,12 @@ bool ChromeExtensionsBrowserClient::HasControlledFrameCapability(
              ->GetContentSetting(url, url,
                                  content_settings::mojom::ContentSettingsType::
                                      CONTROLLED_FRAME) == CONTENT_SETTING_ALLOW;
+}
+
+// static
+void ChromeExtensionsBrowserClient::set_did_chrome_update_for_testing(
+    bool did_update) {
+  g_did_chrome_update_for_testing = did_update;
 }
 
 }  // namespace extensions

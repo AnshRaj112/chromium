@@ -25,6 +25,7 @@ import {getHtml} from './app.html.js';
 
 export interface SplitNewTabPageAppElement {
   $: {
+    header: HTMLElement,
     splitTabsList: CrLazyListElement,
   };
 }
@@ -48,6 +49,7 @@ export class SplitNewTabPageAppElement extends CrLitElement {
       scrollTarget_: {type: Object},
       focusedIndex_: {type: Number},
       focusedItem_: {type: Object},
+      minViewportHeight_: {type: Number},
     };
   }
 
@@ -55,14 +57,24 @@ export class SplitNewTabPageAppElement extends CrLitElement {
   protected accessor scrollTarget_: HTMLElement|null = null;
   protected accessor focusedIndex_: number = -1;
   protected accessor focusedItem_: HTMLElement|null = null;
+  protected accessor minViewportHeight_: number = 0;
   protected title_: string = '';
   private activeTabId_: number = -1;
   private apiProxy_: TabSearchApiProxy = TabSearchApiProxyImpl.getInstance();
   private listenerIds_: number[] = [];
+  private visibilityChangedListener_: () => void;
 
   constructor() {
     super();
     ColorChangeUpdater.forDocument().start();
+
+    this.visibilityChangedListener_ = () => {
+      if (document.visibilityState === 'visible') {
+        this.apiProxy_.getProfileData().then(({profileData}) => {
+          this.onTabsChanged_(profileData);
+        });
+      }
+    };
   }
 
   override connectedCallback() {
@@ -90,6 +102,9 @@ export class SplitNewTabPageAppElement extends CrLitElement {
     this.apiProxy_.getProfileData().then(({profileData}) => {
       this.onTabsChanged_(profileData);
     });
+
+    document.addEventListener(
+        'visibilitychange', this.visibilityChangedListener_);
   }
 
   override disconnectedCallback() {
@@ -98,6 +113,9 @@ export class SplitNewTabPageAppElement extends CrLitElement {
     this.listenerIds_.forEach(
         id => this.apiProxy_.getCallbackRouter().removeListener(id));
     this.listenerIds_ = [];
+
+    document.removeEventListener(
+        'visibilitychange', this.visibilityChangedListener_);
   }
 
   override updated(changedProperties: PropertyValues<this>) {
@@ -137,6 +155,9 @@ export class SplitNewTabPageAppElement extends CrLitElement {
         activeWindow.tabs.filter(tab => !tab.visible)
             .map(tab => this.getTabData_(tab, true, TabItemType.OPEN_TAB));
     this.sortTabs_();
+    this.updateComplete.then(() => {
+      this.updateViewportHeight_(profileData);
+    });
   }
 
   private onTabUpdated_(tabUpdateInfo: TabUpdateInfo) {
@@ -207,6 +228,12 @@ export class SplitNewTabPageAppElement extends CrLitElement {
 
   private redirectToNtp_() {
     window.location.replace(loadTimeData.getString('newTabPageUrl'));
+  }
+
+  private updateViewportHeight_(profileData: ProfileData) {
+    const activeWindow = profileData.windows.find(({active}) => active)!;
+    this.minViewportHeight_ =
+        activeWindow ? activeWindow.height - this.$.header.offsetHeight : 0;
   }
 }
 

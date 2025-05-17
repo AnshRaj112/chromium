@@ -32,6 +32,7 @@
 #include "ash/public/cpp/holding_space/holding_space_controller.h"
 #include "ash/public/cpp/new_window_delegate.h"
 #include "ash/public/cpp/notification_utils.h"
+#include "ash/public/cpp/saved_desk_delegate.h"
 #include "ash/public/cpp/system/toast_data.h"
 #include "ash/public/cpp/system/toast_manager.h"
 #include "ash/resources/vector_icons/vector_icons.h"
@@ -47,7 +48,9 @@
 #include "ash/system/notification_center/message_view_factory.h"
 #include "ash/system/toast/anchored_nudge_manager_impl.h"
 #include "ash/system/video_conference/video_conference_tray_controller.h"
+#include "ash/wm/mru_window_tracker.h"
 #include "ash/wm/screen_pinning_controller.h"
+#include "ash/wm/window_state.h"
 #include "base/auto_reset.h"
 #include "base/check.h"
 #include "base/check_op.h"
@@ -156,6 +159,10 @@ constexpr char kCanShowSunfishRegionNudge[] =
 
 // The ID for the toast shown when text is copied to clipboard.
 constexpr char kCaptureModeTextCopiedToastId[] = "capture_mode_text_copied";
+
+// The ID for the anchored nudge that shows when a user tries to perform a
+// Sunfish image search while an Incognito Chrome window is open.
+constexpr char kSunfishIncognitoNudgeId[] = "kSunfishIncognitoNudge";
 
 // An invalid IDS value used as a placeholder to not show a message in a
 // notification.
@@ -545,11 +552,15 @@ bool ShouldFetchScannerActions(PerformCaptureType capture_type) {
          capture_type == PerformCaptureType::kScanner;
 }
 
+bool CaptureTypeIsImageSearch(PerformCaptureType capture_type) {
+  return capture_type == PerformCaptureType::kSunfish ||
+         capture_type == PerformCaptureType::kSearch;
+}
+
 // Returns true if region search should be performed on a captured image with
 // the given `capture_type`.
 bool ShouldSendRegionSearch(PerformCaptureType capture_type) {
-  return CanShowSunfishUi() && (capture_type == PerformCaptureType::kSunfish ||
-                                capture_type == PerformCaptureType::kSearch);
+  return CanShowSunfishUi() && CaptureTypeIsImageSearch(capture_type);
 }
 
 // Returns true if the capture type requires a network connection.
@@ -603,6 +614,29 @@ gfx::Rect CalculateSearchResultPanelScreenBounds(
   }
 
   return bounds;
+}
+
+bool IsIncognitoWindow(aura::Window* window) {
+  return !Shell::Get()->saved_desk_delegate()->IsWindowPersistable(window);
+}
+
+bool IsIncognitoWindowOpen() {
+  auto windows =
+      Shell::Get()->mru_window_tracker()->BuildMruWindowList(kActiveDesk);
+  for (aura::Window* window : windows) {
+    if (IsIncognitoWindow(window) && !WindowState::Get(window)->IsMinimized()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void ShowSunfishIncognitoNudge() {
+  AnchoredNudgeData nudge_data(
+      kSunfishIncognitoNudgeId, NudgeCatalogName::kSunfishIncognitoNudge,
+      l10n_util::GetStringUTF16(IDS_ASH_SUNFISH_INCOGNITO_NUDGE_LABEL));
+  AnchoredNudgeManager::Get()->Show(nudge_data);
 }
 
 }  // namespace
@@ -711,8 +745,7 @@ SearchResultsPanel* CaptureModeController::GetSearchResultsPanel() const {
              : nullptr;
 }
 
-void CaptureModeController::ShowSearchResultsPanel(
-    const gfx::ImageSkia& image) {
+void CaptureModeController::ShowSearchResultsPanel() {
   // We should not use `CanShowSunfishUi` here, as that could change between
   // sending the region and receiving a URL (for example, if the Sunfish policy
   // changes).
@@ -759,13 +792,6 @@ void CaptureModeController::ShowSearchResultsPanel(
   }
 
   // Note at this point the session may no longer be active.
-  auto* search_results_panel = GetSearchResultsPanel();
-  // The Lens Web API implementation has its own searchbox, so there's no need
-  // to set the thumbnail image.
-  if (!features::IsSunfishLensWebEnabled()) {
-    search_results_panel->SetSearchBoxImage(image);
-  }
-
   if (should_end_session) {
     Stop();
   }
@@ -807,13 +833,6 @@ void CaptureModeController::MaybeUpdateSearchResultsPanelBounds() {
 
 void CaptureModeController::OnLocatedEventDragged() {
   if (IsSearchResultsPanelVisible()) {
-    // Clear the search box text for the next time the panel is opened. Note we
-    // don't need to reset the image or URL since the panel will always be
-    // re-opened with those. Only necessary if the Lens Web API implementation
-    // is not enabled and we are still using the native search box.
-    if (!features::IsSunfishLensWebEnabled()) {
-      GetSearchResultsPanel()->SetSearchBoxText(std::u16string());
-    }
     search_results_panel_widget_->Hide();
   }
 }
@@ -1162,6 +1181,15 @@ void CaptureModeController::PerformCapture(PerformCaptureType capture_type) {
   if (!capture_params)
     return;
 
+  // If we are performing an image search and an Incognito window is open,
+  // return and let the user know it must be closed before making an image
+  // search.
+  if (CaptureTypeIsImageSearch(capture_type) && IsIncognitoWindowOpen()) {
+    Stop();
+    ShowSunfishIncognitoNudge();
+    return;
+  }
+
   DCHECK(!pending_dlp_check_);
   pending_dlp_check_ = true;
   capture_mode_session_->OnWaitingForDlpConfirmationStarted();
@@ -1376,8 +1404,10 @@ void CaptureModeController::MaybeUpdateVcPanel() {
 }
 
 void CaptureModeController::CheckScreenCaptureDlpRestrictions(
+    bool shutting_down,
     OnCaptureModeDlpRestrictionChecked callback) {
-  delegate_->CheckCaptureModeInitRestrictionByDlp(std::move(callback));
+  delegate_->CheckCaptureModeInitRestrictionByDlp(shutting_down,
+                                                  std::move(callback));
 }
 
 bool CaptureModeController::ShouldAllowAnnotating() const {
@@ -1388,17 +1418,6 @@ bool CaptureModeController::IsAnnotatingSupported() const {
   return video_recording_watcher_ &&
          video_recording_watcher_->active_behavior()
              ->ShouldCreateAnnotationsOverlayController();
-}
-
-void CaptureModeController::SendMultimodalSearch(const gfx::ImageSkia& image,
-                                                 const std::string& text) {
-  delegate_->SendMultimodalSearch(
-      *image.bitmap(), user_capture_region_, text,
-      base::BindRepeating(&CaptureModeController::OnSearchUrlFetched,
-                          weak_ptr_factory_.GetWeakPtr(), user_capture_region_,
-                          image));
-
-  RecordMultimodalSearchRequest();
 }
 
 bool CaptureModeController::ActiveUserDefaultSearchProviderIsGoogle() const {
@@ -1590,11 +1609,21 @@ void CaptureModeController::StartInternal(
     return;
   }
 
+  // If we are attempting to start a standalone Sunfish session and an Incognito
+  // window is open, return and let the user know it must be closed before
+  // making an image search.
+  if (entry_type == CaptureModeEntryType::kSunfish && IsIncognitoWindowOpen()) {
+    ShowSunfishIncognitoNudge();
+    return;
+  }
+
   pending_dlp_check_ = true;
-  delegate_->CheckCaptureModeInitRestrictionByDlp(base::BindOnce(
-      &CaptureModeController::OnDlpRestrictionCheckedAtSessionInit,
-      weak_ptr_factory_.GetWeakPtr(), session_type, entry_type,
-      deferred_runner.Release()));
+  delegate_->CheckCaptureModeInitRestrictionByDlp(
+      /*shutting_down=*/false,
+      base::BindOnce(
+          &CaptureModeController::OnDlpRestrictionCheckedAtSessionInit,
+          weak_ptr_factory_.GetWeakPtr(), session_type, entry_type,
+          deferred_runner.Release()));
 }
 
 void CaptureModeController::PushNewRootSizeToRecordingService(
@@ -2070,8 +2099,6 @@ void CaptureModeController::OnImageCapturedForSearch(
     return;
   }
 
-  gfx::ImageSkia image_skia = gfx::ImageSkia();
-  if (features::IsSunfishLensWebEnabled()) {
     const gfx::Image image = gfx::Image::CreateFrom1xBitmap(bitmap);
     const bool is_standalone_session =
         capture_mode_session_->active_behavior()->behavior_type() ==
@@ -2086,24 +2113,11 @@ void CaptureModeController::OnImageCapturedForSearch(
         base::BindRepeating(&CaptureModeController::OnLensWebError,
                             weak_ptr_factory_.GetWeakPtr(),
                             image_search_token));
-  } else {
-    image_skia = gfx::ImageSkia::CreateFrom1xBitmap(bitmap);
-    // `OnSearchUrlFetched()` will be invoked with `image` when the server
-    // response is fetched.
-    delegate_->SendRegionSearch(
-        bitmap, user_capture_region_,
-        base::BindRepeating(&CaptureModeController::OnSearchUrlFetched,
-                            weak_ptr_factory_.GetWeakPtr(),
-                            user_capture_region_, image_skia),
-        base::BindRepeating(&CaptureModeController::OnLensTextDetectionComplete,
-                            weak_ptr_factory_.GetWeakPtr(),
-                            image_search_token));
-  }
 
   // Immediately show the search results panel, with a loading animation in
   // place of the web contents. We will replace it once we receive the URL from
   // the server.
-  ShowSearchResultsPanel(image_skia);
+    ShowSearchResultsPanel();
 }
 
 void CaptureModeController::OnTextDetectionComplete(
@@ -2887,10 +2901,12 @@ void CaptureModeController::CaptureInstantScreenshot(
   }
 
   pending_dlp_check_ = true;
-  delegate_->CheckCaptureModeInitRestrictionByDlp(base::BindOnce(
-      &CaptureModeController::OnDlpRestrictionCheckedAtCaptureScreenshot,
-      weak_ptr_factory_.GetWeakPtr(), entry_type, source,
-      std::move(instant_screenshot_callback), behavior_type));
+  delegate_->CheckCaptureModeInitRestrictionByDlp(
+      /*shutting_down=*/false,
+      base::BindOnce(
+          &CaptureModeController::OnDlpRestrictionCheckedAtCaptureScreenshot,
+          weak_ptr_factory_.GetWeakPtr(), entry_type, source,
+          std::move(instant_screenshot_callback), behavior_type));
 }
 
 void CaptureModeController::OnDlpRestrictionCheckedAtCaptureScreenshot(

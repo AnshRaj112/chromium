@@ -8,11 +8,18 @@
 #include <string>
 #include <vector>
 
+#include "content/browser/renderer_host/render_frame_host_impl.h"
+#include "content/browser/webid/fedcm_metrics.h"
+#include "content/browser/webid/idp_network_request_manager.h"
+#include "content/common/content_export.h"
+#include "content/public/browser/federated_identity_api_permission_context_delegate.h"
 #include "content/public/browser/identity_request_dialog_controller.h"
-#include "third_party/blink/public/mojom/devtools/inspector_issue.mojom.h"
-#include "third_party/blink/public/mojom/webid/federated_auth_request.mojom.h"
+#include "third_party/blink/public/mojom/devtools/inspector_issue.mojom-forward.h"
+#include "third_party/blink/public/mojom/webid/federated_auth_request.mojom-forward.h"
 
 namespace content {
+
+enum class FedCmLifecycleStateFailureReason;
 
 // This header file defines functions which convert between FedCM types. It also
 // defines some constants used in some of these conversions.
@@ -59,6 +66,43 @@ blink::mojom::RequestTokenStatus FederatedAuthRequestResultToRequestTokenStatus(
 // endpoint error code.
 MetricsEndpointErrorCode FederatedAuthRequestResultToMetricsEndpointErrorCode(
     blink::mojom::FederatedAuthRequestResult result);
+
+// Converts an error ParseStatus from the accounts response to a pair. The first
+// member of the pair is a FederatedAuthRequestResult, which is a browser type
+// for the result. The second member of the pair is a FedCmRequestIdTokenStatus,
+// which is a type used in metrics recording. Should not be invoked with
+// ParseStatus::kSuccess.
+std::pair<blink::mojom::FederatedAuthRequestResult, FedCmRequestIdTokenStatus>
+AccountParseStatusToRequestResultAndTokenStatus(
+    IdpNetworkRequestManager::ParseStatus status);
+
+FedCmLifecycleStateFailureReason
+LifecycleStateImplLifecycleStateImplToFedCmLifecycleStateFailureReason(
+    RenderFrameHostImpl::LifecycleStateImpl lifecycle_state);
+
+// Converts a FederatedApiPermissionStatus to a (FederatedAuthRequestResult,
+// FedCmRequestIdTokenStatus) pair. Should not be invoked with
+// FederatedApiPermissionStatus::GRANTED.
+std::pair<blink::mojom::FederatedAuthRequestResult, FedCmRequestIdTokenStatus>
+PermissionStatusToRequestResultAndTokenStatus(
+    content::FederatedIdentityApiPermissionContextDelegate::PermissionStatus
+        permission_status);
+
+FedCmErrorDialogResult DismissReasonToErrorDialogResult(
+    IdentityRequestDialogController::DismissReason dismiss_reason,
+    bool has_url);
+
+// Converts a FetchStatus from the ID assertion endpoint to a
+// (FederatedAuthRequestResult, FedCmRequestIdTokenStatus) pair. Should not be
+// invoked when the parse_status is ParseStatus::kSuccess.
+std::pair<blink::mojom::FederatedAuthRequestResult, FedCmRequestIdTokenStatus>
+IdAssertionFetchStatusToRequestResultAndTokenStatus(
+    IdpNetworkRequestManager::FetchStatus status);
+
+// Returns a list of fields that we should mediate authorization for. If
+// empty, we should not show a permission request dialog.
+CONTENT_EXPORT std::vector<IdentityRequestDialogDisclosureField>
+GetDisclosureFields(const std::optional<std::vector<std::string>>& fields);
 
 }  // namespace content
 

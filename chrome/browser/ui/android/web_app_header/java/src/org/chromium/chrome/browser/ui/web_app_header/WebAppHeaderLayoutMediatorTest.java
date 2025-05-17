@@ -48,6 +48,7 @@ public class WebAppHeaderLayoutMediatorTest {
     private static final int SCREEN_WIDTH = 800;
     private static final int SCREEN_HEIGHT = 1600;
     private static final int SYS_APP_HEADER_HEIGHT = 40;
+    private static final int HEADER_BUTTON_HEIGHT = 46;
     private static final int LEFT_INSET = 50;
     private static final int RIGHT_INSET = 60;
     private static final Rect WIDEST_UNOCCLUDED_RECT =
@@ -91,7 +92,8 @@ public class WebAppHeaderLayoutMediatorTest {
                         mTabSupplier,
                         mNonDraggableAreasSupplier,
                         mThemeColorProvider,
-                        SYS_APP_HEADER_HEIGHT);
+                        SYS_APP_HEADER_HEIGHT,
+                        HEADER_BUTTON_HEIGHT);
 
         mShadowLooper.idle();
     }
@@ -112,6 +114,52 @@ public class WebAppHeaderLayoutMediatorTest {
     }
 
     @Test
+    public void testButtonBottomInset_headerHeightEqualButtonHeight() {
+        Rect widestUnoccludedRect =
+                new Rect(LEFT_INSET, 0, SCREEN_WIDTH - RIGHT_INSET, HEADER_BUTTON_HEIGHT);
+        setupDesktopWindowing(/* isInDesktopWindow= */ true, widestUnoccludedRect);
+        mMediator.onAppHeaderStateChanged(mAppHeaderState);
+
+        assertEquals(
+                "Button bottom inset should be zero.",
+                0,
+                mMediator.getButtonBottomInsetForTesting());
+    }
+
+    @Test
+    public void testButtonBottomInset_headerHeightLessThanButtonHeight() {
+        setupDesktopWindowing(/* isInDesktopWindow= */ true, WIDEST_UNOCCLUDED_RECT);
+        mMediator.onAppHeaderStateChanged(mAppHeaderState);
+
+        assertEquals(
+                "Button bottom inset should cover the extra height needed to fit the button.",
+                HEADER_BUTTON_HEIGHT - SYS_APP_HEADER_HEIGHT,
+                mMediator.getButtonBottomInsetForTesting());
+    }
+
+    @Test
+    public void testButtonBottomInset_adjustedHeaderHeightLessThanButtonHeight() {
+        final int statusBarHeight = HEADER_BUTTON_HEIGHT - SYS_APP_HEADER_HEIGHT;
+
+        // The caption bar is large enough to fit the buttons, but part of the caption bar is
+        // occupied by the status bar.
+        final Rect widestUnoccludedRect =
+                new Rect(
+                        LEFT_INSET,
+                        statusBarHeight,
+                        SCREEN_WIDTH - RIGHT_INSET,
+                        HEADER_BUTTON_HEIGHT);
+
+        setupDesktopWindowing(/* isInDesktopWindow= */ true, widestUnoccludedRect);
+        mMediator.onAppHeaderStateChanged(mAppHeaderState);
+
+        assertEquals(
+                "Button bottom inset should cover the extra height needed to fit the button.",
+                statusBarHeight,
+                mMediator.getButtonBottomInsetForTesting());
+    }
+
+    @Test
     public void testHasAppHeaderStateOnInit_setPaddingsMatchingInsets() {
         setupDesktopWindowing(/* isInDesktopWindow= */ true, WIDEST_UNOCCLUDED_RECT);
         mMediator =
@@ -123,7 +171,8 @@ public class WebAppHeaderLayoutMediatorTest {
                         mTabSupplier,
                         mNonDraggableAreasSupplier,
                         mThemeColorProvider,
-                        SYS_APP_HEADER_HEIGHT);
+                        SYS_APP_HEADER_HEIGHT,
+                        HEADER_BUTTON_HEIGHT);
 
         assertEquals(
                 "Header min height should match app header height",
@@ -170,7 +219,8 @@ public class WebAppHeaderLayoutMediatorTest {
                         mTabSupplier,
                         mNonDraggableAreasSupplier,
                         mThemeColorProvider,
-                        SYS_APP_HEADER_HEIGHT);
+                        SYS_APP_HEADER_HEIGHT,
+                        HEADER_BUTTON_HEIGHT);
         assertEquals(
                 "Header paddings should match updated system insets",
                 new Rect(0, 0, 0, 0),
@@ -223,10 +273,11 @@ public class WebAppHeaderLayoutMediatorTest {
     }
 
     @Test
-    public void testAppHeaderHeightIsGreaterThanMin_setTopPaddingEqualExceedingSize() {
-        final int headerHeight = SYS_APP_HEADER_HEIGHT + 10;
+    public void testAppHeaderHeightIsGreaterThanMin_setTopPaddingEqualStatusBarHeight() {
+        final int statusBarHeight = 10;
+        final int headerHeight = SYS_APP_HEADER_HEIGHT + statusBarHeight;
         final Rect widestUnoccludedRect =
-                new Rect(LEFT_INSET, 0, SCREEN_WIDTH - RIGHT_INSET, headerHeight);
+                new Rect(LEFT_INSET, statusBarHeight, SCREEN_WIDTH - RIGHT_INSET, headerHeight);
         setupDesktopWindowing(/* isInDesktopWindow= */ true, widestUnoccludedRect);
         WebAppHeaderLayoutMediator.setMinHeightForTesting(SYS_APP_HEADER_HEIGHT);
 

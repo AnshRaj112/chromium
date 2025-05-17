@@ -7,6 +7,7 @@
 #include <ostream>
 #include <vector>
 
+#include "base/command_line.h"
 #include "base/feature_list.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
@@ -528,11 +529,6 @@ bool OriginTrialContext::CanEnableTrialFromName(const StringView& trial_name) {
         network::features::kInterestGroupStorage);
   }
 
-  if (trial_name == "SpeculationRulesPrefetchFuture") {
-    return base::FeatureList::IsEnabled(
-        features::kSpeculationRulesPrefetchFuture);
-  }
-
   if (trial_name == "BackForwardCacheSendNotRestoredReasons") {
     return base::FeatureList::IsEnabled(
         features::kBackForwardCacheSendNotRestoredReasons);
@@ -560,8 +556,12 @@ bool OriginTrialContext::CanEnableTrialFromName(const StringView& trial_name) {
     return base::FeatureList::IsEnabled(features::kLanguageDetectionAPI);
   }
 
+  // TODO(crbug.com/385173568): Remove after AIPromptAPIForExtension OT.
   if (trial_name == "AIPromptAPIForExtension") {
-    return base::FeatureList::IsEnabled(features::kAIPromptAPIForExtension);
+    return base::FeatureList::IsEnabled(features::kAIPromptAPI) &&
+           base::FeatureList::IsEnabled(features::kAIPromptAPIForExtension) &&
+           base::CommandLine::ForCurrentProcess()->HasSwitch(
+               "extension-process");
   }
 
   if (trial_name == "SpeculationRulesTargetHint") {

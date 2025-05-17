@@ -19,9 +19,7 @@
 #include "chrome/browser/glic/host/glic.mojom.h"
 #include "chrome/browser/glic/host/glic_web_client_access.h"
 #include "chrome/browser/glic/host/host.h"
-#include "chrome/browser/glic/widget/application_hotkey_delegate.h"
 #include "chrome/browser/glic/widget/glic_modal_manager.h"
-#include "chrome/browser/glic/widget/glic_window_hotkey_delegate.h"
 #include "chrome/browser/glic/widget/local_hotkey_manager.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -29,7 +27,6 @@
 #include "content/public/browser/web_contents.h"
 #include "ui/base/interaction/element_tracker.h"
 #include "ui/views/widget/widget.h"
-#include "ui/views/widget/widget_observer.h"
 
 class Browser;
 namespace gfx {
@@ -70,7 +67,7 @@ class GlicWindowController : public Host::Delegate {
   GlicWindowController(const GlicWindowController&) = delete;
   GlicWindowController& operator=(const GlicWindowController&) = delete;
   GlicWindowController() = default;
-  ~GlicWindowController() = default;
+  virtual ~GlicWindowController() = default;
 
   // Show, summon, or activate the panel if needed, or close it if it's already
   // active and prevent_close is false.
@@ -195,6 +192,8 @@ class GlicWindowController : public Host::Delegate {
 
   virtual GlicView* GetGlicView() = 0;
 
+  virtual base::WeakPtr<views::View> GetGlicViewAsView() = 0;
+
   // Returns the widget that backs the glic window.
   virtual GlicWidget* GetGlicWidget() = 0;
 
@@ -210,14 +209,10 @@ class GlicWindowController : public Host::Delegate {
   //   * Waiting for glic to load (the open animation has finished, but the
   //     glic window contents is not yet ready)
   //   * Open (aka showing, visible)
-  //   * Detaching
-  //   * ClosingToReopenDetached
   enum class State {
     kClosed,
     kWaitingForGlicToLoad,
     kOpen,
-    kDetaching,
-    kClosingToReopenDetached,
   };
   virtual State state() const = 0;
 

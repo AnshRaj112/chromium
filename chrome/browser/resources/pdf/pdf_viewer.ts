@@ -614,6 +614,10 @@ export class PdfViewerElement extends PdfViewerBaseElement {
           !Ink2Manager.getInstance().isInitializationStarted()) {
         await Ink2Manager.getInstance().initializeBrush();
       }
+      if (newAnnotationMode === AnnotationMode.TEXT &&
+          !Ink2Manager.getInstance().isTextInitializationComplete()) {
+        await Ink2Manager.getInstance().initializeTextAnnotations();
+      }
       this.annotationMode_ = newAnnotationMode;
       return;
     }
@@ -984,7 +988,8 @@ export class PdfViewerElement extends PdfViewerBaseElement {
             'Unknown executedEditCommand data received: ' + editCommand);
       // <if expr="enable_pdf_ink2">
       case 'finishInkStroke':
-        this.handleFinishInkStroke_();
+        const modifiedData = data as unknown as {modified: boolean};
+        this.handleFinishInkStroke_(modifiedData.modified);
         return;
       // </if>
       case 'formFocusChange':
@@ -1035,6 +1040,11 @@ export class PdfViewerElement extends PdfViewerBaseElement {
           this.$.searchifyProgress.hide();
         }
         return;
+      // <if expr="enable_pdf_ink2">
+      case 'startInkStroke':
+        this.handleStartInkStroke_();
+        return;
+      // </if>
       case 'startedFindInPage':
         record(UserAction.FIND_IN_PAGE);
         if (this.hasSearchifyText_) {
@@ -1125,12 +1135,20 @@ export class PdfViewerElement extends PdfViewerBaseElement {
   }
 
   // <if expr="enable_pdf_ink2">
-  /** Handles a new ink stroke in annotation mode. */
-  private handleFinishInkStroke_() {
-    this.hasCommittedInk2Edits_ = true;
+  /** Handles the start of a new ink stroke in annotation mode. */
+  private handleStartInkStroke_() {
     this.pluginController_.getEventTarget().dispatchEvent(
-        new CustomEvent(PluginControllerEventType.FINISH_INK_STROKE));
-    this.setShowBeforeUnloadDialog_(true);
+        new CustomEvent(PluginControllerEventType.START_INK_STROKE));
+  }
+
+  /** Handles a new ink stroke in annotation mode. */
+  private handleFinishInkStroke_(modified: boolean) {
+    if (modified) {
+      this.hasCommittedInk2Edits_ = true;
+      this.setShowBeforeUnloadDialog_(true);
+    }
+    this.pluginController_.getEventTarget().dispatchEvent(new CustomEvent(
+        PluginControllerEventType.FINISH_INK_STROKE, {detail: modified}));
   }
 
   /** Handles a 'contentFocused' event in the PDF content. */

@@ -7,6 +7,7 @@ package org.chromium.chrome.browser.toolbar;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -52,6 +53,7 @@ import org.chromium.chrome.browser.browser_controls.BrowserStateBrowserControlsV
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
 import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.toolbar.ToolbarPositionController.BottomControlsLayerWithOffset;
 import org.chromium.chrome.browser.toolbar.ToolbarPositionController.StateTransition;
 import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.ui.KeyboardVisibilityDelegate;
@@ -153,6 +155,11 @@ public class ToolbarPositionControllerTest {
                 }
 
                 @Override
+                public int getTopControlsHairlineHeight() {
+                    return 0;
+                }
+
+                @Override
                 public int getTopControlsMinHeight() {
                     return mTopControlsMinHeight;
                 }
@@ -242,6 +249,10 @@ public class ToolbarPositionControllerTest {
     private ToolbarPositionController mController;
     private final ObservableSupplierImpl<Integer> mBottomToolbarOffsetSupplier =
             new ObservableSupplierImpl<>();
+    private final ObservableSupplierImpl<Integer> mKeyboardAccessoryHeightSupplier =
+            new ObservableSupplierImpl<>(0);
+    private final ObservableSupplierImpl<Integer> mControlContainerTranslationSupplier =
+            new ObservableSupplierImpl<>(0);
     private HistogramWatcher mStartupExpectation;
     private WindowAndroid mWindowAndroid;
 
@@ -299,11 +310,13 @@ public class ToolbarPositionControllerTest {
                         mIsOmniboxFocused,
                         mIsFormFieldFocused,
                         mIsFindInPageShowing,
+                        mKeyboardAccessoryHeightSupplier,
                         mKeyboardVisibilityDelegate,
                         mControlContainer,
                         mBottomControlsStacker,
                         mBottomToolbarOffsetSupplier,
                         mProgressBarContainer,
+                        mControlContainerTranslationSupplier,
                         mContext);
     }
 
@@ -531,9 +544,9 @@ public class ToolbarPositionControllerTest {
         mIsOmniboxFocused.set(true);
         assertControlsAtTop();
         assertEquals(LayerVisibility.HIDDEN, toolbarLayer.getLayerVisibility());
-        verify(mControlContainerView).setTranslationY(0);
+        verify(mControlContainerView, atLeast(1)).setTranslationY(0);
         assertEquals(LayerVisibility.HIDDEN, progressBarLayer.getLayerVisibility());
-        verify(mProgressBarContainer).setTranslationY(0);
+        verify(mProgressBarContainer, atLeast(1)).setTranslationY(0);
     }
 
     @Test
@@ -777,6 +790,36 @@ public class ToolbarPositionControllerTest {
         ToolbarPositionController.resetCachedToolbarConfigurationForTesting();
         assertTrue(ToolbarPositionController.shouldShowToolbarOnTop(null));
         assertTrue(ToolbarPositionController.shouldShowToolbarOnTop(tab));
+    }
+
+    @Test
+    @EnableFeatures({ChromeFeatureList.ANDROID_BOTTOM_TOOLBAR, ChromeFeatureList.MINI_ORIGIN_BAR})
+    public void testControlContainerTranslationAdjustments() {
+        setUserToolbarAnchorPreference(/* showToolbarOnTop= */ false);
+        mIsFormFieldFocused.onNodeAttributeUpdated(true, false);
+        mKeyboardVisibilityDelegate.setVisibilityForTests(true);
+        assertControlsAtBottom();
+
+        BottomControlsLayerWithOffset toolbarLayer =
+                (BottomControlsLayerWithOffset)
+                        mBottomControlsStacker.getLayerForTesting(LayerType.BOTTOM_TOOLBAR);
+        toolbarLayer.onBrowserControlsOffsetUpdate(12);
+        verify(mControlContainerView).setTranslationY(12);
+
+        mKeyboardAccessoryHeightSupplier.set(100);
+        verify(mControlContainerView).setTranslationY(12 - 100);
+        assertEquals(12 - 100, mBottomToolbarOffsetSupplier.get().intValue());
+
+        mKeyboardAccessoryHeightSupplier.set(0);
+        verify(mControlContainerView, times(2)).setTranslationY(12);
+
+        mControlContainerTranslationSupplier.set(10);
+        verify(mControlContainerView).setTranslationY(22);
+        assertEquals(22, mBottomToolbarOffsetSupplier.get().intValue());
+
+        mControlContainerTranslationSupplier.set(20);
+        verify(mControlContainerView).setTranslationY(32);
+        assertEquals(32, mBottomToolbarOffsetSupplier.get().intValue());
     }
 
     private void assertControlsAtBottom() {

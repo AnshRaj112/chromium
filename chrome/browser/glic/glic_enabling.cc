@@ -13,6 +13,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_attributes_storage.h"
 #include "chrome/browser/signin/identity_manager_factory.h"
+#include "chrome/browser/ui/ui_features.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
@@ -97,7 +98,7 @@ GlicEnabling::ProfileEnablement GlicEnabling::EnablementForProfile(
 bool GlicEnabling::IsEnabledByFlags() {
   // Check that the feature flags are enabled.
   return base::FeatureList::IsEnabled(features::kGlic) &&
-         base::FeatureList::IsEnabled(features::kTabstripComboButton);
+         features::IsTabSearchMoving();
 }
 
 bool GlicEnabling::IsProfileEligible(const Profile* profile) {

@@ -6,7 +6,7 @@
 // ash/webui/personalization_app/tools/gen_tsconfig.py --root_out_dir out/pc \
 //   --gn_target chrome/test/data/webui/glic:build_ts
 
-import {PanelStateKind, ScrollToErrorReason, WebClientMode} from '/glic/glic_api/glic_api.js';
+import {ScrollToErrorReason, WebClientMode} from '/glic/glic_api/glic_api.js';
 import type {GlicBrowserHost, GlicHostRegistry, GlicWebClient, Observable, OpenPanelInfo, PanelOpeningData, ScrollToError, Subscriber} from '/glic/glic_api/glic_api.js';
 import {ObservableValue} from '/glic/observable.js';
 
@@ -158,7 +158,7 @@ class ApiTestFixtureBase {
   }
 }
 
-// Test cases here correspond to test cases in glic_api_uitest.cc.
+// Test cases here correspond to test cases in glic_api_browsertest.cc.
 // Since these tests run in the webview, this test can't use normal deps like
 // mocha or chai assert.
 class ApiTests extends ApiTestFixtureBase {
@@ -166,8 +166,8 @@ class ApiTests extends ApiTestFixtureBase {
     await this.client.waitForFirstOpen();
   }
 
-  // WARNING: Remember to update chrome/browser/glic/host/glic_api_uitest.cc
-  // if you add a new test!
+  // WARNING: Remember to update
+  // chrome/browser/glic/host/glic_api_browsertest.cc if you add a new test!
 
   async testDoNothing() {}
 
@@ -248,41 +248,6 @@ class ApiTests extends ApiTestFixtureBase {
     await waitFor(closedPromise.promise);
   }
 
-  async testAttachPanel() {
-    // Test starts in attached mode.
-    await this.waitForPanelState(PanelStateKind.DETACHED);
-    assertTrue(!!this.host.attachPanel);
-    this.host.attachPanel();
-    await this.waitForPanelState(PanelStateKind.ATTACHED);
-  }
-
-  async testDetachPanel() {
-    // Test starts in detached mode.
-    await this.waitForPanelState(PanelStateKind.ATTACHED);
-    assertTrue(!!this.host.detachPanel);
-    this.host.detachPanel();
-    await this.waitForPanelState(PanelStateKind.DETACHED);
-  }
-
-  // Verify that unsubscribing from an observable prevents future updates.
-  async testUnsubscribeFromObservable() {
-    await this.waitForPanelState(PanelStateKind.DETACHED);
-    const panelStateSequence1 = observeSequence(this.host.getPanelState!());
-    const panelStateSequence2 = observeSequence(this.host.getPanelState!());
-    assertEquals(
-        PanelStateKind.DETACHED, (await panelStateSequence1.next()).kind);
-    assertEquals(
-        PanelStateKind.DETACHED, (await panelStateSequence2.next()).kind);
-    panelStateSequence2.unsubscribe();
-    this.host.attachPanel!();
-    assertEquals(
-        PanelStateKind.ATTACHED, (await panelStateSequence1.next()).kind);
-    assertEquals('no-change', await Promise.race([
-      panelStateSequence2.next().then(state => state.kind),
-      sleep(100).then(() => 'no-change'),
-    ]));
-  }
-
   async testShowProfilePicker() {
     assertTrue(!!this.host.showProfilePicker);
     this.host.showProfilePicker();
@@ -300,14 +265,6 @@ class ApiTests extends ApiTestFixtureBase {
     assertTrue(await activeSequence.next());
     await this.advanceToNextStep();
     assertFalse(await activeSequence.next());
-  }
-
-  async testCanAttachPanel() {
-    assertTrue(!!this.host.canAttachPanel);
-    const canAttach = observeSequence(this.host.canAttachPanel());
-    // When subscribing to this value, an initial update is guaranteed to be
-    // emited.
-    assertTrue(await canAttach.next());
   }
 
   async testIsBrowserOpen() {
@@ -866,11 +823,15 @@ class ApiTests extends ApiTestFixtureBase {
     assertEquals(url.pathname, '/glic/test.html');
   }
 
-
-  private async waitForPanelState(kind: PanelStateKind): Promise<void> {
-    assertTrue(!!this.host.getPanelState);
-    await observeSequence(this.host.getPanelState())
-        .waitFor(s => s.kind === kind);
+  async testCallingApiWhileHiddenRecordsMetrics() {
+    assertTrue(!!this.host.createTab);
+    await this.advanceToNextStep();
+    await runUntil(() => document.visibilityState === 'hidden');
+    try {
+      await this.host.createTab(
+          'https://www.google.com', {openInBackground: false});
+    } catch {
+    }
   }
 
   private async assertCreateTabWithUnsupportedSchemeFails(url: string) {
@@ -1260,7 +1221,8 @@ async function waitFor<T>(value: Promise<T>, timeoutMs?: number): Promise<T> {
 // timeout is reached first. Otherwise, this returns the value returned by
 // condition.
 async function runUntil<T>(
-    condition: () => Promise<T>, timeoutMs?: number): Promise<NonNullable<T>> {
+    condition: () => T | PromiseLike<T>,
+    timeoutMs?: number): Promise<NonNullable<T>> {
   timeoutMs = getTimeout(timeoutMs);
   const sleepMs = getTimeout(timeoutMs) / 20;
   const timeout = performance.now() + timeoutMs;

@@ -57,6 +57,10 @@ BASE_DECLARE_FEATURE(kLensOverlaySidePanelOpenInNewTab);
 COMPONENT_EXPORT(LENS_FEATURES)
 BASE_DECLARE_FEATURE(kLensOverlaySimplifiedSelection);
 
+// Enables the Lens overlay visual selection updates.
+COMPONENT_EXPORT(LENS_FEATURES)
+BASE_DECLARE_FEATURE(kLensOverlayVisualSelectionUpdates);
+
 // Enables the Lens overlay updated client context.
 COMPONENT_EXPORT(LENS_FEATURES)
 BASE_DECLARE_FEATURE(kLensOverlayUpdatedClientContext);
@@ -64,6 +68,10 @@ BASE_DECLARE_FEATURE(kLensOverlayUpdatedClientContext);
 // Enables opening the Lens overlay MGT feature in the side panel.
 COMPONENT_EXPORT(LENS_FEATURES)
 BASE_DECLARE_FEATURE(kLensOverlayMGTInSidePanel);
+
+// Enables the Lens Overlay omnibox entry point.
+COMPONENT_EXPORT(LENS_FEATURES)
+BASE_DECLARE_FEATURE(kLensOverlayOmniboxEntryPoint);
 
 // Enables uploading chunking for the Lens overlay.
 COMPONENT_EXPORT(LENS_FEATURES)
@@ -750,6 +758,11 @@ extern int GetTranslateTextReceivedTimeout();
 // feature is enabled.
 COMPONENT_EXPORT(LENS_FEATURES)
 extern bool GetShouldCopyAsImage();
+
+// Whether to enable the border glow for the visual selection updates. Enabling
+// this will disable the shimmer animation.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern bool GetVisualSelectionUpdatesEnableBorderGlow();
 
 // Whether to fix the request id for page content upload requests. When enabled,
 // this will not increment the image upload request ID when the page content

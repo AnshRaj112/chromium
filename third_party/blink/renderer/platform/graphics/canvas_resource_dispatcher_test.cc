@@ -184,20 +184,17 @@ TEST_F(CanvasResourceDispatcherTest, PlaceholderRunsNormally) {
    * the resources in order. */
   // Reclaim first frame
   viz::ResourceId reclaim_resource_id(1u);
-  Dispatcher()->OnPlaceholderReleasedResource(reclaim_resource_id,
-                                              std::move(frame1));
+  Dispatcher()->OnPlaceholderReleasedResource();
   EXPECT_EQ(2u, GetNumUnreclaimedFramesPosted());
 
   // Reclaim second frame
   reclaim_resource_id = NextId(reclaim_resource_id);
-  Dispatcher()->OnPlaceholderReleasedResource(reclaim_resource_id,
-                                              std::move(frame2));
+  Dispatcher()->OnPlaceholderReleasedResource();
   EXPECT_EQ(1u, GetNumUnreclaimedFramesPosted());
 
   // Reclaim third frame
   reclaim_resource_id = NextId(reclaim_resource_id);
-  Dispatcher()->OnPlaceholderReleasedResource(reclaim_resource_id,
-                                              std::move(frame3));
+  Dispatcher()->OnPlaceholderReleasedResource();
   EXPECT_EQ(0u, GetNumUnreclaimedFramesPosted());
 }
 
@@ -253,8 +250,7 @@ TEST_F(CanvasResourceDispatcherTest, PlaceholderBeingBlocked) {
    * Resource reclaim happens in the same order as frame posting. */
   viz::ResourceId reclaim_resource_id(1u);
   EXPECT_CALL(*(Dispatcher()), PostImageToPlaceholder(_, post_resource_id));
-  Dispatcher()->OnPlaceholderReleasedResource(reclaim_resource_id,
-                                              std::move(frame1));
+  Dispatcher()->OnPlaceholderReleasedResource();
   // Reclaim 1 frame and post 1 frame, so numPostImagesUnresponded remains as 3
   EXPECT_EQ(CanvasResourceDispatcher::kMaxUnreclaimedPlaceholderFrames,
             GetNumUnreclaimedFramesPosted());
@@ -266,8 +262,7 @@ TEST_F(CanvasResourceDispatcherTest, PlaceholderBeingBlocked) {
 
   EXPECT_CALL(*(Dispatcher()), PostImageToPlaceholder(_, _)).Times(0);
   reclaim_resource_id = NextId(reclaim_resource_id);
-  Dispatcher()->OnPlaceholderReleasedResource(reclaim_resource_id,
-                                              std::move(frame2));
+  Dispatcher()->OnPlaceholderReleasedResource();
   EXPECT_EQ(CanvasResourceDispatcher::kMaxUnreclaimedPlaceholderFrames - 1,
             GetNumUnreclaimedFramesPosted());
   Mock::VerifyAndClearExpectations(Dispatcher());
@@ -436,7 +431,6 @@ TEST_P(CanvasResourceDispatcherTest, DispatchFrame) {
 
             const auto* texture_quad =
                 static_cast<const viz::TextureDrawQuad*>(quad);
-            EXPECT_TRUE(texture_quad->premultiplied_alpha);
             EXPECT_EQ(texture_quad->uv_top_left, gfx::PointF(0.0f, 0.0f));
             EXPECT_EQ(texture_quad->uv_bottom_right, gfx::PointF(1.0f, 1.0f));
 
@@ -444,15 +438,15 @@ TEST_P(CanvasResourceDispatcherTest, DispatchFrame) {
             // whose origin is top-left.
             EXPECT_EQ(frame->resource_list.front().origin,
                       kTopLeft_GrSurfaceOrigin);
+            EXPECT_EQ(frame->resource_list.front().alpha_type,
+                      kPremul_SkAlphaType);
           })));
 
   constexpr SkIRect damage_rect = SkIRect::MakeWH(kDamageWidth, kDamageHeight);
   Dispatcher()->DispatchFrame(canvas_resource, base::TimeTicks::Now(),
                               damage_rect, !context_alpha /* is_opaque */);
   platform->RunUntilIdle();
-  viz::ResourceId reclaim_resource_id(1u);
-  Dispatcher()->OnPlaceholderReleasedResource(reclaim_resource_id,
-                                              std::move(canvas_resource));
+  Dispatcher()->OnPlaceholderReleasedResource();
 }
 
 const TestParams kTestCases[] = {

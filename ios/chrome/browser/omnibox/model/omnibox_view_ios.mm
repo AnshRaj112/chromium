@@ -16,7 +16,6 @@
 #import "base/metrics/user_metrics_action.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/omnibox/browser/autocomplete_input.h"
-#import "components/omnibox/browser/autocomplete_match.h"
 #import "components/omnibox/browser/clipboard_provider.h"
 #import "components/omnibox/browser/location_bar_model.h"
 #import "components/omnibox/common/omnibox_focus_state.h"
@@ -92,20 +91,6 @@ void OmniboxViewIOS::UpdatePopup() {
   [omnibox_text_controller_ startAutocompleteAfterEdit];
 }
 
-void OmniboxViewIOS::OnTemporaryTextMaybeChanged(
-    const std::u16string& display_text,
-    const AutocompleteMatch& match,
-    bool save_original_selection,
-    bool notify_text_changed) {
-  [omnibox_text_controller_ setWindowText:display_text
-                                 caretPos:display_text.length()
-                        startAutocomplete:NO
-                        notifyTextChanged:NO];
-  if (model()) {
-    model()->OnChanged();
-  }
-}
-
 void OmniboxViewIOS::OnInlineAutocompleteTextMaybeChanged(
     const std::u16string& user_text,
     const std::u16string& inline_autocompletion) {
@@ -123,7 +108,7 @@ void OmniboxViewIOS::OnBeforePossibleChange() {
   marked_text_before_change_ = [[field_ markedText] copy];
 }
 
-bool OmniboxViewIOS::OnAfterPossibleChange(bool allow_keyword_ui_change) {
+bool OmniboxViewIOS::OnAfterPossibleChange() {
   State new_state;
   GetState(&new_state);
   // Manually update the selection state after calling GetState().
@@ -133,10 +118,8 @@ bool OmniboxViewIOS::OnAfterPossibleChange(bool allow_keyword_ui_change) {
   OmniboxViewBase::StateChanges state_changes =
       GetStateChanges(state_before_change_, new_state);
 
-  // iOS does not supports KeywordProvider, so never allow keyword UI changes.
   const bool something_changed =
-      model() &&
-      model()->OnAfterPossibleChange(state_changes, allow_keyword_ui_change);
+      model() && model()->OnAfterPossibleChange(state_changes);
 
   if (model()) {
     model()->OnChanged();
@@ -301,11 +284,7 @@ void OmniboxViewIOS::OnDidChange(bool processing_user_event) {
     return;
   }
 
-  // TODO(crbug.com/41225237): OnAfterPossibleChange() now takes an argument. It
-  // use to not take an argument and was defaulting to false, so as it is
-  // unclear what the correct value is, using what was that before seems
-  // consistent.
-  OnAfterPossibleChange(false);
+  OnAfterPossibleChange();
   OnBeforePossibleChange();
 }
 

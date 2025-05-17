@@ -51,7 +51,7 @@ public abstract class ConditionalState {
     @Phase private int mLifecyclePhase = Phase.NEW;
     private final Elements mConsolidatedElements = new Elements(this);
     protected final Elements.Builder mElements = mConsolidatedElements.newBuilder();
-    private boolean mDeclareElementsCalled;
+    private boolean mAreElementsConsolidated;
 
     /** Lifecycle phases of ConditionalState. */
     @IntDef({
@@ -71,18 +71,6 @@ public abstract class ConditionalState {
     }
 
     /**
-     * Declare the {@link BaseElements} that define this ConditionalState, such as Views.
-     *
-     * <p>Transit-layer {@link Station}s and {@link Facility}s can declare Elements in their
-     * constructor and/or override this method.
-     *
-     * @param elements use the #declare___() methods to describe the Elements that define the state.
-     * @deprecated Declare elements in the constructor or in{@link #declareExtraElements()}.
-     */
-    @Deprecated
-    public void declareElements(Elements.Builder elements) {}
-
-    /**
      * Declare extra {@link Element}s that define this ConditionalState, such as Views.
      *
      * <p>Transit-layer {@link Station}s and {@link Facility}s can declare Elements in their
@@ -92,11 +80,10 @@ public abstract class ConditionalState {
     public void declareExtraElements() {}
 
     Elements getElements() {
-        if (!mDeclareElementsCalled) {
-            declareElements(mElements);
+        if (!mAreElementsConsolidated) {
             declareExtraElements();
             mElements.consolidate();
-            mDeclareElementsCalled = true;
+            mAreElementsConsolidated = true;
         }
         return mConsolidatedElements;
     }
@@ -249,13 +236,35 @@ public abstract class ConditionalState {
     }
 
     /** Declare as an element a View that matches |viewMatcher| with extra Options. */
+    public ViewElement<View> declareView(Matcher<View> viewMatcher, ViewElement.Options options) {
+        return mElements.declareView(viewMatcher, options);
+    }
+
+    /** Declare as an element a |viewClass| that matches |viewMatcher|. */
+    public <ViewT extends View> ViewElement<ViewT> declareView(
+            Class<ViewT> viewClass, Matcher<View> viewMatcher) {
+        return mElements.declareView(viewClass, viewMatcher);
+    }
+
+    /** Declare as an element a |viewClass| that matches |viewMatcher| with extra Options. */
+    public <ViewT extends View> ViewElement<ViewT> declareView(
+            Class<ViewT> viewClass, Matcher<View> viewMatcher, ViewElement.Options options) {
+        return mElements.declareView(viewClass, viewMatcher, options);
+    }
+
+    /** Declare as an element a View that matches |viewSpec| with extra Options. */
     protected <ViewT extends View> ViewElement<ViewT> declareView(
             ViewSpec<ViewT> viewSpec, ViewElement.Options options) {
         return mElements.declareView(viewSpec, options);
     }
 
+    /** Declare as an element a View that matches |viewSpec|. */
+    public ViewElement<View> declareView(Matcher<View> viewMatcher) {
+        return mElements.declareView(viewMatcher);
+    }
+
     /** Declare as a Condition that a View is not displayed. */
-    protected void declareNoView(ViewSpec viewSpec) {
+    protected void declareNoView(ViewSpec<?> viewSpec) {
         mElements.declareNoView(viewSpec);
     }
 

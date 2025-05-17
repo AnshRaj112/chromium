@@ -140,6 +140,8 @@ struct ContextualSearch : Config<ContextualSearch> {
   DECLARE_FEATURE(kSendContextualUrlSuggestParam);
   DECLARE_FEATURE(kOmniboxContextualSearchOnFocusSuggestions);
   DECLARE_FEATURE(kContextualSearchBoxUsesContextualSearchProvider);
+  DECLARE_FEATURE(kOmniboxZeroSuggestSynchronousMatchesOnly);
+  DECLARE_FEATURE(kContextualSearchOpenLensActionUsesThumbnail);
 
   // Whether to use contextual search features, for example the lens action.
   bool IsContextualSearchEnabled() const;
@@ -164,6 +166,14 @@ struct ContextualSearch : Config<ContextualSearch> {
   // Whether to use ContextualSearchProvider instead of ZeroSuggestProvider for
   // sourcing contextual search box matches.
   bool csb_uses_csp;
+
+  // Whether to omit asynchronous matches in ZeroSuggestProvider specifically,
+  // a behavior that is relevant to one planned configuration of this feature.
+  bool zero_suggest_synchronous_matches_only;
+
+  // Whether the Lens entrypoint action uses a thumbnail of web contents view
+  // instead of its regular vector icon.
+  bool open_lens_action_uses_thumbnail;
 };
 
 // If enabled, allows MIA zero-prefix suggestions in NTP omnibox and realbox.
@@ -260,6 +270,9 @@ struct SearchAggregatorProvider : Config<SearchAggregatorProvider> {
   //   "server": Use server-provided scores in both scoped and unscoped mode.
   //   "client": Use client-calculated scores in both scoped and unscoped mode.
   std::string relevance_scoring_mode;
+  // If true, show unscoped `EnterpriseSearchAggregatorProvider` suggestions in
+  // the NTP realbox.
+  bool realbox_unscoped_suggestions;
 
   // See comments in enterprise_search_aggregator_provider.cc
   size_t scoring_max_matches_created_per_type;

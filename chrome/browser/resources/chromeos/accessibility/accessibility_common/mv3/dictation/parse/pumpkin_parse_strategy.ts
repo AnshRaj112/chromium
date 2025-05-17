@@ -43,17 +43,13 @@ export class PumpkinParseStrategy extends ParseStrategy {
   private locale_: PumpkinConstants.PumpkinLocale|null = null;
   private requestedPumpkinInstall_ = false;
   private onPumpkinTaggerReadyChangedForTesting_: VoidFunction|null = null;
+  private offscreenMessageListenerRegistered_ = false;
 
   private init_(): void {
     this.refreshLocale_();
     if (!this.locale_) {
       return;
     }
-
-    chrome.runtime.onMessage.addListener(
-        (message: any|undefined, _sender: chrome.runtime.MessageSender,
-         _sendResponse: (value: any) => void) =>
-            this.handleMessageFromOffscreen_(message));
 
     this.requestedPumpkinInstall_ = true;
     chrome.accessibilityPrivate.installPumpkinForDictation(data => {
@@ -83,6 +79,17 @@ export class PumpkinParseStrategy extends ParseStrategy {
     // Create SandboxedPumpkinTagger.
     this.setPumpkinTaggerReady_(false);
     this.pumpkinData_ = data;
+
+    // Register the offscreen document's message listener when
+    // pumpkin data is available and we are ready to communicate with
+    // the tagger worker via the offscreen document.
+    if (!this.offscreenMessageListenerRegistered_) {
+      chrome.runtime.onMessage.addListener(
+          (message: any|undefined, _sender: chrome.runtime.MessageSender,
+           _sendResponse: (value: any) => void) =>
+              this.handleMessageFromOffscreen_(message));
+      this.offscreenMessageListenerRegistered_ = true;
+    }
 
     this.sendToOffscreen_(OffscreenCommandType.DICTATION_PUMPKIN_INSTALL);
   }
@@ -140,8 +147,22 @@ export class PumpkinParseStrategy extends ParseStrategy {
 
   private sendToSandboxedPumpkinTagger_(
       toPumpkinTagger: PumpkinConstants.ToPumpkinTagger): void {
+    // Seriazlie ArrayBuffer fields in pumpkinData to send it to the offscren
+    // document.
+    // 1. Traverse pumpkinData object keys and convert each ArrayBuffer value to
+    // a Uint8Array, then to a plain array [v1, v2, ...], making it
+    // serializable.
+    // 2. Construct a new object with the same keys but serialized values.
+    const pumpkinData = toPumpkinTagger.pumpkinData ?
+        Object.fromEntries(
+            Object.entries(toPumpkinTagger.pumpkinData)
+                .map(([key,
+                       buffer]) => [key, Array.from(new Uint8Array(buffer))])) :
+        null;
+
     this.sendToOffscreen_(
-        OffscreenCommandType.DICTATION_PUMPKIN_SEND, {toPumpkinTagger});
+        OffscreenCommandType.DICTATION_PUMPKIN_SEND,
+        {toPumpkinTagger: {...toPumpkinTagger, pumpkinData}});
   }
 
   /**

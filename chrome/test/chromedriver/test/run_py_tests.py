@@ -170,6 +170,8 @@ _BROWSER_SPECIFIC_FILTER['chrome-headless-shell'] = [
     'ChromeDriverTest.testSetRPHResgistrationMode',
     # The test is only intended for the headless mode of Chrome.
     'ChromeDriverTest.testBrowserNameHeadlessMode',
+    # chrome-headless-shell does not support Browser.executeBrowserCommand
+    'ChromeDriverTest.testWebviewDetactedDuringClick',
 ]
 
 _BROWSER_AND_PLATFORM_SPECIFIC_FILTER = {
@@ -4254,6 +4256,40 @@ class ChromeDriverTest(ChromeDriverBaseTestWithWebServer):
     """ Regression test for crbug.com/367752739 """
     self._driver.Load(self.GetHttpUrlForFile(
         '/chromedriver/log_long_unicode_string.html'))
+
+  def testWebviewDetactedDuringClick(self):
+    # Regression test for https://crbug.com/410599467
+    self._http_server.SetDataForPath('/fre.html',
+      bytes('''<html>
+            <a href="#continue">continue</a>
+            <script>
+              document.querySelector('a').addEventListener('mousedown', () => {
+                location.href = "#continue";
+              });
+            </script></html>''', 'utf-8'))
+    driver = self.CreateDriver(
+          chrome_switches=[
+            'glic-dev',
+            'glic-automation',
+            'glic-always-open-fre',
+            'enable-features=Glic,TabstripComboButton,ContextualCueing',
+            'glic-fre-url=' + self.GetHttpUrlForFile('/fre.html'),
+            ])
+    driver.SendCommandAndGetResult('Browser.executeBrowserCommand', {
+      'commandId': 'openGlic',
+    })
+    def waitForFRE():
+      for handle in driver.GetWindowHandles():
+        driver.SwitchToWindow(handle)
+        if 'fre.html' in driver.GetCurrentUrl():
+          return True
+      else:
+        return False
+    self.WaitForCondition(waitForFRE)
+    driver.FindElement('css selector', 'a').Click()
+    self.assertTrue(
+        self.WaitForCondition(
+            lambda: len(self._driver.GetWindowHandles()) == 1))
 
 class ChromeDriverPdfTest(ChromeDriverBaseTestWithWebServer):
   """ Regression test for crbug.com/396611138 """
@@ -9260,41 +9296,50 @@ class ComputePressureSpecificTest(ChromeDriverBaseTestWithWebServer):
         self._driver.UpdateVirtualPressureSource,
         'invalid_type',
         'nominal',
+        0.2,
     )
 
-  def testUpdateVirtualPressureSourceWithInvalidSample(self):
+  def testUpdateVirtualPressureSourceWithInvalidState(self):
     self.assertRaisesRegex(
         chromedriver.InvalidArgument,
         'invalid argument: Invalid pressure state: invalid_sample',
         self._driver.UpdateVirtualPressureSource,
         'cpu',
         'invalid_sample',
+        0.2,
     )
 
-  def testUpdateVirtualPressureSourceWithoutSample(self):
+  def testUpdateVirtualPressureSourceWithoutStateAndEstimate(self):
     self.assertRaisesRegex(
         Exception,
-        "UpdateVirtualPressureSource\(\) missing 1 required " +
-        "positional argument: 'sample'",
+        "UpdateVirtualPressureSource\(\) missing 2 required " +
+        "positional arguments: 'sample' and 'own_contribution_estimate'",
         self._driver.UpdateVirtualPressureSource,
         'cpu',
     )
 
-  def testUpdateVirtualPressureSourceWithNonStringSample(self):
+  def testUpdateVirtualPressureSourceWithoutEstimate(self):
+    self.assertRaisesRegex(
+        Exception,
+        "UpdateVirtualPressureSource\(\) missing 1 required " +
+        "positional argument: 'own_contribution_estimate'",
+        self._driver.UpdateVirtualPressureSource,
+        'cpu', 'nominal',
+    )
+
+  def testUpdateVirtualPressureSourceWithNonStringState(self):
     self.assertRaisesRegex(
         chromedriver.InvalidArgument,
         "invalid argument: 'sample' must be a string",
         self._driver.UpdateVirtualPressureSource,
-        "cpu",
-        42,
-    )
+        'cpu', 42, 0.3,)
 
   def testUpdateVirtualPressureSourceWithoutOverriding(self):
     self.assertRaisesRegex(
         Exception,
         'invalid argument: The specified pressure source is not being '
         'overridden',
-        self._driver.UpdateVirtualPressureSource, 'cpu', 'nominal')
+        self._driver.UpdateVirtualPressureSource, 'cpu', 'nominal', 0.3,)
 
   def testRemoveVirtualPressureSourceWithInvalidType(self):
     self.assertRaisesRegex(
@@ -9340,7 +9385,7 @@ class ComputePressureSpecificTest(ChromeDriverBaseTestWithWebServer):
     states_length = 1
 
     for state in pressure_states:
-      self._driver.UpdateVirtualPressureSource(source, state)
+      self._driver.UpdateVirtualPressureSource(source, state, 0.3,)
       self.assertTrue(
           self.WaitForCondition(lambda: self._driver.ExecuteScript(
               'return states.length === arguments[0]', states_length)))
@@ -9357,7 +9402,7 @@ class ComputePressureSpecificTest(ChromeDriverBaseTestWithWebServer):
     self._driver.ExecuteAsyncScript(
         'const done = arguments[0]; addPressureObserver().then(done)')
 
-    self._driver.UpdateVirtualPressureSource(source, 'serious')
+    self._driver.UpdateVirtualPressureSource(source, 'serious', 0.3,)
     self.assertTrue(
         self.WaitForCondition(lambda: self._driver.ExecuteScript(
             'return states.at(-1) === "serious"')))
@@ -9366,7 +9411,7 @@ class ComputePressureSpecificTest(ChromeDriverBaseTestWithWebServer):
         Exception,
         'invalid argument: The specified pressure source is not being '
         'overridden',
-        self._driver.UpdateVirtualPressureSource, source, 'nominal')
+        self._driver.UpdateVirtualPressureSource, source, 'nominal', 0.3,)
 
 
 class NavTrackingMitigationSpecificTest(ChromeDriverBaseTestWithWebServer):

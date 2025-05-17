@@ -31,16 +31,15 @@ class EchoAILanguageModel : public blink::mojom::AILanguageModel {
               mojo::PendingRemote<blink::mojom::ModelStreamingResponder>
                   pending_responder) override;
   void Append(std::vector<blink::mojom::AILanguageModelPromptPtr> prompts,
-              mojo::PendingRemote<blink::mojom::AILanguageModelAppendClient>
-                  client) override;
+              mojo::PendingRemote<blink::mojom::ModelStreamingResponder>
+                  pending_responder) override;
   void Fork(
       mojo::PendingRemote<blink::mojom::AIManagerCreateLanguageModelClient>
           client) override;
   void Destroy() override;
   void MeasureInputUsage(
       std::vector<blink::mojom::AILanguageModelPromptPtr> input,
-      mojo::PendingRemote<blink::mojom::AILanguageModelMeasureInputUsageClient>
-          client) override;
+      MeasureInputUsageCallback callback) override;
 
  private:
   void DoMockExecution(const std::string& input,

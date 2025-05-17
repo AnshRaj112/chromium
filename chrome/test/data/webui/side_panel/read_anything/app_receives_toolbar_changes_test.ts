@@ -5,11 +5,11 @@
 import 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 
 import type {AppElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
-import {BrowserProxy, SpeechBrowserProxyImpl, SpeechController, ToolbarEvent, VoicePackController, WordBoundaries} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import {BrowserProxy, SpeechBrowserProxyImpl, SpeechController, ToolbarEvent, VoiceLanguageController, WordBoundaries} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 import {assertArrayEquals, assertEquals, assertFalse, assertNotEquals, assertTrue} from 'chrome-untrusted://webui-test/chai_assert.js';
 import {hasStyle, microtasksFinished} from 'chrome-untrusted://webui-test/test_util.js';
 
-import {createApp, emitEvent, mockMetrics, setupBasicSpeech} from './common.js';
+import {createApp, createSpeechSynthesisVoice, emitEvent, mockMetrics, setupBasicSpeech} from './common.js';
 import {FakeReadingMode} from './fake_reading_mode.js';
 import {TestColorUpdaterBrowserProxy} from './test_color_updater_browser_proxy.js';
 import type {TestMetricsBrowserProxy} from './test_metrics_browser_proxy.js';
@@ -19,7 +19,7 @@ suite('AppReceivesToolbarChanges', () => {
   let app: AppElement;
   let speech: TestSpeechBrowserProxy;
   let metrics: TestMetricsBrowserProxy;
-  let voicePackController: VoicePackController;
+  let voiceLanguageController: VoiceLanguageController;
   let speechController: SpeechController;
 
   function containerLetterSpacing(): number {
@@ -75,6 +75,11 @@ suite('AppReceivesToolbarChanges', () => {
     emitEvent(app, ToolbarEvent.THEME);
   }
 
+  function emitPlayPause(): Promise<void> {
+    emitEvent(app, ToolbarEvent.PLAY_PAUSE);
+    return microtasksFinished();
+  }
+
   setup(async () => {
     // Clearing the DOM should always be done first.
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
@@ -84,8 +89,8 @@ suite('AppReceivesToolbarChanges', () => {
     const readingMode = new FakeReadingMode();
     chrome.readingMode = readingMode as unknown as typeof chrome.readingMode;
     metrics = mockMetrics();
-    voicePackController = new VoicePackController();
-    VoicePackController.setInstance(voicePackController);
+    voiceLanguageController = new VoiceLanguageController();
+    VoiceLanguageController.setInstance(voiceLanguageController);
     speechController = new SpeechController();
     SpeechController.setInstance(speechController);
     app = await createApp();
@@ -174,13 +179,13 @@ suite('AppReceivesToolbarChanges', () => {
     test('enabled languages are added', () => {
       const firstLanguage = 'en-us';
       emitLanguageToggle(firstLanguage);
-      assertTrue(voicePackController.isLangEnabled(firstLanguage));
+      assertTrue(voiceLanguageController.isLangEnabled(firstLanguage));
       assertTrue(chrome.readingMode.getLanguagesEnabledInPref().includes(
           firstLanguage));
 
       const secondLanguage = 'fr';
       emitLanguageToggle(secondLanguage);
-      assertTrue(voicePackController.isLangEnabled(secondLanguage));
+      assertTrue(voiceLanguageController.isLangEnabled(secondLanguage));
       assertTrue(chrome.readingMode.getLanguagesEnabledInPref().includes(
           secondLanguage));
     });
@@ -188,21 +193,21 @@ suite('AppReceivesToolbarChanges', () => {
     test('disabled languages are removed', () => {
       const firstLanguage = 'en-us';
       emitLanguageToggle(firstLanguage);
-      assertTrue(voicePackController.isLangEnabled(firstLanguage));
+      assertTrue(voiceLanguageController.isLangEnabled(firstLanguage));
       assertTrue(chrome.readingMode.getLanguagesEnabledInPref().includes(
           firstLanguage));
 
       emitLanguageToggle(firstLanguage);
-      assertFalse(voicePackController.isLangEnabled(firstLanguage));
+      assertFalse(voiceLanguageController.isLangEnabled(firstLanguage));
       assertFalse(chrome.readingMode.getLanguagesEnabledInPref().includes(
           firstLanguage));
     });
   });
 
-  test('on speech rate change speech rate updated', () => {
+  test('on speech rate change speech rate updated', async () => {
     setupBasicSpeech(speech);
     app.updateContent();
-    app.playSpeech();
+    await emitPlayPause();
 
     const speechRate1 = 2;
     chrome.readingMode.speechRate = speechRate1;
@@ -222,6 +227,12 @@ suite('AppReceivesToolbarChanges', () => {
     const speechRates =
         speech.getArgs('speak').map(utterance => utterance.rate);
     assertArrayEquals([1, 2, 0.5, 4], speechRates);
+  });
+
+  test('on voice selected, current voice updated', () => {
+    const voice = createSpeechSynthesisVoice({lang: 'es-us', name: 'Poodle'});
+    emitEvent(app, ToolbarEvent.VOICE, {detail: {selectedVoice: voice}});
+    assertEquals(voice, voiceLanguageController.getCurrentVoice());
   });
 
   suite('play/pause', () => {
@@ -297,7 +308,7 @@ suite('AppReceivesToolbarChanges', () => {
     setup(() => {
       emitColorTheme(chrome.readingMode.defaultTheme);
       app.updateContent();
-      app.playSpeech();
+      emitPlayPause();
     });
 
     test('on hide, uses transparent highlight', () => {
@@ -343,19 +354,18 @@ suite('AppReceivesToolbarChanges', () => {
 
     test('updates highlight', () => {
       emitHighlight(chrome.readingMode.wordHighlighting);
-      app.playSpeech();
+      emitPlayPause();
+
       assertEquals(
           chrome.readingMode.wordHighlighting,
           chrome.readingMode.highlightGranularity);
 
       emitHighlight(chrome.readingMode.phraseHighlighting);
-      app.playSpeech();
       assertEquals(
           chrome.readingMode.phraseHighlighting,
           chrome.readingMode.highlightGranularity);
 
       emitHighlight(chrome.readingMode.noHighlighting);
-      app.playSpeech();
       assertEquals(
           chrome.readingMode.noHighlighting,
           chrome.readingMode.highlightGranularity);

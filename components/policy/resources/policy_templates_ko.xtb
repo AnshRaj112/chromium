@@ -936,7 +936,6 @@ URL 패턴은 <ph name="DIRECT_SOCKETS_BLOCKED_FOR_URLS_POLICY_NAME" />와 충�
 <translation id="1639468541408865385">전역적으로 범위가 지정된 HTTP 인증 캐시 사용 설정</translation>
 <translation id="1639673466479276550">로그인 화면에서 화면 보호기를 사용 설정합니다.</translation>
 <translation id="1640824698339859203">플로팅 SSO를 사용 설정하고 사용자의 웹 서비스 인증을 새 기기로 이동</translation>
-<translation id="1641117061932613266"><ph name="PRODUCT_NAME" /> V2 서비스 사용 설정</translation>
 <translation id="1643642938972654829">정책 테스트 페이지에 대한 액세스 허용</translation>
 <translation id="1644373745741524038">보안상의 이유로 <ph name="REQUEST_FULLSCREEN_API_NAME" /> 웹 API에서는 이전 사용자 동작('일시적 활성화')을 호출해야 하며, 그러지 않으면 실패합니다. 사용자의 개인 설정을 사용하면 <ph name="AUTOMATIC_FULLSCREEN_HELP_URL" />에 설명된 대로 특정 출처에서 이전 사용자 동작 없이 이 API를 호출할 수 있습니다.
 
@@ -1105,11 +1104,6 @@ Chrome 앱은 ID(예: <ph name="DEFAULT_HANDLERS_FOR_FILE_EXTENSIONS_POLICY_CHRO
 <translation id="1781720543185538098">제품 내 <ph name="PRODUCT_NAME" /> 설문조사를 사용자에게 표시할지 지정합니다.</translation>
 <translation id="1787790976045065845">이 정책은 <ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_POLICY_NAME" /> 정책이 <ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_LOCK" /> 또는 <ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_LOGOUT" />으로 설정되어 있으며 스마트 카드를 통해 인증하는 사용자가 해당 스마트 카드를 삭제하는 경우에만 적용됩니다. 그런 다음 이 정책은 사용자에게 곧 실행될 작업에 관해 알리는 알림을 몇 초 동안 표시할지 지정합니다. 이 알림은 화면을 가립니다. 작업은 알림이 만료된 후에만 실행됩니다. 사용자는 알림이 만료되기 전에 스마트 카드를 다시 삽입하여 작업이 시작되지 않도록 할 수 있습니다. 정책이 0으로 설정되어 있으면 알림이 표시되지 않으며 작업이 즉시 실행됩니다.</translation>
 <translation id="1793346220873697538">기본적으로 PIN 인쇄를 사용하지 않습니다.</translation>
-<translation id="1793886201577409556">이 정책은 NTP가 확장 프로그램에 의해 제어될 때 새 탭 페이지(NTP)의 바닥글에 확장 프로그램 테마 저작자를 표시할지를 제어합니다. 기본적으로 NTP 바닥글에는 NTP를 제어하는 확장 프로그램에 대한 정보가 표시됩니다.
-
-정책을 설정하지 않거나 true로 설정하면 확장 프로그램으로 제어되는 NTP가 있는 브라우저에 확장 프로그램 이름과 링크가 표시됩니다.
-
-정책을 False로 설정하면 테마 속성이 숨겨집니다.</translation>
 <translation id="1794457906032475749">정책이 사용 설정되면 기업 프로필 생성 시 기존 인터넷 사용 기록을 유지하는 옵션이 기본적으로 선택됩니다.
 
 정책을 설정하지 않거나 사용 중지하면 기업 프로필 생성 시 기존 인터넷 사용 기록을 유지하는 옵션이 기본적으로 선택되지 않습니다.
@@ -2336,6 +2330,7 @@ False로 설정되면 관련 웹사이트 세트 기능이 사용 중지됩니�
 <translation id="2652747206827086936">NTP SharePoint 및 OneDrive 파일 카드 사용 중지</translation>
 <translation id="2656559539624760733">Chrome Root Store를 사용하지 않습니다.</translation>
 <translation id="2658653824183107970">새 <ph name="CORS" /> 대신 기존 <ph name="CORS" /> 구현 사용</translation>
+<translation id="2659581762274047663"><ph name="PRODUCT_NAME" /> 서비스를 사용 설정합니다.</translation>
 <translation id="2660846099862559570">프록시 사용하지 않음</translation>
 <translation id="2661628029848851543">관리 계정의 모든 사용 허용</translation>
 <translation id="2664391398878045611">가운데 슬롯을 사용할 수 있어도 새 탭 페이지에서 알림 표시 안함</translation>
@@ -2975,12 +2970,18 @@ URL 목록에 <ph name="CHROME_ENTERPRISE_DEVICE_TRUST_CONNECTOR" />를 사용 �
 <translation id="3143203373436771188"><ph name="BASIC_EDITOR_NAME" />에서 처리하는 Office 문서로 이동할 때 <ph name="BASIC_EDITOR_NAME" />에서 열기</translation>
 <translation id="3144173889708944482"><ph name="DEVICE_PRINTERS_ACCESS_MODE_POLICY_NAME" />에 <ph name="PRINTERS_BLOCKLIST" />을 선택할 경우 <ph name="DEVICE_PRINTERS_BLOCKLIST_POLICY_NAME" />를 설정하면 사용자가 사용할 수 없는 프린터가 지정됩니다. ID가 이 정책에 명시된 프린터를 제외한 모든 프린터가 사용자에게 제공됩니다. ID는 <ph name="DEVICE_PRINTERS_POLICY_NAME" />에 지정된 파일의 <ph name="ID_FIELD" /> 또는 <ph name="GUID_FIELD" /> 필드와 일치해야 합니다.</translation>
 <translation id="3146711617256415776">텍스트 읽어주기 사용 시 향상된 네트워크 텍스트 음성 변환 음성을 허용하지 않음</translation>
+<translation id="315013437951136266"><ph name="IP_PROTECTION_NAME" /> 기능을 사용 설정합니다.</translation>
 <translation id="3150351525324499342">기본적으로 툴바에 <ph name="PRODUCT_NAME" /> 아이콘이 표시되지 않지만 사용자가 선택하도록 허용</translation>
 <translation id="3152135410085709340">로컬 파일이 PDF 뷰어에서 사이트의 file:// URL에 액세스하도록 허용</translation>
 <translation id="3152425128389603870">통합 바탕화면을 기본적으로 허용하고 사용 설정합니다.</translation>
 <translation id="3159375329008977062">사용자가 UI를 통해 Crostini 컨테이너를 내보내고 가져올 수 있음</translation>
 <translation id="3163167792874598128">이 정책을 설정하지 않거나 사용으로 설정하면 App Store 평가 프로모션이 사용자에게 1년에 최대 한 번 표시될 수 있습니다.
 정책을 사용 안함으로 설정하면 App Store 평가 프로모션이 사용자에게 표시되지 않습니다.</translation>
+<translation id="3163880369487075383">이 정책은 ClearCrossSiteCrossBrowsingContextGroupWindowName 변형이 사용 설정되어 있을 때 새 브라우징 컨텍스트 그룹이 생성되는 사이트 간 최상위 탐색에서 window.name을 삭제할지를 제어합니다.
+
+ClearCrossSiteCrossBrowsingContextGroupWindowName 변형은 사이트 간 최상위 탐색에서 window.name이 삭제되는지를 제어합니다. 이러한 탐색의 예로는 사용자가 검색주소창을 통해 새 사이트로 이동하거나 링크에 'target='_blank'rel='noopener'"가 사용된 경우 새 사이트로 연결되는 링크를 클릭하는 경우가 있습니다. 이러한 경우 window.name을 삭제하면 window.name 속성을 통해 사이트 간에 정보가 유출될 가능성이 차단되어 사용자 개인 정보가 보호됩니다. ClearWindowNameForNewBrowsingContextGroup 정책이 이전 동작을 복원하기 위해 적용됩니다. ClearCrossSiteCrossBrowsingContextGroupWindowName 변형이 사용 설정되고, 이 정책이 사용으로 설정되어 있거나 설정되지 않은 경우, 요건을 충족하는 탐색에 대해 window.name이 삭제됩니다. 사용 중지하면 window.name이 삭제되지 않습니다.
+
+정책을 사용하여 요건을 충족하는 탐색에서 window.name 삭제를 사용 중지해야 하는 경우 <ph name="BUG_URL" />에서 사용 사례를 설명하는 버그를 신고하세요. 이 정책은 <ph name="PRODUCT_NAME" /> 버전 142까지 제공될 예정입니다.</translation>
 <translation id="3164531087779621747">인쇄 PostScript 모드</translation>
 <translation id="3165808775394012744">간편하게 삭제할 수 있도록 정책이 여기에 표시됩니다.</translation>
 <translation id="3166210414652928099">사용자가 신뢰할 수 없는 출처의 Android 앱을 사용하도록 허용</translation>
@@ -4184,6 +4185,7 @@ Chrome에서 퍼스트 파티 세트 관련 통합을 지원하는지 제어합�
 두 정책은 모두 사용될 수 있지만 이 정책은 곧 지원 중단되므로 <ph name="RELATED_WEBSITE_SETS_ENABLED_POLICY_NAME" /> 정책을 사용하는 것이 좋습니다.
 브라우저의 동작에 미치는 영향은 둘 다 동일합니다.</translation>
 <translation id="4016700865356669962">정책을 사용으로 설정하면 사용자가 데스크톱 레이아웃 템플릿을 사용할 수 있습니다.  정책을 사용 중지로 설정하거나 설정하지 않으면 템플릿을 사용할 수 없습니다.</translation>
+<translation id="4018536413833147396">사용자가 기기에서 <ph name="IP_PROTECTION_NAME" /> 설정을 사용 또는 사용 중지하도록 허용합니다. 이 기능은 기본적으로 사용 설정되어 있습니다.</translation>
 <translation id="4020682745012723568">사용자의 프로필로 전송된 쿠키는 Android 앱에 액세스할 수 없습니다.</translation>
 <translation id="4021684548211845008">집중 모드에서 사운드 사용 중지</translation>
 <translation id="4025500273782820766">향후 확인 메시지를 건너뛰는 외부 프로토콜 대화상자가 표시될 때 사용자가 '항상 허용'을 선택하도록 허용</translation>
@@ -4203,6 +4205,7 @@ Chrome에서 퍼스트 파티 세트 관련 통합을 지원하는지 제어합�
 <translation id="4051723201852944592">창 오클루전 사용 설정</translation>
 <translation id="4052529125939620019">시작 시 CryptoToken 구성요소 확장 프로그램 로드</translation>
 <translation id="4053157306171963473">기기 활동 시간 보고 사용 중지</translation>
+<translation id="4056842786707010434">사이트 간 최상위 탐색에서 window.name을 삭제하여 새 브라우징 컨텍스트 그룹을 만들 수 있도록 허용할지 선택합니다.</translation>
 <translation id="4056910949759281379">SPDY 프로토콜 사용 중지</translation>
 <translation id="4057442294431066708">이 정책은 키 재매핑 하위 페이지에서 이벤트를 F11/F12로 재매핑하기 위해 선택된 단축키 옵션을 제어합니다. 이 설정은 ChromeOS 키보드에만 적용되며, 정책을 설정하지 않으면 기본적으로 사용 중지됩니다.</translation>
 <translation id="4061590579642538878">비정상 종료 보고서에 관한 정보를 보고합니다.</translation>
@@ -4671,6 +4674,7 @@ Chrome Root Store를 공개 신뢰의 소스로 사용하는 내장된
 정책을 Disabled로 설정하면 사용자가 PDF 플러그인을 사용 중지하지 않는 한 PDF 플러그인에서 PDF 파일을 엽니다.
 
 정책을 설정하면 사용자가 <ph name="PRODUCT_NAME" />에서 정책을 변경할 수 없습니다. 설정하지 않으면 사용자가 외부에서 PDF를 열지를 선택할 수 있습니다.</translation>
+<translation id="4413764344717830250">관리 브라우저의 새 탭 페이지에서 확장 프로그램 저작자를 표시할지를 제어합니다.</translation>
 <translation id="4415603335307944578">이 정책이 true로 설정되거나 설정되지 않으면 OS 업그레이드 후 처음 실행할 때 브라우저가 시작 페이지를 다시 표시합니다.
 
       이 정책이 false로 설정되면 OS 업그레이드 후 처음 실행할 때 브라우저가 시작 페이지를 다시 표시하지 않습니다.</translation>
@@ -4793,6 +4797,7 @@ false로 설정되면 확장 프로그램 및 플러그인 데이터가 수집�
 
       정책 값은 일 단위로 지정해야 합니다.</translation>
 <translation id="4525328580251166229">Bruschetta 하위 시스템과 관련된 정책을 관리합니다.</translation>
+<translation id="4528981768990874684"><ph name="IP_PROTECTION_NAME" /> 기능을 사용 중지합니다.</translation>
 <translation id="453031441196755904">지원 중단된 정책입니다.</translation>
 <translation id="4531706050939927436">Google Play를 사용해 Google 관리 콘솔에서 Android 앱을 강제 설치할 수 있습니다. Android 앱은 이 정책을 사용하지 않습니다.</translation>
 <translation id="4534500438517478692">Android 제한 이름:</translation>
@@ -5150,7 +5155,6 @@ None으로 설정하거나 설정하지 않으면 ARC 앱에서 <ph name="PRODUC
 정책을 설정하지 않으면 모든 서비스가 사용 설정됩니다.
 
 정책을 사용 설정하면 선택한 서비스만 사용 설정됩니다.</translation>
-<translation id="4758335997982239449"><ph name="PRIVACY_SANDBOX_NAME" /> IP 보호 기능을 사용 설정합니다.</translation>
 <translation id="4767059955897420757">정책을 설정하지 않거나 사용으로 설정하면 Credential Provider Extension Promo가 사용자에게 표시될 수 있습니다.
 정책을 사용 안함으로 설정하면 Credential Provider Extension Promo가 사용자에게 표시되지 않습니다.</translation>
 <translation id="4768446404233019970">TLS에서 3DES 암호화 스위트 사용 설정</translation>
@@ -6217,9 +6221,6 @@ false로 설정되면 기능에 액세스할 수 없습니다.</translation>
 <translation id="5448022937220253000"><ph name="LACROS_NAME" />가 사용 중지된 후 사용자 데이터를 어떻게 처리할지 선택하세요</translation>
 <translation id="5449690328792750354">Event.path API를 사용할 수 있습니다.</translation>
 <translation id="5452024130413254050">이 구성을 사용하는 VM에 vTPM 액세스 권한이 있는지를 제어합니다. 기본값은 False이며, 설정하지 않은 경우 <ph name="FORCE_SHUTDOWN_IF_MORE_RESTRICTED" />입니다.</translation>
-<translation id="5454128917282602937">사용자가 <ph name="PRODUCT_OS_NAME" /> 기기 간에 전환하면 <ph name="PRODUCT_NAME" /> V2 서비스 V2 서비스에서 이전 기기의 브라우저와 앱 창을 새 기기로 실행합니다.
-정책을 사용으로 설정하면 로그인 시 현재 사용자가 마지막으로 사용한 <ph name="PRODUCT_OS_NAME" /> 기기에서 브라우저 및 앱 창이 자동으로 실행됩니다.
-정책을 사용 안함으로 설정하거나 설정하지 않은 채로 두면 전체 복원 설정에 따라 로그인 시 실행할 항목이 결정됩니다.</translation>
 <translation id="5455609857202311243">HTTP 승인 중 KDC 정책 승인 무시</translation>
 <translation id="5455888515928026628">잠금 화면을 통해 로그인할 때 <ph name="PRODUCT_OS_NAME" />이(가) 서버(온라인) 또는 캐시된 비밀번호(오프라인)를 사용하여 인증할 수 있습니다.
 
@@ -6605,6 +6606,11 @@ URL 패턴은 <ph name="DIRECT_SOCKETS_PRIVATE_NETWORK_ACCESS_BLOCKED_FOR_URLS_P
 <translation id="5670249935663090320">정책을 사용 설정하거나 설정하지 않은 상태로 두면 <ph name="PRODUCT_NAME" />가 사용 설정되며 사용자가 앱 메뉴, 페이지 컨텍스트 메뉴, Cast 지원 웹사이트의 미디어 컨트롤, Cast 툴바 아이콘(표시되는 경우)을 통해 실행할 수 있습니다.
 
 정책을 사용 중지하면 <ph name="PRODUCT_NAME" />가 사용 중지됩니다.</translation>
+<translation id="5671392367521500075">이 정책은 NTP가 확장 프로그램에 의해 제어될 때 새 탭 페이지(NTP)의 바닥글에 확장 프로그램 저작자를 표시할지를 제어합니다. 기본적으로 NTP 바닥글에는 NTP를 제어하는 확장 프로그램에 대한 정보가 표시됩니다.
+
+정책을 설정하지 않거나 true로 설정하면 확장 프로그램으로 제어되는 NTP가 있는 브라우저에 확장 프로그램 이름과 링크가 표시됩니다.
+
+정책을 false로 설정하면 확장 프로그램 속성이 숨겨집니다.</translation>
 <translation id="5673254755365419402"><ph name="PRIVACY_SANDBOX_NAME" /> 디지털 지문 수집 보호 기능을 사용 설정합니다.</translation>
 <translation id="567377007899266033">정책을 True로 설정하면 정책에 의해 실행된 확장 프로그램 설치 중에 발생한 중요 이벤트의 보고서를 Google로 전송합니다. False로 설정하면 이벤트가 캡처되지 않습니다. 정책이 설정되지 않으면 기본값이 True로 설정됩니다.</translation>
 <translation id="5673780539191375049"><ph name="PRODUCT_OS_NAME" /> 기기에서 사용자의 인증 흐름을 자동으로 새로고침하는 데 사용되는 시간 간격(분)을 설정합니다. 이 정책은 기기가 한동안 유휴 상태일 때 인증 흐름에 사용되는 일부 서비스의 만료를 처리하기 위해 도입되었습니다.
@@ -6906,7 +6912,6 @@ URL 패턴은 <ph name="DIRECT_SOCKETS_PRIVATE_NETWORK_ACCESS_BLOCKED_FOR_URLS_P
 
 정책을 사용 안함으로 설정하면 집중 모드에서 사운드가 사용 중지됩니다.</translation>
 <translation id="5890063326284543943">Serial API 사용 제어</translation>
-<translation id="5893223274510346852"><ph name="PRIVACY_SANDBOX_NAME" /> IP 보호 기능을 사용 중지합니다.</translation>
 <translation id="5893303508158298667"><ph name="REMOTE_ACCESS_HOST_FIREWALL_TRAVERSAL_POLICY_NAME" />이 사용 설정된 경우 <ph name="REMOTE_ACCESS_HOST_ALLOW_RELAYED_CONNECTION_POLICY_NAME" />을 사용 설정하거나 설정하지 않으면 방화벽 제한 등으로 인해 직접 연결이 불가능할 때 원격 클라이언트를 사용하여 릴레이 서버를 통해 이 컴퓨터에 연결할 수 있게 됩니다.
 
       정책을 사용 중지해도 원격 액세스는 사용 중지되지 않지만 NAT 순회 또는 릴레이가 아닌 같은 네트워크에서의 연결만 허용됩니다.</translation>
@@ -7683,6 +7688,23 @@ DevTools 생성형 AI 기능에는 다음이 포함됩니다.
 
 생성형 AI 기능의 데이터 처리에 관한 자세한 내용은 https://support.google.com/chrome/a?p=generative_ai_settings 페이지를 참고하세요.</translation>
 <translation id="6394350458541421998">이 정책은 <ph name="PRODUCT_OS_NAME" /> 버전 29를 기준으로 지원 중단되었습니다. 대신 PresentationScreenDimDelayScale 정책을 사용해 주시기 바랍니다.</translation>
+<translation id="6397424663361748439"><ph name="PRIVACY_SANDBOX_NAME" /> <ph name="IP_PROTECTION_NAME" /> 기능의 사용 설정 여부를 제어하는 정책입니다.
+
+<ph name="IP_PROTECTION_NAME" /> 기능은 시크릿 모드에서 탐색하는 동안 발생하는 특정 서드 파티 네트워크 요청에 대해 사용자의 원래 IP 주소의 사용 가능 여부를 제한하여, 시크릿 모드 탐색 세션 중 크로스 사이트 추적에 대한 보호를 강화합니다.
+
+정책을 '사용 안함'으로 설정하면 <ph name="IP_PROTECTION_NAME" /> 기능이 사용 중지되며 사용자가 UI 설정을 통해 이 기능을 사용 설정할 수 없게 됩니다.
+정책을 '사용'으로 설정하면 <ph name="IP_PROTECTION_NAME" /> 기능이 사용 설정되며 사용자가 UI 설정을 통해 이 기능을 사용 중지할 수 없게 됩니다.
+정책을 설정하지 않으면 <ph name="IP_PROTECTION_NAME" /> 기능이 기본적으로 사용 설정되며 사용자가 UI 설정을 통해 기기에서 이 기능을 제어할 수 있습니다.
+
+기업에서 <ph name="IP_PROTECTION_NAME" /> 기능을 사용 중지할지 여부를 결정할 때 고려해야 할 사항은 다음과 같습니다.
+- 프록시된 요청에 대해 DNS 조회가 수행되지 않으며, 이는 DNS 기반 모니터링 또는 필터링에 영향을 미칠 수 있습니다.
+- 엔터프라이즈 애플리케이션이 마스크된 도메인 목록(<ph name="MASKED_DOMAIN_LIST_URL" />)에 포함된 도메인(또는 해당 도메인의 하위 도메인)에 대한 요청에 의존하고, 해당 요청이 특정 IP 주소 범위에서 이루어져야 하는 경우, 시크릿 모드에서 애플리케이션이 제대로 작동하지 않을 수 있습니다.
+- 특정 조건에서는 시크릿 모드에서 트래픽이 프록시되지 않을 수 있습니다(예: 사용자가 로그인하지 않은 Chrome 프로필에서 시크릿 모드를 실행하는 경우). 일반적으로 이 기능을 사용하려면 시크릿 모드를 실행할 때 사용자가 개인 Google 계정으로 Chrome에 로그인한 상태여야 합니다.
+- 마스크된 도메인 목록의 도메인 목록은 시간이 지남에 따라 변경될 수 있으며, 새 버전은 사용자에게 자동으로 푸시됩니다. 마스크된 도메인 목록에 관한 자세한 내용은 <ph name="MASKED_DOMAIN_LIST_CRITERIA_URL" /> 페이지를 참고하세요.
+
+<ph name="IP_PROTECTION_NAME" />에 대한 자세한 내용은 <ph name="IP_PROTECTION_README_URL" /> 페이지를 참조하세요.
+
+<ph name="IP_PROTECTION_NAME" /> 기능은 M139 이후에 출시될 예정입니다.</translation>
 <translation id="6397588391180665797">등록된 기기에서 사용자 네트워크 구성을 보고합니다.
 
       정책을 False로 설정하면 정보가 보고되지 않습니다.
@@ -9486,6 +9508,7 @@ true로 설정하면 <ph name="PRODUCT_NAME" />에서는
 <translation id="768925347918758827">미국.</translation>
 <translation id="7696412993033202071">외부 인증 앱 실행 URL</translation>
 <translation id="7696534428021833264">NTP SharePoint 및 OneDrive 파일 카드 사용 설정</translation>
+<translation id="7699644797467448158">사이트 간 최상위 탐색이고 BrowsingContextGroup을 교체할 때 window.name을 지웁니다.</translation>
 <translation id="7701341006446125684">앱 및 확장 프로그램 캐시 크기 설정(단위: 바이트)</translation>
 <translation id="7703041979684393741">Google 서비스에서 WebRTC 이벤트 로그 수집 허용 안함</translation>
 <translation id="770339941914297201">새 동작: 키오스크 Chrome 앱이 정책의 업데이트 URL만 사용하여 업데이트됨</translation>
@@ -10393,7 +10416,6 @@ Windows에서는 GPO를 통해 정책을 설정하는 것이 좋습니다. 하�
 <translation id="8339420913453596618">2단계 인증 사용 안함</translation>
 <translation id="8341175887542205077">Linux 가상 머신 백업 및 복원 사용 중지</translation>
 <translation id="8344454543174932833">처음 실행 시 기본 브라우저에서 북마크 가져오기</translation>
-<translation id="8345184118796116912">관리 브라우저의 새 탭 페이지에서 확장 프로그램 테마 저작자를 표시할지를 제어합니다.</translation>
 <translation id="8347993687936322631">이 정책은 지원이 중단되었으며 <ph name="PRODUCT_OS_NAME" /> 버전 85에서 삭제될 예정입니다. 대신 <ph name="POWER_MANAGEMENT_IDLE_SETTINGS_POLICY_NAME" /> 정책을 사용하세요.
 
           이 정책은 <ph name="IDLE_ACTION_AC_POLICY_NAME" /> 및 <ph name="IDLE_ACTION_BATTERY_POLICY_NAME" /> 정책과 같이 더 구체적인 정책의 대체 값을 제공합니다. 더 구체적인 정책이 설정되지 않은 경우 이 정책에 설정된 대체 값이 사용됩니다.
@@ -10445,6 +10467,17 @@ URL 패턴이 <ph name="SERIAL_BLOCKED_FOR_URLS_POLICY_NAME" />와 충돌하는 
 <translation id="8381774264911275515">로그인 시 SAML SSO 쿠키를 사용자 세션으로 전달하지 않음</translation>
 <translation id="8382184662529825177">기기의 콘텐츠 보호에 원격 인증을 사용합니다.</translation>
 <translation id="838870586332499308">데이터 로밍 사용</translation>
+<translation id="8389925503559691525">이 정책은 가져오기 및 탐색 중에 Blob URL을 파티셔닝할지를 제어합니다.
+정책을 사용으로 설정하거나 설정하지 않으면 Blob URL이 파티셔닝됩니다.
+정책을 사용 중지로 설정하면 Blob URL이 파티셔닝되지 않습니다.
+
+<ph name="THIRD_PARTY_STORAGE_PARTITIONING_BLOCKED_FOR_ORIGINS_POLICY_NAME" /> 또는 <ph name="DEFAULT_THIRD_PARTY_STORAGE_PARTITIONING_SETTING_POLICY_NAME" />에 의해 특정 최상위 출처에 대한 저장용량 파티셔닝이 사용 중지된 경우 Blob URL도 파티셔닝되지 않습니다.
+
+정책을 사용해야 하는 경우 <ph name="BUG_URL" />에서 사용 사례를 설명하는 버그를 제출하세요. 이 정책은 <ph name="PRODUCT_NAME" /> 버전 143까지 제공될 예정이며 이후 버전에서는 이전 구현이 삭제됩니다.
+
+참고: 새로 시작된 렌더기 프로세스만 브라우저가 실행되는 동안 이 정책의 변경사항을 반영합니다.
+
+서드 파티 저장용량 파티셔닝에 관한 자세한 내용은 https://developers.google.com/privacy-sandbox/cookies/storage-partitioning 페이지를 참고하세요.</translation>
 <translation id="8392478748777481636">이 정책은 지원 중단되었으며 지원되지 않습니다. 대신 '<ph name="EXTENSION_INSTALL_BLOCKLIST_POLICY_NAME" />' 정책을 사용하세요.</translation>
 <translation id="8393850527597048037">플랫폼만</translation>
 <translation id="8395350646076131800">사용자 화면 보호기 잠금 화면의 유휴 상태 제한 시간입니다.</translation>
@@ -11215,6 +11248,7 @@ URL 패턴은 <ph name="WEB_PRINTING_BLOCKED_FOR_URLS_POLICY_NAME" />와 충돌�
       그래픽 상태가 보고되지 않습니다. true로 설정되면 디스플레이 및 그래픽 상태가
       보고됩니다.</translation>
 <translation id="891435090623616439">JSON 문자열로 인코딩됨, 자세한 내용은 <ph name="COMPLEX_POLICIES_URL" /> 참조</translation>
+<translation id="8916106787085606382">사이트 간 최상위 탐색이고 BrowsingContextGroup을 교체할 때 window.name을 지우지 않습니다.</translation>
 <translation id="8917070657147922192">사용자가 설치된 CA 인증을 관리하도록 허용합니다.</translation>
 <translation id="8919100556245407184"><ph name="PRODUCT_OS_NAME" /> 버전이 지정된 <ph name="CHROMEOS_VERSION_PROPERTY_NAME" />보다 낮은 경우 사용자가 로그아웃되는 자동 업데이트 만료 지점 이후 경과된 시간입니다.</translation>
 <translation id="8919369436496201075">기기가 LTS 업데이트를 수신하도록 허용</translation>

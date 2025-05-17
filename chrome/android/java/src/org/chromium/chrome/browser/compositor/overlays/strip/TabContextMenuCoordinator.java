@@ -26,6 +26,7 @@ import org.chromium.chrome.browser.share.ShareUtils;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
 import org.chromium.chrome.browser.tabmodel.TabClosureParams;
+import org.chromium.chrome.browser.tabmodel.TabClosureParamsUtils;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tasks.tab_management.TabGroupListBottomSheetCoordinator;
@@ -122,7 +123,7 @@ public class TabContextMenuCoordinator extends TabOverflowMenuCoordinator<Intege
             TabGroupListBottomSheetCoordinator tabGroupListBottomSheetCoordinator,
             MultiInstanceManager multiInstanceManager,
             Supplier<ShareDelegate> shareDelegateSupplier) {
-        return (menuId, tabId, collaborationId) -> {
+        return (menuId, tabId, collaborationId, listViewTouchTracker) -> {
             if (tabId == Tab.INVALID_TAB_ID) return;
             TabModel tabModel = tabModelSupplier.get();
             Tab tab = tabModel.getTabById(tabId);
@@ -148,8 +149,11 @@ public class TabContextMenuCoordinator extends TabOverflowMenuCoordinator<Intege
                         .share(tab, /* shareDirectly= */ false, TAB_STRIP_CONTEXT_MENU);
                 recordUserAction("ShareTab");
             } else if (menuId == R.id.close_tab) {
+                boolean allowUndo = TabClosureParamsUtils.shouldAllowUndo(listViewTouchTracker);
                 tabModel.getTabRemover()
-                        .closeTabs(TabClosureParams.closeTab(tab).build(), /* allowDialog= */ true);
+                        .closeTabs(
+                                TabClosureParams.closeTab(tab).allowUndo(allowUndo).build(),
+                                /* allowDialog= */ true);
                 recordUserAction("CloseTab");
             }
         };

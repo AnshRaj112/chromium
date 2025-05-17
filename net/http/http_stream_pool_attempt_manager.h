@@ -110,7 +110,9 @@ class HttpStreamPool::AttemptManager
 
   Group* group() { return group_; }
 
-  bool is_failing() const { return is_failing_; }
+  bool is_shutting_down() const {
+    return availability_state_ != AvailabilityState::kAvailable;
+  }
 
   int final_error_to_notify_jobs() const;
 
@@ -206,8 +208,6 @@ class HttpStreamPool::AttemptManager
     return weak_ptr_factory_.GetWeakPtr();
   }
 
-  void SetIsFailingForTest(bool is_failing) { is_failing_ = is_failing; }
-
   QuicAttempt* quic_attempt_for_testing() const { return quic_attempt_.get(); }
 
   IPEndPointStateMap& ip_endpoint_states_for_testing() {
@@ -222,6 +222,17 @@ class HttpStreamPool::AttemptManager
  private:
   FRIEND_TEST_ALL_PREFIXES(HttpStreamPoolAttemptManagerTest,
                            GetIPEndPointToAttempt);
+
+  // Represents the availability of this instance. If not kAvailable, `this`
+  // can't handle new Jobs and this should not have in-flight attempts.
+  enum class AvailabilityState {
+    // Can handle new Jobs and make connection attempts.
+    kAvailable = 0,
+    // Is in preparation of a successful completion.
+    kDraining = 1,
+    // Is handling a fatal error.
+    kFailing = 2,
+  };
 
   // Represents the initial attempt state of this manager.
   // These values are persisted to logs. Entries should not be renumbered and
@@ -436,19 +447,18 @@ class HttpStreamPool::AttemptManager
   void ProcessPreconnectsAfterAttemptComplete(int rv,
                                               size_t active_stream_count);
 
-  // Helper methods to post a task to notify a job of preconnect completion. If
-  // `this` is deleted the notification is canceled.
-  void NotifyJobOfPreconnectCompleteLater(Job* job, int rv);
-  void NotifyJobOfPreconnectComplete(Job* job, int rv);
+  // Notifies a job of preconnect completion.
+  void NotifyJobOfPreconnectComplete(raw_ptr<Job> job, int rv);
 
-  // Creates a text based stream. Notifies the highest priority job if there are
-  // waiting jobs. Otherwise, `stream_socket` becomes an idle stream.
-  void CreateTextBasedStreamAndMaybeNotify(
+  // Creates a text based stream and Notifies the highest priority job.
+  void CreateTextBasedStreamAndNotify(
       std::unique_ptr<StreamSocket> stream_socket,
       StreamSocketHandle::SocketReuseType reuse_type,
       LoadTimingInfo::ConnectTiming connect_timing);
 
   bool HasAvailableSpdySession() const;
+
+  void StartDraining();
 
   void MaybeCreateSpdyStreamAndNotify(base::WeakPtr<SpdySession> spdy_session);
 
@@ -547,6 +557,8 @@ class HttpStreamPool::AttemptManager
 
   // Holds jobs that are waiting for notifications.
   JobQueue jobs_;
+  // Holds preconnect requests.
+  std::set<raw_ptr<Job>> preconnect_jobs_;
   // Holds jobs that are already notified results. We need to keep them to avoid
   // dangling pointers.
   std::set<raw_ptr<Job>> notified_jobs_;
@@ -557,23 +569,13 @@ class HttpStreamPool::AttemptManager
 
   base::flat_set<raw_ptr<Job>> alternative_service_disabling_jobs_;
 
-  // Holds preconnect requests.
-  std::set<raw_ptr<Job>> preconnect_jobs_;
-  size_t notifying_preconnect_completion_count_ = 0;
-
   std::unique_ptr<HostResolver::ServiceEndpointRequest>
       service_endpoint_request_;
   bool service_endpoint_request_finished_ = false;
   base::TimeTicks dns_resolution_start_time_;
   base::TimeTicks dns_resolution_end_time_;
 
-  // Set to true when `this` cannot handle further jobs. Used to ensure that
-  // `this` doesn't accept further jobs while notifying the failure to the
-  // existing jobs.
-  bool is_failing_ = false;
-
-  // Set to true when `CancelJobs()` is called.
-  bool is_canceling_jobs_ = false;
+  AvailabilityState availability_state_ = AvailabilityState::kAvailable;
 
   NetErrorDetails net_error_details_;
   ResolveErrorInfo resolve_error_info_;

@@ -31,6 +31,7 @@
 #include "components/sync/engine/traffic_logger.h"
 #include "components/sync/protocol/sync.pb.h"
 #include "components/sync/service/glue/sync_transport_data_prefs.h"
+#include "components/sync/service/local_data_description.h"
 #include "components/sync/service/sync_internals_util.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/test/simple_url_loader_test_helper.h"
@@ -43,16 +44,12 @@
 #include "services/network/public/mojom/fetch_api.mojom-shared.h"
 #include "third_party/zlib/google/compression_utils.h"
 
-#if BUILDFLAG(IS_ANDROID)
-#include "chrome/browser/sync/test/integration/sync_test_utils_android.h"
-#endif  // BUILDFLAG(IS_ANDROID)
+namespace {
 
 using syncer::SyncCycleSnapshot;
 using syncer::SyncServiceImpl;
 
-const char* kSyncUrlClearServerDataKey = "sync-url-clear-server-data";
-
-namespace {
+constexpr char kSyncUrlClearServerDataKey[] = "sync-url-clear-server-data";
 
 bool HasAuthError(SyncServiceImpl* service) {
   return service->GetAuthError().state() ==
@@ -228,12 +225,8 @@ signin::GaiaIdHash SyncServiceImplHarness::GetGaiaIdHashForPrimaryAccount()
 }
 
 GaiaId SyncServiceImplHarness::GetGaiaIdForDefaultTestAccount() const {
-#if !BUILDFLAG(IS_ANDROID)
+  CHECK_EQ(signin_type_, SigninType::FAKE_SIGNIN);
   return signin::GetTestGaiaIdForEmail(username_);
-#else   // !BUILDFLAG(IS_ANDROID)
-  // TODO(crbug.com/40165479): pass `username_` once supported.
-  return sync_test_utils_android::GetGaiaIdForDefaultTestAccount();
-#endif  // !BUILDFLAG(IS_ANDROID)
 }
 
 bool SyncServiceImplHarness::SignInPrimaryAccount(
@@ -251,18 +244,16 @@ bool SyncServiceImplHarness::SignInPrimaryAccount(
 
     case SigninType::FAKE_SIGNIN: {
       signin_delegate_->SigninFake(profile_, username_, consent_level);
-
-      // TODO(b/1523197): The below checks should also be satisfied for the
-      // above case.
-      signin::IdentityManager* identity_manager =
-          IdentityManagerFactory::GetForProfile(profile_);
-      CHECK(identity_manager->HasPrimaryAccount(consent_level));
-      CHECK(identity_manager->HasPrimaryAccountWithRefreshToken(consent_level));
-      CHECK(!service()->GetAccountInfo().IsEmpty());
-
       break;
     }
   }
+
+  signin::IdentityManager* identity_manager =
+      IdentityManagerFactory::GetForProfile(profile_);
+  CHECK(identity_manager->HasPrimaryAccount(signin::ConsentLevel::kSignin));
+  CHECK(identity_manager->HasPrimaryAccount(consent_level));
+  CHECK(identity_manager->HasPrimaryAccountWithRefreshToken(consent_level));
+  CHECK(!service()->GetAccountInfo().IsEmpty());
 
   return true;
 }
@@ -359,9 +350,6 @@ bool SyncServiceImplHarness::SetupSyncNoWaitForCompletion(
   if (!SignInPrimaryAccount(signin::ConsentLevel::kSync)) {
     return false;
   }
-
-  // Now that auth is completed, request that sync actually start.
-  service()->SetSyncFeatureRequested();
 
   if (!AwaitEngineInitialization()) {
     return false;
@@ -619,6 +607,32 @@ SyncServiceImplHarness::GetTypesWithUnsyncedData(
   base::test::TestFuture<absl::flat_hash_map<syncer::DataType, size_t>> future;
   service()->GetTypesWithUnsyncedData(requested_types, future.GetCallback());
   return future;
+}
+
+syncer::LocalDataDescription
+SyncServiceImplHarness::GetLocalDataDescriptionAndWait(
+    syncer::DataType data_type) {
+  base::test::TestFuture<
+      std::map<syncer::DataType, syncer::LocalDataDescription>>
+      descriptions;
+  service()->GetLocalDataDescriptions({data_type}, descriptions.GetCallback());
+
+  if (descriptions.Get().size() != 1u) {
+    ADD_FAILURE()
+        << "The expected size of local data description map is 1. Found "
+        << descriptions.Get().size() << '.';
+    return syncer::LocalDataDescription();
+  }
+
+  if (descriptions.Get().begin()->first != data_type) {
+    ADD_FAILURE()
+        << DataTypeToDebugString(data_type)
+        << " is the only expected key in the local data description map. Found "
+        << DataTypeToDebugString(descriptions.Get().begin()->first) << '.';
+    return syncer::LocalDataDescription();
+  }
+
+  return descriptions.Get().begin()->second;
 }
 
 std::string SyncServiceImplHarness::GetServiceStatus() {

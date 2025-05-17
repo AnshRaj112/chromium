@@ -32,10 +32,11 @@
 #import "ios/chrome/app/change_profile_commands.h"
 #import "ios/chrome/app/change_profile_continuation.h"
 #import "ios/chrome/browser/authentication/ui_bundled/authentication_constants.h"
-#import "ios/chrome/browser/authentication/ui_bundled/authentication_flow/authentication_flow_request_helper.h"
+#import "ios/chrome/browser/authentication/ui_bundled/authentication_flow/authentication_flow_delegate.h"
 #import "ios/chrome/browser/authentication/ui_bundled/authentication_ui_util.h"
 #import "ios/chrome/browser/authentication/ui_bundled/enterprise/managed_profile_creation/managed_profile_creation_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/history_sync/history_sync_capabilities_fetcher.h"
+#import "ios/chrome/browser/authentication/ui_bundled/history_sync/history_sync_utils.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_utils.h"
 #import "ios/chrome/browser/policy/model/browser_policy_connector_ios.h"
 #import "ios/chrome/browser/policy/model/cloud/user_policy_signin_service.h"
@@ -163,9 +164,19 @@ policy::ProfileSeparationPolicies GetFakePolicyResponseForTesting() {
   return response;
 }
 
-void ShowHistorySyncScreenAfterProfileSwitch(
+void MaybeShowHistorySyncScreenAfterProfileSwitch(
     Browser* browser,
     signin_metrics::AccessPoint access_point) {
+  ProfileIOS* profile = browser->GetProfile()->GetOriginalProfile();
+  AuthenticationService* authenticationService =
+      AuthenticationServiceFactory::GetForProfile(profile);
+  syncer::SyncService* syncService = SyncServiceFactory::GetForProfile(profile);
+  if (history_sync::GetSkipReason(syncService, authenticationService,
+                                  profile->GetPrefs(), /*isOptional=*/NO) !=
+      history_sync::HistorySyncSkipReason::kNone) {
+    return;
+  }
+
   ShowSigninCommand* command = [[ShowSigninCommand alloc]
       initWithOperation:AuthenticationOperation::kHistorySync
                identity:nil
@@ -196,11 +207,11 @@ void TriggerAccountSwitchSnackbarWithIdentity(id<SystemIdentity> identity,
       GetManagementState(IdentityManagerFactory::GetForProfile(profile),
                          AuthenticationServiceFactory::GetForProfile(profile),
                          profile->GetPrefs());
-  MDCSnackbarMessage* snackbar_title = [[IdentitySnackbarMessage alloc]
-      initWithName:identity.userGivenName
-             email:identity.userEmail
-            avatar:avatar
-           managed:management_state.is_profile_managed()];
+  MDCSnackbarMessage* snackbar_title =
+      [[IdentitySnackbarMessage alloc] initWithName:identity.userGivenName
+                                              email:identity.userEmail
+                                             avatar:avatar
+                                    managementState:management_state];
   CommandDispatcher* dispatcher = browser->GetCommandDispatcher();
   id<SnackbarCommands> snackbar_commands_handler =
       HandlerForProtocol(dispatcher, SnackbarCommands);
@@ -261,7 +272,7 @@ void CompletePostSignInActions(PostSignInActionSet post_signin_actions,
 
   if (post_signin_actions.Has(
           PostSignInAction::kShowHistorySyncScreenAfterProfileSwitch)) {
-    ShowHistorySyncScreenAfterProfileSwitch(browser, access_point);
+    MaybeShowHistorySyncScreenAfterProfileSwitch(browser, access_point);
   }
 
   if (post_signin_actions.Has(
@@ -440,16 +451,14 @@ void CompletePostSignInActions(PostSignInActionSet post_signin_actions,
 - (void)switchToProfileWithIdentity:(id<SystemIdentity>)identity
                          sceneState:(SceneState*)sceneState
                              reason:(ChangeProfileReason)reason
-                      requestHelper:
-                          (id<AuthenticationFlowRequestHelper>)requestHelper
+                           delegate:(id<AuthenticationFlowDelegate>)delegate
                   postSignInActions:(PostSignInActionSet)postSignInActions
                         accessPoint:(signin_metrics::AccessPoint)accessPoint {
   CHECK(AreSeparateProfilesForManagedAccountsEnabled());
-  CHECK(requestHelper);
   // The continuation specific to the place where the authentication was
   // launched.
-  ChangeProfileContinuation requestHelperContinuation =
-      [requestHelper authenticationFlowWillChangeProfile];
+  ChangeProfileContinuation continuation =
+      [delegate authenticationFlowWillChangeProfile];
 
   std::optional<std::string> profileName =
       GetApplicationContext()
@@ -469,7 +478,7 @@ void CompletePostSignInActions(PostSignInActionSet post_signin_actions,
   [self switchToProfileWithName:*profileName
                      sceneState:sceneState
                          reason:reason
-      changeProfileContinuation:std::move(requestHelperContinuation)
+      changeProfileContinuation:std::move(continuation)
               postSignInActions:postSignInActions
                    withIdentity:identity
                     accessPoint:accessPoint];
@@ -845,21 +854,21 @@ void CompletePostSignInActions(PostSignInActionSet post_signin_actions,
   _managedConfirmationAlertCoordinator = nil;
   [self managedConfirmationDidAccept:accepted
                              browser:browser
-            keepBrowsingDataSeparate:
-                AreSeparateProfilesForManagedAccountsEnabled()];
+                browsingDataSeparate:
+                    AreSeparateProfilesForManagedAccountsEnabled()];
 }
 
 // Called when the user accepted to continue to sign-in with a managed account.
 // `accepted` is YES when the user confirmed or NO if the user canceled.
-// If `keepBrowsingDataSeparate` is `YES`, the managed account gets signed in to
+// If `browsingDataSeparate` is `YES`, the managed account gets signed in to
 // a new empty work profile. This must only be specified if
 // AreSeparateProfilesForManagedAccountsEnabled() is true.
-// If `keepBrowsingDataSeparate` is `NO`, the account gets signed in to the
+// If `browsingDataSeparate` is `NO`, the account gets signed in to the
 // current profile. If AreSeparateProfilesForManagedAccountsEnabled() is true,
 // this involves converting the current profile into a work profile.
 - (void)managedConfirmationDidAccept:(BOOL)accepted
                              browser:(Browser*)browser
-            keepBrowsingDataSeparate:(BOOL)keepBrowsingDataSeparate {
+                browsingDataSeparate:(BOOL)browsingDataSeparate {
   if (!accepted) {
     base::RecordAction(
         base::UserMetricsAction("Signin_AuthenticationFlowPerformer_"
@@ -868,7 +877,7 @@ void CompletePostSignInActions(PostSignInActionSet post_signin_actions,
     return;
   }
   CHECK(AreSeparateProfilesForManagedAccountsEnabled() ||
-        !keepBrowsingDataSeparate);
+        !browsingDataSeparate);
   base::RecordAction(
       base::UserMetricsAction("Signin_AuthenticationFlowPerformer_"
                               "ManagedConfirmationDialog_Confirmed"));
@@ -883,7 +892,8 @@ void CompletePostSignInActions(PostSignInActionSet post_signin_actions,
     // notification isn't needed anymore.
     [self updateUserPolicyNotificationStatusIfNeeded:prefService];
   }
-  [self.delegate didAcceptManagedConfirmation:keepBrowsingDataSeparate];
+  [self.delegate didAcceptManagedConfirmationWithBrowsingDataSeparate:
+                     browsingDataSeparate];
 }
 
 #pragma mark - ManagedProfileCreationCoordinatorDelegate
@@ -891,7 +901,7 @@ void CompletePostSignInActions(PostSignInActionSet post_signin_actions,
 - (void)managedProfileCreationCoordinator:
             (ManagedProfileCreationCoordinator*)coordinator
                                 didAccept:(BOOL)accepted
-                 keepBrowsingDataSeparate:(BOOL)keepBrowsingDataSeparate {
+                     browsingDataSeparate:(BOOL)browsingDataSeparate {
   CHECK(!_managedConfirmationAlertCoordinator, base::NotFatalUntil::M136);
   CHECK(!_errorAlertCoordinator, base::NotFatalUntil::M136);
   CHECK_EQ(_managedConfirmationScreenCoordinator, coordinator);
@@ -900,7 +910,7 @@ void CompletePostSignInActions(PostSignInActionSet post_signin_actions,
   _managedConfirmationScreenCoordinator = nil;
   [self managedConfirmationDidAccept:accepted
                              browser:browser
-            keepBrowsingDataSeparate:keepBrowsingDataSeparate];
+                browsingDataSeparate:browsingDataSeparate];
 }
 
 @end

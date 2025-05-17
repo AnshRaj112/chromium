@@ -28,7 +28,7 @@ import {assert} from 'chrome://resources/js/assert.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 import type {PropertyValues} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
-import {DarkModeMixinLit} from '../dark_mode_mixin_lit.js';
+import {DarkModeMixin} from '../dark_mode_mixin.js';
 import type {Cdd} from '../data/cdd.js';
 import type {Destination} from '../data/destination.js';
 import type {Settings} from '../data/model.js';
@@ -37,7 +37,7 @@ import {State} from '../data/state.js';
 import {MetricsContext, PrintSettingsUiBucket} from '../metrics.js';
 
 import type {DestinationState, PrintPreviewDestinationSettingsElement} from './destination_settings.js';
-import {SettingsMixinLit} from './settings_mixin_lit.js';
+import {SettingsMixin} from './settings_mixin.js';
 import {getCss} from './sidebar.css.js';
 import {getHtml} from './sidebar.html.js';
 
@@ -71,7 +71,7 @@ export interface PrintPreviewSidebarElement {
 }
 
 const PrintPreviewSidebarElementBase = CrContainerShadowMixinLit(
-    WebUiListenerMixinLit(SettingsMixinLit(DarkModeMixinLit(CrLitElement))));
+    WebUiListenerMixinLit(SettingsMixin(DarkModeMixin(CrLitElement))));
 
 export class PrintPreviewSidebarElement extends PrintPreviewSidebarElementBase {
   static get is() {
@@ -119,20 +119,20 @@ export class PrintPreviewSidebarElement extends PrintPreviewSidebarElementBase {
     };
   }
 
-  accessor controlsManaged: boolean;
+  accessor controlsManaged: boolean = false;
   accessor destination: Destination|null = null;
-  accessor destinationCapabilities_: Cdd|null;
+  accessor destinationCapabilities_: Cdd|null = null;
   accessor destinationState: DestinationState;
   accessor error: Error;
-  accessor isPdf: boolean;
+  accessor isPdf: boolean = false;
   accessor pageCount: number;
   accessor state: State;
   protected accessor settingsAvailable_: Record<keyof Settings, boolean>;
-  protected accessor controlsDisabled_: boolean;
+  protected accessor controlsDisabled_: boolean = false;
   protected accessor firstLoad_: boolean = true;
   protected accessor isInAppKioskMode_: boolean = false;
   protected accessor settingsExpandedByUser_: boolean = false;
-  protected accessor shouldShowMoreSettings_: boolean;
+  protected accessor shouldShowMoreSettings_: boolean = false;
 
   constructor() {
     super();

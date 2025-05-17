@@ -49,6 +49,13 @@ const ui::ImageModel GetThirdPartyCookiesIcon(
                                   : views::kEyeCrossedRefreshIcon);
 }
 
+// TODO(crbug.com/388294499): Move this logic into the privacy_sandbox/
+// directory.
+bool IsActUi(CookieControlsState controls_state) {
+  return controls_state == CookieControlsState::kTpActive ||
+         controls_state == CookieControlsState::kTpPaused;
+}
+
 class ThirdPartyCookieLabelWrapper : public views::BoxLayoutView {
   METADATA_HEADER(ThirdPartyCookieLabelWrapper, views::BoxLayoutView)
 
@@ -169,11 +176,6 @@ void PageInfoCookiesContentView::InitCookiesDialogButton() {
   info.type = ContentSettingsType::COOKIES;
   info.setting = CONTENT_SETTING_ALLOW;
 
-  cookies_buttons_container_view_->AddChildView(
-      PageInfoViewFactory::CreateSeparator(
-          ChromeLayoutProvider::Get()->GetDistanceMetric(
-              DISTANCE_HORIZONTAL_SEPARATOR_PADDING_PAGE_INFO_VIEW)));
-
   // Create the cookie button, with a temporary value for the subtitle text
   // since the site count is not yet known.
   cookies_dialog_button_ = cookies_buttons_container_view_->AddChildView(
@@ -198,9 +200,43 @@ void PageInfoCookiesContentView::InitCookiesDialogButton() {
       views::style::STYLE_BODY_4, kColorPageInfoSubtitleForeground);
 }
 
+void PageInfoCookiesContentView::
+    InitIncognitoTrackingProtectionSettingsButton() {
+  if (tp_settings_button_) {
+    return;
+  }
+
+  tp_settings_button_ = cookies_buttons_container_view_->AddChildView(
+      std::make_unique<RichHoverButton>(
+          base::BindRepeating(
+              &PageInfoCookiesContentView::
+                  IncognitoTrackingProtectionSettingsLinkClicked,
+              base::Unretained(this)),
+          PageInfoViewFactory::GetImageModel(vector_icons::kSettingsIcon),
+          l10n_util::GetStringUTF16(
+              IDS_PAGE_INFO_INCOGNITO_TRACKING_PROTECTION_SETTINGS_BUTTON_TITLE),
+          l10n_util::GetStringUTF16(
+              IDS_PAGE_INFO_INCOGNITO_TRACKING_PROTECTION_SETTINGS_BUTTON_SUBTITLE),
+          PageInfoViewFactory::GetLaunchIcon()));
+  tp_settings_button_->SetID(
+      PageInfoViewFactory::
+          VIEW_ID_PAGE_INFO_BUTTON_INCOGNITO_TRACKING_PROTECTIONS_SETTINGS);
+  tp_settings_button_->SetTooltipText(l10n_util::GetStringUTF16(
+      IDS_PAGE_INFO_INCOGNITO_TRACKING_PROTECTION_SETTINGS_BUTTON_SUBTITLE));
+  tp_settings_button_->SetTitleTextStyleAndColor(
+      views::style::STYLE_BODY_3_MEDIUM, kColorPageInfoForeground);
+  tp_settings_button_->SetSubtitleTextStyleAndColor(
+      views::style::STYLE_BODY_4, kColorPageInfoSubtitleForeground);
+}
+
 void PageInfoCookiesContentView::CookiesSettingsLinkClicked(
     const ui::Event& event) {
   presenter_->OpenCookiesSettingsView();
+}
+
+void PageInfoCookiesContentView::IncognitoTrackingProtectionSettingsLinkClicked(
+    const ui::Event& event) {
+  presenter_->OpenIncognitoSettingsView();
 }
 
 void PageInfoCookiesContentView::SyncSettingsLinkClicked(
@@ -210,10 +246,26 @@ void PageInfoCookiesContentView::SyncSettingsLinkClicked(
 
 void PageInfoCookiesContentView::SetCookieInfo(
     const CookiesNewInfo& cookie_info) {
-  SetDescriptionLabel(cookie_info.blocking_status, cookie_info.enforcement,
-                      cookie_info.is_incognito);
+  if (IsActUi(cookie_info.controls_state)) {
+    SetIncognitoTrackingProtectionsDescription(cookie_info.enforcement,
+                                               cookie_info.controls_state);
+  } else {
+    SetCookiesDescription(cookie_info.blocking_status, cookie_info.enforcement,
+                          cookie_info.is_incognito);
+  }
   SetThirdPartyCookiesInfo(cookie_info.controls_state, cookie_info.enforcement,
                            cookie_info.blocking_status, cookie_info.expiration);
+
+  // Ensure the separator is only initialized once.
+  if (!tp_settings_button_ && !cookies_dialog_button_) {
+    cookies_buttons_container_view_->AddChildView(
+        PageInfoViewFactory::CreateSeparator(
+            ChromeLayoutProvider::Get()->GetDistanceMetric(
+                DISTANCE_HORIZONTAL_SEPARATOR_PADDING_PAGE_INFO_VIEW)));
+  }
+  if (IsActUi(cookie_info.controls_state)) {
+    InitIncognitoTrackingProtectionSettingsButton();
+  }
   InitCookiesDialogButton();
   // Update the text displaying the number of allowed sites.
   cookies_dialog_button_->SetSubtitleText(l10n_util::GetPluralStringFUTF16(
@@ -312,7 +364,29 @@ void PageInfoCookiesContentView::SetTrackingProtectionButtonLabel(
   tracking_protection_button_->GetViewAccessibility().SetName(label);
 }
 
-void PageInfoCookiesContentView::SetDescriptionLabel(
+void PageInfoCookiesContentView::SetIncognitoTrackingProtectionsDescription(
+    CookieControlsEnforcement enforcement,
+    CookieControlsState controls_state) {
+  // No description exists for when protections are paused.
+  if (controls_state == CookieControlsState::kTpPaused) {
+    cookies_description_label_->SetVisible(false);
+    return;
+  }
+  int description = IDS_PAGE_INFO_PRIVACY_SITE_DATA_DESCRIPTION;
+  if (enforcement == CookieControlsEnforcement::kEnforcedByCookieSetting) {
+    description = IDS_PAGE_INFO_PRIVACY_SITE_DATA_3PCS_USER_ALLOWED_DESCRIPTION;
+  } else if (enforcement == CookieControlsEnforcement::kEnforcedByPolicy) {
+    description =
+        IDS_PAGE_INFO_PRIVACY_SITE_DATA_3PCS_ENTERPRISE_ALLOWED_DESCRIPTION;
+  } else if (enforcement == CookieControlsEnforcement::kEnforcedByExtension) {
+    description =
+        IDS_PAGE_INFO_PRIVACY_SITE_DATA_3PCS_EXTENSION_ALLOWED_DESCRIPTION;
+  }
+  cookies_description_label_->SetText(l10n_util::GetStringUTF16(description));
+  cookies_description_label_->SetVisible(true);
+}
+
+void PageInfoCookiesContentView::SetCookiesDescription(
     CookieBlocking3pcdStatus blocking_status,
     CookieControlsEnforcement enforcement,
     bool is_incognito) {
@@ -322,8 +396,6 @@ void PageInfoCookiesContentView::SetDescriptionLabel(
 
   size_t offset;
   int description;
-  // TODO(crbug.com/388294499): Add support for ACT enterprise states in
-  // description label.
   if (blocking_status == CookieBlocking3pcdStatus::kNotIn3pcd) {
     description = IDS_PAGE_INFO_COOKIES_DESCRIPTION;
     settings_text_for_link =
@@ -372,25 +444,28 @@ void PageInfoCookiesContentView::SetThirdPartyCookiesInfo(
   tracking_protection_button_->SetID(
       PageInfoViewFactory::VIEW_ID_PAGE_INFO_ACT_PROTECTIONS_BUTTON);
 
-  // Show 3PC toggle in 3PC UI and button in TP UI.
-  bool tpcs_ui = controls_state == CookieControlsState::k3pcsAllowed ||
-                 controls_state == CookieControlsState::k3pcsBlocked;
-  third_party_cookies_row_->SetVisible(tpcs_ui);
-  tracking_protection_button_->SetVisible(!tpcs_ui);
-
-  third_party_cookies_container_->SetCrossAxisAlignment(
-      tpcs_ui ? views::BoxLayout::CrossAxisAlignment::kStretch
-              : views::BoxLayout::CrossAxisAlignment::kStart);
+  if (IsActUi(controls_state)) {
+    third_party_cookies_row_->SetVisible(false);
+    tracking_protection_button_->SetVisible(true);
+    third_party_cookies_container_->SetCrossAxisAlignment(
+        views::BoxLayout::CrossAxisAlignment::kStart);
+    third_party_cookies_label_wrapper_->SetVisible(true);
+  } else {
+    third_party_cookies_row_->SetVisible(true);
+    tracking_protection_button_->SetVisible(false);
+    third_party_cookies_container_->SetCrossAxisAlignment(
+        views::BoxLayout::CrossAxisAlignment::kStretch);
+    bool show_controls_description =
+        enforcement == CookieControlsEnforcement::kNoEnforcement ||
+        (blocking_status != CookieBlocking3pcdStatus::kNotIn3pcd &&
+         enforcement == CookieControlsEnforcement::kEnforcedByCookieSetting);
+    third_party_cookies_label_wrapper_->SetVisible(show_controls_description);
+  }
 
   if (enforcement == CookieControlsEnforcement::kNoEnforcement) {
-    third_party_cookies_label_wrapper_->SetVisible(true);
     third_party_cookies_toggle_->SetVisible(true);
     third_party_cookies_enforced_icon_->SetVisible(false);
   } else {
-    // In 3PCD, tell the user if they allowed the current site via settings.
-    third_party_cookies_label_wrapper_->SetVisible(
-        blocking_status != CookieBlocking3pcdStatus::kNotIn3pcd &&
-        enforcement == CookieControlsEnforcement::kEnforcedByCookieSetting);
     // In the enforced state, the toggle button is hidden; enforced icon is
     // shown instead of the toggle button.
     third_party_cookies_toggle_->SetVisible(false);

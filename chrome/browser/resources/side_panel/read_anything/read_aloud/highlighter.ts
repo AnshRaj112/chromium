@@ -8,7 +8,7 @@ import {getCurrentSpeechRate, isRectVisible} from '../common.js';
 import {NodeStore} from '../node_store.js';
 import {isEspeak} from '../voice_language_util.js';
 
-import {VoicePackController} from './voice_pack_controller.js';
+import {VoiceLanguageController} from './voice_language_controller.js';
 import {WordBoundaries} from './word_boundaries.js';
 
 // Characters that should be ignored for word highlighting when not accompanied
@@ -27,16 +27,11 @@ export class ReadAloudHighlighter {
   // text. For reading aloud we sometimes split up nodes so the speech sounds
   // more natural. When that text is then selected we need to pass the correct
   // index down the pipeline, so we store that info here.
-  private highlightedNodeToOffsetInParent: Map<Node, number> = new Map();
-  private wordBoundaries_: WordBoundaries;
-  private nodeStore_: NodeStore;
+  private highlightedNodeToOffsetInParent_: Map<Node, number> = new Map();
+  private wordBoundaries_: WordBoundaries = WordBoundaries.getInstance();
+  private nodeStore_: NodeStore = NodeStore.getInstance();
   private allowAutoScroll_ = true;
-  private voicePackController_ = VoicePackController.getInstance();
-
-  constructor() {
-    this.wordBoundaries_ = WordBoundaries.getInstance();
-    this.nodeStore_ = NodeStore.getInstance();
-  }
+  private voiceLanguageController_ = VoiceLanguageController.getInstance();
 
   hasCurrentHighlights(): boolean {
     return this.previousHighlights_.some(
@@ -53,8 +48,8 @@ export class ReadAloudHighlighter {
   }
 
   getOffsetInAncestor(node: Node): number {
-    if (this.highlightedNodeToOffsetInParent.has(node)) {
-      return this.highlightedNodeToOffsetInParent.get(node)!;
+    if (this.highlightedNodeToOffsetInParent_.has(node)) {
+      return this.highlightedNodeToOffsetInParent_.get(node)!;
     }
 
     return 0;
@@ -189,7 +184,7 @@ export class ReadAloudHighlighter {
     }
 
     if (this.wordBoundaries_.notSupported() ||
-        isEspeak(this.voicePackController_.getCurrentVoice())) {
+        isEspeak(this.voiceLanguageController_.getCurrentVoice())) {
       // Fall back where word highlighting is not possible. Since espeak
       // boundaries are different than Google TTS word boundaries, fall back
       // to sentence boundaries in that case too.
@@ -340,7 +335,7 @@ export class ReadAloudHighlighter {
     const textNode = document.createTextNode(
         currentNode.textContent!.substring(highlightStart, highlightEnd));
     readingHighlight.appendChild(textNode);
-    this.highlightedNodeToOffsetInParent.set(textNode, highlightStart);
+    this.highlightedNodeToOffsetInParent_.set(textNode, highlightStart);
     parentOfHighlight.appendChild(readingHighlight);
 
     // Finally, append the rest of the text for this node that has yet to be
@@ -348,7 +343,7 @@ export class ReadAloudHighlighter {
     const highlightSuffix = currentNode.textContent!.substring(highlightEnd);
     if (highlightSuffix.length > 0) {
       const suffixNode = document.createTextNode(highlightSuffix);
-      this.highlightedNodeToOffsetInParent.set(suffixNode, highlightEnd);
+      this.highlightedNodeToOffsetInParent_.set(suffixNode, highlightEnd);
       parentOfHighlight.appendChild(suffixNode);
     }
 

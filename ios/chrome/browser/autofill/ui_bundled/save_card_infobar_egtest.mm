@@ -127,7 +127,7 @@ id<GREYMatcher> UploadBottomSheetTitleMatcher() {
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
 id<GREYMatcher> UploadBottomSheetSubTitleMatcher() {
   return grey_accessibilityLabel(l10n_util::GetNSString(
-      IDS_AUTOFILL_SAVE_CARD_PROMPT_UPLOAD_EXPLANATION_V3));
+      IDS_AUTOFILL_SAVE_CARD_PROMPT_UPLOAD_EXPLANATION_SECURITY));
 }
 #endif
 
@@ -236,7 +236,10 @@ void FillAndSubmitXframeCreditCardForm() {
   if ([self isRunningTest:@selector(testStickySavePromptJourney)]) {
     config.features_enabled.push_back(kAutofillStickyInfobarIos);
   }
-  if ([self isRunningTest:@selector
+  if ([self
+          isRunningTest:@selector
+          (testOfferUpstream_FullData_PaymentsAccepts_Xframe_WithBottomSheetDisabled)] ||
+      [self isRunningTest:@selector
             (testOfferUpstream_FullData_PaymentsAccepts_Xframe)] ||
       [self
           isRunningTest:@selector(testUserData_LocalSave_UserAccepts_Xframe)]) {
@@ -245,12 +248,15 @@ void FillAndSubmitXframeCreditCardForm() {
   }
   // testUserData_LocalSave_UserAccepts_Xframe
 
-  if (![self
+  if ([self
           isRunningTest:@selector
-          (testOfferUpstream_FullData_PaymentsAccepts_WithBottomSheetDisabled)] &&
-      ![self
+          (testOfferUpstream_FullData_PaymentsAccepts_WithBottomSheetDisabled)] ||
+      [self
           isRunningTest:@selector
           (testOfferUpstream_FullData_PaymentsAccepts_Xframe_WithBottomSheetDisabled)]) {
+    config.features_disabled.push_back(
+        autofill::features::kAutofillSaveCardBottomSheet);
+  } else {
     config.features_enabled.push_back(
         autofill::features::kAutofillSaveCardBottomSheet);
   }
@@ -738,7 +744,7 @@ void FillAndSubmitXframeCreditCardForm() {
                      IDS_AUTOFILL_GOOGLE_PAY_LOGO_ACCESSIBLE_NAME))]
       assertWithMatcher:grey_sufficientlyVisible()];
 
-  [[EarlGrey selectElementWithMatcher:UploadBottomSheetTitleMatcher()]
+  [[EarlGrey selectElementWithMatcher:UploadBottomSheetSubTitleMatcher()]
       assertWithMatcher:grey_sufficientlyVisible()];
 #endif
 

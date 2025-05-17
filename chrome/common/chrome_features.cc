@@ -126,16 +126,21 @@ BASE_FEATURE(kBorealis, "Borealis", base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
 #if BUILDFLAG(CHROME_ROOT_STORE_CERT_MANAGEMENT_UI)
+// WARNING: These features are launched and the old code paths are in the
+// process of being removed. Attempting to run Chrome with the features
+// disabled will likely break.
+// TODO(crbug.com/390333881): Remove the flags once all references have been
+// cleaned up.
 BASE_FEATURE(kEnableCertManagementUIV2,
-             "EnableCertManagementUIV2",
+             "EnableCertManagementUIV2_LAUNCHED",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEnableCertManagementUIV2Write,
-             "EnableCertManagementUIV2Write",
+             "EnableCertManagementUIV2Write_LAUNCHED",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEnableCertManagementUIV2EditCerts,
-             "EnableCertManagementUIV2EditCerts",
+             "EnableCertManagementUIV2EditCerts_LAUNCHED",
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
@@ -533,40 +538,10 @@ const base::FeatureParam<bool> kGlicPageContextEligibilityAllowNoMetadata{
     &kGlicPageContextEligibility,
     "glic-page-context-eligibility-allow-no-metadata", true};
 
-#endif  // BUILDFLAG(ENABLE_GLIC)
-
-BASE_FEATURE(kTabstripComboButton,
-             "TabstripComboButton",
+BASE_FEATURE(kGlicUnloadOnClose,
+             "GlicUnloadOnClose",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-bool IsTabSearchMoving() {
-  return base::FeatureList::IsEnabled(features::kTabstripComboButton);
-}
-
-const base::FeatureParam<bool> kTabstripComboButtonHasBackground{
-    &kTabstripComboButton, "has_background", false};
-
-const base::FeatureParam<bool> kTabstripComboButtonHasReverseButtonOrder{
-    &kTabstripComboButton, "reverse_button_order", false};
-
-const base::FeatureParam<bool> kTabSearchToolbarButton{
-    &kTabstripComboButton, "tab_search_toolbar_button", false};
-
-bool HasTabstripComboButtonWithBackground() {
-  return IsTabSearchMoving() &&
-         features::kTabstripComboButtonHasBackground.Get() &&
-         !features::kTabSearchToolbarButton.Get();
-}
-
-bool HasTabstripComboButtonWithReverseButtonOrder() {
-  return IsTabSearchMoving() &&
-         features::kTabstripComboButtonHasReverseButtonOrder.Get() &&
-         !features::kTabSearchToolbarButton.Get();
-}
-
-bool HasTabSearchToolbarButton() {
-  return IsTabSearchMoving() && features::kTabSearchToolbarButton.Get();
-}
+#endif  // BUILDFLAG(ENABLE_GLIC)
 
 // Force Privacy Guide to be available even if it would be unavailable
 // otherwise. This is meant for development and test purposes only.
@@ -1260,7 +1235,7 @@ BASE_FEATURE(kSafetyHubUnifiedPasswordsModule,
 // Enables Safety Hub services on start up feature.
 BASE_FEATURE(kSafetyHubServicesOnStartUp,
              "SafetyHubServicesOnStartUp",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables or disables the Trust Safety Sentiment Survey for Safety Hub.
 BASE_FEATURE(kSafetyHubTrustSafetySentimentSurvey,
@@ -1301,7 +1276,7 @@ const base::FeatureParam<base::TimeDelta> kPasswordCheckOverdueInterval{
 // schedule for Mondays.
 COMPONENT_EXPORT(CHROME_FEATURES)
 const base::FeatureParam<int> kPasswordCheckMonWeight{
-    &kSafetyHub, "password-check-mon-weight", 8};
+    &kSafetyHub, "password-check-mon-weight", 6};
 
 // Weight to randomly schedule for Tuesdays.
 COMPONENT_EXPORT(CHROME_FEATURES)
@@ -1437,6 +1412,14 @@ BASE_FEATURE(kProcessPerSiteSkipDevtoolsUsers,
 BASE_FEATURE(kProcessPerSiteSkipEnterpriseUsers,
              "ProcessPerSiteSkipEnterpriseUsers",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Restricts "ProcessPerSiteUpToMainFrameThreshold" to the default search
+// engine. Has no effect if "ProcessPerSiteUpToMainFrameThreshold" is disabled.
+// Note: The "ProcessPerSiteUpToMainFrameThreshold" feature is defined in
+// //content.
+BASE_FEATURE(kProcessPerSiteForDSE,
+             "ProcessPerSiteForDSE",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_CHROMEOS)
 // Enables the SkyVault (cloud-first) changes, some of which are also controlled

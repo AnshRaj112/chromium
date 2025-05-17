@@ -38,16 +38,6 @@ AITestUtils::MockCreateLanguageModelClient::BindNewPipeAndPassRemote() {
   return receiver_.BindNewPipeAndPassRemote();
 }
 
-AITestUtils::MockLanguageModelAppendClient::MockLanguageModelAppendClient() =
-    default;
-AITestUtils::MockLanguageModelAppendClient::~MockLanguageModelAppendClient() =
-    default;
-
-mojo::PendingRemote<blink::mojom::AILanguageModelAppendClient>
-AITestUtils::MockLanguageModelAppendClient::BindNewPipeAndPassRemote() {
-  return receiver_.BindNewPipeAndPassRemote();
-}
-
 mojo::PendingRemote<blink::mojom::ModelDownloadProgressObserver>
 AITestUtils::FakeMonitor::BindNewPipeAndPassRemote() {
   return mock_monitor_.BindNewPipeAndPassRemote();
@@ -141,8 +131,8 @@ void AITestUtils::AITestBase::SetupMockOptimizationGuideKeyedService() {
                         testing::NiceMock<MockOptimizationGuideKeyedService>>();
                   })));
   ON_CALL(*mock_optimization_guide_keyed_service_,
-          GetOnDeviceModelEligibilityAsync(testing::_, testing::_))
-      .WillByDefault([](auto feature, auto callback) {
+          GetOnDeviceModelEligibilityAsync(testing::_, testing::_, testing::_))
+      .WillByDefault([](auto feature, auto capabilities, auto callback) {
         std::move(callback).Run(
             optimization_guide::OnDeviceModelEligibilityReason::kSuccess);
       });

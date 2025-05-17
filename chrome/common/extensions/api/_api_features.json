@@ -63,12 +63,12 @@
   "experimentalActor": {
     "contexts": ["privileged_extension"],
     "dependencies": ["permission:experimentalActor"],
-    "channel": "beta"
+    "channel": "stable"
   },
   "experimentalAiData": {
     "contexts": ["privileged_extension"],
     "dependencies": ["permission:experimentalAiData"],
-    "channel": "beta"
+    "channel": "stable"
   },
   "app": {
     "blocklist": [
@@ -1099,7 +1099,8 @@
     "contexts": ["webui_untrusted"],
     "matches": [
       "chrome-untrusted://crosh/*",
-      "chrome-untrusted://terminal/*"
+      "chrome-untrusted://terminal/*",
+      "chrome-untrusted://boca-app/*"
     ],
     "platforms": ["chromeos"]
   }],

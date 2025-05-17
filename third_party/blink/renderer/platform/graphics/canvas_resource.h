@@ -71,26 +71,14 @@ class PLATFORM_EXPORT CanvasResource
 
   virtual ~CanvasResource();
 
-  // Non-virtual override of ThreadSafeRefCounted::Release
-  void Release();
-
-  // Set a callback that will be invoked as the last outstanding reference to
-  // this CanvasResource goes out of scope.  This provides a last chance hook
-  // to intercept a canvas before it get destroyed. For resources that need to
-  // be destroyed on their thread of origin, this hook can be used to return
-  // resources to their creators.
-  void SetLastUnrefCallback(LastUnrefCallback callback) {
-    last_unref_callback_ = std::move(callback);
-  }
-
-  bool HasLastUnrefCallback() { return !!last_unref_callback_; }
+  static void OnPlaceholderReleasedResource(
+      scoped_refptr<CanvasResource> resource);
 
   // Returns true if this instance creates TransferableResources for usage with
   // GPU compositing.
   virtual bool CreatesAcceleratedTransferableResources() const = 0;
 
-  virtual void OnReturnedFromCompositor(
-      scoped_refptr<CanvasResource>&& resource) {}
+  virtual void OnRefReturned(scoped_refptr<CanvasResource>&& resource) {}
 
   // Returns true if the resource is still usable. It maybe not be valid in the
   // case of a context loss or if we fail to initialize the memory backing for
@@ -183,6 +171,9 @@ class PLATFORM_EXPORT CanvasResource
   const scoped_refptr<base::SingleThreadTaskRunner> owning_thread_task_runner_;
 
  private:
+  static void OnPlaceholderReleasedResourceOnOwningThread(
+      scoped_refptr<CanvasResource> resource);
+
   // Returns true if the resource is rastered via the GPU.
   virtual bool UsesAcceleratedRaster() const = 0;
 
@@ -201,7 +192,6 @@ class PLATFORM_EXPORT CanvasResource
   viz::SharedImageFormat format_;
   SkAlphaType alpha_type_;
   gfx::ColorSpace color_space_;
-  LastUnrefCallback last_unref_callback_;
   bool is_origin_clean_ = true;
 };
 
@@ -230,7 +220,7 @@ class PLATFORM_EXPORT CanvasResourceSharedImage final : public CanvasResource {
   bool CreatesAcceleratedTransferableResources() const override {
     return !GetClientSharedImage()->is_software();
   }
-  void OnReturnedFromCompositor(scoped_refptr<CanvasResource>&& resource) final;
+  void OnRefReturned(scoped_refptr<CanvasResource>&& resource) final;
   bool IsValid() const final;
   scoped_refptr<StaticBitmapImage> Bitmap() final;
   void Transfer() final;

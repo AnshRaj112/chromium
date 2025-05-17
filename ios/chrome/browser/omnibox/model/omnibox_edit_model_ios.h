@@ -103,10 +103,10 @@ class OmniboxEditModelIOS {
   // StartAutocomplete, so that the result is only updated once.
   void UpdateInput(bool has_selected_text, bool prevent_inline_autocomplete);
 
-  // Resets the permanent display texts (display_text_ and url_for_editing_)
-  // to those provided by the controller. Returns true if the display texts
-  // have changed and the change should be immediately user-visible, because
-  // either the user is not editing or the edit does not have focus.
+  // Resets the permanent display texts `url_for_editing_` to those provided by
+  // the controller. Returns true if the display text shave changed and the
+  // change should be immediately user-visible, because either the user is not
+  // editing or the edit does not have focus.
   bool ResetDisplayTexts();
 
   // Returns the permanent display text for the current page and Omnibox state.
@@ -115,14 +115,6 @@ class OmniboxEditModelIOS {
   // Sets the user_text_ to `text`. Also enters user-input-in-progress mode.
   // Virtual for testing.
   virtual void SetUserText(const std::u16string& text);
-
-  // If the omnibox is currently displaying elided text, this method will
-  // restore the full URL into the user text. After unelision, this selects-all,
-  // enters user-input-in-progress mode, and then returns true.
-  //
-  // If the omnibox is not currently displaying elided text, this method will
-  // no-op and return false.
-  bool Unelide();
 
   // Invoked any time the text may have changed in the edit. Notifies the
   // controller.
@@ -175,49 +167,11 @@ class OmniboxEditModelIOS {
     return focus_state_ == OMNIBOX_FOCUS_VISIBLE;
   }
 
-  // Accessors for keyword-related state (see comments on `keyword_`,
-  // `keyword_placeholder_` and `is_keyword_hint_`).
-  const std::u16string& keyword() const { return keyword_; }
-  const std::u16string& keyword_placeholder() const {
-    return keyword_placeholder_;
-  }
-  bool is_keyword_hint() const { return is_keyword_hint_; }
-  bool is_keyword_selected() const {
-    return !is_keyword_hint_ && !keyword_.empty();
-  }
-
-  // Accepts the current keyword hint as a keyword. It always returns true for
-  // caller convenience. `entry_method` indicates how the user entered
-  // keyword mode.
-  bool AcceptKeyword(
-      metrics::OmniboxEventProto::KeywordModeEntryMethod entry_method);
-
-  // Sets the current keyword to that of the given `template_url` and updates
-  // the view so the user sees the keyword chip in the omnibox.  Adjusts
-  // user_text_ and the selection based on the display text and the keyword
-  // entry method. Note, the default match may be updated in this process
-  // so the match must support this keyword mode or it will be exited.
-  void EnterKeywordMode(
-      metrics::OmniboxEventProto::KeywordModeEntryMethod entry_method,
-      const TemplateURL* template_url,
-      const std::u16string& placeholder_text);
-
-  // Enters keyword mode for user's default search provider, if enabled.
-  void EnterKeywordModeForDefaultSearchProvider(
-      metrics::OmniboxEventProto::KeywordModeEntryMethod entry_method);
-
-  // Accepts the current temporary text as the user text.
-  void AcceptTemporaryTextAsUserText();
-
-  // Clears the current keyword.
-  void ClearKeyword();
-
   // Clears additional text.
   void ClearAdditionalText();
 
-  // Called when the view is gaining focus.  `control_down` is whether the
-  // control key is down (at the time we're gaining focus).
-  void OnSetFocus(bool control_down);
+  // Called when the view is gaining focus.
+  void OnSetFocus();
 
   // Starts a request for zero-prefix suggestions if no query is currently
   // running and the popup is closed. This can be called multiple times without
@@ -237,23 +191,11 @@ class OmniboxEditModelIOS {
   // switching tabs.
   void SetCaretVisibility(bool visible);
 
-  // If the ctrl key is down, marks it as consumed to prevent it from triggering
-  // ctrl-enter behavior unless it is released and re-pressed.
-  void ConsumeCtrlKey();
-
   // Sent before `OnKillFocus` and before the popup is closed.
   void OnWillKillFocus();
 
   // Called when the view is losing focus.  Resets some state.
   void OnKillFocus();
-
-  // Called when the user presses the escape key.  Decides what, if anything, to
-  // revert about any current edits.  Returns whether the key was handled.
-  bool OnEscapeKeyPressed();
-
-  // Called when the user presses or releases the control key.  Changes state as
-  // necessary.
-  void OnControlKeyChanged(bool pressed);
 
   // Called when the user pastes in text.
   void OnPaste();
@@ -261,54 +203,17 @@ class OmniboxEditModelIOS {
   // Returns true if pasting is in progress.
   bool is_pasting() const { return paste_state_ == PASTING; }
 
-  // Called when the user presses arrow up, arrow down, page up, or page down.
-  void OnUpOrDownPressed(bool down, bool page);
-
-  // Called when the user presses tab or shift+tab. The latter will traverse up
-  // the selections instead of down.
-  void OnTabPressed(bool shift);
-
-  // Called when the user presses the space key without modifiers.
-  // Returns true if the space is handled in a special way, for example
-  // entering keyword mode on a match somewhere down the list.
-  bool OnSpacePressed();
-
-  // Checks for special input conditions to accelerate keyword mode entry
-  // for starter pack '@' keywords. Returns true if keyword mode was
-  // entered; returns false if feature is disabled or special input
-  // conditions were not detected, in which case this is a no-op.
-  bool MaybeAccelerateKeywordSelection(std::u16string_view input_text,
-                                       char16_t ch);
-
   // Called when any relevant data changes.  This rolls together several
   // separate pieces of data into one call so we can update all the UI
-  // efficiently. Specifically, it's invoked for temporary text, autocompletion,
-  // and keyword changes.
-  //   `temporary_text` is the new temporary text from the user selecting a
-  //     different match. This will be empty when selecting a suggestion
-  //     without a `fill_into_edit` (e.g. FOCUSED_BUTTON_HEADER) and when
-  //     `is_temporary_test` is false.
-  //   `is_temporary_text` is true if invoked because of a temporary text change
-  //     or false if `temporary_text` should be ignored.
+  // efficiently. Specifically, it's invoked for autocompletion.
   //   `inline_autocompletion` is the autocompletion.
-  //   `destination_for_temporary_text_change` is NULL (if temporary text should
-  //     not change) or the pre-change destination URL (if temporary text should
-  //     change) so we can save it off to restore later.
-  //   `keyword` is the keyword to show a hint for if `is_keyword_hint` is true,
-  //     or the currently selected keyword if `is_keyword_hint` is false (see
-  //     comments on keyword_ and is_keyword_hint_).
   //   `additional_text` is additional omnibox text to be displayed adjacent to
   //     the omnibox view.
   //   `new_match` is the selected match when the user is changing selection,
   //     the default match if the user is typing, or an empty match when
   //     selecting a header.
   // Virtual to allow testing.
-  virtual void OnPopupDataChanged(const std::u16string& temporary_text,
-                                  bool is_temporary_text,
-                                  const std::u16string& inline_autocompletion,
-                                  const std::u16string& keyword,
-                                  const std::u16string& keyword_placeholder,
-                                  bool is_keyword_hint,
+  virtual void OnPopupDataChanged(const std::u16string& inline_autocompletion,
                                   const std::u16string& additional_text,
                                   const AutocompleteMatch& new_match);
 
@@ -317,12 +222,8 @@ class OmniboxEditModelIOS {
   // necessary, and returns true if any significant changes occurred.  Note that
   // `text_change.text_differs` may be set even if `text_change.old_text` ==
   // `text_change.new_text`, e.g. if we've just committed an IME composition.
-  //
-  // If `allow_keyword_ui_change` is false then the change should not affect
-  // keyword ui state, even if the text matches a keyword exactly. This value
-  // may be false when the user is composing a text with an IME.
-  bool OnAfterPossibleChange(const OmniboxViewBase::StateChanges& state_changes,
-                             bool allow_keyword_ui_change);
+  bool OnAfterPossibleChange(
+      const OmniboxViewBase::StateChanges& state_changes);
 
   // Called when the current match has changed in the OmniboxControllerIOS.
   void OnCurrentMatchChanged();
@@ -337,79 +238,31 @@ class OmniboxEditModelIOS {
   // Just forwards the call to the OmniboxViewBase referred within.
   void SetAccessibilityLabel(const AutocompleteMatch& match);
 
-  // Reverts the edit box from a temporary text back to the original user text.
-  // Also resets the popup to the initial state.
-  void RevertTemporaryTextAndPopup();
-
   // Returns true if the destination URL of the match is bookmarked.
   bool IsStarredMatch(const AutocompleteMatch& match) const;
+
+  // Gets the suggestion group header text associated with the given suggestion
+  // group ID.
+  // In addition to calling `AutocompleteResult::GetHeaderForSuggestionGroup()`,
+  // this function takes into account certain header visibility criteria (e.g.
+  // experiment flags) to determine the proper header text, which will then be
+  // used by the relevant code to conditionally show suggestion group headers
+  // in the Omnibox/Realbox popup.
+  std::u16string GetSuggestionGroupHeaderText(
+      const std::optional<omnibox::GroupId>& suggestion_group_id) const;
 
   // Returns true if the popup exists and is open. Virtual for testing.
   virtual bool PopupIsOpen() const;
 
-  // Called when the user hits escape after arrowing around the popup.  This
-  // will reset the popup to the initial state.
-  void ResetPopupToInitialState();
-
   // Gets popup's current selection.
   OmniboxPopupSelection GetPopupSelection() const;
-
-  // Sets the current popup selection to `new_selection`. Caller is responsible
-  // for making sure `new_selection` is valid. This assumes the popup is open.
-  // This will update all state and repaint the necessary parts of the window,
-  // as well as updating the textfield with the new temporary text.
-  // `reset_to_default` restores the original inline autocompletion.
-  // `force_update_ui` updates the UI even if the selection has not changed.
-  void SetPopupSelection(OmniboxPopupSelection new_selection,
-                         bool reset_to_default = false,
-                         bool force_update_ui = false);
-
-  // Returns true if popup selection is on the initial line, which is usually
-  // the default match (except in the no-default-match case).
-  bool IsPopupSelectionOnInitialLine() const;
-
-  // Returns true if the control represented by `selection.state` is present on
-  // the match in `selection.line`. This is the source-of-truth the UI code
-  // should query to decide whether or not to draw the control.
-  bool IsPopupControlPresentOnMatch(OmniboxPopupSelection selection) const;
-
-  // From popup, tries to erase the suggestion at `line`. This should determine
-  // if the item at `line` can be removed from history, and if so, remove it
-  // and update the popup.
-  void TryDeletingPopupLine(size_t line);
-
-  // Returns the popup's accessibility label for current selection. This is an
-  // extended version of AutocompleteMatchType::ToAccessibilityLabel() which
-  // also returns narration about the any focused secondary button.
-  // Never call this when the current selection is kNoMatch.
-  std::u16string GetPopupAccessibilityLabelForCurrentSelection(
-      const std::u16string& match_text,
-      bool include_positional_info,
-      int* label_prefix_length = nullptr);
-
-  // The IPH message that sometimes appears at the bottom of the Omnibox is
-  // informational only and cannot be selected/focused. Its a11y label therefore
-  // has to be read at the end of the last suggestion.  Returns the label for
-  // the IPH row if the current selection is the one right before the IPH row.
-  // Otherwise, returns an empty string.
-  std::u16string MaybeGetPopupAccessibilityLabelForIPHSuggestion();
 
   // Invoked any time the result set of the controller changes.
   // This method seems like a good candidate for removal; it is
   // preserved here only to prevent possible behavior change while refactoring.
   void OnPopupResultChanged();
 
-  // Updates the popup view when the visibility of a group changes.
-  void SetPopupSuggestionGroupVisibility(size_t match_index,
-                                         bool suggestion_group_hidden);
-
   void SetAutocompleteInput(AutocompleteInput input);
-
-  // Called to indicate a navigation may occur based on
-  // `navigation_predictor` to the suggestion on `line`.
-  void OnNavigationLikely(
-      size_t line,
-      omnibox::mojom::NavigationPredictor navigation_predictor);
 
   // This calls `OpenMatch` directly for the few remaining `OmniboxEditModelIOS`
   // test cases that require explicit control over match content. For new
@@ -431,10 +284,6 @@ class OmniboxEditModelIOS {
  private:
   friend class OmniboxControllerIOSTest;
   friend class TestOmniboxEditModelIOS;
-  FRIEND_TEST_ALL_PREFIXES(OmniboxEditModelIOSTest, ConsumeCtrlKey);
-  FRIEND_TEST_ALL_PREFIXES(OmniboxEditModelIOSTest,
-                           ConsumeCtrlKeyOnRequestFocus);
-  FRIEND_TEST_ALL_PREFIXES(OmniboxEditModelIOSTest, ConsumeCtrlKeyOnCtrlAction);
 
   enum PasteState {
     NONE,     // Most recent edit was not a paste.
@@ -447,27 +296,11 @@ class OmniboxEditModelIOS {
     PASTED,   // Most recent edit was a paste.
   };
 
-  enum ControlKeyState {
-    UP,                // The control key is not depressed.
-    DOWN,              // The control key is depressed and should trigger the
-                       // "ctrl-enter" behavior when the user hits enter.
-    DOWN_AND_CONSUMED  // The control key is depressed, but has been consumed
-                       // and should not trigger the "ctrl-enter" behavior.
-                       // The control key becomes consumed if it has been used
-                       // for another action such as focusing the location bar
-                       // with ctrl-l or copying the selected text with ctrl-c.
-  };
-
   AutocompleteController* autocomplete_controller() const;
 
   // If no query is in progress, starts working on an autocomplete query.
   // Returns true if started; false otherwise.
   bool MaybeStartQueryForPopup();
-
-  // Changes the popup selection to the next available selection. Stepping the
-  // popup selection gives special consideration for keyword mode state.
-  void StepPopupSelection(OmniboxPopupSelection::Direction direction,
-                          OmniboxPopupSelection::Step step);
 
   // Asks the browser to load the popup's currently selected item, using the
   // supplied disposition.  This may close the popup.
@@ -500,51 +333,15 @@ class OmniboxEditModelIOS {
                  const std::u16string& pasted_text,
                  base::TimeTicks match_selection_timestamp = base::TimeTicks());
 
-  // Updates the feedback type on the match at the given index and schedules a
-  // repaint to update the suggestion view. On negative feedback, also shows the
-  // feedback form.
-  void UpdateFeedbackOnMatch(size_t match_index, FeedbackType feedback_type);
-
   // An internal method to set the user text. Notably, this differs from
   // SetUserText because it does not change the user-input-in-progress state.
   void InternalSetUserText(const std::u16string& text);
-
-  // Conversion between user text and display text. User text is the text the
-  // user has input. Display text is the text being shown in the edit. The
-  // two are different if a keyword is selected.
-  std::u16string MaybeStripKeyword(const std::u16string& text) const;
-  std::u16string MaybePrependKeyword(const std::u16string& text) const;
 
   // Copies a match corresponding to the current text into `match`, and
   // populates `alternate_nav_url` as well if it's not nullptr. If the popup
   // is closed, the match is generated from the autocomplete classifier.
   void GetInfoForCurrentText(AutocompleteMatch* match,
                              GURL* alternate_nav_url) const;
-
-  // Checks whether keyword mode space-triggering has been disabled either by
-  // a pref or relevant feature flags. If the setting isn't available on the
-  // search engines page, the pref should be ignored.  Returns true if space
-  // triggering is enabled, false otherwise.
-  bool AllowKeywordSpaceTriggering() const;
-
-  // Accepts current keyword if the user just typed a space at the end of
-  // `new_text`.  This handles both of the following cases:
-  //   (assume "foo" is a keyword, ` is the input caret, [] is selected text)
-  //   foo` -> foo `      (a space was appended to a keyword)
-  //   foo[bar] -> foo `  (a space replaced other text after a keyword)
-  // Returns true if the current keyword is accepted.
-  bool MaybeAcceptKeywordBySpace(const std::u16string& new_text);
-
-  // Checks whether the user inserted a space into `old_text` and by doing so
-  // created a `new_text` that looks like "<keyword> <search phrase>".
-  bool CreatedKeywordSearchByInsertingSpaceInMiddle(
-      const std::u16string& old_text,
-      const std::u16string& new_text,
-      size_t caret_position) const;
-
-  // Checks if a given character is a valid space character for accepting
-  // keyword.
-  static bool IsSpaceCharForAcceptingKeyword(wchar_t c);
 
   // Sets the state of user_input_in_progress_. Returns whether said state
   // changed, so that the caller can evoke NotifyObserversInputInProgress().
@@ -563,10 +360,6 @@ class OmniboxEditModelIOS {
   // primary data source, this should not be called when there's no view.
   std::u16string GetText() const;
 
-  // Always use these to set keyword members instead of mutating them directly.
-  void SetKeyword(const std::u16string& keyword);
-  void SetKeywordPlaceholder(const std::u16string& keyword_placeholder);
-
   // Closes lens if still needed.
   void MaybeCloseLens();
 
@@ -578,17 +371,7 @@ class OmniboxEditModelIOS {
 
   OmniboxFocusState focus_state_ = OMNIBOX_FOCUS_NONE;
 
-  // Display-only text representing the current page. This could either:
-  //  - The same as `url_for_editing_` if Steady State Elisions is OFF.
-  //  - A simplified version of `url_for_editing_` with some destructive
-  //    elisions applied. This is the case if Steady State Elisions is ON.
-  //
-  // This should not be considered suitable for editing.
-  std::u16string display_text_;
-
   // The initial text representing the current URL suitable for editing.
-  // This should fully represent the current URL without any meaning-changing
-  // elisions applied - and is suitable for user editing.
   std::u16string url_for_editing_;
 
   // This flag is true when the user has modified the contents of the edit, but
@@ -602,8 +385,6 @@ class OmniboxEditModelIOS {
   // The text that the user has entered.  This does not include inline
   // autocomplete text that has not yet been accepted.  `user_text_` can
   // contain a string without `user_input_in_progress_` being true.
-  // For instance, this is the case when the user has unelided a URL without
-  // modifying its contents.
   std::u16string user_text_;
 
   // Used to know what should be displayed. Updated when e.g. the popup
@@ -642,9 +423,9 @@ class OmniboxEditModelIOS {
   // but user_input_in_progress_ is not being cleared.
   std::u16string url_for_remembered_user_selection_;
 
-  // Inline autocomplete is allowed if the user has not just deleted text, and
-  // no temporary text is showing.  In this case, inline_autocompletion_ is
-  // appended to the user_text_ and displayed selected (at least initially).
+  // Inline autocomplete is allowed if the user has not just deleted text. In
+  // this case, inline_autocompletion_ is appended to the user_text_ and
+  // displayed selected (at least initially).
   //
   // NOTE: When the popup is closed there should never be inline autocomplete
   // text (actions that close the popup should either accept the text, convert
@@ -652,74 +433,20 @@ class OmniboxEditModelIOS {
   bool just_deleted_text_;
   std::u16string inline_autocompletion_;
 
-  // Used by OnPopupDataChanged to keep track of whether there is currently a
-  // temporary text.
-  //
-  // Example of use: If the user types "goog", then arrows down in the
-  // autocomplete popup until, say, "google.com" appears in the edit box, then
-  // the user_text_ is still "goog", and "google.com" is "temporary text".
-  // When the user hits <esc>, the edit box reverts to "goog".  Hit <esc> again
-  // and the popup is closed and "goog" is replaced by the permanent display
-  // URL, which is the URL of the current page.
-  //
-  // original_user_text_with_keyword_ tracks the user_text_ before keywords are
-  // removed. When accepting a keyword (from either a default match or another
-  // lower in the dropdown), the user_text_ is destructively trimmed of its 1st
-  // word. In order to restore the user_text_ properly when the omnibox reverts,
-  // e.g. by pressing <escape> or pressing <up> until the first result is
-  // selected, we track original_user_text_with_keyword_.
-  // original_user_text_with_keyword_ is null if a keyword has not been
-  // accepted.
-  bool has_temporary_text_;
-  std::u16string original_user_text_with_keyword_;
-
   // When the user's last action was to paste, we disallow inline autocomplete
   // (on the theory that the user is trying to paste in a new URL or part of
   // one, and in either case inline autocomplete would get in the way).
   PasteState paste_state_;
 
-  // Whether the control key is depressed.  We track this to avoid calling
-  // UpdatePopup() repeatedly if the user holds down the key, and to know
-  // whether to trigger "ctrl-enter" behavior.
-  ControlKeyState control_key_state_;
-
-  // The keyword associated with the current match.  The user may have an actual
-  // selected keyword, or just some input text that looks like a keyword (so we
-  // can show a hint to press <tab>).  This is the keyword in either case;
-  // is_keyword_hint_ (below) distinguishes the two cases.
-  std::u16string keyword_;
-
-  // The placeholder text displayed for the keyword the user has selected.
-  // Usually empty. Only used when the user input is empty.
-  std::u16string keyword_placeholder_;
-
-  // True if the keyword associated with this match is merely a hint, i.e. the
-  // user hasn't actually selected a keyword yet.  When this is true, we can use
-  // keyword_ to show a "Press <tab> to search" sort of hint.
-  bool is_keyword_hint_;
-
-  // Indicates how the user entered keyword mode if the user is actually in
-  // keyword mode.  Otherwise, the value of this variable is INVALID.  This
-  // is used to restore the user's search terms upon a call to ClearKeyword().
-  metrics::OmniboxEventProto::KeywordModeEntryMethod keyword_mode_entry_method_;
-
   // This is needed to properly update the SearchModel state when the user
   // presses escape.
   bool in_revert_;
 
-  // The omnibox sometimes opens the lens controller, e.g. when entering '@page'
-  // keyword mode. When exiting the scope or committing the omnibox, it should
+  // When exiting the scope or committing the omnibox, it should
   // be closed again, unless lens is invoked by taking a contextual search
   // match. In that case, the omnibox relinquishes the obligation to close so
   // as to not interfere with lens match fulfillment and continued use.
   bool close_lens_;
-
-  // Indicates if the upcoming autocomplete search is allowed to be treated as
-  // an exact keyword match.  If this is true then keyword mode will be
-  // triggered automatically if the input is "<keyword> <search string>".  We
-  // allow this when CreatedKeywordSearchByInsertingSpaceInMiddle() is true.
-  // This has no effect if we're already in keyword mode.
-  bool allow_exact_keyword_match_;
 
   // The input that was sent to the AutocompleteController. Since no
   // autocomplete query is started after a tab switch, it is possible for this

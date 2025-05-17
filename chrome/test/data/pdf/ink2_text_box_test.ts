@@ -11,6 +11,7 @@ import {assertDeepEquals, getRequiredElement, setupTestViewportAndMockPluginForI
 // Set up a dummy viewport so that we can get a predictable initial state.
 const {viewport, mockPlugin} = setupTestViewportAndMockPluginForInk();
 const manager = Ink2Manager.getInstance();
+manager.initializeTextAnnotations();
 const textbox = document.createElement('ink-text-box');
 document.body.appendChild(textbox);
 
@@ -662,10 +663,15 @@ chrome.test.runTests([
       textBoxStates.push((e as CustomEvent<TextBoxState>).detail);
     });
 
-    let finishInkStrokeEvents = 0;
+    let finishInkStrokeModifiedEvents = 0;
+    let finishInkStrokeUnmodifiedEvents = 0;
     PluginController.getInstance().getEventTarget().addEventListener(
-        PluginControllerEventType.FINISH_INK_STROKE, () => {
-          finishInkStrokeEvents++;
+        PluginControllerEventType.FINISH_INK_STROKE, e => {
+          if ((e as CustomEvent<boolean>).detail) {
+            finishInkStrokeModifiedEvents++;
+          } else {
+            finishInkStrokeUnmodifiedEvents++;
+          }
         });
 
     // Initialize to a 100x100 box at 400, 300.
@@ -682,11 +688,12 @@ chrome.test.runTests([
     chrome.test.assertFalse(isVisible(textbox));
     chrome.test.assertEq(
         undefined, mockPlugin.findMessage('finishTextAnnotation'));
-    chrome.test.assertEq(0, finishInkStrokeEvents);
+    chrome.test.assertEq(0, finishInkStrokeModifiedEvents);
+    chrome.test.assertEq(0, finishInkStrokeUnmodifiedEvents);
     assertDeepEquals([TextBoxState.NEW, TextBoxState.INACTIVE], textBoxStates);
 
     // When text is edited, commitTextAnnotation() will trigger a plugin message
-    // and a PluginControllerEventType.FINISH_INK_STROKE event.
+    // and a PluginControllerEventType.FINISH_INK_STROKE modified event.
     textBoxStates = [];
     initializeBox(100, 100, 400, 300);
     await microtasksFinished();
@@ -702,13 +709,15 @@ chrome.test.runTests([
     chrome.test.assertFalse(isVisible(textbox));
     chrome.test.assertTrue(
         mockPlugin.findMessage('finishTextAnnotation') !== undefined);
-    chrome.test.assertEq(1, finishInkStrokeEvents);
+    chrome.test.assertEq(1, finishInkStrokeModifiedEvents);
+    chrome.test.assertEq(0, finishInkStrokeUnmodifiedEvents);
     assertDeepEquals(
         [TextBoxState.NEW, TextBoxState.EDITED, TextBoxState.INACTIVE],
         textBoxStates);
 
     // When existing text is not edited, commitTextAnnotation() will trigger a
-    // plugin message but no PluginControllerEventType.FINISH_INK_STROKE event.
+    // plugin message and a PluginControllerEventType.FINISH_INK_STROKE
+    // unmodified event.
     textBoxStates = [];
     initializeBox(100, 100, 400, 300, true);
     await microtasksFinished();
@@ -719,8 +728,54 @@ chrome.test.runTests([
     chrome.test.assertFalse(isVisible(textbox));
     chrome.test.assertTrue(
         mockPlugin.findMessage('finishTextAnnotation') !== undefined);
-    chrome.test.assertEq(1, finishInkStrokeEvents);
+    chrome.test.assertEq(1, finishInkStrokeModifiedEvents);
+    chrome.test.assertEq(1, finishInkStrokeUnmodifiedEvents);
     assertDeepEquals([TextBoxState.NEW, TextBoxState.INACTIVE], textBoxStates);
+
+    chrome.test.succeed();
+  },
+
+  async function testBlurAndFocus() {
+    // Ensure the viewport is scrollable by zooming in.
+    viewport.setZoom(2.0);
+
+    // Using manager initialization to get correct coordinates for the zoom
+    // level.
+    manager.initializeTextAnnotation({x: 20, y: 20});
+    await microtasksFinished();
+    const styles = getComputedStyle(textbox);
+    chrome.test.assertEq('20px', styles.getPropertyValue('left'));
+    chrome.test.assertEq('20px', styles.getPropertyValue('top'));
+
+    // Scroll away from the textbox. Note this method accepts page coordinates.
+    // Scrolling by 35 in page coordinates scrolls by 70 in screen coordinates
+    // at 2x zoom.
+    viewport.goToPageAndXy(0, 35, 35);
+    await microtasksFinished();
+    chrome.test.assertEq('-50px', styles.getPropertyValue('left'));
+    chrome.test.assertEq('-50px', styles.getPropertyValue('top'));
+
+    // Focus the textbox, which should cause the manager to scroll the viewport.
+    // This won't actually scroll the viewport in the test, since the plugin
+    // won't send a corresponding scroll message back.
+    mockPlugin.clearMessages();
+    textbox.$.textbox.focus();
+    const syncScrollMessage = mockPlugin.findMessage('syncScrollToRemote');
+    chrome.test.assertTrue(syncScrollMessage !== undefined);
+    chrome.test.assertEq('syncScrollToRemote', syncScrollMessage.type);
+    // The box is at 20, 20 in viewport coordinates, and the viewport is 100px
+    // wide. The manager specifies a margin of 10% of the viewport when
+    // scrolling.
+    chrome.test.assertEq(10, syncScrollMessage.x);
+    chrome.test.assertEq(10, syncScrollMessage.y);
+
+    // Focusing should also have the active element set to the textarea.
+    const active = textbox.shadowRoot.activeElement;
+    chrome.test.assertTrue(!!active);
+    chrome.test.assertEq('TEXTAREA', active.tagName);
+    manager.dispatchEvent(new CustomEvent('blur-text-box'));
+    // blur-text-box should blur the textarea.
+    chrome.test.assertEq(null, textbox.shadowRoot.activeElement);
 
     chrome.test.succeed();
   },

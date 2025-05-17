@@ -631,6 +631,7 @@ class DisruptiveNotificationPermissionsRevocationBrowserTest
     : public RevokedPermissionsServiceBrowserTest {
  public:
   DisruptiveNotificationPermissionsRevocationBrowserTest() {
+#if BUILDFLAG(IS_ANDROID)
     feature_list_.InitAndEnableFeatureWithParameters(
         features::kSafetyHubDisruptiveNotificationRevocation,
         {{features::kSafetyHubDisruptiveNotificationRevocationShadowRun.name,
@@ -639,6 +640,19 @@ class DisruptiveNotificationPermissionsRevocationBrowserTest
               kSafetyHubDisruptiveNotificationRevocationWaitingForMetricsDays
                   .name,
           "7"}});
+#else
+    feature_list_.InitWithFeaturesAndParameters(
+        /*enabled_features=*/
+        {{features::kSafetyHubDisruptiveNotificationRevocation,
+          {{features::kSafetyHubDisruptiveNotificationRevocationShadowRun.name,
+            "false"},
+           {features::
+                kSafetyHubDisruptiveNotificationRevocationWaitingForMetricsDays
+                    .name,
+            "7"}}}},
+        /*disabled_features=*/{
+            safe_browsing::kShowWarningsForSuspiciousNotifications});
+#endif
   }
 
   void SetUpOnMainThread() override {
@@ -936,39 +950,6 @@ IN_PROC_BROWSER_TEST_F(DisruptiveNotificationPermissionsRevocationBrowserTest,
       static_cast<int>(DisruptiveNotificationPermissionsManager::
                            FalsePositiveReason::kPersistentNotificationClick));
   recorder_->ExpectEntryMetric(entry, "NewSiteEngagement", 2.0);
-  recorder_->ExpectEntryMetric(entry, "OldSiteEngagement", 0.0);
-  recorder_->ExpectEntryMetric(entry, "DailyAverageVolume", 5);
-}
-
-IN_PROC_BROWSER_TEST_F(DisruptiveNotificationPermissionsRevocationBrowserTest,
-                       TestReportUserRegrant) {
-  auto* hcsm =
-      HostContentSettingsMapFactory::GetForProfile(browser()->profile());
-  GURL url = embedded_test_server()->GetURL("/title1.html");
-
-  // Set up a revoked notification permission.
-  DisruptiveNotificationContentSettingHelper(*hcsm).PersistRevocationEntry(
-      url,
-      DisruptiveNotificationRevocationEntry{
-          .revocation_state = DisruptiveNotificationRevocationState::kRevoked,
-          .site_engagement = 0.0,
-          .daily_notification_count = 5,
-          .timestamp = base::Time::Now() - base::Days(3),
-      });
-
-  // Visit the page.
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
-
-  // Allow notifications.
-  hcsm->SetContentSettingDefaultScope(
-      url, url, ContentSettingsType::NOTIFICATIONS, CONTENT_SETTING_ALLOW);
-
-  auto entries = recorder_->GetEntriesByName(
-      "SafetyHub.DisruptiveNotificationRevocations.UserRegrant");
-  ASSERT_EQ(1u, entries.size());
-  auto* entry = entries[0].get();
-  recorder_->ExpectEntryMetric(entry, "DaysSinceRevocation", 3);
-  recorder_->ExpectEntryMetric(entry, "NewSiteEngagement", 3.0);
   recorder_->ExpectEntryMetric(entry, "OldSiteEngagement", 0.0);
   recorder_->ExpectEntryMetric(entry, "DailyAverageVolume", 5);
 }

@@ -23,8 +23,8 @@ import {Error, State} from '../data/state.js';
 import type {PrintPreviewDestinationDialogElement} from './destination_dialog.js';
 import type {PrintPreviewDestinationSelectElement} from './destination_select.js';
 import {getHtml} from './destination_settings.html.js';
-import {getCss as getPrintPreviewSharedLitCss} from './print_preview_shared_lit.css.js';
-import {SettingsMixinLit} from './settings_mixin_lit.js';
+import {getCss as getPrintPreviewSharedLitCss} from './print_preview_shared.css.js';
+import {SettingsMixin} from './settings_mixin.js';
 
 export enum DestinationState {
   INIT = 0,
@@ -51,7 +51,7 @@ export interface PrintPreviewDestinationSettingsElement {
 }
 
 const PrintPreviewDestinationSettingsElementBase =
-    I18nMixinLit(WebUiListenerMixinLit(SettingsMixinLit(CrLitElement)));
+    I18nMixinLit(WebUiListenerMixinLit(SettingsMixin(CrLitElement)));
 
 export class PrintPreviewDestinationSettingsElement extends
     PrintPreviewDestinationSettingsElementBase {
@@ -101,19 +101,19 @@ export class PrintPreviewDestinationSettingsElement extends
     };
   }
 
-  accessor dark: boolean;
+  accessor dark: boolean = false;
   accessor destination: Destination|null = null;
   accessor destinationState: DestinationState = DestinationState.INIT;
-  accessor disabled: boolean;
+  accessor disabled: boolean = false;
   accessor error: Error;
-  accessor firstLoad: boolean;
+  accessor firstLoad: boolean = false;
   accessor state: State;
   protected accessor destinationStore_: DestinationStore|null = null;
   protected accessor displayedDestinations_: Destination[] = [];
   private accessor isDialogOpen_: boolean = false;
   protected accessor noDestinations_: boolean = false;
-  protected accessor pdfPrinterDisabled_: boolean;
-  protected accessor loaded_: boolean;
+  protected accessor pdfPrinterDisabled_: boolean = false;
+  protected accessor loaded_: boolean = false;
 
   private lastUser_: string = '';
   private tracker_: EventTracker = new EventTracker();

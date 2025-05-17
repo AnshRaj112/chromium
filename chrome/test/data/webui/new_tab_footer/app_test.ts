@@ -8,9 +8,9 @@ import type {NewTabFooterAppElement} from 'chrome://newtab-footer/app.js';
 import {NewTabFooterDocumentProxy} from 'chrome://newtab-footer/browser_proxy.js';
 import type {ManagementNotice, NewTabFooterDocumentRemote} from 'chrome://newtab-footer/new_tab_footer.mojom-webui.js';
 import {NewTabFooterDocumentCallbackRouter, NewTabFooterHandlerRemote} from 'chrome://newtab-footer/new_tab_footer.mojom-webui.js';
-import {assertEquals, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 import {TestMock} from 'chrome://webui-test/test_mock.js';
-import {microtasksFinished} from 'chrome://webui-test/test_util.js';
+import {$$, microtasksFinished} from 'chrome://webui-test/test_util.js';
 
 suite('NewTabFooterAppTest', () => {
   let element: NewTabFooterAppElement;
@@ -33,39 +33,85 @@ suite('NewTabFooterAppTest', () => {
     await handler.whenCalled('updateManagementNotice');
   }
 
-  test('Get extension attibution on initialization', async () => {
-    // Arrange.
-    handler.setResultFor(
-        'getNtpExtensionAttribution',
-        {attribution: {name: 'foo', url: 'chrome://extensions/?id=1234'}});
-    await initializeElement();
+  suite('Extension', () => {
+    test('Get extension name on initialization', async () => {
+      // Arrange.
+      await initializeElement();
 
-    // Assert.
-    const attribution =
-        element.shadowRoot.querySelector('#extensionAttribution');
-    assertTrue(!!attribution);
-    const attributionLink = attribution.querySelector('a');
-    assertEquals(attributionLink!.href, 'chrome://extensions/?id=1234');
-    assertEquals(attributionLink!.innerText, 'foo');
+      // Act.
+      const fooName = 'foo';
+      callbackRouter.setNtpExtensionName(fooName);
+      await callbackRouter.$.flushForTesting();
+
+      // Assert.
+      let name = $$(element, '#extensionName');
+      assertTrue(!!name);
+      const link = name.querySelector<HTMLElement>('[role="link"]');
+      assertTrue(!!link);
+      assertEquals(link.innerText, fooName);
+
+      // Act.
+      callbackRouter.setNtpExtensionName('');
+      await callbackRouter.$.flushForTesting();
+
+      // Assert.
+      name = $$(element, '#extensionName');
+      assertFalse(!!name);
+    });
+
+    test('Click extension name link', async () => {
+      // Arrange.
+      callbackRouter.setNtpExtensionName('foo');
+      await initializeElement();
+
+      // Act.
+      const link = $$(element, '#extensionName [role="link"]');
+      assertTrue(!!link);
+      link.click();
+
+      // Assert.
+      assertEquals(
+          1, handler.getCallCount('openExtensionOptionsPageWithFallback'));
+    });
   });
 
-  test('Get management notice on initialization', async () => {
-    // Arrange.
-    await initializeElement();
-    const managementNotice:
-        ManagementNotice = {text: 'Managed by your organization'};
-    callbackRouter.setManagementNotice(managementNotice);
-    await callbackRouter.$.flushForTesting();
+  suite('Managed', () => {
+    test('Get management notice', async () => {
+      // Arrange.
+      await initializeElement();
+      const managementNotice: ManagementNotice = {
+        text: 'Managed by your organization',
+        bitmapDataUrl: {url: 'chrome://resources/images/chrome_logo_dark.svg'},
+      };
 
-    // Assert.
-    // const managementNoticeContainer =
-    //     element.shadowRoot.querySelector('#managementNoticeContainer');
-    // assertTrue(!!managementNoticeContainer);
-    const managementNoticeText =
-        element.shadowRoot.querySelector('#managementNoticeText');
-    assertTrue(!!managementNoticeText);
+      // Act.
+      callbackRouter.setManagementNotice(managementNotice);
+      await callbackRouter.$.flushForTesting();
 
-    assertEquals(
-        managementNoticeText.textContent, 'Managed by your organization');
+      // Assert.
+      const managementNoticeContainer =
+          element.shadowRoot.querySelector('#managementNoticeContainer');
+      assertTrue(!!managementNoticeContainer);
+      let managementNoticeText = managementNoticeContainer.querySelector('p');
+      assertTrue(!!managementNoticeText);
+      assertEquals(
+          managementNoticeText.textContent, 'Managed by your organization');
+      let managementNoticeLogo =
+          managementNoticeContainer.querySelector<HTMLImageElement>('img');
+      assertTrue(!!managementNoticeLogo);
+      assertEquals(
+          managementNoticeLogo.src,
+          'chrome://resources/images/chrome_logo_dark.svg');
+
+      // Act.
+      callbackRouter.setManagementNotice(null);
+      await callbackRouter.$.flushForTesting();
+
+      // Assert.
+      managementNoticeText = $$(element, '#managementNoticeText');
+      managementNoticeLogo = $$(element, '#managementNoticeLogo');
+      assertFalse(!!managementNoticeText);
+      assertFalse(!!managementNoticeLogo);
+    });
   });
 });

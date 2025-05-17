@@ -12,11 +12,14 @@
 #include "third_party/blink/public/mojom/ai/ai_rewriter.mojom-blink.h"
 #include "third_party/blink/public/mojom/ai/ai_summarizer.mojom-blink.h"
 #include "third_party/blink/public/mojom/ai/ai_writer.mojom-blink.h"
+#include "third_party/blink/renderer/bindings/modules/v8/v8_language_model_expected_input.h"
+#include "third_party/blink/renderer/bindings/modules/v8/v8_language_model_prompt_type.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_proofreader_create_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_rewriter_create_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_summarizer_create_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_writer_create_options.h"
 #include "third_party/blink/renderer/modules/ai/availability.h"
+#include "third_party/blink/renderer/platform/heap/collection_support/heap_vector.h"
 
 namespace blink {
 
@@ -56,6 +59,10 @@ mojom::blink::AIProofreaderCreateOptionsPtr ToMojoProofreaderCreateOptions(
     const ProofreaderCreateOptions* options);
 mojom::blink::AIProofreaderCreateOptionsPtr ToMojoProofreaderCreateOptions(
     const ProofreaderCreateCoreOptions* core_options);
+
+// Convert language model expected inputs to the corresponding mojo type.
+Vector<mojom::blink::AILanguageModelExpectedInputPtr> ToMojoExpectedInputs(
+    const HeapVector<Member<LanguageModelExpectedInput>>& expected_inputs);
 
 // Implementation of LookupMatchingLocaleByBestFit
 // (https://tc39.es/ecma402/#sec-lookupmatchinglocalebybestfit) as
@@ -109,6 +116,28 @@ std::optional<Vector<String>> GetBestFitLanguages(
 std::optional<Vector<String>> ValidateAndCanonicalizeBCP47Languages(
     v8::Isolate* isolate,
     const Vector<String>& languages);
+
+// Returns whether model availability status requires user activation for
+// creating a client.
+bool RequiresUserActivation(Availability availability);
+
+// Runs `callback` on destruction unless `Reset` is called.
+class RunOnDestruction {
+ public:
+  explicit RunOnDestruction(base::OnceClosure callback);
+  ~RunOnDestruction();
+
+  RunOnDestruction(const RunOnDestruction&) = delete;
+  RunOnDestruction& operator=(const RunOnDestruction&) = delete;
+
+  RunOnDestruction(RunOnDestruction&& other) = default;
+  RunOnDestruction& operator=(RunOnDestruction&& other) = default;
+
+  void Reset();
+
+ private:
+  base::OnceClosure callback_;
+};
 
 }  // namespace blink
 

@@ -320,23 +320,32 @@
     },
     {
       name: "AIPromptAPI",
-      public: true,
-      status: "experimental",
-      implied_by: ["AIPromptAPIForWebPlatform", "AIPromptAPIMultimodalInput"],
-    },
-    {
-      name: "AIPromptAPIForExtension",
-      public: true,
+      // OriginTrialContext::CanEnableTrialFromName limits access to extensions.
       origin_trial_feature_name: "AIPromptAPIForExtension",
       origin_trial_allows_third_party: true,
-      status: "experimental",
+      status: {
+        "Win": "experimental",
+        "Mac": "experimental",
+        "Linux": "experimental",
+        "default": "",
+      },
       base_feature_status: "enabled",
       copied_from_base_feature_if: "overridden",
+      implied_by: ["AIPromptAPIMultimodalInput", "AIPromptAPIForExtension"],
     },
     {
-      name: "AIPromptAPIForWebPlatform",
-      public: true,
-      status: "experimental",
+      // Extension-specific feature checked in addition to "AIPromptAPI".
+      name: "AIPromptAPIForExtension",
+      origin_trial_feature_name: "AIPromptAPIForExtension",
+      origin_trial_allows_third_party: true,
+      status: {
+        "Win": "experimental",
+        "Mac": "experimental",
+        "Linux": "experimental",
+        "default": "",
+      },
+      base_feature_status: "enabled",
+      copied_from_base_feature_if: "overridden",
     },
     {
       name: "AIPromptAPIForWorkers",
@@ -344,14 +353,23 @@
     },
     {
       name: "AIPromptAPIMultimodalInput",
-      public: true,
-      status: "experimental",
+      status: {
+        "Win": "experimental",
+        "Mac": "experimental",
+        "Linux": "experimental",
+        "default": "",
+      },
     },
     {
       name: "AIPromptAPIStructuredOutput",
       origin_trial_feature_name: "AIPromptAPIForExtension",
       origin_trial_allows_third_party: true,
-      status: "experimental",
+      status: {
+        "Win": "experimental",
+        "Mac": "experimental",
+        "Linux": "experimental",
+        "default": "",
+      },
       base_feature_status: "enabled",
       copied_from_base_feature_if: "overridden",
       implied_by: ["AIPromptAPI"],
@@ -362,8 +380,12 @@
     },
     {
       name: "AIRewriterAPI",
-      public: true,
-      status: "experimental",
+      status: {
+        "Win": "experimental",
+        "Mac": "experimental",
+        "Linux": "experimental",
+        "default": "",
+      },
       origin_trial_feature_name: "AIRewriterAPI",
       origin_trial_allows_third_party: true,
       base_feature_status: "enabled",
@@ -375,8 +397,12 @@
     },
     {
       name: "AISummarizationAPI",
-      public: true,
-      status: "experimental",
+      status: {
+        "Win": "experimental",
+        "Mac": "experimental",
+        "Linux": "experimental",
+        "default": "",
+      },
       origin_trial_feature_name: "AISummarizationAPI",
       origin_trial_allows_third_party: true,
       base_feature_status: "enabled",
@@ -388,8 +414,12 @@
     },
     {
       name: "AIWriterAPI",
-      public: true,
-      status: "experimental",
+      status: {
+        "Win": "experimental",
+        "Mac": "experimental",
+        "Linux": "experimental",
+        "default": "",
+      },
       origin_trial_feature_name: "AIWriterAPI",
       origin_trial_allows_third_party: true,
       base_feature_status: "enabled",
@@ -759,7 +789,6 @@
       // https://github.com/WICG/html-in-canvas/blob/main/README.md
       name: "CanvasDrawElement",
       status: "test",
-      implied_by: ["CanvasPlaceElement"],
     },
     {
       name: "CanvasFloatingPoint",
@@ -783,11 +812,6 @@
       name: "CanvasInterventions",
       browser_process_read_write_access: true,
       base_feature: "none",
-    },
-    {
-      // https://github.com/WICG/html-in-canvas/blob/main/README.md
-      name: "CanvasPlaceElement",
-      status: "test",
     },
     {
       // https://chromestatus.com/feature/5066778773028864
@@ -866,6 +890,16 @@
     },
     {
       name: "CheckVisibilityExtraProperties",
+      status: "stable",
+    },
+    // This flag shifts the timing of clearing the popover invoker so that it
+    // happens after the `beforetoggle` event is fired. This is something of a
+    // bug fix: see the spec discussion at
+    // https://github.com/whatwg/html/issues/11246#issuecomment-2860876897.
+    // This is enabled by default, and is a kill switch. It shipped in M138,
+    // and can be removed in M140.
+    {
+      name: "ClearPopoverInvokerAfterBeforeToggle",
       status: "stable",
     },
     // crbug.com/40851596: Send click to the capture pointer target instead of
@@ -987,6 +1021,13 @@
       }
     },
     {
+      name: "ComputePressureOwnContributionEstimate",
+      status: {
+        "Android": "",
+        "default": "experimental",
+      }
+    },
+    {
       name: "ConsiderFullChildNodeContentForListify",
       status: "stable",
     },
@@ -1080,6 +1121,11 @@
       // Enables alignment properties for block and inline out-of-flow elements.
       name: "CSSAlignBlockAndInlineOutOfFlows",
       status: "stable",
+    },
+    {
+      // Allows using counter() and counters() in alt text (after / in content property).
+      name: "CSSAltCounter",
+      status: "experimental",
     },
     {
       // Remember the scroll offset of the default anchor when initially
@@ -1183,6 +1229,10 @@
     {
       name: "CSSExponentialFunctions",
       status: "stable",
+    },
+    {
+      name: "CSSFallbackContainerQueries",
+      status: "experimental",
     },
     {
       name: "CSSFontSizeAdjust",
@@ -1400,6 +1450,11 @@
       status: "stable",
     },
     {
+      // https://drafts.csswg.org/css-scroll-snap-2/#snapevent-interface
+      name: "CSSScrollSnapEventConstructorExposed",
+      status: "experimental",
+    },
+    {
       // https://drafts.csswg.org/css-scroll-snap-2/#snap-events
       name: "CSSScrollSnapEvents",
       status: "stable",
@@ -1430,6 +1485,14 @@
       status: "stable",
     },
     {
+      // Ignore cycles in unused var()/attr() fallbacks.
+      name: "CSSShortCircuitVarAttr",
+      status: "experimental",
+      // The CSSShortCircuitVarAttr branch assumes that fallbacks
+      // are type-agnostic.
+      depends_on: ["CSSTypeAgnosticVarFallback"],
+    },
+    {
       // sibling-index() and sibling-count()
       name: "CSSSiblingFunctions",
       status: "experimental",
@@ -1454,7 +1517,12 @@
     {
       // Allows the CSS "accent-color" property to support the system accent color as the default option.
       name: "CSSSystemAccentColor",
-      status: "experimental",
+      status: {
+        "ChromeOS": "stable",
+        "Mac": "stable",
+        "Win": "stable",
+        "default": "experimental",
+      },
     },
     {
       // crbug.com/1463890: CSS `text-autospace` property
@@ -1498,12 +1566,6 @@
       // https://chromestatus.com/feature/4850737974345728
       name: "CSSViewTransitionAutoName",
       status: "experimental",
-      depends_on: ["CSSViewTransitionMatchElement"],
-    },
-    {
-      // https://chromestatus.com/feature/5098745710247936
-      name: "CSSViewTransitionMatchElement",
-      status: "stable"
     },
     {
       // Adds the appearance:base-select CSS value which makes <select>
@@ -1660,12 +1722,6 @@
       origin_trial_feature_name: "DisableDifferentOriginSubframeDialogSuppression",
       origin_trial_type: "deprecation",
       origin_trial_allows_insecure: true,
-    },
-    {
-      name: "DisableHardwareNoiseSuppression",
-      origin_trial_feature_name: "DisableHardwareNoiseSuppression",
-      status: "experimental",
-      base_feature: "none",
     },
     {
       name: "DisableReduceAcceptLanguage",
@@ -1963,6 +2019,7 @@
       // crbug.com/414112253
       name: "FastSelectionSync",
       status: "stable",
+      depends_on: ["SelectionDeleteFromDocumentUaShadowFix"],
     },
     {
       name: "FedCm",
@@ -2007,12 +2064,6 @@
       origin_trial_feature_name: "FedCmMultipleIdentityProviders",
       origin_trial_os: ["win", "mac", "linux", "chromeos"],
       origin_trial_allows_third_party: true,
-    },
-    {
-      name: "FedCmSelectiveDisclosure",
-      depends_on: ["FedCm"],
-      public: true,
-      base_feature: "none",
     },
     {
       name: "FencedFrames",
@@ -2060,6 +2111,10 @@
       // https://chromestatus.com/feature/4654499737632768
       name: "FetchLaterAPI",
       status: "stable",
+    },
+    {
+      name: "FetchRetry",
+      status: "experimental",
     },
     {
       name: "FetchUploadStreaming",
@@ -2242,7 +2297,7 @@
     },
     {
       name: "FlexWrapBalance",
-      status: "test",
+      status: "experimental",
     },
     {
       // Don't create LayoutMultiColumnFlowThread objects, or any of the other
@@ -2609,6 +2664,8 @@
       // <select>, but it isn't web compatible enough. This flag allows <input>
       // inside <select> but only if there is another open tag in between the
       // <input> and the <select>, like <select><div><input>.
+      // For now, this flag also makes <input> close <select> like it used to
+      // when the <input> is put directly within an <option> or <optgroup>.
       name: "InputInSelect",
       status: "experimental",
       depends_on: ["SelectParserRelaxation"],
@@ -2638,6 +2695,7 @@
     {
       // Improved support for debugging CSSNestedDeclarations.
       name: "InspectorGhostRules",
+      status: "stable",
     },
     {
       name: "InstalledApp",
@@ -2724,7 +2782,13 @@
     },
     {
       name: "LanguageDetectionAPI",
-      status: "experimental",
+      status: {
+        "Win": "stable",
+        "Mac": "stable",
+        "Linux": "stable",
+        "ChromeOS": "stable",
+        "default": "",
+      },
       origin_trial_feature_name: "LanguageDetectionAPI",
       origin_trial_allows_third_party: true,
       base_feature_status: "enabled",
@@ -2973,7 +3037,7 @@
     },
     {
       name: "MediaSourceNewAbortAndDuration",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "MediaStreamTrackTransfer",
@@ -3009,6 +3073,11 @@
     {
       name: "MiddleClickAutoscroll",
       status: "test",
+    },
+    // Killswitch for crbug.com/40062462 fix.
+    {
+      name: "MixedContentAutoupgradesUseIsMixedContentRestrictedInFrame",
+      status: "stable",
     },
     {
       name: "MobileLayoutTheme",
@@ -3655,6 +3724,12 @@
       status: "test",
       base_feature: "none",
     },
+    {
+      // Propagate overscroll-behavior from the root element rather than the
+      // body element. crbug.com/41453796
+      name: "PropagateOverscrollBehaviorFromRoot",
+      status: "experimental"
+    },
     // Protected memory varariant of the sample API for testing integration with
     // the Origin Trials Framework. This is used only in unit tests.
     // Do not change this flag to stable, as it exists
@@ -3705,6 +3780,11 @@
       public: true,
       status: "experimental",
       base_feature: "none",
+    },
+    {
+      // ChromeStatus: https://chromestatus.com/feature/6194847180128256
+      name: "QuotaExceededErrorUpdate",
+      status: "experimental",
     },
     {
      // crbug.com/323953913
@@ -4161,6 +4241,12 @@
       base_feature: "none",
     },
     {
+      // Implements new UX for SPC including new output states, payment
+      // instrument details and payment entities logos.
+      name: "SecurePaymentConfirmationUxRefresh",
+      status: "test",
+    },
+    {
       // Implements improved accessibility mappings for having an <input>
       // inside of a <select> by keeping the child <input> in the a11y tree at
       // the same place that its at in the DOM tree, but automatically setting
@@ -4207,6 +4293,11 @@
       // https://w3c.github.io/selection-api/#dom-selection-direction
       // This should ship in M137, and it can be removed after M139.
       name: "SelectionAcrossShadowDOM",
+      status: "stable",
+    },
+    {
+      // See https://crbug.com/417823377
+      name: "SelectionDeleteFromDocumentUaShadowFix",
       status: "stable",
     },
     {
@@ -4406,6 +4497,11 @@
       name: "SkipTouchEventFilter",
       status: "stable",
     },
+    // Fix for crbug.com/41393366
+    {
+      name: "SkipUnselectableContentInSerialization",
+      status: "stable",
+    },
     {
       name: "SmartCard",
       status: {"Android": "", "default": "test"},
@@ -4457,18 +4553,6 @@
     {
       name: "SpeculationRulesPointerHoverHeuristics",
       base_feature_status: "enabled",
-    },
-    // This feature exists solely to be the target of implied_by for features
-    // that are part of this trial but which may also be enabled another way.
-    // Otherwise, runtime-enabled features can be added to the origin trial
-    // with the following:
-    //   origin_trial_feature_name: "SpeculationRulesPrefetchFuture",
-    //   origin_trial_allows_third_party: true,
-    {
-      name: "SpeculationRulesPrefetchFuture",
-      base_feature: "none",
-      origin_trial_feature_name: "SpeculationRulesPrefetchFuture",
-      origin_trial_allows_third_party: true,
     },
     {
       name: "SpeculationRulesPrefetchWithSubresources",
@@ -4605,7 +4689,7 @@
     },
     {
       name: "TableIsAutoFixedLayout",
-      status: "stable",
+      status: "test",
     },
     // For unit tests.
     {
@@ -4659,15 +4743,15 @@
       status: "stable",
     },
     {
-      // crbug.com/341564372
+      // crbug.com/414858401
       name: "TextareaLineEndingsAsBr",
-      status: "experimental",
+      status: "stable",
       depends_on: ["EditingFastRichReplace"],
     },
     {
-      // crbug.com/341564372
+      // crbug.com/414858401
       name: "TextareaMultipleIfcs",
-      status: "experimental",
+      status: "stable",
       depends_on: ["FastSelectionSync", "TextareaLineEndingsAsBr"],
     },
     {
@@ -4729,6 +4813,15 @@
     },
     {
       name: "TimeZoneChangeEvent",
+      status: "experimental",
+    },
+    {
+      // Adds an "source" attribute to ToggleEvent which is set to the button
+      // that invoked the element which the toggle event was fired on, if
+      // appropriate.
+      // https://issues.chromium.org/issues/408018828
+      // https://github.com/whatwg/html/issues/9111
+      name: "ToggleEventSource",
       status: "experimental",
     },
     {
@@ -4825,7 +4918,12 @@
     },
     {
       name: "TranslationAPI",
-      status: "experimental",
+      status: {
+        "Win": "experimental",
+        "Mac": "experimental",
+        "Linux": "experimental",
+        "default": "",
+      },
       origin_trial_feature_name: "TranslationAPI",
       origin_trial_allows_third_party: true,
       base_feature_status: "enabled",
@@ -4838,7 +4936,12 @@
     },
     {
       name: "TranslationAPIV1",
-      status: "experimental",
+      status: {
+        "Win": "experimental",
+        "Mac": "experimental",
+        "Linux": "experimental",
+        "default": "",
+      },
       copied_from_base_feature_if: "overridden",
     },
     {
@@ -5020,23 +5123,8 @@
       status: "stable",
     },
     {
-      name: "ViewTransitionDisableSnapBrowserControlsOnHidden",
-      status: "stable",
-    },
-    {
       name: "ViewTransitionLongCallbackTimeoutForTesting",
       status: "test",
-    },
-    {
-      // If enabled, ViewTransition API is supported for navigations including
-      // cross-document transitions.
-      // See https://drafts.csswg.org/css-view-transitions-1/.
-      name: "ViewTransitionOnNavigation",
-      status: "stable",
-    },
-    {
-      name: "ViewTransitionOnNavigationForIframes",
-      status: "stable",
     },
     {
       name: "VisibilityCollapseColumn",
@@ -5297,8 +5385,13 @@
       public: true,
     },
     {
+      // Switch WebGL to use an experimental implementation where WebGL calls
+      // are translated in Blink, via ANGLE, to WebGPU calls. Note that this
+      // is not marked as "experimental" because it is not an incremental
+      // addition like other experimental features but a code switch, so we
+      // don't want to enable it when testing all "experimental Web platform
+      // features".
       name: "WebGLOnWebGPU",
-      status: "experimental",
     },
     {
       name: "WebGPUAdapterInfoIsFallbackAdapter",
@@ -5578,7 +5671,7 @@
     },
     {
       name: "XMLSerializerConsistentDefaultNsDeclMatching",
-      status: "stable",
+      status: "test",
     },
     {
       // If enabled, the `getDisplayMedia()` family of APIs will ask for NV12

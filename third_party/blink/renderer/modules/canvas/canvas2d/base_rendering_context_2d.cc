@@ -156,18 +156,8 @@ BaseRenderingContext2D::BaseRenderingContext2D(
           &BaseRenderingContext2D::TryRestoreContextEvent),
       color_params_(attrs.color_space, attrs.pixel_format, attrs.alpha) {}
 
-void BaseRenderingContext2D::OnPlaceElementStateChanged(Element& element) {
-  element.SetNeedsStyleRecalc(
-      StyleChangeType::kLocalStyleChange,
-      StyleChangeReasonForTracing::Create("placeElement"));
-}
-
 void BaseRenderingContext2D::ResetInternal() {
   Canvas2DRecorderContext::ResetInternal();
-  for (Element* element : placed_elements_.Keys()) {
-    OnPlaceElementStateChanged(*element);
-  }
-  placed_elements_.clear();
 
   // If a WebGPU transfer texture exists, we must destroy it immediately. We
   // can't allow it to continue to exist, as it would be subject to Javascript
@@ -200,75 +190,34 @@ bool BaseRenderingContext2D::IsDrawElementEligible(
 
   if (element->parentElement() != canvas_element) {
     exception_state.ThrowTypeError(
-        "Only immediate children of the <canvas> element can be used with "
-        "placeElement().");
+        "Only immediate children of the <canvas> element can be passed to "
+        "drawElement().");
+    return false;
+  }
+
+  if (!canvas_element->layoutSubtree()) {
+    exception_state.ThrowTypeError(
+        "<canvas> elements without layoutsubtree do not support "
+        "drawElement().");
+    return false;
+  }
+
+  if (!element->GetLayoutObject()) {
+    exception_state.ThrowTypeError(
+        "The canvas and element used with drawElement() must have been laid "
+        "out. Detached canvases are not supported, nor canvas or children that "
+        "are `display: none`.");
     return false;
   }
 
   // TODO(crbug.com/413728246): Maybe we can support canvas element.
   if (IsA<HTMLCanvasElement>(element)) {
     exception_state.ThrowTypeError(
-        "<canvas> elements cannot be used with placeElement().");
+        "<canvas> children of a <canvas> cannot be passed to drawElement().");
     return false;
   }
 
-  // TODO(crbug.com/413408522): Verify that `canvas_element` has the
-  // `withlayout` attribute.
-
   return true;
-}
-
-void BaseRenderingContext2D::placeElement(Element* element,
-                                          double x,
-                                          double y,
-                                          ExceptionState& exception_state) {
-  CHECK(RuntimeEnabledFeatures::CanvasPlaceElementEnabled());
-  if (!IsDrawElementEligible(element, exception_state)) {
-    return;
-  }
-
-  HTMLCanvasElement* canvas_element = HostAsHTMLCanvasElement();
-  DCHECK(canvas_element);
-
-  // TODO(crbug.com/380277045): Only taint for x-origin content.
-  SetOriginTaintedByContent();
-
-  if (!canvas_element->HasPlacedElements()) {
-    // If this is the first time placeElement() is called, its possible that the
-    // canvas contains fallback content that has been ignored and needs to be
-    // laid out.
-    canvas_element->SetForceReattachLayoutTree();
-    canvas_element->SetNeedsStyleRecalc(
-        StyleChangeType::kLocalStyleChange,
-        StyleChangeReasonForTracing::Create("placeElement"));
-  }
-
-  if (placed_elements_.Contains(element)) {
-    // Clear the old deferred paint record so it does not appear.
-    placed_elements_.at(element)->Clear();
-  }
-
-  scoped_refptr<CanvasDeferredPaintRecord> deferred_paint_record =
-      base::MakeRefCounted<CanvasDeferredPaintRecord>();
-
-  cc::PaintImage paint_image =
-      PaintImageBuilder::WithDefault()
-          .set_id(PaintImage::GetNextId())
-          .set_deferred_paint_record(deferred_paint_record)
-          .TakePaintImage();
-
-  placed_elements_.Set(element, deferred_paint_record);
-  deferred_paint_record->SetIsDirty(true);
-  element->SetNeedsStyleRecalc(
-      StyleChangeType::kLocalStyleChange,
-      StyleChangeReasonForTracing::Create("placeElement"));
-
-  // TODO(https://issues.chromium.org/379143301): Figure out the actual visual
-  // rect of the element.
-  WillDraw(SkIRect::MakeXYWH(0, 0, Width(), Height()),
-           CanvasPerformanceMonitor::DrawType::kOther);
-
-  GetOrCreatePaintCanvas()->drawImage(paint_image, x, y);
 }
 
 void BaseRenderingContext2D::DispatchContextLostEvent(TimerBase*) {
@@ -522,7 +471,7 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
   validate_and_create_params.default_color_space =
       GetDefaultImageDataColorSpace();
 
-  if (isContextLost() || !CanCreateCanvas2dResourceProvider()) [[unlikely]] {
+  if (isContextLost()) {
     return ImageData::ValidateAndCreate(
         sw, sh, std::nullopt, image_data_settings, validate_and_create_params,
         exception_state);
@@ -615,6 +564,10 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
         image_data_rect.bottom() > snapshot->Size().height()) {
       validate_and_create_params.zero_initialize = true;
     }
+  } else {
+    // If there's no snapshot, the buffer will not be overwritten and hence must
+    // be zero-initialized.
+    validate_and_create_params.zero_initialize = true;
   }
 
   ImageData* image_data =
@@ -871,7 +824,6 @@ void BaseRenderingContext2D::Trace(Visitor* visitor) const {
   visitor->Trace(dispatch_context_restored_event_timer_);
   visitor->Trace(try_restore_context_event_timer_);
   visitor->Trace(webgpu_access_texture_);
-  visitor->Trace(placed_elements_);
   CanvasRenderingContext::Trace(visitor);
   Canvas2DRecorderContext::Trace(visitor);
 }

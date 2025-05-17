@@ -39,14 +39,14 @@ function getTestAnnotation(id: number): TextAnnotation {
 
 // Verifies that the plugin received a startTextAnnotation message for
 // annotation with id 0.
-function verifyStartTextAnnotationMessage(expected: boolean) {
+function verifyStartTextAnnotationMessage(expected: boolean, id: number = 0) {
   const startTextAnnotationMessage =
       mockPlugin.findMessage('startTextAnnotation');
   chrome.test.assertEq(expected, startTextAnnotationMessage !== undefined);
   if (expected) {
     chrome.test.assertEq(
         'startTextAnnotation', startTextAnnotationMessage.type);
-    chrome.test.assertEq(0, startTextAnnotationMessage.data);
+    chrome.test.assertEq(id, startTextAnnotationMessage.data);
   }
 }
 
@@ -154,6 +154,97 @@ chrome.test.runTests([
     chrome.test.succeed();
   },
 
+  async function testInitializeText() {
+    chrome.test.assertFalse(manager.isTextInitializationComplete());
+
+    // Initialize text annotation mode.
+    const textPromise = manager.initializeTextAnnotations();
+    await textPromise;
+    chrome.test.assertTrue(manager.isTextInitializationComplete());
+
+    // Check that the manager requested all the text annotations.
+    const getAllTextAnnotationsMessage =
+        mockPlugin.findMessage('getAllTextAnnotations');
+    chrome.test.assertTrue(getAllTextAnnotationsMessage !== undefined);
+    chrome.test.assertEq(
+        'getAllTextAnnotations', getAllTextAnnotationsMessage.type);
+
+    chrome.test.succeed();
+  },
+
+  async function testInitializeTextNonEmpty() {
+    // Create a new Ink2Manager so that the state is separate from the rest of
+    // the tests.
+    const testManager = new Ink2Manager();
+    testManager.setViewport(viewport);
+    testManager.viewportChanged();
+
+    // Set the reply to getAllTextAnnotations to return non-empty.
+    const testAnnotation1 = getTestAnnotation(0);
+    const testAnnotation2 = getTestAnnotation(1);
+    testAnnotation2.text = 'Goodbye Moon';
+    testAnnotation2.textBoxRect = {
+      height: 25,
+      locationX: 10,
+      locationY: 65,
+      width: 50,
+    };
+    mockPlugin.clearMessages();
+    mockPlugin.setMessageReply('getAllTextAnnotations', {
+      annotations: [testAnnotation1, testAnnotation2],
+    });
+
+    chrome.test.assertFalse(testManager.isTextInitializationComplete());
+    await testManager.initializeTextAnnotations();
+    chrome.test.assertTrue(testManager.isTextInitializationComplete());
+
+    // Check that the manager requested all the text annotations.
+    const getAllTextAnnotationsMessage =
+        mockPlugin.findMessage('getAllTextAnnotations');
+    chrome.test.assertTrue(getAllTextAnnotationsMessage !== undefined);
+    chrome.test.assertEq(
+        'getAllTextAnnotations', getAllTextAnnotationsMessage.type);
+
+    // Check that initializing a new annotation in a different location sets
+    // a different id.
+    let whenInitEvent = eventToPromise('initialize-text-box', testManager);
+    testManager.initializeTextAnnotation({x: 75, y: 20});
+    let initEvent = await whenInitEvent;
+    chrome.test.assertEq(2, initEvent.detail.annotation.id);
+    chrome.test.assertEq('', initEvent.detail.annotation.text);
+    verifyStartTextAnnotationMessage(false);
+
+    // Check that the two existing annotations can be activated.
+    mockPlugin.clearMessages();
+    whenInitEvent = eventToPromise('initialize-text-box', testManager);
+    testManager.initializeTextAnnotation({x: 30, y: 30});
+    initEvent = await whenInitEvent;
+    const testAnnotation1ScreenCoords = structuredClone(testAnnotation1);
+    // Add page offsets. These are the defaults for the test viewport setup
+    // of a 90x90 page in a 100x100 window.
+    testAnnotation1ScreenCoords.textBoxRect.locationX =
+        testAnnotation1.textBoxRect.locationX + 10;
+    testAnnotation1ScreenCoords.textBoxRect.locationY =
+        testAnnotation1.textBoxRect.locationY + 3;
+    assertDeepEquals(testAnnotation1ScreenCoords, initEvent.detail.annotation);
+    verifyStartTextAnnotationMessage(true, testAnnotation1.id);
+
+    mockPlugin.clearMessages();
+    whenInitEvent = eventToPromise('initialize-text-box', testManager);
+    testManager.initializeTextAnnotation({x: 30, y: 70});
+    initEvent = await whenInitEvent;
+    const testAnnotation2ScreenCoords = structuredClone(testAnnotation2);
+    testAnnotation2ScreenCoords.textBoxRect.locationX =
+        testAnnotation2.textBoxRect.locationX + 10;
+    testAnnotation2ScreenCoords.textBoxRect.locationY =
+        testAnnotation2.textBoxRect.locationY + 3;
+    assertDeepEquals(testAnnotation2ScreenCoords, initEvent.detail.annotation);
+    verifyStartTextAnnotationMessage(true, testAnnotation2.id);
+
+    mockPlugin.clearMessages();
+    chrome.test.succeed();
+  },
+
   function testSetFontProperties() {
     const fontUpdates: TextAttributes[] = [];
     manager.addEventListener('attributes-changed', e => {
@@ -215,6 +306,13 @@ chrome.test.runTests([
       initEvents++;
     });
 
+    // Should fire an event to blur any existing text box when click is on
+    // a scrollbar.
+    let blurEvents = 0;
+    manager.addEventListener('blur-text-box', () => {
+      blurEvents++;
+    });
+
     // Zoom in to 2x so that there are scrollbars in both x and y.
     let whenViewportChanged = eventToPromise('viewport-changed', manager);
     viewport.setZoom(2.0);
@@ -229,8 +327,10 @@ chrome.test.runTests([
 
     const edge = 100 - viewport.scrollbarWidth;
     Ink2Manager.getInstance().initializeTextAnnotation({x: edge, y: 20});
+    chrome.test.assertEq(1, blurEvents);
     Ink2Manager.getInstance().initializeTextAnnotation({x: 20, y: edge});
     chrome.test.assertEq(0, initEvents);
+    chrome.test.assertEq(2, blurEvents);
 
     // Reset the zoom for the next test.
     whenViewportChanged = eventToPromise('viewport-changed', manager);
@@ -330,25 +430,32 @@ chrome.test.runTests([
         annotationPageCoords: TextAnnotation) {
       // Listen for PluginControllerEventType.FINISH_INK_STROKE events. The
       // manager dispatches these on PluginController's eventTarget.
-      let finishInkStrokeEvents = 0;
+      let finishInkStrokeModifiedEvents = 0;
+      let finishInkStrokeUnmodifiedEvents = 0;
       PluginController.getInstance().getEventTarget().addEventListener(
-          PluginControllerEventType.FINISH_INK_STROKE, () => {
-            finishInkStrokeEvents++;
+          PluginControllerEventType.FINISH_INK_STROKE, e => {
+            if ((e as CustomEvent<boolean>).detail) {
+              finishInkStrokeModifiedEvents++;
+            } else {
+              finishInkStrokeUnmodifiedEvents++;
+            }
           });
 
-      // Committing with edited = true should fire an event.
+      // Committing with edited = true should fire a modified event.
       // Use structuredClone since the manager edits the object in place,
       // and we want to reuse this below.
       manager.commitTextAnnotation(
           structuredClone(annotationScreenCoords), true);
-      chrome.test.assertEq(1, finishInkStrokeEvents);
+      chrome.test.assertEq(1, finishInkStrokeModifiedEvents);
+      chrome.test.assertEq(0, finishInkStrokeUnmodifiedEvents);
       verifyFinishTextAnnotationMessage(annotationPageCoords);
       mockPlugin.clearMessages();
 
-      // Committing with edited = false should not fire an event.
+      // Committing with edited = false should fire an unmodified event.
       manager.commitTextAnnotation(
           structuredClone(annotationScreenCoords), false);
-      chrome.test.assertEq(1, finishInkStrokeEvents);
+      chrome.test.assertEq(1, finishInkStrokeModifiedEvents);
+      chrome.test.assertEq(1, finishInkStrokeUnmodifiedEvents);
       verifyFinishTextAnnotationMessage(annotationPageCoords);
       mockPlugin.clearMessages();
     }
@@ -575,6 +682,77 @@ chrome.test.runTests([
     mockPlugin.clearMessages();
     Ink2Manager.getInstance().initializeTextAnnotation({x: 85, y: 0});
     verifyStartTextAnnotationMessage(false);
+
+    chrome.test.succeed();
+  },
+
+  function testTextboxFocused() {
+    // Reset viewport to position 0, 0 and 1.0 zoom.
+    viewport.setZoom(1.0);
+    rotateViewport(/* clockwiseRotations= */ 0);  // 0 rotation.
+    viewport.goToPageAndXy(0, 0, 0);
+
+    // Simulate creating a textbox at (55, 50) (near center of the viewport).
+    manager.initializeTextAnnotation({x: 55, y: 50});
+
+    // Zoom by 2x. This would cause the textbox to be out of the view, at
+    // location 110, 100.
+    viewport.setZoom(2.0);
+
+    mockPlugin.clearMessages();
+
+    // Now simulate focus moving to the textbox (e.g., because the user tabbed
+    // there). Make sure the manager sends a message to the plugin to scroll
+    // the viewport to the textbox.
+    manager.textBoxFocused({
+      locationX: 110,
+      locationY: 100,
+      height: 50,
+      width: 50,
+    });
+
+    let syncScrollMessage = mockPlugin.findMessage('syncScrollToRemote');
+    chrome.test.assertTrue(syncScrollMessage !== undefined);
+    chrome.test.assertEq('syncScrollToRemote', syncScrollMessage.type);
+    // The content is 160x200 (2x page size), and the viewport is 100x100. The
+    // scrollbar is 5px wide.
+    // Max scroll is contentSize - viewportSize + scrollbarWidth.
+    // The max scroll is therefore 160 - 100 + 5 = 65 horizontally, so in the x
+    // direction scroll is clamped at 65, which is less than the desired scroll
+    // of 110 - .1 * viewportWidth = 100.
+    // Vertically, the desired y position is 100 - .1 * viewportHeight = 90,
+    // which is within the max scroll of
+    // contentWidth - viewportWidth + scrollbarWidth = 105.
+    chrome.test.assertEq(65, syncScrollMessage.x);
+    chrome.test.assertEq(90, syncScrollMessage.y);
+
+    // Focusing a textbox that is already in the view shouldn't scroll the
+    // viewport.
+    mockPlugin.clearMessages();
+    manager.textBoxFocused({
+      locationX: 45,
+      locationY: 10,
+      height: 50,
+      width: 50,
+    });
+    syncScrollMessage = mockPlugin.findMessage('syncScrollToRemote');
+    chrome.test.assertEq(undefined, syncScrollMessage);
+
+    // Focus a textbox that is out of bounds the other direction.
+    manager.textBoxFocused({
+      locationX: -20,
+      locationY: -10,
+      height: 50,
+      width: 50,
+    });
+    syncScrollMessage = mockPlugin.findMessage('syncScrollToRemote');
+    chrome.test.assertTrue(syncScrollMessage !== undefined);
+    chrome.test.assertEq('syncScrollToRemote', syncScrollMessage.type);
+    // Scroll x to maxScrollWidth - 20 - .1 * viewportWidth = 65 - 20 - 10 = 35.
+    // Scroll y to maxScrollHeight - 10 - .1 * viewportHeight =
+    // 90 - 10 - 10 = 70.
+    chrome.test.assertEq(35, syncScrollMessage.x);
+    chrome.test.assertEq(70, syncScrollMessage.y);
 
     chrome.test.succeed();
   },

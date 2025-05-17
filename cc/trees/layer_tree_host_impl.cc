@@ -105,7 +105,6 @@
 #include "cc/trees/mutator_host.h"
 #include "cc/trees/presentation_time_callback_buffer.h"
 #include "cc/trees/raster_capabilities.h"
-#include "cc/trees/raster_context_provider_wrapper.h"
 #include "cc/trees/render_frame_metadata.h"
 #include "cc/trees/render_frame_metadata_observer.h"
 #include "cc/trees/scroll_node.h"
@@ -242,25 +241,18 @@ const char* ClientNameForVerboseLog() {
 // GpuImageDecodeCache.
 class LayerTreeHostImpl::ImageDecodeCacheHolder {
  public:
-  ImageDecodeCacheHolder(bool enable_shared_image_cache_for_gpu,
-                         const RasterCapabilities& raster_caps,
-                         scoped_refptr<RasterContextProviderWrapper>
-                             worker_context_provider_wrapper,
-                         size_t decoded_image_working_set_budget_bytes,
-                         RasterDarkModeFilter* dark_mode_filter) {
+  ImageDecodeCacheHolder(
+      const RasterCapabilities& raster_caps,
+      scoped_refptr<viz::RasterContextProvider> worker_context_provider,
+      size_t decoded_image_working_set_budget_bytes,
+      RasterDarkModeFilter* dark_mode_filter) {
     if (raster_caps.use_gpu_rasterization) {
       auto color_type = viz::ToClosestSkColorType(raster_caps.tile_format);
-      if (enable_shared_image_cache_for_gpu) {
-        image_decode_cache_ptr_ =
-            &worker_context_provider_wrapper->GetGpuImageDecodeCache(
-                color_type, raster_caps);
-      } else {
-        image_decode_cache_ = std::make_unique<GpuImageDecodeCache>(
-            worker_context_provider_wrapper->GetContext().get(),
-            /*use_transfer_cache=*/true, color_type,
-            decoded_image_working_set_budget_bytes,
-            raster_caps.max_texture_size, dark_mode_filter);
-      }
+      image_decode_cache_ = std::make_unique<GpuImageDecodeCache>(
+          worker_context_provider.get(),
+          /*use_transfer_cache=*/true, color_type,
+          decoded_image_working_set_budget_bytes, raster_caps.max_texture_size,
+          dark_mode_filter);
     } else {
       image_decode_cache_ = std::make_unique<SoftwareImageDecodeCache>(
           viz::ToClosestSkColorType(raster_caps.tile_format),
@@ -269,19 +261,13 @@ class LayerTreeHostImpl::ImageDecodeCacheHolder {
 
     if (image_decode_cache_) {
       image_decode_cache_ptr_ = image_decode_cache_.get();
-    } else {
-      DCHECK(image_decode_cache_ptr_);
     }
   }
 
   void SetShouldAggressivelyFreeResources(bool aggressively_free_resources) {
-    // This must only be called if the decode cache is not shared aka is not
-    // created via RasterContextProviderWrapper as the cache created via that
-    // gets this calls from ContextCacheController, which notifies only after
-    // ALL clients are invisible or at least one is visible.
     if (image_decode_cache_) {
       image_decode_cache_->SetShouldAggressivelyFreeResources(
-          aggressively_free_resources, /*context_lock_acquired=*/false);
+          aggressively_free_resources);
     }
   }
 
@@ -2665,7 +2651,7 @@ viz::CompositorFrameMetadata LayerTreeHostImpl::MakeCompositorFrameMetadata() {
     screenshot_destination_ = base::UnguessableToken();
   }
 
-  metadata.is_software = !layer_tree_frame_sink_->context_provider();
+  metadata.is_software = GetDrawMode() != DrawMode::DRAW_MODE_HARDWARE;
 
   return metadata;
 }
@@ -4209,8 +4195,7 @@ void LayerTreeHostImpl::RecreateTileResources() {
 void LayerTreeHostImpl::CreateTileManagerResources() {
   DCHECK(!settings_.trees_in_viz_in_viz_process);
   image_decode_cache_holder_ = std::make_unique<ImageDecodeCacheHolder>(
-      settings_.enable_shared_image_cache_for_gpu, raster_caps(),
-      layer_tree_frame_sink_->worker_context_provider_wrapper(),
+      raster_caps(), layer_tree_frame_sink_->worker_context_provider(),
       settings_.decoded_image_working_set_budget_bytes, dark_mode_filter_);
 
   if (raster_caps().use_gpu_rasterization) {
@@ -4321,12 +4306,13 @@ void LayerTreeHostImpl::QueueImageDecode(int request_id,
   tile_manager_.decoded_image_tracker().QueueImageDecode(
       image_copy,
       base::BindOnce(&LayerTreeHostImpl::ImageDecodeFinished,
-                     weak_factory_.GetWeakPtr(), request_id),
+                     weak_factory_.GetWeakPtr(), request_id, speculative),
       speculative);
   tile_manager_.checker_image_tracker().DisallowCheckeringForImage(paint_image);
 }
 
 void LayerTreeHostImpl::ImageDecodeFinished(int request_id,
+                                            bool speculative,
                                             bool decode_succeeded) {
   DCHECK(!settings_.trees_in_viz_in_viz_process);
   TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("cc.debug"),
@@ -4335,7 +4321,8 @@ void LayerTreeHostImpl::ImageDecodeFinished(int request_id,
           features::kSendExplicitDecodeRequestsImmediately)) {
     completed_image_decode_requests_.emplace_back(request_id, decode_succeeded);
   }
-  client_->NotifyImageDecodeRequestFinished(request_id, decode_succeeded);
+  client_->NotifyImageDecodeRequestFinished(request_id, speculative,
+                                            decode_succeeded);
 }
 
 std::vector<std::pair<int, bool>>
@@ -4352,6 +4339,25 @@ std::unique_ptr<MutatorEvents> LayerTreeHostImpl::TakeMutatorEvents() {
   return events;
 }
 
+UIResourceChangeMap LayerTreeHostImpl::TakeUIResourceChanges(
+    bool require_full_sync) {
+  if (require_full_sync) {
+    ui_resource_changes_.clear();
+
+    if (settings_.TreesInVizInClientProcess()) {
+      // Mark all ui resources as created in this change set.
+      for (auto& pair : ui_resource_map_) {
+        UIResourceId uid = pair.first;
+        auto [change_it, success] =
+            ui_resource_changes_.try_emplace(uid, UIResourceChange());
+        change_it->second.resource_created = true;
+      }
+    }
+  }
+
+  return std::move(ui_resource_changes_);
+}
+
 void LayerTreeHostImpl::ClearHistory() {
   client_->ClearHistory();
 }
@@ -4365,11 +4371,6 @@ void LayerTreeHostImpl::ClearCaches() {
   // comes with an invalidation and the image ids are never reused.
   bool can_clear_decode_policy_tracking = true;
   tile_manager_.ClearCheckerImageTracking(can_clear_decode_policy_tracking);
-  // TODO(crbug.com/40243840): add tracking for which clients have used an image
-  // and remove entries used by only one client when the URL on that client
-  // changes. This should be fixed to correctly clear caches for web contents.
-  // This is only a problem when
-  // LayerTreeSettings::enable_shared_image_cache_for_gpu is true.
   if (GetImageDecodeCache())
     GetImageDecodeCache()->ClearCache();
   image_animation_controller_.set_did_navigate();
@@ -5356,6 +5357,9 @@ void LayerTreeHostImpl::CreateUIResource(UIResourceId uid,
                                          const UIResourceBitmap& bitmap) {
   TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("cc.debug"),
                "LayerTreeHostImpl::CreateUIResource");
+  // We expect only CreateUIResourceFromImportedResource to be used for
+  // trees_in_viz_in_viz_process mode.
+  DCHECK(!settings_.trees_in_viz_in_viz_process);
   DCHECK_GT(uid, 0);
 
   // Allow for multiple creation requests with the same UIResourceId.  The
@@ -5556,6 +5560,51 @@ void LayerTreeHostImpl::CreateUIResource(UIResourceId uid,
   ui_resource_map_[uid] = std::move(data);
 
   MarkUIResourceNotEvicted(uid);
+
+  if (settings_.TreesInVizInClientProcess()) {
+    auto [change_it, success] =
+        ui_resource_changes_.try_emplace(uid, UIResourceChange());
+    // Mark that a resource was created in this change set.
+    change_it->second.resource_created = true;
+  }
+}
+
+void LayerTreeHostImpl::CreateUIResourceFromImportedResource(
+    UIResourceId uid,
+    viz::ResourceId resource_id,
+    bool is_opaque) {
+  TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("cc.debug"),
+               "LayerTreeHostImpl::CreateUIResourceFromResource");
+  // We expect only CreateUIResource to be used for
+  // non-trees_in_viz_in_viz_process mode.
+  DCHECK(settings_.trees_in_viz_in_viz_process);
+  DCHECK_GT(uid, 0);
+
+  // Allow for multiple creation requests with the same UIResourceId.  The
+  // previous resource is simply deleted.
+  viz::ResourceId id = ResourceIdForUIResource(uid);
+  if (id) {
+    DeleteUIResource(uid);
+  }
+
+  if (!has_valid_layer_tree_frame_sink_) {
+    evicted_ui_resources_.insert(uid);
+    return;
+  }
+
+  UIResourceData data;
+  data.opaque = is_opaque;
+  data.resource_id_for_export = resource_id;
+  ui_resource_map_[uid] = std::move(data);
+
+  MarkUIResourceNotEvicted(uid);
+
+  if (settings_.TreesInVizInClientProcess()) {
+    auto [change_it, success] =
+        ui_resource_changes_.try_emplace(uid, UIResourceChange());
+    // Mark that a resource was created in this change set.
+    change_it->second.resource_created = true;
+  }
 }
 
 void LayerTreeHostImpl::DeleteUIResource(UIResourceId uid) {
@@ -5572,6 +5621,19 @@ void LayerTreeHostImpl::DeleteUIResource(UIResourceId uid) {
     ui_resource_map_.erase(it);
 
     resource_provider_->RemoveImportedResource(id);
+
+    if (settings_.TreesInVizInClientProcess()) {
+      auto [change_it, success] =
+          ui_resource_changes_.try_emplace(uid, UIResourceChange());
+      // If a resource was marked as created in this change set, unmark it.
+      // Otherwise, the resource must have been created in a prior change set,
+      // so we mark it as requiring deletion.
+      if (change_it->second.resource_created) {
+        change_it->second.resource_created = false;
+      } else {
+        change_it->second.resource_deleted = true;
+      }
+    }
   }
   MarkUIResourceNotEvicted(uid);
 }

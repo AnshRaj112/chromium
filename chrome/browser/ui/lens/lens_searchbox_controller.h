@@ -5,10 +5,12 @@
 #ifndef CHROME_BROWSER_UI_LENS_LENS_SEARCHBOX_CONTROLLER_H_
 #define CHROME_BROWSER_UI_LENS_LENS_SEARCHBOX_CONTROLLER_H_
 
+#include "chrome/browser/lens/core/mojom/lens_ghost_loader.mojom.h"
 #include "chrome/browser/lens/core/mojom/lens_side_panel.mojom.h"
 #include "chrome/browser/ui/webui/searchbox/lens_searchbox_client.h"
 #include "chrome/browser/ui/webui/searchbox/lens_searchbox_handler.h"
 #include "components/lens/proto/server/lens_overlay_response.pb.h"
+#include "components/omnibox/browser/lens_suggest_inputs_utils.h"
 #include "components/sessions/core/session_id.h"
 #include "content/public/browser/web_contents.h"
 #include "third_party/metrics_proto/omnibox_event.pb.h"
@@ -31,6 +33,22 @@ class LensSearchboxController : public LensSearchboxClient {
   explicit LensSearchboxController(
       LensSearchController* lens_search_controller);
   ~LensSearchboxController() override;
+
+  // This method is used to set up communication between this instance and the
+  // overlay ghost loader's WebUI. This is called by the WebUIController when
+  // the WebUI is executing javascript and ready to bind.
+  void BindOverlayGhostLoader(
+      mojo::PendingRemote<lens::mojom::LensGhostLoaderPage> page);
+
+  // This method is used to set up communication between this instance and the
+  // side panel's ghost loader WebUI. This is called by the WebUIController
+  // when the WebUI is executing javascript and ready to bind.
+  void BindSidePanelGhostLoader(
+      mojo::PendingRemote<lens::mojom::LensGhostLoaderPage> page);
+
+  // Must be called at the start of a session so the proper state is
+  // initialized.
+  void OnSessionStart();
 
   // This method is used to set up communication between this instance and the
   // searchbox WebUI. This is called by the WebUIController when the WebUI is
@@ -67,15 +85,31 @@ class LensSearchboxController : public LensSearchboxClient {
   // Handles the creation of a new thumbnail based on the user selection.
   void HandleThumbnailCreated(const std::string& thumbnail_bytes);
 
+  // Handles an update to the suggest inputs. This will be called whenever
+  // any part of the suggest inputs changes, such as when a new objects
+  // request is sent, or when an interaction data response is received.
+  void HandleSuggestInputsResponse(
+      lens::proto::LensOverlaySuggestInputs suggest_inputs);
+
   // Cleans up internal state associated with the searchbox.
   void CloseUI();
 
   // Gets whether this is currently a contextual searchbox.
   bool IsContextualSearchbox() const;
 
+  // Gets whether this searchbox is currently in the side panel. False if it is
+  // in the overlay.
+  bool IsSidePanelSearchbox() const;
+
   // Returns whether the searchbox is in contextual mode by passing the result
   // of IsContextualSearchbox() to the callback.
   void GetIsContextualSearchbox(GetIsContextualSearchboxCallback callback);
+
+  // Waits for the handshake with the Lens backend to complete and then invokes
+  // the callback with the LensOverlaySuggestInputs. Callback will be invoked
+  // immediately if the handshake is already complete.
+  base::CallbackListSubscription GetLensSuggestInputsWhenReady(
+      ::LensOverlaySuggestInputsCallback callback);
 
   // Overridden from LensSearchboxClient:
   const GURL& GetPageURL() const override;
@@ -98,12 +132,34 @@ class LensSearchboxController : public LensSearchboxClient {
   // Adds searchbox related state to the search query.
   void AddSearchboxStateToSearchQuery(lens::SearchQuery& search_query);
 
+ private:
+  // Data class for storing state for the searchbox.
+  struct LensSearchboxInitializationData {
+   public:
+    LensSearchboxInitializationData() = default;
+    ~LensSearchboxInitializationData() = default;
+    // The text query in the searchbox.
+    std::string text_query = "";
+
+    // The URI of the thumbnail in the searchbox.
+    std::string thumbnail_uri = "";
+
+    // The latest suggest inputs from the query controller.
+    lens::proto::LensOverlaySuggestInputs suggest_inputs_;
+  };
+
   // Returns the WebContents associated with the tab this instance of Lens is
   // invoked on.
   content::WebContents* GetTabWebContents() const;
 
   // Owns this.
   const raw_ptr<LensSearchController> lens_search_controller_;
+
+  // The callbacks pending the handshake to complete so the Lens suggest inputs
+  // can be retrieved.
+  base::OnceCallbackList<void(
+      std::optional<lens::proto::LensOverlaySuggestInputs>)>
+      pending_suggest_inputs_callbacks_;
 
   // Searchbox handler for passing in image and text selections. The handler is
   // null if the WebUI containing the searchbox has not been initialized yet,
@@ -126,10 +182,18 @@ class LensSearchboxController : public LensSearchboxClient {
   // currently unused.
   std::unique_ptr<LensSearchboxHandler> overlay_searchbox_handler_;
 
-  // Thumbnail URI referencing the data defined by the user image selection on
-  // the overlay. If the user hasn't made any selection or has made a text
-  // selection this will contain an empty string. Returned by GetThumbnail().
-  std::string selected_region_thumbnail_uri_;
+  // Connections to the overlay ghost loader WebUI. Only valid while
+  // `overlay_view_` is showing, and after the WebUI has started executing JS
+  // and has bound the connection.
+  mojo::Remote<lens::mojom::LensGhostLoaderPage> overlay_ghost_loader_page_;
+
+  // Connections to the side panel ghost loader WebUI. Only valid when the side
+  // panel is currently open and after the WebUI has started executing JS and
+  // has bound the connection.
+  mojo::Remote<lens::mojom::LensGhostLoaderPage> side_panel_ghost_loader_page_;
+
+  // The assembly data needed for the side panel entry to be created and shown.
+  std::unique_ptr<LensSearchboxInitializationData> init_data_;
 
   // A pending text query to be loaded in the side panel. Needed when the side
   // panel is not bound at the time of a text request.

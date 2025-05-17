@@ -389,7 +389,8 @@ class ThrottleManagerTest
     auto* navigation_throttle_manager =
         ThrottleManager::FromNavigationHandle(*navigation_handle);
     if (navigation_throttle_manager) {
-      navigation_throttle_manager->MaybeAppendNavigationThrottles(registry);
+      navigation_throttle_manager->MaybeCreateAndAddNavigationThrottles(
+          registry);
     }
 
     created_fp_throttle_for_last_navigation_ = false;
@@ -403,9 +404,8 @@ class ThrottleManagerTest
         i--;
         continue;
       }
-      navigation_handle->RegisterThrottleForTesting(
-          std::move(registry.throttles()[i]));
     }
+    registry.RegisterHeldThrottles();
   }
 
   void CreateAgentForHost(content::RenderFrameHost* host) {

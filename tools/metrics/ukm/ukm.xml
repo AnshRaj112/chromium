@@ -9584,6 +9584,21 @@ be describing additional metrics about the same event.
   </metric>
 </event>
 
+<event name="GameControls.PlayGameWithGameControls">
+  <owner>cuicuiruan@google.com</owner>
+  <owner>arc-gaming@google.com</owner>
+  <summary>
+    Log once whether the ARC game is played with Game Controls per game session.
+    If it is played with Game Controls, record true immediately. If it is never
+    played with Game Controls, record false when shutting down the game.
+  </summary>
+  <metric name="PlayedWith" enum="Boolean">
+    <summary>
+      Boolean indicating whether the ARC game is played with Game Controls.
+    </summary>
+  </metric>
+</event>
+
 <event name="GameControls.ToggleWithMappingSource">
   <owner>cuicuiruan@google.com</owner>
   <owner>pjlee@google.com</owner>
@@ -15356,6 +15371,13 @@ be describing additional metrics about the same event.
       provisional navigations (i.e. abandoned before commit).
     </summary>
   </metric>
+  <metric name="Net.ExtendedErrorCode" enum="ErrorNavigationTrigger">
+    <summary>
+      The extended error code for the net error for this page load, which
+      represents the detailed context of why the net error happened. Only logged
+      for failed provisional navigations.
+    </summary>
+  </metric>
   <metric name="PreviousBackgroundedTime">
     <summary>
       If we've experienced backgrounding while the navigation/page load is
@@ -21066,6 +21088,11 @@ be describing additional metrics about the same event.
     <summary>
       The reason why the revocation was deemed a false positive: either a web
       site visit or a notification click.
+    </summary>
+  </metric>
+  <metric name="RevocationState" enum="DisruptiveNotificationRevocationState">
+    <summary>
+      The revocation state (either proposed or actually revoked).
     </summary>
   </metric>
 </event>

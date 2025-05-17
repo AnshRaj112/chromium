@@ -1996,17 +1996,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram
-    name="Ash.CaptureModeController.MultimodalSearchRequest.{TabletOrClamshellMode}"
-    enum="Boolean" expires_after="2025-10-08">
-  <owner>hewer@chromium.org</owner>
-  <owner>chromeos-wm@google.com</owner>
-  <summary>
-    Recorded each time a multimodal search request is made in the search results
-    panel in {TabletOrClamshellMode}.
-  </summary>
-</histogram>
-
 <histogram name="Ash.CaptureModeController.NumberOfConnectedCameras"
     units="connected cameras" expires_after="2025-10-08">
   <owner>minch@chromium.org</owner>
@@ -4076,24 +4065,6 @@ chromium-metrics-reviews@google.com.
     to be played from clicking on the playlist while in a focus session or
     starting a session to play the current selected playlist.
   </summary>
-</histogram>
-
-<histogram name="Ash.Frame.ColorChangeCount.{AppType}" units="count"
-    expires_after="2025-05-11">
-  <owner>lingyufeng@google.com</owner>
-  <owner>arc-framework@google.com</owner>
-  <summary>
-    Tracks the number of frame color changes when a {AppType} is launched. The
-    data is collected once per app launching.
-  </summary>
-  <token key="AppType">
-    <variant name="ArcApp"/>
-    <variant name="Browser"/>
-    <variant name="ChromeApp"/>
-    <variant name="CrostiniApp"/>
-    <variant name="Others"/>
-    <variant name="SystemApp"/>
-  </token>
 </histogram>
 
 <histogram name="Ash.FullRestore.Browser.FirstInputDelay" units="ms"

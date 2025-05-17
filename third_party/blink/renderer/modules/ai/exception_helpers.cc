@@ -68,8 +68,11 @@ const char kExceptionMessageUnsupportedLanguages[] =
 const char kExceptionMessageInvalidResponseJsonSchema[] =
     "Response json schema is invalid - it should be an object that can be "
     "stringified into a JSON string.";
-const char kExceptionMessageCrossOriginAccess[] =
-    "Access denied from cross-origin iframes.";
+const char kExceptionMessagePermissionPolicy[] =
+    "Access denied because the Permission Policy is not enabled.";
+const char kExceptionMessageUserActivationRequired[] =
+    "Requires a user gesture when availability is \"downloading\" or "
+    "\"downloadable\".";
 
 void ThrowInvalidContextException(ExceptionState& exception_state) {
   exception_state.ThrowDOMException(DOMExceptionCode::kInvalidStateError,

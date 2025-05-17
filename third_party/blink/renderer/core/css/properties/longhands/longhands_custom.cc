@@ -1036,7 +1036,10 @@ const CSSValue* BackgroundImage::ParseSingleValue(
     const CSSParserContext& context,
     const CSSParserLocalContext&) const {
   return css_parsing_utils::ConsumeCommaSeparatedList(
-      css_parsing_utils::ConsumeImageOrNone, stream, context);
+      static_cast<CSSValue* (*)(CSSParserTokenStream&,
+                                const CSSParserContext&)>(
+          css_parsing_utils::ConsumeImageOrNone),
+      stream, context);
 }
 
 const CSSValue* BackgroundImage::CSSValueFromComputedStyleInternal(
@@ -2841,6 +2844,9 @@ const CSSValue* ContainerType::CSSValueFromComputedStyleInternal(
   if (style.ContainerType() & kContainerTypeScrollState) {
     values->Append(*CSSIdentifierValue::Create(CSSValueID::kScrollState));
   }
+  if (style.ContainerType() & kContainerTypeAnchored) {
+    values->Append(*CSSIdentifierValue::Create(CSSValueID::kAnchored));
+  }
   return values;
 }
 
@@ -2990,27 +2996,33 @@ const CSSValue* ParseContentValue(CSSParserTokenStream& stream,
   }
   outer_list->Append(*values);
   if (alt_text_present) {
-    CSSValueList* alt_text_values = CSSValueList::CreateSpaceSeparated();
+    CSSValueList* alt_values = CSSValueList::CreateSpaceSeparated();
     do {
       CSSParserSavePoint savepoint(stream);
-      CSSValue* alt_text = nullptr;
+      CSSValue* alt_value = nullptr;
       if (stream.Peek().FunctionId() == CSSValueID::kAttr &&
           !RuntimeEnabledFeatures::CSSAdvancedAttrFunctionEnabled()) {
-        alt_text = ConsumeAttr(stream, context);
+        alt_value = ConsumeAttr(stream, context);
+      } else if (RuntimeEnabledFeatures::CSSAltCounterEnabled() &&
+                 stream.Peek().FunctionId() == CSSValueID::kCounter) {
+        alt_value = ConsumeCounterContent(stream, context, false);
+      } else if (RuntimeEnabledFeatures::CSSAltCounterEnabled() &&
+                 stream.Peek().FunctionId() == CSSValueID::kCounters) {
+        alt_value = ConsumeCounterContent(stream, context, true);
       } else {
-        alt_text = css_parsing_utils::ConsumeString(stream);
+        alt_value = css_parsing_utils::ConsumeString(stream);
       }
-      if (!alt_text) {
+      if (!alt_value) {
         break;
       }
-      alt_text_values->Append(*alt_text);
+      alt_values->Append(*alt_value);
       savepoint.Release();
     } while (!stream.AtEnd());
-    if (!alt_text_values->length()) {
+    if (!alt_values->length()) {
       return nullptr;
     }
 
-    outer_list->Append(*alt_text_values);
+    outer_list->Append(*alt_values);
   }
   return outer_list;
 }
@@ -3168,8 +3180,18 @@ void Content::ApplyValue(StyleResolverState& state,
   if (outer_list.length() > 1) {
     CHECK_EQ(outer_list.length(), 2U);
     for (auto& item : To<CSSValueList>(outer_list.Item(1))) {
-      auto* alt_content = MakeGarbageCollected<AltTextContentData>(
-          GetStringFromAttributeOrStringValue(*item, state, builder));
+      ContentData* alt_content = nullptr;
+      if (const auto* counter_value =
+              DynamicTo<cssvalue::CSSCounterValue>(item.Get())) {
+        alt_content = MakeGarbageCollected<AltCounterContentData>(
+            AtomicString(counter_value->Identifier()),
+            counter_value->ListStyle(),
+            AtomicString(counter_value->Separator()),
+            counter_value->GetTreeScope());
+      } else {
+        alt_content = MakeGarbageCollected<AltTextContentData>(
+            GetStringFromAttributeOrStringValue(*item, state, builder));
+      }
       prev_content->SetNext(alt_content);
       prev_content = alt_content;
     }
@@ -4175,15 +4197,27 @@ const CSSValue* FlexWrap::CSSValueFromComputedStyleInternal(
     return CSSIdentifierValue::Create(data.GetWrapMode());
   }
 
+  const uint16_t min_line_count = data.MinLineCount();
   switch (data.GetWrapMode()) {
     case FlexWrapMode::kNowrap:
       NOTREACHED();
     case FlexWrapMode::kWrap:
+      if (min_line_count > 1u) {
+        CSSValueList* list = CSSValueList::CreateSpaceSeparated();
+        list->Append(*CSSIdentifierValue::Create(CSSValueID::kBalance));
+        list->Append(*CSSNumericLiteralValue::Create(
+            min_line_count, CSSPrimitiveValue::UnitType::kNumber));
+        return list;
+      }
       return CSSIdentifierValue::Create(CSSValueID::kBalance);
     case FlexWrapMode::kWrapReverse: {
       CSSValueList* list = CSSValueList::CreateSpaceSeparated();
       list->Append(*CSSIdentifierValue::Create(CSSValueID::kWrapReverse));
       list->Append(*CSSIdentifierValue::Create(CSSValueID::kBalance));
+      if (min_line_count > 1u) {
+        list->Append(*CSSNumericLiteralValue::Create(
+            min_line_count, CSSPrimitiveValue::UnitType::kNumber));
+      }
       return list;
     }
   }
@@ -4192,7 +4226,7 @@ const CSSValue* FlexWrap::CSSValueFromComputedStyleInternal(
 const CSSValue* FlexWrap::ParseSingleValue(CSSParserTokenStream& stream,
                                            const CSSParserContext& context,
                                            const CSSParserLocalContext&) const {
-  // flex-wrap: nowrap | [ [ wrap | wrap-reverse ] || balance ]
+  // flex-wrap: nowrap | [ [ wrap | wrap-reverse ] || balance <integer [1,∞]>?]
   if (CSSValue* value =
           css_parsing_utils::ConsumeIdent<CSSValueID::kNowrap>(stream)) {
     return value;
@@ -4200,6 +4234,7 @@ const CSSValue* FlexWrap::ParseSingleValue(CSSParserTokenStream& stream,
 
   CSSIdentifierValue* wrap_value = nullptr;
   CSSIdentifierValue* balance_value = nullptr;
+  CSSPrimitiveValue* min_line_count_value = nullptr;
 
   do {
     if (!wrap_value) {
@@ -4214,6 +4249,8 @@ const CSSValue* FlexWrap::ParseSingleValue(CSSParserTokenStream& stream,
       balance_value =
           css_parsing_utils::ConsumeIdent<CSSValueID::kBalance>(stream);
       if (balance_value) {
+        min_line_count_value = css_parsing_utils::ConsumeIntegerOrNumberCalc(
+            stream, context, CSSPrimitiveValue::ValueRange::kPositiveInteger);
         continue;
       }
     }
@@ -4227,12 +4264,24 @@ const CSSValue* FlexWrap::ParseSingleValue(CSSParserTokenStream& stream,
   if (wrap_value && wrap_value->GetValueID() == CSSValueID::kWrap) {
     wrap_value = nullptr;
   }
-  if (!wrap_value) {
+  // Coerce "balance 1" to "balance".
+  if (const auto* value =
+          DynamicTo<CSSNumericLiteralValue>(min_line_count_value)) {
+    if (value->ComputeInteger() == 1u) {
+      min_line_count_value = nullptr;
+    }
+  }
+  if (!wrap_value && !min_line_count_value) {
     return balance_value;
   }
   CSSValueList* list = CSSValueList::CreateSpaceSeparated();
-  list->Append(*wrap_value);
+  if (wrap_value) {
+    list->Append(*wrap_value);
+  }
   list->Append(*balance_value);
+  if (min_line_count_value) {
+    list->Append(*min_line_count_value);
+  }
   return list;
 }
 
@@ -5780,7 +5829,7 @@ const blink::Color InternalForcedBackgroundColor::ColorIncludingFallback(
     const ComputedStyle& style,
     bool* is_current_color) const {
   blink::Color forced_current_color;
-  int alpha;
+  float alpha;
   bool alpha_is_current_color;
   if (visited_link) {
     forced_current_color = style.GetInternalForcedVisitedCurrentColor(
@@ -5788,20 +5837,20 @@ const blink::Color InternalForcedBackgroundColor::ColorIncludingFallback(
     alpha = style.InternalVisitedBackgroundColor()
                 .Resolve(style.GetInternalVisitedCurrentColor(),
                          style.UsedColorScheme(), &alpha_is_current_color)
-                .AlphaAsInteger();
+                .Alpha();
   } else {
     forced_current_color = style.GetInternalForcedCurrentColor(
         /* No is_current_color because we might not be forced_current_color */);
     alpha = style.BackgroundColor()
                 .Resolve(style.GetCurrentColor(), style.UsedColorScheme(),
                          &alpha_is_current_color)
-                .AlphaAsInteger();
+                .Alpha();
   }
 
   bool result_is_current_color;
-  blink::Color result = style.InternalForcedBackgroundColor().ResolveWithAlpha(
-      forced_current_color, style.UsedColorScheme(), alpha,
-      &result_is_current_color);
+  blink::Color result = style.InternalForcedBackgroundColor().Resolve(
+      forced_current_color, style.UsedColorScheme(), &result_is_current_color);
+  result.SetAlpha(alpha);
 
   if (is_current_color) {
     *is_current_color = alpha_is_current_color || result_is_current_color;
@@ -7686,9 +7735,7 @@ const CSSValue* ViewTransitionName::ParseSingleValue(
                : nullptr;
   }
   if (stream.Peek().Id() == CSSValueID::kMatchElement) {
-    return RuntimeEnabledFeatures::CSSViewTransitionMatchElementEnabled()
-               ? css_parsing_utils::ConsumeIdent(stream)
-               : nullptr;
+    return css_parsing_utils::ConsumeIdent(stream);
   }
   return css_parsing_utils::ConsumeCustomIdent(stream, context);
 }
@@ -7706,7 +7753,6 @@ const CSSValue* ViewTransitionName::CSSValueFromComputedStyleInternal(
     return CSSIdentifierValue::Create(CSSValueID::kAuto);
   }
   if (style.ViewTransitionName()->IsMatchElement()) {
-    CHECK(RuntimeEnabledFeatures::CSSViewTransitionMatchElementEnabled());
     return CSSIdentifierValue::Create(CSSValueID::kAuto);
   }
 
@@ -10931,7 +10977,10 @@ const CSSValue* MaskImage::ParseSingleValue(
     const CSSParserContext& context,
     const CSSParserLocalContext&) const {
   return css_parsing_utils::ConsumeCommaSeparatedList(
-      css_parsing_utils::ConsumeImageOrNone, stream, context);
+      static_cast<CSSValue* (*)(CSSParserTokenStream&,
+                                const CSSParserContext&)>(
+          css_parsing_utils::ConsumeImageOrNone),
+      stream, context);
 }
 
 const CSSValue* MaskImage::CSSValueFromComputedStyleInternal(
@@ -11612,9 +11661,9 @@ const CSSValue* TimelineScope::ParseSingleValue(
     return css_parsing_utils::ConsumeIdent(stream);
   }
   using css_parsing_utils::ConsumeCommaSeparatedList;
-  using css_parsing_utils::ConsumeCustomIdent;
+  using css_parsing_utils::ConsumeDashedIdent;
   return ConsumeCommaSeparatedList<CSSCustomIdentValue*(
-      CSSParserTokenStream&, const CSSParserContext&)>(ConsumeCustomIdent,
+      CSSParserTokenStream&, const CSSParserContext&)>(ConsumeDashedIdent,
                                                        stream, context);
 }
 

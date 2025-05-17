@@ -12,6 +12,7 @@
 #include "chrome/browser/resource_coordinator/utils.h"
 #include "chrome/browser/ui/performance_controls/tab_resource_usage_tab_helper.h"
 #include "chrome/browser/ui/tab_ui_helper.h"
+#include "chrome/browser/ui/tabs/alert/tab_alert.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/test_tab_strip_model_delegate.h"
 #include "chrome/browser/ui/tabs/test_util.h"
@@ -288,7 +289,7 @@ TEST_F(TabRendererDataTest, AlertStateAudioPlaying) {
       TabRendererData::FromTabInModel(&tab_strip_model_, index);
   EXPECT_NE(data.alert_state.end(),
             std::find(data.alert_state.begin(), data.alert_state.end(),
-                      TabAlertState::AUDIO_PLAYING));
+                      tabs::TabAlert::AUDIO_PLAYING));
 }
 
 TEST_F(TabRendererDataTest, ShouldHideThrobber) {
@@ -335,7 +336,11 @@ TEST_F(TabRendererDataTest, DISABLED_Thumbnail) {
 
 TEST_F(TabRendererDataTest, TabLifecycleManagement) {
   int index = AddTab();
-  content::WebContents* wc = tab_strip_model_.GetWebContentsAt(index);
+
+  auto* tab = tab_strip_model_.GetTabAtIndex(index);
+  auto* features = tab->GetTabFeatures();
+  auto* usage_helper = features->SetResourceUsageHelperForTesting(
+      std::make_unique<TabResourceUsageTabHelper>(*tab));
 
   TabRendererData data_default =
       TabRendererData::FromTabInModel(&tab_strip_model_, index);
@@ -344,9 +349,6 @@ TEST_F(TabRendererDataTest, TabLifecycleManagement) {
   EXPECT_EQ(data_default.discarded_memory_savings_in_bytes, 0);
   EXPECT_TRUE(data_default.tab_resource_usage);
 
-  TabResourceUsageTabHelper::CreateForWebContents(wc);
-  auto* usage_helper = TabResourceUsageTabHelper::FromWebContents(wc);
-  ASSERT_NE(nullptr, usage_helper);
   usage_helper->SetMemoryUsageInBytes(1234);
   TabRendererData data_usage =
       TabRendererData::FromTabInModel(&tab_strip_model_, index);

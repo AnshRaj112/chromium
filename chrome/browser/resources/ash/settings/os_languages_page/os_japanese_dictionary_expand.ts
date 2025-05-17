@@ -13,7 +13,7 @@ import type {CrInputElement} from 'chrome://resources/ash/common/cr_elements/cr_
 import {I18nMixin} from 'chrome://resources/ash/common/cr_elements/i18n_mixin.js';
 import type {BigBuffer} from 'chrome://resources/mojo/mojo/public/mojom/base/big_buffer.mojom-webui.js';
 import type {BigString} from 'chrome://resources/mojo/mojo/public/mojom/base/big_string.mojom-webui.js';
-import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
+import {afterNextRender, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import type {JapaneseDictionary} from '../mojom-webui/user_data_japanese_dictionary.mojom-webui.js';
 import {JpPosType} from '../mojom-webui/user_data_japanese_dictionary.mojom-webui.js';
@@ -71,6 +71,12 @@ class OsJapaneseDictionaryExpandElement extends I18nMixin
     this.push(
         'dict.entries',
         {key: '', value: '', pos: JpPosType.kNoPos, comment: ''});
+    afterNextRender(this, () => {
+      this.shadowRoot!
+          .querySelector<HTMLElement>(
+              'os-japanese-dictionary-entry-row:last-of-type')!.shadowRoot!
+          .querySelector<HTMLElement>('cr-input')!.focus();
+    });
   }
 
   // Renames the dictionary.
@@ -133,8 +139,6 @@ class OsJapaneseDictionaryExpandElement extends I18nMixin
     const fileDataView = new Uint8Array(await fileData.arrayBuffer());
     const fileMojomBigBuffer: BigBuffer = {
       bytes: Array.from(fileDataView),
-      sharedMemory: undefined,
-      invalidBuffer: undefined,
     };
     const fileMojomBigString: BigString = {data: fileMojomBigBuffer};
 

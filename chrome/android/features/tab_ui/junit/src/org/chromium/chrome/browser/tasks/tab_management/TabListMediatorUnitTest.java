@@ -61,6 +61,7 @@ import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
 
+import androidx.annotation.IdRes;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
@@ -153,6 +154,9 @@ import org.chromium.chrome.browser.tasks.tab_management.TabListMediator.TabActio
 import org.chromium.chrome.browser.tasks.tab_management.TabProperties.TabActionState;
 import org.chromium.chrome.browser.tasks.tab_management.TabProperties.UiType;
 import org.chromium.components.browser_ui.widget.ActionConfirmationResult;
+import org.chromium.components.browser_ui.widget.list_view.FakeListViewTouchTracker;
+import org.chromium.components.browser_ui.widget.list_view.ListViewTouchTracker;
+import org.chromium.components.browser_ui.widget.list_view.ListViewTouchTracker.ListViewTouchInfo;
 import org.chromium.components.browser_ui.widget.selectable_list.SelectionDelegate;
 import org.chromium.components.collaboration.CollaborationService;
 import org.chromium.components.collaboration.ServiceStatus;
@@ -251,6 +255,8 @@ public class TabListMediatorUnitTest {
             TabListEditorItemSelectionId.createTabId(TAB2_ID);
     private static final TabListEditorItemSelectionId ITEM3_ID =
             TabListEditorItemSelectionId.createTabId(TAB3_ID);
+    private static final TabListEditorItemSelectionId ITEM4_ID =
+            TabListEditorItemSelectionId.createTabGroupSyncId(SYNC_GROUP_ID1);
 
     public static final PropertyKey[] TAB_GRID_SELECTABLE_KEYS =
             new PropertyKey[] {
@@ -4302,15 +4308,117 @@ public class TabListMediatorUnitTest {
     }
 
     @Test
-    public void testOnMenuItemClickedCallback_CloseGroupInTabSwitcher() {
+    public void testOnMenuItemClickedCallback_CloseGroupInTabSwitcher_NullListViewTouchTracker() {
+        testOnMenuItemClickedCallback_CloseOrDeleteGroupInTabSwitcher(
+                R.id.close_tab_group,
+                /* listViewTouchTracker= */ null,
+                /* shouldAllowUndo= */ true,
+                /* shouldHideTabGroups= */ true);
+    }
+
+    @Test
+    public void testOnMenuItemClickedCallback_CloseGroupInTabSwitcher_ClickWithTouch() {
+        long downMotionTime = SystemClock.uptimeMillis();
+        FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
+        listViewTouchTracker.setLastSingleTapUpInfo(
+                ListViewTouchInfo.fromMotionEvent(
+                        TabUiTestHelper.createTouchMotionEvent(
+                                downMotionTime,
+                                /* eventTime= */ downMotionTime + 50,
+                                MotionEvent.ACTION_UP,
+                                /* x= */ 0,
+                                /* y= */ 0)));
+
+        testOnMenuItemClickedCallback_CloseOrDeleteGroupInTabSwitcher(
+                R.id.close_tab_group,
+                listViewTouchTracker,
+                /* shouldAllowUndo= */ true,
+                /* shouldHideTabGroups= */ true);
+    }
+
+    @Test
+    public void testOnMenuItemClickedCallback_CloseGroupInTabSwitcher_ClickWithMouse() {
+        long downMotionTime = SystemClock.uptimeMillis();
+        FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
+        listViewTouchTracker.setLastSingleTapUpInfo(
+                ListViewTouchInfo.fromMotionEvent(
+                        TabUiTestHelper.createMouseMotionEvent(
+                                downMotionTime,
+                                /* eventTime= */ downMotionTime + 50,
+                                MotionEvent.ACTION_UP,
+                                /* x= */ 0,
+                                /* y= */ 0)));
+
+        testOnMenuItemClickedCallback_CloseOrDeleteGroupInTabSwitcher(
+                R.id.close_tab_group,
+                listViewTouchTracker,
+                /* shouldAllowUndo= */ false,
+                /* shouldHideTabGroups= */ true);
+    }
+
+    @Test
+    public void testOnMenuItemClickedCallback_DeleteGroupInTabSwitcher_NullListViewTouchTracker() {
+        testOnMenuItemClickedCallback_CloseOrDeleteGroupInTabSwitcher(
+                R.id.delete_tab_group,
+                /* listViewTouchTracker= */ null,
+                /* shouldAllowUndo= */ true,
+                /* shouldHideTabGroups= */ false);
+    }
+
+    @Test
+    public void testOnMenuItemClickedCallback_DeleteGroupInTabSwitcher_ClickWithTouch() {
+        long downMotionTime = SystemClock.uptimeMillis();
+        FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
+        listViewTouchTracker.setLastSingleTapUpInfo(
+                ListViewTouchInfo.fromMotionEvent(
+                        TabUiTestHelper.createTouchMotionEvent(
+                                downMotionTime,
+                                /* eventTime= */ downMotionTime + 50,
+                                MotionEvent.ACTION_UP,
+                                /* x= */ 0,
+                                /* y= */ 0)));
+
+        testOnMenuItemClickedCallback_CloseOrDeleteGroupInTabSwitcher(
+                R.id.delete_tab_group,
+                listViewTouchTracker,
+                /* shouldAllowUndo= */ true,
+                /* shouldHideTabGroups= */ false);
+    }
+
+    @Test
+    public void testOnMenuItemClickedCallback_DeleteGroupInTabSwitcher_ClickWithMouse() {
+        long downMotionTime = SystemClock.uptimeMillis();
+        FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
+        listViewTouchTracker.setLastSingleTapUpInfo(
+                ListViewTouchInfo.fromMotionEvent(
+                        TabUiTestHelper.createMouseMotionEvent(
+                                downMotionTime,
+                                /* eventTime= */ downMotionTime + 50,
+                                MotionEvent.ACTION_UP,
+                                /* x= */ 0,
+                                /* y= */ 0)));
+
+        testOnMenuItemClickedCallback_CloseOrDeleteGroupInTabSwitcher(
+                R.id.delete_tab_group,
+                listViewTouchTracker,
+                /* shouldAllowUndo= */ false,
+                /* shouldHideTabGroups= */ false);
+    }
+
+    private void testOnMenuItemClickedCallback_CloseOrDeleteGroupInTabSwitcher(
+            @IdRes int menuId,
+            @Nullable ListViewTouchTracker listViewTouchTracker,
+            boolean shouldAllowUndo,
+            boolean shouldHideTabGroups) {
+        assertTrue(menuId == R.id.close_tab_group || menuId == R.id.delete_tab_group);
+
+        // Create tab group
         List<Tab> tabs = new ArrayList<>();
         for (int i = 0; i < mTabModel.getCount(); i++) {
             tabs.add(mTabModel.getTabAt(i));
         }
-
-        // Create tab group.
-        List<Tab> group1 = new ArrayList<>(Arrays.asList(mTab1, mTab2));
-        createTabGroup(group1, TAB1_ID, TAB_GROUP_ID);
+        List<Tab> group = new ArrayList<>(Arrays.asList(mTab1, mTab2));
+        createTabGroup(group, TAB1_ID, TAB_GROUP_ID);
         mMediator.resetWithListOfTabs(tabs, null, false);
 
         // Assert that the callback performs as expected.
@@ -4318,15 +4426,19 @@ public class TabListMediatorUnitTest {
         when(mTabModel.getTabAt(0)).thenReturn(mTab1);
         when(mTabGroupModelFilter.getTabsInGroup(TAB_GROUP_ID)).thenReturn(tabs);
         when(mTabGroupModelFilter.getGroupLastShownTabId(TAB_GROUP_ID)).thenReturn(TAB1_ID);
+
+        // Act
         mMediator.onMenuItemClicked(
-                R.id.close_tab_group, TAB_GROUP_ID, /* collaborationId= */ null);
+                menuId, TAB_GROUP_ID, /* collaborationId= */ null, listViewTouchTracker);
+
+        // Assert
         verify(mTabRemover)
                 .closeTabs(
                         eq(
                                 TabClosureParams.forCloseTabGroup(
                                                 mTabGroupModelFilter, TAB_GROUP_ID)
-                                        .allowUndo(true)
-                                        .hideTabGroups(true)
+                                        .allowUndo(shouldAllowUndo)
+                                        .hideTabGroups(shouldHideTabGroups)
                                         .build()),
                         /* allowDialog= */ eq(true),
                         any());
@@ -4354,7 +4466,11 @@ public class TabListMediatorUnitTest {
         when(mIncognitoTabGroupModelFilter.getGroupLastShownTabId(TAB_GROUP_ID))
                 .thenReturn(TAB1_ID);
         when(mIncognitoTabGroupModelFilter.tabGroupExists(TAB_GROUP_ID)).thenReturn(true);
-        mMediator.onMenuItemClicked(R.id.ungroup_tab, TAB_GROUP_ID, /* collaborationId= */ null);
+        mMediator.onMenuItemClicked(
+                R.id.ungroup_tab,
+                TAB_GROUP_ID,
+                /* collaborationId= */ null,
+                /* listViewTouchTracker= */ null);
         verify(mIncognitoTabUngrouper)
                 .ungroupTabs(TAB_GROUP_ID, /* trailing= */ true, /* allowDialog= */ true);
     }
@@ -4381,7 +4497,10 @@ public class TabListMediatorUnitTest {
         when(mIncognitoTabGroupModelFilter.getGroupLastShownTabId(TAB_GROUP_ID))
                 .thenReturn(TAB1_ID);
         mMediator.onMenuItemClicked(
-                R.id.delete_tab_group, TAB_GROUP_ID, /* collaborationId= */ null);
+                R.id.delete_tab_group,
+                TAB_GROUP_ID,
+                /* collaborationId= */ null,
+                /* listViewTouchTracker= */ null);
         verify(mIncognitoTabRemover)
                 .closeTabs(
                         eq(
@@ -4409,7 +4528,11 @@ public class TabListMediatorUnitTest {
         // Assert that the callback performs as expected.
         assertNotNull(mModelList.get(POSITION1).model.get(TabProperties.TAB_ACTION_BUTTON_DATA));
         when(mTabGroupModelFilter.getGroupLastShownTabId(TAB_GROUP_ID)).thenReturn(TAB1_ID);
-        mMediator.onMenuItemClicked(R.id.share_group, TAB_GROUP_ID, /* collaborationId= */ null);
+        mMediator.onMenuItemClicked(
+                R.id.share_group,
+                TAB_GROUP_ID,
+                /* collaborationId= */ null,
+                /* listViewTouchTracker= */ null);
         verify(mDataSharingTabManager).createOrManageFlow(any(), anyInt(), any());
     }
 
@@ -4431,7 +4554,10 @@ public class TabListMediatorUnitTest {
         when(mTabGroupModelFilter.getTabsInGroup(TAB_GROUP_ID)).thenReturn(tabs);
         when(mTabGroupModelFilter.getGroupLastShownTabId(TAB_GROUP_ID)).thenReturn(TAB1_ID);
         mMediator.onMenuItemClicked(
-                R.id.close_tab_group, TAB_GROUP_ID, /* collaborationId= */ null);
+                R.id.close_tab_group,
+                TAB_GROUP_ID,
+                /* collaborationId= */ null,
+                /* listViewTouchTracker= */ null);
         verify(mTabRemover)
                 .closeTabs(
                         eq(
@@ -4925,6 +5051,25 @@ public class TabListMediatorUnitTest {
                         mModelList.get(0).model.get(TabProperties.TAB_GROUP_SYNC_ID),
                         /* triggeringMotionEvent= */ null);
         assertThat(mModelList.get(0).model.get(TabProperties.IS_SELECTED), equalTo(true));
+    }
+
+    @Test
+    public void removeListItem_TabGroup() {
+        List<String> syncIds = new ArrayList<>(Arrays.asList(SYNC_GROUP_ID1));
+        mMediator.setDefaultGridCardSize(new Size(100, 200));
+        mMediator.resetWithListOfTabs(null, syncIds, false);
+
+        PropertyModel model = mock(PropertyModel.class);
+        when(model.get(CARD_TYPE)).thenReturn(TAB_GROUP);
+        when(model.get(TabProperties.TAB_GROUP_SYNC_ID)).thenReturn(SYNC_GROUP_ID1);
+        assertEquals(1, mModelList.size());
+
+        // Assert removing a tab type does nothing.
+        mMediator.removeListItemFromModelList(TabProperties.UiType.TAB_GROUP, ITEM1_ID);
+        assertEquals(1, mModelList.size());
+
+        mMediator.removeListItemFromModelList(TabProperties.UiType.TAB_GROUP, ITEM4_ID);
+        assertEquals(0, mModelList.size());
     }
 
     private void setUpTabGroupCardDescriptionString() {

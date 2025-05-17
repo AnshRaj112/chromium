@@ -200,8 +200,8 @@ TEST(AISummarizerStandaloneTest, CombineContexts) {
 TEST_F(AISummarizerTest, CanCreateDefaultOptions) {
   SetupMockOptimizationGuideKeyedService();
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibilityAsync(_, _))
-      .WillOnce([](auto feature, auto callback) {
+              GetOnDeviceModelEligibilityAsync(_, _, _))
+      .WillOnce([](auto feature, auto capabilities, auto callback) {
         std::move(callback).Run(
             optimization_guide::OnDeviceModelEligibilityReason::kSuccess);
       });
@@ -215,8 +215,8 @@ TEST_F(AISummarizerTest, CanCreateDefaultOptions) {
 TEST_F(AISummarizerTest, CanCreateIsLanguagesSupported) {
   SetupMockOptimizationGuideKeyedService();
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibilityAsync(_, _))
-      .WillOnce([](auto feature, auto callback) {
+              GetOnDeviceModelEligibilityAsync(_, _, _))
+      .WillOnce([](auto feature, auto capabilities, auto callback) {
         std::move(callback).Run(
             optimization_guide::OnDeviceModelEligibilityReason::kSuccess);
       });
@@ -276,8 +276,8 @@ TEST_F(AISummarizerTest, CreateSummarizerModelNotEligible) {
               const std::optional<optimization_guide::SessionConfigParams>&
                   config_params) { return nullptr; }));
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibilityAsync(_, _))
-      .WillOnce([](auto feature, auto callback) {
+              GetOnDeviceModelEligibilityAsync(_, _, _))
+      .WillOnce([](auto feature, auto capabilities, auto callback) {
         std::move(callback).Run(
             optimization_guide::OnDeviceModelEligibilityReason::
                 kModelNotEligible);
@@ -324,8 +324,8 @@ TEST_F(AISummarizerTest,
           }));
 
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibilityAsync(_, _))
-      .WillOnce([](auto feature, auto callback) {
+              GetOnDeviceModelEligibilityAsync(_, _, _))
+      .WillOnce([](auto feature, auto capabilities, auto callback) {
         // Returning kConfigNotAvailableForFeature should trigger retry.
         std::move(callback).Run(
             optimization_guide::OnDeviceModelEligibilityReason::
@@ -428,8 +428,8 @@ TEST_F(AISummarizerTest,
                   config_params) { return nullptr; }));
 
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibilityAsync(_, _))
-      .WillOnce([](auto feature, auto callback) {
+              GetOnDeviceModelEligibilityAsync(_, _, _))
+      .WillOnce([](auto feature, auto capabilities, auto callback) {
         // Returning kConfigNotAvailableForFeature should trigger retry.
         std::move(callback).Run(
             optimization_guide::OnDeviceModelEligibilityReason::
@@ -766,7 +766,7 @@ TEST_F(AISummarizerTest, MeasureUsage) {
           [&](optimization_guide::MultimodalMessageReadView request_metadata,
               optimization_guide::OptimizationGuideModelSizeInTokenCallback
                   callback) { std::move(callback).Run(expected_usage); }));
-  base::test::TestFuture<std::optional<uint64_t>> future;
+  base::test::TestFuture<std::optional<uint32_t>> future;
   summarizer_remote->MeasureUsage(kInputString, kContextString,
                                   future.GetCallback());
   ASSERT_EQ(future.Get<0>(), expected_usage);
@@ -782,7 +782,7 @@ TEST_F(AISummarizerTest, MeasureUsageFails) {
           [&](optimization_guide::MultimodalMessageReadView request_metadata,
               optimization_guide::OptimizationGuideModelSizeInTokenCallback
                   callback) { std::move(callback).Run(std::nullopt); }));
-  base::test::TestFuture<std::optional<uint64_t>> future;
+  base::test::TestFuture<std::optional<uint32_t>> future;
   summarizer_remote->MeasureUsage(kInputString, kContextString,
                                   future.GetCallback());
   ASSERT_EQ(future.Get<0>(), std::nullopt);

@@ -22,17 +22,12 @@ import type {SettingsPrefs} from './common.js';
 import {minOverflowLengthToScroll} from './common.js';
 import type {LanguageToastElement} from './language_toast.js';
 import {NodeStore} from './node_store.js';
-import {ReadAloudHighlighter} from './read_aloud/highlighter.js';
 import {SpeechController} from './read_aloud/speech_controller.js';
 import type {SpeechListener} from './read_aloud/speech_controller.js';
-import {PauseActionSource} from './read_aloud/speech_model.js';
-import {VoicePackController} from './read_aloud/voice_pack_controller.js';
-import type {VoiceLanguageListener} from './read_aloud/voice_pack_controller.js';
-import {WordBoundaries} from './read_aloud/word_boundaries.js';
+import {VoiceLanguageController} from './read_aloud/voice_language_controller.js';
+import type {VoiceLanguageListener} from './read_aloud/voice_language_controller.js';
 import {ReadAnythingLogger, TimeFrom} from './read_anything_logger.js';
 import type {ReadAnythingToolbarElement} from './read_anything_toolbar.js';
-import type {SpeechBrowserProxy} from './speech_browser_proxy.js';
-import {SpeechBrowserProxyImpl} from './speech_browser_proxy.js';
 import {VoiceNotificationManager} from './voice_notification_manager.js';
 
 const AppElementBase = WebUiListenerMixinLit(CrLitElement);
@@ -128,13 +123,9 @@ export class AppElement extends AppElementBase implements
   private notificationManager_ = VoiceNotificationManager.getInstance();
   private logger_: ReadAnythingLogger = ReadAnythingLogger.getInstance();
   private styleUpdater_: AppStyleUpdater;
-  private speech_: SpeechBrowserProxy = SpeechBrowserProxyImpl.getInstance();
-  private highlighter_: ReadAloudHighlighter =
-      ReadAloudHighlighter.getInstance();
-  private wordBoundaries_: WordBoundaries = WordBoundaries.getInstance();
   private nodeStore_: NodeStore = NodeStore.getInstance();
-  private voicePackController_: VoicePackController =
-      VoicePackController.getInstance();
+  private voiceLanguageController_: VoiceLanguageController =
+      VoiceLanguageController.getInstance();
   private speechController_: SpeechController = SpeechController.getInstance();
   protected accessor settingsPrefs_: SettingsPrefs = {
     letterSpacing: 0,
@@ -166,7 +157,7 @@ export class AppElement extends AppElementBase implements
     // Even though disconnectedCallback isn't always called reliably in prod,
     // it is called in tests, and the speech extension timeout can cause
     // flakiness.
-    this.voicePackController_.stopWaitingForSpeechExtension();
+    this.voiceLanguageController_.stopWaitingForSpeechExtension();
   }
 
   override connectedCallback() {
@@ -186,12 +177,11 @@ export class AppElement extends AppElementBase implements
 
     if (this.isReadAloudEnabled_) {
       this.speechController_.addListener(this);
-      this.voicePackController_.addListener(this);
+      this.voiceLanguageController_.addListener(this);
       this.notificationManager_.addListener(this.$.languageToast);
 
       // Clear state. We don't do this in disconnectedCallback because that's
       // not always reliabled called.
-      this.speech_.cancel();
       this.hasContent_ = false;
       this.nodeStore_.clearDomNodes();
     }
@@ -221,7 +211,11 @@ export class AppElement extends AppElementBase implements
       }
 
       const {anchorNodeId, anchorOffset, focusNodeId, focusOffset} =
-          this.getSelectedIds();
+          this.isReadAloudEnabled_ ?
+          this.speechController_.getSelectionAdjustedForHighlights(
+              selection.anchorNode, selection.anchorOffset, selection.focusNode,
+              selection.focusOffset) :
+          this.getSelection();
       if (!anchorNodeId || !focusNodeId) {
         return;
       }
@@ -240,25 +234,16 @@ export class AppElement extends AppElementBase implements
             anchorNodeId, anchorOffset, focusNodeId, focusOffset);
       }
 
-      // If there's been a selection, clear the current Read Aloud highlight.
-      if (anchorNodeId && focusNodeId) {
-        // If speech is resumed, this won't be restored.
-        // TODO: crbug.com/40927698 - Restore the previous highlight after
-        // speech is resumed after a selection.
-        this.highlighter_.clearHighlightFormatting();
+      if (this.isReadAloudEnabled_) {
+        this.speechController_.onSelectionChange();
       }
     };
 
     this.$.containerParent.onscroll = () => {
       chrome.readingMode.onScroll(this.scrollingOnSelection_);
       this.scrollingOnSelection_ = false;
-
-      // If the reading mode panel was scrolled while read aloud is speaking,
-      // we should disable autoscroll if the highlights are no longer visible,
-      // and we should re-enable autoscroll if the highlights are now
-      // visible.
-      if (this.speechController_.isSpeechActive()) {
-        this.highlighter_.updateAutoScroll();
+      if (this.isReadAloudEnabled_) {
+        this.speechController_.onScroll();
       }
     };
 
@@ -294,7 +279,7 @@ export class AppElement extends AppElementBase implements
 
     chrome.readingMode.updateVoicePackStatus =
         (lang: string, status: string) => {
-          this.voicePackController_.updateVoicePackStatus(lang, status);
+          this.voiceLanguageController_.updateLanguageStatus(lang, status);
         };
 
     chrome.readingMode.showLoading = () => {
@@ -318,7 +303,7 @@ export class AppElement extends AppElementBase implements
     };
 
     chrome.readingMode.onTtsEngineInstalled = () => {
-      this.voicePackController_.onTtsEngineInstalled();
+      this.voiceLanguageController_.onTtsEngineInstalled();
     };
 
     chrome.readingMode.onNodeWillBeDeleted = (nodeId: number) => {
@@ -427,7 +412,9 @@ export class AppElement extends AppElementBase implements
     // node id to call InitAXPosition in playSpeech. If it's not saved here,
     // we have to retrieve it through a DOM search such as createTreeWalker,
     // which can be computationally expensive.
-    this.speechController_.initializeSpeechTree(nodeId);
+    if (this.isReadAloudEnabled_) {
+      this.speechController_.initializeSpeechTree(nodeId);
+    }
 
     const textContent = chrome.readingMode.getTextContent(nodeId);
     const textNode = document.createTextNode(textContent);
@@ -478,7 +465,6 @@ export class AppElement extends AppElementBase implements
     this.emptyStateSubheading_ = '';
     this.hasContent_ = false;
     if (this.isReadAloudEnabled_) {
-      this.speech_.cancel();
       this.speechController_.clearReadAloudState();
     }
   }
@@ -495,11 +481,11 @@ export class AppElement extends AppElementBase implements
       this.logger_.logSpeechStopSource(
           chrome.readingMode.unexpectedUpdateContentStopSource);
     }
-    const previousSpeechPlayingState = {...this.speechController_.getState()};
-    const previousWordBoundaryState = {...this.wordBoundaries_.state};
 
-    this.speech_.cancel();
-    this.speechController_.clearReadAloudState();
+    if (this.isReadAloudEnabled_) {
+      this.speechController_.saveReadAloudState();
+      this.speechController_.clearReadAloudState();
+    }
     const container = this.$.container;
 
     // Remove all children from container. Use `replaceChildren` rather than
@@ -567,9 +553,8 @@ export class AppElement extends AppElementBase implements
 
     // If the previous reading position still exists and we haven't reached the
     // end of speech, keep that spot.
-    if (previousSpeechPlayingState.hasSpeechBeenTriggered) {
-      this.speechController_.setPreviousReadingPositionIfExists(
-          previousWordBoundaryState, previousSpeechPlayingState);
+    if (this.isReadAloudEnabled_) {
+      this.speechController_.setPreviousReadingPositionIfExists();
     }
   }
 
@@ -684,12 +669,11 @@ export class AppElement extends AppElementBase implements
     startElement.scrollIntoViewIfNeeded();
   }
 
-  protected updateLinks_(shouldRehighlightCurrentNodes: boolean = true) {
+  protected updateLinks_() {
     if (!this.shadowRoot) {
       return;
     }
 
-    const originallyHadHighlights = this.highlighter_.hasCurrentHighlights();
     const selector = this.shouldShowLinks() ? 'span[data-link]' : 'a';
     const elements = this.shadowRoot.querySelectorAll(selector);
 
@@ -701,12 +685,8 @@ export class AppElement extends AppElementBase implements
       this.nodeStore_.replaceDomNode(elem, replacement);
     }
 
-    // Rehighlight the current granularity text after links have been
-    // toggled on or off to ensure the entire granularity segment is
-    // highlighted.
-    if (shouldRehighlightCurrentNodes && originallyHadHighlights) {
-      this.speechController_.highlightCurrentGranularity(
-          chrome.readingMode.getCurrentText());
+    if (this.isReadAloudEnabled_) {
+      this.speechController_.onLinksToggled();
     }
     this.loadImages_();
   }
@@ -782,17 +762,16 @@ export class AppElement extends AppElementBase implements
     this.speechController_.previewVoice(event.detail.previewVoice);
   }
 
-  protected onVoiceMenuClose_(
-      event: CustomEvent<{voicePlayingWhenMenuOpened: boolean}>) {
+  protected onVoiceMenuOpen_(event: CustomEvent) {
     event.preventDefault();
     event.stopPropagation();
+    this.speechController_.onVoiceMenuOpen();
+  }
 
-    // TODO: crbug.com/323912186 - Handle when menu is closed mid-preview and
-    // the user presses play/pause button.
-    if (!this.speechController_.isSpeechActive() &&
-        event.detail.voicePlayingWhenMenuOpened) {
-      this.playSpeech();
-    }
+  protected onVoiceMenuClose_(event: CustomEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.speechController_.onVoiceMenuClose();
   }
 
   protected onPlayPauseClick_() {
@@ -802,15 +781,8 @@ export class AppElement extends AppElementBase implements
 
   onIsSpeechActiveChange(): void {
     this.isSpeechActive_ = this.speechController_.isSpeechActive();
-    if (!chrome.readingMode.linksEnabled) {
-      return;
-    }
-
-    // Restore links if they're enabled when speech pauses via button click or
-    // when it finishes the page.
-    const pauseSource = this.speechController_.getPauseSource();
-    if ((pauseSource === PauseActionSource.BUTTON_CLICK) ||
-        pauseSource === PauseActionSource.SPEECH_FINISHED) {
+    if (chrome.readingMode.linksEnabled &&
+        !this.speechController_.isTemporaryPause()) {
       this.updateLinks_();
     }
   }
@@ -828,102 +800,49 @@ export class AppElement extends AppElementBase implements
     this.previewVoicePlaying_ = this.speechController_.getPreviewVoicePlaying();
   }
 
-  onSpeechRateChange(): void {
-    this.resetSpeechPostSettingChange_();
-  }
-
   onEnabledLangsChange(): void {
-    this.enabledLangs_ = this.voicePackController_.getEnabledLangs();
+    this.enabledLangs_ = this.voiceLanguageController_.getEnabledLangs();
   }
 
   onAvailableVoicesChange(): void {
-    this.availableVoices_ = this.voicePackController_.getAvailableVoices();
+    this.availableVoices_ = this.voiceLanguageController_.getAvailableVoices();
     this.localeToDisplayName_ =
-        this.voicePackController_.getDisplayNamesForLocaleCodes();
+        this.voiceLanguageController_.getDisplayNamesForLocaleCodes();
   }
 
   onCurrentVoiceChange(): void {
-    this.selectedVoice_ = this.voicePackController_.getCurrentVoice();
-    this.resetSpeechPostSettingChange_();
+    this.selectedVoice_ = this.voiceLanguageController_.getCurrentVoice();
+    this.speechController_.onSpeechSettingsChange();
   }
 
-  protected playNextGranularity_() {
-    this.speechController_.playNextGranularity();
+  protected onNextGranularityClick_() {
+    this.speechController_.onNextGranularityClick();
   }
 
-  protected playPreviousGranularity_() {
-    this.speechController_.playPreviousGranularity();
-  }
-
-  playSpeech() {
-    const container = this.$.container;
-    this.speechController_.playSpeech(
-        this.getSelection(), container.textContent);
-  }
-
-  private getSelectedIds(): {
-    anchorNodeId: number|undefined,
-    anchorOffset: number,
-    focusNodeId: number|undefined,
-    focusOffset: number,
-  } {
-    const {anchorNode, anchorOffset, focusNode, focusOffset} =
-        this.getSelection();
-    let anchorNodeId = this.nodeStore_.getAxId(anchorNode);
-    let focusNodeId = this.nodeStore_.getAxId(focusNode);
-    let adjustedAnchorOffset = anchorOffset;
-    let adjustedFocusOffset = focusOffset;
-    if (!anchorNodeId) {
-      anchorNodeId = this.highlighter_.getAncestorId(anchorNode);
-      adjustedAnchorOffset += this.highlighter_.getOffsetInAncestor(anchorNode);
-    }
-    if (!focusNodeId) {
-      focusNodeId = this.highlighter_.getAncestorId(focusNode);
-      adjustedFocusOffset += this.highlighter_.getOffsetInAncestor(focusNode);
-    }
-    return {
-      anchorNodeId: anchorNodeId,
-      anchorOffset: adjustedAnchorOffset,
-      focusNodeId: focusNodeId,
-      focusOffset: adjustedFocusOffset,
-    };
+  protected onPreviousGranularityClick_() {
+    this.speechController_.onPreviousGranularityClick();
   }
 
   protected onSelectVoice_(
       event: CustomEvent<{selectedVoice: SpeechSynthesisVoice}>) {
     event.preventDefault();
     event.stopPropagation();
-
-    const currentVoice = this.voicePackController_.getCurrentVoice();
-    this.voicePackController_.setUserPreferredVoice(event.detail.selectedVoice);
-
-    // If the locales are identical, the voices are likely from the same
-    // voice pack and use the same TTS engine, therefore, we don't need
-    // to reset the word boundary state.
-    if (currentVoice?.lang.toLowerCase() !==
-        event.detail.selectedVoice.lang.toLowerCase()) {
-      this.wordBoundaries_.resetToDefaultState(
-          /*possibleWordBoundarySupportChange=*/ true);
-    }
+    this.speechController_.onVoiceSelected(event.detail.selectedVoice);
   }
 
   protected onVoiceLanguageToggle_(event: CustomEvent<{language: string}>) {
     event.preventDefault();
     event.stopPropagation();
-    this.voicePackController_.onLanguageToggle(event.detail.language);
+    this.voiceLanguageController_.onLanguageToggle(event.detail.language);
   }
 
-  protected resetSpeechPostSettingChange_() {
-    // If speech was playing when a setting was changed, continue playing
-    // speech
-    if (this.speechController_.onSpeechSettingsChange()) {
-      this.playSpeech();
-    }
+  protected onSpeechRateChange_() {
+    this.speechController_.onSpeechSettingsChange();
   }
 
   private restoreSettingsFromPrefs_() {
     if (this.isReadAloudEnabled_) {
-      this.voicePackController_.restoreFromPrefs();
+      this.voiceLanguageController_.restoreFromPrefs();
     }
     this.settingsPrefs_ = {
       ...this.settingsPrefs_,
@@ -991,7 +910,9 @@ export class AppElement extends AppElementBase implements
 
   languageChanged() {
     this.$.toolbar.updateFonts();
-    this.voicePackController_.onPageLanguageChanged();
+    if (this.isReadAloudEnabled_) {
+      this.voiceLanguageController_.onPageLanguageChanged();
+    }
   }
 
   protected computeIsReadAloudPlayable(): boolean {

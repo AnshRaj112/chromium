@@ -6,15 +6,15 @@
 
 #include "base/check.h"
 #include "base/containers/span.h"
+#include "base/functional/callback_forward.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/notreached.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/types/expected_macros.h"
 #include "base/types/pass_key.h"
 #include "services/on_device_model/public/mojom/on_device_model.mojom-blink.h"
-#include "third_party/blink/public/mojom/ai/ai_language_model.mojom-blink-forward.h"
 #include "third_party/blink/public/mojom/ai/ai_language_model.mojom-blink.h"
 #include "third_party/blink/public/mojom/ai/model_streaming_responder.mojom-blink.h"
-#include "third_party/blink/renderer/bindings/core/v8/idl_types.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_language_model_create_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_language_model_prompt_dict.h"
@@ -27,13 +27,14 @@
 #include "third_party/blink/renderer/core/fileapi/blob.h"
 #include "third_party/blink/renderer/core/fileapi/file_reader_client.h"
 #include "third_party/blink/renderer/core/frame/web_feature.h"
-#include "third_party/blink/renderer/modules/ai/ai.h"
+#include "third_party/blink/renderer/core/streams/readable_stream_default_controller.h"
+#include "third_party/blink/renderer/core/streams/readable_stream_default_controller_with_script_scope.h"
 #include "third_party/blink/renderer/modules/ai/ai_context_observer.h"
+#include "third_party/blink/renderer/modules/ai/ai_interface_proxy.h"
 #include "third_party/blink/renderer/modules/ai/ai_metrics.h"
 #include "third_party/blink/renderer/modules/ai/ai_utils.h"
-#include "third_party/blink/renderer/modules/ai/dom_ai.h"
 #include "third_party/blink/renderer/modules/ai/exception_helpers.h"
-#include "third_party/blink/renderer/modules/ai/language_model_factory.h"
+#include "third_party/blink/renderer/modules/ai/language_model_create_client.h"
 #include "third_party/blink/renderer/modules/ai/language_model_prompt_builder.h"
 #include "third_party/blink/renderer/modules/ai/model_execution_responder.h"
 #include "third_party/blink/renderer/modules/canvas/imagebitmap/image_bitmap_source_util.h"
@@ -54,6 +55,11 @@ namespace {
 
 using AILanguageModelPromptContentOrError =
     std::variant<mojom::blink::AILanguageModelPromptContentPtr, DOMException*>;
+
+void RejectResolver(ScriptPromiseResolverBase* resolver,
+                    const ScriptValue& value) {
+  resolver->Reject(value);
+}
 
 class CloneLanguageModelClient
     : public GarbageCollected<CloneLanguageModelClient>,
@@ -122,75 +128,25 @@ class CloneLanguageModelClient
       receiver_;
 };
 
-class MeasureInputUsageClient
-    : public GarbageCollected<MeasureInputUsageClient>,
-      public mojom::blink::AILanguageModelMeasureInputUsageClient,
-      public AIContextObserver<IDLDouble> {
- public:
-  MeasureInputUsageClient(
-      ScriptState* script_state,
-      LanguageModel* language_model,
-      ScriptPromiseResolver<IDLDouble>* resolver,
-      AbortSignal* signal,
-      WTF::Vector<mojom::blink::AILanguageModelPromptPtr> input)
-      : AIContextObserver(script_state, language_model, resolver, signal),
-        language_model_(language_model),
-        receiver_(this, language_model->GetExecutionContext()) {
-    mojo::PendingRemote<mojom::blink::AILanguageModelMeasureInputUsageClient>
-        client_remote;
-    receiver_.Bind(client_remote.InitWithNewPipeAndPassReceiver(),
-                   language_model->GetTaskRunner());
-    language_model_->GetAILanguageModelRemote()->MeasureInputUsage(
-        std::move(input), std::move(client_remote));
-  }
-  ~MeasureInputUsageClient() override = default;
-
-  MeasureInputUsageClient(const MeasureInputUsageClient&) = delete;
-  MeasureInputUsageClient& operator=(const MeasureInputUsageClient&) = delete;
-
-  void Trace(Visitor* visitor) const override {
-    AIContextObserver::Trace(visitor);
-    visitor->Trace(language_model_);
-    visitor->Trace(receiver_);
-  }
-
-  // mojom::blink::AILanguageModelMeasureInputUsageClient implementation.
-  void OnResult(uint32_t number_of_tokens) override {
-    if (!GetResolver()) {
-      return;
-    }
-
-    GetResolver()->Resolve(number_of_tokens);
-    Cleanup();
-  }
-
- protected:
-  void ResetReceiver() override { receiver_.reset(); }
-
- private:
-  Member<LanguageModel> language_model_;
-  HeapMojoReceiver<mojom::blink::AILanguageModelMeasureInputUsageClient,
-                   MeasureInputUsageClient>
-      receiver_;
-};
-
 class AppendClient : public GarbageCollected<AppendClient>,
-                     public mojom::blink::AILanguageModelAppendClient,
+                     public mojom::blink::ModelStreamingResponder,
                      public AIContextObserver<IDLUndefined> {
  public:
-  AppendClient(ScriptState* script_state,
-               LanguageModel* language_model,
-               ScriptPromiseResolver<IDLUndefined>* resolver,
-               WTF::Vector<mojom::blink::AILanguageModelPromptPtr> prompts,
-               AbortSignal* signal,
-               base::RepeatingClosure overflow_callback,
-               base::PassKey<LanguageModel>)
+  AppendClient(
+      ScriptState* script_state,
+      LanguageModel* language_model,
+      ScriptPromiseResolver<IDLUndefined>* resolver,
+      WTF::Vector<mojom::blink::AILanguageModelPromptPtr> prompts,
+      AbortSignal* signal,
+      base::OnceCallback<void(mojom::blink::ModelExecutionContextInfoPtr)>
+          complete_callback,
+      base::RepeatingClosure overflow_callback)
       : AIContextObserver(script_state, language_model, resolver, signal),
         language_model_(language_model),
+        complete_callback_(std::move(complete_callback)),
         overflow_callback_(overflow_callback),
         receiver_(this, language_model->GetExecutionContext()) {
-    mojo::PendingRemote<mojom::blink::AILanguageModelAppendClient>
-        client_remote;
+    mojo::PendingRemote<mojom::blink::ModelStreamingResponder> client_remote;
     receiver_.Bind(client_remote.InitWithNewPipeAndPassReceiver(),
                    language_model->GetTaskRunner());
     language_model_->GetAILanguageModelRemote()->Append(
@@ -201,26 +157,41 @@ class AppendClient : public GarbageCollected<AppendClient>,
   AppendClient(const AppendClient&) = delete;
   AppendClient& operator=(const AppendClient&) = delete;
 
+  // Helper function to make MeasureInputUsageClient with no return type.
+  static void Create(
+      ScriptState* script_state,
+      LanguageModel* language_model,
+      ScriptPromiseResolver<IDLUndefined>* resolver,
+      AbortSignal* signal,
+      base::OnceCallback<void(mojom::blink::ModelExecutionContextInfoPtr)>
+          complete_callback,
+      base::RepeatingClosure overflow_callback,
+      WTF::Vector<mojom::blink::AILanguageModelPromptPtr> input) {
+    MakeGarbageCollected<AppendClient>(
+        std::move(script_state), std::move(language_model), std::move(resolver),
+        std::move(input), std::move(signal), std::move(complete_callback),
+        std::move(overflow_callback));
+  }
+
   void Trace(Visitor* visitor) const override {
     AIContextObserver::Trace(visitor);
     visitor->Trace(language_model_);
     visitor->Trace(receiver_);
   }
 
-  // mojom::blink::AILanguageModelAppendClient implementation.
-  void OnAppendComplete() override {
+  // mojom::blink::ModelStreamingResponder implementation.
+  void OnCompletion(
+      mojom::blink::ModelExecutionContextInfoPtr context_info) override {
     if (!GetResolver()) {
       return;
     }
 
+    if (complete_callback_) {
+      std::move(complete_callback_).Run(std::move(context_info));
+    }
+
     GetResolver()->Resolve();
     Cleanup();
-  }
-
-  void OnQuotaOverflow() override {
-    if (overflow_callback_) {
-      overflow_callback_.Run();
-    }
   }
 
   void OnError(ModelStreamingResponseStatus status) override {
@@ -231,12 +202,24 @@ class AppendClient : public GarbageCollected<AppendClient>,
     Cleanup();
   }
 
+  void OnStreaming(const WTF::String& text) override {
+    NOTREACHED() << "Append() should not invoke `OnStreaming()`";
+  }
+
+  void OnQuotaOverflow() override {
+    if (overflow_callback_) {
+      overflow_callback_.Run();
+    }
+  }
+
   void ResetReceiver() override { receiver_.reset(); }
 
  private:
   Member<LanguageModel> language_model_;
+  base::OnceCallback<void(mojom::blink::ModelExecutionContextInfoPtr)>
+      complete_callback_;
   base::RepeatingClosure overflow_callback_;
-  HeapMojoReceiver<mojom::blink::AILanguageModelAppendClient, AppendClient>
+  HeapMojoReceiver<mojom::blink::ModelStreamingResponder, AppendClient>
       receiver_;
 };
 
@@ -338,11 +321,37 @@ ExecutionContext* LanguageModel::GetExecutionContext() const {
 // static
 ScriptPromise<LanguageModel> LanguageModel::create(
     ScriptState* script_state,
-    const LanguageModelCreateOptions* options,
+    LanguageModelCreateOptions* options,
     ExceptionState& exception_state) {
-  return DOMAI::ai(*ExecutionContext::From(script_state))
-      ->languageModel()
-      ->create(script_state, options, exception_state);
+  if (!script_state->ContextIsValid()) {
+    ThrowInvalidContextException(exception_state);
+    return EmptyPromise();
+  }
+
+  auto* resolver =
+      MakeGarbageCollected<ScriptPromiseResolver<LanguageModel>>(script_state);
+  auto promise = resolver->Promise();
+
+  base::UmaHistogramEnumeration(AIMetrics::GetAIAPIUsageMetricName(
+                                    AIMetrics::AISessionType::kLanguageModel),
+                                AIMetrics::AIAPI::kCreateSession);
+  ExecutionContext* execution_context = ExecutionContext::From(script_state);
+  HeapMojoRemote<mojom::blink::AIManager>& ai_manager_remote =
+      AIInterfaceProxy::GetAIManagerRemote(execution_context);
+  if (!ai_manager_remote.is_connected()) {
+    RejectPromiseWithInternalError(resolver);
+    return promise;
+  }
+
+  CHECK(options);
+  AbortSignal* signal = options->getSignalOr(nullptr);
+  if (signal && signal->aborted()) {
+    resolver->Reject(signal->reason(script_state));
+    return promise;
+  }
+
+  MakeGarbageCollected<LanguageModelCreateClient>(resolver, options)->Create();
+  return promise;
 }
 
 // static
@@ -350,18 +359,84 @@ ScriptPromise<V8Availability> LanguageModel::availability(
     ScriptState* script_state,
     const LanguageModelCreateCoreOptions* options,
     ExceptionState& exception_state) {
-  return DOMAI::ai(*ExecutionContext::From(script_state))
-      ->languageModel()
-      ->availability(script_state, options, exception_state);
+  if (!script_state->ContextIsValid()) {
+    ThrowInvalidContextException(exception_state);
+    return EmptyPromise();
+  }
+
+  auto* resolver =
+      MakeGarbageCollected<ScriptPromiseResolver<V8Availability>>(script_state);
+  auto promise = resolver->Promise();
+
+  base::UmaHistogramEnumeration(AIMetrics::GetAIAPIUsageMetricName(
+                                    AIMetrics::AISessionType::kLanguageModel),
+                                AIMetrics::AIAPI::kCanCreateSession);
+  mojom::blink::AILanguageModelSamplingParamsPtr sampling_params;
+  Vector<mojom::blink::AILanguageModelExpectedInputPtr> expected_inputs;
+  String system_prompt;
+  Vector<mojom::blink::AILanguageModelPromptPtr> initial_prompts;
+  if (options && options->hasExpectedInputs()) {
+    expected_inputs = ToMojoExpectedInputs(options->expectedInputs());
+  }
+
+  auto sampling_params_or_exception = ResolveSamplingParamsOption(options);
+  if (!sampling_params_or_exception.has_value()) {
+    resolver->Resolve(AvailabilityToV8(Availability::kUnavailable));
+    return promise;
+  }
+  sampling_params = std::move(sampling_params_or_exception.value());
+
+  HeapMojoRemote<mojom::blink::AIManager>& ai_manager_remote =
+      AIInterfaceProxy::GetAIManagerRemote(
+          ExecutionContext::From(script_state));
+  ai_manager_remote->CanCreateLanguageModel(
+      mojom::blink::AILanguageModelCreateOptions::New(
+          std::move(sampling_params), std::move(initial_prompts),
+          std::move(expected_inputs)),
+      WTF::BindOnce(
+          [](ScriptPromiseResolver<V8Availability>* resolver,
+             mojom::blink::ModelAvailabilityCheckResult check_result) {
+            Availability availability = HandleModelAvailabilityCheckResult(
+                resolver->GetExecutionContext(),
+                AIMetrics::AISessionType::kLanguageModel, check_result);
+            resolver->Resolve(AvailabilityToV8(availability));
+          },
+          WrapPersistent(resolver)));
+  return promise;
 }
 
 // static
 ScriptPromise<IDLNullable<LanguageModelParams>> LanguageModel::params(
     ScriptState* script_state,
     ExceptionState& exception_state) {
-  return DOMAI::ai(*ExecutionContext::From(script_state))
-      ->languageModel()
-      ->params(script_state, exception_state);
+  if (!script_state->ContextIsValid()) {
+    ThrowInvalidContextException(exception_state);
+    return EmptyPromise();
+  }
+
+  auto* resolver = MakeGarbageCollected<
+      ScriptPromiseResolver<IDLNullable<LanguageModelParams>>>(script_state);
+  auto promise = resolver->Promise();
+
+  HeapMojoRemote<mojom::blink::AIManager>& ai_manager_remote =
+      AIInterfaceProxy::GetAIManagerRemote(
+          ExecutionContext::From(script_state));
+  ai_manager_remote->GetLanguageModelParams(WTF::BindOnce(
+      [](ScriptPromiseResolver<IDLNullable<LanguageModelParams>>* resolver,
+         mojom::blink::AILanguageModelParamsPtr language_model_params) {
+        if (!language_model_params) {
+          resolver->Resolve(nullptr);
+          return;
+        }
+        auto* params = MakeGarbageCollected<LanguageModelParams>(
+            language_model_params->default_sampling_params->top_k,
+            language_model_params->max_sampling_params->top_k,
+            language_model_params->default_sampling_params->temperature,
+            language_model_params->max_sampling_params->temperature);
+        resolver->Resolve(params);
+      },
+      WrapPersistent(resolver)));
+  return promise;
 }
 
 ScriptPromise<IDLString> LanguageModel::prompt(
@@ -369,17 +444,17 @@ ScriptPromise<IDLString> LanguageModel::prompt(
     const V8LanguageModelPromptInput* input,
     const LanguageModelPromptOptions* options,
     ExceptionState& exception_state) {
-  std::optional<ValidateAndProcessPromptInputResult> processed_input =
-      ValidateAndProcessPromptInput(script_state, input, options,
-                                    exception_state);
-  if (!processed_input.has_value()) {
+  std::optional<on_device_model::mojom::blink::ResponseConstraintPtr>
+      processed_constraint = ValidateAndProcessPromptInput(
+          script_state, input, options, exception_state);
+  if (!processed_constraint.has_value()) {
     return EmptyPromise();
   }
   base::UmaHistogramEnumeration(AIMetrics::GetAIAPIUsageMetricName(
                                     AIMetrics::AISessionType::kLanguageModel),
                                 AIMetrics::AIAPI::kSessionPrompt);
 
-  ScriptPromiseResolver<IDLString>* resolver =
+  auto* resolver =
       MakeGarbageCollected<ScriptPromiseResolver<IDLString>>(script_state);
   auto promise = resolver->Promise();
 
@@ -391,10 +466,12 @@ ScriptPromise<IDLString> LanguageModel::prompt(
       WTF::BindRepeating(&LanguageModel::OnQuotaOverflow,
                          WrapWeakPersistent(this)));
 
-  language_model_remote_->Prompt(
-      std::move(processed_input->processed_prompts),
-      std::move(processed_input->processed_constraint),
-      std::move(pending_remote));
+  ConvertPromptInputsToMojo(
+      script_state, options->getSignalOr(nullptr), input, input_types_,
+      WTF::BindOnce(&LanguageModel::ExecutePrompt, WrapPersistent(this),
+                    std::move(*processed_constraint),
+                    std::move(pending_remote)),
+      WTF::BindOnce(&RejectResolver, WrapPersistent(resolver)));
   return promise;
 }
 
@@ -403,10 +480,10 @@ ReadableStream* LanguageModel::promptStreaming(
     const V8LanguageModelPromptInput* input,
     const LanguageModelPromptOptions* options,
     ExceptionState& exception_state) {
-  std::optional<ValidateAndProcessPromptInputResult> processed_input =
-      ValidateAndProcessPromptInput(script_state, input, options,
-                                    exception_state);
-  if (!processed_input.has_value()) {
+  std::optional<on_device_model::mojom::blink::ResponseConstraintPtr>
+      processed_constraint = ValidateAndProcessPromptInput(
+          script_state, input, options, exception_state);
+  if (!processed_constraint.has_value()) {
     return nullptr;
   }
   base::UmaHistogramEnumeration(AIMetrics::GetAIAPIUsageMetricName(
@@ -421,14 +498,66 @@ ReadableStream* LanguageModel::promptStreaming(
       WTF::BindRepeating(&LanguageModel::OnQuotaOverflow,
                          WrapWeakPersistent(this)));
 
-  language_model_remote_->Prompt(
-      std::move(processed_input->processed_prompts),
-      std::move(processed_input->processed_constraint), std::move(remote));
+  ConvertPromptInputsToMojo(
+      script_state, options->getSignalOr(nullptr), input, input_types_,
+      WTF::BindOnce(&LanguageModel::ExecutePrompt, WrapPersistent(this),
+                    std::move(*processed_constraint), std::move(remote)),
+      WTF::BindOnce(
+          [](ReadableStream* readable_stream, ScriptState* script_state,
+             const ScriptValue& error) {
+            ReadableStreamController* controller =
+                readable_stream->GetController();
+            // TODO(crbug.com/414906618): Make this more elegant (i.e.
+            // crrev.com/c/6528669).
+            CHECK(controller->IsDefaultController());
+            MakeGarbageCollected<
+                ReadableStreamDefaultControllerWithScriptScope>(
+                script_state, To<ReadableStreamDefaultController>(controller))
+                ->Error(error.V8ValueFor(script_state));
+          },
+          WrapPersistent(stream), WrapPersistent(script_state)));
 
   return stream;
 }
+void LanguageModel::ExecutePrompt(
+    on_device_model::mojom::blink::ResponseConstraintPtr constraint,
+    mojo::PendingRemote<mojom::blink::ModelStreamingResponder>
+        pending_responder,
+    WTF::Vector<mojom::blink::AILanguageModelPromptPtr> prompts) {
+  language_model_remote_->Prompt(std::move(prompts), std::move(constraint),
+                                 std::move(pending_responder));
+}
 
-std::optional<LanguageModel::ValidateAndProcessPromptInputResult>
+void LanguageModel::ExecuteMeasureInputUsage(
+    ScriptPromiseResolver<IDLDouble>* resolver,
+    AbortSignal* signal,
+    WTF::Vector<mojom::blink::AILanguageModelPromptPtr> prompts) {
+  language_model_remote_->MeasureInputUsage(
+      std::move(prompts),
+      WTF::BindOnce(
+          [](ScriptPromiseResolver<IDLDouble>* resolver, AbortSignal* signal,
+             std::optional<uint32_t> usage) {
+            ExecutionContext* context = resolver->GetExecutionContext();
+            if (!context) {
+              return;
+            }
+            if (signal && signal->aborted()) {
+              resolver->Reject(signal->reason(resolver->GetScriptState()));
+              return;
+            }
+            if (!usage.has_value()) {
+              resolver->Reject(
+                  DOMException::Create(kExceptionMessageUnableToCalculateUsage,
+                                       DOMException::GetErrorName(
+                                           DOMExceptionCode::kOperationError)));
+              return;
+            }
+            resolver->Resolve(static_cast<double>(usage.value()));
+          },
+          WrapPersistent(resolver), WrapPersistent(signal)));
+}
+
+std::optional<on_device_model::mojom::blink::ResponseConstraintPtr>
 LanguageModel::ValidateAndProcessPromptInput(
     ScriptState* script_state,
     const V8LanguageModelPromptInput* input,
@@ -456,12 +585,6 @@ LanguageModel::ValidateAndProcessPromptInput(
     return std::nullopt;
   }
 
-  auto prompts = BuildPrompts(input, script_state, exception_state,
-                              GetExecutionContext(), input_types_);
-  if (!prompts.has_value()) {
-    return std::nullopt;
-  }
-
   // TODO(crbug.com/411470034): Aggregate other input type sizes for UMA.
   if (input->IsString()) {
     base::UmaHistogramCounts1M(
@@ -475,10 +598,7 @@ LanguageModel::ValidateAndProcessPromptInput(
     return std::nullopt;
   }
 
-  return ValidateAndProcessPromptInputResult{
-      .processed_constraint = std::move(constraint),
-      .processed_prompts = std::move(prompts).value(),
-  };
+  return constraint;
 }
 
 ScriptPromise<IDLUndefined> LanguageModel::append(
@@ -501,15 +621,6 @@ ScriptPromise<IDLUndefined> LanguageModel::append(
     exception_state.ThrowTypeError("Input type not supported");
     return promise;
   }
-
-  auto prompts = BuildPrompts(input, script_state, exception_state,
-                              GetExecutionContext(), input_types_);
-  if (!prompts.has_value()) {
-    // `BuildPrompts` will throw the exception if it fails.
-    resolver->Reject();
-    return promise;
-  }
-
   if (!language_model_remote_) {
     ThrowSessionDestroyedException(exception_state);
     return promise;
@@ -520,12 +631,16 @@ ScriptPromise<IDLUndefined> LanguageModel::append(
     return promise;
   }
 
-  MakeGarbageCollected<AppendClient>(
-      script_state, this, resolver, std::move(prompts).value(), signal,
-      WTF::BindRepeating(&LanguageModel::OnQuotaOverflow,
-                         WrapWeakPersistent(this)),
-      base::PassKey<LanguageModel>());
-
+  ConvertPromptInputsToMojo(
+      script_state, options->getSignalOr(nullptr), input, input_types_,
+      WTF::BindOnce(&AppendClient::Create, WrapPersistent(script_state),
+                    WrapPersistent(this), WrapPersistent(resolver),
+                    WrapPersistent(signal),
+                    WTF::BindOnce(&LanguageModel::OnResponseComplete,
+                                  WrapWeakPersistent(this)),
+                    WTF::BindRepeating(&LanguageModel::OnQuotaOverflow,
+                                       WrapWeakPersistent(this))),
+      WTF::BindOnce(&RejectResolver, WrapPersistent(resolver)));
   return promise;
 }
 
@@ -535,7 +650,7 @@ ScriptPromise<LanguageModel> LanguageModel::clone(
     ExceptionState& exception_state) {
   if (!script_state->ContextIsValid()) {
     ThrowInvalidContextException(exception_state);
-    return ScriptPromise<LanguageModel>();
+    return EmptyPromise();
   }
 
   base::UmaHistogramEnumeration(AIMetrics::GetAIAPIUsageMetricName(
@@ -570,14 +685,14 @@ ScriptPromise<IDLDouble> LanguageModel::measureInputUsage(
     ExceptionState& exception_state) {
   if (!script_state->ContextIsValid()) {
     ThrowInvalidContextException(exception_state);
-    return ScriptPromise<IDLDouble>();
+    return EmptyPromise();
   }
 
   // The API impl only accepts a string by default for now, more to come soon!
   if (!input->IsString() &&
       !RuntimeEnabledFeatures::AIPromptAPIMultimodalInputEnabled()) {
     exception_state.ThrowTypeError("Input type not supported");
-    return ScriptPromise<IDLDouble>();
+    return EmptyPromise();
   }
 
   base::UmaHistogramEnumeration(AIMetrics::GetAIAPIUsageMetricName(
@@ -587,12 +702,6 @@ ScriptPromise<IDLDouble> LanguageModel::measureInputUsage(
   ScriptPromiseResolver<IDLDouble>* resolver =
       MakeGarbageCollected<ScriptPromiseResolver<IDLDouble>>(script_state);
   auto promise = resolver->Promise();
-
-  auto prompts = BuildPrompts(input, script_state, exception_state,
-                              GetExecutionContext(), input_types_);
-  if (!prompts.has_value()) {
-    return promise;
-  }
 
   if (!language_model_remote_) {
     ThrowSessionDestroyedException(exception_state);
@@ -605,8 +714,12 @@ ScriptPromise<IDLDouble> LanguageModel::measureInputUsage(
     return promise;
   }
 
-  MakeGarbageCollected<MeasureInputUsageClient>(
-      script_state, this, resolver, signal, std::move(prompts).value());
+  ConvertPromptInputsToMojo(
+      script_state, options->getSignalOr(nullptr), input, input_types_,
+      WTF::BindOnce(&LanguageModel::ExecuteMeasureInputUsage,
+                    WrapPersistent(this), WrapPersistent(resolver),
+                    WrapPersistent(signal)),
+      WTF::BindOnce(&RejectResolver, WrapPersistent(resolver)));
 
   return promise;
 }

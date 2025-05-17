@@ -159,19 +159,9 @@ export class SettingsBasicPageElement extends SettingsBasicPageElementBase {
         value: false,
       },
 
-      showAdvancedFeaturesMainControl_: {
+      showAiPageAiFeatureSection_: {
         type: Boolean,
-        value: () => loadTimeData.getBoolean('showAdvancedFeaturesMainControl'),
-      },
-
-      enableAiSettingsPageRefresh_: {
-        type: Boolean,
-        value: () => loadTimeData.getBoolean('enableAiSettingsPageRefresh'),
-      },
-
-      aiPageTitle_: {
-        type: String,
-        computed: 'computeAiPageTitle_(enableAiSettingsPageRefresh_)',
+        value: () => loadTimeData.getBoolean('showAiPageAiFeatureSection'),
       },
 
       // <if expr="enable_glic">
@@ -200,9 +190,7 @@ export class SettingsBasicPageElement extends SettingsBasicPageElementBase {
   declare private currentRoute_: Route;
   declare private advancedTogglingInProgress_: boolean;
   declare private showBatterySettings_: boolean;
-  declare private showAdvancedFeaturesMainControl_: boolean;
-  declare private enableAiSettingsPageRefresh_: boolean;
-  declare private aiPageTitle_: string;
+  declare private showAiPageAiFeatureSection_: boolean;
   // <if expr="enable_glic">
   declare private showGlicSection_: boolean;
   // </if>
@@ -356,20 +344,8 @@ export class SettingsBasicPageElement extends SettingsBasicPageElementBase {
     return this.showPage_(visibility);
   }
 
-  private showAiInfoCard_(visibility?: boolean): boolean {
-    return loadTimeData.getBoolean('enableAiSettingsPageRefresh') &&
-        this.showExperimentalAdvancedPage_(visibility);
-  }
-
-  private showExperimentalAdvancedPage_(visibility?: boolean): boolean {
-    return loadTimeData.getBoolean('showAdvancedFeaturesMainControl') &&
-        this.showPage_(visibility);
-  }
-
-  private computeAiPageTitle_(): string {
-    return loadTimeData.getString(
-        this.enableAiSettingsPageRefresh_ ? 'aiInnovationsPageTitle' :
-                                            'aiPageTitle');
+  private showAiPage_(visibility?: boolean): boolean {
+    return loadTimeData.getBoolean('showAiPage') && this.showPage_(visibility);
   }
 
   // <if expr="_google_chrome">

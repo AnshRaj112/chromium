@@ -66,6 +66,9 @@ extern const char
 extern const char kAutofillEnableFlatRateCardBenefitsFromCurinosName[];
 extern const char kAutofillEnableFlatRateCardBenefitsFromCurinosDescription[];
 
+extern const char kAutofillEnableFpanRiskBasedAuthenticationName[];
+extern const char kAutofillEnableFpanRiskBasedAuthenticationDescription[];
+
 extern const char kAutofillEnableLogFormEventsToAllParsedFormTypesName[];
 extern const char kAutofillEnableLogFormEventsToAllParsedFormTypesDescription[];
 
@@ -89,6 +92,9 @@ extern const char kAutofillPaymentsSheetV2Description[];
 
 extern const char kPasswordSuggestionBottomSheetV2Name[];
 extern const char kPasswordSuggestionBottomSheetV2Description[];
+
+extern const char kAutofillLocalSaveCardBottomSheetName[];
+extern const char kAutofillLocalSaveCardBottomSheetDescription[];
 
 extern const char kAutofillPruneSuggestionsName[];
 extern const char kAutofillPruneSuggestionsDescription[];
@@ -140,6 +146,9 @@ extern const char kBreakpadNoDelayInitialUploadDescription[];
 
 extern const char kCollaborationMessagingName[];
 extern const char kCollaborationMessagingDescription[];
+
+extern const char kColorfulTabGroupName[];
+extern const char kColorfulTabGroupDescription[];
 
 extern const char kContainedTabGroupName[];
 extern const char kContainedTabGroupDescription[];
@@ -438,6 +447,9 @@ extern const char kLensClearcutBackgroundUploadEnabledDescription[];
 extern const char kLensClearcutLoggerFastQosEnabledName[];
 extern const char kLensClearcutLoggerFastQosEnabledDescription[];
 
+extern const char kLensExactMatchesEnabledName[];
+extern const char kLensExactMatchesEnabledDescription[];
+
 extern const char kLensFetchSrpApiEnabledName[];
 extern const char kLensFetchSrpApiEnabledDescription[];
 
@@ -449,6 +461,9 @@ extern const char kLensGestureTextSelectionDisabledDescription[];
 
 extern const char kLensInkMultiSampleModeDisabledName[];
 extern const char kLensInkMultiSampleModeDisabledDescription[];
+
+extern const char kLensLoadAIMInLensResultPageName[];
+extern const char kLensLoadAIMInLensResultPageDescription[];
 
 extern const char kLensOverlayForceShowOnboardingScreenName[];
 extern const char kLensOverlayForceShowOnboardingScreenDescription[];
@@ -633,6 +648,9 @@ extern const char kOneTapForMapsDescription[];
 
 extern const char kPageActionMenuName[];
 extern const char kPageActionMenuDescription[];
+
+extern const char kGLICPromoConsentName[];
+extern const char kGLICPromoConsentDescription[];
 
 extern const char kPageContentAnnotationsName[];
 extern const char kPageContentAnnotationsDescription[];

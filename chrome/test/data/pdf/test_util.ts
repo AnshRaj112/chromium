@@ -175,8 +175,7 @@ export class MockDocumentDimensions implements DocumentDimensions {
 export class MockPdfPluginElement extends HTMLEmbedElement {
   private messages_: any[] = [];
   // <if expr="enable_pdf_ink2">
-  private messageReply_: Object|null = null;
-  private replyType_: string = '';
+  private messageReplies_: Map<string, Object> = new Map();
   private replyToSave_: boolean = false;
   // </if>
 
@@ -197,14 +196,15 @@ export class MockPdfPluginElement extends HTMLEmbedElement {
     // <if expr="enable_pdf_ink2">
     if (message.type === 'save' && this.replyToSave_) {
       this.replyToSaveMessage_(message);
-    } else if (message.type === this.replyType_) {
-      assert(this.messageReply_);
+    } else if (this.messageReplies_.has(message.type)) {
+      const reply = this.messageReplies_.get(message.type);
+      assert(reply);
       assert(message.messageId);
-
       this.dispatchEvent(new MessageEvent('message', {
         data: {
           messageId: message.messageId,
-          ...this.messageReply_,
+          type: message.type + 'Reply',
+          ...reply,
         },
         origin: '*',
       }));
@@ -221,8 +221,7 @@ export class MockPdfPluginElement extends HTMLEmbedElement {
    * @param reply The reply to the message.
    */
   setMessageReply(type: string, reply: Object) {
-    this.replyType_ = type;
-    this.messageReply_ = reply;
+    this.messageReplies_.set(type, reply);
   }
 
   /**
@@ -491,12 +490,34 @@ export function enterFullscreenWithUserGesture(): Promise<void> {
 
 // <if expr="enable_pdf_ink2">
 /**
- * Helper to simulate the PDF content sending a message to the PDF extension
- * to indicate that a new ink stroke has been drawn.
+ * Convenience function to start stroking, and then modify some Ink stroke
+ * before finishing.
  */
-export function finishInkStroke(controller: PluginController) {
+export function startFinishModifiedInkStroke(controller: PluginController) {
+  startInkStroke(controller);
+  finishInkStroke(controller, true);
+}
+
+/**
+ * Helper to simulate the PDF content sending a message to the PDF extension
+ * to indicate that a new ink stroke has been started.
+ */
+export function startInkStroke(controller: PluginController) {
   const eventTarget = controller.getEventTarget();
-  const message = {type: 'finishInkStroke'};
+  const message = {type: 'startInkStroke'};
+
+  eventTarget.dispatchEvent(new CustomEvent(
+      PluginControllerEventType.PLUGIN_MESSAGE, {detail: message}));
+}
+
+/**
+ * Helper to simulate the PDF content sending a message to the PDF extension
+ * to indicate that Ink stroking has occurred.
+ */
+export function finishInkStroke(
+    controller: PluginController, modified: boolean) {
+  const eventTarget = controller.getEventTarget();
+  const message = {type: 'finishInkStroke', modified};
 
   eventTarget.dispatchEvent(new CustomEvent(
       PluginControllerEventType.PLUGIN_MESSAGE, {detail: message}));
@@ -529,6 +550,9 @@ export function setupTestMockPluginForInk(): MockPdfPluginElement {
       size: 3,
       color: {r: 0, g: 0, b: 0},
     },
+  });
+  mockPlugin.setMessageReply('getAllTextAnnotations', {
+    annotations: [],
   });
   return mockPlugin;
 }
@@ -565,6 +589,9 @@ export function setupTestViewportAndMockPluginForInk():
       size: 3,
       color: {r: 0, g: 0, b: 0},
     },
+  });
+  mockPlugin.setMessageReply('getAllTextAnnotations', {
+    annotations: [],
   });
 
   // Initialize controller. This also calls setContent() on the viewport.

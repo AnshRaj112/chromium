@@ -55,6 +55,7 @@
 #include "third_party/omnibox_proto/answer_type.pb.h"
 #include "third_party/omnibox_proto/entity_info.pb.h"
 #include "third_party/omnibox_proto/groups.pb.h"
+#include "ui/base/device_form_factor.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "url/third_party/mozilla/url_parse.h"
@@ -261,6 +262,7 @@ AutocompleteMatch::AutocompleteMatch(const AutocompleteMatch& match)
       suggestion_group_id(match.suggestion_group_id),
       swap_contents_and_description(match.swap_contents_and_description),
       answer_template(match.answer_template),
+      suggest_template(match.suggest_template),
       answer_type(match.answer_type),
       transition(match.transition),
       type(match.type),
@@ -285,6 +287,9 @@ AutocompleteMatch::AutocompleteMatch(const AutocompleteMatch& match)
           match.typed_search_suggestions_shown_in_session),
       typed_url_suggestions_shown_in_session(
           match.typed_url_suggestions_shown_in_session),
+      contextual_search_suggestions_shown_in_session(
+          match.contextual_search_suggestions_shown_in_session),
+      lens_action_shown_in_session(match.lens_action_shown_in_session),
       search_terms_args(
           match.search_terms_args
               ? new TemplateURLRef::SearchTermsArgs(*match.search_terms_args)
@@ -347,6 +352,7 @@ AutocompleteMatch& AutocompleteMatch::operator=(
   swap_contents_and_description =
       std::move(match.swap_contents_and_description);
   answer_template = std::move(match.answer_template);
+  suggest_template = std::move(match.suggest_template);
   answer_type = std::move(match.answer_type);
   transition = std::move(match.transition);
   type = std::move(match.type);
@@ -372,6 +378,9 @@ AutocompleteMatch& AutocompleteMatch::operator=(
       std::move(match.typed_search_suggestions_shown_in_session);
   typed_url_suggestions_shown_in_session =
       std::move(match.typed_url_suggestions_shown_in_session);
+  contextual_search_suggestions_shown_in_session =
+      std::move(match.contextual_search_suggestions_shown_in_session);
+  lens_action_shown_in_session = std::move(match.lens_action_shown_in_session);
   search_terms_args = std::move(match.search_terms_args);
   post_content = std::move(match.post_content);
   additional_info = std::move(match.additional_info);
@@ -438,6 +447,7 @@ AutocompleteMatch& AutocompleteMatch::operator=(
   suggestion_group_id = match.suggestion_group_id;
   swap_contents_and_description = match.swap_contents_and_description;
   answer_template = match.answer_template;
+  suggest_template = match.suggest_template;
   answer_type = match.answer_type;
   transition = match.transition;
   type = match.type;
@@ -463,6 +473,9 @@ AutocompleteMatch& AutocompleteMatch::operator=(
       match.typed_search_suggestions_shown_in_session;
   typed_url_suggestions_shown_in_session =
       match.typed_url_suggestions_shown_in_session;
+  contextual_search_suggestions_shown_in_session =
+      match.contextual_search_suggestions_shown_in_session;
+  lens_action_shown_in_session = match.lens_action_shown_in_session;
   search_terms_args.reset(
       match.search_terms_args
           ? new TemplateURLRef::SearchTermsArgs(*match.search_terms_args)
@@ -558,7 +571,7 @@ const gfx::VectorIcon& AutocompleteMatch::GetVectorIcon(
              : (IsContextualSearchSuggestion() &&
                 omnibox_feature_configs::ContextualSearch::Get()
                     .contextual_zero_suggest_lens_fulfillment)
-                 ? omnibox::kPageSparkIcon
+                 ? omnibox::kSubdirectoryArrowRightIcon
                  : vector_icons::kSearchChromeRefreshIcon;
 
     case Type::PEDAL:
@@ -1583,6 +1596,21 @@ int AutocompleteMatch::GetSortingOrder() const {
   return 4;
 }
 
+bool AutocompleteMatch::HasCustomDescription() const {
+  if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_DESKTOP &&
+      type == AutocompleteMatchType::CALCULATOR) {
+    return true;
+  }
+  if (suggest_template.has_value() &&
+      !suggest_template->secondary_text().text().empty()) {
+    return true;
+  }
+  return type == AutocompleteMatchType::SEARCH_SUGGEST_ENTITY ||
+         type == AutocompleteMatchType::SEARCH_SUGGEST_PROFILE ||
+         type == AutocompleteMatchType::CLIPBOARD_TEXT ||
+         type == AutocompleteMatchType::CLIPBOARD_IMAGE;
+}
+
 bool AutocompleteMatch::IsMlSignalLoggingEligible() const {
   const auto& ml_config = OmniboxFieldTrial::GetMLConfig();
   if (answer_type != omnibox::ANSWER_TYPE_UNSPECIFIED) {
@@ -2270,6 +2298,10 @@ void AutocompleteMatch::WriteIntoTrace(perfetto::TracedValue context) const {
 
 OmniboxAction* AutocompleteMatch::GetActionAt(size_t index) const {
   return index >= actions.size() ? nullptr : actions[index].get();
+}
+
+bool AutocompleteMatch::HasTakeoverAction(OmniboxActionId id) const {
+  return takeover_action && takeover_action->ActionId() == id;
 }
 
 AutocompleteMatch AutocompleteMatch::CreateActionMatch(

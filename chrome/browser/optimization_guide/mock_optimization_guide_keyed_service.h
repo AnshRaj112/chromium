@@ -11,20 +11,12 @@
 #include "components/optimization_guide/proto/model_quality_service.pb.h"
 #include "testing/gmock/include/gmock/gmock.h"
 
-class TestingPrefServiceSimple;
-
 // Mocks the opt guide service, to be used in unittests.
 //
 // Can be used with `ChromeRenderViewHostTestHarness` based tests.
-//
-// For non ChromeRenderViewHostTestHarness based tests set the local state using
-// `MockOptimizationGuideKeyedService::Initialize()` and then reset using
-// `MockOptimizationGuideKeyedService::TearDown()`.
 class MockOptimizationGuideKeyedService : public OptimizationGuideKeyedService {
  public:
-  static void Initialize(TestingPrefServiceSimple* local_state);
   static void InitializeWithExistingTestLocalState();
-  static void TearDown();
   static void ResetForTesting();
 
   MockOptimizationGuideKeyedService();
@@ -137,6 +129,7 @@ class MockOptimizationGuideKeyedService : public OptimizationGuideKeyedService {
   MOCK_METHOD(void,
               GetOnDeviceModelEligibilityAsync,
               (optimization_guide::ModelBasedCapabilityKey,
+               const on_device_model::Capabilities&,
                base::OnceCallback<
                    void(optimization_guide::OnDeviceModelEligibilityReason)>),
               (override));

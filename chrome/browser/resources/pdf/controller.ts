@@ -54,6 +54,11 @@ interface AnnotationBrushMessage {
   data: AnnotationBrush;
 }
 
+interface AllTextAnnotationsMessage {
+  type: string;
+  annotations: TextAnnotation[];
+}
+
 interface StartTextAnnotationMessage {
   type: 'startTextAnnotation';
   data: number;
@@ -128,6 +133,7 @@ export enum PluginControllerEventType {
   // <if expr="enable_pdf_ink2">
   CONTENT_FOCUSED = 'PluginControllerEventType.CONTENT_FOCUSED',
   FINISH_INK_STROKE = 'PluginControllerEventType.FINISH_INK_STROKE',
+  START_INK_STROKE = 'PluginControllerEventType.START_INK_STROKE',
   UPDATE_INK_THUMBNAIL = 'PluginControllerEventType.UPDATE_INK_THUMBNAIL',
   // </if>
   IS_ACTIVE_CHANGED = 'PluginControllerEventType.IS_ACTIVE_CHANGED',
@@ -233,6 +239,12 @@ export class PluginController implements ContentController {
     };
 
     this.postMessage_(message);
+  }
+
+  getAllTextAnnotations(): Promise<AllTextAnnotationsMessage> {
+    return this.postMessageWithReply_({
+      type: 'getAllTextAnnotations',
+    });
   }
 
   startTextAnnotation(id: number) {

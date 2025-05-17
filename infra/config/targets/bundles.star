@@ -4400,6 +4400,19 @@ targets.bundle(
 )
 
 targets.bundle(
+    name = "gpu_fyi_only_mac_release_graphite_telemetry_tests",
+    targets = [
+        "gpu_common_and_optional_telemetry_tests",
+        "gpu_metal_passthrough_graphite_telemetry_tests",
+        "gpu_webcodecs_metal_passthrough_graphite_telemetry_test",
+        "gpu_webrtc_metal_passthrough_graphite_telemetry_test",
+        "gpu_webgl2_conformance_metal_passthrough_graphite_telemetry_tests",
+        "gpu_webgl_conformance_metal_passthrough_graphite_telemetry_tests",
+        "gpu_webgl_conformance_swangle_passthrough_representative_telemetry_tests",
+    ],
+)
+
+targets.bundle(
     name = "gpu_fyi_vulkan_swiftshader_gtests",
     targets = [
         "vulkan_swiftshader_content_browsertests",
@@ -6690,6 +6703,20 @@ targets.bundle(
     name = "test_traffic_annotation_auditor_script",
     targets = [
         "test_traffic_annotation_auditor",
+    ],
+)
+
+targets.bundle(
+    name = "trees_in_viz_fyi_blink_web_tests",
+    targets = [
+        "blink_web_tests",
+    ],
+    mixins = [
+        targets.mixin(
+            args = [
+                "--flag-specific=trees-in-viz",
+            ],
+        ),
     ],
 )
 

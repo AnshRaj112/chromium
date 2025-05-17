@@ -37,7 +37,6 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/default_tick_clock.h"
 #include "base/time/time.h"
-#include "base/timer/timer.h"
 #include "base/trace_event/optional_trace_event.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
@@ -1490,12 +1489,12 @@ void RenderWidgetHostImpl::ViewDestroyed() {
   SetView(nullptr);
 }
 
-bool RenderWidgetHostImpl::RequestRepaintForTesting() {
+bool RenderWidgetHostImpl::RequestRepaintOnNewSurface() {
   if (!view_) {
     return false;
   }
 
-  return view_->RequestRepaintForTesting();
+  return view_->RequestRepaintOnNewSurface();
 }
 
 void RenderWidgetHostImpl::RenderProcessBlockedStateChanged(bool blocked) {
@@ -2151,7 +2150,20 @@ void RenderWidgetHostImpl::GetSnapshotFromBrowser(
   if (from_surface) {
     pending_surface_browser_snapshots_.insert(
         std::make_pair(snapshot_id, std::move(callback)));
-    RequestForceRedraw(snapshot_id);
+    if (base::FeatureList::IsEnabled(features::kCDPScreenshotNewSurface)) {
+      // 1. Force content redraw in the renderer.
+      blink_widget_->ForceRedraw(base::DoNothing());
+      // 2. Force a repaint to ensure that surface is updated.
+      RequestRepaintOnNewSurface();
+      // 3. Create a copy request from the newest surface. This
+      // should wait until the requested repaint has arrived.
+      GetView()->CopyFromSurface(
+          gfx::Rect(), gfx::Size(),
+          base::BindOnce(&RenderWidgetHostImpl::OnSnapshotFromSurfaceReceived,
+                         weak_factory_.GetWeakPtr(), snapshot_id, 0));
+    } else {
+      RequestForceRedraw(snapshot_id);
+    }
     return;
   }
 
@@ -2806,7 +2818,7 @@ void RenderWidgetHostImpl::UpdateBrowserControlsState(
 void RenderWidgetHostImpl::StartDragging(
     blink::mojom::DragDataPtr drag_data,
     const url::Origin& source_origin,
-    blink::DragOperationsMask drag_operations_mask,
+    DragOperationsMask drag_operations_mask,
     const SkBitmap& bitmap,
     const gfx::Vector2d& cursor_offset_in_dip,
     const gfx::Rect& drag_obj_rect_in_dip,

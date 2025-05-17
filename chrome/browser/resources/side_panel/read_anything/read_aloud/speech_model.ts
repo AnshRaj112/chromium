@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import type {WordBoundaryState} from './word_boundaries.js';
+
 export enum PauseActionSource {
   DEFAULT,
   BUTTON_CLICK,
@@ -67,6 +69,8 @@ export class SpeechModel {
   // our reading position if read aloud has started. This keeps track of the
   // last position so we can check if it's still in the new page.
   private lastReadingPosition_: ReadingPosition|null = null;
+  private savedSpeechPlayingState_: SpeechPlayingState|null = null;
+  private savedWordBoundaryState_: WordBoundaryState|null = null;
 
   // Used for logging play time.
   private playSessionStartTime_: number|null = null;
@@ -75,17 +79,30 @@ export class SpeechModel {
   // has been set. This is null if the id has not been set.
   private firstTextNodeSetForReadAloud_: number|null = null;
 
-  reset(): void {
-    this.speechPlayingState_ = {
-      isSpeechTreeInitialized: false,
-      isSpeechActive: false,
-      pauseSource: PauseActionSource.DEFAULT,
-      isAudioCurrentlyPlaying: false,
-      hasSpeechBeenTriggered: false,
-      isSpeechBeingRepositioned: false,
-    };
-    this.speechEngineState_ = SpeechEngineState.NONE;
-    this.previewVoicePlaying_ = null;
+  private resumeSpeechOnVoiceMenuClose_: boolean = false;
+
+  getSavedSpeechPlayingState(): SpeechPlayingState|null {
+    return this.savedSpeechPlayingState_;
+  }
+
+  setSavedSpeechPlayingState(state: SpeechPlayingState|null): void {
+    this.savedSpeechPlayingState_ = state;
+  }
+
+  getSavedWordBoundaryState(): WordBoundaryState|null {
+    return this.savedWordBoundaryState_;
+  }
+
+  setSavedWordBoundaryState(state: WordBoundaryState|null): void {
+    this.savedWordBoundaryState_ = state;
+  }
+
+  getResumeSpeechOnVoiceMenuClose(): boolean {
+    return this.resumeSpeechOnVoiceMenuClose_;
+  }
+
+  setResumeSpeechOnVoiceMenuClose(shouldResume: boolean) {
+    this.resumeSpeechOnVoiceMenuClose_ = shouldResume;
   }
 
   getFirstTextNode(): number|null {

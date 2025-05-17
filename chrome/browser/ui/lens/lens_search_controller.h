@@ -24,6 +24,8 @@ class LensOverlayController;
 class GURL;
 
 namespace lens {
+class LensSessionMetricsLogger;
+class LensOverlayEventHandler;
 class LensOverlayGen204Controller;
 class LensOverlaySidePanelCoordinator;
 class LensPermissionBubbleController;
@@ -128,11 +130,30 @@ class LensSearchController {
   // nice if the overlay is visible when this is called.
   virtual void CloseLensSync(lens::LensOverlayDismissalSource dismissal_source);
 
+  // Launches the survey if the user has not already seen it.
+  void MaybeLaunchSurvey();
+
+  // Returns true if Lens is currently active on this tab.
+  bool IsActive();
+
+  // Returns true if Lens is currently off on this tab.
+  bool IsOff();
+
+  // Returns true if the overlay is in the process of closing. If true, Lens on
+  // this tab will soon be off.
+  bool IsClosing();
+
+  // Returns whether the handshake with the Lens backend is complete.
+  bool IsHandshakeComplete();
+
   // Returns the tab interface that owns this controller.
   tabs::TabInterface* GetTabInterface();
 
   // Returns the page URL of the tab if Lens has access to it.
   const GURL& GetPageURL() const;
+
+  // Gets the page title.
+  std::optional<std::string> GetPageTitle();
 
   // Returns the weak pointer to this class.
   base::WeakPtr<LensSearchController> GetWeakPtr();
@@ -150,11 +171,17 @@ class LensSearchController {
   // Returns the LensSearchboxController.
   lens::LensSearchboxController* lens_searchbox_controller();
 
+  // Returns the event handler for this instance of the Lens Overlay.
+  lens::LensOverlayEventHandler* lens_overlay_event_handler();
+
   optimization_guide::PageContextEligibility* page_context_eligibility();
 
   // Returns the LensSearchContextualizationController.
   lens::LensSearchContextualizationController*
   lens_search_contextualization_controller();
+
+  // Returns the LensSessionMetricsLogger.
+  lens::LensSessionMetricsLogger* lens_session_metrics_logger();
 
   // Testing function for setting the page context eligibility API for this
   // controller.
@@ -170,6 +197,7 @@ class LensSearchController {
 
  protected:
   friend class LensOverlayController;
+  friend class lens::LensOverlaySidePanelCoordinator;
 
   // Override these methods to stub out individual feature controllers for
   // testing.
@@ -222,7 +250,14 @@ class LensSearchController {
 
   // Shared logic for cleanup that is called after all features have finished
   // cleaning up.
-  void CloseLensPart2();
+  void CloseLensPart2(lens::LensOverlayDismissalSource dismissal_source);
+
+  // Called before the lens results panel begins hiding. This is called before
+  // any side panel closing animations begin.
+  void OnSidePanelWillHide(SidePanelEntryHideReason reason);
+
+  // Called when the lens side panel has been hidden.
+  void OnSidePanelHidden();
 
   // Override these methods to be able to track calls made to the page context
   // eligibility API.
@@ -245,6 +280,9 @@ class LensSearchController {
     // immediately reshown.
     kBackground,
 
+    // The side panel is in the process of closing. Soon will move to kClosing.
+    kClosingSidePanel,
+
     // The controller is in the process of closing all dependencies and cleaning
     // up. Will soon be kOff.
     kClosing,
@@ -262,6 +300,10 @@ class LensSearchController {
   // CreateLensQueryController method.
   std::unique_ptr<lens::LensOverlayQueryController> CreateLensQueryController(
       lens::LensOverlayInvocationSource invocation_source);
+
+  // Creates all state necessary to start a Lens session. This method contains
+  // shared state that is used no matter the entrypoint.
+  void StartLensSession(lens::LensOverlayInvocationSource invocation_source);
 
   // Runs the eligibility checks necessary for Lens to open on this tab. If the
   // user has not granted permission to use Lens on this tab, the permission
@@ -325,6 +367,16 @@ class LensSearchController {
   // Tracks the internal state machine.
   State state_ = State::kOff;
 
+  // Indicates whether a trigger for the HaTS survey has occurred in the current
+  // session. Note that a trigger does not mean the survey will actually be
+  // shown.
+  bool hats_triggered_in_session_ = false;
+
+  // If the side panel needed to be closed before dismissing Lens, this
+  // stores the original dismissal_source so it is properly recorded when the
+  // side panel is done closing and the callback is invoked.
+  std::optional<lens::LensOverlayDismissalSource> last_dismissal_source_;
+
   // The query controller for the Lens Search feature on this tab. Lives for the
   // duration of a Lens feature being active on this tab.
   std::unique_ptr<lens::LensOverlayQueryController>
@@ -354,6 +406,13 @@ class LensSearchController {
   std::unique_ptr<lens::LensSearchContextualizationController>
       lens_contextualization_controller_;
 
+  std::unique_ptr<lens::LensSessionMetricsLogger> lens_session_metrics_logger_;
+
+  // Class for handling key events from the renderer that were not handled. This
+  // is used by both the overlay and the WebUI to share common event handling
+  // logic.
+  std::unique_ptr<lens::LensOverlayEventHandler> lens_overlay_event_handler_;
+
   // Holds subscriptions for TabInterface callbacks.
   std::vector<base::CallbackListSubscription> tab_subscriptions_;
 
@@ -370,6 +429,9 @@ class LensSearchController {
   // The pref service associated with the current profile. Owned by Profile,
   // and thus guaranteed to outlive this instance.
   raw_ptr<PrefService> pref_service_;
+
+  // The sync service associated with the current profile.
+  raw_ptr<syncer::SyncService> sync_service_;
 
   // The theme service associated with the current profile. Owned by Profile,
   // and thus guaranteed to outlive this instance.

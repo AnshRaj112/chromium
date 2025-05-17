@@ -589,12 +589,19 @@ void AddTabToFakeServer(const tab_groups::SavedTabGroupTab& tab) {
 
 void AddSharedTabToFakeServer(const tab_groups::SavedTabGroupTab& tab,
                               const std::string& collaboration_id) {
+  // `unique_position` is currently not used in tests.
+  sync_pb::SharedTabGroupDataSpecifics specifics;
+  specifics.set_guid(tab.saved_tab_guid().AsLowercaseString());
+  specifics.mutable_tab()->set_url(tab.url().spec());
+  specifics.mutable_tab()->set_title(base::UTF16ToUTF8(tab.title()));
+  specifics.mutable_tab()->set_shared_tab_group_guid(
+      tab.saved_group_guid().AsLowercaseString());
+  specifics.set_update_time_windows_epoch_micros(
+      tab.update_time().ToDeltaSinceWindowsEpoch().InMicroseconds());
+
   AddSharedTabGroupDataToFakeServer(
-      tab_groups::SharedTabGroupDataSyncBridge::
-          SharedTabGroupTabToSpecificsForTest(tab),
-      tab.creation_time_windows_epoch_micros()
-          .ToDeltaSinceWindowsEpoch()
-          .InMicroseconds(),
+      specifics,
+      tab.creation_time().ToDeltaSinceWindowsEpoch().InMicroseconds(),
       collaboration_id);
 }
 

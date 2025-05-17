@@ -172,6 +172,11 @@ const NSUInteger kSearchCharacterLimit = 1000;
   [moreActionsAlertController addAction:[self openInIncognitoAlertAction]];
   [moreActionsAlertController addAction:cancelAlertAction];
 
+  moreActionsAlertController.popoverPresentationController.sourceView =
+      self.shareSheet.secondaryActionButton;
+  moreActionsAlertController.popoverPresentationController.sourceRect =
+      self.shareSheet.secondaryActionButton.bounds;
+
   [self.shareSheet presentViewController:moreActionsAlertController
                                 animated:YES
                               completion:nil];

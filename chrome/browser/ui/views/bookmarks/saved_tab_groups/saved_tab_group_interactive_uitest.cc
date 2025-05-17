@@ -75,6 +75,7 @@
 #include "ui/events/test/event_generator.h"
 #include "ui/events/types/event_type.h"
 #include "ui/gfx/skia_util.h"
+#include "ui/views/controls/menu/menu_item_view.h"
 #include "ui/views/interaction/element_tracker_views.h"
 #include "ui/views/interaction/interaction_test_util_views.h"
 #include "ui/views/view_utils.h"
@@ -298,7 +299,7 @@ class SavedTabGroupInteractiveTest
                          /*creator_cache_guid=*/std::nullopt,
                          /*last_updater_cache_guid=*/std::nullopt,
                          /*created_before_syncing_tab_groups=*/false,
-                         /*creation_time_windows_epoch_micros=*/std::nullopt});
+                         /*creation_time=*/std::nullopt});
     });
   }
 
@@ -306,19 +307,18 @@ class SavedTabGroupInteractiveTest
     return Do([=, this]() {
       const base::Uuid group_guid = base::Uuid::GenerateRandomV4();
       const base::Uuid tab_guid = base::Uuid::GenerateRandomV4();
-      SavedTabGroup group = {
-          /*title=*/u"group_title",
-          /*color=*/tab_groups::TabGroupColorId::kBlue,
-          /*urls=*/
-          {{GetURL("/favicon/page_with_favicon.html"), u"tab_title", group_guid,
-            0, tab_guid}},
-          /*position=*/std::nullopt,
-          /*saved_guid=*/group_guid,
-          /*local_group_id=*/std::nullopt,
-          /*creator_cache_guid=*/std::nullopt,
-          /*last_updater_cache_guid=*/std::nullopt,
-          /*created_before_syncing_tab_groups=*/false,
-          /*creation_time_windows_epoch_micros=*/std::nullopt};
+      SavedTabGroup group = {/*title=*/u"group_title",
+                             /*color=*/tab_groups::TabGroupColorId::kBlue,
+                             /*urls=*/
+                             {{GetURL("/favicon/page_with_favicon.html"),
+                               u"tab_title", group_guid, 0, tab_guid}},
+                             /*position=*/std::nullopt,
+                             /*saved_guid=*/group_guid,
+                             /*local_group_id=*/std::nullopt,
+                             /*creator_cache_guid=*/std::nullopt,
+                             /*last_updater_cache_guid=*/std::nullopt,
+                             /*created_before_syncing_tab_groups=*/false,
+                             /*creation_time=*/std::nullopt};
 
       TabGroupSyncService* service =
           SavedTabGroupUtils::GetServiceForProfile(browser()->profile());
@@ -379,6 +379,24 @@ class SavedTabGroupInteractiveTest
                          AsView<SavedTabGroupButton>(el)->OnKeyPressed(event);
                        })
         .SetDescription("OpenTabGroupContextMenu()");
+  }
+
+  // Helper function to check the number of items in a saved tab group
+  // submenu.
+  auto CheckTabGroupSubmenuTabCount(ElementSpecifier menu_item,
+                                    int expected_count) {
+    return WithElement(menu_item, [expected_count](ui::TrackedElement* el) {
+      views::MenuItemView* menu_item_view = AsView<views::MenuItemView>(el);
+      views::SubmenuView* submenu = menu_item_view->GetSubmenu();
+      CHECK(submenu);
+
+      // There are 5 menu items in the menu not including the separator or tabs:
+      // Open, move, unpin, delete, and the tabs title
+      constexpr int num_non_tab_items_in_menu = 5;
+      const int total_items = submenu->GetMenuItems().size();
+      const int num_tabs = total_items - num_non_tab_items_in_menu;
+      EXPECT_EQ(num_tabs, expected_count);
+    });
   }
 
   std::unique_ptr<content::WebContents> CreateWebContents() {
@@ -558,6 +576,58 @@ IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest,
       EnsurePresent(STGTabsMenuModel::kDeleteGroupMenuItem),
       EnsurePresent(STGTabsMenuModel::kTabsTitleItem),
       EnsurePresent(STGTabsMenuModel::kTab));
+}
+
+// Regression test. See https://crbug.com/416815123.
+IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest,
+                       ViewingMultipleGroupSubmenusDoesNotDuplicateTabsList) {
+  ASSERT_TRUE(
+      AddTabAtIndex(0, GURL(url::kAboutBlankURL), ui::PAGE_TRANSITION_TYPED));
+  ASSERT_EQ(2, browser()->tab_strip_model()->count());
+
+  browser()->tab_strip_model()->AddToNewGroup({0});
+  browser()->tab_strip_model()->AddToNewGroup({1});
+
+  const char kEverythingMenuRootViewId[] = "EverythingMenuRootView";
+  const char kSecondSavedGroupItem[] = "SecondSavedGroupItem";
+
+  RunTestSequence(
+      FinishTabstripAnimations(), ShowBookmarksBar(),
+      PressButton(kToolbarAppMenuButtonElementId),
+      WaitForShow(AppMenuModel::kTabGroupsMenuItem),
+      SelectMenuItem(AppMenuModel::kTabGroupsMenuItem),
+
+      // Name the root view of the STGEverythingMenu so we can index into it.
+      NameViewRelative(
+          AppMenuModel::kTabGroupsMenuItem, kEverythingMenuRootViewId,
+          [](views::MenuItemView* item) { return item->GetSubmenu(); }),
+      WaitForShow(kEverythingMenuRootViewId),
+
+      // Identify the second saved group. The menu looks as follows:
+      // Index 0: "Create new tab group"
+      // Index 1: First saved group (aka STGEverythingMenu::kTabGroup)
+      // Index 2: Second saved group
+      NameDescendantViewByType<views::MenuItemView>(kEverythingMenuRootViewId,
+                                                    kSecondSavedGroupItem, 2),
+
+      // Check the number of tabs in the first group.
+      SelectMenuItem(STGEverythingMenu::kTabGroup),
+      WaitForShow(STGTabsMenuModel::kOpenGroup),
+      CheckTabGroupSubmenuTabCount(STGEverythingMenu::kTabGroup, 1),
+
+      // Check the number of tabs in the second group.
+      SelectMenuItem(kSecondSavedGroupItem),
+      WaitForShow(STGTabsMenuModel::kOpenGroup),
+      CheckTabGroupSubmenuTabCount(kSecondSavedGroupItem, 1),
+
+      // Check the number of tabs in the first group again.
+      SelectMenuItem(STGEverythingMenu::kTabGroup),
+      WaitForShow(STGTabsMenuModel::kOpenGroup),
+      CheckTabGroupSubmenuTabCount(STGEverythingMenu::kTabGroup, 1),
+
+      // Close the menu to prevent flakes.
+      HoverTabAt(0), ClickMouse(),
+      WaitForHide(AppMenuModel::kTabGroupsMenuItem));
 }
 
 IN_PROC_BROWSER_TEST_P(SavedTabGroupInteractiveTest,

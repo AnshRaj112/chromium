@@ -251,6 +251,7 @@ if (!is_android) {
 
   source_set("tabs") {
     sources = [
+      "contents_observing_tab_feature.h",
       "features.h",
       "hover_tab_selector.h",
       "pinned_tab_codec.h",
@@ -279,6 +280,7 @@ if (!is_android) {
       "//chrome/browser/ui:browser_list",
       "//chrome/browser/ui/color:color_headers",
       "//chrome/browser/ui/startup:startup_tab",
+      "//chrome/browser/ui/tabs/alert:tab_alert",
       "//components/collaboration/public:public",
       "//components/keyed_service/core",
       "//components/tabs:public",
@@ -300,6 +302,7 @@ if (!is_android) {
     public_deps = [ "//chrome/browser:browser_public_dependencies" ]
 
     sources = [
+      "contents_observing_tab_feature.cc",
       "features.cc",
       "hover_tab_selector.cc",
       "pinned_tab_codec.cc",
@@ -383,6 +386,10 @@ if (!is_android) {
 
     if (enable_glic) {
       deps += [ "//chrome/browser/glic" ]
+    }
+
+    if (!is_android) {
+      deps += [ "//chrome/browser/ui/views/zoom" ]
     }
   }
 
@@ -518,6 +525,7 @@ if (!is_android) {
       "tab_collection_unittest.cc",
       "tab_group_deletion_dialog_controller_unittest.cc",
       "tab_iterator_unittest.cc",
+      "tab_menu_model_unittest.cc",
       "tab_model_unittest.cc",
       "tab_renderer_data_unittest.cc",
       "tab_strip_model_stats_recorder_unittest.cc",

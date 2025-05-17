@@ -80,7 +80,31 @@ TEST_F(PrivacySandboxNoticeCatalogTest, AllNoticesTargetAtLeastOneApi) {
 
   for (Notice* notice : catalog_.GetNotices()) {
     ASSERT_NE(notice, nullptr);
-    EXPECT_THAT(notice->GetTargetApis(), Not(IsEmpty()));
+    EXPECT_THAT(notice->target_apis(), Not(IsEmpty()));
+  }
+}
+
+// Groups are unique per Surface Type when set.
+TEST_F(PrivacySandboxNoticeCatalogTest, UniqueViewGroupPerSurfaceType) {
+  EXPECT_THAT(catalog_.GetNotices(), Not(IsEmpty()));
+
+  std::map<SurfaceType, std::set<std::pair<NoticeViewGroup, int>>>
+      view_groups_per_surface;
+
+  for (const Notice* notice : catalog_.GetNotices()) {
+    ASSERT_NE(notice, nullptr);
+    auto [group, order] = notice->view_group();
+    if (group == NoticeViewGroup::kNotSet) {
+      continue;
+    }
+
+    auto& view_groups_for_surface =
+        view_groups_per_surface[notice->GetNoticeId().second];
+
+    EXPECT_TRUE(view_groups_for_surface.insert({group, order}).second)
+        << "Duplicate view group (" << static_cast<int>(group) << ", " << order
+        << ") for surface type "
+        << static_cast<int>(notice->GetNoticeId().second);
   }
 }
 
@@ -89,8 +113,8 @@ TEST_F(PrivacySandboxNoticeCatalogTest, AllApisAreTargetedByAtLeastOneNotice) {
   EXPECT_THAT(catalog_.GetNoticeApis(), Not(IsEmpty()));
 
   for (const auto& api : catalog_.GetNoticeApis()) {
-    ASSERT_NE(api.get(), nullptr);
-    EXPECT_THAT(api->GetLinkedNotices(), Not(IsEmpty()));
+    ASSERT_NE(api, nullptr);
+    EXPECT_THAT(api->linked_notices(), Not(IsEmpty()));
   }
 }
 
@@ -100,8 +124,8 @@ TEST_F(PrivacySandboxNoticeCatalogTest, UniqueApiInstances) {
 
   std::set<NoticeApi*> api_pointers;
   for (const auto& api_ptr : catalog_.GetNoticeApis()) {
-    ASSERT_NE(api_ptr.get(), nullptr);
-    EXPECT_TRUE(api_pointers.insert(api_ptr.get()).second);
+    ASSERT_NE(api_ptr, nullptr);
+    EXPECT_TRUE(api_pointers.insert(api_ptr).second);
   }
   EXPECT_EQ(api_pointers.size(), catalog_.GetNoticeApis().size());
 }
@@ -114,15 +138,15 @@ TEST_F(PrivacySandboxNoticeCatalogTest, TargetApisAreValid) {
 
   std::set<const NoticeApi*> valid_api_pointers;
   for (const auto& api : catalog_.GetNoticeApis()) {
-    ASSERT_NE(api.get(), nullptr);
-    valid_api_pointers.insert(api.get());
+    ASSERT_NE(api, nullptr);
+    valid_api_pointers.insert(api);
   }
 
   EXPECT_THAT(valid_api_pointers, Not(IsEmpty()));
 
   for (Notice* notice : catalog_.GetNotices()) {
     ASSERT_NE(notice, nullptr);
-    for (const NoticeApi* target_api : notice->GetTargetApis()) {
+    for (const NoticeApi* target_api : notice->target_apis()) {
       EXPECT_THAT(valid_api_pointers, Contains(target_api));
     }
   }
@@ -137,15 +161,15 @@ TEST_F(PrivacySandboxNoticeCatalogTest, PrerequisiteApisAreValid) {
   // Create a set of valid API pointers for quick lookup.
   std::set<const NoticeApi*> valid_api_pointers;
   for (const auto& api : catalog_.GetNoticeApis()) {
-    ASSERT_NE(api.get(), nullptr);
-    valid_api_pointers.insert(api.get());
+    ASSERT_NE(api, nullptr);
+    valid_api_pointers.insert(api);
   }
 
   EXPECT_THAT(valid_api_pointers, Not(IsEmpty()));
 
   for (Notice* notice : catalog_.GetNotices()) {
     ASSERT_NE(notice, nullptr);
-    for (const NoticeApi* prereq_api : notice->GetPreReqApis()) {
+    for (const NoticeApi* prereq_api : notice->pre_req_apis()) {
       EXPECT_THAT(valid_api_pointers, Contains(prereq_api));
     }
   }

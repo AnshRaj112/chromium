@@ -4,7 +4,7 @@
 import 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 
 import type {AppElement} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
-import {PauseActionSource, playFromSelectionTimeout, SpeechController, ToolbarEvent, VoicePackController} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
+import {playFromSelectionTimeout, SpeechController, ToolbarEvent, VoiceLanguageController} from 'chrome-untrusted://read-anything-side-panel.top-chrome/read_anything.js';
 import {assertEquals, assertFalse} from 'chrome-untrusted://webui-test/chai_assert.js';
 import {MockTimer} from 'chrome-untrusted://webui-test/mock_timer.js';
 
@@ -67,14 +67,14 @@ suite('ReadAloudHighlight', () => {
     chrome.readingMode.onConnected = () => {};
     speechController = new SpeechController();
     SpeechController.setInstance(speechController);
-    VoicePackController.setInstance(new VoicePackController());
+    VoiceLanguageController.setInstance(new VoiceLanguageController());
 
     app = await createApp();
     chrome.readingMode.setContentForTesting(axTree, leafIds);
   });
 
   test('on speak first sentence highlights are correct', () => {
-    app.playSpeech();
+    emitEvent(app, ToolbarEvent.PLAY_PAUSE);
     const currentHighlight =
         app.$.container.querySelector('.current-read-highlight');
     const previousHighlight =
@@ -89,7 +89,7 @@ suite('ReadAloudHighlight', () => {
     let previousHighlights: NodeListOf<Element>;
 
     setup(() => {
-      app.playSpeech();
+      emitEvent(app, ToolbarEvent.PLAY_PAUSE);
       emitNextGranularity();
       emitNextGranularity();
     });
@@ -124,7 +124,7 @@ suite('ReadAloudHighlight', () => {
   });
 
   test('on speak next sentence highlights are correct', () => {
-    app.playSpeech();
+    emitEvent(app, ToolbarEvent.PLAY_PAUSE);
     emitNextGranularity();
     const currentHighlight =
         app.$.container.querySelector('.current-read-highlight');
@@ -135,57 +135,17 @@ suite('ReadAloudHighlight', () => {
     assertEquals(sentence1, previousHighlight!.textContent);
   });
 
-  test('on update content after pause, keeps reading position', () => {
-    app.playSpeech();
-    emitNextGranularity();
-    speechController.stopSpeech(PauseActionSource.BUTTON_CLICK);
-
-    app.updateContent();
-    const currentHighlight =
-        app.$.container.querySelector('.current-read-highlight');
-    const previousHighlight =
-        app.$.container.querySelector('.previous-read-highlight');
-
-    assertEquals(sentence2, currentHighlight?.textContent, 'current');
-    assertEquals(sentence1, previousHighlight?.textContent, 'previous');
-  });
-
-  test('on new page after pause, ignores reading position', () => {
-    const newTree = {
-      rootId: 1,
-      nodes: [
-        {
-          id: 1,
-          role: 'rootWebArea',
-          htmlTag: '#document',
-          childIds: [2],
-        },
-        {
-          id: 2,
-          role: 'staticText',
-          name: sentence1,
-        },
-      ],
-    };
-    app.playSpeech();
-    emitNextGranularity();
-    speechController.stopSpeech(PauseActionSource.BUTTON_CLICK);
-
-    chrome.readingMode.setContentForTesting(newTree, [2]);
-    const currentHighlight =
-        app.$.container.querySelector('.current-read-highlight');
-    const previousHighlight =
-        app.$.container.querySelector('.previous-read-highlight');
-    assertFalse(!!currentHighlight);
-    assertFalse(!!previousHighlight);
-  });
+  // TODO: crbug.com/411198154- After refactoring is complete, ensure
+  // there are proper unit tests for keeping the reading position. Until the
+  // refactoring is complete, there isn't a great way to test this due to how
+  // distillation is managed in tests.
 
   suite('on finish speaking', () => {
     let currentHighlight: HTMLElement|null;
     let previousHighlights: NodeListOf<Element>;
 
     setup(() => {
-      app.playSpeech();
+      emitEvent(app, ToolbarEvent.PLAY_PAUSE);
       emitNextGranularity();
       emitNextGranularity();
       emitNextGranularity();
@@ -211,7 +171,7 @@ suite('ReadAloudHighlight', () => {
     let previousHighlights: NodeListOf<Element>;
 
     setup(() => {
-      app.playSpeech();
+      emitEvent(app, ToolbarEvent.PLAY_PAUSE);
       emitNextGranularity();
       emitPreviousGranularity();
 
@@ -288,7 +248,7 @@ suite('ReadAloudHighlight', () => {
           axTree);
       chrome.readingMode.setContentForTesting(selectedTree, leafIds);
       app.updateSelection();
-      app.playSpeech();
+      emitEvent(app, ToolbarEvent.PLAY_PAUSE);
       mockTimer.tick(playFromSelectionTimeout);
       mockTimer.uninstall();
     }

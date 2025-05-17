@@ -81,7 +81,7 @@ void TestSyncService::MimicDashboardClear() {
 #if BUILDFLAG(IS_CHROMEOS)
   // Clearing sync from the dashboard results in
   // IsSyncFeatureDisabledViaDashboard() returning true.
-  user_settings_.SetSyncFeatureDisabledViaDashboard(true);
+  user_settings_.SetSyncFeatureDisabledViaDashboard();
 #else
   SetSignedIn(signin::ConsentLevel::kSignin);
 #endif  // BUILDFLAG(IS_CHROMEOS)
@@ -195,12 +195,6 @@ base::android::ScopedJavaLocalRef<jobject> TestSyncService::GetJavaObject() {
   return base::android::ScopedJavaLocalRef<jobject>();
 }
 #endif  // BUILDFLAG(IS_ANDROID)
-
-void TestSyncService::SetSyncFeatureRequested() {
-#if BUILDFLAG(IS_CHROMEOS)
-  user_settings_.SetSyncFeatureDisabledViaDashboard(false);
-#endif  // BUILDFLAG(IS_CHROMEOS)
-}
 
 TestSyncUserSettings* TestSyncService::GetUserSettings() {
   return &user_settings_;

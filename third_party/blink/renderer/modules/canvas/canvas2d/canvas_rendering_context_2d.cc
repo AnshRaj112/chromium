@@ -683,10 +683,6 @@ ImageData* CanvasRenderingContext2D::getImageDataInternal(
       sx, sy, sw, sh, image_data_settings, exception_state);
 }
 
-bool CanvasRenderingContext2D::HasPlacedElements() const {
-  return !placed_elements_.empty();
-}
-
 void CanvasRenderingContext2D::drawElement(Element* element,
                                            double x,
                                            double y,
@@ -712,22 +708,22 @@ void CanvasRenderingContext2D::DrawElementInternal(
     std::optional<double> dheight,
     ExceptionState& exception_state) {
   CHECK(RuntimeEnabledFeatures::CanvasDrawElementEnabled());
+
+  HTMLCanvasElement* canvas_element = HostAsHTMLCanvasElement();
+  DCHECK(canvas_element);
+  canvas_element->GetDocument().View()->UpdateAllLifecyclePhasesExceptPaint(
+      DocumentUpdateReason::kCanvasDrawElement);
+
   if (!IsDrawElementEligible(element, exception_state)) {
     return;
   }
 
-  HTMLCanvasElement* canvas_element = HostAsHTMLCanvasElement();
-  DCHECK(canvas_element);
-
   // TODO(crbug.com/380277045): Taint for cross-origin and PII content.
   // SetOriginTaintedByContent();
 
-  canvas_element->GetDocument().View()->UpdateAllLifecyclePhasesExceptPaint(
-      DocumentUpdateReason::kCanvasPlaceElement);
-
   PaintRecordBuilder builder;
   LayoutBox* layout_box = element->GetLayoutBox();
-  // All placed elements should have their own stacking contexts.
+  // All drawn elements should have their own stacking contexts.
   CHECK(layout_box->HasLayer());
   CHECK(layout_box->IsStacked());
   PaintLayer* layer = layout_box->EnclosingLayer();
@@ -749,93 +745,23 @@ void CanvasRenderingContext2D::DrawElementInternal(
 
   cc::PaintRecord paint_record = builder.EndRecording(property_tree_state);
 
-  cc::PaintImage paint_image =
-      PaintImageBuilder::WithDefault()
-          .set_id(PaintImage::GetNextId())
-          .set_paint_record(std::move(paint_record), box_rect,
-                            PaintImage::GetNextId())
-          .TakePaintImage();
   WillDraw(SkIRect::MakeXYWH(0, 0, Width(), Height()),
            CanvasPerformanceMonitor::DrawType::kOther);
 
   cc::PaintCanvas* canvas = GetOrCreatePaintCanvas();
+  canvas->save();
+  canvas->translate(x, y);
   if (dwidth && dheight) {
-    canvas->save();
-    canvas->translate(x, y);
     canvas->scale(*dwidth / box_rect.width(), *dheight / box_rect.height());
-    canvas->translate(-x, -y);
   }
 
-  canvas->drawImage(paint_image, x, y);
+  canvas->clipRect(SkRect::MakeWH(box_rect.width(), box_rect.height()));
+  canvas->drawPicture(
+      paint_record,
+      // use a save at the beginning of the record to keep transforms local:
+      true);
 
-  if (dwidth && dheight) {
-    canvas->restore();
-  }
-}
-
-void CanvasRenderingContext2D::PaintPlacedElements() {
-  bool placed_elements_need_repainting = false;
-  for (auto deferred_paint_record : placed_elements_.Values()) {
-    if (deferred_paint_record->IsDirty()) {
-      placed_elements_need_repainting = true;
-      break;
-    }
-  }
-
-  if (!placed_elements_need_repainting) {
-    return;
-  }
-
-  DCHECK_EQ(canvas()->GetDocument().Lifecycle().GetState(),
-            DocumentLifecycle::LifecycleState::kInPaint);
-
-  for (auto& [element, deferred_paint_image] : placed_elements_) {
-    if (!element->GetLayoutBox() || element->parentElement() != canvas()) {
-      // The element is no longer visible or has been reparented.
-      deferred_paint_image->Clear();
-      continue;
-    }
-
-    if (!deferred_paint_image->IsDirty()) {
-      continue;
-    }
-
-    PaintRecordBuilder builder;
-    LayoutBox* layout_box = element->GetLayoutBox();
-    // All placed elements should have their own stacking contexts.
-    CHECK(layout_box->HasLayer());
-    CHECK(layout_box->IsStacked());
-    PaintLayer* layer = layout_box->EnclosingLayer();
-
-    PaintLayerPainter paint_layer_painter = PaintLayerPainter(*layer);
-    paint_layer_painter.Paint(builder.Context(), PaintFlag::kPlacedElement);
-
-    PropertyTreeState property_tree_state = layer->GetLayoutObject()
-                                                .FirstFragment()
-                                                .LocalBorderBoxProperties()
-                                                .Unalias();
-
-    cc::PaintRecord placed_element_picture =
-        builder.EndRecording(property_tree_state);
-
-    cc::RecordPaintCanvas canvas;
-    canvas.drawPicture(placed_element_picture);
-
-    // TODO(https://issues.chromium.org/379143302): Take the border box bounds
-    // of the layout object by walking over the paint chunks to compute the
-    // painted size.
-    deferred_paint_image->SetPaintRecord(
-        placed_element_picture, gfx::SizeF(layer->GetLayoutBox()->Size()));
-    deferred_paint_image->SetIsDirty(false);
-  }
-}
-
-void CanvasRenderingContext2D::MarkPlacedElementDirty(Element* placedElement) {
-  if (!placed_elements_.Contains(placedElement)) {
-    return;
-  }
-
-  placed_elements_.at(placedElement)->SetIsDirty(true);
+  canvas->restore();
 }
 
 void CanvasRenderingContext2D::FinalizeFrame(FlushReason reason) {
@@ -855,7 +781,7 @@ void CanvasRenderingContext2D::FinalizeFrame(FlushReason reason) {
     }
   }
 
-  CanvasRenderingContextHost* host = Host();
+  HTMLCanvasElement* host = canvas();
   CHECK(host);
 
   host->FlushRecording(reason);

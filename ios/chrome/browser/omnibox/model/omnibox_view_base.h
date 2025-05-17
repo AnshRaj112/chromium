@@ -39,7 +39,6 @@ class OmniboxViewBase {
     size_t new_sel_end;
     bool selection_differs;
     bool text_differs;
-    bool keyword_differs;
     bool just_deleted_text;
   };
 
@@ -85,10 +84,6 @@ class OmniboxViewBase {
   // Sets the omnibox adjacent additional text label in the location bar view.
   virtual void SetAdditionalText(const std::u16string& text) = 0;
 
-  // Transitions the user into keyword mode with their default search provider,
-  // preserving and selecting the user's text if they already typed in a query.
-  virtual void EnterKeywordModeForDefaultSearchProvider() = 0;
-
   // Returns true if all text is selected. Returns false if there is no text.
   virtual bool IsSelectAll() const = 0;
 
@@ -129,17 +124,6 @@ class OmniboxViewBase {
                                      const AutocompleteMatch& match,
                                      bool notify_text_changed) {}
 
-  // Called when the temporary text in the model may have changed.
-  // `display_text` is the new text to show; `match_type` is the type of the
-  // match the new text came from. `save_original_selection` is true when there
-  // wasn't previously a temporary text and thus we need to save off the user's
-  // existing selection. `notify_text_changed` is true if the model should be
-  // notified of the change.
-  virtual void OnTemporaryTextMaybeChanged(const std::u16string& display_text,
-                                           const AutocompleteMatch& match,
-                                           bool save_original_selection,
-                                           bool notify_text_changed) = 0;
-
   // Called when the inline autocomplete text in the model may have changed.
   // `user_text` is the portion of omnibox text the user typed.
   // `inline`_autocompletion` is the autocompleted part.
@@ -150,11 +134,6 @@ class OmniboxViewBase {
   // Called when the inline autocomplete text in the model has been cleared.
   virtual void OnInlineAutocompleteTextCleared() = 0;
 
-  // Called when the temporary text has been reverted by the user.  This will
-  // reset the user's original selection.
-  virtual void OnRevertTemporaryText(const std::u16string& display_text,
-                                     const AutocompleteMatch& match) = 0;
-
   // Checkpoints the current edit state before an operation that might trigger
   // a new autocomplete run to open or modify the popup. Call this before
   // user-initiated edit actions that trigger autocomplete, but *not* for
@@ -162,13 +141,8 @@ class OmniboxViewBase {
   virtual void OnBeforePossibleChange() = 0;
 
   // OnAfterPossibleChange() returns true if there was a change that caused it
-  // to call UpdatePopup().  If `allow_keyword_ui_change` is false, we
-  // prevent alterations to the keyword UI state (enabled vs. disabled).
-  virtual bool OnAfterPossibleChange(bool allow_keyword_ui_change) = 0;
-
-  // Called when the placeholder text displayed when the user is in keyword mode
-  // has changed.
-  virtual void OnKeywordPlaceholderTextChange() {}
+  // to call UpdatePopup().
+  virtual bool OnAfterPossibleChange() = 0;
 
   // Returns the gfx::NativeView of the edit view.
   virtual gfx::NativeView GetNativeView() const = 0;
@@ -225,8 +199,6 @@ class OmniboxViewBase {
   // OnAfterPossibleChange().
   struct State {
     std::u16string text;
-    std::u16string keyword;
-    bool is_keyword_selected;
     size_t sel_start;
     size_t sel_end;
   };

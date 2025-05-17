@@ -5,7 +5,6 @@
 package org.chromium.chrome.browser.customtabs.features.toolbar;
 
 import static androidx.browser.customtabs.CustomTabsIntent.CLOSE_BUTTON_POSITION_END;
-import static androidx.browser.customtabs.CustomTabsIntent.NO_TITLE;
 
 import static org.chromium.base.MathUtils.interpolate;
 import static org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider.CustomTabProfileType.INCOGNITO;
@@ -49,6 +48,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.ColorInt;
+import androidx.annotation.DimenRes;
 import androidx.annotation.Dimension;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
@@ -71,6 +71,7 @@ import org.chromium.base.task.TaskTraits;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.browser_controls.BrowserStateBrowserControlsVisibilityDelegate;
 import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider;
+import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider.TitleVisibility;
 import org.chromium.chrome.browser.customtabs.CustomTabFeatureOverridesManager;
 import org.chromium.chrome.browser.customtabs.features.CustomTabDimensionUtils;
 import org.chromium.chrome.browser.customtabs.features.branding.ToolbarBrandingDelegate;
@@ -173,6 +174,7 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
     private final ObserverList<Callback<Integer>> mContainerVisibilityChangeObserverList =
             new ObserverList<>();
     private @Nullable CustomTabFeatureOverridesManager mFeatureOverridesManager;
+    private final boolean mIsRtl;
 
     // Whether the maximization button should be shown when it can. Set to {@code true}
     // while the side sheet is running with the maximize button option on.
@@ -270,6 +272,8 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
         super(context, attrs);
 
         mTint = ChromeColors.getPrimaryIconTint(getContext(), false);
+        mIsRtl =
+                getResources().getConfiguration().getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
     }
 
     @Override
@@ -344,6 +348,14 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
     private void calculateToolbarWidthBeforeMeasure(
             Activity activity, BrowserServicesIntentDataProvider intentDataProvider) {
         mToolbarWidth = CustomTabDimensionUtils.getInitialWidth(activity, intentDataProvider);
+    }
+
+    @Override
+    protected void setCustomActionsVisibility(boolean isVisible) {
+        int visibility = isVisible ? View.VISIBLE : View.GONE;
+        if (visibility == mCustomActionButtons.getVisibility()) return;
+
+        mCustomActionButtons.setVisibility(visibility);
     }
 
     /**
@@ -486,7 +498,7 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
         view.setLayoutParams(lp);
     }
 
-    private void setHorizontalPadding(View view, @Px int startPadding, @Px int endPadding) {
+    private static void setHorizontalPadding(View view, @Px int startPadding, @Px int endPadding) {
         view.setPaddingRelative(
                 startPadding, view.getPaddingTop(), endPadding, view.getPaddingBottom());
     }
@@ -498,7 +510,7 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
         if (mLocationBar.mOmniboxEnabled) {
             locationBarMinWidth +=
                     getResources().getDimensionPixelSize(R.dimen.toolbar_button_width);
-        } else if (mIntentDataProvider.getTitleVisibilityState() == NO_TITLE) {
+        } else if (mIntentDataProvider.getTitleVisibilityState() == TitleVisibility.HIDDEN) {
             locationBarMinWidth +=
                     getResources().getDimensionPixelSize(R.dimen.custom_tabs_security_icon_width);
         }
@@ -613,16 +625,30 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
 
         updateCustomActionButtonVisuals(button, drawable, description);
 
-        int buttonWidth = getResources().getDimensionPixelSize(R.dimen.toolbar_button_width);
+        int buttonWidth = getDimensionPx(R.dimen.toolbar_button_width);
         button.setLayoutParams(new ViewGroup.LayoutParams(buttonWidth, LayoutParams.MATCH_PARENT));
-        int paddingStart =
-                getResources().getDimensionPixelSize(R.dimen.custom_tabs_toolbar_button_spacer_16);
-        int paddingEnd =
-                getResources().getDimensionPixelSize(R.dimen.custom_tabs_toolbar_button_spacer_8);
+
+        // Set the padding to give 16dp spacing. |mCustomActionButtons| contains custom/optional
+        // buttons. Optional button, though not visible, is counted in #getChildCount() as ViewStub.
+        @Dimension int paddingStart;
+        @Dimension int paddingEnd;
+        if (mCustomActionButtons.getChildCount() < 2) {
+            // 16:act1:8 - 8:menu:16
+            paddingStart = getDimensionPx(R.dimen.custom_tabs_toolbar_button_spacer_16);
+            paddingEnd = getDimensionPx(R.dimen.custom_tabs_toolbar_button_spacer_8);
+        } else {
+            // 24:act2:0 - 16:act1:8 - 8:menu:16
+            paddingStart = getDimensionPx(R.dimen.custom_tabs_toolbar_button_spacer_24);
+            paddingEnd = 0;
+        }
         button.setPaddingRelative(paddingStart, /* top= */ 0, paddingEnd, /* bottom= */ 0);
 
         // Add the view at the beginning of the child list.
         mCustomActionButtons.addView(button, 0);
+    }
+
+    private @Dimension int getDimensionPx(@DimenRes int resId) {
+        return getResources().getDimensionPixelSize(resId);
     }
 
     @Override
@@ -1102,8 +1128,7 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
             lpTitle.setMarginEnd(buttonWidth);
             lpUrl.setMarginEnd(buttonWidth);
             lp.setMarginStart(buttonWidth);
-            if (getResources().getConfiguration().getLayoutDirection()
-                    == View.LAYOUT_DIRECTION_RTL) {
+            if (mIsRtl) {
                 var lpSecurity =
                         (ViewGroup.MarginLayoutParams)
                                 mLocationBar.getSecurityIconView().getLayoutParams();
@@ -1536,24 +1561,33 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
             lp.width = getResources().getDimensionPixelSize(R.dimen.toolbar_button_width);
             optionalButton.setLayoutParams(lp);
 
-            // Make the icon/menu button off-centered for even spacing.
+            // Make the icon/menu button/background off-centered for even spacing.
+            int paddingStart = getDimensionPx(R.dimen.custom_tabs_adaptive_button_fg_padding_start);
             View icon = optionalButton.findViewById(R.id.swappable_icon_animation_image);
+            setHorizontalPadding(icon, paddingStart, icon.getPaddingEnd());
+
             View menu = optionalButton.findViewById(R.id.optional_toolbar_button);
-            int padding =
-                    getResources()
-                            .getDimensionPixelSize(
-                                    R.dimen.custom_tabs_adaptive_button_spacer_start);
-            setViewPaddingStart(icon, padding);
-            setViewPaddingStart(menu, padding);
+            // Following commands should be identical to a single #setPaddingRelative in theory
+            // but is not. This might be happening if the padding is applied to image view
+            // whose scale type depends to RTL.
+            if (mIsRtl) {
+                menu.setPadding(0, menu.getPaddingTop(), paddingStart, menu.getPaddingBottom());
+            } else {
+                menu.setPadding(paddingStart, menu.getPaddingTop(), 0, menu.getPaddingBottom());
+            }
+
+            paddingStart = getDimensionPx(R.dimen.custom_tabs_adaptive_button_bg_padding_start);
+            int paddingEnd = getDimensionPx(R.dimen.custom_tabs_adaptive_button_bg_padding_end);
+            int paddingVert = getDimensionPx(R.dimen.custom_tabs_adaptive_button_bg_padding_vert);
+            View background = optionalButton.findViewById(R.id.swappable_icon_secondary_background);
+            background.setPaddingRelative(paddingStart, paddingVert, paddingEnd, paddingVert);
 
             // Update dev button spacing if present.
             View firstButton = mCustomActionButtons.getChildAt(0);
             if (firstButton != optionalButton) {
                 // Give 24dp/0dp padding to the first button to have even 16dp spacing.
-                int paddingStart =
-                        getResources()
-                                .getDimensionPixelSize(
-                                        R.dimen.custom_tabs_toolbar_button_spacer_24);
+                // TODO(crbug.com/416458104): Sort out the padding if the # of buttons reaches 4.
+                paddingStart = getDimensionPx(R.dimen.custom_tabs_toolbar_button_spacer_24);
                 firstButton.setPaddingRelative(
                         paddingStart, /* top= */ 0, /* end= */ 0, /* bottom= */ 0);
             }
@@ -1568,11 +1602,13 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
                                         new Handler());
                             },
                             /* transitionRoot= */ CustomTabToolbar.this,
-                            /* isAnimationAllowedPredicate= */ () -> false,
+                            /* isAnimationAllowedPredicate= */ this::shouldAnimateOptionalButton,
                             mTrackerSupplier);
 
-            mOptionalButtonCoordinator.setBackgroundColorFilter(getBackground().getColor());
+            mOptionalButtonCoordinator.setBackgroundColorFilter(getBackgroundColor());
             mOptionalButtonCoordinator.setIconForegroundColor(mTint);
+            int width = getDimensionPx(R.dimen.toolbar_button_width);
+            mOptionalButtonCoordinator.setCollapsedStateWidth(width);
             mOptionalButtonCoordinator.setTransitionFinishedCallback(
                     transitionType -> {
                         switch (transitionType) {
@@ -1584,9 +1620,22 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
                     });
         }
 
-        private static void setViewPaddingStart(View v, int paddingStart) {
-            v.setPaddingRelative(
-                    paddingStart, v.getPaddingTop(), v.getPaddingEnd(), v.getPaddingBottom());
+        private @Px int getDimensionPx(@DimenRes int resId) {
+            return getResources().getDimensionPixelSize(resId);
+        }
+
+        private boolean shouldAnimateOptionalButton() {
+            // TODO(crdebug/391931152): Do not do animation for < 360dp toolbar width
+            //     and show a tooltip instead (TBD).
+            return true;
+        }
+
+        private @ColorInt int getBackgroundColor() {
+            return ThemeUtils.getTextBoxColorForToolbarBackgroundInNonNativePage(
+                    getContext(),
+                    getBackground().getColor(),
+                    mBrandedColorScheme == BrandedColorScheme.INCOGNITO,
+                    /* isCustomTab= */ true);
         }
 
         private void updateOptionalButton(ButtonData buttonData) {
@@ -2019,8 +2068,14 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
             final int backgroundColor = getBackground().getColor();
             if (ThemeUtils.isUsingDefaultToolbarColor(
                     context, /* isIncognito= */ false, backgroundColor)) {
-                progressBar.setBackgroundColor(
-                        context.getColor(R.color.progress_bar_bg_color_list));
+                if (ChromeFeatureList.sAndroidProgressBarVisualUpdate.isEnabled()) {
+                    progressBar.setBackgroundColor(
+                            SemanticColorUtils.getProgressBarTrackColor(context));
+                } else {
+                    progressBar.setBackgroundColor(
+                            context.getColor(R.color.progress_bar_bg_color_list));
+                }
+
                 progressBar.setForegroundColor(
                         SemanticColorUtils.getProgressBarForeground(context));
             } else {
@@ -2268,15 +2323,7 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
 
         private void updateOmniboxBackground() {
             if (mOmniboxBackground == null) return;
-            @ColorInt int background = getBackground().getColor();
-            @ColorInt
-            int bg =
-                    ThemeUtils.getTextBoxColorForToolbarBackgroundInNonNativePage(
-                            getContext(),
-                            background,
-                            mBrandedColorScheme == BrandedColorScheme.INCOGNITO,
-                            /* isCustomTab= */ true);
-            mOmniboxBackground.setTint(bg);
+            mOmniboxBackground.setTint(getBackgroundColor());
         }
 
         @Override

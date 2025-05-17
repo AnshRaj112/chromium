@@ -10,6 +10,7 @@
 #include "base/android/jni_string.h"
 #include "base/containers/flat_map.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/strings/stringprintf.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/webid/account_selection_view.h"
 #include "chrome/browser/ui/webid/identity_ui_utils.h"
@@ -57,7 +58,7 @@ ScopedJavaLocalRef<jobject> ConvertToJavaAccount(
   ScopedJavaLocalRef<jobject> circle_cropped_badged_picture = nullptr;
   if (is_multi_idp) {
     circle_cropped_badged_picture = gfx::ConvertToJavaBitmap(
-        gfx::Image(ComputeAccountCircleCroppedPicture(
+        gfx::Image(webid::ComputeAccountCircleCroppedPicture(
                        *account, /*avatar_size=*/kCircleCroppedBadgedAvatarSize,
                        std::make_optional<gfx::ImageSkia>(
                            account->identity_provider->idp_metadata
@@ -279,7 +280,7 @@ bool AccountSelectionViewAndroid::Show(
 }
 
 bool AccountSelectionViewAndroid::ShowFailureDialog(
-    const std::string& rp_for_display,
+    const content::RelyingPartyData& rp_data,
     const std::string& idp_for_display,
     blink::mojom::RpContext rp_context,
     blink::mojom::RpMode rp_mode,
@@ -298,13 +299,14 @@ bool AccountSelectionViewAndroid::ShowFailureDialog(
   JNIEnv* env = AttachCurrentThread();
   ScopedJavaLocalRef<jobject> idp_metadata_obj =
       ConvertToJavaIdentityProviderMetadata(env, idp_metadata, rp_mode);
+  // TODO(crbug.com/382086282): Pass RelyingPartyData to Java.
   return Java_AccountSelectionBridge_showFailureDialog(
-      env, java_object_internal_, rp_for_display, idp_for_display,
+      env, java_object_internal_, rp_data.rp_for_display, idp_for_display,
       idp_metadata_obj, static_cast<jint>(rp_context));
 }
 
 bool AccountSelectionViewAndroid::ShowErrorDialog(
-    const std::string& rp_for_display,
+    const content::RelyingPartyData& rp_data,
     const std::string& idp_for_display,
     blink::mojom::RpContext rp_context,
     blink::mojom::RpMode rp_mode,
@@ -320,14 +322,15 @@ bool AccountSelectionViewAndroid::ShowErrorDialog(
   JNIEnv* env = AttachCurrentThread();
   ScopedJavaLocalRef<jobject> idp_metadata_obj =
       ConvertToJavaIdentityProviderMetadata(env, idp_metadata, rp_mode);
+  // TODO(crbug.com/382086282): Pass RelyingPartyData to Java.
   return Java_AccountSelectionBridge_showErrorDialog(
-      env, java_object_internal_, rp_for_display, idp_for_display,
+      env, java_object_internal_, rp_data.rp_for_display, idp_for_display,
       idp_metadata_obj, static_cast<jint>(rp_context),
       ConvertToJavaIdentityCredentialTokenError(env, error));
 }
 
 bool AccountSelectionViewAndroid::ShowLoadingDialog(
-    const std::string& rp_for_display,
+    const content::RelyingPartyData& rp_data,
     const std::string& idp_for_display,
     blink::mojom::RpContext rp_context,
     blink::mojom::RpMode rp_mode) {
@@ -339,8 +342,9 @@ bool AccountSelectionViewAndroid::ShowLoadingDialog(
     return false;
   }
   JNIEnv* env = AttachCurrentThread();
+  // TODO(crbug.com/382086282): Pass RelyingPartyData to Java.
   return Java_AccountSelectionBridge_showLoadingDialog(
-      env, java_object_internal_, rp_for_display, idp_for_display,
+      env, java_object_internal_, rp_data.rp_for_display, idp_for_display,
       static_cast<jint>(rp_context));
 }
 

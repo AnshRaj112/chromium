@@ -46,7 +46,11 @@ gfx::Outsets GetTargetOutsets(const gfx::Rect& bounds) {
 #if BUILDFLAG(IS_WIN)
   RECT bounds_rect = bounds.ToRECT();
   int frame_thickness = ui::GetFrameThickness(
-      MonitorFromRect(&bounds_rect, MONITOR_DEFAULTTONEAREST));
+      MonitorFromRect(&bounds_rect, MONITOR_DEFAULTTONEAREST),
+      /*has_caption=*/false);
+  display::Display display =
+      display::Screen::GetScreen()->GetDisplayMatching(bounds);
+  frame_thickness = frame_thickness / display.device_scale_factor();
   // On Windows, the presence of a frame means that we need to adjust both the
   // width and height of the widget by 2*frame thickness, and center the content
   // horizontally.

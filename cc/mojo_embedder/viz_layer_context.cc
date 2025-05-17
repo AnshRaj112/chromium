@@ -24,7 +24,10 @@
 #include "cc/animation/keyframe_model.h"
 #include "cc/layers/layer_impl.h"
 #include "cc/layers/mirror_layer_impl.h"
+#include "cc/layers/nine_patch_thumb_scrollbar_layer_impl.h"
+#include "cc/layers/painted_scrollbar_layer_impl.h"
 #include "cc/layers/picture_layer_impl.h"
+#include "cc/layers/solid_color_scrollbar_layer_impl.h"
 #include "cc/layers/surface_layer_impl.h"
 #include "cc/layers/texture_layer_impl.h"
 #include "cc/tiles/picture_layer_tiling.h"
@@ -396,6 +399,38 @@ viz::mojom::TransformTreeUpdatePtr ComputeTransformTreePropertiesUpdate(
   return wire;
 }
 
+void SerializeUIResourceRequest(
+    cc::LayerTreeHostImpl& host_impl,
+    viz::RasterContextProvider& context_provider,
+    viz::mojom::LayerTreeUpdate& update,
+    cc::UIResourceId uid,
+    viz::mojom::TransferableUIResourceRequest::Type type) {
+  if (type == viz::mojom::TransferableUIResourceRequest::Type::kCreate) {
+    std::vector<viz::ResourceId> ids;
+    std::vector<viz::TransferableResource> resources;
+
+    viz::ResourceId resource_id = host_impl.ResourceIdForUIResource(uid);
+    bool opaque = host_impl.IsUIResourceOpaque(uid);
+    ids.push_back(resource_id);
+    host_impl.resource_provider()->PrepareSendToParent(ids, &resources,
+                                                       &context_provider);
+    CHECK_EQ(resources.size(), ids.size());
+
+    auto& request = update.ui_resource_requests.emplace_back(
+        viz::mojom::TransferableUIResourceRequest::New());
+    request->type = type;
+    request->uid = uid;
+    request->transferable_resource = resources[0];
+    request->opaque = opaque;
+  } else {
+    CHECK_EQ(type, viz::mojom::TransferableUIResourceRequest::Type::kDelete);
+    auto& request = update.ui_resource_requests.emplace_back(
+        viz::mojom::TransferableUIResourceRequest::New());
+    request->type = type;
+    request->uid = uid;
+  }
+}
+
 viz::mojom::TileResourcePtr SerializeTileResource(
     const Tile& tile,
     viz::ClientResourceProvider& resource_provider,
@@ -509,7 +544,6 @@ void SerializeTextureLayerExtra(TextureLayerImpl& layer,
                                 viz::mojom::TextureLayerExtraPtr& extra,
                                 viz::ClientResourceProvider& resource_provider,
                                 viz::RasterContextProvider& context_provider) {
-  extra->premultiplied_alpha = layer.premultiplied_alpha();
   extra->blend_background_color = layer.blend_background_color();
   extra->force_texture_to_opaque = layer.force_texture_to_opaque();
   extra->uv_top_left = layer.uv_top_left();
@@ -528,6 +562,78 @@ void SerializeTextureLayerExtra(TextureLayerImpl& layer,
 
     layer.ClearNeedsSetResourcePush();
   }
+}
+
+void SerializeScrollbarLayerBaseExtra(
+    ScrollbarLayerImplBase& layer,
+    viz::mojom::ScrollbarLayerBaseExtraPtr& extra) {
+  extra = viz::mojom::ScrollbarLayerBaseExtra::New();
+  extra->scroll_element_id = layer.scroll_element_id();
+  extra->is_overlay_scrollbar = layer.is_overlay_scrollbar();
+  extra->is_web_test = layer.is_web_test();
+  extra->thumb_thickness_scale_factor = layer.thumb_thickness_scale_factor();
+  extra->current_pos = layer.current_pos();
+  extra->clip_layer_length = layer.clip_layer_length();
+  extra->scroll_layer_length = layer.scroll_layer_length();
+  extra->is_horizontal_orientation =
+      layer.orientation() == ScrollbarOrientation::kHorizontal;
+  extra->is_left_side_vertical_scrollbar =
+      layer.is_left_side_vertical_scrollbar();
+  extra->vertical_adjust = layer.vertical_adjust();
+  extra->has_find_in_page_tickmarks = layer.has_find_in_page_tickmarks();
+}
+
+void SerializeNinePatchThumbScrollbarLayerExtra(
+    NinePatchThumbScrollbarLayerImpl& layer,
+    viz::mojom::NinePatchThumbScrollbarLayerExtraPtr& extra) {
+  SerializeScrollbarLayerBaseExtra(static_cast<ScrollbarLayerImplBase&>(layer),
+                                   extra->scrollbar_base_extra);
+
+  extra->thumb_thickness = layer.thumb_thickness();
+  extra->thumb_length = layer.thumb_length();
+  extra->track_start = layer.track_start();
+  extra->track_length = layer.track_length();
+  extra->image_bounds = layer.image_bounds();
+  extra->aperture = layer.aperture();
+  extra->thumb_ui_resource_id = layer.thumb_ui_resource_id();
+  extra->track_and_buttons_ui_resource_id =
+      layer.track_and_buttons_ui_resource_id();
+}
+
+void SerializePaintedScrollbarLayerExtra(
+    PaintedScrollbarLayerImpl& layer,
+    viz::mojom::PaintedScrollbarLayerExtraPtr& extra) {
+  SerializeScrollbarLayerBaseExtra(static_cast<ScrollbarLayerImplBase&>(layer),
+                                   extra->scrollbar_base_extra);
+  extra->internal_contents_scale = layer.internal_contents_scale();
+  extra->internal_content_bounds = layer.internal_content_bounds();
+  extra->jump_on_track_click = layer.jump_on_track_click();
+  extra->supports_drag_snap_back = layer.supports_drag_snap_back();
+  extra->thumb_thickness = layer.thumb_thickness();
+  extra->thumb_length = layer.thumb_length();
+  extra->back_button_rect = layer.back_button_rect();
+  extra->forward_button_rect = layer.forward_button_rect();
+  extra->track_rect = layer.track_rect();
+  extra->track_and_buttons_ui_resource_id =
+      layer.track_and_buttons_ui_resource_id();
+  extra->thumb_ui_resource_id = layer.thumb_ui_resource_id();
+  extra->uses_nine_patch_track_and_buttons =
+      layer.uses_nine_patch_track_and_buttons();
+  extra->painted_opacity = layer.painted_opacity();
+  extra->thumb_color = layer.thumb_color();
+  extra->track_and_buttons_image_bounds =
+      layer.track_and_buttons_image_bounds();
+  extra->track_and_buttons_aperture = layer.track_and_buttons_aperture();
+}
+
+void SerializeSolidColorScrollbarLayerExtra(
+    SolidColorScrollbarLayerImpl& layer,
+    viz::mojom::SolidColorScrollbarLayerExtraPtr& extra) {
+  SerializeScrollbarLayerBaseExtra(static_cast<ScrollbarLayerImplBase&>(layer),
+                                   extra->scrollbar_base_extra);
+  extra->thumb_thickness = layer.thumb_thickness();
+  extra->track_start = layer.track_start();
+  extra->color = layer.color();
 }
 
 void SerializeSurfaceLayerExtra(SurfaceLayerImpl& layer,
@@ -590,6 +696,38 @@ void SerializeLayer(LayerImpl& layer,
                                 mirror_layer_extra);
       wire.layer_extra = viz::mojom::LayerExtra::NewMirrorLayerExtra(
           std::move(mirror_layer_extra));
+      break;
+    }
+    case mojom::LayerType::kNinePatchThumbScrollbar: {
+      auto nine_patch_thumb_scrollbar_layer_extra =
+          viz::mojom::NinePatchThumbScrollbarLayerExtra::New();
+      SerializeNinePatchThumbScrollbarLayerExtra(
+          static_cast<NinePatchThumbScrollbarLayerImpl&>(layer),
+          nine_patch_thumb_scrollbar_layer_extra);
+      wire.layer_extra =
+          viz::mojom::LayerExtra::NewNinePatchThumbScrollbarLayerExtra(
+              std::move(nine_patch_thumb_scrollbar_layer_extra));
+      break;
+    }
+    case mojom::LayerType::kPaintedScrollbar: {
+      auto painted_scrollbar_layer_extra =
+          viz::mojom::PaintedScrollbarLayerExtra::New();
+      SerializePaintedScrollbarLayerExtra(
+          static_cast<PaintedScrollbarLayerImpl&>(layer),
+          painted_scrollbar_layer_extra);
+      wire.layer_extra = viz::mojom::LayerExtra::NewPaintedScrollbarLayerExtra(
+          std::move(painted_scrollbar_layer_extra));
+      break;
+    }
+    case mojom::LayerType::kSolidColorScrollbar: {
+      auto solid_color_scrollbar_layer_extra =
+          viz::mojom::SolidColorScrollbarLayerExtra::New();
+      SerializeSolidColorScrollbarLayerExtra(
+          static_cast<SolidColorScrollbarLayerImpl&>(layer),
+          solid_color_scrollbar_layer_extra);
+      wire.layer_extra =
+          viz::mojom::LayerExtra::NewSolidColorScrollbarLayerExtra(
+              std::move(solid_color_scrollbar_layer_extra));
       break;
     }
     case mojom::LayerType::kSurface: {
@@ -941,6 +1079,23 @@ void VizLayerContext::UpdateDisplayTreeFrom(
   update->outer_scroll = property_ids.outer_scroll;
 
   update->viewport_damage_rect = viewport_damage_rect;
+
+  // Sync changes to UI resources
+  {
+    auto resource_changes = host_impl_->TakeUIResourceChanges(needs_full_sync_);
+    for (const auto& [uid, change] : resource_changes) {
+      if (change.resource_deleted) {
+        SerializeUIResourceRequest(
+            *host_impl_, context_provider, *update, uid,
+            viz::mojom::TransferableUIResourceRequest::Type::kDelete);
+      }
+      if (change.resource_created) {
+        SerializeUIResourceRequest(
+            *host_impl_, context_provider, *update, uid,
+            viz::mojom::TransferableUIResourceRequest::Type::kCreate);
+      }
+    }
+  }
 
   // This flag will be set if and only if a new layer list was pushed to the
   // active tree during activation, implying that at least one layer addition or

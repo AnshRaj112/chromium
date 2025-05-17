@@ -16,6 +16,7 @@
 #import "base/metrics/histogram_macros.h"
 #import "base/metrics/user_metrics.h"
 #import "base/metrics/user_metrics_action.h"
+#import "base/strings/stringprintf.h"
 #import "base/strings/sys_string_conversions.h"
 #import "base/time/time.h"
 #import "components/autofill/core/browser/data_model/addresses/autofill_profile.h"
@@ -55,11 +56,13 @@
 #import "ios/chrome/browser/app_store_rating/ui_bundled/app_store_rating_scene_agent.h"
 #import "ios/chrome/browser/app_store_rating/ui_bundled/features.h"
 #import "ios/chrome/browser/appearance/ui_bundled/appearance_customization.h"
+#import "ios/chrome/browser/authentication/ui_bundled/account_menu/account_menu_constants.h"
+#import "ios/chrome/browser/authentication/ui_bundled/account_menu/account_menu_coordinator.h"
+#import "ios/chrome/browser/authentication/ui_bundled/account_menu/account_menu_coordinator_delegate.h"
 #import "ios/chrome/browser/authentication/ui_bundled/authentication_flow/authentication_flow.h"
 #import "ios/chrome/browser/authentication/ui_bundled/change_profile/change_profile_authentication_continuation.h"
 #import "ios/chrome/browser/authentication/ui_bundled/change_profile/change_profile_load_url.h"
 #import "ios/chrome/browser/authentication/ui_bundled/continuation.h"
-#import "ios/chrome/browser/authentication/ui_bundled/signin/account_menu/account_menu_constants.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/features.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/promo/signin_fullscreen_promo_scene_agent.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
@@ -143,6 +146,7 @@
 #import "ios/chrome/browser/shared/model/browser/browser_list_factory.h"
 #import "ios/chrome/browser/shared/model/browser/browser_provider_interface.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
+#import "ios/chrome/browser/shared/model/profile/features.h"
 #import "ios/chrome/browser/shared/model/profile/profile_attributes_storage_ios.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/profile/profile_manager_ios.h"
@@ -195,7 +199,6 @@
 #import "ios/chrome/browser/web_state_list/model/session_metrics.h"
 #import "ios/chrome/browser/web_state_list/model/web_usage_enabler/web_usage_enabler_browser_agent.h"
 #import "ios/chrome/browser/whats_new/coordinator/promo/whats_new_scene_agent.h"
-#import "ios/chrome/browser/widget_kit/model/features.h"
 #import "ios/chrome/browser/window_activities/model/window_activity_helpers.h"
 #import "ios/chrome/browser/youtube_incognito/coordinator/youtube_incognito_coordinator.h"
 #import "ios/chrome/browser/youtube_incognito/coordinator/youtube_incognito_coordinator_delegate.h"
@@ -217,10 +220,6 @@
 #import "net/base/url_util.h"
 #import "services/network/public/cpp/shared_url_loader_factory.h"
 #import "ui/base/l10n/l10n_util.h"
-
-#if BUILDFLAG(ENABLE_WIDGETS_FOR_MIM)
-#import "ios/chrome/browser/widget_kit/model/model_swift.h"  // nogncheck
-#endif
 
 namespace {
 
@@ -362,7 +361,9 @@ void OnListFamilyMembersResponse(
 
 }  // namespace
 
-@interface SceneController () <HistoryCoordinatorDelegate,
+@interface SceneController () <AccountMenuCoordinatorDelegate,
+                               AuthenticationFlowDelegate,
+                               HistoryCoordinatorDelegate,
                                IncognitoInterstitialCoordinatorDelegate,
                                PasswordCheckupCoordinatorDelegate,
                                PolicyWatcherBrowserAgentObserving,
@@ -398,6 +399,9 @@ void OnListFamilyMembersResponse(
   // Fetches the Family Link member role asynchronously from KidsManagement API.
   std::unique_ptr<supervised_user::ListFamilyMembersFetcher>
       _familyMembersFetcher;
+  AccountMenuCoordinator* _accountMenuCoordinator;
+  // The authentication flow, if one is currently running.
+  AuthenticationFlow* _authenticationFlow;
 }
 
 // Navigation View controller for the settings.
@@ -440,9 +444,8 @@ void OnListFamilyMembersResponse(
 @property(nonatomic, readwrite)
     TabOpeningPostOpeningAction NTPActionAfterTabSwitcherDismissal;
 
-// The main coordinator, lazily created the first time it is accessed. Manages
-// the main view controller. This property should not be accessed before the
-// browser has started up to the FOREGROUND stage.
+// The main coordinator to manage the main view controller. This property should
+// not be accessed before the browser has started up to the FOREGROUND stage.
 @property(nonatomic, strong) TabGridCoordinator* mainCoordinator;
 
 // YES while activating a new browser (often leading to dismissing the tab
@@ -534,7 +537,9 @@ void OnListFamilyMembersResponse(
   [_sceneState addAgent:[[IncognitoBlockerSceneAgent alloc] init]];
   [_sceneState
       addAgent:[[IncognitoReauthSceneAgent alloc]
-                   initWithReauthModule:[[ReauthenticationModule alloc] init]]];
+                         initWithReauthModule:[[ReauthenticationModule alloc]
+                                                  init]
+                   applicationCommandsHandler:self]];
   [_sceneState addAgent:[[StartSurfaceSceneAgent alloc] init]];
   [_sceneState addAgent:[[SessionSavingSceneAgent alloc] init]];
   [_sceneState addAgent:[[LayoutGuideSceneAgent alloc] init]];
@@ -545,20 +550,6 @@ void OnListFamilyMembersResponse(
 }
 
 #pragma mark - Setters and getters
-
-- (TabGridCoordinator*)mainCoordinator {
-  if (!_mainCoordinator) {
-    // Lazily create the main coordinator.
-    TabGridCoordinator* tabGridCoordinator = [[TabGridCoordinator alloc]
-        initWithApplicationCommandEndpoint:self
-                            regularBrowser:self.mainInterface.browser
-                           inactiveBrowser:self.mainInterface.inactiveBrowser
-                          incognitoBrowser:self.incognitoInterface.browser];
-    tabGridCoordinator.delegate = self;
-    _mainCoordinator = tabGridCoordinator;
-  }
-  return _mainCoordinator;
-}
 
 - (WrangledBrowser*)mainInterface {
   return self.browserViewWrangler.mainInterface;
@@ -835,6 +826,12 @@ void OnListFamilyMembersResponse(
 
 #pragma mark - private
 
+- (void)stopAccountMenu {
+  [_accountMenuCoordinator stop];
+  _accountMenuCoordinator.delegate = nil;
+  _accountMenuCoordinator = nil;
+}
+
 - (void)handleURLContextsToOpen {
   if (self.sceneState.URLContextsToOpen.count == 0) {
     return;
@@ -843,43 +840,40 @@ void OnListFamilyMembersResponse(
   NSSet<UIOpenURLContext*>* contexts = self.sceneState.URLContextsToOpen;
   self.sceneState.URLContextsToOpen = nil;
 
-#if BUILDFLAG(ENABLE_WIDGETS_FOR_MIM)
-  // Find the first context that requires an account change.
-  WidgetContext* context = [self findContextRequiringAccountChange:contexts];
-  if (context) {
-    // Perform profile switching if needed.
-    id<ChangeProfileCommands> changeProfileHandler = HandlerForProtocol(
-        self.sceneState.profileState.appState.appCommandDispatcher,
-        ChangeProfileCommands);
+  if (IsWidgetsForMultiprofileEnabled()) {
+    // Find the first context that requires an account change.
+    WidgetContext* context = [self findContextRequiringAccountChange:contexts];
+    if (context) {
+      // Perform profile switching if needed.
+      id<ChangeProfileCommands> changeProfileHandler = HandlerForProtocol(
+          self.sceneState.profileState.appState.appCommandDispatcher,
+          ChangeProfileCommands);
 
-    std::optional<std::string> profileName;
+      std::optional<std::string> profileName;
 
-    if ([context.gaiaID isEqualToString:@"Default"]) {
-      // Use the personal profile name if there is no GaiaID (this happens in
-      // the sign-out scenario).
-      profileName = GetApplicationContext()
-                        ->GetProfileManager()
-                        ->GetProfileAttributesStorage()
-                        ->GetPersonalProfileName();
-    } else {
-      profileName = GetApplicationContext()
-                        ->GetAccountProfileMapper()
-                        ->FindProfileNameForGaiaID(GaiaId(context.gaiaID));
-    }
-    // TODO(crbug.com/388520520): Make sure that ENABLE_WIDGETS_FOR_MIM is
-    // enabled only when AreSeparateProfilesForManagedAccountsEnabled() is true.
-    // If not, add implementation.
-    if (profileName.has_value()) {
-      [changeProfileHandler
-          changeProfile:*profileName
-               forScene:self.sceneState
-                 reason:ChangeProfileReason::kSwitchAccountsFromWidget
-           continuation:CreateChangeProfileAuthenticationContinuation(
-                            context, contexts)];
-      return;
+      if ([context.gaiaID isEqualToString:@"Default"]) {
+        // Use the personal profile name if there is no GaiaID (this happens in
+        // the sign-out scenario).
+        profileName = GetApplicationContext()
+                          ->GetProfileManager()
+                          ->GetProfileAttributesStorage()
+                          ->GetPersonalProfileName();
+      } else {
+        profileName = GetApplicationContext()
+                          ->GetAccountProfileMapper()
+                          ->FindProfileNameForGaiaID(GaiaId(context.gaiaID));
+      }
+      if (profileName.has_value()) {
+        [changeProfileHandler
+            changeProfile:*profileName
+                 forScene:self.sceneState
+                   reason:ChangeProfileReason::kSwitchAccountsFromWidget
+             continuation:CreateChangeProfileAuthenticationContinuation(
+                              context, contexts)];
+        return;
+      }
     }
   }
-#endif
 
   [self openURLContexts:contexts];
 }
@@ -1297,8 +1291,14 @@ void OnListFamilyMembersResponse(
     [self.sceneState setRootViewControllerKeyAndVisible];
   }
 
-  // Lazy init of mainCoordinator.
-  [self.mainCoordinator start];
+  _mainCoordinator = [[TabGridCoordinator alloc]
+      initWithApplicationCommandEndpoint:self
+                          regularBrowser:self.mainInterface.browser
+                         inactiveBrowser:self.mainInterface.inactiveBrowser
+                        incognitoBrowser:self.incognitoInterface.browser];
+  _mainCoordinator.delegate = self;
+
+  [_mainCoordinator start];
 
   if (!base::FeatureList::IsEnabled(
           kMakeKeyAndVisibleBeforeMainCoordinatorStart)) {
@@ -1383,6 +1383,8 @@ void OnListFamilyMembersResponse(
 
   [_mainCoordinator stop];
   _mainCoordinator = nil;
+
+  [self stopAccountMenu];
 
   _incognitoWebStateObserver.reset();
   _mainWebStateObserver.reset();
@@ -2057,19 +2059,16 @@ using UserFeedbackDataCallback =
       << base::SysNSStringToUTF8([self.signinCoordinator description]);
   Browser* browser = self.mainInterface.browser;
   UIViewController* baseViewController = self.mainInterface.viewController;
-  SigninCoordinator* accountMenuCoordinator = [SigninCoordinator
-      accountMenuCoordinatorWithBaseViewController:baseViewController
-                                           browser:browser
-                                      contextStyle:SigninContextStyle::kDefault
-                                        anchorView:nil
-                                       accessPoint:accessPoint
-                                               URL:url];
-
-  [self stopSigninCoordinatorAnimated:NO fromExternalTrigger:NO];
-  self.signinCoordinator = accountMenuCoordinator;
+  _accountMenuCoordinator = [[AccountMenuCoordinator alloc]
+      initWithBaseViewController:baseViewController
+                         browser:browser
+                      anchorView:nil
+                     accessPoint:AccountMenuAccessPoint::kWeb
+                             URL:url];
+  _accountMenuCoordinator.delegate = self;
   // TODO(crbug.com/336719423): Record signin metrics based on the
   // selected action from the account switcher.
-  [self startSigninCoordinatorWithCompletion:nil];
+  [_accountMenuCoordinator start];
 }
 
 - (void)showWebSigninPromoFromViewController:
@@ -3080,20 +3079,28 @@ using UserFeedbackDataCallback =
 }
 
 - (void)openClearBrowsingDataDialog {
-  if (!self.currentInterface.browser) {
+  if (!self.mainInterface.browser || [self isIncognitoForced]) {
     return;
   }
 
-  CommandDispatcher* dispatcher =
-      self.currentInterface.browser->GetCommandDispatcher();
-  if (IsIosQuickDeleteEnabled()) {
-    id<QuickDeleteCommands> quickDeleteHandler =
-        HandlerForProtocol(dispatcher, QuickDeleteCommands);
-    [quickDeleteHandler showQuickDeleteAndCanPerformTabsClosureAnimation:YES];
+  __weak CommandDispatcher* weakDispatcher =
+      self.mainInterface.browser->GetCommandDispatcher();
+  ProceduralBlock openQuickDeleteBlock = ^{
+    if (IsIosQuickDeleteEnabled()) {
+      id<QuickDeleteCommands> quickDeleteHandler =
+          HandlerForProtocol(weakDispatcher, QuickDeleteCommands);
+      [quickDeleteHandler showQuickDeleteAndCanPerformTabsClosureAnimation:YES];
+    } else {
+      id<SettingsCommands> settingsHandler =
+          HandlerForProtocol(weakDispatcher, SettingsCommands);
+      [settingsHandler showClearBrowsingDataSettings];
+    }
+  };
+
+  if (self.currentInterface.incognito) {
+    [self openNonIncognitoTab:openQuickDeleteBlock];
   } else {
-    id<SettingsCommands> settingsHandler =
-        HandlerForProtocol(dispatcher, SettingsCommands);
-    [settingsHandler showClearBrowsingDataSettings];
+    openQuickDeleteBlock();
   }
 }
 
@@ -4371,6 +4378,28 @@ using UserFeedbackDataCallback =
 
 - (void)closeHistory {
   [self closeHistoryWithCompletion:nil];
+}
+
+#pragma mark - AccountMenuCoordinatorDelegate
+
+// Update the state, to take into account that the account menu coordinator is
+// stopped.
+- (void)accountMenuCoordinatorWantsToBeStopped:
+    (AccountMenuCoordinator*)coordinator {
+  CHECK_EQ(_accountMenuCoordinator, coordinator, base::NotFatalUntil::M140);
+  [self stopAccountMenu];
+}
+
+#pragma mark - AuthenticationFlowDelegate
+
+- (void)authenticationFlowDidSignInInSameProfileWithResult:
+    (SigninCoordinatorResult)result {
+  _authenticationFlow = nil;
+}
+
+- (ChangeProfileContinuation)authenticationFlowWillChangeProfile {
+  _authenticationFlow = nil;
+  return DoNothingContinuation();
 }
 
 @end

@@ -177,8 +177,7 @@ public class FullscreenSigninMediator
     }
 
     private Account getSelectedAccount() {
-        assertNonNull(mSelectedAccount);
-        return CoreAccountInfo.getAndroidAccountFrom(mSelectedAccount);
+        return CoreAccountInfo.getAndroidAccountFrom(assertNonNull(mSelectedAccount));
     }
 
     private void onNativeLoaded() {
@@ -565,7 +564,7 @@ public class FullscreenSigninMediator
             }
         }
 
-        AccountUtils.checkChildAccountStatus(
+        AccountUtils.checkIsSubjectToParentalControls(
                 mAccountManagerFacade, accounts, this::onChildAccountStatusReady);
     }
 

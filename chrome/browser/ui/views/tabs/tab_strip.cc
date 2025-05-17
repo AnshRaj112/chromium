@@ -48,6 +48,7 @@
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/layout_constants.h"
+#include "chrome/browser/ui/tabs/alert/tab_alert.h"
 #include "chrome/browser/ui/tabs/features.h"
 #include "chrome/browser/ui/tabs/tab_group_theme.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -1094,7 +1095,8 @@ bool TabStrip::IsTabStripCloseable() const {
 }
 
 bool TabStrip::IsTabStripEditable() const {
-  return !drag_context_->IsDragSessionActive() &&
+  return !tab_strip_not_editable_for_testing_ &&
+         !drag_context_->IsDragSessionActive() &&
          !drag_context_->IsActiveDropTarget();
 }
 
@@ -1106,7 +1108,7 @@ bool TabStrip::TabHasNetworkError(int tab_index) const {
   return tab_at(tab_index)->data().network_state == TabNetworkState::kError;
 }
 
-std::optional<TabAlertState> TabStrip::GetTabAlertState(int tab_index) const {
+std::optional<tabs::TabAlert> TabStrip::GetTabAlertState(int tab_index) const {
   return Tab::GetAlertStateToShow(tab_at(tab_index)->data().alert_state);
 }
 
@@ -1332,6 +1334,10 @@ void TabStrip::OnSplitRemoved(const std::vector<int>& split_indices) {
   }
 
   tab_container_->OnSplitRemoved(split_indices);
+}
+
+void TabStrip::OnSplitContentsChanged(const std::vector<int>& split_indices) {
+  tab_container_->OnSplitContentsChanged(split_indices);
 }
 
 bool TabStrip::ShouldDrawStrokes() const {
@@ -2166,6 +2172,10 @@ BrowserRootView::DropTarget* TabStrip::GetDropTarget(
 views::View* TabStrip::GetViewForDrop() {
   // BrowserView should talk directly to `tab_container_` instead of asking us.
   NOTREACHED();
+}
+
+void TabStrip::SetTabStripNotEditableForTesting() {
+  tab_strip_not_editable_for_testing_ = true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

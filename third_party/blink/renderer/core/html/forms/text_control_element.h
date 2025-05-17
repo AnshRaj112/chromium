@@ -146,7 +146,18 @@ class CORE_EXPORT TextControlElement : public HTMLFormControlElementWithState {
 
   virtual void SetInnerEditorValue(const String&);
   static void AppendTextOrBr(const String& value, ContainerNode& container);
-  String InnerEditorValue() const;
+  // Returns the user-visible editing text.
+  // This cost should be O(1), and may be faster than
+  // SerializeInnerEdtitorValue().
+  virtual String InnerEditorValue() const;
+  // Serialize the user-visible editing text.
+  // This cost might be O(N) where N is the number of InnerEditor children.
+  String SerializeInnerEditorValue() const;
+  // Returns the length of the user-visible editing text, and its is_8bit flag
+  // without serializing the text. `offset_map` can be nullptr.
+  std::pair<wtf_size_t, bool> AnalyzeInnerEditorValue(
+      HeapHashMap<Member<const Text>, unsigned>* offset_map) const;
+
   Node* CreatePlaceholderBreakElement() const;
   // Returns true if the specified node was created by
   // CreatePlaceholderBreakElement().
@@ -201,6 +212,10 @@ class CORE_EXPORT TextControlElement : public HTMLFormControlElementWithState {
   void CloneNonAttributePropertiesFrom(const Element&,
                                        NodeCloningData&) override;
 
+  // Returns the value string. `length` and `is_8bit` must be computed by
+  // AnalyzeInnerEditorValue().
+  String SerializeInnerEditorValueInternal(wtf_size_t length,
+                                           bool is_8bit) const;
   // Returns true if the inner-editor value is empty. This may be cheaper
   // than calling InnerEditorValue(), and InnerEditorValue() returns
   // the wrong thing if the editor hasn't been created yet.

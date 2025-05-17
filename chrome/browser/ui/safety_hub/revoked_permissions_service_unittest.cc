@@ -23,6 +23,7 @@
 #include "base/time/time.h"
 #include "base/values.h"
 #include "chrome/browser/history/history_service_factory.h"
+#include "chrome/browser/permissions/notifications_engagement_service_factory.h"
 #include "chrome/browser/safe_browsing/test_safe_browsing_service.h"
 #include "chrome/browser/ui/safety_hub/abusive_notification_permissions_manager.h"
 #include "chrome/browser/ui/safety_hub/mock_safe_browsing_database_manager.h"
@@ -193,11 +194,14 @@ class RevokedPermissionsServiceTest
         /*enabled_features=*/enabled_features,
         /*disabled_features=*/{});
   }
+
   void SetUp() override {
     ChromeRenderViewHostTestHarness::SetUp();
     base::Time time;
     ASSERT_TRUE(base::Time::FromString("2022-09-07 13:00", &time));
     clock_.SetNow(time);
+
+    ResetService();
     if (ShouldSetupAbusiveNotificationSites()) {
       SetUpSafeBrowsingService();
     }
@@ -229,10 +233,7 @@ class RevokedPermissionsServiceTest
             // Needed for background UKM reporting.
             TestingProfile::TestingFactory{
                 HistoryServiceFactory::GetInstance(),
-                base::BindRepeating(&BuildTestHistoryService)},
-            TestingProfile::TestingFactory{
-                RevokedPermissionsServiceFactory::GetInstance(),
-                base::BindRepeating(&BuildRevokedPermissionsService)}};
+                base::BindRepeating(&BuildTestHistoryService)}};
   }
 
   bool ShouldSetupAbusiveNotificationSites() { return get<0>(GetParam()); }
@@ -1280,6 +1281,58 @@ TEST_P(RevokedPermissionsServiceTest, ClearRevokedPermissionsList) {
   ExpectRevokedDisruptiveNotificationPermissionSize(0U);
 }
 
+TEST_P(RevokedPermissionsServiceTest, RestoreClearedRevokedPermissionsList) {
+  if (ShouldSetupAbusiveNotificationSites()) {
+    SetupAbusiveNotificationSite(url2, ContentSetting::CONTENT_SETTING_ASK);
+    SetupAbusiveNotificationSite(url3, ContentSetting::CONTENT_SETTING_ASK);
+    SetupRevokedAbusiveNotificationSite(url2);
+    SetupRevokedAbusiveNotificationSite(url3);
+    ExpectRevokedAbusiveNotificationPermissionSize(2U);
+  }
+  if (ShouldSetupUnusedSites()) {
+    SetupRevokedUnusedPermissionSite(url1);
+    SetupRevokedUnusedPermissionSite(url2);
+    EXPECT_EQ(2U, GetRevokedUnusedPermissions(hcsm()).size());
+  }
+  if (ShouldSetupDisruptiveSites()) {
+    auto* notifications_engagement_service =
+        NotificationsEngagementServiceFactory::GetForProfile(profile());
+    notifications_engagement_service->RecordNotificationDisplayed(GURL(url4),
+                                                                  21);
+    SetupRevokedDisruptiveNotificationSite(url4);
+  }
+
+  auto new_service = std::make_unique<RevokedPermissionsService>(
+      profile(), profile()->GetPrefs());
+  auto opt_result = new_service->GetCachedResult();
+  EXPECT_TRUE(opt_result.has_value());
+  auto* result =
+      static_cast<RevokedPermissionsService::RevokedPermissionsResult*>(
+          opt_result.value().get());
+  auto revoked_permissions_list = result->GetRevokedPermissions();
+  std::vector<PermissionsData> revoked_permissions_vector{
+      std::begin(revoked_permissions_list), std::end(revoked_permissions_list)};
+
+  // Revoked permissions list should be empty after clearing the revoked
+  // permissions list.
+  service()->ClearRevokedPermissionsList();
+  EXPECT_EQ(0U, GetRevokedUnusedPermissions(hcsm()).size());
+  ExpectRevokedAbusiveNotificationPermissionSize(0U);
+  ExpectRevokedDisruptiveNotificationPermissionSize(0U);
+
+  service()->RestoreDeletedRevokedPermissionsList(revoked_permissions_vector);
+
+  if (ShouldSetupUnusedSites()) {
+    EXPECT_EQ(GetRevokedUnusedPermissions(hcsm()).size(), 2u);
+  }
+  if (ShouldSetupAbusiveNotificationSites()) {
+    ExpectRevokedAbusiveNotificationPermissionSize(2U);
+  }
+  if (ShouldSetupDisruptiveSites()) {
+    ExpectRevokedDisruptiveNotificationPermissionSize(1U);
+  }
+}
+
 TEST_P(RevokedPermissionsServiceTest, RecordRegrantMetricForAllowAgain) {
   SetupRevokedUnusedPermissionSite(url1);
   SetupRevokedUnusedPermissionSite(url2);
@@ -1947,10 +2000,14 @@ INSTANTIATE_TEST_SUITE_P(
         /*should_setup_unused_sites=*/testing::Bool(),
         /*should_setup_disruptive_sites=*/testing::Bool()));
 
-class RevokedPermissionsServiceStartUpTest
+// TODO(crbug.com/415227458): Remove migration code for revoked permissions
+// using strings.
+// Tests the migration of using strings for the revoked permissions instead of
+// ints when the RevokedPermissionsService first starts up.
+class RevokedPermissionsServiceNameMigrationTest
     : public ChromeRenderViewHostTestHarness {
  public:
-  RevokedPermissionsServiceStartUpTest() {
+  RevokedPermissionsServiceNameMigrationTest() {
     feature_list_.InitWithFeatures(
         /*enabled_features=*/
         {content_settings::features::kSafetyCheckUnusedSitePermissions,
@@ -1974,7 +2031,7 @@ class RevokedPermissionsServiceStartUpTest
   base::test::ScopedFeatureList feature_list_;
 };
 
-TEST_F(RevokedPermissionsServiceStartUpTest,
+TEST_F(RevokedPermissionsServiceNameMigrationTest,
        UpdateIntegerValuesToGroupName_OnlyIntegerKeys) {
   base::Value::List permissions_list_int;
   base::Value::List permissions_list_string;
@@ -2017,7 +2074,7 @@ TEST_F(RevokedPermissionsServiceStartUpTest,
                 ->GetDict());
 }
 
-TEST_F(RevokedPermissionsServiceStartUpTest,
+TEST_F(RevokedPermissionsServiceNameMigrationTest,
        UpdateIntegerValuesToGroupName_MixedKeys) {
   // Setting up two entries one with integers and one with strings to simulate
   // partial migration in case of a crash.
@@ -2068,7 +2125,7 @@ TEST_F(RevokedPermissionsServiceStartUpTest,
                 ->GetList());
 }
 
-TEST_F(RevokedPermissionsServiceStartUpTest,
+TEST_F(RevokedPermissionsServiceNameMigrationTest,
        UpdateIntegerValuesToGroupName_MixedKeysWithUnknownTypes) {
   base::HistogramTester histogram_tester;
   // Setting up two entries one with integers and one with strings to simulate

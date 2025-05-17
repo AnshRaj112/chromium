@@ -13,10 +13,12 @@
 
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
+#include "base/metrics/histogram_functions.h"
+#include "base/strings/strcat.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/thread_annotations.h"
 #include "base/trace_event/trace_event.h"
-#include "media/audio/android/audio_device_id.h"
+#include "media/audio/android/audio_device.h"
 #include "media/base/audio_parameters.h"
 #include "media/base/channel_layout.h"
 
@@ -161,10 +163,10 @@ void SetChannelMask(AAudioStreamBuilder* builder,
 AAudioStreamWrapper::AAudioStreamWrapper(DataCallback* callback,
                                          StreamType stream_type,
                                          const AudioParameters& params,
-                                         android::AudioDeviceId device_id,
+                                         android::AudioDevice device,
                                          aaudio_usage_t usage)
     : params_(params),
-      device_id_(std::move(device_id)),
+      device_(std::move(device)),
       stream_type_(stream_type),
       usage_(usage),
       callback_(callback),
@@ -241,7 +243,7 @@ bool AAudioStreamWrapper::Open() {
   AAudioStreamBuilder_setPerformanceMode(builder, performance_mode_);
   AAudioStreamBuilder_setFramesPerDataCallback(builder,
                                                params_.frames_per_buffer());
-  AAudioStreamBuilder_setDeviceId(builder, device_id_.ToAAudioDeviceId());
+  AAudioStreamBuilder_setDeviceId(builder, device_.GetId().ToAAudioDeviceId());
 
   if (__builtin_available(android AAUDIO_CHANNEL_MASK_MIN_API, *)) {
     SetChannelMask(builder, params_);
@@ -282,12 +284,14 @@ bool AAudioStreamWrapper::Open() {
 
   CHECK_EQ(AAUDIO_FORMAT_PCM_FLOAT, AAudioStream_getFormat(aaudio_stream_));
 
-  if (!device_id_.IsDefault()) {
+  if (!device_.GetId().IsDefault()) {
     // `AAudioStreamBuilder_setDeviceId` is not guaranteed to set the specified
     // device.
-    const int32_t expected_device_id = device_id_.ToAAudioDeviceId();
+    const int32_t expected_device_id = device_.GetId().ToAAudioDeviceId();
     const int32_t actual_device_id = AAudioStream_getDeviceId(aaudio_stream_);
-    if (expected_device_id != actual_device_id) {
+    bool device_id_matches = expected_device_id == actual_device_id;
+    EmitSetDeviceIdResultToHistogram(device_id_matches);
+    if (!device_id_matches) {
       DLOG(WARNING) << "Failed to set device ID for AAudio stream. Expected: "
                     << expected_device_id << "; actual: " << actual_device_id;
       return false;
@@ -440,6 +444,25 @@ void AAudioStreamWrapper::OnStreamError(aaudio_result_t error) {
   } else {
     callback_->OnError();
   }
+}
+
+void AAudioStreamWrapper::EmitSetDeviceIdResultToHistogram(bool success) {
+  std::string_view direction_string;
+  switch (stream_type_) {
+    case StreamType::kInput:
+      direction_string = "Input";
+      break;
+    case StreamType::kOutput:
+      direction_string = "Output";
+      break;
+  }
+
+  std::string_view success_string = success ? "Success" : "Failure";
+
+  std::string histogram_name =
+      base::StrCat({"Media.Audio.Android.AAudioSetDeviceId.", direction_string,
+                    ".", success_string});
+  base::UmaHistogramEnumeration(histogram_name, device_.GetType());
 }
 
 }  // namespace media

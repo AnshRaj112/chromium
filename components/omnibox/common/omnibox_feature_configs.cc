@@ -86,6 +86,14 @@ BASE_FEATURE(ContextualSearch::kContextualSearchBoxUsesContextualSearchProvider,
              "ContextualSearchBoxUsesContextualSearchProvider",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(ContextualSearch::kOmniboxZeroSuggestSynchronousMatchesOnly,
+             "OmniboxZeroSuggestSynchronousMatchesOnly",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(ContextualSearch::kContextualSearchOpenLensActionUsesThumbnail,
+             "ContextualSearchOpenLensActionUsesThumbnail",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 ContextualSearch::ContextualSearch() {
   // Meta-feature turns on/off other features, but only if it's overridden by
   // the user. If not then each feature is controlled separately.
@@ -112,6 +120,10 @@ ContextualSearch::ContextualSearch() {
           : 0;
   csb_uses_csp = base::FeatureList::IsEnabled(
       kContextualSearchBoxUsesContextualSearchProvider);
+  zero_suggest_synchronous_matches_only =
+      base::FeatureList::IsEnabled(kOmniboxZeroSuggestSynchronousMatchesOnly);
+  open_lens_action_uses_thumbnail = base::FeatureList::IsEnabled(
+      kContextualSearchOpenLensActionUsesThumbnail);
 }
 
 ContextualSearch::ContextualSearch(const ContextualSearch&) = default;
@@ -208,6 +220,11 @@ SearchAggregatorProvider::SearchAggregatorProvider() {
   relevance_scoring_mode =
       base::FeatureParam<std::string>(&kSearchAggregatorProvider,
                                       "relevance_scoring_mode", "mixed")
+          .Get();
+
+  realbox_unscoped_suggestions =
+      base::FeatureParam<bool>(&kSearchAggregatorProvider,
+                               "realbox_unscoped_suggestions", false)
           .Get();
 
   scoring_max_matches_created_per_type =
@@ -328,7 +345,7 @@ base::Value::Dict SearchAggregatorProvider::CreateMockSearchAggregator(
 
   result.Set("policy_origin",
              3 /*TemplateURLData::PolicyOrigin::kSearchAggregator*/);
-  result.Set("enforced_by_policy", false);
+  result.Set("enforced_by_policy", true);
   result.Set("featured_by_policy", featured_by_policy);
   result.Set("is_active", 1 /*TemplateURLData::ActiveStatus::kTrue*/);
   result.Set("safe_for_autoreplace", false);

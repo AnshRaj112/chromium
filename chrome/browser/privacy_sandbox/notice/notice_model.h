@@ -32,6 +32,12 @@ enum class EligibilityLevel {
   kEligibleConsent,
 };
 
+// Notice view groups. Defining the notices that can be grouped together.
+enum class NoticeViewGroup {
+  kNotSet,
+  kAdsNoticeEeaGroup,
+};
+
 using NoticeId = std::pair<notice::mojom::PrivacySandboxNotice, SurfaceType>;
 class Notice {
   // TODO(crbug.com/392612108): Include view group information.
@@ -52,16 +58,22 @@ class Notice {
   Notice* SetTargetApis(const std::vector<NoticeApi*>& apis);
   Notice* SetPreReqApis(const std::vector<NoticeApi*>& apis);
   Notice* SetFeature(const base::Feature* feature);
+  Notice* SetViewGroup(std::pair<NoticeViewGroup, int> view_group);
 
   // Returns the cached was_fulfilled status.
   bool was_fulfilled() const { return was_fulfilled_; }
+
+  // Linked APIs accessors.
+  base::span<NoticeApi*> target_apis() { return target_apis_; }
+  base::span<NoticeApi*> pre_req_apis() { return pre_req_apis_; }
+
+  // Returns the view_group, consisting of the group and the order in the group.
+  std::pair<NoticeViewGroup, int> view_group() const { return view_group_; }
 
   // Update the cached was_fulfilled status for the notice.
   void RefreshFulfillmentStatus(NoticeStorage& storage);
 
   // Accessors.
-  const std::vector<raw_ptr<NoticeApi>>& GetTargetApis();
-  const std::vector<raw_ptr<NoticeApi>>& GetPreReqApis();
   NoticeId GetNoticeId() const;
   const base::Feature* GetFeature() const;
   const char* GetStorageName() const;
@@ -91,9 +103,10 @@ class Notice {
 
   NoticeId notice_id_;
   bool was_fulfilled_ = false;
-  std::vector<raw_ptr<NoticeApi>> target_apis_;
-  std::vector<raw_ptr<NoticeApi>> pre_req_apis_;
+  std::vector<NoticeApi*> target_apis_;
+  std::vector<NoticeApi*> pre_req_apis_;
   raw_ptr<const base::Feature> feature_;
+  std::pair<NoticeViewGroup, int> view_group_;
 };
 
 class Consent : public Notice {
@@ -120,12 +133,13 @@ class NoticeApi {
   virtual ~NoticeApi();
 
   // Accessors.
-  const std::vector<Notice*>& GetLinkedNotices();
-  EligibilityLevel GetEligibilityLevel();
-  void UpdateResult(bool enabled);
+  base::span<Notice*> linked_notices() { return linked_notices_; }
 
-  // TODO(crbug.com/392612108): Have enablement of an api set by a feature
-  // flag.
+  // Computes the eligibility level
+  EligibilityLevel GetEligibilityLevel();
+
+  // Runs the Result Callback.
+  void UpdateResult(bool enabled);
 
   // Sets a notice this Api can be fulfilled by.
   void CanBeFulfilledBy(Notice* notice);
@@ -133,15 +147,26 @@ class NoticeApi {
   // Returns whether the api was fulfilled.
   bool IsFulfilled();
 
+  // Returns whether the API is enabled and should be considered by the
+  // Orchestrator.
+  bool IsEnabled();
+
   // Callbacks.
   NoticeApi* SetEligibilityCallback(
       base::RepeatingCallback<EligibilityLevel()> callback);
   NoticeApi* SetResultCallback(base::OnceCallback<void(bool)> callback);
 
+  // Feature controlling the API.
+  NoticeApi* SetFeature(const base::Feature* feature);
+
+  // TODO(crbug.com/409386887) Add Supersedes call when multiple versions of the
+  // same API are introduced.
+
  private:
   std::vector<Notice*> linked_notices_;
   base::RepeatingCallback<EligibilityLevel()> eligibility_callback_;
   base::OnceCallback<void(bool)> result_callback_;
+  raw_ptr<const base::Feature> feature_;
 };
 
 }  // namespace privacy_sandbox

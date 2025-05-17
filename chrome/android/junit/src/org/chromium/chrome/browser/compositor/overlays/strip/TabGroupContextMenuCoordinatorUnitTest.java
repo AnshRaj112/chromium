@@ -7,6 +7,7 @@ package org.chromium.chrome.browser.compositor.overlays.strip;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -15,10 +16,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.app.Activity;
+import android.os.SystemClock;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.EditText;
 
+import androidx.annotation.IdRes;
 import androidx.test.ext.junit.rules.ActivityScenarioRule;
 
 import org.junit.Before;
@@ -35,22 +39,30 @@ import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.Features.EnableFeatures;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.collaboration.CollaborationServiceFactory;
 import org.chromium.chrome.browser.data_sharing.DataSharingTabManager;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
+import org.chromium.chrome.browser.multiwindow.MultiInstanceManager;
+import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabLaunchType;
+import org.chromium.chrome.browser.tab.TabSelectionType;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
-import org.chromium.chrome.browser.tab_ui.ActionConfirmationManager;
 import org.chromium.chrome.browser.tabmodel.TabCreator;
+import org.chromium.chrome.browser.tabmodel.TabGroupMetadata;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabRemover;
 import org.chromium.chrome.browser.tabmodel.TabUngrouper;
 import org.chromium.chrome.browser.tasks.tab_management.ColorPickerCoordinator;
 import org.chromium.chrome.browser.tasks.tab_management.TabOverflowMenuCoordinator.OnItemClickedCallback;
+import org.chromium.chrome.browser.tasks.tab_management.TabUiTestHelper;
 import org.chromium.chrome.test.util.browser.tabmodel.MockTabModel;
+import org.chromium.components.browser_ui.widget.list_view.FakeListViewTouchTracker;
+import org.chromium.components.browser_ui.widget.list_view.ListViewTouchTracker;
+import org.chromium.components.browser_ui.widget.list_view.ListViewTouchTracker.ListViewTouchInfo;
 import org.chromium.components.collaboration.CollaborationService;
 import org.chromium.components.collaboration.ServiceStatus;
 import org.chromium.components.data_sharing.member_role.MemberRole;
@@ -63,7 +75,6 @@ import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.listmenu.BasicListMenu.ListMenuItemType;
 import org.chromium.ui.listmenu.ListMenuItemProperties;
 import org.chromium.ui.listmenu.ListSectionDividerProperties;
-import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
 import org.chromium.ui.modelutil.MVCListAdapter.ModelList;
 
@@ -89,22 +100,27 @@ public class TabGroupContextMenuCoordinatorUnitTest {
     private TabGroupContextMenuCoordinator mTabGroupContextMenuCoordinator;
     private OnItemClickedCallback<Token> mOnItemClickedCallback;
     private MockTabModel mTabModel;
+    private View mMenuView;
     private final SavedTabGroup mSavedTabGroup = new SavedTabGroup();
+
+    // Tab state
     @Mock private TabRemover mTabRemover;
     @Mock private TabUngrouper mTabUngrouper;
-    @Mock private View mMenuView;
-    @Mock private TabGroupModelFilter mTabGroupModelFilter;
-    @Mock private Profile mProfile;
-    @Mock private ActionConfirmationManager mActionConfirmationManager;
-    @Mock private ModalDialogManager mModalDialogManager;
     @Mock private TabCreator mTabCreator;
-    @Mock private WindowAndroid mWindowAndroid;
-    @Mock private KeyboardVisibilityDelegate mKeyboardVisibilityDelegate;
+    @Mock private TabGroupModelFilter mTabGroupModelFilter;
+
+    // Share state
     @Mock private TabGroupSyncService mTabGroupSyncService;
     @Mock private CollaborationService mCollaborationService;
     @Mock private ServiceStatus mServiceStatus;
     @Mock private DataSharingTabManager mDataSharingTabManager;
+
+    // Other dependencies
+    @Mock private Profile mProfile;
+    @Mock private WindowAndroid mWindowAndroid;
+    @Mock private KeyboardVisibilityDelegate mKeyboardVisibilityDelegate;
     @Mock private WeakReference<Activity> mWeakReferenceActivity;
+    @Mock private MultiInstanceManager mMultiInstanceManager;
 
     @Before
     public void setUp() {
@@ -112,6 +128,7 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         when(mCollaborationService.getServiceStatus()).thenReturn(mServiceStatus);
         when(mServiceStatus.isAllowedToCreate()).thenReturn(true);
         CollaborationServiceFactory.setForTesting(mCollaborationService);
+        MultiWindowUtils.setMultiInstanceApi31EnabledForTesting(true);
 
         Activity activity = Robolectric.buildActivity(Activity.class).setup().get();
         LayoutInflater inflater = LayoutInflater.from(activity);
@@ -120,6 +137,8 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         when(mWindowAndroid.getActivity()).thenReturn(mWeakReferenceActivity);
         when(mWeakReferenceActivity.get()).thenReturn(activity);
         mTabModel = spy(new MockTabModel(mProfile, null));
+        mTabModel.addTab(0);
+        mTabModel.setIndex(0, TabSelectionType.FROM_NEW);
         when(mTabModel.isIncognito()).thenReturn(false);
         mTabModel.setTabRemoverForTesting(mTabRemover);
         mTabModel.setTabCreatorForTesting(mTabCreator);
@@ -129,16 +148,15 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         mOnItemClickedCallback =
                 TabGroupContextMenuCoordinator.getMenuItemClickedCallback(
                         activity,
+                        () -> mTabModel,
                         mTabGroupModelFilter,
-                        mActionConfirmationManager,
-                        mModalDialogManager,
+                        mMultiInstanceManager,
                         mDataSharingTabManager);
         mTabGroupContextMenuCoordinator =
                 TabGroupContextMenuCoordinator.createContextMenuCoordinator(
                         mTabModel,
                         mTabGroupModelFilter,
-                        mActionConfirmationManager,
-                        mModalDialogManager,
+                        mMultiInstanceManager,
                         mWindowAndroid,
                         mDataSharingTabManager);
 
@@ -160,7 +178,7 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         mTabGroupContextMenuCoordinator.buildMenuActionItems(modelList, TAB_GROUP_ID);
 
         // Assert: verify number of items in the model list.
-        assertEquals("Number of items in the list menu is incorrect", 7, modelList.size());
+        assertEquals("Number of items in the list menu is incorrect", 8, modelList.size());
 
         // Assert: verify divider and normal menu items.
         verifyNormalListItems(modelList, 4);
@@ -170,10 +188,10 @@ public class TabGroupContextMenuCoordinatorUnitTest {
                 R.id.share_group, modelList.get(3).model.get(ListMenuItemProperties.MENU_ITEM_ID));
 
         // Assert: verify divider and delete group menu item.
-        verifyDivider(modelList.get(5));
+        verifyDivider(modelList.get(6));
         assertEquals(
                 R.id.delete_tab_group,
-                modelList.get(6).model.get(ListMenuItemProperties.MENU_ITEM_ID));
+                modelList.get(7).model.get(ListMenuItemProperties.MENU_ITEM_ID));
     }
 
     @Test
@@ -188,7 +206,7 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         mTabGroupContextMenuCoordinator.buildMenuActionItems(modelList, TAB_GROUP_ID);
 
         // Assert: verify number of items in the model list.
-        assertEquals("Number of items in the list menu is incorrect", 4, modelList.size());
+        assertEquals("Number of items in the list menu is incorrect", 5, modelList.size());
 
         // Assert: verify normal menu items.
         verifyNormalListItems(modelList, 3);
@@ -209,13 +227,33 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         mTabGroupContextMenuCoordinator.buildMenuActionItems(modelList, TAB_GROUP_ID);
 
         // Assert: verify number of items in the model list.
-        assertEquals("Number of items in the list menu is incorrect", 6, modelList.size());
+        assertEquals("Number of items in the list menu is incorrect", 7, modelList.size());
 
         // Assert: verify share group option does not show.
         for (int i = 0; i < modelList.size(); i++) {
             if (modelList.get(i).model.containsKey(ListMenuItemProperties.MENU_ITEM_ID)) {
                 assertNotEquals(
                         R.id.share_group,
+                        modelList.get(i).model.get(ListMenuItemProperties.MENU_ITEM_ID));
+            }
+        }
+    }
+
+    @Test
+    @DisableFeatures(ChromeFeatureList.DATA_SHARING)
+    @Feature("Tab Strip Group Context Menu")
+    public void testListMenuItems_belowApi31() {
+        // Build custom view first to setup menu view.
+        MultiWindowUtils.setMultiInstanceApi31EnabledForTesting(false);
+        mTabGroupContextMenuCoordinator.buildCustomView(mMenuView, /* isIncognito= */ false);
+        ModelList modelList = new ModelList();
+        mTabGroupContextMenuCoordinator.buildMenuActionItems(modelList, TAB_GROUP_ID);
+
+        // Assert: verify move group option does not show.
+        for (int i = 0; i < modelList.size(); i++) {
+            if (modelList.get(i).model.containsKey(ListMenuItemProperties.MENU_ITEM_ID)) {
+                assertNotEquals(
+                        R.id.move_to_other_window_menu_id,
                         modelList.get(i).model.get(ListMenuItemProperties.MENU_ITEM_ID));
             }
         }
@@ -256,7 +294,7 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         mTabGroupContextMenuCoordinator.buildCollaborationMenuItems(modelList, MemberRole.OWNER);
 
         // Assert: verify number of items in the model list.
-        assertEquals("Number of items in the list menu is incorrect", 7, modelList.size());
+        assertEquals("Number of items in the list menu is incorrect", 8, modelList.size());
 
         // Assert: verify collaboration menu items; shared group should not have the option to
         // ungroup.
@@ -281,7 +319,7 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         mTabGroupContextMenuCoordinator.buildCollaborationMenuItems(modelList, MemberRole.MEMBER);
 
         // Assert: verify number of items in the model list.
-        assertEquals("Number of items in the list menu is incorrect", 7, modelList.size());
+        assertEquals("Number of items in the list menu is incorrect", 8, modelList.size());
 
         // Assert: verify collaboration menu items; shared group should not have the option to
         // ungroup.
@@ -295,49 +333,141 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         setUpTabGroupModelFilter();
 
         // Verify tab group is ungrouped.
-        mOnItemClickedCallback.onClick(R.id.ungroup_tab, TAB_GROUP_ID, /* collaborationId= */ null);
+        mOnItemClickedCallback.onClick(
+                R.id.ungroup_tab,
+                TAB_GROUP_ID,
+                /* collaborationId= */ null,
+                /* listViewTouchTracker= */ null);
         verify(mTabUngrouper)
                 .ungroupTabs(TAB_GROUP_ID, /* trailing= */ true, /* allowDialog= */ true);
     }
 
     @Test
     @Feature("Tab Strip Group Context Menu")
-    public void testItemClicked_CloseGroup() {
+    public void testMenuItemClicked_CloseGroup_NullListViewTouchTracker() {
+        testItemClicked_CloseOrDeleteGroup(
+                R.id.close_tab_group,
+                /* listViewTouchTracker= */ null,
+                /* shouldAllowUndo= */ true,
+                /* shouldHideTabGroups= */ true);
+    }
+
+    @Test
+    @Feature("Tab Strip Group Context Menu")
+    public void testMenuItemClicked_CloseGroup_ClickWithTouch() {
+        long downMotionTime = SystemClock.uptimeMillis();
+        FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
+        listViewTouchTracker.setLastSingleTapUpInfo(
+                ListViewTouchInfo.fromMotionEvent(
+                        TabUiTestHelper.createTouchMotionEvent(
+                                downMotionTime,
+                                /* eventTime= */ downMotionTime + 50,
+                                MotionEvent.ACTION_UP,
+                                /* x= */ 0,
+                                /* y= */ 0)));
+
+        testItemClicked_CloseOrDeleteGroup(
+                R.id.close_tab_group,
+                listViewTouchTracker,
+                /* shouldAllowUndo= */ true,
+                /* shouldHideTabGroups= */ true);
+    }
+
+    @Test
+    @Feature("Tab Strip Group Context Menu")
+    public void testMenuItemClicked_CloseGroup_ClickWithMouse() {
+        long downMotionTime = SystemClock.uptimeMillis();
+        FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
+        listViewTouchTracker.setLastSingleTapUpInfo(
+                ListViewTouchInfo.fromMotionEvent(
+                        TabUiTestHelper.createMouseMotionEvent(
+                                downMotionTime,
+                                /* eventTime= */ downMotionTime + 50,
+                                MotionEvent.ACTION_UP,
+                                /* x= */ 0,
+                                /* y= */ 0)));
+
+        testItemClicked_CloseOrDeleteGroup(
+                R.id.close_tab_group,
+                listViewTouchTracker,
+                /* shouldAllowUndo= */ false,
+                /* shouldHideTabGroups= */ true);
+    }
+
+    @Test
+    @Feature("Tab Strip Group Context Menu")
+    public void testMenuItemClicked_DeleteGroup_NullListViewTouchTracker() {
+        testItemClicked_CloseOrDeleteGroup(
+                R.id.delete_tab_group,
+                /* listViewTouchTracker= */ null,
+                /* shouldAllowUndo= */ true,
+                /* shouldHideTabGroups= */ false);
+    }
+
+    @Test
+    @Feature("Tab Strip Group Context Menu")
+    public void testMenuItemClicked_DeleteGroup_ClickWithTouch() {
+        long downMotionTime = SystemClock.uptimeMillis();
+        FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
+        listViewTouchTracker.setLastSingleTapUpInfo(
+                ListViewTouchInfo.fromMotionEvent(
+                        TabUiTestHelper.createTouchMotionEvent(
+                                downMotionTime,
+                                /* eventTime= */ downMotionTime + 50,
+                                MotionEvent.ACTION_UP,
+                                /* x= */ 0,
+                                /* y= */ 0)));
+
+        testItemClicked_CloseOrDeleteGroup(
+                R.id.delete_tab_group,
+                listViewTouchTracker,
+                /* shouldAllowUndo= */ true,
+                /* shouldHideTabGroups= */ false);
+    }
+
+    @Test
+    @Feature("Tab Strip Group Context Menu")
+    public void testMenuItemClicked_DeleteGroup_ClickWithMouse() {
+        long downMotionTime = SystemClock.uptimeMillis();
+        FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
+        listViewTouchTracker.setLastSingleTapUpInfo(
+                ListViewTouchInfo.fromMotionEvent(
+                        TabUiTestHelper.createMouseMotionEvent(
+                                downMotionTime,
+                                /* eventTime= */ downMotionTime + 50,
+                                MotionEvent.ACTION_UP,
+                                /* x= */ 0,
+                                /* y= */ 0)));
+
+        testItemClicked_CloseOrDeleteGroup(
+                R.id.delete_tab_group,
+                listViewTouchTracker,
+                /* shouldAllowUndo= */ false,
+                /* shouldHideTabGroups= */ false);
+    }
+
+    private void testItemClicked_CloseOrDeleteGroup(
+            @IdRes int menuId,
+            @Nullable ListViewTouchTracker listViewTouchTracker,
+            boolean shouldAllowUndo,
+            boolean shouldHideTabGroups) {
+        assertTrue(menuId == R.id.close_tab_group || menuId == R.id.delete_tab_group);
+
         // Initialize.
         List<Tab> tabsInGroup = setUpTabGroupModelFilter();
 
         // Verify tab group closed.
         mOnItemClickedCallback.onClick(
-                R.id.close_tab_group, TAB_GROUP_ID, /* collaborationId= */ null);
+                menuId, TAB_GROUP_ID, /* collaborationId= */ null, listViewTouchTracker);
         verify(mTabRemover)
                 .closeTabs(
                         argThat(
                                 params ->
                                         params.tabs.get(0) == tabsInGroup.get(0)
-                                                && params.allowUndo
-                                                && params.hideTabGroups),
-                        eq(true),
-                        any());
-    }
-
-    @Test
-    @Feature("Tab Strip Group Context Menu")
-    public void testMenuItemClicked_DeleteGroup() {
-        // Initialize.
-        List<Tab> tabsInGroup = setUpTabGroupModelFilter();
-
-        // Verify tab group deleted.
-        mOnItemClickedCallback.onClick(
-                R.id.delete_tab_group, TAB_GROUP_ID, /* collaborationId= */ null);
-        verify(mTabRemover)
-                .closeTabs(
-                        argThat(
-                                params ->
-                                        params.tabs.get(0) == tabsInGroup.get(0)
-                                                && params.allowUndo
-                                                && !params.hideTabGroups),
-                        eq(true),
-                        any());
+                                                && (params.allowUndo == shouldAllowUndo)
+                                                && (params.hideTabGroups == shouldHideTabGroups)),
+                        /* allowDialog= */ eq(true),
+                        /* listener= */ any());
     }
 
     @Test
@@ -348,9 +478,29 @@ public class TabGroupContextMenuCoordinatorUnitTest {
 
         // Verify new tab opened in group.
         mOnItemClickedCallback.onClick(
-                R.id.open_new_tab_in_group, TAB_GROUP_ID, /* collaborationId= */ null);
+                R.id.open_new_tab_in_group,
+                TAB_GROUP_ID,
+                /* collaborationId= */ null,
+                /* listViewTouchTracker= */ null);
         verify(mTabCreator)
                 .createNewTab(any(), eq(TabLaunchType.FROM_TAB_GROUP_UI), eq(tabsInGroup.get(0)));
+    }
+
+    @Test
+    @Feature("Tab Strip Group Context Menu")
+    public void testMenuItemClicked_MoveGroup() {
+        // Initialize.
+        setUpTabGroupModelFilter();
+
+        // Fake a click on the move group action.
+        mOnItemClickedCallback.onClick(
+                R.id.move_to_other_window_menu_id,
+                TAB_GROUP_ID,
+                /* collaborationId= */ null,
+                /* listViewTouchTracker= */ null);
+
+        // Verify.
+        verify(mMultiInstanceManager).moveTabGroupToOtherWindow(any(TabGroupMetadata.class));
     }
 
     @Test
@@ -411,6 +561,12 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         assertEquals(
                 R.id.close_tab_group,
                 modelList.get(closeGroupPosition).model.get(ListMenuItemProperties.MENU_ITEM_ID));
+        assertEquals(
+                R.id.move_to_other_window_menu_id,
+                modelList
+                        .get(closeGroupPosition + 1)
+                        .model
+                        .get(ListMenuItemProperties.MENU_ITEM_ID));
     }
 
     private void verifyCollaborationListItems(ModelList modelList, @MemberRole int memberRole) {
@@ -431,19 +587,23 @@ public class TabGroupContextMenuCoordinatorUnitTest {
                 R.id.close_tab_group,
                 modelList.get(4).model.get(ListMenuItemProperties.MENU_ITEM_ID));
         assertEquals(0, modelList.get(4).model.get(ListMenuItemProperties.START_ICON_ID));
-        verifyDivider(modelList.get(5));
+        assertEquals(
+                R.id.move_to_other_window_menu_id,
+                modelList.get(5).model.get(ListMenuItemProperties.MENU_ITEM_ID));
+        assertEquals(0, modelList.get(4).model.get(ListMenuItemProperties.START_ICON_ID));
+        verifyDivider(modelList.get(6));
 
         // Verify delete group or leave group depending on the member role.
         if (memberRole == MemberRole.OWNER) {
             assertEquals(
                     R.id.delete_shared_group,
-                    modelList.get(6).model.get(ListMenuItemProperties.MENU_ITEM_ID));
+                    modelList.get(7).model.get(ListMenuItemProperties.MENU_ITEM_ID));
         } else if (memberRole == MemberRole.MEMBER) {
             assertEquals(
                     R.id.leave_group,
-                    modelList.get(6).model.get(ListMenuItemProperties.MENU_ITEM_ID));
+                    modelList.get(7).model.get(ListMenuItemProperties.MENU_ITEM_ID));
         }
-        assertEquals(0, modelList.get(6).model.get(ListMenuItemProperties.START_ICON_ID));
+        assertEquals(0, modelList.get(7).model.get(ListMenuItemProperties.START_ICON_ID));
     }
 
     private void verifyDivider(ListItem item) {

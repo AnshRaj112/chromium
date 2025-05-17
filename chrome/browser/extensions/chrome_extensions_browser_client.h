@@ -64,6 +64,7 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
 
   // ExtensionsBrowserClient overrides:
   void Init() override;
+  void StartTearDown() override;
   bool IsShuttingDown() override;
   bool AreExtensionsDisabled(const base::CommandLine& command_line,
                              content::BrowserContext* context) override;
@@ -159,6 +160,8 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
   void ReportError(content::BrowserContext* context,
                    std::unique_ptr<ExtensionError> error) override;
   void ClearBackForwardCache() override;
+  void AttachExtensionTaskManagerTag(content::WebContents* web_contents,
+                                     mojom::ViewType view_type) override;
   scoped_refptr<update_client::UpdateClient> CreateUpdateClient(
       content::BrowserContext* context) override;
   std::unique_ptr<ScopedExtensionUpdaterKeepAlive> CreateUpdaterKeepAlive(
@@ -173,6 +176,8 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
                           content::BrowserContext* context) const override;
   bool IsWebUIAllowedToMakeNetworkRequests(const url::Origin& origin) override;
   network::mojom::NetworkContext* GetSystemNetworkContext() override;
+  UserScriptListener* GetUserScriptListener() override;
+  void SignalContentScriptsLoaded(content::BrowserContext* context) override;
   bool ShouldSchemeBypassNavigationChecks(
       const std::string& scheme) const override;
   base::FilePath GetSaveFilePath(content::BrowserContext* context) override;
@@ -186,7 +191,22 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
                     int tab_id,
                     bool include_incognito,
                     content::WebContents** web_contents) const override;
-  static void set_did_chrome_update_for_testing(bool did_update);
+  bool IsExtensionTelemetryServiceEnabled(
+      content::BrowserContext* context) const override;
+  void NotifyExtensionApiTabExecuteScript(
+      content::BrowserContext* context,
+      const ExtensionId& extension_id,
+      const std::string& code) const override;
+  void NotifyExtensionApiDeclarativeNetRequest(
+      content::BrowserContext* context,
+      const ExtensionId& extension_id,
+      const std::vector<api::declarative_net_request::Rule>& rules)
+      const override;
+  void NotifyExtensionDeclarativeNetRequestRedirectAction(
+      content::BrowserContext* context,
+      const ExtensionId& extension_id,
+      const GURL& request_url,
+      const GURL& redirect_url) const override;
   bool IsUsbDeviceAllowedByPolicy(content::BrowserContext* context,
                                   const ExtensionId& extension_id,
                                   int vendor_id,
@@ -221,6 +241,8 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
                                  const GURL& url,
                                  const std::u16string& url_title,
                                  int call_type) override;
+  void CreatePasswordReuseDetectionManager(
+      content::WebContents* web_contents) const override;
   media_device_salt::MediaDeviceSaltService* GetMediaDeviceSaltService(
       content::BrowserContext* context) override;
   bool HasControlledFrameCapability(content::BrowserContext* context,
@@ -230,32 +252,11 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
 // for these methods, so we cannot declare them here (otherwise the linker
 // sees them as un-implemented).
 #if BUILDFLAG(ENABLE_EXTENSIONS)
-  void StartTearDown() override;
   void CleanUpWebView(content::BrowserContext* browser_context,
                       int embedder_process_id,
                       int view_instance_id) override;
-  void AttachExtensionTaskManagerTag(content::WebContents* web_contents,
-                                     mojom::ViewType view_type) override;
-  UserScriptListener* GetUserScriptListener() override;
-  void SignalContentScriptsLoaded(content::BrowserContext* context) override;
-  bool IsExtensionTelemetryServiceEnabled(
-      content::BrowserContext* context) const override;
   ScriptExecutor* GetScriptExecutorForTab(
       content::WebContents& web_contents) override;
-  void NotifyExtensionApiTabExecuteScript(
-      content::BrowserContext* context,
-      const ExtensionId& extension_id,
-      const std::string& code) const override;
-  void NotifyExtensionApiDeclarativeNetRequest(
-      content::BrowserContext* context,
-      const ExtensionId& extension_id,
-      const std::vector<api::declarative_net_request::Rule>& rules)
-      const override;
-  void NotifyExtensionDeclarativeNetRequestRedirectAction(
-      content::BrowserContext* context,
-      const ExtensionId& extension_id,
-      const GURL& request_url,
-      const GURL& redirect_url) const override;
   void GetWebViewStoragePartitionConfig(
       content::BrowserContext* browser_context,
       content::SiteInstance* owner_site_instance,
@@ -263,9 +264,9 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
       bool in_memory,
       base::OnceCallback<void(std::optional<content::StoragePartitionConfig>)>
           callback) override;
-  void CreatePasswordReuseDetectionManager(
-      content::WebContents* web_contents) const override;
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
+
+  static void set_did_chrome_update_for_testing(bool did_update);
 
  private:
   friend struct base::LazyInstanceTraitsBase<ChromeExtensionsBrowserClient>;

@@ -692,6 +692,17 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Arc.Attestation.CertificateSigning.Result"
+    enum="CertificateSigningResult" expires_after="2026-04-01">
+  <owner>batoon@google.com</owner>
+  <owner>arc-commercial@google.com</owner>
+  <summary>
+    Records the result received from the Android Attestation server when
+    requesting signed certificates. It is emitted for every request for signed
+    certificates.
+  </summary>
+</histogram>
+
 <histogram name="Arc.Auth.AccountCheck.Status{ArcUserTypes}"
     enum="ArcAuthAccountCheckStatus" expires_after="never">
 <!-- expires-never: Needed for long-term health monitoring of ARC provisioning. -->
@@ -1221,6 +1232,17 @@ chromium-metrics-reviews@google.com.
   <summary>
     Records how often a specific function within the game controls editing list
     is triggered.
+  </summary>
+</histogram>
+
+<histogram name="Arc.GameControls.PlayGameWithGameControls" enum="Boolean"
+    expires_after="2026-05-12">
+  <owner>cuicuiruan@google.com</owner>
+  <owner>arc-gaming@google.com</owner>
+  <summary>
+    Records wheather users play the game with the Game Controls feature. It
+    records one time only before shutting down the game. If it is played with
+    Game Controls, record it immediately.
   </summary>
 </histogram>
 

@@ -4,21 +4,28 @@
 
 #import "ios/chrome/browser/intelligence/glic/ui/glic_constants.h"
 
-// Sheet detents.
-NSString* const kGLICConsentPartialDetentIdentifier =
+NSString* const kGLICPromoConsentPartialDetentIdentifier =
     @"GLICConsentPartialDetentIdentifier";
-NSString* const kGLICConsentFullDetentIdentifier =
+NSString* const kGLICPromoConsentFullDetentIdentifier =
     @"GLICConsentFullDetentIdentifier";
-const CGFloat kGLICConsentPartialDetentHeight = 300.0;
-const CGFloat kGLICConsentFullDetentHeight = 500.0;
-const CGFloat kGLICConsentPreferredCornerRadius = 10.0;
 
-// Stack view insets and spacing.
-const CGFloat kGLICConsentMainStackHorizontalInset = 20.0;
-const CGFloat kGLICConsentMainStackTopInset = 24.0;
-const CGFloat kGLICConsentMainStackSpacing = 16.0;
-
-// Promo style strings.
-// TODO(crbug.com/414778685): Add strings.
+NSString* const kGLICPromoPrimaryAction = @"Try it out";
 NSString* const kGLICConsentPrimaryAction = @"Yes, I'm in";
-NSString* const kGLICConsentSecondaryAction = @"No thanks";
+NSString* const kGLICPromoConsentSecondaryAction = @"No thanks";
+
+NSString* const kGLICPromoMainTitleText = @"Lorem ipsum dolor sit amet.";
+NSString* const kGLICPromoSubTitleText =
+    @"Lorem ipsum dolor sit amet, consecte tur adipiscing purposes. Sed do.";
+
+NSString* const kGLICConsentFirstBoxTitleText =
+    @"Lorem ipsum dolor sit amet, consecte tur adipiscing elit.";
+NSString* const kGLICConsentFirstBoxBodyText =
+    @"Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut "
+    @"enim ad minim.";
+NSString* const kGLICConsentSecondBoxTitleText = @"Lorem ipsum dolor sit amet";
+NSString* const kGLICConsentSecondBoxBodyText =
+    @"Lorem ipsum dolor sit amet, consecte tur adipiscing purposes. Sed do "
+    @"eiusmod tempor incididunt ut labore et dolore magna ali. eiusmod tempor "
+    @"incididunt ut labore et dolore magna ali.";
+NSString* const kGLICConsentFootNoteText =
+    @"Lorem ipsum dolor sit amet, consecte tur adipiscing elit.";

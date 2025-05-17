@@ -44,7 +44,6 @@ import org.chromium.base.ThreadUtils;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.CriteriaHelper;
-import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.DoNotBatch;
 import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.base.test.util.Restriction;
@@ -209,7 +208,11 @@ public class CollaborationIntegrationTest {
         mActivityTestRule.loadUrlInNewTab(mUrl);
 
         final AtomicBoolean joinCalled = new AtomicBoolean();
-        mDataSharingUIDelegate.setShowJoinFlowRunnable(() -> joinCalled.set(true));
+        Callback<Boolean> callback =
+                (success) -> {
+                    joinCalled.set(true);
+                };
+        mDataSharingUIDelegate.setShowJoinFlowCallback(callback);
         setFakePreviewData();
 
         // Verify that the fullscreen sign-in promo is shown and accept.
@@ -298,7 +301,6 @@ public class CollaborationIntegrationTest {
 
     @Test
     @MediumTest
-    @DisabledTest(message = "crbug.com/415943165")
     public void testDataSharingShowShare() {
         setUpSyncAndSignIn();
 
@@ -308,6 +310,7 @@ public class CollaborationIntegrationTest {
         // Setting create flow callback to show share sheet with share link.
         Callback<Boolean> callback =
                 (success) -> {
+                    mActivityTestRule.getFakeServerHelper().addCollaboration(TEST_COLLABORATION_ID);
                     mDataSharingUIDelegate.forceGroupCreation(
                             TEST_COLLABORATION_ID, TEST_ACCESS_TOKEN);
                 };
@@ -371,15 +374,18 @@ public class CollaborationIntegrationTest {
     // Prepares the tab group to be shared.
     private void prepareToShareTabGroup(
             boolean owner, LocalTabGroupId tabGroupId, String collaborationId) {
-        TabGroupSyncService tabGroupSyncService = getTabGroupSyncService();
-        assert (tabGroupSyncService != null && collaborationId != null);
-        mActivityTestRule.getFakeServerHelper().addCollaboration(collaborationId);
-        tabGroupSyncService.setCollaborationAvailableInFinderForTesting(collaborationId);
-        SavedTabGroup savedGroup = tabGroupSyncService.getGroup(tabGroupId);
-        assert (savedGroup != null && savedGroup.collaborationId == null);
-        mActivityTestRule.getFakeServerHelper().addCollaborationGroupToFakeServer(collaborationId);
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
+                    TabGroupSyncService tabGroupSyncService = getTabGroupSyncService();
+                    assert (tabGroupSyncService != null && collaborationId != null);
+                    tabGroupSyncService.setCollaborationAvailableInFinderForTesting(
+                            collaborationId);
+                    SavedTabGroup savedGroup = tabGroupSyncService.getGroup(tabGroupId);
+                    assert (savedGroup != null && savedGroup.collaborationId == null);
+                    mActivityTestRule
+                            .getFakeServerHelper()
+                            .addCollaborationGroupToFakeServer(collaborationId);
+
                     mActivityTestRule.getSyncService().triggerRefresh();
                 });
     }

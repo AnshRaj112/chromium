@@ -291,6 +291,9 @@ BASE_DECLARE_FEATURE(kEnableLensViewFinderUnifiedExperience);
 // Feature flag to enable the Lens Context Menu Unified experience
 BASE_DECLARE_FEATURE(kEnableLensContextMenuUnifiedExperience);
 
+// Whether to enable loading AIM in the lens result page.
+BASE_DECLARE_FEATURE(kLensLoadAIMInLensResultPage);
+
 // Feature flag to enable the Lens overlay location bar entrypoint. Enabled by
 // default.
 BASE_DECLARE_FEATURE(kLensOverlayEnableLocationBarEntrypoint);
@@ -1048,6 +1051,12 @@ BASE_DECLARE_FEATURE(kContainedTabGroup);
 // Whether the feature associated with contained tab group is enabled.
 bool IsContainedTabGroupEnabled();
 
+// Feature flag to have more color for the tab groups.
+BASE_DECLARE_FEATURE(kColorfulTabGroup);
+
+// Whether the feature associated with colorful tab group is enabled.
+bool IsColorfulTabGroupEnabled();
+
 // Feature flag to highlight the app's features during the FRE.
 BASE_DECLARE_FEATURE(kBestOfAppFRE);
 
@@ -1057,6 +1066,9 @@ bool IsBestOfAppFREEnabled();
 
 // Whether the Guided Tour variant of `kBestOfAppFRE` is enabled.
 bool IsBestOfAppGuidedTourEnabled();
+
+// Whether the Lens Interactive Promo variant of `kBestOfAppFRE` is enabled.
+bool IsBestOfAppLensInteractivePromoEnabled();
 
 // Feature flag to include GWS variations in feedback.
 BASE_DECLARE_FEATURE(kFeedbackIncludeGWSVariations);

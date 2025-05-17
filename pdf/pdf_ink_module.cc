@@ -23,6 +23,7 @@
 #include "base/notreached.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/time/time.h"
+#include "base/timer/timer.h"
 #include "base/values.h"
 #include "pdf/draw_utils/page_boundary_intersect.h"
 #include "pdf/input_utils.h"
@@ -55,6 +56,7 @@
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/cursor/cursor.h"
 #include "ui/base/cursor/mojom/cursor_type.mojom.h"
+#include "ui/events/event_constants.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/point_conversions.h"
 #include "ui/gfx/geometry/point_f.h"
@@ -346,6 +348,8 @@ bool PdfInkModule::OnMessage(const base::Value::Dict& message) {
           {"annotationUndo", &PdfInkModule::HandleAnnotationUndoMessage},
           {"finishTextAnnotation",
            &PdfInkModule::HandleFinishTextAnnotationMessage},
+          {"getAllTextAnnotations",
+           &PdfInkModule::HandleGetAllTextAnnotationsMessage},
           {"getAnnotationBrush",
            &PdfInkModule::HandleGetAnnotationBrushMessage},
           {"setAnnotationBrush",
@@ -451,8 +455,8 @@ bool PdfInkModule::OnMouseDown(const blink::WebMouseEvent& event) {
     }
 
     if (IsHighlightingTextAtPosition(state, position)) {
-      return StartTextHighlight(position, event.ClickCount(),
-                                event.TimeStamp());
+      return StartTextHighlight(position, event.ClickCount(), event.TimeStamp(),
+                                ink::StrokeInput::ToolType::kMouse);
     }
 
     return StartStroke(position, event.TimeStamp(),
@@ -471,7 +475,8 @@ bool PdfInkModule::OnMouseUp(const blink::WebMouseEvent& event) {
 
   gfx::PointF position = event.PositionInWidget();
   if (features::kPdfInk2TextHighlighting.Get() && is_text_highlighting()) {
-    return FinishTextHighlight(position);
+    return FinishTextHighlight(position, /*is_multi_click=*/false,
+                               ink::StrokeInput::ToolType::kMouse);
   }
 
   return is_drawing_stroke()
@@ -482,6 +487,14 @@ bool PdfInkModule::OnMouseUp(const blink::WebMouseEvent& event) {
 
 bool PdfInkModule::OnMouseMove(const blink::WebMouseEvent& event) {
   CHECK(enabled());
+
+  // Before the multi-click text selection timer fired, the mouse moved to a new
+  // position, so the click count can no longer increment. Fire the timer
+  // immediately.
+  if (features::kPdfInk2TextHighlighting.Get() &&
+      text_selection_click_timer_.IsRunning()) {
+    text_selection_click_timer_.FireNow();
+  }
 
   gfx::PointF position = event.PositionInWidget();
 
@@ -554,7 +567,8 @@ bool PdfInkModule::OnTouchStart(const blink::WebTouchEvent& event) {
   if (is_drawing_stroke()) {
     if (IsHighlightingTextAtPosition(drawing_stroke_state(), position)) {
       // Multi-click text selection for touch is not supported.
-      return StartTextHighlight(position, /*click_count=*/1, event.TimeStamp());
+      return StartTextHighlight(position, /*click_count=*/1, event.TimeStamp(),
+                                tool_type);
     }
     return StartStroke(position, event.TimeStamp(), tool_type);
   }
@@ -577,7 +591,7 @@ bool PdfInkModule::OnTouchEnd(const blink::WebTouchEvent& event) {
 
   gfx::PointF position = event.touches[0].PositionInWidget();
   if (features::kPdfInk2TextHighlighting.Get() && is_text_highlighting()) {
-    return FinishTextHighlight(position);
+    return FinishTextHighlight(position, /*is_multi_click=*/false, tool_type);
   }
 
   return is_drawing_stroke()
@@ -616,6 +630,8 @@ bool PdfInkModule::StartStroke(const gfx::PointF& position,
     // Do not draw when not on a page.
     return false;
   }
+
+  client_->StrokeStarted();
 
   CHECK(is_drawing_stroke());
   DrawingStrokeState& state = drawing_stroke_state();
@@ -768,7 +784,7 @@ bool PdfInkModule::FinishStroke(const gfx::PointF& position,
         client_->GetPageContentsRect(state.page_index), client_->GetZoom()));
   }
 
-  client_->StrokeFinished();
+  client_->StrokeFinished(/*modified=*/true);
   GenerateAndSendInkThumbnailInternal(state.page_index);
 
   bool undo_redo_success = undo_redo_model_.FinishDraw();
@@ -799,6 +815,8 @@ bool PdfInkModule::StartEraseStroke(const gfx::PointF& position,
     // Do not erase when not on a page.
     return false;
   }
+
+  client_->StrokeStarted();
 
   CHECK(is_erasing_stroke());
   EraserState& state = erasing_stroke_state();
@@ -861,14 +879,17 @@ bool PdfInkModule::FinishEraseStroke(const gfx::PointF& position,
 
   CHECK(is_erasing_stroke());
   EraserState& state = erasing_stroke_state();
-  if (!state.page_indices_with_stroke_erasures.empty() ||
-      !state.page_indices_with_partitioned_mesh_erasures.empty()) {
-    client_->StrokeFinished();
+  const bool modified =
+      !state.page_indices_with_stroke_erasures.empty() ||
+      !state.page_indices_with_partitioned_mesh_erasures.empty();
+  if (modified) {
     RequestThumbnailUpdates(
         /*ink_updates=*/state.page_indices_with_stroke_erasures,
         /*pdf_updates=*/state.page_indices_with_partitioned_mesh_erasures);
     ReportEraseStroke(tool_type);
   }
+
+  client_->StrokeFinished(modified);
 
   // Reset `state` now that the erase operation is done.
   state.erasing = false;
@@ -968,10 +989,18 @@ void PdfInkModule::EraseHelper(const gfx::PointF& position, int page_index) {
 
 bool PdfInkModule::StartTextHighlight(const gfx::PointF& position,
                                       int click_count,
-                                      base::TimeTicks timestamp) {
+                                      base::TimeTicks timestamp,
+                                      ink::StrokeInput::ToolType tool_type) {
+  client_->StrokeStarted();
+
   current_tool_state_.emplace<TextHighlightState>();
 
-  if (click_count == 3) {
+  bool is_double_click = click_count == 2;
+  bool is_triple_click = click_count == 3;
+  if (is_double_click) {
+    StartTextSelectionMultiClickTimer(tool_type);
+  } else if (is_triple_click) {
+    StopTextSelectionMultiClickTimer();
     // Clicking the same text position two times will select the word. An
     // additional third click will select the line. `StartTextHighlight()` is
     // called for every click count, so the two click text selection has already
@@ -987,50 +1016,77 @@ bool PdfInkModule::StartTextHighlight(const gfx::PointF& position,
   // Notifying the client will update the text selection.
   client_->OnTextOrLinkAreaClick(position, click_count);
 
+  if (is_double_click || is_triple_click) {
+    return FinishTextHighlight(position, /*is_multi_click=*/true, tool_type);
+  }
+
   return true;
 }
 
 bool PdfInkModule::ContinueTextHighlight(const gfx::PointF& position) {
   CHECK(is_text_highlighting());
+  auto& state = text_highlight_state();
+  if (state.finished_multi_click) {
+    // This text highlight has already processed multi-click text selection, so
+    // do not extend the selection.
+    return true;
+  }
+
   client_->ExtendSelectionByPoint(position);
-  text_highlight_state().highlight_strokes = GetTextSelectionAsStrokes();
+  state.highlight_strokes = GetTextSelectionAsStrokes();
   return true;
 }
 
-bool PdfInkModule::FinishTextHighlight(const gfx::PointF& position) {
+bool PdfInkModule::FinishTextHighlight(const gfx::PointF& position,
+                                       bool is_multi_click,
+                                       ink::StrokeInput::ToolType tool_type) {
   CHECK(is_text_highlighting());
 
-  auto& highlight_strokes = text_highlight_state().highlight_strokes;
-  highlight_strokes = GetTextSelectionAsStrokes();
-  for (const auto& [page_index, strokes] : highlight_strokes) {
-    for (const auto& stroke : strokes) {
-      InkStrokeId id = stroke_id_generator_.GetIdAndAdvance();
-      client_->StrokeAdded(page_index, id, stroke);
-      strokes_[page_index].push_back(
-          FinishedStrokeState(std::move(stroke), id));
-      bool undo_redo_success = undo_redo_model_.Draw(id);
-      CHECK(undo_redo_success);
+  auto& state = text_highlight_state();
+  if (!state.finished_multi_click) {
+    auto& highlight_strokes = state.highlight_strokes;
+    highlight_strokes = GetTextSelectionAsStrokes();
+    for (const auto& [page_index, strokes] : highlight_strokes) {
+      for (const auto& stroke : strokes) {
+        InkStrokeId id = stroke_id_generator_.GetIdAndAdvance();
+        client_->StrokeAdded(page_index, id, stroke);
+        strokes_[page_index].push_back(
+            FinishedStrokeState(std::move(stroke), id));
+        bool undo_redo_success = undo_redo_model_.Draw(id);
+        CHECK(undo_redo_success);
+      }
+
+      GenerateAndSendInkThumbnailInternal(page_index);
     }
 
-    GenerateAndSendInkThumbnailInternal(page_index);
+    const bool modified = !highlight_strokes.empty();
+    if (modified) {
+      if (!text_selection_click_timer_.IsRunning()) {
+        ReportTextHighlight(highlighter_brush_.ink_brush(), tool_type);
+      }
+
+      // Invalidation is already handled by the client during text selection.
+    }
+
+    bool undo_redo_success = undo_redo_model_.FinishDraw();
+    CHECK(undo_redo_success);
+
+    client_->ClearSelection();
+
+    // Only call StrokeFinished() in this block, where
+    // `!state.finished_multi_click` is false.
+    client_->StrokeFinished(modified);
   }
 
-  if (!highlight_strokes.empty()) {
-    client_->StrokeFinished();
-
-    // TODO(crbug.com/342445982): Add text highlighting metrics.
-
-    // Invalidation is already handled by the client during text selection.
+  if (is_multi_click) {
+    // Stay in text highlight state to handle any additional events.
+    state.finished_multi_click = true;
+    return true;
   }
-
-  bool undo_redo_success = undo_redo_model_.FinishDraw();
-  CHECK(undo_redo_success);
 
   // Reset state back to a drawing highlighter brush.
   current_tool_state_.emplace<DrawingStrokeState>();
   drawing_stroke_state().brush_type = PdfInkBrush::Type::kHighlighter;
-
-  client_->ClearSelection();
 
   if (!client_->IsSelectableTextOrLinkArea(position)) {
     MaybeSetCursor();
@@ -1142,6 +1198,18 @@ PdfInkModule::GetTextSelectionAsStrokes() {
   return result;
 }
 
+void PdfInkModule::StartTextSelectionMultiClickTimer(
+    ink::StrokeInput::ToolType tool_type) {
+  text_selection_click_timer_.Start(
+      FROM_HERE, base::Milliseconds(ui::kDoubleClickTimeMs),
+      base::BindOnce(&ReportTextHighlight, highlighter_brush_.ink_brush(),
+                     tool_type));
+}
+
+void PdfInkModule::StopTextSelectionMultiClickTimer() {
+  text_selection_click_timer_.Stop();
+}
+
 void PdfInkModule::MaybeRecordPenInput(ink::StrokeInput::ToolType tool_type) {
   if (tool_type == ink::StrokeInput::ToolType::kStylus) {
     using_stylus_instead_of_touch_ = true;
@@ -1162,6 +1230,14 @@ void PdfInkModule::HandleAnnotationRedoMessage(
 void PdfInkModule::HandleAnnotationUndoMessage(
     const base::Value::Dict& message) {
   ApplyUndoRedoCommands(undo_redo_model_.Undo());
+}
+
+void PdfInkModule::HandleGetAllTextAnnotationsMessage(
+    const base::Value::Dict& message) {
+  // TODO(crbug.com/408926609): Fill in this method. For now, just return an
+  // empty set of annotations.
+  client_->PostMessage(
+      PrepareReplyMessage(message).Set("annotations", base::Value::List()));
 }
 
 void PdfInkModule::HandleGetAnnotationBrushMessage(

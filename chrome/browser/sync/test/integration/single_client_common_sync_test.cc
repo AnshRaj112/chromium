@@ -41,6 +41,7 @@
 #include "components/sync/protocol/sync.pb.h"
 #include "components/sync/protocol/sync_enums.pb.h"
 #include "components/sync/service/glue/sync_transport_data_prefs.h"
+#include "components/sync/service/sync_service_utils.h"
 #include "components/sync/test/fake_server.h"
 #include "components/sync_bookmarks/bookmark_sync_service.h"
 #include "content/public/test/browser_test.h"
@@ -328,6 +329,10 @@ IN_PROC_BROWSER_TEST_F(SingleClientGetUnsyncedTypesTest, HttpError) {
                   .Get()
                   .contains(syncer::THEMES));
 
+  // Http error is not an auth error.
+  EXPECT_FALSE(
+      GetClient(0)->service()->HasCachedPersistentAuthErrorForMetrics());
+
   // Clear the error and wait for the local changes to be committed.
   GetFakeServer()->ClearHttpError();
   ASSERT_TRUE(CommittedAllNudgedChangesChecker(GetSyncService(0)).Wait());
@@ -340,6 +345,8 @@ IN_PROC_BROWSER_TEST_F(SingleClientGetUnsyncedTypesTest, HttpError) {
 }
 
 IN_PROC_BROWSER_TEST_F(SingleClientGetUnsyncedTypesTest, SignInPendingState) {
+  base::HistogramTester histograms;
+
   // Sign in.
   ASSERT_TRUE(SetupClients());
   ASSERT_TRUE(GetClient(0)->SignInPrimaryAccount());
@@ -366,6 +373,9 @@ IN_PROC_BROWSER_TEST_F(SingleClientGetUnsyncedTypesTest, SignInPendingState) {
                   .Get()
                   .contains(syncer::THEMES));
 
+  EXPECT_TRUE(
+      GetClient(0)->service()->HasCachedPersistentAuthErrorForMetrics());
+
   // Clear the error and wait for the local changes to be committed.
   ASSERT_TRUE(GetClient(0)->ExitSignInPendingStateForPrimaryAccount());
   ASSERT_TRUE(CommittedAllNudgedChangesChecker(GetSyncService(0)).Wait());
@@ -375,6 +385,12 @@ IN_PROC_BROWSER_TEST_F(SingleClientGetUnsyncedTypesTest, SignInPendingState) {
                    ->GetTypesWithUnsyncedData({syncer::THEMES})
                    .Get()
                    .contains(syncer::THEMES));
+
+  EXPECT_FALSE(
+      GetClient(0)->service()->HasCachedPersistentAuthErrorForMetrics());
+  histograms.ExpectUniqueSample(
+      "Sync.DataTypeNumUnsyncedEntitiesOnReauthFromPendingState.THEME",
+      /*sample=*/1, /*expected_bucket_count=*/1);
 }
 
 #endif  // !BUILDFLAG(IS_ANDROID)
@@ -496,12 +512,8 @@ IN_PROC_BROWSER_TEST_F(SingleClientFeatureToTransportSyncTest,
   ASSERT_FALSE(GetSyncService(0)->IsSyncFeatureEnabled());
   ASSERT_TRUE(GetClient(0)->AwaitSyncTransportActive());
 
-  // Sync re-downloaded the ReadingList entry into the account store, so it now
-  // exists in both.
   ASSERT_EQ(reading_list_model()->size(), 1ul);
-  ASSERT_EQ(reading_list_model()->GetStorageStateForURLForTesting(kUrl),
-            reading_list::DualReadingListModel::StorageStateForTesting::
-                kExistsInBothModels);
+
   // Verify that the URL is marked as needing upload. Most importantly, this
   // call would CHECK-crash if both models were tracking metadata, so this
   // serves as verification that the Sync-the-feature mode metadata was cleaned
@@ -614,5 +626,35 @@ IN_PROC_BROWSER_TEST_F(SingleClientPolicySyncTest,
   EXPECT_FALSE(
       GetSyncService(0)->GetActiveDataTypes().Has(syncer::DataType::BOOKMARKS));
 }
+
+// Regression test for crbug.com/415728693.
+#if !BUILDFLAG(IS_ANDROID)
+IN_PROC_BROWSER_TEST_F(SingleClientPolicySyncTest,
+                       ApplySyncDisabledPolicyWhileSyncPaused) {
+  ASSERT_TRUE(SetupSync()) << "SetupSync() failed.";
+
+  GetClient(0)->EnterSyncPausedStateForPrimaryAccount();
+  ASSERT_EQ(GetSyncService(0)->GetTransportState(),
+            syncer::SyncService::TransportState::PAUSED);
+  ASSERT_EQ(syncer::GetUploadToGoogleState(GetSyncService(0),
+                                           syncer::PRIORITY_PREFERENCES),
+            syncer::UploadState::NOT_ACTIVE);
+
+  policy::PolicyMap policies;
+  policies.Set(policy::key::kSyncDisabled, policy::POLICY_LEVEL_MANDATORY,
+               policy::POLICY_SCOPE_USER, policy::POLICY_SOURCE_CLOUD,
+               base::Value(true), nullptr);
+  policy_provider()->UpdateChromePolicy(policies);
+
+  // Once the policy is applied, sync should be disabled.
+  ASSERT_EQ(GetSyncService(0)->GetTransportState(),
+            syncer::SyncService::TransportState::DISABLED);
+
+  // Should not crash.
+  ASSERT_EQ(syncer::GetUploadToGoogleState(GetSyncService(0),
+                                           syncer::PRIORITY_PREFERENCES),
+            syncer::UploadState::NOT_ACTIVE);
+}
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 }  // namespace

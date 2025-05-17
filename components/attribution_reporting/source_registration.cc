@@ -66,11 +66,11 @@ void RecordFeatureUsage(const SourceRegistration& result) {
                 25);
 }
 
-}  // namespace
-
 void RecordSourceRegistrationError(SourceRegistrationError error) {
   base::UmaHistogramEnumeration("Conversions.SourceRegistrationError13", error);
 }
+
+}  // namespace
 
 SourceRegistration::SourceRegistration(mojo::DefaultConstruct::Tag tag)
     : destination_set(tag) {}
@@ -275,10 +275,8 @@ bool SourceRegistration::IsValid() const {
     return false;
   }
 
-  for (const auto& spec : trigger_specs.specs()) {
-    if (!spec.event_report_windows().IsValidForExpiry(expiry)) {
-      return false;
-    }
+  if (!trigger_specs.event_report_windows().IsValidForExpiry(expiry)) {
+    return false;
   }
 
   if (aggregatable_report_window < kMinReportWindow ||

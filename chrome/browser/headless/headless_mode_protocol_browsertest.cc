@@ -387,4 +387,14 @@ HEADLESS_MODE_PROTOCOL_TEST_WITH_COMMAND_LINE_EXTRAS(
     "sanity/create-target-secondary-screen.js",
     "--screen-info={label='#1'}{label='#2'}")
 
+HEADLESS_MODE_PROTOCOL_TEST_WITH_COMMAND_LINE_EXTRAS(
+    WindowOpenPopupPlacement,
+    "sanity/window-open-popup-placement.js",
+    "--screen-info={1600x1200} --disable-popup-blocking")
+
+HEADLESS_MODE_PROTOCOL_TEST_WITH_COMMAND_LINE_EXTRAS(
+    WindowSizeSwitchHandling,
+    "sanity/window-size-switch-handling.js",
+    "--screen-info={1600x1200} --window-size=700,500")
+
 }  // namespace headless

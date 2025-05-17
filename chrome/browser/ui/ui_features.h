@@ -208,6 +208,10 @@ BASE_DECLARE_FEATURE(kEnterpriseManagementDisclaimerUsesCustomLabel);
 BASE_DECLARE_FEATURE(kEnterpriseUpdatedProfileCreationScreen);
 BASE_DECLARE_FEATURE(kManagedProfileRequiredInterstitial);
 
+// Enables using the same colors used for the default app menu button for the
+// avatar button states using default colors.
+BASE_DECLARE_FEATURE(kEnableAppMenuButtonColorsForDefaultAvatarButtonStates);
+
 BASE_DECLARE_FEATURE(kWebUITabStrip);
 
 // Controls whether the context menu is shown on a touch press or a touch
@@ -269,6 +273,17 @@ BASE_DECLARE_FEATURE(kByDateHistoryInSidePanel);
 
 // Controls whether to use the TabStrip browser api's controller.
 BASE_DECLARE_FEATURE(kTabStripBrowserApi);
+
+// Controls where tab search lives in the browser.
+BASE_DECLARE_FEATURE(kTabstripComboButton);
+extern const base::FeatureParam<bool> kTabstripComboButtonHasBackground;
+extern const base::FeatureParam<bool> kTabstripComboButtonHasReverseButtonOrder;
+extern const base::FeatureParam<bool> kTabSearchToolbarButton;
+extern const base::FeatureParam<bool> kLaunchedTabSearchToolbarButton;
+bool IsTabSearchMoving();
+bool HasTabstripComboButtonWithBackground();
+bool HasTabstripComboButtonWithReverseButtonOrder();
+bool HasTabSearchToolbarButton();
 
 }  // namespace features
 

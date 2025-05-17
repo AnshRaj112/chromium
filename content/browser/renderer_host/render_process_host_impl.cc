@@ -56,6 +56,7 @@
 #include "base/process/process_handle.h"
 #include "base/rand_util.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/stringprintf.h"
 #include "base/supports_user_data.h"
 #include "base/system/sys_info.h"
 #include "base/task/single_thread_task_runner.h"
@@ -689,6 +690,12 @@ const void* const kEmptySiteProcessCountTrackerKey =
 // flag, enables the browser to track and reuse free and empty renderer
 // processes to optimize process creation and navigation performance.
 bool IsEmptyRendererProcessesReuseAllowed() {
+  // In single-process mode (run_renderer_in_process()), there's no separate
+  // renderer process to track for reuse. This logic is therefore skipped
+  // to prevent issues and because reuse is not applicable.
+  if (RenderProcessHost::run_renderer_in_process()) {
+    return false;
+  }
   return base::FeatureList::IsEnabled(
       features::kTrackEmptyRendererProcessesForReuse);
 }
@@ -1779,6 +1786,7 @@ bool RenderProcessHostImpl::Init() {
 
   if (run_renderer_in_process()) {
     DCHECK(g_renderer_main_thread_factory);
+    CHECK(!in_process_renderer_);
     // Crank up a thread and run the initialization there.  With the way that
     // messages flow between the browser and renderer, this thread is required
     // to prevent a deadlock in single-process mode.  Since the primordial
@@ -4626,9 +4634,11 @@ bool RenderProcessHostImpl::MayReuseAndIsSuitable(
     RenderProcessHost* host,
     const IsolationContext& isolation_context,
     const SiteInfo& site_info) {
+  // Don't check for renderer responsiveness in single-process mode - even if
+  // it's unresponsive we can't create another one and trying will crash us.
   return host->MayReuseHost() &&
          IsSuitableHost(host, isolation_context, site_info) &&
-         !IsRendererUnresponsive(host);
+         (run_renderer_in_process() || !IsRendererUnresponsive(host));
 }
 
 // static
@@ -5288,11 +5298,11 @@ uint64_t RenderProcessHostImpl::GetPrivateMemoryFootprint() {
       memory_instrumentation::mojom::PlatformPrivateFootprint::New();
 #if BUILDFLAG(IS_APPLE) && !BUILDFLAG(IS_IOS_TVOS)
   bool success = memory_instrumentation::OSMetrics::FillOSMemoryDump(
-      GetProcess().Handle(), ChildProcessTaskPortProvider::GetInstance(),
+      GetProcess().Handle(), {}, ChildProcessTaskPortProvider::GetInstance(),
       dump.get());
 #else
   bool success = memory_instrumentation::OSMetrics::FillOSMemoryDump(
-      GetProcess().Handle(), dump.get());
+      GetProcess().Handle(), {}, dump.get());
 #endif
 
   // Failed to get private memory for the process, e.g. the process has died.

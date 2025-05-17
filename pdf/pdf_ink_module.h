@@ -18,6 +18,7 @@
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
+#include "base/timer/timer.h"
 #include "base/values.h"
 #include "pdf/buildflags.h"
 #include "pdf/page_orientation.h"
@@ -298,6 +299,14 @@ class PdfInkModule {
     TextHighlightState& operator=(const TextHighlightState&) = delete;
     ~TextHighlightState();
 
+    // Tracks whether the current text highlight has finished highlighting a
+    // multi-click text selection, but has not yet exited text highlight state.
+    // For example, the user may click text three times to select the line, but
+    // may not have performed mouseup nor touchend. The user should still be in
+    // text highlight state but should be unable to highlight any additional
+    // text.
+    bool finished_multi_click = false;
+
     // A mapping of 0-based page indices to a list of strokes on pages that
     // represent the user's highlighter text selections. Unlike drawing strokes
     // which are limited to one page, text selection may cover multiple pages.
@@ -354,9 +363,12 @@ class PdfInkModule {
   // Return values have the same semantics as On{Mouse,Touch}*() above.
   bool StartTextHighlight(const gfx::PointF& position,
                           int click_count,
-                          base::TimeTicks timestamp);
+                          base::TimeTicks timestamp,
+                          ink::StrokeInput::ToolType tool_type);
   bool ContinueTextHighlight(const gfx::PointF& position);
-  bool FinishTextHighlight(const gfx::PointF& position);
+  bool FinishTextHighlight(const gfx::PointF& position,
+                           bool is_multi_click,
+                           ink::StrokeInput::ToolType tool_type);
 
   // Returns a highlighter stroke that matches the position and size of
   // `selection_rect`. `selection_rect` must be in screen coordinates.
@@ -376,6 +388,14 @@ class PdfInkModule {
   // for `TextHighlightState::highlight_strokes`.
   std::map<int, std::vector<ink::Stroke>> GetTextSelectionAsStrokes();
 
+  // Starts a timer for text selection multi-clicks that, when fired, will
+  // report text highlight metrics.
+  void StartTextSelectionMultiClickTimer(ink::StrokeInput::ToolType tool_type);
+
+  // Stops the timer from `StartTextSelectionMultiClickTimer()` without
+  // reporting any metrics.
+  void StopTextSelectionMultiClickTimer();
+
   // Sets `using_stylus_instead_of_touch_` to true if `tool_type` is
   // `ink::StrokeInput::ToolType::kStylus`. Otherwise do nothing.
   void MaybeRecordPenInput(ink::StrokeInput::ToolType tool_type);
@@ -387,6 +407,7 @@ class PdfInkModule {
   void HandleAnnotationRedoMessage(const base::Value::Dict& message);
   void HandleAnnotationUndoMessage(const base::Value::Dict& message);
   void HandleFinishTextAnnotationMessage(const base::Value::Dict& message);
+  void HandleGetAllTextAnnotationsMessage(const base::Value::Dict& message);
   void HandleGetAnnotationBrushMessage(const base::Value::Dict& message);
   void HandleSetAnnotationBrushMessage(const base::Value::Dict& message);
   void HandleSetAnnotationModeMessage(const base::Value::Dict& message);
@@ -541,6 +562,9 @@ class PdfInkModule {
   DocumentStrokesMap strokes_;
 
   PdfInkUndoRedoModel undo_redo_model_;
+
+  // A timer used for reporting metrics during multi-click text selection.
+  base::OneShotTimer text_selection_click_timer_;
 
   base::WeakPtrFactory<PdfInkModule> weak_factory_{this};
 };

@@ -26,6 +26,7 @@
 #include "chrome/browser/signin/e2e_tests/signin_util.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
+#include "chrome/browser/ui/ui_features.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -185,8 +186,7 @@ GlicE2ETest::WaitForAndInstrumentGlic() {
                        std::ref(window_controller())),
           WaitForState(kGlicWindowControllerState,
                        GlicWindowController::State::kOpen),
-          Steps(InstrumentNonTabWebView(kGlicHostElementId,
-                                        GlicView::kWebViewElementIdForTesting),
+          Steps(InstrumentNonTabWebView(kGlicHostElementId, kGlicViewElementId),
                 InstrumentInnerWebContents(kGlicContentsElementId,
                                            kGlicHostElementId, 0),
                 WaitForWebContentsReady(kGlicContentsElementId)),

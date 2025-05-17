@@ -191,11 +191,15 @@ chromium-metrics-reviews@google.com.
   <variant name="WindowPlacement"/>
 </variants>
 
+<!-- LINT.IfChange(PredictionModels) -->
+
 <variants name="PredictionModels">
-  <variant name="AIv1"/>
+  <variant name="Aiv3"/>
   <variant name="OnDevicePredictionService"/>
   <variant name="PredictionService"/>
 </variants>
+
+<!-- LINT.ThenChange(//components/permissions/permission_uma_util.h:PredictionModelType) -->
 
 <variants name="PromptDisposition">
   <variant name="AnchoredBubble"/>
@@ -470,6 +474,18 @@ chromium-metrics-reviews@google.com.
     Records whether a session was created successfully for the on-device AIv1
     model each time we inquire the model. We also log failures when the model is
     not available.
+  </summary>
+</histogram>
+
+<histogram name="Permissions.AIv3.SnapshotTaken" enum="BooleanSuccess"
+    expires_after="2025-12-02">
+  <owner>elklm@chromium.org</owner>
+  <owner>hempjudith@google.com</owner>
+  <owner>src/components/permissions/PERMISSIONS_OWNERS</owner>
+  <summary>
+    Records whether the snapshot needed as input for the AIv3 model was taken
+    successfully. This could go wrong if the current render view was occluded
+    (in the background) during the snapshot was taken.
   </summary>
 </histogram>
 

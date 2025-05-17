@@ -536,7 +536,10 @@ void LayerTreeHost::NotifyTransitionRequestsFinished(
   if (it == view_transition_callbacks_.end()) {
     return;
   }
-  std::move(it->second).Run(rects);
+  // The callback can cause more requests to be added and run the lifecycle, so
+  // unwind the stack before calling it.
+  task_runner_provider_->MainThreadTaskRunner()->PostTask(
+      FROM_HERE, base::BindOnce(std::move(it->second), rects));
   view_transition_callbacks_.erase(it);
 }
 
@@ -1909,6 +1912,10 @@ void LayerTreeHost::QueueImageDecode(const DrawImage& image,
   pending_image_decodes_.emplace(
       next_id, std::make_pair(std::move(callback), speculative));
   SetNeedsCommit();
+}
+
+bool LayerTreeHost::SpeculativeDecodeRequestInFlight() const {
+  return proxy_->SpeculativeDecodeRequestInFlight();
 }
 
 LayerListIterator LayerTreeHost::begin() {

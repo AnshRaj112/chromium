@@ -242,7 +242,7 @@ bool AddServerMetadata(PaymentsAutofillTable* table,
                        const PaymentsMetadata& metadata) {
   switch (type) {
     case WalletMetadataSpecifics::CARD:
-      return table->AddServerCardMetadata(metadata);
+      return table->AddOrUpdateServerCardMetadata(metadata);
     case WalletMetadataSpecifics::IBAN:
       return table->AddOrUpdateServerIbanMetadata(metadata);
     // ADDRESS metadata syncing is deprecated.
@@ -272,7 +272,7 @@ bool UpdateServerMetadata(PaymentsAutofillTable* table,
                           const PaymentsMetadata& metadata) {
   switch (type) {
     case WalletMetadataSpecifics::CARD:
-      return table->UpdateServerCardMetadata(metadata);
+      return table->AddOrUpdateServerCardMetadata(metadata);
     case WalletMetadataSpecifics::IBAN:
       return table->AddOrUpdateServerIbanMetadata(metadata);
     // ADDRESS metadata syncing is deprecated.
@@ -390,7 +390,7 @@ AutofillWalletMetadataSyncBridge::GetAllDataForDebugging() {
 }
 
 std::string AutofillWalletMetadataSyncBridge::GetClientTag(
-    const syncer::EntityData& entity_data) {
+    const syncer::EntityData& entity_data) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   const WalletMetadataSpecifics& remote_metadata =
       entity_data.specifics.wallet_metadata();
@@ -399,7 +399,7 @@ std::string AutofillWalletMetadataSyncBridge::GetClientTag(
 }
 
 std::string AutofillWalletMetadataSyncBridge::GetStorageKey(
-    const syncer::EntityData& entity_data) {
+    const syncer::EntityData& entity_data) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return GetStorageKeyForWalletMetadataTypeAndSpecificsId(
       entity_data.specifics.wallet_metadata().type(),

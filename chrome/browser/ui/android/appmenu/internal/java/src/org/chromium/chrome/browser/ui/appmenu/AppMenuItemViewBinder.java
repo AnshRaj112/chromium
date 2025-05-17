@@ -20,6 +20,7 @@ import androidx.core.widget.ImageViewCompat;
 
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.chrome.browser.ui.appmenu.internal.R;
+import org.chromium.components.browser_ui.util.OnPeripheralClickListener;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter.HighlightParams;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter.HighlightShape;
@@ -93,6 +94,12 @@ class AppMenuItemViewBinder {
             // tint the icon
             ImageViewCompat.setImageTintList(imageView, tintList);
         } else if (key == AppMenuItemProperties.CLICK_HANDLER) {
+            view.setOnTouchListener(
+                    new OnPeripheralClickListener(
+                            view,
+                            triggeringMotionEvent ->
+                                    model.get(AppMenuItemProperties.CLICK_HANDLER)
+                                            .onItemClick(model, triggeringMotionEvent)));
             view.setOnClickListener(
                     v -> model.get(AppMenuItemProperties.CLICK_HANDLER).onItemClick(model));
         }

@@ -125,6 +125,7 @@ export class Ink2Manager extends EventTarget {
   private existingAnnotationAttributes_: TextAttributes|null = null;
   private pageNumber_: number = -1;
   private pluginController_: PluginController = PluginController.getInstance();
+  private textResolver_: PromiseResolver<void>|null = null;
   private viewport_: Viewport|null = null;
   private viewportParams_: ViewportParams = {
     clockwiseRotations: 0,
@@ -137,28 +138,37 @@ export class Ink2Manager extends EventTarget {
     this.viewport_ = viewport;
   }
 
-  // Initialize a text annotation at `location` in screen coordinates.
-  // No-op if there is no PDF page at `location`.
-  initializeTextAnnotation(location: Point) {
+  private isClickOnScrollbar_(location: Point): boolean {
     assert(this.viewport_);
-    // First check if the click was on a scrollbar. If so, ignore it to avoid
-    // interfering with scroll.
     const hasScrollbars = this.viewport_.documentHasScrollbars();
     if (hasScrollbars.vertical &&
             (isRTL() && location.x <= this.viewport_.scrollbarWidth) ||
         (!isRTL() &&
          location.x >=
              (this.viewport_.size.width - this.viewport_.scrollbarWidth))) {
-      return;
+      return true;
     }
-    if (hasScrollbars.horizontal &&
+    return hasScrollbars.horizontal &&
         location.y >=
-            (this.viewport_.size.height - this.viewport_.scrollbarWidth)) {
-      return;
-    }
+        (this.viewport_.size.height - this.viewport_.scrollbarWidth);
+  }
 
-    const page = this.viewport_.getPageAtPoint(location);
+  // Initialize a text annotation at `location` in screen coordinates.
+  // No-op if there is no PDF page at `location`.
+  initializeTextAnnotation(location: Point) {
+    assert(this.isTextInitializationComplete());
+    assert(this.viewport_);
+
+    // Only actually compute the page if the click isn't on a scrollbar.
+    const page = this.isClickOnScrollbar_(location) ?
+        -1 :
+        this.viewport_.getPageAtPoint(location);
     if (page === -1) {
+      // In any case where we ignore the click, blur the textbox. Otherwise,
+      // the textarea will remain in focus and will continue handling all
+      // keyboard events, which is inconsistent with how clicking on other parts
+      // of the UI (e.g. controls) work.
+      this.dispatchEvent(new CustomEvent('blur-text-box'));
       return;
     }
 
@@ -255,6 +265,10 @@ export class Ink2Manager extends EventTarget {
     return this.brushResolver_ !== null;
   }
 
+  isTextInitializationComplete(): boolean {
+    return this.textResolver_ !== null && this.textResolver_.isFulfilled;
+  }
+
   isInitializationComplete(): boolean {
     return this.isInitializationStarted() && this.brushResolver_!.isFulfilled;
   }
@@ -279,6 +293,29 @@ export class Ink2Manager extends EventTarget {
       this.brushResolver_.resolve();
     });
     return this.brushResolver_.promise;
+  }
+
+  initializeTextAnnotations(): Promise<void> {
+    if (this.textResolver_) {
+      return this.textResolver_.promise;
+    }
+
+    this.textResolver_ = new PromiseResolver();
+    this.pluginController_.getAllTextAnnotations().then(message => {
+      message.annotations.forEach(annotation => {
+        let pageMap = this.annotations_.get(annotation.pageNumber);
+        if (!pageMap) {
+          pageMap = new Map();
+          this.annotations_.set(annotation.pageNumber, pageMap);
+        }
+        pageMap.set(annotation.id, annotation);
+        if (annotation.id > this.nextAnnotationId_) {
+          this.nextAnnotationId_ = annotation.id + 1;
+        }
+      });
+      this.textResolver_!.resolve();
+    });
+    return this.textResolver_.promise;
   }
 
   setBrushColor(color: Color) {
@@ -449,13 +486,37 @@ export class Ink2Manager extends EventTarget {
     this.pluginController_.finishTextAnnotation(annotation);
     this.existingAnnotationAttributes_ = null;
 
-    if (edited) {
-      // Using PluginController's event target to dispatch this event, even
-      // though it originates here, because PluginController dispatches this
-      // event for normal ink strokes and this way clients only need to listen
-      // on one instance.
-      this.pluginController_.getEventTarget().dispatchEvent(
-          new CustomEvent(PluginControllerEventType.FINISH_INK_STROKE));
+    // Using PluginController's event target to dispatch this event, even
+    // though it originates here, because PluginController dispatches this
+    // event for normal Ink strokes and this way clients only need to listen
+    // on one instance.
+    this.pluginController_.getEventTarget().dispatchEvent(new CustomEvent(
+        PluginControllerEventType.FINISH_INK_STROKE, {detail: edited}));
+  }
+
+  textBoxFocused(textBoxRect: TextBoxRect) {
+    assert(this.viewport_);
+    const viewportPosition = this.viewport_.position;
+    const viewportSize = this.viewport_.size;
+
+    let scrollX: number|undefined;
+    let scrollY: number|undefined;
+    if (textBoxRect.locationX < 0 ||
+        textBoxRect.locationX + textBoxRect.width > viewportSize.width) {
+      // Adjusting by 10% of viewport, rather than putting the text box on the
+      // exact edge of the viewport.
+      scrollX = viewportPosition.x + textBoxRect.locationX -
+          Math.floor(viewportSize.width / 10);
+    }
+
+    if (textBoxRect.locationY < 0 ||
+        textBoxRect.locationY + textBoxRect.height > viewportSize.height) {
+      scrollY = viewportPosition.y + textBoxRect.locationY -
+          Math.floor(viewportSize.height / 10);
+    }
+
+    if (scrollX !== undefined || scrollY !== undefined) {
+      this.viewport_.scrollTo({x: scrollX, y: scrollY});
     }
   }
 

@@ -101,10 +101,10 @@ import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.ui.base.LocalizationUtils;
 import org.chromium.ui.base.PageTransition;
 import org.chromium.ui.base.WindowAndroid;
+import org.chromium.ui.display.DisplayUtil;
 import org.chromium.ui.dragdrop.DragAndDropDelegate;
 import org.chromium.ui.dragdrop.DragDropGlobalState;
 import org.chromium.ui.interpolators.Interpolators;
-import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.resources.ResourceManager;
 import org.chromium.ui.util.ColorUtils;
 import org.chromium.url.GURL;
@@ -420,7 +420,6 @@ public class StripLayoutHelperManager
      * @param toolbarManager The ToolbarManager instance.
      * @param desktopWindowStateManager The DesktopWindowStateManager for the app header.
      * @param actionConfirmationManager The {@link ActionConfirmationManager} for group actions.
-     * @param modalDialogManager The {@link ModalDialogManager} for the context menu.
      * @param dataSharingTabManager The {@link DataSharingTabManager} for shared groups.
      * @param bottomSheetController The {@link BottomSheetController} used to show bottom sheets.
      * @param shareDelegateSupplier Supplies {@link ShareDelegate} to share tab URLs.
@@ -446,7 +445,6 @@ public class StripLayoutHelperManager
             @NonNull ToolbarManager toolbarManager,
             @Nullable DesktopWindowStateManager desktopWindowStateManager,
             ActionConfirmationManager actionConfirmationManager,
-            ModalDialogManager modalDialogManager,
             DataSharingTabManager dataSharingTabManager,
             @NonNull BottomSheetController bottomSheetController,
             @NonNull Supplier<ShareDelegate> shareDelegateSupplier) {
@@ -468,7 +466,8 @@ public class StripLayoutHelperManager
                 new AreaMotionEventFilter(context, mTabStripEventHandler, null, false, false);
 
         mIsLayoutOptimizationsEnabled =
-                ToolbarFeatures.isTabStripWindowLayoutOptimizationEnabled(true);
+                ToolbarFeatures.isTabStripWindowLayoutOptimizationEnabled(
+                        /* isTablet= */ true, DisplayUtil.isContextInDefaultDisplay(mContext));
         mScrollableStripHeight = res.getDimension(R.dimen.tab_strip_height) / mDensity;
         mHeight =
                 mIsLayoutOptimizationsEnabled
@@ -531,7 +530,6 @@ public class StripLayoutHelperManager
                         toolbarContainerView,
                         windowAndroid,
                         actionConfirmationManager,
-                        modalDialogManager,
                         dataSharingTabManager,
                         () -> getStripVisibilityState() == StripVisibilityState.VISIBLE,
                         bottomSheetController,
@@ -550,7 +548,6 @@ public class StripLayoutHelperManager
                         toolbarContainerView,
                         windowAndroid,
                         actionConfirmationManager,
-                        modalDialogManager,
                         dataSharingTabManager,
                         () -> getStripVisibilityState() == StripVisibilityState.VISIBLE,
                         bottomSheetController,

@@ -215,6 +215,10 @@ BASE_FEATURE(kEnableLensContextMenuUnifiedExperience,
 // Also update in components/omnibox/browser/autocomplete_result.cc.
 const base::NotFatalUntil kLensOverlayNotFatalUntil = base::NotFatalUntil::M200;
 
+BASE_FEATURE(kLensLoadAIMInLensResultPage,
+             "LensLoadAIMInLensResultPage",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kLensOverlayDisablePriceInsights,
              "LensOverlayDisablePriceInsights",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1259,6 +1263,14 @@ bool IsContainedTabGroupEnabled() {
   return base::FeatureList::IsEnabled(kContainedTabGroup);
 }
 
+BASE_FEATURE(kColorfulTabGroup,
+             "ColorfulTabGroup",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool IsColorfulTabGroupEnabled() {
+  return base::FeatureList::IsEnabled(kColorfulTabGroup);
+}
+
 BASE_FEATURE(kBestOfAppFRE, "BestOfAppFRE", base::FEATURE_DISABLED_BY_DEFAULT);
 
 bool IsBestOfAppFREEnabled() {
@@ -1268,6 +1280,13 @@ bool IsBestOfAppFREEnabled() {
 bool IsBestOfAppGuidedTourEnabled() {
   return base::GetFieldTrialParamValueByFeature(kBestOfAppFRE, "variant") ==
          "4";
+}
+
+bool IsBestOfAppLensInteractivePromoEnabled() {
+  return (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_PHONE) &&
+         IsBestOfAppFREEnabled() &&
+         (base::GetFieldTrialParamValueByFeature(kBestOfAppFRE, "variant") ==
+          "1");
 }
 
 BASE_FEATURE(kFeedbackIncludeGWSVariations,

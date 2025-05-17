@@ -253,7 +253,7 @@
   }
 
   if (_omniboxEditModel) {
-    _omniboxEditModel->OnSetFocus(/*control_down=*/false);
+    _omniboxEditModel->OnSetFocus();
 
     if (_inLensOverlay && textField.userText.length) {
       _omniboxEditModel->SetUserText(textField.userText.cr_UTF16String);
@@ -424,6 +424,7 @@
   // Exit preedit state and append the match. Refocus if necessary.
   [textField exitPreEditState];
   _omniboxViewIOS->SetUserText(text);
+  _omniboxViewIOS->OnBeforePossibleChange();
   // Calling setText: does not trigger UIControlEventEditingChanged, so
   // trigger that manually.
   [textField sendActionsForControlEvents:UIControlEventEditingChanged];

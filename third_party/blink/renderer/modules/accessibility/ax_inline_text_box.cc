@@ -398,10 +398,12 @@ void AXInlineTextBox::SerializeMarkerAttributes(
     // offsets.
     const auto start_position = AXPosition::FromPosition(
         Position(*ParentObject()->GetNode(), marker->StartOffset()),
-        TextAffinity::kDownstream, AXPositionAdjustmentBehavior::kMoveLeft);
+        AXObjectCache(), TextAffinity::kDownstream,
+        AXPositionAdjustmentBehavior::kMoveLeft);
     const auto end_position = AXPosition::FromPosition(
         Position(*ParentObject()->GetNode(), marker->EndOffset()),
-        TextAffinity::kDownstream, AXPositionAdjustmentBehavior::kMoveRight);
+        AXObjectCache(), TextAffinity::kDownstream,
+        AXPositionAdjustmentBehavior::kMoveRight);
     if (!start_position.IsValid() || !end_position.IsValid())
       continue;
 
@@ -455,10 +457,6 @@ void AXInlineTextBox::Init(AXObject* parent) {
   // necessary to again recompute this part of the tree.
   parent_ = parent;
   UpdateCachedAttributeValuesIfNeeded(false);
-
-#if DCHECK_IS_ON()
-  is_initialized_ = true;
-#endif
 }
 
 void AXInlineTextBox::Detach() {

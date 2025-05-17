@@ -41,6 +41,8 @@
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/ui/browser_command_controller.h"
 #include "chrome/browser/ui/browser_finder.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+#include "chrome/browser/ui/lens/lens_overlay_entry_point_controller.h"
 #include "chrome/browser/ui/omnibox/omnibox_pedal_implementations.h"
 #include "chrome/common/chrome_features.h"
 #include "chrome/common/pref_names.h"
@@ -96,8 +98,8 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_list.h"
-#include "chrome/browser/ui/lens/lens_overlay_controller.h"
 #include "chrome/browser/ui/lens/lens_search_controller.h"
+#include "chrome/browser/ui/lens/lens_searchbox_controller.h"
 #include "chrome/browser/ui/tabs/public/tab_features.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/ui_features.h"
@@ -142,16 +144,18 @@ content::WebContents* GetWebContents(
   return web_contents_getter ? web_contents_getter.Run() : nullptr;
 }
 
-LensOverlayController* GetLensOverlayController(
-    content::WebContents* web_contents) {
-  return web_contents ? LensOverlayController::FromTabWebContents(web_contents)
-                      : nullptr;
-}
-
 LensSearchController* GetLensSearchController(
     content::WebContents* web_contents) {
   return web_contents ? LensSearchController::FromTabWebContents(web_contents)
                       : nullptr;
+}
+
+lens::LensSearchboxController* GetLensSearchboxController(
+    content::WebContents* web_contents) {
+  if (auto* lens_search_controller = GetLensSearchController(web_contents)) {
+    return lens_search_controller->lens_searchbox_controller();
+  }
+  return nullptr;
 }
 #endif  // !BUILDFLAG(IS_ANDROID)
 
@@ -490,21 +494,26 @@ void ChromeAutocompleteProviderClient::PrefetchImage(const GURL& url) {
 
 void ChromeAutocompleteProviderClient::StartServiceWorker(
     const GURL& destination_url) {
-  if (!SearchSuggestEnabled())
+  if (!SearchSuggestEnabled()) {
     return;
+  }
 
-  if (profile_->IsOffTheRecord())
+  if (profile_->IsOffTheRecord()) {
     return;
+  }
 
   content::StoragePartition* partition = storage_partition_;
-  if (!partition)
+  if (!partition) {
     partition = profile_->GetDefaultStoragePartition();
-  if (!partition)
+  }
+  if (!partition) {
     return;
+  }
 
   content::ServiceWorkerContext* context = partition->GetServiceWorkerContext();
-  if (!context)
+  if (!context) {
     return;
+  }
 
   context->StartServiceWorkerForNavigationHint(
       destination_url,
@@ -537,13 +546,28 @@ bool ChromeAutocompleteProviderClient::IsHistoryEmbeddingsSettingVisible()
   return history_embeddings::IsHistoryEmbeddingsSettingVisible(profile_);
 }
 
+bool ChromeAutocompleteProviderClient::IsLensEnabled() const {
+#if !BUILDFLAG(IS_ANDROID)
+  if (auto* lens_search_controller =
+          GetLensSearchController(GetWebContents(web_contents_getter_))) {
+    // Guaranteed to exist if lens_search_controller is not null.
+    return lens_search_controller->GetTabInterface()
+        ->GetBrowserWindowInterface()
+        ->GetFeatures()
+        .lens_overlay_entry_point_controller()
+        ->IsEnabled();
+  }
+#endif
+  return false;
+}
+
 base::CallbackListSubscription
 ChromeAutocompleteProviderClient::GetLensSuggestInputsWhenReady(
     LensOverlaySuggestInputsCallback callback) const {
 #if !BUILDFLAG(IS_ANDROID)
-  if (auto* lens_overlay_controller =
-          GetLensOverlayController(GetWebContents(web_contents_getter_))) {
-    return lens_overlay_controller->GetLensSuggestInputsWhenReady(
+  if (auto* lens_searchbox_controller =
+          GetLensSearchboxController(GetWebContents(web_contents_getter_))) {
+    return lens_searchbox_controller->GetLensSuggestInputsWhenReady(
         std::move(callback));
   }
 #endif  // !BUILDFLAG(IS_ANDROID)
@@ -592,8 +616,9 @@ void ChromeAutocompleteProviderClient::CloseIncognitoWindows() {
 bool ChromeAutocompleteProviderClient::OpenJourneys(const std::string& query) {
 #if !BUILDFLAG(IS_ANDROID)
   Browser* browser = BrowserList::GetInstance()->GetLastActive();
-  if (!browser)
+  if (!browser) {
     return false;
+  }
 
   if (auto* history_clusters_side_panel_coordinator =
           HistoryClustersSidePanelCoordinator::BrowserUserData::FromBrowser(
@@ -626,9 +651,9 @@ void ChromeAutocompleteProviderClient::OpenLensOverlay(bool show) {
 }
 
 void ChromeAutocompleteProviderClient::IssueContextualSearchRequest(
-      const GURL& destination_url,
-      AutocompleteMatchType::Type match_type,
-      bool is_zero_prefix_suggestion) {
+    const GURL& destination_url,
+    AutocompleteMatchType::Type match_type,
+    bool is_zero_prefix_suggestion) {
 #if !BUILDFLAG(IS_ANDROID)
   if (auto* lens_search_controller =
           GetLensSearchController(GetWebContents(web_contents_getter_))) {
@@ -642,8 +667,9 @@ void ChromeAutocompleteProviderClient::PromptPageTranslation() {
 #if !BUILDFLAG(IS_ANDROID)
   Browser* browser = BrowserList::GetInstance()->GetLastActive();
   content::WebContents* contents = nullptr;
-  if (browser)
+  if (browser) {
     contents = browser->tab_strip_model()->GetActiveWebContents();
+  }
   if (contents) {
     ChromeTranslateClient* translate_client =
         ChromeTranslateClient::FromWebContents(contents);

@@ -7,6 +7,8 @@ package org.chromium.chrome.browser.pdf;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.SystemClock;
 import android.view.LayoutInflater;
@@ -24,6 +26,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import org.chromium.base.Log;
+import org.chromium.base.PackageManagerUtils;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.gsa.GSAUtils;
@@ -42,6 +45,13 @@ import org.chromium.ui.base.MimeTypeUtils;
 @NullMarked
 public class PdfCoordinator {
     private static final String TAG = "PdfCoordinator";
+
+    /**
+     * The timestamp when the last pdf document starts to load. Used to calculate the elapsed time
+     * between two pdf loads.
+     */
+    private static long sLastPdfLoadTimestamp;
+
     private static boolean sSkipLoadPdfForTesting;
     private final View mView;
     private final FragmentManager mFragmentManager;
@@ -227,17 +237,22 @@ public class PdfCoordinator {
         }
         mUri = PdfUtils.getUriFromFilePath(mPdfFilePath);
         if (mUri != null) {
+            // TODO(crbug.com/418075119): Minimize the try catch block.
             try {
                 if (!sSkipLoadPdfForTesting) {
                     // Committing the fragment
-                    // TODO(b/360717802): Reuse fragment from savedInstance.
+                    // TODO(crbug.com/360717802): Reuse fragment from savedInstance.
                     FragmentTransaction transaction = mFragmentManager.beginTransaction();
                     transaction.add(mFragmentContainerViewId, mChromePdfViewerFragment, mTabId);
                     transaction.commitAllowingStateLoss();
                     mFragmentManager.executePendingTransactions();
                     PdfUtils.recordPdfLoad();
-                    mChromePdfViewerFragment.mDocumentLoadStartTimestamp =
-                            SystemClock.elapsedRealtime();
+                    long currentTime = SystemClock.elapsedRealtime();
+                    mChromePdfViewerFragment.mDocumentLoadStartTimestamp = currentTime;
+                    if (sLastPdfLoadTimestamp > 0) {
+                        PdfUtils.recordPdfLoadInterval(currentTime - sLastPdfLoadTimestamp);
+                    }
+                    sLastPdfLoadTimestamp = currentTime;
                     mProgressBar.setVisibility(View.GONE);
                     mChromePdfViewerFragment.setDocumentUri(mUri);
                 }
@@ -247,7 +262,7 @@ public class PdfCoordinator {
                 mIsPdfLoaded = true;
             }
         } else {
-            // TODO(b/348712628): show some error UI when content URI is null.
+            // TODO(crbug.com/348712628): show some error UI when content URI is null.
             Log.e(TAG, "Uri is null.");
         }
     }
@@ -273,6 +288,15 @@ public class PdfCoordinator {
         }
         mActivity.grantUriPermission(
                 GSAUtils.GSA_PACKAGE_NAME, mUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        var intent = new Intent(Intent.ACTION_VOICE_COMMAND);
+        var intentActivities =
+                PackageManagerUtils.queryIntentActivities(intent, PackageManager.MATCH_ALL);
+        for (ResolveInfo packageInfo : intentActivities) {
+            mActivity.grantUriPermission(
+                    packageInfo.activityInfo.packageName,
+                    mUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        }
         PdfUtils.recordIsWorkProfile(isWorkProfile);
         return structuredData;
     }

@@ -16,7 +16,7 @@ class NoticeCatalog {
  public:
   virtual ~NoticeCatalog() = default;
   // Accessors.
-  virtual const std::vector<std::unique_ptr<NoticeApi>>& GetNoticeApis() = 0;
+  virtual base::span<NoticeApi*> GetNoticeApis() = 0;
   virtual base::span<Notice*> GetNotices() = 0;
   virtual Notice* GetNotice(NoticeId notice_id) = 0;
 };
@@ -26,7 +26,7 @@ class NoticeCatalogImpl : public NoticeCatalog {
   NoticeCatalogImpl();
   ~NoticeCatalogImpl() override;
 
-  const std::vector<std::unique_ptr<NoticeApi>>& GetNoticeApis() override;
+  base::span<NoticeApi*> GetNoticeApis() override;
   base::span<Notice*> GetNotices() override;
   Notice* GetNotice(NoticeId notice_id) override;
 
@@ -45,7 +45,9 @@ class NoticeCatalogImpl : public NoticeCatalog {
       std::unique_ptr<Notice> (*notice_creator)(NoticeId),
       std::vector<std::pair<NoticeId, const base::Feature*>>&& notice_ids,
       std::vector<NoticeApi*>&& target_apis,
-      std::vector<NoticeApi*>&& pre_req_apis = {});
+      std::vector<NoticeApi*>&& pre_req_apis = {},
+      std::pair<NoticeViewGroup, int> view_group = {NoticeViewGroup::kNotSet,
+                                                    0});
 
   // Populates the catalog with all the notices and their requirements.
   void Populate();
@@ -53,6 +55,7 @@ class NoticeCatalogImpl : public NoticeCatalog {
   std::vector<std::unique_ptr<NoticeApi>> apis_;
   absl::flat_hash_map<NoticeId, std::unique_ptr<Notice>> notices_;
   std::vector<Notice*> notice_ptrs_;
+  std::vector<NoticeApi*> apis_ptrs_;
 };
 
 }  // namespace privacy_sandbox

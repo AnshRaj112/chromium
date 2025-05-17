@@ -208,6 +208,7 @@
 <translation id="1928618076168182477">Ово је визуелни приказ</translation>
 <translation id="1928696683969751773">Ажурирања</translation>
 <translation id="1939549834451474504">Лозинке ће ускоро престати да раде јер Google Play услуге нису доступне. Можете да направите копију сачуваних лозинки пре него што престану да раде. <ph name="BEGIN_LINK" />Сазнајте више<ph name="END_LINK" /></translation>
+<translation id="1943398124995840148">Изглед отворених картица је сада ажуриран у XR-у</translation>
 <translation id="1943432128510653496">Сачувај лозинке</translation>
 <translation id="1944535645109964458">Није доступан ниједан приступни кôд</translation>
 <translation id="1957557050935255529">PDF се учитава…</translation>
@@ -332,6 +333,7 @@
 <translation id="2527779675047087889">Сакриј садржај привремене меморије</translation>
 <translation id="2532336938189706096">Веб-приказ</translation>
 <translation id="253498598929009420">Сајт ће моћи да види садржај вашег екрана</translation>
+<translation id="2535807170289627159">Све картице</translation>
 <translation id="2536728043171574184">Прегледате офлајн копију ове странице</translation>
 <translation id="2542548955756682219"><ph name="TAB_TITLE" />, картица</translation>
 <translation id="2546283357679194313">Колачићи и подаци о сајтовима</translation>
@@ -434,6 +436,7 @@
 <translation id="2979639724566107830">Отворите у новом прозору</translation>
 <translation id="2981364137500752533">Можете да имате највише 5 прозора.</translation>
 <translation id="2983102365694924129">На основу ваше активности на сајту. Ово подешавање је искључено.</translation>
+<translation id="2983398917942897288">Неактивне (<ph name="ITEM_COUNT" />)</translation>
 <translation id="2984978667043170458">Уврсти околни текст у Google претраге</translation>
 <translation id="2988638966064514052">Ојачајте лозинке</translation>
 <translation id="2989523299700148168">Недавно посећено</translation>
@@ -457,7 +460,6 @@
 <translation id="3072980200212375806"><ph name="APP_NAME" /> ће се отворити у Chrome-у. Ако наставите, прихватате <ph name="BEGIN_LINK1" />Google услове коришћења услуге<ph name="END_LINK1" /> и <ph name="BEGIN_LINK2" />додатне услове коришћења услуге за Google Chrome и Chrome ОС<ph name="END_LINK2" />. Примењује се и <ph name="BEGIN_LINK3" />политика приватности<ph name="END_LINK3" />.</translation>
 <translation id="3080525922482950719">Можете да сачувате странице да бисте их читали касније или офлајн</translation>
 <translation id="3087734570205094154">Дно</translation>
-<translation id="3088687687599869821">НАВИГАЦИЈА ПО СТРАНИЦИ</translation>
 <translation id="3091010850649238832">Прикажи садржај привремене меморије</translation>
 <translation id="3098745985164956033">Неке слике се шаљу Google-у ради побољшања описа</translation>
 <translation id="3114507951000454849">Читајте данашње вести <ph name="NEWS_ICON" /></translation>
@@ -467,6 +469,7 @@
 <translation id="314939179385989105">Chrome почетна страница</translation>
 <translation id="3158667104057012316">Сортира се по ручном редоследу</translation>
 <translation id="3159335509547415276">Сазнајте више о блокираним налозима</translation>
+<translation id="3161699713309727585"><ph name="BUTTON_TEXT" />, отвара се на новој картици</translation>
 <translation id="3166827708714933426">Пречице за картице и прозоре</translation>
 <translation id="316694332262407393">Chrome је већ покренут.</translation>
 <translation id="3167258285411721858">Можете да затражите мобилни сајт за <ph name="HOST_NAME" /></translation>
@@ -681,6 +684,7 @@
 <translation id="4170011742729630528">Услуга није доступна. Пробајте поново касније.</translation>
 <translation id="4177222230309051052">Преузмите све обележиваче</translation>
 <translation id="4177501066905053472">Теме огласа</translation>
+<translation id="4180726336228139707">Само на овом уређају</translation>
 <translation id="4181841719683918333">Језици</translation>
 <translation id="4188221736490993796">Сортирај од Z до A</translation>
 <translation id="4195643157523330669">Отвори на новој картици</translation>
@@ -790,6 +794,7 @@ Google налог можда има друге облике историје п�
 <translation id="469286762610133730">Добијајте бољи садржај</translation>
 <translation id="4695891336199304370">{SHIPPING_OPTIONS,plural, =1{<ph name="SHIPPING_OPTION_PREVIEW" />\u2026 и још <ph name="NUMBER_OF_ADDITIONAL_SHIPPING_OPTIONS" />}one{<ph name="SHIPPING_OPTION_PREVIEW" />\u2026 и још <ph name="NUMBER_OF_ADDITIONAL_SHIPPING_OPTIONS" />}few{<ph name="SHIPPING_OPTION_PREVIEW" />\u2026 и још <ph name="NUMBER_OF_ADDITIONAL_SHIPPING_OPTIONS" />}other{<ph name="SHIPPING_OPTION_PREVIEW" />\u2026 и још <ph name="NUMBER_OF_ADDITIONAL_SHIPPING_OPTIONS" />}}</translation>
 <translation id="4698061626562952596">Прегледајте неактивне картице овде</translation>
+<translation id="4698757800236023795">Активне (<ph name="ITEM_COUNT" />)</translation>
 <translation id="4699172675775169585">Кеширане слике и фајлови</translation>
 <translation id="4710167854527459075">Сортирај по најновијем</translation>
 <translation id="4718044610319080485">Позива AI помоћник</translation>
@@ -1393,6 +1398,7 @@ Google налог можда има друге облике историје п�
 <translation id="7236515828900885295">Пређи на претрагу</translation>
 <translation id="7237724030342645845">Google менаџер лозинки је престао да ради</translation>
 <translation id="72415438529550637">Предлог лозинке је затворен.</translation>
+<translation id="7248671827512403053">Апликација</translation>
 <translation id="7260367682327802201">Android уређај може да има слично подешавање. Ако је мерење огласа укључено у Chrome-у и на Android уређају, компанија можда може да мери ефикасност огласа на веб-сајтовима које посећујете и у апликацијама које користите.</translation>
 <translation id="727288900855680735">Желите да пошаљете <ph name="ONE_TIME_CODE" /> на <ph name="ORIGIN" />?</translation>
 <translation id="7274013316676448362">Сајт је блокиран</translation>
@@ -1642,7 +1648,6 @@ Google налог можда има друге облике историје п�
 <translation id="8260126382462817229">Пробајте поново да се пријавите</translation>
 <translation id="8261506727792406068">Избриши</translation>
 <translation id="82619448491672958">Прикажи друге картице</translation>
-<translation id="8265018477030547118">Само на овом уређају</translation>
 <translation id="8266753737658117282">Наставите уз <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /></translation>
 <translation id="8266862848225348053">Локација за преузимање</translation>
 <translation id="8271267069224406035">Пријави као непожељно</translation>

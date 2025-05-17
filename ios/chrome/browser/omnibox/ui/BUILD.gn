@@ -23,7 +23,7 @@ source_set("omnibox_util") {
   deps = [
     "//base",
     "//components/omnibox/browser",
-    "//components/safe_browsing/core/common:common",
+    "//components/safe_browsing/core/common",
     "//components/security_state/core",
     "//ios/chrome/browser/omnibox/public:features",
     "//ios/chrome/browser/shared/public/features",
@@ -31,12 +31,6 @@ source_set("omnibox_util") {
     "//third_party/omnibox_proto",
   ]
   public_deps = [ "//ios/chrome/app/theme" ]
-}
-
-# This target can also be used on EG2 tests, so it should only contain constants
-source_set("omnibox_icon_type_constants") {
-  sources = [ "omnibox_icon_type.h" ]
-  deps = [ "//ios/chrome/browser/omnibox/public:constants" ]
 }
 
 # Build target allowed while moving files from ui_bundled to other folders.

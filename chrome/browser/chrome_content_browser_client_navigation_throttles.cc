@@ -226,29 +226,28 @@ bool IsErrorPageAutoReloadEnabled() {
 // usage of Profile code which lives in chrome/. The rest of the
 // VisitedLinkNavigationThrottle class lives in components/, which cannot access
 // chrome/ code due to layering.
-std::unique_ptr<VisitedLinkNavigationThrottle>
-MaybeCreateVisitedLinkNavigationThrottleFor(
-    content::NavigationHandle* navigation_handle) {
+void MaybeCreateAndAddVisitedLinkNavigationThrottle(
+    content::NavigationThrottleRegistry& registry) {
   if (!base::FeatureList::IsEnabled(
           blink::features::kPartitionVisitedLinkDatabase) &&
       !base::FeatureList::IsEnabled(
           blink::features::kPartitionVisitedLinkDatabaseWithSelfLinks)) {
-    return nullptr;
+    return;
   }
   Profile* profile = Profile::FromBrowserContext(
-      navigation_handle->GetWebContents()->GetBrowserContext());
+      registry.GetNavigationHandle().GetWebContents()->GetBrowserContext());
   // Off-the-record profiles do not record history or visited links.
   if (profile->IsOffTheRecord()) {
-    return nullptr;
+    return;
   }
   history::HistoryService* history_service =
       HistoryServiceFactory::GetForProfile(profile,
                                            ServiceAccessType::IMPLICIT_ACCESS);
   if (!history_service) {
-    return nullptr;
+    return;
   }
-  return std::make_unique<VisitedLinkNavigationThrottle>(
-      std::move(navigation_handle), history_service);
+  registry.AddThrottle(std::make_unique<VisitedLinkNavigationThrottle>(
+      registry, history_service));
 }
 
 }  // namespace
@@ -278,13 +277,12 @@ void CreateAndAddChromeThrottlesForNavigation(
     navigation_interception::InterceptNavigationDelegate::MaybeCreateAndAdd(
         registry, navigation_interception::SynchronyMode::kAsync);
   }
-  registry.AddThrottle(InterceptOMADownloadNavigationThrottle::Create(&handle));
+  InterceptOMADownloadNavigationThrottle::CreateAndAdd(registry);
 
 #if BUILDFLAG(DFMIFY_DEV_UI)
   // If the DevUI DFM is already installed, then this is a no-op, except for the
   // side effect of ensuring that the DevUI DFM is loaded.
-  registry.MaybeAddThrottle(
-      dev_ui::DevUiLoaderThrottle::MaybeCreateThrottleFor(&handle));
+  dev_ui::DevUiLoaderThrottle::MaybeCreateAndAdd(registry);
 #endif  // BUILDFLAG(DFMIFY_DEV_UI)
 
 #elif BUILDFLAG(ENABLE_PLATFORM_APPS)
@@ -303,13 +301,11 @@ void CreateAndAddChromeThrottlesForNavigation(
     if (ash::merge_session_throttling_utils::ShouldAttachNavigationThrottle() &&
         !ash::merge_session_throttling_utils::AreAllSessionMergedAlready() &&
         handle.GetURL().SchemeIsHTTPOrHTTPS()) {
-      registry.AddThrottle(
-          ash::MergeSessionNavigationThrottle::Create(&handle));
+      ash::MergeSessionNavigationThrottle::CreateAndAdd(registry);
     }
   }
 
-  registry.MaybeAddThrottle(
-      apps::ChromeOsDisabledAppsThrottle::MaybeCreate(&handle));
+  apps::ChromeOsDisabledAppsThrottle::MaybeCreateAndAdd(registry);
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -319,33 +315,25 @@ void CreateAndAddChromeThrottlesForNavigation(
 #if BUILDFLAG(IS_CHROMEOS)
   link_capturing_delegate =
       std::make_unique<apps::ChromeOsLinkCapturingDelegate>();
+  bool url_to_apps_throttle_created =
 #else   // BUILDFLAG(IS_CHROMEOS)
   link_capturing_delegate =
       std::make_unique<web_app::WebAppLinkCapturingDelegate>();
 #endif  // BUILDFLAG(IS_CHROMEOS)
-  std::unique_ptr<content::NavigationThrottle> url_to_apps_throttle =
-      apps::LinkCapturingNavigationThrottle::MaybeCreate(
-          &handle, std::move(link_capturing_delegate));
-
-  bool url_to_apps_throttle_created = url_to_apps_throttle != nullptr;
-  if (url_to_apps_throttle_created) {
-    registry.AddThrottle(std::move(url_to_apps_throttle));
-  }
+      apps::LinkCapturingNavigationThrottle::MaybeCreateAndAdd(
+          registry, std::move(link_capturing_delegate));
 #if BUILDFLAG(IS_CHROMEOS)
   // TODO(crbug.com/366547977): This currently does nothing and allows all
   // navigations to proceed if v2 is enabled on ChromeOS. Implement.
-  std::unique_ptr<content::NavigationThrottle>
-      chromeos_reimpl_navigation_throttle =
-          apps::ChromeOsReimplNavigationCapturingThrottle::MaybeCreate(&handle);
-  if (chromeos_reimpl_navigation_throttle) {
-    // Verify the v1 throttle has not been created.
-    CHECK(!url_to_apps_throttle_created);
-    registry.AddThrottle(std::move(chromeos_reimpl_navigation_throttle));
-  }
+  bool chromeos_reimpl_navigation_throttle_created =
+      apps::ChromeOsReimplNavigationCapturingThrottle::MaybeCreateAndAdd(
+          registry);
+  // Verify the v1 and reimpl throttles have not been created at the same time.
+  CHECK(!chromeos_reimpl_navigation_throttle_created ||
+        !url_to_apps_throttle_created);
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
-  registry.MaybeAddThrottle(
-      web_app::NavigationCapturingRedirectionThrottle::MaybeCreate(&handle));
+  web_app::NavigationCapturingRedirectionThrottle::MaybeCreateAndAdd(registry);
 #endif  // !BUILDFLAG(IS_ANDROID)
 
   Profile* profile =
@@ -355,29 +343,26 @@ void CreateAndAddChromeThrottlesForNavigation(
   if (!extensions::ChromeContentBrowserClientExtensionsPart::
           AreExtensionsDisabledForProfile(profile)) {
     registry.AddThrottle(
-        std::make_unique<extensions::ExtensionNavigationThrottle>(&handle));
+        std::make_unique<extensions::ExtensionNavigationThrottle>(registry));
 
-    registry.MaybeAddThrottle(extensions::ExtensionsBrowserClient::Get()
-                                  ->GetUserScriptListener()
-                                  ->CreateNavigationThrottle(&handle));
+    extensions::ExtensionsBrowserClient::Get()
+        ->GetUserScriptListener()
+        ->CreateAndAddNavigationThrottle(registry);
   }
 #endif
 
 #if BUILDFLAG(ENABLE_GUEST_VIEW)
-  registry.MaybeAddThrottle(
-      extensions::WebViewGuest::MaybeCreateNavigationThrottle(&handle));
+  extensions::WebViewGuest::MaybeCreateAndAddNavigationThrottle(registry);
 #endif
 
-  registry.MaybeAddThrottle(
-      SupervisedUserGoogleAuthNavigationThrottle::MaybeCreate(&handle));
+  SupervisedUserGoogleAuthNavigationThrottle::MaybeCreateAndAdd(registry);
 
-  registry.MaybeAddThrottle(
-      supervised_user::MaybeCreateClassifyUrlNavigationThrottleFor(&handle));
+  supervised_user::MaybeCreateAndAddClassifyUrlNavigationThrottle(registry);
 
   if (auto* throttle_manager =
           subresource_filter::ContentSubresourceFilterThrottleManager::
               FromNavigationHandle(handle)) {
-    throttle_manager->MaybeAppendNavigationThrottles(registry);
+    throttle_manager->MaybeCreateAndAddNavigationThrottles(registry);
   }
 
   if (fingerprinting_protection_filter::features::
@@ -385,29 +370,24 @@ void CreateAndAddChromeThrottlesForNavigation(
               profile ? profile->IsIncognitoProfile() : false)) {
     if (auto* throttle_manager = fingerprinting_protection_filter::
             ThrottleManager::FromNavigationHandle(handle)) {
-      throttle_manager->MaybeAppendNavigationThrottles(registry);
+      throttle_manager->MaybeCreateAndAddNavigationThrottles(registry);
     }
   }
 
-  registry.MaybeAddThrottle(
-      LookalikeUrlNavigationThrottle::MaybeCreateNavigationThrottle(&handle));
+  LookalikeUrlNavigationThrottle::MaybeCreateAndAdd(registry);
 
-  registry.MaybeAddThrottle(
-      PDFIFrameNavigationThrottle::MaybeCreateThrottleFor(&handle));
+  PDFIFrameNavigationThrottle::MaybeCreateAndAdd(registry);
 
 #if BUILDFLAG(ENABLE_PDF)
   registry.AddThrottle(std::make_unique<pdf::PdfNavigationThrottle>(
-      &handle, std::make_unique<ChromePdfStreamDelegate>()));
+      registry, std::make_unique<ChromePdfStreamDelegate>()));
 #endif  // BUILDFLAG(ENABLE_PDF)
 
-  registry.MaybeAddThrottle(TabUnderNavigationThrottle::MaybeCreate(&handle));
+  TabUnderNavigationThrottle::MaybeCreateAndAdd(registry);
 
-  registry.MaybeAddThrottle(
-      WellKnownChangePasswordNavigationThrottle::MaybeCreateThrottleFor(
-          &handle));
+  WellKnownChangePasswordNavigationThrottle::MaybeCreateAndAdd(registry);
 
-  registry.MaybeAddThrottle(
-      PasswordManagerNavigationThrottle::MaybeCreateThrottleFor(&handle));
+  PasswordManagerNavigationThrottle::MaybeCreateAndAdd(registry);
 
   registry.AddThrottle(std::make_unique<PolicyBlocklistNavigationThrottle>(
       registry, handle.GetWebContents()->GetBrowserContext()));
@@ -417,59 +397,49 @@ void CreateAndAddChromeThrottlesForNavigation(
   SSLErrorHandler::SetClientCallbackOnInterstitialsShown(
       base::BindRepeating(&MaybeTriggerSecurityInterstitialShownEvent));
   registry.AddThrottle(std::make_unique<SSLErrorNavigationThrottle>(
-      &handle, base::BindOnce(&HandleSSLErrorWrapper),
+      registry, base::BindOnce(&HandleSSLErrorWrapper),
       base::BindOnce(&IsInHostedApp),
       base::BindOnce(
           &ShouldIgnoreSslInterstitialBecauseNavigationDefaultedToHttps)));
 
-  registry.AddThrottle(std::make_unique<LoginNavigationThrottle>(&handle));
+  registry.AddThrottle(std::make_unique<LoginNavigationThrottle>(registry));
 
   if (base::FeatureList::IsEnabled(omnibox::kDefaultTypedNavigationsToHttps)) {
-    registry.MaybeAddThrottle(
-        TypedNavigationUpgradeThrottle::MaybeCreateThrottleFor(&handle));
+    TypedNavigationUpgradeThrottle::MaybeCreateAndAdd(registry);
   }
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
-  registry.MaybeAddThrottle(
-      WebAppSettingsNavigationThrottle::MaybeCreateThrottleFor(&handle));
-  registry.MaybeAddThrottle(
-      profile_management::ProfileManagementNavigationThrottle::
-          MaybeCreateThrottleFor(&handle));
-  registry.MaybeAddThrottle(
-      profile_management::OidcAuthResponseCaptureNavigationThrottle::
-          MaybeCreateThrottleFor(&handle));
-  registry.MaybeAddThrottle(
-      ManagedProfileRequiredNavigationThrottle::MaybeCreateThrottleFor(
-          &handle));
+  WebAppSettingsNavigationThrottle::MaybeCreateAndAdd(registry);
+  profile_management::ProfileManagementNavigationThrottle::MaybeCreateAndAdd(
+      registry);
+  profile_management::OidcAuthResponseCaptureNavigationThrottle::
+      MaybeCreateAndAdd(registry);
+
+  ManagedProfileRequiredNavigationThrottle::MaybeCreateAndAdd(registry);
 
   if (base::FeatureList::IsEnabled(
           enterprise::webstore::kChromeWebStoreNavigationThrottle)) {
     registry.AddThrottle(
         std::make_unique<enterprise_webstore::ChromeWebStoreNavigationThrottle>(
-            &handle));
+            registry));
   }
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || \
     BUILDFLAG(IS_CHROMEOS)
-  registry.MaybeAddThrottle(
-      enterprise_connectors::DeviceTrustNavigationThrottle::
-          MaybeCreateThrottleFor(&handle));
+  enterprise_connectors::DeviceTrustNavigationThrottle::MaybeCreateAndAdd(
+      registry);
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) ||
         // BUILDFLAG(IS_CHROMEOS)
 
 #if !BUILDFLAG(IS_ANDROID)
-  registry.MaybeAddThrottle(
-      DevToolsWindow::MaybeCreateNavigationThrottle(&handle));
+  DevToolsWindow::MaybeCreateAndAddNavigationThrottle(registry);
 
-  registry.MaybeAddThrottle(
-      NewTabPageNavigationThrottle::MaybeCreateThrottleFor(&handle));
+  NewTabPageNavigationThrottle::MaybeCreateAndAdd(registry);
 
-  registry.MaybeAddThrottle(
-      web_app::TabbedWebAppNavigationThrottle::MaybeCreateThrottleFor(&handle));
+  web_app::TabbedWebAppNavigationThrottle::MaybeCreateAndAdd(registry);
 
-  registry.MaybeAddThrottle(
-      web_app::WebUIWebAppNavigationThrottle::MaybeCreateThrottleFor(&handle));
+  web_app::WebUIWebAppNavigationThrottle::MaybeCreateAndAdd(registry);
 #endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(SAFE_BROWSING_AVAILABLE)
@@ -478,14 +448,13 @@ void CreateAndAddChromeThrottlesForNavigation(
       g_browser_process->safe_browsing_service()
           ? g_browser_process->safe_browsing_service()->ui_manager().get()
           : nullptr;
-  registry.MaybeAddThrottle(
-      safe_browsing::SafeBrowsingNavigationThrottle::MaybeCreateThrottleFor(
-          &handle, ui_manager));
+  safe_browsing::SafeBrowsingNavigationThrottle::MaybeCreateAndAdd(registry,
+                                                                   ui_manager);
 
   if (base::FeatureList::IsEnabled(safe_browsing::kDelayedWarnings)) {
     registry.AddThrottle(
         std::make_unique<safe_browsing::DelayedWarningNavigationThrottle>(
-            &handle));
+            registry));
   }
 #endif  // BUILDFLAG(SAFE_BROWSING_AVAILABLE)
 
@@ -495,74 +464,58 @@ void CreateAndAddChromeThrottlesForNavigation(
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 
 #if BUILDFLAG(IS_CHROMEOS)
-  registry.MaybeAddThrottle(
-      chromeos::KioskSettingsNavigationThrottle::MaybeCreateThrottleFor(
-          &handle));
+  chromeos::KioskSettingsNavigationThrottle::MaybeCreateAndAdd(registry);
 
-  registry.MaybeAddThrottle(
-      ash::OnTaskLockedSessionNavigationThrottle::MaybeCreateThrottleFor(
-          &handle));
+  ash::OnTaskLockedSessionNavigationThrottle::MaybeCreateAndAdd(registry);
 #endif
 
 #if BUILDFLAG(IS_MAC)
-  registry.MaybeAddThrottle(MaybeCreateAuthSessionThrottleFor(&handle));
+  MaybeCreateAndAddAuthSessionNavigationThrottle(registry);
 #endif
 
   if (profile && profile->GetPrefs()) {
-    registry.MaybeAddThrottle(
-        security_interstitials::InsecureFormNavigationThrottle::
-            MaybeCreateNavigationThrottle(
-                &handle, std::make_unique<ChromeSecurityBlockingPageFactory>(),
-                profile->GetPrefs()));
+    security_interstitials::InsecureFormNavigationThrottle::MaybeCreateAndAdd(
+        registry, std::make_unique<ChromeSecurityBlockingPageFactory>(),
+        profile->GetPrefs());
   }
 
   if (IsErrorPageAutoReloadEnabled()) {
-    registry.MaybeAddThrottle(
-        error_page::NetErrorAutoReloader::MaybeCreateThrottleFor(&handle));
+    error_page::NetErrorAutoReloader::MaybeCreateAndAddNavigationThrottle(
+        registry);
   }
 
-  registry.MaybeAddThrottle(
-      payments::PaymentHandlerNavigationThrottle::MaybeCreateThrottleFor(
-          &handle));
+  payments::PaymentHandlerNavigationThrottle::MaybeCreateAndAdd(registry);
 
-  registry.MaybeAddThrottle(
-      prerender::NoStatePrefetchNavigationThrottle::MaybeCreateThrottleFor(
-          &handle));
+  prerender::NoStatePrefetchNavigationThrottle::MaybeCreateAndAdd(registry);
 
 #if !BUILDFLAG(IS_ANDROID)
-  registry.MaybeAddThrottle(
-      ReadAnythingSidePanelNavigationThrottle::CreateFor(&handle));
+  ReadAnythingSidePanelNavigationThrottle::CreateAndAdd(registry);
 
   if (lens::features::IsLensOverlayEnabled()) {
     if (profile) {
       if (ThemeService* theme_service =
               ThemeServiceFactory::GetForProfile(profile)) {
-        registry.MaybeAddThrottle(
-            lens::LensOverlaySidePanelNavigationThrottle::MaybeCreateFor(
-                &handle, theme_service));
+        lens::LensOverlaySidePanelNavigationThrottle::MaybeCreateAndAdd(
+            registry, theme_service);
       }
     }
   }
 
-  registry.MaybeAddThrottle(
-      NtpMicrosoftAuthResponseCaptureNavigationThrottle::MaybeCreateThrottleFor(
-          &handle));
+  NtpMicrosoftAuthResponseCaptureNavigationThrottle::MaybeCreateAndAdd(
+      registry);
 #endif
 
 #if BUILDFLAG(ENABLE_OFFLINE_PAGES)
-  registry.MaybeAddThrottle(
-      offline_pages::OfflinePageNavigationThrottle::MaybeCreateThrottleFor(
-          &handle));
+  offline_pages::OfflinePageNavigationThrottle::MaybeCreateAndAdd(registry);
 #endif
 
   if (profile) {
-    registry.MaybeAddThrottle(
-        HttpsUpgradesNavigationThrottle::MaybeCreateThrottleFor(
-            &handle, std::make_unique<ChromeSecurityBlockingPageFactory>(),
-            profile));
+    HttpsUpgradesNavigationThrottle::MaybeCreateAndAdd(
+        registry, std::make_unique<ChromeSecurityBlockingPageFactory>(),
+        profile);
   }
 
-  registry.MaybeAddThrottle(MaybeCreateNavigationAblationThrottle(&handle));
+  MaybeCreateAndAddNavigationAblationThrottle(registry);
 
 #if !BUILDFLAG(IS_ANDROID)
   MaybeCreateAndAddWebViewSidePanelThrottle(registry);
@@ -572,17 +525,15 @@ void CreateAndAddChromeThrottlesForNavigation(
       PrivacySandboxSettingsFactory::GetForProfile(profile);
   if (privacy_sandbox_settings &&
       privacy_sandbox_settings->AreRelatedWebsiteSetsEnabled()) {
-    registry.MaybeAddThrottle(
-        first_party_sets::FirstPartySetsNavigationThrottle::
-            MaybeCreateNavigationThrottle(&handle));
+    first_party_sets::FirstPartySetsNavigationThrottle::MaybeCreateAndAdd(
+        registry);
   }
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   // Don't perform platform authentication in incognito and guest profiles.
   if (profile && !profile->IsOffTheRecord()) {
-    registry.MaybeAddThrottle(
-        enterprise_auth::PlatformAuthNavigationThrottle::MaybeCreateThrottleFor(
-            &handle));
+    enterprise_auth::PlatformAuthNavigationThrottle::MaybeCreateAndAdd(
+        registry);
   }
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
 
@@ -590,37 +541,29 @@ void CreateAndAddChromeThrottlesForNavigation(
   // TODO(b:296844164) Handle captive portal signin properly.
   if (profile && profile->IsIncognitoProfile() && profile->IsOffTheRecord() &&
       !profile->GetOTRProfileID().IsCaptivePortal()) {
-    registry.MaybeAddThrottle(
-        enterprise_incognito::IncognitoNavigationThrottle::
-            MaybeCreateThrottleFor(&handle));
+    enterprise_incognito::IncognitoNavigationThrottle::MaybeCreateAndAdd(
+        registry);
   }
 
-  registry.MaybeAddThrottle(
-      apps::AppInstallNavigationThrottle::MaybeCreate(&handle));
+  apps::AppInstallNavigationThrottle::MaybeCreateAndAdd(registry);
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   if (profile && profile->IsIncognitoProfile() && profile->IsOffTheRecord()) {
-    registry.MaybeAddThrottle(
-        enterprise_incognito::IncognitoNavigationThrottle::
-            MaybeCreateThrottleFor(&handle));
+    enterprise_incognito::IncognitoNavigationThrottle::MaybeCreateAndAdd(
+        registry);
   }
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 
 #if !BUILDFLAG(IS_ANDROID)
-  registry.MaybeAddThrottle(
-      PreviewNavigationThrottle::MaybeCreateThrottleFor(&handle));
+  PreviewNavigationThrottle::MaybeCreateAndAdd(registry);
 #endif  // !BUILDFLAG(IS_ANDROID)
 
-  registry.MaybeAddThrottle(
-      MaybeCreateVisitedLinkNavigationThrottleFor(&handle));
+  MaybeCreateAndAddVisitedLinkNavigationThrottle(registry);
 
-  registry.MaybeAddThrottle(
-      data_sharing::DataSharingNavigationThrottle::MaybeCreateThrottleFor(
-          &handle));
+  data_sharing::DataSharingNavigationThrottle::MaybeCreateAndAdd(registry);
 
 #if !BUILDFLAG(IS_ANDROID)
-  registry.MaybeAddThrottle(
-      web_app::IsolatedWebAppThrottle::MaybeCreateThrottleFor(&handle));
+  web_app::IsolatedWebAppThrottle::MaybeCreateAndAdd(registry);
 #endif  // !BUILDFLAG(IS_ANDROID)
 }

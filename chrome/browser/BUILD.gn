@@ -143,7 +143,10 @@ source_set("main_extra_parts") {
 source_set("global_features") {
   sources = [ "global_features.h" ]
   deps = [ "//chrome/common:buildflags" ]
-  public_deps = [ "//base" ]
+  public_deps = [
+    "//base",
+    "//build:branding_buildflags",
+  ]
 }
 
 source_set("shell_integration") {
@@ -1003,14 +1006,16 @@ static_library("browser") {
     "password_manager/credentials_cleaner_runner_factory.h",
     "password_manager/field_info_manager_factory.cc",
     "password_manager/field_info_manager_factory.h",
-    "password_manager/password_change/change_form_submission_verifier.cc",
-    "password_manager/password_change/change_form_submission_verifier.h",
+    "password_manager/password_change/change_password_form_filling_submission_helper.cc",
+    "password_manager/password_change/change_password_form_filling_submission_helper.h",
     "password_manager/password_change/change_password_form_finder.cc",
     "password_manager/password_change/change_password_form_finder.h",
     "password_manager/password_change/change_password_form_waiter.cc",
     "password_manager/password_change/change_password_form_waiter.h",
     "password_manager/password_change/model_quality_logs_uploader.cc",
     "password_manager/password_change/model_quality_logs_uploader.h",
+    "password_manager/password_change/password_change_submission_verifier.cc",
+    "password_manager/password_change/password_change_submission_verifier.h",
     "password_manager/password_change_delegate.h",
     "password_manager/password_change_delegate_impl.cc",
     "password_manager/password_change_delegate_impl.h",
@@ -1331,7 +1336,6 @@ static_library("browser") {
     "profiles/profile_metrics.cc",
     "profiles/profile_metrics.h",
     "profiles/profiles_state.cc",
-    "profiles/profiles_state.h",
     "profiles/renderer_updater.cc",
     "profiles/renderer_updater.h",
     "profiles/renderer_updater_factory.cc",
@@ -1415,17 +1419,11 @@ static_library("browser") {
     "send_tab_to_self/send_tab_to_self_util.cc",
     "send_tab_to_self/send_tab_to_self_util.h",
     "serial/chrome_serial_delegate.cc",
-    "serial/chrome_serial_delegate.h",
     "serial/serial_blocklist.cc",
-    "serial/serial_blocklist.h",
     "serial/serial_chooser_context.cc",
     "serial/serial_chooser_context_factory.cc",
-    "serial/serial_chooser_context_factory.h",
-    "serial/serial_chooser_histograms.h",
     "serial/serial_policy_allowed_ports.cc",
-    "serial/serial_policy_allowed_ports.h",
     "serial/web_serial_chooser.cc",
-    "serial/web_serial_chooser.h",
     "sessions/chrome_serialized_navigation_driver.cc",
     "sessions/chrome_serialized_navigation_driver.h",
     "sessions/chrome_tab_restore_service_client.cc",
@@ -1861,7 +1859,7 @@ static_library("browser") {
 
     # TODO(crbug.com/364667551): includes //c/b/about_flags.h and other sources
     # from //chrome/browser/ui/webui, which are not modularized yet.
-    "//chrome/browser/ui/webui/about",
+    "//chrome/browser/ui/webui/about:impl",
   ]
 
   public_deps = [
@@ -2064,6 +2062,7 @@ static_library("browser") {
     "//chrome/browser/ui/webui",
     "//chrome/browser/ui/webui:configs",
     "//chrome/browser/ui/webui/about",
+    "//chrome/browser/ui/webui/about:impl",
     "//chrome/browser/ui/webui/bluetooth_internals",
     "//chrome/browser/ui/webui/bluetooth_internals:mojo_bindings",
     "//chrome/browser/ui/webui/internal_debug_pages_disabled",
@@ -2606,7 +2605,10 @@ static_library("browser") {
   ]
 
   if (is_win && is_chrome_branded) {
-    deps += [ "//chrome/browser/win/installer_downloader" ]
+    deps += [
+      "//chrome/browser/win/installer_downloader:controller",
+      "//chrome/browser/win/installer_downloader:infobar",
+    ]
   }
 
   # Platforms that have a network diagnostics dialog. All others fall through
@@ -3219,7 +3221,6 @@ static_library("browser") {
       "segmentation_platform/client_util/tab_data_collection_util.h",
       "serial/android/serial_bridge.cc",
       "serial/android/web_serial_chooser_android.cc",
-      "serial/android/web_serial_chooser_android.h",
       "sessions/session_restore_android.cc",
       "sharing/click_to_call/click_to_call_message_handler_android.cc",
       "sharing/click_to_call/click_to_call_message_handler_android.h",
@@ -3381,6 +3382,7 @@ static_library("browser") {
       "//chrome/browser/password_manager/android/account_storage_notice",
       "//chrome/browser/password_manager/android/add_username_dialog:android",
       "//chrome/browser/password_manager/android/grouped_affiliations:public",
+      "//chrome/browser/password_manager/android/one_time_passwords:backend",
       "//chrome/browser/policy/android:android",
       "//chrome/browser/policy/android:jni_headers",
       "//chrome/browser/preferences:android",
@@ -3417,6 +3419,8 @@ static_library("browser") {
       "//chrome/browser/ui/android/pdf:pdf_jni_headers",
       "//chrome/browser/ui/digital_credentials",
       "//chrome/browser/ui/fast_checkout:impl",
+      "//chrome/browser/ui/plus_addresses",
+      "//chrome/browser/ui/plus_addresses:impl",
       "//chrome/browser/usb/android:jni_headers",
       "//chrome/browser/wallet/android:jni_headers",
       "//chrome/common:non_code_constants",
@@ -4148,7 +4152,6 @@ static_library("browser") {
       "send_tab_to_self/desktop_notification_handler.cc",
       "send_tab_to_self/desktop_notification_handler.h",
       "serial/web_serial_chooser_desktop.cc",
-      "serial/web_serial_chooser_desktop.h",
       "sessions/restore_on_startup_policy_handler.cc",
       "sessions/restore_on_startup_policy_handler.h",
       "share/share_metrics.cc",
@@ -4338,7 +4341,6 @@ static_library("browser") {
       "//chrome/browser/metrics/desktop_session_duration",
       "//chrome/browser/new_tab_page/chrome_colors",
       "//chrome/browser/policy:path_parser",
-      "//chrome/browser/resources:component_extension_resources",
       "//chrome/browser/screen_ai:prefs",
       "//chrome/browser/screen_ai:screen_ai_install_state",
       "//chrome/browser/screen_ai:screen_ai_service_router_factory",
@@ -4371,7 +4373,9 @@ static_library("browser") {
       "//chrome/browser/ui/page_action:icon_type",
       "//chrome/browser/ui/privacy_sandbox",
       "//chrome/browser/ui/send_tab_to_self",
+      "//chrome/browser/ui/views/zoom:impl",
       "//chrome/browser/ui/webui/access_code_cast",
+      "//chrome/browser/ui/webui/app_service_internals",
 
       # TODO(413315837): Remove this dependency when chrome/browser/privacy_sandbox
       # gets modularized.
@@ -4478,7 +4482,7 @@ static_library("browser") {
       "//components/user_education/webui:webui",
       "//components/vector_icons",
       "//components/web_modal",
-      "//components/webapps/isolated_web_apps",
+      "//components/webapps/isolated_web_apps:isolated_web_apps",
       "//components/webauthn/content/browser",
       "//components/webauthn/core/browser",
       "//components/webauthn/core/browser:passkey_model",
@@ -5502,6 +5506,7 @@ static_library("browser") {
       "//chrome/browser/ui/webui/ash/emoji",
       "//chrome/browser/ui/webui/ash/enterprise_reporting",
       "//chrome/browser/ui/webui/ash/extended_updates",
+      "//chrome/browser/ui/webui/ash/floating_workspace",
       "//chrome/browser/ui/webui/ash/internet",
       "//chrome/browser/ui/webui/ash/kerberos",
       "//chrome/browser/ui/webui/ash/launcher_internals",
@@ -5993,6 +5998,7 @@ static_library("browser") {
       "//chrome/browser/ui/webui/ash/emoji",
       "//chrome/browser/ui/webui/ash/enterprise_reporting",
       "//chrome/browser/ui/webui/ash/extended_updates",
+      "//chrome/browser/ui/webui/ash/floating_workspace",
       "//chrome/browser/ui/webui/ash/kerberos",
       "//chrome/browser/ui/webui/ash/lobster",
       "//chrome/browser/ui/webui/ash/lock_screen_reauth",
@@ -6139,11 +6145,15 @@ static_library("browser") {
       "//chrome/browser/background/glic:impl",
       "//chrome/browser/glic",
       "//chrome/browser/glic:impl",
+      "//chrome/browser/glic/fre",
+      "//chrome/browser/glic/media",
     ]
 
     allow_circular_includes_from += [
       "//chrome/browser/background/glic:impl",
       "//chrome/browser/glic:impl",
+      "//chrome/browser/glic/media",
+      "//chrome/browser/glic/fre",
     ]
   }
 
@@ -7480,6 +7490,7 @@ static_library("browser") {
     deps += [
       "//chrome/browser/enterprise/incognito",
       "//chrome/browser/extensions/api/browsing_data",
+      "//chrome/browser/resources:component_extension_resources",
 
       # This dependency should be removed when //chrome/browser/notifications
       # is modularized.

@@ -108,10 +108,12 @@ void EchoAILanguageModel::Prompt(
 
 void EchoAILanguageModel::Append(
     std::vector<blink::mojom::AILanguageModelPromptPtr> prompts,
-    mojo::PendingRemote<blink::mojom::AILanguageModelAppendClient> client) {
-  mojo::Remote<blink::mojom::AILanguageModelAppendClient> client_remote(
-      std::move(client));
-  client_remote->OnAppendComplete();
+    mojo::PendingRemote<blink::mojom::ModelStreamingResponder>
+        pending_responder) {
+  mojo::Remote<blink::mojom::ModelStreamingResponder> responder(
+      std::move(pending_responder));
+  responder->OnCompletion(
+      blink::mojom::ModelExecutionContextInfo::New(current_tokens_));
 }
 
 void EchoAILanguageModel::Fork(
@@ -143,8 +145,7 @@ void EchoAILanguageModel::Destroy() {
 
 void EchoAILanguageModel::MeasureInputUsage(
     std::vector<blink::mojom::AILanguageModelPromptPtr> input,
-    mojo::PendingRemote<blink::mojom::AILanguageModelMeasureInputUsageClient>
-        client) {
+    MeasureInputUsageCallback callback) {
   size_t total = 0;
   for (const auto& prompt : input) {
     if (prompt->content->is_text()) {
@@ -153,9 +154,7 @@ void EchoAILanguageModel::MeasureInputUsage(
       total += 100;  // TODO(crbug.com/415304330): Improve estimate.
     }
   }
-  mojo::Remote<blink::mojom::AILanguageModelMeasureInputUsageClient>(
-      std::move(client))
-      ->OnResult(total);
+  std::move(callback).Run(total);
 }
 
 }  // namespace content

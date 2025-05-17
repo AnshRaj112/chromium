@@ -172,6 +172,7 @@ export class ViewerToolbarElement extends CrLitElement {
   private currentStroke: number = 0;
   private mostRecentStroke: number = 0;
   private pluginController_: PluginController = PluginController.getInstance();
+  private strokeInProgress_: boolean = false;
   private tracker_: EventTracker = new EventTracker();
 
   constructor() {
@@ -181,6 +182,10 @@ export class ViewerToolbarElement extends CrLitElement {
         this.pluginController_.getEventTarget(),
         PluginControllerEventType.FINISH_INK_STROKE,
         this.handleFinishInkStroke_.bind(this));
+    this.tracker_.add(
+        this.pluginController_.getEventTarget(),
+        PluginControllerEventType.START_INK_STROKE,
+        this.handleStartInkStroke_.bind(this));
   }
   // </if>
 
@@ -490,25 +495,42 @@ export class ViewerToolbarElement extends CrLitElement {
   }
 
   /**
-   * Handles whether the undo and redo buttons should be enabled or disabled
-   * when a new ink stroke is added to the page.
+   * Handles when the user starts a stroke. While the stroke is in progress,
+   * disallow undo/redo operations.
    */
-  private handleFinishInkStroke_() {
-    this.currentStroke++;
-    this.mostRecentStroke = this.currentStroke;
+  private handleStartInkStroke_() {
+    this.strokeInProgress_ = true;
+  }
 
-    // When a new stroke is added, it can always be undone. Since it's the most
-    // recent stroke, the redo action cannot be performed.
-    this.canUndoAnnotation_ = true;
-    this.canRedoAnnotation_ = false;
+  /**
+   * Handles whether the undo and redo buttons should be enabled or disabled
+   * when a new Ink stroke is added to or erased from the page. This event
+   * fires when stroking finishes, but not all strokes (e.g. eraser strokes)
+   * actually modify the page.
+   */
+  private handleFinishInkStroke_(e: CustomEvent<boolean>) {
+    const modified = e.detail;
+    if (modified) {
+      this.currentStroke++;
+      this.mostRecentStroke = this.currentStroke;
+
+      // When a new stroke modification occurs, it can always be undone. Since
+      // it's the most recent modification, the redo action cannot be performed.
+      this.canUndoAnnotation_ = true;
+      this.canRedoAnnotation_ = false;
+    }
+
+    this.strokeInProgress_ = false;
   }
 
   protected computeEnableUndo_(): boolean {
-    return this.canUndoAnnotation_ && this.enableUndoRedo;
+    return this.canUndoAnnotation_ && !this.strokeInProgress_ &&
+        this.enableUndoRedo;
   }
 
   protected computeEnableRedo_(): boolean {
-    return this.canRedoAnnotation_ && this.enableUndoRedo;
+    return this.canRedoAnnotation_ && !this.strokeInProgress_ &&
+        this.enableUndoRedo;
   }
 
   /**

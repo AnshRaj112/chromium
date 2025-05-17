@@ -96,14 +96,12 @@
 <translation id="1377508275003315939">პაროლები</translation>
 <translation id="1381022135873211423">{count,plural, =1{{count}-დან {position} მისამართი}other{{count}-დან {position} მისამართი}}</translation>
 <translation id="1383876407941801731">ძიება</translation>
-<translation id="1385168997509105202">თქვენ მომენტალურად დაკარგავთ წვდომას ჩანართების ჯგუფზე „<ph name="GROUP_NAME" />“ <ph name="USER_NAME" /> (<ph name="USER_EMAIL" />) ვეღარ შეძლებს თქვენთან ინტერაქციას Google სერვისებში.</translation>
 <translation id="138618066238211776">გაგრძელება, როგორც <ph name="USER_NAME" /></translation>
 <translation id="138692594145659985">ბარათის შენახვის ვარიანტები</translation>
 <translation id="1396260204083880024">შესული ხართ, როგორც <ph name="USER_NAME" />. <ph name="USER_EMAIL" />. ანგარიშის მენიუს გახსნა.</translation>
 <translation id="1397144142234474689">ისტორიის დამალვა</translation>
 <translation id="1407135791313364759">ყველას გახსნა</translation>
 <translation id="1408847409015257906">შეხებით აირჩიეთ „კონფიდენციალურობა და უსაფრთხოება“.</translation>
-<translation id="1411311327083909515">თქვენი მართული ანგარიშით შესვლა საშუალებას მოგცემთ, გამიჯნოთ დათვალიერება თქვენი ორგანიზაციისთვის, კერძოდ, ჩანართები, ისტორია და პაროლები.</translation>
 <translation id="1411386976162024013">Lens-ით ვიზუალური ძიება</translation>
 <translation id="1417474386970818917">გასვლა და წაშლა</translation>
 <translation id="1426410128494586442">დიახ</translation>
@@ -535,6 +533,7 @@
 <translation id="3208260410153224535">თქვენმა ორგანიზაციამ გამორთო სისტემაში შესვლა. ახალი სანიშნეები, პაროლები და სხვა კონტენტი შეინახება მხოლოდ ამ მოწყობილობაზე.</translation>
 <translation id="3213807041830307252">იყიდეთ, თარგმნეთ და ამოიცანით ის, რასაც ხედავთ, თქვენი კამერისა და ფოტოგალერეის მეშვეობით.</translation>
 <translation id="3214379938835224220">თქვენი iPad-ის გადაყენების გამო, სისტემიდან გახვედით. სისტემაში შესასვლელად შეეხეთ „გაგრძელებას“ ქვემოთ.</translation>
+<translation id="3218296450292600703">თქვენი მართული ანგარიშით შესვლა საშუალებას მოგცემთ, გამიჯნოთ დათვალიერება თქვენი ორგანიზაციისთვის, კერძოდ, ჩანართები, ისტორია და პაროლები.</translation>
 <translation id="3224075676564434205">ჩანართები დარჩება გახსნილი ამ მოწყობილობაზე, მაგრამ ჯგუფი წაიშლება ყველა მოწყობილობიდან, რომელიც შესულია ანგარიშში: <ph name="USER_EMAIL" /></translation>
 <translation id="3224641773458703735">პაროლების ექსპორტირებისთვის, პირველ რიგში, საჭიროა თქვენს მოწყობილობაზე საიდუმლო კოდის დაყენება.</translation>
 <translation id="3227137524299004712">მიკროფონი</translation>
@@ -654,7 +653,6 @@
 <translation id="381219490185664296">გააუქმებთ ჩანართების დაჯგუფებას?</translation>
 <translation id="3812308602011798782">მიმოხილვები</translation>
 <translation id="3813175908845379029">სასარგებლო შემოთავაზებები, რომლებიც გაგიმარტივებთ დათვალიერებას</translation>
-<translation id="3815668647912194650">შეინარჩუნეთ ეს ჯგუფი, რომ მოგვიანებით მასში დაამატოთ ჩანართები, ან დატოვეთ ის, თუ აღარ გსურთ მასზე წვდომა.</translation>
 <translation id="3819183753496523827">თქვენ ხაზგარეშე რეჟიმში ხართ. შეამოწმეთ ინტერნეტ-კავშირი და ხელახლა ცადეთ.</translation>
 <translation id="3828924571679282172">{COUNT,plural, =1{გადახდის 1 მეთოდი}other{გადახდის # მეთოდი}}</translation>
 <translation id="3831560640878483188">გსურთ გაფრთხილების დახურვა?</translation>
@@ -1002,7 +1000,6 @@
 <translation id="5197255632782567636">ინტერნეტი</translation>
 <translation id="5200894869889836319">ნებართვების დაყენების ვარიანტები</translation>
 <translation id="5203051773066903947">შეყვანა</translation>
-<translation id="5205750905107419335"><ph name="USER_NAME" /> (<ph name="USER_EMAIL" />) მომენტალურად დაკარგავს წვდომას ჩანართების ჯგუფზე „<ph name="GROUP_NAME" />“ და ვეღარ შეძლებს თქვენთან ინტერაქციას Google სერვისებში.</translation>
 <translation id="5206453674369664567">გასვლა და მონაცემთა გასუფთავება</translation>
 <translation id="5210365745912300556">ჩანართის დახურვა</translation>
 <translation id="5211488077761630279">გსურთ, დართოთ ნება „<ph name="SITE_NAME" />“-ს, გამოიყენოს თქვენი <ph name="PERMISSION" />?</translation>
@@ -1082,7 +1079,6 @@ Handoff ასევე უნდა იყოს ჩართული პა�
 <translation id="5567439033041178034">შეიტყვეთ მეტი</translation>
 <translation id="5572648434713976849">მისამართთა ზოლში გაუმჯობესებული შემოთავაზებები დაგხვდებათ</translation>
 <translation id="5576885723883013398">ახალი ფანჯარა</translation>
-<translation id="5578543325423650885"><ph name="USER_NAME" /> (<ph name="USER_EMAIL" />) მომენტალურად დაკარგავს წვდომას ჩანართების ჯგუფზე „<ph name="GROUP_NAME" />“.</translation>
 <translation id="5578795271662203820">ამ გამოსახულების ძიება <ph name="SEARCH_ENGINE" />-ში</translation>
 <translation id="5579012242779565775">საკითხავი სიის დამალვა</translation>
 <translation id="5585019845078534178">ბარათები</translation>
@@ -1489,6 +1485,7 @@ Handoff ასევე უნდა იყოს ჩართული პა�
 <translation id="7102005569666697658">მიმდინარეობს ჩამოტვირთვა… <ph name="FILE_SIZE" /></translation>
 <translation id="7104701424653979232">მენიუ → პარამეტრები → გადახდის მეთოდები</translation>
 <translation id="7108338896283013870">დამალვა</translation>
+<translation id="7115051913071512405">შეამოწმეთ ეს</translation>
 <translation id="7128693485119315539">თქვენს ორგანიზაციას შეიძლება დასჭირდეს თქვენს მართულ ანგარიშთან მიბმული დათვალიერების მონაცემების (დათვალიერების ისტორია და პაროლები) ნახვა და მართვა.</translation>
 <translation id="713215255510512027"><ph name="FILENAME" /> (<ph name="FILESIZE" />)</translation>
 <translation id="7136892417564438900">კამერა მიუწვდომელია</translation>
@@ -1571,6 +1568,7 @@ Handoff ასევე უნდა იყოს ჩართული პა�
 <translation id="750493650310597496">0 არჩეულია</translation>
 <translation id="7506817096924591340"><ph name="FILENAME" /> (<ph name="FILESIZE" />).</translation>
 <translation id="7508728395076009983">ინკოგნიტო ჩანართების ჩასაკეტად დაყენეთ Touch ID, Face ID ან საიდუმლო კოდი.</translation>
+<translation id="750886945254958667">შეინარჩუნეთ ეს ჯგუფი, რომ მოგვიანებით მასში დაამატოთ ჩანართები, ან დატოვეთ ის, თუ აღარ გსურთ მასზე წვდომა</translation>
 <translation id="7512075701202892785">თქვენი საყვარელი ბრაუზერი უკვე iPad-ზეა</translation>
 <translation id="7512909159512473473">შეიყვანეთ საიდუმლო ფრაზა…</translation>
 <translation id="7514365320538308">ჩამოტვირთვა</translation>

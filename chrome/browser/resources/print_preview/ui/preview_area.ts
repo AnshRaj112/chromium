@@ -10,7 +10,7 @@ import {hasKeyModifiers} from 'chrome://resources/js/util.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 import type {PropertyValues} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
-import {DarkModeMixinLit} from '../dark_mode_mixin_lit.js';
+import {DarkModeMixin} from '../dark_mode_mixin.js';
 import {Coordinate2d} from '../data/coordinate2d.js';
 import type {Destination} from '../data/destination.js';
 import type {Margins, MarginsSetting} from '../data/margins.js';
@@ -31,7 +31,7 @@ import type {PluginProxy} from './plugin_proxy.js';
 import {PluginProxyImpl} from './plugin_proxy.js';
 import {getCss} from './preview_area.css.js';
 import {getHtml} from './preview_area.html.js';
-import {SettingsMixinLit} from './settings_mixin_lit.js';
+import {SettingsMixin} from './settings_mixin.js';
 
 export type PreviewTicket = Ticket&{
   headerFooterEnabled: boolean,
@@ -54,7 +54,7 @@ export interface PrintPreviewPreviewAreaElement {
 }
 
 const PrintPreviewPreviewAreaElementBase = WebUiListenerMixinLit(
-    I18nMixinLit(SettingsMixinLit(DarkModeMixinLit(CrLitElement))));
+    I18nMixinLit(SettingsMixin(DarkModeMixin(CrLitElement))));
 
 export class PrintPreviewPreviewAreaElement extends
     PrintPreviewPreviewAreaElementBase {
@@ -96,7 +96,7 @@ export class PrintPreviewPreviewAreaElement extends
   }
 
   accessor destination: Destination;
-  accessor documentModifiable: boolean;
+  accessor documentModifiable: boolean = false;
   accessor error: Error;
   accessor margins: Margins;
   accessor measurementSystem: MeasurementSystem|null;
@@ -136,6 +136,12 @@ export class PrintPreviewPreviewAreaElement extends
     }
   }
 
+  override firstUpdated(changedProperties: PropertyValues<this>) {
+    super.firstUpdated(changedProperties);
+    this.addEventListener('pointerover', this.onPointerOver_.bind(this));
+    this.addEventListener('pointerout', this.onPointerOut_.bind(this));
+  }
+
   override updated(changedProperties: PropertyValues<this>) {
     super.updated(changedProperties);
 
@@ -155,37 +161,17 @@ export class PrintPreviewPreviewAreaElement extends
   /**
    * Called when the pointer moves onto the component. Shows the margin
    * controls if custom margins are being used.
-   * @param event Contains element pointer moved from.
    */
-  private onPointerOver_(event: PointerEvent) {
-    const marginControlContainer = this.$.marginControlContainer;
-    let fromElement = event.relatedTarget as HTMLElement | null;
-    while (fromElement !== null) {
-      if (fromElement === marginControlContainer) {
-        return;
-      }
-
-      fromElement = fromElement.parentElement;
-    }
-    marginControlContainer.setInvisible(false);
+  private onPointerOver_() {
+    this.$.marginControlContainer.setInvisible(false);
   }
 
   /**
    * Called when the pointer moves off of the component. Hides the margin
    * controls if they are visible.
-   * @param event Contains element pointer moved to.
    */
-  private onPointerOut_(event: PointerEvent) {
-    const marginControlContainer = this.$.marginControlContainer;
-    let toElement = event.relatedTarget as HTMLElement | null;
-    while (toElement !== null) {
-      if (toElement === marginControlContainer) {
-        return;
-      }
-
-      toElement = toElement.parentElement;
-    }
-    marginControlContainer.setInvisible(true);
+  private onPointerOut_() {
+    this.$.marginControlContainer.setInvisible(true);
   }
 
   private pluginOrDocumentStatusChanged_() {

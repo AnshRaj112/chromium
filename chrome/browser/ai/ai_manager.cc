@@ -391,22 +391,7 @@ void AIManager::CreateLanguageModel(
         client,
     blink::mojom::AILanguageModelCreateOptionsPtr options) {
   CHECK(options);
-  on_device_model::Capabilities capabilities;
   if (options->expected_inputs.has_value()) {
-    capabilities = GetExpectedCapabilities(options->expected_inputs.value());
-    if (!capabilities.empty()) {
-      auto* service = OptimizationGuideKeyedServiceFactory::GetForProfile(
-          Profile::FromBrowserContext(browser_context_));
-      if (!base::FeatureList::IsEnabled(
-              blink::features::kAIPromptAPIMultimodalInput) ||
-          !service->GetOnDeviceCapabilities().HasAll(capabilities)) {
-        mojo::Remote<blink::mojom::AIManagerCreateLanguageModelClient>(
-            std::move(client))
-            ->OnError(blink::mojom::AIManagerCreateClientError::
-                          kUnableToCreateSession);
-        return;
-      }
-    }
     for (const auto& expected_input : options->expected_inputs.value()) {
       if (expected_input->languages.has_value() &&
           !IsLanguagesSupported(expected_input->languages.value())) {
@@ -466,6 +451,20 @@ void AIManager::CreateLanguageModelInternal(
 
   if (options->expected_inputs) {
     params->capabilities = GetExpectedCapabilities(*options->expected_inputs);
+
+    if (!params->capabilities.empty()) {
+      auto* service = OptimizationGuideKeyedServiceFactory::GetForProfile(
+          Profile::FromBrowserContext(browser_context_));
+      if (!base::FeatureList::IsEnabled(
+              blink::features::kAIPromptAPIMultimodalInput) ||
+          !service->GetOnDeviceCapabilities().HasAll(params->capabilities)) {
+        mojo::Remote<blink::mojom::AIManagerCreateLanguageModelClient>(
+            std::move(client))
+            ->OnError(blink::mojom::AIManagerCreateClientError::
+                          kUnableToCreateSession);
+        return;
+      }
+    }
   }
   mojo::PendingRemote<on_device_model::mojom::Session> session;
   model_client->solution().CreateSession(
@@ -713,9 +712,10 @@ void AIManager::CanCreateSession(
   }
 
   service->GetOnDeviceModelEligibilityAsync(
-      capability, base::BindOnce(&AIManager::FinishCanCreateSession,
-                                 weak_factory_.GetWeakPtr(), capability,
-                                 capabilities, std::move(callback)));
+      capability, capabilities,
+      base::BindOnce(&AIManager::FinishCanCreateSession,
+                     weak_factory_.GetWeakPtr(), capability, capabilities,
+                     std::move(callback)));
 }
 
 void AIManager::FinishCanCreateSession(

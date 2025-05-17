@@ -695,7 +695,7 @@ class TestDialogController
   }
 
   bool ShowFailureDialog(
-      const std::string& rp_for_display,
+      const RelyingPartyData& rp_data,
       const std::string& idp_for_display,
       blink::mojom::RpContext rp_context,
       blink::mojom::RpMode rp_mode,
@@ -727,7 +727,7 @@ class TestDialogController
   }
 
   bool ShowErrorDialog(
-      const std::string& rp_for_display,
+      const RelyingPartyData& rp_data,
       const std::string& idp_for_display,
       blink::mojom::RpContext rp_context,
       blink::mojom::RpMode rp_mode,
@@ -768,7 +768,7 @@ class TestDialogController
     return true;
   }
 
-  bool ShowLoadingDialog(const std::string& rp_for_display,
+  bool ShowLoadingDialog(const RelyingPartyData& rp_data,
                          const std::string& idp_for_display,
                          blink::mojom::RpContext rp_context,
                          blink::mojom::RpMode rp_mode,
@@ -1757,13 +1757,6 @@ class FederatedAuthRequestImplTest : public RenderViewHostImplTestHarness {
     options->config = std::move(config);
     options->fields = fields;
     return options;
-  }
-
-  // Helper to call GetDisclosureFields with the desired fields.
-  std::vector<Field> GetDisclosureFields(
-      const std::vector<std::string>& fields) {
-    return federated_auth_request_impl_->GetDisclosureFields(
-        *NewIDPWithFields(fields));
   }
 
   void SimulateLoginToIdP(std::string login_url = kIdpLoginUrl) {
@@ -6362,53 +6355,6 @@ TEST_F(FederatedAuthRequestImplTest, CloseModalDialogView) {
   EXPECT_TRUE(test_identity_registry_->notified_);
 }
 
-TEST_F(FederatedAuthRequestImplTest, GetDisclosureFieldsEmpty) {
-  // An unknown field is being requested.
-  EXPECT_THAT(GetDisclosureFields({"address"}), ElementsAre());
-  // Nothing is requested.
-  EXPECT_THAT(GetDisclosureFields({}), ElementsAre());
-}
-
-TEST_F(FederatedAuthRequestImplTest, GetDisclosureFields) {
-  // When no fields are passed, we use the default.
-  EXPECT_THAT(federated_auth_request_impl_->GetDisclosureFields(
-                  *NewIDPWithFields(std::nullopt)),
-              ElementsAre(Field::kName, Field::kEmail, Field::kPicture));
-  // When the default fields are explicitly passed, we should mediate them.
-  EXPECT_THAT(GetDisclosureFields({"name", "email", "picture"}),
-              ElementsAre(Field::kName, Field::kEmail, Field::kPicture));
-  // When a superset of the supported fields is passed, we should mediate the
-  // supported fields.
-  EXPECT_THAT(
-      GetDisclosureFields({"name", "email", "picture", "locale", "tel"}),
-      ElementsAre(Field::kName, Field::kEmail, Field::kPicture));
-}
-
-TEST_F(FederatedAuthRequestImplTest,
-       GetDisclosureFieldsWithAlternativeIdentifiers) {
-  base::test::ScopedFeatureList list;
-  list.InitAndEnableFeature(features::kFedCmAlternativeIdentifiers);
-  // When a superset of the supported fields is passed, we should mediate the
-  // supported fields.
-  EXPECT_THAT(
-      GetDisclosureFields({"name", "email", "picture", "locale", "tel"}),
-      ElementsAre(Field::kName, Field::kEmail, Field::kPicture,
-                  Field::kPhoneNumber));
-}
-
-TEST_F(FederatedAuthRequestImplTest,
-       GetDisclosureFieldsWithAlternativeIdentifiersDisabled) {
-  base::test::ScopedFeatureList list;
-  list.InitAndDisableFeature(features::kFedCmAlternativeIdentifiers);
-  // We should only support the new identifiers if the flag is enabled
-  EXPECT_THAT(GetDisclosureFields({"username", "tel"}), ElementsAre());
-}
-TEST_F(FederatedAuthRequestImplTest, GetDisclosureFieldsSubsetOfDefault) {
-  // Subsets of the default fields should work.
-  EXPECT_THAT(GetDisclosureFields({"name", "locale"}),
-              ElementsAre(Field::kName));
-}
-
 class FederatedAuthRequestImplNewTabTest : public FederatedAuthRequestImplTest {
  protected:
   void SetUp() override {
@@ -7633,7 +7579,7 @@ class TestDialogControllerWithImmediateDismiss : public TestDialogController {
   }
 
   bool ShowFailureDialog(
-      const std::string& rp_for_display,
+      const RelyingPartyData& rp_data,
       const std::string& idp_for_display,
       blink::mojom::RpContext rp_context,
       blink::mojom::RpMode rp_mode,
@@ -8148,6 +8094,50 @@ TEST_F(FederatedAuthRequestImplTest, DisconnectWithPendingRequest) {
   // Complete the auth request.
   WaitForCurrentAuthRequest();
   CheckAuthExpectations(kConfigurationValid, kExpectationSuccess);
+}
+
+class FakeLocalFrameWithDelayedCallback : public FakeLocalFrame {
+ public:
+  FakeLocalFrameWithDelayedCallback(RenderFrameHost* rfh) {
+    TestRenderFrameHost* test_rfh = static_cast<TestRenderFrameHost*>(rfh);
+    test_rfh->ResetLocalFrame();
+    Init(test_rfh->GetRemoteAssociatedInterfaces());
+  }
+
+  void RunCallback() {
+    if (!callback_) {
+      return;
+    }
+
+    std::move(callback_).Run(gfx::Point(0, 0));
+  }
+
+  // FakeLocalFrame:
+  void GetScrollPosition(GetScrollPositionCallback callback) override {
+    callback_ = std::move(callback);
+  }
+
+ private:
+  GetScrollPositionCallback callback_;
+};
+
+// Tests that we record the scroll position when an account is selected, even
+// when `GetScrollPosition` runs its callback after the FederatedAuthRequestImpl
+// object is destroyed.
+TEST_F(FederatedAuthRequestImplTest,
+       MetricsForAccountSelectionScrollPositionDelayedCallback) {
+  // Mock the `GetScrollPosition` call.
+  FakeLocalFrameWithDelayedCallback frame(
+      web_contents()->GetPrimaryMainFrame());
+
+  RunAuthTest(kDefaultRequestParameters, kExpectationSuccess,
+              kConfigurationValid);
+
+  frame.RunCallback();
+  base::RunLoop().RunUntilIdle();
+
+  ExpectUkmValueInEntry("AccountSelectionScrollPosition",
+                        FedCmEntry::kEntryName, 0);
 }
 
 }  // namespace content

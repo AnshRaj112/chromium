@@ -9,6 +9,7 @@
 
 #include "base/synchronization/lock.h"
 #include "build/build_config.h"
+#include "gpu/command_buffer/client/fake_gpu_memory_buffer.h"
 #include "gpu/command_buffer/client/shared_image_interface.h"
 #include "gpu/command_buffer/client/test_gpu_memory_buffer_manager.h"
 #include "gpu/command_buffer/common/shared_image_capabilities.h"
@@ -24,6 +25,12 @@
 namespace gpu {
 
 class TestBufferCollection;
+
+class TestSharedImageInterfaceClient {
+ public:
+  virtual ~TestSharedImageInterfaceClient() {}
+  virtual void DidDestroySharedImage() = 0;
+};
 
 class TestSharedImageInterface : public SharedImageInterface {
  public:
@@ -100,6 +107,20 @@ class TestSharedImageInterface : public SharedImageInterface {
   void VerifySyncToken(SyncToken& sync_token) override;
   void WaitSyncToken(const SyncToken& sync_token) override;
 
+  // This is used only on windows for webrtc tests where test wants the
+  // production code to trigger ClientSharedImage::MapAsync() but wants
+  // to control when the callback runs from inside the test. This is achieved by
+  // using a custom MapCallbackController. The callback execution is deferred
+  // by registering the callback with the provided |controller|. The test
+  // manually triggers the mapping completion by invoking the |controller|
+  // later, simulating a delayed (asynchronous) mapping. This is required to
+  // test delayed mapping behavior.
+  scoped_refptr<ClientSharedImage> CreateSharedImageWithMapCallbackController(
+      const SharedImageInfo& si_info,
+      gfx::BufferUsage buffer_usage,
+      bool premapped,
+      FakeGpuMemoryBuffer::MapCallbackController* controller);
+
   void CreateSharedImagePool(
       const SharedImagePoolId& pool_id,
       mojo::PendingRemote<mojom::SharedImagePoolClientInterface> client_remote)
@@ -119,6 +140,10 @@ class TestSharedImageInterface : public SharedImageInterface {
       it->second.reset();
       remote_map_.erase(it);
     }
+  }
+
+  void SetClient(TestSharedImageInterfaceClient* client) {
+    test_client_ = client;
   }
 
   size_t shared_image_count() const { return shared_images_.size(); }
@@ -165,6 +190,8 @@ class TestSharedImageInterface : public SharedImageInterface {
   void InitializeSharedImageCapabilities();
 
   mutable base::Lock lock_;
+
+  raw_ptr<TestSharedImageInterfaceClient> test_client_ = nullptr;
 
   uint64_t release_id_ = 0;
   size_t num_update_shared_image_no_fence_calls_ = 0;

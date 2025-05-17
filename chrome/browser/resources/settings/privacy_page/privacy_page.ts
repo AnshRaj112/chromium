@@ -205,16 +205,6 @@ export class SettingsPrivacyPageElement extends SettingsPrivacyPageElementBase {
         value: () => loadTimeData.getBoolean('capturedSurfaceControlEnabled'),
       },
 
-      enableAiSettingsPageRefresh_: {
-        type: Boolean,
-        value: () => loadTimeData.getBoolean('enableAiSettingsPageRefresh'),
-      },
-
-      enableComposeProactiveNudge_: {
-        type: Boolean,
-        value: () => loadTimeData.getBoolean('enableComposeProactiveNudge'),
-      },
-
       /**
        * Whether the File System Access Persistent Permissions UI should be
        * displayed.
@@ -341,7 +331,13 @@ export class SettingsPrivacyPageElement extends SettingsPrivacyPageElementBase {
 
       enableIncognitoTrackingProtections_: {
         type: Boolean,
-        value: () => loadTimeData.getBoolean('enableIncognitoTrackingProtections'),
+        value: () =>
+            loadTimeData.getBoolean('enableIncognitoTrackingProtections'),
+      },
+
+      enableBundledSecuritySettings_: {
+        type: Boolean,
+        value: () => loadTimeData.getBoolean('enableBundledSecuritySettings'),
       },
 
       allSitesPageTitle_: String,
@@ -373,8 +369,6 @@ export class SettingsPrivacyPageElement extends SettingsPrivacyPageElementBase {
   private privateStateTokensEnabled_: boolean;
   declare private autoPictureInPictureEnabled_: boolean;
   declare private capturedSurfaceControlEnabled_: boolean;
-  declare private enableAiSettingsPageRefresh_: boolean;
-  declare private enableComposeProactiveNudge_: boolean;
   declare private shouldShowSafetyHub_: boolean;
   declare private enableWebAppInstallation_: boolean;
   declare private enableLocalNetworkAccessSetting_: boolean;
@@ -395,6 +389,7 @@ export class SettingsPrivacyPageElement extends SettingsPrivacyPageElementBase {
   declare private enableRelatedWebsiteSetsV2Ui_: boolean;
   declare private allSitesPageTitle_: string;
   declare private enableIncognitoTrackingProtections_: boolean;
+  declare private enableBundledSecuritySettings_: boolean;
 
   override ready() {
     super.ready();
@@ -562,11 +557,6 @@ export class SettingsPrivacyPageElement extends SettingsPrivacyPageElementBase {
   private shouldShowAdPrivacy_(): boolean {
     return !this.isPrivacySandboxRestricted_ ||
         this.isPrivacySandboxRestrictedNoticeEnabled_;
-  }
-
-  private shouldShowComposeProactiveNudge_(): boolean {
-    return this.enableComposeProactiveNudge_ &&
-        !this.enableAiSettingsPageRefresh_;
   }
 }
 

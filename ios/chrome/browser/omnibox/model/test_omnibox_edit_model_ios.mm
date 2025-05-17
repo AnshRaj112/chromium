@@ -41,19 +41,12 @@ void TestOmniboxEditModelIOS::SetCurrentMatchForTest(
 }
 
 void TestOmniboxEditModelIOS::OnPopupDataChanged(
-    const std::u16string& temporary_text,
-    bool is_temporary_text,
     const std::u16string& inline_autocompletion,
-    const std::u16string& keyword,
-    const std::u16string& keyword_placeholder,
-    bool is_keyword_hint,
     const std::u16string& additional_text,
     const AutocompleteMatch& match) {
-  OmniboxEditModelIOS::OnPopupDataChanged(
-      temporary_text, is_temporary_text, inline_autocompletion, keyword,
-      keyword_placeholder, is_keyword_hint, additional_text, match);
-  text_ = is_temporary_text ? temporary_text : inline_autocompletion;
-  is_temporary_text_ = is_temporary_text;
+  OmniboxEditModelIOS::OnPopupDataChanged(inline_autocompletion,
+                                          additional_text, match);
+  text_ = inline_autocompletion;
 }
 
 PrefService* TestOmniboxEditModelIOS::GetPrefService() {

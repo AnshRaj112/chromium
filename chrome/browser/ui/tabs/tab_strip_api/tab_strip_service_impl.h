@@ -46,6 +46,10 @@ class TabStripServiceImpl : public tabs_api::mojom::TabStripService,
   void CreateTabAt(tabs_api::mojom::PositionPtr pos,
                    const std::optional<GURL>& url,
                    CreateTabAtCallback callback) override;
+  void CloseTabs(const std::vector<tabs_api::TabId>& ids,
+                 CloseTabsCallback callback) override;
+  void ActivateTab(const tabs_api::TabId& id,
+                   ActivateTabCallback callback) override;
 
   // TabStripModelObserver overrides
   void OnTabStripModelChanged(

@@ -19,7 +19,6 @@ import android.view.ViewStub;
 
 import androidx.annotation.CallSuper;
 import androidx.annotation.ColorInt;
-import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -32,7 +31,6 @@ import org.chromium.base.Callback;
 import org.chromium.base.CallbackController;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.lifetime.Destroyable;
-import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
@@ -150,6 +148,7 @@ import org.chromium.chrome.browser.ui.desktop_windowing.AppHeaderUtils;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeController;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeControllerFactory;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils;
+import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils.MissingNavbarInsetsReason;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.browser.ui.native_page.NativePage;
 import org.chromium.chrome.browser.ui.system.StatusBarColorController;
@@ -179,6 +178,7 @@ import org.chromium.components.messages.ManagedMessageDispatcher;
 import org.chromium.components.messages.MessageContainer;
 import org.chromium.components.messages.MessageDispatcherProvider;
 import org.chromium.components.messages.MessagesFactory;
+import org.chromium.components.search_engines.TemplateUrlService;
 import org.chromium.components.ukm.UkmRecorder;
 import org.chromium.content_public.browser.ActionModeCallbackHelper;
 import org.chromium.content_public.browser.BrowserContextHandle;
@@ -211,21 +211,6 @@ public class RootUiCoordinator
                 AppMenuBlocker,
                 ContextualSearchTabPromotionDelegate,
                 WindowFocusChangedObserver {
-    private static final String MISSING_NAVBAR_INSETS_HISTOGRAM =
-            "Android.EdgeToEdge.MissingNavbarInsets";
-
-    @IntDef({
-        MissingNavbarInsetsReason.OTHER,
-        MissingNavbarInsetsReason.IN_MULTI_WINDOW,
-        MissingNavbarInsetsReason.IN_DESKTOP_WINDOW,
-        MissingNavbarInsetsReason.NUM_ENTRIES
-    })
-    @interface MissingNavbarInsetsReason {
-        int OTHER = 0;
-        int IN_MULTI_WINDOW = 1;
-        int IN_DESKTOP_WINDOW = 2;
-        int NUM_ENTRIES = 3;
-    }
 
     protected final UnownedUserDataSupplier<TabObscuringHandler> mTabObscuringHandlerSupplier =
             new TabObscuringHandlerSupplier();
@@ -292,7 +277,7 @@ public class RootUiCoordinator
             new ObservableSupplierImpl<>();
     protected final ObservableSupplier<Profile> mProfileSupplier;
     protected final ObservableSupplier<BookmarkModel> mBookmarkModelSupplier;
-    private final ObservableSupplier<TabBookmarker> mTabBookmarkerSupplier;
+    protected final ObservableSupplier<TabBookmarker> mTabBookmarkerSupplier;
     private final OneshotSupplierImpl<AppMenuCoordinator> mAppMenuSupplier;
     private BottomSheetObserver mBottomSheetObserver;
     protected final CallbackController mCallbackController;
@@ -1184,10 +1169,10 @@ public class RootUiCoordinator
 
     /** Generate the LoadUrlParams necessary to load the specified search query. */
     private static LoadUrlParams generateUrlParamsForSearch(Tab tab, String query) {
-        String url =
-                TemplateUrlServiceFactory.getForProfile(tab.getProfile())
-                        .getUrlForSearchQuery(query);
-        String headers = GeolocationHeader.getGeoHeader(url, tab);
+        Profile profile = tab.getProfile();
+        TemplateUrlService service = TemplateUrlServiceFactory.getForProfile(profile);
+        String url = service.getUrlForSearchQuery(query);
+        String headers = GeolocationHeader.getGeoHeader(url, profile, service);
 
         LoadUrlParams loadUrlParams = new LoadUrlParams(url);
         loadUrlParams.setVerbatimHeaders(headers);
@@ -1861,27 +1846,36 @@ public class RootUiCoordinator
     private void recordIfMissingNavigationBar() {
         var rootInsets = mActivity.getWindow().getDecorView().getRootWindowInsets();
         assert rootInsets != null;
-        Insets navigationBarInsets =
-                WindowInsetsCompat.toWindowInsetsCompat(rootInsets)
-                        .getInsets(WindowInsetsCompat.Type.navigationBars());
-        if (!navigationBarInsets.equals(Insets.NONE)) return;
 
-        if (AppHeaderUtils.isAppInDesktopWindow(getDesktopWindowStateManager())) {
-            RecordHistogram.recordEnumeratedHistogram(
-                    MISSING_NAVBAR_INSETS_HISTOGRAM,
-                    MissingNavbarInsetsReason.IN_DESKTOP_WINDOW,
-                    MissingNavbarInsetsReason.NUM_ENTRIES);
-        } else if (MultiWindowUtils.getInstance().isInMultiWindowMode(mActivity)) {
-            RecordHistogram.recordEnumeratedHistogram(
-                    MISSING_NAVBAR_INSETS_HISTOGRAM,
-                    MissingNavbarInsetsReason.IN_MULTI_WINDOW,
-                    MissingNavbarInsetsReason.NUM_ENTRIES);
-        } else {
-            RecordHistogram.recordEnumeratedHistogram(
-                    MISSING_NAVBAR_INSETS_HISTOGRAM,
-                    MissingNavbarInsetsReason.OTHER,
-                    MissingNavbarInsetsReason.NUM_ENTRIES);
+        var rootInsetsCompat = WindowInsetsCompat.toWindowInsetsCompat(rootInsets);
+        Insets navigationBarInsets =
+                rootInsetsCompat.getInsets(WindowInsetsCompat.Type.navigationBars());
+        if (!navigationBarInsets.equals(Insets.NONE)) {
+            return;
         }
+
+        @MissingNavbarInsetsReason int reason;
+        if (AppHeaderUtils.isAppInDesktopWindow(getDesktopWindowStateManager())) {
+            reason = MissingNavbarInsetsReason.IN_DESKTOP_WINDOW;
+        } else if (MultiWindowUtils.getInstance().isInMultiWindowMode(mActivity)) {
+            reason = MissingNavbarInsetsReason.IN_MULTI_WINDOW;
+        } else if (mFullscreenManager.getPersistentFullscreenMode()) {
+            // Fullscreen mode can lead to empty system bar insets. Being in fullscreen mode during
+            // activity recreation should be rare.
+            reason = MissingNavbarInsetsReason.IN_FULLSCREEN;
+        } else if (!MultiWindowUtils.isActivityVisible(mActivity)) {
+            // When activity is not visible (during theme recreation) we could get empty system bar
+            // insets.
+            reason = MissingNavbarInsetsReason.ACTIVITY_NOT_VISIBLE;
+        } else if (rootInsetsCompat
+                .getInsets(WindowInsetsCompat.Type.systemBars())
+                .equals(Insets.NONE)) {
+            reason = MissingNavbarInsetsReason.SYSTEM_BAR_INSETS_EMPTY;
+        } else {
+            reason = MissingNavbarInsetsReason.OTHER;
+        }
+
+        EdgeToEdgeUtils.recordIfMissingNavigationBar(reason);
     }
 
     /** Create a bottom chin for Edge-to-Edge. */

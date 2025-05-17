@@ -152,11 +152,6 @@ chromium-metrics-reviews@google.com.
   <int value="1" label="First sync"/>
 </enum>
 
-<enum name="BooleanIsSignedIn">
-  <int value="0" label="Not signed in"/>
-  <int value="1" label="Signed in"/>
-</enum>
-
 <!-- LINT.IfChange(CrossUserSharingDecryptionResult) -->
 
 <enum name="CrossUserSharingDecryptionResult">
@@ -757,6 +752,7 @@ chromium-metrics-reviews@google.com.
   <int value="100326" label="ReadAloudPlaybackMode"/>
   <int value="100327" label="PinSplitTabButton"/>
   <int value="100328" label="GlicRolloutEligibility"/>
+  <int value="100329" label="ShelfNotebookLmAppPinRolls"/>
 <!-- LINT.ThenChange(/chrome/browser/sync/prefs/chrome_syncable_prefs_database.cc:ChromeSyncablePref)-->
 
 <!-- LINT.IfChange(IosSyncablePref) -->

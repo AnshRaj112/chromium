@@ -6207,6 +6207,7 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="5577" label="ClearSiteData"/>
   <int value="5578" label="ScrollIntoViewContainerNearest"/>
   <int value="5579" label="PopoverShown"/>
+  <int value="5580" label="InputParsedParentOptionOrOptgroup"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom:WebFeature) -->
@@ -6355,6 +6356,7 @@ Called by update_permissions_policy_enum.py.-->
   <int value="135" label="DeviceAttributes"/>
   <int value="136" label="LocalNetworkAccess"/>
   <int value="137" label="RecordAdAuctionEvents"/>
+  <int value="138" label="OnDeviceSpeechRecognition"/>
 </enum>
 
 <enum name="FedCmAccountChooserResult">
@@ -7804,6 +7806,7 @@ Called by update_use_counter_css.py.-->
   <int value="2" label="Low constrast between color and background color"/>
   <int value="3" label="Too small font size"/>
   <int value="4" label="Too large font size"/>
+  <int value="5" label="Invalid display property"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/renderer/core/html/html_permission_element.h:InvalidStyleReason) -->
@@ -8243,6 +8246,7 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="337" label="LightDark"/>
   <int value="338" label="Requestidlecallback"/>
   <int value="339" label="ClearSiteData"/>
+  <int value="340" label="LinkRelExpect"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/public/mojom/use_counter/metrics/webdx_feature.mojom:WebDXFeature) -->

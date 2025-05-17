@@ -23,7 +23,10 @@
 #include "cc/debug/rendering_stats_instrumentation.h"
 #include "cc/layers/layer_impl.h"
 #include "cc/layers/mirror_layer_impl.h"
+#include "cc/layers/nine_patch_thumb_scrollbar_layer_impl.h"
+#include "cc/layers/painted_scrollbar_layer_impl.h"
 #include "cc/layers/solid_color_layer_impl.h"
+#include "cc/layers/solid_color_scrollbar_layer_impl.h"
 #include "cc/layers/surface_layer_impl.h"
 #include "cc/layers/texture_layer_impl.h"
 #include "cc/layers/tile_display_layer_impl.h"
@@ -58,8 +61,9 @@ cc::LayerTreeSettings GetDisplayTreeSettings(bool draw_mode_is_gpu) {
 
 std::unique_ptr<cc::LayerImpl> CreateLayer(cc::LayerTreeHostImpl& host_impl,
                                            cc::LayerTreeImpl& tree,
-                                           cc::mojom::LayerType type,
-                                           int id) {
+                                           const mojom::Layer& wire) {
+  cc::mojom::LayerType type = wire.type;
+  int id = wire.id;
   switch (type) {
     case cc::mojom::LayerType::kLayer:
       return cc::LayerImpl::Create(&tree, id);
@@ -67,8 +71,43 @@ std::unique_ptr<cc::LayerImpl> CreateLayer(cc::LayerTreeHostImpl& host_impl,
     case cc::mojom::LayerType::kMirror:
       return cc::MirrorLayerImpl::Create(&tree, id);
 
+    case cc::mojom::LayerType::kNinePatchThumbScrollbar: {
+      auto& extra =
+          wire.layer_extra->get_nine_patch_thumb_scrollbar_layer_extra();
+      cc::ScrollbarOrientation orientation =
+          extra->scrollbar_base_extra->is_horizontal_orientation
+              ? cc::ScrollbarOrientation::kHorizontal
+              : cc::ScrollbarOrientation::kVertical;
+      return cc::NinePatchThumbScrollbarLayerImpl::Create(
+          &tree, id, orientation,
+          extra->scrollbar_base_extra->is_left_side_vertical_scrollbar);
+    }
+
+    case cc::mojom::LayerType::kPaintedScrollbar: {
+      auto& extra = wire.layer_extra->get_painted_scrollbar_layer_extra();
+      cc::ScrollbarOrientation orientation =
+          extra->scrollbar_base_extra->is_horizontal_orientation
+              ? cc::ScrollbarOrientation::kHorizontal
+              : cc::ScrollbarOrientation::kVertical;
+      return cc::PaintedScrollbarLayerImpl::Create(
+          &tree, id, orientation,
+          extra->scrollbar_base_extra->is_left_side_vertical_scrollbar,
+          extra->scrollbar_base_extra->is_overlay_scrollbar);
+    }
+
     case cc::mojom::LayerType::kPicture:
       return std::make_unique<cc::TileDisplayLayerImpl>(tree, id);
+
+    case cc::mojom::LayerType::kSolidColorScrollbar: {
+      auto& extra = wire.layer_extra->get_solid_color_scrollbar_layer_extra();
+      cc::ScrollbarOrientation orientation =
+          extra->scrollbar_base_extra->is_horizontal_orientation
+              ? cc::ScrollbarOrientation::kHorizontal
+              : cc::ScrollbarOrientation::kVertical;
+      return cc::SolidColorScrollbarLayerImpl::Create(
+          &tree, id, orientation, extra->thumb_thickness, extra->track_start,
+          extra->scrollbar_base_extra->is_left_side_vertical_scrollbar);
+    }
 
     case cc::mojom::LayerType::kSurface:
       // The callback is triggered in the renderer side during WillDraw(),
@@ -397,7 +436,6 @@ void UpdateMirrorLayerExtra(const mojom::MirrorLayerExtraPtr& extra,
 
 void UpdateTextureLayerExtra(const mojom::TextureLayerExtraPtr& extra,
                              cc::TextureLayerImpl& layer) {
-  layer.SetPremultipliedAlpha(extra->premultiplied_alpha);
   layer.SetBlendBackgroundColor(extra->blend_background_color);
   layer.SetForceTextureToOpaque(extra->force_texture_to_opaque);
   layer.SetUVTopLeft(extra->uv_top_left);
@@ -419,6 +457,79 @@ void UpdateTextureLayerExtra(const mojom::TextureLayerExtraPtr& extra,
     layer.SetTransferableResource(extra->transferable_resource.value(),
                                   std::move(release_callback));
   }
+}
+
+void UpdateScrollbarLayerBaseExtra(
+    const mojom::ScrollbarLayerBaseExtraPtr& extra,
+    cc::ScrollbarLayerImplBase& layer) {
+  // ScrollbarLayerImplBase properties
+  layer.SetScrollElementId(extra->scroll_element_id);
+  layer.set_is_overlay_scrollbar(extra->is_overlay_scrollbar);
+  layer.set_is_web_test(extra->is_web_test);
+  layer.SetThumbThicknessScaleFactor(extra->thumb_thickness_scale_factor);
+  layer.SetCurrentPos(extra->current_pos);
+  layer.SetClipLayerLength(extra->clip_layer_length);
+  layer.SetScrollLayerLength(extra->scroll_layer_length);
+  layer.SetVerticalAdjust(extra->vertical_adjust);
+  layer.SetHasFindInPageTickmarks(extra->has_find_in_page_tickmarks);
+}
+
+void UpdateNinePatchThumbScrollbarLayerExtra(
+    const mojom::NinePatchThumbScrollbarLayerExtraPtr& extra,
+    cc::NinePatchThumbScrollbarLayerImpl& layer) {
+  UpdateScrollbarLayerBaseExtra(
+      extra->scrollbar_base_extra,
+      static_cast<cc::ScrollbarLayerImplBase&>(layer));
+
+  layer.SetThumbThickness(extra->thumb_thickness);
+  layer.SetThumbLength(extra->thumb_length);
+  layer.SetTrackStart(extra->track_start);
+  layer.SetTrackLength(extra->track_length);
+  layer.SetImageBounds(extra->image_bounds);
+  layer.SetAperture(extra->aperture);
+  layer.set_thumb_ui_resource_id(extra->thumb_ui_resource_id);
+  layer.set_track_and_buttons_ui_resource_id(
+      extra->track_and_buttons_ui_resource_id);
+}
+
+void UpdatePaintedScrollbarLayerExtra(
+    const mojom::PaintedScrollbarLayerExtraPtr& extra,
+    cc::PaintedScrollbarLayerImpl& layer) {
+  UpdateScrollbarLayerBaseExtra(
+      extra->scrollbar_base_extra,
+      static_cast<cc::ScrollbarLayerImplBase&>(layer));
+
+  layer.set_internal_contents_scale_and_bounds(extra->internal_contents_scale,
+                                               extra->internal_content_bounds);
+
+  layer.SetJumpOnTrackClick(extra->jump_on_track_click);
+  layer.SetSupportsDragSnapBack(extra->supports_drag_snap_back);
+  layer.SetThumbThickness(extra->thumb_thickness);
+  layer.SetThumbLength(extra->thumb_length);
+  layer.SetBackButtonRect(extra->back_button_rect);
+  layer.SetForwardButtonRect(extra->forward_button_rect);
+  layer.SetTrackRect(extra->track_rect);
+
+  layer.set_track_and_buttons_ui_resource_id(
+      extra->track_and_buttons_ui_resource_id);
+  layer.set_thumb_ui_resource_id(extra->thumb_ui_resource_id);
+  layer.set_uses_nine_patch_track_and_buttons(
+      extra->uses_nine_patch_track_and_buttons);
+
+  layer.SetScrollbarPaintedOpacity(extra->painted_opacity);
+  if (extra->thumb_color) {
+    layer.SetThumbColor(extra->thumb_color.value());
+  }
+  layer.SetTrackAndButtonsImageBounds(extra->track_and_buttons_image_bounds);
+  layer.SetTrackAndButtonsAperture(extra->track_and_buttons_aperture);
+}
+
+void UpdateSolidColorScrollbarLayerExtra(
+    const mojom::SolidColorScrollbarLayerExtraPtr& extra,
+    cc::SolidColorScrollbarLayerImpl& layer) {
+  UpdateScrollbarLayerBaseExtra(
+      extra->scrollbar_base_extra,
+      static_cast<cc::ScrollbarLayerImplBase&>(layer));
 }
 
 void UpdateSurfaceLayerExtra(const mojom::SurfaceLayerExtraPtr& extra,
@@ -506,6 +617,21 @@ base::expected<void, std::string> UpdateLayer(const mojom::Layer& wire,
       UpdateMirrorLayerExtra(wire.layer_extra->get_mirror_layer_extra(),
                              static_cast<cc::MirrorLayerImpl&>(layer));
       break;
+    case cc::mojom::LayerType::kNinePatchThumbScrollbar:
+      UpdateNinePatchThumbScrollbarLayerExtra(
+          wire.layer_extra->get_nine_patch_thumb_scrollbar_layer_extra(),
+          static_cast<cc::NinePatchThumbScrollbarLayerImpl&>(layer));
+      break;
+    case cc::mojom::LayerType::kPaintedScrollbar:
+      UpdatePaintedScrollbarLayerExtra(
+          wire.layer_extra->get_painted_scrollbar_layer_extra(),
+          static_cast<cc::PaintedScrollbarLayerImpl&>(layer));
+      break;
+    case cc::mojom::LayerType::kSolidColorScrollbar:
+      UpdateSolidColorScrollbarLayerExtra(
+          wire.layer_extra->get_solid_color_scrollbar_layer_extra(),
+          static_cast<cc::SolidColorScrollbarLayerImpl&>(layer));
+      break;
     case cc::mojom::LayerType::kSurface:
       UpdateSurfaceLayerExtra(wire.layer_extra->get_surface_layer_extra(),
                               static_cast<cc::SurfaceLayerImpl&>(layer));
@@ -548,7 +674,7 @@ base::expected<void, std::string> CreateOrUpdateLayers(
   for (auto& wire : updates) {
     auto& layer = layer_map[wire->id];
     if (!layer) {
-      layer = CreateLayer(host_impl, layers, wire->type, wire->id);
+      layer = CreateLayer(host_impl, layers, *wire);
     }
     RETURN_IF_ERROR(UpdateLayer(*wire, *layer));
   }
@@ -1002,8 +1128,8 @@ LayerContextImpl::LayerContextImpl(CompositorFrameSinkSupport* compositor_sink,
 }
 
 LayerContextImpl::~LayerContextImpl() {
+  DoReturnResources();
   host_impl_->ReleaseLayerTreeFrameSink();
-  DoReturnResources(std::move(resources_to_return_));
 }
 
 void LayerContextImpl::BeginFrame(const BeginFrameArgs& args) {
@@ -1027,16 +1153,17 @@ void LayerContextImpl::BeginFrame(const BeginFrameArgs& args) {
   }
 }
 
-void LayerContextImpl::ReturnResources(
+void LayerContextImpl::ReceiveReturnsFromParent(
     std::vector<ReturnedResource> resources) {
   host_impl_->resource_provider()->ReceiveReturnsFromParent(
       std::move(resources));
-  DoReturnResources(std::move(resources_to_return_));
+  DoReturnResources();
 }
 
-void LayerContextImpl::DoReturnResources(
-    std::vector<ReturnedResource> resources) {
-  compositor_sink_->DoReturnResources(std::move(resources));
+void LayerContextImpl::DoReturnResources() {
+  if (!resources_to_return_.empty()) {
+    compositor_sink_->DoReturnResources(std::move(resources_to_return_));
+  }
 }
 
 void LayerContextImpl::DidLoseLayerTreeFrameSinkOnImplThread() {
@@ -1108,6 +1235,7 @@ void LayerContextImpl::SetNeedsImplSideInvalidation(
     bool needs_first_draw_on_activation) {}
 
 void LayerContextImpl::NotifyImageDecodeRequestFinished(int request_id,
+                                                        bool speculative,
                                                         bool decode_succeeded) {
 }
 
@@ -1343,6 +1471,36 @@ base::expected<void, std::string> LayerContextImpl::DoUpdateDisplayTree(
 
   host_impl_->SetViewportDamage(update->viewport_damage_rect);
 
+  for (auto& ui_resource_request : update->ui_resource_requests) {
+    if (ui_resource_request->type ==
+        mojom::TransferableUIResourceRequest::Type::kCreate) {
+      if (!ui_resource_request->transferable_resource ||
+          ui_resource_request->transferable_resource->is_empty()) {
+        return base::unexpected(
+            "Invalid transferable resource in UI resource creation");
+      }
+      ReleaseCallback release_callback = base::BindOnce(
+          [](cc::LayerTreeHostImpl* host_impl, ResourceId id,
+             const gpu::SyncToken& sync_token, bool is_lost) {
+            host_impl->ReturnResource({id, sync_token,
+                                       /*release_fence=*/gfx::GpuFenceHandle(),
+                                       /*count=*/1, is_lost});
+          },
+          host_impl_.get(), ui_resource_request->transferable_resource->id);
+
+      auto resource_id = host_impl_->resource_provider()->ImportResource(
+          ui_resource_request->transferable_resource.value(),
+          /*impl_release_callback=*/std::move(release_callback),
+          /*main_thread_release_callback=*/base::NullCallback(),
+          /*evicted_callback=*/base::NullCallback());
+
+      host_impl_->CreateUIResourceFromImportedResource(
+          ui_resource_request->uid, resource_id, ui_resource_request->opaque);
+    } else {
+      host_impl_->DeleteUIResource(ui_resource_request->uid);
+    }
+  }
+
   property_trees.UpdateChangeTracking();
   property_trees.transform_tree_mutable().set_needs_update(
       transform_size_changed || transform_properties_changed ||
@@ -1398,6 +1556,10 @@ base::expected<void, std::string> LayerContextImpl::DoUpdateDisplayTree(
       host_impl_->DidFinishImplFrame(update->begin_frame_args);
     }
   }
+
+  // We may have resources to return after a tree update and draw.
+  DoReturnResources();
+
   return base::ok();
 }
 

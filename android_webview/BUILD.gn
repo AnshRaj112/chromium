@@ -456,6 +456,7 @@ if (_is_default_toolchain) {
       "java/src/org/chromium/android_webview/AwMediaIntegrityApiStatusConfig.java",
       "java/src/org/chromium/android_webview/AwNavigation.java",
       "java/src/org/chromium/android_webview/AwNavigationClient.java",
+      "java/src/org/chromium/android_webview/AwNavigationParams.java",
       "java/src/org/chromium/android_webview/AwNetLogsConnection.java",
       "java/src/org/chromium/android_webview/AwNetworkChangeNotifierRegistrationPolicy.java",
       "java/src/org/chromium/android_webview/AwNoVarySearchData.java",
@@ -860,17 +861,10 @@ if (_is_default_toolchain) {
     renaming_sources = []
     renaming_destinations = []
     foreach(_locale, platform_pak_locales) {
-      if (translate_genders) {
-        renaming_sources += process_file_template(
-                all_chrome_genders,
-                "$root_out_dir/android_webview/locales/${_locale}_{{source_name_part}}.pak")
-        renaming_destinations += process_file_template(
-                all_chrome_genders,
-                "stored-locales/${_locale}_{{source_name_part}}.pak")
-      } else {
-        renaming_sources +=
-            [ "$root_out_dir/android_webview/locales/${_locale}.pak" ]
-        renaming_destinations += [ "stored-locales/${_locale}.pak" ]
+      foreach(_gender_suffix, gender_suffixes) {
+        renaming_sources += [ "$root_out_dir/android_webview/locales/${_locale}${_gender_suffix}.pak" ]
+        renaming_destinations +=
+            [ "stored-locales/${_locale}${_gender_suffix}.pak" ]
       }
     }
     treat_as_locale_paks = true
@@ -1222,7 +1216,7 @@ generate_jni("crash_client_jni") {
   sources = [ "java/src/org/chromium/android_webview/common/crash/AwCrashReporterClient.java" ]
 }
 
-component("android_webview") {
+group("android_webview") {
   public_deps = [
     "//android_webview/lib",
     "//android_webview/nonembedded",
@@ -1250,6 +1244,11 @@ template("libwebviewchromium_tmpl") {
     # so there are some Chrome-only native dependencies that sneak into WebView.
     # To fix, we can just remove any uncalled Java->Native methods.
     remove_uncalled_jni = true
+
+    if (!(defined(testonly) && testonly)) {
+      configs -= [ "//build/config/compiler:thinlto_optimize_default" ]
+      configs += [ "//build/config/compiler:thinlto_optimize_max" ]
+    }
   }
 }
 

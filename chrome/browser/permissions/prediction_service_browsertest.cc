@@ -14,6 +14,7 @@
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "chrome/browser/optimization_guide/browser_test_util.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service_factory.h"
@@ -88,6 +89,16 @@ constexpr auto kLikelihoodVeryUnlikely =
     PermissionUmaUtil::PredictionGrantLikelihood::
         PermissionPrediction_Likelihood_DiscretizedLikelihood_VERY_UNLIKELY;
 
+constexpr std::string_view kModelExecutionSuccessHistogram =
+    "OptimizationGuide.ModelExecutor.ExecutionStatus.NotificationPermissionsV3";
+constexpr std::string_view kSnapshotTakenHistogram =
+    "Permissions.AIv3.SnapshotTaken";
+constexpr char kAIv3InquiryDurationHistogram[] =
+    "Permissions.AIv3.InquiryDuration";
+constexpr char kCpssV1InquiryDurationHistogram[] =
+    "Permissions.OnDevicePredictionService.InquiryDuration";
+constexpr char kCpssV3InquiryDurationHistogram[] =
+    "Permissions.PredictionService.InquiryDuration";
 // A CPSSv1 model that returns a constant value of 0.5;
 // its meaning is defined by the max_likely threshold we use in the
 // signature_model_executor to differentiate between
@@ -161,14 +172,15 @@ class PermissionsAiv3HandlerFake : public PermissionsAiv3Handler {
         base::BindOnce(&PermissionsAiv3HandlerFake::ExecuteModelWrapper,
                        weak_ptr_factory_.GetWeakPtr(), std::move(callback)),
         std::move(snapshot));
-    model_execute_run_loop_for_testing_.Run();
   }
 
   void WaitForModelLoadForTesting() { model_load_run_loop_for_testing_.Run(); }
+  void WaitForModelExecutionForTesting() {
+    model_execute_run_loop_for_testing_.Run();
+  }
 
  private:
-  base::RunLoop model_execute_run_loop_for_testing_ =
-      base::RunLoop(base::RunLoop::Type::kNestableTasksAllowed);
+  base::RunLoop model_execute_run_loop_for_testing_;
   base::RunLoop model_load_run_loop_for_testing_;
   base::WeakPtrFactory<PermissionsAiv3HandlerFake> weak_ptr_factory_{this};
 };
@@ -247,6 +259,10 @@ class PredictionServiceBrowserTestBase : public InProcessBrowserTest {
     manager->AddRequest(GetActiveMainFrame(), &req);
 
     bubble_factory()->WaitForPermissionBubble();
+
+    if (notification_model_handler_) {
+      notification_model_handler_->WaitForModelExecutionForTesting();
+    }
     EXPECT_EQ(should_expect_quiet_ui,
               manager->ShouldCurrentRequestUseQuietUI());
     EXPECT_EQ(expected_relevance,
@@ -260,15 +276,20 @@ class PredictionServiceBrowserTestBase : public InProcessBrowserTest {
     }
   }
 
+  base::HistogramTester& histogram_tester() { return histogram_tester_; }
+
  protected:
   OptimizationGuideKeyedService* opt_guide() {
     return OptimizationGuideKeyedServiceFactory::GetForProfile(
         browser()->profile());
   }
 
+  raw_ptr<PermissionsAiv3HandlerFake> notification_model_handler_ = nullptr;
+
  private:
   std::unique_ptr<MockPermissionPromptFactory> mock_permission_prompt_factory_;
   base::test::ScopedFeatureList scoped_feature_list_;
+  base::HistogramTester histogram_tester_;
 };
 
 IN_PROC_BROWSER_TEST_F(PredictionServiceBrowserTestBase,
@@ -410,6 +431,9 @@ IN_PROC_BROWSER_TEST_P(SignatureModelPredictionServiceBrowserTest,
                            GetParam().should_expect_quiet_ui,
                            /*expected_relevance=*/std::nullopt,
                            GetParam().expected_prediction_likelihood);
+
+  histogram_tester().ExpectTotalCount(kCpssV1InquiryDurationHistogram,
+                                      /*expected_count=*/1);
 }
 
 struct Aiv3ModelTestCase {
@@ -424,6 +448,7 @@ struct Aiv3ModelTestCase {
   // manager.
   PermissionUmaUtil::PredictionGrantLikelihood prediction_service_likelihood;
   bool should_expect_quiet_ui;
+  int success_count_model_execution;
 };
 
 class Aiv3ModelPredictionServiceBrowserTest
@@ -509,7 +534,6 @@ class Aiv3ModelPredictionServiceBrowserTest
         browser()->profile());
   }
 
-  raw_ptr<PermissionsAiv3HandlerFake> notification_model_handler_;
   PredictionServiceMock prediction_service_;
 };
 
@@ -524,6 +548,7 @@ INSTANTIATE_TEST_SUITE_P(
             /*expected_relevance=*/PermissionRequestRelevance::kVeryLow,
             /*prediction_service_likelihood=*/kLikelihoodUnspecified,
             /*should_expect_quiet_ui=*/false,
+            /*success_count_model_execution=*/1,
         },
         {
             /*test_name=*/"OnDeviceVeryLowAndServerSideVeryUnlikelyResponse"
@@ -532,6 +557,7 @@ INSTANTIATE_TEST_SUITE_P(
             /*expected_relevance=*/PermissionRequestRelevance::kVeryLow,
             /*prediction_service_likelihood=*/kLikelihoodVeryUnlikely,
             /*should_expect_quiet_ui=*/true,
+            /*success_count_model_execution=*/1,
         },
         {
             /*test_name=*/"OnDeviceVeryHighAndServerSideUnspecifiedResponse"
@@ -540,6 +566,7 @@ INSTANTIATE_TEST_SUITE_P(
             /*expected_relevance=*/PermissionRequestRelevance::kVeryHigh,
             /*prediction_service_likelihood=*/kLikelihoodUnspecified,
             /*should_expect_quiet_ui=*/false,
+            /*success_count_model_execution=*/1,
         },
         {
             /*test_name=*/"OnDeviceVeryHighAndServerSideVeryUnlikelyResponse"
@@ -548,6 +575,7 @@ INSTANTIATE_TEST_SUITE_P(
             /*expected_relevance=*/PermissionRequestRelevance::kVeryHigh,
             /*prediction_service_likelihood=*/kLikelihoodVeryUnlikely,
             /*should_expect_quiet_ui=*/true,
+            /*success_count_model_execution=*/1,
         },
         {
             /*test_name=*/"FailingAiv3ModelStillResultsInValid"
@@ -556,6 +584,7 @@ INSTANTIATE_TEST_SUITE_P(
             /*expected_relevance=*/PermissionRequestRelevance::kUnspecified,
             /*prediction_service_likelihood=*/kLikelihoodVeryUnlikely,
             /*should_expect_quiet_ui=*/true,
+            /*success_count_model_execution=*/0,
         },
     }),
     /*name_generator=*/
@@ -599,7 +628,19 @@ IN_PROC_BROWSER_TEST_P(Aiv3ModelPredictionServiceBrowserTest,
       GetParam().should_expect_quiet_ui, GetParam().expected_relevance,
       GetParam().prediction_service_likelihood);
 
-  EXPECT_EQ(1, bubble_factory()->show_count());
+  histogram_tester().ExpectBucketCount(
+      kModelExecutionSuccessHistogram, /*sample=*/true, /*expected_count=*/
+      GetParam().success_count_model_execution);
+
+  histogram_tester().ExpectBucketCount(kSnapshotTakenHistogram,
+                                       /*sample=*/true,
+                                       /*expected_count=*/1);
+  // We should receive timing information for both, the on-device model and
+  // the server-side model.
+  histogram_tester().ExpectTotalCount(kCpssV3InquiryDurationHistogram,
+                                      /*expected_count=*/1);
+  histogram_tester().ExpectTotalCount(kAIv3InquiryDurationHistogram,
+                                      /*expected_count=*/1);
 }
 
 }  // namespace permissions

@@ -626,13 +626,6 @@ config("compiler") {
         default_toolchain != "//build/toolchain/cros:target") {
       cflags += [ "-Wa,--crel,--allow-experimental-crel" ]
     }
-
-    # TODO(crbug.com/413427035): Remove once
-    # https://github.com/llvm/llvm-project/pull/136867/ is landed.
-    if (!is_win && !llvm_android_mainline &&
-        default_toolchain != "//build/toolchain/cros:target") {
-      cflags += [ "-fextend-variable-liveness=none" ]
-    }
   }
 
   # C11/C++11 compiler flags setup.
@@ -2099,6 +2092,26 @@ config("default_warnings") {
         # annotation completeness, this warning exception can be removed.
         "-Wno-nullability-completeness",
       ]
+
+      if (llvm_force_head_revision) {
+        cflags_cc += [
+          # TODO(crbug.com/417996267): Fix and re-enable
+          "-Wno-character-conversion",
+
+          # Rust bindgen gets these flags, but uses pinned clang, so it doesn't
+          # recognize the new warning. Remove this during the clang roll.
+          "-Wno-unknown-warning-option",
+        ]
+
+        cflags_objcc = [
+          # TODO(crbug.com/417996267): Fix and re-enable
+          "-Wno-character-conversion",
+
+          # Rust bindgen gets these flags, but uses pinned clang, so it doesn't
+          # recognize the new warning. Remove this during the clang roll.
+          "-Wno-unknown-warning-option",
+        ]
+      }
     }
 
     if (is_wasm) {
@@ -3226,17 +3239,14 @@ if (is_apple) {
   # C++ and exceptions in Objective-C code are intended to be fatal, so
   # -fno-objc-arc-exceptions is specified to disable these unwanted exception
   # handlers.
+  # -Wobjc-property-assign-on-object-type enables to show warnings when the
+  # assign is used for a property on an Objective-C object under ARC.
   config("enable_arc") {
     common_flags = [
       "-fobjc-arc",
       "-fno-objc-arc-exceptions",
+      "-Wobjc-property-assign-on-object-type",
     ]
-    cflags_objc = common_flags
-    cflags_objcc = common_flags
-  }
-
-  config("assign_property_warning") {
-    common_flags = [ "-Wobjc-property-assign-on-object-type" ]
     cflags_objc = common_flags
     cflags_objcc = common_flags
   }

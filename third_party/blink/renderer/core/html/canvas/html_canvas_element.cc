@@ -107,6 +107,7 @@
 #include "third_party/blink/renderer/platform/graphics/canvas_resource_dispatcher.h"
 #include "third_party/blink/renderer/platform/graphics/canvas_resource_host.h"
 #include "third_party/blink/renderer/platform/graphics/canvas_resource_provider.h"
+#include "third_party/blink/renderer/platform/graphics/gpu/shared_context_rate_limiter.h"
 #include "third_party/blink/renderer/platform/graphics/gpu/shared_gpu_context.h"
 #include "third_party/blink/renderer/platform/graphics/graphics_context.h"
 #include "third_party/blink/renderer/platform/graphics/image_data_buffer.h"
@@ -130,6 +131,8 @@
 namespace blink {
 
 namespace {
+
+constexpr unsigned kMaxCanvasAnimationBacklog = 2;
 
 // These two constants determine if a newly created canvas starts with
 // acceleration disabled. Specifically:
@@ -259,6 +262,15 @@ class TransferToGPUTextureInvokedSupplement final
   bool transfer_to_gpu_texture_was_invoked_ = false;
 };
 
+// Adapter for wrapping a CanvasResourceReleaseCallback into a
+// viz::ReleaseCallback
+void ReleaseCanvasResource(CanvasResource::ReleaseCallback callback,
+                           scoped_refptr<CanvasResource> canvas_resource,
+                           const gpu::SyncToken& sync_token,
+                           bool is_lost) {
+  std::move(callback).Run(std::move(canvas_resource), sync_token, is_lost);
+}
+
 void UmaHistogramCompressionRatio(
     std::string_view histogram_name,
     const String& data_url,
@@ -338,6 +350,72 @@ HTMLCanvasElement::~HTMLCanvasElement() {
     external_memory_accounter_.Decrease(v8::Isolate::GetCurrent(),
                                         externally_allocated_memory_);
   }
+}
+
+bool HTMLCanvasElement::PrepareTransferableResource(
+    viz::TransferableResource* out_resource,
+    viz::ReleaseCallback* out_release_callback) {
+  CHECK(cc_layer_);  // This explodes if FinalizeFrame() was not called.
+
+  frames_since_last_commit_ = 0;
+  if (rate_limiter_) {
+    rate_limiter_->Reset();
+  }
+
+  // If hibernating but not hidden, we want to wake up from hibernation.
+  if (IsHibernating() && !IsPageVisible()) {
+    return false;
+  }
+
+  if (!IsResourceValid()) {
+    return false;
+  }
+
+  // The beforeprint event listener is sometimes scheduled in the same task
+  // as BeginFrame, which means that this code may sometimes be called between
+  // the event listener and its associated FinalizeFrame call. So in order to
+  // preserve the display list for printing, FlushRecording needs to know
+  // whether any printing occurred in the current task.
+  FlushReason reason = FlushReason::kCanvasPushFrame;
+  if (PrintedInCurrentTask() || IsPrinting()) {
+    reason = FlushReason::kCanvasPushFrameWhilePrinting;
+  }
+  FlushRecording(reason);
+
+  // If the context is lost, we don't know if we should be producing GPU or
+  // software frames, until we get a new context, since the compositor will
+  // be trying to get a new context and may change modes.
+  if (!GetOrCreateCanvasResourceProvider()) {
+    return false;
+  }
+
+  scoped_refptr<CanvasResource> frame =
+      ResourceProvider()->ProduceCanvasResource(reason);
+  if (!frame || !frame->IsValid()) {
+    return false;
+  }
+
+  CanvasResource::ReleaseCallback release_callback;
+  if (!frame->PrepareTransferableResource(out_resource, &release_callback,
+                                          /*needs_verified_synctoken=*/false) ||
+      *out_resource == cc_layer_->current_transferable_resource()) {
+    // If the resource did not change, the release will be handled correctly
+    // when the callback from the previous frame is dispatched. But run the
+    // |release_callback| to release the ref acquired above.
+    std::move(release_callback)
+        .Run(std::move(frame), gpu::SyncToken(), false /* is_lost */);
+    return false;
+  }
+  // TODO(https://crbug.com/1475955): HDR metadata should be propagated to
+  // `frame`, and should be populated by the above call to
+  // CanvasResource::PrepareTransferableResource, rather than be inserted
+  // here.
+  out_resource->hdr_metadata = hdr_metadata_;
+  // Note: frame is kept alive via a reference kept in out_release_callback.
+  *out_release_callback = base::BindOnce(
+      ReleaseCanvasResource, std::move(release_callback), std::move(frame));
+
+  return true;
 }
 
 void HTMLCanvasElement::Dispose() {
@@ -656,7 +734,7 @@ void HTMLCanvasElement::configureHighDynamicRange(
     NOTIMPLEMENTED();
   }
 
-  CanvasResourceHost::SetHdrMetadata(hdr_metadata);
+  hdr_metadata_ = hdr_metadata;
   if (context_ && (IsWebGL() || IsWebGPU())) {
     context_->SetHdrMetadata(hdr_metadata);
   }
@@ -844,23 +922,9 @@ void HTMLCanvasElement::DoDeferredPaintInvalidation() {
   did_notify_listeners_for_current_frame_ = true;
 
   if (layout_box && !ShouldBeDirectComposited()) {
-    // If the document is in prepaint and has not already gotten a layout
-    // invalidation then this was a style invalidation from a placed element on
-    // the canvas.
-    bool is_style_invalidation_from_placed_element =
-        GetDocument().Lifecycle().GetState() ==
-            DocumentLifecycle::LifecycleState::kInPrePaint &&
-        !layout_box->ShouldCheckLayoutForPaintInvalidation();
-
-    if (is_style_invalidation_from_placed_element) {
-      DCHECK(HasPlacedElements());
-      layout_box->SetShouldDoFullPaintInvalidationWithoutLayoutChange(
-          PaintInvalidationReason::kStyle);
-    } else {
-      // If the canvas is not composited, propagate the paint invalidation to
-      // |layout_box| as the painted result will change.
-      layout_box->SetShouldDoFullPaintInvalidation();
-    }
+    // If the canvas is not composited, propagate the paint invalidation to
+    // |layout_box| as the painted result will change.
+    layout_box->SetShouldDoFullPaintInvalidation();
   }
 
   dirty_rect_ = gfx::Rect();
@@ -1093,8 +1157,6 @@ void HTMLCanvasElement::PaintInternal(GraphicsContext& context,
                                       const PhysicalRect& r) {
   context_->PaintRenderingResultsToCanvas(kFrontBuffer);
   CanvasResourceProvider* provider = ResourceProvider();
-
-  PaintPlacedElements();
 
   if (provider != nullptr) {
     // For 2D Canvas, there are two ways of render Canvas for printing:
@@ -1588,6 +1650,43 @@ void HTMLCanvasElement::UpdatePreferred2DRasterMode() {
                             ? RasterModeHint::kPreferGPU
                             : RasterModeHint::kPreferCPU;
   SetPreferred2DRasterMode(hint);
+}
+
+SharedContextRateLimiter* HTMLCanvasElement::RateLimiter() const {
+  return rate_limiter_.get();
+}
+
+void HTMLCanvasElement::CreateRateLimiter() {
+  rate_limiter_ =
+      std::make_unique<SharedContextRateLimiter>(kMaxCanvasAnimationBacklog);
+}
+
+void HTMLCanvasElement::SetIsDisplayed(bool displayed) {
+  is_displayed_ = displayed;
+  // If the canvas is no longer being displayed, stop using the rate
+  // limiter.
+  if (!is_displayed_) {
+    frames_since_last_commit_ = 0;
+    if (rate_limiter_) {
+      rate_limiter_->Reset();
+      rate_limiter_.reset(nullptr);
+    }
+  }
+}
+
+cc::TextureLayer* HTMLCanvasElement::GetOrCreateCcLayerIfNeeded() {
+  if (!IsComposited()) {
+    return nullptr;
+  }
+  if (!cc_layer_) [[unlikely]] {
+    cc_layer_ = cc::TextureLayer::Create(this);
+    InitializeLayerWithCSSProperties(cc_layer_.get());
+    cc_layer_->SetIsDrawable(true);
+    cc_layer_->SetHitTestable(true);
+    cc_layer_->SetContentsOpaque(is_opaque());
+    cc_layer_->SetBlendBackgroundColor(!is_opaque());
+  }
+  return cc_layer_.get();
 }
 
 Canvas2DLayerBridge* HTMLCanvasElement::GetOrCreateCanvas2DLayerBridge() {
@@ -2266,24 +2365,4 @@ bool HTMLCanvasElement::IsAccelerated() const {
   return GetRasterMode() == RasterMode::kGPU;
 }
 
-void HTMLCanvasElement::MarkPlacedElementDirty(Element* placedElement) {
-  if (RenderingContext()) {
-    // TODO(issues.chromium.org/379143301): We should only invalidate the sub
-    // rect of whatever placed element was invalidated.canvas->DidDraw();
-    GetDocument().GetPage()->Animator().SetHasCanvasInvalidation();
-    canvas_is_clear_ = false;
-    dirty_rect_.Union(gfx::Rect(width(), height()));
-    RenderingContext()->MarkPlacedElementDirty(placedElement);
-  }
-}
-
-void HTMLCanvasElement::PaintPlacedElements() const {
-  if (HasPlacedElements()) {
-    RenderingContext()->PaintPlacedElements();
-  }
-}
-
-bool HTMLCanvasElement::HasPlacedElements() const {
-  return RenderingContext() && RenderingContext()->HasPlacedElements();
-}
 }  // namespace blink

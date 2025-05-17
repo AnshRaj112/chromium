@@ -151,20 +151,13 @@ std::string GetContextString(AILanguageModel::Context& ctx) {
   return FormatInput(*ctx.GetNonInitialPrompts());
 }
 
-class TestStreamingResponder
-    : public blink::mojom::ModelStreamingResponder,
-      public blink::mojom::AILanguageModelAppendClient {
+class TestStreamingResponder : public blink::mojom::ModelStreamingResponder {
  public:
   TestStreamingResponder() = default;
   ~TestStreamingResponder() override = default;
 
   mojo::PendingRemote<blink::mojom::ModelStreamingResponder> BindRemote() {
     return receiver_.BindNewPipeAndPassRemote();
-  }
-
-  mojo::PendingRemote<blink::mojom::AILanguageModelAppendClient>
-  BindAppendRemote() {
-    return append_receiver_.BindNewPipeAndPassRemote();
   }
 
   // Returns true on successful completion and false on error.
@@ -200,9 +193,6 @@ class TestStreamingResponder
     run_loop_.Quit();
   }
 
-  // blink::mojom::AILanguageModelAppendClient:
-  void OnAppendComplete() override { run_loop_.Quit(); }
-
   void OnQuotaOverflow() override { quota_overflow_run_loop_.Quit(); }
 
   std::optional<blink::mojom::ModelStreamingResponseStatus> error_status_;
@@ -211,37 +201,6 @@ class TestStreamingResponder
   base::RunLoop run_loop_;
   base::RunLoop quota_overflow_run_loop_;
   mojo::Receiver<blink::mojom::ModelStreamingResponder> receiver_{this};
-  mojo::Receiver<blink::mojom::AILanguageModelAppendClient> append_receiver_{
-      this};
-};
-
-class TestMeasureInputUsageClient
-    : public blink::mojom::AILanguageModelMeasureInputUsageClient {
- public:
-  TestMeasureInputUsageClient() = default;
-  ~TestMeasureInputUsageClient() override = default;
-
-  mojo::PendingRemote<blink::mojom::AILanguageModelMeasureInputUsageClient>
-  BindRemote() {
-    return receiver_.BindNewPipeAndPassRemote();
-  }
-
-  uint32_t Wait() {
-    run_loop_.Run();
-    return number_of_tokens_;
-  }
-
- private:
-  // blink::mojom::AILanguageModelMeasureInputUsageClient::
-  void OnResult(uint32_t number_of_tokens) override {
-    number_of_tokens_ = number_of_tokens;
-    run_loop_.Quit();
-  }
-
-  base::RunLoop run_loop_;
-  uint32_t number_of_tokens_ = 0;
-  mojo::Receiver<blink::mojom::AILanguageModelMeasureInputUsageClient>
-      receiver_{this};
 };
 
 optimization_guide::proto::OnDeviceModelExecutionFeatureConfig CreateConfig() {
@@ -272,13 +231,12 @@ optimization_guide::proto::OnDeviceModelExecutionFeatureConfig CreateConfig() {
 // fake service would look something like this:
 // - s1.Prompt("foo")
 //   - Adds "UfooEM" to the session
-//   - Gets output of ["Context: UfooEM\n"] from fake service
-//   - Adds "Context: UfooEM\nE" to the session (fake response + end token)
+//   - Gets output of ["UfooEM"] from fake service
+//   - Adds "UfooEME" to the session (fake response + end token)
 // - s1.Prompt("bar")
 //   - Adds "UbarEM" to the session
-//   - Gets output of ["Context: UfooEM\n", "Context: Context: UfooEM\nE\n",
-//     "Context: UbarEM\n"].
-//   - Adds "Context: UfooEM\nContext: Context: UfooEM\nE\nContext: UbarEM\n"
+//   - Gets output of ["UfooEM", "UfooEME", "UbarEM"].
+//   - Adds "UfooEMUfooEMEUbarEM"
 //     (concatenated output from fake service) to the session
 // This behavior verifies the correct inputs and outputs are being returned from
 // the model, and this helper makes it easier to construct these expectations.
@@ -289,10 +247,10 @@ std::vector<std::string> FormatResponses(
   std::string last_output;
   for (const std::string& response : responses) {
     if (!last_output.empty()) {
-      formatted.push_back("Context: " + last_output + "E\n");
+      formatted.push_back(last_output + "E");
       last_output += formatted.back();
     }
-    formatted.push_back("Context: " + response + "\n");
+    formatted.push_back(response);
     last_output += formatted.back();
   }
   return formatted;
@@ -371,7 +329,7 @@ class AILanguageModelTest : public AITestUtils::AITestBase {
   void Append(blink::mojom::AILanguageModel& model,
               std::vector<blink::mojom::AILanguageModelPromptPtr> input) {
     TestStreamingResponder responder;
-    model.Append(std::move(input), responder.BindAppendRemote());
+    model.Append(std::move(input), responder.BindRemote());
     EXPECT_TRUE(responder.WaitForCompletion());
   }
 
@@ -412,7 +370,7 @@ TEST_F(AILanguageModelTest, Append) {
   auto session = CreateSession();
   Append(*session, MakeInput("foo"));
   EXPECT_THAT(Prompt(*session, MakeInput("bar")),
-              ElementsAre("Context: UfooE\n", "Context: UbarEM\n"));
+              ElementsAre("UfooE", "UbarEM"));
 }
 
 TEST_F(AILanguageModelTest, PromptTokenCounts) {
@@ -438,6 +396,33 @@ TEST_F(AILanguageModelTest, PromptTokenCounts) {
   {
     TestStreamingResponder responder;
     fork->Prompt(MakeInput("baz"), nullptr, responder.BindRemote());
+    EXPECT_TRUE(responder.WaitForCompletion());
+    EXPECT_EQ(responder.current_tokens(), expected_tokens.size());
+  }
+}
+
+TEST_F(AILanguageModelTest, AppendTokenCounts) {
+  auto session = CreateSession();
+
+  std::string expected_tokens = "UfooE";
+  {
+    TestStreamingResponder responder;
+    session->Append(MakeInput("foo"), responder.BindRemote());
+    EXPECT_TRUE(responder.WaitForCompletion());
+    EXPECT_EQ(responder.current_tokens(), expected_tokens.size());
+  }
+  expected_tokens += "UbarE";
+  {
+    TestStreamingResponder responder;
+    session->Append(MakeInput("bar"), responder.BindRemote());
+    EXPECT_TRUE(responder.WaitForCompletion());
+    EXPECT_EQ(responder.current_tokens(), expected_tokens.size());
+  }
+  auto fork = Fork(*session);
+  expected_tokens += "UbazE";
+  {
+    TestStreamingResponder responder;
+    fork->Append(MakeInput("baz"), responder.BindRemote());
     EXPECT_TRUE(responder.WaitForCompletion());
     EXPECT_EQ(responder.current_tokens(), expected_tokens.size());
   }
@@ -493,9 +478,9 @@ TEST_F(AILanguageModelTest, SamplingParams) {
   auto fork = Fork(*session);
 
   EXPECT_THAT(Prompt(*session, MakeInput("foo")),
-              ElementsAre("Context: UfooEM\n", "TopK: 2, Temp: 1\n"));
+              ElementsAre("UfooEM", "TopK: 2, Temp: 1"));
   EXPECT_THAT(Prompt(*fork, MakeInput("bar")),
-              ElementsAre("Context: UbarEM\n", "TopK: 2, Temp: 1\n"));
+              ElementsAre("UbarEM", "TopK: 2, Temp: 1"));
 }
 
 TEST_F(AILanguageModelTest, SamplingParamsTopKOutOfRange) {
@@ -508,7 +493,7 @@ TEST_F(AILanguageModelTest, SamplingParamsTopKOutOfRange) {
   auto session = CreateSession(std::move(options));
 
   EXPECT_THAT(Prompt(*session, MakeInput("foo")),
-              ElementsAre("Context: UfooEM\n", "TopK: 1, Temp: 1.5\n"));
+              ElementsAre("UfooEM", "TopK: 1, Temp: 1.5"));
 }
 
 TEST_F(AILanguageModelTest, SamplingParamsTemperatureOutOfRange) {
@@ -521,7 +506,7 @@ TEST_F(AILanguageModelTest, SamplingParamsTemperatureOutOfRange) {
   auto session = CreateSession(std::move(options));
 
   EXPECT_THAT(Prompt(*session, MakeInput("foo")),
-              ElementsAre("Context: UfooEM\n", "TopK: 2, Temp: 0\n"));
+              ElementsAre("UfooEM", "TopK: 2, Temp: 0"));
 }
 
 TEST_F(AILanguageModelTest, MaxSamplingParams) {
@@ -534,7 +519,7 @@ TEST_F(AILanguageModelTest, MaxSamplingParams) {
   auto session = CreateSession(std::move(options));
 
   EXPECT_THAT(Prompt(*session, MakeInput("foo")),
-              ElementsAre("Context: UfooEM\n", "TopK: 5, Temp: 1.5\n"));
+              ElementsAre("UfooEM", "TopK: 5, Temp: 1.5"));
 }
 
 TEST_F(AILanguageModelTest, InitialPrompts) {
@@ -544,7 +529,7 @@ TEST_F(AILanguageModelTest, InitialPrompts) {
   auto session = CreateSession(std::move(options));
 
   EXPECT_THAT(Prompt(*session, MakeInput("foo")),
-              ElementsAre("Context: ShiEUbyeE\n", "Context: UfooEM\n"));
+              ElementsAre("ShiEUbyeE", "UfooEM"));
 }
 
 TEST_F(AILanguageModelTest, InitialPromptsInstanceInfo) {
@@ -620,8 +605,7 @@ TEST_F(AILanguageModelTest, QuotaOverflowOnPromptInput) {
   // Response should include input/output of previous prompt with the original
   // long prompt not present.
   EXPECT_THAT(responder.responses(),
-              ElementsAre("Context: SinitE\n", "Context: UfooEMhiE\n",
-                          "Context: U" + long_prompt + "EM\n"));
+              ElementsAre("SinitE", "UfooEMhiE", "U" + long_prompt + "EM"));
 }
 
 TEST_F(AILanguageModelTest, QuotaOverflowOnAppend) {
@@ -634,14 +618,12 @@ TEST_F(AILanguageModelTest, QuotaOverflowOnAppend) {
 
   std::string long_prompt(kTestMaxTokens / 3, 'a');
   TestStreamingResponder responder;
-  session->Append(MakeInput(long_prompt), responder.BindAppendRemote());
+  session->Append(MakeInput(long_prompt), responder.BindRemote());
   responder.WaitForQuotaOverflow();
   EXPECT_TRUE(responder.WaitForCompletion());
 
-  EXPECT_THAT(
-      Prompt(*session, MakeInput("foo")),
-      ElementsAre("Context: SinitE\n", "Context: U" + long_prompt + "E\n",
-                  "Context: UfooEM\n"));
+  EXPECT_THAT(Prompt(*session, MakeInput("foo")),
+              ElementsAre("SinitE", "U" + long_prompt + "E", "UfooEM"));
 }
 
 TEST_F(AILanguageModelTest, QuotaOverflowOnOutput) {
@@ -672,8 +654,7 @@ TEST_F(AILanguageModelTest, QuotaOverflowOnOutput) {
   // - "bar" from the current prompt call
   fake_broker_.settings().set_execute_result({});
   EXPECT_THAT(Prompt(*session, MakeInput("bar")),
-              ElementsAre("Context: UfooEM" + long_response + "E\n",
-                          "Context: UbarEM\n"));
+              ElementsAre("UfooEM" + long_response + "E", "UbarEM"));
 }
 
 TEST_F(AILanguageModelTest, Destroy) {
@@ -753,14 +734,14 @@ TEST_F(AILanguageModelTest, MultimodalInputImageNotSpecified) {
   }
   {
     TestStreamingResponder responder;
-    session->Append(make_input(), responder.BindAppendRemote());
+    session->Append(make_input(), responder.BindRemote());
     EXPECT_FALSE(responder.WaitForCompletion());
     EXPECT_EQ(responder.error_status(),
               blink::mojom::ModelStreamingResponseStatus::kErrorInvalidRequest);
   }
-  TestMeasureInputUsageClient client;
-  session->MeasureInputUsage(make_input(), client.BindRemote());
-  EXPECT_EQ(client.Wait(), 0u);
+  base::test::TestFuture<std::optional<uint32_t>> measure_future;
+  session->MeasureInputUsage(make_input(), measure_future.GetCallback());
+  EXPECT_EQ(measure_future.Get(), std::nullopt);
 }
 
 TEST_F(AILanguageModelTest, MultimodalInputAudioNotSpecified) {
@@ -788,14 +769,14 @@ TEST_F(AILanguageModelTest, MultimodalInputAudioNotSpecified) {
   }
   {
     TestStreamingResponder responder;
-    session->Append(make_input(), responder.BindAppendRemote());
+    session->Append(make_input(), responder.BindRemote());
     EXPECT_FALSE(responder.WaitForCompletion());
     EXPECT_EQ(responder.error_status(),
               blink::mojom::ModelStreamingResponseStatus::kErrorInvalidRequest);
   }
-  TestMeasureInputUsageClient client;
-  session->MeasureInputUsage(make_input(), client.BindRemote());
-  EXPECT_EQ(client.Wait(), 0u);
+  base::test::TestFuture<std::optional<uint32_t>> measure_future;
+  session->MeasureInputUsage(make_input(), measure_future.GetCallback());
+  EXPECT_EQ(measure_future.Get(), std::nullopt);
 }
 
 TEST_F(AILanguageModelTest, MultimodalInput) {
@@ -850,9 +831,36 @@ TEST_F(AILanguageModelTest, ModelDownload) {
 
 TEST_F(AILanguageModelTest, MeasureInputUsage) {
   auto session = CreateSession();
-  TestMeasureInputUsageClient client;
-  session->MeasureInputUsage(MakeInput("foo"), client.BindRemote());
-  EXPECT_EQ(client.Wait(), std::string("UfooEM").size());
+  base::test::TestFuture<std::optional<uint32_t>> measure_future;
+  session->MeasureInputUsage(MakeInput("foo"), measure_future.GetCallback());
+  EXPECT_EQ(measure_future.Get(), std::string("UfooEM").size());
+}
+
+TEST_F(AILanguageModelTest, TextSafetyInitialPrompts) {
+  auto config = CreateConfig();
+  config.set_can_skip_text_safety(false);
+  fake_broker_.UpdateModelAdaptation(
+      optimization_guide::FakeAdaptationAsset({.config = config}));
+  auto safety_config = CreateSafetyConfig();
+  auto* check = safety_config.add_request_check();
+  check->mutable_input_template()->Add(
+      FieldSubstitution("%s", StringValueField()));
+  optimization_guide::FakeSafetyModelAsset safety_asset(
+      std::move(safety_config));
+  fake_broker_.UpdateSafetyModel(safety_asset.model_info());
+
+  base::test::TestFuture<blink::mojom::AIManagerCreateClientError> future;
+  AITestUtils::MockCreateLanguageModelClient language_model_client;
+  EXPECT_CALL(language_model_client, OnError(_)).WillOnce([&](auto error) {
+    future.SetValue(error);
+  });
+
+  auto options = blink::mojom::AILanguageModelCreateOptions::New();
+  options->initial_prompts.push_back(MakePrompt(Role::kSystem, "unsafe"));
+  GetAIManagerRemote()->CreateLanguageModel(
+      language_model_client.BindNewPipeAndPassRemote(), std::move(options));
+  EXPECT_EQ(future.Take(),
+            blink::mojom::AIManagerCreateClientError::kUnableToCreateSession);
 }
 
 TEST_F(AILanguageModelTest, TextSafetyInput) {
@@ -978,7 +986,7 @@ TEST_F(AILanguageModelTest, Constraint) {
   EXPECT_THAT(
       Prompt(*session, MakeInput("foo"),
              on_device_model::mojom::ResponseConstraint::NewRegex("reg")),
-      ElementsAre("Constraint: regex reg\n", "Context: UfooEM\n"));
+      ElementsAre("Constraint: regex reg", "UfooEM"));
 }
 
 TEST_F(AILanguageModelTest, ServiceCrash) {
@@ -1012,10 +1020,11 @@ TEST_F(AILanguageModelTest, MAYBE_CanCreate_WaitsForEligibility) {
       optimization_guide::OnDeviceModelEligibilityReason)>>
       eligibility_future;
   EXPECT_CALL(*mock_optimization_guide_keyed_service_,
-              GetOnDeviceModelEligibilityAsync(_, _))
-      .WillOnce(testing::Invoke([&](auto feature, auto callback) {
-        eligibility_future.SetValue(std::move(callback));
-      }));
+              GetOnDeviceModelEligibilityAsync(_, _, _))
+      .WillOnce(
+          testing::Invoke([&](auto feature, auto capabilities, auto callback) {
+            eligibility_future.SetValue(std::move(callback));
+          }));
 
   base::test::TestFuture<blink::mojom::ModelAvailabilityCheckResult>
       result_future;
@@ -1141,11 +1150,11 @@ TEST_F(AILanguageModelTest, Priority) {
 
   main_rfh()->GetRenderWidgetHost()->GetView()->Hide();
   EXPECT_THAT(Prompt(*session, MakeInput("bar")),
-              ElementsAre("Priority: background\n", "hi"));
+              ElementsAre("Priority: background", "hi"));
 
   auto fork = Fork(*session);
   EXPECT_THAT(Prompt(*fork, MakeInput("bar")),
-              ElementsAre("Priority: background\n", "hi"));
+              ElementsAre("Priority: background", "hi"));
 
   main_rfh()->GetRenderWidgetHost()->GetView()->Show();
   EXPECT_THAT(Prompt(*session, MakeInput("baz")), ElementsAre("hi"));

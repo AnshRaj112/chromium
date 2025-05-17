@@ -152,6 +152,9 @@ specific_include_rules = {
         "+base/threading/thread_task_runner_handle.h",
         # Test harness may use cc directly instead of going through WebViewImpl etc.
         "+cc",
+        "+components/subresource_filter/content/renderer",
+        "+components/subresource_filter/core/common",
+        "+components/subresource_filter/core/mojom",
         "+components/ukm/test_ukm_recorder.h",
         "+components/viz/test",
 	# TODO(crbug.com/838693): Test harnesses use LayerTreeView
@@ -209,6 +212,8 @@ specific_include_rules = {
     "media_values.h": [
         "+ui/base/pointer/pointer_device.h",
     ],
+    # TODO(crbug.com/385173568): Remove after AIPromptAPIForExtension OT.
+    "origin_trial_context.cc": [ "+base/command_line.h" ],
     "scripted_idle_task_controller(_test)?.(cc|h)": [
         "+base/task/delayed_task_handle.h",
     ],

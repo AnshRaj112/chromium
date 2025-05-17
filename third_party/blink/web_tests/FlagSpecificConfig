@@ -63,7 +63,8 @@
     "name": "trees-in-viz",
     "args": [
           "--enable-features=TreesInViz"
-    ]
+    ],
+    "smoke_file": "TestLists/trees-in-viz"
   },
   {
     "name": "webgpu",
@@ -217,6 +218,15 @@
     ],
     "comments": [
       "Used to test Chrome with Skia Ganesh."
+    ]
+  },
+  {
+    "name": "ComputePressureOwnContributionEstimate",
+    "args": [
+      "--enable-features=ComputePressureOwnContributionEstimate"
+    ],
+    "comments": [
+      "Enable experimental attribute onwContributionEstimate."
     ]
   }
 ]

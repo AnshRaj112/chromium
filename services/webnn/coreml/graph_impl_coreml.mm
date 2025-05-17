@@ -29,6 +29,7 @@
 #include "base/task/bind_post_task.h"
 #include "base/task/thread_pool.h"
 #include "base/types/expected_macros.h"
+#include "build/build_config.h"
 #include "mojo/public/cpp/base/big_buffer.h"
 #include "mojo/public/cpp/bindings/self_owned_associated_receiver.h"
 #include "services/webnn/coreml/buffer_content_coreml.h"
@@ -79,6 +80,7 @@ namespace {
 // compilation process.
 struct ScopedModelPaths {
   ~ScopedModelPaths() {
+#if BUILDFLAG(IS_MAC)
     if (base::CommandLine::ForCurrentProcess()->HasSwitch(
             switches::kWebNNCoreMlDumpModel)) {
       const auto dump_directory =
@@ -100,6 +102,7 @@ struct ScopedModelPaths {
         }
       }
     }
+#endif
     // Though the destructors of ScopedTempDir will delete these directories.
     // Explicitly delete them here to check for success.
     if (model_file_dir.IsValid()) {
@@ -429,13 +432,13 @@ void GraphImplCoreml::CreateAndBuildOnBackgroundThread(
   std::vector<std::pair<std::string, std::string>> coreml_name_to_operand_name(
       graph_info->input_operands.size() + graph_info->output_operands.size());
   for (auto const& input_id : graph_info->input_operands) {
-    auto& name = graph_info->id_to_operand_map.at(input_id)->name;
+    auto& name = graph_info->operands.at(input_id)->name;
     CHECK(name.has_value());
     coreml_name_to_operand_name.emplace_back(
         GetCoreMLNameFromInput(name.value(), input_id), name.value());
   }
   for (auto const& output_id : graph_info->output_operands) {
-    auto& name = graph_info->id_to_operand_map.at(output_id)->name;
+    auto& name = graph_info->operands.at(output_id)->name;
     CHECK(name.has_value());
     coreml_name_to_operand_name.emplace_back(
         GetCoreMLNameFromOutput(name.value(), output_id), name.value());

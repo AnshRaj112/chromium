@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 #include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_service_impl.h"
 
+#include <algorithm>
+#include <optional>
+
 #include "base/types/expected.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -105,23 +108,105 @@ void TabStripServiceImpl::CreateTabAt(tabs_api::mojom::PositionPtr pos,
   if (url.has_value()) {
     target_url = url.value();
   }
-  int index = -1;
+  std::optional<int> index;
   if (pos) {
     index = pos->index;
   }
 
-  content::WebContents* content = browser_adapter_->AddTabAt(target_url, index);
-  if (!content) {
+  auto tab_handle = browser_adapter_->AddTabAt(target_url, index);
+  if (tab_handle == tabs::TabHandle::Null()) {
     // Missing content can happen for a number of reasons. i.e. If the profile
     // is shutting down or if navigation requests are blocked due to some
     // internal state. This is usually because the browser is not in the
     // required state to perform the action.
     std::move(callback).Run(base::unexpected(mojo_base::mojom::Error::New(
-        mojo_base::mojom::Code::kFailedPrecondition,
-        "Failed to create WebContents")));
-  } else {
-    std::move(callback).Run(base::ok(true));
+        mojo_base::mojom::Code::kInternal, "Failed to create WebContents")));
+    return;
   }
+
+  auto tab_index = tab_strip_model_adapter_->GetIndexForHandle(tab_handle);
+  if (!tab_index.has_value()) {
+    std::move(callback).Run(base::unexpected(mojo_base::mojom::Error::New(
+        mojo_base::mojom::Code::kInternal,
+        "Could not find the index of the newly created tab")));
+    return;
+  }
+
+  auto renderer_data =
+      tab_strip_model_adapter_->GetTabRendererData(tab_index.value());
+  auto mojo_tab = tabs_api::converters::BuildMojoTab(tab_handle, renderer_data);
+  std::move(callback).Run(base::ok(std::move(mojo_tab)));
+}
+
+void TabStripServiceImpl::CloseTabs(const std::vector<tabs_api::TabId>& ids,
+                                    CloseTabsCallback callback) {
+  std::vector<int32_t> tab_content_targets;
+  for (const auto& id : ids) {
+    if (id.Type() != tabs_api::TabId::Type::kContent) {
+      std::move(callback).Run(base::unexpected(mojo_base::mojom::Error::New(
+          mojo_base::mojom::Code::kUnimplemented,
+          "only content tab closing has been implemented right now")));
+      return;
+    }
+    int32_t numeric_id;
+    if (!base::StringToInt(id.Id(), &numeric_id)) {
+      std::move(callback).Run(base::unexpected(mojo_base::mojom::Error::New(
+          mojo_base::mojom::Code::kInvalidArgument, "invalid tab content id")));
+      return;
+    }
+    tab_content_targets.push_back(numeric_id);
+  }
+
+  std::vector<size_t> tab_strip_indices;
+  // Transform targets from ids to indices in the tabstrip.
+  for (auto target : tab_content_targets) {
+    auto target_idx =
+        tab_strip_model_adapter_->GetIndexForHandle(tabs::TabHandle(target));
+    if (!target_idx.has_value()) {
+      std::move(callback).Run(base::unexpected(mojo_base::mojom::Error::New(
+          mojo_base::mojom::Code::kNotFound, "could not find the a tab")));
+      return;
+    }
+    tab_strip_indices.push_back(target_idx.value());
+  }
+
+  // Close from last to first, that way the removals won't change the index of
+  // the next target.
+  std::sort(tab_strip_indices.begin(), tab_strip_indices.end());
+  std::reverse(tab_strip_indices.begin(), tab_strip_indices.end());
+  for (auto idx : tab_strip_indices) {
+    tab_strip_model_adapter_->CloseTab(idx);
+  }
+
+  std::move(callback).Run(mojo_base::mojom::Empty::New());
+}
+
+void TabStripServiceImpl::ActivateTab(const tabs_api::TabId& id,
+                                      ActivateTabCallback callback) {
+  if (id.Type() != tabs_api::TabId::Type::kContent) {
+    std::move(callback).Run(base::unexpected(
+        mojo_base::mojom::Error::New(mojo_base::mojom::Code::kInvalidArgument,
+                                     "only a content tab id can be provided")));
+    return;
+  }
+
+  int32_t handle_id;
+  if (!base::StringToInt(id.Id(), &handle_id)) {
+    std::move(callback).Run(base::unexpected(mojo_base::mojom::Error::New(
+        mojo_base::mojom::Code::kInvalidArgument, "id is malformed")));
+    return;
+  }
+
+  auto maybe_idx =
+      tab_strip_model_adapter_->GetIndexForHandle(tabs::TabHandle(handle_id));
+  if (!maybe_idx.has_value()) {
+    std::move(callback).Run(base::unexpected(mojo_base::mojom::Error::New(
+        mojo_base::mojom::Code::kNotFound, "tab not found")));
+    return;
+  }
+
+  tab_strip_model_adapter_->ActivateTab(maybe_idx.value());
+  std::move(callback).Run(mojo_base::mojom::Empty::New());
 }
 
 void TabStripServiceImpl::OnTabStripModelChanged(

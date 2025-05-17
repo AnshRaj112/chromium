@@ -853,7 +853,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Blink.CullRect.UpdateTime" units="microseconds"
-    expires_after="2025-06-22">
+    expires_after="2025-09-22">
   <owner>pdr@chromium.org</owner>
   <owner>wangxianzhu@chromium.org</owner>
   <owner>paint-dev@chromium.org</owner>
@@ -5496,6 +5496,20 @@ chromium-metrics-reviews@google.com.
   <token key="CookieOperation">
     <variant name="Cookies"/>
     <variant name="CookiesEnabled"/>
+    <variant name="SetCookie"/>
+  </token>
+</histogram>
+
+<histogram name="Blink.{CookieOperation}Time.AblationDelay" units="ms"
+    expires_after="2025-10-26">
+  <owner>elkurin@chromium.org</owner>
+  <owner>chrome-owp-storage@google.com</owner>
+  <summary>
+    Time (in ms) added to {CookieOperation} operation from the CookieJar used
+    for ablation study purpose.
+  </summary>
+  <token key="CookieOperation">
+    <variant name="Cookies"/>
     <variant name="SetCookie"/>
   </token>
 </histogram>

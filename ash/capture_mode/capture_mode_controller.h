@@ -151,9 +151,8 @@ class ASH_EXPORT CaptureModeController
   // Returns the search results panel, or nullptr if none exists.
   SearchResultsPanel* GetSearchResultsPanel() const;
 
-  // Shows the results panel. `image` is only needed for the thumbnail if the
-  // Lens Web feature flag is disabled.
-  void ShowSearchResultsPanel(const gfx::ImageSkia& image);
+  // Shows the results panel.
+  void ShowSearchResultsPanel();
 
   // Navigates the Sunfish search results panel to the given URL, if the panel
   // is available.
@@ -376,10 +375,12 @@ class ASH_EXPORT CaptureModeController
   void MaybeUpdateVcPanel();
 
   // Checks if there are any content currently on the screen that are restricted
-  // by DLP. `callback` will be triggered by the DLP manager with `proceed` set
-  // to true if screen capture is allowed to continue, or set to false if it
-  // should not continue.
+  // by DLP. `shutting_down` is true if the lock state controller has received a
+  // request to shut down, and false otherwise. `callback` will be triggered by
+  // the DLP manager with `proceed` set to true if screen capture is allowed to
+  // continue, or set to false if it should not continue.
   void CheckScreenCaptureDlpRestrictions(
+      bool shutting_down,
       OnCaptureModeDlpRestrictionChecked callback);
 
   // Returns true if the video recording is in progress and annotating is
@@ -389,10 +390,6 @@ class ASH_EXPORT CaptureModeController
   // Returns true is annotating should be supported for the current capture mode
   // behavior.
   bool IsAnnotatingSupported() const;
-
-  // Calls the delegate to send a multimodal search with `image` and `text`.
-  void SendMultimodalSearch(const gfx::ImageSkia& image,
-                            const std::string& text);
 
   // TODO(hewer): Remove the `image` param when cleaning up the native
   // implementation.

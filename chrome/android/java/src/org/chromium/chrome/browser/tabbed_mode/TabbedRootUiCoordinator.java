@@ -216,6 +216,7 @@ import org.chromium.ui.base.ActivityWindowAndroid;
 import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.base.IntentRequestTracker;
 import org.chromium.ui.base.LocalizationUtils;
+import org.chromium.ui.display.DisplayUtil;
 import org.chromium.ui.dragdrop.DragDropGlobalState;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.url.GURL;
@@ -295,7 +296,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
 
         @Override
         public void onTitleUpdated(Tab tab) {
-            setActivityTitle(tab);
+            setActivityTitle(tab, /* isTabSwitcher= */ false);
         }
 
         private void swapToTab(Tab tab) {
@@ -311,7 +312,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                 swipeHandler.setNavigationCoordinator(mHistoryNavigationCoordinator);
                 swipeHandler.setBrowserControls(mBrowserControlsManager);
             }
-            setActivityTitle(tab);
+            setActivityTitle(tab, /* isTabSwitcher= */ false);
         }
 
         @Override
@@ -486,6 +487,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                     public void onStartedShowing(int layoutType) {
                         if (layoutType == LayoutType.TAB_SWITCHER) {
                             mHistoryNavigationCoordinator.reset();
+                            setActivityTitle(/* tab= */ null, /* isTabSwitcher= */ true);
                         }
                     }
                 };
@@ -561,7 +563,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
             mApplicationLabel = packageManager.getApplicationLabel(applicationInfo);
         } catch (PackageManager.NameNotFoundException e) {
             Log.w(TAG, "Error getting application info", e);
-            mApplicationLabel = "";
+            mApplicationLabel = mActivity.getResources().getString(R.string.app_name);
         }
     }
 
@@ -935,6 +937,8 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                 mActivity,
                 mActivityLifecycleDispatcher,
                 mTabCreatorManagerSupplier,
+                mTabBookmarkerSupplier,
+                mBookmarkModelSupplier,
                 mActivityTabProvider,
                 () -> addVoiceSearchAdaptiveButton(trackerSupplier));
     }
@@ -1393,7 +1397,8 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
     private void initAppHeaderCoordinator(
             Bundle savedInstanceState, EdgeToEdgeStateProvider edgeToEdgeStateProvider) {
         boolean isTablet = DeviceFormFactor.isNonMultiDisplayContextOnTablet(mActivity);
-        if (!ToolbarFeatures.isTabStripWindowLayoutOptimizationEnabled(isTablet)) {
+        if (!ToolbarFeatures.isTabStripWindowLayoutOptimizationEnabled(
+                isTablet, DisplayUtil.isContextInDefaultDisplay(mActivity))) {
             return;
         }
 
@@ -1823,26 +1828,32 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
         return mKeyboardFocusRowManager;
     }
 
-    private void setActivityTitle(Tab tab) {
+    private void setActivityTitle(Tab tab, boolean isTabSwitcher) {
         // Do not update title after Activity destruction.
         if (mActivity == null) {
             return;
         }
 
-        String tabTitle = tab == null ? "" : tab.getTitle();
-        if (TextUtils.isEmpty(mApplicationLabel)) {
-            if (TextUtils.isEmpty(tabTitle)) {
-                mActivity.setTitle("Application");
-                Log.w(TAG, "Both application label and tab title are missing.");
-            } else {
-                mActivity.setTitle(tabTitle);
-            }
+        String title =
+                TextUtils.isEmpty(mApplicationLabel)
+                        ? mActivity
+                                .getResources()
+                                .getString(R.string.accessibility_default_app_label)
+                        : mApplicationLabel.toString();
+        String subTitle;
+        if (isTabSwitcher) {
+            subTitle =
+                    mActivity.getResources().getString(R.string.accessibility_tab_switcher_title);
+        } else if (tab != null) {
+            subTitle = tab.getTitle();
         } else {
-            if (TextUtils.isEmpty(tabTitle)) {
-                mActivity.setTitle(mApplicationLabel);
-            } else {
-                mActivity.setTitle(mApplicationLabel + ": " + tabTitle);
-            }
+            subTitle = "";
+        }
+
+        if (TextUtils.isEmpty(subTitle)) {
+            mActivity.setTitle(title);
+        } else {
+            mActivity.setTitle(title + ": " + subTitle);
         }
     }
 }

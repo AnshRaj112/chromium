@@ -220,7 +220,7 @@ HttpStreamPool::AttemptManager::~AttemptManager() {
 }
 
 void HttpStreamPool::AttemptManager::StartJob(Job* job) {
-  CHECK(!is_failing_);
+  CHECK(availability_state_ == AvailabilityState::kAvailable);
 
   TRACE_EVENT_INSTANT("net.stream", "AttemptManager::StartJob", track_,
                       NetLogWithSourceToFlow(job->request_net_log()));
@@ -281,8 +281,8 @@ void HttpStreamPool::AttemptManager::StartJob(Job* job) {
     // already took the ownership of the idle stream socket. If we don't create
     // an HttpBasicStream here, another call of this method might exceed the
     // per-group limit.
-    CreateTextBasedStreamAndMaybeNotify(std::move(stream_socket), reuse_type,
-                                        LoadTimingInfo::ConnectTiming());
+    CreateTextBasedStreamAndNotify(std::move(stream_socket), reuse_type,
+                                   LoadTimingInfo::ConnectTiming());
     return;
   }
 
@@ -297,14 +297,14 @@ void HttpStreamPool::AttemptManager::StartJob(Job* job) {
 }
 
 void HttpStreamPool::AttemptManager::Preconnect(Job* job) {
-  CHECK(!is_failing_);
+  CHECK(availability_state_ == AvailabilityState::kAvailable);
 
   TRACE_EVENT_INSTANT("net.stream", "AttemptManager::Preconnect", track_,
                       NetLogWithSourceToFlow(job->request_net_log()));
 
   // If `job` is resumed, there could be enough streams at this point.
   if (group_->ActiveStreamSocketCount() >= job->num_streams()) {
-    NotifyJobOfPreconnectCompleteLater(job, OK);
+    NotifyJobOfPreconnectComplete(job, OK);
     return;
   }
 
@@ -468,7 +468,7 @@ HttpStreamPool::AttemptManager::GetSSLConfig(const IPEndPoint& ip_endpoint) {
 }
 
 void HttpStreamPool::AttemptManager::ProcessPendingJob() {
-  if (is_failing_) {
+  if (is_shutting_down()) {
     return;
   }
 
@@ -478,8 +478,8 @@ void HttpStreamPool::AttemptManager::ProcessPendingJob() {
     if (stream_socket) {
       const StreamSocketHandle::SocketReuseType reuse_type =
           GetReuseTypeFromIdleStreamSocket(*stream_socket);
-      CreateTextBasedStreamAndMaybeNotify(std::move(stream_socket), reuse_type,
-                                          LoadTimingInfo::ConnectTiming());
+      CreateTextBasedStreamAndNotify(std::move(stream_socket), reuse_type,
+                                     LoadTimingInfo::ConnectTiming());
       return;
     }
   }
@@ -550,7 +550,6 @@ void HttpStreamPool::AttemptManager::OnJobComplete(Job* job) {
 }
 
 void HttpStreamPool::AttemptManager::CancelJobs(int error) {
-  is_canceling_jobs_ = true;
   HandleFinalError(error);
 }
 
@@ -671,7 +670,7 @@ RequestPriority HttpStreamPool::AttemptManager::GetPriority() const {
 }
 
 bool HttpStreamPool::AttemptManager::IsStalledByPoolLimit() {
-  if (is_failing_) {
+  if (is_shutting_down()) {
     return false;
   }
 
@@ -774,12 +773,10 @@ base::Value::Dict HttpStreamPool::AttemptManager::GetInfoAsValue() const {
   dict.Set("preconnect_count_all", static_cast<int>(preconnect_jobs_.size()));
   dict.Set("preconnect_count_pending",
            static_cast<int>(PendingPreconnectCount()));
-  dict.Set("preconnect_count_notifying",
-           static_cast<int>(notifying_preconnect_completion_count_));
   dict.Set("tcp_based_attempt_count", static_cast<int>(TcpBasedAttemptCount()));
   dict.Set("slow_tcp_based_attempt_count",
            static_cast<int>(slow_tcp_based_attempt_count_));
-  dict.Set("is_failing", is_failing_);
+  dict.Set("availability_state", static_cast<int>(availability_state_));
   if (final_error_to_notify_jobs_.has_value()) {
     dict.Set("final_error_to_notify_job", *final_error_to_notify_jobs_);
   }
@@ -902,7 +899,7 @@ void HttpStreamPool::AttemptManager::
 }
 
 void HttpStreamPool::AttemptManager::ProcessServiceEndpointChanges() {
-  CHECK(!is_failing_);
+  CHECK(availability_state_ == AvailabilityState::kAvailable);
   CHECK(service_endpoint_request_);
 
   // The order of the following checks is important, see the following comments.
@@ -1050,7 +1047,7 @@ void HttpStreamPool::AttemptManager::MaybeNotifySSLConfigReady() {
 }
 
 void HttpStreamPool::AttemptManager::MaybeAttemptQuic() {
-  if (is_failing_ || !CanUseQuic() || quic_attempt_result_.has_value()) {
+  if (is_shutting_down() || !CanUseQuic() || quic_attempt_result_.has_value()) {
     return;
   }
 
@@ -1082,7 +1079,7 @@ void HttpStreamPool::AttemptManager::MaybeAttemptQuic() {
 void HttpStreamPool::AttemptManager::MaybeAttemptTcpBased(
     std::optional<IPEndPoint> exclude_ip_endpoint,
     std::optional<size_t> max_attempts) {
-  if (is_failing_) {
+  if (is_shutting_down()) {
     return;
   }
 
@@ -1416,13 +1413,13 @@ HttpStreamPool::AttemptManager::GetQuicEndpointToAttempt() {
 void HttpStreamPool::AttemptManager::HandleFinalError(int error) {
   // `this` may already be failing, e.g. IP address change happens while failing
   // for a different reason.
-  if (is_failing_) {
+  if (availability_state_ == AvailabilityState::kFailing) {
     return;
   }
 
   CHECK(!final_error_to_notify_jobs_.has_value());
   final_error_to_notify_jobs_ = error;
-  is_failing_ = true;
+  availability_state_ = AvailabilityState::kFailing;
   service_endpoint_request_.reset();
 
   net_log_.AddEvent(
@@ -1448,10 +1445,6 @@ void HttpStreamPool::AttemptManager::HandleFinalError(int error) {
 
 HttpStreamPool::AttemptManager::FailureKind
 HttpStreamPool::AttemptManager::DetermineFailureKind() {
-  if (is_canceling_jobs_) {
-    return FailureKind::kStreamFailed;
-  }
-
   if (IsCertificateError(final_error_to_notify_jobs())) {
     return FailureKind::kCertifcateError;
   }
@@ -1464,7 +1457,7 @@ HttpStreamPool::AttemptManager::DetermineFailureKind() {
 }
 
 void HttpStreamPool::AttemptManager::NotifyJobOfFailure() {
-  CHECK(is_failing_);
+  CHECK_EQ(availability_state_, AvailabilityState::kFailing);
 
   const FailureKind kind = DetermineFailureKind();
   base::WeakPtr<AttemptManager> weak_this = weak_ptr_factory_.GetWeakPtr();
@@ -1510,7 +1503,7 @@ void HttpStreamPool::AttemptManager::NotifyPreconnectsComplete(int rv) {
   while (!preconnect_jobs_.empty()) {
     raw_ptr<Job> job =
         preconnect_jobs_.extract(preconnect_jobs_.begin()).value();
-    NotifyJobOfPreconnectCompleteLater(job, rv);
+    NotifyJobOfPreconnectComplete(std::move(job), rv);
   }
   // TODO(crbug.com/396998469): Do we still need this? Remove if this is not
   // needed.
@@ -1531,7 +1524,7 @@ void HttpStreamPool::AttemptManager::ProcessPreconnectsAfterAttemptComplete(
     auto it = preconnect_jobs_.find(completed_job);
     CHECK(it != preconnect_jobs_.end());
     raw_ptr<Job> job = preconnect_jobs_.extract(it).value();
-    NotifyJobOfPreconnectCompleteLater(job, rv);
+    NotifyJobOfPreconnectComplete(std::move(job), rv);
   }
 
   // TODO(crbug.com/396998469): Do we still need this? Remove if this is not
@@ -1541,40 +1534,25 @@ void HttpStreamPool::AttemptManager::ProcessPreconnectsAfterAttemptComplete(
   }
 }
 
-void HttpStreamPool::AttemptManager::NotifyJobOfPreconnectCompleteLater(
-    Job* job,
+void HttpStreamPool::AttemptManager::NotifyJobOfPreconnectComplete(
+    raw_ptr<Job> job,
     int rv) {
-  ++notifying_preconnect_completion_count_;
-  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-      FROM_HERE, base::BindOnce(&AttemptManager::NotifyJobOfPreconnectComplete,
-                                weak_ptr_factory_.GetWeakPtr(), job, rv));
-}
-
-// TODO(crbug.com/396998469): Ensure `job` isn't a dangling pointer. There are
-// two paths to destroy `job`.
-// 1) JobController::OnPreconnectComplete() is called via
-//    Job::OnPreconnectComplete().
-// 2) JobController is destroyed as a part of HttpStreamPool destruction.
-//
-// In this method, we don't have to consider 1) because we are about to call
-// Job::OnPreconnectComplete(). If 2) happens, `this` should have been destroyed
-// too so we shouldn't reach here because we use "weak this" to post a task.
-void HttpStreamPool::AttemptManager::NotifyJobOfPreconnectComplete(Job* job,
-                                                                   int rv) {
+  Job* raw_job = job.get();
+  notified_jobs_.emplace(std::move(job));
   TRACE_EVENT_INSTANT("net.stream",
                       "AttemptManager::NotifyJobOfPreconnectComplete", track_,
-                      NetLogWithSourceToFlow(job->request_net_log()));
-  CHECK_GT(notifying_preconnect_completion_count_, 0u);
-  --notifying_preconnect_completion_count_;
+                      NetLogWithSourceToFlow(raw_job->request_net_log()));
   // We don't need to call MaybeCompleteLater() here, since `job` will call
   // OnJobComplete() later.
-  job->OnPreconnectComplete(rv);
+  raw_job->OnPreconnectComplete(rv);
 }
 
-void HttpStreamPool::AttemptManager::CreateTextBasedStreamAndMaybeNotify(
+void HttpStreamPool::AttemptManager::CreateTextBasedStreamAndNotify(
     std::unique_ptr<StreamSocket> stream_socket,
     StreamSocketHandle::SocketReuseType reuse_type,
     LoadTimingInfo::ConnectTiming connect_timing) {
+  CHECK(!jobs_.empty());
+
   NextProto negotiated_protocol = stream_socket->GetNegotiatedProtocol();
   CHECK_NE(negotiated_protocol, NextProto::kProtoHTTP2);
 
@@ -1585,17 +1563,7 @@ void HttpStreamPool::AttemptManager::CreateTextBasedStreamAndMaybeNotify(
       << "active=" << group_->ActiveStreamSocketCount()
       << ", limit=" << pool()->max_stream_sockets_per_group();
 
-  if (jobs_.empty()) {
-    // The ownership of the underlying `stream_socket` of `http_stream` will be
-    // moved to the group as an idle stream.
-    // TODO(crbug.com/396998469): Better to move `stream_socket` directly to
-    // the group as an idle stream without creating an HttpStream. Currently we
-    // depends on the fact that the group processes pending preconnects when
-    // the handle of the HttpStream is returned to the group.
-    return;
-  }
   NotifyStreamReady(std::move(http_stream), negotiated_protocol);
-  // `this` may be deleted.
 }
 
 bool HttpStreamPool::AttemptManager::HasAvailableSpdySession() const {
@@ -1603,10 +1571,29 @@ bool HttpStreamPool::AttemptManager::HasAvailableSpdySession() const {
       spdy_session_key(), IsIpBasedPoolingEnabled(), /*is_websocket=*/false);
 }
 
+void HttpStreamPool::AttemptManager::StartDraining() {
+  CHECK_EQ(availability_state_, AvailabilityState::kAvailable);
+  CHECK(jobs_.empty());
+  CHECK(preconnect_jobs_.empty());
+  availability_state_ = AvailabilityState::kDraining;
+  service_endpoint_request_.reset();
+
+  // Cancel in-flight attempts so that draining AttemptManager won't have active
+  // connecting streams.
+  // TODO(crbug.com/414173943): It might be better not to cancel in-flight
+  // attempts (especially the QUIC attempt) for future requests/preconnects
+  // unless these aren't slow. Currently we just cancel them for similicity. If
+  // we want to keep these attempts in the draining `this`,
+  // Group::ConnectingStreamSocketCount() should check draining AttemptManagers.
+  CancelTcpBasedAttempts(StreamSocketCloseReason::kAbort);
+  CancelQuicAttempt(ERR_ABORTED);
+
+  group_->OnAttemptManagerShuttingDown(this);
+}
+
 void HttpStreamPool::AttemptManager::MaybeCreateSpdyStreamAndNotify(
     base::WeakPtr<SpdySession> spdy_session) {
-  CHECK(!is_canceling_jobs_);
-  CHECK(!is_failing_);
+  CHECK(availability_state_ == AvailabilityState::kAvailable);
   CHECK(spdy_session);
   CHECK(spdy_session->IsAvailable());
 
@@ -1624,20 +1611,21 @@ void HttpStreamPool::AttemptManager::MaybeCreateSpdyStreamAndNotify(
                                             dns_aliases);
   });
 
+  // This WeakPtr is to ensure `this` is not destroyed while notifying.
+  // TODO(crbug.com/417339803): Remove once we stabilize the implementation.
   base::WeakPtr<AttemptManager> weak_this = weak_ptr_factory_.GetWeakPtr();
-  while (weak_this && !streams.empty()) {
+  while (!streams.empty()) {
     std::unique_ptr<SpdyHttpStream> stream = std::move(streams.back());
     streams.pop_back();
     NotifyStreamReady(std::move(stream), NextProto::kProtoHTTP2);
-    // `this` may be deleted.
+    CHECK(weak_this);
   }
-  CHECK(!weak_this || jobs_.empty());
+  CHECK(jobs_.empty());
 }
 
 void HttpStreamPool::AttemptManager::MaybeCreateQuicStreamAndNotify(
     QuicChromiumClientSession* quic_session) {
-  CHECK(!is_canceling_jobs_);
-  CHECK(!is_failing_);
+  CHECK(availability_state_ == AvailabilityState::kAvailable);
   CHECK(quic_session);
 
   if (jobs_.empty()) {
@@ -1653,14 +1641,21 @@ void HttpStreamPool::AttemptManager::MaybeCreateQuicStreamAndNotify(
         quic_session->CreateHandle(stream_key().destination()), dns_aliases);
   });
 
+  // This WeakPtr is to ensure `this` is not destroyed while notifying.
+  // TODO(crbug.com/417339803): Remove once we stabilize the implementation.
   base::WeakPtr<AttemptManager> weak_this = weak_ptr_factory_.GetWeakPtr();
-  while (weak_this && !streams.empty()) {
+  while (!streams.empty()) {
     std::unique_ptr<QuicHttpStream> stream = std::move(streams.back());
     streams.pop_back();
     NotifyStreamReady(std::move(stream), NextProto::kProtoQUIC);
-    // `this` may be deleted.
+    CHECK(weak_this);
   }
-  CHECK(!weak_this || jobs_.empty());
+  CHECK(jobs_.empty());
+  // TODO(crbug.com/414173943): Move this StartDraining() call somewhere else
+  // so that `this` enters the draining state when all jobs are notified. We
+  // only start draining here tentatively as we need to update unittests first
+  // to support other paths like SPDY session ready.
+  StartDraining();
 }
 
 void HttpStreamPool::AttemptManager::NotifyStreamReady(
@@ -1678,7 +1673,7 @@ void HttpStreamPool::AttemptManager::HandleSpdySessionReady(
     base::WeakPtr<SpdySession> spdy_session,
     StreamSocketCloseReason refresh_group_reason) {
   CHECK(!group_->force_quic());
-  CHECK(!is_failing_);
+  CHECK(availability_state_ == AvailabilityState::kAvailable);
   CHECK(spdy_session);
   CHECK(spdy_session->IsAvailable());
 
@@ -1692,7 +1687,7 @@ void HttpStreamPool::AttemptManager::HandleSpdySessionReady(
 void HttpStreamPool::AttemptManager::HandleQuicSessionReady(
     QuicChromiumClientSession* quic_session,
     StreamSocketCloseReason refresh_group_reason) {
-  CHECK(!is_failing_);
+  CHECK(availability_state_ == AvailabilityState::kAvailable);
   CHECK(!quic_attempt_);
   CHECK(quic_session);
   // TODO(crbug.com/415488524): Change to DCHECK once we confirm the bug is
@@ -1839,9 +1834,15 @@ void HttpStreamPool::AttemptManager::OnTcpBasedAttemptComplete(
   ProcessPreconnectsAfterAttemptComplete(rv,
                                          group_->ActiveStreamSocketCount() + 1);
 
-  CHECK_NE(stream_socket->GetNegotiatedProtocol(), NextProto::kProtoHTTP2);
-  CreateTextBasedStreamAndMaybeNotify(std::move(stream_socket), reuse_type,
-                                      std::move(connect_timing));
+  // If there is no request job, put the stream as an idle stream and try to
+  // process pending requests in the group/pool.
+  if (jobs_.empty()) {
+    group_->AddIdleStreamSocket(std::move(stream_socket));
+    pool()->ProcessPendingRequestsInGroups();
+  } else {
+    CreateTextBasedStreamAndNotify(std::move(stream_socket), reuse_type,
+                                   std::move(connect_timing));
+  }
 }
 
 void HttpStreamPool::AttemptManager::OnTcpBasedAttemptSlow(
@@ -1880,7 +1881,7 @@ void HttpStreamPool::AttemptManager::HandleTcpBasedAttemptFailure(
   // the active stream count is up-to-date.
   ProcessPreconnectsAfterAttemptComplete(rv, group_->ActiveStreamSocketCount());
 
-  if (is_failing_) {
+  if (is_shutting_down()) {
     // `this` has already failed and is notifying jobs to the failure.
     return;
   }
@@ -2077,7 +2078,6 @@ base::Value::Dict HttpStreamPool::AttemptManager::GetStatesAsNetLogParams()
 
 bool HttpStreamPool::AttemptManager::CanComplete() const {
   return jobs_.empty() && notified_jobs_.empty() && preconnect_jobs_.empty() &&
-         notifying_preconnect_completion_count_ == 0 &&
          tcp_based_attempts_.empty() && !quic_attempt_;
 }
 

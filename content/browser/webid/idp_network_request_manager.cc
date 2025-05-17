@@ -4,8 +4,10 @@
 
 #include "content/browser/webid/idp_network_request_manager.h"
 
+#include "base/barrier_closure.h"
 #include "base/base64.h"
 #include "base/containers/flat_set.h"
+#include "base/functional/callback_helpers.h"
 #include "base/json/json_writer.h"
 #include "base/strings/escape.h"
 #include "base/strings/string_util.h"
@@ -13,9 +15,12 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/values.h"
+#include "content/browser/devtools/devtools_instrumentation.h"
 #include "content/browser/renderer_host/render_frame_host_impl.h"
+#include "content/browser/webid/fedcm_mappers.h"
 #include "content/browser/webid/fedcm_metrics.h"
 #include "content/browser/webid/flags.h"
+#include "content/browser/webid/identity_provider_info.h"
 #include "content/browser/webid/webid_utils.h"
 #include "content/public/browser/federated_identity_permission_context_delegate.h"
 #include "content/public/browser/identity_request_dialog_controller.h"
@@ -24,6 +29,7 @@
 #include "content/public/common/color_parser.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "net/base/isolation_info.h"
+#include "net/base/load_flags.h"
 #include "net/base/network_isolation_partition.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "net/base/schemeful_site.h"
@@ -349,6 +355,7 @@ IdentityRequestAccountPtr ParseAccount(const base::Value::Dict& account,
 bool ParseAccounts(const base::Value::List& accounts,
                    std::vector<IdentityRequestAccountPtr>& account_list,
                    const std::string& client_id,
+                   bool from_accounts_push,
                    AccountsResponseInvalidReason& parsing_error) {
   DCHECK(account_list.empty());
 
@@ -367,6 +374,7 @@ bool ParseAccounts(const base::Value::List& accounts,
         parsing_error = AccountsResponseInvalidReason::kAccountsShareSameId;
         return false;
       }
+      parsed_account->from_accounts_push = from_accounts_push;
       account_ids.insert(parsed_account->id);
       account_list.push_back(std::move(parsed_account));
     } else {
@@ -773,12 +781,14 @@ void OnAccountsRequestParsed(
   AccountsResponseInvalidReason parsing_error =
       AccountsResponseInvalidReason::kResponseIsNotJsonOrDict;
   bool accounts_valid =
-      ParseAccounts(*accounts, account_list, client_id, parsing_error);
+      ParseAccounts(*accounts, account_list, client_id,
+                    fetch_status.from_accounts_push, parsing_error);
 
   if (!accounts_valid) {
     CHECK_NE(parsing_error,
              AccountsResponseInvalidReason::kResponseIsNotJsonOrDict);
     RecordAccountsResponseInvalidReason(parsing_error);
+
     std::move(callback).Run(
         {ParseStatus::kInvalidResponseError, fetch_status.response_code},
         std::vector<IdentityRequestAccountPtr>());
@@ -1049,7 +1059,7 @@ std::unique_ptr<IdpNetworkRequestManager> IdpNetworkRequestManager::Create(
       host->GetMainFrame()->GetLastCommittedOrigin(),
       host->GetStoragePartition()->GetURLLoaderFactoryForBrowserProcess(),
       host->GetBrowserContext()->GetFederatedIdentityPermissionContext(),
-      host->BuildClientSecurityState());
+      host->BuildClientSecurityState(), host->GetFrameTreeNodeId());
 }
 
 IdpNetworkRequestManager::IdpNetworkRequestManager(
@@ -1057,12 +1067,14 @@ IdpNetworkRequestManager::IdpNetworkRequestManager(
     const url::Origin& rp_embedding_origin,
     scoped_refptr<network::SharedURLLoaderFactory> loader_factory,
     FederatedIdentityPermissionContextDelegate* permission_delegate,
-    network::mojom::ClientSecurityStatePtr client_security_state)
+    network::mojom::ClientSecurityStatePtr client_security_state,
+    content::FrameTreeNodeId frame_tree_node_id)
     : relying_party_origin_(relying_party_origin),
       rp_embedding_origin_(rp_embedding_origin),
       loader_factory_(loader_factory),
       permission_delegate_(permission_delegate),
-      client_security_state_(std::move(client_security_state)) {
+      client_security_state_(std::move(client_security_state)),
+      frame_tree_node_id_(frame_tree_node_id) {
   DCHECK(client_security_state_);
   // If COEP:credentialless was used, this would break FedCM credentialled
   // requests. We clear the Cross-Origin-Embedder-Policy because FedCM responses
@@ -1148,13 +1160,15 @@ void IdpNetworkRequestManager::SendAccountsRequest(
     AccountsRequestCallback callback) {
   if (IsFedCmLightweightModeEnabled()) {
     base::Value::List accounts = permission_delegate_->GetAccounts(idp_origin);
+    FetchStatus success_status = {
+        .parse_status = ParseStatus::kSuccess,
+        .response_code = 200,
+        .from_accounts_push = true,
+    };
+
     if (accounts.size() > 0) {
       OnAccountsRequestParsed(
-          client_id, std::move(callback),
-          {
-              .parse_status = ParseStatus::kSuccess,
-              .response_code = 200,
-          },
+          client_id, std::move(callback), success_status,
           data_decoder::DataDecoder::ValueOrError(
               base::Value::Dict().Set(kAccountsKey, std::move(accounts))));
       return;
@@ -1164,11 +1178,7 @@ void IdpNetworkRequestManager::SendAccountsRequest(
     // behave as though we received an empty accounts_endpoint response.
     if (accounts_url.is_empty()) {
       OnAccountsRequestParsed(
-          client_id, std::move(callback),
-          {
-              .parse_status = ParseStatus::kSuccess,
-              .response_code = 200,
-          },
+          client_id, std::move(callback), success_status,
           data_decoder::DataDecoder::ValueOrError(
               base::Value::Dict().Set(kAccountsKey, base::Value::List())));
       return;
@@ -1320,6 +1330,132 @@ void IdpNetworkRequestManager::DownloadAndDecodeImage(const GURL& url,
       maxResponseSizeInKiB * 1024);
 }
 
+void IdpNetworkRequestManager::FetchAccountPicturesAndBrandIcons(
+    const std::vector<IdentityRequestAccountPtr>& accounts,
+    std::unique_ptr<IdentityProviderInfo> idp_info,
+    const GURL& rp_brand_icon_url,
+    FetchAccountPicturesAndBrandIconsCallback callback) {
+  GURL idp_brand_icon_url = idp_info->metadata.brand_icon_url;
+  GURL config_url = idp_info->metadata.config_url;
+
+  auto barrier_callback = base::BarrierClosure(
+      // Wait for all accounts plus the brand icon URLs.
+      accounts.size() + 2,
+      base::BindOnce(&IdpNetworkRequestManager::
+                         OnAllAccountPicturesAndBrandIconUrlReceived,
+                     weak_ptr_factory_.GetWeakPtr(), std::move(callback),
+                     std::move(idp_info), accounts, rp_brand_icon_url));
+
+  for (const auto& account : accounts) {
+    if (IsFedCmLightweightModeEnabled() && account->from_accounts_push) {
+      FetchCachedAccountImage(url::Origin::Create(config_url), account->picture,
+                              barrier_callback);
+    } else {
+      FetchImage(account->picture, barrier_callback);
+    }
+  }
+  FetchImage(idp_brand_icon_url, barrier_callback);
+  FetchImage(rp_brand_icon_url, barrier_callback);
+}
+
+void IdpNetworkRequestManager::FetchIdpBrandIcon(
+    std::unique_ptr<IdentityProviderInfo> idp_info,
+    FetchIdpBrandIconCallback callback) {
+  GURL idp_brand_icon_url = idp_info->metadata.brand_icon_url;
+  FetchImage(idp_brand_icon_url,
+             base::BindOnce(&IdpNetworkRequestManager::OnIdpBrandIconReceived,
+                            weak_ptr_factory_.GetWeakPtr(), std::move(idp_info),
+                            std::move(callback)));
+}
+
+void IdpNetworkRequestManager::FetchImage(const GURL& url,
+                                          base::OnceClosure callback) {
+  if (url.is_valid()) {
+    DownloadAndDecodeImage(
+        url, base::BindOnce(&IdpNetworkRequestManager::OnImageReceived,
+                            weak_ptr_factory_.GetWeakPtr(), std::move(callback),
+                            url));
+  } else {
+    // We have to still call the callback to make sure the barrier
+    // callback gets the right number of calls.
+    std::move(callback).Run();
+  }
+}
+
+void IdpNetworkRequestManager::FetchCachedAccountImage(
+    const url::Origin& idp_origin,
+    const GURL& url,
+    base::OnceClosure callback) {
+  if (url.is_valid()) {
+    DownloadAndDecodeCachedImage(
+        idp_origin, url,
+        base::BindOnce(&IdpNetworkRequestManager::OnImageReceived,
+                       weak_ptr_factory_.GetWeakPtr(), std::move(callback),
+                       url));
+  } else {
+    std::move(callback).Run();
+  }
+}
+
+void IdpNetworkRequestManager::OnImageReceived(base::OnceClosure callback,
+                                               GURL url,
+                                               const gfx::Image& image) {
+  downloaded_images_[url] = image;
+  std::move(callback).Run();
+}
+
+void IdpNetworkRequestManager::OnAllAccountPicturesAndBrandIconUrlReceived(
+    FetchAccountPicturesAndBrandIconsCallback callback,
+    std::unique_ptr<IdentityProviderInfo> idp_info,
+    std::vector<IdentityRequestAccountPtr>&& accounts,
+    const GURL& rp_brand_icon_url) {
+  for (auto& account : accounts) {
+    auto it = downloaded_images_.find(account->picture);
+    if (it != downloaded_images_.end()) {
+      // We do not use std::move here in case multiple accounts use the same
+      // picture URL, and the underlying gfx::Image data is refcounted anyway.
+      account->decoded_picture = it->second;
+    }
+  }
+
+  gfx::Image rp_brand_icon;
+  auto it = downloaded_images_.find(rp_brand_icon_url);
+  if (it != downloaded_images_.end()) {
+    rp_brand_icon = it->second;
+  }
+
+  it = downloaded_images_.find(idp_info->metadata.brand_icon_url);
+  if (it != downloaded_images_.end()) {
+    idp_info->metadata.brand_decoded_icon = it->second;
+  }
+  std::move(callback).Run(std::move(accounts), std::move(idp_info),
+                          rp_brand_icon);
+}
+
+void IdpNetworkRequestManager::OnIdpBrandIconReceived(
+    std::unique_ptr<IdentityProviderInfo> idp_info,
+    FetchIdpBrandIconCallback callback) {
+  auto it = downloaded_images_.find(idp_info->metadata.brand_icon_url);
+  if (it != downloaded_images_.end()) {
+    idp_info->metadata.brand_decoded_icon = it->second;
+  }
+  std::move(callback).Run(std::move(idp_info));
+}
+
+void IdpNetworkRequestManager::DownloadAndDecodeCachedImage(
+    const url::Origin& idp_origin,
+    const GURL& url,
+    ImageCallback callback) {
+  std::unique_ptr<network::ResourceRequest> resource_request =
+      CreateCachedAccountPictureRequest(idp_origin, url, /*cache_only=*/true);
+  DownloadUrl(
+      std::move(resource_request),
+      /*url_encoded_post_data=*/std::nullopt,
+      base::BindOnce(&IdpNetworkRequestManager::OnDownloadedImage,
+                     weak_ptr_factory_.GetWeakPtr(), std::move(callback)),
+      maxResponseSizeInKiB * 1024);
+}
+
 void IdpNetworkRequestManager::DownloadJsonAndParse(
     std::unique_ptr<network::ResourceRequest> resource_request,
     std::optional<std::string> url_encoded_post_data,
@@ -1342,9 +1478,26 @@ void IdpNetworkRequestManager::DownloadUrl(
     resource_request->headers.SetHeader(net::HttpRequestHeaders::kContentType,
                                         kUrlEncodedContentType);
   }
+
+  network::ResourceRequest* resource_request_ptr = resource_request.get();
+
   std::unique_ptr<network::SimpleURLLoader> url_loader =
       network::SimpleURLLoader::Create(std::move(resource_request),
                                        CreateTrafficAnnotation());
+
+  network::SimpleURLLoader* url_loader_ptr = url_loader.get();
+  // Notify DevTools about the request
+  auto request_id = base::UnguessableToken::Create();
+  devtools_instrumentation::MaybeAssignResourceRequestId(
+      frame_tree_node_id_, request_id.ToString(), *resource_request_ptr);
+
+  if (resource_request_ptr->devtools_request_id.has_value()) {
+    urlloader_devtools_request_id_map_[url_loader_ptr] = request_id;
+
+    devtools_instrumentation::WillSendFedCmNetworkRequest(
+        frame_tree_node_id_, *resource_request_ptr);
+  }
+
   if (url_encoded_post_data) {
     url_loader->AttachStringForUpload(*url_encoded_post_data,
                                       kUrlEncodedContentType);
@@ -1353,7 +1506,6 @@ void IdpNetworkRequestManager::DownloadUrl(
     }
   }
 
-  network::SimpleURLLoader* url_loader_ptr = url_loader.get();
   // Callback is a member of IdpNetworkRequestManager in order to cancel
   // callback if IdpNetworkRequestManager object is destroyed prior to callback
   // being run.
@@ -1369,10 +1521,6 @@ void IdpNetworkRequestManager::OnDownloadedUrl(
     std::unique_ptr<network::SimpleURLLoader> url_loader,
     IdpNetworkRequestManager::DownloadCallback callback,
     std::unique_ptr<std::string> response_body) {
-  if (!callback) {
-    // For the metrics endpoint, we do not care about the result.
-    return;
-  }
   auto* response_info = url_loader->ResponseInfo();
   // Use the HTTP response code, if available. If it is not available, use the
   // NetError(). Note that it is acceptable to put these in the same int because
@@ -1380,20 +1528,43 @@ void IdpNetworkRequestManager::OnDownloadedUrl(
   int response_code = response_info && response_info->headers
                           ? response_info->headers->response_code()
                           : url_loader->NetError();
+
+  std::optional<network::URLLoaderCompletionStatus> status =
+      url_loader->CompletionStatus();
+
+  // Notify DevTools about the response
+  auto it = urlloader_devtools_request_id_map_.find(url_loader.get());
+  if (it != urlloader_devtools_request_id_map_.end()) {
+    auto request_id = it->second;
+    const std::string& response_body_str =
+        response_body ? *response_body : std::string();
+    auto completion_status = status.value_or(
+        network::URLLoaderCompletionStatus(url_loader->NetError()));
+
+    devtools_instrumentation::DidReceiveFedCmNetworkResponse(
+        frame_tree_node_id_, request_id.ToString(), url_loader->GetFinalURL(),
+        response_info, response_body_str, completion_status);
+
+    // Remove the entry from the map
+    urlloader_devtools_request_id_map_.erase(it);
+  }
+
+  if (!callback) {
+    // For the metrics endpoint, we do not care about the result.
+    return;
+  }
+
   std::string mime_type;
   if (response_info && response_info->headers) {
     response_info->headers->GetMimeType(&mime_type);
   }
 
   // Check for CORS error
-  std::optional<network::URLLoaderCompletionStatus> status =
-      url_loader->CompletionStatus();
   bool cors_error = false;
   if (status && status.value().cors_error_status.has_value()) {
     cors_error = true;
   }
 
-  url_loader.reset();
   std::move(callback).Run(std::move(response_body), response_code,
                           std::move(mime_type), cors_error);
 }
@@ -1533,6 +1704,52 @@ IdpNetworkRequestManager::CreateCredentialedResourceRequest(
   resource_request->trusted_params->client_security_state =
       client_security_state_.Clone();
   return resource_request;
+}
+
+std::unique_ptr<network::ResourceRequest>
+IdpNetworkRequestManager::CreateCachedAccountPictureRequest(
+    const url::Origin& idp_origin,
+    const GURL& target_url,
+    bool cache_only) const {
+  auto resource_request = std::make_unique<network::ResourceRequest>();
+
+  resource_request->url = target_url;
+  resource_request->credentials_mode = network::mojom::CredentialsMode::kOmit;
+
+  resource_request->destination =
+      network::mojom::RequestDestination::kWebIdentity;
+  resource_request->redirect_mode = network::mojom::RedirectMode::kError;
+
+  resource_request->request_initiator = url::Origin();
+  resource_request->trusted_params = network::ResourceRequest::TrustedParams();
+  resource_request->trusted_params->isolation_info = net::IsolationInfo::Create(
+      net::IsolationInfo::RequestType::kOther,
+      /*top_frame_origin=*/idp_origin,
+      /*frame_origin=*/url::Origin::Create(target_url), net::SiteForCookies(),
+      /*nonce=*/std::nullopt,
+      net::NetworkIsolationPartition::kFedCmUncredentialedRequests);
+  DCHECK(client_security_state_);
+  resource_request->trusted_params->client_security_state =
+      client_security_state_.Clone();
+
+  if (cache_only) {
+    resource_request->load_flags |= net::LOAD_ONLY_FROM_CACHE;
+  }
+
+  return resource_request;
+}
+
+void IdpNetworkRequestManager::CacheAccountPictures(
+    const url::Origin& idp_origin,
+    const std::vector<GURL>& picture_urls) {
+  for (const GURL& url : picture_urls) {
+    if (url.is_valid()) {
+      DownloadUrl(CreateCachedAccountPictureRequest(idp_origin, url,
+                                                    /*cache_only=*/false),
+                  /*url_encoded_post_data=*/std::nullopt, DownloadCallback(),
+                  maxResponseSizeInKiB * 1024);
+    }
+  }
 }
 
 }  // namespace content

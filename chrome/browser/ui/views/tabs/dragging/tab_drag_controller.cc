@@ -62,6 +62,7 @@
 #include "chrome/common/chrome_features.h"
 #include "chrome/grit/chrome_unscaled_resources.h"
 #include "components/tab_groups/tab_group_id.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/clipboard/clipboard_constants.h"
@@ -1168,7 +1169,7 @@ void TabDragController::AttachToNewContext(
     TabDragContext* attached_context,
     std::unique_ptr<TabDragController> controller,
     std::vector<std::variant<std::unique_ptr<tabs::TabModel>,
-                             std::unique_ptr<DetachedTabGroup>>>
+                             std::unique_ptr<DetachedTabCollection>>>
         owned_tabs_and_groups) {
   // We should already have detached by the time we get here.
   CHECK(!attached_context_);
@@ -1206,11 +1207,14 @@ void TabDragController::AttachToNewContext(
   for (auto& tab_or_group : owned_tabs_and_groups) {
     if (auto* tab =
             std::get_if<std::unique_ptr<tabs::TabModel>>(&tab_or_group)) {
+      const tabs::TabInterface* tab_ptr = tab->get();
       // If it's a tab - we add it to the tabstrip.
       int add_types = AddTabTypes::ADD_NONE;
       TabDragData& tab_data = *std::find_if(
           drag_data_.tab_drag_data_.begin(), drag_data_.tab_drag_data_.end(),
-          [](TabDragData& tab_data) { return true; });
+          [tab_ptr](TabDragData& tab_data) {
+            return tab_ptr->GetContents() == tab_data.contents;
+          });
       if (tab_data.pinned) {
         add_types |= AddTabTypes::ADD_PINNED;
       }
@@ -1223,7 +1227,7 @@ void TabDragController::AttachToNewContext(
       index++;
     } else {
       auto group = std::move(
-          *std::get_if<std::unique_ptr<DetachedTabGroup>>(&tab_or_group));
+          *std::get_if<std::unique_ptr<DetachedTabCollection>>(&tab_or_group));
       // If it's a group - we add it to the tabstrip. This will add all the
       // tabs.
       const gfx::Range group_indices =
@@ -1275,7 +1279,7 @@ void TabDragController::AttachImpl() {
 
 std::tuple<std::unique_ptr<TabDragController>,
            std::vector<std::variant<std::unique_ptr<tabs::TabModel>,
-                                    std::unique_ptr<DetachedTabGroup>>>>
+                                    std::unique_ptr<DetachedTabCollection>>>>
 TabDragController::Detach(ReleaseCapture release_capture) {
   TRACE_EVENT1("views", "TabDragController::Detach", "release_capture",
                release_capture);
@@ -1322,7 +1326,7 @@ TabDragController::Detach(ReleaseCapture release_capture) {
       attached_model->GetGroupsDestroyedFromRemovingIndices(dragged_indices);
 
   std::vector<std::variant<std::unique_ptr<tabs::TabModel>,
-                           std::unique_ptr<DetachedTabGroup>>>
+                           std::unique_ptr<DetachedTabCollection>>>
       owned_tabs_and_groups;
   for (TabDragData& tab_drag_datum : drag_data_.tab_drag_data_) {
     const int index =

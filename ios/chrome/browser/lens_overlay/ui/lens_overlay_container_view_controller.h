@@ -41,6 +41,10 @@
 @property(nonatomic, readonly, getter=isSidePanelPresented)
     BOOL sidePanelPresented;
 
+// Animates fading the selection UI of the container.
+- (void)fadeSelectionUIWithDuration:(NSTimeInterval)duration
+                         completion:(void (^)())completion;
+
 /// Presents the given view controller in a side panel, optionally animated.
 - (void)presentViewControllerInSidePanel:(UIViewController*)viewController
                                 animated:(BOOL)animated
@@ -55,9 +59,10 @@
 /// The delegate of the lens overlay container.
 @protocol LensOverlayContainerDelegate <NSObject>
 
-/// Called after the container was added to a view hierarchy
-- (void)lensOverlayContainerDidAppear:
-    (LensOverlayContainerViewController*)lensOverlayContainerViewController;
+/// Called after the container was added to a view hierarchy.
+- (void)lensOverlayContainerDidAppear:(LensOverlayContainerViewController*)
+                                          lensOverlayContainerViewController
+                             animated:(BOOL)animated;
 
 /// Called when the container changes the current horizontal size class
 - (void)lensOverlayContainerDidChangeSizeClass:

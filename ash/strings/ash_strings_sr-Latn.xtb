@@ -462,6 +462,7 @@ Broj povezanih uređaja je <ph name="DEVICECOUNT" />.</translation>
 <translation id="2530896289327917474">Uključite ili isključite navigaciju kursorom</translation>
 <translation id="2531025035050312891">spor uređaj</translation>
 <translation id="2531107890083353124">Dok prevlačite karticu, pritisnite <ph name="KEY_ONE" /></translation>
+<translation id="2532199152994248594">Prevucite ili pritisnite taster za razmak da biste izabrali oblast za snimanje slika</translation>
 <translation id="2545334090614121435">Pokušavate da koristite Home? Koristite</translation>
 <translation id="254900897760075745">Kopiraj izabrani sadržaj u privremenu memoriju</translation>
 <translation id="2549711466868162843">Poboljšano osvetljenje</translation>
@@ -581,7 +582,6 @@ U suprotnom će ugrađeni tačped biti ponovo omogućen za <ph name="TIMEOUT_S
 <translation id="2949420361496057765">Pritisnite <ph name="MODIFIER" /> i kliknite na link</translation>
 <translation id="2957159466053076448">Te funkcije možete da isključite u bilo kom trenutku u Podešavanjima. <ph name="LINK_TO_LEARN_MORE" /></translation>
 <translation id="295852781144570696">Zvuk uređaja</translation>
-<translation id="2960314608273155470">Režim snimanja, podrazumevana vrednost je <ph name="SOURCE" /> <ph name="TYPE" />. Pritisnite Tab za kretanje pomoću tastature.</translation>
 <translation id="2961963223658824723">Došlo je do greške. Probajte ponovo za par sekundi.</translation>
 <translation id="2963773877003373896">mod3</translation>
 <translation id="2965227184985674128">Želite da uključite pristup mikrofonu?</translation>
@@ -1771,6 +1771,7 @@ Novo instaliranje</translation>
 <translation id="6700713906295497288">Dugme IME menija</translation>
 <translation id="6704073473590541209">Izabrali ste marker na desnoj ivici, koristite tastere sa strelicama za pomeranje</translation>
 <translation id="6706742084323792866">Tastatura za PIN</translation>
+<translation id="6709719156428404245">Prevucite ili pritisnite taster za razmak da biste izabrali oblast za snimanje videa</translation>
 <translation id="6710213216561001401">Prethodno</translation>
 <translation id="6723839937902243910">Energija</translation>
 <translation id="672609503628871915">Prikaži šta je novo</translation>
@@ -2435,7 +2436,6 @@ Da biste isključili uređaj, ponovo pritisnite i zadržite dugme za uključivan
 <translation id="8934418770423095813">Napravite Google dokument</translation>
 <translation id="8934926665751933910">{NUM_FILES,plural, =1{1 fajl}one{# fajl}few{# fajla}other{# fajlova}}</translation>
 <translation id="8936501819958976551">deaktivirano</translation>
-<translation id="8937312474322077653">U snimanju ekrana podesite na <ph name="SOURCE" /> <ph name="TYPE" />. Pritisnite Tab da biste izabrali tip snimanja. Pritisnite taster za razmak da biste izabrali region. Pritisnite Enter da biste snimili.</translation>
 <translation id="8938800817013097409">Uređaj sa USB priključkom tipa C (zadnji desni port)</translation>
 <translation id="8939855324412367560">Audio ulaz je <ph name="INPUT_DEVICE_NAME" />, a audio izlaz je <ph name="OUTPUT_DEVICE_NAME" />. Idite u Podešavanja da biste to promenili.</translation>
 <translation id="8940956008527784070">Baterija je skoro prazna (<ph name="PERCENTAGE" />%)</translation>

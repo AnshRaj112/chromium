@@ -55,30 +55,6 @@ bool RequiresUserActivation(
   }
 }
 
-// Runs `callback` on destruction unless `Reset` is called.
-class RunOnDestruction {
- public:
-  explicit RunOnDestruction(base::OnceClosure callback)
-      : callback_(std::move(callback)) {}
-
-  RunOnDestruction(const RunOnDestruction&) = delete;
-  RunOnDestruction& operator=(const RunOnDestruction&) = delete;
-
-  RunOnDestruction(RunOnDestruction&& other) = default;
-  RunOnDestruction& operator=(RunOnDestruction&& other) = default;
-
-  void Reset() { callback_.Reset(); }
-
-  ~RunOnDestruction() {
-    if (!callback_.is_null()) {
-      std::move(callback_).Run();
-    }
-  }
-
- private:
-  base::OnceClosure callback_;
-};
-
 // Rejects if the OnceClosure is destroyed before it is ran.
 template <typename T>
 base::OnceClosure RejectOnDestruction(ScriptPromiseResolver<T>* resolver) {
@@ -152,8 +128,7 @@ class LanguageDetectorCreateTask
         !LocalFrame::ConsumeTransientUserActivation(window->GetFrame())) {
       GetResolver()->RejectWithDOMException(
           DOMExceptionCode::kNotAllowedError,
-          "Requires handling a user gesture when availability is "
-          "\"downloadable\".");
+          kExceptionMessageUserActivationRequired);
       Cleanup();
       return;
     }
@@ -293,15 +268,11 @@ ScriptPromise<V8Availability> LanguageDetector::availability(
       MakeGarbageCollected<ScriptPromiseResolver<V8Availability>>(script_state);
   ScriptPromise<V8Availability> promise = resolver->Promise();
 
-  // Return unavailable for cross-origin iframe access with no permission
-  // policy.
-  if (auto* window = DynamicTo<LocalDOMWindow>(context)) {
-    if (window->IsCrossSiteSubframeIncludingScheme() &&
-        !window->IsFeatureEnabled(
-            network::mojom::PermissionsPolicyFeature::kLanguageDetector)) {
-      resolver->Resolve(AvailabilityToV8(Availability::kUnavailable));
-      return promise;
-    }
+  // Return unavailable when the permission policy is not enabled.
+  if (!context->IsFeatureEnabled(
+          network::mojom::PermissionsPolicyFeature::kLanguageDetector)) {
+    resolver->Resolve(AvailabilityToV8(Availability::kUnavailable));
+    return promise;
   }
 
   AIInterfaceProxy::GetLanguageDetectionModelStatus(
@@ -341,17 +312,12 @@ ScriptPromise<LanguageDetector> LanguageDetector::create(
       MakeGarbageCollected<ScriptPromiseResolver<LanguageDetector>>(
           script_state);
 
-  // Block cross-origin iframe access with no permission policy.
-  if (auto* window = DynamicTo<LocalDOMWindow>(context)) {
-    if (window->GetFrame() &&
-        window->GetFrame()->IsCrossOriginToOutermostMainFrame() &&
-        !window->IsFeatureEnabled(
-            network::mojom::PermissionsPolicyFeature::kLanguageDetector)) {
-      resolver->Reject(MakeGarbageCollected<DOMException>(
-          DOMExceptionCode::kNotAllowedError,
-          kExceptionMessageCrossOriginAccess));
-      return resolver->Promise();
-    }
+  // Block access when the permission policy is not enabled.
+  if (!context->IsFeatureEnabled(
+          network::mojom::PermissionsPolicyFeature::kLanguageDetector)) {
+    resolver->Reject(MakeGarbageCollected<DOMException>(
+        DOMExceptionCode::kNotAllowedError, kExceptionMessagePermissionPolicy));
+    return resolver->Promise();
   }
 
   MakeGarbageCollected<LanguageDetectorCreateTask>(script_state, resolver,

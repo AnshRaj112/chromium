@@ -4903,8 +4903,11 @@ void RenderFrameHostImpl::DidNavigate(
   // occurred.
   // TODO(creis): Remove this block and always set the URL.
   // See https://crbug.com/588314.
-  if (!navigation_request->DidEncounterError())
+  if (!navigation_request->DidEncounterError()) {
     last_successful_url_ = params.url;
+    navigation_request->frame_tree_node()->set_last_successful_origin(
+        GetLastCommittedOrigin());
+  }
 
   renderer_url_info_.last_document_url = GetLastDocumentURL(
       navigation_request, params, is_error_document_, renderer_url_info_);
@@ -5399,6 +5402,9 @@ void RenderFrameHostImpl::SetOriginDependentStateOfNewFrame(
                     : false;
   SetLastCommittedOrigin(new_frame_origin,
                          is_potentially_trustworthy_unique_origin);
+  if (!creator_frame || !creator_frame->is_error_document_) {
+    frame_tree_node()->set_last_successful_origin(new_frame_origin);
+  }
 
   if (creator_frame) {
     // If we're given a parent/opener frame, copy the
@@ -5673,6 +5679,13 @@ void RenderFrameHostImpl::DidFailLoadWithError(const GURL& url,
                                                int32_t error_code) {
   TRACE_EVENT("navigation", "RenderFrameHostImpl::DidFailLoadWithError",
               ChromeTrackEvent::kRenderFrameHost, *this, "error", error_code);
+
+  // Terminate the renderer if it sends an invalid error code.
+  if (!net::IsOkOrDefinedError(error_code)) {
+    bad_message::ReceivedBadMessage(GetProcess(),
+                                    bad_message::RFHI_INVALID_NET_ERROR_CODE);
+    return;
+  }
 
   // Cancel prerendering if DidFailLoadWithError is called on the outermost main
   // document during prerendering. Don't dispatch the DidFailLoad event in such
@@ -10779,22 +10792,18 @@ void RenderFrameHostImpl::StartDragging(
 #if BUILDFLAG(IS_ANDROID)
   RenderWidgetHostImpl* widget = GetRenderWidgetHost();
   RenderWidgetHostViewBase* view = (widget) ? widget->GetView() : nullptr;
-  if (view && input::IsTransferInputToVizSupported()) {
-    RenderWidgetHostViewAndroid* view_android =
-        static_cast<RenderWidgetHostViewAndroid*>(view);
-    if (view_android->IsTouchSequencePotentiallyActiveOnViz()) {
-      view_android->RequestInputBackForDragAndDrop(
-          std::move(drag_data), GetLastCommittedOrigin(), drag_operations_mask,
-          std::move(unsafe_bitmap), std::move(cursor_offset_in_dip),
-          std::move(drag_obj_rect_in_dip), std::move(event_info));
-      return;
-    }
+  if (view && view->IsTouchSequencePotentiallyActiveOnViz()) {
+    view->RequestInputBackForDragAndDrop(
+        std::move(drag_data), GetLastCommittedOrigin(), drag_operations_mask,
+        unsafe_bitmap, cursor_offset_in_dip, drag_obj_rect_in_dip,
+        std::move(event_info));
+    return;
   }
 #endif
   GetRenderWidgetHost()->StartDragging(
       std::move(drag_data), GetLastCommittedOrigin(), drag_operations_mask,
-      std::move(unsafe_bitmap), std::move(cursor_offset_in_dip),
-      std::move(drag_obj_rect_in_dip), std::move(event_info));
+      unsafe_bitmap, cursor_offset_in_dip, drag_obj_rect_in_dip,
+      std::move(event_info));
 }
 
 void RenderFrameHostImpl::IssueKeepAliveHandle(
@@ -11674,11 +11683,14 @@ RenderFrameHostImpl::CheckOrDispatchBeforeUnloadForFrame(
   if (&GetPage() != &rfh->GetPage())
     return FrameIterationAction::kSkipChildren;
 
-  // If |subframes_only| is true, skip this frame and its same-site
-  // descendants.  This happens for renderer-initiated navigations, where
-  // these frames have already run beforeunload.
-  if (subframes_only && rfh->GetSiteInstance() == GetSiteInstance())
+  // If |subframes_only| is true, skip this frame and its same-SiteInstanceGroup
+  // descendants, which share a renderer-side frame tree.  This happens for
+  // renderer-initiated navigations, where these frames have already run
+  // beforeunload.
+  if (subframes_only &&
+      rfh->GetSiteInstance()->group() == GetSiteInstance()->group()) {
     return FrameIterationAction::kContinue;
+  }
 
   // No need to run beforeunload if the RenderFrame isn't live.
   if (!rfh->IsRenderFrameLive())
@@ -15882,7 +15894,7 @@ void RenderFrameHostImpl::MaybeGenerateCrashReport(
   base::Value::Dict body;
   if (base::FeatureList::IsEnabled(
           blink::features::kCrashReportingAPIMoreContextData)) {
-    body.Set("is_top_level", IsOutermostMainFrame() ? "true" : "false");
+    body.Set("is_top_level", IsOutermostMainFrame() ? true : false);
     body.Set("visibility_state",
              GetVisibilityState() == PageVisibilityState::kVisible ? "visible"
                                                                    : "hidden");

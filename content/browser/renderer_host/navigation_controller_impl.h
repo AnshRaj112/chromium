@@ -132,9 +132,9 @@ class CONTENT_EXPORT NavigationControllerImpl : public NavigationController {
   bool CanGoBack() override;
   bool CanGoForward() override;
   bool CanGoToOffset(int offset) override;
-  void GoBack() override;
-  void GoForward() override;
-  void GoToIndex(int index) override;
+  WeakNavigationHandleVector GoBack() override;
+  WeakNavigationHandleVector GoForward() override;
+  WeakNavigationHandleVector GoToIndex(int index) override;
   void GoToOffset(int offset) override;
   bool RemoveEntryAtIndex(int index) override;
   void PruneForwardEntries() override;
@@ -952,6 +952,11 @@ class CONTENT_EXPORT NavigationControllerImpl : public NavigationController {
       const GURL& url,
       const std::string& error_page_html,
       bool is_post_commit_error_page);
+
+  // Finds the target FrameTreeNode for navigation. Returns the node specified
+  // by |params| via ID or name, or the root node if none specified.
+  FrameTreeNode* GetTargetFrameTreeNodeForNavigation(
+      const LoadURLParams& params);
 
   // ---------------------------------------------------------------------------
 

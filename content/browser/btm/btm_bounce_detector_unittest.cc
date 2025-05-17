@@ -166,13 +166,13 @@ class TestBounceDetectorDelegate : public BtmBounceDetectorDelegate {
 
  private:
   void RecordBounce(
-      const GURL& url,
-      bool has_3pc_exception,
-      const GURL& final_url,
-      base::Time time,
-      bool stateful,
+      const BtmRedirectInfo& redirect,
+      const BtmRedirectChainInfo& chain,
       base::RepeatingCallback<void(const GURL&)> increment_bounce_callback) {
-    recorded_bounces_.insert(std::make_tuple(url, time, stateful));
+    bool stateful = redirect.access_type > BtmDataAccessType::kRead;
+
+    recorded_bounces_.insert(
+        std::make_tuple(redirect.redirecting_url.url, redirect.time, stateful));
     if (stateful) {
       stateful_bounce_count_++;
     }
@@ -764,13 +764,13 @@ TEST_F(BtmBounceDetectorTest,
 }
 
 TEST_F(BtmBounceDetectorTest,
-       ReportRedirectorsInChain_OmitNonStatefulRedirects) {
+       ReportRedirectorsInChain_IncludingNonStatefulRedirects) {
   // Visit initial page on a.test and access cookies via JS.
   NavigateTo("http://a.test", kWithUserGesture);
   AccessClientCookie(CookieOperation::kChange);
 
-  // Navigate with a click (not a redirect) to b.test, which S-redirects to
-  // c.test (which doesn't access cookies).
+  // Navigate with a click (not a redirect) to b.test, which accesses cookies,
+  // then S-redirects to c.test (which doesn't access cookies).
   StartNavigation("http://b.test", kWithUserGesture)
       .AccessCookie(CookieOperation::kChange)
       .RedirectTo("http://c.test")
@@ -780,15 +780,16 @@ TEST_F(BtmBounceDetectorTest,
   // Navigate without a click (i.e. by C-redirecting) to d.test (which doesn't
   // access cookies).
   NavigateTo("http://d.test", kNoUserGesture);
-  EXPECT_THAT(GetReportedSites(), testing::ElementsAre("b.test"));
+  EXPECT_THAT(GetReportedSites(), testing::ElementsAre("b.test", "c.test"));
 
-  // Navigate without a click (i.e. by C-redirecting) to e.test, which
-  // S-redirects to f.test.
+  // Navigate without a click (i.e. by C-redirecting) to e.test, which accesses
+  // cookies, then S-redirects to f.test.
   StartNavigation("http://e.test", kNoUserGesture)
       .AccessCookie(CookieOperation::kChange)
       .RedirectTo("http://f.test")
       .Finish(true);
-  EXPECT_THAT(GetReportedSites(), testing::ElementsAre("b.test", "e.test"));
+  EXPECT_THAT(GetReportedSites(),
+              testing::ElementsAre("b.test", "c.test", "d.test, e.test"));
 }
 
 // This test verifies that sites in a redirect chain that are the same as the

@@ -135,8 +135,7 @@ class RevokedPermissionsService final : public SafetyHubService,
   };
 
   class TabHelper : public content::WebContentsObserver,
-                    public content::WebContentsUserData<TabHelper>,
-                    public content_settings::Observer {
+                    public content::WebContentsUserData<TabHelper> {
    public:
     TabHelper(const TabHelper&) = delete;
     TabHelper& operator=(const TabHelper&) = delete;
@@ -145,21 +144,12 @@ class RevokedPermissionsService final : public SafetyHubService,
     // WebContentsObserver:
     void PrimaryPageChanged(content::Page& page) override;
 
-    // content_settings::Observer:
-    void OnContentSettingChanged(
-        const ContentSettingsPattern& primary_pattern,
-        const ContentSettingsPattern& secondary_pattern,
-        ContentSettingsTypeSet content_type_set) override;
-
    private:
     explicit TabHelper(
         content::WebContents* web_contents,
         RevokedPermissionsService* unused_site_permission_service);
 
     base::WeakPtr<RevokedPermissionsService> unused_site_permission_service_;
-
-    base::ScopedObservation<HostContentSettingsMap, content_settings::Observer>
-        observation_{this};
 
     friend class content::WebContentsUserData<TabHelper>;
     WEB_CONTENTS_USER_DATA_KEY_DECL();
@@ -199,9 +189,10 @@ class RevokedPermissionsService final : public SafetyHubService,
   // the user. Does not change permissions themselves.
   void ClearRevokedPermissionsList();
 
-  // Stores revoked permissions data on HCSM.
-  void StorePermissionInRevokedPermissionSetting(
-      const PermissionsData& permission_data);
+  // Restores the list of revoked permissions after it was deleted after user
+  // has accepted the revocation (via `ClearRevokedPermissionsList()`).
+  void RestoreDeletedRevokedPermissionsList(
+      const std::vector<PermissionsData>& permissions_data_list);
 
   // Returns the list of all permissions that have been revoked.
   std::unique_ptr<RevokedPermissionsResult> GetRevokedPermissions();
@@ -272,7 +263,7 @@ class RevokedPermissionsService final : public SafetyHubService,
   void RevokeUnusedPermissions();
 
   // Stores revoked permissions data on HCSM.
-  void StorePermissionInRevokedPermissionSetting(
+  void StorePermissionInUnusedSitePermissionSetting(
       const std::set<ContentSettingsType>& permissions,
       const base::Value::Dict& chooser_permissions_data,
       const std::optional<content_settings::ContentSettingConstraints>

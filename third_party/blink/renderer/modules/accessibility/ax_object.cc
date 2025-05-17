@@ -728,10 +728,6 @@ void AXObject::Init(AXObject* parent) {
   // Set the parent again, this time via SetParent(), so that all related checks
   // and calls occur now that we have the role and updated cached values.
   SetParent(parent_);
-
-#if DCHECK_IS_ON()
-  is_initialized_ = true;
-#endif
 }
 
 void AXObject::Detach() {
@@ -1369,8 +1365,9 @@ void SerializeAriaNotificationAttributes(const AriaNotifications& notifications,
 }  // namespace
 
 void AXObject::Serialize(ui::AXNodeData* node_data,
-                         ui::AXMode accessibility_mode,
-                         bool is_snapshot) const {
+                         ui::AXMode accessibility_mode) const {
+  bool is_snapshot = AXObjectCache().IsForSnapshot();
+
   // Reduce redundant ancestor chain walking for display lock computations.
   auto memoization_scope =
       DisplayLockUtilities::CreateLockCheckMemoizationScope();
@@ -1815,17 +1812,15 @@ void AXObject::SerializeInlineTextBox(ui::AXNodeData* node_data) const {
   DCHECK_EQ(name_from, ax::mojom::blink::NameFrom::kContents);
   node_data->SetNameFrom(ax::mojom::blink::NameFrom::kContents);
 
-  if (::features::IsAccessibilityPruneRedundantInlineTextEnabled()) {
-    DCHECK(parent_);
-    DCHECK(parent_->GetLayoutObject()->IsText());
-    if (IsOnlyChild()) {
-      auto* layout_text = To<LayoutText>(parent_->GetLayoutObject());
-      String visible_text = layout_text->PlainText();
-      if (name == visible_text) {
-        // The text of an only-child inline text box can be inferred directly
-        // from the parent. No need to serialize redundant data.
-        return;
-      }
+  DCHECK(parent_);
+  DCHECK(parent_->GetLayoutObject()->IsText());
+  if (IsOnlyChild()) {
+    auto* layout_text = To<LayoutText>(parent_->GetLayoutObject());
+    String visible_text = layout_text->PlainText();
+    if (name == visible_text) {
+      // The text of an only-child inline text box can be inferred directly
+      // from the parent. No need to serialize redundant data.
+      return;
     }
   }
 
@@ -2582,8 +2577,8 @@ void AXObject::SerializeUnignoredAttributes(ui::AXNodeData* node_data,
       // contenteditables, use AXTreeData.
       //
       // TODO(nektar): Remove kTextSelStart and kTextSelEnd from the renderer.
-      const auto ax_selection =
-          AXSelection::FromCurrentSelection(ToTextControl(*element));
+      const auto ax_selection = AXSelection::FromCurrentSelection(
+          ToTextControl(*element), AXObjectCache());
       int start = ax_selection.Anchor().IsTextPosition()
                       ? ax_selection.Anchor().TextOffset()
                       : ax_selection.Anchor().ChildIndex();
@@ -8507,17 +8502,13 @@ String AXObject::GetNodeString(Node* node) {
 }
 
 String AXObject::ToString(bool verbose) const {
-#if DCHECK_IS_ON()
-  CHECK(is_initialized_) << "Init() must be called before ToString().";
-#endif
-
-  CHECK(!(parent_ == nullptr && role_ == ax::mojom::blink::Role::kUnknown &&
-          id_ == 0))
-      << "Calling ToString() on an AxObject before Init() is not allowed.";
-
   // Build a friendly name for debugging the object.
   // If verbose, build a longer name name in the form of:
   // CheckBox axid#28 <input.someClass#cbox1> name="checkbox"
+  if (role_ == ax::mojom::blink::Role::kUnknown && id_ == 0) {
+    return "Uninitialized object";
+  }
+
 #if !defined(NDEBUG)
   if (IsDetached() && verbose) {
     return "(detached) " + detached_object_debug_info_;

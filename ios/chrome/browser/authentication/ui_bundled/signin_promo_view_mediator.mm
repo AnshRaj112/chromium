@@ -138,6 +138,8 @@ bool IsSupportedAccessPoint(signin_metrics::AccessPoint access_point) {
         kHistorySyncOptinExpansionPillOnInactivity:
     case signin_metrics::AccessPoint::kHistorySyncEducationalTip:
     case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
+    case signin_metrics::AccessPoint::kNonModalSigninPasswordPromo:
+    case signin_metrics::AccessPoint::kNonModalSigninBookmarkPromo:
       return false;
   }
 }
@@ -236,6 +238,8 @@ void RecordImpressionsTilSigninButtonsHistogramForAccessPoint(
         kHistorySyncOptinExpansionPillOnInactivity:
     case signin_metrics::AccessPoint::kHistorySyncEducationalTip:
     case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
+    case signin_metrics::AccessPoint::kNonModalSigninPasswordPromo:
+    case signin_metrics::AccessPoint::kNonModalSigninBookmarkPromo:
       NOTREACHED() << "Unexpected value for access point "
                    << static_cast<int>(access_point);
   }
@@ -335,6 +339,8 @@ void RecordImpressionsTilXButtonHistogramForAccessPoint(
         kHistorySyncOptinExpansionPillOnInactivity:
     case signin_metrics::AccessPoint::kHistorySyncEducationalTip:
     case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
+    case signin_metrics::AccessPoint::kNonModalSigninPasswordPromo:
+    case signin_metrics::AccessPoint::kNonModalSigninBookmarkPromo:
       NOTREACHED() << "Unexpected value for access point "
                    << static_cast<int>(access_point);
   }
@@ -423,6 +429,8 @@ const char* DisplayedCountPreferenceKey(
         kHistorySyncOptinExpansionPillOnInactivity:
     case signin_metrics::AccessPoint::kHistorySyncEducationalTip:
     case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
+    case signin_metrics::AccessPoint::kNonModalSigninPasswordPromo:
+    case signin_metrics::AccessPoint::kNonModalSigninBookmarkPromo:
       return nullptr;
   }
 }
@@ -510,6 +518,8 @@ const char* AlreadySeenSigninViewPreferenceKey(
         kHistorySyncOptinExpansionPillOnInactivity:
     case signin_metrics::AccessPoint::kHistorySyncEducationalTip:
     case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
+    case signin_metrics::AccessPoint::kNonModalSigninPasswordPromo:
+    case signin_metrics::AccessPoint::kNonModalSigninBookmarkPromo:
       return nullptr;
   }
 }
@@ -563,8 +573,6 @@ id<SystemIdentity> GetDisplayedIdentity(
 // Redefined to be readwrite. See documentation in the header file.
 @property(nonatomic, strong, readwrite) id<SystemIdentity> displayedIdentity;
 
-// YES if the sign-in flow is in progress.
-@property(nonatomic, assign, readwrite) BOOL signinInProgress;
 // YES if the initial sync for a specific data type is in progress. The data
 // type is based on `dataTypeToWaitForInitialSync`.
 @property(nonatomic, assign, readwrite) BOOL initialSyncInProgress;
@@ -884,6 +892,10 @@ id<SystemIdentity> GetDisplayedIdentity(
 }
 
 - (void)disconnect {
+  // While the sign-in is in progress, the UI should be frozen, with the
+  // exception of the part of the UI used for sign-in. So it should not be
+  // possible to disconnect the mediator.
+  CHECK(!self.signinInProgress, base::NotFatalUntil::M145);
   [self signinPromoViewIsRemoved];
   self.consumer = nil;
   _accountManagerService = nullptr;

@@ -7,7 +7,10 @@ mojom("mojo_bindings") {
     "//mojo/public/mojom/base",
   ]
 
-  deps = [ "//components/content_settings/core/common:content_settings_types" ]
+  deps = [
+    "//chrome/browser/privacy_sandbox/notice:notice_mojom",
+    "//components/content_settings/core/common:content_settings_types",
+  ]
 
   sources = [
     "base_dialog.mojom",
@@ -33,6 +36,9 @@ if (!is_android) {
     deps = [
       "//base",
       "//chrome/app:generated_resources",
+      "//chrome/browser/privacy_sandbox/notice:desktop_view_manager",
+      "//chrome/browser/privacy_sandbox/notice:factory",
+      "//chrome/browser/privacy_sandbox/notice:notice_mojom",
       "//chrome/browser/profiles:profile",
       "//chrome/browser/resources/privacy_sandbox:resources",
       "//chrome/browser/ui/views/privacy_sandbox",
@@ -52,6 +58,8 @@ if (!is_android) {
       ":mojo_bindings",
       ":privacy_sandbox",
       "//base/test:test_support",
+      "//chrome/browser/privacy_sandbox/notice:test_support",
+      "//chrome/test:test_support",
       "//testing/gmock",
       "//testing/gtest",
     ]

@@ -2008,7 +2008,7 @@ uint32_t Document::softNavigations() const {
     return 0;
   }
   if (SoftNavigationHeuristics* heuristics =
-          SoftNavigationHeuristics::From(*window)) {
+          window->GetSoftNavigationHeuristics()) {
     return heuristics->SoftNavigationCount();
   }
   return 0;
@@ -7491,8 +7491,7 @@ void Document::OnPrepareToStopParsing() {
     render_blocking_resource_manager_->ClearPendingParsingElements();
     if (features::kThrottleFrameRateOnInitialization.Get() && GetFrame() &&
         GetFrame()->IsLocalRoot() && GetFrame()->GetPage() &&
-        GetFrame()->IsAttached() &&
-        GetExecutionContext()->CrossOriginIsolatedCapability()) {
+        GetFrame()->IsAttached()) {
       // The frame rate will be implicitly throttled during initialization
       // if the feature is enabled so unthrottle here.
       GetFrame()->GetPage()->GetChromeClient().SetShouldThrottleFrameRate(
@@ -9561,8 +9560,7 @@ void Document::SetHasFullFrameRateBlockingExpectLinkElements(bool flag) {
 }
 
 void Document::UpdateRenderFrameRate() {
-  if (!GetFrame() || !GetFrame()->GetPage() || !GetFrame()->IsAttached() ||
-      !GetExecutionContext()->CrossOriginIsolatedCapability()) {
+  if (!GetFrame() || !GetFrame()->GetPage() || !GetFrame()->IsAttached()) {
     return;
   }
   GetFrame()->GetPage()->GetChromeClient().SetShouldThrottleFrameRate(

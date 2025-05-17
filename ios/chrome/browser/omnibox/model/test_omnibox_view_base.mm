@@ -16,8 +16,6 @@ OmniboxViewBase::State TestOmniboxViewBase::CreateState(std::string text,
                                                         size_t sel_end) {
   OmniboxViewBase::State state;
   state.text = base::UTF8ToUTF16(text);
-  state.keyword = std::u16string();
-  state.is_keyword_selected = false;
   state.sel_start = sel_start;
   state.sel_end = sel_end;
   return state;
@@ -52,18 +50,6 @@ void TestOmniboxViewBase::SelectAll(bool reversed) {
   }
 }
 
-void TestOmniboxViewBase::OnTemporaryTextMaybeChanged(
-    const std::u16string& display_text,
-    const AutocompleteMatch& match,
-    bool save_original_selection,
-    bool notify_text_changed) {
-  text_ = display_text;
-
-  if (save_original_selection) {
-    saved_temporary_selection_ = selection_;
-  }
-}
-
 void TestOmniboxViewBase::OnInlineAutocompleteTextMaybeChanged(
     const std::u16string& user_text,
     const std::u16string& inline_autocompletion) {
@@ -83,13 +69,7 @@ void TestOmniboxViewBase::OnInlineAutocompleteTextCleared() {
   inline_autocompletion_.clear();
 }
 
-void TestOmniboxViewBase::OnRevertTemporaryText(
-    const std::u16string& display_text,
-    const AutocompleteMatch& match) {
-  selection_ = saved_temporary_selection_;
-}
-
-bool TestOmniboxViewBase::OnAfterPossibleChange(bool allow_keyword_ui_change) {
+bool TestOmniboxViewBase::OnAfterPossibleChange() {
   return false;
 }
 

@@ -21,6 +21,7 @@
 #include "base/memory/ptr_util.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
+#include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -94,10 +95,9 @@ class TestGeolocationPermissionContextDelegate
 #endif
   }
 
-  bool DecidePermission(
-      const std::unique_ptr<PermissionRequestData>& request_data,
-      BrowserPermissionCallback* callback,
-      GeolocationPermissionContext* context) override {
+  bool DecidePermission(const PermissionRequestData& request_data,
+                        BrowserPermissionCallback* callback,
+                        GeolocationPermissionContext* context) override {
     return false;
   }
 

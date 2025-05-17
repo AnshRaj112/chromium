@@ -180,7 +180,6 @@ void HttpStreamPool::Group::ReleaseStreamSocket(
 
   if (reusable) {
     AddIdleStreamSocket(std::move(socket));
-    ProcessPendingRequest();
   } else {
     RecordNetLogClosingSocket(*socket, not_reusable_reason);
     socket.reset();
@@ -198,6 +197,7 @@ void HttpStreamPool::Group::AddIdleStreamSocket(
   idle_stream_sockets_.emplace_back(std::move(socket), base::TimeTicks::Now());
   pool_->IncrementTotalIdleStreamCount();
   CleanupIdleStreamSockets(CleanupMode::kTimeoutOnly, kIdleTimeLimitExpired);
+  ProcessPendingRequest();
 }
 
 std::unique_ptr<StreamSocket> HttpStreamPool::Group::GetIdleStreamSocket() {
@@ -360,13 +360,6 @@ base::Value::Dict HttpStreamPool::Group::GetInfoAsValue() const {
 
 void HttpStreamPool::Group::CleanupTimedoutIdleStreamSocketsForTesting() {
   CleanupIdleStreamSockets(CleanupMode::kTimeoutOnly, "For testing");
-}
-
-bool HttpStreamPool::Group::IsFailing() const {
-  // If we don't have an AttemptManager the group is not considered as failing
-  // because we destroy an AttemptManager after all in-flight attempts are
-  // completed (There are only handed out streams and/or idle streams).
-  return attempt_manager_ && attempt_manager_->is_failing();
 }
 
 void HttpStreamPool::Group::CleanupIdleStreamSockets(

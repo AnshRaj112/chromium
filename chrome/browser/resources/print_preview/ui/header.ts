@@ -17,10 +17,10 @@ import {Error, State} from '../data/state.js';
 
 import {getCss} from './header.css.js';
 import {getHtml} from './header.html.js';
-import {SettingsMixinLit} from './settings_mixin_lit.js';
+import {SettingsMixin} from './settings_mixin.js';
 
 
-const PrintPreviewHeaderElementBase = SettingsMixinLit(CrLitElement);
+const PrintPreviewHeaderElementBase = SettingsMixin(CrLitElement);
 
 export class PrintPreviewHeaderElement extends PrintPreviewHeaderElementBase {
   static get is() {
@@ -49,7 +49,7 @@ export class PrintPreviewHeaderElement extends PrintPreviewHeaderElementBase {
   accessor destination: Destination;
   accessor error: Error;
   accessor state: State;
-  accessor managed: boolean;
+  accessor managed: boolean = false;
   private accessor sheetCount_: number = 0;
   protected accessor summary_: string|null;
 

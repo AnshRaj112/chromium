@@ -80,6 +80,8 @@ BASE_FEATURE(kPrefetchBrowsingDataRemoval,
 BASE_FEATURE(kPrefetchScheduler,
              "PrefetchScheduler",
              base::FEATURE_DISABLED_BY_DEFAULT);
+const base::FeatureParam<bool> kPrefetchSchedulerProgressSyncBestEffort{
+    &kPrefetchScheduler, "kPrefetchSchedulerProgressSyncBestEffort", true};
 
 BASE_FEATURE(kPrefetchSchedulerTesting,
              "PrefetchSchedulerTesting",
@@ -92,5 +94,9 @@ const base::FeatureParam<size_t>
     kPrefetchSchedulerTestingActiveSetSizeLimitForBurst{
         &kPrefetchSchedulerTesting,
         "kPrefetchSchedulerTestingActiveSetSizeLimitForBurst", 1};
+
+BASE_FEATURE(kPrefetchQueueingPartialFixWithoutScheduler,
+             "PrefetchQueueingPartialFixWithoutScheduler",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 }  // namespace features

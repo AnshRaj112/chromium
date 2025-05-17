@@ -42,6 +42,13 @@ chromium-metrics-reviews@google.com.
                to be filled and assigned to the control case."/>
 </variants>
 
+<variants name="Autofill.Ai.PromptTypes">
+  <variant name="SavePrompt"
+      summary="The prompt is asking users to save a new entity."/>
+  <variant name="UpdatePrompt"
+      summary="The prompt is asking users to update an existing entity."/>
+</variants>
+
 <variants name="Autofill.BetterAuthFlowType">
   <variant name="Cvc" summary="CVC authentication only"/>
   <variant name="CvcFallbackFromFido"
@@ -70,6 +77,12 @@ chromium-metrics-reviews@google.com.
       summary="Only product description was visible"/>
 </variants>
 
+<variants name="Autofill.CreditCardBenefitSource">
+  <variant name="Amex" summary="American Express"/>
+  <variant name="Bmo" summary="BMO"/>
+  <variant name="Curinos" summary="Curinos"/>
+</variants>
+
 <variants name="Autofill.CreditCardIssuerId">
   <variant name="Amex" summary="card issued by American Express"/>
   <variant name="Anz" summary="card issued by ANZ"/>
@@ -82,11 +95,6 @@ chromium-metrics-reviews@google.com.
   <variant name="Marqeta" summary="card issued by Marqeta"/>
   <variant name="Nab" summary="card issued by National Australia Bank"/>
   <variant name="Natwest" summary="card issued by Natwest"/>
-</variants>
-
-<variants name="Autofill.CreditCardIssuerId.WithBenefits">
-  <variant name="Amex" summary="card issued by American Express"/>
-  <variant name="Bmo" summary="card issued by BMO"/>
 </variants>
 
 <variants name="Autofill.CreditCardNetwork">
@@ -509,6 +517,7 @@ Called by update_autofill_enums.py. This is a manual comment.-->
   <variant name="DRIVERS_LICENSE_NUMBER"/>
   <variant name="DRIVERS_LICENSE_REGION"/>
   <variant name="EMAIL_ADDRESS"/>
+  <variant name="EMAIL_OR_LOYALTY_MEMBERSHIP_ID"/>
   <variant name="EMPTY_TYPE"/>
   <variant name="FIELD_WITH_DEFAULT_VALUE"/>
   <variant name="IBAN_VALUE"/>
@@ -1079,6 +1088,66 @@ Called by update_autofill_enums.py. This is a manual comment.-->
   </token>
 </histogram>
 
+<histogram name="Autofill.Ai.EditedAutofilledFieldAtSubmission"
+    enum="AutofilledFieldUserEditingStatus" expires_after="2025-12-12">
+  <owner>jihadghanna@google.com</owner>
+  <owner>chrome-autofill-alerts@google.com</owner>
+  <summary>
+    On submission time, this metric emits for every field that was autofilled
+    with Autofill AI, if the filling was accepted or subsequently corrected.
+  </summary>
+</histogram>
+
+<histogram name="Autofill.Ai.EditedAutofilledFieldAtSubmission.ByFieldType"
+    enum="AutofilledFieldUserEditingStatusByFieldType"
+    expires_after="2025-12-12">
+  <owner>jihadghanna@google.com</owner>
+  <owner>chrome-autofill-alerts@google.com</owner>
+  <summary>
+    On submission time, this metric emits for every field that was autofilled
+    with Autofill AI, if the filling was accepted or subsequently corrected, and
+    also split the buckets by the Autofill AI type of the field.
+  </summary>
+</histogram>
+
+<histogram name="Autofill.Ai.Funnel.{SubmissionState}.{FunnelStage}"
+    enum="Boolean" expires_after="2025-12-12">
+  <owner>jihadghanna@google.com</owner>
+  <owner>chrome-autofill-alerts@google.com</owner>
+  <summary>
+    Records various stages of the Autofill AI funnel. The same metric is logged
+    for submitted and for abandoned forms, with an additional metric aggregating
+    both. The metric is recorded once per form per submission/abandonment.
+
+    {FunnelStage}
+  </summary>
+  <token key="SubmissionState">
+    <variant name="Abandoned"/>
+    <variant name="Aggregate"/>
+    <variant name="Submitted"/>
+  </token>
+  <token key="FunnelStage">
+    <variant name="CorrectionAfterFill"
+        summary="Given a form where the user filled an Autofill AI
+                 suggestion, records whether the filling was corrected or
+                 not."/>
+    <variant name="Eligibility"
+        summary="This metric records whether a parsed form is eligible for
+                 Autofill AI filling or not."/>
+    <variant name="FillAfterSuggestion"
+        summary="Given a form where the user saw Autofill AI filling
+                 suggestions, records whether the suggestion was filled or
+                 not."/>
+    <variant name="ReadinessAfterEligibility"
+        summary="Given an Autofill-AI-eligible form, this metric records
+                 whether the user has stored data to fill the form."/>
+    <variant name="SuggestionAfterReadiness"
+        summary="Given an Autofill-AI-eligible form where the user has data
+                 stored to fill it, this metric records whether the user saw
+                 an Autofill AI suggestion or not."/>
+  </token>
+</histogram>
+
 <histogram name="Autofill.Ai.OptInFunnel" enum="AutofillAiOptInFunnelEvents"
     expires_after="2025-12-12">
   <owner>brunobraga@google.com</owner>
@@ -1089,6 +1158,46 @@ Called by update_autofill_enums.py. This is a manual comment.-->
     dialog. Logged when any of them are shown and when the FFR (final step in
     the funnel) is accepted.
   </summary>
+</histogram>
+
+<histogram name="Autofill.Ai.OptInStatus" enum="Boolean"
+    expires_after="2025-12-12">
+  <owner>jihadghanna@google.com</owner>
+  <owner>chrome-autofill-alerts@google.com</owner>
+  <summary>
+    Records whether the user is opted into the Autofill AI feature or not. This
+    metric is emitted each time a form that contains information fillable by
+    Autofill AI is submitted.
+  </summary>
+</histogram>
+
+<histogram name="Autofill.Ai.{PromptType}.AllEntities"
+    enum="AutofillAiSaveOrUpdatePromptResult" expires_after="2025-12-12">
+  <owner>brunobraga@google.com</owner>
+  <owner>chrome-autofill-alerts@google.com</owner>
+  <summary>
+    Records events related to the save or update prompt dialog for all entity
+    types. Emitted when the dialog its closed, regardless of whether it was done
+    so by an user action or not.
+  </summary>
+  <token key="PromptType" variants="Autofill.Ai.PromptTypes"/>
+</histogram>
+
+<histogram name="Autofill.Ai.{PromptType}{EntityType}"
+    enum="AutofillAiSaveOrUpdatePromptResult" expires_after="2025-12-12">
+  <owner>brunobraga@google.com</owner>
+  <owner>chrome-autofill-alerts@google.com</owner>
+  <summary>
+    Records events related to the save or update prompt dialog for each entity
+    type. Emitted when the dialog its closed, regardless of whether it was done
+    so by an user action or not.
+  </summary>
+  <token key="PromptType" variants="Autofill.Ai.PromptTypes"/>
+  <token key="EntityType">
+    <variant name=".DriversLicense" summary="Driver license entity"/>
+    <variant name=".Passport" summary="Passport entity"/>
+    <variant name=".Vehicle" summary="Vehicle entity"/>
+  </token>
 </histogram>
 
 <histogram
@@ -1146,6 +1255,20 @@ Called by update_autofill_enums.py. This is a manual comment.-->
     the reasons why. Only one reason is recorded (e.g. the pref isn't checked if
     a policy makes it impossible to set the pref). The reasons are not ordered.
     Emitted only once per cold start of Chrome when the first tab is created.
+  </summary>
+</histogram>
+
+<histogram name="Autofill.AndroidAutofillManagerErrors"
+    enum="AutofillManagerMethod" expires_after="2025-09-28">
+  <owner>friedrichh@chromium.org</owner>
+  <owner>chrome-autofill-alerts@google.com</owner>
+  <summary>
+    Clank and WebView only. Logs failures when calling Android Autofill's
+    AutofillManager. All logged failures are caught and silently ignores since
+    they are RuntimeExceptions neither the user nor the browser can affect and
+    may be recoverable with later invocations. This includes but is not limited
+    to timeouts. Emitted for every failed API call. No success metric exists
+    since the call volume is quite high but the expected error volume is not.
   </summary>
 </histogram>
 
@@ -3078,19 +3201,18 @@ Called by update_autofill_enums.py. This is a manual comment.-->
   </summary>
 </histogram>
 
-<histogram name="Autofill.FormEvents.CreditCard.WithBenefits.{CardIssuerId}"
+<histogram
+    name="Autofill.FormEvents.CreditCard.WithBenefits.{CardBenefitSource}"
     enum="AutofillFormEvent" expires_after="2025-11-09">
-  <owner>alexandertekle@google.com</owner>
   <owner>yishuil@google.com</owner>
   <summary>
     Autofill form events for credit card forms that contain at least one
     suggestion where a card benefit is available. This includes logging for when
     card suggestions with benefits are shown, selected, filled, and submitted,
-    and logs at each of those times. Log emission pertains to the credit card
-    issuer, {CardIssuerId}.
+    and logs at each of those times. Log emission pertains to credit cards where
+    the benefit source is {CardBenefitSource}.
   </summary>
-  <token key="CardIssuerId"
-      variants="Autofill.CreditCardIssuerId.WithBenefits"/>
+  <token key="CardBenefitSource" variants="Autofill.CreditCardBenefitSource"/>
 </histogram>
 
 <histogram name="Autofill.FormEvents.CreditCard.WithOffer"
@@ -3251,52 +3373,6 @@ Called by update_autofill_enums.py. This is a manual comment.-->
     FormForest::UpdateTreeOfRendererForm() that actually does an entire tree
     traversal.
   </summary>
-</histogram>
-
-<histogram name="Autofill.FormsAI.EditedAutofilledFieldAtSubmission"
-    enum="AutofilledFieldUserEditingStatus" expires_after="2025-12-12">
-  <owner>jihadghanna@google.com</owner>
-  <owner>chrome-autofill-alerts@google.com</owner>
-  <summary>
-    On submission time, this metric emits for every field that was autofilled
-    with FormsAI, if the filling was accepted or subsequently corrected.
-  </summary>
-</histogram>
-
-<histogram name="Autofill.FormsAI.Funnel.{SubmissionState}.{FunnelStage}"
-    enum="Boolean" expires_after="2025-12-12">
-  <owner>jihadghanna@google.com</owner>
-  <owner>chrome-autofill-alerts@google.com</owner>
-  <summary>
-    Records various stages of the FormsAI funnel. The same metric is logged for
-    submitted and for abandoned forms, with an additional metric aggregating
-    both. The metric is recorded once per form per submission/abandonment.
-
-    {FunnelStage}
-  </summary>
-  <token key="SubmissionState">
-    <variant name="Abandoned"/>
-    <variant name="Aggregate"/>
-    <variant name="Submitted"/>
-  </token>
-  <token key="FunnelStage">
-    <variant name="CorrectionAfterFill"
-        summary="Given a form where the user filled a FormsAI suggestion,
-                 records whether the filling was corrected or not."/>
-    <variant name="Eligibility"
-        summary="This metric records whether a parsed form is eligible for
-                 FormsAI filling or not."/>
-    <variant name="FillAfterSuggestion"
-        summary="Given a form where the user saw FormsAI filling suggestions,
-                 records whether the suggestion was filled or not."/>
-    <variant name="ReadinessAfterEligibility"
-        summary="Given a FormsAI-eligible form, this metric records whether
-                 the user has stored data to fill the form."/>
-    <variant name="SuggestionAfterReadiness"
-        summary="Given a FormsAI-eligible form where the user has data stored
-                 to fill it, this metric records whether the user saw a
-                 FormsAI suggestion or not."/>
-  </token>
 </histogram>
 
 <histogram name="Autofill.FormSubmission.PerProfileType"

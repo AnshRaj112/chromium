@@ -282,13 +282,13 @@ targets.mixin(
         # soft affinity so that bots with caches will be picked first
         optional_dimensions = {
             60: {
-                "caches": "android_35_google_apis_tablet_x64",
+                "caches": "android_35_google_apis_tablet_x64_tablet_landscape",
             },
         },
         named_caches = [
             swarming.cache(
-                name = "android_35_google_apis_tablet_x64",
-                path = ".android_emulator/android_35_google_apis_tablet_x64",
+                name = "android_35_google_apis_tablet_x64_tablet_landscape",
+                path = ".android_emulator/android_35_google_apis_tablet_x64_tablet_landscape",
             ),
         ],
     ),
@@ -1655,7 +1655,7 @@ targets.mixin(
             "cpu": "arm64",
             "gpu": "apple:m1",
             "mac_model": "Macmini9,1",
-            "os": "Mac-15.4",
+            "os": "Mac-15.5",
             "pool": "chromium.tests",
             "display_attached": "1",
         },

@@ -62,6 +62,7 @@ sync_pb::SharedTabGroupAccountDataSpecifics TrimSpecifics(
   trimmed_account_specifics.clear_guid();
   trimmed_account_specifics.clear_collaboration_id();
   trimmed_account_specifics.clear_update_time_windows_epoch_micros();
+  trimmed_account_specifics.clear_version();
 
   if (trimmed_account_specifics.has_shared_tab_details()) {
     sync_pb::SharedTabDetails* tab =
@@ -113,13 +114,14 @@ std::unique_ptr<syncer::EntityData> CreateEntityDataFromSavedTabGroupTab(
   sync_pb::SharedTabGroupAccountDataSpecifics specifics;
   specifics.set_guid(tab.saved_tab_guid().AsLowercaseString());
   specifics.set_collaboration_id(collaboration_id->value());
+  specifics.set_version(kCurrentSharedTabGroupAccountDataSpecificsProtoVersion);
 
   sync_pb::SharedTabDetails* tab_group_details =
       specifics.mutable_shared_tab_details();
   tab_group_details->set_shared_tab_group_guid(
       group->saved_guid().AsLowercaseString());
   tab_group_details->set_last_seen_timestamp_windows_epoch(
-      SerializeTime(tab.last_seen_time_windows_epoch_micros().value()));
+      SerializeTime(tab.last_seen_time().value()));
 
   return CreateEntityDataFromSpecifics(specifics);
 }
@@ -259,14 +261,14 @@ SharedTabGroupAccountDataSyncBridge::GetAllDataForDebugging() {
 }
 
 std::string SharedTabGroupAccountDataSyncBridge::GetClientTag(
-    const syncer::EntityData& entity_data) {
+    const syncer::EntityData& entity_data) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return GetClientTagFromSpecifics(
       entity_data.specifics.shared_tab_group_account_data());
 }
 
 std::string SharedTabGroupAccountDataSyncBridge::GetStorageKey(
-    const syncer::EntityData& entity_data) {
+    const syncer::EntityData& entity_data) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return GetClientTag(entity_data);
 }
@@ -403,8 +405,7 @@ void SharedTabGroupAccountDataSyncBridge::SavedTabGroupTabLastSeenTimeUpdated(
   const SavedTabGroupTab* tab = group->GetTab(saved_tab_id);
   CHECK(tab);
 
-  const std::optional<base::Time>& model_last_seen =
-      tab->last_seen_time_windows_epoch_micros();
+  const std::optional<base::Time>& model_last_seen = tab->last_seen_time();
   if (!model_last_seen.has_value()) {
     // This tab has not been seen by the user. Avoid syncing tabs
     // without a timestamp by skipping this.

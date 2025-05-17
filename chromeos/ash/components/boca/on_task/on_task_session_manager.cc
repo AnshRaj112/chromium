@@ -300,6 +300,15 @@ void OnTaskSessionManager::OnAppReloaded() {
 void OnTaskSessionManager::LockOrUnlockWindow(bool lock_window) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (lock_in_progress_ && lock_window) {
+    // Enter pause mode and remove countdown notification if pause mode is
+    // triggered while in locked mode countdown.
+    if (enter_pause_mode_) {
+      notifications_manager_->StopProcessingNotification(
+          kOnTaskEnterLockedModeNotificationId);
+      notifications_manager_->ClearNotification(
+          kOnTaskEnterLockedModeNotificationId);
+      EnterLockedMode();
+    }
     return;
   }
   lock_in_progress_ = lock_window;
@@ -528,12 +537,27 @@ void OnTaskSessionManager::SystemWebAppLaunchHelper::
     SetPinStateForActiveSWAWindow(bool pinned,
                                   base::RepeatingClosure callback) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  latest_pin_state_ = pinned;
+  SetPinStateForActiveSWAWindowInternal(pinned, std::move(callback));
+}
+
+void OnTaskSessionManager::SystemWebAppLaunchHelper::
+    SetPinStateForActiveSWAWindowInternal(bool pinned,
+                                          base::RepeatingClosure callback) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  // Don't set pin state if the pin state is not the latest.
+  if (pinned != latest_pin_state_) {
+    return;
+  }
+
   if (launch_in_progress_) {
     base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
         FROM_HERE,
-        base::BindOnce(&SystemWebAppLaunchHelper::SetPinStateForActiveSWAWindow,
-                       weak_ptr_factory_.GetWeakPtr(), pinned,
-                       std::move(callback)),
+        base::BindOnce(
+            &SystemWebAppLaunchHelper::SetPinStateForActiveSWAWindowInternal,
+            weak_ptr_factory_.GetWeakPtr(), pinned, std::move(callback)),
         kSetPinnedStateDelay);
     return;
   }

@@ -127,6 +127,7 @@ ResourceId CreateGpuResource(
     ClientResourceProvider* resource_provider,
     const gfx::Size& size,
     SharedImageFormat format,
+    SkAlphaType alpha_type,
     gfx::ColorSpace color_space,
     base::span<const uint8_t> pixels,
     GrSurfaceOrigin origin = kTopLeft_GrSurfaceOrigin) {
@@ -134,8 +135,8 @@ ResourceId CreateGpuResource(
   gpu::SharedImageInterface* sii = context_provider->SharedImageInterface();
   DCHECK(sii);
   auto client_shared_image = sii->CreateSharedImage(
-      {format, size, color_space, gpu::SHARED_IMAGE_USAGE_DISPLAY_READ,
-       "TestLabel"},
+      {format, size, color_space, kTopLeft_GrSurfaceOrigin, alpha_type,
+       gpu::SHARED_IMAGE_USAGE_DISPLAY_READ, "TestLabel"},
       pixels);
   gpu::SyncToken sync_token = sii->GenUnverifiedSyncToken();
 
@@ -144,6 +145,7 @@ ResourceId CreateGpuResource(
       false /* is_overlay_candidate */);
   gl_resource.color_space = std::move(color_space);
   gl_resource.origin = origin;
+  gl_resource.alpha_type = alpha_type;
   auto release_callback =
       base::BindOnce(&DeleteSharedImage, std::move(client_shared_image));
   return resource_provider->ImportResource(gl_resource,
@@ -306,10 +308,11 @@ void CreateTestTwoColoredTextureDrawQuad(
 
   ResourceId resource;
   if (gpu_resource) {
-    resource =
-        CreateGpuResource(child_context_provider, child_resource_provider,
-                          rect.size(), SinglePlaneFormat::kBGRA_8888,
-                          gfx::ColorSpace(), MakePixelSpan(pixels), origin);
+    resource = CreateGpuResource(
+        child_context_provider, child_resource_provider, rect.size(),
+        SinglePlaneFormat::kBGRA_8888,
+        premultiplied_alpha ? kPremul_SkAlphaType : kUnpremul_SkAlphaType,
+        gfx::ColorSpace(), MakePixelSpan(pixels), origin);
   } else {
     scoped_refptr<gpu::ClientSharedImage> shared_image;
     gpu::SyncToken sync_token;
@@ -349,7 +352,6 @@ void CreateTestTwoColoredTextureDrawQuad(
   quad->SetNew(shared_state, rect, rect, needs_blending, mapped_resource,
                uv_top_left, uv_bottom_right, background_color, nearest_neighbor,
                /*secure_output=*/false, gfx::ProtectedVideoType::kClear);
-  quad->premultiplied_alpha = premultiplied_alpha;
 }
 
 // TODO(crbug.com/40219248): Make this function use SkColor4f
@@ -376,10 +378,11 @@ void CreateTestTextureDrawQuad(
 
   ResourceId resource;
   if (gpu_resource) {
-    resource =
-        CreateGpuResource(child_context_provider, child_resource_provider,
-                          rect.size(), SinglePlaneFormat::kRGBA_8888,
-                          gfx::ColorSpace(), MakePixelSpan(pixels));
+    resource = CreateGpuResource(
+        child_context_provider, child_resource_provider, rect.size(),
+        SinglePlaneFormat::kRGBA_8888,
+        premultiplied_alpha ? kPremul_SkAlphaType : kUnpremul_SkAlphaType,
+        gfx::ColorSpace(), MakePixelSpan(pixels));
   } else {
     scoped_refptr<gpu::ClientSharedImage> shared_image;
     gpu::SyncToken sync_token;
@@ -418,7 +421,6 @@ void CreateTestTextureDrawQuad(
   quad->SetNew(shared_state, rect, rect, needs_blending, mapped_resource,
                uv_top_left, uv_bottom_right, background_color, nearest_neighbor,
                /*secure_output=*/false, gfx::ProtectedVideoType::kClear);
-  quad->premultiplied_alpha = premultiplied_alpha;
 }
 
 void CreateTestY16TextureDrawQuad_FromVideoFrame(
@@ -3530,8 +3532,8 @@ TEST_P(RendererPixelTest, RenderPassAndMaskWithPartialQuad) {
   if (!is_software_renderer()) {
     mask_resource_id = CreateGpuResource(
         this->child_context_provider_, this->child_resource_provider_.get(),
-        mask_rect.size(), SinglePlaneFormat::kRGBA_8888, gfx::ColorSpace(),
-        MakePixelSpan(bitmap));
+        mask_rect.size(), SinglePlaneFormat::kRGBA_8888, kPremul_SkAlphaType,
+        gfx::ColorSpace(), MakePixelSpan(bitmap));
   } else {
     mask_resource_id = this->AllocateAndFillSoftwareResource(
         this->child_context_provider_, mask_rect.size(), bitmap);
@@ -3628,8 +3630,8 @@ TEST_P(RendererPixelTest, RenderPassAndMaskWithPartialQuad2) {
   if (!is_software_renderer()) {
     mask_resource_id = CreateGpuResource(
         this->child_context_provider_, this->child_resource_provider_.get(),
-        mask_rect.size(), SinglePlaneFormat::kRGBA_8888, gfx::ColorSpace(),
-        MakePixelSpan(bitmap));
+        mask_rect.size(), SinglePlaneFormat::kRGBA_8888, kPremul_SkAlphaType,
+        gfx::ColorSpace(), MakePixelSpan(bitmap));
   } else {
     mask_resource_id = this->AllocateAndFillSoftwareResource(
         this->child_context_provider_, mask_rect.size(), bitmap);
@@ -3721,8 +3723,8 @@ TEST_P(RendererPixelTest, RenderPassAndMaskForRoundedCorner) {
   if (!is_software_renderer()) {
     mask_resource_id = CreateGpuResource(
         this->child_context_provider_, this->child_resource_provider_.get(),
-        mask_rect.size(), SinglePlaneFormat::kRGBA_8888, gfx::ColorSpace(),
-        MakePixelSpan(bitmap));
+        mask_rect.size(), SinglePlaneFormat::kRGBA_8888, kPremul_SkAlphaType,
+        gfx::ColorSpace(), MakePixelSpan(bitmap));
   } else {
     mask_resource_id = this->AllocateAndFillSoftwareResource(
         this->child_context_provider_, mask_rect.size(), bitmap);
@@ -3827,8 +3829,8 @@ TEST_P(RendererPixelTest, RenderPassAndMaskForRoundedCornerMultiRadii) {
   if (!is_software_renderer()) {
     mask_resource_id = CreateGpuResource(
         this->child_context_provider_, this->child_resource_provider_.get(),
-        mask_rect.size(), SinglePlaneFormat::kRGBA_8888, gfx::ColorSpace(),
-        MakePixelSpan(bitmap));
+        mask_rect.size(), SinglePlaneFormat::kRGBA_8888, kPremul_SkAlphaType,
+        gfx::ColorSpace(), MakePixelSpan(bitmap));
   } else {
     mask_resource_id = this->AllocateAndFillSoftwareResource(
         this->child_context_provider_, mask_rect.size(), bitmap);
@@ -3944,8 +3946,8 @@ class RendererPixelTestWithBackdropFilter : public VizPixelTestWithParam {
       if (!is_software_renderer()) {
         mask_resource_id = CreateGpuResource(
             this->child_context_provider_, this->child_resource_provider_.get(),
-            mask_rect.size(), SinglePlaneFormat::kRGBA_8888, gfx::ColorSpace(),
-            MakePixelSpan(bitmap));
+            mask_rect.size(), SinglePlaneFormat::kRGBA_8888,
+            kPremul_SkAlphaType, gfx::ColorSpace(), MakePixelSpan(bitmap));
       } else {
         mask_resource_id = this->AllocateAndFillSoftwareResource(
             this->child_context_provider_, mask_rect.size(), bitmap);
@@ -4335,10 +4337,10 @@ TEST_P(GPURendererPixelTest, TileDrawQuadForceAntiAliasingOff) {
   gfx::Size tile_size(32, 32);
   ResourceId resource;
   if (!is_software_renderer()) {
-    resource = CreateGpuResource(this->child_context_provider_,
-                                 this->child_resource_provider_.get(),
-                                 tile_size, SinglePlaneFormat::kRGBA_8888,
-                                 gfx::ColorSpace(), MakePixelSpan(bitmap));
+    resource = CreateGpuResource(
+        this->child_context_provider_, this->child_resource_provider_.get(),
+        tile_size, SinglePlaneFormat::kRGBA_8888, kPremul_SkAlphaType,
+        gfx::ColorSpace(), MakePixelSpan(bitmap));
   } else {
     resource = this->AllocateAndFillSoftwareResource(
         this->child_context_provider_, tile_size, bitmap);
@@ -4872,9 +4874,10 @@ TEST_P(RendererPixelTest, TileDrawQuadNearestNeighbor) {
   gfx::Size tile_size(2, 2);
   ResourceId resource;
   if (!is_software_renderer()) {
-    resource = CreateGpuResource(
-        this->child_context_provider_, this->child_resource_provider_.get(),
-        tile_size, format, gfx::ColorSpace(), MakePixelSpan(bitmap));
+    resource = CreateGpuResource(this->child_context_provider_,
+                                 this->child_resource_provider_.get(),
+                                 tile_size, format, kPremul_SkAlphaType,
+                                 gfx::ColorSpace(), MakePixelSpan(bitmap));
   } else {
     resource = this->AllocateAndFillSoftwareResource(
         this->child_context_provider_, tile_size, bitmap);
@@ -5342,8 +5345,8 @@ TEST_P(GPURendererPixelTest, TextureQuadBatching) {
 
   ResourceId resource = CreateGpuResource(
       this->child_context_provider_, this->child_resource_provider_.get(),
-      mask_rect.size(), SinglePlaneFormat::kRGBA_8888, gfx::ColorSpace(),
-      MakePixelSpan(bitmap));
+      mask_rect.size(), SinglePlaneFormat::kRGBA_8888, kPremul_SkAlphaType,
+      gfx::ColorSpace(), MakePixelSpan(bitmap));
 
   // Return the mapped resource id.
   std::unordered_map<ResourceId, ResourceId, ResourceIdHasher> resource_map =
@@ -5422,10 +5425,10 @@ TEST_P(GPURendererPixelTest, TileQuadClamping) {
 
   ResourceId resource;
   if (!is_software_renderer()) {
-    resource = CreateGpuResource(this->child_context_provider_,
-                                 this->child_resource_provider_.get(),
-                                 tile_size, SinglePlaneFormat::kRGBA_8888,
-                                 gfx::ColorSpace(), MakePixelSpan(bitmap));
+    resource = CreateGpuResource(
+        this->child_context_provider_, this->child_resource_provider_.get(),
+        tile_size, SinglePlaneFormat::kRGBA_8888, kPremul_SkAlphaType,
+        gfx::ColorSpace(), MakePixelSpan(bitmap));
   } else {
     resource = this->AllocateAndFillSoftwareResource(
         this->child_context_provider_, tile_size, bitmap);
@@ -5533,8 +5536,8 @@ TEST_P(GPURendererPixelTest, RoundedCornerSimpleTextureDrawQuad) {
                             0, 0, 255, 255, 0, 0, 255, 255};
   ResourceId resource = CreateGpuResource(
       this->child_context_provider_, this->child_resource_provider_.get(),
-      gfx::Size(2, 2), SinglePlaneFormat::kRGBA_8888, gfx::ColorSpace(),
-      colors);
+      gfx::Size(2, 2), SinglePlaneFormat::kRGBA_8888, kPremul_SkAlphaType,
+      gfx::ColorSpace(), colors);
 
   std::unordered_map<ResourceId, ResourceId, ResourceIdHasher> resource_map =
       cc::SendResourceAndGetChildToParentMap(
@@ -6383,8 +6386,9 @@ class ColorTransformPixelTest
 
       ResourceId resource = CreateGpuResource(
           this->child_context_provider_, this->child_resource_provider_.get(),
-          rect.size(), SinglePlaneFormat::kRGBA_8888, this->src_color_space_,
-          input_colors);
+          rect.size(), SinglePlaneFormat::kRGBA_8888,
+          premultiplied_alpha_ ? kPremul_SkAlphaType : kUnpremul_SkAlphaType,
+          this->src_color_space_, input_colors);
 
       // Return the mapped resource id.
       std::unordered_map<ResourceId, ResourceId, ResourceIdHasher>
@@ -6404,7 +6408,6 @@ class ColorTransformPixelTest
                    uv_top_left, uv_bottom_right, SkColors::kBlack,
                    nearest_neighbor,
                    /*secure_output=*/false, gfx::ProtectedVideoType::kClear);
-      quad->premultiplied_alpha = this->premultiplied_alpha_;
 
       auto* color_quad = pass->CreateAndAppendDrawQuad<SolidColorDrawQuad>();
       color_quad->SetNew(shared_state, rect, rect, SkColors::kBlack, false);

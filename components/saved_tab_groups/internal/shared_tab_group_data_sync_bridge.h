@@ -77,8 +77,10 @@ class SharedTabGroupDataSyncBridge : public syncer::DataTypeSyncBridge {
   std::unique_ptr<syncer::DataBatch> GetDataForCommit(
       StorageKeyList storage_keys) override;
   std::unique_ptr<syncer::DataBatch> GetAllDataForDebugging() override;
-  std::string GetClientTag(const syncer::EntityData& entity_data) override;
-  std::string GetStorageKey(const syncer::EntityData& entity_data) override;
+  std::string GetClientTag(
+      const syncer::EntityData& entity_data) const override;
+  std::string GetStorageKey(
+      const syncer::EntityData& entity_data) const override;
   bool SupportsGetClientTag() const override;
   bool SupportsGetStorageKey() const override;
   bool SupportsIncrementalUpdates() const override;
@@ -107,11 +109,6 @@ class SharedTabGroupDataSyncBridge : public syncer::DataTypeSyncBridge {
 
   void UntrackEntitiesForCollaboration(
       const syncer::CollaborationId& collaboration_id);
-
-  // Generates specifics for a shared tab based on the information of `tab`.
-  // Used only for tests.
-  static sync_pb::SharedTabGroupDataSpecifics
-  SharedTabGroupTabToSpecificsForTest(const SavedTabGroupTab& tab);
 
  private:
   // Loads the data already stored in the DataTypeStore.
@@ -216,6 +213,19 @@ class SharedTabGroupDataSyncBridge : public syncer::DataTypeSyncBridge {
   // group exists in the model.
   std::optional<syncer::ModelError> ResolveTabsMissingGroups(
       syncer::MetadataChangeList& metadata_change_list);
+
+  // Converts a `group` to a `SharedTabGroupDataSpecifics` proto. The returned
+  // specifics also contains unsupported fields that are stored in sync
+  // metadata.
+  sync_pb::SharedTabGroupDataSpecifics SharedTabGroupToSpecifics(
+      const SavedTabGroup& group) const;
+
+  // Converts a `tab` to a `SharedTabGroupDataSpecifics` proto. The returned
+  // specifics also contains unsupported fields that are stored in sync
+  // metadata.
+  sync_pb::SharedTabGroupDataSpecifics SharedTabGroupTabToSpecifics(
+      const SavedTabGroupTab& tab,
+      sync_pb::UniquePosition unique_position) const;
 
   SEQUENCE_CHECKER(sequence_checker_);
 

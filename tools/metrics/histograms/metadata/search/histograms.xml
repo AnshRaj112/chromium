@@ -89,6 +89,18 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Search.AuxiliarySearch.CustomTabFetchResults.Count"
+    units="count" expires_after="2025-11-16">
+  <owner>hanxi@chromium.org</owner>
+  <owner>clank-start@google.com</owner>
+  <summary>
+    Records the number of entries returned from fetching history database which
+    was initiated by a Custom Tab for auxiliary search. The histogram is logged
+    when the Custom Tab is paused and the fetching from history database is
+    completed. Android-only.
+  </summary>
+</histogram>
+
 <histogram name="Search.AuxiliarySearch.DeleteTime{AuxiliarySearchDataType}"
     units="ms" expires_after="2026-02-10">
   <owner>gangwu@chromium.org</owner>
@@ -285,6 +297,18 @@ chromium-metrics-reviews@google.com.
     Records the whether the sharing Tabs with OS config is enabled. The
     histogram is logged when the user changes the config on Tabs settings.
     Android-only.
+  </summary>
+</histogram>
+
+<histogram name="Search.AuxiliarySearch.TimeToCreateControllerInCustomTab"
+    units="ms" expires_after="2025-11-15">
+  <owner>hanxi@chromium.org</owner>
+  <owner>clank-start@google.com</owner>
+  <summary>
+    Records the time from CustomTabActivity is created until the
+    AuxiliarySearchController is created in the deferred startup. The histogram
+    is logged when the AuxiliarySearchController is created in the
+    CustomTabActivity. Android-only.
   </summary>
 </histogram>
 

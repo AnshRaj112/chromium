@@ -135,14 +135,10 @@ class AIWritingAssistanceBase : public ExecutionContextClient {
     auto promise = resolver->Promise();
     ExecutionContext* execution_context = ExecutionContext::From(script_state);
 
-    // Return unavailable for cross-origin iframe access with no permission
-    // policy.
-    if (auto* window = DynamicTo<LocalDOMWindow>(execution_context)) {
-      if (window->IsCrossSiteSubframeIncludingScheme() &&
-          !window->IsFeatureEnabled(GetPermissionsPolicy())) {
-        resolver->Resolve(AvailabilityToV8(Availability::kUnavailable));
-        return promise;
-      }
+    // Return unavailable if the Permission Policy is not enabled.
+    if (!execution_context->IsFeatureEnabled(GetPermissionsPolicy())) {
+      resolver->Resolve(AvailabilityToV8(Availability::kUnavailable));
+      return promise;
     }
 
     HeapMojoRemote<mojom::blink::AIManager>& ai_manager_remote =
@@ -191,20 +187,16 @@ class AIWritingAssistanceBase : public ExecutionContextClient {
       return promise;
     }
 
-    // Block cross-origin iframe access with no permission policy.
-    auto* context = ExecutionContext::From(script_state);
-    if (auto* window = DynamicTo<LocalDOMWindow>(context)) {
-      if (window->GetFrame() &&
-          window->GetFrame()->IsCrossOriginToOutermostMainFrame() &&
-          !window->IsFeatureEnabled(GetPermissionsPolicy())) {
-        resolver->Reject(MakeGarbageCollected<DOMException>(
-            DOMExceptionCode::kNotAllowedError,
-            kExceptionMessageCrossOriginAccess));
-        return promise;
-      }
+    ExecutionContext* execution_context = ExecutionContext::From(script_state);
+
+    // Block access if the Permission Policy is not enabled.
+    if (!execution_context->IsFeatureEnabled(GetPermissionsPolicy())) {
+      resolver->Reject(MakeGarbageCollected<DOMException>(
+          DOMExceptionCode::kNotAllowedError,
+          kExceptionMessagePermissionPolicy));
+      return promise;
     }
 
-    ExecutionContext* execution_context = ExecutionContext::From(script_state);
     HeapMojoRemote<mojom::blink::AIManager>& ai_manager_remote =
         AIInterfaceProxy::GetAIManagerRemote(execution_context);
 
@@ -213,10 +205,49 @@ class AIWritingAssistanceBase : public ExecutionContextClient {
       return promise;
     }
     RecordCreateOptionMetrics(*options, "create");
-    MakeGarbageCollected<AIWritingAssistanceCreateClient<
-        AIMojoClient, AIMojoCreateClient, CreateOptions, V8SessionObjectType>>(
-        script_state, resolver, options)
-        ->Create();
+
+    RemoteCanCreate(
+        ai_manager_remote, options,
+        WTF::BindOnce(
+            [](ScriptPromiseResolver<V8SessionObjectType>* resolver,
+               CreateOptions* options,
+               mojom::blink::ModelAvailabilityCheckResult result) {
+              ScriptState* script_state = resolver->GetScriptState();
+              if (!script_state || !script_state->ContextIsValid()) {
+                return;
+              }
+
+              auto availability = ConvertModelAvailabilityCheckResult(result);
+              if (availability == Availability::kUnavailable) {
+                resolver->RejectWithDOMException(
+                    DOMExceptionCode::kNotAllowedError,
+                    ConvertModelAvailabilityCheckResultToDebugString(result));
+                return;
+              }
+
+              LocalDOMWindow* const window = LocalDOMWindow::From(script_state);
+
+              // Writing Assistance APIs are only available within window and
+              // extension worker contexts by default. User activation is not
+              // consumed by workers, as they lack the ability to do so.
+              if (window && RequiresUserActivation(availability) &&
+                  !LocalFrame::ConsumeTransientUserActivation(
+                      window->GetFrame())) {
+                resolver->RejectWithDOMException(
+                    DOMExceptionCode::kNotAllowedError,
+                    kExceptionMessageUserActivationRequired);
+                return;
+              }
+
+              // TODO(crbug.com/396466270): Make this one mojo round trip
+              // once we can consume User Activation on the browser-side.
+              MakeGarbageCollected<AIWritingAssistanceCreateClient<
+                  AIMojoClient, AIMojoCreateClient, CreateOptions,
+                  V8SessionObjectType>>(script_state, resolver, options)
+                  ->Create();
+            },
+            WrapPersistent(resolver), WrapPersistent(options)));
+
     return promise;
   }
 
@@ -341,7 +372,7 @@ class AIWritingAssistanceBase : public ExecutionContextClient {
         input, options->getContextOr(g_empty_string),
         WTF::BindOnce(
             [](ScriptPromiseResolver<IDLDouble>* resolver, AbortSignal* signal,
-               std::optional<uint64_t> usage) {
+               std::optional<uint32_t> usage) {
               ExecutionContext* context = resolver->GetExecutionContext();
               if (!context) {
                 return;

@@ -53,7 +53,6 @@ void TextureLayerImpl::PushPropertiesTo(LayerImpl* layer) {
   TextureLayerImpl* texture_layer = static_cast<TextureLayerImpl*>(layer);
   texture_layer->SetUVTopLeft(uv_top_left_);
   texture_layer->SetUVBottomRight(uv_bottom_right_);
-  texture_layer->SetPremultipliedAlpha(premultiplied_alpha_);
   texture_layer->SetBlendBackgroundColor(blend_background_color_);
   texture_layer->SetForceTextureToOpaque(force_texture_to_opaque_);
   if (needs_set_resource_push_) {
@@ -100,6 +99,7 @@ bool TextureLayerImpl::WillDraw(
         DCHECK(MayEvictResourceInBackground(
             transferable_resource_.resource_source));
       }
+
       resource_id_ = resource_provider->ImportResource(
           transferable_resource_,
           /* impl_thread_release_callback= */ viz::ReleaseCallback(),
@@ -149,7 +149,6 @@ void TextureLayerImpl::AppendQuads(const AppendQuadsContext& context,
                resource_id_, uv_top_left_, uv_bottom_right_, bg_color,
                nearest_neighbor,
                /*secure_output=*/false, gfx::ProtectedVideoType::kClear);
-  quad->premultiplied_alpha = premultiplied_alpha_;
   quad->dynamic_range_limit = GetDynamicRangeLimit();
   ValidateQuadResources(quad);
 }
@@ -187,10 +186,6 @@ gfx::ContentColorUsage TextureLayerImpl::GetContentColorUsage() const {
     return gfx::ContentColorUsage::kHDR;
   }
   return transferable_resource_.color_space.GetContentColorUsage();
-}
-
-void TextureLayerImpl::SetPremultipliedAlpha(bool premultiplied_alpha) {
-  premultiplied_alpha_ = premultiplied_alpha;
 }
 
 void TextureLayerImpl::SetBlendBackgroundColor(bool blend) {

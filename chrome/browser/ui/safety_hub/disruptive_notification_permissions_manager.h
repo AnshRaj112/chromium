@@ -84,6 +84,7 @@ class DisruptiveNotificationPermissionsManager
   };
   // LINT.ThenChange(//tools/metrics/histograms/enums.xml:DisruptiveNotificationFalsePositiveReason)
 
+  // LINT.IfChange(RevocationState)
   enum class RevocationState {
     kNone = 0,
     kProposed = 1,
@@ -92,6 +93,7 @@ class DisruptiveNotificationPermissionsManager
     kUnknown = 4,
     kMaxValue = kUnknown,
   };
+  // LINT.ThenChange(//tools/metrics/histograms/enums.xml:DisruptiveNotificationRevocationState)
 
   class SafetyHubNotificationWrapper {
    public:
@@ -146,19 +148,20 @@ class DisruptiveNotificationPermissionsManager
       const ContentSettingsPattern& primary_pattern,
       const ContentSettingsPattern& secondary_pattern);
 
+  // Restores REVOKED_DISRUPTIVE_NOTIFICATION_PERMISSIONS entry for the
+  // primary_pattern after it was deleted after user has accepted the revocation
+  // (via `ClearRevokedPermissionsList()`). Only restores the value if there is
+  // a matching notification engagement entry.
+  void RestoreDeletedRevokedPermission(
+      const ContentSettingsPattern& primary_pattern,
+      content_settings::ContentSettingConstraints constraints);
+
   // If the URL is in the revoke or proposed revoke list, report a false
   // positive and record metrics.
   static void MaybeReportFalsePositive(Profile* profile,
                                        const GURL& origin,
                                        FalsePositiveReason reason,
                                        ukm::SourceId source_id);
-
-  // If the URL is in the false positive list, report user regrant after a
-  // revocation. Since the user regrant only happens on a page visit, the site
-  // will be in false positive list, not in the revoked list.
-  static void MaybeReportUserRegrant(Profile* profile,
-                                     const GURL& url,
-                                     ukm::SourceId source_id);
 
   // Logs metrics for proposed disruptive notification revocation, to be called
   // when displaying a persistent notification.

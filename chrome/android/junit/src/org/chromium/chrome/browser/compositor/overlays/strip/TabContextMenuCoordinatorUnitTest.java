@@ -16,6 +16,8 @@ import static org.chromium.ui.listmenu.ListSectionDividerProperties.COLOR_ID;
 
 import android.app.Activity;
 import android.graphics.Rect;
+import android.os.SystemClock;
+import android.view.MotionEvent;
 
 import androidx.test.ext.junit.rules.ActivityScenarioRule;
 
@@ -32,6 +34,7 @@ import org.chromium.base.Token;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Features.EnableFeatures;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.collaboration.CollaborationServiceFactory;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -48,7 +51,11 @@ import org.chromium.chrome.browser.tabmodel.TabRemover;
 import org.chromium.chrome.browser.tabmodel.TabUngrouper;
 import org.chromium.chrome.browser.tasks.tab_management.TabGroupListBottomSheetCoordinator;
 import org.chromium.chrome.browser.tasks.tab_management.TabOverflowMenuCoordinator.OnItemClickedCallback;
+import org.chromium.chrome.browser.tasks.tab_management.TabUiTestHelper;
 import org.chromium.chrome.test.util.browser.tabmodel.MockTabModel;
+import org.chromium.components.browser_ui.widget.list_view.FakeListViewTouchTracker;
+import org.chromium.components.browser_ui.widget.list_view.ListViewTouchTracker;
+import org.chromium.components.browser_ui.widget.list_view.ListViewTouchTracker.ListViewTouchInfo;
 import org.chromium.components.collaboration.CollaborationService;
 import org.chromium.components.collaboration.ServiceStatus;
 import org.chromium.components.tab_group_sync.SavedTabGroup;
@@ -427,28 +434,77 @@ public class TabContextMenuCoordinatorUnitTest {
     @Test
     @Feature("Tab Strip Context Menu")
     public void testRemoveFromGroup() {
-        mOnItemClickedCallback.onClick(R.id.remove_from_tab_group, TAB_ID, COLLABORATION_ID);
+        mOnItemClickedCallback.onClick(
+                R.id.remove_from_tab_group,
+                TAB_ID,
+                COLLABORATION_ID,
+                /* listViewTouchTracker= */ null);
         verify(mTabUngrouper, times(1)).ungroupTabs(List.of(mTab1), true, true);
     }
 
     @Test
     @Feature("Tab Strip Context Menu")
     public void testShareUrl() {
-        mOnItemClickedCallback.onClick(R.id.share_tab, TAB_ID, COLLABORATION_ID);
+        mOnItemClickedCallback.onClick(
+                R.id.share_tab, TAB_ID, COLLABORATION_ID, /* listViewTouchTracker= */ null);
         verify(mShareDelegate, times(1)).share(mTab1, false, TAB_STRIP_CONTEXT_MENU);
     }
 
     @Test
     @Feature("Tab Strip Context Menu")
-    public void testCloseTab() {
-        mOnItemClickedCallback.onClick(R.id.close_tab, TAB_ID, COLLABORATION_ID);
-        verify(mTabRemover, times(1)).closeTabs(TabClosureParams.closeTab(mTab1).build(), true);
+    public void testCloseTab_nullListViewTouchTracker() {
+        testCloseTab(/* listViewTouchTracker= */ null, /* shouldAllowUndo= */ true);
+    }
+
+    @Test
+    @Feature("Tab Strip Context Menu")
+    public void testCloseTab_clickWithTouch() {
+        long downMotionTime = SystemClock.uptimeMillis();
+        FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
+        listViewTouchTracker.setLastSingleTapUpInfo(
+                ListViewTouchInfo.fromMotionEvent(
+                        TabUiTestHelper.createTouchMotionEvent(
+                                downMotionTime,
+                                /* eventTime= */ downMotionTime + 50,
+                                MotionEvent.ACTION_UP,
+                                /* x= */ 0,
+                                /* y= */ 0)));
+
+        testCloseTab(listViewTouchTracker, /* shouldAllowUndo= */ true);
+    }
+
+    @Test
+    @Feature("Tab Strip Context Menu")
+    public void testCloseTab_clickWithMouse() {
+        long downMotionTime = SystemClock.uptimeMillis();
+        FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
+        listViewTouchTracker.setLastSingleTapUpInfo(
+                ListViewTouchInfo.fromMotionEvent(
+                        TabUiTestHelper.createMouseMotionEvent(
+                                downMotionTime,
+                                /* eventTime= */ downMotionTime + 50,
+                                MotionEvent.ACTION_UP,
+                                /* x= */ 0,
+                                /* y= */ 0)));
+
+        testCloseTab(listViewTouchTracker, /* shouldAllowUndo= */ false);
+    }
+
+    private void testCloseTab(
+            @Nullable ListViewTouchTracker listViewTouchTracker, boolean shouldAllowUndo) {
+        mOnItemClickedCallback.onClick(
+                R.id.close_tab, TAB_ID, COLLABORATION_ID, listViewTouchTracker);
+        verify(mTabRemover, times(1))
+                .closeTabs(
+                        TabClosureParams.closeTab(mTab1).allowUndo(shouldAllowUndo).build(),
+                        /* allowDialog= */ true);
     }
 
     @Test
     @Feature("Tab Strip Context Menu")
     public void testAddToTabGroup_newTabGroup() {
-        mOnItemClickedCallback.onClick(R.id.add_to_tab_group, TAB_ID, COLLABORATION_ID);
+        mOnItemClickedCallback.onClick(
+                R.id.add_to_tab_group, TAB_ID, COLLABORATION_ID, /* listViewTouchTracker= */ null);
         verify(mBottomSheetCoordinator, times(1)).showBottomSheet(List.of(mTab1));
     }
 
@@ -517,7 +573,11 @@ public class TabContextMenuCoordinatorUnitTest {
     @Test
     @Feature("Tab Strip Context Menu")
     public void testMoveToAnotherWindow() {
-        mOnItemClickedCallback.onClick(R.id.move_to_other_window_menu_id, TAB_ID, COLLABORATION_ID);
+        mOnItemClickedCallback.onClick(
+                R.id.move_to_other_window_menu_id,
+                TAB_ID,
+                COLLABORATION_ID,
+                /* listViewTouchTracker= */ null);
         verify(mMultiInstanceManager, times(1)).moveTabToOtherWindow(mTab1);
     }
 }

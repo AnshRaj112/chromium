@@ -1,12 +1,16 @@
+// META: title=Language Model Abort
 // META: script=resources/utils.js
-// META: script=resources/workaround-for-382640509.js
+// META: timeout=long
+
+'use strict';
+
 promise_test(async t => {
   await testAbortPromise(t, signal => {
     return LanguageModel.create({
       signal: signal
     });
   });
-}, "Aborting AILanguageModelFactory.create().");
+}, "Aborting LanguageModel.create().");
 
 promise_test(async t => {
   const session = await LanguageModel.create();
@@ -15,14 +19,14 @@ promise_test(async t => {
       signal: signal
     });
   });
-}, "Aborting AILanguageModel.clone().");
+}, "Aborting LanguageModel.clone().");
 
 promise_test(async t => {
   const session = await LanguageModel.create();
   await testAbortPromise(t, signal => {
     return session.prompt(kTestPrompt, { signal: signal });
   });
-}, "Aborting AILanguageModel.prompt().");
+}, "Aborting LanguageModel.prompt().");
 
 promise_test(async t => {
   const session = await LanguageModel.create();
@@ -31,4 +35,4 @@ promise_test(async t => {
       kTestPrompt, { signal: signal }
     );
   });
-}, "Aborting AILanguageModel.promptStreaming().");
+}, "Aborting LanguageModel.promptStreaming().");

@@ -36,6 +36,7 @@
 #import "ios/chrome/app/profile/profile_state.h"
 #import "ios/chrome/app/tests_hook.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/signin_coordinator.h"
 #import "ios/chrome/browser/bookmarks/model/bookmark_model_factory.h"
 #import "ios/chrome/browser/commerce/model/push_notification/push_notification_feature.h"
 #import "ios/chrome/browser/commerce/model/shopping_service_factory.h"
@@ -254,7 +255,7 @@ using segmentation_platform::TipIdentifier;
   PriceTrackingPromoMediator* _priceTrackingPromoMediator;
   ShopCardMediator* _shopCardMediator;
   SendTabPromoMediator* _sendTabPromoMediator;
-
+  SigninCoordinator* _signinCoordinator;
   MagicStackCollectionViewController* _magicStackCollectionView;
 
   raw_ptr<segmentation_platform::SegmentationPlatformService>
@@ -565,10 +566,7 @@ using segmentation_platform::TipIdentifier;
   self.contentSuggestionsMetricsRecorder = nil;
   self.contentSuggestionsViewController.audience = nil;
   self.contentSuggestionsViewController = nil;
-  [_defaultBrowserPromoCoordinator stop];
-  _defaultBrowserPromoCoordinator = nil;
-  [_notificationsOptInAlertCoordinator stop];
-  _notificationsOptInAlertCoordinator = nil;
+  [self clearPresentedState];
   [self.browser->GetCommandDispatcher()
       stopDispatchingForProtocol:@protocol(ContentSuggestionsCommands)];
   _started = NO;
@@ -576,6 +574,14 @@ using segmentation_platform::TipIdentifier;
 
 - (ContentSuggestionsViewController*)viewController {
   return self.contentSuggestionsViewController;
+}
+
+- (void)clearPresentedState {
+  [_defaultBrowserPromoCoordinator stop];
+  _defaultBrowserPromoCoordinator = nil;
+  [_notificationsOptInAlertCoordinator stop];
+  _notificationsOptInAlertCoordinator = nil;
+  [self stopSigninCoordinator];
 }
 
 #pragma mark - Public methods
@@ -1154,12 +1160,6 @@ using segmentation_platform::TipIdentifier;
       [self
           showNotificationsOptInView:NotificationOptInAccessPoint::kSetUpList];
       break;
-    case SetUpListItemType::kDocking:
-      [self showDockingPromo];
-      break;
-    case SetUpListItemType::kAddressBar:
-      [self showAddressBarPromo];
-      break;
     case SetUpListItemType::kFollow:
     case SetUpListItemType::kAllSet:
       // TODO(crbug.com/40262090): Add a Follow item to the Set Up List.
@@ -1185,14 +1185,10 @@ using segmentation_platform::TipIdentifier;
 
 // Shows the SigninSync UI with the SetUpList access point.
 - (void)showSignIn {
+  __weak __typeof(self) weakSelf = self;
   SigninCoordinatorCompletionCallback completion =
       ^(SigninCoordinatorResult result, id<SystemIdentity> completionIdentity) {
-        if (result == SigninCoordinatorResultSuccess ||
-            result == SigninCoordinatorResultCanceledByUser) {
-          PrefService* localState = GetApplicationContext()->GetLocalState();
-          set_up_list_prefs::MarkItemComplete(localState,
-                                              SetUpListItemType::kSignInSync);
-        }
+        [weakSelf signinCoordinatiorCompletionWithResult:result];
       };
   // If there are 0 identities, kInstantSignin requires less taps.
   AuthenticationOperation operation =
@@ -1205,9 +1201,28 @@ using segmentation_platform::TipIdentifier;
             promoAction:signin_metrics::PromoAction::
                             PROMO_ACTION_NO_SIGNIN_PROMO
              completion:completion];
-  [HandlerForProtocol(self.browser->GetCommandDispatcher(), ApplicationCommands)
-              showSignin:command
-      baseViewController:self.magicStackCollectionView];
+  _signinCoordinator =
+      [SigninCoordinator signinCoordinatorWithCommand:command
+                                              browser:self.browser
+                                   baseViewController:self.viewController];
+  [_signinCoordinator start];
+}
+
+// Stops the SigninCoordinator.
+- (void)stopSigninCoordinator {
+  [_signinCoordinator stop];
+  _signinCoordinator = nil;
+}
+
+// Callback for the SigninCoordinator.
+- (void)signinCoordinatiorCompletionWithResult:(SigninCoordinatorResult)result {
+  [self stopSigninCoordinator];
+  if (result == SigninCoordinatorResultSuccess ||
+      result == SigninCoordinatorResultCanceledByUser) {
+    PrefService* localState = GetApplicationContext()->GetLocalState();
+    set_up_list_prefs::MarkItemComplete(localState,
+                                        SetUpListItemType::kSignInSync);
+  }
 }
 
 // Shows the Credential Provider Promo using the SetUpList trigger.
@@ -1226,19 +1241,6 @@ using segmentation_platform::TipIdentifier;
   _notificationsOptInCoordinator.accessPoint = accessPoint;
   _notificationsOptInCoordinator.delegate = self;
   [_notificationsOptInCoordinator start];
-}
-
-// Shows the Docking promo.
-- (void)showDockingPromo {
-  [HandlerForProtocol(self.browser->GetCommandDispatcher(),
-                      DockingPromoCommands)
-      showDockingPromoWithTrigger:DockingPromoTrigger::kSetUpList];
-}
-
-// Shows the Address Bar promo.
-- (void)showAddressBarPromo {
-  [HandlerForProtocol(self.browser->GetCommandDispatcher(),
-                      BrowserCoordinatorCommands) showOmniboxPositionChoice];
 }
 
 #pragma mark - NotificationsOptInAlertCoordinatorDelegate

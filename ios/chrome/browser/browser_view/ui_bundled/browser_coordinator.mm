@@ -44,6 +44,7 @@
 #import "ios/chrome/browser/authentication/ui_bundled/enterprise/enterprise_prompt/enterprise_prompt_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/enterprise/enterprise_prompt/enterprise_prompt_type.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/signin_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin_presenter.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin_promo/coordinator/non_modal_signin_promo_coordinator.h"
 #import "ios/chrome/browser/authentication/ui_bundled/trusted_vault_reauthentication/trusted_vault_reauthentication_coordinator.h"
@@ -625,6 +626,7 @@ enum class ToolbarKind {
 @end
 
 @implementation BrowserCoordinator {
+  SigninCoordinator* _signinCoordinator;
   BrowserViewControllerDependencies _viewControllerDependencies;
   KeyCommandsProvider* _keyCommandsProvider;
   BubblePresenterCoordinator* _bubblePresenterCoordinator;
@@ -749,6 +751,7 @@ enum class ToolbarKind {
   self.started = NO;
   [super stop];
   self.active = NO;
+  [self stopSigninCoordinator];
   [self uninstallDelegatesForBrowserState];
   [self uninstallDelegatesForBrowser];
   [self.tabEventsMediator disconnect];
@@ -895,17 +898,21 @@ enum class ToolbarKind {
 
   [self dismissLensPromo];
   [self dismissEnhancedSafeBrowsingPromo];
-
-  [self dismissAccountMenu];
   [self dismissAutoDeletionActionSheet];
 
   [self cancelCollaborationFlows];
+  [self.NTPCoordinator clearPresentedState];
 
   [self.viewController clearPresentedStateWithCompletion:completion
                                           dismissOmnibox:dismissOmnibox];
 }
 
 #pragma mark - Private
+
+- (void)stopSigninCoordinator {
+  [_signinCoordinator stop];
+  _signinCoordinator = nil;
+}
 
 - (void)stopTrustedVaultReauthentication {
   [_trustedVaultReauthenticationCoordinator stop];
@@ -994,13 +1001,6 @@ enum class ToolbarKind {
   [self.passwordSettingsCoordinator stop];
   self.passwordSettingsCoordinator.delegate = nil;
   self.passwordSettingsCoordinator = nil;
-}
-
-// Dismisses the account menu.
-- (void)dismissAccountMenu {
-  if (!_NTPCoordinator) {
-    return;
-  }
 }
 
 - (void)setWebUsageEnabled:(BOOL)webUsageEnabled {
@@ -1940,13 +1940,14 @@ enum class ToolbarKind {
 
 - (void)presentAutoDeletionActionSheetWithDownloadTask:
     (web::DownloadTask*)task {
-  // Do not present the action sheet if it is already being presented.
-  if (_autoDeletionCoordinator) {
+  // Do not present the action sheet if it is already being presented or the
+  // DownloadManagerCoordinator is null.
+  if (_autoDeletionCoordinator || !self.downloadManagerCoordinator) {
     return;
   }
 
   _autoDeletionCoordinator = [[AutoDeletionCoordinator alloc]
-      initWithBaseViewController:self.viewController
+      initWithBaseViewController:self.downloadManagerCoordinator.viewController
                          browser:self.browser
                     downloadTask:task];
   [_autoDeletionCoordinator start];
@@ -2308,7 +2309,7 @@ enum class ToolbarKind {
   TabGroupService* groupService =
       TabGroupServiceFactory::GetForProfile(self.profile);
   const TabGroup* group = webStateList->GetGroupOfWebStateAt(active_index);
-  if (groupService->ShouldDisplayLastTabCloseAlert(group)) {
+  if (groupService && groupService->ShouldDisplayLastTabCloseAlert(group)) {
     web::WebState* webState = webStateList->GetWebStateAt(active_index);
     BOOL isTablet = ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET;
     SharedTabGroupLastTabAlertCommand* command =
@@ -3509,12 +3510,11 @@ enum class ToolbarKind {
                          kSuccess);
           });
 
-  TabGroupService* groupService =
-      TabGroupServiceFactory::GetForProfile(self.profile);
   std::unique_ptr<collaboration::IOSCollaborationControllerDelegate> delegate =
       std::make_unique<collaboration::IOSCollaborationControllerDelegate>(
-          self.browser, viewController, groupService,
-          collaboration::FlowType::kLeaveOrDelete);
+          self.browser, CreateControllerDelegateParamsFromProfile(
+                            self.profile, viewController,
+                            collaboration::FlowType::kLeaveOrDelete));
   delegate->SetLeaveOrDeleteConfirmationCallback(std::move(completionCallback));
 
   collaboration::CollaborationService* collaborationService =
@@ -3720,9 +3720,20 @@ enum class ToolbarKind {
 #pragma mark - SigninPresenter
 
 - (void)showSignin:(ShowSigninCommand*)command {
-  [HandlerForProtocol(self.dispatcher, ApplicationCommands)
-              showSignin:command
-      baseViewController:self.viewController];
+  _signinCoordinator =
+      [SigninCoordinator signinCoordinatorWithCommand:command
+                                              browser:self.browser
+                                   baseViewController:self.viewController];
+  __weak __typeof(self) weakSelf = self;
+  _signinCoordinator.signinCompletion =
+      ^(SigninCoordinatorResult result, id<SystemIdentity> identity) {
+        SigninCoordinatorCompletionCallback completion = command.completion;
+        if (completion) {
+          completion(result, identity);
+        }
+        [weakSelf stopSigninCoordinator];
+      };
+  [_signinCoordinator start];
 }
 
 #pragma mark - SnapshotGeneratorDelegate methods
@@ -4330,15 +4341,11 @@ enum class ToolbarKind {
 - (void)stopQuickDeleteForAnimationWithCompletion:(ProceduralBlock)completion {
   CHECK(IsIosQuickDeleteEnabled());
 
-  // If BrowserViewController has not presented any view controller, then
-  // trigger `completion` immediately.
-  if (!self.viewController.presentedViewController) {
-    // TODO(crbug.com/335387869): Remove NotFatalUntil when we're sure this code
-    // path is infeasible. If Quick Delete is not visible because it was
-    // dismissed while the deletion was occuring, then the tab grid should be
-    // visible.
-    CHECK(self.sceneState.controller.isTabGridVisible,
-          base::NotFatalUntil::M139);
+  // If BrowserViewController has not presented any view controller (i.e. QD has
+  // been dismissed) and the tab grid is also not visible, then just trigger
+  // `completion` immediately.
+  if (!self.viewController.presentedViewController &&
+      !self.sceneState.controller.isTabGridVisible) {
     if (completion) {
       completion();
     }
@@ -4441,9 +4448,9 @@ enum class ToolbarKind {
 
   std::unique_ptr<collaboration::IOSCollaborationControllerDelegate> delegate =
       std::make_unique<collaboration::IOSCollaborationControllerDelegate>(
-          browser, self.viewController,
-          TabGroupServiceFactory::GetForProfile(browser->GetProfile()),
-          collaboration::FlowType::kShareOrManage);
+          browser, CreateControllerDelegateParamsFromProfile(
+                       self.profile, self.viewController,
+                       collaboration::FlowType::kShareOrManage));
   collaboration::CollaborationService* collaborationService =
       collaboration::CollaborationServiceFactory::GetForProfile(self.profile);
   collaborationService->StartShareOrManageFlow(

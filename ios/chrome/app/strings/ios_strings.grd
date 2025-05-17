@@ -1594,6 +1594,9 @@ See your search engine’s instructions for deleting your search history, if app
       <message name="IDS_IOS_CONTENT_SUGGESTIONS_WHATS_NEW" desc="The What's New title on the new tab page [Length: 10em]">
         What's New
       </message>
+      <message name="IDS_IOS_CONTEXTUAL_PANEL_READER_MODE_MODEL_ENTRYPOINT_MESSAGE" desc="Message appearing as the Contextual Panel entry point for Reader mode (appears in the omnibox)">
+        Reading mode available
+      </message>
       <message name="IDS_IOS_CONTEXTUAL_PANEL_SAMPLE_MODEL_ENTRYPOINT_IPH_TEXT" desc="The body text for the in-product help bubble of the Contextual Panel's sample model entry point, used for demo purposes">
         Sample rich in-product help for the Contextual Panel, which should appear multiple times a day.
       </message>
@@ -2294,7 +2297,7 @@ See your search engine’s instructions for deleting your search history, if app
         Managed Account
       </message>
       <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_SUBTITLE" desc="Message displayed in the secondary button on a screen where the user is asked to create a work profile.">
-        Signing in with your managed account helps you separate browsing related to your organization, like tabs, history, and passwords.
+        Signing in with your managed account helps you keep browsing related to your organization (including tabs, history, and passwords) separate from your other browsing
       </message>
       <message name="IDS_IOS_ENTERPRISE_PROFILE_CREATION_TITLE" desc="Message displayed in the secondary button on a screen where the user is asked to create a work profile.">
        A separate space for work
@@ -2520,6 +2523,15 @@ See your search engine’s instructions for deleting your search history, if app
       </message>
       <message name="IDS_IOS_GENERIC_PASSKIT_ERROR" desc="Generic error message on failure reading a PassKit object. [Length: 60em] [iOS only]">
         Sorry, your Pass cannot be installed to Passbook at this time.
+      </message>
+      <message name="IDS_IOS_GLIC_CONSENT_PRIMARY_BUTTON" desc="Text for the GLIC Consent primary button.">
+        Yes, I'm in
+      </message>
+      <message name="IDS_IOS_GLIC_FIRST_RUN_SECONDARY_BUTTON" desc="Text for the GLIC First Run secondary button.">
+        No thanks
+      </message>
+      <message name="IDS_IOS_GLIC_PROMO_PRIMARY_BUTTON" desc="Text for the GLIC Promo primary button.">
+        Try it out
       </message>
       <message name="IDS_IOS_GOOGLE_ACCOUNTS_MANAGEMENT_FROM_ACCOUNT_SETTINGS_TITLE" desc="Title of a page that shows all accounts on the user's device and lets them add, remove and otherwise manage their accounts. Avoid long strings given the limited space between surrounding buttons.">
         Accounts on this device
@@ -5816,15 +5828,6 @@ While in Incognito, sites can't use cookies to see your browsing activity across
       <message name="IDS_IOS_SETTING_OPENED_IN_ANOTHER_WINDOW" desc="Generic status label displayed in Settings to show that a setting cannot be edited because it is currently being opened for edit in another window. [Length: keep it short.] [iOS only]" meaning="The setting is opened for edit in another window.">
         Opened elsewhere
       </message>
-      <message name="IDS_IOS_SET_UP_LIST_ADDRESS_BAR_LONG_DESCRIPTION" desc="The description for the Set Up List item that encourages users to select the position of their address bar.">
-        Pick the position of your address bar that works best for you.
-      </message>
-      <message name="IDS_IOS_SET_UP_LIST_ADDRESS_BAR_SHORT_DESCRIPTION" desc="The description for the Set Up List item that encourages users to select the position of their address bar (used when the Set Up List is in compact mode).">
-        Select the position that works best for you.
-      </message>
-      <message name="IDS_IOS_SET_UP_LIST_ADDRESS_BAR_TITLE" desc="The title of the Set Up List item that encourages users to select the position of their address bar.">
-        Choose Address Bar Position
-      </message>
       <message name="IDS_IOS_SET_UP_LIST_ALL_SET_TITLE" desc="Title for the Set Up List item that tells the user they have completed all tasks.">
         You're all set
       </message>
@@ -5839,9 +5842,6 @@ While in Incognito, sites can't use cookies to see your browsing activity across
       </message>
       <message name="IDS_IOS_SET_UP_LIST_DEFAULT_BROWSER_SHORT_DESCRIPTION" desc="Shortened description for the Set Up List item that encourages the user to set Chrome as their default browser.">
         Easily open links in other apps.
-      </message>
-      <message name="IDS_IOS_SET_UP_LIST_DOCK_CHROME_LONG_DESCRIPTION" desc="Description for the Set Up List item that encourages the user to add Chrome to their iOS dock.">
-        Get faster access from your Home Screen.
       </message>
       <message name="IDS_IOS_SET_UP_LIST_EXPAND" desc="Accessibility label for the button to expand the Set Up List.">
         Expand list
@@ -5925,13 +5925,16 @@ While in Incognito, sites can't use cookies to see your browsing activity across
         If you delete it, everyone will immediately lose access to the “<ph name="GROUP_NAME">$1<ex>Vacation</ex></ph>" tab group, and it will be deleted from all devices.
       </message>
       <message name="IDS_IOS_SHARED_TAB_GROUP_CONFIRMATION_KEEP_OR_LEAVE_MESSAGE" desc="Message of the confirmation when a member of a shared tab group is closing the last tab.">
-        Keep this group to add tabs later, or leave it if you no longer want access to it.
+        Keep this group to add tabs later, or leave it if you no longer want access to it
       </message>
       <message name="IDS_IOS_SHARED_TAB_GROUP_CONFIRMATION_LEAVE_MESSAGE" desc="Message of the confirmation to leave a shared tab group in the action sheet.">
         You’ll immediately lose access to the “<ph name="GROUP_NAME">$1<ex>Vacation</ex></ph>" tab group, and it will be deleted from all your devices
       </message>
       <message name="IDS_IOS_SHARED_TAB_GROUP_CONFIRMATION_LEAVE_TITLE" desc="Title of the confirmation to leave a shared tab group in the action sheet.">
         Leave group?
+      </message>
+      <message name="IDS_IOS_SHARED_TAB_GROUP_CONFIRMATION_STOP_SHARING_MESSAGE" desc="Message of the confirmation to delete a shared tab group in the action sheet.">
+        Everyone will immediately lose access to the “<ph name="GROUP_NAME">$1<ex>Vacation</ex></ph>" tab group, and all invitation links will be turned off
       </message>
       <message name="IDS_IOS_SHARE_BUTTON_LABEL" desc="Label of a button which will initiate a share flow. [iOS only]">
         Share…
@@ -5946,10 +5949,10 @@ While in Incognito, sites can't use cookies to see your browsing activity across
         Google+ post completed.
       </message>
       <message name="IDS_IOS_SHARE_KIT_BLOCK_AND_LEAVE_MESSAGE" desc="The message shown when the user tries to block another user and leave a tab group.">
-        You'll immediately lose access to the “<ph name="GROUP_NAME">$1<ex>Vacation</ex></ph>" tab group, and <ph name="USER_NAME">$2<ex>John Doe</ex></ph> (<ph name="USER_EMAIL">$3<ex>john.doe@gmail.com</ex></ph>) will no longer be able to interact with you across Google services.
+        You'll immediately lose access to the “<ph name="GROUP_NAME">$1<ex>Vacation</ex></ph>" tab group, and <ph name="USER_NAME">$2<ex>John Doe</ex></ph> (<ph name="USER_EMAIL">$3<ex>john.doe@gmail.com</ex></ph>) will no longer be able to interact with you across Google services
       </message>
       <message name="IDS_IOS_SHARE_KIT_BLOCK_MESSAGE" desc="The message shown when the user tries to block another user.">
-        <ph name="USER_NAME">$1<ex>John Doe</ex></ph> (<ph name="USER_EMAIL">$2<ex>john.doe@gmail.com</ex></ph>) will immediately lose access to the “<ph name="GROUP_NAME">$3<ex>Vacation</ex></ph>" tab group, and will no longer be able to interact with you across Google services.
+        <ph name="USER_NAME">$1<ex>John Doe</ex></ph> (<ph name="USER_EMAIL">$2<ex>john.doe@gmail.com</ex></ph>) will immediately lose access to the “<ph name="GROUP_NAME">$3<ex>Vacation</ex></ph>" tab group, and will no longer be able to interact with you across Google services
       </message>
       <message name="IDS_IOS_SHARE_KIT_JOIN_ALERT_EXPIRED_ACTION_TITLE" desc="The title of the button in the alert displayed when the shared link has expired.">
         Got it
@@ -5999,7 +6002,7 @@ While in Incognito, sites can't use cookies to see your browsing activity across
         Anyone with the link can edit all tabs.
       </message>
       <message name="IDS_IOS_SHARE_KIT_REMOVE_MESSAGE" desc="The message shown when the user tries to remove another user from a tab group.">
-        <ph name="USER_NAME">$1<ex>John Doe</ex></ph> (<ph name="USER_EMAIL">$2<ex>john.doe@gmail.com</ex></ph>) will immediately lose access to the “<ph name="GROUP_NAME">$3<ex>Vacation</ex></ph>" tab group.
+        <ph name="USER_NAME">$1<ex>John Doe</ex></ph> (<ph name="USER_EMAIL">$2<ex>john.doe@gmail.com</ex></ph>) will immediately lose access to the “<ph name="GROUP_NAME">$3<ex>Vacation</ex></ph>" tab group
       </message>
       <message name="IDS_IOS_SHARE_KIT_SHARE_GROUP_DISCLAIMER" desc="Disclaimer for sharing a tab group.">
         Anyone with the link can edit all tabs, so share wisely. Link expires in 48 hours.

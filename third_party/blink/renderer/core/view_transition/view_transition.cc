@@ -467,10 +467,8 @@ void ViewTransition::ProcessCurrentState() {
         // performing the capture.
         bool snap_browser_controls =
             document_->GetFrame()->IsOutermostMainFrame() &&
-            (!RuntimeEnabledFeatures::
-                 ViewTransitionDisableSnapBrowserControlsOnHiddenEnabled() ||
-             document_->GetPage()->GetBrowserControls().PermittedState() !=
-                 cc::BrowserControlsState::kHidden) &&
+            document_->GetPage()->GetBrowserControls().PermittedState() !=
+                cc::BrowserControlsState::kHidden &&
             creation_type_ == CreationType::kForSnapshot;
         if (!style_tracker_->Capture(snap_browser_controls)) {
           SkipTransition(PromiseResponse::kRejectInvalidState);
@@ -1090,6 +1088,17 @@ void ViewTransition::RebuildTransitionPseudoLayoutTree() const {
         style_tracker_->GetViewTransitionNames());
   } else {
     scope->RebuildTransitionPseudoLayoutTree({});
+  }
+}
+
+void ViewTransition::WillEnterGetComputedStyleScope() {
+  if (style_tracker_) {
+    style_tracker_->WillEnterGetComputedStyleScope();
+  }
+}
+void ViewTransition::WillExitGetComputedStyleScope() {
+  if (style_tracker_) {
+    style_tracker_->WillExitGetComputedStyleScope();
   }
 }
 

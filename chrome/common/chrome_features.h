@@ -306,19 +306,10 @@ BASE_DECLARE_FEATURE(kGlicPageContextEligibility);
 COMPONENT_EXPORT(CHROME_FEATURES)
 extern const base::FeatureParam<bool>
     kGlicPageContextEligibilityAllowNoMetadata;
-#endif  // BUILDFLAG(ENABLE_GLIC)
 
-COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kTabstripComboButton);
-COMPONENT_EXPORT(CHROME_FEATURES) bool IsTabSearchMoving();
 COMPONENT_EXPORT(CHROME_FEATURES)
-extern const base::FeatureParam<bool> kTabstripComboButtonHasBackground;
-COMPONENT_EXPORT(CHROME_FEATURES) bool HasTabstripComboButtonWithBackground();
-COMPONENT_EXPORT(CHROME_FEATURES)
-extern const base::FeatureParam<bool> kTabstripComboButtonHasReverseButtonOrder;
-COMPONENT_EXPORT(CHROME_FEATURES)
-bool HasTabstripComboButtonWithReverseButtonOrder();
-extern const base::FeatureParam<bool> kTabSearchToolbarButton;
-COMPONENT_EXPORT(CHROME_FEATURES) bool HasTabSearchToolbarButton();
+BASE_DECLARE_FEATURE(kGlicUnloadOnClose);
+#endif  // BUILDFLAG(ENABLE_GLIC)
 
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kPrivacyGuideForceAvailable);
@@ -875,6 +866,7 @@ COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kProcessPerSiteSkipDevtoolsUsers);
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kProcessPerSiteSkipEnterpriseUsers);
+COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kProcessPerSiteForDSE);
 
 #if BUILDFLAG(IS_CHROMEOS)
 COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kSkyVault);

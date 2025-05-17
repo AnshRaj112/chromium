@@ -35,8 +35,17 @@ using testing::Invoke;
 using testing::Matcher;
 using testing::Not;
 using testing::Return;
+using testing::SaveArgPointee;
 using testing::Sequence;
 using testing::UnorderedElementsAre;
+
+// Action SaveArgPointeeMove<k>(pointer) saves the value pointed to by the k-th
+// (0-based) argument of the mock function by moving it to *pointer.
+ACTION_TEMPLATE(SaveArgPointeeMove,
+                HAS_1_TEMPLATE_PARAMS(int, k),
+                AND_1_VALUE_PARAMS(pointer)) {
+  *pointer = std::move(*testing::get<k>(args));
+}
 
 MATCHER_P3(HasAccountMetadata, title, color, collaboration_id, "") {
   return base::UTF16ToUTF8(arg.title()) == title && arg.color() == color &&
@@ -373,8 +382,8 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
 
   EXPECT_EQ(model().Count(), 1);
   EXPECT_TRUE(model().Contains(created_group_id));
-  EXPECT_FALSE(created_tab1.last_seen_time_windows_epoch_micros().has_value());
-  EXPECT_FALSE(created_tab2.last_seen_time_windows_epoch_micros().has_value());
+  EXPECT_FALSE(created_tab1.last_seen_time().has_value());
+  EXPECT_FALSE(created_tab2.last_seen_time().has_value());
 
   base::Time last_seen_time1 = base::Time::Now();
   base::Time last_seen_time2 = base::Time::Now();
@@ -394,10 +403,10 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
   const SavedTabGroupTab* tab1 = group->GetTab(created_tab_id1);
   const SavedTabGroupTab* tab2 = group->GetTab(created_tab_id2);
 
-  EXPECT_TRUE(tab1->last_seen_time_windows_epoch_micros().has_value());
-  EXPECT_EQ(tab1->last_seen_time_windows_epoch_micros(), last_seen_time1);
-  EXPECT_TRUE(tab2->last_seen_time_windows_epoch_micros().has_value());
-  EXPECT_EQ(tab2->last_seen_time_windows_epoch_micros(), last_seen_time2);
+  EXPECT_TRUE(tab1->last_seen_time().has_value());
+  EXPECT_EQ(tab1->last_seen_time(), last_seen_time1);
+  EXPECT_TRUE(tab2->last_seen_time().has_value());
+  EXPECT_EQ(tab2->last_seen_time(), last_seen_time2);
   EXPECT_EQ(GetNumTabDetailsInStore(), 2u);
 }
 
@@ -415,7 +424,7 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
 
   EXPECT_EQ(model().Count(), 1);
   EXPECT_TRUE(model().Contains(created_group_id));
-  EXPECT_FALSE(created_tab.last_seen_time_windows_epoch_micros().has_value());
+  EXPECT_FALSE(created_tab.last_seen_time().has_value());
 
   base::Time last_seen_time1 = base::Time::Now();
   syncer::EntityChangeList change_list1;
@@ -432,8 +441,8 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
     const SavedTabGroup* group = model().Get(created_group_id);
     const SavedTabGroupTab* tab = group->GetTab(created_tab_id);
 
-    EXPECT_TRUE(tab->last_seen_time_windows_epoch_micros().has_value());
-    EXPECT_EQ(tab->last_seen_time_windows_epoch_micros(), last_seen_time1);
+    EXPECT_TRUE(tab->last_seen_time().has_value());
+    EXPECT_EQ(tab->last_seen_time(), last_seen_time1);
     EXPECT_EQ(GetNumTabDetailsInStore(), 1u);
   }
 
@@ -451,8 +460,8 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
     const SavedTabGroup* group = model().Get(created_group_id);
     const SavedTabGroupTab* tab = group->GetTab(created_tab_id);
 
-    EXPECT_TRUE(tab->last_seen_time_windows_epoch_micros().has_value());
-    EXPECT_EQ(tab->last_seen_time_windows_epoch_micros(), last_seen_time2);
+    EXPECT_TRUE(tab->last_seen_time().has_value());
+    EXPECT_EQ(tab->last_seen_time(), last_seen_time2);
     EXPECT_EQ(GetNumTabDetailsInStore(), 1u);
   }
 }
@@ -470,7 +479,7 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest, ShouldDeleteDataFromSync) {
 
   EXPECT_EQ(model().Count(), 1);
   EXPECT_TRUE(model().Contains(created_group_id));
-  EXPECT_FALSE(created_tab.last_seen_time_windows_epoch_micros().has_value());
+  EXPECT_FALSE(created_tab.last_seen_time().has_value());
 
   base::Time last_seen_time1 = base::Time::Now();
   syncer::EntityChangeList change_list1;
@@ -488,8 +497,8 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest, ShouldDeleteDataFromSync) {
     const SavedTabGroupTab* tab = group->GetTab(created_tab_id);
 
     EXPECT_TRUE(bridge().HasSpecificsForTab(*tab));
-    EXPECT_TRUE(tab->last_seen_time_windows_epoch_micros().has_value());
-    EXPECT_EQ(tab->last_seen_time_windows_epoch_micros(), last_seen_time1);
+    EXPECT_TRUE(tab->last_seen_time().has_value());
+    EXPECT_EQ(tab->last_seen_time(), last_seen_time1);
     EXPECT_EQ(GetNumTabDetailsInStore(), 1u);
   }
 
@@ -522,7 +531,7 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
 
   EXPECT_EQ(model().Count(), 1);
   EXPECT_TRUE(model().Contains(created_group_id));
-  EXPECT_FALSE(created_tab.last_seen_time_windows_epoch_micros().has_value());
+  EXPECT_FALSE(created_tab.last_seen_time().has_value());
 
   base::Time last_seen_time = base::Time::Now();
   syncer::EntityChangeList change_list;
@@ -552,7 +561,7 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
 
   EXPECT_EQ(model().Count(), 1);
   EXPECT_TRUE(model().Contains(created_group_id));
-  EXPECT_FALSE(created_tab.last_seen_time_windows_epoch_micros().has_value());
+  EXPECT_FALSE(created_tab.last_seen_time().has_value());
 
   base::Time last_seen_time = base::Time::Now();
   syncer::EntityChangeList change_list;
@@ -568,8 +577,8 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
     const SavedTabGroupTab* tab = group->GetTab(created_tab_id);
 
     EXPECT_TRUE(tab);
-    EXPECT_TRUE(tab->last_seen_time_windows_epoch_micros().has_value());
-    EXPECT_EQ(tab->last_seen_time_windows_epoch_micros(), last_seen_time);
+    EXPECT_TRUE(tab->last_seen_time().has_value());
+    EXPECT_EQ(tab->last_seen_time(), last_seen_time);
   }
 
   // Mock browser restart.
@@ -587,8 +596,8 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
     const SavedTabGroupTab* tab = group->GetTab(created_tab_id);
 
     EXPECT_TRUE(tab);
-    EXPECT_TRUE(tab->last_seen_time_windows_epoch_micros().has_value());
-    EXPECT_EQ(tab->last_seen_time_windows_epoch_micros(), last_seen_time);
+    EXPECT_TRUE(tab->last_seen_time().has_value());
+    EXPECT_EQ(tab->last_seen_time(), last_seen_time);
   }
 
   // Mock browser restart.
@@ -610,8 +619,8 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
     const SavedTabGroupTab* tab = group->GetTab(created_tab_id);
 
     EXPECT_TRUE(tab);
-    EXPECT_TRUE(tab->last_seen_time_windows_epoch_micros().has_value());
-    EXPECT_EQ(tab->last_seen_time_windows_epoch_micros(), last_seen_time);
+    EXPECT_TRUE(tab->last_seen_time().has_value());
+    EXPECT_EQ(tab->last_seen_time(), last_seen_time);
   }
 }
 
@@ -632,8 +641,8 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
 
   EXPECT_EQ(model().Count(), 1);
   EXPECT_TRUE(model().Contains(group_id));
-  EXPECT_FALSE(created_tab1.last_seen_time_windows_epoch_micros().has_value());
-  EXPECT_FALSE(created_tab2.last_seen_time_windows_epoch_micros().has_value());
+  EXPECT_FALSE(created_tab1.last_seen_time().has_value());
+  EXPECT_FALSE(created_tab2.last_seen_time().has_value());
 
   // Send timestamp update for both tabs from sync.
   base::Time last_seen_time1 = base::Time::Now();
@@ -657,10 +666,10 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
   const std::string storage_key1 = CreateClientTagForSharedTab(*group, *tab1);
   const std::string storage_key2 = CreateClientTagForSharedTab(*group, *tab2);
 
-  EXPECT_TRUE(tab1->last_seen_time_windows_epoch_micros().has_value());
-  EXPECT_EQ(tab1->last_seen_time_windows_epoch_micros(), last_seen_time1);
-  EXPECT_TRUE(tab2->last_seen_time_windows_epoch_micros().has_value());
-  EXPECT_EQ(tab2->last_seen_time_windows_epoch_micros(), last_seen_time2);
+  EXPECT_TRUE(tab1->last_seen_time().has_value());
+  EXPECT_EQ(tab1->last_seen_time(), last_seen_time1);
+  EXPECT_TRUE(tab2->last_seen_time().has_value());
+  EXPECT_EQ(tab2->last_seen_time(), last_seen_time2);
   EXPECT_EQ(GetNumTabDetailsInStore(), 2u);
 
   // Update the last seen timestamp for tab1 locally. The updated timestamp
@@ -668,9 +677,23 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
   base::Time last_seen_time3 = base::Time::Now() + base::Seconds(55);
   base::Time last_seen_time4 = base::Time::Now() + base::Seconds(99);
 
-  EXPECT_CALL(mock_processor(), Put(Eq(storage_key1), _, _)).Times(1);
+  syncer::EntityData entity_data;
+  EXPECT_CALL(mock_processor(), Put(Eq(storage_key1), _, _))
+      .WillOnce(SaveArgPointeeMove<1>(&entity_data));
   model().UpdateTabLastSeenTime(group_id, tab_id1, last_seen_time3,
                                 TriggerSource::LOCAL);
+
+  // Verify the written specifics.
+  const sync_pb::SharedTabGroupAccountDataSpecifics& specifics =
+      entity_data.specifics.shared_tab_group_account_data();
+  EXPECT_EQ(kCurrentSharedTabGroupDataSpecificsProtoVersion,
+            specifics.version());
+  EXPECT_EQ(tab_id1.AsLowercaseString(), specifics.guid());
+  EXPECT_TRUE(specifics.has_shared_tab_details());
+  EXPECT_EQ(group_id.AsLowercaseString(),
+            specifics.shared_tab_details().shared_tab_group_guid());
+  EXPECT_EQ(last_seen_time3.ToDeltaSinceWindowsEpoch().InMicroseconds(),
+            specifics.shared_tab_details().last_seen_timestamp_windows_epoch());
 
   // Update the last seen timestamp for tab2 from sync. The updated timestamp
   // should not be sent back to sync.
@@ -678,7 +701,7 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
   model().UpdateTabLastSeenTime(group_id, tab_id2, last_seen_time4,
                                 TriggerSource::REMOTE);
 
-  ASSERT_EQ(tab1->last_seen_time_windows_epoch_micros(), last_seen_time3);
+  ASSERT_EQ(tab1->last_seen_time(), last_seen_time3);
   EXPECT_EQ(GetNumTabDetailsInStore(), 2u);
   auto specifics1 = bridge().GetSpecificsForStorageKey(storage_key1);
   EXPECT_TRUE(specifics1.has_value());
@@ -686,7 +709,7 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
       last_seen_time3.ToDeltaSinceWindowsEpoch().InMicroseconds(),
       specifics1->shared_tab_details().last_seen_timestamp_windows_epoch());
 
-  ASSERT_EQ(tab2->last_seen_time_windows_epoch_micros(), last_seen_time4);
+  ASSERT_EQ(tab2->last_seen_time(), last_seen_time4);
   EXPECT_EQ(GetNumTabDetailsInStore(), 2u);
   auto specifics2 = bridge().GetSpecificsForStorageKey(storage_key2);
   EXPECT_TRUE(specifics2.has_value());
@@ -814,6 +837,7 @@ TEST_F(SharedTabGroupAccountDataSyncBridgeTest,
   account_data_specifics2->set_update_time_windows_epoch_micros(1234567890);
   account_data_specifics2->mutable_shared_tab_group_details()
       ->set_pinned_position(11);
+  account_data_specifics2->set_version(999);
 
   EXPECT_THAT(bridge().TrimAllSupportedFieldsFromRemoteSpecifics(
                   remote_account_data_specifics2),

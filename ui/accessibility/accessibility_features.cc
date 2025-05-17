@@ -43,14 +43,6 @@ bool IsAccessibilityBlockFlowIteratorEnabled() {
       ::features::kAccessibilityBlockFlowIterator);
 }
 
-BASE_FEATURE(kAccessibilityPruneRedundantInlineText,
-             "AccessibilityPruneRedundantInlineText",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-bool IsAccessibilityPruneRedundantInlineTextEnabled() {
-  return base::FeatureList::IsEnabled(
-      ::features::kAccessibilityPruneRedundantInlineText);
-}
-
 BASE_FEATURE(kAccessibilityPruneRedundantInlineConnectivity,
              "AccessibilityPruneRedundantInlineConnectivity",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -71,6 +63,45 @@ BASE_FEATURE(kAccessibilityTreeForViews,
              base::FEATURE_DISABLED_BY_DEFAULT);
 bool IsAccessibilityTreeForViewsEnabled() {
   return base::FeatureList::IsEnabled(::features::kAccessibilityTreeForViews);
+}
+
+BASE_FEATURE(kAccessibilityPerformanceMeasurementExperiment,
+             "AccessibilityPerformanceMeasurementExperiment",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+bool IsAccessibilityPerformanceMeasurementExperimentEnabled() {
+  return base::FeatureList::IsEnabled(
+      ::features::kAccessibilityPerformanceMeasurementExperiment);
+}
+
+namespace {
+
+constexpr base::FeatureParam<
+    AccessibilityPerformanceMeasurementExperimentGroup>::Option
+    kAccessibilityPerformanceMeasurementExperimentParamOptions[] = {
+        {AccessibilityPerformanceMeasurementExperimentGroup ::kAXModeComplete,
+         "AXModeComplete"},
+        {AccessibilityPerformanceMeasurementExperimentGroup ::kWebContentsOnly,
+         "WebContentsOnly"},
+        {AccessibilityPerformanceMeasurementExperimentGroup ::
+             kAXModeCompleteNoInlineTextBoxes,
+         "AXModeCompleteNoInlineTextBoxes"},
+        {AccessibilityPerformanceMeasurementExperimentGroup ::
+             kRendererSerializationOnly,
+         "RendererSerializationOnly"}};
+
+BASE_FEATURE_ENUM_PARAM(
+    AccessibilityPerformanceMeasurementExperimentGroup,
+    kAccessibilityPerformanceMeasurementExperimentParam,
+    &kAccessibilityPerformanceMeasurementExperiment,
+    "accessibility_performance_group_name",
+    AccessibilityPerformanceMeasurementExperimentGroup::kAXModeComplete,
+    &kAccessibilityPerformanceMeasurementExperimentParamOptions);
+}  // namespace
+
+AccessibilityPerformanceMeasurementExperimentGroup
+GetAccessibilityPerformanceMeasurementExperimentGroup() {
+  DCHECK(IsAccessibilityPerformanceMeasurementExperimentEnabled());
+  return kAccessibilityPerformanceMeasurementExperimentParam.Get();
 }
 
 BASE_FEATURE(kViewsAccessibilitySerializeOnDataChanged,

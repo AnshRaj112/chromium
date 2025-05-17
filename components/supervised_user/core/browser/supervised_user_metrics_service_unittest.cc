@@ -28,6 +28,14 @@
 
 namespace supervised_user {
 
+namespace {
+constexpr char kWebFilterTypeHistogramName[] = "FamilyUser.WebFilterType";
+constexpr char kManagedSiteListHistogramName[] = "FamilyUser.ManagedSiteList";
+constexpr char kApprovedSitesCountHistogramName[] =
+    "FamilyUser.ManagedSiteListCount.Approved";
+constexpr char kBlockedSitesCountHistogramName[] =
+    "FamilyUser.ManagedSiteListCount.Blocked";
+
 class MockSupervisedUserMetricsServiceExtensionDelegateImpl
     : public SupervisedUserMetricsService::
           SupervisedUserMetricsServiceExtensionDelegate {
@@ -43,7 +51,7 @@ class SupervisedUserMetricsServiceTest : public testing::Test {
     RegisterProfilePrefs(pref_service_.registry());
     SupervisedUserMetricsService::RegisterProfilePrefs(
         pref_service_.registry());
-    supervised_user_sync_data_fake_.Init(pref_service_);
+    supervised_user_sync_data_fake_.Init();
     settings_service_.Init(pref_service_.user_prefs_store());
     supervised_user_service_ = std::make_unique<SupervisedUserService>(
         identity_test_env_.identity_manager(),
@@ -69,7 +77,7 @@ class SupervisedUserMetricsServiceTest : public testing::Test {
   void CreateMetricsService() {
     supervised_user_metrics_service_ =
         std::make_unique<SupervisedUserMetricsService>(
-            &pref_service_, GetURLFilter(),
+            &pref_service_, *supervised_user_service_,
             std::make_unique<
                 MockSupervisedUserMetricsServiceExtensionDelegateImpl>());
   }
@@ -91,7 +99,8 @@ class SupervisedUserMetricsServiceTest : public testing::Test {
 
   SupervisedUserSettingsService settings_service_;
   syncer::MockSyncService sync_service_;
-  SupervisedUserSyncDataFake supervised_user_sync_data_fake_;
+  test::SupervisedUserSyncDataFake<sync_preferences::TestingPrefServiceSyncable>
+      supervised_user_sync_data_fake_{pref_service_};
 
   std::unique_ptr<SupervisedUserMetricsService>
       supervised_user_metrics_service_;
@@ -140,12 +149,10 @@ TEST_F(SupervisedUserMetricsServiceTest,
        MetricsNotRecordedForSignedOutSupervisedUser) {
   DisableParentalControls(pref_service_);
   CreateMetricsService();
-  histogram_tester_.ExpectTotalCount(
-      SupervisedUserURLFilter::GetWebFilterTypeHistogramNameForTest(),
-      /*expected_count=*/0);
-  histogram_tester_.ExpectTotalCount(
-      SupervisedUserURLFilter::GetManagedSiteListHistogramNameForTest(),
-      /*expected_count=*/0);
+  histogram_tester_.ExpectTotalCount(kWebFilterTypeHistogramName,
+                                     /*expected_count=*/0);
+  histogram_tester_.ExpectTotalCount(kManagedSiteListHistogramName,
+                                     /*expected_count=*/0);
 }
 
 // Tests that default metrics are recorded for supervised users whose parent has
@@ -155,22 +162,22 @@ TEST_F(SupervisedUserMetricsServiceTest, RecordDefaultMetrics) {
   // should be subject to default mature sites blocking.
   EnableParentalControls(pref_service_);
   CreateMetricsService();
+  histogram_tester_.ExpectUniqueSample(kWebFilterTypeHistogramName,
+                                       /*sample=*/
+                                       WebFilterType::kTryToBlockMatureSites,
+                                       /*expected_bucket_count=*/1);
   histogram_tester_.ExpectUniqueSample(
-      SupervisedUserURLFilter::GetWebFilterTypeHistogramNameForTest(),
-      /*sample=*/
-      WebFilterType::kTryToBlockMatureSites,
-      /*expected_bucket_count=*/1);
-  histogram_tester_.ExpectUniqueSample(
-      SupervisedUserURLFilter::GetManagedSiteListHistogramNameForTest(),
+      kManagedSiteListHistogramName,
       /*sample=*/
       SupervisedUserURLFilter::ManagedSiteList::kEmpty,
       /*expected_bucket_count=*/1);
-  histogram_tester_.ExpectUniqueSample(
-      SupervisedUserURLFilter::GetApprovedSitesCountHistogramNameForTest(),
-      /*sample=*/0, /*expected_bucket_count=*/1);
-  histogram_tester_.ExpectUniqueSample(
-      SupervisedUserURLFilter::GetBlockedSitesCountHistogramNameForTest(),
-      /*sample=*/0, /*expected_bucket_count=*/1);
+  histogram_tester_.ExpectUniqueSample(kApprovedSitesCountHistogramName,
+                                       /*sample=*/0,
+                                       /*expected_bucket_count=*/1);
+  histogram_tester_.ExpectUniqueSample(kBlockedSitesCountHistogramName,
+                                       /*sample=*/0,
+                                       /*expected_bucket_count=*/1);
 }
 
+}  // namespace
 }  // namespace supervised_user

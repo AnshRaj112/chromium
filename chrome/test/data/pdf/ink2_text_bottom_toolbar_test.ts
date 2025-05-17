@@ -31,6 +31,7 @@ chrome.test.runTests([
     await microtasksFinished();
 
     viewer.$.toolbar.setAnnotationMode(AnnotationMode.TEXT);
+    await Ink2Manager.getInstance().initializeTextAnnotations();
     await microtasksFinished();
 
     chrome.test.assertEq(AnnotationMode.TEXT, viewer.$.toolbar.annotationMode);
@@ -138,7 +139,7 @@ chrome.test.runTests([
     assert(selector);
     const buttons =
         selector.shadowRoot.querySelectorAll('selectable-icon-button');
-    chrome.test.assertEq(4, buttons.length);
+    chrome.test.assertEq(3, buttons.length);
     chrome.test.assertTrue(buttons[0]!.checked);
 
     const whenChanged =

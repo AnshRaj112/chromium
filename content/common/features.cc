@@ -121,6 +121,13 @@ BASE_FEATURE(kCanvas2DImageChromium,
 #endif
 );
 
+// When enabled, CDP method Page.captureScreenshot will increment
+// the LocalSurfaceId instead of waiting for ForceRedraw to complete.
+// This should avoid a possible stall due to frames not being presented.
+BASE_FEATURE(kCDPScreenshotNewSurface,
+             "CDPScreenshotNewSurface",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // When enabled, code cache does not use a browsing_data filter for deletions.
 BASE_FEATURE(kCodeCacheDeletionWithoutFilter,
              "CodeCacheDeletionWithoutFilter",
@@ -403,6 +410,29 @@ BASE_FEATURE(kProcessReuseOnPrerenderCOOPSwap,
              base::FEATURE_ENABLED_BY_DEFAULT
 #endif
 );
+
+// Causes the browser to progressively enable accessibility for WebContents as
+// they are unhidden and, optionally, disable accessibility some time after they
+// become hidden.
+BASE_FEATURE(kProgressiveAccessibility,
+             "ProgressiveAccessibility",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+namespace {
+
+constexpr base::FeatureParam<ProgressiveAccessibilityMode>::Option
+    kProgressiveAccessibilityModeOptions[] = {
+        {ProgressiveAccessibilityMode::kOnlyEnable, "only_enable"},
+        {ProgressiveAccessibilityMode::kDisableOnHide, "disable_on_hide"}};
+
+}  // namespace
+
+BASE_FEATURE_ENUM_PARAM(ProgressiveAccessibilityMode,
+                        kProgressiveAccessibilityModeParam,
+                        &kProgressiveAccessibility,
+                        "progressive_accessibility_mode",
+                        ProgressiveAccessibilityMode::kOnlyEnable,
+                        &kProgressiveAccessibilityModeOptions);
 
 // Causes hidden tabs with crashed subframes to be marked for reload, meaning
 // that if a user later switches to that tab, the current page will be

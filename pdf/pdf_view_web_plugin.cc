@@ -401,10 +401,19 @@ class PdfViewWebPlugin::PdfInkModuleClientImpl : public PdfInkModuleClient {
     plugin_->snapshot_needs_update_for_ink_input_ = true;
   }
 
-  void StrokeFinished() override {
-    plugin_->client_->PostMessage(
-        base::Value::Dict().Set("type", "finishInkStroke"));
-    plugin_->SetPluginCanSave(true);
+  void StrokeFinished(bool modified) override {
+    plugin_->client_->PostMessage(base::Value::Dict()
+                                      .Set("type", "finishInkStroke")
+                                      .Set("modified", modified));
+    if (modified) {
+      plugin_->SetPluginCanSave(true);
+    }
+  }
+
+  void StrokeStarted() override {
+    base::Value::Dict message;
+    message.Set("type", "startInkStroke");
+    plugin_->client_->PostMessage(std::move(message));
   }
 
   void UpdateInkCursor(const ui::Cursor& cursor) override {

@@ -37,6 +37,7 @@ chromium-metrics-reviews@google.com.
 
 <variants name="ContextualPanelItemType">
   <variant name="PriceInsightsItem" summary="Price insights item"/>
+  <variant name="ReaderModeItem" summary="Reader mode item"/>
   <variant name="SamplePanelItem" summary="Sample panel item"/>
 </variants>
 
@@ -2047,7 +2048,7 @@ chromium-metrics-reviews@google.com.
   </token>
 </histogram>
 
-<histogram name="IOS.GLICConsent" enum="GLICConsentType"
+<histogram name="IOS.GLIC.Outcome" enum="GLICConsentType"
     expires_after="2026-05-04">
   <owner>prasanaa@google.com</owner>
   <owner>bling-alchemy-eng@google.com</owner>
@@ -2323,7 +2324,6 @@ chromium-metrics-reviews@google.com.
 <histogram name="IOS.IsEnabled.Password.BottomSheet" enum="Boolean"
     expires_after="2025-10-12">
   <owner>sugoi@chromium.org</owner>
-  <owner>veronguyen@google.com</owner>
   <owner>tmartino@chromium.org</owner>
   <summary>
     At the moment of trying to enable the bottom sheet at page load time, track
@@ -3825,7 +3825,6 @@ chromium-metrics-reviews@google.com.
 <histogram name="IOS.PasswordBottomSheet.ExitReason"
     enum="PasswordSuggestionBottomSheetExitReason" expires_after="2025-09-14">
   <owner>sugoi@chromium.org</owner>
-  <owner>veronguyen@google.com</owner>
   <owner>tmartino@chromium.org</owner>
   <summary>
     Tracks the bottom sheet dismissal, use of a password suggestion and long
@@ -3845,12 +3844,15 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.PasswordManager.Favicons.Percentage" units="%"
-    expires_after="2024-04-19">
-  <owner>veronguyen@google.com</owner>
+    expires_after="2025-10-19">
+  <owner>rgod@google.com</owner>
   <owner>tmartino@chromium.org</owner>
   <summary>
     The percentage of passwords that have a favicon that is an image in the
     Password Manager recorded when the view will disappear.
+
+    Note: this metric was expired from 2024-04-19 to 2025-05-13; data may be
+    missing.
   </summary>
 </histogram>
 
@@ -3896,7 +3898,6 @@ chromium-metrics-reviews@google.com.
 <histogram name="IOS.PaymentsBottomSheet.ExitReason"
     enum="PaymentsSuggestionBottomSheetExitReason" expires_after="2025-10-26">
   <owner>sugoi@chromium.org</owner>
-  <owner>veronguyen@google.com</owner>
   <owner>tmartino@chromium.org</owner>
   <summary>
     Tracks the bottom sheet dismissal or use of a payments suggestion.
@@ -4524,7 +4525,6 @@ chromium-metrics-reviews@google.com.
 <histogram name="IOS.Reauth.Password.BottomSheet" enum="ReauthenticationEvent"
     expires_after="2025-07-13">
   <owner>sugoi@chromium.org</owner>
-  <owner>veronguyen@google.com</owner>
   <owner>tmartino@chromium.org</owner>
   <summary>
     Tracks the results and attempts of reauthentication when using suggestions
@@ -4555,13 +4555,14 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.ResetDismissCount.Password.BottomSheet" units="dismisses"
-    expires_after="2024-05-08">
+    expires_after="2025-10-08">
   <owner>sugoi@chromium.org</owner>
-  <owner>veronguyen@google.com</owner>
   <owner>tmartino@chromium.org</owner>
   <summary>
     Tracks the number of times in a row the Password Bottom Sheet had been
     dismissed at the moment the dismiss count was reset to 0 (between 1 and 3).
+
+    Note: this metric was expired from 2024-05 to 2025-05; data may be missing.
   </summary>
 </histogram>
 
@@ -4601,7 +4602,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="IOS.SafeBrowsing.Enhanced.Infobar.Interaction"
     enum="IOSEnhancedSafeBrowseringInfobarInteraction"
-    expires_after="2025-06-26">
+    expires_after="2026-06-26">
   <owner>danieltwhite@google.com</owner>
   <owner>bling-fundamentals@google.com</owner>
   <summary>
@@ -6162,7 +6163,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ManualFallback.PresentedOptions.AllPasswords"
-    units="Credentials" expires_after="2025-09-21">
+    units="Credentials" expires_after="2026-06-22">
   <owner>tmartino@chromium.org</owner>
   <owner>bling-transactions@google.com</owner>
   <summary>
@@ -6173,7 +6174,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ManualFallback.PresentedOptions.CreditCards" units="Cards"
-    expires_after="2025-06-22">
+    expires_after="2026-06-22">
   <owner>tmartino@chromium.org</owner>
   <owner>bling-transactions@google.com</owner>
   <summary>
@@ -6184,7 +6185,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ManualFallback.PresentedOptions.Passwords" units="Credentials"
-    expires_after="2025-06-22">
+    expires_after="2026-06-22">
   <owner>tmartino@chromium.org</owner>
   <owner>bling-transactions@google.com</owner>
   <summary>
@@ -6195,7 +6196,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ManualFallback.PresentedOptions.Profiles" units="Profiles"
-    expires_after="2025-06-22">
+    expires_after="2026-06-22">
   <owner>tmartino@chromium.org</owner>
   <owner>bling-transactions@google.com</owner>
   <summary>

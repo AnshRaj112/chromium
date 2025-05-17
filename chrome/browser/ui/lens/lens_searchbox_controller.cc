@@ -4,11 +4,14 @@
 
 #include "chrome/browser/ui/lens/lens_searchbox_controller.h"
 
+#include "chrome/browser/lens/core/mojom/lens_ghost_loader.mojom.h"
 #include "chrome/browser/ui/lens/lens_overlay_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_side_panel_coordinator.h"
 #include "chrome/browser/ui/lens/lens_search_controller.h"
+#include "chrome/browser/ui/lens/lens_session_metrics_logger.h"
 #include "chrome/browser/ui/webui/util/image_util.h"
 #include "components/lens/proto/server/lens_overlay_response.pb.h"
+#include "components/omnibox/browser/lens_suggest_inputs_utils.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/sessions/core/session_id.h"
 #include "net/base/url_util.h"
@@ -26,6 +29,23 @@ LensSearchboxController::LensSearchboxController(
     LensSearchController* lens_search_controller)
     : lens_search_controller_(lens_search_controller) {}
 LensSearchboxController::~LensSearchboxController() = default;
+
+void LensSearchboxController::BindOverlayGhostLoader(
+    mojo::PendingRemote<lens::mojom::LensGhostLoaderPage> page) {
+  overlay_ghost_loader_page_.reset();
+  overlay_ghost_loader_page_.Bind(std::move(page));
+}
+
+void LensSearchboxController::BindSidePanelGhostLoader(
+    mojo::PendingRemote<lens::mojom::LensGhostLoaderPage> page) {
+  side_panel_ghost_loader_page_.reset();
+  side_panel_ghost_loader_page_.Bind(std::move(page));
+}
+
+void LensSearchboxController::OnSessionStart() {
+  // Initialize any data needed for the searchbox.
+  init_data_ = std::make_unique<LensSearchboxInitializationData>();
+}
 
 void LensSearchboxController::SetSidePanelSearchboxHandler(
     std::unique_ptr<LensSearchboxHandler> handler) {
@@ -48,6 +68,7 @@ void LensSearchboxController::ResetSidePanelSearchboxHandler() {
 void LensSearchboxController::SetSearchboxInputText(const std::string& text) {
   if (side_panel_searchbox_handler_ &&
       side_panel_searchbox_handler_->IsRemoteBound()) {
+    init_data_->text_query = text;
     side_panel_searchbox_handler_->SetInputText(text);
   } else {
     // If the side panel was not bound at the time of request, we store the
@@ -60,8 +81,8 @@ void LensSearchboxController::SetSearchboxThumbnail(
     const std::string& thumbnail_uri) {
   if (side_panel_searchbox_handler_ &&
       side_panel_searchbox_handler_->IsRemoteBound()) {
+    init_data_->thumbnail_uri = thumbnail_uri;
     side_panel_searchbox_handler_->SetThumbnail(thumbnail_uri);
-    selected_region_thumbnail_uri_ = thumbnail_uri;
   } else {
     // If the side panel was not bound at the time of request, we store the
     // thumbnail as pending to send it to the searchbox on bind.
@@ -71,17 +92,50 @@ void LensSearchboxController::SetSearchboxThumbnail(
 
 void LensSearchboxController::HandleThumbnailCreated(
     const std::string& thumbnail_bytes) {
-  selected_region_thumbnail_uri_ =
+  init_data_->thumbnail_uri =
       webui::MakeDataURIForImage(base::as_byte_span(thumbnail_bytes), "jpeg");
-  SetSearchboxThumbnail(selected_region_thumbnail_uri_);
+  SetSearchboxThumbnail(init_data_->thumbnail_uri);
+}
+
+void LensSearchboxController::HandleSuggestInputsResponse(
+    lens::proto::LensOverlaySuggestInputs suggest_inputs) {
+  if (!init_data_) {
+    DCHECK(init_data_)
+        << "The initialization data should be set on searchbox startup, which "
+           "should have happened before any suggest inputs were received.";
+    return;
+  }
+
+  // If the handshake was already complete, without the new suggest inputs,
+  // exit early so that LensOverlayController::OnHandshakeComplete() isn't
+  // called multiple times.
+  if (lens_search_controller_->IsHandshakeComplete()) {
+    init_data_->suggest_inputs_ = suggest_inputs;
+    return;
+  }
+
+  // Check if the handshake with the server has been completed with the new
+  // inputs. If so, this is the first time the suggest inputs satisfy the
+  // handshake criteria, so notify the overlay that the handshake is complete.
+  init_data_->suggest_inputs_ = suggest_inputs;
+  if (lens_search_controller_->IsHandshakeComplete()) {
+    // Notify the overlay that it is now safe to query autocomplete.
+    lens_search_controller_->lens_overlay_controller()->OnHandshakeComplete();
+
+    // Send the suggest inputs to any pending callbacks.
+    pending_suggest_inputs_callbacks_.Notify(GetLensSuggestInputs());
+  }
 }
 
 void LensSearchboxController::CloseUI() {
   overlay_searchbox_handler_.reset();
   side_panel_searchbox_handler_.reset();
-  selected_region_thumbnail_uri_ = "";
+  overlay_ghost_loader_page_.reset();
+  side_panel_ghost_loader_page_.reset();
+  init_data_ = std::make_unique<LensSearchboxInitializationData>();
   pending_text_query_ = std::nullopt;
   pending_thumbnail_uri_ = std::nullopt;
+  pending_suggest_inputs_callbacks_.Notify(std::nullopt);
 }
 
 bool LensSearchboxController::IsContextualSearchbox() const {
@@ -91,9 +145,31 @@ bool LensSearchboxController::IsContextualSearchbox() const {
          metrics::OmniboxEventProto::CONTEXTUAL_SEARCHBOX;
 }
 
+bool LensSearchboxController::IsSidePanelSearchbox() const {
+  return side_panel_searchbox_handler_ != nullptr;
+}
+
 void LensSearchboxController::GetIsContextualSearchbox(
     GetIsContextualSearchboxCallback callback) {
   std::move(callback).Run(IsContextualSearchbox());
+}
+
+base::CallbackListSubscription
+LensSearchboxController::GetLensSuggestInputsWhenReady(
+    ::LensOverlaySuggestInputsCallback callback) {
+  // Exit early if the overlay is either off or going to soon be off.
+  if (lens_search_controller_->IsClosing() ||
+      lens_search_controller_->IsOff()) {
+    std::move(callback).Run(std::nullopt);
+    return {};
+  }
+
+  // If the handshake is complete, return the Lens suggest inputs immediately.
+  if (lens_search_controller_->IsHandshakeComplete()) {
+    std::move(callback).Run(init_data_->suggest_inputs_);
+    return {};
+  }
+  return pending_suggest_inputs_callbacks_.Add(std::move(callback));
 }
 
 const GURL& LensSearchboxController::GetPageURL() const {
@@ -117,31 +193,27 @@ LensSearchboxController::GetPageClassification() const {
       state == LensOverlayController::State::kOverlay) {
     return metrics::OmniboxEventProto::CONTEXTUAL_SEARCHBOX;
   }
-  return selected_region_thumbnail_uri_.empty()
+  return init_data_->thumbnail_uri.empty()
              ? metrics::OmniboxEventProto::SEARCH_SIDE_PANEL_SEARCHBOX
              : metrics::OmniboxEventProto::LENS_SIDE_PANEL_SEARCHBOX;
 }
 
 std::string& LensSearchboxController::GetThumbnail() {
-  return selected_region_thumbnail_uri_;
+  return init_data_->thumbnail_uri;
 }
 
 const lens::proto::LensOverlaySuggestInputs&
 LensSearchboxController::GetLensSuggestInputs() const {
-  // TODO(crbug.com/413138792): Implement suggest inputs tracking in this class.
-  return lens_search_controller_->lens_overlay_controller()
-      ->GetLensSuggestInputs();
+  return init_data_
+             ? init_data_->suggest_inputs_
+             : lens::proto::LensOverlaySuggestInputs().default_instance();
 }
 
 void LensSearchboxController::OnTextModified() {
-  // TOOD(crbug.com/404941800): Verify this doesn't break if the overlay is
-  // off.
   lens_search_controller_->lens_overlay_controller()->ClearTextSelection();
 }
 
 void LensSearchboxController::OnThumbnailRemoved() {
-  // TOOD(crbug.com/404941800): Verify this doesn't break if the overlay is
-  // off.
   lens_search_controller_->lens_overlay_controller()->ClearRegionSelection();
 }
 
@@ -200,24 +272,34 @@ void LensSearchboxController::OnPageBound() {
 }
 
 void LensSearchboxController::ShowGhostLoaderErrorState() {
-  // TODO(crbug.com/413138792): Move ghost loader handling logic to this class.
-  lens_search_controller_->lens_overlay_controller()
-      ->ShowGhostLoaderErrorState();
+  if (!IsContextualSearchbox()) {
+    return;
+  }
+  if (overlay_ghost_loader_page_) {
+    overlay_ghost_loader_page_->ShowErrorState();
+  }
+  if (side_panel_ghost_loader_page_) {
+    side_panel_ghost_loader_page_->ShowErrorState();
+  }
 }
 
 void LensSearchboxController::OnZeroSuggestShown() {
-  // TODO(crbug.com/413138792): Move the OnZeroSuggestShown() logic to this
-  // class.
-  lens_search_controller_->lens_overlay_controller()->OnZeroSuggestShown();
-}
+  if (!IsContextualSearchbox()) {
+    return;
+  }
 
-content::WebContents* LensSearchboxController::GetTabWebContents() const {
-  return lens_search_controller_->GetTabInterface()->GetContents();
+  // If this is in the side panel, it is not the initial query.
+  lens_search_controller_->lens_session_metrics_logger()->OnZeroSuggestShown(
+      /*is_initial_query=*/!IsSidePanelSearchbox());
 }
 
 void LensSearchboxController::AddSearchboxStateToSearchQuery(
     lens::SearchQuery& search_query) {
-  search_query.selected_region_thumbnail_uri_ = selected_region_thumbnail_uri_;
+  search_query.selected_region_thumbnail_uri_ = init_data_->thumbnail_uri;
+}
+
+content::WebContents* LensSearchboxController::GetTabWebContents() const {
+  return lens_search_controller_->GetTabInterface()->GetContents();
 }
 
 }  // namespace lens

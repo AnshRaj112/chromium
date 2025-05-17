@@ -733,11 +733,9 @@ bool UserAccountIsUnnecessarilyElevated() {
   // policy set.
   DWORD size;
   TOKEN_ELEVATION_TYPE elevation_type;
-  if (GetTokenInformation(GetCurrentProcessToken(), TokenElevationType,
-                          &elevation_type, sizeof(elevation_type), &size)) {
-    return elevation_type == TokenElevationTypeFull;
-  }
-  return false;
+  return GetTokenInformation(GetCurrentProcessToken(), TokenElevationType,
+                             &elevation_type, sizeof(elevation_type), &size) &&
+         elevation_type == TokenElevationTypeFull;
 }
 
 bool SetBooleanValueForPropertyStore(IPropertyStore* property_store,
@@ -1253,6 +1251,17 @@ ScopedDomainStateForTesting::ScopedDomainStateForTesting(bool state)
 
 ScopedDomainStateForTesting::~ScopedDomainStateForTesting() {
   *GetDomainEnrollmentStateStorage() = initial_state_;
+}
+
+ScopedDeviceRegisteredWithManagementForTesting::
+    ScopedDeviceRegisteredWithManagementForTesting(bool state)
+    : initial_state_(IsDeviceRegisteredWithManagement()) {
+  *GetRegisteredWithManagementStateStorage() = state;
+}
+
+ScopedDeviceRegisteredWithManagementForTesting::
+    ~ScopedDeviceRegisteredWithManagementForTesting() {
+  *GetRegisteredWithManagementStateStorage() = initial_state_;
 }
 
 ScopedAzureADJoinStateForTesting::ScopedAzureADJoinStateForTesting(bool state)

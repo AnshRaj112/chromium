@@ -895,6 +895,42 @@ TEST_F(TabStripModelTest, TestTabHandlesAcrossModels) {
   delegate()->SetBrowserWindowInterface(nullptr);
 }
 
+TEST_F(TabStripModelTest, TestDetachTabInGroupNewSelection) {
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(1), false);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(2), false);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(3), true);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(4), true);
+
+  EXPECT_EQ(tabstrip()->count(), 4);
+
+  tabstrip()->AddToNewGroup(std::vector<int>{1, 2});
+  tabstrip()->ActivateTabAt(
+      2, TabStripUserGestureDetails(
+             TabStripUserGestureDetails::GestureType::kOther));
+  tabstrip()->ForgetAllOpeners();
+
+  tabstrip()->DetachTabAtForInsertion(2);
+  EXPECT_EQ(tabstrip()->active_index(), 1);
+}
+
+TEST_F(TabStripModelTest, TestDetachTabInSplitNewSelection) {
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(1), false);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(2), false);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(3), true);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(4), true);
+  EXPECT_EQ(tabstrip()->count(), 4);
+  tabstrip()->AddToNewGroup(std::vector<int>{1, 2, 3});
+  tabstrip()->ActivateTabAt(
+      1, TabStripUserGestureDetails(
+             TabStripUserGestureDetails::GestureType::kOther));
+
+  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->ForgetAllOpeners();
+
+  tabstrip()->DetachTabAtForInsertion(1);
+  EXPECT_EQ(tabstrip()->active_index(), 1);
+}
+
 TEST_F(TabStripModelTest, TestDetachGroupForInsertion) {
   tabstrip()->AppendWebContents(CreateWebContentsWithID(1), false);
   tabstrip()->AppendWebContents(CreateWebContentsWithID(2), false);
@@ -905,10 +941,14 @@ TEST_F(TabStripModelTest, TestDetachGroupForInsertion) {
 
   tab_groups::TabGroupId group_id =
       tabstrip()->AddToNewGroup(std::vector<int>{1, 2});
-  std::unique_ptr<DetachedTabGroup> detached_group =
+  std::unique_ptr<DetachedTabCollection> detached_group =
       tabstrip()->DetachTabGroupForInsertion(group_id);
+  tabs::TabGroupTabCollection* group_collection =
+      std::get<std::unique_ptr<tabs::TabGroupTabCollection>>(
+          detached_group->collection_)
+          .get();
 
-  EXPECT_EQ(detached_group->collection_->TabCountRecursive(), 2u);
+  EXPECT_EQ(group_collection->TabCountRecursive(), 2u);
   EXPECT_FALSE(tabstrip()->group_model()->ContainsTabGroup(group_id));
   EXPECT_EQ(tabstrip()->count(), 4);
 
@@ -939,7 +979,7 @@ TEST_F(TabStripModelTest, TestDetachGroupNewSelection) {
   tabstrip()->ActivateTabAt(2);
   tabstrip()->ForgetAllOpeners();
   tabstrip()->SetOpenerOfWebContentsAt(0, tabstrip()->GetWebContentsAt(1));
-  std::unique_ptr<DetachedTabGroup> detached_group =
+  std::unique_ptr<DetachedTabCollection> detached_group =
       tabstrip()->DetachTabGroupForInsertion(group_id);
 
   EXPECT_EQ(tabstrip()->active_index(), 0);
@@ -1003,10 +1043,14 @@ TEST_F(TabStripModelTest, TestDetachAndInsertGroupWithSplit) {
   split_tabs::SplitTabId split_id =
       tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabLayout::kVertical);
 
-  std::unique_ptr<DetachedTabGroup> detached_group =
+  std::unique_ptr<DetachedTabCollection> detached_group =
       tabstrip()->DetachTabGroupForInsertion(group_id);
+  tabs::TabGroupTabCollection* group_collection =
+      std::get<std::unique_ptr<tabs::TabGroupTabCollection>>(
+          detached_group->collection_)
+          .get();
 
-  EXPECT_EQ(detached_group->collection_->TabCountRecursive(), 3u);
+  EXPECT_EQ(group_collection->TabCountRecursive(), 3u);
   EXPECT_FALSE(tabstrip()->group_model()->ContainsTabGroup(group_id));
   EXPECT_EQ(tabstrip()->count(), 2);
 
@@ -1038,7 +1082,7 @@ TEST_F(TabStripModelTest, InsertDetachedGroupSelectionObserver) {
   tab_groups::TabGroupId group_id =
       tabstrip()->AddToNewGroup(std::vector<int>{1, 2});
   tabstrip()->ActivateTabAt(1);
-  std::unique_ptr<DetachedTabGroup> detached_group =
+  std::unique_ptr<DetachedTabCollection> detached_group =
       tabstrip()->DetachTabGroupForInsertion(group_id);
 
   tabs::TabInterface* active_tab = tabstrip()->GetActiveTab();
@@ -1091,10 +1135,12 @@ TEST_F(TabStripModelTest, TestBasicOpenerAPI) {
   }
 
   // If there is a next adjacent item, then the index should be of that item.
-  EXPECT_EQ(2, tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_opener, 1));
+  EXPECT_EQ(2, tabstrip()->GetIndexOfNextWebContentsOpenedByOpenerOf(
+                   gfx::Range(1, 2)));
   // If the last tab in the opener tree is closed, the preceding tab in the same
   // tree should be selected.
-  EXPECT_EQ(4, tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_opener, 5));
+  EXPECT_EQ(4, tabstrip()->GetIndexOfNextWebContentsOpenedByOpenerOf(
+                   gfx::Range(5, 6)));
 
   // Tests the method that finds the last tab opened by the same opener in the
   // strip (this is the insertion index for the next background tab for the
@@ -1104,14 +1150,16 @@ TEST_F(TabStripModelTest, TestBasicOpenerAPI) {
   // For a tab that has opened no other tabs, the return value should always be
   // -1...
   EXPECT_EQ(-1,
-            tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_contents1, 3));
+            tabstrip()->GetIndexOfNextWebContentsOpenedBy(gfx::Range(1, 2)));
   EXPECT_EQ(-1,
             tabstrip()->GetIndexOfLastWebContentsOpenedBy(raw_contents1, 3));
 
   // ForgetAllOpeners should destroy all opener relationships.
   tabstrip()->ForgetAllOpeners();
-  EXPECT_EQ(-1, tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_opener, 1));
-  EXPECT_EQ(-1, tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_opener, 5));
+  EXPECT_EQ(-1,
+            tabstrip()->GetIndexOfNextWebContentsOpenedBy(gfx::Range(1, 2)));
+  EXPECT_EQ(-1,
+            tabstrip()->GetIndexOfNextWebContentsOpenedBy(gfx::Range(5, 6)));
   EXPECT_EQ(-1, tabstrip()->GetIndexOfLastWebContentsOpenedBy(raw_opener, 1));
 
   // Specify the last tab as the opener of the others.
@@ -1125,11 +1173,13 @@ TEST_F(TabStripModelTest, TestBasicOpenerAPI) {
   }
 
   // If there is a next adjacent item, then the index should be of that item.
-  EXPECT_EQ(2, tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_contents5, 1));
+  EXPECT_EQ(2, tabstrip()->GetIndexOfNextWebContentsOpenedByOpenerOf(
+                   gfx::Range(1, 2)));
 
   // If the last tab in the opener tree is closed, the preceding tab in the same
   // opener tree should be selected.
-  EXPECT_EQ(3, tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_contents5, 4));
+  EXPECT_EQ(3, tabstrip()->GetIndexOfNextWebContentsOpenedByOpenerOf(
+                   gfx::Range(4, 5)));
 
   tabstrip()->CloseAllTabs();
   EXPECT_TRUE(tabstrip()->empty());
@@ -1222,8 +1272,10 @@ TEST_F(TabStripModelTest, TestInsertionIndexDetermination) {
   EXPECT_EQ(raw_other, tabstrip()->GetWebContentsAt(4));
 
   // The opener API should work...
-  EXPECT_EQ(3, tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_opener, 2));
-  EXPECT_EQ(2, tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_opener, 3));
+  EXPECT_EQ(3, tabstrip()->GetIndexOfNextWebContentsOpenedByOpenerOf(
+                   gfx::Range(2, 3)));
+  EXPECT_EQ(2, tabstrip()->GetIndexOfNextWebContentsOpenedByOpenerOf(
+                   gfx::Range(3, 4)));
   EXPECT_EQ(3, tabstrip()->GetIndexOfLastWebContentsOpenedBy(raw_opener, 1));
 
   // Now open a foreground tab from a link. It should be opened adjacent to the
@@ -1262,9 +1314,10 @@ TEST_F(TabStripModelTest, TestInsertionIndexDetermination) {
   EXPECT_EQ(raw_fg_nonlink_contents, tabstrip()->GetActiveWebContents());
 
   // Verify that all opener relationships are forgotten.
-  EXPECT_EQ(-1, tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_opener, 2));
-  EXPECT_EQ(-1, tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_opener, 3));
-  EXPECT_EQ(-1, tabstrip()->GetIndexOfNextWebContentsOpenedBy(raw_opener, 3));
+  EXPECT_EQ(-1,
+            tabstrip()->GetIndexOfNextWebContentsOpenedBy(gfx::Range(2, 3)));
+  EXPECT_EQ(-1,
+            tabstrip()->GetIndexOfNextWebContentsOpenedBy(gfx::Range(3, 4)));
   EXPECT_EQ(-1, tabstrip()->GetIndexOfLastWebContentsOpenedBy(raw_opener, 1));
 
   tabstrip()->CloseAllTabs();
@@ -1491,8 +1544,7 @@ TEST_F(TabStripModelTest, CollapseGroupShiftsSelection_SuccessNextTab) {
              TabStripUserGestureDetails::GestureType::kOther));
   ASSERT_EQ(1, tabstrip()->active_index());
 
-  std::optional<int> next_active =
-      tabstrip()->GetNextExpandedActiveTab(tabstrip()->active_index(), group);
+  std::optional<int> next_active = tabstrip()->GetNextExpandedActiveTab(group);
 
   EXPECT_EQ(2, next_active);
 
@@ -1518,8 +1570,7 @@ TEST_F(TabStripModelTest, CollapseGroupShiftsSelection_SuccessPreviousTab) {
              TabStripUserGestureDetails::GestureType::kOther));
   ASSERT_EQ(2, tabstrip()->active_index());
 
-  std::optional<int> next_active =
-      tabstrip()->GetNextExpandedActiveTab(tabstrip()->active_index(), group);
+  std::optional<int> next_active = tabstrip()->GetNextExpandedActiveTab(group);
 
   EXPECT_EQ(1, next_active);
 
@@ -1545,8 +1596,7 @@ TEST_F(TabStripModelTest, CollapseGroupShiftsSelection_NoAvailableTabs) {
              TabStripUserGestureDetails::GestureType::kOther));
   ASSERT_EQ(1, tabstrip()->active_index());
 
-  std::optional<int> next_active =
-      tabstrip()->GetNextExpandedActiveTab(tabstrip()->active_index(), group);
+  std::optional<int> next_active = tabstrip()->GetNextExpandedActiveTab(group);
 
   EXPECT_EQ(std::nullopt, next_active);
 
@@ -2153,6 +2203,29 @@ TEST_F(TabStripModelTest, ReverseTabsInSplit) {
   EXPECT_EQ(2ul, new_tabs.size());
   EXPECT_EQ(old_tabs[1], new_tabs[0]);
   EXPECT_EQ(old_tabs[0], new_tabs[1]);
+
+  tabstrip()->CloseAllTabs();
+  EXPECT_TRUE(tabstrip()->empty());
+}
+
+TEST_F(TabStripModelTest, ReverseAndReplaceTabsInSplit) {
+  ASSERT_NO_FATAL_FAILURE(
+      PrepareTabstripForSelectionTest(tabstrip(), 3, 0, {1}));
+
+  tabstrip()->ActivateTabAt(
+      2, TabStripUserGestureDetails(
+             TabStripUserGestureDetails::GestureType::kOther));
+
+  split_tabs::SplitTabId split_tab_id =
+      tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabLayout::kVertical);
+  EXPECT_EQ("0 1s 2s", GetTabStripStateString(tabstrip()));
+
+  tabstrip()->ReverseTabsInSplit(split_tab_id);
+  EXPECT_EQ("0 2s 1s", GetTabStripStateString(tabstrip()));
+
+  tabstrip()->UpdateActiveTabInSplit(split_tab_id, 0,
+                                     TabStripModel::SplitUpdateType::kReplace);
+  EXPECT_EQ("0s 1s", GetTabStripStateString(tabstrip()));
 
   tabstrip()->CloseAllTabs();
   EXPECT_TRUE(tabstrip()->empty());

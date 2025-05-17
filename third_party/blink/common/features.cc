@@ -762,10 +762,6 @@ BASE_FEATURE(kEventTimingIgnorePresentationTimeFromUnexpectedFrameSource,
              "EventTimingIgnorePresentationTimeFromUnexpectedFrameSource",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kExemptSpeculationRulesHeaderFromCSP,
-             "ExemptSpeculationRulesHeaderFromCSP",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kExpandCompositedCullRect,
              "ExpandCompositedCullRect",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -1156,10 +1152,6 @@ BASE_FEATURE(kGetUserMediaDeferredDeviceSettingsSelection,
              "GetUserMediaDeferredDeviceSettingsSelection",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
-
-BASE_FEATURE(kHiddenSelectionBounds,
-             "HiddenSelectionBounds",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kIgnoreInputWhileHidden,
              "IgnoreInputWhileHidden",
@@ -2135,10 +2127,6 @@ BASE_FEATURE(kPageHideEventForPrerender2,
              "PageHideEventForPrerender2",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kPrerender2MainFrameNavigation,
-             "Prerender2MainFrameNavigation",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 const char kPrerender2MaxNumOfRunningSpeculationRules[] =
     "max_num_of_running_speculation_rules";
 
@@ -2371,7 +2359,7 @@ BASE_FEATURE(kScriptStreamingForNonHTTP,
 // Enables sending Sec-Purpose: "prefetch" header for rel="prefetch".
 BASE_FEATURE(kSecPurposePrefetchHeaderRelPrefetch,
              "SecPurposePrefetchHeaderRelPrefetch",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kSelectiveInOrderScript,
              "SelectiveInOrderScript",
@@ -2431,10 +2419,6 @@ const char kSkipTouchEventFilterFilteringProcessParamName[] =
 const char kSkipTouchEventFilterFilteringProcessParamValueBrowser[] = "browser";
 const char kSkipTouchEventFilterFilteringProcessParamValueBrowserAndRenderer[] =
     "browser_and_renderer";
-
-BASE_FEATURE(kSpeculationRulesPrefetchFuture,
-             "SpeculationRulesPrefetchFuture",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kSpeculativeImageDecodes,
              "SpeculativeImageDecodes",
@@ -2546,10 +2530,6 @@ BASE_FEATURE(kStreamlineRendererInit,
 
 BASE_FEATURE(kSubSampleWindowProxyUsageMetrics,
              "SubSampleWindowProxyUsageMetrics",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kStylusRichGestures,
-             "StylusRichGestures",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kThreadedBodyLoader,
@@ -2811,6 +2791,11 @@ BASE_FEATURE(kWebRtcUseMinMaxVEADimensions,
              base::FEATURE_DISABLED_BY_DEFAULT
 #endif
 );
+
+// Kill switch for crbug.com/407785197.
+BASE_FEATURE(kWebRtcAllowDataChannelRecordingInWebrtcInternals,
+             "WebRtcAllowDataChannelRecordingInWebrtcInternals",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Kill switch for https://crbug.com/338955051.
 BASE_FEATURE(kWebUSBTransferSizeLimit,

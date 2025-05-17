@@ -12,8 +12,6 @@
 #import "ios/chrome/browser/omnibox/model/omnibox_view_base.h"
 #import "ui/gfx/range/range.h"
 
-struct AutocompleteMatch;
-
 // Fake implementation of OmniboxViewBase for use in tests.
 class TestOmniboxViewBase : public OmniboxViewBase {
  public:
@@ -38,25 +36,18 @@ class TestOmniboxViewBase : public OmniboxViewBase {
                                 bool notify_text_changed) override;
   void SetCaretPos(size_t caret_pos) override {}
   void SetAdditionalText(const std::u16string& text) override {}
-  void EnterKeywordModeForDefaultSearchProvider() override {}
   bool IsSelectAll() const override;
   void GetSelectionBounds(size_t* start, size_t* end) const override;
   void SelectAll(bool reversed) override;
   void UpdatePopup() override {}
   void SetFocus(bool is_user_initiated) override {}
   void ApplyCaretVisibility() override {}
-  void OnTemporaryTextMaybeChanged(const std::u16string& display_text,
-                                   const AutocompleteMatch& match,
-                                   bool save_original_selection,
-                                   bool notify_text_changed) override;
   void OnInlineAutocompleteTextMaybeChanged(
       const std::u16string& user_text,
       const std::u16string& inline_autocompletion) override;
   void OnInlineAutocompleteTextCleared() override;
-  void OnRevertTemporaryText(const std::u16string& display_text,
-                             const AutocompleteMatch& match) override;
   void OnBeforePossibleChange() override {}
-  bool OnAfterPossibleChange(bool allow_keyword_ui_change) override;
+  bool OnAfterPossibleChange() override;
   gfx::NativeView GetNativeView() const override;
   gfx::NativeView GetRelativeWindowForPopup() const override;
   bool IsImeComposing() const override;
@@ -70,7 +61,6 @@ class TestOmniboxViewBase : public OmniboxViewBase {
   std::u16string text_;
   std::u16string inline_autocompletion_;
   gfx::Range selection_;
-  gfx::Range saved_temporary_selection_;
 };
 
 #endif  // IOS_CHROME_BROWSER_OMNIBOX_MODEL_TEST_OMNIBOX_VIEW_BASE_H_

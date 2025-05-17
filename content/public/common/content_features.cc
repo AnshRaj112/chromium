@@ -433,12 +433,6 @@ BASE_FEATURE(kFedCmMultipleIdentityProviders,
              "FedCmMultipleIdentityProviders",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables usage of the FedCM API with the Selective Disclosure API at the same
-// time.
-BASE_FEATURE(kFedCmSelectiveDisclosure,
-             "FedCmSelectiveDisclosure",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Enables showing filtered out accounts in FedCM UI after the user attempts to
 // login to an account. These accounts are shown greyed out.
 BASE_FEATURE(kFedCmShowFilteredAccounts,
@@ -1325,6 +1319,11 @@ BASE_FEATURE(kWebPermissionsApi,
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_ANDROID)
+// When enabled, will no longer cache java side AccessibilityNodeInfo objects.
+BASE_FEATURE(kAccessibilityDeprecateJavaNodeCache,
+             "AccessibilityDeprecateJavaNodeCache",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // When enabled, TYPE_ANNOUNCE events will no longer be sent for live regions in
 // the web contents.
 BASE_FEATURE(kAccessibilityDeprecateTypeAnnounce,

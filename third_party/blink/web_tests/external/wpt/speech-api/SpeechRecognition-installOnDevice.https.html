@@ -7,6 +7,7 @@
 <script>
 promise_test(async (t) => {
   const validLang = "en-US";
+  const validLangAlternateLocale = "en-GB";
   const invalidLang = "invalid language code";
   window.SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -85,6 +86,26 @@ promise_test(async (t) => {
       "'available'."
     );
 
+    // Verify that the newly installed language pack is available for an alternate locale.
+    const alternateLocaleResultPromise =
+      SpeechRecognition.availableOnDevice(validLangAlternateLocale);
+    assert_true(
+      alternateLocaleResultPromise instanceof Promise,
+      "availableOnDevice should return a Promise."
+    );
+
+    const alternateLocaleResult = await alternateLocaleResultPromise;
+    assert_true(
+      typeof alternateLocaleResult === "string",
+      "The resolved value of the availableOnDevice promise should be a string."
+    );
+
+    assert_true(
+      alternateLocaleResult === "available",
+      "The resolved value of the availableOnDevice promise should be " +
+      "'available'."
+    );
+
     // Verify that installing an already installed language resolves to true.
     const secondResultPromise = test_driver.bless(
       "Call SpeechRecognition.installOnDevice for an already installed language",
@@ -154,6 +175,116 @@ promise_test(async (t) => {
       }
     )
   );
-}, "SpeechRecognition.installOnDevice rejects in a detached context " +
-   "(with user gesture).");
+}, "SpeechRecognition.installOnDevice rejects in a detached context.");
+
+promise_test(async (t) => {
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("allow",
+    "on-device-speech-recognition 'none'");
+  document.body.appendChild(iframe);
+  t.add_cleanup(() => iframe.remove());
+
+  await new Promise(resolve => {
+    if (iframe.contentWindow &&
+        iframe.contentWindow.document.readyState === 'complete') {
+      resolve();
+    } else {
+      iframe.onload = resolve;
+    }
+  });
+
+  const frameWindow = iframe.contentWindow;
+  const frameSpeechRecognition = frameWindow.SpeechRecognition ||
+    frameWindow.webkitSpeechRecognition;
+  const frameDOMException = frameWindow.DOMException;
+
+  assert_true(!!frameSpeechRecognition,
+    "SpeechRecognition should exist in iframe.");
+  assert_true(!!frameSpeechRecognition.installOnDevice,
+    "installOnDevice method should exist on SpeechRecognition in iframe.");
+
+  await promise_rejects_dom(
+    t,
+    "NotAllowedError",
+    frameDOMException,
+    frameSpeechRecognition.installOnDevice("en-US"),
+    "installOnDevice should reject with NotAllowedError if " +
+    "'install-on-device-speech-recognition' Permission Policy is " +
+    "disabled."
+  );
+}, "SpeechRecognition.installOnDevice rejects if " +
+  "'install-on-device-speech-recognition' Permission Policy is disabled.");
+
+promise_test(async (t) => {
+  const html = `
+    <!DOCTYPE html>
+    <script>
+      window.addEventListener('message', async (event) => {
+        try {
+          const SpeechRecognition = window.SpeechRecognition ||
+                                    window.webkitSpeechRecognition;
+          if (!SpeechRecognition || !SpeechRecognition.installOnDevice) {
+            parent.postMessage({
+              type: "rejection",
+              name: "NotSupportedError",
+              message: "API not available"
+            }, "*");
+            return;
+          }
+
+          await SpeechRecognition.installOnDevice("en-US");
+          parent.postMessage({ type: "resolution", result: "success" }, "*");
+        } catch (err) {
+          parent.postMessage({
+            type: "rejection",
+            name: err.name,
+            message: err.message
+          }, "*");
+        }
+      });
+    <\/script>
+  `;
+
+  // Create a cross-origin Blob URL by fetching from remote origin
+  const blob = new Blob([html], { type: "text/html" });
+  const blobUrl = URL.createObjectURL(blob);
+
+  const iframe = document.createElement("iframe");
+  iframe.src = blobUrl;
+  iframe.setAttribute("sandbox", "allow-scripts");
+  document.body.appendChild(iframe);
+  t.add_cleanup(() => iframe.remove());
+
+  await new Promise(resolve => iframe.onload = resolve);
+
+  const testResult = await new Promise((resolve, reject) => {
+    const timeoutId = t.step_timeout(() => {
+      reject(new Error("Timed out waiting for message from iframe"));
+    }, 6000);
+
+    window.addEventListener("message", t.step_func((event) => {
+      if (event.source !== iframe.contentWindow) return;
+      clearTimeout(timeoutId);
+      resolve(event.data);
+    }));
+
+    iframe.contentWindow.postMessage("runTest", "*");
+  });
+
+  assert_equals(
+    testResult.type,
+    "rejection",
+    "Should reject due to cross-origin restriction"
+  );
+  assert_equals(
+    testResult.name,
+    "NotAllowedError",
+    "Should reject with NotAllowedError"
+  );
+  assert_true(
+    testResult.message.includes("cross-origin iframe") ||
+    testResult.message.includes("cross-site subframe"),
+    `Error message should reference cross-origin. Got: "${testResult.message}"`
+  );
+}, "SpeechRecognition.installOnDevice should reject in a cross-origin iframe.");
 </script>

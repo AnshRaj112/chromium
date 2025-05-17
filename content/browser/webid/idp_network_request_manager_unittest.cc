@@ -11,6 +11,7 @@
 #include <tuple>
 #include <utility>
 
+#include "base/memory/ref_counted_memory.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/bind.h"
@@ -23,11 +24,17 @@
 #include "content/public/browser/identity_request_dialog_controller.h"
 #include "content/public/browser/manifest_icon_downloader.h"
 #include "content/public/common/content_features.h"
+#include "content/public/test/browser_task_environment.h"
+#include "net/base/isolation_info.h"
+#include "net/base/load_flags.h"
+#include "net/base/network_isolation_key.h"
+#include "net/base/network_isolation_partition.h"
 #include "net/http/http_request_headers.h"
 #include "net/http/http_response_headers.h"
 #include "net/http/http_status_code.h"
 #include "services/data_decoder/public/cpp/test_support/in_process_data_decoder.h"
 #include "services/network/public/cpp/cors/cors_error_status.h"
+#include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/url_loader_completion_status.h"
 #include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
 #include "services/network/public/mojom/client_security_state.mojom.h"
@@ -36,7 +43,7 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/public/mojom/webid/federated_auth_request.mojom.h"
 #include "third_party/re2/src/re2/re2.h"
-#include "ui/gfx/geometry/size.h"
+#include "ui/gfx/image/image.h"
 #include "url/gurl.h"
 
 using ::testing::_;
@@ -137,7 +144,7 @@ class IdpNetworkRequestManagerTest : public ::testing::Test {
         base::MakeRefCounted<network::WeakWrapperSharedURLLoaderFactory>(
             &test_url_loader_factory_),
         test_permission_delegate_.get(),
-        network::mojom::ClientSecurityState::New());
+        network::mojom::ClientSecurityState::New(), content::FrameTreeNodeId());
   }
 
   void AddResponse(const GURL& url,
@@ -355,7 +362,8 @@ class IdpNetworkRequestManagerTest : public ::testing::Test {
   std::optional<ErrorUrlType> error_url_type() { return error_url_type_; }
 
  private:
-  base::test::TaskEnvironment task_environment_;
+  content::BrowserTaskEnvironment task_environment_{
+      content::BrowserTaskEnvironment::MainThreadType::UI};
   network::TestURLLoaderFactory test_url_loader_factory_;
   data_decoder::test::InProcessDataDecoder in_process_data_decoder;
   base::HistogramTester histogram_tester_;
@@ -914,6 +922,53 @@ TEST_F(IdpNetworkRequestManagerTest, ParseAccountEmptyLightweightFedcm) {
   EXPECT_EQ(0UL, accounts.size());
 }
 
+TEST_F(IdpNetworkRequestManagerTest, CacheProfilePictures) {
+  std::unique_ptr<IdpNetworkRequestManager> manager = CreateTestManager();
+  url::Origin idp_origin = url::Origin::Create(GURL(kTestIdpUrl));
+  GURL picture_url("https://idp.cdn.test/profile/1234");
+
+  manager->CacheAccountPictures(idp_origin, {picture_url});
+  EXPECT_EQ(1, test_url_loader_factory().NumPending());
+  network::TestURLLoaderFactory::PendingRequest* pending_request =
+      test_url_loader_factory().GetPendingRequest(0);
+  ASSERT_TRUE(pending_request);
+  network::ResourceRequest resource_request = pending_request->request;
+  EXPECT_FALSE(resource_request.load_flags & net::LOAD_ONLY_FROM_CACHE);
+  net::IsolationInfo expected_isolation_info = net::IsolationInfo::Create(
+      net::IsolationInfo::RequestType::kOther,
+      /*top_frame_origin=*/idp_origin,
+      /*frame_origin=*/url::Origin::Create(GURL("https://idp.cdn.test/")),
+      net::SiteForCookies(),
+      /*nonce=*/std::nullopt,
+      net::NetworkIsolationPartition::kFedCmUncredentialedRequests);
+  EXPECT_TRUE(expected_isolation_info.IsEqualForTesting(
+      resource_request.trusted_params->isolation_info));
+}
+
+TEST_F(IdpNetworkRequestManagerTest, DownloadAndDecodeCachedImage) {
+  std::unique_ptr<IdpNetworkRequestManager> manager = CreateTestManager();
+  url::Origin idp_origin = url::Origin::Create(GURL(kTestIdpUrl));
+  GURL picture_url("https://idp.cdn.test/profile/1234");
+
+  manager->DownloadAndDecodeCachedImage(
+      idp_origin, picture_url, base::DoNothingAs<void(const gfx::Image&)>());
+
+  EXPECT_EQ(1, test_url_loader_factory().NumPending());
+  network::TestURLLoaderFactory::PendingRequest* pending_request =
+      test_url_loader_factory().GetPendingRequest(0);
+  ASSERT_TRUE(pending_request);
+  network::ResourceRequest resource_request = pending_request->request;
+  EXPECT_TRUE(resource_request.load_flags & net::LOAD_ONLY_FROM_CACHE);
+  net::IsolationInfo expected_isolation_info = net::IsolationInfo::Create(
+      net::IsolationInfo::RequestType::kOther,
+      /*top_frame_origin=*/idp_origin,
+      /*frame_origin=*/url::Origin::Create(GURL("https://idp.cdn.test/")),
+      net::SiteForCookies(),
+      /*nonce=*/std::nullopt,
+      net::NetworkIsolationPartition::kFedCmUncredentialedRequests);
+  EXPECT_TRUE(expected_isolation_info.IsEqualForTesting(
+      resource_request.trusted_params->isolation_info));
+}
 // Test that IdpNetworkRequestManager::FetchWellKnown() fails when the
 // identity provider domain is empty.
 TEST_F(IdpNetworkRequestManagerTest, FetchWellKnownIllegalDomainFails) {
@@ -929,7 +984,7 @@ TEST_F(IdpNetworkRequestManagerTest, FetchWellKnownIllegalDomainFails) {
       base::MakeRefCounted<network::WeakWrapperSharedURLLoaderFactory>(
           &test_url_loader_factory),
       test_permission_delegate_.get(),
-      network::mojom::ClientSecurityState::New());
+      network::mojom::ClientSecurityState::New(), content::FrameTreeNodeId());
 
   base::RunLoop run_loop;
   auto callback = base::BindLambdaForTesting(

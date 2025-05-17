@@ -8,11 +8,20 @@ import type {SplitNewTabPageAppElement} from './app.js';
 
 export function getHtml(this: SplitNewTabPageAppElement) {
   return html`<!--_html_template_start_-->
-<div class="header">
+<div id="header">
   <cr-icon-button id="closeButton"
       iron-icon="tab-search:close"
       @click="${this.onClose_}">
   </cr-icon-button>
+  ${
+      this.allInvisibleTabs_.length === 0 ? html`
+        <picture>
+          <source media="(prefers-color-scheme: dark)"
+              srcset="./split_view/images/empty_dark.svg">
+          <img id="product-logo" srcset="./split_view/images/empty.svg" alt="">
+        </picture>
+      ` :
+                                            html``}
   <div class="title">${this.title_}</div>
   ${
       this.allInvisibleTabs_.length === 0 ?
@@ -23,6 +32,7 @@ export function getHtml(this: SplitNewTabPageAppElement) {
   <cr-lazy-list id="splitTabsList" class="scroller"
       .items="${this.allInvisibleTabs_}"
       item-size="66"
+      .minViewportHeight="${this.minViewportHeight_}"
       .scrollTarget="${this.scrollTarget_}"
       @keydown="${this.onTabClick_}"
       @viewport-filled="${this.updateFocusedItem_}"

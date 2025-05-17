@@ -890,6 +890,9 @@ bool FrameFetchContext::StartSpeculativeImageDecode(
     return false;
   }
   ImageResource* image_resource = To<ImageResource>(resource);
+  if (image_resource->RequestedSpeculativeDecode()) {
+    return false;
+  }
   Image* image = image_resource->GetContent()->GetImage();
   if (IsA<SVGImage>(image)) {
     return false;
@@ -899,6 +902,7 @@ bool FrameFetchContext::StartSpeculativeImageDecode(
   }
   PaintImage paint_image = image->PaintImageForCurrentFrame();
   if (paint_image) {
+    image_resource->OnRequestSpeculativeDecode();
     SkM44 matrix;
     gfx::Size image_size(image->width(), image->height());
     gfx::SizeF content_size(image_resource->GetContent()->MaxSize());
@@ -944,6 +948,15 @@ bool FrameFetchContext::StartSpeculativeImageDecode(
     return true;
   }
   return false;
+}
+
+bool FrameFetchContext::SpeculativeDecodeRequestInFlight() const {
+  if (GetResourceFetcherProperties().IsDetached()) {
+    return false;
+  }
+  return document_->GetFrame()
+      ->GetChromeClient()
+      .SpeculativeDecodeRequestInFlight(document_->GetFrame());
 }
 
 bool FrameFetchContext::IsPrerendering() const {

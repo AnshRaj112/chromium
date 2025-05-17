@@ -67,6 +67,7 @@
 #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
 #include "third_party/blink/renderer/platform/wtf/text/strcat.h"
+#include "third_party/blink/renderer/platform/wtf/text/string_buffer.h"
 #include "third_party/blink/renderer/platform/wtf/text/string_builder.h"
 
 namespace blink {
@@ -951,7 +952,7 @@ void TextControlElement::SetInnerEditorValue(const String& value) {
   if (!IsTextControl() || OpenShadowRoot())
     return;
 
-  bool text_is_changed = value != InnerEditorValue();
+  bool text_is_changed = value != SerializeInnerEditorValue();
   HTMLElement* inner_editor = EnsureInnerEditorElement();
   if (!text_is_changed && inner_editor->HasChildren())
     return;
@@ -1005,7 +1006,7 @@ void TextControlElement::AppendTextOrBr(const String& value,
   }
 }
 
-String TextControlElement::InnerEditorValue() const {
+String TextControlElement::SerializeInnerEditorValue() const {
   DCHECK(!OpenShadowRoot());
   HTMLElement* inner_editor = InnerEditorElement();
   if (!inner_editor || !IsTextControl())
@@ -1026,6 +1027,11 @@ String TextControlElement::InnerEditorValue() const {
     return g_empty_string;
   }
 
+  if (RuntimeEnabledFeatures::TextareaLineEndingsAsBrEnabled()) {
+    auto [length, is_8bit] = AnalyzeInnerEditorValue(nullptr);
+    return SerializeInnerEditorValueInternal(length, is_8bit);
+  }
+
   StringBuilder result;
   for (Node& node : NodeTraversal::InclusiveDescendantsOf(*inner_editor)) {
     if (IsA<HTMLBRElement>(node)) {
@@ -1044,6 +1050,77 @@ String TextControlElement::InnerEditorValue() const {
     }
   }
   return result.ToString();
+}
+
+std::pair<wtf_size_t, bool> TextControlElement::AnalyzeInnerEditorValue(
+    HeapHashMap<Member<const Text>, unsigned>* offset_map) const {
+  const HTMLElement* inner_editor = InnerEditorElement();
+  if (!inner_editor) {
+    return {0u, true};
+  }
+  wtf_size_t offset = 0;
+  bool is_8bit = true;
+  for (const auto& child : NodeTraversal::ChildrenOf(*inner_editor)) {
+    if (const auto* text = DynamicTo<Text>(child)) {
+      if (offset_map) {
+        offset_map->insert(text, offset);
+      }
+      offset += text->length();
+      is_8bit = is_8bit && text->data().Is8Bit();
+    } else if (!TextControlElement::IsPlaceholderBreakElement(&child)) {
+      DCHECK(IsA<HTMLBRElement>(child));
+      ++offset;
+    }
+  }
+  return {offset, is_8bit};
+}
+
+String TextControlElement::SerializeInnerEditorValueInternal(
+    wtf_size_t length,
+    bool is_8bit) const {
+  if (length == 0u) {
+    return g_empty_string;
+  }
+  const HTMLElement* inner_editor = InnerEditorElement();
+  const auto* first_text = DynamicTo<Text>(inner_editor->firstChild());
+  if (first_text && !first_text->nextSibling()) {
+    return first_text->data();
+  }
+  if (is_8bit) {
+    StringBuffer<LChar> buffer(length);
+    base::span<LChar> span = buffer.Span();
+    for (const auto& child : NodeTraversal::ChildrenOf(*inner_editor)) {
+      if (const auto* text = DynamicTo<Text>(child)) {
+        span.take_first(text->data().length()).copy_from(text->data().Span8());
+      } else if (!IsPlaceholderBreakElement(&child)) {
+        DCHECK(IsA<HTMLBRElement>(child));
+        span[0] = kNewlineCharacter;
+        span = span.subspan(1u);
+      }
+    }
+    return buffer.Release();
+  }
+  StringBuffer<UChar> buffer(length);
+  base::span<UChar> span = buffer.Span();
+  for (const auto& child : NodeTraversal::ChildrenOf(*inner_editor)) {
+    if (const auto* text = DynamicTo<Text>(child)) {
+      base::span<UChar> destination = span.take_first(text->data().length());
+      if (text->data().Is8Bit()) {
+        std::ranges::copy(text->data().Span8(), destination.begin());
+      } else {
+        destination.copy_from(text->data().Span16());
+      }
+    } else if (!IsPlaceholderBreakElement(&child)) {
+      DCHECK(IsA<HTMLBRElement>(child));
+      span[0] = kNewlineCharacter;
+      span = span.subspan(1u);
+    }
+  }
+  return buffer.Release();
+}
+
+String TextControlElement::InnerEditorValue() const {
+  return SerializeInnerEditorValue();
 }
 
 String TextControlElement::ValueWithHardLineBreaks() const {

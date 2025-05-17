@@ -26,6 +26,7 @@ import static androidx.browser.customtabs.CustomTabsIntent.EXTRA_CLOSE_BUTTON_PO
 import static androidx.browser.customtabs.CustomTabsIntent.EXTRA_INITIAL_ACTIVITY_HEIGHT_PX;
 import static androidx.browser.customtabs.CustomTabsIntent.EXTRA_INITIAL_ACTIVITY_WIDTH_PX;
 import static androidx.browser.customtabs.CustomTabsIntent.EXTRA_NETWORK;
+import static androidx.browser.customtabs.CustomTabsIntent.EXTRA_TITLE_VISIBILITY_STATE;
 import static androidx.browser.customtabs.CustomTabsIntent.EXTRA_TOOLBAR_CORNER_RADIUS_DP;
 import static androidx.browser.trusted.LaunchHandlerClientMode.FOCUS_EXISTING;
 import static androidx.browser.trusted.LaunchHandlerClientMode.NAVIGATE_EXISTING;
@@ -56,7 +57,9 @@ import androidx.browser.customtabs.CustomTabsIntent.ActivityHeightResizeBehavior
 import androidx.browser.customtabs.CustomTabsIntent.ActivitySideSheetDecorationType;
 import androidx.browser.customtabs.CustomTabsIntent.ActivitySideSheetRoundedCornersPosition;
 import androidx.browser.customtabs.CustomTabsIntent.CloseButtonPosition;
+import androidx.browser.customtabs.CustomTabsIntent.OpenInBrowserState;
 import androidx.browser.customtabs.CustomTabsSessionToken;
+import androidx.browser.customtabs.ExperimentalOpenInBrowser;
 import androidx.browser.customtabs.TrustedWebUtils;
 import androidx.browser.trusted.FileHandlingData;
 import androidx.browser.trusted.LaunchHandlerClientMode;
@@ -277,6 +280,19 @@ public class CustomTabIntentDataProvider extends BrowserServicesIntentDataProvid
     public static final String EXTRA_ACTIVITY_SCROLL_CONTENT_RESIZE =
             "androidx.browser.customtabs.extra.ACTIVITY_SCROLL_CONTENT_RESIZE";
 
+    @IntDef({
+        OpenInBrowserButtonState.OPEN_IN_BROWSER_STATE_OFF,
+        OpenInBrowserButtonState.OPEN_IN_BROWSER_STATE_ON,
+        OpenInBrowserButtonState.OPEN_IN_BROWSER_STATE_DEFAULT
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    @ExperimentalOpenInBrowser
+    public @interface OpenInBrowserButtonState {
+        int OPEN_IN_BROWSER_STATE_OFF = CustomTabsIntent.OPEN_IN_BROWSER_STATE_OFF;
+        int OPEN_IN_BROWSER_STATE_ON = CustomTabsIntent.OPEN_IN_BROWSER_STATE_ON;
+        int OPEN_IN_BROWSER_STATE_DEFAULT = CustomTabsIntent.OPEN_IN_BROWSER_STATE_DEFAULT;
+    }
+
     private final Intent mIntent;
     private final SessionHolder<CustomTabsSessionToken> mSession;
     private final boolean mIsTrustedIntent;
@@ -314,6 +330,7 @@ public class CustomTabIntentDataProvider extends BrowserServicesIntentDataProvid
     private final PendingIntent mSecondaryToolbarSwipeUpPendingIntent;
     private PendingIntent.OnFinished mOnFinishedForTesting;
     private @DisplayMode.EnumType int mResolvedDisplayMode = DisplayMode.UNDEFINED;
+    private final @OpenInBrowserState int mOpenInBrowserState;
 
     /** Whether this CustomTabActivity was explicitly started by another Chrome Activity. */
     private final boolean mIsOpenedByChrome;
@@ -548,6 +565,12 @@ public class CustomTabIntentDataProvider extends BrowserServicesIntentDataProvid
             }
         }
 
+        mOpenInBrowserState =
+                IntentUtils.safeGetIntExtra(
+                        intent,
+                        EXTRA_OPEN_IN_BROWSER_STATE,
+                        OpenInBrowserButtonState.OPEN_IN_BROWSER_STATE_DEFAULT);
+
         List<Bundle> menuItems =
                 IntentUtils.getParcelableArrayListExtra(intent, CustomTabsIntent.EXTRA_MENU_ITEMS);
 
@@ -577,11 +600,16 @@ public class CustomTabIntentDataProvider extends BrowserServicesIntentDataProvid
         // until native is loaded.
 
         mTrustedWebActivityDisplayMode = resolveTwaDisplayMode();
-        mTitleVisibilityState =
+
+        int intentVisibilityState =
                 IntentUtils.safeGetIntExtra(
                         intent,
                         CustomTabsIntent.EXTRA_TITLE_VISIBILITY_STATE,
                         CustomTabsIntent.NO_TITLE);
+        mTitleVisibilityState =
+                BrowserServicesIntentDataProvider.customTabIntentTitleBarVisibility(
+                        intentVisibilityState, isTwa);
+
         mRemoteViews =
                 IntentUtils.safeGetParcelableExtra(intent, CustomTabsIntent.EXTRA_REMOTEVIEWS);
         mClickableViewIds =
@@ -1120,7 +1148,7 @@ public class CustomTabIntentDataProvider extends BrowserServicesIntentDataProvid
         if (IntentUtils.safeHasExtra(intent, CustomTabsIntent.EXTRA_SHARE_STATE)) {
             featureUsage.log(CustomTabsFeature.EXTRA_SHARE_STATE);
         }
-        if (mTitleVisibilityState != CustomTabsIntent.NO_TITLE) {
+        if (IntentUtils.safeHasExtra(intent, EXTRA_TITLE_VISIBILITY_STATE)) {
             featureUsage.log(CustomTabsFeature.EXTRA_TITLE_VISIBILITY_STATE);
         }
         if (IntentUtils.safeHasExtra(intent, CustomTabsIntent.EXTRA_TOOLBAR_ITEMS)) {
@@ -1161,6 +1189,9 @@ public class CustomTabIntentDataProvider extends BrowserServicesIntentDataProvid
             featureUsage.log(CustomTabsFeature.EXTRA_GOOGLE_BOTTOM_BAR_BUTTONS);
         }
         if (mNetwork != null) featureUsage.log(CustomTabsFeature.EXTRA_NETWORK);
+        if (IntentUtils.safeHasExtra(intent, EXTRA_OPEN_IN_BROWSER_STATE)) {
+            featureUsage.log(CustomTabsFeature.EXTRA_OPEN_IN_BROWSER_STATE);
+        }
     }
 
     @Override
@@ -1276,7 +1307,7 @@ public class CustomTabIntentDataProvider extends BrowserServicesIntentDataProvid
     }
 
     @Override
-    public int getTitleVisibilityState() {
+    public @TitleVisibility int getTitleVisibilityState() {
         return mTitleVisibilityState;
     }
 
@@ -1656,6 +1687,12 @@ public class CustomTabIntentDataProvider extends BrowserServicesIntentDataProvid
 
         mResolvedDisplayMode = resolveDisplayMode();
         return mResolvedDisplayMode;
+    }
+
+    @ExperimentalOpenInBrowser
+    @Override
+    public @OpenInBrowserState int getOpenInBrowserButtonState() {
+        return mOpenInBrowserState;
     }
 
     private @DisplayMode.EnumType int resolveDisplayMode() {

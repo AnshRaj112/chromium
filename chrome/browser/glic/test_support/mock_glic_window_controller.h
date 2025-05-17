@@ -65,8 +65,8 @@ class MockGlicWindowController
   MOCK_METHOD(void, PreloadFre, (), (override));
   MOCK_METHOD(void, Reload, (), (override));
   MOCK_METHOD(bool, IsWarmed, (), (const, override));
-  MOCK_METHOD(base::WeakPtr<GlicWindowController>, GetWeakPtr, (), (override));
   MOCK_METHOD(GlicView*, GetGlicView, (), (override));
+  MOCK_METHOD(base::WeakPtr<views::View>, GetGlicViewAsView, (), (override));
   MOCK_METHOD(GlicWidget*, GetGlicWidget, (), (override));
   MOCK_METHOD(content::WebContents*, GetFreWebContents, (), (override));
   MOCK_METHOD(Browser*, attached_browser, (), (override));
@@ -79,6 +79,13 @@ class MockGlicWindowController
   MOCK_METHOD(gfx::Rect, GetInitialBounds, (Browser*), (override));
   MOCK_METHOD(void, ShowDetachedForTesting, (), (override));
   MOCK_METHOD(void, SetPreviousPositionForTesting, (gfx::Point), (override));
+
+  base::WeakPtr<GlicWindowController> GetWeakPtr() override {
+    return weak_ptr_factory_.GetWeakPtr();
+  }
+
+ private:
+  base::WeakPtrFactory<MockGlicWindowController> weak_ptr_factory_{this};
 };
 }  // namespace glic
 

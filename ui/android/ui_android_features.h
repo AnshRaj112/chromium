@@ -21,21 +21,12 @@ UI_ANDROID_EXPORT BASE_DECLARE_FEATURE(kAndroidHDR);
 // Management Web API works well.
 UI_ANDROID_EXPORT BASE_DECLARE_FEATURE(kAndroidWindowManagementWebApi);
 
-// Enables converting trackpad click gestures to mouse events in
-// order for them to be interpreted similar to a desktop
-// experience (i.e. double-click to select word.)
-UI_ANDROID_EXPORT BASE_DECLARE_FEATURE(kConvertTrackpadEventsToMouse);
-
 // Use the old-style opening of an External Picker when uploading files.
 UI_ANDROID_EXPORT BASE_DECLARE_FEATURE(kDeprecatedExternalPickerFunction);
 
 // Flip the back/forward direction of navigation gestures when the UI language
 // is an RTL language.
 UI_ANDROID_EXPORT BASE_DECLARE_FEATURE(kMirrorBackForwardGesturesInRTL);
-
-// Reports all of the available pointer types (i.e. coarse, fine) to content
-// rather than just the first one detected.
-UI_ANDROID_EXPORT BASE_DECLARE_FEATURE(kReportAllAvailablePointerTypes);
 
 // Reports bottom overscrolls on the web page.
 UI_ANDROID_EXPORT BASE_DECLARE_FEATURE(kReportBottomOverscrolls);

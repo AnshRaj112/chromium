@@ -96,14 +96,12 @@
 <translation id="1377508275003315939">Пароли</translation>
 <translation id="1381022135873211423">{count,plural, =1{{position} от {count} адрес}other{{position} от {count} адреса}}</translation>
 <translation id="1383876407941801731">Търсене</translation>
-<translation id="1385168997509105202">Незабавно ще загубите достъп до групата раздели „<ph name="GROUP_NAME" />“, а <ph name="USER_NAME" /> (<ph name="USER_EMAIL" />) вече няма да може да взаимодейства с вас в услугите на Google.</translation>
 <translation id="138618066238211776">Продължаване като <ph name="USER_NAME" /></translation>
 <translation id="138692594145659985">Опции за запазване на картата</translation>
 <translation id="1396260204083880024">Влезли сте като <ph name="USER_NAME" />. <ph name="USER_EMAIL" />. Отваряне на менюто на профила.</translation>
 <translation id="1397144142234474689">Скриване на „История“</translation>
 <translation id="1407135791313364759">Отваряне на всички</translation>
 <translation id="1408847409015257906">Докоснете „Поверителност и сигурност“.</translation>
-<translation id="1411311327083909515">Влизането в управлявания ви профил помага да отделите данните за сърфирането, свързани с организацията ви, като например разделите, историята и паролите.</translation>
 <translation id="1411386976162024013">Визуално търсене с Обектив</translation>
 <translation id="1417474386970818917">Излизане от профила и изтриване</translation>
 <translation id="1426410128494586442">Да</translation>
@@ -305,6 +303,7 @@
 <translation id="2216366330550244277">Към страницата на продукт</translation>
 <translation id="2220529011494928058">Подаване на сигнал за проблем</translation>
 <translation id="2223461067862937305">Създаване на QR код</translation>
+<translation id="2225701818156393674">Продуктът е добавен към списъка ви с проследявани продукти.</translation>
 <translation id="2229345671837147090">Табличен изглед с раздели „Отдалечено“</translation>
 <translation id="2230173723195178503">Уеб страницата се зареди</translation>
 <translation id="2236949375853147973">Моята активност</translation>
@@ -653,7 +652,6 @@
 <translation id="381219490185664296">Искате ли да разгрупирате разделите?</translation>
 <translation id="3812308602011798782">Отзиви</translation>
 <translation id="3813175908845379029">Полезни предложения, които подобряват и улесняват сърфирането</translation>
-<translation id="3815668647912194650">Запазете тази група, за да добавяте раздели по-късно, или я напуснете, ако вече не искате достъп до нея.</translation>
 <translation id="3819183753496523827">Офлайн сте. Проверете връзката си с интернет и опитайте отново.</translation>
 <translation id="3828924571679282172">{COUNT,plural, =1{1 начин на плащане}other{# начина на плащане}}</translation>
 <translation id="3831560640878483188">Отхвърляне на предупреждението</translation>
@@ -1001,7 +999,6 @@
 <translation id="5197255632782567636">Интернет</translation>
 <translation id="5200894869889836319">Опции за задаване на разрешения</translation>
 <translation id="5203051773066903947">Въведете</translation>
-<translation id="5205750905107419335"><ph name="USER_NAME" /> (<ph name="USER_EMAIL" />) незабавно ще загуби достъп до групата раздели „<ph name="GROUP_NAME" />“ и вече няма да може да взаимодейства с вас в услугите на Google.</translation>
 <translation id="5206453674369664567">Излизане от профила и изчистване на данните</translation>
 <translation id="5210365745912300556">Затваряне на раздела</translation>
 <translation id="5211488077761630279">Да се разреши ли на <ph name="SITE_NAME" /> да използва <ph name="PERMISSION" />?</translation>
@@ -1081,7 +1078,6 @@
 <translation id="5567439033041178034">НАУЧЕТЕ ПОВЕЧЕ</translation>
 <translation id="5572648434713976849">Ще получавате подобрени предложения в адресната лента</translation>
 <translation id="5576885723883013398">Нов прозорец</translation>
-<translation id="5578543325423650885"><ph name="USER_NAME" /> (<ph name="USER_EMAIL" />) незабавно ще загуби достъп до групата раздели „<ph name="GROUP_NAME" />“.</translation>
 <translation id="5578795271662203820">Търсене на изображението със: <ph name="SEARCH_ENGINE" /></translation>
 <translation id="5579012242779565775">Скриване на „Списък за четене“</translation>
 <translation id="5585019845078534178">Карти</translation>
@@ -1179,6 +1175,7 @@
 <translation id="594324569139756587">Блокиране на трети страни</translation>
 <translation id="5944869793365969636">Сканиране на QR кода</translation>
 <translation id="5948291296578561264">Това ви позволява да запазвате снимки във фотобиблиотеката си.</translation>
+<translation id="5948605885471592910">Преглед и управление на всичко, което сте отворили</translation>
 <translation id="5952641243319721872">Наистина ли искате да отхвърлите избора си?</translation>
 <translation id="5956112131836209882">Група раздели – раздел <ph name="TAB_INDEX_IN_GROUP" /> от <ph name="NUMBER_OF_TABS_IN_GROUP" />.</translation>
 <translation id="595769230373966252">Търсене с(ъс) <ph name="SEARCH_PROVIDER" /></translation>
@@ -1386,6 +1383,7 @@
 Докато сте в режим „инкогнито“, сайтовете не могат да използват „бисквитки“, за да следят активността ви при сърфиране в различни сайтове, например с цел персонализиране на реклами.</translation>
 <translation id="6672697278890207089">Въведете паролата си</translation>
 <translation id="6674917187596384849">Можете лесно да превключвате между профилите</translation>
+<translation id="6676349090816247042">Опции за влизане в профила.</translation>
 <translation id="667999046851023355">Документ</translation>
 <translation id="6680416467695217368">Персонализиране на менюто</translation>
 <translation id="6681586159478273915">Гласово търсене</translation>
@@ -1486,6 +1484,7 @@
 <translation id="7102005569666697658">Изтегля се… <ph name="FILE_SIZE" /></translation>
 <translation id="7104701424653979232">Меню → Настройки → Начини на плащане</translation>
 <translation id="7108338896283013870">Скриване</translation>
+<translation id="7115051913071512405">Изпробване</translation>
 <translation id="7128693485119315539">Може да е необходимо организацията ви да вижда и управлява данните за сърфиране, свързани с управлявания ви профил, като например историята на сърфиране и паролите ви.</translation>
 <translation id="713215255510512027"><ph name="FILENAME" /> (<ph name="FILESIZE" />)</translation>
 <translation id="7136892417564438900">Няма достъп до камерата</translation>
@@ -1568,6 +1567,7 @@
 <translation id="750493650310597496">Избрахте 0</translation>
 <translation id="7506817096924591340"><ph name="FILENAME" /> (<ph name="FILESIZE" />).</translation>
 <translation id="7508728395076009983">За да заключите разделите си в режим „инкогнито“, настройте Touch ID, Face ID или код за достъп.</translation>
+<translation id="750886945254958667">Запазете тази група, за да добавяте раздели по-късно, или я напуснете, ако вече не искате достъп до нея</translation>
 <translation id="7512075701202892785">Любимият ви браузър вече и за iPad</translation>
 <translation id="7512909159512473473">Въвеждане на пропуск…</translation>
 <translation id="7514365320538308">Изтегляне</translation>
@@ -1675,6 +1675,7 @@
 <translation id="7933880123415105005">Търсене в(ъв) <ph name="SEARCH_PROVIDER" /></translation>
 <translation id="7938254975914653459">FaceTime</translation>
 <translation id="7941578031639087549">{count,plural, =1{Страницата бе добавена към списъка за четене в профила ви {email}}other{{count} страници бяха добавени към списъка за четене в профила ви {email}}}</translation>
+<translation id="7952353944614086413">Вашите отворени раздели и групи</translation>
 <translation id="7952670906562503188">Напът сте да изтриете {passkey_count} ключа за достъп и списъка със сайтове и приложения, за които сте избрали данните за вход никога да не се запазват. Профилите, които сте създали за сайтове или приложения, няма да бъдат изтрити.</translation>
 <translation id="7958575506592576831">Информация за сигурността на страницата</translation>
 <translation id="7961015016161918242">Никога</translation>
@@ -1967,6 +1968,7 @@
 <translation id="9008201768610948239">Пренебрегване</translation>
 <translation id="9012585441087414258">Защитава срещу сайтове, изтегляния и разширения, за които е известно, че са опасни. Ако дадена страница направи нещо подозрително, URL адресите и част от съдържанието ѝ се изпращат до Google Безопасно сърфиране.</translation>
 <translation id="9013605037177245304">Включване на известията</translation>
+<translation id="9013632079355478927">Скриване на режима на четене</translation>
 <translation id="9029650858822697271">Излязохте от профила си</translation>
 <translation id="9032405509996909363">Потвърждаване на изтриването на данните за сърфирането</translation>
 <translation id="9039373489628511875">Капацитет</translation>

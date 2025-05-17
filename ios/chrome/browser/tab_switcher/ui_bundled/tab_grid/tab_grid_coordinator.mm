@@ -54,7 +54,6 @@
 #import "ios/chrome/browser/recent_tabs/ui_bundled/recent_tabs_presentation_delegate.h"
 #import "ios/chrome/browser/recent_tabs/ui_bundled/recent_tabs_table_view_controller.h"
 #import "ios/chrome/browser/saved_tab_groups/model/ios_tab_group_sync_util.h"
-#import "ios/chrome/browser/saved_tab_groups/model/tab_group_service_factory.h"
 #import "ios/chrome/browser/saved_tab_groups/model/tab_group_sync_service_factory.h"
 #import "ios/chrome/browser/search_engines/model/template_url_service_factory.h"
 #import "ios/chrome/browser/sessions/model/ios_chrome_tab_restore_service_factory.h"
@@ -79,6 +78,7 @@
 #import "ios/chrome/browser/shared/public/commands/bookmarks_commands.h"
 #import "ios/chrome/browser/shared/public/commands/bring_android_tabs_commands.h"
 #import "ios/chrome/browser/shared/public/commands/browser_commands.h"
+#import "ios/chrome/browser/shared/public/commands/browser_coordinator_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
 #import "ios/chrome/browser/shared/public/commands/popup_menu_commands.h"
@@ -830,9 +830,9 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
 
   std::unique_ptr<IOSCollaborationControllerDelegate> delegate =
       std::make_unique<IOSCollaborationControllerDelegate>(
-          browser, self.baseViewController,
-          TabGroupServiceFactory::GetForProfile(browser->GetProfile()),
-          FlowType::kShareOrManage);
+          browser, CreateControllerDelegateParamsFromProfile(
+                       browser->GetProfile(), self.baseViewController,
+                       FlowType::kShareOrManage));
   collaborationService->StartShareOrManageFlow(
       std::move(delegate), tabGroup->tab_group_id(), entryPoint);
 }
@@ -1076,6 +1076,11 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
   self.incognitoTabsMediator.gridConsumer = self.baseViewController;
   self.regularTabsMediator.gridConsumer = self.baseViewController;
   self.remoteTabsMediator.gridConsumer = self.baseViewController;
+
+  // Set the `baseViewController` active and current page.
+  TabGridPage page = profile->IsOffTheRecord() ? TabGridPageIncognitoTabs
+                                               : TabGridPageRegularTabs;
+  [_mediator setActivePage:page];
 
   self.incognitoTabsMediator.tabGridIdleStatusHandler = self.baseViewController;
   self.regularTabsMediator.tabGridIdleStatusHandler = self.baseViewController;
@@ -1355,6 +1360,26 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
               kIOSSwipeRightForIncognitoIPHDismissButtonTapped);
     }
   }
+}
+
+- (void)closeCurrentTab {
+  Browser* browser = nil;
+  switch (self.baseViewController.activePage) {
+    case TabGridPageIncognitoTabs:
+      browser = self.incognitoBrowser;
+      break;
+    case TabGridPageRegularTabs:
+      browser = self.regularBrowser;
+      break;
+    case TabGridPageRemoteTabs:
+    case TabGridPageTabGroups:
+      NOTREACHED();
+  }
+
+  id<BrowserCoordinatorCommands> browserCoordinatorCommandsHandler =
+      HandlerForProtocol(browser->GetCommandDispatcher(),
+                         BrowserCoordinatorCommands);
+  [browserCoordinatorCommandsHandler closeCurrentTab];
 }
 
 #pragma mark - InactiveTabsCoordinatorDelegate

@@ -918,7 +918,6 @@
 <translation id="1639468541408865385">啟用全域範圍的 HTTP 驗證快取</translation>
 <translation id="1639673466479276550">啟用登入畫面螢幕保護程式。</translation>
 <translation id="1640824698339859203">啟用浮動單一登入 (SSO)，並將使用者的 Web 服務驗證移到新裝置</translation>
-<translation id="1641117061932613266">啟用<ph name="PRODUCT_NAME" /> V2 服務</translation>
 <translation id="1643642938972654829">允許存取政策測試頁面</translation>
 <translation id="1644373745741524038">為了安全起見，只有在使用者做出手勢 (「短暫啟用」) 後，才能呼叫 <ph name="REQUEST_FULLSCREEN_API_NAME" /> Web API，否則呼叫會失敗。視使用者的個人設定而定，特定來源或許可在使用者未做出手勢時呼叫這個 API，詳情請參閱 <ph name="AUTOMATIC_FULLSCREEN_HELP_URL" /> 中的說明。這項政策會取代使用者的個人設定，允許相符來源在使用者未做出手勢時呼叫這個 API。
 
@@ -1065,11 +1064,6 @@
 <translation id="1781720543185538098">指定是否要向使用者顯示 <ph name="PRODUCT_NAME" /> 產品內問卷調查。</translation>
 <translation id="1787790976045065845">只有當 <ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_POLICY_NAME" /> 政策設為 <ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_LOCK" /> 或 <ph name="SECURITY_TOKEN_SESSION_BEHAVIOR_LOGOUT" />，且透過智慧型卡片驗證的使用者移除該智慧型卡片時，這項政策才會生效。這項政策會指定當系統通知使用者即將執行的動作時，通知要顯示幾秒。這項通知會遮住螢幕。系統會在這項通知到期後才執行動作。如要避免系統執行該動作，使用者可在通知到期之前重新插入智慧型卡片。如果將這項政策設為 0，則系統不會顯示通知，並會立即執行動作。</translation>
 <translation id="1793346220873697538">預設為停用 PIN 碼列印模式</translation>
-<translation id="1793886201577409556">如果新分頁 (NTP) 由擴充功能控管，這項政策會控制是否在 NTP 頁尾顯示擴充功能主題來源資訊。根據預設，NTP 頁尾會顯示控管 NTP 的擴充功能相關資訊。
-
-如果將這項政策設為 True 或未設定，使用擴充功能控管 NTP 的瀏覽器會顯示擴充功能名稱和連結。
-
-如果將這項政策設為 False，就會隱藏主題來源資訊。</translation>
 <translation id="1794457906032475749">如果啟用這項政策，系統預設會勾選保留在建立企業設定檔時所有現有瀏覽資料的選項。
 
 如果不設定或停用這項政策，系統預設不會勾選保留在建立企業設定檔時任何現有瀏覽資料的選項。
@@ -2278,6 +2272,7 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 <translation id="2652747206827086936">停用 NTP SharePoint 和 OneDrive 檔案資訊卡</translation>
 <translation id="2656559539624760733">不要使用 Chrome Root Store。</translation>
 <translation id="2658653824183107970">使用舊版 <ph name="CORS" /> 模式，而不使用新版 <ph name="CORS" /></translation>
+<translation id="2659581762274047663">啟用<ph name="PRODUCT_NAME" />服務</translation>
 <translation id="2660846099862559570">永不使用 Proxy</translation>
 <translation id="2661628029848851543">允許受管理帳戶的所有使用情況</translation>
 <translation id="2664391398878045611">即使中間版位公告可供存取，新分頁也不會顯示</translation>
@@ -2898,12 +2893,18 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 <translation id="3143203373436771188">瀏覽由<ph name="BASIC_EDITOR_NAME" />處理的 Office 文件時，在<ph name="BASIC_EDITOR_NAME" />中開啟文件</translation>
 <translation id="3144173889708944482">如果在 <ph name="DEVICE_PRINTERS_ACCESS_MODE_POLICY_NAME" /> 中選擇了 <ph name="PRINTERS_BLOCKLIST" />，系統會根據 <ph name="DEVICE_PRINTERS_BLOCKLIST_POLICY_NAME" /> 的設定指定使用者不能操作的印表機。除了這項政策所列 ID 的印表機外，其他印表機皆可供使用。印表機 ID 必須與 <ph name="DEVICE_PRINTERS_POLICY_NAME" /> 政策指定檔案的 <ph name="ID_FIELD" /> 或 <ph name="GUID_FIELD" /> 欄位值相符。</translation>
 <translation id="3146711617256415776">禁止在使用隨選朗讀時使用加強型網路文字轉語音功能</translation>
+<translation id="315013437951136266">啟用 <ph name="IP_PROTECTION_NAME" />功能。</translation>
 <translation id="3150351525324499342">預設不在工具列顯示 <ph name="PRODUCT_NAME" /> 圖示，但允許使用者選擇</translation>
 <translation id="3152135410085709340">允許這些網站在 PDF 檢視器中存取本機的 file:// 網址</translation>
 <translation id="3152425128389603870">允許使用整合桌面並預設為啟用。</translation>
 <translation id="3159375329008977062">允許使用者透過 UI 匯出/匯入 Crostini 容器</translation>
 <translation id="3163167792874598128">如未設定這項政策或設為啟用，系統可能會向使用者顯示 App Store 評分宣傳 (一年最多一次)。
 如果將這項政策設為停用，系統就不會向使用者顯示 App Store 評分宣傳。</translation>
+<translation id="3163880369487075383">這項政策控管 ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本啟用時，能否清除跨網站頂層瀏覽的 window.name，以便建立新的瀏覽內容群組。
+
+ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要清除跨網站頂層瀏覽的 window.name，例如使用者透過網址列前往新網站，或是點選連結 (使用「target='_blank' rel='noopener'」) 前往新網站。在上述情況下，清除 window.name 可防止資訊透過 window.name 屬性在網站間外洩，強化使用者隱私保護。ClearWindowNameForNewBrowsingContextGroup 政策已生效，可還原先前的行為。如果啟用 ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本，同時也將這項政策設為啟用或不設定，系統會為適用瀏覽情況清除 window.name。如果停用，系統就不會清除 window.name。
+
+如果你必須透過這項政策停用適用瀏覽情況的 window.name 清除功能，請前往 <ph name="BUG_URL" /> 回報錯誤並說明用途。這項政策預計可持續使用到 <ph name="PRODUCT_NAME" /> 142 版。</translation>
 <translation id="3164531087779621747">列印 PostScript 模式</translation>
 <translation id="3165808775394012744">這些政策全部集中在這個資料夾裡，方便輕鬆移除。</translation>
 <translation id="3166210414652928099">允許使用者使用來源不受信任的 Android 應用程式</translation>
@@ -4059,6 +4060,7 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 這項政策與 <ph name="RELATED_WEBSITE_SETS_ENABLED_POLICY_NAME" /> 政策相同，系統可能會使用其中一項，但前者將在不久後淘汰，因此建議使用 <ph name="RELATED_WEBSITE_SETS_ENABLED_POLICY_NAME" /> 政策。
 上述兩項政策對瀏覽器行為的影響效力相同。</translation>
 <translation id="4016700865356669962">如果將這項政策設為 Enabled，使用者就能使用桌面版面配置範本。如果將這項政策設為 Disabled 或不設定，則會導致使用者無法使用這些範本。</translation>
+<translation id="4018536413833147396">允許使用者在裝置上開啟或關閉 <ph name="IP_PROTECTION_NAME" />設定。這項功能將預設為啟用。</translation>
 <translation id="4020682745012723568">Android 應用程式無法存取傳輸到該使用者設定檔的 Cookie。</translation>
 <translation id="4021684548211845008">禁止在專注模式下播放任何音效。</translation>
 <translation id="4025500273782820766">如有外部通訊協定對話方塊詢問使用者是否要略過日後的確認提示，允許使用者選取 [一律允許]</translation>
@@ -4078,6 +4080,7 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 <translation id="4051723201852944592">啟用視窗遮蔽功能</translation>
 <translation id="4052529125939620019">啟動時載入 CryptoToken 元件擴充功能</translation>
 <translation id="4053157306171963473">停用裝置活動時間回報功能</translation>
+<translation id="4056842786707010434">選擇是否允許清除頂層跨網站瀏覽的 window.name，以便建立新的瀏覽內容群組。</translation>
 <translation id="4056910949759281379">停用 SPDY 通訊協定</translation>
 <translation id="4057442294431066708">這項政策會控制重新對應按鍵子頁面中將事件重新對應到 F11/F12 的指定快速鍵選項。這些設定僅適用於 ChromeOS 鍵盤，如果不設定這項政策，系統預設會停用這些設定。</translation>
 <translation id="4061590579642538878">回報當機報告相關資訊。</translation>
@@ -4531,6 +4534,7 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 如果將這項政策設為停用，則表示除非使用者停用 PDF 外掛程式，否則系統一律會使用 PDF 外掛程式開啟 PDF 檔案。
 
 如果設定這項政策，使用者將無法在 <ph name="PRODUCT_NAME" /> 中進行變更。如果不設定這項政策，使用者可以選擇是否要從外部開啟 PDF。</translation>
+<translation id="4413764344717830250">在受管理瀏覽器中，控管是否在新分頁顯示擴充功能來源資訊</translation>
 <translation id="4415603335307944578">如果將這項政策設為 True 或不設定，當裝置升級 OS 後，瀏覽器將在首次啟動時重新顯示歡迎頁面。
 
       如果將這項政策設為 False，當裝置升級 OS 後，瀏覽器不會在首次啟動時重新顯示歡迎頁面。</translation>
@@ -4651,6 +4655,7 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 
       指定政策值時需以天為單位。</translation>
 <translation id="4525328580251166229">控管 Bruschetta 子系統的相關政策。</translation>
+<translation id="4528981768990874684">停用 <ph name="IP_PROTECTION_NAME" />功能。</translation>
 <translation id="453031441196755904">這項政策已遭到淘汰。</translation>
 <translation id="4531706050939927436">你可以在 Google 管理控制台中使用 Google Play 強制安裝 Android 應用程式 (不會使用這項政策)。</translation>
 <translation id="4534500438517478692">Android 限制名稱：</translation>
@@ -4995,7 +5000,6 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 如果不設定這項政策，系統將啟用所有服務。
 
 如果設定這項政策，系統只會啟用所選服務。</translation>
-<translation id="4758335997982239449">啟用 <ph name="PRIVACY_SANDBOX_NAME" /> IP 保護功能。</translation>
 <translation id="4767059955897420757">如果未設定政策或設為啟用，使用者可能會看到憑證提供者擴充功能宣傳資訊。
 如果將政策設為停用，使用者可能不會看到憑證提供者擴充功能擴充能宣傳資訊。</translation>
 <translation id="4768446404233019970">在傳輸層安全標準 (TLS) 中啟用 3DES 加密套件</translation>
@@ -6016,9 +6020,6 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 <translation id="5448022937220253000">選擇系統在 <ph name="LACROS_NAME" /> 停用後要如何處理使用者資料</translation>
 <translation id="5449690328792750354">Event.path API 將可供使用。</translation>
 <translation id="5452024130413254050">控制使用這項設定的 VM 是否可存取 vTPM。如未設定，預設為 False，如果不設定，則預設為 <ph name="FORCE_SHUTDOWN_IF_MORE_RESTRICTED" />。</translation>
-<translation id="5454128917282602937">當使用者在 <ph name="PRODUCT_OS_NAME" /> 裝置之間切換時，<ph name="PRODUCT_NAME" /> V2 服務會在新裝置啟動前一部裝置上的瀏覽器和應用程式視窗。
-如果將這項政策設為啟用，當使用者登入時，系統就會為目前使用者自動啟動上次使用的 <ph name="PRODUCT_OS_NAME" /> 裝置上的瀏覽器和應用程式視窗。
-如果將這項政策設為停用或不設定，登入時啟動的項目便取決於完整還原設定。</translation>
 <translation id="5455609857202311243">在 HTTP 驗證期間忽略 KDC 政策的核准結果</translation>
 <translation id="5455888515928026628">透過螢幕鎖定畫面登入時，<ph name="PRODUCT_OS_NAME" />可以透過伺服器進行線上驗證，或使用快取密碼進行離線驗證。
 
@@ -6395,6 +6396,11 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 <translation id="5670249935663090320">如果將這項政策設為啟用或不設定，系統會開啟 <ph name="PRODUCT_NAME" />，使用者可以從應用程式選單、頁面內容選單、支援投放裝置網站的媒體控制選項，以及投放裝置工具列圖示 (如有顯示) 中啟動。
 
 如果將這項政策設為停用，系統會關閉 <ph name="PRODUCT_NAME" />。</translation>
+<translation id="5671392367521500075">如果新分頁 (NTP) 由擴充功能控管，這項政策會控制是否在 NTP 頁尾顯示擴充功能來源資訊。根據預設，NTP 頁尾會顯示控管 NTP 的擴充功能相關資訊。
+
+如果將這項政策設為 True 或未設定，使用擴充功能控管 NTP 的瀏覽器會顯示擴充功能名稱和連結。
+
+如果將這項政策設為 False，就會隱藏擴充功能來源資訊。</translation>
 <translation id="5673254755365419402">啟用 <ph name="PRIVACY_SANDBOX_NAME" /> 數位指紋採集防護功能。</translation>
 <translation id="567377007899266033">如果將這項政策設為 True，系統會將政策觸發的主要擴充功能安裝事件報告傳送給 Google。如果將這項政策設為 False，則系統不會擷取任何事件。如果不設定這項政策，預設值為 True。</translation>
 <translation id="5673780539191375049">設定 <ph name="PRODUCT_OS_NAME" /> 裝置上自動重新載入使用者驗證流程的時間間隔 (以分鐘為單位)。這項政策的作用是，判斷裝置閒置一段時間後，驗證流程中使用的部分服務是否到期。
@@ -6671,7 +6677,6 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 
 如果將這項政策設為停用，就無法在專注模式下播放任何音效。</translation>
 <translation id="5890063326284543943">控管 Serial API 的使用</translation>
-<translation id="5893223274510346852">停用 <ph name="PRIVACY_SANDBOX_NAME" /> IP 保護功能。</translation>
 <translation id="5893303508158298667">若已啟用 <ph name="REMOTE_ACCESS_HOST_FIREWALL_TRAVERSAL_POLICY_NAME" />，同時又啟用 <ph name="REMOTE_ACCESS_HOST_ALLOW_RELAYED_CONNECTION_POLICY_NAME" /> 或不去設定它，遠端用戶端可在無法直接連線時 (例如受到防火牆限制)，使用轉送伺服器連線至這部裝置。
 
       如果停用這項政策，系統不會封鎖遠端存取權，但只會允許來自相同網路的連線，禁止網路位址轉譯 (NAT) 穿越或轉送而來的連線。</translation>
@@ -7433,6 +7438,23 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 
 如要進一步瞭解生成式 AI 功能的資料處理方式，請前往 https://support.google.com/chrome/a?p=generative_ai_settings。</translation>
 <translation id="6394350458541421998">我們已於 <ph name="PRODUCT_OS_NAME" />版本 29 中移除這項政策。請改用 PresentationScreenDimDelayScale 政策。</translation>
+<translation id="6397424663361748439">這項政策控管是否應啟用 <ph name="PRIVACY_SANDBOX_NAME" /> <ph name="IP_PROTECTION_NAME" />功能。
+
+<ph name="IP_PROTECTION_NAME" />功能可控管在無痕模式下瀏覽時，是否要針對某些第三方網路要求提供使用者的原始 IP 位址，加強防範無痕瀏覽工作階段的跨網站追蹤。
+
+如果將這項政策設為停用，系統會停用 <ph name="IP_PROTECTION_NAME" />功能，而且使用者無法透過使用者介面設定啟用。
+如果將這項政策設為啟用，系統會啟用 <ph name="IP_PROTECTION_NAME" />功能，而且使用者無法透過使用者介面設定停用。
+如果未設定這項政策，系統會預設啟用 <ph name="IP_PROTECTION_NAME" />功能，使用者可透過裝置上的使用者介面設定控制這項功能。
+
+考量企業是否應停用 <ph name="IP_PROTECTION_NAME" />功能時，請留意以下事項：
+- 系統不會為經由 Proxy 傳送的要求執行 DNS 查詢，這可能會影響以 DNS 為依據的監控或篩選作業。
+- 如果企業應用程式需要向「已加遮罩的網域清單」(<ph name="MASKED_DOMAIN_LIST_URL" />) 中的網域 (或相關子網域) 提出要求，且這些要求必須來自特定 IP 位址範圍，使用者可能會在無痕模式下遇到應用程式故障的問題。
+- 在某些情況下，系統可能不會在無痕模式中透過 Proxy 處理流量，例如使用者透過未登入的 Chrome 設定檔啟動無痕模式時。一般來說，使用者必須先以個人 Google 帳戶登入 Chrome，才能啟動無痕模式。
+- 已加遮罩的網域清單可能會隨時間變動，系統會自動向使用者推送新版本。如要進一步瞭解已加遮罩的網域清單，請參閱：<ph name="MASKED_DOMAIN_LIST_CRITERIA_URL" />。
+
+如要進一步瞭解 <ph name="IP_PROTECTION_NAME" />功能，請參閱：<ph name="IP_PROTECTION_README_URL" />。
+
+<ph name="IP_PROTECTION_NAME" />功能最快會在 M139 推出。</translation>
 <translation id="6397588391180665797">回報已註冊裝置上的使用者網路設定。
 
       如果將這項政策設為 False，系統不會回報這項資訊。
@@ -9166,6 +9188,7 @@ Microsoft Outlook 資訊卡需要額外的管理員設定。想進一步瞭解�
 <translation id="768925347918758827">美國。</translation>
 <translation id="7696412993033202071">外部驗證應用程式啟動網址</translation>
 <translation id="7696534428021833264">啟用 NTP SharePoint 和 OneDrive 檔案資訊卡</translation>
+<translation id="7699644797467448158">如果進行頂層跨網站瀏覽並替換 BrowsingContextGroup，就會清除 window.name。</translation>
 <translation id="7701341006446125684">設定應用程式和擴充功能快取大小 (以位元組為單位)</translation>
 <translation id="7703041979684393741">不允許從 Google 服務收集 WebRTC 事件記錄</translation>
 <translation id="770339941914297201">新行為：Kiosk Chrome 應用程式只會透過政策中的更新網址進行更新</translation>
@@ -10046,7 +10069,6 @@ Microsoft Outlook 資訊卡需要額外的管理員設定。想進一步瞭解�
 <translation id="8339420913453596618">已停用雙重驗證</translation>
 <translation id="8341175887542205077">停用 Linux 虛擬機器備份與還原功能</translation>
 <translation id="8344454543174932833">第一次執行時從預設瀏覽器匯入書籤</translation>
-<translation id="8345184118796116912">在受管理瀏覽器中，控管是否在新分頁顯示擴充功能主題來源資訊</translation>
 <translation id="8347993687936322631">請注意，這項政策已遭淘汰，並將在 <ph name="PRODUCT_OS_NAME" />第 85 版中移除。請改用 <ph name="POWER_MANAGEMENT_IDLE_SETTINGS_POLICY_NAME" />。
 
           這項政策會針對內容更具體的 <ph name="IDLE_ACTION_AC_POLICY_NAME" /> 和 <ph name="IDLE_ACTION_BATTERY_POLICY_NAME" /> 政策提供備用值。如果設定這項政策，但未設定內容更具體的相關政策，系統就會使用這項政策的值。
@@ -10098,6 +10120,20 @@ Microsoft Outlook 資訊卡需要額外的管理員設定。想進一步瞭解�
 <translation id="8381774264911275515">禁止在登入時將 SAML 單一登入 (SSO) Cookie 傳輸到使用者工作階段</translation>
 <translation id="8382184662529825177">啟用可用於保護裝置內容的遠端認證機制</translation>
 <translation id="838870586332499308">啟用數據漫遊</translation>
+<translation id="8389925503559691525">這項政策可控管系統是否在擷取及瀏覽期間分割 Blob 網址。
+如果將這項政策設為啟用或不設定，系統將會分割 Blob 網址。
+如果將這項政策設為停用，系統就不會分割 Blob 網址。
+
+如果已透過 <ph name="THIRD_PARTY_STORAGE_PARTITIONING_BLOCKED_FOR_ORIGINS_POLICY_NAME" /> 或 <ph name="DEFAULT_THIRD_PARTY_STORAGE_PARTITIONING_SETTING_POLICY_NAME" /> 停用特定頂層來源的儲存空間分區功能，則系統也不會分割 Blob 網址。
+
+如果你有必要使用這項政策，請前往 <ph name="BUG_URL" /> 回報錯誤並說明用途。這項政策預計可持續使用到
+<ph name="PRODUCT_NAME" /> 143 版，
+屆時我們將移除舊的實作方式。
+
+注意：在瀏覽器執行期間，只有新啟動的轉譯器程序會套用這項政策的變更。
+
+如要進一步瞭解第三方儲存空間分區，請參閱
+https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</translation>
 <translation id="8392478748777481636">這項政策已淘汰，因此系統不再支援，請改用「<ph name="EXTENSION_INSTALL_BLOCKLIST_POLICY_NAME" />」政策。</translation>
 <translation id="8393850527597048037">僅限平台</translation>
 <translation id="8395350646076131800">使用者螢幕保護程式鎖定畫面閒置逾時。</translation>
@@ -10843,6 +10879,7 @@ Microsoft Outlook 資訊卡需要額外的管理員設定。想進一步瞭解�
       回報顯示狀態和圖形狀態。如果設為 True，系統將會
       回報顯示狀態和圖形狀態。</translation>
 <translation id="891435090623616439">以 JSON 字串格式編碼，詳情請參閱 <ph name="COMPLEX_POLICIES_URL" /></translation>
+<translation id="8916106787085606382">進行頂層跨網站瀏覽並替換 BrowsingContextGroup，不要清除 window.name。</translation>
 <translation id="8917070657147922192">允許使用者管理已安裝的 CA 憑證。</translation>
 <translation id="8919100556245407184">將使用者登出前的緩衝天數。如果使用者未在自動更新期限訊息顯示後將 <ph name="PRODUCT_OS_NAME" />版本更新為指定的 <ph name="CHROMEOS_VERSION_PROPERTY_NAME" /> 版，系統會在設定的天數過後將該使用者登出</translation>
 <translation id="8919369436496201075">允許裝置接收長期支援更新</translation>

@@ -1361,12 +1361,10 @@ inline constexpr char kShouldReadIncomingSyncingThemePrefs[] =
     "should_read_incoming_syncing_theme_prefs";
 
 // Enum tracking the color scheme preference for the browser.
-// Note: In the process of migration. Please use `GetThemePrefNameInMigration()`
-// instead. See crbug.com/356148174.
-inline constexpr char kBrowserColorSchemeDoNotUse[] =
+// Use `kBrowserColorScheme` only.
+inline constexpr char kDeprecatedBrowserColorSchemeDoNotUse[] =
     "browser.theme.color_scheme";
-inline constexpr char kNonSyncingBrowserColorSchemeDoNotUse[] =
-    "browser.theme.color_scheme2";
+inline constexpr char kBrowserColorScheme[] = "browser.theme.color_scheme2";
 
 // SkColor used to theme the browser for Chrome Refresh. The value
 // SK_ColorTRANSPARENT means the user color has not been set.
@@ -1376,24 +1374,20 @@ inline constexpr char kDeprecatedUserColorDoNotUse[] =
 inline constexpr char kUserColor[] = "browser.theme.user_color2";
 
 // Enum tracking the color variant preference for the browser.
-// Note: In the process of migration. Please use `GetThemePrefNameInMigration()`
-// instead. See crbug.com/356148174.
-extern inline constexpr char kBrowserColorVariantDoNotUse[] =
+// Use `kBrowserColorVariant` only.
+inline constexpr char kDeprecatedBrowserColorVariantDoNotUse[] =
     "browser.theme.color_variant";
-inline constexpr char kNonSyncingBrowserColorVariantDoNotUse[] =
-    "browser.theme.color_variant2";
+inline constexpr char kBrowserColorVariant[] = "browser.theme.color_variant2";
 
 // Boolean pref tracking whether chrome follows the system's color theme.
 extern inline constexpr char kBrowserFollowsSystemThemeColors[] =
     "browser.theme.follows_system_colors";
 
 // Boolean pref tracking whether the grayscale theme has been enabled.
-// Note: In the process of migration. Please use `GetThemePrefNameInMigration()`
-// instead. See crbug.com/356148174.
-inline constexpr char kGrayscaleThemeEnabledDoNotUse[] =
+// Use `kGrayscaleThemeEnabled` only.
+inline constexpr char kDeprecatedGrayscaleThemeEnabledDoNotUse[] =
     "browser.theme.is_grayscale";
-inline constexpr char kNonSyncingGrayscaleThemeEnabledDoNotUse[] =
-    "browser.theme.is_grayscale2";
+inline constexpr char kGrayscaleThemeEnabled[] = "browser.theme.is_grayscale2";
 
 // Boolean pref which persists whether the extensions_ui is in developer mode
 // (showing developer packing tools and extensions details)
@@ -2389,11 +2383,10 @@ inline constexpr char kNtpCollapsedSnapshotDocument[] =
 inline constexpr char kNtpCollapsedSyncPromo[] = "ntp.collapsed_sync_promo";
 #else
 // Holds info for New Tab Page custom background
-// Note: In the process of migration. Please use `GetThemePrefNameInMigration()`
-// instead. See crbug.com/356148174.
-inline constexpr char kNtpCustomBackgroundDictDoNotUse[] =
+// Use `kNtpCustomBackgroundDict` only.
+inline constexpr char kDeprecatedNtpCustomBackgroundDictDoNotUse[] =
     "ntp.custom_background_dict";
-inline constexpr char kNonSyncingNtpCustomBackgroundDictDoNotUse[] =
+inline constexpr char kNtpCustomBackgroundDict[] =
     "ntp.custom_background_dict2";
 inline constexpr char kNtpCustomBackgroundLocalToDevice[] =
     "ntp.custom_background_local_to_device";
@@ -3387,6 +3380,11 @@ inline constexpr char kShelfDefaultPinLayoutRollsForTabletFormFactor[] =
 // NOTE: The Gemini app was previously referred to as the container app.
 inline constexpr char kShelfGeminiAppPinRolls[] =
     "shelf_container_app_pin_layout_rolls";
+// Keeps track of whether the NotebookLM app was pinned to shelf as a default
+// app, to prevent applying the default pin twice (after the user unpins the
+// app).
+inline constexpr char kShelfNotebookLmAppPinRolls[] =
+    "shelf_notebook_lm_app_pin_layout_rolls";
 // Keeps track of whether the Mall app was pinned to shelf as a default app,
 // to prevent applying the default pin twice (after the user unpins the app).
 inline constexpr char kShelfMallAppPinRolls[] =

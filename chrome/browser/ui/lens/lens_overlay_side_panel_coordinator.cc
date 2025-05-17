@@ -11,6 +11,7 @@
 #include "chrome/browser/lens/core/mojom/lens_side_panel.mojom.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/lens/lens_help_menu_utils.h"
 #include "chrome/browser/ui/lens/lens_overlay_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_side_panel_web_view.h"
 #include "chrome/browser/ui/lens/lens_overlay_url_builder.h"
@@ -47,6 +48,7 @@
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/base/page_transition_types.h"
+#include "ui/base/window_open_disposition_utils.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/vector_icons.h"
 #include "ui/views/view_class_properties.h"
@@ -139,8 +141,11 @@ LensOverlaySidePanelCoordinator::~LensOverlaySidePanelCoordinator() {
   }
 }
 
-std::unique_ptr<SidePanelInUse>
-LensOverlaySidePanelCoordinator::RegisterEntryAndShow() {
+void LensOverlaySidePanelCoordinator::RegisterEntryAndShow() {
+  if (state_ != State::kOff) {
+    // Exit early if the side panel is already registered or opening.
+    return;
+  }
   state_ = State::kOpeningSidePanel;
   RegisterEntry();
   GetSidePanelUI(GetLensOverlayController())
@@ -156,8 +161,6 @@ LensOverlaySidePanelCoordinator::RegisterEntryAndShow() {
                                 ->GetFeatures()
                                 .side_panel_coordinator();
   CHECK(side_panel_coordinator_);
-
-  return std::make_unique<SidePanelInUseImpl>(this);
 }
 
 void LensOverlaySidePanelCoordinator::RecordAndShowSidePanelErrorPage() {
@@ -176,7 +179,7 @@ void LensOverlaySidePanelCoordinator::SetSidePanelNewTabUrl(const GURL& url) {
 void LensOverlaySidePanelCoordinator::OnEntryWillHide(
     SidePanelEntry* entry,
     SidePanelEntryHideReason reason) {
-  GetLensOverlayController()->OnSidePanelWillHide(reason);
+  GetLensSearchController()->OnSidePanelWillHide(reason);
 }
 
 void LensOverlaySidePanelCoordinator::OnEntryHidden(SidePanelEntry* entry) {
@@ -186,7 +189,7 @@ void LensOverlaySidePanelCoordinator::OnEntryHidden(SidePanelEntry* entry) {
   //   (2) The user clicked the 'x' button while the overlay is showing.
   //   (3) The side panel naturally went away after a tab switch.
   // Forward to LensOverlayController to have it disambiguate.
-  GetLensOverlayController()->OnSidePanelHidden();
+  GetLensSearchController()->OnSidePanelHidden();
 }
 
 void LensOverlaySidePanelCoordinator::WebViewClosing() {
@@ -412,7 +415,8 @@ void LensOverlaySidePanelCoordinator::GetIsContextualSearchbox(
 }
 
 void LensOverlaySidePanelCoordinator::RequestSendFeedback() {
-  GetLensOverlayController()->FeedbackRequestedByEvent(ui::EF_NONE);
+  FeedbackRequestedByEvent(lens_search_controller_->GetTabInterface(),
+                           ui::EF_NONE);
 }
 
 void LensOverlaySidePanelCoordinator::OnScrollToMessage(
@@ -457,19 +461,22 @@ void LensOverlaySidePanelCoordinator::ExecuteCommand(int command_id,
     case COMMAND_MY_ACTIVITY: {
       lens::RecordSidePanelMenuOptionSelected(
           lens::LensOverlaySidePanelMenuOption::kMyActivity);
-      GetLensOverlayController()->ActivityRequestedByEvent(event_flags);
+      ActivityRequestedByEvent(lens_search_controller_->GetTabInterface(),
+                               event_flags);
       break;
     }
     case COMMAND_LEARN_MORE: {
       lens::RecordSidePanelMenuOptionSelected(
           lens::LensOverlaySidePanelMenuOption::kLearnMore);
-      GetLensOverlayController()->InfoRequestedByEvent(event_flags);
+      InfoRequestedByEvent(lens_search_controller_->GetTabInterface(),
+                           event_flags);
       break;
     }
     case COMMAND_SEND_FEEDBACK: {
       lens::RecordSidePanelMenuOptionSelected(
           lens::LensOverlaySidePanelMenuOption::kSendFeedback);
-      GetLensOverlayController()->FeedbackRequestedByEvent(event_flags);
+      FeedbackRequestedByEvent(lens_search_controller_->GetTabInterface(),
+                               event_flags);
       break;
     }
     default: {
@@ -511,7 +518,13 @@ void LensOverlaySidePanelCoordinator::SetLatestPageUrlWithResponse(
 void LensOverlaySidePanelCoordinator::BindSidePanel(
     mojo::PendingReceiver<lens::mojom::LensSidePanelPageHandler> receiver,
     mojo::PendingRemote<lens::mojom::LensSidePanelPage> page) {
-  CHECK(state_ == State::kOpeningSidePanel);
+  // Ideally, this should be a CHECK, but if the user just navigates to the
+  // WebUI link directly, then this will be called without
+  // RegisterEntryAndShow() being called. If that is the case, ignore this call.
+  // More info at crbug.com/417119042.
+  if (state_ != State::kOpeningSidePanel) {
+    return;
+  }
 
   side_panel_receiver_.Bind(std::move(receiver));
   side_panel_page_.Bind(std::move(page));
@@ -626,21 +639,6 @@ LensOverlaySidePanelCoordinator::SidePanelInitializationData::
     SidePanelInitializationData() = default;
 LensOverlaySidePanelCoordinator::SidePanelInitializationData::
     ~SidePanelInitializationData() = default;
-
-LensOverlaySidePanelCoordinator::SidePanelInUseImpl::SidePanelInUseImpl(
-    LensOverlaySidePanelCoordinator* coordinator)
-    : coordinator_(coordinator->weak_ptr_factory_.GetWeakPtr()) {
-  coordinator_->side_panel_in_use_count_++;
-}
-
-LensOverlaySidePanelCoordinator::SidePanelInUseImpl::~SidePanelInUseImpl() {
-  if (coordinator_) {
-    coordinator_->side_panel_in_use_count_--;
-    if (coordinator_->side_panel_in_use_count_ == 0) {
-      coordinator_->DeregisterEntryAndCleanup();
-    }
-  }
-}
 
 void LensOverlaySidePanelCoordinator::DeregisterEntryAndCleanup() {
   auto* registry = lens_search_controller_->GetTabInterface()
@@ -947,14 +945,14 @@ void LensOverlaySidePanelCoordinator::RegisterEntry() {
   if (!registry->GetEntryForKey(
           SidePanelEntry::Key(SidePanelEntry::Id::kLensOverlayResults))) {
     auto entry = std::make_unique<SidePanelEntry>(
-        SidePanelEntry::Id::kLensOverlayResults,
+        SidePanelEntry::Key(SidePanelEntry::Id::kLensOverlayResults),
         base::BindRepeating(
             &LensOverlaySidePanelCoordinator::CreateLensOverlayResultsView,
             base::Unretained(this)),
         base::BindRepeating(
             &LensOverlaySidePanelCoordinator::GetOpenInNewTabUrl,
             base::Unretained(this)),
-        GetMoreInfoCallback());
+        GetMoreInfoCallback(), SidePanelEntry::kSidePanelDefaultContentWidth);
     entry->SetProperty(kShouldShowTitleInSidePanelHeaderKey, false);
     registry->Register(std::move(entry));
 

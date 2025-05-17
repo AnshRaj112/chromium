@@ -39,6 +39,8 @@ source_set("configs") {
     "//chrome/browser/optimization_guide:optimization_guide",
     "//chrome/browser/ui",
     "//chrome/browser/ui/webui/about",
+    "//chrome/browser/ui/webui/accessibility",
+    "//chrome/browser/ui/webui/autofill_and_password_manager_internals",
     "//components/compose:buildflags",
     "//components/lens:buildflags",
     "//components/security_interstitials/content:security_interstitial_page",
@@ -52,6 +54,7 @@ source_set("configs") {
   if (!is_android) {
     deps += [
       "//chrome/browser/ui/webui/access_code_cast",
+      "//chrome/browser/ui/webui/app_service_internals",
       "//chrome/browser/ui/webui/new_tab_footer",
       "//chrome/browser/ui/webui/privacy_sandbox",
     ]

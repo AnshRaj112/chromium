@@ -528,7 +528,7 @@
 #include "chromeos/components/kiosk/kiosk_utils.h"
 #include "chromeos/constants/chromeos_features.h"
 #include "third_party/cros_system_api/switches/chrome_switches.h"
-#endif
+#endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if !BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/devtools/chrome_devtools_manager_delegate.h"
@@ -1217,6 +1217,8 @@ void MaybeAddCondition(
 void NotifyMultiCaptureStarted(const std::string& label,
                                content::WebContents* web_contents,
                                const webapps::AppId* app_id) {
+  const url::Origin origin =
+      url::Origin::Create(web_contents->GetLastCommittedURL());
   if (app_id) {
     CHECK_DEREF(ash::Shell::Get())
         .multi_capture_service()
@@ -1224,14 +1226,14 @@ void NotifyMultiCaptureStarted(const std::string& label,
             label, *app_id,
             web_app::WebAppProvider::GetForWebContents(web_contents)
                 ->registrar_unsafe()
-                .GetAppShortName(*app_id));
+                .GetAppShortName(*app_id),
+            origin);
   } else {
     // TODO(b/319317165): Remove this case once the pivot to web apps is
     // complete.
     CHECK_DEREF(ash::Shell::Get())
         .multi_capture_service()
-        ->NotifyMultiCaptureStarted(
-            label, url::Origin::Create(web_contents->GetLastCommittedURL()));
+        ->NotifyMultiCaptureStarted(label, origin);
   }
 }
 
@@ -1318,6 +1320,18 @@ ProfileSelections GetHumanProfileSelections() {
       .WithSystem(ProfileSelection::kNone)
       .WithAshInternals(ProfileSelection::kNone)
       .Build();
+}
+
+bool IsDefaultSearchEngine(Profile* profile, const GURL& url) {
+  auto* template_url_service =
+      TemplateURLServiceFactory::GetForProfile(profile);
+
+  const TemplateURL* default_search_engine =
+      template_url_service->GetDefaultSearchProvider();
+
+  return default_search_engine &&
+         template_url_service->IsSearchResultsPageFromDefaultSearchProvider(
+             url);
 }
 
 }  // namespace
@@ -1915,6 +1929,22 @@ bool ChromeContentBrowserClient::ShouldUseProcessPerSite(
   // Non-extension, non-NTP URLs should generally use process-per-site-instance
   // (rather than process-per-site).
   return false;
+}
+
+bool ChromeContentBrowserClient::
+    ShouldReuseExistingProcessForNewMainFrameSiteInstance(
+        content::BrowserContext* browser_context,
+        const GURL& site_instance_original_url) {
+  // When `kProcessPerSiteForDSE` is disabled,
+  // `ProcessPerSiteUpToMainFrameThreshold` can be used for any site.
+  if (!base::FeatureList::IsEnabled(features::kProcessPerSiteForDSE)) {
+    return true;
+  }
+
+  Profile* profile = Profile::FromBrowserContext(browser_context);
+  CHECK(profile);
+
+  return IsDefaultSearchEngine(profile, site_instance_original_url);
 }
 
 bool ChromeContentBrowserClient::ShouldAllowProcessPerSiteForMultipleMainFrames(
@@ -3628,7 +3658,8 @@ bool ChromeContentBrowserClient::IsFullCookieAccessAllowed(
   }
   return cookie_settings->IsFullCookieAccessAllowed(
       url, storage_key.ToNetSiteForCookies(),
-      url::Origin::Create(storage_key.top_level_site().GetURL()), overrides);
+      url::Origin::Create(storage_key.top_level_site().GetURL()), overrides,
+      storage_key.ToCookiePartitionKey());
 }
 
 void ChromeContentBrowserClient::GrantCookieAccessDueToHeuristic(
@@ -7297,11 +7328,12 @@ void ChromeContentBrowserClient::GetMediaDeviceIDSalt(
   privacy_sandbox::TrackingProtectionSettings* tracking_protection =
       TrackingProtectionSettingsFactory::GetForProfile(
           Profile::FromBrowserContext(browser_context));
-  bool allowed = cookie_settings->IsFullCookieAccessAllowed(
-                     url, site_for_cookies, top_frame_origin,
-                     net::CookieSettingOverrides()) ||
-                 (tracking_protection->IsTrackingProtection3pcdEnabled() &&
-                  !tracking_protection->AreAllThirdPartyCookiesBlocked());
+  bool allowed =
+      cookie_settings->IsFullCookieAccessAllowed(
+          url, site_for_cookies, top_frame_origin,
+          net::CookieSettingOverrides(), storage_key.ToCookiePartitionKey()) ||
+      (tracking_protection->IsTrackingProtection3pcdEnabled() &&
+       !tracking_protection->AreAllThirdPartyCookiesBlocked());
   ChromeBrowsingDataModelDelegate::BrowsingDataAccessed(
       rfh, storage_key,
       ChromeBrowsingDataModelDelegate::StorageType::kMediaDeviceSalt, !allowed);
@@ -7988,23 +8020,44 @@ bool ChromeContentBrowserClient::
     return true;
   }
 
+  net::SchemefulSite top_frame_site(top_frame_origin);
+  std::optional<net::CookiePartitionKey> cookie_partition_key =
+      net::CookiePartitionKey::FromStorageKeyComponents(
+          top_frame_site,
+          net::CookiePartitionKey::BoolToAncestorChainBit(
+              !site_for_cookies.IsFirstParty(url)),
+          /*nonce=*/std::nullopt);
+
   // Cookie settings overrides are not relevant for this check.
   net::CookieSettingOverrides empty_overrides;
 
   return cookie_settings->IsFullCookieAccessAllowed(
-      url, site_for_cookies, top_frame_origin, empty_overrides);
+      url, site_for_cookies, top_frame_origin, empty_overrides,
+      cookie_partition_key);
 }
 
 bool ChromeContentBrowserClient::AreDeprecatedAutomaticBeaconCredentialsAllowed(
     content::BrowserContext* browser_context,
     const GURL& destination_url,
     const url::Origin& top_frame_origin) {
+  // With what is available here, we can create a cookie_partition_key for the
+  // given top_frame_origin and we can assume the ancestor chain bit is
+  // cross_site since the `IsFullCookieAccessAllowed` call below uses a null
+  // `SiteForCookies`, which means that we will always be in a cross site
+  // context.
+  net::SchemefulSite top_frame_site(top_frame_origin);
+  std::optional<net::CookiePartitionKey> cookie_partition_key =
+      net::CookiePartitionKey::FromStorageKeyComponents(
+          top_frame_site,
+          net::CookiePartitionKey::BoolToAncestorChainBit(/*cross_site=*/true),
+          /*nonce=*/std::nullopt);
+
   scoped_refptr<content_settings::CookieSettings> cookie_settings =
       CookieSettingsFactory::GetForProfile(
           Profile::FromBrowserContext(browser_context));
   return cookie_settings->IsFullCookieAccessAllowed(
       destination_url, net::SiteForCookies(), top_frame_origin,
-      net::CookieSettingOverrides());
+      net::CookieSettingOverrides(), cookie_partition_key);
 }
 
 bool ChromeContentBrowserClient::

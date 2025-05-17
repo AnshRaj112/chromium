@@ -120,6 +120,17 @@ class SupervisedUserURLFilter {
     }
   };
 
+  // Encapsulates statistics about this URL filter.
+  struct Statistics {
+    bool operator==(const Statistics& other) const = default;
+    ManagedSiteList GetManagedSiteList() const;
+
+    std::size_t allowed_hosts_count = 0;
+    std::size_t blocked_hosts_count = 0;
+    std::size_t allowed_urls_count = 0;
+    std::size_t blocked_urls_count = 0;
+  };
+
   // Provides access to functionality from services on which we don't want
   // to depend directly.
   class Delegate {
@@ -144,14 +155,8 @@ class SupervisedUserURLFilter {
 
   virtual ~SupervisedUserURLFilter();
 
-  static const char* GetWebFilterTypeHistogramNameForTest();
-  static const char* GetManagedSiteListHistogramNameForTest();
-  static const char* GetApprovedSitesCountHistogramNameForTest();
-  static const char* GetBlockedSitesCountHistogramNameForTest();
   static const char* GetManagedSiteListConflictHistogramNameForTest();
   static const char* GetManagedSiteListConflictTypeHistogramNameForTest();
-
-  static FilteringBehavior BehaviorFromInt(int behavior_value);
 
   // Returns true if the |host| matches the pattern. A pattern is a hostname
   // with one or both of the following modifications:
@@ -201,24 +206,13 @@ class SupervisedUserURLFilter {
       FilteringContext filtering_context = FilteringContext::kDefault,
       std::optional<ui::PageTransition> transition_type = std::nullopt);
 
-  // Sets the filtering behavior for pages not on a list (default is ALLOW).
-  void SetDefaultFilteringBehavior(FilteringBehavior behavior);
+  // Refreshes data structures that hold manually configured url and host
+  // exceptions.
+  void UpdateManualHosts();
+  void UpdateManualUrls();
 
-  FilteringBehavior GetDefaultFilteringBehavior() const;
-
-  // Sets the set of manually allowed or blocked hosts. Returns true if new
-  // value held different value from existing values.
-  // TODO(crbug.com/413654322): change name to reflect that the operation is
-  // no-op if new value is equal to current one.
-  bool SetManualHosts(std::map<std::string, bool> host_map);
-
-  bool IsManualHostsEmpty() const;
-
-  // Sets the set of manually allowed or blocked URLs. Returns true if new value
-  // held different value from existing values.
-  // TODO(crbug.com/413654322): change name to reflect that the operation is
-  // no-op if new value is equal to current one.
-  bool SetManualURLs(std::map<GURL, bool> url_map);
+  // Returns summary of url filtering settings.
+  Statistics GetFilteringStatistics() const;
 
   // Removes all filter entries, clears the async checker if present, and resets
   // the default behavior to "allow".
@@ -229,20 +223,8 @@ class SupervisedUserURLFilter {
 
   WebFilterType GetWebFilterType() const;
 
-  // Emits URL filter metrics based on the parent web filter configuration
-  // applied to the supervised user. Returns true if one or more metrics were
-  // emitted.
-  bool EmitURLFilterMetrics() const;
-
-  // Reports FamilyUser.WebFilterType metrics based on parent web filter type
-  // configuration.
-  void ReportWebFilterTypeMetrics() const;
-
-  // Reports FamilyUser.ManagedSiteList metrics based on parent web filter allow
-  // and blocklist configuration.
-  void ReportManagedSiteListMetrics() const;
-
-  // Set value for `is_filter_initialized_`.
+  // Set or get the value for `is_filter_initialized_`.
+  bool IsFilterInitialized() const { return is_filter_initialized_; }
   void SetFilterInitialized(bool is_filter_initialized);
 
   // Sets safe_search_api::URLCheckerClient for SafeSites classification.
@@ -253,9 +235,6 @@ class SupervisedUserURLFilter {
   bool IsHostInBlocklist(const std::string& host) const;
 
  private:
-  friend class SupervisedUserURLFilterTest;
-  friend class SupervisedUserURLFilteringWithConflictsTest;
-
   bool IsExemptedFromGuardianApproval(const GURL& effective_url);
 
   virtual bool RunAsyncChecker(const GURL& url, ResultCallback callback) const;
@@ -277,8 +256,6 @@ class SupervisedUserURLFilter {
 
   base::ObserverList<Observer>::Unchecked observers_;
 
-  FilteringBehavior default_behavior_;
-
   // Maps from a URL to whether it is manually allowed (true) or blocked
   // (false).
   std::map<GURL, bool> url_map_;
@@ -286,6 +263,9 @@ class SupervisedUserURLFilter {
   // Blocked and Allowed host lists.
   std::set<std::string> blocked_host_list_;
   std::set<std::string> allowed_host_list_;
+
+  // Statistics about this filter configuration
+  Statistics statistics_;
 
   const raw_ref<PrefService> user_prefs_;
 

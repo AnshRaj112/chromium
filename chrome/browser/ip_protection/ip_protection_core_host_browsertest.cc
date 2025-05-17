@@ -165,13 +165,6 @@ class IpProtectionCoreHostInterceptor
   bool should_intercept_;
 };
 
-void SetIsLikelyDogfoodClient(bool is_dogfood) {
-  CHECK(g_browser_process);
-  CHECK(g_browser_process->variations_service());
-  g_browser_process->variations_service()->SetIsLikelyDogfoodClientForTesting(
-      is_dogfood);
-}
-
 constexpr base::Time kDontRetry = base::Time::Max();
 }  // namespace
 
@@ -360,9 +353,6 @@ IN_PROC_BROWSER_TEST_F(IpProtectionCoreHostBrowserTest,
   ASSERT_EQ(getter->receivers_for_testing().size(), 2U);
 }
 
-// We don't rely on managed device detection for ChromeOS so skip these tests
-// on that platform.
-#if !BUILDFLAG(IS_CHROMEOS)
 IN_PROC_BROWSER_TEST_F(IpProtectionCoreHostBrowserTest,
                        NotDisabledForManagedDevice) {
   IpProtectionCoreHost* getter =
@@ -379,26 +369,6 @@ IN_PROC_BROWSER_TEST_F(IpProtectionCoreHostBrowserTest,
   }
 }
 
-IN_PROC_BROWSER_TEST_F(IpProtectionCoreHostBrowserTest,
-                       NotDisabledForManagedDogfoodDevice) {
-  IpProtectionCoreHost* getter =
-      IpProtectionCoreHostFactory::GetForProfile(GetProfile());
-  ASSERT_TRUE(getter);
-  ASSERT_TRUE(getter->IsIpProtectionEnabled());
-
-  {
-    policy::ScopedManagementServiceOverrideForTesting browser_management{
-        policy::ManagementServiceFactory::GetForPlatform(),
-        policy::EnterpriseManagementAuthority::COMPUTER_LOCAL};
-    SetIsLikelyDogfoodClient(true);
-
-    EXPECT_TRUE(getter->IsIpProtectionEnabled());
-
-    SetIsLikelyDogfoodClient(false);
-  }
-}
-#endif
-
 class IpProtectionBrowserTestEnterpriseKillSwitchEnabled
     : public IpProtectionCoreHostBrowserTest {
  public:
@@ -408,7 +378,6 @@ class IpProtectionBrowserTestEnterpriseKillSwitchEnabled
             /*enterprise_killswitch_enabled=*/true) {}
 };
 
-#if !BUILDFLAG(IS_CHROMEOS)
 IN_PROC_BROWSER_TEST_F(IpProtectionBrowserTestEnterpriseKillSwitchEnabled,
                        DisabledForManagedDevice) {
   IpProtectionCoreHost* getter =
@@ -431,27 +400,6 @@ IN_PROC_BROWSER_TEST_F(IpProtectionBrowserTestEnterpriseKillSwitchEnabled,
     EXPECT_FALSE(getter->IsIpProtectionEnabled());
   }
 }
-
-IN_PROC_BROWSER_TEST_F(IpProtectionBrowserTestEnterpriseKillSwitchEnabled,
-                       NotDisabledForManagedDogfoodDevice) {
-  IpProtectionCoreHost* getter =
-      IpProtectionCoreHostFactory::GetForProfile(GetProfile());
-  ASSERT_TRUE(getter);
-
-  {
-    policy::ScopedManagementServiceOverrideForTesting browser_management{
-        policy::ManagementServiceFactory::GetForPlatform(),
-        policy::EnterpriseManagementAuthority::COMPUTER_LOCAL};
-
-    EXPECT_FALSE(getter->IsIpProtectionEnabled());
-
-    SetIsLikelyDogfoodClient(true);
-    EXPECT_TRUE(getter->IsIpProtectionEnabled());
-
-    SetIsLikelyDogfoodClient(false);
-  }
-}
-#endif
 
 class IpProtectionBrowserTestIncognitoOnlyModeDisabled
     : public IpProtectionCoreHostBrowserTest {
@@ -812,14 +760,6 @@ class IpProtectionCoreHostPolicyBrowserTest : public policy::PolicyTest {
     provider_.UpdateChromePolicy(policies);
   }
 
-#if BUILDFLAG(IS_CHROMEOS)
-  void SetChromeOSEnterpriseUserDefaults() {
-    policy::PolicyMap policies;
-    policy::SetEnterpriseUsersDefaults(&policies);
-    provider_.UpdateChromePolicy(policies);
-  }
-#endif
-
   void UnsetPolicyValues() {
     policy::PolicyMap policies;
     provider_.UpdateChromePolicy(policies);
@@ -871,65 +811,29 @@ IN_PROC_BROWSER_TEST_F(IpProtectionCoreHostPolicyBrowserTest,
   EXPECT_EQ(provider->IsIpProtectionEnabled(), initial_state);
 }
 
-// For ChromeOS, setting a user policy isn't enough to make the profile/device
-// be considered managed.
-#if !BUILDFLAG(IS_CHROMEOS)
 IN_PROC_BROWSER_TEST_F(IpProtectionCoreHostPolicyBrowserTest,
                        NotDisabledForManagedBrowser) {
-  IpProtectionCoreHost* provider =
-      IpProtectionCoreHostFactory::GetForProfile(GetProfile());
-  ASSERT_TRUE(provider);
-  ASSERT_TRUE(provider->IsIpProtectionEnabled());
-
-  EnableUnrelatedPolicy();
-
-  EXPECT_TRUE(provider->IsIpProtectionEnabled());
-
-  UnsetPolicyValues();
-  EXPECT_TRUE(provider->IsIpProtectionEnabled());
-}
-IN_PROC_BROWSER_TEST_F(IpProtectionCoreHostPolicyBrowserTest,
-                       NotDisabledForManagedDogfoodBrowser) {
-  IpProtectionCoreHost* provider =
-      IpProtectionCoreHostFactory::GetForProfile(GetProfile());
-  ASSERT_TRUE(provider);
-
-  EnableUnrelatedPolicy();
-  SetIsLikelyDogfoodClient(true);
-  EXPECT_TRUE(provider->IsIpProtectionEnabled());
-
-  UnsetPolicyValues();
-  SetIsLikelyDogfoodClient(false);
-}
-#else
-IN_PROC_BROWSER_TEST_F(IpProtectionCoreHostPolicyBrowserTest,
-                       NotDisabledForEnterpriseUser) {
-  IpProtectionCoreHost* provider =
-      IpProtectionCoreHostFactory::GetForProfile(GetProfile());
-  ASSERT_TRUE(provider);
-  ASSERT_TRUE(provider->IsIpProtectionEnabled());
-
-  SetChromeOSEnterpriseUserDefaults();
-  EXPECT_TRUE(provider->IsIpProtectionEnabled());
-
-  UnsetPolicyValues();
-  ASSERT_TRUE(provider->IsIpProtectionEnabled());
-}
-
-IN_PROC_BROWSER_TEST_F(IpProtectionCoreHostPolicyBrowserTest,
-                       NotDisabledForEnterpriseDogfoodUser) {
-  IpProtectionCoreHost* provider =
-      IpProtectionCoreHostFactory::GetForProfile(GetProfile());
-  ASSERT_TRUE(provider);
-
-  SetChromeOSEnterpriseUserDefaults();
-  SetIsLikelyDogfoodClient(true);
-  EXPECT_TRUE(provider->IsIpProtectionEnabled());
-
-  UnsetPolicyValues();
-  SetIsLikelyDogfoodClient(false);
-}
+#if BUILDFLAG(IS_CHROMEOS)
+  // On ChromeOS this is required for the unrelated policy enabled below to
+  // cause the profile `policy::ManagementService` to reflect that the profile
+  // is managed.
+  policy::ScopedManagementServiceOverrideForTesting browser_management{
+      policy::ManagementServiceFactory::GetForProfile(GetProfile()),
+      policy::EnterpriseManagementAuthority::COMPUTER_LOCAL};
 #endif
+
+  IpProtectionCoreHost* provider =
+      IpProtectionCoreHostFactory::GetForProfile(GetProfile());
+  ASSERT_TRUE(provider);
+  ASSERT_TRUE(provider->IsIpProtectionEnabled());
+
+  EnableUnrelatedPolicy();
+
+  EXPECT_TRUE(provider->IsIpProtectionEnabled());
+
+  UnsetPolicyValues();
+  EXPECT_TRUE(provider->IsIpProtectionEnabled());
+}
 
 class IpProtectionPolicyBrowserTestEnterpriseKillSwitchEnabled
     : public IpProtectionCoreHostPolicyBrowserTest {
@@ -941,12 +845,18 @@ class IpProtectionPolicyBrowserTestEnterpriseKillSwitchEnabled
 };
 
 // With the killswitch, if the browser is considered managed and IP Protection
-// isn't enabled via enterprise policy, IP Protection should be disabled on all
-// platforms except ChromeOS (where it's challenging to do managed device
-// detection without using `default_for_enterprise_users`).
-#if !BUILDFLAG(IS_CHROMEOS)
+// isn't enabled via enterprise policy, IP Protection should be disabled.
 IN_PROC_BROWSER_TEST_F(IpProtectionPolicyBrowserTestEnterpriseKillSwitchEnabled,
                        DisabledForManagedBrowser) {
+#if BUILDFLAG(IS_CHROMEOS)
+  // On ChromeOS this is required for the unrelated policy enabled below to
+  // cause the profile `policy::ManagementService` to reflect that the profile
+  // is managed.
+  policy::ScopedManagementServiceOverrideForTesting browser_management{
+      policy::ManagementServiceFactory::GetForProfile(GetProfile()),
+      policy::EnterpriseManagementAuthority::COMPUTER_LOCAL};
+#endif
+
   IpProtectionCoreHost* provider =
       IpProtectionCoreHostFactory::GetForProfile(GetProfile());
   ASSERT_TRUE(provider);
@@ -966,49 +876,3 @@ IN_PROC_BROWSER_TEST_F(IpProtectionPolicyBrowserTestEnterpriseKillSwitchEnabled,
   UnsetPolicyValues();
   EXPECT_TRUE(provider->IsIpProtectionEnabled());
 }
-IN_PROC_BROWSER_TEST_F(IpProtectionPolicyBrowserTestEnterpriseKillSwitchEnabled,
-                       NotDisabledForManagedDogfoodBrowser) {
-  IpProtectionCoreHost* provider =
-      IpProtectionCoreHostFactory::GetForProfile(GetProfile());
-  ASSERT_TRUE(provider);
-
-  EnableUnrelatedPolicy();
-  EXPECT_FALSE(provider->IsIpProtectionEnabled());
-
-  SetIsLikelyDogfoodClient(true);
-  EXPECT_TRUE(provider->IsIpProtectionEnabled());
-
-  UnsetPolicyValues();
-  SetIsLikelyDogfoodClient(false);
-}
-#else
-IN_PROC_BROWSER_TEST_F(IpProtectionPolicyBrowserTestEnterpriseKillSwitchEnabled,
-                       NotDisabledForEnterpriseUser) {
-  IpProtectionCoreHost* provider =
-      IpProtectionCoreHostFactory::GetForProfile(GetProfile());
-  ASSERT_TRUE(provider);
-  ASSERT_TRUE(provider->IsIpProtectionEnabled());
-
-  SetChromeOSEnterpriseUserDefaults();
-  EXPECT_TRUE(provider->IsIpProtectionEnabled());
-
-  UnsetPolicyValues();
-  ASSERT_TRUE(provider->IsIpProtectionEnabled());
-}
-
-IN_PROC_BROWSER_TEST_F(IpProtectionPolicyBrowserTestEnterpriseKillSwitchEnabled,
-                       NotDisabledForEnterpriseDogfoodUser) {
-  IpProtectionCoreHost* provider =
-      IpProtectionCoreHostFactory::GetForProfile(GetProfile());
-  ASSERT_TRUE(provider);
-
-  SetChromeOSEnterpriseUserDefaults();
-  EXPECT_TRUE(provider->IsIpProtectionEnabled());
-
-  SetIsLikelyDogfoodClient(true);
-  EXPECT_TRUE(provider->IsIpProtectionEnabled());
-
-  UnsetPolicyValues();
-  SetIsLikelyDogfoodClient(false);
-}
-#endif

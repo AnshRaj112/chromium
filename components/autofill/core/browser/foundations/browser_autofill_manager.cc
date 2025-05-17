@@ -96,6 +96,7 @@
 #include "components/autofill/core/browser/geo/phone_number_i18n.h"
 #include "components/autofill/core/browser/integrators/compose/autofill_compose_delegate.h"
 #include "components/autofill/core/browser/integrators/optimization_guide/autofill_optimization_guide.h"
+#include "components/autofill/core/browser/integrators/password_manager/autofill_password_manager_delegate.h"
 #include "components/autofill/core/browser/logging/log_manager.h"
 #include "components/autofill/core/browser/metrics/autofill_in_devtools_metrics.h"
 #include "components/autofill/core/browser/metrics/autofill_metrics.h"
@@ -1097,7 +1098,19 @@ void BrowserAutofillManager::OnAskForValuesToFillImpl(
     const FormData& form,
     const FieldGlobalId& field_id,
     const gfx::Rect& caret_bounds,
-    AutofillSuggestionTriggerSource trigger_source) {
+    AutofillSuggestionTriggerSource trigger_source,
+    base::optional_ref<const PasswordSuggestionRequest> password_request) {
+  if (client().GetPasswordManagerDelegate() && password_request.has_value()) {
+#if !BUILDFLAG(IS_ANDROID)
+    client().GetPasswordManagerDelegate()->ShowSuggestions(
+        password_request->field);
+#else
+    client().GetPasswordManagerDelegate()->ShowKeyboardReplacingSurface(
+        password_request.value());
+#endif  // !BUILDFLAG(IS_ANDROID)
+    return;
+  }
+
   if (base::FeatureList::IsEnabled(features::kAutofillDisableFilling)) {
     return;
   }
@@ -1913,17 +1926,10 @@ void BrowserAutofillManager::OnFocusOnNonFormFieldImpl() {
 
   ProcessPendingFormForUpload();
 
-#if BUILDFLAG(IS_CHROMEOS)
-  // There is no way of determining whether ChromeVox is in use, so assume it's
-  // being used.
-  external_delegate_->OnAutofillAvailabilityEvent(
-      mojom::AutofillSuggestionAvailability::kNoSuggestions);
-#else
   if (external_delegate_->HasActiveScreenReader()) {
     external_delegate_->OnAutofillAvailabilityEvent(
         mojom::AutofillSuggestionAvailability::kNoSuggestions);
   }
-#endif
 }
 
 void BrowserAutofillManager::OnFocusOnFormFieldImpl(
@@ -1947,14 +1953,10 @@ void BrowserAutofillManager::OnFocusOnFormFieldImpl(
   autofill_field->set_was_focused(true);
 
   // Notify installed screen readers if the focus is on a field for which there
-  // are suggestions to present. Ignore if a screen reader is not present. If
-  // the platform is ChromeOS, then assume ChromeVox is in use as there is no
-  // way of determining whether it's being used from this point in the code.
-#if !BUILDFLAG(IS_CHROMEOS)
+  // are suggestions to present. Ignore if a screen reader is not present.
   if (!external_delegate_->HasActiveScreenReader()) {
     return;
   }
-#endif
 
   const FormFieldData& field = CHECK_DEREF(form.FindFieldByGlobalId(field_id));
   SuggestionsContext context =
@@ -2069,6 +2071,14 @@ void BrowserAutofillManager::DidShowSuggestions(
       })) {
     base::RecordAction(
         base::UserMetricsAction("PlusAddresses.AddressFillSuggestionShown"));
+  }
+
+  if (shown_suggestion_types.contains(SuggestionType::kIbanEntry) &&
+      client().GetPaymentsAutofillClient()->GetIbanManager()) {
+    client()
+        .GetPaymentsAutofillClient()
+        ->GetIbanManager()
+        ->OnIbanSuggestionsShown(field_id);
   }
 
   FormStructure* form_structure = nullptr;
@@ -2534,6 +2544,7 @@ void BrowserAutofillManager::OnDidFillOrPreviewForm(
                            delegate->OnDidFillSuggestion(
                                entity->guid(), form_structure,
                                trigger_autofill_field,
+                               safe_filled_autofill_fields,
                                driver().GetPageUkmSourceId());
                          }
                        },
@@ -3105,6 +3116,17 @@ std::vector<Suggestion> BrowserAutofillManager::GetAvailableSuggestions(
       suggestions = GetProfileSuggestions(
           form, *form_structure, field, *autofill_field, trigger_source,
           std::move(plus_address_email_override));
+      if (base::FeatureList::IsEnabled(
+              features::kAutofillEnableEmailOrLoyaltyCardsFilling) &&
+          autofill_field->Type().GetStorableType() ==
+              EMAIL_OR_LOYALTY_MEMBERSHIP_ID) {
+        if (ValuablesDataManager* valuables_manager =
+                client().GetValuablesDataManager()) {
+          ExtendEmailSuggestionsWithLoyaltyCardSuggestions(
+              suggestions, *valuables_manager,
+              client().GetLastCommittedPrimaryMainFrameURL());
+        }
+      }
       break;
     case FillingProduct::kCreditCard:
       suggestions = GetCreditCardSuggestions(form, *form_structure, field,

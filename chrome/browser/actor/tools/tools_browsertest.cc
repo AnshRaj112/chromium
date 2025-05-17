@@ -15,6 +15,7 @@
 #include "chrome/browser/actor/actor_test_util.h"
 #include "chrome/browser/actor/tools/wait_tool.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/zoom/chrome_zoom_level_prefs.h"
 #include "chrome/common/actor.mojom.h"
@@ -37,6 +38,7 @@
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
 #include "third_party/blink/public/common/page/page_zoom.h"
 #include "ui/display/display_switches.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/point_conversions.h"
 #include "ui/gfx/geometry/vector2d.h"
 
@@ -297,6 +299,103 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_ClippedElements) {
     EXPECT_EQ(button, EvalJs(web_contents(), "clicked_button"));
 
     ASSERT_TRUE(ExecJs(web_contents(), "clicked_button = ''"));
+  }
+}
+
+// Ensure clicks can be sent to a coordinate onscreen.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinate) {
+  const GURL url =
+      embedded_test_server()->GetURL("/actor/page_with_clickable_element.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // Send a click to a (0,0) coordinate inside the document.
+  {
+    BrowserAction action = MakeClick(gfx::Point(0, 0));
+    TestFuture<mojom::ActionResultPtr> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    ExpectOkResult(result);
+    EXPECT_EQ("mousedown[HTML#],mouseup[HTML#],click[HTML#]",
+              EvalJs(web_contents(), "mouse_event_log.join(',')"));
+  }
+
+  ASSERT_TRUE(ExecJs(web_contents(), "mouse_event_log = []"));
+
+  // Send a second click to a coordinate on the button.
+  {
+    gfx::Point click_point = gfx::ToFlooredPoint(
+        GetCenterCoordinatesOfElementWithId(web_contents(), "clickable"));
+
+    BrowserAction action = MakeClick(click_point);
+    TestFuture<mojom::ActionResultPtr> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    ExpectOkResult(result);
+    EXPECT_EQ(
+        "mousedown[BUTTON#clickable],mouseup[BUTTON#clickable],click[BUTTON#"
+        "clickable]",
+        EvalJs(web_contents(), "mouse_event_log.join(',')"));
+
+    // Ensure the button's event handler was invoked.
+    EXPECT_EQ(true, EvalJs(web_contents(), "button_clicked"));
+  }
+}
+
+// Sending a click to a coordinate not in the viewport should fail without
+// dispatching events.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinateOffScreen) {
+  const GURL url =
+      embedded_test_server()->GetURL("/actor/page_with_clickable_element.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // Send a click to a negative coordinate offscreen.
+  {
+    gfx::Point negative_offscreen = {-1, 0};
+    BrowserAction action = MakeClick(negative_offscreen);
+    TestFuture<mojom::ActionResultPtr> result_fail;
+    actor_coordinator().Act(action, result_fail.GetCallback());
+    ExpectErrorResult(result_fail, mojom::ActionResultCode::kClickInvalidPoint);
+
+    // The page should not have received any events.
+    EXPECT_EQ("", EvalJs(web_contents(), "mouse_event_log.join(',')"));
+  }
+
+  // Send a click to a positive coordinate offscreen.
+  {
+    gfx::Point positive_offscreen = gfx::ToFlooredPoint(
+        GetCenterCoordinatesOfElementWithId(web_contents(), "offscreen"));
+    BrowserAction action = MakeClick(positive_offscreen);
+    TestFuture<mojom::ActionResultPtr> result_fail;
+    actor_coordinator().Act(action, result_fail.GetCallback());
+    ExpectErrorResult(result_fail, mojom::ActionResultCode::kClickInvalidPoint);
+    // The page should not have received any events.
+    EXPECT_EQ("", EvalJs(web_contents(), "mouse_event_log.join(',')"));
+  }
+}
+
+// Ensure click is using viewport coordinate.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_ViewportCoordinate) {
+  const GURL url =
+      embedded_test_server()->GetURL("/actor/page_with_clickable_element.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // Scroll the window by 100vh so #offscreen button is in viewport.
+  ASSERT_TRUE(ExecJs(web_contents(), "window.scrollBy(0, window.innerHeight)"));
+
+  // Send a click to button's viewport coordinate.
+  {
+    gfx::Point click_point = gfx::ToFlooredPoint(
+        GetCenterCoordinatesOfElementWithId(web_contents(), "offscreen"));
+
+    BrowserAction action = MakeClick(click_point);
+    TestFuture<mojom::ActionResultPtr> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    ExpectOkResult(result);
+    EXPECT_EQ(
+        "mousedown[BUTTON#offscreen],mouseup[BUTTON#offscreen],click[BUTTON#"
+        "offscreen]",
+        EvalJs(web_contents(), "mouse_event_log.join(',')"));
+
+    // Ensure the button's event handler was invoked.
+    EXPECT_EQ(true, EvalJs(web_contents(), "offscreen_button_clicked"));
   }
 }
 
@@ -616,6 +715,53 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, MouseMoveTool_TargetOutsideViewport) {
 
   EXPECT_EQ("mouseenter[DIV#offscreen],mousemove[DIV#offscreen]",
             EvalJs(web_contents(), "event_log.join(',')"));
+}
+
+// Ensure mouse can be moved to a coordinate onscreen.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, MouseMoveTool_MoveToCoordinate) {
+  const GURL url = embedded_test_server()->GetURL("/actor/mouse_log.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // Log starts empty.
+  ASSERT_EQ("", EvalJs(web_contents(), "event_log.join(',')"));
+
+  // Move mouse over #first DIV
+  gfx::Point move_point = gfx::ToFlooredPoint(
+      GetCenterCoordinatesOfElementWithId(web_contents(), "first"));
+  BrowserAction action = MakeMouseMove(move_point);
+
+  TestFuture<mojom::ActionResultPtr> result;
+  actor_coordinator().Act(action, result.GetCallback());
+  ExpectOkResult(result);
+
+  EXPECT_EQ("mouseenter[DIV#first],mousemove[DIV#first]",
+            EvalJs(web_contents(), "event_log.join(',')"));
+}
+
+// Moving mouse to a coordinate not in the viewport should fail without
+// dispatching events.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest,
+                       MouseMoveTool_MoveToCoordinateOffScreen) {
+  const GURL url = embedded_test_server()->GetURL("/actor/mouse_log.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // Log starts empty.
+  ASSERT_EQ("", EvalJs(web_contents(), "event_log.join(',')"));
+
+  // Move mouse over #offscreen DIV. This should fail since #offscreen is
+  // outside the viewport.
+  {
+    gfx::Point move_point = gfx::ToFlooredPoint(
+        GetCenterCoordinatesOfElementWithId(web_contents(), "offscreen"));
+    BrowserAction action = MakeMouseMove(move_point);
+
+    TestFuture<mojom::ActionResultPtr> result;
+    actor_coordinator().Act(action, result.GetCallback());
+    ExpectErrorResult(result, mojom::ActionResultCode::kError);
+  }
+
+  // The action should fail without generating any events.
+  EXPECT_EQ("", EvalJs(web_contents(), "event_log.join(',')"));
 }
 
 // ===============================================
@@ -1051,6 +1197,9 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, NavigateTool) {
 // History Tool
 // ===============================================
 
+// TODO(crbug.com/415385900): Add a test for navigation API canceling a
+// same-document navigation.
+
 // Basic test of the HistoryTool going back.
 IN_PROC_BROWSER_TEST_F(ActorToolsTest, HistoryTool_Back) {
   const GURL url_first =
@@ -1122,7 +1271,8 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, HistoryTool_FailNoSessionHistory) {
   {
     TestFuture<mojom::ActionResultPtr> result;
     actor_coordinator().Act(MakeHistoryForward(), result.GetCallback());
-    ExpectErrorResult(result, mojom::ActionResultCode::kError);
+    ExpectErrorResult(result,
+                      mojom::ActionResultCode::kHistoryNoForwardEntries);
     EXPECT_EQ(web_contents()->GetURL(), url_second);
   }
 
@@ -1135,7 +1285,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, HistoryTool_FailNoSessionHistory) {
   {
     TestFuture<mojom::ActionResultPtr> result;
     actor_coordinator().Act(MakeHistoryBack(), result.GetCallback());
-    ExpectErrorResult(result, mojom::ActionResultCode::kError);
+    ExpectErrorResult(result, mojom::ActionResultCode::kHistoryNoBackEntries);
     EXPECT_EQ(web_contents()->GetURL(), url_second);
   }
 }
@@ -1278,8 +1428,32 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, HistoryTool_ConcurrentNavigations) {
   EXPECT_EQ(web_contents()->GetURL(), main_frame_url);
 }
 
+// Ensure the history tool works correctly when a before unload handler is
+// present (but doesn't cause a prompt to show).
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, HistoryTool_HasBeforeUnload) {
+  const GURL url_first =
+      embedded_test_server()->GetURL("/actor/blank.html?start");
+  const GURL url_second =
+      embedded_test_server()->GetURL("/actor/blank.html?target");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url_first));
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url_second));
+
+  // Add a no-op beforeunload handler. This won't show the prompt but may force
+  // the browser to send an event to the renderer to confirm which can change
+  // the async path taken by the navigation.
+  ASSERT_TRUE(ExecJs(web_contents(),
+                     R"JS(
+                      addEventListener('beforeunload', () => {});
+                      )JS"));
+
+  TestFuture<mojom::ActionResultPtr> result_success;
+  actor_coordinator().Act(MakeHistoryBack(), result_success.GetCallback());
+  ExpectOkResult(result_success);
+  EXPECT_EQ(web_contents()->GetURL(), url_first);
+}
+
 // ===============================================
-// History Tool
+// Select Tool
 // ===============================================
 
 // Test that the SelectTool can select an ordinary <option> in a <select>

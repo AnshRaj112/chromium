@@ -550,6 +550,29 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Media.Audio.Android.AAudioSetDeviceId.{Direction}.{Result}"
+    enum="AndroidAudioDeviceType" expires_after="2025-11-09">
+  <owner>mjel@google.com</owner>
+  <owner>tguilbert@chromium.org</owner>
+  <owner>media-dev-uma@chromium.org</owner>
+  <summary>
+    For every AAudio {Direction} stream that is opened without resulting in an
+    internal AAudio error and with a non-default device requested, records if
+    setting the device ID was a {Result}. This operation is considered
+    successful if the requested device (passed to
+    AAudioStreamBuilder_setDeviceId) is the same as the actual device assigned
+    to the stream (received via AAudioStream_getDeviceId).
+  </summary>
+  <token key="Direction">
+    <variant name="Input"/>
+    <variant name="Output"/>
+  </token>
+  <token key="Result">
+    <variant name="Failure"/>
+    <variant name="Success"/>
+  </token>
+</histogram>
+
 <histogram name="Media.Audio.Autoplay" enum="AutoplaySource"
     expires_after="2025-11-25">
   <owner>evliu@google.com</owner>
@@ -5944,7 +5967,7 @@ chromium-metrics-reviews@google.com.
 <histogram
     name="Media.Ui.GetDisplayMedia.ScreenSharingPermissionInteractionMac"
     enum="MediaUiGetDisplayMediaPermissionInteraction"
-    expires_after="2025-05-22">
+    expires_after="2026-05-13">
   <owner>tovep@chromium.org</owner>
   <owner>eladalon@chromium.org</owner>
   <owner>kron@chromium.org</owner>
@@ -5956,10 +5979,21 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Media.Ui.GetDisplayMedia.TabSharingInfoBarInteraction"
+    enum="MediaUiGetDisplayMediaTabSharingInfoBarInteraction"
+    expires_after="2026-05-07">
+  <owner>tovep@chromium.org</owner>
+  <owner>eladalon@chromium.org</owner>
+  <summary>
+    Records which controls are clicked in the TabSharingInfoBar. The histogram
+    is recorded for each click on such a control.
+  </summary>
+</histogram>
+
 <histogram
     name="Media.Ui.GetDisplayMedia.WindowSharingPermissionInteractionMac"
     enum="MediaUiGetDisplayMediaPermissionInteraction"
-    expires_after="2025-05-22">
+    expires_after="2026-05-13">
   <owner>tovep@chromium.org</owner>
   <owner>eladalon@chromium.org</owner>
   <owner>kron@chromium.org</owner>
@@ -6629,7 +6663,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Media.VideoCapture.Win.Device.CaptureBeginTime.MFTimeOffset"
-    units="ms" expires_after="2025-06-22">
+    units="ms" expires_after="2026-06-22">
   <owner>ilnik@google.com</owner>
   <owner>video-cmi-mpp@google.com</owner>
   <summary>

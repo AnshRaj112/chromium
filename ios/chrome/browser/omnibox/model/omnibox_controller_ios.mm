@@ -18,7 +18,6 @@
 #import "components/omnibox/browser/omnibox_field_trial.h"
 #import "components/omnibox/browser/omnibox_popup_selection.h"
 #import "components/omnibox/browser/omnibox_popup_view.h"
-#import "components/omnibox/browser/omnibox_prefs.h"
 #import "components/omnibox/browser/page_classification_functions.h"
 #import "components/omnibox/common/omnibox_feature_configs.h"
 #import "components/search_engines/template_url_starter_pack_data.h"
@@ -50,15 +49,6 @@ OmniboxControllerIOS::OmniboxControllerIOS(
   if (auto* emitter = client_->GetAutocompleteControllerEmitter()) {
     autocomplete_controller_->AddObserver(emitter);
   }
-
-  if (PrefService* prefs = client_->GetPrefs()) {
-    pref_change_registrar_.Init(prefs);
-    pref_change_registrar_.Add(
-        omnibox::kSuggestionGroupVisibility,
-        base::BindRepeating(
-            &OmniboxControllerIOS::OnSuggestionGroupVisibilityPrefChanged,
-            base::Unretained(this)));
-  }
 }
 
 constexpr bool is_ios = !!BUILDFLAG(IS_IOS);
@@ -68,7 +58,6 @@ OmniboxControllerIOS::~OmniboxControllerIOS() = default;
 void OmniboxControllerIOS::StartAutocomplete(
     const AutocompleteInput& input) const {
   TRACE_EVENT0("omnibox", "OmniboxControllerIOS::StartAutocomplete");
-  ClearPopupKeywordMode();
 
   // We don't explicitly clear OmniboxPopupModel::manually_selected_match, as
   // Start ends up invoking OmniboxPopupModel::OnResultChanged which clears it.
@@ -114,10 +103,8 @@ void OmniboxControllerIOS::OnResultChanged(AutocompleteController* controller,
       edit_model_->OnCurrentMatchChanged();
     } else {
       edit_model_->OnPopupResultChanged();
-      edit_model_->OnPopupDataChanged(
-          std::u16string(),
-          /*is_temporary_text=*/false, std::u16string(), std::u16string(),
-          std::u16string(), false, std::u16string(), AutocompleteMatch());
+      edit_model_->OnPopupDataChanged(std::u16string(), std::u16string(),
+                                      AutocompleteMatch());
     }
   } else {
     edit_model_->OnPopupResultChanged();
@@ -129,9 +116,6 @@ void OmniboxControllerIOS::OnResultChanged(AutocompleteController* controller,
   }
 
   if (popup_was_open && !popup_is_open) {
-    // Accept the temporary text as the user text, because it makes little sense
-    // to have temporary text when the popup is closed.
-    edit_model_->AcceptTemporaryTextAsUserText();
     // Closing the popup can change the default suggestion. This usually occurs
     // when it's unclear whether the input represents a search or URL; e.g.,
     // 'a.com/b c' or when title autocompleting. Clear the additional text to
@@ -149,62 +133,4 @@ void OmniboxControllerIOS::OnResultChanged(AutocompleteController* controller,
                            default_match_changed,
                            /*should_preload=*/controller->done(),
                            /*on_bitmap_fetched=*/base::DoNothing());
-}
-
-void OmniboxControllerIOS::ClearPopupKeywordMode() const {
-  TRACE_EVENT0("omnibox", "OmniboxControllerIOS::ClearPopupKeywordMode");
-  if (edit_model_->PopupIsOpen()) {
-    OmniboxPopupSelection selection = edit_model_->GetPopupSelection();
-    if (selection.state == OmniboxPopupSelection::KEYWORD_MODE) {
-      selection.state = OmniboxPopupSelection::NORMAL;
-      edit_model_->SetPopupSelection(selection);
-    }
-  }
-}
-
-std::u16string OmniboxControllerIOS::GetHeaderForSuggestionGroup(
-    omnibox::GroupId suggestion_group_id) const {
-  return autocomplete_controller_->result().GetHeaderForSuggestionGroup(
-      suggestion_group_id);
-}
-
-bool OmniboxControllerIOS::IsSuggestionHidden(
-    const AutocompleteMatch& match) const {
-  if (OmniboxFieldTrial::IsStarterPackExpansionEnabled() &&
-      match.from_keyword) {
-    const TemplateURL* turl =
-        match.GetTemplateURL(client_->GetTemplateURLService(), false);
-    if (turl &&
-        turl->starter_pack_id() == TemplateURLStarterPackData::kGemini) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool OmniboxControllerIOS::IsSuggestionGroupHidden(
-    omnibox::GroupId suggestion_group_id) const {
-  const PrefService* prefs = client_->GetPrefs();
-  return prefs && autocomplete_controller_->result().IsSuggestionGroupHidden(
-                      prefs, suggestion_group_id);
-}
-
-void OmniboxControllerIOS::SetSuggestionGroupHidden(
-    omnibox::GroupId suggestion_group_id,
-    bool hidden) const {
-  if (PrefService* prefs = client_->GetPrefs()) {
-    autocomplete_controller_->result().SetSuggestionGroupHidden(
-        prefs, suggestion_group_id, hidden);
-  }
-}
-
-void OmniboxControllerIOS::OnSuggestionGroupVisibilityPrefChanged() {
-  for (size_t i = 0; i < autocomplete_controller_->result().size(); ++i) {
-    const AutocompleteMatch& match =
-        autocomplete_controller_->result().match_at(i);
-    bool suggestion_group_hidden =
-        match.suggestion_group_id.has_value() &&
-        IsSuggestionGroupHidden(match.suggestion_group_id.value());
-    edit_model_->SetPopupSuggestionGroupVisibility(i, suggestion_group_hidden);
-  }
 }

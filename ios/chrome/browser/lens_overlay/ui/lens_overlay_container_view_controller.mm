@@ -4,6 +4,7 @@
 
 #import "ios/chrome/browser/lens_overlay/ui/lens_overlay_container_view_controller.h"
 
+#import "base/i18n/rtl.h"
 #import "ios/chrome/browser/keyboard/ui_bundled/UIKeyCommand+Chrome.h"
 #import "ios/chrome/browser/lens_overlay/ui/lens_overlay_accessibility_identifier_constants.h"
 #import "ios/chrome/browser/shared/public/commands/lens_overlay_commands.h"
@@ -14,7 +15,7 @@
 namespace {
 
 // The width of the side panel.
-const CGFloat kSidePanelWidth = 400.0;
+const CGFloat kSidePanelWidth = 375.0;
 
 // The ammount padding from the side panel to the selection UI.
 const CGFloat kSidePannelSelectionPadding = 20.0;
@@ -26,17 +27,17 @@ const CGFloat kSidePannelAnimationDuration = 0.4;
 const CGFloat kSidePannelOutlineBorderWidth = 1.0;
 
 // The corner radius of the outline that surrounds the results page.
-const CGFloat kSidePannelOutlineCornerRadius = 10.0;
+const CGFloat kSidePannelOutlineCornerRadius = 8.0;
 
 // The lateral inset ammount of the border outlining the results page.
-const CGFloat kSidePannelOutlineLateralInset = 10.0;
+const CGFloat kSidePannelOutlineLateralInset = 8.0;
 
 // The bottom inset ammount of the border outlining the results page.
 const CGFloat kSidePannelOutlineBottomInset = 8.0;
 
 // The corner radius of the selection UI when presented in the side panel
 // presentation.
-const CGFloat kSelectionUICornerRadius = 16.0;
+const CGFloat kSelectionUICornerRadius = 14.0;
 
 }  // namespace
 
@@ -67,7 +68,11 @@ const CGFloat kSelectionUICornerRadius = 16.0;
 
 - (void)viewDidLoad {
   [super viewDidLoad];
-  self.view.backgroundColor = [UIColor colorNamed:kBackgroundColor];
+  // To ensure the elements within this side panel adapt properly to its limited
+  // width, explicitly set its horizontal size class to compact.
+  if (@available(iOS 17, *)) {
+    self.traitOverrides.horizontalSizeClass = UIUserInterfaceSizeClassCompact;
+  }
   _borderView = [self createBorderView];
   [self.view addSubview:_borderView];
   AddSameConstraintsWithInsets(_borderView, self.view,
@@ -154,7 +159,8 @@ const CGFloat kSelectionUICornerRadius = 16.0;
 - (void)viewDidLoad {
   [super viewDidLoad];
 
-  self.view.backgroundColor = [UIColor clearColor];
+  self.view.backgroundColor = [UIColor colorNamed:kBackgroundColor];
+
   self.view.accessibilityIdentifier = kLenscontainerViewAccessibilityIdentifier;
 
   if (!self.selectionViewController) {
@@ -163,12 +169,12 @@ const CGFloat kSelectionUICornerRadius = 16.0;
 
   _splitViewLayoutGuide = [[UILayoutGuide alloc] init];
   [self.view addLayoutGuide:_splitViewLayoutGuide];
-  _splitViewConstraint = [self.view.rightAnchor
-      constraintEqualToAnchor:_splitViewLayoutGuide.leftAnchor];
+  _splitViewConstraint = [self.view.trailingAnchor
+      constraintEqualToAnchor:_splitViewLayoutGuide.leadingAnchor];
   [NSLayoutConstraint activateConstraints:@[
     _splitViewConstraint,
-    [_splitViewLayoutGuide.rightAnchor
-        constraintEqualToAnchor:_splitViewLayoutGuide.leftAnchor],
+    [_splitViewLayoutGuide.trailingAnchor
+        constraintEqualToAnchor:_splitViewLayoutGuide.leadingAnchor],
     [_splitViewLayoutGuide.topAnchor
         constraintEqualToAnchor:self.view.topAnchor],
     [_splitViewLayoutGuide.bottomAnchor
@@ -184,8 +190,8 @@ const CGFloat kSelectionUICornerRadius = 16.0;
       self.selectionViewController.view, self.view,
       (LayoutSides::kLeading | LayoutSides::kTop | LayoutSides::kBottom));
   [NSLayoutConstraint activateConstraints:@[
-    [self.selectionViewController.view.rightAnchor
-        constraintEqualToAnchor:_splitViewLayoutGuide.leftAnchor],
+    [self.selectionViewController.view.trailingAnchor
+        constraintEqualToAnchor:_splitViewLayoutGuide.leadingAnchor],
   ]];
 
   if (@available(iOS 17, *)) {
@@ -196,7 +202,7 @@ const CGFloat kSelectionUICornerRadius = 16.0;
 
 - (void)viewDidAppear:(BOOL)animated {
   [super viewDidAppear:animated];
-  [self.delegate lensOverlayContainerDidAppear:self];
+  [self.delegate lensOverlayContainerDidAppear:self animated:animated];
 }
 
 #if !defined(__IPHONE_17_0) || __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_17_0
@@ -238,8 +244,12 @@ const CGFloat kSelectionUICornerRadius = 16.0;
 }
 
 - (UIEdgeInsets)sidePanelOcclusionInsets {
-  return UIEdgeInsetsMake(0, 0, 0,
-                          kSidePanelWidth + kSidePannelSelectionPadding);
+  CGFloat sideInset = kSidePanelWidth + kSidePannelSelectionPadding;
+  if (base::i18n::IsRTL()) {
+    return UIEdgeInsetsMake(0, sideInset, 0, 0);
+  } else {
+    return UIEdgeInsetsMake(0, 0, 0, sideInset);
+  }
 }
 
 - (void)setSelectionInteractionDisabled:(BOOL)selectionInteractionDisabled {
@@ -262,6 +272,20 @@ const CGFloat kSelectionUICornerRadius = 16.0;
   _selectionInteractionBlockingView = blocker;
 }
 
+- (void)fadeSelectionUIWithDuration:(NSTimeInterval)duration
+                         completion:(void (^)())completion {
+  [UIView animateWithDuration:duration
+      animations:^{
+        self.view.backgroundColor = [UIColor clearColor];
+        self.selectionViewController.view.alpha = 0;
+      }
+      completion:^(BOOL success) {
+        if (completion) {
+          completion();
+        }
+      }];
+}
+
 - (void)presentViewControllerInSidePanel:(UIViewController*)viewController
                                 animated:(BOOL)animated
                               completion:(ProceduralBlock)completion {
@@ -273,24 +297,22 @@ const CGFloat kSelectionUICornerRadius = 16.0;
   AddSameConstraintsToSides(_sidePanel.view, _splitViewLayoutGuide,
                             (LayoutSides::kTop | LayoutSides::kBottom));
   [NSLayoutConstraint activateConstraints:@[
-    [_sidePanel.view.leftAnchor
-        constraintEqualToAnchor:_splitViewLayoutGuide.rightAnchor],
+    [_sidePanel.view.leadingAnchor
+        constraintEqualToAnchor:_splitViewLayoutGuide.trailingAnchor],
     [_sidePanel.view.widthAnchor constraintEqualToConstant:kSidePanelWidth],
   ]];
 
   self.selectionViewController.view.clipsToBounds = YES;
-  self.selectionViewController.view.layer.cornerRadius =
-      kSelectionUICornerRadius;
-  self.selectionViewController.view.layer.backgroundColor =
-      [UIColor colorNamed:kBackgroundColor].CGColor;
   self.selectionViewController.view.layer.maskedCorners =
-      kCALayerMaxXMinYCorner | kCALayerMaxXMaxYCorner;
+      [self selectionUICornerMask];
 
   [self.selectionViewController setOcclusionInsets:self.sidePanelOcclusionInsets
                                         reposition:YES
                                           animated:animated];
   if (!animated) {
     self.sidePanelOpen = YES;
+    self.selectionViewController.view.layer.cornerRadius =
+        kSelectionUICornerRadius;
     if (completion) {
       completion();
     }
@@ -302,6 +324,8 @@ const CGFloat kSelectionUICornerRadius = 16.0;
       delay:0
       options:UIViewAnimationCurveEaseInOut
       animations:^{
+        self.selectionViewController.view.layer.cornerRadius =
+            kSelectionUICornerRadius;
         self.sidePanelOpen = YES;
         [self.view layoutIfNeeded];
       }
@@ -396,6 +420,15 @@ const CGFloat kSelectionUICornerRadius = 16.0;
 
 - (void)escapeButtonPressed {
   [self closeOverlayRequested];
+}
+
+#pragma mark - Private
+- (CACornerMask)selectionUICornerMask {
+  if (base::i18n::IsRTL()) {
+    return kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;
+  } else {
+    return kCALayerMaxXMinYCorner | kCALayerMaxXMaxYCorner;
+  }
 }
 
 @end

@@ -60,15 +60,28 @@ class TabbedModeScopeMatcher;
 
 class WebApp {
  public:
+  // Deprecated, use the other constructor instead.
   explicit WebApp(const webapps::AppId& app_id);
+
+  // This creates a web app object, and will CHECK-fail if the arguments are
+  // invalid. To be valid, the following invariants must hold:
+  // - All GURLs and the `manifest_id` must be non-empty and valid.
+  // - `start_url`, `manifest_id` and `scope` must be same-origin.
+  // - `manifest_id` must not contain a fragment.
+  // - `scope` must not contain a query or fragment.
+  // - `scope` must be a prefix of `start_url`.
+  WebApp(const webapps::ManifestId& manifest_id,
+         const GURL& start_url,
+         const GURL& scope,
+         std::optional<webapps::AppId> parent_app_id = std::nullopt,
+         std::optional<webapps::ManifestId> parent_manifest_id = std::nullopt);
   ~WebApp();
 
   // Copyable and move-assignable to support Copy-on-Write with Commit.
   WebApp(const WebApp& web_app);
   WebApp& operator=(WebApp&& web_app);
+  WebApp(WebApp&&);
 
-  // Explicitly disallow other copy ctors and assign operators.
-  WebApp(WebApp&&) = delete;
   WebApp& operator=(const WebApp&) = delete;
 
   const webapps::AppId& app_id() const { return app_id_; }
@@ -375,10 +388,6 @@ class WebApp {
     return related_applications_;
   }
 
-  const std::optional<std::string>& update_token() const {
-    return update_token_;
-  }
-
   // A Web App can be installed from multiple sources simultaneously. Installs
   // add a source to the app. Uninstalls remove a source from the app.
   void AddSource(WebAppManagement::Type source);
@@ -480,7 +489,6 @@ class WebApp {
   void SetDiyAppIconsMaskedOnMac(bool diy_app_icons_masked_on_mac);
   void SetRelatedApplications(
       std::vector<blink::Manifest::RelatedApplication> related_applications);
-  void SetUpdateToken(const std::optional<std::string>& update_token);
 
   void AddPlaceholderInfoToManagementExternalConfigMap(
       WebAppManagement::Type source_type,
@@ -628,8 +636,6 @@ class WebApp {
   bool diy_app_icons_masked_on_mac_ = false;
 
   std::vector<blink::Manifest::RelatedApplication> related_applications_;
-
-  std::optional<std::string> update_token_;
 
   // New fields must be added to:
   //  - |operator==|

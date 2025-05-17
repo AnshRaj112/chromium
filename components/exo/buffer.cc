@@ -11,6 +11,7 @@
 #include <string_view>
 #include <utility>
 
+#include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
@@ -74,6 +75,11 @@ const gfx::BufferUsage kDefaultBufferUsage = gfx::BufferUsage::GPU_READ;
 const gpu::SharedImageUsageSet kDefaultMappableSIUsage =
     gpu::SHARED_IMAGE_USAGE_DISPLAY_READ;
 
+// Killswitch for disabling RG88 format support over exo.
+BASE_FEATURE(kExoDisableRG88Format,
+             "kExoDisableRG88Format",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 // Gets the color type of |format| for creating bitmap. If it returns
 // SkColorType::kUnknown_SkColorType, it means with this format, this buffer
 // contents should not be used to create bitmap.
@@ -98,12 +104,6 @@ viz::SharedImageFormat GetSharedImageFormat(gfx::BufferFormat buffer_format) {
       return viz::SinglePlaneFormat::kBGRA_8888;
     case gfx::BufferFormat::R_8:
       return viz::SinglePlaneFormat::kR_8;
-    case gfx::BufferFormat::R_16:
-      return viz::SinglePlaneFormat::kR_16;
-    case gfx::BufferFormat::RG_1616:
-      return viz::SinglePlaneFormat::kRG_1616;
-    case gfx::BufferFormat::RGBA_4444:
-      return viz::SinglePlaneFormat::kRGBA_4444;
     case gfx::BufferFormat::RGBA_8888:
       return viz::SinglePlaneFormat::kRGBA_8888;
     case gfx::BufferFormat::RGBA_F16:
@@ -111,6 +111,9 @@ viz::SharedImageFormat GetSharedImageFormat(gfx::BufferFormat buffer_format) {
     case gfx::BufferFormat::BGR_565:
       return viz::SinglePlaneFormat::kBGR_565;
     case gfx::BufferFormat::RG_88:
+      if (base::FeatureList::IsEnabled(kExoDisableRG88Format)) {
+        NOTREACHED();
+      }
       return viz::SinglePlaneFormat::kRG_88;
     case gfx::BufferFormat::RGBX_8888:
       return viz::SinglePlaneFormat::kRGBX_8888;
@@ -126,12 +129,14 @@ viz::SharedImageFormat GetSharedImageFormat(gfx::BufferFormat buffer_format) {
     case gfx::BufferFormat::YUV_420_BIPLANAR:
       format = viz::MultiPlaneFormat::kNV12;
       break;
-    case gfx::BufferFormat::YUVA_420_TRIPLANAR:
-      format = viz::MultiPlaneFormat::kNV12A;
-      break;
     case gfx::BufferFormat::P010:
       format = viz::MultiPlaneFormat::kP010;
       break;
+    case gfx::BufferFormat::R_16:
+    case gfx::BufferFormat::RG_1616:
+    case gfx::BufferFormat::RGBA_4444:
+    case gfx::BufferFormat::YUVA_420_TRIPLANAR:
+      NOTREACHED();
   }
 #if BUILDFLAG(IS_CHROMEOS)
   // If format is true multiplanar format, we prefer external sampler on

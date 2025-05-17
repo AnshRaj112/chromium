@@ -173,6 +173,13 @@ namespace OnDangerousDownloadOpened =
 namespace safe_browsing {
 
 namespace {
+// Default filename that should appear as a a file eligible for download
+// protection checks.
+#if BUILDFLAG(IS_ANDROID)
+const base::FilePath::CharType kEligibleFilename[] = FILE_PATH_LITERAL("a.apk");
+#else
+const base::FilePath::CharType kEligibleFilename[] = FILE_PATH_LITERAL("a.exe");
+#endif
 
 #if BUILDFLAG(IS_ANDROID)
 // Fake content-URI values for Android tests.
@@ -3919,6 +3926,26 @@ TEST_F(DeepScanningDownloadTest, LargeFileBlockedByPreference) {
 }
 #endif  // BUILDFLAG(ENTERPRISE_CLOUD_CONTENT_ANALYSIS)
 
+// Android enforces a feature state before checking a File System Access Write.
+#if BUILDFLAG(IS_ANDROID)
+TEST_F(DownloadProtectionServiceTest, FileSystemAccessWriteRequest_NotEnabled) {
+  DisableFeatures({kMaliciousApkDownloadCheck});
+
+  auto item = PrepareBasicFileSystemAccessWriteItem(
+      /*tmp_path_literal=*/FILE_PATH_LITERAL("a.txt.crswap"),
+      /*final_path_literal=*/FILE_PATH_LITERAL(kEligibleFilename));
+
+  RunLoop run_loop;
+  download_service_->CheckFileSystemAccessWrite(
+      std::move(item),
+      base::BindOnce(&DownloadProtectionServiceTest::CheckDoneCallback,
+                     base::Unretained(this), run_loop.QuitClosure()));
+  run_loop.Run();
+  EXPECT_TRUE(IsResult(DownloadCheckResult::UNKNOWN));
+  EXPECT_FALSE(HasClientDownloadRequest());
+}
+#endif
+
 TEST_F(DownloadProtectionServiceTest, FileSystemAccessWriteRequest_NotABinary) {
   auto item = PrepareBasicFileSystemAccessWriteItem(
       /*tmp_path_literal=*/FILE_PATH_LITERAL("a.txt.crswap"),
@@ -4046,7 +4073,7 @@ TEST_F(DownloadProtectionServiceTest,
 
   auto item = PrepareBasicFileSystemAccessWriteItem(
       /*tmp_path_literal=*/FILE_PATH_LITERAL("a.exe.crswap"),
-      /*final_path_literal=*/FILE_PATH_LITERAL("a.exe"));
+      /*final_path_literal=*/kEligibleFilename);
 
   EXPECT_CALL(*sb_service_->mock_database_manager(),
               MatchDownloadAllowlistUrl(_, _))
@@ -4076,7 +4103,7 @@ TEST_F(DownloadProtectionServiceTest, FileSystemAccessWriteRequest_Success) {
 
   auto item = PrepareBasicFileSystemAccessWriteItem(
       /*tmp_path_literal=*/FILE_PATH_LITERAL("a.exe.crswap"),
-      /*final_path_literal=*/FILE_PATH_LITERAL("a.exe"));
+      /*final_path_literal=*/kEligibleFilename);
 
   EXPECT_CALL(*sb_service_->mock_database_manager(),
               MatchDownloadAllowlistUrl(_, _))
@@ -4160,7 +4187,7 @@ TEST_F(DownloadProtectionServiceTest,
 
   auto item = PrepareBasicFileSystemAccessWriteItem(
       /*tmp_path_literal=*/FILE_PATH_LITERAL("a.exe.crswap"),
-      /*final_path_literal=*/FILE_PATH_LITERAL("a.exe"));
+      /*final_path_literal=*/kEligibleFilename);
   item->web_contents = nullptr;
 
   EXPECT_CALL(*sb_service_->mock_database_manager(),
@@ -4193,7 +4220,7 @@ TEST_F(DownloadProtectionServiceTest,
       testing_profile_manager_.CreateTestingProfile("profile 1");
   auto item = PrepareBasicFileSystemAccessWriteItem(
       /*tmp_path_literal=*/FILE_PATH_LITERAL("a.exe.crswap"),
-      /*final_path_literal=*/FILE_PATH_LITERAL("a.exe"));
+      /*final_path_literal=*/kEligibleFilename);
   item->browser_context = profile1;
 
   // Note 'AtMost' is used below because on Mac timing differences make the
@@ -4222,7 +4249,7 @@ TEST_F(DownloadProtectionServiceTest,
 
   auto item = PrepareBasicFileSystemAccessWriteItem(
       /*tmp_path_literal=*/FILE_PATH_LITERAL("a.txt.crswap"),
-      /*final_path_literal=*/FILE_PATH_LITERAL("a.txt"));
+      /*final_path_literal=*/kEligibleFilename);
   item->frame_url = GURL("https://example.com/foo");
   download_service_->CheckFileSystemAccessWrite(
       std::move(item),
@@ -4239,7 +4266,7 @@ TEST_F(DownloadProtectionServiceTest,
        FileSystemAccessWriteRequest_CheckRequest) {
   auto item = PrepareBasicFileSystemAccessWriteItem(
       /*tmp_path_literal=*/FILE_PATH_LITERAL("a.exe.crswap"),
-      /*final_path_literal=*/FILE_PATH_LITERAL("a.exe"));
+      /*final_path_literal=*/kEligibleFilename);
   item->frame_url = GURL("http://www.google.com/");
 
   GURL tab_url("http://tab.com/final");
@@ -4430,6 +4457,9 @@ TEST_F(EnhancedProtectionDownloadTest, AccessTokenForEnhancedProtectionUsers) {
     sb_service_->GetTestURLLoaderFactory(profile())->SetInterceptor(
         base::BindLambdaForTesting(
             [&](const network::ResourceRequest& request) {
+              EXPECT_EQ(*request.headers.GetHeader(
+                            net::HttpRequestHeaders::kAuthorization),
+                        "Bearer access_token");
               // Cookies should be removed when token is set.
               EXPECT_EQ(request.credentials_mode,
                         network::mojom::CredentialsMode::kOmit);
@@ -4445,7 +4475,6 @@ TEST_F(EnhancedProtectionDownloadTest, AccessTokenForEnhancedProtectionUsers) {
     const std::vector<std::unique_ptr<ClientDownloadRequest>>& requests =
         WebUIInfoSingleton::GetInstance()->client_download_requests_sent();
     ASSERT_EQ(requests.size(), 1u);
-    EXPECT_EQ(requests[0]->access_token(), "access_token");
   }
 
   {
@@ -4474,6 +4503,10 @@ TEST_F(EnhancedProtectionDownloadTest, AccessTokenForEnhancedProtectionUsers) {
     sb_service_->GetTestURLLoaderFactory(profile())->SetInterceptor(
         base::BindLambdaForTesting(
             [&](const network::ResourceRequest& request) {
+              EXPECT_FALSE(
+                  request.headers
+                      .GetHeader(net::HttpRequestHeaders::kAuthorization)
+                      .has_value());
               // Cookies should be attached when token is empty.
               EXPECT_EQ(request.credentials_mode,
                         network::mojom::CredentialsMode::kInclude);
@@ -4489,7 +4522,6 @@ TEST_F(EnhancedProtectionDownloadTest, AccessTokenForEnhancedProtectionUsers) {
     const std::vector<std::unique_ptr<ClientDownloadRequest>>& requests =
         WebUIInfoSingleton::GetInstance()->client_download_requests_sent();
     ASSERT_EQ(requests.size(), 2u);
-    EXPECT_TRUE(requests[1]->access_token().empty());
   }
 
   WebUIInfoSingleton::GetInstance()->ClearListenerForTesting();
@@ -4526,6 +4558,17 @@ TEST_F(EnhancedProtectionDownloadTest, AccessTokenOnlyWhenSignedIn) {
                 ExtractImageFeatures(
                     tmp_path_, BinaryFeatureExtractor::kDefaultOptions, _, _))
         .Times(1);
+    sb_service_->GetTestURLLoaderFactory(profile())->SetInterceptor(
+        base::BindLambdaForTesting(
+            [&](const network::ResourceRequest& request) {
+              EXPECT_FALSE(
+                  request.headers
+                      .GetHeader(net::HttpRequestHeaders::kAuthorization)
+                      .has_value());
+              // Cookies should be attached when token is empty.
+              EXPECT_EQ(request.credentials_mode,
+                        network::mojom::CredentialsMode::kInclude);
+            }));
 
     // Confirm that we don't try to request fetching the token
     base::MockCallback<base::OnceClosure> access_token_requested;
@@ -4543,7 +4586,6 @@ TEST_F(EnhancedProtectionDownloadTest, AccessTokenOnlyWhenSignedIn) {
     const std::vector<std::unique_ptr<ClientDownloadRequest>>& requests =
         WebUIInfoSingleton::GetInstance()->client_download_requests_sent();
     ASSERT_EQ(requests.size(), 1u);
-    EXPECT_TRUE(requests[0]->access_token().empty());
     identity_test_env_adaptor_->identity_test_env()
         ->SetCallbackForNextAccessTokenRequest(base::NullCallback());
   }
@@ -4573,6 +4615,16 @@ TEST_F(EnhancedProtectionDownloadTest, AccessTokenOnlyWhenSignedIn) {
                 ExtractImageFeatures(
                     tmp_path_, BinaryFeatureExtractor::kDefaultOptions, _, _))
         .Times(1);
+    sb_service_->GetTestURLLoaderFactory(profile())->SetInterceptor(
+        base::BindLambdaForTesting(
+            [&](const network::ResourceRequest& request) {
+              EXPECT_EQ(*request.headers.GetHeader(
+                            net::HttpRequestHeaders::kAuthorization),
+                        "Bearer access_token");
+              // Cookies should be removed when token is set.
+              EXPECT_EQ(request.credentials_mode,
+                        network::mojom::CredentialsMode::kOmit);
+            }));
 
     RunLoop run_loop;
     download_service_->CheckClientDownload(
@@ -4584,7 +4636,6 @@ TEST_F(EnhancedProtectionDownloadTest, AccessTokenOnlyWhenSignedIn) {
     const std::vector<std::unique_ptr<ClientDownloadRequest>>& requests =
         WebUIInfoSingleton::GetInstance()->client_download_requests_sent();
     ASSERT_EQ(requests.size(), 2u);
-    EXPECT_EQ(requests[1]->access_token(), "access_token");
   }
 
   WebUIInfoSingleton::GetInstance()->ClearListenerForTesting();
@@ -4624,6 +4675,17 @@ TEST_F(EnhancedProtectionDownloadTest, NoAccessTokenWhileIncognito) {
                 ExtractImageFeatures(
                     tmp_path_, BinaryFeatureExtractor::kDefaultOptions, _, _))
         .Times(1);
+    sb_service_->GetTestURLLoaderFactory(profile())->SetInterceptor(
+        base::BindLambdaForTesting(
+            [&](const network::ResourceRequest& request) {
+              EXPECT_FALSE(
+                  request.headers
+                      .GetHeader(net::HttpRequestHeaders::kAuthorization)
+                      .has_value());
+              // Cookies should be attached when token is empty.
+              EXPECT_EQ(request.credentials_mode,
+                        network::mojom::CredentialsMode::kInclude);
+            }));
 
     RunLoop run_loop;
     download_service_->CheckClientDownload(
@@ -4635,7 +4697,6 @@ TEST_F(EnhancedProtectionDownloadTest, NoAccessTokenWhileIncognito) {
     const std::vector<std::unique_ptr<ClientDownloadRequest>>& requests =
         WebUIInfoSingleton::GetInstance()->client_download_requests_sent();
     ASSERT_EQ(requests.size(), 1u);
-    EXPECT_TRUE(requests[0]->access_token().empty());
   }
 
   WebUIInfoSingleton::GetInstance()->ClearListenerForTesting();

@@ -135,74 +135,18 @@ suite('PrivacyPage', function() {
     assertTrue(!!dialog);
   });
 
-  test('cookiesLinkRowSublabel', function() {
-    page.set(
-        'prefs.profile.cookie_controls_mode.value', CookieControlsMode.OFF);
-    const thirdPartyCookiesLinkRow =
-        page.shadowRoot!.querySelector<CrLinkRowElement>(
-            '#thirdPartyCookiesLinkRow');
-    assertTrue(!!thirdPartyCookiesLinkRow);
-    assertEquals(
-        page.i18n('thirdPartyCookiesLinkRowSublabelEnabled'),
-        thirdPartyCookiesLinkRow.subLabel);
+  // TODO(crbug.com/417690232): Update once its kBundledSecuritySettings is
+  // launched.
+  test('onSecurityPageClick', function() {
+    // Click on the security page row that takes us to
+    // chrome://settings/security
+    page.$.securityLinkRow.click();
+    flush();
+    assertEquals(routes.SECURITY, Router.getInstance().getCurrentRoute());
 
-    page.set(
-        'prefs.profile.cookie_controls_mode.value',
-        CookieControlsMode.INCOGNITO_ONLY);
-    assertEquals(
-        page.i18n('thirdPartyCookiesLinkRowSublabelDisabledIncognito'),
-        thirdPartyCookiesLinkRow.subLabel);
-
-    page.set(
-        'prefs.profile.cookie_controls_mode.value',
-        CookieControlsMode.BLOCK_THIRD_PARTY);
-    assertEquals(
-        page.i18n('thirdPartyCookiesLinkRowSublabelDisabled'),
-        thirdPartyCookiesLinkRow.subLabel);
-  });
-
-  test('cookiesLinkRowSublabelAlwaysBlock3pcsIncognito', async function() {
-    loadTimeData.overrideValues({
-      isAlwaysBlock3pcsIncognitoEnabled: true,
-    });
-    resetRouterForTesting();
-    await createPage();
-
-    page.set(
-        'prefs.profile.cookie_controls_mode.value',
-        CookieControlsMode.INCOGNITO_ONLY);
-    const thirdPartyCookiesLinkRow =
-        page.shadowRoot!.querySelector<CrLinkRowElement>(
-            '#thirdPartyCookiesLinkRow');
-    assertTrue(!!thirdPartyCookiesLinkRow);
-    assertEquals(
-        page.i18n('thirdPartyCookiesLinkRowSublabelEnabled'),
-        thirdPartyCookiesLinkRow.subLabel);
-  });
-
-  test('ContentSettingsVisibility', async function() {
-    // Ensure pages are visited so that HTML components are stamped.
-    redesignedPages.forEach(route => Router.getInstance().navigateTo(route));
-    await flushTasks();
-
-    // All redesigned pages, except protocol handlers, pdf documents and
-    // protected content (except chromeos and win), will use a
-    // settings-category-default-radio-group.
-    // Exclude notifications page which is in its own element.
-    // <if expr="is_chromeos or is_win">
-    assertEquals(
-        page.shadowRoot!
-            .querySelectorAll('settings-category-default-radio-group')
-            .length,
-        redesignedPages.length - 3);
-    // </if>
-    // <if expr="not is_chromeos and not is_win">
-    assertEquals(
-        page.shadowRoot!
-            .querySelectorAll('settings-category-default-radio-group')
-            .length,
-        redesignedPages.length - 4);
-    // </if>
+    // Make sure that the new UI is visible and the old UI is not.
+    assertTrue(!!page.shadowRoot!.querySelector('settings-security-page-v2'));
+    assertFalse(!!page.shadowRoot!.querySelector('settings-security-page'));
   });
 
   test('NotificationPage', async function() {
@@ -291,6 +235,51 @@ suite('PrivacyPage', function() {
     assertEquals(
         ContentSettingsTypes.AUTOMATIC_FULLSCREEN,
         categorySettingExceptions.category);
+  });
+});
+
+// Isolated ContentSettingsVisibility test suite due to significantly higher
+// execution time (10-20x factor) of that specific tests compare to other
+// sub-tests.
+suite('ContentSettingsVisibility', function() {
+  let page: SettingsPrivacyPageElement;
+  let settingsPrefs: SettingsPrefsElement;
+
+  suiteSetup(function() {
+    settingsPrefs = document.createElement('settings-prefs');
+    return CrSettingsPrefs.initialized;
+  });
+
+  setup(function() {
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+
+    page = document.createElement('settings-privacy-page');
+    page.prefs = settingsPrefs.prefs!;
+    document.body.appendChild(page);
+    return flushTasks();
+  });
+
+  test('ContentSettingsVisibility', async function() {
+    // Ensure pages are visited so that HTML components are stamped.
+    redesignedPages.forEach(route => Router.getInstance().navigateTo(route));
+    await flushTasks();
+
+    // All redesigned pages will use `settings-category-default-radio-group`,
+    // except
+    //   1. protocol handlers,
+    //   2. pdf documents,
+    //   3. protected content (except on chromeos and win),
+    //   4. notifications (is in its own element)
+    let expectedPagesCount = redesignedPages.length - 4;
+    // <if expr="is_chromeos or is_win">
+    expectedPagesCount += 1;
+    // </if>
+
+    assertEquals(
+        page.shadowRoot!
+            .querySelectorAll('settings-category-default-radio-group')
+            .length,
+        expectedPagesCount);
   });
 });
 
@@ -458,8 +447,84 @@ suite(`CookiesSubpage`, function() {
     thirdPartyCookiesLinkRow.click();
     // Check that the correct page was navigated to.
     await flushTasks();
+    assertEquals(routes.COOKIES, Router.getInstance().getCurrentRoute());
+  });
+});
+
+suite('CookiesSubpageRedesignDisabled', function() {
+  let page: SettingsPrivacyPageElement;
+  let settingsPrefs: SettingsPrefsElement;
+
+  suiteSetup(function() {
+    settingsPrefs = document.createElement('settings-prefs');
+    return CrSettingsPrefs.initialized;
+  });
+
+  function createPage() {
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+    page = document.createElement('settings-privacy-page');
+    page.prefs = settingsPrefs.prefs!;
+    document.body.appendChild(page);
+
+    return flushTasks();
+  }
+
+  test(
+      'cookiesLinkRowSublabelAlwaysBlock3pcsIncognitoDisabled',
+      async function() {
+        loadTimeData.overrideValues({
+          is3pcdCookieSettingsRedesignEnabled: false,
+          isAlwaysBlock3pcsIncognitoEnabled: false,
+        });
+        resetRouterForTesting();
+
+        await createPage();
+
+        page.set(
+            'prefs.profile.cookie_controls_mode.value', CookieControlsMode.OFF);
+        const thirdPartyCookiesLinkRow =
+            page.shadowRoot!.querySelector<CrLinkRowElement>(
+                '#thirdPartyCookiesLinkRow');
+        assertTrue(!!thirdPartyCookiesLinkRow);
+        assertEquals(
+            page.i18n('thirdPartyCookiesLinkRowSublabelEnabled'),
+            thirdPartyCookiesLinkRow.subLabel);
+
+        page.set(
+            'prefs.profile.cookie_controls_mode.value',
+            CookieControlsMode.INCOGNITO_ONLY);
+        assertEquals(
+            page.i18n('thirdPartyCookiesLinkRowSublabelDisabledIncognito'),
+            thirdPartyCookiesLinkRow.subLabel,
+        );
+
+        page.set(
+            'prefs.profile.cookie_controls_mode.value',
+            CookieControlsMode.BLOCK_THIRD_PARTY);
+        assertEquals(
+            page.i18n('thirdPartyCookiesLinkRowSublabelDisabled'),
+            thirdPartyCookiesLinkRow.subLabel);
+      });
+
+  test('cookiesLinkRowSublabel', async function() {
+    loadTimeData.overrideValues({
+      is3pcdCookieSettingsRedesignEnabled: false,
+      isAlwaysBlock3pcsIncognitoEnabled: true,
+    });
+    resetRouterForTesting();
+
+    await createPage();
+
+    page.set(
+        'prefs.profile.cookie_controls_mode.value',
+        CookieControlsMode.INCOGNITO_ONLY);
+    const thirdPartyCookiesLinkRow =
+        page.shadowRoot!.querySelector<CrLinkRowElement>(
+            '#thirdPartyCookiesLinkRow');
+    assertTrue(!!thirdPartyCookiesLinkRow);
     assertEquals(
-        routes.COOKIES, Router.getInstance().getCurrentRoute());
+        page.i18n('thirdPartyCookiesLinkRowSublabelEnabled'),
+        thirdPartyCookiesLinkRow.subLabel);
   });
 });
 
@@ -1019,5 +1084,37 @@ suite('DeleteBrowsingDataRevampDisabled', () => {
     const dialog =
         page.shadowRoot!.querySelector('settings-clear-browsing-data-dialog');
     assertTrue(!!dialog);
+  });
+});
+
+// TODO(crbug.com/417690232): Remove once kBundledSecuritySettings is launched.
+suite('BundledSecuritySettingsDisabled', () => {
+  let page: SettingsPrivacyPageElement;
+  let settingsPrefs: SettingsPrefsElement;
+
+  suiteSetup(function() {
+    settingsPrefs = document.createElement('settings-prefs');
+    return CrSettingsPrefs.initialized;
+  });
+
+  setup(function() {
+    loadTimeData.overrideValues({
+      enableBundledSecuritySettings: false,
+    });
+    resetRouterForTesting();
+
+    document.body.innerHTML = window.trustedTypes!.emptyHTML;
+    page = document.createElement('settings-privacy-page');
+    page.prefs = settingsPrefs.prefs!;
+    document.body.appendChild(page);
+    return flushTasks();
+  });
+
+  test('renderOriginalSecurityPage', function() {
+    assertFalse(!!page.shadowRoot!.querySelector('settings-security-page'));
+    page.$.securityLinkRow.click();
+    flush();
+
+    assertTrue(!!page.shadowRoot!.querySelector('settings-security-page'));
   });
 });

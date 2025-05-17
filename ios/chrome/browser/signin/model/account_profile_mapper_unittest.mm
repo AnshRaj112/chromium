@@ -22,6 +22,7 @@
 #import "ios/chrome/browser/shared/model/profile/profile_attributes_storage_observer_ios.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
 #import "ios/chrome/browser/shared/model/profile/profile_manager_ios.h"
+#import "ios/chrome/browser/shared/model/profile/scoped_profile_keep_alive_ios.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity.h"
 #import "ios/chrome/browser/signin/model/fake_system_identity_manager.h"
@@ -200,6 +201,8 @@ class FakeProfileManagerIOS : public ProfileManagerIOS {
   }
   ~FakeProfileManagerIOS() override = default;
 
+  void PrepareForDestruction() override { NOTREACHED(); }
+
   void AddObserver(ProfileManagerObserverIOS* observer) override {
     NOTREACHED();
   }
@@ -266,20 +269,16 @@ class FakeProfileManagerIOS : public ProfileManagerIOS {
     ProfileIOS* profile = profiles_map_.find(name)->second.get();
     if (created_callback) {
       base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-          FROM_HERE, base::BindOnce(std::move(created_callback), profile));
+          FROM_HERE, base::BindOnce(std::move(created_callback),
+                                    CreateScopedProfileKeepAlive(profile)));
     }
     if (initialized_callback) {
       base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-          FROM_HERE, base::BindOnce(std::move(initialized_callback), profile));
+          FROM_HERE, base::BindOnce(std::move(initialized_callback),
+                                    CreateScopedProfileKeepAlive(profile)));
     }
     return true;
   }
-
-  ProfileIOS* LoadProfile(std::string_view name) override { NOTREACHED(); }
-  ProfileIOS* CreateProfile(std::string_view name) override { NOTREACHED(); }
-
-  void UnloadProfile(std::string_view name) override { NOTREACHED(); }
-  void UnloadAllProfiles() override { NOTREACHED(); }
 
   void MarkProfileForDeletion(std::string_view name) override {
     DCHECK(CanDeleteProfileWithName(name));
@@ -299,6 +298,10 @@ class FakeProfileManagerIOS : public ProfileManagerIOS {
   }
 
  private:
+  ScopedProfileKeepAliveIOS CreateScopedProfileKeepAlive(ProfileIOS* profile) {
+    return ScopedProfileKeepAliveIOS(CreatePassKey(), profile, {});
+  }
+
   MutableProfileAttributesStorageIOS profile_attributes_storage_;
 
   std::map<std::string, std::unique_ptr<FakeProfileIOS>, std::less<>>
@@ -432,7 +435,7 @@ TEST_F(AccountProfileMapperAccountsInSeparateProfilesTest,
   const std::string kTestProfile1Name("11111111-1111-1111-1111-111111111111");
   const std::string kTestProfile2Name("ffffffff-ffff-ffff-ffff-ffffffffffff");
 
-  base::test::TestFuture<ProfileIOS*> profile_initialized;
+  base::test::TestFuture<ScopedProfileKeepAliveIOS> profile_initialized;
   profile_manager_->CreateProfileAsync(
       kTestProfile1Name, profile_initialized.GetCallback(), base::DoNothing());
   ASSERT_TRUE(profile_initialized.Wait());
@@ -478,7 +481,7 @@ TEST_F(AccountProfileMapperAccountsInSeparateProfilesTest,
     return;
   }
   const std::string kTestProfile1Name("TestProfile1");
-  base::test::TestFuture<ProfileIOS*> profile_initialized;
+  base::test::TestFuture<ScopedProfileKeepAliveIOS> profile_initialized;
   profile_manager_->CreateProfileAsync(
       kTestProfile1Name, profile_initialized.GetCallback(), base::DoNothing());
   ASSERT_TRUE(profile_initialized.Wait());
@@ -534,7 +537,7 @@ TEST_F(AccountProfileMapperAccountsInSingleProfileTest,
 TEST_F(AccountProfileMapperAccountsInSingleProfileTest,
        AllIdentitiesAreVisibleInAllProfiles) {
   const std::string kTestProfile1Name("TestProfile1");
-  base::test::TestFuture<ProfileIOS*> profile_initialized;
+  base::test::TestFuture<ScopedProfileKeepAliveIOS> profile_initialized;
   profile_manager_->CreateProfileAsync(
       kTestProfile1Name, profile_initialized.GetCallback(), base::DoNothing());
   ASSERT_TRUE(profile_initialized.Wait());

@@ -12,13 +12,13 @@ import {MarginsType} from '../data/margins.js';
 import {State} from '../data/state.js';
 
 import {getHtml} from './margins_settings.html.js';
-import {getCss as getPrintPreviewSharedCss} from './print_preview_shared_lit.css.js';
-import {SelectMixinLit} from './select_mixin_lit.js';
-import {SettingsMixinLit} from './settings_mixin_lit.js';
+import {getCss as getPrintPreviewSharedCss} from './print_preview_shared.css.js';
+import {SelectMixin} from './select_mixin.js';
+import {SettingsMixin} from './settings_mixin.js';
 
 
 const PrintPreviewMarginsSettingsElementBase =
-    SettingsMixinLit(SelectMixinLit(CrLitElement));
+    SettingsMixin(SelectMixin(CrLitElement));
 
 export class PrintPreviewMarginsSettingsElement extends
     PrintPreviewMarginsSettingsElementBase {
@@ -46,9 +46,9 @@ export class PrintPreviewMarginsSettingsElement extends
     };
   }
 
-  accessor disabled: boolean;
+  accessor disabled: boolean = false;
   accessor state: State;
-  protected accessor marginsDisabled_: boolean;
+  protected accessor marginsDisabled_: boolean = false;
   private accessor pagesPerSheet_: number;
   private loaded_: boolean = false;
 

@@ -94,6 +94,7 @@ aggregate_vector_icons("omnibox_vector_icons") {
     "star_active.icon",
     "star_active_chrome_refresh.icon",
     "star_chrome_refresh.icon",
+    "subdirectory_arrow_right.icon",
     "summarize_auto.icon",
     "switch.icon",
     "switch_cr2023.icon",
@@ -442,17 +443,18 @@ static_library("browser") {
     deps += [ "//content/public/common" ]
   }
 
-  if (enable_extensions) {
-    deps += [
-      "//extensions/common:common_constants",
-      "//extensions/common:extension_features",
-    ]
-    sources += [
-      "omnibox_input_watcher.cc",
-      "omnibox_input_watcher.h",
-      "omnibox_suggestions_watcher.cc",
-      "omnibox_suggestions_watcher.h",
-    ]
+  if (enable_extensions_core) {
+    deps += [ "//extensions/common:common_constants" ]
+
+    if (enable_extensions) {
+      deps += [ "//extensions/common:extension_features" ]
+      sources += [
+        "omnibox_input_watcher.cc",
+        "omnibox_input_watcher.h",
+        "omnibox_suggestions_watcher.cc",
+        "omnibox_suggestions_watcher.h",
+      ]
+    }
   }
 
   if (build_with_tflite_lib) {
@@ -860,7 +862,6 @@ source_set("unit_tests") {
     "omnibox_field_trial_unittest.cc",
     "omnibox_metrics_provider_unittest.cc",
     "omnibox_popup_selection_unittest.cc",
-    "omnibox_prefs_unittest.cc",
     "omnibox_triggered_feature_service_unittest.cc",
     "omnibox_view_unittest.cc",
     "on_device_head_model_unittest.cc",
