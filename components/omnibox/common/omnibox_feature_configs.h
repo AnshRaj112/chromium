@@ -142,9 +142,14 @@ struct ContextualSearch : Config<ContextualSearch> {
   DECLARE_FEATURE(kContextualSearchBoxUsesContextualSearchProvider);
   DECLARE_FEATURE(kOmniboxZeroSuggestSynchronousMatchesOnly);
   DECLARE_FEATURE(kContextualSearchOpenLensActionUsesThumbnail);
+  DECLARE_FEATURE(kSendPageTitleSuggestParam);
 
   // Whether to use contextual search features, for example the lens action.
   bool IsContextualSearchEnabled() const;
+
+  // Whether to enable prefetching to support this feature's synchronous
+  // match production requirement.
+  bool IsEnabledWithPrefetch() const;
 
   // Whether the starter pack page scope is enabled.
   bool starter_pack_page;
@@ -174,6 +179,12 @@ struct ContextualSearch : Config<ContextualSearch> {
   // Whether the Lens entrypoint action uses a thumbnail of web contents view
   // instead of its regular vector icon.
   bool open_lens_action_uses_thumbnail;
+
+  // Whether to send the current page title (via "pageTitle" CGI param) on zero
+  // suggest requests.
+  // When set to false, the CGI param will not be sent at all (as opposed to
+  // sending an empty value).
+  bool send_page_title_suggest_param;
 };
 
 // If enabled, allows MIA zero-prefix suggestions in NTP omnibox and realbox.
@@ -182,6 +193,24 @@ struct MiaZPS : Config<MiaZPS> {
 
   MiaZPS();
   bool enabled;
+};
+
+// If enabled, adjusts the indentation of the omnibox input and matches to fix
+// the visual shift in omnibox input text when the omnibox popup opens.
+struct AdjustOmniboxIndent : Config<AdjustOmniboxIndent> {
+  DECLARE_FEATURE(kAdjustOmniboxIndent);
+
+  AdjustOmniboxIndent();
+  // Whether to indent the omnibox input text and icon when the popup is closed.
+  bool indent_input_when_popup_closed;
+  // Amount by which the indentation of the omnibox input icon is offset.
+  int input_icon_indent_offset;
+  // Amount by which the indentation of the omnibox input text is offset.
+  int input_text_indent_offset;
+  // Amount by which the indentation of the omnibox match icon is offset.
+  int match_icon_indent_offset;
+  // Amount by which the indentation of the omnibox match text is offset.
+  int match_text_indent_offset;
 };
 
 // If enabled, allow document provider requests when all other conditions are

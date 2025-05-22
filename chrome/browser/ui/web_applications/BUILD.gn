@@ -79,7 +79,6 @@ source_set("browser_tests") {
     "//chrome/browser/apps/link_capturing:test_support",
     "//chrome/browser/browsing_data:constants",
     "//chrome/browser/devtools",
-    "//chrome/browser/metrics/structured:features",
     "//chrome/browser/metrics/structured:test_support",
     "//chrome/browser/permissions",
     "//chrome/browser/picture_in_picture",
@@ -165,21 +164,4 @@ source_set("app_service_browser_tests") {
   if (is_chromeos) {
     deps += [ "//chrome/browser/ash/fileapi" ]
   }
-}
-
-source_set("pwa_install_page_action") {
-  public = [ "pwa_install_page_action.h" ]
-
-  sources = [
-    "pwa_install_page_action.cc",
-    "pwa_install_page_action.h",
-  ]
-
-  deps = [
-    "//base",
-    "//chrome/browser:browser_public_dependencies",
-    "//chrome/browser/ui/actions:actions_headers",
-    "//chrome/browser/ui/views/page_action:page_action",
-    "//chrome/browser/web_applications:web_applications",
-  ]
 }

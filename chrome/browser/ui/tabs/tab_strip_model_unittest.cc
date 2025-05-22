@@ -33,11 +33,10 @@
 #include "chrome/browser/ui/browser_window/test/mock_browser_window_interface.h"
 #include "chrome/browser/ui/tabs/features.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
-#include "chrome/browser/ui/tabs/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
-#include "chrome/browser/ui/tabs/tab_group_tab_collection.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
+#include "chrome/browser/ui/tabs/tab_strip_model_test_utils.h"
 #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
 #include "chrome/browser/ui/tabs/tab_utils.h"
 #include "chrome/browser/ui/tabs/test_tab_strip_model_delegate.h"
@@ -51,6 +50,8 @@
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/split_tab_data.h"
 #include "components/tabs/public/split_tab_visual_data.h"
+#include "components/tabs/public/tab_group.h"
+#include "components/tabs/public/tab_group_tab_collection.h"
 #include "components/tabs/public/tab_interface.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "components/web_modal/web_contents_modal_dialog_manager_delegate.h"
@@ -68,18 +69,6 @@
 using content::WebContents;
 
 namespace {
-
-const char kTabStripModelTestIDUserDataKey[] = "TabStripModelTestIDUserData";
-
-class TabStripModelTestIDUserData : public base::SupportsUserData::Data {
- public:
-  explicit TabStripModelTestIDUserData(int id) : id_(id) {}
-  ~TabStripModelTestIDUserData() override = default;
-  int id() { return id_; }
-
- private:
-  int id_;
-};
 
 struct ObservedSelectionChange {
   ObservedSelectionChange() = default;
@@ -492,46 +481,6 @@ class TabStripModelTest : public testing::Test {
     return contents;
   }
 
-  // Sets the id of the specified contents.
-  void SetID(WebContents* contents, int id) {
-    contents->SetUserData(&kTabStripModelTestIDUserDataKey,
-                          std::make_unique<TabStripModelTestIDUserData>(id));
-  }
-
-  // Returns the id of the specified contents.
-  int GetID(WebContents* contents) {
-    TabStripModelTestIDUserData* user_data =
-        static_cast<TabStripModelTestIDUserData*>(
-            contents->GetUserData(&kTabStripModelTestIDUserDataKey));
-
-    return user_data ? user_data->id() : -1;
-  }
-
-  // Returns the state of the given tab strip as a string. The state consists
-  // of the ID of each web contents followed by a 'p' if pinned, or an 's' if
-  // split. For example, if the model consists of four tabs with ids 0, 1, 2,
-  // and 3, with the first tab pinned and the last two split, this returns
-  // "0p 1 2s 3s".
-  std::string GetTabStripStateString(const TabStripModel* model) {
-    std::string actual;
-    for (int i = 0; i < model->count(); ++i) {
-      if (i > 0) {
-        actual += " ";
-      }
-
-      actual += base::NumberToString(GetID(model->GetWebContentsAt(i)));
-
-      if (model->IsTabPinned(i)) {
-        actual += "p";
-      }
-
-      if (model->GetSplitForTab(i).has_value()) {
-        actual += "s";
-      }
-    }
-    return actual;
-  }
-
   void PrepareTabs(TabStripModel* model, int tab_count) {
     for (int i = 0; i < tab_count; ++i) {
       model->AppendWebContents(CreateWebContentsWithID(i), true);
@@ -542,17 +491,10 @@ class TabStripModelTest : public testing::Test {
                                        int tab_count,
                                        int pinned_count,
                                        const std::vector<int> selected_tabs) {
-    PrepareTabs(model, tab_count);
-    for (int i = 0; i < pinned_count; ++i) {
-      model->SetTabPinned(i, true);
-    }
-
-    ui::ListSelectionModel selection_model;
-    for (const int selected_tab : selected_tabs) {
-      selection_model.AddIndexToSelection(selected_tab);
-    }
-    selection_model.set_active(*selection_model.selected_indices().begin());
-    model->SetSelectionFromModel(selection_model);
+    ::PrepareTabstripForSelectionTest(
+        base::BindOnce(&TabStripModelTest::PrepareTabs, base::Unretained(this),
+                       model),
+        model, tab_count, pinned_count, selected_tabs);
   }
 
   void ExpectSelectionIsExactly(TabStripModel* tabstrip,
@@ -895,6 +837,26 @@ TEST_F(TabStripModelTest, TestTabHandlesAcrossModels) {
   delegate()->SetBrowserWindowInterface(nullptr);
 }
 
+TEST_F(TabStripModelTest, TestDetachSplitInGroupNewSelection) {
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(1), false);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(2), false);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(3), true);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(4), true);
+
+  EXPECT_EQ(tabstrip()->count(), 4);
+
+  tabstrip()->AddToNewGroup(std::vector<int>{1, 2, 3});
+  tabstrip()->ActivateTabAt(
+      2, TabStripUserGestureDetails(
+             TabStripUserGestureDetails::GestureType::kOther));
+  split_tabs::SplitTabId split_id = tabstrip()->AddToNewSplit(
+      std::vector<int>{3}, split_tabs::SplitTabVisualData());
+  tabstrip()->ForgetAllOpeners();
+
+  tabstrip()->DetachSplitTabForInsertion(split_id);
+  EXPECT_EQ(tabstrip()->active_index(), 1);
+}
+
 TEST_F(TabStripModelTest, TestDetachTabInGroupNewSelection) {
   tabstrip()->AppendWebContents(CreateWebContentsWithID(1), false);
   tabstrip()->AppendWebContents(CreateWebContentsWithID(2), false);
@@ -924,11 +886,50 @@ TEST_F(TabStripModelTest, TestDetachTabInSplitNewSelection) {
       1, TabStripUserGestureDetails(
              TabStripUserGestureDetails::GestureType::kOther));
 
-  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabVisualData());
   tabstrip()->ForgetAllOpeners();
 
   tabstrip()->DetachTabAtForInsertion(1);
   EXPECT_EQ(tabstrip()->active_index(), 1);
+}
+
+TEST_F(TabStripModelTest, TestDetachSplitForInsertion) {
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(1), false);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(2), false);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(3), true);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(4), false);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(5), false);
+  tabstrip()->AppendWebContents(CreateWebContentsWithID(6), true);
+
+  tabstrip()->ActivateTabAt(
+      2, TabStripUserGestureDetails(
+             TabStripUserGestureDetails::GestureType::kOther));
+
+  split_tabs::SplitTabId split_id =
+      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabVisualData());
+
+  tabstrip()->ForgetAllOpeners();
+
+  std::unique_ptr<DetachedTabCollection> detached_split =
+      tabstrip()->DetachSplitTabForInsertion(split_id);
+
+  tabs::SplitTabCollection* split_collection =
+      std::get<std::unique_ptr<tabs::SplitTabCollection>>(
+          detached_split->collection_)
+          .get();
+
+  EXPECT_EQ(split_collection->TabCountRecursive(), 2u);
+  EXPECT_FALSE(tabstrip()->ContainsSplit(split_id));
+  EXPECT_EQ(tabstrip()->count(), 4);
+  EXPECT_EQ(tabstrip()->active_index(), 2);
+  // Reinsert the detached group.
+  tabstrip()->InsertDetachedSplitTabAt(std::move(detached_split), 0, false);
+
+  EXPECT_TRUE(tabstrip()->ContainsSplit(split_id));
+  EXPECT_EQ(tabstrip()->GetSplitData(split_id)->ListTabs().size(), 2u);
+  EXPECT_EQ(tabstrip()->GetTabAtIndex(0)->GetSplit().value(), split_id);
+  EXPECT_EQ(tabstrip()->GetTabAtIndex(1)->GetSplit().value(), split_id);
+  EXPECT_EQ(tabstrip()->count(), 6);
 }
 
 TEST_F(TabStripModelTest, TestDetachGroupForInsertion) {
@@ -1041,7 +1042,7 @@ TEST_F(TabStripModelTest, TestDetachAndInsertGroupWithSplit) {
       2, TabStripUserGestureDetails(
              TabStripUserGestureDetails::GestureType::kOther));
   split_tabs::SplitTabId split_id =
-      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabVisualData());
 
   std::unique_ptr<DetachedTabCollection> detached_group =
       tabstrip()->DetachTabGroupForInsertion(group_id);
@@ -1831,7 +1832,7 @@ TEST_F(TabStripModelTest, SplitTabPinning) {
     for (bool use_left_tab : {true, false}) {
       ASSERT_NO_FATAL_FAILURE(
           PrepareTabstripForSelectionTest(tabstrip(), 5, 1, {2}));
-      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabLayout::kHorizontal);
+      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabVisualData());
       ASSERT_EQ("0p 1 2s 3s 4", GetTabStripStateString(tabstrip()));
       if (!split_is_selected) {
         tabstrip()->ActivateTabAt(1);
@@ -1854,11 +1855,11 @@ TEST_F(TabStripModelTest, SplitTabPinning) {
 TEST_F(TabStripModelTest, SplitTabPinningBulk) {
   ASSERT_NO_FATAL_FAILURE(
       PrepareTabstripForSelectionTest(tabstrip(), 12, 2, {4}));
-  tabstrip()->AddToNewSplit({5}, split_tabs::SplitTabLayout::kHorizontal);
+  tabstrip()->AddToNewSplit({5}, split_tabs::SplitTabVisualData());
   ASSERT_EQ("0p 1p 2 3 4s 5s 6 7 8 9 10 11",
             GetTabStripStateString(tabstrip()));
   tabstrip()->ActivateTabAt(8);
-  tabstrip()->AddToNewSplit({9}, split_tabs::SplitTabLayout::kHorizontal);
+  tabstrip()->AddToNewSplit({9}, split_tabs::SplitTabVisualData());
   ASSERT_EQ("0p 1p 2 3 4s 5s 6 7 8s 9s 10 11",
             GetTabStripStateString(tabstrip()));
   tabstrip()->SelectTabAt(0);
@@ -1903,7 +1904,7 @@ TEST_F(TabStripModelTest, AddToSplitInGroup) {
       4, TabStripUserGestureDetails(
              TabStripUserGestureDetails::GestureType::kOther));
 
-  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0p 1p 3 2s 4s", GetTabStripStateString(tabstrip()));
   EXPECT_EQ(
@@ -1925,7 +1926,7 @@ TEST_F(TabStripModelTest, AddToSplitInPinned) {
       0, TabStripUserGestureDetails(
              TabStripUserGestureDetails::GestureType::kOther));
 
-  tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0ps 3ps 1p 2 4", GetTabStripStateString(tabstrip()));
 
@@ -1939,7 +1940,7 @@ TEST_F(TabStripModelTest, AddToSplitInSelected) {
       PrepareTabstripForSelectionTest(tabstrip(), 5, 0, {2}));
 
   tabstrip()->ActivateTabAt(0);
-  tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0s 1s 2 3 4", GetTabStripStateString(tabstrip()));
   EXPECT_EQ(tabstrip()->active_index(), 0);
@@ -1962,7 +1963,7 @@ TEST_F(TabStripModelTest, UnsplitOperation) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0ps 3ps 1p 2 4", GetTabStripStateString(tabstrip()));
 
@@ -1982,7 +1983,7 @@ TEST_F(TabStripModelTest, MoveInsideSplitRemovesSplit) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ(tabstrip()->GetSplitData(split_tab_id)->ListTabs().size(), 2u);
   tabstrip()->MoveWebContentsAt(3, 1, false);
@@ -2001,7 +2002,7 @@ TEST_F(TabStripModelTest, MoveFromSplitRemovesSplit) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ(tabstrip()->GetSplitData(split_tab_id)->ListTabs().size(), 2u);
   tabstrip()->MoveWebContentsAt(1, 3, false);
@@ -2020,7 +2021,7 @@ TEST_F(TabStripModelTest, AddTabInsideSplitRemovesSplit) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ(tabstrip()->GetSplitData(split_tab_id)->ListTabs().size(), 2u);
 
@@ -2042,7 +2043,7 @@ TEST_F(TabStripModelTest, RemoveSplitTabRemovesEntireSplit) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ(tabstrip()->GetSplitData(split_tab_id)->ListTabs().size(), 2u);
 
@@ -2062,7 +2063,7 @@ TEST_F(TabStripModelTest, MoveGroupWithinSplitRemovesSplit) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({4}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({4}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ(tabstrip()->GetSplitData(split_tab_id)->ListTabs().size(), 2u);
   tab_groups::TabGroupId group_id = tabstrip()->AddToNewGroup({0, 1});
@@ -2085,7 +2086,7 @@ TEST_F(TabStripModelTest, SplitLayoutTest) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0ps 3ps 1p 2 4", GetTabStripStateString(tabstrip()));
   EXPECT_EQ(
@@ -2114,7 +2115,7 @@ TEST_F(TabStripModelTest, SplitRatioTest) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0ps 3ps 1p 2 4", GetTabStripStateString(tabstrip()));
   EXPECT_EQ(
@@ -2142,7 +2143,7 @@ TEST_F(TabStripModelTest, ReplaceActiveTabInSplit) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0ps 3ps 1p 2 4", GetTabStripStateString(tabstrip()));
 
@@ -2164,7 +2165,7 @@ TEST_F(TabStripModelTest, SwapActiveTabInSplit) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0ps 3ps 1p 2 4", GetTabStripStateString(tabstrip()));
 
@@ -2188,7 +2189,7 @@ TEST_F(TabStripModelTest, ReverseTabsInSplit) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({3}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0ps 3ps 1p 2 4", GetTabStripStateString(tabstrip()));
   std::vector<tabs::TabInterface*> old_tabs =
@@ -2217,7 +2218,7 @@ TEST_F(TabStripModelTest, ReverseAndReplaceTabsInSplit) {
              TabStripUserGestureDetails::GestureType::kOther));
 
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabVisualData());
   EXPECT_EQ("0 1s 2s", GetTabStripStateString(tabstrip()));
 
   tabstrip()->ReverseTabsInSplit(split_tab_id);
@@ -3611,7 +3612,7 @@ TEST_F(TabStripModelTest, MoveSelectedTabsToWithSplit) {
       6, TabStripUserGestureDetails(
              TabStripUserGestureDetails::GestureType::kOther));
 
-  tabstrip()->AddToNewSplit({7}, split_tabs::SplitTabLayout::kHorizontal);
+  tabstrip()->AddToNewSplit({7}, split_tabs::SplitTabVisualData());
 
   PrepareTabstripForSelectionTest(tabstrip(), 0, 0, {6, 7});
 
@@ -3630,17 +3631,17 @@ TEST_F(TabStripModelTest, MoveSelectedTabsToWithGroupAndSplit) {
   tabstrip()->ActivateTabAt(
       1, TabStripUserGestureDetails(
              TabStripUserGestureDetails::GestureType::kOther));
-  tabstrip()->AddToNewSplit({0}, split_tabs::SplitTabLayout::kHorizontal);
+  tabstrip()->AddToNewSplit({0}, split_tabs::SplitTabVisualData());
 
   tabstrip()->ActivateTabAt(
       6, TabStripUserGestureDetails(
              TabStripUserGestureDetails::GestureType::kOther));
-  tabstrip()->AddToNewSplit({7}, split_tabs::SplitTabLayout::kHorizontal);
+  tabstrip()->AddToNewSplit({7}, split_tabs::SplitTabVisualData());
 
   tabstrip()->ActivateTabAt(
       11, TabStripUserGestureDetails(
               TabStripUserGestureDetails::GestureType::kOther));
-  tabstrip()->AddToNewSplit({12}, split_tabs::SplitTabLayout::kHorizontal);
+  tabstrip()->AddToNewSplit({12}, split_tabs::SplitTabVisualData());
 
   // Move all the split tabs along with some other tabs.
   PrepareTabstripForSelectionTest(tabstrip(), 0, 0,
@@ -4657,7 +4658,7 @@ TEST_F(TabStripModelTest, SetVisualDataForGroup) {
 
   const tab_groups::TabGroupVisualData new_data(
       u"Foo", tab_groups::TabGroupColorId::kCyan);
-  tabstrip()->group_model()->GetTabGroup(group)->SetVisualData(new_data);
+  tabstrip()->ChangeTabGroupVisuals(group, new_data);
   const tab_groups::TabGroupVisualData* data =
       tabstrip()->group_model()->GetTabGroup(group)->visual_data();
   EXPECT_EQ(data->title(), new_data.title());
@@ -4677,7 +4678,7 @@ TEST_F(TabStripModelTest, VisualDataChangeNotifiesObservers) {
 
   const tab_groups::TabGroupVisualData new_data(
       u"Foo", tab_groups::TabGroupColorId::kBlue);
-  tabstrip()->group_model()->GetTabGroup(group)->SetVisualData(new_data);
+  tabstrip()->ChangeTabGroupVisuals(group, new_data);
 
   // Now check that we are notified when we change it, once at creation
   // and once from the explicit update.
@@ -5509,9 +5510,9 @@ TEST_F(TabStripModelTest, ExtendSelectionTo_SplitTabs) {
   ASSERT_NO_FATAL_FAILURE(
       PrepareTabstripForSelectionTest(tabstrip(), 6, 0, {0}));
   tabstrip()->ActivateTabAt(0);
-  tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabVisualData());
   tabstrip()->ActivateTabAt(4);
-  tabstrip()->AddToNewSplit({5}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({5}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0s 1s 2 3 4s 5s", GetTabStripStateString(tabstrip()));
 
@@ -5568,9 +5569,9 @@ TEST_F(TabStripModelTest, AddSelectionFromAnchorTo_SplitTabs) {
   ASSERT_NO_FATAL_FAILURE(
       PrepareTabstripForSelectionTest(tabstrip(), 6, 0, {0}));
   tabstrip()->ActivateTabAt(0);
-  tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabVisualData());
   tabstrip()->ActivateTabAt(4);
-  tabstrip()->AddToNewSplit({5}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({5}, split_tabs::SplitTabVisualData());
 
   tabstrip()->ActivateTabAt(3);
   tabstrip()->AddSelectionFromAnchorTo(4);
@@ -5604,7 +5605,7 @@ TEST_F(TabStripModelTest, AddSelectionFromAnchorTo_NoAnchorAndSplit) {
   ASSERT_NO_FATAL_FAILURE(
       PrepareTabstripForSelectionTest(tabstrip(), 6, 0, {0}));
   tabstrip()->ActivateTabAt(0);
-  tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabLayout::kHorizontal);
+  tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabVisualData());
 
   ui::ListSelectionModel selection_model;
   selection_model.AddIndexToSelection(3);
@@ -5622,7 +5623,7 @@ TEST_F(TabStripModelTest, SelectTabAt_SplitTabs) {
   ASSERT_NO_FATAL_FAILURE(
       PrepareTabstripForSelectionTest(tabstrip(), 4, 0, {0}));
   tabstrip()->ActivateTabAt(3);
-  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0 1 2s 3s", GetTabStripStateString(tabstrip()));
 
@@ -5638,7 +5639,7 @@ TEST_F(TabStripModelTest, DeselectTabAt_SplitTabs) {
   ASSERT_NO_FATAL_FAILURE(
       PrepareTabstripForSelectionTest(tabstrip(), 4, 0, {0}));
   tabstrip()->ActivateTabAt(3);
-  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0 1 2s 3s", GetTabStripStateString(tabstrip()));
 
@@ -5656,7 +5657,7 @@ TEST_F(TabStripModelTest, DeselectTabAt_CantDeselectOnlySelectedSplitTabs) {
   ASSERT_NO_FATAL_FAILURE(
       PrepareTabstripForSelectionTest(tabstrip(), 4, 0, {0}));
   tabstrip()->ActivateTabAt(3);
-  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabVisualData());
 
   EXPECT_EQ("0 1 2s 3s", GetTabStripStateString(tabstrip()));
 
@@ -5673,7 +5674,7 @@ TEST_F(TabStripModelTest, RemoveSplitInSelectionActivatesRemainingTab) {
   PrepareTabs(tabstrip(), 6);
   ASSERT_EQ(6, tabstrip()->count());
   tabstrip()->ActivateTabAt(1);
-  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabVisualData());
   tabstrip()->ActivateTabAt(3);
   tabstrip()->SelectTabAt(0);
   tabstrip()->SelectTabAt(2);
@@ -5698,7 +5699,7 @@ TEST_F(TabStripModelTest, RemoveSplitUnselectsNonActiveTab) {
   ASSERT_EQ(4, tabstrip()->count());
   tabstrip()->ActivateTabAt(1);
   split_tabs::SplitTabId split_tab_id =
-      tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabLayout::kVertical);
+      tabstrip()->AddToNewSplit({2}, split_tabs::SplitTabVisualData());
 
   // Verify the selection model before closing the tab.
   EXPECT_EQ(tabstrip()->active_index(), 1);
@@ -5724,12 +5725,12 @@ TEST_F(TabStripModelTest, SplitSelectionTestFromModel) {
                          TabStripUserGestureDetails(
                              TabStripUserGestureDetails::GestureType::kOther));
 
-  tabstrip.AddToNewSplit({7}, split_tabs::SplitTabLayout::kHorizontal);
+  tabstrip.AddToNewSplit({7}, split_tabs::SplitTabVisualData());
 
   tabstrip.ActivateTabAt(2,
                          TabStripUserGestureDetails(
                              TabStripUserGestureDetails::GestureType::kOther));
-  tabstrip.AddToNewSplit({1}, split_tabs::SplitTabLayout::kHorizontal);
+  tabstrip.AddToNewSplit({1}, split_tabs::SplitTabVisualData());
 
   // Pass in only one of the selected tabs in the splits.
   PrepareTabstripForSelectionTest(&tabstrip, 0, 0, {6, 2});
@@ -5748,7 +5749,7 @@ TEST_F(TabStripModelTest, RemoveLeftTabInSplitActivatesRemainingTab) {
   PrepareTabs(tabstrip(), 4);
   ASSERT_EQ(4, tabstrip()->count());
   tabstrip()->ActivateTabAt(0);
-  tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabLayout::kVertical);
+  tabstrip()->AddToNewSplit({1}, split_tabs::SplitTabVisualData());
 
   // Verify the selection model before closing the tab.
   EXPECT_EQ("0s 1s 2 3", GetTabStripStateString(tabstrip()));

@@ -1070,7 +1070,7 @@ std::string GetCoreMLNameFromInput(std::string_view input_name,
   // operands' names. `operand_id` is added to avoid collision with other
   // inputs' sanitized values.
   return base::JoinString({kInputNamePrefix, SanitizeName(input_name),
-                           base::NumberToString(operand_id)},
+                           base::NumberToString(operand_id.value())},
                           kStringSeparator);
 }
 
@@ -1080,7 +1080,7 @@ std::string GetCoreMLNameFromOutput(std::string_view output_name,
   // operands' names. `operand_id` is added to avoid collision with other
   // outputs' sanitized values.
   return base::JoinString({kOutputNamePrefix, SanitizeName(output_name),
-                           base::NumberToString(operand_id)},
+                           base::NumberToString(operand_id.value())},
                           kStringSeparator);
 }
 
@@ -1089,7 +1089,7 @@ base::expected<std::unique_ptr<GraphBuilderCoreml::Result>, mojom::ErrorPtr>
 GraphBuilderCoreml::CreateAndBuild(
     const mojom::GraphInfo& graph_info,
     ContextProperties context_properties,
-    mojom::CreateContextOptions::Device device,
+    mojom::Device device,
     const base::flat_map<OperandId, std::unique_ptr<WebNNConstantOperand>>&
         constant_operands,
     const base::FilePath& working_directory) {
@@ -1404,7 +1404,7 @@ ContextProperties GraphBuilderCoreml::GetContextProperties() {
 GraphBuilderCoreml::GraphBuilderCoreml(
     const mojom::GraphInfo& graph_info,
     ContextProperties context_properties,
-    mojom::CreateContextOptions::Device device,
+    mojom::Device device,
     const base::flat_map<OperandId, std::unique_ptr<WebNNConstantOperand>>&
         constant_operands,
     base::FilePath ml_package_dir,
@@ -1455,7 +1455,7 @@ GraphBuilderCoreml::BuildCoreMLModel() {
 
   for (size_t operand_id = 0; operand_id < graph_info_->operands.size();
        ++operand_id) {
-    UpdateCoreMLInputInfoMap(operand_id);
+    UpdateCoreMLInputInfoMap(OperandId(operand_id));
   }
 
   // Add inputs.
@@ -2017,7 +2017,7 @@ GraphBuilderCoreml::AddOperationForArgMinMax(
   // already scalar.
   if (input_operand_info.dimensions.empty() && operation.keep_dimensions) {
     ASSIGN_OR_RETURN(
-        int64_t intermediate_output_operand_id,
+        OperandId intermediate_output_operand_id,
         GenerateInternalOperandInfo(output_operand_info.mil_data_type,
                                     base::span<const uint32_t>({1})));
     PopulateNamedValueType(intermediate_output_operand_id, *op->add_outputs());
@@ -2041,7 +2041,7 @@ GraphBuilderCoreml::AddOperationForBatchNormalization(
   // Rank of 5 causes crashes when not targeting `MLComputeUnitsCPUOnly`, see
   // crbug.com/391566721, so reshape to 4 to perform batch norm, then reshape
   // back.
-  if (device_ != mojom::CreateContextOptions::Device::kCpu &&
+  if (device_ != mojom::Device::kCpu &&
       input_operand_info.dimensions.size() == 5) {
     std::array<uint32_t, 4> flattened_dims{
         input_operand_info.dimensions[0], input_operand_info.dimensions[1],
@@ -3973,7 +3973,7 @@ GraphBuilderCoreml::AddOperationForLayerNormalization(
         return (a + 1) != b;
       }) == operation.axes.end();
   if (!is_consecutive) {
-    if (device_ == mojom::CreateContextOptions::Device::kCpu) {
+    if (device_ == mojom::Device::kCpu) {
       return NewNotSupportedError(
           "Axes must be consecutive for layerNormalization on cpu.");
     }
@@ -4590,10 +4590,6 @@ base::expected<void, mojom::ErrorPtr> GraphBuilderCoreml::AddOperationForPad(
       mode = "constant";
       constant = operation.mode->get_constant()->value;
       break;
-    case mojom::PaddingMode::Tag::kSymmetric:
-      // TODO: crbug.com/354101904 - figure out out how to emulate this or
-      // resolve the incompabitility at spec level.
-      return NewNotSupportedError("Unsupported mode symmetric for pad.");
     case mojom::PaddingMode::Tag::kEdge:
       mode = "replicate";
       break;
@@ -5657,7 +5653,7 @@ GraphBuilderCoreml::AddOperationForTriangular(
 
 const mojom::Operand& GraphBuilderCoreml::GetOperand(
     OperandId operand_id) const {
-  return *graph_info_->operands.at(operand_id);
+  return *graph_info_->operands.at(operand_id.value());
 }
 
 [[nodiscard]] const GraphBuilderCoreml::OperandInfo&
@@ -5726,16 +5722,17 @@ GraphBuilderCoreml::GenerateInternalOperandInfo(
   if (!internal_operand_id_.IsValid()) {
     return NewUnknownError("Number of operands in graph exceeds limit.");
   }
-  OperandId operand_id = internal_operand_id_.ValueOrDie();
+  OperandId operand_id(internal_operand_id_.ValueOrDie());
   // Prefix is added to internal operands generated for WebNN operations that
   // need to be decomposed into multiple CoreML operations.
   CHECK(id_to_operand_info_map()
-            .try_emplace(operand_id, std::make_unique<OperandInfo>(
-                                         base::JoinString(
-                                             {kInternalNamePrefix,
-                                              base::NumberToString(operand_id)},
-                                             kStringSeparator),
-                                         dimensions, mil_data_type))
+            .try_emplace(
+                operand_id,
+                std::make_unique<OperandInfo>(
+                    base::JoinString({kInternalNamePrefix,
+                                      base::NumberToString(operand_id.value())},
+                                     kStringSeparator),
+                    dimensions, mil_data_type))
             .second);
   return operand_id;
 }
@@ -5793,17 +5790,17 @@ std::string GraphBuilderCoreml::GetCoreMLNameFromOperand(OperandId operand_id) {
       CHECK(operand.name.has_value());
       return GetCoreMLNameFromInput(operand.name.value(), operand_id);
     case mojom::Operand::Kind::kConstant:
-      return base::JoinString(
-          {kIntermediateOperandPrefix, base::NumberToString(operand_id)},
-          kStringSeparator);
+      return base::JoinString({kIntermediateOperandPrefix,
+                               base::NumberToString(operand_id.value())},
+                              kStringSeparator);
     case mojom::Operand::Kind::kOutput:
       if (operand.name.has_value()) {
         return GetCoreMLNameFromOutput(operand.name.value(), operand_id);
       } else {
         // Intermediate outputs don't have names so use operand_id instead.
-        return base::JoinString(
-            {kIntermediateOperandPrefix, base::NumberToString(operand_id)},
-            kStringSeparator);
+        return base::JoinString({kIntermediateOperandPrefix,
+                                 base::NumberToString(operand_id.value())},
+                                kStringSeparator);
       }
   }
 }

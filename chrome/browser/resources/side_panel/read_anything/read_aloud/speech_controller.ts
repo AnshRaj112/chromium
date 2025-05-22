@@ -173,7 +173,6 @@ export class SpeechController {
     // that this step can be skipped.
     chrome.readingMode.initAxPositionWithNode(firstTextNode);
     this.model_.setIsSpeechTreeInitialized(true);
-    chrome.readingMode.preprocessTextForSpeech();
   }
 
   onSelectionChange() {
@@ -789,7 +788,6 @@ export class SpeechController {
       isSpeechBeingRepositioned: false,
     };
     this.setState_(speechPlayingState);
-    this.setEngineState_(SpeechEngineState.NONE);
     this.setPreviewVoicePlaying_(null);
     this.model_.setFirstTextNode(null);
     this.model_.setResumeSpeechOnVoiceMenuClose(false);

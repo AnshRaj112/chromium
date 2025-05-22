@@ -4429,7 +4429,7 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="3965" label="TapDelayEnabled"/>
   <int value="3966" label="V8URLPattern_CompareComponent_Method"/>
   <int value="3967" label="EarlyHintsPreload"/>
-  <int value="3968" label="ClientHintsUAReduced"/>
+  <int value="3968" label="OBSOLETE_ClientHintsUAReduced"/>
   <int value="3969" label="SpeculationRulesPrerender"/>
   <int value="3970" label="OBSOLETE_ExecCommandWithTrustedTypes"/>
   <int value="3971" label="OBSOLETE_CSSSelectorPseudoHasInSnapshotProfile"/>
@@ -4619,7 +4619,7 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="4146" label="FrameNameContainsBrace"/>
   <int value="4147" label="FrameNameContainsNewline"/>
   <int value="4148" label="AbortSignalThrowIfAborted"/>
-  <int value="4149" label="ClientHintsUAFull"/>
+  <int value="4149" label="OBSOLETE_ClientHintsUAFull"/>
   <int value="4150" label="PrivateNetworkAccessWithinWorker"/>
   <int value="4151" label="ClientHintsUAWoW64"/>
   <int value="4152" label="FetchSetCookieInRequestGuardedHeaders"/>
@@ -6208,6 +6208,12 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="5578" label="ScrollIntoViewContainerNearest"/>
   <int value="5579" label="PopoverShown"/>
   <int value="5580" label="InputParsedParentOptionOrOptgroup"/>
+  <int value="5581" label="NavigatorUAData_toJSON"/>
+  <int value="5582"
+      label="EditContextUpdateTextRangePrecedesOrOverlapsSelection"/>
+  <int value="5583" label="EditContextUpdateTextRangePrecedesCompositionRange"/>
+  <int value="5584" label="EditContextUpdateTextRangeOverlapsCompositionRange"/>
+  <int value="5585" label="EditContextUpdateSelectionDuringActiveComposition"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom:WebFeature) -->
@@ -7794,9 +7800,24 @@ Called by update_use_counter_css.py.-->
   <int value="851" label="rule-color"/>
   <int value="852" label="rule-width"/>
   <int value="853" label="rule-style"/>
+  <int value="854" label="caret-shape"/>
+  <int value="855" label="row-rule"/>
+  <int value="856" label="text-grow"/>
+  <int value="857" label="text-shrink"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/public/mojom/use_counter/metrics/css_property_id.mojom:CSSSampleId) -->
+
+<!-- LINT.IfChange(OriginStatusOnSubresource) -->
+
+<enum name="OriginStatusOnSubresource">
+  <int value="0" label="kFromSameOriginToSameOrigin"/>
+  <int value="1" label="kFromSameOriginToCrossOrigin"/>
+  <int value="2" label="kFromCrossOriginToSameOrigin"/>
+  <int value="3" label="kFromCrossOriginToCrossOrigin"/>
+</enum>
+
+<!-- LINT.ThenChange(//third_party/blink/renderer/core/loader/preload_helper.h:OriginStatusOnSubresource) -->
 
 <!-- LINT.IfChange(PermissionElementInvalidStyleReason) -->
 
@@ -8247,6 +8268,8 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="338" label="Requestidlecallback"/>
   <int value="339" label="ClearSiteData"/>
   <int value="340" label="LinkRelExpect"/>
+  <int value="341" label="UaClientHints"/>
+  <int value="342" label="CustomizableSelect"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/public/mojom/use_counter/metrics/webdx_feature.mojom:WebDXFeature) -->

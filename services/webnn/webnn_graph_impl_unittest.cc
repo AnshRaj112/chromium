@@ -30,6 +30,7 @@
 #include "services/webnn/public/cpp/webnn_types.h"
 #include "services/webnn/public/mojom/features.mojom-features.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom.h"
+#include "services/webnn/public/mojom/webnn_device.mojom-data-view.h"
 #include "services/webnn/public/mojom/webnn_graph.mojom.h"
 #include "services/webnn/public/mojom/webnn_graph_builder.mojom.h"
 #include "services/webnn/public/mojom/webnn_tensor.mojom.h"
@@ -55,7 +56,8 @@ class FakeWebNNGraphImpl final : public WebNNGraphImpl {
       ComputeResourceInfo compute_resource_info)
       : WebNNGraphImpl(std::move(receiver),
                        context,
-                       std::move(compute_resource_info)) {}
+                       std::move(compute_resource_info),
+                       /*devices=*/{}) {}
   ~FakeWebNNGraphImpl() override = default;
 
   static void CreateAndBuild(
@@ -121,6 +123,7 @@ class FakeWebNNContextImpl final : public WebNNContextImpl {
       base::flat_map<
           OperandId,
           std::unique_ptr<WebNNConstantOperand>> /*constant_operands*/,
+      base::flat_map<OperandId, WebNNTensorImpl*> /*constant_tensor_operands*/,
       CreateGraphImplCallback callback) override {
     FakeWebNNGraphImpl::CreateAndBuild(std::move(receiver), this, *graph_info,
                                        std::move(compute_resource_info),
@@ -175,7 +178,7 @@ CreateTensorSuccess CreateWebNNTensor(
       mojom::TensorInfo::New(
           OperandDescriptor::UnsafeCreateForTesting(data_type, shape),
           MLTensorUsage()),
-      create_tensor_future.GetCallback());
+      mojo_base::BigBuffer(0), create_tensor_future.GetCallback());
   mojom::CreateTensorResultPtr create_tensor_result =
       create_tensor_future.Take();
   mojo::AssociatedRemote<mojom::WebNNTensor> webnn_tensor;
@@ -211,12 +214,15 @@ bool ValidateDispatch(
 
   // Creates WebNN Graph mojo interface with the graph information which is
   // validated before compiling.
-  base::test::TestFuture<mojom::CreateGraphResultPtr> create_graph_future;
+  base::test::TestFuture<
+      base::expected<mojom::CreateGraphSuccessPtr, mojom::ErrorPtr>>
+      create_graph_future;
   graph_builder_remote->CreateGraph(std::move(graph_info),
                                     create_graph_future.GetCallback());
-  mojom::CreateGraphResultPtr create_graph_result = create_graph_future.Take();
+  base::expected<mojom::CreateGraphSuccessPtr, mojom::ErrorPtr>
+      create_graph_result = create_graph_future.Take();
   mojo::AssociatedRemote<mojom::WebNNGraph> webnn_graph;
-  webnn_graph.Bind(std::move(create_graph_result->get_graph_remote()));
+  webnn_graph.Bind(std::move(create_graph_result.value()->graph_remote));
 
   // Validate the inputs in the `Dispatch` function.
   bool valid = true;

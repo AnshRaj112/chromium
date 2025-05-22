@@ -48,6 +48,7 @@ using ::testing::Field;
 using ::testing::IsEmpty;
 using ::testing::Matcher;
 using ::testing::NiceMock;
+using ::testing::Optional;
 using ::testing::Pointee;
 using ::testing::Property;
 using ::testing::Ref;
@@ -170,6 +171,16 @@ class MockBrowserAutofillManager : public TestBrowserAutofillManager {
                AutofillTriggerSource trigger_source),
               (override));
   MOCK_METHOD(void,
+              FillOrPreviewField,
+              (mojom::ActionPersistence action_persistence,
+               mojom::FieldActionType action_type,
+               const FormData& form,
+               const FormFieldData& field,
+               const std::u16string& value,
+               SuggestionType type,
+               std::optional<FieldType> field_type),
+              (override));
+  MOCK_METHOD(void,
               DidShowSuggestions,
               (base::span<const Suggestion> suggestions,
                const FormData& form,
@@ -266,6 +277,9 @@ class TouchToFillDelegateAndroidImplUnitTest : public testing::Test {
         .AddLoyaltyCard(loyalty_card);
     form_ = test::CreateTestLoyaltyCardFormData();
     test_api(form_).field(0).set_is_focusable(true);
+    // The current URL matches the loyalty card merchant domain.
+    autofill_client_.set_last_committed_primary_main_frame_url(
+        GURL("https://domain.example"));
   }
 
   void OnFormsSeen() {
@@ -1138,7 +1152,10 @@ TEST_F(TouchToFillDelegateAndroidImplLoyaltyCardUnitTest,
 TEST_F(TouchToFillDelegateAndroidImplLoyaltyCardUnitTest,
        PassTheLoyaltyCardsToTheClient) {
   // TODO: crbug.com/404437211 - Test that the loyalty cards are sorted.
-  std::vector<LoyaltyCard> loyalty_cards{test::CreateLoyaltyCard()};
+  LoyaltyCard card = test::CreateLoyaltyCard();
+  std::vector<LoyaltyCard> loyalty_cards{card};
+  autofill_client_.set_last_committed_primary_main_frame_url(
+      card.merchant_domains()[0]);
   test_api(*autofill_client_.GetValuablesDataManager())
       .SetLoyaltyCards(loyalty_cards);
 
@@ -1149,12 +1166,40 @@ TEST_F(TouchToFillDelegateAndroidImplLoyaltyCardUnitTest,
 }
 
 TEST_F(TouchToFillDelegateAndroidImplLoyaltyCardUnitTest,
+       TryToShowTouchToFillFailsIfNoMatchingDomains) {
+  autofill_client_.set_last_committed_primary_main_frame_url(
+      GURL("https://non-matching.domain"));
+  std::vector<LoyaltyCard> loyalty_cards{test::CreateLoyaltyCard()};
+  test_api(*autofill_client_.GetValuablesDataManager())
+      .SetLoyaltyCards(loyalty_cards);
+
+  EXPECT_CALL(payments_autofill_client(), ShowTouchToFillLoyaltyCard).Times(0);
+
+  TryToShowTouchToFill(/*expected_success=*/false);
+}
+
+TEST_F(TouchToFillDelegateAndroidImplLoyaltyCardUnitTest,
        SafelyHideTouchToFillInDtor) {
   payments_autofill_client()
       .ExpectDelegateWeakPtrFromShowInvalidatedOnHideForLoyaltyCards();
   TryToShowTouchToFill(/*expected_success=*/true);
 
   browser_autofill_manager_.reset();
+}
+
+TEST_F(TouchToFillDelegateAndroidImplLoyaltyCardUnitTest,
+       LoyaltyCardSelectionFillsFormAndHidesSheet) {
+  const std::string kLoyaltyCardNumber = "1234";
+  TryToShowTouchToFill(/*expected_success=*/true);
+
+  EXPECT_CALL(payments_autofill_client(), HideTouchToFillPaymentMethod);
+  EXPECT_CALL(*browser_autofill_manager_,
+              FillOrPreviewField(mojom::ActionPersistence::kFill,
+                                 mojom::FieldActionType::kReplaceAll, _, _,
+                                 base::UTF8ToUTF16(kLoyaltyCardNumber),
+                                 SuggestionType::kLoyaltyCardEntry,
+                                 Optional(LOYALTY_MEMBERSHIP_ID)));
+  touch_to_fill_delegate_->LoyaltyCardSuggestionSelected(kLoyaltyCardNumber);
 }
 
 class TouchToFillDelegateAndroidImplVcnGrayOutForMerchantOptOutUnitTest

@@ -30,6 +30,8 @@ import constants as license_constants
 REPOSITORY_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir))
 sys.path.insert(0, REPOSITORY_ROOT)
+
+import components.cronet.tools.utils as cronet_utils
 import build.gn_helpers
 
 CRONET_LICENSE_NAME = "external_cronet_license"
@@ -209,6 +211,10 @@ def initialize_globals(import_channel: str):
           })
       ],
       # end export_include_dir.
+      # TODO: https://crbug.com/418746360 - Handle //base:build_date_internal
+      # for os:linux_glibc.
+      f'{MODULE_PREFIX}base_build_date_internal__testing': [('host_supported',
+                                                             True)],
   }
 
 
@@ -237,8 +243,6 @@ BLUEPRINTS_MAPPING = {
     # Moving is undergoing, see crbug/40273848
     "buildtools/third_party/libc++abi": "third_party/libc++abi",
 }
-
-_MIN_SDK_VERSION = 30
 
 # Path for the protobuf sources in the standalone build.
 buildtools_protobuf_src = '//buildtools/protobuf/src'
@@ -1972,6 +1976,40 @@ class WriteNativeLibrariesJavaSanitizer(BaseActionSanitizer):
     super()._sanitize_args()
 
 
+class CopyActionSanitizer(BaseActionSanitizer):
+
+  def get_tool_files(self):
+    # CopyAction makes use of no tools, it simply relies on cp.
+    return set()
+
+  def get_cmd(self):
+    return (super().get_pre_cmd() + ['cp'] +
+            [shlex.quote(arg) for arg in self.target.args])
+
+  def get_srcs(self):
+    srcs = super().get_srcs()
+    if srcs:
+      raise Exception(
+          f'CopyAction {self.target.name} specifies {srcs=}. Only deps are supported'
+      )
+    deps = self.get_deps()
+    if len(deps) > 1:
+      raise Exception(
+          f'CopyAction {self.target.name} specifies multiple {deps=}. Only a single dep is supported'
+      )
+    return set(f':{label_to_module_name(dep)}' for dep in deps)
+
+  def sanitize(self):
+    # By convention, copy targets use their deps as args for the copy (see get_srcs).
+    if len(self.target.args) > 1:
+      raise Exception(
+          f'CopyAction {self.target.name} specifies {self.target.args=}. Only deps are supported'
+      )
+    self.target.args = [f'$(location {src})' for src in self.get_srcs()]
+    self.target.args.append('$(out)')
+    super().sanitize()
+
+
 class ProtocJavaSanitizer(BaseActionSanitizer):
 
   def __init__(self, target, arch, gn):
@@ -2028,6 +2066,8 @@ def get_action_sanitizer(gn, target, gn_type, arch, is_test_target):
     return JavaCppStringSanitizer(target, arch)
   if target.script == '//build/android/gyp/write_native_libraries_java.py':
     return WriteNativeLibrariesJavaSanitizer(target, arch)
+  if target.script == '//cp':
+    return CopyActionSanitizer(target, arch)
   if target.script == '//build/gn_run_binary.py':
     return GnRunBinarySanitizer(target, arch)
   if target.script == '//build/protoc_java.py':
@@ -2207,7 +2247,7 @@ def merge_modules(modules, genrule_type):
 def create_java_module(bp_module_name, target, blueprint):
 
   def add_java_library_properties(module):
-    module.min_sdk_version = _MIN_SDK_VERSION
+    module.min_sdk_version = cronet_utils.MIN_SDK_VERSION_FOR_AOSP
     module.apex_available = [tethering_apex]
     module.defaults.add(java_framework_defaults_module)
     module.build_file_path = target.build_file_path
@@ -2411,7 +2451,7 @@ def create_bindgen_module(blueprint: Blueprint, target,
   # to already be present in AOSP (currently, in Android.extras.bp). See
   # https://r.android.com/3413202.
   module.header_libs = {f"{MODULE_PREFIX}repository_root_include_dirs_anchor"}
-  module.min_sdk_version = _MIN_SDK_VERSION
+  module.min_sdk_version = cronet_utils.MIN_SDK_VERSION_FOR_AOSP
   module.apex_available = [tethering_apex]
   blueprint.add_module(module)
   return module
@@ -2638,10 +2678,8 @@ def create_modules_from_target(blueprint, gn, gn_target_name, parent_gn_type,
       modules = create_action_foreach_modules(blueprint, gn, target,
                                               is_test_target)
   elif target.type == 'copy':
-    # TODO: careful now! copy targets are not supported yet, but this will stop
-    # traversing the dependency tree. For //base:base, this is not a big
-    # problem as libicu contains the only copy target which happens to be a
-    # leaf node.
+    # Copy targets are not supported: currently, we stop traversing the
+    # dependency tree when we encounter one.
     return ()
   elif target.type == 'java_library':
     modules = (create_java_module(bp_module_name, target, blueprint), )
@@ -2705,7 +2743,7 @@ def create_modules_from_target(blueprint, gn, gn_target_name, parent_gn_type,
     if module.type in ["rust_proc_macro", "rust_binary", "rust_ffi_static"]:
       module.crate_name = target.crate_name
       module.crate_root = gn_utils.label_to_path(target.crate_root)
-      module.min_sdk_version = _MIN_SDK_VERSION
+      module.min_sdk_version = cronet_utils.MIN_SDK_VERSION_FOR_AOSP
       module.apex_available = [tethering_apex]
       for arch_name, arch in target.get_archs().items():
         _set_rust_flags(module.target[arch_name], arch.rust_flags, arch_name)
@@ -3093,7 +3131,7 @@ def create_cc_defaults_module():
   defaults.target['host'].compile_multilib = '64'
   defaults.stl = 'none'
   defaults.cpp_std = CPP_VERSION
-  defaults.min_sdk_version = _MIN_SDK_VERSION
+  defaults.min_sdk_version = cronet_utils.MIN_SDK_VERSION_FOR_AOSP
   defaults.apex_available.add(tethering_apex)
   return defaults
 

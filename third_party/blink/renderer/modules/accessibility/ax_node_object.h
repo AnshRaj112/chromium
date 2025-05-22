@@ -61,8 +61,6 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
 
   // Call to force-load inline text boxes for the current subtree.
   void LoadInlineTextBoxes() override;
-  // Should inline text boxes be considered when adding chldren to this node.
-  bool ShouldLoadInlineTextBoxes() const override;
 
   ScrollableArea* GetScrollableAreaIfScrollable() const final;
 
@@ -295,7 +293,11 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
   Element* ActionElement() const override;
   Element* AnchorElement() const override;
   Document* GetDocument() const override;
-  Node* GetNode() const final;
+  // This function is manually inlined because it is very hot and LTO/PGO
+  // doesn't manage to inline it. To call it, you will need to include
+  // ax_object-inl.h.
+  ALWAYS_INLINE Node* GetNode() const;
+
   LayoutObject* GetLayoutObject() const final;
 
   // Modify or take an action on an object.
@@ -445,12 +447,18 @@ class MODULES_EXPORT AXNodeObject : public AXObject {
       bool first) const;
   AXObject* NextOnLine() const override;
   AXObject* PreviousOnLine() const override;
-#if defined(REDUCE_AX_INLINE_TEXTBOXES)
-  bool always_load_inline_text_boxes_ = false;
-#endif
 
   Member<Node> node_;
   Member<LayoutObject> layout_object_;
+
+  friend class AXObject;  // For GetNode().
+};
+
+template <>
+struct DowncastTraits<AXNodeObject> {
+  static bool AllowFrom(const AXObject& object) {
+    return object.IsNodeObject();
+  }
 };
 
 }  // namespace blink

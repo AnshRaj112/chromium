@@ -90,11 +90,14 @@
 #include "chrome/browser/ui/webui/app_service_internals/app_service_internals_ui.h"
 #include "chrome/browser/ui/webui/commerce/product_specifications_ui.h"
 #include "chrome/browser/ui/webui/commerce/shopping_insights_side_panel_ui.h"
+#include "chrome/browser/ui/webui/customize_buttons/customize_buttons.mojom.h"
 #include "chrome/browser/ui/webui/data_sharing/data_sharing.mojom.h"
 #include "chrome/browser/ui/webui/data_sharing/data_sharing_ui.h"
 #include "chrome/browser/ui/webui/downloads/downloads.mojom.h"
 #include "chrome/browser/ui/webui/downloads/downloads_ui.h"
 #include "chrome/browser/ui/webui/history/history_ui.h"
+#include "chrome/browser/ui/webui/infobar_internals/infobar_internals.mojom.h"
+#include "chrome/browser/ui/webui/infobar_internals/infobar_internals_ui.h"
 #include "chrome/browser/ui/webui/metrics_reporter/metrics_reporter_service.h"
 #include "chrome/browser/ui/webui/new_tab_footer/new_tab_footer.mojom.h"
 #include "chrome/browser/ui/webui/new_tab_footer/new_tab_footer_ui.h"
@@ -528,6 +531,10 @@ void PopulateChromeWebUIFrameBinders(
       NewTabFooterUI>(map);
 
   RegisterWebUIControllerInterfaceBinder<
+      customize_buttons::mojom::CustomizeButtonsHandlerFactory, NewTabPageUI>(
+      map);
+
+  RegisterWebUIControllerInterfaceBinder<
       new_tab_page::mojom::PageHandlerFactory, NewTabPageUI>(map);
 
   RegisterWebUIControllerInterfaceBinder<
@@ -544,6 +551,9 @@ void PopulateChromeWebUIFrameBinders(
     RegisterWebUIControllerInterfaceBinder<history::mojom::PageHandler,
                                            HistoryUI>(map);
   }
+
+  RegisterWebUIControllerInterfaceBinder<
+      infobar_internals::mojom::PageHandlerFactory, InfoBarInternalsUI>(map);
 
   auto* history_clusters_service =
       HistoryClustersServiceFactory::GetForBrowserContext(
@@ -1221,7 +1231,7 @@ void PopulateChromeWebUIFrameBinders(
   }
 
   RegisterWebUIControllerInterfaceBinder<
-      privacy_sandbox::dialog::mojom::BaseDialogPageHandler,
+      privacy_sandbox::dialog::mojom::BaseDialogPageHandlerFactory,
       privacy_sandbox::BaseDialogUI>(map);
 #endif
 

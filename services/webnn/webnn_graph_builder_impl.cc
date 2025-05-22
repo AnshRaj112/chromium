@@ -13,6 +13,7 @@
 #include "base/memory/raw_ref.h"
 #include "base/memory/stack_allocated.h"
 #include "base/numerics/checked_math.h"
+#include "base/types/expected.h"
 #include "base/types/pass_key.h"
 #include "services/webnn/error.h"
 #include "services/webnn/public/cpp/graph_validation_utils.h"
@@ -24,6 +25,7 @@
 #include "services/webnn/webnn_context_impl.h"
 #include "services/webnn/webnn_graph_impl.h"
 #include "services/webnn/webnn_pending_constant_operand.h"
+#include "services/webnn/webnn_tensor_impl.h"
 #include "services/webnn/webnn_utils.h"
 
 // Evaluate `condition`, and if it returns false then return false.
@@ -139,10 +141,10 @@ bool ValidateLinearAttributes(const mojom::Linear& linear) {
 const mojom::Operand* GetMojoOperand(
     base::span<const mojom::OperandPtr> operands,
     OperandId operand_id) {
-  if (operand_id >= operands.size()) {
+  if (operand_id.value() >= operands.size()) {
     return nullptr;
   }
-  return operands.at(operand_id).get();
+  return operands.at(operand_id.value()).get();
 }
 
 webnn::BatchNormalizationAttributes ConvertToBatchNormalizationAttributes(
@@ -152,12 +154,12 @@ webnn::BatchNormalizationAttributes ConvertToBatchNormalizationAttributes(
   const auto& scale_operand_id = batch_normalization.scale_operand_id;
   if (scale_operand_id) {
     const mojom::Operand& scale_operand =
-        *operands.at(scale_operand_id.value());
+        *operands.at(*scale_operand_id.value());
     component_attributes.scale = scale_operand.descriptor;
   }
   const auto& bias_operand_id = batch_normalization.bias_operand_id;
   if (bias_operand_id) {
-    const mojom::Operand& bias_operand = *operands.at(bias_operand_id.value());
+    const mojom::Operand& bias_operand = *operands.at(*bias_operand_id.value());
     component_attributes.bias = bias_operand.descriptor;
   }
   component_attributes.axis = batch_normalization.axis;
@@ -340,13 +342,13 @@ webnn::LayerNormalizationAttributes ConvertToLayerNormalizationAttributes(
   const auto& scale_operand_id = layer_normalization.scale_operand_id;
   if (scale_operand_id.has_value()) {
     const mojom::Operand& scale_operand =
-        *operands.at(scale_operand_id.value());
+        *operands.at(*scale_operand_id.value());
     component_attributes.scale = scale_operand.descriptor;
   }
 
   const auto& bias_operand_id = layer_normalization.bias_operand_id;
   if (bias_operand_id.has_value()) {
-    const mojom::Operand& bias_operand = *operands.at(bias_operand_id.value());
+    const mojom::Operand& bias_operand = *operands.at(*bias_operand_id.value());
     component_attributes.bias = bias_operand.descriptor;
   }
   component_attributes.label = layer_normalization.label;
@@ -398,7 +400,7 @@ webnn::GemmAttributes ConvertToGemmAttributes(
   webnn::GemmAttributes component_attributes;
   auto& c_operand_id = gemm.c_operand_id;
   if (c_operand_id) {
-    const mojom::Operand& c_operand = *operands.at(c_operand_id.value());
+    const mojom::Operand& c_operand = *operands.at(*c_operand_id.value());
     component_attributes.c_operand = c_operand.descriptor;
   }
   component_attributes.alpha = gemm.alpha;
@@ -467,12 +469,12 @@ webnn::InstanceNormalizationAttributes ConvertToInstanceNormalizationAttributes(
   const auto& scale_operand_id = instance_normalization.scale_operand_id;
   if (scale_operand_id) {
     const mojom::Operand& scale_operand =
-        *operands.at(scale_operand_id.value());
+        *operands.at(*scale_operand_id.value());
     component_attributes.scale = scale_operand.descriptor;
   }
   const auto& bias_operand_id = instance_normalization.bias_operand_id;
   if (bias_operand_id) {
-    const mojom::Operand& bias_operand = *operands.at(bias_operand_id.value());
+    const mojom::Operand& bias_operand = *operands.at(*bias_operand_id.value());
     component_attributes.bias = bias_operand.descriptor;
   }
   component_attributes.layout = context_properties.input_operand_layout;
@@ -753,7 +755,8 @@ bool OperationValidationContext::NoteOutputDependency(
     RETURN_IF_FALSE(operand_to_producing_operation_
                         .try_emplace(output_operand_id, operation_id)
                         .second);
-    RETURN_IF_FALSE(processed_operands_.insert(output_operand_id).second);
+    RETURN_IF_FALSE(
+        processed_operands_.insert(OperandId(output_operand_id)).second);
   }
   return true;
 }
@@ -1493,7 +1496,7 @@ bool OperationValidationContext::ValidateGru(const mojom::Gru& gru,
 
   const auto& bias_operand_id = gru.bias_operand_id;
   if (bias_operand_id.has_value()) {
-    if (bias_operand_id.value() >= operands_.size() ||
+    if (*bias_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(gru.bias_operand_id)) {
       return false;
     }
@@ -1501,7 +1504,7 @@ bool OperationValidationContext::ValidateGru(const mojom::Gru& gru,
   }
   const auto& recurrent_bias_operand_id = gru.recurrent_bias_operand_id;
   if (recurrent_bias_operand_id.has_value()) {
-    if (recurrent_bias_operand_id.value() >= operands_.size() ||
+    if (*recurrent_bias_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(gru.recurrent_bias_operand_id)) {
       return false;
     }
@@ -1510,7 +1513,7 @@ bool OperationValidationContext::ValidateGru(const mojom::Gru& gru,
   const auto& initial_hidden_state_operand_id =
       gru.initial_hidden_state_operand_id;
   if (initial_hidden_state_operand_id.has_value()) {
-    if (initial_hidden_state_operand_id.value() >= operands_.size() ||
+    if (*initial_hidden_state_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(gru.initial_hidden_state_operand_id)) {
       return false;
     }
@@ -1579,7 +1582,7 @@ bool OperationValidationContext::ValidateGruCell(const mojom::GruCell& gru_cell,
 
   const std::optional<OperandId>& bias_operand_id = gru_cell.bias_operand_id;
   if (bias_operand_id.has_value()) {
-    if (bias_operand_id.value() >= operands_.size() ||
+    if (*bias_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(gru_cell.bias_operand_id)) {
       return false;
     }
@@ -1588,7 +1591,7 @@ bool OperationValidationContext::ValidateGruCell(const mojom::GruCell& gru_cell,
   const std::optional<OperandId>& recurrent_bias_operand_id =
       gru_cell.recurrent_bias_operand_id;
   if (recurrent_bias_operand_id.has_value()) {
-    if (recurrent_bias_operand_id.value() >= operands_.size() ||
+    if (*recurrent_bias_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(gru_cell.recurrent_bias_operand_id)) {
       return false;
     }
@@ -1658,7 +1661,9 @@ bool OperationValidationContext::ValidateLayerNormalization(
 
   const auto& scale_operand_id = layer_normalization.scale_operand_id;
   if (scale_operand_id) {
-    if (scale_operand_id.value() >= operands_.size() ||
+    // TODO(crbug.com/413722115): encapsulate below checks to an
+    // IsUnprocessedOperand helper function.
+    if (*scale_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(scale_operand_id.value()) ||
         scale_operand_id.value() == layer_normalization.output_operand_id) {
       // The scale operand is invalid.
@@ -1668,7 +1673,7 @@ bool OperationValidationContext::ValidateLayerNormalization(
   }
   const auto& bias_operand_id = layer_normalization.bias_operand_id;
   if (bias_operand_id) {
-    if (bias_operand_id.value() >= operands_.size() ||
+    if (*bias_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(bias_operand_id.value()) ||
         bias_operand_id.value() == layer_normalization.output_operand_id) {
       // The bias operand is invalid.
@@ -1742,7 +1747,7 @@ bool OperationValidationContext::ValidateLstm(const mojom::Lstm& lstm,
 
   const auto& bias_operand_id = lstm.bias_operand_id;
   if (bias_operand_id.has_value()) {
-    if (bias_operand_id.value() >= operands_.size() ||
+    if (*bias_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(lstm.bias_operand_id)) {
       return false;
     }
@@ -1750,7 +1755,7 @@ bool OperationValidationContext::ValidateLstm(const mojom::Lstm& lstm,
   }
   const auto& recurrent_bias_operand_id = lstm.recurrent_bias_operand_id;
   if (recurrent_bias_operand_id.has_value()) {
-    if (recurrent_bias_operand_id.value() >= operands_.size() ||
+    if (*recurrent_bias_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(lstm.recurrent_bias_operand_id)) {
       return false;
     }
@@ -1758,7 +1763,7 @@ bool OperationValidationContext::ValidateLstm(const mojom::Lstm& lstm,
   }
   const auto& peephole_weight_operand_id = lstm.peephole_weight_operand_id;
   if (peephole_weight_operand_id.has_value()) {
-    if (peephole_weight_operand_id.value() >= operands_.size() ||
+    if (*peephole_weight_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(lstm.peephole_weight_operand_id)) {
       return false;
     }
@@ -1767,7 +1772,7 @@ bool OperationValidationContext::ValidateLstm(const mojom::Lstm& lstm,
   const auto& initial_hidden_state_operand_id =
       lstm.initial_hidden_state_operand_id;
   if (initial_hidden_state_operand_id.has_value()) {
-    if (initial_hidden_state_operand_id.value() >= operands_.size() ||
+    if (*initial_hidden_state_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(lstm.initial_hidden_state_operand_id)) {
       return false;
     }
@@ -1776,7 +1781,7 @@ bool OperationValidationContext::ValidateLstm(const mojom::Lstm& lstm,
   const auto& initial_cell_state_operand_id =
       lstm.initial_cell_state_operand_id;
   if (initial_cell_state_operand_id.has_value()) {
-    if (initial_cell_state_operand_id.value() >= operands_.size() ||
+    if (*initial_cell_state_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(lstm.initial_cell_state_operand_id)) {
       return false;
     }
@@ -1850,7 +1855,7 @@ bool OperationValidationContext::ValidateLstmCell(
 
   const std::optional<OperandId> bias_operand_id = lstm_cell.bias_operand_id;
   if (bias_operand_id.has_value()) {
-    if (bias_operand_id.value() >= operands_.size() ||
+    if (*bias_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(bias_operand_id.value())) {
       return false;
     }
@@ -1859,7 +1864,7 @@ bool OperationValidationContext::ValidateLstmCell(
   const std::optional<OperandId> recurrent_bias_operand_id =
       lstm_cell.recurrent_bias_operand_id;
   if (recurrent_bias_operand_id.has_value()) {
-    if (recurrent_bias_operand_id.value() >= operands_.size() ||
+    if (*recurrent_bias_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(recurrent_bias_operand_id.value())) {
       return false;
     }
@@ -1868,7 +1873,7 @@ bool OperationValidationContext::ValidateLstmCell(
   const std::optional<OperandId> peephole_weight_operand_id =
       lstm_cell.peephole_weight_operand_id;
   if (peephole_weight_operand_id.has_value()) {
-    if (peephole_weight_operand_id.value() >= operands_.size() ||
+    if (*peephole_weight_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(peephole_weight_operand_id.value())) {
       return false;
     }
@@ -1930,7 +1935,7 @@ bool OperationValidationContext::ValidateInstanceNormalization(
   }
   const auto& scale_operand_id = instance_normalization.scale_operand_id;
   if (scale_operand_id) {
-    if (scale_operand_id.value() >= operands_.size() ||
+    if (*scale_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(scale_operand_id.value()) ||
         scale_operand_id.value() == instance_normalization.output_operand_id) {
       // The scale operand is invalid.
@@ -1940,7 +1945,7 @@ bool OperationValidationContext::ValidateInstanceNormalization(
   }
   const auto& bias_operand_id = instance_normalization.bias_operand_id;
   if (bias_operand_id) {
-    if (bias_operand_id.value() >= operands_.size() ||
+    if (*bias_operand_id.value() >= operands_.size() ||
         !processed_operands_.contains(bias_operand_id.value()) ||
         bias_operand_id.value() == instance_normalization.output_operand_id) {
       // The bias operand is invalid.
@@ -2692,9 +2697,11 @@ bool OperationValidationContext::ValidateOperation(
 WebNNGraphBuilderImpl::ValidateGraphSuccessResult::ValidateGraphSuccessResult(
     WebNNGraphImpl::ComputeResourceInfo compute_resource_info,
     base::flat_map<OperandId, std::unique_ptr<WebNNConstantOperand>>
-        constant_operands)
+        constant_operands,
+    base::flat_map<OperandId, WebNNTensorImpl*> constant_tensor_operands)
     : compute_resource_info(std::move(compute_resource_info)),
-      constant_operands(std::move(constant_operands)) {}
+      constant_operands(std::move(constant_operands)),
+      constant_tensor_operands(std::move(constant_tensor_operands)) {}
 
 WebNNGraphBuilderImpl::ValidateGraphSuccessResult::ValidateGraphSuccessResult(
     ValidateGraphSuccessResult&&) = default;
@@ -2780,6 +2787,7 @@ void WebNNGraphBuilderImpl::CreateGraph(mojom::GraphInfoPtr graph_info,
       std::move(receiver), std::move(graph_info),
       std::move(validate_graph_result->compute_resource_info),
       std::move(validate_graph_result->constant_operands),
+      std::move(validate_graph_result->constant_tensor_operands),
       base::BindOnce(&WebNNGraphBuilderImpl::DidCreateGraph,
                      weak_factory_.GetWeakPtr(), std::move(callback),
                      std::move(remote)));
@@ -2812,13 +2820,13 @@ void WebNNGraphBuilderImpl::DidCreateGraph(
       &WebNNGraphBuilderImpl::DestroySelf, weak_factory_.GetWeakPtr()));
 
   if (!result.has_value()) {
-    std::move(callback).Run(
-        mojom::CreateGraphResult::NewError(std::move(result.error())));
+    std::move(callback).Run(base::unexpected(std::move(result.error())));
     return;
   }
 
-  std::move(callback).Run(
-      mojom::CreateGraphResult::NewGraphRemote(std::move(remote)));
+  auto success = mojom::CreateGraphSuccess::New(std::move(remote),
+                                                result.value()->devices());
+  std::move(callback).Run(std::move(success));
 
   context_->TakeGraph(*std::move(result),
                       base::PassKey<WebNNGraphBuilderImpl>());
@@ -2867,9 +2875,13 @@ WebNNGraphBuilderImpl::ValidateGraphImpl(
   std::vector<std::pair<OperandId, std::unique_ptr<WebNNConstantOperand>>>
       graph_constants;
   graph_constants.reserve(graph_info.constant_operand_ids_to_handles.size());
+  std::vector<std::pair<OperandId, WebNNTensorImpl*>> graph_constant_tensors;
+  graph_constant_tensors.reserve(
+      graph_info.id_to_constant_tensor_operand_map.size());
 
   for (size_t id = 0; id < graph_info.operands.size(); ++id) {
     const mojom::OperandPtr& operand = graph_info.operands[id];
+    const OperandId operand_id(id);
     const size_t byte_length = operand->descriptor.PackedByteLength();
     if (byte_length > context_properties.tensor_byte_length_limit) {
       return std::nullopt;
@@ -2890,8 +2902,8 @@ WebNNGraphBuilderImpl::ValidateGraphImpl(
           // Input data type not supported.
           return std::nullopt;
         }
-        graph_inputs.push_back(id);
-        processed_operands.insert(id);
+        graph_inputs.push_back(operand_id);
+        processed_operands.insert(operand_id);
         break;
       }
       case mojom::Operand::Kind::kOutput: {
@@ -2911,7 +2923,7 @@ WebNNGraphBuilderImpl::ValidateGraphImpl(
             // Output data type not supported.
             return std::nullopt;
           }
-          graph_outputs.push_back(id);
+          graph_outputs.push_back(operand_id);
         } else {
           // The intermediate operand that connects with two operators has no
           // the name value.
@@ -2922,6 +2934,33 @@ WebNNGraphBuilderImpl::ValidateGraphImpl(
         if (name) {
           // Constant operand should not have a name.
           return std::nullopt;
+        }
+
+        // Constants using tensors for weights.
+        if (auto id_and_handle_it =
+                graph_info.id_to_constant_tensor_operand_map.find(id);
+            id_and_handle_it !=
+            graph_info.id_to_constant_tensor_operand_map.end()) {
+          // `id` must correspond to a handle known by the context...
+          base::optional_ref<WebNNTensorImpl> tensor_impl =
+              context_->GetWebNNTensorImpl(id_and_handle_it->second);
+          if (!tensor_impl.has_value()) {
+            return std::nullopt;
+          }
+
+          // ...whose tensor must have the correct usage.
+          if (!tensor_impl->usage().Has(MLTensorUsageFlags::kGraphConstant)) {
+            return std::nullopt;
+          }
+
+          // ...whose data must be compatible with what `operand` expects.
+          if (!tensor_impl->IsValidWithDescriptor(operand->descriptor)) {
+            return std::nullopt;
+          }
+
+          graph_constant_tensors.emplace_back(operand_id, tensor_impl.as_ptr());
+          processed_operands.insert(operand_id);
+          break;
         }
 
         // `id` must correspond to a pending constant operand handle...
@@ -2950,7 +2989,7 @@ WebNNGraphBuilderImpl::ValidateGraphImpl(
           // placeholder `nullptr` rather than extracting corresponding
           // `WebNNPendingConstantOperand` from `pending_constant_operands_` and
           // converting it into a concrete operand, as is done below.
-          graph_constants.emplace_back(id, nullptr);
+          graph_constants.emplace_back(operand_id, nullptr);
         } else {
           auto extracted_pending_constant =
               pending_constant_operands_.extract(pending_constant_operand_it);
@@ -2968,10 +3007,10 @@ WebNNGraphBuilderImpl::ValidateGraphImpl(
             return std::nullopt;
           }
 
-          graph_constants.emplace_back(id, std::move(constant_operand));
+          graph_constants.emplace_back(operand_id, std::move(constant_operand));
         }
 
-        processed_operands.insert(id);
+        processed_operands.insert(operand_id);
         break;
       }
     }
@@ -3000,6 +3039,11 @@ WebNNGraphBuilderImpl::ValidateGraphImpl(
     return std::nullopt;
   }
 
+  if (graph_constant_tensors.size() !=
+      graph_info.id_to_constant_tensor_operand_map.size()) {
+    return std::nullopt;
+  }
+
   // Validate the operations which are sorted in the topological order.
   std::optional<OperationValidationContext::ValidationResult> result =
       OperationValidationContext::ValidateOperationsAndGetDependencies(
@@ -3014,16 +3058,17 @@ WebNNGraphBuilderImpl::ValidateGraphImpl(
   // operands are connected to the graph inputs and outputs.
   for (size_t id = 0; id < graph_info.operands.size(); ++id) {
     const mojom::OperandPtr& operand = graph_info.operands[id];
+    const OperandId operand_id(id);
     if (operand->kind == mojom::Operand::Kind::kOutput) {
       // Graph outputs must be the output of some operator.
       // Intermediate outputs can be eliminated by constant folding logic so
       // they don't need to be the input of some operators.
-      if (operand->name && !result->processed_operands.contains(id)) {
+      if (operand->name && !result->processed_operands.contains(operand_id)) {
         return std::nullopt;
       }
     } else {
       // All other operands must be the input to some operator.
-      if (!result->operand_to_dependent_operations.contains(id)) {
+      if (!result->operand_to_dependent_operations.contains(operand_id)) {
         return std::nullopt;
       }
     }
@@ -3035,7 +3080,7 @@ WebNNGraphBuilderImpl::ValidateGraphImpl(
           std::move(result->operand_to_dependent_operations),
           std::move(result->operand_to_producing_operation),
           base::PassKey<WebNNGraphBuilderImpl>()),
-      std::move(graph_constants)};
+      std::move(graph_constants), std::move(graph_constant_tensors)};
 }
 
 void WebNNGraphBuilderImpl::DestroySelf() {

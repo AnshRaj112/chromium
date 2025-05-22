@@ -47,6 +47,20 @@ enum class SignInHistorySyncStep {
   kCompleted,
 };
 
+// Converts HistorySyncResult in SigninCoordinatorResult.
+SigninCoordinatorResult HistorySyncResultToSigninCoordinatorResult(
+    HistorySyncResult history_sync_result) {
+  switch (history_sync_result) {
+    case HistorySyncResult::kSuccess:
+    case HistorySyncResult::kUserCanceled:
+    case HistorySyncResult::kSkipped:
+      return SigninCoordinatorResultSuccess;
+    case HistorySyncResult::kPrimaryIdentityRemoved:
+      return SigninCoordinatorResultInterrupted;
+  }
+  NOTREACHED();
+}
+
 }  // namespace
 
 @interface SignInAndHistorySyncCoordinator () <
@@ -126,11 +140,13 @@ enum class SignInHistorySyncStep {
 #pragma mark - HistorySyncPopupCoordinatorDelegate
 
 - (void)historySyncPopupCoordinator:(HistorySyncPopupCoordinator*)coordinator
-                didFinishWithResult:(SigninCoordinatorResult)result {
+                didFinishWithResult:(HistorySyncResult)result {
   CHECK_EQ(coordinator, _historySyncPopupCoordinator,
            base::NotFatalUntil::M145);
   [self stopHistorySyncPopupCoordinatorAnimated:YES];
-  [self presentNextStepWithPreviousResult:result];
+  SigninCoordinatorResult signinResult =
+      HistorySyncResultToSigninCoordinatorResult(result);
+  [self presentNextStepWithPreviousResult:signinResult];
 }
 
 #pragma mark - Private
@@ -158,8 +174,6 @@ enum class SignInHistorySyncStep {
       _currentStep = [self nextStep];
       break;
     case SigninCoordinatorProfileSwitch:
-      // TODO(crbug.com/375605572): Open the history sync dialog after the
-      // continuation.
     case SigninCoordinatorResultInterrupted:
     case SigninCoordinatorResultCanceledByUser:
       _currentStep = SignInHistorySyncStep::kCompleted;
@@ -199,7 +213,6 @@ enum class SignInHistorySyncStep {
 - (void)createAndPresentStepChildCoordinator {
   switch (_currentStep) {
     case SignInHistorySyncStep::kFullscreenSignin: {
-      // TODO(crbug.com/375605572) Sends an actual continuation.
       _signinCoordinator = [[FullscreenSigninCoordinator alloc]
                  initWithBaseViewController:self.baseViewController
                                     browser:self.browser
@@ -232,7 +245,6 @@ enum class SignInHistorySyncStep {
       return;
     }
     case SignInHistorySyncStep::kInstantSignin: {
-      // TODO(crbug.com/375605572) Sends an actual continuation.
       _signinCoordinator = [[InstantSigninCoordinator alloc]
           initWithBaseViewController:self.baseViewController
                              browser:self.browser

@@ -37,7 +37,6 @@
 #include "chrome/browser/ui/tabs/organization/metrics.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_utils.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
-#include "chrome/browser/ui/tabs/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -62,6 +61,7 @@
 #include "chrome/common/chrome_features.h"
 #include "chrome/grit/chrome_unscaled_resources.h"
 #include "components/tab_groups/tab_group_id.h"
+#include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
@@ -77,6 +77,7 @@
 #include "ui/gfx/geometry/point_conversions.h"
 #include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/image/image_skia_operations.h"
+#include "ui/gfx/range/range.h"
 #include "ui/views/controls/scroll_view.h"
 #include "ui/views/drag_utils.h"
 #include "ui/views/event_monitor.h"
@@ -437,12 +438,12 @@ TabDragController::Liveness TabDragController::Init(
     const tab_groups::TabGroupId group_id = source_view->group().value();
     const std::optional<tab_groups::TabGroupId> active_group_id =
         tab_strip_model->GetActiveTab()->GetGroup();
-    const std::optional<int> group_starting_index =
-        tab_strip_model->group_model()->GetTabGroup(group_id)->GetFirstTab();
+    gfx::Range group_range =
+        tab_strip_model->group_model()->GetTabGroup(group_id)->ListTabs();
     const int active_tab_index_within_group =
         (active_group_id.has_value() && active_group_id.value() == group_id &&
-         group_starting_index.has_value())
-            ? tab_strip_model->active_index() - group_starting_index.value()
+         !group_range.is_empty())
+            ? tab_strip_model->active_index() - group_range.GetMin()
             : 0;
     ref->drag_data_.group_drag_data_ = std::make_optional<GroupDragData>(
         group_id, active_tab_index_within_group);
@@ -1170,7 +1171,7 @@ void TabDragController::AttachToNewContext(
     std::unique_ptr<TabDragController> controller,
     std::vector<std::variant<std::unique_ptr<tabs::TabModel>,
                              std::unique_ptr<DetachedTabCollection>>>
-        owned_tabs_and_groups) {
+        owned_tabs_and_collections) {
   // We should already have detached by the time we get here.
   CHECK(!attached_context_);
   attached_context_ = attached_context;
@@ -1204,9 +1205,9 @@ void TabDragController::AttachToNewContext(
       },
       attached_context_->GetTabStripModel());
 
-  for (auto& tab_or_group : owned_tabs_and_groups) {
+  for (auto& tab_or_collection : owned_tabs_and_collections) {
     if (auto* tab =
-            std::get_if<std::unique_ptr<tabs::TabModel>>(&tab_or_group)) {
+            std::get_if<std::unique_ptr<tabs::TabModel>>(&tab_or_collection)) {
       const tabs::TabInterface* tab_ptr = tab->get();
       // If it's a tab - we add it to the tabstrip.
       int add_types = AddTabTypes::ADD_NONE;
@@ -1226,19 +1227,29 @@ void TabDragController::AttachToNewContext(
       update_sad_tab.Run(index);
       index++;
     } else {
-      auto group = std::move(
-          *std::get_if<std::unique_ptr<DetachedTabCollection>>(&tab_or_group));
-      // If it's a group - we add it to the tabstrip. This will add all the
-      // tabs.
-      const gfx::Range group_indices =
-          attached_context_->GetTabStripModel()->InsertDetachedTabGroupAt(
-              std::move(group), index);
+      gfx::Range collection_indices;
+      auto* detached_tab_collection =
+          std::get_if<std::unique_ptr<DetachedTabCollection>>(
+              &tab_or_collection);
 
-      CHECK_EQ(group_indices.start(), index);
-      index += group_indices.length();
+      const bool pinned = detached_tab_collection->get()->pinned_;
 
-      for (size_t sad_index = group_indices.start();
-           sad_index < group_indices.end(); sad_index++) {
+      if (std::holds_alternative<std::unique_ptr<tabs::TabGroupTabCollection>>(
+              detached_tab_collection->get()->collection_)) {
+        collection_indices =
+            attached_context_->GetTabStripModel()->InsertDetachedTabGroupAt(
+                std::move(*detached_tab_collection), index);
+      } else {
+        collection_indices =
+            attached_context_->GetTabStripModel()->InsertDetachedSplitTabAt(
+                std::move(*detached_tab_collection), index, pinned);
+      }
+
+      CHECK_EQ(collection_indices.start(), index);
+      index += collection_indices.length();
+
+      for (size_t sad_index = collection_indices.start();
+           sad_index < collection_indices.end(); sad_index++) {
         update_sad_tab.Run(sad_index);
       }
     }
@@ -1327,7 +1338,7 @@ TabDragController::Detach(ReleaseCapture release_capture) {
 
   std::vector<std::variant<std::unique_ptr<tabs::TabModel>,
                            std::unique_ptr<DetachedTabCollection>>>
-      owned_tabs_and_groups;
+      owned_tabs_and_collections;
   for (TabDragData& tab_drag_datum : drag_data_.tab_drag_data_) {
     const int index =
         attached_model->GetIndexOfWebContents(tab_drag_datum.contents);
@@ -1342,10 +1353,14 @@ TabDragController::Detach(ReleaseCapture release_capture) {
         attached_model->GetTabGroupForTab(index);
     if (std::find(groups_to_move.begin(), groups_to_move.end(), group) !=
         groups_to_move.end()) {
-      owned_tabs_and_groups.emplace_back(
+      owned_tabs_and_collections.emplace_back(
           attached_model->DetachTabGroupForInsertion(group.value()));
+    } else if (attached_model->GetTabAtIndex(index)->IsSplit()) {
+      owned_tabs_and_collections.emplace_back(
+          attached_model->DetachSplitTabForInsertion(
+              attached_model->GetTabAtIndex(index)->GetSplit().value()));
     } else {
-      owned_tabs_and_groups.emplace_back(
+      owned_tabs_and_collections.emplace_back(
           attached_model->DetachTabAtForInsertion(index));
     }
   }
@@ -1368,7 +1383,7 @@ TabDragController::Detach(ReleaseCapture release_capture) {
   attached_context_->DraggedTabsDetached();
   attached_context_ = nullptr;
 
-  return std::make_tuple(std::move(me), std::move(owned_tabs_and_groups));
+  return std::make_tuple(std::move(me), std::move(owned_tabs_and_collections));
 }
 
 TabDragController::Liveness
@@ -1696,14 +1711,11 @@ void TabDragController::RevertDrag() {
     }
   }
 
-  // Revert each tab and group. N.B. we manually increment `i` because each
-  // group has multiple entries in `tab_drag_data_`.
+  // Revert each tab, split and group. We manually increment `i` because
+  // each group or split has multiple entries in `tab_drag_data_`.
   for (size_t i = 0; i < drag_data_.tab_drag_data_.size();) {
     const TabDragData tab_data = drag_data_.tab_drag_data_[i];
-    if (tab_data.view_type == TabSlotView::ViewType::kTab) {
-      RevertTabAt(i);
-      i++;
-    } else {
+    if (tab_data.view_type == TabSlotView::ViewType::kTabGroupHeader) {
       RevertGroupAt(i);
       // Skip all the tabs in the group too.
       i += source_context_->GetTabStripModel()
@@ -1711,6 +1723,23 @@ void TabDragController::RevertDrag() {
                ->GetTabGroup(tab_data.tab_group_data->group_id)
                ->tab_count() +
            1;
+    } else {
+      CHECK(tab_data.contents);
+
+      const tabs::TabInterface* tab =
+          tabs::TabInterface::GetFromContents(tab_data.contents);
+
+      if (tab->IsSplit()) {
+        split_tabs::SplitTabId split_id = tab->GetSplit().value();
+        RevertSplitAt(i);
+        i += source_context_->GetTabStripModel()
+                 ->GetSplitData(split_id)
+                 ->ListTabs()
+                 .size();
+      } else {
+        RevertTabAt(i);
+        i++;
+      }
     }
   }
   MaybeResumeTrackingSavedTabGroup();
@@ -1825,10 +1854,8 @@ void TabDragController::RevertGroupAt(size_t drag_index) {
         attached_context_->GetTabStripModel()->DetachTabGroupForInsertion(
             group_id),
         target_index);
-    source_context_->GetTabStripModel()
-        ->group_model()
-        ->GetTabGroup(group_id)
-        ->SetVisualData(first_tab_in_group.tab_group_data->group_visual_data);
+    source_context_->GetTabStripModel()->ChangeTabGroupVisuals(
+        group_id, first_tab_in_group.tab_group_data->group_visual_data);
     return;
   }
 
@@ -1857,6 +1884,74 @@ void TabDragController::RevertGroupAt(size_t drag_index) {
 
   source_context_->GetTabStripModel()->MoveGroupTo(
       first_tab_in_group.tab_group_data->group_id, target_index);
+}
+
+void TabDragController::RevertSplitAt(size_t drag_index) {
+  CHECK_NE(current_state_, DragState::kNotStarted);
+  CHECK(attached_context_);
+  CHECK(source_context_);
+  // We can't revert if `contents` was destroyed during the drag, or if this is
+  // a group header.
+  CHECK(drag_data_.tab_drag_data_[drag_index].contents);
+
+  const TabDragData tab_data = drag_data_.tab_drag_data_[drag_index];
+  const tabs::TabInterface* tab =
+      tabs::TabInterface::GetFromContents(tab_data.contents);
+  split_tabs::SplitTabId split_id = tab->GetSplit().value();
+
+  // The split can be reverted into its original group if it still exists.
+  const std::optional<tab_groups::TabGroupId> existing_group =
+      tab_data.tab_group_data.has_value() &&
+              source_context_->GetTabStripModel()
+                  ->group_model()
+                  ->ContainsTabGroup(tab_data.tab_group_data->group_id)
+          ? std::make_optional(tab_data.tab_group_data->group_id)
+          : std::nullopt;
+
+  const int from_index =
+      attached_context_->GetTabStripModel()->GetIndexOfWebContents(
+          tab_data.contents);
+  CHECK_NE(from_index, TabStripModel::kNoTab);
+  int target_index = tab_data.source_model_index.value();
+
+  if (attached_context_ != source_context_) {
+    // The Split was inserted into another TabDragContext. We need to
+    // put it back into the original one.
+    std::unique_ptr<DetachedTabCollection> detached_split =
+        attached_context_->GetTabStripModel()->DetachSplitTabForInsertion(
+            split_id);
+    source_context_->GetTabStripModel()->InsertDetachedSplitTabAt(
+        std::move(detached_split), target_index, tab_data.pinned,
+        existing_group);
+  } else {
+    if (target_index > from_index) {
+      for (size_t i = drag_index + 1; i < drag_data_.tab_drag_data_.size();
+           ++i) {
+        const TabDragData other_tab = drag_data_.tab_drag_data_[i];
+
+        // Ignore group headers, they don't have model indices to skip over.
+        if (other_tab.view_type != TabSlotView::ViewType::kTab) {
+          continue;
+        }
+
+        tabs::TabInterface* other_tab_interface =
+            tabs::TabInterface::GetFromContents(other_tab.contents);
+
+        CHECK(other_tab_interface);
+
+        // Ignore other tabs in this split, they will get moved along with us
+        // so we won't skip over them.
+        if (other_tab_interface->GetSplit() == split_id) {
+          continue;
+        }
+
+        ++target_index;
+      }
+    }
+
+    source_context_->GetTabStripModel()->MoveSplitTo(
+        split_id, target_index, tab_data.pinned, existing_group);
+  }
 }
 
 void TabDragController::RevertTabAt(size_t drag_index) {

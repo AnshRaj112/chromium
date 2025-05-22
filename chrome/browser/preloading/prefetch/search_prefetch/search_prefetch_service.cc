@@ -779,7 +779,10 @@ bool SearchPrefetchService::OnNavigationLikely(
                                               &search_terms)) {
     return false;
   }
-  CHECK(!search_terms.empty());
+  // Normalized search terms can be empty.
+  if (search_terms.empty()) {
+    return false;
+  }
 
   RecordPotentialDuplicateSearchTermsAheadOfNavigationalPrefetch(search_terms);
 
@@ -1101,9 +1104,12 @@ SearchPrefetchService::RetrieveSearchTermsInMemoryCache(
     recorder.reason_ = SearchPrefetchServingReason::kNotDefaultSearchWithTerms;
     return prefetches_.end();
   }
-  // `HasCanonicalPreloadingOmniboxSearchURL` should return false if
-  // search_terms is empty.
-  CHECK(!search_terms.empty());
+  // TODO(https://crbug.com/417978876): figure out the reason why search_terms
+  // can be empty when `HasCanonicalPreloadingOmniboxSearchURL` returns true.
+  if (search_terms.empty()) {
+    recorder.reason_ = SearchPrefetchServingReason::kNotDefaultSearchWithTerms;
+    return prefetches_.end();
+  }
   recorder.search_terms_ = search_terms;
   const auto& iter = prefetches_.find(canonical_search_url);
 
@@ -1294,6 +1300,13 @@ void SearchPrefetchService::RecordInterceptionMetrics(
         base::Milliseconds(1), base::Hours(10), 100);
     if (age < base::Milliseconds(30)) {
       base::trace_event::EmitNamedTrigger("second-search-request-within30");
+    }
+    if (age < base::Seconds(1)) {
+      // Limit the age to 1 second to rule out the case where restarting chrome
+      // affects the distribution.
+      base::UmaHistogramCustomTimes(
+          "Omnibox.SearchPrefetch.Within1sDuplicateSearchTermsAge", age,
+          base::Milliseconds(1), base::Seconds(1), 20);
     }
   }
   search_terms_cache_.Put(search_terms, base::Time::Now());

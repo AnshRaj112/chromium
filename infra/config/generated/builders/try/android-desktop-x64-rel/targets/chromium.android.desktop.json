@@ -9,6 +9,7 @@
       {
         "args": [
           "--avd-config=../../tools/android/avd/proto/android_35_google_apis_tablet_x64_tablet_landscape.textpb",
+          "--force-android-desktop",
           "--test-launcher-filter-file=../../testing/buildbot/filters/android.desktop.emulator_15.android_browsertests.filter",
           "--emulator-debug-tags=all",
           "--gs-results-bucket=chromium-result-details",
@@ -50,7 +51,7 @@
             }
           },
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com",
-          "shards": 114
+          "shards": 50
         },
         "test": "android_browsertests",
         "test_id_prefix": "ninja://chrome/test:android_browsertests/"
@@ -59,6 +60,7 @@
         "args": [
           "--git-revision=${got_revision}",
           "--avd-config=../../tools/android/avd/proto/android_35_google_apis_tablet_x64_tablet_landscape.textpb",
+          "--force-android-desktop",
           "--gtest_filter=-org.chromium.chrome.browser.ui.appmenu.AppMenuTest.testShowAppMenu_AnchorTop",
           "--gs-results-bucket=chromium-result-details",
           "--recover-devices"
@@ -113,6 +115,7 @@
       {
         "args": [
           "--avd-config=../../tools/android/avd/proto/android_35_google_apis_tablet_x64_tablet_landscape.textpb",
+          "--force-android-desktop",
           "--gs-results-bucket=chromium-result-details",
           "--recover-devices"
         ],
@@ -159,6 +162,7 @@
       {
         "args": [
           "--avd-config=../../tools/android/avd/proto/android_35_google_apis_tablet_x64_tablet_landscape.textpb",
+          "--force-android-desktop",
           "--test-launcher-filter-file=../../testing/buildbot/filters/android.desktop.emulator_15.unit_tests.filter",
           "--gs-results-bucket=chromium-result-details",
           "--recover-devices"
@@ -199,7 +203,7 @@
             }
           },
           "service_account": "chromium-tester@chops-service-accounts.iam.gserviceaccount.com",
-          "shards": 4
+          "shards": 5
         },
         "test": "unit_tests",
         "test_id_prefix": "ninja://chrome/test:unit_tests/"

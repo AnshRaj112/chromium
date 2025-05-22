@@ -207,6 +207,19 @@ BASE_FEATURE(kDbdRevampDesktop,
 BASE_FEATURE(kPreinstalledWebAppInstallation,
              "DefaultWebAppInstallation",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Whether to force migrate preinstalled web apps whenever the old Chrome app
+// they're replacing is detected, even if the web app is already installed.
+BASE_FEATURE(kPreinstalledWebAppAlwaysMigrate,
+             "PreinstalledWebAppAlwaysMigrate",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Whether to force migrate the calculator preinstalled web app whenever the
+// old Chrome app is detected, even if the calculator web app is already
+// installed.
+BASE_FEATURE(kPreinstalledWebAppAlwaysMigrateCalculator,
+             "PreinstalledWebAppAlwaysMigrateCalculator",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -314,15 +327,14 @@ BASE_FEATURE(kForcedAppRelaunchOnPlaceholderUpdate,
 // of languages.
 BASE_FEATURE(kGeoLanguage, "GeoLanguage", base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Controls whether the actor component of Glic is enabled.
+BASE_FEATURE(kGlicActor, "GlicActor", base::FEATURE_DISABLED_BY_DEFAULT);
+const base::FeatureParam<base::TimeDelta> kGlicActorActorObservationDelay{
+    &kGlicActor, "glic-actor-observation-delay", base::Seconds(3)};
+
 #if BUILDFLAG(ENABLE_GLIC)
 // Controls whether the Glic feature is enabled.
 BASE_FEATURE(kGlic, "Glic", base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Controls whether the actor component of Glic is enabled.
-BASE_FEATURE(kGlicActor, "GlicActor", base::FEATURE_DISABLED_BY_DEFAULT);
-
-const base::FeatureParam<base::TimeDelta> kGlicActorActorObservationDelay{
-    &kGlicActor, "glic-actor-observation-delay", base::Seconds(3)};
 
 // Controls whether the Glic feature is always detached.
 BASE_FEATURE(kGlicDetached, "GlicDetached", base::FEATURE_ENABLED_BY_DEFAULT);
@@ -487,11 +499,6 @@ BASE_FEATURE(kGlicScrollTo, "GlicScrollTo", base::FEATURE_DISABLED_BY_DEFAULT);
 const base::FeatureParam<bool> kGlicScrollToEnforceDocumentId{
     &kGlicScrollTo, "glic-scroll-to-enforce-document-id", false};
 
-// Controls whether the Glic UI container can be resized by the user
-BASE_FEATURE(kGlicUserResize,
-             "GlicUserResize",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Controls whether the web client should resize itself to fit the window.
 BASE_FEATURE(kGlicSizingFitWindow,
              "GlicSizingFitWindow",
@@ -541,6 +548,14 @@ const base::FeatureParam<bool> kGlicPageContextEligibilityAllowNoMetadata{
 BASE_FEATURE(kGlicUnloadOnClose,
              "GlicUnloadOnClose",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kGlicApiActivationGating,
+             "GlicApiActivationGating",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kGlicGetUserProfileInfoApiActivationGating,
+             "GlicGetUserProfileInfoApiActivationGating",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
 // Force Privacy Guide to be available even if it would be unavailable
@@ -1142,6 +1157,11 @@ constexpr base::FeatureParam<double>
     kSafetyHubDisruptiveNotificationRevocationMaxEngagementScore{
         &kSafetyHubDisruptiveNotificationRevocation,
         /*name=*/"max_engagement_score", /*default_value=*/0.0};
+
+constexpr base::FeatureParam<base::TimeDelta>
+    kSafetyHubDisruptiveNotificationRevocationWaitingTimeAsProposed{
+        &kSafetyHubDisruptiveNotificationRevocation,
+        /*name=*/"waiting_time_as_proposed", /*default_value=*/base::Days(0)};
 
 constexpr base::FeatureParam<int>
     kSafetyHubDisruptiveNotificationRevocationNotificationTimeoutSeconds{

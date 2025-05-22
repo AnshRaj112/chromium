@@ -373,6 +373,7 @@ build_webui("build") {
     "privacy_page/privacy_guide/privacy_guide_fragment_shared.css",
     "search_engines_page/search_engine_entry.css",
     "site_settings/clear_storage_dialog_shared.css",
+    "site_settings/site_settings_shared.css",
     "site_settings_page/site_review_shared.css",
   ]
 
@@ -412,11 +413,6 @@ build_webui("build") {
         [ "//ui/webui/resources/cr_components/theme_color_picker:build_ts" ]
   } else {
     ts_deps += [ "//ash/webui/common/resources:build_ts" ]
-  }
-
-  if (use_nss_certs || chrome_root_store_cert_management_ui) {
-    ts_deps +=
-        [ "//ui/webui/resources/cr_components/certificate_manager:build_ts" ]
   }
 
   ts_path_mappings =

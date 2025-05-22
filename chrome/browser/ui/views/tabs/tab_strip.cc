@@ -506,14 +506,6 @@ class TabStrip::TabDragContextImpl : public TabDragContext,
     return TabDragAreaBeginX() + GetTabDragAreaWidth();
   }
 
-  int GetHorizontalDragThreshold() const override {
-    constexpr int kHorizontalMoveThreshold = 16;  // DIPs.
-
-    double ratio = static_cast<double>(tab_strip_->GetInactiveTabWidth()) /
-                   TabStyle::Get()->GetStandardWidth(/*is_split=*/false);
-    return base::ClampRound(ratio * kHorizontalMoveThreshold);
-  }
-
   int GetInsertionIndexForDraggedBounds(const gfx::Rect& dragged_bounds,
                                         std::vector<TabSlotView*> dragged_views,
                                         int num_dragged_tabs) const override {
@@ -1173,8 +1165,6 @@ void TabStrip::AddTabsAt(
         base::TimeTicks::Now() - new_tab_button_pressed_start_time_.value());
     new_tab_button_pressed_start_time_.reset();
   }
-
-  LogTabWidthsForTabScrolling();
 }
 
 void TabStrip::MoveTab(int from_model_index,
@@ -2079,10 +2069,6 @@ const Browser* TabStrip::GetBrowser() const {
   return controller_->GetBrowser();
 }
 
-int TabStrip::GetInactiveTabWidth() const {
-  return tab_container_->GetInactiveTabWidth();
-}
-
 bool TabStrip::IsFrameCondensed() const {
   return controller_->IsFrameCondensed();
 }
@@ -2453,19 +2439,6 @@ void TabStrip::ShiftGroupRelative(const tab_groups::TabGroupId& group,
   controller_->MoveGroup(group, target_index);
 }
 
-void TabStrip::LogTabWidthsForTabScrolling() {
-  int active_tab_width = GetActiveTabWidth();
-  int inactive_tab_width = GetInactiveTabWidth();
-
-  if (active_tab_width > 1) {
-    UMA_HISTOGRAM_EXACT_LINEAR("Tabs.ActiveTabWidth", active_tab_width, 257);
-  }
-  if (inactive_tab_width > 1) {
-    UMA_HISTOGRAM_EXACT_LINEAR("Tabs.InactiveTabWidth", inactive_tab_width,
-                               257);
-  }
-}
-
 // TabStrip:TabContextMenuController:
 // ----------------------------------------------------------
 
@@ -2584,5 +2557,4 @@ ADD_READONLY_PROPERTY_METADATA(SkColor,
                                ui::metadata::SkColorConverter)
 ADD_READONLY_PROPERTY_METADATA(float, HoverOpacityForRadialHighlight)
 ADD_READONLY_PROPERTY_METADATA(int, ActiveTabWidth)
-ADD_READONLY_PROPERTY_METADATA(int, InactiveTabWidth)
 END_METADATA

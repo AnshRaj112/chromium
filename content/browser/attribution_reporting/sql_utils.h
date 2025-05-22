@@ -27,10 +27,11 @@ namespace attribution_reporting {
 class AggregatableTriggerConfig;
 class AggregationKeys;
 class AttributionScopesData;
+class EventReportWindows;
 class FilterData;
 class MaxEventLevelReports;
 class SuitableOrigin;
-class TriggerSpecs;
+class TriggerDataSet;
 }  // namespace attribution_reporting
 
 namespace base {
@@ -59,7 +60,9 @@ std::optional<attribution_reporting::mojom::SourceType> DeserializeSourceType(
     int val);
 
 std::string SerializeReadOnlySourceData(
-    const attribution_reporting::TriggerSpecs&,
+    const attribution_reporting::TriggerDataSet&,
+    const attribution_reporting::EventReportWindows&,
+    attribution_reporting::MaxEventLevelReports,
     double randomized_response_rate,
     attribution_reporting::mojom::TriggerDataMatching,
     bool cookie_based_debug_allowed,
@@ -74,10 +77,12 @@ std::optional<attribution_reporting::FilterData> DeserializeFilterData(
     sql::Statement&,
     int col);
 
-std::optional<attribution_reporting::TriggerSpecs> DeserializeTriggerSpecs(
+std::optional<attribution_reporting::TriggerDataSet> DeserializeTriggerDataSet(
     const proto::AttributionReadOnlySourceData&,
-    attribution_reporting::mojom::SourceType,
-    attribution_reporting::MaxEventLevelReports);
+    attribution_reporting::mojom::SourceType);
+
+std::optional<attribution_reporting::EventReportWindows>
+DeserializeEventReportWindows(const proto::AttributionReadOnlySourceData&);
 
 std::string SerializeAggregationKeys(
     const attribution_reporting::AggregationKeys&);

@@ -45,6 +45,7 @@
 #include "base/time/time.h"
 #include "base/trace_event/base_tracing.h"
 #include "base/trace_event/memory_dump_manager.h"
+#include "base/types/expected_macros.h"
 #include "build/build_config.h"
 #include "components/services/storage/indexed_db/locks/partitioned_lock.h"
 #include "components/services/storage/indexed_db/locks/partitioned_lock_manager.h"
@@ -1086,6 +1087,14 @@ Status ReadObjectStores(
   return s;
 }
 
+BackingStore::RecordIdentifier CreateRecordIdentifier(const IndexedDBKey& key,
+                                                      int64_t version) {
+  BackingStore::RecordIdentifier record_identifier;
+  record_identifier.number = version;
+  EncodeIDBKey(key, &record_identifier.data);
+  return record_identifier;
+}
+
 }  // namespace
 
 BackingStore::BackingStore(
@@ -1236,15 +1245,11 @@ void BackingStore::InvalidateBlobReferences() {
 Status BackingStore::UpgradeBlobEntriesToV4(
     LevelDBWriteBatch* write_batch,
     std::vector<base::FilePath>* empty_blobs_to_delete) {
-  std::vector<std::u16string> names;
-  Status status = GetDatabaseNames(&names);
-  if (!status.ok()) {
-    return status;
-  }
+  ASSIGN_OR_RETURN(std::vector<std::u16string> names, GetDatabaseNames());
 
   for (const std::u16string& name : names) {
     DatabaseMetadata metadata(name);
-    status = ReadMetadataForDatabaseName(metadata);
+    Status status = ReadMetadataForDatabaseName(metadata);
     if (!metadata.id) {
       // This is a rather odd error message, but it's left as-is for legacy
       // reasons.
@@ -1325,15 +1330,11 @@ Status BackingStore::UpgradeBlobEntriesToV4(
 }
 
 Status BackingStore::ValidateBlobFiles() {
-  std::vector<std::u16string> names;
-  Status status = GetDatabaseNames(&names);
-  if (!status.ok()) {
-    return status;
-  }
+  ASSIGN_OR_RETURN(std::vector<std::u16string> names, GetDatabaseNames());
 
   for (const std::u16string& name : names) {
     DatabaseMetadata metadata(name);
-    status = ReadMetadataForDatabaseName(metadata);
+    Status status = ReadMetadataForDatabaseName(metadata);
     if (!metadata.id) {
       return Status::NotFound(base::StrCat(
           {"Metadata not found for \"%s\".: ", base::UTF16ToUTF8(name)}));
@@ -1601,16 +1602,12 @@ BackingStore::OpenAndVerify(BucketContext& bucket_context,
 
 Status BackingStore::GetCompleteMetadata(
     std::vector<std::unique_ptr<IndexedDBDatabaseMetadata>>* output) {
-  std::vector<std::u16string> names;
-  Status status = GetDatabaseNames(&names);
-  if (!status.ok()) {
-    return status;
-  }
+  ASSIGN_OR_RETURN(std::vector<std::u16string> names, GetDatabaseNames());
 
   output->reserve(names.size());
   for (const std::u16string& name : names) {
     auto metadata = std::make_unique<DatabaseMetadata>(name);
-    status = ReadMetadataForDatabaseName(*metadata);
+    Status status = ReadMetadataForDatabaseName(*metadata);
     if (!metadata->id) {
       return Status::NotFound(base::StrCat(
           {"Metadata not found for \"%s\".: ", base::UTF16ToUTF8(name)}));
@@ -1621,7 +1618,7 @@ Status BackingStore::GetCompleteMetadata(
     output->emplace_back(std::move(metadata));
   }
 
-  return status;
+  return Status::OK();
 }
 
 // static
@@ -1639,7 +1636,7 @@ void BackingStore::HandleCorruption(
   DLOG_IF(ERROR, !s.ok()) << "Unable to delete backing store: " << s.ToString();
 }
 
-base::expected<std::unique_ptr<indexed_db::BackingStore::Database>, Status>
+StatusOr<std::unique_ptr<indexed_db::BackingStore::Database>>
 BackingStore::CreateOrOpenDatabase(const std::u16string& name) {
   DatabaseMetadata metadata(name);
   Status s = ReadMetadataForDatabaseName(metadata);
@@ -2012,13 +2009,11 @@ Status BackingStore::Transaction::RenameObjectStore(
   return Status::OK();
 }
 
-Status BackingStore::Transaction::CreateIndex(int64_t object_store_id,
-                                              int64_t index_id,
-                                              const std::u16string& name,
-                                              blink::IndexedDBKeyPath key_path,
-                                              bool is_unique,
-                                              bool is_multi_entry) {
+Status BackingStore::Transaction::CreateIndex(
+    int64_t object_store_id,
+    blink::IndexedDBIndexMetadata index) {
   CHECK_EQ(mode(), blink::mojom::IDBTransactionMode::VersionChange);
+  const int64_t index_id = index.id;
   auto object_store_it =
       database_->metadata().object_stores.find(object_store_id);
   if (object_store_it == database_->metadata().object_stores.end()) {
@@ -2049,30 +2044,24 @@ Status BackingStore::Transaction::CreateIndex(int64_t object_store_id,
   const std::string multi_entry_key = IndexMetaDataKey::Encode(
       database_id(), object_store_id, index_id, IndexMetaDataKey::MULTI_ENTRY);
 
-  s = PutString(leveldb_transaction, name_key, name);
+  s = PutString(leveldb_transaction, name_key, index.name);
   if (!s.ok()) {
     return s;
   }
-  s = PutBool(leveldb_transaction, unique_key, is_unique);
+  s = PutBool(leveldb_transaction, unique_key, index.unique);
   if (!s.ok()) {
     return s;
   }
-  s = PutIDBKeyPath(leveldb_transaction, key_path_key, key_path);
+  s = PutIDBKeyPath(leveldb_transaction, key_path_key, index.key_path);
   if (!s.ok()) {
     return s;
   }
-  s = PutBool(leveldb_transaction, multi_entry_key, is_multi_entry);
+  s = PutBool(leveldb_transaction, multi_entry_key, index.multi_entry);
   if (!s.ok()) {
     return s;
   }
 
-  blink::IndexedDBIndexMetadata metadata;
-  metadata.name = std::move(name);
-  metadata.id = index_id;
-  metadata.key_path = std::move(key_path);
-  metadata.unique = is_unique;
-  metadata.multi_entry = is_multi_entry;
-  object_store.indexes[index_id] = std::move(metadata);
+  object_store.indexes[index_id] = std::move(index);
 
   DCHECK_LT(object_store.max_index_id, index_id);
   object_store.max_index_id = index_id;
@@ -2226,14 +2215,13 @@ int64_t BackingStore::GetInMemorySize() const {
   return blob_size + level_db_size;
 }
 
-Status BackingStore::Transaction::PutRecord(
+StatusOr<BackingStore::RecordIdentifier> BackingStore::Transaction::PutRecord(
     int64_t object_store_id,
     const IndexedDBKey& key,
-    IndexedDBValue* value,
-    RecordIdentifier* record_identifier) {
+    IndexedDBValue value) {
   TRACE_EVENT0("IndexedDB", "BackingStore::PutRecord");
   if (!KeyPrefix::ValidIds(database_id(), object_store_id)) {
-    return InvalidDBKeyStatus();
+    return base::unexpected(InvalidDBKeyStatus());
   }
   DCHECK(key.IsValid());
 
@@ -2242,7 +2230,7 @@ Status BackingStore::Transaction::PutRecord(
   Status s = GetNewVersionNumber(leveldb_transaction, database_id(),
                                  object_store_id, &version);
   if (!s.ok()) {
-    return s;
+    return base::unexpected(s);
   }
   DCHECK_GE(version, 0);
   const std::string object_store_data_key =
@@ -2250,16 +2238,16 @@ Status BackingStore::Transaction::PutRecord(
 
   std::string v;
   EncodeVarInt(version, &v);
-  v.append(value->bits.begin(), value->bits.end());
+  v.append(value.bits.begin(), value.bits.end());
 
   s = leveldb_transaction->Put(object_store_data_key, &v);
   if (!s.ok()) {
-    return s;
+    return base::unexpected(s);
   }
   s = PutExternalObjectsIfNeeded(object_store_data_key,
-                                 &value->external_objects);
+                                 &value.external_objects);
   if (!s.ok()) {
-    return s;
+    return base::unexpected(s);
   }
 
   const std::string exists_entry_key =
@@ -2268,13 +2256,10 @@ Status BackingStore::Transaction::PutRecord(
   EncodeInt(version, &version_encoded);
   s = leveldb_transaction->Put(exists_entry_key, &version_encoded);
   if (!s.ok()) {
-    return s;
+    return base::unexpected(s);
   }
 
-  std::string key_encoded;
-  EncodeIDBKey(key, &key_encoded);
-  record_identifier->Reset(key_encoded, version);
-  return s;
+  return CreateRecordIdentifier(key, version);
 }
 
 Status BackingStore::Transaction::ClearObjectStore(int64_t object_store_id) {
@@ -2378,11 +2363,10 @@ Status BackingStore::Transaction::DeleteRange(
   return s;
 }
 
-Status BackingStore::Transaction::GetKeyGeneratorCurrentNumber(
-    int64_t object_store_id,
-    int64_t* key_generator_current_number) {
+StatusOr<int64_t> BackingStore::Transaction::GetKeyGeneratorCurrentNumber(
+    int64_t object_store_id) {
   if (!KeyPrefix::ValidIds(database_id(), object_store_id)) {
-    return InvalidDBKeyStatus();
+    return base::unexpected(InvalidDBKeyStatus());
   }
   TransactionalLevelDBTransaction* leveldb_transaction = transaction();
 
@@ -2391,7 +2375,6 @@ Status BackingStore::Transaction::GetKeyGeneratorCurrentNumber(
           database_id(), object_store_id,
           ObjectStoreMetaDataKey::KEY_GENERATOR_CURRENT_NUMBER);
 
-  *key_generator_current_number = -1;
   std::string data;
 
   bool found = false;
@@ -2399,15 +2382,16 @@ Status BackingStore::Transaction::GetKeyGeneratorCurrentNumber(
                                     &found));
   if (!s.ok()) {
     INTERNAL_READ_ERROR(GET_KEY_GENERATOR_CURRENT_NUMBER);
-    return s;
+    return base::unexpected(s);
   }
   if (found && !data.empty()) {
+    int64_t key_generator_current_number = -1;
     std::string_view slice(data);
-    if (!DecodeInt(&slice, key_generator_current_number) || !slice.empty()) {
+    if (!DecodeInt(&slice, &key_generator_current_number) || !slice.empty()) {
       INTERNAL_READ_ERROR(GET_KEY_GENERATOR_CURRENT_NUMBER);
-      return InternalInconsistencyStatus();
+      return base::unexpected(InternalInconsistencyStatus());
     }
-    return s;
+    return key_generator_current_number;
   }
 
   // Previously, the key generator state was not stored explicitly
@@ -2424,7 +2408,7 @@ Status BackingStore::Transaction::GetKeyGeneratorCurrentNumber(
   std::tie(it, s) = CreateIteratorAndGetStatus(*leveldb_transaction);
   if (!s.ok()) {
     INTERNAL_READ_ERROR(GET_KEY_GENERATOR_CURRENT_NUMBER);
-    return s;
+    return base::unexpected(s);
   }
   int64_t max_numeric_key = 0;
 
@@ -2435,7 +2419,7 @@ Status BackingStore::Transaction::GetKeyGeneratorCurrentNumber(
     ObjectStoreDataKey data_key;
     if (!ObjectStoreDataKey::Decode(&slice, &data_key) || !slice.empty()) {
       INTERNAL_READ_ERROR(GET_KEY_GENERATOR_CURRENT_NUMBER);
-      return InternalInconsistencyStatus();
+      return base::unexpected(InternalInconsistencyStatus());
     }
     std::unique_ptr<IndexedDBKey> user_key = data_key.user_key();
     if (user_key->type() == blink::mojom::IDBKeyType::Number) {
@@ -2446,13 +2430,11 @@ Status BackingStore::Transaction::GetKeyGeneratorCurrentNumber(
     }
   }
 
-  if (s.ok()) {
-    *key_generator_current_number = max_numeric_key + 1;
-  } else {
+  if (!s.ok()) {
     INTERNAL_READ_ERROR(GET_KEY_GENERATOR_CURRENT_NUMBER);
+    return base::unexpected(s);
   }
-
-  return s;
+  return max_numeric_key + 1;
 }
 
 Status BackingStore::Transaction::MaybeUpdateKeyGeneratorCurrentNumber(
@@ -2464,13 +2446,10 @@ Status BackingStore::Transaction::MaybeUpdateKeyGeneratorCurrentNumber(
   }
 
   if (check_current) {
-    int64_t current_number;
-    Status s = GetKeyGeneratorCurrentNumber(object_store_id, &current_number);
-    if (!s.ok()) {
-      return s;
-    }
+    ASSIGN_OR_RETURN(int64_t current_number,
+                     GetKeyGeneratorCurrentNumber(object_store_id));
     if (new_number <= current_number) {
-      return s;
+      return Status::OK();
     }
   }
 
@@ -2481,43 +2460,38 @@ Status BackingStore::Transaction::MaybeUpdateKeyGeneratorCurrentNumber(
   return PutInt(transaction(), key_generator_current_number_key, new_number);
 }
 
-Status BackingStore::Transaction::KeyExistsInObjectStore(
-    int64_t object_store_id,
-    const IndexedDBKey& key,
-    RecordIdentifier* found_record_identifier,
-    bool* found) {
+StatusOr<std::optional<BackingStore::RecordIdentifier>>
+BackingStore::Transaction::KeyExistsInObjectStore(int64_t object_store_id,
+                                                  const IndexedDBKey& key) {
   TRACE_EVENT0("IndexedDB", "BackingStore::KeyExistsInObjectStore");
   if (!KeyPrefix::ValidIds(database_id(), object_store_id)) {
-    return InvalidDBKeyStatus();
+    return base::unexpected(InvalidDBKeyStatus());
   }
-  *found = false;
   const std::string leveldb_key =
       ObjectStoreDataKey::Encode(database_id(), object_store_id, key);
   std::string data;
 
-  Status s(transaction()->Get(leveldb_key, &data, found));
+  bool found = false;
+  Status s = transaction()->Get(leveldb_key, &data, &found);
   if (!s.ok()) {
     INTERNAL_READ_ERROR(KEY_EXISTS_IN_OBJECT_STORE);
-    return s;
+    return base::unexpected(s);
   }
-  if (!*found) {
-    return Status::OK();
+  if (!found) {
+    return std::nullopt;
   }
   if (data.empty()) {
     INTERNAL_READ_ERROR(KEY_EXISTS_IN_OBJECT_STORE);
-    return InternalInconsistencyStatus();
+    return base::unexpected(InternalInconsistencyStatus());
   }
 
   int64_t version;
   std::string_view slice(data);
   if (!DecodeVarInt(&slice, &version)) {
-    return InternalInconsistencyStatus();
+    return base::unexpected(InternalInconsistencyStatus());
   }
 
-  std::string encoded_key;
-  EncodeIDBKey(key, &encoded_key);
-  found_record_identifier->Reset(encoded_key, version);
-  return s;
+  return CreateRecordIdentifier(key, version);
 }
 
 void BackingStore::ReportBlobUnused(int64_t database_id, int64_t blob_number) {
@@ -2859,13 +2833,14 @@ Status BackingStore::Transaction::PutIndexDataForRecord(
   std::string encoded_key;
   EncodeIDBKey(key, &encoded_key);
 
+  const std::string& encoded_primary_key = record_identifier.data;
   const std::string index_data_key =
       IndexDataKey::Encode(database_id(), object_store_id, index_id,
-                           encoded_key, record_identifier.primary_key(), 0);
+                           encoded_key, encoded_primary_key, 0);
 
   std::string data;
-  EncodeVarInt(record_identifier.version(), &data);
-  data.append(record_identifier.primary_key());
+  EncodeVarInt(record_identifier.number, &data);
+  data.append(encoded_primary_key);
 
   return Status(transaction()->Put(index_data_key, &data));
 }
@@ -3007,13 +2982,15 @@ Status BackingStore::Transaction::KeyExistsInIndex(
   return InvalidDBKeyStatus();
 }
 
-Status BackingStore::GetDatabaseNames(std::vector<std::u16string>* names) {
-  std::vector<blink::mojom::IDBNameAndVersionPtr> names_and_versions;
-  Status s = GetDatabaseNamesAndVersions(&names_and_versions);
+StatusOr<std::vector<std::u16string>> BackingStore::GetDatabaseNames() {
+  ASSIGN_OR_RETURN(
+      std::vector<blink::mojom::IDBNameAndVersionPtr> names_and_versions,
+      GetDatabaseNamesAndVersions());
+  std::vector<std::u16string> names;
   for (const blink::mojom::IDBNameAndVersionPtr& nav : names_and_versions) {
-    names->push_back(nav->name);
+    names.push_back(nav->name);
   }
-  return s;
+  return names;
 }
 
 uintptr_t BackingStore::GetIdentifierForMemoryDump() {
@@ -3022,11 +2999,11 @@ uintptr_t BackingStore::GetIdentifierForMemoryDump() {
   return reinterpret_cast<uintptr_t>(db()->db());
 }
 
-Status BackingStore::GetDatabaseNamesAndVersions(
-    std::vector<blink::mojom::IDBNameAndVersionPtr>* names_and_versions) {
+StatusOr<std::vector<blink::mojom::IDBNameAndVersionPtr>>
+BackingStore::GetDatabaseNamesAndVersions() {
   // TODO(dmurph): Get rid of on-demand metadata loading, and store metadata
   // in-memory.
-  DCHECK(names_and_versions->empty());
+  std::vector<blink::mojom::IDBNameAndVersionPtr> names_and_versions;
   const std::string start_key =
       DatabaseNameKey::EncodeMinKeyForOrigin(origin_identifier_);
   const std::string stop_key =
@@ -3069,15 +3046,16 @@ Status BackingStore::GetDatabaseNamesAndVersions(
 
     // Ignore stale metadata from failed initial opens.
     if (database_version != IndexedDBDatabaseMetadata::DEFAULT_VERSION) {
-      names_and_versions->push_back(blink::mojom::IDBNameAndVersion::New(
+      names_and_versions.push_back(blink::mojom::IDBNameAndVersion::New(
           database_name_key.database_name(), database_version));
     }
   }
   if (!s.ok()) {
     INTERNAL_READ_ERROR(GET_DATABASE_NAMES);
+    return base::unexpected(s);
   }
 
-  return s;
+  return names_and_versions;
 }
 
 Status BackingStore::ReadMetadataForDatabaseName(
@@ -3561,11 +3539,6 @@ bool ObjectStoreKeyCursorImpl::LoadCurrentRow(Status* s) {
     return false;
   }
 
-  // TODO(jsbell): This re-encodes what was just decoded; try and optimize.
-  std::string encoded_key;
-  EncodeIDBKey(*current_key_, &encoded_key);
-  record_identifier_.Reset(encoded_key, version);
-
   return true;
 }
 
@@ -3636,11 +3609,6 @@ bool ObjectStoreCursorImpl::LoadCurrentRow(Status* s) {
     *s = InternalInconsistencyStatus();
     return false;
   }
-
-  // TODO(jsbell): This re-encodes what was just decoded; try and optimize.
-  std::string encoded_key;
-  EncodeIDBKey(*current_key_, &encoded_key);
-  record_identifier_.Reset(encoded_key, version);
 
   *s = transaction_->GetExternalObjectsForRecord(std::string(iterator_->Key()),
                                                  &current_value_);
@@ -3888,7 +3856,7 @@ bool IndexCursorImpl::LoadCurrentRow(Status* s) {
   return s->ok();
 }
 
-base::expected<std::unique_ptr<indexed_db::BackingStore::Cursor>, Status>
+StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>>
 BackingStore::Transaction::OpenObjectStoreCursor(
     int64_t object_store_id,
     const IndexedDBKeyRange& range,
@@ -3912,7 +3880,7 @@ BackingStore::Transaction::OpenObjectStoreCursor(
       AsWeakPtr(), database_id(), cursor_options));
 }
 
-base::expected<std::unique_ptr<indexed_db::BackingStore::Cursor>, Status>
+StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>>
 BackingStore::Transaction::OpenObjectStoreKeyCursor(
     int64_t object_store_id,
     const IndexedDBKeyRange& range,
@@ -3936,7 +3904,7 @@ BackingStore::Transaction::OpenObjectStoreKeyCursor(
       AsWeakPtr(), database_id(), cursor_options));
 }
 
-base::expected<std::unique_ptr<indexed_db::BackingStore::Cursor>, Status>
+StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>>
 BackingStore::Transaction::OpenIndexKeyCursor(
     int64_t object_store_id,
     int64_t index_id,
@@ -3958,7 +3926,7 @@ BackingStore::Transaction::OpenIndexKeyCursor(
       AsWeakPtr(), database_id(), cursor_options));
 }
 
-base::expected<std::unique_ptr<indexed_db::BackingStore::Cursor>, Status>
+StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>>
 BackingStore::Transaction::OpenIndexCursor(
     int64_t object_store_id,
     int64_t index_id,
@@ -4231,7 +4199,7 @@ void BackingStore::Transaction::PartitionBlobsToRemove(
   }
 }
 
-base::expected<std::unique_ptr<indexed_db::BackingStore::Cursor>, Status>
+StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>>
 BackingStore::Transaction::PrepareCursor(std::unique_ptr<Cursor> cursor) {
   Status s;
   if (cursor->FirstSeek(&s)) {

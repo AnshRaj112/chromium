@@ -7,9 +7,9 @@
 #import "base/functional/callback_helpers.h"
 #import "components/prefs/pref_service.h"
 #import "components/signin/public/identity_manager/identity_manager.h"
-#import "ios/chrome/browser/intelligence/glic/coordinator/glic_consent_coordinator.h"
-#import "ios/chrome/browser/intelligence/glic/model/glic_service.h"
-#import "ios/chrome/browser/intelligence/glic/model/glic_service_factory.h"
+#import "ios/chrome/browser/intelligence/gemini/coordinator/glic_coordinator.h"
+#import "ios/chrome/browser/intelligence/gemini/model/glic_service.h"
+#import "ios/chrome/browser/intelligence/gemini/model/glic_service_factory.h"
 #import "ios/chrome/browser/intelligence/page_action_menu/coordinator/page_action_menu_mediator.h"
 #import "ios/chrome/browser/intelligence/page_action_menu/ui/page_action_menu_mutator.h"
 #import "ios/chrome/browser/intelligence/page_action_menu/ui/page_action_menu_view_controller.h"
@@ -29,7 +29,7 @@
   PageContextWrapper* _pageContextWrapper;
 
   // The coordinator for the glic consent flow.
-  GLICConsentCoordinator* _glicConsentCoordinator;
+  GLICCoordinator* _glicCoordinator;
 }
 
 #pragma mark - ChromeCoordinator
@@ -40,9 +40,10 @@
 
   _viewController.mutator = _mediator;
 
-  // TODO(crbug.com/408006823): Have the view controller call this when its
-  // button is pressed.
-  [self handleEntryPointPressed];
+  [self.baseViewController presentViewController:_viewController
+                                        animated:YES
+                                      completion:nil];
+
   [super start];
 }
 
@@ -97,11 +98,11 @@
 
 // Shows GLIC consent.
 - (void)showGLICConsent {
-  _glicConsentCoordinator = [[GLICConsentCoordinator alloc]
+  _glicCoordinator = [[GLICCoordinator alloc]
       initWithBaseViewController:self.baseViewController
                          browser:self.browser];
 
-  [_glicConsentCoordinator start];
+  [_glicCoordinator start];
 }
 
 // Prepares GLIC overlay.

@@ -116,7 +116,7 @@ class GraphBuilderCoreml {
   CreateAndBuild(
       const mojom::GraphInfo& graph_info,
       ContextProperties context_properties,
-      mojom::CreateContextOptions::Device,
+      mojom::Device device,
       const base::flat_map<OperandId, std::unique_ptr<WebNNConstantOperand>>&
           constant_operands,
       const base::FilePath& working_directory);
@@ -200,7 +200,7 @@ class GraphBuilderCoreml {
   GraphBuilderCoreml(
       const mojom::GraphInfo& graph_info,
       ContextProperties context_properties,
-      mojom::CreateContextOptions::Device device,
+      mojom::Device device,
       const base::flat_map<OperandId, std::unique_ptr<WebNNConstantOperand>>&
           constant_operands,
       base::FilePath ml_package_dir,
@@ -664,11 +664,11 @@ class GraphBuilderCoreml {
       constant_operands_;
 
   const ContextProperties context_properties_;
-  const mojom::CreateContextOptions::Device device_;
+  const mojom::Device device_;
 
   // Used to generate unique names for internal operands generated for WebNN
   // operations that need to be decomposed into multiple CoreML operations.
-  base::CheckedNumeric<OperandId> internal_operand_id_;
+  base::CheckedNumeric<OperandId::underlying_type> internal_operand_id_;
 
   CoreML::Specification::Model ml_model_;
   raw_ptr<CoreML::Specification::MILSpec::Program> program_;

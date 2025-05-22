@@ -462,6 +462,7 @@
 <translation id="2530896289327917474">ເປີດ ຫຼື ປິດການຮຽກເບິ່ງດ້ວຍແປ້ນພິມ</translation>
 <translation id="2531025035050312891">ອຸປະກອນເຮັດວຽກຊ້າ</translation>
 <translation id="2531107890083353124">ໃນຂະນະທີ່ລາກແຖບ, ໃຫ້ກົດ <ph name="KEY_ONE" /></translation>
+<translation id="2532199152994248594">ລາກ ຫຼື ກົດ Space ເພື່ອເລືອກພື້ນທີ່ເພື່ອຖ່າຍຮູບໜ້າຈໍ</translation>
 <translation id="2545334090614121435">ພະຍາຍາມໃຊ້ຟັງຊັນ Home ບໍ? ໃຫ້ໃຊ້ປຸ່ມ</translation>
 <translation id="254900897760075745">ສຳເນົາເນື້ອຫາທີ່ເລືອກໃສ່ຄລິບບອດ</translation>
 <translation id="2549711466868162843">ປັບປຸງແສງ</translation>
@@ -1485,6 +1486,7 @@
 <translation id="5788127256798019331">ໄຟລ໌ Play</translation>
 <translation id="5788535737706478207">ເປີດແຖບ ຫຼື ໜ້າຈໍທີ່ປິດຫຼ້າສຸດຂຶ້ນມາອີກຄັ້ງ</translation>
 <translation id="5790085346892983794">ສໍາ​ເລັດ</translation>
+<translation id="5791926618942305301">ໃນການຖ່າຍຮູບໜ້າຈໍ, ໃຫ້ຕັ້ງເປັນ <ph name="SOURCE" /> <ph name="TYPE" />. ກົດແຖບເພື່ອເລືອກປະເພດການຖ່າຍຮູບ. ກົດ Enter ເພື່ອຖ່າຍຮູບ. ເພື່ອເລືອກພື້ນທີ່ຖ່າຍຮູບ, ໃຫ້ຕັ້ງຄ່າເປັນຮູບໜ້າຈໍບາງສ່ວນ. ຖ້າຍັງບໍ່ໄດ້ເປີດໃຊ້, ໃຫ້ກົດປຸ່ມ space ເພື່ອເລືອກພາກພື້ນ.</translation>
 <translation id="579415080077680903">ປິດສຽງ</translation>
 <translation id="5802516411616338943">ເປີດການຕັ້ງຄ່າດ່ວນ</translation>
 <translation id="5804651031882187592">ປິດການຕັ້ງຄ່າ "ລັອກຊິມ"</translation>
@@ -1641,6 +1643,7 @@
 <translation id="6288235558961782912">ສາມາດເພີ່ມ <ph name="USER_EMAIL_ADDRESS" /> ຄືນໃໝ່ໃນພາຍຫຼັງໄດ້ໂດຍມີການອະນຸຍາດຂອງພໍ່ແມ່.</translation>
 <translation id="6291221004442998378">ບໍ່ໄດ້ສາກໄຟ</translation>
 <translation id="6298183524022479114">ປັບແຕ່ງອຸປະກອນນີ້ໃນແອັບ</translation>
+<translation id="6304076460080088478">ປິດ ຫຼື ຫຍໍ້ໜ້າຈໍທີ່ບໍ່ເປີດເຜີຍຕົວຕົນເພື່ອຊອກຫາໜ້າຈໍຂອງທ່ານດ້ວຍ Google Lens</translation>
 <translation id="6309219492973062892">ຄລິກ ຫຼື ແຕະໄອຄອນຖ້ານ 1-8</translation>
 <translation id="6315170314923504164">ສຽງ</translation>
 <translation id="6319058840130157106">ຍ້າຍກັບຫຼັງລະຫວ່າງມຸມຂວາລຸ່ມ, ຕົວເປີດໃຊ້, ແຖບທີ່ຢູ່, ແຖບບຸກມາກ, ເວັບໄຊທີ່ເປີດ ແລະ ດາວໂຫຼດ</translation>
@@ -1769,6 +1772,7 @@
 <translation id="6700713906295497288">ປຸ່ມເມນູ IME</translation>
 <translation id="6704073473590541209">ເລືອກດ້າມຈັບຂອບເບື້ອງຂວາແລ້ວ, ໃຊ້ປຸ່ມລູກສອນເພື່ອຍ້າຍ</translation>
 <translation id="6706742084323792866">ປັກໝຸດແປ້ນພິມ</translation>
+<translation id="6709719156428404245">ລາກ ຫຼື ກົດ Space ເພື່ອເລືອກພື້ນທີ່ເພື່ອບັນທຶກ</translation>
 <translation id="6710213216561001401">ຜ່ານມາ</translation>
 <translation id="6723839937902243910">ໄຟ</translation>
 <translation id="672609503628871915">ເບິ່ງ​ມີອັນໃດໃຫມ່</translation>

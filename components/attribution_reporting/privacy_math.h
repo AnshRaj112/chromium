@@ -20,7 +20,9 @@
 namespace attribution_reporting {
 
 class AttributionScopesData;
-class TriggerSpecs;
+class EventReportWindows;
+class MaxEventLevelReports;
+class TriggerDataSet;
 
 struct FakeEventLevelReport {
   uint32_t trigger_data;
@@ -38,7 +40,10 @@ struct FakeEventLevelReport {
 using RandomizedResponse = std::optional<std::vector<FakeEventLevelReport>>;
 
 COMPONENT_EXPORT(ATTRIBUTION_REPORTING)
-bool IsValid(const RandomizedResponse&, const TriggerSpecs&);
+bool IsValid(const RandomizedResponse&,
+             const TriggerDataSet&,
+             const EventReportWindows&,
+             MaxEventLevelReports);
 
 enum class RandomizedResponseError {
   kExceedsChannelCapacityLimit,
@@ -83,7 +88,9 @@ double GetRandomizedResponseRate(uint32_t num_states, double epsilon);
 // Returns the number of possible output states for the given API configuration.
 COMPONENT_EXPORT(ATTRIBUTION_REPORTING)
 base::expected<uint32_t, RandomizedResponseError> GetNumStates(
-    const TriggerSpecs& specs);
+    const TriggerDataSet&,
+    const EventReportWindows&,
+    MaxEventLevelReports);
 
 struct COMPONENT_EXPORT(ATTRIBUTION_REPORTING) PrivacyMathConfig {
   // Controls the max number bits of information that can be associated with
@@ -107,7 +114,9 @@ struct COMPONENT_EXPORT(ATTRIBUTION_REPORTING) PrivacyMathConfig {
 // Otherwise will return a vector of fake reports.
 COMPONENT_EXPORT(ATTRIBUTION_REPORTING)
 base::expected<RandomizedResponseData, RandomizedResponseError>
-DoRandomizedResponse(const TriggerSpecs& specs,
+DoRandomizedResponse(const TriggerDataSet&,
+                     const EventReportWindows&,
+                     MaxEventLevelReports,
                      double epsilon,
                      mojom::SourceType,
                      const std::optional<AttributionScopesData>&,
@@ -195,7 +204,9 @@ double ComputeChannelCapacityScopes(
 COMPONENT_EXPORT(ATTRIBUTION_REPORTING)
 base::expected<std::vector<FakeEventLevelReport>, RandomizedResponseError>
 GetFakeReportsForSequenceIndex(
-    const TriggerSpecs&,
+    const TriggerDataSet&,
+    const EventReportWindows&,
+    MaxEventLevelReports,
     base::StrictNumeric<uint32_t> random_stars_and_bars_sequence_index);
 
 }  // namespace internal

@@ -599,6 +599,12 @@
       name: "AutoPictureInPictureVideoHeuristics",
       status: "experimental",
     },
+    { // If the start and end positions are the same in MoveParagraph,
+      // there is no need to collapse the whitespace between them.
+      // https://crbug.com/406053617
+      name: "AvoidNormalizingVisiblePositionsWhenStartEqualsEnd",
+      status: "stable",
+    },
     // When enabled, clicking on canvas element will not update the selection.
     // See crbug.com/40130450.
     {
@@ -943,6 +949,14 @@
       status: "stable",
     },
     {
+      // Enables the ability to reset the clipboard snapshot when clipboard write
+      // operations are performed. This feature ensures that stale clipboard data
+      // is cleared and a fresh snapshot is created when necessary.
+      // See crbug.com/388081043
+      name: "ClipboardSnapshotResetOnWrite",
+      status: "stable",
+    },
+    {
       name: "ClipPathNestedRasterOptimization",
       status: "stable",
     },
@@ -1182,10 +1196,26 @@
       status: "experimental",
     },
     {
+      // Need a feature entry
+      name: "CSSCaretShape",
+      status: "test",
+    },
+    {
       // Support case-sensitive attribute selector modifier
       // https://drafts.csswg.org/selectors-4/#attribute-case
       name: "CSSCaseSensitiveSelector",
       status: "test",
+    },
+    {
+      // In the cases where it is impossible or impractical to determine the
+      // measure of the “0” glyph, it must be assumed to be 0.5em wide by 1em
+      // tall. Thus, the ch unit falls back to 0.5em in the general case, and to
+      // 1em when it would be typeset upright (i.e. writing-mode is vertical-rl or
+      // vertical-lr and text-orientation is upright).
+      // https://drafts.csswg.org/css-values-4/#ch
+      // See crbug.com/416145497 for more details.
+      name: "CSSChUnitSpecCompliantFallback",
+      status: "stable",
     },
     {
       name: "CSSColorContrast",
@@ -1204,6 +1234,11 @@
     {
       name: "CSSContainerProgressNotation",
       status: "experimental",
+    },
+    {
+      // https://github.com/w3c/csswg-drafts/issues/8376#issuecomment-2751161553
+      name: "CSSContainerStyleQueriesRange",
+      status: "test",
     },
     {
       // https://drafts.csswg.org/css-borders-4/#corner-shaping
@@ -1235,6 +1270,11 @@
       status: "experimental",
     },
     {
+      // crbug.com/417306102
+      name: "CssFitWidthText",
+      status: "test",
+    },
+    {
       name: "CSSFontSizeAdjust",
       status: "stable",
     },
@@ -1253,6 +1293,11 @@
       // https://crrev.com/f311a84728272e30979432e8474089b3db3c67df
       name: "CSSHexAlphaColor",
       status: "stable",
+    },
+    {
+      // // https://drafts.csswg.org/css-values-5/#ident
+      name: "CSSIdentFunction",
+      status: "test",
     },
     {
       // Support making elements inert through the interactivity property.
@@ -1341,7 +1386,7 @@
     // progress()
     {
       name: "CSSProgressNotation",
-      status: "experimental",
+      status: "stable",
     },
     {
       // For ::column pseudo element for fragment styling.
@@ -1495,11 +1540,16 @@
     {
       // sibling-index() and sibling-count()
       name: "CSSSiblingFunctions",
-      status: "experimental",
+      status: "stable",
+    },
+    {
+      // Allow sibling-index() and sibling-count() in @container queries
+      name: "CSSSiblingFunctionsInContainerQueries",
+      status: "stable",
     },
     {
       name: "CSSSignRelatedFunctions",
-      status: "experimental",
+      status: "stable",
     },
     {
       // Explainer: https://drafts.csswg.org/css-values/#round-func
@@ -1641,7 +1691,7 @@
     {
       name: "DeviceBoundSessionCredentials",
       origin_trial_feature_name: "DeviceBoundSessionCredentials",
-      origin_trial_os: ["win"],
+      origin_trial_os: ["win", "linux", "mac"],
       status: "experimental",
       // Killswitch is net::features::kDeviceBoundSessions
       base_feature: "none",
@@ -2210,6 +2260,11 @@
       status: "stable",
     },
     {
+      // crbug.com/411739501
+      name: "FixNextPositionCalculationInInsertList",
+      status: "stable",
+    },
+    {
       name: "Fledge",
       status: "stable",
       base_feature: "none",
@@ -2281,6 +2336,11 @@
       // use bidNonce in bids.
       name: "FledgeSellerNonce",
       status: "stable",
+    },
+    {
+      // Enables having `executionMode` in the auctionConfig to use for seller scripts.
+      name: "FledgeSellerScriptExecutionMode",
+      status: "test",
     },
     {
       name: "FledgeTrustedSignalsKVv1CreativeScanning",
@@ -2572,6 +2632,10 @@
       name: "HTMLParserYieldAndDelayOftenForTesting",
     },
     {
+      name: "HTMLParserYieldByUserTiming",
+      status: "test",
+    },
+    {
       name: "HTMLSelectElementShowPicker",
       status: "stable",
     },
@@ -2835,7 +2899,7 @@
     },
     {
       name: "LayoutStretch",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "LazyInitializeMediaControls",
@@ -3268,10 +3332,6 @@
     },
     {
       name: "OnDeviceWebSpeechAvailable",
-      status: "experimental",
-    },
-    {
-      name: "OptimizeHTMLElementUrls",
       status: "experimental",
     },
     {
@@ -4755,6 +4815,11 @@
       depends_on: ["FastSelectionSync", "TextareaLineEndingsAsBr"],
     },
     {
+      // crbug.com/341564372
+      name: "TextareaSplitText",
+      status: "experimental",
+    },
+    {
       // killswitch for fix in M137
       name: "TextareaStableResizing",
       status: "stable",
@@ -5269,7 +5334,7 @@
     // Prototyping https://github.com/w3c/webauthn/issues/2228
     {
       name: "WebAuthenticationImmediateGet",
-      status: "experimental",
+      origin_trial_feature_name: "WebAuthenticationImmediateGet",
       base_feature: "none",
       public: true,
     },
@@ -5304,7 +5369,7 @@
       name: "WebAuthenticationSupplementalPubKeys",
       status: "experimental",
     },
-    // WebBluetooth is enabled by default on Android, ChromeOS, macOS and
+    // WebBluetooth is enabled by default on Android, ChromeOS, iOS, macOS and
     // Windows.
     {
       name: "WebBluetooth",
@@ -5312,6 +5377,7 @@
       status: {
         "Android": "stable",
         "ChromeOS": "stable",
+        "iOS": "stable",
         "Mac": "stable",
         "Win": "stable",
         "default": "experimental",
@@ -5677,6 +5743,6 @@
       // If enabled, the `getDisplayMedia()` family of APIs will ask for NV12
       // frames, which should trigger a zero-copy path in the tab capture code.
       name: "ZeroCopyTabCapture",
-    },
+    }
   ],
 }

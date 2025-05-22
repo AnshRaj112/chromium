@@ -94,7 +94,7 @@
 #import "ios/chrome/browser/incognito_reauth/ui_bundled/incognito_reauth_scene_agent.h"
 #import "ios/chrome/browser/infobars/model/infobar_manager_impl.h"
 #import "ios/chrome/browser/intelligence/features/features.h"
-#import "ios/chrome/browser/intelligence/glic/coordinator/glic_promo_scene_agent.h"
+#import "ios/chrome/browser/intelligence/gemini/coordinator/glic_promo_scene_agent.h"
 #import "ios/chrome/browser/intents/model/user_activity_browser_agent.h"
 #import "ios/chrome/browser/lens/ui_bundled/lens_entrypoint.h"
 #import "ios/chrome/browser/lens_overlay/coordinator/lens_overlay_availability.h"
@@ -251,6 +251,20 @@ enum class TabSwitcherDismissalMode { NONE, NORMAL, INCOGNITO };
 // Key of the UMA IOS.MultiWindow.OpenInNewWindow histogram.
 const char kMultiWindowOpenInNewWindowHistogram[] =
     "IOS.MultiWindow.OpenInNewWindow";
+
+// Histogram key used to log the number of contexts to open that the app
+// received.
+const char kContextsToOpen[] = "IOS.NumberOfContextsToOpen";
+
+// Enum for IOS.NumberOfContextsToOpen histogram.
+// Keep in sync with "ContextsToOpen" in tools/metrics/histograms/enums.xml.
+enum class ContextsToOpen {
+  kNoContexts = 0,
+  kOneContext = 1,
+  kMoreThanOneContext = 2,
+  kMoreThanOneContextWithAccountChange = 3,
+  kMaxValue = kMoreThanOneContextWithAccountChange,
+};
 
 // TODO(crbug.com/40788009): Use the Authentication Service sign-in status API
 // instead of this when available.
@@ -834,10 +848,24 @@ void OnListFamilyMembersResponse(
 
 - (void)handleURLContextsToOpen {
   if (self.sceneState.URLContextsToOpen.count == 0) {
+    base::UmaHistogramEnumeration(kContextsToOpen, ContextsToOpen::kNoContexts);
     return;
   }
+  ContextsToOpen contextInfo = self.sceneState.URLContextsToOpen.count == 1
+                                   ? ContextsToOpen::kOneContext
+                                   : ContextsToOpen::kMoreThanOneContext;
+  base::UmaHistogramEnumeration(kContextsToOpen, contextInfo);
 
   NSSet<UIOpenURLContext*>* contexts = self.sceneState.URLContextsToOpen;
+  if ([self multipleAccountSwitchesRequired:contexts]) {
+    // If more than one context require a potental account change only open the
+    // first context and discard the others to avoid looping between acocunt
+    // changes.
+    NSEnumerator<UIOpenURLContext*>* enumerator = [contexts objectEnumerator];
+    contexts = [NSSet setWithObject:[enumerator nextObject]];
+    base::UmaHistogramEnumeration(
+        kContextsToOpen, ContextsToOpen::kMoreThanOneContextWithAccountChange);
+  }
   self.sceneState.URLContextsToOpen = nil;
 
   if (IsWidgetsForMultiprofileEnabled()) {
@@ -876,6 +904,23 @@ void OnListFamilyMembersResponse(
   }
 
   [self openURLContexts:contexts];
+}
+
+- (BOOL)multipleAccountSwitchesRequired:(NSSet<UIOpenURLContext*>*)URLContexts {
+  if (URLContexts.count == 1) {
+    return NO;
+  }
+
+  // Store the number of URLs that may require an account change.
+  int accountChanges = 0;
+  for (UIOpenURLContext* context : URLContexts) {
+    std::string newGaia;
+    if (net::GetValueForKeyInQuery(net::GURLWithNSURL(context.URL), "gaia_id",
+                                   &newGaia)) {
+      accountChanges++;
+    }
+  }
+  return accountChanges > 1 ? YES : NO;
 }
 
 - (WidgetContext*)findContextRequiringAccountChange:
@@ -1369,7 +1414,7 @@ void OnListFamilyMembersResponse(
 
 - (void)teardownUI {
   // The UI should be stopped before the models they observe are stopped.
-  [self stopSigninCoordinatorAnimated:NO fromExternalTrigger:NO];
+  [self stopSigninCoordinatorWithCompletionAnimated:NO fromExternalTrigger:NO];
   DCHECK(!self.signinCoordinator)
       << base::SysNSStringToUTF8([self.signinCoordinator description]);
 
@@ -1682,7 +1727,7 @@ void OnListFamilyMembersResponse(
       << "self.signinCoordinator: "
       << base::SysNSStringToUTF8([self.signinCoordinator description]);
   Browser* browser = self.mainInterface.browser;
-  [self stopSigninCoordinatorAnimated:NO fromExternalTrigger:NO];
+  [self stopSigninCoordinatorWithCompletionAnimated:NO fromExternalTrigger:NO];
   self.signinCoordinator = [SigninCoordinator
       upgradeSigninPromoCoordinatorWithBaseViewController:self.mainInterface
                                                               .viewController
@@ -2041,7 +2086,7 @@ using UserFeedbackDataCallback =
     return;
   }
   Browser* mainBrowser = self.mainInterface.browser;
-  [self stopSigninCoordinatorAnimated:NO fromExternalTrigger:NO];
+  [self stopSigninCoordinatorWithCompletionAnimated:NO fromExternalTrigger:NO];
   self.signinCoordinator =
       [SigninCoordinator signinCoordinatorWithCommand:command
                                               browser:mainBrowser
@@ -2090,7 +2135,7 @@ using UserFeedbackDataCallback =
   };
   ChangeProfileContinuationProvider provider =
       base::BindRepeating(&CreateChangeProfileOpensURLContinuation, url);
-  [self stopSigninCoordinatorAnimated:NO fromExternalTrigger:NO];
+  [self stopSigninCoordinatorWithCompletionAnimated:NO fromExternalTrigger:NO];
   self.signinCoordinator = [SigninCoordinator
       consistencyPromoSigninCoordinatorWithBaseViewController:baseViewController
                                                       browser:self.mainInterface
@@ -2269,7 +2314,8 @@ using UserFeedbackDataCallback =
   }
 }
 
-- (void)prepareToPresentModal:(ProceduralBlock)completion {
+- (void)prepareToPresentModalWithSnackbarDismissal:(BOOL)dismissSnackbars
+                                        completion:(ProceduralBlock)completion {
   __weak __typeof(self) weakSelf = self;
   ProceduralBlock ensureNTP = ^{
     [weakSelf ensureNTP];
@@ -2283,7 +2329,9 @@ using UserFeedbackDataCallback =
                    }];
     return;
   }
-  [self dismissModalDialogsWithCompletion:ensureNTP];
+  [self dismissModalDialogsWithCompletion:ensureNTP
+                           dismissOmnibox:YES
+                         dismissSnackbars:dismissSnackbars];
 }
 
 // Returns YES if the current Tab is available to present a view controller.
@@ -3299,8 +3347,18 @@ using UserFeedbackDataCallback =
   [self activateBVCAndMakeCurrentBVCPrimary];
 }
 
+// Helper method to call `-dismissModalDialogsWithCompletion:` with default
+// snackbar dismissal behavior.
 - (void)dismissModalDialogsWithCompletion:(ProceduralBlock)completion
                            dismissOmnibox:(BOOL)dismissOmnibox {
+  [self dismissModalDialogsWithCompletion:completion
+                           dismissOmnibox:dismissOmnibox
+                         dismissSnackbars:YES];
+}
+
+- (void)dismissModalDialogsWithCompletion:(ProceduralBlock)completion
+                           dismissOmnibox:(BOOL)dismissOmnibox
+                         dismissSnackbars:(BOOL)dismissSnackbars {
   // Disconnected scenes should no-op, since browser objects may not exist.
   // See crbug.com/371847600.
   if (self.sceneState.activationLevel == SceneActivationLevelDisconnected) {
@@ -3317,10 +3375,12 @@ using UserFeedbackDataCallback =
   // they are not visible.
   ios::provider::HideModalViewStack();
 
-  // Dismiss all snackbars.
-  id<SnackbarCommands> snackbarHandler = HandlerForProtocol(
-      self.mainInterface.browser->GetCommandDispatcher(), SnackbarCommands);
-  [snackbarHandler dismissAllSnackbars];
+  // Conditionally dismiss all snackbars.
+  if (dismissSnackbars) {
+    id<SnackbarCommands> snackbarHandler = HandlerForProtocol(
+        self.mainInterface.browser->GetCommandDispatcher(), SnackbarCommands);
+    [snackbarHandler dismissAllSnackbars];
+  }
 
   // Exit fullscreen mode for web page when we re-enter app through external
   // intents.
@@ -3753,7 +3813,8 @@ using UserFeedbackDataCallback =
     // to be closed first.
     // If signinCoordinator is already dismissing, completion execution will
     // happen when it is done animating.
-    [self stopSigninCoordinatorAnimated:animated fromExternalTrigger:YES];
+    [self stopSigninCoordinatorWithCompletionAnimated:animated
+                                  fromExternalTrigger:YES];
     UIViewController* presentingViewController =
         self.settingsNavigationController.presentingViewController;
     if (presentingViewController) {
@@ -3767,15 +3828,17 @@ using UserFeedbackDataCallback =
   } else {
     // `self.signinCoordinator` can be presented without settings, from the
     // bookmarks or the recent tabs view.
-    [self stopSigninCoordinatorAnimated:animated fromExternalTrigger:YES];
+    [self stopSigninCoordinatorWithCompletionAnimated:animated
+                                  fromExternalTrigger:YES];
     resetAndDismiss();
   }
 }
 
 // Stops the sign-in coordinator actions and dismisses its views either
-// with or without animation.
-- (void)stopSigninCoordinatorAnimated:(BOOL)animated
-                  fromExternalTrigger:(BOOL)external {
+// with or without animation. Executes its signinCompletion. It’s expected to be
+// not already executed.
+- (void)stopSigninCoordinatorWithCompletionAnimated:(BOOL)animated
+                                fromExternalTrigger:(BOOL)external {
   if (!self.signinCoordinator) {
     return;
   }
@@ -4350,7 +4413,8 @@ using UserFeedbackDataCallback =
     (PolicyWatcherBrowserAgent*)policyWatcher {
 
   if (self.signinCoordinator) {
-    [self stopSigninCoordinatorAnimated:YES fromExternalTrigger:YES];
+    [self stopSigninCoordinatorWithCompletionAnimated:YES
+                                  fromExternalTrigger:YES];
     UMA_HISTOGRAM_BOOLEAN(
         "Enterprise.BrowserSigninIOS.SignInInterruptedByPolicy", true);
     policyWatcher->SignInUIDismissed();

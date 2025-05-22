@@ -28,11 +28,10 @@ class AttributionScopesData;
 class AttributionScopesSet;
 class DestinationSet;
 class EventReportWindows;
-class MaxEventLevelReports;
 class RandomizedResponseData;
 class SourceAggregatableDebugReportingConfig;
 class SuitableOrigin;
-class TriggerSpecs;
+class TriggerDataSet;
 
 struct AggregatableDebugReportingConfig;
 struct AggregatableDedupKey;
@@ -47,9 +46,9 @@ FiltersDisjunction FiltersForSourceType(
     mojom::SourceType,
     std::optional<base::TimeDelta> lookback_window = std::nullopt);
 
-TriggerSpecs SpecsFromDescription(int num_report_windows,
-                                  int trigger_data_cardinality,
-                                  MaxEventLevelReports);
+TriggerDataSet TriggerDataSetWithCardinality(int cardinality);
+
+EventReportWindows EventReportWindowsWithCount(int num_report_windows);
 
 std::ostream& operator<<(std::ostream&, const AggregationKeys&);
 
@@ -86,7 +85,7 @@ std::ostream& operator<<(std::ostream&, const AggregatableDedupKey&);
 
 std::ostream& operator<<(std::ostream&, const OsRegistrationItem&);
 
-std::ostream& operator<<(std::ostream&, const TriggerSpecs&);
+std::ostream& operator<<(std::ostream&, const TriggerDataSet&);
 
 std::ostream& operator<<(std::ostream&, const AggregatableTriggerConfig&);
 

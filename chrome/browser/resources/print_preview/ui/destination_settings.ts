@@ -23,7 +23,7 @@ import {Error, State} from '../data/state.js';
 import type {PrintPreviewDestinationDialogElement} from './destination_dialog.js';
 import type {PrintPreviewDestinationSelectElement} from './destination_select.js';
 import {getHtml} from './destination_settings.html.js';
-import {getCss as getPrintPreviewSharedLitCss} from './print_preview_shared.css.js';
+import {getCss as getPrintPreviewSharedCss} from './print_preview_shared.css.js';
 import {SettingsMixin} from './settings_mixin.js';
 
 export enum DestinationState {
@@ -61,7 +61,7 @@ export class PrintPreviewDestinationSettingsElement extends
 
   static override get styles() {
     return [
-      getPrintPreviewSharedLitCss(),
+      getPrintPreviewSharedCss(),
     ];
   }
 
@@ -105,9 +105,9 @@ export class PrintPreviewDestinationSettingsElement extends
   accessor destination: Destination|null = null;
   accessor destinationState: DestinationState = DestinationState.INIT;
   accessor disabled: boolean = false;
-  accessor error: Error;
+  accessor error: Error|null = null;
   accessor firstLoad: boolean = false;
-  accessor state: State;
+  accessor state: State = State.NOT_READY;
   protected accessor destinationStore_: DestinationStore|null = null;
   protected accessor displayedDestinations_: Destination[] = [];
   private accessor isDialogOpen_: boolean = false;
@@ -115,7 +115,6 @@ export class PrintPreviewDestinationSettingsElement extends
   protected accessor pdfPrinterDisabled_: boolean = false;
   protected accessor loaded_: boolean = false;
 
-  private lastUser_: string = '';
   private tracker_: EventTracker = new EventTracker();
 
   override connectedCallback() {
@@ -210,7 +209,7 @@ export class PrintPreviewDestinationSettingsElement extends
         return numDestinationsToDisplay;
       }
       // If a destination is pinned, increment numDestinationsToDisplay.
-      if (isPdfPrinter(recentDestinations[i].id)) {
+      if (isPdfPrinter(recentDestinations[i]!.id)) {
         numDestinationsToDisplay++;
       }
     }
@@ -284,11 +283,11 @@ export class PrintPreviewDestinationSettingsElement extends
     // necessarily be set to true in this case.
     let isVisible = false;
     let numUnpinnedChecked = 0;
-    for (let index = 0; index < recentDestinations.length; index++) {
-      const recent = recentDestinations[index];
+    for (let i = 0; i < recentDestinations.length; i++) {
+      const recent = recentDestinations[i]!;
       if (recent.id === newDestination.id &&
           recent.origin === newDestination.origin) {
-        indexFound = index;
+        indexFound = i;
         // If we haven't seen the maximum unpinned destinations already, this
         // destination is visible in the dropdown.
         isVisible = numUnpinnedChecked < NUM_UNPINNED_DESTINATIONS;
@@ -301,7 +300,7 @@ export class PrintPreviewDestinationSettingsElement extends
 
     // No change
     if (indexFound === 0 &&
-        recentDestinations[0].capabilities === newDestination.capabilities) {
+        recentDestinations[0]!.capabilities === newDestination.capabilities) {
       return;
     }
     const isNew = indexFound === -1;

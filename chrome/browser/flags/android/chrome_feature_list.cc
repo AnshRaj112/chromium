@@ -178,7 +178,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &history::kOrganicRepeatableQueries,
     &history_clusters::internal::kJourneys,
     &history_clusters::internal::kOmniboxAction,
-    &kAccessibilityAndroidEventInvestigations,
     &kAdaptiveButtonInTopToolbarCustomizationV2,
     &kAdaptiveButtonInTopToolbarPageSummary,
     &kAllowTabClosingUponMinimization,
@@ -285,6 +284,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kEdgeToEdgeEverywhere,
     &kEdgeToEdgeMonitorConfigurations,
     &kEdgeToEdgeSafeAreaConstraint,
+    &kEdgeToEdgeTablet,
     &kEdgeToEdgeWebOptIn,
     &kEducationalTipDefaultBrowserPromoCard,
     &kEmptyTabListAnimationKillSwitch,
@@ -301,6 +301,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kHeadlessTabModel,
     &kHideTabletToolbarDownloadButton,
     &kHistoryPaneAndroid,
+    &kHomepageIsNewTabPagePolicyAndroid,
     &kLegacyTabStateDeprecation,
     &kLockBackPressHandlerAtStart,
     &kIncognitoScreenshot,
@@ -313,6 +314,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kMostVisitedTilesCustomization,
     &kMostVisitedTilesReselect,
     &kMultiInstanceApplicationStatusCleanup,
+    &kMvcUpdateViewWhenModelChanged,
     &kNativePageTransitionHardwareCapture,
     &kNavBarColorAnimation,
     &kNavBarColorMatchesTabBackground,
@@ -332,6 +334,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kPwaRestoreUiAtStartup,
     &kOmahaMinSdkVersionAndroid,
     &kShortCircuitUnfocusAnimation,
+    &kShowHomeButtonPolicyAndroid,
     &kShowNewTabAnimations,
     &kPartnerCustomizationsUma,
     &kQuickDeleteAndroidSurvey,
@@ -349,7 +352,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kRelatedSearchesAllLanguage,
     &kRelatedSearchesSwitch,
     &kRemoveTabFocusOnShowingAndSelect,
-    &kReportParentalControlSitesChild,
     &kRightEdgeGoesForwardGestureNav,
     &kSearchInCCT,
     &kSearchInCCTAlternateTapHandling,
@@ -403,7 +405,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &plus_addresses::features::kPlusAddressesEnabled,
     &plus_addresses::features::kPlusAddressAndroidOpenGmsCoreManagementPage,
     &privacy_sandbox::kAlwaysBlock3pcsIncognito,
-    &privacy_sandbox::kActUserBypassUx,
     &privacy_sandbox::kDisplayWildcardInContentSettings,
     &privacy_sandbox::kFingerprintingProtectionUx,
     &privacy_sandbox::kIpProtectionUx,
@@ -461,10 +462,6 @@ static jlong JNI_ChromeFeatureMap_GetNativeMap(JNIEnv* env) {
 }
 
 // Alphabetical:
-
-BASE_FEATURE(kAccessibilityAndroidEventInvestigations,
-             "AccessibilityAndroidEventInvestigations",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAdaptiveButtonInTopToolbarCustomizationV2,
              "AdaptiveButtonInTopToolbarCustomizationV2",
@@ -917,6 +914,10 @@ BASE_FEATURE(kEdgeToEdgeSafeAreaConstraint,
              "EdgeToEdgeSafeAreaConstraint",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kEdgeToEdgeTablet,
+             "EdgeToEdgeTablet",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kEdgeToEdgeWebOptIn,
              "EdgeToEdgeWebOptIn",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -973,6 +974,10 @@ BASE_FEATURE(kHistoryPaneAndroid,
              "HistoryPaneAndroid",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kHomepageIsNewTabPagePolicyAndroid,
+             "HomepageIsNewTabPagePolicyAndroid",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kLegacyTabStateDeprecation,
              "LegacyTabStateDeprecation",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -991,7 +996,7 @@ BASE_FEATURE(kInstanceSwitcherV2,
 
 BASE_FEATURE(kKeyboardEscBackNavigation,
              "KeyboardEscBackNavigation",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kMagicStackAndroid,
              "MagicStackAndroid",
@@ -1018,6 +1023,10 @@ BASE_FEATURE(kMostVisitedTilesReselect,
 
 BASE_FEATURE(kMultiInstanceApplicationStatusCleanup,
              "MultiInstanceApplicationStatusCleanup",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kMvcUpdateViewWhenModelChanged,
+             "MvcUpdateViewWhenModelChanged",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kNativePageTransitionHardwareCapture,
@@ -1097,6 +1106,10 @@ BASE_FEATURE(kShortCircuitUnfocusAnimation,
              "ShortCircuitUnfocusAnimation",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kShowHomeButtonPolicyAndroid,
+             "ShowHomeButtonPolicyAndroid",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kShowNewTabAnimations,
              "ShowNewTabAnimations",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1165,10 +1178,6 @@ BASE_FEATURE(kRelatedSearchesSwitch,
 
 BASE_FEATURE(kRemoveTabFocusOnShowingAndSelect,
              "RemoveTabFocusOnShowingAndSelect",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kReportParentalControlSitesChild,
-             "ReportParentalControlSitesChild",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kRightEdgeGoesForwardGestureNav,

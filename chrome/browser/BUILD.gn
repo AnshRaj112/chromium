@@ -1214,8 +1214,6 @@ static_library("browser") {
     "predictors/resource_prefetch_predictor_tables.h",
     "preloading/chrome_preloading.cc",
     "preloading/chrome_preloading.h",
-    "preloading/navigation_ablation_throttle.cc",
-    "preloading/navigation_ablation_throttle.h",
     "preloading/prefetch/chrome_prefetch_manager.cc",
     "preloading/prefetch/chrome_prefetch_manager.h",
     "preloading/prefetch/no_state_prefetch/chrome_no_state_prefetch_contents_delegate.cc",
@@ -1314,10 +1312,6 @@ static_library("browser") {
     "profiles/force_youtube_safety_mode_policy_handler.h",
     "profiles/incognito_mode_policy_handler.cc",
     "profiles/incognito_mode_policy_handler.h",
-    "profiles/keep_alive/profile_keep_alive_types.cc",
-    "profiles/keep_alive/profile_keep_alive_types.h",
-    "profiles/keep_alive/scoped_profile_keep_alive.cc",
-    "profiles/keep_alive/scoped_profile_keep_alive.h",
     "profiles/off_the_record_profile_impl.cc",
     "profiles/off_the_record_profile_impl.h",
     "profiles/profile_avatar_downloader.cc",
@@ -1489,9 +1483,6 @@ static_library("browser") {
     "signin/header_modification_delegate_impl.h",
     "signin/identity_manager_factory.cc",
     "signin/identity_manager_factory.h",
-    "signin/reauth_result.h",
-    "signin/reauth_tab_helper.cc",
-    "signin/reauth_tab_helper.h",
     "signin/signin_error_controller_factory.cc",
     "signin/signin_error_controller_factory.h",
     "signin/signin_metrics_service_factory.cc",
@@ -1834,6 +1825,9 @@ static_library("browser") {
     # TODO(crbug.com/40110173): Eliminate usages of browser.h from Media Router.
     "//chrome/browser/media/router",
 
+    # TODO(crbug.com/419304389): Remove once c/b/profile get fully modularized.
+    "//chrome/browser/profiles/keep_alive:impl",
+
     # TODO(crbug.com/344921703): Remove circular dependencies.
     "//chrome/browser/sync",
 
@@ -1978,12 +1972,15 @@ static_library("browser") {
     "//chrome/browser/privacy_budget",
     "//chrome/browser/privacy_sandbox",
     "//chrome/browser/privacy_sandbox:headers",
+    "//chrome/browser/privacy_sandbox/incognito",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/profiles:profile_util",
     "//chrome/browser/profiles:profile_util_impl",
     "//chrome/browser/profiles:profiles",
     "//chrome/browser/profiles:profiles_extra_parts",
     "//chrome/browser/profiles:profiles_extra_parts_impl",
+    "//chrome/browser/profiles/keep_alive",
+    "//chrome/browser/profiles/keep_alive:impl",
     "//chrome/browser/profiling_host",
     "//chrome/browser/promos:utils",
     "//chrome/browser/reading_list",
@@ -2974,8 +2971,6 @@ static_library("browser") {
       "dom_distiller/tab_utils_android.cc",
       "download/android/dangerous_download_dialog_bridge.cc",
       "download/android/dangerous_download_dialog_bridge.h",
-      "download/android/dangerous_download_infobar_delegate.cc",
-      "download/android/dangerous_download_infobar_delegate.h",
       "download/android/download_callback_validator.cc",
       "download/android/download_callback_validator.h",
       "download/android/download_controller.cc",
@@ -3003,8 +2998,6 @@ static_library("browser") {
       "download/android/duplicate_download_dialog_bridge_delegate.h",
       "download/android/insecure_download_dialog_bridge.cc",
       "download/android/insecure_download_dialog_bridge.h",
-      "download/android/insecure_download_infobar_delegate.cc",
-      "download/android/insecure_download_infobar_delegate.h",
       "download/android/intercept_oma_download_navigation_throttle.cc",
       "download/android/intercept_oma_download_navigation_throttle.h",
       "download/android/items/offline_content_aggregator_factory_android.cc",
@@ -3415,6 +3408,7 @@ static_library("browser") {
       "//chrome/browser/touch_to_fill/password_manager/password_generation/android:public",
       "//chrome/browser/translate/android",
       "//chrome/browser/translate/android:jni_headers",
+      "//chrome/browser/ui/android/hats:impl",
       "//chrome/browser/ui/android/layouts:android",
       "//chrome/browser/ui/android/pdf:pdf_jni_headers",
       "//chrome/browser/ui/digital_credentials",
@@ -3498,6 +3492,7 @@ static_library("browser") {
       "//components/payments/content/android",
       "//components/payments/content/android:jni_headers",
       "//components/payments/content/android/ui",
+      "//components/payments/content/browser_binding:browser_bound_keys_deleter_factory",
       "//components/permissions/android:native",
       "//components/plus_addresses:features",
       "//components/plus_addresses/resources/strings",
@@ -3579,6 +3574,8 @@ static_library("browser") {
       # TODO(crbug.com/353332589): Remove this circular dependency when
       # //c/b/translate/chrome_translate_client gets modularized.
       "//chrome/browser/android:tabs_impl",
+
+      "//chrome/browser/ui/android/hats:impl",
     ]
 
     if (safe_browsing_mode == 2) {
@@ -4303,6 +4300,8 @@ static_library("browser") {
       "webauthn/local_authentication_token.h",
       "webauthn/local_credential_management.cc",
       "webauthn/local_credential_management.h",
+      "webauthn/mechanism_sorter.cc",
+      "webauthn/mechanism_sorter.h",
       "webauthn/observable_authenticator_list.cc",
       "webauthn/observable_authenticator_list.h",
       "webauthn/passkey_model_factory.cc",
@@ -4323,6 +4322,7 @@ static_library("browser") {
       "//chrome/app/vector_icons",
       "//chrome/browser/accessibility/tree_fixing:prefs",
       "//chrome/browser/accessibility/tree_fixing:service",
+      "//chrome/browser/actor",
       "//chrome/browser/apps/app_service",
       "//chrome/browser/apps/link_capturing",
       "//chrome/browser/contextual_cueing",
@@ -4372,10 +4372,22 @@ static_library("browser") {
       "//chrome/browser/ui/media_router:impl",
       "//chrome/browser/ui/page_action:icon_type",
       "//chrome/browser/ui/privacy_sandbox",
+      "//chrome/browser/ui/search",
+
+      # TODO(crbug.com/418180294): Remove this circular dependency when:
+      # - bookmark_model_factory.h,
+      # - after_startup_task_utils.h,
+      # - history_service_factory.h,
+      # - identity_manager_factory.h
+      # ... get componentized.
+      "//chrome/browser/ui/search:impl",
       "//chrome/browser/ui/send_tab_to_self",
       "//chrome/browser/ui/views/zoom:impl",
       "//chrome/browser/ui/webui/access_code_cast",
+      "//chrome/browser/ui/webui/access_code_cast:impl",
       "//chrome/browser/ui/webui/app_service_internals",
+      "//chrome/browser/ui/webui/infobar_internals",
+      "//chrome/browser/ui/webui/infobar_internals:impl",
 
       # TODO(413315837): Remove this dependency when chrome/browser/privacy_sandbox
       # gets modularized.
@@ -4410,6 +4422,8 @@ static_library("browser") {
       "//chrome/browser/ui/webui/commerce",
       "//chrome/browser/ui/webui/commerce:impl",
       "//chrome/browser/ui/webui/cr_components/theme_color_picker",
+      "//chrome/browser/ui/webui/customize_buttons",
+      "//chrome/browser/ui/webui/customize_buttons:impl",
       "//chrome/browser/ui/webui/new_tab_footer",
       "//chrome/browser/ui/webui/new_tab_footer:impl",
       "//chrome/browser/ui/webui/privacy_sandbox",
@@ -4557,6 +4571,14 @@ static_library("browser") {
       # gets modularized.
       "//chrome/browser/ui/privacy_sandbox:impl",
 
+      # TODO(crbug.com/418180294): Remove this circular dependency when:
+      # - bookmark_model_factory.h,
+      # - after_startup_task_utils.h,
+      # - history_service_factory.h,
+      # - identity_manager_factory.h
+      # ... get componentized.
+      "//chrome/browser/ui/search:impl",
+
       "//chrome/browser/ui/browser_window:impl",
       "//chrome/browser/ui/exclusive_access",
       "//chrome/browser/ui/views/toolbar",
@@ -4570,6 +4592,7 @@ static_library("browser") {
       "//chrome/browser/ui:browser_list_impl",
       "//chrome/browser/importer:impl",
       "//chrome/browser/ui/webui/commerce:impl",
+      "//chrome/browser/ui/webui/customize_buttons",
       "//chrome/browser/ui/webui/settings:impl",
       "//chrome/browser/ui/webui/new_tab_footer:impl",
       "//chrome/browser/ui/webui/signin:signin_impl",
@@ -4587,7 +4610,7 @@ static_library("browser") {
 
       # TODO(crbug.com/364667551): It includes
       # //c/b/signin/identity_manager_factory.h.
-      "//chrome/browser/ui/webui/access_code_cast",
+      "//chrome/browser/ui/webui/access_code_cast:impl",
     ]
 
     #!is_android
@@ -4657,6 +4680,7 @@ static_library("browser") {
       deps += [
         "//chrome/browser/shortcuts",
         "//chrome/browser/ui/webui/app_home",
+        "//chrome/browser/ui/webui/app_home:impl",
         "//chrome/browser/ui/webui/signin:profile",
         "//chrome/browser/ui/webui/signin:profile_impl",
       ]
@@ -5428,7 +5452,6 @@ static_library("browser") {
       "//chrome/browser/chromeos/upload_office_to_cloud",
       "//chrome/browser/chromeos/video_conference",
       "//chrome/browser/enterprise/connectors/device_trust/attestation/ash",
-      "//chrome/browser/metrics/structured:features",
       "//chrome/browser/nearby_sharing:share_target",
       "//chrome/browser/nearby_sharing/certificates",
       "//chrome/browser/nearby_sharing/client",
@@ -6762,8 +6785,8 @@ static_library("browser") {
       "enterprise/connectors/analysis/content_analysis_delegate.cc",
       "enterprise/connectors/analysis/content_analysis_delegate.h",
       "enterprise/connectors/analysis/content_analysis_delegate_base.h",
-      "enterprise/connectors/analysis/content_analysis_dialog.cc",
-      "enterprise/connectors/analysis/content_analysis_dialog.h",
+      "enterprise/connectors/analysis/content_analysis_dialog_controller.cc",
+      "enterprise/connectors/analysis/content_analysis_dialog_controller.h",
       "enterprise/connectors/analysis/content_analysis_downloads_delegate.cc",
       "enterprise/connectors/analysis/content_analysis_downloads_delegate.h",
       "enterprise/connectors/analysis/content_analysis_info.cc",
@@ -6902,6 +6925,8 @@ static_library("browser") {
       "//chrome/browser/enterprise/connectors/device_trust/key_management/browser",
       "//chrome/browser/enterprise/connectors/device_trust/key_management/core",
       "//chrome/browser/enterprise/connectors/device_trust/key_management/core/persistence",
+      "//chrome/browser/ui/webui/app_settings",
+      "//chrome/browser/ui/webui/app_settings:impl",
       "//chrome/browser/ui/webui/signin/history_sync_optin:mojo_bindings",
       "//chrome/services/system_signals/public/cpp/browser",
       "//components/supervised_user/core/common:features",
@@ -8618,8 +8643,10 @@ static_library("browser_generated_files") {
       "//chrome/browser/ui/tabs/tab_strip_api:mojom",
       "//chrome/browser/ui/webui/access_code_cast:mojo_bindings",
       "//chrome/browser/ui/webui/app_service_internals:mojo_bindings",
+      "//chrome/browser/ui/webui/customize_buttons:mojo_bindings",
       "//chrome/browser/ui/webui/data_sharing:mojo_bindings",
       "//chrome/browser/ui/webui/downloads:mojo_bindings",
+      "//chrome/browser/ui/webui/infobar_internals:mojo_bindings",
       "//chrome/browser/ui/webui/new_tab_footer:mojo_bindings",
       "//chrome/browser/ui/webui/new_tab_page:mojo_bindings",
       "//chrome/browser/ui/webui/new_tab_page_third_party:mojo_bindings",

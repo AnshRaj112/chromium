@@ -374,7 +374,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Accessibility.Android.PageZoom.MainFrameZoomFactor"
-    units="zoom factor %" expires_after="2025-09-14">
+    units="zoom factor %" expires_after="2025-11-16">
   <owner>mschillaci@google.com</owner>
   <owner>chrome-a11y-core@google.com</owner>
   <summary>
@@ -829,7 +829,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Accessibility.CaptionSettingsLoadedFromPrefs"
-    enum="BooleanEnabled" expires_after="2025-06-27">
+    enum="BooleanEnabled" expires_after="2026-05-19">
   <owner>evliu@google.com</owner>
   <owner>chrome-media-ux@google.com</owner>
   <summary>
@@ -839,7 +839,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Accessibility.CaptionSettingsLoadedFromSystemSettings"
-    enum="BooleanEnabled" expires_after="2025-06-27">
+    enum="BooleanEnabled" expires_after="2026-05-19">
   <owner>evliu@google.com</owner>
   <owner>chrome-media-ux@google.com</owner>
   <summary>
@@ -1590,7 +1590,7 @@ even if they fit the naming pattern. -->
 </histogram>
 
 <histogram name="Accessibility.EngineUse.PageNavsUntilStart" units="count"
-    expires_after="2025-09-14">
+    expires_after="2025-11-16">
   <owner>mschillaci@google.com</owner>
   <owner>aleventhal@chromium.org</owner>
   <owner>chrome-a11y-core@google.com</owner>
@@ -1602,7 +1602,7 @@ even if they fit the naming pattern. -->
 </histogram>
 
 <histogram name="Accessibility.EngineUse.TimeUntilStart" units="ms"
-    expires_after="2025-09-14">
+    expires_after="2025-11-16">
   <owner>mschillaci@google.com</owner>
   <owner>aleventhal@chromium.org</owner>
   <owner>chrome-a11y-core@google.com</owner>
@@ -1800,7 +1800,7 @@ even if they fit the naming pattern. -->
 </histogram>
 
 <histogram name="Accessibility.InactiveTime" units="ms"
-    expires_after="2025-09-14">
+    expires_after="2025-11-16">
   <owner>aleventhal@chromium.org</owner>
   <owner>abigailbklein@chromium.org</owner>
   <owner>janewman@microsoft.com</owner>
@@ -1838,7 +1838,7 @@ even if they fit the naming pattern. -->
 </histogram>
 
 <histogram name="Accessibility.iOS.NewLargerTextCategory" enum="BooleanHit"
-    expires_after="2025-09-14">
+    expires_after="2025-11-16">
   <owner>gambard@chromium.org</owner>
   <owner>rkgibson@google.com</owner>
   <summary>
@@ -2179,7 +2179,7 @@ even if they fit the naming pattern. -->
 </histogram>
 
 <histogram name="Accessibility.ManuallyEnabled" enum="BooleanEnabled"
-    expires_after="2025-09-14">
+    expires_after="2025-11-16">
   <owner>aleventhal@chromium.org</owner>
   <owner>kenjibaheux@google.com</owner>
   <owner>chrome-a11y-core@google.com</owner>
@@ -2255,25 +2255,8 @@ even if they fit the naming pattern. -->
   </summary>
 </histogram>
 
-<histogram name="Accessibility.PDF.HasAccessibleText2" enum="BooleanExists"
-    expires_after="2025-11-04">
-  <owner>dtseng@chromium.org</owner>
-  <owner>nektar@chromium.org</owner>
-  <owner>chrome-a11y-core@google.com</owner>
-  <summary>
-    When a PDF is constructed for accessibility, true if any page of the PDF
-    contains any accessible text derived from a text run. Note that a PDF
-    containing a mix of images and text will record true even though the images
-    may themselves contain inaccessible text. This metric (previously recorded
-    as HasAccessibleText) was affected by PDF Searchify feature before M133 as
-    when PDF searchify is enabled, all PDFs are made accessible before recording
-    the metric. It is updated in M133 to consider text availablity without
-    searchify's effect.
-  </summary>
-</histogram>
-
 <histogram name="Accessibility.PDF.IsPDFTagged" enum="BooleanExists"
-    expires_after="2025-09-14">
+    expires_after="2025-11-16">
   <owner>dtseng@chromium.org</owner>
   <owner>kyungjunlee@google.com</owner>
   <owner>chrome-a11y-core@google.com</owner>
@@ -2324,7 +2307,8 @@ even if they fit the naming pattern. -->
   <owner>chrome-a11y-core@google.com</owner>
   <summary>
     Records the number of pages in an inaccessible PDF when a PDF accessibility
-    tree gets created for the PDF.
+    tree gets created for the PDF. This metric is only recorded when
+    accessibility features are enabled.
   </summary>
 </histogram>
 
@@ -2349,7 +2333,7 @@ even if they fit the naming pattern. -->
 </histogram>
 
 <histogram name="Accessibility.PdfOcr.MediaApp.PercentageReadingProgression"
-    units="%" expires_after="2025-06-30">
+    units="%" expires_after="2026-06-30">
   <owner>kyungjunlee@google.com</owner>
   <owner>chrome-a11y-core@google.com</owner>
   <summary>
@@ -3422,7 +3406,7 @@ even if they fit the naming pattern. -->
 </histogram>
 
 <histogram name="Accessibility.ScreenAI.{ServiceName}.InitializationLatency"
-    units="ms" expires_after="2025-09-07">
+    units="ms" expires_after="2025-11-16">
   <owner>rhalavati@chromium.org</owner>
   <owner>chrome-a11y-core@google.com</owner>
   <summary>

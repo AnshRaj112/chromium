@@ -131,9 +131,13 @@ class TouchToFillPaymentMethodProperties {
                 new PropertyModel.ReadableObjectPropertyKey<>("loyalty_card_number");
         static final PropertyModel.ReadableObjectPropertyKey<String> MERCHANT_NAME =
                 new PropertyModel.ReadableObjectPropertyKey<>("merchant_name");
+        static final PropertyModel.ReadableObjectPropertyKey<Runnable>
+                ON_LOYALTY_CARD_CLICK_ACTION =
+                        new PropertyModel.ReadableObjectPropertyKey<>(
+                                "on_loyalty_card_click_action");
 
         static final PropertyKey[] NON_TRANSFORMING_LOYALTY_CARD_KEYS = {
-            LOYALTY_CARD_NUMBER, MERCHANT_NAME
+            LOYALTY_CARD_NUMBER, MERCHANT_NAME, ON_LOYALTY_CARD_CLICK_ACTION
         };
 
         private LoyaltyCardProperties() {}
@@ -159,8 +163,10 @@ class TouchToFillPaymentMethodProperties {
     static class HeaderProperties {
         static final PropertyModel.ReadableIntPropertyKey IMAGE_DRAWABLE_ID =
                 new PropertyModel.ReadableIntPropertyKey("image_drawable_id");
+        static final PropertyModel.ReadableIntPropertyKey TITLE_ID =
+                new PropertyModel.ReadableIntPropertyKey("title_id");
 
-        static final PropertyKey[] ALL_KEYS = {IMAGE_DRAWABLE_ID};
+        static final PropertyKey[] ALL_KEYS = {IMAGE_DRAWABLE_ID, TITLE_ID};
 
         private HeaderProperties() {}
     }

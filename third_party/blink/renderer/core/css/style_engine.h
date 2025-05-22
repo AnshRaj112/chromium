@@ -670,23 +670,26 @@ class CORE_EXPORT StyleEngine final : public GarbageCollected<StyleEngine>,
   void UpdateViewport();
   void UpdateViewportStyle();
   void UpdateStyleAndLayoutTree();
-  // To be called from layout when container queries change for the container.
-  void UpdateStyleAndLayoutTreeForContainer(Element& container,
-                                            const LogicalSize&,
-                                            LogicalAxes contained_axes);
+  // To be called from layout when size queries change for the container.
+  void UpdateStyleAndLayoutTreeForSizeContainer(Element& container,
+                                                const LogicalSize&,
+                                                LogicalAxes contained_axes);
   // To be called from layout-tree building for subtree skipped for style
   // recalcs when we found out the container is eligible for size containment
   // after all.
-  void UpdateStyleForNonEligibleContainer(Element& container);
+  void UpdateStyleForNonEligibleSizeContainer(Element& container);
   // Updates the style of `element`, and descendants if needed.
   // The provided `try_set` represents the declaration block from
   // a @position-try rule. The specified TryTacticList will cause
   // CSSFlipRevertValues to appear in the try-tactics layer (see
   // OutOfFlowData::try_tactics_set_).
-  void UpdateStyleForOutOfFlow(Element& element,
-                               const CSSPropertyValueSet* try_set,
-                               const TryTacticList&,
-                               AnchorEvaluator*);
+  void UpdateStyleAndLayoutTreeForOutOfFlow(
+      Element& element,
+      std::optional<wtf_size_t> try_fallback_index,
+      const CSSPropertyValueSet* try_set,
+      const TryTacticList&,
+      AnchorEvaluator*);
+  void PostInterleavedRecalcUpdate(const Element& interleaving_root);
   StyleRulePositionTry* GetPositionTryRule(const ScopedCSSName&);
   void RecalcStyle();
 
@@ -701,6 +704,9 @@ class CORE_EXPORT StyleEngine final : public GarbageCollected<StyleEngine>,
   bool InPositionTryStyleRecalc() const {
     return in_position_try_style_recalc_;
   }
+  bool InInterleavedStyleRecalc() const {
+    return InContainerQueryStyleRecalc() || InPositionTryStyleRecalc();
+  }
   void SetInScrollMarkersAttachment(bool in_scroll_markers_attachment) {
     DCHECK(!in_scroll_markers_attachment_ || !in_scroll_markers_attachment);
     in_scroll_markers_attachment_ = in_scroll_markers_attachment;
@@ -712,10 +718,10 @@ class CORE_EXPORT StyleEngine final : public GarbageCollected<StyleEngine>,
   // return nullptr if the interleaving root is a PseudoElement, because such
   // elements can't be recalc roots.
   //
-  // See StyleEngine::UpdateStyleAndLayoutTreeForContainer.
-  // See StyleEngine::UpdateStyleForOutOfFlow.
+  // See StyleEngine::UpdateStyleAndLayoutTreeForSizeContainer.
+  // See StyleEngine::UpdateStyleAndLayoutTreeForOutOfFlow.
   Element* GetInterleavingRecalcRoot() const {
-    if (InContainerQueryStyleRecalc() || InPositionTryStyleRecalc()) {
+    if (InInterleavedStyleRecalc()) {
       // During interleaved style recalc, the recalc root is either set
       // to the interleaving root (always an Element), or nullptr (if it's
       // a PseudoElement).
@@ -787,8 +793,6 @@ class CORE_EXPORT StyleEngine final : public GarbageCollected<StyleEngine>,
  private:
   void UpdateCounters(const Element& element,
                       CountersAttachmentContext& context);
-  void UpdateLayoutCounters(const LayoutObject& layout_object,
-                            CountersAttachmentContext& context);
   // FontSelectorClient implementation.
   void FontsNeedUpdate(FontSelector*, FontInvalidationReason) override;
 

@@ -84,7 +84,7 @@ TensorRemoteAndHandle CreateTensor(
   mojo::AssociatedRemote<mojom::WebNNTensor> webnn_tensor_remote;
 
   base::test::TestFuture<mojom::CreateTensorResultPtr> create_tensor_future;
-  context_remote->CreateTensor(std::move(tensor_info),
+  context_remote->CreateTensor(std::move(tensor_info), mojo_base::BigBuffer(0),
                                create_tensor_future.GetCallback());
   mojom::CreateTensorResultPtr create_tensor_result =
       create_tensor_future.Take();
@@ -131,7 +131,8 @@ BuildAndCompute(
   named_input_remotes_and_handles.reserve(graph_info->input_operands.size());
 
   for (OperandId operand_id : graph_info->input_operands) {
-    const mojom::Operand& operand = *graph_info->operands.at(operand_id);
+    const mojom::Operand& operand =
+        *graph_info->operands.at(operand_id.value());
     EXPECT_TRUE(operand.name.has_value());
 
     auto it = named_inputs.find(*operand.name);
@@ -158,7 +159,8 @@ BuildAndCompute(
   named_output_remotes_and_handles.reserve(graph_info->output_operands.size());
 
   for (OperandId operand_id : graph_info->output_operands) {
-    const mojom::Operand& operand = *graph_info->operands.at(operand_id);
+    const mojom::Operand& operand =
+        *graph_info->operands.at(operand_id.value());
     EXPECT_TRUE(operand.name.has_value());
 
     auto tensor_info = mojom::TensorInfo::New(
@@ -168,23 +170,25 @@ BuildAndCompute(
   }
 
   // The GraphImpl should be built successfully.
-  base::test::TestFuture<mojom::CreateGraphResultPtr> create_graph_future;
+  base::test::TestFuture<
+      base::expected<mojom::CreateGraphSuccessPtr, mojom::ErrorPtr>>
+      create_graph_future;
   graph_builder_remote->CreateGraph(std::move(graph_info),
                                     create_graph_future.GetCallback());
-  mojom::CreateGraphResultPtr create_graph_result = create_graph_future.Take();
+  auto create_graph_result = create_graph_future.Take();
 
   switch (expectation) {
     case BuildAndComputeExpectation::kSuccess:
-      EXPECT_TRUE(create_graph_result->is_graph_remote())
-          << create_graph_result->get_error()->message;
+      EXPECT_TRUE(create_graph_result.has_value())
+          << create_graph_result.error()->message;
       break;
     case BuildAndComputeExpectation::kCreateGraphFailure:
-      EXPECT_TRUE(create_graph_result->is_error());
+      EXPECT_FALSE(create_graph_result.has_value());
       return {};
   }
 
   mojo::AssociatedRemote<mojom::WebNNGraph> graph_remote;
-  graph_remote.Bind(std::move(create_graph_result->get_graph_remote()));
+  graph_remote.Bind(std::move(create_graph_result.value()->graph_remote));
 
   std::vector<std::pair<std::string, blink::WebNNTensorToken>>
       named_input_handles;
@@ -473,7 +477,7 @@ void WebNNGraphImplBackendTest::SetUpBase() {
   base::test::TestFuture<mojom::CreateContextResultPtr> create_context_future;
   provider_remote_->CreateWebNNContext(
       mojom::CreateContextOptions::New(
-          mojom::CreateContextOptions::Device::kGpu,
+          mojom::Device::kGpu,
           mojom::CreateContextOptions::PowerPreference::kDefault),
       create_context_future.GetCallback());
   mojom::CreateContextResultPtr create_context_result =

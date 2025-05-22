@@ -418,6 +418,22 @@ bool HTMLCanvasElement::PrepareTransferableResource(
   return true;
 }
 
+bool HTMLCanvasElement::IsResourceValid() {
+  if (IsHibernating()) {
+    return true;
+  }
+
+  if (IsContextLost()) {
+    return false;
+  }
+
+  if (ResourceProvider() && !ResourceProvider()->IsValid()) {
+    return false;
+  }
+
+  return !!GetOrCreateCanvasResourceProvider();
+}
+
 void HTMLCanvasElement::Dispose() {
   disposing_ = true;
   // We need to record metrics before we dispose of anything
@@ -715,9 +731,11 @@ CanvasRenderingContext* HTMLCanvasElement::GetCanvasRenderingContextInternal(
   if (!IsRenderingContext2D())
     SetNeedsCompositingUpdate();
 
-  SetOpacityMode(SkAlphaTypeIsOpaque(GetRenderingContextAlphaType())
-                     ? kOpaque
-                     : kNonOpaque);
+  is_opaque_ = SkAlphaTypeIsOpaque(GetRenderingContextAlphaType());
+  if (cc_layer_) {
+    cc_layer_->SetContentsOpaque(is_opaque_);
+    cc_layer_->SetBlendBackgroundColor(!is_opaque_);
+  }
 
   return context_.Get();
 }
@@ -911,7 +929,9 @@ void HTMLCanvasElement::DoDeferredPaintInvalidation() {
     if (dirty_rect_.IsEmpty())
       return;
 
-    DoPaintInvalidation(gfx::ToEnclosingRect(invalidation_rect));
+    if (cc_layer_ && IsComposited()) {
+      cc_layer_->SetNeedsDisplayRect(gfx::ToEnclosingRect(invalidation_rect));
+    }
   }
 
   if (IsImageBitmapRenderingContext() && RenderingContext()->CcLayer()) {
@@ -978,6 +998,17 @@ void HTMLCanvasElement::Reset() {
         To<LayoutHTMLCanvas>(layout_object)->CanvasSizeChanged();
       layout_object->SetShouldDoFullPaintInvalidation();
     }
+  }
+}
+
+void HTMLCanvasElement::ResetLayer() {
+  if (cc_layer_) {
+    // Orphaning the layer is required to trigger the recreation of a new
+    // layer in the case where destruction is caused by a canvas resize. Test:
+    // virtual/gpu/fast/canvas/canvas-resize-after-paint-without-layout.html
+    cc_layer_->RemoveFromParent();
+    cc_layer_->ClearClient();
+    cc_layer_ = nullptr;
   }
 }
 
@@ -1683,10 +1714,16 @@ cc::TextureLayer* HTMLCanvasElement::GetOrCreateCcLayerIfNeeded() {
     InitializeLayerWithCSSProperties(cc_layer_.get());
     cc_layer_->SetIsDrawable(true);
     cc_layer_->SetHitTestable(true);
-    cc_layer_->SetContentsOpaque(is_opaque());
-    cc_layer_->SetBlendBackgroundColor(!is_opaque());
+    cc_layer_->SetContentsOpaque(is_opaque_);
+    cc_layer_->SetBlendBackgroundColor(!is_opaque_);
   }
   return cc_layer_.get();
+}
+
+void HTMLCanvasElement::ClearLayerTexture() {
+  if (cc_layer_) {
+    cc_layer_->ClearTexture();
+  }
 }
 
 Canvas2DLayerBridge* HTMLCanvasElement::GetOrCreateCanvas2DLayerBridge() {
@@ -1719,6 +1756,12 @@ Canvas2DLayerBridge* HTMLCanvasElement::GetOrCreateCanvas2DLayerBridge() {
   }
 
   return canvas2d_bridge_.get();
+}
+
+void HTMLCanvasElement::SetNeedsPushProperties() {
+  if (cc_layer_) {
+    cc_layer_->SetNeedsSetTransferableResource();
+  }
 }
 
 void HTMLCanvasElement::SetResourceProviderForTesting(

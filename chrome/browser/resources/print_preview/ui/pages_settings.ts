@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 import 'chrome://resources/cr_elements/cr_input/cr_input.js';
-import 'chrome://resources/cr_elements/md_select.css.js';
 import 'chrome://resources/cr_elements/cr_collapse/cr_collapse.js';
 import './print_preview_shared.css.js';
 import './settings_section.js';
@@ -96,14 +95,14 @@ export class PrintPreviewPagesSettingsElement extends
   }
 
   accessor disabled: boolean = false;
-  accessor pageCount: number;
+  accessor pageCount: number = 0;
   protected accessor controlsDisabled_: boolean = false;
   private accessor errorState_: PagesInputErrorState =
       PagesInputErrorState.NO_ERROR;
   protected accessor hasError_: boolean = false;
   private accessor inputString_: string = '';
   private accessor pagesToPrint_: number[] = [];
-  private accessor rangesToPrint_: Range[];
+  private accessor rangesToPrint_: Range[] = [];
   private accessor selection_: PagesValue = PagesValue.ALL;
 
   /**
@@ -256,8 +255,8 @@ export class PrintPreviewPagesSettingsElement extends
         return;
       }
 
-      let min = parseIntStrict(limits[0]);
-      if ((limits[0].length > 0 && Number.isNaN(min)) || min < 1) {
+      let min = parseIntStrict(limits[0]!);
+      if ((limits[0]!.length > 0 && Number.isNaN(min)) || min < 1) {
         this.errorState_ = PagesInputErrorState.INVALID_SYNTAX;
         this.onRangeChange_();
         return;
@@ -275,8 +274,8 @@ export class PrintPreviewPagesSettingsElement extends
         continue;
       }
 
-      let max = parseIntStrict(limits[1]);
-      if (Number.isNaN(max) && limits[1].length > 0) {
+      let max = parseIntStrict(limits[1]!);
+      if (Number.isNaN(max) && limits[1]!.length > 0) {
         this.errorState_ = PagesInputErrorState.INVALID_SYNTAX;
         this.onRangeChange_();
         return;
@@ -321,9 +320,9 @@ export class PrintPreviewPagesSettingsElement extends
       return [];
     }
 
-    let from = this.pagesToPrint_[0];
-    let to = this.pagesToPrint_[0];
-    const ranges = [];
+    let from = this.pagesToPrint_[0]!;
+    let to = this.pagesToPrint_[0]!;
+    const ranges: Range[] = [];
     for (const page of this.pagesToPrint_.slice(1)) {
       if (page === to + 1) {
         to = page;
@@ -438,14 +437,6 @@ export class PrintPreviewPagesSettingsElement extends
    */
   protected isSinglePage_(): boolean {
     return this.pageCount === 1;
-  }
-
-  /**
-   * @return Whether to hide the hint.
-   */
-  private hintHidden_(): boolean {
-    return this.errorState_ === PagesInputErrorState.NO_ERROR ||
-        this.errorState_ === PagesInputErrorState.EMPTY;
   }
 
   /**

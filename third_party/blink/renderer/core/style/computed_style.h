@@ -597,7 +597,7 @@ class ComputedStyle final : public ComputedStyleBase {
     const GapDataList<EBorderStyle> rule_style = ColumnRuleStyle();
     if (rule_style.HasSingleValue() &&
         ColumnRuleWidthInternal().HasSingleValue() &&
-        !BorderStyleIsVisible(rule_style)) {
+        !BorderStyleIsVisible(rule_style.GetLegacyValue())) {
       return GapDataList<int>(0);
     }
 
@@ -605,17 +605,8 @@ class ComputedStyle final : public ComputedStyleBase {
   }
 
   // row-rule-width
-  GapDataList<int> RowRuleWidth() const { return RowRuleWidthInternal(); }
-
-  bool HasGapDecoration() const {
-    // Various layouts in CSS such as multicol containers, flex containers, grid
-    // containers, and masonry containers position child boxes adjacent to each
-    // other with gaps, also known as gutters, between them. Each such gap may
-    // contain a gap decoration, which is a visible separator (such as a line)
-    // painted between adjacent boxes.
-    // See https://drafts.csswg.org/css-gaps-1/#gap-decorations
-    return SpecifiesColumns() || IsDisplayFlexibleBox() || IsDisplayGridBox() ||
-           IsDisplayMasonryBox();
+  const GapDataList<int>& RowRuleWidth() const {
+    return RowRuleWidthInternal();
   }
 
   // content
@@ -1001,10 +992,7 @@ class ComputedStyle final : public ComputedStyleBase {
            !HasAutoColumnHeight();
   }
   bool ColumnRuleIsTransparent() const {
-    return ColumnRuleColor()
-        .GetLegacyValue()
-        .Resolve(GetCurrentColor(), UsedColorScheme())
-        .IsFullyTransparent();
+    return GapRuleColorIsTransparent(ColumnRuleColor());
   }
   bool ColumnRuleEquivalent(const ComputedStyle& other_style) const;
   bool HasColumnRule() const {
@@ -1017,17 +1005,26 @@ class ComputedStyle final : public ComputedStyleBase {
   }
 
   bool RowRuleIsTransparent() const {
-    return RowRuleColor()
-        .GetLegacyValue()
-        .Resolve(GetCurrentColor(), UsedColorScheme())
-        .IsFullyTransparent();
+    return GapRuleColorIsTransparent(RowRuleColor());
   }
   bool HasRowRule() const {
+    // `SpecifiesColumns()` signifies we are in a multicol context. Return false
+    // if we are not in a multicol, grid, or flex context.
+    if (!SpecifiesColumns() && (Display() != EDisplay::kGrid &&
+                                Display() != EDisplay::kFlex)) [[likely]] {
+      return false;
+    }
+
     return HasRuleWidth(RowRuleWidth()) && !RowRuleIsTransparent() &&
            BorderStyleIsVisible(RowRuleStyle());
   }
 
-  bool HasGapRule() const { return HasColumnRule() || HasRowRule(); }
+  bool HasGapRule() const {
+    if (!MaybeHasGapDecorations()) {
+      return false;
+    }
+    return HasColumnRule() || HasRowRule();
+  }
 
   // Flex utility functions.
   bool ResolvedIsColumnFlexDirection() const {
@@ -1056,11 +1053,11 @@ class ComputedStyle final : public ComputedStyleBase {
     }
     return FlexWrap().GetWrapMode() == FlexWrapMode::kNowrap;
   }
-  bool ResolvedIsFlexBalanced() const {
-    if (IsDeprecatedFlexbox()) {
-      return false;
+  std::optional<wtf_size_t> ResolvedFlexBalanceMinLineCount() const {
+    if (IsDeprecatedFlexbox() || !FlexWrap().IsBalanced()) {
+      return std::nullopt;
     }
-    return FlexWrap().IsBalanced();
+    return FlexWrap().MinLineCount();
   }
 
   float ResolvedFlexGrow(const ComputedStyle& box_style) const {
@@ -1569,6 +1566,9 @@ class ComputedStyle final : public ComputedStyleBase {
       }
       effective |= kContainsBlockSize;
     }
+    if (container_type & kContainerTypeAnchored) {
+      effective |= kContainsStyle;
+    }
     if (!IsContentVisibilityVisible(content_visibility)) {
       effective |= kContainsStyle;
       effective |= kContainsLayout;
@@ -1625,6 +1625,10 @@ class ComputedStyle final : public ComputedStyleBase {
 
   bool IsContainerForScrollStateContainerQueries() const {
     return IsScrollStateContainer() && StyleType() == kPseudoIdNone;
+  }
+
+  bool IsContainerForAnchoredContainerQueries() const {
+    return IsAnchoredContainer() && StyleType() == kPseudoIdNone;
   }
 
   bool DependsOnContainerQueries() const {
@@ -2254,7 +2258,8 @@ class ComputedStyle final : public ComputedStyleBase {
     return style != EBorderStyle::kNone && style != EBorderStyle::kHidden;
   }
 
-  static bool BorderStyleIsVisible(GapDataList<EBorderStyle> styles) {
+  // Rule utility functions.
+  static bool BorderStyleIsVisible(const GapDataList<EBorderStyle>& styles) {
     for (const auto& style : styles.GetGapDataList()) {
       if (!style.IsRepeaterData()) {
         // Simple single value, check directly.
@@ -2275,7 +2280,7 @@ class ComputedStyle final : public ComputedStyleBase {
     return false;
   }
 
-  static bool HasRuleWidth(GapDataList<int> widths) {
+  static bool HasRuleWidth(const GapDataList<int>& widths) {
     for (const auto& width : widths.GetGapDataList()) {
       if (!width.IsRepeaterData()) {
         // Simple single value, check directly.
@@ -2531,6 +2536,9 @@ class ComputedStyle final : public ComputedStyleBase {
   bool IsScrollStateContainer() const {
     return ContainerType() & kContainerTypeScrollState;
   }
+  bool IsAnchoredContainer() const {
+    return ContainerType() & kContainerTypeAnchored;
+  }
 
   static bool IsDisplayBlockContainer(EDisplay display) {
     return display == EDisplay::kBlock || display == EDisplay::kListItem ||
@@ -2671,7 +2679,8 @@ class ComputedStyle final : public ComputedStyleBase {
   CORE_EXPORT bool CustomPropertiesEqual(const Vector<AtomicString>& properties,
                                          const ComputedStyle& other) const;
 
-  blink::Color GetCurrentColor(bool* is_current_color = nullptr) const;
+  CORE_EXPORT blink::Color GetCurrentColor(
+      bool* is_current_color = nullptr) const;
   blink::Color GetInternalVisitedCurrentColor(
       bool* is_current_color = nullptr) const;
   blink::Color GetInternalForcedCurrentColor(
@@ -2748,6 +2757,9 @@ class ComputedStyle final : public ComputedStyleBase {
 
   // Derived flags:
   bool CalculateIsStackingContextWithoutContainment() const;
+
+  CORE_EXPORT bool GapRuleColorIsTransparent(
+      const GapDataList<StyleColor>& gap_rule_color) const;
 
   FRIEND_TEST_ALL_PREFIXES(ComputedStyleTest, CustomPropertiesEqual_Values);
   FRIEND_TEST_ALL_PREFIXES(ComputedStyleTest, CustomPropertiesEqual_Data);
@@ -2966,11 +2978,41 @@ class ComputedStyleBuilder final : public ComputedStyleBuilderBase {
     SetColumnCountInternal(ComputedStyleInitialValues::InitialColumnCount());
   }
 
+  // column-rule-color
+  void SetColumnRuleColor(const GapDataList<StyleColor>& colors) {
+    SetMaybeHasGapDecorations();
+    SetColumnRuleColorInternal(colors);
+  }
+
+  // row-rule-color
+  void SetRowRuleColor(const GapDataList<StyleColor>& colors) {
+    SetMaybeHasGapDecorations();
+    SetRowRuleColorInternal(colors);
+  }
+
+  // column-rule-style
+  void SetColumnRuleStyle(const GapDataList<EBorderStyle>& styles) {
+    SetMaybeHasGapDecorations();
+    SetColumnRuleStyleInternal(styles);
+  }
+
+  // row-rule-style
+  void SetRowRuleStyle(const GapDataList<EBorderStyle>& styles) {
+    SetMaybeHasGapDecorations();
+    SetRowRuleStyleInternal(styles);
+  }
+
   // column-rule-width
-  void SetColumnRuleWidth(GapDataList<int> w) { SetColumnRuleWidthInternal(w); }
+  void SetColumnRuleWidth(const GapDataList<int>& widths) {
+    SetMaybeHasGapDecorations();
+    SetColumnRuleWidthInternal(widths);
+  }
 
   // row-rule-width
-  void SetRowRuleWidth(GapDataList<int> w) { SetRowRuleWidthInternal(w); }
+  void SetRowRuleWidth(const GapDataList<int>& widths) {
+    SetMaybeHasGapDecorations();
+    SetRowRuleWidthInternal(widths);
+  }
 
   // column-width
   void SetColumnWidth(float f) {

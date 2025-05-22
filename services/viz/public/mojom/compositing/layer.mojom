@@ -156,6 +156,22 @@ struct SolidColorScrollbarLayerExtra {
   skia.mojom.SkColor4f color;
 };
 
+// Extra fields in a cc::ViewTransitionContentLayerImpl that has been added
+// to a tree or modified in some interesting way since a prior tree update.
+struct ViewTransitionContentLayerExtra {
+  // The corresponding element resource id to be drawn.
+  ViewTransitionElementResourceId resource_id;
+
+  // Live content layers that don't have a corresponding resource render
+  // passes are skipped for drawing.
+  bool is_live_content_layer;
+
+  // max_extents_rect is the maximum possible size of the originating layer, as
+  // known to blink, in the originating layer's coordinate space.
+  gfx.mojom.RectF max_extents_rect;
+};
+
+
 // Extra properties that are specific to a LayerImpl type.
 union LayerExtra {
   // Extra properties that are specific to MirrorLayerImpl.
@@ -170,6 +186,8 @@ union LayerExtra {
   SurfaceLayerExtra surface_layer_extra;
   // Extra properties that are specific to TextureLayerImpl.
   TextureLayerExtra texture_layer_extra;
+  // Extra properties that are specific to ViewTransitionContentLayerImpl.
+  ViewTransitionContentLayerExtra view_transition_content_layer_extra;
 };
 
 // Details about a cc::LayerImpl that has been added to a tree or modified in
@@ -426,6 +444,20 @@ struct EffectNode {
   // The index of the ancestor EffectNode which induces a render surface. Must
   // be a valid index in the same effect tree.
   int32 target_id;
+
+  // If this node is tagged with a ViewTransitionElementResourceId, it means it
+  // produces a snapshot for an element participating in a transition. This
+  // target id corresponds to the effect node where the
+  // ViewTransitionContentLayer using this resource draws. Can be unset if no
+  // layer using this resource is being drawn.
+  int32 view_transition_target_id;
+
+  // The ancestor ids indicate the existence of render surfaces, copy requests,
+  // or captures on ancestor effect nodes.
+  int32 closest_ancestor_with_cached_render_surface_id;
+  int32 closest_ancestor_with_copy_request_id;
+  int32 closest_ancestor_being_captured_id;
+  int32 closest_ancestor_with_shared_element_id;
 
   // Represents a resource id for a resource cached or generated in the Viz
   // process.

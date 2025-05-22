@@ -30,6 +30,7 @@
 #include "cc/layers/solid_color_scrollbar_layer_impl.h"
 #include "cc/layers/surface_layer_impl.h"
 #include "cc/layers/texture_layer_impl.h"
+#include "cc/layers/view_transition_content_layer_impl.h"
 #include "cc/tiles/picture_layer_tiling.h"
 #include "cc/trees/layer_tree_impl.h"
 #include "cc/trees/property_tree.h"
@@ -162,6 +163,16 @@ void ComputePropertyTreeNodeUpdate(
       old_node->subtree_size == new_node.subtree_size &&
       old_node->blend_mode == new_node.blend_mode &&
       old_node->target_id == new_node.target_id &&
+      old_node->view_transition_target_id ==
+          new_node.view_transition_target_id &&
+      old_node->closest_ancestor_with_cached_render_surface_id ==
+          new_node.closest_ancestor_with_cached_render_surface_id &&
+      old_node->closest_ancestor_with_copy_request_id ==
+          new_node.closest_ancestor_with_copy_request_id &&
+      old_node->closest_ancestor_being_captured_id ==
+          new_node.closest_ancestor_being_captured_id &&
+      old_node->closest_ancestor_with_shared_element_id ==
+          new_node.closest_ancestor_with_shared_element_id &&
       old_node->view_transition_element_resource_id ==
           new_node.view_transition_element_resource_id &&
       old_node->has_copy_request == new_node.has_copy_request &&
@@ -216,6 +227,15 @@ void ComputePropertyTreeNodeUpdate(
   wire->subtree_size = new_node.subtree_size;
   wire->blend_mode = base::checked_cast<uint32_t>(new_node.blend_mode);
   wire->target_id = new_node.target_id;
+  wire->view_transition_target_id = new_node.view_transition_target_id;
+  wire->closest_ancestor_with_cached_render_surface_id =
+      new_node.closest_ancestor_with_cached_render_surface_id;
+  wire->closest_ancestor_with_copy_request_id =
+      new_node.closest_ancestor_with_copy_request_id;
+  wire->closest_ancestor_being_captured_id =
+      new_node.closest_ancestor_being_captured_id;
+  wire->closest_ancestor_with_shared_element_id =
+      new_node.closest_ancestor_with_shared_element_id;
   wire->view_transition_element_resource_id =
       new_node.view_transition_element_resource_id;
   wire->copy_output_requests = std::move(copy_requests);
@@ -455,10 +475,21 @@ viz::mojom::TilePtr SerializeTile(
   auto wire = viz::mojom::Tile::New();
   wire->column_index = tile.tiling_i_index();
   wire->row_index = tile.tiling_j_index();
+
+  // If a Tile is being deleted, mark the reason as deleted. This is essential
+  // to distinguish deleted tiles from OOMed OR RESOURCE_MODE tiles with no
+  // resources. OOMed tiles have no content but are still required in order to
+  // perform checkerboard.
+  if (tile.deleted()) {
+    wire->contents = viz::mojom::TileContents::NewMissingReason(
+        mojom::MissingTileReason::kTileDeleted);
+    return wire;
+  }
+
   switch (tile.draw_info().mode()) {
     case TileDrawInfo::OOM_MODE:
       wire->contents = viz::mojom::TileContents::NewMissingReason(
-          viz::mojom::MissingTileReason::kOutOfMemory);
+          mojom::MissingTileReason::kOutOfMemory);
       break;
 
     case TileDrawInfo::SOLID_COLOR_MODE:
@@ -473,7 +504,7 @@ viz::mojom::TilePtr SerializeTile(
             SerializeTileResource(tile, resource_provider, context_provider));
       } else {
         wire->contents = viz::mojom::TileContents::NewMissingReason(
-            viz::mojom::MissingTileReason::kResourceNotReady);
+            mojom::MissingTileReason::kResourceNotReady);
       }
       break;
   }
@@ -636,6 +667,14 @@ void SerializeSolidColorScrollbarLayerExtra(
   extra->color = layer.color();
 }
 
+void SerializeViewTransitionContentLayerExtra(
+    ViewTransitionContentLayerImpl& layer,
+    viz::mojom::ViewTransitionContentLayerExtraPtr& extra) {
+  extra->resource_id = layer.resource_id();
+  extra->is_live_content_layer = layer.is_live_content_layer();
+  extra->max_extents_rect = layer.max_extents_rect();
+}
+
 void SerializeSurfaceLayerExtra(SurfaceLayerImpl& layer,
                                 viz::mojom::SurfaceLayerExtraPtr& extra) {
   extra->surface_range = layer.range();
@@ -756,6 +795,17 @@ void SerializeLayer(LayerImpl& layer,
                                  context_provider);
       wire.layer_extra = viz::mojom::LayerExtra::NewTextureLayerExtra(
           std::move(texture_layer_extra));
+      break;
+    }
+    case mojom::LayerType::kViewTransitionContent: {
+      auto view_transition_content_layer_extra =
+          viz::mojom::ViewTransitionContentLayerExtra::New();
+      SerializeViewTransitionContentLayerExtra(
+          static_cast<ViewTransitionContentLayerImpl&>(layer),
+          view_transition_content_layer_extra);
+      wire.layer_extra =
+          viz::mojom::LayerExtra::NewViewTransitionContentLayerExtra(
+              std::move(view_transition_content_layer_extra));
       break;
     }
     default:
@@ -1107,6 +1157,7 @@ void VizLayerContext::UpdateDisplayTreeFrom(
     for (LayerImpl* layer : tree) {
       update->layer_order->push_back(layer->id());
     }
+    tree.set_needs_full_tree_sync(false);
   }
 
   if (needs_full_sync_) {
@@ -1118,6 +1169,7 @@ void VizLayerContext::UpdateDisplayTreeFrom(
       SerializeLayer(*layer, resource_provider, context_provider, *update);
     }
   }
+  tree.ClearLayersThatShouldPushProperties();
 
   // TODO(rockot): Granular change tracking for property trees, so we aren't
   // diffing every time.

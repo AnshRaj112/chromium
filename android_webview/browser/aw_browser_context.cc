@@ -73,6 +73,7 @@
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/download_request_utils.h"
+#include "content/public/browser/spare_render_process_host_manager.h"
 #include "content/public/browser/ssl_host_state_delegate.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
@@ -600,6 +601,11 @@ void AwBrowserContext::ConfigureNetworkContextParams(
         aw_ipp_core_host->IsIpProtectionEnabled();
   }
 
+  if (base::FeatureList::IsEnabled(features::kWebViewQuicConnectionTimeout)) {
+    context_params->quic_idle_connection_timeout_seconds =
+        features::kWebViewQuicConnectionTimeoutSeconds.Get();
+  }
+
   // Add proxy settings
   AwProxyConfigMonitor::GetInstance()->AddProxyToNetworkContextParams(
       context_params);
@@ -680,6 +686,11 @@ void AwBrowserContext::SetAllowedPrerenderingCount(JNIEnv* const env,
   CHECK_GT(allowed_count, 0);
   allowed_prerendering_count_ =
       std::min(allowed_count, MAX_ALLOWED_PRERENDERING_COUNT);
+}
+
+void AwBrowserContext::WarmUpSpareRenderer(JNIEnv* const env) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  content::SpareRenderProcessHostManager::Get().WarmupSpare(this);
 }
 
 std::unique_ptr<AwContentsIoThreadClient>

@@ -57,15 +57,16 @@ class SupervisedUserMetricsServiceTest : public testing::Test {
         identity_test_env_.identity_manager(),
         test_url_loader_factory_.GetSafeWeakWrapper(), pref_service_,
         settings_service_, &sync_service_,
-        std::make_unique<FakeURLFilterDelegate>(),
+        std::make_unique<SupervisedUserURLFilter>(
+            pref_service_, std::make_unique<FakeURLFilterDelegate>()),
         std::make_unique<FakePlatformDelegate>());
-    supervised_user_service_->Init();
   }
 
   void TearDown() override {
-    settings_service_.Shutdown();
+    // Order of shutdown must follow reverse order of dependencies.
     supervised_user_metrics_service_->Shutdown();
     supervised_user_service_->Shutdown();
+    settings_service_.Shutdown();
   }
 
  protected:

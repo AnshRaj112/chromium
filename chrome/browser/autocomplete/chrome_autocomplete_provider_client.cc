@@ -174,6 +174,10 @@ ChromeAutocompleteProviderClient::ChromeAutocompleteProviderClient(
       url_consent_helper_(
           unified_consent::UrlKeyedDataCollectionConsentHelper::
               NewAnonymizedDataCollectionConsentHelper(profile_->GetPrefs())),
+      personalized_url_consent_helper_(
+          unified_consent::UrlKeyedDataCollectionConsentHelper::
+              NewPersonalizedDataCollectionConsentHelper(
+                  SyncServiceFactory::GetForProfile(profile_))),
       tab_matcher_(GetTemplateURLService(), profile_),
       storage_partition_(nullptr),
       omnibox_triggered_feature_service_(
@@ -446,6 +450,11 @@ bool ChromeAutocompleteProviderClient::IsUrlDataCollectionActive() const {
   return url_consent_helper_->IsEnabled();
 }
 
+bool ChromeAutocompleteProviderClient::IsPersonalizedUrlDataCollectionActive()
+    const {
+  return personalized_url_consent_helper_->IsEnabled();
+}
+
 bool ChromeAutocompleteProviderClient::IsAuthenticated() const {
   const auto* identity_manager =
       IdentityManagerFactory::GetForProfile(profile_);
@@ -550,12 +559,14 @@ bool ChromeAutocompleteProviderClient::IsLensEnabled() const {
 #if !BUILDFLAG(IS_ANDROID)
   if (auto* lens_search_controller =
           GetLensSearchController(GetWebContents(web_contents_getter_))) {
-    // Guaranteed to exist if lens_search_controller is not null.
+    // Only allow Lens entrypoints if the Lens overlay is enabled and Lens is
+    // not currently active. Guaranteed to exist if lens_search_controller is
+    // not null.
     return lens_search_controller->GetTabInterface()
         ->GetBrowserWindowInterface()
         ->GetFeatures()
         .lens_overlay_entry_point_controller()
-        ->IsEnabled();
+        ->AreVisible();
   }
 #endif
   return false;

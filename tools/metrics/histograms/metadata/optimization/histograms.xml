@@ -767,7 +767,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="OptimizationGuide.HintsFetcher.GetHintsRequest.UrlCount.{RequestContext}"
-    units="total url count" expires_after="2025-09-14">
+    units="total url count" expires_after="2025-11-16">
   <owner>mcrouse@chromium.org</owner>
   <owner>sophiechang@chromium.org</owner>
   <summary>
@@ -1017,6 +1017,17 @@ chromium-metrics-reviews@google.com.
     response.
   </summary>
   <token key="ModelExecutionFeature" variants="ModelExecutionFeature"/>
+</histogram>
+
+<histogram name="OptimizationGuide.ModelExecution.OnDeviceModelCrashCount"
+    enum="OnDeviceModelValidationResult" expires_after="2026-05-19">
+  <owner>cduvall@chromium.org</owner>
+  <owner>sophiechang@chromium.org</owner>
+  <summary>
+    Records the number of consecutive crashes of the on-device model service
+    without a successful response. Recorded each time the on-device model
+    service crashes.
+  </summary>
 </histogram>
 
 <histogram

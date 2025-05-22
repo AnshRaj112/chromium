@@ -340,7 +340,6 @@ class TabStrip : public views::View,
   void ShiftGroupLeft(const tab_groups::TabGroupId& group) override;
   void ShiftGroupRight(const tab_groups::TabGroupId& group) override;
   const Browser* GetBrowser() const override;
-  int GetInactiveTabWidth() const override;
   bool IsFrameCondensed() const override;
 #if BUILDFLAG(IS_CHROMEOS)
   bool IsLockedForOnTask() override;
@@ -446,10 +445,6 @@ class TabStrip : public views::View,
   // Screen-reader-only announcements that depend on tab group titles.
   void AnnounceTabAddedToGroup(tab_groups::TabGroupId group_id);
   void AnnounceTabRemovedFromGroup(tab_groups::TabGroupId group_id);
-
-  // For metrics on the best size for tab scrolling, log if the different
-  // sizes would trigger tab scrolling
-  void LogTabWidthsForTabScrolling();
 
   // -- Member Variables ------------------------------------------------------
 

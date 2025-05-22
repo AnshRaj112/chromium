@@ -104,7 +104,6 @@
 #include "chrome/browser/ui/browser_location_bar_model_delegate.h"
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
-#include "chrome/browser/ui/browser_tab_menu_model_delegate.h"
 #include "chrome/browser/ui/browser_tab_strip_model_delegate.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_ui_prefs.h"
@@ -135,7 +134,6 @@
 #include "chrome/browser/ui/tab_modal_confirm_dialog.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_utils.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
-#include "chrome/browser/ui/tabs/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_group_deletion_dialog_controller.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
@@ -201,6 +199,7 @@
 #include "components/tabs/public/split_tab_data.h"
 #include "components/tabs/public/split_tab_id.h"
 #include "components/tabs/public/split_tab_visual_data.h"
+#include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"
 #include "components/user_manager/user_manager.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
@@ -635,8 +634,6 @@ Browser::Browser(const CreateParams& params)
           params.profile,
           params.are_tab_groups_enabled ? TabGroupModelFactory::GetInstance()
                                         : nullptr)),
-      tab_menu_model_delegate_(
-          std::make_unique<chrome::BrowserTabMenuModelDelegate>(this)),
       app_name_(params.app_name),
       is_trusted_source_(params.trusted_source),
       session_id_(SessionID::NewUnique()),
@@ -943,8 +940,15 @@ std::u16string Browser::GetWindowTitleForTab(int index) const {
   std::u16string title = base::UTF8ToUTF16(user_title_);
 
   if (title.empty()) {
-    title = FormatTitleForDisplay(
-        tab_strip_model_->GetWebContentsAt(index)->GetTitle());
+    title = tab_strip_model_->GetWebContentsAt(index)->GetTitle();
+    if (is_type_picture_in_picture()) {
+      content::WebContents* pip_web_contents =
+          PictureInPictureWindowManager::GetInstance()->GetWebContents();
+      if (pip_web_contents) {
+        title = pip_web_contents->GetTitle();
+      }
+    }
+    title = FormatTitleForDisplay(title);
   }
 
   if (title.empty() && (is_type_normal() || is_type_popup())) {
@@ -2782,7 +2786,8 @@ void Browser::RegisterProtocolHandler(
 
     permission_request_manager->AddRequest(
         requesting_frame,
-        new custom_handlers::RegisterProtocolHandlerPermissionRequest(
+        std::make_unique<
+            custom_handlers::RegisterProtocolHandlerPermissionRequest>(
             registry, handler, url, std::move(fullscreen_block)));
   }
 }

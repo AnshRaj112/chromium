@@ -463,6 +463,7 @@
 <translation id="2530896289327917474">تفعيل ميزة "التصفُّح النصي بالمؤشر" أو إيقافها</translation>
 <translation id="2531025035050312891">الجهاز بطيء</translation>
 <translation id="2531107890083353124">أثناء سحب علامة التبويب، اضغط على <ph name="KEY_ONE" />.</translation>
+<translation id="2532199152994248594">لتحديد موضع لالتقاط صورة له، عليك السحب أو الضغط على مفتاح المسافة</translation>
 <translation id="2545334090614121435">‏هل تحاول استخدام زر Home؟ استخدِم</translation>
 <translation id="254900897760075745">نسخ المحتوى الذي تم اختياره إلى الحافظة</translation>
 <translation id="2549711466868162843">تحسين الإضاءة</translation>
@@ -1483,6 +1484,7 @@
 <translation id="5788127256798019331">‏ملفات Play</translation>
 <translation id="5788535737706478207">إعادة فتح آخر علامة تبويب أو نافذة تم إغلاقها</translation>
 <translation id="5790085346892983794">تم بنجاح</translation>
+<translation id="5791926618942305301">‏في ميزة "لقطة الشاشة"، عليك ضبط الإعدادات على "<ph name="SOURCE" />" من النوع "<ph name="TYPE" />". يُرجى الضغط على مفتاح Tab لاختيار نوع الالتقاط، ثم الضغط على مفتاح Enter لالتقاط صورة. لاختيار منطقة الالتقاط، عليك الضبط على لقطة شاشة جزئية. وإذا لم تكن الميزة مفعّلة، عليك الضغط على مفتاح المسافة لاختيار المنطقة.</translation>
 <translation id="579415080077680903">صامت</translation>
 <translation id="5802516411616338943">فتح "الإعدادات السريعة"</translation>
 <translation id="5804651031882187592">‏إيقاف الإعداد "قفل شريحة SIM"</translation>
@@ -1498,7 +1500,7 @@
 <translation id="5842553299352339114">نقطة اتصال <ph name="DEVICE_NAME" /> مفعَّلة، وما مِن أجهزة متصلة بها.</translation>
 <translation id="584525477304726060">انقر مع الاستمرار على النافذة لتكبيرها.</translation>
 <translation id="5856638668464565213">الشبكة <ph name="NETWORK_NAME" /> غير مفعّلة.</translation>
-<translation id="5860033963881614850">غير مفعّلة</translation>
+<translation id="5860033963881614850">غير مفعّل</translation>
 <translation id="5860491529813859533">تفعيل</translation>
 <translation id="5864691701242730005">‏يعرض هذا المربّع إعدادات ميزة Quick Share. تم اختيار إذن الوصول إلى "<ph name="VISIBILITY" />"</translation>
 <translation id="5864748620896638071">مستوى شحن البطارية: %<ph name="BATTERY_PERCENTAGE" /></translation>
@@ -1639,6 +1641,7 @@
 <translation id="6288235558961782912">يمكن إعادة إضافة <ph name="USER_EMAIL_ADDRESS" /> لاحقًا بإذنٍ من أحد الوالدَين.</translation>
 <translation id="6291221004442998378">لا يتم الشحن.</translation>
 <translation id="6298183524022479114">تخصيص هذا الجهاز من خلال التطبيق</translation>
+<translation id="6304076460080088478">‏إغلاق نوافذ التصفُّح المتخفي أو تصغيرها للبحث في شاشتك باستخدام "عدسة Google"</translation>
 <translation id="6309219492973062892">النقر على الرموز من 1 إلى 8 على الرف</translation>
 <translation id="6315170314923504164">الصوت</translation>
 <translation id="6319058840130157106">التنقُّل للخلف بين أسفل يسار الشاشة ومشغّل التطبيقات وشريط العناوين وشريط الإشارات والموقع الإلكتروني المفتوح وعمليات التنزيل</translation>
@@ -1767,6 +1770,7 @@
 <translation id="6700713906295497288">‏زر قائمة أداة تحرير أسلوب الإدخال (IME)</translation>
 <translation id="6704073473590541209">مقبض الحافة اليسرى المحدَّد، ويمكن استخدام مفاتيح الأسهم لتحريكه</translation>
 <translation id="6706742084323792866">تثبيت لوحة المفاتيح</translation>
+<translation id="6709719156428404245">لتحديد موضع لتسجيل فيديو له، عليك السحب أو الضغط على مفتاح المسافة</translation>
 <translation id="6710213216561001401">السابق</translation>
 <translation id="6723839937902243910">الطاقة</translation>
 <translation id="672609503628871915">تعرف على الجديد</translation>

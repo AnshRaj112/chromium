@@ -7,6 +7,8 @@
 
 #include <set>
 
+#include "base/containers/flat_map.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "content/browser/webid/fedcm_config_fetcher.h"
 #include "content/browser/webid/idp_network_request_manager.h"
@@ -42,12 +44,14 @@ class FedCmAccountsFetcher {
   struct FedCmFetchingParams {
     FedCmFetchingParams(blink::mojom::RpMode rp_mode,
                         int icon_ideal_size,
-                        int icon_minimum_size);
+                        int icon_minimum_size,
+                        MediationRequirement mediation_requirement);
     ~FedCmFetchingParams();
 
     blink::mojom::RpMode rp_mode;
     int icon_ideal_size;
     int icon_minimum_size;
+    MediationRequirement mediation_requirement;
   };
 
   FedCmAccountsFetcher(
@@ -62,6 +66,19 @@ class FedCmAccountsFetcher {
   // Fetch well-known, config, accounts and client metadata endpoints for
   // passed-in IdPs. Uses parameters from `token_request_get_infos_`.
   void FetchEndpointsForIdps(const std::set<GURL>& idp_config_urls);
+
+  // Notifies metrics endpoint that either the user did not select the IDP in
+  // the prompt or that there was an error in fetching data for the IDP.
+  void SendAllFailedTokenRequestMetrics(
+      blink::mojom::FederatedAuthRequestResult result,
+      bool did_show_ui);
+  void SendSuccessfulTokenRequestMetrics(
+      const GURL& idp_config_url,
+      base::TimeDelta api_call_to_show_dialog_time,
+      base::TimeDelta show_dialog_to_continue_clicked_time,
+      base::TimeDelta account_selected_to_token_response_time,
+      base::TimeDelta api_call_to_token_response_time,
+      bool did_show_ui);
 
  private:
   void OnAllConfigAndWellKnownFetched(
@@ -111,7 +128,26 @@ class FedCmAccountsFetcher {
   void ComputeLoginStates(const GURL& idp_config_url,
                           std::vector<IdentityRequestAccountPtr>& accounts);
 
+  // Updates the IdpSigninStatus in case of accounts fetch failure and shows a
+  // failure UI if applicable.
+  void HandleAccountsFetchFailure(
+      std::unique_ptr<IdentityProviderInfo> idp_info,
+      std::optional<bool> old_idp_signin_status,
+      blink::mojom::FederatedAuthRequestResult result,
+      std::optional<content::FedCmRequestIdTokenStatus> token_status,
+      const IdpNetworkRequestManager::FetchStatus& status);
+
+  void OnIdpMismatch(std::unique_ptr<IdentityProviderInfo> idp_info);
+
+  void SendFailedTokenRequestMetrics(
+      const GURL& metrics_endpoint,
+      blink::mojom::FederatedAuthRequestResult result,
+      bool did_show_ui);
+
   std::unique_ptr<FedCmConfigFetcher> config_fetcher_;
+
+  // Populated in OnAllConfigAndWellKnownFetched().
+  base::flat_map<GURL, GURL> metrics_endpoints_;
 
   // Owned by FederatedAuthRequestImpl.
   raw_ref<RenderFrameHost> render_frame_host_;

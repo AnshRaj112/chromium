@@ -113,6 +113,7 @@ enum class HistorySyncOptinExpansionPillOption {
   kBrowseAcrossDevices,
   kSyncHistory,
   kSeeTabsFromOtherDevices,
+  kBrowseAcrossDevicesNewProfileMenuPromoVariant,
 };
 
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
@@ -189,11 +190,6 @@ BASE_DECLARE_FEATURE(kDeferWebSigninTrackerCreation);
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 BASE_DECLARE_FEATURE(kStableDeviceId);
 #endif  // BUILDFLAG(IS_CHROMEOS)
-
-#if BUILDFLAG(ENABLE_MIRROR) && !BUILDFLAG(IS_IOS)
-COMPONENT_EXPORT(SIGNIN_SWITCHES)
-BASE_DECLARE_FEATURE(kVerifyRequestInitiatorForMirrorHeaders);
-#endif  // BUILDFLAG(ENABLE_MIRROR) && !BUILDFLAG(IS_IOS)
 
 COMPONENT_EXPORT(SIGNIN_SWITCHES)
 BASE_DECLARE_FEATURE(kProfilesReordering);

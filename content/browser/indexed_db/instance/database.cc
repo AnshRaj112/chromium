@@ -30,6 +30,7 @@
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/trace_event/base_tracing.h"
+#include "base/types/expected_macros.h"
 #include "base/unguessable_token.h"
 #include "components/services/storage/indexed_db/locks/partitioned_lock_id.h"
 #include "components/services/storage/indexed_db/locks/partitioned_lock_manager.h"
@@ -277,22 +278,18 @@ Status Database::RunTasks() {
 }
 
 Status Database::ForceCloseAndRunTasks(const std::string& message) {
-  Status status;
   DCHECK(!force_closing_);
   force_closing_ = true;
   for (Connection* connection : connections_) {
     connection->CloseAndReportForceClose(message);
   }
   connections_.clear();
-  Status abort_status =
-      connection_coordinator_.PruneTasksForForceClose(message);
-  if (!abort_status.ok()) [[unlikely]] {
-    return abort_status;
-  }
+  IDB_RETURN_IF_ERROR(connection_coordinator_.PruneTasksForForceClose(message));
   connection_coordinator_.OnNoConnections();
 
   // Execute any pending tasks in the connection coordinator.
   ConnectionCoordinator::ExecuteTaskResult task_state;
+  Status status;
   do {
     std::tie(task_state, status) = connection_coordinator_.ExecuteTask(false);
     DCHECK(task_state !=
@@ -326,11 +323,8 @@ Status Database::VersionChangeOperation(int64_t version,
   int64_t old_version = metadata().version;
   DCHECK_GT(version, old_version);
 
-  Status s =
-      transaction->BackingStoreTransaction()->SetDatabaseVersion(version);
-  if (!s.ok()) {
-    return s;
-  }
+  IDB_RETURN_IF_ERROR(
+      transaction->BackingStoreTransaction()->SetDatabaseVersion(version));
 
   connection_coordinator_.BindVersionChangeTransactionReceiver();
   connection_coordinator_.OnUpgradeTransactionStarted(old_version);
@@ -360,8 +354,7 @@ Status Database::GetOperation(int64_t object_store_id,
   if (key_range.IsOnlyKey()) {
     key = std::move(key_range).TakeOnlyKey();
   } else {
-    base::expected<std::unique_ptr<BackingStore::Cursor>, Status>
-        backing_store_cursor;
+    StatusOr<std::unique_ptr<BackingStore::Cursor>> backing_store_cursor;
     if (index_id == IndexedDBIndexMetadata::kInvalidId) {
       // ObjectStore Retrieval Operation
       if (cursor_type == CursorType::kKeyOnly) {
@@ -589,7 +582,7 @@ Status Database::GetAllOperation(
   const IndexedDBObjectStoreMetadata& object_store_metadata =
       GetObjectStoreMetadata(object_store_id);
 
-  base::expected<std::unique_ptr<BackingStore::Cursor>, Status> cursor;
+  StatusOr<std::unique_ptr<BackingStore::Cursor>> cursor;
 
   if (result_type == blink::mojom::IDBGetAllResultType::Keys) {
     // Retrieving keys
@@ -661,12 +654,10 @@ Status Database::GetAllOperation(
       cursor_valid = true;
       did_first_seek = true;
     }
-    if (!s.ok()) {
-      result_sink->Get()->OnError(
-          CreateIDBErrorPtr(blink::mojom::IDBException::kUnknownError,
-                            "Seek failure, unable to continue", transaction));
-      return s;
-    }
+    IDB_RETURN_IF_ERROR_AND_DO(
+        s, result_sink->Get()->OnError(CreateIDBErrorPtr(
+               blink::mojom::IDBException::kUnknownError,
+               "Seek failure, unable to continue", transaction)));
 
     if (!cursor_valid) {
       break;
@@ -726,14 +717,11 @@ Status Database::SetIndexKeysOperation(
   DCHECK_EQ(transaction->mode(),
             blink::mojom::IDBTransactionMode::VersionChange);
 
-  BackingStore::RecordIdentifier record_identifier;
-  bool found = false;
-  Status s = transaction->BackingStoreTransaction()->KeyExistsInObjectStore(
-      object_store_id, primary_key, &record_identifier, &found);
-  if (!s.ok()) {
-    return s;
-  }
-  if (!found) {
+  ASSIGN_OR_RETURN(
+      std::optional<BackingStore::RecordIdentifier> found_record,
+      transaction->BackingStoreTransaction()->KeyExistsInObjectStore(
+          object_store_id, primary_key));
+  if (!found_record) {
     return transaction->Abort(
         DatabaseError(blink::mojom::IDBException::kUnknownError,
                       "Internal error setting index keys for object store."));
@@ -760,12 +748,9 @@ Status Database::SetIndexKeysOperation(
   }
 
   for (const auto& writer : index_writers) {
-    s = writer->WriteIndexKeys(record_identifier,
-                               transaction->BackingStoreTransaction(),
-                               object_store_id);
-    if (!s.ok()) {
-      return s;
-    }
+    IDB_RETURN_IF_ERROR(writer->WriteIndexKeys(
+        *found_record, transaction->BackingStoreTransaction(),
+        object_store_id));
   }
   return Status::OK();
 }
@@ -800,8 +785,7 @@ Status Database::OpenCursorOperation(
     transaction->AddPreemptiveEvent();
   }
 
-  base::expected<std::unique_ptr<BackingStore::Cursor>, Status>
-      backing_store_cursor;
+  StatusOr<std::unique_ptr<BackingStore::Cursor>> backing_store_cursor;
   if (params->index_id == IndexedDBIndexMetadata::kInvalidId) {
     if (params->cursor_type == CursorType::kKeyOnly) {
       DCHECK_EQ(params->task_type, blink::mojom::IDBTaskType::Normal);
@@ -880,8 +864,7 @@ Status Database::CountOperation(
     return Status::InvalidArgument("Invalid object_store_id and/or index_id.");
   }
 
-  base::expected<std::unique_ptr<BackingStore::Cursor>, Status>
-      backing_store_cursor;
+  StatusOr<std::unique_ptr<BackingStore::Cursor>> backing_store_cursor;
   if (index_id == IndexedDBIndexMetadata::kInvalidId) {
     backing_store_cursor =
         transaction->BackingStoreTransaction()->OpenObjectStoreKeyCursor(
@@ -906,9 +889,7 @@ Status Database::CountOperation(
   uint32_t count = 1;
   Status s;
   while ((*backing_store_cursor)->Continue(&s)) {
-    if (!s.ok()) {
-      return s;
-    }
+    IDB_RETURN_IF_ERROR(s);
     ++count;
   }
   std::move(callback).Run(/*success=*/true, count);
@@ -951,20 +932,21 @@ Status Database::GetKeyGeneratorCurrentNumberOperation(
     return Status::InvalidArgument("Invalid object_store_id.");
   }
 
-  int64_t current_number;
-  Status s =
+  ASSIGN_OR_RETURN(
+      int64_t current_number,
       transaction->BackingStoreTransaction()->GetKeyGeneratorCurrentNumber(
-          object_store_id, &current_number);
-  if (!s.ok()) {
-    std::move(callback).Run(
-        -1,
-        CreateIDBErrorPtr(blink::mojom::IDBException::kDataError,
-                          "Failed to get the current number of key generator.",
-                          transaction));
-    return s;
-  }
+          object_store_id),
+      [&callback, transaction](const Status& status) {
+        std::move(callback).Run(
+            -1, CreateIDBErrorPtr(
+                    blink::mojom::IDBException::kDataError,
+                    "Failed to get the current number of key generator.",
+                    transaction));
+        return status;
+      });
+
   std::move(callback).Run(current_number, nullptr);
-  return s;
+  return Status::OK();
 }
 
 Status Database::ClearOperation(

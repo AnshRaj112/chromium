@@ -4,10 +4,12 @@
 
 package org.chromium.chrome.browser.tabmodel;
 
+import android.view.MotionEvent;
+
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
+import org.chromium.components.browser_ui.util.motion.MotionEventInfo;
 import org.chromium.components.browser_ui.widget.list_view.ListViewTouchTracker;
-import org.chromium.components.browser_ui.widget.list_view.ListViewTouchTracker.ListViewTouchInfo;
 import org.chromium.ui.util.MotionEventUtils;
 
 /** Utility to help build {@link TabClosureParams}. */
@@ -29,12 +31,38 @@ public final class TabClosureParamsUtils {
             return true;
         }
 
-        ListViewTouchInfo lastSingleTapUp = listViewTouchTracker.getLastSingleTapUp();
-        if (lastSingleTapUp == null || lastSingleTapUp.toolType.length == 0) {
+        return shouldAllowUndo(listViewTouchTracker.getLastSingleTapUp());
+    }
+
+    /**
+     * Whether tab / tab group closure should allow undo, depending on the {@link MotionEventInfo}
+     * that triggered the closure.
+     *
+     * @param triggeringMotion {@link MotionEventInfo} that triggered the closure.
+     * @return true if undo is allowed.
+     */
+    public static boolean shouldAllowUndo(@Nullable MotionEventInfo triggeringMotion) {
+        if (triggeringMotion == null) {
             return true;
         }
 
-        // Allow undo as long as the last "single tap up" was *not* from a mouse.
-        return !MotionEventUtils.isMouseEvent(lastSingleTapUp.source, lastSingleTapUp.toolType[0]);
+        if (triggeringMotion.toolType.length == 0) {
+            return true;
+        }
+
+        // Allow undo as long as the triggering motion was *not* from a mouse.
+        return !MotionEventUtils.isMouseEvent(
+                triggeringMotion.source, triggeringMotion.toolType[0]);
+    }
+
+    /**
+     * Whether tab / tab group closure should allow undo, depending on the button state of the
+     * "down" motion that initiated the closure.
+     *
+     * @param downMotionButtonState the "down" motion's {@link MotionEvent#getButtonState()}
+     * @return true if undo is allowed.
+     */
+    public static boolean shouldAllowUndo(int downMotionButtonState) {
+        return downMotionButtonState == MotionEventUtils.MOTION_EVENT_BUTTON_NONE;
     }
 }

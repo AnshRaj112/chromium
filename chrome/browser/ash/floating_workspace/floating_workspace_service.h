@@ -45,6 +45,10 @@ struct SyncedSession;
 
 namespace ash {
 
+// How long do we wait before showing the network screen in case there is no
+// connection.
+inline constexpr base::TimeDelta kFwsNetworkScreenDelay = base::Seconds(2);
+
 // A keyed service to support floating workspace. Note that a periodical
 // task `CaptureAndUploadActiveDesk` will be dispatched during service
 // initialization.
@@ -92,6 +96,7 @@ class FloatingWorkspaceService
 
   // ash::SessionObserver overrides:
   void OnActiveUserSessionChanged(const AccountId& account_id) override;
+  void OnFirstSessionReady() override;
   void OnLockStateChanged(bool locked) override;
 
   // ash::LogoutConfirmationController::Observer:
@@ -241,9 +246,7 @@ class FloatingWorkspaceService
   // initialized.
   bool AreRequiredAppTypesInitialized();
 
-  // Once network state or sync feature active state changes have been detected,
-  // handle the startup UI appropriately based on connection.
-  void OnNetworkStateOrSyncServiceStateChanged();
+  void UpdateUiStateIfNeeded();
 
   // Initial task start. This includes checking the network connectivity upon
   // login and setting the appropriate state for startup UI.
@@ -270,6 +273,13 @@ class FloatingWorkspaceService
   void LaunchWhenAppCacheIsReady();
 
   void LaunchWhenDeskTemplatesAreReadyOnFirstSync();
+
+  // When there is no connection, we slightly delay showing the network screen,
+  // because on startup ChromeOS might be connecting to a new network, and we
+  // want to avoid showing the network screen for a few seconds only for it to
+  // immediately go away.
+  void ScheduleShowingNetworkScreen();
+  void MaybeShowNetworkScreen();
 
   // When syncing for the very first time, Chrome can assume that all Chrome
   // Sync data for a given Sync type is downloaded once corresponding Sync
@@ -325,10 +335,6 @@ class FloatingWorkspaceService
   // to detect stale entries when we rerun floating workspace flow from sleep
   // mode.
   std::optional<base::Time> timestamp_before_suspend_;
-
-  // The in memory cache of the latest workspace desk datatype download status.
-  std::optional<syncer::SyncService::DataTypeDownloadStatus>
-      download_status_cache_;
 
   // Timer used for periodic capturing and uploading.
   base::RepeatingTimer timer_;

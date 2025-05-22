@@ -8,6 +8,8 @@ import("//mojo/public/tools/bindings/mojom.gni")
 import("//testing/test.gni")
 
 assert(!is_fuchsia, "Fuchsia shouldn't use anything in //chrome")
+assert(!is_android,
+       "Android shouldn't use anything in //chrome/web_applications")
 
 source_set("web_applications") {
   sources = [
@@ -512,6 +514,7 @@ source_set("web_applications") {
     "//chrome/browser/content_settings:content_settings_factory",
     "//chrome/browser/favicon",
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles/keep_alive",
     "//chrome/browser/shortcuts",
     "//chrome/browser/sync:factories",
     "//chrome/browser/task_manager",
@@ -599,6 +602,7 @@ source_set("web_applications") {
         "preinstalled_web_apps/notebook_lm.cc",
         "preinstalled_web_apps/notebook_lm.h",
       ]
+      deps += [ "//extensions/common:common_constants" ]
     }
 
     deps += [ "//chrome/browser/resources:preinstalled_web_apps_resources" ]
@@ -860,6 +864,7 @@ source_set("web_applications_unit_tests") {
     "commands/install_app_locally_command_unittest.cc",
     "commands/install_from_sync_command_unittest.cc",
     "commands/manifest_update_check_command_unittest.cc",
+    "commands/manifest_update_check_command_v2_unittest.cc",
     "commands/manifest_update_finalize_command_unittest.cc",
     "commands/os_integration_synchronize_command_unittest.cc",
     "commands/run_on_os_login_command_unittest.cc",
@@ -1009,6 +1014,7 @@ source_set("web_applications_unit_tests") {
     "//chrome/browser/apps/link_capturing:test_support",
     "//chrome/browser/content_settings:content_settings_factory",
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles/keep_alive",
     "//chrome/browser/shortcuts:shortcuts",
     "//chrome/common",
     "//chrome/common:chrome_features",

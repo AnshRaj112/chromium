@@ -87,7 +87,8 @@ bool SnapGroupController::OnWindowSnapped(
       CanSnapActionSourceStartFasterSplitView(snap_action_source) ||
       snap_action_source ==
           WindowSnapActionSource::kSnapByClamshellTabletTransition ||
-      snap_action_source == WindowSnapActionSource::kAutoSnapInSplitView;
+      snap_action_source == WindowSnapActionSource::kAutoSnapInSplitView ||
+      snap_action_source == WindowSnapActionSource::kKeyboardShortcutToSnap;
   if (!can_group_or_replace) {
     return false;
   }
@@ -117,7 +118,6 @@ bool SnapGroupController::OnWindowSnapped(
     aura::Window* target_window = nullptr;
     switch (snap_action_source) {
       case WindowSnapActionSource::kSnapByWindowLayoutMenu:
-      case WindowSnapActionSource::kLacrosSnapButtonOrWindowLayoutMenu:
       case WindowSnapActionSource::kSnapByClamshellTabletTransition:
         // If the window was snapped via the layout menu, respect its
         // requested snap ratio. We also refresh the bounds for tablet
@@ -128,9 +128,11 @@ bool SnapGroupController::OnWindowSnapped(
       case WindowSnapActionSource::kLongPressCaptionButtonToSnap:
       case WindowSnapActionSource::kDragOrSelectOverviewWindowToSnap:
       case WindowSnapActionSource::kAutoSnapInSplitView:
-        // Else if using a drag to snap or auto-snap action source, respect the
-        // opposite window's snap ratio. This is to give the impression of
-        // filling the layout and feels more intuitive to the user.
+      case WindowSnapActionSource::kKeyboardShortcutToSnap:
+        // Else, e.g. if using a drag to snap or auto-snap action source,
+        // respect the opposite window's snap ratio. This is to give the
+        // impression of filling the layout and feels more intuitive to the
+        // user.
         target_window = opposite;
         break;
       default:

@@ -56,6 +56,8 @@ struct AndroidInfo {
   const std::string soc_manufacturer;
 
   const std::string abi_name;
+
+  const std::string security_patch;
 };
 
 static std::optional<AndroidInfo>& get_holder() {
@@ -88,7 +90,8 @@ static void JNI_AndroidInfo_FillFields(JNIEnv* env,
                                        std::string& socManufacturer,
                                        std::string& supportedAbis,
                                        jint sdkInt,
-                                       jboolean isDebugAndroid) {
+                                       jboolean isDebugAndroid,
+                                       std::string& securityPatch) {
   std::optional<AndroidInfo>& holder = get_holder();
   DCHECK(!holder.has_value());
   holder.emplace(
@@ -106,7 +109,8 @@ static void JNI_AndroidInfo_FillFields(JNIEnv* env,
                   .hardware = hardware,
                   .codename = codeName,
                   .soc_manufacturer = socManufacturer,
-                  .abi_name = supportedAbis});
+                  .abi_name = supportedAbis,
+                  .security_patch = securityPatch});
 }
 
 const std::string& device() {
@@ -168,6 +172,10 @@ const std::string& soc_manufacturer() {
 
 const std::string& abi_name() {
   return get_android_info().abi_name;
+}
+
+const std::string& security_patch() {
+  return get_android_info().security_patch;
 }
 
 }  // namespace base::android::android_info

@@ -693,11 +693,7 @@ void Connection::Clear(int64_t transaction_id,
 
 void Connection::CreateIndex(int64_t transaction_id,
                              int64_t object_store_id,
-                             int64_t index_id,
-                             const std::u16string& name,
-                             const IndexedDBKeyPath& key_path,
-                             bool unique,
-                             bool multi_entry) {
+                             const blink::IndexedDBIndexMetadata& index) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!IsConnected()) {
     return;
@@ -726,13 +722,12 @@ void Connection::CreateIndex(int64_t transaction_id,
   transaction->ScheduleTask(
       blink::mojom::IDBTaskType::Preemptive,
       base::BindOnce(
-          [](int64_t object_store_id, int64_t index_id,
-             const std::u16string& name, const IndexedDBKeyPath& key_path,
-             bool unique, bool multi_entry, Transaction* transaction) {
+          [](int64_t object_store_id, blink::IndexedDBIndexMetadata index,
+             Transaction* transaction) {
             return transaction->BackingStoreTransaction()->CreateIndex(
-                object_store_id, index_id, name, key_path, unique, multi_entry);
+                object_store_id, std::move(index));
           },
-          object_store_id, index_id, name, key_path, unique, multi_entry));
+          object_store_id, index));
 }
 
 void Connection::DeleteIndex(int64_t transaction_id,
@@ -933,15 +928,11 @@ Status Connection::AbortAllTransactionsAndIgnoreErrors(
 
 Status Connection::AbortAllTransactions(const DatabaseError& error) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  for (const auto& pair : transactions_) {
-    auto& transaction = pair.second;
+  for (auto& [_, transaction] : transactions_) {
     if (transaction->state() != Transaction::FINISHED) {
       TRACE_EVENT1("IndexedDB", "Database::Abort(error)", "transaction.id",
                    transaction->id());
-      Status status = transaction->Abort(error);
-      if (!status.ok()) {
-        return status;
-      }
+      IDB_RETURN_IF_ERROR(transaction->Abort(error));
     }
   }
   return Status::OK();

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "services/webnn/public/mojom/webnn_device.mojom-blink-forward.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_transpose_options.h"
 #ifdef UNSAFE_BUFFERS_BUILD
 // TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
@@ -214,7 +215,7 @@ MLOperand* BuildGemm(V8TestingScope& scope,
                      MLGraphBuilder* builder,
                      MLOperand* a,
                      MLOperand* b,
-                     const MLGemmOptions* options = MLGemmOptions::Create()) {
+                     MLGemmOptions* options = MLGemmOptions::Create()) {
   auto* output = builder->gemm(a, b, options, scope.GetExceptionState());
   EXPECT_THAT(output, testing::NotNull());
   EXPECT_EQ(output->Kind(), webnn::mojom::blink::Operand::Kind::kOutput);
@@ -232,7 +233,7 @@ MLOperand* BuildElementWiseBinaryOperator(
     MLOperand* a,
     MLOperand* b,
     webnn::mojom::blink::ElementWiseBinary::Kind kind,
-    const MLOperatorOptions* options) {
+    MLOperatorOptions* options) {
   switch (kind) {
     case webnn::mojom::blink::ElementWiseBinary::Kind::kAdd:
       return builder->add(a, b, options, scope.GetExceptionState());
@@ -275,7 +276,7 @@ MLOperand* BuildElementWiseBinary(
     webnn::mojom::blink::ElementWiseBinary::Kind kind,
     MLOperand* a,
     MLOperand* b,
-    const MLOperatorOptions* options = MLOperatorOptions::Create()) {
+    MLOperatorOptions* options = MLOperatorOptions::Create()) {
   MLOperand* output =
       BuildElementWiseBinaryOperator(builder, scope, a, b, kind, options);
   EXPECT_THAT(output, testing::NotNull());
@@ -461,8 +462,9 @@ class FakeWebNNGraphBuilder : public blink_mojom::WebNNGraphBuilder {
         std::make_unique<FakeWebNNGraph>(*helper_),
         blink_remote.InitWithNewEndpointAndPassReceiver());
 
-    std::move(callback).Run(blink_mojom::CreateGraphResult::NewGraphRemote(
-        std::move(blink_remote)));
+    auto success = blink_mojom::CreateGraphSuccess::New(
+        std::move(blink_remote), WTF::Vector<blink_mojom::Device>());
+    std::move(callback).Run(std::move(success));
   }
 
   void CreatePendingConstant(const WebNNPendingConstantToken& constant_handle,
@@ -499,6 +501,7 @@ class FakeWebNNContext : public blink_mojom::WebNNContext {
   }
 
   void CreateTensor(blink_mojom::TensorInfoPtr tensor_info,
+                    mojo_base::BigBuffer tensor_data,
                     CreateTensorCallback callback) override {
     mojo::PendingAssociatedRemote<blink_mojom::WebNNTensor> blink_remote;
     auto blink_receiver = blink_remote.InitWithNewEndpointAndPassReceiver();
@@ -795,7 +798,7 @@ ScriptPromise<MLGraph> BuildSimpleGraph(V8TestingScope& scope,
   auto* rhs_operand = BuildInput(scope.GetScriptState(), builder, "rhs",
                                  {3, 4, 5}, V8MLOperandDataType::Enum::kFloat32,
                                  scope.GetExceptionState());
-  const MLOperatorOptions* options = MLOperatorOptions::Create();
+  MLOperatorOptions* options = MLOperatorOptions::Create();
   auto* output = builder->add(lhs_operand, rhs_operand, options,
                               scope.GetExceptionState());
   EXPECT_THAT(output, testing::NotNull());
@@ -919,7 +922,7 @@ TEST_F(MLGraphTest, BuildTest) {
                          V8MLOperandDataType::Enum::kFloat32, exception_state);
     auto* b = BuildInput(scope.GetScriptState(), builder, "a", {3, 4, 5},
                          V8MLOperandDataType::Enum::kFloat32, exception_state);
-    const MLOperatorOptions* options = MLOperatorOptions::Create();
+    MLOperatorOptions* options = MLOperatorOptions::Create();
     auto* c = builder->add(a, b, options, exception_state);
     ASSERT_THAT(c, testing::NotNull());
 
@@ -944,7 +947,7 @@ TEST_F(MLGraphTest, BuildTest) {
     ASSERT_THAT(builder, testing::NotNull());
     auto* a = BuildInput(scope.GetScriptState(), builder, "a", {3, 4, 5},
                          V8MLOperandDataType::Enum::kFloat32, exception_state);
-    const MLOperatorOptions* options = MLOperatorOptions::Create();
+    MLOperatorOptions* options = MLOperatorOptions::Create();
     auto* output = builder->add(a, a, options, exception_state);
     ASSERT_THAT(output, testing::NotNull());
     MLNamedOperands named_outputs = {{"b", output}};
@@ -971,7 +974,7 @@ TEST_F(MLGraphTest, BuildTest) {
     ASSERT_THAT(builder, testing::NotNull());
     auto* a = BuildInput(scope.GetScriptState(), builder, "a", {3, 4, 5},
                          V8MLOperandDataType::Enum::kFloat32, exception_state);
-    const MLOperatorOptions* options = MLOperatorOptions::Create();
+    MLOperatorOptions* options = MLOperatorOptions::Create();
     auto* b = builder->relu(a, options, exception_state);
     ASSERT_THAT(b, testing::NotNull());
     auto* c = builder->sigmoid(a, options, exception_state);
@@ -1265,7 +1268,7 @@ struct SoftmaxTester {
     auto* input_operand =
         BuildInput(scope.GetScriptState(), builder, "input", input.dimensions,
                    input.data_type, scope.GetExceptionState());
-    const MLOperatorOptions* options = MLOperatorOptions::Create();
+    MLOperatorOptions* options = MLOperatorOptions::Create();
     auto* output_operand =
         builder->softmax(input_operand, options, scope.GetExceptionState());
     MLNamedOperands named_outputs = {{"output", output_operand}};
@@ -1280,8 +1283,8 @@ struct SoftmaxTester {
     EXPECT_TRUE(operation->is_softmax());
     EXPECT_EQ(graph_info->output_operands.size(), 1u);
     auto output_operand_id = graph_info->output_operands[0];
-    ASSERT_LT(output_operand_id, graph_info->operands.size());
-    EXPECT_EQ(graph_info->operands[output_operand_id]->descriptor,
+    ASSERT_LT(output_operand_id.value(), graph_info->operands.size());
+    EXPECT_EQ(graph_info->operands[output_operand_id.value()]->descriptor,
               expected_descriptor);
   }
 };
@@ -1329,7 +1332,7 @@ struct CastTester {
     auto* input_operand =
         BuildInput(scope.GetScriptState(), builder, "input", input.dimensions,
                    input.data_type, scope.GetExceptionState());
-    const MLOperatorOptions* options = MLOperatorOptions::Create();
+    MLOperatorOptions* options = MLOperatorOptions::Create();
     auto* output_operand =
         builder->cast(input_operand, V8MLOperandDataType(output_data_type),
                       options, scope.GetExceptionState());
@@ -1349,8 +1352,8 @@ struct CastTester {
               blink_mojom::ElementWiseUnary::Kind::kCast);
     EXPECT_EQ(graph_info->output_operands.size(), 1u);
     auto output_operand_id = graph_info->output_operands[0];
-    ASSERT_LT(output_operand_id, graph_info->operands.size());
-    EXPECT_EQ(graph_info->operands[output_operand_id]->descriptor,
+    ASSERT_LT(output_operand_id.value(), graph_info->operands.size());
+    EXPECT_EQ(graph_info->operands[output_operand_id.value()]->descriptor,
               expected_descriptor);
   }
 };
@@ -1571,7 +1574,7 @@ TEST_F(MLGraphTest, MLTransformTest) {
     //   [b]
     auto* a = BuildInput(scope.GetScriptState(), builder, "a", {3, 4, 5},
                          V8MLOperandDataType::Enum::kFloat32, exception_state);
-    const MLOperatorOptions* options = MLOperatorOptions::Create();
+    MLOperatorOptions* options = MLOperatorOptions::Create();
     auto* b = builder->add(a, a, options, exception_state);
     ASSERT_THAT(b, testing::NotNull());
     //  Transform the graph to:

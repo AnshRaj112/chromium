@@ -59,7 +59,6 @@ android_library("java") {
     "java/src/org/chromium/chrome/browser/touch_to_fill/TouchToFillCoordinator.java",
     "java/src/org/chromium/chrome/browser/touch_to_fill/TouchToFillMediator.java",
     "java/src/org/chromium/chrome/browser/touch_to_fill/TouchToFillProperties.java",
-    "java/src/org/chromium/chrome/browser/touch_to_fill/TouchToFillResourceProvider.java",
     "java/src/org/chromium/chrome/browser/touch_to_fill/TouchToFillView.java",
     "java/src/org/chromium/chrome/browser/touch_to_fill/TouchToFillViewBinder.java",
     "java/src/org/chromium/chrome/browser/touch_to_fill/TouchToFillViewHolder.java",
@@ -74,8 +73,6 @@ android_resources("java_resources") {
     "//ui/android:ui_java_resources",
   ]
   sources = [
-    "java/res/drawable-night/touch_to_fill_header_image.xml",
-    "java/res/drawable/touch_to_fill_header_image.xml",
     "java/res/drawable/touch_to_fill_more_passkeys_icon.xml",
     "java/res/layout/touch_to_fill_footer_item.xml",
     "java/res/layout/touch_to_fill_header_item.xml",

@@ -933,7 +933,6 @@ bool NdkVideoEncodeAccelerator::DrainConfig() {
 
   NdkMediaCodecWrapper::OutputInfo output_buffer = media_codec_->PeekOutput();
   AMediaCodecBufferInfo& mc_buffer_info = output_buffer.info;
-  const size_t mc_buffer_size = static_cast<size_t>(mc_buffer_info.size);
 
   // Check that the first buffer in the queue contains config data.
   if ((mc_buffer_info.flags & AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG) == 0)
@@ -942,28 +941,15 @@ bool NdkVideoEncodeAccelerator::DrainConfig() {
   // We already have the info we need from `output_buffer`
   std::ignore = media_codec_->TakeOutput();
 
-  auto out_buffer_data =
-      media_codec_->GetOutputBuffer(output_buffer.buffer_index);
+  auto out_buffer_data = media_codec_->GetOutputBuffer(output_buffer);
   if (out_buffer_data.empty()) {
     NotifyErrorStatus({EncoderStatus::Codes::kEncoderFailedEncode,
                        "Can't obtain output buffer from media codec"});
     return false;
   }
 
-  if (mc_buffer_info.offset + mc_buffer_size > out_buffer_data.size()) {
-    NotifyErrorStatus({EncoderStatus::Codes::kEncoderFailedEncode,
-                       base::StringPrintf("Invalid output buffer layout."
-                                          "offset: %d size: %zu capacity: %zu",
-                                          mc_buffer_info.offset, mc_buffer_size,
-                                          out_buffer_data.size())});
-    return false;
-  }
-
   if (ProfileNeedsConfigDataInBitstream(config_.output_profile)) {
-    config_data_.resize(mc_buffer_size);
-    base::span(config_data_)
-        .copy_from(out_buffer_data.subspan(
-            static_cast<size_t>(mc_buffer_info.offset), mc_buffer_size));
+    config_data_.assign(out_buffer_data.begin(), out_buffer_data.end());
   }
   AMediaCodec_releaseOutputBuffer(media_codec_->codec(),
                                   output_buffer.buffer_index, false);
@@ -1022,20 +1008,10 @@ void NdkVideoEncodeAccelerator::DrainOutput() {
     return;
   }
 
-  auto out_buffer_data =
-      media_codec_->GetOutputBuffer(output_buffer.buffer_index);
+  auto out_buffer_data = media_codec_->GetOutputBuffer(output_buffer);
   if (out_buffer_data.empty()) {
     NotifyErrorStatus({EncoderStatus::Codes::kEncoderFailedEncode,
                        "Can't obtain output buffer from media codec"});
-    return;
-  }
-
-  if (mc_buffer_info.offset + mc_buffer_size > out_buffer_data.size()) {
-    NotifyErrorStatus({EncoderStatus::Codes::kEncoderFailedEncode,
-                       base::StringPrintf("Invalid output buffer layout."
-                                          "offset: %d size: %zu capacity: %zu",
-                                          mc_buffer_info.offset, mc_buffer_size,
-                                          out_buffer_data.size())});
     return;
   }
 
@@ -1053,9 +1029,8 @@ void NdkVideoEncodeAccelerator::DrainOutput() {
     output_dst.copy_prefix_from(config_data_);
     output_dst = output_dst.subspan(config_size);
   }
-  output_dst.copy_prefix_from(out_buffer_data.subspan(
-      static_cast<size_t>(mc_buffer_info.offset), mc_buffer_size));
 
+  output_dst.copy_prefix_from(out_buffer_data);
   auto timestamp = RetrieveRealTimestamp(
       base::Microseconds(mc_buffer_info.presentationTimeUs));
   auto metadata = BitstreamBufferMetadata(mc_buffer_size + config_size,
@@ -1074,7 +1049,7 @@ void NdkVideoEncodeAccelerator::DrainOutput() {
     }
 
     TemporalScalabilityIdExtractor::BitstreamMetadata bits_md;
-    if (!svc_parser_->ParseChunk(output_dst.subspan(mc_buffer_size),
+    if (!svc_parser_->ParseChunk(output_dst.first(mc_buffer_size),
                                  input_since_keyframe_count_, bits_md)) {
       NotifyErrorStatus({EncoderStatus::Codes::kEncoderHardwareDriverError,
                          "Parse bitstream failed"});

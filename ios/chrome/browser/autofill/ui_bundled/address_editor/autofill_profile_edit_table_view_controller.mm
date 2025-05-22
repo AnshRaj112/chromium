@@ -103,6 +103,8 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
     _settingsView = settingsView;
     _addManualAddress = addManualAddress;
     _moveToAccountFromSettings = NO;
+    _hasSaveButton = NO;
+    _hasUpdateButton = NO;
     _dynamicallyLoadInputFieldsEnabled = base::FeatureList::IsEnabled(
         kAutofillDynamicallyLoadsFieldsForAddressInput);
   }
@@ -154,9 +156,6 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 }
 
 - (void)loadModel {
-  _hasSaveButton = NO;
-  _hasUpdateButton = NO;
-
   TableViewModel* model = _controller.tableViewModel;
 
   AutofillProfileDetailsSectionIdentifier nameSection =
@@ -312,6 +311,8 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
 
 - (void)loadMessageAndButtonForModalIfSaveOrUpdate:(BOOL)update {
   CHECK(!_settingsView);
+  _hasSaveButton = !update;
+  _hasUpdateButton = update;
   TableViewModel* model = _controller.tableViewModel;
 
   if (self.accountProfile || self.migrationPrompt) {
@@ -338,9 +339,6 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
     [model addItem:[self saveButtonIfSaveOrUpdate:update]
         toSectionWithIdentifier:AutofillProfileDetailsSectionIdentifierFields];
   }
-
-  _hasSaveButton = !update;
-  _hasUpdateButton = update;
 }
 
 - (BOOL)isItemAtIndexPathTextEditCell:(NSIndexPath*)cellPath {
@@ -734,7 +732,9 @@ const CGFloat kLineSpacingBetweenErrorAndFooter = 12.0f;
   return _moveToAccountFromSettings
              ? @""
              : l10n_util::GetNSStringF(
-                   IDS_IOS_SETTINGS_AUTOFILL_ACCOUNT_ADDRESS_FOOTER_TEXT,
+                   _hasSaveButton
+                       ? IDS_IOS_AUTOFILL_SAVE_ADDRESS_IN_ACCOUNT_FOOTER
+                       : IDS_IOS_SETTINGS_AUTOFILL_ACCOUNT_ADDRESS_FOOTER_TEXT,
                    base::SysNSStringToUTF16(_userEmail));
 }
 

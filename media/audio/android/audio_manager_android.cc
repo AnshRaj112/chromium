@@ -29,6 +29,7 @@
 #include "media/audio/fake_audio_input_stream.h"
 #include "media/base/audio_parameters.h"
 #include "media/base/channel_layout.h"
+#include "media/base/media_switches.h"
 #include "media/media_buildflags.h"
 
 #if BUILDFLAG(USE_OPENSLES)
@@ -371,7 +372,7 @@ AudioOutputStream* AudioManagerAndroid::MakeAudioOutputStream(
   AudioOutputStream* stream = AudioManagerBase::MakeAudioOutputStream(
       params, device_id, AudioManager::LogCallback());
   if (stream) {
-    streams_.insert(static_cast<MuteableAudioOutputStream*>(stream));
+    output_streams_.insert(static_cast<MuteableAudioOutputStream*>(stream));
   }
   return stream;
 }
@@ -403,7 +404,7 @@ AudioInputStream* AudioManagerAndroid::MakeAudioInputStream(
   // Bluetooth headset.
   bool force_communication_mode = false;
 #if BUILDFLAG(IS_DESKTOP_ANDROID)
-  force_communication_mode = IsBluetoothMicrophoneOn();
+  force_communication_mode = IsBluetoothScoOn();
 #endif
   if (params.effects() != AudioParameters::NO_EFFECTS ||
       force_communication_mode) {
@@ -415,7 +416,7 @@ AudioInputStream* AudioManagerAndroid::MakeAudioInputStream(
 
 void AudioManagerAndroid::ReleaseOutputStream(AudioOutputStream* stream) {
   DCHECK(GetTaskRunner()->BelongsToCurrentThread());
-  streams_.erase(static_cast<MuteableAudioOutputStream*>(stream));
+  output_streams_.erase(static_cast<MuteableAudioOutputStream*>(stream));
   AudioManagerBase::ReleaseOutputStream(stream);
 }
 
@@ -564,6 +565,41 @@ AudioInputStream* AudioManagerAndroid::MakeLowLatencyInputStream(
 #endif
 }
 
+void AudioManagerAndroid::OnStartAAudioInputStream(AAudioInputStream* stream) {
+  // Enable Bluetooth SCO for Bluetooth SCO input streams when per-stream device
+  // selection is enabled.
+
+  DCHECK(GetTaskRunner()->BelongsToCurrentThread());
+
+  bool stream_requires_sco =
+      UseAAudioPerStreamDeviceSelection() &&
+      stream->GetDevice().GetType() == AudioDeviceType::kBluetoothSco;
+  if (!stream_requires_sco) {
+    return;
+  }
+
+  input_streams_requiring_sco_.insert(stream);
+
+  // SCO can safely be re-enabled even if it is already on.
+  MaybeSetBluetoothScoState(true);
+}
+
+void AudioManagerAndroid::OnStopAAudioInputStream(AAudioInputStream* stream) {
+  // Disable Bluetooth SCO when it is no longer needed by any input streams.
+
+  DCHECK(GetTaskRunner()->BelongsToCurrentThread());
+
+  // Only disable SCO if the last stream requiring it was just stopped
+  if (input_streams_requiring_sco_.erase(stream) == 0) {
+    return;
+  }
+  if (!input_streams_requiring_sco_.empty()) {
+    return;
+  }
+
+  MaybeSetBluetoothScoState(false);
+}
+
 void AudioManagerAndroid::SetMute(JNIEnv* env,
                                   const JavaParamRef<jobject>& obj,
                                   jboolean muted) {
@@ -623,6 +659,14 @@ AudioParameters AudioManagerAndroid::GetPreferredOutputStreamParameters(
     }
   }
 
+  if (base::FeatureList::IsEnabled(kUseAudioManagerMaxChannelLayout)) {
+    // Since channel count never changes over the lifetime of an output stream,
+    // use the max number of channels supported. This can prevent down-sampling
+    // and loss of channel information (e.g. if a stream starts as stereo and
+    // changes to 5.1)
+    channel_layout_config = GetLayoutWithMaxChannels(channel_layout_config);
+  }
+
   int user_buffer_size = GetUserBufferSize();
   if (user_buffer_size) {
     buffer_size = user_buffer_size;
@@ -633,7 +677,6 @@ AudioParameters AudioManagerAndroid::GetPreferredOutputStreamParameters(
     return GetAudioFormatsSupportedBySinkDevice(
         output_device_id, channel_layout_config, sample_rate, buffer_size);
   }
-
   return AudioParameters(AudioParameters::AUDIO_PCM_LOW_LATENCY,
                          channel_layout_config, sample_rate, buffer_size);
 }
@@ -680,9 +723,14 @@ bool AudioManagerAndroid::SetCommunicationDevice(const std::string& device_id) {
       env, GetJavaAudioManager(), j_device_id);
 }
 
-bool AudioManagerAndroid::IsBluetoothMicrophoneOn() {
-  return Java_AudioManagerAndroid_isBluetoothMicrophoneOn(
+bool AudioManagerAndroid::IsBluetoothScoOn() {
+  return Java_AudioManagerAndroid_isBluetoothScoOn(
       base::android::AttachCurrentThread(), GetJavaAudioManager());
+}
+
+void AudioManagerAndroid::MaybeSetBluetoothScoState(bool state) {
+  return Java_AudioManagerAndroid_maybeSetBluetoothScoState(
+      base::android::AttachCurrentThread(), GetJavaAudioManager(), state);
 }
 
 int AudioManagerAndroid::GetNativeOutputSampleRate() {
@@ -739,7 +787,7 @@ AudioParameters AudioManagerAndroid::GetAudioFormatsSupportedBySinkDevice(
 
 void AudioManagerAndroid::DoSetMuteOnAudioThread(bool muted) {
   DCHECK(GetTaskRunner()->BelongsToCurrentThread());
-  for (auto stream : streams_) {
+  for (auto stream : output_streams_) {
     stream->SetMute(muted);
   }
 }
@@ -749,9 +797,25 @@ void AudioManagerAndroid::DoSetVolumeOnAudioThread(double volume) {
   output_volume_override_ = volume;
 
   DCHECK(GetTaskRunner()->BelongsToCurrentThread());
-  for (auto stream : streams_) {
+  for (auto stream : output_streams_) {
     stream->SetVolume(volume);
   }
+}
+
+ChannelLayoutConfig AudioManagerAndroid::GetLayoutWithMaxChannels(
+    ChannelLayoutConfig layout_configuration) {
+  JNIEnv* env = AttachCurrentThread();
+  int value = Java_AudioManagerAndroid_getLayoutWithMaxChannels(
+      env, GetJavaAudioManager());
+  CHECK_GT(value, 0);
+  CHECK_LE(value, CHANNEL_LAYOUT_MAX);
+  ChannelLayout channel_layout = static_cast<ChannelLayout>(value);
+  int number_channels = ChannelLayoutToChannelCount(channel_layout);
+  if (number_channels > layout_configuration.channels()) {
+    return ChannelLayoutConfig(channel_layout, number_channels);
+  }
+
+  return layout_configuration;
 }
 
 }  // namespace media

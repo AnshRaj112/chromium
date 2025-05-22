@@ -97,6 +97,10 @@ BASE_DECLARE_FEATURE(kLensOverlayCornerSliders);
 COMPONENT_EXPORT(LENS_FEATURES)
 BASE_DECLARE_FEATURE(kLensSearchProtectedPage);
 
+// Enables the EDU action chip.
+COMPONENT_EXPORT(LENS_FEATURES)
+BASE_DECLARE_FEATURE(kLensOverlayEduActionChip);
+
 // The base URL for Lens.
 COMPONENT_EXPORT(LENS_FEATURES)
 extern const base::FeatureParam<std::string> kHomepageURLForLens;
@@ -764,6 +768,15 @@ extern bool GetShouldCopyAsImage();
 COMPONENT_EXPORT(LENS_FEATURES)
 extern bool GetVisualSelectionUpdatesEnableBorderGlow();
 
+// Whether to enable the gradient region stroke for the visual selection
+// updates.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern bool GetVisualSelectionUpdatesEnableGradientRegionStroke();
+
+// Whether to enable the thumbnail in the contextual searchbox.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern bool GetVisualSelectionUpdatesEnableCsbThumbnail();
+
 // Whether to fix the request id for page content upload requests. When enabled,
 // this will not increment the image upload request ID when the page content
 // upload request is sent.
@@ -841,6 +854,34 @@ bool IsLensSearchProtectedPageEnabled();
 // Whether to enable the limited scroll-to API functionality in the side panel.
 COMPONENT_EXPORT(LENS_FEATURES)
 bool IsLensSearchSidePanelScrollToAPIEnabled();
+
+// Whether to enable the EDU action chip.
+COMPONENT_EXPORT(LENS_FEATURES)
+bool IsLensOverlayEduActionChipEnabled();
+
+// URL allow filters for the EDU action chip.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern std::string GetLensOverlayEduUrlAllowFilters();
+
+// URL block filters for the EDU action chip.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern std::string GetLensOverlayEduUrlBlockFilters();
+
+// URL path match allow filters for the EDU action chip.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern std::string GetLensOverlayEduUrlPathMatchAllowFilters();
+
+// URL path match block filters for the EDU action chip.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern std::string GetLensOverlayEduUrlPathMatchBlockFilters();
+
+// URL force-allowed match patterns for the EDU action chip.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern std::string GetLensOverlayEduUrlForceAllowedMatchPatterns();
+
+// Hashed domain block filters for the EDU action chip.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern std::string GetLensOverlayEduHashedDomainBlockFilters();
 
 }  // namespace lens::features
 #endif  // COMPONENTS_LENS_LENS_FEATURES_H_

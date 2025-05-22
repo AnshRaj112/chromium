@@ -71,11 +71,22 @@ BASE_FEATURE(kReplaceSyncPromosWithSignInPromos,
 
 BASE_FEATURE(kSyncSupportAlwaysSyncingPriorityPreferences,
              "SyncSupportAlwaysSyncingPriorityPreferences",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_CHROMEOS)
+             // TODO(crbug.com/418991364): Enable by default once prefs account
+             // storage is launched on ChromeOS.
+             base::FEATURE_DISABLED_BY_DEFAULT
+#else
+             base::FEATURE_ENABLED_BY_DEFAULT
+#endif  // BUILDFLAG(IS_CHROMEOS)
+);
 
 BASE_FEATURE(kEnableBookmarksSelectedTypeOnSigninForTesting,
              "EnableBookmarksSelectedTypeOnSigninForTesting",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kSearchEngineAvoidFaviconOnlyCommits,
+             "SearchEngineAvoidFaviconOnlyCommits",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 BASE_FEATURE(kReadingListEnableSyncTransportModeUponSignIn,
@@ -154,6 +165,12 @@ BASE_FEATURE(kSyncEnablePasswordsSyncErrorMessageAlternative,
 #if BUILDFLAG(IS_IOS)
 BASE_FEATURE(kSyncTrustedVaultInfobarImprovements,
              "SyncTrustedVaultInfobarImprovements",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(IS_IOS)
+
+#if BUILDFLAG(IS_IOS)
+BASE_FEATURE(kSyncTrustedVaultInfobarMessageImprovements,
+             "SyncTrustedVaultInfobarMessageImprovements",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_IOS)
 

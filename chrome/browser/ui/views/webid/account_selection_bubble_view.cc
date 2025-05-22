@@ -57,6 +57,7 @@
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/layout/box_layout_view.h"
 #include "ui/views/layout/flex_layout.h"
+#include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
 
@@ -228,7 +229,7 @@ void AccountSelectionBubbleView::ShowVerifyingSheet(
     const IdentityRequestAccountPtr& account,
     const std::u16string& title) {
   UpdateHeader(account->identity_provider->idp_metadata.brand_decoded_icon,
-               title, webid::GetSubtitle(rp_data_),
+               title, u"",
                /*show_back_button=*/false,
                /*should_circle_crop_header_icon=*/true);
 
@@ -307,7 +308,7 @@ void AccountSelectionBubbleView::ShowFailureDialog(
                           base::Unretained(owner_), idp_metadata.config_url,
                           idp_metadata.idp_login_url),
       l10n_util::GetStringUTF16(IDS_SIGNIN_CONTINUE), this, idp_metadata,
-      /*extra_accessible_text=*/std::nullopt);
+      /*extra_accessible_text=*/u"Opens in a new tab");
   row->AddChildView(std::move(button));
   AddChildView(std::move(row));
 
@@ -498,6 +499,11 @@ std::unique_ptr<views::View> AccountSelectionBubbleView::CreateHeaderView() {
       header->AddChildView(std::make_unique<views::View>());
   titles_container->SetLayoutManager(std::make_unique<views::BoxLayout>(
       views::BoxLayout::Orientation::kVertical));
+  views::FlexSpecification flex_spec(views::LayoutOrientation::kHorizontal,
+                                     views::MinimumFlexSizeRule::kScaleToZero,
+                                     views::MaximumFlexSizeRule::kUnbounded);
+  titles_container->SetProperty(views::kFlexBehaviorKey, flex_spec);
+
   // Add the title.
   title_label_ = titles_container->AddChildView(std::make_unique<views::Label>(
       title_, views::style::CONTEXT_DIALOG_BODY_TEXT,
@@ -711,6 +717,8 @@ std::unique_ptr<views::View> AccountSelectionBubbleView::CreateMultiIdpLoginRow(
       /*horizontal=*/kLeftRightPadding)));
   button->SetIconHorizontalMargins(kMultiIdpIconLeftMargin,
                                    kMultiIdpIconRightMargin);
+  button->AddExtraAccessibleText(
+      l10n_util::GetStringUTF16(IDS_ACCOUNT_SELECTION_OPENS_IN_NEW_TAB));
   return button;
 }
 
@@ -728,6 +736,8 @@ AccountSelectionBubbleView::CreateSingleIdpUseOtherAccountButton(
                           idp_metadata.idp_login_url),
       std::move(icon_view), title);
   button->SetIconHorizontalMargins(icon_margin, icon_margin);
+  button->AddExtraAccessibleText(
+      l10n_util::GetStringUTF16(IDS_ACCOUNT_SELECTION_OPENS_IN_NEW_TAB));
   return button;
 }
 

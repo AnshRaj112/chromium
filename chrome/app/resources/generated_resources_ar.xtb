@@ -721,6 +721,7 @@
 <translation id="1494349716233667318">السماح للمواقع الإلكترونية بطلب إذن باستخدام أشكال الخط المثبَّتة على جهازك</translation>
 <translation id="1494429729245089920">تم رصد جهاز افتراضي باسم "<ph name="VM_NAME" />"، لكن لا يبدو أنّه يستخدم "<ph name="APP_NAME" />" صالحًا. يُرجى التواصل مع المشرف.</translation>
 <translation id="1495677929897281669">الرجوع إلى علامة التبويب</translation>
+<translation id="1496514951988037011">اسم المستخدم</translation>
 <translation id="1498498210836053409">إيقاف "وضع التثبيت" عند تعديل النص (وضع التثبيت الذكي)</translation>
 <translation id="1499041187027566160">الصوت مرتفع</translation>
 <translation id="1500297251995790841">جهاز غير معروف [<ph name="VENDOR_ID" />:<ph name="PRODUCT_ID" />]</translation>
@@ -1165,6 +1166,7 @@
 <translation id="1796588414813960292">لن تعمل الميزات التي تحتاج إلى استخدام الصوت.</translation>
 <translation id="1797117170091578105">‏يمكنك اللعب باستخدام لوحة مفاتيح Chromebook. ويمكنك تخصيص مفاتيح لتنفيذ إجراءات محدَّدة.</translation>
 <translation id="1798335429200675510">‏انقر بزر الماوس الأيمن في مربّع نص لإنشاء مسودة أو تحسين نص حالي، وذلك باستخدام تكنولوجيات الذكاء الاصطناعي من Google. تتوفّر هذه الميزة حاليًا بشكل محدود.</translation>
+<translation id="1799852120691957794">تتعذّر استعادة النوافذ من الجلسة السابقة</translation>
 <translation id="180203835522132923">‏مفتاح البحث + O، ثم W</translation>
 <translation id="1802624026913571222">السكون عند غلق الغطاء
 </translation>
@@ -1441,6 +1443,7 @@
 <translation id="1981434377190976112">الاطّلاع على جميع بياناتك على جميع المواقع الإلكترونية</translation>
 <translation id="1982851102516626421">لقد سجّلت الخروج من حسابك</translation>
 <translation id="1983612835086592681">تم فتحه الأسبوع الماضي</translation>
+<translation id="1984087999855033707">رقم الهاتف</translation>
 <translation id="1984417487208496350">بلا حماية (غير مُستحسَن)</translation>
 <translation id="1984683754853869253">هل المطلوب إنشاء ملف مؤسسة تعليمية جديد؟</translation>
 <translation id="198507684520034826">مساعدة</translation>
@@ -1465,7 +1468,6 @@
 <translation id="1999115740519098545">عند بدء التشغيل</translation>
 <translation id="1999763610967697511">السحب والإفلات</translation>
 <translation id="2002109485265116295">الوقت الفعلي</translation>
-<translation id="2002160221914907025">الذكاء الاصطناعي التجريبي</translation>
 <translation id="2003130567827682533">‏لتفعيل بيانات "<ph name="NAME" />"، يمكنك أولاً الاتصال بشبكة Wi-Fi.</translation>
 <translation id="200321182559008924">تنظيم علامات التبويب</translation>
 <translation id="2003596238737586336">تم ضبط الجدول الزمني الحالي على الفترة من <ph name="SUNRISE" /> إلى <ph name="SUNSET" />. ويدير المشرف هذا الإعداد.</translation>
@@ -2358,6 +2360,7 @@
 <translation id="2610374175948698697">يمكنها قراءة الملفات أو المجلدات على جهازك</translation>
 <translation id="2610780100389066815">‏توقيع قائمة الثقة لـ Microsoft</translation>
 <translation id="261114180663074524">‏سجِّل الدخول إلى حسابك على Microsoft ثم أعِد المحاولة.</translation>
+<translation id="2611702650078660078">حدث خطأ</translation>
 <translation id="2611776654555141051">أداة رسم المستطيل</translation>
 <translation id="2612676031748830579">رقم البطاقة</translation>
 <translation id="261305050785128654">يمكنك السماح للمواقع الإلكترونية بمعرفة اللغات التي تتحدّث بها. وستعرض لك المحتوى بتلك اللغات إن أمكن ذلك.</translation>
@@ -2718,6 +2721,7 @@
 <translation id="2849936225196189499">مهمة</translation>
 <translation id="285033512555869047">مغلقة</translation>
 <translation id="2850541429955027218">إضافة مظهر</translation>
+<translation id="2852045827873867442">يجب توفُّر اتصال بالإنترنت.</translation>
 <translation id="285237063405807022">(جارٍ تحميله)</translation>
 <translation id="2853121255651601031">تم حفظ كلمة المرور.</translation>
 <translation id="2855243985454069333">سيتم حذف السجلّ من جميع الأجهزة التي تمت مزامنتها</translation>
@@ -5164,6 +5168,7 @@
 <translation id="4585793705637313973">تعديل الصفحة</translation>
 <translation id="4586275095964870617">تعذَّر فتح <ph name="URL" /> في متصفِّح بديل. يُرجى التواصل مع مشرف النظام.</translation>
 <translation id="4587589328781138893">المواقع</translation>
+<translation id="4588497044036650559">يتم فتح صفحة خيارات إضافة صفحة "علامة تبويب جديدة" في علامة التبويب الحالية</translation>
 <translation id="4588749726511456218">تسريع الانتقال للأعلى أو للأسفل. <ph name="LINK_BEGIN" />مزيد من المعلومات<ph name="LINK_END" /></translation>
 <translation id="4589197033939192905">يبدو أنّ <ph name="PASSWORD_DOMAIN" /> و<ph name="DOMAIN" /> مرتبطان. يُرجى التأكّد من أنّك تثق في <ph name="DOMAIN" /> قبل استخدام كلمة المرور.</translation>
 <translation id="4589713469967853491">تمّت كتابة السجلّات في دليل "عمليات التنزيل" بنجاح.</translation>
@@ -5430,6 +5435,7 @@
 <translation id="4779855924282373274"><ph name="URL" /> • علامة تبويب واحدة مكرّرة</translation>
 <translation id="4780321648949301421">حفظ صفحة باسم...</translation>
 <translation id="4780558987886269159">للعمل</translation>
+<translation id="4781633367688946589">المتابعة إلى جلسة جديدة</translation>
 <translation id="4784349455504343791">يريد <ph name="WEBSITE_ORIGIN" /> استخدام معلومات شخصية من محفظتك الرقمية.</translation>
 <translation id="4785719467058219317">أنت تستخدم مفتاح أمان غير مُسجَّل مع هذا الموقع الإلكتروني</translation>
 <translation id="4785914069240823137">إلغاء الاقتصاص</translation>
@@ -6912,7 +6918,7 @@
 <translation id="5857693745746757503">‏يمكنك توفير 50 دولار أمريكي أو أكثر عند شراء جهاز Chromebook جديد اليوم.</translation>
 <translation id="5858490737742085133">Terminal</translation>
 <translation id="585979798156957858">‏مفتاح Meta الخارجي</translation>
-<translation id="5860033963881614850">غير مفعّلة</translation>
+<translation id="5860033963881614850">غير مفعّل</translation>
 <translation id="5860254591544742609">إظهار شريط العناوين</translation>
 <translation id="5860335608673904825">‏مفتاح البحث + ctrl + Shift + <ph name="TOP_ROW_KEY" /></translation>
 <translation id="5860491529813859533">تفعيل</translation>
@@ -9148,6 +9154,7 @@
 <translation id="7461924472993315131">تثبيت</translation>
 <translation id="746216226901520237">‏في المرة القادمة، سيفتح هاتفك قفل جهاز <ph name="DEVICE_TYPE" />. يمكنك إيقاف Smart Lock في "الإعدادات".</translation>
 <translation id="746329643760972486">MacOS</translation>
+<translation id="7463985990119325874">تتحكّم مؤسستك في كيفية استخدام البيانات التي تجمعها هذه الميزات.</translation>
 <translation id="7464645554245611385">آخر تعديل على علامة التبويب هذه</translation>
 <translation id="7465522323587461835">{NUM_OPEN_TABS,plural, =1{هناك علامة تبويب واحدة مفتوحة. اضغط لعرض شريط علامات التبويب أو إخفائه.}zero{ليس هناك أي علامات تبويب مفتوحة. اضغط لعرض شريط علامات التبويب أو إخفائه.}two{هناك علامتَا تبويب مفتوحتَان. اضغط لعرض شريط علامات التبويب أو إخفائه.}few{هناك # علامات تبويب مفتوحة. اضغط لعرض شريط علامات التبويب أو إخفائه.}many{هناك # علامة تبويب مفتوحة. اضغط لعرض شريط علامات التبويب أو إخفائه.}other{هناك # علامة تبويب مفتوحة. اضغط لعرض شريط علامات التبويب أو إخفائه.}}</translation>
 <translation id="7465635034594602553">حدث خطأ. يُرجى الانتظار بضع دقائق، ثم إعادة تشغيل <ph name="APP_NAME" />.</translation>
@@ -11716,6 +11723,7 @@
 <translation id="934244546219308557">تسمية هذه المجموعة</translation>
 <translation id="93480724622239549">خلل أو خطأ</translation>
 <translation id="9354763467503131">المواقع الإلكترونية التي يُسمح لها بطلب تثبيت تطبيقات الويب على جهازك</translation>
+<translation id="936329857119665832">يتم فتح الرابط في علامة التبويب الحالية</translation>
 <translation id="936646668635477464">الكاميرا والميكروفون</translation>
 <translation id="936801553271523408">بيانات تشخيص النظام</translation>
 <translation id="93766956588638423">إصلاح الإضافة</translation>

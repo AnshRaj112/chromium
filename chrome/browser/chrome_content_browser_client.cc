@@ -312,6 +312,7 @@
 #include "content/public/browser/client_certificate_delegate.h"
 #include "content/public/browser/digital_identity_provider.h"
 #include "content/public/browser/file_url_loader.h"
+#include "content/public/browser/internal_webui_config.h"
 #include "content/public/browser/isolated_web_apps_policy.h"
 #include "content/public/browser/legacy_tech_cookie_issue_details.h"
 #include "content/public/browser/navigation_handle.h"
@@ -4647,6 +4648,11 @@ void ChromeContentBrowserClient::OverrideWebPreferences(
   web_prefs->touch_drag_drop_enabled =
       base::FeatureList::IsEnabled(features::kTouchDragAndDrop);
 
+#if BUILDFLAG(IS_WIN)
+  web_prefs->touch_dragend_context_menu =
+      base::FeatureList::IsEnabled(features::kTouchDragAndDrop);
+#endif
+
   for (auto& parts : extra_parts_) {
     parts->OverrideWebPreferences(web_contents, main_frame_site, web_prefs);
   }
@@ -5970,6 +5976,16 @@ class SpecialAccessFileURLLoaderFactory
   int child_id_;
 };
 
+bool IsDisabledInternalWebUI(const GURL& url) {
+  if (!content::IsInternalWebUI(url)) {
+    return false;
+  }
+
+  PrefService* local_state = g_browser_process->local_state();
+  DCHECK(local_state);
+  return !local_state->GetBoolean(chrome_urls::kInternalOnlyUisEnabled);
+}
+
 #if BUILDFLAG(IS_CHROMEOS)
 bool IsSystemFeatureDisabled(policy::SystemFeature system_feature) {
   return policy::SystemFeaturesDisableListPolicyHandler::
@@ -6844,6 +6860,14 @@ bool ChromeContentBrowserClient::HandleWebUI(
   }
 #endif
 
+  if (IsDisabledInternalWebUI(*url)) {
+    GURL::Replacements replacements;
+    std::string query("host=" + url->host());
+    replacements.SetQueryStr(query);
+    *url = GURL(chrome::kChromeUIInternalDebugPagesDisabledURL)
+               .ReplaceComponents(replacements);
+  }
+
   if (!ChromeWebUIControllerFactory::GetInstance()->UseWebUIForURL(
           browser_context, *url) &&
       !content::WebUIConfigMap::GetInstance().GetConfig(browser_context,
@@ -7524,6 +7548,16 @@ ChromeContentBrowserClient::ShouldOverridePrivateNetworkRequestPolicy(
     const url::Origin& origin) {
 #if BUILDFLAG(IS_ANDROID)
   if (base::android::BuildInfo::GetInstance()->is_automotive()) {
+    return content::ContentBrowserClient::PrivateNetworkRequestPolicyOverride::
+        kBlockInsteadOfWarn;
+  }
+#endif
+
+// TODO(crbug.com/400455013): Add LNA support on Android
+#if !BUILDFLAG(IS_ANDROID)
+  Profile* profile = Profile::FromBrowserContext(browser_context);
+  if (profile->GetPrefs()->GetBoolean(
+          prefs::kManagedLocalNetworkAccessRestrictionsEnabled)) {
     return content::ContentBrowserClient::PrivateNetworkRequestPolicyOverride::
         kBlockInsteadOfWarn;
   }
@@ -8614,19 +8648,6 @@ void ChromeContentBrowserClient::OnTracingServiceStopped() {
   windows_system_tracing_client_.reset();
 }
 #endif  // BUILDFLAG(IS_WIN)
-
-std::unique_ptr<content::WebUIController>
-ChromeContentBrowserClient::OverrideForInternalWebUI(content::WebUI* web_ui,
-                                                     const GURL& url) {
-  PrefService* local_state = g_browser_process->local_state();
-  DCHECK(local_state);
-  DCHECK(local_state->FindPreference(chrome_urls::kInternalOnlyUisEnabled));
-  if (local_state->GetBoolean(chrome_urls::kInternalOnlyUisEnabled)) {
-    return nullptr;
-  }
-
-  return std::make_unique<InternalDebugPagesDisabledUI>(web_ui, url.host());
-}
 
 bool ChromeContentBrowserClient::ShouldEnableSubframeZoom() {
 #if BUILDFLAG(ENABLE_PDF)

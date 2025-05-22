@@ -329,6 +329,16 @@ suite('<bookmarks-command-manager>', function() {
     assertTrue(split);
   });
 
+  test('"Open in New Tab Group" does not expand nodes', async function() {
+    const items = new Set(['1']);
+    assertTrue(commandManager.canExecute(Command.OPEN_NEW_GROUP, items));
+    commandManager.handle(Command.OPEN_NEW_GROUP, items);
+    await microtasksFinished();
+
+    const [ids] = await bookmarkManagerProxy.whenCalled('openInNewTabGroup');
+    assertDeepEquals(['1'], ids);
+  });
+
   test(
       'cannot execute "Open in New Tab" on folders with no items', async () => {
         const items = new Set(['2']);
@@ -662,6 +672,7 @@ suite('<bookmarks-item> CommandManager integration', function() {
         const modifier = isMac ? 'meta' : 'ctrl';
 
         store.data.selection.items = new Set(['12', '13']);
+        store.data.folderOpenState.set('1', true);
         store.notifyObservers();
         await microtasksFinished();
         const targetNode = findFolderNode(rootNode, '11');

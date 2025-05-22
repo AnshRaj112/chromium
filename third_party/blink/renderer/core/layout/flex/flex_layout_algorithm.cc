@@ -680,10 +680,10 @@ FlexLayoutAlgorithm::FlexLayoutAlgorithm(
       is_wrap_reverse_(Style().ResolvedIsFlexWrapReverse()),
       is_reverse_direction_(Style().ResolvedIsReverseFlexDirection()),
       is_multi_line_(!Style().ResolvedIsFlexNowrap()),
-      is_balanced_(Style().ResolvedIsFlexBalanced()),
       is_horizontal_flow_(Style().IsHorizontalWritingMode() ? !is_column_
                                                             : is_column_),
       is_cross_size_definite_(IsContainerCrossSizeDefinite()),
+      balance_min_line_count_(Style().ResolvedFlexBalanceMinLineCount()),
       child_percentage_size_(
           CalculateChildPercentageSize(GetConstraintSpace(),
                                        Node(),
@@ -1336,6 +1336,24 @@ const ConstraintSpace FlexLayoutAlgorithm::BuildSpaceForLayout(
   LogicalSize available_size = ChildAvailableSize();
   LogicalSize percentage_size = child_percentage_size_;
 
+  // If we are balancing with a minimum line-count, divide the cross-axis
+  // available-space if definite.
+  if (balance_min_line_count_) {
+    const LayoutUnit gap_size =
+        (*balance_min_line_count_ - 1) * gap_between_lines_;
+    if (is_column_) {
+      if (available_size.inline_size != kIndefiniteSize) {
+        available_size.inline_size =
+            (available_size.inline_size - gap_size) / *balance_min_line_count_;
+      }
+    } else {
+      if (available_size.block_size != kIndefiniteSize) {
+        available_size.block_size =
+            (available_size.block_size - gap_size) / *balance_min_line_count_;
+      }
+    }
+  }
+
   if (is_column_) {
     if (override_inline_size) {
       DCHECK(!line_cross_size)
@@ -1939,9 +1957,9 @@ void FlexLayoutAlgorithm::PlaceFlexItems(
   ConstructAndAppendFlexItems(phase, oof_children);
 
   const LayoutUnit line_break_size = MainAxisContentExtent(LayoutUnit::Max());
-  const FlexLineBreakerResult result =
-      BreakFlexItemsIntoLines(base::span(flex_items_), line_break_size,
-                              gap_between_items_, is_multi_line_, is_balanced_);
+  const FlexLineBreakerResult result = BreakFlexItemsIntoLines(
+      base::span(flex_items_), line_break_size, gap_between_items_,
+      is_multi_line_, balance_min_line_count_);
 
   // For column flexboxes we can now determine the intrinsic block-size, which
   // we use to flex all the lines to.

@@ -262,6 +262,9 @@ void SetSuggestionText(GroupSuggestion& suggestion) {
 // Returns true if the group is visible.
 bool IsGroupVisible(const GroupSuggestion& suggestion,
                     const std::vector<URLVisitAggregate>& candidates) {
+  if (!features::kGroupSuggestionEnableVisibilityCheck.Get()) {
+    return true;
+  }
   std::map<int, bool> suggestion_tabs_visibility;
   for (const auto& candidate : candidates) {
     auto tab_it = candidate.fetcher_data_map.find(Fetcher::kTabModel);
@@ -288,7 +291,7 @@ bool IsGroupVisible(const GroupSuggestion& suggestion,
             history->last_visited.content_annotations.model_annotations
                 .visibility_score > kVisibilityScoreThreshold;
       }
-    };
+    }
   }
 
   // Return false if all tabs in the suggestion do not have a score, or if any
@@ -364,6 +367,11 @@ std::optional<GroupSuggestion> GetSuggestionFromHeuristicResult(
   }
 
   if (!IsGroupVisible(suggestion, candidates)) {
+    VLOG(1) << "Suggestion discarded due to visibility";
+    base::UmaHistogramEnumeration(
+        "GroupSuggestionsService.SuggestionThrottledReason",
+        TabGroupSuggestionThrottleReason::kGroupNotVisible);
+
     return std::nullopt;
   }
 

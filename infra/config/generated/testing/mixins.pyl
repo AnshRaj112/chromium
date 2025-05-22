@@ -162,6 +162,18 @@
       },
     },
   },
+  'chromium_pixel_2_q': {
+    'fail_if_unused': False,
+    'swarming': {
+      'dimensions': {
+        'device_os': 'QQ1A.191205.008',
+        'device_os_flavor': 'google',
+        'device_type': 'walleye',
+        'os': 'Android',
+        'pool': 'chromium.tests',
+      },
+    },
+  },
   'crosier-no-arc': {
     'args': [
       '--test-launcher-filter-file=../../testing/buildbot/filters/chromeos.reven.chromeos_integration_tests.filter',
@@ -627,7 +639,7 @@
       'dimensions': {
         'cpu': 'x86-64',
         'gpu': '8086:3e9b',
-        'os': 'Mac-15.4',
+        'os': 'Mac-15.5',
         'display_attached': '1',
       },
     },

@@ -64,6 +64,7 @@ public class ContextMenuCoordinator implements ContextMenuUi {
         ListItemType.CONTEXT_MENU_ITEM,
         ListItemType.CONTEXT_MENU_ITEM_WITH_ICON_BUTTON,
         ListItemType.CONTEXT_MENU_ITEM_WITH_CHECKBOX,
+        ListItemType.CONTEXT_MENU_ITEM_WITH_RADIO_BUTTON,
     })
     public @interface ListItemType {
         int DIVIDER = 0;
@@ -71,6 +72,7 @@ public class ContextMenuCoordinator implements ContextMenuUi {
         int CONTEXT_MENU_ITEM = 2;
         int CONTEXT_MENU_ITEM_WITH_ICON_BUTTON = 3;
         int CONTEXT_MENU_ITEM_WITH_CHECKBOX = 4;
+        int CONTEXT_MENU_ITEM_WITH_RADIO_BUTTON = 5;
     }
 
     private static final int INVALID_ITEM_ID = -1;
@@ -345,6 +347,14 @@ public class ContextMenuCoordinator implements ContextMenuUi {
                 ListItemType.CONTEXT_MENU_ITEM_WITH_ICON_BUTTON,
                 new LayoutViewBuilder(R.layout.context_menu_share_row),
                 ContextMenuItemWithIconButtonViewBinder::bind);
+        adapter.registerType(
+                ListItemType.CONTEXT_MENU_ITEM_WITH_CHECKBOX,
+                new LayoutViewBuilder<>(R.layout.checkbox_layout),
+                ContextMenuItemWithCheckboxViewBinder::bind);
+        adapter.registerType(
+                ListItemType.CONTEXT_MENU_ITEM_WITH_RADIO_BUTTON,
+                new LayoutViewBuilder<>(R.layout.radio_button_layout_element),
+                ContextMenuItemWithRadioButtonViewBinder::bind);
 
         mListView.setOnItemClickListener(
                 (p, v, pos, id) -> {

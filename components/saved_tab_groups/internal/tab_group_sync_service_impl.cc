@@ -290,10 +290,10 @@ void TabGroupSyncServiceImpl::OnLastTabClosed(
                            saved_tab_group.saved_guid(), 0);
   new_tab.SetCreatorCacheGuid(
       sync_bridge_mediator_->GetLocalCacheGuidForSavedBridge());
-  std::optional<GaiaId> account_id =
-      sync_bridge_mediator_->GetTrackingAccountIdForSharedBridge();
-  if (account_id.has_value()) {
-    new_tab.SetUpdatedByAttribution(std::move(account_id.value()));
+  std::optional<GaiaId> gaia_id =
+      sync_bridge_mediator_->GetTrackingGaiaIdForSharedBridge();
+  if (gaia_id.has_value()) {
+    new_tab.SetUpdatedByAttribution(std::move(gaia_id.value()));
   }
   model_->AddTabToGroupLocally(saved_tab_group.saved_guid(),
                                std::move(new_tab));
@@ -394,12 +394,12 @@ void TabGroupSyncServiceImpl::AddGroup(SavedTabGroup group) {
   group.SetCreatorCacheGuid(
       sync_bridge_mediator_->GetLocalCacheGuidForSavedBridge());
   if (group.is_shared_tab_group()) {
-    std::optional<GaiaId> account_id =
-        sync_bridge_mediator_->GetTrackingAccountIdForSharedBridge();
-    if (account_id.has_value()) {
-      group.SetUpdatedByAttribution(account_id.value());
+    std::optional<GaiaId> gaia_id =
+        sync_bridge_mediator_->GetTrackingGaiaIdForSharedBridge();
+    if (gaia_id.has_value()) {
+      group.SetUpdatedByAttribution(gaia_id.value());
       for (SavedTabGroupTab& tab : group.saved_tabs()) {
-        tab.SetUpdatedByAttribution(account_id.value());
+        tab.SetUpdatedByAttribution(gaia_id.value());
       }
     }
   }
@@ -500,10 +500,10 @@ void TabGroupSyncServiceImpl::AddTab(const LocalTabGroupID& group_id,
 
   UpdateAttributions(group_id);
   if (group->is_shared_tab_group()) {
-    std::optional<GaiaId> account_id =
-        sync_bridge_mediator_->GetTrackingAccountIdForSharedBridge();
-    if (account_id.has_value()) {
-      new_tab.SetUpdatedByAttribution(std::move(account_id.value()));
+    std::optional<GaiaId> gaia_id =
+        sync_bridge_mediator_->GetTrackingGaiaIdForSharedBridge();
+    if (gaia_id.has_value()) {
+      new_tab.SetUpdatedByAttribution(std::move(gaia_id.value()));
     }
   }
   model_->UpdateLastUserInteractionTimeLocally(group_id);
@@ -587,7 +587,7 @@ void TabGroupSyncServiceImpl::RemoveTab(const LocalTabGroupID& group_id,
   model_->UpdateLastUserInteractionTimeLocally(group_id);
   std::optional<GaiaId> local_gaia_id =
       group->is_shared_tab_group()
-          ? sync_bridge_mediator_->GetTrackingAccountIdForSharedBridge()
+          ? sync_bridge_mediator_->GetTrackingGaiaIdForSharedBridge()
           : std::nullopt;
   model_->RemoveTabFromGroupLocally(sync_id, tab->saved_tab_guid(),
                                     std::move(local_gaia_id));
@@ -697,10 +697,9 @@ void TabGroupSyncServiceImpl::MakeTabGroupShared(
 
   LogTabGroupEvent(logger_, "MakeTabGroupShared", saved_group);
 
-  // TODO(crbug.com/380088920): add CHECK to verify that the bridge is syncing.
-  std::optional<GaiaId> account_id =
-      sync_bridge_mediator_->GetTrackingAccountIdForSharedBridge();
-  if (!account_id.has_value()) {
+  std::optional<GaiaId> gaia_id =
+      sync_bridge_mediator_->GetTrackingGaiaIdForSharedBridge();
+  if (!gaia_id.has_value()) {
     // Do not share the group if the bridge is not syncing. This can happen if
     // the caller thinks we just signed in, but sync is still preparing for
     // the account and hasn't been through the initial merge.
@@ -715,14 +714,14 @@ void TabGroupSyncServiceImpl::MakeTabGroupShared(
   // tab groups, and without migration of local IDs.
   SavedTabGroup shared_group = saved_group->CloneAsSharedTabGroup(
       CollaborationId(std::string(collaboration_id)));
-  shared_group.SetUpdatedByAttribution(account_id.value());
+  shared_group.SetUpdatedByAttribution(gaia_id.value());
 
   // The shared group must never be empty.
   CHECK(!shared_group.saved_tabs().empty());
   for (SavedTabGroupTab& tab : shared_group.saved_tabs()) {
     UpdateTabTitleIfNeeded(shared_group, tab, opt_guide_,
                            stats::TitleSanitizationType::kShareTabGroup);
-    tab.SetUpdatedByAttribution(account_id.value());
+    tab.SetUpdatedByAttribution(gaia_id.value());
   }
 
   LogTabGroupEvent(logger_, "MakeTabGroupShared - Starting Timer", saved_group);
@@ -755,8 +754,9 @@ void TabGroupSyncServiceImpl::OnTabGroupUnShareComplete(
     bool success) {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
   const SavedTabGroup* saved_group = model_->Get(local_group_id);
-  CHECK(saved_group);
-  CHECK(saved_group->is_transitioning_to_saved());
+  if (!saved_group) {
+    return;
+  }
 
   {
     std::string prefix = "OnTabGroupUnShareComplete ";
@@ -766,6 +766,9 @@ void TabGroupSyncServiceImpl::OnTabGroupUnShareComplete(
   if (!success) {
     return;
   }
+
+  // Make a deep copy of shared tab group.
+  SavedTabGroup cloned_group = saved_group->CloneAsSavedTabGroup();
 
   // The originating saved group for this shared tab group might still be alive.
   // Remove it.
@@ -778,16 +781,9 @@ void TabGroupSyncServiceImpl::OnTabGroupUnShareComplete(
       DCHECK(!originating_group->local_group_id());
       LogTabGroupEvent(logger_, "Cleanup Saved Group", originating_group);
       RemoveGroup(originating_tab_group_guid.value());
-      // Retrieve `saved_group` again as the array index in model might have
-      // changed, and the previous pointer is pointing to another group.
-      // TODO(crbug.com/399198634): fix the dangerous pointer issue in
-      // SavedTabGroupModel.
-      saved_group = model_->Get(local_group_id);
     }
   }
 
-  // Make a deep copy of shared tab group.
-  SavedTabGroup cloned_group = saved_group->CloneAsSavedTabGroup();
   cloned_group.SetCreatedBeforeSyncingTabGroups(
       !sync_bridge_mediator_->IsSavedBridgeSyncing());
   cloned_group.SetCreatorCacheGuid(
@@ -1076,12 +1072,12 @@ bool TabGroupSyncServiceImpl::IsRemoteDevice(
 bool TabGroupSyncServiceImpl::WasTabGroupClosedLocally(
     const base::Uuid& sync_tab_group_id) const {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
-  std::optional<GaiaId> account_id =
-      sync_bridge_mediator_->GetAccountIdForSavedBridge();
-  if (account_id) {
+  std::optional<GaiaId> gaia_id =
+      sync_bridge_mediator_->GetGaiaIdForSavedBridge();
+  if (gaia_id) {
     return syncer::GetAccountKeyedPrefDictEntry(
         pref_service_, prefs::kLocallyClosedRemoteTabGroupIds,
-        signin::GaiaIdHash::FromGaiaId(*account_id),
+        signin::GaiaIdHash::FromGaiaId(*gaia_id),
         sync_tab_group_id.AsLowercaseString().c_str());
   }
   return false;
@@ -1547,23 +1543,23 @@ void TabGroupSyncServiceImpl::RemoveDeletedGroupIdFromPref(
 void TabGroupSyncServiceImpl::AddLocallyClosedGroupIdToPref(
     const base::Uuid& sync_id) {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
-  std::optional<GaiaId> account_id =
-      sync_bridge_mediator_->GetAccountIdForSavedBridge();
-  if (!account_id) {
+  std::optional<GaiaId> gaia_id =
+      sync_bridge_mediator_->GetGaiaIdForSavedBridge();
+  if (!gaia_id) {
     // If there's no signed-in account, nothing to do.
     return;
   }
   syncer::SetAccountKeyedPrefDictEntry(
       pref_service_, prefs::kLocallyClosedRemoteTabGroupIds,
-      signin::GaiaIdHash::FromGaiaId(*account_id),
+      signin::GaiaIdHash::FromGaiaId(*gaia_id),
       sync_id.AsLowercaseString().c_str(), base::Value());
 }
 
 void TabGroupSyncServiceImpl::RemoveLocallyClosedGroupIdFromPref(
     const base::Uuid& sync_id) {
-  std::optional<GaiaId> account_id =
-      sync_bridge_mediator_->GetAccountIdForSavedBridge();
-  if (!account_id) {
+  std::optional<GaiaId> gaia_id =
+      sync_bridge_mediator_->GetGaiaIdForSavedBridge();
+  if (!gaia_id) {
     // If there's no signed-in account, nothing to do. Most notably, this
     // happens right after sign-out, when all tab groups associated to the
     // account get closed.
@@ -1571,7 +1567,7 @@ void TabGroupSyncServiceImpl::RemoveLocallyClosedGroupIdFromPref(
   }
   syncer::RemoveAccountKeyedPrefDictEntry(
       pref_service_, prefs::kLocallyClosedRemoteTabGroupIds,
-      signin::GaiaIdHash::FromGaiaId(*account_id),
+      signin::GaiaIdHash::FromGaiaId(*gaia_id),
       sync_id.AsLowercaseString().c_str());
 }
 
@@ -1655,8 +1651,7 @@ void TabGroupSyncServiceImpl::OnSyncBridgeUpdateTypeChanged(
     SyncBridgeUpdateType sync_bridge_update_type) {
   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
   if (sync_bridge_update_type == SyncBridgeUpdateType::kDefaultState &&
-      sync_bridge_mediator_->GetTrackingAccountIdForSharedBridge()
-          .has_value()) {
+      sync_bridge_mediator_->GetTrackingGaiaIdForSharedBridge().has_value()) {
     while (!pending_actions_waiting_sign_in_.empty()) {
       // User just signed-in. Run any pending actions.
       auto callback = std::move(pending_actions_waiting_sign_in_.front());
@@ -1676,6 +1671,21 @@ void TabGroupSyncServiceImpl::OnSyncBridgeUpdateTypeChanged(
       base::BindOnce(
           &TabGroupSyncServiceImpl::NotifyOnSyncBridgeUpdateTypeChanged,
           weak_ptr_factory_.GetWeakPtr(), sync_bridge_update_type));
+}
+
+void TabGroupSyncServiceImpl::TabGroupTransitioningToSavedRemovedFromSync(
+    const base::Uuid& saved_group_id) {
+  const SavedTabGroup* saved_tab_group = model_->Get(saved_group_id);
+  if (!saved_tab_group) {
+    return;
+  }
+  CHECK(saved_tab_group->is_shared_tab_group());
+  CHECK(saved_tab_group->is_transitioning_to_saved());
+
+  if (saved_tab_group->local_group_id().has_value()) {
+    OnTabGroupUnShareComplete(saved_tab_group->local_group_id().value(),
+                              /*success=*/true);
+  }
 }
 
 void TabGroupSyncServiceImpl::NotifyOnSyncBridgeUpdateTypeChanged(
@@ -1725,14 +1735,13 @@ void TabGroupSyncServiceImpl::UpdateSharedAttributions(
     return;
   }
 
-  std::optional<GaiaId> account_id =
-      sync_bridge_mediator_->GetTrackingAccountIdForSharedBridge();
-  if (!account_id) {
+  std::optional<GaiaId> gaia_id =
+      sync_bridge_mediator_->GetTrackingGaiaIdForSharedBridge();
+  if (!gaia_id) {
     return;
   }
 
-  model_->UpdateSharedAttribution(group_id, tab_id,
-                                  std::move(account_id.value()));
+  model_->UpdateSharedAttribution(group_id, tab_id, std::move(gaia_id.value()));
 }
 
 void TabGroupSyncServiceImpl::

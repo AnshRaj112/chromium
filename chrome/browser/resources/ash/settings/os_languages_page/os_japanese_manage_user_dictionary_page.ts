@@ -14,7 +14,7 @@ import 'chrome://resources/ash/common/cr_elements/cr_shared_style.css.js';
 import 'chrome://resources/polymer/v3_0/iron-collapse/iron-collapse.js';
 
 import {I18nMixin} from 'chrome://resources/ash/common/cr_elements/i18n_mixin.js';
-import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
+import {afterNextRender, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
 
 import {GlobalScrollTargetMixin} from '../common/global_scroll_target_mixin.js';
 import type {JapaneseDictionary} from '../mojom-webui/user_data_japanese_dictionary.mojom-webui.js';
@@ -29,10 +29,8 @@ import {UserDataServiceProvider} from './user_data_service_provider.js';
 const OsSettingsJapaneseManageUserDictionaryPageElementBase =
     GlobalScrollTargetMixin(I18nMixin(PolymerElement));
 
-const NEW_DICTIONARY_NAME = 'New Dictionary';
-
-class OsSettingsJapaneseManageUserDictionaryPageElement extends
-    OsSettingsJapaneseManageUserDictionaryPageElementBase {
+class OsSettingsJapaneseManageUserDictionaryPageElement extends I18nMixin
+(OsSettingsJapaneseManageUserDictionaryPageElementBase) {
   static get is() {
     return 'os-settings-japanese-manage-user-dictionary-page' as const;
   }
@@ -87,20 +85,27 @@ class OsSettingsJapaneseManageUserDictionaryPageElement extends
         (await UserDataServiceProvider.getRemote().createJapaneseDictionary(
              this.newDictName_()))
             .status;
-    if (resp.success) {
-      this.getDictionaries_();
+    if (!resp.success) {
+      return;
     }
+    this.getDictionaries_();
+    afterNextRender(this, () => {
+      this.shadowRoot!
+          .querySelector<HTMLElement>(
+              'os-japanese-dictionary-expand:last-of-type')!.shadowRoot!
+          .querySelector<HTMLElement>('cr-expand-button')!.focus();
+    });
   }
 
   // The backend does not let you add the same dictionary name twice. We have to
   // automatically append an incrementing number to it if there is a clash.
   private newDictName_(): string {
-    let count = 0;
-    let newName = NEW_DICTIONARY_NAME;
+    let count = 1;
+    let newName = this.i18n('japaneseDictionaryDefaultName', count);
     while (this.dictionaries_.some(
         (dict: JapaneseDictionary) => dict.name === newName)) {
       count++;
-      newName = `${NEW_DICTIONARY_NAME} ${count}`;
+      newName = this.i18n('japaneseDictionaryDefaultName', count);
     }
 
     return newName;

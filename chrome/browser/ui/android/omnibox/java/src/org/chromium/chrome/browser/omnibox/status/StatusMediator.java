@@ -45,6 +45,7 @@ import org.chromium.components.content_settings.CookieBlocking3pcdStatus;
 import org.chromium.components.content_settings.CookieControlsBridge;
 import org.chromium.components.content_settings.CookieControlsObserver;
 import org.chromium.components.metrics.OmniboxEventProtos.OmniboxEventProto.PageClassification;
+import org.chromium.components.omnibox.OmniboxFeatures;
 import org.chromium.components.page_info.PageInfoController;
 import org.chromium.components.permissions.PermissionDialogController;
 import org.chromium.components.search_engines.TemplateUrlService;
@@ -72,6 +73,10 @@ public class StatusMediator
     private final Supplier<Profile> mProfileSupplier;
     private final @Nullable Supplier<MerchantTrustSignalsCoordinator>
             mMerchantTrustSignalsCoordinatorSupplier;
+    // When the parity update is enabled, we want to:
+    // 1. Always show the DSE logo on the regular and incognito NTP
+    // 2. Remove the incognito badge.
+    private final boolean mParityUpdateEnabled;
     private boolean mUrlHasFocus;
     private boolean mVerboseStatusSpaceAvailable;
     private boolean mPageIsPaintPreview;
@@ -167,12 +172,17 @@ public class StatusMediator
 
         mIsTablet = isTablet;
         mShowStatusIconWhenUrlFocused = mIsTablet;
+        mParityUpdateEnabled = OmniboxFeatures.sOmniboxMobileParityUpdate.isEnabled();
+        if (mParityUpdateEnabled) {
+            mModel.set(StatusProperties.INCOGNITO_BADGE_VISIBLE, false);
+        }
 
         mPermissionDialogController = permissionDialogController;
         mPermissionDialogController.addObserver(this);
 
         updateColorTheme();
-        setStatusIconShown(/* show= */ !mLocationBarDataProvider.isIncognitoBranded());
+        setStatusIconShown(
+                /* show= */ mParityUpdateEnabled || !mLocationBarDataProvider.isIncognitoBranded());
         updateLocationBarIcon(IconTransitionType.CROSSFADE);
     }
 
@@ -317,12 +327,13 @@ public class StatusMediator
         // This logic doesn't apply to tablets.
         if (mIsTablet) return;
 
-        boolean shouldShowLogo = !mLocationBarDataProvider.isIncognitoBranded();
+        boolean shouldShowLogo =
+                mParityUpdateEnabled || !mLocationBarDataProvider.isIncognitoBranded();
         setShowIconsWhenUrlFocused(shouldShowLogo);
         if (!shouldShowLogo) return;
 
         if (mProfileSupplier.hasValue() && isNtpVisible()) {
-            setStatusIconShown(shouldShowLogo && (mUrlHasFocus || mUrlFocusPercent > 0));
+            setStatusIconShown(mParityUpdateEnabled || mUrlHasFocus || mUrlFocusPercent > 0);
         } else {
             setStatusIconShown(true);
         }
@@ -353,7 +364,7 @@ public class StatusMediator
         updateStatusVisibility();
 
         // Only fade the animation on the new tab page.
-        if (mProfileSupplier.hasValue() && isNtpVisible()) {
+        if (mProfileSupplier.hasValue() && isNtpVisible() && !mParityUpdateEnabled) {
             setStatusIconAlpha(percent);
         } else {
             setStatusIconAlpha(1f);
@@ -459,7 +470,15 @@ public class StatusMediator
     }
 
     private boolean isNtpVisible() {
-        return mLocationBarDataProvider.getNewTabPageDelegate().isCurrentlyVisible();
+        return mLocationBarDataProvider.getNewTabPageDelegate() != null
+                && mLocationBarDataProvider.getNewTabPageDelegate().isCurrentlyVisible();
+    }
+
+    private boolean isIncognitoNtpVisible() {
+        return mLocationBarDataProvider.getNewTabPageDelegate() != null
+                && mLocationBarDataProvider
+                        .getNewTabPageDelegate()
+                        .isIncognitoNewTabPageCurrentlyVisible();
     }
 
     /**
@@ -557,7 +576,7 @@ public class StatusMediator
             return false;
         }
 
-        if (mLocationBarDataProvider.isIncognitoBranded()) {
+        if (mLocationBarDataProvider.isIncognitoBranded() && !mParityUpdateEnabled) {
             return false;
         }
 
@@ -565,8 +584,8 @@ public class StatusMediator
             return true;
         }
 
-        return (mUrlHasFocus || mUrlFocusPercent > 0)
-                && isNtpVisible()
+        return (mParityUpdateEnabled || mUrlHasFocus || mUrlFocusPercent > 0)
+                && (isNtpVisible() || isIncognitoNtpVisible())
                 && mProfileSupplier.hasValue();
     }
 
@@ -630,11 +649,13 @@ public class StatusMediator
     }
 
     public void onIncognitoStateChanged() {
-        boolean incognitoBadgeVisible = mLocationBarDataProvider.isIncognitoBranded();
-        mModel.set(StatusProperties.INCOGNITO_BADGE_VISIBLE, incognitoBadgeVisible);
-        mModel.set(StatusProperties.STATUS_ICON_RESOURCE, null);
-        setStatusIconAlpha(1f);
-        setStatusIconShown(false);
+        if (!mParityUpdateEnabled) {
+            boolean incognitoBadgeVisible = mLocationBarDataProvider.isIncognitoBranded();
+            mModel.set(StatusProperties.INCOGNITO_BADGE_VISIBLE, incognitoBadgeVisible);
+            mModel.set(StatusProperties.STATUS_ICON_RESOURCE, null);
+            setStatusIconAlpha(1f);
+            setStatusIconShown(false);
+        }
     }
 
     // PermissionDialogController.Observer interface
@@ -688,11 +709,7 @@ public class StatusMediator
 
     @Override
     public void onStatusChanged(
-            boolean controlsVisible,
-            boolean protectionsOn,
-            int enforcement,
-            int blockingStatus,
-            long expiration) {
+            int cookieControlsState, int enforcement, int blockingStatus, long expiration) {
         mBlockingStatus3pcd = blockingStatus;
     }
 

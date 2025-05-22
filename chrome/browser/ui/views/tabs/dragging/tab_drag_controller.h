@@ -23,6 +23,7 @@
 #include "chrome/browser/ui/views/tabs/tab_strip_types.h"
 #include "components/saved_tab_groups/public/tab_group_sync_service.h"
 #include "components/tab_groups/tab_group_visual_data.h"
+#include "components/tabs/public/split_tab_data.h"
 #include "components/webapps/common/web_app_id.h"
 #include "ui/base/dragdrop/mojom/drag_drop_types.mojom-shared.h"
 #include "ui/base/models/list_selection_model.h"
@@ -353,7 +354,7 @@ class TabDragController : public views::WidgetObserver
       std::unique_ptr<TabDragController> controller,
       std::vector<std::variant<std::unique_ptr<tabs::TabModel>,
                                std::unique_ptr<DetachedTabCollection>>>
-          owned_tabs_and_groups);
+          owned_tabs_and_collections);
 
   // Sets up dragging in `attached_context_`. The dragged tabs must already
   // be present.
@@ -412,6 +413,9 @@ class TabDragController : public views::WidgetObserver
 
   // Reverts the tab at `drag_index` in `drag_data_`.
   void RevertTabAt(size_t drag_index);
+
+  // Reverts the split starting at `drag_index_`.
+  void RevertSplitAt(size_t drag_index);
 
   // Finishes a successful drag operation.
   void CompleteDrag();

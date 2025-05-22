@@ -25,7 +25,6 @@ import {NativeLayerImpl} from '../native_layer.js';
 import {getCss} from './destination_dialog.css.js';
 import {getHtml} from './destination_dialog.html.js';
 import type {PrintPreviewDestinationListElement} from './destination_list.js';
-import type {PrintPreviewDestinationListItemElement} from './destination_list_item.js';
 import type {PrintPreviewSearchBoxElement} from './print_preview_search_box.js';
 
 export interface PrintPreviewDestinationDialogElement {
@@ -109,9 +108,7 @@ export class PrintPreviewDestinationDialogElement extends CrLitElement {
       return;
     }
 
-    this.$.printList.updateList(
-        'destinations', destination => destination.key,
-        this.destinationStore.destinations());
+    this.$.printList.destinations = this.destinationStore.destinations();
 
     this.loadingDestinations_ =
         this.destinationStore.isPrintDestinationSearchInProgress;
@@ -128,13 +125,10 @@ export class PrintPreviewDestinationDialogElement extends CrLitElement {
   }
 
   /**
-   * @param e Event containing the selected destination list item element.
+   * @param e Event containing the selected destination.
    */
-  protected onDestinationSelected_(
-      e: CustomEvent<PrintPreviewDestinationListItemElement>) {
-    const listItem = e.detail;
-    const destination = listItem.destination;
-    this.selectDestination_(destination);
+  protected onDestinationSelected_(e: CustomEvent<Destination>) {
+    this.selectDestination_(e.detail);
   }
 
   private selectDestination_(destination: Destination) {

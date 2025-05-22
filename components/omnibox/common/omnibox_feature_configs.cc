@@ -94,6 +94,10 @@ BASE_FEATURE(ContextualSearch::kContextualSearchOpenLensActionUsesThumbnail,
              "ContextualSearchOpenLensActionUsesThumbnail",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(ContextualSearch::kSendPageTitleSuggestParam,
+             "SendPageTitleSuggestParam",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 ContextualSearch::ContextualSearch() {
   // Meta-feature turns on/off other features, but only if it's overridden by
   // the user. If not then each feature is controlled separately.
@@ -124,6 +128,7 @@ ContextualSearch::ContextualSearch() {
       base::FeatureList::IsEnabled(kOmniboxZeroSuggestSynchronousMatchesOnly);
   open_lens_action_uses_thumbnail = base::FeatureList::IsEnabled(
       kContextualSearchOpenLensActionUsesThumbnail);
+  send_page_title_suggest_param = feature_enabled(kSendPageTitleSuggestParam);
 }
 
 ContextualSearch::ContextualSearch(const ContextualSearch&) = default;
@@ -133,6 +138,10 @@ ContextualSearch::~ContextualSearch() = default;
 
 bool ContextualSearch::IsContextualSearchEnabled() const {
   return contextual_zps_limit > 0;
+}
+
+bool ContextualSearch::IsEnabledWithPrefetch() const {
+  return IsContextualSearchEnabled() && zero_suggest_synchronous_matches_only;
 }
 
 BASE_FEATURE(MiaZPS::kOmniboxMiaZPS,
@@ -159,6 +168,39 @@ DocumentProvider::DocumentProvider() {
                          &omnibox::kDocumentProvider,
                          "DocumentProviderBackoffDuration", base::TimeDelta())
                          .Get();
+}
+
+BASE_FEATURE(AdjustOmniboxIndent::kAdjustOmniboxIndent,
+             "AdjustOmniboxIndent",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+AdjustOmniboxIndent::AdjustOmniboxIndent() {
+  const bool enabled = base::FeatureList::IsEnabled(kAdjustOmniboxIndent);
+  indent_input_when_popup_closed =
+      enabled ? base::FeatureParam<bool>(&kAdjustOmniboxIndent,
+                                         "indent-input-when-popup-closed", true)
+                    .Get()
+              : false;
+  input_icon_indent_offset =
+      enabled ? base::FeatureParam<int>(&kAdjustOmniboxIndent,
+                                        "input-icon-indent-offset", -7)
+                    .Get()
+              : 0;
+  input_text_indent_offset =
+      enabled ? base::FeatureParam<int>(&kAdjustOmniboxIndent,
+                                        "input-text-indent-offset", -2)
+                    .Get()
+              : 0;
+  match_icon_indent_offset =
+      enabled ? base::FeatureParam<int>(&kAdjustOmniboxIndent,
+                                        "match-icon-indent-offset", -7)
+                    .Get()
+              : 0;
+  match_text_indent_offset =
+      enabled ? base::FeatureParam<int>(&kAdjustOmniboxIndent,
+                                        "match-text-indent-offset", -9)
+                    .Get()
+              : 0;
 }
 
 // static
@@ -214,7 +256,7 @@ SearchAggregatorProvider::SearchAggregatorProvider() {
                                            "disable_drive", true)
                       .Get();
   multiple_requests = base::FeatureParam<bool>(&kSearchAggregatorProvider,
-                                               "multiple_requests", false)
+                                               "multiple_requests", true)
                           .Get();
 
   relevance_scoring_mode =

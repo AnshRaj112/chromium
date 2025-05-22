@@ -15,10 +15,12 @@ import org.jni_zero.JNINamespace;
 import org.jni_zero.NativeMethods;
 
 import org.chromium.base.Callback;
+import org.chromium.base.ThreadUtils;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.data_sharing.DataSharingMetrics;
 import org.chromium.chrome.browser.data_sharing.DataSharingTabManager;
+import org.chromium.chrome.browser.feature_engagement.TrackerFactory;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.settings.SettingsNavigationFactory;
 import org.chromium.chrome.browser.signin.services.IdentityServicesProvider;
@@ -45,6 +47,7 @@ import org.chromium.components.data_sharing.GroupToken;
 import org.chromium.components.data_sharing.SharedTabGroupPreview;
 import org.chromium.components.data_sharing.configs.DataSharingCreateUiConfig;
 import org.chromium.components.data_sharing.configs.DataSharingJoinUiConfig;
+import org.chromium.components.feature_engagement.Tracker;
 import org.chromium.components.signin.metrics.SigninAccessPoint;
 import org.chromium.components.tab_group_sync.LocalTabGroupId;
 import org.chromium.components.tab_group_sync.SavedTabGroup;
@@ -61,6 +64,7 @@ import org.chromium.url.GURL;
 @NullMarked
 @JNINamespace("collaboration")
 public class CollaborationControllerDelegateImpl implements CollaborationControllerDelegate {
+    private final ThreadUtils.ThreadChecker mThreadChecker = new ThreadUtils.ThreadChecker();
     private final @FlowType int mFlowType;
     private Activity mActivity;
     private DataSharingTabManager mDataSharingTabManager;
@@ -76,6 +80,9 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
     // Stores the runnable to close the current showing UI. Is null when there's no UI showing.
     private @Nullable Runnable mCloseScreenRunnable;
+
+    /** Used to suppress IPH UIs while a collaboration flow UI is on the screen. */
+    private Tracker.@Nullable DisplayLockHandle mFeatureEngagementLock;
 
     /**
      * Constructor for a new {@link CollaborationControllerDelegateImpl} object.
@@ -96,6 +103,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
             @Nullable Callback<Runnable> switchToTabSwitcherCallback,
             Callback<Callback<Boolean>> startAccountRefreshCallback) {
         mNativePtr = CollaborationControllerDelegateImplJni.get().createNativeObject(this);
+        mThreadChecker.assertOnValidThread();
 
         mActivity = activity;
         mFlowType = type;
@@ -114,6 +122,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
     @Override
     public long getNativePtr() {
+        mThreadChecker.assertOnValidThread();
         return mNativePtr;
     }
 
@@ -124,9 +133,16 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
      */
     @CalledByNative
     void prepareFlowUI(long exitCallback, long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         mExitCallback = exitCallback;
+
+        // Acquire lock to prevent IPH from being shown in a collaboration flow.
+        Tracker tracker = TrackerFactory.getTrackerForProfile(mDataSharingTabManager.getProfile());
+        mFeatureEngagementLock = tracker.acquireDisplayLock();
+
         Runnable onTabSwitcherShownRunnable =
                 () -> {
+                    mThreadChecker.assertOnValidThread();
                     CollaborationControllerDelegateImplJni.get()
                             .runResultCallback(Outcome.SUCCESS, resultCallback);
                 };
@@ -150,8 +166,8 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
      */
     @CalledByNative
     void showError(String titleText, String messageParagraphText, long resultCallback) {
-        @Nullable
-        ModalDialogManager modalDialogManager =
+        mThreadChecker.assertOnValidThread();
+        @Nullable ModalDialogManager modalDialogManager =
                 mDataSharingTabManager.getWindowAndroid().getModalDialogManager();
         assert modalDialogManager != null;
 
@@ -159,6 +175,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
                 new ModalDialogProperties.Controller() {
                     @Override
                     public void onClick(PropertyModel model, @ButtonType int buttonType) {
+                        mThreadChecker.assertOnValidThread();
                         modalDialogManager.dismissDialog(
                                 model, DialogDismissalCause.POSITIVE_BUTTON_CLICKED);
                     }
@@ -166,6 +183,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
                     @Override
                     public void onDismiss(
                             PropertyModel model, @DialogDismissalCause int dismissalCause) {
+                        mThreadChecker.assertOnValidThread();
                         CollaborationControllerDelegateImplJni.get()
                                 .runResultCallback(Outcome.SUCCESS, resultCallback);
                     }
@@ -191,6 +209,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
         mCloseScreenRunnable =
                 () -> {
+                    mThreadChecker.assertOnValidThread();
                     modalDialogManager.dismissDialog(model, DialogDismissalCause.NAVIGATE);
                 };
     }
@@ -202,6 +221,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
      */
     @CalledByNative
     void cancel(long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         CollaborationControllerDelegateImplJni.get()
                 .runResultCallback(Outcome.FAILURE, resultCallback);
     }
@@ -213,6 +233,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
      */
     @CalledByNative
     void showAuthenticationUi(long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         Profile profile = mDataSharingTabManager.getProfile();
         assert profile != null;
 
@@ -232,6 +253,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
             // Need to redirect to verify account activity.
             Callback<Boolean> successCallback =
                     (success) -> {
+                        mThreadChecker.assertOnValidThread();
                         @Outcome int outcome = success ? Outcome.SUCCESS : Outcome.CANCEL;
 
                         CollaborationControllerDelegateImplJni.get()
@@ -273,11 +295,13 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
         mCloseScreenRunnable =
                 () -> {
+                    mThreadChecker.assertOnValidThread();
                     mDataSharingTabManager.getWindowAndroid().cancelIntent(requestCode);
                 };
     }
 
     private void openSigninSettingsModel(long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         SettingsNavigation settingsNavigation =
                 SettingsNavigationFactory.createSettingsNavigation();
 
@@ -290,6 +314,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
                 new ModalDialogProperties.Controller() {
                     @Override
                     public void onClick(PropertyModel model, @ButtonType int buttonType) {
+                        mThreadChecker.assertOnValidThread();
                         switch (buttonType) {
                             case ModalDialogProperties.ButtonType.POSITIVE:
                                 settingsNavigation.startSettings(
@@ -307,6 +332,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
                     @Override
                     public void onDismiss(
                             PropertyModel model, @DialogDismissalCause int dismissalCause) {
+                        mThreadChecker.assertOnValidThread();
                         CollaborationControllerDelegateImplJni.get()
                                 .runResultCallback(Outcome.CANCEL, resultCallback);
                     }
@@ -338,11 +364,13 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
         mCloseScreenRunnable =
                 () -> {
+                    mThreadChecker.assertOnValidThread();
                     modalDialogManager.dismissDialog(model, DialogDismissalCause.NAVIGATE);
                 };
     }
 
     private @Nullable Intent createBottomSheetSigninIntent() {
+        mThreadChecker.assertOnValidThread();
         AccountPickerBottomSheetStrings strings =
                 new AccountPickerBottomSheetStrings.Builder(
                                 R.string.collaboration_signin_bottom_sheet_title)
@@ -372,6 +400,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
     }
 
     private @Nullable Intent createFullscreenSigninIntent() {
+        mThreadChecker.assertOnValidThread();
         FullscreenSigninAndHistorySyncConfig fullscreenConfig =
                 new FullscreenSigninAndHistorySyncConfig.Builder()
                         .historyOptInMode(HistorySyncConfig.OptInMode.REQUIRED)
@@ -391,6 +420,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
     }
 
     private void onSigninResult(int resultCode, long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         mCloseScreenRunnable = null;
         if (resultCode == Activity.RESULT_OK) {
             CollaborationControllerDelegateImplJni.get()
@@ -414,6 +444,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
      */
     @CalledByNative
     void showJoinDialog(GroupToken token, SharedTabGroupPreview previewData, long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         if (previewData == null) {
             CollaborationControllerDelegateImplJni.get()
                     .runResultCallback(Outcome.FAILURE, resultCallback);
@@ -422,6 +453,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
         DataSharingJoinUiConfig.JoinCallback joinCallback =
                 new DataSharingJoinUiConfig.JoinCallback() {
+                    // mThreadChecker is an instance variable of the outer class.
                     private long mResultCallback;
 
                     {
@@ -432,12 +464,14 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
                     public void onGroupJoinedWithWait(
                             org.chromium.components.sync.protocol.GroupData groupData,
                             Callback<Boolean> onJoinFinished) {
+                        mThreadChecker.assertOnValidThread();
                         DataSharingMetrics.recordJoinActionFlowState(
                                 DataSharingMetrics.JoinActionStateAndroid.ADD_MEMBER_SUCCESS);
                         assert groupData.getGroupId().equals(token.collaborationId);
                         mCloseScreenRunnable =
                                 () -> {
                                     onJoinFinished.onResult(true);
+                                    mThreadChecker.assertOnValidThread();
                                 };
                         long callback = mResultCallback;
                         mResultCallback = 0;
@@ -447,6 +481,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
                     @Override
                     public void onSessionFinished() {
+                        mThreadChecker.assertOnValidThread();
                         mCloseScreenRunnable = null;
                         if (mResultCallback != 0) {
                             CollaborationControllerDelegateImplJni.get()
@@ -462,6 +497,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
         mCloseScreenRunnable =
                 () -> {
+                    mThreadChecker.assertOnValidThread();
                     assumeNonNull(mDataSharingTabManager.getUiDelegate()).destroyFlow(sessionId);
                 };
     }
@@ -476,8 +512,10 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
     @CalledByNative
     void showShareDialog(
             String syncId, LocalTabGroupId localId, long resultWithGroupTokenCallback) {
+        mThreadChecker.assertOnValidThread();
         DataSharingCreateUiConfig.CreateCallback createCallback =
                 new DataSharingCreateUiConfig.CreateCallback() {
+                    // mThreadChecker is an instance variable of the outer class.
                     private long mResultCallback;
 
                     {
@@ -488,10 +526,12 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
                     public void onGroupCreatedWithWait(
                             org.chromium.components.sync.protocol.GroupData result,
                             Callback<Boolean> onCreateFinished) {
+                        mThreadChecker.assertOnValidThread();
                         DataSharingMetrics.recordShareActionFlowState(
                                 DataSharingMetrics.ShareActionStateAndroid.GROUP_CREATE_SUCCESS);
                         mCloseScreenRunnable =
                                 () -> {
+                                    mThreadChecker.assertOnValidThread();
                                     onCreateFinished.onResult(true);
                                 };
 
@@ -506,12 +546,14 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
                     @Override
                     public void onCancelClicked() {
+                        mThreadChecker.assertOnValidThread();
                         DataSharingMetrics.recordShareActionFlowState(
                                 DataSharingMetrics.ShareActionStateAndroid.BOTTOM_SHEET_DISMISSED);
                     }
 
                     @Override
                     public void onSessionFinished() {
+                        mThreadChecker.assertOnValidThread();
                         mCloseScreenRunnable = null;
                         if (mResultCallback != 0) {
                             CollaborationControllerDelegateImplJni.get()
@@ -531,6 +573,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
         mCloseScreenRunnable =
                 () -> {
+                    mThreadChecker.assertOnValidThread();
                     assumeNonNull(mDataSharingTabManager.getUiDelegate()).destroyFlow(sessionId);
                 };
     }
@@ -542,10 +585,12 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
      */
     @CalledByNative
     void onUrlReadyToShare(String groupId, GURL url, long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         if (mCloseScreenRunnable == null) return;
         Callback<Boolean> onFinishCallback =
                 (result) -> {
                     // Close the share dialog that is waiting to finish.
+                    mThreadChecker.assertOnValidThread();
                     closeScreenIfNeeded();
                     if (!result) {
                         CollaborationControllerDelegateImplJni.get()
@@ -566,6 +611,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
      */
     @CalledByNative
     void showManageDialog(String syncId, LocalTabGroupId localId, long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         SavedTabGroup existingGroup =
                 mDataSharingTabManager.getSavedTabGroupForEitherId(syncId, localId);
 
@@ -574,6 +620,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
                         mActivity,
                         assumeNonNull(existingGroup.collaborationId),
                         (outcome) -> {
+                            mThreadChecker.assertOnValidThread();
                             CollaborationControllerDelegateImplJni.get()
                                     .runResultCallback(outcome, resultCallback);
                         });
@@ -581,12 +628,15 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
         mCloseScreenRunnable =
                 () -> {
+                    mThreadChecker.assertOnValidThread();
                     assumeNonNull(mDataSharingTabManager.getUiDelegate()).destroyFlow(sessionId);
                 };
     }
 
     private Callback<MaybeBlockingResult> getActionConfirmationCallback(long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         return (MaybeBlockingResult maybeBlockingResult) -> {
+            mThreadChecker.assertOnValidThread();
             boolean accept =
                     maybeBlockingResult.result != ActionConfirmationResult.CONFIRMATION_NEGATIVE;
 
@@ -605,6 +655,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
     }
 
     private ActionConfirmationManager getActionConfirmationManager() {
+        mThreadChecker.assertOnValidThread();
         return new ActionConfirmationManager(
                 assumeNonNull(mDataSharingTabManager.getProfile()),
                 mActivity,
@@ -620,6 +671,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
      */
     @CalledByNative
     void showLeaveDialog(String syncId, LocalTabGroupId localId, long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         SavedTabGroup existingGroup =
                 mDataSharingTabManager.getSavedTabGroupForEitherId(syncId, localId);
 
@@ -638,6 +690,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
      */
     @CalledByNative
     void showDeleteDialog(String syncId, LocalTabGroupId localId, long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         SavedTabGroup existingGroup =
                 mDataSharingTabManager.getSavedTabGroupForEitherId(syncId, localId);
 
@@ -648,6 +701,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
     }
 
     private String getSavedTabGroupTitle(SavedTabGroup tabGroup) {
+        mThreadChecker.assertOnValidThread();
         return TextUtils.isEmpty(tabGroup.title)
                 ? TabGroupTitleUtils.getDefaultTitle(mActivity, tabGroup.savedTabs.size())
                 : tabGroup.title;
@@ -661,6 +715,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
      */
     @CalledByNative
     void promoteTabGroup(String collaborationId, long resultCallback) {
+        mThreadChecker.assertOnValidThread();
         closeScreenIfNeeded();
         boolean success =
                 mDataSharingTabManager.displayTabGroupAnywhere(
@@ -677,12 +732,16 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
     /** Called when the flow is finished. */
     @CalledByNative
     void onFlowFinished() {
+        mThreadChecker.assertOnValidThread();
         // Destroy currently showing UI if any.
         closeLoadingIfNeeded();
         closeScreenIfNeeded();
         mDataSharingTabManager.onCollaborationDelegateFlowFinished();
         cleanUpPointers();
 
+        if (mFeatureEngagementLock != null) {
+            mFeatureEngagementLock.release();
+        }
         if (mExitCallback != 0) {
             CollaborationControllerDelegateImplJni.get().deleteExitCallback(mExitCallback);
         }
@@ -691,6 +750,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
     /** It is guaranteed that onFlowFinished() is called before this function. */
     @CalledByNative
     void clearNativePtr() {
+        mThreadChecker.assertOnValidThread();
         mNativePtr = 0;
         assert mActivity == null;
     }
@@ -698,6 +758,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
     /** Cleans up any outstanding resources. */
     @Override
     public void destroy() {
+        mThreadChecker.assertOnValidThread();
         long tempCallback = mExitCallback;
         mExitCallback = 0;
         CollaborationControllerDelegateImplJni.get().runExitCallback(tempCallback);
@@ -705,6 +766,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
 
     @SuppressWarnings("NullAway")
     private void cleanUpPointers() {
+        mThreadChecker.assertOnValidThread();
         mActivity = null;
         mDataSharingTabManager = null;
         mSigninAndHistorySyncActivityLauncher = null;
@@ -712,6 +774,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
     }
 
     private void closeScreenIfNeeded() {
+        mThreadChecker.assertOnValidThread();
         if (mCloseScreenRunnable != null) {
             mCloseScreenRunnable.run();
             mCloseScreenRunnable = null;
@@ -719,6 +782,7 @@ public class CollaborationControllerDelegateImpl implements CollaborationControl
     }
 
     private void closeLoadingIfNeeded() {
+        mThreadChecker.assertOnValidThread();
         if (mLoadingFullscreenCoordinator != null) {
             mLoadingFullscreenCoordinator.closeLoadingScreen();
         }

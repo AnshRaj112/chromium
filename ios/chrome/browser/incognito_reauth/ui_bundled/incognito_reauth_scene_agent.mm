@@ -238,6 +238,7 @@
     }
   } else if (level >= SceneActivationLevelForegroundInactive) {
     [self updateWindowHasIncognitoContent:sceneState];
+    [self handleExternalStartupIntents:sceneState];
     [self updateBackgroundedForEnoughTimeOnForeground];
     // Close media presentations when the app is foregrounded rather than
     // backgrounded to avoid freezes.
@@ -254,8 +255,8 @@
   [self logEnabledHistogramOnce];
   if (IsIOSSoftLockEnabled()) {
     [self setUpPrefObservers];
+    [self notifyObservers];
     [self maybeEnterTabGridWithSceneState:sceneState];
-
     [self logIncognitoLockStateHistogramOnce];
     [self recordIncognitoLockImpressionForSceneState:sceneState];
   }
@@ -281,6 +282,19 @@
 }
 
 #pragma mark - private
+
+// Marks the lock screen as authenticated, if reauth is not enabled and Chrome
+// was started via external intents.
+- (void)handleExternalStartupIntents:(SceneState*)sceneState {
+  if (!IsIOSSoftLockEnabled()) {
+    return;
+  }
+
+  if (self.incognitoLockState != IncognitoLockState::kReauth &&
+      sceneState.startupHadExternalIntent) {
+    self.authenticatedSinceLastForeground = YES;
+  }
+}
 
 // Switch from tab to tab switcher, if the current surface is a locked Incognito
 // tab.

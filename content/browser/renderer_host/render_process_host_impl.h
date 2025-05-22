@@ -87,7 +87,6 @@
 #include "third_party/blink/public/mojom/push_messaging/push_messaging.mojom-forward.h"
 #include "third_party/perfetto/include/perfetto/tracing/traced_proto.h"
 #include "third_party/perfetto/include/perfetto/tracing/traced_value_forward.h"
-#include "ui/gfx/gpu_memory_buffer.h"
 
 #if BUILDFLAG(IS_ANDROID)
 #include "base/memory/memory_pressure_listener.h"
@@ -606,6 +605,10 @@ class CONTENT_EXPORT RenderProcessHostImpl
 #if !BUILDFLAG(IS_ANDROID)
   // Gets the platform-specific limit. Used by GetMaxRendererProcessCount().
   static size_t GetPlatformMaxRendererProcessCount();
+
+  // Returns whether the current platform has no known process limit, in which
+  // case `GetPlatformMaxRendererProcessCount()` will use a fallback value.
+  static bool IsPlatformProcessLimitUnknownForTesting();
 #endif
 
   // This forces a renderer that is running "in process" to shut down.

@@ -26,6 +26,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_STYLE_CONTENT_DATA_H_
 #define THIRD_PARTY_BLINK_RENDERER_CORE_STYLE_CONTENT_DATA_H_
 
+#include "third_party/blink/renderer/core/core_export.h"
 #include "third_party/blink/renderer/core/css/css_value.h"
 #include "third_party/blink/renderer/core/style/computed_style_constants.h"
 #include "third_party/blink/renderer/core/style/style_image.h"
@@ -39,6 +40,8 @@ namespace blink {
 
 class LayoutObject;
 class TreeScope;
+class StyleEngine;
+class CountersAttachmentContext;
 
 class ContentData : public GarbageCollected<ContentData> {
  public:
@@ -51,6 +54,10 @@ class ContentData : public GarbageCollected<ContentData> {
   virtual bool IsText() const { return false; }
   virtual bool IsAltText() const { return false; }
   virtual bool IsNone() const { return false; }
+  virtual bool IsAlt() const { return IsAltText() || IsAltCounter(); }
+
+  CORE_EXPORT static String ConcatenateAltText(
+      const ContentData& first_alt_data);
 
   // Create a layout object for this piece of content. `owner` is the layout
   // object that has the content property, e.g. a pseudo element, or an @page
@@ -200,14 +207,6 @@ class AltTextContentData final : public ContentData {
   explicit AltTextContentData(const String& text) : text_(text) {}
 
   String GetText() const { return text_; }
-  String ConcatenateAltText() const {
-    StringBuilder alt_text;
-    for (const ContentData* content_data = this; content_data;
-         content_data = content_data->Next()) {
-      alt_text.Append(To<AltTextContentData>(content_data)->GetText());
-    }
-    return alt_text.ToString();
-  }
   void SetText(const String& text) { text_ = text; }
 
   bool IsAltText() const override { return true; }
@@ -316,12 +315,18 @@ class AltCounterContentData : public CounterContentData {
  public:
   bool IsAltCounter() const override { return true; }
 
+  LayoutObject* CreateLayoutObject(LayoutObject& owner) const override;
+
   const String& GetText() const { return counter_value_text_; }
-  void SetText(const String& text) { counter_value_text_ = text; }
+  void UpdateText(CountersAttachmentContext& context,
+                  const StyleEngine& style_engine,
+                  const LayoutObject& content_generating_object);
 
   String DebugString() const override { return "<alt-counter>"; }
 
  private:
+  void SetText(const String& text) { counter_value_text_ = text; }
+
   ContentData* CloneInternal() const override {
     auto* data = MakeGarbageCollected<AltCounterContentData>(counter_data_);
     data->SetText(GetText());
@@ -426,7 +431,7 @@ inline bool ShouldUseContentDataForElement(const ContentData* content_data) {
   if (!content_data->IsImage()) {
     return false;
   }
-  if (content_data->Next() && !content_data->Next()->IsAltText()) {
+  if (content_data->Next() && !content_data->Next()->IsAlt()) {
     return false;
   }
 

@@ -164,11 +164,7 @@ class CONTENT_EXPORT BackingStore : public indexed_db::BackingStore,
 
     // Creates a new index metadata and writes it to the transaction.
     Status CreateIndex(int64_t object_store_id,
-                       int64_t index_id,
-                       const std::u16string& name,
-                       blink::IndexedDBKeyPath key_path,
-                       bool is_unique,
-                       bool is_multi_entry) override;
+                       blink::IndexedDBIndexMetadata index) override;
     // Deletes the index metadata on the transaction (but not any index
     // entries).
     Status DeleteIndex(int64_t object_store_id, int64_t index_id) override;
@@ -179,22 +175,20 @@ class CONTENT_EXPORT BackingStore : public indexed_db::BackingStore,
     Status GetRecord(int64_t object_store_id,
                      const blink::IndexedDBKey& key,
                      IndexedDBValue* record) override;
-    Status PutRecord(int64_t object_store_id,
-                     const blink::IndexedDBKey& key,
-                     IndexedDBValue* value,
-                     RecordIdentifier* record) override;
+    StatusOr<RecordIdentifier> PutRecord(int64_t object_store_id,
+                                         const blink::IndexedDBKey& key,
+                                         IndexedDBValue value) override;
     Status ClearObjectStore(int64_t object_store_id) override;
     Status DeleteRange(int64_t object_store_id,
                        const blink::IndexedDBKeyRange&) override;
-    Status GetKeyGeneratorCurrentNumber(int64_t object_store_id,
-                                        int64_t* current_number) override;
+    StatusOr<int64_t> GetKeyGeneratorCurrentNumber(
+        int64_t object_store_id) override;
     Status MaybeUpdateKeyGeneratorCurrentNumber(int64_t object_store_id,
                                                 int64_t new_state,
                                                 bool check_current) override;
-    Status KeyExistsInObjectStore(int64_t object_store_id,
-                                  const blink::IndexedDBKey& key,
-                                  RecordIdentifier* found_record_identifier,
-                                  bool* found) override;
+    StatusOr<std::optional<RecordIdentifier>> KeyExistsInObjectStore(
+        int64_t object_store_id,
+        const blink::IndexedDBKey& key) override;
     Status PutIndexDataForRecord(int64_t object_store_id,
                                  int64_t index_id,
                                  const blink::IndexedDBKey& key,
@@ -210,24 +204,24 @@ class CONTENT_EXPORT BackingStore : public indexed_db::BackingStore,
         const blink::IndexedDBKey& key,
         std::unique_ptr<blink::IndexedDBKey>* found_primary_key,
         bool* exists) override;
-    base::expected<std::unique_ptr<indexed_db::BackingStore::Cursor>, Status>
+    StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>>
     OpenObjectStoreKeyCursor(int64_t object_store_id,
                              const blink::IndexedDBKeyRange& key_range,
                              blink::mojom::IDBCursorDirection) override;
-    base::expected<std::unique_ptr<indexed_db::BackingStore::Cursor>, Status>
+    StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>>
     OpenObjectStoreCursor(int64_t object_store_id,
                           const blink::IndexedDBKeyRange& key_range,
                           blink::mojom::IDBCursorDirection) override;
-    base::expected<std::unique_ptr<indexed_db::BackingStore::Cursor>, Status>
+    StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>>
     OpenIndexKeyCursor(int64_t object_store_id,
                        int64_t index_id,
                        const blink::IndexedDBKeyRange& key_range,
                        blink::mojom::IDBCursorDirection) override;
-    base::expected<std::unique_ptr<indexed_db::BackingStore::Cursor>, Status>
-    OpenIndexCursor(int64_t object_store_id,
-                    int64_t index_id,
-                    const blink::IndexedDBKeyRange& key_range,
-                    blink::mojom::IDBCursorDirection) override;
+    StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>> OpenIndexCursor(
+        int64_t object_store_id,
+        int64_t index_id,
+        const blink::IndexedDBKeyRange& key_range,
+        blink::mojom::IDBCursorDirection) override;
 
     Status PutExternalObjectsIfNeeded(const std::string& object_store_data_key,
                                       std::vector<IndexedDBExternalObject>*);
@@ -284,8 +278,8 @@ class CONTENT_EXPORT BackingStore : public indexed_db::BackingStore,
 
     // Prepares a cursor and returns it if successful, an error Status if
     // there's an error, or null if the cursor is empty.
-    base::expected<std::unique_ptr<indexed_db::BackingStore::Cursor>, Status>
-    PrepareCursor(std::unique_ptr<Cursor> cursor);
+    StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>> PrepareCursor(
+        std::unique_ptr<Cursor> cursor);
 
     // This does NOT mean that this class can outlive the BackingStore.
     // This is only to protect against security issues before this class is
@@ -483,18 +477,15 @@ class CONTENT_EXPORT BackingStore : public indexed_db::BackingStore,
   void InvalidateBlobReferences() override;
   void StartPreCloseTasks(base::OnceClosure on_done) override;
   void StopPreCloseTasks() override;
-  base::expected<std::unique_ptr<indexed_db::BackingStore::Database>, Status>
+  StatusOr<std::unique_ptr<indexed_db::BackingStore::Database>>
   CreateOrOpenDatabase(const std::u16string& name) override;
 
   uintptr_t GetIdentifierForMemoryDump() override;
   void FlushForTesting() override;
 
-  // Fill in the provided list with existing database names.
-  Status GetDatabaseNames(std::vector<std::u16string>* names) override;
-  // Fill in the provided list with existing database names and versions.
-  Status GetDatabaseNamesAndVersions(
-      std::vector<blink::mojom::IDBNameAndVersionPtr>* names_and_versions)
-      override;
+  StatusOr<std::vector<std::u16string>> GetDatabaseNames() override;
+  StatusOr<std::vector<blink::mojom::IDBNameAndVersionPtr>>
+  GetDatabaseNamesAndVersions() override;
 
   base::FilePath GetBlobFileName(int64_t database_id, int64_t key) const;
 

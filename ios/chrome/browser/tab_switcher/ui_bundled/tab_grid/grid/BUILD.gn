@@ -176,14 +176,6 @@ source_set("grid_utils") {
   ]
 }
 
-source_set("group_tab_info") {
-  sources = [
-    "group_tab_info.h",
-    "group_tab_info.mm",
-  ]
-  deps = []
-}
-
 source_set("grid_ui") {
   sources = [
     "base_grid_view_controller+Testing.h",
@@ -215,7 +207,6 @@ source_set("grid_ui") {
     ":grid_mediator_item_provider",
     ":grid_ui_constants",
     ":grid_view_controller_mutator",
-    ":group_tab_info",
     "//base",
     "//components/saved_tab_groups/public",
     "//components/supervised_user/core/common",
@@ -335,6 +326,19 @@ source_set("activity_label_view") {
   ]
   deps = [
     "//base",
+    "//ios/chrome/common/ui/colors",
+  ]
+}
+
+source_set("tabs_closure_animation") {
+  sources = [
+    "tabs_closure_animation.h",
+    "tabs_closure_animation.mm",
+  ]
+
+  deps = [
+    "//base",
+    "//ios/chrome/common:timing",
     "//ios/chrome/common/ui/colors",
   ]
 }

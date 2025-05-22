@@ -12,8 +12,6 @@ import android.graphics.drawable.Drawable;
 import android.os.SystemClock;
 import android.view.InputDevice;
 import android.view.MotionEvent;
-import android.view.MotionEvent.PointerCoords;
-import android.view.MotionEvent.PointerProperties;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
@@ -42,6 +40,8 @@ import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuHandler.AppMenuItemType;
 import org.chromium.chrome.browser.ui.appmenu.test.R;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
+import org.chromium.components.browser_ui.util.motion.MotionEventInfo;
+import org.chromium.components.browser_ui.util.motion.MotionEventTestUtils;
 import org.chromium.ui.modelutil.LayoutViewBuilder;
 import org.chromium.ui.modelutil.ModelListAdapter;
 import org.chromium.ui.modelutil.PropertyKey;
@@ -63,7 +63,7 @@ public class AppMenuItemViewBinderTest {
         public PropertyModel lastLongClickedModel;
 
         @Override
-        public void onItemClick(PropertyModel model, @Nullable MotionEvent triggeringMotionEvent) {
+        public void onItemClick(PropertyModel model, @Nullable MotionEventInfo triggeringMotion) {
             onClickCallback.notifyCalled();
             lastClickedModel = model;
         }
@@ -125,11 +125,6 @@ public class AppMenuItemViewBinderTest {
         }
 
         @Override
-        public boolean supportsEnterAnimation(int id) {
-            return true;
-        }
-
-        @Override
         public int getPixelHeight(Context context) {
             return 0;
         }
@@ -170,11 +165,6 @@ public class AppMenuItemViewBinderTest {
                 lastBindId = model.get(AppMenuItemProperties.MENU_ITEM_ID);
                 getViewItemCallbackHelper.notifyCalled();
             }
-        }
-
-        @Override
-        public boolean supportsEnterAnimation(int id) {
-            return false;
         }
 
         @Override
@@ -446,7 +436,7 @@ public class AppMenuItemViewBinderTest {
             View view, int motionSource, int motionToolType) {
         long downTime = SystemClock.uptimeMillis();
         view.dispatchTouchEvent(
-                createMotionEvent(
+                MotionEventTestUtils.createMotionEvent(
                         downTime,
                         /* eventTime= */ downTime,
                         MotionEvent.ACTION_DOWN,
@@ -455,7 +445,7 @@ public class AppMenuItemViewBinderTest {
                         motionSource,
                         motionToolType));
         view.dispatchTouchEvent(
-                createMotionEvent(
+                MotionEventTestUtils.createMotionEvent(
                         downTime,
                         /* eventTime= */ downTime + 50,
                         MotionEvent.ACTION_UP,
@@ -463,38 +453,6 @@ public class AppMenuItemViewBinderTest {
                         /* y= */ 0,
                         motionSource,
                         motionToolType));
-    }
-
-    /**
-     * Creates a {@link MotionEvent}.
-     *
-     * <p>All parameters are for {@link MotionEvent#obtain}.
-     */
-    private static MotionEvent createMotionEvent(
-            long downTime, long eventTime, int action, float x, float y, int source, int toolType) {
-        PointerProperties pointerProperties = new MotionEvent.PointerProperties();
-        pointerProperties.id = 0;
-        pointerProperties.toolType = toolType;
-
-        PointerCoords pointerCoords = new PointerCoords();
-        pointerCoords.x = x;
-        pointerCoords.y = y;
-
-        return MotionEvent.obtain(
-                downTime,
-                eventTime,
-                action,
-                /* pointerCount= */ 1,
-                new PointerProperties[] {pointerProperties},
-                new PointerCoords[] {pointerCoords},
-                /* metaState= */ 0,
-                /* buttonState= */ 0,
-                /* xPrecision= */ 1.0f,
-                /* yPrecision= */ 1.0f,
-                /* deviceId= */ 0,
-                /* edgeFlags= */ 0,
-                source,
-                /* flags= */ 0);
     }
 
     @Test

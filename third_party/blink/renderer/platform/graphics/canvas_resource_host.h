@@ -58,7 +58,6 @@ class PLATFORM_EXPORT CanvasResourceHost {
   virtual void InitializeLayerWithCSSProperties(cc::Layer* layer) {}
 
   bool IsComposited() const;
-  bool IsResourceValid();
   gfx::Size Size() const { return size_; }
   virtual void SetSize(gfx::Size size) { size_ = size; }
 
@@ -90,11 +89,11 @@ class PLATFORM_EXPORT CanvasResourceHost {
 
   // Actual RasterMode used for rendering 2d primitives.
   RasterMode GetRasterMode() const;
-  void ResetLayer();
-  void ClearLayerTexture();
-  void SetNeedsPushProperties();
-  void DoPaintInvalidation(const gfx::Rect& dirty_rect);
-  void SetOpacityMode(OpacityMode opacity_mode);
+
+  // Called when the CC texture layer that this instance is holding (if any)
+  // should be cleared. Subclasses that can hold a CC texture layer should
+  // override this method.
+  virtual void ClearLayerTexture() {}
 
   virtual void SetTransferToGPUTextureWasInvoked() {}
   virtual bool TransferToGPUTextureWasInvoked() { return false; }
@@ -102,15 +101,7 @@ class PLATFORM_EXPORT CanvasResourceHost {
  protected:
   virtual CanvasResourceProvider* GetOrCreateCanvasResourceProviderImpl() = 0;
 
-  bool is_opaque() { return is_opaque_; }
-
-  // TODO(399587138): Move this field to be held by HTMLCanvasElement and
-  // eventually by CanvasRenderingContext2D, as it's only instantiated by the
-  // latter.
-  scoped_refptr<cc::TextureLayer> cc_layer_;
-
  private:
-  bool is_opaque_ = false;
   std::unique_ptr<CanvasResourceProvider> resource_provider_;
   RasterModeHint preferred_2d_raster_mode_ = RasterModeHint::kPreferCPU;
   gfx::Size size_;

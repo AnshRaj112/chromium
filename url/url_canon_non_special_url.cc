@@ -63,8 +63,9 @@ bool DoCanonicalizeNonSpecialURL(const URLComponentSource<CHAR>& source,
     if (parsed.host.is_nonempty()) {
       // User info: the canonicalizer will handle the : and @.
       success &= CanonicalizeUserInfo(
-          source.username, parsed.username, source.password, parsed.password,
-          &output, &new_parsed.username, &new_parsed.password);
+          parsed.username.maybe_as_string_view_on(source.username),
+          parsed.password.maybe_as_string_view_on(source.password), &output,
+          &new_parsed.username, &new_parsed.password);
     } else {
       new_parsed.username.reset();
       new_parsed.password.reset();
@@ -164,8 +165,8 @@ bool DoCanonicalizeNonSpecialURL(const URLComponentSource<CHAR>& source,
   }
 
   // Query
-  CanonicalizeQuery(source.query, parsed.query, query_converter, &output,
-                    &new_parsed.query);
+  CanonicalizeQuery(parsed.query.maybe_as_string_view_on(source.query),
+                    query_converter, &output, &new_parsed.query);
 
   // Ref: ignore failure for this, since the page can probably still be loaded.
   CanonicalizeRef(parsed.ref.maybe_as_string_view_on(source.ref), &output,

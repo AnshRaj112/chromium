@@ -33,9 +33,11 @@ import org.chromium.base.BuildInfo;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.IntentUtils;
 import org.chromium.base.ResettersForTesting;
+import org.chromium.base.TimeUtils;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.shared_preferences.SharedPreferencesManager;
+import org.chromium.base.supplier.Supplier;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.ChromeTabbedActivity2;
 import org.chromium.chrome.browser.IntentHandler;
@@ -80,12 +82,12 @@ public class MultiWindowUtils implements ActivityStateListener {
             ".ExistingInstance";
 
     private static MultiWindowUtils sInstance = new MultiWindowUtils();
+    protected static Supplier<Activity> sActivitySupplierForTesting;
 
     private static Integer sMaxInstancesForTesting;
     private static Integer sInstanceCountForTesting;
-
-    private final boolean mMultiInstanceApi31Enabled;
     private static Boolean sMultiInstanceApi31EnabledForTesting;
+    private final boolean mMultiInstanceApi31Enabled;
     private static Boolean sIsMultiInstanceApi31Enabled;
 
     // Used to keep track of whether ChromeTabbedActivity2 is running. A tri-state Boolean is
@@ -452,9 +454,12 @@ public class MultiWindowUtils implements ActivityStateListener {
     /**
      * @param current Current activity trying to find its adjacent one.
      * @return ChromeTabbedActivity instance of the task running adjacently to the current one.
-     *         {@code null} if there is no such task.
+     *     {@code null} if there is no such task.
      */
     public static Activity getAdjacentWindowActivity(Activity current) {
+        if (sActivitySupplierForTesting != null) {
+            return sActivitySupplierForTesting.get();
+        }
         List<Activity> runningActivities = ApplicationStatus.getRunningActivities();
         int currentTaskId = current.getTaskId();
         for (Activity activity : runningActivities) {
@@ -480,6 +485,7 @@ public class MultiWindowUtils implements ActivityStateListener {
 
     /**
      * Determines if multiple instances of Chrome are running.
+     *
      * @param context The current Context, used to retrieve the ActivityManager system service.
      * @return True if multiple instances of Chrome are running.
      */
@@ -685,12 +691,13 @@ public class MultiWindowUtils implements ActivityStateListener {
 
     /**
      * Write the time this instance is accessed.
+     *
      * @param index Instance ID
      */
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     public static void writeLastAccessedTime(int index) {
         ChromeSharedPreferences.getInstance()
-                .writeLong(lastAccessedTimeKey(index), System.currentTimeMillis());
+                .writeLong(lastAccessedTimeKey(index), TimeUtils.currentTimeMillis());
     }
 
     @VisibleForTesting
@@ -732,7 +739,7 @@ public class MultiWindowUtils implements ActivityStateListener {
                     long startTime = prefs.readLong(ChromePreferenceKeys.MULTI_WINDOW_START_TIME);
                     if (startTime == 0) {
                         RecordUserAction.record("Android.MultiWindowMode.Enter2");
-                        long current = System.currentTimeMillis();
+                        long current = TimeUtils.currentTimeMillis();
                         prefs.writeLong(ChromePreferenceKeys.MULTI_WINDOW_START_TIME, current);
                     }
                 } else {
@@ -743,7 +750,7 @@ public class MultiWindowUtils implements ActivityStateListener {
                     SharedPreferencesManager prefs = ChromeSharedPreferences.getInstance();
                     long startTime = prefs.readLong(ChromePreferenceKeys.MULTI_WINDOW_START_TIME);
                     if (startTime > 0) {
-                        long current = System.currentTimeMillis();
+                        long current = TimeUtils.currentTimeMillis();
                         RecordUserAction.record("Android.MultiWindowMode.Exit2");
                         RecordHistogram.recordLongTimesHistogram(
                                 "Android.MultiWindowMode.TotalDuration", current - startTime);
@@ -977,5 +984,10 @@ public class MultiWindowUtils implements ActivityStateListener {
     public static void setMultiInstanceApi31EnabledForTesting(boolean value) {
         sMultiInstanceApi31EnabledForTesting = value;
         ResettersForTesting.register(() -> sMultiInstanceApi31EnabledForTesting = null);
+    }
+
+    public static void setActivitySupplierForTesting(Supplier<Activity> supplier) {
+        sActivitySupplierForTesting = supplier;
+        ResettersForTesting.register(() -> sActivitySupplierForTesting = null);
     }
 }

@@ -51,7 +51,8 @@ public class HomepageSettings extends ChromeBaseSettingsFragment {
                 new ChromeManagedPreferenceDelegate(getProfile()) {
                     @Override
                     public boolean isPreferenceControlledByPolicy(Preference preference) {
-                        return HomepagePolicyManager.isHomepageManagedByPolicy();
+                        return HomepagePolicyManager.isHomepageLocationManaged()
+                                || HomepagePolicyManager.isShowHomeButtonManaged();
                     }
                 });
 
@@ -77,8 +78,8 @@ public class HomepageSettings extends ChromeBaseSettingsFragment {
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
+    public void onStart() {
+        super.onStart();
         // If view created, update the state for pref values or policy state changes.
         if (mRadioButtons != null) {
             mRadioButtons.setupPreferenceValues(createPreferenceValuesForRadioGroup());
@@ -113,7 +114,7 @@ public class HomepageSettings extends ChromeBaseSettingsFragment {
     private void updateHomepageFromRadioGroupPreference(PreferenceValues newValue) {
         // When the preference is changed by code during initialization due to policy, ignore the
         // changes of the preference.
-        if (HomepagePolicyManager.isHomepageManagedByPolicy()) return;
+        if (HomepagePolicyManager.isHomepageLocationManaged()) return;
 
         boolean setToUseNtp = newValue.getCheckedOption() == HomepageOption.ENTRY_CHROME_NTP;
         GURL newHomepage = UrlFormatter.fixupUrl(newValue.getCustomURI());
@@ -129,7 +130,7 @@ public class HomepageSettings extends ChromeBaseSettingsFragment {
      * @return The user customized homepage setting.
      */
     private GURL getHomepageForEditText() {
-        if (HomepagePolicyManager.isHomepageManagedByPolicy()) {
+        if (HomepagePolicyManager.isHomepageLocationManaged()) {
             return HomepagePolicyManager.getHomepageUrl();
         }
 
@@ -147,7 +148,7 @@ public class HomepageSettings extends ChromeBaseSettingsFragment {
     }
 
     private PreferenceValues createPreferenceValuesForRadioGroup() {
-        boolean isPolicyEnabled = HomepagePolicyManager.isHomepageManagedByPolicy();
+        boolean isPolicyEnabled = HomepagePolicyManager.isHomepageLocationManaged();
 
         // Check if the NTP button should be checked.
         // Note it is not always checked when homepage is NTP. When user customized homepage is NTP
@@ -182,5 +183,10 @@ public class HomepageSettings extends ChromeBaseSettingsFragment {
                 isRadioButtonPreferenceEnabled,
                 isNtpOptionVisible,
                 isCustomizedOptionVisible);
+    }
+
+    @Override
+    public @AnimationType int getAnimationType() {
+        return AnimationType.PROPERTY;
     }
 }

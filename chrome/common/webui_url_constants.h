@@ -142,16 +142,24 @@ inline constexpr char kChromeUIHistorySyncedTabs[] = "/syncedTabs";
 inline constexpr char kChromeUIHistoryURL[] = "chrome://history/";
 inline constexpr char16_t kChromeUIHistoryURL16[] = u"chrome://history/";
 inline constexpr char kChromeUIIdentityInternalsHost[] = "identity-internals";
+inline constexpr char kChromeUIInfobarInternalsHost[] = "infobar-internals";
+inline constexpr char kChromeUIInfobarInternalsURL[] =
+    "chrome://infobar-internals/";
 inline constexpr char kChromeUIImageHost[] = "image";
 inline constexpr char kChromeUIImageURL[] = "chrome://image/";
 inline constexpr char kChromeUIInspectHost[] = "inspect";
 inline constexpr char kChromeUIInspectURL[] = "chrome://inspect/";
+inline constexpr char kChromeUIInternalDebugPagesDisabledHost[] =
+    "debug-webuis-disabled";
+inline constexpr char kChromeUIInternalDebugPagesDisabledURL[] =
+    "chrome://debug-webuis-disabled/";
 inline constexpr char kChromeUIInternalsHost[] = "internals";
 inline constexpr char kChromeUIInterstitialHost[] = "interstitials";
 inline constexpr char kChromeUIInterstitialURL[] = "chrome://interstitials/";
 inline constexpr char kChromeUIKillHost[] = "kill";
 inline constexpr char kChromeUILauncherInternalsHost[] = "launcher-internals";
 inline constexpr char kChromeUILocalStateHost[] = "local-state";
+inline constexpr char kChromeUILocalStateURL[] = "chrome://local-state";
 inline constexpr char kChromeUILocationInternalsHost[] = "location-internals";
 inline constexpr char kChromeUIManagementHost[] = "management";
 inline constexpr char kChromeUIManagementURL[] = "chrome://management";
@@ -631,7 +639,6 @@ inline constexpr char kIncognitoSettingsSubPage[] = "incognito";
 inline constexpr char kLanguageOptionsSubPage[] = "languages";
 inline constexpr char kLanguagesSubPage[] = "languages/details";
 inline constexpr char kManageProfileSubPage[] = "manageProfile";
-inline constexpr char kOfferWritingHelpSubpage[] = "content/offerWritingHelp";
 inline constexpr char kAiHelpMeWriteSubpage[] = "ai/helpMeWrite";
 inline constexpr char kOnDeviceSiteDataSubpage[] = "content/siteData";
 inline constexpr char kOnStartupSubPage[] = "onStartup";

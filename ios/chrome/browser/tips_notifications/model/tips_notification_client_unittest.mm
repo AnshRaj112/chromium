@@ -53,7 +53,8 @@ using startup_metric_utils::FirstRunSentinelCreationResult;
 @end
 
 @implementation PrepareToPresentModalStub
-- (void)prepareToPresentModal:(ProceduralBlock)completion {
+- (void)prepareToPresentModalWithSnackbarDismissal:(BOOL)dismissSnackbars
+                                        completion:(ProceduralBlock)completion {
   completion();
 }
 @end
@@ -193,8 +194,8 @@ class TipsNotificationClientTest : public PlatformTest {
         kTipsNotificationsSentPref, bits);
   }
 
-  // Stubs the `prepareToPresentModal:` method from `ApplicationCommands` so
-  // that it immediately calls the completion block.
+  // Stubs the `-prepareToPresentModalWithSnackbarDismissal:` method from
+  // `ApplicationCommands` so that it immediately calls the completion block.
   void StubPrepareToPresentModal() {
     prepare_to_present_modal_stub_ = [[PrepareToPresentModalStub alloc] init];
     [browser_->GetCommandDispatcher()
@@ -520,8 +521,7 @@ TEST_F(TipsNotificationClientTest, DockingRequest) {
 TEST_F(TipsNotificationClientTest, DockingHandle) {
   StubPrepareToPresentModal();
   id mock_handler = MockHandler(@protocol(DockingPromoCommands));
-  OCMExpect([mock_handler
-      showDockingPromoWithTrigger:DockingPromoTrigger::kTipsModule]);
+  OCMExpect([mock_handler showDockingPromo:YES]);
 
   id mock_response = MockRequestResponse(TipsNotificationType::kDocking);
   client_->HandleNotificationInteraction(mock_response);
@@ -778,7 +778,8 @@ TEST_F(TipsNotificationClientTest, TestOrderParam) {
   EXPECT_EQ(order[2], TipsNotificationType::kOmniboxPosition);
 }
 
-// Tests that the client can register a CPE Promo notification.
+// Tests that the client can register a CPE Promo notification, only when the
+// CPE promo was displayed more than 30 days ago.
 TEST_F(TipsNotificationClientTest, CPERequest) {
   base::test::ScopedFeatureList feature_list;
   feature_list.InitAndEnableFeature(kIOSExpandedTips);
@@ -794,11 +795,27 @@ TEST_F(TipsNotificationClientTest, CPERequest) {
       TipsNotificationType::kDocking,
       TipsNotificationType::kSignin,
   });
-  ExpectNotificationRequest(TipsNotificationType::kCPE);
+  PrefService* local_state = GetApplicationContext()->GetLocalState();
+  local_state->SetTime(prefs::kIosCredentialProviderPromoDisplayTime,
+                       base::Time::Now() - base::Days(29));
 
+  // A notification should not be requested yet because promo display time is
+  // less than 30 days ago.
+  OCMReject([mock_notification_center_ addNotificationRequest:[OCMArg any]
+                                        withCompletionHandler:[OCMArg any]]);
   base::RunLoop run_loop;
   client_->OnSceneActiveForegroundBrowserReady(run_loop.QuitClosure());
   run_loop.Run();
+
+  // Simulate that the CPE promo was displayed more than 30 days ago.
+  local_state->SetTime(prefs::kIosCredentialProviderPromoDisplayTime,
+                       base::Time::Now() - base::Days(31));
+  SetupMockNotificationCenter();
+  StubGetPendingRequests(nil);
+  ExpectNotificationRequest(TipsNotificationType::kCPE);
+  base::RunLoop run_loop2;
+  client_->OnSceneActiveForegroundBrowserReady(run_loop2.QuitClosure());
+  run_loop2.Run();
 
   EXPECT_OCMOCK_VERIFY(mock_notification_center_);
   histogram_tester_.ExpectUniqueSample("IOS.Notifications.Tips.Sent",

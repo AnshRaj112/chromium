@@ -58,11 +58,10 @@ import org.chromium.chrome.browser.tabmodel.TabRemover;
 import org.chromium.chrome.browser.tabmodel.TabUngrouper;
 import org.chromium.chrome.browser.tasks.tab_management.ColorPickerCoordinator;
 import org.chromium.chrome.browser.tasks.tab_management.TabOverflowMenuCoordinator.OnItemClickedCallback;
-import org.chromium.chrome.browser.tasks.tab_management.TabUiTestHelper;
 import org.chromium.chrome.test.util.browser.tabmodel.MockTabModel;
+import org.chromium.components.browser_ui.util.motion.MotionEventTestUtils;
 import org.chromium.components.browser_ui.widget.list_view.FakeListViewTouchTracker;
 import org.chromium.components.browser_ui.widget.list_view.ListViewTouchTracker;
-import org.chromium.components.browser_ui.widget.list_view.ListViewTouchTracker.ListViewTouchInfo;
 import org.chromium.components.collaboration.CollaborationService;
 import org.chromium.components.collaboration.ServiceStatus;
 import org.chromium.components.data_sharing.member_role.MemberRole;
@@ -85,6 +84,13 @@ import java.util.List;
 /** Unit tests for {@link TabGroupContextMenuCoordinator}. */
 @RunWith(BaseRobolectricTestRunner.class)
 @EnableFeatures({ChromeFeatureList.DATA_SHARING})
+// TODO(crbug.com/419289558): Re-enable color surface feature flags
+@DisableFeatures({
+    ChromeFeatureList.ANDROID_SURFACE_COLOR_UPDATE,
+    ChromeFeatureList.GRID_TAB_SWITCHER_SURFACE_COLOR_UPDATE,
+    ChromeFeatureList.GRID_TAB_SWITCHER_UPDATE,
+    ChromeFeatureList.ANDROID_THEME_MODULE
+})
 public class TabGroupContextMenuCoordinatorUnitTest {
     private static final int TAB_ID = 1;
     private static final int ROOT_ID = TAB_ID;
@@ -358,13 +364,10 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         long downMotionTime = SystemClock.uptimeMillis();
         FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
         listViewTouchTracker.setLastSingleTapUpInfo(
-                ListViewTouchInfo.fromMotionEvent(
-                        TabUiTestHelper.createTouchMotionEvent(
-                                downMotionTime,
-                                /* eventTime= */ downMotionTime + 50,
-                                MotionEvent.ACTION_UP,
-                                /* x= */ 0,
-                                /* y= */ 0)));
+                MotionEventTestUtils.createTouchMotionInfo(
+                        downMotionTime,
+                        /* eventTime= */ downMotionTime + 50,
+                        MotionEvent.ACTION_UP));
 
         testItemClicked_CloseOrDeleteGroup(
                 R.id.close_tab_group,
@@ -379,13 +382,10 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         long downMotionTime = SystemClock.uptimeMillis();
         FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
         listViewTouchTracker.setLastSingleTapUpInfo(
-                ListViewTouchInfo.fromMotionEvent(
-                        TabUiTestHelper.createMouseMotionEvent(
-                                downMotionTime,
-                                /* eventTime= */ downMotionTime + 50,
-                                MotionEvent.ACTION_UP,
-                                /* x= */ 0,
-                                /* y= */ 0)));
+                MotionEventTestUtils.createMouseMotionInfo(
+                        downMotionTime,
+                        /* eventTime= */ downMotionTime + 50,
+                        MotionEvent.ACTION_UP));
 
         testItemClicked_CloseOrDeleteGroup(
                 R.id.close_tab_group,
@@ -410,13 +410,10 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         long downMotionTime = SystemClock.uptimeMillis();
         FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
         listViewTouchTracker.setLastSingleTapUpInfo(
-                ListViewTouchInfo.fromMotionEvent(
-                        TabUiTestHelper.createTouchMotionEvent(
-                                downMotionTime,
-                                /* eventTime= */ downMotionTime + 50,
-                                MotionEvent.ACTION_UP,
-                                /* x= */ 0,
-                                /* y= */ 0)));
+                MotionEventTestUtils.createTouchMotionInfo(
+                        downMotionTime,
+                        /* eventTime= */ downMotionTime + 50,
+                        MotionEvent.ACTION_UP));
 
         testItemClicked_CloseOrDeleteGroup(
                 R.id.delete_tab_group,
@@ -431,13 +428,10 @@ public class TabGroupContextMenuCoordinatorUnitTest {
         long downMotionTime = SystemClock.uptimeMillis();
         FakeListViewTouchTracker listViewTouchTracker = new FakeListViewTouchTracker();
         listViewTouchTracker.setLastSingleTapUpInfo(
-                ListViewTouchInfo.fromMotionEvent(
-                        TabUiTestHelper.createMouseMotionEvent(
-                                downMotionTime,
-                                /* eventTime= */ downMotionTime + 50,
-                                MotionEvent.ACTION_UP,
-                                /* x= */ 0,
-                                /* y= */ 0)));
+                MotionEventTestUtils.createMouseMotionInfo(
+                        downMotionTime,
+                        /* eventTime= */ downMotionTime + 50,
+                        MotionEvent.ACTION_UP));
 
         testItemClicked_CloseOrDeleteGroup(
                 R.id.delete_tab_group,

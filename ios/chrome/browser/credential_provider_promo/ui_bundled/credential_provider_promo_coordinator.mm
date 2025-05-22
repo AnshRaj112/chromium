@@ -111,6 +111,8 @@ using credential_provider_promo::IOSCredentialProviderPromoAction;
                                 completion:nil];
   self.promoSeenInCurrentSession = YES;
 
+  GetApplicationContext()->GetLocalState()->SetTime(
+      prefs::kIosCredentialProviderPromoDisplayTime, base::Time::Now());
   credential_provider_promo::RecordImpression(
       [self.mediator promoOriginalSource],
       self.trigger == CredentialProviderPromoTrigger::RemindMeLater);
@@ -228,6 +230,18 @@ using credential_provider_promo::IOSCredentialProviderPromoAction;
       TurnOnCredentialProviderExtensionPromptSource::
           kCredentialProviderExtensionPromo,
       outcome);
+}
+
+// Opens the iOS credential provider settings. Delegates this task to
+// `settingsOpenerDelegate` when valid.
+- (void)openIOSCredentialProviderSettings {
+  if (self.settingsOpenerDelegate) {
+    [self.settingsOpenerDelegate
+        credentialProviderPromoCoordinatorOpenIOSCredentialProviderSettings:
+            self];
+    return;
+  }
+  OpenIOSCredentialProviderSettings();
 }
 
 @end

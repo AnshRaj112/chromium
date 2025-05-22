@@ -38,8 +38,6 @@
 #include "content/browser/webid/flags.h"
 #include "content/browser/webid/identity_registry.h"
 #include "content/browser/webid/idp_network_request_manager.h"
-#include "content/browser/webid/jwt_signer.h"
-#include "content/browser/webid/sd_jwt.h"
 #include "content/browser/webid/webid_utils.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/content_browser_client.h"
@@ -52,14 +50,9 @@
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/page_visibility_state.h"
-#include "crypto/ec_private_key.h"
-#include "crypto/hash.h"
-#include "crypto/sha2.h"
-#include "services/data_decoder/public/cpp/data_decoder.h"
 #include "services/network/public/cpp/is_potentially_trustworthy.h"
 #include "third_party/blink/public/common/webid/login_status_account.h"
 #include "third_party/blink/public/common/webid/login_status_options.h"
-#include "third_party/blink/public/mojom/devtools/inspector_issue.mojom.h"
 #include "third_party/blink/public/mojom/webid/federated_auth_request.mojom.h"
 #include "url/gurl.h"
 
@@ -67,8 +60,6 @@ using base::Value;
 using blink::mojom::DisconnectStatus;
 using blink::mojom::FederatedAuthRequestResult;
 using blink::mojom::IdentityProviderConfig;
-using blink::mojom::IdentityProviderConfigPtr;
-using blink::mojom::IdentityProviderRequestOptions;
 using blink::mojom::IdentityProviderRequestOptionsPtr;
 using blink::mojom::RegisterIdpStatus;
 using blink::mojom::RequestTokenStatus;
@@ -137,12 +128,6 @@ bool IsFrameActive(RenderFrameHost* frame) {
 bool IsFrameVisible(RenderFrameHost* frame) {
   return frame && frame->IsActive() &&
          frame->GetVisibilityState() == content::PageVisibilityState::kVisible;
-}
-
-std::vector<uint8_t> Sha256(std::string_view data) {
-  auto hash = crypto::hash::Sha256(base::as_byte_span(data));
-  std::vector<uint8_t> result{hash.begin(), hash.end()};
-  return result;
 }
 
 bool CanBypassPermissionStatusCheck(
@@ -248,10 +233,10 @@ FederatedAuthRequestImpl& FederatedAuthRequestImpl::CreateForTesting(
       permission_context, identity_registry, std::move(receiver));
 }
 
-std::vector<blink::mojom::IdentityProviderRequestOptionsPtr>
+std::vector<IdentityProviderRequestOptionsPtr>
 FederatedAuthRequestImpl::MaybeAddRegisteredProviders(
-    std::vector<blink::mojom::IdentityProviderRequestOptionsPtr>& providers) {
-  std::vector<blink::mojom::IdentityProviderRequestOptionsPtr> result;
+    std::vector<IdentityProviderRequestOptionsPtr>& providers) {
+  std::vector<IdentityProviderRequestOptionsPtr> result;
 
   std::vector<GURL> registered_config_urls =
       permission_delegate_->GetRegisteredIdPs();
@@ -270,7 +255,7 @@ FederatedAuthRequestImpl::MaybeAddRegisteredProviders(
     }
 
     for (auto& configURL : registered_config_urls) {
-      blink::mojom::IdentityProviderRequestOptionsPtr idp = provider->Clone();
+      IdentityProviderRequestOptionsPtr idp = provider->Clone();
       // Keep `from_idp_registration_api` so it is clear this is a registered
       // provider.
       idp->config->config_url = configURL;
@@ -304,7 +289,7 @@ void FederatedAuthRequestImpl::RequestToken(
   // Expand the providers list with registered providers.
   if (IsFedCmIdPRegistrationEnabled()) {
     for (auto& idp_get_params_ptr : idp_get_params_ptrs) {
-      std::vector<blink::mojom::IdentityProviderRequestOptionsPtr> providers =
+      std::vector<IdentityProviderRequestOptionsPtr> providers =
           MaybeAddRegisteredProviders(idp_get_params_ptr->providers);
       if (providers.empty()) {
         render_frame_host().AddMessageToConsole(
@@ -764,8 +749,8 @@ void FederatedAuthRequestImpl::FetchEndpointsForIdps(
   fedcm_accounts_fetcher_ = std::make_unique<FedCmAccountsFetcher>(
       render_frame_host(), network_manager_.get(), api_permission_delegate_,
       permission_delegate_,
-      FedCmAccountsFetcher::FedCmFetchingParams(rp_mode_, icon_ideal_size,
-                                                icon_minimum_size),
+      FedCmAccountsFetcher::FedCmFetchingParams(
+          rp_mode_, icon_ideal_size, icon_minimum_size, mediation_requirement_),
       this);
   fedcm_accounts_fetcher_->FetchEndpointsForIdps(idp_config_urls);
 }
@@ -877,12 +862,6 @@ void FederatedAuthRequestImpl::OnFetchDataForIdpFailed(
 
   AddDevToolsIssue(result);
   AddConsoleErrorMessage(result);
-
-  if (IsFedCmMetricsEndpointEnabled()) {
-    SendFailedTokenRequestMetrics(idp_info->endpoints.metrics, result);
-  }
-
-  metrics_endpoints_.erase(idp_config_url);
 
   // We do not call both OnFetchDataForIdpFailed() after OnFetchDataSucceeded()
   // for the same IDP.
@@ -1254,70 +1233,10 @@ void FederatedAuthRequestImpl::OnAccountsDisplayed() {
   accounts_dialog_display_time_ = base::TimeTicks::Now();
 }
 
-void FederatedAuthRequestImpl::HandleAccountsFetchFailure(
-    std::unique_ptr<IdentityProviderInfo> idp_info,
-    std::optional<bool> old_idp_signin_status,
-    blink::mojom::FederatedAuthRequestResult result,
-    std::optional<TokenStatus> token_status,
-    const IdpNetworkRequestManager::FetchStatus& status) {
-  if (status.parse_status != IdpNetworkRequestManager::ParseStatus::kSuccess) {
-    MaybeAddResponseCodeToConsole("accounts endpoint", status.response_code);
-  }
-  if (!old_idp_signin_status.has_value()) {
-    if (rp_mode_ == blink::mojom::RpMode::kActive) {
-      MaybeShowActiveModeModalDialog(idp_info->provider->config->config_url,
-                                     idp_info->metadata.idp_login_url);
-      return;
-    }
-    OnFetchDataForIdpFailed(std::move(idp_info), result, token_status,
-                            /*should_delay_callback=*/true);
-    return;
-  }
-
-  if (!IsFrameActive(render_frame_host().GetMainFrame())) {
-    CompleteRequestWithError(FederatedAuthRequestResult::kRpPageNotVisible,
-                             TokenStatus::kRpPageNotVisible,
-
-                             /*should_delay_callback=*/true);
-    return;
-  }
-
-  if (mediation_requirement_ == MediationRequirement::kSilent) {
-    // By this moment we know that the user has granted permission in the past
-    // for the RP/IdP. Because otherwise we have returned already in
-    // `ShouldFailBeforeFetchingAccounts`. It means that we can do the
-    // following without privacy cost:
-    // 1. Reject the promise immediately without delay
-    // 2. Not to show any UI to respect `mediation: silent`
-    // TODO(crbug.com/40266561): validate the statement above with stakeholders
-    OnFetchDataForIdpFailed(std::move(idp_info),
-                            FederatedAuthRequestResult::kSilentMediationFailure,
-                            TokenStatus::kSilentMediationFailure,
-                            /*should_delay_callback=*/false);
-    return;
-  }
-
-  // We are going to show mismatch UI, so fetch the brand icon URL (needed at
-  // least for passive mode). We currently never need the RP icon for mismatch
-  // UI.
-  network_manager_->FetchIdpBrandIcon(
-      std::move(idp_info),
-      base::BindOnce(&FederatedAuthRequestImpl::OnIdpMismatch,
-                     weak_ptr_factory_.GetWeakPtr()));
-}
-
 void FederatedAuthRequestImpl::OnIdpMismatch(
     std::unique_ptr<IdentityProviderInfo> idp_info) {
   const GURL& idp_config_url = idp_info->provider->config->config_url;
 
-  const std::string idp_for_display =
-      webid::FormatUrlForDisplay(idp_config_url);
-  idp_info->data = base::MakeRefCounted<IdentityProviderData>(
-      idp_for_display, idp_info->metadata,
-      ClientMetadata{GURL(), GURL(), GURL(), gfx::Image()},
-      idp_info->rp_context, idp_info->format,
-      GetDisclosureFields(idp_info->provider->fields),
-      /*has_login_status_mismatch=*/true);
   idp_infos_[idp_config_url] = std::move(idp_info);
 
   fetch_data_.pending_idps.erase(idp_config_url);
@@ -1485,17 +1404,11 @@ void FederatedAuthRequestImpl::OnAccountSelected(const GURL& idp_config_url,
     // Checked previously.
     DCHECK(IsFedCmDelegationEnabled());
 
-    // Creates a throw away private key for a one-time use for
-    // a single presentation. The public key gets sent to the
-    // VC issuance endpoint and gets bound to the issued SD-JWT
-    // by the issuer, delegating the presentation to the holder.
-    // The browser selectively discloses the fields that were
-    // requested and binds the audience and the nonce to the
-    // Key Binding JWT before returning to the verifier.
-    private_key_ = crypto::ECPrivateKey::Create();
     endpoint = idp_info.endpoints.issuance;
-    query = ComputeUrlEncodedTokenPostDataForIssuers(
-        account_id, *sdjwt::ExportPublicKey(*private_key_), "vc+sd-jwt");
+    federated_sdjwt_handler_ = std::make_unique<FederatedSdJwtHandler>(
+        idp_info.provider, render_frame_host(), this);
+    query = federated_sdjwt_handler_->ComputeUrlEncodedTokenPostDataForIssuers(
+        account_id);
   } else {
     endpoint = idp_info.endpoints.token;
     query = ComputeUrlEncodedTokenPostData(
@@ -1811,7 +1724,8 @@ void FederatedAuthRequestImpl::CompleteTokenRequest(
   DCHECK(!start_time_.is_null());
   constexpr char kIdAssertionUrl[] = "id assertion endpoint";
   if (status.parse_status != IdpNetworkRequestManager::ParseStatus::kSuccess) {
-    MaybeAddResponseCodeToConsole(kIdAssertionUrl, status.response_code);
+    webid::MaybeAddResponseCodeToConsole(render_frame_host(), kIdAssertionUrl,
+                                         status.response_code);
     std::pair<FederatedAuthRequestResult, TokenStatus> resultAndTokenStatus =
         IdAssertionFetchStatusToRequestResultAndTokenStatus(status);
     CompleteRequestWithError(resultAndTokenStatus.first,
@@ -1820,7 +1734,8 @@ void FederatedAuthRequestImpl::CompleteTokenRequest(
     return;
   }
   if (token_error_) {
-    MaybeAddResponseCodeToConsole(kIdAssertionUrl, status.response_code);
+    webid::MaybeAddResponseCodeToConsole(render_frame_host(), kIdAssertionUrl,
+                                         status.response_code);
     if (error_url_type_ && *error_url_type_ == ErrorUrlType::kCrossSite) {
       CompleteRequestWithError(
           FederatedAuthRequestResult::kIdTokenCrossSiteIdpErrorResponse,
@@ -1842,12 +1757,12 @@ void FederatedAuthRequestImpl::CompleteTokenRequest(
           (accounts_dialog_display_time_ -
            ready_to_display_accounts_dialog_time_));
 
-  const blink::mojom::IdentityProviderRequestOptionsPtr& provider =
+  const IdentityProviderRequestOptionsPtr& provider =
       idp_infos_[idp_config_url]->provider;
   DCHECK(provider);
 
   if (provider->format && *provider->format == blink::mojom::Format::kSdJwt) {
-    ProcessSdJwt(idp_config_url, token.value());
+    federated_sdjwt_handler_->ProcessSdJwt(token.value());
     return;
   }
 
@@ -1864,112 +1779,6 @@ void FederatedAuthRequestImpl::CompleteRequestWithError(
   CompleteRequest(result, token_status, token_error_,
                   /*selected_idp_config_url=*/std::nullopt,
                   /*token=*/"", should_delay_callback);
-}
-
-void FederatedAuthRequestImpl::ProcessSdJwt(const GURL& config_url,
-                                            const std::string& token) {
-  // Checked previously.
-  DCHECK(IsFedCmDelegationEnabled());
-
-  auto value = sdjwt::SdJwt::Parse(token);
-  if (!value) {
-    CompleteRequestWithError(FederatedAuthRequestResult::kError,
-                             /*token_status=*/std::nullopt,
-                             /*should_delay_callback=*/false);
-    return;
-  }
-
-  auto sd_jwt = sdjwt::SdJwt::From(*value);
-  if (!sd_jwt) {
-    CompleteRequestWithError(FederatedAuthRequestResult::kError,
-                             /*token_status=*/std::nullopt,
-                             /*should_delay_callback=*/false);
-    return;
-  }
-
-  // Each of the disclosures is an individual JSON Object.
-  // Parse them all and use BarrierCallback to get a callback when all
-  // parsing is done.
-  auto callback = BarrierClosure(
-      sd_jwt->disclosures.size(),
-      base::BindOnce(&FederatedAuthRequestImpl::OnSdJwtParsed,
-                     weak_ptr_factory_.GetWeakPtr(), config_url, sd_jwt->jwt));
-
-  for (const auto& json : sd_jwt->disclosures) {
-    data_decoder::DataDecoder::ParseJsonIsolated(
-        json.value(),
-        base::BindOnce(&FederatedAuthRequestImpl::OnDisclosureParsed,
-                       weak_ptr_factory_.GetWeakPtr(), callback, json.value()));
-  }
-}
-
-void FederatedAuthRequestImpl::OnDisclosureParsed(
-    base::RepeatingClosure cb,
-    const std::string& json,
-    data_decoder::DataDecoder::ValueOrError result) {
-  if (!result.has_value() || !result->is_list()) {
-    cb.Run();
-    return;
-  }
-
-  auto disclosure = sdjwt::Disclosure::From(result->GetList());
-  if (!disclosure) {
-    // Ignore invalid disclosure structures.
-    cb.Run();
-    return;
-  }
-
-  disclosures_.push_back({disclosure->name, sdjwt::JSONString(json)});
-  cb.Run();
-}
-
-void FederatedAuthRequestImpl::OnSdJwtParsed(const GURL& config_url,
-                                             const sdjwt::Jwt& jwt) {
-  const blink::mojom::IdentityProviderRequestOptionsPtr& provider =
-      idp_infos_[config_url]->provider;
-  DCHECK(provider);
-
-  std::vector<std::string> fields = {kFedCmDefaultFieldName,
-                                     kFedCmDefaultFieldEmail,
-                                     kFedCmDefaultFieldPicture};
-  if (provider->fields) {
-    fields = *provider->fields;
-  }
-
-  auto selected = sdjwt::SdJwt::Disclose(disclosures_, fields);
-
-  disclosures_.clear();
-
-  if (!selected) {
-    CompleteRequestWithError(FederatedAuthRequestResult::kError,
-                             /*token_status=*/std::nullopt,
-                             /*should_delay_callback=*/false);
-    return;
-  }
-
-  sdjwt::SdJwt result;
-  result.jwt = jwt;
-  result.disclosures = *selected;
-
-  auto sdjwtkb = sdjwt::SdJwtKb::Create(
-      result, origin().Serialize(), provider->nonce,
-      /*iat=*/base::Time::Now(), base::BindRepeating(Sha256),
-      sdjwt::CreateJwtSigner(std::move(private_key_)));
-
-  if (!sdjwtkb) {
-    CompleteRequestWithError(FederatedAuthRequestResult::kError,
-                             /*token_status=*/std::nullopt,
-                             /*should_delay_callback=*/false);
-    return;
-  }
-
-  auto token = sdjwtkb->Serialize();
-  // TODO(crbug.com/380367784): introduce and use a more specific
-  // TokenStatus type for SD-JWTs.
-  CompleteRequest(FederatedAuthRequestResult::kSuccess,
-                  TokenStatus::kSuccessUsingTokenInHttpResponse,
-                  /*token_error=*/std::nullopt, config_url, token,
-                  /*should_delay_callback=*/false);
 }
 
 void FederatedAuthRequestImpl::CompleteRequest(
@@ -2053,9 +1862,18 @@ void FederatedAuthRequestImpl::CompleteRequest(
   }
 
   if (result == FederatedAuthRequestResult::kSuccess) {
-    DCHECK(selected_idp_config_url);
+    CHECK(selected_idp_config_url);
+    CHECK(fedcm_accounts_fetcher_);
     if (IsFedCmMetricsEndpointEnabled()) {
-      SendSuccessfulTokenRequestMetrics(*selected_idp_config_url);
+      fedcm_accounts_fetcher_->SendSuccessfulTokenRequestMetrics(
+          *selected_idp_config_url,
+          ready_to_display_accounts_dialog_time_ - start_time_,
+          select_account_time_ - accounts_dialog_display_time_,
+          id_assertion_response_time_ - select_account_time_,
+          id_assertion_response_time_ - start_time_ -
+              (accounts_dialog_display_time_ -
+               ready_to_display_accounts_dialog_time_),
+          did_show_ui_);
     }
   } else if (!errors_logged_to_console_) {
     errors_logged_to_console_ = true;
@@ -2063,10 +1881,11 @@ void FederatedAuthRequestImpl::CompleteRequest(
     AddDevToolsIssue(result);
     AddConsoleErrorMessage(result);
 
-    if (IsFedCmMetricsEndpointEnabled()) {
-      for (const auto& metrics_endpoint_kv : metrics_endpoints_) {
-        SendFailedTokenRequestMetrics(metrics_endpoint_kv.second, result);
-      }
+    // fedcm_accounts_fetcher_ could be null if configs were not fetched, e.g.
+    // because of cooldown.
+    if (IsFedCmMetricsEndpointEnabled() && fedcm_accounts_fetcher_) {
+      fedcm_accounts_fetcher_->SendAllFailedTokenRequestMetrics(result,
+                                                                did_show_ui_);
     }
   }
 
@@ -2108,49 +1927,6 @@ void FederatedAuthRequestImpl::CompleteRequest(
   }
 }
 
-void FederatedAuthRequestImpl::SendFailedTokenRequestMetrics(
-    const GURL& metrics_endpoint,
-    blink::mojom::FederatedAuthRequestResult result) {
-  DCHECK(IsFedCmMetricsEndpointEnabled());
-  if (!metrics_endpoint.is_valid()) {
-    return;
-  }
-
-  network_manager_->SendFailedTokenRequestMetrics(
-      metrics_endpoint, did_show_ui_,
-      FederatedAuthRequestResultToMetricsEndpointErrorCode(result));
-}
-
-void FederatedAuthRequestImpl::SendSuccessfulTokenRequestMetrics(
-    const GURL& idp_config_url) {
-  DCHECK(IsFedCmMetricsEndpointEnabled());
-
-  for (const auto& metrics_endpoint_kv : metrics_endpoints_) {
-    const GURL& metrics_endpoint = metrics_endpoint_kv.second;
-    if (!metrics_endpoint.is_valid()) {
-      continue;
-    }
-
-    if (metrics_endpoint_kv.first == idp_config_url) {
-      network_manager_->SendSuccessfulTokenRequestMetrics(
-          metrics_endpoint,
-          ready_to_display_accounts_dialog_time_ - start_time_,
-          select_account_time_ - accounts_dialog_display_time_,
-          id_assertion_response_time_ - select_account_time_,
-          id_assertion_response_time_ - start_time_ -
-              (accounts_dialog_display_time_ -
-               ready_to_display_accounts_dialog_time_));
-    } else {
-      // Send kUserFailure so that IDP cannot tell difference between user
-      // selecting a different IDP and user dismissing dialog without
-      // selecting any IDP.
-      network_manager_->SendFailedTokenRequestMetrics(
-          metrics_endpoint, did_show_ui_,
-          MetricsEndpointErrorCode::kUserFailure);
-    }
-  }
-}
-
 void FederatedAuthRequestImpl::CleanUp() {
   weak_ptr_factory_.InvalidateWeakPtrs();
 
@@ -2160,6 +1936,7 @@ void FederatedAuthRequestImpl::CleanUp() {
   // instance we destroy that first.
   request_dialog_controller_.reset();
   fedcm_accounts_fetcher_.reset();
+  federated_sdjwt_handler_.reset();
   network_manager_.reset();
   fedcm_metrics_.reset();
   account_id_ = std::string();
@@ -2184,7 +1961,6 @@ void FederatedAuthRequestImpl::CleanUp() {
   fetch_data_ = FetchData();
   idps_user_tried_to_signin_to_.clear();
   idp_order_.clear();
-  metrics_endpoints_.clear();
   token_request_get_infos_.clear();
   login_url_ = GURL();
   config_url_ = GURL();
@@ -2194,8 +1970,6 @@ void FederatedAuthRequestImpl::CleanUp() {
   had_transient_user_activation_ = false;
   did_show_ui_ = false;
   rp_mode_ = RpMode::kPassive;
-  private_key_.reset();
-  disclosures_.clear();
 }
 
 void FederatedAuthRequestImpl::AddDevToolsIssue(
@@ -2225,18 +1999,6 @@ void FederatedAuthRequestImpl::AddConsoleErrorMessage(
   render_frame_host().AddMessageToConsole(
       blink::mojom::ConsoleMessageLevel::kError,
       webid::GetConsoleErrorMessageFromResult(result));
-}
-
-void FederatedAuthRequestImpl::MaybeAddResponseCodeToConsole(
-    const char* fetch_description,
-    int response_code) {
-  std::optional<std::string> console_message =
-      webid::ComputeConsoleMessageForHttpResponseCode(fetch_description,
-                                                      response_code);
-  if (console_message) {
-    render_frame_host().AddMessageToConsole(
-        blink::mojom::ConsoleMessageLevel::kError, *console_message);
-  }
 }
 
 url::Origin FederatedAuthRequestImpl::GetEmbeddingOrigin() const {
@@ -2364,12 +2126,12 @@ bool FederatedAuthRequestImpl::OnResolve(
   fedcm_metrics_->RecordContinueOnPopupResult(
       FedCmContinueOnPopupResult::kTokenReceived);
 
-  const blink::mojom::IdentityProviderRequestOptionsPtr& provider =
+  const IdentityProviderRequestOptionsPtr& provider =
       idp_infos_[idp_config_url]->provider;
   DCHECK(provider);
 
   if (provider->format && *provider->format == blink::mojom::Format::kSdJwt) {
-    ProcessSdJwt(idp_config_url, token);
+    federated_sdjwt_handler_->ProcessSdJwt(token);
     return true;
   }
 

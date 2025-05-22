@@ -733,6 +733,9 @@ void NavigationURLLoaderImpl::CreateInterceptors() {
 }
 
 void NavigationURLLoaderImpl::Restart() {
+  TRACE_EVENT_WITH_FLOW0("navigation", "NavigationURLLoaderImpl::Restart",
+                         TRACE_ID_LOCAL(this),
+                         TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT);
   // Cancel all inflight early hints preloads except for same origin redirects.
   if (!IsSameOriginRedirect(resource_request_->navigation_redirect_chain)) {
     early_hints_manager_.reset();
@@ -1034,7 +1037,10 @@ void NavigationURLLoaderImpl::CreateThrottlingLoaderAndStart(
       std::move(factory), std::move(throttles), global_request_id_.request_id,
       options, resource_request_.get(), /*client=*/this,
       kNavigationUrlLoaderTrafficAnnotation,
-      GetUIThreadTaskRunner({BrowserTaskType::kNavigationNetworkResponse}));
+      GetUIThreadTaskRunner({BrowserTaskType::kNavigationNetworkResponse}),
+      /*cors_exempt_header_list=*/std::nullopt,
+      /*client_receiver_delegate=*/nullptr,
+      &request_info_->common_params->initiator_origin_trial_features);
 }
 
 void NavigationURLLoaderImpl::OnReceiveEarlyHints(

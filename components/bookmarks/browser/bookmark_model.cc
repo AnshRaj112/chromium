@@ -907,10 +907,15 @@ bool BookmarkModel::HasBookmarks() const {
   return url_index_ && url_index_->HasBookmarks();
 }
 
-bool BookmarkModel::HasNoUserCreatedBookmarksOrFolders() const {
+bool BookmarkModel::HasUserCreatedBookmarksOrFolders() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  return bookmark_bar_node_->children().empty() &&
-         other_node_->children().empty() && mobile_node_->children().empty();
+  return !bookmark_bar_node_->children().empty() ||
+         !other_node_->children().empty() ||
+         !mobile_node_->children().empty() ||
+         (account_bookmark_bar_node_ &&
+          !account_bookmark_bar_node_->children().empty()) ||
+         (account_other_node_ && !account_other_node_->children().empty()) ||
+         (account_mobile_node_ && !account_mobile_node_->children().empty());
 }
 
 bool BookmarkModel::IsBookmarked(const GURL& url) const {
@@ -1609,10 +1614,15 @@ void BookmarkModel::CreateAccountPermanentFolders() {
                                  /*notify_observers=*/true);
   }
 
+  // Set the nodes' `date_added` to the same time so that there is no inherent
+  // hierarchy in terms of their added time between them. This is relevant for
+  // deciding which folder should be the default parent for new nodes.
+  const base::Time current_timestamp = base::Time::Now();
   {
     std::unique_ptr<BookmarkPermanentNode> account_bookmark_bar_node =
         BookmarkPermanentNode::CreateBookmarkBar(next_node_id_++);
     account_bookmark_bar_node_ = account_bookmark_bar_node.get();
+    account_bookmark_bar_node_->set_date_added(current_timestamp);
     account_bookmark_bar_node_->set_visibility(DetermineIfNodeShouldBeVisible(
         *account_bookmark_bar_node, /*account_folders_exist=*/true,
         HasLocalOrSyncableBookmarks(this)));
@@ -1624,6 +1634,7 @@ void BookmarkModel::CreateAccountPermanentFolders() {
     std::unique_ptr<BookmarkPermanentNode> account_other_node =
         BookmarkPermanentNode::CreateOtherBookmarks(next_node_id_++);
     account_other_node_ = account_other_node.get();
+    account_other_node_->set_date_added(current_timestamp);
     account_other_node_->set_visibility(DetermineIfNodeShouldBeVisible(
         *account_other_node,
         /*account_folders_exist=*/true, HasLocalOrSyncableBookmarks(this)));
@@ -1634,6 +1645,7 @@ void BookmarkModel::CreateAccountPermanentFolders() {
     std::unique_ptr<BookmarkPermanentNode> account_mobile_node =
         BookmarkPermanentNode::CreateMobileBookmarks(next_node_id_++);
     account_mobile_node_ = account_mobile_node.get();
+    account_mobile_node_->set_date_added(current_timestamp);
     account_mobile_node_->set_visibility(DetermineIfNodeShouldBeVisible(
         *account_mobile_node,
         /*account_folders_exist=*/true, HasLocalOrSyncableBookmarks(this)));

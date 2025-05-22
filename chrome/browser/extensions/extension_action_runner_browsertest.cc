@@ -17,6 +17,7 @@
 #include "base/test/scoped_feature_list.h"
 #include "chrome/browser/extensions/browsertest_util.h"
 #include "chrome/browser/extensions/extension_browsertest.h"
+#include "chrome/browser/extensions/permissions/active_tab_permission_granter.h"
 #include "chrome/browser/extensions/permissions/scripting_permissions_modifier.h"
 #include "chrome/browser/extensions/permissions/site_permissions_helper.h"
 #include "chrome/browser/extensions/tab_helper.h"
@@ -96,6 +97,7 @@ bool DidInjectScript(content::WebContents& web_contents) {
 
 using ContextType = extensions::browser_test_util::ContextType;
 
+// TODO(crbug.com/393179880): Port to desktop Android.
 class ExtensionActionRunnerBrowserTest : public ExtensionBrowserTest {
  public:
   explicit ExtensionActionRunnerBrowserTest(
@@ -599,7 +601,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionActionRunnerFencedFrameBrowserTest,
   EXPECT_FALSE(runner->WantsToRun(extension));
 
   ActiveTabPermissionGranter* active_tab_granter =
-      TabHelper::FromWebContents(web_contents)->active_tab_permission_granter();
+      ActiveTabPermissionGranter::FromWebContents(web_contents);
   ASSERT_TRUE(active_tab_granter);
   EXPECT_EQ(active_tab_granter->granted_extensions_.size(), 1U);
 

@@ -20,6 +20,7 @@ BASE_DECLARE_FEATURE(kWebViewBackForwardCache);
 BASE_DECLARE_FEATURE(kWebViewDigitalAssetLinksLoadIncludes);
 BASE_DECLARE_FEATURE(kWebViewDisableCHIPS);
 BASE_DECLARE_FEATURE(kWebViewDisableSharpeningAndMSAA);
+BASE_DECLARE_FEATURE(kWebViewDrainPrefetchQueueDuringInit);
 BASE_DECLARE_FEATURE(kWebViewFileSystemAccess);
 BASE_DECLARE_FEATURE(kWebViewInvokeZoomPickerOnGSU);
 // Feature parameter for `network::features::kMaskedDomainList` which is
@@ -55,6 +56,8 @@ BASE_DECLARE_FEATURE(kWebViewInterceptedCookieHeader);
 BASE_DECLARE_FEATURE(kWebViewInterceptedCookieHeaderReadWrite);
 BASE_DECLARE_FEATURE(kWebViewShortCircuitShouldInterceptRequest);
 BASE_DECLARE_FEATURE(kWebViewRecordAppCacheHistograms);
+BASE_DECLARE_FEATURE(kWebViewQuicConnectionTimeout);
+extern const base::FeatureParam<int> kWebViewQuicConnectionTimeoutSeconds;
 
 }  // namespace android_webview::features
 

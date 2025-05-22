@@ -46,7 +46,7 @@ public class TabSwitcherDrawableRenderTest {
     public final ChromeRenderTestRule mRenderTestRule =
             ChromeRenderTestRule.Builder.withPublicCorpus()
                     .setBugComponent(RenderTestRule.Component.UI_BROWSER_MOBILE_TAB_GROUPS)
-                    .setRevision(2)
+                    .setRevision(3)
                     .build();
 
     @ClassRule
@@ -126,6 +126,7 @@ public class TabSwitcherDrawableRenderTest {
     @Test
     @MediumTest
     @Feature("RenderTest")
+    @DisabledTest(message = "https://crbug.com/419257653")
     public void testTabSwitcherDrawable_newTabPageIncognito() throws Exception {
         ChromeTabbedActivity activity = sActivityTestRule.getActivity();
 

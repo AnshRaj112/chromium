@@ -178,28 +178,17 @@ bool StructTraits<attribution_reporting::mojom::EventReportWindowsDataView,
 }
 
 // static
-bool StructTraits<attribution_reporting::mojom::TriggerSpecsDataView,
-                  attribution_reporting::TriggerSpecs>::
-    Read(attribution_reporting::mojom::TriggerSpecsDataView data,
-         attribution_reporting::TriggerSpecs* out) {
-  attribution_reporting::EventReportWindows event_report_windows;
-  if (!data.ReadEventReportWindows(&event_report_windows)) {
-    return false;
-  }
-
+bool StructTraits<attribution_reporting::mojom::TriggerDataSetDataView,
+                  attribution_reporting::TriggerDataSet>::
+    Read(attribution_reporting::mojom::TriggerDataSetDataView data,
+         attribution_reporting::TriggerDataSet* out) {
   std::vector<uint32_t> trigger_data;
   if (!data.ReadTriggerData(&trigger_data)) {
     return false;
   }
 
-  attribution_reporting::MaxEventLevelReports max_event_level_reports;
-  if (!max_event_level_reports.SetIfValid(data.max_event_level_reports())) {
-    return false;
-  }
-
-  auto result = attribution_reporting::TriggerSpecs::Create(
-      std::move(trigger_data), std::move(event_report_windows),
-      max_event_level_reports);
+  auto result =
+      attribution_reporting::TriggerDataSet::Create(std::move(trigger_data));
   if (!result.has_value()) {
     return false;
   }
@@ -362,7 +351,16 @@ bool StructTraits<attribution_reporting::mojom::SourceRegistrationDataView,
     return false;
   }
 
-  if (!data.ReadTriggerSpecs(&out->trigger_specs)) {
+  if (!data.ReadTriggerData(&out->trigger_data)) {
+    return false;
+  }
+
+  if (!data.ReadEventReportWindows(&out->event_report_windows)) {
+    return false;
+  }
+
+  if (!out->max_event_level_reports.SetIfValid(
+          data.max_event_level_reports())) {
     return false;
   }
 

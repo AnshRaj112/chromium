@@ -21,6 +21,7 @@
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/supervised_user/core/browser/remote_web_approvals_manager.h"
+#include "components/supervised_user/core/browser/supervised_user_preferences.h"
 #include "components/supervised_user/core/browser/supervised_user_url_filter.h"
 #include "components/supervised_user/core/common/supervised_user_constants.h"
 #include "components/supervised_user/core/common/supervised_users.h"
@@ -105,13 +106,10 @@ class SupervisedUserService : public KeyedService {
     return remote_web_approvals_manager_;
   }
 
-  // Initializes this object.
-  void Init();
-
   // Returns the URL filter for filtering navigations and classifying sites in
   // the history view. Both this method and the returned filter may only be used
   // on the UI thread.
-  supervised_user::SupervisedUserURLFilter* GetURLFilter() const;
+  SupervisedUserURLFilter* GetURLFilter() const;
 
   std::optional<Custodian> GetCustodian() const;
   std::optional<Custodian> GetSecondCustodian() const;
@@ -142,56 +140,19 @@ class SupervisedUserService : public KeyedService {
       signin::IdentityManager* identity_manager,
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
       PrefService& user_prefs,
-      supervised_user::SupervisedUserSettingsService& settings_service,
+      SupervisedUserSettingsService& settings_service,
       syncer::SyncService* sync_service,
-      std::unique_ptr<supervised_user::SupervisedUserURLFilter::Delegate>
-          url_filter_delegate,
-      std::unique_ptr<supervised_user::SupervisedUserService::PlatformDelegate>
+      std::unique_ptr<SupervisedUserURLFilter> url_filter,
+      std::unique_ptr<SupervisedUserService::PlatformDelegate>
           platform_delegate);
 
  private:
-  friend class SupervisedUserServiceExtensionTestBase;
-  friend class ::SupervisedUserServiceFactory;
-  friend class ClassifyUrlNavigationThrottleTest;
-  FRIEND_TEST_ALL_PREFIXES(
-      SupervisedUserServiceExtensionTest,
-      ExtensionManagementPolicyProviderWithoutSUInitiatedInstalls);
-  FRIEND_TEST_ALL_PREFIXES(
-      SupervisedUserServiceExtensionTest,
-      ExtensionManagementPolicyProviderWithSUInitiatedInstalls);
-  FRIEND_TEST_ALL_PREFIXES(SupervisedUserServiceTest, InterstitialBannerState);
-  FRIEND_TEST_ALL_PREFIXES(SupervisedUserNavigationThrottleTest,
-                           BlockedMatureSitesRecordedInBlockSafeSitesBucket);
-  FRIEND_TEST_ALL_PREFIXES(ClassifyUrlNavigationThrottleTest,
-                           BlockedMatureSitesRecordedInBlockSafeSitesBucket);
-  FRIEND_TEST_ALL_PREFIXES(ClassifyUrlNavigationThrottleTest,
-                           ClassificationIsFasterThanHttp);
-  FRIEND_TEST_ALL_PREFIXES(ClassifyUrlNavigationThrottleTest,
-                           ClassificationIsSlowerThanHttp);
-  FRIEND_TEST_ALL_PREFIXES(ClassifyUrlNavigationThrottleTest,
-                           ReverseOrderOfResponsesAfterContentIsReady);
-  FRIEND_TEST_ALL_PREFIXES(ClassifyUrlNavigationThrottleParallelizationTest,
-                           ClassificationIsFasterThanHttp);
-  FRIEND_TEST_ALL_PREFIXES(ClassifyUrlNavigationThrottleParallelizationTest,
-                           ClassificationIsSlowerThanHttp);
-  FRIEND_TEST_ALL_PREFIXES(ClassifyUrlNavigationThrottleParallelizationTest,
-                           ShortCircuitsSynchronousBlock);
-  FRIEND_TEST_ALL_PREFIXES(ClassifyUrlNavigationThrottleParallelizationTest,
-                           HandlesLateAsynchronousBlock);
-  FRIEND_TEST_ALL_PREFIXES(ClassifyUrlNavigationThrottleParallelizationTest,
-                           OutOfOrderClassification);
-
-  // Method used in testing to set the given test_filter as the url_filter_
-  void SetURLFilterForTesting(
-      std::unique_ptr<SupervisedUserURLFilter> test_filter);
-
-  void SetActive(bool active);
-
   void SetSettingsServiceActive(bool active);
 
   void OnCustodianInfoChanged();
 
-  void OnSupervisedUserIdChanged();
+  void OnParentalControlsEnabled();
+  void OnParentalControlsDisabled();
 
   void OnDefaultFilteringBehaviorChanged();
 
@@ -209,8 +170,7 @@ class SupervisedUserService : public KeyedService {
 
   const raw_ref<PrefService> user_prefs_;
 
-  const raw_ref<supervised_user::SupervisedUserSettingsService>
-      settings_service_;
+  const raw_ref<SupervisedUserSettingsService> settings_service_;
 
   const raw_ptr<syncer::SyncService> sync_service_;
 
@@ -218,14 +178,18 @@ class SupervisedUserService : public KeyedService {
 
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
 
-  bool active_ = false;
+  // Manages the status of parental controls and notifies this instance when the
+  // state changes.
+  ParentalControlsState parental_controls_state_;
 
   std::unique_ptr<PlatformDelegate> platform_delegate_;
 
-  PrefChangeRegistrar pref_change_registrar_;
-
-  // True only when |Init()| method has been called.
-  bool did_init_ = false;
+  // Registrar for core prefs that drive this service.
+  PrefChangeRegistrar main_pref_change_registrar_;
+  // Registrar for prefs that configure features offered by this service. It is
+  // only observing changes when the user is subject to family link parental
+  // controls.
+  PrefChangeRegistrar feature_pref_change_registrar_;
 
   // True only when |Shutdown()| method has been called.
   bool did_shutdown_ = false;

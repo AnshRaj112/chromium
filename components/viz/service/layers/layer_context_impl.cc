@@ -30,6 +30,7 @@
 #include "cc/layers/surface_layer_impl.h"
 #include "cc/layers/texture_layer_impl.h"
 #include "cc/layers/tile_display_layer_impl.h"
+#include "cc/layers/view_transition_content_layer_impl.h"
 #include "cc/trees/layer_tree_host_impl.h"
 #include "cc/trees/layer_tree_impl.h"
 #include "cc/trees/layer_tree_settings.h"
@@ -116,6 +117,13 @@ std::unique_ptr<cc::LayerImpl> CreateLayer(cc::LayerTreeHostImpl& host_impl,
 
     case cc::mojom::LayerType::kTexture:
       return cc::TextureLayerImpl::Create(&tree, id);
+
+    case cc::mojom::LayerType::kViewTransitionContent: {
+      auto& extra = wire.layer_extra->get_view_transition_content_layer_extra();
+      return cc::ViewTransitionContentLayerImpl::Create(
+          &tree, id, extra->resource_id, extra->is_live_content_layer,
+          extra->max_extents_rect);
+    }
 
     default:
       // TODO(rockot): Support other layer types.
@@ -255,6 +263,15 @@ base::expected<void, std::string> UpdatePropertyTreeNode(
   }
   node.blend_mode = static_cast<SkBlendMode>(wire.blend_mode);
   node.target_id = wire.target_id;
+  node.view_transition_target_id = wire.view_transition_target_id;
+  node.closest_ancestor_with_cached_render_surface_id =
+      wire.closest_ancestor_with_cached_render_surface_id;
+  node.closest_ancestor_with_copy_request_id =
+      wire.closest_ancestor_with_copy_request_id;
+  node.closest_ancestor_being_captured_id =
+      wire.closest_ancestor_being_captured_id;
+  node.closest_ancestor_with_shared_element_id =
+      wire.closest_ancestor_with_shared_element_id;
   node.view_transition_element_resource_id =
       wire.view_transition_element_resource_id;
   node.filters = wire.filters;
@@ -545,6 +562,12 @@ void UpdateSurfaceLayerExtra(const mojom::SurfaceLayerExtraPtr& extra,
   layer.SetOverrideChildPaintFlags(extra->override_child_paint_flags);
 }
 
+void UpdateViewTransitionContentLayerExtra(
+    const mojom::ViewTransitionContentLayerExtraPtr& extra,
+    cc::ViewTransitionContentLayerImpl& layer) {
+  layer.SetMaxExtentsRect(extra->max_extents_rect);
+}
+
 base::expected<void, std::string> UpdateLayer(const mojom::Layer& wire,
                                               cc::LayerImpl& layer) {
   layer.SetBounds(wire.bounds);
@@ -640,6 +663,11 @@ base::expected<void, std::string> UpdateLayer(const mojom::Layer& wire,
       UpdateTextureLayerExtra(wire.layer_extra->get_texture_layer_extra(),
                               static_cast<cc::TextureLayerImpl&>(layer));
       break;
+    case cc::mojom::LayerType::kViewTransitionContent:
+      UpdateViewTransitionContentLayerExtra(
+          wire.layer_extra->get_view_transition_content_layer_extra(),
+          static_cast<cc::ViewTransitionContentLayerImpl&>(layer));
+      break;
     default:
       // TODO(zmo): handle other types of LayerImpl.
       break;
@@ -676,6 +704,8 @@ base::expected<void, std::string> CreateOrUpdateLayers(
     if (!layer) {
       layer = CreateLayer(host_impl, layers, *wire);
     }
+    // TODO(crbug.com/418022040): Make sure we support re-creating Layers with
+    // a previously used Id.
     RETURN_IF_ERROR(UpdateLayer(*wire, *layer));
   }
   for (auto id : *layer_order) {
@@ -743,7 +773,7 @@ DeserializeTileContents(mojom::TileContents& wire) {
   switch (wire.which()) {
     case mojom::TileContents::Tag::kMissingReason:
       return cc::TileDisplayLayerImpl::TileContents(
-          cc::TileDisplayLayerImpl::NoContents());
+          cc::TileDisplayLayerImpl::NoContents(wire.get_missing_reason()));
 
     case mojom::TileContents::Tag::kResource:
       return DeserializeTileResource(*wire.get_resource());

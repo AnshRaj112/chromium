@@ -20,7 +20,7 @@ import androidx.core.widget.ImageViewCompat;
 
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.chrome.browser.ui.appmenu.internal.R;
-import org.chromium.components.browser_ui.util.OnPeripheralClickListener;
+import org.chromium.components.browser_ui.util.motion.OnPeripheralClickListener;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter.HighlightParams;
 import org.chromium.components.browser_ui.widget.highlight.ViewHighlighter.HighlightShape;
@@ -62,7 +62,7 @@ class AppMenuItemViewBinder {
             }
         } else if (key == AppMenuItemProperties.ICON) {
             Drawable icon = model.get(AppMenuItemProperties.ICON);
-            ChromeImageView imageView = (ChromeImageView) view.findViewById(R.id.menu_item_icon);
+            ChromeImageView imageView = view.findViewById(R.id.menu_item_icon);
 
             @ColorRes int colorResId = model.get(AppMenuItemProperties.ICON_COLOR_RES);
             if (colorResId == 0) {
@@ -97,9 +97,9 @@ class AppMenuItemViewBinder {
             view.setOnTouchListener(
                     new OnPeripheralClickListener(
                             view,
-                            triggeringMotionEvent ->
+                            triggeringMotion ->
                                     model.get(AppMenuItemProperties.CLICK_HANDLER)
-                                            .onItemClick(model, triggeringMotionEvent)));
+                                            .onItemClick(model, triggeringMotion)));
             view.setOnClickListener(
                     v -> model.get(AppMenuItemProperties.CLICK_HANDLER).onItemClick(model));
         }

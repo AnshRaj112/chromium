@@ -65,27 +65,27 @@ void ExtensionKeybindingRegistry::AddExtensionKeybindings(
     return;
   }
 
-  CommandService* command_service = CommandService::Get(browser_context());
   // Add all the active keybindings (except toolbar action executions,
   // which are handled elsewhere).
   ui::CommandMap commands;
-  if (!command_service->GetNamedCommands(extension->id(),
-                                         CommandService::ACTIVE,
-                                         CommandService::REGULAR, &commands)) {
+  if (!PopulateCommands(extension, &commands)) {
     return;
   }
-  ui::CommandMap::const_iterator iter = commands.begin();
-  for (; iter != commands.end(); ++iter) {
+
+  for (auto& command : commands) {
     if (!command_name.empty() &&
-        (iter->second.command_name() != command_name)) {
+        (command.second.command_name() != command_name)) {
       continue;
     }
-    const ui::Accelerator& accelerator = iter->second.accelerator();
+    const ui::Accelerator& accelerator = command.second.accelerator();
+
     if (!IsAcceleratorRegistered(accelerator)) {
-      RegisterAccelerator(accelerator);
+      if (!RegisterAccelerator(accelerator)) {
+        continue;
+      }
     }
 
-    AddEventTarget(accelerator, extension->id(), iter->second.command_name());
+    AddEventTarget(accelerator, extension->id(), command.second.command_name());
   }
 }
 
@@ -189,8 +189,7 @@ void ExtensionKeybindingRegistry::CommandExecuted(
     // not set the delegate as it deals only with named commands (not
     // page/browser actions that are associated with the current page directly).
     ActiveTabPermissionGranter* granter =
-        web_contents ? TabHelper::FromWebContents(web_contents)
-                           ->active_tab_permission_granter()
+        web_contents ? ActiveTabPermissionGranter::FromWebContents(web_contents)
                      : nullptr;
     if (granter) {
       granter->GrantIfRequested(extension);

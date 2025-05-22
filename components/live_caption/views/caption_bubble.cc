@@ -22,6 +22,7 @@
 #include "components/language/core/common/language_util.h"
 #include "components/live_caption/caption_bubble_context.h"
 #include "components/live_caption/caption_bubble_settings.h"
+#include "components/live_caption/views/format_constants.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/translate/core/browser/translate_download_manager.h"
 #include "components/translate/core/browser/translate_ui_languages_manager.h"
@@ -89,33 +90,8 @@
 #include "ui/accessibility/platform/ax_platform.h"
 #endif
 
+namespace captions {
 namespace {
-
-// Formatting constants
-static constexpr int kLineHeightDip = 24;
-static constexpr int kLiveTranslateLabelLineHeightDip = 18;
-static constexpr int kLiveTranslateImageWidthDip = 16;
-static constexpr int kLanguageButtonImageLabelSpacing = 4;
-static constexpr auto kLanguageButtonInsets = gfx::Insets::TLBR(2, 8, 2, 6);
-static constexpr int kNumLinesCollapsed = 2;
-static constexpr int kNumLinesExpanded = 8;
-static constexpr int kCornerRadiusDip = 4;
-static constexpr int kSidePaddingDip = 18;
-static constexpr int kButtonDip = 16;
-static constexpr int kButtonCircleHighlightPaddingDip = 2;
-static constexpr int kMaxWidthDip = 536;
-// Margin of the bubble with respect to the context window.
-static constexpr int kMinAnchorMarginDip = 20;
-static constexpr char kPrimaryFont[] = "Roboto";
-static constexpr char kSecondaryFont[] = "Arial";
-static constexpr char kTertiaryFont[] = "sans-serif";
-static constexpr int kFontSizePx = 16;
-static constexpr int kLiveTranslateLabelFontSizePx = 11;
-static constexpr double kDefaultRatioInParentX = 0.5;
-static constexpr double kDefaultRatioInParentY = 1;
-static constexpr int kErrorImageSizeDip = 20;
-static constexpr int kErrorMessageBetweenChildSpacingDip = 16;
-static constexpr double kContextSufficientOverlapRatio = .4;
 
 constexpr base::TimeDelta kAnimationDuration = base::Milliseconds(250);
 
@@ -183,6 +159,8 @@ bool ParseNonTransparentRGBACSSColorString(
   return match;
 }
 
+}  // namespace
+
 // Helper class for observing mouse and key events from native window.
 class CaptionBubbleEventObserver : public ui::EventObserver {
  public:
@@ -228,10 +206,6 @@ class CaptionBubbleEventObserver : public ui::EventObserver {
   raw_ptr<captions::CaptionBubble> caption_bubble_;
   std::unique_ptr<views::EventMonitor> event_monitor_;
 };
-
-}  // namespace
-
-namespace captions {
 
 #if BUILDFLAG(IS_CHROMEOS)
 DEFINE_UI_CLASS_PROPERTY_KEY(bool, kIsCaptionBubbleKey, false)
@@ -766,8 +740,7 @@ void CaptionBubble::Init() {
   collapse_button_ =
       content_container->AddChildView(std::move(collapse_button));
 
-  if (caption_bubble_settings_->IsLiveTranslateFeatureEnabled() ||
-      base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+  if (IsTranslateHeaderEnabled()) {
     std::vector<std::string> language_codes;
     translate::TranslateDownloadManager::GetSupportedLanguages(true,
                                                                &language_codes);
@@ -868,8 +841,7 @@ void CaptionBubble::Init() {
   header_container_ = AddChildViewRaw(std::move(header_container));
   AddChildViewRaw(std::move(content_container));
 
-  if (caption_bubble_settings_->IsLiveTranslateFeatureEnabled() ||
-      base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+  if (IsTranslateHeaderEnabled()) {
     std::vector<raw_ptr<views::View, VectorExperimental>> buttons =
         GetButtons();
     for (views::View* button : buttons) {
@@ -913,8 +885,7 @@ bool CaptionBubble::ShouldShowCloseButton() const {
 std::unique_ptr<views::NonClientFrameView>
 CaptionBubble::CreateNonClientFrameView(views::Widget* widget) {
   std::vector<raw_ptr<views::View, VectorExperimental>> buttons = GetButtons();
-  if (caption_bubble_settings_->IsLiveTranslateFeatureEnabled() ||
-      base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+  if (IsTranslateHeaderEnabled()) {
     caption_bubble_event_observer_ =
         std::make_unique<CaptionBubbleEventObserver>(this, widget);
   }
@@ -932,8 +903,7 @@ void CaptionBubble::OnWidgetActivationChanged(views::Widget* widget,
     active = true;
   }
 
-  if (caption_bubble_settings_->IsLiveTranslateFeatureEnabled() ||
-      base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+  if (IsTranslateHeaderEnabled()) {
     UpdateControlsVisibility(active);
   }
 }
@@ -1053,8 +1023,7 @@ void CaptionBubble::SetModel(CaptionBubbleModel* model) {
 }
 
 void CaptionBubble::AnimationProgressed(const gfx::Animation* animation) {
-  if (!caption_bubble_settings_->IsLiveTranslateFeatureEnabled() &&
-      !base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+  if (!IsTranslateHeaderEnabled()) {
     return;
   }
   std::vector<raw_ptr<views::View, VectorExperimental>> buttons = GetButtons();
@@ -1098,16 +1067,14 @@ void CaptionBubble::OnDownloadProgressTextChanged() {
 }
 
 void CaptionBubble::OnLanguagePackInstalled() {
-  if (caption_bubble_settings_->IsLiveTranslateFeatureEnabled() ||
-      base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+  if (IsTranslateHeaderEnabled()) {
     download_progress_label_->SetVisible(false);
     label_->SetVisible(true);
   }
 }
 
 void CaptionBubble::OnAutoDetectedLanguageChanged() {
-  if (!caption_bubble_settings_->IsLiveTranslateFeatureEnabled() &&
-      !base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+  if (!IsTranslateHeaderEnabled()) {
     return;
   }
   std::string auto_detected_language_code =
@@ -1323,8 +1290,7 @@ void CaptionBubble::SetTextSizeAndFontFamily() {
   label_->SetLineHeight(kLineHeightDip * textScaleFactor);
   label_->SetMaximumWidth(kMaxWidthDip * textScaleFactor - kSidePaddingDip * 2);
   title_->SetLineHeight(kLineHeightDip * textScaleFactor);
-  if (caption_bubble_settings_->IsLiveTranslateFeatureEnabled() ||
-      base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+  if (IsTranslateHeaderEnabled()) {
     download_progress_label_->SetLineHeight(kLiveTranslateLabelLineHeightDip *
                                             textScaleFactor);
     download_progress_label_->SetFontList(
@@ -1393,8 +1359,7 @@ void CaptionBubble::SetTextColor() {
   generic_error_icon_->SetImage(ui::ImageModel::FromVectorIcon(
       vector_icons::kErrorOutlineIcon, primary_color));
 
-  if (caption_bubble_settings_->IsLiveTranslateFeatureEnabled() ||
-      base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+  if (IsTranslateHeaderEnabled()) {
     source_language_button_->SetEnabledTextColors(language_label_color);
     target_language_button_->SetEnabledTextColors(language_label_color);
 // On macOS whenever the caption bubble is not in main focus the button state
@@ -1647,8 +1612,7 @@ void CaptionBubble::UpdateContentSize() {
       gfx::Size(left_header_width, button_size.height()));
   download_progress_label_->SetPreferredSize(gfx::Size(width, content_height));
 
-  if (caption_bubble_settings_->IsLiveTranslateFeatureEnabled() ||
-      base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+  if (IsTranslateHeaderEnabled()) {
     source_language_button_->SetMinSize(gfx::Size());
     source_language_button_->SetPreferredSize(
         source_language_button_->CalculatePreferredSize({}));
@@ -1738,8 +1702,7 @@ CaptionBubble::GetButtons() {
       back_to_tab_button_.get(), close_button_.get(), expand_button_.get(),
       collapse_button_.get()};
 
-  if (caption_bubble_settings_->IsLiveTranslateFeatureEnabled() ||
-      base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage)) {
+  if (IsTranslateHeaderEnabled()) {
     buttons.push_back(source_language_button_.get());
     buttons.push_back(target_language_button_.get());
   }
@@ -1860,6 +1823,11 @@ std::u16string CaptionBubble::GetTargetLanguageName() const {
   CHECK(translate_ui_languages_manager_);
   return translate_ui_languages_manager_->GetLanguageNameAt(
       translate_ui_languages_manager_->GetTargetLanguageIndex());
+}
+
+bool CaptionBubble::IsTranslateHeaderEnabled() const {
+  return caption_bubble_settings_->IsLiveTranslateFeatureEnabled() ||
+         base::FeatureList::IsEnabled(media::kLiveCaptionMultiLanguage);
 }
 
 BEGIN_METADATA(CaptionBubble)

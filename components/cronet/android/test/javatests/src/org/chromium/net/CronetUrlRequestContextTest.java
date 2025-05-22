@@ -39,6 +39,7 @@ import org.junit.runner.RunWith;
 import org.chromium.base.Log;
 import org.chromium.base.PathUtils;
 import org.chromium.base.test.util.DoNotBatch;
+import org.chromium.build.BuildConfig;
 import org.chromium.net.CronetTestRule.BoolFlag;
 import org.chromium.net.CronetTestRule.CronetImplementation;
 import org.chromium.net.CronetTestRule.DisableAutomaticNetLog;
@@ -2142,37 +2143,6 @@ public class CronetUrlRequestContextTest {
     @Test
     @SmallTest
     @IgnoreFor(
-            implementations = {CronetImplementation.FALLBACK, CronetImplementation.AOSP_PLATFORM},
-            reason = "Global metrics delta is supported only by the native implementation")
-    public void testGetGlobalMetricsDeltas() throws Exception {
-        ExperimentalCronetEngine cronetEngine = mTestRule.getTestFramework().startEngine();
-
-        byte[] delta1 = cronetEngine.getGlobalMetricsDeltas();
-
-        TestUrlRequestCallback callback = new TestUrlRequestCallback();
-        UrlRequest.Builder builder =
-                cronetEngine.newUrlRequestBuilder(mUrl, callback, callback.getExecutor());
-        builder.build().start();
-        callback.blockForDone();
-        // Fetch deltas on a different thread the second time to make sure this is permitted.
-        // See crbug.com/719448
-        FutureTask<byte[]> task =
-                new FutureTask<byte[]>(
-                        new Callable<byte[]>() {
-                            @Override
-                            public byte[] call() {
-                                return cronetEngine.getGlobalMetricsDeltas();
-                            }
-                        });
-        new Thread(task).start();
-        byte[] delta2 = task.get();
-        assertThat(delta2).isNotEmpty();
-        assertThat(delta2).isNotEqualTo(delta1);
-    }
-
-    @Test
-    @SmallTest
-    @IgnoreFor(
             implementations = {CronetImplementation.FALLBACK},
             reason = "Deliberate manual creation of native engines")
     public void testCronetEngineBuilderConfig() throws Exception {
@@ -2289,8 +2259,16 @@ public class CronetUrlRequestContextTest {
             throws Exception {
         CronetProvider nativeProvider =
                 new NativeCronetProvider(mTestRule.getTestFramework().getContext());
-        assertThat(nativeProvider.createBuilder().getDefaultUserAgent())
-                .doesNotContain("AndroidHttpClient");
+        // TODO(crbug.com/412608685): Cronet in AOSP always forces the user agent to
+        // AndroidHttpClient, breaking the assumption of this test. Drop this once the
+        // divergence is fixed.
+        if (BuildConfig.CRONET_FOR_AOSP_BUILD) {
+            assertThat(nativeProvider.createBuilder().getDefaultUserAgent())
+                    .contains("AndroidHttpClient");
+        } else {
+            assertThat(nativeProvider.createBuilder().getDefaultUserAgent())
+                    .doesNotContain("AndroidHttpClient");
+        }
     }
 
     // Creates a CronetEngine on another thread and then one on the main thread.  This shouldn't

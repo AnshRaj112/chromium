@@ -122,6 +122,7 @@ Chrome के अनुभव को बेहतर बनाने के ल�
 <translation id="1480287803138246127">ऐसा हो सकता है कि आपको Chrome पर ब्राउज़िंग के इतिहास का कुछ डेटा न दिखे. पूरा इतिहास देखने के लिए, Chrome का पूरा इतिहास खोलें.</translation>
 <translation id="1492417797159476138">आपने इस साइट के लिए, यह उपयोगकर्ता नाम पहले ही सेव कर दिया है</translation>
 <translation id="1493287004536771723">आप <ph name="SITE_NAME" /> को फ़ॉलो कर रहे हैं</translation>
+<translation id="1496514951988037011">उपयोगकर्ता नाम</translation>
 <translation id="1501480321619201731">ग्रुप मिटाएं</translation>
 <translation id="1502010315804028179">अपने पासवर्ड मैनेज करने के लिए, Google Play services को अपडेट करें</translation>
 <translation id="1506061864768559482">सर्च इंजन</translation>
@@ -221,6 +222,7 @@ Chrome के अनुभव को बेहतर बनाने के ल�
 <translation id="197288927597451399">रखें</translation>
 <translation id="1973912524893600642">डेटा को सेव रखें</translation>
 <translation id="1974060860693918893">ऐडवांस सेटिंग</translation>
+<translation id="1984087999855033707">फ़ोन नंबर</translation>
 <translation id="1984417487208496350">कोई सुरक्षा नहीं (हम ऐसा करने का सुझाव नहीं देते)</translation>
 <translation id="1986685561493779662">नाम पहले से मौजूद है</translation>
 <translation id="200114059308480249">क्या आप Google पर कुछ खोजते समय, खोज से जुड़े मिलते-जुलते शब्द भी शामिल करना चाहते हैं?</translation>
@@ -1874,6 +1876,7 @@ Chrome के अनुभव को बेहतर बनाने के ल�
 <translation id="939598580284253335">'पासफ़्रेज़' दर्ज करें</translation>
 <translation id="95817756606698420">चीन में खोज करने के लिए Chrome, <ph name="BEGIN_BOLD" />Sogou<ph name="END_BOLD" /> का इस्तेमाल कर सकता है. आप इसे <ph name="BEGIN_LINK" />सेटिंग<ph name="END_LINK" /> में बदल सकते हैं.</translation>
 <translation id="961856697154696964">ब्राउज़िंग डेटा मिटाएं</translation>
+<translation id="963246339335003378">टास्क मैनेजर खोलें</translation>
 <translation id="966131775676567255">खाते का डेटा मिटाया जा रहा है</translation>
 <translation id="96681097142096641">क्या आप सरल बनाए गए पेज को देखना चाहते हैं?</translation>
 <translation id="970715775301869095"><ph name="MINUTES" /> मिनट शेष</translation>

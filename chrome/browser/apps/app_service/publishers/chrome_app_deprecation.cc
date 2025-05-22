@@ -159,12 +159,19 @@ constexpr auto kKioskSessionAllowlist =
          "pjicdfmcmiihceiefbmioikgkcicochj", "plebdlehcdhfkmidnmfpolcifjngmdck",
          "pmcgpdpmlgkeociebbpdbppimbeheoli"});
 
+// Add only allowlisted test app ids.
+constexpr auto kTestAllowlist = {
+    "aajgmlihcokkalfjbangebcffdoanjfo", "epeagdmdgnhlibpbnhalblaohdhhkpne",
+    "fimgekdokgldflggeacgijngdienfdml", "kjecmldfmbflidigcdfdnegjgkgggoih"};
+
 // The std::unordered_set<std::string_view> type has complex constructors and
 // for static variables it would require an exit-time destructor. For these
 // cases go/totw/110 suggests using NoDestructor to prevent the destructor from
 // running and avoid multi-thread race conditions. We do not risk memory leaks
 // because the allowlist are always valid while Chrome is running.
-static base::NoDestructor<std::unordered_set<std::string>> testAllowlistedApps;
+static base::NoDestructor<std::unordered_set<std::string>> testAllowlistedApps(
+    std::unordered_set<std::string>(kTestAllowlist.begin(),
+                                    kTestAllowlist.end()));
 
 // This enum lists the possible outcomes of the deprecation checks performed
 // during the launch of a ChromeApp.

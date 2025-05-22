@@ -7,6 +7,7 @@
 
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -45,32 +46,15 @@ struct IndexedDBValue;
 // than reaching directly into level_db::BackingStore.
 class BackingStore {
  public:
-  class CONTENT_EXPORT RecordIdentifier {
-   public:
-    RecordIdentifier() = default;
-    RecordIdentifier(std::string primary_key, int64_t version)
-        : primary_key_(std::move(primary_key)), version_(version) {
-      DCHECK(!primary_key_.empty());
-    }
-
-    RecordIdentifier(const RecordIdentifier&) = delete;
-    RecordIdentifier& operator=(const RecordIdentifier&) = delete;
-
-    ~RecordIdentifier() = default;
-
-    const std::string& primary_key() const { return primary_key_; }
-    int64_t version() const { return version_; }
-
-    void Reset(std::string primary_key, int64_t version) {
-      primary_key_ = std::move(primary_key);
-      version_ = version;
-    }
-
-   private:
-    // TODO(jsbell): Make it more clear that this is the *encoded* version of
-    // the key.
-    std::string primary_key_;
-    int64_t version_ = -1;
+  // Used to uniquely identify a record in the database. Can be treated as an
+  // opaque token by consumers of the `BackingStore`.
+  struct RecordIdentifier {
+    // The meaning of these fields is backend-specific. Consumer code should
+    // ignore them.
+    // SQLite: a row id. LevelDB: a version.
+    int64_t number;
+    // SQLite: unused. LevelDB: the *encoded* primary key bytes.
+    std::string data;
   };
 
   class Cursor;
@@ -136,12 +120,10 @@ class BackingStore {
     [[nodiscard]] virtual Status ClearObjectStore(int64_t object_store_id) = 0;
 
     // Creates a new index metadata and writes it to the transaction.
-    [[nodiscard]] virtual Status CreateIndex(int64_t object_store_id,
-                                             int64_t index_id,
-                                             const std::u16string& name,
-                                             blink::IndexedDBKeyPath key_path,
-                                             bool is_unique,
-                                             bool is_multi_entry) = 0;
+    [[nodiscard]] virtual Status CreateIndex(
+        int64_t object_store_id,
+        blink::IndexedDBIndexMetadata index) = 0;
+
     // Deletes the index metadata on the transaction (but not any index
     // entries).
     [[nodiscard]] virtual Status DeleteIndex(int64_t object_store_id,
@@ -154,25 +136,26 @@ class BackingStore {
     [[nodiscard]] virtual Status GetRecord(int64_t object_store_id,
                                            const blink::IndexedDBKey& key,
                                            IndexedDBValue* record) = 0;
-    [[nodiscard]] virtual Status PutRecord(int64_t object_store_id,
-                                           const blink::IndexedDBKey& key,
-                                           IndexedDBValue* value,
-                                           RecordIdentifier* record) = 0;
+    // When successful, returns the identifier for the newly stored record.
+    [[nodiscard]] virtual StatusOr<RecordIdentifier> PutRecord(
+        int64_t object_store_id,
+        const blink::IndexedDBKey& key,
+        IndexedDBValue value) = 0;
     [[nodiscard]] virtual Status DeleteRange(
         int64_t object_store_id,
         const blink::IndexedDBKeyRange&) = 0;
-    [[nodiscard]] virtual Status GetKeyGeneratorCurrentNumber(
-        int64_t object_store_id,
-        int64_t* current_number) = 0;
+    [[nodiscard]] virtual StatusOr<int64_t> GetKeyGeneratorCurrentNumber(
+        int64_t object_store_id) = 0;
     [[nodiscard]] virtual Status MaybeUpdateKeyGeneratorCurrentNumber(
         int64_t object_store_id,
         int64_t new_state,
         bool check_current) = 0;
-    [[nodiscard]] virtual Status KeyExistsInObjectStore(
-        int64_t object_store_id,
-        const blink::IndexedDBKey& key,
-        RecordIdentifier* found_record_identifier,
-        bool* found) = 0;
+    // Returns the `RecordIdentifier` for the record if the primary key exists
+    // in the given object store. Returns `Status` on error. Returns nullopt if
+    // no record exists with the given key.
+    [[nodiscard]] virtual StatusOr<std::optional<RecordIdentifier>>
+    KeyExistsInObjectStore(int64_t object_store_id,
+                           const blink::IndexedDBKey& key) = 0;
     [[nodiscard]] virtual Status PutIndexDataForRecord(
         int64_t object_store_id,
         int64_t index_id,
@@ -189,20 +172,20 @@ class BackingStore {
         const blink::IndexedDBKey& key,
         std::unique_ptr<blink::IndexedDBKey>* found_primary_key,
         bool* exists) = 0;
-    virtual base::expected<std::unique_ptr<Cursor>, Status>
-    OpenObjectStoreKeyCursor(int64_t object_store_id,
-                             const blink::IndexedDBKeyRange& key_range,
-                             blink::mojom::IDBCursorDirection) = 0;
-    virtual base::expected<std::unique_ptr<Cursor>, Status>
-    OpenObjectStoreCursor(int64_t object_store_id,
-                          const blink::IndexedDBKeyRange& key_range,
-                          blink::mojom::IDBCursorDirection) = 0;
-    virtual base::expected<std::unique_ptr<Cursor>, Status> OpenIndexKeyCursor(
+    virtual StatusOr<std::unique_ptr<Cursor>> OpenObjectStoreKeyCursor(
+        int64_t object_store_id,
+        const blink::IndexedDBKeyRange& key_range,
+        blink::mojom::IDBCursorDirection) = 0;
+    virtual StatusOr<std::unique_ptr<Cursor>> OpenObjectStoreCursor(
+        int64_t object_store_id,
+        const blink::IndexedDBKeyRange& key_range,
+        blink::mojom::IDBCursorDirection) = 0;
+    virtual StatusOr<std::unique_ptr<Cursor>> OpenIndexKeyCursor(
         int64_t object_store_id,
         int64_t index_id,
         const blink::IndexedDBKeyRange& key_range,
         blink::mojom::IDBCursorDirection) = 0;
-    virtual base::expected<std::unique_ptr<Cursor>, Status> OpenIndexCursor(
+    virtual StatusOr<std::unique_ptr<Cursor>> OpenIndexCursor(
         int64_t object_store_id,
         int64_t index_id,
         const blink::IndexedDBKeyRange& key_range,
@@ -242,17 +225,20 @@ class BackingStore {
   // Gets the total size of blobs and the database for in-memory backing
   // stores.
   virtual int64_t GetInMemorySize() const = 0;
-  // Fill in the provided list with existing database names.
-  [[nodiscard]] virtual Status GetDatabaseNames(
-      std::vector<std::u16string>* names) = 0;
-  // Fill in the provided list with existing database names and versions.
-  [[nodiscard]] virtual Status GetDatabaseNamesAndVersions(
-      std::vector<blink::mojom::IDBNameAndVersionPtr>* names_and_versions) = 0;
+  // Returns a list of names of existing databases, regardless of whether
+  // they're currently open.
+  [[nodiscard]] virtual StatusOr<std::vector<std::u16string>>
+  GetDatabaseNames() = 0;
+  // Returns a list of names of existing databases and their version numbers
+  // (i.e. `IndexedDBDatabaseMetadata::version`), regardless of whether they're
+  // currently open.
+  [[nodiscard]]
+  virtual StatusOr<std::vector<blink::mojom::IDBNameAndVersionPtr>>
+  GetDatabaseNamesAndVersions() = 0;
   // Creates a new database in the backing store, or opens an existing one. If
   // pre-existing, the database's metadata will be populated from disk.
-  // Otherwise the version will be set to DEFAULT_VERSION.
-  [[nodiscard]] virtual base::expected<std::unique_ptr<BackingStore::Database>,
-                                       Status>
+  // Otherwise the version will be initialized to NO_VERSION.
+  [[nodiscard]] virtual StatusOr<std::unique_ptr<BackingStore::Database>>
   CreateOrOpenDatabase(const std::u16string& name) = 0;
 
   virtual uintptr_t GetIdentifierForMemoryDump() = 0;

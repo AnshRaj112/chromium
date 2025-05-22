@@ -16,6 +16,7 @@ import static org.robolectric.Shadows.shadowOf;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Looper;
+import android.view.View;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -30,9 +31,13 @@ import org.robolectric.shadows.ShadowLooper;
 
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.test.BaseRobolectricTestRunner;
+import org.chromium.base.test.util.HistogramWatcher;
+import org.chromium.blink.mojom.DisplayMode;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.theme.ThemeColorProvider;
+import org.chromium.chrome.browser.ui.web_app_header.WebAppHeaderUtils.BackEvent;
+import org.chromium.chrome.browser.ui.web_app_header.WebAppHeaderUtils.ReloadType;
 import org.chromium.components.browser_ui.desktop_windowing.AppHeaderState;
 import org.chromium.components.browser_ui.desktop_windowing.DesktopWindowStateManager;
 import org.chromium.components.browser_ui.widget.scrim.ScrimManager;
@@ -93,7 +98,8 @@ public class WebAppHeaderLayoutMediatorTest {
                         mNonDraggableAreasSupplier,
                         mThemeColorProvider,
                         SYS_APP_HEADER_HEIGHT,
-                        HEADER_BUTTON_HEIGHT);
+                        HEADER_BUTTON_HEIGHT,
+                        DisplayMode.MINIMAL_UI);
 
         mShadowLooper.idle();
     }
@@ -172,7 +178,8 @@ public class WebAppHeaderLayoutMediatorTest {
                         mNonDraggableAreasSupplier,
                         mThemeColorProvider,
                         SYS_APP_HEADER_HEIGHT,
-                        HEADER_BUTTON_HEIGHT);
+                        HEADER_BUTTON_HEIGHT,
+                        DisplayMode.MINIMAL_UI);
 
         assertEquals(
                 "Header min height should match app header height",
@@ -220,7 +227,8 @@ public class WebAppHeaderLayoutMediatorTest {
                         mNonDraggableAreasSupplier,
                         mThemeColorProvider,
                         SYS_APP_HEADER_HEIGHT,
-                        HEADER_BUTTON_HEIGHT);
+                        HEADER_BUTTON_HEIGHT,
+                        DisplayMode.MINIMAL_UI);
         assertEquals(
                 "Header paddings should match updated system insets",
                 new Rect(0, 0, 0, 0),
@@ -255,6 +263,52 @@ public class WebAppHeaderLayoutMediatorTest {
                 mModel.get(WebAppHeaderLayoutProperties.PADDINGS));
         assertFalse(
                 "Header view should be gone", mModel.get(WebAppHeaderLayoutProperties.IS_VISIBLE));
+    }
+
+    @Test
+    public void testHeaderInitiallyHidden_WidthSupplierUpdatesOnVisibilityChange() {
+        setupDesktopWindowing(/* isInDesktopWindow= */ true, WIDEST_UNOCCLUDED_RECT);
+
+        mMediator =
+                new WebAppHeaderLayoutMediator(
+                        mModel,
+                        mHeaderDelegate,
+                        mDesktopWindowStateManager,
+                        mScrimManager,
+                        mTabSupplier,
+                        mNonDraggableAreasSupplier,
+                        mThemeColorProvider,
+                        SYS_APP_HEADER_HEIGHT,
+                        HEADER_BUTTON_HEIGHT,
+                        DisplayMode.MINIMAL_UI);
+        mShadowLooper.idle();
+
+        mModel.get(WebAppHeaderLayoutProperties.WIDTH_CHANGED_CALLBACK).onResult(SCREEN_WIDTH);
+
+        // View starts off visible.
+        assertTrue(
+                "IS_VISIBLE property should be true.",
+                mModel.get(WebAppHeaderLayoutProperties.IS_VISIBLE));
+        assertEquals(
+                "Width supplier should report SCREEN_WIDTH.",
+                Integer.valueOf(SCREEN_WIDTH),
+                mMediator.getWidthSupplierForTesting().get());
+
+        // Change the app header state to have a View.GONE app header view.
+        AppHeaderState goneState =
+                new AppHeaderState(
+                        WIDEST_UNOCCLUDED_RECT,
+                        WIDEST_UNOCCLUDED_RECT,
+                        /* isInDesktopWindow= */ false);
+        mMediator.onAppHeaderStateChanged(goneState);
+        mModel.get(WebAppHeaderLayoutProperties.VISIBILITY_CHANGED_CALLBACK).onResult(View.GONE);
+        assertFalse(
+                "IS_VISIBLE property should be false.",
+                mModel.get(WebAppHeaderLayoutProperties.IS_VISIBLE));
+        assertEquals(
+                "Width supplier should be zero.",
+                Integer.valueOf(0),
+                mMediator.getWidthSupplierForTesting().get());
     }
 
     @Test
@@ -294,26 +348,78 @@ public class WebAppHeaderLayoutMediatorTest {
 
     @Test
     public void testGoBackWithHistory_shouldGoBack() {
+        var watcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        "CustomTabs.WebAppHeader.BackButtonEvent", BackEvent.BACK);
         mTabSupplier.set(mTab);
         when(mTab.canGoBack()).thenReturn(true);
 
         mMediator.goBack();
         verify(mTab).goBack();
+        watcher.assertExpected("Back event should be recorded.");
     }
 
     @Test
     public void testGoBackNoHistory_shouldNotGoBack() {
+        var watcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        "CustomTabs.WebAppHeader.BackButtonEvent", BackEvent.INVALID);
         mTabSupplier.set(mTab);
         when(mTab.canGoBack()).thenReturn(false);
 
         mMediator.goBack();
         verify(mTab, never()).goBack();
+        watcher.assertExpected("Invalid event should be recorded.");
     }
 
     @Test
     public void testGoBackNoTab_shouldNotGoBack() {
+        var watcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        "CustomTabs.WebAppHeader.BackButtonEvent", BackEvent.INVALID);
         mMediator.goBack();
         verify(mTab, never()).goBack();
+        watcher.assertExpected("Invalid event should be recorded.");
+    }
+
+    @Test
+    public void testReload_shouldReloadTab() {
+        var watcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        "CustomTabs.WebAppHeader.ReloadButtonEvent", ReloadType.RELOAD_FROM_CACHE);
+        when(mTab.isLoading()).thenReturn(false);
+        mTabSupplier.set(mTab);
+
+        mMediator.refreshTab(false);
+        verify(mTab).reload();
+        watcher.assertExpected("Reload from cache should be recorded.");
+    }
+
+    @Test
+    public void testReloadWhileReloading_shouldStopReloading() {
+        var watcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        "CustomTabs.WebAppHeader.ReloadButtonEvent", ReloadType.STOP_RELOAD);
+        when(mTab.isLoading()).thenReturn(true);
+        mTabSupplier.set(mTab);
+
+        mMediator.refreshTab(false);
+        verify(mTab).stopLoading();
+        watcher.assertExpected("Stop reloading should be recorded.");
+    }
+
+    @Test
+    public void testReloadTabIgnoringCache_shouldReloadIgnoringCache() {
+        var watcher =
+                HistogramWatcher.newSingleRecordWatcher(
+                        "CustomTabs.WebAppHeader.ReloadButtonEvent",
+                        ReloadType.RELOAD_IGNORE_CACHE);
+        when(mTab.isLoading()).thenReturn(false);
+        mTabSupplier.set(mTab);
+
+        mMediator.refreshTab(true);
+        verify(mTab).reloadIgnoringCache();
+        watcher.assertExpected("Reload ignoring cache should be recorded.");
     }
 
     @Test

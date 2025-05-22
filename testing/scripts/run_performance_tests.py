@@ -94,7 +94,7 @@ else:
 
 SHARD_MAPS_DIR = CHROMIUM_SRC_DIR / 'tools/perf/core/shard_maps'
 CROSSBENCH_TOOL = CHROMIUM_SRC_DIR / 'third_party/crossbench/cb.py'
-ADB_TOOL = THIRD_PARTY_DIR / 'catapult/devil/bin/deps/linux2/x86_64/bin/adb'
+ADB_TOOL = THIRD_PARTY_DIR / 'android_sdk/public/platform-tools/adb'
 GSUTIL_DIR = THIRD_PARTY_DIR / 'catapult/third_party/gsutil'
 PAGE_SETS_DATA = CHROMIUM_SRC_DIR / 'tools/perf/page_sets/data'
 PERF_TOOLS = ['benchmarks', 'executables', 'crossbench']
@@ -747,6 +747,7 @@ class CrossbenchTest(object):
     self.network = self._get_network_arg(options.passthrough_args)
     self.is_chrome = (not self.cb_options.official_browser
                       or self.cb_options.official_browser.startswith('chrome'))
+    self.env = self._create_env_arg()
     if self.options.luci_chromium:
       # In luci.chromium the Chrome and driver are in the user path.
       self.browser = '--browser=%s' % get_abs_user_path('chrome')
@@ -784,6 +785,13 @@ class CrossbenchTest(object):
       arg = '--fileserver'
       args.append(arg)
       return self._create_fileserver_network(arg)
+    return []
+
+  def _create_env_arg(self):
+    if (self.options.benchmarks.startswith('motionmark')
+        and sys.platform == 'darwin'):
+      # Set screen refresh rate to 60Hz on Mac due to crbug.com/415318275.
+      return ['--env={screen_refresh_rate:60}']
     return []
 
   def _create_fileserver_network(self, arg):
@@ -886,7 +894,7 @@ class CrossbenchTest(object):
     return (['vpython3', '-Xutf8'] + [self.options.executable] + [benchmark] +
             ['--env-validation=throw'] + [self.OUTDIR % working_dir] +
             [self.browser] + benchmark_args + self.driver_path_arg +
-            self.network + self._get_default_args())
+            self.network + self.env + self._get_default_args())
 
   def execute_benchmark(self,
                         benchmark,

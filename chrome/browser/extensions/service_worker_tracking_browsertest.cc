@@ -117,7 +117,7 @@ class ServiceWorkerTrackingBrowserTest : public ExtensionBrowserTest {
 
   virtual std::string GetExtensionPageContent() const { return "<p>page</p>"; }
 
-  virtual void LoadServiceWorkerExtension() {
+  void LoadServiceWorkerExtension() {
     // Load a basic extension with a service worker and wait for the worker to
     // start running.
     static constexpr char kManifest[] =
@@ -203,8 +203,7 @@ class ServiceWorkerIdTrackingBrowserTest
       : allow_multiple_worker_per_extension_in_worker_id_set_(
             WorkerIdSet::AllowMultipleWorkersPerExtensionForTesting()),
         allow_multiple_workers_per_extension_in_task_queue_(
-            ServiceWorkerTaskQueue::
-                AllowMultipleWorkersPerExtensionForTesting()) {}
+            ServiceWorkerState::AllowMultipleWorkersPerExtensionForTesting()) {}
 
  protected:
   void SetUpOnMainThread() override {
@@ -294,7 +293,7 @@ class ServiceWorkerIdTrackingBrowserTest
 // ServiceWorkerVersionTest.StallInStopping_DetachThenStart to more closely
 // simulate a worker thread delayed in stopping. This will also allow testing
 // when the delay causes ProcessManager::RenderProcessExited() to be called
-// before ServiceWorkerTaskQueue::OnStopped().
+// before ServiceWorkerState::OnStopped().
 
 // Tests that when:
 //   1) something, other than a worker, keeps the extension renderer process
@@ -382,11 +381,10 @@ IN_PROC_BROWSER_TEST_F(
   const content::ServiceWorkerRunningInfo& sw_info =
       sw_context->GetRunningServiceWorkerInfos().at(
           previous_service_worker_id->version_id);
-
-  // Remove the task queue as an observer of `ServiceWorkerContext` so that
+  // Remove the worker state as an observer of `ServiceWorkerContext` so that
   // the browser stop notification will not run immediately.
-  ServiceWorkerTaskQueue::Get(profile())->StopObservingContextForTest(
-      sw_context);
+  ServiceWorkerState* worker_state = GetWorkerState();
+  worker_state->StopObservingContextForTest();
 
   TestServiceWorkerTaskQueueObserver worker_id_removed_observer;
 
@@ -406,8 +404,7 @@ IN_PROC_BROWSER_TEST_F(
 
   // Run the browser stop notification after the renderer stop notification, and
   // it should do nothing.
-  ServiceWorkerTaskQueue::Get(profile())->OnStopped(
-      previous_service_worker_id->version_id, sw_info);
+  worker_state->OnStopped(previous_service_worker_id->version_id, sw_info);
 
   // Confirm after the browser stop notification that we are still no longer
   // tracking the worker.
@@ -526,6 +523,12 @@ IN_PROC_BROWSER_TEST_F(
   EXPECT_EQ(worker_state->renderer_state(),
             ServiceWorkerState::RendererState::kNotActive);
 
+  // Confirm the worker has been untracked from ProcessManager.
+  std::vector<WorkerId> workers_for_extension =
+      ProcessManager::Get(profile())->GetServiceWorkersForExtension(
+          extension()->id());
+  EXPECT_EQ(workers_for_extension.size(), 0ul);
+
   // Simulate the render stop notification arriving afterwards.
   task_queue->DidStopServiceWorkerContext(
       stopped_service_worker_id->render_process_id,
@@ -569,10 +572,9 @@ IN_PROC_BROWSER_TEST_F(
   ASSERT_EQ(worker_state->browser_state(),
             ServiceWorkerState::BrowserState::kReady);
 
-  // Remove the task queue as an observer of `ServiceWorkerContext` so that
+  // Remove the worker state as an observer of `ServiceWorkerContext` so that
   // the browser stop notification will not run immediately.
-  ServiceWorkerTaskQueue::Get(profile())->StopObservingContextForTest(
-      sw_context);
+  worker_state->StopObservingContextForTest();
 
   // Stop the service worker.
   browsertest_util::StopServiceWorkerForExtensionGlobalScope(
@@ -588,8 +590,7 @@ IN_PROC_BROWSER_TEST_F(
             ServiceWorkerState::RendererState::kNotActive);
 
   // Simulate browser stop notification after the render stop notification.
-  ServiceWorkerTaskQueue::Get(profile())->OnStopped(
-      stopped_service_worker_id->version_id, sw_info);
+  worker_state->OnStopped(stopped_service_worker_id->version_id, sw_info);
 
   // Confirm the worker state still exists, and browser and renderer state
   // remain not ready.
@@ -597,13 +598,18 @@ IN_PROC_BROWSER_TEST_F(
             ServiceWorkerState::BrowserState::kNotStarted);
   EXPECT_EQ(worker_state->renderer_state(),
             ServiceWorkerState::RendererState::kNotActive);
+
+  // Confirm the worker has been untracked from ProcessManager.
+  std::vector<WorkerId> workers_for_extension =
+      ProcessManager::Get(profile())->GetServiceWorkersForExtension(
+          extension()->id());
+  EXPECT_EQ(workers_for_extension.size(), 0ul);
 }
 
-// Test that if a browser stop notification is received after a worker is
-// deactivated (since they can be triggered independently) we don't update the
-// worker's browser readiness information.
+// Test that if an extension and its worker are deactivated, the worker is
+// untracked from both ServiceWorkerTaskQueue and ProcessManager.
 IN_PROC_BROWSER_TEST_F(ServiceWorkerStopTrackingBrowserTest,
-                       OnStoppedRunsAfterDeactivatingWorker) {
+                       DisablingExtensionUntracksWorker) {
   ASSERT_NO_FATAL_FAILURE(LoadServiceWorkerExtension());
 
   // Get information about worker for extension that will be deactivated soon.
@@ -617,9 +623,6 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerStopTrackingBrowserTest,
   ASSERT_TRUE(sw_context);
   ASSERT_TRUE(base::Contains(sw_context->GetRunningServiceWorkerInfos(),
                              deactivated_service_worker_id->version_id));
-  const content::ServiceWorkerRunningInfo& sw_info =
-      sw_context->GetRunningServiceWorkerInfos().at(
-          deactivated_service_worker_id->version_id);
 
   // Confirm the worker is browser state ready.
   ASSERT_EQ(worker_state->browser_state(),
@@ -634,12 +637,11 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerStopTrackingBrowserTest,
   worker_state = GetWorkerState();
   ASSERT_FALSE(worker_state);
 
-  // Simulate browser stop notification after deactivating the extension.
-  ServiceWorkerTaskQueue::Get(profile())->OnStopped(
-      deactivated_service_worker_id->version_id, sw_info);
-
-  // Confirm the worker state still does not exist.
-  EXPECT_FALSE(worker_state);
+  // Confirm the worker has been untracked from ProcessManager.
+  std::vector<WorkerId> workers_for_extension =
+      ProcessManager::Get(profile())->GetServiceWorkersForExtension(
+          extension()->id());
+  EXPECT_EQ(workers_for_extension.size(), 0ul);
 }
 
 // Test that if a renderer process exit notification is received before
@@ -667,10 +669,9 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerStopTrackingBrowserTest,
   ASSERT_EQ(worker_state->renderer_state(),
             ServiceWorkerState::RendererState::kActive);
 
-  // Remove the task queue as an observer of `ServiceWorkerContext` so that
+  // Remove the worker state as an observer of `ServiceWorkerContext` so that
   // the browser stop notification will not run immediately.
-  ServiceWorkerTaskQueue::Get(profile())->StopObservingContextForTest(
-      sw_context);
+  worker_state->StopObservingContextForTest();
   // Setup intercept of `ServiceWorkerHost::DidStopServiceWorkerContext()`.
   // This simulates the worker renderer thread never informing that the worker
   // context terminated.
@@ -816,9 +817,7 @@ class ServiceWorkerSubScopeWorkerTrackingBrowserTest
     return R"(<script src="/page.js"></script>)";
   }
 
-  void LoadServiceWorkerExtension() override {
-    ServiceWorkerIdTrackingBrowserTest::LoadServiceWorkerExtension();
-
+  void LoadSubScopeServiceWorker() {
     // Code for a service worker that will be registered for a sub-scope
     // of the extension root scope. This service worker is not allowed
     // access to extension APIs, as it's not listed in the manifest.
@@ -826,13 +825,8 @@ class ServiceWorkerSubScopeWorkerTrackingBrowserTest
       base::ScopedAllowBlockingForTesting allow_blocking;
       base::CreateDirectory(test_extension_dir()->UnpackedPath().Append(
           FILE_PATH_LITERAL("subscope")));
-      // NOTE: `setInterval` is used to keep the service worker alive
-      // for the duration of the test, preventing it from being stopped
-      // prematurely, which could lead to test flakiness.
-      // See crbug.com/417430921.
       test_extension_dir()->WriteFile(FILE_PATH_LITERAL("subscope/sw.js"), R"(
           console.log("subscope service worker");
-          setInterval(() => { console.log("keepalive"); }, 1000);
       )");
     }
 
@@ -842,12 +836,19 @@ class ServiceWorkerSubScopeWorkerTrackingBrowserTest
         navigator.serviceWorker.register("subscope/sw.js").then(function() {
           // Wait until the service worker is active.
           return navigator.serviceWorker.ready;
-        }).then(function(r) {
-          console.log("registration successful");
         }).catch(function(err) {
           console.log("registration error: " + err.message);
         });
     )");
+
+    // Open the extension page, which will cause the sub-scope service
+    // worker to start. We wait for its registration here.
+    content::ServiceWorkerContext* sw_context =
+        GetServiceWorkerContext(profile());
+    service_worker_test_utils::TestServiceWorkerContextObserver
+        registration_observer(sw_context);
+    OpenExtensionTab();
+    registration_observer.WaitForRegistrationStored();
   }
 };
 
@@ -858,17 +859,12 @@ class ServiceWorkerSubScopeWorkerTrackingBrowserTest
 // crbug.com/395536907.
 IN_PROC_BROWSER_TEST_F(ServiceWorkerSubScopeWorkerTrackingBrowserTest,
                        StoppingSubScopeWorkerDoesNotAffectExtensionWorker) {
-  ASSERT_NO_FATAL_FAILURE(LoadServiceWorkerExtensionAndOpenExtensionTab());
-
-  // Wait for a console message that confirms the service worker for
-  // the sub-scope has been registered. Note that we can't use
-  // ExtensionTestMessageListener here since extension APIs are not
-  // available.
-  content::WebContents* web_contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
-  content::WebContentsConsoleObserver console_observer(web_contents);
-  console_observer.SetPattern("registration successful");
-  ASSERT_TRUE(console_observer.Wait());
+  // Load the extension service worker. This method will wait for its
+  // registration to be stored and the service worker to be running.
+  ASSERT_NO_FATAL_FAILURE(LoadServiceWorkerExtension());
+  // Load the sub-scope service worker and open the extension tab.
+  // This method will wait for the registration to be stored.
+  ASSERT_NO_FATAL_FAILURE(LoadSubScopeServiceWorker());
 
   // Confirm that we are tracking the main extension service worker.
   std::optional<WorkerId> extension_service_worker_id =

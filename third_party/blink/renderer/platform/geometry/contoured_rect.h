@@ -62,6 +62,11 @@ class PLATFORM_EXPORT ContouredRect {
       return (top_left_ == kRound) && IsUniform();
     }
 
+    constexpr bool IsConvex() const {
+      return top_left_ >= kBevel && top_right_ >= kBevel &&
+             bottom_right_ >= kBevel && bottom_left_ >= kBevel;
+    }
+
     constexpr bool IsUniform() const {
       return top_left_ == top_right_ && top_left_ == bottom_right_ &&
              top_left_ == bottom_left_;
@@ -125,8 +130,23 @@ class PLATFORM_EXPORT ContouredRect {
     constexpr bool IsConcave() const { return curvature_ < 1; }
     constexpr bool IsZero() const { return Start() == End(); }
     constexpr bool operator==(const Corner&) const = default;
+
+    // Invert the curvature
     constexpr Corner Inverse() const {
       return Corner({Start(), Center(), End(), Outer()}, 1 / Curvature());
+    }
+
+    // Change the direction (clockwise/counter-counterclockwise)
+    constexpr Corner Reverse() const {
+      return Corner({End(), Outer(), Start(), Center()}, Curvature());
+    }
+
+    constexpr gfx::RectF BoundingBox() const {
+      return gfx::BoundingRect(Start(), End());
+    }
+
+    constexpr bool Intersects(const Corner& other) const {
+      return BoundingBox().Intersects(other.BoundingBox());
     }
 
     constexpr gfx::Vector2dF v1() const { return Outer() - Start(); }
@@ -170,6 +190,10 @@ class PLATFORM_EXPORT ContouredRect {
 
   constexpr bool HasRoundCurvature() const {
     return corner_curvature_.IsRound() || !IsRounded();
+  }
+
+  constexpr bool IsConvex() const {
+    return !IsRounded() || corner_curvature_.IsConvex();
   }
 
   const FloatRoundedRect::Radii& GetRadii() const { return rect_.GetRadii(); }

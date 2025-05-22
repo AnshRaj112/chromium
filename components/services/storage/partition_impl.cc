@@ -8,13 +8,11 @@
 #include <utility>
 
 #include "base/functional/bind.h"
-#include "base/synchronization/waitable_event.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "build/build_config.h"
 #include "components/services/storage/dom_storage/local_storage_impl.h"
 #include "components/services/storage/dom_storage/session_storage_impl.h"
-#include "components/services/storage/service_worker/service_worker_storage_control_impl.h"
 #include "components/services/storage/storage_service_impl.h"
 
 namespace storage {
@@ -65,19 +63,6 @@ void PartitionImpl::BindReceiver(
   receivers_.Add(this, std::move(receiver));
 }
 
-void PartitionImpl::BindOriginContext(
-    const url::Origin& origin,
-    mojo::PendingReceiver<mojom::OriginContext> receiver) {
-  auto iter = origin_contexts_.find(origin);
-  if (iter == origin_contexts_.end()) {
-    auto result = origin_contexts_.emplace(
-        origin, std::make_unique<OriginContextImpl>(this, origin));
-    iter = result.first;
-  }
-
-  iter->second->BindReceiver(std::move(receiver));
-}
-
 void PartitionImpl::BindSessionStorageControl(
     mojo::PendingReceiver<mojom::SessionStorageControl> receiver) {
   session_storage_ = std::make_unique<SessionStorageImpl>(
@@ -105,22 +90,11 @@ void PartitionImpl::BindLocalStorageControl(
       base::SequencedTaskRunner::GetCurrentDefault(), std::move(receiver));
 }
 
-void PartitionImpl::BindServiceWorkerStorageControl(
-    mojo::PendingReceiver<mojom::ServiceWorkerStorageControl> receiver) {
-  service_worker_storage_ = std::make_unique<ServiceWorkerStorageControlImpl>(
-      path_.value_or(base::FilePath()),
-      std::move(receiver));
-}
-
 void PartitionImpl::OnDisconnect() {
   if (receivers_.empty()) {
     // Deletes |this|.
     service_->RemovePartition(this);
   }
-}
-
-void PartitionImpl::RemoveOriginContext(const url::Origin& origin) {
-  origin_contexts_.erase(origin);
 }
 
 }  // namespace storage

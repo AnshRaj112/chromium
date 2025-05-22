@@ -19,6 +19,7 @@ class FromGWSNavigationAndKeepAliveRequestObserver;
 class IntentPickerViewPageActionController;
 class LensOverlayController;
 class LensSearchController;
+class MemorySaverChipTabHelper;
 class PinnedTranslateActionListener;
 class Profile;
 class PwaInstallPageActionController;
@@ -73,6 +74,7 @@ class PermissionIndicatorsTabData;
 
 namespace privacy_sandbox {
 class PrivacySandboxTabObserver;
+class PrivacySandboxIncognitoTabObserver;
 }  // namespace privacy_sandbox
 
 namespace metrics {
@@ -105,6 +107,7 @@ class NewTabFooterController;
 
 namespace tabs {
 
+class TabAlertController;
 class TabInterface;
 class TabDialogManager;
 
@@ -163,6 +166,11 @@ class TabFeatures {
 
   privacy_sandbox::PrivacySandboxTabObserver* privacy_sandbox_tab_observer() {
     return privacy_sandbox_tab_observer_.get();
+  }
+
+  privacy_sandbox::PrivacySandboxIncognitoTabObserver*
+  privacy_sandbox_incognito_tab_observer() {
+    return privacy_sandbox_incognito_tab_observer_.get();
   }
 
   metrics::DwaWebContentsObserver* dwa_web_contents_observer() {
@@ -231,6 +239,10 @@ class TabFeatures {
     return resource_usage_helper_.get();
   }
 
+  MemorySaverChipTabHelper* memory_saver_chip_helper() {
+    return memory_saver_chip_helper_.get();
+  }
+
   // Note: Temporary until there is a more uniform way to swap out features for
   // testing.
   TabResourceUsageTabHelper* SetResourceUsageHelperForTesting(
@@ -242,6 +254,10 @@ class TabFeatures {
     return glic_page_context_eligibility_observer_.get();
   }
 #endif
+
+  TabAlertController* tab_alert_controller() {
+    return tab_alert_controller_.get();
+  }
 
   // Called exactly once to initialize features.
   // Can be overridden in tests to initialize nothing.
@@ -297,6 +313,9 @@ class TabFeatures {
 
   std::unique_ptr<privacy_sandbox::PrivacySandboxTabObserver>
       privacy_sandbox_tab_observer_;
+
+  std::unique_ptr<privacy_sandbox::PrivacySandboxIncognitoTabObserver>
+      privacy_sandbox_incognito_tab_observer_;
 
   std::unique_ptr<metrics::DwaWebContentsObserver>
       dwa_web_contents_observer_;
@@ -375,6 +394,10 @@ class TabFeatures {
       new_tab_footer_controller_;
 
   std::unique_ptr<TabResourceUsageTabHelper> resource_usage_helper_;
+
+  std::unique_ptr<MemorySaverChipTabHelper> memory_saver_chip_helper_;
+
+  std::unique_ptr<TabAlertController> tab_alert_controller_;
 
   // Must be the last member.
   base::WeakPtrFactory<TabFeatures> weak_factory_{this};

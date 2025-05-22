@@ -462,6 +462,7 @@
 <translation id="2530896289327917474">开启或关闭光标浏览模式</translation>
 <translation id="2531025035050312891">设备运行缓慢</translation>
 <translation id="2531107890083353124">在拖动标签页的同时按 <ph name="KEY_ONE" /></translation>
+<translation id="2532199152994248594">拖动或按空格键可选择要截取的区域</translation>
 <translation id="2545334090614121435">要使用 Home 键吗？请使用</translation>
 <translation id="254900897760075745">将所选内容复制到剪贴板</translation>
 <translation id="2549711466868162843">改善光线</translation>
@@ -881,7 +882,7 @@
 <translation id="3925540965556789199"><ph name="DATE" />，正在加载活动。</translation>
 <translation id="3927049937406914450">由于位置信息权限已关闭，无法获取天气信息。您可以在设置中开启此权限。</translation>
 <translation id="3932043219784172185">未连接任何设备</translation>
-<translation id="3934456833412894880">已开启“自适应充电”功能。电池电量将会保持在 80% 以延长电池寿命，并会在您需要时完全充满。</translation>
+<translation id="3934456833412894880">已开启“自动调节充电”功能。电池电量将会保持在 80% 以延长电池寿命，并会在您需要时完全充满。</translation>
 <translation id="3943857333388298514">粘贴</translation>
 <translation id="394485226368336402">音频设置</translation>
 <translation id="3945319193631853098">点按即可完成设置</translation>
@@ -1767,6 +1768,7 @@
 <translation id="6700713906295497288">IME 菜单按钮</translation>
 <translation id="6704073473590541209">已选择右边缘手柄，使用箭头键即可移动</translation>
 <translation id="6706742084323792866">PIN 码键盘</translation>
+<translation id="6709719156428404245">拖动或按空格键可选择要录制的区域</translation>
 <translation id="6710213216561001401">上一项</translation>
 <translation id="6723839937902243910">电源</translation>
 <translation id="672609503628871915">了解一下新变化</translation>

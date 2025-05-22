@@ -48,7 +48,15 @@ class OsJapaneseDictionaryExpandElement extends I18nMixin
       showingDeleteDialog_: {
         type: Boolean,
       },
+      statusMessage_: {
+        type: String,
+      },
     };
+  }
+
+  override ready(): void {
+    super.ready();
+    this.addEventListener('dictionary-entry-deleted', this.onEntryDelete_);
   }
 
   // The Japanese Dictionary that this component displays information on.
@@ -62,6 +70,16 @@ class OsJapaneseDictionaryExpandElement extends I18nMixin
   private expanded_ = false;
 
   private showingDeleteDialog_ = false;
+
+  // Used for chromevox announcements.
+  private statusMessage_ = '';
+
+  private onEntryDelete_(): void {
+    this.statusMessage_ = '';
+    afterNextRender(this, () => {
+      this.statusMessage_ = this.i18n('japaneseDictionaryEntryDeleted');
+    });
+  }
 
   // Adds a new entry locally to create an entry-row component.
   private addEntry_(): void {
@@ -134,6 +152,9 @@ class OsJapaneseDictionaryExpandElement extends I18nMixin
     // The limit below is the max size that a mojo BigBuffer can handle via
     // directly using the bytes rather than shared memory.
     if (fileData.size >= 128 * 1048576) {
+      // Clear value so that file select change will retrigger for the same
+      // file.
+      fileInput.value = '';
       return;
     }
     const fileDataView = new Uint8Array(await fileData.arrayBuffer());
@@ -148,6 +169,8 @@ class OsJapaneseDictionaryExpandElement extends I18nMixin
     if (status.success) {
       this.dispatchSavedEvent_();
     }
+    // Clear value so that file select change will retrigger for the same file.
+    fileInput.value = '';
   }
 
   // Returns true if this entry is a locally added entry.

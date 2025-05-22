@@ -129,7 +129,13 @@ IOSCollaborationControllerDelegate::IOSCollaborationControllerDelegate(
   CHECK(base_view_controller_);
 }
 
-IOSCollaborationControllerDelegate::~IOSCollaborationControllerDelegate() {}
+IOSCollaborationControllerDelegate::~IOSCollaborationControllerDelegate() {
+  if (IsInObserverList()) {
+    CHECK(browser_);
+    browser_->RemoveObserver(this);
+    browser_ = nullptr;
+  }
+}
 
 // CollaborationControllerDelegate.
 void IOSCollaborationControllerDelegate::PrepareFlowUI(
@@ -487,6 +493,11 @@ void IOSCollaborationControllerDelegate::OnAuthenticationComplete(
     ResultCallback result,
     SigninCoordinatorResult sign_in_result,
     id<SystemIdentity> completion_info) {
+  if (sign_in_result == SigninCoordinatorResultCanceledByUser) {
+    std::move(result).Run(CollaborationControllerDelegate::Outcome::kCancel);
+    return;
+  }
+
   if (sign_in_result != SigninCoordinatorResultSuccess) {
     std::move(result).Run(CollaborationControllerDelegate::Outcome::kFailure);
     return;

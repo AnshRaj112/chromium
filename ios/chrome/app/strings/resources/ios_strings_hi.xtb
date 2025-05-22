@@ -492,6 +492,8 @@
 <translation id="3020183492814296499">शॉर्टकट</translation>
 <translation id="3023690182746510369">हम इस वेब पेज के कॉन्टेक्स्ट के आधार पर, एआई की मदद से आपके कैलेंडर इवेंट को बेहतर बना रहे हैं. कृपया इंतज़ार करें.</translation>
 <translation id="3030138564564344289">डाउनलोड का फिर से प्रयास करें</translation>
+<translation id="3032704072014531631">आपके लिए “<ph name="GROUP_NAME" />" टैब ग्रुप का ऐक्सेस तुरंत हटा दिया जाएगा. साथ ही, <ph name="USER_NAME" /> (<ph name="USER_EMAIL" />) को Google की सेवाओं पर आपके साथ इंटरैक्ट करने का विकल्प नहीं मिलेगा</translation>
+<translation id="3034496853223708513"><ph name="USER_NAME" /> (<ph name="USER_EMAIL" />) के लिए, “<ph name="GROUP_NAME" />" टैब ग्रुप का ऐक्सेस तुरंत हटा दिया जाएगा. साथ ही, उन्हें Google की सेवाओं पर आपके साथ इंटरैक्ट करने का विकल्प नहीं मिलेगा</translation>
 <translation id="3037177537145227281">कीमत ट्रैक की जा रही है</translation>
 <translation id="3039671569659952257">फ़ोल्डर हटाएं</translation>
 <translation id="3053332585453689122">आपने जिन यूआरएल को विज़िट किया है और उस पेज के कॉन्टेंट का छोटा सा नमूना, डाउनलोड, एक्सटेंशन की गतिविधि, और सिस्टम की जानकारी 'Google सुरक्षित ब्राउज़िंग' को भेजती है. इससे यह जांच की जाती है कि ये सभी चीज़ें नुकसान पहुंचाने वाली हैं या नहीं.</translation>
@@ -603,7 +605,6 @@
 <translation id="3547356470684043247">प्रॉडक्ट, सेवाओं या अनुभव से जुड़ी खरीदारों की समीक्षाएं पढ़ें, ताकि आप समीक्षाओं के हिसाब से फ़ैसले ले सकें</translation>
 <translation id="3557336313807607643">संपर्कों में जोड़ें</translation>
 <translation id="355765753469272474">पहले जैसा करें</translation>
-<translation id="3562379378751492229">अपने हिसाब से सबसे सही पोज़िशन चुनें.</translation>
 <translation id="3565930036634619844">टैब. <ph name="NUMBER_OF_TABS" /> में से <ph name="TAB_INDEX" />.</translation>
 <translation id="3570693105179140209">पासवर्ड से जुड़े ज़्यादा सुझाव पाने के लिए दो बार टैप करें.</translation>
 <translation id="3572607909481582402">आपके Google खाते में</translation>
@@ -1089,7 +1090,6 @@ Handoff को Settings के General अनुभाग में भी स�
 <translation id="5611398002774823980">खाते में सेव करें</translation>
 <translation id="5613297089029360427">'सबसे नए' के मुताबिक क्रम से लगाएं</translation>
 <translation id="5614553682702429503">पासवर्ड सेव करें?</translation>
-<translation id="5614805397884895755">अपनी होम स्क्रीन से तेज़ी से ऐक्सेस करें.</translation>
 <translation id="5619871095170816857">यह कार्ड, पिछले 24 घंटों में आपके सिंक किए गए सभी डिवाइसों पर, पिछली बार इस्तेमाल किया गया टैब दिखाता है.</translation>
 <translation id="5624120631404540903">पासवर्ड मैनेज करें</translation>
 <translation id="5624637933505983014">सिंक करने की सुविधा को चालू न करें</translation>
@@ -1251,6 +1251,7 @@ Handoff को Settings के General अनुभाग में भी स�
 <translation id="6223816392543092032">अपने सभी डिवाइसों पर अपने बुकमार्क, इतिहास, पासवर्ड, और अन्य सेटिंग पाएं.</translation>
 <translation id="6225572914528673855">पता बार</translation>
 <translation id="6227126502342367214">Lens कैमरे की मदद से खोजने की सुविधा</translation>
+<translation id="6227958838185907047"><ph name="NAME" /> (<ph name="EMAIL" />) के तौर पर साइन इन करें</translation>
 <translation id="6231782223312638214">सुझाया गया</translation>
 <translation id="6232329973559504466">गुप्त मोड में खोजें</translation>
 <translation id="6234310016144827337">अपना इंटरनेट कनेक्शन देखें और फिर से कोशिश करें</translation>
@@ -1536,6 +1537,7 @@ Handoff को Settings के General अनुभाग में भी स�
 <translation id="7399802613464275309">सुरक्षा जांच</translation>
 <translation id="7400418766976504921">URL</translation>
 <translation id="7402602673739047753">{count,plural, =1{सिर्फ़ इस डिवाइस में 1 बुकमार्क सेव है. अपने दूसरे डिवाइसों पर इस बुकमार्क का इस्तेमाल करने के लिए, इसे अपने Google खाते {email} में सेव करें.}one{सिर्फ़ इस डिवाइस में {count} बुकमार्क सेव है. अपने दूसरे डिवाइसों पर इन बुकमार्क का इस्तेमाल करने के लिए, इन्हें अपने Google खाते {email} में सेव करें.}other{सिर्फ़ इस डिवाइस में {count} बुकमार्क सेव हैं. अपने दूसरे डिवाइसों पर इन बुकमार्क का इस्तेमाल करने के लिए, इन्हें अपने Google खाते {email} में सेव करें.}}</translation>
+<translation id="7403227077090127147"><ph name="USER_NAME" /> (<ph name="USER_EMAIL" />) के लिए “<ph name="GROUP_NAME" />" टैब ग्रुप का ऐक्सेस तुरंत हटा दिया जाएगा</translation>
 <translation id="7409985198648820906"><ph name="UNREAD_COUNT" /> लेख पढ़े नहीं गए हैं.</translation>
 <translation id="7412027924265291969">जारी रखें</translation>
 <translation id="741204030948306876">हां, मैं सहमत हूं</translation>
@@ -1548,6 +1550,7 @@ Handoff को Settings के General अनुभाग में भी स�
 <translation id="7431991332293347422">यह कंट्रोल करें कि खोज वगैरह को मनमुताबिक बनाने के लिए, आपके ब्राउज़िंग इतिहास का इस्तेमाल कैसे किया जाए</translation>
 <translation id="7435356471928173109">आपके एडमिन ने ये सुविधा बंद की हुई है</translation>
 <translation id="7437712592381799950">आपके लिए खास तौर पर बनाया गया ज़्यादा कॉन्टेंट देखने के लिए, ऊपर की ओर स्वाइप करें.</translation>
+<translation id="7438473148803748807">सभी लोगों के लिए “<ph name="GROUP_NAME" />" टैब ग्रुप का ऐक्सेस तुरंत हटा दिया जाएगा. साथ ही, न्योते के सभी लिंक काम करना बंद कर देंगे</translation>
 <translation id="7438481509621345350">नया टैब खोलने पर, अब आपको <ph name="CHANNEL_NAME" /> की स्टोरीज़ दिखेंगी.</translation>
 <translation id="7451023311965289370">{count,plural, =1{"{title}" में बुकमार्क सेव किया गया}one{"{title}" में बुकमार्क सेव किया गया}other{"{title}" में बुकमार्क सेव किए गए}}</translation>
 <translation id="7451404862887877229">"निजता और सुरक्षा" पर टैप करें. इसके बाद, "सुरक्षित ब्राउज़िंग" पर टैप करें</translation>
@@ -1558,7 +1561,6 @@ Handoff को Settings के General अनुभाग में भी स�
 <translation id="7468373585447318060">ट्रैक किए जा रहे सभी प्रॉडक्ट की कीमत में आई गिरावट से जुड़ी सूचनाएं पाएं.</translation>
 <translation id="746872191028309255">कैमरे की मदद से या फ़ोटो गैलरी पर दिख रही चीज़ों को खरीदें.</translation>
 <translation id="7471557245617580330">नया टैब बनाएं</translation>
-<translation id="7473891865547856676">नहीं, रहने दें</translation>
 <translation id="7476548258282096076">यह कार्ड, सबसे ज़्यादा देखी गई साइटों की जानकारी दिखाता है.</translation>
 <translation id="7484645889979462775">इस साइट के लिए कभी नहीं</translation>
 <translation id="7486006552035434095">अपने डिवाइसों को सिंक करके रखें</translation>
@@ -1644,7 +1646,6 @@ Handoff को Settings के General अनुभाग में भी स�
 <translation id="78146569776629510">डाउनलोड</translation>
 <translation id="7815852444315004084">अभी के लिए छिपाएं</translation>
 <translation id="7825973332242257878">टैब ग्रुप</translation>
-<translation id="7831876841288640403">पता बार की अपने हिसाब से सबसे सही पोज़िशन चुनें.</translation>
 <translation id="7839994177130598711">आपके परिवार के सदस्यों के पास अब Google Password Manager की मदद से, आपके उपयोगकर्ता नाम और पासवर्ड का इस्तेमाल करके <ph name="BEGIN_BOLD" /><ph name="WEBSITE" /><ph name="END_BOLD" /> में साइन इन करने की सुविधा है.</translation>
 <translation id="7840771868269352570">आपके चुने हुए आइटम हटा दिए जाएंगे.</translation>
 <translation id="7841180087127694526">कॉपी किया गया टेक्स्ट खोजें</translation>
@@ -1904,6 +1905,7 @@ Handoff को Settings के General अनुभाग में भी स�
 <translation id="8786100550345425552">अनुमतियों में बदलाव करें</translation>
 <translation id="878871978861915380">"कीमत को ट्रैक करने की सुविधा" कार्ड को छिपाएं</translation>
 <translation id="8792626944327216835">माइक्रोफ़ोन</translation>
+<translation id="8796634520835503150">रीडिंग मोड उपलब्ध है</translation>
 <translation id="8803526663383843427">यह सुविधा चालू होने पर</translation>
 <translation id="8803639129939845298">सुरक्षित</translation>
 <translation id="8806823403540278281">आपका संगठन चाहता है कि आप निजी मोड में ब्राउज़ करें. गुप्त मोड में टैब सेव नहीं होते.

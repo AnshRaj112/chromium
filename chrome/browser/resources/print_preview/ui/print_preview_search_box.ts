@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'chrome://resources/cr_elements/cr_icons.css.js';
 import 'chrome://resources/cr_elements/cr_icon_button/cr_icon_button.js';
 import 'chrome://resources/cr_elements/cr_input/cr_input.js';
 
@@ -58,7 +57,7 @@ export class PrintPreviewSearchBoxElement extends
   }
 
   override accessor autofocus: boolean = false;
-  accessor searchQuery: RegExp|null;
+  accessor searchQuery: RegExp|null = null;
   private lastQuery_: string = '';
 
   override firstUpdated() {

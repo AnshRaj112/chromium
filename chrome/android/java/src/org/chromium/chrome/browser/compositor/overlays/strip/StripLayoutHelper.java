@@ -91,6 +91,7 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
 import org.chromium.chrome.browser.tab_ui.ActionConfirmationManager;
 import org.chromium.chrome.browser.tabmodel.TabClosureParams;
+import org.chromium.chrome.browser.tabmodel.TabClosureParamsUtils;
 import org.chromium.chrome.browser.tabmodel.TabCreator;
 import org.chromium.chrome.browser.tabmodel.TabGroupColorUtils;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
@@ -1062,6 +1063,9 @@ public class StripLayoutHelper
             computeAndUpdateTabWidth(
                     /* animate= */ false, /* deferAnimations= */ false, /* closedTab= */ null);
         }
+        if (getSelectedTabId() != Tab.INVALID_TAB_ID) {
+            tabSelected(LayoutManagerImpl.time(), getSelectedTabId(), Tab.INVALID_TAB_ID);
+        }
     }
 
     /** Called to notify that the tab state has been initialized. */
@@ -1090,6 +1094,9 @@ public class StripLayoutHelper
         // Recreate the StripLayoutTabs from the TabModel, now that all of the real Tabs have been
         // restored. This will reuse valid tabs, discard invalid tabs, and correct tab orders.
         rebuildStripTabs(false, false);
+        if (getSelectedTabId() != Tab.INVALID_TAB_ID) {
+            tabSelected(LayoutManagerImpl.time(), getSelectedTabId(), Tab.INVALID_TAB_ID);
+        }
     }
 
     /**
@@ -1380,7 +1387,9 @@ public class StripLayoutHelper
             updateCloseButtons();
 
             Tab tab = getTabById(id);
-            if (tab != null && mTabGroupModelFilter.getTabGroupCollapsed(tab.getRootId())) {
+            if (tab != null
+                    && mTabGroupModelFilter != null
+                    && mTabGroupModelFilter.getTabGroupCollapsed(tab.getRootId())) {
                 mTabGroupModelFilter.deleteTabGroupCollapsed(tab.getRootId());
             }
 
@@ -1393,7 +1402,9 @@ public class StripLayoutHelper
             mUpdateHost.requestUpdate();
 
             setAccessibilityDescription(stripTab, getTabById(id));
-            setAccessibilityDescription(findTabById(prevId), getTabById(prevId));
+            if (prevId != Tab.INVALID_TAB_ID) {
+                setAccessibilityDescription(findTabById(prevId), getTabById(prevId));
+            }
         }
         StripLayoutTab previouslyFocusedTab = findTabById(prevId);
         if (previouslyFocusedTab != null) previouslyFocusedTab.setIsSelected(false);
@@ -2919,10 +2930,7 @@ public class StripLayoutHelper
                     handleCloseTab(tab, tabClosureParams.allowUndo);
                 };
 
-        // Allow undo of tab closure only when the click wasn't from a button on peripherals like
-        // mouses, trackpads, etc.
-        boolean allowUndo = (motionEventButtonState == MotionEventUtils.MOTION_EVENT_BUTTON_NONE);
-
+        boolean allowUndo = TabClosureParamsUtils.shouldAllowUndo(motionEventButtonState);
         TabClosureParams params = TabClosureParams.closeTab(realTab).allowUndo(allowUndo).build();
         mTabGroupModelFilter
                 .getTabModel()

@@ -993,6 +993,10 @@ const char kOmniboxMaxZPSMatchesDescription[] =
     "Changes the maximum number of autocomplete matches displayed in the "
     "zero-prefix state in the omnibox (e.g. on NTP when tapped on OB).";
 
+const char kOmniboxMiaZps[] = "Omnibox Mia ZPS on NTP";
+const char kOmniboxMiaZpsDescription[] =
+    "Enables Mia ZPS suggestions in NTP omnibox";
+
 const char kOmniboxMlLogUrlScoringSignalsName[] =
     "Log Omnibox URL Scoring Signals";
 const char kOmniboxMlLogUrlScoringSignalsDescription[] =
@@ -1003,6 +1007,11 @@ const char kOmniboxMlUrlPiecewiseMappedSearchBlendingName[] =
 const char kOmniboxMlUrlPiecewiseMappedSearchBlendingDescription[] =
     "Specifies how to blend URL ML scores and search traditional scores using "
     "a piecewise ML score mapping function.";
+
+const char kOmniboxMobileParityUpdateName[] = "Omnibox Mobile parity update";
+const char kOmniboxMobileParityUpdateDescription[] =
+    "When set, applies certain assets to match Desktop visuals and "
+    "descriptions";
 
 const char kOmniboxMlUrlScoreCachingName[] = "Omnibox ML URL Score Caching";
 const char kOmniboxMlUrlScoreCachingDescription[] =
@@ -1190,19 +1199,14 @@ const char kNotificationSettingsMenuItemDescription[] =
     "Displays the menu item for the notification controls inside the chrome "
     "settings UI.";
 
-const char kReaderModeDistillerName[] = "Enables Reader Mode distillation";
-const char kReaderModeDistillerDescription[] =
-    "Enables Reader Mode distillation on the current web page.";
-
-const char kReaderModeDistillerHeuristicName[] =
-    "Reader Mode distillation trigger heuristic";
-const char kReaderModeDistillerHeuristicDescription[] =
-    "Enables Reader Mode distillation heuristic that triggers Reader Mode UI "
-    "entry point if available";
-
 const char kReaderModeName[] = "Enables Reader Mode";
 const char kReaderModeDescription[] =
     "Enables Reader Mode UI and entry points.";
+
+const char kReaderModeDebugInfoName[] = "Enables Reader Mode Debugging";
+const char kReaderModeDebugInfoDescription[] =
+    "Enables additional debug information for the Reader Mode feature such as "
+    "latency metrics.";
 
 const char kRefactorToolbarsSizeName[] = "Refactor toolbars size";
 const char kRefactorToolbarsSizeDescription[] =
@@ -1380,6 +1384,12 @@ const char kSyncTrustedVaultInfobarImprovementsName[] =
 const char kSyncTrustedVaultInfobarImprovementsDescription[] =
     "Enabled improvements to the UI of the trusted vault error infobar (e.g. "
     "displaying it on pages with password forms).";
+
+const char kSyncTrustedVaultInfobarMessageImprovementsName[] =
+    "Trusted vault infobar message improvements";
+const char kSyncTrustedVaultInfobarMessageImprovementsDescription[] =
+    "Enables massage improvements for the UI of the trusted vault error "
+    "infobar.";
 
 const char kTabGroupIndicatorName[] = "Tab Group Indicator";
 const char kTabGroupIndicatorDescription[] =

@@ -29,6 +29,13 @@ BASE_FEATURE(kAndroidDragDropOopif,
              "AndroidDragDropOopif",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Whether to allow attaching an inner WebContents not owned by the outer
+// WebContents. This is for prototyping purposes and should not be enabled in
+// production.
+BASE_FEATURE(kAttachUnownedInnerWebContents,
+             "AttachUnownedInnerWebContents",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Synchronously continuing with navigation can lead to trying to start another
 // navigation synchronously while the first navigation is still being processed
 // on the stack. This results in re-entrancy which is unsafe and triggers a
@@ -181,13 +188,6 @@ BASE_FEATURE(kEnableDevToolsJsErrorReporting,
 // experimental Content Security Policy features ('navigate-to').
 BASE_FEATURE(kExperimentalContentSecurityPolicyFeatures,
              "ExperimentalContentSecurityPolicyFeatures",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// For cross-site iframes, sends the top-level origin to the IDP and parses
-// an optional returned boolean indicating whether it is part of the same
-// client to allow for UI decisions based on the boolean.
-BASE_FEATURE(kFedCmIframeOrigin,
-             "FedCmIframeOrigin",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Whether to support the newer syntax for the "Use Other Account"

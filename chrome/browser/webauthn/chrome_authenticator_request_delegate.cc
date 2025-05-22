@@ -1091,7 +1091,23 @@ void ChromeAuthenticatorRequestDelegate::GetPhoneContactableGpmPasskeysForRpId(
     type = device::AuthenticatorType::kPhone;
   }
 
+  if (dialog_controller_->ui_presentation() ==
+          UIPresentation::kModalImmediate &&
+      !credentials.empty()) {
+    if (enclave_controller_ && !enclave_controller_->is_account_ready()) {
+      base::UmaHistogramBoolean(
+          "WebAuthentication.GetAssertion.Immediate.EnclaveReady", false);
+      return;
+    }
+    base::UmaHistogramBoolean(
+        "WebAuthentication.GetAssertion.Immediate.EnclaveReady", true);
+  }
+
   for (const sync_pb::WebauthnCredentialSpecifics& passkey : credentials) {
+    const base::Time last_used_time = base::Time::FromDeltaSinceWindowsEpoch(
+        base::Microseconds(passkey.last_used_time_windows_epoch_micros()));
+    const base::Time creation_time =
+        base::Time::FromMillisecondsSinceUnixEpoch(passkey.creation_time());
     passkeys->emplace_back(
         type, passkey.rp_id(),
         std::vector<uint8_t>(passkey.credential_id().begin(),
@@ -1100,7 +1116,8 @@ void ChromeAuthenticatorRequestDelegate::GetPhoneContactableGpmPasskeysForRpId(
             std::vector<uint8_t>(passkey.user_id().begin(),
                                  passkey.user_id().end()),
             passkey.user_name(), passkey.user_display_name()),
-        /*provider_name=*/std::nullopt);
+        /*provider_name=*/std::nullopt,
+        last_used_time > creation_time ? last_used_time : creation_time);
   }
 }
 

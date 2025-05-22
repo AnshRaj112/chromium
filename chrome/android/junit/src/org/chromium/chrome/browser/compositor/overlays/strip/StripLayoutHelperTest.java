@@ -16,6 +16,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -2305,6 +2306,8 @@ public class StripLayoutHelperTest {
         StripLayoutTab[] tabs = getMockedStripLayoutTabs(TAB_WIDTH_1);
         mStripLayoutHelper.setStripLayoutTabsForTesting(tabs);
         // NTB is after group indicator and tabs.
+        mStripLayoutHelper.onSizeChanged(
+                SCREEN_WIDTH, SCREEN_HEIGHT, false, TIMESTAMP, PADDING_LEFT, PADDING_RIGHT, 0f);
         mStripLayoutHelper.getNewTabButton().setDrawX(TAB_WIDTH_1 + tabs.length * TAB_WIDTH_1);
         setupForGroupContextMenu();
 
@@ -2322,8 +2325,12 @@ public class StripLayoutHelperTest {
         StripLayoutView view = mStripLayoutHelper.getViewAtPositionX(10f, true);
         assertTrue(view instanceof StripLayoutGroupTitle);
         StripLayoutGroupTitle titleView = (StripLayoutGroupTitle) view;
-        Rect expectedRect = new Rect();
-        titleView.getPaddedBoundsPx(expectedRect);
+        Rect expectedRect =
+                new Rect(
+                        Math.round(titleView.getPaddedX()),
+                        Math.round(titleView.getDrawY()),
+                        Math.round(titleView.getPaddedX() + titleView.getPaddedWidth()),
+                        Math.round(titleView.getDrawY() + titleView.getHeight()));
         Rect actualRect = rectProviderArgumentCaptor.getValue().getRect();
         assertEquals("Anchor view for menu is positioned incorrectly", expectedRect, actualRect);
     }
@@ -3939,6 +3946,33 @@ public class StripLayoutHelperTest {
         verifySharedGroupState(groupTitle, false);
     }
 
+    @Test
+    public void testTabSelectionStateSet_whenTabModelSet() {
+        mStripLayoutHelper = spy(createStripLayoutHelper(/* rtl= */ false, /* incognito= */ false));
+        mModel.setIndex(0);
+        when(mModel.getTabAt(0)).thenReturn(mTab);
+        int tabId = 100;
+        when(mTab.getId()).thenReturn(tabId);
+        mStripLayoutHelper.setTabModel(mModel, mTabCreator, true);
+        verify(mStripLayoutHelper, times(1))
+                .tabSelected(anyLong(), eq(tabId), eq(Tab.INVALID_TAB_ID));
+    }
+
+    @Test
+    public void testTabSelectionStateSet_whenTabStateInitialized() {
+        mStripLayoutHelper = spy(createStripLayoutHelper(/* rtl= */ false, /* incognito= */ false));
+        mModel.setIndex(0);
+        when(mModel.getTabAt(0)).thenReturn(mTab);
+        int tabId = 100;
+        when(mTab.getId()).thenReturn(tabId);
+        mStripLayoutHelper.setTabModel(mModel, mTabCreator, true);
+        verify(mStripLayoutHelper, times(1))
+                .tabSelected(anyLong(), eq(tabId), eq(Tab.INVALID_TAB_ID));
+        mStripLayoutHelper.onTabStateInitialized();
+        verify(mStripLayoutHelper, times(2))
+                .tabSelected(anyLong(), eq(tabId), eq(Tab.INVALID_TAB_ID));
+    }
+
     private SavedTabGroup setupTabGroupSync(Token tabGroupId) {
         SavedTabGroup savedTabGroup = new SavedTabGroup();
         savedTabGroup.localId = new LocalTabGroupId(tabGroupId);
@@ -4102,7 +4136,7 @@ public class StripLayoutHelperTest {
                 "Tab strip should match tab model.",
                 expectedNumTabs,
                 mStripLayoutHelper.getStripLayoutTabsForTesting().length);
-        verify(mUpdateHost, times(7)).requestUpdate();
+        verify(mUpdateHost, times(8)).requestUpdate();
     }
 
     @Test

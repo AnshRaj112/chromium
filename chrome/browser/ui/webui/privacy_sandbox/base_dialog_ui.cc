@@ -4,7 +4,6 @@
 
 #include "chrome/browser/ui/webui/privacy_sandbox/base_dialog_ui.h"
 
-#include "chrome/browser/privacy_sandbox/notice/notice.mojom.h"
 #include "chrome/browser/privacy_sandbox/notice/notice_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/views/privacy_sandbox/dialog_view_context.h"
@@ -18,8 +17,8 @@
 
 namespace privacy_sandbox {
 
+using dialog::mojom::BaseDialogPage;
 using dialog::mojom::BaseDialogPageHandler;
-using notice::mojom::PrivacySandboxNotice;
 
 BaseDialogUI::BaseDialogUI(content::WebUI* web_ui)
     : ui::MojoWebUIController(web_ui) {
@@ -38,12 +37,10 @@ BaseDialogUI::BaseDialogUI(content::WebUI* web_ui)
           web_ui->GetWebContents());
   if (view_context) {
     delegate_ = &view_context->GetDelegate();
+    source->AddInteger(
+        "noticeIdToShow",
+        static_cast<int32_t>(delegate_->GetPrivacySandboxNotice()));
   }
-  // TODO(crbug.com/398005782): Replace hard coded value once notice is passed
-  // in from constructor.
-  source->AddInteger(
-      "noticeIdToShow",
-      static_cast<int32_t>(PrivacySandboxNotice::kTopicsConsentNotice));
 }
 
 WEB_UI_CONTROLLER_TYPE_IMPL(BaseDialogUI)
@@ -51,12 +48,21 @@ WEB_UI_CONTROLLER_TYPE_IMPL(BaseDialogUI)
 BaseDialogUI::~BaseDialogUI() = default;
 
 void BaseDialogUI::BindInterface(
+    mojo::PendingReceiver<BaseDialogPageHandlerFactory> receiver) {
+  page_factory_receiver_.reset();
+  page_factory_receiver_.Bind(std::move(receiver));
+}
+
+void BaseDialogUI::CreatePageHandler(
+    mojo::PendingRemote<BaseDialogPage> page,
     mojo::PendingReceiver<BaseDialogPageHandler> receiver) {
+  // Checks that the PendingRemote is bound.
+  CHECK(page);
   if (auto* privacy_sandbox_notice_service =
           PrivacySandboxNoticeServiceFactory::GetForProfile(
               Profile::FromWebUI(web_ui()))) {
     page_handler_ = std::make_unique<BaseDialogHandler>(
-        std::move(receiver),
+        std::move(receiver), std::move(page),
         privacy_sandbox_notice_service->GetDesktopViewManager(), delegate_);
   }
 }

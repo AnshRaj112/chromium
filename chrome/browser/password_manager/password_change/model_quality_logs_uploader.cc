@@ -18,6 +18,10 @@ using PasswordChangeOutcome = optimization_guide::proto ::
 using PageType = optimization_guide::proto::OpenFormResponseData_PageType;
 
 namespace {
+int64_t ComputeRequestLatencyMs(base::Time server_request_start_time) {
+  return (base::Time::Now() - server_request_start_time).InMilliseconds();
+}
+
 FinalModelStatus GetFinalModelStatus(
     const std::optional<optimization_guide::proto::PasswordChangeResponse>&
         response) {
@@ -67,7 +71,8 @@ ModelQualityLogsUploader::~ModelQualityLogsUploader() = default;
 
 void ModelQualityLogsUploader::SetOpenFormQuality(
     const optimization_guide::proto::PasswordChangeResponse& response,
-    std::unique_ptr<LoggingData> logging_data) {
+    std::unique_ptr<LoggingData> logging_data,
+    base::Time server_request_start_time) {
   PageType open_form = response.open_form_data().page_type();
   QualityStatus quality_status;
 
@@ -87,18 +92,42 @@ void ModelQualityLogsUploader::SetOpenFormQuality(
         PasswordChangeQuality_StepQuality_SubmissionStatus_UNEXPECTED_STATE;
   }
 
-  optimization_guide::proto::LogAiDataRequest request;
-  request.mutable_password_change_submission()->MergeFrom(*logging_data);
-  request.mutable_password_change_submission()
+  final_log_data_.mutable_password_change_submission()->MergeFrom(
+      *logging_data);
+  final_log_data_.mutable_password_change_submission()
       ->mutable_quality()
       ->mutable_open_form()
       ->set_status(quality_status);
-  final_log_data_.MergeFrom(request);
+  // Set latency
+  final_log_data_.mutable_password_change_submission()
+      ->mutable_quality()
+      ->mutable_open_form()
+      ->set_request_latency_ms(
+          ComputeRequestLatencyMs(server_request_start_time));
+}
+
+void ModelQualityLogsUploader::FormNotDetectedAfterOpening() {
+  final_log_data_.mutable_password_change_submission()
+      ->mutable_quality()
+      ->mutable_open_form()
+      ->set_status(
+          QualityStatus::
+              PasswordChangeQuality_StepQuality_SubmissionStatus_FORM_NOT_FOUND);
+}
+
+void ModelQualityLogsUploader::OpenFormTargetElementNotFound() {
+  final_log_data_.mutable_password_change_submission()
+      ->mutable_quality()
+      ->mutable_open_form()
+      ->set_status(
+          QualityStatus::
+              PasswordChangeQuality_StepQuality_SubmissionStatus_ELEMENT_NOT_FOUND);
 }
 
 void ModelQualityLogsUploader::SetSubmitFormQuality(
     const optimization_guide::proto::PasswordChangeResponse& response,
-    std::unique_ptr<LoggingData> logging_data) {
+    std::unique_ptr<LoggingData> logging_data,
+    base::Time server_request_start_time) {
   QualityStatus quality_status;
   if (response.submit_form_data().dom_node_id_to_click()) {
     quality_status = QualityStatus::
@@ -108,32 +137,43 @@ void ModelQualityLogsUploader::SetSubmitFormQuality(
         PasswordChangeQuality_StepQuality_SubmissionStatus_ELEMENT_NOT_FOUND;
   }
 
-  optimization_guide::proto::LogAiDataRequest request;
-  request.mutable_password_change_submission()->MergeFrom(*logging_data);
-  request.mutable_password_change_submission()
+  final_log_data_.mutable_password_change_submission()->MergeFrom(
+      *logging_data);
+  final_log_data_.mutable_password_change_submission()
       ->mutable_quality()
       ->mutable_submit_form()
       ->set_status(quality_status);
-  final_log_data_.MergeFrom(request);
+  // Set latency
+  final_log_data_.mutable_password_change_submission()
+      ->mutable_quality()
+      ->mutable_submit_form()
+      ->set_request_latency_ms(
+          ComputeRequestLatencyMs(server_request_start_time));
 }
 
 void ModelQualityLogsUploader::SetVerifySubmissionQuality(
     const std::optional<optimization_guide::proto::PasswordChangeResponse>&
         response,
-    std::unique_ptr<LoggingData> logging_data) {
+    std::unique_ptr<LoggingData> logging_data,
+    base::Time server_request_start_time) {
   FinalModelStatus final_model_status = GetFinalModelStatus(response);
   QualityStatus quality_status = GetVerifySubmissionQualityStatus(response);
-  optimization_guide::proto::LogAiDataRequest request;
-  request.mutable_password_change_submission()->MergeFrom(*logging_data);
-  // Set final model status and quality status
-  request.mutable_password_change_submission()
-      ->mutable_quality()
-      ->set_final_model_status(final_model_status);
-  request.mutable_password_change_submission()
+
+  final_log_data_.mutable_password_change_submission()->MergeFrom(
+      *logging_data);
+  final_log_data_.mutable_password_change_submission()
       ->mutable_quality()
       ->mutable_verify_submission()
       ->set_status(quality_status);
-  final_log_data_.MergeFrom(request);
+  final_log_data_.mutable_password_change_submission()
+      ->mutable_quality()
+      ->set_final_model_status(final_model_status);
+  // Set latency
+  final_log_data_.mutable_password_change_submission()
+      ->mutable_quality()
+      ->mutable_verify_submission()
+      ->set_request_latency_ms(
+          ComputeRequestLatencyMs(server_request_start_time));
 }
 
 void ModelQualityLogsUploader::UploadFinalLog() {

@@ -68,6 +68,10 @@ BASE_DECLARE_FEATURE(kSyncSupportAlwaysSyncingPriorityPreferences);
 // flag makes the type enabled by default, for manual testing.
 BASE_DECLARE_FEATURE(kEnableBookmarksSelectedTypeOnSigninForTesting);
 
+// If enabled, avoids committing changes containing only favicon URL related
+// change.
+BASE_DECLARE_FEATURE(kSearchEngineAvoidFaviconOnlyCommits);
+
 // Feature flag used for enabling sync (transport mode) for signed-in users that
 // haven't turned on full sync.
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
@@ -158,6 +162,13 @@ inline constexpr base::FeatureParam<int>
 // iOS (displaying it on pages with password forms, adjusting display time,
 // adding dismiss conditions, adding a notification pause after dismissal).
 BASE_DECLARE_FEATURE(kSyncTrustedVaultInfobarImprovements);
+#endif  // BUILDFLAG(IS_IOS)
+
+#if BUILDFLAG(IS_IOS)
+// Enables a message improvements to the existing trusted vault error infobar
+// (informing users that fixing the error will help them to start syncing their
+// passwords).
+BASE_DECLARE_FEATURE(kSyncTrustedVaultInfobarMessageImprovements);
 #endif  // BUILDFLAG(IS_IOS)
 
 }  // namespace syncer

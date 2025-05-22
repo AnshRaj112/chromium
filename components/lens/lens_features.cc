@@ -107,6 +107,10 @@ BASE_FEATURE(kLensSearchProtectedPage,
              "LensSearchProtectedPage",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kLensOverlayEduActionChip,
+             "LensOverlayEduActionChip",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 const base::FeatureParam<int> kLensOverlayMinRamMb{&kLensOverlay, "min_ram_mb",
                                                    /*default=value=*/-1};
 const base::FeatureParam<std::string> kActivityUrl{
@@ -474,6 +478,15 @@ constexpr base::FeatureParam<bool>
     kLensOverlayVisualSelectionUpdatesEnableBorderGlow{
         &kLensOverlayVisualSelectionUpdates, "enable-border-glow", true};
 
+constexpr base::FeatureParam<bool>
+    kLensOverlayVisualSelectionUpdatesEnableGradientRegionStroke{
+        &kLensOverlayVisualSelectionUpdates, "enable-gradient-region-stroke",
+        true};
+
+constexpr base::FeatureParam<bool>
+    kLensOverlayVisualSelectionUpdatesCsbThumbnail{
+        &kLensOverlayVisualSelectionUpdates, "enable-csb-thumbnail", true};
+
 constexpr base::FeatureParam<std::string> kHomepageURLForLens{
     &kLensStandalone, "lens-homepage-url", "https://lens.google.com/v3/"};
 
@@ -504,6 +517,26 @@ constexpr base::FeatureParam<int> kLensOverlayUploadChunkRequestTimeoutMs{
 
 constexpr base::FeatureParam<int> kLensOverlaySliderChangedTimeout{
     &kLensOverlayCornerSliders, "slider-changed-timeout", 1000};
+
+const base::FeatureParam<std::string> kLensOverlayEduUrlAllowFilters{
+    &kLensOverlayEduActionChip, "url-allow-filters", "[]"};
+
+const base::FeatureParam<std::string> kLensOverlayEduUrlBlockFilters{
+    &kLensOverlayEduActionChip, "url-block-filters", "[]"};
+
+const base::FeatureParam<std::string> kLensOverlayEduUrlPathMatchAllowFilters{
+    &kLensOverlayEduActionChip, "url-path-match-allow-filters", "[]"};
+
+const base::FeatureParam<std::string> kLensOverlayEduUrlPathMatchBlockFilters{
+    &kLensOverlayEduActionChip, "url-path-match-block-filters", "[]"};
+
+const base::FeatureParam<std::string> kLensOverlayEduHashedDomainBlockFilters{
+    &kLensOverlayEduActionChip, "hashed-domain-block-filters", ""};
+
+const base::FeatureParam<std::string>
+    kLensOverlayEduUrlForceAllowedMatchPatterns{
+        &kLensOverlayEduActionChip, "url-path-forced-allowed-match-patterns",
+        "[]"};
 
 std::string GetHomepageURLForLens() {
   return kHomepageURLForLens.Get();
@@ -999,6 +1032,16 @@ bool GetVisualSelectionUpdatesEnableBorderGlow() {
          kLensOverlayVisualSelectionUpdatesEnableBorderGlow.Get();
 }
 
+bool GetVisualSelectionUpdatesEnableGradientRegionStroke() {
+  return base::FeatureList::IsEnabled(kLensOverlayVisualSelectionUpdates) &&
+         kLensOverlayVisualSelectionUpdatesEnableGradientRegionStroke.Get();
+}
+
+bool GetVisualSelectionUpdatesEnableCsbThumbnail() {
+  return base::FeatureList::IsEnabled(kLensOverlayVisualSelectionUpdates) &&
+         kLensOverlayVisualSelectionUpdatesCsbThumbnail.Get();
+}
+
 bool PageContentUploadRequestIdFixEnabled() {
   return kPageContentUploadRequestIdFix.Get();
 }
@@ -1076,6 +1119,34 @@ bool IsLensSearchProtectedPageEnabled() {
 
 bool IsLensSearchSidePanelScrollToAPIEnabled() {
   return base::FeatureList::IsEnabled(kLensSearchSidePanelScrollToAPI);
+}
+
+bool IsLensOverlayEduActionChipEnabled() {
+  return base::FeatureList::IsEnabled(kLensOverlayEduActionChip);
+}
+
+std::string GetLensOverlayEduUrlAllowFilters() {
+  return kLensOverlayEduUrlAllowFilters.Get();
+}
+
+std::string GetLensOverlayEduUrlBlockFilters() {
+  return kLensOverlayEduUrlBlockFilters.Get();
+}
+
+std::string GetLensOverlayEduUrlPathMatchAllowFilters() {
+  return kLensOverlayEduUrlPathMatchAllowFilters.Get();
+}
+
+std::string GetLensOverlayEduUrlPathMatchBlockFilters() {
+  return kLensOverlayEduUrlPathMatchBlockFilters.Get();
+}
+
+std::string GetLensOverlayEduUrlForceAllowedMatchPatterns() {
+  return kLensOverlayEduUrlForceAllowedMatchPatterns.Get();
+}
+
+std::string GetLensOverlayEduHashedDomainBlockFilters() {
+  return kLensOverlayEduHashedDomainBlockFilters.Get();
 }
 
 }  // namespace lens::features

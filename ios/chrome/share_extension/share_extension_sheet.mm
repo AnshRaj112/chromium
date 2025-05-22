@@ -88,10 +88,12 @@ NSString* const kCustomMinimizedDetentIdentifier = @"customMinimizedDetent";
   [self setUpBottomSheetDetents];
 }
 
-- (void)viewWillDisappear:(BOOL)animated {
-  [super viewWillDisappear:animated];
-  if (!self.dismissedFromSheetAction) {
-    [self.delegate shareExtensionSheetWillDisappear:self];
+- (void)viewDidDisappear:(BOOL)animated {
+  [super viewDidDisappear:animated];
+  if (self.isBeingDismissed) {
+    if (!self.dismissedFromSheetAction) {
+      [self.delegate shareExtensionSheetDidDisappear:self];
+    }
   }
 }
 
@@ -189,7 +191,7 @@ NSString* const kCustomMinimizedDetentIdentifier = @"customMinimizedDetent";
 
 // Configures the bottom sheet's presentation controller appearance.
 - (void)setUpBottomSheetPresentationController {
-  self.modalPresentationStyle = UIModalPresentationPageSheet;
+  self.modalPresentationStyle = UIModalPresentationFormSheet;
   UISheetPresentationController* presentationController =
       self.sheetPresentationController;
   presentationController.prefersEdgeAttachedInCompactHeight = YES;
@@ -241,6 +243,13 @@ NSString* const kCustomMinimizedDetentIdentifier = @"customMinimizedDetent";
 #endif
 
   titleView.titleLogoSpacing = kTitleViewSpacing;
+  titleView.accessibilityLabel = [NSString
+      stringWithFormat:
+          @"%@ %@",
+          NSLocalizedString(
+              @"IDS_IOS_ACCESSIBILITY_LABEL_SHARE_EXTENSION",
+              @"The accessible name for the Chrome logo in the header."),
+          _appName];
 
   return titleView;
 }

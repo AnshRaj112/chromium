@@ -651,6 +651,7 @@ chromium-metrics-reviews@google.com.
       label="ServiceWorkerWebSettingsCompat.setIncludeCookiesOnIntercept"/>
   <int value="149"
       label="ServiceWorkerWebSettingsCompat.getIncludeCookiesOnIntercept"/>
+  <int value="150" label="Profile.warmUpRendererProcess"/>
 <!-- LINT.ThenChange(/android_webview/support_library/java/src/org/chromium/support_lib_glue/SupportLibWebViewChromiumFactory.java:ApiCall) -->
 
 </enum>
@@ -768,6 +769,16 @@ chromium-metrics-reviews@google.com.
   <int value="21" label="(07) HUB"/>
   <int value="22" label="(06) ARCHIVED_TABS_DIALOG"/>
 </enum>
+
+<!-- LINT.IfChange(BackPressTabCloseType) -->
+
+<enum name="BackPressTabCloseType">
+  <int value="0" label="close without minimization"/>
+  <int value="1" label="close during minimization by chrome"/>
+  <int value="2" label="close during minimization by os"/>
+</enum>
+
+<!-- LINT.ThenChange(//chrome/browser/back_press/android/java/src/org/chromium/chrome/browser/back_press/MinimizeAppAndCloseTabBackPressHandler.java:TabClosureType)-->
 
 <enum name="BiometricsAvailability">
   <int value="0" label="Other error"/>
@@ -1779,9 +1790,10 @@ chromium-metrics-reviews@google.com.
   <int value="10" label="MultipleBrowserWindowsOpen"/>
   <int value="11" label="DownTimeAfterEventTime"/>
   <int value="12" label="SequenceTransferredBackFromViz"/>
+  <int value="13" label="WebContentsIgnoringInputEvents"/>
 </enum>
 
-<!-- LINT.ThenChange(//content/browser/renderer_host/input/transfer_input_to_viz_result.h:TransferInputToVizResult)-->
+<!-- LINT.ThenChange(//content/public/browser/android/transfer_input_to_viz_result.h:TransferInputToVizResult)-->
 
 <enum name="UrlTargetType">
   <int value="0" label="URL"/>

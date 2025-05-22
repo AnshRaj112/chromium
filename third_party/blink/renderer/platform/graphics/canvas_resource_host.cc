@@ -23,9 +23,7 @@ bool CanUseGPU() {
 
 CanvasResourceHost::CanvasResourceHost(gfx::Size size) : size_(size) {}
 
-CanvasResourceHost::~CanvasResourceHost() {
-  ResetLayer();
-}
+CanvasResourceHost::~CanvasResourceHost() = default;
 
 std::unique_ptr<CanvasResourceProvider>
 CanvasResourceHost::ReplaceResourceProvider(
@@ -86,63 +84,10 @@ RasterMode CanvasResourceHost::GetRasterMode() const {
   return ShouldTryToUseGpuRaster() ? RasterMode::kGPU : RasterMode::kCPU;
 }
 
-void CanvasResourceHost::ResetLayer() {
-  if (cc_layer_) {
-    // Orphaning the layer is required to trigger the recreation of a new
-    // layer in the case where destruction is caused by a canvas resize. Test:
-    // virtual/gpu/fast/canvas/canvas-resize-after-paint-without-layout.html
-    cc_layer_->RemoveFromParent();
-    cc_layer_->ClearClient();
-    cc_layer_ = nullptr;
-  }
-}
-
-void CanvasResourceHost::ClearLayerTexture() {
-  if (cc_layer_) {
-    cc_layer_->ClearTexture();
-  }
-}
-
-void CanvasResourceHost::SetNeedsPushProperties() {
-  if (cc_layer_) {
-    cc_layer_->SetNeedsSetTransferableResource();
-  }
-}
-
-void CanvasResourceHost::DoPaintInvalidation(const gfx::Rect& dirty_rect) {
-  if (cc_layer_ && IsComposited()) {
-    cc_layer_->SetNeedsDisplayRect(dirty_rect);
-  }
-}
-
-void CanvasResourceHost::SetOpacityMode(OpacityMode opacity_mode) {
-  is_opaque_ = opacity_mode == kOpaque;
-  if (cc_layer_) {
-    cc_layer_->SetContentsOpaque(is_opaque_);
-    cc_layer_->SetBlendBackgroundColor(!is_opaque_);
-  }
-}
-
 void CanvasResourceHost::FlushRecording(FlushReason reason) {
   if (resource_provider_) {
     resource_provider_->FlushCanvas(reason);
   }
-}
-
-bool CanvasResourceHost::IsResourceValid() {
-  if (IsHibernating()) {
-    return true;
-  }
-
-  if (IsContextLost()) {
-    return false;
-  }
-
-  if (resource_provider_ && !resource_provider_->IsValid()) {
-    return false;
-  }
-
-  return !!GetOrCreateCanvasResourceProvider();
 }
 
 }  // namespace blink

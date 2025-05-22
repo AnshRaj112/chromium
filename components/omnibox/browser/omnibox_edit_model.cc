@@ -29,6 +29,7 @@
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/dom_distiller/core/url_constants.h"
 #include "components/dom_distiller/core/url_utils.h"
+#include "components/grit/components_scaled_resources.h"
 #include "components/history_embeddings/history_embeddings_features.h"
 #include "components/navigation_metrics/navigation_metrics.h"
 #include "components/omnibox/browser/actions/omnibox_action.h"
@@ -48,6 +49,7 @@
 #include "components/omnibox/browser/omnibox_event_global_tracker.h"
 #include "components/omnibox/browser/omnibox_field_trial.h"
 #include "components/omnibox/browser/omnibox_log.h"
+#include "components/omnibox/browser/omnibox_logging_utils.h"
 #include "components/omnibox/browser/omnibox_metrics_provider.h"
 #include "components/omnibox/browser/omnibox_navigation_observer.h"
 #include "components/omnibox/browser/omnibox_popup_selection.h"
@@ -73,6 +75,7 @@
 #include "third_party/metrics_proto/omnibox_focus_type.pb.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/resource/resource_bundle.h"
 #include "ui/gfx/color_palette.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/image/image.h"
@@ -224,95 +227,6 @@ size_t CountNumberOfIPv4Parts(const std::u16string& text,
     }
   }
   return parts;
-}
-
-// This function provides a logging implementation that aligns with the original
-// definition of the `DEPRECATED_UMA_HISTOGRAM_MEDIUM_TIMES()` macro, which is
-// currently being used to log the `FocusToOpenTimeAnyPopupState3` Omnibox
-// metric.
-void LogHistogramMediumTimes(const std::string& histogram_name,
-                             base::TimeDelta elapsed) {
-  base::UmaHistogramCustomTimes(histogram_name, elapsed, base::Milliseconds(10),
-                                base::Minutes(3), 50);
-}
-
-void LogFocusToOpenTime(base::TimeDelta elapsed,
-                        bool is_zero_prefix,
-                        PageClassification page_classification,
-                        AutocompleteMatch& match,
-                        size_t action_index) {
-  LogHistogramMediumTimes("Omnibox.FocusToOpenTimeAnyPopupState3", elapsed);
-
-  std::string summarized_result_type;
-  switch (OmniboxMetricsProvider::GetClientSummarizedResultType(
-      match.GetOmniboxEventResultType(action_index))) {
-    case ClientSummarizedResultType::kSearch:
-      summarized_result_type = "SEARCH";
-      break;
-    case ClientSummarizedResultType::kUrl:
-      summarized_result_type = "URL";
-      break;
-    default:
-      summarized_result_type = "OTHER";
-      break;
-  }
-
-  LogHistogramMediumTimes(
-      base::StrCat(
-          {"Omnibox.FocusToOpenTimeAnyPopupState3.BySummarizedResultType.",
-           summarized_result_type}),
-      elapsed);
-
-  const std::string page_context =
-      OmniboxEventProto::PageClassification_Name(page_classification);
-  LogHistogramMediumTimes(
-      base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.ByPageContext.",
-                    page_context}),
-      elapsed);
-
-  LogHistogramMediumTimes(
-      base::StrCat(
-          {"Omnibox.FocusToOpenTimeAnyPopupState3.BySummarizedResultType.",
-           summarized_result_type, ".ByPageContext.", page_context}),
-      elapsed);
-
-  if (is_zero_prefix) {
-    LogHistogramMediumTimes("Omnibox.FocusToOpenTimeAnyPopupState3.ZeroSuggest",
-                            elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.ZeroSuggest."
-                      "BySummarizedResultType.",
-                      summarized_result_type}),
-        elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat(
-            {"Omnibox.FocusToOpenTimeAnyPopupState3.ZeroSuggest.ByPageContext.",
-             page_context}),
-        elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.ZeroSuggest."
-                      "BySummarizedResultType.",
-                      summarized_result_type, ".ByPageContext.", page_context}),
-        elapsed);
-  } else {
-    LogHistogramMediumTimes(
-        "Omnibox.FocusToOpenTimeAnyPopupState3.TypedSuggest", elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.TypedSuggest."
-                      "BySummarizedResultType.",
-                      summarized_result_type}),
-        elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.TypedSuggest."
-                      "ByPageContext.",
-                      page_context}),
-        elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.TypedSuggest."
-                      "BySummarizedResultType.",
-                      summarized_result_type, ".ByPageContext.", page_context}),
-        elapsed);
-  }
 }
 
 }  // namespace
@@ -711,6 +625,24 @@ ui::ImageModel OmniboxEditModel::GetSuperGIcon(int image_size,
   }
 #else
   return ui::ImageModel();
+#endif
+}
+
+gfx::Image OmniboxEditModel::GetAgentspaceIcon(bool dark_mode) const {
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+  if (dark_mode) {
+    // For dark mode, per Agentspace branding, use `SK_ColorWhite` over the
+    // monochrome logo.
+    return controller_->client()->GetSizedIcon(
+        vector_icons::kGoogleAgentspaceMonochromeLogoIcon, SK_ColorWHITE);
+  } else {
+    return controller_->client()->GetSizedIcon(
+        ui::ResourceBundle::GetSharedInstance()
+            .GetImageNamed(IDR_GOOGLE_AGENTSPACE_LOGO)
+            .ToSkBitmap());
+  }
+#else
+  return gfx::Image();
 #endif
 }
 
@@ -1796,7 +1728,8 @@ bool OmniboxEditModel::IsStarredMatch(const AutocompleteMatch& match) const {
 // Android and iOS have their own platform-specific icon logic.
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 gfx::Image OmniboxEditModel::GetMatchIcon(const AutocompleteMatch& match,
-                                          SkColor vector_icon_color) const {
+                                          SkColor vector_icon_color,
+                                          bool dark_mode) const {
   if (!match.icon_url.is_empty()) {
     const SkBitmap* bitmap = GetIconBitmap(match.icon_url);
     if (bitmap) {
@@ -1823,11 +1756,20 @@ gfx::Image OmniboxEditModel::GetMatchIcon(const AutocompleteMatch& match,
   // code. In order to apply custom styling to the icon (e.g. colors), we ignore
   // this favicon in favor of using a vector icon which has better styling
   // support.
-  if (!AutocompleteMatch::IsSearchType(match.type) &&
-      match.type != AutocompleteMatchType::DOCUMENT_SUGGESTION &&
-      match.type != AutocompleteMatchType::HISTORY_CLUSTER &&
-      match.type != AutocompleteMatchType::HISTORY_EMBEDDINGS_ANSWER &&
-      !AutocompleteMatch::IsStarterPackType(match.type)) {
+  // Enterprise search aggregator people suggestions are another unique case.
+  // These suggestions should use the Agentspace icon if available. Otherwise,
+  // they should use the vector icon instead of the favicon.
+  if (match.enterprise_search_aggregator_type ==
+      AutocompleteMatch::EnterpriseSearchAggregatorType::PEOPLE) {
+    gfx::Image agentspace_icon = GetAgentspaceIcon(dark_mode);
+    if (!agentspace_icon.IsEmpty()) {
+      return agentspace_icon;
+    }
+  } else if (!AutocompleteMatch::IsSearchType(match.type) &&
+             match.type != AutocompleteMatchType::DOCUMENT_SUGGESTION &&
+             match.type != AutocompleteMatchType::HISTORY_CLUSTER &&
+             match.type != AutocompleteMatchType::HISTORY_EMBEDDINGS_ANSWER &&
+             !AutocompleteMatch::IsStarterPackType(match.type)) {
     // Because the Views UI code calls GetMatchIcon in both the layout and
     // painting code, we may generate multiple `OnFaviconFetched` callbacks,
     // all run one after another. This seems to be harmless as the callback
@@ -2668,9 +2610,10 @@ void OmniboxEditModel::OpenMatch(OmniboxPopupSelection selection,
     elapsed_time_since_user_focused_omnibox = now - last_omnibox_focus_;
     // Only record focus to open time when a focus actually happened (as
     // opposed to, say, dragging a link onto the omnibox).
-    LogFocusToOpenTime(elapsed_time_since_user_focused_omnibox,
-                       input_.IsZeroSuggest(), GetPageClassification(), match,
-                       selection.IsAction() ? selection.action_index : -1);
+    omnibox::LogFocusToOpenTime(
+        elapsed_time_since_user_focused_omnibox, input_.IsZeroSuggest(),
+        GetPageClassification(), match,
+        selection.IsAction() ? selection.action_index : -1);
   }
 
   // In some unusual cases, we ignore autocomplete_controller()->result() and
@@ -3049,4 +2992,3 @@ void OmniboxEditModel::SetKeywordPlaceholder(
     const std::u16string& keyword_placeholder) {
   keyword_placeholder_ = keyword_placeholder;
 }
-

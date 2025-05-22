@@ -60,6 +60,10 @@ namespace {
 
 // The amount of time used to determine if Lens was opened recently.
 const base::TimeDelta kLensOpenedRecency = base::Days(30);
+// The amount of time used to determine if the CPE promo was displayed recently.
+const base::TimeDelta kCPEPromoRecency = base::Days(30);
+// The amount of time used to determine if the user should be classified.
+const base::TimeDelta kClassifyUserRecency = base::Hours(2);
 
 // Returns the first notification from `requests` whose identifier matches
 // `identifier`.
@@ -126,6 +130,11 @@ void SetUserType(PrefService* local_state, TipsNotificationUserType user_type) {
   base::UmaHistogramEnumeration("IOS.Notifications.Tips.UserType", user_type);
 }
 
+// Returns true if `time` is less time ago than `delta`.
+bool IsRecent(base::Time time, base::TimeDelta delta) {
+  return base::Time::Now() - time < delta;
+}
+
 }  // namespace
 
 TipsNotificationClient::TipsNotificationClient()
@@ -187,11 +196,12 @@ void TipsNotificationClient::HandleNotificationInteraction(
   CHECK(browser);
   id<ApplicationCommands> application_handler =
       HandlerForProtocol(browser->GetCommandDispatcher(), ApplicationCommands);
+  auto showUICallback = base::CallbackToBlock(
+      base::BindOnce(&TipsNotificationClient::ShowUIForNotificationType,
+                     weak_ptr_factory_.GetWeakPtr(), type, browser));
   [application_handler
-      prepareToPresentModal:
-          base::CallbackToBlock(
-              base::BindOnce(&TipsNotificationClient::ShowUIForNotificationType,
-                             weak_ptr_factory_.GetWeakPtr(), type, browser))];
+      prepareToPresentModalWithSnackbarDismissal:NO
+                                      completion:showUICallback];
 
   // If a relavent feature is enabled and the user hasn't yet opted-in, and the
   // current auth status is "authorized", interacting with a notification (which
@@ -554,7 +564,7 @@ bool TipsNotificationClient::ShouldSendLens(ProfileIOS* profile) {
 
   base::Time last_opened =
       GetApplicationContext()->GetLocalState()->GetTime(prefs::kLensLastOpened);
-  return base::Time::Now() - last_opened > kLensOpenedRecency;
+  return !IsRecent(last_opened, kLensOpenedRecency);
 }
 
 bool TipsNotificationClient::ShouldSendEnhancedSafeBrowsing(
@@ -576,8 +586,12 @@ bool TipsNotificationClient::ShouldSendCPE(ProfileIOS* profile) {
   if (is_credential_provider_enabled) {
     return false;
   }
+  base::Time promo_display_time =
+      local_state_->GetTime(prefs::kIosCredentialProviderPromoDisplayTime);
+  if (IsRecent(promo_display_time, kCPEPromoRecency)) {
+    return false;
+  }
   // TODO(crbug.com/417940156): Refine CPE trigger criteria to include:
-  //   * have not seen the promo in the last 30 days, AND
   //   * have used autofill in the last 30 days.
   return true;
 }
@@ -672,7 +686,7 @@ void TipsNotificationClient::ShowSetUpListContinuation(Browser* browser) {
 void TipsNotificationClient::ShowDocking(Browser* browser) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   [HandlerForProtocol(browser->GetCommandDispatcher(), DockingPromoCommands)
-      showDockingPromoWithTrigger:DockingPromoTrigger::kTipsModule];
+      showDockingPromo:YES];
 }
 
 void TipsNotificationClient::ShowOmniboxPosition(Browser* browser) {
@@ -849,20 +863,19 @@ void TipsNotificationClient::ClassifyUser() {
     return;
   }
 
-  base::Time now = base::Time::Now();
   base::Time last_request =
       local_state_->GetTime(kTipsNotificationsLastRequestedTime);
-  if (now < last_request + base::Hours(2)) {
+  if (IsRecent(last_request, kClassifyUserRecency)) {
     // Not enough time has passed to classify the user.
     return;
   }
 
-  if (now > last_request + TipsNotificationTriggerDelta(
-                               CanSendReactivation(),
-                               TipsNotificationUserType::kUnknown)) {
-    user_type_ = TipsNotificationUserType::kLessEngaged;
-  } else {
+  base::TimeDelta trigger_delta = TipsNotificationTriggerDelta(
+      CanSendReactivation(), TipsNotificationUserType::kUnknown);
+  if (IsRecent(last_request, trigger_delta)) {
     user_type_ = TipsNotificationUserType::kActiveSeeker;
+  } else {
+    user_type_ = TipsNotificationUserType::kLessEngaged;
   }
   SetUserType(local_state_, user_type_);
 }

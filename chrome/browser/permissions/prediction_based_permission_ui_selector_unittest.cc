@@ -288,7 +288,7 @@ TEST_F(PredictionBasedPermissionUiSelectorTest, GetPredictionTypeToUseCpssV1) {
           std::make_unique<permissions::ContentSettingPermissionResolver>(
               ContentSettingsType::GEOLOCATION),
           /*user_gesture=*/true, GURL("http://example.com/")),
-      base::BindRepeating(decided), /*delete_callback=*/base::NullCallback());
+      base::BindRepeating(decided));
 
   permissions::PredictionRequestFeatures features =
       prediction_selector.BuildPredictionRequestFeatures(&permission_request);
@@ -339,14 +339,16 @@ INSTANTIATE_TEST_SUITE_P(
          PredictionSource::kOnDeviceAiv1AndServerSideModel},
         {/*test_name=*/"UsePermissionsAiv3OnDesktop",
          /*enabled_features=*/
-         {BASIC_CPSS_FEATURES, permissions::features::kPermissionsAIv3},
+         {BASIC_CPSS_FEATURES, permissions::features::kPermissionsAIv3,
+          permissions::features::kPermissionsAIv3Geolocation},
          /*disabled_features=*/{},
          /*expected_prediction_source=*/
          PredictionSource::kOnDeviceAiv3AndServerSideModel},
         {/*test_name=*/"UsePermissionsAiv3OverAiv1OnDesktop",
          /*enabled_features=*/
          {BASIC_CPSS_FEATURES, permissions::features::kPermissionsAIv1,
-          permissions::features::kPermissionsAIv3},
+          permissions::features::kPermissionsAIv3,
+          permissions::features::kPermissionsAIv3Geolocation},
          /*disabled_features=*/{},
          /*expected_prediction_source=*/
          PredictionSource::kOnDeviceAiv3AndServerSideModel},

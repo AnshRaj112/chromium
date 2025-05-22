@@ -78,8 +78,8 @@
 #include "components/autofill/core/browser/integrators/identity_credential/mock_identity_credential_delegate.h"
 #include "components/autofill/core/browser/integrators/optimization_guide/mock_autofill_optimization_guide.h"
 #include "components/autofill/core/browser/integrators/password_form_classification.h"
-#include "components/autofill/core/browser/integrators/password_manager/autofill_password_manager_delegate.h"
-#include "components/autofill/core/browser/integrators/password_manager/mock_autofill_password_manager_delegate.h"
+#include "components/autofill/core/browser/integrators/password_manager/mock_password_manager_delegate.h"
+#include "components/autofill/core/browser/integrators/password_manager/password_manager_delegate.h"
 #include "components/autofill/core/browser/integrators/plus_addresses/autofill_plus_address_delegate.h"
 #include "components/autofill/core/browser/integrators/plus_addresses/mock_autofill_plus_address_delegate.h"
 #include "components/autofill/core/browser/metrics/form_events/form_events.h"
@@ -882,6 +882,10 @@ class MockTouchToFillDelegate : public TouchToFillDelegate {
   MOCK_METHOD(void,
               IbanSuggestionSelected,
               ((std::variant<Iban::Guid, Iban::InstrumentId>)),
+              (override));
+  MOCK_METHOD(void,
+              LoyaltyCardSuggestionSelected,
+              (const std::string& loyalty_card_number),
               (override));
   MOCK_METHOD(void, OnDismissed, (bool dismissed_by_user), (override));
   MOCK_METHOD(void,
@@ -2130,7 +2134,12 @@ TEST_F(BrowserAutofillManagerTestValuables,
 
   Suggestion loyalty_cards_submenu = Suggestion(
       l10n_util::GetStringUTF8(IDS_AUTOFILL_LOYALTY_CARDS_SUBMENU_TITLE), "",
-      Suggestion::Icon::kNoIcon, SuggestionType::kLoyaltyCardEntry);
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+      Suggestion::Icon::kGoogleWalletMonochrome,
+#else
+      Suggestion::Icon::kNoIcon,
+#endif
+      SuggestionType::kLoyaltyCardEntry);
   loyalty_cards_submenu.acceptability =
       Suggestion::Acceptability::kUnacceptable;
   loyalty_cards_submenu.children = {
@@ -8396,8 +8405,8 @@ TEST_F(BrowserAutofillManagerPlusAddressTest,
   EXPECT_CALL(merchant_promo_code_manager(), OnGetSingleFieldSuggestions)
       .WillRepeatedly(Return(false));
   EXPECT_CALL(iban_manager(), OnGetSingleFieldSuggestions)
-      .WillRepeatedly([&](const FormFieldData& field, const AutofillField&,
-                          const AutofillClient&,
+      .WillRepeatedly([&](const FormStructure&, const FormFieldData& field,
+                          const AutofillField&, const AutofillClient&,
                           SingleFieldFillRouter::OnSuggestionsReturnedCallback&
                               on_suggestions_returned) {
         std::move(on_suggestions_returned)
@@ -8881,7 +8890,7 @@ TEST_F(BrowserAutofillManagerPlusAddressTest,
       external_delegate()->suggestions().front(), {});
 }
 
-// Fixture setting the BAM's `AutofillPasswordManagerDelegate` to a mock instead
+// Fixture setting the BAM's `PasswordManagerDelegate` to a mock instead
 // of the default `nullptr`. Enables any features if necessary.
 class BrowserAutofillManagerUsingPasswordDelegateTest
     : public BrowserAutofillManagerTest {
@@ -8896,19 +8905,16 @@ class BrowserAutofillManagerUsingPasswordDelegateTest
     BrowserAutofillManagerTest::TearDown();
   }
 
-  MockAutofillPasswordManagerDelegate& password_delegate() {
-    return *delegate_;
-  }
+  MockPasswordManagerDelegate& password_delegate() { return *delegate_; }
 
  private:
-  std::unique_ptr<AutofillPasswordManagerDelegate> CreatePasswordDelegate() {
-    auto password_delegate =
-        std::make_unique<MockAutofillPasswordManagerDelegate>();
+  std::unique_ptr<PasswordManagerDelegate> CreatePasswordDelegate() {
+    auto password_delegate = std::make_unique<MockPasswordManagerDelegate>();
     delegate_ = password_delegate.get();
     return password_delegate;
   }
 
-  raw_ptr<MockAutofillPasswordManagerDelegate> delegate_ = nullptr;
+  raw_ptr<MockPasswordManagerDelegate> delegate_ = nullptr;
 };
 
 // Test that the BAM queries the password delegate as soon as it's present.

@@ -623,6 +623,22 @@ targets.mixin(
 )
 
 targets.mixin(
+    name = "chromium_pixel_2_q",
+    # We always need this entry to be generated since it is used by
+    # //content/test/gpu/find_bad_machines.py.
+    generate_pyl_entry = targets.IGNORE_UNUSED,
+    swarming = targets.swarming(
+        dimensions = {
+            "device_os": "QQ1A.191205.008",
+            "device_os_flavor": "google",
+            "device_type": "walleye",
+            "os": "Android",
+            "pool": "chromium.tests",
+        },
+    ),
+)
+
+targets.mixin(
     name = "chromium-tester-dev-service-account",
     generate_pyl_entry = False,
     swarming = targets.swarming(
@@ -749,6 +765,14 @@ targets.mixin(
             "pool": "chromium.tests.finch",
         },
     ),
+)
+
+targets.mixin(
+    name = "force-android-desktop",
+    generate_pyl_entry = False,
+    args = [
+        "--force-android-desktop",
+    ],
 )
 
 targets.mixin(
@@ -1787,7 +1811,7 @@ targets.mixin(
         dimensions = {
             "cpu": "x86-64",
             "gpu": "8086:3e9b",
-            "os": "Mac-15.4",
+            "os": "Mac-15.5",
             "display_attached": "1",
         },
     ),

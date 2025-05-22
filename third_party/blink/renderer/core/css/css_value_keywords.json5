@@ -512,6 +512,7 @@
     //none
     //
     // The order must match the order found in IsDisplayOutside().
+    // "block" also a keyword for caret-shape
     "inline",
     "block",
     // The order must match the order found in IsDisplayInside().
@@ -1975,6 +1976,14 @@
     "context-fill",
     "context-stroke",
 
+    // text-grow / text-shrink
+    "per-line",
+    "consistent",
+    // "scale",
+    "font-size",
+    "scale-inline",
+    "letter-spacing",
+
     // media-progress()
     "media-progress",
 
@@ -1997,6 +2006,9 @@
     "sibling-count",
     "sibling-index",
 
+    // https://drafts.csswg.org/css-values-5/#ident
+    "ident",
+
     // @function
     "returns",
 
@@ -2010,5 +2022,10 @@
     "if",
     "else",
     "media",
+
+    // caret-shape
+    // block is elsewhere
+    "bar",
+    "underscore",
   ],
 }

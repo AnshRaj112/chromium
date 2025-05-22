@@ -294,6 +294,12 @@ class StreamRequester : public HttpStreamRequest::Delegate {
         enable_alternative_services_,
         NetLogWithSource::Make(pool.http_network_session()->net_log(),
                                NetLogSourceType::URL_REQUEST));
+    Group* group = pool.GetGroupForTesting(stream_key);
+    AttemptManager* attempt_manager =
+        group ? group->attempt_manager() : nullptr;
+    if (attempt_manager) {
+      associated_attempt_manager_ = attempt_manager->GetWeakPtrForTesting();
+    }
     return request_.get();
   }
 
@@ -393,6 +399,10 @@ class StreamRequester : public HttpStreamRequest::Delegate {
 
   const ProxyInfo& used_proxy_info() const { return used_proxy_info_; }
 
+  base::WeakPtr<AttemptManager> associated_attempt_manager() {
+    return associated_attempt_manager_;
+  }
+
  private:
   void SetResult(int rv) {
     result_ = rv;
@@ -415,6 +425,8 @@ class StreamRequester : public HttpStreamRequest::Delegate {
   AlternativeServiceInfo alternative_service_info_;
 
   std::unique_ptr<HttpStreamRequest> request_;
+
+  base::WeakPtr<AttemptManager> associated_attempt_manager_;
 
   base::OnceClosure wait_result_closure_;
 
@@ -1454,7 +1466,7 @@ TEST_F(HttpStreamPoolAttemptManagerTest, IPEndPointsSlow) {
 
   FastForwardBy(HttpStreamPool::GetConnectionAttemptDelay());
   ASSERT_EQ(manager->TcpBasedAttemptCount(), 2u);
-  ASSERT_EQ(manager->PendingJobCount(), 0u);
+  ASSERT_EQ(manager->PendingRequestJobCount(), 0u);
   ASSERT_FALSE(request->completed());
 
   // FastForwardBy() executes non-delayed tasks so the request finishes
@@ -1470,8 +1482,8 @@ TEST_F(HttpStreamPoolAttemptManagerTest, IPEndPointSlowSuccessSlow) {
   const IPEndPoint ip_endpoint = MakeIPEndPoint("2001:db8::1");
 
   resolver()
-      ->AddFakeRequest()
-      ->add_endpoint(
+      ->ConfigureDefaultResolution()
+      .add_endpoint(
           ServiceEndpointBuilder().add_ip_endpoint(ip_endpoint).endpoint())
       .CompleteStartSynchronously(OK);
 
@@ -1543,11 +1555,11 @@ TEST_F(HttpStreamPoolAttemptManagerTest, PreferNonSlowIPEndPoint) {
   const IPEndPoint ip_endpoint_v4 = MakeIPEndPoint("192.0.2.1");
 
   resolver()
-      ->AddFakeRequest()
-      ->add_endpoint(ServiceEndpointBuilder()
-                         .add_ip_endpoint(ip_endpoint_v6)
-                         .add_ip_endpoint(ip_endpoint_v4)
-                         .endpoint())
+      ->ConfigureDefaultResolution()
+      .add_endpoint(ServiceEndpointBuilder()
+                        .add_ip_endpoint(ip_endpoint_v6)
+                        .add_ip_endpoint(ip_endpoint_v4)
+                        .endpoint())
       .CompleteStartSynchronously(OK);
 
   auto get_remote_ip_endpoint = [&](StreamRequester& requester) -> IPEndPoint {
@@ -1616,11 +1628,11 @@ TEST_F(HttpStreamPoolAttemptManagerTest, UseSlowAttemptingIPEndPoint) {
   const IPEndPoint ip_endpoint_failure = MakeIPEndPoint("192.0.2.1");
 
   resolver()
-      ->AddFakeRequest()
-      ->add_endpoint(ServiceEndpointBuilder()
-                         .add_ip_endpoint(ip_endpoint_slow)
-                         .add_ip_endpoint(ip_endpoint_failure)
-                         .endpoint())
+      ->ConfigureDefaultResolution()
+      .add_endpoint(ServiceEndpointBuilder()
+                        .add_ip_endpoint(ip_endpoint_slow)
+                        .add_ip_endpoint(ip_endpoint_failure)
+                        .endpoint())
       .CompleteStartSynchronously(OK);
 
   // Socket data preparation, see the following comments for the scenario.
@@ -1714,11 +1726,11 @@ TEST_F(HttpStreamPoolAttemptManagerTest, PreferSlowSucceededToSlowAttempting) {
   const IPEndPoint ip_endpoint_slow = MakeIPEndPoint("192.0.2.1");
 
   resolver()
-      ->AddFakeRequest()
-      ->add_endpoint(ServiceEndpointBuilder()
-                         .add_ip_endpoint(ip_endpoint_slow_success)
-                         .add_ip_endpoint(ip_endpoint_slow)
-                         .endpoint())
+      ->ConfigureDefaultResolution()
+      .add_endpoint(ServiceEndpointBuilder()
+                        .add_ip_endpoint(ip_endpoint_slow_success)
+                        .add_ip_endpoint(ip_endpoint_slow)
+                        .endpoint())
       .CompleteStartSynchronously(OK);
 
   // Socket data preparation, see the following comments for the scenario.
@@ -1998,7 +2010,7 @@ TEST_F(HttpStreamPoolAttemptManagerTest, ReachedGroupLimit) {
   ASSERT_EQ(pool().TotalActiveStreamCount(), kMaxPerGroup);
   ASSERT_EQ(group.ActiveStreamSocketCount(), kMaxPerGroup);
   ASSERT_EQ(manager->TcpBasedAttemptCount(), kMaxPerGroup);
-  ASSERT_EQ(manager->PendingJobCount(), 0u);
+  ASSERT_EQ(manager->PendingRequestJobCount(), 0u);
 
   // This request should not start an attempt as the group reached its limit.
   StreamRequester stalled_requester;
@@ -2011,7 +2023,7 @@ TEST_F(HttpStreamPoolAttemptManagerTest, ReachedGroupLimit) {
   ASSERT_EQ(pool().TotalActiveStreamCount(), kMaxPerGroup);
   ASSERT_EQ(group.ActiveStreamSocketCount(), kMaxPerGroup);
   ASSERT_EQ(manager->TcpBasedAttemptCount(), kMaxPerGroup);
-  ASSERT_EQ(manager->PendingJobCount(), 1u);
+  ASSERT_EQ(manager->PendingRequestJobCount(), 1u);
   ASSERT_EQ(stalled_request->GetLoadState(),
             LOAD_STATE_WAITING_FOR_AVAILABLE_SOCKET);
 
@@ -2020,7 +2032,7 @@ TEST_F(HttpStreamPoolAttemptManagerTest, ReachedGroupLimit) {
   ASSERT_EQ(pool().TotalActiveStreamCount(), kMaxPerGroup);
   ASSERT_EQ(group.ActiveStreamSocketCount(), kMaxPerGroup);
   ASSERT_EQ(manager->TcpBasedAttemptCount(), 0u);
-  ASSERT_EQ(manager->PendingJobCount(), 1u);
+  ASSERT_EQ(manager->PendingRequestJobCount(), 1u);
 
   // Release one HttpStream and close it to make non-reusable.
   std::unique_ptr<StreamRequester> released_requester =
@@ -2045,14 +2057,14 @@ TEST_F(HttpStreamPoolAttemptManagerTest, ReachedGroupLimit) {
   ASSERT_EQ(pool().TotalActiveStreamCount(), kMaxPerGroup);
   ASSERT_EQ(group.ActiveStreamSocketCount(), kMaxPerGroup);
   ASSERT_EQ(manager->TcpBasedAttemptCount(), 1u);
-  ASSERT_EQ(manager->PendingJobCount(), 0u);
+  ASSERT_EQ(manager->PendingRequestJobCount(), 0u);
 
   RunUntilIdle();
 
   ASSERT_EQ(pool().TotalActiveStreamCount(), kMaxPerGroup);
   ASSERT_EQ(group.ActiveStreamSocketCount(), kMaxPerGroup);
   ASSERT_EQ(manager->TcpBasedAttemptCount(), 0u);
-  ASSERT_EQ(manager->PendingJobCount(), 0u);
+  ASSERT_EQ(manager->PendingRequestJobCount(), 0u);
   ASSERT_TRUE(stalled_request->completed());
   std::unique_ptr<HttpStream> stream = stalled_requester.ReleaseStream();
   ASSERT_TRUE(stream);
@@ -2132,7 +2144,7 @@ TEST_F(HttpStreamPoolAttemptManagerTest, ReachedPoolLimit) {
   ASSERT_TRUE(pool().ReachedMaxStreamLimit());
   ASSERT_TRUE(pool().IsPoolStalled());
   ASSERT_EQ(manager_b->TcpBasedAttemptCount(), 0u);
-  ASSERT_EQ(manager_b->PendingJobCount(), 1u);
+  ASSERT_EQ(manager_b->PendingRequestJobCount(), 1u);
 
   // Release one HttpStream from group A. It should unblock the in-flight
   // request in group B.
@@ -2142,7 +2154,7 @@ TEST_F(HttpStreamPoolAttemptManagerTest, ReachedPoolLimit) {
   RunUntilIdle();
 
   ASSERT_TRUE(request2->completed());
-  ASSERT_EQ(manager_b->PendingJobCount(), 0u);
+  ASSERT_EQ(manager_b->PendingRequestJobCount(), 0u);
   ASSERT_TRUE(pool().ReachedMaxStreamLimit());
   ASSERT_FALSE(pool().IsPoolStalled());
 }
@@ -2548,7 +2560,7 @@ TEST_F(HttpStreamPoolAttemptManagerTest, UseIdleStreamSocketAfterRelease) {
   RunUntilIdle();
   AttemptManager* manager = group.attempt_manager();
   ASSERT_FALSE(request->completed());
-  ASSERT_EQ(manager->PendingJobCount(), 1u);
+  ASSERT_EQ(manager->PendingRequestJobCount(), 1u);
 
   // Release an active HttpStream. The underlying StreamSocket should be used
   // to the pending request.
@@ -2558,7 +2570,7 @@ TEST_F(HttpStreamPoolAttemptManagerTest, UseIdleStreamSocketAfterRelease) {
   released_stream.reset();
   requester.WaitForResult();
   ASSERT_TRUE(request->completed());
-  ASSERT_EQ(manager->PendingJobCount(), 0u);
+  ASSERT_EQ(manager->PendingRequestJobCount(), 0u);
 }
 
 TEST_F(HttpStreamPoolAttemptManagerTest,
@@ -2673,16 +2685,16 @@ TEST_F(HttpStreamPoolAttemptManagerTest,
       pool()
           .GetOrCreateGroupForTesting(requester2.GetStreamKey())
           .attempt_manager();
-  ASSERT_EQ(manager1->JobCount(), 1u);
+  ASSERT_EQ(manager1->RequestJobCount(), 1u);
   ASSERT_EQ(manager1->TcpBasedAttemptCount(), 1u);
-  ASSERT_EQ(manager2->JobCount(), 1u);
+  ASSERT_EQ(manager2->RequestJobCount(), 1u);
   ASSERT_EQ(manager2->TcpBasedAttemptCount(), 1u);
 
   NetworkChangeNotifier::NotifyObserversOfIPAddressChangeForTests();
   RunUntilIdle();
-  ASSERT_EQ(manager1->JobCount(), 0u);
+  ASSERT_EQ(manager1->RequestJobCount(), 0u);
   ASSERT_EQ(manager1->TcpBasedAttemptCount(), 0u);
-  ASSERT_EQ(manager2->JobCount(), 0u);
+  ASSERT_EQ(manager2->RequestJobCount(), 0u);
   ASSERT_EQ(manager2->TcpBasedAttemptCount(), 0u);
   EXPECT_THAT(requester1.result(), Optional(IsError(ERR_NETWORK_CHANGED)));
   EXPECT_THAT(requester2.result(), Optional(IsError(ERR_NETWORK_CHANGED)));
@@ -2791,8 +2803,8 @@ TEST_F(HttpStreamPoolAttemptManagerTest, CancelAttemptOnSSLConfigChangeNoJobs) {
   }
   AttemptManager* manager =
       pool().GetGroupForTesting(stream_key)->attempt_manager();
-  ASSERT_EQ(manager->JobCount(), 2u);
-  ASSERT_EQ(manager->NotifiedJobCount(), 0u);
+  ASSERT_EQ(manager->RequestJobCount(), 2u);
+  ASSERT_EQ(manager->NotifiedRequestJobCount(), 0u);
   ASSERT_EQ(manager->TcpBasedAttemptCount(), 2u);
 
   auto count_slow_attempt_endpoints = [&]() {
@@ -2815,8 +2827,8 @@ TEST_F(HttpStreamPoolAttemptManagerTest, CancelAttemptOnSSLConfigChangeNoJobs) {
   requesters.clear();
   manager = pool().GetGroupForTesting(stream_key)->attempt_manager();
   ASSERT_TRUE(manager);
-  ASSERT_EQ(manager->JobCount(), 0u);
-  ASSERT_EQ(manager->NotifiedJobCount(), 0u);
+  ASSERT_EQ(manager->RequestJobCount(), 0u);
+  ASSERT_EQ(manager->NotifiedRequestJobCount(), 0u);
   ASSERT_EQ(manager->TcpBasedAttemptCount(), 2u);
 
   // Trigger an SSLConfig change. This should cancel in-flight attempts.
@@ -3210,7 +3222,7 @@ TEST_F(HttpStreamPoolAttemptManagerTest, SpdyReachedPoolLimit) {
   RunUntilIdle();
   Group& group_c =
       pool().GetOrCreateGroupForTesting(requester_c.GetStreamKey());
-  ASSERT_EQ(group_c.attempt_manager()->PendingJobCount(), 1u);
+  ASSERT_EQ(group_c.attempt_manager()->PendingRequestJobCount(), 1u);
   ASSERT_TRUE(pool().ReachedMaxStreamLimit());
   ASSERT_TRUE(pool().IsPoolStalled());
 
@@ -4177,13 +4189,10 @@ TEST_F(HttpStreamPoolAttemptManagerTest,
   requester1.RequestStream(pool());
 
   Group* group = pool().GetGroupForTesting(stream_key);
-  // This AttemptManager will fail.
-  base::WeakPtr<AttemptManager> first_attempt_manager =
-      group->attempt_manager()->GetWeakPtrForTesting();
 
   requester1.WaitForResult();
   EXPECT_THAT(requester1.result(), Optional(IsError(ERR_CONNECTION_RESET)));
-  EXPECT_TRUE(first_attempt_manager->is_shutting_down());
+  EXPECT_TRUE(requester1.associated_attempt_manager()->is_shutting_down());
 
   // The first request isn't destroyed yet so the failing AttemptManager is
   // still alive. A request that comes during a failure should use a new
@@ -4191,7 +4200,8 @@ TEST_F(HttpStreamPoolAttemptManagerTest,
   StreamRequester requester2(stream_key);
   HttpStreamRequest* request2 = requester2.RequestStream(pool());
   ASSERT_FALSE(requester2.result().has_value());
-  ASSERT_NE(first_attempt_manager.get(), group->attempt_manager());
+  ASSERT_NE(requester1.associated_attempt_manager().get(),
+            group->attempt_manager());
   ASSERT_EQ(group->attempt_manager()->TcpBasedAttemptCount(), 1u);
   EXPECT_EQ(request2->GetLoadState(), LOAD_STATE_CONNECTING);
 
@@ -4203,8 +4213,8 @@ TEST_F(HttpStreamPoolAttemptManagerTest,
   // Destroy the failed request. This should destroy the failing attempt
   // manager.
   requester1.ResetRequest();
-  WaitForAttemptManagerComplete(first_attempt_manager.get());
-  ASSERT_FALSE(first_attempt_manager);
+  WaitForAttemptManagerComplete(requester1.associated_attempt_manager().get());
+  ASSERT_FALSE(requester1.associated_attempt_manager());
 
   // The second request should succeed.
   requester2.WaitForResult();
@@ -4294,8 +4304,6 @@ TEST_F(HttpStreamPoolAttemptManagerTest, MultipleJobsFailAgain) {
   StreamRequester failing_requester1(stream_key);
   failing_requester1.RequestStream(pool());
   Group* group = pool().GetGroupForTesting(stream_key);
-  base::WeakPtr<AttemptManager> first_attempt_manager =
-      group->attempt_manager()->GetWeakPtrForTesting();
   failing_requester1.WaitForResult();
   EXPECT_THAT(failing_requester1.result(),
               Optional(IsError(ERR_CONNECTION_RESET)));
@@ -4304,9 +4312,8 @@ TEST_F(HttpStreamPoolAttemptManagerTest, MultipleJobsFailAgain) {
   // The second request also fails.
   StreamRequester failing_requester2(stream_key);
   failing_requester2.RequestStream(pool());
-  base::WeakPtr<AttemptManager> second_attempt_manager =
-      group->attempt_manager()->GetWeakPtrForTesting();
-  EXPECT_NE(first_attempt_manager.get(), second_attempt_manager.get());
+  EXPECT_NE(failing_requester1.associated_attempt_manager().get(),
+            failing_requester2.associated_attempt_manager().get());
   failing_requester2.WaitForResult();
   EXPECT_THAT(failing_requester2.result(),
               Optional(IsError(ERR_CONNECTION_RESET)));
@@ -4330,13 +4337,15 @@ TEST_F(HttpStreamPoolAttemptManagerTest, MultipleJobsFailAgain) {
 
   // Destroy the first request. It should destroy the first AttemptManager.
   failing_requester1.ResetRequest();
-  WaitForAttemptManagerComplete(first_attempt_manager.get());
-  ASSERT_FALSE(first_attempt_manager);
+  WaitForAttemptManagerComplete(
+      failing_requester1.associated_attempt_manager().get());
+  ASSERT_FALSE(failing_requester1.associated_attempt_manager());
 
   // Destroy the second request. It should destroy the second AttemptManager.
   failing_requester2.ResetRequest();
-  WaitForAttemptManagerComplete(second_attempt_manager.get());
-  ASSERT_FALSE(second_attempt_manager);
+  WaitForAttemptManagerComplete(
+      failing_requester2.associated_attempt_manager().get());
+  ASSERT_FALSE(failing_requester2.associated_attempt_manager());
 
   // Complete subsequent requests.
   for (size_t i = 0; i < kNumJobsAfterFailure; ++i) {
@@ -4372,8 +4381,6 @@ TEST_F(HttpStreamPoolAttemptManagerTest, SpdySessionAvailableAfterFailure) {
   StreamRequester failing_requester(stream_key);
   failing_requester.RequestStream(pool());
   Group* group = pool().GetGroupForTesting(stream_key);
-  base::WeakPtr<AttemptManager> attempt_manager =
-      group->attempt_manager()->GetWeakPtrForTesting();
   failing_requester.WaitForResult();
   EXPECT_THAT(failing_requester.result(),
               Optional(IsError(ERR_CONNECTION_RESET)));
@@ -4393,8 +4400,9 @@ TEST_F(HttpStreamPoolAttemptManagerTest, SpdySessionAvailableAfterFailure) {
 
   // Destroy the first request. It will destroy the first AttemptManager.
   failing_requester.ResetRequest();
-  WaitForAttemptManagerComplete(attempt_manager.get());
-  ASSERT_FALSE(attempt_manager);
+  WaitForAttemptManagerComplete(
+      failing_requester.associated_attempt_manager().get());
+  ASSERT_FALSE(failing_requester.associated_attempt_manager());
 
   // Ensure the second request succeeds.
   requester.WaitForResult();
@@ -4432,8 +4440,6 @@ TEST_F(HttpStreamPoolAttemptManagerTest, QuicSessionAvailableAfterFailure) {
   StreamRequester failing_requester(stream_key);
   failing_requester.RequestStream(pool());
   Group* group = pool().GetGroupForTesting(stream_key);
-  base::WeakPtr<AttemptManager> attempt_manager =
-      group->attempt_manager()->GetWeakPtrForTesting();
   failing_requester.WaitForResult();
   EXPECT_THAT(failing_requester.result(),
               Optional(IsError(ERR_CONNECTION_RESET)));
@@ -4448,7 +4454,8 @@ TEST_F(HttpStreamPoolAttemptManagerTest, QuicSessionAvailableAfterFailure) {
   Preconnector preconnector(stream_key);
   preconnector.Preconnect(pool());
   ASSERT_FALSE(preconnector.result().has_value());
-  ASSERT_NE(attempt_manager.get(), group->attempt_manager());
+  ASSERT_NE(failing_requester.associated_attempt_manager().get(),
+            group->attempt_manager());
 
   // Simulate creating a QUIC session that can be used for kDefaultDestination
   // before resuming the paused request/preconnect. The QUIC session is created
@@ -4503,7 +4510,8 @@ TEST_F(HttpStreamPoolAttemptManagerTest, QuicSessionAvailableAfterFailure) {
   // Destroy requests so that the group can complete.
   failing_requester.ResetRequest();
   requester.ResetRequest();
-  WaitForAttemptManagerComplete(attempt_manager.get());
+  WaitForAttemptManagerComplete(
+      failing_requester.associated_attempt_manager().get());
   ASSERT_FALSE(pool().GetGroupForTesting(stream_key));
 }
 
@@ -4531,11 +4539,6 @@ TEST_F(HttpStreamPoolAttemptManagerTest, ReleaseStreamWhileFailing) {
   StreamRequester requester1;
   const HttpStreamKey stream_key = requester1.GetStreamKey();
   requester1.set_destination(kDestination).RequestStream(pool());
-  base::WeakPtr<AttemptManager> attempt_manager =
-      pool()
-          .GetGroupForTesting(stream_key)
-          ->attempt_manager()
-          ->GetWeakPtrForTesting();
   requester1.WaitForResult();
   EXPECT_THAT(requester1.result(), Optional(IsOk()));
 
@@ -4561,7 +4564,7 @@ TEST_F(HttpStreamPoolAttemptManagerTest, ReleaseStreamWhileFailing) {
   // Reset the requests. The manager should complete.
   requester1.ResetRequest();
   requester2.ResetRequest();
-  WaitForAttemptManagerComplete(attempt_manager.get());
+  WaitForAttemptManagerComplete(requester1.associated_attempt_manager().get());
   ASSERT_FALSE(pool().GetOrCreateGroupForTesting(stream_key).attempt_manager());
 }
 
@@ -4873,9 +4876,6 @@ TEST_F(HttpStreamPoolAttemptManagerTest, DontStartQuicAfterFailure) {
       .set_quic_version(quic_version())
       .RequestStream(pool());
   Group* group = pool().GetGroupForTesting(requester.GetStreamKey());
-  // This AttemptManager will fail later.
-  base::WeakPtr<AttemptManager> attempt_manager =
-      group->attempt_manager()->GetWeakPtrForTesting();
   ASSERT_FALSE(requester.result().has_value());
 
   // Simulate a network change event to fail the AttemptManager. The
@@ -4891,8 +4891,8 @@ TEST_F(HttpStreamPoolAttemptManagerTest, DontStartQuicAfterFailure) {
 
   // Ensure that the attempt manager completes after the request is destroyed.
   requester.ResetRequest();
-  ASSERT_TRUE(attempt_manager);
-  WaitForAttemptManagerComplete(attempt_manager.get());
+  ASSERT_TRUE(requester.associated_attempt_manager().get());
+  WaitForAttemptManagerComplete(requester.associated_attempt_manager().get());
 }
 
 // Tests that QUIC is not attempted when marked broken.
@@ -4996,9 +4996,6 @@ TEST_F(HttpStreamPoolAttemptManagerTest, QuicFailAfterTls) {
   requester.set_destination(kDefaultDestination)
       .set_quic_version(quic_version())
       .RequestStream(pool());
-  Group* group = pool().GetGroupForTesting(requester.GetStreamKey());
-  base::WeakPtr<AttemptManager> attempt_manager =
-      group->attempt_manager()->GetWeakPtrForTesting();
   ASSERT_FALSE(requester.result().has_value());
 
   tls_completer.Complete(ERR_SOCKET_NOT_CONNECTED);
@@ -5008,8 +5005,9 @@ TEST_F(HttpStreamPoolAttemptManagerTest, QuicFailAfterTls) {
 
   quic_completer.Complete(ERR_CONNECTION_REFUSED);
   requester.WaitForResult();
-  EXPECT_THAT(attempt_manager->GetQuicAttemptResultForTesting(),
-              Optional(IsError(ERR_CONNECTION_REFUSED)));
+  EXPECT_THAT(
+      requester.associated_attempt_manager()->GetQuicAttemptResultForTesting(),
+      Optional(IsError(ERR_CONNECTION_REFUSED)));
   EXPECT_THAT(requester.result(), Optional(IsError(ERR_CONNECTION_REFUSED)));
 
   // QUIC should not be marked as broken because TLS attempt also failed.
@@ -6617,13 +6615,12 @@ TEST_F(HttpStreamPoolAttemptManagerTest, FlushWithErrorPendingJobs) {
   StreamRequester failing_requester(stream_key);
   failing_requester.RequestStream(pool());
   Group* group = pool().GetGroupForTesting(stream_key);
-  base::WeakPtr<AttemptManager> attempt_manager1 =
-      group->attempt_manager()->GetWeakPtrForTesting();
   failing_requester.WaitForResult();
   EXPECT_THAT(failing_requester.result(),
               Optional(IsError(ERR_CONNECTION_REFUSED)));
   EXPECT_FALSE(group->attempt_manager());
-  EXPECT_TRUE(attempt_manager1->is_shutting_down());
+  EXPECT_TRUE(
+      failing_requester.associated_attempt_manager()->is_shutting_down());
 
   // Subsequent requests (jobs) uses a new AttemptManager. Thsese requests are
   // blocked by DNS resolution.
@@ -6636,9 +6633,10 @@ TEST_F(HttpStreamPoolAttemptManagerTest, FlushWithErrorPendingJobs) {
     raw_requester->RequestStream(pool());
     ASSERT_FALSE(raw_requester->result().has_value());
   }
-  base::WeakPtr<AttemptManager> attempt_manager2 =
+  base::WeakPtr<AttemptManager> second_attempt_manager =
       group->attempt_manager()->GetWeakPtrForTesting();
-  EXPECT_NE(attempt_manager1.get(), attempt_manager2.get());
+  EXPECT_NE(failing_requester.associated_attempt_manager().get(),
+            second_attempt_manager.get());
 
   // Abort requests. The second AttemptManager also fails.
   pool().FlushWithError(ERR_ABORTED, StreamSocketCloseReason::kUnspecified,
@@ -6647,7 +6645,7 @@ TEST_F(HttpStreamPoolAttemptManagerTest, FlushWithErrorPendingJobs) {
     requester->WaitForResult();
     EXPECT_THAT(requester->result(), Optional(IsError(ERR_ABORTED)));
   }
-  EXPECT_TRUE(attempt_manager2->is_shutting_down());
+  EXPECT_TRUE(second_attempt_manager->is_shutting_down());
 
   // Destroy the first request. This should result in attempting to delete the
   // group. The group should be still alive since we don't destroy all requests
@@ -6662,9 +6660,10 @@ TEST_F(HttpStreamPoolAttemptManagerTest, FlushWithErrorPendingJobs) {
 
   // Ensure the group is destroyed. Waiting for completion of one failing
   // AttemptManager is sufficient to destroy the group.
-  WaitForAttemptManagerComplete(attempt_manager1.get());
-  ASSERT_FALSE(attempt_manager1.get());
-  ASSERT_FALSE(attempt_manager2.get());
+  WaitForAttemptManagerComplete(
+      failing_requester.associated_attempt_manager().get());
+  ASSERT_FALSE(failing_requester.associated_attempt_manager().get());
+  ASSERT_FALSE(second_attempt_manager.get());
   EXPECT_FALSE(pool().GetGroupForTesting(stream_key));
   EXPECT_EQ(pool().TotalActiveStreamCount(), 0u);
 }
@@ -7304,9 +7303,6 @@ TEST_F(HttpStreamPoolAttemptManagerTest, NetworkChangeCancelJobs) {
   ASSERT_FALSE(requester.result().has_value());
 
   Group* group = pool().GetGroupForTesting(requester.GetStreamKey());
-  // This AttemptManager will fail.
-  base::WeakPtr<AttemptManager> first_attempt_manager =
-      group->attempt_manager()->GetWeakPtrForTesting();
 
   NetworkChangeNotifier::NotifyObserversOfIPAddressChangeForTests();
   FastForwardUntilNoTasksRemain();
@@ -7317,13 +7313,15 @@ TEST_F(HttpStreamPoolAttemptManagerTest, NetworkChangeCancelJobs) {
   EXPECT_THAT(requester.result(), Optional(IsError(ERR_NETWORK_CHANGED)));
   // The group should not have active AttemptManager.
   EXPECT_FALSE(group->attempt_manager());
-  EXPECT_THAT(first_attempt_manager->TcpBasedAttemptCount(), 0u);
-  EXPECT_THAT(first_attempt_manager->GetQuicAttemptResultForTesting(),
-              Optional(IsError(ERR_NETWORK_CHANGED)));
+  EXPECT_THAT(requester.associated_attempt_manager()->TcpBasedAttemptCount(),
+              0u);
+  EXPECT_THAT(
+      requester.associated_attempt_manager()->GetQuicAttemptResultForTesting(),
+      Optional(IsError(ERR_NETWORK_CHANGED)));
 
   // Ensure that the group is destroyed after the request is destroyed.
   requester.ResetRequest();
-  WaitForAttemptManagerComplete(first_attempt_manager.get());
+  WaitForAttemptManagerComplete(requester.associated_attempt_manager().get());
   ASSERT_FALSE(pool().GetGroupForTesting(requester.GetStreamKey()));
 }
 
@@ -7356,11 +7354,6 @@ TEST_F(HttpStreamPoolAttemptManagerTest,
   requester.set_destination(kDefaultDestination)
       .set_quic_version(quic_version())
       .RequestStream(pool());
-  base::WeakPtr<AttemptManager> attempt_manager =
-      pool()
-          .GetGroupForTesting(requester.GetStreamKey())
-          ->attempt_manager()
-          ->GetWeakPtrForTesting();
   ASSERT_FALSE(requester.result().has_value());
 
   // Notifies partial endpoint results. Triggers QuicAttempt to start.
@@ -7373,9 +7366,11 @@ TEST_F(HttpStreamPoolAttemptManagerTest,
 
   requester.WaitForResult();
   EXPECT_THAT(requester.result(), Optional(IsError(ERR_NAME_NOT_RESOLVED)));
-  EXPECT_THAT(attempt_manager->TcpBasedAttemptCount(), 0u);
-  EXPECT_THAT(attempt_manager->GetQuicAttemptResultForTesting(),
-              Optional(IsError(ERR_NAME_NOT_RESOLVED)));
+  EXPECT_THAT(requester.associated_attempt_manager()->TcpBasedAttemptCount(),
+              0u);
+  EXPECT_THAT(
+      requester.associated_attempt_manager()->GetQuicAttemptResultForTesting(),
+      Optional(IsError(ERR_NAME_NOT_RESOLVED)));
 }
 
 // Regression test for crbug.com/384965448
@@ -7407,20 +7402,17 @@ TEST_F(HttpStreamPoolAttemptManagerTest, ClientAuthRequiredCancelQuic) {
   requester.set_destination(kDefaultDestination)
       .set_quic_version(quic_version())
       .RequestStream(pool());
-  base::WeakPtr<AttemptManager> attempt_manager =
-      pool()
-          .GetOrCreateGroupForTesting(requester.GetStreamKey())
-          .attempt_manager()
-          ->GetWeakPtrForTesting();
   ASSERT_FALSE(requester.result().has_value());
 
   requester.WaitForResult();
   EXPECT_THAT(requester.result(),
               Optional(IsError(ERR_SSL_CLIENT_AUTH_CERT_NEEDED)));
   quic_completer.Complete(OK);
-  EXPECT_THAT(attempt_manager->TcpBasedAttemptCount(), 0u);
-  EXPECT_THAT(attempt_manager->GetQuicAttemptResultForTesting(),
-              Optional(IsError(ERR_SSL_CLIENT_AUTH_CERT_NEEDED)));
+  EXPECT_THAT(requester.associated_attempt_manager()->TcpBasedAttemptCount(),
+              0u);
+  EXPECT_THAT(
+      requester.associated_attempt_manager()->GetQuicAttemptResultForTesting(),
+      Optional(IsError(ERR_SSL_CLIENT_AUTH_CERT_NEEDED)));
 }
 
 // Regression test for crbug.com/384965448
@@ -7448,19 +7440,16 @@ TEST_F(HttpStreamPoolAttemptManagerTest, CertificateErrorCancelQuic) {
   requester.set_destination(kDefaultDestination)
       .set_quic_version(quic_version())
       .RequestStream(pool());
-  base::WeakPtr<AttemptManager> attempt_manager =
-      pool()
-          .GetGroupForTesting(requester.GetStreamKey())
-          ->attempt_manager()
-          ->GetWeakPtrForTesting();
   ASSERT_FALSE(requester.result().has_value());
 
   requester.WaitForResult();
   EXPECT_THAT(requester.result(), Optional(IsError(ERR_CERT_DATE_INVALID)));
   quic_completer.Complete(OK);
-  EXPECT_THAT(attempt_manager->TcpBasedAttemptCount(), 0u);
-  EXPECT_THAT(attempt_manager->GetQuicAttemptResultForTesting(),
-              Optional(IsError(ERR_CERT_DATE_INVALID)));
+  EXPECT_THAT(requester.associated_attempt_manager()->TcpBasedAttemptCount(),
+              0u);
+  EXPECT_THAT(
+      requester.associated_attempt_manager()->GetQuicAttemptResultForTesting(),
+      Optional(IsError(ERR_CERT_DATE_INVALID)));
 }
 
 // Regression test for crbug.com/403373872. ServiceEndpointRequest may change

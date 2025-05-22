@@ -546,9 +546,6 @@ public final class ProductionSupportedFlagList {
                 "When enabled, WARNING_SHOWN client reports will be sent when a warning is "
                         + "shown to the user"),
         Flag.baseFeature(
-                BlinkFeatures.ANDROID_EXTENDED_KEYBOARD_SHORTCUTS,
-                "Enables WebView to use the extended keyboard shortcuts added for Android U"),
-        Flag.baseFeature(
                 NetFeatures.THIRD_PARTY_STORAGE_PARTITIONING,
                 "Enables partitioning of third-party storage by top-level site. Note: this is under"
                     + " active development and may result in unexpected behavior. Please file bugs"
@@ -728,6 +725,9 @@ public final class ProductionSupportedFlagList {
                 BaseFeatures.BACKGROUND_NOT_PERCEPTIBLE_BINDING,
                 "If enabled, not perceptible binding put processes to the background cpu cgroup"),
         Flag.baseFeature(
+                BaseFeatures.PARTITION_ALLOC_WITH_ADVANCED_CHECKS,
+                "Enables PartitionAlloc with advanced safety checks"),
+        Flag.baseFeature(
                 BaseFeatures.PARTITION_ALLOC_SCHEDULER_LOOP_QUARANTINE,
                 "Enables PartitionAlloc's FreeFlags::kSchedulerLoopQuarantine"),
         Flag.baseFeature(
@@ -840,6 +840,10 @@ public final class ProductionSupportedFlagList {
                 AwFeatures.WEBVIEW_DO_NOT_SEND_ACCESSIBILITY_EVENTS_ON_GSU,
                 "Do not send TYPE_VIEW_SCROLLED accessibility events on kGestureScrollUpdate acks,"
                         + " instead send them every 100ms when in a scroll gesture."),
+        Flag.baseFeature(
+                AwFeatures.WEBVIEW_DRAIN_PREFETCH_QUEUE_DURING_INIT,
+                "Drain any prefetches that were triggered on the background thread during WebView"
+                        + " initialization."),
         Flag.baseFeature(
                 CcFeatures.METRICS_TRACING_CALCULATION_REDUCTION,
                 "Reduces Renderer event latency attribution to only during tracing."),
@@ -1055,6 +1059,13 @@ public final class ProductionSupportedFlagList {
         Flag.baseFeature(
                 NetFeatures.RESTRICT_ABUSE_PORTS_ON_LOCALHOST,
                 "Used to restrict connections to specified ports on localhost."),
+        Flag.baseFeature(
+                AwFeatures.WEBVIEW_QUIC_CONNECTION_TIMEOUT,
+                "Enables updating the QUIC connection timeout to a value set by the"
+                        + " WebViewUpdateQuicConnectionTimeoutSeconds feature param."),
+        Flag.baseFeature(
+                NetworkServiceFeatures.SHARED_DICTIONARY_CACHE,
+                "When enabled, keep recently-used compression dictionaries in a memory cache."),
         // Add new commandline switches and features above. The final entry should have a
         // trailing comma for cleaner diffs.
     };

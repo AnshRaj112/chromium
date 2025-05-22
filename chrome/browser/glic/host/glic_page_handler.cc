@@ -325,6 +325,17 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     state->can_attach = browser_attach_observation_->CanAttachToBrowser();
     state->panel_is_active = active_state_calculator_.IsActive();
 
+    if (ShouldDoApiActivationGating()) {
+      // We will force a notification to be sent later when the panel
+      // is activated, so skip here.
+      cached_focused_tab_data_ =
+          CreateFocusedTabData(glic_service_->GetFocusedTabData());
+      state->focused_tab_data = CreateFocusedTabData(NoFocusedTabData());
+    } else {
+      state->focused_tab_data =
+          CreateFocusedTabData(glic_service_->GetFocusedTabData());
+    }
+
     state->sizing_mode = GetWebClientSizingMode();
 
     state->browser_is_open = browser_is_open_calculator_.IsOpen();
@@ -335,8 +346,6 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
         base::FeatureList::IsEnabled(features::kGlicActor);
     state->enable_scroll_to =
         base::FeatureList::IsEnabled(features::kGlicScrollTo);
-    state->enable_drag_to_resize_panel =
-        base::FeatureList::IsEnabled(features::kGlicUserResize);
     state->enable_zero_state_suggestions = base::FeatureList::IsEnabled(
         contextual_cueing::kGlicZeroStateSuggestions);
 
@@ -379,6 +388,10 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
                  bool open_in_background,
                  const std::optional<int32_t> window_id,
                  CreateTabCallback callback) override {
+    if (ShouldDoApiActivationGating()) {
+      std::move(callback).Run(nullptr);
+      return;
+    }
     glic_service_->CreateTab(url, open_in_background, window_id,
                              std::move(callback));
   }
@@ -411,9 +424,23 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     glic_service_->CloseUI();
   }
 
-  void AttachPanel() override { glic_service_->AttachPanel(); }
+  void AttachPanel() override {
+    if (GlicWindowController::AlwaysDetached()) {
+      receiver_.ReportBadMessage(
+          "AttachPanel cannot be called when always detached mode is enabled.");
+      return;
+    }
+    glic_service_->AttachPanel();
+  }
 
-  void DetachPanel() override { glic_service_->DetachPanel(); }
+  void DetachPanel() override {
+    if (GlicWindowController::AlwaysDetached()) {
+      receiver_.ReportBadMessage(
+          "DetachPanel cannot be called when always detached mode is enabled.");
+      return;
+    }
+    glic_service_->DetachPanel();
+  }
 
   void ShowProfilePicker() override {
     glic::GlicProfileManager::GetInstance()->ShowProfilePicker();
@@ -434,12 +461,29 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   void ActInFocusedTab(const std::vector<uint8_t>& action_proto,
                        glic::mojom::GetTabContextOptionsPtr options,
                        ActInFocusedTabCallback callback) override {
+    if (!base::FeatureList::IsEnabled(features::kGlicActor)) {
+      receiver_.ReportBadMessage(
+          "ActInFocusedTab cannot be called without GlicActor enabled.");
+      return;
+    }
     glic_service_->ActInFocusedTab(action_proto, *options, std::move(callback));
   }
 
-  void StopActorTask() override { glic_service_->StopActorTask(); }
+  void StopActorTask() override {
+    if (!base::FeatureList::IsEnabled(features::kGlicActor)) {
+      receiver_.ReportBadMessage(
+          "StopActorTask cannot be called without GlicActor enabled.");
+      return;
+    }
+    glic_service_->StopActorTask();
+  }
 
   void CaptureScreenshot(CaptureScreenshotCallback callback) override {
+    if (ShouldDoApiActivationGating()) {
+      std::move(callback).Run(mojom::CaptureScreenshotResult::NewErrorReason(
+          glic::mojom::CaptureScreenshotErrorReason::kUnknown));
+      return;
+    }
     glic_service_->CaptureScreenshot(std::move(callback));
   }
 
@@ -518,6 +562,12 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   void SetClosedCaptioningSetting(
       bool enabled,
       SetClosedCaptioningSettingCallback callback) override {
+    if (!base::FeatureList::IsEnabled(features::kGlicClosedCaptioning)) {
+      receiver_.ReportBadMessage(
+          "Client should not be able to call SetClosedCaptioningSetting "
+          "without the GlicClosedCaptioning feature enabled.");
+      return;
+    }
     pref_service_->SetBoolean(prefs::kGlicClosedCaptioningEnabled, enabled);
     if (enabled) {
       base::RecordAction(
@@ -548,6 +598,13 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   }
 
   void GetUserProfileInfo(GetUserProfileInfoCallback callback) override {
+    if (ShouldDoGetUserProfileInfoApiActivationGating()) {
+      on_get_user_profile_info_activation_callbacks_.push_back(
+          base::BindOnce(&GlicWebClientHandler::GetUserProfileInfo,
+                         base::Unretained(this), std::move(callback)));
+      return;
+    }
+
     ProfileAttributesEntry* entry =
         g_browser_process->profile_manager()
             ->GetProfileAttributesStorage()
@@ -602,9 +659,13 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   void ScrollTo(mojom::ScrollToParamsPtr params,
                 ScrollToCallback callback) override {
     if (!base::FeatureList::IsEnabled(features::kGlicScrollTo)) {
-      mojo::ReportBadMessage(
+      receiver_.ReportBadMessage(
           "Client should not be able to call ScrollTo without the GlicScrollTo "
           "feature enabled.");
+      return;
+    }
+    if (ShouldDoApiActivationGating()) {
+      std::move(callback).Run(glic::mojom::ScrollToErrorReason::kNotSupported);
       return;
     }
     annotation_manager_->ScrollTo(std::move(params), std::move(callback));
@@ -621,7 +682,7 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     if (type != ContentSettingsType::MEDIASTREAM_MIC &&
         type != ContentSettingsType::GEOLOCATION) {
       // This will terminate the render process.
-      mojo::ReportBadMessage(
+      receiver_.ReportBadMessage(
           "OpenOsPermissionSettingsMenu received for unsupported "
           "OS permission.");
       return;
@@ -675,7 +736,32 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     if (web_client_) {
       web_client_->NotifyPanelActiveChange(is_active);
     }
+
+    if (!is_active) {
+      return;
+    }
+
+    if (base::FeatureList::IsEnabled(
+            features::kGlicGetUserProfileInfoApiActivationGating)) {
+      auto to_remove =
+          std::move(on_get_user_profile_info_activation_callbacks_);
+      on_get_user_profile_info_activation_callbacks_.clear();
+      for (auto& cb : to_remove) {
+        std::move(cb).Run();
+      }
+    }
+
+    CHECK(on_get_user_profile_info_activation_callbacks_.empty());
+
+    if (base::FeatureList::IsEnabled(features::kGlicApiActivationGating)) {
+      if (cached_focused_tab_data_) {
+        web_client_->NotifyFocusedTabChanged(
+            std::move(cached_focused_tab_data_));
+      }
+      cached_focused_tab_data_ = nullptr;
+    }
   }
+
   // BrowserIsOpenCalculator implementation.
   void BrowserIsOpenChanged(bool is_open) override {
     if (web_client_) {
@@ -688,12 +774,18 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
       GetZeroStateSuggestionsForFocusedTabCallback callback) override {
     if (!base::FeatureList::IsEnabled(
             contextual_cueing::kGlicZeroStateSuggestions)) {
-      mojo::ReportBadMessage(
+      receiver_.ReportBadMessage(
           "Client should not call "
           "GetZeroStateSuggestionsForFocusedTab "
           "without the GlicZeroStateSuggestions feature enabled.");
       return;
     }
+
+    if (ShouldDoApiActivationGating()) {
+      std::move(callback).Run(nullptr);
+      return;
+    }
+
     glic_service_->FetchZeroStateSuggestions(
         is_fre.value_or(false),
         base::BindOnce(
@@ -756,6 +848,10 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   }
 
   void OnFocusedTabChanged(FocusedTabData focused_tab_data) {
+    if (ShouldDoApiActivationGating()) {
+      cached_focused_tab_data_ = CreateFocusedTabData(focused_tab_data);
+      return;
+    }
     web_client_->NotifyFocusedTabChanged(
         CreateFocusedTabData(focused_tab_data));
   }
@@ -764,10 +860,27 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     if (!tab_data) {
       return;
     }
+    if (ShouldDoApiActivationGating()) {
+      cached_focused_tab_data_ =
+          glic::mojom::FocusedTabData::NewFocusedTab(tab_data->Clone());
+      return;
+    }
     web_client_->NotifyFocusedTabChanged(
         glic::mojom::FocusedTabData::NewFocusedTab(tab_data->Clone()));
   }
 
+  bool ShouldDoApiActivationGating() const {
+    return base::FeatureList::IsEnabled(features::kGlicApiActivationGating) &&
+           !active_state_calculator_.IsActive();
+  }
+
+  bool ShouldDoGetUserProfileInfoApiActivationGating() const {
+    return base::FeatureList::IsEnabled(
+               features::kGlicGetUserProfileInfoApiActivationGating) &&
+           !active_state_calculator_.IsActive();
+  }
+
+  glic::mojom::FocusedTabDataPtr cached_focused_tab_data_ = nullptr;
   PrefChangeRegistrar pref_change_registrar_;
   PrefChangeRegistrar local_state_pref_change_registrar_;
   raw_ptr<Profile> profile_;
@@ -785,6 +898,7 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   std::unique_ptr<GlicAnnotationManager> annotation_manager_;
   std::unique_ptr<system_permission_settings::ScopedObservation>
       system_permission_settings_observation_;
+  std::vector<base::OnceClosure> on_get_user_profile_info_activation_callbacks_;
 };
 
 GlicPageHandler::GlicPageHandler(
@@ -878,6 +992,8 @@ void GlicPageHandler::ResizeWidget(const gfx::Size& size,
 }
 
 void GlicPageHandler::EnableDragResize(bool enabled) {
+  // features::kGlicUserResize is not checked here because the WebUI page
+  // invokes this method when it is disabled, too (when its state changes).
   GetGlicService()->window_controller().EnableDragResize(enabled);
 }
 

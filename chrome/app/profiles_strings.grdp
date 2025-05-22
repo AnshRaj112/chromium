@@ -1157,5 +1157,8 @@
     <message name="IDS_PROFILE_MENU_SYNC_PROMO_BUTTON_LABEL" desc="The button label for the sync promo. When clicked, it opens the turn on sync dialog.">
       Turn on
     </message>
+    <message name="IDS_PROFILE_MENU_SYNC_PROMO_ROW_BUTTON_LABEL" desc="The button label for the history sync promo. When clicked, it opens the turn on sync dialog.">
+      Browse across devices
+    </message>
   </if>
 </grit-part>

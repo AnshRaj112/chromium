@@ -47,6 +47,7 @@
 #import "components/omnibox/browser/omnibox_event_global_tracker.h"
 #import "components/omnibox/browser/omnibox_field_trial.h"
 #import "components/omnibox/browser/omnibox_log.h"
+#import "components/omnibox/browser/omnibox_logging_utils.h"
 #import "components/omnibox/browser/omnibox_metrics_provider.h"
 #import "components/omnibox/browser/omnibox_navigation_observer.h"
 #import "components/omnibox/browser/omnibox_popup_selection.h"
@@ -65,22 +66,17 @@
 #import "components/search_engines/template_url_starter_pack_data.h"
 #import "components/strings/grit/components_strings.h"
 #import "ios/chrome/browser/omnibox/model/omnibox_controller_ios.h"
-#import "ios/chrome/browser/omnibox/model/omnibox_popup_view_base.h"
-#import "ios/chrome/browser/omnibox/model/omnibox_view_base.h"
+#import "ios/chrome/browser/omnibox/model/omnibox_popup_view_ios.h"
+#import "ios/chrome/browser/omnibox/model/omnibox_view_ios.h"
 #import "net/cookies/cookie_util.h"
 #import "third_party/icu/source/common/unicode/ubidi.h"
 #import "third_party/metrics_proto/omnibox_event.pb.h"
 #import "third_party/metrics_proto/omnibox_focus_type.pb.h"
-#import "ui/base/l10n/l10n_util.h"
-#import "ui/gfx/color_palette.h"
-#import "ui/gfx/geometry/rect.h"
-#import "ui/gfx/image/image.h"
 #import "url/third_party/mozilla/url_parse.h"
 #import "url/url_util.h"
 
 using bookmarks::BookmarkModel;
 using metrics::OmniboxEventProto;
-using omnibox::mojom::NavigationPredictor;
 
 // Helpers --------------------------------------------------------------------
 
@@ -143,120 +139,25 @@ size_t CountNumberOfIPv4Parts(const std::u16string& text,
   return parts;
 }
 
-// This function provides a logging implementation that aligns with the original
-// definition of the `DEPRECATED_UMA_HISTOGRAM_MEDIUM_TIMES()` macro, which is
-// currently being used to log the `FocusToOpenTimeAnyPopupState3` Omnibox
-// metric.
-void LogHistogramMediumTimes(const std::string& histogram_name,
-                             base::TimeDelta elapsed) {
-  base::UmaHistogramCustomTimes(histogram_name, elapsed, base::Milliseconds(10),
-                                base::Minutes(3), 50);
-}
-
-void LogFocusToOpenTime(base::TimeDelta elapsed,
-                        bool is_zero_prefix,
-                        PageClassification page_classification,
-                        AutocompleteMatch& match,
-                        size_t action_index) {
-  LogHistogramMediumTimes("Omnibox.FocusToOpenTimeAnyPopupState3", elapsed);
-
-  std::string summarized_result_type;
-  switch (OmniboxMetricsProvider::GetClientSummarizedResultType(
-      match.GetOmniboxEventResultType(action_index))) {
-    case ClientSummarizedResultType::kSearch:
-      summarized_result_type = "SEARCH";
-      break;
-    case ClientSummarizedResultType::kUrl:
-      summarized_result_type = "URL";
-      break;
-    default:
-      summarized_result_type = "OTHER";
-      break;
-  }
-
-  LogHistogramMediumTimes(
-      base::StrCat(
-          {"Omnibox.FocusToOpenTimeAnyPopupState3.BySummarizedResultType.",
-           summarized_result_type}),
-      elapsed);
-
-  const std::string page_context =
-      OmniboxEventProto::PageClassification_Name(page_classification);
-  LogHistogramMediumTimes(
-      base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.ByPageContext.",
-                    page_context}),
-      elapsed);
-
-  LogHistogramMediumTimes(
-      base::StrCat(
-          {"Omnibox.FocusToOpenTimeAnyPopupState3.BySummarizedResultType.",
-           summarized_result_type, ".ByPageContext.", page_context}),
-      elapsed);
-
-  if (is_zero_prefix) {
-    LogHistogramMediumTimes("Omnibox.FocusToOpenTimeAnyPopupState3.ZeroSuggest",
-                            elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.ZeroSuggest."
-                      "BySummarizedResultType.",
-                      summarized_result_type}),
-        elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat(
-            {"Omnibox.FocusToOpenTimeAnyPopupState3.ZeroSuggest.ByPageContext.",
-             page_context}),
-        elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.ZeroSuggest."
-                      "BySummarizedResultType.",
-                      summarized_result_type, ".ByPageContext.", page_context}),
-        elapsed);
-  } else {
-    LogHistogramMediumTimes(
-        "Omnibox.FocusToOpenTimeAnyPopupState3.TypedSuggest", elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.TypedSuggest."
-                      "BySummarizedResultType.",
-                      summarized_result_type}),
-        elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.TypedSuggest."
-                      "ByPageContext.",
-                      page_context}),
-        elapsed);
-    LogHistogramMediumTimes(
-        base::StrCat({"Omnibox.FocusToOpenTimeAnyPopupState3.TypedSuggest."
-                      "BySummarizedResultType.",
-                      summarized_result_type, ".ByPageContext.", page_context}),
-        elapsed);
-  }
-}
-
 }  // namespace
 
 // OmniboxEditModelIOS
 // -----------------------------------------------------------
 
 OmniboxEditModelIOS::OmniboxEditModelIOS(OmniboxControllerIOS* controller,
-                                         OmniboxViewBase* view)
+                                         OmniboxViewIOS* view)
     : controller_(controller),
       view_(view),
       user_input_in_progress_(false),
       focus_resulted_in_navigation_(false),
       just_deleted_text_(false),
       paste_state_(NONE),
-      in_revert_(false),
-      close_lens_(false) {}
+      in_revert_(false) {}
 
 OmniboxEditModelIOS::~OmniboxEditModelIOS() = default;
 
-void OmniboxEditModelIOS::set_popup_view(OmniboxPopupViewBase* popup_view) {
+void OmniboxEditModelIOS::set_popup_view(OmniboxPopupViewIOS* popup_view) {
   popup_view_ = popup_view;
-
-  // Clear/reset popup-related state.
-  old_focused_url_ = GURL();
-  popup_selection_ = OmniboxPopupSelection(OmniboxPopupSelection::kNoMatch,
-                                           OmniboxPopupSelection::NORMAL);
 }
 
 metrics::OmniboxEventProto::PageClassification
@@ -319,16 +220,6 @@ void OmniboxEditModelIOS::OnChanged() {
       autocomplete_controller()->result(), has_focus());
 }
 
-void OmniboxEditModelIOS::GetDataForURLExport(GURL* url,
-                                              std::u16string* title,
-                                              gfx::Image* favicon) {
-  *url = CurrentMatch(nullptr).destination_url;
-  if (*url == controller_->client()->GetURL()) {
-    *title = controller_->client()->GetTitle();
-    *favicon = controller_->client()->GetFavicon();
-  }
-}
-
 bool OmniboxEditModelIOS::CurrentTextIsURL() const {
   // If !user_input_in_progress_, we can determine if the text is a URL without
   // starting the autocomplete system. This speeds browser startup.
@@ -372,10 +263,6 @@ void OmniboxEditModelIOS::AdjustTextForCopy(int sel_min,
   // This code early exits if the copied text looks like a search query. It's
   // not at the very top of this method, as it would interpret the intranet URL
   // "printer/path" as a search query instead of a URL.
-  //
-  // We can't use CurrentTextIsURL() or GetDataForURLExport() because right now
-  // the user is probably holding down control to cause the copy, which will
-  // screw up our calculation of the desired_tld.
   AutocompleteMatch match_from_text;
   controller_->client()->GetAutocompleteClassifier()->Classify(
       *text, /*is_keyword_selected=*/false, true, GetPageClassification(),
@@ -524,48 +411,6 @@ void OmniboxEditModelIOS::StartAutocomplete(bool has_selected_text,
   controller_->StartAutocomplete(input_);
 }
 
-bool OmniboxEditModelIOS::CanPasteAndGo(const std::u16string& text) const {
-  if (!controller_->client()->IsPasteAndGoEnabled()) {
-    return false;
-  }
-
-  AutocompleteMatch match;
-  ClassifyString(text, &match, nullptr);
-  return match.destination_url.is_valid();
-}
-
-void OmniboxEditModelIOS::PasteAndGo(
-    const std::u16string& text,
-    base::TimeTicks match_selection_timestamp) {
-  DCHECK(CanPasteAndGo(text));
-
-  if (view_) {
-    view_->RevertAll();
-  }
-  AutocompleteMatch match;
-  GURL alternate_nav_url;
-  ClassifyString(text, &match, &alternate_nav_url);
-
-  GURL upgraded_url;
-  if (match.type == AutocompleteMatchType::URL_WHAT_YOU_TYPED &&
-      controller_->client()->ShouldDefaultTypedNavigationsToHttps() &&
-      AutocompleteInput::ShouldUpgradeToHttps(
-          text, match.destination_url,
-          controller_->client()->GetHttpsPortForTesting(),
-          controller_->client()->IsUsingFakeHttpsForHttpsUpgradeTesting(),
-          &upgraded_url)) {
-    input_.set_added_default_scheme_to_typed_url(true);
-    DCHECK(upgraded_url.is_valid());
-    match.destination_url = upgraded_url;
-  } else {
-    input_.set_added_default_scheme_to_typed_url(false);
-  }
-
-  OpenMatch(OmniboxPopupSelection(OmniboxPopupSelection::kNoMatch), match,
-            WindowOpenDisposition::CURRENT_TAB, alternate_nav_url, text,
-            match_selection_timestamp);
-}
-
 void OmniboxEditModelIOS::OpenSelection(OmniboxPopupSelection selection,
                                         base::TimeTicks timestamp,
                                         WindowOpenDisposition disposition) {
@@ -588,7 +433,9 @@ void OmniboxEditModelIOS::OpenSelection(OmniboxPopupSelection selection,
 
 void OmniboxEditModelIOS::OpenSelection(base::TimeTicks timestamp,
                                         WindowOpenDisposition disposition) {
-  OpenSelection(popup_selection_, timestamp, disposition);
+  OpenSelection(OmniboxPopupSelection(OmniboxPopupSelection::kNoMatch,
+                                      OmniboxPopupSelection::NORMAL),
+                timestamp, disposition);
 }
 
 void OmniboxEditModelIOS::ClearAdditionalText() {
@@ -606,7 +453,7 @@ void OmniboxEditModelIOS::OnSetFocus() {
   // If the omnibox lost focus while the caret was hidden and then regained
   // focus, OnSetFocus() is called and should restore visibility. Note that
   // focus can be regained without an accompanying call to
-  // OmniboxViewBase::SetFocus(), e.g. by tabbing in.
+  // OmniboxViewIOS::SetFocus(), e.g. by tabbing in.
   SetFocusState(OMNIBOX_FOCUS_VISIBLE, OMNIBOX_FOCUS_CHANGE_EXPLICIT);
 
   if (user_input_in_progress_ || !in_revert_) {
@@ -662,14 +509,6 @@ void OmniboxEditModelIOS::StartZeroSuggestRequest(
   controller_->StartAutocomplete(input_);
 }
 
-void OmniboxEditModelIOS::SetCaretVisibility(bool visible) {
-  // Caret visibility only matters if the omnibox has focus.
-  if (focus_state_ != OMNIBOX_FOCUS_NONE) {
-    SetFocusState(visible ? OMNIBOX_FOCUS_VISIBLE : OMNIBOX_FOCUS_INVISIBLE,
-                  OMNIBOX_FOCUS_CHANGE_EXPLICIT);
-  }
-}
-
 void OmniboxEditModelIOS::OnWillKillFocus() {
   if (user_input_in_progress_ || !in_revert_) {
     controller_->client()->OnInputStateChanged();
@@ -707,9 +546,6 @@ void OmniboxEditModelIOS::OnPopupDataChanged(
   current_match_ = new_match;
 
   inline_autocompletion_ = inline_autocompletion;
-  if (inline_autocompletion_.empty() && view_) {
-    view_->OnInlineAutocompleteTextCleared();
-  }
 
   const std::u16string& user_text =
       user_input_in_progress_ ? user_text_ : input_.text();
@@ -725,7 +561,7 @@ void OmniboxEditModelIOS::OnPopupDataChanged(
 }
 
 bool OmniboxEditModelIOS::OnAfterPossibleChange(
-    const OmniboxViewBase::StateChanges& state_changes) {
+    const OmniboxViewIOS::StateChanges& state_changes) {
   // Update the paste state as appropriate: if we're just finishing a paste
   // that replaced all the text, preserve that information; otherwise, if we've
   // made some other edit, clear paste tracking.
@@ -787,20 +623,10 @@ void OmniboxEditModelIOS::OnCurrentMatchChanged() {
 const char OmniboxEditModelIOS::kCutOrCopyAllTextHistogram[] =
     "Omnibox.CutOrCopyAllText";
 
-void OmniboxEditModelIOS::SetAccessibilityLabel(
-    const AutocompleteMatch& match) {
-  if (view_) {
-    view_->SetAccessibilityLabel(view_->GetText(), match, true);
-  }
-}
-
 void OmniboxEditModelIOS::InternalSetUserText(const std::u16string& text) {
   user_text_ = text;
   just_deleted_text_ = false;
   inline_autocompletion_.clear();
-  if (view_) {
-    view_->OnInlineAutocompleteTextCleared();
-  }
 }
 
 void OmniboxEditModelIOS::GetInfoForCurrentText(AutocompleteMatch* match,
@@ -816,13 +642,6 @@ void OmniboxEditModelIOS::GetInfoForCurrentText(AutocompleteMatch* match,
       // The user cannot have manually selected a match, or the query would have
       // stopped. So the default match must be the desired selection.
       *match = *autocomplete_controller()->result().default_match();
-      found_match_for_text = true;
-    } else if (PopupIsOpen() &&
-               GetPopupSelection().line != OmniboxPopupSelection::kNoMatch) {
-      const OmniboxPopupSelection selection = GetPopupSelection();
-      const AutocompleteMatch& selected_match =
-          autocomplete_controller()->result().match_at(selection.line);
-      *match = selected_match;
       found_match_for_text = true;
     }
     if (found_match_for_text && alternate_nav_url) {
@@ -845,46 +664,13 @@ void OmniboxEditModelIOS::GetInfoForCurrentText(AutocompleteMatch* match,
   }
 }
 
-bool OmniboxEditModelIOS::IsStarredMatch(const AutocompleteMatch& match) const {
-  auto* bookmark_model = controller_->client()->GetBookmarkModel();
-  return bookmark_model && bookmark_model->IsBookmarked(match.destination_url);
-}
-
-std::u16string OmniboxEditModelIOS::GetSuggestionGroupHeaderText(
-    const std::optional<omnibox::GroupId>& suggestion_group_id) const {
-  bool force_hide_row_header =
-      OmniboxFieldTrial::IsHideSuggestionGroupHeadersEnabledInContext(
-          autocomplete_controller()->input().current_page_classification());
-
-  return suggestion_group_id.has_value() && !force_hide_row_header
-             ? autocomplete_controller()->result().GetHeaderForSuggestionGroup(
-                   suggestion_group_id.value())
-             : u"";
-}
-
 bool OmniboxEditModelIOS::PopupIsOpen() const {
   return popup_view_ && popup_view_->IsOpen();
-}
-
-OmniboxPopupSelection OmniboxEditModelIOS::GetPopupSelection() const {
-  DCHECK(popup_view_);
-  return popup_selection_;
 }
 
 void OmniboxEditModelIOS::OnPopupResultChanged() {
   if (!popup_view_) {
     return;
-  }
-  const AutocompleteResult& result = autocomplete_controller()->result();
-
-  if (result.default_match()) {
-    OmniboxPopupSelection selection = GetPopupSelection();
-    selection.line = 0;
-    selection.state = OmniboxPopupSelection::NORMAL;
-    popup_selection_ = selection;
-  } else {
-    popup_selection_ = OmniboxPopupSelection(OmniboxPopupSelection::kNoMatch,
-                                             OmniboxPopupSelection::NORMAL);
   }
   popup_view_->UpdatePopupAppearance();
 }
@@ -1026,9 +812,11 @@ void OmniboxEditModelIOS::OpenMatch(OmniboxPopupSelection selection,
     elapsed_time_since_user_focused_omnibox = now - last_omnibox_focus_;
     // Only record focus to open time when a focus actually happened (as
     // opposed to, say, dragging a link onto the omnibox).
-    LogFocusToOpenTime(elapsed_time_since_user_focused_omnibox,
-                       input_.IsZeroSuggest(), GetPageClassification(), match,
-                       selection.IsAction() ? selection.action_index : -1);
+
+    omnibox::LogFocusToOpenTime(
+        elapsed_time_since_user_focused_omnibox, input_.IsZeroSuggest(),
+        GetPageClassification(), match,
+        selection.IsAction() ? selection.action_index : -1);
   }
 
   // In some unusual cases, we ignore autocomplete_controller()->result() and
@@ -1211,14 +999,6 @@ void OmniboxEditModelIOS::OpenMatch(OmniboxPopupSelection selection,
   }
 }
 
-void OmniboxEditModelIOS::ClassifyString(const std::u16string& text,
-                                         AutocompleteMatch* match,
-                                         GURL* alternate_nav_url) const {
-  DCHECK(match);
-  controller_->client()->GetAutocompleteClassifier()->Classify(
-      text, false, false, GetPageClassification(), match, alternate_nav_url);
-}
-
 bool OmniboxEditModelIOS::SetInputInProgressNoNotify(bool in_progress) {
   if (user_input_in_progress_ == in_progress) {
     return false;
@@ -1247,15 +1027,7 @@ void OmniboxEditModelIOS::SetFocusState(OmniboxFocusState state,
     return;
   }
 
-  // Update state and notify view if the omnibox has focus and the caret
-  // visibility changed.
-  const bool was_caret_visible = is_caret_visible();
   focus_state_ = state;
-  if (focus_state_ != OMNIBOX_FOCUS_NONE &&
-      is_caret_visible() != was_caret_visible && view_) {
-    view_->ApplyCaretVisibility();
-  }
-
   controller_->client()->OnFocusChanged(focus_state_, reason);
 }
 

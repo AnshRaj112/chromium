@@ -34,6 +34,7 @@
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_util.h"
 #include "extensions/browser/test_extension_registry_observer.h"
+#include "extensions/buildflags/buildflags.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_builder.h"
@@ -42,6 +43,8 @@
 #include "extensions/common/features/feature_channel.h"
 #include "extensions/common/permissions/permissions_data.h"
 #include "extensions/test/test_extension_dir.h"
+
+static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
 
 using extensions::mojom::APIPermissionID;
 
@@ -103,8 +106,7 @@ class ActiveTabTest : public ChromeRenderViewHostTestHarness {
   }
 
   ActiveTabPermissionGranter* active_tab_permission_granter() {
-    return TabHelper::FromWebContents(web_contents())
-        ->active_tab_permission_granter();
+    return ActiveTabPermissionGranter::FromWebContents(web_contents());
   }
 
   bool IsAllowed(const scoped_refptr<const Extension>& extension_refptr,
@@ -524,8 +526,7 @@ TEST_F(ActiveTabWithServiceTest, FileURLs) {
 
   TabHelper::CreateForWebContents(web_contents.get());
   ActiveTabPermissionGranter* permission_granter =
-      TabHelper::FromWebContents(web_contents.get())
-          ->active_tab_permission_granter();
+      ActiveTabPermissionGranter::FromWebContents(web_contents.get());
   ASSERT_TRUE(permission_granter);
   const int tab_id =
       sessions::SessionTabHelper::IdForTab(web_contents.get()).id();

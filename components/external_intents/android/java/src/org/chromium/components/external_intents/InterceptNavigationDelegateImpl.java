@@ -125,6 +125,9 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
     private static final String INTENT_LAUNCH_FROM_TAB_CREATION =
             "Android.Intent.IntentLaunchFromTabCreation";
 
+    private static final String OVERRIDE_BROWSER_AUXILIARY_NAVIGATION =
+            "Android.Intent.OverrideBrowserAuxiliaryNavigation";
+
     private static final long DEFER_NAVIGATION_TIMEOUT_MILLIS = 5000;
 
     private final InterceptNavigationDelegateClient mClient;
@@ -261,15 +264,6 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
             startTimeoutForDeferredNavigation();
         }
 
-        // Catches all cases where a navigation that starts in a PWA should cause a Tab reparenting
-        // towards the Chrome browser.
-        // TODO(crbug.com/416562397): eventually consider in-scope PWAs in the reparenting process.
-        if (shouldReparentTab(navigationHandle.getWebContents())) {
-            resultCallback.onResult(false);
-            mClient.startReparentingTask();
-            return;
-        }
-
         mShouldIgnoreResultCallback = resultCallback;
         OverrideUrlLoadingResult result =
                 shouldOverrideUrlLoading(
@@ -311,6 +305,7 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
             case OverrideUrlLoadingResultType.OVERRIDE_CLOSING_AFTER_AUTH:
                 shouldIgnore = true;
                 break;
+            case OverrideUrlLoadingResultType.OVERRIDE_WITH_REPARENT_TO_BROWSER:
             case OverrideUrlLoadingResultType.NO_OVERRIDE:
             default:
                 if (isExternalProtocol) {
@@ -322,6 +317,13 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
                 break;
         }
         runResultCallback(shouldIgnore);
+
+        if (!shouldIgnore
+                && result.getResultType()
+                        == OverrideUrlLoadingResultType.OVERRIDE_WITH_REPARENT_TO_BROWSER) {
+            // Reparenting task must be executed after runResultCallback has been called.
+            mClient.startReparentingTask();
+        }
     }
 
     @Override
@@ -460,6 +462,7 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
                         .setIsSandboxedMainFrame(isSandboxedMainFrame)
                         .setNavigationId(navigationId)
                         .setIsTabInPWA(mClient.isTabInPWA())
+                        .setIsInDesktopWindowingMode(mClient.isInDesktopWindowingMode())
                         .build();
         if (!shouldRunAsync) return doShouldOverrideUrlLoading(params, isExternalProtocol);
         Runnable shouldIgnoreCheck =
@@ -511,7 +514,25 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
     private OverrideUrlLoadingResult doShouldOverrideUrlLoading(
             ExternalNavigationParams params, boolean isExternalProtocol) {
         try (TraceEvent e = TraceEvent.scoped("shouldOverrideUrlLoading")) {
-            OverrideUrlLoadingResult result = mExternalNavHandler.shouldOverrideUrlLoading(params);
+            OverrideUrlLoadingResult result = null;
+            if (shouldReparentTab(mClient.getWebContents())) {
+                // Catches all cases where a navigation that starts in a PWA should cause a Tab
+                // reparenting towards the Chrome browser.
+                // TODO(crbug.com/416562397): eventually consider in-scope PWAs in the reparenting
+                // process.
+                // TODO(crbug.com/415926894): do not override POPUP auxiliary navigations when they
+                // lead to popup window opening.
+                result = OverrideUrlLoadingResult.forReparentToBrowser();
+            } else if (ExternalIntentsFeatures.AUXILIARY_NAVIGATION_STAYS_IN_BROWSER.isEnabled(
+                            mClient.isInDesktopWindowingMode())
+                    && isBrowserAuxiliaryNavigation()) {
+                // A new auxiliary browsing context navigation starting in the browser should not be
+                // captured.
+                result = OverrideUrlLoadingResult.forNoOverride();
+            } else {
+                result = mExternalNavHandler.shouldOverrideUrlLoading(params);
+            }
+
             if (sResultCallbackForTesting != null) {
                 sResultCallbackForTesting.onResult(Pair.create(params.getUrl(), result));
             }
@@ -521,6 +542,13 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
                     "Android.TabNavigationInterceptResult.For" + protocolType,
                     result.getResultType(),
                     OverrideUrlLoadingResultType.NUM_ENTRIES);
+
+            // Measure how many navigations would be affected if enabling feature flag
+            // AUXILIARY_NAVIGATION_STAYS_IN_BROWSER for all windowing modes.
+            RecordHistogram.recordBooleanHistogram(
+                    OVERRIDE_BROWSER_AUXILIARY_NAVIGATION,
+                    isBrowserAuxiliaryNavigation()
+                            && result.getResultType() != OverrideUrlLoadingResultType.NO_OVERRIDE);
 
             int scheme = InterceptScheme.UNKNOWN_SCHEME;
             if (result.getResultType() == OverrideUrlLoadingResultType.NO_OVERRIDE) {
@@ -621,11 +649,18 @@ public class InterceptNavigationDelegateImpl extends InterceptNavigationDelegate
 
     /** Returns whether a Tab instance should be reparented from the PWA to the browser. */
     public boolean shouldReparentTab(WebContents webContents) {
-        return ExternalIntentsFeatures.NAVIGATION_CAPTURE_REFACTOR_ANDROID.isEnabled()
+        return ExternalIntentsFeatures.REPARENT_AUXILIARY_NAVIGATION_FROM_PWA.isEnabled()
                 && mClient.isTabInPWA()
                 && mClient.isInDesktopWindowingMode()
                 && webContents.hasOpener()
                 && webContents.getOriginalWindowOpenDisposition()
+                        == WindowOpenDisposition.NEW_FOREGROUND_TAB;
+    }
+
+    private boolean isBrowserAuxiliaryNavigation() {
+        return mClient.isTabInBrowser()
+                && mClient.getWebContents().hasOpener()
+                && mClient.getWebContents().getOriginalWindowOpenDisposition()
                         == WindowOpenDisposition.NEW_FOREGROUND_TAB;
     }
 

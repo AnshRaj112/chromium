@@ -462,6 +462,7 @@
 <translation id="2530896289327917474">የጽሑፍ ጠቋሚ አሰሳን ያብሩ ወይም ያጥፉ</translation>
 <translation id="2531025035050312891">መሣሪያ ቀርፋፋ ነው</translation>
 <translation id="2531107890083353124">ትሩን እየጎተቱ እያሉ <ph name="KEY_ONE" />ን ይጫኑ</translation>
+<translation id="2532199152994248594">የሚቀርጹትን ቦታን ለመምረጥ ይጎትቱ ወይም ክፍተትን ይጫኑ</translation>
 <translation id="2545334090614121435">ቤትን ለመጠቀም እየሞከሩ ነው? ይጠቀሙ</translation>
 <translation id="254900897760075745">የተመረጠውን ይዘት ወደ ቅንጥብ ሰሌዳው ይቅዱት</translation>
 <translation id="2549711466868162843">ብርሃን አሻሽል</translation>
@@ -1485,6 +1486,7 @@
 <translation id="5788127256798019331">የPlay ፋይሎች</translation>
 <translation id="5788535737706478207">መጨረሻ የዘጉትን ትር ወይም መስኮት እንደገና ይክፈቱ</translation>
 <translation id="5790085346892983794">ተሳክቷል</translation>
+<translation id="5791926618942305301">የማያ ገፅ ቀረፃ ውስጥ ወደ <ph name="SOURCE" /> <ph name="TYPE" /> ያቀናብሩ። የቀረጻ ዓይነት ለመምረጥ ትርን መታ ያድርጉ። ለመቅረጽ አስገባን ይጫኑ። የቀረጻ ቦታን ለመምረጥ ወደ ከፊል ቅጽበታዊ ገፅ ዕይታ ያቀናብሩ። ቀድሞውኑ ገቢር ካልሆኑ ክልልን ለመምረጥ ቦታ ይጫኑ።</translation>
 <translation id="579415080077680903">ፀጥታ</translation>
 <translation id="5802516411616338943">ፈጣን ቅንብሮችን ይክፈቱ</translation>
 <translation id="5804651031882187592">«የሲም ቆልፍ» ቅንብርን አጥፋ</translation>
@@ -1769,6 +1771,7 @@
 <translation id="6700713906295497288">የIME ምናሌ አዝራር</translation>
 <translation id="6704073473590541209">የተመረጠ የቀኝ ጠርዝ መያዣ፣ ለማንቀሳቀስ የቀስት ቋልፎችን ይጠቀሙ</translation>
 <translation id="6706742084323792866">ተሰኪ ቁልፍ ሰሌዳ</translation>
+<translation id="6709719156428404245">የሚቀዱትን ቦታ ለመምረጥ ይጎትቱ ወይም ክፍተትን ይጫኑ</translation>
 <translation id="6710213216561001401">ቀዳሚ</translation>
 <translation id="6723839937902243910">ኃይል</translation>
 <translation id="672609503628871915">ምን አዲስ ነገር እንዳለ ይመልከቱ</translation>

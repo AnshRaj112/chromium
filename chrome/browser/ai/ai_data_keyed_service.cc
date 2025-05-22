@@ -74,9 +74,9 @@
 
 #if !BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/tabs/tab_group.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "components/tabs/public/tab_group.h"
 #endif
 
 #if BUILDFLAG(ENABLE_PDF)
@@ -1004,7 +1004,7 @@ void AiDataKeyedService::OnActionFinished(
   // handles getting a new observation.
 
   glic::FocusedTabData focused_tab_data{tab_->GetContents()->GetWeakPtr()};
-  glic::GlicPageContextFetcher::Fetch(
+  glic::FetchPageContext(
       focused_tab_data, DefaultOptions(),
       base::BindOnce(&AiDataKeyedService::ConvertToBrowserActionResult,
                      weak_factory_.GetWeakPtr(), std::move(callback), task_id_,

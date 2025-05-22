@@ -125,7 +125,7 @@
 #import "ios/chrome/browser/intelligence/enhanced_calendar/coordinator/enhanced_calendar_coordinator.h"
 #import "ios/chrome/browser/intelligence/enhanced_calendar/model/enhanced_calendar_configuration.h"
 #import "ios/chrome/browser/intelligence/features/features.h"
-#import "ios/chrome/browser/intelligence/glic/coordinator/glic_promo_coordinator.h"
+#import "ios/chrome/browser/intelligence/gemini/coordinator/glic_coordinator.h"
 #import "ios/chrome/browser/intelligence/page_action_menu/coordinator/page_action_menu_coordinator.h"
 #import "ios/chrome/browser/intents/model/intents_donation_helper.h"
 #import "ios/chrome/browser/lens/ui_bundled/lens_coordinator.h"
@@ -167,6 +167,7 @@
 #import "ios/chrome/browser/promos_manager/ui_bundled/promos_manager_coordinator.h"
 #import "ios/chrome/browser/qr_scanner/ui_bundled/qr_scanner_legacy_coordinator.h"
 #import "ios/chrome/browser/reader_mode/coordinator/reader_mode_coordinator.h"
+#import "ios/chrome/browser/reader_mode/model/reader_mode_browser_agent.h"
 #import "ios/chrome/browser/reader_mode/model/reader_mode_tab_helper.h"
 #import "ios/chrome/browser/reading_list/model/reading_list_browser_agent.h"
 #import "ios/chrome/browser/reading_list/ui_bundled/reading_list_coordinator.h"
@@ -286,6 +287,7 @@
 #import "ios/chrome/browser/tips_manager/model/tips_manager_ios_factory.h"
 #import "ios/chrome/browser/tips_notifications/coordinator/enhanced_safe_browsing_promo_coordinator.h"
 #import "ios/chrome/browser/tips_notifications/coordinator/lens_promo_coordinator.h"
+#import "ios/chrome/browser/tips_notifications/coordinator/search_what_you_see_promo_coordinator.h"
 #import "ios/chrome/browser/toolbar/ui_bundled/accessory/toolbar_accessory_coordinator_delegate.h"
 #import "ios/chrome/browser/toolbar/ui_bundled/accessory/toolbar_accessory_presenter.h"
 #import "ios/chrome/browser/toolbar/ui_bundled/toolbar_coordinator.h"
@@ -692,8 +694,11 @@ enum class ToolbarKind {
   // group is closed.
   TabGroupConfirmationCoordinator* _lastTabClosingAlert;
 
-  // The coordinator for the GLIC promo.
-  GLICPromoCoordinator* _glicPromoCoordinator;
+  // The coordinator for GLIC related logic.
+  GLICCoordinator* _glicCoordinator;
+
+  // The coordinator for the Search What You See promo.
+  SearchWhatYouSeePromoCoordinator* _searchWhatYouSeePromoCoordinator;
 }
 
 #pragma mark - ChromeCoordinator
@@ -899,6 +904,7 @@ enum class ToolbarKind {
   [self dismissLensPromo];
   [self dismissEnhancedSafeBrowsingPromo];
   [self dismissAutoDeletionActionSheet];
+  [self dismissSearchWhatYouSeePromo];
 
   [self cancelCollaborationFlows];
   [self.NTPCoordinator clearPresentedState];
@@ -1700,8 +1706,8 @@ enum class ToolbarKind {
   [_lastTabClosingAlert stop];
   _lastTabClosingAlert = nil;
 
-  [_glicPromoCoordinator stop];
-  _glicPromoCoordinator = nil;
+  [_glicCoordinator stop];
+  _glicCoordinator = nil;
 
   [self hideDriveFilePicker];
   [self hideContextualSheet];
@@ -1711,6 +1717,7 @@ enum class ToolbarKind {
   [self dismissAutoDeletionActionSheet];
   [self hideGoogleOne];
   [self stopTrustedVaultReauthentication];
+  [self dismissSearchWhatYouSeePromo];
 }
 
 // Starts independent mediators owned by this coordinator.
@@ -2431,6 +2438,19 @@ enum class ToolbarKind {
   _enhancedSafeBrowsingPromoCoordinator = nil;
 }
 
+- (void)showSearchWhatYouSeePromo {
+  [_searchWhatYouSeePromoCoordinator stop];
+  _searchWhatYouSeePromoCoordinator = [[SearchWhatYouSeePromoCoordinator alloc]
+      initWithBaseViewController:self.viewController
+                         browser:self.browser];
+  [_searchWhatYouSeePromoCoordinator start];
+}
+
+- (void)dismissSearchWhatYouSeePromo {
+  [_searchWhatYouSeePromoCoordinator stop];
+  _searchWhatYouSeePromoCoordinator = nil;
+}
+
 #pragma mark - ContextualPanelEntrypointIPHCommands
 
 - (BOOL)showContextualPanelEntrypointIPHWithConfig:
@@ -2628,22 +2648,6 @@ enum class ToolbarKind {
 #pragma mark - ReaderModeCommands
 
 - (void)showReaderMode {
-  web::WebState* activeWebState = self.activeWebState;
-  if (!activeWebState) {
-    return;
-  }
-  ReaderModeTabHelper* tabHelper =
-      ReaderModeTabHelper::FromWebState(activeWebState);
-  if (!tabHelper) {
-    return;
-  }
-  if (!tabHelper->IsActive()) {
-    // If Reader mode is not active yet in this tab, activate it first. When the
-    // distilled page is ready, -showReaderMode will be called again and the
-    // Reader mode UI can be presented.
-    tabHelper->SetActive(true);
-    return;
-  }
   if (_readerModeCoordinator) {
     // If the Reader mode UI is already presented then there is nothing to do.
     return;
@@ -2655,46 +2659,12 @@ enum class ToolbarKind {
 }
 
 - (void)hideReaderMode {
-  web::WebState* activeWebState = self.activeWebState;
-  if (!activeWebState) {
-    return;
-  }
-  ReaderModeTabHelper* tabHelper =
-      ReaderModeTabHelper::FromWebState(activeWebState);
-  if (!tabHelper) {
-    return;
-  }
-  if (tabHelper->IsActive()) {
-    // If Reader mode is active in this tab, deactivate it first. When it has
-    // been deactivated, -hideReaderMode will be called again and the Reader
-    // mode UI can be dismissed.
-    tabHelper->SetActive(false);
-    return;
-  }
   if (!_readerModeCoordinator) {
     // If the Reader mode UI is already dismissed then there is nothing to do.
     return;
   }
   [_readerModeCoordinator stop];
   _readerModeCoordinator = nil;
-}
-
-- (void)toggleReaderMode {
-  web::WebState* activeWebState = self.activeWebState;
-  if (!activeWebState) {
-    return;
-  }
-  ReaderModeTabHelper* tabHelper =
-      ReaderModeTabHelper::FromWebState(activeWebState);
-  if (!tabHelper) {
-    return;
-  }
-  // If Reader mode is active in the current tab, hide it. Otherwise, show it.
-  if (tabHelper->IsActive()) {
-    [self hideReaderMode];
-  } else {
-    [self showReaderMode];
-  }
 }
 
 #pragma mark - FindInPageCommands
@@ -2967,10 +2937,10 @@ enum class ToolbarKind {
 
 - (void)showGLICPromo {
   if (IsPageActionMenuEnabled()) {
-    _glicPromoCoordinator = [[GLICPromoCoordinator alloc]
-        initWithBaseViewController:self.viewController
-                           browser:self.browser];
-    [_glicPromoCoordinator start];
+    _glicCoordinator =
+        [[GLICCoordinator alloc] initWithBaseViewController:self.viewController
+                                                    browser:self.browser];
+    [_glicCoordinator start];
   }
 }
 
@@ -3211,6 +3181,13 @@ enum class ToolbarKind {
             static_cast<id<SnackbarCommands>>(commandDispatcher),
             HandlerForProtocol(commandDispatcher, FeedCommands));
   }
+
+  ReaderModeBrowserAgent* readerModeBrowserAgent =
+      ReaderModeBrowserAgent::FromBrowser(self.browser);
+  if (readerModeBrowserAgent) {
+    readerModeBrowserAgent->SetReaderModeHandler(HandlerForProtocol(
+        self.browser->GetCommandDispatcher(), ReaderModeCommands));
+  }
 }
 
 // Installs delegates for self.profile
@@ -3245,6 +3222,12 @@ enum class ToolbarKind {
 
   if (FollowBrowserAgent::FromBrowser(self.browser)) {
     FollowBrowserAgent::FromBrowser(self.browser)->ClearUIProviders();
+  }
+
+  ReaderModeBrowserAgent* readerModeBrowserAgent =
+      ReaderModeBrowserAgent::FromBrowser(self.browser);
+  if (readerModeBrowserAgent) {
+    readerModeBrowserAgent->SetReaderModeHandler(nil);
   }
 }
 
@@ -3987,9 +3970,11 @@ enum class ToolbarKind {
 - (void)presentLensIconBubble {
   __weak NewTabPageCoordinator* weakNTPCoordinator = _NTPCoordinator;
   [HandlerForProtocol(self.dispatcher, ApplicationCommands)
-      prepareToPresentModal:^{
-        [weakNTPCoordinator presentLensIconBubble];
-      }];
+      prepareToPresentModalWithSnackbarDismissal:YES
+                                      completion:^{
+                                        [weakNTPCoordinator
+                                            presentLensIconBubble];
+                                      }];
 }
 
 - (void)presentFeedSwipeFirstRunBubble {

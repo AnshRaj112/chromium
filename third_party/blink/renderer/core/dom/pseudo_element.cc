@@ -491,9 +491,15 @@ void PseudoElement::AttachLayoutTree(AttachContext& context) {
 
   DCHECK(!style.ContentBehavesAsNormal());
   DCHECK(!style.ContentPreventsBoxGeneration());
-  for (const ContentData* content = style.GetContentData(); content;
+  for (ContentData* content = style.GetContentData(); content;
        content = content->Next()) {
-    if (!content->IsAltText() && !content->IsAltCounter()) {
+    if (auto* alt_counter_data = DynamicTo<AltCounterContentData>(content)) {
+      alt_counter_data->UpdateText(context.counters_context,
+                                   GetDocument().GetStyleEngine(),
+                                   *layout_object);
+      continue;
+    }
+    if (!content->IsAltText()) {
       LayoutObject* child = content->CreateLayoutObject(*layout_object);
       if (layout_object->IsChildAllowed(child, style)) {
         layout_object->AddChild(child);

@@ -5,20 +5,25 @@
 #include "chrome/browser/win/installer_downloader/installer_downloader_infobar_delegate.h"
 
 #include <memory>
+#include <string>
 #include <utility>
 
+#include "base/check.h"
 #include "base/functional/callback.h"
 #include "base/memory/ptr_util.h"
 #include "chrome/browser/ui/views/infobars/confirm_infobar.h"
+#include "chrome/browser/win/installer_downloader/installer_downloader_feature.h"
 #include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/infobars/content/content_infobar_manager.h"
 #include "components/infobars/core/infobar.h"
 #include "components/infobars/core/infobar_manager.h"
 #include "components/omnibox/browser/vector_icons.h"
+#include "components/strings/grit/components_strings.h"
 #include "components/vector_icons/vector_icons.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/gfx/vector_icon_types.h"
+#include "url/gurl.h"
 
 namespace installer_downloader {
 
@@ -29,22 +34,23 @@ constexpr infobars::InfoBarDelegate::InfoBarIdentifier
 }  // namespace
 
 // static
-void InstallerDownloaderInfoBarDelegate::Show(
-    content::WebContents* contents,
-    base::RepeatingCallback<void()> accept_cb) {
+void InstallerDownloaderInfoBarDelegate::Show(content::WebContents* contents,
+                                              base::OnceClosure accept_cb,
+                                              base::OnceClosure close_cb) {
   infobars::ContentInfoBarManager* infobar_manager =
       infobars::ContentInfoBarManager::FromWebContents(contents);
 
   std::unique_ptr<InstallerDownloaderInfoBarDelegate> delegate =
-      std::make_unique<InstallerDownloaderInfoBarDelegate>(
-          std::move(accept_cb));
+      std::make_unique<InstallerDownloaderInfoBarDelegate>(std::move(accept_cb),
+                                                           std::move(close_cb));
   infobar_manager->AddInfoBar(
       std::make_unique<ConfirmInfoBar>(std::move(delegate)));
 }
 
 InstallerDownloaderInfoBarDelegate::InstallerDownloaderInfoBarDelegate(
-    base::RepeatingCallback<void()> accept_cb)
-    : accept_cb_(std::move(accept_cb)) {}
+    base::OnceClosure accept_cb,
+    base::OnceClosure close_cb)
+    : accept_cb_(std::move(accept_cb)), close_cb_(std::move(close_cb)) {}
 
 InstallerDownloaderInfoBarDelegate::~InstallerDownloaderInfoBarDelegate() =
     default;
@@ -66,12 +72,16 @@ bool InstallerDownloaderInfoBarDelegate::ShouldExpire(
   return false;
 }
 
+void InstallerDownloaderInfoBarDelegate::InfoBarDismissed() {
+  std::move(close_cb_).Run();
+}
+
 std::u16string InstallerDownloaderInfoBarDelegate::GetMessageText() const {
   return l10n_util::GetStringUTF16(IDS_INSTALLER_DOWNLOADER_DISCLAIMER);
 }
 
 std::u16string InstallerDownloaderInfoBarDelegate::GetLinkText() const {
-  return l10n_util::GetStringUTF16(IDS_INSTALLER_DOWNLOADER_LINK_TEXT);
+  return l10n_util::GetStringUTF16(IDS_LEARN_MORE);
 }
 
 int InstallerDownloaderInfoBarDelegate::GetButtons() const {
@@ -83,11 +93,12 @@ std::u16string InstallerDownloaderInfoBarDelegate::GetButtonLabel(
   return l10n_util::GetStringUTF16(IDS_INSTALLER_DOWNLOADER_BUTTON_LABEL);
 }
 
-bool InstallerDownloaderInfoBarDelegate::LinkClicked(
-    WindowOpenDisposition disposition) {
-  // TODO(crbug.com/412697757): Add implementation of what will happen once link
-  // is clicked.
-  return true;
+GURL InstallerDownloaderInfoBarDelegate::GetLinkURL() const {
+  const std::string learn_more_url_str = kLearnMoreUrl.Get();
+  GURL learn_more_url(learn_more_url_str);
+  CHECK(learn_more_url.is_valid());
+
+  return learn_more_url;
 }
 
 }  // namespace installer_downloader

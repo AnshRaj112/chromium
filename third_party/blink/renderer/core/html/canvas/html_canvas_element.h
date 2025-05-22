@@ -105,6 +105,7 @@ class CORE_EXPORT HTMLCanvasElement final
   bool PrepareTransferableResource(
       viz::TransferableResource* out_resource,
       viz::ReleaseCallback* out_release_callback) override;
+  bool IsResourceValid();
 
   // Attributes and functions exposed to script
   unsigned width() const { return Size().width(); }
@@ -188,7 +189,11 @@ class CORE_EXPORT HTMLCanvasElement final
 
   cc::TextureLayer* GetOrCreateCcLayerIfNeeded();
   cc::TextureLayer* GetCcLayerForTesting() { return cc_layer_.get(); }
+  void ClearLayerTexture() override;
+
   Canvas2DLayerBridge* GetOrCreateCanvas2DLayerBridge();
+
+  void SetNeedsPushProperties();
 
   void DiscardResourceProvider() override;
 
@@ -395,6 +400,7 @@ class CORE_EXPORT HTMLCanvasElement final
   bool AreAuthorShadowsAllowed() const override { return false; }
 
   void Reset();
+  void ResetLayer();
 
   void SetSurfaceSize(gfx::Size);
 
@@ -438,6 +444,9 @@ class CORE_EXPORT HTMLCanvasElement final
   bool ignore_reset_ = false;
   gfx::Rect dirty_rect_;
 
+  scoped_refptr<cc::TextureLayer> cc_layer_;
+
+  bool is_opaque_ = false;
   bool is_displayed_ = false;
   unsigned frames_since_last_commit_ = 0;
   std::unique_ptr<SharedContextRateLimiter> rate_limiter_;

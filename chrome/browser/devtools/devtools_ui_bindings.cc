@@ -1873,6 +1873,12 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
   response_dict.Set("devToolsAiGeneratedTimelineLabels",
                     std::move(ai_generated_timeline_labels_dict));
 
+  base::Value::Dict flexible_layout_dict;
+  flexible_layout_dict.Set(
+      "verticalalDrawerEnabled",
+      base::FeatureList::IsEnabled(::features::kDevToolsVerticalDrawer));
+  response_dict.Set("devToolsFlexibleLayout", std::move(flexible_layout_dict));
+
   base::Value response = base::Value(std::move(response_dict));
   std::move(callback).Run(&response);
 }
@@ -2009,15 +2015,15 @@ bool DevToolsUIBindings::MaybeStartLogging() {
     }
     int gen_ai_settings =
         profile_->GetPrefs()->GetInteger(prefs::kDevToolsGenAiSettings);
-    if (gen_ai_settings &
+    if (gen_ai_settings ==
         static_cast<int>(DevToolsGenAiEnterprisePolicyValue::kDisable)) {
       session_tags |= SessionTags::kDevToolsGetAiEnterprisePolicyDisabled;
     }
-    if (gen_ai_settings &
+    if (gen_ai_settings ==
         static_cast<int>(
             DevToolsGenAiEnterprisePolicyValue::kAllowWithoutLogging)) {
       session_tags |=
-          SessionTags::kDevToolsGetAiEnterprisePolicyAllowWithLogging;
+          SessionTags::kDevToolsGetAiEnterprisePolicyAllowWithoutLogging;
     }
     bool remote_debugging_enabled =
         g_browser_process->local_state()->GetBoolean(

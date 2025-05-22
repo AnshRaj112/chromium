@@ -34,15 +34,13 @@ class Label;
 class MenuRunner;
 }  // namespace views
 
-namespace {
-class CaptionBubbleEventObserver;
-}
-
 namespace translate {
 class TranslateUILanguagesManager;
 }
 
 namespace captions {
+
+class CaptionBubbleEventObserver;
 class CaptionBubbleFrameView;
 class CaptionBubbleLabel;
 class LanguageTextButton;
@@ -265,6 +263,8 @@ class CaptionBubble : public views::BubbleDialogDelegateView,
 
   std::u16string GetSourceLanguageName() const;
   std::u16string GetTargetLanguageName() const;
+
+  bool IsTranslateHeaderEnabled() const;
 
   // Unowned. Owned by views hierarchy.
   raw_ptr<CaptionBubbleLabel> label_;

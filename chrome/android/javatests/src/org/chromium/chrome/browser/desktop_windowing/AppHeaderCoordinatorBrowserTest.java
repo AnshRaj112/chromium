@@ -373,6 +373,7 @@ public class AppHeaderCoordinatorBrowserTest {
 
     @Test
     @MediumTest
+    @Restriction(DeviceFormFactor.PHONE) // https://crbug.com/393388366
     public void testKeyboardInDesktopWindow_RootViewPadded() throws TimeoutException {
         ChromeTabbedActivity activity = mActivityTestRule.getActivity();
         triggerDesktopWindowingModeChange(activity, true);
@@ -570,14 +571,13 @@ public class AppHeaderCoordinatorBrowserTest {
                                     activity.getToolbarManager().getToolbarLayoutForTesting();
                     Criteria.checkThat(
                             "Home button tint is incorrect",
-                            toolbarTablet.getHomeButton().getImageTintList().getDefaultColor(),
+                            ((ImageButton) toolbarTablet.findViewById(R.id.home_button))
+                                    .getImageTintList()
+                                    .getDefaultColor(),
                             Matchers.is(nonOmniboxIconTint));
                     Criteria.checkThat(
                             "Tab switcher icon tint is incorrect.",
-                            ((ImageButton)
-                                            activity.getToolbarManager()
-                                                    .getTabSwitcherButtonCoordinatorForTesting()
-                                                    .getContainerView())
+                            ((ImageButton) toolbarTablet.findViewById(R.id.tab_switcher_button))
                                     .getImageTintList()
                                     .getDefaultColor(),
                             Matchers.is(nonOmniboxIconTint));
@@ -589,8 +589,7 @@ public class AppHeaderCoordinatorBrowserTest {
                             Matchers.is(nonOmniboxIconTint));
                     Criteria.checkThat(
                             "Bookmark button tint is incorrect.",
-                            toolbarTablet
-                                    .getBookmarkButtonForTesting()
+                            ((ImageButton) toolbarTablet.findViewById(R.id.bookmark_button))
                                     .getImageTintList()
                                     .getDefaultColor(),
                             Matchers.is(omniboxIconTint));

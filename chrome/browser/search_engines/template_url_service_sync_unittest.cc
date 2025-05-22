@@ -7239,3 +7239,172 @@ TEST_F(TemplateURLServiceSyncTestWithSeparateLocalAndAccountSearchEngines,
   histogram_tester.ExpectUniqueSample(
       "Sync.SearchEngine.HasLocalDataDuringStopSyncing2", true, 1);
 }
+
+TEST_F(TemplateURLServiceSyncTestWithSeparateLocalAndAccountSearchEngines,
+       ShouldLogCommittedChangesUponSyncStart) {
+  syncer::SyncDataList initial_data;
+  // This should lead to a deletion commit (because of empty url).
+  syncer::SyncData sync_data1 =
+      TemplateURLService::CreateSyncDataFromTemplateURLData(
+          CreateTestTemplateURL(u"key1", /*url=*/"https://key1.com", "guid1")
+              ->data());
+  const_cast<sync_pb::EntitySpecifics&>(sync_data1.GetSpecifics())
+      .mutable_search_engine()
+      ->set_url("");
+  initial_data.push_back(sync_data1);
+
+  // This should lead to an update commit.
+  TemplateURLData data2 =
+      CreateTestTemplateURL(u"key2", "http://key2.com", "guid2")->data();
+  data2.input_encodings = {"UTF-8", "UTF-16", "UTF-16", "UTF-8"};
+  initial_data.push_back(
+      TemplateURLService::CreateSyncDataFromTemplateURLData(data2));
+
+  base::HistogramTester histogram_tester;
+  model()->MergeDataAndStartSyncing(syncer::SEARCH_ENGINES, initial_data,
+                                    PassProcessor());
+
+  ASSERT_EQ(processor()->change_list_size(), 2u);
+  ASSERT_TRUE(processor()->contains_guid("guid1"));
+  ASSERT_EQ(processor()->change_for_guid("guid1").change_type(),
+            syncer::SyncChange::ACTION_DELETE);
+  ASSERT_FALSE(model()->GetTemplateURLForGUID("guid1"));
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SearchEngine.ChangesCommittedUponSyncStart_Deleted", /*sample=*/1,
+      /*expected_bucket_count=*/1);
+  ASSERT_TRUE(processor()->contains_guid("guid2"));
+  ASSERT_EQ(processor()->change_for_guid("guid2").change_type(),
+            syncer::SyncChange::ACTION_UPDATE);
+  ASSERT_THAT(model()->GetTemplateURLForGUID("guid2"),
+              Pointee(Property(&TemplateURL::input_encodings,
+                               std::vector<std::string>{"UTF-8", "UTF-16"})));
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SearchEngine.ChangesCommittedUponSyncStart_Updated", /*sample=*/1,
+      /*expected_bucket_count=*/1);
+
+  // No adds are committed upon sync start.
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SearchEngine.ChangesCommittedUponSyncStart_Added", /*sample=*/0,
+      /*expected_bucket_count=*/1);
+}
+
+TEST_F(TemplateURLServiceSyncTestWithSeparateLocalAndAccountSearchEngines,
+       ShouldLogCommittedChangesUponIncrementalUpdate) {
+  model()->MergeDataAndStartSyncing(syncer::SEARCH_ENGINES,
+                                    syncer::SyncDataList{}, PassProcessor());
+
+  syncer::SyncChangeList changes;
+  // This should lead to an deletion commit (because of empty url).
+  syncer::SyncData sync_data1 =
+      TemplateURLService::CreateSyncDataFromTemplateURLData(
+          CreateTestTemplateURL(u"key1", /*url=*/"https://key1.com", "guid1")
+              ->data());
+  const_cast<sync_pb::EntitySpecifics&>(sync_data1.GetSpecifics())
+      .mutable_search_engine()
+      ->set_url("");
+  changes.emplace_back(FROM_HERE, syncer::SyncChange::ACTION_UPDATE,
+                       sync_data1);
+  // This should lead to an update commit.
+  TemplateURLData data2 =
+      CreateTestTemplateURL(u"key2", "http://key2.com", "guid2")->data();
+  data2.input_encodings = {"UTF-8", "UTF-16", "UTF-16", "UTF-8"};
+  changes.push_back(CreateTestSyncChange(syncer::SyncChange::ACTION_UPDATE,
+                                         std::make_unique<TemplateURL>(data2)));
+
+  base::HistogramTester histogram_tester;
+  model()->ProcessSyncChanges(FROM_HERE, changes);
+
+  ASSERT_EQ(processor()->change_list_size(), 2u);
+  ASSERT_TRUE(processor()->contains_guid("guid1"));
+  ASSERT_EQ(processor()->change_for_guid("guid1").change_type(),
+            syncer::SyncChange::ACTION_DELETE);
+  ASSERT_FALSE(model()->GetTemplateURLForGUID("guid1"));
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SearchEngine.ChangesCommittedUponIncrementalUpdate_Deleted",
+      /*sample=*/1,
+      /*expected_bucket_count=*/1);
+  ASSERT_TRUE(processor()->contains_guid("guid2"));
+  ASSERT_EQ(processor()->change_for_guid("guid2").change_type(),
+            syncer::SyncChange::ACTION_UPDATE);
+  ASSERT_THAT(model()->GetTemplateURLForGUID("guid2"),
+              Pointee(Property(&TemplateURL::input_encodings,
+                               std::vector<std::string>{"UTF-8", "UTF-16"})));
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SearchEngine.ChangesCommittedUponIncrementalUpdate_Updated",
+      /*sample=*/1,
+      /*expected_bucket_count=*/1);
+
+  // No adds are committed upon sync start.
+  histogram_tester.ExpectUniqueSample(
+      "Sync.SearchEngine.ChangesCommittedUponIncrementalUpdate_Added",
+      /*sample=*/0,
+      /*expected_bucket_count=*/1);
+}
+
+class TemplateURLServiceSyncTestWithAvoidFaviconOnlyCommits
+    : public TemplateURLServiceSyncTestWithSeparateLocalAndAccountSearchEngines {
+ private:
+  base::test::ScopedFeatureList scoped_feature_list_{
+      syncer::kSearchEngineAvoidFaviconOnlyCommits};
+};
+
+TEST_F(TemplateURLServiceSyncTestWithAvoidFaviconOnlyCommits,
+       ShouldNotCommitFaviconOnlyChanges) {
+  // Add a local-only search engine.
+  TemplateURL* local_turl = model()->Add(
+      CreateTestTemplateURL(u"localkey", "http://localkey.com", "localguid",
+                            base::Time::FromTimeT(100)));
+
+  // Add an account-only search engine.
+  syncer::SyncDataList initial_data;
+  initial_data.push_back(TemplateURLService::CreateSyncDataFromTemplateURLData(
+      CreateTestTemplateURL(u"keyword", "http://keyword.com", "guid",
+                            base::Time::FromTimeT(100))
+          ->data()));
+  // Start syncing.
+  model()->MergeDataAndStartSyncing(syncer::SEARCH_ENGINES, initial_data,
+                                    PassProcessor());
+
+  base::HistogramTester histogram_tester;
+
+  // Local-only search engines: no affect since they have no account data.
+  ASSERT_EQ(local_turl, model()->GetTemplateURLForGUID("localguid"));
+  ASSERT_EQ(local_turl->GetAccountData(), std::nullopt);
+  TemplateURLData data = local_turl->data();
+  // Update the favicon URL.
+  data.favicon_url = GURL("http://localfavicon.com");
+  model()->UpdateData(local_turl, data);
+  ASSERT_EQ(local_turl->favicon_url(), GURL("http://localfavicon.com"));
+  ASSERT_EQ(local_turl->GetAccountData(), std::nullopt);
+  ASSERT_EQ(0u, processor()->change_list_size());
+  histogram_tester.ExpectTotalCount("Sync.SearchEngine.FaviconOnlyUpdate", 0);
+  // Update any other field.
+  data.SetKeyword(u"newkeyword");
+  model()->UpdateData(local_turl, data);
+  ASSERT_EQ(local_turl->keyword(), u"newkeyword");
+  EXPECT_EQ(0u, processor()->change_list_size());
+  histogram_tester.ExpectTotalCount("Sync.SearchEngine.FaviconOnlyUpdate", 0);
+
+  // Search engines with account data.
+  TemplateURL* account_turl = model()->GetTemplateURLForGUID("guid");
+  ASSERT_NE(account_turl, nullptr);
+  ASSERT_EQ(account_turl->GetLocalData(), std::nullopt);
+  // Update the favicon URL.
+  data = account_turl->data();
+  data.favicon_url = GURL("http://favicon.com");
+  model()->UpdateData(account_turl, data);
+  ASSERT_EQ(account_turl->favicon_url(), GURL("http://favicon.com"));
+  EXPECT_EQ(0u, processor()->change_list_size());
+  EXPECT_THAT(
+      histogram_tester.GetAllSamples("Sync.SearchEngine.FaviconOnlyUpdate"),
+      base::BucketsAre(base::Bucket(true, 1)));
+
+  // Update any other field.
+  data.SetKeyword(u"newkeyword");
+  model()->UpdateData(account_turl, data);
+  ASSERT_EQ(account_turl->keyword(), u"newkeyword");
+  EXPECT_EQ(1u, processor()->change_list_size());
+  EXPECT_THAT(
+      histogram_tester.GetAllSamples("Sync.SearchEngine.FaviconOnlyUpdate"),
+      base::BucketsAre(base::Bucket(false, 1), base::Bucket(true, 1)));
+}

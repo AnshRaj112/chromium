@@ -23,27 +23,30 @@ class InstallerDownloaderInfoBarDelegate : public ConfirmInfoBarDelegate {
   // `infobar_manager`. The `infobar_manager` will own the returned infobar.
   // `accept_cb` is called when the user accepts the infobar.
   static void Show(content::WebContents* contents,
-                   base::RepeatingCallback<void()> accept_cb);
+                   base::OnceClosure accept_cb,
+                   base::OnceClosure close_cb);
 
   InstallerDownloaderInfoBarDelegate& operator=(
       const InstallerDownloaderInfoBarDelegate&) = delete;
 
-  explicit InstallerDownloaderInfoBarDelegate(
-      base::RepeatingCallback<void()> accept_cb);
+  explicit InstallerDownloaderInfoBarDelegate(base::OnceClosure accept_cb,
+                                              base::OnceClosure close_cb);
   ~InstallerDownloaderInfoBarDelegate() override;
 
   // ConfirmInfoBarDelegate:
   infobars::InfoBarDelegate::InfoBarIdentifier GetIdentifier() const override;
   const gfx::VectorIcon& GetVectorIcon() const override;
   bool ShouldExpire(const NavigationDetails& details) const override;
+  void InfoBarDismissed() override;
   std::u16string GetMessageText() const override;
   std::u16string GetLinkText() const override;
   int GetButtons() const override;
   std::u16string GetButtonLabel(InfoBarButton button) const override;
-  bool LinkClicked(WindowOpenDisposition disposition) override;
+  GURL GetLinkURL() const override;
 
  private:
-  base::RepeatingCallback<void()> accept_cb_;
+  base::OnceClosure accept_cb_;
+  base::OnceClosure close_cb_;
 };
 
 }  // namespace installer_downloader

@@ -312,6 +312,17 @@ BASE_FEATURE(kBocaCaptionToggle,
              "BocaCaptionToggle",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enables or disables using the native ChromeOS implementation of the CRD
+// client for Spotlight within the Boca SWA.
+BASE_FEATURE(kBocaSpotlightRobotRequester,
+             "BocaSpotlightRobotRequester",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables or disables enforcing sequential execution for Boca insert activity.
+BASE_FEATURE(kBocaSequentialInsertActivity,
+             "BocaSequentialInsertActivity",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 BASE_FEATURE(kCrosSwitcher, "CrosSwitcher", base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Indicates whether the camera super resolution is supported. Note that this
@@ -2201,11 +2212,6 @@ BASE_FEATURE(kOobeQuickStartOnLoginScreen,
              "OobeQuickStartOnLoginScreen",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables or disables search customizable shortcuts in launcher.
-BASE_FEATURE(kSearchCustomizableShortcutsInLauncher,
-             "SearchCustomizableShortcutsInLauncher",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables or disables Orca for ARC apps.
 BASE_FEATURE(kOrcaArc, "OrcaArc", base::FEATURE_ENABLED_BY_DEFAULT);
 
@@ -2658,7 +2664,6 @@ BASE_FEATURE(kSchedulerConfiguration,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables sea pen feature in the personalization app.
-BASE_FEATURE(kSeaPen, "SeaPen", base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kFeatureManagementSeaPen,
              "FeatureManagementSeaPen",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -3543,6 +3548,14 @@ bool IsBocaNavSettingsDialogEnabled() {
 
 bool IsBocaCaptionToggleEnabled() {
   return base::FeatureList::IsEnabled(kBocaCaptionToggle);
+}
+
+bool IsBocaSpotlightRobotRequesterEnabled() {
+  return base::FeatureList::IsEnabled(kBocaSpotlightRobotRequester);
+}
+
+bool IsBocaSequentialInsertActivityEnabled() {
+  return base::FeatureList::IsEnabled(kBocaSequentialInsertActivity);
 }
 
 bool IsBrightnessControlInSettingsEnabled() {
@@ -4525,8 +4538,7 @@ bool IsSeaPenQueryRewriteEnabled() {
 }
 
 bool IsSeaPenEnabled() {
-  return base::FeatureList::IsEnabled(kSeaPen) &&
-         base::FeatureList::IsEnabled(kFeatureManagementSeaPen);
+  return base::FeatureList::IsEnabled(kFeatureManagementSeaPen);
 }
 
 bool IsSeaPenTextInputEnabled() {
@@ -4795,10 +4807,6 @@ bool IsWindowSplittingEnabled() {
 
 bool IsWmModeEnabled() {
   return base::FeatureList::IsEnabled(kWmMode);
-}
-
-bool IsSearchCustomizableShortcutsInLauncherEnabled() {
-  return base::FeatureList::IsEnabled(kSearchCustomizableShortcutsInLauncher);
 }
 
 bool IsFeatureAwareDeviceDemoModeEnabled() {

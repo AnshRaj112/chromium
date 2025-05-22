@@ -34,8 +34,6 @@ BASE_DECLARE_FEATURE(kFewerUpdateConfirmations);
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
 
-BASE_DECLARE_FEATURE(kLightweightExtensionOverrideConfirmations);
-
 // Controls how extensions show up in the main menu. When enabled, if the
 // current profile has no extensions, instead of a full extensions submenu, only
 // the "Discover Chrome Extensions" item will be present.
@@ -45,6 +43,7 @@ BASE_DECLARE_FEATURE(kExtensionsCollapseMainMenu);
 
 #if BUILDFLAG(IS_WIN)
 BASE_DECLARE_FEATURE(kOfferPinToTaskbarWhenSettingToDefault);
+BASE_DECLARE_FEATURE(kOfferPinToTaskbarInFirstRunExperience);
 #endif
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
@@ -276,10 +275,10 @@ BASE_DECLARE_FEATURE(kTabStripBrowserApi);
 
 // Controls where tab search lives in the browser.
 BASE_DECLARE_FEATURE(kTabstripComboButton);
+BASE_DECLARE_FEATURE(kLaunchedTabSearchToolbarButton);
 extern const base::FeatureParam<bool> kTabstripComboButtonHasBackground;
 extern const base::FeatureParam<bool> kTabstripComboButtonHasReverseButtonOrder;
 extern const base::FeatureParam<bool> kTabSearchToolbarButton;
-extern const base::FeatureParam<bool> kLaunchedTabSearchToolbarButton;
 bool IsTabSearchMoving();
 bool HasTabstripComboButtonWithBackground();
 bool HasTabstripComboButtonWithReverseButtonOrder();

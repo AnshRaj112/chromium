@@ -122,6 +122,8 @@ BASE_DECLARE_FEATURE(kReportApplicationLanguageInSearchRequest);
 BASE_DECLARE_FEATURE(kOmniboxAsyncViewInflation);
 BASE_DECLARE_FEATURE(kUseFusedLocationProvider);
 
+BASE_DECLARE_FEATURE(kOmniboxMobileParityUpdate);
+
 // Omnibox suggestions tuning
 BASE_DECLARE_FEATURE(kNumNtpZpsRecentSearches);
 BASE_DECLARE_FEATURE(kNumNtpZpsTrendingSearches);
@@ -150,6 +152,9 @@ BASE_DECLARE_FEATURE(kEnableSearchAggregatorPolicy);
 
 // Ipad ZPS matches limit increase.
 BASE_DECLARE_FEATURE(kIpadZeroSuggestMatches);
+
+// Site search allow user override feature.
+BASE_DECLARE_FEATURE(kEnableSiteSearchAllowUserOverridePolicy);
 
 }  // namespace omnibox
 

@@ -5,18 +5,23 @@
 package org.chromium.chrome.browser.ui.web_app_header;
 
 import android.graphics.Rect;
+import android.view.View;
 
 import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.Callback;
 import org.chromium.base.ResettersForTesting;
+import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.Supplier;
+import org.chromium.blink.mojom.DisplayMode;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.theme.ThemeColorProvider;
+import org.chromium.chrome.browser.ui.web_app_header.WebAppHeaderUtils.BackEvent;
+import org.chromium.chrome.browser.ui.web_app_header.WebAppHeaderUtils.ReloadType;
 import org.chromium.components.browser_ui.desktop_windowing.AppHeaderState;
 import org.chromium.components.browser_ui.desktop_windowing.DesktopWindowStateManager;
 import org.chromium.components.browser_ui.widget.scrim.ScrimManager;
@@ -52,8 +57,10 @@ class WebAppHeaderLayoutMediator
     private final Callback<Boolean> mScrimVisibilityObserver;
     private @Nullable Callback<Integer> mOnButtonBottomInsetChanged;
     private int mButtonBottomInset;
+    private final @DisplayMode.EnumType int mDisplayMode;
 
     private int mDisabledControlsToken = TokenHolder.INVALID_TOKEN;
+    private boolean mIsFirstAppHeaderStateUpdate = true;
 
     /**
      * Constructs the instance of {@link WebAppHeaderLayoutMediator}.
@@ -76,7 +83,8 @@ class WebAppHeaderLayoutMediator
             Supplier<List<Rect>> nonDraggableAreasSupplier,
             ThemeColorProvider themeColorProvider,
             int webAppHeaderMinHeightFromResources,
-            int headerButtonHeight) {
+            int headerButtonHeight,
+            int displayMode) {
         mThemeColorProvider = themeColorProvider;
         mWebAppMinHeaderHeight = webAppHeaderMinHeightFromResources;
         mHeaderDelegate = headerDelegate;
@@ -84,6 +92,7 @@ class WebAppHeaderLayoutMediator
         mTabSupplier = tabSupplier;
         mNonDraggableAreasSupplier = nonDraggableAreasSupplier;
         mHeaderButtonHeight = headerButtonHeight;
+        mDisplayMode = displayMode;
 
         mScrimVisibilityObserver =
                 (isScrimVisible) -> {
@@ -104,6 +113,9 @@ class WebAppHeaderLayoutMediator
         mModel = model;
         // View should notify us about initial width.
         mModel.set(WebAppHeaderLayoutProperties.WIDTH_CHANGED_CALLBACK, this::onLayoutWidthUpdated);
+        mModel.set(
+                WebAppHeaderLayoutProperties.VISIBILITY_CHANGED_CALLBACK,
+                this::onVisibilityChanged);
 
         final var appHeaderState = desktopWindowStateManager.getAppHeaderState();
         if (appHeaderState != null) {
@@ -120,6 +132,13 @@ class WebAppHeaderLayoutMediator
 
         // Update draggable area even if width hasn't changed, because children might've changed.
         updateNonDraggableAreas();
+    }
+
+    private void onVisibilityChanged(int visibility) {
+        // If the web app header view is GONE, we should update the width to reflect this.
+        if (visibility == View.GONE) {
+            mWidthSupplier.set(0);
+        }
     }
 
     @Override
@@ -140,6 +159,12 @@ class WebAppHeaderLayoutMediator
                 Math.max(mCurrentHeaderState.getAppHeaderHeight(), getDefaultMinHeight()));
         mModel.set(
                 WebAppHeaderLayoutProperties.IS_VISIBLE, mCurrentHeaderState.isInDesktopWindow());
+
+        if (mIsFirstAppHeaderStateUpdate && mCurrentHeaderState.isInDesktopWindow()) {
+            RecordHistogram.recordEnumeratedHistogram(
+                    "CustomTabs.WebAppHeader.DisplayMode", mDisplayMode, DisplayMode.MAX_VALUE);
+            mIsFirstAppHeaderStateUpdate = false;
+        }
     }
 
     /**
@@ -209,12 +234,48 @@ class WebAppHeaderLayoutMediator
         final var tab = mTabSupplier.get();
         if (tab != null && tab.canGoBack()) {
             tab.goBack();
+            WebAppHeaderUtils.recordBackButtonEvent(BackEvent.BACK);
+        } else {
+            WebAppHeaderUtils.recordBackButtonEvent(BackEvent.INVALID);
+        }
+    }
+
+    /** Records histograms when navigation pop up is shown by long pressing back button */
+    public void onNavigationPopupShown() {
+        WebAppHeaderUtils.recordBackButtonEvent(BackEvent.NAVIGATION_MENU);
+    }
+
+    /**
+     * Reloads current visible tab or stops reloading.
+     *
+     * @param ignoreCache whether to force reload current tab.
+     */
+    public void refreshTab(boolean ignoreCache) {
+        final var tab = mTabSupplier.get();
+        if (tab == null) {
+            WebAppHeaderUtils.recordReloadButtonEvent(ReloadType.INVALID);
+            return;
+        }
+
+        if (tab.isLoading()) {
+            tab.stopLoading();
+            WebAppHeaderUtils.recordReloadButtonEvent(ReloadType.STOP_RELOAD);
+        } else if (ignoreCache) {
+            tab.reloadIgnoringCache();
+            WebAppHeaderUtils.recordReloadButtonEvent(ReloadType.RELOAD_IGNORE_CACHE);
+        } else {
+            tab.reload();
+            WebAppHeaderUtils.recordReloadButtonEvent(ReloadType.RELOAD_FROM_CACHE);
         }
     }
 
     private int getDefaultMinHeight() {
         if (sMinHeaderHeightForTesting != null) return sMinHeaderHeightForTesting;
         return mWebAppMinHeaderHeight;
+    }
+
+    public ObservableSupplierImpl<Integer> getWidthSupplierForTesting() {
+        return mWidthSupplier;
     }
 
     static void setMinHeightForTesting(final int height) {

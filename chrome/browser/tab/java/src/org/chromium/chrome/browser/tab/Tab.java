@@ -341,7 +341,7 @@ public interface Tab extends TabLifecycle {
     boolean isTabInPWA();
 
     /**
-     * @return true if the {@link Tab} is in a Browser.
+     * @return true if the {@link Tab} is in the main browser app (i.e. not a CCT, TWA, or WebApk).
      */
     boolean isTabInBrowser();
 
@@ -457,6 +457,16 @@ public interface Tab extends TabLifecycle {
      * @param contentIsSensitive True if the content is sensitive.
      */
     void setTabHasSensitiveContent(boolean contentIsSensitive);
+
+    /** Returns the current pinned state of the tab. */
+    boolean getIsPinned();
+
+    /**
+     * Sets the pinned state of the tab.
+     *
+     * @param isPinned True if the tab is pinned.
+     */
+    void setIsPinned(boolean isPinned);
 
     /** Called when the tab is restored from the archived tab model. */
     void onTabRestoredFromArchivedTabModel();

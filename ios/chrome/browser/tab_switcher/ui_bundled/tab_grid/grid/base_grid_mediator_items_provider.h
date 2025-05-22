@@ -9,9 +9,16 @@
 
 @class ActivityLabelData;
 @class GridItemIdentifier;
+@class TabSnapshotAndFavicon;
 namespace web {
 class WebStateID;
 }  // namespace web
+
+// Block invoked when a TabSnapshotAndFavicon fetching operation completes. The
+// `groupTabInfos` is nil if the operation failed.
+typedef void (^GroupTabSnapshotAndFaviconCompletionBlock)(
+    TabGroupItem* item,
+    NSArray<TabSnapshotAndFavicon*>* groupTabInfos);
 
 // Protocol allowing to get information of the grid model.
 @protocol BaseGridMediatorItemProvider
@@ -26,9 +33,11 @@ class WebStateID;
 // Returns the facePile view associated with the `itemID`.
 - (UIView*)facePileViewForItem:(GridItemIdentifier*)itemID;
 
-// Fetches the `tabGroupItem` info and executes the given `completion` block.
+// Fetches the `tabGroupItem` snapshot and favicon, then executes the given
+// `completion` block.
 - (void)fetchTabGroupItemInfo:(TabGroupItem*)tabGroupItem
-                   completion:(GroupTabInfosFetchingCompletionBlock)completion;
+                   completion:
+                       (GroupTabSnapshotAndFaviconCompletionBlock)completion;
 
 @end
 

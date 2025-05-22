@@ -583,6 +583,9 @@ extern const char kOmniboxMaxURLMatchesDescription[];
 extern const char kOmniboxMaxZPSMatchesName[];
 extern const char kOmniboxMaxZPSMatchesDescription[];
 
+extern const char kOmniboxMiaZps[];
+extern const char kOmniboxMiaZpsDescription[];
+
 extern const char kOmniboxMlLogUrlScoringSignalsName[];
 extern const char kOmniboxMlLogUrlScoringSignalsDescription[];
 
@@ -600,6 +603,9 @@ extern const char kOmniboxMlUrlScoringModelDescription[];
 
 extern const char kOmniboxMlUrlSearchBlendingName[];
 extern const char kOmniboxMlUrlSearchBlendingDescription[];
+
+extern const char kOmniboxMobileParityUpdateName[];
+extern const char kOmniboxMobileParityUpdateDescription[];
 
 extern const char kOmniboxOnClobberFocusTypeOnIOSName[];
 extern const char kOmniboxOnClobberFocusTypeOnIOSDescription[];
@@ -698,14 +704,11 @@ extern const char kIPHPriceNotificationsWhileBrowsingDescription[];
 extern const char kNotificationSettingsMenuItemName[];
 extern const char kNotificationSettingsMenuItemDescription[];
 
-extern const char kReaderModeDistillerName[];
-extern const char kReaderModeDistillerDescription[];
-
-extern const char kReaderModeDistillerHeuristicName[];
-extern const char kReaderModeDistillerHeuristicDescription[];
-
 extern const char kReaderModeName[];
 extern const char kReaderModeDescription[];
+
+extern const char kReaderModeDebugInfoName[];
+extern const char kReaderModeDebugInfoDescription[];
 
 // Title and description for the flag to refactor the toolbarsSize.
 extern const char kRefactorToolbarsSizeName[];
@@ -816,6 +819,9 @@ extern const char kSyncSandboxDescription[];
 
 extern const char kSyncTrustedVaultInfobarImprovementsName[];
 extern const char kSyncTrustedVaultInfobarImprovementsDescription[];
+
+extern const char kSyncTrustedVaultInfobarMessageImprovementsName[];
+extern const char kSyncTrustedVaultInfobarMessageImprovementsDescription[];
 
 extern const char kTabGroupIndicatorName[];
 extern const char kTabGroupIndicatorDescription[];

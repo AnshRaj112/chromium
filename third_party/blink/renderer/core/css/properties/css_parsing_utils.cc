@@ -27,6 +27,7 @@
 #include "third_party/blink/renderer/core/css/css_font_feature_value.h"
 #include "third_party/blink/renderer/core/css/css_font_style_range_value.h"
 #include "third_party/blink/renderer/core/css/css_function_value.h"
+#include "third_party/blink/renderer/core/css/css_gap_decoration_property_utils.h"
 #include "third_party/blink/renderer/core/css/css_gradient_value.h"
 #include "third_party/blink/renderer/core/css/css_grid_auto_repeat_value.h"
 #include "third_party/blink/renderer/core/css/css_grid_integer_repeat_value.h"
@@ -1604,8 +1605,59 @@ CSSIdentifierValue* ConsumeIdentRange(CSSParserTokenStream& stream,
   return ConsumeIdent(stream);
 }
 
+namespace {
+
+// https://drafts.csswg.org/css-values-5/#ident
+CSSFunctionValue* ConsumeIdentFunction(CSSParserTokenStream& stream,
+                                       const CSSParserContext& context) {
+  if (stream.Peek().FunctionId() != CSSValueID::kIdent) {
+    return nullptr;
+  }
+
+  CSSParserTokenStream::RestoringBlockGuard guard(stream);
+  stream.ConsumeWhitespace();
+
+  HeapVector<Member<const CSSValue>, 4> values;
+
+  while (!stream.AtEnd()) {
+    if (CSSValue* custom_ident = ConsumeCustomIdent(stream, context)) {
+      values.push_back(custom_ident);
+      continue;
+    }
+    if (CSSValue* string_value = ConsumeString(stream)) {
+      values.push_back(string_value);
+      continue;
+    }
+    if (CSSValue* integer_value = ConsumeInteger(
+            stream, context,
+            /*minimum_value=*/-std::numeric_limits<double>::max(),
+            /*is_percentage_allowed=*/false)) {
+      values.push_back(integer_value);
+      continue;
+    }
+    return nullptr;
+  }
+
+  if (values.empty()) {
+    return nullptr;
+  }
+
+  CHECK(guard.Release());
+  stream.ConsumeWhitespace();
+
+  return MakeGarbageCollected<CSSFunctionValue>(
+      CSSValueID::kIdent, CSSValueList::kSpaceSeparator, std::move(values));
+}
+
+}  // namespace
+
 CSSCustomIdentValue* ConsumeCustomIdent(CSSParserTokenStream& stream,
                                         const CSSParserContext& context) {
+  if (RuntimeEnabledFeatures::CSSIdentFunctionEnabled()) {
+    if (auto* ident_function = ConsumeIdentFunction(stream, context)) {
+      return MakeGarbageCollected<CSSCustomIdentValue>(*ident_function);
+    }
+  }
   if (stream.Peek().GetType() != kIdentToken ||
       IsCSSWideKeyword(stream.Peek().Id()) ||
       stream.Peek().Id() == CSSValueID::kDefault) {
@@ -1617,13 +1669,13 @@ CSSCustomIdentValue* ConsumeCustomIdent(CSSParserTokenStream& stream,
 
 CSSCustomIdentValue* ConsumeDashedIdent(CSSParserTokenStream& stream,
                                         const CSSParserContext& context) {
-  if (stream.Peek().GetType() != kIdentToken) {
+  // Note that the ident() function can currently bypass the double-dash
+  // requirement of <dashed-ident>.
+  // https://github.com/w3c/csswg-drafts/issues/12206
+  if (stream.Peek().GetType() == kIdentToken &&
+      !stream.Peek().Value().ToString().StartsWith(kTwoDashes)) {
     return nullptr;
   }
-  if (!stream.Peek().Value().ToString().StartsWith(kTwoDashes)) {
-    return nullptr;
-  }
-
   return ConsumeCustomIdent(stream, context);
 }
 
@@ -6974,13 +7026,15 @@ bool ConsumeGapDecorationsShorthandRepeatFunction(
 // Top level parsing function for the gap-decorations shorthand, which handles
 // the parsing of simple <gap-rule> or repeat <gap-rule> values.
 bool ConsumeGapDecorationsRuleShorthand(
+    CSSGapDecorationPropertyDirection direction,
     bool important,
     const CSSParserContext& context,
     CSSParserTokenStream& stream,
     HeapVector<CSSPropertyValue, 64>& properties) {
-  // TODO(samomekarajr): Add support for `row-rule` shorthand when implemented.
   const StylePropertyShorthand& gapDecorationsRuleShorthand =
-      columnRuleShorthand();
+      direction == CSSGapDecorationPropertyDirection::kRow
+          ? rowRuleShorthand()
+          : columnRuleShorthand();
   DCHECK_EQ(gapDecorationsRuleShorthand.length(), 3u);
 
   // If the CSSGapDecorations feature is not enabled, consume greedily since
@@ -7039,15 +7093,23 @@ bool ConsumeGapDecorationsRuleShorthand(
   }
 
   css_parsing_utils::AddProperty(
-      CSSPropertyID::kColumnRuleWidth, CSSPropertyID::kColumnRule, *rule_widths,
+      CSSGapDecorationUtils::GetLonghandProperty(
+          direction, CSSGapDecorationPropertyType::kWidth),
+      CSSGapDecorationUtils::GetShorthandProperty(direction), *rule_widths,
       important, css_parsing_utils::IsImplicitProperty::kNotImplicit,
       properties);
+
   css_parsing_utils::AddProperty(
-      CSSPropertyID::kColumnRuleStyle, CSSPropertyID::kColumnRule, *rule_styles,
+      CSSGapDecorationUtils::GetLonghandProperty(
+          direction, CSSGapDecorationPropertyType::kStyle),
+      CSSGapDecorationUtils::GetShorthandProperty(direction), *rule_styles,
       important, css_parsing_utils::IsImplicitProperty::kNotImplicit,
       properties);
+
   css_parsing_utils::AddProperty(
-      CSSPropertyID::kColumnRuleColor, CSSPropertyID::kColumnRule, *rule_colors,
+      CSSGapDecorationUtils::GetLonghandProperty(
+          direction, CSSGapDecorationPropertyType::kColor),
+      CSSGapDecorationUtils::GetShorthandProperty(direction), *rule_colors,
       important, css_parsing_utils::IsImplicitProperty::kNotImplicit,
       properties);
 
@@ -8363,20 +8425,19 @@ CSSValue* ParseSpacing(CSSParserTokenStream& stream,
 
 CSSValue* ConsumeSingleContainerName(CSSParserTokenStream& stream,
                                      const CSSParserContext& context) {
-  if (stream.Peek().GetType() != kIdentToken) {
-    return nullptr;
-  }
-  if (stream.Peek().Id() == CSSValueID::kNone) {
-    return nullptr;
-  }
-  if (EqualIgnoringASCIICase(stream.Peek().Value(), "not")) {
-    return nullptr;
-  }
-  if (EqualIgnoringASCIICase(stream.Peek().Value(), "and")) {
-    return nullptr;
-  }
-  if (EqualIgnoringASCIICase(stream.Peek().Value(), "or")) {
-    return nullptr;
+  if (stream.Peek().GetType() == kIdentToken) {
+    if (stream.Peek().Id() == CSSValueID::kNone) {
+      return nullptr;
+    }
+    if (EqualIgnoringASCIICase(stream.Peek().Value(), "not")) {
+      return nullptr;
+    }
+    if (EqualIgnoringASCIICase(stream.Peek().Value(), "and")) {
+      return nullptr;
+    }
+    if (EqualIgnoringASCIICase(stream.Peek().Value(), "or")) {
+      return nullptr;
+    }
   }
   return ConsumeCustomIdent(stream, context);
 }
@@ -8669,6 +8730,38 @@ CSSValue* ConsumePositionTryFallbacks(CSSParserTokenStream& stream,
   }
   return ConsumeCommaSeparatedList(ConsumeSinglePositionTryFallback, stream,
                                    context);
+}
+
+CSSValue* ConsumeFitText(CSSParserTokenStream& stream,
+                         const CSSParserContext& context) {
+  CSSValue* target = ConsumeIdent<CSSValueID::kNone, CSSValueID::kPerLine,
+                                  CSSValueID::kConsistent>(stream);
+  if (!target) {
+    return nullptr;
+  }
+  CSSValueList* list = CSSValueList::CreateSpaceSeparated();
+  list->Append(*target);
+
+  if (CSSValue* method =
+          ConsumeIdent<CSSValueID::kScale, CSSValueID::kFontSize,
+                       CSSValueID::kScaleInline, CSSValueID::kLetterSpacing>(
+              stream)) {
+    if (To<CSSIdentifierValue>(method)->GetValueID() != CSSValueID::kScale) {
+      list->Append(*method);
+    }
+  }
+
+  if (CSSValue* size = ConsumeLength(
+          stream, context, CSSPrimitiveValue::ValueRange::kNonNegative)) {
+    list->Append(*size);
+  }
+
+  // The list is either:
+  // - [target]
+  // - [target, method]
+  // - [target, size], or
+  // - [target, method, size]
+  return list;
 }
 
 namespace {

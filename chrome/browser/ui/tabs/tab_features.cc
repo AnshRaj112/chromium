@@ -20,6 +20,7 @@
 #include "chrome/browser/image_fetcher/image_fetcher_service_factory.h"
 #include "chrome/browser/loader/from_gws_navigation_and_keep_alive_request_observer.h"
 #include "chrome/browser/passage_embeddings/embedder_tab_observer.h"
+#include "chrome/browser/privacy_sandbox/incognito/privacy_sandbox_incognito_tab_observer.h"
 #include "chrome/browser/privacy_sandbox/privacy_sandbox_tab_observer.h"
 #include "chrome/browser/privacy_sandbox/tracking_protection_settings_factory.h"
 #include "chrome/browser/profiles/profile.h"
@@ -37,7 +38,9 @@
 #include "chrome/browser/ui/lens/lens_search_controller.h"
 #include "chrome/browser/ui/page_action/page_action_icon_type.h"
 #include "chrome/browser/ui/performance_controls/memory_saver_chip_controller.h"
+#include "chrome/browser/ui/performance_controls/memory_saver_chip_tab_helper.h"
 #include "chrome/browser/ui/performance_controls/tab_resource_usage_tab_helper.h"
+#include "chrome/browser/ui/tabs/alert/tab_alert_controller.h"
 #include "chrome/browser/ui/tabs/inactive_window_mouse_event_controller.h"
 #include "chrome/browser/ui/tabs/public/tab_dialog_manager.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/collaboration_messaging_tab_data.h"
@@ -145,80 +148,10 @@ void TabFeatures::Init(TabInterface& tab, Profile* profile) {
   // dependencies for non-normal browsers.
   side_panel_registry_ = std::make_unique<SidePanelRegistry>(&tab);
 
-  // Features that are only enabled for normal browser windows. By default most
-  // features should be instantiated in this block.
-  if (tab.IsInNormalWindow()) {
-    lens_search_controller_ = CreateLensController(&tab);
-    lens_search_controller_->Initialize(
-        profile->GetVariationsClient(),
-        IdentityManagerFactory::GetForProfile(profile), profile->GetPrefs(),
-        SyncServiceFactory::GetForProfile(profile),
-        ThemeServiceFactory::GetForProfile(profile));
-
-    // Each time a new tab is created, validate the topics calculation schedule
-    // to help investigate a scheduling bug (crbug.com/343750866).
-    if (browsing_topics::BrowsingTopicsService* browsing_topics_service =
-            browsing_topics::BrowsingTopicsServiceFactory::GetForProfile(
-                profile)) {
-      browsing_topics_service->ValidateCalculationSchedule();
-    }
-
-    permission_indicators_tab_data_ =
-        std::make_unique<permissions::PermissionIndicatorsTabData>(
-            tab.GetContents());
-
-    chrome_autofill_ai_client_ =
-        ChromeAutofillAiClient::MaybeCreateForWebContents(tab.GetContents());
-
-    pinned_translate_action_listener_ =
-        std::make_unique<PinnedTranslateActionListener>(&tab);
-
-    if (!profile->IsIncognitoProfile()) {
-      commerce_ui_tab_helper_ =
-          CreateCommerceUiTabHelper(tab.GetContents(), profile);
-    }
-
-    contextual_cueing::ContextualCueingHelper::MaybeCreateForWebContents(
-        tab.GetContents());
-
-    privacy_sandbox_tab_observer_ =
-        std::make_unique<privacy_sandbox::PrivacySandboxTabObserver>(
-            tab.GetContents());
-
-    dwa_web_contents_observer_ =
-        std::make_unique<metrics::DwaWebContentsObserver>(
-            tab.GetContents());
-
-    if (tab_groups::TabGroupSyncService* tab_group_sync_service =
-            tab_groups::SavedTabGroupUtils::GetServiceForProfile(profile)) {
-      saved_tab_group_web_contents_listener_ =
-          std::make_unique<tab_groups::SavedTabGroupWebContentsListener>(
-              tab_group_sync_service, &tab);
-    }
-
-    if (tab_groups::SavedTabGroupUtils::SupportsSharedTabGroups()) {
-      collaboration_messaging_tab_data_ =
-          std::make_unique<tab_groups::CollaborationMessagingTabData>(profile);
-    }
-
-#if BUILDFLAG(ENABLE_GLIC)
-    if (glic::GlicEnabling::IsProfileEligible(
-            tab.GetBrowserWindowInterface()->GetProfile())) {
-      glic_tab_indicator_helper_ =
-          std::make_unique<glic::GlicTabIndicatorHelper>(&tab);
-
-      glic_page_context_eligibility_observer_ =
-          glic::GlicPageContextEligibilityObserver::MaybeCreateForWebContents(
-              tab.GetContents());
-    }
-#endif  // BUILDFLAG(ENABLE_GLIC)
-
-    if (base::FeatureList::IsEnabled(ntp_features::kNtpFooter)) {
-      new_tab_footer_controller_ =
-          std::make_unique<new_tab_footer::NewTabFooterController>(&tab);
-    }
-  }     // IsInNormalWindow() end.
-
+  // This block instantiate the page action controllers. They do not require any
+  // pre-condition. Because some feature need them during their instantiation,
+  // therefore this block should come before the feature controllers
+  // instantiation.
   if (base::FeatureList::IsEnabled(features::kPageActionsMigration)) {
     auto* pinned_actions_model = PinnedToolbarActionsModel::Get(profile);
     CHECK(pinned_actions_model);
@@ -267,6 +200,84 @@ void TabFeatures::Init(TabInterface& tab, Profile* profile) {
               tab);
     }
   }
+
+  // Features that are only enabled for normal browser windows. By default most
+  // features should be instantiated in this block.
+  if (tab.IsInNormalWindow()) {
+    lens_search_controller_ = CreateLensController(&tab);
+    lens_search_controller_->Initialize(
+        profile->GetVariationsClient(),
+        IdentityManagerFactory::GetForProfile(profile), profile->GetPrefs(),
+        SyncServiceFactory::GetForProfile(profile),
+        ThemeServiceFactory::GetForProfile(profile));
+
+    // Each time a new tab is created, validate the topics calculation schedule
+    // to help investigate a scheduling bug (crbug.com/343750866).
+    if (browsing_topics::BrowsingTopicsService* browsing_topics_service =
+            browsing_topics::BrowsingTopicsServiceFactory::GetForProfile(
+                profile)) {
+      browsing_topics_service->ValidateCalculationSchedule();
+    }
+
+    permission_indicators_tab_data_ =
+        std::make_unique<permissions::PermissionIndicatorsTabData>(
+            tab.GetContents());
+
+    chrome_autofill_ai_client_ =
+        ChromeAutofillAiClient::MaybeCreateForWebContents(tab.GetContents());
+
+    pinned_translate_action_listener_ =
+        std::make_unique<PinnedTranslateActionListener>(&tab);
+
+    if (!profile->IsIncognitoProfile()) {
+      commerce_ui_tab_helper_ =
+          CreateCommerceUiTabHelper(tab.GetContents(), profile);
+    }
+
+    contextual_cueing::ContextualCueingHelper::MaybeCreateForWebContents(
+        tab.GetContents());
+
+    privacy_sandbox_tab_observer_ =
+        std::make_unique<privacy_sandbox::PrivacySandboxTabObserver>(
+            tab.GetContents());
+
+    privacy_sandbox_incognito_tab_observer_ =
+        std::make_unique<privacy_sandbox::PrivacySandboxIncognitoTabObserver>(
+            tab.GetContents());
+
+    dwa_web_contents_observer_ =
+        std::make_unique<metrics::DwaWebContentsObserver>(
+            tab.GetContents());
+
+    if (tab_groups::TabGroupSyncService* tab_group_sync_service =
+            tab_groups::SavedTabGroupUtils::GetServiceForProfile(profile)) {
+      saved_tab_group_web_contents_listener_ =
+          std::make_unique<tab_groups::SavedTabGroupWebContentsListener>(
+              tab_group_sync_service, &tab);
+    }
+
+    if (tab_groups::SavedTabGroupUtils::SupportsSharedTabGroups()) {
+      collaboration_messaging_tab_data_ =
+          std::make_unique<tab_groups::CollaborationMessagingTabData>(profile);
+    }
+
+#if BUILDFLAG(ENABLE_GLIC)
+    if (glic::GlicEnabling::IsProfileEligible(
+            tab.GetBrowserWindowInterface()->GetProfile())) {
+      glic_tab_indicator_helper_ =
+          std::make_unique<glic::GlicTabIndicatorHelper>(&tab);
+
+      glic_page_context_eligibility_observer_ =
+          glic::GlicPageContextEligibilityObserver::MaybeCreateForWebContents(
+              tab.GetContents());
+    }
+#endif  // BUILDFLAG(ENABLE_GLIC)
+
+    if (base::FeatureList::IsEnabled(ntp_features::kNtpFooter)) {
+      new_tab_footer_controller_ =
+          std::make_unique<new_tab_footer::NewTabFooterController>(&tab);
+    }
+  }     // IsInNormalWindow() end.
 
   customize_chrome_side_panel_controller_ =
       std::make_unique<customize_chrome::SidePanelControllerViews>(tab);
@@ -324,6 +335,11 @@ void TabFeatures::Init(TabInterface& tab, Profile* profile) {
           tab.GetContents());
 
   resource_usage_helper_ = std::make_unique<TabResourceUsageTabHelper>(tab);
+
+  memory_saver_chip_helper_ = std::make_unique<MemorySaverChipTabHelper>(tab);
+
+  tab_alert_controller_ =
+      std::make_unique<TabAlertController>(tab.GetContents());
 
   task_manager::WebContentsTags::CreateForTabContents(tab.GetContents());
 
@@ -393,6 +409,13 @@ void TabFeatures::WillDiscardContents(tabs::TabInterface* tab,
     privacy_sandbox_tab_observer_.reset();
     privacy_sandbox_tab_observer_ =
         std::make_unique<privacy_sandbox::PrivacySandboxTabObserver>(
+            new_contents);
+  }
+
+  if (privacy_sandbox_incognito_tab_observer_) {
+    privacy_sandbox_incognito_tab_observer_.reset();
+    privacy_sandbox_incognito_tab_observer_ =
+        std::make_unique<privacy_sandbox::PrivacySandboxIncognitoTabObserver>(
             new_contents);
   }
 

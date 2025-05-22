@@ -9,6 +9,7 @@
 #include <string>
 
 #include "base/strings/string_util.h"
+#include "base/types/expected.h"
 #include "content/common/content_export.h"
 #include "third_party/leveldatabase/src/include/leveldb/status.h"
 
@@ -105,6 +106,27 @@ class CONTENT_EXPORT Status {
   std::optional<leveldb::Status> leveldb_status_;
   std::string msg_;
 };
+
+// Makes a common return value more concise. For this return type, "no error" is
+// represented by returning a value for `T`, and the Status should never be
+// `ok()`.
+template <typename T>
+using StatusOr = base::expected<T, Status>;
+
+// One common way of returning an error from a function that does not otherwise
+// return a value would be base::expected<void, Status>, and that would allow us
+// to make use of the `base::expected` macros such as RETURN_IF_ERROR. However,
+// that would require updating tons of code, so we simply define similar macros.
+#define IDB_RETURN_IF_ERROR_AND_DO(expr, on_error) \
+  {                                                \
+    Status _status = expr;                         \
+    if (!_status.ok()) [[unlikely]] {              \
+      on_error;                                    \
+      return _status;                              \
+    }                                              \
+  }
+
+#define IDB_RETURN_IF_ERROR(expr) IDB_RETURN_IF_ERROR_AND_DO(expr, {})
 
 }  // namespace content::indexed_db
 

@@ -55,7 +55,7 @@ const std::string& android_build_fp();
 
 BASE_EXPORT int sdk_int();
 
-bool is_debug_android();
+BASE_EXPORT bool is_debug_android();
 
 const std::string& version_incremental();
 
@@ -67,6 +67,8 @@ const std::string& codename();
 const std::string& soc_manufacturer();
 
 const std::string& abi_name();
+
+BASE_EXPORT const std::string& security_patch();
 
 }  // namespace base::android::android_info
 

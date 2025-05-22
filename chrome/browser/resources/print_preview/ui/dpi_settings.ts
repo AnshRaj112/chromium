@@ -45,10 +45,10 @@ export class PrintPreviewDpiSettingsElement extends
     };
   }
 
-  accessor capability: DpiCapability|null;
+  accessor capability: DpiCapability|null = null;
   accessor disabled: boolean = false;
   protected accessor capabilityWithLabels_: DpiCapability|null = null;
-  private lastSelectedValue_: DpiOption;
+  private lastSelectedValue_: DpiOption|null = null;
 
   override connectedCallback() {
     super.connectedCallback();
@@ -85,18 +85,18 @@ export class PrintPreviewDpiSettingsElement extends
     }
 
     const result: LabelledDpiCapability = structuredClone(this.capability);
-    result.option.forEach((dpiOption, index) => {
+    for (const dpiOption of result.option) {
       const hDpi = dpiOption.horizontal_dpi || 0;
       const vDpi = dpiOption.vertical_dpi || 0;
       if (hDpi > 0 && vDpi > 0 && hDpi !== vDpi) {
-        result.option[index].name = loadTimeData.getStringF(
+        dpiOption.name = loadTimeData.getStringF(
             'nonIsotropicDpiItemLabel', hDpi.toLocaleString(),
             vDpi.toLocaleString());
       } else {
-        result.option[index].name = loadTimeData.getStringF(
+        dpiOption.name = loadTimeData.getStringF(
             'dpiItemLabel', (hDpi || vDpi).toLocaleString());
       }
-    });
+    }
     return result;
   }
 

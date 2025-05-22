@@ -23,7 +23,6 @@
 #include "base/scoped_multi_source_observation.h"
 #include "base/scoped_observation.h"
 #include "build/build_config.h"
-#include "chrome/browser/ui/tabs/tab_group_controller.h"
 #include "chrome/browser/ui/tabs/tab_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_scrubbing_metrics.h"
 #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
@@ -70,7 +69,7 @@ class TabGroupModelFactory {
   TabGroupModelFactory& operator=(const TabGroupModelFactory&) = delete;
 
   static TabGroupModelFactory* GetInstance();
-  std::unique_ptr<TabGroupModel> Create(TabGroupController* controller);
+  std::unique_ptr<TabGroupModel> Create();
 };
 
 // Have DetachedTabCollection object as a container of the `collection_` so
@@ -79,7 +78,8 @@ struct DetachedTabCollection {
   DetachedTabCollection(
       std::variant<std::unique_ptr<tabs::TabGroupTabCollection>,
                    std::unique_ptr<tabs::SplitTabCollection>> collection,
-      std::optional<int> active_index);
+      std::optional<int> active_index,
+      bool pinned_);
   DetachedTabCollection(const DetachedTabCollection&) = delete;
   DetachedTabCollection& operator=(const DetachedTabCollection&) = delete;
   ~DetachedTabCollection();
@@ -89,6 +89,7 @@ struct DetachedTabCollection {
       collection_;
   // Store the index of tab that was active in the detached group.
   std::optional<int> active_index_ = std::nullopt;
+  bool pinned_ = false;
 };
 
 // Holds state for a tab that has been detached from the tab strip.
@@ -172,7 +173,7 @@ class ScopedTabStripModalUI {
 // accessed on the UI thread.
 //
 ////////////////////////////////////////////////////////////////////////////////
-class TabStripModel : public TabGroupController {
+class TabStripModel {
  public:
   using TabIterator = tabs::TabCollection::Iterator;
 
@@ -194,7 +195,7 @@ class TabStripModel : public TabGroupController {
   TabStripModel(const TabStripModel&) = delete;
   TabStripModel& operator=(const TabStripModel&) = delete;
 
-  ~TabStripModel() override;
+  ~TabStripModel();
 
   // Retrieves the TabStripModelDelegate associated with this TabStripModel.
   TabStripModelDelegate* delegate() const { return delegate_; }
@@ -209,6 +210,11 @@ class TabStripModel : public TabGroupController {
 
   // Retrieve the number of WebContentses/emptiness of the TabStripModel.
   int count() const;
+
+  // TODO(crbug.com/417291958) remove this function since its the same as
+  // count().
+  int GetTabCount() const;
+
   bool empty() const;
 
   // Retrieve the Profile associated with this TabStripModel.
@@ -265,8 +271,8 @@ class TabStripModel : public TabGroupController {
 
   // Creates a group object so that group_model can link it with once group
   // collection owns it.
-  // TODO(392952244): Remove this after replacing callers with detaching and
-  // attaching groups.
+  // TODO(crbug.com/392952244): Remove this after replacing callers with
+  // detaching and attaching groups.
   void AddTabGroup(const tab_groups::TabGroupId group_id,
                    tab_groups::TabGroupVisualData visual_data);
 
@@ -288,6 +294,21 @@ class TabStripModel : public TabGroupController {
   gfx::Range InsertDetachedTabGroupAt(
       std::unique_ptr<DetachedTabCollection> group,
       int index);
+
+  // Removes the split collection from the collection hierarchy and passes it to
+  // the client. The client can re-insert into another tabstrip using
+  // `InsertDetachedSplitTabAt` without destroying the split.
+  std::unique_ptr<DetachedTabCollection> DetachSplitTabForInsertion(
+      const split_tabs::SplitTabId split_id);
+
+  // Inserts a detached split tab into the tabstrip starting at `index`.
+  // `pinned` and `group` information are used to insert it in the right place
+  // in the collection hierarchy.
+  gfx::Range InsertDetachedSplitTabAt(
+      std::unique_ptr<DetachedTabCollection> split,
+      int index,
+      bool pinned,
+      std::optional<tab_groups::TabGroupId> group_id = std::nullopt);
 
   // Closes the WebContents at the specified index. This causes the
   // WebContents to be destroyed, but it may not happen immediately.
@@ -376,9 +397,17 @@ class TabStripModel : public TabGroupController {
   void MoveSelectedTabsTo(int index,
                           std::optional<tab_groups::TabGroupId> group);
 
-  // Moves all tabs in |group| to |to_index|. This has no checks to make sure
+  // Moves all tabs in `group` to `to_index`. This has no checks to make sure
   // the position is valid for a group to move to.
   void MoveGroupTo(const tab_groups::TabGroupId& group, int to_index);
+
+  // Moves all tabs in split with `split_id` to `to_index` with  properties
+  // `pinned` and `group_id`. This has no checks to make sure the position is
+  // valid for a split to move to.
+  void MoveSplitTo(const split_tabs::SplitTabId& split_id,
+                   int to_index,
+                   bool pinned,
+                   std::optional<tab_groups::TabGroupId> group_id);
 
   // Returns the currently active WebContents, or NULL if there is none.
   content::WebContents* GetActiveWebContents() const;
@@ -475,8 +504,7 @@ class TabStripModel : public TabGroupController {
 
   // Returns the group that contains the tab at |index|, or nullopt if the tab
   // index is invalid or not grouped.
-  std::optional<tab_groups::TabGroupId> GetTabGroupForTab(
-      int index) const override;
+  std::optional<tab_groups::TabGroupId> GetTabGroupForTab(int index) const;
 
   // If a tab inserted at |index| would be within a tab group, return that
   // group's ID. Otherwise, return nullopt. If |index| points to the first tab
@@ -586,8 +614,9 @@ class TabStripModel : public TabGroupController {
   // Create a new split view with the active tab and add the set of tabs pointed
   // to by |indices| to it. Reorders the tabs so they are contiguous. |indices|
   // must be sorted in ascending order.
-  split_tabs::SplitTabId AddToNewSplit(const std::vector<int> indices,
-                                       split_tabs::SplitTabLayout tab_layout);
+  split_tabs::SplitTabId AddToNewSplit(
+      const std::vector<int> indices,
+      split_tabs::SplitTabVisualData visual_data);
 
   // Create a new tab group and add the set of tabs pointed to be |indices| to
   // it. Pins all of the tabs if any of them were pinned, and reorders the tabs
@@ -630,14 +659,15 @@ class TabStripModel : public TabGroupController {
   // Saves tabs with url supported by Read Later.
   void AddToReadLater(const std::vector<int>& indices);
 
-  // TabGroupController:
-  void OpenTabGroupEditor(const tab_groups::TabGroupId& group) override;
-  void OnTabGroupVisualsChanged(
-      const tab_groups::TabGroupId& group,
-      const TabGroupChange::VisualsChange& visuals) override;
-  std::u16string GetTitleAt(int index) const override;
-  // The same as count(), but overridden for TabGroup to access.
-  int GetTabCount() const override;
+  // Notifies all group observers that the TabGroupEditor is opening. This is
+  // used by Views that want to force the editor to open without having to find
+  // the group's header view in the Tab Strip.
+  void OpenTabGroupEditor(const tab_groups::TabGroupId& group);
+
+  // Updates the group visuals and notifies observers.
+  void ChangeTabGroupVisuals(const tab_groups::TabGroupId& group,
+                             tab_groups::TabGroupVisualData visual_data,
+                             bool is_customized = false);
 
   // Returns iterators for traversing through all the tabs in the tabstrip.
   TabIterator begin() const;
@@ -786,6 +816,10 @@ class TabStripModel : public TabGroupController {
   tabs::TabInterface* GetTabForWebContents(
       const content::WebContents* contents) const;
 
+  // Returns [start, end) where the leftmost tab in the split has index start
+  // and the rightmost tab in the split has index end - 1.
+  gfx::Range GetIndexRangeOfSplit(split_tabs::SplitTabId split_id) const;
+
  private:
   FRIEND_TEST_ALL_PREFIXES(TabStripModelTest, GetIndicesClosedByCommand);
 
@@ -817,6 +851,10 @@ class TabStripModel : public TabGroupController {
                 const TabStripSelectionChange& selection);
 
   // Notify observers that a `group` was created.
+  void NotifyTabGroupVisualsChanged(const tab_groups::TabGroupId& group_id,
+                                    TabGroupChange::VisualsChange visuals);
+
+  // Notify observers that a `group` was created.
   void NotifyTabGroupCreated(const tab_groups::TabGroupId& group);
 
   // Notify observers that a `group` was closed.
@@ -825,36 +863,53 @@ class TabStripModel : public TabGroupController {
   // Notify observers that `group` is moved.
   void NotifyTabGroupMoved(const tab_groups::TabGroupId& group);
 
-  // Notify observers that `group` is detached from the model.
-  void NotifyTabGroupDetached(tabs::TabGroupTabCollection* group_collection);
+  // Notify observers that `group` is detached from the model. This also sends
+  // split related observations within the group.
+  void NotifyTabGroupDetached(
+      tabs::TabGroupTabCollection* group_collection,
+      std::map<split_tabs::SplitTabId,
+               std::vector<std::pair<tabs::TabInterface*, int>>>
+          splits_in_group);
 
-  // Notify observers that `group` is attached to the model.
+  // Notify observers that `group` is attached to the model. This also sends
+  // split related observations within the group.
   void NotifyTabGroupAttached(tabs::TabGroupTabCollection* group_collection);
 
   // Notify observers that split with `split_id` has been created.
-  void OnSplitTabCreated(
+  void NotifySplitTabCreated(
       split_tabs::SplitTabId split_id,
       const std::vector<std::pair<tabs::TabInterface*, int>>& tabs_with_indices,
       SplitTabChange::SplitTabAddReason reason,
       const split_tabs::SplitTabVisualData& visual_data);
 
   // Notify observers that visual data for a split has changed.
-  void OnSplitTabVisualsChanged(
+  void NotifySplitTabVisualsChanged(
       split_tabs::SplitTabId split_id,
       const split_tabs::SplitTabVisualData& old_visual_data,
       const split_tabs::SplitTabVisualData& new_visual_data);
 
   // Notify observers that contents of a split has been reordered.
-  void OnSplitTabContentsUpdated(
+  void NotifySplitTabContentsUpdated(
       split_tabs::SplitTabId split_id,
       const std::vector<std::pair<tabs::TabInterface*, int>>& prev_tabs,
       const std::vector<std::pair<tabs::TabInterface*, int>>& new_tabs);
 
   // Notify observers that split with `split_id` has been removed.
-  void OnSplitTabRemoved(
+  void NotifySplitTabRemoved(
       split_tabs::SplitTabId split_id,
       const std::vector<std::pair<tabs::TabInterface*, int>>& tabs_with_indices,
       SplitTabChange::SplitTabRemoveReason reason);
+
+  // Notify observers that a split was detached from this tabstrip model.
+  // This also sends any group related notification.
+  void NotifySplitTabDetached(
+      tabs::SplitTabCollection* split_collection,
+      std::vector<std::pair<tabs::TabInterface*, int>> tabs_in_split,
+      std::optional<tab_groups::TabGroupId> previous_group_state);
+
+  // Notify observers that a split was attached to this tabstrip model.
+  // This also sends any group related notification.
+  void NotifySplitTabAttached(tabs::SplitTabCollection* split_collection);
 
   // Detaches the tab at the specified `index` from this strip.
   // `web_contents_remove_reason` is used to indicate to observers what is going
@@ -879,11 +934,44 @@ class TabStripModel : public TabGroupController {
       TabStripModelChange::RemoveReason web_contents_remove_reason,
       tabs::TabInterface::DetachReason tab_detach_reason);
 
-  std::unique_ptr<DetachedTabCollection> DetachTabGroupImpl(
-      const tab_groups::TabGroupId& group);
+  // Removes a tab collection from `contents_data_` using
+  // `execute_detach_collection_operation`. Also sends collection specific
+  // observation using `execute_tabs_notify_observer_operation` like group and
+  // split related observation calls. `TabStripModelChange` and
+  // `TabStripSelectionChange` observation calls are handled as common code.
+  std::unique_ptr<tabs::TabCollection> DetachTabCollectionImpl(
+      tabs::TabCollection* collection,
+      base::OnceCallback<std::unique_ptr<tabs::TabCollection>()>
+          execute_detach_collection_operation,
+      base::OnceClosure execute_tabs_notify_observer_operation);
 
-  gfx::Range InsertDetachedTabGroupImpl(
-      std::unique_ptr<DetachedTabCollection> detached_group,
+  // Helper method performing tasks like notification, fixing opener and
+  // returning back a Remove struct before actually detaching the set of
+  // tab_indices.
+  TabStripModelChange::Remove ProcessTabsForDetach(gfx::Range tab_indices);
+
+  // Helper method for updating the selection model after detaching a collection
+  // from `contents_data_`.
+  void UpdateSelectionModelForDetach(gfx::Range tab_indices,
+                                     std::optional<int> next_selected_index);
+
+  // Attaches a tab collection to `contents_data_` using
+  // `execute_insert_detached_tabs_operation`. Also sends collection specific
+  // observation using `execute_tabs_notify_observer_operation` like group and
+  // split related observation calls. `TabStripModelChange` and
+  // `TabStripSelectionChange` observation calls are handled as common code.
+  gfx::Range InsertDetachedCollectionImpl(
+      tabs::TabCollection* collection,
+      std::optional<int> active_index,
+      base::OnceClosure execute_insert_detached_tabs_operation,
+      base::OnceClosure execute_tabs_notify_observer_operation);
+
+  // This is the callback used as `execute_insert_detached_tabs_operation` in
+  // `InsertDetachedCollectionImpl` when a group is inserted into a tabstrip. It
+  // updates the `group_model_` and inserts the `group_collection` into
+  // `contents_data_`.
+  void InsertDetachedTabGroupImpl(
+      std::unique_ptr<tabs::TabGroupTabCollection> group_collection,
       int index);
 
   // We batch send notifications. This has two benefits:
@@ -1175,10 +1263,6 @@ class TabStripModel : public TabGroupController {
 
   std::vector<std::pair<tabs::TabInterface*, int>> GetTabsAndIndicesInSplit(
       split_tabs::SplitTabId split_id);
-
-  // Returns [start, end) where the leftmost tab in the split has index start
-  // and the rightmost tab in the split has index end - 1.
-  gfx::Range GetIndexRangeOfSplit(split_tabs::SplitTabId split_id) const;
 
   // If inserting at `index` breaks a split, returns its id, otherwise nullopt.
   std::optional<split_tabs::SplitTabId> InsertionBreaksSplitContiguity(

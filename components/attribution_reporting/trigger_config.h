@@ -10,8 +10,6 @@
 #include "base/component_export.h"
 #include "base/containers/flat_set.h"
 #include "base/types/expected.h"
-#include "components/attribution_reporting/event_report_windows.h"
-#include "components/attribution_reporting/max_event_level_reports.h"
 #include "components/attribution_reporting/source_registration_error.mojom-forward.h"
 #include "components/attribution_reporting/source_type.mojom-forward.h"
 #include "components/attribution_reporting/trigger_data_matching.mojom-forward.h"
@@ -22,36 +20,29 @@ class DictValue;
 
 namespace attribution_reporting {
 
-// Conceptually a map from `uint32_t` trigger data values to `TriggerSpec`s.
-class COMPONENT_EXPORT(ATTRIBUTION_REPORTING) TriggerSpecs {
+class COMPONENT_EXPORT(ATTRIBUTION_REPORTING) TriggerDataSet {
  public:
   using TriggerData = base::flat_set<uint32_t>;
 
-  // Parses the top-level `trigger_data` field.
-  static base::expected<TriggerSpecs, mojom::SourceRegistrationError>
-  ParseTopLevelTriggerData(const base::DictValue&,
-                           mojom::SourceType,
-                           EventReportWindows default_report_windows,
-                           mojom::TriggerDataMatching);
+  static base::expected<TriggerDataSet, mojom::SourceRegistrationError>
+  Parse(const base::DictValue&, mojom::SourceType, mojom::TriggerDataMatching);
 
-  static std::optional<TriggerSpecs> Create(TriggerData,
-                                            EventReportWindows,
-                                            MaxEventLevelReports);
+  static std::optional<TriggerDataSet> Create(TriggerData);
 
-  // Creates specs matching no trigger data.
-  TriggerSpecs();
+  // Creates an empty set matching no trigger data.
+  TriggerDataSet();
 
-  // Creates specs with the default trigger data cardinality for the given
+  // Creates a set with the default trigger data cardinality for the given
   // source type.
-  TriggerSpecs(mojom::SourceType, EventReportWindows, MaxEventLevelReports);
+  explicit TriggerDataSet(mojom::SourceType);
 
-  ~TriggerSpecs();
+  ~TriggerDataSet();
 
-  TriggerSpecs(const TriggerSpecs&);
-  TriggerSpecs& operator=(const TriggerSpecs&);
+  TriggerDataSet(const TriggerDataSet&);
+  TriggerDataSet& operator=(const TriggerDataSet&);
 
-  TriggerSpecs(TriggerSpecs&&);
-  TriggerSpecs& operator=(TriggerSpecs&&);
+  TriggerDataSet(TriggerDataSet&&);
+  TriggerDataSet& operator=(TriggerDataSet&&);
 
   base::DictValue ToJson() const;
 
@@ -64,7 +55,7 @@ class COMPONENT_EXPORT(ATTRIBUTION_REPORTING) TriggerSpecs {
   //
   // Note: `TriggerDataMatching::kModulus` can still be applied
   // even if the trigger data does not form a contiguous range starting at 0.
-  // Such a combination is prohibited by `TriggerSpecs::Parse()`, but there is
+  // Such a combination is prohibited by `TriggerDataSet::Parse()`, but there is
   // still a well-defined meaning for it for arbitrary trigger data, so we do
   // not bother preventing it here, though we may do so in the future.
   std::optional<uint32_t> find(uint64_t trigger_data,
@@ -72,27 +63,13 @@ class COMPONENT_EXPORT(ATTRIBUTION_REPORTING) TriggerSpecs {
 
   const TriggerData& trigger_data() const { return trigger_data_; }
 
-  const EventReportWindows& event_report_windows() const {
-    return event_report_windows_;
-  }
-
-  MaxEventLevelReports max_event_level_reports() const {
-    return max_event_level_reports_;
-  }
-
-  void SetMaxEventLevelReportsForTesting(
-      MaxEventLevelReports max_event_level_reports) {
-    max_event_level_reports_ = max_event_level_reports;
-  }
-
-  friend bool operator==(const TriggerSpecs&, const TriggerSpecs&) = default;
+  friend bool operator==(const TriggerDataSet&,
+                         const TriggerDataSet&) = default;
 
  private:
-  TriggerSpecs(TriggerData, EventReportWindows, MaxEventLevelReports);
+  explicit TriggerDataSet(TriggerData);
 
   TriggerData trigger_data_;
-  EventReportWindows event_report_windows_;
-  MaxEventLevelReports max_event_level_reports_;
 };
 
 COMPONENT_EXPORT(ATTRIBUTION_REPORTING)
