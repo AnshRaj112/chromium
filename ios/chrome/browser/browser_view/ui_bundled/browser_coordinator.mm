@@ -220,6 +220,7 @@
 #import "ios/chrome/browser/shared/public/commands/enhanced_calendar_commands.h"
 #import "ios/chrome/browser/shared/public/commands/feed_commands.h"
 #import "ios/chrome/browser/shared/public/commands/find_in_page_commands.h"
+#import "ios/chrome/browser/shared/public/commands/glic_commands.h"
 #import "ios/chrome/browser/shared/public/commands/google_one_commands.h"
 #import "ios/chrome/browser/shared/public/commands/help_commands.h"
 #import "ios/chrome/browser/shared/public/commands/lens_overlay_commands.h"
@@ -359,6 +360,7 @@ enum class ToolbarKind {
     EditMenuBuilder,
     EnterprisePromptCoordinatorDelegate,
     FormInputAccessoryCoordinatorNavigator,
+    GlicCommands,
     GoogleOneCommands,
     MiniMapCommands,
     NetExportTabHelperDelegate,
@@ -1108,6 +1110,7 @@ enum class ToolbarKind {
     @protocol(FeedCommands),
     @protocol(PromosManagerCommands),
     @protocol(FindInPageCommands),
+    @protocol(GlicCommands),
     @protocol(ReaderModeCommands),
     @protocol(NewTabPageCommands),
     @protocol(NonModalSignInPromoCommands),
@@ -2487,6 +2490,7 @@ enum class ToolbarKind {
                  bubbleType:ShouldShowRichContextualPanelEntrypointIPH()
                                 ? BubbleViewTypeRich
                                 : BubbleViewTypeDefault
+            pageControlPage:BubblePageControlPageNone
           dismissalCallback:dismissalCallback];
 
   _contextualPanelEntrypointHelpPresenter.voiceOverAnnouncement =
@@ -2847,6 +2851,21 @@ enum class ToolbarKind {
 - (void)hideCountryCodePicker {
   [_countryCodePickerCoordinator stop];
   _countryCodePickerCoordinator = nil;
+}
+
+#pragma mark - GlicCommands
+
+- (void)startGlicFlow {
+  _glicCoordinator =
+      [[GLICCoordinator alloc] initWithBaseViewController:self.viewController
+                                                  browser:self.browser];
+
+  [_glicCoordinator start];
+}
+
+- (void)dismissGlicFlow {
+  [_glicCoordinator stop];
+  _glicCoordinator = nil;
 }
 
 #pragma mark - PromosManagerCommands
@@ -3518,7 +3537,7 @@ enum class ToolbarKind {
       groupService->WebStateToAddToEmptyGroup();
   webStateList->InsertWebState(
       std::move(webState),
-      WebStateList::InsertionParams::Automatic().InGroup(group));
+      WebStateList::InsertionParams::Automatic().Activate().InGroup(group));
 
   const WebStateSearchCriteria& searchCriteria = WebStateSearchCriteria{
       .identifier = tabID,
@@ -3868,6 +3887,11 @@ enum class ToolbarKind {
   UIView* sadTabView = self.sadTabCoordinator.viewController.view;
   if (sadTabView) {
     [overlays addObject:sadTabView];
+  }
+
+  UIView* readerModeView = _readerModeCoordinator.viewForSnapshot;
+  if (readerModeView) {
+    [overlays addObject:readerModeView];
   }
 
   BrowserContainerViewController* browserContainerViewController =

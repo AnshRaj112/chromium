@@ -61,7 +61,10 @@ namespace {
 // The amount of time used to determine if Lens was opened recently.
 const base::TimeDelta kLensOpenedRecency = base::Days(30);
 // The amount of time used to determine if the CPE promo was displayed recently.
-const base::TimeDelta kCPEPromoRecency = base::Days(30);
+const base::TimeDelta kCPEPromoRecency = base::Days(7);
+// The amount of time used to determine if the user successfully logged in
+// recently.
+const base::TimeDelta kSuccessfullLoginRecency = base::Days(30);
 // The amount of time used to determine if the user should be classified.
 const base::TimeDelta kClassifyUserRecency = base::Hours(2);
 
@@ -89,6 +92,14 @@ bool IsSigninEnabled(AuthenticationService* auth_service) {
     case AuthenticationService::ServiceStatus::SigninDisabledByInternal:
       return false;
   }
+}
+
+// Returns true if the user can sign in.
+bool CanSignIn(ProfileIOS* profile) {
+  AuthenticationService* auth_service =
+      AuthenticationServiceFactory::GetForProfile(profile);
+  return IsSigninEnabled(auth_service) &&
+         !auth_service->HasPrimaryIdentity(signin::ConsentLevel::kSignin);
 }
 
 // Returns true if a Default Browser Promo was canceled.
@@ -504,11 +515,7 @@ bool TipsNotificationClient::ShouldSendWhatsNew(ProfileIOS* profile) {
 
 bool TipsNotificationClient::ShouldSendSignin(ProfileIOS* profile) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  AuthenticationService* auth_service =
-      AuthenticationServiceFactory::GetForProfile(profile);
-
-  return IsSigninEnabled(auth_service) &&
-         !auth_service->HasPrimaryIdentity(signin::ConsentLevel::kSignin);
+  return CanSignIn(profile);
 }
 
 bool TipsNotificationClient::ShouldSendSetUpListContinuation(
@@ -591,9 +598,9 @@ bool TipsNotificationClient::ShouldSendCPE(ProfileIOS* profile) {
   if (IsRecent(promo_display_time, kCPEPromoRecency)) {
     return false;
   }
-  // TODO(crbug.com/417940156): Refine CPE trigger criteria to include:
-  //   * have used autofill in the last 30 days.
-  return true;
+  base::Time login_time =
+      local_state_->GetTime(prefs::kIosSuccessfulLoginWithExistingPassword);
+  return IsRecent(login_time, kSuccessfullLoginRecency);
 }
 
 bool TipsNotificationClient::IsSceneLevelForegroundActive() {
@@ -659,6 +666,15 @@ void TipsNotificationClient::ShowWhatsNew(Browser* browser) {
 
 void TipsNotificationClient::ShowSignin(Browser* browser) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  // The user may have signed in between when the notification was requested
+  // and when it triggered. If the user can no longer sign in, then open
+  // the account settings.
+  if (!CanSignIn(browser->GetProfile())) {
+    [HandlerForProtocol(browser->GetCommandDispatcher(), SettingsCommands)
+        showAccountsSettingsFromViewController:nil
+                          skipIfUINotAvailable:NO];
+    return;
+  }
   // If there are 0 identities, kInstantSignin requires less taps.
   AuthenticationOperation operation =
       HasIdentitiesOnDevice(browser->GetProfile())

@@ -6,6 +6,7 @@ import '/strings.m.js';
 
 import {I18nMixinLit} from 'chrome://resources/cr_elements/i18n_mixin_lit.js';
 import {WebUiListenerMixinLit} from 'chrome://resources/cr_elements/web_ui_listener_mixin_lit.js';
+import {assert} from 'chrome://resources/js/assert.js';
 import {hasKeyModifiers} from 'chrome://resources/js/util.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 import type {PropertyValues} from 'chrome://resources/lit/v3_0/lit.rollup.js';
@@ -95,10 +96,10 @@ export class PrintPreviewPreviewAreaElement extends
     };
   }
 
-  accessor destination: Destination;
+  accessor destination: Destination|null = null;
   accessor documentModifiable: boolean = false;
   accessor error: Error|null = null;
-  accessor margins: Margins;
+  accessor margins: Margins|null = null;
   accessor measurementSystem: MeasurementSystem|null = null;
   accessor pageSize: Size = new Size(612, 792);
   accessor previewState: PreviewAreaState = PreviewAreaState.LOADING;
@@ -520,6 +521,8 @@ export class PrintPreviewPreviewAreaElement extends
       return true;
     }
 
+    assert(this.destination);
+
     const lastTicket = this.lastTicket_;
 
     // Margins
@@ -550,7 +553,7 @@ export class PrintPreviewPreviewAreaElement extends
 
       const customMarginsChanged =
           Object.values(CustomMarginsOrientation).some(side => {
-            return this.margins.get(side) !==
+            return this.margins!.get(side) !==
                 customMargins[MARGIN_KEY_MAP.get(side)!];
           });
       if (customMarginsChanged) {
@@ -611,6 +614,7 @@ export class PrintPreviewPreviewAreaElement extends
 
   /** @return Native color model of the destination. */
   private getColorForTicket_(): number {
+    assert(this.destination);
     return this.destination.getNativeColorModel(
         this.getSettingValue('color') as boolean);
   }
@@ -673,6 +677,7 @@ export class PrintPreviewPreviewAreaElement extends
    *     generated.
    */
   private getPreview_(): Promise<number> {
+    assert(this.destination);
     this.inFlightRequestId_++;
     const ticket: PreviewTicket = {
       pageRange: this.getSettingValue('ranges'),

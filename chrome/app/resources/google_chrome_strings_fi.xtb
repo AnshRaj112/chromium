@@ -96,7 +96,6 @@
 <translation id="2199691482078155239">Chromen avulla voit vaikuttaa enemmän näkemiisi mainoksiin ja rajoittaa, mitä tietoa sivustot saavat sinusta, kun ne näyttävät sinulle personoituja mainoksia</translation>
 <translation id="2216543877350048334">Jos haluat poistaa Google-tilin Chromesta, kirjaudu ulos</translation>
 <translation id="2236949375853147973">Omat tapahtumat</translation>
-<translation id="223889379102603431">Tietoa siitä, miten Chrome hallinnoi juurivarmenteitaan</translation>
 <translation id="2290014774651636340">Googlen sovellusliittymän avaimet puuttuvat. Jotkin Google Chromen toiminnoista poistetaan käytöstä.</translation>
 <translation id="2290095356545025170">Haluatko varmasti poistaa Google Chromen?</translation>
 <translation id="2309047409763057870">Tämä on Google Chromen toissijainen asennus, eikä sitä voi asettaa oletusselaimeksi.</translation>
@@ -242,6 +241,7 @@
 <translation id="4050175100176540509">Uusimmassa versiossa on käytettävissä tärkeitä turvallisuusparannuksia ja uusia ominaisuuksia.</translation>
 <translation id="4053720452172726777">Google Chromen muokkaaminen ja hallinta</translation>
 <translation id="408393047846373801">Kirjaudu Chromeen, niin voit käyttää salasanojasi ja muita tietoja kaikilla laitteillasi. Tämä salasana tallennetaan Google-tilillesi kirjautumisen jälkeen.</translation>
+<translation id="409936259433005390">Päivitätkö pian Windows 11:een? Lataa Chrome-asennusohjelma OneDriveen, jotta olet valmis heti ensimmäisestä päivästä lähtien.</translation>
 <translation id="4110895483821904099">Luo uusi Chrome-profiili</translation>
 <translation id="4111566860456076004">Chrome ei voi vahvistaa, mistä tämä laajennus on peräisin, ja se saattaa olla vaarallinen. Poista se Chromesta, jotta se ei enää voi nähdä tai muuttaa dataasi (mukaan lukien henkilökohtaisia tietoja) avatuilla sivustoilla.</translation>
 <translation id="4128488089242627000">Chrome toimii nopeammin ja JavaScriptiä käyttävien ominaisuuksien pitäisi toimia suunnitellusti (suositus)</translation>
@@ -564,7 +564,6 @@
 <translation id="8255190535488645436">Google Chrome käyttää kameraasi ja mikrofoniasi.</translation>
 <translation id="8257796129973882597">Voit avata esimerkiksi kirjanmerkit ja lukutilan Chrome-valikosta</translation>
 <translation id="8267953129876836456">Chrome on löytänyt turvallisuussuosituksia, jotka sinun täytyy tarkistaa</translation>
-<translation id="8270775718612349140">Chromen hallinnoimat varmenteet</translation>
 <translation id="8286862437124483331">Google Chrome yrittää näyttää salasanoja. Salli tämä kirjoittamalla Windows-salasanasi.</translation>
 <translation id="829923460755755423">Lisää pikakuvake Google Salasanoihin</translation>
 <translation id="8313851650939857356">Käynnistysvirhe: <ph name="STARTUP_ERROR" />.</translation>

@@ -311,6 +311,12 @@ crbug.com/380039243 crbug.com/382294240 wpt_internal/html/canvas/placeElement/pl
 
 # --- END canvasRenderingContext.placeElement() implementation
 
+# --- canvasRenderingContext.drawElement() implementation: issues.chromium.org/issues/417556295
+
+crbug.com/419363705 wpt_internal/html/canvas/drawElement/svg-foreign-object.html [ Failure ]
+
+# --- END canvasRenderingContext.drawElement() implementation
+
 # --- Skia roll test suppressions
 
 # --- END Skia roll test suppresions
@@ -1202,7 +1208,6 @@ crbug.com/906369 external/wpt/css/css-text/text-transform/text-transform-capital
 crbug.com/906369 external/wpt/css/css-text/text-transform/text-transform-capitalize-028.html [ Failure ]
 crbug.com/750990 external/wpt/css/css-text/text-transform/text-transform-upperlower-006.html [ Failure ]
 crbug.com/906369 external/wpt/css/css-text/text-transform/text-transform-multiple-001.html [ Failure ]
-crbug.com/906369 external/wpt/css/css-text/text-transform/text-transform-capitalize-033.html [ Failure ]
 crbug.com/1219058 external/wpt/css/css-text/letter-spacing/letter-spacing-bidi-002.html [ Failure ]
 crbug.com/1219058 external/wpt/css/css-text/letter-spacing/letter-spacing-nesting-002.html [ Failure ]
 crbug.com/1219058 external/wpt/css/css-text/letter-spacing/letter-spacing-nesting-001.html [ Failure ]
@@ -1470,7 +1475,10 @@ crbug.com/379233932 [ Win11-arm64 ] external/wpt/ai/translator/* [ Skip Timeout 
 # Failing on Intel Mac11
 crbug.com/379233396 [ Mac11 ] external/wpt/ai/translator/* [ Failure ]
 
-### sheriff 2019-07-16
+# Failing (PRECONDITION_FAILED) without blink::features::kAIPromptAPIMultimodalInput flag
+crbug.com/419853199 wpt_internal/ai/language-model-api-availability-available-multimodal.https.window.html [ Failure Pass ]
+crbug.com/419853199 wpt_internal/ai/language-model-api-create-multimodal.https.window.html [ Failure Pass ]
+crbug.com/419853199 wpt_internal/ai/language-model-api-prompt-multimodal.https.window.html [ Failure Pass ]
 
 ### sheriff 2018-05-28
 
@@ -3347,6 +3355,7 @@ crbug.com/378891966 [ Win11-arm64 ] virtual/no-auto-wpt-origin-isolation/externa
 crbug.com/378891966 [ Win10.20h2 ] virtual/no-auto-wpt-origin-isolation/external/wpt/html/semantics/embedded-content/the-iframe-element/iframe_sandbox_iframe_pdf_viewer.html [ Failure ]
 crbug.com/378891966 [ Linux ] virtual/no-auto-wpt-origin-isolation/external/wpt/html/semantics/embedded-content/the-iframe-element/iframe_sandbox_iframe_pdf_viewer.html [ Failure ]
 crbug.com/378891966 [ Mac ] virtual/no-auto-wpt-origin-isolation/external/wpt/html/semantics/embedded-content/the-iframe-element/iframe_sandbox_iframe_pdf_viewer.html [ Failure ]
+crbug.com/415773057 [ Mac15 ] virtual/no-auto-wpt-origin-isolation/external/wpt/html/semantics/embedded-content/the-iframe-element/iframe-loading-lazy-reload-navigation-reload.html [ Crash ]
 crbug.com/378014595 [ Mac15 ] external/wpt/webrtc/RTCPeerConnection-addIceCandidate.html [ Timeout ]
 crbug.com/378014595 [ Mac15 ] external/wpt/webrtc/RTCPeerConnection-description-attributes-timing.https.html [ Timeout ]
 crbug.com/378750930 [ Mac14 ] external/wpt/webcodecs/per-frame-qp-encoding.https.any.html?av1 [ Timeout ]
@@ -3586,6 +3595,7 @@ crbug.com/348474007 [ Win11-arm64 ] external/wpt/compression/decompression-buffe
 crbug.com/347779309 external/wpt/html/semantics/embedded-content/the-iframe-element/iframe-loading-lazy-nav-link-click-fragment.html [ Timeout ]
 crbug.com/347779309 [ Win10.20h2 ] external/wpt/html/semantics/embedded-content/the-iframe-element/iframe-loading-lazy-reload-navigation-reload.html [ Crash Failure ]
 crbug.com/347779309 [ Mac14 ] external/wpt/html/semantics/embedded-content/the-iframe-element/iframe-loading-lazy-reload-navigation-reload.html [ Crash ]
+crbug.com/347779309 [ Mac15 ] external/wpt/html/semantics/embedded-content/the-iframe-element/iframe-loading-lazy-reload-navigation-reload.html [ Crash ]
 crbug.com/347779309 [ Linux ] external/wpt/html/semantics/embedded-content/the-iframe-element/iframe-loading-lazy-reload-navigation-reload.html [ Crash ]
 crbug.com/347779309 [ Linux ] external/wpt/html/semantics/embedded-content/the-iframe-element/iframe-loading-lazy-nav-form-submit.html [ Failure Pass ]
 crbug.com/347779309 [ Linux ] external/wpt/html/semantics/embedded-content/the-iframe-element/iframe-loading-lazy-nav-meta-refresh.optional.html [ Failure Pass ]
@@ -5040,9 +5050,6 @@ crbug.com/40854799 virtual/prefetch-sw/http/tests/inspector-protocol/prefetch/re
 crbug.com/40854799 virtual/prerender2-fallback-prefetch-spec-rules-prefetch/http/tests/inspector-protocol/prefetch/request-will-be-sent.https.js [ Failure Pass ]
 crbug.com/40854799 virtual/prerender2-fallback-prefetch-spec-rules-prefetch/http/tests/inspector-protocol/prefetch/request-will-be-sent-redirect.https.js [ Failure Pass ]
 
-crbug.com/419222084 virtual/prefetch/external/wpt/speculation-rules/prefetch/tentative/service-worker/basic.sub.https.html?origin=same-site&sw=race-fetch-handler-modify-url [ Failure Pass ]
-crbug.com/419222084 virtual/prefetch-sw/external/wpt/speculation-rules/prefetch/tentative/service-worker/basic.sub.https.html?origin=same-site&sw=race-fetch-handler-modify-url [ Failure Pass ]
-
 # Sheriff 2018-03-22
 crbug.com/824848 external/wpt/html/semantics/links/following-hyperlinks/activation-behavior.window.html [ Failure Pass ]
 
@@ -5330,10 +5337,6 @@ crbug.com/1041973 external/wpt/html/semantics/forms/constraints/form-validation-
 
 # Failing origin trial for css properties test
 crbug.com/1041993 http/tests/origin_trials/sample-api-script-added-after-css-declaration.html [ Failure ]
-
-# Will change clip-path and mix-blend-mode don't trigger a Backdrop Root
-crbug.com/338250112 external/wpt/css/filter-effects/backdrop-filter-backdrop-root-clip-path.html [ Failure ]
-crbug.com/338250112 external/wpt/css/filter-effects/backdrop-filter-backdrop-root-mix-blend-mode.html [ Failure ]
 
 # Ref_Tests which fail when SkiaRenderer is enable, and which cannot be
 # rebaselined. TODO(jonross): triage these into any existing bugs or file more
@@ -6709,6 +6712,13 @@ crbug.com/1225773 external/wpt/html/webappapis/scripting/processing-model-2/unha
 # Flaky timeouts on Linux MSAN
 crbug.com/1218100 [ Linux ] external/wpt/IndexedDB/idb-partitioned-coverage.sub.html [ Pass Timeout ]
 
+# Virtual suite mostly fails while feature is in development.
+crbug.com/40253999 virtual/indexeddb_sqlite/* [ Skip Timeout ]
+crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/abort-in-initial-upgradeneeded.any.html [ Pass ]
+crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/abort-in-initial-upgradeneeded.any.serviceworker.html [ Pass ]
+crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/abort-in-initial-upgradeneeded.any.sharedworker.html [ Pass ]
+crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/abort-in-initial-upgradeneeded.any.worker.html [ Pass ]
+
 # Sheriff 2022-08-06
 crbug.com/1350337 [ Linux ] external/wpt/web-locks/query-ordering.tentative.https.html [ Failure Pass ]
 
@@ -7323,10 +7333,6 @@ crbug.com/1371395 external/wpt/performance-timeline/not-restored-reasons/perform
 # Test is flaky because of test_driver.bless, see crbug.com/1066891
 crbug.com/1382865 external/wpt/storage-access-api/requestStorageAccess-cross-site-iframe.sub.https.window.html [ Failure ]
 crbug.com/1382865 external/wpt/storage-access-api/requestStorageAccess-nested-cross-site-iframe.sub.https.window.html [ Failure ]
-
-# Test is flaky with "Illegal invocation" error reading
-# PromiseRejectionEvent.promise
-crbug.com/407400666 external/wpt/html/dom/idlharness.https.html?exclude=(Document|Window|HTML.+) [ Failure Pass ]
 
 # Sheriff 2022-11-15
 crbug.com/1383990 [ Mac ] external/wpt/html/dom/idlharness.worker.html [ Failure Skip ]
@@ -9330,7 +9336,7 @@ crbug.com/402564647 external/wpt/scroll-to-text-fragment/scroll-to-text-diretive
 # Gardener 2025-03-06
 crbug.com/400726001 [ Win ] external/wpt/css/css-ruby/ruby-text-combine-upright-002b.html [ Failure Pass ]
 crbug.com/400726001 [ Mac14 ] external/wpt/css/css-ruby/ruby-text-combine-upright-002b.html [ Failure Pass ]
-crbug.com/395503013 [ Mac ] external/wpt/soft-navigation-heuristics/first-interaction-not-softnav.tentative.html [ Pass Timeout ]
+crbug.com/395503013 [ Mac ] external/wpt/soft-navigation-heuristics/first-interaction-not-softnav.tentative.html [ Failure Pass Timeout ]
 
 # Gardener 2025-03-07
 crbug.com/398165466 [ Mac12 ] http/tests/inspector-protocol/tracing/screenshots.js [ Pass Timeout ]
@@ -9443,4 +9449,4 @@ crbug.com/417921517 [ Win11-arm64 ] external/wpt/css/css-ruby/ruby-text-combine-
 # Gardener 2025-05-19
 crbug.com/418345234 [ Win ] external/wpt/fetch/fetch-later/quota/max-payload.tentative.https.window.html [ Failure ]
 crbug.com/418572857 external/wpt/background-fetch/fetch.https.window.html [ Failure Pass Timeout ]
-crbug.com/418362694 [ Debug Linux ] external/wpt/geolocation/enabled-by-permission-policy-attribute-redirect-on-load.https.sub.html [ Crash Timeout ]
+crbug.com/418362694 [ Linux ] external/wpt/geolocation/enabled-by-permission-policy-attribute-redirect-on-load.https.sub.html [ Crash Timeout ]

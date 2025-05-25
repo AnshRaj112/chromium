@@ -98,6 +98,7 @@ extern NSString* const kFamilylinkSymbol;
 extern NSString* const kMyDriveSymbol;
 extern NSString* const kSharedDrivesSymbol;
 extern NSString* const kEllipsisSquareFillSymbol;
+extern NSString* const kMagnifyingglassSparkSymbol;
 
 // Custom symbol names which can be configured with a color palette. iOS 15+
 // only.
@@ -279,6 +280,7 @@ extern NSString* const kWorkSymbol;
 extern NSString* const kShieldedEnvelope;
 extern NSString* const kReaderModeSymbolPreIOS18;
 extern NSString* const kReaderModeSymbolPostIOS18;
+extern NSString* const kCircleBadgeFill;
 
 // Names of the default symbol being non-monochrome by default. When using them,
 // you probably want to set their color to monochrome.

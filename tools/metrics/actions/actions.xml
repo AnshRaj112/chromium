@@ -25371,6 +25371,104 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="MobilePasswordCheckupCoordinatorCheckStateCanceled"
+    not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported to track the canceled state of the password check upon opening
+    Password Issues from the Password Checkup homepage. iOS only.
+    TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
+  </description>
+</action>
+
+<action name="MobilePasswordCheckupCoordinatorCheckStateIdle"
+    not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported to track the idle state of the password check upon opening Password
+    Issues from the Password Checkup homepage. iOS only.
+    TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
+  </description>
+</action>
+
+<action name="MobilePasswordCheckupCoordinatorCheckStateNoPasswords"
+    not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported to track the no passwords state of the password check upon opening
+    Password Issues from the Password Checkup homepage. iOS only.
+    TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
+  </description>
+</action>
+
+<action name="MobilePasswordCheckupCoordinatorCheckStateOffline"
+    not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported to track the offline state of the password check upon opening
+    Password Issues from the Password Checkup homepage. iOS only.
+    TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
+  </description>
+</action>
+
+<action name="MobilePasswordCheckupCoordinatorCheckStateOther"
+    not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported to track the other state of the password check upon opening
+    Password Issues from the Password Checkup homepage. iOS only.
+    TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
+  </description>
+</action>
+
+<action name="MobilePasswordCheckupCoordinatorCheckStateQuotaLimit"
+    not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported to track the quota limit state of the password check upon opening
+    Password Issues from the Password Checkup homepage. iOS only.
+    TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
+  </description>
+</action>
+
+<action name="MobilePasswordCheckupCoordinatorCheckStateRunning"
+    not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported to track the running state of the password check upon opening
+    Password Issues from the Password Checkup homepage. iOS only.
+    TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
+  </description>
+</action>
+
+<action name="MobilePasswordCheckupCoordinatorCheckStateSignedOut"
+    not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported to track the signed out state of the password check upon opening
+    Password Issues from the Password Checkup homepage. iOS only.
+    TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
+  </description>
+</action>
+
+<action name="MobilePasswordCheckupCoordinatorShowReauth"
+    not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported when reauth is requested as a result of entering the Password
+    Checkup homepage. iOS only. TODO(crbug.com/409680593): This user action was
+    added to investigate a crash. Remove when done with the investigation.
+  </description>
+</action>
+
 <action name="MobilePasswordCheckupSettingsBack">
   <owner>noemies@google.com</owner>
   <description>
@@ -25432,6 +25530,15 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="MobilePasswordIssuesCoordinatorStart" not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported when the PasswordIssuesCoordinator is started. iOS only.
+    TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
+  </description>
+</action>
+
 <action name="MobilePasswordIssuesOpenPasswordDetails">
   <owner>noemies@google.com</owner>
   <description>
@@ -25459,6 +25566,24 @@ should be able to be added at any place in this file.
   <owner>noemies@google.com</owner>
   <description>
     Reported when Password Issues Settings UI was dismissed. iOS only.
+  </description>
+</action>
+
+<action name="MobilePasswordIssuesViewDidAppear" not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported when the PasswordIssuesTableViewController view has appeared. iOS
+    only. TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
+  </description>
+</action>
+
+<action name="MobilePasswordIssuesViewDidLoad" not_user_triggered="true">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported when the PasswordIssuesTableViewController view has loaded. iOS
+    only. TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
   </description>
 </action>
 
@@ -25757,6 +25882,24 @@ should be able to be added at any place in this file.
 
     This user action is of special interest to the chrome-analysis-team@. Do not
     change its semantics or retire it without talking to them first.
+  </description>
+</action>
+
+<action name="MobileReauthFailed">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported when reauthentication failed. iOS only. TODO(crbug.com/409680593):
+    This user action was added to investigate a crash. Remove when done with the
+    investigation.
+  </description>
+</action>
+
+<action name="MobileReauthSuccessful">
+  <owner>noemies@google.com</owner>
+  <description>
+    Reported when reauthentication succeeded. iOS only.
+    TODO(crbug.com/409680593): This user action was added to investigate a
+    crash. Remove when done with the investigation.
   </description>
 </action>
 
@@ -27861,6 +28004,14 @@ should be able to be added at any place in this file.
   <description>
     User shared the URL open in a tab, via the tab context menu on tab strip on
     Android.
+  </description>
+</action>
+
+<action name="MobileToolbarTabMenu.Shown">
+  <owner>jhimawan@google.com</owner>
+  <owner>clank-large-form-factors@google.com</owner>
+  <description>
+    User opened the tab context menu via long-press on tab strip on Android.
   </description>
 </action>
 
@@ -43503,6 +43654,16 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="Tab.PinnedTabToastClosedAfterConfirmation">
+  <owner>dljames@google.com</owner>
+  <owner>chrome-desktop-ui@google.com</owner>
+  <description>
+    On desktop, triggered when a user invokes the keyboard shortcut to close a
+    tab on a single selected pinned tab after the confirmation toast has been
+    displayed.
+  </description>
+</action>
+
 <action name="Tab.Screenshot">
   <owner>petewil@chromium.org</owner>
   <description>
@@ -44794,6 +44955,14 @@ should be able to be added at any place in this file.
   <description>
     Recorded when an archived tab is deleted. This happens when the tab's last
     archived time exceeds the limit for auto-deletion.
+  </description>
+</action>
+
+<action name="Tabs.ArchivedTabAutoDeletePromo">
+  <owner>hitarthkothari@google.com</owner>
+  <owner>clank-tab-dev@google.com</owner>
+  <description>
+    Recorded when the user opts in/out of auto delete through the promo.
   </description>
 </action>
 
@@ -48442,7 +48611,8 @@ should be able to be added at any place in this file.
     The code that caused the issue this action was meant to track is no longer
     present.
   </obsolete>
-  <owner>bialpio@chromium.org</owner>
+  <owner>alcooper@chromium.org</owner>
+  <owner>xr-dev@chromium.org</owner>
   <description>
     Raised when XR service was unable to obtain necessary component. The action
     is not directly raised by the user's behavior as it should only be logged
@@ -49143,7 +49313,6 @@ should be able to be added at any place in this file.
   <suffix name="WebFeedPostFollowDialogWithUIUpdate"
       label="For Web Feed successful follow operations after the UI update."/>
   <suffix name="WebUiHelpBubbleTest" label="For WebUiHelpBubbleTest feature."/>
-  <suffix name="WebUITabStrip" label="For the WebUI tab strip."/>
   <suffix name="WhatsNewUpdated" label="For what's new updated content."/>
   <affected-action name="InProductHelp.NotifyEvent.IPH"/>
   <affected-action name="InProductHelp.NotifyUsedEvent.IPH"/>
@@ -49899,6 +50068,14 @@ should be able to be added at any place in this file.
       label="Recorded when the 'Share' option in the context menu is
              selected."/>
   <affected-action name="TabSwitcher.ContextMenu"/>
+</action-suffix>
+
+<action-suffix separator="." ordering="suffix">
+  <suffix name="No"
+      label="Recorded when user opts out of auto delete through the promo."/>
+  <suffix name="Yes"
+      label="Recorded when user opts into auto delete through the promo."/>
+  <affected-action name="Tabs.ArchivedTabAutoDeletePromo"/>
 </action-suffix>
 
 </actions>

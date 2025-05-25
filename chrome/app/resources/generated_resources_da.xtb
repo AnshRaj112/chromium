@@ -2654,7 +2654,6 @@ Du kan administrere indstillingerne for denne konto ved at installere Family Lin
 <translation id="2798347533012571708">Behold opdateringer</translation>
 <translation id="2799162042226656283">Dit Chrome</translation>
 <translation id="2799223571221894425">Genstart</translation>
-<translation id="2800309299477632167">Brugerdefineret tastatur</translation>
 <translation id="2800760947029405028">Upload et billede</translation>
 <translation id="2800996978423439835">Få dine bogmærker og meget andet på alle dine enheder</translation>
 <translation id="2801134910297796778">Logget ind på <ph name="EMAIL" /></translation>
@@ -4771,7 +4770,6 @@ Vil du starte <ph name="CONTROL_PANEL_APPLET_NAME" />?</translation>
 <translation id="4289540628985791613">Oversigt</translation>
 <translation id="428963538941819373">Disse websites kan bruge oplysninger, de har gemt om dig, når du browser på <ph name="HOST" /></translation>
 <translation id="4289732974614035569">Vælg en pinkode</translation>
-<translation id="4290526909608432059">Understøttelsen af Chrome-apps ophører snart. Kontakt appudvikleren eller dit it-supportteam for at få flere oplysninger om dine muligheder.</translation>
 <translation id="4290791284969893584">Når du har lukket en side, kan de handlinger, du har påbegyndt, muligvis ikke gennemføres</translation>
 <translation id="4290826901752066702"><ph name="NUM" /> medlem</translation>
 <translation id="4290898381118933198">Stryg for at navigere mellem sider</translation>
@@ -7639,6 +7637,7 @@ Flere kontakter kan tildeles denne handling.</translation>
 <translation id="6365069501305898914">Facebook</translation>
 <translation id="6365411474437319296">Tilføj familie og venner</translation>
 <translation id="6367097275976877956">Vil du aktivere ChromeVox, der er den indbyggede skærmlæser til ChromeOS? Tryk på mellemrumstasten for at aktivere.</translation>
+<translation id="6367196786591004737">Slet post</translation>
 <translation id="6367396429435748845">Tryk på <ph name="ALT" /> + <ph name="LAUNCHER" /> + <ph name="NUM_4" /> for at sætte musetasterne på pause eller genoptage dem</translation>
 <translation id="6367985768157257101">Vil du modtage via Deling tæt på?</translation>
 <translation id="6368157733310917710">Adresser m.m.</translation>
@@ -7974,7 +7973,6 @@ Du har # andre kompromitterede adgangskoder. Google Adgangs­kode­admin­istrat
 <translation id="6610002944194042868">Valgmuligheder for oversættelse</translation>
 <translation id="6610064275805055636">Administrer isolerede webapps</translation>
 <translation id="6611432349566876829"><ph name="NUM" /> fane</translation>
-<translation id="6611972847767394631">Find dine faner her</translation>
 <translation id="661266467055912436">Forbedrer din og alles sikkerhed på nettet.</translation>
 <translation id="6613267708691765962">Søger efter malware…</translation>
 <translation id="6615455863669487791">Lad mig se</translation>
@@ -8301,7 +8299,6 @@ Du har # andre kompromitterede adgangskoder. Google Adgangs­kode­admin­istrat
 <translation id="6831043979455480757">Oversæt</translation>
 <translation id="6832218595502288407">Venstrejusteret</translation>
 <translation id="6832815922179448173">{MULTI_GROUP_TAB_COUNT,plural, =0{Vil du fjerne fanen og slette gruppen?}=1{Vil du fjerne fanerne og slette gruppen?}one{Vil du fjerne fanerne og slette gruppen?}other{Vil du fjerne fanerne og slette grupperne?}}</translation>
-<translation id="6833103209700200188">Sidefod</translation>
 <translation id="6833479554815567477">Fanen blev fjernet fra gruppen <ph name="GROUP_NAME" /> – <ph name="GROUP_CONTENTS" /></translation>
 <translation id="6833753236242482566">Balanceret (anbefales)</translation>
 <translation id="6835762382653651563">Opret forbindelse til internettet for at opdatere din <ph name="DEVICE_TYPE" />.</translation>
@@ -10636,6 +10633,7 @@ Opbevar din nøglefil på et sikkert sted. Du skal bruge den til at oprette nye 
 <translation id="8472623782143987204">hardwarebaseret</translation>
 <translation id="8473540203671727883">Oplæs teksten under markøren</translation>
 <translation id="8473863474539038330">Adresser m.m.</translation>
+<translation id="847433688444405067">Få samme indhold på flere enheder</translation>
 <translation id="8474378002946546633">Tillad notifikationer</translation>
 <translation id="8474561048882755118">Hjælper dig med at se lignende produkter side om side og nemt sammenligne de oplysninger, der er vigtige for dig</translation>
 <translation id="8475313423285172237">Et andet program på din computer tilføjede en udvidelse, der kan ændre den måde, hvorpå Chrome fungerer.</translation>

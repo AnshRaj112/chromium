@@ -80,6 +80,7 @@
 <translation id="1049743911850919806">無痕</translation>
 <translation id="1049795001945932310">語言設定(&amp;L)</translation>
 <translation id="1050693411695664090">欠佳</translation>
+<translation id="1053226848101751430">已刪除項目</translation>
 <translation id="1053898984916097744">開始新工作，或在過程中取得協助。</translation>
 <translation id="1054048317165655285">在手機上完成設定</translation>
 <translation id="1054153489933238809">在新分頁中開啟原始圖片(&amp;I)</translation>
@@ -2250,6 +2251,7 @@
 <translation id="2519250377986324805">查看操作說明</translation>
 <translation id="2519517390894391510">憑證設定檔名稱</translation>
 <translation id="2520644704042891903">正在等待可用的通訊端…</translation>
+<translation id="2520961587246779103">更多分割檢視選項</translation>
 <translation id="2521427645491031107">在裝置「設定」中設定應用程式同步功能</translation>
 <translation id="2521835766824839541">上一首歌</translation>
 <translation id="2521854691574443804">正在檢查 <ph name="FILE_NAME" /> 是否符合您機構的安全性政策…</translation>
@@ -2651,7 +2653,6 @@
 <translation id="2798347533012571708">保留更新</translation>
 <translation id="2799162042226656283">你的 Chrome</translation>
 <translation id="2799223571221894425">重新啟動</translation>
-<translation id="2800309299477632167">自訂按鍵配置</translation>
 <translation id="2800760947029405028">上載圖片</translation>
 <translation id="2800996978423439835">在任何裝置上存取書籤及其他設定</translation>
 <translation id="2801134910297796778">已登入 <ph name="EMAIL" /></translation>
@@ -3195,6 +3196,7 @@
 <translation id="3202578601642193415">最新記錄</translation>
 <translation id="3204648577100496185">系統可能會從裝置中移除與此應用程式相關的資料</translation>
 <translation id="3204717934117444051">只儲存在此裝置上的資料會保留在現有設定檔中，不會同步至 <ph name="EMAIL" /></translation>
+<translation id="3206289903841621620">用戶字典 <ph name="NUMBER" /></translation>
 <translation id="3207344462385471911">系統會根據你的近期活動，顯示你可能感興趣的建議搜尋與購物折扣。
         <ph name="BREAK" />
         <ph name="BREAK" />
@@ -4763,7 +4765,6 @@
 <translation id="4289540628985791613">概覽</translation>
 <translation id="428963538941819373">這些網站可在你瀏覽 <ph name="HOST" /> 時，使用與你相關的既有資料</translation>
 <translation id="4289732974614035569">選擇 PIN</translation>
-<translation id="4290526909608432059">我們即將停止支援 Chrome 應用程式。如要瞭解可用的選項，請聯絡應用程式開發人員或 IT 支援團隊。</translation>
 <translation id="4290791284969893584">關閉網頁後，您已開始的工作可能無法完成</translation>
 <translation id="4290826901752066702"><ph name="NUM" /> 個成員</translation>
 <translation id="4290898381118933198">滑動即可瀏覽頁面</translation>
@@ -7626,6 +7627,7 @@
 <translation id="6365069501305898914">Facebook</translation>
 <translation id="6365411474437319296">新增家人好友</translation>
 <translation id="6367097275976877956">係咪要啟動 Chrome OS 內置嘅螢幕閱讀器 ChromeVox？要嘅話請㩒空格鍵。</translation>
+<translation id="6367196786591004737">刪除項目</translation>
 <translation id="6367396429435748845">按 <ph name="ALT" /> + <ph name="LAUNCHER" /> + <ph name="NUM_4" /> 可暫停和恢復滑鼠鍵</translation>
 <translation id="6367985768157257101">要透過咫尺共享接收嗎？</translation>
 <translation id="6368157733310917710">地址和其他資料(&amp;A)</translation>
@@ -7959,7 +7961,6 @@
 <translation id="6610002944194042868">翻譯選項</translation>
 <translation id="6610064275805055636">管理隔離的網絡應用程式</translation>
 <translation id="6611432349566876829"><ph name="NUM" /> 個分頁</translation>
-<translation id="6611972847767394631">您的分頁會在這裡顯示</translation>
 <translation id="661266467055912436">為您和網絡上的所有使用者提高安全性。</translation>
 <translation id="6613267708691765962">正在掃瞄惡意軟件…</translation>
 <translation id="6615455863669487791">顯示</translation>
@@ -8286,7 +8287,6 @@
 <translation id="6831043979455480757">翻譯</translation>
 <translation id="6832218595502288407">靠左對齊</translation>
 <translation id="6832815922179448173">{MULTI_GROUP_TAB_COUNT,plural, =0{要移除分頁並刪除群組嗎？}=1{要移除分頁並刪除群組嗎？}other{要移除分頁並刪除群組嗎？}}</translation>
-<translation id="6833103209700200188">頁腳</translation>
 <translation id="6833479554815567477">分頁已經由包含「<ph name="GROUP_CONTENTS" />」嘅「<ph name="GROUP_NAME" />」群組度移除</translation>
 <translation id="6833753236242482566">平衡 (建議)</translation>
 <translation id="6835762382653651563">請連接互聯網以更新 <ph name="DEVICE_TYPE" />。</translation>
@@ -9991,6 +9991,7 @@
 <translation id="8037801708772278989">剛檢查過</translation>
 <translation id="8038111231936746805">(預設)</translation>
 <translation id="8039151841428107077">{NUM_OF_FILES,plural, =1{正在將 1 個檔案複製至 <ph name="CLOUD_PROVIDER" />}other{正在將 {NUM_OF_FILES} 個檔案複製至 <ph name="CLOUD_PROVIDER" />}}</translation>
+<translation id="8039525676147630657">ChromeOS 版本更新後，此 Chrome 應用程式就會停止運作。請儲存要保留的所有應用程式資料。如要瞭解可用的選項，請聯絡應用程式開發人員或 IT 支援團隊。</translation>
 <translation id="8041089156583427627">提供意見</translation>
 <translation id="8041093619605951337">高興</translation>
 <translation id="8041267120753677077">串流播放手機應用程式內容</translation>
@@ -10619,6 +10620,7 @@
 <translation id="8472623782143987204">硬件支援</translation>
 <translation id="8473540203671727883">說出滑鼠游標下的文字</translation>
 <translation id="8473863474539038330">地址及其他資料</translation>
+<translation id="847433688444405067">在不同裝置上瀏覽</translation>
 <translation id="8474378002946546633">允許通知</translation>
 <translation id="8474561048882755118">方便你並排查看類似產品，輕鬆比較重要資料</translation>
 <translation id="8475313423285172237">電腦中其他程式所新增的擴充功能可能會變更 Chrome 的運作方式。</translation>
@@ -10983,6 +10985,7 @@
 <translation id="8729133765463465108">使用相機掃瞄 QR 碼</translation>
 <translation id="8730621377337864115">完成</translation>
 <translation id="8731029916209785242">權限 (<ph name="FORMATTED_ORIGIN" />)</translation>
+<translation id="8731258351357994801">項目 <ph name="NUMBER" /></translation>
 <translation id="8731268612289859741">安全碼</translation>
 <translation id="8731629443331803108"><ph name="SITE_NAME" /> 需要你批准：<ph name="PERMISSION" /></translation>
 <translation id="8731787661154643562">連接埠號碼</translation>

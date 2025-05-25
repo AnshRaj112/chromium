@@ -102,6 +102,16 @@ const char kAutofillEnableLogFormEventsToAllParsedFormTypesDescription[] =
     "all credit card form types and address form events will log to all "
     "address form types.";
 
+const char
+    kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentName[] =
+        "Enable multiple server request support for virtual card downstream "
+        "enrollment";
+const char
+    kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentDescription
+        [] = "When enabled, Chrome will be able to send preflight call for "
+             "enrollment earlier in the flow with the multiple server request "
+             "support.";
+
 const char kAutofillEnableFpanRiskBasedAuthenticationName[] =
     "Enable risk-based authentication for FPAN retrieval";
 const char kAutofillEnableFpanRiskBasedAuthenticationDescription[] =
@@ -1307,10 +1317,6 @@ const char kSharedHighlightingIOSName[] = "Enable Shared Highlighting features";
 const char kSharedHighlightingIOSDescription[] =
     "Adds a Link to Text option in the Edit Menu which generates URLs with a "
     "text fragment.";
-
-const char kSetUpListInFirstRunName[] = "Set Up List in First Run";
-const char kSetUpListInFirstRunNameDescription[] =
-    "Displays the Set Up List in the First Run.";
 
 const char kSetUpListShortenedDurationName[] = "Set Up List Shortened Duration";
 const char kSetUpListShortenedDurationDescription[] =

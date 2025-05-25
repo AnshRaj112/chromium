@@ -9133,14 +9133,15 @@ be describing additional metrics about the same event.
   </metric>
   <metric name="CompletionStatus.ErrorCode">
     <summary>
-      An integer representing the error code of the request when it completes or
-      fails. This comes from network::URLLoaderCompletionStatus.error_code.
+      Deprecated as of 2025/05/22. An integer representing the error code of the
+      request when it completes or fails. This comes from
+      network::URLLoaderCompletionStatus.error_code.
     </summary>
   </metric>
   <metric name="CompletionStatus.ExtendedErrorCode">
     <summary>
-      An integer representing the error code of the request when it completes or
-      fails. This comes from
+      Deprecated as of 2025/05/22. An integer representing the error code of the
+      request when it completes or fails. This comes from
       network::URLLoaderCompletionStatus.extended_error_code.
     </summary>
   </metric>
@@ -9167,6 +9168,20 @@ be describing additional metrics about the same event.
       Whether the Context is detached or not when this event is logged.
     </summary>
   </metric>
+  <metric name="LoaderCompleted.ErrorCode">
+    <summary>
+      An integer representing the error code of the request when it reaches the
+      kLoaderCompleted stage. This comes from
+      network::URLLoaderCompletionStatus.error_code.
+    </summary>
+  </metric>
+  <metric name="LoaderCompleted.ExtendedErrorCode">
+    <summary>
+      An integer representing the extended error code of the request when it
+      reaches the kLoaderCompleted stage. This comes from
+      network::URLLoaderCompletionStatus.extended_error_code.
+    </summary>
+  </metric>
   <metric name="NumRedirects">
     <summary>
       The number of redirects a fetch keepalive request loader has experienced
@@ -9183,6 +9198,20 @@ be describing additional metrics about the same event.
 
       When the request is abandoned from the &quot;LoaderCreated&quot; stage,
       this is also set to &quot;LoaderCreated&quot; stage.
+    </summary>
+  </metric>
+  <metric name="RequestFailed.ErrorCode">
+    <summary>
+      An integer representing the error code of the request when it reaches the
+      kRequestfailed stage. This comes from
+      network::URLLoaderCompletionStatus.error_code.
+    </summary>
+  </metric>
+  <metric name="RequestFailed.ExtendedErrorCode">
+    <summary>
+      An integer representing the extended error code of the request when it
+      reaches the kRequestFailed stage. This comes from
+      network::URLLoaderCompletionStatus.extended_error_code.
     </summary>
   </metric>
   <metric name="RequestType" enum="FetchKeepAliveRequestType">
@@ -11540,13 +11569,14 @@ be describing additional metrics about the same event.
   </metric>
 </event>
 
-<event name="HistoryApi">
+<event name="HistoryApi.AdvanceMethod">
   <owner>yaoxia@chromium.org</owner>
   <owner>shivanisha@chromium.org</owner>
   <summary>
-    Records usage of the window.history API, capturing details about the
-    operation type, user activation, and ad-related information. Recorded when
-    window.history API is used.
+    Records usage of `window.history` methods that advance the history position
+    (`pushState()`, `forward()`, and `go()` with positive values), capturing
+    details about user activation and ad-related information. Recorded when
+    these specific methods are invoked.
   </summary>
   <metric name="FromAd" enum="Boolean">
     <summary>
@@ -11560,12 +11590,6 @@ be describing additional metrics about the same event.
     <summary>
       Whether the invoking context has seen user activation.
       (https://mustaqahmed.github.io/user-activation-v2)
-    </summary>
-  </metric>
-  <metric name="IsHistoryModifyingOperation" enum="Boolean">
-    <summary>
-      Whether the operation modifies the history state (i.e., back(), forward(),
-      go(), pushState(), replaceState()).
     </summary>
   </metric>
 </event>
@@ -12813,6 +12837,32 @@ be describing additional metrics about the same event.
   <metric name="Omnibox">
     <summary>
       Time to first interaction when overlay invoked through the omnibox.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="OmniboxContextualSuggestion">
+    <summary>
+      Time to first interaction when overlay invoked through the omnibox
+      contextual suggestion.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
+  <metric name="OmniboxPageAction">
+    <summary>
+      Time to first interaction when overlay invoked through the omnibox Lens
+      page action suggestion.
     </summary>
     <aggregation>
       <history>
@@ -19602,6 +19652,13 @@ be describing additional metrics about the same event.
     <summary>
       A boolean signaling whether the URL is on the high confidence allowlist or
       not.
+    </summary>
+  </metric>
+  <metric name="SiteEngagementLevel">
+    <summary>
+      The site engagement level of the site when the user receives a
+      notification from them. Set to 0 even if the origin is not tracked by the
+      Site Engagement Service.
     </summary>
   </metric>
   <metric name="SuspiciousScore">
@@ -26811,10 +26868,8 @@ be describing additional metrics about the same event.
 </event>
 
 <event name="XR.WebXR.Session">
-  <owner>billorr@chromium.org</owner>
-  <owner>bialpio@chromium.org</owner>
+  <owner>alcooper@chromium.org</owner>
   <owner>xr-dev@chromium.org</owner>
-  <owner>cassew@google.com</owner>
   <summary>
     When session ends, records data for a WebXR / WebVR session.
   </summary>

@@ -2639,7 +2639,6 @@
 <translation id="2798347533012571708">განახლებების შენარჩუნება</translation>
 <translation id="2799162042226656283">თქვენი Chrome</translation>
 <translation id="2799223571221894425">ხელახლა გაშვება</translation>
-<translation id="2800309299477632167">კლავიშთა მორგებული განლაგება</translation>
 <translation id="2800760947029405028">სურათის ატვირთვა</translation>
 <translation id="2800996978423439835">მიიღეთ თქვენი სანიშნეები და სხვა მონაცემები თქვენს ყველა მოწყობილობაზე</translation>
 <translation id="2801134910297796778">შესული ხართ <ph name="EMAIL" />-ში</translation>
@@ -4756,7 +4755,6 @@
 <translation id="4289540628985791613">მიმოხილვა</translation>
 <translation id="428963538941819373">ამ საიტებს შეუძლია გამოიყენონ მათ მიერ თქვენ შესახებ შენახული ინფორმაცია, როცა <ph name="HOST" />-ს ათვალიერებთ</translation>
 <translation id="4289732974614035569">აირჩიეთ PIN-კოდი</translation>
-<translation id="4290526909608432059">Chrome აპების მხარდაჭერა მალე დასრულდება. თქვენი ვარიანტების შესახებ მეტის გასაგებად დაუკავშირდით აპის დეველოპერს ან თქვენს IT მხარდაჭერის გუნდს.</translation>
 <translation id="4290791284969893584">გვერდის დახურვის შემდეგ, თქვენ მიერ დაყენებული ამოცანები, შესაძლოა, არ დასრულდეს</translation>
 <translation id="4290826901752066702"><ph name="NUM" /> წევრი</translation>
 <translation id="4290898381118933198">გადაფურცლეთ გვერდებს შორის ნავიგაციისთვის</translation>
@@ -7624,6 +7622,7 @@
 <translation id="6365069501305898914">Facebook</translation>
 <translation id="6365411474437319296">დაამატე ოჯახი და მეგობრები</translation>
 <translation id="6367097275976877956">გსურთ, გაააქტიუროთ ChromeVox, ChromeOS-ში ჩაშენებული ეკრანის წამკითხველი? ამისთვის დააჭირეთ შორისის კლავიშს.</translation>
+<translation id="6367196786591004737">შენატანის წაშლა</translation>
 <translation id="6367396429435748845">დააჭირეთ კომბინაციას <ph name="ALT" /> + <ph name="LAUNCHER" /> + <ph name="NUM_4" /> მაუსის კლავიშების დასაპაუზებლად და გასაახლებლად</translation>
 <translation id="6367985768157257101">გსურთ, კონტენტის მიღება მახლობლად გაზიარების მეშვეობით?</translation>
 <translation id="6368157733310917710">&amp;მისამართები და სხვა</translation>
@@ -7957,7 +7956,6 @@
 <translation id="6610002944194042868">თარგმნის ვარიანტები</translation>
 <translation id="6610064275805055636">იზოლირებული ვებ-აპების მართვა</translation>
 <translation id="6611432349566876829"><ph name="NUM" /> ჩანართი</translation>
-<translation id="6611972847767394631">იპოვეთ თქვენი ჩანართი აქ</translation>
 <translation id="661266467055912436">უსაფრთხოების გაუმჯობესება თქვენთვის და ვების ყველა მომხმარებლისთვის.</translation>
 <translation id="6613267708691765962">მიმდინარეობს მავნე პროგრამების სკანირება...</translation>
 <translation id="6615455863669487791">მაჩვენე</translation>
@@ -8284,7 +8282,6 @@
 <translation id="6831043979455480757">თარგმნა</translation>
 <translation id="6832218595502288407">მარცხნივ გასწორება</translation>
 <translation id="6832815922179448173">{MULTI_GROUP_TAB_COUNT,plural, =0{ამოიშალოს ჩანართი და წაიშალოს ჯგუფი?}=1{ამოიშალოს ჩანართები და წაიშალოს ჯგუფი?}other{ამოიშალოს ჩანართები და წაიშალოს ჯგუფები?}}</translation>
-<translation id="6833103209700200188">ქვედა კოლონტიტული</translation>
 <translation id="6833479554815567477">ჩანართი ამოიშალა ჯგუფიდან <ph name="GROUP_NAME" /> — <ph name="GROUP_CONTENTS" /></translation>
 <translation id="6833753236242482566">ბალანსირებული (რეკომენდებული)</translation>
 <translation id="6835762382653651563"><ph name="DEVICE_TYPE" />-ის განსაახლებლად, გთხოვთ, დაუკავშირდეთ ინტერნეტს.</translation>
@@ -9989,6 +9986,7 @@
 <translation id="8037801708772278989">შემოწმდა რამდენიმე წამის წინ</translation>
 <translation id="8038111231936746805">(ნაგულისხმევი)</translation>
 <translation id="8039151841428107077">{NUM_OF_FILES,plural, =1{მიმდინარეობს 1 ფაილის კოპირება <ph name="CLOUD_PROVIDER" />-ში}other{მიმდინარეობს {NUM_OF_FILES} ფაილის კოპირება <ph name="CLOUD_PROVIDER" />-ში}}</translation>
+<translation id="8039525676147630657">ეს Chrome-ის აპი მას შემდეგ შეწყვეტს მუშაობას, რაც ChromeOS-ის ვერსია განახლდება. შეინახეთ აპის ნებისმიერი მონაცემი, რომლის შეანრჩუნებაც გსურთ. თქვენი ვარიანტების შესახებ მეტის გასაგებად დაუკავშირდით აპის დეველოპერს ან თქვენს IT მხარდაჭერის გუნდს.</translation>
 <translation id="8041089156583427627">გამოხმაურება</translation>
 <translation id="8041093619605951337">ბედნიერი</translation>
 <translation id="8041267120753677077">შეასრულეთ თქვენი ტელეფონის აპების სტრიმინგი</translation>
@@ -10617,6 +10615,7 @@
 <translation id="8472623782143987204">აპარატურული რეზერვით</translation>
 <translation id="8473540203671727883">მაუსის კურსორის ქვეშ მოქცეული ტექსტის გახმოვანება</translation>
 <translation id="8473863474539038330">მისამართები და სხვა</translation>
+<translation id="847433688444405067">დაათვალიერეთ ყველა მოწყობილობაზე</translation>
 <translation id="8474378002946546633">შეტყობინებების დაშვება</translation>
 <translation id="8474561048882755118">გეხმარებათ მსგავსი პროდუქტების გვერდიგვერდ დათვალიერებაში და თქვენთვის მნიშვნელოვანი დეტალების შედარებაში</translation>
 <translation id="8475313423285172237">სხვა პროგრამამ თქვენს კომპიუტერში დაამატა გაფართოება, რომელსაც შეუძლია შეცვალოს Chrome-ის მუშაობის ფორმა.</translation>

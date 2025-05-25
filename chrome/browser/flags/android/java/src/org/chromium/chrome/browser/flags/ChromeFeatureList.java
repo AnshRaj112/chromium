@@ -356,6 +356,7 @@ public abstract class ChromeFeatureList {
     public static final String DRAW_KEY_NATIVE_EDGE_TO_EDGE = "DrawKeyNativeEdgeToEdge";
     public static final String DYNAMIC_SAFE_AREA_INSETS = "DynamicSafeAreaInsets";
     public static final String EDGE_TO_EDGE_BOTTOM_CHIN = "EdgeToEdgeBottomChin";
+    public static final String EDGE_TO_EDGE_DEBUGGING = "EdgeToEdgeDebugging";
     public static final String EDGE_TO_EDGE_MONITOR_CONFIGURATIONS =
             "EdgeToEdgeMonitorConfigurations";
     public static final String EDGE_TO_EDGE_EVERYWHERE = "EdgeToEdgeEverywhere";
@@ -483,8 +484,6 @@ public abstract class ChromeFeatureList {
             "PrivacySandboxAdTopicsContentParity";
     public static final String PRIVACY_SANDBOX_CCT_ADS_NOTICE_SURVEY =
             "PrivacySandboxCctAdsNoticeSurvey";
-    public static final String PRIVACY_SANDBOX_NOTICE_ACTION_DEBOUNCING_ANDROID =
-            "PrivacySandboxNoticeActionDebouncingAndroid";
     public static final String PRIVACY_SANDBOX_RELATED_WEBSITE_SETS_UI =
             "PrivacySandboxRelatedWebsiteSetsUi";
     public static final String PRIVACY_SANDBOX_SENTIMENT_SURVEY = "PrivacySandboxSentimentSurvey";
@@ -755,8 +754,10 @@ public abstract class ChromeFeatureList {
             newCachedFlag(DRAW_KEY_NATIVE_EDGE_TO_EDGE, true);
     public static final CachedFlag sEdgeToEdgeBottomChin =
             newCachedFlag(EDGE_TO_EDGE_BOTTOM_CHIN, /* defaultValue= */ true);
+    public static final CachedFlag sEdgeToEdgeDebugging =
+            newCachedFlag(EDGE_TO_EDGE_DEBUGGING, /* defaultValue= */ true);
     public static final CachedFlag sEdgeToEdgeMonitorConfigurations =
-            newCachedFlag(EDGE_TO_EDGE_MONITOR_CONFIGURATIONS, /* defaultValue= */ false);
+            newCachedFlag(EDGE_TO_EDGE_MONITOR_CONFIGURATIONS, /* defaultValue= */ true);
     public static final CachedFlag sEdgeToEdgeEverywhere =
             newCachedFlag(
                     EDGE_TO_EDGE_EVERYWHERE,
@@ -804,7 +805,7 @@ public abstract class ChromeFeatureList {
     public static final CachedFlag sLockBackPressHandlerAtStart =
             newCachedFlag(LOCK_BACK_PRESS_HANDLER_AT_START, true);
     public static final CachedFlag sMagicStackAndroid = newCachedFlag(MAGIC_STACK_ANDROID, true);
-    public static final CachedFlag sMiniOriginBar = newCachedFlag(MINI_ORIGIN_BAR, false);
+    public static final CachedFlag sMiniOriginBar = newCachedFlag(MINI_ORIGIN_BAR, false, true);
     public static final CachedFlag sMostVisitedTilesCustomization =
             newCachedFlag(MOST_VISITED_TILES_CUSTOMIZATION, false);
     public static final CachedFlag sMostVisitedTilesReselect =
@@ -823,7 +824,7 @@ public abstract class ChromeFeatureList {
     public static final CachedFlag sNewTabPageAndroidTriggerForPrerender2 =
             newCachedFlag(NEW_TAB_PAGE_ANDROID_TRIGGER_FOR_PRERENDER2, true);
     public static final CachedFlag sNewTabPageCustomization =
-            newCachedFlag(NEW_TAB_PAGE_CUSTOMIZATION, false);
+            newCachedFlag(NEW_TAB_PAGE_CUSTOMIZATION, false, true);
     public static final CachedFlag sNewTabPageCustomizationToolbarButton =
             newCachedFlag(NEW_TAB_PAGE_CUSTOMIZATION_TOOLBAR_BUTTON, false);
     public static final CachedFlag sNotificationTrampoline =
@@ -841,6 +842,8 @@ public abstract class ChromeFeatureList {
     public static final CachedFlag sPrefetchBrowserInitiatedTriggers =
             newCachedFlag(PREFETCH_BROWSER_INITIATED_TRIGGERS, true);
     public static final CachedFlag sPriceChangeModule = newCachedFlag(PRICE_CHANGE_MODULE, true);
+    public static final CachedFlag sReportNotificationContentDetectionData =
+            newCachedFlag(REPORT_NOTIFICATION_CONTENT_DETECTION_DATA, false);
     public static final CachedFlag sRightEdgeGoesForwardGestureNav =
             newCachedFlag(RIGHT_EDGE_GOES_FORWARD_GESTURE_NAV, false);
     public static final CachedFlag sSafetyHubMagicStack =
@@ -961,6 +964,7 @@ public abstract class ChromeFeatureList {
                     sDisableListTabSwitcher,
                     sDrawKeyNativeEdgeToEdge,
                     sEdgeToEdgeBottomChin,
+                    sEdgeToEdgeDebugging,
                     sEdgeToEdgeEverywhere,
                     sEdgeToEdgeMonitorConfigurations,
                     sEdgeToEdgeTablet,
@@ -1000,6 +1004,7 @@ public abstract class ChromeFeatureList {
                     sPowerSavingModeBroadcastReceiverInBackground,
                     sPrefetchBrowserInitiatedTriggers,
                     sPriceChangeModule,
+                    sReportNotificationContentDetectionData,
                     sRightEdgeGoesForwardGestureNav,
                     sSafetyHubMagicStack,
                     sSafetyHubWeakAndReusedPasswords,
@@ -1458,6 +1463,11 @@ public abstract class ChromeFeatureList {
             newBooleanCachedFeatureParam(
                     TAB_STRIP_LAYOUT_OPTIMIZATION, "enable_on_external_display", false);
 
+    public static final StringCachedFeatureParam
+            sTabStripLayoutOptimizationOnExternalDisplayOemDenylist =
+                    newStringCachedFeatureParam(
+                            TAB_STRIP_LAYOUT_OPTIMIZATION, "external_display_oem_denylist", "");
+
     public static final IntCachedFeatureParam
             sTabWindowManagerReportIndicesMismatchTimeDiffThresholdMs =
                     newIntCachedFeatureParam(
@@ -1542,6 +1552,7 @@ public abstract class ChromeFeatureList {
                     sTabStripLayoutOptimizationOemAllowlist,
                     sTabStripLayoutOptimizationOemDenylist,
                     sTabStripLayoutOptimizationOnExternalDisplay,
+                    sTabStripLayoutOptimizationOnExternalDisplayOemDenylist,
                     sTabWindowManagerReportIndicesMismatchTimeDiffThresholdMs,
                     sUseChimeAndroidSdkAlwaysRegister,
                     sWebApkMinShellApkVersionValue);

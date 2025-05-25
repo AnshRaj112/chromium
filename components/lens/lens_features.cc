@@ -481,11 +481,29 @@ constexpr base::FeatureParam<bool>
 constexpr base::FeatureParam<bool>
     kLensOverlayVisualSelectionUpdatesEnableGradientRegionStroke{
         &kLensOverlayVisualSelectionUpdates, "enable-gradient-region-stroke",
+        false};
+
+constexpr base::FeatureParam<bool>
+    kLensOverlayVisualSelectionUpdatesEnableWhiteRegionStroke{
+        &kLensOverlayVisualSelectionUpdates, "enable-white-region-stroke",
         true};
+
+constexpr base::FeatureParam<bool>
+    kLensOverlayVisualSelectionUpdatesEnableRegionSelectedGlow{
+        &kLensOverlayVisualSelectionUpdates, "enable-region-selected-glow",
+        true};
+
+constexpr base::FeatureParam<bool>
+    kLensOverlayVisualSelectionUpdatesEnableGradientSuperG{
+        &kLensOverlayVisualSelectionUpdates, "enable-gradient-super-g", true};
 
 constexpr base::FeatureParam<bool>
     kLensOverlayVisualSelectionUpdatesCsbThumbnail{
         &kLensOverlayVisualSelectionUpdates, "enable-csb-thumbnail", true};
+
+constexpr base::FeatureParam<bool>
+    kLensOverlayVisualSelectionUpdatesEnableCsbMotionTweaks{
+        &kLensOverlayVisualSelectionUpdates, "enable-csb-motion-tweaks", true};
 
 constexpr base::FeatureParam<std::string> kHomepageURLForLens{
     &kLensStandalone, "lens-homepage-url", "https://lens.google.com/v3/"};
@@ -1037,9 +1055,29 @@ bool GetVisualSelectionUpdatesEnableGradientRegionStroke() {
          kLensOverlayVisualSelectionUpdatesEnableGradientRegionStroke.Get();
 }
 
+bool GetVisualSelectionUpdatesEnableWhiteRegionStroke() {
+  return base::FeatureList::IsEnabled(kLensOverlayVisualSelectionUpdates) &&
+         kLensOverlayVisualSelectionUpdatesEnableWhiteRegionStroke.Get();
+}
+
+bool GetVisualSelectionUpdatesEnableRegionSelectedGlow() {
+  return base::FeatureList::IsEnabled(kLensOverlayVisualSelectionUpdates) &&
+         kLensOverlayVisualSelectionUpdatesEnableRegionSelectedGlow.Get();
+}
+
+bool GetVisualSelectionUpdatesEnableGradientSuperG() {
+  return base::FeatureList::IsEnabled(kLensOverlayVisualSelectionUpdates) &&
+         kLensOverlayVisualSelectionUpdatesEnableGradientSuperG.Get();
+}
+
 bool GetVisualSelectionUpdatesEnableCsbThumbnail() {
   return base::FeatureList::IsEnabled(kLensOverlayVisualSelectionUpdates) &&
          kLensOverlayVisualSelectionUpdatesCsbThumbnail.Get();
+}
+
+bool GetVisualSelectionUpdatesEnableCsbMotionTweaks() {
+  return base::FeatureList::IsEnabled(kLensOverlayVisualSelectionUpdates) &&
+         kLensOverlayVisualSelectionUpdatesEnableCsbMotionTweaks.Get();
 }
 
 bool PageContentUploadRequestIdFixEnabled() {

@@ -125,9 +125,14 @@ id<GREYMatcher> KeyboardAccessoryCreditCardSuggestionChip() {
                  (testAttemptToOpenPaymentsBottomSheetWithoutCreditCardOnV3)]) {
     config.features_enabled.push_back(kAutofillPaymentsSheetV3Ios);
     config.features_enabled.push_back(kStatelessFormSuggestionController);
+  } else if ([self
+                 isRunningTest:@selector(testFillingFromKeyboardOnAutofocus)]) {
+    config.features_enabled.push_back(
+        autofill::features::kAutofillEnableFpanRiskBasedAuthentication);
   } else if ([self isRunningTest:@selector
-                   (testFillingFromKeyboardOnAutofocus_WithFix)]) {
-    config.features_enabled.push_back(kAutofillFixPaymentSheetSpam);
+                   (testUpdateBottomSheetOnAddServerCreditCard)]) {
+    config.features_enabled.push_back(
+        autofill::features::kAutofillEnableFpanRiskBasedAuthentication);
   }
   return config;
 }
@@ -818,12 +823,13 @@ void CheckAutofillSuggestionAcceptedIndexMetricsCount(
 
 // Tests that the payment sheet doesn't spam after filling from the KA on an
 // autofocused field This ensures that crbug.com/389077460 doesn't happen.
-- (void)testFillingFromKeyboardOnAutofocus_WithFix {
+- (void)testFillingFromKeyboardOnAutofocus {
   // Clear the credit cards to remove the default local cards that aren't needed
   // for this test case.
   [AutofillAppInterface clearCreditCardStore];
 
   [AutofillAppInterface setUpFakeCreditCardServer];
+
   // Add the server credit card. Before loading the page so it can be in the
   // autofill suggestion upon autofocusing the credit card field.
   [AutofillAppInterface saveMaskedCreditCard];

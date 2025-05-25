@@ -748,6 +748,11 @@ void HttpStreamPool::AttemptManager::OnQuicAttemptComplete(
 
   MaybeMarkQuicBroken();
 
+  if (is_shutting_down()) {
+    MaybeCompleteLater();
+    return;
+  }
+
   if (rv == OK) {
     HandleQuicSessionReady(quic_session,
                            StreamSocketCloseReason::kQuicSessionCreated);
@@ -766,6 +771,15 @@ void HttpStreamPool::AttemptManager::OnQuicAttemptComplete(
     CancelTcpBasedAttemptDelayTimer();
     MaybeAttemptTcpBased();
   } else {
+    MaybeCompleteLater();
+  }
+}
+
+void HttpStreamPool::AttemptManager::OnQuicAttemptSlow() {
+  CHECK(quic_attempt_);
+  CHECK(quic_attempt_->is_slow());
+  if (is_shutting_down()) {
+    CancelQuicAttempt(ERR_ABORTED);
     MaybeCompleteLater();
   }
 }
@@ -1586,18 +1600,22 @@ void HttpStreamPool::AttemptManager::StartDraining() {
   CHECK_EQ(availability_state_, AvailabilityState::kAvailable);
   CHECK(request_jobs_.empty());
   CHECK(preconnect_jobs_.empty());
+  CHECK(!CanComplete());
   availability_state_ = AvailabilityState::kDraining;
   service_endpoint_request_.reset();
 
-  // Cancel in-flight attempts so that draining AttemptManager won't have active
-  // connecting streams.
+  // Cancel in-flight TCP based attempts so that draining AttemptManager won't
+  // have active connecting streams.
   // TODO(crbug.com/414173943): It might be better not to cancel in-flight
-  // attempts (especially the QUIC attempt) for future requests/preconnects
-  // unless these aren't slow. Currently we just cancel them for similicity. If
-  // we want to keep these attempts in the draining `this`,
-  // Group::ConnectingStreamSocketCount() should check draining AttemptManagers.
+  // TCP based attempts for future requests/preconnects unless these aren't
+  // slow. Currently we just cancel them for simplicity. If we want to keep
+  // these attempts in the draining `this`, Group::ConnectingStreamSocketCount()
+  // should check draining AttemptManagers.
   CancelTcpBasedAttempts(StreamSocketCloseReason::kAbort);
-  CancelQuicAttempt(ERR_ABORTED);
+
+  if (quic_attempt_ && quic_attempt_->is_slow()) {
+    CancelQuicAttempt(ERR_ABORTED);
+  }
 
   group_->OnAttemptManagerShuttingDown(this);
 }
@@ -1632,6 +1650,10 @@ void HttpStreamPool::AttemptManager::MaybeCreateSpdyStreamAndNotify(
     CHECK(weak_this);
   }
   CHECK(request_jobs_.empty());
+  // TODO(crbug.com/414173943): Move this StartDraining() call to
+  // somewhere else so that `this` enters the draining state when all jobs are
+  // notified.
+  StartDraining();
 }
 
 void HttpStreamPool::AttemptManager::MaybeCreateQuicStreamAndNotify(
@@ -1662,10 +1684,9 @@ void HttpStreamPool::AttemptManager::MaybeCreateQuicStreamAndNotify(
     CHECK(weak_this);
   }
   CHECK(request_jobs_.empty());
-  // TODO(crbug.com/414173943): Move this StartDraining() call somewhere else
-  // so that `this` enters the draining state when all jobs are notified. We
-  // only start draining here tentatively as we need to update unittests first
-  // to support other paths like SPDY session ready.
+  // TODO(crbug.com/414173943): Move this StartDraining() call to
+  // somewhere else so that `this` enters the draining state when all jobs are
+  // notified.
   StartDraining();
 }
 

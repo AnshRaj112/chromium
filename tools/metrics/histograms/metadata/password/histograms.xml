@@ -1823,7 +1823,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.Import.DesktopInteractions"
-    enum="PasswordsImportDesktopInteractions" expires_after="2025-11-16">
+    enum="PasswordsImportDesktopInteractions" expires_after="2025-12-11">
   <owner>natiahlyi@google.com</owner>
   <owner>markusheintz@google.com</owner>
   <summary>
@@ -1833,7 +1833,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.Import.FileDeletionSelected" enum="Boolean"
-    expires_after="2025-06-29">
+    expires_after="2025-12-11">
   <owner>natiahlyi@google.com</owner>
   <owner>markusheintz@google.com</owner>
   <summary>
@@ -1843,7 +1843,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.Import.PerFile.ConflictsResolved"
-    units="saved credentials" expires_after="2025-06-29">
+    units="saved credentials" expires_after="2025-12-11">
   <owner>natiahlyi@google.com</owner>
   <owner>markusheintz@google.com</owner>
   <summary>
@@ -1855,7 +1855,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.Import.PerFile.Notes.{Type}" units="units"
-    expires_after="2025-07-06">
+    expires_after="2025-12-11">
   <owner>natiahlyi@google.com</owner>
   <owner>markusheintz@google.com</owner>
   <summary>
@@ -1907,7 +1907,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.ImportDuration" units="ms"
-    expires_after="2025-10-26">
+    expires_after="2025-12-11">
   <owner>natiahlyi@google.com</owner>
   <owner>markusheintz@google.com</owner>
   <summary>
@@ -1921,7 +1921,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.ImportedPasswordsPerUserInCSV" units="units"
-    expires_after="2025-08-24">
+    expires_after="2025-12-11">
   <owner>vasilii@chromium.org</owner>
   <owner>src/components/password_manager/OWNERS</owner>
   <summary>
@@ -1931,7 +1931,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.ImportEntryStatus"
-    enum="PasswordManagerImportEntryStatus" expires_after="2025-08-24">
+    enum="PasswordManagerImportEntryStatus" expires_after="2025-12-11">
   <owner>natiahlyi@google.com</owner>
   <owner>markusheintz@google.com</owner>
   <summary>
@@ -1943,7 +1943,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.ImportFileSize" units="bytes"
-    expires_after="2025-10-12">
+    expires_after="2025-12-11">
   <owner>natiahlyi@google.com</owner>
   <owner>markusheintz@google.com</owner>
   <summary>
@@ -1954,7 +1954,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="PasswordManager.ImportResultsStatus2"
-    enum="PasswordManagerImportResultsStatus" expires_after="2025-09-28">
+    enum="PasswordManagerImportResultsStatus" expires_after="2025-12-11">
   <owner>natiahlyi@google.com</owner>
   <owner>markusheintz@google.com</owner>
   <summary>
@@ -2867,8 +2867,10 @@ useful for Chirp alerts (go/crca-alerts). -->
   <owner>derinel@google.com</owner>
   <owner>markusheintz@google.com</owner>
   <summary>
-    Logs the number of passwords in the password dropdown when it's shown for a
-    WebAuthn request.
+    Logs the number of passwords in the password dropdown when it's shown. This
+    metric is only recorded when the field is not supporting WebAuthn
+    conditional UI, that is the field is not annotated with
+    autocomplete=&quot;webauthn&quot;.
   </summary>
 </histogram>
 
@@ -2883,48 +2885,37 @@ useful for Chirp alerts (go/crca-alerts). -->
 </histogram>
 
 <histogram
-    name="PasswordManager.PasswordDropdownShown.WebAuthnRequest.PasskeyCount"
-    units="credentials" expires_after="2025-11-16">
-  <owner>derinel@google.com</owner>
-  <owner>markusheintz@google.com</owner>
-  <summary>
-    Logs the number of passkeys in the password dropdown when it's shown for a
-    WebAuthn conditional get request.
-  </summary>
-</histogram>
-
-<histogram
-    name="PasswordManager.PasswordDropdownShown.WebAuthnRequest.PasswordCount"
-    units="credentials" expires_after="2025-11-16">
-  <owner>derinel@google.com</owner>
-  <owner>markusheintz@google.com</owner>
-  <summary>
-    Logs the number of passwords in the password dropdown when it's shown for a
-    WebAuthn conditional get request.
-  </summary>
-</histogram>
-
-<histogram
-    name="PasswordManager.PasswordDropdownShown.WebAuthnRequest.TotalCount"
-    units="credentials" expires_after="2025-11-16">
-  <owner>derinel@google.com</owner>
-  <owner>markusheintz@google.com</owner>
-  <summary>
-    Logs the total number of credentials in the password dropdown when it's
-    shown for a WebAuthn conditional get request. This is the sum of
-    &quot;PasskeyCount&quot; and &quot;PasswordCount&quot; with the same prefix.
-  </summary>
-</histogram>
-
-<histogram
     name="PasswordManager.PasswordDropdownShown.WebAuthnRequest.UseAnotherDeviceShown"
     enum="Boolean" expires_after="2025-11-16">
   <owner>derinel@google.com</owner>
   <owner>markusheintz@google.com</owner>
   <summary>
     Logs whether the password dropdown has the option to use another device for
-    a passkey sign in. This is emitted when the dropdown is displayed.
+    a passkey sign in. Recorded when the dropdown is displayed for a WebAuthn
+    conditional get request.
   </summary>
+</histogram>
+
+<histogram
+    name="PasswordManager.PasswordDropdownShown.WebAuthnRequest{MetricType}"
+    units="credentials" expires_after="2025-11-16">
+  <owner>derinel@google.com</owner>
+  <owner>markusheintz@google.com</owner>
+  <summary>
+    Logs details about the password dropdown when it's shown for a WebAuthn
+    conditional get request. Recorded when the dropdown is displayed.
+    {MetricType}
+  </summary>
+  <token key="MetricType">
+    <variant name=".PasskeyCount"
+        summary="Logs the number of passkeys in the password dropdown."/>
+    <variant name=".PasswordCount"
+        summary="Logs the number of passwords in the password dropdown."/>
+    <variant name=".TotalCount"
+        summary="Logs the total number of credentials in the password
+                 dropdown. This is the sum of PasskeyCount and PasswordCount
+                 for WebAuthn requests."/>
+  </token>
 </histogram>
 
 <histogram name="PasswordManager.PasswordFilling.ReauthPromo"
@@ -5000,35 +4991,38 @@ useful for Chirp alerts (go/crca-alerts). -->
 </histogram>
 
 <histogram name="PasswordProtection.ModalWarningDialogLifetime" units="ms"
-    expires_after="2025-04-19">
+    expires_after="2026-05-19">
   <owner>nwokedi@chromium.org</owner>
   <owner>chrome-counter-abuse-alerts@google.com</owner>
   <summary>
     Records the interval between when the password protection modal warning
     dialog is constructed and when the dialog is destructed. The dialog can be
     destructed when the user takes action or the web content is destroyed.
+    Warning: The histogram was expired from 2025-04-20 to 2025-05-22.
   </summary>
 </histogram>
 
 <histogram name="PasswordProtection.NoHostedDomainFoundMatched" enum="Boolean"
-    expires_after="2025-04-19">
+    expires_after="2026-05-19">
   <owner>nwokedi@chromium.org</owner>
   <owner>chrome-counter-abuse-alerts@google.com</owner>
   <summary>
     Tracks whether the kNoHostedDomainFound check is useful when the gmail and
-    googlemail domains are being checked explicitly.
+    googlemail domains are being checked explicitly. Warning: The histogram was
+    expired from 2025-04-20 to 2025-05-22.
   </summary>
 </histogram>
 
 <histogram name="PasswordProtection.PageInfoAction"
-    enum="PasswordProtectionWarningAction" expires_after="2025-05-12">
+    enum="PasswordProtectionWarningAction" expires_after="2026-05-12">
   <owner>nwokedi@chromium.org</owner>
   <owner>chrome-counter-abuse-alerts@google.com</owner>
   <summary>
     Records how a user interacts with page info bubble that displays the
     password protection warning. Logged when such page info bubble is shown and
     when the user chooses to change their password, ignore warning, or mark site
-    as legitimate via buttons on the page info bubble.
+    as legitimate via buttons on the page info bubble. Warning: The histogram
+    was expired from 2025-05-13 to 2025-05-22.
   </summary>
 </histogram>
 

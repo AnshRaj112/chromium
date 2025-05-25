@@ -7757,7 +7757,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_NTP_CUSTOMIZE_CHROME_CHANGE_THEME_LABEL" desc="The label for the action button for changing Chrome theme in the New Tab Page customize chrome side panel.">
         Change theme
       </message>
-      <message name="IDS_NTP_CUSTOMIZE_FOOTER_HEADER" desc="The label for the Footer title in the customization menu on the New Tab Page.">
+      <message name="IDS_NTP_CUSTOMIZE_FOOTER_HEADER" desc="The toggle for the Footer title in the customization menu on the New Tab Page." meaning="The footer which shows at the bottom of the New Tab page.">
         Footer
       </message>
       <message name="IDS_NTP_CUSTOMIZE_CHROME_MANAGED_NEW_TAB_PAGE" desc="The string that shows on the customize chrome UI when a 3rd party manages the new tab page.">
@@ -7788,7 +7788,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
         AI created theme
       </message>
       <message name="IDS_NTP_CUSTOMIZE_CHROME_CURRENT_THEME_LABEL" desc="The second line of the label for the button that opens a link to a third party theme.">
-        Current theme you have installed.
+        Current theme you have installed
       </message>
       <message name="IDS_NTP_CUSTOMIZE_SHOW_CARDS_LABEL" desc="The label for the option to show cards in the customization menu on the New Tab Page">
         Show cards
@@ -10239,6 +10239,15 @@ Keep your key file in a safe place. You will need it to create new versions of y
           =1 {To manage it, open Extensions}
           other {To manage them, open Extensions}}
       </message>
+      <message name="IDS_EXTENSIONS_ZERO_STATE_PROMO_IPH_TITLE" desc="Title text shown on the promotional UI appearing when the user has no extensions installed.">
+         Enhance your browser with extensions
+      </message>
+      <message name="IDS_EXTENSIONS_ZERO_STATE_PROMO_CUSTOM_ACTION_IPH_DESCRIPTION" desc="Body text shown on the promotional UI appearing when the user has no extensions installed.">
+         Extensions are add-ons to Chrome that can help you stay organized, simplify tasks, and customize your browsing
+      </message>
+      <message name="IDS_EXTENSIONS_ZERO_STATE_PROMO_CUSTOM_ACTION_IPH_ACCEPT" desc="Text on the custom action button that opens a new tab to the Chrome Web Store.">
+         Discover extensions
+      </message>
       <message name="IDS_GLOBAL_MEDIA_CONTROLS_PROMO" desc="Text shown on promotional UI appearing next to the global media controls toolbar button.">
         New! Control your music, videos, and more.
       </message>
@@ -11508,9 +11517,6 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
 
       <!-- WebUI Tab Strip -->
       <if expr="enable_webui_tab_strip">
-        <message name="IDS_WEBUI_TAB_STRIP_PROMO" desc="Promotional UI shown next to the tab counter button to encourage its use">
-          Find your tabs here
-        </message>
         <message name="IDS_TOOLTIP_WEBUI_TAB_STRIP_TAB_COUNTER" desc="The tooltip for the button which toggles the tab strip. It counts the number of open tabs. [ICU Syntax]">
           {NUM_OPEN_TABS, plural, =1 {# open tab, press to toggle tab strip} other {# open tabs, press to toggle tab strip}}
         </message>

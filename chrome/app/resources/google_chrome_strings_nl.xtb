@@ -100,7 +100,6 @@ Sommige functies zijn wellicht niet beschikbaar en wijzigingen in voorkeuren wor
 <translation id="2199691482078155239">Chrome geeft je meer controle over de advertenties die je te zien krijgt en beperkt wat sites over jou te weten kunnen komen als ze je gepersonaliseerde advertenties tonen</translation>
 <translation id="2216543877350048334">Log uit als je je Google-account uit Chrome wilt verwijderen</translation>
 <translation id="2236949375853147973">Mijn activiteit</translation>
-<translation id="223889379102603431">Informatie over hoe Chrome rootcertificaten beheert</translation>
 <translation id="2290014774651636340">Google API-sleutels ontbreken. Sommige functies van Google Chrome worden uitgezet.</translation>
 <translation id="2290095356545025170">Weet je zeker dat je Google Chrome wilt verwijderen?</translation>
 <translation id="2309047409763057870">Dit is een tweede installatie van Google Chrome en kan niet als standaardbrowser worden ingesteld.</translation>
@@ -245,6 +244,7 @@ Sommige functies zijn wellicht niet beschikbaar en wijzigingen in voorkeuren wor
 <translation id="4050175100176540509">Er zijn belangrijke beveiligingsverbeteringen en nieuwe functies beschikbaar in de nieuwste versie.</translation>
 <translation id="4053720452172726777">Google Chrome aanpassen en beheren</translation>
 <translation id="408393047846373801">Log in bij Chrome om onder andere je wachtwoorden te gebruiken op al je apparaten. Dit wachtwoord wordt opgeslagen in je Google-account nadat je bent ingelogd.</translation>
+<translation id="409936259433005390">Upgrade je binnenkort naar Windows 11? Download het Chrome-installatieprogramma naar OneDrive zodat je er vanaf de eerste dag klaar voor bent.</translation>
 <translation id="4110895483821904099">Je nieuwe Chrome-profiel instellen</translation>
 <translation id="4111566860456076004">Chrome kan niet verifiëren waar deze extensie vandaan komt en de extensie is misschien onveilig. Verwijder de extensie uit Chrome zodat deze je gegevens (waaronder je persoonlijke informatie) niet meer kan bekijken en wijzigen op sites die je bezoekt.</translation>
 <translation id="4128488089242627000">Chrome werkt sneller en functies die JavaScript gebruiken, zouden naar behoren moeten werken (aanbevolen)</translation>
@@ -569,7 +569,6 @@ Sommige functies zijn wellicht niet beschikbaar. Geef een andere profieldirector
 <translation id="8255190535488645436">Google Chrome gebruikt je camera en microfoon.</translation>
 <translation id="8257796129973882597">Je kunt onder meer bookmarks en de leesmodus openen via het Chrome-menu</translation>
 <translation id="8267953129876836456">Chrome heeft een aantal veiligheidsaanbevelingen gevonden</translation>
-<translation id="8270775718612349140">Certificaten beheerd door Chrome</translation>
 <translation id="8286862437124483331">Google Chrome probeert wachtwoorden te bekijken. Geef je Windows-wachtwoord op om dit toe te staan.</translation>
 <translation id="829923460755755423">Voeg een snelkoppeling toe naar Google Wachtwoordmanager</translation>
 <translation id="8313851650939857356">Opstartfout: <ph name="STARTUP_ERROR" />.</translation>

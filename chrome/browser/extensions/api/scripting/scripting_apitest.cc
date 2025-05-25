@@ -4,6 +4,7 @@
 
 #include <optional>
 
+#include "base/strings/stringprintf.h"
 #include "base/test/bind.h"
 #include "build/build_config.h"
 #include "chrome/browser/extensions/api/scripting/scripting_api.h"
@@ -118,7 +119,7 @@ IN_PROC_BROWSER_TEST_F(ScriptingAPITest, GetContentScripts) {
   ASSERT_TRUE(RunExtensionTest("scripting/get_scripts")) << message_;
 }
 
-// TODO(crbug.com/391932982): Most of the tests in this file are skipped on
+// TODO(crbug.com/371432155): Most of the tests in this file are skipped on
 // desktop Android because they use the chrome.tabs API, which hasn't been
 // ported yet.
 #if BUILDFLAG(ENABLE_EXTENSIONS)

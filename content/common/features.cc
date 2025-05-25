@@ -308,6 +308,24 @@ BASE_FEATURE(kIOSurfaceCapturer,
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
+// If enabled, set a soft limit on the number of renderer processes on
+// Android, after which Chrome will reuse existing processes when possible.
+// This diverges from current Clank behavior, where we do not set any upper
+// bound and instead delegate that to the system. 42 is approximated from
+// 8GBs ((8192 - 1024) / (16384 / 96)), and has nothing to do with Douglas
+// Adams' book. 1GB is a carve-out for integrated GPU VRAM.
+#if BUILDFLAG(IS_ANDROID)
+BASE_FEATURE(kRendererProcessLimitOnAndroid,
+             "RendererProcessLimitOnAndroid",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE_PARAM(size_t,
+                   kRendererProcessLimitOnAndroidCount,
+                   &kRendererProcessLimitOnAndroid,
+                   "count",
+                   42u);
+#endif  // BUILDFLAG(IS_ANDROID)
+
 // If this feature is enabled, media-device enumerations use a cache that is
 // invalidated upon notifications sent by base::SystemMonitor. If disabled, the
 // cache is considered invalid on every enumeration request.
@@ -376,7 +394,7 @@ BASE_FEATURE(kPrerenderMoreCorrectSpeculativeRFHCreation,
 // RenderProcessHost even when there is a priority override.
 BASE_FEATURE(kPriorityOverridePendingViews,
              "PriorityOverridePendingViews",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables exposure of the core milestone 1 (M1) APIs in the renderer without an
 // origin trial token: Attribution Reporting, FLEDGE, Topics.
@@ -515,7 +533,7 @@ BASE_FEATURE(kSkipEarlyCommitPendingForCrashedFrame,
 // Skip granting access to the data path if it has already been set.
 BASE_FEATURE(kSkipGrantAccessToDataPathIfAlreadySet,
              "SkipGrantAccessToDataPathIfAlreadySet",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif
 
 #if BUILDFLAG(IS_MAC)

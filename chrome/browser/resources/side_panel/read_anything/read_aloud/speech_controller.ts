@@ -118,7 +118,7 @@ export class SpeechController {
   }
 
   isSpeechTreeInitialized(): boolean {
-    return this.model_.isSpeechTreeInitialized();
+    return chrome.readingMode.isSpeechTreeInitialized;
   }
 
   isPausedFromButton(): boolean {
@@ -172,7 +172,6 @@ export class SpeechController {
     // TODO: crbug.com/40927698 - There should be a way to use AXPosition so
     // that this step can be skipped.
     chrome.readingMode.initAxPositionWithNode(firstTextNode);
-    this.model_.setIsSpeechTreeInitialized(true);
   }
 
   onSelectionChange() {
@@ -280,7 +279,6 @@ export class SpeechController {
 
   private moveGranularity_() {
     this.model_.setIsSpeechBeingRepositioned(true);
-    this.speech_.cancel();
     this.highlighter_.resetPreviousHighlight();
 
     // Reset the word boundary index whenever we move the granularity position.
@@ -290,7 +288,6 @@ export class SpeechController {
   private resumeSpeech_(selection: Selection|null) {
     let playedFromSelection = false;
     if (this.hasSelection_(selection)) {
-      this.speech_.cancel();
       this.wordBoundaries_.resetToDefaultState();
       playedFromSelection = this.playFromSelection_(selection);
     }
@@ -302,7 +299,6 @@ export class SpeechController {
         // restarting the current message.
         this.speech_.resume();
       } else {
-        this.speech_.cancel();
         if (!this.highlightAndPlayInterruptedMessage_()) {
           // Ensure we're updating Read Aloud state if there's no text to
           // speak.
@@ -551,7 +547,6 @@ export class SpeechController {
       // the accessible text length boundaries to shorten the text. Even
       // if this gives a much smaller sentence than TTS would have supported,
       // this is still preferable to no speech.
-      this.speech_.cancel();
       this.playTextWithBoundaries_(
           utteranceText, true,
           this.getUtteranceEndBoundary_(utteranceText, true));
@@ -780,7 +775,6 @@ export class SpeechController {
     this.wordBoundaries_.resetToDefaultState();
 
     const speechPlayingState = {
-      isSpeechTreeInitialized: false,
       isSpeechActive: false,
       pauseSource: PauseActionSource.DEFAULT,
       isAudioCurrentlyPlaying: false,
@@ -900,6 +894,8 @@ export class SpeechController {
   private speakWithDefaults_(message: SpeechSynthesisUtterance) {
     message.lang = chrome.readingMode.baseLanguageForSpeech;
     message.rate = getCurrentSpeechRate();
+    // Cancel any pending utterances that may be happening in other tabs.
+    this.speech_.cancel();
     this.speech_.speak(message);
   }
 

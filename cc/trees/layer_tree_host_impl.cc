@@ -478,8 +478,7 @@ LayerTreeHostImpl::LayerTreeHostImpl(
           ? task_runner_provider_->ImplThreadTaskRunner()
           : task_runner_provider_->MainThreadTaskRunner(),
       base::BindRepeating(&LayerTreeHostImpl::MaybeFlushPendingWork,
-                          weak_factory_.GetWeakPtr()),
-      /*use_imported_resource_id=*/settings.trees_in_viz_in_viz_process);
+                          weak_factory_.GetWeakPtr()));
   DCHECK(mutator_host_);
   mutator_host_->SetMutatorHostClient(this);
   mutator_events_ = mutator_host_->CreateEvents();
@@ -3110,8 +3109,12 @@ viz::CompositorFrame LayerTreeHostImpl::GenerateCompositorFrame(
     auto display_color_spaces = GetDisplayColorSpaces();
     for (auto& request : active_tree_->TakeViewTransitionRequests(
              /*should_set_needs_update_draw_properties=*/true)) {
-      metadata.transition_directives.push_back(request->ConstructDirective(
-          view_transition_element_map, display_color_spaces));
+      if (resourceless_software_draw_) {
+        OnCompositorFrameTransitionDirectiveProcessed(request->sequence_id());
+      } else {
+        metadata.transition_directives.push_back(request->ConstructDirective(
+            view_transition_element_map, display_color_spaces));
+      }
     }
   } else {
     // In TreesInViz mode, we call TakeViewTransitionRequest() later in
@@ -5408,14 +5411,13 @@ void LayerTreeHostImpl::CreateUIResource(UIResourceId uid,
   // For software compositing, shared memory will be allocated and the
   // UIResource will be copied into it.
   std::unique_ptr<gpu::ClientSharedImage::ScopedMapping> shared_mapping;
-  bool overlay_candidate = false;
 
   if (layer_tree_frame_sink_->context_provider()) {
     viz::RasterContextProvider* context_provider =
         layer_tree_frame_sink_->context_provider();
     const auto& shared_image_caps =
         context_provider->SharedImageInterface()->GetCapabilities();
-    overlay_candidate =
+    const bool overlay_candidate =
         settings_.use_gpu_memory_buffer_resources &&
         shared_image_caps.supports_scanout_shared_images &&
         viz::CanCreateGpuMemoryBufferForSinglePlaneSharedImageFormat(format);
@@ -5532,18 +5534,16 @@ void LayerTreeHostImpl::CreateUIResource(UIResourceId uid,
                                     ->SharedImageInterface()
                                     ->GenUnverifiedSyncToken();
 
-    GLenum texture_target = client_shared_image->GetTextureTarget();
-    transferable = viz::TransferableResource::MakeGpu(
-        client_shared_image, texture_target, sync_token, upload_size, format,
-        overlay_candidate, viz::TransferableResource::ResourceSource::kUI);
+    transferable = viz::TransferableResource::Make(
+        client_shared_image, viz::TransferableResource::ResourceSource::kUI,
+        sync_token);
   } else {
     auto sii = layer_tree_frame_sink_->shared_image_interface();
     gpu::SyncToken sync_token = sii->GenVerifiedSyncToken();
-    transferable = viz::TransferableResource::MakeSoftwareSharedImage(
-        client_shared_image, sync_token, upload_size, format,
-        viz::TransferableResource::ResourceSource::kUI);
+    transferable = viz::TransferableResource::Make(
+        client_shared_image, viz::TransferableResource::ResourceSource::kUI,
+        sync_token);
   }
-  transferable.color_space = color_space;
   id = resource_provider_->ImportResource(
       transferable,
       // The OnUIResourceReleased method is bound with a WeakPtr, but the

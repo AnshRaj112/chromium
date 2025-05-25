@@ -80,9 +80,14 @@ public class ToolbarProgressBarTest {
                                     activity.setContentView(view, params);
 
                                     Resources res = activity.getResources();
-                                    int heightPx =
-                                            res.getDimensionPixelSize(
-                                                    R.dimen.toolbar_progress_bar_height);
+                                    int heightPx;
+                                    if (ChromeFeatureList.sAndroidProgressBarVisualUpdate.isEnabled()) {
+                                        heightPx = res.getDimensionPixelSize(
+                                                R.dimen.toolbar_progress_bar_increased_height);
+                                    } else {
+                                        heightPx = res.getDimensionPixelSize(
+                                                R.dimen.toolbar_progress_bar_height);
+                                    }
 
                                     View anchor = new View(activity);
                                     view.addView(
@@ -393,8 +398,6 @@ public class ToolbarProgressBarTest {
         Drawable drawable = mProgressBar.getDrawable();
         assertTrue(drawable instanceof LayerDrawable);
         LayerDrawable layerDrawable = (LayerDrawable) drawable;
-        assertEquals(2, layerDrawable.getNumberOfLayers());
-        assertTrue(layerDrawable.getDrawable(0) instanceof ClipDrawable);
-        assertTrue(layerDrawable.getDrawable(1) instanceof ClipDrawable);
+        assertTrue(layerDrawable.getNumberOfLayers() > 1);
     }
 }

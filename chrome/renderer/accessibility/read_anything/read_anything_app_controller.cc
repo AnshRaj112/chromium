@@ -847,6 +847,13 @@ void ReadAnythingAppController::Draw(bool recompute_display_nodes) {
   }
   if (recompute_display_nodes && !model_.content_node_ids().empty()) {
     model_.ComputeDisplayNodeIdsForDistilledTree();
+
+    // If we need to recompute which nodes are displayed, reset read aloud as
+    // we previously preprocessed the previous nodes and should re-process the
+    // new ones.
+    if (IsReadAloudEnabled()) {
+      read_aloud_model_.ResetReadAloudState();
+    }
   }
   // This call should check that the active tree isn't in an undistilled state
   // -- that is, it is awaiting distillation or never requested distillation.
@@ -954,6 +961,8 @@ gin::ObjectTemplateBuilder ReadAnythingAppController::GetObjectTemplateBuilder(
                    &ReadAnythingAppController::EngineErrorStopSource)
       .SetProperty("contentFinishedStopSource",
                    &ReadAnythingAppController::ContentFinishedStopSource)
+      .SetProperty("isSpeechTreeInitialized",
+                   &ReadAnythingAppController::IsSpeechTreeInitialized)
       .SetProperty(
           "unexpectedUpdateContentStopSource",
           &ReadAnythingAppController::UnexpectedUpdateContentStopSource)
@@ -1803,6 +1812,10 @@ void ReadAnythingAppController::InitAXPositionWithNode(
   // TODO: crbug.com/411198154: This should only be called if the ax position
   // is not already initialized.
   PreprocessTextForSpeech();
+}
+
+bool ReadAnythingAppController::IsSpeechTreeInitialized() {
+  return read_aloud_model_.speech_tree_initialized();
 }
 
 std::vector<ui::AXNodeID> ReadAnythingAppController::GetCurrentText() {

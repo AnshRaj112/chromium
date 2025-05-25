@@ -20,6 +20,9 @@ class AXBitset {
   AXBitset() = default;
   ~AXBitset() = default;
 
+  uint64_t GetSetBits() const { return set_bits_; }
+  uint64_t GetValues() const { return values_; }
+
   // Returns whether enum T at |value| is set to true, false or unset.
   std::optional<bool> Has(T enum_value) const {
     uint64_t index = static_cast<uint64_t>(enum_value);
@@ -82,6 +85,10 @@ class AXBitset {
       remainder &= remainder - 1;
     }
   }
+
+  // Returns the number of attributes that are currently explicitly set
+  // (i.e., have been Set to true or false and not subsequently Unset).
+  size_t Size() const { return std::popcount(set_bits_); }
 
  private:
   uint64_t set_bits_ = 0;

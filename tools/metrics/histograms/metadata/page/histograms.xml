@@ -239,6 +239,7 @@ chromium-metrics-reviews@google.com.
   <variant name=".CustomizeChrome"/>
   <variant name=".DataSharingBubble"/>
   <variant name=".Emoji"/>
+  <variant name=".ExtensionsWebStoreZeroStatePromo"/>
   <variant name=".Feed"/>
   <variant name=".HistoryClustersSidePanel"/>
   <variant name=".HistorySidePanel"/>
@@ -399,6 +400,7 @@ chromium-metrics-reviews@google.com.
     <variant name="Find"/>
     <variant name="IntentPicker"/>
     <variant name="LensOverlay"/>
+    <variant name="LensOverlayHomework"/>
     <variant name="LocalCardMigration"/>
     <variant name="ManagePasswords"/>
     <variant name="MandatoryReauth"/>

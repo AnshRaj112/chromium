@@ -320,32 +320,25 @@
     },
     {
       name: "AIPromptAPI",
-      // OriginTrialContext::CanEnableTrialFromName limits access to extensions.
-      origin_trial_feature_name: "AIPromptAPIForExtension",
-      origin_trial_allows_third_party: true,
+      public: true,
       status: {
         "Win": "experimental",
         "Mac": "experimental",
         "Linux": "experimental",
         "default": "",
       },
-      base_feature_status: "enabled",
-      copied_from_base_feature_if: "overridden",
-      implied_by: ["AIPromptAPIMultimodalInput", "AIPromptAPIForExtension"],
+      implied_by: ["AIPromptAPIMultimodalInput"],
     },
     {
-      // Extension-specific feature checked in addition to "AIPromptAPI".
+      // Extension access to "AIPromptAPI".
       name: "AIPromptAPIForExtension",
-      origin_trial_feature_name: "AIPromptAPIForExtension",
-      origin_trial_allows_third_party: true,
+      public: true,
       status: {
-        "Win": "experimental",
-        "Mac": "experimental",
-        "Linux": "experimental",
+        "Win": "stable",
+        "Mac": "stable",
+        "Linux": "stable",
         "default": "",
       },
-      base_feature_status: "enabled",
-      copied_from_base_feature_if: "overridden",
     },
     {
       name: "AIPromptAPIForWorkers",
@@ -361,18 +354,10 @@
       },
     },
     {
+      // Gates access to the responseConstraint enhancement for "AIPromptAPI".
+      // This feature alone does not expose any "AIPromptAPI" feature access.
       name: "AIPromptAPIStructuredOutput",
-      origin_trial_feature_name: "AIPromptAPIForExtension",
-      origin_trial_allows_third_party: true,
-      status: {
-        "Win": "experimental",
-        "Mac": "experimental",
-        "Linux": "experimental",
-        "default": "",
-      },
-      base_feature_status: "enabled",
-      copied_from_base_feature_if: "overridden",
-      implied_by: ["AIPromptAPI"],
+      status: "stable",
     },
     {
       name: "AIProofreadingAPI",
@@ -1380,7 +1365,7 @@
     },
     {
       name: "CSSPreferredTextScale",
-      status: "experimental",
+      status: "stable",
     },
     // https://drafts.csswg.org/css-values-5/#progress
     // progress()
@@ -2648,6 +2633,10 @@
       status: "stable",
     },
     {
+      name: "IgnoreOutOfFlowPositionForPreviousText",
+      status: "experimental",
+    },
+    {
       name: "ImageDataPixelFormat",
       status: "stable",
     },
@@ -3844,7 +3833,7 @@
     {
       // ChromeStatus: https://chromestatus.com/feature/6194847180128256
       name: "QuotaExceededErrorUpdate",
-      status: "experimental",
+      status: "stable",
     },
     {
      // crbug.com/323953913
@@ -4041,6 +4030,10 @@
       status: "stable",
     },
     {
+      name: "RestrictOwnAudio",
+      status: "experimental",
+    },
+    {
       name: "RestrictTabFocusForHiddenSVGElements",
       status: "stable",
     },
@@ -4155,7 +4148,7 @@
       status: "test",
     },
     {
-      name: "SchedulerYieldCrossOriginFix",
+      name: "SchedulerYieldDisallowCrossFrameInheritance",
       status: "stable",
     },
     {
@@ -4586,9 +4579,14 @@
       status: "stable",
     },
     {
+      name: "SoftNavigationDetectionAdvancedPaintAttribution",
+      status: "experimental",
+      depends_on: ["SoftNavigationDetection"],
+    },
+    {
       name: "SoftNavigationHeuristics",
       status: "experimental",
-      depends_on: ["NavigationId","SoftNavigationDetection"],
+      depends_on: ["NavigationId","SoftNavigationDetectionAdvancedPaintAttribution"],
       origin_trial_allows_third_party: true,
       origin_trial_feature_name: "SoftNavigationHeuristics",
     },
@@ -4706,10 +4704,6 @@
       // Enables loading of external SVG resource documents for the 'clip-path',
       // 'fill', 'stroke' and 'marker-*' properties.
       name: "SvgExternalResources",
-      status: "stable",
-    },
-    {
-      name: "SvgFilterUserSpaceViewportForNonSvg",
       status: "stable",
     },
     {

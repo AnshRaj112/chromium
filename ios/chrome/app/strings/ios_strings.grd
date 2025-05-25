@@ -2454,10 +2454,10 @@ See your search engine’s instructions for deleting your search history, if app
         Tap <ph name="BEGIN_BOLD">BEGIN_BOLD</ph>Default Browser App<ph name="END_BOLD">END_BOLD</ph>
       </message>
       <message name="IDS_IOS_FIRST_RUN_GUIDED_TOUR_NTP_IPH_TEXT" desc="Text of the Guided Tour IPH for the NTP step focusing on the tab grid." meaning="Title-cased">
-          Your open tabs and groups
+          See and manage everything you have open
     </message>
       <message name="IDS_IOS_FIRST_RUN_GUIDED_TOUR_NTP_IPH_TITLE" desc="Title of the Guided Tour IPH for the NTP step focusing on the tab grid." meaning="Title-cased">
-          See and manage everything you have open
+          Your open tabs and groups
     </message>
       <message name="IDS_IOS_FIRST_RUN_GUIDED_TOUR_PROMPT_BUTTON_TITLE" desc="Title of the button for the user to start the First Run Guided Tour." meaning="Title-cased">
       Show me around
@@ -2467,6 +2467,18 @@ See your search engine’s instructions for deleting your search history, if app
     </message>
       <message name="IDS_IOS_FIRST_RUN_GUIDED_TOUR_TAB_GRID_INCOGNITO_IPH_TITLE" desc="Title of the Guided Tour IPH for the step focusing on the tab grid's incognito page control item." meaning="Title-cased">
           Browse in Incognito
+    </message>
+      <message name="IDS_IOS_FIRST_RUN_GUIDED_TOUR_TAB_GRID_LONG_PRESS_IPH_TEXT" desc="Text of the Guided Tour IPH for the step focusing on the active tab." meaning="Title-cased">
+          Create tab groups to organize your open tabs and stay productive
+    </message>
+      <message name="IDS_IOS_FIRST_RUN_GUIDED_TOUR_TAB_GRID_LONG_PRESS_IPH_TITLE" desc="Title of the Guided Tour IPH for the step focusing on the active tab." meaning="Title-cased">
+          Long press to add to a tab group
+    </message>
+      <message name="IDS_IOS_FIRST_RUN_GUIDED_TOUR_TAB_GRID_TAB_GROUP_IPH_TEXT" desc="Text of the Guided Tour IPH for the step focusing on tab grid's tab group page control item." meaning="Title-cased">
+          When you close a tab group it's automatically saved here
+    </message>
+      <message name="IDS_IOS_FIRST_RUN_GUIDED_TOUR_TAB_GRID_TAB_GROUP_IPH_TITLE" desc="Title of the Guided Tour IPH for the step focusing on tab grid's tab group page control item." meaning="Title-cased">
+          Tab groups are saved here
     </message>
       <message name="IDS_IOS_FIRST_RUN_SCREEN_READ_MORE" desc="The label on the primary button of some screens in the first run experience if the content requires scrolling to the end [iOS only]">
         More
@@ -5530,6 +5542,21 @@ While in Incognito, sites can't use cookies to see your browsing activity across
       <message name="IDS_IOS_SEARCH_ENGINE_SETTINS_CELL_VOICE_OVER" desc="This string is used to add the search engine name and the search engine domain. It is only used by VoiceOver. [iOS only]">
         <ph name="SEARCH_ENGINE_NAME">$1<ex>Google</ex></ph>, <ph name="SEARCH_ENGINE_DOMAIN">$2<ex>google.com</ex></ph>
       </message>
+      <message name="IDS_IOS_SEARCH_WHAT_YOU_SEE_TIPS_INSTRUCTION_LEARN_MORE_ACTION" desc="The text for the 'Learn more' link/button in the 'Search what you see' instructions overlay. [iOS only]">
+        Learn more
+      </message>
+      <message name="IDS_IOS_SEARCH_WHAT_YOU_SEE_TIPS_INSTRUCTION_STEP_1" desc="The text for the first step in the 'Search what you see' instructions overlay. [iOS only]">
+        Go to any page you like
+      </message>
+      <message name="IDS_IOS_SEARCH_WHAT_YOU_SEE_TIPS_INSTRUCTION_STEP_2" desc="The text for the second step in the 'Search what you see' instructions overlay. [iOS only]">
+        In the address bar, tap on the Google Lens camera icon
+      </message>
+      <message name="IDS_IOS_SEARCH_WHAT_YOU_SEE_TIPS_INSTRUCTION_STEP_3" desc="The text for the third step in the 'Search what you see' instructions overlay. [iOS only]">
+        Draw, highlight or tap anything on your screen to search
+      </message>
+      <message name="IDS_IOS_SEARCH_WHAT_YOU_SEE_TIPS_INSTRUCTION_TITLE" desc="The title for the 'Search what you see' instructions overlay. [iOS only]">
+        How do I enable this feature?
+      </message>
       <message name="IDS_IOS_SEARCH_WHAT_YOU_SEE_TIPS_PROMO_SHOW_ME_HOW_ACTION" desc="The text for the 'Show me how' button in the 'Search what you see' promotional UI. [iOS only]">
         Show me how
       </message>
@@ -7254,6 +7281,18 @@ While in Incognito, sites can't use cookies to see your browsing activity across
       </message>
       <message name="IDS_IOS_WEB_INSPECTOR_TITLE" desc="The title of the screen in which the user can enable Web Inspector support, to allow debugging web pages">
         Web Inspector
+      </message>
+      <message name="IDS_IOS_WELCOME_BACK_KEEP_BROWSING_BUTTON" desc="The text of the Keep browsing button on the Welcome Back promo">
+        Keep browsing
+      </message>
+      <message name="IDS_IOS_WELCOME_BACK_SUBTITLE" desc="The subtitle of the Welcome Back promo">
+        Explore helpful features that you've missed
+      </message>
+      <message name="IDS_IOS_WELCOME_BACK_TITLE_DEFAULT" desc="The title of the Welcome Back promo for users who are not signed in">
+        Welcome back
+      </message>
+      <message name="IDS_IOS_WELCOME_BACK_TITLE_SIGNED_IN" desc="The title of the Welcome Back promo for users who are signed in">
+        Welcome back, <ph name="USER_NAME">$1<ex>John</ex></ph>
       </message>
       <message name="IDS_IOS_WHATS_HOW_TO_ENABLE_TITLE" desc="Title of a section in What's New that show users the instructions to enable the feature.">
         How do I enable this feature?

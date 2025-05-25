@@ -21,6 +21,7 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
 #include "components/download/public/common/download_stats.h"
@@ -680,7 +681,7 @@ void NavigationURLLoaderImpl::CreateInterceptors() {
     // The interceptor may not be created in certain cases (e.g., the origin
     // is not secure).
     if (service_worker_interceptor) {
-      if (base::FeatureList::IsEnabled(features::kPrefetchServiceWorker)) {
+      if (features::IsPrefetchServiceWorkerEnabled(browser_context_)) {
         // Set up an interceptor for ServiceWorker-controlled prefetches. This
         // is needed before the ServiceWorkerMainResourceLoaderInterceptor which
         // would also intercept the request for ServiceWorker-controlled URLs.

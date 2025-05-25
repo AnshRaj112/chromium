@@ -98,8 +98,8 @@ BASE_FEATURE_ENUM_PARAM(
     IPHExtensionsZeroStatePromoVariant,
     kIPHExtensionsZeroStatePromoVariantParam,
     &feature_engagement::kIPHExtensionsZeroStatePromoFeature,
-    "iph-variant",
-    IPHExtensionsZeroStatePromoVariant::kCustomUiChipIph,
+    "x_iph-variant",
+    IPHExtensionsZeroStatePromoVariant::kCustomActionIph,
     &kIPHExtensionsZeroStatePromoVariantOptions);
 #endif
 BASE_FEATURE(kIPHFocusHelpBubbleScreenReaderPromoFeature,
@@ -247,9 +247,6 @@ BASE_FEATURE(kIPHTabSearchFeature,
              base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHTabSearchToolbarButtonFeature,
              "IPH_TabSearchToolbarButton",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-BASE_FEATURE(kIPHWebUITabStripFeature,
-             "IPH_WebUITabStrip",
              base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kIPHDesktopSnoozeFeature,
              "IPH_DesktopSnoozeFeature",

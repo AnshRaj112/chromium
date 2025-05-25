@@ -2648,7 +2648,6 @@
 <translation id="2798347533012571708">Шинэчлэлтийг хадгалах</translation>
 <translation id="2799162042226656283">Таны Chrome</translation>
 <translation id="2799223571221894425">Дахин эхлүүлэх</translation>
-<translation id="2800309299477632167">Гарын хэвшмэл товчлуурын байрлал</translation>
 <translation id="2800760947029405028">Зураг байршуулах</translation>
 <translation id="2800996978423439835">Хавчуурга болон бусад зүйлээ бүх төхөөрөмж дээрээ аваарай</translation>
 <translation id="2801134910297796778"><ph name="EMAIL" />-д нэвтэрсэн</translation>
@@ -4764,7 +4763,6 @@
 <translation id="4289540628985791613">Тойм</translation>
 <translation id="428963538941819373">Эдгээр сайт таныг <ph name="HOST" />-г үзэх явцад таны талаар хадгалсан мэдээллийг ашиглах боломжтой</translation>
 <translation id="4289732974614035569">ПИН сонгоно уу</translation>
-<translation id="4290526909608432059">Chrome аппын дэмжлэг удахгүй дуусна. Сонголтуудынхаа талаар мэдэж авахын тулд апп хөгжүүлэгч эсвэл IT-н тусламжийн багтайгаа холбогдоно уу.</translation>
 <translation id="4290791284969893584">Хуудсыг хаасны дараа таны эхлүүлсэн ажлууд дуусахгүй байж болзошгүй</translation>
 <translation id="4290826901752066702"><ph name="NUM" /> гишүүн</translation>
 <translation id="4290898381118933198">Хуудаснуудын хооронд шилжихийн тулд шудрах</translation>
@@ -7632,6 +7630,7 @@
 <translation id="6365069501305898914">Facebook</translation>
 <translation id="6365411474437319296">Гэр бүл болон найз нөхөдөө нэмэх</translation>
 <translation id="6367097275976877956">Та ChromeOS-н бүрэлдэхүүн дэлгэц уншигч болох ChromeVox-г идэвхжүүлэхийг хүсэж байна уу? Хэрэв тийм бол зай авах товчийг дарна уу.</translation>
+<translation id="6367196786591004737">Оруулгыг устгах</translation>
 <translation id="6367396429435748845">Хулганын товчийг түр зогсоох, үргэлжлүүлэхийн тулд <ph name="ALT" /> + <ph name="LAUNCHER" /> + <ph name="NUM_4" /> дээр дарна уу</translation>
 <translation id="6367985768157257101">Ойролцоо хуваалцах онцлогоор хүлээн авах уу?</translation>
 <translation id="6368157733310917710">&amp;Хаяг болон бусад</translation>
@@ -7965,7 +7964,6 @@
 <translation id="6610002944194042868">Орчуулах сонголт</translation>
 <translation id="6610064275805055636">Тусгаарласан веб аппуудыг удирдах</translation>
 <translation id="6611432349566876829"><ph name="NUM" /> таб</translation>
-<translation id="6611972847767394631">Эндээс табуудаа олоорой</translation>
 <translation id="661266467055912436">Таны болон веб дэх хүн бүрийн аюулгүй байдлыг нэмэгдүүлдэг.</translation>
 <translation id="6613267708691765962">Хортой программыг скан хийж байна...</translation>
 <translation id="6615455863669487791">Надад үзүүлнэ үү</translation>
@@ -8292,7 +8290,6 @@
 <translation id="6831043979455480757">Хөрвүүлэх</translation>
 <translation id="6832218595502288407">Зүүн талд эгнүүлэх</translation>
 <translation id="6832815922179448173">{MULTI_GROUP_TAB_COUNT,plural, =0{Табыг хасаж, бүлгийг устгах уу?}=1{Табуудыг хасаж, бүлгийг устгах уу?}other{Табуудыг хасаж, бүлгүүдийг устгах уу?}}</translation>
-<translation id="6833103209700200188">Хуудасны доод хэсэг</translation>
 <translation id="6833479554815567477">Табыг <ph name="GROUP_NAME" /> бүлгээс хассан - <ph name="GROUP_CONTENTS" /></translation>
 <translation id="6833753236242482566">Тэнцвэртэй (санал болгосон)</translation>
 <translation id="6835762382653651563"><ph name="DEVICE_TYPE" />-ээ шинэчлэхийн тулд интернэтэд холбогдоно уу.</translation>
@@ -10624,6 +10621,7 @@
 <translation id="8472623782143987204">Техник хангамж дээр тулгуурласан</translation>
 <translation id="8473540203671727883">Хулганын доорх текстийг хэлнэ үү</translation>
 <translation id="8473863474539038330">Хаяг болон бусад</translation>
+<translation id="847433688444405067">Төхөөрөмжүүдэд үзэх</translation>
 <translation id="8474378002946546633">Мэдэгдлүүдийг зөвшөөрөх</translation>
 <translation id="8474561048882755118">Танд төстэй бүтээгдэхүүнүүдийг зэрэгцүүлэн харж, чухал мэдээллээ хялбархан харьцуулахад тусална</translation>
 <translation id="8475313423285172237">Таны компьютер дээрх программ өргөтгөл нэмсэн байна. Энэ нь Chrome-ийн ажиллагаанд нөлөөлж болох юм.</translation>

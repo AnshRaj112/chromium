@@ -13,8 +13,8 @@ import("//build/config/python.gni")
 import("//build/config/ui.gni")
 import("//chrome/browser/buildflags.gni")
 import("//chrome/browser/downgrade/buildflags.gni")
-import("//chrome/browser/request_header_integrity/buildflags.gni")
 import("//chrome/common/features.gni")
+import("//chrome/common/request_header_integrity/buildflags.gni")
 import("//chrome/services/speech/buildflags/buildflags.gni")
 import("//chromeos/ash/components/assistant/assistant.gni")
 import("//components/captive_portal/core/features.gni")
@@ -395,6 +395,8 @@ static_library("browser") {
     "data_sharing/data_sharing_service_factory.h",
     "defaults.cc",
     "defaults.h",
+    "digital_credentials/digital_credentials_keyed_service.cc",
+    "digital_credentials/digital_credentials_keyed_service.h",
     "digital_credentials/digital_identity_interstitial_closed_reason.h",
     "digital_credentials/digital_identity_low_risk_origins.cc",
     "digital_credentials/digital_identity_low_risk_origins.h",
@@ -2077,6 +2079,7 @@ static_library("browser") {
     "//chrome/services/speech/buildflags",
     "//components/application_locale_storage",
     "//components/assist_ranker",
+    "//components/autofill/content/browser",
     "//components/autofill/core/browser",
     "//components/back_forward_cache",
     "//components/background_fetch",
@@ -2605,6 +2608,7 @@ static_library("browser") {
     deps += [
       "//chrome/browser/win/installer_downloader:controller",
       "//chrome/browser/win/installer_downloader:infobar",
+      "//chrome/browser/win/installer_downloader:infobar_impl",
     ]
   }
 
@@ -3414,7 +3418,6 @@ static_library("browser") {
       "//chrome/browser/ui/digital_credentials",
       "//chrome/browser/ui/fast_checkout:impl",
       "//chrome/browser/ui/plus_addresses",
-      "//chrome/browser/ui/plus_addresses:impl",
       "//chrome/browser/usb/android:jni_headers",
       "//chrome/browser/wallet/android:jni_headers",
       "//chrome/common:non_code_constants",
@@ -3557,6 +3560,12 @@ static_library("browser") {
       "//chrome/browser/ui/interventions",
     ]
 
+    deps += [
+      # TODO(crbug.com/413572035): Remove once c/b/tab_android* sources get modularized.
+      "//chrome/browser/ui/android/tab_model",
+      "//chrome/browser/ui/android/tab_model:impl",
+    ]
+
     # Any circular includes must depend on the target
     # "browser_public_dependencies".
     allow_circular_includes_from += [
@@ -3576,6 +3585,9 @@ static_library("browser") {
       "//chrome/browser/android:tabs_impl",
 
       "//chrome/browser/ui/android/hats:impl",
+
+      # TODO(crbug.com/413572035): Remove once c/b/tab_android* sources get modularized.
+      "//chrome/browser/ui/android/tab_model:impl",
     ]
 
     if (safe_browsing_mode == 2) {
@@ -4005,6 +4017,8 @@ static_library("browser") {
       "passage_embeddings/web_contents_passage_embedder.h",
       "password_manager/generated_password_leak_detection_pref.cc",
       "password_manager/generated_password_leak_detection_pref.h",
+      "password_manager/password_change/button_click_helper.cc",
+      "password_manager/password_change/button_click_helper.h",
       "password_manager/web_app_profile_switcher.cc",
       "password_manager/web_app_profile_switcher.h",
       "payments/chrome_payment_request_delegate.cc",
@@ -4151,8 +4165,6 @@ static_library("browser") {
       "serial/web_serial_chooser_desktop.cc",
       "sessions/restore_on_startup_policy_handler.cc",
       "sessions/restore_on_startup_policy_handler.h",
-      "share/share_metrics.cc",
-      "share/share_metrics.h",
       "sharing/click_to_call/click_to_call_context_menu_observer.cc",
       "sharing/click_to_call/click_to_call_context_menu_observer.h",
       "sharing/click_to_call/click_to_call_metrics.cc",
@@ -4170,13 +4182,9 @@ static_library("browser") {
       "sharing/sms/sms_remote_fetcher_ui_controller.cc",
       "sharing/sms/sms_remote_fetcher_ui_controller.h",
       "sharing_hub/sharing_hub_features.cc",
-      "sharing_hub/sharing_hub_features.h",
       "sharing_hub/sharing_hub_model.cc",
-      "sharing_hub/sharing_hub_model.h",
       "sharing_hub/sharing_hub_service.cc",
-      "sharing_hub/sharing_hub_service.h",
       "sharing_hub/sharing_hub_service_factory.cc",
-      "sharing_hub/sharing_hub_service_factory.h",
       "signin/signin_promo.cc",
       "signin/signin_promo.h",
       "signin/signin_ui_delegate.cc",
@@ -4346,6 +4354,7 @@ static_library("browser") {
       "//chrome/browser/screen_ai:screen_ai_service_router_factory",
       "//chrome/browser/screen_ai/public:optical_character_recognizer",
       "//chrome/browser/search/background",
+      "//chrome/browser/sharing_hub",
       "//chrome/browser/smart_card",
       "//chrome/browser/themes",
       "//chrome/browser/ui:browser_list",
@@ -4416,6 +4425,7 @@ static_library("browser") {
       "//chrome/browser/ui/toolbar/cast:impl",
       "//chrome/browser/ui/user_education",
       "//chrome/browser/ui/views/download",
+      "//chrome/browser/ui/views/new_tab_footer",
       "//chrome/browser/ui/views/side_panel",
       "//chrome/browser/ui/views/toolbar",
       "//chrome/browser/ui/webui:webui_util",
@@ -4582,6 +4592,7 @@ static_library("browser") {
       "//chrome/browser/ui/browser_window:impl",
       "//chrome/browser/ui/exclusive_access",
       "//chrome/browser/ui/views/toolbar",
+      "//chrome/browser/ui/views/new_tab_footer",
       "//chrome/browser/ui/webui/searchbox",
       "//chrome/browser/ui/webui/top_chrome:impl",
       "//chrome/browser/ui/content_settings:impl",
@@ -5073,17 +5084,12 @@ static_library("browser") {
       "sharesheet/share_action/share_action.h",
       "sharesheet/share_action/share_action_cache.cc",
       "sharesheet/share_action/share_action_cache.h",
-      "sharesheet/sharesheet_controller.h",
       "sharesheet/sharesheet_metrics.cc",
-      "sharesheet/sharesheet_metrics.h",
       "sharesheet/sharesheet_service.cc",
-      "sharesheet/sharesheet_service.h",
       "sharesheet/sharesheet_service_delegator.cc",
       "sharesheet/sharesheet_service_delegator.h",
       "sharesheet/sharesheet_service_factory.cc",
-      "sharesheet/sharesheet_service_factory.h",
       "sharesheet/sharesheet_types.cc",
-      "sharesheet/sharesheet_types.h",
       "sharesheet/sharesheet_ui_delegate.h",
       "shell_integration_chromeos.cc",
       "signin/signin_ui_chromeos_util.cc",
@@ -5260,6 +5266,7 @@ static_library("browser") {
       "//chrome/browser/ash/boca",
       "//chrome/browser/ash/boca/babelorca",
       "//chrome/browser/ash/boca/on_task",
+      "//chrome/browser/ash/boca/spotlight",
       "//chrome/browser/ash/boot_times_recorder",
       "//chrome/browser/ash/borealis",
       "//chrome/browser/ash/bruschetta",
@@ -5464,6 +5471,7 @@ static_library("browser") {
       "//chrome/browser/push_notification:push_notification",
       "//chrome/browser/resources:app_icon_resources",
       "//chrome/browser/screen_ai:screen_ai_dlc_installer",
+      "//chrome/browser/sharesheet",
       "//chrome/browser/support_tool/ash",
       "//chrome/browser/ui/ash/accelerator",
       "//chrome/browser/ui/ash/accessibility",
@@ -5798,6 +5806,7 @@ static_library("browser") {
       "//chrome/browser/ash/boca",
       "//chrome/browser/ash/boca/babelorca",
       "//chrome/browser/ash/boca/on_task",
+      "//chrome/browser/ash/boca/spotlight",
       "//chrome/browser/ash/borealis",
       "//chrome/browser/ash/bruschetta",
       "//chrome/browser/ash/calendar",
@@ -6773,7 +6782,10 @@ static_library("browser") {
       "enterprise/connectors/reporting/reporting_event_router_factory.cc",
       "enterprise/connectors/reporting/reporting_event_router_factory.h",
     ]
-    deps += [ "//components/enterprise/connectors/core" ]
+    deps += [
+      "//components/enterprise/common/proto:chrome_reporting_entity",
+      "//components/enterprise/connectors/core",
+    ]
   }
 
   if (enterprise_cloud_content_analysis) {
@@ -7699,6 +7711,7 @@ static_library("browser") {
       "//chrome/browser/controlled_frame",
       "//chrome/browser/extensions",
       "//chrome/browser/ui/tabs:tab_strip_model_observer",
+      "//chrome/browser/ui/webui/extensions_zero_state_promo:mojo_bindings",
       "//ui/base/mojom:ui_base_types",
     ]
 
@@ -8051,7 +8064,7 @@ static_library("browser") {
   }
 
   if (enable_request_header_integrity) {
-    deps += [ "//chrome/browser/request_header_integrity" ]
+    deps += [ "//chrome/common/request_header_integrity" ]
   }
 
   if (enable_rlz) {
@@ -8280,8 +8293,6 @@ static_library("browser") {
 
   if (use_nss_certs) {
     sources += [
-      "certificate_manager_model.cc",
-      "certificate_manager_model.h",
       "net/nss_service.cc",
       "net/nss_service.h",
       "net/nss_service_factory.cc",
@@ -8602,7 +8613,6 @@ static_library("browser_generated_files") {
     "//chrome/browser/policy/messaging_layer/proto:log_upload_event_proto",
     "//chrome/browser/push_messaging:budget_proto",
     "//chrome/browser/regional_capabilities",
-    "//chrome/browser/request_header_integrity:buildflags",
     "//chrome/browser/resource_coordinator:mojo_bindings",
     "//chrome/browser/sharing:buildflags",
     "//chrome/browser/ui/webui/app_service_internals:mojo_bindings",
@@ -8616,6 +8626,7 @@ static_library("browser_generated_files") {
     "//chrome/browser/ui/webui/user_education_internals:mojo_bindings",
     "//chrome/browser/v8_compile_hints/proto",
     "//chrome/browser/web_applications/mojom:mojom_web_apps_enum",
+    "//chrome/common/request_header_integrity:buildflags",
     "//components/data_sharing/data_sharing_internals/webui:mojo_bindings",
     "//components/webui/chrome_urls/mojom:mojo_bindings",
   ]
@@ -8737,8 +8748,10 @@ static_library("browser_generated_files") {
     ]
   }
   if (is_win || is_mac || is_linux || is_chromeos) {
-    public_deps +=
-        [ "//chrome/browser/ui/webui/connectors_internals:mojo_bindings" ]
+    public_deps += [
+      "//chrome/browser/ui/webui/connectors_internals:mojo_bindings",
+      "//ui/webui/resources/cr_components/help_bubble:mojo_bindings",
+    ]
   }
   if (safe_browsing_mode == 1) {
     public_deps += [ "//chrome/browser/ui/webui/reset_password:mojo_bindings" ]

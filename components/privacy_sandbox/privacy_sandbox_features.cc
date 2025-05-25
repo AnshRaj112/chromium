@@ -34,8 +34,6 @@ const char kPrivacySandboxSettings4ForceShowNoticeEeaForTestingName[] =
     "force-show-notice-eea-for-testing";
 const char kPrivacySandboxSettings4ForceShowNoticeRestrictedForTestingName[] =
     "force-show-notice-restricted-for-testing";
-const char kPrivacySandboxSettings4ForceRestrictedUserForTestingName[] =
-    "force-restricted-user";
 const char kPrivacySandboxSettings4ShowSampleDataForTestingName[] =
     "show-sample-data";
 
@@ -65,10 +63,6 @@ const base::FeatureParam<bool>
     kPrivacySandboxSettings4ForceShowNoticeRestrictedForTesting{
         &kPrivacySandboxSettings4,
         kPrivacySandboxSettings4ForceShowNoticeRestrictedForTestingName, false};
-const base::FeatureParam<bool>
-    kPrivacySandboxSettings4ForceRestrictedUserForTesting{
-        &kPrivacySandboxSettings4,
-        kPrivacySandboxSettings4ForceRestrictedUserForTestingName, false};
 const base::FeatureParam<bool> kPrivacySandboxSettings4ShowSampleDataForTesting{
     &kPrivacySandboxSettings4,
     kPrivacySandboxSettings4ShowSampleDataForTestingName, false};
@@ -250,13 +244,6 @@ const base::FeatureParam<int>
     kPrivacySandboxCctAdsNoticeSurveyDelaysMilliseconds{
         &kPrivacySandboxCctAdsNoticeSurvey, "survey-delay-ms",
         /*20 seconds*/ 20000};
-
-BASE_FEATURE(kPrivacySandboxNoticeActionDebouncingAndroid,
-             "PrivacySandboxNoticeActionDebouncingAndroid",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-const base::FeatureParam<int> kPrivacySandboxDebouncingDelayMilliseconds{
-    &kPrivacySandboxNoticeActionDebouncingAndroid, "debouncing-delay-ms", 200};
 
 #endif  // BUILDFLAG(IS_ANDROID)
 BASE_FEATURE(kPrivacySandboxAdsApiUxEnhancements,

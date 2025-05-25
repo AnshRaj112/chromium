@@ -136,22 +136,6 @@ const UserMetricsAction* GetActionForLocationAndDisposition(
   }
 }
 
-// Returns true if `selection` represents a permanent bookmark folder.
-bool IsSelectionPermanentBookmarkFolder(
-    const std::vector<raw_ptr<const BookmarkNode, VectorExperimental>>&
-        selection) {
-  if (selection.size() == 1) {
-    return selection[0]->is_permanent_node();
-  }
-
-  if (selection.size() == 2) {
-    return selection[0]->is_permanent_node() &&
-           selection[1]->is_permanent_node() &&
-           selection[0]->type() == selection[1]->type();
-  }
-  return false;
-}
-
 // Check selection is not empty, nodes are not null nor repeated.
 void CheckSelectionIsValid(
     const std::vector<raw_ptr<const BookmarkNode, VectorExperimental>>&
@@ -271,6 +255,8 @@ void BookmarkContextMenuController::BuildMenu() {
   }
 
   AddSeparator();
+  // Permanent folders representation should show the `Rename` option, that will
+  // be disabled.
   if ((selection_.size() == 1 && selection_[0]->is_folder()) ||
       IsSelectionPermanentBookmarkFolder(selection_)) {
     AddItem(IDC_BOOKMARK_BAR_RENAME_FOLDER, IDS_BOOKMARK_BAR_RENAME_FOLDER);
@@ -357,12 +343,12 @@ void BookmarkContextMenuController::ExecuteCommand(int id, int event_flags) {
         base::RecordAction(*action);
       }
 
-      chrome::OpenAllBookmarksContext context =
-          chrome::OpenAllBookmarksContext::kNone;
+      bookmarks::OpenAllBookmarksContext context =
+          bookmarks::OpenAllBookmarksContext::kNone;
       if (id == IDC_BOOKMARK_BAR_OPEN_ALL_NEW_TAB_GROUP) {
-        context = chrome::OpenAllBookmarksContext::kInGroup;
+        context = bookmarks::OpenAllBookmarksContext::kInGroup;
       } else if (id == IDC_BOOKMARK_BAR_OPEN_SPLIT_VIEW) {
-        context = chrome::OpenAllBookmarksContext::kInSplit;
+        context = bookmarks::OpenAllBookmarksContext::kInSplit;
       }
       chrome::OpenAllIfAllowed(browser_, selection_, initial_disposition,
                                context);
@@ -748,4 +734,19 @@ BookmarkContextMenuController::ComputeNodeToFocusForBookmarkManager() const {
   CHECK(!selection_[0]->is_folder());
   CHECK(selection_[0]->parent()->is_permanent_node());
   return selection_[0]->parent();
+}
+
+bool IsSelectionPermanentBookmarkFolder(
+    const std::vector<raw_ptr<const BookmarkNode, VectorExperimental>>&
+        selection) {
+  if (selection.size() == 1) {
+    return selection[0]->is_permanent_node();
+  }
+
+  if (selection.size() == 2) {
+    return selection[0]->is_permanent_node() &&
+           selection[1]->is_permanent_node() &&
+           selection[0]->type() == selection[1]->type();
+  }
+  return false;
 }

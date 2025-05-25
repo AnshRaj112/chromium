@@ -62,7 +62,6 @@
 #include "third_party/blink/renderer/bindings/core/v8/js_based_event_listener.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise.h"
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
-#include "third_party/blink/renderer/bindings/core/v8/v8_throw_dom_exception.h"
 #include "third_party/blink/renderer/bindings/core/v8/worker_or_worklet_script_controller.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_background_fetch_event_init.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_content_index_event_init.h"
@@ -837,24 +836,33 @@ bool ServiceWorkerGlobalScope::IsIsolatedContext() const {
   return Agent::IsIsolatedContext();
 }
 
-void ServiceWorkerGlobalScope::importScripts(const Vector<String>& urls) {
-  for (const String& string_url : urls) {
+void ServiceWorkerGlobalScope::importScripts(
+    const HeapVector<Member<V8UnionTrustedScriptURLOrUSVString>>& urls,
+    ExceptionState& exception_state) {
+  Vector<String> url_strings;
+  for (const auto& url : urls) {
+    url_strings.push_back(TrustedTypesCheckForScriptURL(
+        url, GetExecutionContext(), "WorkerGlobalScope", "importScripts",
+        exception_state));
+    if (exception_state.HadException()) {
+      return;
+    }
+  }
+
+  for (const String& string_url : url_strings) {
     KURL completed_url = CompleteURL(string_url);
     if (installed_scripts_manager_ &&
         !installed_scripts_manager_->IsScriptInstalled(completed_url)) {
       DCHECK(installed_scripts_manager_->IsScriptInstalled(Url()));
-      v8::Isolate* isolate = GetThread()->GetIsolate();
-      V8ThrowException::ThrowException(
-          isolate,
-          V8ThrowDOMException::CreateOrEmpty(
-              isolate, DOMExceptionCode::kNetworkError,
-              "Failed to import '" + completed_url.ElidedString() +
-                  "'. importScripts() of new scripts after service worker "
-                  "installation is not allowed."));
+      exception_state.ThrowDOMException(
+          DOMExceptionCode::kNetworkError,
+          "Failed to import '" + completed_url.ElidedString() +
+              "'. importScripts() of new scripts after service worker "
+              "installation is not allowed.");
       return;
     }
   }
-  WorkerGlobalScope::importScripts(urls);
+  WorkerGlobalScope::ImportScriptsInternal(url_strings, exception_state);
 }
 
 CachedMetadataHandler*

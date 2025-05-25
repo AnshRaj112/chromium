@@ -208,9 +208,11 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       const GURL& site_instance_original_url) override;
   bool ShouldAllowProcessPerSiteForMultipleMainFrames(
       content::BrowserContext* context) override;
-  std::optional<SpareProcessRefusedByEmbedderReason>
-  ShouldUseSpareRenderProcessHost(content::BrowserContext* browser_context,
-                                  const GURL& site_url) override;
+  bool ShouldUseSpareRenderProcessHost(
+      content::BrowserContext* browser_context,
+      const GURL& site_url,
+      std::optional<SpareProcessRefusedByEmbedderReason>& refused_reason)
+      override;
   bool DoesSiteRequireDedicatedProcess(content::BrowserContext* browser_context,
                                        const GURL& effective_site_url) override;
   bool ShouldAllowCrossProcessSandboxedFrameForPrecursor(
@@ -440,6 +442,8 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       const GURL& url,
       const blink::StorageKey& storage_key,
       net::CookieSettingOverrides overrides) override;
+  bool IsPrefetchWithServiceWorkerAllowed(
+      content::BrowserContext* browser_context) override;
   void GrantCookieAccessDueToHeuristic(content::BrowserContext* browser_context,
                                        const net::SchemefulSite& top_frame_site,
                                        const net::SchemefulSite& accessing_site,

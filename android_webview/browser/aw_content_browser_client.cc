@@ -34,6 +34,7 @@
 #include "android_webview/browser/network_service/aw_proxying_restricted_cookie_manager.h"
 #include "android_webview/browser/network_service/aw_proxying_url_loader_factory.h"
 #include "android_webview/browser/network_service/aw_url_loader_throttle.h"
+#include "android_webview/browser/network_service/net_helpers.h"
 #include "android_webview/browser/prefetch/aw_prefetch_service_delegate.h"
 #include "android_webview/browser/safe_browsing/aw_safe_browsing_navigation_throttle.h"
 #include "android_webview/browser/safe_browsing/aw_url_checker_delegate_impl.h"
@@ -491,15 +492,21 @@ gfx::ImageSkia AwContentBrowserClient::GetDefaultFavicon() {
 content::GeneratedCodeCacheSettings
 AwContentBrowserClient::GetGeneratedCodeCacheSettings(
     content::BrowserContext* context) {
-  // WebView limits the main HTTP cache to 20MB; we need to set a comparable
-  // limit for the code cache since the source file needs to be in the HTTP
-  // cache for the code cache entry to be used. There are two code caches that
-  // both use this value, so we pass 10MB to keep the total disk usage to
-  // roughly 2x what it was before the code cache was implemented.
-  // TODO(crbug.com/41419561): webview should have smarter cache sizing logic.
   AwBrowserContext* browser_context = static_cast<AwBrowserContext*>(context);
+  // We need to set a comparable limit for the code cache since the source file
+  // needs to be in the HTTP cache for the code cache entry to be used. There
+  // are two code caches that both use this value, so we pass half the the HTTP
+  // cache size limit to keep the total cache usage to roughly 2x the HTTP cache
+  // limit.
+  int code_cache_limit = 0.5 * GetHttpCacheSize();
+  if (base::FeatureList::IsEnabled(
+          features::kWebViewCacheSizeLimitDerivedFromAppCacheQuota)) {
+    code_cache_limit = features::kWebViewCodeCacheSizeLimitMultiplier.Get() *
+                       GetHttpCacheSize();
+  }
+
   return content::GeneratedCodeCacheSettings(
-      true, 10 * 1024 * 1024, browser_context->GetHttpCachePath());
+      true, code_cache_limit, browser_context->GetHttpCachePath());
 }
 
 void AwContentBrowserClient::AllowCertificateError(

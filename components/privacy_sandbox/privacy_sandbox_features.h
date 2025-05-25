@@ -47,8 +47,6 @@ COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const char
     kPrivacySandboxSettings4ForceShowNoticeRestrictedForTestingName[];
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
-extern const char kPrivacySandboxSettings4ForceRestrictedUserForTestingName[];
-COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const char kPrivacySandboxSettings4ShowSampleDataForTestingName[];
 
 // When true, the user will be shown a consent to enable the Privacy Sandbox
@@ -82,9 +80,6 @@ extern const base::FeatureParam<bool>
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const base::FeatureParam<bool>
     kPrivacySandboxSettings4ForceShowNoticeRestrictedForTesting;
-COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
-extern const base::FeatureParam<bool>
-    kPrivacySandboxSettings4ForceRestrictedUserForTesting;
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const base::FeatureParam<bool>
     kPrivacySandboxSettings4ShowSampleDataForTesting;
@@ -281,10 +276,6 @@ extern const base::FeatureParam<std::string>
 COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
 extern const base::FeatureParam<int>
     kPrivacySandboxCctAdsNoticeSurveyDelaysMilliseconds;
-
-// If true, enables debouncing for button clicks on all Android notices.
-COMPONENT_EXPORT(PRIVACY_SANDBOX_FEATURES)
-BASE_DECLARE_FEATURE(kPrivacySandboxNoticeActionDebouncingAndroid);
 
 // The delay in milliseconds between the first click and the next accepted
 // click.

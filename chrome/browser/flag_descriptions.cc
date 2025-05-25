@@ -122,6 +122,13 @@ const char kAndroidAppIntegrationV2Description[] =
     "If enabled, allows Chrome to integrate with the Android App Search "
     "directly without using internal library.";
 
+const char kNewContentForCheckerboardedScrollsName[] =
+    "Change scrolling scheduling to reduce checkerboarding";
+const char kNewContentForCheckerboardedScrollsDescription[] =
+    "If enabled, scrolling that would generate blank frames will now "
+    "prioritize the new content over scrolling with the intention of "
+    "decreasing the amount of checkerboarded frames.";
+
 #if BUILDFLAG(IS_ANDROID)
 const char kNewTabPageCustomizationName[] = "Customize the new tab page";
 const char kNewTabPageCustomizationDescription[] =
@@ -771,6 +778,16 @@ const char kAutofillEnableLoyaltyCardsFillingName[] =
 const char kAutofillEnableLoyaltyCardsFillingDescription[] =
     "When enabled, Autofill will offer support for filling the user's loyalty "
     "cards stored in Google Wallet.";
+
+const char
+    kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentName[] =
+        "Enable multiple server request support for virtual card downstream "
+        "enrollment";
+const char
+    kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentDescription
+        [] = "When enabled, Chrome will be able to send preflight call for "
+             "enrollment earlier in the flow with the multiple server request "
+             "support.";
 
 const char kAutofillEnableNewFopDisplayDesktopName[] =
     "Enable Autofill new FOP display on Desktop";
@@ -2975,6 +2992,11 @@ const char kContextualSearchOpenLensActionUsesThumbnailDescription[] =
     "Enables web content thumbnail image to override the Lens icon "
     "for the omnibox entry point action match.";
 
+const char kContextualSuggestionsAblateOthersWhenPresentName[] =
+    "Contextual suggestions ablate others when present";
+const char kContextualSuggestionsAblateOthersWhenPresentDescription[] =
+    "Makes contextual search suggestions exclusive in zero suggest.";
+
 const char kOmniboxContextualSearchOnFocusSuggestionsName[] =
     "Omnibox contextual search on focus suggestions";
 const char kOmniboxContextualSearchOnFocusSuggestionsDescription[] =
@@ -3679,7 +3701,15 @@ const char kScrollableTabStripDescription[] =
 const char kTabstripComboButtonFlagId[] = "tabstrip-combo-button";
 const char kTabstripComboButtonName[] = "Tabstrip Combo Button";
 const char kTabstripComboButtonDescription[] =
-    "Combines tab search and the new tab button into a single combo button.";
+    "Combines tab search and the new tab button into a single combo button. "
+    "Might require tab search toolbar flag to be disabled to take effect in "
+    "specific regions.";
+
+const char kLaunchedTabSearchToolbarName[] = "Tab Search Toolbar Button";
+const char kLaunchedTabSearchToolbarDescription[] =
+    "Enables tab search button to be in toolbar area. "
+    "Might require enabling the tab strip combo button configuration to also "
+    "match to toolbar in specific regions.";
 
 const char kTabScrollingButtonPositionFlagId[] =
     "tab-scrolling-button-position";
@@ -5714,12 +5744,6 @@ const char kMainNodeAnnotationsDescription[] =
     "Uses Screen2x main content extractor to annotate the accessibility tree "
     "with the main landmark on the node identified as main.";
 
-const char kOmniboxDriveSuggestionsName[] =
-    "Omnibox Google Drive Document suggestions";
-const char kOmniboxDriveSuggestionsDescription[] =
-    "Display suggestions for Google Drive documents in the omnibox when Google "
-    "is the default search engine.";
-
 const char kOmniboxDriveSuggestionsNoSyncRequirementName[] =
     "Omnibox Google Drive Document suggestions don't require Chrome Sync";
 const char kOmniboxDriveSuggestionsNoSyncRequirementDescription[] =
@@ -5948,6 +5972,14 @@ const char kMacAccessibilityAPIMigrationName[] = "Mac A11y API Migration";
 const char kMacAccessibilityAPIMigrationDescription[] =
     "Enables the migration to the new Cocoa accessibility API.";
 
+const char kMacCatapSystemAudioLoopbackCaptureName[] =
+    "Mac Core Audio Tap System Loopback Capture";
+const char kMacCatapSystemAudioLoopbackCaptureDescription[] =
+    "Enable system audio loopback capture using the macOS CoreAudio tap API on "
+    "macOS 14.2+. For system audio loopback to be enabled in "
+    "getDisplayMedia(), the feature 'MacLoopbackAudioForScreenShare' must also "
+    "be enabled.";
+
 const char kMacImeLiveConversionFixName[] = "Mac IME Live Conversion";
 const char kMacImeLiveConversionFixDescription[] =
     "A fix for the Live Conversion feature of Japanese IME.";
@@ -5955,9 +5987,13 @@ const char kMacImeLiveConversionFixDescription[] =
 const char kMacLoopbackAudioForScreenShareName[] =
     "Mac System Audio Loopback for Screen Sharing";
 const char kMacLoopbackAudioForScreenShareDescription[] =
-    "Enable system audio sharing when screen sharing on macOS 13-14. This "
-    "won't have any effect on macOS 15+ unless the feature "
-    "MacSystemAudioLoopbackOverride is enabled.";
+    "Enables system audio sharing when using getDisplayMedia() for screen "
+    "sharing. This requires loopback audio capture to be enabled. On macOS "
+    "13-14, ScreenCaptureKit loopback capture is enabled by default. If "
+    "'MacSckSystemAudioLoopbackOverride' is enabled, ScreenCaptureKit "
+    "loopback capture can be used on all macOS versions that support it. "
+    "On macOS 14.2+, CoreAudio tap loopback capture will be used if the "
+    "'MacCatapSystemAudioLoopbackCapture' feature is enabled.";
 
 const char kMacPWAsNotificationAttributionName[] =
     "Mac PWA notification attribution";
@@ -6043,6 +6079,14 @@ const char kAndroidMinimalUiLargeScreenDescription[] =
     "Display new minimal ui for PWAs on devices that support "
     "desktop windowing.";
 
+const char kAndroidUseCorrectDisplayWorkAreaName[] =
+    "Enable accounting system UI for computing the display work area";
+const char kAndroidUseCorrectDisplayWorkAreaDescription[] =
+    "Enable accounting system's bars and display cutouts for the correct "
+    "computation of the display work area. The Web API Screen properties "
+    "availLeft / availTop / availHeight / availWidth accurately reflect the "
+    "accessible content display area.";
+
 const char kAndroidWindowManagementWebApiName[] = "Window Management Web API";
 const char kAndroidWindowManagementWebApiDescription[] =
     "Enable Window Management Web API. Websites can obtain information about "
@@ -6124,12 +6168,6 @@ const char kLinkCrossDeviceInternalsName[] =
 const char kLinkCrossDeviceInternalsDescription[] =
     "Improves debugging of Cross-Device features by recording more verbose "
     "logs and attaching these logs to filed Feedback reports.";
-
-const char kAllowScrollSettingsName[] =
-    "Allow changes to scroll acceleration/sensitivity for mice.";
-const char kAllowScrollSettingsDescription[] =
-    "Shows settings to enable/disable scroll acceleration and to adjust the "
-    "sensitivity for scrolling.";
 
 const char kAltClickAndSixPackCustomizationName[] =
     "Allow users to customize Alt-Click and 6-pack key remapping.";
@@ -6982,6 +7020,11 @@ const char kAccessibilityManifestV3EnhancedNetworkTtsName[] =
 const char kAccessibilityManifestV3EnhancedNetworkTtsDescription[] =
     "Experimental migration of Enhanced Network TTS from extension manifest "
     "v2 to v3.";
+
+const char kAccessibilityManifestV3EspeakNGName[] =
+    "Changes accessibility extension EspeakNG TTS manifest v2 to v3.";
+const char kAccessibilityManifestV3EspeakNGDescription[] =
+    "Experimental migration of EspeakNG TTS from extension manifest v2 to v3.";
 
 const char kAccessibilityManifestV3SelectToSpeakName[] =
     "Changes accessibility extension Select to Speak manifest v2 to v3.";

@@ -827,16 +827,18 @@ IN_PROC_BROWSER_TEST_F(RenderFrameHostImplBrowserTest,
     histogram_tester.ExpectTotalCount(
         "Navigation.Timeline.TotalExcludingBeforeUnload.MainFrameOnly.Duration",
         1);
-    // This navigation has no start adjustment or delayed start time, so there
-    // are no IgnoredIncorrectly metrics reported.
+    // This navigation has no start adjustment, but the
+    //`actual_navigation_start` is now recorded at an earlier time (closer to
+    // the start of the navigation) than the web-facing `navigation_start_time`
+    // in NavigateWithoutEntry, so this triggers IgnoredIncorrectly metrics.
     histogram_tester.ExpectTotalCount(
-        "Navigation.Timeline.IgnoredIncorrectly.Duration", 0);
+        "Navigation.Timeline.IgnoredIncorrectly.Duration", 1);
     histogram_tester.ExpectTotalCount(
-        "Navigation.Timeline.IgnoredIncorrectly.MainFrameOnly.Duration", 0);
+        "Navigation.Timeline.IgnoredIncorrectly.MainFrameOnly.Duration", 1);
     histogram_tester.ExpectTotalCount(
-        "Navigation.Timeline.IgnoredIncorrectly.Percentage", 0);
+        "Navigation.Timeline.IgnoredIncorrectly.Percentage", 1);
     histogram_tester.ExpectTotalCount(
-        "Navigation.Timeline.IgnoredIncorrectly.MainFrameOnly.Percentage", 0);
+        "Navigation.Timeline.IgnoredIncorrectly.MainFrameOnly.Percentage", 1);
   }
   // Disable the hang monitor, otherwise there will be a race between the
   // beforeunload dialog and the beforeunload hang timer.
@@ -8604,7 +8606,9 @@ IN_PROC_BROWSER_TEST_F(
                                         ->RequiresDedicatedProcess();
 
   // `shell()` and `second_shell` opened different sites.
-  if (requires_dedicated_process) {
+  // TODO(crbug.com/419469455): Make sure metrics are updated correctly with the
+  // introduction of default SiteInstanceGroup.
+  if (requires_dedicated_process || ShouldUseDefaultSiteInstanceGroup()) {
     EXPECT_THAT(histogram.GetAllSamples(
                     "SiteIsolation."
                     "NewProcessUsedForNavigationWhenSameSiteProcessExists"),
@@ -8618,7 +8622,7 @@ IN_PROC_BROWSER_TEST_F(
 
   ASSERT_TRUE(NavigateToURL(second_shell, url));
   // Now `shell()` and `second_shell` opened the same site.
-  if (requires_dedicated_process) {
+  if (requires_dedicated_process || ShouldUseDefaultSiteInstanceGroup()) {
     EXPECT_THAT(
         histogram.GetAllSamples(
             "SiteIsolation."

@@ -13,6 +13,7 @@
 #include "base/files/file_util.h"
 #include "base/functional/callback_helpers.h"
 #include "base/strings/string_split.h"
+#include "base/strings/stringprintf.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
@@ -317,7 +318,7 @@ class ContentVerifierTest : public ExtensionBrowserTest {
 };
 
 #if BUILDFLAG(ENABLE_EXTENSIONS)
-// TODO(crbug.com/391932982): Port to desktop Android when the tabs API is
+// TODO(crbug.com/371432155): Port to desktop Android when the tabs API is
 // supported.
 IN_PROC_BROWSER_TEST_F(ContentVerifierTest, DotSlashPaths) {
   TestContentVerifyJobObserver job_observer;
@@ -444,7 +445,7 @@ class ContentVerifierTestWithForcedHashes : public ContentVerifierTest {
 };
 
 // Tests detection of corruption in an extension's service worker file.
-// TODO(crbug.com/391932982): Port to desktop Android when the tabs API is
+// TODO(crbug.com/371432155): Port to desktop Android when the tabs API is
 // supported.
 IN_PROC_BROWSER_TEST_F(ContentVerifierTestWithForcedHashes,
                        TestServiceWorkerCorruption_DisableAndEnable) {
@@ -534,7 +535,7 @@ IN_PROC_BROWSER_TEST_F(ContentVerifierTestWithForcedHashes,
 }
 
 // Tests service worker corruption detection across browser starts.
-// TODO(crbug.com/391932982): Port to desktop Android when the tabs API is
+// TODO(crbug.com/371432155): Port to desktop Android when the tabs API is
 // supported.
 IN_PROC_BROWSER_TEST_F(ContentVerifierTest,
                        PRE_TestServiceWorker_AcrossSession) {
@@ -596,7 +597,7 @@ IN_PROC_BROWSER_TEST_F(ContentVerifierTest,
   // is preserved by the PRE_ test.)
 }
 
-// TODO(crbug.com/391932982): Port to desktop Android when the tabs API is
+// TODO(crbug.com/371432155): Port to desktop Android when the tabs API is
 // supported.
 IN_PROC_BROWSER_TEST_F(ContentVerifierTest, TestServiceWorker_AcrossSession) {
   // Force-enable content verification for every extension.

@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "ui/events/android/motion_event_android_java.h"
 
 #include <android/input.h>
@@ -224,14 +219,8 @@ float MotionEventAndroidJava::GetOrientation(size_t pointer_index) const {
 
 float MotionEventAndroidJava::GetPressure(size_t pointer_index) const {
   DCHECK_LT(pointer_index, GetPointerCount());
-  // Note that this early return is a special case exercised only in testing, as
-  // caching the pressure values is not a worthwhile optimization (they're
-  // accessed at most once per event instance).
-  if (!event_.obj()) {
-    return 0.f;
-  }
-  if (GetAction() == MotionEvent::Action::UP) {
-    return 0.f;
+  if (pointer_index < MAX_POINTERS_TO_CACHE) {
+    return cached_pointers_[pointer_index].pressure;
   }
   return JNI_MotionEvent::Java_MotionEvent_getPressure(AttachCurrentThread(),
                                                        event_, pointer_index);

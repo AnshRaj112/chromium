@@ -206,6 +206,7 @@
 <translation id="1758018619400202187">EAP-TLS</translation>
 <translation id="1758459542619182298"><ph name="CONTROL_TYPE" /> <ph name="KEY_LIST" /></translation>
 <translation id="1759842336958782510">Chrome</translation>
+<translation id="1762353673362288306">Hiện bạn chỉ có thể sử dụng Công cụ cho lớp học</translation>
 <translation id="1762483337755424125">Bản chép lời</translation>
 <translation id="1765169783255151332">Chuyển đổi phím nhanh chóng</translation>
 <translation id="1768959921651994223">Loại xác thực</translation>
@@ -1459,7 +1460,6 @@ Hãy tải mô hình chép lời xuống (tối đa 100 MB) để nhận các b�
 <translation id="7388345524791662148">Lựa chọn khác cho <ph name="RECORDING_NAME" /></translation>
 <translation id="7388959671917308825">Bàn di chuột tích hợp sẵn</translation>
 <translation id="7397270852490618635">Tắt giao diện sáng</translation>
-<translation id="7400166052988585408">Giáo viên sẽ khoá màn hình của bạn sau <ph name="NUM_SECONDS" /> giây</translation>
 <translation id="7401543881546089382">Xóa phím tắt</translation>
 <translation id="7405493795721832710">Bạn đã có thể cập nhật <ph name="DEVICE_NAME" /></translation>
 <translation id="741244894080940828">chuyển đổi</translation>
@@ -1614,7 +1614,7 @@ Hãy tải mô hình chép lời xuống (tối đa 100 MB) để nhận các b�
 <translation id="8088963492174775412">Nhấn để ghi</translation>
 <translation id="8094062939584182041">Cho phép Google gửi email về vấn đề này cho bạn</translation>
 <translation id="8104083085214006426">Bạn đang dùng mạng mở và không an toàn</translation>
-<translation id="8110942816572072814">Giáo viên đã khoá màn hình của bạn</translation>
+<translation id="8108879170356113798">Sau <ph name="NUM_SECONDS" /> giây nữa, bạn sẽ chỉ có thể sử dụng Công cụ cho lớp học</translation>
 <translation id="811820734797650957">(Android) Có thể ping cổng vào</translation>
 <translation id="8129620843620772246"><ph name="TEMPERATURE_C" />°C</translation>
 <translation id="8131740175452115882">Xác nhận</translation>

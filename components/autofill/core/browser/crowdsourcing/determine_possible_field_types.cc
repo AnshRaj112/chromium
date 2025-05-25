@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "base/containers/flat_set.h"
+#include "base/containers/span.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/utf_string_conversions.h"
@@ -35,7 +36,7 @@ namespace {
 
 // Finds the first field in |form_structure| with |field.value|=|value|.
 AutofillField* FindFirstFieldWithValue(const FormStructure& form_structure,
-                                       const std::u16string& value) {
+                                       std::u16string_view value) {
   for (const auto& field : form_structure) {
     std::u16string trimmed_value;
     base::TrimWhitespace(field->value_for_import(), base::TRIM_ALL,
@@ -119,7 +120,7 @@ AutofillField* HeuristicallyFindCVCFieldForUpload(
 // search for the CVC field if any.
 AutofillField* GetBestPossibleCVCFieldForUpload(
     const FormStructure& form_structure,
-    std::u16string last_unlocked_credit_card_cvc) {
+    std::u16string_view last_unlocked_credit_card_cvc) {
   if (!last_unlocked_credit_card_cvc.empty()) {
     AutofillField* result =
         FindFirstFieldWithValue(form_structure, last_unlocked_credit_card_cvc);
@@ -128,7 +129,6 @@ AutofillField* GetBestPossibleCVCFieldForUpload(
     }
     return result;
   }
-
   return HeuristicallyFindCVCFieldForUpload(form_structure);
 }
 
@@ -138,9 +138,9 @@ AutofillField* GetBestPossibleCVCFieldForUpload(
 // found.
 void FindAndSetPossibleFieldTypesForField(
     AutofillField& field,
-    const std::vector<AutofillProfile>& profiles,
-    const std::vector<CreditCard>& credit_cards,
-    const std::vector<LoyaltyCard>& loyalty_cards,
+    base::span<const AutofillProfile> profiles,
+    base::span<const CreditCard> credit_cards,
+    base::span<const LoyaltyCard> loyalty_cards,
     const std::set<FieldGlobalId> fields_that_match_state,
     const std::string& app_locale) {
   std::u16string value_u16 = field.value_for_import();
@@ -184,11 +184,11 @@ void FindAndSetPossibleFieldTypesForField(
 // cards and sets the field's possible types accordingly. Special heuristics are
 // run for finding the CVC field.
 void FindAndSetPossibleFieldTypes(
-    const std::vector<AutofillProfile>& profiles,
-    const std::vector<CreditCard>& credit_cards,
-    const std::vector<LoyaltyCard>& loyalty_cards,
+    base::span<const AutofillProfile> profiles,
+    base::span<const CreditCard> credit_cards,
+    base::span<const LoyaltyCard> loyalty_cards,
     const std::set<FieldGlobalId> fields_that_match_state,
-    const std::u16string& last_unlocked_credit_card_cvc,
+    std::u16string_view last_unlocked_credit_card_cvc,
     const std::string& app_locale,
     FormStructure& form) {
   for (size_t i = 0; i < form.field_count(); ++i) {
@@ -236,21 +236,21 @@ std::vector<std::u16string> GetMatchingCompleteDateFormats(
 }  // namespace
 
 std::set<FieldGlobalId> PreProcessStateMatchingTypes(
-    const std::vector<AutofillProfile>& profiles,
+    base::span<const AutofillProfile*> profiles,
     const FormStructure& form_structure,
     const std::string& app_locale) {
   std::set<FieldGlobalId> fields_that_match_state;
-  for (const auto& profile : profiles) {
+  for (const auto* profile : profiles) {
     std::optional<AlternativeStateNameMap::CanonicalStateName>
         canonical_state_name_from_profile =
-            profile.GetAddress().GetCanonicalizedStateName();
+            profile->GetAddress().GetCanonicalizedStateName();
 
     if (!canonical_state_name_from_profile) {
       continue;
     }
 
     const std::u16string& country_code =
-        profile.GetInfo(AutofillType(HtmlFieldType::kCountryCode), app_locale);
+        profile->GetInfo(AutofillType(HtmlFieldType::kCountryCode), app_locale);
 
     for (auto& field : form_structure) {
       if (fields_that_match_state.contains(field->global_id())) {
@@ -273,11 +273,11 @@ std::set<FieldGlobalId> PreProcessStateMatchingTypes(
 }
 
 void DeterminePossibleFieldTypesForUpload(
-    const std::vector<AutofillProfile>& profiles,
-    const std::vector<CreditCard>& credit_cards,
-    const std::vector<LoyaltyCard>& loyalty_cards,
+    base::span<const AutofillProfile> profiles,
+    base::span<const CreditCard> credit_cards,
+    base::span<const LoyaltyCard> loyalty_cards,
     const std::set<FieldGlobalId>& fields_that_match_state,
-    const std::u16string& last_unlocked_credit_card_cvc,
+    std::u16string_view last_unlocked_credit_card_cvc,
     const std::string& app_locale,
     FormStructure& form) {
   for (const std::unique_ptr<AutofillField>& field : form) {
@@ -289,6 +289,33 @@ void DeterminePossibleFieldTypesForUpload(
                                fields_that_match_state,
                                last_unlocked_credit_card_cvc, app_locale, form);
   DisambiguatePossibleFieldTypes(form);
+}
+
+FieldTypeSet DetermineAvailableFieldTypes(
+    base::span<const AutofillProfile> profiles,
+    base::span<const CreditCard> credit_cards,
+    base::span<const LoyaltyCard> loyalty_cards,
+    std::u16string_view last_unlocked_credit_card_cvc,
+    const std::string& app_locale) {
+  FieldTypeSet types;
+  for (const AutofillProfile& profile : profiles) {
+    profile.GetNonEmptyTypes(app_locale, &types);
+  }
+  for (const CreditCard& card : credit_cards) {
+    card.GetNonEmptyTypes(app_locale, &types);
+  }
+  // As CVC is not stored, treat it separately.
+  if (!last_unlocked_credit_card_cvc.empty() ||
+      types.contains(CREDIT_CARD_NUMBER)) {
+    types.insert(CREDIT_CARD_VERIFICATION_CODE);
+  }
+  if (base::FeatureList::IsEnabled(
+          features::kAutofillEnableLoyaltyCardsFilling) &&
+      !loyalty_cards.empty()) {
+    types.insert(LOYALTY_MEMBERSHIP_ID);
+  }
+
+  return types;
 }
 
 std::map<FieldGlobalId, base::flat_set<std::u16string>>

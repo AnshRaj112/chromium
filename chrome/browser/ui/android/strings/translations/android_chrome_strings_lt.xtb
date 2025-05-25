@@ -31,7 +31,6 @@
 <translation id="1108214977745280468">Žr. puslapio įžvalgas</translation>
 <translation id="1108938384783527433">Istorijos sinchronizavimas</translation>
 <translation id="1111673857033749125">Čia bus rodomos kituose įrenginiuose išsaugotos žymės.</translation>
-<translation id="1113597929977215864">Rodyti supaprastintą rodinį</translation>
 <translation id="1126696498560056882">Tvarkyti paskyras šiame įrenginyje</translation>
 <translation id="1129510026454351943">Išsami informacija: <ph name="ERROR_DESCRIPTION" /></translation>
 <translation id="1135018701024399762">Naudodami inkognito režimą galite naršyti privačiai nuo kitų, naudojančių jūsų įrenginį</translation>
@@ -377,6 +376,7 @@ Tik jūsų slaptafrazę turintis asmuo galės perskaityti šifruotus duomenis. S
 <translation id="2718352093833049315">Tik su „Wi–Fi“</translation>
 <translation id="2718846868787000099">Kad turinys būtų rodomas pageidaujamomis kalbomis, svetainės, kuriose lankotės, gali matyti jūsų nuostatas</translation>
 <translation id="2723001399770238859">garso įrašas</translation>
+<translation id="2734335652257251631">Rodyti skaitymo režimą</translation>
 <translation id="2739887572830526131">Išsaugokite šią grupę, kad galėtumėte vėliau pridėti skirtukų, arba ištrinkite, jei jos nebereikia.</translation>
 <translation id="2742373789128106053">„<ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" />“ šiuo metu nepasiekiama.</translation>
 <translation id="2760805590727089264">mm / MM</translation>
@@ -1747,6 +1747,7 @@ Jei norite pakeisti šį nustatymą, <ph name="BEGIN_LINK" />ištrinkite „Chro
 <translation id="8676789164135894283">Prisijungimo patvirtinimai</translation>
 <translation id="8683039184091909753">vaizdas</translation>
 <translation id="8688183792442786085">„<ph name="TAB_TITLE" />“, pasirinktas skirtukas</translation>
+<translation id="8693232767599693749">Peržiūrėti skaitymo režimą?</translation>
 <translation id="8697753151306746444">Vietoj to bendrinkite langą ar ekraną</translation>
 <translation id="869891660844655955">Galiojimo data</translation>
 <translation id="8699120352855309748">Nesiūlyti versti šių kalbų</translation>
@@ -1878,7 +1879,6 @@ Jei norite pakeisti šį nustatymą, <ph name="BEGIN_LINK" />ištrinkite „Chro
 <translation id="961856697154696964">Ištrinti naršymo duomenis</translation>
 <translation id="963246339335003378">Atidaryti užduočių tvarkytuvę</translation>
 <translation id="966131775676567255">Trinami paskyros duomenys</translation>
-<translation id="96681097142096641">Peržiūrėti supaprastintą puslapį?</translation>
 <translation id="970715775301869095">Liko <ph name="MINUTES" /> min.</translation>
 <translation id="981121421437150478">Neprisijungus</translation>
 <translation id="983192555821071799">Uždar. visų skirtukų lapus</translation>

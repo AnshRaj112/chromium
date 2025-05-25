@@ -120,6 +120,8 @@ class ChromeAutofillClient : public ContentAutofillClient,
   AutocompleteHistoryManager* GetAutocompleteHistoryManager() final;
   AutofillComposeDelegate* GetComposeDelegate() final;
   AutofillPlusAddressDelegate* GetPlusAddressDelegate() final;
+  PasswordManagerDelegate* GetPasswordManagerDelegate(
+      const FieldGlobalId& field_id) final;
   void GetAiPageContent(GetAiPageContentCallback callback) final;
   AutofillAiDelegate* GetAutofillAiDelegate() final;
   AutofillAiModelCache* GetAutofillAiModelCache() final;
@@ -243,6 +245,10 @@ class ChromeAutofillClient : public ContentAutofillClient,
   std::unique_ptr<AutofillManager> CreateManager(
       base::PassKey<ContentAutofillDriver> pass_key,
       ContentAutofillDriver& driver) final;
+
+  // ContentAutofillClient:
+  credential_management::ContentCredentialManager* GetContentCredentialManager()
+      override;
 
  protected:
   explicit ChromeAutofillClient(content::WebContents* web_contents);

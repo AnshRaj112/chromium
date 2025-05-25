@@ -462,6 +462,12 @@ extern const char kAutofillEnableLogFormEventsToAllParsedFormTypesDescription[];
 extern const char kAutofillEnableLoyaltyCardsFillingName[];
 extern const char kAutofillEnableLoyaltyCardsFillingDescription[];
 
+extern const char
+    kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentName[];
+extern const char
+    kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentDescription
+        [];
+
 extern const char kAutofillEnableNewFopDisplayDesktopName[];
 extern const char kAutofillEnableNewFopDisplayDesktopDescription[];
 
@@ -889,6 +895,9 @@ extern const char kAccessibilityCaptionsOnBrailleDisplayDescription[];
 extern const char kBiometricAuthIdentityCheckName[];
 extern const char kBiometricAuthIdentityCheckDescription[];
 #endif  // BUILDFLAG(IS_ANDROID)
+
+extern const char kNewContentForCheckerboardedScrollsName[];
+extern const char kNewContentForCheckerboardedScrollsDescription[];
 
 extern const char kNewMacNotificationAPIName[];
 extern const char kNewMacNotificationAPIDescription[];
@@ -1711,6 +1720,9 @@ extern const char kContextualSearchBoxUsesContextualSearchProviderDescription[];
 extern const char kContextualSearchOpenLensActionUsesThumbnailName[];
 extern const char kContextualSearchOpenLensActionUsesThumbnailDescription[];
 
+extern const char kContextualSuggestionsAblateOthersWhenPresentName[];
+extern const char kContextualSuggestionsAblateOthersWhenPresentDescription[];
+
 extern const char kOmniboxContextualSearchOnFocusSuggestionsName[];
 extern const char kOmniboxContextualSearchOnFocusSuggestionsDescription[];
 
@@ -2114,6 +2126,9 @@ extern const char kScrollableTabStripDescription[];
 extern const char kTabstripComboButtonFlagId[];
 extern const char kTabstripComboButtonName[];
 extern const char kTabstripComboButtonDescription[];
+
+extern const char kLaunchedTabSearchToolbarName[];
+extern const char kLaunchedTabSearchToolbarDescription[];
 
 extern const char kTabScrollingButtonPositionFlagId[];
 extern const char kTabScrollingButtonPositionName[];
@@ -3360,9 +3375,6 @@ extern const char kHappinessTrackingSurveysForDesktopDemoDescription[];
 extern const char kMainNodeAnnotationsName[];
 extern const char kMainNodeAnnotationsDescription[];
 
-extern const char kOmniboxDriveSuggestionsName[];
-extern const char kOmniboxDriveSuggestionsDescription[];
-
 extern const char kOmniboxDriveSuggestionsNoSyncRequirementName[];
 extern const char kOmniboxDriveSuggestionsNoSyncRequirementDescription[];
 
@@ -3502,6 +3514,9 @@ extern const char kImmersiveFullscreenDescription[];
 extern const char kMacAccessibilityAPIMigrationName[];
 extern const char kMacAccessibilityAPIMigrationDescription[];
 
+extern const char kMacCatapSystemAudioLoopbackCaptureName[];
+extern const char kMacCatapSystemAudioLoopbackCaptureDescription[];
+
 extern const char kMacImeLiveConversionFixName[];
 extern const char kMacImeLiveConversionFixDescription[];
 
@@ -3554,6 +3569,9 @@ extern const char kUseAngleGL[];
 
 extern const char kAndroidMinimalUiLargeScreenName[];
 extern const char kAndroidMinimalUiLargeScreenDescription[];
+
+extern const char kAndroidUseCorrectDisplayWorkAreaName[];
+extern const char kAndroidUseCorrectDisplayWorkAreaDescription[];
 
 extern const char kAndroidWindowManagementWebApiName[];
 extern const char kAndroidWindowManagementWebApiDescription[];
@@ -3608,9 +3626,6 @@ extern const char kAllowCrossDeviceFeatureSuiteDescription[];
 
 extern const char kLinkCrossDeviceInternalsName[];
 extern const char kLinkCrossDeviceInternalsDescription[];
-
-extern const char kAllowScrollSettingsName[];
-extern const char kAllowScrollSettingsDescription[];
 
 extern const char kAllowUserInstalledChromeAppsName[];
 extern const char kAllowUserInstalledChromeAppsDescription[];
@@ -4112,6 +4127,9 @@ extern const char kAccessibilityManifestV3ChromeVoxDescription[];
 
 extern const char kAccessibilityManifestV3EnhancedNetworkTtsName[];
 extern const char kAccessibilityManifestV3EnhancedNetworkTtsDescription[];
+
+extern const char kAccessibilityManifestV3EspeakNGName[];
+extern const char kAccessibilityManifestV3EspeakNGDescription[];
 
 extern const char kAccessibilityManifestV3SelectToSpeakName[];
 extern const char kAccessibilityManifestV3SelectToSpeakDescription[];

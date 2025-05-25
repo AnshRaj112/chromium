@@ -10,6 +10,9 @@
 // Delegate for the GLICMediator.
 @protocol GLICMediatorDelegate
 
+// Presents the Glic first run experience.
+- (void)presentGlicFRE;
+
 // Dismisses the GLIC consent UI.
 - (void)dismissGLICConsentUI;
 

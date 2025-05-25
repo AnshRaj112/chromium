@@ -133,6 +133,7 @@ struct ContextualSearch : Config<ContextualSearch> {
   ContextualSearch& operator=(const ContextualSearch&);
   ~ContextualSearch();
 
+  DECLARE_FEATURE(kContextualSuggestionsAblateOthersWhenPresent);
   DECLARE_FEATURE(kOmniboxContextualSuggestions);
   DECLARE_FEATURE(kStarterPackPage);
   DECLARE_FEATURE(kContextualZeroSuggestLensFulfillment);
@@ -143,6 +144,7 @@ struct ContextualSearch : Config<ContextualSearch> {
   DECLARE_FEATURE(kOmniboxZeroSuggestSynchronousMatchesOnly);
   DECLARE_FEATURE(kContextualSearchOpenLensActionUsesThumbnail);
   DECLARE_FEATURE(kSendPageTitleSuggestParam);
+  DECLARE_FEATURE(kContextualSearchAlternativeActionLabel);
 
   // Whether to use contextual search features, for example the lens action.
   bool IsContextualSearchEnabled() const;
@@ -150,6 +152,11 @@ struct ContextualSearch : Config<ContextualSearch> {
   // Whether to enable prefetching to support this feature's synchronous
   // match production requirement.
   bool IsEnabledWithPrefetch() const;
+
+  // Whether to make contextual suggestions exclusive; that is, remove
+  // other kinds of zero suggest matches when there are any contextual
+  // search matches.
+  bool contextual_suggestions_ablate_others_when_present;
 
   // Whether the starter pack page scope is enabled.
   bool starter_pack_page;
@@ -185,6 +192,12 @@ struct ContextualSearch : Config<ContextualSearch> {
   // When set to false, the CGI param will not be sent at all (as opposed to
   // sending an empty value).
   bool send_page_title_suggest_param;
+
+  // Which alternative action label to use for lens entrypoint action.
+  int alternative_action_label;
+
+  // Whether the Lens entrypoint action should be shown in the Omnibox popup.
+  bool show_open_lens_action;
 };
 
 // If enabled, allows MIA zero-prefix suggestions in NTP omnibox and realbox.
@@ -220,9 +233,6 @@ struct DocumentProvider : Config<DocumentProvider> {
   bool enabled;
   // The minimum input length required before requesting document suggestions.
   size_t min_query_length;
-  // Whether to ignore the state of the document provider when deciding to
-  // finish debouncing.
-  bool ignore_when_debouncing;
   // Whether to scope backoff state to the profile instead of the current
   // window.
   bool scope_backoff_to_profile;

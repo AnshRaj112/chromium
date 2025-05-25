@@ -773,9 +773,28 @@ extern bool GetVisualSelectionUpdatesEnableBorderGlow();
 COMPONENT_EXPORT(LENS_FEATURES)
 extern bool GetVisualSelectionUpdatesEnableGradientRegionStroke();
 
+// Whether to enable the white region stroke for the visual selection updates.
+// Note: `GetVisualSelectionUpdatesEnableGradientRegionStroke` takes precedence
+// over this flag. This flag will have no effect if the gradient region stroke
+// is enabled.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern bool GetVisualSelectionUpdatesEnableWhiteRegionStroke();
+
+// Whether to enable the region selected glow for the visual selection updates.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern bool GetVisualSelectionUpdatesEnableRegionSelectedGlow();
+
+// Whether to enable the gradient super G in the Lens searchbox.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern bool GetVisualSelectionUpdatesEnableGradientSuperG();
+
 // Whether to enable the thumbnail in the contextual searchbox.
 COMPONENT_EXPORT(LENS_FEATURES)
 extern bool GetVisualSelectionUpdatesEnableCsbThumbnail();
+
+// Whether to enable the motion tweaks in the contextual searchbox.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern bool GetVisualSelectionUpdatesEnableCsbMotionTweaks();
 
 // Whether to fix the request id for page content upload requests. When enabled,
 // this will not increment the image upload request ID when the page content

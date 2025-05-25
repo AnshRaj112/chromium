@@ -31,7 +31,6 @@
 <translation id="1108214977745280468">មើល​ស្ថិតិ​ទំព័រ</translation>
 <translation id="1108938384783527433">​សម​កាល​កម្មប្រវត្តិ</translation>
 <translation id="1111673857033749125">ចំណាំដែលបានរក្សាទុកនៅលើឧបករណ៍ផ្សេងទៀតរបស់អ្នកនឹងបង្ហាញនៅទីនេះ</translation>
-<translation id="1113597929977215864">បង្ហាញ​ទិដ្ឋភាព​សាមញ្ញ</translation>
 <translation id="1126696498560056882">គ្រប់គ្រង​គណនី​នៅ​លើ​ឧបករណ៍​នេះ</translation>
 <translation id="1129510026454351943">ព័ត៌មានលម្អិត៖ <ph name="ERROR_DESCRIPTION" /></translation>
 <translation id="1135018701024399762">មុខងារ​ឯកជន​រក្សាការរុករក​របស់អ្នក​ជាលក្ខណៈ​ឯកជន​ពីអ្នកផ្សេងទៀត​ដែលប្រើ​ឧបករណ៍​របស់អ្នក</translation>
@@ -377,6 +376,7 @@
 <translation id="2718352093833049315">នៅលើ Wi-Fi តែប៉ុណ្ណោះ</translation>
 <translation id="2718846868787000099">ដើម្បីបង្ហាញខ្លឹមសារជាភាសាដែលអ្នកចង់បកប្រែ គេហទំព័រដែលអ្នកចូលមើលអាចមើលចំណូលចិត្តរបស់អ្នក</translation>
 <translation id="2723001399770238859">សម្លេង</translation>
+<translation id="2734335652257251631">បង្ហាញ​មុខងារ​អាន</translation>
 <translation id="2739887572830526131">រក្សា​ក្រុមនេះ ដើម្បី​បញ្ចូលផ្ទាំង​នៅពេលក្រោយ ឬ​លុបវា ប្រសិនបើ​អ្នកលែង​ត្រូវការ​វាទៀតហើយ។</translation>
 <translation id="2742373789128106053">មិនអាច​ប្រើ <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> ឥឡូវនេះបានទេ។</translation>
 <translation id="2760805590727089264">MM / YY</translation>
@@ -1747,6 +1747,7 @@
 <translation id="8676789164135894283">ការផ្ទៀងផ្ទាត់​ការចូលគណនី</translation>
 <translation id="8683039184091909753">រូបភាព</translation>
 <translation id="8688183792442786085"><ph name="TAB_TITLE" />, ផ្ទាំង​ដែលបាន​ជ្រើសរើស</translation>
+<translation id="8693232767599693749">មើល​មុខងារ​អានឬ?</translation>
 <translation id="8697753151306746444">បង្ហាញ​វិនដូ ឬ​អេក្រង់​ជំនួសវិញ</translation>
 <translation id="869891660844655955">កាលបរិច្ឆេទការផុតកំណត់</translation>
 <translation id="8699120352855309748">មិនផ្ដល់ការបកប្រែភាសាទាំងនេះទេ</translation>
@@ -1878,7 +1879,6 @@
 <translation id="961856697154696964">លុប​ទិន្នន័យរុករក</translation>
 <translation id="963246339335003378">បើក​កម្មវិធីគ្រប់គ្រងកិច្ចការ</translation>
 <translation id="966131775676567255">កំពុងលុបទិន្នន័យគណនី</translation>
-<translation id="96681097142096641">មើលទំព័រសាមញ្ញឬ?</translation>
 <translation id="970715775301869095">នៅសល់ <ph name="MINUTES" /> នាទីទៀត</translation>
 <translation id="981121421437150478">ក្រៅបណ្តាញ</translation>
 <translation id="983192555821071799">បិទផ្ទាំងទាំងអស់</translation>

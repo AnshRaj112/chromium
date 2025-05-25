@@ -40,6 +40,7 @@
 #include "chrome/browser/ui/autofill/payments/save_card_bubble_controller_impl.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_actions.h"
+#include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
@@ -97,6 +98,7 @@
 #include "components/omnibox/browser/omnibox_edit_model.h"
 #include "components/omnibox/browser/omnibox_field_trial.h"
 #include "components/omnibox/browser/omnibox_popup_view.h"
+#include "components/omnibox/browser/omnibox_text_util.h"
 #include "components/omnibox/browser/vector_icons.h"
 #include "components/omnibox/common/omnibox_feature_configs.h"
 #include "components/omnibox/common/omnibox_features.h"
@@ -165,6 +167,7 @@
 #include "ui/views/style/typography.h"
 #include "ui/views/style/typography_provider.h"
 #include "ui/views/view.h"
+#include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 
@@ -232,6 +235,7 @@ LocationBarView::LocationBarView(Browser* browser,
           &LocationBarView::OnAppShimChanged, base::Unretained(this)));
 #endif
   GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
+  SetProperty(views::kElementIdentifierKey, kLocationBarElementId);
 }
 
 LocationBarView::~LocationBarView() = default;
@@ -433,6 +437,14 @@ void LocationBarView::Init() {
       params.types_enabled.insert(params.types_enabled.begin(),
                                   PageActionIconType::kLensOverlay);
     }
+  }
+
+  if (browser_ && lens::features::IsLensOverlayEduActionChipEnabled()) {
+    // Position in the leading position, like the expanding entrypoint for
+    // kLensOverlay above. While both chips may be enabled, they will not appear
+    // at the same time due to different focus behavior.
+    params.types_enabled.insert(params.types_enabled.begin(),
+                                PageActionIconType::kLensOverlayHomework);
   }
 
   if (browser_ && tab_groups::SavedTabGroupUtils::SupportsSharedTabGroups()) {
@@ -1016,11 +1028,6 @@ void LocationBarView::Update(WebContents* contents) {
 
 void LocationBarView::ResetTabState(WebContents* contents) {
   omnibox_view_->ResetTabState(contents);
-}
-
-bool LocationBarView::ActivateFirstInactiveBubbleForAccessibility() {
-  return page_action_icon_controller_
-      ->ActivateFirstInactiveBubbleForAccessibility();
 }
 
 ChipController* LocationBarView::GetChipController() {
@@ -1608,7 +1615,7 @@ void LocationBarView::OnLocationIconPressed(const ui::MouseEvent& event) {
     std::u16string text;
     ui::Clipboard::GetForCurrentThread()->ReadText(
         ui::ClipboardBuffer::kSelection, /* data_dst = */ nullptr, &text);
-    text = OmniboxView::SanitizeTextForPaste(text);
+    text = omnibox::SanitizeTextForPaste(text);
 
     if (!GetOmniboxView()->model()->CanPasteAndGo(text)) {
       return;

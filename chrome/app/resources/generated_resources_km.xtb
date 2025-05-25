@@ -80,6 +80,7 @@
 <translation id="1049743911850919806">អនាមិក</translation>
 <translation id="1049795001945932310">&amp;ការកំណត់ភាសា</translation>
 <translation id="1050693411695664090">ខ្សោយ</translation>
+<translation id="1053226848101751430">បានលុប​ធាតុចូល</translation>
 <translation id="1053898984916097744">ចាប់ផ្ដើមអ្វីមួយថ្មី ឬទទួលជំនួយពេលបំពេញកិច្ចការ។</translation>
 <translation id="1054048317165655285">បញ្ចប់​ការរៀបចំ​នៅលើ​ទូរសព្ទ​របស់អ្នក</translation>
 <translation id="1054153489933238809">បើករូបភាពដើមនៅក្នុងផ្ទាំងថ្មី</translation>
@@ -2250,6 +2251,7 @@
 <translation id="2519250377986324805">មើលរបៀប</translation>
 <translation id="2519517390894391510">ឈ្មោះ​កម្រងព័ត៌មាន​វិញ្ញាបនបត្រ</translation>
 <translation id="2520644704042891903">កំពុងរង់ចាំរន្ធភ្ជាប់ដែលមាន...</translation>
+<translation id="2520961587246779103">ជម្រើស​ច្រើនទៀត​សម្រាប់​ទិដ្ឋភាព​បំបែក</translation>
 <translation id="2521427645491031107">សមកាលកម្ម​កម្មវិធី​ត្រូវបាន​កំណត់​នៅក្នុង​ការកំណត់ឧបករណ៍</translation>
 <translation id="2521835766824839541">ចម្រៀង​មុន</translation>
 <translation id="2521854691574443804">កំពុងពិនិត្យ <ph name="FILE_NAME" /> ដោយប្រើគោលការណ៍សុវត្ថិភាពរបស់ស្ថាប័នអ្នក...</translation>
@@ -2652,7 +2654,6 @@
 <translation id="2798347533012571708">បន្តដំឡើងកំណែ</translation>
 <translation id="2799162042226656283">Chrome របស់អ្នក</translation>
 <translation id="2799223571221894425">បើកដំណើរការឡើងវិញ</translation>
-<translation id="2800309299477632167">ប្លង់គ្រាប់ចុច​ផ្ទាល់ខ្លួន</translation>
 <translation id="2800760947029405028">បង្ហោះ​រូបភាព</translation>
 <translation id="2800996978423439835">ទទួលបាន​ចំណាំ​របស់អ្នក និងអ្វីៗជា​ច្រើនទៀត​នៅលើ​ឧបករណ៍​ទាំងអស់​របស់អ្នក</translation>
 <translation id="2801134910297796778">បានចូល <ph name="EMAIL" /></translation>
@@ -3196,6 +3197,7 @@
 <translation id="3202578601642193415">ថ្មីបំផុត</translation>
 <translation id="3204648577100496185">ទិន្នន័យ​ដែលពាក់ព័ន្ធនឹង​កម្មវិធីនេះ​អាចត្រូវ​បានដកចេញ​ពីឧបករណ៍នេះ</translation>
 <translation id="3204717934117444051">ទិន្នន័យ​ដែលត្រូវបាន​រក្សាទុក​តែនៅលើ​ឧបករណ៍នេះ​នឹងនៅតែ​ស្ថិតនៅក្នុង​កម្រងព័ត៌មាន​ដែលមាន​ស្រាប់ដដែល។ វានឹង​មិនធ្វើ​សមកាលកម្ម​ទៅ <ph name="EMAIL" /> ទេ</translation>
+<translation id="3206289903841621620">វចនានុក្រម​អ្នកប្រើប្រាស់​ទី <ph name="NUMBER" /></translation>
 <translation id="3207344462385471911">អ្នកកំពុង​មើលឃើញ​ការបញ្ចុះតម្លៃ​លើការទិញទំនិញ និង​ការស្វែងរក​ដែលបានណែនាំ​ដែលអ្នក​អាចចាប់អារម្មណ៍ ផ្អែកលើ​សកម្មភាពថ្មីៗ​របស់អ្នក។
         <ph name="BREAK" />
         <ph name="BREAK" />
@@ -4767,7 +4769,6 @@
 <translation id="4289540628985791613">ទិដ្ឋភាពទូទៅ</translation>
 <translation id="428963538941819373">គេហទំព័រ​ទាំងនេះ​អាចប្រើ​ព័ត៌មាន​ដែលគេហទំព័រ​ទាំងនេះ​បានរក្សាទុក​ពាក់ព័ន្ធនឹងអ្នក នៅពេលដែលអ្នក​រុករក​នៅលើ <ph name="HOST" /></translation>
 <translation id="4289732974614035569">ជ្រើសរើស​កូដ PIN</translation>
-<translation id="4290526909608432059">ជំនួយ​សម្រាប់​កម្មវិធី Chrome នឹងចប់​ឆាប់ៗនេះ។ ដើម្បី​ស្វែងយល់​អំពី​ជម្រើស​របស់អ្នក សូម​ទាក់ទងទៅ​អ្នក​អភិវឌ្ឍន៍​កម្មវិធី ឬ​ក្រុមការងារ​ផ្នែកជំនួយ​ព័ត៌មានវិទ្យា​របស់អ្នក។</translation>
 <translation id="4290791284969893584">បន្ទាប់ពីបិទទំព័រ កិច្ចការដែលអ្នកបានចាប់ផ្ដើមអាចនឹងមិនបញ្ចប់ទេ</translation>
 <translation id="4290826901752066702">សមាជិក <ph name="NUM" /> នាក់</translation>
 <translation id="4290898381118933198">អូស ដើម្បី​រុករក​រវាង​ទំព័រនានា</translation>
@@ -7634,6 +7635,7 @@
 <translation id="6365069501305898914">Facebook</translation>
 <translation id="6365411474437319296">បន្ថែមគ្រួសារ និងមិត្តភ័ក្ត</translation>
 <translation id="6367097275976877956">តើអ្នកចង់​បើកដំណើរការ ChromeVox ដែលជា​កម្មវិធី​អានអេក្រង់​ភ្ជាប់មកជាមួយស្រាប់​សម្រាប់ ChromeOS ដែរទេ? ប្រសិនបើដូច្នេះមែន សូមចុចរបារដកឃ្លា។</translation>
+<translation id="6367196786591004737">លុបធាតុ</translation>
 <translation id="6367396429435748845">ចុច <ph name="ALT" /> + <ph name="LAUNCHER" /> + <ph name="NUM_4" /> ដើម្បីផ្អាក និងបន្តគ្រាប់ចុចម៉ៅស៍ឡើងវិញ</translation>
 <translation id="6367985768157257101">ទទួលដោយប្រើការ​ចែករំលែកនៅ​ជិតឬ?</translation>
 <translation id="6368157733310917710">&amp;អាសយដ្ឋាន និង​អ្វីៗជាច្រើនទៀត</translation>
@@ -7967,7 +7969,6 @@
 <translation id="6610002944194042868">ជម្រើស​បកប្រែ</translation>
 <translation id="6610064275805055636">គ្រប់គ្រងកម្មវិធីលើអ៊ីនធឺណិតដាច់តែឯង</translation>
 <translation id="6611432349566876829"><ph name="NUM" /> ផ្ទាំង</translation>
-<translation id="6611972847767394631">ស្វែងរកផ្ទាំងរបស់អ្នកនៅទីនេះ</translation>
 <translation id="661266467055912436">ពង្រឹងសុវត្ថិភាព​សម្រាប់អ្នក និងអ្នកគ្រប់គ្នានៅលើអ៊ីនធឺណិត។</translation>
 <translation id="6613267708691765962">កំពុង​ស្កេនរក​កម្មវិធីគ្រោះថ្នាក់...</translation>
 <translation id="6615455863669487791">បង្ហាញខ្ញុំ</translation>
@@ -8294,7 +8295,6 @@
 <translation id="6831043979455480757">បកប្រែ</translation>
 <translation id="6832218595502288407">តម្រឹម​ឆ្វេង</translation>
 <translation id="6832815922179448173">{MULTI_GROUP_TAB_COUNT,plural, =0{ដកផ្ទាំងចេញ និងលុបក្រុមឬ?}=1{ដកផ្ទាំងចេញ និងលុបក្រុមឬ?}other{ដកផ្ទាំងចេញ និងលុបក្រុមឬ?}}</translation>
-<translation id="6833103209700200188">ផ្នែកខាងក្រោម</translation>
 <translation id="6833479554815567477">បានលុបផ្ទាំង​ចេញពី​ក្រុម <ph name="GROUP_NAME" /> - <ph name="GROUP_CONTENTS" /></translation>
 <translation id="6833753236242482566">មាន​តុល្យភាព (បាន​ណែនាំ)</translation>
 <translation id="6835762382653651563">សូមភា្ជប់អ៊ីនធឺណិតដើម្បីធ្វើបច្ចុប្បន្នភាព <ph name="DEVICE_TYPE" /> របស់អ្នក។</translation>
@@ -10000,6 +10000,7 @@
 <translation id="8037801708772278989">ទើបបាន​ពិនិត្យមើល​អម្បាញ់មិញ</translation>
 <translation id="8038111231936746805">(លំនាំដើម)</translation>
 <translation id="8039151841428107077">{NUM_OF_FILES,plural, =1{កំពុងចម្លងឯកសារចំនួន 1 ទៅ <ph name="CLOUD_PROVIDER" />}other{កំពុងចម្លងឯកសារចំនួន {NUM_OF_FILES} ទៅ <ph name="CLOUD_PROVIDER" />}}</translation>
+<translation id="8039525676147630657">កម្មវិធី Chrome នេះ​នឹងឈប់​ដំណើរការ បន្ទាប់ពី​ដំឡើង​កំណែ ChromeOS របស់អ្នក​រួច។ សូម​រក្សាទុក​ទិន្នន័យ​កម្មវិធី​ដែលអ្នក​ចង់រក្សា។ ដើម្បី​ស្វែងយល់​អំពី​ជម្រើស​របស់អ្នក សូម​ទាក់ទងទៅ​អ្នក​អភិវឌ្ឍន៍​កម្មវិធី ឬ​ក្រុមការងារ​ផ្នែកជំនួយ​ព័ត៌មានវិទ្យា​របស់អ្នក។</translation>
 <translation id="8041089156583427627">ផ្ញើមតិ</translation>
 <translation id="8041093619605951337">សប្បាយ</translation>
 <translation id="8041267120753677077">បញ្ចាំងកម្មវិធីរបស់ទូរសព្ទអ្នក</translation>
@@ -10628,6 +10629,7 @@
 <translation id="8472623782143987204">ផ្នែករឹងបម្រុង</translation>
 <translation id="8473540203671727883">អានអត្ថបទនៅផ្នែកខាងក្រោម​កណ្ដុរ</translation>
 <translation id="8473863474539038330">អាសយដ្ឋាន​ និងច្រើន​ទៀត</translation>
+<translation id="847433688444405067">រុករក​ឆ្លង​ឧបករណ៍</translation>
 <translation id="8474378002946546633">អនុញ្ញាត​ការជូនដំណឹង</translation>
 <translation id="8474561048882755118">ជួយអ្នកក្នុងការមើលផលិតផលស្រដៀងគ្នាទន្ទឹមគ្នា និងងាយស្រួលប្រៀបធៀបព័ត៌មានលម្អិតដែលសំខាន់ចំពោះអ្នក</translation>
 <translation id="8475313423285172237">កម្មវិធីដ៏ទៃទៀតនៅលើកុំព្យូទ័ររបស់អ្នកបានបន្ថែមកម្មវិធីបន្ថែម ដែលអាចប្តូររបៀបដំណើរការរបស់ Chrome។</translation>
@@ -10993,6 +10995,7 @@
 <translation id="8729133765463465108">ប្រើកាមេរ៉ា ដើម្បីស្កេនកូដ QR</translation>
 <translation id="8730621377337864115">រួចរាល់</translation>
 <translation id="8731029916209785242">ការអនុញ្ញាត (<ph name="FORMATTED_ORIGIN" />)</translation>
+<translation id="8731258351357994801">ធាតុចូល​ទី <ph name="NUMBER" /></translation>
 <translation id="8731268612289859741">លេខ​កូដ​សុវត្ថិភាព</translation>
 <translation id="8731629443331803108"><ph name="SITE_NAME" /> ចង់៖ <ph name="PERMISSION" /></translation>
 <translation id="8731787661154643562">លេខ​ច្រក</translation>

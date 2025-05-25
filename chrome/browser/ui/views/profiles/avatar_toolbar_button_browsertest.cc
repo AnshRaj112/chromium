@@ -482,6 +482,18 @@ class AvatarToolbarButtonBaseBrowserTest {
     GetTestSyncService()->FireStateChanged();
   }
 
+  void SimulateTypeManagedByPolicy(syncer::UserSelectableType type) {
+    GetTestSyncService()->GetUserSettings()->SetTypeIsManagedByPolicy(type,
+                                                                      true);
+    GetTestSyncService()->FireStateChanged();
+  }
+
+  void SimulateTypeManagedByCustodian(syncer::UserSelectableType type) {
+    GetTestSyncService()->GetUserSettings()->SetTypeIsManagedByCustodian(type,
+                                                                         true);
+    GetTestSyncService()->FireStateChanged();
+  }
+
   void SimulatePassphraseError() {
     GetTestSyncService()->GetUserSettings()->SetPassphraseRequired(
         std::string(kTestPassphrase));
@@ -530,6 +542,15 @@ class AvatarToolbarButtonBrowserTest
  protected:
   // AvatarToolbarButtonBaseBrowserTest:
   Browser* GetBrowser() const override { return browser(); }
+
+  // InProcessBrowserTest:
+  void SetUpOnMainThread() override {
+    InProcessBrowserTest::SetUpOnMainThread();
+    if (GetIdentityManager()) {
+      // Puts `IdentityManager` in a known good state to avoid flakiness.
+      signin::WaitForRefreshTokensLoaded(GetIdentityManager());
+    }
+  }
 };
 
 IN_PROC_BROWSER_TEST_F(AvatarToolbarButtonBrowserTest, IncognitoWindowCount) {
@@ -730,8 +751,6 @@ IN_PROC_BROWSER_TEST_F(AvatarToolbarButtonBrowserTest,
   EXPECT_EQ(avatar->GetText(),
             l10n_util::GetStringFUTF16(IDS_AVATAR_BUTTON_GREETING, name));
 
-  ASSERT_TRUE(GetIdentityManager()->AreRefreshTokensLoaded());
-
   // Creating a new browser while the refresh tokens are already loaded and the
   // name showing should not break/crash.
   Browser* new_browser = CreateBrowser(browser()->profile());
@@ -922,7 +941,6 @@ IN_PROC_BROWSER_TEST_F(AvatarToolbarButtonBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(AvatarToolbarButtonBrowserTest,
                        SignedInWithNewSessionKeepIcon) {
-  signin::WaitForRefreshTokensLoaded(GetIdentityManager());
   ASSERT_TRUE(
       GetIdentityManager()->HasPrimaryAccount(signin::ConsentLevel::kSignin));
   // Previously added image on signin should still be shown in the new session.
@@ -980,6 +998,15 @@ class AvatarToolbarButtonWithInteractiveFeaturePromoBrowserTest
 
   // AvatarToolbarButtonBaseBrowserTest:
   Browser* GetBrowser() const override { return browser(); }
+
+  // InteractiveFeaturePromoTest:
+  void SetUpOnMainThread() override {
+    InteractiveFeaturePromoTest::SetUpOnMainThread();
+    if (GetIdentityManager()) {
+      // Puts `IdentityManager` in a known good state to avoid flakiness.
+      signin::WaitForRefreshTokensLoaded(GetIdentityManager());
+    }
+  }
 };
 
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
@@ -1090,6 +1117,77 @@ IN_PROC_BROWSER_TEST_F(AvatarToolbarButtonHistorySyncOptinBrowserTest,
   // if sync is not allowed.
   EXPECT_TRUE(avatar->GetText().empty());
 }
+
+enum class ManagedBy {
+  kPolicy,
+  kCustodian,
+};
+
+struct HistorySyncOptinSyncManagedTypeTestCase {
+  ManagedBy managed_by;
+  syncer::UserSelectableType managed_type;
+};
+
+class AvatarToolbarButtonHistorySyncOptinManagedTypeTest
+    : public AvatarToolbarButtonHistorySyncOptinBrowserTest,
+      public WithParamInterface<HistorySyncOptinSyncManagedTypeTestCase> {};
+
+// TODO(crbug.com/331746545): Check the flaky test issue on Windows.
+#if BUILDFLAG(IS_WIN)
+#define MAYBE_HistorySyncOptinNotShownWhenSyncManaged \
+  DISABLED_HistorySyncOptinNotShownWhenSyncManaged
+#else
+#define MAYBE_HistorySyncOptinNotShownWhenSyncManaged \
+  HistorySyncOptinNotShownWhenSyncManaged
+#endif
+IN_PROC_BROWSER_TEST_P(AvatarToolbarButtonHistorySyncOptinManagedTypeTest,
+                       MAYBE_HistorySyncOptinNotShownWhenSyncManaged) {
+  switch (GetParam().managed_by) {
+    case ManagedBy::kPolicy:
+      SimulateTypeManagedByPolicy(GetParam().managed_type);
+      break;
+    case ManagedBy::kCustodian:
+      SimulateTypeManagedByCustodian(GetParam().managed_type);
+      break;
+    default:
+      NOTREACHED();
+  }
+  AvatarToolbarButton* avatar = GetAvatarToolbarButton(browser());
+  // Normal state.
+  ASSERT_TRUE(avatar->GetText().empty());
+  const std::u16string account_name(u"Account name");
+  SigninWithImage(/*email=*/u"test@gmail.com", account_name);
+  ASSERT_EQ(avatar->GetText(), l10n_util::GetStringFUTF16(
+                                   IDS_AVATAR_BUTTON_GREETING, account_name));
+  avatar->TriggerTimeoutForTesting(AvatarDelayType::kNameGreeting);
+  // The greeting should NOT be followed by the history sync opt-in entry point
+  // if sync is not allowed.
+  EXPECT_TRUE(avatar->GetText().empty());
+}
+
+const HistorySyncOptinSyncManagedTypeTestCase
+    kHistorySyncOptinSyncManagedTypeTestCases[] = {
+        {
+            ManagedBy::kPolicy,
+            syncer::UserSelectableType::kHistory,
+        },
+        {
+            ManagedBy::kPolicy,
+            syncer::UserSelectableType::kTabs,
+        },
+        {
+            ManagedBy::kCustodian,
+            syncer::UserSelectableType::kHistory,
+        },
+        {
+            ManagedBy::kCustodian,
+            syncer::UserSelectableType::kTabs,
+        },
+};
+
+INSTANTIATE_TEST_SUITE_P(HistorySyncOptinManagedType,
+                         AvatarToolbarButtonHistorySyncOptinManagedTypeTest,
+                         ValuesIn(kHistorySyncOptinSyncManagedTypeTestCases));
 
 // TODO(crbug.com/331746545): Check the flaky test issue on Windows.
 #if BUILDFLAG(IS_WIN)
@@ -2338,8 +2436,6 @@ IN_PROC_BROWSER_TEST_P(
 IN_PROC_BROWSER_TEST_P(
     AvatarToolbarButtonEnterpriseBadgingWithSyncPromoParamsBrowserTest,
     MAYBE_SignedInWithNewSessionKeepWorkBadge) {
-  signin::WaitForRefreshTokensLoaded(GetIdentityManager());
-
   AvatarToolbarButton* avatar = GetAvatarToolbarButton(browser());
   // The greetings are shown due to the management service override (unaware of
   // the management acceptance after restart).
@@ -2496,7 +2592,7 @@ IN_PROC_BROWSER_TEST_F(AvatarToolbarButtonBrowserTest,
 }
 
 // TODO(crbug.com/360106845): Fix flaky test and re-enable.
-#if BUILDFLAG(IS_WIN)
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
 #define MAYBE_SigninPausedFromWebSignoutThenRestartChrome \
   DISABLED_SigninPausedFromWebSignoutThenRestartChrome
 #else

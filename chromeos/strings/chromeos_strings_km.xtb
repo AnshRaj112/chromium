@@ -206,6 +206,7 @@
 <translation id="1758018619400202187">EAP-TLS</translation>
 <translation id="1758459542619182298"><ph name="CONTROL_TYPE" /> <ph name="KEY_LIST" /></translation>
 <translation id="1759842336958782510">Chrome</translation>
+<translation id="1762353673362288306">ឥឡូវនេះ អ្នកអាច​ត្រឹមតែ​ប្រើ​ឧបករណ៍ថ្នាក់​ប៉ុណ្ណោះ</translation>
 <translation id="1762483337755424125">ប្រតិចារឹក</translation>
 <translation id="1765169783255151332">ប្ដូរ​គ្រាប់ចុច​យ៉ាងរហ័ស</translation>
 <translation id="1768959921651994223">ប្រភេទ​ផ្ទៀងផ្ទាត់</translation>
@@ -1459,7 +1460,6 @@
 <translation id="7388345524791662148">ជម្រើស​ច្រើន​ទៀត​សម្រាប់ <ph name="RECORDING_NAME" /></translation>
 <translation id="7388959671917308825">ផ្ទាំងប៉ះដែលបានភ្ជាប់​មកជាមួយ​ស្រាប់</translation>
 <translation id="7397270852490618635">បិទ​រចនាប័ទ្ម​ភ្លឺ</translation>
-<translation id="7400166052988585408">គ្រូ​របស់អ្នក​នឹងចាក់សោ​អេក្រង់​របស់អ្នក​ក្នុងរយៈពេល <ph name="NUM_SECONDS" /> វិនាទី​ទៀត</translation>
 <translation id="7401543881546089382">លុបផ្លូវកាត់</translation>
 <translation id="7405493795721832710">អាចដំឡើងកំណែ <ph name="DEVICE_NAME" /> បានហើយ</translation>
 <translation id="741244894080940828">ការបំប្លែង</translation>
@@ -1614,7 +1614,7 @@
 <translation id="8088963492174775412">ចុច​ដើម្បីថត</translation>
 <translation id="8094062939584182041">អនុញ្ញាត​ឱ្យ Google ផ្ញើអ៊ីមែល​ទៅអ្នក​អំពី​បញ្ហានេះ</translation>
 <translation id="8104083085214006426">អ្នកកំពុងប្រើបណ្ដាញចំហ និងគ្មានសុវត្ថិភាព</translation>
-<translation id="8110942816572072814">គ្រូរបស់អ្នក​បានចាក់សោ​អេក្រង់​របស់អ្នក​ហើយ</translation>
+<translation id="8108879170356113798">អ្នកនឹង​អាច​ប្រើ​ឧបករណ៍ថ្នាក់​ក្នុងរយៈពេល <ph name="NUM_SECONDS" /> វិនាទី​ទៀតតែប៉ុណ្ណោះ</translation>
 <translation id="811820734797650957">(Android) អាចធ្វើតេស្ដ​ភីងលើច្រកបាន</translation>
 <translation id="8129620843620772246"><ph name="TEMPERATURE_C" />° C</translation>
 <translation id="8131740175452115882">អះអាង</translation>

@@ -40,11 +40,12 @@
 #error This file should only be included on desktop.
 #endif
 
+class DraggingTabsSession;
 class Profile;
 class TabGroupModel;
 class TabStripModelDelegate;
 class TabStripModelObserver;
-class DraggingTabsSession;
+class TabStripServiceImpl;
 
 namespace content {
 class WebContents;
@@ -175,7 +176,8 @@ class ScopedTabStripModalUI {
 ////////////////////////////////////////////////////////////////////////////////
 class TabStripModel {
  public:
-  using TabIterator = tabs::TabCollection::Iterator;
+  using TabIterator = tabs::TabCollection::TabIterator;
+  using CollectionIterator = tabs::TabCollection::Iterator;
 
   // TODO(crbug.com/40881446): Remove this, and use std::optional<size_t> (or at
   // least std::optional<int>) in its place.
@@ -673,6 +675,11 @@ class TabStripModel {
   TabIterator begin() const;
   TabIterator end() const;
 
+  CollectionIterator collection_begin(
+      base::PassKey<TabStripServiceImpl> key) const;
+  CollectionIterator collection_end(
+      base::PassKey<TabStripServiceImpl> key) const;
+
   // View API //////////////////////////////////////////////////////////////////
 
   // Context menu functions. Tab groups uses command ids following CommandLast
@@ -1143,7 +1150,9 @@ class TabStripModel {
 
   // Updates the `contents_data_` and sends out observer notifications for
   // removing an existing tab in  the tabstrip.
-  std::unique_ptr<tabs::TabModel> RemoveTabFromIndexImpl(int index);
+  std::unique_ptr<tabs::TabModel> RemoveTabFromIndexImpl(
+      int index,
+      tabs::TabInterface::DetachReason tab_detach_reason);
 
   // Updates the `contents_data_` and sends out observer notifications for
   // updating the index, pinned state or group property.

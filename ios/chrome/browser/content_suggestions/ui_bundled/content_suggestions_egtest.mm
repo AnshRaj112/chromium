@@ -129,7 +129,6 @@ void TapMagicStackEditButton() {
       [self isRunningTest:@selector
             (testMagicStackCompactedSetUpListCompleteAllItems)]) {
     config.features_disabled.push_back(kContentPushNotifications);
-    config.features_disabled.push_back(set_up_list::kSetUpListInFirstRun);
     config.features_disabled.push_back(
         set_up_list::kSetUpListWithoutSignInItem);
   }
@@ -230,13 +229,7 @@ void TapMagicStackEditButton() {
 
 // Tests the "Remove" action of the Most Visited context menu, and the "Undo"
 // action.
-// TODO(crbug.com/337064665): Test is flaky on simluator. Re-enable when fixed.
-#if TARGET_IPHONE_SIMULATOR
-#define MAYBE_testMostVisitedRemoveUndo FLAKY_testMostVisitedRemoveUndo
-#else
-#define MAYBE_testMostVisitedRemoveUndo testMostVisitedRemoveUndo
-#endif
-- (void)MAYBE_testMostVisitedRemoveUndo {
+- (void)testMostVisitedRemoveUndo {
   [self setupMostVisitedTileLongPress];
   const GURL pageURL = self.testServer->GetURL(kPageURL);
   NSString* pageTitle = base::SysUTF8ToNSString(kPageTitle);

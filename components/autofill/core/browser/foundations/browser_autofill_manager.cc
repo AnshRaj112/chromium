@@ -109,8 +109,8 @@
 #include "components/autofill/core/browser/metrics/form_interactions_ukm_logger.h"
 #include "components/autofill/core/browser/metrics/log_event.h"
 #include "components/autofill/core/browser/metrics/payments/card_metadata_metrics.h"
+#include "components/autofill/core/browser/metrics/per_fill_metrics.h"
 #include "components/autofill/core/browser/metrics/quality_metrics.h"
-#include "components/autofill/core/browser/metrics/refill_metrics.h"
 #include "components/autofill/core/browser/metrics/suggestions_list_metrics.h"
 #include "components/autofill/core/browser/ml_model/autofill_ai/autofill_ai_model_cache.h"
 #include "components/autofill/core/browser/ml_model/autofill_ai/autofill_ai_model_executor.h"
@@ -1100,15 +1100,16 @@ void BrowserAutofillManager::OnAskForValuesToFillImpl(
     const gfx::Rect& caret_bounds,
     AutofillSuggestionTriggerSource trigger_source,
     base::optional_ref<const PasswordSuggestionRequest> password_request) {
-  if (client().GetPasswordManagerDelegate() && password_request.has_value()) {
+  if (password_request.has_value()) {
+    if (PasswordManagerDelegate* password_delegate =
+            client().GetPasswordManagerDelegate(field_id)) {
 #if !BUILDFLAG(IS_ANDROID)
-    client().GetPasswordManagerDelegate()->ShowSuggestions(
-        password_request->field);
+      password_delegate->ShowSuggestions(password_request->field);
 #else
-    client().GetPasswordManagerDelegate()->ShowKeyboardReplacingSurface(
-        password_request.value());
+      password_delegate->ShowKeyboardReplacingSurface(password_request.value());
 #endif  // !BUILDFLAG(IS_ANDROID)
-    return;
+      return;
+    }
   }
 
   if (base::FeatureList::IsEnabled(features::kAutofillDisableFilling)) {
@@ -2510,6 +2511,8 @@ void BrowserAutofillManager::OnDidFillOrPreviewForm(
   }
   CHECK_EQ(action_persistence, mojom::ActionPersistence::kFill);
 
+  autofill_metrics::LogNumberOfFieldsModifiedByAutofill(safe_filled_fields,
+                                                        filling_payload);
   if (refill_trigger_reason) {
     autofill_metrics::LogNumberOfFieldsModifiedByRefill(
         *refill_trigger_reason, safe_filled_fields.size());
@@ -3121,9 +3124,15 @@ std::vector<Suggestion> BrowserAutofillManager::GetAvailableSuggestions(
               EMAIL_OR_LOYALTY_MEMBERSHIP_ID) {
         if (ValuablesDataManager* valuables_manager =
                 client().GetValuablesDataManager()) {
-          ExtendEmailSuggestionsWithLoyaltyCardSuggestions(
-              suggestions, *valuables_manager,
-              client().GetLastCommittedPrimaryMainFrameURL());
+          if (suggestions.empty()) {
+            suggestions = GetLoyaltyCardSuggestions(
+                *valuables_manager,
+                client().GetLastCommittedPrimaryMainFrameURL());
+          } else {
+            ExtendEmailSuggestionsWithLoyaltyCardSuggestions(
+                suggestions, *valuables_manager,
+                client().GetLastCommittedPrimaryMainFrameURL());
+          }
         }
       }
       break;

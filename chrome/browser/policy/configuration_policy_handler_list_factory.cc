@@ -407,8 +407,11 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     prefs::kAllowDeletingBrowserHistory,
     base::Value::Type::BOOLEAN },
   { key::kClearWindowNameForNewBrowsingContextGroup,
-      prefs::kClearWindowNameForNewBrowsingContextGroup,
-      base::Value::Type::BOOLEAN },
+    prefs::kClearWindowNameForNewBrowsingContextGroup,
+    base::Value::Type::BOOLEAN },
+  { key::kPrefetchWithServiceWorkerEnabled,
+    prefs::kPrefetchWithServiceWorkerEnabled,
+    base::Value::Type::BOOLEAN },
 // Policies for all platforms - End
 #if BUILDFLAG(IS_ANDROID)
   { key::kAccessibilityPerformanceFilteringAllowed,
@@ -629,10 +632,10 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kHideWebStoreIcon,
     policy::policy_prefs::kHideWebStoreIcon,
     base::Value::Type::BOOLEAN },
+#endif // !BUILDFLAG(IS_ANDROID)
   { key::kHomepageIsNewTabPage,
     prefs::kHomePageIsNewTabPage,
     base::Value::Type::BOOLEAN },
-#endif // !BUILDFLAG(IS_ANDROID)
   { key::kImagesAllowedForUrls,
     prefs::kManagedImagesAllowedForUrls,
     base::Value::Type::LIST },
@@ -2214,6 +2217,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::STRING },
 #endif  // BUILDFLAG(IS_CHROMEOS)
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+  { key::kNTPFooterExtensionAttributionEnabled,
+    prefs::kNTPFooterExtensionAttributionEnabled,
+    base::Value::Type::BOOLEAN },
   { key::kTabDiscardingExceptions,
     performance_manager::user_tuning::prefs::kManagedTabDiscardingExceptions,
     base::Value::Type::LIST },
@@ -2377,13 +2383,14 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::BOOLEAN },
 #endif  // BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_FUCHSIA)
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
-  { key::kNTPFooterExtensionAttributionEnabled,
-    prefs::kNTPFooterExtensionAttributionEnabled,
-    base::Value::Type::BOOLEAN },
   { key::kNTPFooterManagementNoticeEnabled,
     prefs::kNTPFooterManagementNoticeEnabled,
     base::Value::Type::BOOLEAN },
 #endif // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+  { key::kAIModeSearchSuggestSettings,
+    omnibox::kAIModeSearchSuggestSettings,
+    base::Value::Type::INTEGER },
+
 };
 // clang-format on
 
@@ -3065,8 +3072,6 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
       std::make_unique<ExternalDataPolicyHandler>(key::kExternalPrintServers));
   handlers->AddHandler(std::make_unique<ExternalDataPolicyHandler>(
       key::kDeviceExternalPrintServers));
-  handlers->AddHandler(std::make_unique<ExternalDataPolicyHandler>(
-      key::kCrostiniAnsiblePlaybook));
   handlers->AddHandler(
       std::make_unique<AppLaunchAutomationPolicyHandler>(chrome_schema));
   handlers->AddHandler(std::make_unique<ExternalDataPolicyHandler>(
@@ -3364,6 +3369,10 @@ std::unique_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
       key::kGenAIInlineImageSettings,
       ash::prefs::kLobsterEnterprisePolicySettings);
 #endif  // BUILDFLAG(IS_CHROMEOS)
+  gen_ai_default_policies.emplace_back(
+      key::kAIModeSearchSuggestSettings, omnibox::kAIModeSearchSuggestSettings,
+      GenAiDefaultSettingsPolicyHandler::PolicyValueToPrefMap(
+          {{0, 0}, {1, 0}, {2, 1}}));
   handlers->AddHandler(std::make_unique<GenAiDefaultSettingsPolicyHandler>(
       std::move(gen_ai_default_policies)));
 

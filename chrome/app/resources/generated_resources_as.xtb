@@ -2650,7 +2650,6 @@
 <translation id="2798347533012571708">আপডে’টসমূহ ৰাখক</translation>
 <translation id="2799162042226656283">আপোনাৰ Chrome</translation>
 <translation id="2799223571221894425">পুনৰ লঞ্চ কৰক</translation>
-<translation id="2800309299477632167">কাষ্টম কীমেপ</translation>
 <translation id="2800760947029405028">ছবি আপল’ড কৰক</translation>
 <translation id="2800996978423439835">আপোনাৰ আটাইবোৰ ডিভাইচত নিজৰ বুকমাৰ্ক আৰু আন বহুতো সুবিধা লাভ কৰক</translation>
 <translation id="2801134910297796778"><ph name="EMAIL" />ত ছাইন ইন কৰা আছে</translation>
@@ -4766,7 +4765,6 @@
 <translation id="4289540628985791613">ৰূপৰেখা</translation>
 <translation id="428963538941819373">এই ছাইটসমূহে আপুনি <ph name="HOST" /> ব্ৰাউজ কৰাৰ সময়ত আপোনাৰ বিষয়ে ছেভ কৰা তথ্য ব্যৱহাৰ কৰিব পাৰে</translation>
 <translation id="4289732974614035569">পিন বাছনি কৰক</translation>
-<translation id="4290526909608432059">শীঘ্ৰেই Chromeৰ এপ্‌সমূহৰ সমৰ্থন বন্ধ হ’ব। আপোনাৰ বিকল্পসমূহৰ বিষয়ে জানিবলৈ এপ্‌ বিকাশকৰ্তা বা আপোনাৰ IT সহায়ক দলৰ সৈতে যোগাযোগ কৰক।</translation>
 <translation id="4290791284969893584">এখন পৃষ্ঠা বন্ধ কৰাৰ পাছত আপুনি আৰম্ভ কৰা কাৰ্যসমূহ সম্পূৰ্ণ নহ'বও পাৰে</translation>
 <translation id="4290826901752066702"><ph name="NUM" /> গৰাকী সদস্য</translation>
 <translation id="4290898381118933198">পৃষ্ঠাসমূহৰ মাজত নেভিগে’ট কৰিবলৈ ছোৱাইপ কৰক</translation>
@@ -7634,6 +7632,7 @@
 <translation id="6365069501305898914">ফেচবুক</translation>
 <translation id="6365411474437319296">পৰিয়াল আৰু বন্ধুবর্গক যোগ কৰক</translation>
 <translation id="6367097275976877956">আপুনি ChromeOSৰ বাবে বিল্ট-ইন স্ক্ৰীন ৰীডাৰ, ChromeVox সক্ৰিয় কৰিবলৈ বিচাৰেনে? যদি বিচাৰে, স্পেচ বাৰডালত টিপক।</translation>
+<translation id="6367196786591004737">প্ৰৱিষ্টি মচক</translation>
 <translation id="6367396429435748845">মাউছ কীসমূহ পজ কৰিবলৈ আৰু পুনৰ আৰম্ভ কৰিবলৈ <ph name="ALT" /> + <ph name="LAUNCHER" /> + <ph name="NUM_4" /> টিপক</translation>
 <translation id="6367985768157257101">Nearby Shareৰ সৈতে শ্বেয়াৰ কৰাৰ সুবিধাটোৰ জৰিয়তে গ্ৰহণ কৰিবনে?</translation>
 <translation id="6368157733310917710">ঠিকনা আৰু আন বহুতো</translation>
@@ -7969,7 +7968,6 @@
 <translation id="6610002944194042868">অনুবাদৰ বিকল্প</translation>
 <translation id="6610064275805055636">পোনপটীয়াকৈ বিতৰণ কৰা ৱেব এপ্‌ পৰিচালনা কৰক</translation>
 <translation id="6611432349566876829"><ph name="NUM" /> টা টেব</translation>
-<translation id="6611972847767394631">ইয়াত আপোনাৰ টেবসমূহ বিচাৰক</translation>
 <translation id="661266467055912436">আপোনাৰ লগতে ৱেবত থকা প্ৰত্যেকজনৰ বাবে সুৰক্ষা উন্নত কৰে।</translation>
 <translation id="6613267708691765962">মালৱেৰৰ বাবে স্কেন কৰি থকা হৈছে...</translation>
 <translation id="6615455863669487791">মোক দেখুৱাওক</translation>
@@ -8296,7 +8294,6 @@
 <translation id="6831043979455480757">Translate</translation>
 <translation id="6832218595502288407">বাওঁফালে শাৰীবিন্যাস কৰক</translation>
 <translation id="6832815922179448173">{MULTI_GROUP_TAB_COUNT,plural, =0{টেবটো আঁতৰাই গোটটো মচিবনে?}=1{টেবসমূহ আঁতৰাই গোটটো মচিবনে?}one{টেবসমূহ আঁতৰাই গোটসমূহ মচিবনে?}other{টেবসমূহ আঁতৰাই গোটসমূহ মচিবনে?}}</translation>
-<translation id="6833103209700200188">ফুটাৰ</translation>
 <translation id="6833479554815567477"><ph name="GROUP_NAME" /> গোটৰ পৰা টেবটো আঁতৰোৱা হ'ল - <ph name="GROUP_CONTENTS" /></translation>
 <translation id="6833753236242482566">সন্তুলিত (চুপাৰিছ কৰা)</translation>
 <translation id="6835762382653651563">অনুগ্ৰহ কৰি আপোনাৰ <ph name="DEVICE_TYPE" /> আপডে’ট কৰিবলৈ ইন্টাৰনেটৰ সৈতে সংযোগ কৰক।</translation>
@@ -10002,6 +9999,7 @@
 <translation id="8037801708772278989">এইমাত্ৰ পৰীক্ষা কৰা হৈছে</translation>
 <translation id="8038111231936746805">ডিফ’ল্ট</translation>
 <translation id="8039151841428107077">{NUM_OF_FILES,plural, =1{১ টা ফাইল <ph name="CLOUD_PROVIDER" />লৈ প্ৰতিলিপি কৰি থকা হৈছে}one{{NUM_OF_FILES} টা ফাইল<ph name="CLOUD_PROVIDER" />লৈ প্ৰতিলিপি কৰি থকা হৈছে}other{{NUM_OF_FILES} টা ফাইল<ph name="CLOUD_PROVIDER" />লৈ প্ৰতিলিপি কৰি থকা হৈছে}}</translation>
+<translation id="8039525676147630657">আপোনাৰ ChromeOSৰ সংস্কৰণটো আপডে’ট কৰাৰ পাছত এই Chromeৰ এপ্‌টোৱে কাম নকৰা হ’ব। আপুনি ৰাখিবলৈ বিচৰা যিকোনো ডেটা ছেভ কৰক। আপোনাৰ বিকল্পসমূহৰ বিষয়ে জানিবলৈ এপ্‌টোৰ বিকাশকৰ্তা বা আপোনাৰ আইটি সহায়ক দলৰ সৈতে যোগাযোগ কৰক।</translation>
 <translation id="8041089156583427627">মতামত পঠিয়াওক</translation>
 <translation id="8041093619605951337">সুখী</translation>
 <translation id="8041267120753677077">আপোনাৰ ফ’নৰ এপ্‌সমূহ ষ্ট্ৰীম কৰক</translation>
@@ -10630,6 +10628,7 @@
 <translation id="8472623782143987204">হাৰ্ডৱেৰ-সমৰ্থিত</translation>
 <translation id="8473540203671727883">মাউছৰ তলত থকা পাঠ কৈ শুনাওক</translation>
 <translation id="8473863474539038330">ঠিকনা আৰু অধিক</translation>
+<translation id="847433688444405067">বিভিন্ন ডিভাইচত ব্ৰাউজ কৰক</translation>
 <translation id="8474378002946546633">জাননীৰ অনুমতি দিয়ক</translation>
 <translation id="8474561048882755118">আপোনাক একে ধৰণৰ প্ৰ’ডাক্ট ছাইড-বাই-ছাইড চোৱাত আৰু আপোনাৰ বাবে গুৰুত্বপূৰ্ণ সবিশেষসমূহ সহজে তুলনা কৰাত সহায় কৰে</translation>
 <translation id="8475313423285172237">আপোনাৰ কম্পিউটাৰৰ অন্য প্ৰ'গ্ৰেম যোগ কৰা এক্সটেনশ্বনে Chrome কার্যপ্ৰণালী সলনি কৰিব পাৰে।</translation>

@@ -48,6 +48,10 @@ CalcProvider::CalcProvider() {
           .Get();
 }
 
+BASE_FEATURE(ContextualSearch::kContextualSuggestionsAblateOthersWhenPresent,
+             "ContextualSuggestionsAblateOthersWhenPresent",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Meta-feature that enables/disables the other related features if set.
 // When not overridden, each feature is enabled/disabled separately.
 BASE_FEATURE(ContextualSearch::kOmniboxContextualSuggestions,
@@ -98,6 +102,10 @@ BASE_FEATURE(ContextualSearch::kSendPageTitleSuggestParam,
              "SendPageTitleSuggestParam",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(ContextualSearch::kContextualSearchAlternativeActionLabel,
+             "ContextualSearchAlternativeActionLabel",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 ContextualSearch::ContextualSearch() {
   // Meta-feature turns on/off other features, but only if it's overridden by
   // the user. If not then each feature is controlled separately.
@@ -107,6 +115,9 @@ ContextualSearch::ContextualSearch() {
     return meta_state.value_or(base::FeatureList::IsEnabled(feature));
   };
 
+  contextual_suggestions_ablate_others_when_present =
+      base::FeatureList::IsEnabled(
+          kContextualSuggestionsAblateOthersWhenPresent);
   starter_pack_page = feature_enabled(kStarterPackPage);
   contextual_zero_suggest_lens_fulfillment =
       feature_enabled(kContextualZeroSuggestLensFulfillment);
@@ -129,6 +140,12 @@ ContextualSearch::ContextualSearch() {
   open_lens_action_uses_thumbnail = base::FeatureList::IsEnabled(
       kContextualSearchOpenLensActionUsesThumbnail);
   send_page_title_suggest_param = feature_enabled(kSendPageTitleSuggestParam);
+  alternative_action_label =
+      base::FeatureParam<int>(&kContextualSearchAlternativeActionLabel,
+                              "LabelIndex", 0)
+          .Get();
+  show_open_lens_action =
+      feature_enabled(kOmniboxContextualSearchOnFocusSuggestions);
 }
 
 ContextualSearch::ContextualSearch(const ContextualSearch&) = default;
@@ -137,7 +154,7 @@ ContextualSearch& ContextualSearch::operator=(const ContextualSearch&) =
 ContextualSearch::~ContextualSearch() = default;
 
 bool ContextualSearch::IsContextualSearchEnabled() const {
-  return contextual_zps_limit > 0;
+  return show_open_lens_action;
 }
 
 bool ContextualSearch::IsEnabledWithPrefetch() const {
@@ -155,10 +172,6 @@ DocumentProvider::DocumentProvider() {
   min_query_length =
       base::FeatureParam<int>(&omnibox::kDocumentProvider,
                               "DocumentProviderMinQueryLength", 4)
-          .Get();
-  ignore_when_debouncing =
-      base::FeatureParam<bool>(&omnibox::kDocumentProvider,
-                               "DocumentProviderIgnoreWhenDebouncing", false)
           .Get();
   scope_backoff_to_profile =
       base::FeatureParam<bool>(&omnibox::kDocumentProvider,

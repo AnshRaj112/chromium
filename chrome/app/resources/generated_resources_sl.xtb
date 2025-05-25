@@ -2655,7 +2655,6 @@ Nastavitve tega računa je mogoče upravljati z namestitvijo aplikacije Family L
 <translation id="2798347533012571708">Ohrani posodobitve</translation>
 <translation id="2799162042226656283">Vaš Chrome</translation>
 <translation id="2799223571221894425">Vnovičen zagon</translation>
-<translation id="2800309299477632167">Razporeditev tipk po meri</translation>
 <translation id="2800760947029405028">Naloži sliko</translation>
 <translation id="2800996978423439835">Dostop do zaznamkov in drugih podatkov v vseh vaših napravah</translation>
 <translation id="2801134910297796778">Prijavljen v račun <ph name="EMAIL" /></translation>
@@ -4772,7 +4771,6 @@ Domena <ph name="DOMAIN" /> zahteva, da je pametna kartica vstavljena.</translat
 <translation id="4289540628985791613">Pregled</translation>
 <translation id="428963538941819373">Ta spletna mesta lahko uporabljajo podatke, ki so jih shranila o vas med brskanjem po <ph name="HOST" /></translation>
 <translation id="4289732974614035569">Izbira kode PIN</translation>
-<translation id="4290526909608432059">Podpora za aplikacije za Chrome bo kmalu ukinjena. Če želite izvedeti, katere možnosti imate, se obrnite na razvijalca aplikacije ali skupino za podporo za IT.</translation>
 <translation id="4290791284969893584">Ko zaprete stran, se začeta opravila morda ne bodo dokončala.</translation>
 <translation id="4290826901752066702"><ph name="NUM" /> član</translation>
 <translation id="4290898381118933198">Povlecite, če se želite pomikati med stranmi</translation>
@@ -7642,6 +7640,7 @@ Domena <ph name="DOMAIN" /> zahteva, da je pametna kartica vstavljena.</translat
 <translation id="6365069501305898914">Facebook</translation>
 <translation id="6365411474437319296">Dodajte sorodnike in prijatelje</translation>
 <translation id="6367097275976877956">Ali želite aktivirati ChromeVox, vgrajeni bralnik zaslona za Chrome OS? Če ga želite, pritisnite preslednico.</translation>
+<translation id="6367196786591004737">Izbriši vnos</translation>
 <translation id="6367396429435748845">Pritisnite <ph name="ALT" /> + <ph name="LAUNCHER" /> + <ph name="NUM_4" /> za začasno zaustavitev in nadaljevanje uporabe tipk za miško</translation>
 <translation id="6367985768157257101">Želite sprejeti s funkcijo Deljenje v bližini?</translation>
 <translation id="6368157733310917710">&amp;Naslovi in drugo</translation>
@@ -7981,7 +7980,6 @@ Imate še # ogroženih gesel. Googlov upravitelj gesel priporoča, da takoj prev
 <translation id="6610002944194042868">Možnosti prevajanja</translation>
 <translation id="6610064275805055636">Upravljanje izoliranih spletnih aplikacij</translation>
 <translation id="6611432349566876829"><ph name="NUM" /> zavihek</translation>
-<translation id="6611972847767394631">Poiščite svoje zavihke tukaj</translation>
 <translation id="661266467055912436">Izboljšuje varnost za vas in vse druge v spletu.</translation>
 <translation id="6613267708691765962">Iskanje zlonamerne programske opreme …</translation>
 <translation id="6615455863669487791">Pokaži mi</translation>
@@ -8308,7 +8306,6 @@ Imate še # ogroženih gesel. Googlov upravitelj gesel priporoča, da takoj prev
 <translation id="6831043979455480757">Prevedi</translation>
 <translation id="6832218595502288407">Poravnaj levo</translation>
 <translation id="6832815922179448173">{MULTI_GROUP_TAB_COUNT,plural, =0{Želite odstraniti zavihek in izbrisati skupino?}=1{Želite odstraniti zavihke in izbrisati skupino?}one{Želite odstraniti zavihke in izbrisati skupine?}two{Želite odstraniti zavihke in izbrisati skupine?}few{Želite odstraniti zavihke in izbrisati skupine?}other{Želite odstraniti zavihke in izbrisati skupine?}}</translation>
-<translation id="6833103209700200188">Noga</translation>
 <translation id="6833479554815567477">Zavihek je odstranjen iz skupine <ph name="GROUP_NAME" /> – <ph name="GROUP_CONTENTS" />.</translation>
 <translation id="6833753236242482566">Uravnoteženo (priporočeno)</translation>
 <translation id="6835762382653651563">Če želite posodobiti napravo <ph name="DEVICE_TYPE" />, vzpostavite internetno povezavo.</translation>
@@ -10644,6 +10641,7 @@ Datoteko s ključem shranite na varnem. Potrebovali jo boste za izdelavo novih r
 <translation id="8472623782143987204">podprto s strojno opremo</translation>
 <translation id="8473540203671727883">Izgovori besedilo pod miško</translation>
 <translation id="8473863474539038330">Naslovi in drugo</translation>
+<translation id="847433688444405067">Brskanje po vseh napravah</translation>
 <translation id="8474378002946546633">Omogoči obvestila</translation>
 <translation id="8474561048882755118">Pomaga vam, da si vzporedno ogledate podobne izdelke in preprosto primerjate podrobnosti, ki so za vas pomembne</translation>
 <translation id="8475313423285172237">Drug program v računalniku je dodal razširitev, ki lahko spremeni način delovanja Chroma.</translation>

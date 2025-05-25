@@ -142,7 +142,6 @@
 #include "chrome/browser/profiling_host/chrome_browser_main_extra_parts_profiling.h"
 #include "chrome/browser/renderer_host/chrome_navigation_ui_data.h"
 #include "chrome/browser/renderer_preferences_util.h"
-#include "chrome/browser/request_header_integrity/buildflags.h"
 #include "chrome/browser/safe_browsing/url_checker_delegate_impl.h"
 #include "chrome/browser/search/search.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
@@ -204,6 +203,7 @@
 #include "chrome/common/profiler/process_type.h"
 #include "chrome/common/profiler/thread_profiler_configuration.h"
 #include "chrome/common/renderer_configuration.mojom.h"
+#include "chrome/common/request_header_integrity/buildflags.h"
 #include "chrome/common/secure_origin_allowlist.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/common/webui_url_constants.h"
@@ -654,10 +654,6 @@
 #include "services/video_effects/public/mojom/video_effects_processor.mojom-forward.h"
 #endif  // BUILDFLAG(ENABLE_VIDEO_EFFECTS)
 
-#if BUILDFLAG(ENABLE_REQUEST_HEADER_INTEGRITY)
-#include "chrome/browser/request_header_integrity/request_header_integrity_url_loader_throttle.h"  // nogncheck crbug.com/1125897
-#endif
-
 #if BUILDFLAG(SAFE_BROWSING_AVAILABLE)
 #include "chrome/browser/enterprise/connectors/connectors_service.h"
 #include "chrome/browser/safe_browsing/chrome_enterprise_url_lookup_service_factory.h"
@@ -730,6 +726,10 @@
 #include "chrome/browser/on_device_translation/component_manager.h"
 #include "chrome/browser/on_device_translation/pref_names.h"
 #endif  // BUILDFLAG(ENABLE_ON_DEVICE_TRANSLATION)
+
+#if BUILDFLAG(ENABLE_REQUEST_HEADER_INTEGRITY)
+#include "chrome/common/request_header_integrity/request_header_integrity_url_loader_throttle.h"  // nogncheck crbug.com/1125897
+#endif
 
 #include "base/win/windows_h_disallowed.h"
 
@@ -1508,6 +1508,7 @@ void ChromeContentBrowserClient::RegisterProfilePrefs(
                                 true);
   registry->RegisterBooleanPref(
       prefs::kClearWindowNameForNewBrowsingContextGroup, true);
+  registry->RegisterBooleanPref(prefs::kPrefetchWithServiceWorkerEnabled, true);
 }
 
 // static
@@ -1980,14 +1981,15 @@ bool ChromeContentBrowserClient::ShouldAllowProcessPerSiteForMultipleMainFrames(
   return true;
 }
 
-std::optional<
-    content::ContentBrowserClient::SpareProcessRefusedByEmbedderReason>
-ChromeContentBrowserClient::ShouldUseSpareRenderProcessHost(
+bool ChromeContentBrowserClient::ShouldUseSpareRenderProcessHost(
     content::BrowserContext* browser_context,
-    const GURL& site_url) {
+    const GURL& site_url,
+    std::optional<SpareProcessRefusedByEmbedderReason>& refused_reason) {
+  refused_reason = std::nullopt;
   Profile* profile = Profile::FromBrowserContext(browser_context);
   if (!profile) {
-    return SpareProcessRefusedByEmbedderReason::NoProfile;
+    refused_reason = SpareProcessRefusedByEmbedderReason::NoProfile;
+    return false;
   }
 
 #if !BUILDFLAG(IS_ANDROID)
@@ -1999,17 +2001,20 @@ ChromeContentBrowserClient::ShouldUseSpareRenderProcessHost(
     // The NTP page chrome://new-tab-page and chrome://new-tab-page-third-party
     // are using WebUI and will not use instant renderer.
     // The only usecase is chrome-search:// URLs.
-    return SpareProcessRefusedByEmbedderReason::InstantRendererForNewTabPage;
+    refused_reason =
+        SpareProcessRefusedByEmbedderReason::InstantRendererForNewTabPage;
+    return false;
   }
 #endif
 
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   if (!ChromeContentBrowserClientExtensionsPart::
           ShouldUseSpareRenderProcessHost(profile, site_url)) {
-    return SpareProcessRefusedByEmbedderReason::ExtensionProcess;
+    refused_reason = SpareProcessRefusedByEmbedderReason::ExtensionProcess;
+    return false;
   }
 #endif
-  return std::nullopt;
+  return true;
 }
 
 bool ChromeContentBrowserClient::DoesSiteRequireDedicatedProcess(
@@ -3661,6 +3666,13 @@ bool ChromeContentBrowserClient::IsFullCookieAccessAllowed(
       url, storage_key.ToNetSiteForCookies(),
       url::Origin::Create(storage_key.top_level_site().GetURL()), overrides,
       storage_key.ToCookiePartitionKey());
+}
+
+bool ChromeContentBrowserClient::IsPrefetchWithServiceWorkerAllowed(
+    content::BrowserContext* browser_context) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  Profile* profile = Profile::FromBrowserContext(browser_context);
+  return profile->GetPrefs()->GetBoolean(prefs::kPrefetchWithServiceWorkerEnabled);
 }
 
 void ChromeContentBrowserClient::GrantCookieAccessDueToHeuristic(

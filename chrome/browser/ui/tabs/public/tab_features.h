@@ -26,6 +26,7 @@ class PwaInstallPageActionController;
 class ReadAnythingSidePanelController;
 class SidePanelRegistry;
 class TabResourceUsageTabHelper;
+class TabUIHelper;
 class TranslatePageActionController;
 
 namespace commerce {
@@ -100,10 +101,6 @@ class EmbedderTabObserver;
 namespace tab_groups {
 class CollaborationMessagingTabData;
 }  // namespace tab_groups
-
-namespace new_tab_footer {
-class NewTabFooterController;
-}  // namespace new_tab_footer
 
 namespace tabs {
 
@@ -231,10 +228,6 @@ class TabFeatures {
     return inactive_window_mouse_event_controller_.get();
   }
 
-  new_tab_footer::NewTabFooterController* new_tab_footer_controller() {
-    return new_tab_footer_controller_.get();
-  }
-
   TabResourceUsageTabHelper* resource_usage_helper() {
     return resource_usage_helper_.get();
   }
@@ -243,10 +236,15 @@ class TabFeatures {
     return memory_saver_chip_helper_.get();
   }
 
+  TabUIHelper* tab_ui_helper() { return tab_ui_helper_.get(); }
+
   // Note: Temporary until there is a more uniform way to swap out features for
   // testing.
   TabResourceUsageTabHelper* SetResourceUsageHelperForTesting(
       std::unique_ptr<TabResourceUsageTabHelper> resource_usage_helper);
+
+  TabUIHelper* SetTabUIHelperForTesting(
+      std::unique_ptr<TabUIHelper> tab_ui_helper);
 
 #if BUILDFLAG(ENABLE_GLIC)
   glic::GlicPageContextEligibilityObserver*
@@ -390,14 +388,13 @@ class TabFeatures {
   std::unique_ptr<FromGWSNavigationAndKeepAliveRequestObserver>
       from_gws_navigation_and_keep_alive_request_observer_;
 
-  std::unique_ptr<new_tab_footer::NewTabFooterController>
-      new_tab_footer_controller_;
-
   std::unique_ptr<TabResourceUsageTabHelper> resource_usage_helper_;
 
   std::unique_ptr<MemorySaverChipTabHelper> memory_saver_chip_helper_;
 
   std::unique_ptr<TabAlertController> tab_alert_controller_;
+
+  std::unique_ptr<TabUIHelper> tab_ui_helper_;
 
   // Must be the last member.
   base::WeakPtrFactory<TabFeatures> weak_factory_{this};

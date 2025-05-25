@@ -55,9 +55,10 @@ public class ClipDrawableProgressBar extends ImageView {
     @Nullable private ColorDrawable mForegroundColorDrawable;
     @Nullable private GradientDrawable mForegroundGradientDrawable;
     @Nullable private GradientDrawable mBackgroundGradientDrawable;
+    @Nullable private GradientDrawable mEndCapCircleDrawable;
     private int mForegroundColor;
     private int mBackgroundColor;
-    protected int mProgressBarHeight;
+    protected final int mProgressBarHeight;
     private float mProgress;
     private int mDesiredVisibility;
 
@@ -72,12 +73,18 @@ public class ClipDrawableProgressBar extends ImageView {
     public ClipDrawableProgressBar(Context context, AttributeSet attrs) {
         super(context, attrs);
 
+        setScaleType(ScaleType.FIT_XY); // Ensure the drawable fills the ImageView
         mDesiredVisibility = getVisibility();
 
         mForegroundColor = SemanticColorUtils.getProgressBarForeground(getContext());
         mBackgroundColor = getContext().getColor(R.color.progress_bar_bg_color_list);
-        mProgressBarHeight = getResources().getDimensionPixelSize(
-                R.dimen.toolbar_progress_bar_height);
+        if (useGradientDrawable()) {
+            mProgressBarHeight = getResources().getDimensionPixelSize(
+                    R.dimen.toolbar_progress_bar_increased_height);
+        } else {
+            mProgressBarHeight = getResources().getDimensionPixelSize(
+                    R.dimen.toolbar_progress_bar_height);
+        }
         initializeDrawables();
         setBackgroundColor(mBackgroundColor);
     }
@@ -91,27 +98,38 @@ public class ClipDrawableProgressBar extends ImageView {
     private void initializeDrawables() {
         if (useGradientDrawable()) {
             mForegroundGradientDrawable = createGradientDrawable(mForegroundColor,
-                    mProgressBarHeight / 2);
-            ClipDrawable foregroundClipDrawable =
-                    new ClipDrawable(mForegroundGradientDrawable, Gravity.START,
-                            ClipDrawable.HORIZONTAL);
+                    GradientDrawable.RECTANGLE);
+            mForegroundGradientDrawable.setCornerRadius((float) mProgressBarHeight / 2);
+            ClipDrawable foregroundClipDrawable = new ClipDrawable(mForegroundGradientDrawable,
+                    Gravity.START, ClipDrawable.HORIZONTAL);
 
             mBackgroundGradientDrawable = createGradientDrawable(mBackgroundColor,
-                    mProgressBarHeight / 2);
+                    GradientDrawable.RECTANGLE);
+            mBackgroundGradientDrawable.setCornerRadius((float) mProgressBarHeight / 2);
             ClipDrawable backgroundClipDrawable = new ClipDrawable(
                     mBackgroundGradientDrawable, Gravity.END, ClipDrawable.HORIZONTAL);
             // Background will be fully visible.
             backgroundClipDrawable.setLevel(CLIP_DRAWABLE_MAX);
 
-            // A layerDrawable with the 2 moving components, foreground and background.
-            Drawable[] layers = {foregroundClipDrawable, backgroundClipDrawable};
+            // Create the end circular stop indicator
+            mEndCapCircleDrawable = createGradientDrawable(mForegroundColor, GradientDrawable.OVAL);
+            mEndCapCircleDrawable.setSize(mProgressBarHeight, mProgressBarHeight);
 
-            setImageDrawable(new LayerDrawable(layers));
+            // A layerDrawable with the 2 moving components, foreground and background, and the
+            // end stop indicator. Layers are drawn in the order they are added to the array,
+            // with the last one appearing on top.
+            Drawable[] layers =
+                    {foregroundClipDrawable, backgroundClipDrawable, mEndCapCircleDrawable};
+            LayerDrawable layerDrawable = new LayerDrawable(layers);
+
+            // The circle (layer 2) will be drawn at the right end of the progress bar.
+            layerDrawable.setLayerGravity(2, Gravity.END | Gravity.CENTER_VERTICAL);
+
+            setImageDrawable(layerDrawable);
         } else {
             mForegroundColorDrawable = new ColorDrawable(mForegroundColor);
-            setImageDrawable(
-                    new ClipDrawable(mForegroundColorDrawable, Gravity.START,
-                            ClipDrawable.HORIZONTAL));
+            setImageDrawable(new ClipDrawable(mForegroundColorDrawable, Gravity.START,
+                    ClipDrawable.HORIZONTAL));
         }
     }
 
@@ -121,11 +139,10 @@ public class ClipDrawableProgressBar extends ImageView {
      * @param color The color to set for the drawable.
      * @return A new {@link GradientDrawable} instance.
      */
-    private static GradientDrawable createGradientDrawable(int color, int cornerRadius) {
+    private static GradientDrawable createGradientDrawable(int color, int shape) {
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.RECTANGLE);
+        drawable.setShape(shape);
         drawable.setColor(color);
-        drawable.setCornerRadius(cornerRadius);
         return drawable;
     }
 
@@ -292,8 +309,11 @@ public class ClipDrawableProgressBar extends ImageView {
      * @param color The new color of the progress bar foreground.
      */
     public void setForegroundColor(int color) {
-        if (useGradientDrawable() && mForegroundGradientDrawable != null) {
+        if (useGradientDrawable()) {
+            assert mForegroundGradientDrawable != null;
+            assert mEndCapCircleDrawable != null;
             mForegroundGradientDrawable.setColor(color);
+            mEndCapCircleDrawable.setColor(color);
         } else {
             assert mForegroundColorDrawable != null;
             mForegroundColorDrawable.setColor(color);

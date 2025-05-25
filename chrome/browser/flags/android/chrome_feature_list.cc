@@ -281,6 +281,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kDisableListTabSwitcher,
     &kDrawKeyNativeEdgeToEdge,
     &kEdgeToEdgeBottomChin,
+    &kEdgeToEdgeDebugging,
     &kEdgeToEdgeEverywhere,
     &kEdgeToEdgeMonitorConfigurations,
     &kEdgeToEdgeSafeAreaConstraint,
@@ -409,7 +410,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &privacy_sandbox::kFingerprintingProtectionUx,
     &privacy_sandbox::kIpProtectionUx,
     &privacy_sandbox::kPrivacySandboxActivityTypeStorage,
-    &privacy_sandbox::kPrivacySandboxNoticeActionDebouncingAndroid,
     &privacy_sandbox::kPrivacySandboxAdsApiUxEnhancements,
     &privacy_sandbox::kPrivacySandboxAdsNoticeCCT,
     &privacy_sandbox::kPrivacySandboxRelatedWebsiteSetsUi,
@@ -902,9 +902,13 @@ BASE_FEATURE(kEdgeToEdgeBottomChin,
              "EdgeToEdgeBottomChin",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kEdgeToEdgeDebugging,
+             "EdgeToEdgeDebugging",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 BASE_FEATURE(kEdgeToEdgeMonitorConfigurations,
              "EdgeToEdgeMonitorConfigurations",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEdgeToEdgeEverywhere,
              "EdgeToEdgeEverywhere",
@@ -1230,7 +1234,7 @@ BASE_FEATURE(kTabStateFlatBuffer,
 
 BASE_FEATURE(kTabStripContextMenuAndroid,
              "TabStripContextMenuAndroid",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabStripDensityChangeAndroid,
              "TabStripDensityChangeAndroid",

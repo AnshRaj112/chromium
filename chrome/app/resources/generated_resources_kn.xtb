@@ -80,6 +80,7 @@
 <translation id="1049743911850919806">ಅದೃಶ್ಯ</translation>
 <translation id="1049795001945932310">&amp;ಭಾಷೆ ಸೆಟ್ಟಿಂಗ್‌ಗಳು</translation>
 <translation id="1050693411695664090">ಕಳಪೆ</translation>
+<translation id="1053226848101751430">ನಮೂದನ್ನು ಅಳಿಸಲಾಗಿದೆ</translation>
 <translation id="1053898984916097744">ಹೊಸದನ್ನು ಪ್ರಾರಂಭಿಸಿ ಅಥವಾ ಪ್ರಕ್ರಿಯೆಯಲ್ಲಿ ಸಹಾಯ ಪಡೆಯಿರಿ.</translation>
 <translation id="1054048317165655285">ನಿಮ್ಮ ಫೋನ್‌ನಲ್ಲಿ ಸೆಟಪ್ ಅನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ</translation>
 <translation id="1054153489933238809">ಹೊಸ ಟ್ಯಾಬ್‌ನಲ್ಲಿ ಮೂಲ &amp;ಚಿತ್ರವನ್ನು ತೆರೆಯಿರಿ</translation>
@@ -2243,6 +2244,7 @@
 <translation id="2519250377986324805">ಹೇಗೆಂದು ನೋಡಿ</translation>
 <translation id="2519517390894391510">ಪ್ರಮಾಣಪತ್ರ ಪ್ರೊಫೈಲ್ ಹೆಸರು</translation>
 <translation id="2520644704042891903">ಲಭ್ಯವಿರುವ ಸಾಕೆಟ್‌ಗಾಗಿ ಕಾಯಲಾಗುತ್ತಿದೆ...</translation>
+<translation id="2520961587246779103">ಸ್ಪ್ಲಿಟ್ ವೀಕ್ಷಣೆಗೆ ಹೆಚ್ಚಿನ ಆಯ್ಕೆಗಳು</translation>
 <translation id="2521427645491031107">ಆ್ಯಪ್‌ಗಳ ಸಿಂಕ್ ಅನ್ನು ಸಾಧನದ ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಸೆಟ್‌ ಮಾಡಲಾಗಿದೆ</translation>
 <translation id="2521835766824839541">ಹಿಂದಿನ ಟ್ರ್ಯಾಕ್</translation>
 <translation id="2521854691574443804">ನಿಮ್ಮ ಸಂಸ್ಥೆಯ ಭದ್ರತಾ ನೀತಿಗಳ ಜೊತೆಗೆ <ph name="FILE_NAME" /> ಅನ್ನು ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ...</translation>
@@ -2645,7 +2647,6 @@
 <translation id="2798347533012571708">ಅಪ್‌ಡೇಟ್‌ಗಳನ್ನು ಇರಿಸಿ</translation>
 <translation id="2799162042226656283">ನಿಮ್ಮ Chrome</translation>
 <translation id="2799223571221894425">ಮರುಪ್ರಾರಂಭಿಸು</translation>
-<translation id="2800309299477632167">ಕಸ್ಟಮ್ ಕೀಮ್ಯಾಪ್</translation>
 <translation id="2800760947029405028">ಒಂದು ಚಿತ್ರವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ</translation>
 <translation id="2800996978423439835">ನಿಮ್ಮ ಎಲ್ಲಾ ಸಾಧನಗಳಲ್ಲಿ ನಿಮ್ಮದೇ ಆದ ಬುಕ್‌ಮಾರ್ಕ್‌ಗಳು ಹಾಗೂ ಇತ್ಯಾದಿಗಳನ್ನು ಪಡೆಯಿರಿ</translation>
 <translation id="2801134910297796778"><ph name="EMAIL" /> ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಲಾಗಿದೆ</translation>
@@ -3189,6 +3190,7 @@
 <translation id="3202578601642193415">ನವನವೀನ</translation>
 <translation id="3204648577100496185">ಈ ಆ್ಯಪ್ ಜೊತೆಗೆ ಸಂಯೋಜಿತವಾಗಿರುವ ಡೇಟಾವನ್ನು ಈ ಸಾಧನದಿಂದ ತೆಗೆದುಹಾಕಲಾಗುತ್ತದೆ</translation>
 <translation id="3204717934117444051">ಈ ಸಾಧನದಲ್ಲಿ ಮಾತ್ರ ಸೇವ್ ಮಾಡಲಾದ ಡೇಟಾ ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ ಪ್ರೊಫೈಲ್‌ನಲ್ಲಿ ಸೇವ್ ಆಗುತ್ತದೆ. ಇದು <ph name="EMAIL" /> ಗೆ ಸಿಂಕ್ ಆಗುವುದಿಲ್ಲ</translation>
+<translation id="3206289903841621620"><ph name="NUMBER" /> ಬಳಕೆದಾರರ ನಿಘಂಟು</translation>
 <translation id="3207344462385471911">ನಿಮ್ಮ ಇತ್ತೀಚಿನ ಚಟುವಟಿಕೆಯ ಆಧಾರದ ಮೇಲೆ ನಿಮಗೆ ಆಸಕ್ತಿಯಿರುವ ಸೂಚಿಸಿದ ಹುಡುಕಾಟಗಳು ಮತ್ತು ಶಾಪಿಂಗ್ ರಿಯಾಯಿತಿಗಳನ್ನು ನೀವು ನೋಡುತ್ತಿರುವಿರಿ.
         <ph name="BREAK" />
         <ph name="BREAK" />
@@ -4761,7 +4763,6 @@
 <translation id="4289540628985791613">ಅವಲೋಕನ</translation>
 <translation id="428963538941819373">ನೀವು <ph name="HOST" /> ಬ್ರೌಸ್ ಮಾಡಿದಂತೆಲ್ಲ ಈ ಸೈಟ್‌ಗಳು ನಿಮ್ಮ ಬಗ್ಗೆ ಸೇವ್ ಮಾಡಿದ ಮಾಹಿತಿಯನ್ನು ಬಳಸಬಹುದು</translation>
 <translation id="4289732974614035569">ಪಿನ್‌ ಆಯ್ಕೆ ಮಾಡಿ</translation>
-<translation id="4290526909608432059">Chrome ಆ್ಯಪ್‌ಗಳಿಗೆ ಬೆಂಬಲ ಶೀಘ್ರದಲ್ಲೇ ಕೊನೆಗೊಳ್ಳಲಿದೆ. ನಿಮ್ಮ ಆಯ್ಕೆಗಳ ಕುರಿತು ತಿಳಿದುಕೊಳ್ಳಲು, ಆ್ಯಪ್ ಡೆವಲಪರ್ ಅಥವಾ ನಿಮ್ಮ ಐಟಿ ಬೆಂಬಲ ತಂಡವನ್ನು ಸಂಪರ್ಕಿಸಿ.</translation>
 <translation id="4290791284969893584">ಪುಟವನ್ನು ಮುಚ್ಚಿದ ನಂತರ, ನೀವು ಪ್ರಾರಂಭಿಸಿದ ಕಾರ್ಯಗಳು ಪೂರ್ಣಗೊಳ್ಳದಿರಬಹುದು</translation>
 <translation id="4290826901752066702"><ph name="NUM" /> ಸದಸ್ಯರು</translation>
 <translation id="4290898381118933198">ಪುಟಗಳ ನಡುವೆ ನ್ಯಾವಿಗೇಟ್ ಮಾಡಲು ಸ್ವೈಪ್ ಮಾಡಿ</translation>
@@ -7629,6 +7630,7 @@
 <translation id="6365069501305898914">Facebook</translation>
 <translation id="6365411474437319296">ಸ್ನೇಹಿತರು ಮತ್ತು ಕುಟುಂಬದವರನ್ನು ಸೇರಿಸಿ</translation>
 <translation id="6367097275976877956">ChromeVox, ChromeOS ಗಾಗಿ ಅಂತರ್ನಿರ್ಮಿತ ಸ್ಕ್ರೀನ್ ರೀಡರ್ ಅನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಲು ನೀವು ಬಯಸುವಿರಾ? ಹಾಗಿದ್ದರೆ, ಸ್ಪೇಸ್ ಬಾರ್ ಅನ್ನು ಒತ್ತಿ.</translation>
+<translation id="6367196786591004737">ನಮೂದನ್ನು ಅಳಿಸಿ</translation>
 <translation id="6367396429435748845">ಮೌಸ್ ಕೀಗಳನ್ನು ವಿರಾಮಗೊಳಿಸಲು ಮತ್ತು ಪುನರಾರಂಭಿಸಲು <ph name="ALT" /> + <ph name="LAUNCHER" /> + <ph name="NUM_4" /> ಒತ್ತಿರಿ</translation>
 <translation id="6367985768157257101">Nearby ಶೇರ್ ಮೂಲಕ ಸ್ವೀಕರಿಸಬೇಕೆ?</translation>
 <translation id="6368157733310917710">&amp;ವಿಳಾಸಗಳು ಮತ್ತು ಇನ್ನಷ್ಟು</translation>
@@ -7964,7 +7966,6 @@
 <translation id="6610002944194042868">ಅನುವಾದ ಆಯ್ಕೆಗಳು</translation>
 <translation id="6610064275805055636">ಪ್ರತ್ಯೇಕಗೊಳಿಸಲಾದ ವೆಬ್ ಆ್ಯಪ್‌ಗಳನ್ನು ನಿರ್ವಹಿಸಿ</translation>
 <translation id="6611432349566876829"><ph name="NUM" /> ಟ್ಯಾಬ್</translation>
-<translation id="6611972847767394631">ನಿಮ್ಮ ಟ್ಯಾಬ್‌ಗಳನ್ನು ಇಲ್ಲಿ ಕಂಡುಕೊಳ್ಳಿ</translation>
 <translation id="661266467055912436">ನಿಮಗಾಗಿ ಹಾಗೂ ವೆಬ್‌ನಲ್ಲಿರುವ ಎಲ್ಲರಿಗಾಗಿ ಸುರಕ್ಷತೆಯನ್ನು ಸುಧಾರಿಸುತ್ತದೆ.</translation>
 <translation id="6613267708691765962">ಮಾಲ್‌ವೇರ್‌ಗಾಗಿ ಸ್ಕ್ಯಾನ್ ಮಾಡಲಾಗುತ್ತಿದೆ...</translation>
 <translation id="6615455863669487791">ನನಗೆ ತೋರಿಸಿ</translation>
@@ -8291,7 +8292,6 @@
 <translation id="6831043979455480757">Translate</translation>
 <translation id="6832218595502288407">ಎಡಕ್ಕೆ ಅಲೈನ್ ಮಾಡಿ</translation>
 <translation id="6832815922179448173">{MULTI_GROUP_TAB_COUNT,plural, =0{ಟ್ಯಾಬ್ ಅನ್ನು ತೆಗೆದುಹಾಕಿ, ಗುಂಪನ್ನು ಅಳಿಸಬೇಕೇ?}=1{ಟ್ಯಾಬ್‌ಗಳನ್ನು ತೆಗೆದುಹಾಕಿ, ಗುಂಪನ್ನು ಅಳಿಸಬೇಕೆ?}one{ಟ್ಯಾಬ್‌ಗಳನ್ನು ತೆಗೆದುಹಾಕಿ, ಗುಂಪನ್ನು ಅಳಿಸಬೇಕೆ?}other{ಟ್ಯಾಬ್‌ಗಳನ್ನು ತೆಗೆದುಹಾಕಿ, ಗುಂಪನ್ನು ಅಳಿಸಬೇಕೆ?}}</translation>
-<translation id="6833103209700200188">ಅಡಿಟಿಪ್ಪಣಿ</translation>
 <translation id="6833479554815567477"><ph name="GROUP_NAME" /> - <ph name="GROUP_CONTENTS" /> ಗುಂಪಿನಿಂದ ಟ್ಯಾಬ್ ತೆಗೆದುಹಾಕಲಾಗಿದೆ</translation>
 <translation id="6833753236242482566">ಸಮತೋಲಿತ (ಶಿಫಾರಸು ಮಾಡಲಾಗಿದೆ)</translation>
 <translation id="6835762382653651563">ನಿಮ್ಮ <ph name="DEVICE_TYPE" /> ಅಪ್‌ಡೇಟ್ ಮಾಡಲು ದಯವಿಟ್ಟು ಇಂಟರ್ನೆಟ್‌ಗೆ ಸಂಪರ್ಕಗೊಳಿಸಿ.</translation>
@@ -9995,6 +9995,7 @@
 <translation id="8037801708772278989">ಈಗಷ್ಟೇ ಪರಿಶೀಲಿಸಲಾಗಿದೆ</translation>
 <translation id="8038111231936746805">(ಡಿಫಾಲ್ಟ್)</translation>
 <translation id="8039151841428107077">{NUM_OF_FILES,plural, =1{1 ಫೈಲ್ ಅನ್ನು <ph name="CLOUD_PROVIDER" /> ಗೆ ಕಾಪಿ ಮಾಡಲಾಗುತ್ತಿದೆ}one{{NUM_OF_FILES} ಫೈಲ್‌ಗಳನ್ನು <ph name="CLOUD_PROVIDER" /> ಗೆ ಕಾಪಿ ಮಾಡಲಾಗುತ್ತಿದೆ}other{{NUM_OF_FILES} ಫೈಲ್‌ಗಳನ್ನು <ph name="CLOUD_PROVIDER" /> ಗೆ ಕಾಪಿ ಮಾಡಲಾಗುತ್ತಿದೆ}}</translation>
+<translation id="8039525676147630657">ನಿಮ್ಮ ChromeOS ಆವೃತ್ತಿಯನ್ನು ಅಪ್‌ಡೇಟ್ ಮಾಡಿದ ನಂತರ ಈ Chrome ಆ್ಯಪ್ ಕಾರ್ಯನಿರ್ವಹಿಸುವುದನ್ನು ನಿಲ್ಲಿಸುತ್ತದೆ. ನೀವು ಇರಿಸಿಕೊಳ್ಳಲು ಬಯಸುವ ಯಾವುದೇ ಆ್ಯಪ್ ಡೇಟಾವನ್ನು ಸೇವ್ ಮಾಡಿ. ನಿಮ್ಮ ಆಯ್ಕೆಗಳ ಕುರಿತು ತಿಳಿದುಕೊಳ್ಳಲು, ಆ್ಯಪ್ ಡೆವಲಪರ್ ಅಥವಾ ನಿಮ್ಮ IT ಬೆಂಬಲ ತಂಡವನ್ನು ಸಂಪರ್ಕಿಸಿ.</translation>
 <translation id="8041089156583427627">ಪ್ರತಿಕ್ರಿಯೆ ಕಳುಹಿಸಿ</translation>
 <translation id="8041093619605951337">ಸಂತೋಷ</translation>
 <translation id="8041267120753677077">ನಿಮ್ಮ ಫೋನ್‍ನ ಆ್ಯಪ್‌ಗಳನ್ನು ಸ್ಟ್ರೀಮ್ ಮಾಡಿ</translation>
@@ -10623,6 +10624,7 @@
 <translation id="8472623782143987204">ಹಾರ್ಡ್‌ವೇರ್-ಹಿಂತಿರುಗಿಸಿದೆ</translation>
 <translation id="8473540203671727883">ಮೌಸ್ ಕರ್ಸರ್‌ನ ಕೆಳಗಿರುವ ಪಠ್ಯವನ್ನು ಓದಿ</translation>
 <translation id="8473863474539038330">ವಿಳಾಸಗಳು ಮತ್ತು ಇನ್ನಷ್ಟು</translation>
+<translation id="847433688444405067">ಸಾಧನಗಳಾದ್ಯಂತ ಬ್ರೌಸ್ ಮಾಡಿ</translation>
 <translation id="8474378002946546633">ಅಧಿಸೂಚನೆಗಳನ್ನು ಅನುಮತಿಸಿ</translation>
 <translation id="8474561048882755118">ಒಂದೇ ರೀತಿಯ ಉತ್ಪನ್ನಗಳನ್ನು ಅಕ್ಕಪಕ್ಕದಲ್ಲಿ ನೋಡಲು ಮತ್ತು ನಿಮಗೆ ಮುಖ್ಯವಾದ ವಿವರಗಳನ್ನು ಸುಲಭವಾಗಿ ಹೋಲಿಸಲು ನಿಮಗೆ ಸಹಾಯ ಮಾಡುತ್ತದೆ</translation>
 <translation id="8475313423285172237">ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿನ ಮತ್ತೊಂದು ಪ್ರೋಗ್ರಾಂ Chrome ಕಾರ್ಯನಿರ್ವಹಿಸುವ ವಿಧಾನವನ್ನು ಬದಲಿಸಬಹುದಾದಂತಹ ವಿಸ್ತರಣೆಯನ್ನು ಸೇರಿಸಿದೆ.</translation>
@@ -10987,6 +10989,7 @@
 <translation id="8729133765463465108">QR ಕೋಡ್ ಸ್ಕ್ಯಾನ್ ಮಾಡಲು ಕ್ಯಾಮರಾ ಬಳಸಿ</translation>
 <translation id="8730621377337864115">ಮುಗಿದಿದೆ</translation>
 <translation id="8731029916209785242">ಅನುಮತಿಗಳು (<ph name="FORMATTED_ORIGIN" />)</translation>
+<translation id="8731258351357994801"><ph name="NUMBER" /> ನಮೂದು</translation>
 <translation id="8731268612289859741">ಭದ್ರತಾ ಕೋಡ್</translation>
 <translation id="8731629443331803108"><ph name="SITE_NAME" />, ಇದನ್ನು ಮಾಡಲು ಬಯಸುತ್ತಿದೆ: <ph name="PERMISSION" /></translation>
 <translation id="8731787661154643562">ಪೋರ್ಟ್ ಸಂಖ್ಯೆ</translation>

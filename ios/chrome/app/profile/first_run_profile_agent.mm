@@ -26,6 +26,7 @@
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
 #import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
 #import "ios/chrome/browser/shared/public/commands/guided_tour_commands.h"
+#import "ios/chrome/browser/shared/public/commands/tab_grid_commands.h"
 #import "ios/chrome/browser/shared/public/commands/tab_grid_toolbar_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/signin/model/signin_util.h"
@@ -226,6 +227,34 @@
 }
 
 - (void)showLongPressStep {
+  _currentGuidedTourStep = GuidedTourStepTabGridLongPress;
+  id<BrowserProvider> presentingInterface =
+      _presentingSceneState.browserProviderInterface.currentBrowserProvider;
+  Browser* browser = presentingInterface.browser;
+  __weak FirstRunProfileAgent* weakSelf = self;
+  ProceduralBlock completion = ^{
+    [weakSelf showTabGroupStep];
+  };
+  id<TabGridCommands> handler =
+      HandlerForProtocol(browser->GetCommandDispatcher(), TabGridCommands);
+  [handler showGuidedTourLongPressStepWithDismissalCompletion:completion];
+}
+
+- (void)showTabGroupStep {
+  _currentGuidedTourStep = GuidedTourStepTabGridTabGroup;
+  id<BrowserProvider> presentingInterface =
+      _presentingSceneState.browserProviderInterface.currentBrowserProvider;
+  Browser* browser = presentingInterface.browser;
+  __weak FirstRunProfileAgent* weakSelf = self;
+  ProceduralBlock completion = ^{
+    [weakSelf guidedTourCompleted];
+  };
+  id<TabGridToolbarCommands> handler = HandlerForProtocol(
+      browser->GetCommandDispatcher(), TabGridToolbarCommands);
+  [handler showGuidedTourTabGroupStepWithDismissalCompletion:completion];
+}
+
+- (void)guidedTourCompleted {
   // TODO(crbug.com/413461470): Implement
 }
 

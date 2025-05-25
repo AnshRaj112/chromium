@@ -31,7 +31,6 @@
 <translation id="1108214977745280468">Lihat cerapan halaman</translation>
 <translation id="1108938384783527433">Penyegerakan sejarah</translation>
 <translation id="1111673857033749125">Penanda halaman yang disimpan pada peranti anda yang lain akan dipaparkan di sini.</translation>
-<translation id="1113597929977215864">Tunjukkan paparan ringkas</translation>
 <translation id="1126696498560056882">Urus akaun pada peranti ini</translation>
 <translation id="1129510026454351943">Butiran: <ph name="ERROR_DESCRIPTION" /></translation>
 <translation id="1135018701024399762">Mod Inkognito memastikan penyemakan imbas anda peribadi daripada pengguna lain yang menggunakan peranti anda</translation>
@@ -377,6 +376,7 @@ Orang yang mengetahui ungkapan laluan anda sahaja yang dapat membaca data anda y
 <translation id="2718352093833049315">Hanya pada Wi-Fi</translation>
 <translation id="2718846868787000099">Untuk memaparkan kandungan dalam bahasa pilihan anda, tapak yang anda lawati dapat melihat pilihan anda</translation>
 <translation id="2723001399770238859">audio</translation>
+<translation id="2734335652257251631">Tunjukkan Mod Membaca</translation>
 <translation id="2739887572830526131">Simpan kumpulan ini untuk menambahkan tab kemudian atau padamkan jika anda tidak memerlukan kumpulan ini lagi.</translation>
 <translation id="2742373789128106053"><ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> tidak tersedia sekarang.</translation>
 <translation id="2760805590727089264">BB / TT</translation>
@@ -1747,6 +1747,7 @@ Untuk menukar tetapan ini, <ph name="BEGIN_LINK" />padamkan data Chrome dalam ak
 <translation id="8676789164135894283">Pengesahan log masuk</translation>
 <translation id="8683039184091909753">imej</translation>
 <translation id="8688183792442786085"><ph name="TAB_TITLE" />, Tab yang Dipilih</translation>
+<translation id="8693232767599693749">Lihat Mod Membaca?</translation>
 <translation id="8697753151306746444">Kongsi tetingkap atau skrin</translation>
 <translation id="869891660844655955">Tarikh tamat tempoh</translation>
 <translation id="8699120352855309748">Jangan tawarkan untuk menterjemahkan bahasa ini</translation>
@@ -1878,7 +1879,6 @@ Untuk menukar tetapan ini, <ph name="BEGIN_LINK" />padamkan data Chrome dalam ak
 <translation id="961856697154696964">Padamkan data semakan imbas</translation>
 <translation id="963246339335003378">Buka Pengurus Tugas</translation>
 <translation id="966131775676567255">Memadamkan data akaun</translation>
-<translation id="96681097142096641">Lihat paparan mudah?</translation>
 <translation id="970715775301869095"><ph name="MINUTES" /> minit lagi</translation>
 <translation id="981121421437150478">Luar talian</translation>
 <translation id="983192555821071799">Tutup semua tab</translation>

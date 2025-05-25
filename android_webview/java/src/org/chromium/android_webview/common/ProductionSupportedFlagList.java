@@ -834,6 +834,10 @@ public final class ProductionSupportedFlagList {
                 AwFeatures.WEBVIEW_RECORD_APP_CACHE_HISTOGRAMS,
                 "When enabled, records histograms relating to app's cache size."),
         Flag.baseFeature(
+                AwFeatures.WEBVIEW_CACHE_SIZE_LIMIT_DERIVED_FROM_APP_CACHE_QUOTA,
+                "When enabled, instead of using the 20MiB as the HTTP cache limit, derive the value"
+                        + " from the cache quota allocated to the app by the Android framework."),
+        Flag.baseFeature(
                 GfxSwitches.USE_SMART_REF_FOR_GPU_FENCE_HANDLE,
                 "Avoids cloning of gpu fences when possible"),
         Flag.baseFeature(
@@ -1066,6 +1070,10 @@ public final class ProductionSupportedFlagList {
         Flag.baseFeature(
                 NetworkServiceFeatures.SHARED_DICTIONARY_CACHE,
                 "When enabled, keep recently-used compression dictionaries in a memory cache."),
+        Flag.baseFeature(
+                NetworkServiceFeatures.CACHE_SHARING_FOR_PERVASIVE_SCRIPTS,
+                "When enabled, enables a singled-keyed HTTP cache for well-known privacy-safe"
+                        + " resources."),
         // Add new commandline switches and features above. The final entry should have a
         // trailing comma for cleaner diffs.
     };

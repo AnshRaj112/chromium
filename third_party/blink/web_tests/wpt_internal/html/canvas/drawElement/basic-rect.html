@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<html class=reftest-wait>
+<html>
 <title>Canvas.drawElement: green rect</title>
 <link rel="help" href="https://github.com/WICG/html-in-canvas">
 <link rel="author" href="mailto:vmpstr@chromium.org">
 <link rel="match" href="basic-rect-ref.html">
-<script src="/common/reftest-wait.js"></script>
 <style>
 #child {
   width: 100px;
@@ -23,7 +22,6 @@
 <script>
 function runTest() {
   canvas.getContext("2d").drawElement(child, 20, 30);
-  requestAnimationFrame(takeScreenshot);
 }
 
 onload = () => runTest();

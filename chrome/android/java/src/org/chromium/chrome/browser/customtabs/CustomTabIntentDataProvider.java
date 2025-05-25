@@ -250,6 +250,10 @@ public class CustomTabIntentDataProvider extends BrowserServicesIntentDataProvid
     public static final String EXTRA_TWA_STARTUP_UPTIME_MS =
             "org.chromium.chrome.browser.customtabs.trusted.STARTUP_UPTIME_MILLIS";
 
+    /** Extra that, if set, corresponds to the integer version of android_browser_helper. */
+    public static final String EXTRA_ANDROID_BROWSER_HELPER_VERSION =
+            "org.chromium.chrome.browser.ANDROID_BROWSER_HELPER_VERSION";
+
     /**
      * Extra that, if set, allows you to interact with the background app when a PCCT is launched.
      * Note: Deprecated. Use {@link CustomTabsIntent#isBackgroundInteractionEnabled(Intent)}.
@@ -1199,6 +1203,14 @@ public class CustomTabIntentDataProvider extends BrowserServicesIntentDataProvid
         if (IntentUtils.safeHasExtra(intent, EXTRA_OPEN_IN_BROWSER_STATE)) {
             featureUsage.log(CustomTabsFeature.EXTRA_OPEN_IN_BROWSER_STATE);
         }
+        if (IntentUtils.safeHasExtra(
+                intent, TrustedWebActivityIntentBuilder.EXTRA_LAUNCH_HANDLER_CLIENT_MODE)) {
+            featureUsage.log(CustomTabsFeature.EXTRA_LAUNCH_HANDLER);
+        }
+        if (IntentUtils.safeHasExtra(
+                intent, TrustedWebActivityIntentBuilder.EXTRA_FILE_HANDLING_DATA)) {
+            featureUsage.log(CustomTabsFeature.EXTRA_FILE_HANDLERS);
+        }
     }
 
     @Override
@@ -1731,5 +1743,12 @@ public class CustomTabIntentDataProvider extends BrowserServicesIntentDataProvid
         if (!isTrustedWebActivity()) return null;
         long value = IntentUtils.safeGetLongExtra(getIntent(), EXTRA_TWA_STARTUP_UPTIME_MS, 0);
         return value != 0 ? Long.valueOf(value) : null;
+    }
+
+    @Override
+    public @Nullable Integer getAndroidBrowserHelperVersion() {
+        int value =
+                IntentUtils.safeGetIntExtra(getIntent(), EXTRA_ANDROID_BROWSER_HELPER_VERSION, 0);
+        return value != 0 ? Integer.valueOf(value) : null;
     }
 }

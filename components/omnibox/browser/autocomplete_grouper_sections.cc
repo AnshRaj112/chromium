@@ -303,7 +303,8 @@ AndroidHubNonZPSSection::AndroidHubNonZPSSection(
           group_configs) {}
 
 AndroidNTPZpsSection::AndroidNTPZpsSection(
-    omnibox::GroupConfigMap& group_configs)
+    omnibox::GroupConfigMap& group_configs,
+    bool mia_enabled)
     : ZpsSectionWithLocalHistory(
           30,
           {
@@ -315,14 +316,14 @@ AndroidNTPZpsSection::AndroidNTPZpsSection(
                     {
                         {
                             omnibox::GROUP_PERSONALIZED_ZERO_SUGGEST_WITH_MIA,
-                            omnibox_feature_configs::MiaZPS::Get().enabled
+                            mia_enabled
                                 ? OmniboxFieldTrial::
                                       kOmniboxNumNtpZpsRecentSearches.Get()
                                 : 0,
                         },
                         {
                             omnibox::GROUP_MIA_RECOMMENDATIONS,
-                            omnibox_feature_configs::MiaZPS::Get().enabled
+                            mia_enabled
                                 ? OmniboxFieldTrial::
                                       kOmniboxNumNtpZpsRecentSearches.Get()
                                 : 0,
@@ -404,7 +405,8 @@ AndroidWebZpsSection::AndroidWebZpsSection(
 
 DesktopNTPZpsSection::DesktopNTPZpsSection(
     omnibox::GroupConfigMap& group_configs,
-    size_t limit)
+    size_t limit,
+    bool mia_enabled)
     : ZpsSectionWithLocalHistory(
           limit,
           {
@@ -412,9 +414,8 @@ DesktopNTPZpsSection::DesktopNTPZpsSection(
                   8,
                   {
                       {omnibox::GROUP_PERSONALIZED_ZERO_SUGGEST_WITH_MIA,
-                       omnibox_feature_configs::MiaZPS::Get().enabled ? 8 : 0},
-                      {omnibox::GROUP_MIA_RECOMMENDATIONS,
-                       omnibox_feature_configs::MiaZPS::Get().enabled ? 8 : 0},
+                       mia_enabled ? 8 : 0},
+                      {omnibox::GROUP_MIA_RECOMMENDATIONS, mia_enabled ? 8 : 0},
                       {omnibox::GROUP_PERSONALIZED_ZERO_SUGGEST, 8},
                   }),
               Group(8,
@@ -575,6 +576,26 @@ DesktopWebSearchZpsSection::DesktopWebSearchZpsSection(
               },
               group_configs) {}
 
+DesktopWebSearchZpsContextualOnlySection::
+    DesktopWebSearchZpsContextualOnlySection(
+        omnibox::GroupConfigMap& group_configs,
+        size_t contextual_action_limit,
+        size_t contextual_search_limit)
+    : Section(contextual_action_limit + contextual_search_limit,
+              {
+                  Group(contextual_action_limit,
+                        {
+                            {omnibox::GROUP_CONTEXTUAL_SEARCH_ACTION,
+                             contextual_action_limit},
+                        }),
+                  Group(contextual_search_limit,
+                        {
+                            {omnibox::GROUP_CONTEXTUAL_SEARCH,
+                             contextual_search_limit},
+                        }),
+              },
+              group_configs) {}
+
 DesktopLensContextualZpsSection::DesktopLensContextualZpsSection(
     omnibox::GroupConfigMap& group_configs)
     : ZpsSection(5,
@@ -687,7 +708,8 @@ void ZpsSectionWithMVTiles::InitFromMatches(ACMatches& matches) {
   ZpsSection::InitFromMatches(matches);
 }
 
-IOSNTPZpsSection::IOSNTPZpsSection(omnibox::GroupConfigMap& group_configs)
+IOSNTPZpsSection::IOSNTPZpsSection(omnibox::GroupConfigMap& group_configs,
+                                   bool mia_enabled)
     : ZpsSectionWithLocalHistory(
           26,
           {
@@ -695,15 +717,14 @@ IOSNTPZpsSection::IOSNTPZpsSection(omnibox::GroupConfigMap& group_configs)
                     {
                         {omnibox::GROUP_MOBILE_CLIPBOARD, 1},
                     }),
-              Group(
-                  20,
-                  {
-                      {omnibox::GROUP_PERSONALIZED_ZERO_SUGGEST_WITH_MIA,
-                       omnibox_feature_configs::MiaZPS::Get().enabled ? 20 : 0},
-                      {omnibox::GROUP_MIA_RECOMMENDATIONS,
-                       omnibox_feature_configs::MiaZPS::Get().enabled ? 20 : 0},
-                      {omnibox::GROUP_PERSONALIZED_ZERO_SUGGEST, 20},
-                  }),
+              Group(20,
+                    {
+                        {omnibox::GROUP_PERSONALIZED_ZERO_SUGGEST_WITH_MIA,
+                         mia_enabled ? 20 : 0},
+                        {omnibox::GROUP_MIA_RECOMMENDATIONS,
+                         mia_enabled ? 20 : 0},
+                        {omnibox::GROUP_PERSONALIZED_ZERO_SUGGEST, 20},
+                    }),
               Group(5,
                     {
                         {omnibox::GROUP_TRENDS, 5},
@@ -781,7 +802,8 @@ IOSLensMultimodalZpsSection::IOSLensMultimodalZpsSection(
 IOSIpadNTPZpsSection::IOSIpadNTPZpsSection(
     size_t trends_count,
     size_t total_count,
-    omnibox::GroupConfigMap& group_configs)
+    omnibox::GroupConfigMap& group_configs,
+    bool mia_enabled)
     : ZpsSectionWithLocalHistory(
           total_count,
           {
@@ -793,15 +815,11 @@ IOSIpadNTPZpsSection::IOSIpadNTPZpsSection(
                     {
                         {
                             omnibox::GROUP_PERSONALIZED_ZERO_SUGGEST_WITH_MIA,
-                            omnibox_feature_configs::MiaZPS::Get().enabled
-                                ? total_count - trends_count - 1
-                                : 0,
+                            mia_enabled ? total_count - trends_count - 1 : 0,
                         },
                         {
                             omnibox::GROUP_MIA_RECOMMENDATIONS,
-                            omnibox_feature_configs::MiaZPS::Get().enabled
-                                ? total_count - trends_count - 1
-                                : 0,
+                            mia_enabled ? total_count - trends_count - 1 : 0,
                         },
                         {omnibox::GROUP_PERSONALIZED_ZERO_SUGGEST,
                          total_count - trends_count - 1},

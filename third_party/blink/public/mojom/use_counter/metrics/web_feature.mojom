@@ -4892,6 +4892,12 @@ enum WebFeature {
   kEditContextUpdateTextRangePrecedesCompositionRange = 5583,
   kEditContextUpdateTextRangeOverlapsCompositionRange = 5584,
   kEditContextUpdateSelectionDuringActiveComposition = 5585,
+  kClipboardChangeEventAddListener = 5586,
+  kClipboardChangeEventFired = 5587,
+  kClipboardChangeEventFiredAfterFocusGain = 5588,
+  kClipboardChangeEventTypesAttribute = 5589,
+  kSchedulerYieldNonTrivialInherit = 5590,
+  kSchedulerYieldNonTrivialInheritCrossFrameIgnored = 5591,
 
   // Add new features immediately above this line. Don't change assigned
   // numbers of any item, and don't reuse removed slots. Also don't add extra

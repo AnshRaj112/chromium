@@ -287,6 +287,8 @@ COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlicSizingFitWindow);
 
 COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlicWarming);
 
+COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlicDisableWarming);
+
 COMPONENT_EXPORT(CHROME_FEATURES)
 extern const base::FeatureParam<int> kGlicWarmingDelayMs;
 COMPONENT_EXPORT(CHROME_FEATURES)
@@ -678,6 +680,14 @@ BASE_DECLARE_FEATURE(kSafetyHubThreeDotDetails);
 // in Safety Hub.
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kSafetyHubDisruptiveNotificationRevocation);
+
+// And integer which tracks the current version of the running experiment for
+// disruptive notification revocation. Proposed revocations will be versioned
+// and ignored upon version change. This allows to ignore proposed revocations
+// from previous experiments in order to consistently revoke and report metrics.
+COMPONENT_EXPORT(CHROME_FEATURES)
+extern const base::FeatureParam<int>
+    kSafetyHubDisruptiveNotificationRevocationExperimentVersion;
 
 // Whether the disruptive notification revocation will be performed as a shadow
 // run (without actually revoking permissions). Used to collect metrics and

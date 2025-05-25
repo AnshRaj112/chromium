@@ -390,6 +390,8 @@ void AutocompleteResult::SortAndCull(
     const AutocompleteInput& input,
     TemplateURLService* template_url_service,
     OmniboxTriggeredFeatureService* triggered_feature_service,
+    bool is_lens_active,
+    bool mia_enabled,
     std::optional<AutocompleteMatch> default_match_to_preserve) {
   SCOPED_UMA_HISTOGRAM_TIMER_MICROS(
       "Omnibox.AutocompletionTime.UpdateResult.SortAndCull");
@@ -445,8 +447,8 @@ void AutocompleteResult::SortAndCull(
     PSections sections;
     if constexpr (is_android) {
       if (omnibox::IsNTPPage(page_classification)) {
-        sections.push_back(
-            std::make_unique<AndroidNTPZpsSection>(suggestion_groups_map_));
+        sections.push_back(std::make_unique<AndroidNTPZpsSection>(
+            suggestion_groups_map_, mia_enabled));
       } else if (omnibox::IsSearchResultsPage(page_classification)) {
         sections.push_back(
             std::make_unique<AndroidSRPZpsSection>(suggestion_groups_map_));
@@ -459,9 +461,15 @@ void AutocompleteResult::SortAndCull(
       }
     } else if constexpr (is_desktop) {
       const size_t contextual_zps_limit =
-          omnibox_feature_configs::ContextualSearch::Get().contextual_zps_limit;
+          is_lens_active ? 0u
+                         : omnibox_feature_configs::ContextualSearch::Get()
+                               .contextual_zps_limit;
+      // Make space for the extra Lens action. It needs to be included above
+      // any contextual search matches but does not count against their limit.
       const size_t contextual_action_limit =
-          contextual_zps_limit > 0u ? 1u : 0u;
+          omnibox_feature_configs::ContextualSearch::Get().show_open_lens_action
+              ? 1u
+              : 0u;
       if (omnibox::IsLensSearchbox(page_classification)) {
         switch (page_classification) {
           case OmniboxEventProto::CONTEXTUAL_SEARCHBOX:
@@ -487,7 +495,7 @@ void AutocompleteResult::SortAndCull(
             page_classification != OmniboxEventProto::NTP_REALBOX &&
             has_iph_match;
         sections.push_back(std::make_unique<DesktopNTPZpsSection>(
-            suggestion_groups_map_, add_iph_section ? 7u : 8u));
+            suggestion_groups_map_, add_iph_section ? 7u : 8u, mia_enabled));
 #if BUILDFLAG(ENABLE_EXTENSIONS)
         // Show unscoped extension suggestions on NTP except in the realbox.
         if (base::FeatureList::IsEnabled(
@@ -535,15 +543,24 @@ void AutocompleteResult::SortAndCull(
         }
 #endif
       } else {
-        // Make space for the extra action when there is any contextual search
-        // budget. It needs to be included above any contextual search matches
-        // but does not count against their limit.
-        sections.push_back(std::make_unique<DesktopWebURLZpsSection>(
-            suggestion_groups_map_, max_url_suggestions));
-        sections.push_back(std::make_unique<DesktopWebSearchZpsSection>(
-            suggestion_groups_map_,
-            max_search_suggestions + contextual_action_limit,
-            contextual_action_limit, contextual_zps_limit));
+        if (contextual_zps_limit > 0u &&
+            omnibox_feature_configs::ContextualSearch::Get()
+                .contextual_suggestions_ablate_others_when_present &&
+            std::ranges::any_of(matches_, [](const auto& match) {
+              return match.IsContextualSearchSuggestion();
+            })) {
+          sections.push_back(
+              std::make_unique<DesktopWebSearchZpsContextualOnlySection>(
+                  suggestion_groups_map_, contextual_action_limit,
+                  contextual_zps_limit));
+        } else {
+          sections.push_back(std::make_unique<DesktopWebURLZpsSection>(
+              suggestion_groups_map_, max_url_suggestions));
+          sections.push_back(std::make_unique<DesktopWebSearchZpsSection>(
+              suggestion_groups_map_,
+              max_search_suggestions + contextual_action_limit,
+              contextual_action_limit, contextual_zps_limit));
+        }
 #if BUILDFLAG(ENABLE_EXTENSIONS)
         if (base::FeatureList::IsEnabled(
                 extensions_features::kExperimentalOmniboxLabs)) {
@@ -561,7 +578,8 @@ void AutocompleteResult::SortAndCull(
 
         if (omnibox::IsNTPPage(page_classification)) {
           sections.push_back(std::make_unique<IOSIpadNTPZpsSection>(
-              num_trending_queries, total_count, suggestion_groups_map_));
+              num_trending_queries, total_count, suggestion_groups_map_,
+              mia_enabled));
         } else if (omnibox::IsSearchResultsPage(page_classification)) {
           sections.push_back(std::make_unique<IOSIpadSRPZpsSection>(
               total_count, suggestion_groups_map_));
@@ -581,8 +599,8 @@ void AutocompleteResult::SortAndCull(
               NOTREACHED(base::NotFatalUntil::M200);
           }
         } else if (omnibox::IsNTPPage(page_classification)) {
-          sections.push_back(
-              std::make_unique<IOSNTPZpsSection>(suggestion_groups_map_));
+          sections.push_back(std::make_unique<IOSNTPZpsSection>(
+              suggestion_groups_map_, mia_enabled));
         } else if (omnibox::IsSearchResultsPage(page_classification)) {
           sections.push_back(
               std::make_unique<IOSSRPZpsSection>(suggestion_groups_map_));

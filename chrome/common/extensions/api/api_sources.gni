@@ -16,6 +16,7 @@ schema_sources_ = [
   "bookmarks.json",
   "cookies.json",
   "developer_private.idl",
+  "history.json",
   "identity.idl",
   "notifications.idl",
   "scripting.idl",
@@ -26,6 +27,7 @@ schema_sources_ = [
 # In many cases, this includes schemas used to generate types used in manifest
 # parsing.
 uncompiled_sources_ = [
+  "action.json",
   "browsing_data.json",
   "extension.json",
 ]
@@ -62,7 +64,6 @@ if (enable_extensions) {
     "enterprise_reporting_private.idl",
     "font_settings.json",
     "gcm.json",
-    "history.json",
     "image_writer_private.idl",
     "instance_id.json",
     "language_settings_private.idl",
@@ -156,7 +157,6 @@ if (enable_extensions) {
   }
 
   uncompiled_sources_ += [
-    "action.json",
     "browser_action.json",
     "idltest.idl",
     "page_action.json",

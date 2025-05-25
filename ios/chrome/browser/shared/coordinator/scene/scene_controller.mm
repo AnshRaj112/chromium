@@ -67,6 +67,7 @@
 #import "ios/chrome/browser/authentication/ui_bundled/signin/promo/signin_fullscreen_promo_scene_agent.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_constants.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_coordinator.h"
+#import "ios/chrome/browser/authentication/ui_bundled/signin/signin_in_progress.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/signin_utils.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin_notification_infobar_delegate.h"
 #import "ios/chrome/browser/browser_view/ui_bundled/browser_view_controller.h"
@@ -479,14 +480,6 @@ void OnListFamilyMembersResponse(
 // the coordinator.
 @property(nonatomic, strong) SigninCoordinator* signinCoordinator;
 
-// YES if the process of dismissing the sign-in prompt is from an external
-// trigger and is currently ongoing. An external trigger isn't done from the
-// signin prompt itself (i.e., tapping a button in the sign-in prompt that
-// dismisses the prompt). For example, the -dismissModalDialogswithCompletion
-// command is considered as an external trigger because it comes from something
-// outside the sign-in prompt UI.
-@property(nonatomic, assign) BOOL dismissingSigninPromptFromExternalTrigger;
-
 // The coordinator used to present the Incognito interstitial on Incognito
 // third-party intents. Created in
 // `showIncognitoInterstitialWithUrlLoadParams:dismissOmnibox:completion:`
@@ -628,6 +621,14 @@ void OnListFamilyMembersResponse(
   ProfileState* profileState = self.sceneState.profileState;
   [self transitionToSceneActivationLevel:level
                         profileInitStage:profileState.initStage];
+}
+
+- (void)signinDidEnd:(SceneState*)sceneState {
+  if (IsSigninForcedByPolicy()) {
+    // Handle intents after sign-in is done when the forced sign-in policy
+    // is enabled.
+    [self handleExternalIntents];
+  }
 }
 
 - (void)handleExternalIntents {
@@ -973,8 +974,11 @@ void OnListFamilyMembersResponse(
 // Stops the signin coordinator.
 // TODO(crbug.com/381444097): always use the animated.
 - (void)stopSigninCoordinatorAnimated:(BOOL)animated {
-  [self.signinCoordinator stopAnimated:animated];
+  // This ensure that when the SceneController receives the `signinFinished`
+  // command, it does not detect the SigninCoordinator as still presented.
+  SigninCoordinator* signinCoordinator = self.signinCoordinator;
   self.signinCoordinator = nil;
+  [signinCoordinator stopAnimated:animated];
 }
 
 // Creates, if needed, and presents saved passwords settings. Assumes all modal
@@ -1414,7 +1418,7 @@ void OnListFamilyMembersResponse(
 
 - (void)teardownUI {
   // The UI should be stopped before the models they observe are stopped.
-  [self stopSigninCoordinatorWithCompletionAnimated:NO fromExternalTrigger:NO];
+  [self stopSigninCoordinatorWithCompletionAnimated:NO];
   DCHECK(!self.signinCoordinator)
       << base::SysNSStringToUTF8([self.signinCoordinator description]);
 
@@ -1625,9 +1629,9 @@ void OnListFamilyMembersResponse(
   }
 
   if (IsSigninForcedByPolicy()) {
-    if (self.signinCoordinator) {
-      // Return NO because intents cannot be handled when using
-      // `self.signinCoordinator` for the forced sign-in prompt.
+    if (self.sceneState.signinInProgress) {
+      // Return NO because intents cannot be handled when a sign-in is in
+      // progress.
       return NO;
     }
     if (![self isSignedIn]) {
@@ -1727,7 +1731,7 @@ void OnListFamilyMembersResponse(
       << "self.signinCoordinator: "
       << base::SysNSStringToUTF8([self.signinCoordinator description]);
   Browser* browser = self.mainInterface.browser;
-  [self stopSigninCoordinatorWithCompletionAnimated:NO fromExternalTrigger:NO];
+  [self stopSigninCoordinatorWithCompletionAnimated:NO];
   self.signinCoordinator = [SigninCoordinator
       upgradeSigninPromoCoordinatorWithBaseViewController:self.mainInterface
                                                               .viewController
@@ -2086,7 +2090,7 @@ using UserFeedbackDataCallback =
     return;
   }
   Browser* mainBrowser = self.mainInterface.browser;
-  [self stopSigninCoordinatorWithCompletionAnimated:NO fromExternalTrigger:NO];
+  [self stopSigninCoordinatorWithCompletionAnimated:NO];
   self.signinCoordinator =
       [SigninCoordinator signinCoordinatorWithCommand:command
                                               browser:mainBrowser
@@ -2135,7 +2139,7 @@ using UserFeedbackDataCallback =
   };
   ChangeProfileContinuationProvider provider =
       base::BindRepeating(&CreateChangeProfileOpensURLContinuation, url);
-  [self stopSigninCoordinatorWithCompletionAnimated:NO fromExternalTrigger:NO];
+  [self stopSigninCoordinatorWithCompletionAnimated:NO];
   self.signinCoordinator = [SigninCoordinator
       consistencyPromoSigninCoordinatorWithBaseViewController:baseViewController
                                                       browser:self.mainInterface
@@ -3792,7 +3796,6 @@ using UserFeedbackDataCallback =
   self.historyCoordinator = nil;
 
   __weak __typeof(self) weakSelf = self;
-  BOOL resetSigninState = self.signinCoordinator != nil;
   ProceduralBlock resetAndDismiss = ^{
     __typeof(self) strongSelf = weakSelf;
     // Cleanup settings resources after dismissal.
@@ -3800,10 +3803,6 @@ using UserFeedbackDataCallback =
     if (completion) {
       completion();
     }
-    if (resetSigninState) {
-      strongSelf.sceneState.signinInProgress = NO;
-    }
-    strongSelf.dismissingSigninPromptFromExternalTrigger = NO;
   };
 
   if (self.settingsNavigationController && !self.dismissingSettings) {
@@ -3813,8 +3812,7 @@ using UserFeedbackDataCallback =
     // to be closed first.
     // If signinCoordinator is already dismissing, completion execution will
     // happen when it is done animating.
-    [self stopSigninCoordinatorWithCompletionAnimated:animated
-                                  fromExternalTrigger:YES];
+    [self stopSigninCoordinatorWithCompletionAnimated:animated];
     UIViewController* presentingViewController =
         self.settingsNavigationController.presentingViewController;
     if (presentingViewController) {
@@ -3828,8 +3826,7 @@ using UserFeedbackDataCallback =
   } else {
     // `self.signinCoordinator` can be presented without settings, from the
     // bookmarks or the recent tabs view.
-    [self stopSigninCoordinatorWithCompletionAnimated:animated
-                                  fromExternalTrigger:YES];
+    [self stopSigninCoordinatorWithCompletionAnimated:animated];
     resetAndDismiss();
   }
 }
@@ -3837,13 +3834,9 @@ using UserFeedbackDataCallback =
 // Stops the sign-in coordinator actions and dismisses its views either
 // with or without animation. Executes its signinCompletion. It’s expected to be
 // not already executed.
-- (void)stopSigninCoordinatorWithCompletionAnimated:(BOOL)animated
-                                fromExternalTrigger:(BOOL)external {
+- (void)stopSigninCoordinatorWithCompletionAnimated:(BOOL)animated {
   if (!self.signinCoordinator) {
     return;
-  }
-  if (external) {
-    self.dismissingSigninPromptFromExternalTrigger = YES;
   }
 
   [self.signinCoordinator stopAnimated:animated];
@@ -3901,16 +3894,12 @@ using UserFeedbackDataCallback =
     self.signinCoordinator = nil;
     return;
   }
-  self.sceneState.signinInProgress = YES;
 
-  __block std::unique_ptr<ScopedUIBlocker> uiBlocker =
-      std::make_unique<ScopedUIBlocker>(self.sceneState);
   __weak __typeof(self) weakSelf = self;
   self.signinCoordinator.signinCompletion =
       ^(SigninCoordinatorResult result, id<SystemIdentity> identity) {
         [weakSelf signinCompletedWithResult:result
                                    identity:identity
-                                  uiBlocker:std::move(uiBlocker)
                                  completion:completion];
       };
 
@@ -3920,29 +3909,12 @@ using UserFeedbackDataCallback =
 // Completion block for Signin coordinators.
 - (void)signinCompletedWithResult:(SigninCoordinatorResult)result
                          identity:(id<SystemIdentity>)identity
-                        uiBlocker:(std::unique_ptr<ScopedUIBlocker>)uiBlocker
                        completion:
                            (SigninCoordinatorCompletionCallback)completion {
   [self stopSigninCoordinatorAnimated:YES];
-  uiBlocker.reset();
 
   if (completion) {
     completion(result, identity);
-  }
-
-  if (!self.dismissingSigninPromptFromExternalTrigger) {
-    // If the coordinator isn't stopped by an external trigger, sign-in
-    // is done. Otherwise, there might be extra steps to be done before
-    // considering sign-in as done. This is up to the handler that sets
-    // `self.dismissingSigninPromptFromExternalTrigger` to YES to set
-    // back `signinInProgress` to NO.
-    self.sceneState.signinInProgress = NO;
-  }
-
-  if (IsSigninForcedByPolicy()) {
-    // Handle intents after sign-in is done when the forced sign-in policy
-    // is enabled.
-    [self handleExternalIntents];
   }
 }
 
@@ -4413,8 +4385,7 @@ using UserFeedbackDataCallback =
     (PolicyWatcherBrowserAgent*)policyWatcher {
 
   if (self.signinCoordinator) {
-    [self stopSigninCoordinatorWithCompletionAnimated:YES
-                                  fromExternalTrigger:YES];
+    [self stopSigninCoordinatorWithCompletionAnimated:YES];
     UMA_HISTOGRAM_BOOLEAN(
         "Enterprise.BrowserSigninIOS.SignInInterruptedByPolicy", true);
     policyWatcher->SignInUIDismissed();

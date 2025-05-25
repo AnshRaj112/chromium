@@ -246,6 +246,15 @@ LensOverlayUntrustedUI::LensOverlayUntrustedUI(content::WebUI* web_ui)
   html_source->AddBoolean(
       "enableGradientRegionStroke",
       lens::features::GetVisualSelectionUpdatesEnableGradientRegionStroke());
+  html_source->AddBoolean(
+      "enableWhiteRegionStroke",
+      lens::features::GetVisualSelectionUpdatesEnableWhiteRegionStroke());
+  html_source->AddBoolean(
+      "enableRegionSelectedGlow",
+      lens::features::GetVisualSelectionUpdatesEnableRegionSelectedGlow());
+  html_source->AddBoolean(
+      "enableCsbMotionTweaks",
+      lens::features::GetVisualSelectionUpdatesEnableCsbMotionTweaks());
   html_source->AddBoolean("autoFocusSearchbox",
                           lens::features::ShouldAutoFocusSearchbox());
   html_source->AddBoolean("cornerSlidersEnabled",
@@ -289,7 +298,9 @@ LensOverlayUntrustedUI::LensOverlayUntrustedUI(content::WebUI* web_ui)
                                          Profile::FromWebUI(web_ui));
   html_source->AddString(
       "searchboxDefaultIcon",
-      "//resources/cr_components/searchbox/icons/google_g_cr23.svg");
+      lens::features::GetVisualSelectionUpdatesEnableGradientSuperG()
+          ? "//resources/cr_components/searchbox/icons/google_g_gradient.svg"
+          : "//resources/cr_components/searchbox/icons/google_g_cr23.svg");
   html_source->AddBoolean("reportMetrics", false);
   html_source->AddLocalizedString("searchBoxHintDefault",
                                   IDS_GOOGLE_SEARCH_BOX_EMPTY_HINT_CONTEXTUAL);

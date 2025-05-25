@@ -61,7 +61,6 @@
 #include "chrome/browser/ui/tabs/organization/tab_organization_service.h"
 #include "chrome/browser/ui/tabs/organization/tab_organization_service_factory.h"
 #include "chrome/browser/ui/tabs/organization/tab_organization_session.h"
-#include "chrome/browser/ui/tabs/split_tab_util.h"
 #include "chrome/browser/ui/tabs/tab_change_type.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
@@ -791,12 +790,9 @@ std::unique_ptr<DetachedTab> TabStripModel::DetachTabImpl(
   if (create_historical_tab) {
     id = delegate_->CreateHistoricalTab(tab->GetContents());
   }
-  if (tab_detach_reason == tabs::TabInterface::DetachReason::kDelete) {
-    tab->DestroyTabFeatures();
-  }
 
   std::unique_ptr<tabs::TabModel> old_tab_model =
-      RemoveTabFromIndexImpl(index_at_time_of_removal);
+      RemoveTabFromIndexImpl(index_at_time_of_removal, tab_detach_reason);
 
   old_tab_model->OnRemovedFromModel();
   return std::make_unique<DetachedTab>(
@@ -2192,6 +2188,15 @@ TabStripModel::TabIterator TabStripModel::begin() const {
 }
 TabStripModel::TabIterator TabStripModel::end() const {
   return contents_data_->end();
+}
+
+TabStripModel::CollectionIterator TabStripModel::collection_begin(
+    base::PassKey<TabStripServiceImpl> key) const {
+  return contents_data_->collection_begin(key);
+}
+TabStripModel::CollectionIterator TabStripModel::collection_end(
+    base::PassKey<TabStripServiceImpl> key) const {
+  return contents_data_->collection_end(key);
 }
 
 // Context menu functions.
@@ -3832,16 +3837,19 @@ void TabStripModel::InsertTabAtIndexImpl(
 }
 
 std::unique_ptr<tabs::TabModel> TabStripModel::RemoveTabFromIndexImpl(
-    int index) {
-  tabs::TabInterface* tab = GetTabAtIndex(index);
+    int index,
+    tabs::TabInterface::DetachReason tab_detach_reason) {
+  tabs::TabModel* const tab = GetTabModelAtIndex(index);
   const std::optional<tab_groups::TabGroupId> old_group = tab->GetGroup();
-
-  std::optional<int> next_selected_index =
-      DetermineNewSelectedIndex(GetTabAtIndex(index));
+  std::optional<int> next_selected_index = DetermineNewSelectedIndex(tab);
   const bool removed_tab_is_split = tab->IsSplit();
   if (removed_tab_is_split) {
     RemoveSplitImpl(tab->GetSplit().value(),
                     SplitTabChange::SplitTabRemoveReason::kSplitTabRemoved);
+  }
+
+  if (tab_detach_reason == tabs::TabInterface::DetachReason::kDelete) {
+    tab->DestroyTabFeatures();
   }
 
   // Remove the tab.

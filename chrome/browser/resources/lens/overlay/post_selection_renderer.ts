@@ -10,6 +10,7 @@ import {PolymerElement} from '//resources/polymer/v3_0/polymer/polymer_bundled.m
 
 import {BrowserProxyImpl} from './browser_proxy.js';
 import type {BrowserProxy} from './browser_proxy.js';
+import {GLIF_HEX_COLORS} from './color_utils.js';
 import {CenterRotatedBox_CoordinateType} from './geometry.mojom-webui.js';
 import type {CenterRotatedBox} from './geometry.mojom-webui.js';
 import {UserAction} from './lens.mojom-webui.js';
@@ -54,6 +55,8 @@ export const CUTOUT_RADIUS_PX = 5;
 const CUTOUT_RADIUS_THRESHOLD_PX = 12;
 // Minimum box size allowed. Exported for testing.
 export const MIN_BOX_SIZE_PX = 12;
+const MIN_BLUR = 8;
+const MAX_BLUR = 40;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -119,6 +122,11 @@ export class PostSelectionRendererElement extends
       canvasWidth: Number,
       canvasPhysicalHeight: Number,
       canvasPhysicalWidth: Number,
+      regionSelectedGlowEnabled: {
+        type: Boolean,
+        reflectToAttribute: true,
+        value: () => loadTimeData.getBoolean('enableRegionSelectedGlow'),
+      },
       selectionOverlayRect: Object,
       shouldDarkenScrim: {
         type: Boolean,
@@ -149,6 +157,8 @@ export class PostSelectionRendererElement extends
   declare private canvasPhysicalWidth: number;
   // The bounds of the parent element. This is updated by the parent to avoid
   // this class needing to call getBoundingClientRect().
+  // Whether the region selected glow is enabled via feature flag.
+  declare private regionSelectedGlowEnabled: boolean;
   declare private selectionOverlayRect: DOMRect;
 
   private context: CanvasRenderingContext2D;
@@ -456,6 +466,31 @@ export class PostSelectionRendererElement extends
       this.sliderChangedTimeoutID = -1;
       this.handleGestureEnd();
     }, this.sliderChangedTimeout);
+  }
+
+  private getPostSelectionStyles(): string {
+    const style: string[] = [
+      `--gradient-blue: ${GLIF_HEX_COLORS.blue}`,
+      `--gradient-red: ${GLIF_HEX_COLORS.red}`,
+      `--gradient-yellow: ${GLIF_HEX_COLORS.yellow}`,
+      `--gradient-green: ${GLIF_HEX_COLORS.green}`,
+    ];
+
+    if (!this.selectionOverlayRect) {
+      return style.join('; ');
+    }
+
+    const imageBounds = this.selectionOverlayRect;
+    const selectionWidth = this.width * imageBounds.width;
+    const selectionHeight = this.height * imageBounds.height;
+    if (selectionWidth > 0 && selectionHeight > 0) {
+      const minSide = Math.min(selectionWidth, selectionHeight);
+      const blurAmount =
+          Math.max(MIN_BLUR, Math.min(Math.round(minSide / 2), MAX_BLUR));
+      style.push(`--region-selected-glow-blur-radius: ${blurAmount}px`);
+    }
+
+    return style.join('; ');
   }
 
   private setDimensions(

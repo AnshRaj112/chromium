@@ -723,6 +723,7 @@ Mae'n bosib y bydd caniatadau rydych eisoes wedi'u rhoi i apiau yn berthnasol i'
 <translation id="1494349716233667318">Gall gwefannau ofyn am ddefnyddio ffontiau sydd wedi'u gosod ar eich dyfais</translation>
 <translation id="1494429729245089920">Mae'r peiriant rhithwir "<ph name="VM_NAME" />" yn bodoli, ond nid yw'n ymddangos ei fod yn beiriant rhithwir <ph name="APP_NAME" /> dilys. Cysylltwch â'ch gweinyddwr.</translation>
 <translation id="1495677929897281669">Yn ôl i'r tab</translation>
+<translation id="1496514951988037011">enw defnyddiwr</translation>
 <translation id="1498498210836053409">Diffodd y modd gludiog wrth olygu testun (Modd Gludiog Smart)</translation>
 <translation id="1499041187027566160">codi'r sain</translation>
 <translation id="1500297251995790841">Dyfais anhysbys [<ph name="VENDOR_ID" />:<ph name="PRODUCT_ID" />]</translation>
@@ -1450,6 +1451,7 @@ Mae'n bosib y bydd caniatadau rydych eisoes wedi'u rhoi i apiau yn berthnasol i'
 <translation id="1981434377190976112">Darllen eich holl ddata ar bob gwefan</translation>
 <translation id="1982851102516626421">Rydych wedi'ch allgofnodi</translation>
 <translation id="1983612835086592681">Agorwyd gennych yn yr wythnos ddiwethaf</translation>
+<translation id="1984087999855033707">rhif ffôn</translation>
 <translation id="1984417487208496350">Dim diogelwch (ni argymhellir)</translation>
 <translation id="1984683754853869253">Ydych chi eisiau creu proffil newydd ar gyfer ysgol?</translation>
 <translation id="198507684520034826">Cymorth</translation>
@@ -2653,7 +2655,6 @@ Mae Voice Match yn helpu Google Assistant i adnabod llais <ph name="SUPERVISED_U
 <translation id="2798347533012571708">Cadw diweddariadau</translation>
 <translation id="2799162042226656283">Eich Chrome</translation>
 <translation id="2799223571221894425">Ail-lansio</translation>
-<translation id="2800309299477632167">Map bysellau personol</translation>
 <translation id="2800760947029405028">Uwchlwytho llun</translation>
 <translation id="2800996978423439835">Cael eich nodau tudalen a rhagor ar eich holl ddyfeisiau</translation>
 <translation id="2801134910297796778">Wedi mewngofnodi i <ph name="EMAIL" /></translation>
@@ -4770,7 +4771,6 @@ Mae <ph name="DOMAIN" /> yn gofyn i chi gadw'ch cerdyn smart wedi'i fewnosod.</t
 <translation id="4289540628985791613">Trosolwg</translation>
 <translation id="428963538941819373">Gall y gwefannau hyn ddefnyddio gwybodaeth y maent wedi'i chadw amdanoch wrth i chi bori <ph name="HOST" /></translation>
 <translation id="4289732974614035569">Dewiswch PIN</translation>
-<translation id="4290526909608432059">Bydd cefnogaeth ar gyfer apiau Chrome yn dod i ben yn fuan. I ddysgu am eich opsiynau, cysylltwch â datblygwr yr ap neu'ch tîm cymorth TG.</translation>
 <translation id="4290791284969893584">Ar ôl cau tudalen, mae'n bosib na fydd y tasgau y gwnaethoch eu cychwyn yn gorffen</translation>
 <translation id="4290826901752066702"><ph name="NUM" /> aelod</translation>
 <translation id="4290898381118933198">Sweipiwch i lywio rhwng tudalennau</translation>
@@ -7638,6 +7638,7 @@ Mae <ph name="DOMAIN" /> yn gofyn i chi gadw'ch cerdyn smart wedi'i fewnosod.</t
 <translation id="6365069501305898914">Facebook</translation>
 <translation id="6365411474437319296">Ychwanegu'ch teulu a'ch ffrindiau</translation>
 <translation id="6367097275976877956">Ydych chi am weithredu ChromeVox, y darllenydd sgrîn integredig ar gyfer ChromeOS? Os felly, pwyswch Space.</translation>
+<translation id="6367196786591004737">Dileu'r cofnod</translation>
 <translation id="6367396429435748845">Pwyswch <ph name="ALT" /> + <ph name="LAUNCHER" /> + <ph name="NUM_4" /> i seibio ac ailddechrau bysellau llygoden</translation>
 <translation id="6367985768157257101">Derbyn gyda Rhannu Gerllaw?</translation>
 <translation id="6368157733310917710">&amp;Cyfeiriadau a rhagor</translation>
@@ -7979,7 +7980,6 @@ Mae gennych # cyfrinair arall sydd wedi'u darganfod. Mae Rheolwr Cyfrineiriau Go
 <translation id="6610002944194042868">Opsiynau cyfieithu</translation>
 <translation id="6610064275805055636">Rheoli apiau gwe wedi'u hynysu</translation>
 <translation id="6611432349566876829"><ph name="NUM" /> o dabiau</translation>
-<translation id="6611972847767394631">Gallwch ddod o hyd i'ch tabiau yma</translation>
 <translation id="661266467055912436">Yn gwella diogelwch i chi a phawb ar y we.</translation>
 <translation id="6613267708691765962">Sganio am ddrwgwedd...</translation>
 <translation id="6615455863669487791">Dangos i fi</translation>
@@ -8306,7 +8306,6 @@ Mae gennych # cyfrinair arall sydd wedi'u darganfod. Mae Rheolwr Cyfrineiriau Go
 <translation id="6831043979455480757">Cyfieithu</translation>
 <translation id="6832218595502288407">Alinio i’r chwith</translation>
 <translation id="6832815922179448173">{MULTI_GROUP_TAB_COUNT,plural, =0{Tynnu'r Tab a Dileu'r Grŵp?}=1{Tynnu'r Tabiau a Dileu'r Grŵp?}two{Tynnu'r Tabiau a Dileu'r Grwpiau?}few{Tynnu'r Tabiau a Dileu'r Grwpiau?}many{Tynnu'r Tabiau a Dileu'r Grwpiau?}other{Tynnu'r Tabiau a Dileu'r Grwpiau?}}</translation>
-<translation id="6833103209700200188">Troedyn</translation>
 <translation id="6833479554815567477">Mae tab wedi'i dynnu o'r grŵp <ph name="GROUP_NAME" /> - <ph name="GROUP_CONTENTS" /></translation>
 <translation id="6833753236242482566">Cytbwys (argymhellir)</translation>
 <translation id="6835762382653651563">Cysylltwch â'r Rhyngrwyd i ddiweddaru eich <ph name="DEVICE_TYPE" />.</translation>
@@ -10641,6 +10640,7 @@ Cadwch eich ffeil allwedd mewn man diogel. Bydd ei hangen arnoch i greu fersiyna
 <translation id="8472623782143987204">gyda chefnogaeth caledwedd</translation>
 <translation id="8473540203671727883">Adrodd testun sydd o dan y llygoden</translation>
 <translation id="8473863474539038330">Cyfeiriadau a rhagor</translation>
+<translation id="847433688444405067">Pori ar draws dyfeisiau</translation>
 <translation id="8474378002946546633">Caniatáu hysbysiadau</translation>
 <translation id="8474561048882755118">Yn eich helpu i weld cynhyrchion tebyg ochr yn ochr a chymharu'r manylion sy'n bwysig i chi yn hawdd</translation>
 <translation id="8475313423285172237">Ychwanegodd rhaglen arall ar eich cyfrifiadur estyniad a allai newid y ffordd y mae Chrome yn gweithio.</translation>

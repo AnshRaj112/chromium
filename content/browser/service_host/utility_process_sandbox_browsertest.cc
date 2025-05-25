@@ -11,7 +11,6 @@
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "build/build_config.h"
-#include "build/chromeos_buildflags.h"
 #include "content/browser/service_host/utility_process_host.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
@@ -77,14 +76,15 @@ class UtilityProcessSandboxBrowserTest
     done_closure_ =
         base::BindOnce(&UtilityProcessSandboxBrowserTest::DoneRunning,
                        base::Unretained(this), run_loop.QuitClosure());
-    UtilityProcessHost* host = new UtilityProcessHost();
-    host->SetSandboxType(GetParam());
-    host->SetName(u"SandboxTestProcess");
-    host->SetMetricsName(kTestProcessName);
-    EXPECT_TRUE(host->Start());
+    EXPECT_TRUE(UtilityProcessHost::Start(
+        UtilityProcessHost::Options()
+            .WithSandboxType(GetParam())
+            .WithName(u"SandboxTestProcess")
+            .WithMetricsName(kTestProcessName)
+            .WithBoundReceiverOnChildProcessForTesting(
+                service_.BindNewPipeAndPassReceiver())
+            .Pass()));
 
-    host->GetChildProcess()->BindReceiver(
-        service_.BindNewPipeAndPassReceiver());
     service_->GetSandboxStatus(
         base::BindOnce(&UtilityProcessSandboxBrowserTest::OnGotSandboxStatus,
                        base::Unretained(this)));

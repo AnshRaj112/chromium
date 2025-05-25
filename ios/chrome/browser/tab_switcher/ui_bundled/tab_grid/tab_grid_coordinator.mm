@@ -43,9 +43,12 @@
 #import "ios/chrome/browser/feature_engagement/model/tracker_factory.h"
 #import "ios/chrome/browser/find_in_page/model/find_tab_helper.h"
 #import "ios/chrome/browser/find_in_page/model/util.h"
+#import "ios/chrome/browser/first_run/ui_bundled/guided_tour/guided_tour_coordinator.h"
 #import "ios/chrome/browser/history/ui_bundled/history_coordinator.h"
 #import "ios/chrome/browser/history/ui_bundled/history_coordinator_delegate.h"
 #import "ios/chrome/browser/history/ui_bundled/public/history_presentation_delegate.h"
+#import "ios/chrome/browser/incognito_reauth/ui_bundled/features.h"
+#import "ios/chrome/browser/incognito_reauth/ui_bundled/incognito_reauth_scene_agent.h"
 #import "ios/chrome/browser/main/ui_bundled/bvc_container_view_controller.h"
 #import "ios/chrome/browser/menu/ui_bundled/tab_context_menu_delegate.h"
 #import "ios/chrome/browser/policy/model/policy_util.h"
@@ -174,6 +177,7 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
 @interface TabGridCoordinator () <BringAndroidTabsCommands,
                                   GridCoordinatorAudience,
                                   GridMediatorDelegate,
+                                  GuidedTourCoordinatorDelegate,
                                   HistoryCoordinatorDelegate,
                                   HistoryPresentationDelegate,
                                   HistorySyncPopupCoordinatorDelegate,
@@ -287,7 +291,12 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
 
 @end
 
-@implementation TabGridCoordinator
+@implementation TabGridCoordinator {
+  // Coordinator for the long press step of the guided tour.
+  GuidedTourCoordinator* _guidedTourCoordinator;
+  // Completion block for when the `_guidedTourCoordinator` finishes.
+  ProceduralBlock _guidedTourCompletionBlock;
+}
 // Superclass property.
 @synthesize baseViewController = _baseViewController;
 // Ivars are not auto-synthesized when accessors are overridden.
@@ -483,6 +492,17 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
   }
 
   BOOL toTabGroup = tabGroup != nullptr;
+
+  if (IsIOSSoftLockEnabled()) {
+    // Only check the lock state if animation is enabled and the current
+    // interface is Incognito.
+    if (animated && currentActivePage == TabGridPageIncognitoTabs) {
+      IncognitoReauthSceneAgent* incognitoReauthAgent =
+          [IncognitoReauthSceneAgent
+              agentFromScene:self.incognitoBrowser->GetSceneState()];
+      animated = !incognitoReauthAgent.isAuthenticationRequired;
+    }
+  }
 
   __weak __typeof(self) weakSelf = self;
 
@@ -1832,6 +1852,28 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
     return;
   }
   [self showActiveTabInPage:targetPage focusOmnibox:NO];
+}
+
+- (void)showGuidedTourLongPressStepWithDismissalCompletion:
+    (ProceduralBlock)completion {
+  _guidedTourCoordinator =
+      [[GuidedTourCoordinator alloc] initWithStep:GuidedTourStepTabGridLongPress
+                               baseViewController:self.baseViewController
+                                          browser:self.regularBrowser
+                                         delegate:self];
+  [_guidedTourCoordinator start];
+  _guidedTourCompletionBlock = completion;
+}
+
+#pragma mark - GuidedTourCoordinatorDelegate
+
+- (void)nextTappedForStep:(GuidedTourStep)step {
+}
+
+- (void)stepCompleted:(GuidedTourStep)step {
+  [_guidedTourCoordinator stop];
+  _guidedTourCoordinator = nil;
+  _guidedTourCompletionBlock();
 }
 
 #pragma mark - SnackbarCoordinatorDelegate

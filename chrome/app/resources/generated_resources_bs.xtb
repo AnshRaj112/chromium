@@ -2651,7 +2651,6 @@ Postavkama ovog računa možete upravljati instaliranjem aplikacije Family Link 
 <translation id="2798347533012571708">Zadrži ažuriranja</translation>
 <translation id="2799162042226656283">Vaš Chrome</translation>
 <translation id="2799223571221894425">Ponovo pokreni</translation>
-<translation id="2800309299477632167">Prilagođena mapa tipki</translation>
 <translation id="2800760947029405028">Otpremite sliku</translation>
 <translation id="2800996978423439835">Pristupajte svojim oznakama i drugim podacima na svim svojim uređajima</translation>
 <translation id="2801134910297796778">Prijavljeni ste na <ph name="EMAIL" /></translation>
@@ -4768,7 +4767,6 @@ Domena <ph name="DOMAIN" /> zahtijeva da pametna kartica ostane umetnuta.</trans
 <translation id="4289540628985791613">Pregled</translation>
 <translation id="428963538941819373">Ove web lokacije mogu koristiti informacije o vama koje su sačuvale dok ste pregledali <ph name="HOST" /></translation>
 <translation id="4289732974614035569">Odaberite PIN</translation>
-<translation id="4290526909608432059">Podrška za Chromeove aplikacije će se uskoro završiti. Da saznate više o opcijama, kontaktirajte programera aplikacije ili tim za IT podršku.</translation>
 <translation id="4290791284969893584">Kada zatvorite stranicu, zadaci koje ste započeli se možda neće završiti</translation>
 <translation id="4290826901752066702"><ph name="NUM" /> član</translation>
 <translation id="4290898381118933198">Prevucite za kretanje između stranica</translation>
@@ -7636,6 +7634,7 @@ Domena <ph name="DOMAIN" /> zahtijeva da pametna kartica ostane umetnuta.</trans
 <translation id="6365069501305898914">Facebook</translation>
 <translation id="6365411474437319296">Dodajte porodicu i prijatelje</translation>
 <translation id="6367097275976877956">Želite li aktivirati ChromeVox, ugrađeni čitač ekrana za ChromeOS? Ako želite, pritisnite tipku za razmak.</translation>
+<translation id="6367196786591004737">Izbrišite unos</translation>
 <translation id="6367396429435748845">Pritisnite <ph name="ALT" /> + <ph name="LAUNCHER" /> + <ph name="NUM_4" /> da pauzirate i nastavite tipke za miš</translation>
 <translation id="6367985768157257101">Primiti pomoću Dijeljenja u blizini?</translation>
 <translation id="6368157733310917710">&amp;Adrese i drugo</translation>
@@ -7973,7 +7972,6 @@ Imate još # ugroženih lozinki. Googleov Upravitelj lozinki preporučuje da odm
 <translation id="6610002944194042868">Opcije za prevođenje</translation>
 <translation id="6610064275805055636">Upravljajte izoliranim web aplikacijama</translation>
 <translation id="6611432349566876829"><ph name="NUM" /> kartica</translation>
-<translation id="6611972847767394631">Ovdje pronađite svoje kartice</translation>
 <translation id="661266467055912436">Poboljšava vašu i svačiju sigurnost na webu.</translation>
 <translation id="6613267708691765962">Skeniranje radi provjere prisustva zlonamjernog softvera…</translation>
 <translation id="6615455863669487791">Pokaži mi</translation>
@@ -8300,7 +8298,6 @@ Imate još # ugroženih lozinki. Googleov Upravitelj lozinki preporučuje da odm
 <translation id="6831043979455480757">Prevedi</translation>
 <translation id="6832218595502288407">Poravnaj lijevo</translation>
 <translation id="6832815922179448173">{MULTI_GROUP_TAB_COUNT,plural, =0{Ukloniti karticu i izbrisati grupu?}=1{Ukloniti kartice i izbrisati grupu?}one{Ukloniti kartice i izbrisati grupe?}few{Ukloniti kartice i izbrisati grupe?}other{Ukloniti kartice i izbrisati grupe?}}</translation>
-<translation id="6833103209700200188">Podnožje</translation>
 <translation id="6833479554815567477">Kartica je uklonjena iz grupe <ph name="GROUP_NAME" /> – <ph name="GROUP_CONTENTS" /></translation>
 <translation id="6833753236242482566">Uravnoteženo (preporučeno)</translation>
 <translation id="6835762382653651563">Povežite se na internet da ažurirate uređaj <ph name="DEVICE_TYPE" />.</translation>
@@ -10008,6 +10005,7 @@ Fajl ključa: <ph name="KEY_FILE" />
 <translation id="8037801708772278989">Upravo provjereno</translation>
 <translation id="8038111231936746805">(zadano)</translation>
 <translation id="8039151841428107077">{NUM_OF_FILES,plural, =1{Kopiranje 1 fajla na uslugu <ph name="CLOUD_PROVIDER" />}one{Kopiranje {NUM_OF_FILES} fajla na uslugu <ph name="CLOUD_PROVIDER" />}few{Kopiranje {NUM_OF_FILES} fajla na uslugu <ph name="CLOUD_PROVIDER" />}other{Kopiranje {NUM_OF_FILES} fajlova na uslugu <ph name="CLOUD_PROVIDER" />}}</translation>
+<translation id="8039525676147630657">Ova Chromeova aplikacija će prestati funkcionirati nakon ažuriranja verzije ChromeOS-a. Sačuvajte podatke aplikacije koje želite zadržati. Da saznate više o opcijama, kontaktirajte programera aplikacije ili tim za IT podršku.</translation>
 <translation id="8041089156583427627">Pošaljite povratne informacije</translation>
 <translation id="8041093619605951337">Sretno</translation>
 <translation id="8041267120753677077">Prenosite aplikacije s telefona</translation>
@@ -10636,6 +10634,7 @@ Fajl ključa: <ph name="KEY_FILE" />
 <translation id="8472623782143987204">s hardverskom podlogom</translation>
 <translation id="8473540203671727883">Izgovaraj tekst koji se nalazi ispod kursora miša</translation>
 <translation id="8473863474539038330">Adrese i još mnogo toga</translation>
+<translation id="847433688444405067">Pregledajte na uređajima</translation>
 <translation id="8474378002946546633">Dopusti obavijesti</translation>
 <translation id="8474561048882755118">Pomaže da vam se slični proizvodi prikažu jedan pored drugog i da jednostavno uporedite detalje koji su vam važni</translation>
 <translation id="8475313423285172237">Drugi program na vašem računaru je dodao ekstenziju koja može promijeniti rad Chromea.</translation>

@@ -4,12 +4,13 @@
 
 #include "content/public/browser/permission_overrides.h"
 
+#include "base/containers/contains.h"
+#include "base/containers/map_util.h"
 #include "base/types/optional_ref.h"
+#include "base/types/optional_util.h"
 #include "third_party/blink/public/common/permissions/permission_utils.h"
 
 namespace content {
-using PermissionOverridesMap =
-    base::flat_map<blink::PermissionType, blink::mojom::PermissionStatus>;
 using PermissionStatus = blink::mojom::PermissionStatus;
 
 PermissionOverrides::PermissionOverrides() = default;
@@ -40,13 +41,13 @@ void PermissionOverrides::Set(base::optional_ref<const url::Origin> origin,
 std::optional<PermissionStatus> PermissionOverrides::Get(
     const url::Origin& origin,
     blink::PermissionType permission) const {
-  auto current_override = overrides_.find({origin, permission});
-  if (current_override == overrides_.end())
-    current_override = overrides_.find({global_overrides_origin_, permission});
-  if (current_override == overrides_.end())
-    return std::nullopt;
+  const auto* status = base::FindOrNull(overrides_, {origin, permission});
+  if (!status) {
+    status =
+        base::FindOrNull(overrides_, {global_overrides_origin_, permission});
+  }
 
-  return current_override->second;
+  return base::OptionalFromPtr(status);
 }
 
 void PermissionOverrides::Reset(base::optional_ref<const url::Origin> origin) {
@@ -61,13 +62,13 @@ void PermissionOverrides::Reset(base::optional_ref<const url::Origin> origin) {
 void PermissionOverrides::GrantPermissions(
     base::optional_ref<const url::Origin> origin,
     const std::vector<blink::PermissionType>& permissions) {
-  const std::vector<blink::PermissionType>& kAllPermissionTypes =
-      blink::GetAllPermissionTypes();
-  PermissionOverridesMap granted_overrides;
-  for (const auto& permission : kAllPermissionTypes)
-    granted_overrides[permission] = PermissionStatus::DENIED;
-  for (const auto& permission : permissions)
-    granted_overrides[permission] = PermissionStatus::GRANTED;
+  const auto granted_overrides =
+      base::MakeFlatMap<blink::PermissionType, PermissionStatus>(
+          blink::GetAllPermissionTypes(), {}, [&](blink::PermissionType type) {
+            return std::make_pair(type, base::Contains(permissions, type)
+                                            ? PermissionStatus::GRANTED
+                                            : PermissionStatus::DENIED);
+          });
   Reset(origin);
   for (const auto& setting : granted_overrides)
     Set(origin, setting.first, setting.second);

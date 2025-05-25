@@ -441,6 +441,15 @@ chromium-metrics-reviews@google.com.
 
 <!-- LINT.ThenChange(//content/browser/attribution_reporting/attribution_storage_sql.h:InitStatus) -->
 
+<!-- LINT.IfChange(ConversionTriggerDataMatching) -->
+
+<enum name="ConversionTriggerDataMatching">
+  <int value="0" label="modulus"/>
+  <int value="1" label="exact"/>
+</enum>
+
+<!-- LINT.ThenChange(//components/attribution_reporting/trigger_data_matching.mojom:TriggerDataMatching) -->
+
 <!-- LINT.IfChange(ConversionTriggerRegistrationError) -->
 
 <enum name="ConversionTriggerRegistrationError">
@@ -480,7 +489,7 @@ chromium-metrics-reviews@google.com.
   <int value="28"
       label="trigger_context_id disallowed for
              aggregatable_source_registration_time"/>
-  <int value="29" label="event_trigger_data value field is invalid"/>
+  <int value="29" label="(Obsolete) event_trigger_data value field is invalid"/>
   <int value="30" label="aggregatable_filtering_id_max_bytes field is invalid"/>
   <int value="31"
       label="non-default aggregatable_filtering_id_max_bytes is disallowed

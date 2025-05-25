@@ -2287,6 +2287,13 @@ Voor de privacy ondersteunt dit beleid geen updates van de beleidswaarde tijdens
 De gebruiker kan erop vertrouwen dat er geen andere apps zijn die de schermen kunnen vastleggen na het inloggen als dit nog niet was toegestaan bij de start van de sessie.</translation>
 <translation id="2615240493030733717">Informatie over tijdzone rapporteren</translation>
 <translation id="2619258867868873629">De bestemming Opslaan als pdf en de bestemming Opslaan in Google Drive op <ph name="PRODUCT_OS_NAME" />-apparaten</translation>
+<translation id="262035875928535253">Stel de lijst met domeinen in waarvoor <ph name="PRODUCT_NAME" /> <ph name="PASSWORD_MANAGER_NAME" /> moet uitzetten. Dit betekent dat de workflows Opslaan en Invullen worden uitgezet, zodat wachtwoorden voor die websites niet worden opgeslagen of automatisch worden ingevuld in webformulieren.
+
+Als een domein in de lijst staat, wordt <ph name="PASSWORD_MANAGER_NAME" /> voor dat domein uitgezet.
+
+Als een domein niet in de lijst staat, is <ph name="PASSWORD_MANAGER_NAME" /> beschikbaar voor dat domein.
+
+Als je het beleid niet instelt, is <ph name="PASSWORD_MANAGER_NAME" /> beschikbaar voor alle domeinen.</translation>
 <translation id="2621290137818374425">Als je het beleid instelt, wordt de handhaving van vereisten voor openbaarmaking via Certificaattransparantie uitgezet voor de hostnamen in de opgegeven URL's. Hoewel het moeilijker wordt om misbruik van certificaten vast te stellen, kunnen hosts certificaten blijven gebruiken die anders niet zouden worden vertrouwd (omdat deze niet op de juiste manier openbaar zijn gemaakt).
 
 Als je het beleid niet instelt, betekent dit dat als certificaten die openbaar moeten worden gemaakt via Certificaattransparantie niet openbaar worden gemaakt, de betreffende certificaten niet door <ph name="PRODUCT_NAME" /> worden vertrouwd.
@@ -4632,7 +4639,6 @@ Dit is verwijderd in M112.</translation>
 Als je het beleid niet toepast, worden pdf-bestanden geopend, tenzij gebruikers de pdf-plug-in uitzetten.
 
 Als je het beleid instelt, kunnen gebruikers dit niet wijzigen in <ph name="PRODUCT_NAME" />. Als je het beleid niet instelt, kunnen gebruikers kiezen of ze pdf-bestanden extern willen openen.</translation>
-<translation id="4413764344717830250">Bepalen of de toeschrijving van de extensie zichtbaar is op de pagina Nieuw tabblad voor beheerde browsers</translation>
 <translation id="4415603335307944578">Als dit beleid is ingesteld op true of niet is geconfigureerd, toont de browser opnieuw de welkomstpagina bij de eerste opstart na een upgrade van het besturingssysteem.
 
       Als dit beleid is ingesteld op false, toont de browser de welkomstpagina niet bij de eerste opstart na een upgrade van het besturingssysteem.</translation>
@@ -6510,11 +6516,6 @@ Ga naar <ph name="DEFAULT_DIRECT_SOCKETS_SETTING_POLICY_NAME" />, <ph name="DIRE
 <translation id="5670249935663090320">Als je het beleid toepast of niet instelt, wordt <ph name="PRODUCT_NAME" /> aangezet en kunnen gebruikers dit starten via het app-menu, de paginacontextmenu's, mediabediening op websites die werken met Cast en (als dit wordt getoond) het Cast-icoon op de werkbalk.
 
 Als je het beleid niet toepast, wordt <ph name="PRODUCT_NAME" /> uitgezet.</translation>
-<translation id="5671392367521500075">Dit beleid bepaalt of de toeschrijving van de extensie zichtbaar is in de voettekst van de pagina Nieuw tabblad (NTP) als de NTP wordt beheerd door een extensie. De NTP-voettekst toont standaard informatie over de extensie die de NTP beheert.
-
-Als je dit beleid niet instelt of instelt op Waar, tonen browsers met een NTP die wordt beheerd door een extensie, de naam van de extensie en een link naar de extensie.
-
-Als je dit beleid instelt op Onwaar, wordt de toeschrijving van de extensie verborgen.</translation>
 <translation id="5673254755365419402">De functie voor fingerprinting-beveiliging van <ph name="PRIVACY_SANDBOX_NAME" /> aanzetten.</translation>
 <translation id="567377007899266033">Als het beleid wordt ingesteld op True, worden rapporten over belangrijke, op basis van beleid geactiveerde installatiegebeurtenissen voor extensies naar Google gestuurd. Er worden geen gebeurtenissen geregistreerd als het beleid is ingesteld op False. Als het beleid niet is ingesteld, is True de standaardwaarde.</translation>
 <translation id="5673780539191375049">Hiermee stel je het tijdsinterval (in minuten) in waarmee het verificatieproces van de gebruiker automatisch opnieuw wordt geladen op hun <ph name="PRODUCT_OS_NAME" />-apparaat. Dit beleid is geïntroduceerd om de vervaldatum te verwerken van bepaalde services die worden gebruikt in verificatieprocessen als het apparaat enige tijd niet wordt gebruikt.
@@ -9258,6 +9259,7 @@ Als je geen beleid opgeeft, zijn er geen uitzonderingen toegestaan op <ph name="
           Als je het beleid instelt op False of niet instelt, wordt de functie voor automatisch versturen van pincodes niet toegepast op het vergrendelscherm en het inlogscherm van gebruikers.
 
           Als dit beleid is ingesteld, kunnen gebruikers de functie niet aanzetten.</translation>
+<translation id="7612030083959326401">De lijst met domeinen instellen waarvoor <ph name="PASSWORD_MANAGER_NAME" /> (Opslaan en Invullen) wordt uitgezet</translation>
 <translation id="7612059745454194563">Niet toestaan dat de promotie voor de extensie voor inloggegevensproviders wordt getoond</translation>
 <translation id="7612157962821894603">Markeringen voor het hele systeem die worden toegepast bij het starten van <ph name="PRODUCT_NAME" /></translation>
 <translation id="7613115815080726221">De tijdsduur zonder gebruikersinvoer waarna de actie voor inactiviteit wordt ondernomen (in milliseconden)</translation>

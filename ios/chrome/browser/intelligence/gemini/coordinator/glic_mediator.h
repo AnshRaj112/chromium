@@ -5,10 +5,11 @@
 #ifndef IOS_CHROME_BROWSER_INTELLIGENCE_GEMINI_COORDINATOR_GLIC_MEDIATOR_H_
 #define IOS_CHROME_BROWSER_INTELLIGENCE_GEMINI_COORDINATOR_GLIC_MEDIATOR_H_
 
-#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 
 #import "ios/chrome/browser/intelligence/gemini/ui/glic_consent_mutator.h"
 
+class Browser;
 class PrefService;
 
 @protocol GLICMediatorDelegate;
@@ -16,10 +17,15 @@ class PrefService;
 // GLIC Mediator.
 @interface GLICMediator : NSObject <GLICConsentMutator>
 
-- (instancetype)initWithPrefService:(PrefService*)prefService;
+- (instancetype)initWithPrefService:(PrefService*)prefService
+                            browser:(Browser*)browser
+                 baseViewController:(UIViewController*)baseViewController;
 
 // The delegate for this mediator.
 @property(nonatomic, weak) id<GLICMediatorDelegate> delegate;
+
+// Presents the Glic flow, which can either show the FRE or Glic directly.
+- (void)presentGlicFlow;
 
 @end
 

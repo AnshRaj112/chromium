@@ -487,6 +487,13 @@ AutofillPlusAddressDelegate* ChromeAutofillClient::GetPlusAddressDelegate() {
       web_contents()->GetBrowserContext());
 }
 
+PasswordManagerDelegate* ChromeAutofillClient::GetPasswordManagerDelegate(
+    const FieldGlobalId& field_id) {
+  ChromePasswordManagerClient* client =
+      ChromePasswordManagerClient::FromWebContents(web_contents());
+  return client ? client->GetAutofillDelegate(field_id) : nullptr;
+}
+
 void ChromeAutofillClient::GetAiPageContent(GetAiPageContentCallback callback) {
   blink::mojom::AIPageContentOptionsPtr extraction_options =
       optimization_guide::DefaultAIPageContentOptions();
@@ -1136,6 +1143,15 @@ std::unique_ptr<AutofillManager> ChromeAutofillClient::CreateManager(
     base::PassKey<ContentAutofillDriver> pass_key,
     ContentAutofillDriver& driver) {
   return std::make_unique<BrowserAutofillManager>(&driver);
+}
+
+credential_management::ContentCredentialManager*
+ChromeAutofillClient::GetContentCredentialManager() {
+  if (auto* chrome_password_manager_client =
+          ChromePasswordManagerClient::FromWebContents(web_contents())) {
+    return chrome_password_manager_client->GetContentCredentialManager();
+  }
+  return nullptr;
 }
 
 void ChromeAutofillClient::set_test_addresses(

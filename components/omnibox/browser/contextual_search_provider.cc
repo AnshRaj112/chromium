@@ -105,9 +105,7 @@ void ContextualSearchProvider::Start(
          omnibox::IsSearchResultsPage(input.current_page_classification())) &&
         (input.current_url().SchemeIsHTTPOrHTTPS() ||
          input.current_url().SchemeIs(url::kFileScheme)) &&
-        (input.IsZeroSuggest() ||
-         input.type() == metrics::OmniboxInputType::EMPTY) &&
-        client()->IsLensEnabled()) {
+        input.IsZeroSuggest() && client()->IsLensEnabled()) {
       AddPageSearchActionMatches(input);
     }
     return;
@@ -320,7 +318,8 @@ void ContextualSearchProvider::AddPageSearchActionMatches(
   // Lens invocation action with secondary text that shows URL host.
   match.takeover_action =
       base::MakeRefCounted<ContextualSearchOpenLensAction>();
-  match.contents = base::UTF8ToUTF16(input.current_url().host());
+  match.contents =
+      base::UTF8ToUTF16(url_formatter::StripWWW(input.current_url().host()));
   if (!match.contents.empty()) {
     match.contents_class = {{0, ACMatchClassification::DIM}};
   }
@@ -328,6 +327,7 @@ void ContextualSearchProvider::AddPageSearchActionMatches(
   if (!match.description.empty()) {
     match.description_class = {{0, ACMatchClassification::NONE}};
   }
+  match.fill_into_edit = match.description;
   matches_.push_back(match);
 }
 

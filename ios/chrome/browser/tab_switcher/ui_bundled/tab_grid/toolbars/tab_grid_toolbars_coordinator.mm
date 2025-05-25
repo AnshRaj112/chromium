@@ -88,6 +88,7 @@
              arrowDirection:BubbleArrowDirectionUp
                   alignment:BubbleAlignmentCenter
                  bubbleType:BubbleViewTypeDefault
+            pageControlPage:BubblePageControlPageNone
           dismissalCallback:^(IPHDismissalReasonType reason) {
             [weakSelf savedTabGroupIPHDismissed];
           }];
@@ -114,6 +115,18 @@
   [self.topToolbar highlightPageControlItem:TabGridPageIncognitoTabs];
   _guidedTourCoordinator =
       [[GuidedTourCoordinator alloc] initWithStep:GuidedTourStepTabGridIncognito
+                               baseViewController:self.baseViewController
+                                          browser:self.browser
+                                         delegate:self];
+  [_guidedTourCoordinator start];
+  _guidedTourCompletionBlock = completion;
+}
+
+- (void)showGuidedTourTabGroupStepWithDismissalCompletion:
+    (ProceduralBlock)completion {
+  [self.topToolbar highlightPageControlItem:TabGridPageTabGroups];
+  _guidedTourCoordinator =
+      [[GuidedTourCoordinator alloc] initWithStep:GuidedTourStepTabGridTabGroup
                                baseViewController:self.baseViewController
                                           browser:self.browser
                                          delegate:self];

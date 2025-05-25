@@ -10,7 +10,6 @@
 #include "base/metrics/field_trial_params.h"
 #include "build/branding_buildflags.h"
 #include "build/build_config.h"
-#include "build/chromeos_buildflags.h"
 #include "chromeos/components/libsegmentation/buildflags.h"
 #include "chromeos/constants/chromeos_features.h"
 
@@ -51,12 +50,6 @@ BASE_FEATURE(kAllowCrossDeviceFeatureSuite,
 BASE_FEATURE(kAlwaysReinstallSystemWebApps,
              "ReinstallSystemWebApps",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Shows settings for adjusting scroll acceleration/sensitivity for
-// mouse.
-BASE_FEATURE(kAllowScrollSettings,
-             "AllowScrollSettings",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAltClickAndSixPackCustomization,
              "AltClickAndSixPackCustomization",
@@ -316,11 +309,17 @@ BASE_FEATURE(kBocaCaptionToggle,
 // client for Spotlight within the Boca SWA.
 BASE_FEATURE(kBocaSpotlightRobotRequester,
              "BocaSpotlightRobotRequester",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables or disables enforcing sequential execution for Boca insert activity.
 BASE_FEATURE(kBocaSequentialInsertActivity,
              "BocaSequentialInsertActivity",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables or disables translation toggle for caption bubble in the context of
+// boca.
+BASE_FEATURE(kBocaTranslateToggle,
+             "BocaTranslateToggle",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kCrosSwitcher, "CrosSwitcher", base::FEATURE_DISABLED_BY_DEFAULT);
@@ -3399,8 +3398,7 @@ bool IsAllowAmbientEQEnabled() {
 }
 
 bool IsAllowScrollSettingsEnabled() {
-  return IsInputDeviceSettingsSplitEnabled() &&
-         base::FeatureList::IsEnabled(kAllowScrollSettings);
+  return IsInputDeviceSettingsSplitEnabled();
 }
 
 bool IsAltClickAndSixPackCustomizationEnabled() {
@@ -3556,6 +3554,10 @@ bool IsBocaSpotlightRobotRequesterEnabled() {
 
 bool IsBocaSequentialInsertActivityEnabled() {
   return base::FeatureList::IsEnabled(kBocaSequentialInsertActivity);
+}
+
+bool IsBocaTranslateToggleEnabled() {
+  return base::FeatureList::IsEnabled(kBocaTranslateToggle);
 }
 
 bool IsBrightnessControlInSettingsEnabled() {

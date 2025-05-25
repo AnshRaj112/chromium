@@ -2651,7 +2651,6 @@ Ha kezelni szeretné a fiók beállításait, telepítse eszközére a Family Li
 <translation id="2798347533012571708">Frissítések megőrzése</translation>
 <translation id="2799162042226656283">Az Ön Chrome böngészője</translation>
 <translation id="2799223571221894425">Újraindítás</translation>
-<translation id="2800309299477632167">Egyéni billentyűzetkiosztás</translation>
 <translation id="2800760947029405028">Kép feltöltése</translation>
 <translation id="2800996978423439835">A könyvjelzők és egyebek elérése bármely eszközéről</translation>
 <translation id="2801134910297796778">Bejelentkezve a(z) <ph name="EMAIL" /> fiókba</translation>
@@ -4767,7 +4766,6 @@ Elindítja a következőt: <ph name="CONTROL_PANEL_APPLET_NAME" />?</translation
 <translation id="4289540628985791613">Áttekintés</translation>
 <translation id="428963538941819373">Ezek a webhelyek használhatják az Önről mentett adatokat, miközben a következőt böngészi: <ph name="HOST" /></translation>
 <translation id="4289732974614035569">PIN-kód megadása</translation>
-<translation id="4290526909608432059">A Chrome-alkalmazások támogatása hamarosan megszűnik. A lehetőségekről az alkalmazásfejlesztőtől vagy az informatikai támogatási csapatától kaphat tájékoztatást.</translation>
 <translation id="4290791284969893584">Előfordulhat, hogy az adott oldal bezárása után az elkezdett feladatok nem fejeződnek be</translation>
 <translation id="4290826901752066702"><ph name="NUM" /> tag</translation>
 <translation id="4290898381118933198">Gyors csúsztatással való navigálás az oldalak között</translation>
@@ -7636,6 +7634,7 @@ A(z) <ph name="DOMAIN" /> megköveteli, hogy ne távolítsa el az intelligens k�
 <translation id="6365069501305898914">Facebook</translation>
 <translation id="6365411474437319296">Családtagok és ismerősök hozzáadása</translation>
 <translation id="6367097275976877956">Szeretné aktiválni a ChromeVoxot, a ChromeOS beépített képernyőolvasóját? Ha igen, nyomja meg a szóköz billentyűt.</translation>
+<translation id="6367196786591004737">Bejegyzés törlése</translation>
 <translation id="6367396429435748845">Az egérgombok használatának szüneteltetéséhez és folytatásához nyomja le a következő billentyűkombinációt: <ph name="ALT" /> + <ph name="LAUNCHER" /> + <ph name="NUM_4" /></translation>
 <translation id="6367985768157257101">Fogadja a Közeli megosztás segítségével?</translation>
 <translation id="6368157733310917710">&amp;Címek és egyebek</translation>
@@ -7969,7 +7968,6 @@ A(z) <ph name="DOMAIN" /> megköveteli, hogy ne távolítsa el az intelligens k�
 <translation id="6610002944194042868">Fordítási beállítások</translation>
 <translation id="6610064275805055636">Izolált internetes alkalmazások kezelése</translation>
 <translation id="6611432349566876829"><ph name="NUM" /> lap</translation>
-<translation id="6611972847767394631">Itt találhatja lapjait</translation>
 <translation id="661266467055912436">Javítja az Ön és mindenki más biztonságát az interneten.</translation>
 <translation id="6613267708691765962">Rosszindulatú programok keresése…</translation>
 <translation id="6615455863669487791">Megjelenítés</translation>
@@ -8296,7 +8294,6 @@ A(z) <ph name="DOMAIN" /> megköveteli, hogy ne távolítsa el az intelligens k�
 <translation id="6831043979455480757">Fordítás</translation>
 <translation id="6832218595502288407">Balra igazítás</translation>
 <translation id="6832815922179448173">{MULTI_GROUP_TAB_COUNT,plural, =0{Eltávolítja a lapot és törli a csoportot?}=1{Eltávolítja a lapokat, és törli a csoportot?}other{Eltávolítja a lapokat, és törli a csoportokat?}}</translation>
-<translation id="6833103209700200188">Lábléc</translation>
 <translation id="6833479554815567477">Lap eltávolítva a következő csoportból: <ph name="GROUP_NAME" /> – <ph name="GROUP_CONTENTS" /></translation>
 <translation id="6833753236242482566">Kiegyensúlyozott (ajánlott)</translation>
 <translation id="6835762382653651563">A(z) <ph name="DEVICE_TYPE" /> frissítése érdekében csatlakozzon az internethez.</translation>
@@ -10631,6 +10628,7 @@ A kulcsfájlt tartsa biztonságos helyen. Szüksége lesz rá ahhoz, hogy új ve
 <translation id="8472623782143987204">hardvertámogatott</translation>
 <translation id="8473540203671727883">Kurzor alatti szöveg felolvasása</translation>
 <translation id="8473863474539038330">Címek és egyebek</translation>
+<translation id="847433688444405067">Böngészés több eszközön</translation>
 <translation id="8474378002946546633">Értesítések engedélyezése</translation>
 <translation id="8474561048882755118">Segít a hasonló termékek egymás melletti megtekintésében és az Ön számára fontos részletek könnyű összehasonlításában</translation>
 <translation id="8475313423285172237">A számítógépen lévő egyik program olyan bővítményt adott hozzá, amely módosíthatja a Chrome működését.</translation>

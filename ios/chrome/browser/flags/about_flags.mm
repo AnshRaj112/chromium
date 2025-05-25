@@ -1140,21 +1140,6 @@ const FeatureEntry::FeatureVariation
              kIOSStartTimeBrowserBackgroundRemediationsUpdateFeedRefreshArm),
          nullptr}};
 
-const FeatureEntry::FeatureParam kSetUpListInFirstRunArm1[] = {
-    {set_up_list::kSetUpListInFirstRunParam, "1"}};
-const FeatureEntry::FeatureParam kSetUpListInFirstRunArm2[] = {
-    {set_up_list::kSetUpListInFirstRunParam, "2"}};
-const FeatureEntry::FeatureParam kSetUpListInFirstRunArm3[] = {
-    {set_up_list::kSetUpListInFirstRunParam, "3"}};
-
-const FeatureEntry::FeatureVariation kSetUpListInFirstRunVariations[] = {
-    {" - Variation 1", kSetUpListInFirstRunArm1,
-     std::size(kSetUpListInFirstRunArm1), nullptr},
-    {" - Variation 2", kSetUpListInFirstRunArm2,
-     std::size(kSetUpListInFirstRunArm2), nullptr},
-    {" - Variation 3", kSetUpListInFirstRunArm3,
-     std::size(kSetUpListInFirstRunArm3), nullptr}};
-
 const FeatureEntry::FeatureParam kSetUpListDuration3Days[] = {
     {set_up_list::kSetUpListDurationParam, "2"}};
 const FeatureEntry::FeatureParam kSetUpListDuration5Days[] = {
@@ -1419,6 +1404,8 @@ const FeatureEntry::FeatureParam kSingleScreenForGLICPromoConsent[] = {
     {kGLICPromoConsentParams, "1"}};
 const FeatureEntry::FeatureParam kDoubleScreenForGLICPromoConsent[] = {
     {kGLICPromoConsentParams, "2"}};
+const FeatureEntry::FeatureParam kSkipGLICPromoConsent[] = {
+    {kGLICPromoConsentParams, "3"}};
 
 const FeatureEntry::FeatureVariation kGLICPromoConsentVariations[] = {
     {"Single screen for GLIC Promo Consent Flow",
@@ -1426,7 +1413,9 @@ const FeatureEntry::FeatureVariation kGLICPromoConsentVariations[] = {
      std::size(kSingleScreenForGLICPromoConsent), nullptr},
     {"Double screen for GLIC Promo Consent Flow",
      kDoubleScreenForGLICPromoConsent,
-     std::size(kDoubleScreenForGLICPromoConsent), nullptr}};
+     std::size(kDoubleScreenForGLICPromoConsent), nullptr},
+    {"Skip FRE", kSkipGLICPromoConsent, std::size(kSkipGLICPromoConsent),
+     nullptr}};
 
 // To add a new entry, add to the end of kFeatureEntries. There are four
 // distinct types of entries:
@@ -2371,11 +2360,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
          kIOSStartTimeBrowserBackgroundRemediations,
          kIOSStartTimeBrowserBackgroundRemediationsVariations,
          "IOSStartTimeStartupRemediations")},
-    {"set-up-list-in-first-run", flag_descriptions::kSetUpListInFirstRunName,
-     flag_descriptions::kSetUpListInFirstRunNameDescription, flags_ui::kOsIos,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(set_up_list::kSetUpListInFirstRun,
-                                    kSetUpListInFirstRunVariations,
-                                    "SetUpListInFirstRun")},
     {"lens-unary-http-transport-enabled",
      flag_descriptions::kLensUnaryHttpTransportEnabledName,
      flag_descriptions::kLensUnaryHttpTransportEnabledDescription,
@@ -2708,6 +2692,15 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(
          autofill::features::kAutofillEnableFpanRiskBasedAuthentication)},
+    {"autofill-enable-multiple-request-in-virtual-card-downstream-enrollment",
+     flag_descriptions::
+         kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentName,
+     flag_descriptions::
+         kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentDescription,
+     flags_ui::kOsIos,
+     FEATURE_VALUE_TYPE(
+         autofill::features::
+             kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollment)},
 };
 
 bool SkipConditionalFeatureEntry(const flags_ui::FeatureEntry& entry) {

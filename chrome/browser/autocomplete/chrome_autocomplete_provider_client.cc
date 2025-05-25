@@ -559,18 +559,31 @@ bool ChromeAutocompleteProviderClient::IsLensEnabled() const {
 #if !BUILDFLAG(IS_ANDROID)
   if (auto* lens_search_controller =
           GetLensSearchController(GetWebContents(web_contents_getter_))) {
-    // Only allow Lens entrypoints if the Lens overlay is enabled and Lens is
-    // not currently active. Guaranteed to exist if lens_search_controller is
-    // not null.
+    // Guaranteed to exist if lens_search_controller is  not null.
     return lens_search_controller->GetTabInterface()
         ->GetBrowserWindowInterface()
         ->GetFeatures()
         .lens_overlay_entry_point_controller()
-        ->AreVisible();
+        ->IsEnabled();
   }
 #endif
   return false;
 }
+
+bool ChromeAutocompleteProviderClient::AreLensEntrypointsVisible() const {
+  #if !BUILDFLAG(IS_ANDROID)
+    if (auto* lens_search_controller =
+            GetLensSearchController(GetWebContents(web_contents_getter_))) {
+      // Guaranteed to exist if lens_search_controller is  not null.
+      return lens_search_controller->GetTabInterface()
+          ->GetBrowserWindowInterface()
+          ->GetFeatures()
+          .lens_overlay_entry_point_controller()
+          ->AreVisible();
+    }
+  #endif
+    return false;
+  }
 
 base::CallbackListSubscription
 ChromeAutocompleteProviderClient::GetLensSuggestInputsWhenReady(
@@ -648,12 +661,12 @@ void ChromeAutocompleteProviderClient::OpenLensOverlay(bool show) {
   if (auto* lens_search_controller =
           GetLensSearchController(GetWebContents(web_contents_getter_))) {
     if (show) {
+      lens_search_controller->OpenLensOverlay(
+          lens::LensOverlayInvocationSource::kOmniboxPageAction);
+    } else {
       // TODO(crbug.com/402497756): For prototyping, reusing the existing
       // omnibox entry point. However, for production, create a new invocation
       // source for this new entry point.
-      lens_search_controller->OpenLensOverlay(
-          lens::LensOverlayInvocationSource::kOmnibox);
-    } else {
       lens_search_controller->StartContextualization(
           lens::LensOverlayInvocationSource::kOmnibox);
     }
@@ -669,6 +682,7 @@ void ChromeAutocompleteProviderClient::IssueContextualSearchRequest(
   if (auto* lens_search_controller =
           GetLensSearchController(GetWebContents(web_contents_getter_))) {
     lens_search_controller->IssueContextualSearchRequest(
+        lens::LensOverlayInvocationSource::kOmniboxContextualSuggestion,
         destination_url, match_type, is_zero_prefix_suggestion);
   }
 #endif  // !BUILDFLAG(IS_ANDROID)

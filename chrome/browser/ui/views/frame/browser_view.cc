@@ -1584,11 +1584,9 @@ void BrowserView::UpdateContentsInSplitView(
       multi_contents_view_->GetActiveContentsView()->HasFocus();
 
   // Clear web contents for prev_tabs in preparation to reset for new_tabs.
-  for (std::pair<tabs::TabInterface*, int> split_tab_with_index : prev_tabs) {
-    CHECK(split_id == split_tab_with_index.first->GetSplit());
-    int relative_index = split_tab_with_index.second - first_split_tab_index;
-    multi_contents_view_->SetWebContentsAtIndex(nullptr, relative_index);
-  }
+  multi_contents_view_->GetInactiveContentsView()->SetWebContents(nullptr);
+  multi_contents_view_->GetActiveContentsView()->SetWebContents(nullptr);
+
   // Set web contents in multi_contents_view_ to match new_tabs and update the
   // active multi_contents_view_ index.
   for (std::pair<tabs::TabInterface*, int> split_tab_with_index : new_tabs) {
@@ -2101,10 +2099,10 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
     if (loading_bar_) {
       loading_bar_->SetWebContents(nullptr);
     }
-    active_contents_view->SetWebContents(nullptr);
     if (multi_contents_view_) {
       multi_contents_view_->GetInactiveContentsView()->SetWebContents(nullptr);
     }
+    active_contents_view->SetWebContents(nullptr);
     devtools_web_view_->SetWebContents(nullptr);
   }
 
@@ -3103,10 +3101,6 @@ bool BrowserView::ActivateFirstInactiveBubbleForAccessibility() {
     return true;
   }
 
-  if (GetLocationBarView()->ActivateFirstInactiveBubbleForAccessibility()) {
-    return true;
-  }
-
   // TODO: this fixes https://crbug.com/40668249 and https://crbug.com/40674460,
   // but a more general solution should be desirable to find any bubbles
   // anchored in the views hierarchy.
@@ -3312,14 +3306,6 @@ void BrowserView::TitleWasSet(content::NavigationEntry* entry) {
 
 void BrowserView::TouchModeChanged() {
   MaybeInitializeWebUITabStrip();
-  MaybeShowWebUITabStripIPH();
-}
-
-void BrowserView::MaybeShowWebUITabStripIPH() {
-  if (!webui_tab_strip_) {
-    return;
-  }
-  MaybeShowStartupFeaturePromo(feature_engagement::kIPHWebUITabStripFeature);
 }
 
 void BrowserView::MaybeShowReadingListInSidePanelIPH() {
@@ -5374,7 +5360,6 @@ void BrowserView::AddedToWidget() {
   using_native_frame_ = frame_->ShouldUseNativeFrame();
 
   MaybeInitializeWebUITabStrip();
-  MaybeShowWebUITabStripIPH();
   MaybeShowTabStripToolbarButtonIPH();
 
   // Want to show this promo, but not right at startup.
@@ -6195,7 +6180,15 @@ void BrowserView::MaybeShowFeaturePromo(
 void BrowserView::MaybeShowStartupFeaturePromo(
     user_education::FeaturePromoParams params) {
   if (feature_promo_controller_) {
-    feature_promo_controller_->MaybeShowStartupPromo(std::move(params));
+    // Preconditions for feature promos may require the browser to be fully
+    // constructed before they can be run. Post this task to ensure browser
+    // initialization is complete before attempting to show startup promos.
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(&user_education::FeaturePromoControllerCommon::
+                           MaybeShowStartupPromo,
+                       feature_promo_controller_->GetAsWeakPtr(),
+                       std::move(params)));
   }
 }
 

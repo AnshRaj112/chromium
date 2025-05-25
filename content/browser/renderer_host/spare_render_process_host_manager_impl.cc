@@ -126,6 +126,12 @@ std::string GetCategorizedSpareProcessMaybeTakeTimeUMAName(
     case SpareProcessMaybeTakeAction::kRefusedForPdfContent:
       action_name = "RefusedForPdfContent";
       break;
+    case SpareProcessMaybeTakeAction::kRefusedForJitMismatch:
+      action_name = "RefusedForJitMismatch";
+      break;
+    case SpareProcessMaybeTakeAction::kRefusedForV8OptimizationMismatch:
+      action_name = "RefusedForV8OptimizationMismatch";
+      break;
   }
   return base::StrCat(
       {"BrowserRenderProcessHost.SpareProcessMaybeTakeTime.", action_name});
@@ -577,6 +583,12 @@ RenderProcessHost* SpareRenderProcessHostManagerImpl::MaybeTakeSpare(
     action = SpareProcessMaybeTakeAction::kRefusedBySiteInstance;
   } else if (site_instance->GetSiteInfo().is_pdf()) {
     action = SpareProcessMaybeTakeAction::kRefusedForPdfContent;
+  } else if (next_spare_rph->IsJitDisabled() !=
+             site_instance->GetSiteInfo().is_jit_disabled()) {
+    action = SpareProcessMaybeTakeAction::kRefusedForJitMismatch;
+  } else if (next_spare_rph->AreV8OptimizationsDisabled() !=
+             site_instance->GetSiteInfo().are_v8_optimizations_disabled()) {
+    action = SpareProcessMaybeTakeAction::kRefusedForV8OptimizationMismatch;
   } else {
     action = SpareProcessMaybeTakeAction::kSpareTaken;
   }
@@ -647,10 +659,11 @@ SpareRenderProcessHostManagerImpl::DoesEmbedderAllowSpareUsage(
   // ShouldUseSpareRenderProcessHost starts covering non-process-per-site
   // scenarios).
   std::optional<ContentBrowserClient::SpareProcessRefusedByEmbedderReason>
-      refuse_reason =
-          GetContentClient()->browser()->ShouldUseSpareRenderProcessHost(
-              browser_context, site_instance->GetSiteInfo().site_url());
-  if (refuse_reason.has_value()) {
+      refuse_reason;
+  if (!GetContentClient()->browser()->ShouldUseSpareRenderProcessHost(
+          browser_context, site_instance->GetSiteInfo().site_url(),
+          refuse_reason)) {
+    CHECK(refuse_reason.has_value());
     return refuse_reason;
   }
 

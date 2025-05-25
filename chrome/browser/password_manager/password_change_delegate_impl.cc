@@ -131,6 +131,8 @@ std::unique_ptr<content::WebContents> CreateWebContents(Profile* profile,
 
   new_web_contents->GetController().LoadURLWithParams(
       content::NavigationController::LoadURLParams(url));
+  new_web_contents->Resize({0, 0, 1024, 768});
+
   return new_web_contents;
 }
 
@@ -145,9 +147,7 @@ PasswordChangeDelegateImpl::PasswordChangeDelegateImpl(
       username_(std::move(username)),
       original_password_(std::move(password)),
       profile_(Profile::FromBrowserContext(originator->GetBrowserContext())),
-      originator_(originator->GetWeakPtr()),
-      logs_uploader_(std::make_unique<ModelQualityLogsUploader>(
-          Profile::FromBrowserContext(originator->GetBrowserContext()))) {
+      originator_(originator->GetWeakPtr()) {
   if (auto logger = GetLoggerIfAvailable(originator_)) {
     logger->LogMessage(
         BrowserSavePasswordProgressLogger::STRING_PASSWORD_CHANGE_STARTED);
@@ -183,6 +183,7 @@ void PasswordChangeDelegateImpl::StartPasswordChange() {
 
   executor_ = CreateWebContents(profile_, change_password_url_);
   CHECK(executor_);
+  logs_uploader_ = std::make_unique<ModelQualityLogsUploader>(executor_.get());
   form_finder_ = std::make_unique<ChangePasswordFormFinder>(
       executor_.get(),
       base::BindOnce(&PasswordChangeDelegateImpl::OnPasswordChangeFormFound,

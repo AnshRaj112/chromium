@@ -15,6 +15,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Handler;
+import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -23,6 +24,7 @@ import android.view.View.OnClickListener;
 import android.view.View.OnLayoutChangeListener;
 import android.view.View.OnLongClickListener;
 import android.view.ViewGroup;
+import android.view.ViewGroup.LayoutParams;
 import android.view.ViewStub;
 
 import androidx.activity.BackEventCompat;
@@ -369,6 +371,7 @@ public class ToolbarManager
 
     private @Nullable StripLayoutHelperManager mStripLayoutHelperManager;
     private @Nullable MiniOriginBarController mMiniOriginBarController;
+    private @Nullable ToolbarPositionController mToolbarPositionController;
     private @Nullable UndoBarThrottle mUndoBarThrottle;
 
     private CustomTabCount mCustomTabCount;
@@ -1036,6 +1039,13 @@ public class ToolbarManager
                 mToolbarLongPressMenuHandler.getOnLongClickListener();
 
         ViewStub progressBarStub = mActivity.findViewById(R.id.progress_bar_stub);
+        if (ChromeFeatureList.sAndroidProgressBarVisualUpdate.isEnabled()) {
+            ViewGroup.LayoutParams progressBarParams = progressBarStub.getLayoutParams();
+            progressBarParams.height = mActivity.getResources().getDimensionPixelSize(
+                    R.dimen.toolbar_progress_bar_increased_height);
+            progressBarStub.setLayoutParams(progressBarParams);
+        }
+
         mProgressBarContainer = progressBarStub.inflate();
         ToolbarProgressBar progressBar =
                 mProgressBarContainer.findViewById(R.id.toolbar_progress_bar);
@@ -1621,7 +1631,11 @@ public class ToolbarManager
         if (extensionToolbarStub != null) {
             mExtensionToolbarManager =
                     ExtensionToolbarManager.maybeCreate(
-                            mActivity, extensionToolbarStub, profileSupplier, tabProvider);
+                            mActivity,
+                            extensionToolbarStub,
+                            profileSupplier,
+                            tabProvider,
+                            browsingModeThemeColorProvider);
         }
 
         TraceEvent.end("ToolbarManager.ToolbarManager");
@@ -1671,22 +1685,27 @@ public class ToolbarManager
                         mControlContainer.getView());
         ObservableSupplierImpl<Integer> controlContainerTranslationSupplier =
                 new ObservableSupplierImpl<>(0);
-        new ToolbarPositionController(
-                mBrowserControlsSizer,
-                ContextUtils.getAppSharedPreferences(),
-                mIsNtpShowingSupplier,
-                mIsTabSwitcherFinishedShowingSupplier,
-                mOmniboxFocusStateSupplier,
-                mFormFieldFocusedSupplier,
-                mFindInPageShowingSupplier,
-                keyboardAccessoryStateSupplier,
-                mWindowAndroid.getKeyboardDelegate(),
-                mControlContainer,
-                mBottomControlsStacker,
-                mBottomToolbarControlsOffsetSupplier,
-                mProgressBarContainer,
-                controlContainerTranslationSupplier,
-                mActivity);
+        ObservableSupplierImpl<Integer> controlContainerHeightSupplier =
+                new ObservableSupplierImpl<>(LayoutParams.WRAP_CONTENT);
+        mToolbarPositionController =
+                new ToolbarPositionController(
+                        mBrowserControlsSizer,
+                        ContextUtils.getAppSharedPreferences(),
+                        mIsNtpShowingSupplier,
+                        mIsTabSwitcherFinishedShowingSupplier,
+                        mOmniboxFocusStateSupplier,
+                        mFormFieldFocusedSupplier,
+                        mFindInPageShowingSupplier,
+                        keyboardAccessoryStateSupplier,
+                        mWindowAndroid.getKeyboardDelegate(),
+                        mControlContainer,
+                        mBottomControlsStacker,
+                        mBottomToolbarControlsOffsetSupplier,
+                        mProgressBarContainer,
+                        controlContainerTranslationSupplier,
+                        controlContainerHeightSupplier,
+                        new Handler(Looper.getMainLooper()),
+                        mActivity);
         if (ChromeFeatureList.sMiniOriginBar.isEnabled()) {
             mMiniOriginBarController =
                     new MiniOriginBarController(
@@ -1699,6 +1718,7 @@ public class ToolbarManager
                             mBrowserControlsSizer,
                             mWindowAndroid.getInsetObserver(),
                             controlContainerTranslationSupplier,
+                            controlContainerHeightSupplier,
                             keyboardAccessoryStateSupplier.getIsSheetShowingSupplier());
         }
     }
@@ -2382,6 +2402,11 @@ public class ToolbarManager
 
         if (mDesktopWindowStateManager != null) {
             mDesktopWindowStateManager.removeObserver(mControlContainer);
+        }
+
+        if (mToolbarPositionController != null) {
+            mToolbarPositionController.destroy();
+            mToolbarPositionController = null;
         }
 
         if (mMiniOriginBarController != null) {

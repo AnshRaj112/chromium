@@ -1942,19 +1942,11 @@ void PDFiumEngine::StartFind(const std::u16string& text, bool case_sensitive) {
   int current_page = next_page_to_search_;
 
   if (pages_[current_page]->available()) {
-    // Don't use PDFium to search for now, since it doesn't support unicode
-    // text. Leave the code for now to avoid bit-rot, in case it's fixed later.
-    // The extra parens suppress a -Wunreachable-code warning.
-    if ((false)) {
-      SearchUsingPDFium(text, case_sensitive, first_search,
-                        character_to_start_searching_from, current_page);
-    } else {
-      SearchUsingICU(
-          text, case_sensitive, first_search, character_to_start_searching_from,
-          last_character_index_to_search_, current_page, last_page_to_search_,
-          base::BindRepeating(&PDFiumEngine::AddFindResult,
-                              weak_factory_.GetWeakPtr()));
-    }
+    SearchUsingICU(
+        text, case_sensitive, first_search, character_to_start_searching_from,
+        last_character_index_to_search_, current_page, last_page_to_search_,
+        base::BindRepeating(&PDFiumEngine::AddFindResult,
+                            weak_factory_.GetWeakPtr()));
 
     if (!IsPageVisible(current_page))
       pages_[current_page]->Unload();
@@ -1996,38 +1988,6 @@ void PDFiumEngine::StartFind(const std::u16string& text, bool case_sensitive) {
         base::BindOnce(&PDFiumEngine::ContinueFind,
                        find_weak_factory_.GetWeakPtr(), case_sensitive));
   }
-}
-
-void PDFiumEngine::SearchUsingPDFium(const std::u16string& term,
-                                     bool case_sensitive,
-                                     bool first_search,
-                                     int character_to_start_searching_from,
-                                     int current_page) {
-  // Find all the matches in the current page.
-  unsigned long flags = case_sensitive ? FPDF_MATCHCASE : 0;
-  FPDF_SCHHANDLE find =
-      FPDFText_FindStart(pages_[current_page]->GetTextPage(),
-                         reinterpret_cast<const unsigned short*>(term.c_str()),
-                         flags, character_to_start_searching_from);
-
-  // Note: since we search one page at a time, we don't find matches across
-  // page boundaries.  We could do this manually ourself, but it seems low
-  // priority since Reader itself doesn't do it.
-  while (FPDFText_FindNext(find)) {
-    PDFiumRange result(pages_[current_page].get(),
-                       FPDFText_GetSchResultIndex(find),
-                       FPDFText_GetSchCount(find));
-
-    if (!first_search && last_character_index_to_search_ != -1 &&
-        result.page_index() == last_page_to_search_ &&
-        result.char_index() >= last_character_index_to_search_) {
-      break;
-    }
-
-    AddFindResult(std::move(result));
-  }
-
-  FPDFText_FindClose(find);
 }
 
 void PDFiumEngine::SearchUsingICU(const std::u16string& term,
@@ -3613,96 +3573,76 @@ PDFiumEngine::ChangeInvalidator::GetVisibleScreenRectsFromRanges(
   return rects;
 }
 
-void PDFiumEngine::ChangeInvalidator::Invalidate(const gfx::Rect& rect) {
-  gfx::Rect expanded_rect = rect;
-  expanded_rect.Inset(-1);
-  engine_->client_->Invalidate(expanded_rect);
+bool PDFiumEngine::ChangeInvalidator::Invalidate(
+    base::span<const gfx::Rect> screen_rects) {
+  bool invalidated = false;
+  for (const auto& rect : screen_rects) {
+    if (rect.IsEmpty()) {
+      continue;
+    }
+
+    gfx::Rect expanded_rect = rect;
+    expanded_rect.Outset(1);
+    engine_->client_->Invalidate(expanded_rect);
+    invalidated = true;
+  }
+  return invalidated;
 }
 
-PDFiumEngine::SelectionChangeInvalidator::SelectionChangeInvalidator(
-    PDFiumEngine* engine)
-    : ChangeInvalidator(engine), old_selections_(GetVisibleSelections()) {}
-
-PDFiumEngine::SelectionChangeInvalidator::~SelectionChangeInvalidator() {
+bool PDFiumEngine::ChangeInvalidator::InvalidateChangesOnDestruct() {
   // Offset the old selections if the document scrolled since we recorded them.
   gfx::Vector2d offset = previous_origin_ - engine_->GetVisibleRect().origin();
-  for (auto& old_selection : old_selections_)
-    old_selection.Offset(offset);
+  for (auto& previous_rect : previous_rects_) {
+    previous_rect.Offset(offset);
+  }
 
-  std::vector<gfx::Rect> new_selections = GetVisibleSelections();
-  for (auto& new_selection : new_selections) {
-    for (auto& old_selection : old_selections_) {
-      if (!old_selection.IsEmpty() && new_selection == old_selection) {
+  std::vector<gfx::Rect> new_rects = GetVisibleChangeRects();
+  for (auto& new_rect : new_rects) {
+    for (auto& previous_rect : previous_rects_) {
+      if (!previous_rect.IsEmpty() && new_rect == previous_rect) {
         // Rectangle was selected before and after, so no need to invalidate it.
         // Mark the rectangles by setting them to empty.
-        new_selection = old_selection = gfx::Rect();
+        new_rect = previous_rect = gfx::Rect();
         break;
       }
     }
   }
 
-  bool selection_changed = false;
-  for (const auto& old_selection : old_selections_) {
-    if (!old_selection.IsEmpty()) {
-      Invalidate(old_selection);
-      selection_changed = true;
-    }
-  }
-  for (const auto& new_selection : new_selections) {
-    if (!new_selection.IsEmpty()) {
-      Invalidate(new_selection);
-      selection_changed = true;
-    }
-  }
+  bool invalidated = Invalidate(previous_rects_);
+  invalidated |= Invalidate(new_rects);
+  return invalidated;
+}
 
-  if (selection_changed) {
+PDFiumEngine::SelectionChangeInvalidator::SelectionChangeInvalidator(
+    PDFiumEngine* engine)
+    : ChangeInvalidator(engine) {
+  previous_rects_ = GetVisibleChangeRects();
+}
+
+PDFiumEngine::SelectionChangeInvalidator::~SelectionChangeInvalidator() {
+  if (InvalidateChangesOnDestruct()) {
     engine_->OnSelectionTextChanged();
     engine_->OnSelectionPositionChanged();
   }
 }
 
 std::vector<gfx::Rect>
-PDFiumEngine::SelectionChangeInvalidator::GetVisibleSelections() const {
+PDFiumEngine::SelectionChangeInvalidator::GetVisibleChangeRects() const {
   return GetVisibleScreenRectsFromRanges(engine_->selection_);
 }
 
 PDFiumEngine::HighlightChangeInvalidator::HighlightChangeInvalidator(
     PDFiumEngine* engine)
-    : ChangeInvalidator(engine), old_highlights_(GetVisibleHighlights()) {}
+    : ChangeInvalidator(engine) {
+  previous_rects_ = GetVisibleChangeRects();
+}
 
 PDFiumEngine::HighlightChangeInvalidator::~HighlightChangeInvalidator() {
-  // Offset the old selections if the document scrolled since we recorded them.
-  gfx::Vector2d offset = previous_origin_ - engine_->GetVisibleRect().origin();
-  for (auto& old_highlight : old_highlights_) {
-    old_highlight.Offset(offset);
-  }
-
-  std::vector<gfx::Rect> new_highlights = GetVisibleHighlights();
-  for (auto& new_highlight : new_highlights) {
-    for (auto& old_highlight : old_highlights_) {
-      if (!old_highlight.IsEmpty() && new_highlight == old_highlight) {
-        // Rectangle was selected before and after, so no need to invalidate it.
-        // Mark the rectangles by setting them to empty.
-        new_highlight = old_highlight = gfx::Rect();
-        break;
-      }
-    }
-  }
-
-  for (const auto& old_highlight : old_highlights_) {
-    if (!old_highlight.IsEmpty()) {
-      Invalidate(old_highlight);
-    }
-  }
-  for (const auto& new_highlight : new_highlights) {
-    if (!new_highlight.IsEmpty()) {
-      Invalidate(new_highlight);
-    }
-  }
+  InvalidateChangesOnDestruct();
 }
 
 std::vector<gfx::Rect>
-PDFiumEngine::HighlightChangeInvalidator::GetVisibleHighlights() const {
+PDFiumEngine::HighlightChangeInvalidator::GetVisibleChangeRects() const {
   return GetVisibleScreenRectsFromRanges(engine_->text_fragment_highlights_);
 }
 

@@ -1349,13 +1349,6 @@ const FeatureEntry::FeatureVariation
          std::size(kOmniboxRichAutocompletionAggressive4), nullptr},
 };
 
-const FeatureEntry::FeatureParam
-    kOmniboxDriveSuggestionsIgnoreWhenDebouncing[] = {
-        {"DocumentProviderIgnoreWhenDebouncing", "true"}};
-const FeatureEntry::FeatureVariation kOmniboxDriveSuggestionsVariations[] = {
-    {"ignore when debouncing", kOmniboxDriveSuggestionsIgnoreWhenDebouncing,
-     std::size(kOmniboxDriveSuggestionsIgnoreWhenDebouncing), nullptr}};
-
 const FeatureEntry::FeatureParam kOmniboxStarterPackExpansionPreProdUrl[] = {
     {"StarterPackGeminiUrlOverride", "https://gemini.google.com/corp/prompt"}};
 const FeatureEntry::FeatureParam kOmniboxStarterPackExpansionStagingUrl[] = {
@@ -1368,9 +1361,8 @@ const FeatureEntry::FeatureVariation kOmniboxStarterPackExpansionVariations[] =
       std::size(kOmniboxStarterPackExpansionStagingUrl), nullptr}};
 
 const FeatureEntry::FeatureParam kOmniboxSearchAggregatorProdParams[] = {
-    {"name", "Agentspace (prod)"},
+    {"name", "Agentspace"},
     {"shortcut", "agentspace"},
-    {"icon_url", "https://gstatic.com/vertexaisearch/favicon.png"},
     {"search_url",
      "https://vertexaisearch.cloud.google.com/home/cid/"
      "8884f744-aae1-4fbc-8a64-b8bf7cbf270e?q={searchTerms}"},
@@ -1378,41 +1370,18 @@ const FeatureEntry::FeatureParam kOmniboxSearchAggregatorProdParams[] = {
      "https://discoveryengine.googleapis.com/v1alpha/projects/862721868538/"
      "locations/global/collections/default_collection/engines/"
      "teamfood-v11_1720671063545/completionConfig:completeQuery"}};
-const FeatureEntry::FeatureParam
-    kOmniboxSearchAggregatorProdWithFallbackIconParams[] = {
-        {"name", "Agentspace (prod with fallback icon)"},
-        {"shortcut", "agentspace"},
-        {"search_url",
-         "https://vertexaisearch.cloud.google.com/home/cid/"
-         "8884f744-aae1-4fbc-8a64-b8bf7cbf270e?q={searchTerms}"},
-        {"suggest_url",
-         "https://discoveryengine.googleapis.com/v1alpha/projects/862721868538/"
-         "locations/global/collections/default_collection/engines/"
-         "teamfood-v11_1720671063545/completionConfig:completeQuery"}};
 const FeatureEntry::FeatureParam kOmniboxSearchAggregatorStagingParams[] = {
     {"name", "Agentspace (staging)"},
     {"shortcut", "agentspace"},
     {"icon_url", "https://gstatic.com/vertexaisearch/favicon.png"},
     {"search_url",
      "https://vertexaisearch.cloud.google.com/home/cid/"
-     "8884f744-aae1-4fbc-8a64-b8bf7cbf270e?e=97710846%2C97750609%2C97760709%"
-     "2C97711975&q={searchTerms}"},
+     "3abd7045-7845-4f83-b204-e39fcbca3494?q={searchTerms}&mods=widget_staging_"
+     "api_mod"},
     {"suggest_url",
      "https://staging-discoveryengine.sandbox.googleapis.com/v1alpha/projects/"
      "862721868538/locations/global/collections/default_collection/engines/"
      "teamfood-v11/completionConfig:completeQuery"}};
-const FeatureEntry::FeatureParam kOmniboxSearchAggregatorAlternateParams[] = {
-    {"name", "NeuraVibe"},
-    {"shortcut", "neura"},
-    {"icon_url", "https://gstatic.com/vertexaisearch/favicon.png"},
-    {"search_url",
-     "https://vertexaisearch.cloud.google.com/home/cid/"
-     "e04a19e6-1fc2-48ba-9d0d-53c6aabcba7b?e=97844069%2C-97770083&"
-     "q={searchTerms}"},
-    {"suggest_url",
-     "https://discoveryengine.googleapis.com/v1alpha/projects/301214329925/"
-     "locations/global/collections/default_collection/engines/"
-     "neuravibeblendedsearch_1727383849310/completionConfig:completeQuery"}};
 const FeatureEntry::FeatureParam kOmniboxSearchAggregatorDemoParams[] = {
     {"name", "Neuravibe"},
     {"shortcut", "neura"},
@@ -1427,13 +1396,8 @@ const FeatureEntry::FeatureParam kOmniboxSearchAggregatorDemoParams[] = {
 const FeatureEntry::FeatureVariation kOmniboxSearchAggregatorVariations[] = {
     {"prod", kOmniboxSearchAggregatorProdParams,
      std::size(kOmniboxSearchAggregatorProdParams), nullptr},
-    {"prod (with fallback icon)",
-     kOmniboxSearchAggregatorProdWithFallbackIconParams,
-     std::size(kOmniboxSearchAggregatorProdWithFallbackIconParams), nullptr},
     {"staging", kOmniboxSearchAggregatorStagingParams,
      std::size(kOmniboxSearchAggregatorStagingParams), nullptr},
-    {"alternate", kOmniboxSearchAggregatorAlternateParams,
-     std::size(kOmniboxSearchAggregatorAlternateParams), nullptr},
     {"demo", kOmniboxSearchAggregatorDemoParams,
      std::size(kOmniboxSearchAggregatorDemoParams), nullptr}};
 
@@ -1842,6 +1806,13 @@ constexpr FeatureEntry::FeatureParam kOmniboxDiagInputConnection[]{
 constexpr FeatureEntry::FeatureVariation kOmniboxDiagnosticsAndroidVaiants[] = {
     {"- InputConnection", kOmniboxDiagInputConnection,
      std::size(kOmniboxDiagInputConnection), nullptr}};
+
+const FeatureEntry::FeatureParam kOmniboxMobileParityRetrieveTrueFavicon[] = {
+    {OmniboxFieldTrial::kMobileParityRetrieveTrueFavicon.name, "true"}};
+const FeatureEntry::FeatureVariation kOmniboxMobileParityVariants[] = {
+    {"with True Favicon", kOmniboxMobileParityRetrieveTrueFavicon,
+     std::size(kOmniboxMobileParityRetrieveTrueFavicon)},
+};
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -3795,12 +3766,25 @@ const FeatureEntry::FeatureParam kShowNewTabAnimationsBounce[] = {
 const FeatureEntry::FeatureParam kShowNewTabAnimationsDecelerate[] = {
     {"version", "2"},
     {"new-duration", "true"}};
+const FeatureEntry::FeatureParam kShowNewTabAnimationsBounceDecelerate[] = {
+    {"version", "3"},
+    {"new-duration", "true"}};
+const FeatureEntry::FeatureParam
+    kShowNewTabAnimationsBounceDecelerateWithDelay[] = {
+        {"version", "4"},
+        {"new-duration", "true"}};
 const FeatureEntry::FeatureVariation kShowNewTabAnimationsVariations[] = {
     {"- Use new duration only", kShowNewTabAnimationsNewDurationOnly,
      std::size(kShowNewTabAnimationsNewDurationOnly), nullptr},
-    {"- Bounce version", kShowNewTabAnimationsBounce,
+    {"- Bouncy GTS icon with delay", kShowNewTabAnimationsBounce,
      std::size(kShowNewTabAnimationsBounce), nullptr},
-    {"- Decelerate version", kShowNewTabAnimationsDecelerate,
+    {"- Bouncy GTS icon with decelerate arc",
+     kShowNewTabAnimationsBounceDecelerate,
+     std::size(kShowNewTabAnimationsBounceDecelerate), nullptr},
+    {"- Bouncy GTS icon with decelerate arc and delay",
+     kShowNewTabAnimationsBounceDecelerateWithDelay,
+     std::size(kShowNewTabAnimationsBounceDecelerateWithDelay), nullptr},
+    {"- Decelerate arc", kShowNewTabAnimationsDecelerate,
      std::size(kShowNewTabAnimationsDecelerate), nullptr},
 };
 
@@ -4654,6 +4638,37 @@ const FeatureEntry::FeatureVariation
         {"With Adaptation", nullptr, 0, "3389300"},
         {"With EE Adaptation", nullptr, 0, "3389532"},
 };
+
+#if BUILDFLAG(ENABLE_DICE_SUPPORT)
+const FeatureEntry::FeatureParam
+    kHistorySyncOptinExpansionPillBrowseAcrossDevices[] = {
+        {"history-sync-optin-expansion-pill-option", "browse-across-devices"}};
+const FeatureEntry::FeatureParam kHistorySyncOptinExpansionPillSyncHistory[] = {
+    {"history-sync-optin-expansion-pill-option", "sync-history"}};
+const FeatureEntry::FeatureParam
+    kHistorySyncOptinExpansionPillSeeTabsFromOtherDevices[] = {
+        {"history-sync-optin-expansion-pill-option",
+         "see-tabs-from-other-devices"}};
+const FeatureEntry::FeatureParam
+    kHistorySyncOptinExpansionPillBrowseAcrossDevicesNewProfileMenuPromoVariant
+        [] = {{"history-sync-optin-expansion-pill-option",
+               "browse-across-devices-new-profile-menu-promo-variant"}};
+
+const FeatureEntry::FeatureVariation kHistorySyncOptinExpansionPillVariations[] = {
+    {"- Browse across devices",
+     kHistorySyncOptinExpansionPillBrowseAcrossDevices,
+     std::size(kHistorySyncOptinExpansionPillBrowseAcrossDevices), nullptr},
+    {"- Sync history", kHistorySyncOptinExpansionPillSyncHistory,
+     std::size(kHistorySyncOptinExpansionPillSyncHistory), nullptr},
+    {"- See tabs from other devices",
+     kHistorySyncOptinExpansionPillSeeTabsFromOtherDevices,
+     std::size(kHistorySyncOptinExpansionPillSeeTabsFromOtherDevices), nullptr},
+    {"- Browse across devices (Profile Menu Variant)",
+     kHistorySyncOptinExpansionPillBrowseAcrossDevicesNewProfileMenuPromoVariant,
+     std::size(
+         kHistorySyncOptinExpansionPillBrowseAcrossDevicesNewProfileMenuPromoVariant),
+     nullptr}};
+#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
 // RECORDING USER METRICS FOR FLAGS:
 // -----------------------------------------------------------------------------
@@ -5714,6 +5729,11 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_MAC)
+    {"mac-catap-system-audio-loopback-capture",
+     flag_descriptions::kMacCatapSystemAudioLoopbackCaptureName,
+     flag_descriptions::kMacCatapSystemAudioLoopbackCaptureDescription, kOsMac,
+     FEATURE_VALUE_TYPE(features::kMacCatapSystemAudioLoopbackCapture)},
+
     {"mac-loopback-audio-for-screen-share",
      flag_descriptions::kMacLoopbackAudioForScreenShareName,
      flag_descriptions::kMacLoopbackAudioForScreenShareDescription, kOsMac,
@@ -6670,6 +6690,14 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(omnibox_feature_configs::ContextualSearch::
                             kContextualSearchOpenLensActionUsesThumbnail)},
 
+    {"contextual-suggestions-ablate-others-when-present",
+     flag_descriptions::kContextualSuggestionsAblateOthersWhenPresentName,
+     flag_descriptions::
+         kContextualSuggestionsAblateOthersWhenPresentDescription,
+     kOsDesktop,
+     FEATURE_VALUE_TYPE(omnibox_feature_configs::ContextualSearch::
+                            kContextualSuggestionsAblateOthersWhenPresent)},
+
     {"omnibox-contextual-search-on-focus-suggestions",
      flag_descriptions::kOmniboxContextualSearchOnFocusSuggestionsName,
      flag_descriptions::kOmniboxContextualSearchOnFocusSuggestionsDescription,
@@ -6696,12 +6724,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kOmniboxDomainSuggestionsDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(omnibox::kDomainSuggestions)},
 
-    {"omnibox-drive-suggestions",
-     flag_descriptions::kOmniboxDriveSuggestionsName,
-     flag_descriptions::kOmniboxDriveSuggestionsDescription, kOsDesktop,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kDocumentProvider,
-                                    kOmniboxDriveSuggestionsVariations,
-                                    "OmniboxDocumentProvider")},
     {"omnibox-drive-suggestions-no-sync-requirement",
      flag_descriptions::kOmniboxDriveSuggestionsNoSyncRequirementName,
      flag_descriptions::kOmniboxDriveSuggestionsNoSyncRequirementDescription,
@@ -6795,7 +6817,9 @@ const FeatureEntry kFeatureEntries[] = {
     {"omnibox-mobile-parity-update",
      flag_descriptions::kOmniboxMobileParityUpdateName,
      flag_descriptions::kOmniboxMobileParityUpdateDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(omnibox::kOmniboxMobileParityUpdate)},
+     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kOmniboxMobileParityUpdate,
+                                    kOmniboxMobileParityVariants,
+                                    "OmniboxMobileParityUpdate")},
 #endif  // BUILDFLAG(IS_ANDROID)
 #if BUILDFLAG(IS_WIN)
     {"omnibox-on-device-head-suggestions",
@@ -7109,6 +7133,11 @@ const FeatureEntry kFeatureEntries[] = {
                                     kTabScrollingWithDraggingVariations,
                                     "TabScrollingWithDragging")},
 
+    {"tabsearch-toolbar-button",
+     flag_descriptions::kLaunchedTabSearchToolbarName,
+     flag_descriptions::kLaunchedTabSearchToolbarDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kLaunchedTabSearchToolbarButton)},
+
     {flag_descriptions::kTabstripComboButtonFlagId,
      flag_descriptions::kTabstripComboButtonName,
      flag_descriptions::kTabstripComboButtonDescription, kOsDesktop,
@@ -7156,11 +7185,6 @@ const FeatureEntry kFeatureEntries[] = {
      commerce::flag_descriptions::kCompareConfirmationToastName,
      commerce::flag_descriptions::kCompareConfirmationToastDescription,
      kOsDesktop, FEATURE_VALUE_TYPE(commerce::kCompareConfirmationToast)},
-
-    {"compare-management-interface",
-     commerce::flag_descriptions::kCompareManagementInterfaceName,
-     commerce::flag_descriptions::kCompareManagementInterfaceDescription,
-     kOsDesktop, FEATURE_VALUE_TYPE(commerce::kCompareManagementInterface)},
 
     {"shopping-list", commerce::flag_descriptions::kShoppingListName,
      commerce::flag_descriptions::kShoppingListDescription,
@@ -8132,10 +8156,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kLinkCrossDeviceInternalsName,
      flag_descriptions::kLinkCrossDeviceInternalsDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kLinkCrossDeviceInternals)},
-
-    {"allow-scroll-settings", flag_descriptions::kAllowScrollSettingsName,
-     flag_descriptions::kAllowScrollSettingsDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kAllowScrollSettings)},
 
     {"block-telephony-device-phone-mute",
      flag_descriptions::kBlockTelephonyDevicePhoneMuteName,
@@ -10475,7 +10495,10 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kEnableHistorySyncOptinExpansionPillName,
      flag_descriptions::kEnableHistorySyncOptinExpansionPillDescription,
      kOsWin | kOsMac | kOsLinux,
-     FEATURE_VALUE_TYPE(switches::kEnableHistorySyncOptinExpansionPill)},
+     FEATURE_WITH_PARAMS_VALUE_TYPE(
+         switches::kEnableHistorySyncOptinExpansionPill,
+         kHistorySyncOptinExpansionPillVariations,
+         "EnableHistorySyncOptinExpansionPill")},
 #endif
 
 #if BUILDFLAG(ENABLE_DICE_SUPPORT) && BUILDFLAG(ENABLE_EXTENSIONS)
@@ -12511,6 +12534,13 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(password_manager::features::kFillRecoveryPassword)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
+#if BUILDFLAG(IS_ANDROID)
+    {"android-use-correct-display-work-area",
+     flag_descriptions::kAndroidUseCorrectDisplayWorkAreaName,
+     flag_descriptions::kAndroidUseCorrectDisplayWorkAreaDescription,
+     kOsAndroid, FEATURE_VALUE_TYPE(ui::kAndroidUseCorrectDisplayWorkArea)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) || \
     BUILDFLAG(IS_CHROMEOS)
     {"enable-site-search-allow-user-override-policy",
@@ -12520,6 +12550,32 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(omnibox::kEnableSiteSearchAllowUserOverridePolicy)},
 #endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN) ||
         // BUILDFLAG(IS_CHROME_OS)
+    // TODO(crbug.com/40680264): Remove this flag after regression investigation
+    // is finished.
+    {
+        "new-content-for-checkerboarded-scrolls",
+        flag_descriptions::kNewContentForCheckerboardedScrollsName,
+        flag_descriptions::kNewContentForCheckerboardedScrollsDescription,
+        kOsAll,
+        FEATURE_VALUE_TYPE(features::kNewContentForCheckerboardedScrolls),
+    },
+
+    {"autofill-enable-multiple-request-in-virtual-card-downstream-enrollment",
+     flag_descriptions::
+         kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentName,
+     flag_descriptions::
+         kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollmentDescription,
+     kOsAll,
+     FEATURE_VALUE_TYPE(
+         autofill::features::
+             kAutofillEnableMultipleRequestInVirtualCardDownstreamEnrollment)},
+
+#if BUILDFLAG(IS_CHROMEOS)
+    {"espeakng-manifest-v3",
+     flag_descriptions::kAccessibilityManifestV3EspeakNGName,
+     flag_descriptions::kAccessibilityManifestV3EspeakNGDescription, kOsCrOS,
+     FEATURE_VALUE_TYPE(::features::kAccessibilityManifestV3EspeakNGTts)},
+#endif
 
     // Add new entries above this line.
 

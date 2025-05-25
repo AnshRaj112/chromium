@@ -241,7 +241,12 @@ void DesktopDataControlsDialog::Show(base::OnceClosure on_destructed) {
 
   widget_ = base::WrapUnique(views::DialogDelegate::CreateDialogWidget(
       dialog_delegate_.get(), gfx::NativeWindow(),
+#if BUILDFLAG(IS_MAC)
       top_web_contents->GetNativeView()));
+#else
+      top_web_contents->GetTopLevelNativeWindow()));
+#endif
+
   widget_->MakeCloseSynchronous(base::BindOnce(
       &DesktopDataControlsDialog::CloseDialog, base::Unretained(this)));
   widget_->SetBounds(
@@ -293,7 +298,7 @@ void DesktopDataControlsDialog::WebContentsDestroyed() {
   // was neither bypassed or accepted so it should close without calling
   // any callback.
   ClearCallbacks();
-  OnDialogButtonClicked(/*bypassed=*/false);
+  CloseDialog(views::Widget::ClosedReason::kAcceptButtonClicked);
 }
 
 void DesktopDataControlsDialog::PrimaryPageChanged(content::Page& page) {
@@ -303,7 +308,7 @@ void DesktopDataControlsDialog::PrimaryPageChanged(content::Page& page) {
   // that trigger on the new page, so callbacks must be cleared before closing
   // the dialog.
   ClearCallbacks();
-  OnDialogButtonClicked(/*bypassed=*/false);
+  CloseDialog(views::Widget::ClosedReason::kAcceptButtonClicked);
 }
 
 DesktopDataControlsDialog::DesktopDataControlsDialog(

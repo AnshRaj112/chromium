@@ -54,6 +54,7 @@
 #include "base/timer/elapsed_timer.h"
 #include "base/timer/timer.h"
 #include "base/trace_event/optional_trace_event.h"
+#include "base/trace_event/trace_event.h"
 #include "base/types/optional_util.h"
 #include "base/uuid.h"
 #include "build/build_config.h"
@@ -2737,7 +2738,10 @@ RenderFrameHostImpl::~RenderFrameHostImpl() {
 
   // Delete this before destroying the widget, to guard against reentrancy
   // by in-process screen readers such as JAWS.
-  browser_accessibility_manager_.reset();
+  if (browser_accessibility_manager_) {
+    browser_accessibility_manager_->DetachFromParentManager();
+    browser_accessibility_manager_.reset();
+  }
 
   // Note: The RenderWidgetHost of the main frame is owned by the RenderViewHost
   // instead. In this case the RenderViewHost is responsible for shutting down
@@ -8339,6 +8343,8 @@ void RenderFrameHostImpl::GoToEntryAtOffset(
         soft_navigation_heuristics_task_id) {
   OPTIONAL_TRACE_EVENT2("content", "RenderFrameHostImpl::GoToEntryAtOffset",
                         "render_frame_host", this, "offset", offset);
+  // TODO(crbug.com/385170155): Pass the actual start time from the renderer.
+  base::TimeTicks actual_navigation_start = base::TimeTicks::Now();
 
   // Non-user initiated navigations coming from the renderer should be ignored
   // if there is an ongoing browser-initiated navigation.
@@ -8354,7 +8360,8 @@ void RenderFrameHostImpl::GoToEntryAtOffset(
   // All frames are allowed to navigate the global history.
   if (delegate_->IsAllowedToGoToEntryAtOffset(offset)) {
     frame_tree_->controller().GoToOffsetFromRenderer(
-        offset, this, soft_navigation_heuristics_task_id);
+        offset, this, soft_navigation_heuristics_task_id,
+        actual_navigation_start);
   }
 }
 
@@ -8362,6 +8369,9 @@ void RenderFrameHostImpl::NavigateToNavigationApiKey(
     const std::string& key,
     bool has_user_gesture,
     std::optional<blink::scheduler::TaskAttributionId> task_id) {
+  // TODO(crbug.com/385170155): Pass the actual start time from the renderer.
+  base::TimeTicks actual_navigation_start = base::TimeTicks::Now();
+
   // Non-user initiated navigations coming from the renderer should be ignored
   // if there is an ongoing browser-initiated navigation.
   // See https://crbug.com/879965.
@@ -8372,7 +8382,8 @@ void RenderFrameHostImpl::NavigateToNavigationApiKey(
           frame_tree_->root()->navigation_request(), has_user_gesture)) {
     return;
   }
-  frame_tree_->controller().NavigateToNavigationApiKey(this, task_id, key);
+  frame_tree_->controller().NavigateToNavigationApiKey(this, task_id, key,
+                                                       actual_navigation_start);
 }
 
 void RenderFrameHostImpl::NavigateEventHandlerPresenceChanged(bool present) {
@@ -18147,6 +18158,11 @@ void RenderFrameHostImpl::Clone(
 void RenderFrameHostImpl::NotifyCookiesAccessed(
     std::vector<network::mojom::CookieAccessDetailsPtr> details_vector,
     CookieAccessDetails::Source source) {
+  TRACE_EVENT("browser", "RenderFrameHostImpl::NotifyCookiesAccessed");
+  std::optional<base::ElapsedTimer> timer;
+  if (base::ShouldRecordSubsampledMetric(0.01)) {
+    timer.emplace();
+  }
   UMA_HISTOGRAM_COUNTS_1M("Cookie.OnCookiesAccessed.BatchSize",
                           details_vector.size());
   size_t access_sum = 0;
@@ -18165,6 +18181,11 @@ void RenderFrameHostImpl::NotifyCookiesAccessed(
     }
   }
   UMA_HISTOGRAM_COUNTS_1M("Cookie.OnCookiesAccessed.TotalAccesses", access_sum);
+  if (timer) {
+    base::UmaHistogramCustomMicrosecondsTimes(
+        "Browser.CookieAccessObserver.RenderFrameHost.Duration.Subsampled",
+        timer->Elapsed(), base::Microseconds(1), base::Seconds(1), 100);
+  }
 }
 
 void RenderFrameHostImpl::OnTrustTokensAccessed(
