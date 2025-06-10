@@ -28,7 +28,6 @@ class PseudoElementData final : public GarbageCollected<PseudoElementData>,
       PseudoId,
       const AtomicString& view_transition_name = g_null_atom) const;
 
-  bool HasViewTransitionGroupPseudoElement() const;
   bool HasScrollButtonOrMarkerGroupPseudos() const;
 
   using PseudoElementVector = HeapVector<Member<PseudoElement>, 2>;
@@ -216,6 +215,7 @@ inline void PseudoElementData::SetPseudoElement(
       break;
     case kPseudoIdViewTransition:
     case kPseudoIdViewTransitionGroup:
+    case kPseudoIdViewTransitionGroupChildren:
     case kPseudoIdViewTransitionImagePair:
     case kPseudoIdViewTransitionNew:
     case kPseudoIdViewTransitionOld:
@@ -287,11 +287,6 @@ inline PseudoElement* PseudoElementData::GetPseudoElement(
                             : nullptr;
   }
   return nullptr;
-}
-
-inline bool PseudoElementData::HasViewTransitionGroupPseudoElement() const {
-  return transition_data_ &&
-         transition_data_->HasViewTransitionGroupPseudoElement();
 }
 
 inline bool PseudoElementData::HasScrollButtonOrMarkerGroupPseudos() const {

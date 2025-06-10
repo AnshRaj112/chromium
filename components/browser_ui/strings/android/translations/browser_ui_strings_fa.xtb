@@ -96,6 +96,7 @@
 <translation id="2182457891543959921">قبل از اینکه به سایت‌ها اجازه داده شود نقشه سه‌بعدی از محیط ایجاد کنند یا موقعیت دوربین را ردیابی کنند سؤال شود (توصیه می‌شود)</translation>
 <translation id="2185965788978862351">با این کار <ph name="DATASIZE" /> از داده‌ها و کوکی‌هایی که سایت‌ها و برنامه‌ها در صفحه اصلی ذخیره کرده‌اند حذف می‌شود.</translation>
 <translation id="2194856509914051091">مواردی که باید درنظر داشت</translation>
+<translation id="2202902749237646524">{NUM_DAYS,plural, =1{دیروز}one{‫<ph name="NUM_DAYS_MANY" /> روز پیش}other{‫<ph name="NUM_DAYS_MANY" /> روز پیش}}</translation>
 <translation id="2215727959747642672">ویرایش فایل</translation>
 <translation id="2218389616572918761">سایت‌ها می‌توانند درخواست کنند از میکروفون شما استفاده کنند</translation>
 <translation id="2228071138934252756">‏برای اینکه به <ph name="APP_NAME" /> اجازه دهید به دوربین دسترسی پیدا کند، دوربین را در <ph name="BEGIN_LINK" />تنظیمات Android<ph name="END_LINK" /> نیز روشن کنید.</translation>
@@ -386,6 +387,7 @@
 <translation id="5723967018671998714">کوکی‌های طرف سوم در «حالت ناشناس» مسدود می‌شوند</translation>
 <translation id="5740126560802162366">سایت‌ها می‌توانند در دستگاه داده ذخیره کنند</translation>
 <translation id="5743425052258407233">در همه دستگاه‌هایتان سابقه را دریافت می‌کنید تا بتوانید به‌راحتی کارتان از جایی که متوقف کردید ادامه دهید</translation>
+<translation id="5749158352074143502">ادامه کار با این برگه</translation>
 <translation id="5750869797196646528">ردیابی دست</translation>
 <translation id="5771720122942595109"><ph name="PERMISSION_1" /> مسدود شد</translation>
 <translation id="5804241973901381774">اجازه‌ها</translation>
@@ -447,6 +449,7 @@
 <translation id="6527303717912515753">اشتراک‌گذاری</translation>
 <translation id="6530703012083415527">هرگاه روشن باشد، سایت‌ها می‌توانند از بالاپرها و هدایت کردن استفاده کنند. هرگاه خاموش باشد، سایت‌ها نمی‌توانند از بالاپرها و هدایت کردن استفاده کنند.</translation>
 <translation id="6540488083026747005">کوکی‌های طرف سوم را برای این سایت مجاز کرده‌اید</translation>
+<translation id="6542770556219257399">{NUM_WEEKS,plural, =1{‫<ph name="NUM_WEEKS_ONE" /> هفته پیش}one{‫<ph name="NUM_WEEKS_MANY" /> هفته پیش}other{‫<ph name="NUM_WEEKS_MANY" /> هفته پیش}}</translation>
 <translation id="6545864417968258051">اسکن کردن بلوتوث</translation>
 <translation id="6552800053856095716">{PERMISSIONS_SUMMARY_BLOCKED,plural, =1{<ph name="PERMISSION_1" />، <ph name="PERMISSION_2" />، و <ph name="NUM_MORE" /> اجازه دیگر مسدود هستند}one{<ph name="PERMISSION_1" />، <ph name="PERMISSION_2" />، و <ph name="NUM_MORE" /> اجازه دیگر مسدود هستند}other{<ph name="PERMISSION_1" />، <ph name="PERMISSION_2" />، و <ph name="NUM_MORE" /> اجازه دیگر مسدود هستند}}</translation>
 <translation id="6554732001434021288">آخرین بازدید: <ph name="NUM_DAYS" /> روز پیش</translation>
@@ -458,6 +461,7 @@
 <translation id="6612358246767739896">محتوای محافظت‌شده</translation>
 <translation id="662080504995468778">ماندن</translation>
 <translation id="6635327442719709864">وقتی روشن باشد، سایت‌ها می‌توانند درخواست استفاده از درگاه‌های سریال را داشته باشند. وقتی خاموش باشد، سایت‌ها نمی‌توانند از درگاه‌های سریال استفاده کنند.</translation>
+<translation id="6678072580827808850">ارزیابی کنترل ایمنی</translation>
 <translation id="6683865262523156564">این سایت در گروهی است که می‌تواند فعالیت شما را ببیند. ‫<ph name="RWS_OWNER" /> این گروه را تعریف کرده است</translation>
 <translation id="6689172468748959065">عکس‌های نمایه</translation>
 <translation id="6697925417670533197">بارگیری‌های فعال</translation>
@@ -519,6 +523,7 @@
 <translation id="7554752735887601236">سایتی درحال استفاده از میکروفونتان است</translation>
 <translation id="7561196759112975576">همیشه</translation>
 <translation id="7573594921350120855">سایت‌ها معمولاً از دوربین ویدیو برای ارائه ویژگی‌های ارتباطی، مانند گپ تصویری، استفاده می‌کنند.</translation>
+<translation id="7574529565935733861">{NUM_MONTHS,plural, =1{‫<ph name="NUM_MONTHS_ONE" /> ماه پیش}one{‫<ph name="NUM_MONTHS_MANY" /> ماه پیش}other{‫<ph name="NUM_MONTHS_MANY" /> ماه پیش}}</translation>
 <translation id="757524316907819857">مسدود کردن سایت‌ها برای پخش محتوای محافظت‌شده</translation>
 <translation id="7594634374516752650">به دستگاه بلوتوث متصل است</translation>
 <translation id="7617547684249261169">می‌توانید همه یا بخشی از سابقه، کوکی‌ها، داده‌های سایت، و موارد دیگر را حذف کنید</translation>
@@ -532,7 +537,6 @@
 <translation id="7759147511335618829">‏برنامه‌ریزی مجدد و کنترل دستگاه MIDI</translation>
 <translation id="7781829728241885113">دیروز</translation>
 <translation id="7791543448312431591">افزودن</translation>
-<translation id="7801888679188438140">{TILE_COUNT,plural, =1{ادامه کار با این برگه}one{ادامه کار با این برگه}other{ادامه کار با این برگه‌ها}}</translation>
 <translation id="780301667611848630">نه متشکرم</translation>
 <translation id="7804248752222191302">سایتی درحال استفاده از دوربینتان است</translation>
 <translation id="7807060072011926525">‏ارائه از Google</translation>
@@ -541,6 +545,7 @@
 <translation id="7846076177841592234">لغو انتخاب</translation>
 <translation id="7881140103901777395">‏‫Chrome استفاده از کوکی‌های طرف سوم را برای اکثر سایت‌ها محدود می‌کند. اما کوکی‌های طرف سوم در این سایت مجاز است زیرا این سایت برای ارائه سرویس‌های پایه متکی به آن‌ها است.\n\nبرای <ph name="BEGIN_LINK" />مدیریت دسترسی به کوکی‌های طرف سوم<ph name="END_LINK" /> به تنظیمات بروید.</translation>
 <translation id="7882806643839505685">پخش صدا برای سایت خاصی مجاز شود.</translation>
+<translation id="7891547341794213004">پنهان کردن کارت «ادامه دادن با این زبانه»</translation>
 <translation id="789180354981963912">مسدود کردن کوکی‌های طرف سوم در «حالت ناشناس»:</translation>
 <translation id="789722939441020330">به سایت‌ها اجازه داده نشود چند فایل را به‌طور خودکار بارگیری کنند</translation>
 <translation id="7940722705963108451">به من یادآوری شود</translation>
@@ -549,7 +554,6 @@
 <translation id="7986741934819883144">مخاطبی انتخاب کنید</translation>
 <translation id="7990211076305263060">هرگاه روشن باشد، سایت‌ها می‌توانند استفاده از میکروفون را درخواست کنند. هرگاه خاموش باشد، سایت‌ها نمی‌توانند از میکروفون استفاده کنند.</translation>
 <translation id="8007176423574883786">برای این دستگاه غیرفعال شد</translation>
-<translation id="8010630645305864042">{TILE_COUNT,plural, =1{پنهان کردن کارت «ادامه دادن با این برگه»}one{پنهان کردن کارت «ادامه دادن با این برگه»}other{پنهان کردن کارت «ادامه دادن با این برگه‌ها»}}</translation>
 <translation id="802154636333426148">بارگیری نشد</translation>
 <translation id="8042586301629853791">مرتب‌سازی براساس:</translation>
 <translation id="8051193500142930381">ویژگی‌هایی که به دوربین نیاز دارند کار نخواهند کرد</translation>

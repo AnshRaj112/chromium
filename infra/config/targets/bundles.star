@@ -38,7 +38,19 @@ targets.bundle(
                 "WEBVIEW_TRICHROME_INSTANT_CTS_TESTS",
             ],
         ),
+        "webview_instrumentation_test_apk_single_process_mode_gtests",
         "webview_ui_instrumentation_tests",
+    ],
+)
+
+targets.bundle(
+    name = "android_10_isolated_scripts",
+    targets = [
+        "android_isolated_scripts",
+        "chromium_junit_tests_scripts",
+        "components_perftests_isolated_scripts",
+        "telemetry_android_minidump_unittests_isolated_scripts",
+        "telemetry_perf_unittests_isolated_scripts_android",
     ],
 )
 
@@ -417,6 +429,7 @@ targets.bundle(
         "chrome_public_unit_test_apk",
         "extensions_unittests",
         "unit_tests",
+        "video_encode_accelerator_tests",
     ],
     mixins = [
         "has_native_resultdb_integration",
@@ -845,6 +858,7 @@ targets.bundle(
         # the Android-specific section.
         "gl_tests_validating",
         "gl_unittests",
+        "video_encode_accelerator_tests",
     ],
     per_test_modifications = {
         "android_browsertests": targets.mixin(
@@ -4859,106 +4873,12 @@ targets.bundle(
 )
 
 targets.bundle(
-    name = "ios17_beta_simulator_tests",
-    targets = [
-        targets.bundle(
-            targets = "ios_common_tests",
-            variants = [
-                "SIM_IPAD_AIR_5TH_GEN_18_4",
-                "SIM_IPHONE_14_18_4",
-            ],
-        ),
-        targets.bundle(
-            targets = "ios_crash_xcuitests",
-            mixins = [
-                "xcodebuild_sim_runner",
-            ],
-            variants = [
-                "SIM_IPAD_AIR_5TH_GEN_18_4",
-                "SIM_IPHONE_14_18_4",
-            ],
-        ),
-        targets.bundle(
-            targets = "ios_eg2_cq_tests",
-            mixins = [
-                "xcodebuild_sim_runner",
-                "record_failed_tests",
-            ],
-            variants = [
-                "SIM_IPAD_AIR_5TH_GEN_18_4",
-                "SIM_IPHONE_14_18_4",
-            ],
-        ),
-        targets.bundle(
-            targets = "ios_eg2_tests",
-            mixins = [
-                "xcodebuild_sim_runner",
-                "record_failed_tests",
-            ],
-            variants = [
-                "SIM_IPAD_AIR_5TH_GEN_18_4",
-                "SIM_IPHONE_14_18_4",
-            ],
-        ),
-        targets.bundle(
-            targets = "ios_screen_size_dependent_tests",
-            variants = [
-                "SIM_IPAD_AIR_5TH_GEN_18_4",
-                "SIM_IPHONE_14_18_4",
-                "SIM_IPHONE_SE_3RD_GEN_18_4",
-            ],
-        ),
-    ],
-)
-
-targets.bundle(
-    name = "ios17_sdk_simulator_tests",
-    targets = [
-        targets.bundle(
-            targets = "ios_common_tests",
-            variants = [
-                "SIM_IPAD_AIR_5TH_GEN_18_4",
-                "SIM_IPHONE_14_18_4",
-            ],
-        ),
-        targets.bundle(
-            targets = "ios_eg2_cq_tests",
-            mixins = [
-                "xcodebuild_sim_runner",
-            ],
-            variants = [
-                "SIM_IPAD_AIR_5TH_GEN_18_4",
-                "SIM_IPHONE_14_18_4",
-            ],
-        ),
-        targets.bundle(
-            targets = "ios_eg2_tests",
-            mixins = [
-                "xcodebuild_sim_runner",
-            ],
-            variants = [
-                "SIM_IPAD_AIR_5TH_GEN_18_4",
-                "SIM_IPHONE_14_18_4",
-            ],
-        ),
-        targets.bundle(
-            targets = "ios_screen_size_dependent_tests",
-            variants = [
-                "SIM_IPAD_AIR_5TH_GEN_18_4",
-                "SIM_IPHONE_14_18_4",
-                "SIM_IPHONE_SE_3RD_GEN_18_4",
-            ],
-        ),
-    ],
-)
-
-targets.bundle(
     name = "ios18_beta_simulator_tests",
     targets = [
         targets.bundle(
             targets = "ios_common_tests",
             variants = [
-                "SIM_IPHONE_15_18_4",
+                "SIM_IPHONE_15_18_5",
             ],
         ),
         targets.bundle(
@@ -4967,7 +4887,7 @@ targets.bundle(
                 "xcodebuild_sim_runner",
             ],
             variants = [
-                "SIM_IPHONE_15_18_4",
+                "SIM_IPHONE_15_18_5",
             ],
         ),
         targets.bundle(
@@ -4977,9 +4897,9 @@ targets.bundle(
                 "record_failed_tests",
             ],
             variants = [
-                "SIM_IPAD_10TH_GEN_18_4",
-                "SIM_IPAD_AIR_6TH_GEN_18_4",
-                "SIM_IPHONE_15_18_4",
+                "SIM_IPAD_10TH_GEN_18_5",
+                "SIM_IPAD_AIR_6TH_GEN_18_5",
+                "SIM_IPHONE_15_18_5",
             ],
         ),
         targets.bundle(
@@ -4989,19 +4909,19 @@ targets.bundle(
                 "record_failed_tests",
             ],
             variants = [
-                "SIM_IPAD_10TH_GEN_18_4",
-                "SIM_IPAD_AIR_6TH_GEN_18_4",
-                "SIM_IPAD_PRO_7TH_GEN_18_4",
-                "SIM_IPHONE_15_18_4",
+                "SIM_IPAD_10TH_GEN_18_5",
+                "SIM_IPAD_AIR_6TH_GEN_18_5",
+                "SIM_IPAD_PRO_7TH_GEN_18_5",
+                "SIM_IPHONE_15_18_5",
             ],
         ),
         targets.bundle(
             targets = "ios_screen_size_dependent_tests",
             variants = [
-                "SIM_IPAD_AIR_6TH_GEN_18_4",
-                "SIM_IPAD_PRO_7TH_GEN_18_4",
-                "SIM_IPHONE_15_18_4",
-                "SIM_IPHONE_15_PRO_MAX_18_4",
+                "SIM_IPAD_AIR_6TH_GEN_18_5",
+                "SIM_IPAD_PRO_7TH_GEN_18_5",
+                "SIM_IPHONE_15_18_5",
+                "SIM_IPHONE_15_PRO_MAX_18_5",
             ],
         ),
     ],
@@ -5014,7 +4934,7 @@ targets.bundle(
             targets = "ios_common_tests",
             variants = [
                 "SIM_IPHONE_14_17_5",
-                "SIM_IPHONE_15_18_4",
+                "SIM_IPHONE_15_18_5",
             ],
         ),
         targets.bundle(
@@ -5024,7 +4944,7 @@ targets.bundle(
             ],
             variants = [
                 "SIM_IPHONE_14_17_5",
-                "SIM_IPHONE_15_18_4",
+                "SIM_IPHONE_15_18_5",
             ],
         ),
         targets.bundle(
@@ -5034,9 +4954,9 @@ targets.bundle(
                 "record_failed_tests",
             ],
             variants = [
-                "SIM_IPAD_PRO_7TH_GEN_18_4",
+                "SIM_IPAD_PRO_7TH_GEN_18_5",
                 "SIM_IPHONE_14_17_5",
-                "SIM_IPHONE_15_18_4",
+                "SIM_IPHONE_15_18_5",
             ],
         ),
         targets.bundle(
@@ -5046,18 +4966,112 @@ targets.bundle(
                 "record_failed_tests",
             ],
             variants = [
-                "SIM_IPAD_PRO_7TH_GEN_18_4",
+                "SIM_IPAD_PRO_7TH_GEN_18_5",
                 "SIM_IPHONE_14_17_5",
-                "SIM_IPHONE_15_18_4",
+                "SIM_IPHONE_15_18_5",
             ],
         ),
         targets.bundle(
             targets = "ios_screen_size_dependent_tests",
             variants = [
-                "SIM_IPAD_AIR_6TH_GEN_18_4",
-                "SIM_IPAD_PRO_7TH_GEN_18_4",
-                "SIM_IPHONE_15_18_4",
-                "SIM_IPHONE_SE_3RD_GEN_18_4",
+                "SIM_IPAD_AIR_6TH_GEN_18_5",
+                "SIM_IPAD_PRO_7TH_GEN_18_5",
+                "SIM_IPHONE_15_18_5",
+                "SIM_IPHONE_SE_3RD_GEN_18_5",
+            ],
+        ),
+    ],
+)
+
+targets.bundle(
+    name = "ios26_beta_simulator_tests",
+    targets = [
+        targets.bundle(
+            targets = "ios_common_tests",
+            variants = [
+                "SIM_IPAD_AIR_5TH_GEN_18_5",
+                "SIM_IPHONE_14_18_5",
+            ],
+        ),
+        targets.bundle(
+            targets = "ios_crash_xcuitests",
+            mixins = [
+                "xcodebuild_sim_runner",
+            ],
+            variants = [
+                "SIM_IPAD_AIR_5TH_GEN_18_5",
+                "SIM_IPHONE_14_18_5",
+            ],
+        ),
+        targets.bundle(
+            targets = "ios_eg2_cq_tests",
+            mixins = [
+                "xcodebuild_sim_runner",
+                "record_failed_tests",
+            ],
+            variants = [
+                "SIM_IPAD_AIR_5TH_GEN_18_5",
+                "SIM_IPHONE_14_18_5",
+            ],
+        ),
+        targets.bundle(
+            targets = "ios_eg2_tests",
+            mixins = [
+                "xcodebuild_sim_runner",
+                "record_failed_tests",
+            ],
+            variants = [
+                "SIM_IPAD_AIR_5TH_GEN_18_5",
+                "SIM_IPHONE_14_18_5",
+            ],
+        ),
+        targets.bundle(
+            targets = "ios_screen_size_dependent_tests",
+            variants = [
+                "SIM_IPAD_AIR_5TH_GEN_18_5",
+                "SIM_IPHONE_14_18_5",
+                "SIM_IPHONE_SE_3RD_GEN_18_5",
+            ],
+        ),
+    ],
+)
+
+targets.bundle(
+    name = "ios26_sdk_simulator_tests",
+    targets = [
+        targets.bundle(
+            targets = "ios_common_tests",
+            variants = [
+                "SIM_IPAD_AIR_5TH_GEN_18_5",
+                "SIM_IPHONE_14_18_5",
+            ],
+        ),
+        targets.bundle(
+            targets = "ios_eg2_cq_tests",
+            mixins = [
+                "xcodebuild_sim_runner",
+            ],
+            variants = [
+                "SIM_IPAD_AIR_5TH_GEN_18_5",
+                "SIM_IPHONE_14_18_5",
+            ],
+        ),
+        targets.bundle(
+            targets = "ios_eg2_tests",
+            mixins = [
+                "xcodebuild_sim_runner",
+            ],
+            variants = [
+                "SIM_IPAD_AIR_5TH_GEN_18_5",
+                "SIM_IPHONE_14_18_5",
+            ],
+        ),
+        targets.bundle(
+            targets = "ios_screen_size_dependent_tests",
+            variants = [
+                "SIM_IPAD_AIR_5TH_GEN_18_5",
+                "SIM_IPHONE_14_18_5",
+                "SIM_IPHONE_SE_3RD_GEN_18_5",
             ],
         ),
     ],
@@ -5982,7 +5996,6 @@ targets.bundle(
             variants = [
                 "MAC_MINI_INTEL_GPU_STABLE",
                 "MAC_RETINA_AMD_GPU_STABLE",
-                "MAC_RETINA_NVIDIA_GPU_STABLE",
             ],
         ),
         targets.bundle(
@@ -6004,7 +6017,6 @@ targets.bundle(
             variants = [
                 "MAC_MINI_INTEL_GPU_STABLE",
                 "MAC_RETINA_AMD_GPU_STABLE",
-                "MAC_RETINA_NVIDIA_GPU_STABLE",
             ],
         ),
         targets.bundle(
@@ -6012,7 +6024,6 @@ targets.bundle(
             variants = [
                 "MAC_MINI_INTEL_GPU_STABLE",
                 "MAC_RETINA_AMD_GPU_STABLE",
-                "MAC_RETINA_NVIDIA_GPU_STABLE",
             ],
         ),
         targets.bundle(
@@ -6082,7 +6093,6 @@ targets.bundle(
             variants = [
                 "MAC_MINI_INTEL_GPU_STABLE",
                 "MAC_RETINA_AMD_GPU_STABLE",
-                "MAC_RETINA_NVIDIA_GPU_STABLE",
             ],
         ),
         targets.bundle(
@@ -6090,7 +6100,6 @@ targets.bundle(
             variants = [
                 "MAC_MINI_INTEL_GPU_STABLE",
                 "MAC_RETINA_AMD_GPU_STABLE",
-                "MAC_RETINA_NVIDIA_GPU_STABLE",
             ],
         ),
     ],
@@ -6383,17 +6392,6 @@ targets.bundle(
     ],
 )
 
-targets.bundle(
-    name = "q_isolated_scripts",
-    targets = [
-        "android_isolated_scripts",
-        "chromium_junit_tests_scripts",
-        "components_perftests_isolated_scripts",
-        "telemetry_android_minidump_unittests_isolated_scripts",
-        "telemetry_perf_unittests_isolated_scripts_android",
-    ],
-)
-
 # Rust tests run on all targets.
 targets.bundle(
     name = "rust_common_gtests",
@@ -6622,7 +6620,6 @@ targets.bundle(
     name = "telemetry_android_minidump_unittests_isolated_scripts",
     targets = [
         "telemetry_chromium_minidump_unittests",
-        "telemetry_monochrome_minidump_unittests",
     ],
 )
 
@@ -6733,6 +6730,7 @@ targets.bundle(
     targets = [
         "blink_unittests",
         "blink_platform_unittests",
+        "browser_tests",
         "cc_unittests",
         "content_browsertests",
     ],
@@ -6753,6 +6751,14 @@ targets.bundle(
             args = [
                 "--test-launcher-filter-file=../../testing/buildbot/filters/trees_in_viz.blink_platform_unittests.filter",
             ],
+        ),
+        "browser_tests": targets.mixin(
+            args = [
+                "--test-launcher-filter-file=../../testing/buildbot/filters/trees_in_viz.browser_tests.filter",
+            ],
+            swarming = targets.swarming(
+                shards = 16,
+            ),
         ),
         "cc_unittests": targets.mixin(
             args = [

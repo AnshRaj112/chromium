@@ -149,9 +149,10 @@ class CORE_EXPORT MediaQueryExpValue {
     kDynamicViewport = 1 << 2,
     kStaticViewport = 1 << 3,
     kContainer = 1 << 4,
+    kTreeCounting = 1 << 5,
   };
 
-  static const int kUnitFlagsBits = 5;
+  static const int kUnitFlagsBits = 6;
 
   unsigned GetUnitFlags() const;
 
@@ -407,6 +408,11 @@ class CORE_EXPORT MediaQueryFeatureExpNode : public MediaQueryExpNode {
   const String& Name() const {
     DCHECK(HasMediaFeature());
     return exp_.MediaFeature();
+  }
+
+  const CSSUnparsedDeclarationValue& ReferenceValue() const {
+    DCHECK(HasStyleRange());
+    return exp_.ReferenceValue();
   }
 
   bool HasMediaFeature() const { return exp_.HasMediaFeature(); }

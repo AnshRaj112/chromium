@@ -12,20 +12,16 @@
 #include "components/optimization_guide/core/model_quality/model_execution_logging_wrappers.h"
 #include "components/optimization_guide/proto/features/password_change_submission.pb.h"
 #include "content/public/browser/web_contents.h"
-
-#if !BUILDFLAG(IS_ANDROID)
 #include "chrome/browser/password_manager/password_change/button_click_helper.h"
-#endif
 
 namespace {
 
 blink::mojom::AIPageContentOptionsPtr GetAIPageContentOptions() {
-  auto options = blink::mojom::AIPageContentOptions::New();
+  auto options = optimization_guide::ActionableAIPageContentOptions();
   // WebContents where password change is happening is hidden, and renderer
   // won't capture a snapshot unless it becomes visible again or
   // on_critical_path is set to true.
   options->on_critical_path = true;
-  options->enable_experimental_actionable_data = true;
   return options;
 }
 
@@ -131,17 +127,12 @@ void ChangePasswordFormFinder::OnExecutionResponseCallback(
     return;
   }
 
-#if !BUILDFLAG(IS_ANDROID)
   click_helper_ = std::make_unique<ButtonClickHelper>(
       web_contents_.get(), dom_node_id,
       base::BindOnce(&ChangePasswordFormFinder::OnButtonClicked,
                      weak_ptr_factory_.GetWeakPtr()));
-#else
-  std::move(callback_).Run(nullptr);
-#endif
 }
 
-#if !BUILDFLAG(IS_ANDROID)
 void ChangePasswordFormFinder::OnButtonClicked(bool result) {
   click_helper_.reset();
 
@@ -162,4 +153,3 @@ void ChangePasswordFormFinder::OnSubsequentFormWaitingResult(
   // TODO(crbug.com/407503334): Record metrics here.
   std::move(callback_).Run(form_manager);
 }
-#endif

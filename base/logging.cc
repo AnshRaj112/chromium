@@ -33,7 +33,6 @@
 #include "base/functional/callback.h"
 #include "base/immediate_crash.h"
 #include "base/no_destructor.h"
-#include "base/not_fatal_until.h"
 #include "base/path_service.h"
 #include "base/pending_task.h"
 #include "base/posix/eintr_wrapper.h"
@@ -48,11 +47,13 @@
 #include "base/task/common/task_annotator.h"
 #include "base/test/scoped_logging_settings.h"
 #include "base/threading/platform_thread.h"
-#include "base/trace_event/base_tracing.h"
+#include "base/trace_event/interned_args_helper.h"
+#include "base/trace_event/typed_macros.h"
 #include "base/vlog.h"
 #include "build/build_config.h"
 #include "third_party/abseil-cpp/absl/base/internal/raw_logging.h"
 #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
+#include "third_party/perfetto/protos/perfetto/trace/track_event/log_message.pbzero.h"
 
 #if !BUILDFLAG(IS_NACL)
 #include "base/auto_reset.h"
@@ -550,13 +551,13 @@ bool BaseInitLoggingImpl(const LoggingSettings& settings) {
 
 #if BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_WIN)
   if (settings.log_file) {
-    CHECK(settings.log_file_path.empty(), base::NotFatalUntil::M127);
+    CHECK(settings.log_file_path.empty());
     g_log_file = settings.log_file;
     return true;
   }
 #endif  // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_WIN)
 
-  CHECK(!settings.log_file_path.empty(), base::NotFatalUntil::M127)
+  CHECK(!settings.log_file_path.empty())
       << "LOG_TO_FILE set but no log_file_path!";
 
   if (!g_log_file_name) {

@@ -68,6 +68,16 @@ BASE_DECLARE_FEATURE(kAlignSafeSitesValueWithBrowserDefault);
 // enabled iff kAlignSafeSitesValueWithBrowserDefault is also enabled.
 BASE_DECLARE_FEATURE(kDecoupleSafeSitesFromMainSwitch);
 
+#if BUILDFLAG(IS_ANDROID)
+// Allows the URL classification mode without credentials, if the profile is not
+// managed by the family link System.
+BASE_DECLARE_FEATURE(kAllowNonFamilyLinkUrlFilterMode);
+
+// Propagates the device settings about content filters to the supervised user
+// content filters.
+BASE_DECLARE_FEATURE(kPropagateDeviceContentFiltersToSupervisedUser);
+#endif
+
 // Returns whether the V3 version of the URL filter interstitial is
 // enabled.
 bool IsBlockInterstitialV3Enabled();

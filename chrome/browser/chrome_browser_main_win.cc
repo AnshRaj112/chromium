@@ -41,15 +41,17 @@
 #include "base/path_service.h"
 #include "base/scoped_native_library.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "base/strings/sys_string_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
-#include "base/trace_event/base_tracing.h"
+#include "base/trace_event/trace_event.h"
 #include "base/types/expected.h"
 #include "base/version.h"
 #include "base/win/elevation_util.h"
 #include "base/win/pe_image.h"
+#include "base/win/scoped_variant.h"
 #include "base/win/win_util.h"
 #include "base/win/wrapped_window_proc.h"
 #include "build/branding_buildflags.h"
@@ -62,6 +64,7 @@
 #include "chrome/browser/first_run/first_run.h"
 #include "chrome/browser/first_run/upgrade_util.h"
 #include "chrome/browser/first_run/upgrade_util_win.h"
+#include "chrome/browser/google/google_update_app_command.h"
 #include "chrome/browser/performance_manager/public/dll_pre_read_policy_win.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_shortcut_manager.h"
@@ -133,10 +136,6 @@
 #include "ui/gfx/win/crash_id_helper.h"
 #include "ui/strings/grit/app_locale_settings.h"
 
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-#include "chrome/browser/win/conflicts/third_party_conflicts_manager.h"
-#endif
-
 namespace {
 
 typedef HRESULT (STDAPICALLTYPE* RegisterApplicationRestartProc)(
@@ -183,7 +182,6 @@ void InitializeModuleDatabase() {
   ModuleDatabase::SetInstance(std::make_unique<ModuleDatabase>());
 
   auto* module_database = ModuleDatabase::GetInstance();
-  module_database->StartDrainingModuleLoadAttemptsLog();
 
   // Enumerate shell extensions and input method editors. It is safe to use
   // base::Unretained() here because the ModuleDatabase is never freed.
@@ -335,7 +333,7 @@ bool TryGetModuleTimeDateStamp(void* module_load_address,
 }
 
 void ShowCloseBrowserFirstMessageBox() {
-  chrome::ShowWarningMessageBox(
+  chrome::ShowWarningMessageBoxAsync(
       nullptr, l10n_util::GetStringUTF16(IDS_PRODUCT_NAME),
       l10n_util::GetStringUTF16(IDS_UNINSTALL_CLOSE_APP));
 }
@@ -484,59 +482,40 @@ const wchar_t kPlatformExperienceHelperExe[] =
 // Returns true if the platform_experience_helper is installed.
 // Returns true if it can't determine whether it's installed or not.
 bool PlatformExperienceHelperMightBeInstalled() {
-  // Currently only implemented for user-level installs.
-  CHECK(!install_static::IsSystemInstall());
-
-  base::FilePath user_data_dir;
-  if (!base::PathService::Get(chrome::DIR_USER_DATA, &user_data_dir)) {
-    return true;
-  }
+  base::FilePath peh_base_dir = base::PathService::CheckedGet(
+      install_static::IsSystemInstall()
+          ? static_cast<int>(base::DIR_EXE)
+          : static_cast<int>(chrome::DIR_USER_DATA));
 
   base::FilePath peh_exe_path =
-      user_data_dir.Append(kPlatformExperienceHelperDir)
+      peh_base_dir.Append(kPlatformExperienceHelperDir)
           .Append(kPlatformExperienceHelperExe);
   return base::PathExists(peh_exe_path);
 }
 
-// This function might block. Returns nullopt if it can't find an existing path.
-std::optional<base::FilePath> GetPlatformExperienceHelperInstallerPath() {
-  base::FilePath chrome_dir;
-  if (!base::PathService::Get(base::DIR_EXE, &chrome_dir)) {
-    return std::nullopt;
-  }
-
-  const wchar_t kOsUpdateHandlerExe[] = L"os_update_handler.exe";
-  base::FilePath exe_path = chrome_dir.AppendASCII(chrome::kChromeVersion)
-                                .Append(kOsUpdateHandlerExe);
-  if (base::PathExists(exe_path)) {
-    return exe_path;
-  }
-  // In dev builds, the launcher will be in the executable directory.
-  exe_path = chrome_dir.Append(kOsUpdateHandlerExe);
-  if (base::PathExists(exe_path)) {
-    return exe_path;
-  }
-  return std::nullopt;
-}
-
 // This function might block.
 void MaybeInstallPlatformExperienceHelper() {
-  // TODO(crbug.com/393626337): remove this check once we implement PEH
-  // installation for system-level installs.
-  if (install_static::IsSystemInstall()) {
-    return;
-  }
-
   if (PlatformExperienceHelperMightBeInstalled()) {
     return;
   }
 
-  std::optional<base::FilePath> peh_installer_path =
-      GetPlatformExperienceHelperInstallerPath();
-  if (!peh_installer_path.has_value()) {
+  // TODO(crbug.com/422447800): Report metrics for number of installer launch
+  // attempts (success vs. failure), split by user vs system installs.
+  if (install_static::IsSystemInstall()) {
+    auto command = GetUpdaterAppCommand(installer::kCmdInstallPEH);
+    if (!command.has_value()) {
+      return;
+    }
+
+    const VARIANT& var = base::win::ScopedVariant::kEmptyVariant;
+    (*command)->execute(var, var, var, var, var, var, var, var, var);
     return;
   }
-  base::CommandLine install_cmd(peh_installer_path.value());
+
+  base::FilePath peh_installer_path =
+      base::PathService::CheckedGet(base::DIR_MODULE)
+          .Append(FILE_PATH_LITERAL("os_update_handler.exe"));
+  base::CommandLine install_cmd(peh_installer_path);
   install_cmd.AppendSwitch(kPlatformExperienceHelperForceInstallSwitch);
   InstallUtil::AppendModeAndChannelSwitches(&install_cmd);
 
@@ -826,7 +805,9 @@ void ChromeBrowserMainPartsWin::PostBrowserStart() {
   if (base::FeatureList::IsEnabled(
           features::kInstallPlatformExperienceHelperWin)) {
     base::ThreadPool::PostTask(
-        FROM_HERE, {base::TaskPriority::BEST_EFFORT, base::MayBlock()},
+        FROM_HERE,
+        {base::TaskPriority::BEST_EFFORT, base::MayBlock(),
+         base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN},
         base::BindOnce(&MaybeInstallPlatformExperienceHelper));
   }
 #endif  // GOOGLE_CHROME_BRANDING
@@ -1043,26 +1024,6 @@ void ChromeBrowserMainPartsWin::SetupModuleDatabase(
     std::unique_ptr<ModuleWatcher>* module_watcher) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   DCHECK(module_watcher);
-
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-  // Explicitly disable the third-party modules blocking.
-  //
-  // Because the blocking code lives in chrome_elf, it is not possible to check
-  // the feature (via the FeatureList API) or the policy to control whether it
-  // is enabled or not.
-  //
-  // What truly controls if the blocking is enabled is the presence of the
-  // module blocklist cache file. This means that to disable the feature, the
-  // cache must be deleted and the browser relaunched.
-  if (!ModuleBlocklistCacheUpdater::IsBlockingEnabled()) {
-    ThirdPartyConflictsManager::DisableThirdPartyModuleBlocking(
-        base::ThreadPool::CreateTaskRunner(
-            {base::TaskPriority::BEST_EFFORT,
-             base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN,
-             base::MayBlock()})
-            .get());
-  }
-#endif
 
   ModuleDatabase::GetTaskRunner()->PostTask(
       FROM_HERE, base::BindOnce(&InitializeModuleDatabase));

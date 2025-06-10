@@ -949,20 +949,6 @@ void HttpNetworkTransaction::OnQuicBroken() {
   net_error_details_.quic_broken = true;
 }
 
-void HttpNetworkTransaction::OnSwitchesToHttpStreamPool(
-    HttpStreamPoolRequestInfo request_info) {
-  CHECK_EQ(STATE_CREATE_STREAM_COMPLETE, next_state_);
-  CHECK(stream_request_);
-  stream_request_.reset();
-
-  stream_request_ = session_->http_stream_pool()->RequestStream(
-      this, std::move(request_info), priority_,
-      /*allowed_bad_certs=*/observed_bad_certs_, enable_ip_based_pooling_,
-      enable_alternative_services_, net_log_);
-  CHECK(!stream_request_->completed());
-  // No IO completion yet.
-}
-
 ConnectionAttempts HttpNetworkTransaction::GetConnectionAttempts() const {
   return connection_attempts_;
 }
@@ -1011,18 +997,18 @@ int HttpNetworkTransaction::DoLoop(int result) {
       case STATE_CREATE_STREAM_COMPLETE:
         rv = DoCreateStreamComplete(rv);
         break;
+      case STATE_CONNECTED_CALLBACK:
+        rv = DoConnectedCallback();
+        break;
+      case STATE_CONNECTED_CALLBACK_COMPLETE:
+        rv = DoConnectedCallbackComplete(rv);
+        break;
       case STATE_INIT_STREAM:
         DCHECK_EQ(OK, rv);
         rv = DoInitStream();
         break;
       case STATE_INIT_STREAM_COMPLETE:
         rv = DoInitStreamComplete(rv);
-        break;
-      case STATE_CONNECTED_CALLBACK:
-        rv = DoConnectedCallback();
-        break;
-      case STATE_CONNECTED_CALLBACK_COMPLETE:
-        rv = DoConnectedCallbackComplete(rv);
         break;
       case STATE_GENERATE_PROXY_AUTH_TOKEN:
         DCHECK_EQ(OK, rv);
@@ -1136,8 +1122,12 @@ int HttpNetworkTransaction::DoCreateStream() {
 }
 
 int HttpNetworkTransaction::DoCreateStreamComplete(int result) {
-  TRACE_EVENT("net", "HttpNetworkTransaction::CreateStreamComplete",
-              NetLogWithSourceToFlow(net_log_), "result", result);
+  CHECK(stream_request_);
+  TRACE_EVENT(
+      "net", "HttpNetworkTransaction::CreateStreamComplete",
+      NetLogWithSourceToFlow(net_log_), "result", result, "negotiated_protocol",
+      stream_request_->completed() ? stream_request_->negotiated_protocol()
+                                   : NextProto::kProtoUnknown);
   RecordStreamRequestResult(result);
   CopyConnectionAttemptsFromStreamRequest();
   if (result == OK) {
@@ -1171,65 +1161,6 @@ int HttpNetworkTransaction::DoCreateStreamComplete(int result) {
 
   // At this point we are done with the stream_request_.
   stream_request_.reset();
-  return result;
-}
-
-int HttpNetworkTransaction::DoInitStream() {
-  DCHECK(stream_.get());
-  TRACE_EVENT("net", "HttpNetworkTransaction::InitStream",
-              NetLogWithSourceToFlow(net_log_));
-  next_state_ = STATE_INIT_STREAM_COMPLETE;
-
-  initialize_stream_start_time_ = base::TimeTicks::Now();
-  int rv = stream_->InitializeStream(can_send_early_data_, priority_, net_log_,
-                                     io_callback_);
-
-  // TODO(crbug.com/359404121): Remove this histogram after the investigation
-  // completes.
-  bool blocked = rv == ERR_IO_PENDING;
-  if (blocked) {
-    blocked_initialize_stream_start_time_ = initialize_stream_start_time_;
-  }
-  base::UmaHistogramBoolean(
-      base::StrCat(
-          {"Net.NetworkTransaction.InitializeStreamBlocked",
-           IsGoogleHostWithAlpnH3(url_.host_piece()) ? "GoogleHost." : ".",
-           NegotiatedProtocolToHistogramSuffix(negotiated_protocol_)}),
-      blocked);
-  return rv;
-}
-
-int HttpNetworkTransaction::DoInitStreamComplete(int result) {
-  TRACE_EVENT("net", "HttpNetworkTransaction::InitStreamComplete",
-              NetLogWithSourceToFlow(net_log_), "result", result);
-  initialize_stream_end_time_ = base::TimeTicks::Now();
-
-  // TODO(crbug.com/359404121): Remove this histogram after the investigation
-  // completes.
-  if (!blocked_initialize_stream_start_time_.is_null()) {
-    base::UmaHistogramTimes(
-        base::StrCat(
-            {"Net.NetworkTransaction.InitializeStreamBlockTime",
-             IsGoogleHostWithAlpnH3(url_.host_piece()) ? "GoogleHost." : ".",
-             NegotiatedProtocolToHistogramSuffix(negotiated_protocol_)}),
-        initialize_stream_end_time_ - blocked_initialize_stream_start_time_);
-  }
-
-  if (result != OK) {
-    if (result < 0)
-      result = HandleIOError(result);
-
-    // The stream initialization failed, so this stream will never be useful.
-    if (stream_) {
-      total_received_bytes_ += stream_->GetTotalReceivedBytes();
-      total_sent_bytes_ += stream_->GetTotalSentBytes();
-    }
-    CacheNetErrorDetailsAndResetStream();
-
-    return result;
-  }
-
-  next_state_ = STATE_GENERATE_PROXY_AUTH_TOKEN;
   return result;
 }
 
@@ -1299,6 +1230,66 @@ int HttpNetworkTransaction::DoConnectedCallbackComplete(int result) {
 
   next_state_ = STATE_INIT_STREAM;
   return OK;
+}
+
+int HttpNetworkTransaction::DoInitStream() {
+  DCHECK(stream_.get());
+  TRACE_EVENT("net", "HttpNetworkTransaction::InitStream",
+              NetLogWithSourceToFlow(net_log_));
+  next_state_ = STATE_INIT_STREAM_COMPLETE;
+
+  initialize_stream_start_time_ = base::TimeTicks::Now();
+  int rv = stream_->InitializeStream(can_send_early_data_, priority_, net_log_,
+                                     io_callback_);
+
+  // TODO(crbug.com/359404121): Remove this histogram after the investigation
+  // completes.
+  bool blocked = rv == ERR_IO_PENDING;
+  if (blocked) {
+    blocked_initialize_stream_start_time_ = initialize_stream_start_time_;
+  }
+  base::UmaHistogramBoolean(
+      base::StrCat(
+          {"Net.NetworkTransaction.InitializeStreamBlocked",
+           IsGoogleHostWithAlpnH3(url_.host_piece()) ? "GoogleHost." : ".",
+           NegotiatedProtocolToHistogramSuffix(negotiated_protocol_)}),
+      blocked);
+  return rv;
+}
+
+int HttpNetworkTransaction::DoInitStreamComplete(int result) {
+  TRACE_EVENT("net", "HttpNetworkTransaction::InitStreamComplete",
+              NetLogWithSourceToFlow(net_log_), "result", result);
+  initialize_stream_end_time_ = base::TimeTicks::Now();
+
+  // TODO(crbug.com/359404121): Remove this histogram after the investigation
+  // completes.
+  if (!blocked_initialize_stream_start_time_.is_null()) {
+    base::UmaHistogramTimes(
+        base::StrCat(
+            {"Net.NetworkTransaction.InitializeStreamBlockTime",
+             IsGoogleHostWithAlpnH3(url_.host_piece()) ? "GoogleHost." : ".",
+             NegotiatedProtocolToHistogramSuffix(negotiated_protocol_)}),
+        initialize_stream_end_time_ - blocked_initialize_stream_start_time_);
+  }
+
+  if (result != OK) {
+    if (result < 0) {
+      result = HandleIOError(result);
+    }
+
+    // The stream initialization failed, so this stream will never be useful.
+    if (stream_) {
+      total_received_bytes_ += stream_->GetTotalReceivedBytes();
+      total_sent_bytes_ += stream_->GetTotalSentBytes();
+    }
+    CacheNetErrorDetailsAndResetStream();
+
+    return result;
+  }
+
+  next_state_ = STATE_GENERATE_PROXY_AUTH_TOKEN;
+  return result;
 }
 
 int HttpNetworkTransaction::DoGenerateProxyAuthToken() {

@@ -59,7 +59,6 @@
 #include "ui/accessibility/platform/inspect/ax_api_type.h"
 #include "ui/base/cursor/mojom/cursor_type.mojom-shared.h"
 #include "ui/color/color_provider_key.h"
-#include "ui/display/types/display_constants.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/native_widget_types.h"
@@ -124,6 +123,7 @@ class RenderViewHost;
 class RenderWidgetHostView;
 class ScreenOrientationDelegate;
 class SiteInstance;
+class UnownedInnerWebContentsClient;
 class WebContentsDelegate;
 class WebUI;
 struct DropData;
@@ -883,6 +883,17 @@ class WebContents : public PageNavigator, public base::SupportsUserData {
   // directly to determine its aggregate audio state.
   virtual void OnAudioStateChanged() = 0;
 
+  // Signals that the main frame is currently a source of audio.
+  //
+  // Returns a base::ScopedClosureRunner. The WebContents will be considered
+  // audible as long as this ScopedClosureRunner instance is alive.
+  //
+  // When the WebContents is no longer audible, call RunAndReset() on the
+  // returned ScopedClosureRunner. If the WebContents remains audible until it
+  // is destroyed, you can simply let the ScopedClosureRunner go out of scope
+  // when the WebContents is destroyed.
+  [[nodiscard]] virtual base::ScopedClosureRunner MarkAudible() = 0;
+
   // Get/Set the last time ticks that the WebContents was made active (either
   // when it was created or shown with WasShown()). Note: GetLastActiveTimeTicks
   // and GetLastActiveTime can get desynced if the process is suspended or if
@@ -955,6 +966,7 @@ class WebContents : public PageNavigator, public base::SupportsUserData {
   // TODO(crbug.com/416609971): Remove this method once we find a way to attach
   // inner WebContents without using WebContents trees.
   virtual void AttachUnownedInnerWebContents(
+      base::PassKey<UnownedInnerWebContentsClient>,
       WebContents* inner_web_contents,
       RenderFrameHost* render_frame_host) = 0;
 
@@ -964,6 +976,7 @@ class WebContents : public PageNavigator, public base::SupportsUserData {
   // TODO(crbug.com/416609971): Remove this method once we find a way to attach
   // inner WebContents without using WebContents trees.
   virtual void DetachUnownedInnerWebContents(
+      base::PassKey<UnownedInnerWebContentsClient>,
       WebContents* inner_web_contents) = 0;
 
   // Attaches `guest_page` to the container frame `outer_render_frame_host`,
@@ -1613,9 +1626,11 @@ class WebContents : public PageNavigator, public base::SupportsUserData {
   //   request.
   // - `holdback_status_override` is used to override holdback status, if
   //   specified.
-  //  - Returns `PrefetchHandle` to control prefetch resources. This can be
-  //    nullptr when this function can't add `PrefetchContainer` to
-  //    `PrefetchService`.
+  // - `ttl`: TTL; `PrefetchService` holds prefetch in `ttl`. Uses default value
+  // if `std::nullopt`.
+  // - Returns `PrefetchHandle` to control prefetch resources. This can be
+  //   nullptr when this function can't add `PrefetchContainer` to
+  //   `PrefetchService`.
   virtual std::unique_ptr<PrefetchHandle> StartPrefetch(
       const GURL& prefetch_url,
       bool use_prefetch_proxy,
@@ -1625,7 +1640,8 @@ class WebContents : public PageNavigator, public base::SupportsUserData {
       std::optional<net::HttpNoVarySearchData> no_vary_search_hint,
       scoped_refptr<PreloadPipelineInfo> preload_pipeline_info,
       base::WeakPtr<PreloadingAttempt> attempt,
-      std::optional<PreloadingHoldbackStatus> holdback_status_override) = 0;
+      std::optional<PreloadingHoldbackStatus> holdback_status_override,
+      std::optional<base::TimeDelta> ttl) = 0;
 
   // Starts an embedder triggered (browser-initiated) prerendering page and
   // returns the unique_ptr<PrerenderHandle>, which cancels prerendering on its

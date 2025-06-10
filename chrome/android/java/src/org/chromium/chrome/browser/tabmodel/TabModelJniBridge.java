@@ -49,6 +49,7 @@ public abstract class TabModelJniBridge implements TabModelInternal {
     }
 
     /** Initializes the native-side counterpart to this class. */
+    @CallSuper
     protected void initializeNative(Profile profile) {
         assert mNativeTabModelJniBridge == 0;
         mNativeTabModelJniBridge =
@@ -116,7 +117,7 @@ public abstract class TabModelJniBridge implements TabModelInternal {
      */
     public abstract void completeInitialization();
 
-    /** Broadcast a native-side notification that all tabs are now loaded from storage. */
+    @Override
     public void broadcastSessionRestoreComplete() {
         assert isNativeInitialized();
         assert isInitializationComplete();
@@ -223,6 +224,9 @@ public abstract class TabModelJniBridge implements TabModelInternal {
      */
     @CalledByNative
     protected abstract void openTabProgrammatically(GURL url, int index);
+
+    @CalledByNative
+    protected abstract Tab[] getAllTabs();
 
     @NativeMethods
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)

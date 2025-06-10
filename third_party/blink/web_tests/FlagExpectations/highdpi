@@ -1,4 +1,4 @@
-# tags: [ Android Fuchsia Linux Mac Mac11 Mac12 Mac13 Mac13-arm64 Mac14 Mac14-arm64 Mac15 Mac15-arm64  Win Win10.20h2 Win11 Win11-arm64 ]
+# tags: [ Android Fuchsia Linux Mac Mac12 Mac13 Mac13-arm64 Mac14 Mac14-arm64 Mac15 Mac15-arm64  Win Win10.20h2 Win11 Win11-arm64 ]
 # tags: [ Release Debug ]
 # results: [ Timeout Crash Pass Failure Slow Skip ]
 
@@ -66,6 +66,14 @@ crbug.com/1179572 animations/cross-fade-webkit-mask-box-image.html [ Failure ]
 
 crbug.com/1412910 virtual/threaded/external/wpt/css/css-view-transitions/fractional-translation-from-position.html [ Failure ]
 crbug.com/1414855 virtual/threaded/external/wpt/css/css-view-transitions/new-content-captures-spans.html [ Failure ]
+
+# These test expectation position things by pixels, which mismatches in hidpi.
+virtual/threaded/external/wpt/css/css-view-transitions/nested/group-children-sizing.html [ Skip ]
+virtual/view-transition-wide-gamut/external/wpt/css/css-view-transitions/nested/group-children-sizing.html [ Skip ]
+virtual/view-transition-mpa-serialization/external/wpt/css/css-view-transitions/nested/group-children-sizing.html [ Skip ]
+virtual/threaded/external/wpt/css/css-view-transitions/nested/group-children-sizing-with-border.html [ Skip ]
+virtual/view-transition-wide-gamut/external/wpt/css/css-view-transitions/nested/group-children-sizing-with-border.html [ Skip ]
+virtual/view-transition-mpa-serialization/external/wpt/css/css-view-transitions/nested/group-children-sizing-with-border.html [ Skip ]
 
 crbug.com/1179544 compositing/canvas-with-object-fit-contain-in-composited-layer.html [ Failure ]
 crbug.com/1179544 compositing/composited-replaced-subpixel-location.html [ Failure ]

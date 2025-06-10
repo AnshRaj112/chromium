@@ -16,7 +16,10 @@
 #include "components/omnibox/browser/base_search_provider.h"
 #include "components/omnibox/browser/omnibox.mojom-shared.h"
 #include "components/search_engines/template_url_service.h"
+#include "content/public/browser/preloading_data.h"
+#include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
+#include "services/network/public/mojom/network_context.mojom.h"
 
 namespace {
 
@@ -66,9 +69,57 @@ void SearchPreloadPipelineManager::ClearPreloads() {
   pipelines_.clear();
 }
 
-void SearchPreloadPipelineManager::OnAutocompleteResultChanged(
+void SearchPreloadPipelineManager::EraseNotAlivePipelines() {
+  base::EraseIf(
+      pipelines_,
+      [](const std::pair<GURL, std::unique_ptr<SearchPreloadPipeline>>& pair) {
+        auto& pipeline = pair.second;
+        const bool is_alive =
+            pipeline->IsPrefetchAlive() || pipeline->IsPrerenderValid();
+        return !is_alive;
+      });
+}
+
+void SearchPreloadPipelineManager::MaybePreloadSharedDictionary(
     Profile& profile,
     const AutocompleteResult& result) {
+  std::vector<GURL> urls;
+  urls.reserve(result.size());
+  for (const AutocompleteMatch& match : result) {
+    if (match.destination_url.SchemeIsHTTPOrHTTPS()) {
+      urls.emplace_back(match.destination_url);
+    }
+  }
+
+  if (urls.empty()) {
+    return;
+  }
+
+  // Keep the old handle until `PreloadSharedDictionaryInfoForDocument()` call
+  // to avoid reloading dictionaries in the network service.
+  mojo::PendingRemote<network::mojom::PreloadedSharedDictionaryInfoHandle>
+      old_handle = std::move(shared_dictionary_handle_);
+
+  shared_dictionary_handle_.reset();
+  profile.GetDefaultStoragePartition()
+      ->GetNetworkContext()
+      ->PreloadSharedDictionaryInfoForDocument(
+          urls, shared_dictionary_handle_.InitWithNewPipeAndPassReceiver());
+  shared_dictionary_expiry_timer_.Start(
+      FROM_HERE, features::kDsePreload2OnSuggestSharedDictionaryTtl.Get(),
+      base::BindOnce(&SearchPreloadPipelineManager::InvalidateSharedDictionary,
+                     base::Unretained(this)));
+}
+
+void SearchPreloadPipelineManager::InvalidateSharedDictionary() {
+  shared_dictionary_handle_.reset();
+}
+
+void SearchPreloadPipelineManager::OnAutocompleteResultChanged(
+    Profile& profile,
+    base::WeakPtr<SearchPreloadService> search_preload_service,
+    const AutocompleteResult& result,
+    const std::optional<net::HttpNoVarySearchData>& no_vary_search_hint) {
   auto* template_url_service =
       TemplateURLServiceFactory::GetForProfile(&profile);
   CHECK(template_url_service);
@@ -76,27 +127,46 @@ void SearchPreloadPipelineManager::OnAutocompleteResultChanged(
     return;
   }
 
+  MaybePreloadSharedDictionary(profile, result);
+
+  // Erase to count prefetches.
+  EraseNotAlivePipelines();
+
   if (base::FeatureList::IsEnabled(
           features::kDsePreload2OnSuggestNonDefalutMatch)) {
-    // TODO(crbug.com/403198750): Limit the number of active pipelines.
     for (const auto& match : result) {
-      OnAutocompleteResultChangedProcessOne(profile, *template_url_service,
-                                            match);
+      // Limit the number of prefetches.
+      if (pipelines_.size() >= features::kDsePreload2MaxPrefetch.Get()) {
+        return;
+      }
+
+      OnAutocompleteResultChangedProcessOne(profile, search_preload_service,
+                                            *template_url_service, match,
+                                            no_vary_search_hint);
     }
   } else {
     if (!result.default_match()) {
       return;
     }
     const auto& match = *result.default_match();
-    OnAutocompleteResultChangedProcessOne(profile, *template_url_service,
-                                          match);
+
+    // Limit the number of prefetches.
+    if (pipelines_.size() >= features::kDsePreload2MaxPrefetch.Get()) {
+      return;
+    }
+
+    OnAutocompleteResultChangedProcessOne(profile, search_preload_service,
+                                          *template_url_service, match,
+                                          no_vary_search_hint);
   }
 }
 
 void SearchPreloadPipelineManager::OnAutocompleteResultChangedProcessOne(
     Profile& profile,
+    base::WeakPtr<SearchPreloadService> search_preload_service,
     TemplateURLService& template_url_service,
-    const AutocompleteMatch& match) {
+    const AutocompleteMatch& match,
+    const std::optional<net::HttpNoVarySearchData>& no_vary_search_hint) {
   const bool should_prefetch = BaseSearchProvider::ShouldPrefetch(match) ||
                                BaseSearchProvider::ShouldPrerender(match);
   const bool should_prerender = BaseSearchProvider::ShouldPrerender(match);
@@ -137,14 +207,25 @@ void SearchPreloadPipelineManager::OnAutocompleteResultChangedProcessOne(
       GetPrefetchUrlFromMatch(*match.search_terms_args, template_url_service,
                               /*is_navigation_likely=*/false);
   pipelines_[canonical_url]->StartPrefetch(
-      GetWebContents(), prefetch_url,
-      chrome_preloading_predictor::kDefaultSearchEngine);
+      GetWebContents(), search_preload_service, prefetch_url,
+      chrome_preloading_predictor::kDefaultSearchEngine, no_vary_search_hint);
 
   // Trigger prerender without waiting prefetch.
   //
   // They are coordinated by `PrefetchMatchResolver`. For more details, see
   // https://docs.google.com/document/d/1IAIVrDBE-FnO14Qnghr8hsrxUeoFfeob5QIsV_UNRck/edit?tab=t.0#heading=h.vpxgrp4zne09
   if (should_prerender) {
+    // Unlike prefetch, we cancel the existing prerender and start new one if we
+    // have a signal for prerender. This behavior comes from DSE preload 1
+    // (`SearchPrefetchService`).
+    //
+    // TODO(https://crrev.com/421387697): Consider to use different policy.
+    for (const auto& [key, value] : pipelines_) {
+      if (key != canonical_url) {
+        value->CancelPrerender();
+      }
+    }
+
     const GURL prerender_url = GetPrerenderUrlFromMatch(
         *match.search_terms_args, template_url_service);
     pipelines_[canonical_url]->StartPrerender(
@@ -155,8 +236,10 @@ void SearchPreloadPipelineManager::OnAutocompleteResultChangedProcessOne(
 
 bool SearchPreloadPipelineManager::OnNavigationLikely(
     Profile& profile,
+    base::WeakPtr<SearchPreloadService> search_preload_service,
     const AutocompleteMatch& match,
-    omnibox::mojom::NavigationPredictor navigation_predictor) {
+    omnibox::mojom::NavigationPredictor navigation_predictor,
+    const std::optional<net::HttpNoVarySearchData>& no_vary_search_hint) {
   if (!features::IsDsePreload2OnPressEnabled()) {
     return false;
   }
@@ -183,6 +266,13 @@ bool SearchPreloadPipelineManager::OnNavigationLikely(
           ->data()
           .prefetch_likely_navigations;
   if (!does_search_provider_opt_in) {
+    return false;
+  }
+
+  // Erase to count prefetches.
+  EraseNotAlivePipelines();
+  // Limit the number of prefetches.
+  if (pipelines_.size() >= features::kDsePreload2MaxPrefetch.Get()) {
     return false;
   }
 
@@ -236,6 +326,12 @@ bool SearchPreloadPipelineManager::OnNavigationLikely(
         canonical_url, std::make_unique<SearchPreloadPipeline>(canonical_url));
   }
   pipelines_[canonical_url]->UpdateConfidence(GetWebContents(), 100);
-  return pipelines_[canonical_url]->StartPrefetch(GetWebContents(),
-                                                  prefetch_url, predictor);
+  return pipelines_[canonical_url]->StartPrefetch(
+      GetWebContents(), search_preload_service, prefetch_url, predictor,
+      no_vary_search_hint);
+}
+
+bool SearchPreloadPipelineManager::InvalidatePipelineForTesting(
+    GURL canonical_url) {
+  return static_cast<bool>(pipelines_.erase(canonical_url));
 }

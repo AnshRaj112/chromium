@@ -224,13 +224,6 @@ BASE_FEATURE(kAutofillEnableSupportForParsingWithSharedLabels,
              "AutofillEnableSupportForParsingWithSharedLabels",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Controls if heuristic field parsing should be performed on email-only forms
-// without an enclosing form tag.
-// TODO(crbug.com/40285735): Remove when/if launched.
-BASE_FEATURE(kAutofillEnableEmailHeuristicOutsideForms,
-             "AutofillEnableEmailHeuristicOutsideForms",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Control if Autofill supports German transliteration.
 // TODO(crbug.com/328968064): Remove when/if launched.
 BASE_FEATURE(kAutofillEnableGermanTransliteration,
@@ -273,13 +266,6 @@ BASE_FEATURE(kAutofillEnableLoyaltyCardsFilling,
 BASE_FEATURE(kAutofillEnableEmailOrLoyaltyCardsFilling,
              "AutofillEnableEmailOrLoyaltyCardsFilling",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// When enabled, extracts <input type=date>, which may be filled by Autofill AI.
-// This is a kill switch.
-// TODO(crbug.com/396325496): Clean up after M137 branch (April 28, 2025).
-BASE_FEATURE(kAutofillExtractInputDate,
-             "AutofillExtractInputDate",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, only non-ad frames are extracted.
 // Otherwise, non-ad frames as well as *visible* ad frames are extracted.
@@ -332,13 +318,6 @@ BASE_FEATURE(kAutofillPaymentsFieldSwapping,
              "AutofillPaymentsFieldSwapping",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// When enabled, and upon receiving a signal that a select element has been
-// edited by the user, BrowserAutofillManager will record this correction, which
-// will affect many correctness metrics.
-BASE_FEATURE(kAutofillRecordCorrectionOfSelectElements,
-             "AutofillRecordCorrectionOfSelectElements",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // When enabled, chrome will support home and work addresses from account.
 // TODO: crbug.com/354706653 - Clean up when launched.
 BASE_FEATURE(kAutofillEnableSupportForHomeAndWork,
@@ -366,25 +345,6 @@ const base::FeatureParam<bool>
     kAutofillImprovedLabelsParamWithDifferentiatingLabelsInFrontParam{
         &kAutofillImprovedLabels,
         "autofill_improved_labels_with_differentiating_labels_in_front", false};
-
-// If enabled, we include a `FormFieldData`'s maxlength in crowdsourcing votes.
-// TODO(crbug.com/393995180): Clean up in M137.
-BASE_FEATURE(kAutofillIncludeMaxLengthInCrowdsourcing,
-             "AutofillIncludeMaxLengthInCrowdsourcing",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// If enabled, we include a <select>'s first, second, and last <option> in
-// crowdsourcing votes.
-// TODO(crbug.com/393999140): Clean up in M137.
-BASE_FEATURE(kAutofillIncludeSelectOptionsInCrowdsourcing,
-             "AutofillIncludeSelectOptionsInCrowdsourcing",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// If enabled, we include a `FormData`'s URL in crowdsourcing votes.
-// TODO(crbug.com/385043924): Clean up in M137.
-BASE_FEATURE(kAutofillIncludeUrlInCrowdsourcing,
-             "AutofillIncludeUrlInCrowdsourcing",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, the new suggestion generation logic is used.
 // TODO(crbug.com/409962888): Remove once launched.
@@ -451,15 +411,6 @@ BASE_FEATURE(kAutofillDetectFieldVisibility,
              "AutofillDetectFieldVisibility",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// LINT.IfChange(autofill_disallow_slash_dot_labels)
-// Kill switch that adds '/' and '.' to the list of characters of which a label
-// must not consist exclusively.
-// TODO(crbug.com/396325496): Clean up after after M138 branch (May 26, 2025).
-BASE_FEATURE(kAutofillDisallowSlashDotLabels,
-             "AutofillDisallowSlashDotLabels",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-// LINT.ThenChange(//components/autofill/ios/form_util/resources/autofill_form_features.ts:autofill_disallow_slash_dot_labels)
-
 // If enabled, new heuristics are applied for disambiguating multiple possible
 // types in a form field. Otherwise, only the already established heuristic for
 // disambiguating address and credit card names is used.
@@ -467,24 +418,11 @@ BASE_FEATURE(kAutofillDisambiguateContradictingFieldTypes,
              "AutofillDisambiguateContradictingFieldTypes",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// If enabled, whenever form controls are removed from the DOM, the ChromeClient
-// is informed about this. This enables Autofill to trigger a reparsing of
-// forms.
-BASE_FEATURE(kAutofillDetectRemovedFormControls,
-             "AutofillDetectRemovedFormControls",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Replaces cached web elements in AutofillAgent and FormTracker by their
 // renderer ids.
 BASE_FEATURE(kAutofillReplaceCachedWebElementsByRendererIds,
              "AutofillReplaceCachedWebElementsByRendererIds",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables using a custom address model for France, overriding the legacy one.
-// TODO(crbug.com/347859030): Delete after M139.
-BASE_FEATURE(kAutofillUseFRAddressModel,
-             "AutofillUseFRAddressModel",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables using a custom address model for India, overriding the legacy one.
 BASE_FEATURE(kAutofillUseINAddressModel,
@@ -500,19 +438,6 @@ BASE_FEATURE(kAutofillSupportPhoneticNameForJP,
 BASE_FEATURE(kAutofillSupportLastNamePrefix,
              "AutofillSupportLastNamePrefix",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Kill switch that ignores duplicate AskForValuesToFill() which in
-// AutofillAgent as to work around the broken focus-event handling.
-// TODO(crbug.com/40284788): Clean up after M138 branch (26 May 2025).
-BASE_FEATURE(kAutofillThrottleAskForValuesToFill,
-             "AutofillThrottleAskForValuesToFill",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Enables using a custom address model for the Netherlands, overriding the
-// legacy one.
-BASE_FEATURE(kAutofillUseNLAddressModel,
-             "AutofillUseNLAddressModel",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When enabled, the form field parser won't try to match other attributes if
 // any of the negative patterns matched.
@@ -547,14 +472,6 @@ BASE_FEATURE(kAutofillSkipPreFilledFields,
 BASE_FEATURE(kAutofillPageLanguageDetection,
              "AutofillPageLanguageDetection",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// When enabled, we check whether a field's label or placeholder has the format
-// of a valid email address. If it does, we use that as a signal that the field
-// is of type EMAIL_ADDRESS.
-// TODO(crbug.com/361560365): Clean up when launched.
-BASE_FEATURE(kAutofillParseEmailLabelAndPlaceholder,
-             "AutofillParseEmailLabelAndPlaceholder",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If the feature is enabled, before triggering suggestion acceptance, the row
 // view checks that a substantial portion of its content was visible for some
@@ -716,6 +633,15 @@ const base::FeatureParam<std::string> kAutofillUKMExperimentalFieldsBucket4{
 COMPONENT_EXPORT(AUTOFILL)
 BASE_FEATURE(kAutofillGreekRegexes,
              "AutofillGreekRegexes",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// When enabled, the field classification model uses runtime caching to not run
+// models on the same inputs multiple times.
+// TODO(crbug.com/371933424). Clean up when launched, if not used for Autofill
+// experiments.
+COMPONENT_EXPORT(AUTOFILL)
+BASE_FEATURE(kFieldClassificationModelCaching,
+             "FieldClassificationModelCaching",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // When enabled, a HaTS survey is shown after the successful first time creation

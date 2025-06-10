@@ -11,9 +11,10 @@
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/scoped_feature_list.h"
-#include "chrome/browser/ui/tabs/test/mock_tab_interface.h"
+#include "build/build_config.h"
 #include "chrome/browser/ui/views/controls/hover_button.h"
 #include "chrome/browser/ui/views/webid/account_selection_view_base.h"
 #include "chrome/browser/ui/views/webid/account_selection_view_test_base.h"
@@ -22,10 +23,12 @@
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chrome/test/views/chrome_views_test_base.h"
+#include "components/tabs/public/mock_tab_interface.h"
 #include "content/public/browser/identity_request_dialog_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/color_parser.h"
 #include "content/public/common/content_features.h"
+#include "content/public/test/scoped_accessibility_mode_override.h"
 #include "content/public/test/test_renderer_host.h"
 #include "content/public/test/web_contents_tester.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
@@ -246,6 +249,10 @@ class AccountSelectionBubbleViewTest : public ChromeViewsTestBase,
                 testing::ElementsAreArray(expected_class_names));
 
     views::View* titles_container = GetViewWithClassName(header, "View");
+    EXPECT_EQ(
+        static_cast<views::BoxLayout*>(titles_container->GetLayoutManager())
+            ->main_axis_alignment(),
+        views::LayoutAlignment::kCenter);
 
     // Check title text.
     views::Label* title_view =
@@ -1508,6 +1515,34 @@ TEST_F(AccountSelectionBubbleViewTest, IframeTitle) {
                     kSubtitleIframeSignIn);
 }
 
+// TODO(crbug.com/420421406): Re-enable this test on ChromeOS.
+#if BUILDFLAG(IS_CHROMEOS)
+#define MAYBE_ContinueButtonFocusedWithScreenReader \
+  DISABLED_ContinueButtonFocusedWithScreenReader
+#else
+#define MAYBE_ContinueButtonFocusedWithScreenReader \
+  ContinueButtonFocusedWithScreenReader
+#endif
+TEST_F(AccountSelectionBubbleViewTest,
+       MAYBE_ContinueButtonFocusedWithScreenReader) {
+  content::ScopedAccessibilityModeOverride screen_reader_mode(
+      ui::AXMode::kScreenReader);
+  CreateAndShowSingleAccountPicker(/*has_display_identifier=*/true);
+  views::View* single_account_chooser = dialog()->children()[2];
+  views::MdTextButton* button =
+      static_cast<views::MdTextButton*>(single_account_chooser->children()[1]);
+  EXPECT_TRUE(button->HasFocus());
+}
+
+TEST_F(AccountSelectionBubbleViewTest,
+       ContinueButtonNotFocusedWithoutScreenReader) {
+  CreateAndShowSingleAccountPicker(/*has_display_identifier=*/true);
+  views::View* single_account_chooser = dialog()->children()[2];
+  views::MdTextButton* button =
+      static_cast<views::MdTextButton*>(single_account_chooser->children()[1]);
+  EXPECT_FALSE(button->HasFocus());
+}
+
 // Test interaction of AccountHoverButton & FedCmAccountSelectionView via
 // FakeFedCmAccountSelectionView when AccountHoverButton OnPressed() is
 // called.
@@ -1549,4 +1584,5 @@ TEST_F(AccountSelectionInteractionTest,
                                           /*expected_icon_visibility=*/true,
                                           /*has_display_identifier=*/true);
 }
+
 }  //  namespace webid

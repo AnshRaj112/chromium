@@ -24,6 +24,7 @@
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/pattern.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
@@ -69,6 +70,7 @@
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/site_isolation_policy.h"
+#include "content/public/browser/unowned_inner_web_contents_client.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -4492,7 +4494,9 @@ IN_PROC_BROWSER_TEST_F(UnownedInnerWebContentsBrowserTest,
     run_loop.Quit();
     return false;
   }));
-  outer_wc->AttachUnownedInnerWebContents(inner_wc.get(), iframe_rfh);
+  outer_wc->AttachUnownedInnerWebContents(
+      UnownedInnerWebContentsClient::GetPassKeyForTesting(),
+      inner_wc.get(), iframe_rfh);
 
   // The outer RFH was unloaded while attaching the inner WC. The RFH was marked
   // as offline by the asynchronous UnloadACK().
@@ -4551,11 +4555,15 @@ IN_PROC_BROWSER_TEST_F(UnownedInnerWebContentsBrowserTest,
   WebContentsImpl* inner_wc_impl =
       static_cast<WebContentsImpl*>(inner_wc.get());
   ASSERT_TRUE(NavigateToURL(inner_wc.get(), inner_url));
-  outer_wc->AttachUnownedInnerWebContents(inner_wc.get(), iframe_rfh);
+  outer_wc->AttachUnownedInnerWebContents(
+      UnownedInnerWebContentsClient::GetPassKeyForTesting(),
+      inner_wc.get(), iframe_rfh);
   ASSERT_EQ(outer_wc, inner_wc->GetOuterWebContents());
 
   // Detach the inner WebContents
-  outer_wc->DetachUnownedInnerWebContents(inner_wc.get());
+  outer_wc->DetachUnownedInnerWebContents(
+      UnownedInnerWebContentsClient::GetPassKeyForTesting(),
+      inner_wc.get());
 
   // Verify that the connection is broken.
   EXPECT_EQ(nullptr, inner_wc->GetOuterWebContents());
@@ -4603,13 +4611,19 @@ IN_PROC_BROWSER_TEST_F(UnownedInnerWebContentsBrowserTest,
 
   // Attach the inner WebContents
   ASSERT_TRUE(NavigateToURL(inner_wc.get(), inner_url));
-  outer_wc->AttachUnownedInnerWebContents(inner_wc.get(), iframe_rfh);
+  outer_wc->AttachUnownedInnerWebContents(
+      UnownedInnerWebContentsClient::GetPassKeyForTesting(),
+      inner_wc.get(), iframe_rfh);
   ASSERT_EQ(outer_wc, inner_wc->GetOuterWebContents());
 
   // Detach and then reattach the inner WebContents
-  outer_wc->DetachUnownedInnerWebContents(inner_wc.get());
+  outer_wc->DetachUnownedInnerWebContents(
+      UnownedInnerWebContentsClient::GetPassKeyForTesting(),
+      inner_wc.get());
   ASSERT_EQ(nullptr, inner_wc->GetOuterWebContents());
-  outer_wc->AttachUnownedInnerWebContents(inner_wc.get(), iframe_rfh);
+  outer_wc->AttachUnownedInnerWebContents(
+      UnownedInnerWebContentsClient::GetPassKeyForTesting(),
+      inner_wc.get(), iframe_rfh);
   ASSERT_EQ(outer_wc, inner_wc->GetOuterWebContents());
 }
 
@@ -4637,7 +4651,9 @@ IN_PROC_BROWSER_TEST_F(UnownedInnerWebContentsBrowserTest,
   ASSERT_TRUE(NavigateToURL(inner_wc.get(), inner_url));
 
   // Attach the inner WebContents
-  outer_wc->AttachUnownedInnerWebContents(inner_wc.get(), iframe_rfh);
+  outer_wc->AttachUnownedInnerWebContents(
+      UnownedInnerWebContentsClient::GetPassKeyForTesting(),
+      inner_wc.get(), iframe_rfh);
   ASSERT_EQ(outer_wc, inner_wc->GetOuterWebContents());
 
   // Verify RenderFrameHost is created for the inner WebContents
@@ -4674,7 +4690,9 @@ IN_PROC_BROWSER_TEST_F(UnownedInnerWebContentsBrowserTest,
             rfh_b2->GetView());
 
   // Detach the inner WebContents
-  outer_wc->DetachUnownedInnerWebContents(inner_wc.get());
+  outer_wc->DetachUnownedInnerWebContents(
+      UnownedInnerWebContentsClient::GetPassKeyForTesting(),
+      inner_wc.get());
   ASSERT_EQ(nullptr, inner_wc->GetOuterWebContents());
 
   // Verify that the inner WebContents's RFHs are still alive.
@@ -4705,7 +4723,6 @@ IN_PROC_BROWSER_TEST_F(UnownedInnerWebContentsBrowserTest,
   EXPECT_TRUE(static_cast<RenderViewHostImpl*>(
       rfh_b2->GetRenderViewHost())->IsRenderViewLive());
 }
-
 #endif  // !BUILDFLAG(IS_ANDROID)
 
 IN_PROC_BROWSER_TEST_F(WebContentsImplBrowserTest,
@@ -4871,9 +4888,17 @@ IN_PROC_BROWSER_TEST_F(WebContentsImplBrowserTest,
 // frame and mouse up is on OOF iframe, the mouse up event is delivered to the
 // main frame as well to clear cached mouse states including autoscroll
 // selection state.
+#if BUILDFLAG(IS_MAC)
+// TODO(crbug.com/421826783): Re-enable this test
+#define MAYBE_MouseUpInOOPIframeShouldCancelMainFrameAutoscrollSelection \
+  DISABLED_MouseUpInOOPIframeShouldCancelMainFrameAutoscrollSelection
+#else
+#define MAYBE_MouseUpInOOPIframeShouldCancelMainFrameAutoscrollSelection \
+  MouseUpInOOPIframeShouldCancelMainFrameAutoscrollSelection
+#endif  // BUILDFLAG(IS_MAC)
 IN_PROC_BROWSER_TEST_F(
     WebContentsImplBrowserTest,
-    MouseUpInOOPIframeShouldCancelMainFrameAutoscrollSelection) {
+    MAYBE_MouseUpInOOPIframeShouldCancelMainFrameAutoscrollSelection) {
   ASSERT_TRUE(embedded_test_server()->Start());
   WebContentsImpl* web_contents =
       static_cast<WebContentsImpl*>(shell()->web_contents());

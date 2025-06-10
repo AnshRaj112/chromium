@@ -17,7 +17,7 @@
 #include "base/threading/scoped_blocking_call_internal.h"
 #include "base/threading/thread_checker.h"
 #include "base/time/time_override.h"
-#include "base/trace_event/base_tracing.h"
+#include "base/trace_event/trace_event.h"
 #include "third_party/abseil-cpp/absl/container/inlined_vector.h"
 
 namespace base::internal {
@@ -615,7 +615,7 @@ void ThreadGroupImpl::WorkerDelegate::CleanupLockRequired(
 
   // Remove the worker from |workers_|.
   auto worker_iter = std::ranges::find(outer_->workers_, worker);
-  CHECK(worker_iter != outer_->workers_.end(), base::NotFatalUntil::M125);
+  CHECK(worker_iter != outer_->workers_.end());
   outer_->workers_.erase(worker_iter);
 }
 

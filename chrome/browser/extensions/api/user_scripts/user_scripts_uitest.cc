@@ -83,12 +83,16 @@ class UserScriptsUITest : public InteractiveBrowserTestT<UserScriptsAPITest> {
     // it registered successfully.
     return CheckResult(
         [this, &extension_id]() -> bool {
-          return BackgroundScriptExecutor::ExecuteScript(
-                     profile(), extension_id, "verifyApiIsNotAvailable();",
-                     BackgroundScriptExecutor::ResultCapture::
-                         kSendScriptResult) == "success";
+          return CheckUserScriptsAPIAvailability(extension_id) == "unavailable";
         },
         true, "Checking that the userScripts API is not available");
+  }
+
+  std::string CheckUserScriptsAPIAvailability(const ExtensionId& extension_id) {
+    return BackgroundScriptExecutor::ExecuteScript(
+               profile(), extension_id, "checkApiAvailability();",
+               BackgroundScriptExecutor::ResultCapture::kSendScriptResult)
+        .GetString();
   }
 
   // Registers a dynamic user script with the chrome.userScripts API.
@@ -96,13 +100,14 @@ class UserScriptsUITest : public InteractiveBrowserTestT<UserScriptsAPITest> {
     // Register the user script in the extension background script and confirm
     // it registered successfully.
     return CheckResult(
-        [this, &extension_id]() -> bool {
+        [this, &extension_id]() -> std::string {
           return BackgroundScriptExecutor::ExecuteScript(
                      profile(), extension_id, "registerUserScripts();",
-                     BackgroundScriptExecutor::ResultCapture::
-                         kSendScriptResult) == "success";
+                     BackgroundScriptExecutor::ResultCapture::kSendScriptResult)
+              .TakeString();
         },
-        true, "Registering dynamic user script and checking that it completed");
+        /*matcher=*/"success", /*check_description=*/
+        "Registering dynamic user script and checking that it completed");
   }
 };
 
@@ -128,15 +133,28 @@ IN_PROC_BROWSER_TEST_P(UserScriptsUITest, ToggleControls_UserScriptsAPIUsage) {
   //      and injected.
   //   3) Disabling the toggle causes user scripts to no longer inject
   DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kTab);
+  DEFINE_LOCAL_STATE_IDENTIFIER_VALUE(
+      ui::test::PollingStateObserver<std::string>, kApiAvailability);
   RunTestSequence(
       InstrumentTab(kTab),
 
+      // When the UI toggle changes to enable the userScript API the message
+      // path is: webUI (renderer) -> browser -> extension (renderer). Because
+      // of the  multiple hops, the simplest method of checking is just polling
+      // for when the API changes to the desired state.
+      PollState(kApiAvailability,
+                [this, &extension]() {
+                  return CheckUserScriptsAPIAvailability(extension->id());
+                }),
+
       VerifyUserScriptsIsNotAvailable(extension->id()),
 
-      // Enable the toggle depending on feature state.
+      // Enable the toggle depending on feature state and wait for the
+      // userScripts API to become available to use.
       GetParam() ? TogglePerExtensionToggleInUI(kTab, extension->id(),
                                                 /*enabled=*/true)
                  : ToggleDevModeInUI(kTab, /*enabled=*/true),
+      WaitForState(kApiAvailability, "available"),
 
       RegisterUserScript(extension->id()),
 
@@ -146,10 +164,13 @@ IN_PROC_BROWSER_TEST_P(UserScriptsUITest, ToggleControls_UserScriptsAPIUsage) {
       // Ensure the user script injected its <div>.
       EnsurePresent(kTab, kPathToUserScriptInjectedDiv),
 
-      // Disable the toggle depending on feature state.
+      // Disable the toggle depending on feature state and wait for the
+      // userScripts API to become unavailable to use.
       GetParam() ? TogglePerExtensionToggleInUI(kTab, extension->id(),
                                                 /*enabled=*/false)
                  : ToggleDevModeInUI(kTab, /*enabled=*/false),
+      WaitForState(kApiAvailability, "unavailable"),
+
       // Navigate tab to a webpage where the user script should no longer inject
       // a <div>.
       NavigateWebContents(

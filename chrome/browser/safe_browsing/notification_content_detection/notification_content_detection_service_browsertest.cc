@@ -5,6 +5,7 @@
 #include "components/safe_browsing/content/browser/notification_content_detection/notification_content_detection_service.h"
 
 #include "base/path_service.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -710,14 +711,18 @@ class NotificationContentDetectionLoggingEnabledBrowserTest
     notification_database_data.notification_data.body =
         base::UTF8ToUTF16(notification_message);
     notification_database_data.origin = origin;
+
+    base::RunLoop run_loop;
     browser()
         ->profile()
         ->GetStoragePartitionForUrl(origin)
         ->GetPlatformNotificationContext()
-        ->WriteNotificationData(notification_id,
-                                kFakeServiceWorkerRegistrationId, origin,
-                                notification_database_data, base::DoNothing());
-    base::RunLoop().RunUntilIdle();
+        ->WriteNotificationData(
+            notification_id, kFakeServiceWorkerRegistrationId, origin,
+            notification_database_data,
+            base::IgnoreArgs<bool, const std::string&>(run_loop.QuitClosure()));
+
+    run_loop.Run();
 
     service()->DisplayPersistentNotification(
         GetNotificationId(/*is_allowlisted=*/true),

@@ -19,6 +19,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/notreached.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "build/build_config.h"
@@ -1636,7 +1637,6 @@ bool IsCreditCardFooterSuggestion(
     case SuggestionType::kBnplEntry:
     case SuggestionType::kPendingStateSignin:
     case SuggestionType::kLoyaltyCardEntry:
-    case SuggestionType::kHomeAndWorkAddressEntry:
       return false;
   }
 }

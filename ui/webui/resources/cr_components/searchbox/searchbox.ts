@@ -141,6 +141,12 @@ export class SearchboxElement extends SearchboxElementBase {
         reflectToAttribute: true,
       },
 
+      composeButtonEnabled: {
+        type: Boolean,
+        value: () => loadTimeData.getBoolean('searchboxShowComposeEntrypoint'),
+        reflectToAttribute: true,
+      },
+
       //========================================================================
       // Private properties
       //========================================================================
@@ -148,6 +154,12 @@ export class SearchboxElement extends SearchboxElementBase {
       isLensSearchbox_: {
         type: Boolean,
         value: () => loadTimeData.getBoolean('isLensSearchbox'),
+        reflectToAttribute: true,
+      },
+
+      enableThumbnailSizingTweaks_: {
+        type: Boolean,
+        value: () => loadTimeData.getBoolean('enableThumbnailSizingTweaks'),
         reflectToAttribute: true,
       },
 
@@ -250,6 +262,11 @@ export class SearchboxElement extends SearchboxElementBase {
         value: '',
       },
 
+      isThumbnailDeletable_: {
+        type: Boolean,
+        value: false,
+      },
+
       queryAutocompleteOnEmptyInput_: {
         type: Boolean,
         value: () => loadTimeData.getBoolean('queryAutocompleteOnEmptyInput'),
@@ -274,9 +291,11 @@ export class SearchboxElement extends SearchboxElementBase {
   declare searchboxLensSearchEnabled: boolean;
   declare searchboxChromeRefreshTheming: boolean;
   declare searchboxSteadyStateShadow: boolean;
+  declare composeButtonEnabled: boolean;
   declare showThumbnail: boolean;
   declare private inputAriaLive_: string;
   declare private isLensSearchbox_: boolean;
+  declare private enableThumbnailSizingTweaks_: boolean;
   declare private isDeletingInput_: boolean;
   declare private queryAutocompleteOnEmptyInput_: boolean;
   declare private lastIgnoredEnterEvent_: KeyboardEvent|null;
@@ -291,6 +310,7 @@ export class SearchboxElement extends SearchboxElementBase {
   declare private selectedMatch_: AutocompleteMatch|null;
   declare private selectedMatchIndex_: number;
   declare private thumbnailUrl_: string;
+  declare private isThumbnailDeletable_: boolean;
 
   private pageHandler_: PageHandlerInterface;
   private callbackRouter_: PageCallbackRouter;
@@ -338,7 +358,7 @@ export class SearchboxElement extends SearchboxElementBase {
     performance.measure('realbox-creation', 'realbox-creation-start');
   }
 
-  getSuggestionsElement(): HTMLElement {
+  getSuggestionsElement(): SearchboxDropdownElement {
     return this.$.matches;
   }
 
@@ -417,8 +437,9 @@ export class SearchboxElement extends SearchboxElementBase {
     this.updateInput_({text: inputText, inline: ''});
   }
 
-  private onSetThumbnail_(thumbnailUrl: string) {
+  private onSetThumbnail_(thumbnailUrl: string, isDeletable: boolean) {
     this.thumbnailUrl_ = thumbnailUrl;
+    this.isThumbnailDeletable_ = isDeletable;
   }
 
   //============================================================================
@@ -801,6 +822,35 @@ export class SearchboxElement extends SearchboxElementBase {
     this.dispatchEvent(new Event('open-lens-search'));
   }
 
+  private onComposeButtonClick_(e: MouseEvent) {
+    if (this.composeButtonEnabled &&
+        !loadTimeData.getBoolean('searchboxShowComposebox')) {
+      // Construct navigation url.
+      const searchParams = new URLSearchParams();
+      searchParams.append('sourceid', 'chrome');
+      searchParams.append('udm', '50');
+      if (this.$.input.value) {
+        searchParams.append('q', this.$.input.value);
+      }
+      const queryUrl =
+          new URL('/search', loadTimeData.getString('googleBaseUrl'));
+      queryUrl.search = searchParams.toString();
+      const href = queryUrl.href;
+
+      // Handle mouse events.
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        window.open(href, '_blank');
+      } else if (e.shiftKey) {
+        window.open(href, '_blank', 'noopener');
+      } else {
+        window.open(href, '_self');
+      }
+    } else {
+      this.dispatchEvent(new CustomEvent('open-composebox'));
+    }
+  }
+
   private onRemoveThumbnailClick_() {
     /* Remove thumbnail, focus input, and notify browser. */
     this.thumbnailUrl_ = '';
@@ -918,6 +968,12 @@ export class SearchboxElement extends SearchboxElementBase {
     this.isDeletingInput_ = lastInputValue.length > newInputValue.length &&
         lastInputValue.startsWith(newInputValue);
     this.lastInput_ = newInput;
+  }
+
+  private getThumbnailTabindex_(): string {
+    // If the thumbnail can't be deleted, returning an empty string will set the
+    // tabindex to nothing, which will make the thumbnail not focusable.
+    return this.isThumbnailDeletable_ ? '1' : '';
   }
 }
 

@@ -42,18 +42,33 @@ class MEDIA_EXPORT API_AVAILABLE(macos(14.2)) CatapAudioInputStream
   using NotifyOnCloseCallback = base::OnceCallback<void(AudioInputStream*)>;
 
  public:
-  // The supplied parameters must be compatible with the loopback device. In
-  // particular:
-  // - Number of channels must be either mono or stereo.
-  // - Sample rate must be the same as the sample rate of the current default
-  //   output device.
-  // - Number of frames per buffer must be 512, which is the default buffer size
-  //   for CoreAudio Taps.
-  // The parameters that are obtained by calling
-  // AudioManagerMac::GetInputStreamParameters() for a loopback device fulfills
-  // these requirements.
-  // TODO(crbug.com/417799564): Add an intermediate buffer that handles
-  // differences in buffer sizes and sample rates.
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
+  enum class OpenStatus {
+    kOk = 0,
+    kErrorDeviceAlreadyOpen = 1,
+    kErrorCreatingProcessTap = 2,
+    kErrorCreatingAggregateDevice = 3,
+    kErrorCreatingIOProcID = 4,
+    kErrorMissingAudioTapPermission = 5,
+    kGetProcessAudioDeviceIdsReturnedEmpty = 6,
+    kErrorConfiguringSampleRate = 7,
+    kErrorConfiguringFramesPerBuffer = 8,
+    kMaxValue = kErrorConfiguringFramesPerBuffer
+  };
+
+  // These values are persisted to logs. Entries should not be renumbered and
+  // numeric values should never be reused.
+  enum class CloseStatus {
+    kOk = 0,
+    kErrorDestroyingIOProcID = 1,
+    kErrorDestroyingAggregateDevice = 2,
+    kErrorDestroyingProcessTap = 3,
+    kMaxValue = kErrorDestroyingProcessTap
+  };
+
+  // Only mono or stereo channels are supported for loopback device
+  // compatibility.
   CatapAudioInputStream(std::unique_ptr<CatapApi> catap_api,
                         const AudioParameters& params,
                         const std::string& device_id,
@@ -88,6 +103,13 @@ class MEDIA_EXPORT API_AVAILABLE(macos(14.2)) CatapAudioInputStream
   // Returns all CoreAudio process audio device IDs that belong to the specified
   // process ID.
   NSArray<NSNumber*>* GetProcessAudioDeviceIds(pid_t chrome_process_id);
+
+  // Configure the sample rate of the aggregate device according to `params_`.
+  bool ConfigureSampleRateOfAggregateDevice();
+
+  // Configure the frames per buffer of the aggregate device according to
+  // `params_`.
+  bool ConfigureFramesPerBufferOfAggregateDevice();
 
   // Probe audio tap permission by getting and setting
   // AudioTapPropertyDescription. If either of these operations fail, this

@@ -41,9 +41,6 @@ CC_BASE_EXPORT BASE_DECLARE_FEATURE(kUseDMSAAForTiles);
 // Enabled 03/2024, kept to run a holdback experiment.
 CC_BASE_EXPORT BASE_DECLARE_FEATURE(kReclaimResourcesDelayedFlushInBackground);
 
-// Use 4x MSAA (vs 8) on High DPI screens.
-CC_BASE_EXPORT BASE_DECLARE_FEATURE(kDetectHiDpiForMsaa);
-
 // When no frames are produced in a certain time interval, reclaim prepaint
 // tiles.
 CC_BASE_EXPORT BASE_DECLARE_FEATURE(kReclaimPrepaintTilesWhenIdle);
@@ -201,11 +198,6 @@ CC_BASE_EXPORT void SetIsEligibleForThrottleMainFrameTo60Hz(bool is_eligible);
 // instead displays the properly constructed frame while at the same doing
 // capture.
 CC_BASE_EXPORT BASE_DECLARE_FEATURE(kViewTransitionCaptureAndDisplay);
-
-// When enabled, we save the `EventMetrics` for a scroll, even when the result
-// is no damage. So that the termination can be per properly attributed to the
-// end of frame production for the given VSync.
-CC_BASE_EXPORT BASE_DECLARE_FEATURE(kZeroScrollMetricsUpdate);
 
 // When enabled, the view transition capture transform is floored instead of
 // rounded and we use the render surface pixel snapping to counteract the blurry

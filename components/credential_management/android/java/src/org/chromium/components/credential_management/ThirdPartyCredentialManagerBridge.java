@@ -20,14 +20,17 @@ import androidx.credentials.exceptions.GetCredentialException;
 
 import org.jni_zero.CalledByNative;
 import org.jni_zero.JNINamespace;
+import org.jni_zero.JniType;
 
 import org.chromium.base.Callback;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.ResettersForTesting;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
+import org.chromium.url.GURL;
 
 import java.util.Collections;
+import java.util.List;
 
 /** A bridge for interacting with Credential Manager. */
 @JNINamespace("credential_management")
@@ -47,16 +50,23 @@ class ThirdPartyCredentialManagerBridge {
     void get(
             boolean isAutoSelectAllowed,
             boolean includePasswords,
+            @JniType("std::vector") List<GURL> federations,
             String origin,
             Callback<PasswordCredentialResponse> callback) {
+        // TODO(crbug.com/419810756): Add support for federated credentials.
         Context context = ContextUtils.getApplicationContext();
         CredentialManager credentialManager =
                 sCredentialManagerForTesting == null
                         ? CredentialManager.create(context)
                         : sCredentialManagerForTesting;
+        // We're currently preventing silent access for every get request by
+        // default in 3rd party mode so isAutoSelectAllowed is always set to
+        // false.
         GetPasswordOption passwordOption =
                 new GetPasswordOption(
-                        Collections.emptySet(), isAutoSelectAllowed, Collections.emptySet());
+                        Collections.emptySet(),
+                        /* isAutoSelectAllowed= */ false,
+                        Collections.emptySet());
         GetCredentialRequest.Builder getCredentialRequestBuilder =
                 new GetCredentialRequest.Builder();
         if (includePasswords) {

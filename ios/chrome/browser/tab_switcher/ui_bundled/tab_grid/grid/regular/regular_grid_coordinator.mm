@@ -73,11 +73,9 @@
 #pragma mark - Superclass overrides
 
 - (LegacyGridTransitionLayout*)transitionLayout {
-  if (IsTabGroupInGridEnabled()) {
-    if (self.tabGroupCoordinator) {
-      return [self.tabGroupCoordinator.viewController
-                  .gridViewController transitionLayout];
-    }
+  if (self.tabGroupCoordinator) {
+    return [self.tabGroupCoordinator.viewController
+                .gridViewController transitionLayout];
   }
 
   LegacyGridTransitionLayout* transitionLayout =
@@ -97,8 +95,7 @@
 - (BOOL)isSelectedCellVisible {
   BOOL isSelectedCellVisible = [super isSelectedCellVisible];
 
-  if (IsPinnedTabsEnabled() &&
-      !(IsTabGroupInGridEnabled() && self.tabGroupCoordinator)) {
+  if (IsPinnedTabsEnabled() && !self.tabGroupCoordinator) {
     isSelectedCellVisible |= self.pinnedTabsViewController.selectedCellVisible;
   }
 
@@ -157,6 +154,7 @@
   gridViewController.mutator = _mediator;
   gridViewController.gridProvider = _mediator;
   gridViewController.menuProvider = _contextMenuProvider;
+  gridViewController.snapshotAndfaviconDataSource = _mediator;
 
   // If regular is enabled then the grid exists and it is not disabled.
   // TODO(crbug.com/40273478): Get disabled status from the mediator.
@@ -187,6 +185,7 @@
     _pinnedTabsMediator.browser = self.browser;
     pinnedTabsViewController.menuProvider = _contextMenuProvider;
     pinnedTabsViewController.dragDropHandler = _pinnedTabsMediator;
+    pinnedTabsViewController.snapshotAndfaviconDataSource = _pinnedTabsMediator;
   }
 
   [super start];
@@ -207,11 +206,13 @@
                            groups:
                                (std::map<tab_groups::TabGroupId, std::set<int>>)
                                    groupsWithTabsToClose
+                     sharedGroups:(std::set<tab_groups::TabGroupId>)sharedGroups
                   allInactiveTabs:(BOOL)animateAllInactiveTabs
                 completionHandler:(ProceduralBlock)completionHandler {
   [self hideTabGroup];  // Make sure that no tab group is being displayed.
   [_gridViewController animateTabsClosureForTabs:tabsToClose
                                           groups:groupsWithTabsToClose
+                                    sharedGroups:sharedGroups
                                  allInactiveTabs:animateAllInactiveTabs
                                completionHandler:completionHandler];
 }

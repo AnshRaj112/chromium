@@ -27,6 +27,7 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
@@ -1389,7 +1390,7 @@ void NewTabPageHandler::MaybeLaunchInteractionSurvey(
   CHECK(hats_service);
   hats_service->LaunchDelayedSurveyForWebContents(
       kHatsSurveyTriggerNtpModules, web_contents_, delay_time_ms, {}, {},
-      HatsService::NavigationBehaviour::ALLOW_ANY, base::DoNothing(),
+      HatsService::NavigationBehavior::ALLOW_ANY, base::DoNothing(),
       base::DoNothing(), module_trigger_id);
 }
 

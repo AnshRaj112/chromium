@@ -8,6 +8,7 @@
 #import <Cocoa/Cocoa.h>
 #include <CoreFoundation/CoreFoundation.h>
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -301,9 +302,21 @@ void NativeWidgetMac::InitNativeWidget(Widget::InitParams params) {
 
   DCHECK(GetWidget()->GetRootView());
   ns_window_host_->SetRootView(GetWidget()->GetRootView());
+
+  std::optional<int> corner_radius;
+  if (params.rounded_corners) {
+    CHECK_EQ(params.rounded_corners->upper_left(),
+             params.rounded_corners->upper_right());
+    CHECK_EQ(params.rounded_corners->upper_left(),
+             params.rounded_corners->lower_left());
+    CHECK_EQ(params.rounded_corners->lower_left(),
+             params.rounded_corners->lower_right());
+    corner_radius = params.rounded_corners->upper_left();
+  }
+
   GetNSWindowMojo()->CreateContentView(ns_window_host_->GetRootViewNSViewId(),
                                        GetWidget()->GetRootView()->bounds(),
-                                       params.corner_radius);
+                                       corner_radius);
   if (auto* focus_manager = GetWidget()->GetFocusManager()) {
     GetNSWindowMojo()->MakeFirstResponder();
     // Only one ZoomFocusMonitor is needed per FocusManager, so create one only
@@ -372,7 +385,8 @@ void NativeWidgetMac::ReparentNativeViewImpl(gfx::NativeView new_parent) {
 
 std::unique_ptr<NonClientFrameView>
 NativeWidgetMac::CreateNonClientFrameView() {
-  return GetWidget() ? std::make_unique<NativeFrameViewMac>(GetWidget())
+  return GetWidget() ? std::make_unique<NativeFrameViewMac>(GetWidget(),
+                                                            /*client=*/nullptr)
                      : nullptr;
 }
 
@@ -549,7 +563,9 @@ void NativeWidgetMac::InitModalType(ui::mojom::ModalType modal_type) {
   // Everything happens upon show.
 }
 
-void NativeWidgetMac::OnWidgetThemeChanged(ui::ColorProviderKey::ColorMode color_mode) {
+void NativeWidgetMac::OnWidgetThemeChanged(
+    ui::ColorProviderKey::ColorMode color_mode,
+    std::optional<SkColor> background_color) {
   if (ns_window_host_) {
     ns_window_host_->SetColorMode(color_mode);
   }
@@ -1060,6 +1076,10 @@ bool NativeWidgetMac::AreScreenshotsAllowed() {
   if (ns_window_host_) {
     return ns_window_host_->AllowScreenshots();
   }
+  return true;
+}
+
+bool NativeWidgetMac::IsDesktopNativeWidget() const {
   return true;
 }
 

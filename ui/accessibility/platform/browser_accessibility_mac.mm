@@ -7,7 +7,6 @@
 #import <Cocoa/Cocoa.h>
 
 #include "base/apple/foundation_util.h"
-#include "base/debug/stack_trace.h"
 #include "base/memory/ptr_util.h"
 #include "base/memory/scoped_policy.h"
 #import "base/task/single_thread_task_runner.h"
@@ -43,8 +42,6 @@ void BrowserAccessibilityMac::OnDataChanged() {
   BrowserAccessibility::OnDataChanged();
   if (!GetNativeWrapper()) {
     CreatePlatformNodes();
-  } else if (!features::IsMacAccessibilityOptimizeChildrenChangedEnabled()) {
-    [GetNativeWrapper() childrenChanged];
   }
 }
 

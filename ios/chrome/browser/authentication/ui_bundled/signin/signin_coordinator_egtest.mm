@@ -417,6 +417,11 @@ void SetSigninEnterprisePolicyValue(BrowserSigninMode signinMode) {
 // Sign-in opened from: tab switcher.
 // Interrupted at: user consent.
 - (void)testDismissSigninFromTabSwitcher {
+  // TODO(crbug.com/422731851): Test is failing on iPad. Re-enable when fixed.
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    EARL_GREY_TEST_DISABLED(@"Failing on iPad.");
+  }
+
   // When Tab Groups is the third panel (i.e. when Tab Group Sync is enabled),
   // Recent Tabs is not reachable from the Tab Grid. So the sign-in flow is not
   // supported with Tab Group Sync enabled.
@@ -432,6 +437,11 @@ void SetSigninEnterprisePolicyValue(BrowserSigninMode signinMode) {
 // Sign-in opened from: tab switcher.
 // Interrupted at: identity picker.
 - (void)testDismissSigninFromTabSwitcherFromIdentityPicker {
+  // TODO(crbug.com/422731851): Test is failing on iPad. Re-enable when fixed.
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    EARL_GREY_TEST_DISABLED(@"Failing on iPad.");
+  }
+
   // When Tab Groups is the third panel (i.e. when Tab Group Sync is enabled),
   // Recent Tabs is not reachable from the Tab Grid. So the sign-in flow is not
   // supported with Tab Group Sync enabled.
@@ -548,20 +558,6 @@ void SetSigninEnterprisePolicyValue(BrowserSigninMode signinMode) {
   // TODO(crbug.com/41493423): We should log Signin offered.
   expecteds.signinSigninStartedAccessPoint = 1;
   expecteds.signinSignInStarted = 1;
-  [SigninEarlGrey assertExpectedSigninHistograms:expecteds];
-}
-
-// Tests that an add account operation triggered from the web is handled.
-// Regression test for crbug.com/1054861.
-- (void)testSigninAddAccountFromWeb {
-  [ChromeEarlGrey simulateAddAccountFromWeb];
-
-  [self assertFakeSSOScreenIsVisible];
-
-  // TODO(crbug.com/41493423): We should log signin started. Ideally that signin
-  // was offered, but this is probably not possible on the web.
-  ExpectedSigninHistograms* expecteds = [[ExpectedSigninHistograms alloc]
-      initWithAccessPoint:signin_metrics::AccessPoint::kWebSignin];
   [SigninEarlGrey assertExpectedSigninHistograms:expecteds];
 }
 

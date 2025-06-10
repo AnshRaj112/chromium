@@ -61,6 +61,7 @@
 #include "components/sync/base/features.h"
 #include "sql/sqlite_result_code_values.h"
 #include "sql/test/test_helpers.h"
+#include "sql/transaction.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -94,6 +95,10 @@ const gfx::Size kLargeSize = gfx::Size(kLargeEdgeSize, kLargeEdgeSize);
 
 MATCHER_P(HasVisitID, visit_id, "") {
   return arg.visit_id == visit_id;
+}
+
+MATCHER_P2(MvuMatches, expected_url, expected_title, "") {
+  return arg.url == expected_url && arg.title == expected_title;
 }
 
 // Minimal representation of a `Cluster` for verifying 2 clusters are equal.
@@ -233,6 +238,7 @@ class TestHistoryBackend : public HistoryBackend {
   using HistoryBackend::expirer_;
   using HistoryBackend::favicon_backend_;
   using HistoryBackend::recent_redirects_;
+  using HistoryBackend::singleton_transaction_;
 
   VisitTracker& visit_tracker() { return tracker_; }
 
@@ -3277,6 +3283,22 @@ TEST_F(HistoryBackendTest, DatabaseErrorSynchronouslyKillAndNotifyBridge) {
                                  /*user_initiated*/ true);
 }
 
+// Tests for https://crbug.com/420369590.
+TEST_F(HistoryBackendTest, DatabaseErrorOnClosedDatabase) {
+  // Clear the pending transaction to avoid DCHECKs to trigger. This is required
+  // since we are closing the raw sqlite database.
+  backend_->singleton_transaction_.reset();
+
+  // Close the database. This is simulating a case where the open failed but
+  // the database is not poisoned.
+  backend_->db()->GetDBForTesting().Close();
+
+  // Retrieve the error diagnostic information.
+  std::string result = backend_->db()->GetDiagnosticInfo(
+      static_cast<int>(sql::SqliteResultCode::kCorrupt), nullptr, nullptr);
+  EXPECT_EQ(result, "Database is not opened.");
+}
+
 // Tests that a typed navigation which results in a redirect from HTTP to HTTPS
 // will cause the HTTPS URL to accrue the typed count, and the HTTP URL to not.
 TEST_F(HistoryBackendTest, RedirectScoring) {
@@ -3722,6 +3744,87 @@ TEST_F(HistoryBackendTest, ExpireSegmentData) {
               ElementsAre(MostVisitedURL(GURL("http://example2.com"),
                                          std::u16string())));
   histogram_tester.ExpectTotalCount("History.QueryMostVisitedURLsTime", 2);
+}
+
+TEST_F(HistoryBackendTest, QueryMostVisitedURLs_VisualDeduplicationLogic) {
+  ASSERT_TRUE(backend_.get());
+
+  struct TestSiteData {
+    GURL url;
+    std::u16string title;
+    base::TimeDelta recency_offset;
+  };
+  const TestSiteData site1 = {GURL("http://example.com/pageA"),
+                              u"DedupeThisTitle_High_Score", base::Days(-1)};
+  const TestSiteData site2 = {GURL("http://example.com/pageB"),
+                              u"DedupeThisTitle_Medium_Score", base::Days(-3)};
+  const TestSiteData site3 = {GURL("http://another.com/pageC"),
+                              u"UniqueTitle_Good_Score", base::Days(-2)};
+  const TestSiteData site4 = {GURL("http://example.com/pageD"),
+                              u"DedupeThisTitle_Low_Score", base::Days(-5)};
+  const TestSiteData site5 = {GURL("http://example.com/pageE"),
+                              u"DedupeXXXXX_Okay_Score", base::Days(-4)};
+  std::vector<TestSiteData> test_sites_data = {site1, site2, site3, site4,
+                                               site5};
+  base::Time current_time = base::Time::Now();
+
+  for (const auto& data : test_sites_data) {
+    HistoryAddPageArgs args;
+    args.url = data.url;
+    args.time = current_time + data.recency_offset;
+    args.transition = ui::PAGE_TRANSITION_TYPED;
+    args.consider_for_ntp_most_visited = true;
+    backend_->AddPage(args);
+    backend_->SetPageTitle(data.url, data.title);
+  }
+  // Test Case 1: Deduplication Enabled.
+  {
+    SCOPED_TRACE("Deduplication Enabled");
+    base::test::ScopedFeatureList feature_list;
+    feature_list.InitAndEnableFeature(
+        history::kMostVisitedTilesVisualDeduplication);
+
+    MostVisitedURLList results =
+        backend_->QueryMostVisitedURLs(100, std::nullopt, std::nullopt, true);
+
+    ASSERT_EQ(3u, results.size());
+    EXPECT_THAT(results, ElementsAre(MvuMatches(site1.url, site1.title),
+                                     MvuMatches(site3.url, site3.title),
+                                     MvuMatches(site5.url, site5.title)));
+  }
+  // Helper lambda for asserting when all sites are expected (no deduplication).
+  auto expect_all_sites_ordered_by_score = [&](const MostVisitedURLList& res) {
+    ASSERT_EQ(5u, res.size());
+    EXPECT_THAT(res, testing::ElementsAre(MvuMatches(site1.url, site1.title),
+                                          MvuMatches(site3.url, site3.title),
+                                          MvuMatches(site2.url, site2.title),
+                                          MvuMatches(site5.url, site5.title),
+                                          MvuMatches(site4.url, site4.title)));
+  };
+
+  // Test Case 2: Deduplication Disabled (because feature flag is off).
+  {
+    SCOPED_TRACE("Deduplication Disabled by Feature Flag");
+    base::test::ScopedFeatureList feature_list;
+    feature_list.InitAndDisableFeature(
+        history::kMostVisitedTilesVisualDeduplication);
+
+    MostVisitedURLList results =
+        backend_->QueryMostVisitedURLs(100, std::nullopt, std::nullopt, true);
+    expect_all_sites_ordered_by_score(results);
+  }
+
+  // Test Case 3: Deduplication Disabled (because boolean parameter is false).
+  {
+    SCOPED_TRACE("Deduplication Disabled by Boolean Parameter");
+    base::test::ScopedFeatureList feature_list;
+    feature_list.InitAndEnableFeature(
+        history::kMostVisitedTilesVisualDeduplication);
+
+    MostVisitedURLList results =
+        backend_->QueryMostVisitedURLs(100, std::nullopt, std::nullopt, false);
+    expect_all_sites_ordered_by_score(results);
+  }
 }
 
 TEST_F(HistoryBackendTest, QueryMostRepeatedQueriesForKeyword) {

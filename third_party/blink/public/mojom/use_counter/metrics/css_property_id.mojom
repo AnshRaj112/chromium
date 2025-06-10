@@ -899,7 +899,7 @@ enum CSSSampleId {
     kColumnRuleOutset = 840,
     kRowRuleOutset = 841,
     kCornerShape = 842,
-    kScrollMarkerContain = 843,
+    kScrollTargetGroup = 843,
     kRowRuleStyle = 844,
     kGapRulePaintOrder = 845,
     kRowRuleWidth = 846,
@@ -915,6 +915,7 @@ enum CSSSampleId {
     kTextGrow = 856,
     kTextShrink = 857,
     kRule = 858,
+    kOriginTrialTestShorthand = 859,
 
     // 1. Add new features above this line (don't change the assigned numbers of
     //    the existing items).

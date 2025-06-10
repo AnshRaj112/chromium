@@ -924,6 +924,8 @@ chromium-metrics-reviews@google.com.
   <int value="10" label="RootCompositorFrameSinkDestroyed"/>
   <int value="11" label="FailedChoreographerNotSupported"/>
   <int value="12" label="FailedNullChoreographer"/>
+  <int value="13" label="FailedNullParentSurfaceControl"/>
+  <int value="14" label="FailedNullChildSurfaceControl"/>
 </enum>
 
 <!-- LINT.ThenChange(//components/viz/service/input/input_manager.cc:CreateAndroidInputReceiverResult) -->
@@ -937,13 +939,14 @@ chromium-metrics-reviews@google.com.
              of the setWebContentsDebuggingEnabled value."/>
 </enum>
 
-<enum name="DesktopWindowHeuristicResult3">
+<enum name="DesktopWindowHeuristicResult">
   <int value="0" label="Invalid result."/>
   <int value="1" label="The app is in a desktop window."/>
   <int value="2" label="Caption bar top insets are not present."/>
   <int value="3" label="Caption bar bounding rect has an invalid height."/>
   <int value="4" label="Caption bar customizable space unavailable."/>
   <int value="5" label="The app is open on an external display."/>
+  <int value="6" label="Caption bar has a complex unoccluded region."/>
 </enum>
 
 <enum name="DesktopWindowModeState">
@@ -1020,6 +1023,18 @@ chromium-metrics-reviews@google.com.
   <int value="2" label="TAB_STRIP_TO_NEW_INSTANCE"/>
   <int value="3" label="LINK_TO_NEW_INSTANCE"/>
   <int value="4" label="UNKNOWN_TO_NEW_INSTANCE"/>
+</enum>
+
+<enum name="EdgeToEdgeConfigurationSwitchOutcome">
+  <summary>
+    When edge to edge changed into unsupported configuration, what's the outcome
+  </summary>
+  <int value="0" label="ADD_PADDING_NEW_INSETS"/>
+  <int value="1" label="ADD_PADDING_ORIGINAL_INSETS"/>
+  <int value="2" label="ERROR_ADD_PADDING_BOTH_INSETS_EMPTY"/>
+  <int value="3" label="NO_PADDING_BOTH_INSETS_EMPTY"/>
+  <int value="4" label="NO_PADDING_NO_NEW_INSETS"/>
+  <int value="5" label="ERROR_NO_PADDING_WITH_NEW_INSETS"/>
 </enum>
 
 <enum name="ExifOrientation">
@@ -1797,6 +1812,7 @@ chromium-metrics-reviews@google.com.
   <int value="11" label="DownTimeAfterEventTime"/>
   <int value="12" label="SequenceTransferredBackFromViz"/>
   <int value="13" label="WebContentsIgnoringInputEvents"/>
+  <int value="14" label="RIRDelegateConnectionNotSetup"/>
 </enum>
 
 <!-- LINT.ThenChange(//content/public/browser/android/transfer_input_to_viz_result.h:TransferInputToVizResult)-->

@@ -147,7 +147,6 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
 
   void EnterTestMode(const GURL& update_url,
                      const GURL& crash_upload_url,
-                     const GURL& device_management_url,
                      const GURL& app_logo_url,
                      base::TimeDelta idle_timeout,
                      base::TimeDelta server_keep_alive_time,
@@ -156,7 +155,6 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
         "enter_test_mode",
         {Param("update_url", update_url.spec()),
          Param("crash_upload_url", crash_upload_url.spec()),
-         Param("device_management_url", device_management_url.spec()),
          Param("app_logo_url", app_logo_url.spec()),
          Param("idle_timeout", base::NumberToString(idle_timeout.InSeconds())),
          Param("server_keep_alive_time",
@@ -611,6 +609,30 @@ class IntegrationTestCommandsSystem : public IntegrationTestCommands {
                {Param("legacy_install", BoolToString(is_legacy_install)),
                 Param("silent", BoolToString(is_silent_install)),
                 Param("language", language)});
+  }
+
+  void RunMockOfflineMetaInstall(const std::string& app_id,
+                                 const base::Version& version,
+                                 const base::FilePath& installer_path,
+                                 const std::string& arguments,
+                                 bool is_silent_install,
+                                 const std::string& platform,
+                                 int string_resource_id_to_find,
+                                 const std::string& language,
+                                 bool expect_success) override {
+    RunCommand("run_mock_offline_meta_install",
+               {
+                   Param("app_id", app_id),
+                   Param("version", version.GetString()),
+                   Param("installer_path", installer_path.AsUTF8Unsafe()),
+                   Param("arguments", arguments),
+                   Param("is_silent_install", BoolToString(is_silent_install)),
+                   Param("platform", platform),
+                   Param("string_resource_id_to_find",
+                         base::ToString(string_resource_id_to_find)),
+                   Param("language", language),
+                   Param("expect_success", BoolToString(expect_success)),
+               });
   }
 
   void DMPushEnrollmentToken(const std::string& enrollment_token) override {

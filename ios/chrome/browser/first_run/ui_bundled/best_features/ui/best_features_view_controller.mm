@@ -8,9 +8,9 @@
 #import "base/check.h"
 #import "base/not_fatal_until.h"
 #import "build/branding_buildflags.h"
+#import "ios/chrome/browser/first_run/public/best_features_item.h"
 #import "ios/chrome/browser/first_run/ui_bundled/best_features/ui/best_features_cell.h"
 #import "ios/chrome/browser/first_run/ui_bundled/best_features/ui/best_features_delegate.h"
-#import "ios/chrome/browser/first_run/ui_bundled/best_features/ui/best_features_item.h"
 #import "ios/chrome/browser/first_run/ui_bundled/features.h"
 #import "ios/chrome/browser/first_run/ui_bundled/first_run_constants.h"
 #import "ios/chrome/browser/shared/ui/list_model/list_model.h"
@@ -107,7 +107,7 @@ const CGFloat kTableViewSectionFooterHeight = 3;
 #pragma mark - BestFeaturesScreenConsumer
 
 - (void)setBestFeaturesItems:(NSArray<BestFeaturesItem*>*)items {
-  CHECK([items count] == 3, base::NotFatalUntil::M128);
+  CHECK([items count] == 3);
   _bestFeaturesItems = items;
 }
 
@@ -173,7 +173,7 @@ const CGFloat kTableViewSectionFooterHeight = 3;
 // Creates the data source for the table view.
 - (UITableViewDiffableDataSource<NSNumber*, NSNumber*>*)
     createAndFillDataSource {
-  CHECK(_bestFeaturesItems, base::NotFatalUntil::M128);
+  CHECK(_bestFeaturesItems);
   __weak __typeof(self) weakSelf = self;
   UITableViewDiffableDataSource<NSNumber*, NSNumber*>* dataSource =
       [[UITableViewDiffableDataSource alloc]

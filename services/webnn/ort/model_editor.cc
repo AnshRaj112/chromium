@@ -4,15 +4,13 @@
 
 #include "services/webnn/ort/model_editor.h"
 
-#include <numeric>
 #include <ranges>
 
-#include "base/functional/overloaded.h"
-#include "base/notreached.h"
-#include "base/numerics/checked_math.h"
 #include "base/types/fixed_array.h"
 #include "services/webnn/ort/ort_data_type.h"
 #include "services/webnn/ort/ort_status.h"
+#include "services/webnn/ort/ort_tensor.h"
+#include "third_party/abseil-cpp/absl/functional/overload.h"
 
 namespace webnn::ort {
 
@@ -43,50 +41,6 @@ const OrtModelEditorApi* GetOrtModelEditorApi() {
   return PlatformFunctions::GetInstance()->ort_model_editor_api();
 }
 
-std::vector<int64_t> VectorUint32ToInt64(base::span<const uint32_t> vec) {
-  return std::vector<int64_t>(vec.begin(), vec.end());
-}
-
-size_t CalculateOrtTensorSizeInBytes(base::span<const int64_t> shape,
-                                     ONNXTensorElementDataType data_type) {
-  base::CheckedNumeric<uint64_t> element_size_in_bits;
-  switch (data_type) {
-    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64:
-    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64: {
-      element_size_in_bits = 64;
-      break;
-    }
-    case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT:
-    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32:
-    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32: {
-      element_size_in_bits = 32;
-      break;
-    }
-    case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16: {
-      element_size_in_bits = 16;
-      break;
-    }
-    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8:
-    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8: {
-      element_size_in_bits = 8;
-      break;
-    }
-    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT4:
-    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT4: {
-      element_size_in_bits = 4;
-      break;
-    }
-    default: {
-      NOTREACHED()
-          << "CalculateOrtTensorSizeInBytes() only supports WebNN data types.";
-    }
-  }
-  auto tensor_size_in_bits = std::accumulate(
-      shape.begin(), shape.end(), element_size_in_bits, std::multiplies());
-
-  return ((tensor_size_in_bits + 7) / 8).ValueOrDie<size_t>();
-}
-
 ScopedOrtValueInfo CreateOrtValueInfo(base::cstring_view name,
                                       const OperandDescriptor& descriptor) {
   const OrtApi* ort_api = GetOrtApi();
@@ -98,7 +52,7 @@ ScopedOrtValueInfo CreateOrtValueInfo(base::cstring_view name,
       tensor_type_and_shape_info.get(),
       WebnnToOnnxDataType(descriptor.data_type())));
 
-  std::vector<int64_t> int64_shape = VectorUint32ToInt64(descriptor.shape());
+  std::vector<int64_t> int64_shape = WebnnToOnnxShape(descriptor.shape());
   CHECK_STATUS(ort_api->SetDimensions(tensor_type_and_shape_info.get(),
                                       int64_shape.data(), int64_shape.size()));
 
@@ -147,14 +101,24 @@ void ModelEditor::AddOutput(base::cstring_view name,
   outputs_.push_back(CreateOrtValueInfo(name, descriptor));
 }
 
-void ModelEditor::AddInitializer(base::cstring_view name,
-                                 const WebNNConstantOperand& constant_operand) {
+void ModelEditor::AddInitializer(
+    base::cstring_view name,
+    std::unique_ptr<WebNNConstantOperand> constant_operand) {
   CHECK(!has_built_);
 
-  const OperandDescriptor& descriptor = constant_operand.descriptor();
-  AddInitializer(name, WebnnToOnnxDataType(descriptor.data_type()),
-                 VectorUint32ToInt64(descriptor.shape()),
-                 constant_operand.ByteSpan());
+  bool use_external_data =
+      constant_operand->ByteSpan().size() >= kMinExternalDataSize;
+  const OperandDescriptor& descriptor = constant_operand->descriptor();
+  ONNXTensorElementDataType data_type =
+      WebnnToOnnxDataType(descriptor.data_type());
+  std::vector<int64_t> int64_shape = WebnnToOnnxShape(descriptor.shape());
+  if (use_external_data) {
+    AddInitializerAsExternalData(name, data_type, int64_shape,
+                                 constant_operand->TakeData());
+  } else {
+    AddInitializerAsRawData(name, data_type, int64_shape,
+                            constant_operand->ByteSpan());
+  }
 }
 
 void ModelEditor::AddInitializer(base::cstring_view name,
@@ -165,7 +129,8 @@ void ModelEditor::AddInitializer(base::cstring_view name,
 
   bool use_external_data = data.size() >= kMinExternalDataSize;
   if (use_external_data) {
-    AddInitializerAsExternalData(name, data_type, shape, data);
+    AddInitializerAsExternalData(name, data_type, shape,
+                                 base::HeapArray<uint8_t>::CopiedFrom(data));
   } else {
     AddInitializerAsRawData(name, data_type, shape, data);
   }
@@ -212,12 +177,11 @@ void ModelEditor::AddInitializerAsExternalData(
     base::cstring_view name,
     ONNXTensorElementDataType data_type,
     base::span<const int64_t> shape,
-    base::span<const uint8_t> data) {
-  // The data will not be copied into the graph, so it must be stored outside.
-  auto weight = base::HeapArray<uint8_t>::CopiedFrom(data);
-  model_info_->external_data.push_back(std::move(weight));
-
+    base::HeapArray<uint8_t> data) {
   CHECK_EQ(data.size(), CalculateOrtTensorSizeInBytes(shape, data_type));
+
+  // The data will not be copied into the graph, so it must be stored outside.
+  model_info_->external_data.push_back(std::move(data));
 
   const OrtApi* ort_api = GetOrtApi();
   ScopedOrtValue initializer;
@@ -242,7 +206,7 @@ ScopedOrtOpAttr ModelEditor::CreateAttribute(base::cstring_view name,
 
   const OrtApi* ort_api = GetOrtApi();
   ScopedOrtOpAttr attribute;
-  std::visit(base::Overloaded{
+  std::visit(absl::Overload{
                  [&](int64_t int_data) {
                    CHECK_STATUS(ort_api->CreateOpAttr(
                        name.c_str(), &int_data,

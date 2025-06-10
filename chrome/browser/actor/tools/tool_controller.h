@@ -9,46 +9,67 @@
 
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
-#include "chrome/browser/actor/tools/tool_invocation.h"
+#include "chrome/browser/actor/aggregated_journal.h"
+#include "chrome/browser/actor/task_id.h"
+#include "chrome/browser/actor/tools/observation_delay_controller.h"
 #include "chrome/common/actor.mojom-forward.h"
+#include "content/public/browser/weak_document_ptr.h"
 
 namespace content {
 class RenderFrameHost;
 }  // namespace content
 
+namespace optimization_guide::proto {
+class ActionInformation;
+}  // namespace optimization_guide::proto
+
 namespace actor {
 
+class AggregatedJournal;
 class Tool;
 
 // Entry point into actor tool usage. ToolController is a profile-scoped,
-// ActorCoordinator-owned object. This class routes a tool use request to the
+// ExecutionEngine-owned object. This class routes a tool use request to the
 // appropriate browser tool or to a corresponding executor in the renderer for
 // page-level tools.
 class ToolController {
  public:
+  using ResultCallback = base::OnceCallback<void(mojom::ActionResultPtr)>;
   ToolController();
   ~ToolController();
   ToolController(const ToolController&) = delete;
   ToolController& operator=(const ToolController&) = delete;
 
   // Invokes a tool action.
-  void Invoke(const ToolInvocation& action,
-              ToolInvocation::ResultCallback result_callback);
+  void Invoke(const optimization_guide::proto::ActionInformation& action,
+              AggregatedJournal& journal,
+              TaskId task_id,
+              content::RenderFrameHost& target_frame,
+              ResultCallback result_callback);
+
+ private:
+  // Called when the tool itself finishes its invocation.
+  void DidFinishToolInvoke(mojom::ActionResultPtr result);
 
   // Call to clear the current tool invocation and return the given result to
   // the initiator. Must only be called when a tool invocation is in-progress.
   void CompleteToolRequest(mojom::ActionResultPtr result);
 
- private:
-  std::unique_ptr<Tool> CreateTool(content::RenderFrameHost& frame,
-                                   const ToolInvocation& invocation);
+  std::unique_ptr<Tool> CreateTool(
+      AggregatedJournal& journal,
+      TaskId task_id,
+      content::RenderFrameHost& frame,
+      const optimization_guide::proto::ActionInformation& action_information);
 
   void ValidationComplete(mojom::ActionResultPtr result);
 
   // This state is non-null whenever a tool invocation is in progress.
   struct ActiveState {
-    ActiveState(std::unique_ptr<Tool> tool,
-                ToolInvocation::ResultCallback completion_callback);
+    ActiveState(
+        std::unique_ptr<Tool> tool,
+        ResultCallback completion_callback,
+        content::WeakDocumentPtr weak_document_ptr,
+        std::unique_ptr<AggregatedJournal::PendingAsyncEntry> journal_entry);
     ~ActiveState();
     ActiveState(const ActiveState&) = delete;
     ActiveState& operator=(const ActiveState&) = delete;
@@ -56,9 +77,15 @@ class ToolController {
     // Both `tool` and `completion_callback` are guaranteed to be non-null while
     // active_state_ is set.
     std::unique_ptr<Tool> tool;
-    ToolInvocation::ResultCallback completion_callback;
+    ResultCallback completion_callback;
+    content::WeakDocumentPtr weak_document_ptr;
+    std::unique_ptr<AggregatedJournal::PendingAsyncEntry> journal_entry;
   };
   std::optional<ActiveState> active_state_;
+
+  // Set while a tool invocation is in progress, delays invocation of the
+  // completion_callback until the page is ready for observation.
+  std::unique_ptr<ObservationDelayController> observation_delayer_;
 
   base::WeakPtrFactory<ToolController> weak_ptr_factory_{this};
 };

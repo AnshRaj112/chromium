@@ -19,7 +19,6 @@
 
 #include "base/check_deref.h"
 #include "base/containers/fixed_flat_map.h"
-#include "base/debug/stack_trace.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/metrics_hashes.h"
 #include "base/notreached.h"
@@ -580,8 +579,12 @@ void ReadAnythingAppController::AccessibilityLocationChangesReceived(
   // the current active tree has been destroyed, do nothing.
   DUMP_WILL_BE_CHECK(model_.active_tree_id() != ui::AXTreeIDUnknown());
   DUMP_WILL_BE_CHECK(model_.ContainsTree(tree_id));
+  // TODO: crbug.com/411776559- Determine if a DUMP_WILL_BE_CHECK is needed
+  // here or if it's okay to just ignore AccessibilityLocationChangesReceived
+  // events if they're sent not on the active tree.
+  DUMP_WILL_BE_CHECK(model_.active_tree_id() == tree_id);
   if (model_.active_tree_id() == ui::AXTreeIDUnknown() ||
-      !model_.ContainsTree(tree_id)) {
+      !model_.ContainsTree(tree_id) || model_.active_tree_id() != tree_id) {
     return;
   }
   // Listen to location change notifications to update locations of the nodes
@@ -679,7 +682,7 @@ void ReadAnythingAppController::Distill(bool for_training_data) {
     // When distillation is in progress, the model may have queued up tree
     // updates. In those cases, assume we eventually get to `OnAXTreeDistilled`,
     // where we re-request `Distill`. When speech is playing, assume it will
-    // eventually stop and call `OnSpeechPlayingStateChanged` where we
+    // eventually stop and call `OnIsSpeechActiveChanged` where we
     // re-request `Distill`.
     model_.set_requires_distillation(true);
     return;
@@ -1044,8 +1047,10 @@ gin::ObjectTemplateBuilder ReadAnythingAppController::GetObjectTemplateBuilder(
                  &ReadAnythingAppController::GetCurrentTextEndIndex)
       .SetMethod("getCurrentText", &ReadAnythingAppController::GetCurrentText)
       .SetMethod("shouldShowUi", &ReadAnythingAppController::ShouldShowUI)
-      .SetMethod("onSpeechPlayingStateChanged",
-                 &ReadAnythingAppController::OnSpeechPlayingStateChanged)
+      .SetMethod("onIsSpeechActiveChanged",
+                 &ReadAnythingAppController::OnIsSpeechActiveChanged)
+      .SetMethod("onIsAudioCurrentlyPlayingChanged",
+                 &ReadAnythingAppController::OnIsAudioCurrentlyPlayingChanged)
       .SetMethod("getAccessibleBoundary",
                  &ReadAnythingAppController::GetAccessibleBoundary)
       .SetMethod("movePositionToNextGranularity",
@@ -1078,8 +1083,12 @@ gin::ObjectTemplateBuilder ReadAnythingAppController::GetObjectTemplateBuilder(
 
 ui::AXNodeID ReadAnythingAppController::RootId() const {
   ui::AXSerializableTree* tree = model_.GetActiveTree();
-  DCHECK(tree);
-  DCHECK(tree->root());
+  // Fail gracefully if RootId() is ever called with an invalid active tree.
+  DUMP_WILL_BE_CHECK(tree);
+  DUMP_WILL_BE_CHECK(tree->root());
+  if (!tree || !tree->root()) {
+    return ui::kInvalidAXNodeID;
+  }
   return tree->root()->id();
 }
 
@@ -1892,6 +1901,11 @@ void ReadAnythingAppController::OnTabWillDetach() {
   }
 }
 
+void ReadAnythingAppController::OnTabMuteStateChange(bool muted) {
+  ExecuteJavaScript("chrome.readingMode.onTabMuteStateChange(" +
+                    base::ToString(muted) + ")");
+}
+
 void ReadAnythingAppController::SetDefaultLanguageCode(
     const std::string& code) {
   std::string default_lang = std::string(language::ExtractBaseLanguage(code));
@@ -1926,8 +1940,7 @@ void ReadAnythingAppController::ShouldShowUI() {
   page_handler_factory_->ShouldShowUI();
 }
 
-void ReadAnythingAppController::OnSpeechPlayingStateChanged(
-    bool is_speech_active) {
+void ReadAnythingAppController::OnIsSpeechActiveChanged(bool is_speech_active) {
   // Don't send event updates if the speech playing state hasn't actually
   // changed. This can get triggered incorrectly when changing pages.
   if (read_aloud_model_.speech_playing() == is_speech_active) {
@@ -1937,6 +1950,11 @@ void ReadAnythingAppController::OnSpeechPlayingStateChanged(
   if (!is_speech_active) {
     SendEventUpdates();
   }
+}
+
+void ReadAnythingAppController::OnIsAudioCurrentlyPlayingChanged(
+    bool is_audio_currently_playing) {
+  page_handler_->OnReadAloudAudioStateChange(is_audio_currently_playing);
 }
 
 int ReadAnythingAppController::GetAccessibleBoundary(const std::u16string& text,

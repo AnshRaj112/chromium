@@ -4,10 +4,15 @@
 
 #include "chrome/browser/actor/tools/tool.h"
 
+#include <memory>
+
+#include "chrome/browser/actor/tools/observation_delay_controller.h"
+
 namespace actor {
 
-bool Tool::ShouldAddCompletionDelay() const {
-  return true;
+std::unique_ptr<ObservationDelayController> Tool::GetObservationDelayer(
+    content::RenderFrameHost& target_frame) const {
+  return std::make_unique<ObservationDelayController>(target_frame);
 }
 
 }  // namespace actor

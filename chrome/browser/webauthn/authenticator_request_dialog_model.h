@@ -278,7 +278,7 @@ struct AuthenticatorRequestDialogModel
     kGPMChangeArbitraryPin,
     kGPMCreateArbitraryPin,
     kGPMEnterArbitraryPin,
-    // User verification prompt for GPM. Only valid on macOS 12+.
+    // User verification prompt for GPM.
     kGPMTouchID,
     // GPM passkey creation.
     kGPMCreatePasskey,
@@ -373,7 +373,8 @@ struct AuthenticatorRequestDialogModel
               std::u16string name,
               std::u16string short_name,
               const gfx::VectorIcon& icon,
-              base::RepeatingClosure callback);
+              base::RepeatingClosure callback,
+              std::u16string display_name = std::u16string());
     ~Mechanism();
     Mechanism(Mechanism&&);
     Mechanism(const Mechanism&) = delete;
@@ -381,7 +382,9 @@ struct AuthenticatorRequestDialogModel
 
     const Type type;
     const std::u16string name;
+    // TODO(crbug.com/422394117): This is not used anywhere. Remove it.
     const std::u16string short_name;
+    const std::u16string display_name;
     std::u16string description;
     const raw_ref<const gfx::VectorIcon> icon;
     const base::RepeatingClosure callback;

@@ -46,6 +46,7 @@
 #include "ui/events/event.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/native_theme/native_theme_aura.h"
 #include "ui/views/buildflags.h"
 #include "ui/views/drag_utils.h"
@@ -240,9 +241,9 @@ void NativeWidgetAura::InitNativeWidget(Widget::InitParams params) {
 
   RegisterNativeWidgetForWindow(this, window_);
   window_->SetType(GetAuraWindowTypeForWidgetType(params.type));
-  if (params.corner_radius) {
-    window_->SetProperty(aura::client::kWindowCornerRadiusKey,
-                         *params.corner_radius);
+  if (params.rounded_corners) {
+    window_->SetProperty(aura::client::kWindowRoundedCornersKey,
+                         params.rounded_corners.value());
   }
   window_->SetProperty(aura::client::kShowStateKey, params.show_state);
 
@@ -571,7 +572,8 @@ void NativeWidgetAura::InitModalType(ui::mojom::ModalType modal_type) {
 }
 
 void NativeWidgetAura::OnWidgetThemeChanged(
-    ui::ColorProviderKey::ColorMode color_mode) {
+    ui::ColorProviderKey::ColorMode color_mode,
+    std::optional<SkColor> background_color) {
   // Intentional no-op.
   // The window frame is drawn by views. The OS does not need to know about
   // which color mode the window is using.
@@ -1096,6 +1098,10 @@ bool NativeWidgetAura::AreScreenshotsAllowed() {
   // screenshot blocking logic is handled in desktop_native_widget_aura.cc
   NOTIMPLEMENTED();
   return true;
+}
+
+bool NativeWidgetAura::IsDesktopNativeWidget() const {
+  return false;
 }
 
 std::string NativeWidgetAura::GetName() const {

@@ -94,6 +94,16 @@ void MaybeRecordMediaFeatureValue(
   }
 }
 
+// Supported types: <number> | <percentage> | <length> | <angle> | <time> |
+// <resolution>
+bool TypesMatch(const CSSNumericLiteralValue& a,
+                const CSSNumericLiteralValue& b) {
+  return (a.IsNumber() && b.IsNumber()) ||
+         (a.IsPercentage() && b.IsPercentage()) ||
+         (a.IsLength() && b.IsLength()) || (a.IsAngle() && b.IsAngle()) ||
+         (a.IsTime() && b.IsTime()) || (a.IsResolution() && b.IsResolution());
+}
+
 }  // namespace
 
 using mojom::blink::DevicePostureType;
@@ -1726,13 +1736,8 @@ KleeneValue MediaQueryEvaluator::EvalFeature(
     return KleeneValue::kUnknown;
   }
 
-  if (feature.HasStyleRange()) {
-    // TODO(crbug.com/408011559): Add support for container style queries
-    // ranges.
-    return KleeneValue::kFalse;
-  }
-
-  if (CSSVariableParser::IsValidVariableName(feature.Name())) {
+  if (feature.HasStyleRange() ||
+      CSSVariableParser::IsValidVariableName(feature.Name())) {
     return EvalStyleFeature(feature, result_flags);
   }
 
@@ -1772,6 +1777,42 @@ KleeneValue MediaQueryEvaluator::EvalFeature(
   return result ? KleeneValue::kTrue : KleeneValue::kFalse;
 }
 
+namespace {
+
+unsigned ConversionFlagsToUnitFlags(
+    CSSToLengthConversionData::Flags conversion_flags) {
+  unsigned unit_flags = 0;
+
+  using Flags = CSSToLengthConversionData::Flags;
+  using Flag = CSSToLengthConversionData::Flag;
+  using UnitFlags = MediaQueryExpValue::UnitFlags;
+
+  if (conversion_flags & (static_cast<Flags>(Flag::kEm) |
+                          static_cast<Flags>(Flag::kGlyphRelative))) {
+    unit_flags |= UnitFlags::kFontRelative;
+  }
+  if (conversion_flags & (static_cast<Flags>(Flag::kRootFontRelative))) {
+    unit_flags |= UnitFlags::kRootFontRelative;
+  }
+  if (conversion_flags & static_cast<Flags>(Flag::kDynamicViewport)) {
+    unit_flags |= UnitFlags::kDynamicViewport;
+  }
+  if (conversion_flags & (static_cast<Flags>(Flag::kViewport) |
+                          static_cast<Flags>(Flag::kSmallLargeViewport))) {
+    unit_flags |= UnitFlags::kStaticViewport;
+  }
+  if (conversion_flags & static_cast<Flags>(Flag::kContainerRelative)) {
+    unit_flags |= UnitFlags::kContainer;
+  }
+  if (conversion_flags & static_cast<Flags>(Flag::kSiblingRelative)) {
+    unit_flags |= UnitFlags::kTreeCounting;
+  }
+
+  return unit_flags;
+}
+
+}  // namespace
+
 KleeneValue MediaQueryEvaluator::EvalStyleFeature(
     const MediaQueryFeatureExpNode& feature,
     MediaQueryResultFlags* result_flags) const {
@@ -1783,6 +1824,8 @@ KleeneValue MediaQueryEvaluator::EvalStyleFeature(
   const MediaQueryExpBounds& bounds = feature.Bounds();
 
   if (bounds.IsRange()) {
+    DCHECK(feature.HasStyleRange());
+    DCHECK(RuntimeEnabledFeatures::CSSContainerStyleQueriesRangeEnabled());
     // TODO(crbug.com/408011559): Add support for container style queries
     // ranges.
     return KleeneValue::kFalse;
@@ -1803,8 +1846,10 @@ KleeneValue MediaQueryEvaluator::EvalStyleFeature(
     return KleeneValue::kFalse;
   }
 
-  const CSSValue* query_value = StyleResolver::ComputeValue(
-      container, CSSPropertyName(property_name), query_specified);
+  CSSToLengthConversionData::Flags conversion_flags = 0;
+  const CSSValue* query_value =
+      StyleResolver::ComputeValue(container, CSSPropertyName(property_name),
+                                  query_specified, conversion_flags);
 
   if (const auto* decl_value =
           DynamicTo<CSSUnparsedDeclarationValue>(query_value)) {
@@ -1821,6 +1866,10 @@ KleeneValue MediaQueryEvaluator::EvalStyleFeature(
     return KleeneValue::kFalse;
   }
 
+  if (result_flags && conversion_flags != 0) {
+    result_flags->unit_flags |= ConversionFlagsToUnitFlags(conversion_flags);
+  }
+
   const CSSValue* computed_value =
       CustomProperty(property_name, *media_values_->GetDocument())
           .CSSValueFromComputedStyle(
@@ -1830,6 +1879,30 @@ KleeneValue MediaQueryEvaluator::EvalStyleFeature(
     return KleeneValue::kTrue;
   }
   return KleeneValue::kFalse;
+}
+
+KleeneValue MediaQueryEvaluator::EvalIfRange(const CSSValue& reference_value,
+                                             const CSSValue& query_value,
+                                             MediaQueryOperator op,
+                                             bool reverse_op) {
+  const CSSNumericLiteralValue* reference_numeric =
+      DynamicTo<CSSNumericLiteralValue>(reference_value);
+  const CSSNumericLiteralValue* query_numeric =
+      DynamicTo<CSSNumericLiteralValue>(query_value);
+
+  if (!reference_numeric || !query_numeric ||
+      !TypesMatch(*reference_numeric, *query_numeric)) {
+    return KleeneValue::kFalse;
+  }
+
+  if (reverse_op) {
+    op = ReverseOperator(op);
+  }
+
+  return CompareDoubleValue(reference_numeric->DoubleValue(),
+                            query_numeric->DoubleValue(), op)
+             ? KleeneValue::kTrue
+             : KleeneValue::kFalse;
 }
 
 }  // namespace blink

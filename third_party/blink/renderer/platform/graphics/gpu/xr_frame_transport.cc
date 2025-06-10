@@ -19,7 +19,6 @@
 #include "third_party/blink/renderer/platform/graphics/static_bitmap_image.h"
 #include "third_party/blink/renderer/platform/mojo/mojo_binding_context.h"
 #include "ui/gfx/gpu_fence.h"
-#include "ui/gfx/gpu_memory_buffer.h"
 
 namespace blink {
 
@@ -151,7 +150,7 @@ bool XRFrameTransport::FrameSubmit(
     gpu::gles2::GLES2Interface* gl,
     gpu::SharedImageInterface* sii,
     DrawingBuffer::Client* drawing_buffer_client,
-    scoped_refptr<Image> image_ref,
+    scoped_refptr<StaticBitmapImage> image_ref,
     int16_t vr_frame_id) {
   DCHECK(transport_options_);
 
@@ -203,8 +202,7 @@ bool XRFrameTransport::FrameSubmit(
     // mailbox is used via CreateAndTexStorage2DSharedImageCHROMIUM, the mailbox
     // itself does not keep it alive. We must keep a reference to the
     // image until the mailbox was consumed.
-    StaticBitmapImage* static_image =
-        static_cast<StaticBitmapImage*>(image_ref.get());
+    StaticBitmapImage* static_image = image_ref.get();
     static_image->EnsureSyncTokenVerified();
 
     // Conditionally wait for the previous render to finish. A late wait here

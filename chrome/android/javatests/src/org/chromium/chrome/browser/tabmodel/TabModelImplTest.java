@@ -11,10 +11,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import androidx.test.filters.SmallTest;
-import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Before;
-import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -31,12 +29,14 @@ import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabCreationState;
 import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.test.ChromeJUnit4ClassRunner;
-import org.chromium.chrome.test.ChromeTabbedActivityTestRule;
-import org.chromium.chrome.test.batch.BlankCTATabInitialStateRule;
-import org.chromium.chrome.test.util.ChromeTabUtils;
-import org.chromium.net.test.EmbeddedTestServer;
-import org.chromium.net.test.EmbeddedTestServerRule;
+import org.chromium.chrome.test.transit.AutoResetCtaTransitTestRule;
+import org.chromium.chrome.test.transit.ChromeTransitTestRules;
+import org.chromium.chrome.test.transit.Journeys;
+import org.chromium.chrome.test.transit.ntp.RegularNewTabPageStation;
+import org.chromium.chrome.test.transit.page.WebPageStation;
 import org.chromium.url.GURL;
+
+import java.util.List;
 
 /** Tests for {@link TabModelImpl}. */
 @RunWith(ChromeJUnit4ClassRunner.class)
@@ -46,48 +46,27 @@ import org.chromium.url.GURL;
 })
 @Batch(Batch.PER_CLASS)
 public class TabModelImplTest {
-    @ClassRule
-    public static ChromeTabbedActivityTestRule sActivityTestRule =
-            new ChromeTabbedActivityTestRule();
-
-    @ClassRule public static EmbeddedTestServerRule sTestServerRule = new EmbeddedTestServerRule();
-
     @Rule
-    public BlankCTATabInitialStateRule mBlankCtaTabInitialStateRule =
-            new BlankCTATabInitialStateRule(sActivityTestRule, false);
+    public AutoResetCtaTransitTestRule mActivityTestRule =
+            ChromeTransitTestRules.fastAutoResetCtaActivityRule();
 
-    private ChromeTabbedActivity mActivity;
-    private EmbeddedTestServer mTestServer;
     private String mTestUrl;
+    private WebPageStation mPage;
 
     @Before
     public void setUp() {
-        sActivityTestRule.waitForActivityNativeInitializationComplete();
-        mTestServer = sTestServerRule.getServer();
-        mTestUrl = mTestServer.getURL("/chrome/test/data/android/ok.txt");
-
-        mActivity = sActivityTestRule.getActivity();
-        final Tab tab = mActivity.getActivityTab();
-        ChromeTabUtils.waitForInteractable(tab);
-    }
-
-    private void createTabs(int tabsCount, boolean isIncognito, String url) {
-        for (int i = 0; i < tabsCount; i++) {
-            ChromeTabUtils.fullyLoadUrlInNewTab(
-                    InstrumentationRegistry.getInstrumentation(), mActivity, url, isIncognito);
-        }
+        mTestUrl = mActivityTestRule.getTestServer().getURL("/chrome/test/data/android/ok.txt");
+        mPage = mActivityTestRule.startOnBlankPage();
     }
 
     @Test
     @SmallTest
     public void validIndexAfterRestored_FromColdStart() {
-        TabModel normalTabModel =
-                sActivityTestRule.getActivity().getTabModelSelector().getModel(false);
+        TabModel normalTabModel = mPage.getTabModelSelector().getModel(false);
         assertEquals(1, normalTabModel.getCount());
         assertNotEquals(TabModel.INVALID_TAB_INDEX, normalTabModel.index());
 
-        TabModel incognitoTabModel =
-                sActivityTestRule.getActivity().getTabModelSelector().getModel(true);
+        TabModel incognitoTabModel = mPage.getTabModelSelector().getModel(true);
         assertEquals(0, incognitoTabModel.getCount());
         assertEquals(TabModel.INVALID_TAB_INDEX, incognitoTabModel.index());
     }
@@ -95,22 +74,22 @@ public class TabModelImplTest {
     @Test
     @SmallTest
     @DisabledTest(message = "https://crbug.com/410945407")
-    public void validIndexAfterRestored_FromColdStart_WithIncognitoTabs() throws Exception {
-        createTabs(1, true, mTestUrl);
+    public void validIndexAfterRestored_FromColdStart_WithIncognitoTabs() {
+        mPage = Journeys.createIncognitoTabsWithWebPages(mPage, List.of(mTestUrl));
 
-        ApplicationTestUtils.finishActivity(sActivityTestRule.getActivity());
+        ApplicationTestUtils.finishActivity(mPage.getActivity());
 
-        sActivityTestRule.startMainActivityOnBlankPage();
+        mActivityTestRule.getActivityTestRule().startMainActivityOnBlankPage();
 
         TabModel normalTabModel =
-                sActivityTestRule.getActivity().getTabModelSelector().getModel(false);
+                mActivityTestRule.getActivity().getTabModelSelector().getModel(false);
         // Tab count is 2, because startMainActivityOnBlankPage() is called twice.
         assertEquals(2, normalTabModel.getCount());
         assertNotEquals(TabModel.INVALID_TAB_INDEX, normalTabModel.index());
 
         // No incognito tabs are restored from a cold start.
         TabModel incognitoTabModel =
-                sActivityTestRule.getActivity().getTabModelSelector().getModel(true);
+                mActivityTestRule.getActivity().getTabModelSelector().getModel(true);
         assertEquals(0, incognitoTabModel.getCount());
         assertEquals(TabModel.INVALID_TAB_INDEX, incognitoTabModel.index());
     }
@@ -119,8 +98,8 @@ public class TabModelImplTest {
     @SmallTest
     @DisabledTest(message = "https://crbug.com/1448777")
     public void validIndexAfterRestored_FromPreviousActivity() {
-        sActivityTestRule.recreateActivity();
-        ChromeTabbedActivity newActivity = sActivityTestRule.getActivity();
+        mActivityTestRule.recreateActivity();
+        ChromeTabbedActivity newActivity = mActivityTestRule.getActivity();
         CriteriaHelper.pollUiThread(newActivity.getTabModelSelector()::isTabStateInitialized);
 
         TabModel normalTabModel = newActivity.getTabModelSelector().getModel(false);
@@ -135,10 +114,10 @@ public class TabModelImplTest {
     @Test
     @SmallTest
     public void validIndexAfterRestored_FromPreviousActivity_WithIncognitoTabs() {
-        createTabs(1, true, mTestUrl);
+        mPage = Journeys.createIncognitoTabsWithWebPages(mPage, List.of(mTestUrl));
 
-        sActivityTestRule.recreateActivity();
-        ChromeTabbedActivity newActivity = sActivityTestRule.getActivity();
+        mActivityTestRule.recreateActivity();
+        ChromeTabbedActivity newActivity = mActivityTestRule.getActivity();
         CriteriaHelper.pollUiThread(newActivity.getTabModelSelector()::isTabStateInitialized);
 
         TabModel normalTabModel = newActivity.getTabModelSelector().getModel(false);
@@ -153,12 +132,12 @@ public class TabModelImplTest {
     @Test
     @SmallTest
     public void testTabRemover_RemoveTab() {
-        createTabs(1, false, mTestUrl);
+        mPage = Journeys.createRegularTabsWithWebPages(mPage, List.of(mTestUrl));
 
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     TabModel tabModel =
-                            sActivityTestRule.getActivity().getTabModelSelector().getModel(false);
+                            mActivityTestRule.getActivity().getTabModelSelector().getModel(false);
                     assertEquals(2, tabModel.getCount());
 
                     Tab tab1 = tabModel.getTabAt(1);
@@ -182,12 +161,12 @@ public class TabModelImplTest {
     @Test
     @SmallTest
     public void testTabRemover_CloseTabs() {
-        createTabs(1, false, mTestUrl);
+        mPage = Journeys.createRegularTabsWithWebPages(mPage, List.of(mTestUrl));
 
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     TabModel tabModel =
-                            sActivityTestRule.getActivity().getTabModelSelector().getModel(false);
+                            mActivityTestRule.getActivity().getTabModelSelector().getModel(false);
                     assertEquals(2, tabModel.getCount());
 
                     Tab tab1 = tabModel.getTabAt(1);
@@ -208,9 +187,9 @@ public class TabModelImplTest {
     public void testOpenTabProgrammatically() {
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
-                    TabModelImpl tabModel =
-                            (TabModelImpl)
-                                    sActivityTestRule
+                    TabModelJniBridge tabModel =
+                            (TabModelJniBridge)
+                                    mActivityTestRule
                                             .getActivity()
                                             .getTabModelSelector()
                                             .getModel(false);
@@ -220,9 +199,30 @@ public class TabModelImplTest {
                     tabModel.openTabProgrammatically(url, 0);
                     assertEquals(2, tabModel.getCount());
 
-                    Tab tab1 = tabModel.getTabAt(1);
-                    assertNotNull(tab1);
-                    assertEquals(url, tab1.getUrl());
+                    Tab tab = tabModel.getTabAt(0);
+                    assertNotNull(tab);
+                    assertEquals(url, tab.getUrl());
+                });
+    }
+
+    @Test
+    @SmallTest
+    public void testGetAllTabs() {
+        RegularNewTabPageStation secondTab = mPage.openNewTabFast();
+        secondTab.openNewTabFast();
+
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    TabModelJniBridge tabModel =
+                            (TabModelJniBridge)
+                                    mActivityTestRule
+                                            .getActivity()
+                                            .getTabModelSelector()
+                                            .getModel(false);
+
+                    assertEquals(3, tabModel.getCount());
+                    Tab[] tabs = tabModel.getAllTabs();
+                    assertEquals(3, tabs.length);
                 });
     }
 }

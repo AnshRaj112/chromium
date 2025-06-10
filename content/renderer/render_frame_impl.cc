@@ -193,7 +193,7 @@
 #include "third_party/blink/public/platform/url_conversion.h"
 #include "third_party/blink/public/platform/weak_wrapper_resource_load_info_notifier.h"
 #include "third_party/blink/public/platform/web_data.h"
-#include "third_party/blink/public/platform/web_dedicated_or_shared_worker_fetch_context.h"
+#include "third_party/blink/public/platform/web_dedicated_or_shared_worker_global_scope_context.h"
 #include "third_party/blink/public/platform/web_http_body.h"
 #include "third_party/blink/public/platform/web_media_player.h"
 #include "third_party/blink/public/platform/web_media_player_source.h"
@@ -2309,7 +2309,7 @@ void RenderFrameImpl::Delete(mojom::FrameDeleteIntention intent) {
 #else
       // Previously this CHECK() was disabled on Android because it was much
       // easier to hit the race there.
-      CHECK(!in_frame_tree_, base::NotFatalUntil::M135);
+      CHECK(!in_frame_tree_);
 #endif  // !BUILDFLAG(IS_ANDROID)
       break;
   }
@@ -2764,6 +2764,13 @@ void RenderFrameImpl::CommitNavigation(
   LogCommitHistograms(commit_params->commit_sent, is_main_frame_,
                       common_params->url);
 
+  // Clear the `redirects` array to ensure it is not accidentally used somewhere
+  // downstream of this code.
+  if (base::FeatureList::IsEnabled(
+          blink::features::kRemoveCommitRedirectUrlsArray)) {
+    commit_params->redirects.clear();
+  }
+
   bool is_new_navigation_in_outermost_main_frame_with_http_or_https = false;
   if (frame_->IsOutermostMainFrame() &&
       common_params->url.SchemeIsHTTPOrHTTPS()) {
@@ -3128,6 +3135,13 @@ void RenderFrameImpl::CommitFailedNavigation(
   AssertNavigationCommits assert_navigation_commits(
       this, kMayReplaceInitialEmptyDocument);
 
+  // Clear the `redirects` array to ensure it is not accidentally used somewhere
+  // downstream of this code.
+  if (base::FeatureList::IsEnabled(
+          blink::features::kRemoveCommitRedirectUrlsArray)) {
+    commit_params->redirects.clear();
+  }
+
   GetWebView()->SetHistoryListFromNavigation(
       commit_params->current_history_list_index,
       commit_params->current_history_list_length);
@@ -3247,11 +3261,21 @@ void RenderFrameImpl::CommitFailedNavigation(
   // message to the browser.
   // TODO(crbug.com/40150370): Stop sending the URL back with DidCommit.
   navigation_params->unreachable_url = error.url();
-  if (commit_params->redirects.size()) {
-    navigation_params->pre_redirect_url_for_failed_navigations =
-        commit_params->redirects[0];
+  if (base::FeatureList::IsEnabled(
+          blink::features::kRemoveCommitRedirectUrlsArray)) {
+    if (commit_params->redirect_infos.size()) {
+      navigation_params->pre_redirect_url_for_failed_navigations =
+          common_params->url;
+    } else {
+      navigation_params->pre_redirect_url_for_failed_navigations = error.url();
+    }
   } else {
-    navigation_params->pre_redirect_url_for_failed_navigations = error.url();
+   if (commit_params->redirects.size()) {
+     navigation_params->pre_redirect_url_for_failed_navigations =
+         commit_params->redirects[0];
+   } else {
+     navigation_params->pre_redirect_url_for_failed_navigations = error.url();
+   }
   }
 
   navigation_params->policy_container =
@@ -3596,9 +3620,9 @@ RenderFrameImpl::CreateWorkletFetchContext() {
 
   // `pending_subresource_loader_updater` and
   // `pending_resource_load_info_notifier` are not used for worklets.
-  scoped_refptr<blink::WebDedicatedOrSharedWorkerFetchContext>
-      web_dedicated_or_shared_worker_fetch_context =
-          blink::WebDedicatedOrSharedWorkerFetchContext::Create(
+  scoped_refptr<blink::WebDedicatedOrSharedWorkerGlobalScopeContext>
+      web_dedicated_or_shared_worker_global_scope_context =
+          blink::WebDedicatedOrSharedWorkerGlobalScopeContext::Create(
               provider->context(), GetWebView()->GetRendererPreferences(),
               std::move(watcher_receiver), GetLoaderFactoryBundle()->Clone(),
               GetLoaderFactoryBundle()->Clone(),
@@ -3606,18 +3630,18 @@ RenderFrameImpl::CreateWorkletFetchContext() {
               web_cors_exempt_header_list,
               std::move(pending_resource_load_info_notifier));
 
-  web_dedicated_or_shared_worker_fetch_context->SetAncestorFrameToken(
+  web_dedicated_or_shared_worker_global_scope_context->SetAncestorFrameToken(
       frame_->GetLocalFrameToken());
-  web_dedicated_or_shared_worker_fetch_context->set_site_for_cookies(
+  web_dedicated_or_shared_worker_global_scope_context->set_site_for_cookies(
       frame_->GetDocument().SiteForCookies());
-  web_dedicated_or_shared_worker_fetch_context->set_top_frame_origin(
+  web_dedicated_or_shared_worker_global_scope_context->set_top_frame_origin(
       frame_->GetDocument().TopFrameOrigin());
 
   for (auto& observer : observers_) {
     observer.WillCreateWorkerFetchContext(
-        web_dedicated_or_shared_worker_fetch_context.get());
+        web_dedicated_or_shared_worker_global_scope_context.get());
   }
-  return web_dedicated_or_shared_worker_fetch_context;
+  return web_dedicated_or_shared_worker_global_scope_context;
 }
 
 scoped_refptr<blink::WebWorkerFetchContext>
@@ -3637,26 +3661,26 @@ RenderFrameImpl::CreateWorkerFetchContext(
       pending_resource_load_info_notifier.InitWithNewPipeAndPassReceiver(),
       agent_scheduling_group_->agent_group_scheduler().DefaultTaskRunner());
 
-  scoped_refptr<blink::WebDedicatedOrSharedWorkerFetchContext>
-      web_dedicated_or_shared_worker_fetch_context =
+  scoped_refptr<blink::WebDedicatedOrSharedWorkerGlobalScopeContext>
+      web_dedicated_or_shared_worker_global_scope_context =
           static_cast<DedicatedWorkerHostFactoryClient*>(factory_client)
-              ->CreateWorkerFetchContext(
+              ->CreateWorkerGlobalScopeContext(
                   GetWebView()->GetRendererPreferences(),
                   std::move(watcher_receiver),
                   std::move(pending_resource_load_info_notifier));
 
-  web_dedicated_or_shared_worker_fetch_context->SetAncestorFrameToken(
+  web_dedicated_or_shared_worker_global_scope_context->SetAncestorFrameToken(
       frame_->GetLocalFrameToken());
-  web_dedicated_or_shared_worker_fetch_context->set_site_for_cookies(
+  web_dedicated_or_shared_worker_global_scope_context->set_site_for_cookies(
       frame_->GetDocument().SiteForCookies());
-  web_dedicated_or_shared_worker_fetch_context->set_top_frame_origin(
+  web_dedicated_or_shared_worker_global_scope_context->set_top_frame_origin(
       frame_->GetDocument().TopFrameOrigin());
 
   for (auto& observer : observers_) {
     observer.WillCreateWorkerFetchContext(
-        web_dedicated_or_shared_worker_fetch_context.get());
+        web_dedicated_or_shared_worker_global_scope_context.get());
   }
-  return web_dedicated_or_shared_worker_fetch_context;
+  return web_dedicated_or_shared_worker_global_scope_context;
 }
 
 std::unique_ptr<blink::WebPrescientNetworking>

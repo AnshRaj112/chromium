@@ -68,7 +68,7 @@ public class ChromeBrowserInitializer {
             task.run();
         } else {
             if (mTasksToRunWithFullBrowser == null) {
-                mTasksToRunWithFullBrowser = new ArrayList<Runnable>();
+                mTasksToRunWithFullBrowser = new ArrayList<>();
             }
             mTasksToRunWithFullBrowser.add(task);
         }
@@ -162,6 +162,9 @@ public class ChromeBrowserInitializer {
                     "ChromeBrowserInitializer.handlePostNativeStartup called before "
                             + "ChromeBrowserInitializer.postInflationStartup has been run.");
         }
+
+        ProcessInitializationHandler.getInstance().onPostNativeStartup();
+
         final ChainedTasks tasks = new ChainedTasks();
         ProcessInitializationHandler.getInstance()
                 .enqueuePostNativeTasksToRunBeforeActivityNativeInit(

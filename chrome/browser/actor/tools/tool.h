@@ -5,12 +5,19 @@
 #ifndef CHROME_BROWSER_ACTOR_TOOLS_TOOL_H_
 #define CHROME_BROWSER_ACTOR_TOOLS_TOOL_H_
 
+#include <memory>
 #include <string>
 
 #include "base/functional/callback_forward.h"
 #include "chrome/common/actor.mojom-forward.h"
 
+namespace content {
+class RenderFrameHost;
+}  // namespace content
+
 namespace actor {
+
+class ObservationDelayController;
 
 // Interface all actor tools implement. A tool is held by the ToolController and
 // validated and invoked from there. The controller makes no guarantees about
@@ -38,9 +45,15 @@ class Tool {
   // debugging purposes.
   virtual std::string DebugString() const = 0;
 
-  // Returns true if the completion of this tool should be artificially delayed
-  // to allow async work triggered by the tool to finish.
-  virtual bool ShouldAddCompletionDelay() const;
+  // Provides a journal event name.
+  virtual std::string JournalEvent() const = 0;
+
+  // Returns an optional delay object that can be used to delay completion of
+  // the tool until some external conditions are met. By default, this returns
+  // an object that watches for loading navigations and waits until load is
+  // completed and a new frame presented.
+  virtual std::unique_ptr<ObservationDelayController> GetObservationDelayer(
+      content::RenderFrameHost& target_frame) const;
 };
 
 }  // namespace actor

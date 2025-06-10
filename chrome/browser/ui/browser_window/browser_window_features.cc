@@ -13,6 +13,7 @@
 #include "chrome/browser/collaboration/collaboration_service_factory.h"
 #include "chrome/browser/commerce/shopping_service_factory.h"
 #include "chrome/browser/download/bubble/download_bubble_prefs.h"
+#include "chrome/browser/extensions/browser_extension_window_controller.h"
 #include "chrome/browser/extensions/manifest_v2_experiment_manager.h"
 #include "chrome/browser/extensions/mv2_experiment_stage.h"
 #include "chrome/browser/lens/region_search/lens_region_search_controller.h"
@@ -22,19 +23,23 @@
 #include "chrome/browser/ui/browser_actions.h"
 #include "chrome/browser/ui/browser_command_controller.h"
 #include "chrome/browser/ui/browser_instant_controller.h"
+#include "chrome/browser/ui/browser_location_bar_model_delegate.h"
 #include "chrome/browser/ui/browser_tab_menu_model_delegate.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/desktop_browser_window_capabilities.h"
 #include "chrome/browser/ui/commerce/product_specifications_entry_point_controller.h"
 #include "chrome/browser/ui/extensions/mv2_disabled_dialog_controller.h"
 #include "chrome/browser/ui/lens/lens_overlay_entry_point_controller.h"
 #include "chrome/browser/ui/performance_controls/memory_saver_bubble_controller.h"
 #include "chrome/browser/ui/performance_controls/memory_saver_opt_in_iph_controller.h"
+#include "chrome/browser/ui/sync/browser_synced_window_delegate.h"
 #include "chrome/browser/ui/tabs/glic_nudge_controller.h"
 #include "chrome/browser/ui/tabs/organization/tab_declutter_controller.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/most_recent_shared_tab_update_store.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_utils.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/session_service_tab_group_sync_observer.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/shared_tab_group_feedback_controller.h"
+#include "chrome/browser/ui/tabs/tab_group_deletion_dialog_controller.h"
 #include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_service_impl.h"
 #include "chrome/browser/ui/toasts/toast_controller.h"
 #include "chrome/browser/ui/toasts/toast_features.h"
@@ -53,6 +58,7 @@
 #include "chrome/browser/ui/views/side_panel/bookmarks/bookmarks_side_panel_coordinator.h"
 #include "chrome/browser/ui/views/side_panel/extensions/extension_side_panel_manager.h"
 #include "chrome/browser/ui/views/side_panel/history/history_side_panel_coordinator.h"
+#include "chrome/browser/ui/views/side_panel/reading_list/reading_list_side_panel_coordinator.h"
 #include "chrome/browser/ui/views/side_panel/side_panel_coordinator.h"
 #include "chrome/browser/ui/views/tabs/tab_strip_action_container.h"
 #include "chrome/browser/ui/views/toolbar/chrome_labs/chrome_labs_coordinator.h"
@@ -64,10 +70,13 @@
 #include "components/commerce/core/feature_utils.h"
 #include "components/commerce/core/shopping_service.h"
 #include "components/lens/lens_features.h"
+#include "components/omnibox/browser/location_bar_model.h"
+#include "components/omnibox/browser/location_bar_model_impl.h"
 #include "components/profile_metrics/browser_profile_type.h"
 #include "components/saved_tab_groups/public/features.h"
 #include "components/search/ntp_features.h"
 #include "components/search/search.h"
+#include "content/public/common/content_constants.h"
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
 #include "chrome/browser/ui/pdf/infobar/pdf_infobar_controller.h"
@@ -161,9 +170,9 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
 #if BUILDFLAG(ENABLE_GLIC)
     if (glic::GlicEnabling::IsProfileEligible(browser->GetProfile())) {
       DCHECK(features::IsTabSearchMoving());
+      glic_iph_controller_ = std::make_unique<glic::GlicIphController>(browser);
       glic_nudge_controller_ =
           std::make_unique<tabs::GlicNudgeController>(browser);
-      glic_iph_controller_ = std::make_unique<glic::GlicIphController>(browser);
     }
 #endif  // BUILDFLAG(ENABLE_GLIC)
   }
@@ -197,14 +206,31 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
           browser->GetSessionID(), browser->GetProfile(),
           browser->GetAppBrowserController());
 
+  tab_group_deletion_dialog_controller_ =
+      std::make_unique<tab_groups::DeletionDialogController>(browser);
+
+  location_bar_model_delegate_ =
+      std::make_unique<BrowserLocationBarModelDelegate>(tab_strip_model_);
+  location_bar_model_ = std::make_unique<LocationBarModelImpl>(
+      location_bar_model_delegate_.get(), content::kMaxURLDisplayChars);
+
+  reading_list_side_panel_coordinator_ =
+      std::make_unique<ReadingListSidePanelCoordinator>(
+          browser->GetProfile(), browser->GetTabStripModel());
+
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   if (base::FeatureList::IsEnabled(features::kPdfInfoBar)) {
-    pdf_infobar_controller_ = std::make_unique<PdfInfoBarController>(browser);
+    pdf_infobar_controller_ =
+        std::make_unique<pdf::infobar::PdfInfoBarController>(browser);
   }
 #endif
 }
 
 void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
+  desktop_browser_window_capabilities_ =
+      std::make_unique<DesktopBrowserWindowCapabilities>(
+          browser, browser->window(), browser->GetUnownedUserDataHost());
+
   // Features that are only enabled for normal browser windows (e.g. a window
   // with an omnibox and a tab strip). By default most features should be
   // instantiated in this block.
@@ -248,7 +274,26 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
             std::make_unique<extensions::Mv2DisabledDialogController>(browser);
       }
     }
+
+    if (features::HasTabSearchToolbarButton()) {
+      // TODO(crbug.com/360163254): We should really be using
+      // Browser::GetBrowserView, which always returns a non-null BrowserView
+      // in production, but this crashes during unittests using
+      // BrowserWithTestWindowTest; these should eventually be refactored.
+      if (BrowserView* browser_view =
+              BrowserView::GetBrowserViewForBrowser(browser)) {
+        tab_search_toolbar_button_controller_ =
+            std::make_unique<TabSearchToolbarButtonController>(
+                browser_view, browser_view->GetTabSearchBubbleHost());
+      }
+    }
   }
+
+  synced_window_delegate_ =
+      std::make_unique<BrowserSyncedWindowDelegate>(browser);
+
+  extension_window_controller_ =
+      std::make_unique<extensions::BrowserExtensionWindowController>(browser);
 
   if (browser->is_type_normal() || browser->is_type_app()) {
     toast_service_ = std::make_unique<ToastService>(browser);
@@ -295,7 +340,8 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
           browser_view->tab_strip_region_view()->GetTabStripActionContainer(),
           glic_service);
     }
-#endif
+
+#endif  // BUILDFLAG(ENABLE_GLIC)
 
     memory_saver_opt_in_iph_controller_ =
         std::make_unique<MemorySaverOptInIPHController>(
@@ -305,11 +351,6 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
       cast_browser_controller_ =
           std::make_unique<media_router::CastBrowserController>(
               browser_view->browser());
-    }
-
-    if (features::HasTabSearchToolbarButton()) {
-      tab_search_toolbar_button_controller_ =
-          std::make_unique<TabSearchToolbarButtonController>(browser_view);
     }
   }
 
@@ -338,6 +379,7 @@ void BrowserWindowFeatures::TearDownPreBrowserViewDestruction() {
   memory_saver_opt_in_iph_controller_.reset();
   lens_overlay_entry_point_controller_.reset();
   tab_search_toolbar_button_controller_.reset();
+  extension_window_controller_.reset();
 
 #if BUILDFLAG(ENABLE_GLIC)
   glic_button_controller_.reset();
@@ -368,6 +410,8 @@ void BrowserWindowFeatures::TearDownPreBrowserViewDestruction() {
   if (new_tab_footer_controller_) {
     new_tab_footer_controller_->TearDown();
   }
+
+  desktop_browser_window_capabilities_.reset();
 }
 
 SidePanelUI* BrowserWindowFeatures::side_panel_ui() {

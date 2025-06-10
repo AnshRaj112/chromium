@@ -40,6 +40,7 @@
 
 #include "base/command_line.h"
 #include "base/containers/adapters.h"
+#include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/functional/bind.h"
 #include "base/logging.h"
@@ -48,6 +49,7 @@
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/escape.h"
 #include "base/strings/string_util.h"
+#include "base/strings/string_view_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "base/trace_event/optional_trace_event.h"
@@ -125,9 +127,10 @@ namespace {
 
 // Feature to skip a redundant NavigationRequest creation for bfcache
 // activations, per https://crbug.com/417251428.
+// TODO(crbug.com/420275259): Diagnose crashes and enable by default.
 BASE_FEATURE(kSkipExtraBfcacheNavigationRequest,
              "SkipExtraBfcacheNavigationRequest",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Invoked when entries have been pruned, or removed. For example, if the
 // current entries are [google, digg, yahoo], with the current entry google,
@@ -3380,7 +3383,8 @@ NavigationControllerImpl::NavigateToExistingPendingEntry(
   // Navigate immediately if the document is in the BackForwardCache.
   if (back_forward_cache_.GetOrEvictEntry(nav_entry_id).has_value()) {
     TRACE_EVENT0("navigation", "BackForwardCache_CreateNavigationRequest");
-    CHECK_EQ(reload_type, ReloadType::NONE);
+    // TODO(crbug.com/420275259): Diagnose failures and upgrade to a CHECK.
+    DCHECK_EQ(reload_type, ReloadType::NONE);
     base::WeakPtr<NavigationRequest> request;
 
     // Skip a redundant NavigationRequest creation, per

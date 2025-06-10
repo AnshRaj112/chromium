@@ -86,7 +86,7 @@ public class PersonalDataManagerTest {
 
     private static Matcher<Iban> ibanMatcher(
             final @IbanRecordType int recordType, final String nickname) {
-        return new TypeSafeMatcher<Iban>() {
+        return new TypeSafeMatcher<>() {
             @Override
             protected boolean matchesSafely(Iban iban) {
                 return iban.getRecordType() == recordType && iban.getNickname().equals(nickname);
@@ -392,7 +392,8 @@ public class PersonalDataManagerTest {
                                 capitalOneIconUrl,
                                 widthPixels,
                                 heightPixels,
-                                /* circleCrop= */ false))
+                                /* circleCrop= */ false,
+                                /* requestPng= */ false))
                 .isEqualTo(
                         new GURL(
                                 capitalOneIconUrl.getSpec()
@@ -400,13 +401,14 @@ public class PersonalDataManagerTest {
                                         + widthPixels
                                         + "-h"
                                         + heightPixels));
-        // The URL should be updated as `cardArtUrl=w{width}-h{height}-cc`.
+        // The URL should be updated as `cardArtUrl=w{width}-h{height}-cc-rp`.
         assertThat(
                         AutofillUiUtils.getFifeIconUrlWithParams(
                                 capitalOneIconUrl,
                                 widthPixels,
                                 heightPixels,
-                                /* circleCrop= */ true))
+                                /* circleCrop= */ true,
+                                /* requestPng= */ true))
                 .isEqualTo(
                         new GURL(
                                 capitalOneIconUrl.getSpec()
@@ -414,12 +416,23 @@ public class PersonalDataManagerTest {
                                         + widthPixels
                                         + "-h"
                                         + heightPixels
-                                        + "-cc"));
+                                        + "-cc"
+                                        + "-rp"));
         assertThat(
                         AutofillUiUtils.getFifeIconUrlWithParams(
-                                cardArtUrl, widthPixels, heightPixels, /* circleCrop= */ false))
+                                cardArtUrl,
+                                widthPixels,
+                                heightPixels,
+                                /* circleCrop= */ false,
+                                /* requestPng= */ true))
                 .isEqualTo(
-                        new GURL(cardArtUrl.getSpec() + "=w" + widthPixels + "-h" + heightPixels));
+                        new GURL(
+                                cardArtUrl.getSpec()
+                                        + "=w"
+                                        + widthPixels
+                                        + "-h"
+                                        + heightPixels
+                                        + "-rp"));
     }
 
     @Test
@@ -642,7 +655,7 @@ public class PersonalDataManagerTest {
         mHelper.setProfile(profile3);
         mHelper.setProfile(profile4);
 
-        List<String> expectedLabels = new LinkedList<String>();
+        List<String> expectedLabels = new LinkedList<>();
         expectedLabels.add("123 Main, jm@example.com");
         expectedLabels.add("123 Main, jm-work@example.com");
         expectedLabels.add("1500 Second Ave, 90068");

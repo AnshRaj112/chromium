@@ -17,7 +17,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
 #include "base/metrics/histogram_macros.h"
-#include "base/not_fatal_until.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/trace_event/typed_macros.h"
 #include "base/tracing/protos/chrome_track_event.pbzero.h"
@@ -288,7 +288,7 @@ v8::Local<v8::Object> CreateFullBinding(
     const std::string& root_name) {
   const FeatureMap& features = api_feature_provider->GetAllFeatures();
   auto lower = features.lower_bound(root_name);
-  CHECK(lower != features.end(), base::NotFatalUntil::M130);
+  CHECK(lower != features.end());
 
   // Some bindings have a prefixed name, like app.runtime, where 'app' and
   // 'app.runtime' are, in fact, separate APIs. It's also possible for a

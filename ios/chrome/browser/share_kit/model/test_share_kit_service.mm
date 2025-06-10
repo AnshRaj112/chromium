@@ -128,7 +128,11 @@ void TestShareKitService::PrimaryAccountChanged() {
   // No-op for testing.
 }
 
-void TestShareKitService::CancelSession(NSString* session_id) {}
+void TestShareKitService::CancelSession(NSString* session_id) {
+  [presented_view_controller_.presentingViewController
+      dismissViewControllerAnimated:NO
+                         completion:nil];
+}
 
 NSString* TestShareKitService::ShareTabGroup(
     ShareKitShareGroupConfiguration* config) {
@@ -154,6 +158,8 @@ NSString* TestShareKitService::ShareTabGroup(
   [config.baseViewController presentViewController:navController
                                           animated:NO
                                         completion:nil];
+  // Keep a weak link to potentially dismiss it.
+  presented_view_controller_ = navController;
   return @"sharedFlow";
 }
 
@@ -169,6 +175,8 @@ NSString* TestShareKitService::ManageTabGroup(
   [config.baseViewController presentViewController:navController
                                           animated:NO
                                         completion:nil];
+  // Keep a weak link to potentially dismiss it.
+  presented_view_controller_ = navController;
   return @"manageFlow";
 }
 
@@ -192,6 +200,8 @@ NSString* TestShareKitService::JoinTabGroup(ShareKitJoinConfiguration* config) {
   [config.baseViewController presentViewController:navController
                                           animated:NO
                                         completion:nil];
+  // Keep a weak link to potentially dismiss it.
+  presented_view_controller_ = navController;
   return @"joinFlow";
 }
 
@@ -317,15 +327,14 @@ void TestShareKitService::PrepareToShareGroup(
   syncer::CollaborationId collaboration_id(base::SysNSStringToUTF8(collab_id));
   // It is necessary to make the collab available on both the sync server and
   // the finder.
-  chrome_test_util::AddCollaboration(collaboration_id.value());
+  chrome_test_util::AddCollaboration(collaboration_id);
   tab_group_sync_service_->GetCollaborationFinderForTesting()
       ->SetCollaborationAvailableForTesting(collaboration_id);
 
   std::optional<tab_groups::SavedTabGroup> saved_group =
       tab_group_sync_service_->GetGroup(tab_group_id);
   if (saved_group && !saved_group->is_shared_tab_group()) {
-    chrome_test_util::AddCollaborationGroupToFakeServer(
-        collaboration_id.value());
+    chrome_test_util::AddCollaborationGroupToFakeServer(collaboration_id);
     chrome_test_util::TriggerSyncCycle(syncer::COLLABORATION_GROUP);
   }
 }
@@ -344,7 +353,8 @@ void TestShareKitService::SetTabGroupCollabIdFromGroupId(
       tab_group_sync_service_->GetGroup(tab_group_id);
   if (saved_group && !saved_group->is_shared_tab_group()) {
     tab_group_sync_service_->MakeTabGroupShared(
-        tab_group_id, base::SysNSStringToUTF8(collab_id),
+        tab_group_id,
+        syncer::CollaborationId(base::SysNSStringToUTF8(collab_id)),
         base::BindOnce(&TestShareKitService::ProcessTabGroupSharingResult,
                        weak_pointer_factory_.GetWeakPtr(),
                        saved_group.value().saved_guid()));

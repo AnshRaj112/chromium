@@ -79,7 +79,25 @@ export declare interface HostRequestTypes {
       actInFocusedTabResult: ActInFocusedTabResultPrivate,
     },
   };
-  glicBrowserStopActorTask: {};
+  glicBrowserStopActorTask: {
+    request: {
+      taskId: number,
+    },
+  };
+  glicBrowserPauseActorTask: {
+    request: {
+      taskId: number,
+    },
+  };
+  glicBrowserResumeActorTask: {
+    request: {
+      taskId: number,
+      tabContextOptions: TabContextOptions,
+    },
+    response: {
+      tabContextResult: TabContextResultPrivate,
+    },
+  };
   glicBrowserCaptureScreenshot: {
     response: {
       screenshot: Screenshot,
@@ -161,6 +179,7 @@ export declare interface HostRequestTypes {
       mode: number,
     },
   };
+  glicBrowserOnRequestStarted: {};
   glicBrowserOnResponseStarted: {};
   glicBrowserOnResponseStopped: {};
   glicBrowserOnSessionTerminated: {};
@@ -292,6 +311,8 @@ type HostRequestEnumNamesType = {
     GetContextFromFocusedTab: 0,
     ActInFocusedTab: 0,
     StopActorTask: 0,
+    PauseActorTask: 0,
+    ResumeActorTask: 0,
     CaptureScreenshot: 0,
     ResizeWindow: 0,
     EnableDragResize: 0,
@@ -307,6 +328,7 @@ type HostRequestEnumNamesType = {
     DetachPanel: 0,
     SetAudioDucking: 0,
     OnUserInputSubmitted: 0,
+    OnRequestStarted: 0,
     OnResponseStarted: 0,
     OnResponseStopped: 0,
     OnSessionTerminated: 0,

@@ -152,9 +152,8 @@ public class OMADownloadHandler extends BroadcastReceiver {
 
     private final Context mContext;
     private final SharedPreferencesManager mSharedPrefs;
-    private final LongSparseArray<DownloadItem> mSystemDownloadIdMap =
-            new LongSparseArray<DownloadItem>();
-    private final LongSparseArray<OMAInfo> mPendingOMADownloads = new LongSparseArray<OMAInfo>();
+    private final LongSparseArray<DownloadItem> mSystemDownloadIdMap = new LongSparseArray<>();
+    private final LongSparseArray<OMAInfo> mPendingOMADownloads = new LongSparseArray<>();
     private final ObserverList<TestObserver> mObservers = new ObserverList<>();
 
     /**
@@ -167,8 +166,8 @@ public class OMADownloadHandler extends BroadcastReceiver {
         private final List<String> mTypes;
 
         OMAInfo() {
-            mDescription = new HashMap<String, String>();
-            mTypes = new ArrayList<String>();
+            mDescription = new HashMap<>();
+            mTypes = new ArrayList<>();
         }
 
         /**
@@ -679,7 +678,7 @@ public class OMADownloadHandler extends BroadcastReceiver {
             OMAInfo info = new OMAInfo();
             StringBuilder sb = null;
             List<String> attributeList =
-                    new ArrayList<String>(
+                    new ArrayList<>(
                             Arrays.asList(
                                     OMA_TYPE,
                                     OMA_SIZE,

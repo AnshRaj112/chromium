@@ -96,6 +96,7 @@ Avanceret beskyttelse styrer disse Chrome-indstillinger:
 <translation id="2182457891543959921">Spørg, inden websites kan oprette et 3D-kort over dine omgivelser eller registrere kamerapositionen (anbefales)</translation>
 <translation id="2185965788978862351">Denne handling sletter <ph name="DATASIZE" /> data og cookies, som er gemt af websites eller apps på din startside.</translation>
 <translation id="2194856509914051091">Vigtige oplysninger</translation>
+<translation id="2202902749237646524">{NUM_DAYS,plural, =1{I går}one{For <ph name="NUM_DAYS_MANY" /> dag siden}other{For <ph name="NUM_DAYS_MANY" /> dage siden}}</translation>
 <translation id="2215727959747642672">Filredigering</translation>
 <translation id="2218389616572918761">Websites kan anmode om adgang til din mikrofon</translation>
 <translation id="2228071138934252756">Aktivér også dit kamera i <ph name="BEGIN_LINK" />Android-indstillingerne<ph name="END_LINK" /> for at give <ph name="APP_NAME" /> adgang til kameraet.</translation>
@@ -386,6 +387,7 @@ Avanceret beskyttelse styrer disse Chrome-indstillinger:
 <translation id="5723967018671998714">Tredjepartscookies er blokeret i inkognitotilstand</translation>
 <translation id="5740126560802162366">Websites kan gemme data på din enhed</translation>
 <translation id="5743425052258407233">Se din historik på alle dine enheder, så du nemt kan fortsætte, hvor du slap</translation>
+<translation id="5749158352074143502">Fortsæt med denne fane</translation>
 <translation id="5750869797196646528">Registrering af håndbevægelser</translation>
 <translation id="5771720122942595109"><ph name="PERMISSION_1" /> blev blokeret</translation>
 <translation id="5804241973901381774">Tilladelser</translation>
@@ -447,6 +449,7 @@ Avanceret beskyttelse styrer disse Chrome-indstillinger:
 <translation id="6527303717912515753">Del</translation>
 <translation id="6530703012083415527">Når dette er slået til, kan websites anvende pop op-vinduer og omdirigeringer. Når dette er slået fra, kan websites ikke anvende pop op-vinduer og omdirigeringer.</translation>
 <translation id="6540488083026747005">Du har tilladt tredjepartscookies på dette website</translation>
+<translation id="6542770556219257399">{NUM_WEEKS,plural, =1{For <ph name="NUM_WEEKS_ONE" /> uge siden}one{For <ph name="NUM_WEEKS_MANY" /> uge siden}other{For <ph name="NUM_WEEKS_MANY" /> uger siden}}</translation>
 <translation id="6545864417968258051">Bluetooth-scanning</translation>
 <translation id="6552800053856095716">{PERMISSIONS_SUMMARY_BLOCKED,plural, =1{<ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> og <ph name="NUM_MORE" /> mere er blokeret}one{<ph name="PERMISSION_1" />, <ph name="PERMISSION_2" />, and <ph name="NUM_MORE" /> more blocked}other{<ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> og <ph name="NUM_MORE" /> mere er blokeret}}</translation>
 <translation id="6554732001434021288">Senest besøgt for <ph name="NUM_DAYS" /> dage siden</translation>
@@ -458,6 +461,7 @@ Avanceret beskyttelse styrer disse Chrome-indstillinger:
 <translation id="6612358246767739896">Beskyttet indhold</translation>
 <translation id="662080504995468778">Bliv her</translation>
 <translation id="6635327442719709864">Når denne indstilling er aktiveret, kan websites anmode om at anvende serieporte. Når denne indstilling er deaktiveret, kan websites ikke anvende serieporte.</translation>
+<translation id="6678072580827808850">Gennemgå sikkerhedstjek</translation>
 <translation id="6683865262523156564">Dette website er i en gruppe, der kan se din aktivitet. Gruppen er defineret af <ph name="RWS_OWNER" /></translation>
 <translation id="6689172468748959065">Profilbilleder</translation>
 <translation id="6697925417670533197">Aktive downloads</translation>
@@ -519,6 +523,7 @@ Avanceret beskyttelse styrer disse Chrome-indstillinger:
 <translation id="7554752735887601236">Et website anvender din mikrofon</translation>
 <translation id="7561196759112975576">Altid</translation>
 <translation id="7573594921350120855">Websites bruger normalt dit videokamera til kommunikationsformål såsom videochat</translation>
+<translation id="7574529565935733861">{NUM_MONTHS,plural, =1{For <ph name="NUM_MONTHS_ONE" /> måned siden}one{For <ph name="NUM_MONTHS_MANY" /> måned siden}other{For <ph name="NUM_MONTHS_MANY" /> måneder siden}}</translation>
 <translation id="757524316907819857">Bloker afspilning af beskyttet indhold på websites</translation>
 <translation id="7594634374516752650">Forbundet til en Bluetooth-enhed</translation>
 <translation id="7617547684249261169">Du kan slette dele af eller hele din historik og dele af eller alle cookies, websitedata og meget mere</translation>
@@ -532,7 +537,6 @@ Avanceret beskyttelse styrer disse Chrome-indstillinger:
 <translation id="7759147511335618829">Styring/omprogrammering af MIDI</translation>
 <translation id="7781829728241885113">I går</translation>
 <translation id="7791543448312431591">Tilføj</translation>
-<translation id="7801888679188438140">{TILE_COUNT,plural, =1{Fortsæt med denne fane}one{Fortsæt med denne fane}other{Fortsæt med disse faner}}</translation>
 <translation id="780301667611848630">Nej tak</translation>
 <translation id="7804248752222191302">Et website anvender dit kamera</translation>
 <translation id="7807060072011926525">Leveret af Google</translation>
@@ -541,6 +545,7 @@ Avanceret beskyttelse styrer disse Chrome-indstillinger:
 <translation id="7846076177841592234">Annuller valg</translation>
 <translation id="7881140103901777395">Chrome begrænser de fleste websites fra at bruge tredjepartscookies. Tredjepartscookies er dog tilladt på dette website, fordi det er afhængigt af, at de leverer grundlæggende tjenester.\n\nGå til indstillingerne for at <ph name="BEGIN_LINK" />administrere adgangen til tredjepartscookies<ph name="END_LINK" />.</translation>
 <translation id="7882806643839505685">Tillad, at et bestemt website afspiller lyd.</translation>
+<translation id="7891547341794213004">Skjul kortet Fortsæt med denne fane</translation>
 <translation id="789180354981963912">Bloker tredjepartscookies i inkognitotilstand:</translation>
 <translation id="789722939441020330">Tillad ikke, at websites automatisk downloader flere filer</translation>
 <translation id="7940722705963108451">Påmind mig</translation>
@@ -549,7 +554,6 @@ Avanceret beskyttelse styrer disse Chrome-indstillinger:
 <translation id="7986741934819883144">Vælg en kontakt</translation>
 <translation id="7990211076305263060">Når dette er slået til, kan websites anmode om at anvende din mikrofon. Når dette er slået fra, kan websites ikke anvende din mikrofon.</translation>
 <translation id="8007176423574883786">Deaktiveret på denne enhed</translation>
-<translation id="8010630645305864042">{TILE_COUNT,plural, =1{Skjul kortet Fortsæt med denne fane}one{Skjul kortet Fortsæt med denne fane}other{Skjul kortet Fortsæt med disse faner}}</translation>
 <translation id="802154636333426148">Download mislykkedes</translation>
 <translation id="8042586301629853791">Sortér efter:</translation>
 <translation id="8051193500142930381">Funktioner, der skal bruge et kamera, fungerer ikke</translation>

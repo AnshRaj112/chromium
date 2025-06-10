@@ -16,6 +16,7 @@
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/tab_grid_page_mutator.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/tab_grid_paging.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/toolbars/tab_grid_toolbars_grid_delegate.h"
+#import "ios/chrome/browser/tab_switcher/ui_bundled/tab_switcher_item_snapshot_and_favicon_data_source.h"
 
 @class ActivityLabelData;
 @class BaseGridMediator;
@@ -50,13 +51,15 @@ class WebState;
 @end
 
 // Mediates between model layer and tab grid UI layer.
-@interface BaseGridMediator : NSObject <BaseGridMediatorItemProvider,
-                                        GridCommands,
-                                        GridViewControllerMutator,
-                                        SuggestedActionsDelegate,
-                                        TabCollectionDragDropHandler,
-                                        TabGridPageMutator,
-                                        TabGridToolbarsGridDelegate>
+@interface BaseGridMediator
+    : NSObject <BaseGridMediatorItemProvider,
+                GridCommands,
+                GridViewControllerMutator,
+                SuggestedActionsDelegate,
+                TabCollectionDragDropHandler,
+                TabGridPageMutator,
+                TabGridToolbarsGridDelegate,
+                TabSwitcherItemSnapShotAndFaviconDataSource>
 
 // The source browser.
 @property(nonatomic, assign) Browser* browser;
@@ -157,12 +160,6 @@ class WebState;
 
 // Ungroups all tabs in `group`. The tabs in the group remain open.
 - (void)ungroupTabGroup:(const TabGroup*)group;
-
-// Leaves shared `group`. The group is closed locally.
-- (void)leaveSharedTabGroup:(const TabGroup*)group;
-
-// Deletes shared `group`. The group is deleted for everyone.
-- (void)deleteSharedTabGroup:(const TabGroup*)group;
 
 // Returns whether this mediator can handle the drop of `tabGroupInfo`.
 - (BOOL)canHandleTabGroupDrop:(TabGroupInfo*)tabGroupInfo;

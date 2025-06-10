@@ -18,6 +18,7 @@
 #include "third_party/blink/renderer/modules/accessibility/ax_object.h"
 #include "third_party/blink/renderer/modules/accessibility/ax_object_cache_impl.h"
 #include "third_party/blink/renderer/modules/accessibility/ax_selection.h"
+#include "third_party/blink/renderer/platform/wtf/text/string_builder_stream.h"
 #include "ui/accessibility/ax_role_properties.h"
 #include "ui/accessibility/ax_tree_id.h"
 
@@ -165,14 +166,14 @@ bool BlinkAXTreeSource::GetTreeData(ui::AXTreeData* tree_data) const {
         }
         // TODO(chrishtr): replace the below with elem->outerHTML().
         String tag = elem->tagName().LowerASCII();
-        String html = "<" + tag;
+        StringBuilder html;
+        html << "<" << tag;
         for (unsigned i = 0; i < elem->Attributes().size(); i++) {
-          html = html + String(" ") + elem->Attributes().at(i).LocalName() +
-                 String("=\"") + elem->Attributes().at(i).Value() + "\"";
+          html << " " << elem->Attributes().at(i).LocalName() << "=\""
+               << elem->Attributes().at(i).Value() << "\"";
         }
-        html = html + String(">") + elem->innerHTML() + String("</") + tag +
-               String(">");
-        tree_data->metadata.push_back(html.Utf8());
+        html << ">" << elem->innerHTML() << "</" << tag << ">";
+        tree_data->metadata.push_back(html.ReleaseString().Utf8());
       }
     }
   }
@@ -241,18 +242,15 @@ AXObject* BlinkAXTreeSource::ChildAt(const AXObject* node, size_t index) const {
   // The child may be invalid due to issues in blink accessibility code.
   CHECK(child);
   if (child->IsDetached()) {
-    NOTREACHED(base::NotFatalUntil::M127)
-        << "Should not try to serialize an invalid child:" << "\nParent: "
-        << node->ToString().Utf8() << "\nChild: " << child->ToString().Utf8();
-    return nullptr;
+    NOTREACHED() << "Should not try to serialize an invalid child:"
+                 << "\nParent: " << node->ToString().Utf8()
+                 << "\nChild: " << child->ToString().Utf8();
   }
 
   if (!child->IsIncludedInTree()) {
-    NOTREACHED(base::NotFatalUntil::M127)
-        << "Should not receive unincluded child."
-        << "\nChild: " << child->ToString().Utf8()
-        << "\nParent: " << node->ToString().Utf8();
-    return nullptr;
+    NOTREACHED() << "Should not receive unincluded child."
+                 << "\nChild: " << child->ToString().Utf8()
+                 << "\nParent: " << node->ToString().Utf8();
   }
 
   // These should not be produced by Blink. They are only needed on Mac and

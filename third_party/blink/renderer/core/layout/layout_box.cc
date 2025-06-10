@@ -1948,8 +1948,9 @@ bool LayoutBox::ApplyBoxClips(
   PhysicalRect clip_rect = ClippingRect(PhysicalOffset());
 
   transform_state.Flatten();
-  PhysicalRect rect(
-      gfx::ToEnclosingRect(transform_state.LastPlanarQuad().BoundingBox()));
+  PhysicalRect rect = PhysicalRect::EnclosingRect(
+      transform_state.LastPlanarQuad().BoundingBox());
+
   bool does_intersect;
   if (visual_rect_flags & kEdgeInclusive) {
     does_intersect = rect.InclusiveIntersect(clip_rect);
@@ -3000,12 +3001,14 @@ void LayoutBox::ClearSpannerPlaceholder() {
   rare_data_->spanner_placeholder_ = nullptr;
 }
 
-bool LayoutBox::IsValidColumnSpanner() const {
+bool LayoutBox::IsValidColumnSpanner(const ComputedStyle& style) const {
   NOT_DESTROYED();
   // Note that this function may be called in many circumstances, such as before
   // it is inserted into the tree, and even as part of calculating the
   // containing block. Be careful.
-  DCHECK_EQ(StyleRef().GetColumnSpan(), EColumnSpan::kAll);
+  if (style.GetColumnSpan() != EColumnSpan::kAll) {
+    return false;
+  }
   if (!RuntimeEnabledFeatures::FlowThreadLessEnabled()) {
     return SpannerPlaceholder();
   }
@@ -3016,8 +3019,8 @@ bool LayoutBox::IsValidColumnSpanner() const {
 
   // The spec says that column-span only applies to in-flow block-level
   // elements.
-  if (ShouldBeHandledAsInline() || ShouldBeHandledAsFloating() ||
-      ToPositionedState() == kIsOutOfFlowPositioned) {
+  if (ShouldBeHandledAsInline(style) || ShouldBeHandledAsFloating(style) ||
+      ToPositionedState(style.GetPosition()) == kIsOutOfFlowPositioned) {
     return false;
   }
 
@@ -3195,7 +3198,8 @@ LayoutUnit LayoutBox::ContainingBlockLogicalHeightForPositioned(
   return height_result;
 }
 
-PhysicalRect LayoutBox::LocalCaretRect(int caret_offset) const {
+PhysicalRect LayoutBox::LocalCaretRect(int caret_offset,
+                                       CaretShape caret_shape) const {
   NOT_DESTROYED();
   // VisiblePositions at offsets inside containers either a) refer to the
   // positions before/after those containers (tables and select elements) or
@@ -4627,15 +4631,14 @@ bool LayoutBox::IsReadingFlowContainer() const {
   return false;
 }
 
-const HeapVector<Member<Node>>& LayoutBox::ReadingFlowNodes() const {
+const GCedHeapVector<Member<Node>>& LayoutBox::ReadingFlowNodes() const {
   NOT_DESTROYED();
   if (const auto* nodes = GetPhysicalFragment(0)->ReadingFlowNodes()) {
     return *nodes;
   }
-  using HolderType = DisallowNewWrapper<HeapVector<Member<Node>>>;
-  DEFINE_STATIC_LOCAL(Persistent<HolderType>, empty_vector,
-                      (MakeGarbageCollected<HolderType>()));
-  return empty_vector->Value();
+  DEFINE_STATIC_LOCAL(Persistent<GCedHeapVector<Member<Node>>>, empty_vector,
+                      (MakeGarbageCollected<GCedHeapVector<Member<Node>>>()));
+  return *empty_vector.Get();
 }
 
 }  // namespace blink

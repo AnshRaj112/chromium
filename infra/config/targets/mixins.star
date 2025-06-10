@@ -505,9 +505,16 @@ targets.mixin(
 )
 
 targets.mixin(
-    name = "skylab-shards-50",
+    name = "skylab-shards-45",
     skylab = targets.skylab(
-        shards = 50,
+        shards = 45,
+    ),
+)
+
+targets.mixin(
+    name = "skylab-20-tests-per-shard",
+    skylab = targets.skylab(
+        cros_test_max_in_shard = 20,
     ),
 )
 
@@ -1274,6 +1281,19 @@ targets.mixin(
 )
 
 targets.mixin(
+    name = "ios_runtime_cache_18_5",
+    generate_pyl_entry = False,
+    swarming = targets.swarming(
+        named_caches = [
+            swarming.cache(
+                name = "runtime_ios_18_5",
+                path = "Runtime-ios-18.5",
+            ),
+        ],
+    ),
+)
+
+targets.mixin(
     name = "ioswpt-chromium-swarming-pool",
     generate_pyl_entry = False,
     swarming = targets.swarming(
@@ -1619,7 +1639,7 @@ targets.mixin(
     swarming = targets.swarming(
         dimensions = {
             "cpu": "arm64",
-            "os": "Mac-14|Mac-15",
+            "os": "Mac-14",
         },
     ),
 )
@@ -1629,7 +1649,7 @@ targets.mixin(
     swarming = targets.swarming(
         dimensions = {
             "cpu": "x86-64",
-            "os": "Mac-14|Mac-15",
+            "os": "Mac-14",
         },
     ),
 )
@@ -1640,7 +1660,7 @@ targets.mixin(
     swarming = targets.swarming(
         dimensions = {
             "cpu": "arm64",
-            "os": "Mac-15",
+            "os": "Mac-15.5",
         },
     ),
 )
@@ -1763,7 +1783,7 @@ targets.mixin(
     swarming = targets.swarming(
         dimensions = {
             "cpu": "arm64",
-            "os": "Mac-15",
+            "os": "Mac-15.5",
         },
     ),
 )
@@ -1774,7 +1794,7 @@ targets.mixin(
     swarming = targets.swarming(
         dimensions = {
             "cpu": "x86-64",
-            "os": "Mac-15",
+            "os": "Mac-15.5",
         },
     ),
 )
@@ -1784,7 +1804,7 @@ targets.mixin(
     swarming = targets.swarming(
         dimensions = {
             "cpu": "arm64",
-            "os": "Mac-14|Mac-15",
+            "os": "Mac-15",
         },
     ),
 )
@@ -1797,7 +1817,7 @@ targets.mixin(
     swarming = targets.swarming(
         dimensions = {
             "cpu": "x86-64",
-            "os": "Mac-14|Mac-15",
+            "os": "Mac-15",
         },
     ),
 )
@@ -1876,41 +1896,6 @@ targets.mixin(
             "gpu": "1002:7340",
             "hidpi": "1",
             "os": "Mac-14.4.1",
-            "pool": "chromium.tests.gpu",
-            "display_attached": "1",
-        },
-    ),
-)
-
-targets.mixin(
-    name = "mac_retina_nvidia_gpu_experimental",
-    # We always need this entry to be generated since it is used by
-    # //content/test/gpu/find_bad_machines.py.
-    generate_pyl_entry = targets.IGNORE_UNUSED,
-    # Currently the same as the stable version.
-    swarming = targets.swarming(
-        dimensions = {
-            "cpu": "x86-64",
-            "gpu": "10de:0fe9",
-            "hidpi": "1",
-            "os": "Mac-11.7.9",
-            "pool": "chromium.tests.gpu",
-            "display_attached": "1",
-        },
-    ),
-)
-
-targets.mixin(
-    name = "mac_retina_nvidia_gpu_stable",
-    # We always need this entry to be generated since it is used by
-    # //content/test/gpu/find_bad_machines.py.
-    generate_pyl_entry = targets.IGNORE_UNUSED,
-    swarming = targets.swarming(
-        dimensions = {
-            "cpu": "x86-64",
-            "gpu": "10de:0fe9",
-            "hidpi": "1",
-            "os": "Mac-11.7.9",
             "pool": "chromium.tests.gpu",
             "display_attached": "1",
         },
@@ -2138,6 +2123,20 @@ targets.mixin(
 )
 
 targets.mixin(
+    # Tests that reach out to Skia's gold instance slowdown substantially when
+    # ran on GCE bots without external IPs. By explicitly targeting bots with
+    # external IPs in such tests, we can roll out internal IPs more broadly
+    # without affecting these Skia gold tests.
+    name = "skia_gold_test_on_linux_gce",
+    generate_pyl_entry = False,
+    swarming = targets.swarming(
+        dimensions = {
+            "gce_has_external_ip": "1",
+        },
+    ),
+)
+
+targets.mixin(
     name = "swarming_containment_auto",
     generate_pyl_entry = targets.IGNORE_UNUSED,
     swarming = targets.swarming(
@@ -2262,9 +2261,6 @@ targets.mixin(
     linux_args = [
         "--no-xvfb",
         "--additional-driver-flag=--enable-features=Vulkan",
-    ],
-    mac_args = [
-        "--platform=mac-mac11",
     ],
     merge = targets.merge(
         script = "//third_party/blink/tools/merge_web_test_results.py",
@@ -2556,12 +2552,12 @@ targets.mixin(
     generate_pyl_entry = False,
     args = [
         "--xcode-build-version",
-        "16e140",
+        "16f6",
     ],
     swarming = targets.swarming(
         named_caches = [
             swarming.cache(
-                name = "xcode_ios_16e140",
+                name = "xcode_ios_16f6",
                 path = "Xcode.app",
             ),
         ],

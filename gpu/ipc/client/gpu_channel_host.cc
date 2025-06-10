@@ -139,14 +139,6 @@ void GpuChannelHost::CopyToGpuMemoryBufferAsync(
       std::move(callback));
 }
 
-void GpuChannelHost::CopyNativeGmbToSharedMemorySync(
-    gfx::GpuMemoryBufferHandle buffer_handle,
-    base::UnsafeSharedMemoryRegion memory_region,
-    bool* status) {
-  GetGpuChannel().CopyNativeGmbToSharedMemorySync(
-      std::move(buffer_handle), std::move(memory_region), status);
-}
-
 void GpuChannelHost::CopyNativeGmbToSharedMemoryAsync(
     gfx::GpuMemoryBufferHandle buffer_handle,
     base::UnsafeSharedMemoryRegion memory_region,
@@ -160,11 +152,7 @@ void GpuChannelHost::CopyNativeGmbToSharedMemoryAsync(
   GetGpuChannel().CopyNativeGmbToSharedMemoryAsync(
       std::move(buffer_handle), std::move(memory_region), std::move(callback));
 }
-
-bool GpuChannelHost::IsConnected() {
-  return static_cast<bool>(gpu_channel_);
-}
-#endif
+#endif  // BUILDFLAG(IS_WIN)
 
 void GpuChannelHost::DelayedEnsureFlush(uint32_t deferred_message_id) {
   AutoLock lock(deferred_message_lock_);
@@ -381,7 +369,7 @@ GpuChannelHost::~GpuChannelHost() = default;
 GpuChannelHost::ConnectionTracker::ConnectionTracker() = default;
 
 GpuChannelHost::ConnectionTracker::~ConnectionTracker() {
-  CHECK(observer_list_.empty(), base::NotFatalUntil::M126);
+  CHECK(observer_list_.empty());
 }
 
 void GpuChannelHost::ConnectionTracker::OnDisconnectedFromGpuProcess() {
@@ -392,7 +380,7 @@ void GpuChannelHost::ConnectionTracker::OnDisconnectedFromGpuProcess() {
 void GpuChannelHost::ConnectionTracker::AddObserver(
     GpuChannelLostObserver* obs) {
   AutoLock lock(channel_obs_lock_);
-  CHECK(!base::Contains(observer_list_, obs), base::NotFatalUntil::M126);
+  CHECK(!base::Contains(observer_list_, obs));
   observer_list_.push_back(obs);
 }
 

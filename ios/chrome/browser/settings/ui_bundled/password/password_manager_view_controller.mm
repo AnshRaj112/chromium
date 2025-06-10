@@ -15,6 +15,8 @@
 #import "base/ios/ios_util.h"
 #import "base/metrics/histogram_functions.h"
 #import "base/metrics/user_metrics.h"
+#import "base/strings/string_number_conversions.h"
+#import "base/strings/string_util.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/google/core/common/google_util.h"
 #import "components/keyed_service/core/service_access_type.h"
@@ -304,6 +306,8 @@ bool AreIssuesEqual(const std::vector<password_manager::AffiliatedGroup>& lhs,
   BOOL _trustedVaultWidgetPromoImpressionWasRecorded;
   // Stores the most recently created or updated password form.
   std::optional<password_manager::CredentialUIEntry> _mostRecentlyUpdatedCred;
+  // Stores an email address of a user.
+  std::u16string _userEmail;
 }
 
 @synthesize manageAccountLinkItem = _manageAccountLinkItem;
@@ -718,18 +722,14 @@ bool AreIssuesEqual(const std::vector<password_manager::AffiliatedGroup>& lhs,
   _trustedVaultWidgetPromoItem =
       [[InlinePromoItem alloc] initWithType:ItemTypeTrustedVaultWidgetPromo];
   _trustedVaultWidgetPromoItem.shouldShowCloseButton = NO;
-  // TODO(crbug.com/407605858): Update this image based on the UX
-  // recommendation.
+  _trustedVaultWidgetPromoItem.shouldDisplayBadge = NO;
   _trustedVaultWidgetPromoItem.promoImage =
-      [UIImage imageNamed:WidgetPromoImageName()];
-  // TODO(crbug.com/407605858): Update this string based on the UXW
-  // recommendation.
-  _trustedVaultWidgetPromoItem.promoText =
-      @"You should retrieve the Trusted Vault key (TODO: refine)";
-  // TODO(crbug.com/407605858): Update this string based on the UXW
-  // recommendation.
-  _trustedVaultWidgetPromoItem.moreInfoButtonTitle =
-      @"Retrieve the key (TODO: refine)";
+      [UIImage imageNamed:kPasswordManagerTrustedVaultWidgetPromoImage];
+  _trustedVaultWidgetPromoItem.promoText = l10n_util::GetNSStringF(
+      IDS_IOS_IDENTITY_ERROR_INFOBAR_KEEP_USING_PASSWORDS_MESSAGE_WITH_EMAIL,
+      _userEmail);
+  _trustedVaultWidgetPromoItem.moreInfoButtonTitle = l10n_util::GetNSString(
+      IDS_IOS_IDENTITY_ERROR_INFOBAR_VERIFY_ITS_YOU_TITLE);
   _trustedVaultWidgetPromoItem.shouldHaveWideLayout =
       [self shouldWidgetPromoCellHaveWideLayout];
   _trustedVaultWidgetPromoItem.accessibilityIdentifier =
@@ -1032,6 +1032,10 @@ bool AreIssuesEqual(const std::vector<password_manager::AffiliatedGroup>& lhs,
   if (self.viewLoaded) {
     [self reloadData];
   }
+}
+
+- (void)setUserEmail:(const std::u16string&)userEmail {
+  _userEmail = userEmail;
 }
 
 - (void)setShouldShowTrustedVaultWidgetPromo:
@@ -1540,10 +1544,10 @@ bool AreIssuesEqual(const std::vector<password_manager::AffiliatedGroup>& lhs,
   }
 
   self.trustedVaultWidgetPromoItem.enabled = enabled;
-  // TODO(crbug.com/407605858): Update images based on the UX recommendation.
-  self.trustedVaultWidgetPromoItem.promoImage =
-      [UIImage imageNamed:enabled ? WidgetPromoImageName()
-                                  : WidgetPromoDisabledImageName()];
+  self.trustedVaultWidgetPromoItem.promoImage = [UIImage
+      imageNamed:enabled
+                     ? kPasswordManagerTrustedVaultWidgetPromoImage
+                     : kPasswordManagerTrustedVaultWidgetPromoDisabledImage];
   [self reconfigureCellsForItems:@[ self.trustedVaultWidgetPromoItem ]];
 }
 

@@ -183,15 +183,56 @@ export declare interface GlicBrowserHost {
    * Inform Chrome about an action. Chrome Takes an action based on the
    * action proto and returns new context based on the tab context options.
    *
+   * Attempts to act while the associated task is stopped/paused will be
+   * rejected.
+   *
    * @throws {ActInFocusedTabError} on failure.
    */
   actInFocusedTab?
       (params: ActInFocusedTabParams): Promise<ActInFocusedTabResult>;
 
   /**
-   * Stops an actor task in the browser if one exists. No-op otherwise.
+   * Stops the actor task with the given ID in the browser if it exists. No-op
+   * otherwise.
+   *
+   * Stopping a task removes all actor related restrictions from the associated
+   * tab. Any in progress actions are canceled and the associated Promises are
+   * rejected.
+   *
+   * If the task ID is not provided or 0, the most recent task is stopped.
+   *
+   * @todo Require callers to provide a valid ID.
    */
-  stopActorTask?(): void;
+  stopActorTask?(taskId?: number): void;
+
+  /**
+   * Pauses the actor task with the given ID in the browser if it exists. No-op
+   * otherwise.
+   *
+   * Pausing a task removes actor related restrictions that prevent the user
+   * from interacting with the associated tab. Any in progress actions are
+   * canceled and the associated Promises are rejected.
+   *
+   * If the task ID is 0, the most recent task is paused.
+   *
+   * @todo Require callers to provide a valid ID.
+   */
+  pauseActorTask?(taskId: number): void;
+
+  /**
+   * Resumes a previously paused actor task with the given ID.
+   *
+   * Returns the tab context at the time of resumption, based on the provided
+   * context options.
+   *
+   * If the task ID is 0, the most recent task is resumed.
+   *
+   * @throws {Error} on failure.
+   *
+   * @todo Require callers to provide a valid ID.
+   */
+  resumeActorTask?(taskId: number, tabContextOptions: TabContextOptions):
+      Promise<TabContextResult>;
 
   /**
    * Requests the host to capture a screenshot. The choice of the screenshot
@@ -515,9 +556,11 @@ export declare interface CreateTabOptions {
  * Provides measurement-related functionality to the Glic web client.
  *
  * The typical sequence of events should be either:
- *  onUserInputSubmitted -> onResponseStarted -> onResponseStopped -> (repeat)
+ *  (onUserInputSubmitted -> (onRequestStarted -> onResponseStarted ->
+ *                            onResponseStopped)*
+ *  )*
  * or
- *  onUserInputSubmitted -> onResponseStopped -> (repeat)
+ *  onUserInputSubmitted -> onResponseStopped -> * (repeat)
  *
  * This is the core flow for metrics and the web client should do its best to
  * provide accurate and timely callbacks.
@@ -528,6 +571,12 @@ export declare interface CreateTabOptions {
 export declare interface GlicBrowserHostMetrics {
   /** Called when the user has submitted input via the web client. */
   onUserInputSubmitted?(mode: WebClientMode): void;
+
+  /**
+   * Called when the web client has submitted a request to the server
+   * awaiting a response.
+   */
+  onRequestStarted?(): void;
 
   /**
    * Called when the web client has sufficiently processed the input such that
@@ -929,6 +978,8 @@ export enum ActInFocusedTabErrorReason {
   INVALID_ACTION_PROTO = 2,
   /** Action target is not found. */
   TARGET_NOT_FOUND = 3,
+  /** Failed to start a new task. */
+  FAILED_TO_START_TASK = 4,
 }
 
 /**

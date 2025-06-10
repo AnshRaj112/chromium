@@ -10,9 +10,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
-#include "base/functional/overloaded.h"
 #include "base/metrics/histogram_functions.h"
-#include "base/not_fatal_until.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/trace_event/trace_event.h"
 #include "chrome/browser/browser_process.h"
@@ -49,6 +47,7 @@
 #include "chrome/grit/generated_resources.h"
 #include "components/signin/public/base/signin_metrics.h"
 #include "google_apis/gaia/core_account_id.h"
+#include "third_party/abseil-cpp/absl/functional/overload.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/mojom/themes.mojom.h"
 
@@ -497,7 +496,7 @@ void ProfilePickerFlowController::SwitchToDiceSignIn(
 
   base::FilePath profile_path;
   // Split the variant information from `profile_info`.
-  std::visit(base::Overloaded{
+  std::visit(absl::Overload{
                  [&suggested_profile_color =
                       suggested_profile_color_](std::optional<SkColor> color) {
                    suggested_profile_color = color;
@@ -754,11 +753,11 @@ ProfilePickerFlowController::RegisterPostIdentitySteps(
     // TODO(crbug.com/40942098): Find a way to get the web contents without
     // relying on the weak ptr.
     web_contents = weak_signed_in_flow_controller_->contents();
-    CHECK(web_contents, base::NotFatalUntil::M127);
+    CHECK(web_contents);
   } else {
     // TODO(crbug.com/40942098): Find another way to fetch the web contents.
     web_contents = GetSignedOutFlowWebContents();
-    CHECK(web_contents, base::NotFatalUntil::M127);
+    CHECK(web_contents);
   }
 
   auto search_engine_choice_step_completed = base::BindOnce(

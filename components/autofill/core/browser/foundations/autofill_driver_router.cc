@@ -10,6 +10,7 @@
 #include "base/check_deref.h"
 #include "base/containers/contains.h"
 #include "base/containers/to_vector.h"
+#include "base/debug/crash_logging.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/time/time.h"
@@ -95,10 +96,10 @@ void AutofillDriverRouter::UnregisterDriver(AutofillDriver& driver,
                         found_driver_deleted);
   if (driver_is_dying) {
     if (found_token_has_driver) {
-      CHECK(found_driver, base::NotFatalUntil::M135);
-      CHECK(found_driver_deleted, base::NotFatalUntil::M135);
+      CHECK(found_driver);
+      CHECK(found_driver_deleted);
     } else {
-      CHECK(!found_driver, base::NotFatalUntil::M135);
+      CHECK(!found_driver);
     }
   }
 }

@@ -346,6 +346,33 @@ std::string EncodeURIComponent(const std::string& component) {
   return std::string(encoded.view());
 }
 
+// Returns whether contextual suggestions can be shown to the user.
+// If the page has a paywall signal, contextual suggestions cannot be shown.
+// If the page paywall signal could not be determined (this `paywall_signal` is
+// std::nullopt), a feature flag will be used to determine if contextual
+// suggestions can be shown.
+bool CanShowContextualSuggestions(std::optional<bool> paywall_signal) {
+  const auto& contextual_search_params =
+      omnibox_feature_configs::ContextualSearch::Get();
+  // If the feature flag to use the APC paywall signal is disabled, show
+  // contextual suggestions.
+  if (!contextual_search_params.use_apc_paywall_signal) {
+    return true;
+  }
+
+  // If the page has determined a signal, use it to determine if contextual
+  // suggestions should be shown.
+  if (paywall_signal.has_value()) {
+    // Negate since if `paywall_signal` is true, it means the page is paywalled
+    // and contextual suggestions should not be shown.
+    return !paywall_signal.value();
+  }
+
+  // Finally, if no signal was extracted from the page, fallback to either show
+  // or hide contextual suggestions based on the feature flag.
+  return contextual_search_params.show_suggestions_on_no_apc;
+}
+
 }  // namespace
 
 AutocompleteController::OldResult::OldResult(UpdateType update_type,
@@ -1078,10 +1105,8 @@ bool AutocompleteController::ShouldRunProvider(
   if (omnibox::IsAndroidHub(input_.current_page_classification())) {
     return provider->type() == AutocompleteProvider::TYPE_SEARCH ||
            provider->type() == AutocompleteProvider::TYPE_OPEN_TAB ||
-           (OmniboxFieldTrial::kAndroidHubSearchEnableBookmarkProvider.Get() &&
-            provider->type() == AutocompleteProvider::TYPE_BOOKMARK) ||
-           (OmniboxFieldTrial::kAndroidHubSearchEnableHistoryProvider.Get() &&
-            provider->type() == AutocompleteProvider::TYPE_HISTORY_QUICK);
+           provider->type() == AutocompleteProvider::TYPE_BOOKMARK ||
+           provider->type() == AutocompleteProvider::TYPE_HISTORY_QUICK;
   }
 #endif
 
@@ -1443,22 +1468,27 @@ void AutocompleteController::UpdateResult(UpdateType update_type,
   // suggestions shouldn't be shown.
   const bool is_lens_active =
       !autocomplete_provider_client()->AreLensEntrypointsVisible();
-  bool mia_enabled =
+  const bool can_show_contextual_suggestions = CanShowContextualSuggestions(
+      autocomplete_provider_client()->IsPagePaywalled());
+  const bool mia_enabled =
       omnibox_feature_configs::MiaZPS::Get().enabled &&
-      !omnibox::IsMiaDisabledByPolicy(provider_client_->GetPrefs());
+      omnibox::IsMiaAllowedByPolicy(provider_client_->GetPrefs());
+
   if (update_type == UpdateType::kSyncPass ||
       update_type == UpdateType::kAsyncPass ||
       update_type == UpdateType::kLastAsyncPassExceptDoc) {
-    internal_result_.SortAndCull(
-        input_, template_url_service_, triggered_feature_service_,
-        is_lens_active, mia_enabled, old_result.default_match_to_preserve);
+    internal_result_.SortAndCull(input_, template_url_service_,
+                                 triggered_feature_service_, is_lens_active,
+                                 can_show_contextual_suggestions, mia_enabled,
+                                 old_result.default_match_to_preserve);
     internal_result_.TransferOldMatches(input_,
                                         &old_result.matches_to_transfer);
   }
 
-  internal_result_.SortAndCull(
-      input_, template_url_service_, triggered_feature_service_, is_lens_active,
-      mia_enabled, old_result.default_match_to_preserve);
+  internal_result_.SortAndCull(input_, template_url_service_,
+                               triggered_feature_service_, is_lens_active,
+                               can_show_contextual_suggestions, mia_enabled,
+                               old_result.default_match_to_preserve);
 
   if (update_type == UpdateType::kSyncPass) {
     StartExpireTimer();
@@ -1826,22 +1856,6 @@ void AutocompleteController::UpdateKeywordDescriptions(
         last_keyword = i->keyword;
         last_contextual = is_contextual;
       }
-    } else if (i->type == AutocompleteMatchType::NAVSUGGEST &&
-               i->enterprise_search_aggregator_type ==
-                   AutocompleteMatch::EnterpriseSearchAggregatorType::PEOPLE) {
-      if (i->keyword != last_keyword) {
-        const TemplateURL* template_url =
-            i->GetTemplateURL(template_url_service_, false);
-        if (template_url) {
-          i->description_class.emplace_back(ACMatchClassification(
-              (i->description).size(), ACMatchClassification::DIM));
-          i->description +=
-              u" - " + l10n_util::GetStringFUTF16(
-                           IDS_PERSON_SUGGESTION_DESCRIPTION,
-                           template_url->AdjustedShortNameForLocaleDirection());
-        }
-      }
-      last_keyword = i->keyword;
     } else {
       last_keyword.clear();
     }
@@ -2037,30 +2051,25 @@ void AutocompleteController::UpdateSearchboxStats(AutocompleteResult* result) {
 // `UpdateSearchboxStats()` once we've rolled all session-related data into a
 // single `SessionData` property on matches.
 void AutocompleteController::UpdateShownInSession(AutocompleteResult* result) {
+  // Currently, `AutocompleteClassifier::Classify()` is the only place where
+  // `omit_asynchronous_matches` is set to `true`. Therefore, this check is
+  // essentially asking "Is `UpdateShownInSession()` being invoked via
+  // `AutocompleteClassifier::Classify()`?"
+  //
+  // The internal `AutocompleteResult` generated during the match
+  // classification process is not actually shown to the user in any way, so it
+  // doesn't make sense to record session-based "suggestion shown" metrics
+  // in this particular case.
+  if (input_.omit_asynchronous_matches()) {
+    return;
+  }
+
   for (auto& match : *result) {
     result->set_suggestions_shown_in_session(input_.IsZeroSuggest(), match);
   }
 
   for (auto& match : *result) {
-    const auto [zero_prefix_search_shown, zero_prefix_url_shown] =
-        result->suggestions_shown_in_session(/*is_zero_suggest=*/true);
-    match.zero_prefix_search_suggestions_shown_in_session =
-        zero_prefix_search_shown;
-    match.zero_prefix_url_suggestions_shown_in_session = zero_prefix_url_shown;
-
-    match.zero_prefix_suggestions_shown_in_session =
-        zero_prefix_search_shown || zero_prefix_url_shown;
-
-    const auto [typed_search_shown, typed_url_shown] =
-        result->suggestions_shown_in_session(/*is_zero_suggest=*/false);
-    match.typed_search_suggestions_shown_in_session = typed_search_shown;
-    match.typed_url_suggestions_shown_in_session = typed_url_shown;
-
-    const auto [contextual_search_shown, lens_action_shown] =
-        result->contextual_suggestions_shown_in_session();
-    match.contextual_search_suggestions_shown_in_session =
-        contextual_search_shown;
-    match.lens_action_shown_in_session = lens_action_shown;
+    match.session = result->session();
   }
 }
 

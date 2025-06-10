@@ -8,7 +8,6 @@
 #include "components/viz/common/resources/transferable_resource.h"
 #include "components/viz/test/test_context_provider.h"
 #include "gpu/GLES2/gl2extchromium.h"
-#include "gpu/command_buffer/common/gpu_memory_buffer_support.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/blink/renderer/platform/graphics/gpu/shared_gpu_context.h"
@@ -45,7 +44,7 @@ TEST(CanvasResourceTest, PrepareTransferableResource_Software) {
 
   scoped_refptr<CanvasResource> canvas_resource =
       CanvasResourceSharedImage::CreateSoftware(
-          gfx::Size(10, 10), viz::SinglePlaneFormat::kRGBA_8888,
+          gfx::Size(10, 10), viz::SinglePlaneFormat::kBGRA_8888,
           kPremul_SkAlphaType, gfx::ColorSpace::CreateSRGB(),
           /*CanvasResourceProvider=*/nullptr, shared_image_interface_provider);
   EXPECT_TRUE(!!canvas_resource);

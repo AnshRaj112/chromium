@@ -12,11 +12,13 @@
 #include <limits>
 #include <memory>
 
+#include "base/compiler_specific.h"
 #include "base/containers/heap_array.h"
 #include "base/files/file_util.h"
 #include "base/hash/hash.h"
 #include "base/numerics/safe_math.h"
 #include "base/strings/string_util.h"
+#include "base/strings/string_view_util.h"
 #include "base/time/time.h"
 #include "net/base/io_buffer.h"
 #include "net/base/net_errors.h"
@@ -460,8 +462,9 @@ bool EntryImpl::CreateEntry(Addr node_address,
     if (address.is_separate_file())
       key_file->SetLength(key.size() + 1);
   } else {
-    memcpy(entry_store->key, key.data(), key.size());
-    entry_store->key[key.size()] = '\0';
+    auto internal_key = InternalKeySpan();
+    internal_key.copy_prefix_from(key);
+    internal_key.at(key.size()) = '\0';
   }
   backend_->ModifyStorageSize(0, static_cast<int32_t>(key.size()));
   node->dirty = backend_->GetCurrentEntryId();
@@ -632,9 +635,15 @@ bool EntryImpl::DataSanityCheck() {
   EntryStore* stored = entry_.Data();
   Addr key_addr(stored->long_key);
 
-  // The key must be NULL terminated.
-  if (!key_addr.is_initialized() && stored->key[stored->key_len])
+  // The key must be NULL terminated. Note the only caller of this is
+  // BackendImpl::NewEntry, which checks EntryImpl::SanityCheck() first. That
+  // ensures (among other things) that `key_addr.is_initialized()` reflects
+  // whether the key is external or inside `stored->key` accurately; and in
+  // case of internal key 0 <= key_len <= kMaxInternalKeyLength.
+  if (!key_addr.is_initialized() &&
+      InternalKeySpan().at(static_cast<size_t>(stored->key_len)) != '\0') {
     return false;
+  }
 
   if (stored->hash != base::PersistentHash(GetKey()))
     return false;
@@ -662,8 +671,13 @@ void EntryImpl::FixForDelete() {
   EntryStore* stored = entry_.Data();
   Addr key_addr(stored->long_key);
 
-  if (!key_addr.is_initialized())
-    stored->key[stored->key_len] = '\0';
+  // Note: this passed `SanityCheck()` which is sufficient for `stored->key` to
+  // be the right size for `key_len` if `key_addr` is not initialized, and for
+  // `key_len` to be in right range. It failed `DataSanityCheck()`, however,
+  // so the null termination may be missing.
+  if (!key_addr.is_initialized()) {
+    InternalKeySpan().at(static_cast<size_t>(stored->key_len)) = '\0';
+  }
 
   for (int i = 0; i < kNumStreams; i++) {
     Addr data_addr(stored->data_addr[i]);
@@ -748,7 +762,8 @@ std::string EntryImpl::GetKey() const {
   CacheEntryBlock* entry = const_cast<CacheEntryBlock*>(&entry_);
   int key_len = entry->Data()->key_len;
   if (key_len <= kMaxInternalKeyLength)
-    return std::string(entry->Data()->key, key_len);
+    return std::string(base::as_string_view(
+        InternalKeySpan().first(static_cast<size_t>(key_len))));
 
   // We keep a copy of the key so that we can always return it, even if the
   // backend is disabled.
@@ -1543,6 +1558,25 @@ void EntryImpl::GetData(int index,
     entry_.Data()->data_addr[index] = 0;
     entry_.Data()->data_size[index] = 0;
   }
+}
+
+base::span<char> EntryImpl::InternalKeySpan() const {
+  CacheEntryBlock* entry = const_cast<CacheEntryBlock*>(&entry_);
+  Addr key_addr(entry->Data()->long_key);
+  CHECK(!key_addr.is_initialized());
+
+  int num_blocks = entry_.address().num_blocks();
+  size_t max_key_size = sizeof(EntryStore) - offsetof(EntryStore, key);
+  if (num_blocks > 1) {
+    max_key_size += sizeof(EntryStore) * (num_blocks - 1);
+  }
+
+  // Safety: this depends on BackendImpl::CreateEntryImpl allocating the right
+  // amount of space using EntryImpl::NumBlocksForEntry, EntryImpl::SanityCheck
+  // checking the consistency of fields when opening the entry, and `entry_`
+  // mechanics making sure that entry_.address().num_blocks() *
+  // sizeof(EntryStore) bytes are mapped.
+  return UNSAFE_BUFFERS(base::span(entry->Data()->key, max_key_size));
 }
 
 }  // namespace disk_cache

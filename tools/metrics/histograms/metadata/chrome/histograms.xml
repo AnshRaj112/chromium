@@ -23,7 +23,7 @@ chromium-metrics-reviews@google.com.
 <histograms>
 
 <histogram name="Chrome.AppMenu.MenuHostInitToNextFramePresented" units="ms"
-    expires_after="2025-09-21">
+    expires_after="2025-11-23">
   <owner>temao@chromium.org</owner>
   <owner>robliao@chromium.org</owner>
   <summary>
@@ -44,7 +44,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="Chrome.Headless.Action" enum="HeadlessChromeAction"
     expires_after="2023-12-31">
-  <owner>kvitekp@chromium.org</owner>
+  <owner>kvitekp@google.com</owner>
   <owner>headless-owners@chromium.org</owner>
   <summary>
     Records headless chrome action, e.g. remote debugging, screenshot, print to

@@ -40,17 +40,12 @@ import org.chromium.chrome.browser.readaloud.player.expanded.ExpandedPlayerCoord
 import org.chromium.chrome.browser.readaloud.player.mini.MiniPlayerCoordinator;
 import org.chromium.chrome.browser.readaloud.player.mini.MiniPlayerLayout;
 import org.chromium.chrome.browser.readaloud.testing.MockPrefServiceHelper;
-import org.chromium.chrome.modules.readaloud.Feedback.FeedbackType;
 import org.chromium.chrome.modules.readaloud.Playback;
 import org.chromium.chrome.modules.readaloud.PlaybackArgs.PlaybackMode;
-import org.chromium.chrome.modules.readaloud.PlaybackArgs.PlaybackModeSelectionEnablementStatus;
-import org.chromium.chrome.modules.readaloud.PlaybackArgs.PlaybackVoice;
 import org.chromium.chrome.modules.readaloud.PlaybackListener;
 import org.chromium.chrome.modules.readaloud.Player;
 import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
 import org.chromium.components.prefs.PrefService;
-
-import java.util.List;
 
 /** Unit tests for {@link PlayerCoordinator}. */
 @Config(manifest = Config.NONE)
@@ -112,16 +107,10 @@ public class PlayerCoordinatorUnitTest {
         ReadAloudPrefs.setSpeed(prefs, 2f);
         doReturn(prefs).when(mDelegate).getPrefService();
         doReturn(Mockito.mock(LayoutManager.class)).when(mDelegate).getLayoutManager();
-        doReturn(new ObservableSupplierImpl<List<PlaybackVoice>>())
-                .when(mDelegate)
-                .getCurrentLanguageVoicesSupplier();
-        doReturn(new ObservableSupplierImpl<String>()).when(mDelegate).getVoiceIdSupplier();
-        doReturn(new ObservableSupplierImpl<PlaybackModeSelectionEnablementStatus>())
-                .when(mDelegate)
-                .getPlaybackModeSelectionEnabled();
-        doReturn(new ObservableSupplierImpl<FeedbackType>())
-                .when(mDelegate)
-                .getFeedbackTypeSupplier();
+        doReturn(new ObservableSupplierImpl<>()).when(mDelegate).getCurrentLanguageVoicesSupplier();
+        doReturn(new ObservableSupplierImpl<>()).when(mDelegate).getVoiceIdSupplier();
+        doReturn(new ObservableSupplierImpl<>()).when(mDelegate).getPlaybackModeSelectionEnabled();
+        doReturn(new ObservableSupplierImpl<>()).when(mDelegate).getFeedbackTypeSupplier();
         doReturn(mActivity).when(mDelegate).getActivity();
 
         mPlayerCoordinator = new PlayerCoordinator(mDelegate);

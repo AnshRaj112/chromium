@@ -99,6 +99,7 @@ Browser* GetBrowserFromInstantMessage(
     case CollaborationEvent::TAB_GROUP_REMOVED:
     case CollaborationEvent::UNDEFINED:
     case CollaborationEvent::COLLABORATION_REMOVED:
+    case CollaborationEvent::VERSION_OUT_OF_DATE:
       use_first_available_browser = true;
       break;
   }
@@ -146,6 +147,51 @@ bool CollaborationGroupInfoBarDelegate::Create(
   return !!infobar_manager->AddInfoBar(std::move(infobar));
 }
 
+void CollaborationGroupInfoBarDelegate::ClearCollaborationGroupInfobars(
+    ProfileIOS* profile,
+    const std::set<base::Uuid>& message_ids) {
+  // Only check the first available regular browser.
+  BrowserList* browser_list = BrowserListFactory::GetForProfile(profile);
+  Browser* browser = GetBrowserFromInstantMessage(
+      collaboration::messaging::InstantMessage(), browser_list);
+  if (!browser) {
+    return;
+  }
+
+  web::WebState* active_web_state =
+      browser->GetWebStateList()->GetActiveWebState();
+  if (!active_web_state) {
+    return;
+  }
+
+  infobars::InfoBarManager* infobar_manager =
+      InfoBarManagerImpl::FromWebState(active_web_state);
+
+  // Iterate in reverse. This prevents issues when removing infobars.
+  const auto& infobars = infobar_manager->infobars();
+  for (int i = static_cast<int>(infobars.size()) - 1; i >= 0; --i) {
+    infobars::InfoBar* infobar = infobars[i];
+    CollaborationGroupInfoBarDelegate* delegate =
+        static_cast<CollaborationGroupInfoBarDelegate*>(infobar->delegate());
+    if (!delegate) {
+      continue;
+    }
+
+    // Retrieve the instant message identifier for the infobar.
+    std::optional<base::Uuid> opt_message_id =
+        delegate->GetInstantMessageIdentifier();
+    if (!opt_message_id) {
+      continue;
+    }
+
+    // Remove the infobar if its message ID is in the set of IDs to clear.
+    base::Uuid message_id = opt_message_id.value();
+    if (message_ids.count(message_id)) {
+      infobar_manager->RemoveInfoBar(infobar);
+    }
+  }
+}
+
 CollaborationGroupInfoBarDelegate::CollaborationGroupInfoBarDelegate(
     ProfileIOS* profile,
     collaboration::messaging::InstantMessage instant_message)
@@ -154,6 +200,21 @@ CollaborationGroupInfoBarDelegate::CollaborationGroupInfoBarDelegate(
 }
 
 CollaborationGroupInfoBarDelegate::~CollaborationGroupInfoBarDelegate() {}
+
+std::optional<base::Uuid>
+CollaborationGroupInfoBarDelegate::GetInstantMessageIdentifier() const {
+  const auto& attributions = instant_message_.attributions;
+  if (attributions.empty()) {
+    return std::nullopt;
+  }
+
+  const auto& message_id = attributions.at(0).id;
+  if (!message_id.has_value() || !message_id.value().is_valid()) {
+    return std::nullopt;
+  }
+
+  return message_id;
+}
 
 infobars::InfoBarDelegate::InfoBarIdentifier
 CollaborationGroupInfoBarDelegate::GetIdentifier() const {
@@ -191,6 +252,8 @@ std::u16string CollaborationGroupInfoBarDelegate::GetButtonLabel(
     case CollaborationEvent::COLLABORATION_ADDED:
     case CollaborationEvent::COLLABORATION_REMOVED:
     case CollaborationEvent::COLLABORATION_MEMBER_REMOVED:
+    case CollaborationEvent::VERSION_OUT_OF_DATE:
+      // TODO(crbug.com/422424386): Implement for versioning.
       return l10n_util::GetStringUTF16(
           IDS_IOS_COLLABORATION_GROUP_DEFAULT_PRIMARY_TOOLBAR_BUTTON);
   }
@@ -214,6 +277,8 @@ bool CollaborationGroupInfoBarDelegate::Accept() {
     case CollaborationEvent::COLLABORATION_ADDED:
     case CollaborationEvent::COLLABORATION_REMOVED:
     case CollaborationEvent::COLLABORATION_MEMBER_REMOVED:
+    case CollaborationEvent::VERSION_OUT_OF_DATE:
+      // TODO(crbug.com/422424386): Implement for versioning.
       break;
   }
 
@@ -222,6 +287,17 @@ bool CollaborationGroupInfoBarDelegate::Accept() {
 
 void CollaborationGroupInfoBarDelegate::InfoBarDismissed() {
   ConfirmInfoBarDelegate::InfoBarDismissed();
+}
+
+bool CollaborationGroupInfoBarDelegate::EqualsDelegate(
+    infobars::InfoBarDelegate* delegate) const {
+  if (delegate->GetIdentifier() != GetIdentifier()) {
+    return false;
+  }
+  CollaborationGroupInfoBarDelegate* collaboration_delegate =
+      static_cast<CollaborationGroupInfoBarDelegate*>(delegate);
+  return collaboration_delegate->GetInstantMessageIdentifier() ==
+         GetInstantMessageIdentifier();
 }
 
 id<ShareKitAvatarPrimitive>
@@ -233,13 +309,17 @@ CollaborationGroupInfoBarDelegate::GetAvatarPrimitive() {
   }
 
   const auto& attribution = attributions.front();
-  const auto& opt_triggering_user = attribution.triggering_user;
-  if (!opt_triggering_user) {
-    // No avatar primitive if no triggering user.
+  const auto& opt_user = instant_message_.collaboration_event ==
+                                 CollaborationEvent::COLLABORATION_MEMBER_ADDED
+                             ? attribution.affected_user
+                             : attribution.triggering_user;
+
+  if (!opt_user) {
+    // No avatar primitive if no user.
     return nil;
   }
 
-  data_sharing::GroupMember user = opt_triggering_user.value();
+  data_sharing::GroupMember user = opt_user.value();
   ShareKitService* share_kit_service =
       ShareKitServiceFactory::GetForProfile(profile_);
 
@@ -273,6 +353,8 @@ UIImage* CollaborationGroupInfoBarDelegate::GetSymbolImage() {
       break;
     case CollaborationEvent::TAB_GROUP_REMOVED:
     case CollaborationEvent::COLLABORATION_REMOVED:
+    case CollaborationEvent::VERSION_OUT_OF_DATE:
+      // TODO(crbug.com/422424386): Implement for versioning.
       symbolName = kTabGroupsSymbol;
       break;
   }

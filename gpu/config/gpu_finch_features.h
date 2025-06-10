@@ -66,6 +66,11 @@ GPU_EXPORT extern const base::FeatureParam<bool>
     kSkiaGraphiteDawnBackendDebugLabels;
 
 #if BUILDFLAG(IS_WIN)
+GPU_EXPORT extern const base::FeatureParam<bool>
+    kSkiaGraphiteDawnDumpWCOnD3DError;
+GPU_EXPORT extern const base::FeatureParam<bool>
+    kSkiaGraphiteDawnD3D11DelayFlush;
+
 GPU_EXPORT BASE_DECLARE_FEATURE(kSkiaGraphiteDawnUseD3D12);
 #endif
 

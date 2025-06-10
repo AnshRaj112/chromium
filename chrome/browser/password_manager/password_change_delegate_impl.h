@@ -27,6 +27,7 @@ class PasswordFormManager;
 class ChangePasswordFormFillingSubmissionHelper;
 class ChangePasswordFormFinder;
 class ModelQualityLogsUploader;
+class PasswordChangeUIController;
 class Profile;
 
 // This class controls password change process including acceptance of privacy
@@ -56,6 +57,10 @@ class PasswordChangeDelegateImpl : public PasswordChangeDelegate,
 #if defined(UNIT_TEST)
   ChangePasswordFormFinder* form_finder() { return form_finder_.get(); }
   content::WebContents* executor() { return executor_.get(); }
+  void SetCustomUIController(
+      std::unique_ptr<PasswordChangeUIController> controller) {
+    ui_controller_ = std::move(controller);
+  }
 #endif
 
  private:
@@ -65,9 +70,7 @@ class PasswordChangeDelegateImpl : public PasswordChangeDelegate,
   State GetCurrentState() const override;
   void Stop() override;
   void Restart() override;
-#if !BUILDFLAG(IS_ANDROID)
   void OpenPasswordChangeTab() override;
-#endif
   void OnPasswordFormSubmission(content::WebContents* web_contents) override;
   void OnOtpFieldDetected(content::WebContents* web_contents) override;
   void OnPrivacyNoticeAccepted() override;
@@ -120,6 +123,9 @@ class PasswordChangeDelegateImpl : public PasswordChangeDelegate,
   base::ObserverList<Observer, /*check_empty=*/true> observers_;
 
   base::Time flow_start_time_;
+
+  // The controller for password change views.
+  std::unique_ptr<PasswordChangeUIController> ui_controller_;
 
   base::WeakPtrFactory<PasswordChangeDelegateImpl> weak_ptr_factory_{this};
 };

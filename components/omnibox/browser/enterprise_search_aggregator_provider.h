@@ -55,6 +55,12 @@ class EnterpriseSearchAggregatorProvider : public AutocompleteProvider {
 
     SearchAggregatorRequest(const SearchAggregatorRequest&) = delete;
 
+    // Logs how long it has been since a request started at `start_time` sliced
+    // by whether the request was completed or interrupted.
+    void LogResponseTime(const std::string& histogram_suffix, bool interrupted);
+
+    SuggestionType type = SuggestionType::NONE;
+    base::TimeTicks start_time;
     std::vector<AutocompleteMatch> matches;
     std::unique_ptr<network::SimpleURLLoader> loader;
     // Can't use `loader != nullptr` as a proxy for `done` because loader is
@@ -64,9 +70,6 @@ class EnterpriseSearchAggregatorProvider : public AutocompleteProvider {
     // filtered down set of results from the response.
     int result_count = 0;
   };
-
-  // The number of requests to make if we are making multiple requests.
-  static const int kNumMultipleRequests = 3;
 
   EnterpriseSearchAggregatorProvider(AutocompleteProviderClient* client,
                                      AutocompleteProviderListener* listener);
@@ -175,7 +178,10 @@ class EnterpriseSearchAggregatorProvider : public AutocompleteProvider {
   // excluded because the input matching that would be a coincidence and not
   // a sign the user wanted this suggestion. Does not return fields already
   // returned by `GetMatchDescription()` and `GetMatchContents()`.
-  std::vector<std::string> GetAdditionalScoringFields(
+  std::vector<std::string> GetStrongScoringFields(
+      const base::Value::Dict& result,
+      SuggestionType suggestion_type) const;
+  std::vector<std::string> GetWeakScoringFields(
       const base::Value::Dict& result,
       SuggestionType suggestion_type) const;
 
@@ -193,9 +199,10 @@ class EnterpriseSearchAggregatorProvider : public AutocompleteProvider {
   // Helper function for setting the time when the request started.
   void SetTimeRequestSent();
 
-  // Helper function for logging request times sliced by whether the request was
-  // interrupted or not.
-  void LogResponseTime(bool interrupted);
+  // Helper function for logging request response times for any `request_index`.
+  // Only handles completed requests as interrupted requests are logged in the
+  // `SearchAggregatorRequest` deconstructor.
+  void LogResponseTime(std::optional<int> request_index);
 
   // Helper function for logging the number of results received from the
   // request.

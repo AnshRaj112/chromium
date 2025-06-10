@@ -12,7 +12,8 @@
 #include <utility>
 
 #include "base/functional/bind.h"
-#include "base/not_fatal_until.h"
+#include "base/strings/escape.h"
+#include "base/strings/string_util.h"
 #include "extensions/browser/extension_api_frame_id_map.h"
 #include "extensions/browser/extensions_browser_client.h"
 #include "extensions/browser/load_and_localize_file.h"
@@ -211,7 +212,7 @@ bool ExecuteCodeFunction::LoadFile(const std::string& file,
     return false;
   }
 
-  script_url_ = extension()->GetResourceURL(file);
+  script_url_ = extension()->ResolveExtensionURL(base::EscapePath(file));
 
   bool might_require_localization = is_css_injection;
 
@@ -232,7 +233,7 @@ void ExecuteCodeFunction::OnExecuteCodeFinished(
   auto root_frame_result = std::ranges::find(
       results, root_frame_id_, &ScriptExecutor::FrameResult::frame_id);
 
-  CHECK(root_frame_result != results.end(), base::NotFatalUntil::M130);
+  CHECK(root_frame_result != results.end());
 
   // We just error out if we never injected in the root frame.
   // TODO(devlin): That's a bit odd, because other injections may have

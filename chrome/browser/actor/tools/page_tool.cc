@@ -4,10 +4,17 @@
 
 #include "chrome/browser/actor/tools/page_tool.h"
 
-#include "chrome/browser/actor/actor_coordinator.h"
+#include "base/functional/bind.h"
+#include "base/task/sequenced_task_runner.h"
+#include "chrome/browser/actor/aggregated_journal.h"
+#include "chrome/browser/actor/execution_engine.h"
 #include "chrome/common/actor/action_result.h"
 #include "chrome/common/chrome_render_frame.mojom.h"
+#include "components/optimization_guide/proto/features/actions_data.pb.h"
+#include "content/public/browser/global_routing_id.h"
 #include "content/public/browser/render_frame_host.h"
+#include "content/public/browser/web_contents.h"
+#include "content/public/browser/web_contents_observer.h"
 #include "mojo/public/cpp/bindings/associated_remote.h"
 #include "third_party/abseil-cpp/absl/strings/str_format.h"
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
@@ -15,7 +22,10 @@
 
 namespace {
 
+using ::content::GlobalRenderFrameHostId;
 using ::content::RenderFrameHost;
+using ::content::WebContents;
+using ::content::WebContentsObserver;
 using ::optimization_guide::proto::ActionInformation;
 using ::optimization_guide::proto::ActionTarget;
 using ::optimization_guide::proto::ClickAction_ClickCount;
@@ -177,9 +187,37 @@ void SetDragAndReleaseToolArgs(
 
 namespace actor {
 
-PageTool::PageTool(RenderFrameHost& frame, const ToolInvocation& invocation)
-    : invocation_(invocation) {
-  frame.GetRemoteAssociatedInterfaces()->GetInterface(&chrome_render_frame_);
+// Observer to track if the a given RenderFrameHost is changed.
+class RenderFrameChangeObserver : public WebContentsObserver {
+ public:
+  RenderFrameChangeObserver(RenderFrameHost& rfh, base::OnceClosure callback)
+      : WebContentsObserver(WebContents::FromRenderFrameHost(&rfh)),
+        rfh_id_(rfh.GetGlobalId()),
+        callback_(std::move(callback)) {}
+
+  // WebContentsObserver
+  void RenderFrameHostChanged(RenderFrameHost* old_host,
+                              RenderFrameHost* /*new_host*/) override {
+    if (!callback_) {
+      return;
+    }
+
+    if (old_host && old_host->GetGlobalId() == rfh_id_) {
+      std::move(callback_).Run();
+    }
+  }
+
+ private:
+  GlobalRenderFrameHostId rfh_id_;
+  base::OnceClosure callback_;
+};
+
+PageTool::PageTool(AggregatedJournal& journal,
+                   RenderFrameHost& frame,
+                   const ActionInformation& action_information)
+    : render_frame_host_(frame.GetWeakDocumentPtr()),
+      action_information_(action_information) {
+  journal.EnsureJournalBound(frame);
 }
 
 PageTool::~PageTool() = default;
@@ -191,15 +229,20 @@ void PageTool::Validate(ValidateCallback callback) {
 }
 
 void PageTool::Invoke(InvokeCallback callback) {
-  auto request = actor::mojom::ToolInvocation::New();
-  auto action_info = invocation_.GetActionInfo();
+  invoke_callback_ = std::move(callback);
+  RenderFrameHost* frame = render_frame_host_.AsRenderFrameHostIfValid();
+  if (!frame) {
+    PostFinishInvoke(mojom::ActionResultCode::kFrameWentAway);
+    return;
+  }
 
-  switch (action_info.action_info_case()) {
+  auto request = actor::mojom::ToolInvocation::New();
+
+  switch (action_information_.action_info_case()) {
     case ActionInformation::ActionInfoCase::kClick: {
       auto click = mojom::ClickAction::New();
-      if (!SetClickToolArgs(click, action_info)) {
-        std::move(callback).Run(
-            MakeResult(mojom::ActionResultCode::kArgumentsInvalid));
+      if (!SetClickToolArgs(click, action_information_)) {
+        PostFinishInvoke(mojom::ActionResultCode::kArgumentsInvalid);
         return;
       }
       request->action = mojom::ToolAction::NewClick(std::move(click));
@@ -207,9 +250,8 @@ void PageTool::Invoke(InvokeCallback callback) {
     }
     case ActionInformation::ActionInfoCase::kType: {
       auto type = mojom::TypeAction::New();
-      if (!SetTypeToolArgs(type, action_info)) {
-        std::move(callback).Run(
-            MakeResult(mojom::ActionResultCode::kArgumentsInvalid));
+      if (!SetTypeToolArgs(type, action_information_)) {
+        PostFinishInvoke(mojom::ActionResultCode::kArgumentsInvalid);
         return;
       }
       request->action = mojom::ToolAction::NewType(std::move(type));
@@ -217,9 +259,8 @@ void PageTool::Invoke(InvokeCallback callback) {
     }
     case ActionInformation::ActionInfoCase::kScroll: {
       auto scroll = mojom::ScrollAction::New();
-      if (!SetScrollToolArgs(scroll, action_info)) {
-        std::move(callback).Run(
-            MakeResult(mojom::ActionResultCode::kArgumentsInvalid));
+      if (!SetScrollToolArgs(scroll, action_information_)) {
+        PostFinishInvoke(mojom::ActionResultCode::kArgumentsInvalid);
         return;
       }
       request->action = mojom::ToolAction::NewScroll(std::move(scroll));
@@ -227,20 +268,20 @@ void PageTool::Invoke(InvokeCallback callback) {
     }
     case ActionInformation::ActionInfoCase::kMoveMouse: {
       auto mouse_move = mojom::MouseMoveAction::New();
-      SetMouseMoveToolArgs(mouse_move, action_info);
+      SetMouseMoveToolArgs(mouse_move, action_information_);
       request->action = mojom::ToolAction::NewMouseMove(std::move(mouse_move));
       break;
     }
     case ActionInformation::ActionInfoCase::kDragAndRelease: {
       auto drag_and_release = mojom::DragAndReleaseAction::New();
-      SetDragAndReleaseToolArgs(drag_and_release, action_info);
+      SetDragAndReleaseToolArgs(drag_and_release, action_information_);
       request->action =
           mojom::ToolAction::NewDragAndRelease(std::move(drag_and_release));
       break;
     }
     case ActionInformation::ActionInfoCase::kSelect: {
       auto select = mojom::SelectAction::New();
-      SetSelectToolArgs(select, action_info);
+      SetSelectToolArgs(select, action_information_);
       request->action = mojom::ToolAction::NewSelect(std::move(select));
       break;
     }
@@ -248,50 +289,107 @@ void PageTool::Invoke(InvokeCallback callback) {
     case ActionInformation::ActionInfoCase::kBack:
     case ActionInformation::ActionInfoCase::kForward:
     case ActionInformation::ActionInfoCase::kWait:
+    case ActionInformation::kCreateTab:
+    case ActionInformation::kCloseTab:
+    case ActionInformation::kActivateTab:
+    case ActionInformation::kCreateWindow:
+    case ActionInformation::kCloseWindow:
+    case ActionInformation::kActivateWindow:
+    case ActionInformation::kYieldToUser:
     case ActionInformation::ActionInfoCase::ACTION_INFO_NOT_SET:
       NOTREACHED();
   }
 
-  chrome_render_frame_->InvokeTool(std::move(request), std::move(callback));
+  frame->GetRemoteAssociatedInterfaces()->GetInterface(&chrome_render_frame_);
+
+  // Watch for the RenderFrameHost being swapped out by a navigation (e.g. after
+  // clicking on a link). In that case, finish the invocation successfully as
+  // the ToolController will wait on the new page to load if needed. We rely on
+  // this running before the RenderFrameHost is destroyed since otherwise the
+  // chrome_render_frame_ mojo pipe will call the disconnect error handler which
+  // finishes the invocation with an error. Finally, this also handles cases
+  // where the old frame is put into the BFCache since in that case we may not
+  // get a reply from the renderer at all.
+  // Note: If there's already an in progress navigation then
+  // frame_change_observer may call FinishInvoke as a result of that navigation
+  // rather than the tool use. In that case we'll return success as if the tool
+  // completed successfully (expecting that's fine, as a new observation will be
+  // taken).
+  // `this` Unretained because the observer is owned by this class and thus
+  // removed on destruction.
+  frame_change_observer_ = std::make_unique<RenderFrameChangeObserver>(
+      *frame, base::BindOnce(&PageTool::FinishInvoke, base::Unretained(this),
+                             MakeOkResult()));
+
+  // `this` Unretained because this class owns the mojo pipe that invokes the
+  // callbacks.
+  chrome_render_frame_.set_disconnect_handler(
+      base::BindOnce(&PageTool::FinishInvoke, base::Unretained(this),
+                     MakeResult(mojom::ActionResultCode::kExecutorDestroyed)));
+  chrome_render_frame_->InvokeTool(
+      std::move(request),
+      base::BindOnce(&PageTool::FinishInvoke, base::Unretained(this)));
 }
 
 std::string PageTool::DebugString() const {
-  std::string tool_type;
   // TODO(crbug.com/402210051): Add more details here about tool params.
-  switch (invocation_.GetActionInfo().action_info_case()) {
+  return absl::StrFormat("PageTool:%s", JournalEvent().c_str());
+}
+
+std::string PageTool::JournalEvent() const {
+  switch (action_information_.action_info_case()) {
     case ActionInformation::ActionInfoCase::kClick: {
-      tool_type = "Click";
-      break;
+      return "Click";
     }
     case ActionInformation::ActionInfoCase::kType: {
-      tool_type = "Type";
-      break;
+      return "Type";
     }
     case ActionInformation::ActionInfoCase::kScroll: {
-      tool_type = "Scroll";
-      break;
+      return "Scroll";
     }
     case ActionInformation::ActionInfoCase::kMoveMouse: {
-      tool_type = "MoveMouse";
-      break;
+      return "MoveMouse";
     }
     case ActionInformation::ActionInfoCase::kDragAndRelease: {
-      tool_type = "DragAndRelease";
-      break;
+      return "DragAndRelease";
     }
     case ActionInformation::ActionInfoCase::kSelect: {
-      tool_type = "Select";
-      break;
+      return "Select";
     }
     case ActionInformation::ActionInfoCase::kNavigate:
     case ActionInformation::ActionInfoCase::kBack:
     case ActionInformation::ActionInfoCase::kForward:
     case ActionInformation::ActionInfoCase::kWait:
+    case ActionInformation::kCreateTab:
+    case ActionInformation::kCloseTab:
+    case ActionInformation::kActivateTab:
+    case ActionInformation::kCreateWindow:
+    case ActionInformation::kCloseWindow:
+    case ActionInformation::kActivateWindow:
+    case ActionInformation::kYieldToUser:
     case ActionInformation::ActionInfoCase::ACTION_INFO_NOT_SET:
       NOTREACHED();
   }
+}
 
-  return absl::StrFormat("PageTool:%s", tool_type.c_str());
+void PageTool::FinishInvoke(mojom::ActionResultPtr result) {
+  if (!invoke_callback_) {
+    return;
+  }
+
+  frame_change_observer_.reset();
+
+  std::move(invoke_callback_).Run(std::move(result));
+
+  // WARNING: `this` may now be destroyed.
+}
+
+void PageTool::PostFinishInvoke(mojom::ActionResultCode result_code) {
+  CHECK(invoke_callback_);
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(&PageTool::FinishInvoke, weak_ptr_factory_.GetWeakPtr(),
+                     MakeResult(result_code)));
 }
 
 }  // namespace actor

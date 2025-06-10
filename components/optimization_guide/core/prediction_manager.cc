@@ -17,10 +17,10 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/metrics/histogram_macros_local.h"
-#include "base/not_fatal_until.h"
 #include "base/observer_list.h"
 #include "base/path_service.h"
 #include "base/sequence_checker.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
@@ -34,7 +34,6 @@
 #include "components/optimization_guide/core/optimization_guide_logger.h"
 #include "components/optimization_guide/core/optimization_guide_permissions_util.h"
 #include "components/optimization_guide/core/optimization_guide_prefs.h"
-#include "components/optimization_guide/core/optimization_guide_store.h"
 #include "components/optimization_guide/core/optimization_guide_switches.h"
 #include "components/optimization_guide/core/optimization_guide_util.h"
 #include "components/optimization_guide/core/optimization_target_model_observer.h"
@@ -42,10 +41,10 @@
 #include "components/optimization_guide/core/prediction_model_fetcher_impl.h"
 #include "components/optimization_guide/core/prediction_model_override.h"
 #include "components/optimization_guide/core/prediction_model_store.h"
-#include "components/optimization_guide/core/store_update_data.h"
 #include "components/optimization_guide/optimization_guide_internals/webui/optimization_guide_internals.mojom.h"
 #include "components/optimization_guide/proto/models.pb.h"
 #include "components/prefs/pref_service.h"
+#include "components/services/unzip/public/cpp/unzip.h"
 #include "google_apis/google_api_keys.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
@@ -124,45 +123,41 @@ bool ShouldFetchModels(bool off_the_record,
 
 // Returns whether the model metadata proto is on the server allowlist.
 bool IsModelMetadataTypeOnServerAllowlist(const proto::Any& model_metadata) {
-  return model_metadata.type_url() ==
-             "type.googleapis.com/"
-             "google.internal.chrome.optimizationguide.v1."
-             "OnDeviceTailSuggestModelMetadata" ||
-         model_metadata.type_url() ==
-             "type.googleapis.com/"
-             "google.internal.chrome.optimizationguide.v1."
-             "PageTopicsModelMetadata" ||
-         model_metadata.type_url() ==
-             "type.googleapis.com/"
-             "google.internal.chrome.optimizationguide.v1."
-             "SegmentationModelMetadata" ||
-         model_metadata.type_url() ==
-             "type.googleapis.com/"
-             "google.privacy.webpermissionpredictions.v1."
-             "WebPermissionPredictionsModelMetadata" ||
-         model_metadata.type_url() ==
-             "type.googleapis.com/"
-             "google.internal.chrome.optimizationguide.v1."
-             "ClientSidePhishingModelMetadata" ||
-         model_metadata.type_url() ==
-             "type.googleapis.com/"
-             "lens.prime.csc.VisualSearchModelMetadata" ||
-         model_metadata.type_url() ==
-             "type.googleapis.com/"
-             "google.internal.chrome.optimizationguide.v1."
-             "OnDeviceBaseModelMetadata" ||
-         model_metadata.type_url() ==
-             "type.googleapis.com/"
-             "google.internal.chrome.optimizationguide.v1."
-             "AutofillFieldClassificationModelMetadata" ||
-         model_metadata.type_url() ==
-             "type.googleapis.com/"
-             "google.internal.chrome.optimizationguide.v1."
-             "AutocompleteScoringModelMetadata" ||
-         model_metadata.type_url() ==
-             "type.googleapis.com/"
-             "google.privacy.webpermissionpredictions.v1."
-             "WebPermissionPredictionsClientInfo";
+  static const auto* const kAllowList = new base::flat_set<std::string>{
+      "type.googleapis.com/"
+      "google.internal.chrome.optimizationguide.v1."
+      "OnDeviceTailSuggestModelMetadata",
+      "type.googleapis.com/"
+      "google.internal.chrome.optimizationguide.v1."
+      "PageTopicsModelMetadata",
+      "type.googleapis.com/"
+      "google.internal.chrome.optimizationguide.v1."
+      "SegmentationModelMetadata",
+      "type.googleapis.com/"
+      "google.privacy.webpermissionpredictions.v1."
+      "WebPermissionPredictionsModelMetadata",
+      "type.googleapis.com/"
+      "google.internal.chrome.optimizationguide.v1."
+      "ClientSidePhishingModelMetadata",
+      "type.googleapis.com/"
+      "lens.prime.csc.VisualSearchModelMetadata",
+      "type.googleapis.com/"
+      "google.internal.chrome.optimizationguide.v1."
+      "OnDeviceBaseModelMetadata",
+      "type.googleapis.com/"
+      "google.internal.chrome.optimizationguide.v1."
+      "AutofillFieldClassificationModelMetadata",
+      "type.googleapis.com/"
+      "google.internal.chrome.optimizationguide.v1."
+      "AutocompleteScoringModelMetadata",
+      "type.googleapis.com/"
+      "google.privacy.webpermissionpredictions.v1."
+      "WebPermissionPredictionsClientInfo",
+      "type.googleapis.com/"
+      "google.privacy.webpermissionpredictions.aiv3.v1."
+      "PermissionsAiv3ModelMetadata"};
+
+  return base::Contains(*kAllowList, model_metadata.type_url());
 }
 
 void RecordModelAvailableAtRegistration(
@@ -191,12 +186,14 @@ PredictionManager::PredictionManager(
     const base::FilePath& models_dir_path,
     OptimizationGuideLogger* optimization_guide_logger,
     BackgroundDownloadServiceProvider background_download_service_provider,
-    ComponentUpdatesEnabledProvider component_updates_enabled_provider)
+    ComponentUpdatesEnabledProvider component_updates_enabled_provider,
+    unzip::UnzipperFactory unzipper_factory)
     : prediction_model_download_manager_(nullptr),
       prediction_model_store_(prediction_model_store),
       url_loader_factory_(url_loader_factory),
       optimization_guide_logger_(optimization_guide_logger),
       component_updates_enabled_provider_(component_updates_enabled_provider),
+      unzipper_factory_(std::move(unzipper_factory)),
       prediction_model_fetch_timer_(
           pref_service,
           base::BindRepeating(
@@ -319,8 +316,7 @@ void PredictionManager::RemoveObserverForOptimizationTargetModel(
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   auto registration_info =
       model_registration_info_map_.find(optimization_target);
-  CHECK(registration_info != model_registration_info_map_.end(),
-        base::NotFatalUntil::M130);
+  CHECK(registration_info != model_registration_info_map_.end());
 
   auto& observers = registration_info->second.model_observers;
   DCHECK(observers.HasObserver(observer));
@@ -790,6 +786,7 @@ void PredictionManager::MaybeInitializeModelDownloads(
                 // base::Unretained is safe here because the
                 // PredictionModelDownloadManager is owned by `this`
                 base::Unretained(this)),
+            unzipper_factory_,
             base::ThreadPool::CreateSequencedTaskRunner(
                 {base::MayBlock(), base::TaskPriority::BEST_EFFORT,
                  base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN}));
@@ -830,7 +827,7 @@ void PredictionManager::LoadPredictionModels(
       base::FilePath base_model_dir =
           GetBaseModelDirForDownload(optimization_target);
       entry->BuildModel(
-          base_model_dir,
+          base_model_dir, unzipper_factory_,
           base::BindOnce(&PredictionManager::OnPredictionModelOverrideLoaded,
                          ui_weak_ptr_factory_.GetWeakPtr(),
                          optimization_target));

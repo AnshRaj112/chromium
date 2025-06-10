@@ -256,7 +256,7 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
 
 @property(nonatomic, strong) OverflowMenuAction* setTabReminderAction;
 
-@property(nonatomic, strong) OverflowMenuAction* askGLICAction;
+@property(nonatomic, strong) OverflowMenuAction* askBWGAction;
 
 @end
 
@@ -708,7 +708,7 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
   }
 
   if (IsPageActionMenuEnabled()) {
-    self.askGLICAction = [self openAskGLICAction];
+    self.askBWGAction = [self openAskBWGAction];
   }
 
   if (IsReaderModeAvailable()) {
@@ -841,19 +841,19 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
                                  }];
 }
 
-- (OverflowMenuAction*)openAskGLICAction {
+- (OverflowMenuAction*)openAskBWGAction {
   __weak __typeof(self) weakSelf = self;
   // TODO(crbug.com/414777888): Change the icon.
   return
-      [self createOverflowMenuActionWithName:@"Ask GLIC"
-                                  actionType:overflow_menu::ActionType::AskGLIC
+      [self createOverflowMenuActionWithName:@"Ask BWG"
+                                  actionType:overflow_menu::ActionType::AskBWG
                                   symbolName:kMagicStackSymbol
                                 systemSymbol:YES
                             monochromeSymbol:NO
-                             accessibilityID:kToolsMenuOpenAskGLIC
+                             accessibilityID:kToolsMenuOpenAskBWG
                                 hideItemText:nil
                                      handler:^{
-                                       [weakSelf startAskGLIC];
+                                       [weakSelf startAskBWG];
                                      }];
 }
 
@@ -1487,26 +1487,11 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
       IsIncognitoModeDisabled(self.profilePrefs);
 
   if (IsLensOverlayAvailable(_profilePrefs)) {
-    BOOL isPortrait = !IsCompactHeight(self.baseViewController.traitCollection);
-    BOOL isSupported =
-        search_engines::SupportsSearchImageWithLens(self.templateURLService);
-    BOOL portraitOverride =
-        IsLensOverlayLandscapeOrientationEnabled(_profilePrefs);
-    self.lensOverlayAction.enabled =
-        isSupported && (isPortrait || portraitOverride);
+    self.lensOverlayAction.enabled = ![self isLensOverlayVisible];
   }
 
   if (IsReaderModeAvailable()) {
     self.readerModeAction.enabled = [self isReaderModeEnabled];
-  }
-
-  // If Lens Overlay is already being displayed, disable the action.
-  if (self.webState) {
-    if (LensOverlayTabHelper* lensOverlayTabHelper =
-            LensOverlayTabHelper::FromWebState(self.webState)) {
-      self.lensOverlayAction.enabled =
-          !lensOverlayTabHelper->IsLensOverlayUIAttachedAndAlive();
-    }
   }
 }
 
@@ -1576,7 +1561,28 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
 
 // Returns whether translate is enabled on the current page.
 - (BOOL)isTranslateEnabled {
-  return [self canManuallyTranslate:NO];
+  return [self canManuallyTranslate:NO] && ![self isLensOverlayVisible];
+}
+
+- (BOOL)isLensOverlayEnabled {
+  BOOL isPortrait = !IsCompactHeight(self.baseViewController.traitCollection);
+  BOOL isSupported =
+      search_engines::SupportsSearchImageWithLens(self.templateURLService);
+  BOOL portraitOverride =
+      IsLensOverlayLandscapeOrientationEnabled(_profilePrefs);
+  return isSupported && (isPortrait || portraitOverride) &&
+         ![self isLensOverlayVisible];
+}
+
+// Returns whether Lens Overlay is currently being displayed.
+- (BOOL)isLensOverlayVisible {
+  if (!self.webState) {
+    return NO;
+  }
+  LensOverlayTabHelper* lensOverlayTabHelper =
+      LensOverlayTabHelper::FromWebState(self.webState);
+  return lensOverlayTabHelper &&
+         lensOverlayTabHelper->IsLensOverlayUIAttachedAndAlive();
 }
 
 // Determines whether or not translate is available on the page and logs the
@@ -1600,6 +1606,13 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
 - (BOOL)isReaderModeEnabled {
   if (!self.webState) {
     return NO;
+  }
+
+  // Reader Mode is always enabled in the Overflow menu if the triggering
+  // heuristic is disabled.
+  if (!base::FeatureList::IsEnabled(
+          kEnableReaderModePageEligibilityForToolsMenu)) {
+    return YES;
   }
 
   ReaderModeTabHelper* helper =
@@ -2086,7 +2099,7 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
   }
 
   if (IsPageActionMenuEnabled()) {
-    actions.push_back(overflow_menu::ActionType::AskGLIC);
+    actions.push_back(overflow_menu::ActionType::AskBWG);
   }
 
   if (IsReaderModeAvailable()) {
@@ -2167,8 +2180,8 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
                  : nil;
     case overflow_menu::ActionType::ReaderMode:
       return self.readerModeAction;
-    case overflow_menu::ActionType::AskGLIC:
-      return self.askGLICAction;
+    case overflow_menu::ActionType::AskBWG:
+      return self.askBWGAction;
   }
 }
 
@@ -2213,8 +2226,8 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
       return [self newSetTabReminderAction];
     case overflow_menu::ActionType::ReaderMode:
       return [self toggleReaderModeAction];
-    case overflow_menu::ActionType::AskGLIC:
-      return [self openAskGLICAction];
+    case overflow_menu::ActionType::AskBWG:
+      return [self openAskBWGAction];
   }
 }
 
@@ -2435,8 +2448,8 @@ OverflowMenuFooter* CreateOverflowMenuManagedFooter(
   [self.applicationHandler openAIMenu];
 }
 
-// Starts ask GLIC.
-- (void)startAskGLIC {
+// Starts ask BWG.
+- (void)startAskBWG {
   [self dismissMenu];
   [self.pageActionMenuHandler showPageActionMenu];
 }

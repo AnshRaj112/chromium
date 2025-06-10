@@ -121,7 +121,14 @@ class CORE_EXPORT SoftNavigationHeuristics
   void ReportSoftNavigationToMetrics(LocalFrame*, SoftNavigationContext*) const;
   void SetIsTrackingSoftNavigationHeuristicsOnDocument(bool value) const;
 
-  SoftNavigationContext* GetSoftNavigationContextForCurrentTask();
+  // We can grab a context from the "running task", or sometimes from other
+  // scheduling sources-- but these can leak across windows.
+  // Any time we retrieve a context, we should check to ensure that these were
+  // created for this window (i.e. by this SNH instance).
+  SoftNavigationContext* EnsureContextForCurrentWindow(
+      SoftNavigationContext*) const;
+  SoftNavigationContext* GetSoftNavigationContextForCurrentTask() const;
+
   void ResetPaintTimingsIfNeeded();
   void CommitPreviousPaintTimings(LocalFrame*);
   bool EmitSoftNavigationEntryIfAllConditionsMet(SoftNavigationContext*);
@@ -129,6 +136,7 @@ class CORE_EXPORT SoftNavigationHeuristics
   void OnSoftNavigationEventScopeDestroyed(const EventScope&);
   EventScope CreateEventScope(EventScope::Type type, ScriptState*);
   uint64_t CalculateRequiredPaintArea() const;
+  uint64_t CalculateViewportArea() const;
 
   Member<LocalDOMWindow> window_;
 
@@ -159,11 +167,11 @@ class CORE_EXPORT SoftNavigationHeuristics
   // events, this remains alive until the next interaction.
   Member<SoftNavigationContext> active_interaction_context_;
 
-  // Save a strong reference to the most recent soft navigation detected.  This
+  // Save a strong reference to the most recent context that changed URL.  This
   // context could still be pending (not emitted) as we wait to observe more
   // paints, or it might have already been emitted, but we still want to
   // continue measuring paints for a while.
-  Member<SoftNavigationContext> most_recent_context_to_meet_non_paint_criteria_;
+  Member<SoftNavigationContext> context_for_current_url_;
 
   uint32_t soft_navigation_count_ = 0;
   bool has_active_event_scope_ = false;

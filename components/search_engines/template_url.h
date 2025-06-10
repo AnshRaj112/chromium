@@ -865,6 +865,10 @@ class TemplateURL {
   // OMNIBOX_API_EXTENSION.
   std::string GetExtensionId() const;
 
+  // Returns the resource ID for the logo (small / favicon style) associated
+  // with this template URL, or an empty string is none is associated with it.
+  std::string GetBuiltinImageResourceId() const;
+
   // Returns the type of this search engine, or SEARCH_ENGINE_OTHER if no
   // engines match.
   SearchEngineType GetEngineType(
@@ -987,6 +991,11 @@ class TemplateURL {
 
   void CopyActiveValueToLocalAndAccount();
 
+  // Returns whether this search engine can be overridden and added to the
+  // overridden keyword pref list. Should be used for engines that are created
+  // by an Enterprise policy that doesn't define the Default Search Provider.
+  bool CanPolicyBeOverridden() const;
+
  private:
   // Resizes the |url_refs_| vector, which always holds the search URL as the
   // last item.
@@ -1001,6 +1010,10 @@ class TemplateURL {
                             std::u16string* search_terms,
                             url::Parsed::ComponentType* search_terms_component,
                             url::Component* search_terms_position) const;
+
+  // Returns the resource ID base associated with this template URL, if it is
+  // provided from built-in data.
+  std::optional<std::string_view> GetBaseBuiltinResourceId() const;
 
   TemplateURLData& active_data();
 
@@ -1028,6 +1041,13 @@ class TemplateURL {
 
   // Caches the computed engine type across successive calls to GetEngineType().
   mutable SearchEngineType engine_type_;
+
+  // Caches the computed base resource ID across successive calls to
+  // `GetBaseBuiltinResourceId()`.
+  // The actual string lives in built-in
+  // `TemplateURLPrepopulateData::PrepopulatedEngine` entries.
+  mutable std::optional<std::optional<std::string_view>>
+      base_builtin_resource_id_;
 
   // TODO(sky): Add date last parsed OSD file.
 };

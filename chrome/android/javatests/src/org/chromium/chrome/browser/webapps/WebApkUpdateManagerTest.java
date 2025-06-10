@@ -286,7 +286,7 @@ public class WebApkUpdateManagerTest {
         creationData.name = WEBAPK_NAME;
         creationData.shortName = WEBAPK_SHORT_NAME;
 
-        creationData.iconUrlToMurmur2HashMap = new HashMap<String, String>();
+        creationData.iconUrlToMurmur2HashMap = new HashMap<>();
         creationData.iconUrlToMurmur2HashMap.put(
                 mTestServer.getURL(WEBAPK_ICON_URL), WEBAPK_ICON_MURMUR2_HASH);
 
@@ -448,7 +448,7 @@ public class WebApkUpdateManagerTest {
         CreationData creationData = defaultCreationData();
         creationData.manifestUrl = mTestServer.getURL(WEBAPK_MANIFEST_WITH_MASKABLE_ICON_URL);
 
-        creationData.iconUrlToMurmur2HashMap = new HashMap<String, String>();
+        creationData.iconUrlToMurmur2HashMap = new HashMap<>();
         creationData.iconUrlToMurmur2HashMap.put(
                 mTestServer.getURL("/chrome/test/data/banners/launcher-icon-4x.png"),
                 "8692598279279335241");
@@ -513,7 +513,7 @@ public class WebApkUpdateManagerTest {
         creationData.startUrl =
                 mTestServer.getURL("/chrome/test/data/banners/manifest_test_page.html");
 
-        List<Integer> expectedUpdateReasons = new ArrayList<Integer>();
+        List<Integer> expectedUpdateReasons = new ArrayList<>();
         creationData.name += "!";
         creationData.shortName += "!";
         creationData.backgroundColor -= 1;
@@ -554,7 +554,7 @@ public class WebApkUpdateManagerTest {
         creationData.startUrl =
                 mTestServer.getURL("/chrome/test/data/banners/manifest_test_page.html");
 
-        List<Integer> expectedUpdateReasons = new ArrayList<Integer>();
+        List<Integer> expectedUpdateReasons = new ArrayList<>();
 
         boolean expectIconChange = false;
 

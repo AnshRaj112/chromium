@@ -49,6 +49,7 @@ chromium-metrics-reviews@google.com.
   <int value="14" label="'Select plus address' link in the password sheet"/>
   <int value="15" label="'Manage plus addresses' link in the password sheet"/>
   <int value="16" label="'Manage loyalty cards' link"/>
+  <int value="17" label="'Verify it's you' link"/>
 </enum>
 
 <enum name="AccessorySheetTrigger">
@@ -728,12 +729,6 @@ chromium-metrics-reviews@google.com.
              credentials report"/>
 </enum>
 
-<enum name="PasswordBubbleFollowupType">
-  <int value="0" label="Safe state"/>
-  <int value="1" label="More passwords to fix"/>
-  <int value="2" label="Unsafe state"/>
-</enum>
-
 <enum name="PasswordChangeFlowState">
   <int value="0" label="Offering password change"/>
   <int value="1" label="Waiting for privacy notice acceptance"/>
@@ -819,6 +814,26 @@ chromium-metrics-reviews@google.com.
   <int value="1" label="Succeeded"/>
   <int value="2" label="Succeeded by skipping"/>
   <int value="3" label="Succeeded by ignoring failure"/>
+</enum>
+
+<enum name="PasswordDropdownDuplicateCredentialsType">
+  <summary>
+    Describes the combination of duplicate credential types found in a password
+    dropdown when it is shown. These are based on credentials sharing the same
+    username. This metric is logged for each distinct type of duplication found
+    in a single dropdown appearance.
+  </summary>
+  <int value="0" label="DuplicatePasswords">
+    A user has multiple password credentials for the same username.
+  </int>
+  <int value="1" label="DuplicatePasskeys">
+    A user has multiple passkey credentials for the same username.
+  </int>
+  <int value="2" label="DuplicatePasswordsAndPasskeys">
+    A user has at least one password and at least one passkey credential for the
+    same username. This is logged even if other duplications (e.g. multiple
+    passwords for this same user) also exist for this user.
+  </int>
 </enum>
 
 <enum name="PasswordDropdownSelectedOption">

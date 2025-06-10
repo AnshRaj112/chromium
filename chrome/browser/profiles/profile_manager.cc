@@ -17,6 +17,7 @@
 
 #include "base/command_line.h"
 #include "base/containers/contains.h"
+#include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/debug/stack_trace.h"
 #include "base/feature_list.h"
@@ -30,7 +31,6 @@
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
-#include "base/not_fatal_until.h"
 #include "base/observer_list.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
@@ -1192,11 +1192,6 @@ void ProfileManager::InitProfileUserPrefs(Profile* profile) {
     profile->GetPrefs()->SetString(prefs::kSupervisedUserId,
                                    supervised_user_id);
   }
-#if !BUILDFLAG(IS_ANDROID)
-  if (profile->IsNewProfile()) {
-    profile->GetPrefs()->SetBoolean(prefs::kHasSeenWelcomePage, false);
-  }
-#endif  // !BUILDFLAG(IS_ANDROID)
 }
 
 void ProfileManager::RegisterTestingProfile(std::unique_ptr<Profile> profile,
@@ -1754,7 +1749,7 @@ void ProfileManager::OnProfileCreationFinished(Profile* profile,
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
 
   auto iter = profiles_info_.find(profile->GetPath());
-  CHECK(iter != profiles_info_.end(), base::NotFatalUntil::M130);
+  CHECK(iter != profiles_info_.end());
   ProfileInfo* info = iter->second.get();
 
   if (create_mode == Profile::CreateMode::kSynchronous) {

@@ -16,6 +16,7 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/time/time.h"
 #include "content/browser/webid/fedcm_accounts_fetcher.h"
+#include "content/browser/webid/fedcm_idp_registration_handler.h"
 #include "content/browser/webid/fedcm_metrics.h"
 #include "content/browser/webid/fedcm_url_computations.h"
 #include "content/browser/webid/federated_sd_jwt_handler.h"
@@ -360,12 +361,6 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
       blink::mojom::RequestUserInfoStatus status,
       std::optional<std::vector<blink::mojom::IdentityUserInfoPtr>> user_info);
 
-  // When two APIs that are associated with the same frame, hence
-  // fedcm_metrics_, are triggered concurrently, we need to reset
-  // `fedcm_metrics` to record UKM for the first request when it's completed and
-  // recreate one for the second if needed.
-  void HandleMetricsForPotentialConcurrentRequests();
-
   // Validates the input from the renderer and signals to terminate the request
   // if needed.
   bool ShouldTerminateRequest(
@@ -429,10 +424,14 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
       std::optional<IdpNetworkRequestManager::FedCmErrorUrlType>
           error_url_type);
 
+  void OnIdpRegistrationConfigFetched(
+      RegisterIdPCallback callback,
+      const GURL& idp,
+      std::vector<FedCmConfigFetcher::FetchResult> fetch_results);
   void OnRegisterIdPPermissionResponse(RegisterIdPCallback callback,
                                        const GURL& idp,
                                        bool accepted);
-  void MaybeCreateFedCmMetrics();
+  std::unique_ptr<FedCmMetrics> CreateFedCmMetrics();
 
   bool IsNewlyLoggedIn(const IdentityRequestAccount& account);
 
@@ -518,6 +517,8 @@ class CONTENT_EXPORT FederatedAuthRequestImpl
   std::unique_ptr<FedCmAccountsFetcher> fedcm_accounts_fetcher_;
 
   std::unique_ptr<FederatedSdJwtHandler> federated_sdjwt_handler_;
+
+  std::unique_ptr<FedCmIdpRegistrationHandler> fedcm_idp_registration_handler_;
 
   // Set of pending user info requests.
   base::flat_set<std::unique_ptr<FederatedAuthUserInfoRequest>>

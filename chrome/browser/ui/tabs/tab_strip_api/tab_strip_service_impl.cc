@@ -6,16 +6,37 @@
 #include <algorithm>
 #include <optional>
 
+#include "base/strings/string_number_conversions.h"
 #include "base/types/expected.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_api/adapters/browser_adapter_impl.h"
 #include "chrome/browser/ui/tabs/tab_strip_api/adapters/tab_strip_model_adapter_impl.h"
 #include "chrome/browser/ui/tabs/tab_strip_api/converters/tab_converters.h"
+#include "chrome/browser/ui/tabs/tab_strip_api/event_broadcaster.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_delegate.h"
 #include "mojo/public/mojom/base/error.mojom.h"
 #include "url/gurl.h"
+
+// Starts a mutation session that suppresses incoming messages to prevent
+// re-entrancy and replays all recorded mutations on session destruction.
+class MutationSession {
+ public:
+   explicit MutationSession(tabs_api::events::TabStripEventRecorder* recorder)
+       : recorder_(recorder) {
+     recorder_->StopNotificationAndStartRecording();
+   }
+
+   ~MutationSession() { recorder_->PlayRecordingsAndStartNotification(); }
+
+   // Disallow copy and assign.
+   MutationSession(const MutationSession&) = delete;
+   MutationSession& operator=(const MutationSession&) = delete;
+
+  private:
+   raw_ptr<tabs_api::events::TabStripEventRecorder> recorder_;
+ };
 
 TabStripServiceImpl::TabStripServiceImpl(BrowserWindowInterface* browser,
                                          TabStripModel* tab_strip_model)
@@ -29,11 +50,21 @@ TabStripServiceImpl::TabStripServiceImpl(
     std::unique_ptr<tabs_api::TabStripModelAdapter> tab_strip_model_adapter)
     : browser_adapter_(std::move(browser_adapter)),
       tab_strip_model_adapter_(std::move(tab_strip_model_adapter)) {
-  tab_strip_model_adapter_->AddObserver(this);
+  recorder_ = std::make_unique<tabs_api::events::TabStripEventRecorder>(
+      tab_strip_model_adapter_.get(),
+      base::BindRepeating(&TabStripServiceImpl::BroadcastEvent,
+                          base::Unretained(this)));
+  tab_strip_model_adapter_->AddObserver(recorder_.get());
+}
+
+void TabStripServiceImpl::BroadcastEvent(
+    const tabs_api::events::Event& event) const {
+  tabs_api::EventBroadcaster broadcaster;
+  broadcaster.Broadcast(observers_, event);
 }
 
 TabStripServiceImpl::~TabStripServiceImpl() {
-  tab_strip_model_adapter_->RemoveObserver(this);
+  tab_strip_model_adapter_->RemoveObserver(recorder_.get());
 
   // Clear all observers
   // TODO (crbug.com/412955607): Implement a removal mechanism similar to
@@ -43,22 +74,15 @@ TabStripServiceImpl::~TabStripServiceImpl() {
 }
 
 void TabStripServiceImpl::GetTabs(GetTabsCallback callback) {
+  tabs_api::mojom::TabCollectionContainerPtr topology =
+      tab_strip_model_adapter_->GetTabStripTopology();
   auto snapshot = tabs_api::mojom::TabsSnapshot::New();
-
-  std::vector<tabs_api::mojom::TabPtr> result;
-  auto tabs = tab_strip_model_adapter_->GetTabs();
-  for (unsigned int i = 0; i < tabs.size(); ++i) {
-    auto& handle = tabs.at(i);
-    auto renderer_data = tab_strip_model_adapter_->GetTabRendererData(i);
-    auto entry = tabs_api::converters::BuildMojoTab(handle, renderer_data);
-    result.push_back(std::move(entry));
-  }
-  snapshot->tabs = std::move(result);
+  snapshot->tab_strip = std::move(topology);
 
   // Now that we have a snapshot, create a event stream that will capture all
   // subsequent updates.
-  mojo::Remote<tabs_api::mojom::TabsObserver> stream;
-  auto pending_receiver = stream.BindNewPipeAndPassReceiver();
+  mojo::AssociatedRemote<tabs_api::mojom::TabsObserver> stream;
+  auto pending_receiver = stream.BindNewEndpointAndPassReceiver();
   observers_.Add(std::move(stream));
   snapshot->stream = std::move(pending_receiver);
 
@@ -104,6 +128,8 @@ void TabStripServiceImpl::GetTab(const tabs_api::TabId& tab_mojom_id,
 void TabStripServiceImpl::CreateTabAt(tabs_api::mojom::PositionPtr pos,
                                       const std::optional<GURL>& url,
                                       CreateTabAtCallback callback) {
+  MutationSession recorder_session(recorder_.get());
+
   GURL target_url;
   if (url.has_value()) {
     target_url = url.value();
@@ -140,6 +166,8 @@ void TabStripServiceImpl::CreateTabAt(tabs_api::mojom::PositionPtr pos,
 
 void TabStripServiceImpl::CloseTabs(const std::vector<tabs_api::TabId>& ids,
                                     CloseTabsCallback callback) {
+  MutationSession recorder_session(recorder_.get());
+
   std::vector<int32_t> tab_content_targets;
   for (const auto& id : ids) {
     if (id.Type() != tabs_api::TabId::Type::kContent) {
@@ -183,6 +211,8 @@ void TabStripServiceImpl::CloseTabs(const std::vector<tabs_api::TabId>& ids,
 
 void TabStripServiceImpl::ActivateTab(const tabs_api::TabId& id,
                                       ActivateTabCallback callback) {
+  MutationSession recorder_session(recorder_.get());
+
   if (id.Type() != tabs_api::TabId::Type::kContent) {
     std::move(callback).Run(base::unexpected(
         mojo_base::mojom::Error::New(mojo_base::mojom::Code::kInvalidArgument,
@@ -209,37 +239,39 @@ void TabStripServiceImpl::ActivateTab(const tabs_api::TabId& id,
   std::move(callback).Run(mojo_base::mojom::Empty::New());
 }
 
-void TabStripServiceImpl::OnTabStripModelChanged(
-    TabStripModel* tab_strip_model,
-    const TabStripModelChange& change,
-    const TabStripSelectionChange& selection) {
-  switch (change.type()) {
-    case TabStripModelChange::kInserted:
-      OnTabStripModelChangeAdded(*change.GetInsert());
-      break;
-    case TabStripModelChange::kRemoved:
-    case TabStripModelChange::kReplaced:
-    case TabStripModelChange::kMoved:
-    case TabStripModelChange::kSelectionOnly:
-      break;
-  }
-}
+void TabStripServiceImpl::MoveTab(const tabs_api::TabId& id,
+                                  tabs_api::mojom::PositionPtr position,
+                                  MoveTabCallback callback) {
+  MutationSession recorder_session(recorder_.get());
 
-void TabStripServiceImpl::OnTabStripModelChangeAdded(
-    const TabStripModelChange::Insert& insert_change) {
-  if (insert_change.contents.size() == 0) {
+  // TODO(crbug.com/409086859): this implementation is not complete, because
+  // it will only move the tabs within the unpinned section. We need additional
+  // API support for the tab strip model, which is currently in discussion.
+  if (id.Type() != tabs_api::TabId::Type::kContent) {
+    std::move(callback).Run(base::unexpected(
+        mojo_base::mojom::Error::New(mojo_base::mojom::Code::kUnimplemented,
+                                     "only tab moves have been implemetned")));
     return;
   }
 
-  for (auto& observer : observers_) {
-    std::vector<tabs_api::mojom::PositionPtr> positions;
-    for (const auto& content : insert_change.contents) {
-      auto pos = tabs_api::mojom::Position::New();
-      pos->index = content.index;
-      positions.emplace_back(std::move(pos));
-    }
-    observer->OnTabsCreated(std::move(positions));
+  int32_t handle_id;
+  if (!base::StringToInt(id.Id(), &handle_id)) {
+    std::move(callback).Run(base::unexpected(mojo_base::mojom::Error::New(
+        mojo_base::mojom::Code::kInvalidArgument, "id is malformed")));
+    return;
   }
+
+  auto tab_handle = tabs::TabHandle(handle_id);
+  if (position->index >= tab_strip_model_adapter_->GetTabs().size()) {
+    std::move(callback).Run(base::unexpected(
+        mojo_base::mojom::Error::New(mojo_base::mojom::Code::kInvalidArgument,
+                                     "position cannot exceed tab strip")));
+    return;
+  }
+
+  tab_strip_model_adapter_->MoveTab(tab_handle, {position->index});
+
+  std::move(callback).Run(mojo_base::mojom::Empty::New());
 }
 
 void TabStripServiceImpl::Accept(

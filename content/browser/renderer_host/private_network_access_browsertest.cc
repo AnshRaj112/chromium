@@ -12,6 +12,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "base/synchronization/lock.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/thread_annotations.h"
@@ -405,9 +406,9 @@ class FakeAddressSpaceServer {
       network::mojom::IPAddressSpace space) {
     switch (space) {
       case network::mojom::IPAddressSpace::kLocal:
-        return "local";
+        return "loopback";
       case network::mojom::IPAddressSpace::kPrivate:
-        return "private";
+        return "local";
       case network::mojom::IPAddressSpace::kPublic:
         return "public";
       default:

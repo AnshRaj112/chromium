@@ -28,6 +28,8 @@ class SidePanelRegistry;
 class TabResourceUsageTabHelper;
 class TabUIHelper;
 class TranslatePageActionController;
+class QwacWebContentsObserver;
+class ManagePasswordsPageActionController;
 
 namespace commerce {
 class CommerceUiTabHelper;
@@ -143,6 +145,13 @@ class TabFeatures {
     return customize_chrome_side_panel_controller_.get();
   }
 
+  // Note: Temporary until there is a more uniform way to swap out features for
+  // testing.
+  customize_chrome::SidePanelController*
+  SetCustomizeChromeSidePanelControllerForTesting(
+      std::unique_ptr<customize_chrome::SidePanelController>
+          customize_chrome_side_panel_controller);
+
   // This side-panel registry is tab-scoped. It is different from the browser
   // window scoped SidePanelRegistry.
   SidePanelRegistry* side_panel_registry() {
@@ -197,6 +206,11 @@ class TabFeatures {
   FileSystemAccessPageActionController*
   file_system_access_page_action_controller() {
     return file_system_access_page_action_controller_.get();
+  }
+
+  ManagePasswordsPageActionController*
+  manage_passwords_page_action_controller() {
+    return manage_passwords_page_action_controller_.get();
   }
 
   tab_groups::CollaborationMessagingTabData*
@@ -270,8 +284,7 @@ class TabFeatures {
       TabInterface* tab);
 
   virtual std::unique_ptr<commerce::CommerceUiTabHelper>
-  CreateCommerceUiTabHelper(content::WebContents* web_contents,
-                            Profile* profile);
+  CreateCommerceUiTabHelper(TabInterface& tab, Profile* profile);
 
  private:
   bool initialized_ = false;
@@ -350,6 +363,10 @@ class TabFeatures {
   // interact with this to have their feature's page action shown.
   std::unique_ptr<page_actions::PageActionController> page_action_controller_;
 
+  // Responsible for managing the "Manage Passwords" page action.
+  std::unique_ptr<ManagePasswordsPageActionController>
+      manage_passwords_page_action_controller_;
+
   // Responsible for managing the "Translate" page action.
   std::unique_ptr<TranslatePageActionController>
       translate_page_action_controller_;
@@ -395,6 +412,8 @@ class TabFeatures {
   std::unique_ptr<TabAlertController> tab_alert_controller_;
 
   std::unique_ptr<TabUIHelper> tab_ui_helper_;
+
+  std::unique_ptr<QwacWebContentsObserver> qwac_web_contents_observer_;
 
   // Must be the last member.
   base::WeakPtrFactory<TabFeatures> weak_factory_{this};

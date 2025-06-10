@@ -15,7 +15,6 @@
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
-#include "base/not_fatal_until.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/task/single_thread_task_runner.h"
@@ -41,7 +40,6 @@
 #include "third_party/blink/renderer/modules/mediastream/local_media_stream_audio_source.h"
 #include "third_party/blink/renderer/modules/mediastream/local_video_capturer_source.h"
 #include "third_party/blink/renderer/modules/mediastream/media_constraints.h"
-#include "third_party/blink/renderer/modules/mediastream/media_stream_audio_processing_layout.h"
 #include "third_party/blink/renderer/modules/mediastream/media_stream_audio_processor.h"
 #include "third_party/blink/renderer/modules/mediastream/media_stream_constraints_util.h"
 #include "third_party/blink/renderer/modules/mediastream/media_stream_constraints_util_audio.h"
@@ -120,6 +118,8 @@ const char* MediaStreamRequestResultToString(MediaStreamRequestResult value) {
       return "REQUEST_CANCELLED";
     case MediaStreamRequestResult::START_TIMEOUT:
       return "START_TIMEOUT";
+    case MediaStreamRequestResult::PERMISSION_DENIED_BY_USER:
+      return "PERMISSION_DENIED_BY_USER";
     case MediaStreamRequestResult::NUM_MEDIA_REQUEST_RESULTS:
       break;
   }
@@ -292,6 +292,8 @@ String ErrorCodeToString(MediaStreamRequestResult result) {
       return "Timeout starting video source";
     case MediaStreamRequestResult::CONSTRAINT_NOT_SATISFIED:
       return "Constraint not satisfied";
+    case MediaStreamRequestResult::PERMISSION_DENIED_BY_USER:
+      return "Permission denied by user";
     case MediaStreamRequestResult::NUM_MEDIA_REQUEST_RESULTS:
       break;  // Not a valid enum value.
   }
@@ -598,7 +600,7 @@ void UserMediaProcessor::RequestInfo::OnTrackStarted(
     const blink::WebString& result_name) {
   SendLogMessage(GetOnTrackStartedLogString(source, result));
   auto it = std::ranges::find(sources_waiting_for_callback_, source);
-  CHECK(it != sources_waiting_for_callback_.end(), base::NotFatalUntil::M130);
+  CHECK(it != sources_waiting_for_callback_.end());
   sources_waiting_for_callback_.erase(it);
   // All tracks must be started successfully. Otherwise the request is a
   // failure.
@@ -1823,40 +1825,36 @@ UserMediaProcessor::CreateAudioSource(
   DCHECK(current_request_info_);
 
   StreamControls* stream_controls = current_request_info_->stream_controls();
-
   // If the audio device is a loopback device (for screen capture), or if the
   // constraints/effects parameters indicate no audio processing is needed,
   // create an efficient, direct-path MediaStreamAudioSource instance.
-  std::optional<MediaStreamAudioProcessingLayout> processing_layout =
-      (device.type == mojom::blink::MediaStreamType::DEVICE_AUDIO_CAPTURE)
-          ? std::make_optional(MediaStreamAudioProcessingLayout(
-                current_request_info_->audio_capture_settings()
-                    .audio_processing_properties(),
-                device.input.effects(),
-                current_request_info_->audio_capture_settings().num_channels()))
-          : std::nullopt;
-
-  if (processing_layout && processing_layout->NeedWebrtcAudioProcessing()) {
-    // The audio device is not associated with screen capture and also requires
-    // processing.
+  blink::AudioProcessingProperties audio_processing_properties =
+      current_request_info_->audio_capture_settings()
+          .audio_processing_properties();
+  if (blink::IsScreenCaptureMediaType(device.type) ||
+      !blink::MediaStreamAudioProcessor::WouldModifyAudio(
+          audio_processing_properties)) {
     SendLogMessage(
-        base::StringPrintf("%s => (audiprocessing is required)", __func__));
-    return std::make_unique<blink::ProcessedLocalAudioSource>(
-        *frame_, device, stream_controls->disable_local_echo,
-        *processing_layout, std::move(source_ready), task_runner_);
+        base::StringPrintf("%s => (no audiprocessing is used)", __func__));
+    return std::make_unique<blink::LocalMediaStreamAudioSource>(
+        frame_, device,
+        base::OptionalToPtr(current_request_info_->audio_capture_settings()
+                                .requested_buffer_size()),
+        stream_controls->disable_local_echo,
+        audio_processing_properties.echo_cancellation_type ==
+            EchoCancellationType::kEchoCancellationSystem,
+        std::move(source_ready), task_runner_);
   }
 
-  bool system_aec = processing_layout &&
-                    processing_layout->properties().echo_cancellation_type ==
-                        EchoCancellationType::kEchoCancellationSystem;
+  // The audio device is not associated with screen capture and also requires
+  // processing.
   SendLogMessage(
-      base::StringPrintf("%s => (no audiprocessing is used)", __func__));
-  return std::make_unique<blink::LocalMediaStreamAudioSource>(
-      frame_, device,
-      base::OptionalToPtr(current_request_info_->audio_capture_settings()
-                              .requested_buffer_size()),
-      stream_controls->disable_local_echo, system_aec, std::move(source_ready),
-      task_runner_);
+      base::StringPrintf("%s => (audiprocessing is required)", __func__));
+  return std::make_unique<blink::ProcessedLocalAudioSource>(
+      *frame_, device, stream_controls->disable_local_echo,
+      audio_processing_properties,
+      current_request_info_->audio_capture_settings().num_channels(),
+      std::move(source_ready), task_runner_);
 }
 
 std::unique_ptr<blink::MediaStreamVideoSource>

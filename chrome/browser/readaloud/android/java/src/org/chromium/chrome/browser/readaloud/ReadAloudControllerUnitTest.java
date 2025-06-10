@@ -90,6 +90,8 @@ import org.chromium.chrome.browser.tabmodel.TabModelUtils;
 import org.chromium.chrome.browser.translate.FakeTranslateBridgeJni;
 import org.chromium.chrome.browser.translate.TranslateBridgeJni;
 import org.chromium.chrome.browser.ui.native_page.NativePage;
+import org.chromium.chrome.modules.readaloud.Feedback.FeedbackType;
+import org.chromium.chrome.modules.readaloud.Feedback.NegativeFeedbackReason;
 import org.chromium.chrome.modules.readaloud.Playback;
 import org.chromium.chrome.modules.readaloud.Playback.PlaybackTextPart;
 import org.chromium.chrome.modules.readaloud.Playback.PlaybackTextType;
@@ -262,7 +264,7 @@ public class ReadAloudControllerUnitTest {
                         });
         when(mHooksImpl.isEnabled()).thenReturn(true);
         when(mHooksImpl.getCompatibleLanguages())
-                .thenReturn(new HashSet<String>(Arrays.asList("en", "es", "fr", "ja")));
+                .thenReturn(new HashSet<>(Arrays.asList("en", "es", "fr", "ja")));
         initPlaybackHooks();
         ReadAloudController.setReadabilityHooks(mHooksImpl);
         ReadAloudController.setPlaybackHooks(mPlaybackHooks);
@@ -302,7 +304,7 @@ public class ReadAloudControllerUnitTest {
         when(mRenderFrameHost.getGlobalRenderFrameHostId()).thenReturn(mGlobalRenderFrameHostId);
         mController.setHighlighterForTests(mHighlighter);
         mUserActionTester = new UserActionTester();
-        mExtractorPromise = new Promise<Long>();
+        mExtractorPromise = new Promise<>();
         when(mExtractor.getDateModified(any())).thenReturn(mExtractorPromise);
         mExtractorPromise.fulfill(1234567123456L);
         ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
@@ -936,6 +938,24 @@ public class ReadAloudControllerUnitTest {
         mController.playTab(newTab, ReadAloudController.Entrypoint.MAGIC_TOOLBAR);
         resolvePromises();
         verify(mPlayback, times(1)).release();
+    }
+
+    @Test
+    public void testSendPositiveFeedback() {
+      requestAndStartPlayback();
+
+      mController.onPositiveFeedback();
+
+      verify(mPlayback).sendFeedback(eq(FeedbackType.POSITIVE), eq(NegativeFeedbackReason.OTHER), Mockito.any(ReadAloudPlaybackHooks.SendFeedbackCallback.class));
+    }
+
+    @Test
+    public void testSendNegativeFeedback() {
+      requestAndStartPlayback();
+
+      mController.onNegativeFeedback(NegativeFeedbackReason.OFFENSIVE);
+
+      verify(mPlayback).sendFeedback(eq(FeedbackType.NEGATIVE), eq(NegativeFeedbackReason.OFFENSIVE), Mockito.any(ReadAloudPlaybackHooks.SendFeedbackCallback.class));
     }
 
     @Test

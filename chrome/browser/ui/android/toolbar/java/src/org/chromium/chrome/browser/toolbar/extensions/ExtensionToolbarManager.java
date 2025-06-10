@@ -15,6 +15,7 @@ import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.theme.ThemeColorProvider;
+import org.chromium.ui.base.WindowAndroid;
 
 /** Provides extension-related buttons for {@link ToolbarManager}. */
 @NullMarked
@@ -23,6 +24,7 @@ public interface ExtensionToolbarManager extends Destroyable {
     public void initialize(
             Context context,
             ViewStub extensionToolbarStub,
+            WindowAndroid windowAndroid,
             ObservableSupplier<Profile> profileSupplier,
             ObservableSupplier<Tab> currentTabSupplier,
             ThemeColorProvider themeColorProvider);
@@ -32,6 +34,7 @@ public interface ExtensionToolbarManager extends Destroyable {
     public static ExtensionToolbarManager maybeCreate(
             Context context,
             ViewStub extensionToolbarStub,
+            WindowAndroid windowAndroid,
             ObservableSupplier<Profile> profileSupplier,
             ObservableSupplier<Tab> currentTabSupplier,
             ThemeColorProvider themeColorProvider) {
@@ -43,9 +46,13 @@ public interface ExtensionToolbarManager extends Destroyable {
         manager.initialize(
                 context,
                 extensionToolbarStub,
+                windowAndroid,
                 profileSupplier,
                 currentTabSupplier,
                 themeColorProvider);
         return manager;
     }
+
+    /** Initialize the manager with the components that had native initialization dependencies. */
+    public void initializeWithNative();
 }

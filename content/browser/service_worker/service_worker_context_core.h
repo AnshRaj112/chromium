@@ -386,7 +386,7 @@ class CONTENT_EXPORT ServiceWorkerContextCore
                               const GURL& source_url) override;
 
   ServiceWorkerContextWrapper* wrapper() const { return wrapper_; }
-  ServiceWorkerRegistry* registry() const { return registry_.get(); }
+  ServiceWorkerRegistry& registry() { return registry_; }
   mojo::Remote<storage::mojom::ServiceWorkerStorageControl>&
   GetStorageControl();
   ServiceWorkerProcessManager* process_manager();
@@ -474,7 +474,7 @@ class CONTENT_EXPORT ServiceWorkerContextCore
   void ProtectVersion(const scoped_refptr<ServiceWorkerVersion>& version);
   void UnprotectVersion(int64_t version_id);
 
-  void ScheduleDeleteAndStartOver() const;
+  void ScheduleDeleteAndStartOver();
 
   // Deletes all files on disk and restarts the system. This leaves the system
   // in a disabled state until it's done.
@@ -631,6 +631,9 @@ class CONTENT_EXPORT ServiceWorkerContextCore
       base::TimeTicks start_time,
       const std::vector<blink::StorageKey>& storage_keys);
 
+  void SetRegisteredStorageKeys(
+      const std::vector<blink::StorageKey>& storage_keys);
+
   // It's safe to store a raw pointer instead of a scoped_refptr to |wrapper_|
   // because the Wrapper::Shutdown call that hops threads to destroy |this| uses
   // Bind() to hold a reference to |wrapper_| until |this| is fully destroyed.
@@ -638,7 +641,7 @@ class CONTENT_EXPORT ServiceWorkerContextCore
 
   std::unique_ptr<ServiceWorkerClientOwner> service_worker_client_owner_;
 
-  std::unique_ptr<ServiceWorkerRegistry> registry_;
+  ServiceWorkerRegistry registry_;
   std::unique_ptr<ServiceWorkerJobCoordinator> job_coordinator_;
   // TODO(bashi): Move |live_registrations_| to ServiceWorkerRegistry as
   // ServiceWorkerRegistry is a better place to manage in-memory representation

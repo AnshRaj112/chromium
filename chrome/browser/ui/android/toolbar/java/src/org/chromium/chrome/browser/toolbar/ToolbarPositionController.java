@@ -423,7 +423,7 @@ public class ToolbarPositionController implements OnSharedPreferenceChangeListen
                                 (LayoutParams) mToolbarProgressBarContainer.getLayoutParams();
                         progressBarLayoutParams.setAnchorId(mControlContainer.getView().getId());
                         progressBarLayoutParams.anchorGravity = Gravity.BOTTOM;
-                        progressBarLayoutParams.gravity = Gravity.TOP;
+                        progressBarLayoutParams.gravity = Gravity.CENTER;
                         mToolbarProgressBarContainer.setLayoutParams(progressBarLayoutParams);
                     };
 
@@ -549,6 +549,12 @@ public class ToolbarPositionController implements OnSharedPreferenceChangeListen
             mControlContainerHeight = mControlContainer.getToolbarHeight();
         } else {
             mControlContainerHeight = height;
+        }
+
+        if (mCurrentPosition == ControlsPosition.BOTTOM) {
+            mControlContainer.mutateHairlineLayoutParams().bottomMargin = mControlContainerHeight;
+        } else {
+            mControlContainer.mutateHairlineLayoutParams().topMargin = mControlContainerHeight;
         }
 
         mBottomControlsStacker.requestLayerUpdate(false);

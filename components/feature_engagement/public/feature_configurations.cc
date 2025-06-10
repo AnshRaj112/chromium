@@ -1866,9 +1866,9 @@ std::optional<FeatureConfig> GetClientSideFeatureConfig(
     return config;
   }
   if (kIPHTabSwitcherXR.name == feature->name) {
-    // A config that allows the card info retrieval suggestion IPH to be shown
-    // at most 3 times. IPH will not be shown once user has selected the
-    // suggestion.
+    // A config that allows the XR tab switcher IPH to be shown at most 3 times.
+    // IPH will not be shown is user has clicked on it, otherwise it will be
+    // snoozed for one day.
     FeatureConfig config;
     config.valid = true;
     config.availability = Comparator(ANY, 0);
@@ -1876,9 +1876,30 @@ std::optional<FeatureConfig> GetClientSideFeatureConfig(
         EventConfig("tab_switcher_xr_iph_trigger", Comparator(LESS_THAN, 3),
                     feature_engagement::kMaxStoragePeriod,
                     feature_engagement::kMaxStoragePeriod);
-    config.used = EventConfig("tab_switcher_xr_iph_shown", Comparator(ANY, 0),
+    config.used = EventConfig("tab_switcher_xr_iph_used", Comparator(ANY, 0),
                               feature_engagement::kMaxStoragePeriod,
                               feature_engagement::kMaxStoragePeriod);
+    config.snooze_params.snooze_interval = 1;
+    config.snooze_params.max_limit = 3;
+
+    return config;
+  }
+  if (kIPHTabTearingXR.name == feature->name) {
+    // A config that allows XR tab tearing IPH to be shown
+    // at most 3 times. IPH will not be shown is user has clicked on it,
+    // otherwise it will be snoozed for one day.
+    FeatureConfig config;
+    config.valid = true;
+    config.availability = Comparator(ANY, 0);
+    config.trigger =
+        EventConfig("tab_tearing_xr_iph_trigger", Comparator(LESS_THAN, 3),
+                    feature_engagement::kMaxStoragePeriod,
+                    feature_engagement::kMaxStoragePeriod);
+    config.used = EventConfig("tab_tearing_xr_iph_used", Comparator(ANY, 0),
+                              feature_engagement::kMaxStoragePeriod,
+                              feature_engagement::kMaxStoragePeriod);
+    config.snooze_params.snooze_interval = 1;
+    config.snooze_params.max_limit = 3;
 
     return config;
   }
@@ -2556,23 +2577,6 @@ std::optional<FeatureConfig> GetClientSideFeatureConfig(
     return config;
   }
 
-  if (kIPHPlusAddressCreateSuggestionFeature.name == feature->name) {
-    // A config that allows a user education bubble to be shown for the plus
-    // address feature. Will be shown up to 9 times in the 90 day window with
-    // the exception of 2 times if the user accepted the suggestion.
-
-    FeatureConfig config;
-    config.valid = true;
-    config.availability = Comparator(ANY, 0);
-    config.session_rate = Comparator(EQUAL, 0);
-    config.trigger =
-        EventConfig("plus_address_create_suggestion_feature_trigger",
-                    Comparator(LESS_THAN, 10), 90, 360);
-    config.used = EventConfig("plus_address_create_suggestion_feature_used",
-                              Comparator(LESS_THAN, 2), 90, 360);
-    return config;
-  }
-
   if (kIPHHomeCustomizationMenuFeature.name == feature->name) {
     FeatureConfig config;
     config.valid = true;
@@ -2710,6 +2714,25 @@ std::optional<FeatureConfig> GetClientSideFeatureConfig(
     return config;
   }
 #endif  // BUILDFLAG(IS_CHROMEOS)
+
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+  if (kIPHPlusAddressCreateSuggestionFeature.name == feature->name) {
+    // A config that allows a user education bubble to be shown for the plus
+    // address feature. Will be shown up to 9 times in the 90 day window with
+    // the exception of 2 times if the user accepted the suggestion.
+
+    FeatureConfig config;
+    config.valid = true;
+    config.availability = Comparator(ANY, 0);
+    config.session_rate = Comparator(EQUAL, 0);
+    config.trigger =
+        EventConfig("plus_address_create_suggestion_feature_trigger",
+                    Comparator(LESS_THAN, 9), 90, 360);
+    config.used = EventConfig("plus_address_create_suggestion_feature_used",
+                              Comparator(LESS_THAN, 2), 90, 360);
+    return config;
+  }
+#endif  // BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
 
   if (kIPHDummyFeature.name == feature->name) {
     // Only used for tests. Various magic tricks are used below to ensure this

@@ -204,8 +204,11 @@ class CONTENT_EXPORT BrowserContext : public base::SupportsUserData {
   // `embedder_histogram_suffix` is used for generating internal histogram names
   // recorded per trigger. `ttl` (Time-To-Live) specifies how long
   // prefetched data remains valid in the cache. After this period, the data is
-  // reset. Returns `PrefetchHandle` to control prefetch resources. This can be
-  // null when it can't add `PrefetchContainer` to `PrefetchService`.
+  // reset. `should_disable_block_until_head_timeout` specifies whether we
+  // should have a timeout when this prefetch blocks the navigation until its
+  // head is determined. Returns `PrefetchHandle` to control prefetch resources.
+  // This can be null when it can't add `PrefetchContainer` to
+  // `PrefetchService`.
   std::unique_ptr<content::PrefetchHandle> StartBrowserPrefetchRequest(
       const GURL& url,
       const std::string& embedder_histogram_suffix,
@@ -213,8 +216,9 @@ class CONTENT_EXPORT BrowserContext : public base::SupportsUserData {
       std::optional<net::HttpNoVarySearchData> no_vary_search_hint,
       const net::HttpRequestHeaders& additional_headers,
       std::unique_ptr<PrefetchRequestStatusListener> request_status_listener,
-      base::TimeDelta ttl_in_sec,
-      bool should_append_variations_header);
+      base::TimeDelta ttl,
+      bool should_append_variations_header,
+      bool should_disable_block_until_head_timeout);
 
   // Updates the "Accept Language" header that the prefetch service delegate
   // will use.

@@ -61,6 +61,14 @@ IN_PROC_BROWSER_TEST_F(NewTabPageTest, Transparency) {
   RunTest("new_tab_page/transparency_test.js", "mocha.run()");
 }
 
+IN_PROC_BROWSER_TEST_F(NewTabPageTest, Composebox) {
+  RunTest("new_tab_page/composebox/composebox_test.js", "mocha.run()");
+}
+
+IN_PROC_BROWSER_TEST_F(NewTabPageTest, ComposeboxFileCarousel) {
+  RunTest("new_tab_page/composebox/file_carousel_test.js", "mocha.run()");
+}
+
 using NewTabPageModulesTest = NewTabPageBrowserTest;
 
 IN_PROC_BROWSER_TEST_F(NewTabPageModulesTest, ModuleWrapper) {
@@ -196,6 +204,11 @@ IN_PROC_BROWSER_TEST_F(NewTabPageAppTest, CustomizeChromeSidePanel) {
 IN_PROC_BROWSER_TEST_F(NewTabPageAppTest, LensUploadDialog) {
   RunTest("new_tab_page/app_test.js",
           "runMochaSuite('NewTabPageAppTest LensUploadDialog')");
+}
+
+IN_PROC_BROWSER_TEST_F(NewTabPageAppTest, Composebox) {
+  RunTest("new_tab_page/app_test.js",
+          "runMochaSuite('NewTabPageAppTest Composebox')");
 }
 
 IN_PROC_BROWSER_TEST_F(NewTabPageAppTest, WallpaperSearch) {

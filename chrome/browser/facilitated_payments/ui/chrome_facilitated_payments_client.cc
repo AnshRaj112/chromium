@@ -24,7 +24,7 @@
 #include "components/facilitated_payments/core/browser/network_api/multiple_request_facilitated_payments_network_interface.h"
 #include "components/facilitated_payments/core/features/features.h"
 #include "components/facilitated_payments/core/utils/facilitated_payments_ui_utils.h"
-#include "components/optimization_guide/core/optimization_guide_decider.h"
+#include "components/optimization_guide/core/hints/optimization_guide_decider.h"
 #include "components/optimization_guide/proto/hints.pb.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "content/public/browser/web_contents.h"
@@ -177,8 +177,16 @@ bool ChromeFacilitatedPaymentsClient::IsPixAccountLinkingSupported() const {
   return payments::facilitated::IsWalletEligibleForPixAccountLinking();
 }
 
-void ChromeFacilitatedPaymentsClient::ShowPixAccountLinkingPrompt() {
-  facilitated_payments_controller_->ShowPixAccountLinkingPrompt();
+void ChromeFacilitatedPaymentsClient::ShowPixAccountLinkingPrompt(
+    base::OnceCallback<void()> on_accepted,
+    base::OnceCallback<void()> on_declined) {
+  facilitated_payments_controller_->ShowPixAccountLinkingPrompt(
+      std::move(on_accepted), std::move(on_declined));
+}
+
+void ChromeFacilitatedPaymentsClient::OnPixAccountLinkingPromptAccepted() {
+  // TODO(crbug.com/419108993): Add metrics.
+  payments::facilitated::OpenPixAccountLinkingPageInWallet();
 }
 
 void ChromeFacilitatedPaymentsClient::RegisterAllowlists() {
@@ -187,11 +195,8 @@ void ChromeFacilitatedPaymentsClient::RegisterAllowlists() {
       optimization_guide_decider_->RegisterOptimizationTypes(
           {optimization_guide::proto::EWALLET_MERCHANT_ALLOWLIST});
     }
-    if (base::FeatureList::IsEnabled(
-            payments::facilitated::kEnablePixPayments)) {
-      optimization_guide_decider_->RegisterOptimizationTypes(
-          {optimization_guide::proto::PIX_MERCHANT_ORIGINS_ALLOWLIST});
-    }
+    optimization_guide_decider_->RegisterOptimizationTypes(
+        {optimization_guide::proto::PIX_MERCHANT_ORIGINS_ALLOWLIST});
   }
 }
 

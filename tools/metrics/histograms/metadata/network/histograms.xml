@@ -61,6 +61,13 @@ chromium-metrics-reviews@google.com.
 
 <!-- LINT.ThenChange(/services/network/public/cpp/content_decoding_interceptor.h:ContentDecodingInterceptorClientType) -->
 
+<variants name="DHCPProvisionReason">
+  <variant name="Connect"/>
+  <variant name="LeaseExpiration"/>
+  <variant name="Roaming"/>
+  <variant name="SuspendResume"/>
+</variants>
+
 <variants name="HTTPRequestConnectionProtocol">
   <variant name="Multiplexed"/>
   <variant name="Simple"/>
@@ -2112,6 +2119,7 @@ chromium-metrics-reviews@google.com.
     <variant name="Googlecast"/>
     <variant name="Other"/>
     <variant name="PrintScan"/>
+    <variant name="UUID"/>
   </token>
 </histogram>
 
@@ -2419,7 +2427,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Network.SharedDictionary.EncodingType"
-    enum="SharedDictionaryEncodingType" expires_after="2025-10-05">
+    enum="SharedDictionaryEncodingType" expires_after="2025-12-07">
   <owner>nidhijaju@chromium.org</owner>
   <owner>blink-network-stack@google.com</owner>
   <summary>
@@ -4789,6 +4797,18 @@ chromium-metrics-reviews@google.com.
   <token key="Technology" variants="PhysicalTechnology"/>
 </histogram>
 
+<histogram name="Network.Shill.{Technology}.DHCPv4RenewRebind"
+    enum="DHCPv4RenewRebind" expires_after="2025-12-31">
+  <owner>chenzikai@google.com</owner>
+  <owner>cros-network-metrics@google.com</owner>
+  <summary>
+    ChromeOS network performance metric that tracks the number of successful
+    DHCPv4 Renew/Rebind events for {Technology}. The metric will be emitted once
+    per DHCPv4 Renew/Rebind event in shill.
+  </summary>
+  <token key="Technology" variants="PhysicalTechnology"/>
+</histogram>
+
 <histogram name="Network.Shill.{Technology}.IPType" enum="NetworkIPType"
     expires_after="2025-12-31">
   <owner>jiejiang@chromium.org</owner>
@@ -4816,6 +4836,20 @@ chromium-metrics-reviews@google.com.
     kernel.
   </summary>
   <token key="Technology" variants="PhysicalTechnology"/>
+</histogram>
+
+<histogram
+    name="Network.Shill.{Technology}.{DHCPProvisionReason}.DHCPv4ProvisionResult"
+    enum="DHCPv4ProvisionResult" expires_after="2025-12-31">
+  <owner>chenzikai@google.com</owner>
+  <owner>cros-network-metrics@google.com</owner>
+  <summary>
+    ChromeOS network performance metric that tracks the DHCPv4 provision result
+    for {Technology} due to {DHCPProvisionReason}. The metric is emitted once
+    the provisioning is done (either succeeded or failed).
+  </summary>
+  <token key="Technology" variants="PhysicalTechnology"/>
+  <token key="DHCPProvisionReason" variants="DHCPProvisionReason"/>
 </histogram>
 
 <histogram name="Network.TrafficCounters.{Technology}.AverageDailyDataUsage"
@@ -5131,7 +5165,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NetworkService.IpProtection.EmptyTokenCache2"
-    enum="IpProtectionProxyLayer" expires_after="2025-10-05">
+    enum="IpProtectionProxyLayer" expires_after="2025-12-07">
   <owner>djmitche@chromium.org</owner>
   <owner>ashleynewson@chromium.org</owner>
   <owner>src/android_webview/OWNERS</owner>
@@ -5288,7 +5322,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NetworkService.IpProtection.OAuthTokenFetchTime" units="ms"
-    expires_after="2025-09-28">
+    expires_after="2025-11-30">
   <owner>djmitche@chromium.org</owner>
   <owner>src/chrome/browser/ip_protection/OWNERS</owner>
   <summary>
@@ -5518,7 +5552,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NetworkService.IpProtection.TryGetAuthTokensErrors"
-    enum="IpProtectionTokenBatchRequestError" expires_after="2025-10-05">
+    enum="IpProtectionTokenBatchRequestError" expires_after="2025-12-07">
   <owner>linxinan@chromium.org</owner>
   <owner>src/chrome/browser/ip_protection/OWNERS</owner>
   <summary>
@@ -5530,7 +5564,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NetworkService.IpProtection.TryGetAuthTokensResult"
-    enum="IpProtectionTokenBatchRequestResult" expires_after="2025-09-28">
+    enum="IpProtectionTokenBatchRequestResult" expires_after="2025-11-30">
   <owner>djmitche@chromium.org</owner>
   <owner>src/chrome/browser/ip_protection/OWNERS</owner>
   <summary>
@@ -5688,7 +5722,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NetworkService.ParsedHeaders.IPCHandleTime"
-    units="microseconds" expires_after="2025-09-25">
+    units="microseconds" expires_after="2025-11-30">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-loading@google.com</owner>
   <summary>
@@ -5702,7 +5736,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="NetworkService.Requests.{Multiplexed}.{RequestType}.{Method}.{Result}.TotalHeadersSize"
-    units="bytes" expires_after="2025-10-05">
+    units="bytes" expires_after="2025-12-07">
   <owner>ortuno@chromium.org</owner>
   <owner>navtracking-team@google.com</owner>
   <summary>
@@ -5719,7 +5753,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="NetworkService.Requests.{Multiplexed}.{RequestType}.{Method}.{Result}.TotalRequestSize"
-    units="bytes" expires_after="2025-10-05">
+    units="bytes" expires_after="2025-12-07">
   <owner>ortuno@chromium.org</owner>
   <owner>navtracking-team@google.com</owner>
   <summary>
@@ -5736,7 +5770,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="NetworkService.Requests.{Multiplexed}.{RequestType}.{Method}.{Result}.TotalUrlSize"
-    units="bytes" expires_after="2025-10-05">
+    units="bytes" expires_after="2025-12-07">
   <owner>ortuno@chromium.org</owner>
   <owner>navtracking-team@google.com</owner>
   <summary>

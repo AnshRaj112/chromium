@@ -93,6 +93,7 @@ import org.chromium.chrome.browser.tab_ui.TabContentManager;
 import org.chromium.chrome.browser.tabmodel.TabCreatorManager;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveToolbarBehavior;
+import org.chromium.chrome.browser.toolbar.menu_button.MenuButtonCoordinator;
 import org.chromium.chrome.browser.ui.RootUiCoordinator;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuBlocker;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuDelegate;
@@ -389,6 +390,7 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
         return false;
     }
 
+    @ExperimentalOpenInBrowser
     @Override
     protected void initializeToolbar() {
         CustomTabsConnection connection = CustomTabsConnection.getInstance();
@@ -417,13 +419,19 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
                             mActivityLifecycleDispatcher);
             super.initializeToolbar();
 
-            mToolbarCoordinator.get().onToolbarInitialized(mToolbarManager);
+            mToolbarCoordinator
+                    .get()
+                    .onToolbarInitialized(mToolbarManager, mToolbarButtonsCoordinator);
             View coordinator = mActivity.findViewById(R.id.coordinator);
             mCustomTabHeightStrategy.onToolbarInitialized(
                     coordinator,
                     toolbar,
                     mIntentDataProvider.get().getPartialTabToolbarCornerRadius(),
                     mToolbarButtonsCoordinator);
+
+            if (shouldEnableOmnibox) {
+                toolbar.setOmniboxParams(omniboxParams);
+            }
 
             return;
         }
@@ -433,12 +441,15 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
         // TODO(crbug.com/402213312): Move as much of this as possible into
         // CustomTabToolbar#initializeToolbar rather than calling a bunch of setters.
 
-        mToolbarCoordinator.get().onToolbarInitialized(mToolbarManager);
+        mToolbarCoordinator.get().onToolbarInitialized(mToolbarManager, null);
 
         CustomTabToolbar toolbar = mActivity.findViewById(R.id.toolbar);
+        toolbar.calculateToolbarWidthBeforeMeasure(mActivity, mIntentDataProvider.get());
         if (ChromeFeatureList.sCctIntentFeatureOverrides.isEnabled()) {
             toolbar.setFeatureOverridesManager(mFeatureOverridesManagerSupplier.get());
         }
+        var cpac = getContextualPageActionController();
+        if (cpac != null) cpac.setButtonVisibilitySupplier(toolbar::shouldShowOptionalButton);
         View coordinator = mActivity.findViewById(R.id.coordinator);
         mCustomTabHeightStrategy.onToolbarInitialized(
                 coordinator,
@@ -1026,5 +1037,10 @@ public class BaseCustomTabRootUiCoordinator extends RootUiCoordinator {
     @VisibleForTesting
     public WebAppHeaderLayoutCoordinator getWebAppHeaderLayoutCoordinator() {
         return mWebAppHeaderLayoutCoordinator;
+    }
+
+    @Override
+    protected @Nullable MenuButtonCoordinator.VisibilityDelegate getMenuButtonVisibilityDelegate() {
+        return mToolbarButtonsCoordinator;
     }
 }

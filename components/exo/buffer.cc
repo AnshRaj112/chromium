@@ -17,7 +17,7 @@
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "base/not_fatal_until.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
@@ -33,21 +33,19 @@
 #include "gpu/GLES2/gl2extchromium.h"
 #include "gpu/command_buffer/client/client_shared_image.h"
 #include "gpu/command_buffer/client/context_support.h"
-#include "gpu/command_buffer/client/gpu_memory_buffer_manager.h"
 #include "gpu/command_buffer/client/raster_interface.h"
 #include "gpu/command_buffer/client/shared_image_interface.h"
 #include "gpu/command_buffer/common/mailbox.h"
 #include "gpu/command_buffer/common/shared_image_capabilities.h"
 #include "gpu/command_buffer/common/shared_image_usage.h"
 #include "gpu/command_buffer/common/sync_token.h"
-#include "gpu/ipc/common/gpu_memory_buffer_support.h"
 #include "media/base/media_switches.h"
 #include "ui/aura/env.h"
 #include "ui/color/color_id.h"
 #include "ui/compositor/compositor.h"
 #include "ui/gfx/color_space.h"
 #include "ui/gfx/gpu_fence_handle.h"
-#include "ui/gfx/gpu_memory_buffer.h"
+#include "ui/gfx/gpu_memory_buffer_handle.h"
 
 #if BUILDFLAG(USE_ARC_PROTECTED_MEDIA)
 #include "base/files/scoped_file.h"
@@ -108,7 +106,9 @@ viz::SharedImageFormat GetSharedImageFormat(gfx::BufferFormat buffer_format) {
       return viz::SinglePlaneFormat::kRGBA_8888;
     case gfx::BufferFormat::RGBA_F16:
       return viz::SinglePlaneFormat::kRGBA_F16;
-    case gfx::BufferFormat::BGR_565:
+    case gfx::BufferFormat::BGR_565: {
+      UMA_HISTOGRAM_BOOLEAN("Graphics.Exo.Buffer.Used_BRG_565", true);
+    }
       return viz::SinglePlaneFormat::kBGR_565;
     case gfx::BufferFormat::RG_88:
       if (base::FeatureList::IsEnabled(kExoDisableRG88Format)) {
@@ -253,6 +253,7 @@ class Buffer::Texture : public viz::ContextLostObserver {
   const base::TimeDelta wait_for_release_delay_;
   base::TimeTicks wait_for_release_time_;
   bool wait_for_release_pending_ = false;
+  gpu::SyncToken sync_token_;
   base::WeakPtrFactory<Texture> weak_ptr_factory_{this};
 };
 
@@ -281,9 +282,8 @@ Buffer::Texture::Texture(
                              gpu::kNullSurfaceHandle);
   CHECK(shared_image_);
   DCHECK(!shared_image_->mailbox().IsZero());
-  gpu::raster::RasterInterface* ri = context_provider_->RasterInterface();
   sync_token_out = sii->GenUnverifiedSyncToken();
-  ri->WaitSyncTokenCHROMIUM(sync_token_out.GetConstData());
+  sync_token_ = sync_token_out;
 
   // Provides a notification when |context_provider_| is lost.
   context_provider_->AddObserver(this);
@@ -329,7 +329,7 @@ Buffer::Texture::Texture(
   DCHECK(!shared_image_->mailbox().IsZero());
   gpu::raster::RasterInterface* ri = context_provider_->RasterInterface();
   sync_token_out = sii->GenUnverifiedSyncToken();
-  ri->WaitSyncTokenCHROMIUM(sync_token_out.GetConstData());
+  sync_token_ = sync_token_out;
   ri->GenQueriesEXT(1, &query_id_);
 
   // Provides a notification when |context_provider_| is lost.
@@ -363,8 +363,7 @@ void Buffer::Texture::Release(
   if (context_provider_) {
     // Only need to wait on the sync token if we don't have a release fence.
     if (resource.sync_token.HasData() && resource.release_fence.is_null()) {
-      gpu::raster::RasterInterface* ri = context_provider_->RasterInterface();
-      ri->WaitSyncTokenCHROMIUM(resource.sync_token.GetConstData());
+      sync_token_ = resource.sync_token;
     }
   }
 
@@ -375,7 +374,6 @@ void Buffer::Texture::Release(
 
 gpu::SyncToken Buffer::Texture::UpdateSharedImage(
     std::unique_ptr<gfx::GpuFence> acquire_fence) {
-  gpu::SyncToken sync_token;
   if (context_provider_) {
     gpu::SharedImageInterface* sii = context_provider_->SharedImageInterface();
     CHECK(shared_image_);
@@ -385,10 +383,10 @@ gpu::SyncToken Buffer::Texture::UpdateSharedImage(
     // |query_type_| is available.
     sii->UpdateSharedImage(gpu::SyncToken(), std::move(acquire_fence),
                            shared_image_->mailbox());
-    sync_token = sii->GenUnverifiedSyncToken();
+    sync_token_ = sii->GenUnverifiedSyncToken();
     TRACE_EVENT_ASYNC_STEP_INTO0("exo", kBufferInUse, GetBufferId(), "bound");
   }
-  return sync_token;
+  return sync_token_;
 }
 
 void Buffer::Texture::ReleaseSharedImage(
@@ -400,6 +398,7 @@ void Buffer::Texture::ReleaseSharedImage(
     gpu::raster::RasterInterface* ri = context_provider_->RasterInterface();
     if (resource.sync_token.HasData()) {
       ri->WaitSyncTokenCHROMIUM(resource.sync_token.GetConstData());
+      sync_token_ = resource.sync_token;
     }
     ri->BeginQueryEXT(query_type_, query_id_);
     ri->EndQueryEXT(query_type_);
@@ -420,17 +419,19 @@ gpu::SyncToken Buffer::Texture::CopyTexImage(
     std::unique_ptr<gfx::GpuFence> acquire_fence,
     Texture* destination,
     base::OnceClosure callback) {
-  gpu::SyncToken sync_token;
   if (context_provider_) {
     CHECK(shared_image_);
     gpu::SharedImageInterface* sii = context_provider_->SharedImageInterface();
-    sii->UpdateSharedImage(gpu::SyncToken(), std::move(acquire_fence),
+    sii->UpdateSharedImage(sync_token_, std::move(acquire_fence),
                            shared_image_->mailbox());
-    sync_token = sii->GenUnverifiedSyncToken();
+    gpu::SyncToken sync_token = sii->GenUnverifiedSyncToken();
 
     gpu::raster::RasterInterface* ri = context_provider_->RasterInterface();
-    std::unique_ptr<gpu::RasterScopedAccess> ri_access =
+    std::unique_ptr<gpu::RasterScopedAccess> ri_src_access =
         shared_image_->BeginRasterAccess(ri, sync_token, /*readonly=*/true);
+    std::unique_ptr<gpu::RasterScopedAccess> ri_dst_access =
+        destination->shared_image_->BeginRasterAccess(
+            ri, destination->sync_token_, /*readonly=*/false);
 
     DCHECK_NE(query_id_, 0u);
     ri->BeginQueryEXT(query_type_, query_id_);
@@ -444,9 +445,11 @@ gpu::SyncToken Buffer::Texture::CopyTexImage(
     // Create and return a sync token that can be used to ensure that the
     // CopySharedImage call is processed before issuing any commands
     // that will read from the target texture on a different context.
-    sync_token = gpu::RasterScopedAccess::EndAccess(std::move(ri_access));
+    destination->sync_token_ =
+        gpu::RasterScopedAccess::EndAccess(std::move(ri_dst_access));
+    sync_token_ = gpu::RasterScopedAccess::EndAccess(std::move(ri_src_access));
   }
-  return sync_token;
+  return sync_token_;
 }
 
 void Buffer::Texture::DestroyResources() {
@@ -716,7 +719,8 @@ bool Buffer::ProduceTransferableResource(
   // require a secure output.
   if (secure_output_only &&
       protected_buffer_state_ == ProtectedBufferState::UNKNOWN &&
-      !gpu_memory_buffer_handle_.is_null() && protected_native_pixmap_query) {
+      gpu_memory_buffer_handle_.type == gfx::NATIVE_PIXMAP &&
+      protected_native_pixmap_query) {
     if (!gpu_memory_buffer_handle_.native_pixmap_handle().planes.empty()) {
       base::ScopedFD pixmap_handle(
           HANDLE_EINTR(dup(gpu_memory_buffer_handle_.native_pixmap_handle()
@@ -944,7 +948,7 @@ void Buffer::MaybeRunPerCommitRelease(
 
 void Buffer::FenceSignalled(uint64_t commit_id) {
   auto iter = buffer_releases_.find(commit_id);
-  CHECK(iter != buffer_releases_.end(), base::NotFatalUntil::M130);
+  CHECK(iter != buffer_releases_.end());
   std::move(iter->second.buffer_release_callback).Run();
   buffer_releases_.erase(iter);
 }

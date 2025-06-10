@@ -164,13 +164,13 @@ BASE_FEATURE(kDocumentProvider,
 // cookie jar.
 BASE_FEATURE(kDocumentProviderPrimaryAccountRequirement,
              "OmniboxDocumentProviderPrimaryAccountRequirement",
-             DISABLED);
+             ENABLED);
 
 // If enabled, the primary account must be subject to enterprise policies in
 // order to receive Drive suggestions.
 BASE_FEATURE(kDocumentProviderEnterpriseEligibility,
              "OmniboxDocumentProviderEnterpriseEligibility",
-             DISABLED);
+             ENABLED);
 
 // If enabled, the enterprise eligibility requirement for Drive suggestions
 // is considered met even when the account capability is unknown. Has no effect
@@ -184,12 +184,18 @@ BASE_FEATURE(kDocumentProviderEnterpriseEligibilityWhenUnknown,
 // requirements.
 BASE_FEATURE(kDocumentProviderNoSyncRequirement,
              "OmniboxDocumentProviderNoSyncRequirement",
-             DISABLED);
+             ENABLED);
 
 // Feature to determine if the HQP should double as a domain provider by
 // suggesting up to the provider limit for each of the user's highly visited
 // domains.
 BASE_FEATURE(kDomainSuggestions, "OmniboxDomainSuggestions", DISABLED);
+
+// If enabled, the omnibox popup is not presented until the mouse button is
+// released.
+BASE_FEATURE(kShowPopupOnMouseReleased,
+             "OmniboxShowPopupOnMouseReleased",
+             DISABLED);
 
 // If enabled, makes Most Visited Tiles a Horizontal render group.
 // Horizontal render group decomposes aggregate suggestions (such as old Most
@@ -392,9 +398,6 @@ BASE_FEATURE(kSuppressIntermediateACUpdatesOnLowEndDevices,
              "SuppressIntermediateACUpdatesOnLowEndDevices",
              DISABLED);
 
-// (Android only) Show the search feature in the hub.
-BASE_FEATURE(kAndroidHubSearch, "AndroidHubSearch", ENABLED);
-
 // (Android only) Show tab groups via the search feature in the hub.
 BASE_FEATURE(kAndroidHubSearchTabGroups, "AndroidHubSearchTabGroups", DISABLED);
 
@@ -418,7 +421,6 @@ static jlong JNI_OmniboxFeatureMap_GetNativeMap(JNIEnv* env) {
       &kOmniboxElegantTextHeight,
       &kRetainOmniboxOnFocus,
       &kJumpStartOmnibox,
-      &kAndroidHubSearch,
       &kAndroidHubSearchTabGroups,
       &kPostDelayedTaskFocusTab,
       &kOmniboxMobileParityUpdate};
@@ -443,6 +445,17 @@ BASE_FEATURE(kEnableSearchAggregatorPolicy,
 // determines if the engine can be overridden on the Settings page.
 BASE_FEATURE(kEnableSiteSearchAllowUserOverridePolicy,
              "EnableSiteSearchAllowUserOverridePolicy",
+             DISABLED);
+
+// Enables preconnecting to omnibox suggestions that are not only Search types.
+BASE_FEATURE(kPreconnectNonSearchOmniboxSuggestions,
+             "PreconnectNonSearchOmniboxSuggestions",
+             DISABLED);
+
+// Enables restricting omnibox focus restoration to only situations that involve
+// "invisible focus".
+BASE_FEATURE(kOmniboxRestoreInvisibleFocusOnly,
+             "OmniboxRestoreInvisibleFocusOnly",
              DISABLED);
 
 }  // namespace omnibox

@@ -2,49 +2,82 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'chrome://newtab-footer/app.js';
-
 import type {NewTabFooterAppElement} from 'chrome://newtab-footer/app.js';
+import {CustomizeDialogPage, FooterCustomizeChromeEntryPoint, FooterElement} from 'chrome://newtab-footer/app.js';
 import {NewTabFooterDocumentProxy} from 'chrome://newtab-footer/browser_proxy.js';
+import type {CustomizeButtonsDocumentRemote} from 'chrome://newtab-footer/customize_buttons.mojom-webui.js';
+import {CustomizeButtonsDocumentCallbackRouter, CustomizeButtonsHandlerRemote, CustomizeChromeSection, SidePanelOpenTrigger} from 'chrome://newtab-footer/customize_buttons.mojom-webui.js';
+import {CustomizeButtonsProxy} from 'chrome://newtab-footer/customize_buttons_proxy.js';
 import type {ManagementNotice, NewTabFooterDocumentRemote} from 'chrome://newtab-footer/new_tab_footer.mojom-webui.js';
 import {NewTabFooterDocumentCallbackRouter, NewTabFooterHandlerRemote} from 'chrome://newtab-footer/new_tab_footer.mojom-webui.js';
-import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {WindowProxy} from 'chrome://newtab-footer/window_proxy.js';
+import type {CrButtonElement} from 'chrome://resources/cr_elements/cr_button/cr_button.js';
+import {assertDeepEquals, assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
+import type {MetricsTracker} from 'chrome://webui-test/metrics_test_support.js';
+import {fakeMetricsPrivate} from 'chrome://webui-test/metrics_test_support.js';
 import {TestMock} from 'chrome://webui-test/test_mock.js';
 import {$$, microtasksFinished} from 'chrome://webui-test/test_util.js';
+
+type Constructor<T> = new (...args: any[]) => T;
+type Installer<T> = (instance: T) => void;
+
+function installMock<T extends object>(
+    clazz: Constructor<T>, installer?: Installer<T>): TestMock<T> {
+  installer = installer ||
+      (clazz as unknown as {setInstance: Installer<T>}).setInstance;
+  const mock = TestMock.fromClass(clazz);
+  installer(mock);
+  return mock;
+}
 
 suite('NewTabFooterAppTest', () => {
   let element: NewTabFooterAppElement;
   let handler: TestMock<NewTabFooterHandlerRemote>&NewTabFooterHandlerRemote;
   let callbackRouter: NewTabFooterDocumentRemote;
+  let customizeButtonsCallbackRouterRemote: CustomizeButtonsDocumentRemote;
+  let customizeButtonsHandler: TestMock<CustomizeButtonsHandlerRemote>;
+  let metrics: MetricsTracker;
+  let windowProxy: TestMock<WindowProxy>;
 
-  setup(() => {
+  const url: URL = new URL(location.href);
+
+  async function setupFooter() {
     document.body.innerHTML = window.trustedTypes!.emptyHTML;
     handler = TestMock.fromClass(NewTabFooterHandlerRemote);
     NewTabFooterDocumentProxy.setInstance(
         handler, new NewTabFooterDocumentCallbackRouter());
     callbackRouter = NewTabFooterDocumentProxy.getInstance()
                          .callbackRouter.$.bindNewPipeAndPassRemote();
-  });
 
-  async function initializeElement() {
+    customizeButtonsHandler = installMock(
+        CustomizeButtonsHandlerRemote,
+        mock => CustomizeButtonsProxy.setInstance(
+            mock, new CustomizeButtonsDocumentCallbackRouter()));
+    customizeButtonsCallbackRouterRemote =
+        CustomizeButtonsProxy.getInstance()
+            .callbackRouter.$.bindNewPipeAndPassRemote();
+    metrics = fakeMetricsPrivate();
+    windowProxy = installMock(WindowProxy);
+    windowProxy.setResultFor('url', url);
+
     element = document.createElement('new-tab-footer-app');
     document.body.appendChild(element);
     await microtasksFinished();
-    await handler.whenCalled('updateManagementNotice');
   }
 
   suite('Extension', () => {
-    test('Get extension name on initialization', async () => {
-      // Arrange.
-      await initializeElement();
+    setup(async () => {
+      await setupFooter();
+    });
 
+    test('Get extension name on initialization', async () => {
       // Act.
       const fooName = 'foo';
       callbackRouter.setNtpExtensionName(fooName);
       await callbackRouter.$.flushForTesting();
 
       // Assert.
-      let name = $$(element, '#extensionName');
+      let name = $$(element, '#extensionNameContainer');
       assertTrue(!!name);
       const link = name.querySelector<HTMLElement>('[role="link"]');
       assertTrue(!!link);
@@ -55,33 +88,42 @@ suite('NewTabFooterAppTest', () => {
       await callbackRouter.$.flushForTesting();
 
       // Assert.
-      name = $$(element, '#extensionName');
+      name = $$(element, '#extensionNameContainer');
       assertFalse(!!name);
     });
 
     test('Click extension name link', async () => {
       // Arrange.
       callbackRouter.setNtpExtensionName('foo');
-      await initializeElement();
+      await callbackRouter.$.flushForTesting();
 
       // Act.
-      const link = $$(element, '#extensionName [role="link"]');
+      const link = $$(element, '#extensionNameContainer [role="link"]');
       assertTrue(!!link);
       link.click();
 
       // Assert.
       assertEquals(
           1, handler.getCallCount('openExtensionOptionsPageWithFallback'));
+      assertEquals(1, metrics.count('NewTabPage.Footer.Click'));
+      assertEquals(
+          1,
+          metrics.count(
+              'NewTabPage.Footer.Click', FooterElement.EXTENSION_NAME));
     });
   });
 
   suite('Managed', () => {
+    setup(async () => {
+      await setupFooter();
+    });
+
     test('Get management notice', async () => {
       // Arrange.
-      await initializeElement();
       const managementNotice: ManagementNotice = {
         text: 'Managed by your organization',
         bitmapDataUrl: {url: 'chrome://resources/images/chrome_logo_dark.svg'},
+        isCustomLogo: false,
       };
 
       // Act.
@@ -92,12 +134,13 @@ suite('NewTabFooterAppTest', () => {
       const managementNoticeContainer =
           element.shadowRoot.querySelector('#managementNoticeContainer');
       assertTrue(!!managementNoticeContainer);
-      let managementNoticeText = managementNoticeContainer.querySelector('p');
-      assertTrue(!!managementNoticeText);
+      let managementNoticeLink =
+          $$(element, '#managementNoticeContainer [role="link"]');
+      assertTrue(!!managementNoticeLink);
       assertEquals(
-          managementNoticeText.innerText, 'Managed by your organization');
+          managementNoticeLink.innerText, 'Managed by your organization');
       let managementNoticeLogo =
-          managementNoticeContainer.querySelector<HTMLImageElement>('img');
+          $$<HTMLImageElement>(element, '#managementNoticeLogo');
       assertTrue(!!managementNoticeLogo);
       assertEquals(
           managementNoticeLogo.src,
@@ -108,10 +151,211 @@ suite('NewTabFooterAppTest', () => {
       await callbackRouter.$.flushForTesting();
 
       // Assert.
-      managementNoticeText = $$(element, '#managementNoticeContainer p');
+      managementNoticeLink =
+          $$(element, '#managementNoticeContainer [role="link"]');
       managementNoticeLogo = $$(element, '#managementNoticeLogo');
-      assertFalse(!!managementNoticeText);
+      assertFalse(!!managementNoticeLink);
       assertFalse(!!managementNoticeLogo);
+    });
+
+    test('Management notice logo style', async () => {
+      // Arrange.
+      const managementNoticeWithCustomLogo: ManagementNotice = {
+        text: 'Managed by your organization',
+        bitmapDataUrl: {url: 'chrome://resources/images/chrome_logo_dark.svg'},
+        isCustomLogo: true,
+      };
+
+      // Act.
+      callbackRouter.setManagementNotice(managementNoticeWithCustomLogo);
+      await callbackRouter.$.flushForTesting();
+
+      // Assert.
+      let logoContainter = $$(element, '#managementNoticeLogoContainer');
+      assertTrue(!!logoContainter);
+      assertTrue(logoContainter.classList.contains('custom_logo'));
+
+      const managementNoticeWithDefaultLogo: ManagementNotice = {
+        text: 'Managed by your organization',
+        bitmapDataUrl: {url: 'chrome://resources/images/chrome_logo_dark.svg'},
+        isCustomLogo: false,
+      };
+
+      // Act.
+      callbackRouter.setManagementNotice(managementNoticeWithDefaultLogo);
+      await callbackRouter.$.flushForTesting();
+
+      logoContainter = $$(element, '#managementNoticeLogoContainer');
+      assertTrue(!!logoContainter);
+      assertEquals(logoContainter.classList.length, 0);
+    });
+
+    test('Click manageemnt notice link', async () => {
+      // Arrange.
+      const managementNotice: ManagementNotice = {
+        text: 'Managed by your organization',
+        bitmapDataUrl: {url: 'chrome://resources/images/chrome_logo_dark.svg'},
+        isCustomLogo: false,
+      };
+      callbackRouter.setManagementNotice(managementNotice);
+      await callbackRouter.$.flushForTesting();
+
+      // Act.
+      const link = $$(element, '#managementNoticeContainer [role="link"]');
+      assertTrue(!!link);
+      link.click();
+
+      // Assert.
+      assertEquals(1, handler.getCallCount('openManagementPage'));
+    });
+  });
+
+  suite('CustomizeChromeButton', () => {
+    setup(async () => {
+      await setupFooter();
+    });
+
+    function getCustomizeButton(): CrButtonElement {
+      const buttons = $$(element, '#customizeButtons');
+      assertTrue(!!buttons);
+      const button = $$<CrButtonElement>(buttons, '#customizeButton');
+      assertTrue(!!button);
+      return button;
+    }
+
+    test('clicking customize button opens side panel', () => {
+      // Act.
+      getCustomizeButton().click();
+
+      // Assert.
+      assertDeepEquals(
+          [
+            true,
+            CustomizeChromeSection.kUnspecified,
+            SidePanelOpenTrigger.kNewTabFooter,
+          ],
+          customizeButtonsHandler.getArgs(
+              'setCustomizeChromeSidePanelVisible')[0]);
+      assertEquals(
+          1,
+          metrics.count(
+              'NewTabPage.Footer.CustomizeChromeOpened',
+              FooterCustomizeChromeEntryPoint.CUSTOMIZE_BUTTON));
+      assertEquals(
+          1,
+          customizeButtonsHandler.getCallCount(
+              'incrementCustomizeChromeButtonOpenCount'));
+    });
+
+    test(`clicking #customizeButton records click`, () => {
+      getCustomizeButton().click();
+      assertEquals(1, metrics.count('NewTabPage.Footer.Click'));
+      assertEquals(
+          1,
+          metrics.count(
+              'NewTabPage.Footer.Click', FooterElement.CUSTOMIZE_BUTTON));
+    });
+
+    test('clicking customize button hides side panel', async () => {
+      // Act.
+      customizeButtonsCallbackRouterRemote
+          .setCustomizeChromeSidePanelVisibility(true);
+      assertEquals(
+          0,
+          metrics.count(
+              'NewTabPage.Footer.CustomizeChromeOpened',
+              FooterCustomizeChromeEntryPoint.CUSTOMIZE_BUTTON));
+      await customizeButtonsCallbackRouterRemote.$.flushForTesting();
+      getCustomizeButton().click();
+
+      // Assert.
+      assertDeepEquals(
+          [
+            false,
+            CustomizeChromeSection.kUnspecified,
+            SidePanelOpenTrigger.kNewTabFooter,
+          ],
+          customizeButtonsHandler.getArgs(
+              'setCustomizeChromeSidePanelVisible')[0]);
+      assertEquals(
+          0,
+          metrics.count(
+              'NewTabPage.Footer.CustomizeChromeOpened',
+              FooterCustomizeChromeEntryPoint.CUSTOMIZE_BUTTON));
+      assertEquals(
+          0,
+          customizeButtonsHandler.getCallCount(
+              'incrementCustomizeChromeButtonOpenCount'));
+    });
+
+    test('clicking customize button is accessible', async () => {
+      customizeButtonsCallbackRouterRemote
+          .setCustomizeChromeSidePanelVisibility(true);
+      await customizeButtonsCallbackRouterRemote.$.flushForTesting();
+      assertEquals('true', getCustomizeButton().getAttribute('aria-pressed'));
+      customizeButtonsCallbackRouterRemote
+          .setCustomizeChromeSidePanelVisibility(false);
+      await customizeButtonsCallbackRouterRemote.$.flushForTesting();
+      assertEquals('false', getCustomizeButton().getAttribute('aria-pressed'));
+    });
+
+    ([
+      [
+        CustomizeDialogPage.BACKGROUNDS,
+        CustomizeChromeSection.kAppearance,
+        'BACKGROUNDS',
+      ],
+      [
+        CustomizeDialogPage.THEMES,
+        CustomizeChromeSection.kAppearance,
+        'THEMES',
+      ],
+      [
+        CustomizeDialogPage.SHORTCUTS,
+        CustomizeChromeSection.kShortcuts,
+        'SHORTCUTS',
+      ],
+      [
+        CustomizeDialogPage.MODULES,
+        CustomizeChromeSection.kModules,
+        'MODULES',
+      ],
+    ] as Array<[CustomizeDialogPage, CustomizeChromeSection, string]>)
+        .forEach(([page, section, label]) => {
+          test(
+              `page ${label} maps to section ${
+                  CustomizeChromeSection[section]}`,
+              () => {
+                element.setSelectedCustomizeDialogPageForTesting(page);
+                const returnedSection =
+                    element.setCustomizeChromeSidePanelVisible(true);
+                assertEquals(section, returnedSection);
+              });
+        });
+
+    suite('customize URL', () => {
+      suiteSetup(() => {
+        // We inject the URL param in this suite setup so that the URL is
+        // updated before the app element gets created.
+        url.searchParams.append('customize', 'themes');
+      });
+
+      test('URL opens side panel', () => {
+        // Assert.
+        assertDeepEquals(
+            [
+              true,
+              CustomizeChromeSection.kAppearance,
+              SidePanelOpenTrigger.kNewTabFooter,
+            ],
+            customizeButtonsHandler.getArgs(
+                'setCustomizeChromeSidePanelVisible')[0]);
+        assertEquals(
+            1,
+            metrics.count(
+                'NewTabPage.Footer.CustomizeChromeOpened',
+                FooterCustomizeChromeEntryPoint.URL));
+      });
     });
   });
 });

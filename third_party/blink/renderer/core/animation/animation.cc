@@ -382,12 +382,6 @@ Animation::Animation(ExecutionContext* execution_context,
   DCHECK(document_);
   attached_timeline->AnimationAttached(this);
   timeline_duration_ = attached_timeline->GetDuration();
-  if (trigger_) {
-    if (trigger_->GetTimelineInternal() &&
-        trigger_->GetTimelineInternal()->IsProgressBased()) {
-      trigger_->GetTimelineInternal()->AddAnimationForTriggering(this);
-    }
-  }
   probe::DidCreateAnimation(document_, sequence_number_);
 }
 
@@ -399,11 +393,6 @@ Animation::~Animation() {
 void Animation::Dispose() {
   if (timeline_)
     timeline_->AnimationDetached(this);
-  if (trigger_) {
-    if (trigger_->GetTimelineInternal()) {
-      trigger_->GetTimelineInternal()->RemoveAnimationForTriggering(this);
-    }
-  }
   DestroyCompositorAnimation();
   // If the DocumentTimeline and its Animation objects are
   // finalized by the same GC, we have to eagerly clear out
@@ -527,6 +516,10 @@ void Animation::setCurrentTime(const V8CSSNumberish* current_time,
       exception_state.ThrowTypeError(
           "currentTime may not be changed from resolved to unresolved");
     }
+    // We clear paused_for_trigger_ whenever there an explicit Animation API,
+    // e.g. play(), pause() is invoked. However we make sure to do so only if
+    // the API invocation was successful, i.e. did not throw an exception.
+    SetPausedForTrigger(false);
     return;
   }
 
@@ -537,6 +530,8 @@ void Animation::setCurrentTime(const V8CSSNumberish* current_time,
   if (!ConvertCSSNumberishToTime(current_time, new_current_time, "currentTime",
                                  exception_state))
     return;
+
+  SetPausedForTrigger(false);
 
   DCHECK(new_current_time);
   SetCurrentTimeInternal(new_current_time.value());
@@ -1179,6 +1174,8 @@ void Animation::setStartTime(const V8CSSNumberish* start_time,
                                  exception_state))
     return;
 
+  SetPausedForTrigger(false);
+
   auto_align_start_time_ = false;
 
   const bool had_start_time = start_time_.has_value();
@@ -1456,10 +1453,15 @@ void Animation::ResetPendingTasks() {
 
 // https://www.w3.org/TR/web-animations-1/#pausing-an-animation-section
 void Animation::pause(ExceptionState& exception_state) {
+  PauseInternal(exception_state);
+}
+
+void Animation::PauseInternal(ExceptionState& exception_state) {
   // 1. If animation has a pending pause task, abort these steps.
   // 2. If the play state of animation is paused, abort these steps.
   if (pending_pause_ ||
       CalculateAnimationPlayState() == V8AnimationPlayState::Enum::kPaused) {
+    SetPausedForTrigger(false);
     return;
   }
 
@@ -1494,6 +1496,8 @@ void Animation::pause(ExceptionState& exception_state) {
       seek_time = EffectEnd();
     }
   }
+
+  SetPausedForTrigger(false);
 
   // 6. If seek time is resolved,
   //        If has finite timeline is true,
@@ -1564,6 +1568,9 @@ void Animation::play(ExceptionState& exception_state) {
   // Begin or resume playback of the animation by running the procedure to
   // play an animation passing true as the value of the auto-rewind flag.
   PlayInternal(AutoRewind::kEnabled, exception_state);
+  if (!exception_state.HadException()) {
+    SetPausedForTrigger(false);
+  }
 }
 
 // https://www.w3.org/TR/web-animations-2/#playing-an-animation-section
@@ -1655,6 +1662,8 @@ void Animation::PlayInternal(AutoRewind auto_rewind,
     hold_time_ = AnimationTimeDelta();
   }
 
+  SetPausedForTrigger(false);
+
   // 8. If seek time is resolved,
   //      * If has finite timeline is true,
   //          * Set animation’s start time to seek time.
@@ -1742,8 +1751,12 @@ void Animation::PlayInternal(AutoRewind auto_rewind,
   NotifyProbe();
 }
 
-// https://www.w3.org/TR/web-animations-1/#reversing-an-animation-section
 void Animation::reverse(ExceptionState& exception_state) {
+  ReverseInternal(exception_state);
+}
+
+// https://www.w3.org/TR/web-animations-1/#reversing-an-animation-section
+void Animation::ReverseInternal(ExceptionState& exception_state) {
   // 1. If there is no timeline associated with animation, or the associated
   //    timeline is inactive throw an "InvalidStateError" DOMException and abort
   //    these steps.
@@ -1753,6 +1766,8 @@ void Animation::reverse(ExceptionState& exception_state) {
         "Cannot reverse an animation with no active timeline");
     return;
   }
+
+  SetPausedForTrigger(false);
 
   // 2. Let original pending playback rate be animation’s pending playback rate.
   // 3. Let animation’s pending playback rate be the additive inverse of its
@@ -1792,6 +1807,8 @@ void Animation::finish(ExceptionState& exception_state) {
         "Cannot finish Animation with an infinite target effect end.");
     return;
   }
+
+  SetPausedForTrigger(false);
 
   auto_align_start_time_ = false;
 
@@ -2116,12 +2133,8 @@ bool Animation::HasPendingActivity() const {
       finished_promise_ &&
       finished_promise_->GetState() == AnimationPromise::kPending;
 
-  // If an animation can still be played by its trigger, we should keep the
-  // animation alive.
-  bool can_be_triggered = CanBeTriggered();
-
   return pending_finished_event_ || pending_cancelled_event_ ||
-         pending_remove_event_ || has_pending_promise || can_be_triggered ||
+         pending_remove_event_ || has_pending_promise ||
          (!finished_ && HasEventListeners(event_type_names::kFinish));
 }
 
@@ -2822,6 +2835,12 @@ void Animation::UpdateBoundaryAlignment(
     Timing::NormalizedTiming& timing) const {
   timing.is_start_boundary_aligned = false;
   timing.is_end_boundary_aligned = false;
+  if (PausedForTrigger()) {
+    // While paused in anticipation of a trigger, we consider the active
+    // interval to be boundary exclusive.
+    return;
+  }
+
   if (!auto_align_start_time_) {
     // If the start time is not auto adjusted to align with the bounds of the
     // animation range, then it is not possible in all cases to test whether
@@ -3032,7 +3051,7 @@ void Animation::EffectInvalidated() {
 }
 
 bool Animation::IsEventDispatchAllowed() const {
-  return Paused() || start_time_;
+  return (Paused() || start_time_) && !PausedForTrigger();
 }
 
 std::optional<AnimationTimeDelta> Animation::TimeToEffectChange() {
@@ -3064,6 +3083,7 @@ std::optional<AnimationTimeDelta> Animation::TimeToEffectChange() {
 void Animation::cancel() {
   AnimationTimeDelta current_time_before_cancel =
       CurrentTimeInternal().value_or(AnimationTimeDelta());
+  SetPausedForTrigger(false);
   V8AnimationPlayState::Enum initial_play_state = CalculateAnimationPlayState();
   if (initial_play_state != V8AnimationPlayState::Enum::kIdle) {
     ResetPendingTasks();
@@ -3626,41 +3646,18 @@ void Animation::CompositorAnimationHolder::Detach() {
   compositor_animation_.reset();
 }
 
-bool Animation::CanBeTriggered() const {
-  AnimationTrigger* trigger = GetTriggerInternal();
-  // This animation can be played by |trigger| if:
-  // 1. |trigger| has a progress-based timeline (only triggers with
-  //    scroll/view timelines are supported currently) AND,
-  // 2. Either:
-  //    a. |trigger| is still in the idle state, i.e. has never played this
-  //       animation OR,
-  //    b. |trigger| is of an animation-trigger-type which could play an
-  //       animation multiple times, i.e. 'alternate' or 'repeat' or 'state'.
-  return trigger && trigger->GetTimelineInternal() &&
-         trigger->GetTimelineInternal()->IsProgressBased() &&
-         (trigger->type() !=
-              AnimationTrigger::Type(AnimationTrigger::Type::Enum::kOnce) ||
-          trigger_data_.state == AnimationTriggerState::kIdle);
-}
+void Animation::ResetPlayback() {
+  bool advances_backwards = playbackRate() < 0;
 
-void Animation::setTrigger(AnimationTrigger* trigger) {
-  if (trigger == trigger_) {
-    return;
-  }
-  if (trigger_) {
-    // Out with the old.
-    if (trigger_->GetTimelineInternal()) {
-      trigger_->GetTimelineInternal()->RemoveAnimationForTriggering(this);
-    }
-  }
-  trigger_ = trigger;
-  if (trigger_) {
-    // In with the new.
-    if (trigger_->GetTimelineInternal() &&
-        trigger_->GetTimelineInternal()->IsProgressBased()) {
-      trigger_->GetTimelineInternal()->AddAnimationForTriggering(this);
-    }
-  }
+  AnimationTimeDelta reset_time =
+      advances_backwards ? EffectEnd() : AnimationTimeDelta();
+
+  setCurrentTime(ConvertTimeToCSSNumberish(reset_time), ASSERT_NO_EXCEPTION);
+
+  // We must pause the animation, otherwise it will just continue playing.
+  pause();
+
+  SetPausedForTrigger(true);
 }
 
 }  // namespace blink

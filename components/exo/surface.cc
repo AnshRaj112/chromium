@@ -19,7 +19,6 @@
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_macros.h"
-#include "base/not_fatal_until.h"
 #include "base/notreached.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/stringprintf.h"
@@ -77,7 +76,6 @@
 #include "ui/gfx/geometry/transform_util.h"
 #include "ui/gfx/geometry/vector2d_f.h"
 #include "ui/gfx/gpu_fence.h"
-#include "ui/gfx/gpu_memory_buffer.h"
 #include "ui/gfx/presentation_feedback.h"
 #include "ui/views/widget/widget.h"
 
@@ -596,7 +594,7 @@ void Surface::SetSubSurfacePosition(Surface* sub_surface,
   if (sub_surface->is_augmented()) {
     auto* render_layer = sub_surface;
     auto it = FindListEntry(render_layers_, render_layer);
-    CHECK(it != render_layers_.end(), base::NotFatalUntil::M130);
+    CHECK(it != render_layers_.end());
     if (it->second == position) {
       return;
     }
@@ -608,7 +606,7 @@ void Surface::SetSubSurfacePosition(Surface* sub_surface,
                sub_surface->AsTracedValue(), "position", position.ToString());
 
   auto it = FindListEntry(pending_sub_surfaces_, sub_surface);
-  CHECK(it != pending_sub_surfaces_.end(), base::NotFatalUntil::M130);
+  CHECK(it != pending_sub_surfaces_.end());
   if (it->second == position) {
     return;
   }

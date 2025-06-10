@@ -240,6 +240,19 @@ chromium-metrics-reviews@google.com.
   <int value="2" label="Shill error"/>
 </enum>
 
+<enum name="DHCPv4ProvisionResult">
+  <int value="0" label="Success"/>
+  <int value="1" label="IPv6OnlyPreferred"/>
+  <int value="2" label="ClientFailure"/>
+  <int value="3" label="Nak"/>
+  <int value="4" label="Timeout"/>
+</enum>
+
+<enum name="DHCPv4RenewRebind">
+  <int value="0" label="Renew"/>
+  <int value="1" label="Rebind"/>
+</enum>
+
 <enum name="DnsProxy.DnsOverHttpsMode">
   <int value="0" label="Unknown"/>
   <int value="1" label="Off"/>
@@ -1200,6 +1213,9 @@ chromium-metrics-reviews@google.com.
   <int value="5" label="DEPRECATED: Dialog using an incognito Profile"/>
   <int value="6" label="Incognito mode disabled by policy"/>
   <int value="7" label="Incognito mode disabled by parental controls"/>
+  <int value="8"
+      label="Show in a dialog window on top of the floating workspace dialog
+             inside the session."/>
 </enum>
 
 <enum name="NetworkPortalSigninSource">

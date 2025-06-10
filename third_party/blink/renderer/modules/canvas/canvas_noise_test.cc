@@ -82,7 +82,7 @@ class CanvasNoiseTest : public PageTestBase {
         CanvasContextCreationAttributesCore::WillReadFrequently::kFalse;
     canvas_element_->GetCanvasRenderingContext(/*canvas_type=*/"2d",
                                                attributes);
-    canvas_element_->GetOrCreateCanvasResourceProvider();
+    canvas_element_->GetOrCreateCanvasResourceProviderForCanvas2D();
     CanvasNoiseToken::Set(0x1234567890123456);
     EnableInterventions();
   }
@@ -277,7 +277,7 @@ TEST_F(CanvasNoiseTest,
 }
 
 TEST_F(CanvasNoiseTest, MaybeNoiseSnapshotDoesNotNoiseForCpuCanvas) {
-  CanvasElement().DisableAcceleration();
+  CanvasElement().DisableAccelerationForCanvas2D();
   base::HistogramTester histogram_tester;
 
   auto* window = GetFrame().DomWindow();

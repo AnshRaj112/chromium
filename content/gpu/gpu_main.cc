@@ -12,8 +12,8 @@
 #include "base/allocator/partition_alloc_support.h"
 #include "base/check.h"
 #include "base/command_line.h"
-#include "base/files/scoped_file.h"
 #include "base/feature_list.h"
+#include "base/files/scoped_file.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
 #include "base/message_loop/message_pump_type.h"
@@ -34,6 +34,7 @@
 #include "base/timer/hi_res_timer_manager.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
+#include "components/viz/service/gl/gpu_log_message_manager.h"
 #include "components/viz/service/main/viz_main_impl.h"
 #include "content/child/child_process.h"
 #include "content/common/content_constants_internal.h"
@@ -55,7 +56,6 @@
 #include "gpu/config/gpu_preferences.h"
 #include "gpu/config/gpu_switches.h"
 #include "gpu/config/gpu_util.h"
-#include "gpu/ipc/common/gpu_memory_buffer_support.h"
 #include "gpu/ipc/service/gpu_config.h"
 #include "gpu/ipc/service/gpu_init.h"
 #include "gpu/ipc/service/gpu_watchdog_thread.h"
@@ -76,7 +76,6 @@
 #include "ui/gl/gl_switches.h"
 #include "ui/gl/gpu_switching_manager.h"
 #include "ui/gl/init/gl_factory.h"
-#include "ui/gl/startup_trace.h"
 
 #if BUILDFLAG(IS_WIN)
 #include <windows.h>
@@ -153,7 +152,7 @@ class ContentSandboxHelper : public gpu::GpuSandboxHelper {
  private:
   // SandboxHelper:
   void PreSandboxStartup(const gpu::GpuPreferences& gpu_prefs) override {
-    GPU_STARTUP_TRACE_EVENT("gpu_main::PreSandboxStartup");
+    TRACE_EVENT("gpu,startup", "gpu_main::PreSandboxStartup");
     // Warm up resources that don't need access to GPUInfo.
     {
       TRACE_EVENT0("gpu", "Warm up rand");
@@ -186,7 +185,7 @@ class ContentSandboxHelper : public gpu::GpuSandboxHelper {
   bool EnsureSandboxInitialized(gpu::GpuWatchdogThread* watchdog_thread,
                                 const gpu::GPUInfo* gpu_info,
                                 const gpu::GpuPreferences& gpu_prefs) override {
-    GPU_STARTUP_TRACE_EVENT("gpu_main::EnsureSandboxInitialized");
+    TRACE_EVENT("gpu,startup", "gpu_main::EnsureSandboxInitialized");
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
     return StartSandboxLinux(watchdog_thread, gpu_info, gpu_prefs);
 #elif BUILDFLAG(IS_WIN)
@@ -266,7 +265,7 @@ int GpuMain(MainFunctionParams parameters) {
 
   // Installs a base::LogMessageHandlerFunction which ensures messages are sent
   // to the GpuProcessHost once the GpuServiceImpl has started.
-  viz::GpuServiceImpl::InstallPreInitializeLogHandler();
+  viz::GpuLogMessageManager::GetInstance()->InstallPreInitializeLogHandler();
 
   // We are experiencing what appear to be memory-stomp issues in the GPU
   // process. These issues seem to be impacting the task executor and listeners
@@ -352,7 +351,7 @@ int GpuMain(MainFunctionParams parameters) {
   // Since GPU initialization calls into skia, it's important to initialize skia
   // before it.
   {
-    GPU_STARTUP_TRACE_EVENT("gpu_main::InitializeSkia");
+    TRACE_EVENT("gpu,startup", "gpu_main::InitializeSkia");
     InitializeSkia();
   }
 
@@ -464,7 +463,7 @@ namespace {
 bool StartSandboxLinux(gpu::GpuWatchdogThread* watchdog_thread,
                        const gpu::GPUInfo* gpu_info,
                        const gpu::GpuPreferences& gpu_prefs) {
-  GPU_STARTUP_TRACE_EVENT("Initialize sandbox");
+  TRACE_EVENT("gpu,startup", "Initialize sandbox");
 
   if (watchdog_thread) {
     // SandboxLinux needs to be able to ensure that the thread
@@ -562,7 +561,7 @@ bool StartSandboxAndroid(gpu::GpuWatchdogThread* watchdog_thread) {
 
 #if BUILDFLAG(IS_WIN)
 bool StartSandboxWindows(const sandbox::SandboxInterfaceInfo* sandbox_info) {
-  GPU_STARTUP_TRACE_EVENT("Lower token");
+  TRACE_EVENT("gpu,startup", "Lower token");
 
   // For Windows, if the target_services interface is not zero, the process
   // is sandboxed and we must call LowerToken() before rendering untrusted

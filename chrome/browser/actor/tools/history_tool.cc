@@ -28,12 +28,10 @@ namespace actor {
 
 using ::content::NavigationController;
 using ::content::NavigationHandle;
-using ::tabs::TabInterface;
+using ::content::WebContents;
 
-HistoryTool::HistoryTool(TabInterface& tab, Direction direction)
-    : WebContentsObserver(tab.GetContents()), direction_(direction) {
-  CHECK(tab.GetContents());
-}
+HistoryTool::HistoryTool(WebContents& web_contents, Direction direction)
+    : WebContentsObserver(&web_contents), direction_(direction) {}
 
 HistoryTool::~HistoryTool() = default;
 
@@ -91,8 +89,11 @@ void HistoryTool::Invoke(InvokeCallback callback) {
 }
 
 std::string HistoryTool::DebugString() const {
-  return absl::StrFormat("HistoryTool[%s]",
-                         direction_ == kBack ? "Back" : "Forward");
+  return absl::StrFormat("HistoryTool[%s]", JournalEvent());
+}
+
+std::string HistoryTool::JournalEvent() const {
+  return direction_ == kBack ? "Back" : "Forward";
 }
 
 void HistoryTool::DidStartNavigation(NavigationHandle* navigation_handle) {

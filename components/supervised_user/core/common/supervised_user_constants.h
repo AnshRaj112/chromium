@@ -7,7 +7,6 @@
 
 #include "base/files/file_path.h"
 #include "ui/base/page_transition_types.h"
-#include "url/gurl.h"
 
 namespace supervised_user {
 
@@ -245,6 +244,10 @@ extern const char kLocalWebApprovalDurationMillisecondsHistogramName[];
 // Histogram name to track the different error types that may occur during the
 // local web approval flow.
 extern const char kLocalWebApprovalErrorTypeHistogramName[];
+
+// Name of the Android's secure setting to observe the content filters.
+extern const char kBrowserContentFiltersSettingName[];
+extern const char kSearchContentFiltersSettingName[];
 }  // namespace supervised_user
 
 #endif  // COMPONENTS_SUPERVISED_USER_CORE_COMMON_SUPERVISED_USER_CONSTANTS_H_

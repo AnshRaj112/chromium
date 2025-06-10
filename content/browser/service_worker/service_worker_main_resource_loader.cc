@@ -1000,7 +1000,7 @@ bool ServiceWorkerMainResourceLoader::MaybeStartSyntheticNetworkRequest(
     scoped_refptr<ServiceWorkerVersion> version) {
   is_synthetic_response_used_ =
       service_worker_loader_helpers::IsEligibleForSyntheticResponse(
-          resource_request_.url) &&
+          context_wrapper->browser_context(), resource_request_.url) &&
       resource_request_.is_outermost_main_frame;
   if (!is_synthetic_response_used_) {
     return false;
@@ -1046,6 +1046,10 @@ bool ServiceWorkerMainResourceLoader::MaybeStartSyntheticNetworkRequest(
       // network.
       break;
     case SyntheticResponseStatus::kReady:
+      // When it's ready, the header which the service worker locally storead is
+      // passed to the client. To let this information to the renderer, set
+      // `from_synthetic_response` to `response_head_`.
+      response_head_->from_synthetic_response = true;
       synthetic_response_manager_->StartSyntheticResponse(base::BindOnce(
           &ServiceWorkerMainResourceLoader::DidDispatchFetchEvent,
           weak_factory_.GetWeakPtr()));

@@ -51,6 +51,7 @@
 #include "content/public/common/url_constants.h"
 #include "extensions/browser/guest_view/web_view/web_view_guest.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
+#include "net/log/net_log_with_source.h"
 #include "third_party/blink/public/common/web_preferences/web_preferences.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/views/widget/widget.h"
@@ -70,6 +71,11 @@ base::TimeDelta GetWarmingDelay() {
   }
   return delay_start;
 }
+
+// TODO(b/421426722): Use net::DefineNetworkTrafficAnnotationTag() to define the
+// annotation, and remove this file from tools/traffic_annotation/safe_list.txt.
+const net::NetworkTrafficAnnotationTag kGlicWebUITrafficAnnotation =
+    MISSING_TRAFFIC_ANNOTATION;
 
 }  // namespace
 
@@ -181,7 +187,9 @@ void GlicKeyedService::CloseUI() {
 void GlicKeyedService::PrepareForOpen() {
   window_controller_->fre_controller()->MaybePreconnect();
 
-  auto* active_web_contents = GetFocusedTabData().focus();
+  auto* active_web_contents = GetFocusedTabData().focus()
+                                  ? GetFocusedTabData().focus()->GetContents()
+                                  : nullptr;
   if (contextual_cueing_service_ && active_web_contents) {
     contextual_cueing_service_
         ->PrepareToFetchContextualGlicZeroStateSuggestions(active_web_contents);
@@ -209,7 +217,9 @@ void GlicKeyedService::FetchZeroStateSuggestions(
     bool is_first_run,
     mojom::WebClientHandler::GetZeroStateSuggestionsForFocusedTabCallback
         callback) {
-  auto* active_web_contents = GetFocusedTabData().focus();
+  auto* active_web_contents = GetFocusedTabData().focus()
+                                  ? GetFocusedTabData().focus()->GetContents()
+                                  : nullptr;
 
   if (contextual_cueing_service_ && active_web_contents && IsWindowShowing()) {
     auto suggestions = mojom::ZeroStateSuggestions::New();
@@ -350,10 +360,16 @@ void GlicKeyedService::GetContextFromFocusedTab(
         std::string("permission denied")));
     return;
   }
-
+  FocusedTabData data = GetFocusedTabData();
+  if (!data.focus()) {
+    std::move(callback).Run(
+        mojom::GetContextResult::NewErrorReason(data.GetFocus().error()));
+    return;
+  }
   metrics_->DidRequestContextFromFocusedTab();
 
-  FetchPageContext(GetFocusedTabData(), options, std::move(callback));
+  FetchPageContext(data.focus(), options,
+                   /*include_actionable_data=*/false, std::move(callback));
 }
 
 void GlicKeyedService::ActInFocusedTab(
@@ -378,21 +394,64 @@ void GlicKeyedService::ActInFocusedTab(
                          std::move(callback));
 }
 
-void GlicKeyedService::StopActorTask() {
+void GlicKeyedService::StopActorTask(actor::TaskId task_id) {
   CHECK(base::FeatureList::IsEnabled(features::kGlicActor));
   CHECK(actor_controller_);
-  actor_controller_->StopTask();
+  actor_controller_->StopTask(task_id);
 }
 
-bool GlicKeyedService::IsActorCoordinatorActingOnTab(
+void GlicKeyedService::PauseActorTask(actor::TaskId task_id) {
+  CHECK(base::FeatureList::IsEnabled(features::kGlicActor));
+  CHECK(actor_controller_);
+  actor_controller_->PauseTask(task_id);
+}
+
+void GlicKeyedService::ResumeActorTask(
+    actor::TaskId task_id,
+    const mojom::GetTabContextOptions& context_options,
+    glic::mojom::WebClientHandler::ResumeActorTaskCallback callback) {
+  CHECK(base::FeatureList::IsEnabled(features::kGlicActor));
+  CHECK(actor_controller_);
+  actor_controller_->ResumeTask(task_id, context_options, std::move(callback));
+}
+
+void GlicKeyedService::OnUserInputSubmitted(glic::mojom::WebClientMode mode) {
+  metrics_->OnUserInputSubmitted(mode);
+  if (actor_controller_) {
+    actor_controller_->OnUserInputSubmitted();
+  }
+}
+
+void GlicKeyedService::OnRequestStarted() {
+  if (actor_controller_) {
+    actor_controller_->OnRequestStarted();
+  }
+}
+
+void GlicKeyedService::OnResponseStarted() {
+  metrics_->OnResponseStarted();
+  if (actor_controller_) {
+    actor_controller_->OnResponseStarted();
+  }
+}
+
+void GlicKeyedService::OnResponseStopped() {
+  metrics_->OnResponseStarted();
+  if (actor_controller_) {
+    actor_controller_->OnResponseStopped();
+  }
+}
+
+bool GlicKeyedService::IsExecutionEngineActingOnTab(
     const content::WebContents* tab) const {
   return actor_controller_ &&
-         actor_controller_->IsActorCoordinatorActingOnTab(tab);
+         actor_controller_->IsExecutionEngineActingOnTab(tab);
 }
 
-actor::ActorCoordinator& GlicKeyedService::GetActorCoordinatorForTesting() {
+actor::ExecutionEngine& GlicKeyedService::GetExecutionEngineForTesting(
+    tabs::TabInterface* tab) {
   CHECK(actor_controller_);
-  return actor_controller_->GetActorCoordinatorForTesting();  // IN-TEST
+  return actor_controller_->GetExecutionEngineForTesting(tab);  // IN-TEST
 }
 
 void GlicKeyedService::CaptureScreenshot(
@@ -408,13 +467,20 @@ FocusedTabData GlicKeyedService::GetFocusedTabData() {
 
 bool GlicKeyedService::IsContextAccessIndicatorShown(
     const content::WebContents* contents) {
-  return is_context_access_indicator_enabled_ &&
-         GetFocusedTabData().focus() == contents;
+  return is_context_access_indicator_enabled_ && GetFocusedTabData().focus() &&
+         GetFocusedTabData().focus()->GetContents() == contents;
+}
+
+void GlicKeyedService::AddPreloadCallback(base::OnceCallback<void()> callback) {
+  preload_callback_ = std::move(callback);
 }
 
 void GlicKeyedService::TryPreload() {
   if (base::FeatureList::IsEnabled(features::kGlicDisableWarming) &&
       !base::FeatureList::IsEnabled(features::kGlicWarming)) {
+    // This is to ensure the preload process completes and preload_callback_ is
+    // called.
+    FinishPreload(false);
     return;
   }
   GlicProfileManager* glic_profile_manager = GlicProfileManager::GetInstance();
@@ -431,11 +497,17 @@ void GlicKeyedService::TryPreload() {
   } else {
     base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
         FROM_HERE,
-        base::BindOnce(
-            &GlicProfileManager::ShouldPreloadForProfile,
-            glic_profile_manager->GetWeakPtr(), profile_,
-            base::BindOnce(&GlicKeyedService::FinishPreload, GetWeakPtr())),
+        base::BindOnce(&GlicKeyedService::TryPreloadAfterDelay, GetWeakPtr()),
         delay);
+  }
+}
+
+void GlicKeyedService::TryPreloadAfterDelay() {
+  GlicProfileManager* glic_profile_manager = GlicProfileManager::GetInstance();
+  if (glic_profile_manager) {
+    glic_profile_manager->ShouldPreloadForProfile(
+        profile_,
+        base::BindOnce(&GlicKeyedService::FinishPreload, GetWeakPtr()));
   }
 }
 
@@ -479,9 +551,13 @@ bool GlicKeyedService::IsActiveWebContents(content::WebContents* contents) {
          contents == window_controller().GetFreWebContents();
 }
 
-void GlicKeyedService::FinishPreload(Profile* profile, bool should_preload) {
-  if (base::FeatureList::IsEnabled(features::kGlicWarming) && profile &&
-      GlicEnabling::IsEnabledAndConsentForProfile(profile)) {
+void GlicKeyedService::FinishPreload(bool should_preload) {
+  if (preload_callback_) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(std::move(preload_callback_)));
+  }
+  if (base::FeatureList::IsEnabled(features::kGlicWarming) && profile_ &&
+      GlicEnabling::IsEnabledAndConsentForProfile(profile_)) {
     base::UmaHistogramBoolean("Glic.ShouldPreload", should_preload);
   }
 
@@ -492,7 +568,7 @@ void GlicKeyedService::FinishPreload(Profile* profile, bool should_preload) {
   window_controller_->Preload();
 }
 
-void GlicKeyedService::FinishPreloadFre(Profile* profile, bool should_preload) {
+void GlicKeyedService::FinishPreloadFre(bool should_preload) {
   if (!should_preload) {
     return;
   }
@@ -513,6 +589,21 @@ bool GlicKeyedService::IsProcessHostForGlic(
 
 bool GlicKeyedService::IsGlicWebUi(content::WebContents* web_contents) {
   return host().IsGlicWebUi(web_contents);
+}
+
+void GlicKeyedService::LogDummyNetworkRequestForTrafficAnnotation(
+    const GURL& url) {
+  net::NetLogWithSource net_log =
+      net::NetLogWithSource::Make(net::NetLogSourceType::URL_REQUEST);
+  net_log.AddEvent(net::NetLogEventType::REQUEST_ALIVE, [&]() {
+    base::Value::Dict dict;
+    dict.Set("priority", "IDLE");
+    dict.Set("url", url.spec());
+    dict.Set("traffic_annotation",
+             kGlicWebUITrafficAnnotation.unique_id_hash_code);
+    dict.Set("dummy_request", true);
+    return dict;
+  });
 }
 
 }  // namespace glic

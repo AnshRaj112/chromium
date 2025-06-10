@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import './composebox/composebox.js';
 import './iframe.js';
 import './logo.js';
 import '/strings.m.js';
@@ -175,7 +176,6 @@ export class AppElement extends AppElementBase {
       backgroundImageAttribution1_: {type: String},
       backgroundImageAttribution2_: {type: String},
       backgroundImageAttributionUrl_: {type: String},
-      backgroundColor_: {type: Object},
 
       // Used in cr-searchbox component via host-context.
       colorSourceIsBaseline: {type: Boolean},
@@ -225,6 +225,11 @@ export class AppElement extends AppElementBase {
        */
       promoAndModulesLoaded_: {type: Boolean},
 
+      showComposebox_: {
+        type: Boolean,
+        reflect: true,
+      },
+
       showLensUploadDialog_: {type: Boolean},
 
       /**
@@ -246,7 +251,7 @@ export class AppElement extends AppElementBase {
   protected accessor oneGoogleBarIframeOrigin_: string = OGB_IFRAME_ORIGIN;
   protected accessor oneGoogleBarIframePath_: string|undefined;
   protected accessor oneGoogleBarLoaded_: boolean = false;
-  protected accessor theme_: Theme|undefined;
+  protected accessor theme_: Theme|null = null;
   protected accessor showCustomize_: boolean = false;
   protected accessor showCustomizeChromeText_: boolean = false;
   protected accessor showWallpaperSearch_: boolean = false;
@@ -256,7 +261,6 @@ export class AppElement extends AppElementBase {
   protected accessor backgroundImageAttribution1_: string = '';
   protected accessor backgroundImageAttribution2_: string = '';
   protected accessor backgroundImageAttributionUrl_: string = '';
-  protected accessor backgroundColor_: SkColor|null = null;
   protected accessor colorSourceIsBaseline: boolean = false;
   protected accessor logoColor_: SkColor|null = null;
   protected accessor singleColoredLogo_: boolean = false;
@@ -264,6 +268,7 @@ export class AppElement extends AppElementBase {
   accessor realboxHadSecondarySide: boolean = false;
   protected accessor realboxShown_: boolean = false;
   protected accessor showLensUploadDialog_: boolean = false;
+  protected accessor showComposebox_: boolean = false;
   protected accessor logoEnabled_: boolean =
       loadTimeData.getBoolean('logoEnabled');
   protected accessor oneGoogleBarEnabled_: boolean =
@@ -504,9 +509,6 @@ export class AppElement extends AppElementBase {
       this.singleColoredLogo_ = this.computeSingleColoredLogo_();
     }
 
-    // theme_, showBackgroundImage_
-    this.backgroundColor_ = this.computeBackgroundColor_();
-
     // theme_, showLensUploadDialog_
     this.realboxShown_ = this.computeRealboxShown_();
 
@@ -589,7 +591,8 @@ export class AppElement extends AppElementBase {
 
   private computeRealboxShown_(): boolean {
     // Do not show the realbox if the upload dialog is showing.
-    return !!this.theme_ && !this.showLensUploadDialog_;
+    return !!this.theme_ && !this.showLensUploadDialog_ &&
+        !this.showComposebox_;
   }
 
   private computePromoAndModulesLoaded_(): boolean {
@@ -613,6 +616,10 @@ export class AppElement extends AppElementBase {
     if (this.showWallpaperSearchButton_) {
       this.customizeButtonsHandler_.incrementWallpaperSearchButtonShownCount();
     }
+  }
+
+  protected toggleComposebox_() {
+    this.showComposebox_ = !this.showComposebox_;
   }
 
   protected onOpenVoiceSearch_() {
@@ -705,10 +712,6 @@ export class AppElement extends AppElementBase {
     this.backgroundManager_.setShowBackgroundImage(this.showBackgroundImage_);
   }
 
-  protected onShowCustomizeChange_(e: CustomEvent<boolean>) {
-    this.showCustomize_ = e.detail;
-  }
-
   private onThemeChange_() {
     if (this.theme_) {
       this.backgroundManager_.setBackgroundColor(this.theme_.backgroundColor);
@@ -769,14 +772,6 @@ export class AppElement extends AppElementBase {
             NtpBackgroundImageSource.kWallpaperSearchInspiration) {
       this.wallpaperSearchButtonAnimationEnabled_ = false;
     }
-  }
-
-  private computeBackgroundColor_(): SkColor|null {
-    if (this.showBackgroundImage_ || !this.theme_) {
-      return null;
-    }
-
-    return this.theme_.backgroundColor;
   }
 
   private computeColorSourceIsBaseline(): boolean {

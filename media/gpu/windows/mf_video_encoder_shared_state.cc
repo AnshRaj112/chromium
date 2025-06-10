@@ -210,16 +210,26 @@ void MediaFoundationVideoEncoderSharedState::GetSupportedProfilesInternal() {
       }
 
       if (base::FeatureList::IsEnabled(kMediaFoundationD3DVideoProcessing)) {
-        std::ranges::copy(
-            kSupportedPixelFormatsD3DVideoProcessing,
-            std::back_inserter(profile.gpu_supported_pixel_formats));
+        bool is_unsupported_for_gpu =
+            (codec == VideoCodec::kVP9 &&
+             workarounds_.disable_vp9_shared_image_encode) ||
+            (codec == VideoCodec::kAV1 &&
+             workarounds_.disable_av1_shared_image_encode);
+        if (!is_unsupported_for_gpu) {
+          std::ranges::copy(
+              kSupportedPixelFormatsD3DVideoProcessing,
+              std::back_inserter(profile.gpu_supported_pixel_formats));
+        }
       }
 
       VideoEncodeAccelerator::SupportedProfile portrait_profile(profile);
       portrait_profile.max_resolution.Transpose();
 
       if (base::FeatureList::IsEnabled(kMediaFoundationSharedImageEncode)) {
-        profile.supports_gpu_shared_images = true;
+        if (codec != VideoCodec::kVP9 ||
+            !workarounds_.disable_vp9_shared_image_encode) {
+          profile.supports_gpu_shared_images = true;
+        }
       }
 
       std::vector<VideoCodecProfile> codec_profiles;

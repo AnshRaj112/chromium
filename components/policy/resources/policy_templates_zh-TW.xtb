@@ -197,9 +197,9 @@
 <translation id="1144147113722324623">啟用音訊和影片的 HTTPS 自動升級功能，並針對圖片顯示「不安全」的警告。</translation>
 <translation id="1146804230175611166">有了 AI 輔助歷史記錄搜尋功能，使用者除了可以搜尋網頁標題和網址，還能根據網頁內容搜尋瀏覽記錄，並取得生成的解答。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -231,9 +231,9 @@
 
 此功能無法透過使用者設定操控，通常會提供給所有將預設搜尋引擎設為 Google 的使用者，除非這項政策設為停用。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -727,7 +727,6 @@
 <translation id="152657506688053119">預設搜尋的替代網址清單</translation>
 <translation id="1530812829012954197">一律在瀏覽器中算繪以下網址模式</translation>
 <translation id="1534007181698071943">允許在淘汰期間預設停用卸載事件處理常式</translation>
-<translation id="1535199908978041429">在新分頁中顯示 Outlook 行事曆資訊卡 (Beta 版)</translation>
 <translation id="1539343118617844331">學校</translation>
 <translation id="1542491165152947087">允許使用者在裝置上開啟或關閉 <ph name="PRIVACY_SANDBOX_NAME" /> 廣告主題設定。</translation>
 <translation id="1542958897137600427">啟用用戶端憑證佈建作業</translation>
@@ -926,6 +925,7 @@
 
 系統會封鎖同時符合封鎖和許可政策模式的來源。如果不是政策或使用者設定中指定的來源，則只能在使用者做出手勢後呼叫這個 API。</translation>
 <translation id="1645793986494086629">架構：</translation>
+<translation id="1647420986475965896">網址列和新分頁搜尋框的 AI 模式搜尋建議設定</translation>
 <translation id="1647558381546345298">設定這項政策後，無論使用者是否指定 --media-cache-size 旗標，<ph name="PRODUCT_NAME" /> 都會使用你設定的快取大小，在磁碟上儲存快取媒體檔案。這項政策所指定的值並非不可變動的界線，而是提供給快取系統的建議值。MB 以下的值會進位為 MB。
 
       如果將這項政策的值設為 0，系統會使用預設的快取大小，且使用者無法變更設定。
@@ -1502,17 +1502,6 @@
 
       如果未設定 <ph name="DEFAULT_SEARCH_PROVIDER_ICON_URL_POLICY_NAME" /> 政策，搜尋引擎不會有任何圖示。</translation>
 <translation id="2136073175041447267">設定 <ph name="PRODUCT_OS_NAME" /> 中的雲端硬碟 (Google 雲端硬碟、Microsoft OneDrive)。</translation>
-<translation id="2142409122365327693">這是 Beta 版功能。
-
-這項政策可控管新分頁上的 SharePoint 和 OneDrive 檔案資訊卡顯示設定。只有在啟用這項政策，且貴機構授權在瀏覽器中使用 SharePoint 和 OneDrive 檔案資料時，新分頁才會顯示這張資訊卡。
-
-瀏覽器不會儲存 SharePoint 和 OneDrive 資料。
-
-SharePoint 和 OneDrive 檔案建議資訊卡會顯示建議檔案清單。這張資訊卡會為使用者提供前往最重要文件的捷徑，方便解決內容切換問題及提升工作效率。
-
-Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想進一步瞭解如何將 Chrome 新分頁資訊卡連結至 SharePoint，請參閱說明文章。
-
-如果停用 <ph name="NTPCARDSVISIBLE" />，就不會顯示 SharePoint 和 OneDrive 資訊卡。如果啟用 <ph name="NTPCARDSVISIBLE" />，同時也啟用這項政策且有待顯示的資料，就會顯示 SharePoint 和 OneDrive 資訊卡。如果未設定 <ph name="NTPCARDSVISIBLE" />，但有啟用這項政策、使用者在「自訂 Chrome」中啟用 SharePoint 和 OneDrive 資訊卡，且有待顯示的資料，就會顯示此資訊卡。</translation>
 <translation id="2144236546337326489">允許啟用 Phone Hub 工作接續</translation>
 <translation id="2145735238144543545">必須提供用戶端憑證</translation>
 <translation id="2146103669166779785">系統會根據這個十六進位顏色產生主題，並套用至瀏覽器。</translation>
@@ -2211,9 +2200,9 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
       如果不設定這項政策或其中的任何設定，系統會針對各項電源設定使用預設值。</translation>
 <translation id="2589944745979739478">這項政策會控管 <ph name="PRODUCT_OS_NAME" /> 的生成式 AI 相片編輯功能設定。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -2250,6 +2239,13 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 使用者可以確定，如果在工作階段開始時沒有獲得許可，則在登入後也沒有其他應用程式能擷取畫面。</translation>
 <translation id="2615240493030733717">回報時區資訊</translation>
 <translation id="2619258867868873629"><ph name="PRODUCT_OS_NAME" /> 裝置上的「另存為 PDF」目的地和「儲存至 Google 雲端硬碟」目的地</translation>
+<translation id="262035875928535253">設定 <ph name="PRODUCT_NAME" /> 應停用<ph name="PASSWORD_MANAGER_NAME" />的網域清單。這表示系統會停用「儲存及填入」工作流程，確保不會儲存用於這些網站的密碼，也不會在網頁表單中自動填入密碼。
+
+系統會針對清單中的網域停用<ph name="PASSWORD_MANAGER_NAME" />。
+
+如果是未列在清單中的網域，則可使用<ph name="PASSWORD_MANAGER_NAME" />。
+
+如果不設定這項政策，所有網域都可使用<ph name="PASSWORD_MANAGER_NAME" />。</translation>
 <translation id="2621290137818374425">設定這項政策後，系統不會要求指定網址中的主機名稱依憑證透明化揭露規定公開憑證。雖然這會讓系統更難以偵測到誤用憑證的情形，但也因此可讓主機繼續使用因為未依規定對外公開而不受信任的憑證。
 
       如果未設定這項政策，凡是應依憑證透明化規定公開而未公開的憑證，<ph name="PRODUCT_NAME" /> 都會將其視為不受信任的憑證。
@@ -2312,6 +2308,7 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 <translation id="268695908564263739">這項政策可啟用或停用高效率模式設定。這項設定能讓系統在一段時間後於背景捨棄分頁，以便回收記憶體。
       如果不設定這項政策，使用者將可透過 chrome://settings/performance 控制這項設定。
       </translation>
+<translation id="2687600966277668971">SpeculationRules 預先擷取無法傳送到 ServiceWorkers 控管的網址 (舊版行為)。</translation>
 <translation id="2691668238491124549">如果設定了這項政策 (只能設為「建議」)，系統會將受管理工作階段的建議語言代碼移至清單頂端，並按照政策中顯示的順序排列。系統會預先選取第一個建議語言代碼。
       如果未設定，系統會預先選取目前的 UI 語言代碼。
 
@@ -2333,6 +2330,16 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 <translation id="2702682139813393777">強制透過 cmd.exe 啟動 Windows 內建訊息傳遞主機</translation>
 <translation id="270582584528242502">使用者嘗試關閉瀏覽器時，不會顯示警告對話方塊</translation>
 <translation id="2706708761587205154">只在 PIN 碼啟用時允許列印</translation>
+<translation id="2706972066112233185">這項政策會控管網址列和新分頁搜尋框的 AI 模式建議專區。
+
+除非將這項政策設為停用，否則所有將預設搜尋引擎設為 Google 的使用者都能使用這項功能。
+
+如果未設定這項政策，系統會根據 <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" /> 政策決定其行為。
+
+如果將政策設為「0 - 啟用」或未設定，使用者就能存取這項功能。如果將政策設為「1 - 停用」，使用者將無法存取這項功能。
+
+0 = 允許使用這項功能。
+1 = 不允許使用這項功能。</translation>
 <translation id="2707733461906745082">設定檔區隔</translation>
 <translation id="2707873794476722903">已啟用標準模式中的安全瀏覽功能。</translation>
 <translation id="2709516037105925701">自動填入</translation>
@@ -2998,13 +3005,6 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="3210408472559816322">你可以透過這項政策，指定拒絕載入的原生訊息傳遞主機。如果將拒絕清單的值設為 <ph name="WILDCARD_VALUE" />，系統會拒絕所有原生訊息傳遞主機，但政策明確允許使用的主機除外。
       如果不設定這項政策，<ph name="PRODUCT_NAME" /> 會載入所有已安裝的原生訊息傳遞主機。</translation>
 <translation id="3211426942294667684">瀏覽器登入設定</translation>
-<translation id="3213872023700948990">設定這項政策可暫時選擇不採用透過鍵盤聚焦於捲軸的新行為。
-
-如果啟用或不設定這項政策，沒有可聚焦子項的捲軸預設可透過鍵盤聚焦。
-
-如果停用這項政策，捲軸將預設為不可透過鍵盤聚焦。
-
-這項政策只是臨時解決方案，將在 M135 中移除。</translation>
 <translation id="3216094710930835317">系統將停用允許更多標記的新 HTML 剖析器行為。</translation>
 <translation id="3217774577897351942">為符合 <ph name="FIREFOX_PRODUCT_NAME" /> 和 <ph name="SAFARI_PRODUCT_NAME" /> 中的變更，我們也正在變更 <ph name="PRODUCT_NAME" /> 中的 <ph name="OFFSET_PARENT" /> API。這項政策會恢復舊行為，直到 M120 版本推出為止。
 
@@ -3087,6 +3087,15 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="3256920103934729145">禁止使用者點閱安全資料傳輸層警告網頁</translation>
 <translation id="3257786863492892609">控管螢幕側錄的各項政策。</translation>
 <translation id="3258380413685430793">執行所有 <ph name="FLASH_PLUGIN_NAME" /> 內容</translation>
+<translation id="3258754138048508776">這項政策可控管新分頁的 Outlook 資訊卡顯示設定。只有在啟用這項政策，且貴機構授權在瀏覽器中使用 Outlook 行事曆資料時，新分頁才會顯示這張資訊卡。
+
+瀏覽器不會儲存 Outlook 資料。
+
+Outlook 資訊卡會顯示下一個日曆活動，以及當天的其他會議一覽，使用者可以快速前往下一場會議，不僅解決內容切換問題，也提升工作效率。
+
+Microsoft Outlook 資訊卡需要額外的管理員設定。想進一步瞭解如何連結 Chrome 新分頁資訊卡與 Outlook，請參閱 https://support.google.com/chrome/a?p=chrome_ntp_microsoft_cards。
+
+如果停用 <ph name="NTPCARDSVISIBLE" />，Outlook 資訊卡就不會顯示。如果同時啟用 <ph name="NTPCARDSVISIBLE" /> 和這項政策，而且有可顯示的資料，就會顯示 Outlook 資訊卡。如果未設定 <ph name="NTPCARDSVISIBLE" />，但啟用了這項政策、使用者在「自訂 Chrome」中也啟用 Outlook 資訊卡，而且有可顯示的資料，就會顯示這張資訊卡。</translation>
 <translation id="3261592499545947104">憑證過期之前提早觸發更新程序的秒數</translation>
 <translation id="3262080895269946462">允許將第三方內容中的 WebSQL 預設為停用。</translation>
 <translation id="326341982850521928">啟用色彩校正</translation>
@@ -3526,9 +3535,9 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
       請注意，我們之前宣布將在 <ph name="PRODUCT_NAME" /> 第 82 版中移除這項政策，但改為在第 84 版中移除。</translation>
 <translation id="3604709604504768625">這項政策會控管 <ph name="PRODUCT_OS_NAME" /> 的內嵌圖片功能設定。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改良 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改良 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改良 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改良 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改良模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改良模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -3894,6 +3903,7 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 
  如未設定這項政策、設為空白或無效值，系統就不會在列印工作要求中新增額外的 <ph name="CLIENT_INFO_IPP_ATTRIBUTE" />。
 </translation>
+<translation id="3895626555961466729">允許使用 AI 模式建議。</translation>
 <translation id="3896591584655529057">允許使用密碼管理工具儲存密碼金鑰</translation>
 <translation id="3896751141670591496">如果將這項政策設為啟用或不設定，使用具有安全疑慮的指令列旗標啟動 Chrome 時，系統將顯示安全性警告。
 
@@ -4311,6 +4321,7 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="4189872355465413041">系統應用程式</translation>
 <translation id="4190316993598857632">允許編輯書籤</translation>
 <translation id="4192388905594723944">用於驗證遠端存取用戶端驗證憑證的網址</translation>
+<translation id="4195119404667420672">SpeculationRules 預先擷取可傳送到 ServiceWorkers 控管的網址。</translation>
 <translation id="4195698007674066525">輸入密碼時預設顯示數字鍵盤</translation>
 <translation id="4203055629055264833">如果將這項政策設為啟用或不設定，代表使用者可透過工具列上的切換圖示開啟側邊面板，查看預設搜尋引擎的最新搜尋結果。
 
@@ -4874,6 +4885,13 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="4650044303940238102">本機字型設定</translation>
 <translation id="4650759511838826572">停用網址通訊協定機制</translation>
 <translation id="465099050592230505">企業線上應用程式商店網址 (已不適用)</translation>
+<translation id="4652388001247121058">SpeculationRules 預先擷取可傳送到 ServiceWorkers 控管的網址。不過，舊版程式碼不允許這項操作，而且會取消預先擷取要求。這項政策可控管這項行為。
+
+如果將這項政策設為啟用或未設定，系統就會允許將 SpeculationRules 預先擷取傳送到 ServiceWorkers 控管的網址 (如果 PrefetchServiceWorker 功能旗標已啟用)。這是目前的預設行為，而且符合詳細規定。
+
+如果將這項政策設為停用，系統就會禁止將 SpeculationRules 預先擷取傳送到 ServiceWorkers 控管的網址 (舊版行為)。
+
+這項政策只是暫時解決方案，日後將會移除。</translation>
 <translation id="4653465451589191309">如果將這項政策設為啟用或不設定，使用者將可管理 (中斷或修改) VPN 連線。如果是使用 VPN 應用程式建立的 VPN 連線，則應用程式內的使用者介面不會受到影響。因此使用者仍可使用應用程式修改 VPN 連線。這項政策可搭配「永久連線 VPN」功能使用，該功能可讓管理員決定是否在裝置啟動時建立 VPN 連線。
 
       如果將這項政策設為停用，系統會關閉使用者可中斷或關閉 VPN 連線的 <ph name="PRODUCT_OS_NAME" />使用者介面。</translation>
@@ -4890,7 +4908,6 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="4661889655253181651">內容設定可讓你指定特定內容類型 (例如 Cookie、圖片或 JavaScript) 的處理方式。</translation>
 <translation id="4663509616441994711">禁止合併使用者層級的雲端政策。</translation>
 <translation id="4663588423815449593">強制 <ph name="PEPPER_NAME" /> 使用舊版影片解碼器。</translation>
-<translation id="4665632569240493493">在 NTP 頁尾顯示擴充主題來源資訊</translation>
 <translation id="4665897631924472251">擴充功能管理設定</translation>
 <translation id="4666930704271463612">指定系統尋找伺服器印表機時，要查詢符合何種條件的印表機伺服器。
 
@@ -5393,9 +5410,9 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="5055474681190962362">每月應重新啟動的日期 [1-31] (根據裝置當地時區)，僅適用於「frequency」設為「MONTHLY」的情況。如果這個值大於指定月份的天數上限，系統會選擇當月的最後一天。</translation>
 <translation id="5055513974503523022">生成式 AI VC 背景功能可讓使用者透過生成式 AI 功能，在 <ph name="PRODUCT_OS_NAME" /> 中建立個人化的視訊會議背景，展現自我風格。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -5425,9 +5442,9 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
       如果將這項政策設為「<ph name="LACROS_BACKWARD_MIGRATION_KEEP_ALL" />」，系統將保留所有使用者資料。這個選項的失敗風險很高，必須恢復原廠設定才能復原。</translation>
 <translation id="507032775281485106">生成式 AI 桌布可讓使用者透過生成式 AI 功能，在 <ph name="PRODUCT_OS_NAME" /> 中建立個人化桌布，展現自我風格。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -5467,6 +5484,7 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="5090791951240382356">允許合併不同來源的字典政策</translation>
 <translation id="5091315650312105069">允許透過 HTTP 使用<ph name="BASIC_AUTH" />驗證</translation>
 <translation id="5093603777978346818">不啟用螢幕鎖定畫面螢幕保護程式。</translation>
+<translation id="5099140200662153931">在新分頁顯示 SharePoint 和 OneDrive 檔案資訊卡</translation>
 <translation id="5099239365323299669">自版本 M106 起，系統不再支援永久配額功能。這項政策會重新啟用永久配額功能，直到 M107 推出為止。
 
       如果將這項政策設為啟用，永久類型的 webkitRequestFileSystem 將採用永久配額運作。
@@ -5525,6 +5543,7 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 
           如果未設定這項政策，系統會使用預設命令列。</translation>
 <translation id="5151099177901233471">啟用裝置時區資訊回報功能</translation>
+<translation id="5151163911478747031">不在 NTP 頁尾顯示擴充功能來源資訊</translation>
 <translation id="5152393033264257734">允許 DNS 攔截檢查功能，以及你是不是要前往「http://intranetsite/」資訊列。</translation>
 <translation id="5152787786897382519">Chromium 和 Google Chrome 有部分政策群組具有相依關係，依此共同管控特定功能。這些組合如下列政策群組所示。由於政策可能具有多個來源，系統只會套用群組中最高優先來源所提供的值，忽略同個群組中優先順序較低的來源所提供的值。請參閱 <ph name="POLICY_PRIORITY_DOC_URL" /> 瞭解來源的優先順序。</translation>
 <translation id="5153187201534281749">工具列中的瀏覽器實驗功能圖示</translation>
@@ -5611,6 +5630,7 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="5194683382395300627">允許在網站上使用 <ph name="ASSISTANT_PRODUCT_NAME" /> 執行操作，例如自動變更密碼</translation>
 <translation id="5196630732055960309">允許這些網頁應用程式上的 File Handling API</translation>
 <translation id="5205352023880027050">不啟用 EphemeralNetworkPolicies 功能。</translation>
+<translation id="5205385499831960279">限制對區域網路端點的要求</translation>
 <translation id="5206454085187851382">如果在 <ph name="PRINTERS_BULK_ACCESS_MODE_POLICY_NAME" /> 中選擇了 <ph name="PRINTERS_ALLOWLIST" />，系統會根據 <ph name="PRINTERS_BULK_ALLOWLIST_POLICY_NAME" /> 的設定指定使用者可操作的印表機。只有 ID 與這項政策值相符的印表機，才會提供給使用者。印表機 ID 必須與 <ph name="PRINTERS_BULK_CONFIGURATION_POLICY_NAME" /> 政策指定檔案的 <ph name="ID_FIELD" /> 或 <ph name="GUID_FIELD" /> 欄位值相符。</translation>
 <translation id="5207543664699568887">設定 Linux 上的 <ph name="PRODUCT_NAME" /> 是否要使用系統通知。
 
@@ -5847,6 +5867,7 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="5334404204520035180">控管 WebPrinting API 的使用情形</translation>
 <translation id="5334501839642146593">一律不傳送指標資料給 Google</translation>
 <translation id="5335910979215357815">為第三方 <ph name="PRODUCT_OS_NAME" /> 控制項啟用 Save and Share API。</translation>
+<translation id="5337869685871558036">允許將 SpeculationRules 預先擷取傳送到 ServiceWorkers 控管的網址</translation>
 <translation id="5339096331970464266">啟用無障礙虛擬鍵盤</translation>
 <translation id="5340008866815063393">啟用政策資料報告功能</translation>
 <translation id="5345892164332459671">停用浮動單一登入 (SSO)，而且不將使用者的 Web 服務驗證移到新裝置</translation>
@@ -5899,7 +5920,6 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="5373552304217872025">如果將這項政策設為 True 或不設定，<ph name="PRODUCT_NAME" /> 和 <ph name="LACROS_NAME" /> 將允許從使用者管理工具新增使用者。
 
       如果將這項政策設為 False，<ph name="PRODUCT_NAME" /> 和 <ph name="LACROS_NAME" /> 將不允許從使用者管理工具新增使用者。</translation>
-<translation id="5374300764724537955">不在 NTP 頁尾顯示擴充功能主題來源資訊</translation>
 <translation id="5376712696238639532">你可以透過這項政策，指定老師能否使用字幕功能。
 
 如果將值設為 True 或未設定，所選老師可以為講課內容加上字幕，並傳送語音轉錄稿給學生。
@@ -6117,6 +6137,15 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="5511266910976210617">不允許使用「幫我寫」功能。</translation>
 <translation id="5511702823008968136">啟用書籤列</translation>
 <translation id="5512418063782665071">首頁網址</translation>
+<translation id="5512785896190859782">這項政策可控管新分頁的 SharePoint 和 OneDrive 檔案資訊卡顯示設定。只有在啟用這項政策，且貴機構授權在瀏覽器中使用 SharePoint 和 OneDrive 檔案資料時，新分頁才會顯示這張資訊卡。
+
+瀏覽器不會儲存 SharePoint 和 OneDrive 資料。
+
+SharePoint 和 OneDrive 檔案建議資訊卡會顯示建議檔案清單，使用者可快速開啟最重要文件，不僅解決內容切換問題，也提升工作效率。
+
+Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想進一步瞭解如何連結 Chrome 新分頁資訊卡和 SharePoint，請參閱 https://support.google.com/chrome/a?p=chrome_ntp_microsoft_cards。
+
+如果停用 <ph name="NTPCARDSVISIBLE" />，SharePoint 和 OneDrive 資訊卡就不會顯示。如果同時啟用 <ph name="NTPCARDSVISIBLE" /> 和這項政策，而且有可顯示的資料，就會顯示 SharePoint 和 OneDrive 資訊卡。如果未設定 <ph name="NTPCARDSVISIBLE" />，但啟用了這項政策，使用者在「自訂 Chrome」中也啟用 SharePoint 和 OneDrive 資訊卡，而且有可顯示的資料，就會顯示這張資訊卡。</translation>
 <translation id="5516293691820655022">完全關閉 Chrome</translation>
 <translation id="551639594034811656">這項政策是用來定義一份百分比清單，藉此指定首次偵測到更新的當天開始起算的各天內，機構單位中應安裝更新的 <ph name="PRODUCT_OS_NAME" />裝置百分比。偵測到更新的時間會晚於更新發布時間，因為更新發布後，裝置可能要經過一段時間才會檢查是否有更新。
 
@@ -6229,9 +6258,9 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
       </translation>
 <translation id="5582570632838248297">「分頁比較」是 AI 輔助工具，可用於比較不同分頁的資訊。舉例來說，假如使用者開啟多個分頁，而且分頁中的商品類似，就可以使用這項功能比較商品資訊。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -6253,9 +6282,9 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="5586942249556966598">不要處理</translation>
 <translation id="5595355842329604596">這項政策會定義所有相關生成式 AI 功能的預設設定。舉例來說，如果將這項政策的值設為 1，1 就會是所有相關生成式 AI 功能的預設設定值。這不會影響任何手動設定的政策值。這項設定會定義 <ph name="GEMINI_SETTINGS_POLICY_NAME" /> 和相關的 Chrome 生成式 AI 功能預設值。如要查看相關功能的完整清單，請前往 https://support.google.com/chrome/a?p=generative_ai_settings。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改進 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改進 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改良模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改良模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -6382,6 +6411,13 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="5655060841667911118">指定應使用裝置管理通訊協定註冊的用戶端憑證。<ph name="PRODUCT_OS_NAME" /> 132 版起支援 <ph name="EC_KEY_ALGORITHM_VALUE_NAME" /> 金鑰演算法選項。</translation>
 <translation id="5655553344896004108">允許使用已淘汰的 U2F Security Key API</translation>
 <translation id="5656177735561364047">啟用剪貼簿共用功能</translation>
+<translation id="5657289110555300740">設定這項政策後，可暫時停用以鍵盤聚焦捲軸的新行為。
+
+如果啟用這項政策或未設定，沒有可聚焦子項的捲軸預設可透過鍵盤聚焦。
+
+如果停用這項政策，捲軸將預設為不可透過鍵盤聚焦。
+
+這項政策只是暫時解決方案，並於 M139 起淘汰。</translation>
 <translation id="5657752663637568277">這項政策可控管是否要在列印預覽對話方塊或設定頁面中，向使用者顯示 <ph name="CLOUD_PRINT_NAME" />淘汰警告訊息。
       如果將這項政策設為 True，系統會隱藏淘汰警告訊息。
       如果將這項政策設為 False 或不設定，系統會顯示淘汰警告訊息。</translation>
@@ -6488,6 +6524,7 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 
       注意：延長比例係數必須為 100% 以上的值。</translation>
 <translation id="5740636973289452345">啟用擴充功能和外掛程式資訊的報告功能</translation>
+<translation id="5740716956489996914">決定網站能否對區域網路端點發出要求時，使用預設行為</translation>
 <translation id="5741110260062082926">停用 Orca</translation>
 <translation id="5746149754419996562">在 <ph name="PRODUCT_OS_NAME" /> 上啟用 Glanceables 小工具。具體來說，你可以透過檔案櫃上的日期方塊存取這些小工具。
 如果啟用這項政策，系統就會在 <ph name="PRODUCT_OS_NAME" /> 上啟用 Glanceables。
@@ -6579,9 +6616,9 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="5838452040629810808">啟用游標醒目顯示功能</translation>
 <translation id="5839430986743008680">這項政策會控管是否會為 <ph name="PRODUCT_OS_NAME" /> 建議以類似內容為依據的群組。內容可包含瀏覽器分頁和應用程式。使用者登入時，系統會顯示建議的群組。在工作階段中，系統會提供群組的建議桌面。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改進 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改進 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改進 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改進 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改進模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改進模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -6609,6 +6646,7 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 
       如果將這項政策設為停用或不設定，系統不會回報任何系統記錄。</translation>
 <translation id="5861856285460256766">家長存取碼設定</translation>
+<translation id="5864898931148094192">控管是否在新分頁顯示擴充功能來源資訊</translation>
 <translation id="5868414965372171132">使用者層級網路設定</translation>
 <translation id="5868454276721377379">使用者切換 <ph name="PRODUCT_OS_NAME" /> 裝置時，浮動單一登入 (SSO) 服務會在新裝置還原舊裝置上的使用者 Web 服務驗證狀態，做法是在裝置間移動使用者的 Cookie。
 
@@ -6891,6 +6929,13 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 <translation id="604243460476563291">不允許企業管理員在遠端支援連線時傳輸檔案</translation>
 <translation id="6042629184389251062">不允許輸入網址指標收集功能</translation>
 <translation id="6046615715547751255">禁止使用精細回報控制項</translation>
+<translation id="6047041034696466581">這項政策會決定是否在新分頁 (NTP) 的頁尾顯示擴充功能修改 NTP 的來源資訊。
+
+根據預設，如果擴充功能覆寫標準 NTP，頁尾會顯示一則訊息，說明是分頁由哪一項擴充功能變更。這類來源資訊通常會附上擴充功能的 Chrome 線上應用程式商店連結。
+
+如果將這項政策設為 True 或未設定，當擴充功能控管 NTP 時，NTP 頁尾會顯示擴充功能來源資訊。
+
+如果將這項政策設為 False，NTP 頁尾就不會顯示擴充功能的來源資訊。</translation>
 <translation id="6048199181629830227">開啟用電尖峰轉移電源管理功能</translation>
 <translation id="6048690591359317353">不允許使用者手動中斷連線或修改 VPN</translation>
 <translation id="6049117606554031363">啟用裝置主機板狀態回報功能</translation>
@@ -7078,9 +7123,9 @@ ClearCrossSiteCrossBrowsingContextGroupWindowName 變化版本會控制是否要
 如果不設定這項政策，所有網站都將使用全域預設值 (不會自動取得存取權)。</translation>
 <translation id="6205472215607025971">分頁整理工具採用 AI 技術，可依據使用者開啟的分頁自動建立分頁群組。系統會根據開啟的分頁 (而非網頁內容) 提供建議。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -7412,6 +7457,7 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 
 如果未設定這項政策，<ph name="PRODUCT_OS_NAME" /> 會使用預設的「下載」目錄儲存螢幕畫面擷取內容，而使用者可變更儲存位置。</translation>
 <translation id="6377031865393559909">允許使用者使用桌面範本</translation>
+<translation id="6377570995433636383">指定是否要限制對區域網路端點的要求</translation>
 <translation id="6378076389057087301">指定會影響電源管理的音訊活動</translation>
 <translation id="6378393933102834628">如果將這項政策設為 True，系統會顯示應用程式捷徑。如果將這項政策設為 False，系統一律不會顯示應用程式捷徑。
 
@@ -7435,9 +7481,9 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 <translation id="6389240462871677239">允許隔離網頁應用程式來源使用受控頁框</translation>
 <translation id="6390338862225976270">這些 <ph name="PRODUCT_NAME" /> 開發人員工具功能採用生成式 AI 模型，可提供額外偵錯資訊。如要使用這些功能，<ph name="PRODUCT_NAME" /> 必須收集錯誤訊息、堆疊追蹤、程式碼片段和網路要求等資料，再傳送到執行生成式 AI 模型的 Google 伺服器。傳送到伺服器的資料不會有網路要求中的回應內文、驗證和 Cookie 標頭。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -8158,17 +8204,6 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 <translation id="685769593149966548">強制執行 YouTube 高度嚴格篩選模式</translation>
 <translation id="686079137349561371">Microsoft Windows 7 以上版本</translation>
 <translation id="6866755486434471318">允許 <ph name="PEPPER_NAME" /> 使用分享的圖片解碼影片。</translation>
-<translation id="6871249820683694350">這是 Beta 版功能。
-
-這項政策可控管新分頁上的 Outlook 資訊卡顯示設定。只有在啟用這項政策，且貴機構授權在瀏覽器中使用 Outlook 行事曆資料時，新分頁才會顯示這張資訊卡。
-
-瀏覽器不會儲存 Outlook 資料。
-
-Outlook 資訊卡會顯示下一個日曆活動，以及當天其他會議的一覽表。這張資訊卡會為使用者提供前往下一場會議的捷徑，方便解決內容切換問題及提升工作效率。
-
-Microsoft Outlook 資訊卡需要額外的管理員設定。想進一步瞭解如何將 Chrome 新分頁資訊卡連結至 Outlook，請參閱說明文章。
-
-如果停用 <ph name="NTPCARDSVISIBLE" />，就不會顯示 Outlook 資訊卡。如果啟用 <ph name="NTPCARDSVISIBLE" />，同時也啟用這項政策且有待顯示的資料，就會顯示 Outlook 資訊卡。如果未設定 <ph name="NTPCARDSVISIBLE" />，但有啟用這項政策、使用者在「自訂 Chrome」中啟用 Outlook 資訊卡，且有待顯示的資料，就會顯示此資訊卡。</translation>
 <translation id="6878757724611298427">允許使用者在無關聯的裝置上使用 Android 應用程式</translation>
 <translation id="6881397131210596522">如果將這項政策設為 2，系統會自動禁止網站使用 WebPrinting API。
 
@@ -8799,7 +8834,6 @@ Microsoft Outlook 資訊卡需要額外的管理員設定。想進一步瞭解�
           如果設定這項政策，使用者將無法變更或覆寫設定。
 
           如果未設定這項政策，系統預設會停用色彩校正功能，但使用者隨時可以啟用。</translation>
-<translation id="7323780795955997799">在新分頁中顯示 SharePoint 和 OneDrive 檔案資訊卡 (Beta 版)</translation>
 <translation id="7323855063560306712">允許你設定網站網址模式清單，指定要自動拒絕授予視窗管理權限的網站。這項政策會限制網站執行以下操作：查看裝置畫面相關資訊、使用該資訊開啟及放置視窗，或在特定畫面上要求進入全螢幕模式。
 
 如要進一步瞭解有效的網站網址模式，請前往 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。你也可以使用萬用字元 (<ph name="WILDCARD_VALUE" />)。這項政策只會根據來源進行比對，因此會忽略網址模式中的路徑。
@@ -9112,6 +9146,7 @@ Microsoft Outlook 資訊卡需要額外的管理員設定。想進一步瞭解�
           如果將這項政策設為 False 或不設定，系統就不會在螢幕鎖定畫面和登入畫面提供 PIN 碼自動提交功能。
 
           如果設定了這項政策，使用者就無法啟用這項功能。</translation>
+<translation id="7612030083959326401">設定要停用<ph name="PASSWORD_MANAGER_NAME" /> (儲存及填入) 的網域清單</translation>
 <translation id="7612059745454194563">不允許顯示憑證提供者擴充功能宣傳資訊</translation>
 <translation id="7612157962821894603">要在 <ph name="PRODUCT_NAME" /> 啟動時套用的全系統設定</translation>
 <translation id="7613115815080726221">閒置動作執行前的緩衝時間長度 (以毫秒為單位)。如果使用者在這段時間內沒有任何動作，系統就會採取閒置動作</translation>
@@ -10040,6 +10075,7 @@ Microsoft Outlook 資訊卡需要額外的管理員設定。想進一步瞭解�
 
       如果停用這項政策，對於螢幕畫面分享 API 的任何呼叫就會失敗並傳回錯誤訊息；不過，如果網站與下列任何政策中的來源模式相符，系統就不會考量這項政策 (網站將可以使用螢幕畫面分享 API)：<ph name="SCREEN_CAPTURE_ALLOWED_BY_ORIGINS_POLICY_NAME" />、<ph name="WINDOW_CAPTURE_ALLOWED_BY_ORIGINS_POLICY_NAME" />、<ph name="TAB_CAPTURE_ALLOWED_BY_ORIGINS_POLICY_NAME" />、<ph name="SAME_ORIGIN_TAB_CAPTURE_ALLOWED_BY_ORIGINS_POLICY_NAME" />。
       </translation>
+<translation id="8309511882585098865">不允許使用 AI 模式建議。</translation>
 <translation id="8310392396850884147">支援 CORS 非萬用字元要求標頭。</translation>
 <translation id="8312129124898414409">允許您設定網站是否可以使用金鑰產生功能。您可以允許或禁止所有網站使用金鑰產生功能。
 
@@ -10341,9 +10377,9 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
 <translation id="8528951285051082869">禁止任何網頁應用程式透過 File Handling API 存取特定類型的檔案</translation>
 <translation id="8529958869261780079">這項政策會控管 <ph name="PRODUCT_OS_NAME" /> 的「幫我閱讀」功能設定。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -10382,11 +10418,11 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
 如要設定這項政策，必須將 <ph name="PRIVACY_SANDBOX_PROMPT_ENABLED_POLICY_NAME" /> 政策設為停用。</translation>
 <translation id="8559221882677768248">在登入畫面上停用隨選朗讀功能</translation>
 <translation id="8561512522781085002">PageUp/PageDown 設定採用含有搜尋輔助鍵的快速鍵</translation>
-<translation id="8562398722263115493">「幫我寫」是採用 AI 技術的撰寫助理，適用於簡短格式的網頁內容。系統會根據使用者輸入的提示和網頁內容提供建議。
+<translation id="8562398722263115493">「幫我寫」是採用 AI 技術的撰寫助理，適用於簡短格式的網頁內容。系統會根據使用者輸入的提示詞和網頁內容提供建議。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -10404,9 +10440,9 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
 <translation id="85723976805793612">將 Android 應用程式安裝事件記錄分享給 Google</translation>
 <translation id="8573354257711790704">這項政策會控管 <ph name="PRODUCT_OS_NAME" /> 的掃描器功能設定。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -10754,6 +10790,7 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
 如果未設定這項政策或設為 False，自動調節充電模式就不會調整充電速度。
 
 注意：如果已設定 DevicePowerBatteryChargingOptimization，這項政策就不會生效。</translation>
+<translation id="883025651704099882">在 NTP 頁尾顯示擴充功能來源資訊</translation>
 <translation id="8830717323204407209">允許向使用者顯示憑證提供者擴充功能宣傳資訊</translation>
 <translation id="8832829916385857156">如果系統可以取得與卡片相關的網頁內容，新分頁就會顯示卡片</translation>
 <translation id="8833109046074170275">透過預設的 GAIA 流程進行驗證</translation>
@@ -10822,6 +10859,7 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
       新裝置的出廠預設時區是美國/太平洋時間。時區值格式是採用「IANA 時區資料庫」中訂定的名稱 (請參閱 https://en.wikipedia.org/wiki/Tz_database )。如果輸入無效值，系統會啟用以 GMT 做為時區值的政策。
 
       如果未設定或輸入空白字串，裝置會使用目前採用的時區，但使用者可以變更這項設定。</translation>
+<translation id="8874071621901957187">在新分頁中顯示 Outlook 行事曆資訊卡</translation>
 <translation id="8875202330803089599">如果設定這項政策，使用者就無法略過下載作業安全性判斷機制。
 
       Chrome 有多種下載作業警告，大致可分成以下幾個類別 (如要進一步瞭解安全瀏覽功能判斷機制，請前往 https://support.google.com/chrome/?p=ib_download_blocked)：
@@ -10975,9 +11013,9 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
 <translation id="8985219286836584291">啟用裝置系統資訊回報功能</translation>
 <translation id="8986457452582123237">使用者可透過「使用 AI 建立主題」功能，從選項清單中預先選取偏好設定，然後建立自訂主題/桌布。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改善 AI 模型。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 
@@ -11005,6 +11043,11 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
       如果這項政策和 <ph name="SENSORS_BLOCKED_FOR_URLS_POLICY_NAME" /> 政策有相同的網址模式，系統會優先執行後者，並禁止存取動作或光源感應器。
 
       想進一步瞭解有效的<ph name="URL_LABEL" />模式，請參閱 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。系統允許使用萬用字元 (<ph name="WILDCARD_VALUE" />)。</translation>
+<translation id="9002299469625801504">如果將這項政策設為啟用，只要系統因 <ph name="LOCAL_NETWORK_ACCCESS" /> 檢查失敗而應在<ph name="DEV_TOOLS_NAME" />中顯示警告，系統就會改為封鎖主要要求。
+
+如果將這項政策設為停用或未設定，系統會使用預設處理方式處理 <ph name="LOCAL_NETWORK_ACCESS" /> 要求。
+
+如要瞭解<ph name="LOCAL_NETWORK_ACCESS" />限制，請參閱 https://github.com/explainers-by-googlers/local-network-access。</translation>
 <translation id="9003823644527627017">在 <ph name="PRODUCT_OS_NAME" /> 上設定 Bruschetta VM</translation>
 <translation id="9004469022085379212">如果將這項政策設為啟用，裝置即可在 <ph name="PRODUCT_OS_NAME" />上執行虛擬機器。請務必啟用 <ph name="VIRTUAL_MACHINES_ALLOWED_POLICY_NAME" /> 和 <ph name="CROSTINI_ALLOWED_POLICY_NAME" />，才能使用 <ph name="PRODUCT_CROSTINI_NAME" />。如果將這項政策設為停用，裝置將無法執行虛擬機器。變更為停用後，系統會開始將這項政策套用到新的虛擬機器，不會套用到已經在執行的虛擬機器。
 
@@ -11125,9 +11168,9 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
       如果想進一步瞭解有效的網址模式，請參閱 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。</translation>
 <translation id="9061455386353325110">指定使用者能否讓 <ph name="PRODUCT_NAME" /> 使用生成式 AI 來進一步辨識表單，協助填寫更多欄位。
 
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。預設值為 0，但以下註明的情形除外。
+0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。預設值為 0，但以下註明的情形除外。
 
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改善模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
 
 2 = 不允許使用這項功能。
 

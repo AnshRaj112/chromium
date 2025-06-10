@@ -5,6 +5,7 @@
 <translation id="1029669172902658969">&amp;ChromiumOS আপডেট করতে আবার লঞ্চ করুন</translation>
 <translation id="1040916596585577953">এই এক্সটেনশন পর্যালোচনা করার জন্য Chromium সাজেশন দেয়</translation>
 <translation id="1042552502243217427">কোনও সাইট তার পৃষ্ঠায় লিঙ্ক ব্যক্তিগতভাবে প্রিলোড করতে বললে, Chromium, Google সার্ভার ব্যবহার করে। এর ফলে প্রিলোড করা সাইটের থেকে আপনার পরিচয় লুকানো থাকে, কিন্তু Google জানতে পারে কোন সাইটগুলি প্রিলোড করা হয়েছে।</translation>
+<translation id="1051793555070215510">এই ১-মিনিটের সমীক্ষায় অংশ নিয়ে ছদ্মবেশী মোড উন্নত করতে আমাদের সাহায্য করুন।</translation>
 <translation id="1065672644894730302">আপনার অভিরুচিগুলি পড়া যাবে না৷ কিছু বৈশিষ্ট্য অনুপলব্ধ থাকতে পারে ও অভিরুচিগুলিতে করা পরিবর্তনগুলি সংরক্ষিত হবে না৷</translation>
 <translation id="1083934481477628225">তোমার অভিভাবক Chromium-এর জন্য "সাইট, অ্যাপ ও এক্সটেনশনের অনুমতি" বন্ধ করে দিয়েছেন</translation>
 <translation id="1104942323762546749">Chromium আপনার পাসওয়ার্ড এক্সপোর্ট করতে চাইছে। অনুমতি দিতে Windows এর পাসওয়ার্ড টাইপ করুন।</translation>
@@ -85,7 +86,6 @@
 <translation id="2126108037660393668">ডাউনলোড করা ফাইলটি যাচাই করা যায়নি।</translation>
 <translation id="2137162749895930932">অনুবাদ করার স্ক্রিন বন্ধ করুন</translation>
 <translation id="215352261310130060">এই সাইটটি নিরাপদ কানেকশন ব্যবহার করছে না এবং ফাইলটিতে কিছু পরিবর্তন করা হয়ে থাকতে পারে, তাই Chromium এই ডাউনলোডটি ব্লক করে দিয়েছে</translation>
-<translation id="2157600032285353789">আপনার Chromium মেনু থেকে বুকমার্ক, রিডিং মোড ও আরও অনেক কিছু খুলতে পারবেন</translation>
 <translation id="2174178932569897599">Chromium কাস্টমাইজ করুন</translation>
 <translation id="2174917724755363426">ইনস্টলেশন শেষ হয়নি। আপনি কি সত্যিই বাতিল করতে চান?</translation>
 <translation id="2185166961232948079">Chromium - নেটওয়ার্ক সাইন-ইন - <ph name="PAGE_TITLE" /></translation>
@@ -119,7 +119,6 @@
 <translation id="2572494885440352020">Chromium সহায়ক</translation>
 <translation id="2575822587468774919">'ছবি সার্চ করা' ফিচার ব্যবহার করে সার্চ করার জন্য যেকোনও কিছু বেছে নিন</translation>
 <translation id="2576118232315942160">নিজের সব ডিভাইসে পাসওয়ার্ড ও আরও অনেক কিছু পেতে, Chromium-এ সাইন-ইন করুন</translation>
-<translation id="2583187216237139145">এই প্রোফাইল ব্যবহার করার সময় জেনারেট হওয়া Chromium ডেটা (যেমন বুকমার্ক, ইতিহাস, পাসওয়ার্ড ও অন্যান্য সেটিংস) অফিস প্রোফাইল অ্যাডমিনিস্ট্রেটর মুছে দিতে পারেন। <ph name="LEARN_MORE" /></translation>
 <translation id="2592940277904433508">Chromium ব্যবহার করা চালিয়ে যান</translation>
 <translation id="259935314519650377">ডাউনলোড করা ইনস্টলার ক্যাশে করা যায়নি। সমস্যা হয়েছে: <ph name="UNPACK_CACHING_ERROR_CODE" />।</translation>
 <translation id="2620436844016719705">সিস্টেম</translation>
@@ -226,6 +225,7 @@
 <translation id="4019629340646866719"><ph name="BEGIN_LINK_LINUX_OSS" />Linux ডেভেলপমেন্ট এনভায়রনমেন্ট<ph name="END_LINK_LINUX_OSS" />-এর ক্ষেত্রে যেমন করা হয়েছে, তেমনভাবে অতিরিক্ত <ph name="BEGIN_LINK_CROS_OSS" />ওপেন সোর্স সফ্টওয়্যার<ph name="END_LINK_CROS_OSS" />-এর মাধ্যমে ChromiumOS তৈরি করা সম্ভব হয়েছে।</translation>
 <translation id="4022972681110646219">স্ক্রিনে থাকা সব কন্টেন্ট অনুবাদ করুন</translation>
 <translation id="4023601594785368013">মূল ভাষা: <ph name="LANGUAGE" /></translation>
+<translation id="4023845192681161785">যেকোনও অ্যাপ থেকে Chromium-এ লিঙ্ক খুলুন। এর সাথে, সহজ অ্যাক্সেসের জন্য এটি আপনার টাস্কবারে পিন করা থাকে।</translation>
 <translation id="4036079820698952681"><ph name="BEGIN_LINK" />বর্তমান সেটিংস<ph name="END_LINK" />-এর রিপোর্ট করে Chromium-কে আরও ভালো করে তুলতে সাহায্য করুন</translation>
 <translation id="4050175100176540509">গুরুত্বপূর্ণ নিরাপত্তা উন্নতি এবং নতুন বৈশিষ্ট্যগুলি সর্বশেষ ভার্সনে উপলভ্য।</translation>
 <translation id="4055805654398742145">Password Manager</translation>
@@ -327,6 +327,7 @@
 <translation id="5524890928877629608">সার্চে উপরের বাঁদিকের কোণা: বাঁদিক থেকে <ph name="LEFT" />%, উপরের দিকে <ph name="TOP" />%</translation>
 <translation id="5527463683072221100">Chromium-এ পিডিএফ ফাইল খুলুন</translation>
 <translation id="5579324208890605088">স্টার্টআপ সম্পর্কিত এরর: নিয়মিত ব্যবহারকারী হিসেবে ইনস্টলার চালান, অ্যাডমিনিস্ট্রেটর হিসেবে নয়।</translation>
+<translation id="5580770360767802657">ডিফল্ট হিসেবে Chromium ব্যবহার করুন এবং এটি পিন করুন</translation>
 <translation id="5596627076506792578">আরও বিকল্পগুলি</translation>
 <translation id="5605834417512968703">'ছবি সার্চ করা' ফিচার ব্যবহার করে সার্চ করার জন্য যেকোনও কিছু বেছে নিন অথবা 'ছবি সার্চ করা' ফিচার থেকে বেরিয়ে আসতে Escape বোতাম প্রেস করুন</translation>
 <translation id="5618818588972826921">'ছবি সার্চ করা' ফিচারের সাহায্যে কিছু সার্চ করতে যেকোনও টেক্সট বা ছবি বেছে নিন অথবা Escape বোতাম প্রেস করে বেরিয়ে আসুন</translation>
@@ -357,14 +358,12 @@
 <translation id="5987687638152509985">সিঙ্ক শুরু করতে Chromium আপডেট করুন</translation>
 <translation id="5988505247484123880">আপনার অভিজ্ঞতাকে পছন্দমতো করতে, আপনি যে সাইটগুলিতে যান সেগুলি আপনার আগ্রহের বিষয়গুলি মনে রাখা সাধারণ। এছাড়া Chromium-এর মাধ্যমে আপনার আগ্রহের বিষয়ে তথ্যগুলি সাইট স্টোর করতে পারে।</translation>
 <translation id="6003112304606738118">ডাউনলোড হচ্ছে... <ph name="HOURS" /> ঘণ্টা বাকি আছে</translation>
-<translation id="6019451407441383358">আপনি একেবারে উপরের ডানদিকে Chromium মেনু থেকে বুকমার্ক, রিডিং মোড ও আরও অনেক কিছু খুলতে পারবেন</translation>
 <translation id="6040143037577758943">বন্ধ</translation>
 <translation id="6058380562449900225">আপনার ডেটা সুরক্ষিত রাখতে, আপনি সম্প্রতি ভিজিট করেননি এমন সাইট থেকে Chromium-কে অনুমতি সরাতে দিন। এর ফলে বিজ্ঞপ্তি বন্ধ হয় না।</translation>
 <translation id="6063093106622310249">Chromium এ খুলুন</translation>
 <translation id="6069027071882229820">ছবি হিসেবে কপি করুন</translation>
 <translation id="6072279588547424923">Chromium-এ <ph name="EXTENSION_NAME" /> যোগ করা হয়েছে</translation>
 <translation id="6072463441809498330">Chromium-এর ব্যবহার আরও দ্রুত করে তোলা</translation>
-<translation id="608006075545470555">এই ব্রাউজারে অফিস প্রোফাইল যোগ করুন</translation>
 <translation id="6096348254544841612">Chromium কে কাস্টমাইজ এবং নিয়ন্ত্রণ করুন৷ আপডেট পাওয়া যাবে৷</translation>
 <translation id="6107893135096467929">চালু আছে • Chromium এই এক্সটেনশনের সোর্স যাচাই করতে পারে না</translation>
 <translation id="6119438414301547735">Chromium টুলবারে অ্যাক্সেস সংক্রান্ত অনুরোধ দেখাতে এক্সটেনশনকে অনুমতি দিন</translation>
@@ -558,7 +557,6 @@ Chromium আপনার সেটিংস পুনরুদ্ধার ক�
 <translation id="8471947159125090285">আপনার Google অ্যাকাউন্টে Chromium ডেটা ব্যবহার এবং সেভ করতে, আপনার পরিচয় যাচাই করুন</translation>
 <translation id="8493179195440786826">Chromium পুরানো হয়ে গেছে</translation>
 <translation id="8522801943730206384">আপনি পাসওয়ার্ড সেভ করলে Chromium তা চেক করতে পারবে</translation>
-<translation id="8550334526674375523">এই অফিস প্রোফাইল আপনার ব্যক্তিগত প্রোফাইল থেকে সম্পূর্ণ আলাদা।</translation>
 <translation id="8555465886620020932">পরিষেবায় সমস্যা হয়েছে: <ph name="SERVICE_ERROR" />।</translation>
 <translation id="8556420416730706394">সহজে অ্যাক্সেস করার জন্য আপনি 'ছবি সার্চ করা' ফিচার পিন করে রাখতে পারেন; সাইড প্যানেলের একেবারে উপরে পিন করুন বোতামে ক্লিক করুন</translation>
 <translation id="856656450041460113">ভাষার তালিকা সার্চ করুন</translation>
@@ -587,7 +585,6 @@ Chromium আপনার সেটিংস পুনরুদ্ধার ক�
 <translation id="8931379085695076764">Chromium গত কয়েক সপ্তাহের আপনার ব্রাউজিং ইতিহাসের উপর ভিত্তি করে আপনার আগ্রহ অনুমান করতে পারে। আপনার ডিভাইসে এই তথ্য থাকে।</translation>
 <translation id="8941642502866065432">Chromium আপডেট করা যাচ্ছে না</translation>
 <translation id="897581876605952338">Chromium Enterprise লোগো</translation>
-<translation id="8986207147630327271">আপনি এই ব্রাউজারে অফিস প্রোফাইল যোগ করছেন এবং আপনার অ্যাডমিনিস্ট্রেটরকে শুধু অফিস প্রোফাইলটি নিয়ন্ত্রণ করার অধিকার দিচ্ছেন।</translation>
 <translation id="8988036198400390003">Chromium প্রোফাইল ম্যানেজ করুন</translation>
 <translation id="9019929317751753759">Chromium-কে আরও নিরাপদ করতে, আমরা নিচের এক্সটেনশনটি বন্ধ করেছি যা <ph name="IDS_EXTENSION_WEB_STORE_TITLE" />-এ তালিকাবদ্ধ করা হয়নি এবং হয়ত আপনাকে না জানিয়ে যোগ করা হয়েছিল৷</translation>
 <translation id="9022552996538154597">Chromium-এ সাইন-ইন করুন</translation>
@@ -600,6 +597,7 @@ Chromium আপনার সেটিংস পুনরুদ্ধার ক�
 <translation id="9106612006984859720">ভবিষ্যতে Chromium আপডেট পেতে হলে, আপনার কম্পিউটারে Windows 10 বা এর পরবর্তী যেকোনও ভার্সন থাকতে হবে। এই কম্পিউটারে Windows 8.1 ভার্সন ব্যবহার করা হচ্ছে।</translation>
 <translation id="91086099826398415">নতুন Chromium ট্যাবে লিঙ্ক খুলুন</translation>
 <translation id="911206726377975832">আপনার ব্রাউজিং ডেটাও মুছে দেবেন?</translation>
+<translation id="9134482777260927479">হোমওয়ার্কে সহায়তা</translation>
 <translation id="9148058034647219655">প্রস্থান করুন</translation>
 <translation id="9158494823179993217"><ph name="TARGET_URL_HOSTNAME" /> অ্যাক্সেস করতে অন্য ব্রাউজার খোলার জন্য আপনার সিস্টেম অ্যাডমিনিস্ট্রেটর Chromium কনফিগার করেছেন।</translation>
 <translation id="9185526690718004400">&amp;Chromium আপডেট করতে আবার লঞ্চ করুন</translation>

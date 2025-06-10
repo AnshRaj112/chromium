@@ -33,7 +33,6 @@
 #include "gpu/command_buffer/client/context_support.h"
 #include "gpu/command_buffer/client/raster_interface.h"
 #include "gpu/command_buffer/common/capabilities.h"
-#include "gpu/command_buffer/common/gpu_memory_buffer_support.h"
 #include "gpu/command_buffer/common/shared_image_capabilities.h"
 #include "gpu/command_buffer/common/shared_image_trace_utils.h"
 #include "gpu/command_buffer/common/shared_image_usage.h"
@@ -414,16 +413,9 @@ class CanvasResourceProviderSharedImage : public CanvasResourceProvider,
     TRACE_EVENT0("blink", "CanvasResourceProviderSharedImage::CreateResource");
 
     if (is_software_) {
-      auto format = GetSharedImageFormat();
-      if (!format.IsBitmapFormatSupported()) {
-        // If the rendering format is not supported, downgrade to 8-bits.
-        // TODO(junov): Should we try 12-12-12-12 and 10-10-10-2?
-        format = GetN32FormatForCanvas();
-      }
-
       return CanvasResourceSharedImage::CreateSoftware(
-          Size(), format, GetAlphaType(), GetColorSpace(), CreateWeakPtr(),
-          shared_image_interface_provider_);
+          Size(), viz::SinglePlaneFormat::kBGRA_8888, GetAlphaType(),
+          GetColorSpace(), CreateWeakPtr(), shared_image_interface_provider_);
     }
 
     if (IsGpuContextLost())
@@ -1275,6 +1267,9 @@ CanvasResourceProvider::CreateSharedImageProviderForSoftwareCompositor(
   if (SharedGpuContext::IsGpuCompositingEnabled()) {
     return nullptr;
   }
+
+  CHECK(format == viz::SharedImageFormat::N32Format() ||
+        format == viz::SinglePlaneFormat::kRGBA_F16);
 
   auto provider = std::make_unique<CanvasResourceProviderSharedImage>(
       size, format, alpha_type, color_space, shared_image_interface_provider,

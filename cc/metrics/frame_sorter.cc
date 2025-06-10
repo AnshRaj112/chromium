@@ -52,7 +52,7 @@ void FrameSorter::AddNewFrame(const viz::BeginFrameArgs& args) {
       current_source_id_ < args.frame_id.source_id) {
     // The change in source_id can be as a result of crash on gpu process,
     // which invalidates existing pending frames (no ack is expected).
-    Reset();
+    Reset(true);
   }
 
   if (!pending_frames_.empty()) {
@@ -74,6 +74,19 @@ void FrameSorter::AddNewFrame(const viz::BeginFrameArgs& args) {
     frame_states_.erase(first.frame_id);
     frame_infos_.erase(first.frame_id);
     pending_frames_.pop_front();
+  }
+}
+
+void FrameSorter::AddFrameInfoToBuffer(const FrameInfo& frame_info) {
+  ring_buffer_.SaveToBuffer(frame_info.final_state);
+  ++total_frames_;
+  if (frame_info.final_state == FrameInfo::FrameFinalState::kDropped) {
+    ++total_dropped_;
+  } else if (frame_info.final_state ==
+                 FrameInfo::FrameFinalState::kPresentedPartialNewMain ||
+             frame_info.final_state ==
+                 FrameInfo::FrameFinalState::kPresentedPartialOldMain) {
+    ++total_partial_;
   }
 }
 
@@ -135,7 +148,10 @@ bool FrameSorter::IsAlreadyReportedDropped(const viz::BeginFrameId& id) const {
   return it->second.is_dropped();
 }
 
-void FrameSorter::Reset() {
+void FrameSorter::Reset(bool reset_fcp) {
+  total_frames_ = 0;
+  total_partial_ = 0;
+  total_dropped_ = 0;
   for (const auto& pending_frame : pending_frames_) {
     const auto& frame_id = pending_frame.frame_id;
     auto& frame_state = frame_states_[frame_id];
@@ -150,6 +166,10 @@ void FrameSorter::Reset() {
     frame_state.OnReset();
   }
   pending_frames_.clear();
+  ring_buffer_.Clear();
+  if (reset_fcp) {
+    first_contentful_paint_received_ = false;
+  }
 }
 
 void FrameSorter::FlushFrames() {
@@ -170,6 +190,24 @@ void FrameSorter::FlushFrames() {
     pending_frames_.pop_front();
   }
   DCHECK_GT(flushed_count, 0u);
+}
+
+uint32_t FrameSorter::GetAverageThroughput() const {
+  size_t good_frames = 0;
+  for (auto it = End(); it; --it) {
+    if (**it == FrameInfo::FrameFinalState::kPresentedAll ||
+        **it == FrameInfo::FrameFinalState::kPresentedPartialOldMain ||
+        **it == FrameInfo::FrameFinalState::kPresentedPartialNewMain) {
+      ++good_frames;
+    }
+  }
+  double throughput = 100. * good_frames / ring_buffer_.BufferSize();
+  return static_cast<uint32_t>(throughput);
+}
+
+void FrameSorter::OnFirstContentfulPaintReceived() {
+  DCHECK(!first_contentful_paint_received_);
+  first_contentful_paint_received_ = true;
 }
 
 }  // namespace cc

@@ -22,8 +22,7 @@ tabs_api::mojom::TabPtr BuildMojoTab(tabs::TabHandle handle,
   result->url = data.visible_url;
   result->network_state = data.network_state;
   if (handle.Get() != nullptr) {
-    for (const auto alert_state :
-         GetTabAlertStatesForContents(handle.Get()->GetContents())) {
+    for (const auto alert_state : GetTabAlertStatesForTab(handle.Get())) {
       result->alert_states.push_back(alert_state);
     }
   }
@@ -31,4 +30,37 @@ tabs_api::mojom::TabPtr BuildMojoTab(tabs::TabHandle handle,
   return result;
 }
 
+tabs_api::mojom::TabCollectionPtr BuildMojoTabCollection(
+    tabs::TabCollectionHandle handle,
+    tabs::TabCollection::Type collection_type) {
+  auto tab_collection = tabs_api::mojom::TabCollection::New();
+  tab_collection->id =
+      tabs_api::TabId(tabs_api::TabId::Type::kCollection,
+                      base::NumberToString(handle.raw_value()));
+  tab_collection->collection_type =
+      tabs_api::mojom::TabCollection::CollectionType::kUnknown;
+  switch (collection_type) {
+    case tabs::TabCollection::Type::TABSTRIP:
+      tab_collection->collection_type =
+          tabs_api::mojom::TabCollection::CollectionType::kTabStrip;
+      break;
+    case tabs::TabCollection::Type::PINNED:
+      tab_collection->collection_type =
+          tabs_api::mojom::TabCollection::CollectionType::kPinned;
+      break;
+    case tabs::TabCollection::Type::UNPINNED:
+      tab_collection->collection_type =
+          tabs_api::mojom::TabCollection::CollectionType::kUnpinned;
+      break;
+    case tabs::TabCollection::Type::GROUP:
+      tab_collection->collection_type =
+          tabs_api::mojom::TabCollection::CollectionType::kTabGroup;
+      break;
+    case tabs::TabCollection::Type::SPLIT:
+      tab_collection->collection_type =
+          tabs_api::mojom::TabCollection::CollectionType::kSplitTab;
+      break;
+  }
+  return tab_collection;
+}
 }  // namespace tabs_api::converters

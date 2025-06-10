@@ -215,8 +215,7 @@ IN_PROC_BROWSER_TEST_F(DeveloperPrivateApiTest,
   for (const scoped_refptr<content::DevToolsAgentHost>& host : targets) {
     if (host->GetType() == content::DevToolsAgentHost::kTypeServiceWorker &&
         host->GetURL() ==
-            extension->GetResourceURL(
-                BackgroundInfo::GetBackgroundServiceWorkerScript(extension))) {
+            BackgroundInfo::GetBackgroundServiceWorkerScriptURL(extension)) {
       EXPECT_FALSE(service_worker_host);
       service_worker_host = host;
     }
@@ -268,8 +267,7 @@ IN_PROC_BROWSER_TEST_F(DeveloperPrivateApiTest,
   for (const scoped_refptr<content::DevToolsAgentHost>& host : targets) {
     if (host->GetType() == content::DevToolsAgentHost::kTypeServiceWorker &&
         host->GetURL() ==
-            extension->GetResourceURL(
-                BackgroundInfo::GetBackgroundServiceWorkerScript(extension))) {
+            BackgroundInfo::GetBackgroundServiceWorkerScriptURL(extension)) {
       EXPECT_FALSE(service_worker_host);
       service_worker_host = host;
     }
@@ -412,7 +410,7 @@ IN_PROC_BROWSER_TEST_F(DeveloperPrivateApiTest, InspectOffscreenDocument) {
 
   // Create an offscreen document and wait for it to load.
   std::unique_ptr<OffscreenDocumentHost> offscreen_document;
-  GURL offscreen_url = extension->GetResourceURL("offscreen.html");
+  GURL offscreen_url = extension->ResolveExtensionURL("offscreen.html");
   {
     ExtensionHostTestHelper offscreen_waiter(profile(), extension->id());
     offscreen_waiter.RestrictToType(mojom::ViewType::kOffscreenDocument);

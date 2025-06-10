@@ -15,6 +15,7 @@
 
 #include "base/barrier_closure.h"
 #include "base/containers/contains.h"
+#include "base/debug/dump_without_crashing.h"
 #include "base/feature_list.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
@@ -25,6 +26,7 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_view_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/system/sys_info.h"
 #include "base/task/sequenced_task_runner.h"
@@ -454,7 +456,7 @@ void LocalStorageImpl::FlushStorageKeyForTesting(
 }
 
 void LocalStorageImpl::ShutDown(base::OnceClosure callback) {
-  DCHECK_NE(connection_state_, CONNECTION_SHUTDOWN);
+  CHECK_NE(connection_state_, CONNECTION_SHUTDOWN);
   DCHECK(callback);
 
   control_receiver_.reset();
@@ -603,8 +605,16 @@ void LocalStorageImpl::ForceFakeOpenStorageAreaForTesting(
 
 LocalStorageImpl::~LocalStorageImpl() {
   DCHECK_EQ(connection_state_, CONNECTION_SHUTDOWN);
-  // ShutDown() should run before this destructor and clear `areas_`.
-  CHECK(areas_.empty());
+  // ShutDown() should run before this destructor and clear `areas_`. If this
+  // didn't occur, collect a crash dump to help diagnose the issue.
+  // TODO(crbug.com/396030877): Remove this DWOC and workaround once the issue
+  // is resolved.
+  if (!areas_.empty()) {
+    base::debug::DumpWithoutCrashing();
+    // Clear `areas_`to avoid a UaF crash in the StorageAreaHolder d'tor which
+    // tries to access `this`'s state.
+    areas_.clear();
+  }
   base::trace_event::MemoryDumpManager::GetInstance()->UnregisterDumpProvider(
       this);
 }
@@ -908,7 +918,7 @@ void LocalStorageImpl::OnGotStorageUsageForShutdown(
     }
   }
 
-  if (!storage_keys_to_delete.empty()) {
+  if (!storage_keys_to_delete.empty() && database_) {
     DeleteStorageKeys(database_.get(), std::move(storage_keys_to_delete),
                       base::BindOnce(&LocalStorageImpl::OnStorageKeysDeleted,
                                      base::Unretained(this)));
@@ -986,6 +996,13 @@ void LocalStorageImpl::DeleteStaleStorageAreas() {
 
 void LocalStorageImpl::OnGotMetaDataToDeleteStaleStorageAreas(
     std::vector<DomStorageDatabase::KeyValuePair> data) {
+  if (!database_) {
+    // This method is provided as a callback to an off thread task. Between the
+    // time that the task is posted and now when this callback is invoked, the
+    // `database_` member may have been reset.
+    return;
+  }
+
   // Collect last accessed or modified time for all storage areas.
   std::map<blink::StorageKey, base::Time> storage_key_to_latest_use_time;
   for (const DomStorageDatabase::KeyValuePair& row : data) {

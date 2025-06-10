@@ -34,6 +34,8 @@
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
 #include "chrome/app/chrome_command_ids.h"
+#include "chrome/browser/actor/actor_keyed_service.h"
+#include "chrome/browser/actor/execution_engine.h"
 #include "chrome/browser/app_mode/app_mode_utils.h"
 #include "chrome/browser/background/background_contents.h"
 #include "chrome/browser/background/background_contents_service.h"
@@ -53,7 +55,6 @@
 #include "chrome/browser/download/bubble/download_display_controller.h"
 #include "chrome/browser/download/download_core_service.h"
 #include "chrome/browser/download/download_core_service_factory.h"
-#include "chrome/browser/extensions/browser_extension_window_controller.h"
 #include "chrome/browser/extensions/extension_ui_util.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/tab_helper.h"
@@ -101,7 +102,6 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_live_tab_context.h"
-#include "chrome/browser/ui/browser_location_bar_model_delegate.h"
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "chrome/browser/ui/browser_tab_strip_model_delegate.h"
@@ -109,6 +109,7 @@
 #include "chrome/browser/ui/browser_ui_prefs.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+#include "chrome/browser/ui/browser_window/public/desktop_browser_window_capabilities.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/chrome_select_file_policy.h"
 #include "chrome/browser/ui/exclusive_access/exclusive_access_manager.h"
@@ -127,14 +128,12 @@
 #include "chrome/browser/ui/signin/cookie_clear_on_exit_migration_notice.h"
 #include "chrome/browser/ui/singleton_tabs.h"
 #include "chrome/browser/ui/status_bubble.h"
-#include "chrome/browser/ui/sync/browser_synced_window_delegate.h"
 #include "chrome/browser/ui/tab_contents/core_tab_helper.h"
 #include "chrome/browser/ui/tab_dialogs.h"
 #include "chrome/browser/ui/tab_helpers.h"
 #include "chrome/browser/ui/tab_modal_confirm_dialog.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_utils.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
-#include "chrome/browser/ui/tabs/tab_group_deletion_dialog_controller.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -184,8 +183,6 @@
 #include "components/keep_alive_registry/keep_alive_registry.h"
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
-#include "components/omnibox/browser/location_bar_model.h"
-#include "components/omnibox/browser/location_bar_model_impl.h"
 #include "components/page_load_metrics/browser/metrics_web_contents_observer.h"
 #include "components/page_load_metrics/common/page_load_metrics.mojom.h"
 #include "components/paint_preview/buildflags/buildflags.h"
@@ -464,23 +461,25 @@ base::FunctionRef<bool(const Browser*)> MaybeLazyIsFullscreen(
                                               : &AlwaysReturnFalse;
 }
 
-bool IsActorCoordinatorActingOnTab(Profile* profile,
-                                   const content::WebContents* tab) {
+bool IsActorExecutionEngineActingOnTab(Profile* profile,
+                                       const content::WebContents* tab) {
+  // TODO(crbug.com/411462297): Delete this code.
 #if BUILDFLAG(ENABLE_GLIC)
   if (glic::GlicEnabling::IsEnabledByFlags()) {
     if (const auto* glic_service = glic::GlicKeyedService::Get(profile);
-        glic_service && glic_service->IsActorCoordinatorActingOnTab(tab)) {
+        glic_service && glic_service->IsExecutionEngineActingOnTab(tab)) {
       return true;
     }
   }
-  // TODO(https://crbug.com/411462297): Deduplicate ownership of
-  // ActorCoordinators.
-  if (const auto* ai_data_service =
-          AiDataKeyedServiceFactory::GetAiDataKeyedService(profile);
-      ai_data_service && ai_data_service->IsActorCoordinatorActingOnTab(tab)) {
-    return true;
-  }
 #endif
+  auto* actor_service = actor::ActorKeyedService::Get(profile);
+  if (actor_service) {
+    for (auto& [task_id, task] : actor_service->GetTasks()) {
+      if (task->GetExecutionEngine()->HasTaskForTab(tab)) {
+        return true;
+      }
+    }
+  }
   return false;
 }
 
@@ -649,18 +648,11 @@ Browser::Browser(const CreateParams& params)
       unload_controller_(this),
       content_setting_bubble_model_delegate_(
           new BrowserContentSettingBubbleModelDelegate(this)),
-      location_bar_model_delegate_(new BrowserLocationBarModelDelegate(this)),
-      location_bar_model_(std::make_unique<LocationBarModelImpl>(
-          location_bar_model_delegate_.get(),
-          content::kMaxURLDisplayChars)),
       live_tab_context_(new BrowserLiveTabContext(this)),
-      synced_window_delegate_(new BrowserSyncedWindowDelegate(this)),
       app_controller_(web_app::MaybeCreateAppBrowserController(this)),
       bookmark_bar_state_(BookmarkBar::HIDDEN),
       browser_actions_(new BrowserActions(*this)),
       command_controller_(new chrome::BrowserCommandController(this)),
-      tab_group_deletion_dialog_controller_(
-          std::make_unique<tab_groups::DeletionDialogController>(this)),
       window_has_shown_(false),
       user_title_(params.user_title),
       signin_view_controller_(this),
@@ -737,10 +729,6 @@ Browser::Browser(const CreateParams& params)
     app_controller_->UpdateCustomTabBarVisibility(false);
   }
 
-  // Create the extension window controller before sending notifications.
-  extension_window_controller_ =
-      std::make_unique<extensions::BrowserExtensionWindowController>(this);
-
   if (session_service) {
     session_service->WindowOpened(this);
   }
@@ -768,10 +756,6 @@ Browser::~Browser() {
   // destroy `features_` because that's what breaks things the least :)
   features_.reset();
   ClearAllUserData();
-
-  // Destroy the deletion dialog before profile resets.
-  // (see https://crbug.com/357391254)
-  tab_group_deletion_dialog_controller_.reset();
 
   // Stop observing notifications and destroy the tab monitor before continuing
   // with destruction. Profile destruction will unload extensions and reentrant
@@ -824,10 +808,6 @@ Browser::~Browser() {
   }
 
   profile_pref_registrar_.Reset();
-
-  // Destroy BrowserExtensionWindowController before the incognito profile
-  // is destroyed to make sure the chrome.windows.onRemoved event is sent.
-  extension_window_controller_.reset();
 
   // The system incognito profile should not try be destroyed using
   // ProfileDestroyer::DestroyProfileWhenAppropriate(). This profile can be
@@ -1257,18 +1237,6 @@ views::View* Browser::TopContainer() {
   return window_->GetTopContainer();
 }
 
-bool Browser::IsMinimized() const {
-  return window_->IsMinimized();
-}
-
-bool Browser::IsVisibleOnScreen() const {
-  return window_->IsVisibleOnScreen();
-}
-
-bool Browser::IsVisible() const {
-  return window_->IsVisible();
-}
-
 base::WeakPtr<BrowserWindowInterface> Browser::GetWeakPtr() {
   return AsWeakPtr();
 }
@@ -1288,6 +1256,14 @@ tabs::TabInterface* Browser::GetActiveTabInterface() {
 
 BrowserWindowFeatures& Browser::GetFeatures() {
   return *features_.get();
+}
+
+UnownedUserDataHost& Browser::GetUnownedUserDataHost() {
+  return unowned_user_data_host_;
+}
+
+const UnownedUserDataHost& Browser::GetUnownedUserDataHost() const {
+  return unowned_user_data_host_;
 }
 
 web_modal::WebContentsModalDialogHost*
@@ -1356,10 +1332,6 @@ Browser* Browser::GetBrowserForMigrationOnly() {
   return this;
 }
 
-void Browser::ActivateWindow() {
-  window_->Activate();
-}
-
 bool Browser::IsTabModalPopupDeprecated() const {
   return is_tab_modal_popup_deprecated_;
 }
@@ -1370,6 +1342,18 @@ bool Browser::CanShowCallToAction() const {
 
 std::unique_ptr<ScopedWindowCallToAction> Browser::ShowCallToAction() {
   return std::make_unique<ScopedWindowCallToActionImpl>(this);
+}
+
+ui::BaseWindow* Browser::GetWindow() {
+  return window_.get();
+}
+
+DesktopBrowserWindowCapabilities* Browser::capabilities() {
+  return DesktopBrowserWindowCapabilities::From(this);
+}
+
+const DesktopBrowserWindowCapabilities* Browser::capabilities() const {
+  return DesktopBrowserWindowCapabilities::From(this);
 }
 
 void Browser::DidBecomeActive() {
@@ -2394,9 +2378,9 @@ bool Browser::IsWebContentsCreationOverridden(
     const GURL& opener_url,
     const std::string& frame_name,
     const GURL& target_url) {
-  if (IsActorCoordinatorActingOnTab(
+  if (IsActorExecutionEngineActingOnTab(
           profile(), content::WebContents::FromRenderFrameHost(opener))) {
-    // If an ActorCoordinator is acting on the opener, prevent it from creating
+    // If an ExecutionEngine is acting on the opener, prevent it from creating
     // a new WebContents. We'll instead force the navigation to happen in the
     // same tab.
     return true;
@@ -2418,8 +2402,8 @@ WebContents* Browser::CreateCustomWebContents(
     const content::StoragePartitionConfig& partition_config,
     content::SessionStorageNamespace* session_storage_namespace) {
   if (auto* opener_contents = content::WebContents::FromRenderFrameHost(opener);
-      IsActorCoordinatorActingOnTab(profile(), opener_contents)) {
-    // If an ActorCoordinator is acting on the opener, we force the navigation
+      IsActorExecutionEngineActingOnTab(profile(), opener_contents)) {
+    // If an ExecutionEngine is acting on the opener, we force the navigation
     // to happen in the same tab.
     content::NavigationController::LoadURLParams params(target_url);
     params.initiator_frame_token = opener->GetFrameToken();

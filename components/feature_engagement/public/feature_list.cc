@@ -121,6 +121,7 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHRestoreTabsOnFREFeature,
     &kIPHRtlGestureNavigationFeature,
     &kIPHTabSwitcherXR,
+    &kIPHTabTearingXR,
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_IOS) || BUILDFLAG(IS_ANDROID)
@@ -186,14 +187,15 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHiOSSettingsInOverflowMenuBubbleFeature,
     &kIPHiOSSwitchAccountsWithNTPAccountParticleDiscFeature,
     &kIPHiOSWelcomeBackFeature,
-    &kIPHIOSGLICPromoFeature,
+    &kIPHIOSBWGPromoFeature,
+    &kIPHiOSSafariImportFeature,
+    &kIPHIOSPageActionMenu,
 #endif  // BUILDFLAG(IS_IOS)
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_LINUX) || \
     BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_FUCHSIA)
 #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
     &kEsbDownloadRowPromoFeature,
 #endif
-    &kIPHAutofillEnableLoyaltyCardsFeature,
     &kIPHBatterySaverModeFeature,
     &kIPHCompanionSidePanelFeature,
     &kIPHCompanionSidePanelRegionSearchFeature,
@@ -271,6 +273,7 @@ const base::Feature* const kAllFeatures[] = {
     &kIPHAutofillCardInfoRetrievalSuggestionFeature,
     &kIPHAutofillCreditCardBenefitFeature,
     &kIPHAutofillDisabledVirtualCardSuggestionFeature,
+    &kIPHAutofillEnableLoyaltyCardsFeature,
     &kIPHAutofillExternalAccountProfileSuggestionFeature,
     &kIPHAutofillHomeWorkProfileSuggestionFeature,
     &kIPHAutofillVirtualCardCVCSuggestionFeature,

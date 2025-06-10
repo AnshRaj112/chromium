@@ -143,6 +143,17 @@ chromium-metrics-reviews@google.com.
   <int value="2" label="Import with section union"/>
 </enum>
 
+<enum name="AutofillAiModelExecutionStatus">
+  <int value="0"
+      label="One or more field indices returned by the model are out of
+             bounds or duplicates."/>
+  <int value="1" label="The server returned an error or timed out."/>
+  <int value="2"
+      label="The server replied with the wrong response proto type."/>
+  <int value="3" label="The model returned a result, but it was empty"/>
+  <int value="4" label="The model returned a valid, non-empty result."/>
+</enum>
+
 <enum name="AutofillAiOptInFunnelEvents">
   <int value="0" label="IPH was shown"/>
   <int value="1" label="FFR was shown"/>
@@ -265,6 +276,8 @@ chromium-metrics-reviews@google.com.
   <int value="3"
       label="Only kAccount profiles originating from outside Chrome were used"/>
   <int value="4" label="Profiles from different categories were used."/>
+  <int value="5" label="Only a kAccountHome profile was used"/>
+  <int value="6" label="Only a kAccountWork profile was used"/>
 </enum>
 
 <enum name="AutofillCategoryResolvedFillingReadiness">
@@ -275,6 +288,8 @@ chromium-metrics-reviews@google.com.
   <int value="3"
       label="Only kAccount profiles originating from outside Chrome available"/>
   <int value="4" label="Profiles from different categories available."/>
+  <int value="5" label="Only a kAccountHome profile available"/>
+  <int value="6" label="Only a kAccountWork profile available"/>
 </enum>
 
 <enum name="AutofillCreditCardAuthenticationEvents">
@@ -2467,6 +2482,7 @@ Called by update_autofill_enums.py.-->
   <int value="10" label="UnusableIncompleteProfile"/>
   <int value="11" label="ProfileMigration"/>
   <int value="12" label="ProfileMigrationAndSilentUpdate"/>
+  <int value="13" label="HomeAndWorkSuperset"/>
 </enum>
 
 <enum name="AutofillProfileRecordType">
@@ -2548,6 +2564,7 @@ Called by update_autofill_enums.py.-->
   <int value="0" label="Shown"/>
   <int value="1" label="Not shown, max strikes reached"/>
   <int value="2" label="Not shown, required delay has not passed"/>
+  <int value="3" label="Not shown, CVC missing for possible card update"/>
 </enum>
 
 <enum name="AutofillSavePaymentMethodPromptResultEnum">
@@ -3028,10 +3045,8 @@ Called by update_autofill_enums.py.-->
   <int value="275" label="UpdateServerIbanMetadata: Failure"/>
   <int value="276" label="ClearAllCreditCardBenefits: Success"/>
   <int value="277" label="ClearAllCreditCardBenefits: Failure"/>
-  <int value="280" label="AddEntityInstance: Success"/>
-  <int value="281" label="AddEntityInstance: Failure"/>
-  <int value="290" label="UpdateEntityInstance: Success"/>
-  <int value="291" label="UpdateEntityInstance: Failure"/>
+  <int value="290" label="AddOrUpdateEntityInstance: Success"/>
+  <int value="291" label="AddOrUpdateEntityInstance: Failure"/>
   <int value="300" label="RemoveEntityInstance: Success"/>
   <int value="301" label="RemoveEntityInstance: Failure"/>
   <int value="310" label="RemoveEntityInstancesModifiedBetween: Success"/>
@@ -3041,6 +3056,34 @@ Called by update_autofill_enums.py.-->
 </enum>
 
 <!-- LINT.ThenChange(/components/autofill/core/browser/webdata/autofill_webdata_backend_impl.cc:Result) -->
+
+<!-- LINT.IfChange(AutofillZipCodeSeparators) -->
+
+<enum name="AutofillZipCodeSeparators">
+  <int value="0" label="NoSeparator"/>
+  <int value="1" label="HyphenMinus (-)"/>
+  <int value="2" label="EnDash (–)"/>
+  <int value="3" label="EmDash (—)"/>
+  <int value="4" label="Hyphen (‐)"/>
+  <int value="5" label="NonBreakingHyphen (‑)"/>
+  <int value="6" label="MinusSign (−)"/>
+  <int value="7" label="ModifierMinus (˗)"/>
+  <int value="8" label="FigureDash (‒)"/>
+  <int value="9" label="HorizontalBar (―)"/>
+  <int value="10" label="SmallHyphenMinus (﹣)"/>
+  <int value="11" label="FullwidthHyphenMinus (－)"/>
+  <int value="12" label="Space"/>
+  <int value="13" label="NonBreakingSpace"/>
+  <int value="14" label="EnSpace"/>
+  <int value="15" label="EmSpace"/>
+  <int value="16" label="ThinSpace"/>
+  <int value="17" label="IdeographicSpace"/>
+  <int value="18" label="FigureSpace"/>
+  <int value="19" label="NarrowNonBreakingSpace"/>
+  <int value="20" label="Other"/>
+</enum>
+
+<!-- LINT.ThenChange(/components/autofill/core/browser/metrics/profile_import_metrics.h:AutofillZipCodeSeparators) -->
 
 <!-- LINT.IfChange(BnplFormEvent) -->
 
@@ -3995,7 +4038,7 @@ Called by update_autofill_enums.py.-->
   <int value="66" label="Identity Credentials"/>
   <int value="67" label="Loyalty card entry"/>
   <int value="68" label="Manage Loyalty Cards information"/>
-  <int value="69" label="Home and Work address suggestion"/>
+  <int value="69" label="(Obsolete) Home and Work address suggestion"/>
 </enum>
 
 <!-- LINT.ThenChange(/components/autofill/core/browser/suggestions/suggestion_type.h:SuggestionType) -->
@@ -4013,6 +4056,12 @@ Called by update_autofill_enums.py.-->
   <int value="0"
       label="IBAN selected from the sheet (either local or server one)"/>
   <int value="1" label="Manage payment settings option selected"/>
+  <int value="2" label="Bottom sheet dismissed"/>
+</enum>
+
+<enum name="TouchToFill.LoyaltyCard.Outcome">
+  <int value="0" label="Loyalty card selected from the sheet"/>
+  <int value="1" label="Manage passes option selected"/>
   <int value="2" label="Bottom sheet dismissed"/>
 </enum>
 

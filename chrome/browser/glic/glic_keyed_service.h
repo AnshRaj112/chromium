@@ -12,6 +12,7 @@
 #include "base/containers/flat_set.h"
 #include "base/memory/memory_pressure_listener.h"
 #include "base/memory/raw_ptr.h"
+#include "chrome/browser/actor/task_id.h"
 #include "chrome/browser/glic/host/context/glic_focused_tab_manager.h"
 #include "chrome/browser/glic/host/glic.mojom.h"
 #include "components/keyed_service/core/keyed_service.h"
@@ -22,7 +23,7 @@ class Profile;
 class ProfileManager;
 
 namespace actor {
-class ActorCoordinator;
+class ExecutionEngine;
 }  // namespace actor
 
 namespace contextual_cueing {
@@ -125,7 +126,7 @@ class GlicKeyedService : public KeyedService {
 
   // Callback for all changes to focused tab.
   using FocusedTabChangedCallback =
-      base::RepeatingCallback<void(FocusedTabData)>;
+      base::RepeatingCallback<void(const FocusedTabData&)>;
   // Callback for changes to focused tab data.
   using FocusedTabDataChangedCallback =
       base::RepeatingCallback<void(const glic::mojom::TabData*)>;
@@ -134,7 +135,7 @@ class GlicKeyedService : public KeyedService {
       base::RepeatingCallback<void(content::WebContents*)>;
   // Callback for changes to the focused tab container or candidate instances.
   using FocusedTabOrCandidateInstanceChangedCallback =
-      base::RepeatingCallback<void(FocusedTabData)>;
+      base::RepeatingCallback<void(const FocusedTabData&)>;
   // Callback for changes to the context access indicator status.
   using ContextAccessIndicatorChangedCallback =
       base::RepeatingCallback<void(bool)>;
@@ -200,14 +201,24 @@ class GlicKeyedService : public KeyedService {
       const mojom::GetTabContextOptions& options,
       mojom::WebClientHandler::ActInFocusedTabCallback callback);
 
-  void StopActorTask();
+  void StopActorTask(actor::TaskId task_id);
+  void PauseActorTask(actor::TaskId task_id);
+  void ResumeActorTask(
+      actor::TaskId task_id,
+      const mojom::GetTabContextOptions& context_options,
+      glic::mojom::WebClientHandler::ResumeActorTaskCallback callback);
 
-  // Returns true if the associated ActorCoordinator is active on the given
+  void OnUserInputSubmitted(glic::mojom::WebClientMode mode);
+  void OnRequestStarted();
+  void OnResponseStarted();
+  void OnResponseStopped();
+
+  // Returns true if the associated ExecutionEngine is active on the given
   // `tab`. This can be used by callers to customize certain behaviour that
-  // might interfere with the ActorCoordinator.
-  bool IsActorCoordinatorActingOnTab(const content::WebContents* tab) const;
+  // might interfere with the ExecutionEngine.
+  bool IsExecutionEngineActingOnTab(const content::WebContents* tab) const;
 
-  actor::ActorCoordinator& GetActorCoordinatorForTesting();
+  actor::ExecutionEngine& GetExecutionEngineForTesting(tabs::TabInterface* tab);
 
   void CaptureScreenshot(
       glic::mojom::WebClientHandler::CaptureScreenshotCallback callback);
@@ -216,11 +227,17 @@ class GlicKeyedService : public KeyedService {
 
   bool IsActiveWebContents(content::WebContents* contents);
 
+  void AddPreloadCallback(base::OnceCallback<void()> callback);
+
   virtual void TryPreload();
+  void TryPreloadAfterDelay();
   virtual void TryPreloadFre();
   void Reload();
 
   Profile* profile() const { return profile_; }
+
+  // Used only for testing purposes.
+  void reset_profile_for_test() { profile_ = nullptr; }
 
   base::WeakPtr<GlicKeyedService> GetWeakPtr();
 
@@ -235,6 +252,14 @@ class GlicKeyedService : public KeyedService {
   // chrome://glic.
   bool IsGlicWebUi(content::WebContents* web_contents);
 
+  // Log a fake network request to NetLog with a Glic traffic annotation. This
+  // doesn't *send* a request, it just logs it for chrome://net-export.
+  //
+  // Unfortunately there's no way to pass `traffic_annotation` to
+  // LoadURLWithParams() or to tag the WebContents with an annotation, so we
+  // use this hacky workaround to capture the annotation at runtime.
+  void LogDummyNetworkRequestForTrafficAnnotation(const GURL& url);
+
  private:
   // A helper function to route GetZeroStateSuggestionsForFocusedTabCallback
   // callbacks.
@@ -244,8 +269,8 @@ class GlicKeyedService : public KeyedService {
           GetZeroStateSuggestionsForFocusedTabCallback callback,
       std::optional<std::vector<std::string>> returned_suggestions);
 
-  void FinishPreload(Profile* profile, bool should_preload);
-  void FinishPreloadFre(Profile* profile, bool should_preload);
+  void FinishPreload(bool should_preload);
+  void FinishPreloadFre(bool should_preload);
 
   // List of callbacks to be notified when the client requests a change to the
   // context access indicator status.
@@ -265,6 +290,7 @@ class GlicKeyedService : public KeyedService {
   std::unique_ptr<AuthController> auth_controller_;
   std::unique_ptr<GlicActorController> actor_controller_;
   std::unique_ptr<base::MemoryPressureListener> memory_pressure_listener_;
+  base::OnceCallback<void()> preload_callback_;
 
   // Unowned
   raw_ptr<contextual_cueing::ContextualCueingService>

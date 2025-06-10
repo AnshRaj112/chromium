@@ -22,8 +22,8 @@ public class PopupOnClickPageStation extends WebPageStation {
     public HtmlElement linkToPopup;
     public HtmlElement linkToPopupWithBounds;
 
-    protected <T extends PopupOnClickPageStation> PopupOnClickPageStation(Builder<T> builder) {
-        super(builder);
+    protected PopupOnClickPageStation(Config config) {
+        super(config);
 
         linkToPopup =
                 declareElement(new HtmlElement(new HtmlElementSpec("link"), webContentsElement));
@@ -45,7 +45,7 @@ public class PopupOnClickPageStation extends WebPageStation {
     /** Opens the same page as a pop-up (in Android, this means in a new tab). */
     public PopupOnClickPageStation clickLinkToOpenPopup() {
         PopupOnClickPageStation newPage =
-                new Builder<PopupOnClickPageStation>(PopupOnClickPageStation::new)
+                new Builder<>(PopupOnClickPageStation::new)
                         .initFrom(this)
                         .withIsOpeningTabs(1)
                         .withIsSelectingTabs(1)
@@ -70,7 +70,6 @@ public class PopupOnClickPageStation extends WebPageStation {
      */
     public PopupBlockedMessageFacility clickLinkAndExpectPopupBlockedMessage() {
         return enterFacilitySync(
-                new PopupBlockedMessageFacility<PopupOnClickPageStation>(1),
-                linkToPopup.getClickTrigger());
+                new PopupBlockedMessageFacility<>(1), linkToPopup.getClickTrigger());
     }
 }

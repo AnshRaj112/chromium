@@ -443,6 +443,7 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) URLLoader
 
   void ScheduleStart();
   void ReadMore();
+  void ReadMoreAsync();
   void DidRead(int num_bytes,
                bool completed_synchronously,
                bool into_slop_bucket);
@@ -579,8 +580,19 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) URLLoader
 
   scoped_refptr<net::IOBufferWithSize> discard_buffer_;
 
-  // True if there's a URLRequest::Read() call in progress.
-  bool read_in_progress_ = false;
+  // State checker between URLRequest::Read() and `response_body_stream_`.
+  enum class URLReadState {
+    // While waiting for `response_body_stream_` to be writable.
+    // TODO(yoichio): Since ReadMore() is called both when mojo pipe is ready
+    // to read and we want to write to the pipe.
+    // Consider spliting this into kNotReading and kWaitMojoPipeWritable.
+    kWaitMojoPipeWritable,
+    // While async URLRequest::ReadMore() task is posted.
+    kReadMoreTaskPosted,
+    // While there's a URLRequest::Read() call in progress.
+    kURLReadInProgress
+  };
+  URLReadState url_read_state_ = URLReadState::kWaitMojoPipeWritable;
 
   // Stores any CORS error encountered while processing |url_request_|.
   std::optional<CorsErrorStatus> cors_error_status_;

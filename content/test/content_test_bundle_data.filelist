@@ -25,7 +25,6 @@ data/accessibility/accname/desc-from-content-of-describedby-element-expected-and
 data/accessibility/accname/desc-from-content-of-describedby-element-expected-android.txt
 data/accessibility/accname/desc-from-content-of-describedby-element-expected-auralinux.txt
 data/accessibility/accname/desc-from-content-of-describedby-element-expected-blink.txt
-data/accessibility/accname/desc-from-content-of-describedby-element-expected-mac-before-11.txt
 data/accessibility/accname/desc-from-content-of-describedby-element-expected-mac.txt
 data/accessibility/accname/desc-from-content-of-describedby-element-expected-win.txt
 data/accessibility/accname/desc-from-content-of-describedby-element-recursive-expected-blink.txt
@@ -664,7 +663,6 @@ data/accessibility/aria/aria-describedby-expected-android-external.txt
 data/accessibility/aria/aria-describedby-expected-android.txt
 data/accessibility/aria/aria-describedby-expected-auralinux.txt
 data/accessibility/aria/aria-describedby-expected-blink.txt
-data/accessibility/aria/aria-describedby-expected-mac-before-11.txt
 data/accessibility/aria/aria-describedby-expected-mac.txt
 data/accessibility/aria/aria-describedby-expected-uia-win.txt
 data/accessibility/aria/aria-describedby-expected-win.txt
@@ -1156,6 +1154,13 @@ data/accessibility/aria/aria-menu-expected-blink.txt
 data/accessibility/aria/aria-menu-expected-mac.txt
 data/accessibility/aria/aria-menu-expected-win.txt
 data/accessibility/aria/aria-menu.html
+data/accessibility/aria/aria-focusable-menu-expected-android-external.txt
+data/accessibility/aria/aria-focusable-menu-expected-android.txt
+data/accessibility/aria/aria-focusable-menu-expected-auralinux.txt
+data/accessibility/aria/aria-focusable-menu-expected-blink.txt
+data/accessibility/aria/aria-focusable-menu-expected-mac.txt
+data/accessibility/aria/aria-focusable-menu-expected-win.txt
+data/accessibility/aria/aria-focusable-menu.html
 data/accessibility/aria/aria-menubar-expected-android-assist-data.txt
 data/accessibility/aria/aria-menubar-expected-android-external.txt
 data/accessibility/aria/aria-menubar-expected-android.txt
@@ -1750,7 +1755,6 @@ data/accessibility/aria/aria-tooltip-expected-android-external.txt
 data/accessibility/aria/aria-tooltip-expected-android.txt
 data/accessibility/aria/aria-tooltip-expected-auralinux.txt
 data/accessibility/aria/aria-tooltip-expected-blink.txt
-data/accessibility/aria/aria-tooltip-expected-mac-before-11.txt
 data/accessibility/aria/aria-tooltip-expected-mac.txt
 data/accessibility/aria/aria-tooltip-expected-win.txt
 data/accessibility/aria/aria-tooltip.html
@@ -1889,7 +1893,6 @@ data/accessibility/aria/input-text-aria-placeholder-expected-android-assist-data
 data/accessibility/aria/input-text-aria-placeholder-expected-android-external.txt
 data/accessibility/aria/input-text-aria-placeholder-expected-android.txt
 data/accessibility/aria/input-text-aria-placeholder-expected-blink.txt
-data/accessibility/aria/input-text-aria-placeholder-expected-mac-before-11.txt
 data/accessibility/aria/input-text-aria-placeholder-expected-mac.txt
 data/accessibility/aria/input-text-aria-placeholder-expected-win.txt
 data/accessibility/aria/input-text-aria-placeholder.html
@@ -3304,7 +3307,6 @@ data/accessibility/html/button-name-calc-expected-android.txt
 data/accessibility/html/button-name-calc-expected-auralinux.txt
 data/accessibility/html/button-name-calc-expected-blink.txt
 data/accessibility/html/button-name-calc-expected-fuchsia.txt
-data/accessibility/html/button-name-calc-expected-mac-before-11.txt
 data/accessibility/html/button-name-calc-expected-mac.txt
 data/accessibility/html/button-name-calc-expected-uia-win.txt
 data/accessibility/html/button-name-calc-expected-win.txt
@@ -3347,7 +3349,6 @@ data/accessibility/html/canvas-fallback-expected-android.txt
 data/accessibility/html/canvas-fallback-expected-auralinux.txt
 data/accessibility/html/canvas-fallback-expected-blink.txt
 data/accessibility/html/canvas-fallback-expected-fuchsia.txt
-data/accessibility/html/canvas-fallback-expected-mac-before-11.txt
 data/accessibility/html/canvas-fallback-expected-mac.txt
 data/accessibility/html/canvas-fallback-expected-uia-win.txt
 data/accessibility/html/canvas-fallback-expected-win.txt
@@ -3384,7 +3385,6 @@ data/accessibility/html/checkbox-name-calc-expected-android.txt
 data/accessibility/html/checkbox-name-calc-expected-auralinux.txt
 data/accessibility/html/checkbox-name-calc-expected-blink.txt
 data/accessibility/html/checkbox-name-calc-expected-fuchsia.txt
-data/accessibility/html/checkbox-name-calc-expected-mac-before-11.txt
 data/accessibility/html/checkbox-name-calc-expected-mac.txt
 data/accessibility/html/checkbox-name-calc-expected-uia-win.txt
 data/accessibility/html/checkbox-name-calc-expected-win.txt
@@ -3542,7 +3542,6 @@ data/accessibility/html/contenteditable-with-no-descendants-expected-android.txt
 data/accessibility/html/contenteditable-with-no-descendants-expected-auralinux.txt
 data/accessibility/html/contenteditable-with-no-descendants-expected-blink.txt
 data/accessibility/html/contenteditable-with-no-descendants-expected-fuchsia.txt
-data/accessibility/html/contenteditable-with-no-descendants-expected-mac-before-11.txt
 data/accessibility/html/contenteditable-with-no-descendants-expected-mac.txt
 data/accessibility/html/contenteditable-with-no-descendants-expected-uia-win.txt
 data/accessibility/html/contenteditable-with-no-descendants-expected-win.txt
@@ -5512,7 +5511,7 @@ data/accessibility/html/tabindex-with-link-children.html
 data/accessibility/html/table-canvas-fallback-expected-blink.txt
 data/accessibility/html/table-canvas-fallback.html
 data/accessibility/html/table-column-remove-expected-blink.txt
-data/accessibility/html/table-column-remove-expected-fuchsia.txt
+data/accessibility/html/table-column-remove-expected-mac.txt
 data/accessibility/html/table-column-remove.html
 data/accessibility/html/table-focusable-sections-expected-android-assist-data.txt
 data/accessibility/html/table-focusable-sections-expected-android-external.txt
@@ -5930,7 +5929,6 @@ data/accessibility/mac/methods/accessibility-column-index-range-expected.txt
 data/accessibility/mac/methods/accessibility-column-index-range.html
 data/accessibility/mac/methods/accessibility-columns-expected.txt
 data/accessibility/mac/methods/accessibility-columns.html
-data/accessibility/mac/methods/accessibility-custom-content-expected-mac-before-11.txt
 data/accessibility/mac/methods/accessibility-custom-content-expected.txt
 data/accessibility/mac/methods/accessibility-custom-content.html
 data/accessibility/mac/methods/accessibility-disclosed-by-row-expected.txt
@@ -7327,12 +7325,16 @@ data/gpu/single_face.jpg
 data/gpu/third_party/stats-js/LICENSE
 data/gpu/third_party/stats-js/README.chromium
 data/gpu/third_party/stats-js/stats.js
+data/gpu/vc/teddy1_avc_320x180_7fps.mp4
+data/gpu/vc/teddy1_avc_640x360_30fps.mp4
 data/gpu/vc/teddy1_vp8_320x180_7fps.webm
 data/gpu/vc/teddy1_vp8_640x360_30fps.webm
 data/gpu/vc/teddy1_vp9_320x180_7fps.webm
 data/gpu/vc/teddy1_vp9_640x360_30fps.webm
+data/gpu/vc/teddy2_avc_320x180_15fps.mp4
 data/gpu/vc/teddy2_vp8_320x180_15fps.webm
 data/gpu/vc/teddy2_vp9_320x180_15fps.webm
+data/gpu/vc/teddy3_avc_320x180_30fps.mp4
 data/gpu/vc/teddy3_vp8_320x180_30fps.webm
 data/gpu/vc/teddy3_vp9_320x180_30fps.webm
 data/gpu/vc/test_video_call_fps.html
@@ -8042,8 +8044,6 @@ data/prerender/page_with_trigger_function.html
 data/prerender/prerender-no-crash.html
 data/prerender/prerender_with_opt_in_header.html
 data/prerender/prerender_with_opt_in_header.html.mock-http-headers
-data/prerender/purpose_prefetch_header.html
-data/prerender/purpose_prefetch_header_iframe.html
 data/prerender/restriction-gamepad.html
 data/prerender/restriction_file_system.html
 data/prerender/session_storage.html
@@ -8323,6 +8323,8 @@ data/shared_dictionary/fetch_dictionary.js
 data/shared_dictionary/path/compressed.data
 data/shared_dictionary/path/compressed.data.mock-http-headers
 data/shared_dictionary/test.dict
+data/shared_dictionary/test.dict.gz
+data/shared_dictionary/test.dict.gz.mock-http-headers
 data/shared_dictionary/test.dict.mock-http-headers
 data/shared_dictionary/test.empty_dest.dict
 data/shared_dictionary/test.empty_dest.dict.mock-http-headers

@@ -23,6 +23,7 @@
 #include "base/containers/heap_array.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
+#include "base/strings/string_util.h"
 #include "build/build_config.h"
 #include "gpu/command_buffer/common/gles2_cmd_format.h"
 #include "gpu/command_buffer/common/gles2_cmd_utils.h"
@@ -211,7 +212,7 @@ ContextResult GLES2DecoderTestBase::MaybeInitDecoderWithWorkarounds(
       new FeatureInfo(workarounds, gpu_feature_info);
 
   group_ = scoped_refptr<ContextGroup>(new ContextGroup(
-      gpu_preferences_, std::move(memory_tracker_), &shader_translator_cache_,
+      gpu_preferences_, memory_tracker_, &shader_translator_cache_,
       &framebuffer_completeness_cache_, feature_info,
       normalized_init.bind_generates_resource, /*progress_reporter=*/nullptr,
       gpu_feature_info, &discardable_manager_, nullptr,
@@ -339,11 +340,10 @@ ContextResult GLES2DecoderTestBase::MaybeInitDecoderWithWorkarounds(
     }
     if (group_->feature_info()->feature_flags().arb_texture_rectangle) {
       EXPECT_CALL(
-          *gl_,
-          BindTexture(GL_TEXTURE_RECTANGLE_ARB,
-                      use_default_textures
-                          ? TestHelper::kServiceDefaultRectangleTextureId
-                          : 0))
+          *gl_, BindTexture(GL_TEXTURE_RECTANGLE_ANGLE,
+                            use_default_textures
+                                ? TestHelper::kServiceDefaultRectangleTextureId
+                                : 0))
           .Times(1)
           .RetiresOnSaturation();
     }
@@ -455,7 +455,7 @@ ContextResult GLES2DecoderTestBase::MaybeInitDecoderWithWorkarounds(
 
   if (context_->HasRobustness()) {
     EXPECT_CALL(*gl_, GetGraphicsResetStatusARB())
-        .WillOnce(Return(init.lose_context_on_init ? GL_GUILTY_CONTEXT_RESET_ARB
+        .WillOnce(Return(init.lose_context_on_init ? GL_GUILTY_CONTEXT_RESET
                                                    : GL_NO_ERROR));
   }
 
@@ -966,9 +966,9 @@ void GLES2DecoderTestBase::SetupExpectationsForFramebufferClearingMulti(
   EXPECT_CALL(*gl_, CheckFramebufferStatusEXT(target))
       .WillOnce(Return(GL_FRAMEBUFFER_COMPLETE))
       .RetiresOnSaturation();
-  if (target == GL_READ_FRAMEBUFFER_EXT) {
-    EXPECT_CALL(*gl_, BindFramebufferEXT(
-        GL_DRAW_FRAMEBUFFER_EXT, read_framebuffer_service_id))
+  if (target == GL_READ_FRAMEBUFFER) {
+    EXPECT_CALL(*gl_, BindFramebufferEXT(GL_DRAW_FRAMEBUFFER,
+                                         read_framebuffer_service_id))
         .Times(1)
         .RetiresOnSaturation();
   }
@@ -1004,9 +1004,9 @@ void GLES2DecoderTestBase::SetupExpectationsForFramebufferClearingMulti(
       restore_red, restore_green, restore_blue, restore_alpha, restore_stencil,
       restore_depth, restore_scissor_test, restore_scissor_x, restore_scissor_y,
       restore_scissor_width, restore_scissor_height);
-  if (target == GL_READ_FRAMEBUFFER_EXT) {
-    EXPECT_CALL(*gl_, BindFramebufferEXT(
-        GL_DRAW_FRAMEBUFFER_EXT, draw_framebuffer_service_id))
+  if (target == GL_READ_FRAMEBUFFER) {
+    EXPECT_CALL(*gl_, BindFramebufferEXT(GL_DRAW_FRAMEBUFFER,
+                                         draw_framebuffer_service_id))
         .Times(1)
         .RetiresOnSaturation();
   }

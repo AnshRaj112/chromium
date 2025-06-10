@@ -79,6 +79,7 @@ import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.modaldialog.ModalDialogManager;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.ui.modelutil.PropertyModelChangeProcessor;
+import org.chromium.ui.util.XrUtils;
 import org.chromium.ui.widget.ViewRectProvider;
 
 import java.util.List;
@@ -87,6 +88,7 @@ import java.util.Set;
 /** Coordinator for a {@link TabSwitcherPaneBase}'s UI. */
 public class TabSwitcherPaneCoordinator implements BackPressHandler {
     static final String COMPONENT_NAME = "GridTabSwitcher";
+    static final int XR_FADING_EDGE_LENGTH_PX = 24;
 
     private final MessageUpdateObserver mMessageUpdateObserver =
             new MessageUpdateObserver() {
@@ -199,6 +201,8 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
      * @param shareDelegateSupplier Supplies the {@link ShareDelegate} that will be used to share
      *     the tab's URL when the user selects the "Share" option.
      * @param tabBookmarkerSupplier Supplier of {@link TabBookmarker} for bookmarking a given tab.
+     * @param undoBarThrottle Throttle to block undo snackbar.
+     * @param setOverlayViewCallback Callback to set the current overlay view.
      */
     public TabSwitcherPaneCoordinator(
             @NonNull Activity activity,
@@ -225,7 +229,8 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
             @Nullable DesktopWindowStateManager desktopWindowStateManager,
             @NonNull ObservableSupplier<ShareDelegate> shareDelegateSupplier,
             @NonNull ObservableSupplier<TabBookmarker> tabBookmarkerSupplier,
-            UndoBarThrottle undoBarThrottle) {
+            UndoBarThrottle undoBarThrottle,
+            Callback<View> setOverlayViewCallback) {
         try (TraceEvent e = TraceEvent.scoped("TabSwitcherPaneCoordinator.constructor")) {
             mProfileProviderSupplier = profileProviderSupplier;
             mIsVisibleSupplier = isVisibleSupplier;
@@ -276,7 +281,6 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
                                                 dataSharingTabManager,
                                                 tabGroupModelFilterSupplier,
                                                 tabContentManager,
-                                                coordinatorView,
                                                 resetHandler,
                                                 getGridCardOnClickListenerProvider(),
                                                 TabSwitcherPaneCoordinator.this
@@ -286,7 +290,8 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
                                                 desktopWindowStateManager,
                                                 undoBarThrottle,
                                                 tabBookmarkerSupplier,
-                                                shareDelegateSupplier);
+                                                shareDelegateSupplier,
+                                                setOverlayViewCallback);
                                 mTabGridDialogCoordinator.setPageKeyEvent(
                                         event ->
                                                 onPageKeyEvent(
@@ -322,7 +327,7 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
             int emptyImageResId =
                     DeviceFormFactor.isNonMultiDisplayContextOnTablet(activity)
                             ? R.drawable.tablet_tab_switcher_empty_state_illustration
-                            : R.drawable.phone_tab_switcher_empty_state_illustration;
+                            : R.drawable.phone_tab_switcher_empty_state_illustration_static;
             TabListCoordinator tabListCoordinator =
                     new TabListCoordinator(
                             mode,
@@ -355,10 +360,17 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
             mTabListCoordinator = tabListCoordinator;
             tabListCoordinator.setOnLongPressTabItemEventListener(mLongPressItemEventListener);
 
-            mTabListOnScrollListener
-                    .getYOffsetNonZeroSupplier()
-                    .addObserver(setHairlineVisibilityCallback);
             TabListRecyclerView recyclerView = tabListCoordinator.getContainerView();
+
+            if (XrUtils.isXrDevice()) {
+                recyclerView.setVerticalFadingEdgeEnabled(true);
+                recyclerView.setFadingEdgeLength(XR_FADING_EDGE_LENGTH_PX);
+            } else {
+                mTabListOnScrollListener
+                        .getYOffsetNonZeroSupplier()
+                        .addObserver(setHairlineVisibilityCallback);
+            }
+
             recyclerView.setVisibility(View.VISIBLE);
             recyclerView.setBackgroundColor(Color.TRANSPARENT);
             recyclerView.addOnScrollListener(mTabListOnScrollListener);
@@ -666,7 +678,7 @@ public class TabSwitcherPaneCoordinator implements BackPressHandler {
                 new ViewRectProvider(cardView, TabGridViewRectUpdater::new);
         Token groupId = tab.getTabGroupId();
         if (groupId != null) {
-            tabListGroupMenuCoordinator.showMenuWithIcons(viewRectProvider, groupId);
+            tabListGroupMenuCoordinator.showMenu(viewRectProvider, groupId);
             return tabListGroupMenuCoordinator::dismiss;
         } else {
             tabGridContextMenuCoordinator.showMenu(viewRectProvider, tabId);

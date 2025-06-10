@@ -31,6 +31,7 @@
 #include "base/sequence_checker.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
+#include "base/strings/string_view_util.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
@@ -917,6 +918,10 @@ void URLLoader::OnReceivedRedirect(net::URLRequest* url_request,
   DCHECK(!deferred_redirect_url_);
   deferred_redirect_url_ = std::make_unique<GURL>(redirect_info.new_url);
 
+  TRACE_EVENT("loading", "URLLoader::OnReceivedRedirect",
+              net::NetLogWithSourceToFlow(url_request_->net_log()), "new_url",
+              deferred_redirect_url_);
+
   // Send the redirect response to the client, allowing them to inspect it and
   // optionally follow the redirect.
   *defer_redirect = true;
@@ -1414,6 +1419,9 @@ void URLLoader::CheckPartialDecoderResult(int result) {
 }
 
 void URLLoader::ReadMore() {
+  CHECK_NE(url_read_state_, URLReadState::kURLReadInProgress);
+  url_read_state_ = URLReadState::kWaitMojoPipeWritable;
+
   if (partial_decoder_result_) {
     // If we have buffered raw data from the partial decoder, send that first.
     while (partial_decoder_result_->HasRawData()) {
@@ -1455,14 +1463,13 @@ void URLLoader::ReadMore() {
     partial_decoder_result_.reset();
   }
 
-  DCHECK(!read_in_progress_);
   // Once the MIME type is sniffed, all data is sent as soon as it is read from
   // the network.
   DCHECK(consumer_handle_.is_valid() || !pending_write_);
 
   // TODO(ricea): Refactor this method and DidRead() to reduce duplication.
   if (options_ & mojom::kURLLoadOptionReadAndDiscardBody) {
-    read_in_progress_ = true;
+    url_read_state_ = URLReadState::kURLReadInProgress;
     int bytes_read =
         url_request_->Read(discard_buffer_.get(), discard_buffer_->size());
     if (bytes_read != net::ERR_IO_PENDING) {
@@ -1492,6 +1499,7 @@ void URLLoader::ReadMore() {
           // pipe to empty out.
           std::optional<int> bytes_read_maybe = slop_bucket_->AttemptRead();
           if (bytes_read_maybe.has_value()) {
+            url_read_state_ = URLReadState::kURLReadInProgress;
             int bytes_read = bytes_read_maybe.value();
             if (bytes_read != net::ERR_IO_PENDING) {
               // DidRead() will not delete `this` when `into_slop_bucket` is
@@ -1518,16 +1526,14 @@ void URLLoader::ReadMore() {
 
     // We may be able to fill up the buffer from the slop bucket.
     if (slop_bucket_) {
-      const size_t consumed = slop_bucket_->Consume(pending_write_->buffer(),
-                                                    pending_write_buffer_size_);
+      const size_t consumed =
+          slop_bucket_->Consume(base::as_writable_byte_span(*pending_write_));
       if (consumed) {
         // TODO(ricea): Refactor the way pending writes work so we don't need to
         // poke a value into `pending_write_buffer_offset_` here.
         pending_write_buffer_offset_ = consumed;
         CompletePendingWrite(true);
-        base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-            FROM_HERE, base::BindOnce(&URLLoader::ReadMore,
-                                      weak_ptr_factory_.GetWeakPtr()));
+        ReadMoreAsync();
         return;
       } else if (slop_bucket_->read_in_progress()) {
         // There were no bytes available, but a read is in progress. Need to
@@ -1550,7 +1556,7 @@ void URLLoader::ReadMore() {
   CHECK(!slop_bucket_ || !slop_bucket_->IsComplete());
   auto buf = base::MakeRefCounted<NetToMojoIOBuffer>(
       pending_write_, pending_write_buffer_offset_);
-  read_in_progress_ = true;
+  url_read_state_ = URLReadState::kURLReadInProgress;
   int bytes_read = url_request_->Read(
       buf.get(), static_cast<int>(pending_write_buffer_size_ -
                                   pending_write_buffer_offset_));
@@ -1561,6 +1567,14 @@ void URLLoader::ReadMore() {
   }
 }
 
+void URLLoader::ReadMoreAsync() {
+  CHECK_EQ(url_read_state_, URLReadState::kWaitMojoPipeWritable);
+  url_read_state_ = URLReadState::kReadMoreTaskPosted;
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(&URLLoader::ReadMore, weak_ptr_factory_.GetWeakPtr()));
+}
+
 // Handles the completion of a read. `num_bytes` is the number of bytes read, 0
 // if we reached the end of the response body, or a net::Error otherwise.
 // `completed_synchronously` is true if the call to URLRequest::Read did not
@@ -1569,8 +1583,8 @@ void URLLoader::ReadMore() {
 void URLLoader::DidRead(int num_bytes,
                         bool completed_synchronously,
                         bool into_slop_bucket) {
-  DCHECK(read_in_progress_ || into_slop_bucket);
-  read_in_progress_ = false;
+  CHECK_EQ(url_read_state_, URLReadState::kURLReadInProgress);
+  url_read_state_ = URLReadState::kWaitMojoPipeWritable;
 
   size_t new_data_offset = pending_write_buffer_offset_;
   if (num_bytes > 0) {
@@ -1686,9 +1700,7 @@ void URLLoader::DidRead(int num_bytes,
     CompletePendingWrite(true /* success */);
   }
   if (completed_synchronously) {
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE,
-        base::BindOnce(&URLLoader::ReadMore, weak_ptr_factory_.GetWeakPtr()));
+    ReadMoreAsync();
   } else {
     ReadMore();
   }
@@ -1959,7 +1971,9 @@ void URLLoader::OnResponseBodyStreamReady(MojoResult result) {
     return;
   }
 
-  ReadMore();
+  if (url_read_state_ == URLReadState::kWaitMojoPipeWritable) {
+    ReadMore();
+  }
 }
 
 void URLLoader::DeleteSelf() {

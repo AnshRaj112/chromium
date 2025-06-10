@@ -5,8 +5,10 @@
 package org.chromium.chrome.browser.ui.edge_to_edge;
 
 import android.app.Activity;
+import android.os.Build;
 import android.os.Build.VERSION_CODES;
 import android.view.Window;
+import android.view.WindowInsets;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.OptIn;
@@ -122,6 +124,11 @@ public class EdgeToEdgeUtils {
         return ChromeFeatureList.sEdgeToEdgeBottomChin.isEnabled();
     }
 
+    /** Whether the edge-to-edge feature is enabled on tablet. */
+    public static boolean isEdgeToEdgeTabletEnabled() {
+        return ChromeFeatureList.sEdgeToEdgeTablet.isEnabled();
+    }
+
     /**
      * Whether drawing the website that has `viewport-fit=cover` fully edge to edge, removing the
      * bottom chin.
@@ -200,7 +207,8 @@ public class EdgeToEdgeUtils {
                     IneligibilityReason.NUM_TYPES);
         }
 
-        if (DeviceFormFactor.isNonMultiDisplayContextOnTablet(activity)) {
+        if (!EdgeToEdgeUtils.isEdgeToEdgeTabletEnabled()
+                && DeviceFormFactor.isNonMultiDisplayContextOnTablet(activity)) {
             eligible = false;
             RecordHistogram.recordEnumeratedHistogram(
                     INELIGIBLE_REASON_HISTOGRAM,
@@ -386,6 +394,23 @@ public class EdgeToEdgeUtils {
         ResettersForTesting.register(() -> sObservedTappableNavigationBar = false);
     }
 
+    /** Returns whether the insets indicate that the device is in gesture navigation mode. */
+    public static boolean isInGestureNavigationMode(WindowInsetsCompat insets) {
+        Insets mandatorySystemGesturesInsets =
+                insets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures());
+        Insets systemGesturesInsets = insets.getInsets(WindowInsetsCompat.Type.systemGestures());
+        Insets nonMandatorySystemGestures =
+                Insets.subtract(systemGesturesInsets, mandatorySystemGesturesInsets);
+
+        // In gesture navigation mode, the left and right sides have insets for swiping gestures,
+        // but these are not considered mandatory system gestures. These non-mandatory gesture
+        // insets do not appear in 3-button navigation mode. Note, though, that even in gesture
+        // navigation mode, one side may not show an inset when in landscape mode, as the side with
+        // the display cutout / camera will not show a gesture inset (the other side will still show
+        // an inset).
+        return nonMandatorySystemGestures.left > 0 || nonMandatorySystemGestures.right > 0;
+    }
+
     /**
      * A class to store the debugging info for edge-to-edge error case, when EdgeToEdgeController is
      * presented in an unsupported configuration.
@@ -415,6 +440,8 @@ public class EdgeToEdgeUtils {
 
             if (!isCaseOfInterests(hasEdgeToEdgeController, window)) return;
 
+            String missingNavbarReasonString =
+                    mMissingNavBarReason != null ? String.valueOf(mMissingNavBarReason) : "null";
             String state =
                     "EdgeToEdgeDebugging: callSite: "
                             + callSite
@@ -427,21 +454,24 @@ public class EdgeToEdgeUtils {
                             + " \nobservedTappableNavigationBar: "
                             + sObservedTappableNavigationBar
                             + " \nmissingNavBarReason: "
-                            + mMissingNavBarReason;
+                            + missingNavbarReasonString;
 
-            String rootInsetsState = "";
-            if (window != null && window.getDecorView().getRootWindowInsets() != null) {
-                var rootWindowInsets =
-                        WindowInsetsCompat.toWindowInsetsCompat(
-                                window.getDecorView().getRootWindowInsets());
-                var insetsString =
-                        rootWindowInsets.getInsets(WindowInsetsCompat.Type.systemBars()).toString();
-                rootInsetsState = " \nrootWindowInsets: " + insetsString;
-            }
-
+            String rawWindowInsetsIndicateGestureNav = "";
             String rawWindowInsetsState = "";
+            String rawWindowInsetsIgnoringVisibilityState = "";
+            String rawWindowInsetsTappableState = "";
+            String rawWindowInsetsStateSystemGestures = "";
             if (windowAndroid != null && windowAndroid.getInsetObserver() != null) {
                 var lastRawWindowInsets = windowAndroid.getInsetObserver().getLastRawWindowInsets();
+                var gestureNavString =
+                        lastRawWindowInsets == null
+                                ? "null"
+                                : Boolean.toString(
+                                        EdgeToEdgeUtils.isInGestureNavigationMode(
+                                                lastRawWindowInsets));
+                rawWindowInsetsIndicateGestureNav =
+                        "\nisGestureNav (from lastRawWindowInsets): " + gestureNavString;
+
                 var insetsString =
                         lastRawWindowInsets == null
                                 ? "null"
@@ -449,11 +479,115 @@ public class EdgeToEdgeUtils {
                                         .getInsets(WindowInsetsCompat.Type.systemBars())
                                         .toString();
                 rawWindowInsetsState = " \nlastRawWindowInsets: " + insetsString;
+
+                var insetsIgnoringVisibilityString =
+                        lastRawWindowInsets == null
+                                ? "null"
+                                : lastRawWindowInsets
+                                        .getInsetsIgnoringVisibility(
+                                                WindowInsetsCompat.Type.systemBars())
+                                        .toString();
+                rawWindowInsetsIgnoringVisibilityState =
+                        " \nlastRawWindowInsets ignoringVisibility: "
+                                + insetsIgnoringVisibilityString;
+
+                var tappableInsetsString =
+                        lastRawWindowInsets == null
+                                ? "null"
+                                : lastRawWindowInsets
+                                        .getInsetsIgnoringVisibility(
+                                                WindowInsetsCompat.Type.tappableElement())
+                                        .toString();
+                rawWindowInsetsTappableState =
+                        " \nlastRawWindowInsets tappable: " + tappableInsetsString;
+
+                var systemGesturesInsetsString =
+                        lastRawWindowInsets == null
+                                ? "null"
+                                : lastRawWindowInsets
+                                        .getInsetsIgnoringVisibility(
+                                                WindowInsetsCompat.Type.systemGestures())
+                                        .toString();
+                rawWindowInsetsStateSystemGestures =
+                        " \nlastRawWindowInsets systemGestures: " + systemGesturesInsetsString;
+            }
+
+            String windowMetricsIndicateGestureNav = "";
+            String windowMetricsInsetsState = "";
+            String windowMetricsInsetsStateTappable = "";
+            String windowMetricsInsetsStateMandatoryGestures = "";
+            String windowMetricsInsetsStateSystemGestures = "";
+            if (Build.VERSION.SDK_INT >= VERSION_CODES.R) {
+                if (window != null
+                        && window.getWindowManager() != null
+                        && window.getWindowManager().getCurrentWindowMetrics() != null) {
+                    WindowInsets windowInsets =
+                            window.getWindowManager().getCurrentWindowMetrics().getWindowInsets();
+
+                    var gestureNavString =
+                            windowInsets == null
+                                    ? "null"
+                                    : Boolean.toString(
+                                            EdgeToEdgeUtils.isInGestureNavigationMode(
+                                                    WindowInsetsCompat.toWindowInsetsCompat(
+                                                            windowInsets)));
+                    windowMetricsIndicateGestureNav =
+                            "\nisGestureNav (from windowMetrics): " + gestureNavString;
+
+                    var insetsString =
+                            windowInsets == null
+                                    ? "null"
+                                    : windowInsets
+                                            .getInsets(WindowInsetsCompat.Type.systemBars())
+                                            .toString();
+                    windowMetricsInsetsState = " \nwindowMetricsInsets: " + insetsString;
+
+                    var insetsStringTappable =
+                            windowInsets == null
+                                    ? "null"
+                                    : windowInsets
+                                            .getInsets(WindowInsetsCompat.Type.tappableElement())
+                                            .toString();
+                    windowMetricsInsetsStateTappable =
+                            " \nwindowMetricsInsetsTappable: " + insetsStringTappable;
+
+                    var insetsStringMandatoryGestures =
+                            windowInsets == null
+                                    ? "null"
+                                    : windowInsets
+                                            .getInsets(
+                                                    WindowInsetsCompat.Type
+                                                            .mandatorySystemGestures())
+                                            .toString();
+                    windowMetricsInsetsStateMandatoryGestures =
+                            " \nwindowMetricsInsetsMandatoryGestures: "
+                                    + insetsStringMandatoryGestures;
+
+                    var insetsStringSystemGestures =
+                            windowInsets == null
+                                    ? "null"
+                                    : windowInsets
+                                            .getInsets(WindowInsetsCompat.Type.systemGestures())
+                                            .toString();
+                    windowMetricsInsetsStateSystemGestures =
+                            " \nwindowMetricsInsetsSystemGestures: " + insetsStringSystemGestures;
+                }
             }
 
             // Ensure report is only sent once.
             mHasUploaded = true;
-            reportUploadCallback.onResult(state + rootInsetsState + rawWindowInsetsState);
+            reportUploadCallback.onResult(
+                    state
+                            + rawWindowInsetsIndicateGestureNav
+                            + rawWindowInsetsState
+                            + rawWindowInsetsIgnoringVisibilityState
+                            + rawWindowInsetsTappableState
+                            + rawWindowInsetsStateSystemGestures
+                            + windowMetricsIndicateGestureNav
+                            + windowMetricsInsetsState
+                            + windowMetricsInsetsStateTappable
+                            + windowMetricsInsetsStateMandatoryGestures
+                            + windowMetricsInsetsStateSystemGestures);
         }
 
         /** Returns whether the the instance has uploaded any report. */

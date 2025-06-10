@@ -17,6 +17,7 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "base/version_info/version_info.h"
+#include "chrome/browser/actor/task_id.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/contextual_cueing/contextual_cueing_features.h"
 #include "chrome/browser/enterprise/browser_management/management_service_factory.h"
@@ -330,7 +331,8 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
       // is activated, so skip here.
       cached_focused_tab_data_ =
           CreateFocusedTabData(glic_service_->GetFocusedTabData());
-      state->focused_tab_data = CreateFocusedTabData(NoFocusedTabData());
+      state->focused_tab_data = CreateFocusedTabData(FocusedTabData(
+          std::string("glic not active"), /*unfocused_tab=*/nullptr));
     } else {
       state->focused_tab_data =
           CreateFocusedTabData(glic_service_->GetFocusedTabData());
@@ -469,13 +471,34 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     glic_service_->ActInFocusedTab(action_proto, *options, std::move(callback));
   }
 
-  void StopActorTask() override {
+  void StopActorTask(int32_t task_id) override {
     if (!base::FeatureList::IsEnabled(features::kGlicActor)) {
       receiver_.ReportBadMessage(
           "StopActorTask cannot be called without GlicActor enabled.");
       return;
     }
-    glic_service_->StopActorTask();
+    glic_service_->StopActorTask(actor::TaskId(task_id));
+  }
+
+  void PauseActorTask(int32_t task_id) override {
+    if (!base::FeatureList::IsEnabled(features::kGlicActor)) {
+      receiver_.ReportBadMessage(
+          "PauseActorTask cannot be called without GlicActor enabled.");
+      return;
+    }
+    glic_service_->PauseActorTask(actor::TaskId(task_id));
+  }
+
+  void ResumeActorTask(int32_t task_id,
+                       glic::mojom::GetTabContextOptionsPtr context_options,
+                       ResumeActorTaskCallback callback) override {
+    if (!base::FeatureList::IsEnabled(features::kGlicActor)) {
+      receiver_.ReportBadMessage(
+          "ResumeActorTask cannot be called without GlicActor enabled.");
+      return;
+    }
+    glic_service_->ResumeActorTask(actor::TaskId(task_id), *context_options,
+                                   std::move(callback));
   }
 
   void CaptureScreenshot(CaptureScreenshotCallback callback) override {
@@ -637,16 +660,14 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   }
 
   void OnUserInputSubmitted(glic::mojom::WebClientMode mode) override {
-    glic_service_->metrics()->OnUserInputSubmitted(mode);
+    glic_service_->OnUserInputSubmitted(mode);
   }
 
-  void OnResponseStarted() override {
-    glic_service_->metrics()->OnResponseStarted();
-  }
+  void OnRequestStarted() override { glic_service_->OnRequestStarted(); }
 
-  void OnResponseStopped() override {
-    glic_service_->metrics()->OnResponseStopped();
-  }
+  void OnResponseStarted() override { glic_service_->OnResponseStarted(); }
+
+  void OnResponseStopped() override { glic_service_->OnResponseStopped(); }
 
   void OnSessionTerminated() override {
     glic_service_->metrics()->OnSessionTerminated();
@@ -858,7 +879,7 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     }
   }
 
-  void OnFocusedTabChanged(FocusedTabData focused_tab_data) {
+  void OnFocusedTabChanged(const FocusedTabData& focused_tab_data) {
     if (ShouldDoApiActivationGating()) {
       cached_focused_tab_data_ = CreateFocusedTabData(focused_tab_data);
       return;

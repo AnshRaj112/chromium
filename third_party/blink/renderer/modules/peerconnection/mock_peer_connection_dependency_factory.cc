@@ -7,7 +7,6 @@
 #include <stddef.h>
 
 #include "base/containers/contains.h"
-#include "base/not_fatal_until.h"
 #include "base/task/single_thread_task_runner.h"
 #include "third_party/blink/renderer/modules/peerconnection/mock_peer_connection_impl.h"
 #include "third_party/blink/renderer/modules/peerconnection/mock_rtc_peer_connection_handler_platform.h"
@@ -88,8 +87,9 @@ bool MockMediaStream::AddTrack(
 bool MockMediaStream::RemoveTrack(
     webrtc::scoped_refptr<AudioTrackInterface> track) {
   auto it = FindTrack(&audio_track_vector_, track->id());
-  if (it == audio_track_vector_.end())
+  if (it == audio_track_vector_.end()) {
     return false;
+  }
   audio_track_vector_.erase(it);
   NotifyObservers();
   return true;
@@ -98,8 +98,9 @@ bool MockMediaStream::RemoveTrack(
 bool MockMediaStream::RemoveTrack(
     webrtc::scoped_refptr<VideoTrackInterface> track) {
   auto it = FindTrack(&video_track_vector_, track->id());
-  if (it == video_track_vector_.end())
+  if (it == video_track_vector_.end()) {
     return false;
+  }
   video_track_vector_.erase(it);
   NotifyObservers();
   return true;
@@ -136,7 +137,7 @@ void MockMediaStream::RegisterObserver(ObserverInterface* observer) {
 
 void MockMediaStream::UnregisterObserver(ObserverInterface* observer) {
   auto it = observers_.find(observer);
-  CHECK(it != observers_.end(), base::NotFatalUntil::M130);
+  CHECK(it != observers_.end());
   observers_.erase(it);
 }
 
@@ -199,8 +200,9 @@ void MockWebRtcAudioTrack::UnregisterObserver(ObserverInterface* observer) {
 void MockWebRtcAudioTrack::SetEnded() {
   DCHECK_EQ(webrtc::MediaStreamTrackInterface::kLive, state_);
   state_ = webrtc::MediaStreamTrackInterface::kEnded;
-  for (auto* o : observers_)
+  for (auto* o : observers_) {
     o->OnChanged();
+  }
 }
 
 MockWebRtcVideoTrack::MockWebRtcVideoTrack(
@@ -271,8 +273,9 @@ void MockWebRtcVideoTrack::UnregisterObserver(ObserverInterface* observer) {
 void MockWebRtcVideoTrack::SetEnded() {
   DCHECK_EQ(webrtc::MediaStreamTrackInterface::kLive, state_);
   state_ = webrtc::MediaStreamTrackInterface::kEnded;
-  for (auto* o : observers_)
+  for (auto* o : observers_) {
     o->OnChanged();
+  }
 }
 
 scoped_refptr<MockWebRtcVideoTrackSource> MockWebRtcVideoTrackSource::Create(
@@ -331,31 +334,6 @@ void MockWebRtcVideoTrackSource::AddOrUpdateSink(
 void MockWebRtcVideoTrackSource::RemoveSink(
     webrtc::VideoSinkInterface<webrtc::VideoFrame>* sink) {}
 
-class MockIceCandidate : public IceCandidateInterface {
- public:
-  MockIceCandidate(const std::string& sdp_mid,
-                   int sdp_mline_index,
-                   const std::string& sdp)
-      : sdp_mid_(sdp_mid), sdp_mline_index_(sdp_mline_index), sdp_(sdp) {
-    // Assign an valid address to |candidate_| to pass assert in code.
-    candidate_.set_address(webrtc::SocketAddress("127.0.0.1", 5000));
-  }
-  ~MockIceCandidate() override {}
-  std::string sdp_mid() const override { return sdp_mid_; }
-  int sdp_mline_index() const override { return sdp_mline_index_; }
-  const webrtc::Candidate& candidate() const override { return candidate_; }
-  bool ToString(std::string* out) const override {
-    *out = sdp_;
-    return true;
-  }
-
- private:
-  std::string sdp_mid_;
-  int sdp_mline_index_;
-  std::string sdp_;
-  webrtc::Candidate candidate_;
-};
-
 MockPeerConnectionDependencyFactory::MockPeerConnectionDependencyFactory()
     : thread_("MockPCFactory WebRtc Signaling/Networking Thread") {
   EnsureWebRtcAudioDeviceImpl();
@@ -399,7 +377,10 @@ webrtc::IceCandidateInterface*
 MockPeerConnectionDependencyFactory::CreateIceCandidate(const String& sdp_mid,
                                                         int sdp_mline_index,
                                                         const String& sdp) {
-  return new MockIceCandidate(sdp_mid.Utf8(), sdp_mline_index, sdp.Utf8());
+  std::string sdp_mid_str = sdp_mid.Utf8();
+  std::string sdp_str = sdp.Utf8();
+  return webrtc::CreateIceCandidate(sdp_mid_str, sdp_mline_index, sdp_str,
+                                    nullptr);
 }
 
 scoped_refptr<base::SingleThreadTaskRunner>

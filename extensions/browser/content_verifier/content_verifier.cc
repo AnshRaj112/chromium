@@ -17,7 +17,6 @@
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
-#include "base/not_fatal_until.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/threading/thread_restrictions.h"
@@ -126,16 +125,21 @@ std::unique_ptr<ContentVerifierIOData::ExtensionData> CreateIOData(
   }
 
   if (BackgroundInfo::HasBackgroundPage(extension)) {
+    // Note: `NormalizeRelativePath` isn't necessary for relative paths that are
+    // retrieved from URLs since they don't start with a leading '/', and don't
+    // have any '.' or '..' components.
     result->canonical_background_page_path =
-        canonicalize_path(extensions::file_util::ExtensionURLToRelativeFilePath(
-            BackgroundInfo::GetBackgroundURL(extension)));
+        content_verifier_utils::CanonicalizeRelativePath(
+            extensions::file_util::ExtensionURLToRelativeFilePath(
+                BackgroundInfo::GetBackgroundURL(extension)));
   }
 
   if (BackgroundInfo::IsServiceWorkerBased(extension)) {
-    const std::string& script_path =
-        BackgroundInfo::GetBackgroundServiceWorkerScript(extension);
     result->canonical_service_worker_script_path =
-        canonicalize_path(extension->GetResource(script_path).relative_path());
+        content_verifier_utils::CanonicalizeRelativePath(
+            file_util::ExtensionURLToRelativeFilePath(
+                BackgroundInfo::GetBackgroundServiceWorkerScriptURL(
+                    extension)));
   }
 
   for (const std::unique_ptr<UserScript>& script :
@@ -365,7 +369,7 @@ class ContentVerifier::HashHelper {
     }
 
     auto iter = callback_infos_.find(key);
-    CHECK(iter != callback_infos_.end(), base::NotFatalUntil::M130);
+    CHECK(iter != callback_infos_.end());
     auto& callback_info = iter->second;
 
     // Force creation of computed_hashes.json if all of the following are true:
@@ -404,7 +408,7 @@ class ContentVerifier::HashHelper {
     }
 
     auto iter = callback_infos_.find(key);
-    CHECK(iter != callback_infos_.end(), base::NotFatalUntil::M130);
+    CHECK(iter != callback_infos_.end());
     auto& callback_info = iter->second;
 
     for (auto& callback : callback_info.callbacks)

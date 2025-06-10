@@ -15,6 +15,7 @@ import android.graphics.drawable.Drawable;
 import androidx.browser.customtabs.ExperimentalOpenInBrowser;
 
 import org.chromium.base.supplier.Supplier;
+import org.chromium.build.annotations.NullMarked;
 import org.chromium.chrome.browser.ActivityTabProvider;
 import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider;
 import org.chromium.chrome.browser.browserservices.intents.CustomButtonParams;
@@ -23,6 +24,7 @@ import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveToolbarBehavior;
 import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveToolbarButtonController;
 import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveToolbarButtonVariant;
+import org.chromium.chrome.browser.toolbar.adaptive.AdaptiveToolbarFeatures;
 import org.chromium.chrome.browser.toolbar.adaptive.OpenInBrowserButtonController;
 import org.chromium.components.feature_engagement.Tracker;
 
@@ -31,6 +33,7 @@ import java.util.List;
 import java.util.Set;
 
 /** Implements CustomTab-specific behavior of adaptive toolbar button. */
+@NullMarked
 public class CustomTabAdaptiveToolbarBehavior implements AdaptiveToolbarBehavior {
     private final Context mContext;
     private final ActivityTabProvider mActivityTabProvider;
@@ -73,6 +76,12 @@ public class CustomTabAdaptiveToolbarBehavior implements AdaptiveToolbarBehavior
     @Override
     public boolean canShowSettings() {
         return false;
+    }
+
+    @Override
+    public boolean shouldShowTextBubble() {
+        int screenWidthDp = mContext.getResources().getConfiguration().screenWidthDp;
+        return screenWidthDp < AdaptiveToolbarFeatures.MAX_WIDTH_FOR_BUBBLE_DP;
     }
 
     @ExperimentalOpenInBrowser
@@ -120,9 +129,19 @@ public class CustomTabAdaptiveToolbarBehavior implements AdaptiveToolbarBehavior
         // Try the next best one if the top one is not available.
         for (int i = 0; i < Math.min(segmentationResults.size(), 2); ++i) {
             int result = segmentationResults.get(i);
-            if (mValidButtons.contains(result) && !isButtonDuplicated(result)) return result;
+            if (mValidButtons.contains(result)
+                    && !isButtonDuplicated(result)
+                    && !shouldSkipStaticAction(result)) {
+                return result;
+            }
         }
         return AdaptiveToolbarButtonVariant.UNKNOWN;
+    }
+
+    /** Whether static actions should be skipped in contextual page action-only mode. */
+    private static boolean shouldSkipStaticAction(@AdaptiveToolbarButtonVariant int variant) {
+        return ChromeFeatureList.sCctAdaptiveButtonContextualOnly.getValue()
+                && !AdaptiveToolbarFeatures.isDynamicAction(variant);
     }
 
     @Override
@@ -139,9 +158,7 @@ public class CustomTabAdaptiveToolbarBehavior implements AdaptiveToolbarBehavior
 
     @Override
     public @AdaptiveToolbarButtonVariant int getSegmentationDefault() {
-        // CCT MTB doesn't provide a default action. The button will be hidden if there is
-        // no action to display.
-        return AdaptiveToolbarButtonVariant.UNKNOWN;
+        return ChromeFeatureList.sCctAdaptiveButtonDefaultVariant.getValue();
     }
 
     @ExperimentalOpenInBrowser

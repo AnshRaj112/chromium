@@ -24,8 +24,36 @@ source_set("ui_bundled_interface") {
   ]
 }
 
+source_set("placeholder_service") {
+  sources = [
+    "placeholder_service.h",
+    "placeholder_service.mm",
+    "placeholder_service_factory.h",
+    "placeholder_service_factory.mm",
+    "placeholder_service_observer_bridge.h",
+    "placeholder_service_observer_bridge.mm",
+  ]
+
+  deps = [
+    "//base",
+    "//components/keyed_service/core",
+    "//components/omnibox/common",
+    "//components/search_engines",
+    "//components/strings",
+    "//ios/chrome/app/strings",
+    "//ios/chrome/browser/favicon/model",
+    "//ios/chrome/browser/search_engines/model",
+    "//ios/chrome/browser/shared/model/profile",
+    "//ios/chrome/browser/shared/model/profile:profile_keyed_service_factory",
+    "//rlz/buildflags",
+    "//ui/base",
+  ]
+}
+
 source_set("model") {
   sources = [
+    "autocomplete_controller_observer_bridge.h",
+    "autocomplete_controller_observer_bridge.mm",
     "autocomplete_match_formatter.h",
     "autocomplete_match_formatter.mm",
     "autocomplete_result_wrapper.h",
@@ -53,6 +81,8 @@ source_set("model") {
     "omnibox_text_controller.h",
     "omnibox_text_controller.mm",
     "omnibox_text_controller_delegate.h",
+    "omnibox_text_model.h",
+    "omnibox_text_model.mm",
     "omnibox_view_ios.h",
     "omnibox_view_ios.mm",
     "pedal_section_extractor.h",
@@ -155,6 +185,7 @@ swift_source_set("omnibox_pedal_swift") {
 source_set("test_support") {
   testonly = true
   sources = [
+    "omnibox_autocomplete_controller+Testing.h",
     "test_omnibox_edit_model_ios.h",
     "test_omnibox_edit_model_ios.mm",
     "test_omnibox_popup_view_ios.h",

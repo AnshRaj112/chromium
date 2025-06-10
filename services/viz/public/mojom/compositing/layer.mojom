@@ -8,6 +8,7 @@ import "cc/mojom/element_id.mojom";
 import "cc/mojom/hit_test_opaqueness.mojom";
 import "cc/mojom/layer_type.mojom";
 import "cc/mojom/paint_flags.mojom";
+import "cc/mojom/render_surface_reason.mojom";
 import "cc/mojom/synced_scroll_offset.mojom";
 import "cc/mojom/ui_resource_id.mojom";
 import "skia/public/mojom/skcolor4f.mojom";
@@ -91,6 +92,17 @@ struct TextureLayerExtra {
   gfx.mojom.PointF uv_top_left;
   gfx.mojom.PointF uv_bottom_right;
   TransferableResource? transferable_resource;
+};
+
+// Extra fields in a cc::TileDisplayLayerImpl that has been added to a tree or
+// modified in some interesting way since a prior tree update.
+struct TileDisplayLayerExtra {
+  // Optional field that will be set if this Layer is a PictureLayer that is
+  // actually a solid color.
+  skia.mojom.SkColor4f? solid_color;
+
+  // Will be set to true for PictureLayers that are backdrop filter masks.
+  bool is_backdrop_filter_mask;
 };
 
 // Extra fields in a cc::ScrollbarLayerImplBase that has been added
@@ -187,6 +199,8 @@ union LayerExtra {
   SurfaceLayerExtra surface_layer_extra;
   // Extra properties that are specific to TextureLayerImpl.
   TextureLayerExtra texture_layer_extra;
+  // Extra properties that are specific to TileDisplayLayerImpl.
+  TileDisplayLayerExtra tile_display_layer_extra;
   // Extra properties that are specific to ViewTransitionContentLayerImpl.
   ViewTransitionContentLayerExtra view_transition_content_layer_extra;
 };
@@ -230,13 +244,6 @@ struct Layer {
   skia.mojom.SkColor4f background_color;
   skia.mojom.SkColor4f safe_opaque_background_color;
 
-  // Optional field that will be set if this Layer is a PictureLayer that is
-  // actually a solid color.
-  skia.mojom.SkColor4f? solid_color;
-
-  // Will be set to true for PictureLayers that are backdrop filter masks.
-  bool is_backdrop_filter_mask;
-
   // Optional stable identifier that may be referenced in property trees and
   // animations. Identifies a client-side object which can be represented by
   // multiple layers over time but only by a single layer at once.
@@ -257,7 +264,6 @@ struct Layer {
   int32 scroll_tree_index;
 
   bool should_check_backface_visibility;
-  bool may_contain_video;
 
   RareProperties? rare_properties;
 
@@ -305,6 +311,7 @@ struct TransformTreeUpdate {
   float device_scale_factor;
   float device_transform_scale_factor;
   array<int32> nodes_affected_by_outer_viewport_bounds_delta;
+  array<int32> nodes_affected_by_safe_area_bottom;
   array<StickyPositionNodeData> sticky_position_data;
   array<AnchorPositionScrollData> anchor_position_scroll_data;
 };
@@ -426,10 +433,9 @@ struct EffectNode {
   // The opacity of drawn layers associated with this effect node.
   float opacity;
 
-  // TODO(rockot): Replace this with a RenderSurfaceReason enumeration. In
-  // practice the specific reason is only useful for metrics, and for now all we
-  // need is to know whether or not the reason is kNone.
-  bool has_render_surface;
+  // RenderSurfaceReason::kNone if this effect node should not create a render
+  // surface, or the reason that this effect node should create one.
+  cc.mojom.RenderSurfaceReason render_surface_reason;
 
   // Scale applied to the contents of the render surface. Ignored if this node
   // doesn't induce a render surface.
@@ -521,6 +527,7 @@ struct EffectNode {
 // correspond to data members of cc::ScrollTree.
 struct ScrollTreeUpdate {
   map<cc.mojom.ElementId, cc.mojom.SyncedScrollOffset> synced_scroll_offsets;
+  map<cc.mojom.ElementId, gfx.mojom.Rect> scrolling_contents_cull_rects;
 };
 
 // Details about a new or updated node within a scroll property tree.

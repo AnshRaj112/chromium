@@ -435,22 +435,6 @@ void CheckFocusListForCycles(views::View* const start_view) {
 
 #endif  // DCHECK_IS_ON()
 
-void MaybeResetStoredFocusForWebContents(content::WebContents* web_contents) {
-  // In the case that the last focused view of the WebContents is a
-  // ContentsWebView, but not the ContentsWebView hosting the WebContents
-  // itself, we must reset the stored focus to prevent incorrect split-tab
-  // activation behavior when the split-view is swapped in during a tab switch.
-  ChromeWebContentsViewFocusHelper* focus_helper =
-      ChromeWebContentsViewFocusHelper::FromWebContents(web_contents);
-  if (focus_helper) {
-    ContentsWebView* focused_view =
-        views::AsViewClass<ContentsWebView>(focus_helper->GetStoredFocus());
-    if (focused_view && focused_view->web_contents() != web_contents) {
-      focus_helper->ResetStoredFocus();
-    }
-  }
-}
-
 bool GetGestureCommand(ui::GestureEvent* event, int* command) {
   DCHECK(command);
   *command = 0;
@@ -833,11 +817,42 @@ class BrowserViewLayoutDelegateImpl : public BrowserViewLayoutDelegate {
     // will enable BrowserViewLayout to hide the contents separator on its own
     // using the same logic used by normal BrowserViews.
     // The separator should not be shown when in split view.
-    return !browser_view_->browser()->app_controller() &&
-           !browser_view_->IsInSplitView();
+    return !browser_view_->browser()->app_controller() && !IsActiveTabSplit();
   }
 
-  bool IsInSplitView() const override { return browser_view_->IsInSplitView(); }
+  bool IsActiveTabSplit() const override {
+    // Use the model state as this can be called during active tab change
+    // when the multi contents view hasn't been fully setup and this
+    // inconsistency would cause unnecessary re-layout of content view during
+    // tab switch.
+    const tabs::TabInterface* active_tab =
+        browser_view_->browser()->GetActiveTabInterface();
+    return active_tab && active_tab->IsSplit();
+  }
+
+  void UpdateSplitViewInsets() override {
+    CHECK(browser_view_->multi_contents_view());
+
+    bool side_panel_visible = browser_view_->unified_side_panel()->GetVisible();
+    bool right_aligned = browser_view_->unified_side_panel()->IsRightAligned();
+    bool infobar_visible = browser_view_->infobar_container()->GetVisible();
+
+    browser_view_->multi_contents_view()
+        ->start_contents_view_inset()
+        .set_left(side_panel_visible && !right_aligned
+                      ? 0
+                      : MultiContentsView::kSplitViewContentInset)
+        .set_top(!infobar_visible ? 0
+                                  : MultiContentsView::kSplitViewContentInset);
+
+    browser_view_->multi_contents_view()
+        ->end_contents_view_inset()
+        .set_right(side_panel_visible && right_aligned
+                       ? 0
+                       : MultiContentsView::kSplitViewContentInset)
+        .set_top(!infobar_visible ? 0
+                                  : MultiContentsView::kSplitViewContentInset);
+  }
 
   ExclusiveAccessBubbleViews* GetExclusiveAccessBubble() const override {
     return browser_view_->exclusive_access_bubble();
@@ -944,6 +959,32 @@ class BrowserView::AccessibilityModeObserver : public ui::AXModeObserver {
 };
 
 ///////////////////////////////////////////////////////////////////////////////
+// Delegate implementation for MultiContentsView. Usually just forwards calls
+// into BrowserView.
+class MultiContentsViewDelegateImpl : public MultiContentsView::Delegate {
+ public:
+  explicit MultiContentsViewDelegateImpl(BrowserView* browser_view)
+      : browser_view_(browser_view) {}
+  MultiContentsViewDelegateImpl(const MultiContentsViewDelegateImpl&) = delete;
+  MultiContentsViewDelegateImpl& operator=(
+      const MultiContentsViewDelegateImpl&) = delete;
+  ~MultiContentsViewDelegateImpl() override = default;
+
+  void WebContentsFocused(content::WebContents* contents) override {
+    browser_view_->ActivateWebContents(contents);
+  }
+
+  void ResizeWebContents(double ratio) override {
+    browser_view_->ResizeWebContents(ratio);
+  }
+
+  void ReverseWebContents() override { browser_view_->ReverseWebContents(); }
+
+ private:
+  raw_ptr<BrowserView> browser_view_;
+};
+
+///////////////////////////////////////////////////////////////////////////////
 // BrowserView, public:
 
 BrowserView::BrowserView(std::unique_ptr<Browser> browser)
@@ -1010,6 +1051,7 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
   if (GetIsWebAppType()) {
     web_app_frame_toolbar_ = top_container_->AddChildView(
         std::make_unique<WebAppFrameToolbarView>(this));
+    top_container_->set_web_app_frame_toolbar(web_app_frame_toolbar_);
     if (ShouldShowWindowTitle()) {
       web_app_window_title_ = top_container_->AddChildView(
           std::make_unique<views::Label>(GetWindowTitle()));
@@ -1045,11 +1087,7 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
   views::View* contents_view;
   if (base::FeatureList::IsEnabled(features::kSideBySide)) {
     auto multi_contents_view = std::make_unique<MultiContentsView>(
-        this,
-        base::BindRepeating(&BrowserView::ActivateWebContents,
-                            base::Unretained(this)),
-        base::BindRepeating(&BrowserView::ResizeWebContents,
-                            base::Unretained(this)));
+        this, std::make_unique<MultiContentsViewDelegateImpl>(this));
     multi_contents_view_ =
         contents_container->AddChildView(std::move(multi_contents_view));
     multi_contents_view_->SetID(VIEW_ID_TAB_CONTAINER);
@@ -1066,6 +1104,11 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
 
   if (base::FeatureList::IsEnabled(ntp_features::kNtpFooter) &&
       !base::FeatureList::IsEnabled(features::kSideBySide)) {
+    new_tab_footer_web_view_separator_ =
+        contents_container->AddChildView(std::make_unique<ContentsSeparator>());
+    new_tab_footer_web_view_separator_->SetProperty(
+        views::kElementIdentifierKey, kFooterWebViewSeparatorElementId);
+
     new_tab_footer_web_view_ =
         contents_container->AddChildView(std::move(new_tab_footer_web_view));
   }
@@ -1110,12 +1153,12 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
   contents_container->SetLayoutManager(std::make_unique<ContentsLayoutManager>(
       devtools_web_view_, devtools_scrim_view_, contents_view,
       lens_overlay_view_, contents_scrim_view_, glic_border_, watermark_view_,
-      new_tab_footer_web_view_));
+      new_tab_footer_web_view_separator_, new_tab_footer_web_view_));
 #else
   contents_container->SetLayoutManager(std::make_unique<ContentsLayoutManager>(
       devtools_web_view_, devtools_scrim_view_, contents_view,
       lens_overlay_view_, contents_scrim_view_, nullptr, watermark_view_,
-      new_tab_footer_web_view_));
+      new_tab_footer_web_view_separator_, new_tab_footer_web_view_));
 #endif
 
   toolbar_ = top_container_->AddChildView(
@@ -1202,13 +1245,6 @@ BrowserView::~BrowserView() {
   // other cleanups that destroy views referenced in the layout manager.
   SetLayoutManager(nullptr);
 
-  auto* tab_search_toolbar_button_controller =
-      browser_->GetFeatures().tab_search_toolbar_button_controller();
-  if (tab_search_toolbar_button_controller) {
-    tab_search_bubble_host_->RemoveObserver(
-        tab_search_toolbar_button_controller);
-  }
-
   tab_search_bubble_host_.reset();
 
   // Destroy the top controls slide controller first as it depends on the
@@ -1263,6 +1299,7 @@ BrowserView::~BrowserView() {
   watermark_view_ = nullptr;
   glic_border_ = nullptr;
   new_tab_footer_web_view_ = nullptr;
+  new_tab_footer_web_view_separator_ = nullptr;
   contents_container_ = nullptr;
   unified_side_panel_ = nullptr;
   right_aligned_side_panel_separator_ = nullptr;
@@ -1511,135 +1548,6 @@ views::Widget* BrowserView::GetWidgetForAnchoring() {
 
 bool BrowserView::IsInSplitView() const {
   return multi_contents_view_ && multi_contents_view_->IsInSplitView();
-}
-
-void BrowserView::ShowSplitView(bool focus_active_view) {
-  CHECK(multi_contents_view_);
-  const int active_index = browser_->tab_strip_model()->active_index();
-
-  std::optional<split_tabs::SplitTabId> split_tab_id =
-      browser_->tab_strip_model()->GetTabAtIndex(active_index)->GetSplit();
-
-  CHECK(split_tab_id.has_value());
-  split_tabs::SplitTabData* split_data =
-      browser_->tab_strip_model()->GetSplitData(split_tab_id.value());
-
-  std::vector<tabs::TabInterface*> split_tabs = split_data->ListTabs();
-
-  for (size_t i = 0; tabs::TabInterface* tab : split_tabs) {
-    multi_contents_view_->SetWebContentsAtIndex(tab->GetContents(), i++);
-  }
-  const int first_split_tab_index =
-      browser_->tab_strip_model()->GetIndexOfTab(split_tabs[0]);
-  const int relative_active_position = active_index - first_split_tab_index;
-  multi_contents_view_->SetActiveIndex(relative_active_position);
-
-  if (focus_active_view) {
-    multi_contents_view_->GetActiveContentsView()->RequestFocus();
-  }
-
-  // Update visual information for the split.
-  multi_contents_view_->UpdateSplitRatio(
-      split_data->visual_data()->split_ratio());
-}
-
-void BrowserView::HideSplitView() {
-  CHECK(multi_contents_view_);
-  multi_contents_view_->CloseSplitView();
-}
-
-void BrowserView::UpdateActiveTabInSplitView() {
-  CHECK(multi_contents_view_ && multi_contents_view_->IsInSplitView());
-  const int active_index = browser_->tab_strip_model()->active_index();
-
-  std::optional<split_tabs::SplitTabId> split_tab_id =
-      browser_->tab_strip_model()->GetTabAtIndex(active_index)->GetSplit();
-
-  CHECK(split_tab_id.has_value());
-
-  tabs::TabInterface* first_tab = browser_->tab_strip_model()
-                                      ->GetSplitData(split_tab_id.value())
-                                      ->ListTabs()[0];
-  const int first_split_tab_index =
-      browser_->tab_strip_model()->GetIndexOfTab(first_tab);
-  const int relative_active_position = active_index - first_split_tab_index;
-  multi_contents_view_->SetActiveIndex(relative_active_position);
-}
-
-void BrowserView::UpdateContentsInSplitView(
-    const std::vector<std::pair<tabs::TabInterface*, int>>& prev_tabs,
-    const std::vector<std::pair<tabs::TabInterface*, int>>& new_tabs) {
-  CHECK(multi_contents_view_ && multi_contents_view_->IsInSplitView());
-
-  std::optional<split_tabs::SplitTabId> split_id =
-      browser_->GetActiveTabInterface()->GetSplit();
-  CHECK(split_id.has_value());
-
-  split_tabs::SplitTabData* split_data =
-      browser_->tab_strip_model()->GetSplitData(split_id.value());
-  const int first_split_tab_index =
-      browser_->tab_strip_model()->GetIndexOfTab(split_data->ListTabs()[0]);
-
-  const bool active_view_has_focus =
-      multi_contents_view_->GetActiveContentsView()->HasFocus();
-
-  // Clear web contents for prev_tabs in preparation to reset for new_tabs.
-  multi_contents_view_->GetInactiveContentsView()->SetWebContents(nullptr);
-  multi_contents_view_->GetActiveContentsView()->SetWebContents(nullptr);
-
-  // Set web contents in multi_contents_view_ to match new_tabs and update the
-  // active multi_contents_view_ index.
-  for (std::pair<tabs::TabInterface*, int> split_tab_with_index : new_tabs) {
-    CHECK(split_id == split_tab_with_index.first->GetSplit());
-    int relative_index = split_tab_with_index.second - first_split_tab_index;
-    multi_contents_view_->SetWebContentsAtIndex(
-        split_tab_with_index.first->GetContents(), relative_index);
-    if (split_tab_with_index.first->IsActivated()) {
-      multi_contents_view_->SetActiveIndex(relative_index);
-    }
-  }
-  // Focus the active contents view if it previously had focus prior to swap.
-  if (active_view_has_focus) {
-    multi_contents_view_->GetActiveContentsView()->RequestFocus();
-  }
-}
-
-bool BrowserView::IsTabChangeInSplitView(content::WebContents* old_contents,
-                                         content::WebContents* new_contents) {
-  return multi_contents_view_ && multi_contents_view_->IsInSplitView() &&
-         multi_contents_view_->GetActiveContentsView()->web_contents() ==
-             old_contents &&
-         multi_contents_view_->GetInactiveContentsView()->web_contents() ==
-             new_contents;
-}
-
-void BrowserView::ReverseWebContents() {
-  CHECK(multi_contents_view_);
-  const int active_index = browser_->tab_strip_model()->active_index();
-
-  std::optional<split_tabs::SplitTabId> split_tab_id =
-      browser_->tab_strip_model()->GetTabAtIndex(active_index)->GetSplit();
-
-  CHECK(split_tab_id.has_value());
-  browser_->tab_strip_model()->ReverseTabsInSplit(split_tab_id.value());
-}
-
-void BrowserView::ResizeWebContents(double start_ratio) {
-  const tabs::TabInterface* active_tab =
-      browser_->tab_strip_model()->GetActiveTab();
-
-  if (active_tab->GetSplit().has_value()) {
-    browser_->tab_strip_model()->UpdateSplitRatio(
-        active_tab->GetSplit().value(), start_ratio);
-  }
-}
-
-void BrowserView::ActivateWebContents(content::WebContents* web_contents) {
-  int tab_index =
-      browser_->tab_strip_model()->GetIndexOfWebContents(web_contents);
-  if (tab_index != TabStripModel::kNoTab) {
-    browser_->tab_strip_model()->ActivateTabAt(tab_index);
-  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2171,7 +2079,6 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
         multi_contents_view_->GetActiveContentsView()->SetWebContents(
             new_contents);
       }
-      MaybeResetStoredFocusForWebContents(new_contents);
     } else {
       active_contents_view->SetWebContents(new_contents);
     }
@@ -2188,10 +2095,17 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
     UpdateActiveTabInSplitView();
   }
 
+  MaybeUpdateStoredFocusForWebContents(new_contents);
+
   if (will_restore_focus) {
     // We only restore focus if our window is visible, to avoid invoking blur
     // handlers when we are eventually shown.
     new_contents->RestoreFocus();
+  } else if (!GetWidget()->IsActive()) {
+    // When the window is inactive during tab switch, restore focus for the
+    // active web content on activation.
+    GetFocusManager()->SetStoredFocusView(nullptr);
+    restore_focus_on_activation_ = true;
   }
 
   // Update all the UI bits.
@@ -2517,12 +2431,15 @@ void BrowserView::FullscreenStateChanged() {
     // Enable immersive before the browser refreshes its list of enabled
     // commands.
     // Enable immersive mode when entering browser fullscreen, unless it's in
-    // app mode.
+    // app mode or requested by an extension.
     if (IsFullscreen()) {
+      auto* fullscreen_controller =
+          GetExclusiveAccessManager()->fullscreen_controller();
+
       bool enable_immersive =
-          !IsRunningInAppMode() && GetExclusiveAccessManager()
-                                       ->fullscreen_controller()
-                                       ->IsFullscreenForBrowser();
+          !IsRunningInAppMode() &&
+          !fullscreen_controller->IsExtensionFullscreenOrPending() &&
+          fullscreen_controller->IsFullscreenForBrowser();
       immersive_mode_controller_->SetEnabled(enable_immersive);
     } else if (!immersive_mode_controller_
                     ->ShouldStayImmersiveAfterExitingFullscreen()) {
@@ -3162,7 +3079,8 @@ void BrowserView::TryNotifyWindowBoundsChanged(const gfx::Rect& widget_bounds) {
 
   // `extension_window_controller()` may be null if we are in the process of
   // creating the Browser. In that case, skip the notification.
-  if (auto* const controller = browser()->extension_window_controller()) {
+  if (auto* const controller =
+          browser()->GetFeatures().extension_window_controller()) {
     controller->NotifyWindowBoundsChanged();
   }
 }
@@ -3282,7 +3200,7 @@ void BrowserView::OnWidgetWindowModalVisibilityChanged(views::Widget* widget,
 
 #if !BUILDFLAG(IS_MAC)
   // MacOS does not need views window scrim. We use sheets to show window modals
-  // (-[NSWindow beginSheet:]), which natively draw a scrim since macOS 11.
+  // (-[NSWindow beginSheet:]), which natively draw a scrim.
   window_scrim_view_->SetVisible(visible);
 #endif
 }
@@ -3383,6 +3301,10 @@ bool BrowserView::IsBookmarkBarAnimating() const {
 
 bool BrowserView::IsTabStripEditable() const {
   return tabstrip_->IsTabStripEditable();
+}
+
+void BrowserView::SetTabStripNotEditableForTesting() {
+  tabstrip_->SetTabStripNotEditableForTesting();
 }
 
 bool BrowserView::IsToolbarVisible() const {
@@ -3723,24 +3645,7 @@ void BrowserView::ShowAppMenu() {
 }
 
 bool BrowserView::PreHandleMouseEvent(const blink::WebMouseEvent& event) {
-  if (multi_contents_view_) {
-    return multi_contents_view_->PreHandleMouseEvent(event);
-  }
   return false;
-}
-
-void BrowserView::PreHandleDragUpdate(const content::DropData& drop_data,
-                                      const gfx::PointF& point) {
-  if (multi_contents_view_) {
-    multi_contents_view_->drop_target_controller().OnWebContentsDragUpdate(
-        drop_data, point);
-  }
-}
-
-void BrowserView::PreHandleDragExit() {
-  if (multi_contents_view_) {
-    multi_contents_view_->drop_target_controller().OnWebContentsDragExit();
-  }
 }
 
 content::KeyboardEventProcessingResult BrowserView::PreHandleKeyboardEvent(
@@ -3822,6 +3727,20 @@ content::KeyboardEventProcessingResult BrowserView::PreHandleKeyboardEvent(
   DCHECK_EQ(event.GetType(), blink::WebInputEvent::Type::kRawKeyDown);
   // |accelerator| is a non-reserved browser shortcut (e.g. Ctrl+f).
   return content::KeyboardEventProcessingResult::NOT_HANDLED_IS_SHORTCUT;
+}
+
+void BrowserView::PreHandleDragUpdate(const content::DropData& drop_data,
+                                      const gfx::PointF& point) {
+  if (multi_contents_view_) {
+    multi_contents_view_->drop_target_controller().OnWebContentsDragUpdate(
+        drop_data, point);
+  }
+}
+
+void BrowserView::PreHandleDragExit() {
+  if (multi_contents_view_) {
+    multi_contents_view_->drop_target_controller().OnWebContentsDragExit();
+  }
 }
 
 bool BrowserView::HandleKeyboardEvent(const NativeWebKeyboardEvent& event) {
@@ -4868,6 +4787,154 @@ void BrowserView::CloseTabSearchBubble() {
   }
 }
 
+void BrowserView::ShowSplitView(bool focus_active_view) {
+  CHECK(multi_contents_view_);
+  const int active_index = browser_->tab_strip_model()->active_index();
+
+  std::optional<split_tabs::SplitTabId> split_tab_id =
+      browser_->tab_strip_model()->GetTabAtIndex(active_index)->GetSplit();
+
+  CHECK(split_tab_id.has_value());
+  split_tabs::SplitTabData* split_data =
+      browser_->tab_strip_model()->GetSplitData(split_tab_id.value());
+
+  std::vector<tabs::TabInterface*> split_tabs = split_data->ListTabs();
+
+  for (size_t i = 0; tabs::TabInterface* tab : split_tabs) {
+    multi_contents_view_->SetWebContentsAtIndex(tab->GetContents(), i++);
+  }
+  const int first_split_tab_index =
+      browser_->tab_strip_model()->GetIndexOfTab(split_tabs[0]);
+  const int relative_active_position = active_index - first_split_tab_index;
+  multi_contents_view_->SetActiveIndex(relative_active_position);
+
+  if (focus_active_view) {
+    multi_contents_view_->GetActiveContentsView()->RequestFocus();
+  }
+
+  // Update visual information for the split.
+  multi_contents_view_->UpdateSplitRatio(
+      split_data->visual_data()->split_ratio());
+}
+
+void BrowserView::HideSplitView() {
+  CHECK(multi_contents_view_);
+  multi_contents_view_->CloseSplitView();
+}
+
+void BrowserView::UpdateActiveTabInSplitView() {
+  CHECK(multi_contents_view_ && multi_contents_view_->IsInSplitView());
+  const int active_index = browser_->tab_strip_model()->active_index();
+
+  std::optional<split_tabs::SplitTabId> split_tab_id =
+      browser_->tab_strip_model()->GetTabAtIndex(active_index)->GetSplit();
+
+  CHECK(split_tab_id.has_value());
+
+  tabs::TabInterface* first_tab = browser_->tab_strip_model()
+                                      ->GetSplitData(split_tab_id.value())
+                                      ->ListTabs()[0];
+  const int first_split_tab_index =
+      browser_->tab_strip_model()->GetIndexOfTab(first_tab);
+  const int relative_active_position = active_index - first_split_tab_index;
+  multi_contents_view_->SetActiveIndex(relative_active_position);
+}
+
+void BrowserView::UpdateContentsInSplitView(
+    const std::vector<std::pair<tabs::TabInterface*, int>>& prev_tabs,
+    const std::vector<std::pair<tabs::TabInterface*, int>>& new_tabs) {
+  CHECK(multi_contents_view_ && multi_contents_view_->IsInSplitView());
+
+  std::optional<split_tabs::SplitTabId> split_id =
+      browser_->GetActiveTabInterface()->GetSplit();
+  CHECK(split_id.has_value());
+
+  split_tabs::SplitTabData* split_data =
+      browser_->tab_strip_model()->GetSplitData(split_id.value());
+  const int first_split_tab_index =
+      browser_->tab_strip_model()->GetIndexOfTab(split_data->ListTabs()[0]);
+
+  const bool active_view_has_focus =
+      multi_contents_view_->GetActiveContentsView()->HasFocus();
+
+  // Clear web contents for prev_tabs in preparation to reset for new_tabs.
+  multi_contents_view_->GetInactiveContentsView()->SetWebContents(nullptr);
+  multi_contents_view_->GetActiveContentsView()->SetWebContents(nullptr);
+
+  // Set web contents in multi_contents_view_ to match new_tabs and update the
+  // active multi_contents_view_ index.
+  for (std::pair<tabs::TabInterface*, int> split_tab_with_index : new_tabs) {
+    CHECK(split_id == split_tab_with_index.first->GetSplit());
+    int relative_index = split_tab_with_index.second - first_split_tab_index;
+    multi_contents_view_->SetWebContentsAtIndex(
+        split_tab_with_index.first->GetContents(), relative_index);
+    if (split_tab_with_index.first->IsActivated()) {
+      multi_contents_view_->SetActiveIndex(relative_index);
+    }
+  }
+  // Focus the active contents view if it previously had focus prior to swap.
+  if (active_view_has_focus) {
+    multi_contents_view_->GetActiveContentsView()->RequestFocus();
+  }
+}
+
+bool BrowserView::IsTabChangeInSplitView(content::WebContents* old_contents,
+                                         content::WebContents* new_contents) {
+  return multi_contents_view_ && multi_contents_view_->IsInSplitView() &&
+         multi_contents_view_->GetActiveContentsView()->web_contents() ==
+             old_contents &&
+         multi_contents_view_->GetInactiveContentsView()->web_contents() ==
+             new_contents;
+}
+
+void BrowserView::MaybeUpdateStoredFocusForWebContents(
+    content::WebContents* web_contents) {
+  ChromeWebContentsViewFocusHelper* focus_helper =
+      ChromeWebContentsViewFocusHelper::FromWebContents(web_contents);
+  if (!focus_helper) {
+    return;
+  }
+
+  // In the case that the last focused view of the WebContents is a
+  // ContentsWebView, but not the ContentsWebView hosting the WebContents
+  // itself, we must reset the stored focus to prevent incorrect tab
+  // activation behavior when the split view is swapped in during a tab switch.
+  ContentsWebView* focused_view =
+      views::AsViewClass<ContentsWebView>(focus_helper->GetStoredFocus());
+  if (focused_view && focused_view->web_contents() != web_contents) {
+    focus_helper->SetStoredFocusView(GetContentsView());
+  }
+}
+
+void BrowserView::ReverseWebContents() {
+  CHECK(multi_contents_view_);
+  const int active_index = browser_->tab_strip_model()->active_index();
+
+  std::optional<split_tabs::SplitTabId> split_tab_id =
+      browser_->tab_strip_model()->GetTabAtIndex(active_index)->GetSplit();
+
+  CHECK(split_tab_id.has_value());
+  browser_->tab_strip_model()->ReverseTabsInSplit(split_tab_id.value());
+}
+
+void BrowserView::ResizeWebContents(double start_ratio) {
+  const tabs::TabInterface* active_tab =
+      browser_->tab_strip_model()->GetActiveTab();
+
+  if (active_tab->GetSplit().has_value()) {
+    browser_->tab_strip_model()->UpdateSplitRatio(
+        active_tab->GetSplit().value(), start_ratio);
+  }
+}
+
+void BrowserView::ActivateWebContents(content::WebContents* web_contents) {
+  int tab_index =
+      browser_->tab_strip_model()->GetIndexOfWebContents(web_contents);
+  if (tab_index != TabStripModel::kNoTab) {
+    browser_->tab_strip_model()->ActivateTabAt(tab_index);
+  }
+}
+
 std::vector<ContentsWebView*> BrowserView::GetAllVisibleContentsWebViews() {
   std::vector<ContentsWebView*> contents_views;
   if (multi_contents_view_) {
@@ -5288,8 +5355,6 @@ void BrowserView::AddedToWidget() {
       tab_search_bubble_host_ = std::make_unique<TabSearchBubbleHost>(
           toolbar_->tab_search_button(), browser_.get(),
           tabstrip_->AsWeakPtr());
-      tab_search_bubble_host_->AddObserver(
-          browser_->GetFeatures().tab_search_toolbar_button_controller());
     } else {
       tab_search_bubble_host_ = std::make_unique<TabSearchBubbleHost>(
           tab_strip_region_view_->GetTabSearchButton(), browser_.get(),
@@ -5699,9 +5764,18 @@ void BrowserView::UpdateDevToolsForContents(WebContents* web_contents,
 void BrowserView::UpdateUIForContents(WebContents* contents) {
   TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
   bool needs_layout = MaybeShowBookmarkBar(contents);
+
   // TODO(jamescook): This function always returns true. Remove it and figure
   // out when layout is actually required.
   needs_layout |= MaybeShowInfoBar(contents);
+
+  if (multi_contents_view_) {
+    bool current_state = multi_contents_view_->IsInSplitView();
+    bool updated_state =
+        contents && tabs::TabInterface::GetFromContents(contents)->IsSplit();
+    needs_layout |= (current_state != updated_state);
+  }
+
   if (needs_layout) {
     DeprecatedLayoutImmediately();
   }

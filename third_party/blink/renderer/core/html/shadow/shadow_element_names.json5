@@ -18,6 +18,10 @@
       Symbol: "kIdDetailsContent",
     },
     {
+      name: "permission-icon",
+      Symbol: "kIdPermissionIcon",
+    },
+    {
       name: "details-summary",
       Symbol: "kIdDetailsSummary",
     },
@@ -169,6 +173,10 @@
     {
       name: "-internal-permission-text",
       Symbol: "kPseudoInternalPermissionTextSpan",
+    },
+    {
+      name: "-internal-permission-container",
+      Symbol: "kPseudoInternalPermissionContainer",
     },
     {
       name: "-internal-optgroup-label",

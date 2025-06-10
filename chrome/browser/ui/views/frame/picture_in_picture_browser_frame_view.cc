@@ -20,6 +20,7 @@
 #include "chrome/browser/ui/views/frame/top_container_view.h"
 #include "chrome/browser/ui/views/overlay/overlay_window_image_button.h"
 #include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
+#include "chrome/browser/ui/views/picture_in_picture/picture_in_picture_tucker.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/omnibox/browser/location_bar_model_impl.h"
 #include "components/vector_icons/vector_icons.h"
@@ -610,6 +611,8 @@ PictureInPictureBrowserFrameView::PictureInPictureBrowserFrameView(
 PictureInPictureBrowserFrameView::~PictureInPictureBrowserFrameView() {
   base::UmaHistogramEnumeration("Media.DocumentPictureInPicture.CloseReason",
                                 close_reason_);
+  PictureInPictureWindowManager::GetInstance()->OnPictureInPictureWindowHidden(
+      this);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -851,7 +854,8 @@ void PictureInPictureBrowserFrameView::AddedToWidget() {
 
   // TODO(crbug.com/40279642): Don't force dark mode once we support a
   // light mode window.
-  GetWidget()->SetColorModeOverride(ui::ColorProviderKey::ColorMode::kDark);
+  GetWidget()->SetColorModeOverride(ui::ColorProviderKey::ColorMode::kDark,
+                                    /*background_color=*/std::nullopt);
 
   // If the AutoPiP setting overlay is set, then post a task to show it.  Don't
   // do this here, since not all observers might have found out about the new
@@ -873,6 +877,9 @@ void PictureInPictureBrowserFrameView::AddedToWidget() {
     tracker->OnPictureInPictureWidgetOpened(GetWidget());
   }
 
+  PictureInPictureWindowManager::GetInstance()->OnPictureInPictureWindowShown(
+      this);
+
   BrowserNonClientFrameView::AddedToWidget();
 }
 
@@ -886,18 +893,57 @@ void PictureInPictureBrowserFrameView::RemovedFromWidget() {
     auto_pip_setting_overlay_ = nullptr;
   }
 
+  PictureInPictureWindowManager::GetInstance()->OnPictureInPictureWindowHidden(
+      this);
+  tucker_.reset();
+
   BrowserNonClientFrameView::RemovedFromWidget();
 }
 
 void PictureInPictureBrowserFrameView::SetFrameBounds(const gfx::Rect& bounds) {
+  gfx::Rect adjusted_bounds(bounds);
+  gfx::Rect current_bounds = GetWidget()->GetWindowBoundsInScreen();
+  bool did_adjust_size = false;
+
+  // If the website is requesting that the window increases in size, then ensure
+  // that it's not increasing beyond the site-requested maximum.
+  if (bounds.size().width() > current_bounds.size().width() ||
+      bounds.size().height() > current_bounds.size().height()) {
+    auto display = display::Screen::GetScreen()->GetDisplayNearestWindow(
+        GetWidget()->GetNativeWindow());
+    gfx::Size adjusted_new_size =
+        PictureInPictureWindowManager::AdjustRequestedSizeIfNecessary(
+            bounds.size(), display);
+
+    // If so, then use the adjusted size centered on the current location rather
+    // than centered on the new location (as we only ever expect size to change,
+    // and a large requested size could incidentally move the window).
+    if (adjusted_new_size != bounds.size()) {
+      adjusted_bounds = current_bounds;
+      adjusted_bounds.ClampToCenteredSize(adjusted_new_size);
+      did_adjust_size = true;
+    }
+  }
+
+  base::UmaHistogramBoolean(
+      "Media.DocumentPictureInPicture.RequestedLargeResize", did_adjust_size);
+
   if (!base::FeatureList::IsEnabled(
           media::kDocumentPictureInPictureAnimateResize) ||
-      !gfx::Animation::ShouldRenderRichAnimation()) {
-    BrowserNonClientFrameView::SetFrameBounds(bounds);
+      !gfx::Animation::ShouldRenderRichAnimation() || is_tucking_forced_) {
+    BrowserNonClientFrameView::SetFrameBounds(adjusted_bounds);
+
+    // If we're forced to tuck, then re-tuck after the size adjustment. Note
+    // that we also always skip the bounds change animation when tucking is
+    // forced.
+    if (is_tucking_forced_) {
+      tucker_->Tuck();
+    }
     return;
   }
   bounds_change_animation_ =
-      std::make_unique<BrowserFrameBoundsChangeAnimation>(*frame(), bounds);
+      std::make_unique<BrowserFrameBoundsChangeAnimation>(*frame(),
+                                                          adjusted_bounds);
   bounds_change_animation_->Start();
 }
 
@@ -1058,10 +1104,53 @@ void PictureInPictureBrowserFrameView::OnWidgetDestroying(
   child_dialog_observer_helper_.reset();
 }
 
+void PictureInPictureBrowserFrameView::OnWidgetVisibilityChanged(
+    views::Widget* widget,
+    bool visible) {
+  if (visible) {
+    EnforceTucking();
+  }
+}
+
 void PictureInPictureBrowserFrameView::OnWidgetBoundsChanged(
     views::Widget* widget,
     const gfx::Rect& new_bounds) {
   PictureInPictureWindowManager::GetInstance()->UpdateCachedBounds(new_bounds);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// PictureInPictureWindow implementations:
+
+void PictureInPictureBrowserFrameView::SetForcedTucking(bool tuck) {
+  if (!tucker_) {
+    CHECK(GetWidget());
+    tucker_ = std::make_unique<PictureInPictureTucker>(*GetWidget());
+  }
+  is_tucking_forced_ = tuck;
+
+  // Attempting to tuck our Widget before it's been shown causes issues since
+  // it may be still adjusting its bounds. Once visible, tucking will be
+  // enforced.
+  if (GetWidget()->IsVisible()) {
+    EnforceTucking();
+  }
+}
+
+void PictureInPictureBrowserFrameView::EnforceTucking() {
+  // The `tucker_` will have been created if there's any tucking to be enforced.
+  if (!tucker_) {
+    return;
+  }
+
+  if (is_tucking_forced_) {
+    // Stop any existing bounds change animations.
+    if (bounds_change_animation_) {
+      bounds_change_animation_->End();
+    }
+    tucker_->Tuck();
+  } else {
+    tucker_->Untuck();
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1294,8 +1383,8 @@ gfx::Size PictureInPictureBrowserFrameView::GetNonClientViewAreaSize() const {
 #if BUILDFLAG(IS_WIN)
 gfx::Insets PictureInPictureBrowserFrameView::GetClientAreaInsets(
     HMONITOR monitor) const {
-  const int frame_thickness =
-      ui::GetFrameThickness(monitor, /*has_caption=*/true);
+  const int frame_thickness = ui::GetResizableFrameThicknessFromMonitorInPixels(
+      monitor, /*has_caption=*/true);
   return gfx::Insets::TLBR(0, frame_thickness, frame_thickness,
                            frame_thickness);
 }

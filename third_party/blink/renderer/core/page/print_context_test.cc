@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/351564777): Remove this and convert code to safer constructs.
-#pragma allow_unsafe_buffers
-#endif
-
 #include "third_party/blink/renderer/core/page/print_context.h"
 
 #include <memory>
+#include <ranges>
+#include <string_view>
 
+#include "base/containers/span.h"
 #include "base/test/scoped_feature_list.h"
 #include "components/viz/test/test_context_provider.h"
 #include "components/viz/test/test_gles2_interface.h"
@@ -64,8 +62,10 @@ class MockPageContextCanvas : public SkCanvas {
                         const char key[],
                         SkData* value) override {
     // Ignore PDF node key annotations, defined in SkPDFDocument.cpp.
-    if (0 == strcmp(key, "PDF_Node_Key"))
+    static constexpr std::string_view kPDFNodeKey("PDF_Node_Key");
+    if (kPDFNodeKey == key) {
       return;
+    }
 
     if (rect.width() == 0 && rect.height() == 0) {
       SkPoint point = getTotalMatrix().mapXY(rect.x(), rect.y());
@@ -550,12 +550,12 @@ TEST_P(PrintContextTest, LinkedTarget) {
   EXPECT_SKRECT_EQ(50, 460, 10, 10, operations[3].rect);
 
   // The DrawPoint operations come from an unstable iterator.
-  std::sort(operations.begin() + 4, operations.begin() + 8,
-            [](const MockPageContextCanvas::Operation& a,
-               const MockPageContextCanvas::Operation& b) {
-              return std::pair(a.rect.x(), a.rect.y()) <
-                     std::pair(b.rect.x(), b.rect.y());
-            });
+  std::ranges::sort(base::span(operations).subspan(4ul, 4ul),
+                    [](const MockPageContextCanvas::Operation& a,
+                       const MockPageContextCanvas::Operation& b) {
+                      return std::pair(a.rect.x(), a.rect.y()) <
+                             std::pair(b.rect.x(), b.rect.y());
+                    });
   EXPECT_EQ(MockPageContextCanvas::kDrawPoint, operations[4].type);
   EXPECT_SKRECT_EQ(0, 0, 0, 0, operations[4].rect);
   EXPECT_EQ(MockPageContextCanvas::kDrawPoint, operations[5].type);
@@ -1358,6 +1358,34 @@ TEST_P(PrintContextTest, WhiteRootBackgroundWithShouldPrintBackgroundEnabled) {
   // We should paint the specified white background.
   EXPECT_CALL(canvas, onDrawRect(_, _)).Times(1);
   PrintSinglePage(canvas);
+}
+
+// Test env(safe-printable-inset).
+TEST_P(PrintContextFrameTest, SafePrintableInset) {
+  SetBodyInnerHTML(R"HTML(
+      <div id="target" style="height:env(safe-printable-inset);"></div>
+)HTML");
+  gfx::SizeF page_size(400, 400);
+  auto* target = GetDocument().getElementById(AtomicString("target"));
+
+  WebPrintParams params(page_size);
+  // top, right, bottom, left insets: 20px, 50px, 0, 10px (see page_size).
+  params.printable_area_in_css_pixels = gfx::RectF(10, 20, 340, 380);
+
+  // Test that it only works when printing.
+  EXPECT_EQ(target->OffsetHeight(), 0);
+  GetDocument().GetFrame()->StartPrinting(params);
+  EXPECT_EQ(target->OffsetHeight(), 50);
+  GetDocument().GetFrame()->EndPrinting();
+  EXPECT_EQ(target->OffsetHeight(), 0);
+
+  // Test n-up printing (multiple pages per sheet). The printing code makes sure
+  // that the pages steer clear of any unprintable area near the paper edges, so
+  // env(safe-printable-inset) should just be 0.
+  params.pages_per_sheet = 4;
+  GetDocument().GetFrame()->StartPrinting(params);
+  EXPECT_EQ(target->OffsetHeight(), 0);
+  GetDocument().GetFrame()->EndPrinting();
 }
 
 }  // namespace blink

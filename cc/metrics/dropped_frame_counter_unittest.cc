@@ -157,7 +157,8 @@ class DroppedFrameCounterTestBase : public LayerTreeTest {
     if (presented_frames_ < config_.animation_frames)
       return;
 
-    auto* dropped_frame_counter = host_impl->dropped_frame_counter();
+    auto* dropped_frame_counter =
+        host_impl->dropped_frame_counter_for_testing();
     DCHECK(dropped_frame_counter);
 
     total_frames_ = dropped_frame_counter->total_frames();
@@ -307,7 +308,6 @@ class DroppedFrameCounterTest : public testing::Test {
                                        SmoothnessStrategy::kDefaultStrategy)
       : smoothness_strategy_(smoothness_strategy) {
     dropped_frame_counter_ = std::make_unique<DroppedFrameCounter>();
-    dropped_frame_counter_->set_total_counter(&total_frame_counter_);
     dropped_frame_counter_->OnFirstContentfulPaintReceived();
     frame_sorter_.AddObserver(dropped_frame_counter_.get());
   }
@@ -420,7 +420,6 @@ class DroppedFrameCounterTest : public testing::Test {
     args.interval = interval_;
     return args;
   }
-  TotalFrameCounter total_frame_counter_;
   base::test::ScopedFeatureList scoped_feature_list_;
 };
 
@@ -675,8 +674,9 @@ class DroppedFrameCounterLegacyMetricsTest : public DroppedFrameCounterTest {
 DroppedFrameCounterLegacyMetricsTest::DroppedFrameCounterLegacyMetricsTest() {
   frame_sorter_.RemoveObserver(dropped_frame_counter_.get());
   dropped_frame_counter_ = std::make_unique<DroppedFrameCounter>();
-  frame_sorter_.Reset();
+  frame_sorter_.Reset(/*reset_fcp=*/true);
   dropped_frame_counter_->OnFirstContentfulPaintReceived();
+  frame_sorter_.OnFirstContentfulPaintReceived();
   frame_sorter_.AddObserver(dropped_frame_counter_.get());
 }
 

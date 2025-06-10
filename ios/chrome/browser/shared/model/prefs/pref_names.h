@@ -298,6 +298,10 @@ inline constexpr char
     kIosMagicStackSegmentationTabResumptionImpressionsSinceFreshness[] =
         "ios.magic_stack_segmentation.tab_resumption_freshness";
 
+// Whether to show Google links to GoogleMaps in a native view.
+inline constexpr char kIosMiniMapShowNativeMap[] =
+    "ios.mini_map.show_native_map";
+
 // The number of consecutive times the user dismissed the password bottom sheet.
 // This gets reset to 0 whenever the user selects a password from the bottom
 // sheet or from the keyboard accessory.
@@ -532,6 +536,10 @@ inline constexpr char kLensCameraAssistedSearchPolicyAllowed[] =
 // Date of the last time the user opened the Lens UI.
 inline constexpr char kLensLastOpened[] = "ios.lens.last_opened";
 
+// Date when the Lens Overlay was last presented.
+inline constexpr char kLensOverlayLastPresented[] =
+    "ios.lens_overlay.last_presented";
+
 // Number of times the NTP Lens button "new" IPH badge has been shown.
 // This is set to INT_MAX when the user taps the button.
 inline constexpr char kNTPLensEntryPointNewBadgeShownCount[] =
@@ -759,8 +767,11 @@ inline constexpr char kProvisionalNotificationsAllowedByPolicy[] =
 inline constexpr char kIosSyncInfobarErrorLastDismissedTimestamp[] =
     "ios.sync_infobar_error.last_dismissed_timestamp";
 
-// A boolean specifying whether the glic consent form has been accepted.
-inline constexpr char kIOSGLICConsent[] = "ios.glic.consent";
+// A boolean specifying whether the bwg consent form has been accepted.
+inline constexpr char kIOSBwgConsent[] = "ios.bwg.consent";
+
+// A boolean specifying whether the BWG Promo was shown manually.
+inline constexpr char kIOSBWGManualPromo[] = "ios.bwg.manual_promo";
 
 // A time object storing the first browser startup with a managed primary
 // identity in the personal profile after multi-profile becomes supported. Used

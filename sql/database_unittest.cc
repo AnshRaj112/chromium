@@ -38,6 +38,7 @@
 #include "base/sequence_checker.h"
 #include "base/strings/cstring_view.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_view_util.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/task_traits.h"
 #include "base/task/thread_pool.h"
@@ -2418,31 +2419,6 @@ TEST_P(SQLDatabaseTest, OpenFails_ExclusiveLock) {
   ASSERT_TRUE(db_->Open(db_path_));
 }
 
-// This test is simulating an common error code received on Windows when
-// the database file is being copied by a third-party. The common API used
-// is CopyFileEx(...) which is acquiring a shared lock on the file.
-TEST_P(SQLDatabaseTest, OpenFails_SharedLock) {
-  db_->Close();
-
-  base::File file(db_path_, base::File::FLAG_OPEN | base::File::FLAG_READ);
-  ASSERT_TRUE(file.IsValid());
-  ASSERT_EQ(base::File::FILE_OK, file.Lock(base::File::LockMode::kShared));
-
-  {
-    base::HistogramTester tester;
-    sql::test::ScopedErrorExpecter expecter;
-    expecter.ExpectError(SQLITE_BUSY);
-    ASSERT_FALSE(db_->Open(db_path_));
-    ASSERT_TRUE(expecter.SawExpectedErrors());
-    tester.ExpectTotalCount("Sql.Database.Open.FailureReason.Test", 1);
-    db_->Close();
-  }
-
-  ASSERT_EQ(base::File::FILE_OK, file.Unlock());
-
-  ASSERT_TRUE(db_->Open(db_path_));
-}
-
 #endif  // BUILDFLAG(IS_WIN)
 
 TEST_P(SQLDatabaseTest, OpenHistograms) {
@@ -2454,8 +2430,6 @@ TEST_P(SQLDatabaseTest, OpenHistograms) {
   ASSERT_TRUE(db_->Open(db_path_));
   tester.ExpectTotalCount("Sql.Database.Success.SqliteOpenTime.Test", 1);
   tester.ExpectTotalCount("Sql.Database.Success.OpenInternalTime.Test", 1);
-  tester.ExpectUniqueSample("Sql.Database.Success.SqliteOpenAttempts.Test", 1,
-                            1);
 }
 
 TEST_P(SQLDatabaseTest, OpenFailsAfterCorruptSizeInHeader) {
@@ -2691,16 +2665,11 @@ TEST_P(ReadOnlySQLDatabaseTest, Histograms) {
 
   tester.ExpectTotalCount("Sql.Database.Success.OpenInternalTime.Test", 1);
   tester.ExpectTotalCount("Sql.Database.Success.SqliteOpenTime.Test", 1);
-  tester.ExpectUniqueSample("Sql.Database.Success.SqliteOpenAttempts.Test", 1,
-                            1);
 
   ASSERT_NO_FATAL_FAILURE(OpenDatabase(false));
 
   tester.ExpectTotalCount("Sql.Database.Success.OpenInternalTime.Test", 2);
   tester.ExpectTotalCount("Sql.Database.Success.SqliteOpenTime.Test", 2);
-  EXPECT_THAT(
-      tester.GetAllSamples("Sql.Database.Success.SqliteOpenAttempts.Test"),
-      testing::ElementsAre(base::Bucket(1, 2)));
 }
 
 TEST_P(ReadOnlySQLDatabaseTest, CreateAndSelect) {

@@ -536,7 +536,7 @@ _CROSSBENCH_PIXEL9 = frozenset([
     ]),
 ])
 
-_CROSSBENCH_ANDROID_BYRA = frozenset([
+_CROSSBENCH_ANDROID_AL = frozenset([
     _crossbench_speedometer3(arguments=['--fileserver', '--debug']),
 ])
 
@@ -769,12 +769,8 @@ _ANDROID_PIXEL_TANGOR_BENCHMARK_CONFIGS = PerfSuite(
         _GetBenchmarkConfig('speedometer3-minorms')
     ])
 # Android Desktop (AL)
-_ANDROID_BYRA_BENCHMARK_CONFIGS = PerfSuite([
-    # Byra will also run the crossbench variant to ensure that both legacy and
-    # crossbench work.
-    _GetBenchmarkConfig('speedometer3'),
+_ANDROID_AL_BENCHMARK_CONFIGS = PerfSuite([
     _GetBenchmarkConfig('rendering.mobile'),
-    _GetBenchmarkConfig('rendering.desktop'),
 ])
 
 _CHROMEOS_KEVIN_FYI_BENCHMARK_CONFIGS = PerfSuite(
@@ -939,25 +935,30 @@ WIN_ARM64_SNAPDRAGON_PLUS = PerfPlatform(
     executables=_WIN_ARM64_EXECUTABLE_CONFIGS,
     crossbench=_CROSSBENCH_BENCHMARKS_ALL,
     is_fyi=True)
-WIN_ARM64_SNAPDRAGON_ELITE = PerfPlatform(
-    'win-arm64-snapdragon-elite-perf',
-    'Windows Dell Snapdragon Elite',
-    _WIN_ARM64_BENCHMARK_CONFIGS,
-    1,
-    'win',
-    executables=_WIN_ARM64_EXECUTABLE_CONFIGS,
-    crossbench=_CROSSBENCH_BENCHMARKS_ALL,
-    is_fyi=True)
 
 # Android
-ANDROID_BYRA = PerfPlatform(name='android-byra-perf',
-                            description='AL Byra',
-                            num_shards=7,
-                            benchmark_configs=_ANDROID_BYRA_BENCHMARK_CONFIGS,
-                            platform_os='android',
-                            executables=None,
-                            crossbench=_CROSSBENCH_ANDROID_BYRA)
-
+ANDROID_BRYA = PerfPlatform(
+    name='android-brya-kano-i5-8gb-perf',
+    description='Brya SKU kano_12th_Gen_IntelR_CoreTM_i5_1235U_8GB',
+    num_shards=7,
+    benchmark_configs=_ANDROID_AL_BENCHMARK_CONFIGS,
+    platform_os='android',
+    executables=None,
+    crossbench=_CROSSBENCH_ANDROID_AL)
+ANDROID_CORSOLA = PerfPlatform(name='android-corsola-steelix-8gb-perf',
+                               description='Corsola SKU steelix_MT8186_8GB',
+                               num_shards=7,
+                               benchmark_configs=_ANDROID_AL_BENCHMARK_CONFIGS,
+                               platform_os='android',
+                               executables=None,
+                               crossbench=_CROSSBENCH_ANDROID_AL)
+ANDROID_NISSA = PerfPlatform(name='android-nissa-uldren-8gb-perf',
+                             description='Nissa SKU uldren_99C4LZ/Q1XT/6W_8GB',
+                             num_shards=7,
+                             benchmark_configs=_ANDROID_AL_BENCHMARK_CONFIGS,
+                             platform_os='android',
+                             executables=None,
+                             crossbench=_CROSSBENCH_ANDROID_AL)
 ANDROID_PIXEL4 = PerfPlatform('android-pixel4-perf',
                               'Android R',
                               _ANDROID_PIXEL4_BENCHMARK_CONFIGS,

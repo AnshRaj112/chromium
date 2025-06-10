@@ -11,8 +11,10 @@
 
 class FaviconLoader;
 @class TabGroupItem;
+@class TabGroupItemFetchInfo;
 @class TabSnapshotAndFavicon;
 class WebStateList;
+@class WebStateTabSwitcherItem;
 
 namespace web {
 class WebState;
@@ -32,24 +34,37 @@ class TabSnapshotAndFaviconConfigurator {
 
   // Fetches snapshots and favicons for all tabs within a `tab_group_item`
   // and its associated `web_state_list` asynchronously.
-  // The `completion` block is called once all information for the tabs
-  // in the group has been fetched.
+  // The `completion` block is invoked twice per tabIndex: once when the
+  // snapshot has been fetched, and again when the favicon has been fetched.
   void FetchSnapshotAndFaviconForTabGroupItem(
       TabGroupItem* group_item,
       WebStateList* web_state_list,
-      void (^completion)(
-          TabGroupItem* item,
-          NSArray<TabSnapshotAndFavicon*>* tab_snapshots_and_favicons));
+      void (^completion)(TabGroupItem* item,
+                         NSInteger tabIndex,
+                         TabSnapshotAndFavicon* tabSnapshotAndFavicon));
 
   // Fetches the snapshot and favicon for a single `web_state` asynchronously.
-  // The `completion` block is called once the information for the web state
-  // has been fetched.
+  // The `completion` block is invoked twice: once when the snapshot has been
+  // fetched, and again when the favicon has been fetched.
   void FetchSingleSnapshotAndFaviconFromWebState(
       web::WebState* web_state,
       void (^completion)(TabSnapshotAndFavicon* tab_snapshot_and_favicon));
 
-  // TODO(crbug.com/400966281): Add function to fetch snapshot and favicon for
-  // TabSwitcherItem.
+  // Fetches the snapshot and favicon for `tab_item`.
+  // The `completion` block is invoked twice: once when the snapshot has been
+  // fetched, and again when the favicon has been fetched.
+  void FetchSnapshotAndFaviconForTabSwitcherItem(
+      WebStateTabSwitcherItem* tab_item,
+      void (^completion)(WebStateTabSwitcherItem* item,
+                         TabSnapshotAndFavicon* tab_snapshot_and_favicon));
+
+  // Fetches the favicon for `tab_item`.
+  // The `completion` block is invoked when the favicon has been fetched.
+  // The snapshot is not fetched and always nil.
+  void FetchFaviconForTabSwitcherItem(
+      WebStateTabSwitcherItem* tab_item,
+      void (^completion)(WebStateTabSwitcherItem* item,
+                         TabSnapshotAndFavicon* tab_snapshot));
 
  private:
   // Initiates the asynchronous fetching of a snapshot and favicon for a
@@ -57,36 +72,40 @@ class TabSnapshotAndFaviconConfigurator {
   void FetchSnapshotAndFaviconFromWebState(
       TabGroupItem* group_item,
       web::WebState* web_state,
-      NSMutableDictionary<NSNumber*, TabSnapshotAndFavicon*>*
-          tab_snapshots_and_favicons,
-      NSUInteger request_index,
-      NSUInteger number_of_requests,
+      NSInteger request_index,
       NSUUID* request_id,
-      void (^completion)(
-          TabGroupItem* item,
-          NSArray<TabSnapshotAndFavicon*>* tab_snapshots_and_favicons));
+      void (^completion)(TabGroupItem* item,
+                         NSInteger tabIndex,
+                         TabSnapshotAndFavicon* tabSnapshotAndFavicon));
 
-  // Called when the snapshot and/or favicon for a web state has been  fetched.
-  // Checks if all information has been collected and calls the `completion`
-  // block.
+  // Called when a snapshot or favicon for a web state has been fetched.
+  // This updates the fetch status and executes the `completion` block.
   void OnSnapshotAndFaviconFromWebStateFetched(
       TabGroupItem* group_item,
       TabSnapshotAndFavicon* tab_snapshot_and_favicon,
-      NSMutableDictionary<NSNumber*, TabSnapshotAndFavicon*>*
-          tab_snapshots_and_favicons,
-      NSUInteger request_index,
-      NSUInteger number_of_requests,
+      NSInteger request_index,
       NSUUID* request_id,
-      void (^completion)(
-          TabGroupItem* item,
-          NSArray<TabSnapshotAndFavicon*>* tab_snapshots_and_favicons));
+      void (^completion)(TabGroupItem* item,
+                         NSInteger tabIndex,
+                         TabSnapshotAndFavicon* tabSnapshotAndFavicon));
+
+  // Fetches the snapshot and favicon for `tab_item`.
+  // If `fetch_snapshot` is false, only the favicon will be fetched.
+  // The `completion` block is invoked twice: once when the snapshot
+  // has been fetched (if requested), and again when the favicon has been
+  // fetched.
+  void FetchSnapshotAndFaviconForTabSwitcherItem(
+      WebStateTabSwitcherItem* tab_item,
+      bool fetch_snapshot,
+      void (^completion)(WebStateTabSwitcherItem* item,
+                         TabSnapshotAndFavicon* tab_snapshot_and_favicon));
 
   raw_ptr<FaviconLoader> favicon_loader_ = nullptr;
 
-  // Stores the UUIDs of in-progress TabGroupItem fetch requests, keyed by the
-  // item's tabGroupIdentifier. This is used to cancel previous fetches if a new
-  // one starts for the same item.
-  NSMutableDictionary<NSValue*, NSUUID*>* group_item_fetches_;
+  // Stores the TabGroupItemFetchInfo of in-progress TabGroupItem fetch
+  // requests, keyed by the item's tabGroupIdentifier. This is used to cancel
+  // previous fetches if a new one starts for the same item.
+  NSMutableDictionary<NSValue*, TabGroupItemFetchInfo*>* group_item_fetches_;
 };
 
 #endif  // IOS_CHROME_BROWSER_TAB_SWITCHER_UI_BUNDLED_TAB_SNAPSHOT_AND_FAVICON_CONFIGURATOR_H_

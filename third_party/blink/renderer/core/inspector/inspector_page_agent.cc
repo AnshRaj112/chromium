@@ -347,7 +347,7 @@ bool InspectorPageAgent::SegmentedBufferContent(
   const auto byte_buffer = base::as_byte_span(flat_buffer);
   if (decoder) {
     text_content = decoder->Decode(byte_buffer);
-    text_content = text_content + decoder->Flush();
+    text_content = WTF::StrCat({text_content, decoder->Flush()});
   } else if (encoding.IsValid()) {
     text_content = encoding.Decode(byte_buffer);
   }
@@ -798,17 +798,17 @@ void InspectorPageAgent::getResourceContent(
           WrapPersistent(this), frame_id, url, std::move(callback)));
 }
 
-protocol::Response InspectorPageAgent::getAdScriptAncestryIds(
+protocol::Response InspectorPageAgent::getAdScriptAncestry(
     const String& frame_id,
-    std::unique_ptr<protocol::Array<protocol::Page::AdScriptId>>*
-        out_ad_script_ancestry) {
+    std::unique_ptr<protocol::Page::AdScriptAncestry>* out_ad_script_ancestry) {
   auto it = frame_ad_script_ancestry_.find(frame_id);
   if (it != frame_ad_script_ancestry_.end()) {
-    const Vector<AdScriptIdentifier>& ad_script_ancestry = it->value;
+    const AdTracker::AdScriptAncestry& ad_script_ancestry = it->value;
+    CHECK(!ad_script_ancestry.ancestry_chain.empty());
 
-    std::vector<std::unique_ptr<protocol::Page::AdScriptId>> results;
-    for (const auto& ad_script_identifier : ad_script_ancestry) {
-      results.push_back(
+    std::vector<std::unique_ptr<protocol::Page::AdScriptId>> ancestry_chain;
+    for (const auto& ad_script_identifier : ad_script_ancestry.ancestry_chain) {
+      ancestry_chain.push_back(
           protocol::Page::AdScriptId::create()
               .setScriptId(String::Number(ad_script_identifier.id))
               .setDebuggerId(ToCoreString(
@@ -816,9 +816,19 @@ protocol::Response InspectorPageAgent::getAdScriptAncestryIds(
               .build());
     }
 
-    *out_ad_script_ancestry =
-        std::make_unique<protocol::Array<protocol::Page::AdScriptId>>(
-            std::move(results));
+    std::unique_ptr<protocol::Page::AdScriptAncestry> ancestry =
+        protocol::Page::AdScriptAncestry::create()
+            .setAncestryChain(
+                std::make_unique<protocol::Array<protocol::Page::AdScriptId>>(
+                    std::move(ancestry_chain)))
+            .build();
+
+    if (ad_script_ancestry.root_script_filterlist_rule.IsValid()) {
+      ancestry->setRootScriptFilterlistRule(
+          String(ad_script_ancestry.root_script_filterlist_rule.ToString()));
+    }
+
+    *out_ad_script_ancestry = std::move(ancestry);
   }
 
   return protocol::Response::Success();
@@ -1159,13 +1169,12 @@ void InspectorPageAgent::DidOpenDocument(LocalFrame* frame,
 
 void InspectorPageAgent::FrameAttachedToParent(
     LocalFrame* frame,
-    const Vector<AdScriptIdentifier>& ad_script_ancestry) {
+    const AdTracker::AdScriptAncestry& ad_script_ancestry) {
   // TODO(crbug.com/1217041): If an ad script on the stack caused this frame to
   // be tagged as an ad, send the script's ID to the frontend.
   Frame* parent_frame = frame->Tree().Parent();
-  std::unique_ptr<SourceLocation> location =
-      SourceLocation::CaptureWithFullStackTrace();
-  if (!ad_script_ancestry.empty()) {
+  SourceLocation* location = SourceLocation::CaptureWithFullStackTrace();
+  if (!ad_script_ancestry.ancestry_chain.empty()) {
     frame_ad_script_ancestry_.Set(IdentifiersFactory::FrameId(frame),
                                   ad_script_ancestry);
   }
@@ -1550,7 +1559,7 @@ std::unique_ptr<protocol::Page::Frame> InspectorPageAgent::BuildObjectForFrame(
           .setGatedAPIFeatures(CreateGatedAPIFeaturesArray(frame->DomWindow()))
           .build();
   if (url.HasFragmentIdentifier()) {
-    frame_object->setUrlFragment("#" + url.FragmentIdentifier());
+    frame_object->setUrlFragment(WTF::StrCat({"#", url.FragmentIdentifier()}));
   }
   Frame* parent_frame = frame->Tree().Parent();
   if (parent_frame) {

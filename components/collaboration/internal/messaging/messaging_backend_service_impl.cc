@@ -19,6 +19,8 @@
 #include "base/functional/callback_helpers.h"
 #include "base/i18n/break_iterator.h"
 #include "base/i18n/message_formatter.h"
+#include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/collaboration/internal/messaging/data_sharing_change_notifier_impl.h"
 #include "components/collaboration/internal/messaging/storage/collaboration_message_util.h"
@@ -169,6 +171,8 @@ CollaborationEvent ToCollaborationEvent(
       return CollaborationEvent::COLLABORATION_MEMBER_ADDED;
     case collaboration_pb::COLLABORATION_MEMBER_REMOVED:
       return CollaborationEvent::COLLABORATION_MEMBER_REMOVED;
+    case collaboration_pb::VERSION_OUT_OF_DATE:
+      return CollaborationEvent::VERSION_OUT_OF_DATE;
     default:
       return CollaborationEvent::UNDEFINED;
   }
@@ -194,6 +198,8 @@ RecentActivityAction GetRecentActivityActionFromCollaborationEvent(
     case CollaborationEvent::COLLABORATION_MEMBER_ADDED:
     case CollaborationEvent::COLLABORATION_MEMBER_REMOVED:
       return RecentActivityAction::kManageSharing;
+    case CollaborationEvent::VERSION_OUT_OF_DATE:
+      return RecentActivityAction::kNone;
     case CollaborationEvent::UNDEFINED:
       return RecentActivityAction::kNone;
   }
@@ -475,6 +481,10 @@ bool IsCurrentUserOwner(const signin::IdentityManager* identity_manager,
   }
 
   return IsMemberOwner(group_data, account.gaia);
+}
+
+bool HasSeenTabUpdate(const tab_groups::SavedTabGroupTab& tab) {
+  return tab.last_seen_time() >= tab.navigation_time();
 }
 
 }  // namespace
@@ -882,6 +892,11 @@ void MessagingBackendServiceImpl::OnTabAdded(
   DirtyType dirty_type = (is_local || triggering_user_is_self)
                              ? DirtyType::kNone
                              : DirtyType::kDotAndChip;
+
+  if (HasSeenTabUpdate(added_tab)) {
+    dirty_type = DirtyType::kNone;
+  }
+
   collaboration_pb::Message message =
       CreateTabMessage(*collaboration_group_id, added_tab,
                        collaboration_pb::TAB_ADDED, dirty_type);
@@ -980,6 +995,9 @@ void MessagingBackendServiceImpl::OnTabUpdated(
       (is_local || triggering_user_is_self)
           ? DirtyType::kNone
           : (is_selected ? DirtyType::kChip : DirtyType::kDotAndChip);
+  if (HasSeenTabUpdate(updated_tab)) {
+    dirty_type = DirtyType::kNone;
+  }
 
   collaboration_pb::Message message =
       CreateTabMessage(*collaboration_group_id, updated_tab,
@@ -1121,6 +1139,10 @@ void MessagingBackendServiceImpl::OnTabLastSeenTimeChanged(
   }
 
   if (!tab) {
+    return;
+  }
+
+  if (!HasSeenTabUpdate(*tab)) {
     return;
   }
 
@@ -1299,6 +1321,7 @@ int GetTitleStringRes(CollaborationEvent collaboration_event,
     case CollaborationEvent::TAB_GROUP_REMOVED:
     case CollaborationEvent::COLLABORATION_ADDED:
     case CollaborationEvent::COLLABORATION_REMOVED:
+    case CollaborationEvent::VERSION_OUT_OF_DATE:
     case CollaborationEvent::UNDEFINED:
       CHECK(false) << "No string res for collaboration event "
                    << static_cast<size_t>(collaboration_event);

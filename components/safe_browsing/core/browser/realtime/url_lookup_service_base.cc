@@ -10,7 +10,6 @@
 #include "base/logging.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
-#include "base/not_fatal_until.h"
 #include "base/rand_util.h"
 #include "base/strings/strcat.h"
 #include "base/task/sequenced_task_runner.h"
@@ -167,9 +166,11 @@ RealTimeUrlLookupServiceBase::RealTimeUrlLookupServiceBase(
     base::RepeatingCallback<ChromeUserPopulation()>
         get_user_population_callback,
     ReferrerChainProvider* referrer_chain_provider,
+    std::unique_ptr<SafeBrowsingTokenFetcher> token_fetcher,
     PrefService* pref_service,
     WebUIDelegate* delegate)
-    : url_loader_factory_(url_loader_factory),
+    : token_fetcher_(std::move(token_fetcher)),
+      url_loader_factory_(url_loader_factory),
       cache_manager_(cache_manager),
       pref_service_(pref_service),
       get_user_population_callback_(get_user_population_callback),
@@ -344,6 +345,42 @@ void RealTimeUrlLookupServiceBase::SendSampledRequest(
                    std::move(referring_app_info));
 }
 
+void RealTimeUrlLookupServiceBase::GetAccessToken(
+    const GURL& url,
+    RTLookupResponseCallback response_callback,
+    scoped_refptr<base::SequencedTaskRunner> callback_task_runner,
+    SessionID tab_id,
+    std::optional<internal::ReferringAppInfo> referring_app_info) {
+  token_fetcher_->Start(base::BindOnce(
+      &RealTimeUrlLookupServiceBase::OnGetAccessToken,
+      weak_factory_.GetWeakPtr(), url, std::move(response_callback),
+      std::move(callback_task_runner), base::TimeTicks::Now(), tab_id,
+      std::move(referring_app_info)));
+}
+
+void RealTimeUrlLookupServiceBase::OnGetAccessToken(
+    const GURL& url,
+    RTLookupResponseCallback response_callback,
+    scoped_refptr<base::SequencedTaskRunner> callback_task_runner,
+    base::TimeTicks get_token_start_time,
+    SessionID tab_id,
+    std::optional<internal::ReferringAppInfo> referring_app_info,
+    const std::string& access_token) {
+  if (shutting_down()) {
+    return;
+  }
+
+  RecordTimesWithAndWithoutSuffix(
+      "SafeBrowsing.RT.GetToken.TimeTaken", GetMetricSuffix(),
+      base::TimeTicks::Now() - get_token_start_time);
+  RecordBooleanWithAndWithoutSuffix("SafeBrowsing.RT.HasAccessTokenFromFetcher",
+                                    GetMetricSuffix(), !access_token.empty());
+  MaybeSendRequest(url, access_token, std::move(response_callback),
+                   std::move(callback_task_runner),
+                   /* is_sampled_report */ false, tab_id,
+                   std::move(referring_app_info));
+}
+
 void RealTimeUrlLookupServiceBase::StartLookup(
     const GURL& url,
     RTLookupResponseCallback response_callback,
@@ -471,8 +508,7 @@ void RealTimeUrlLookupServiceBase::OnURLLoaderComplete(
   CHECK(first_request_start_time_);
 
   auto it = pending_requests_.find(url);
-  CHECK(it != pending_requests_.end(), base::NotFatalUntil::M130)
-      << "Request not found";
+  CHECK(it != pending_requests_.end()) << "Request not found";
 
   RecordTimesWithAndWithoutSuffix("SafeBrowsing.RT.Network.Time",
                                   GetMetricSuffix(),
@@ -502,7 +538,7 @@ void RealTimeUrlLookupServiceBase::OnURLLoaderComplete(
 
   if (response_code == net::HTTP_UNAUTHORIZED &&
       access_token_string.has_value()) {
-    OnResponseUnauthorized(access_token_string.value());
+    token_fetcher_->OnInvalidAccessToken(access_token_string.value());
   }
 
   auto response = std::make_unique<RTLookupResponse>();
@@ -714,8 +750,7 @@ void RealTimeUrlLookupServiceBase::OnRequestProtoFilled(
     LogAuthenticatedCookieResets(
         *resource_request,
         SafeBrowsingAuthenticatedEndpoint::kRealtimeUrlLookup);
-    SetAccessTokenAndClearCookieInResourceRequest(resource_request.get(),
-                                                  access_token_string);
+    SetAccessToken(resource_request.get(), access_token_string);
   }
   RecordBooleanWithAndWithoutSuffix("SafeBrowsing.RT.HasTokenInRequest",
                                     GetMetricSuffix(),
@@ -757,9 +792,6 @@ void RealTimeUrlLookupServiceBase::LogLookupResponseForToken(
   webui_delegate_->AddToURTLookupResponses(token.value(), response);
 }
 
-void RealTimeUrlLookupServiceBase::OnResponseUnauthorized(
-    const std::string& invalid_access_token) {}
-
 void RealTimeUrlLookupServiceBase::Shutdown() {
   shutting_down_ = true;
 
@@ -768,6 +800,8 @@ void RealTimeUrlLookupServiceBase::Shutdown() {
   // Clear references to other KeyedServices.
   cache_manager_ = nullptr;
   referrer_chain_provider_ = nullptr;
+
+  token_fetcher_.reset();
 }
 
 }  // namespace safe_browsing

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "components/optimization_guide/core/hints/hints_fetcher.h"
+
 #include <map>
 #include <memory>
 #include <string>
@@ -14,6 +16,7 @@
 #include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_util.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
@@ -36,19 +39,18 @@
 #include "components/metrics/content/subprocess_metrics_provider.h"
 #include "components/no_state_prefetch/browser/no_state_prefetch_handle.h"
 #include "components/no_state_prefetch/browser/no_state_prefetch_manager.h"
-#include "components/optimization_guide/core/hints_component_info.h"
-#include "components/optimization_guide/core/hints_component_util.h"
-#include "components/optimization_guide/core/hints_fetcher.h"
+#include "components/optimization_guide/core/filters/hints_component_info.h"
+#include "components/optimization_guide/core/filters/hints_component_util.h"
+#include "components/optimization_guide/core/filters/optimization_hints_component_update_listener.h"
+#include "components/optimization_guide/core/filters/test_hints_component_creator.h"
+#include "components/optimization_guide/core/hints/optimization_guide_store.h"
+#include "components/optimization_guide/core/hints/top_host_provider.h"
 #include "components/optimization_guide/core/optimization_guide_constants.h"
 #include "components/optimization_guide/core/optimization_guide_enums.h"
 #include "components/optimization_guide/core/optimization_guide_features.h"
 #include "components/optimization_guide/core/optimization_guide_prefs.h"
-#include "components/optimization_guide/core/optimization_guide_store.h"
 #include "components/optimization_guide/core/optimization_guide_switches.h"
 #include "components/optimization_guide/core/optimization_guide_test_util.h"
-#include "components/optimization_guide/core/optimization_hints_component_update_listener.h"
-#include "components/optimization_guide/core/test_hints_component_creator.h"
-#include "components/optimization_guide/core/top_host_provider.h"
 #include "components/optimization_guide/proto/hints.pb.h"
 #include "components/prefs/pref_service.h"
 #include "components/site_engagement/content/site_engagement_service.h"
@@ -1806,4 +1808,110 @@ IN_PROC_BROWSER_TEST_F(PersonalizedHintsFetcherBrowserTest, UserSignedIn) {
   histogram_tester.ExpectUniqueSample(
       "OptimizationGuide.HintsFetcher.GetHintsRequest.RequestStatus.Journeys",
       optimization_guide::FetcherRequestStatus::kSuccess, 1);
+}
+
+class ProactivePersonalizationHintsFetcherBrowserTest
+    : public HintsFetcherBrowserTest {
+ public:
+  ProactivePersonalizationHintsFetcherBrowserTest() = default;
+
+  ProactivePersonalizationHintsFetcherBrowserTest(
+      const ProactivePersonalizationHintsFetcherBrowserTest&) = delete;
+  ProactivePersonalizationHintsFetcherBrowserTest& operator=(
+      const ProactivePersonalizationHintsFetcherBrowserTest&) = delete;
+
+  ~ProactivePersonalizationHintsFetcherBrowserTest() override = default;
+
+  void SetUpBrowserContextKeyedServices(
+      content::BrowserContext* context) override {
+    HintsFetcherBrowserTest::SetUpBrowserContextKeyedServices(context);
+    IdentityTestEnvironmentProfileAdaptor::
+        SetIdentityTestEnvironmentFactoriesOnBrowserContext(context);
+  }
+
+  void SetUpOnMainThread() override {
+    HintsFetcherBrowserTest::SetUpOnMainThread();
+    identity_test_env_adaptor_ =
+        std::make_unique<IdentityTestEnvironmentProfileAdaptor>(
+            browser()->profile());
+  }
+
+  void PopulateEnabledFeatures(
+      std::vector<base::test::FeatureRefAndParams>* enabled_features) override {
+    base::FieldTrialParams personalized_fetching_params = GetFieldTrialParams();
+    enabled_features->emplace_back(
+        optimization_guide::features::
+            kOptimizationGuideProactivePersonalizedHintsFetching,
+        personalized_fetching_params);
+  }
+
+  virtual base::FieldTrialParams GetFieldTrialParams() {
+    return {
+        {"allowed_optimization_types", "NOSCRIPT"},
+    };
+  }
+
+  void EnableSignin() {
+    identity_test_env_adaptor_->identity_test_env()
+        ->MakePrimaryAccountAvailable("user@gmail.com",
+                                      signin::ConsentLevel::kSignin);
+    identity_test_env_adaptor_->identity_test_env()
+        ->SetAutomaticIssueOfAccessTokens(true);
+  }
+
+ private:
+  // Identity test support.
+  std::unique_ptr<IdentityTestEnvironmentProfileAdaptor>
+      identity_test_env_adaptor_;
+};
+
+IN_PROC_BROWSER_TEST_F(ProactivePersonalizationHintsFetcherBrowserTest,
+                       OnNavigationFetchesWithAccessToken) {
+  SetNetworkConnectionOnline();
+  SetResponseType(
+      optimization_guide::HintsFetcherRemoteResponseType::kSuccessful);
+
+  ResetCountHintsRequestsReceived();
+  EnableSignin();
+  SetExpectedBearerAccessToken("Bearer access_token");
+
+  GURL full_url = GURL("https://foo.com/test/");
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), full_url));
+
+  base::flat_set<std::string> expected_request;
+  expected_request.insert(full_url.host());
+  expected_request.insert(full_url.spec());
+  SetExpectedHintsRequestForHostsAndUrls(expected_request);
+  EXPECT_EQ(1u, count_hints_requests_received());
+}
+
+class ProactivePersonalizationHintsWrongOptimizationTypeFetcherBrowserTest
+    : public ProactivePersonalizationHintsFetcherBrowserTest {
+ public:
+  base::FieldTrialParams GetFieldTrialParams() override {
+    return {
+        {"allowed_optimization_types", "PERFORMANCE_HINTS"},
+    };
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(
+    ProactivePersonalizationHintsWrongOptimizationTypeFetcherBrowserTest,
+    OnNavigationDoesNotFetchAccessToken) {
+  SetNetworkConnectionOnline();
+  SetResponseType(
+      optimization_guide::HintsFetcherRemoteResponseType::kSuccessful);
+
+  ResetCountHintsRequestsReceived();
+  EnableSignin();
+  SetExpectedBearerAccessToken(std::string());
+
+  GURL full_url = GURL("https://foo.com/test/");
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), full_url));
+
+  base::flat_set<std::string> expected_request;
+  expected_request.insert(full_url.host());
+  expected_request.insert(full_url.spec());
+  SetExpectedHintsRequestForHostsAndUrls(expected_request);
+  EXPECT_EQ(1u, count_hints_requests_received());
 }

@@ -382,6 +382,9 @@ extern int kDefaultMinimumTimeBetweenSuggestQueriesMs;
 // optionally subdomains) in the steady state.
 extern const char kOmniboxUIUnelideURLOnHoverThresholdMsParam[];
 
+// Parameter names used by MIA experiments.
+extern const char kSuppressPsuggestBackfillWithMIAParam[];
+
 // `FeatureParam`s
 
 // Local history zero-prefix (aka zero-suggest) and prefix suggestions.
@@ -741,20 +744,6 @@ bool IsStarterPackIPHEnabled();
 
 // <- Site Search Starter Pack
 // ---------------------------------------------------------
-// Android Hub Search -->
-//
-// Controls different variations of android hub search including what
-// primitives are included.
-#if BUILDFLAG(IS_ANDROID)
-constexpr base::FeatureParam<bool> kAndroidHubSearchEnableBookmarkProvider{
-    &omnibox::kAndroidHubSearch, "enable_bookmark_provider", true};
-
-constexpr base::FeatureParam<bool> kAndroidHubSearchEnableHistoryProvider{
-    &omnibox::kAndroidHubSearch, "enable_history_provider", true};
-#endif
-
-// <- Android Hub Search
-// ---------------------------------------------------------
 // Power Tools -->
 constexpr base::FeatureParam<size_t> kOmniboxNumNtpZpsRecentSearches{
     &omnibox::kNumNtpZpsRecentSearches, "omnibox_num_ntp_zps_recent_searches",
@@ -787,10 +776,11 @@ inline constexpr base::FeatureParam<bool> kAndroidDiagInputConnection{
 // <- Diagnostics
 // ---------------------------------------------------------
 // Mobile Parity update -->
-#if BUILDFLAG(IS_ANDROID)
 inline constexpr base::FeatureParam<bool> kMobileParityRetrieveTrueFavicon{
     &omnibox::kOmniboxMobileParityUpdate, "retrieve_true_favicon", false};
-#endif
+
+inline constexpr base::FeatureParam<bool> kMobileParityEnableFeedForGoogleOnly{
+    &omnibox::kOmniboxMobileParityUpdate, "enable_feed_for_google_only", true};
 // <-- Mobile Parity update
 
 // New params should be inserted above this comment. They should be ordered

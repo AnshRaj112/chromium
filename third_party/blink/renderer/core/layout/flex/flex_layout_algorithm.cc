@@ -7,7 +7,6 @@
 #include <memory>
 #include <optional>
 
-#include "base/not_fatal_until.h"
 #include "base/types/optional_util.h"
 #include "third_party/blink/renderer/core/frame/web_feature.h"
 #include "third_party/blink/renderer/core/layout/baseline_utils.h"
@@ -344,6 +343,9 @@ class GapAccumulator {
 
     // "last" here refers to last in the block direction.
     bool is_last_edge_intersection = flex_line_index == flex_lines.size() - 1;
+    // "last" here refers to last in the inline direction.
+    bool is_last_item_in_line =
+        item_index_in_line == flex_line.item_indices.size() - 1;
 
     if (item_index_in_line == 0) {
       // For the first item in each line, the intersection associated with
@@ -370,26 +372,37 @@ class GapAccumulator {
       if (is_first_edge_intersection) {
         PopulateGapIntersectionsForFirstLine(
             flex_line, flex_lines.size(),
-            item_index_in_line == flex_line.item_indices.size() - 1,
             main_intersection_offset, item_cross_intersections_list);
       } else if (is_last_edge_intersection) {
         PopulateGapIntersectionsForLastLine(flex_line, main_intersection_offset,
                                             item_cross_intersections_list);
       } else {
-        PopulateGapIntersectionsForMiddleItem(
-            flex_lines, item_index_in_line == flex_line.item_indices.size() - 1,
-            flex_line_index, main_intersection_offset,
-            item_cross_intersections_list);
+        PopulateGapIntersectionsForMiddleItem(flex_lines, flex_line_index,
+                                              main_intersection_offset,
+                                              item_cross_intersections_list);
       }
 
       cross_axis_gaps_.push_back(std::move(item_cross_intersections_list));
+    }
+
+    if (is_last_item_in_line && flex_lines.size() > 1 &&
+        !is_last_edge_intersection) {
+      // If we are the last item in any line except the last, we add the
+      // intersection of the next main gap with the edge of the container to the
+      // main axis gap intersections.
+      LayoutUnit next_main_axis_gap_start = flex_line.LineCrossEnd();
+      LayoutUnit next_main_axis_gap_end =
+          flex_line.LineCrossEnd() + gap_between_lines_;
+      LayoutUnit cross_intersection_offset =
+          (next_main_axis_gap_start + next_main_axis_gap_end) / 2;
+      PopulateNextMainAxisGapIntersectionsForLastItem(
+          cross_intersection_offset);
     }
   }
 
   void PopulateGapIntersectionsForFirstLine(
       const FlexLine& flex_line,
       wtf_size_t num_lines,
-      bool is_last_item_in_line,
       LayoutUnit main_intersection_offset,
       Vector<GapIntersection>& item_cross_intersections_list) {
     // This method assumes that the inline offset of the
@@ -419,10 +432,6 @@ class GapAccumulator {
       AddGapIntersectionToResults(main_intersection_offset,
                                   cross_intersection_offset,
                                   main_intersections_after_current_line_);
-
-      if (is_last_item_in_line) {
-        PopulateMainAxisGapIntersectionsForLastItem(cross_intersection_offset);
-      }
     }
   }
 
@@ -482,7 +491,7 @@ class GapAccumulator {
     main_intersections_before_current_line_.clear();
   }
 
-  void PopulateMainAxisGapIntersectionsForLastItem(
+  void PopulateNextMainAxisGapIntersectionsForLastItem(
       LayoutUnit cross_intersection_offset) {
     CHECK(container_builder_);
     // If we are the last item on the line, we add the intersection
@@ -503,7 +512,6 @@ class GapAccumulator {
 
   void PopulateGapIntersectionsForMiddleItem(
       const FlexLineVector& flex_lines,
-      bool is_last_item_in_line,
       size_t flex_line_index,
       LayoutUnit main_intersection_offset,
       Vector<GapIntersection>& item_cross_intersections_list) {
@@ -537,10 +545,6 @@ class GapAccumulator {
     AddGapIntersectionToResults(main_intersection_offset,
                                 cross_intersection_offset,
                                 item_cross_intersections_list);
-
-    if (is_last_item_in_line) {
-      PopulateMainAxisGapIntersectionsForLastItem(cross_intersection_offset);
-    }
   }
 
   void PopulateGapIntersectionsForLastLine(
@@ -3125,8 +3129,7 @@ FlexLayoutAlgorithm::GiveItemsFinalPositionAndSizeForFragmentation(
             AdjustOffsetForNextLine(flex_lines, flex_line_idx, item_expansion);
           } else {
             auto it = row_cross_size_updates_.find(flex_line_idx + 1);
-            CHECK_NE(it, row_cross_size_updates_.end(),
-                     base::NotFatalUntil::M130);
+            CHECK_NE(it, row_cross_size_updates_.end());
             if (item_expansion > it->value) {
               AdjustOffsetForNextLine(flex_lines, flex_line_idx,
                                       item_expansion - it->value);

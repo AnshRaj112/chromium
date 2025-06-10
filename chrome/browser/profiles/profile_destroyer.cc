@@ -8,12 +8,12 @@
 #include <sstream>
 #include <utility>
 
+#include "base/debug/alias.h"
 #include "base/feature_list.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/no_destructor.h"
-#include "base/not_fatal_until.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
@@ -362,7 +362,7 @@ ProfileDestroyer::~ProfileDestroyer() {
   CHECK(!observations_.IsObservingAnySource())
       << "Some render process hosts were not destroyed early enough!";
   auto iter = PendingDestroyers().find(this);
-  CHECK(iter != PendingDestroyers().end(), base::NotFatalUntil::M130);
+  CHECK(iter != PendingDestroyers().end());
   PendingDestroyers().erase(iter);
 }
 

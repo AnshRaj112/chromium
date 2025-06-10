@@ -10,8 +10,8 @@
 #include "base/check_is_test.h"
 #include "base/containers/adapters.h"
 #include "base/containers/contains.h"
+#include "base/debug/alias.h"
 #include "base/debug/crash_logging.h"
-#include "base/functional/overloaded.h"
 #include "base/notreached.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/types/optional_util.h"
@@ -37,6 +37,7 @@
 #include "services/network/public/cpp/single_request_url_loader_factory.h"
 #include "services/network/public/cpp/url_loader_factory_builder.h"
 #include "services/network/public/cpp/wrapper_shared_url_loader_factory.h"
+#include "third_party/abseil-cpp/absl/functional/overload.h"
 #include "third_party/blink/public/common/service_worker/service_worker_scope_match.h"
 #include "third_party/blink/public/common/storage_key/storage_key.h"
 #include "third_party/blink/public/mojom/service_worker/service_worker_running_status_callback.mojom.h"
@@ -430,7 +431,7 @@ blink::mojom::ServiceWorkerClientType ServiceWorkerClient::GetClientType()
     const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return std::visit(
-      base::Overloaded(
+      absl::Overload(
           [](GlobalRenderFrameHostId render_frame_host_id) {
             return blink::mojom::ServiceWorkerClientType::kWindow;
           },
@@ -638,17 +639,20 @@ blink::StorageKey ServiceWorkerClient::CalculateStorageKeyForUpdateUrls(
   const url::Origin origin = url::Origin::Create(url);
 
   const std::optional<blink::StorageKey> storage_key = std::visit(
-      base::Overloaded(
+      absl::Overload(
           [&](GlobalRenderFrameHostId render_frame_host_id) {
+            if (is_initiated_by_prefetch_) {
+              // Falls back to the `CreateFromOriginAndIsolationInfo()` case
+              // below.
+              // Navigation isn't served by prefetch if the key for prefetch
+              // calculated here is wrong/mismatching, checked at
+              // `PrefetchURLLoaderInterceptor::OnGetPrefetchComplete()`.
+              // https://crbug.com/413207408.
+              return std::optional<blink::StorageKey>(std::nullopt);
+            }
             // We use `ongoing_navigation_frame_tree_node_id_` instead of
             // `render_frame_host_id` because this method is called before
             // response commit.
-            //
-            // TODO(https://crbug.com/40947546): For clients for prefetch where
-            // `ongoing_navigation_frame_tree_node_id` is null, this returns
-            // `nullptr` and thus falls back to the
-            // `CreateFromOriginAndIsolationInfo()` case below. Check if this is
-            // correct or fix this.
             return GetStorageKeyFromRenderFrameHost(
                 ongoing_navigation_frame_tree_node_id_, origin,
                 base::OptionalToPtr(isolation_info_from_handle.nonce()));
@@ -1184,28 +1188,6 @@ void ServiceWorkerClient::InheritControllerFrom(
                               false /* notify_controllerchange */);
   }
   creator_host.SetInherited();
-}
-
-void ServiceWorkerClient::InheritControllerFromPrefetch(
-    ServiceWorkerClient& client_for_prefetch,
-    const GURL& navigation_url) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  CHECK(base::FeatureList::IsEnabled(features::kPrefetchServiceWorker));
-  CHECK(IsContainerForWindowClient());
-  CHECK(client_for_prefetch.IsContainerForWindowClient());
-
-  UpdateUrls(navigation_url, client_for_prefetch.top_frame_origin(),
-             client_for_prefetch.key());
-
-  // Inherit the controller used for prefetching from `client_for_prefetch`.
-  if (client_for_prefetch.controller_registration()) {
-    AddMatchingRegistration(client_for_prefetch.controller_registration());
-    // `client_for_prefetch` shouldn't be in back forward cache because it's for
-    // prefetch.
-    CHECK(!client_for_prefetch.is_in_back_forward_cache());
-    SetControllerRegistration(client_for_prefetch.controller_registration(),
-                              false /* notify_controllerchange */);
-  }
 }
 
 mojo::PendingReceiver<blink::mojom::ServiceWorkerRunningStatusCallback>

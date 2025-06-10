@@ -1078,9 +1078,6 @@ void WebContentsViewAura::OnCapturerCountChanged() {
 
 void WebContentsViewAura::FullscreenStateChanged(bool is_fullscreen) {}
 
-void WebContentsViewAura::UpdateWindowControlsOverlay(
-    const gfx::Rect& bounding_rect) {}
-
 BackForwardTransitionAnimationManager*
 WebContentsViewAura::GetBackForwardTransitionAnimationManager() {
   return nullptr;
@@ -1182,7 +1179,7 @@ void WebContentsViewAura::StartDragging(
   }
 
   // |this| should still be alive at this point.
-  CHECK(weak_this, base::NotFatalUntil::M130);
+  CHECK(weak_this);
 
   // If drag is still in progress that means we haven't received drop targeting
   // callback yet. So we have to make sure to delay calling EndDrag until drop

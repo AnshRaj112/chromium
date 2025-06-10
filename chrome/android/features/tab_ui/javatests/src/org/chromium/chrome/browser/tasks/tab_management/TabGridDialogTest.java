@@ -44,6 +44,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
 
 import static org.chromium.chrome.browser.flags.ChromeFeatureList.DATA_SHARING;
+import static org.chromium.chrome.browser.flags.ChromeFeatureList.DATA_SHARING_JOIN_ONLY;
 import static org.chromium.chrome.browser.flags.ChromeFeatureList.NAV_BAR_COLOR_MATCHES_TAB_BACKGROUND;
 import static org.chromium.chrome.browser.flags.ChromeFeatureList.TAB_GROUP_PARITY_BOTTOM_SHEET_ANDROID;
 import static org.chromium.chrome.browser.flags.ChromeFeatureList.TAB_GROUP_SYNC_ANDROID;
@@ -183,7 +184,7 @@ import java.util.concurrent.TimeoutException;
 @CommandLineFlags.Add({ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE})
 @Restriction({Restriction.RESTRICTION_TYPE_NON_LOW_END_DEVICE})
 @DisableFeatures({NAV_BAR_COLOR_MATCHES_TAB_BACKGROUND, TAB_GROUP_PARITY_BOTTOM_SHEET_ANDROID})
-@EnableFeatures({DATA_SHARING})
+@EnableFeatures({DATA_SHARING, DATA_SHARING_JOIN_ONLY})
 @Batch(Batch.PER_CLASS)
 public class TabGridDialogTest {
     private static final String CUSTOMIZED_TITLE1 = "wfh tips";
@@ -972,7 +973,7 @@ public class TabGridDialogTest {
                 sActivityTestRule.getTestServer().getURL(PAGE_WITH_HTTP_CANONICAL_URL);
         sActivityTestRule.loadUrlInNewTab(httpCanonicalUrl);
 
-        ArrayList<String> urls = new ArrayList<String>();
+        ArrayList<String> urls = new ArrayList<>();
         urls.add(httpsCanonicalUrl);
         urls.add(httpCanonicalUrl);
 
@@ -1463,7 +1464,7 @@ public class TabGridDialogTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
-    @DisableFeatures(DATA_SHARING) // Needs new goldens post-launch.
+    @DisableFeatures({DATA_SHARING, DATA_SHARING_JOIN_ONLY}) // Needs new goldens post-launch.
     @RequiresRestart("Group creation modal dialog is sometimes persistent when dismissing")
     @ParameterAnnotations.UseMethodParameter(NightModeTestUtils.NightModeParams.class)
     public void testRenderDialog_3Tabs_Portrait(boolean nightModeEnabled) throws Exception {
@@ -1488,7 +1489,7 @@ public class TabGridDialogTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
-    @DisableFeatures(DATA_SHARING) // Needs new goldens post-launch.
+    @DisableFeatures({DATA_SHARING, DATA_SHARING_JOIN_ONLY}) // Needs new goldens post-launch.
     @RequiresRestart("Group creation modal dialog is sometimes persistent when dismissing")
     @ParameterAnnotations.UseMethodParameter(NightModeTestUtils.NightModeParams.class)
     public void testRenderDialog_3Tabs_Landscape_NewAspectRatio(boolean nightModeEnabled)
@@ -1515,7 +1516,7 @@ public class TabGridDialogTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
-    @DisableFeatures(DATA_SHARING) // Needs new goldens post-launch.
+    @DisableFeatures({DATA_SHARING, DATA_SHARING_JOIN_ONLY}) // Needs new goldens post-launch.
     @RequiresRestart("Group creation modal dialog is sometimes persistent when dismissing")
     @ParameterAnnotations.UseMethodParameter(NightModeTestUtils.NightModeParams.class)
     @DisableIf.Build(sdk_equals = Build.VERSION_CODES.S_V2, message = "crbug.com/40263769")
@@ -1547,7 +1548,7 @@ public class TabGridDialogTest {
     @Test
     @MediumTest
     @Feature({"RenderTest"})
-    @DisableFeatures(DATA_SHARING) // Needs new goldens post-launch.
+    @DisableFeatures({DATA_SHARING, DATA_SHARING_JOIN_ONLY}) // Needs new goldens post-launch.
     @RequiresRestart("Group creation modal dialog is sometimes persistent when dismissing")
     @ParameterAnnotations.UseMethodParameter(NightModeTestUtils.NightModeParams.class)
     @DisabledTest(message = "crbug.com/385205037, flaky due to thumbnails")
@@ -1647,10 +1648,10 @@ public class TabGridDialogTest {
 
         // Verify accessibility importance adjustment when opening dialog from tab switcher.
         openDialogFromTabSwitcherAndVerify(cta, 2, null);
-        verifyBackgroundViewAccessibilityImportance(cta, true);
+        verifyBackgroundViewAccessibilityImportanceInSwitcher(cta, true);
         Espresso.pressBack();
         waitForDialogHidingAnimationInTabSwitcher(cta);
-        verifyBackgroundViewAccessibilityImportance(cta, false);
+        verifyBackgroundViewAccessibilityImportanceInSwitcher(cta, false);
 
         // Verify accessibility importance adjustment when opening dialog from tab strip.
         openDialogFromTabSwitcherAndVerify(cta, 2, null);
@@ -2119,7 +2120,7 @@ public class TabGridDialogTest {
 
     private boolean isDialogHidden(ChromeTabbedActivity cta) {
         View dialogView = cta.findViewById(R.id.dialog_parent_view);
-        return dialogView.getVisibility() == View.GONE;
+        return dialogView == null || dialogView.getVisibility() == View.GONE;
     }
 
     private void showDialogFromStrip(ChromeTabbedActivity cta) {
@@ -2390,6 +2391,15 @@ public class TabGridDialogTest {
 
     private boolean isTablet(ChromeTabbedActivity cta) {
         return DeviceFormFactor.isNonMultiDisplayContextOnTablet(cta);
+    }
+
+    private void verifyBackgroundViewAccessibilityImportanceInSwitcher(
+            ChromeTabbedActivity cta, boolean isDialogFullyVisible) {
+        View toolbarAndPaneContainer = (View) cta.findViewById(R.id.hub_pane_host).getParent();
+        assertEquals(
+                isDialogFullyVisible,
+                IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                        == toolbarAndPaneContainer.getImportantForAccessibility());
     }
 
     private void verifyBackgroundViewAccessibilityImportance(

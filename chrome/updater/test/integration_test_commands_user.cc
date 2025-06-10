@@ -85,14 +85,13 @@ class IntegrationTestCommandsUser : public IntegrationTestCommands {
 
   void EnterTestMode(const GURL& update_url,
                      const GURL& crash_upload_url,
-                     const GURL& device_management_url,
                      const GURL& app_logo_url,
                      base::TimeDelta idle_timeout,
                      base::TimeDelta server_keep_alive_time,
                      base::TimeDelta ceca_connection_timeout) const override {
-    updater::test::EnterTestMode(
-        update_url, crash_upload_url, device_management_url, app_logo_url,
-        idle_timeout, server_keep_alive_time, ceca_connection_timeout);
+    updater::test::EnterTestMode(update_url, crash_upload_url, app_logo_url,
+                                 idle_timeout, server_keep_alive_time,
+                                 ceca_connection_timeout);
   }
 
   void ExitTestMode() const override {
@@ -501,6 +500,21 @@ class IntegrationTestCommandsUser : public IntegrationTestCommands {
                                        const std::string& language) override {
     updater::test::RunOfflineInstallOsNotSupported(
         updater_scope_, is_legacy_install, is_silent_install, language);
+  }
+
+  void RunMockOfflineMetaInstall(const std::string& app_id,
+                                 const base::Version& version,
+                                 const base::FilePath& installer_path,
+                                 const std::string& arguments,
+                                 bool is_silent_install,
+                                 const std::string& platform,
+                                 int string_resource_id_to_find,
+                                 const std::string& language,
+                                 bool expect_success) override {
+    updater::test::RunMockOfflineMetaInstall(
+        updater_scope_, app_id, version, installer_path, arguments,
+        is_silent_install, platform, string_resource_id_to_find, language,
+        expect_success);
   }
 
   void DMPushEnrollmentToken(const std::string& enrollment_token) override {

@@ -10,10 +10,8 @@
 #include <optional>
 #include <string>
 
-#include "base/strings/string_util.h"
 #include "base/uuid.h"
 #include "components/sync/test/bookmark_entity_builder.h"
-#include "url/gurl.h"
 
 namespace fake_server {
 

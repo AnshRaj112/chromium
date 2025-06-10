@@ -133,6 +133,7 @@ class CC_EXPORT LayerTreeImpl {
   ImageDecodeCache* image_decode_cache() const;
   ImageAnimationController* image_animation_controller() const;
   DroppedFrameCounter* dropped_frame_counter() const;
+  FrameSorter* frame_sorter() const;
   MemoryHistory* memory_history() const;
   DebugRectHistory* debug_rect_history() const;
   const GlobalStateThatImpactsTilePriority& global_tile_state() const {
@@ -163,7 +164,6 @@ class CC_EXPORT LayerTreeImpl {
                                      float initial_opacity);
   void DidAnimateScrollOffset();
   bool use_gpu_rasterization() const;
-  bool create_low_res_tiling() const;
   bool RequiresHighResToDraw() const;
   bool SmoothnessTakesPriority() const;
   VideoFrameControllerClient* GetVideoFrameControllerClient() const;
@@ -414,6 +414,7 @@ class CC_EXPORT LayerTreeImpl {
   bool new_local_surface_id_request_for_testing() const {
     return new_local_surface_id_request_;
   }
+  bool TakeNewLocalSurfaceIdRequestForVizProcess();
 
   void SetScreenshotDestinationToken(base::UnguessableToken destination_token);
   base::UnguessableToken TakeScreenshotDestinationToken();
@@ -710,7 +711,9 @@ class CC_EXPORT LayerTreeImpl {
   std::unique_ptr<PendingPageScaleAnimation> TakePendingPageScaleAnimation();
 
   void AppendEventsMetricsFromMainThread(EventMetrics::List events_metrics);
+  void AppendEventMetricsFromRasterThread(EventMetrics::List event_metrics);
   EventMetrics::List TakeEventsMetrics();
+  EventMetrics::List TakeRasterEventsMetrics();
 
   // Requests that we force send RenderFrameMetadata with the next frame.
   void RequestForceSendMetadata() { force_send_metadata_request_ = true; }
@@ -790,6 +793,10 @@ class CC_EXPORT LayerTreeImpl {
 
   size_t events_metrics_from_main_thread_count_for_testing() const {
     return events_metrics_from_main_thread_.size();
+  }
+
+  size_t events_metrics_from_raster_thread_count_for_testing() const {
+    return event_metrics_from_raster_thread_.size();
   }
 
   bool device_viewport_rect_changed() const {
@@ -905,6 +912,10 @@ class CC_EXPORT LayerTreeImpl {
   viz::LocalSurfaceId local_surface_id_from_parent_;
 
   bool new_local_surface_id_request_ : 1 = false;
+
+  // This will be set when new_local_surface_id_request_ is set,
+  // but will only be cleared in VizLayerContext::UpdateDisplayTreeFrom().
+  bool new_local_surface_id_request_for_viz_process_ : 1 = false;
 
   bool needs_update_draw_properties_ : 1 = true;
 
@@ -1022,6 +1033,8 @@ class CC_EXPORT LayerTreeImpl {
 
   // Event metrics that are reported back from the main thread.
   EventMetrics::List events_metrics_from_main_thread_;
+  // Event metrics that are reported back from the raster thread.
+  EventMetrics::List event_metrics_from_raster_thread_;
 
   std::unique_ptr<gfx::DelegatedInkMetadata> delegated_ink_metadata_;
 

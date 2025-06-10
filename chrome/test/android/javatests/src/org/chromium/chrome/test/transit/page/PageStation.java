@@ -39,28 +39,16 @@ import org.chromium.chrome.test.transit.ntp.RegularNewTabPageStation;
 import org.chromium.chrome.test.util.MenuUtils;
 import org.chromium.content_public.browser.test.util.TouchCommon;
 
-import java.util.function.Function;
-
 /**
  * The screen that shows a web or native page with the toolbar within a tab.
  *
  * <p>Contains extra configurable Conditions such as waiting for a tab to be created, selected, have
  * the expected title, etc.
+ *
+ * <p>TODO(crbug.com/420471518): Rename this to CtaPageStation to match {@link CctPageStation}.
+ * Then, rename {@link BasePageStation} to {@link PageStation}.
  */
 public class PageStation extends BasePageStation<ChromeTabbedActivity> {
-
-    /**
-     * Builder for all PageStation subclasses.
-     *
-     * @param <T> the subclass of PageStation to build.
-     */
-    public static class Builder<T extends PageStation>
-            extends BasePageStation.Builder<ChromeTabbedActivity, T, Builder<T>> {
-        public Builder(Function<Builder<T>, T> factoryMethod) {
-            super(factoryMethod);
-        }
-    }
-
     public static final ViewSpec<UrlBar> URL_BAR = viewSpec(UrlBar.class, withId(R.id.url_bar));
     public ViewElement<ToolbarControlContainer> toolbarElement;
     public ViewElement<ToggleTabStackButton> tabSwitcherButtonElement;
@@ -72,8 +60,8 @@ public class PageStation extends BasePageStation<ChromeTabbedActivity> {
     }
 
     /** Use the PageStation's subclass |newBuilder()|. */
-    protected <T extends PageStation> PageStation(Builder<T> builder) {
-        super(ChromeTabbedActivity.class, builder);
+    protected PageStation(Config config) {
+        super(ChromeTabbedActivity.class, config);
 
         declareEnterCondition(
                 new LayoutTypeVisibleCondition(mActivityElement, LayoutType.BROWSING));
@@ -110,8 +98,7 @@ public class PageStation extends BasePageStation<ChromeTabbedActivity> {
     public PageAppMenuFacility<PageStation> openGenericAppMenu() {
         recheckActiveConditions();
 
-        return enterFacilitySync(
-                new PageAppMenuFacility<PageStation>(), menuButtonElement.getClickTrigger());
+        return enterFacilitySync(new PageAppMenuFacility<>(), menuButtonElement.getClickTrigger());
     }
 
     /** Shortcut to open a new tab programmatically as if selecting "New Tab" from the app menu. */
@@ -158,24 +145,24 @@ public class PageStation extends BasePageStation<ChromeTabbedActivity> {
                 Transition.runTriggerOnUiThreadOption(),
                 () ->
                         TabModelUtils.selectTabById(
-                                getActivity().getTabModelSelector(),
+                                getTabModelSelector(),
                                 tabToSelect.getId(),
                                 TabSelectionType.FROM_USER));
     }
 
     /** Opens the tab switcher by pressing the toolbar tab switcher button. */
     public RegularTabSwitcherStation openRegularTabSwitcher() {
-        assert !mIncognito;
+        assert !mIsIncognito;
         return travelToSync(
-                RegularTabSwitcherStation.from(getActivity().getTabModelSelector()),
+                RegularTabSwitcherStation.from(getTabModelSelector()),
                 tabSwitcherButtonElement.getClickTrigger());
     }
 
     /** Opens the incognito tab switcher by pressing the toolbar tab switcher button. */
     public IncognitoTabSwitcherStation openIncognitoTabSwitcher() {
-        assert mIncognito;
+        assert mIsIncognito;
         return travelToSync(
-                IncognitoTabSwitcherStation.from(getActivity().getTabModelSelector()),
+                IncognitoTabSwitcherStation.from(getTabModelSelector()),
                 tabSwitcherButtonElement.getClickTrigger());
     }
 
@@ -193,13 +180,13 @@ public class PageStation extends BasePageStation<ChromeTabbedActivity> {
         return travelToSync(
                 builder.withIsOpeningTabs(1)
                         .withIsSelectingTabs(1)
-                        .withIncognito(mIncognito)
+                        .withIncognito(mIsIncognito)
                         .withExpectedUrlSubstring(url)
                         .build(),
                 Transition.runTriggerOnUiThreadOption(),
                 () ->
                         getActivity()
-                                .getTabCreator(mIncognito)
+                                .getTabCreator(mIsIncognito)
                                 .launchUrl(url, TabLaunchType.FROM_LINK));
     }
 

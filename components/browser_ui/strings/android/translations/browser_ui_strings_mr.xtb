@@ -96,6 +96,7 @@
 <translation id="2182457891543959921">साइटना तुमच्या आसपासच्या परिसराचा 3D नकाशा तयार करू किंवा कॅमेर्‍याचे स्थान ट्रॅक करू देण्याआधी विचारा (शिफारस केलेले)</translation>
 <translation id="2185965788978862351">यामुळे साइटनी किंवा तुमच्या होम स्क्रीनवर त्याच्या अ‍ॅपने स्टोअर केलेला डेटा आणि कुकीचा <ph name="DATASIZE" /> हटवला जाईल.</translation>
 <translation id="2194856509914051091">विचार करण्याच्या गोष्टी</translation>
+<translation id="2202902749237646524">{NUM_DAYS,plural, =1{काल}other{<ph name="NUM_DAYS_MANY" /> दिवसांपूर्वी}}</translation>
 <translation id="2215727959747642672">फाइलचे संपादन</translation>
 <translation id="2218389616572918761">साइट तुमच्या मायक्रोफोनची परवानगी मागू शकतात</translation>
 <translation id="2228071138934252756"><ph name="APP_NAME" /> ला तुमचा कॅमेरा ॲक्सेस करू देण्यासाठी, <ph name="BEGIN_LINK" />Android सेटिंग्ज<ph name="END_LINK" /> मध्येदेखील कॅमेरा सुरू करा.</translation>
@@ -386,6 +387,7 @@
 <translation id="5723967018671998714">गुप्त मोडमध्ये तृतीय पक्ष कुकी ब्लॉक केल्या जातात</translation>
 <translation id="5740126560802162366">साइट या तुमच्या डिव्हाइसवर डेटा सेव्ह करू शकतात</translation>
 <translation id="5743425052258407233">तुमच्या सर्व डिव्हाइसवर तुमचा इतिहास मिळवा, जेणेकरून तुम्ही सोडले होते तिथून सहजपणे सुरू करू शकाल.</translation>
+<translation id="5749158352074143502">या टॅबसह पुढे सुरू ठेवा</translation>
 <translation id="5750869797196646528">हँड ट्रॅकिंग</translation>
 <translation id="5771720122942595109"><ph name="PERMISSION_1" /> ला ब्लॉक केले</translation>
 <translation id="5804241973901381774">परवानग्या</translation>
@@ -447,6 +449,7 @@
 <translation id="6527303717912515753">शेअर करा</translation>
 <translation id="6530703012083415527">सुरू असताना, साइट पॉप-अप आणि रीडिरेक्ट वापरू शकतात. बंद असताना, साइट पॉप-अप आणि रीडिरेक्ट वापरू शकत नाहीत.</translation>
 <translation id="6540488083026747005">तुम्ही या साइटवर तृतीय पक्ष कुकीना अनुमती दिली आहे</translation>
+<translation id="6542770556219257399">{NUM_WEEKS,plural, =1{<ph name="NUM_WEEKS_ONE" /> आठवड्यापूर्वी}other{<ph name="NUM_WEEKS_MANY" /> आठवड्यांपूर्वी}}</translation>
 <translation id="6545864417968258051">ब्लूटूथ स्कॅन करत आहे</translation>
 <translation id="6552800053856095716">{PERMISSIONS_SUMMARY_BLOCKED,plural, =1{<ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> आणि आणखी <ph name="NUM_MORE" /> ब्लॉक केली}other{<ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> आणि आणखी <ph name="NUM_MORE" /> ब्लॉक केल्या}}</translation>
 <translation id="6554732001434021288"><ph name="NUM_DAYS" /> दिवसांपूर्वी शेवटची भेट दिली</translation>
@@ -458,6 +461,7 @@
 <translation id="6612358246767739896">संरक्षित आशय</translation>
 <translation id="662080504995468778">यावर रहा</translation>
 <translation id="6635327442719709864">सुरू असताना, साइट सिरीअल पोर्ट वापरण्यास सांगू शकतात. बंद असताना, साइट सिरीअल पोर्ट वापरू शकत नाहीत.</translation>
+<translation id="6678072580827808850">सुरक्षितता तपासणीचे पुनरावलोकन करा</translation>
 <translation id="6683865262523156564">ही साइट तुमच्या अ‍ॅक्टिव्हिटी पाहू शकते अशा गटामध्ये आहे. हा गट <ph name="RWS_OWNER" /> द्वारे परिभाषित केला आहे</translation>
 <translation id="6689172468748959065">प्रोफाइल फोटो</translation>
 <translation id="6697925417670533197">सुरू असलेली डाउनलोड</translation>
@@ -519,6 +523,7 @@
 <translation id="7554752735887601236">साइट तुमचा मायक्रोफोन वापरत आहे</translation>
 <translation id="7561196759112975576">नेहमी</translation>
 <translation id="7573594921350120855">व्हिडिओ चॅटिंगसारख्या संवाद वैशिष्ट्यांसाठी साइट सामान्यपणे तुमचा व्हिडिओ कॅमेरा वापरतात</translation>
+<translation id="7574529565935733861">{NUM_MONTHS,plural, =1{<ph name="NUM_MONTHS_ONE" /> महिन्यापूर्वी}other{<ph name="NUM_MONTHS_MANY" /> महिन्यांपूर्वी}}</translation>
 <translation id="757524316907819857">संरक्षित आशय प्ले करण्यापासून साइटवर ब्लॉक करा</translation>
 <translation id="7594634374516752650">ब्लूटूथ डिव्‍हाइसशी कनेक्ट केली आहे</translation>
 <translation id="7617547684249261169">तुम्ही तुमचा काही किंवा सर्व इतिहास, कुकी, साइट डेटा आणि आणखी बरेच काही हटवू शकता</translation>
@@ -532,7 +537,6 @@
 <translation id="7759147511335618829">MIDI डिव्हाइस नियंत्रण व रीप्रोग्राम</translation>
 <translation id="7781829728241885113">काल</translation>
 <translation id="7791543448312431591">जोडा</translation>
-<translation id="7801888679188438140">{TILE_COUNT,plural, =1{या टॅबसह पुढे सुरू ठेवा}other{या टॅबसह पुढे सुरू ठेवा}}</translation>
 <translation id="780301667611848630">नाही, नको</translation>
 <translation id="7804248752222191302">साइट तुमचा कॅमेरा वापरत आहे</translation>
 <translation id="7807060072011926525">Google द्वारे पुरवलेली</translation>
@@ -541,6 +545,7 @@
 <translation id="7846076177841592234">निवड रद्द करा</translation>
 <translation id="7881140103901777395">Chrome हे तृतीय पक्ष कुकी वापरण्यापासून अनेक साइटना मर्यादित करते. पण, तृतीय पक्ष कुकीना या साइटवर अनुमती आहे, कारण मूलभूत सेवा पुरवण्यासाठी ती त्यांच्यावर अवलंबून असते.\n\n<ph name="BEGIN_LINK" />तृतीय पक्ष कुकीना असलेला अ‍ॅक्सेस व्यवस्थापित करणे<ph name="END_LINK" /> हे करण्यासाठी सेटिंग्जला भेट द्या.</translation>
 <translation id="7882806643839505685">विशिष्ट साइटसाठी ध्वनीची परवानगी द्या.</translation>
+<translation id="7891547341794213004">हा टॅब वापरणे पुढे सुरू ठेवा कार्ड लपवा</translation>
 <translation id="789180354981963912">गुप्त मोडमधील तृतीय पक्ष कुकी ब्लॉक करा:</translation>
 <translation id="789722939441020330">साइटना एकाहून अधिक फाइल आपोआप डाउनलोड करण्याची अनुमती देऊ नका</translation>
 <translation id="7940722705963108451">मला आठवण करून द्या</translation>
@@ -549,7 +554,6 @@
 <translation id="7986741934819883144">संपर्क निवडा</translation>
 <translation id="7990211076305263060">सुरू असताना, साइट तुमचा मायक्रोफोन वापरण्याची विनंती करू शकतात. बंद असताना, साइट तुमचा मायक्रोफोन वापरू शकत नाहीत.</translation>
 <translation id="8007176423574883786">या डिव्हाइससाठी बंद करा</translation>
-<translation id="8010630645305864042">{TILE_COUNT,plural, =1{हा टॅब वापरणे पुढे सुरू ठेवा कार्ड लपवा}other{हे टॅब वापरणे पुढे सुरू ठेवा कार्ड लपवा}}</translation>
 <translation id="802154636333426148">डाउनलोड अयशस्वी झाले</translation>
 <translation id="8042586301629853791">यानुसार क्रमाने लावा:</translation>
 <translation id="8051193500142930381">कॅमेर्‍याची आवश्यकता असलेली वैशिष्ट्ये काम करणार नाहीत</translation>

@@ -5,6 +5,7 @@
 <translation id="1029669172902658969">&amp;ChromiumOSને અપડેટ કરવા માટે, તેને ફરીથી લૉન્ચ કરો</translation>
 <translation id="1040916596585577953">Chromium તમને આ એક્સ્ટેન્શનનો રિવ્યૂ કરવાનો સુઝાવ આપે છે</translation>
 <translation id="1042552502243217427">જ્યારે કોઈ સાઇટ તેના પેજ પર લિંક ખાનગી રીતે પહેલેથી લોડ કરવાનું પૂછે, ત્યારે Chromium Google સર્વરનો ઉપયોગ કરે છે. આ તમારી ઓળખ પહેલેથી લોડ કરેલી સાઇટથી છુપાવે છે, પણ Googleને એ જાણવા મળે છે કે કઈ સાઇટ પહેલેથી લોડ કરવામાં આવે છે.</translation>
+<translation id="1051793555070215510">આ 1 મિનિટનું સર્વેક્ષણ લઈને અમને છૂપા મોડને બહેતર બનાવવામાં અમારી મદદ કરો.</translation>
 <translation id="1065672644894730302">તમારી પસંદગીઓને વાંચી શકાતી નથી.
 
 કેટલીક સુવિધાઓ ઉપલબ્ધ હોઈ શકે છે અને પસંદગીઓ પરના ફેરફારોને સાચવવામાં આવશે નહીં.</translation>
@@ -87,7 +88,6 @@
 <translation id="2126108037660393668">ડાઉનલોડ કરેલી ફાઇલની ચકાસણી નિષ્ફળ થઈ.</translation>
 <translation id="2137162749895930932">અનુવાદ સ્ક્રીન બંધ કરો</translation>
 <translation id="215352261310130060">Chromium દ્વારા આ ડાઉનલોડ બ્લૉક કરવામાં આવ્યું કારણ કે આ સાઇટ કોઈ સુરક્ષિત કનેક્શનનો ઉપયોગ કરી રહી નથી તેમજ ફાઇલ સાથે ચેડાં કરવામાં આવ્યા હોઈ શકે છે</translation>
-<translation id="2157600032285353789">તમે Chromium મેનૂમાંથી બુકમાર્ક અને વાંચન મોડ જેવું બીજું ઘણું ખોલી શકો છો</translation>
 <translation id="2174178932569897599">Chromium કસ્ટમાઇઝ કરો</translation>
 <translation id="2174917724755363426">ઇન્સ્ટૉલેશનની પ્રક્રિયા પૂર્ણ થઈ નથી. શું તમે ખરેખર રદ કરવા માગો છો?</translation>
 <translation id="2185166961232948079">Chromium - નેટવર્ક સાઇન ઇન - <ph name="PAGE_TITLE" /></translation>
@@ -121,7 +121,6 @@
 <translation id="2572494885440352020">Chromium હેલ્પર</translation>
 <translation id="2575822587468774919">'છબી વડે શોધ' સુવિધા વડે શોધવા માટે કંઈપણ પસંદ કરો</translation>
 <translation id="2576118232315942160">તમારા બધા ડિવાઇસ પર તમારા પાસવર્ડ અને બીજું ઘણું મેળવવા માટે, Chromiumમાં સાઇન ઇન કરો</translation>
-<translation id="2583187216237139145">આ પ્રોફાઇલના ઉપયોગ (જેમકે બુકમાર્ક, ઇતિહાસ, પાસવર્ડ બનાવવા અને અન્ય સેટિંગ ગોઠવવા) દરમિયાન જનરેટ થયેલા કોઈપણ Chromium ડેટાને ઑફિસની પ્રોફાઇલના વ્યવસ્થાપક કાઢી નાખી શકે છે. <ph name="LEARN_MORE" /></translation>
 <translation id="2592940277904433508">Chromiumનો ઉપયોગ કરવાનું ચાલુ રાખો</translation>
 <translation id="259935314519650377">ડાઉનલોડ કરેલા ઇન્સ્ટૉલરને કૅશ મેમરીમાં સાચવવામાં નિષ્ફળ રહ્યાં. ભૂલ: <ph name="UNPACK_CACHING_ERROR_CODE" />.</translation>
 <translation id="2620436844016719705">સિસ્ટમ</translation>
@@ -228,6 +227,7 @@
 <translation id="4019629340646866719"><ph name="BEGIN_LINK_LINUX_OSS" />Linux ડેવલપમેન્ટ એન્વાયરમેન્ટ<ph name="END_LINK_LINUX_OSS" />ની જેમ, ChromiumOSને વધારાના <ph name="BEGIN_LINK_CROS_OSS" />ઓપન સૉર્સ સૉફ્ટવેર<ph name="END_LINK_CROS_OSS" /> દ્વારા શક્ય બનાવવામાં આવ્યું છે.</translation>
 <translation id="4022972681110646219">સ્ક્રીનનો અનુવાદ કરો</translation>
 <translation id="4023601594785368013">મૂળ ભાષા: <ph name="LANGUAGE" /></translation>
+<translation id="4023845192681161785">કોઈપણ ઍપમાંથી લિંકને Chromiumમાં ખોલો. વધુમાં, સરળ ઍક્સેસ માટે તે તમારા ટાસ્કબારમાં પિન કરવામાં આવે છે.</translation>
 <translation id="4036079820698952681"><ph name="BEGIN_LINK" />વર્તમાન સેટિંગ<ph name="END_LINK" />ની જાણ કરીને Chromiumને બહેતર બનાવવામાં સહાય કરો</translation>
 <translation id="4050175100176540509">નવીનતમ વર્ઝનમાં મહત્ત્વપૂર્ણ સુરક્ષા સુધારણાઓ અને નવી સુવિધાઓ ઉપલબ્ધ છે.</translation>
 <translation id="4055805654398742145">P&amp;assword Manager</translation>
@@ -329,6 +329,7 @@
 <translation id="5524890928877629608">શોધ વિસ્તારના સૌથી ઉપર ડાબા ખૂણે: ડાબી બાજુ <ph name="LEFT" />%, સૌથી ઉપર <ph name="TOP" />%</translation>
 <translation id="5527463683072221100">Chromiumમાં PDFs ખોલો</translation>
 <translation id="5579324208890605088">સ્ટાર્ટઅપ દરમિયાન ભૂલ: કૃપા કરીને ઇન્સ્ટૉલરને નિયમિત વપરાશકર્તા તરીકે ચલાવો, ઍડમિનિસ્ટ્રેટર તરીકે નહીં.</translation>
+<translation id="5580770360767802657">ડિફૉલ્ટ તરીકે Chromiumનો ઉપયોગ કરો અને તેને પિન કરો</translation>
 <translation id="5596627076506792578">વધુ વિકલ્પો</translation>
 <translation id="5605834417512968703">'છબી વડે શોધ' સુવિધા વડે શોધવા માટે કંઈપણ પસંદ કરો અથવા 'છબી વડે શોધ' સુવિધામાંથી બહાર નીકળવા માટે Escape કી દબાવો</translation>
 <translation id="5618818588972826921">'છબી વડે શોધ' સુવિધા વડે શોધવા માટે કોઈપણ ટેક્સ્ટ અથવા છબી પસંદ કરો અથવા 'છબી વડે શોધ' સુવિધામાંથી બહાર નીકળવા માટે Escape દબાવો</translation>
@@ -359,14 +360,12 @@
 <translation id="5987687638152509985">સમન્વયનને પ્રારંભ કરવા માટે Chromium ને અપડેટ કરો</translation>
 <translation id="5988505247484123880">તમારા અનુભવને મનગમતો બનાવવા માટે તમે જે સાઇટની મુલાકાત લો છો તે બધી સાઇટ તમને જેમાં રુચિ હોય એવી તમામ વસ્તુઓ યાદ રાખી લે તે સામાન્ય બાબત છે. સાઇટ, Chromium પર તમારી રુચિના વિષયો વિશેની માહિતી પણ સ્ટોર કરી શકે છે.</translation>
 <translation id="6003112304606738118">ડાઉનલોડ કરી રહ્યાં છીએ… <ph name="HOURS" /> કલાક બાકી છે</translation>
-<translation id="6019451407441383358">સૌથી ઉપર જમણી બાજુએ Chromium મેનૂમાંથી તમે બુકમાર્ક અને વાંચન મોડ જેવું બીજું ઘણું ખોલી શકો છો</translation>
 <translation id="6040143037577758943">બંધ કરો</translation>
 <translation id="6058380562449900225">તમારા ડેટાને સુરક્ષિત કરવા માટે, Chromiumને તમે તાજેતરમાં મુલાકાત લીધી ન હોય તેવી સાઇટમાંથી પરવાનગીઓ દૂર કરવા દો. નોટિફિકેશન બંધ કરવામાં આવશે નહીં.</translation>
 <translation id="6063093106622310249">અને Chromiumમાં ખોલો</translation>
 <translation id="6069027071882229820">છબી તરીકે કૉપિ કરો</translation>
 <translation id="6072279588547424923"><ph name="EXTENSION_NAME" />ને Chromiumમાં ઉમેરવામાં આવ્યું છે</translation>
 <translation id="6072463441809498330">Chromiumને વધુ ઝડપી બનાવો</translation>
-<translation id="608006075545470555">આ બ્રાઉઝરમાં ઑફિસની પ્રોફાઇલ ઉમેરો</translation>
 <translation id="6096348254544841612">Chromiumને કસ્ટમાઇઝ અને નિયંત્રિત કરો. અપડેટ ઉપલબ્ધ છે.</translation>
 <translation id="6107893135096467929">ચાલુ • આ એક્સ્ટેન્શન ક્યાંથી આવે છે તેની ચકાસણી Chromium કરી શકતું નથી</translation>
 <translation id="6119438414301547735">Chromiumના ટૂલબારમાં ઍક્સેસની વિનંતીઓ બતાવવા માટે એક્સ્ટેન્શનને મંજૂરી આપો</translation>
@@ -562,7 +561,6 @@ Chromium તમારા સેટિંગને રિકવર શકતુ�
 <translation id="8471947159125090285">તમારા Google એકાઉન્ટમાં Chromiumના ડેટાનો ઉપયોગ કરવા અને તેને સાચવવા માટે, આ તમે જ છો તેની ચકાસણી કરો</translation>
 <translation id="8493179195440786826">Chromium જૂનું થઈ ગયું છે</translation>
 <translation id="8522801943730206384">જ્યારે તમે તમારા પાસવર્ડ સાચવો ત્યારે Chromium તેને ચેક કરી શકે છે</translation>
-<translation id="8550334526674375523">ઑફિસની આ પ્રોફાઇલ તમારી વ્યક્તિગત પ્રોફાઇલથી સાવ અલગ છે.</translation>
 <translation id="8555465886620020932">સેવામાં ભૂલ: <ph name="SERVICE_ERROR" />.</translation>
 <translation id="8556420416730706394">તમે સરળ ઍક્સેસ માટે 'છબી વડે શોધ' સુવિધાને પિન કરી શકો છો; બાજુની પૅનલમાં સૌથી ઉપર પિન કરો બટન પર ક્લિક કરો</translation>
 <translation id="856656450041460113">ભાષાની સૂચિ શોધો</translation>
@@ -591,7 +589,6 @@ Chromium તમારા સેટિંગને રિકવર શકતુ�
 <translation id="8931379085695076764">Chromium છેલ્લા અમુક અઠવાડિયાઓના તમારા બ્રાઉઝિંગ ઇતિહાસને આધારે તમારી રુચિઓનું અનુમાન લગાવી શકે છે. આ માહિતી તમારા ડિવાઇસમાં જ રહે છે.</translation>
 <translation id="8941642502866065432">Chromium અપડેટ કરી શકતાં નથી</translation>
 <translation id="897581876605952338">Chromium Enterpriseનો લોગો</translation>
-<translation id="8986207147630327271">તમે આ બ્રાઉઝરમાં ઑફિસની પ્રોફાઇલ ઉમેરી રહ્યાં છો અને તમારા વ્યવસ્થાપકને માત્ર ઑફિસની પ્રોફાઇલનો નિયંત્રણ આપી રહ્યાં છો.</translation>
 <translation id="8988036198400390003">Chromium પ્રોફાઇલ મેનેજ કરો</translation>
 <translation id="9019929317751753759">Chromium ને સુરક્ષિત બનાવવા માટે, અમે નીચેના એક્સ્ટેન્શનને અક્ષમ કર્યું છે કે જે <ph name="IDS_EXTENSION_WEB_STORE_TITLE" /> માં સૂચિબદ્ધ નથી અને તમારી જાણ વિના ઉમેરવામાં આવ્યું હોઈ શકે છે.</translation>
 <translation id="9022552996538154597">Chromium માં સાઇન ઇન કરો</translation>
@@ -604,6 +601,7 @@ Chromium તમારા સેટિંગને રિકવર શકતુ�
 <translation id="9106612006984859720">Chromiumની ભાવિ અપડેટ મેળવવા માટે, તમારે Windows 10 કે તે પછીના વર્ઝન પર અપડેટ કરવું જરૂરી રહેશે. આ કમ્પ્યુટર Windows 8.1નો ઉપયોગ કરે છે.</translation>
 <translation id="91086099826398415">નવા Chromium &amp;ટૅબમાં લિંક ખોલો</translation>
 <translation id="911206726377975832">તમારો બ્રાઉઝિંગ ડેટા પણ ડિલીટ કરી દઈએ?</translation>
+<translation id="9134482777260927479">હોમવર્ક માટે મદદ</translation>
 <translation id="9148058034647219655">બહાર નીકળો</translation>
 <translation id="9158494823179993217">તમારા સિસ્ટમ વ્યવસ્થાપકે <ph name="TARGET_URL_HOSTNAME" />ને ઍક્સેસ કરવા Chromiumને વૈકલ્પિક બ્રાઉઝર ખોલવા માટે ગોઠવેલું છે.</translation>
 <translation id="9185526690718004400">&amp;Chromium અપડેટ કરવા માટે, ફરીથી લૉન્ચ કરો</translation>

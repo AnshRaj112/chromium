@@ -294,12 +294,10 @@ void AppTestHelper::FirstTaskRun() {
                        "idle_timeout",
                        WithSwitch(
                            "app_logo_url",
-                           WithSwitch(
-                               "device_management_url",
-                               WithSwitch(
-                                   "crash_upload_url",
-                                   WithSwitch("update_url",
-                                              Wrap(&EnterTestMode))))))))},
+                            WithSwitch(
+                                "crash_upload_url",
+                                WithSwitch("update_url",
+                                           Wrap(&EnterTestMode)))))))},
           {"exit_test_mode", WithSystemScope(Wrap(&ExitTestMode))},
           {"set_dict_policies", WithSwitch("values", Wrap(&SetDictPolicies))},
           {"set_platform_policies",
@@ -504,6 +502,27 @@ void AppTestHelper::FirstTaskRun() {
                           WithSwitch("legacy_install",
                                      WithSystemScope(Wrap(
                                          &RunOfflineInstallOsNotSupported)))))},
+          {"run_mock_offline_meta_install",
+           WithSwitch(
+               "expect_success",
+               WithSwitch(
+                   "language",
+                   WithSwitch(
+                       "string_resource_id_to_find",
+                       WithSwitch(
+                           "platform",
+                           WithSwitch(
+                               "is_silent_install",
+                               WithSwitch(
+                                   "arguments",
+                                   WithSwitch(
+                                       "installer_path",
+                                       WithSwitch(
+                                           "version",
+                                           WithSwitch(
+                                               "app_id",
+                                               WithSystemScope(Wrap(
+                                                   &RunMockOfflineMetaInstall)))))))))))},  // NOLINT
           {"dm_push_enrollment_token",
            WithSwitch("enrollment_token", Wrap(DMPushEnrollmentToken))},
           {"dm_deregister_device", WithSystemScope(Wrap(&DMDeregisterDevice))},

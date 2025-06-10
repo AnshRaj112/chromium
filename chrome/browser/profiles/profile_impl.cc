@@ -24,10 +24,10 @@
 #include "base/functional/callback_helpers.h"
 #include "base/logging.h"
 #include "base/memory/ptr_util.h"
+#include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/no_destructor.h"
-#include "base/not_fatal_until.h"
 #include "base/path_service.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
@@ -195,6 +195,7 @@
 
 #if BUILDFLAG(IS_CHROMEOS)
 #include "ash/constants/ash_switches.h"
+#include "base/check_deref.h"
 #include "base/command_line.h"
 #include "chrome/browser/app_mode/app_mode_utils.h"
 #include "chrome/browser/ash/account_manager/account_manager_util.h"
@@ -229,10 +230,6 @@
 #include "content/public/common/page_zoom.h"
 #include "ui/accessibility/accessibility_features.h"
 #endif
-
-#if !BUILDFLAG(IS_ANDROID) && BUILDFLAG(ENABLE_PDF)
-#include "chrome/browser/accessibility/pdf_ocr_controller_factory.h"
-#endif  // !BUILDFLAG(IS_ANDROID) && BUILDFLAG(ENABLE_PDF)
 
 #if BUILDFLAG(ENABLE_BACKGROUND_MODE)
 #include "chrome/browser/background/extensions/background_mode_manager.h"
@@ -509,6 +506,10 @@ ProfileImpl::ProfileImpl(
   // TODO(crbug.com/40225390): Move this into
   // ProfileUserManagerController::OnProfileCreationStarted().
   if (ash::ProfileHelper::IsUserProfile(this)) {
+    // TODO(crbug.com/404133029): Avoid g_browser_process usage.
+    scoped_refptr<network::SharedURLLoaderFactory> shared_url_loader_factory =
+        g_browser_process->shared_url_loader_factory();
+
     // |ash::InitializeAccountManager| is called during a User's session
     // initialization but some tests do not properly login to a User Session.
     // This invocation of |ash::InitializeAccountManager| is used only during
@@ -517,7 +518,8 @@ ProfileImpl::ProfileImpl(
     // multiple times.
     // TODO(crbug.com/40635309): Remove this call.
     ash::InitializeAccountManager(
-        path_, base::DoNothing() /* initialization_callback */);
+        std::move(shared_url_loader_factory), path_,
+        base::DoNothing() /* initialization_callback */);
 
     auto* account_manager = g_browser_process->platform_part()
                                 ->GetAccountManagerFactory()
@@ -561,6 +563,11 @@ void ProfileImpl::TakePrefsFromStartupData() {
   user_cloud_policy_manager_ = startup_data->TakeUserCloudPolicyManager();
   profile_policy_connector_ = startup_data->TakeProfilePolicyConnector();
   pref_registry_ = startup_data->TakePrefRegistrySyncable();
+
+  // The extension prefs value store requires a profile, so it can't be created
+  // in StartupData.
+  prefs_->UpdateExtensionPrefStore(
+      CreateExtensionPrefStore(this, /*incognito_pref_store=*/false));
 
   ProfileKeyStartupAccessor::GetInstance()->Reset();
 }
@@ -848,19 +855,6 @@ void ProfileImpl::DoFinalInit(CreateMode create_mode) {
   PasswordManagerSettingsServiceFactory::GetForProfile(this);
 #else
 
-#if BUILDFLAG(ENABLE_PDF)
-  bool pcf_ocr_may_be_needed = true;
-#if BUILDFLAG(IS_CHROMEOS)
-  // `PdfOcrControllerFactory` is not needed in the not-signed-in profile of
-  // ChromeOS as no user navigation to PDFs is possible there.
-  pcf_ocr_may_be_needed = IsSignedIn();
-#endif
-  // Create the PDF OCR controller so that it can self-activate as needed.
-  if (pcf_ocr_may_be_needed) {
-    screen_ai::PdfOcrControllerFactory::GetForProfile(this);
-  }
-#endif  // BUILDFLAG(ENABLE_PDF)
-
   if (features::IsMainNodeAnnotationsEnabled()) {
     screen_ai::AXMainNodeAnnotatorControllerFactory::GetForProfile(this);
   }
@@ -1119,17 +1113,13 @@ void ProfileImpl::OnLocaleReady(CreateMode create_mode) {
   // the services affected by the migration are.
   // TODO(crbug.com/369297671): Remove one year after launching
   // kForceMigrateSyncingUserToSignedIn on all //chrome platforms.
-  CHECK(GetPrefs(), base::NotFatalUntil::M133);
-  CHECK(!IdentityManagerFactory::GetForProfileIfExists(this),
-        base::NotFatalUntil::M133);
-  CHECK(!SyncServiceFactory::HasSyncService(this), base::NotFatalUntil::M133);
-  CHECK(!BookmarkModelFactory::GetForBrowserContextIfExists(this),
-        base::NotFatalUntil::M133);
-  CHECK(!ProfilePasswordStoreFactory::HasStore(this),
-        base::NotFatalUntil::M133);
-  CHECK(!AccountPasswordStoreFactory::HasStore(this),
-        base::NotFatalUntil::M133);
-  CHECK(!ReadingListModelFactory::HasModel(this), base::NotFatalUntil::M133);
+  CHECK(GetPrefs());
+  CHECK(!IdentityManagerFactory::GetForProfileIfExists(this));
+  CHECK(!SyncServiceFactory::HasSyncService(this));
+  CHECK(!BookmarkModelFactory::GetForBrowserContextIfExists(this));
+  CHECK(!ProfilePasswordStoreFactory::HasStore(this));
+  CHECK(!AccountPasswordStoreFactory::HasStore(this));
+  CHECK(!ReadingListModelFactory::HasModel(this));
   browser_sync::MaybeMigrateSyncingUserToSignedIn(GetPath(), GetPrefs());
 
 #if BUILDFLAG(IS_ANDROID)

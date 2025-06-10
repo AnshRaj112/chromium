@@ -4,9 +4,12 @@
 
 package org.chromium.chrome.browser.toolbar.extensions;
 
+import android.content.Context;
 import android.graphics.Bitmap;
+import android.view.View;
 
 import org.chromium.base.Callback;
+import org.chromium.base.Log;
 import org.chromium.base.lifetime.Destroyable;
 import org.chromium.base.lifetime.LifetimeAssert;
 import org.chromium.base.supplier.ObservableSupplier;
@@ -15,6 +18,9 @@ import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.toolbar.extensions.ExtensionActionButtonProperties.ListItemType;
+import org.chromium.content_public.browser.WebContents;
+import org.chromium.extensions.ShowAction;
+import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
 import org.chromium.ui.modelutil.MVCListAdapter.ModelList;
 import org.chromium.ui.modelutil.ModelListAdapter;
@@ -29,9 +35,14 @@ import java.util.List;
  */
 @NullMarked
 class ExtensionActionListMediator implements Destroyable {
+    private static final String TAG = "EALMediator";
+
+    private final Context mContext;
+    private final WindowAndroid mWindowAndroid;
     private final ModelList mModels;
     private final ObservableSupplier<Profile> mProfileSupplier;
     private final ObservableSupplier<Tab> mCurrentTabSupplier;
+
     private final Callback<Profile> mProfileUpdatedCallback = this::onProfileUpdated;
     private final Callback<Tab> mTabChangedCallback = this::onTabChanged;
     private final ActionsObserver mActionsObserver = new ActionsObserver();
@@ -41,11 +52,16 @@ class ExtensionActionListMediator implements Destroyable {
     @Nullable private Profile mProfile;
     @Nullable private ExtensionActionsBridge mExtensionActionsBridge;
     @Nullable private Tab mCurrentTab;
+    @Nullable private ExtensionActionPopup mCurrentPopup;
 
     public ExtensionActionListMediator(
+            Context context,
+            WindowAndroid windowAndroid,
             ModelList models,
             ObservableSupplier<Profile> profileSupplier,
             ObservableSupplier<Tab> currentTabSupplier) {
+        mContext = context;
+        mWindowAndroid = windowAndroid;
         mModels = models;
         mProfileSupplier = profileSupplier;
         mCurrentTabSupplier = currentTabSupplier;
@@ -62,6 +78,8 @@ class ExtensionActionListMediator implements Destroyable {
         mCurrentTabSupplier.removeObserver(mTabChangedCallback);
         mProfileSupplier.removeObserver(mProfileUpdatedCallback);
 
+        closePopup();
+        assert mCurrentPopup == null;
         mCurrentTab = null;
         mExtensionActionsBridge = null;
         mProfile = null;
@@ -73,6 +91,9 @@ class ExtensionActionListMediator implements Destroyable {
         if (profile == mProfile) {
             return;
         }
+
+        closePopup();
+        assert mCurrentPopup == null;
 
         if (mExtensionActionsBridge != null) {
             mExtensionActionsBridge.removeObserver(mActionsObserver);
@@ -104,6 +125,9 @@ class ExtensionActionListMediator implements Destroyable {
         if (tab == mCurrentTab) {
             return;
         }
+
+        closePopup();
+
         if (tab == null) {
             // The current tab can be null when a non-tab UI is shown (e.g. tab switcher). In this
             // case, we do not bother refreshing actions as they're hidden anyway. We do not set
@@ -121,6 +145,61 @@ class ExtensionActionListMediator implements Destroyable {
         }
 
         maybeUpdateAllActions();
+    }
+
+    private void onPrimaryClick(View buttonView, String actionId) {
+        if (mExtensionActionsBridge == null || mCurrentTab == null) {
+            return;
+        }
+
+        WebContents webContents = mCurrentTab.getWebContents();
+        if (webContents == null) {
+            // TODO(crbug.com/385985177): Revisit how to handle this case.
+            return;
+        }
+
+        @ShowAction int showAction = mExtensionActionsBridge.runAction(actionId, webContents);
+        switch (showAction) {
+            case ShowAction.NONE:
+                break;
+            case ShowAction.SHOW_POPUP:
+                openPopup(buttonView, actionId);
+                break;
+            case ShowAction.TOGGLE_SIDE_PANEL:
+                Log.e(TAG, "Extension side panels are not implemented yet");
+                break;
+        }
+    }
+
+    private void openPopup(View buttonView, String actionId) {
+        // TODO(crbug.com/385987224): Do not open a popup again when the user clicks the action
+        // button while its popup is open.
+        closePopup();
+
+        if (mProfile == null || mCurrentTab == null) {
+            return;
+        }
+        int tabId = mCurrentTab.getId();
+
+        ExtensionActionPopupContents contents =
+                ExtensionActionPopupContents.create(mProfile, actionId, tabId);
+        assert mCurrentPopup == null;
+        mCurrentPopup =
+                new ExtensionActionPopup(mContext, mWindowAndroid, buttonView, actionId, contents);
+        mCurrentPopup.loadInitialPage();
+        mCurrentPopup.addOnDismissListener(this::closePopup);
+    }
+
+    private void closePopup() {
+        if (mCurrentPopup == null) {
+            return;
+        }
+        assert mExtensionActionsBridge != null;
+
+        // Clear mCurrentPopup now to avoid calling closePopup recursively via OnDismissListener.
+        ExtensionActionPopup popup = mCurrentPopup;
+        mCurrentPopup = null;
+        popup.destroy();
     }
 
     private void maybeUpdateAllActions() {
@@ -150,9 +229,12 @@ class ExtensionActionListMediator implements Destroyable {
                     new ModelListAdapter.ListItem(
                             ListItemType.EXTENSION_ACTION,
                             new PropertyModel.Builder(ExtensionActionButtonProperties.ALL_KEYS)
-                                    .with(ExtensionActionButtonProperties.ID, action.getId())
-                                    .with(ExtensionActionButtonProperties.TITLE, action.getTitle())
                                     .with(ExtensionActionButtonProperties.ICON, icon)
+                                    .with(ExtensionActionButtonProperties.ID, action.getId())
+                                    .with(
+                                            ExtensionActionButtonProperties.ON_CLICK_LISTENER,
+                                            (view) -> onPrimaryClick(view, actionId))
+                                    .with(ExtensionActionButtonProperties.TITLE, action.getTitle())
                                     .build()));
         }
         mModels.set(items);

@@ -580,9 +580,13 @@ size_t FindNewPositionsAndTransferSlots(
 
   const auto insert_slot = [&](void* slot) {
     size_t hash = policy.hash_slot(hash_fn, slot);
-    FindInfo target =
-        common.is_small() ? FindInfo{0, 0} : find_first_non_full(common, hash);
-    SetCtrl(common, target.offset, H2(hash), slot_size);
+    FindInfo target;
+    if (common.is_small()) {
+      target = FindInfo{0, 0};
+    } else {
+      target = find_first_non_full(common, hash);
+      SetCtrl(common, target.offset, H2(hash), slot_size);
+    }
     policy.transfer_n(&common, SlotAddress(new_slots, target.offset, slot_size),
                       slot, 1);
     return target.probe_length;
@@ -669,8 +673,12 @@ void ResizeNonSooImpl(CommonFields& common,
   ABSL_SWISSTABLE_ASSERT(new_capacity > policy.soo_capacity());
 
   const size_t old_capacity = common.capacity();
-  [[maybe_unused]] ctrl_t* old_ctrl = common.control();
-  [[maybe_unused]] void* old_slots = common.slot_array();
+  [[maybe_unused]] ctrl_t* old_ctrl;
+  [[maybe_unused]] void* old_slots;
+  if constexpr (kMode == ResizeNonSooMode::kGuaranteedAllocated) {
+    old_ctrl = common.control();
+    old_slots = common.slot_array();
+  }
 
   const size_t slot_size = policy.slot_size;
   const size_t slot_align = policy.slot_align;
@@ -879,7 +887,7 @@ void GrowIntoSingleGroupShuffleControlBytes(ctrl_t* __restrict old_ctrl,
     return;
   }
 
-  ABSL_SWISSTABLE_ASSERT(Group::kWidth == 16);
+  ABSL_SWISSTABLE_ASSERT(Group::kWidth == 16);  // NOLINT(misc-static-assert)
 
   // Fill the second half of the main control bytes with kEmpty.
   // For small capacity that may write into mirrored control bytes.
@@ -1388,7 +1396,7 @@ size_t GrowToNextCapacityAndPrepareInsert(
 
 }  // namespace
 
-std::pair<ctrl_t*, void*> SmallNonSooPrepareInsert(
+std::pair<ctrl_t*, void*> PrepareInsertSmallNonSoo(
     CommonFields& common, const PolicyFunctions& __restrict policy,
     absl::FunctionRef<size_t()> get_hash) {
   ABSL_SWISSTABLE_ASSERT(common.is_small());
@@ -1497,11 +1505,11 @@ size_t RehashOrGrowToNextCapacityAndPrepareInsert(
   }
 }
 
-// Slow path for PrepareInsertNonSoo that is called when the table has deleted
+// Slow path for PrepareInsertLarge that is called when the table has deleted
 // slots or need to be resized or rehashed.
-size_t PrepareInsertNonSooSlow(CommonFields& common,
-                               const PolicyFunctions& __restrict policy,
-                               size_t hash) {
+size_t PrepareInsertLargeSlow(CommonFields& common,
+                              const PolicyFunctions& __restrict policy,
+                              size_t hash) {
   const GrowthInfo growth_info = common.growth_info();
   ABSL_SWISSTABLE_ASSERT(!growth_info.HasNoDeletedAndGrowthLeft());
   if (ABSL_PREDICT_TRUE(growth_info.HasNoGrowthLeftAndNoDeleted())) {
@@ -1857,14 +1865,11 @@ void ReserveTableToFitNewSize(CommonFields& common,
   ReserveAllocatedTable(common, policy, new_size);
 }
 
-size_t PrepareInsertNonSoo(CommonFields& common,
-                           const PolicyFunctions& __restrict policy,
-                           size_t hash, FindInfo target) {
-  const bool rehash_for_bug_detection =
-      common.should_rehash_for_bug_detection_on_insert() &&
-      // Required to allow use of ResizeAllocatedTable.
-      common.capacity() > 0;
-  if (rehash_for_bug_detection) {
+size_t PrepareInsertLarge(CommonFields& common,
+                          const PolicyFunctions& __restrict policy, size_t hash,
+                          FindInfo target) {
+  ABSL_SWISSTABLE_ASSERT(!common.is_small());
+  if (common.should_rehash_for_bug_detection_on_insert()) {
     // Move to a different heap allocation in order to detect bugs.
     const size_t cap = common.capacity();
     ResizeAllocatedTableWithSeedChange(
@@ -1877,7 +1882,7 @@ size_t PrepareInsertNonSoo(CommonFields& common,
   // and growth_left is positive, we can insert at the first
   // empty slot in the probe sequence (target).
   if (ABSL_PREDICT_FALSE(!growth_info.HasNoDeletedAndGrowthLeft())) {
-    return PrepareInsertNonSooSlow(common, policy, hash);
+    return PrepareInsertLargeSlow(common, policy, hash);
   }
   PrepareInsertCommon(common);
   common.growth_info().OverwriteEmptyAsFull();

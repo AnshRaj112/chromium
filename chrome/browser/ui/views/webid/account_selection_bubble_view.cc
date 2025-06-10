@@ -15,7 +15,6 @@
 #include "chrome/app/vector_icons/vector_icons.h"
 #include "chrome/browser/image_fetcher/image_decoder_impl.h"
 #include "chrome/browser/ui/browser_finder.h"
-#include "chrome/browser/ui/monogram_utils.h"
 #include "chrome/browser/ui/passwords/ui_utils.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/controls/hover_button.h"
@@ -27,11 +26,13 @@
 #include "components/image_fetcher/core/image_fetcher_impl.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/vector_icons/vector_icons.h"
+#include "content/public/browser/render_widget_host.h"
 #include "content/public/common/content_features.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
 #include "skia/ext/image_operations.h"
 #include "third_party/blink/public/mojom/webid/federated_auth_request.mojom.h"
 #include "third_party/skia/include/core/SkPath.h"
+#include "ui/accessibility/platform/ax_platform.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
@@ -176,7 +177,13 @@ AccountSelectionBubbleView::AccountSelectionBubbleView(
           views::BubbleBorder::Arrow::TOP_RIGHT,
           views::BubbleBorder::DIALOG_SHADOW,
           /*autosize=*/true),
-      AccountSelectionViewBase(owner, std::move(url_loader_factory), rp_data),
+      AccountSelectionViewBase(owner,
+                               std::move(url_loader_factory),
+                               rp_data,
+                               owner->web_contents()
+                                   ->GetPrimaryMainFrame()
+                                   ->GetRenderWidgetHost()
+                                   ->GetDeviceScaleFactor()),
       rp_context_(rp_context) {
   SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
   set_fixed_width(kBubbleWidth);
@@ -265,8 +272,16 @@ void AccountSelectionBubbleView::ShowSingleAccountConfirmDialog(
 
   RemoveNonHeaderChildViews();
   AddChildView(std::make_unique<views::Separator>());
-  AddChildView(CreateSingleAccountChooser(account));
+  std::pair<std::unique_ptr<views::View>, views::MdTextButton*>
+      chooser_and_button = CreateSingleAccountChooser(account);
+  AddChildView(std::move(chooser_and_button.first));
 
+  // If the screen reader is active, request focus so that the creation of
+  // this button is announced to the user. Do not do this when screen reader
+  // is not active because it looks bad.
+  if (ui::AXPlatform::GetInstance().IsScreenReaderActive()) {
+    chooser_and_button.second->RequestFocus();
+  }
   PreferredSizeChanged();
 }
 
@@ -497,8 +512,10 @@ std::unique_ptr<views::View> AccountSelectionBubbleView::CreateHeaderView() {
 
   auto* titles_container =
       header->AddChildView(std::make_unique<views::View>());
-  titles_container->SetLayoutManager(std::make_unique<views::BoxLayout>(
-      views::BoxLayout::Orientation::kVertical));
+  titles_container
+      ->SetLayoutManager(std::make_unique<views::BoxLayout>(
+          views::BoxLayout::Orientation::kVertical))
+      ->set_main_axis_alignment(views::BoxLayout::MainAxisAlignment::kCenter);
   views::FlexSpecification flex_spec(views::LayoutOrientation::kHorizontal,
                                      views::MinimumFlexSizeRule::kScaleToZero,
                                      views::MaximumFlexSizeRule::kUnbounded);
@@ -529,7 +546,7 @@ std::unique_ptr<views::View> AccountSelectionBubbleView::CreateHeaderView() {
   return header;
 }
 
-std::unique_ptr<views::View>
+std::pair<std::unique_ptr<views::View>, views::MdTextButton*>
 AccountSelectionBubbleView::CreateSingleAccountChooser(
     const IdentityRequestAccountPtr& account) {
   auto row = std::make_unique<views::View>();
@@ -557,18 +574,19 @@ AccountSelectionBubbleView::CreateSingleAccountChooser(
                           base::Unretained(owner_), account),
       button_title, this, idp_metadata,
       base::UTF8ToUTF16(account->display_identifier));
+  views::MdTextButton* button_ptr = button.get();
   row->AddChildView(std::move(button));
 
   // Do not add disclosure text if this is a sign in or if we were requested
   // to skip it.
   if (account->login_state == Account::LoginState::kSignIn ||
       idp_data.disclosure_fields.empty()) {
-    return row;
+    return std::make_pair(std::move(row), button_ptr);
   }
 
   // Add disclosure text.
   row->AddChildView(CreateDisclosureLabel(idp_data));
-  return row;
+  return std::make_pair(std::move(row), button_ptr);
 }
 
 void AccountSelectionBubbleView::AddSeparatorAndMultipleAccountChooser(

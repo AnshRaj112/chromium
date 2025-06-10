@@ -130,7 +130,8 @@ class CONTENT_EXPORT PrefetchContainer {
       scoped_refptr<PreloadPipelineInfo> preload_pipeline_info,
       base::WeakPtr<PreloadingAttempt> attempt = nullptr,
       std::optional<PreloadingHoldbackStatus> holdback_status_override =
-          std::nullopt);
+          std::nullopt,
+      std::optional<base::TimeDelta> ttl = std::nullopt);
 
   // Ctor used for browser-initiated prefetch that doesn't depend on web
   // contents. We can pass the referring origin of prefetches via
@@ -148,9 +149,9 @@ class CONTENT_EXPORT PrefetchContainer {
       const net::HttpRequestHeaders& additional_headers = {},
       std::unique_ptr<PrefetchRequestStatusListener> request_status_listener =
           nullptr,
-      base::TimeDelta ttl_in_sec =
-          PrefetchContainerDefaultTtlInPrefetchService(),
-      bool should_append_variations_header = true);
+      base::TimeDelta ttl = PrefetchContainerDefaultTtlInPrefetchService(),
+      bool should_append_variations_header = true,
+      bool should_disable_block_until_head_timeout = false);
 
   ~PrefetchContainer();
 
@@ -742,6 +743,7 @@ class CONTENT_EXPORT PrefetchContainer {
   // `PrefetchMatchResolver`s.
   void OnUnregisterCandidate(const GURL& navigated_url,
                              bool is_served,
+                             bool is_nav_prerender,
                              std::optional<base::TimeDelta> blocked_duration);
 
   // TODO(crbug.com/372186548): Revisit the semantics of
@@ -778,7 +780,7 @@ class CONTENT_EXPORT PrefetchContainer {
   // See also `PrefetchService::AddPrefetchContainerWithoutStartingPrefetch()`.
   void MigrateNewlyAdded(std::unique_ptr<PrefetchContainer> added);
 
-  // DevTools
+  // Handles loader related events. Currently used for DevTools and metrics.
   void NotifyPrefetchRequestWillBeSent(
       const network::mojom::URLResponseHeadPtr* redirect_head);
   void NotifyPrefetchResponseReceived(
@@ -794,6 +796,10 @@ class CONTENT_EXPORT PrefetchContainer {
       PrefetchServiceWorkerState service_worker_state);
   PrefetchServiceWorkerState service_worker_state() const {
     return service_worker_state_;
+  }
+
+  bool ShouldDisableBlockUntilHeadTimeout() const {
+    return should_disable_block_until_head_timeout_;
   }
 
  protected:
@@ -826,8 +832,9 @@ class CONTENT_EXPORT PrefetchContainer {
       const net::HttpRequestHeaders& additional_headers,
       std::unique_ptr<PrefetchRequestStatusListener> request_status_listener,
       bool is_javascript_enabled,
-      base::TimeDelta ttl_in_sec,
-      bool should_append_variations_header);
+      base::TimeDelta ttl,
+      bool should_append_variations_header,
+      bool should_disable_block_until_head_timeout);
 
   // Update |prefetch_status_| and report prefetch status to
   // DevTools without updating TriggeringOutcome.
@@ -875,12 +882,13 @@ class CONTENT_EXPORT PrefetchContainer {
   // Records `Prefetch.PrefetchContainer.DurationAdded*` UMAs.
   void RecordDurationFromAdded();
   // Records `Prefetch.PrefetchMatchingBlockedNavigationWithPrefetch.*` UMAs.
-  void RecordPrefetchMatchingBlockedNavigationHistogram(
-      bool blocked_until_head);
+  void RecordPrefetchMatchingBlockedNavigationHistogram(bool blocked_until_head,
+                                                        bool is_nav_prerender);
   // Records `Prefetch.BlockUntilHeadDuration.*` UMAs.
   void RecordBlockUntilHeadDurationHistogram(
       const std::optional<base::TimeDelta>& blocked_duration,
-      bool served);
+      bool served,
+      bool is_nav_prerender);
 
   // The ID of the RenderFrameHost/Document that triggered the prefetch.
   // This will be empty when browser-initiated prefetch.
@@ -1093,13 +1101,18 @@ class CONTENT_EXPORT PrefetchContainer {
   // Time-to-live (TTL) for this prefetched data. Currently, this is configured
   // for browser-initiated prefetch that doesn't depend on web content.
   // Default value is `PrefetchContainerDefaultTtlInPrefetchService()`.
-  base::TimeDelta ttl_in_sec_;
+  base::TimeDelta ttl_;
 
   // Whether to add the X-Client-Data header with experiment IDs from field
   // trials. This will not be applied to redirects. Currently, this is
   // configured for browser-initiated prefetch that doesn't depend on web
   // content.
   const bool should_append_variations_header_ = true;
+
+  // Whether the caller of prefetches requests to disable
+  // `BlockUntilHeadTimeout`, which is currently calculated by
+  // `PrefetchBlockUntilHeadTimeout()` as a `prefetch_params`.
+  const bool should_disable_block_until_head_timeout_ = false;
 
   // Timing information for metrics
   //
@@ -1108,6 +1121,7 @@ class CONTENT_EXPORT PrefetchContainer {
   std::optional<base::TimeTicks> time_added_to_prefetch_service_;
   std::optional<base::TimeTicks> time_initial_eligibility_got_;
   std::optional<base::TimeTicks> time_prefetch_started_;
+  std::optional<base::TimeTicks> time_url_request_started_;
   std::optional<base::TimeTicks> time_header_determined_successfully_;
   std::optional<base::TimeTicks> time_prefetch_completed_successfully_;
 

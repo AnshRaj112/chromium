@@ -636,8 +636,8 @@ bool CSSPropertyEquality::PropertiesEqual(const PropertyHandle& property,
       return a.RubyAlign() == b.RubyAlign();
     case CSSPropertyID::kRubyPosition:
       return a.GetRubyPosition() == b.GetRubyPosition();
-    case CSSPropertyID::kScrollMarkerContain:
-      return a.ScrollMarkerContain() == b.ScrollMarkerContain();
+    case CSSPropertyID::kScrollTargetGroup:
+      return a.ScrollTargetGroup() == b.ScrollTargetGroup();
     case CSSPropertyID::kScrollMarkerGroup:
       return a.ScrollMarkerGroup() == b.ScrollMarkerGroup();
     case CSSPropertyID::kScrollbarColor:
@@ -1281,6 +1281,7 @@ bool CSSPropertyEquality::PropertiesEqual(const PropertyHandle& property,
     case CSSPropertyID::kMasonryFlow:
     case CSSPropertyID::kMasonryTrack:
     case CSSPropertyID::kOffset:
+    case CSSPropertyID::kOriginTrialTestShorthand:
     case CSSPropertyID::kOutline:
     case CSSPropertyID::kOverflow:
     case CSSPropertyID::kOverscrollBehavior:

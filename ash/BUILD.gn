@@ -3275,6 +3275,8 @@ component("ash") {
     "wm/wm_default_layout_manager.h",
     "wm/wm_event.cc",
     "wm/wm_event.h",
+    "wm/wm_highlight_border_overlay_delegate.cc",
+    "wm/wm_highlight_border_overlay_delegate.h",
     "wm/wm_metrics.cc",
     "wm/wm_metrics.h",
     "wm/wm_shadow_controller_delegate.cc",
@@ -3649,6 +3651,8 @@ component("ash") {
 
   if (!is_chromeos_device) {
     sources += [
+      "examples/client_controlled_state_util.cc",
+      "examples/client_controlled_state_util.h",
       "examples/test_app_window.cc",
       "examples/test_app_window.h",
     ]
@@ -4580,7 +4584,7 @@ test("ash_unittests") {
     "wm/system_gesture_event_filter_unittest.cc",
     "wm/system_modal_container_layout_manager_unittest.cc",
     "wm/system_panel_view_unittest.cc",
-    "wm/tablet_mode/accelerometer_test_data_literals.cc",
+    "wm/tablet_mode/accelerometer_test_data_literals.h",
     "wm/tablet_mode/tablet_mode_controller_unittest.cc",
     "wm/tablet_mode/tablet_mode_multitask_cue_controller_unittest.cc",
     "wm/tablet_mode/tablet_mode_multitask_menu_unittest.cc",
@@ -5357,8 +5361,6 @@ static_library("test_support") {
     "test/failing_local_time_converter.h",
     "test/fake_android_intent_helper.cc",
     "test/fake_android_intent_helper.h",
-    "test/layer_animation_verifier.cc",
-    "test/layer_animation_verifier.h",
     "test/login_info.h",
     "test/pixel/ash_pixel_test_helper.cc",
     "test/pixel/ash_pixel_test_helper.h",

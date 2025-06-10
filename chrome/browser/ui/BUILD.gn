@@ -66,8 +66,6 @@ static_library("ui") {
     "idle_bubble.h",
     "managed_ui.cc",
     "managed_ui.h",
-    "monogram_utils.cc",
-    "monogram_utils.h",
     "passwords/account_avatar_fetcher.cc",
     "passwords/account_avatar_fetcher.h",
     "passwords/manage_passwords_state.cc",
@@ -762,6 +760,7 @@ static_library("ui") {
 
   if (is_android) {
     sources += [
+      "android/accelerator_utils_android.cc",
       "android/android_about_app_info.cc",
       "android/android_about_app_info.h",
       "android/autofill/authenticator_selection_dialog_view_android.cc",
@@ -831,8 +830,6 @@ static_library("ui") {
       "android/infobars/autofill_virtual_card_enrollment_infobar.h",
       "android/infobars/infobar_container_android.cc",
       "android/infobars/infobar_container_android.h",
-      "android/infobars/permission_infobar.cc",
-      "android/infobars/permission_infobar.h",
       "android/infobars/simple_confirm_infobar_builder.cc",
       "android/login_handler_android.cc",
       "android/logo/logo_bridge.cc",
@@ -924,6 +921,7 @@ static_library("ui") {
       "//components/page_info/android:android",
       "//components/page_info/core",
       "//components/page_info/core:proto",
+      "//components/page_load_metrics/browser:browser",
       "//components/password_manager/core/browser:browser",
       "//components/resources:android_resources",
       "//components/search_provider_logos",
@@ -950,11 +948,15 @@ static_library("ui") {
       sources += [
         "android/extensions/extension_keybinding_registry_android.cc",
         "android/extensions/extension_keybinding_registry_android.h",
+        "android/toolbar/extension_action_popup_contents.cc",
+        "android/toolbar/extension_action_popup_contents.h",
         "android/toolbar/extension_actions_bridge.cc",
         "android/toolbar/extension_actions_bridge.h",
         "android/toolbar/extension_actions_bridge_factory.cc",
         "android/toolbar/extension_actions_bridge_factory.h",
       ]
+
+      deps += [ "//extensions/browser:extension_action_enums" ]
     }
   } else {
     # !is_android
@@ -1072,6 +1074,8 @@ static_library("ui") {
       "passwords/password_base_dialog_controller.h",
       "passwords/password_change_icon_views_controller.cc",
       "passwords/password_change_icon_views_controller.h",
+      "passwords/password_change_ui_controller.cc",
+      "passwords/password_change_ui_controller.h",
       "passwords/password_dialog_prompts.h",
       "passwords/password_generation_popup_controller.h",
       "passwords/password_generation_popup_controller_impl.cc",
@@ -1171,7 +1175,8 @@ static_library("ui") {
       "tab_sharing/tab_sharing_ui.h",
       "tabs/glic_nudge_controller.cc",
       "tabs/glic_nudge_controller.h",
-      "tabs/glic_nudge_observer.h",
+      "tabs/glic_nudge_delegate.cc",
+      "tabs/glic_nudge_delegate.h",
       "tabs/organization/logging_util.cc",
       "tabs/organization/logging_util.h",
       "tabs/organization/metrics.cc",
@@ -1280,10 +1285,7 @@ static_library("ui") {
       "toolbar/pinned_toolbar/tab_search_toolbar_button_controller.h",
       "toolbar/reading_list_sub_menu_model.cc",
       "toolbar/reading_list_sub_menu_model.h",
-      "toolbar/toolbar_action_hover_card_types.h",
-      "toolbar/toolbar_action_view_controller.h",
       "toolbar/toolbar_action_view_delegate.h",
-      "toolbar/toolbar_actions_bar_bubble_delegate.h",
       "toolbar/toolbar_pref_names.cc",
       "toolbar/toolbar_pref_names.h",
       "translate/translate_bubble_factory.cc",
@@ -1382,8 +1384,6 @@ static_library("ui") {
       "webui/metrics_reporter/metrics_reporter.h",
       "webui/metrics_reporter/metrics_reporter_service.cc",
       "webui/metrics_reporter/metrics_reporter_service.h",
-      "webui/new_tab_footer/new_tab_footer_ui.cc",
-      "webui/new_tab_footer/new_tab_footer_ui.h",
       "webui/new_tab_page/new_tab_page_handler.cc",
       "webui/new_tab_page/new_tab_page_handler.h",
       "webui/new_tab_page/new_tab_page_ui.cc",
@@ -1612,8 +1612,8 @@ static_library("ui") {
       "//base",
       "//chrome/app/vector_icons",
       "//chrome/browser:shell_integration",
-      "//chrome/browser/accessibility:utils",
       "//chrome/browser/actor",
+      "//chrome/browser/actor:impl",
       "//chrome/browser/apps/app_service",
       "//chrome/browser/apps/app_service/app_icon",
       "//chrome/browser/apps/app_service/app_icon:util",
@@ -1630,6 +1630,7 @@ static_library("ui") {
       "//chrome/browser/ui/search_engine_choice",
       "//chrome/browser/ui/search_engine_choice:impl",
       "//chrome/browser/ui/shared_highlighting",
+      "//chrome/browser/ui/toolbar",
       "//chrome/browser/ui/webui/access_code_cast",
       "//chrome/browser/ui/webui/access_code_cast:impl",
 
@@ -1715,6 +1716,7 @@ static_library("ui") {
       "//chrome/browser/ui/views/toolbar",
       "//chrome/browser/ui/views/zoom",
       "//chrome/browser/ui/webui:webui_util",
+      "//chrome/browser/ui/webui/actor_internals",
       "//chrome/browser/ui/webui/app_management",
       "//chrome/browser/ui/webui/commerce",
       "//chrome/browser/ui/webui/commerce:impl",
@@ -1871,6 +1873,8 @@ static_library("ui") {
       "//chrome/browser/ui/privacy_sandbox:impl",
       "//chrome/browser/ui/tabs/alert:impl",
       "//chrome/browser/ui/toasts:impl",
+      "//chrome/browser/ui/webui/customize_buttons",
+      "//chrome/browser/ui/webui/customize_buttons:impl",
       "//chrome/browser/ui/views/toolbar",
       "//chrome/browser/ui/views/page_action",
       "//chrome/browser/ui/views/new_tab_footer",
@@ -1896,7 +1900,7 @@ static_library("ui") {
 
       "//chrome/browser/ui:browser_list_impl",
       "//chrome/browser/ui/media_router:impl",
-      "//chrome/browser/actor",
+      "//chrome/browser/actor:impl",
       "//chrome/browser/ui/window_sizer:impl",
       "//chrome/browser/ui/webui/settings:impl",
       "//chrome/browser/ui/search_engine_choice:impl",
@@ -2158,7 +2162,6 @@ static_library("ui") {
       "//ash/webui/vc_background_ui",
       "//ash/webui/web_applications",
       "//chrome/app:generated_resources",
-      "//chrome/browser/accessibility:utils",
       "//chrome/browser/apps/app_discovery_service",
       "//chrome/browser/apps/app_preload_service",
       "//chrome/browser/apps/browser_instance",
@@ -2256,7 +2259,6 @@ static_library("ui") {
       "//chrome/browser/ash/locale",
       "//chrome/browser/ash/login",
       "//chrome/browser/ash/login/app_mode",
-      "//chrome/browser/ash/login/demo_mode",
       "//chrome/browser/ash/login/enrollment",
       "//chrome/browser/ash/login/lock",
       "//chrome/browser/ash/login/lock/online_reauth",
@@ -2774,7 +2776,6 @@ static_library("ui") {
       "//chrome/browser/ash/locale",
       "//chrome/browser/ash/login",
       "//chrome/browser/ash/login/app_mode",
-      "//chrome/browser/ash/login/demo_mode",
       "//chrome/browser/ash/login/enrollment",
       "//chrome/browser/ash/login/lock",
       "//chrome/browser/ash/login/lock/online_reauth",
@@ -3246,11 +3247,7 @@ static_library("ui") {
   }
 
   if (is_win || is_mac) {
-    deps += [
-      "//chrome/browser/ui/pdf/infobar",
-      "//chrome/browser/ui/pdf/infobar:impl",
-    ]
-    allow_circular_includes_from += [ "//chrome/browser/ui/pdf/infobar:impl" ]
+    deps += [ "//chrome/browser/ui/pdf/infobar" ]
   }
 
   if (is_mac) {
@@ -3414,10 +3411,8 @@ static_library("ui") {
     include_dirs = [ "$target_gen_dir" ]
     frameworks = [
       "Carbon.framework",
+      "LocalAuthenticationEmbeddedUI.framework",
       "Quartz.framework",
-    ]
-    weak_frameworks = [
-      "LocalAuthenticationEmbeddedUI.framework",  # macOS 12+
     ]
 
     # For version_ui.cc:
@@ -3516,11 +3511,7 @@ static_library("ui") {
     libs += [ "crypt32.lib" ]
 
     if (is_chrome_branded) {
-      sources += [
-        "webui/help/version_updater_win.cc",
-        "webui/settings/incompatible_applications_handler_win.cc",
-        "webui/settings/incompatible_applications_handler_win.h",
-      ]
+      sources += [ "webui/help/version_updater_win.cc" ]
       deps += [
         "//chrome/browser/win/installer_downloader:prefs",
         "//chrome/updater/app/server/win:updater_legacy_idl",
@@ -3626,8 +3617,6 @@ static_library("ui") {
   if (toolkit_views) {
     sources += [
       "bubble_anchor_util.h",
-      "side_search/side_search_prefs.cc",
-      "side_search/side_search_prefs.h",
       "sync/one_click_signin_links_delegate.h",
       "sync/one_click_signin_links_delegate_impl.cc",
       "sync/one_click_signin_links_delegate_impl.h",
@@ -4029,6 +4018,8 @@ static_library("ui") {
       "views/frame/browser_window_factory.cc",
       "views/frame/caption_button_placeholder_container.cc",
       "views/frame/caption_button_placeholder_container.h",
+      "views/frame/contents_container_view.cc",
+      "views/frame/contents_container_view.h",
       "views/frame/contents_layout_manager.cc",
       "views/frame/contents_layout_manager.h",
       "views/frame/contents_web_view.cc",
@@ -4037,6 +4028,8 @@ static_library("ui") {
       "views/frame/immersive_mode_controller_factory_views.cc",
       "views/frame/immersive_mode_controller_stub.cc",
       "views/frame/immersive_mode_controller_stub.h",
+      "views/frame/multi_contents_drop_target_view.cc",
+      "views/frame/multi_contents_drop_target_view.h",
       "views/frame/multi_contents_resize_area.cc",
       "views/frame/multi_contents_resize_area.h",
       "views/frame/multi_contents_view.cc",
@@ -4108,14 +4101,6 @@ static_library("ui") {
       "views/incognito_clear_browsing_data_dialog.h",
       "views/incognito_clear_browsing_data_dialog_coordinator.cc",
       "views/incognito_clear_browsing_data_dialog_coordinator.h",
-      "views/infobars/alternate_nav_infobar_view.cc",
-      "views/infobars/alternate_nav_infobar_view.h",
-      "views/infobars/confirm_infobar.cc",
-      "views/infobars/confirm_infobar.h",
-      "views/infobars/infobar_container_view.cc",
-      "views/infobars/infobar_container_view.h",
-      "views/infobars/infobar_view.cc",
-      "views/infobars/infobar_view.h",
       "views/intent_picker_bubble_view.cc",
       "views/intent_picker_bubble_view.h",
       "views/javascript_tab_modal_dialog_view_views.cc",
@@ -4342,6 +4327,8 @@ static_library("ui") {
       "views/passwords/manage_passwords_icon_views.h",
       "views/passwords/manage_passwords_list_view.cc",
       "views/passwords/manage_passwords_list_view.h",
+      "views/passwords/manage_passwords_page_action_controller.cc",
+      "views/passwords/manage_passwords_page_action_controller.h",
       "views/passwords/manage_passwords_view.cc",
       "views/passwords/manage_passwords_view.h",
       "views/passwords/manage_passwords_view_ids.h",
@@ -4365,6 +4352,8 @@ static_library("ui") {
       "views/passwords/password_change/password_change_icon_views.h",
       "views/passwords/password_change/password_change_info_bubble_view.cc",
       "views/passwords/password_change/password_change_info_bubble_view.h",
+      "views/passwords/password_change/password_change_toast.cc",
+      "views/passwords/password_change/password_change_toast.h",
       "views/passwords/password_change/password_change_view_factory.cc",
       "views/passwords/password_change/password_change_view_factory.h",
       "views/passwords/password_change/privacy_notice_view.cc",
@@ -4507,6 +4496,8 @@ static_library("ui") {
       "views/permissions/permission_prompt_quiet_icon.cc",
       "views/permissions/permission_prompt_quiet_icon.h",
       "views/permissions/permission_prompt_style.h",
+      "views/picture_in_picture/picture_in_picture_tucker.cc",
+      "views/picture_in_picture/picture_in_picture_tucker.h",
       "views/profiles/avatar_toolbar_button.cc",
       "views/profiles/avatar_toolbar_button.h",
       "views/profiles/avatar_toolbar_button_delegate.cc",
@@ -4950,8 +4941,8 @@ static_library("ui") {
     deps += [
       "//base",
       "//chrome/browser:main_extra_parts",
-      "//chrome/browser/accessibility:utils",
       "//chrome/browser/apps:icon_standardizer",
+      "//chrome/browser/infobars",
       "//chrome/browser/profiles/keep_alive",
       "//chrome/browser/promos:utils",
       "//chrome/browser/ui/actions:actions",
@@ -4970,10 +4961,12 @@ static_library("ui") {
       "//chrome/browser/ui/send_tab_to_self:impl",
       "//chrome/browser/ui/sharing_hub",
       "//chrome/browser/ui/sharing_hub:impl",
+      "//chrome/browser/ui/side_search",
       "//chrome/browser/ui/views",
       "//chrome/browser/ui/views/bubble",
       "//chrome/browser/ui/views/download",
       "//chrome/browser/ui/views/frame:immersive_mode_controller",
+      "//chrome/browser/ui/views/infobars",
       "//chrome/browser/ui/views/intent_picker:intent_picker_page_action",
       "//chrome/browser/ui/views/page_action",
       "//chrome/browser/ui/webui/app_service_internals",
@@ -5094,8 +5087,8 @@ static_library("ui") {
         "views/apps/app_window_native_widget_mac.mm",
         "views/apps/chrome_native_app_window_views_mac.h",
         "views/apps/chrome_native_app_window_views_mac.mm",
-        "views/apps/native_app_window_frame_view_mac.h",
-        "views/apps/native_app_window_frame_view_mac.mm",
+        "views/apps/native_app_window_frame_view_mac_client.h",
+        "views/apps/native_app_window_frame_view_mac_client.mm",
         "views/chrome_views_delegate_mac.cc",
         "views/desktop_capture/desktop_media_permission_pane_view_mac.h",
         "views/desktop_capture/desktop_media_permission_pane_view_mac.mm",
@@ -5273,8 +5266,6 @@ static_library("ui") {
 
   if (enable_extensions_core) {
     sources += [
-      "extensions/extension_install_ui.cc",
-      "extensions/extension_install_ui.h",
       "toolbar/toolbar_actions_model.cc",
       "toolbar/toolbar_actions_model.h",
       "toolbar/toolbar_actions_model_factory.cc",
@@ -5294,21 +5285,15 @@ static_library("ui") {
       "webui/plural_string_handler.cc",
       "webui/plural_string_handler.h",
     ]
-    deps += [ "//chrome/browser/extensions" ]
-    allow_circular_includes_from += [ "//chrome/browser/extensions" ]
+    deps += [
+      "//chrome/browser/extensions",
+      "//chrome/browser/ui/extensions",
+      "//chrome/browser/ui/extensions:impl",
+    ]
 
-    if (is_win || is_mac || is_linux || is_chromeos) {
-      sources += [
-        "extensions/extension_install_ui_desktop.cc",
-        "extensions/extension_install_ui_desktop.h",
-      ]
-    }
-    if (is_android) {
-      sources += [
-        "extensions/extension_install_ui_android.cc",
-        "extensions/extension_install_ui_android.h",
-      ]
-    }
+    # TODO(crbug.com/420905611): Verify whether this circular dependency declaration can
+    # be removed from here.
+    allow_circular_includes_from += [ "//chrome/browser/extensions" ]
   }
 
   if (enable_extensions) {
@@ -5320,7 +5305,11 @@ static_library("ui") {
       "//chrome/browser/extensions/api/omnibox",
       "//chrome/browser/policy:policy_util",
       "//chrome/browser/profiles",
+      "//chrome/browser/ui/extensions",
       "//chrome/browser/ui/extensions:extension_enable_flow_delegate",
+      "//chrome/browser/ui/extensions:extension_popup_types",
+      "//chrome/browser/ui/extensions:impl",
+      "//chrome/browser/ui/web_applications",
       "//chrome/browser/ui/webui/extensions_zero_state_promo:mojo_bindings",
       "//chrome/browser/web_applications",
       "//chrome/browser/web_applications/app_service",
@@ -5342,48 +5331,10 @@ static_library("ui") {
     allow_circular_includes_from += [
       "//chrome/browser/apps/platform_apps",
       "//chrome/browser/apps/platform_apps/api",
+      "//chrome/browser/ui/extensions:impl",
     ]
 
     sources += [
-      "extensions/accelerator_priority.h",
-      "extensions/app_launch_params.cc",
-      "extensions/app_launch_params.h",
-      "extensions/application_launch.cc",
-      "extensions/application_launch.h",
-      "extensions/controlled_home_bubble_delegate.cc",
-      "extensions/controlled_home_bubble_delegate.h",
-      "extensions/extension_action_platform_delegate.h",
-      "extensions/extension_action_view_controller.cc",
-      "extensions/extension_action_view_controller.h",
-      "extensions/extension_enable_flow.cc",
-      "extensions/extension_enable_flow.h",
-      "extensions/extension_installed_bubble_model.cc",
-      "extensions/extension_installed_bubble_model.h",
-      "extensions/extension_installed_waiter.cc",
-      "extensions/extension_installed_waiter.h",
-      "extensions/extension_popup_types.h",
-      "extensions/extension_settings_overridden_dialog.cc",
-      "extensions/extension_settings_overridden_dialog.h",
-      "extensions/extension_side_panel_utils.h",
-      "extensions/extensions_container.h",
-      "extensions/extensions_dialogs.h",
-      "extensions/extensions_overrides/simple_overrides.cc",
-      "extensions/extensions_overrides/simple_overrides.h",
-      "extensions/hosted_app_browser_controller.cc",
-      "extensions/hosted_app_browser_controller.h",
-      "extensions/icon_with_badge_image_source.cc",
-      "extensions/icon_with_badge_image_source.h",
-      "extensions/installation_error_infobar_delegate.cc",
-      "extensions/installation_error_infobar_delegate.h",
-      "extensions/mv2_disabled_dialog_controller.cc",
-      "extensions/mv2_disabled_dialog_controller.h",
-      "extensions/settings_api_bubble_helpers.cc",
-      "extensions/settings_api_bubble_helpers.h",
-      "extensions/settings_overridden_dialog_controller.h",
-      "extensions/settings_overridden_params_providers.cc",
-      "extensions/settings_overridden_params_providers.h",
-      "extensions/web_file_handlers/multiclient_util.cc",
-      "extensions/web_file_handlers/multiclient_util.h",
       "views/chrome_javascript_app_modal_view_factory_views.cc",
       "views/extensions/browser_action_drag_data.cc",
       "views/extensions/browser_action_drag_data.h",
@@ -5401,7 +5352,6 @@ static_library("ui") {
       "views/extensions/media_gallery_checkbox_view.h",
       "views/javascript_app_modal_event_blocker.h",
       "web_applications/app_browser_controller.cc",
-      "web_applications/app_browser_controller.h",
       "web_applications/diagnostics/app_type_initialized_event.cc",
       "web_applications/diagnostics/app_type_initialized_event.h",
       "web_applications/diagnostics/web_app_icon_health_checks.cc",
@@ -5768,8 +5718,7 @@ static_library("ui_public_dependencies") {
     ]
   }
   if (chrome_root_store_cert_management_ui) {
-    public_deps +=
-        [ "//ui/webui/resources/cr_components/certificate_manager:mojom" ]
+    public_deps += [ "//chrome/browser/resources/certificate_manager:mojom" ]
   }
 }
 
@@ -5911,12 +5860,12 @@ static_library("test_support") {
 
   if (toolkit_views) {
     deps += [
+      "//chrome/browser/ui/extensions:test_support",
       "//components/constrained_window:constrained_window",
       "//components/webauthn/content/browser",
       "//ui/views:test_support",
     ]
     sources += [
-      "extensions/extension_action_test_helper.h",
       "views/extensions/extensions_menu_test_util.cc",
       "views/extensions/extensions_menu_test_util.h",
       "views/find_bar_host_unittest_util_views.cc",
@@ -5948,17 +5897,7 @@ static_library("test_support") {
     }
   }
 
-  if (is_android) {
-    # TODO(crbug.com/413572035): Move to c/b/ui/android/tab_model build file.
-    sources += [
-      "android/tab_model/tab_model_test_helper.cc",
-      "android/tab_model/tab_model_test_helper.h",
-    ]
-    deps += [
-      "//chrome/browser/flags:flags_android",
-      "//chrome/browser/ui/android/tab_model",
-    ]
-  } else {
+  if (!is_android) {
     sources += [
       "browser_window/test/mock_browser_window_interface.cc",
       "browser_window/test/mock_browser_window_interface.h",
@@ -5970,8 +5909,6 @@ static_library("test_support") {
       "passwords/passwords_leak_dialog_delegate_mock.h",
       "passwords/passwords_model_delegate_mock.cc",
       "passwords/passwords_model_delegate_mock.h",
-      "tabs/test/mock_tab_interface.cc",
-      "tabs/test/mock_tab_interface.h",
       "test/popup_test_base.cc",
       "test/popup_test_base.h",
       "test/test_confirm_bubble_model.cc",
@@ -6016,9 +5953,6 @@ static_library("browser_element_identifiers") {
 }
 
 if (is_android) {
-  java_cpp_enum("tab_model_enums_java") {
-    sources = [ "android/tab_model/tab_model.h" ]
-  }
   java_cpp_enum("adaptive_toolbar_enums_java") {
     sources = [ "android/toolbar/adaptive_toolbar_enums.h" ]
   }
