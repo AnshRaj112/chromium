@@ -223,6 +223,7 @@
 <translation id="3716540481907974026">ChromeOS Flex версиясы</translation>
 <translation id="3718181793972440140">Ушуну менен түзмөктөгү 1 нерсе өчүрүлөт. Дайын-даректериңизди кийинчерээк чыгарып алуу үчүн Chrome'го <ph name="USER_EMAIL" /> аккаунту менен кириңиз.</translation>
 <translation id="3723744677043446310">{NUM_EXTENSIONS,plural, =1{Chrome аны өчүрүүнү сунуштайт. <ph name="BEGIN_LINK" />Колдоого алынган кеңейтүүлөр жөнүндө кеңири маалымат<ph name="END_LINK" />}other{Chrome аларды өчүрүүнү сунуштайт. <ph name="BEGIN_LINK" />Колдоого алынган кеңейтүүлөр жөнүндө кеңири маалымат<ph name="END_LINK" />}}</translation>
+<translation id="3756724684201900923">Chrome'ду орнотконду үйрөнүп алыңыз</translation>
 <translation id="3780814664026482060">Chrome - <ph name="PAGE_TITLE" /></translation>
 <translation id="3785324443014631273">Кирүү катасынан улам, ChromeOS Flex дайын-даректериңизди шайкештештире алган жок.</translation>
 <translation id="3795971588916395511">Google ChromeOS</translation>
@@ -455,7 +456,6 @@ Google Chrome параметрлериңизди калыбына келтире
 <translation id="6831043979455480757">Которуу</translation>
 <translation id="683440813066116847">mDNS трафигине мүмкүндүк берүү үчүн Google Chrome Canary'нин кайрылуу эрежеси.</translation>
 <translation id="684888714667046800">Интернетке туташуу мүмкүн болбой жатат. Эгер тармактык коргоону колдонсоңуз, <ph name="PRODUCT_EXE_NAME" /> уруксат берилгендердин тизмесинде болушу керек.</translation>
-<translation id="6851981911629679515">Chrome'дун JavaScript жана WebAssembly куралында кошумча коргоону күйгүзүү</translation>
 <translation id="6877155553248388166">издөө аймагынын төмөнкү оң бурчу: оң жагы <ph name="RIGHT" />%, төмөн жагы <ph name="BOTTOM" />%</translation>
 <translation id="6881299373831449287">Chrome жаңыртылууда</translation>
 <translation id="6885412569789873916">Chrome Бета Колдонмолору</translation>

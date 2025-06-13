@@ -611,7 +611,6 @@
 <translation id="3557336313807607643">ਸੰਪਰਕਾਂ ਵਿੱਚ ਸ਼ਾਮਲ ਕਰੋ</translation>
 <translation id="355765753469272474">ਅਣਕੀਤਾ ਕਰੋ</translation>
 <translation id="3565930036634619844">ਟੈਬ। <ph name="NUMBER_OF_TABS" /> ਵਿੱਚੋਂ <ph name="TAB_INDEX" />.</translation>
-<translation id="3570693105179140209">ਹੋਰ ਪਾਸਵਰਡਾਂ ਲਈ ਡਬਲ ਟੈਪ ਕਰੋ।</translation>
 <translation id="3572607909481582402">ਤੁਹਾਡੇ Google ਖਾਤੇ ਵਿੱਚ</translation>
 <translation id="3575234738189584619">Lens ਨਾਲ ਖੋਜੋ</translation>
 <translation id="3575426792457739946">ਇਸ ਸੂਚੀ ਵਿੱਚ ਸਾਰੇ ਲੋਡ ਕੀਤੇ ਗਏ ਪ੍ਰੋਫਾਈਲ ਸ਼ਾਮਲ ਹਨ।</translation>
@@ -654,7 +653,6 @@
 <translation id="3779810277399252432">ਕੋਈ ਇੰਟਰਨੈੱਟ ਕਨੈਕਸ਼ਨ ਨਹੀਂ ਹੈ।</translation>
 <translation id="3782614601387961027">ਚਿਤਾਵਨੀ ਖਾਰਜ ਕਰੋ</translation>
 <translation id="3789841737615482174">ਸਥਾਪਤ ਕਰੋ</translation>
-<translation id="3795478177331815672">ਟੈਬਾਂ ਅਤੇ ਟੈਬ ਗਰੁੱਪਾਂ ਨੂੰ ਖੋਲ੍ਹੋ</translation>
 <translation id="380329542618494757">ਨਾਮ</translation>
 <translation id="3803696231112616155">ਇਸ ਸਾਈਟ ਨੂੰ ਅਨੁਵਾਦ ਕਰਨ ਦੀ ਪੇਸ਼ਕਸ਼</translation>
 <translation id="3808311849069021992">ਖੋਜ ਇੰਜਣ ਦੇ ਵੇਰਵੇ ਦਿਖਾਓ</translation>
@@ -700,7 +698,6 @@
 <translation id="3955740319737378355">ਹੋ ਗਿਆ</translation>
 <translation id="3955822496205734389">ਤੁਹਾਡੇ ਪਾਸਵਰਡ ਕਮਜ਼ੋਰ ਹਨ।</translation>
 <translation id="3958312024468322930">ਇਸਨੂੰ ਆਪਣੀ ਹੋਮ ਸਕ੍ਰੀਨ ਦੇ ਹੇਠਾਂ ਡੌਕ ਤੱਕ ਘਸੀਟੋ</translation>
-<translation id="3960218941754097036">Google Lens ਨਾਲ ਆਪਣੀ ਸਕ੍ਰੀਨ 'ਤੇ ਮੌਜੂਦ ਸਮੱਗਰੀ ਖੋਜੋ</translation>
 <translation id="3962326069546168954">ਰੱਖਿਅਤ ਕਰੋ</translation>
 <translation id="3967327056943561740">ਬੁੱਕਮਾਰਕ</translation>
 <translation id="3967822245660637423">ਡਾਊਨਲੋਡ ਪੂਰਾ ਹੋਇਆ</translation>
@@ -1814,6 +1811,7 @@ Handoff ਨੂੰ ਵੀ ਸੈਟਿੰਗਾਂ ਦੇ 'ਆਮ' ਸੈਕਸ਼�
 <translation id="8343993175958086504">ਆਪਣੀ ਸਮੱਗਰੀ ਦਾ ਬੈਕਅੱਪ ਲਓ ਅਤੇ ਇਸਨੂੰ ਕਿਸੇ ਵੀ ਡੀਵਾਈਸ 'ਤੇ ਵਰਤੋ।</translation>
 <translation id="8348530355586151720">ਤਿੰਨ-ਬਿੰਦੂਆਂ ਵਾਲੇ ਮੀਨੂ 'ਤੇ ਟੈਪ ਕਰੋ</translation>
 <translation id="8349305172487531364">ਬੁੱਕਮਾਰਕਸ ਬਾਰ</translation>
+<translation id="8363484128299778310">ਸਾਈਨ-ਇਨ ਦੌਰਾਨ ਸਮੱਸਿਆ ਆਉਣ 'ਤੇ ਰਿਕਵਰੀ ਪਾਸਵਰਡ ਵਰਤੋ</translation>
 <translation id="8364563001733875155">ਆਪਣਾ ਪਿੰਨ ਬਦਲਣ ਲਈ, ਪਹਿਲਾਂ ਆਪਣੇ ਡੀਵਾਈਸ 'ਤੇ ਪਾਸਕੋਡ ਦਾ ਸੈੱਟਅੱਪ ਕਰੋ।</translation>
 <translation id="8366466717204352506">ਕਦੇ ਵੀ ਜਾਂਚ ਨਹੀਂ ਹੋਈ</translation>
 <translation id="8368001212524806591">ਕੀਮਤ 'ਤੇ ਨਜ਼ਰ ਰੱਖੋ</translation>

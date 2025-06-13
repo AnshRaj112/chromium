@@ -36,6 +36,7 @@ TextPaintTimingDetector::TextPaintTimingDetector(
 void LargestTextPaintManager::PopulateTraceValue(
     TracedValue& value,
     const TextRecord& first_text_paint) {
+  value.SetString("nodeName", first_text_paint.node_->DebugName());
   value.SetInteger("DOMNodeId",
                    static_cast<int>(first_text_paint.node_->GetDomNodeId()));
   value.SetInteger("size", static_cast<int>(first_text_paint.recorded_size));
@@ -297,7 +298,7 @@ void TextPaintTimingDetector::AssignPaintTimeToQueuedRecords(
   texts_queued_for_paint_time_.RemoveAll(keys_to_be_removed);
 }
 
-void TextPaintTimingDetector::MaybeRecordTextRecord(
+TextRecord* TextPaintTimingDetector::MaybeRecordTextRecord(
     const LayoutObject& object,
     const uint64_t& visual_size,
     const PropertyTreeStateOrAlias& property_tree_state,
@@ -306,27 +307,30 @@ void TextPaintTimingDetector::MaybeRecordTextRecord(
   Node* node = object.GetNode();
   DCHECK(node);
 
-  bool is_needed_for_timing = TextElementTiming::NeededForTiming(*node);
+  bool is_needed_for_lcp = IsRecordingLargestTextPaint() && visual_size > 0u;
+  bool is_needed_for_element_timing = TextElementTiming::NeededForTiming(*node);
+
   // If the node is not required by LCP and not required by ElementTiming, we
   // can bail out early.
-  if ((visual_size == 0u || !IsRecordingLargestTextPaint()) &&
-      !is_needed_for_timing) {
-    return;
+  if (!is_needed_for_lcp && !is_needed_for_element_timing) {
+    return nullptr;
   }
+
   TextRecord* record;
   if (visual_size == 0u) {
     record = MakeGarbageCollected<TextRecord>(
-        *node, 0, gfx::RectF(), gfx::Rect(), gfx::RectF(), frame_index_,
-        is_needed_for_timing);
+        *node, visual_size, gfx::RectF(), gfx::Rect(), gfx::RectF(),
+        frame_index_, is_needed_for_element_timing);
   } else {
     record = MakeGarbageCollected<TextRecord>(
-        *object.GetNode(), visual_size,
+        *node, visual_size,
         TextElementTiming::ComputeIntersectionRect(
             object, frame_visual_rect, property_tree_state, frame_view_),
         frame_visual_rect, root_visual_rect, frame_index_,
-        is_needed_for_timing);
+        is_needed_for_element_timing);
   }
   QueueToMeasurePaintTime(object, record);
+  return record;
 }
 
 }  // namespace blink

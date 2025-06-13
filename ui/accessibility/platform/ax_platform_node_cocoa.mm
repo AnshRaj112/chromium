@@ -18,7 +18,6 @@
 #include "skia/ext/skia_utils_mac.h"
 #include "ui/accessibility/accessibility_features.h"
 #include "ui/accessibility/ax_action_data.h"
-#include "ui/accessibility/ax_common.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/accessibility/ax_range.h"
 #include "ui/accessibility/ax_role_properties.h"
@@ -535,47 +534,15 @@ const ui::CocoaActionList& GetCocoaActionListForTesting() {
 }
 
 - (BOOL)instanceActive {
-  if (!_node) {
-    return NO;
-  }
-
-  // Checking this here because every property getter checks instanceActive
-  // first. We shouldn't have an active instance that is ignored.
-#if AX_FAIL_FAST_BUILD()
-  static bool check_ignored = true;
-  if (check_ignored && _node->GetData().IsIgnored()) {
-    DUMP_WILL_BE_NOTREACHED()
-        << "Mac APIs must not expose an invisible or ignored node: "
-        << _node->GetData().ToString(/*verbose*/ true);
-    check_ignored = false;
-  }
-#endif
-
-  return YES;
+  return _node != nullptr;
 }
 
 - (BOOL)isIncludedInPlatformTree {
-  if (!_node) {
-    return NO;
-  }
-  if (_node->IsInvisibleOrIgnored()) {
-    return NO;
-  }
-  ax::mojom::Role internal_role = _node->GetRole();
-  if ([AXPlatformNodeCocoa nativeRoleFromAXRole:internal_role] ==
-      NSAccessibilityUnknownRole) {
-    return NO;
-  }
-
-  // Explicitly empty alt="" on an img is another cause of
-  // NSAccessibilityUnknownRole.
-  if (ui::IsImage(internal_role) &&
-      _node->GetData().GetNameFrom() ==
-          ax::mojom::NameFrom::kAttributeExplicitlyEmpty) {
-    return NO;
-  }
-
-  return YES;
+  // TODO(accessibility): Do we really need to have invisible objects in
+  // the platform tree?
+  return [self instanceActive] &&
+         ![[self AXRole] isEqualToString:NSAccessibilityUnknownRole] &&
+         !_node->IsInvisibleOrIgnored();
 }
 
 - (id)titleUIElement {
@@ -973,7 +940,7 @@ const ui::CocoaActionList& GetCocoaActionListForTesting() {
     case ax::mojom::Role::kRadioGroup:
       return NSAccessibilityRadioGroupRole;
     case ax::mojom::Role::kRootWebArea:
-      return NSAccessibilityWebAreaRole;
+      return CrNSAccessibilityWebAreaRole;
     case ax::mojom::Role::kRow:
       return NSAccessibilityRowRole;
     case ax::mojom::Role::kRowHeader:
@@ -1384,12 +1351,9 @@ const ui::CocoaActionList& GetCocoaActionListForTesting() {
 // https://developer.apple.com/documentation/appkit/deprecated_symbols/nsaccessibility
 //
 
-// See notes on isAccessibilityElement (this is the legacy API version of that).
-// LINT.IfChange
 - (BOOL)accessibilityIsIgnored {
   return ![self isAccessibilityElement];
 }
-// LINT.ThenChange(//ui/accessibility/platform/ax_platform_node_cocoa.mm:isAccessibilityElement)
 
 - (id)accessibilityHitTest:(NSPoint)point {
   if (!NSPointInRect(point, self.boundsInScreen)) {
@@ -1538,7 +1502,7 @@ const ui::CocoaActionList& GetCocoaActionListForTesting() {
 
   // These attributes are required on all accessibility objects.
   NSArray* const kAllRoleAttributes = @[
-    NSAccessibilityBlockQuoteLevelAttribute, NSAccessibilityChildrenAttribute,
+    CrNSAccessibilityBlockQuoteLevelAttribute, NSAccessibilityChildrenAttribute,
     NSAccessibilityDOMClassList, NSAccessibilityDOMIdentifierAttribute,
     NSAccessibilityDescriptionAttribute, NSAccessibilityElementBusyAttribute,
     NSAccessibilityParentAttribute, NSAccessibilityPositionAttribute,
@@ -1551,8 +1515,9 @@ const ui::CocoaActionList& GetCocoaActionListForTesting() {
     // Attributes which are not required, but are general to all roles.
     NSAccessibilityRoleDescriptionAttribute, NSAccessibilityEnabledAttribute,
     NSAccessibilityFocusedAttribute, NSAccessibilityHelpAttribute,
-    NSAccessibilityTopLevelUIElementAttribute, NSAccessibilityVisitedAttribute,
-    NSAccessibilityWindowAttribute, NSAccessibilityChromeAXNodeIdAttribute
+    NSAccessibilityTopLevelUIElementAttribute,
+    CrNSAccessibilityVisitedAttribute, NSAccessibilityWindowAttribute,
+    NSAccessibilityChromeAXNodeIdAttribute
   ];
   // Attributes required for user-editable controls.
   NSArray* const kValueAttributes = @[ NSAccessibilityValueAttribute ];
@@ -1656,7 +1621,7 @@ const ui::CocoaActionList& GetCocoaActionListForTesting() {
   if (ui::IsSetLike(role))
     [axAttributes addObject:@"AXARIASetSize"];
 
-  if ([[self accessibilityRole] isEqualToString:NSAccessibilityWebAreaRole]) {
+  if ([[self accessibilityRole] isEqualToString:CrNSAccessibilityWebAreaRole]) {
     [axAttributes addObjectsFromArray:@[
       NSAccessibilityLoadedAttribute, NSAccessibilityLoadingProgressAttribute
     ]];
@@ -2653,24 +2618,14 @@ const ui::CocoaActionList& GetCocoaActionListForTesting() {
 // NSAccessibilityElement sufficient?
 
 // NSAccessibility: Configuring Accessibility.
-
-// This has the same function as accessibilityIsIgnored from the legacy API.
-// TODO(crbug.com/419580129): Consider using this to greatly simplify our
-// removal of hidden and other nodes we ignore only in the Mac a11y tree.
-// LINT.IfChange
 - (BOOL)isAccessibilityElement {
-  if (!_node) {
+  if (![self instanceActive])
     return NO;
-  }
-  // TODO(accessibility): Remove this once we stop hitting the ignored check
-  // in instanceActive(). We're still hitting that because ignored
-  // nodes aren't always cleaned up, although we yet don't know why.
-  if (_node->GetData().IsIgnored()) {
-    return NO;
-  }
-  return YES;
+
+  return (![[[self class] nativeRoleFromAXRole:_node->GetRole()]
+              isEqualToString:NSAccessibilityUnknownRole] &&
+          !_node->GetDelegate()->IsIgnored());
 }
-// LINT.ThenChange(//ui/accessibility/platform/ax_platform_node_cocoa.mm:accessibilityIsIgnored)
 
 - (BOOL)isAccessibilityEnabled {
   if (!_node)
@@ -2961,7 +2916,7 @@ const ui::CocoaActionList& GetCocoaActionListForTesting() {
     case ax::mojom::Role::kHeader:  // Default: IDS_AX_ROLE_HEADER
       return l10n_util::GetNSString(IDS_AX_ROLE_BANNER);
     case ax::mojom::Role::kRootWebArea: {
-      if ([role isEqualToString:NSAccessibilityWebAreaRole]) {
+      if ([role isEqualToString:CrNSAccessibilityWebAreaRole]) {
         return l10n_util::GetNSString(IDS_AX_ROLE_WEB_AREA);
       }
       // Preserve platform default of "group" in the case of the child
@@ -3555,10 +3510,11 @@ const ui::CocoaActionList& GetCocoaActionListForTesting() {
     return nil;
 
   std::string url;
-  if ([[self accessibilityRole] isEqualToString:NSAccessibilityWebAreaRole])
+  if ([[self accessibilityRole] isEqualToString:CrNSAccessibilityWebAreaRole]) {
     url = _node->GetDelegate()->GetTreeData().url;
-  else
+  } else {
     url = _node->GetStringAttribute(ax::mojom::StringAttribute::kUrl);
+  }
 
   if (url.empty())
     return nil;

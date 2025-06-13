@@ -786,7 +786,6 @@ Posibleng malapat sa account na ito ang mga pahintulot na naibigay mo na sa mga 
 <translation id="1542524755306892917">Binibigyang-daan nito ang Google Assistant na magbigay ng mga iniangkop na sagot kapag nagtatanong si <ph name="SUPERVISED_USER_NAME" />.</translation>
 <translation id="1543284117603151572">Na-import Mula Sa Edge</translation>
 <translation id="1543538514740974167">Mas mabilis na makapunta rito</translation>
-<translation id="154420222899071768">Hindi na-update ang iyong password, pero naa-access mo pa rin dapat ang site gamit ang iyong lumang password</translation>
 <translation id="1544588554445317666">Subukang gumamit ng mas maikling pangalan ng file o mag-save sa ibang folder</translation>
 <translation id="1545177026077493356">Awtomatikong Kiosk Mode</translation>
 <translation id="1545749641540134597">I-scan ang QR Code</translation>
@@ -2338,7 +2337,6 @@ Puwede mong pamahalaan ang mga setting ng account na ito sa pamamagitan ng pag-i
 <translation id="2588636910004461974">Mga device mula sa <ph name="VENDOR_NAME" /></translation>
 <translation id="2589658397149952302">Huwag kailanman ipakita ang mga file sa Drive</translation>
 <translation id="2593499352046705383">Bago magsimula, tiyaking mayroon kang backup ng iyong data. Mao-overwrite ang iyong hard drive kapag na-install ang <ph name="DEVICE_OS" />. Matuto pa sa g.co/flex/InstallGuide.</translation>
-<translation id="2594832159966169099">Pamahalaan ang seguridad ng V8</translation>
 <translation id="2597073208962000830">Gumagamit ang Nearby Share ng pag-scan ng Bluetooth para maghanap ng mga kalapit na device.</translation>
 <translation id="2598136842498757793">I-customize ang mga button ng toolbar</translation>
 <translation id="2598710988533271874">May bagong Chrome na available</translation>
@@ -7030,7 +7028,6 @@ Puwede kang magtalaga ng maraming switch sa pagkilos na ito.</translation>
 <translation id="594221546068848596">Hanapin ang page gamit ang <ph name="VISUAL_SEARCH_PROVIDER" /></translation>
 <translation id="5942779427914696408">Visibility ng device</translation>
 <translation id="5943127421590245687">Matagumpay ang iyong pag-verify. Para i-unlock at i-restore ang iyong lokal na data, pakilagay ang lumang password mo sa <ph name="DEVICE_TYPE" />.</translation>
-<translation id="5943209617717087975">Pinapamahalaan ng <ph name="THIRD_PARTY_NTP_MANAGER" /> ang iyong page na bagong tab</translation>
 <translation id="5945002094477276055">Posibleng mapanganib ang <ph name="FILE_NAME" />. Ipadala sa Ligtas na Pag-browse sa Google para ma-scan?</translation>
 <translation id="5945192511027649793">I-disable ang Touchpad</translation>
 <translation id="5945363896952315544">Hindi na puwedeng mag-store ng anupamang fingerprint ang iyong security key. Para makapagdagdag ng bago, mag-delete muna ng kasalukuyang fingerprint.</translation>

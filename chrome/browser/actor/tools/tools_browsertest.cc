@@ -35,6 +35,7 @@
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/weak_document_ptr.h"
+#include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/test/back_forward_cache_util.h"
 #include "content/public/test/browser_test.h"
@@ -54,6 +55,7 @@
 using base::test::ScopedFeatureList;
 using base::test::TestFuture;
 using content::ChildFrameAt;
+using content::DisableProactiveBrowsingInstanceSwapFor;
 using content::EvalJs;
 using content::ExecJs;
 using content::GetDOMNodeId;
@@ -126,8 +128,7 @@ class ActorToolsTest : public InProcessBrowserTest {
     scoped_feature_list_.InitWithFeaturesAndParameters(
         /*enabled_features=*/{{features::kGlic, {}},
                               {features::kTabstripComboButton, {}},
-                              {features::kGlicActor,
-                               GetDefaultActorParamsForTesting()},
+                              {features::kGlicActor, {}},
                               {kGlicActionAllowlist, GetAllowlistParams()}},
         /*disabled_features=*/{features::kGlicWarming});
   }
@@ -2215,109 +2216,6 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, InvokeToolInInactiveFrame) {
   execution_engine().Act(action, result.GetCallback());
   ExpectErrorResult(result, mojom::ActionResultCode::kFrameWentAway);
 }
-
-enum class PageToolDelay { kInstant, kDelayed };
-enum class NavigationType { kSameSite, kCrossSite };
-
-// Run the following test using same and cross site navigations to exercise
-// paths where the RenderFrameHost is swapped or kept. Also run with the page
-// tool replying immediately, which should complete before the RenderFrame is
-// torn down as well as delaying until the RenderFrame is torn down by the
-// navigation (in the cross site case) or new document loaded (in the same site
-// case).
-class ActorToolsPageToolsTest : public ActorToolsTest,
-                                public testing::WithParamInterface<
-                                    std::tuple<PageToolDelay, NavigationType>> {
- public:
-  // Provides meaningful param names instead of /0, /1, ...
-  static std::string DescribeParams(
-      const testing::TestParamInfo<ParamType>& info) {
-    auto [delay, navigation_type] = info.param;
-    std::stringstream params_description;
-    switch (delay) {
-      case PageToolDelay::kInstant:
-        params_description << "Instant";
-        break;
-      case PageToolDelay::kDelayed:
-        params_description << "Delayed";
-        break;
-    }
-    switch (navigation_type) {
-      case NavigationType::kSameSite:
-        params_description << "_SameSite";
-        break;
-      case NavigationType::kCrossSite:
-        params_description << "_CrossSite";
-        break;
-    }
-    return params_description.str();
-  }
-
-  ActorToolsPageToolsTest() {
-    base::FieldTrialParams allowlist_params;
-    allowlist_params["allowlist"] = "foo.com,bar.com";
-    allowlist_params["allowlist_only"] = "true";
-
-    // Note: the delay is 5s but in practice the RenderFrame is torn down by
-    // navigation so this won't block the test.
-    PageToolDelay delay = std::get<0>(GetParam());
-    std::string delay_value =
-        delay == PageToolDelay::kInstant ? "0ms" : "5000ms";
-
-    page_tools_feature_list_.InitWithFeaturesAndParameters(
-        /*enabled_features=*/{{features::kGlic, {}},
-                              {features::kTabstripComboButton, {}},
-                              {features::kGlicActor,
-                               {{"glic-actor-observation-delay", delay_value}}},
-                              {kGlicActionAllowlist, GetAllowlistParams()}},
-        /*disabled_features=*/{features::kGlicWarming});
-  }
-
-  bool IsCrossSite() {
-    return std::get<1>(GetParam()) == NavigationType::kCrossSite;
-  }
-
- private:
-  ScopedFeatureList page_tools_feature_list_;
-};
-
-// Ensure a page tool (click, in this case) causing a cross-document navigation
-// works successfully waits for loading to finish.
-IN_PROC_BROWSER_TEST_P(ActorToolsPageToolsTest, PageToolNavigation) {
-  const GURL url_start = embedded_https_test_server().GetURL(
-      "foo.com", "/actor/cross_document_nav.html");
-  const GURL url_next = embedded_https_test_server().GetURL(
-      IsCrossSite() ? "bar.com" : "foo.com", "/actor/simple_iframe.html");
-  ASSERT_TRUE(content::NavigateToURL(web_contents(), url_start));
-
-  // The link in the file is relative so replace it to include the mock
-  // hostname.
-  ASSERT_TRUE(
-      ExecJs(web_contents(),
-             JsReplace("document.getElementById('link').href = $1", url_next)));
-
-  // Send a click to the link.
-  std::optional<int> link_id = GetDOMNodeId(*main_frame(), "#link");
-  ASSERT_TRUE(link_id);
-
-  // TODO(crbug.com/414662842): Add cases where the new document load is delayed
-  // as well as the PageTool doesn't outlive the outgoing RenderFrame
-
-  BrowserAction action = MakeClick(*main_frame(), link_id.value());
-  TestFuture<mojom::ActionResultPtr> result;
-  execution_engine().Act(action, result.GetCallback());
-  ExpectOkResult(result);
-
-  EXPECT_EQ(web_contents()->GetURL(), url_next);
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    /* no prefix */,
-    ActorToolsPageToolsTest,
-    testing::Combine(
-        testing::Values(PageToolDelay::kInstant, PageToolDelay::kDelayed),
-        testing::Values(NavigationType::kSameSite, NavigationType::kCrossSite)),
-    ActorToolsPageToolsTest::DescribeParams);
 
 }  // namespace
 

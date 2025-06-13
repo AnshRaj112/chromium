@@ -109,6 +109,7 @@ Per altre impostazioni che utilizzano i dati per migliorare la tua esperienza co
 <translation id="1419753403124156396">Vuoi riavviare Chrome?</translation>
 <translation id="1428770807407000502">Vuoi disattivare la sincronizzazione?</translation>
 <translation id="1430915738399379752">Stampa</translation>
+<translation id="1433478348197382180">Modalità Lettura</translation>
 <translation id="1435593198351412143">Apri automaticamente i PDF</translation>
 <translation id="1437543266176261764">Esecuzione in <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Organizza i tuoi prodotti monitorati in Segnalibri</translation>
@@ -1080,7 +1081,6 @@ Il tuo Account Google potrebbe avere altre forme di cronologia di navigazione, a
 <translation id="5956665950594638604">Apri Centro assistenza di Chrome in nuova scheda</translation>
 <translation id="59577092665511740">Scegli un account.</translation>
 <translation id="5958275228015807058">Puoi trovare i tuoi file e le tue pagine nella cartella Download</translation>
-<translation id="5958994127112619898">Pagina semplificata</translation>
 <translation id="5962718611393537961">Tocca per comprimere</translation>
 <translation id="5964869237734432770">Interrompi descr. immagini</translation>
 <translation id="5975083100439434680">Diminuisci lo zoom</translation>
@@ -1629,7 +1629,6 @@ Per modificare questa impostazione, <ph name="BEGIN_LINK" />elimina i dati di Ch
 <translation id="8137562778192957619">Non dovrai ricordare questa password perché verrà salvata in Gestore delle password di Google.</translation>
 <translation id="8152331954420209374">Vai a Lens</translation>
 <translation id="8163820386638255770">Verifica la tua identità per usare e salvare le password nel tuo Account Google</translation>
-<translation id="8179976553408161302">Invio</translation>
 <translation id="8186512483418048923"><ph name="FILES" /> file rimanenti</translation>
 <translation id="8190358571722158785">1 giorno rimanente</translation>
 <translation id="8192765420340770300">Riquadro inferiore di accesso aperto a schermo intero</translation>

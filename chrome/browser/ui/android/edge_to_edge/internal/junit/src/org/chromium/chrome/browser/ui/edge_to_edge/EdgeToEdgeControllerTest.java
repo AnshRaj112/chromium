@@ -250,7 +250,7 @@ public class EdgeToEdgeControllerTest {
         }
         verify(mInsetObserver, times(1))
                 .addInsetsConsumer(any(), eq(InsetConsumerSource.EDGE_TO_EDGE_CONTROLLER_IMPL));
-        EdgeToEdgeControllerFactory.setHas3ButtonNavBar(false);
+        EdgeToEdgeUtils.setHas3ButtonNavBarForTesting(false);
 
         mEdgeToEdgeControllerImpl.registerObserver(mChangeObserver);
     }
@@ -690,7 +690,7 @@ public class EdgeToEdgeControllerTest {
     public void isSupportedConfiguration_default() {
         assertTrue(
                 "The default setup should be a supported configuration but it not!",
-                EdgeToEdgeControllerFactory.isSupportedConfiguration(
+                EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(
                         Robolectric.buildActivity(AppCompatActivity.class).setup().get()));
     }
 
@@ -700,7 +700,7 @@ public class EdgeToEdgeControllerTest {
         assertNull(activity.getWindow().getDecorView().getRootWindowInsets());
         assertFalse(
                 "The activity is not supported before its root window insets is available.",
-                EdgeToEdgeControllerFactory.isSupportedConfiguration(activity));
+                EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(activity));
     }
 
     @Test
@@ -710,7 +710,7 @@ public class EdgeToEdgeControllerTest {
         EdgeToEdgeUtils.setAlwaysDrawWebEdgeToEdgeForTesting(true);
         // Even the always-draw flags do not override the device abilities.
         assertFalse(
-                EdgeToEdgeControllerFactory.isSupportedConfiguration(
+                EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(
                         Robolectric.buildActivity(AppCompatActivity.class).setup().get()));
     }
 
@@ -719,15 +719,15 @@ public class EdgeToEdgeControllerTest {
         // Even these always-draw flags do not override the device abilities.
         EdgeToEdgeUtils.setAlwaysDrawWebEdgeToEdgeForTesting(true);
         // Even the always-draw flags do not override the device abilities.
-        EdgeToEdgeControllerFactory.setHas3ButtonNavBar(true);
+        EdgeToEdgeUtils.setHas3ButtonNavBarForTesting(true);
         assertFalse(
-                EdgeToEdgeControllerFactory.isSupportedConfiguration(
+                EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(
                         Robolectric.buildActivity(AppCompatActivity.class).setup().get()));
     }
 
     @Test
     public void supportConfigurationRecorded() {
-        assertTrue(EdgeToEdgeControllerFactory.isSupportedConfiguration(mActivity));
+        assertTrue(EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(mActivity));
         try (var watcher =
                 HistogramWatcher.newBuilder()
                         .expectNoRecords("Android.EdgeToEdge.SupportedConfigurationSwitch2")
@@ -738,12 +738,12 @@ public class EdgeToEdgeControllerTest {
 
     @Test
     public void supportConfigurationRecorded_supportedToUnsupported() {
-        assertTrue(EdgeToEdgeControllerFactory.isSupportedConfiguration(mActivity));
+        assertTrue(EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(mActivity));
         var watcher =
                 HistogramWatcher.newSingleRecordWatcher(
                         "Android.EdgeToEdge.SupportedConfigurationSwitch2",
                         SupportedConfigurationSwitch.FROM_SUPPORTED_TO_UNSUPPORTED);
-        EdgeToEdgeControllerFactory.setHas3ButtonNavBar(true);
+        EdgeToEdgeUtils.setHas3ButtonNavBarForTesting(true);
         mEdgeToEdgeControllerImpl.handleWindowInsets(mViewMock, SYSTEM_BARS_WINDOW_INSETS);
         watcher.assertExpected();
     }
@@ -751,8 +751,8 @@ public class EdgeToEdgeControllerTest {
     @Test
     public void supportConfigurationRecorded_unsupportToSupported() {
         // Simulate a 3-button navbar being added without activity recreation.
-        EdgeToEdgeControllerFactory.setHas3ButtonNavBar(true);
-        assertFalse(EdgeToEdgeControllerFactory.isSupportedConfiguration(mActivity));
+        EdgeToEdgeUtils.setHas3ButtonNavBarForTesting(true);
+        assertFalse(EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(mActivity));
         mEdgeToEdgeControllerImpl.handleWindowInsets(mViewMock, SYSTEM_BARS_WINDOW_INSETS);
 
         var watcher =
@@ -760,7 +760,7 @@ public class EdgeToEdgeControllerTest {
                         "Android.EdgeToEdge.SupportedConfigurationSwitch2",
                         SupportedConfigurationSwitch.FROM_UNSUPPORTED_TO_SUPPORTED);
         // Simulate a 3-button navbar being removed without activity recreation.
-        EdgeToEdgeControllerFactory.setHas3ButtonNavBar(false);
+        EdgeToEdgeUtils.setHas3ButtonNavBarForTesting(false);
         mEdgeToEdgeControllerImpl.handleWindowInsets(mViewMock, SYSTEM_BARS_WINDOW_INSETS);
         watcher.assertExpected();
     }
@@ -1069,7 +1069,7 @@ public class EdgeToEdgeControllerTest {
     @Test
     @EnableFeatures(ChromeFeatureList.EDGE_TO_EDGE_MONITOR_CONFIGURATIONS)
     public void drawToEdge_configurationChanges() {
-        assertTrue(EdgeToEdgeControllerFactory.isSupportedConfiguration(mActivity));
+        assertTrue(EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(mActivity));
         when(mLayoutManager.getActiveLayoutType()).thenReturn(LayoutType.BROWSING);
         when(mTab.isNativePage()).thenReturn(false);
         mTabProvider.set(mTab);
@@ -1078,8 +1078,8 @@ public class EdgeToEdgeControllerTest {
         assertTrue(mEdgeToEdgeControllerImpl.isDrawingToEdge());
 
         // Simulate a tappable navigation bar.
-        EdgeToEdgeControllerFactory.setHas3ButtonNavBar(true);
-        assertFalse(EdgeToEdgeControllerFactory.isSupportedConfiguration(mActivity));
+        EdgeToEdgeUtils.setHas3ButtonNavBarForTesting(true);
+        assertFalse(EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(mActivity));
         mEdgeToEdgeControllerImpl.handleWindowInsets(mViewMock, SYSTEM_BARS_WITH_TAPPABLE_NAVBAR);
         assertFalse(
                 "Drawing to edge should be false when the configuration is not supported.",
@@ -1096,6 +1096,7 @@ public class EdgeToEdgeControllerTest {
     @Test
     @DisableFeatures(ChromeFeatureList.EDGE_TO_EDGE_MONITOR_CONFIGURATIONS)
     public void hasSeenTappableNavigationBarInsets_disabled() {
+        EdgeToEdgeUtils.setHas3ButtonNavBarForTesting(null);
         Window window = mockWindowWithRootInsets(SYSTEM_BARS_WITH_TAPPABLE_NAVBAR);
         assertTrue(
                 "Insets should be considered has tappable nav bar.",
@@ -1110,6 +1111,7 @@ public class EdgeToEdgeControllerTest {
     @Test
     @EnableFeatures(ChromeFeatureList.EDGE_TO_EDGE_MONITOR_CONFIGURATIONS)
     public void hasSeenTappableNavigationBarInsets() {
+        EdgeToEdgeUtils.setHas3ButtonNavBarForTesting(null);
         Window window = mockWindowWithRootInsets(SYSTEM_BARS_WITH_TAPPABLE_NAVBAR);
         assertTrue(
                 "Insets should be considered has tappable nav bar.",

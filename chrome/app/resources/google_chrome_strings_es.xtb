@@ -223,6 +223,7 @@ Es posible que algunas funciones no estén disponibles y que no se guarden los c
 <translation id="3716540481907974026">Versión de ChromeOS Flex</translation>
 <translation id="3718181793972440140">Se eliminará un elemento de este dispositivo. Para recuperar tus datos en otro momento, inicia sesión en Chrome como <ph name="USER_EMAIL" />.</translation>
 <translation id="3723744677043446310">{NUM_EXTENSIONS,plural, =1{Chrome te recomienda que la elimines. <ph name="BEGIN_LINK" />Más información sobre las extensiones compatibles<ph name="END_LINK" />}other{Chrome te recomienda que las elimines. <ph name="BEGIN_LINK" />Más información sobre las extensiones compatibles<ph name="END_LINK" />}}</translation>
+<translation id="3756724684201900923">Más información sobre cómo instalar Chrome</translation>
 <translation id="3780814664026482060">Chrome - <ph name="PAGE_TITLE" /></translation>
 <translation id="3785324443014631273">ChromeOS Flex no ha podido sincronizar tus datos debido a un error de inicio de sesión.</translation>
 <translation id="3795971588916395511">Google ChromeOS</translation>
@@ -455,7 +456,6 @@ Google Chrome no puede recuperar tu configuración.</translation>
 <translation id="6831043979455480757">Traducir</translation>
 <translation id="683440813066116847">Regla entrante para que Google Chrome Canary permita tráfico mDNS.</translation>
 <translation id="684888714667046800">No se puede conectar a Internet. Si usas un cortafuegos, asegúrate de que <ph name="PRODUCT_EXE_NAME" /> esté en la lista de permitidos.</translation>
-<translation id="6851981911629679515">Activa la protección adicional en el motor de Chrome para JavaScript y WebAssembly</translation>
 <translation id="6877155553248388166">esquina inferior derecha del área de búsqueda: un <ph name="RIGHT" /> % a la derecha y un <ph name="BOTTOM" /> % abajo</translation>
 <translation id="6881299373831449287">Actualizando Chrome</translation>
 <translation id="6885412569789873916">Aplicaciones de Chrome Beta</translation>

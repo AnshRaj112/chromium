@@ -522,6 +522,7 @@ Annars blockeras detta av integritetsinställningarna. Om du tillåter detta kan
 <translation id="1863257867908022953">Fack 12</translation>
 <translation id="1864927262126810325">Från <ph name="SOURCE_NAME" /></translation>
 <translation id="186539747722034544">Kabel- och parabolleverantörer</translation>
+<translation id="1866757068250903512">Styra autentiseringsenheter med namnet <ph name="READERNAME" /> och smartkorten som används med dem</translation>
 <translation id="1870473978371099486">Privat läxhjälp</translation>
 <translation id="1871208020102129563">Proxyn är inställd på att använda fasta proxyservrar, inte en webbadress med PAC-skript.</translation>
 <translation id="1871284979644508959">Obligatoriskt fält</translation>
@@ -866,6 +867,7 @@ Annars blockeras detta av integritetsinställningarna. Om du tillåter detta kan
           <ph name="LIST_ITEM" />Uppgifter som anges i formulär
         <ph name="END_LIST" /></translation>
 <translation id="2448295565072560657">Kringutrustning som är ansluten till enheten när du är inloggad</translation>
+<translation id="2450019289047528273">Betalningsmetoder och annan information från Google Wallet</translation>
 <translation id="2451607499823206582">Spårning</translation>
 <translation id="2452098632681057184">Ekologi och miljö</translation>
 <translation id="2452837234288608067">Det gick inte att hjälpa till med det. Försök igen.</translation>
@@ -1045,6 +1047,7 @@ Annars blockeras detta av integritetsinställningarna. Om du tillåter detta kan
 <translation id="2743934314332613923">Vill du uppdatera körkortet?</translation>
 <translation id="2759299890026163685">Kontrollera att du har en stabil internetanslutning innan du försöker igen</translation>
 <translation id="2759825833388495838">fylla i ditt lösenord i <ph name="APP_NAME" /></translation>
+<translation id="2760805590727089264">MM/ÅÅ</translation>
 <translation id="2764001903315068341">Serietidningar</translation>
 <translation id="2765217105034171413">Liten</translation>
 <translation id="2768397283109119044">Du försökte nå <ph name="DOMAIN" /> men servern angav ett ogiltigt certifikat som har utfärdats till detta namn. Namnet är en reserverad IP-adress eller ett internt värdnamn.</translation>

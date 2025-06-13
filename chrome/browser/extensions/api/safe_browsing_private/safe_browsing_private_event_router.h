@@ -67,10 +67,10 @@ class SafeBrowsingPrivateEventRouter : public KeyedService {
   static const char kKeyThreatType[];
   static const char kKeyContentType[];
   static const char kKeyContentSize[];
+  static const char kKeyReferrers[];
   static const char kKeyTrigger[];
   static const char kKeyEventResult[];
   static const char kKeyScanId[];
-  static const char kKeyReferrers[];
   static const char kKeyIsFederated[];
   static const char kKeyFederatedOrigin[];
   static const char kKeyLoginUserName[];
@@ -152,6 +152,7 @@ class SafeBrowsingPrivateEventRouter : public KeyedService {
       safe_browsing::DeepScanAccessPoint access_point,
       const enterprise_connectors::ContentAnalysisResponse::Result& result,
       const int64_t content_size,
+      const safe_browsing::ReferrerChain& referrer_chain,
       enterprise_connectors::EventResult event_result);
 
   // Notifies listeners that an analysis connector violation was bypassed.
@@ -167,6 +168,7 @@ class SafeBrowsingPrivateEventRouter : public KeyedService {
       const std::string& scan_id,
       const std::string& content_transfer_method,
       safe_browsing::DeepScanAccessPoint access_point,
+      const safe_browsing::ReferrerChain& referrer_chain,
       const enterprise_connectors::ContentAnalysisResponse::Result& result,
       const int64_t content_size,
       std::optional<std::u16string> user_justification);
@@ -184,6 +186,7 @@ class SafeBrowsingPrivateEventRouter : public KeyedService {
                             const std::string& reason,
                             const std::string& content_transfer_method,
                             const int64_t content_size,
+                            const safe_browsing::ReferrerChain& referrer_chain,
                             enterprise_connectors::EventResult event_result);
 
   // Notifies listeners that the user saw a download warning.
@@ -279,6 +282,7 @@ class SafeBrowsingPrivateEventRouter : public KeyedService {
       const std::string& mime_type,
       const std::string& trigger,
       const int64_t content_size,
+      const safe_browsing::ReferrerChain& referrer_chain,
       enterprise_connectors::EventResult event_result,
       const std::string& scan_id,
       const std::string& content_transfer_method);
@@ -297,6 +301,7 @@ class SafeBrowsingPrivateEventRouter : public KeyedService {
       const std::string& content_transfer_method,
       const enterprise_connectors::ContentAnalysisResponse::Result& result,
       const int64_t content_size,
+      const safe_browsing::ReferrerChain& referrer_chain,
       enterprise_connectors::EventResult event_result);
 
   raw_ptr<content::BrowserContext> context_;

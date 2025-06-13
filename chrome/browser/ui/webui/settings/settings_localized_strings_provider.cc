@@ -622,6 +622,7 @@ void AddClearBrowsingDataStrings(content::WebUIDataSource* html_source,
       {"clearPasswords", IDS_SETTINGS_CLEAR_PASSWORDS},
       {"clearFormData", IDS_SETTINGS_CLEAR_FORM_DATA},
       {"clearHostedAppData", IDS_SETTINGS_CLEAR_HOSTED_APP_DATA},
+      {"clearPeriod15Min", IDS_SETTINGS_CLEAR_PERIOD_15_MIN},
       {"clearPeriod15Minutes", IDS_SETTINGS_CLEAR_PERIOD_15_MINUTES},
       {"clearPeriodHour", IDS_SETTINGS_CLEAR_PERIOD_HOUR},
       {"clearPeriod24Hours", IDS_SETTINGS_CLEAR_PERIOD_24_HOURS},
@@ -649,8 +650,11 @@ void AddClearBrowsingDataStrings(content::WebUIDataSource* html_source,
        IDS_SETTINGS_MANAGE_IN_GOOGLE_PASSWORD_MANAGER},
       {"searchHistory", IDS_SETTINGS_SEARCH_HISTORY},
       {"myActivity", IDS_SETTINGS_MY_ACTIVITY},
-      {"manageInYourGoogleAccount",
-       IDS_SETTINGS_MANAGE_IN_YOUR_GOOGLE_ACCOUNT}};
+      {"manageInYourGoogleAccount", IDS_SETTINGS_MANAGE_IN_YOUR_GOOGLE_ACCOUNT},
+      {"deletionConfirmationToast",
+       IDS_SETTINGS_DELETION_CONFIRMATION_TOAST_LABEL},
+      {"deletionConfirmationAllTimeToast",
+       IDS_SETTINGS_DELETION_CONFIRMATION_ALL_TIME_TOAST_LABEL}};
 
   html_source->AddString(
       "clearGoogleSearchHistoryGoogleDse",
@@ -1735,13 +1739,18 @@ void AddSyncControlsStrings(content::WebUIDataSource* html_source) {
       {"syncEverythingCheckboxLabel",
        IDS_SETTINGS_SYNC_EVERYTHING_CHECKBOX_LABEL},
       {"appCheckboxLabel", IDS_SETTINGS_APPS_CHECKBOX_LABEL},
-      {"paymentsCheckboxLabel", IDS_SYNC_DATATYPE_PAYMENTS},
       {"nonPersonalizedServicesSectionLabel",
        IDS_SETTINGS_NON_PERSONALIZED_SERVICES_SECTION_LABEL},
       {"customizeSyncLabel", IDS_SETTINGS_CUSTOMIZE_SYNC},
       {"syncData", IDS_SETTINGS_SYNC_DATA},
   };
   html_source->AddLocalizedStrings(kLocalizedStrings);
+  html_source->AddLocalizedString(
+      "paymentsCheckboxLabel",
+      base::FeatureList::IsEnabled(
+          autofill::features::kAutofillEnableLoyaltyCardsFilling)
+          ? IDS_SYNC_DATATYPE_PAYMENTS_AND_INFO
+          : IDS_SYNC_DATATYPE_PAYMENTS);
 }
 
 void AddPeopleStrings(content::WebUIDataSource* html_source, Profile* profile) {

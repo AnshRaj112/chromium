@@ -109,6 +109,7 @@
 <translation id="1419753403124156396">ចាប់ផ្ដើម Chrome ឡើងវិញឬ?</translation>
 <translation id="1428770807407000502">បិទ​សមកាលកម្មឬ?</translation>
 <translation id="1430915738399379752">បោះពុម្ព</translation>
+<translation id="1433478348197382180">មុខងារអាន</translation>
 <translation id="1435593198351412143">បើក PDF ដោយ​ស្វ័យប្រវត្តិ</translation>
 <translation id="1437543266176261764">កំពុងដំណើរការក្នុង <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">រៀបចំផលិតផលដែលអ្នកតាមដាននៅក្នុងចំណាំ</translation>
@@ -331,6 +332,7 @@
 <translation id="2524132927880411790">ចូលទៅកាន់ការស្វែងរក​តាម​សំឡេងនៅក្នុងកម្មវិធី Google</translation>
 <translation id="2527209463677295330">តាមរយៈ​ការរួមបញ្ចូល​អត្ថបទរបស់ទំព័រ​បន្ថែម អ្នកអាចមើលឃើញ​លទ្ធផលប្រសើរជាងមុន</translation>
 <translation id="2527779675047087889">លាក់ខ្លឹមសារឃ្លីបបត</translation>
+<translation id="2531209299761896527">ច្បិច សង្កត់ឱ្យជាប់ ហើយអូស​ទៅ​ផ្ទាំង​ដែលបើក​នៅក្នុង​វិនដូថ្មី</translation>
 <translation id="2532336938189706096">មើលគេហទំព័រ</translation>
 <translation id="253498598929009420">គេហទំព័រ​នេះ​នឹង​អាច​មើលឃើញ​ខ្លឹមសារ​​លើ​អេក្រង់​របស់​អ្នក</translation>
 <translation id="2535807170289627159">ផ្ទាំង​ទាំងអស់</translation>
@@ -1079,7 +1081,6 @@
 <translation id="5956665950594638604">បើកមជ្ឈមណ្ឌលជំនួយ Chrome នៅក្នុងផ្ទាំងថ្មី</translation>
 <translation id="59577092665511740">ជ្រើសរើស​គណនី។</translation>
 <translation id="5958275228015807058">ស្វែងរក​ឯកសារ​ និងទំព័ររបស់អ្នកនៅក្នុង ទាញយក</translation>
-<translation id="5958994127112619898">សម្រួលទំព័រ</translation>
 <translation id="5962718611393537961">ចុច​ដើម្បី​លាក់</translation>
 <translation id="5964869237734432770">ឈប់យក​ការពណ៌នា​អំពីរូបភាព</translation>
 <translation id="5975083100439434680">បង្រួម</translation>
@@ -1628,7 +1629,6 @@
 <translation id="8137562778192957619">អ្នកនឹង​មិនចាំបាច់​ចងចាំ​ពាក្យសម្ងាត់​នេះទេ។ ពាក្យសម្ងាត់នេះ​នឹងត្រូវបានរក្សាទុក​ទៅក្នុងកម្មវិធីគ្រប់គ្រងពាក្យសម្ងាត់។</translation>
 <translation id="8152331954420209374">ចូលទៅកាន់ Lens</translation>
 <translation id="8163820386638255770">ដើម្បីប្រើ និងរក្សាទុកពាក្យ​សម្ងាត់នៅក្នុងគណនី Google របស់អ្នក សូមផ្ទៀងផ្ទាត់ថាជាអ្នក</translation>
-<translation id="8179976553408161302">បញ្ចូល</translation>
 <translation id="8186512483418048923">នៅសល់ឯកសារចំនួន <ph name="FILES" /></translation>
 <translation id="8190358571722158785">នៅសល់ 1 ថ្ងៃទៀត</translation>
 <translation id="8192765420340770300">បានបើក​សន្លឹក​ខាងក្រោម​សម្រាប់​ចូលគណនី​ពេញអេក្រង់</translation>

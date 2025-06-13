@@ -109,6 +109,7 @@
 <translation id="1419753403124156396">Chrome रीस्टार्ट करायचे आहे का?</translation>
 <translation id="1428770807407000502">सिंक बंद करायचे आहे का?</translation>
 <translation id="1430915738399379752">प्रिंट</translation>
+<translation id="1433478348197382180">वाचन मोड</translation>
 <translation id="1435593198351412143">PDFs आपोआप उघडा</translation>
 <translation id="1437543266176261764"><ph name="APP_NAME" /> मध्ये रन होत आहे</translation>
 <translation id="1448440926884431741">तुमची माग ठेवलेली उत्पादने Bookmarks मध्ये व्यवस्थापित करा</translation>
@@ -1080,7 +1081,6 @@
 <translation id="5956665950594638604">नवीन टॅबमध्ये Chrome मदत केंद्र उघडा</translation>
 <translation id="59577092665511740">खाते निवडा.</translation>
 <translation id="5958275228015807058">तुमच्या फाइल आणि पेज डाउनलोडमध्ये शोधा</translation>
-<translation id="5958994127112619898">पेज सुलभ करा</translation>
 <translation id="5962718611393537961">संकुचित करण्‍यासाठी टॅप करा</translation>
 <translation id="5964869237734432770">इमेजची वर्णने थांबवा</translation>
 <translation id="5975083100439434680">झूम कमी करा</translation>
@@ -1629,7 +1629,6 @@
 <translation id="8137562778192957619">तुम्ही हा पासवर्ड लक्षात ठेवण्याची आवश्यकता नाही. तो Google Password Manager यामध्ये सेव्ह केला जाईल.</translation>
 <translation id="8152331954420209374">Lens वर जा</translation>
 <translation id="8163820386638255770">तुमच्या Google खाते मध्ये पासवर्ड वापरण्यासाठी आणि सेव्ह करण्यासाठी, हे तुम्हीच असल्याची पडताळणी करा</translation>
-<translation id="8179976553408161302">एंटर</translation>
 <translation id="8186512483418048923"><ph name="FILES" /> फाइल शिल्लक</translation>
 <translation id="8190358571722158785">1 दिवस शिल्लक</translation>
 <translation id="8192765420340770300">पूर्ण उंचीवर उघडलेल्या तळाशी असलेल्या शीटमध्ये साइन इन करा</translation>

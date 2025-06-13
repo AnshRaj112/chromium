@@ -75,6 +75,7 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_navigator.h"
+#include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window_state.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
@@ -125,6 +126,7 @@
 #include "chrome/browser/ui/views/frame/contents_layout_manager.h"
 #include "chrome/browser/ui/views/frame/immersive_mode_controller.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view_delegate.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
 #include "chrome/browser/ui/views/frame/native_browser_frame.h"
 #include "chrome/browser/ui/views/frame/scrim_view.h"
@@ -875,11 +877,12 @@ class BrowserViewLayoutDelegateImpl : public BrowserViewLayoutDelegate {
   }
 
   bool HasFindBarController() const override {
-    return browser_view_->browser()->HasFindBarController();
+    return browser_view_->browser()->GetFeatures().HasFindBarController();
   }
 
   void MoveWindowForFindBarIfNecessary() const override {
-    auto* const controller = browser_view_->browser()->GetFindBarController();
+    auto* const controller =
+        browser_view_->browser()->GetFeatures().GetFindBarController();
     return controller->find_bar()->MoveWindowIfNecessary();
   }
 
@@ -956,32 +959,6 @@ class BrowserView::AccessibilityModeObserver : public ui::AXModeObserver {
   const raw_ptr<BrowserView> browser_view_;
   base::ScopedObservation<ui::AXPlatform, ui::AXModeObserver>
       ax_mode_observation_{this};
-};
-
-///////////////////////////////////////////////////////////////////////////////
-// Delegate implementation for MultiContentsView. Usually just forwards calls
-// into BrowserView.
-class MultiContentsViewDelegateImpl : public MultiContentsView::Delegate {
- public:
-  explicit MultiContentsViewDelegateImpl(BrowserView* browser_view)
-      : browser_view_(browser_view) {}
-  MultiContentsViewDelegateImpl(const MultiContentsViewDelegateImpl&) = delete;
-  MultiContentsViewDelegateImpl& operator=(
-      const MultiContentsViewDelegateImpl&) = delete;
-  ~MultiContentsViewDelegateImpl() override = default;
-
-  void WebContentsFocused(content::WebContents* contents) override {
-    browser_view_->ActivateWebContents(contents);
-  }
-
-  void ResizeWebContents(double ratio) override {
-    browser_view_->ResizeWebContents(ratio);
-  }
-
-  void ReverseWebContents() override { browser_view_->ReverseWebContents(); }
-
- private:
-  raw_ptr<BrowserView> browser_view_;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1087,7 +1064,8 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
   views::View* contents_view;
   if (base::FeatureList::IsEnabled(features::kSideBySide)) {
     auto multi_contents_view = std::make_unique<MultiContentsView>(
-        this, std::make_unique<MultiContentsViewDelegateImpl>(this));
+        this, std::make_unique<MultiContentsViewDelegateImpl>(
+                  *browser_->tab_strip_model()));
     multi_contents_view_ =
         contents_container->AddChildView(std::move(multi_contents_view));
     multi_contents_view_->SetID(VIEW_ID_TAB_CONTAINER);
@@ -4903,35 +4881,6 @@ void BrowserView::MaybeUpdateStoredFocusForWebContents(
       views::AsViewClass<ContentsWebView>(focus_helper->GetStoredFocus());
   if (focused_view && focused_view->web_contents() != web_contents) {
     focus_helper->SetStoredFocusView(GetContentsView());
-  }
-}
-
-void BrowserView::ReverseWebContents() {
-  CHECK(multi_contents_view_);
-  const int active_index = browser_->tab_strip_model()->active_index();
-
-  std::optional<split_tabs::SplitTabId> split_tab_id =
-      browser_->tab_strip_model()->GetTabAtIndex(active_index)->GetSplit();
-
-  CHECK(split_tab_id.has_value());
-  browser_->tab_strip_model()->ReverseTabsInSplit(split_tab_id.value());
-}
-
-void BrowserView::ResizeWebContents(double start_ratio) {
-  const tabs::TabInterface* active_tab =
-      browser_->tab_strip_model()->GetActiveTab();
-
-  if (active_tab->GetSplit().has_value()) {
-    browser_->tab_strip_model()->UpdateSplitRatio(
-        active_tab->GetSplit().value(), start_ratio);
-  }
-}
-
-void BrowserView::ActivateWebContents(content::WebContents* web_contents) {
-  int tab_index =
-      browser_->tab_strip_model()->GetIndexOfWebContents(web_contents);
-  if (tab_index != TabStripModel::kNoTab) {
-    browser_->tab_strip_model()->ActivateTabAt(tab_index);
   }
 }
 

@@ -58,7 +58,6 @@
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/favicon_size.h"
 #include "ui/gfx/geometry/resize_utils.h"
-#include "ui/gfx/geometry/rounded_corners_f.h"
 #include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
@@ -784,6 +783,12 @@ void VideoOverlayWindowViews::UpdateControlsBounds() {
 bool VideoOverlayWindowViews::IsLayoutPendingForTesting() const {
   return update_controls_bounds_timer_ &&
          update_controls_bounds_timer_->IsRunning();
+}
+
+void VideoOverlayWindowViews::FinishTuckAnimationForTesting() {
+  if (tucker_) {
+    tucker_->FinishAnimationForTesting();  // IN-TEST
+  }
 }
 
 void VideoOverlayWindowViews::OnDisplayMetricsChanged(

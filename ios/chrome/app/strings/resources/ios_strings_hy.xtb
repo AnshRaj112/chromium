@@ -611,7 +611,6 @@
 <translation id="3557336313807607643">Ավելացնել կոնտակտներում</translation>
 <translation id="355765753469272474">Հետարկել</translation>
 <translation id="3565930036634619844">Ներդիր։ Էջ <ph name="TAB_INDEX" />՝ <ph name="NUMBER_OF_TABS" />-ից։</translation>
-<translation id="3570693105179140209">Կրկնակի հպեք՝ ավելի շատ գաղտնաբառեր տեսնելու համար։</translation>
 <translation id="3572607909481582402">Ձեր Google հաշվում</translation>
 <translation id="3575234738189584619">Որոնել Տեսապակու միջոցով</translation>
 <translation id="3575426792457739946">Այս ցանկը պարունակում է բոլոր բեռնված պրոֆիլները։</translation>
@@ -654,7 +653,6 @@
 <translation id="3779810277399252432">Կապ չկա</translation>
 <translation id="3782614601387961027">Փակել նախազգուշացումը</translation>
 <translation id="3789841737615482174">Տեղադրել</translation>
-<translation id="3795478177331815672">Բաց ներդիրներ և ներդիրների խմբեր</translation>
 <translation id="380329542618494757">Անուն</translation>
 <translation id="3803696231112616155">Առաջարկել այս կայքի թագմանությունը</translation>
 <translation id="3808311849069021992">Ցույց տալ որոնողական համակարգի մանրամասները</translation>
@@ -700,7 +698,6 @@
 <translation id="3955740319737378355">Պատրաստ է</translation>
 <translation id="3955822496205734389">Դուք ունեք թույլ գաղտնաբառեր։</translation>
 <translation id="3958312024468322930">Քաշեք պատկերակը Dock վահանակի վրա՝ հիմնական էկրանի ներքևում</translation>
-<translation id="3960218941754097036">Որոնեք ցանկացած բան ձեր էկրանին Google Տեսապակու միջոցով</translation>
 <translation id="3962326069546168954">Պահել</translation>
 <translation id="3967327056943561740">Էջանիշներ</translation>
 <translation id="3967822245660637423">Ներբեռնումն ավարտվեց</translation>
@@ -1446,6 +1443,7 @@ Handoff-ը պետք է միացված լինի նաև Կարգավորումնե
 <translation id="6831043979455480757">Թարգմանել</translation>
 <translation id="6842136130964845393">Հաստատեք ձեր ինքնությունը, որպեսզի պահված գաղտնաբառերը միշտ հասանելի լինեն ձեզ</translation>
 <translation id="6851516051005285358">Համակարգչային տարբերակ</translation>
+<translation id="6857446173140146664">Ջնջել ֆոնը</translation>
 <translation id="6858718102216837409">Ավելացնել լեզու…</translation>
 <translation id="6858855187367714033">Սկանավորվեց</translation>
 <translation id="6859944681507688231">QR կոդ կամ վարկային քարտ սկանավորելու համար կարգավորումներում միացրեք ֆոտոխցիկը:</translation>
@@ -1813,6 +1811,7 @@ Handoff-ը պետք է միացված լինի նաև Կարգավորումնե
 <translation id="8343993175958086504">Պահուստավորեք ձեր տվյալները և օգտագործեք դրանք ցանկացած սարքում։</translation>
 <translation id="8348530355586151720">Հպեք եռակետ ընտրացանկին</translation>
 <translation id="8349305172487531364">Էջանիշների գոտի</translation>
+<translation id="8363484128299778310">Ժամանակավոր վերականգնում խնդիրների դեպքում</translation>
 <translation id="8364563001733875155">Ձեր PIN կոդը փոխելու համար նախ սարքում կարգավորեք անցակոդ։</translation>
 <translation id="8366466717204352506">Ստուգում երբեք չի կատարվել</translation>
 <translation id="8368001212524806591">Հետևել գներին</translation>

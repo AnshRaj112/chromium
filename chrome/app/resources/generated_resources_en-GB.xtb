@@ -785,7 +785,6 @@ Permissions that you've already given to apps may apply to this account. You can
 <translation id="1542524755306892917">This allows Google Assistant to provide tailored responses when <ph name="SUPERVISED_USER_NAME" /> asks questions.</translation>
 <translation id="1543284117603151572">Imported From Edge</translation>
 <translation id="1543538514740974167">Get here quicker</translation>
-<translation id="154420222899071768">Your password wasn't updated, but you should still be able to access the site with your old password</translation>
 <translation id="1544588554445317666">Try using a shorter file name or saving to a different folder</translation>
 <translation id="1545177026077493356">Automatic Kiosk Mode</translation>
 <translation id="1545749641540134597">Scan QR Code</translation>
@@ -2337,7 +2336,6 @@ You can manage this account’s settings by installing the Family Link app on yo
 <translation id="2588636910004461974">Devices from <ph name="VENDOR_NAME" /></translation>
 <translation id="2589658397149952302">Never show Drive files</translation>
 <translation id="2593499352046705383">Before starting, make sure that you have a backup of your data. Installing <ph name="DEVICE_OS" /> will overwrite your hard drive. Learn more at g.co/flex/InstallGuide.</translation>
-<translation id="2594832159966169099">Manage V8 security</translation>
 <translation id="2597073208962000830">Nearby Share uses Bluetooth scanning to find nearby devices.</translation>
 <translation id="2598136842498757793">Customise toolbar buttons</translation>
 <translation id="2598710988533271874">New Chrome available</translation>
@@ -4805,7 +4803,7 @@ You can manage this account’s settings by installing the Family Link app on yo
 <translation id="4320177379694898372">No internet connection</translation>
 <translation id="4321179778687042513">ctrl</translation>
 <translation id="432160826079505197">Show <ph name="FILE_NAME" /> in finder</translation>
-<translation id="4322394346347055525">Close Other Tabs</translation>
+<translation id="4322394346347055525">Close other tabs</translation>
 <translation id="4324577459193912240">File incomplete</translation>
 <translation id="4325237902968425115">Uninstalling <ph name="LINUX_APP_NAME" />…</translation>
 <translation id="4325433082696797523">Storage and power</translation>
@@ -7029,7 +7027,6 @@ You can assign multiple switches to this action.</translation>
 <translation id="594221546068848596">Search page with <ph name="VISUAL_SEARCH_PROVIDER" /></translation>
 <translation id="5942779427914696408">Device visibility</translation>
 <translation id="5943127421590245687">Your verification was successful. To unlock and restore your local data, please enter your old <ph name="DEVICE_TYPE" /> password.</translation>
-<translation id="5943209617717087975"><ph name="THIRD_PARTY_NTP_MANAGER" /> is managing your new tab page</translation>
 <translation id="5945002094477276055"><ph name="FILE_NAME" /> may be dangerous. Send to Google Safe Browsing for scanning?</translation>
 <translation id="5945192511027649793">Disable touchpad</translation>
 <translation id="5945363896952315544">Your security key can't store any more fingerprints. To add a new one, first delete an existing fingerprint.</translation>
@@ -8443,7 +8440,7 @@ You have # more compromised passwords. Google Password Manager recommends checki
 <translation id="6963772203726867701">Not detected</translation>
 <translation id="6963872466817251924">Text cursor highlighter</translation>
 <translation id="6964390816189577014">Hero</translation>
-<translation id="6964760285928603117">Remove From Group</translation>
+<translation id="6964760285928603117">Remove from group</translation>
 <translation id="6965382102122355670">OK</translation>
 <translation id="6965607054907047032">Free up memory based on tab inactivity</translation>
 <translation id="6965648386495488594">Port</translation>

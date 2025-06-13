@@ -109,6 +109,7 @@ Siirry <ph name="BEGIN_LINK2" />Googlen palveluihin<ph name="END_LINK2" />, jos 
 <translation id="1419753403124156396">Käynnistetäänkö Chrome uudelleen?</translation>
 <translation id="1428770807407000502">Laitetaanko synkronointi pois päältä?</translation>
 <translation id="1430915738399379752">Tulosta</translation>
+<translation id="1433478348197382180">Lukutila</translation>
 <translation id="1435593198351412143">Avaa PDF-tiedostot automaattisesti</translation>
 <translation id="1437543266176261764">Käynnissä: <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Järjestele seurattuja tuotteita kirjanmerkeissä</translation>
@@ -331,6 +332,7 @@ Salattua dataa voi lukea vain tunnuslauseen avulla. Tunnuslausetta ei lähetetä
 <translation id="2524132927880411790">Siirry Google-sovelluksen puhehakuun</translation>
 <translation id="2527209463677295330">Voit saada parempia tuloksia, jos sisällytät enemmän tekstiä sivulta</translation>
 <translation id="2527779675047087889">Piilota leikepöydän sisältö</translation>
+<translation id="2531209299761896527">Avaa välilehdet uuteen ikkunaan nipistämällä, pitämällä painettuna ja vetämällä</translation>
 <translation id="2532336938189706096">Verkkonäkymä</translation>
 <translation id="253498598929009420">Sivusto voi nähdä näytön sisällön</translation>
 <translation id="2535807170289627159">Kaikki välilehdet</translation>
@@ -1079,7 +1081,6 @@ Google-tililläsi voi olla muita selaushistoriatietoja, kuten hakuja ja toiminta
 <translation id="5956665950594638604">Avaa Chromen ohjekeskus uudella välilehdellä</translation>
 <translation id="59577092665511740">Valitse tili.</translation>
 <translation id="5958275228015807058">Löydät tiedostosi ja sivusi Latauksista</translation>
-<translation id="5958994127112619898">Yksinkertaista sivua</translation>
 <translation id="5962718611393537961">Tiivistä napauttamalla.</translation>
 <translation id="5964869237734432770">Lopeta kuvaselitykset</translation>
 <translation id="5975083100439434680">Loitonna</translation>
@@ -1628,7 +1629,6 @@ Jos haluat muuttaa tätä asetusta, <ph name="BEGIN_LINK" />poista tilin Chrome-
 <translation id="8137562778192957619">Sinun ei tarvitse muistaa tätä salasanaa. Se tallennetaan Google Salasanoihin.</translation>
 <translation id="8152331954420209374">Siirry Lensiin</translation>
 <translation id="8163820386638255770">Salasanojen käyttö ja tallennus Google-tilillä edellyttää, että vahvistat henkilöllisyytesi</translation>
-<translation id="8179976553408161302">Enter</translation>
 <translation id="8186512483418048923"><ph name="FILES" /> tiedostoa jäljellä</translation>
 <translation id="8190358571722158785">1 päivä jäljellä</translation>
 <translation id="8192765420340770300">Kirjautumisen alapaneeli avattu kokonaan</translation>

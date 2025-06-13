@@ -5511,7 +5511,7 @@ data/accessibility/html/tabindex-with-link-children.html
 data/accessibility/html/table-canvas-fallback-expected-blink.txt
 data/accessibility/html/table-canvas-fallback.html
 data/accessibility/html/table-column-remove-expected-blink.txt
-data/accessibility/html/table-column-remove-expected-mac.txt
+data/accessibility/html/table-column-remove-expected-fuchsia.txt
 data/accessibility/html/table-column-remove.html
 data/accessibility/html/table-focusable-sections-expected-android-assist-data.txt
 data/accessibility/html/table-focusable-sections-expected-android-external.txt
@@ -6842,7 +6842,6 @@ data/dom_storage/crash_recovery.html
 data/dom_storage/sanity_check.html
 data/dom_storage/sanity_check.js
 data/dom_storage/store_data.html
-data/dom_storage/store_data_task.html
 data/dom_storage/store_session_storage_data.html
 data/dom_storage/verify_data.html
 data/dom_storage/verify_session_storage_data.html

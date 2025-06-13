@@ -684,7 +684,7 @@ PaymentsDataManager::GetApplicableBenefitDescriptionForCardAndOrigin(
   if (optimization_guide) {
     CreditCardCategoryBenefit::BenefitCategory category_benefit_type =
         optimization_guide->AttemptToGetEligibleCreditCardBenefitCategory(
-            credit_card.issuer_id(), origin.GetURL());
+            credit_card.benefit_source(), origin.GetURL());
     if (category_benefit_type !=
         CreditCardCategoryBenefit::BenefitCategory::kUnknownBenefitCategory) {
       std::optional<CreditCardCategoryBenefit> category_benefit =
@@ -700,7 +700,16 @@ PaymentsDataManager::GetApplicableBenefitDescriptionForCardAndOrigin(
   std::optional<CreditCardFlatRateBenefit> flat_rate_benefit =
       GetFlatRateBenefitByInstrumentId(benefit_instrument_id);
   if (flat_rate_benefit && flat_rate_benefit->IsActiveBenefit()) {
-    return flat_rate_benefit->benefit_description();
+    // Return empty string if flat rate benefit is blocked on the current
+    // merchant.
+    return base::FeatureList::IsEnabled(
+               features::kAutofillEnableFlatRateCardBenefitsBlocklist) &&
+                   optimization_guide &&
+                   optimization_guide
+                       ->ShouldBlockFlatRateBenefitSuggestionLabelsForUrl(
+                           origin.GetURL())
+               ? std::u16string()
+               : flat_rate_benefit->benefit_description();
   }
 
   // No eligible benefit to display.
@@ -2009,6 +2018,16 @@ void PaymentsDataManager::AddCreditCardBenefitForTest(
 
 bool PaymentsDataManager::IsFacilitatedPaymentsPixUserPrefEnabled() const {
   return prefs::IsFacilitatedPaymentsPixEnabled(pref_service_);
+}
+
+void PaymentsDataManager::SetFacilitatedPaymentsPixAccountLinkingUserPref(
+    bool enabled) {
+  prefs::SetFacilitatedPaymentsPixAccountLinking(pref_service_, enabled);
+}
+
+bool PaymentsDataManager::
+    IsFacilitatedPaymentsPixAccountLinkingUserPrefEnabled() const {
+  return prefs::IsFacilitatedPaymentsPixAccountLinkingEnabled(pref_service_);
 }
 
 bool PaymentsDataManager::IsFacilitatedPaymentsEwalletUserPrefEnabled() const {

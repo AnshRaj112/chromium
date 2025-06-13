@@ -786,7 +786,6 @@ Povolenia, ktoré ste už udelili aplikáciám, sa môžu vzťahovať na tento �
 <translation id="1542524755306892917">Asistent Google tak bude môcť poskytovať prispôsobené odpovede, keď sa <ph name="SUPERVISED_USER_NAME" /> na niečo spýta.</translation>
 <translation id="1543284117603151572">Importované z prehliadača Edge</translation>
 <translation id="1543538514740974167">Prechádzajte rýchlejšie</translation>
-<translation id="154420222899071768">Vaše heslo nebolo aktualizované, ale prístup na daný web by ste stále mali mať pomocou starého hesla</translation>
 <translation id="1544588554445317666">Skúste použiť iný názov súboru alebo ho uložiť do iného priečinka</translation>
 <translation id="1545177026077493356">Automatický režim verejného terminálu</translation>
 <translation id="1545749641540134597">Naskenovať kód QR</translation>
@@ -2326,7 +2325,6 @@ Ak chcete spravovať nastavenia tohto účtu, nainštalujte si do zariadenia apl
 <translation id="2588636910004461974">Zariadenia od dodávateľa <ph name="VENDOR_NAME" /></translation>
 <translation id="2589658397149952302">Nikdy nezobrazovať súbory na Disku</translation>
 <translation id="2593499352046705383">Pred začatím skontrolujte, či máte zálohu údajov. Inštaláciou operačného systému <ph name="DEVICE_OS" /> prepíšete pevný disk. Viac sa dozviete na g.co/flex/InstallGuide.</translation>
-<translation id="2594832159966169099">Spravovať zabezpečenie V8</translation>
 <translation id="2597073208962000830">Zdieľanie nablízku nájde zariadenia v okolí vyhľadávaním rozhraním Bluetooth.</translation>
 <translation id="2598136842498757793">Prispôsobiť tlačidlá panela s nástrojmi</translation>
 <translation id="2598710988533271874">K dispozícii je nový Chrome</translation>
@@ -7016,7 +7014,6 @@ Tejto akcii môžete prideliť viacero prepínačov.</translation>
 <translation id="594221546068848596">Hľadať na stránke pomocou služby <ph name="VISUAL_SEARCH_PROVIDER" /></translation>
 <translation id="5942779427914696408">Viditeľnosť zariadenia</translation>
 <translation id="5943127421590245687">Overenie bolo úspešné. Ak chcete zariadenie odomknúť a obnoviť svoje miestne údaje, zadajte staré heslo pre zariadenie <ph name="DEVICE_TYPE" />.</translation>
-<translation id="5943209617717087975">Vašu stránku na novej karte spravuje <ph name="THIRD_PARTY_NTP_MANAGER" /></translation>
 <translation id="5945002094477276055">Súbor <ph name="FILE_NAME" /> môže byť nebezpečný. Chcete ho odoslať do Bezpečného prehliadania Google na kontrolu?</translation>
 <translation id="5945192511027649793">Vypnúť touchpad</translation>
 <translation id="5945363896952315544">V bezpečnostnom kľúči už nemôžete uložiť žiadne ďalšie odtlačky prstov. Ak chcete pridať nový, najprv odstráňte niektorý z existujúcich.</translation>

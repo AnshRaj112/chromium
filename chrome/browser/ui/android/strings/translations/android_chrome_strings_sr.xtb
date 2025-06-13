@@ -109,6 +109,7 @@
 <translation id="1419753403124156396">Желите да поново покренете Chrome?</translation>
 <translation id="1428770807407000502">Желите да искључите синхронизацију?</translation>
 <translation id="1430915738399379752">Штампај</translation>
+<translation id="1433478348197382180">Режим читања</translation>
 <translation id="1435593198351412143">Аутоматски отварај PDF-ове</translation>
 <translation id="1437543266176261764">Користи <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Организујте производе које пратите у Обележивачима</translation>
@@ -331,6 +332,7 @@
 <translation id="2524132927880411790">Иди на гласовну претрагу апликације Google</translation>
 <translation id="2527209463677295330">Ако уврстите већи део текста странице, можете да добијете боље резултате</translation>
 <translation id="2527779675047087889">Сакриј садржај привремене меморије</translation>
+<translation id="2531209299761896527">Уштините, задржавајте и превлачите да бисте отварали картице у новом прозору</translation>
 <translation id="2532336938189706096">Веб-приказ</translation>
 <translation id="253498598929009420">Сајт ће моћи да види садржај вашег екрана</translation>
 <translation id="2535807170289627159">Све картице</translation>
@@ -1079,7 +1081,6 @@ Google налог можда има друге облике историје п�
 <translation id="5956665950594638604">Отварање Chrome центра за помоћ на новој картици</translation>
 <translation id="59577092665511740">Изаберите налог.</translation>
 <translation id="5958275228015807058">Пронађите датотеке и странице у Преузимањима</translation>
-<translation id="5958994127112619898">Поједностави страницу</translation>
 <translation id="5962718611393537961">Додирните да бисте скупили</translation>
 <translation id="5964869237734432770">Заустави описе слика</translation>
 <translation id="5975083100439434680">Умањивање</translation>
@@ -1628,7 +1629,6 @@ Google налог можда има друге облике историје п�
 <translation id="8137562778192957619">Не морате да запамтите ову лозинку. Чува се у Google менаџеру лозинки.</translation>
 <translation id="8152331954420209374">Иди на Објектив</translation>
 <translation id="8163820386638255770">Да бисте користили и чували лозинке на Google налогу, потврдите свој идентитет</translation>
-<translation id="8179976553408161302">Enter</translation>
 <translation id="8186512483418048923">Преостале датотеке: <ph name="FILES" /></translation>
 <translation id="8190358571722158785">Још 1 дан</translation>
 <translation id="8192765420340770300">Доња табела за пријављивање је отворена у пуној висини</translation>

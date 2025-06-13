@@ -27,7 +27,6 @@
 #include "chrome/browser/ui/ash/quick_answers/ui/typography.h"
 #include "chrome/browser/ui/ash/read_write_cards/read_write_cards_ui_controller.h"
 #include "chrome/browser/ui/ash/read_write_cards/read_write_cards_view.h"
-#include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chromeos/components/magic_boost/public/cpp/views/experiment_badge.h"
 #include "chromeos/components/quick_answers/public/cpp/constants.h"
 #include "chromeos/components/quick_answers/quick_answers_model.h"
@@ -628,14 +627,14 @@ void QuickAnswersView::ShowRetryView() {
   SwitchTo(retry_view_);
 }
 
-bool QuickAnswersView::ShouldAddPhoneticsAudioButton(ResultType result_type,
-                                                     GURL phonetics_audio,
-                                                     bool tts_audio_enabled) {
+bool QuickAnswersView::ShouldAddPhoneticsAudioButton(
+    ResultType result_type,
+    const quick_answers::PhoneticsInfo& phonetics_info) {
   if (result_type != ResultType::kDefinitionResult) {
     return false;
   }
 
-  return !phonetics_audio.is_empty() || tts_audio_enabled;
+  return phonetics_info.PhoneticsInfoAvailable();
 }
 
 void QuickAnswersView::SetMockGenerateTtsCallbackForTesting(

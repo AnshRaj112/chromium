@@ -1804,26 +1804,6 @@
     "expires": "never"
   },
   {
-    "prefix": "keepalive-in-browser-migration",
-    "owners": ["mych@chromium.org"],
-    "platforms": ["Linux", "Mac", "Win"],
-    "bases": [
-      "external/wpt/background-fetch/",
-      "external/wpt/beacon/",
-      "external/wpt/content-security-policy/connect-src/connect-src-beacon-allowed.sub.html",
-      "external/wpt/content-security-policy/connect-src/connect-src-beacon-blocked.sub.html",
-      "external/wpt/content-security-policy/connect-src/connect-src-beacon-redirect-to-blocked.sub.html",
-      "external/wpt/content-security-policy/reporting/",
-      "external/wpt/fetch/",
-      "external/wpt/xhr/"
-    ],
-    "args": [
-      "--enable-features=KeepAliveInBrowserMigration",
-      "--disable-features=DeprecateUnload"
-    ],
-    "expires": "Apr 1, 2024"
-  },
-  {
     "prefix": "text-size-adjust",
     "owners": ["pdr@chromium.org"],
     "platforms": ["Linux", "Mac"],
@@ -4348,5 +4328,158 @@
       "--enable-features=CSSDoNotHideVisitedColor"
     ],
     "expires": "Jun 3, 2026"
+  },
+  {
+    "prefix": "log-dns-prefetch-and-preconnect",
+    "owners": [
+      "leimy@google.com"
+    ],
+    "platforms": [
+      "Linux",
+      "Mac",
+      "Win",
+      "Fuchsia"
+    ],
+    "bases": [
+      "http/tests/linkHeader/link-dnsprefetch-valid.php",
+      "http/tests/linkHeader/link-header-skips-invalid-headers.php",
+      "http/tests/linkHeader/link-preconnect-schemeless.https.php",
+      "http/tests/linkHeader/link-preconnect-schemeless.php",
+      "http/tests/linkHeader/link-preconnect-valid.php"
+    ],
+    "exclusive_tests": "ALL",
+    "args": [
+      "--web-settings-for-testing=logDnsPrefetchAndPreconnect:true"
+    ],
+    "expires": "never"
+  },
+  {
+    "prefix": "log-preload",
+    "owners": [
+      "leimy@google.com"
+    ],
+    "platforms": [
+      "Linux",
+      "Mac",
+      "Win",
+      "Fuchsia"
+    ],
+    "bases": [
+      "http/tests/linkHeader/link-header-preload-fetchpriority.php"
+    ],
+    "exclusive_tests": "ALL",
+    "args": [
+      "--web-settings-for-testing=logPreload:true"
+    ],
+    "expires": "never"
+  },
+  {
+    "prefix": "autoplay-policy-no-user-gesture-required",
+    "owners": [
+      "leimy@google.com"
+    ],
+    "platforms": [
+      "Linux",
+      "Mac",
+      "Win",
+      "Fuchsia"
+    ],
+    "bases": [
+      "http/tests/media/autoplay/document-user-activation-navigation-nogesture.html"
+    ],
+    "exclusive_tests": "ALL",
+    "args": [
+      "--web-settings-for-testing=autoplayPolicy:2"
+    ],
+    "expires": "never"
+  },
+  {
+    "prefix": "viewport-and-meta-enabled",
+    "owners": [
+      "leimy@google.com"
+    ],
+    "platforms": [
+      "Linux",
+      "Mac",
+      "Win",
+      "Fuchsia"
+    ],
+    "bases": [
+      "http/tests/preload/meta-viewport-link-headers-imagesrcset.php"
+    ],
+    "exclusive_tests": "ALL",
+    "args": [
+      "--web-settings-for-testing=viewportEnabled:true,viewportMetaEnabled:true"
+    ],
+    "expires": "never"
+  },
+  {
+    "prefix": "image-disabled",
+    "owners": [
+      "leimy@google.com"
+    ],
+    "platforms": [
+      "Linux",
+      "Mac",
+      "Win",
+      "Fuchsia"
+    ],
+    "bases": [
+      "fast/loader/data-images-with-images-disabled.html"
+    ],
+    "exclusive_tests": "ALL",
+    "args": [
+      "--web-settings-for-testing=imagesEnabled:false"
+    ],
+    "expires": "never"
+  },
+  {
+    "prefix": "target-device-scale-factor-2",
+    "owners": [
+      "leimy@google.com"
+    ],
+    "platforms": [
+      "Linux",
+      "Mac",
+      "Win",
+      "Fuchsia"
+    ],
+    "bases": [
+      "fast/hidpi/2x",
+      "fast/dom/HTMLImageElement/image-sizes-2x.html",
+      "fast/dom/HTMLImageElement/image-sizes-js-change.html",
+      "http/tests/loading/link-preload-image-sizes-2x.html",
+      "http/tests/loading/link-preload-image-srcset-2x.html",
+      "http/tests/loading/preload-image-sizes-2x.html",
+      "http/tests/loading/preload-image-srcset-2x.html",
+      "http/tests/loading/preload-picture-sizes-2x.html",
+      "svg/css/svg-resource-fragment-identifier-background-srcset.html",
+      "svg/css/svg-resource-fragment-identifier-img-src.html"
+    ],
+    "exclusive_tests": "ALL",
+    "args": [
+      "--target-device-scale-for-testing=2"
+    ],
+    "expires": "never"
+  },
+  {
+    "prefix": "target-device-scale-factor-2_5",
+    "owners": [
+      "leimy@google.com"
+    ],
+    "platforms": [
+      "Linux",
+      "Mac",
+      "Win",
+      "Fuchsia"
+    ],
+    "bases": [
+      "fast/hidpi/image-srcset-fraction.html"
+    ],
+    "exclusive_tests": "ALL",
+    "args": [
+      "--target-device-scale-for-testing=2.5"
+    ],
+    "expires": "never"
   }
 ]

@@ -788,7 +788,6 @@ Leidimai, kuriuos jau esate suteikę programoms, gali būti taikomi šiai paskyr
 <translation id="1542524755306892917">Taip, „Google“ padėjėjas gali teikti pritaikytus atsakymus, kai <ph name="SUPERVISED_USER_NAME" /> užduoda klausimų.</translation>
 <translation id="1543284117603151572">Importuota iš „Edge“</translation>
 <translation id="1543538514740974167">Spartesnė prieiga</translation>
-<translation id="154420222899071768">Slaptažodis nebuvo atnaujintas, bet vis tiek turėtumėte galėti pasiekti svetainę naudodami senąjį slaptažodį</translation>
 <translation id="1544588554445317666">Bandykite naudoti trumpesnį pavadinimą arba išsaugoti kitame aplanke</translation>
 <translation id="1545177026077493356">Automatinis viešojo terminalo režimas</translation>
 <translation id="1545749641540134597">Nuskaitykite QR kodą</translation>
@@ -2340,7 +2339,6 @@ Jei nenorite, dabar atsijunkite, kad šios paskyros pakeitimai būtų matomi ši
 <translation id="2588636910004461974">Įrenginiai iš „<ph name="VENDOR_NAME" />“</translation>
 <translation id="2589658397149952302">Niekada nerodyti Disko failų</translation>
 <translation id="2593499352046705383">Prieš pradėdami, patikrinkite, ar turite atsarginę duomenų kopiją. Įdiegiant „<ph name="DEVICE_OS" />“ bus perrašytas standusis diskas. Sužinokite daugiau adresu g.co/flex/InstallGuide.</translation>
-<translation id="2594832159966169099">V8 saugos tvarkymas</translation>
 <translation id="2597073208962000830">Bendrinimo netoliese funkcija naudoja „Bluetooth“ nuskaitymą, kad rastų įrenginius netoliese.</translation>
 <translation id="2598136842498757793">Tinkinti įrankių juostos mygtukus</translation>
 <translation id="2598710988533271874">Pasiekiama nauja „Chrome“</translation>
@@ -7033,7 +7031,6 @@ Jei norite nutolinti, naudokite „Ctrl“ + „Alt“ + šviesumo mažinimo kla
 <translation id="594221546068848596">Paieškos puslapis naudojant „<ph name="VISUAL_SEARCH_PROVIDER" />“</translation>
 <translation id="5942779427914696408">Įrenginio matomumas</translation>
 <translation id="5943127421590245687">Patvirtinta sėkmingai. Kad galėtumėte atrakinti ir atkurti vietinius duomenis, įveskite seną „<ph name="DEVICE_TYPE" />“ slaptažodį.</translation>
-<translation id="5943209617717087975">„<ph name="THIRD_PARTY_NTP_MANAGER" />“ tvarko jūsų naujo skirtuko puslapį</translation>
 <translation id="5945002094477276055">Failas „<ph name="FILE_NAME" />“ gali būti pavojingas. Siųsti „Google“ saugaus naršymo funkcijai, kad nuskaitytų?</translation>
 <translation id="5945192511027649793">Išjungti jutiklinę dalį</translation>
 <translation id="5945363896952315544">Naudojant jūsų saugos raktą nebegalima išsaugoti daugiau kontrolinių kodų. Norėdami pridėti naują, pirmiausia ištrinkite kurį nors esamą kontrolinį kodą.</translation>

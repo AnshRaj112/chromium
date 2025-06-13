@@ -303,11 +303,6 @@
       name: "AdjustEndOfNextParagraphIfMovedParagraphIsUpdated",
       status: "stable",
     },
-    // See crbug.com/41115285
-    {
-      name: "AdjustStartOfParagraphToMoveDuringIndent",
-      status: "stable",
-    },
     {
       name: "AdTagging",
       public: true,
@@ -893,12 +888,6 @@
     // and can be removed in M140.
     {
       name: "ClearPopoverInvokerAfterBeforeToggle",
-      status: "stable",
-    },
-    // crbug.com/40851596: Send click to the capture pointer target instead of
-    // the common ancestor of pointerdown and pointerup targets.
-    {
-      name: "ClickToCapturedPointer",
       status: "stable",
     },
     {
@@ -1589,6 +1578,11 @@
       status: "experimental",
     },
     {
+      // crbug.com/41442840: Enabled by default on M139, remove after M141.
+      name: "CSSTransitionNoneRunningTransitionsFix",
+      status: "stable",
+    },
+    {
       // Support for tree-scoped [1] timeline names (e.g. produced by
       // scroll-timeline).
       //
@@ -1644,6 +1638,12 @@
       name: "CustomizableSelectInPage",
       status: "experimental",
       depends_on: ["CustomizableSelect"],
+    },
+    {
+      // appearance:base-select for <select multiple size=1> with a picker.
+      name: "CustomizableSelectMultiplePopup",
+      status: "experimental",
+      depends_on: ["CustomizableSelectInPage"],
     },
     {
       // Replaces \r\n and \r with \n in setCustomValidity.
@@ -2569,7 +2569,7 @@
     {
       name: "HTMLCommandRequestClose",
       depends_on: ["HTMLCommandAttributes"],
-      status: "experimental",
+      status: "stable",
     },
     // The `<embed>` should follow the specification, layout is not forced
     // when the `type` attribute is set to `image`.
@@ -2686,12 +2686,6 @@
       // crbug.com/420639769
       name: "ImprovedSourceRetargeting",
       status: "experimental",
-    },
-    // This ensures that table tag is included in extended selection.
-    // https://crbug.com/40833812
-    {
-      name: "IncludeTableTagInExtendedSelection",
-      status: "stable",
     },
     {
       name: "IncomingCallNotifications",
@@ -2907,10 +2901,6 @@
     },
     {
       name: "LayoutMinSizeAutoIndefinite",
-      status: "stable",
-    },
-    {
-      name: "LayoutMinSizeIndefinite",
       status: "stable",
     },
     {
@@ -3564,11 +3554,6 @@
       name: "PasswordReveal",
     },
     {
-      // https://crbug.com/41247646
-      name: "PasteListItemOutsidePreviousListItem",
-      status: "stable",
-    },
-    {
       name: "PaymentApp",
       public: true,
       status: "experimental",
@@ -4128,7 +4113,7 @@
     },
     {
       name: "RTCEncodedFrameAudioLevel",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "RTCEncodedFrameSetMetadata",
@@ -5043,9 +5028,9 @@
     {
       name: "TranslationAPI",
       status: {
-        "Win": "experimental",
-        "Mac": "experimental",
-        "Linux": "experimental",
+        "Win": "stable",
+        "Mac": "stable",
+        "Linux": "stable",
         "default": "",
       },
       origin_trial_feature_name: "TranslationAPI",
@@ -5539,6 +5524,7 @@
       // Launch feature flag for WebGPU Compatibility Mode
       // https://chromestatus.com/feature/6436406437871616
       name: "WebGPUCompatibilityMode",
+      origin_trial_feature_name: "WebGPUCompatibilityMode",
       status: "experimental",
       // Also enabled as part of all experimental WebGPU features.
       implied_by: ["WebGPUExperimentalFeatures"],
@@ -5560,15 +5546,6 @@
       name: "WebGPUExperimentalFeatures",
       status: "experimental",
       public: true,
-    },
-    {
-      // Launch feature flag for GPURequestAdapterOptions featureLevel
-      // https://chromestatus.com/feature/5154347661656064
-      name: "WebGPUFeatureLevel",
-      status: "experimental",
-      // Also enabled as part of all experimental WebGPU features and
-      // as part of Compatibility Mode.
-      implied_by: ["WebGPUExperimentalFeatures", "WebGPUCompatibilityMode"],
     },
     {
       name: "WebHID",

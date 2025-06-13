@@ -221,6 +221,7 @@
 <translation id="3716540481907974026">ChromeOS Flex-ի տարբերակը</translation>
 <translation id="3718181793972440140">1 տարր ձեր սարքից կջնջվի: Հետագայում ձեր տվյալներն առբերելու համար մուտք գործեք Chrome <ph name="USER_EMAIL" /> հաշվով:</translation>
 <translation id="3723744677043446310">{NUM_EXTENSIONS,plural, =1{Chrome-ը խորհուրդ է տալիս հեռացնել այն։ <ph name="BEGIN_LINK" />Իմանալ ավելին աջակցվող ընդլայնումների մասին<ph name="END_LINK" />}one{Chrome-ը խորհուրդ է տալիս հեռացնել այն։ <ph name="BEGIN_LINK" />Իմանալ ավելին աջակցվող ընդլայնումների մասին<ph name="END_LINK" />}other{Chrome-ը խորհուրդ է տալիս հեռացնել դրանք։ <ph name="BEGIN_LINK" />Իմանալ ավելին աջակցվող ընդլայնումների մասին<ph name="END_LINK" />}}</translation>
+<translation id="3756724684201900923">Իմանալ ավելին Chrome-ի տեղադրման մասին</translation>
 <translation id="3780814664026482060">Chrome – <ph name="PAGE_TITLE" /></translation>
 <translation id="3785324443014631273">Մուտքի սխալի պատճառով ChromeOS Flex-ը չկարողացավ համաժամացնել ձեր տվյալները։</translation>
 <translation id="3795971588916395511">Google ChromeOS</translation>
@@ -452,7 +453,6 @@ Google Chrome-ը չի կարողանում վերականգնել ձեր կար�
 <translation id="6831043979455480757">Թարգմանել</translation>
 <translation id="683440813066116847">Թույլատրել Google Chrome Canary-ում տվյալների մուտքային հոսքի փոխանցումը mDNS հաղորդակարգով:</translation>
 <translation id="684888714667046800">Հնարավոր չէ միանալ ինտերնետին։ Հրապատ օգտագործելու դեպքում համոզվեք, որ <ph name="PRODUCT_EXE_NAME" /> ֆայլը թույլատրվածների ցուցակում է։</translation>
-<translation id="6851981911629679515">Միացրեք լրացուցիչ պաշտպանությունը Chrome-ի JavaScript և WebAssembly համակարգում</translation>
 <translation id="6877155553248388166">որոնման տարածքի ներքևի աջ անկյուն՝ <ph name="RIGHT" />% աջից, <ph name="BOTTOM" />% վերևից</translation>
 <translation id="6881299373831449287">Chrome-ի թարմացում</translation>
 <translation id="6885412569789873916">Chrome Բետա հավելվածներ</translation>

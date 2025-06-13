@@ -219,6 +219,7 @@
 <translation id="3716540481907974026">Версія ОС Chrome Flex</translation>
 <translation id="3718181793972440140">1 елемент буде видалено з цього пристрою. Щоб відновити дані пізніше, увійдіть в обліковий запис Chrome як <ph name="USER_EMAIL" />.</translation>
 <translation id="3723744677043446310">{NUM_EXTENSIONS,plural, =1{Chrome радить вилучити його. <ph name="BEGIN_LINK" />Докладніше про підтримувані розширення.<ph name="END_LINK" />}one{Chrome радить вилучити їх. <ph name="BEGIN_LINK" />Докладніше про підтримувані розширення.<ph name="END_LINK" />}few{Chrome радить вилучити їх. <ph name="BEGIN_LINK" />Докладніше про підтримувані розширення.<ph name="END_LINK" />}many{Chrome радить вилучити їх. <ph name="BEGIN_LINK" />Докладніше про підтримувані розширення.<ph name="END_LINK" />}other{Chrome радить вилучити їх. <ph name="BEGIN_LINK" />Докладніше про підтримувані розширення.<ph name="END_LINK" />}}</translation>
+<translation id="3756724684201900923">Докладніше про встановлення Chrome</translation>
 <translation id="3780814664026482060">Chrome – <ph name="PAGE_TITLE" /></translation>
 <translation id="3785324443014631273">ОС Chrome Flex не змогла синхронізувати ваші дані через помилку входу в систему.</translation>
 <translation id="3795971588916395511">Google ChromeOS</translation>
@@ -447,7 +448,6 @@ Google Chrome потрібен доступ до Bluetooth. <ph name="IDS_SERIAL
 <translation id="6831043979455480757">Перекласти</translation>
 <translation id="683440813066116847">Вхідне правило для Google Chrome Canary дозволяє трафік mDNS.</translation>
 <translation id="684888714667046800">Не вдалося підключитися до Інтернету. Якщо ви використовуєте брандмауер, переконайтеся, що <ph name="PRODUCT_EXE_NAME" /> є в білому списку.</translation>
-<translation id="6851981911629679515">Увімкніть додатковий захист у системі JavaScript і WebAssembly для Chrome</translation>
 <translation id="6877155553248388166">правий нижній кут області пошуку: <ph name="RIGHT" />% праворуч, <ph name="BOTTOM" />% знизу</translation>
 <translation id="6881299373831449287">Оновлення Chrome</translation>
 <translation id="6885412569789873916">Бета-версія додатків Chrome</translation>

@@ -48,6 +48,7 @@
 #include "chrome/browser/ui/webui/customize_buttons/customize_buttons_handler.h"
 #include "chrome/browser/ui/webui/favicon_source.h"
 #include "chrome/browser/ui/webui/metrics_reporter/metrics_reporter_service.h"
+#include "chrome/browser/ui/webui/new_tab_page/composebox/composebox_handler.h"
 #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.h"
 #include "chrome/browser/ui/webui/new_tab_page/ntp_pref_names.h"
 #include "chrome/browser/ui/webui/new_tab_page/untrusted_source.h"
@@ -72,6 +73,7 @@
 #include "components/google/core/common/google_util.h"
 #include "components/grit/components_scaled_resources.h"
 #include "components/history_clusters/core/features.h"
+#include "components/omnibox/browser/omnibox_prefs.h"
 #include "components/page_image_service/image_service.h"
 #include "components/page_image_service/image_service_handler.h"
 #include "components/prefs/pref_registry_simple.h"
@@ -479,6 +481,17 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(Profile* profile) {
   source->AddString("composeboxAttachmentFileTypes", ".pdf,application/pdf");
   source->AddInteger("composeboxFileMaxSize", 1000000);
 
+  source->AddBoolean(
+      "searchboxShowComposeEntrypoint",
+      (base::FeatureList::IsEnabled(
+           ntp_features::kNtpSearchboxComposeEntrypoint) ||
+       base::FeatureList::IsEnabled(ntp_features::kNtpSearchboxComposebox)) &&
+          omnibox::IsMiaAllowedByPolicy(profile->GetPrefs()));
+  source->AddBoolean(
+      "searchboxShowComposebox",
+      base::FeatureList::IsEnabled(ntp_features::kNtpSearchboxComposebox) &&
+          omnibox::IsMiaAllowedByPolicy(profile->GetPrefs()));
+
   SearchboxHandler::SetupWebUIDataSource(
       source, profile,
       /*enable_voice_search=*/true,
@@ -716,6 +729,13 @@ void NewTabPageUI::BindInterface(
   most_relevant_tab_resumption_handler_ =
       std::make_unique<MostRelevantTabResumptionPageHandler>(
           std::move(pending_page_handler), web_contents());
+}
+
+void NewTabPageUI::BindInterface(
+    mojo::PendingReceiver<composebox::mojom::ComposeboxPageHandler>
+        pending_receiver) {
+  composebox_handler_ =
+      std::make_unique<ComposeboxHandler>(std::move(pending_receiver));
 }
 
 void NewTabPageUI::BindInterface(

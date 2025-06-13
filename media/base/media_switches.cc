@@ -396,6 +396,18 @@ BASE_FEATURE(kWebrtcMediaCapabilitiesParameters,
              "WebrtcMediaCapabilitiesParameters",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Controls the persistent license support for protected media that uses
+// widevine.
+BASE_FEATURE(kWidvinePersistentLicenseSupport,
+             "WidvinePersistentLicenseSupport",
+#if BUILDFLAG(ENABLE_LIBRARY_CDMS)
+             // TODO(crbug.com/423458074): This will rollout slowly as an
+             // experiment eventually becoming disabled by default.
+             base::FEATURE_ENABLED_BY_DEFAULT);
+#else
+             base::FEATURE_ENABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(ENABLE_LIBRARY_CDMS)
+
 // Display the Cast overlay button on the media controls.
 BASE_FEATURE(kMediaCastOverlayButton,
              "MediaCastOverlayButton",
@@ -874,6 +886,9 @@ BASE_FEATURE(kLogSodaLoadFailures,
 // a Chromium prompt through which they choose which tab/window/screen
 // to share. If this flag is enabled, then when the user chooses to
 // share, transient activation is conferred on the capturing Web application.
+//
+// TODO(crbug.com/420406085): Remove after January 2028.
+// Keep this flag around at least until that date.
 BASE_FEATURE(kGetDisplayMediaConfersActivation,
              "GetDisplayMediaConfersActivation",
              base::FEATURE_DISABLED_BY_DEFAULT);

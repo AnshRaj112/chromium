@@ -166,7 +166,7 @@ CanvasRenderingContextHost::GetOrCreateCanvasResourceProviderForCanvas2D() {
 CanvasResourceProvider*
 CanvasRenderingContextHost::GetOrCreateCanvasResourceProviderForWebGL() {
   CHECK(IsWebGL());
-  auto* provider = ResourceProvider();
+  auto* provider = GetResourceProviderForWebGL();
   if (!provider && !did_fail_to_create_resource_provider_) {
     if (IsValidImageSize()) {
       ReplaceResourceProvider(CreateCanvasResourceProviderWebGL());
@@ -495,6 +495,13 @@ bool CanvasRenderingContextHost::ContextHasOpenLayers(
 bool CanvasRenderingContextHost::IsContextLost() const {
   CanvasRenderingContext* context = RenderingContext();
   return !context || context->isContextLost();
+}
+
+void CanvasRenderingContextHost::FlushRecordingForCanvas2D(FlushReason reason) {
+  CHECK(IsRenderingContext2D());
+  if (auto* provider = GetResourceProviderForCanvas2D()) {
+    provider->FlushCanvas(reason);
+  }
 }
 
 }  // namespace blink

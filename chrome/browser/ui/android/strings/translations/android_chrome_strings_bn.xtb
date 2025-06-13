@@ -109,6 +109,7 @@
 <translation id="1419753403124156396">Chrome রিস্টার্ট করতে চান?</translation>
 <translation id="1428770807407000502">সিঙ্ক করা বন্ধ করতে চান?</translation>
 <translation id="1430915738399379752">প্রিন্ট</translation>
+<translation id="1433478348197382180">Reading Mode</translation>
 <translation id="1435593198351412143">পিডিএফ অটোমেটিক খোলার সুবিধা</translation>
 <translation id="1437543266176261764"><ph name="APP_NAME" />-এ চলছে</translation>
 <translation id="1448440926884431741">Bookmarks-এ আপনার ট্র্যাক করা সমস্ত প্রোডাক্ট সাজিয়ে রাখুন</translation>
@@ -1080,7 +1081,6 @@
 <translation id="5956665950594638604">Chrome সহায়তা কেন্দ্রকে একটি নতুন ট্যাবে খুলুন</translation>
 <translation id="59577092665511740">একটি অ্যাকাউন্ট বেছে নিন।</translation>
 <translation id="5958275228015807058">ডাউনলোড ফোল্ডার থেকে আপনার সমস্ত ফাইল ও পৃষ্ঠাগুলি খুঁজে নিন</translation>
-<translation id="5958994127112619898">পৃষ্ঠা সরলীকরণ করুন</translation>
 <translation id="5962718611393537961">সঙ্কুচিত করতে আলতো চাপুন</translation>
 <translation id="5964869237734432770">ছবির বিবরণ বন্ধ করুন</translation>
 <translation id="5975083100439434680">ছোট করুন</translation>
@@ -1629,7 +1629,6 @@
 <translation id="8137562778192957619">আপনাকে এই পাসওয়ার্ড মনে রাখতে হবে না। এটি Google Password Manager-এ সেভ হয়ে যাবে।</translation>
 <translation id="8152331954420209374">Lens-এ যান</translation>
 <translation id="8163820386638255770">আপনার Google অ্যাকাউন্টের পাসওয়ার্ড সেভ ও ব্যবহার করতে, আপনার পরিচয় যাচাই করুন</translation>
-<translation id="8179976553408161302">Enter</translation>
 <translation id="8186512483418048923"><ph name="FILES" />টি ফাইল বাকি</translation>
 <translation id="8190358571722158785">১ দিন বাকি আছে</translation>
 <translation id="8192765420340770300">সাইন-ইন করার জন্য স্ক্রিনের নিচে অ্যাটাচ করা শিট সম্পূর্ণ স্ক্রিন জুড়ে খুলেছে</translation>

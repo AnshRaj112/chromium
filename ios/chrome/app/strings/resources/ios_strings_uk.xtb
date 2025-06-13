@@ -611,7 +611,6 @@
 <translation id="3557336313807607643">Додати до контактів</translation>
 <translation id="355765753469272474">Відмінити</translation>
 <translation id="3565930036634619844">Вкладка. <ph name="TAB_INDEX" /> з <ph name="NUMBER_OF_TABS" />.</translation>
-<translation id="3570693105179140209">Двічі торкніться, щоб переглянути інші паролі.</translation>
 <translation id="3572607909481582402">В обліковому записі Google</translation>
 <translation id="3575234738189584619">Шукати через Об’єктив</translation>
 <translation id="3575426792457739946">Цей список містить усі завантажені профілі.</translation>
@@ -654,7 +653,6 @@
 <translation id="3779810277399252432">Немає з’єднання з Інтернетом</translation>
 <translation id="3782614601387961027">Закрити попередження</translation>
 <translation id="3789841737615482174">Установити</translation>
-<translation id="3795478177331815672">Відкриті вкладки й групи вкладок</translation>
 <translation id="380329542618494757">Повне ім’я</translation>
 <translation id="3803696231112616155">Пропонувати переклад для цього сайту</translation>
 <translation id="3808311849069021992">Показати відомості про пошукову систему</translation>
@@ -700,7 +698,6 @@
 <translation id="3955740319737378355">Готово</translation>
 <translation id="3955822496205734389">У вас є ненадійні паролі.</translation>
 <translation id="3958312024468322930">Перетягніть його на нижню панель головного екрана</translation>
-<translation id="3960218941754097036">Шукайте будь-що на екрані за допомогою Google Об’єктива</translation>
 <translation id="3962326069546168954">Зберегти</translation>
 <translation id="3967327056943561740">Закладки</translation>
 <translation id="3967822245660637423">Завантажено</translation>
@@ -1814,6 +1811,7 @@
 <translation id="8343993175958086504">Створюйте резервні копії даних і використовуйте їх на будь-якому пристрої.</translation>
 <translation id="8348530355586151720">Натисніть меню додаткових параметрів.</translation>
 <translation id="8349305172487531364">Панель закладок</translation>
+<translation id="8363484128299778310">Тимчасове відновлення в разі виникнення проблем</translation>
 <translation id="8364563001733875155">Щоб змінити PIN-код, спершу налаштуйте код доступу на своєму пристрої.</translation>
 <translation id="8366466717204352506">Паролі ніколи не перевірялися</translation>
 <translation id="8368001212524806591">Відстеження цін</translation>

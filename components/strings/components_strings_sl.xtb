@@ -867,6 +867,7 @@ V nasprotnem primeru bodo to blokirale nastavitve zasebnosti. S tem bo vsebina, 
             <ph name="LIST_ITEM" />Podatkov, vnesenih v obrazce
           <ph name="END_LIST" /></translation>
 <translation id="2448295565072560657">Zunanje naprave, priključene na to napravo, medtem ko ste prijavljeni.</translation>
+<translation id="2450019289047528273">Plačilna sredstva in drugi podatki iz Google Denarnice</translation>
 <translation id="2451607499823206582">Spremljanje</translation>
 <translation id="2452098632681057184">Ekologija in okolje</translation>
 <translation id="2452837234288608067">Pri tem vam nismo mogli pomagati. Poskusite znova.</translation>
@@ -1046,6 +1047,7 @@ V nasprotnem primeru bodo to blokirale nastavitve zasebnosti. S tem bo vsebina, 
 <translation id="2743934314332613923">Želite posodobiti vozniško dovoljenje?</translation>
 <translation id="2759299890026163685">Pred vnovičnim poskusom poskrbite, da je internetna povezava stabilna</translation>
 <translation id="2759825833388495838">vnesti geslo v aplikaciji <ph name="APP_NAME" /></translation>
+<translation id="2760805590727089264">MM/LL</translation>
 <translation id="2764001903315068341">Stripi</translation>
 <translation id="2765217105034171413">Majhna</translation>
 <translation id="2768397283109119044">Poskusili ste dostopati do domene <ph name="DOMAIN" />, vendar je strežnik uporabil neveljavno potrdilo, izdano za to ime. Ime je rezerviran naslov IP ali notranje ime gostitelja.</translation>

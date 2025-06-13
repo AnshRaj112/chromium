@@ -30,10 +30,8 @@ ci.defaults.set(
     tree_closing_notifiers = ci.DEFAULT_TREE_CLOSING_NOTIFIERS,
     execution_timeout = ci.DEFAULT_EXECUTION_TIMEOUT,
     health_spec = health_spec.DEFAULT,
-    reclient_enabled = False,
     service_account = ci.DEFAULT_SERVICE_ACCOUNT,
     shadow_service_account = ci.DEFAULT_SHADOW_SERVICE_ACCOUNT,
-    siso_enabled = True,
     siso_project = siso.project.DEFAULT_TRUSTED,
     siso_remote_jobs = siso.remote_jobs.HIGH_JOBS_FOR_CI,
 )
@@ -2512,7 +2510,6 @@ ci.builder(
 
 ci.builder(
     name = "android-oreo-x86-rel",
-    branch_selector = branches.selector.ANDROID_BRANCHES,
     builder_spec = builder_config.builder_spec(
         gclient_config = builder_config.gclient_config(
             config = "chromium",
@@ -2714,7 +2711,7 @@ ci.builder(
     builderless = not settings.is_main,
     tree_closing = True,
     console_view_entry = consoles.console_view_entry(
-        category = "on_cq|x86",
+        category = "builder_tester|x86",
         short_name = "O",
     ),
     contact_team_email = "clank-engprod@google.com",
@@ -2963,6 +2960,7 @@ ci.builder(
 
 ci.builder(
     name = "android-10-x86-rel",
+    branch_selector = branches.selector.ANDROID_BRANCHES,
     description_html = "Run chromium tests on Android 10 emulators.",
     builder_spec = builder_config.builder_spec(
         gclient_config = builder_config.gclient_config(
@@ -3090,10 +3088,8 @@ ci.builder(
                     shards = 6,
                 ),
             ),
+            # If you change this, make similar changes in android-x86-code-coverage
             "content_unittests": targets.mixin(
-                args = [
-                    "--test-launcher-filter-file=../../testing/buildbot/filters/android.emulator_10.content_unittests.filter",
-                ],
                 ci_only = True,
             ),
             # If you change this, make similar changes in android-x86-code-coverage
@@ -3172,7 +3168,7 @@ ci.builder(
     ),
     tree_closing = True,
     console_view_entry = consoles.console_view_entry(
-        category = "builder_tester|x86",
+        category = "on_cq|x86",
         short_name = "10",
     ),
     contact_team_email = "clank-engprod@google.com",

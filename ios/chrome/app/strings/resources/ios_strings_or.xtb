@@ -611,7 +611,6 @@
 <translation id="3557336313807607643">ଯୋଗାଯୋଗରେ ଯୋଗ କରନ୍ତୁ</translation>
 <translation id="355765753469272474">ଅନଡୁ କରନ୍ତୁ</translation>
 <translation id="3565930036634619844">ଟାବ। <ph name="NUMBER_OF_TABS" />ଟିରୁ <ph name="TAB_INDEX" />।</translation>
-<translation id="3570693105179140209">ଅଧିକ ପାସୱାର୍ଡ ପାଇଁ ଦୁଇଥର ଟାପ କରନ୍ତୁ।</translation>
 <translation id="3572607909481582402">ଆପଣଙ୍କ Google ଆକାଉଣ୍ଟରେ</translation>
 <translation id="3575234738189584619">Lens ମାଧ୍ୟମରେ ସର୍ଚ୍ଚ କରନ୍ତୁ</translation>
 <translation id="3575426792457739946">ଏହି ତାଲିକାରେ ଲୋଡ କରାଯାଇଥିବା ସମସ୍ତ ପ୍ରୋଫାଇଲ ଅଛି।</translation>
@@ -654,7 +653,6 @@
 <translation id="3779810277399252432">କୌଣସି ଇଣ୍ଟର୍ନେଟ୍ ସଂଯୋଗ ନାହିଁ।</translation>
 <translation id="3782614601387961027">ଚେତାବନୀକୁ ଖାରଜ କରନ୍ତୁ</translation>
 <translation id="3789841737615482174">ସଂସ୍ଥାପନ</translation>
-<translation id="3795478177331815672">ଟାବ ଏବଂ ଟାବ ଗ୍ରୁପ ଖୋଲନ୍ତୁ</translation>
 <translation id="380329542618494757">ନାମ</translation>
 <translation id="3803696231112616155">ଏହି ସାଇଟ୍ ଅନୁବାଦ କରିବାକୁ ଅଫର୍ କରନ୍ତୁ</translation>
 <translation id="3808311849069021992">ସର୍ଚ୍ଚ ଇଞ୍ଜିନ ବିବରଣୀ ଦେଖାନ୍ତୁ</translation>
@@ -700,7 +698,6 @@
 <translation id="3955740319737378355">ହୋଇଗଲା</translation>
 <translation id="3955822496205734389">ଆପଣଙ୍କ ପାଖରେ ଦୁର୍ବଳ ପାସୱାର୍ଡଗୁଡ଼ିକ ଅଛି।</translation>
 <translation id="3958312024468322930">ଏହାକୁ ଆପଣଙ୍କ ହୋମ ସ୍କ୍ରିନର ନିମ୍ନରେ ଥିବା ଡକକୁ ଡ୍ରାଗ କରନ୍ତୁ</translation>
-<translation id="3960218941754097036">Google Lens ମାଧ୍ୟମରେ ଆପଣଙ୍କ ସ୍କ୍ରିନରେ କିଛି ବି ସର୍ଚ୍ଚ କରନ୍ତୁ</translation>
 <translation id="3962326069546168954">ସେଭ କରନ୍ତୁ</translation>
 <translation id="3967327056943561740">ବୁକମାର୍କ</translation>
 <translation id="3967822245660637423">ଡାଉନ୍‍‍‍ଲୋଡ୍ ଶେଷ ହୋଇଛି</translation>
@@ -1446,6 +1443,7 @@ Handoff, ନିଶ୍ଚିତ ରୂପେ ସେଟିଂସ୍‍ର ସା�
 <translation id="6831043979455480757">Translate</translation>
 <translation id="6842136130964845393">ଆପଣ ଆପଣଙ୍କ ସେଭ୍ କରାଯାଇଥିବା ପାସୱାର୍ଡଗୁଡ଼ିକୁ ସର୍ବଦା ଆକ୍ସେସ୍ କରିପାରିବେ, ତାହା ସୁନିଶ୍ଚିତ କରିବା ପାଇଁ ଏହା ଆପଣ ଅଟନ୍ତି ବୋଲି ଯାଞ୍ଚ କରନ୍ତୁ</translation>
 <translation id="6851516051005285358">ଡେସ୍କଟପ୍ ସାଇଟ୍ ପାଇଁ ଅନୁରୋଧ କରନ୍ତୁ</translation>
+<translation id="6857446173140146664">ବେକଗ୍ରାଉଣ୍ଡ ଡିଲିଟ କରନ୍ତୁ</translation>
 <translation id="6858718102216837409">ଭାଷା ଯୋଗ କରନ୍ତୁ…</translation>
 <translation id="6858855187367714033">ସ୍କାନ୍ କରାଯାଇଛି</translation>
 <translation id="6859944681507688231">କୌଣସି QR କୋଡ୍ କିମ୍ବା କ୍ରେଡିଟ୍ କାର୍ଡ ସ୍କାନ୍ କରିବା ପାଇଁ, ସେଟିଂସ୍‍ରୁ କ୍ୟାମେରାକୁ ସକ୍ଷମ କରନ୍ତୁ।</translation>
@@ -1813,6 +1811,7 @@ Handoff, ନିଶ୍ଚିତ ରୂପେ ସେଟିଂସ୍‍ର ସା�
 <translation id="8343993175958086504">ଆପଣଙ୍କ ଷ୍ଟଫର ବେକଅପ ନେଇ ଯେ କୌଣସି ଡିଭାଇସରେ ଏହାକୁ ବ୍ୟବହାର କରନ୍ତୁ।</translation>
 <translation id="8348530355586151720">ତିନି-ଡଟ ମେନୁରେ ଟାପ କରନ୍ତୁ</translation>
 <translation id="8349305172487531364">ବୁକମାର୍କସ୍ ଦଣ୍ଡିକା</translation>
+<translation id="8363484128299778310">ସମସ୍ୟା ଥିଲେ ଅସ୍ଥାୟୀ ରିକଭରି</translation>
 <translation id="8364563001733875155">ଆପଣଙ୍କର PIN ପରିବର୍ତ୍ତନ କରିବା ପାଇଁ ପ୍ରଥମେ ଆପଣଙ୍କ ଡିଭାଇସରେ ଏକ ପାସକୋଡ ସେଟ ଅପ କରନ୍ତୁ।</translation>
 <translation id="8366466717204352506">କେବେ ବି ଯାଞ୍ଚ କରାଯାଇନାହିଁ</translation>
 <translation id="8368001212524806591">ମୂଲ୍ୟ ଟ୍ରାକ କରନ୍ତୁ</translation>

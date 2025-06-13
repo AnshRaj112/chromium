@@ -109,6 +109,7 @@
 <translation id="1419753403124156396">Վերագործարկե՞լ Chrome-ը</translation>
 <translation id="1428770807407000502">Անջատե՞լ համաժամացումը</translation>
 <translation id="1430915738399379752">Տպում</translation>
+<translation id="1433478348197382180">Ընթերցման ռեժիմ</translation>
 <translation id="1435593198351412143">Ավտոմատ բացել PDF ֆայլերը</translation>
 <translation id="1437543266176261764">Կատարվում է <ph name="APP_NAME" />-ում</translation>
 <translation id="1448440926884431741">Էջանիշներում դասավորեք ապրանքները, որոնց հետևում եք</translation>
@@ -331,6 +332,7 @@
 <translation id="2524132927880411790">Բացել Google հավելվածի ձայնային որոնումը</translation>
 <translation id="2527209463677295330">Էջից ավելի շատ տեքստ ներառելու դեպքում կարող եք ավելի լավ արդյունքներ ստանալ</translation>
 <translation id="2527779675047087889">Թաքցնել սեղմատախտակի բովանդակությունը</translation>
+<translation id="2531209299761896527">Նոր պատուհանում ներդիրներ բացելու համար մատներն իրար միացրեք, պահեք ներդիրը և այն քաշեք այն ընթացիկ պատուհանից դուրս</translation>
 <translation id="2532336938189706096">Վեբ տարբերակ</translation>
 <translation id="253498598929009420">Կայքը կկարողանա տեսնել ձեր էկրանի բովանդակությունը</translation>
 <translation id="2535807170289627159">Բոլոր ներդիրները</translation>
@@ -1079,7 +1081,6 @@
 <translation id="5956665950594638604">Բացել Chrome-ի օգնության կենտրոնը նոր ներդիրում</translation>
 <translation id="59577092665511740">Ընտրեք հաշիվ։</translation>
 <translation id="5958275228015807058">Ձեր ֆայլերն ու էջերը որոնեք «Ներբեռնումներ» պանակում</translation>
-<translation id="5958994127112619898">Պարզեցնել էջը</translation>
 <translation id="5962718611393537961">Հպեք՝ կոծկելու համար</translation>
 <translation id="5964869237734432770">Չստանալ նկարագրություններ</translation>
 <translation id="5975083100439434680">Փոքրացնել</translation>
@@ -1628,7 +1629,6 @@
 <translation id="8137562778192957619">Այս գաղտնաբառը հիշելու կարիք չկա։ Այն կպահվի Google գաղտնաբառերի կառավարչում։</translation>
 <translation id="8152331954420209374">Բացել Տեսապակին</translation>
 <translation id="8163820386638255770">Հաստատեք ձեր ինքնությունը՝ Google հաշվում գաղտնաբառեր օգտագործելու և պահելու համար</translation>
-<translation id="8179976553408161302">Enter</translation>
 <translation id="8186512483418048923">Մնաց <ph name="FILES" /> ֆայլ</translation>
 <translation id="8190358571722158785">Մնացել է 1 օր</translation>
 <translation id="8192765420340770300">Հաշիվ մտնելու ներքևի էկրանը ամբողջությամբ բացված է</translation>

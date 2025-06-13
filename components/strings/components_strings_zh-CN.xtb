@@ -522,6 +522,7 @@
 <translation id="1863257867908022953">纸匣 12</translation>
 <translation id="1864927262126810325">来自<ph name="SOURCE_NAME" /></translation>
 <translation id="186539747722034544">有线电视和卫星电视提供商</translation>
+<translation id="1866757068250903512">控制名为“<ph name="READERNAME" />”的身份验证设备以及与其搭配使用的智能卡</translation>
 <translation id="1870473978371099486">家教服务</translation>
 <translation id="1871208020102129563">代理已设置为使用固定的代理服务器，而不是 .pac 脚本网址。</translation>
 <translation id="1871284979644508959">必填字段</translation>
@@ -866,6 +867,7 @@
             <ph name="LIST_ITEM" />在表单中填写的信息
           <ph name="END_LIST" /></translation>
 <translation id="2448295565072560657">登录时连接至该设备的外围设备</translation>
+<translation id="2450019289047528273">Google 钱包中的支付方式和其他信息</translation>
 <translation id="2451607499823206582">正在跟踪</translation>
 <translation id="2452098632681057184">生态与环境</translation>
 <translation id="2452837234288608067">无法提供这方面的帮助。请重试。</translation>
@@ -1045,6 +1047,7 @@
 <translation id="2743934314332613923">要更新驾照信息吗？</translation>
 <translation id="2759299890026163685">请确保您拥有稳定的网络连接，然后再重试</translation>
 <translation id="2759825833388495838">在<ph name="APP_NAME" />上填充您的密码</translation>
+<translation id="2760805590727089264">MM / YY</translation>
 <translation id="2764001903315068341">漫画</translation>
 <translation id="2765217105034171413">小</translation>
 <translation id="2768397283109119044">您试图访问 <ph name="DOMAIN" />，但服务器提供的为该名称颁发的证书无效。该名称是预留的 IP 地址或内部主机名。</translation>
@@ -1383,6 +1386,7 @@
 <translation id="3362968246557010467">此政策的值是系统从已弃用的 <ph name="OLD_POLICY" /> 政策中自动复制而来的。您应改用此政策。</translation>
 <translation id="3364869320075768271"><ph name="URL" /> 想使用您的虚拟现实设备和数据</translation>
 <translation id="3369192424181595722">时钟错误</translation>
+<translation id="3370855919511944393">钱包设置</translation>
 <translation id="3371064404604898522">将 Chrome 设为默认浏览器</translation>
 <translation id="3371186787117738282">已添加<ph name="ATTRIBUTE_NAME" /></translation>
 <translation id="337363190475750230">已取消配置</translation>
@@ -1556,6 +1560,7 @@
 <translation id="3641116835972736297">美式橄榄球</translation>
 <translation id="3642196846309122856">尝试重新下载文件</translation>
 <translation id="3642638418806704195">应用：</translation>
+<translation id="3644768007456662469">付款项图标</translation>
 <translation id="3646643500201740985">衡量广告效果</translation>
 <translation id="3647286794400715637">每个网址字符串条目都必须包含 1-2 个网址。</translation>
 <translation id="3647400963805615193">关闭 Chrome 提示按钮，按 Enter 键即可关闭提示，<ph name="REMOVE_BUTTON_FOCUSED_FRIENDLY_MATCH_TEXT" /></translation>

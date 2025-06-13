@@ -4,14 +4,18 @@
 
 #include "chrome/browser/password_manager/password_change/change_password_form_filling_submission_helper.h"
 
+#include <string>
+
 #include "base/metrics/histogram_functions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service_factory.h"
+#include "chrome/browser/password_manager/password_change/button_click_helper.h"
 #include "chrome/browser/password_manager/password_change/password_change_submission_verifier.h"
 #include "chrome/browser/profiles/profile.h"
 #include "components/optimization_guide/core/model_quality/model_execution_logging_wrappers.h"
 #include "components/password_manager/content/browser/content_password_manager_driver.h"
+#include "components/password_manager/core/browser/password_form_manager.h"
 #include "content/public/browser/web_contents.h"
 #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
 
@@ -33,7 +37,7 @@ ChangePasswordFormFillingSubmissionHelper::
         content::WebContents* web_contents,
         ModelQualityLogsUploader* logs_uploader,
         base::OnceCallback<void(bool)> callback)
-    : web_contents_(web_contents->GetWeakPtr()),
+    : web_contents_(web_contents),
       callback_(std::move(callback)),
       logs_uploader_(logs_uploader) {
   capture_annotated_page_content_ =
@@ -49,7 +53,7 @@ ChangePasswordFormFillingSubmissionHelper::
         base::OnceCallback<void(optimization_guide::OnAIPageContentDone)>
             capture_annotated_page_content,
         base::OnceCallback<void(bool)> result_callback)
-    : web_contents_(web_contents->GetWeakPtr()),
+    : web_contents_(web_contents),
       callback_(std::move(result_callback)),
       logs_uploader_(logs_uploader),
       capture_annotated_page_content_(
@@ -60,6 +64,7 @@ ChangePasswordFormFillingSubmissionHelper::
 
 void ChangePasswordFormFillingSubmissionHelper::FillChangePasswordForm(
     password_manager::PasswordFormManager* form_manager,
+    const std::u16string& username,
     const std::u16string& old_password,
     const std::u16string& new_password) {
   CHECK(form_manager);
@@ -76,7 +81,8 @@ void ChangePasswordFormFillingSubmissionHelper::FillChangePasswordForm(
       base::BindOnce(&ChangePasswordFormFillingSubmissionHelper::TriggerFilling,
                      weak_ptr_factory_.GetWeakPtr(),
                      *form_manager->GetParsedObservedForm(),
-                     form_manager->GetDriver(), old_password, new_password));
+                     form_manager->GetDriver(), username, old_password,
+                     new_password));
 
   // Proceed with verifying password on timeout, in case submission was not
   // captured.
@@ -93,10 +99,7 @@ void ChangePasswordFormFillingSubmissionHelper::OnPasswordFormSubmission(
   if (!submission_verifier_) {
     return;
   }
-  if (!web_contents_) {
-    return;
-  }
-  if (web_contents != web_contents_.get()) {
+  if (web_contents != web_contents_) {
     return;
   }
   if (std::exchange(submission_detected_, true)) {
@@ -121,6 +124,7 @@ GURL ChangePasswordFormFillingSubmissionHelper::GetURL() const {
 void ChangePasswordFormFillingSubmissionHelper::TriggerFilling(
     const password_manager::PasswordForm& form,
     base::WeakPtr<password_manager::PasswordManagerDriver> driver,
+    const std::u16string& username,
     const std::u16string& old_password,
     const std::u16string& new_password) {
   CHECK(form_manager_);
@@ -137,7 +141,14 @@ void ChangePasswordFormFillingSubmissionHelper::TriggerFilling(
           weak_ptr_factory_.GetWeakPtr(), driver,
           form.new_password_element_renderer_id));
 
-  form_manager_->PresaveGeneratedPassword(form.form_data, new_password);
+  password_manager::PasswordForm form_to_save(form);
+  form_to_save.username_value = username;
+  form_to_save.password_value = old_password;
+  password_manager::PasswordFormManager::PresaveGeneratedPasswordAsBackup(
+      *form_manager_, form_to_save, new_password);
+  // Fetch newly saved password so that it's included in the matches when we
+  // save the submitted form.
+  form_manager_->GetFormFetcher()->Fetch();
 }
 
 void ChangePasswordFormFillingSubmissionHelper::ChangePasswordFormFilled(
@@ -181,7 +192,7 @@ void ChangePasswordFormFillingSubmissionHelper::OnSubmitWithEnterResult(
 
 void ChangePasswordFormFillingSubmissionHelper::OnPageContentReceived(
     std::optional<optimization_guide::AIPageContentResult> content) {
-  if (!content || !web_contents_) {
+  if (!content) {
     return;
   }
 
@@ -210,7 +221,8 @@ void ChangePasswordFormFillingSubmissionHelper::OnExecutionResponseCallback(
     std::unique_ptr<
         optimization_guide::proto::PasswordChangeSubmissionLoggingData>
         logging_data) {
-  if (!web_contents_ || !execution_result.response.has_value()) {
+  CHECK(web_contents_);
+  if (!execution_result.response.has_value()) {
     return;
   }
   std::optional<optimization_guide::proto::PasswordChangeResponse> response =
@@ -221,12 +233,27 @@ void ChangePasswordFormFillingSubmissionHelper::OnExecutionResponseCallback(
     return;
   }
 
-  // TODO(crbug.com/407487665): Click the button specified in execution_result.
+  int dom_node_id = response.value().submit_form_data().dom_node_id_to_click();
+  click_helper_ = std::make_unique<ButtonClickHelper>(
+      web_contents_.get(), dom_node_id,
+      base::BindOnce(
+          &ChangePasswordFormFillingSubmissionHelper::OnButtonClicked,
+          weak_ptr_factory_.GetWeakPtr()));
 }
 
 void ChangePasswordFormFillingSubmissionHelper::OnFormSubmitted() {
   submission_verifier_ = std::make_unique<PasswordChangeSubmissionVerifier>(
-      web_contents_.get(), logs_uploader_);
+      web_contents_, logs_uploader_);
+}
+
+void ChangePasswordFormFillingSubmissionHelper::OnButtonClicked(bool result) {
+  click_helper_.reset();
+
+  if (!result || !web_contents_) {
+    return;
+  }
+
+  OnFormSubmitted();
 }
 
 void ChangePasswordFormFillingSubmissionHelper::

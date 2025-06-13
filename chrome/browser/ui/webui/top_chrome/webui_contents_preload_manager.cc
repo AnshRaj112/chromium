@@ -118,6 +118,11 @@ content::WebUIController* GetWebUIController(
   return webui->GetController();
 }
 
+bool IsShowingErrorPage(content::WebContents* web_contents) {
+  return web_contents->GetSiteInstance()->GetSiteURL().SchemeIs(
+      content::kChromeErrorScheme);
+}
+
 }  // namespace
 
 // A stub WebUI page embdeder that captures the ready-to-show signal.
@@ -159,6 +164,18 @@ class WebUIContentsPreloadManager::WebUIControllerEmbedderStub final
   // Detach from the previously attached `web_contents`.
   void Detach() {
     if (!web_contents_) {
+      return;
+    }
+
+    // The enterprise policy might block navigation to the WebUI. When such
+    // policy is in place, the WebUI object is created on LoadURL(), then
+    // asynchronously the navigation commit fails, destroying the WebUI object
+    // and the RFH. For unknown reasons the primary main RFH of the WebContents
+    // might be dangling at this point, causing a crash on calling
+    // WebContents::GetWebUI(). See https://crbug.com/409389408.
+    // TODO(crbug.com/424551539): figure out why the primary main RFH is
+    // dangling.
+    if (IsShowingErrorPage(web_contents_)) {
       return;
     }
 
@@ -318,7 +335,8 @@ void WebUIContentsPreloadManager::SetPreloadCandidateSelector(
 }
 
 void WebUIContentsPreloadManager::MaybePreloadForBrowserContext(
-    content::BrowserContext* browser_context, PreloadReason preload_reason) {
+    content::BrowserContext* browser_context,
+    PreloadReason preload_reason) {
   pending_preload_.reset();
 
   if (!ShouldPreloadForBrowserContext(browser_context)) {
@@ -355,6 +373,13 @@ void WebUIContentsPreloadManager::MaybePreloadForBrowserContextLater(
     PreloadReason preload_reason,
     base::TimeDelta deadline) {
   CHECK(!is_delay_preload_disabled_for_test_);
+
+  // Usually destroying a WebContents may trigger preload, but if the
+  // destroy is caused by setting new preload contents, ignore it.
+  if (is_setting_preloaded_web_contents_) {
+    return;
+  }
+
   pending_preload_ = std::make_unique<PendingPreload>(
       this, Profile::FromBrowserContext(browser_context),
       busy_web_contents_to_watch, preload_reason, deadline);

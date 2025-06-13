@@ -288,9 +288,6 @@ extern const base::NotFatalUntil kLensOverlayNotFatalUntil;
 // Feature flag to enable the Lens View Finder Unified experience
 BASE_DECLARE_FEATURE(kEnableLensViewFinderUnifiedExperience);
 
-// Feature flag to enable the Lens Context Menu Unified experience
-BASE_DECLARE_FEATURE(kEnableLensContextMenuUnifiedExperience);
-
 // Whether to enable loading AIM in the lens result page.
 BASE_DECLARE_FEATURE(kLensLoadAIMInLensResultPage);
 
@@ -801,6 +798,10 @@ BASE_DECLARE_FEATURE(kChromeStartupParametersAsync);
 // Feature flag to enable the opening of links from Youtube Incognito in Chrome
 // incognito.
 BASE_DECLARE_FEATURE(kYoutubeIncognito);
+
+// Feature flag to have share extension item shared per profile.
+// DO NOT CHECK DIRECTLY, use IsShareExtensionForMultiprofileEnabled().
+BASE_DECLARE_FEATURE(kShareExtensionForMultiprofile);
 
 // Feature param to specify whether the youtube incognito handling is done
 // without the incognito interstitial.

@@ -48,12 +48,11 @@ class GlicActorControllerUiTest : public test::InteractiveGlicTest {
   using ActionProtoProvider = base::OnceCallback<std::string()>;
 
   GlicActorControllerUiTest() {
-    scoped_feature_list_.InitWithFeaturesAndParameters(
-        {{features::kGlicActor, actor::GetDefaultActorParamsForTesting()},
-         {optimization_guide::features::
-              kAnnotatedPageContentWithActionableElements,
-          {}}},
-        {});
+    scoped_feature_list_.InitWithFeatures(
+        /*enabled_features=*/{features::kGlicActor,
+                              optimization_guide::features::
+                                  kAnnotatedPageContentWithActionableElements},
+        /*disabled_features=*/{});
   }
   ~GlicActorControllerUiTest() override = default;
 
@@ -317,7 +316,7 @@ class GlicActorControllerUiTest : public test::InteractiveGlicTest {
 
       auto options = mojom::GetTabContextOptions::New();
       options->include_annotated_page_content = true;
-      FocusedTabData data = glic_service->GetFocusedTabData();
+      FocusedTabData data = glic_service->sharing_manager().GetFocusedTabData();
       if (data.focus()) {
         FetchPageContext(
             data.focus(), *options,

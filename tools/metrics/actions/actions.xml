@@ -32482,6 +32482,33 @@ should be able to be added at any place in this file.
   <description>Permissions reset from PageInfo.</description>
 </action>
 
+<action name="PageInfo.PrivacySubpage.IncognitoSettingsOpened">
+  <owner>michelleabreo@google.com</owner>
+  <owner>koilos@google.com</owner>
+  <description>
+    Incognito settings link clicked on the page info &quot;Privacy and site
+    data&quot; subpage.
+  </description>
+</action>
+
+<action name="PageInfo.PrivacySubpage.TrackingProtectionsPaused">
+  <owner>michelleabreo@google.com</owner>
+  <owner>koilos@google.com</owner>
+  <description>
+    User paused tracking protections on the page info &quot;Privacy and site
+    data&quot; subpage via the tracking protections button.
+  </description>
+</action>
+
+<action name="PageInfo.PrivacySubpage.TrackingProtectionsReenabled">
+  <owner>michelleabreo@google.com</owner>
+  <owner>koilos@google.com</owner>
+  <description>
+    User reenabled tracking protections on the page info &quot;Privacy and site
+    data&quot; subpage via the tracking protections button.
+  </description>
+</action>
+
 <action name="PageInfo.SafeBrowsing.HelpOpened">
   <owner>olesiamarukhno@google.com</owner>
   <owner>dullweber@chromium.org</owner>
@@ -44645,6 +44672,36 @@ should be able to be added at any place in this file.
   <description>
     Record when the user attempts to group tabs through the
     TabListEditorAddToGroupAction.
+  </description>
+</action>
+
+<action name="TabGroups.ArchivedTabGroupManualCloseOnInactiveSurface">
+  <owner>wylieb@google.com</owner>
+  <owner>evanluo@google.com</owner>
+  <owner>clank-tab-dev@google.com</owner>
+  <description>
+    Recorded when archived tab group is closed due to user manually clicking the
+    X button of the tab group in the inactive pane.
+  </description>
+</action>
+
+<action name="TabGroups.RestoreFromTabGroupPane">
+  <owner>wylieb@google.com</owner>
+  <owner>evanluo@google.com</owner>
+  <owner>clank-tab-dev@google.com</owner>
+  <description>
+    Recorded when an archived tab group is restored when the user opens the same
+    tab group from the tab group pane.
+  </description>
+</action>
+
+<action name="TabGroups.RestoreSingleTabGroup">
+  <owner>wylieb@google.com</owner>
+  <owner>evanluo@google.com</owner>
+  <owner>clank-tab-dev@google.com</owner>
+  <description>
+    Recorded when archived tab group is restored due to user manually clicking
+    into the tab group in the inactive pane.
   </description>
 </action>
 

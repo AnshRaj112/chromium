@@ -784,7 +784,6 @@ A questo account potrebbero essere applicate le autorizzazioni già concesse all
 <translation id="1542524755306892917">Ciò consente all'Assistente Google di fornire risposte personalizzate alle domande di <ph name="SUPERVISED_USER_NAME" />.</translation>
 <translation id="1543284117603151572">Importati da Edge</translation>
 <translation id="1543538514740974167">Accedi più rapidamente a questa pagina</translation>
-<translation id="154420222899071768">La tua password non è stata aggiornata, ma dovresti comunque riuscire ad accedere al sito con la password precedente</translation>
 <translation id="1544588554445317666">Prova a usare un nome di file più breve o a salvare l'elemento in un'altra cartella</translation>
 <translation id="1545177026077493356">Modalità kiosk automatica</translation>
 <translation id="1545749641540134597">Scansiona codice QR</translation>
@@ -2324,7 +2323,6 @@ Puoi gestire le impostazioni dell'account installando l'app Family Link su quest
 <translation id="2588636910004461974">Dispositivi di <ph name="VENDOR_NAME" /></translation>
 <translation id="2589658397149952302">Non mostrare mai i file di Drive</translation>
 <translation id="2593499352046705383">Prima di iniziare, assicurati di avere una copia di backup dei tuoi dati. L'installazione di <ph name="DEVICE_OS" /> comporterà la sovrascrittura del disco rigido. Scopri di più all'indirizzo g.co/flex/InstallGuide.</translation>
-<translation id="2594832159966169099">Gestisci la sicurezza di V8</translation>
 <translation id="2597073208962000830">La funzionalità Condivisione nelle vicinanze usa la scansione Bluetooth per trovare dispositivi nelle vicinanze.</translation>
 <translation id="2598136842498757793">Personalizza i pulsanti della barra degli strumenti</translation>
 <translation id="2598710988533271874">Nuovo Chrome disponibile</translation>
@@ -7013,7 +7011,6 @@ Puoi assegnare più sensori a questa azione.</translation>
 <translation id="594221546068848596">Pagina di ricerca con <ph name="VISUAL_SEARCH_PROVIDER" /></translation>
 <translation id="5942779427914696408">Visibilità del dispositivo</translation>
 <translation id="5943127421590245687">La verifica è andata a buon fine. Per sbloccare e ripristinare i dati locali, inserisci la vecchia password del dispositivo <ph name="DEVICE_TYPE" />.</translation>
-<translation id="5943209617717087975"><ph name="THIRD_PARTY_NTP_MANAGER" /> gestisce la pagina Nuova scheda</translation>
 <translation id="5945002094477276055">Il file <ph name="FILE_NAME" /> potrebbe essere pericoloso. Inviare a Google Navigazione sicura per la scansione?</translation>
 <translation id="5945192511027649793">Disattiva touchpad</translation>
 <translation id="5945363896952315544">Impossibile memorizzare altre impronte sul token di sicurezza. Per aggiungere una nuova impronta, devi prima eliminarne una esistente.</translation>
@@ -9007,6 +9004,7 @@ Hai altre # password compromesse. Gestore delle password di Google consiglia di 
 <translation id="7387951778417998929">Per usare un motore di ricerca diverso da quello predefinito, digita la relativa scorciatoia nella barra degli indirizzi seguita dalla tua scorciatoia da tastiera preferita. Puoi anche modificare il tuo motore di ricerca predefinito qui.</translation>
 <translation id="7388615499319468910">Siti e inserzionisti possono conoscere il rendimento degli annunci. Questa impostazione non è attiva.</translation>
 <translation id="738903649531469042">Aggiungi scheda all'elenco di lettura</translation>
+<translation id="7389615853658756494">Modificala sul sito</translation>
 <translation id="7392118418926456391">Scansione virus non riuscita</translation>
 <translation id="7392915005464253525">R&amp;iapri finestra chiusa</translation>
 <translation id="7393073300870882456">{COUNT,plural, =1{1 elemento copiato}other{{COUNT} elementi copiati}}</translation>
@@ -9136,6 +9134,7 @@ Hai altre # password compromesse. Gestore delle password di Google consiglia di 
 <translation id="7474043404939621342">Personalizza la barra degli strumenti</translation>
 <translation id="747459581954555080">Ripristina tutto</translation>
 <translation id="747507174130726364">{NUM_DAYS,plural, =1{È richiesta la restituzione immediata}other{Restituisci questo <ph name="DEVICE_TYPE" /> entro {NUM_DAYS} giorni}}</translation>
+<translation id="747557463733380256">Scopri di più su come viene gestito il tuo browser</translation>
 <translation id="7475671414023905704">URL password persa Netscape</translation>
 <translation id="7475742997309661417">ChromeVox, lo screen reader su ChromeOS, viene usato principalmente da persone cieche o ipovedenti per leggere il testo visualizzato sullo schermo con un sintetizzatore vocale o un display braille. Per attivare ChromeVox, tieni premuti entrambi i tasti del volume per cinque secondi. Quando ChromeVox verrà attivato potrai fare un rapido tour.</translation>
 <translation id="7476454130948140105">Livello della batteria troppo basso per eseguire l'aggiornamento (<ph name="BATTERY_PERCENT" />%)</translation>
@@ -10285,6 +10284,7 @@ Conserva il file di chiave in un luogo sicuro. Ti servirà per creare nuove vers
 <translation id="8265018477030547118">Solo su questo dispositivo</translation>
 <translation id="826511437356419340">Modalità panoramica finestre attivata. Scorri per spostarti oppure premi Tab se usi una tastiera.</translation>
 <translation id="8265671588726449108">{COUNT,plural, =1{La finestra di navigazione in incognito non verrà aperta dopo il riavvio}other{Le {COUNT} finestre di navigazione in incognito non verranno riaperte dopo il riavvio}}</translation>
+<translation id="8266430295499893285">Devi verificare la tua identità prima di poter accedere alle tue password</translation>
 <translation id="8266947622852630193">Tutti i metodi di immissione</translation>
 <translation id="8267539814046467575">Aggiungere una stampante</translation>
 <translation id="8267961145111171918"><ph name="BEGIN_PARAGRAPH1" />Queste sono informazioni generali sul dispositivo e sulla relativa modalità di utilizzo (ad esempio il livello della batteria, l'attività nelle app e nel sistema e gli errori). I dati vengono utilizzati per migliorare Android e alcune informazioni aggregate sono utili anche per app e partner di Google, ad esempio gli sviluppatori Android, che possono utilizzarle per migliorare i propri prodotti e le proprie app.<ph name="END_PARAGRAPH1" />

@@ -248,6 +248,7 @@ bool IsSingleFieldFillerFillingProduct(FillingProduct filling_product) {
     case FillingProduct::kAddress:
     case FillingProduct::kNone:
     case FillingProduct::kIdentityCredential:
+    case FillingProduct::kDataList:
       return false;
   }
 }
@@ -290,6 +291,9 @@ FillDataType GetEventTypeFromSingleFieldSuggestionType(SuggestionType type) {
     case SuggestionType::kInsecureContextPaymentDisabledMessage:
     case SuggestionType::kMixedFormMessage:
     case SuggestionType::kPasswordEntry:
+    case SuggestionType::kBackupPasswordEntry:
+    case SuggestionType::kTroubleSigningInEntry:
+    case SuggestionType::kFreeformFooter:
     case SuggestionType::kPasswordFieldByFieldFilling:
     case SuggestionType::kPlusAddressError:
     case SuggestionType::kFillPassword:
@@ -551,8 +555,7 @@ void MaybeAddAddressSuggestionStrikes(AutofillClient& client,
 std::optional<std::string> GetPlusAddressOverride(
     const AutofillPlusAddressDelegate* delegate,
     const std::vector<std::string>& plus_addresses) {
-  if (!delegate || !delegate->IsPlusAddressFullFormFillingEnabled() ||
-      plus_addresses.empty()) {
+  if (!delegate || plus_addresses.empty()) {
     return std::nullopt;
   }
   // Except in very rare cases where affiliation data changes, `plus_addresses`
@@ -694,7 +697,9 @@ void AddCachedAutofillAiPredictions(const AutofillAiModelCache& cache,
 
 BrowserAutofillManager::MetricsState::MetricsState(
     BrowserAutofillManager* owner)
-    : address_form_event_logger(owner), credit_card_form_event_logger(owner) {}
+    : address_form_event_logger(owner),
+      credit_card_form_event_logger(owner),
+      loyalty_card_form_event_logger(owner) {}
 
 BrowserAutofillManager::MetricsState::~MetricsState() {
   if (has_parsed_forms) {
@@ -706,6 +711,7 @@ BrowserAutofillManager::MetricsState::~MetricsState() {
   }
   credit_card_form_event_logger.OnDestroyed();
   address_form_event_logger.OnDestroyed();
+  loyalty_card_form_event_logger.OnDestroyed();
 }
 
 BrowserAutofillManager::BrowserAutofillManager(AutofillDriver* driver)
@@ -935,6 +941,9 @@ void BrowserAutofillManager::LogSubmissionMetrics(
         metrics_->signin_state_for_metrics);
     metrics_->credit_card_form_event_logger.OnWillSubmitForm(*submitted_form);
   }
+  if (client().IsAutofillEnabled()) {
+    metrics_->loyalty_card_form_event_logger.OnWillSubmitForm(*submitted_form);
+  }
 
   if (client().IsAutofillProfileEnabled()) {
     metrics_->address_form_event_logger.OnFormSubmitted(*submitted_form);
@@ -948,6 +957,9 @@ void BrowserAutofillManager::LogSubmissionMetrics(
     if (touch_to_fill_delegate_) {
       touch_to_fill_delegate_->LogMetricsAfterSubmission(*submitted_form);
     }
+  }
+  if (client().IsAutofillEnabled()) {
+    metrics_->loyalty_card_form_event_logger.OnFormSubmitted(*submitted_form);
   }
 }
 
@@ -1729,6 +1741,11 @@ void BrowserAutofillManager::FillOrPreviewField(
       type == SuggestionType::kAddressFieldByFieldFilling) {
     metrics_->address_form_event_logger.OnFilledByFieldByFieldFilling(type);
   }
+  if (action_persistence == mojom::ActionPersistence::kFill &&
+      type == SuggestionType::kLoyaltyCardEntry) {
+    metrics_->loyalty_card_form_event_logger.OnDidFillSuggestion(
+        *autofill_field);
+  }
 }
 
 void BrowserAutofillManager::OnDidFillAddressFormFillingSuggestion(
@@ -2482,6 +2499,12 @@ void BrowserAutofillManager::UpdateLoggersReadinessData() {
   GetCreditCardAccessManager().UpdateCreditCardFormEventLogger();
   metrics_->address_form_event_logger.UpdateProfileAvailabilityForReadiness(
       client().GetPersonalDataManager().address_data_manager().GetProfiles());
+  if (ValuablesDataManager* valuables_manager =
+          client().GetValuablesDataManager()) {
+    metrics_->loyalty_card_form_event_logger
+        .UpdateLoyaltyCardsAvailabilityForReadiness(
+            valuables_manager->GetLoyaltyCards());
+  }
 }
 
 void BrowserAutofillManager::OnDidFillOrPreviewForm(
@@ -2957,14 +2980,20 @@ void BrowserAutofillManager::OnFormProcessed(
   }
   // Log the type of form that was parsed.
   DenseSet<FormType> form_types = form_structure.GetFormTypes();
-  bool card_form = base::Contains(form_types, FormType::kCreditCardForm) ||
-                   base::Contains(form_types, FormType::kStandaloneCvcForm);
-  bool address_form = base::Contains(form_types, FormType::kAddressForm);
+  const bool card_form =
+      base::Contains(form_types, FormType::kCreditCardForm) ||
+      base::Contains(form_types, FormType::kStandaloneCvcForm);
+  const bool address_form = base::Contains(form_types, FormType::kAddressForm);
+  const bool loyalty_card_form =
+      base::Contains(form_types, FormType::kLoyaltyCardForm);
   if (card_form) {
     metrics_->credit_card_form_event_logger.OnDidParseForm(form_structure);
   }
   if (address_form) {
     metrics_->address_form_event_logger.OnDidParseForm(form_structure);
+  }
+  if (loyalty_card_form) {
+    metrics_->loyalty_card_form_event_logger.OnDidParseForm(form_structure);
   }
   // `autofill_optimization_guide_` is not present on unsupported platforms.
   if (auto* autofill_optimization_guide =
@@ -3205,6 +3234,8 @@ BrowserAutofillManager::GetEventFormLogger(const AutofillField& field) {
     case FormType::kCreditCardForm:
     case FormType::kStandaloneCvcForm:
       return &metrics_->credit_card_form_event_logger;
+    case FormType::kLoyaltyCardForm:
+      return &metrics_->loyalty_card_form_event_logger;
     case FormType::kPasswordForm:
     case FormType::kUnknownFormType:
       return nullptr;
@@ -3272,6 +3303,9 @@ void BrowserAutofillManager::ProcessFieldLogEventsInForm(
         form_structure.global_id()));
     form_events.insert_all(
         metrics_->credit_card_form_event_logger.GetFormEvents(
+            form_structure.global_id()));
+    form_events.insert_all(
+        metrics_->loyalty_card_form_event_logger.GetFormEvents(
             form_structure.global_id()));
     client().GetFormInteractionsUkmLogger().LogAutofillFormSummaryAtFormRemove(
         driver().GetPageUkmSourceId(), form_structure, form_events,
@@ -3384,6 +3418,7 @@ void BrowserAutofillManager::SetFastCheckoutRunId(
     case FormType::kStandaloneCvcForm:
       metrics_->credit_card_form_event_logger.SetFastCheckoutRunId(run_id);
       break;
+    case FormType::kLoyaltyCardForm:
     case FormType::kPasswordForm:
     case FormType::kUnknownFormType:
       // FastCheckout only supports address and credit card forms.

@@ -611,7 +611,6 @@
 <translation id="3557336313807607643">အဆက်အသွယ်များသို့ ထည့်ရန်</translation>
 <translation id="355765753469272474">နောက်ပြန်ရန်</translation>
 <translation id="3565930036634619844">တဘ်။ <ph name="NUMBER_OF_TABS" /> အနက် <ph name="TAB_INDEX" />။</translation>
-<translation id="3570693105179140209">နောက်ထပ်စကားဝှက်များအတွက် နှစ်ချက်တို့ပါ။</translation>
 <translation id="3572607909481582402">သင့် Google အကောင့်တွင်</translation>
 <translation id="3575234738189584619">Lens ဖြင့် ရှာဖွေရန်</translation>
 <translation id="3575426792457739946">ဤစာရင်းတွင် ဖွင့်ထားသော ပရိုဖိုင်အားလုံး ပါဝင်သည်။</translation>
@@ -654,7 +653,6 @@
 <translation id="3779810277399252432">အင်တာနက် ချိတ်ဆက်မှု မရှိပါ။</translation>
 <translation id="3782614601387961027">သတိပေးချက်ကို ပယ်ရန်</translation>
 <translation id="3789841737615482174">တပ်ဆင်ရန်</translation>
-<translation id="3795478177331815672">တဘ်နှင့် တဘ်အုပ်စုများ ဖွင့်ရန်</translation>
 <translation id="380329542618494757">အမည်</translation>
 <translation id="3803696231112616155">ဤဝဘ်ဆိုက်ကို ဘာသာပြန်ရန် ကမ်းလှမ်းချက်</translation>
 <translation id="3808311849069021992">ရှာဖွေရေး အင်ဂျင် အသေးစိတ် ပြပါ</translation>
@@ -700,7 +698,6 @@
 <translation id="3955740319737378355">ပြီးပြီ</translation>
 <translation id="3955822496205734389">သင့်တွင် အားနည်းသည့် စကားဝှက်များရှိသည်။</translation>
 <translation id="3958312024468322930">‘ပင်မစာမျက်နှာ’ အောက်ခြေရှိ ပုံသေအထိုင်နေရာသို့ ၎င်းကို ဖိဆွဲပါ</translation>
-<translation id="3960218941754097036">စခရင်ပေါ်ရှိ မည်သည့်အရာကိုမဆို Google Lens ဖြင့် ရှာခြင်း</translation>
 <translation id="3962326069546168954">သိမ်းရန်</translation>
 <translation id="3967327056943561740">လိပ်စာများ</translation>
 <translation id="3967822245660637423">ဒေါင်းလုဒ်လုပ်ခြင်း ပြည့်စုံပါပြီ</translation>
@@ -1813,6 +1810,7 @@ Handoff ကို ဆက်တင်များ၏ ယေဘူယျအပိ�
 <translation id="8343993175958086504">သင့်အချက်အလက်များကို အရန်သိမ်းပြီး စက်တိုင်းတွင် သုံးနိုင်သည်။</translation>
 <translation id="8348530355586151720">အစက်သုံးစက်မီနူးကို တို့ပါ</translation>
 <translation id="8349305172487531364">စာညှပ် ဘား</translation>
+<translation id="8363484128299778310">ပြဿနာဖြစ်လာပါက ယာယီပြန်လည်ရယူရန်</translation>
 <translation id="8364563001733875155">ပင်နံပါတ် ပြောင်းရန် သင့်စက်တွင် လျှို့ဝှက်ကုဒ်ကို ဦးစွာ သတ်မှတ်ပါ။</translation>
 <translation id="8366466717204352506">မည်သည့်အခါမျှ မစစ်ရသေးပါ</translation>
 <translation id="8368001212524806591">ဈေးနှုန်း စောင့်ကြည့်ခြင်း</translation>

@@ -273,6 +273,18 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="Blink.Blink.LoadURLSynchronouslyDuration" units="ms"
+    expires_after="2025-11-30">
+  <owner>fdoray@chromium.org</owner>
+  <owner>catan-team@chromium.org</owner>
+  <summary>
+    Duration of a synchronous load by blink::URLLoader. Recorded every time
+    blink::URLLoader::LoadSynchronously performs a load. Synchronous load are
+    discouraged as they block the main thread. This histogram will be used to
+    estimate to which extent they affect Interaction to Next Paint (INP).
+  </summary>
+</histogram>
+
 <histogram name="Blink.Canvas.2DLayerBridge.Compression.DecompressionTime"
     units="ms" expires_after="2025-11-16">
   <owner>lizeb@chromium.org</owner>
@@ -1149,19 +1161,6 @@ chromium-metrics-reviews@google.com.
     The EffectiveZoom as reported by ComputedStyle in a Blink renderer. The
     value is reported each time the effective zoom is set to a new value. The
     maximum zoom reported is 400% to keep the histogram of reasonable size.
-  </summary>
-</histogram>
-
-<histogram name="Blink.Element.Fullscreen.DurationUpTo1H.RequestFullscreen"
-    units="ms" expires_after="2025-04-13">
-  <owner>btriebw@chromium.org</owner>
-  <owner>msw@chromium.org</owner>
-  <owner>web-windowing-team@google.com</owner>
-  <summary>
-    The duration of a fullscreen session initiated by a
-    element.{webkit}requestFullscreen request, up to 1 hour. The value is
-    reported each time HTML fullscreen mode exits after it was initiated by
-    element.{webkit}requestFullscreen. Excludes XR fullscreen.
   </summary>
 </histogram>
 

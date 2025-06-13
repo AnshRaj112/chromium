@@ -109,6 +109,7 @@ Još podešavanja koja koriste podatke za poboljšanje doživljaja Chrome-a potr
 <translation id="1419753403124156396">Želite da ponovo pokrenete Chrome?</translation>
 <translation id="1428770807407000502">Želite da isključite sinhronizaciju?</translation>
 <translation id="1430915738399379752">Štampaj</translation>
+<translation id="1433478348197382180">Režim čitanja</translation>
 <translation id="1435593198351412143">Automatski otvaraj PDF-ove</translation>
 <translation id="1437543266176261764">Koristi <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Organizujte proizvode koje pratite u Obeleživačima</translation>
@@ -331,6 +332,7 @@ Samo neko ko ima pristupnu frazu može da čita šifrovane podatke. Pristupna fr
 <translation id="2524132927880411790">Idi na glasovnu pretragu aplikacije Google</translation>
 <translation id="2527209463677295330">Ako uvrstite veći deo teksta stranice, možete da dobijete bolje rezultate</translation>
 <translation id="2527779675047087889">Sakrij sadržaj privremene memorije</translation>
+<translation id="2531209299761896527">Uštinite, zadržavajte i prevlačite da biste otvarali kartice u novom prozoru</translation>
 <translation id="2532336938189706096">Veb-prikaz</translation>
 <translation id="253498598929009420">Sajt će moći da vidi sadržaj vašeg ekrana</translation>
 <translation id="2535807170289627159">Sve kartice</translation>
@@ -1079,7 +1081,6 @@ Google nalog možda ima druge oblike istorije pregledanja, poput pretraga i akti
 <translation id="5956665950594638604">Otvaranje Chrome centra za pomoć na novoj kartici</translation>
 <translation id="59577092665511740">Izaberite nalog.</translation>
 <translation id="5958275228015807058">Pronađite datoteke i stranice u Preuzimanjima</translation>
-<translation id="5958994127112619898">Pojednostavi stranicu</translation>
 <translation id="5962718611393537961">Dodirnite da biste skupili</translation>
 <translation id="5964869237734432770">Zaustavi opise slika</translation>
 <translation id="5975083100439434680">Umanjivanje</translation>
@@ -1628,7 +1629,6 @@ Da biste promenili ovo podešavanje, <ph name="BEGIN_LINK" />izbrišite Chrome p
 <translation id="8137562778192957619">Ne morate da zapamtite ovu lozinku. Čuva se u Google menadžeru lozinki.</translation>
 <translation id="8152331954420209374">Idi na Objektiv</translation>
 <translation id="8163820386638255770">Da biste koristili i čuvali lozinke na Google nalogu, potvrdite svoj identitet</translation>
-<translation id="8179976553408161302">Enter</translation>
 <translation id="8186512483418048923">Preostale datoteke: <ph name="FILES" /></translation>
 <translation id="8190358571722158785">Još 1 dan</translation>
 <translation id="8192765420340770300">Donja tabela za prijavljivanje je otvorena u punoj visini</translation>

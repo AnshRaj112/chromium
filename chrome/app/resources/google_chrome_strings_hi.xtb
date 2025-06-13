@@ -219,6 +219,7 @@
 <translation id="3716540481907974026">ChromeOS Flex का वर्शन</translation>
 <translation id="3718181793972440140">ऐसा करने से इस डिवाइस से 1 आइटम मिट जाएगा. बाद में अपना डेटा पाने के लिए, Chrome में <ph name="USER_EMAIL" /> के रूप में साइन इन करें.</translation>
 <translation id="3723744677043446310">{NUM_EXTENSIONS,plural, =1{Chrome का सुझाव है कि आप यह एक्सटेंशन हटा दें. <ph name="BEGIN_LINK" />Chrome पर इस्तेमाल किए जा सकने वाले एक्सटेंशन के बारे में ज़्यादा जानें<ph name="END_LINK" />}one{Chrome का सुझाव है कि आप यह एक्सटेंशन हटा दें. <ph name="BEGIN_LINK" />Chrome पर इस्तेमाल किए जा सकने वाले एक्सटेंशन के बारे में ज़्यादा जानें<ph name="END_LINK" />}other{Chrome का सुझाव है कि आप ये एक्सटेंशन हटा दें. <ph name="BEGIN_LINK" />Chrome पर इस्तेमाल किए जा सकने वाले एक्सटेंशन के बारे में ज़्यादा जानें<ph name="END_LINK" />}}</translation>
+<translation id="3756724684201900923">Chrome इंस्टॉल करने के बारे में ज़्यादा जानें</translation>
 <translation id="3780814664026482060">Chrome - <ph name="PAGE_TITLE" /></translation>
 <translation id="3785324443014631273">ChromeOS Flex आपके डेटा को सिंक नहीं कर सका, क्योंकि साइन इन करने के दौरान कोई गड़बड़ी हुई है.</translation>
 <translation id="3795971588916395511">Google ChromeOS</translation>
@@ -450,7 +451,6 @@ Google Chrome आपकी सेटिंग बहाल नहीं कर �
 <translation id="6831043979455480757">Translate</translation>
 <translation id="683440813066116847">mDNS ट्रैफ़िक की अनुमति देने के लिए Google Chrome Canary के लिए इनबाउंड नियम.</translation>
 <translation id="684888714667046800">इंटरनेट से कनेक्ट नहीं किया जा सका. अगर आपने फ़ायरवॉल का इस्तेमाल किया है, तो कृपया पक्का करें कि <ph name="PRODUCT_EXE_NAME" /> को अनुमति वाली सूची में शामिल किया गया हो.</translation>
-<translation id="6851981911629679515">Chrome के JavaScript और WebAssembly इंजन में अतिरिक्त सुरक्षा चालू करें</translation>
 <translation id="6877155553248388166">खोज वाली जगह में सबसे नीचे का दायां कोना: दाईं ओर से <ph name="RIGHT" />%, सबसे नीचे से <ph name="BOTTOM" />%</translation>
 <translation id="6881299373831449287">Chrome को अपडेट किया जा रहा है</translation>
 <translation id="6885412569789873916">Chrome बीटा ऐप्लिकेशन</translation>

@@ -6193,6 +6193,7 @@
       valid_for_first_letter: true,
       valid_for_first_line: true,
       valid_for_page_context: true,
+      valid_for_permission_element: true,
     },
     {
       name: "view-timeline-axis",
@@ -6584,7 +6585,7 @@
     {
       name: "row-rule-color",
       property_methods: ["ParseSingleValue", "CSSValueFromComputedStyleInternal", "ColorIncludingFallback"],
-      interpolable: true,
+      interpolable: false,
       field_group: "*",
       field_template: "external",
       include_paths: ["third_party/blink/renderer/core/style/gap_data_list.h",

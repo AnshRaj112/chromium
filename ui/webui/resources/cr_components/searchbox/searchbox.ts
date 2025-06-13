@@ -26,6 +26,7 @@ import {decodeString16, mojoString16} from './utils.js';
 // LINT.IfChange(GhostLoaderTagName)
 const LENS_GHOST_LOADER_TAG_NAME = 'cr-searchbox-ghost-loader';
 // LINT.ThenChange(/chrome/browser/resources/lens/shared/searchbox_ghost_loader.ts:GhostLoaderTagName)
+const DESKTOP_CHROME_NTP_REALBOX_ENTRY_POINT_VALUE = '42';
 
 interface Input {
   text: string;
@@ -141,9 +142,18 @@ export class SearchboxElement extends SearchboxElementBase {
         reflectToAttribute: true,
       },
 
+      composeboxEnabled: {
+        type: Boolean,
+      },
+
       composeButtonEnabled: {
         type: Boolean,
-        value: () => loadTimeData.getBoolean('searchboxShowComposeEntrypoint'),
+      },
+
+      composeIcon: {
+        type: String,
+        value: () =>
+            '//resources/cr_components/searchbox/icons/search_spark.svg',
         reflectToAttribute: true,
       },
 
@@ -291,7 +301,9 @@ export class SearchboxElement extends SearchboxElementBase {
   declare searchboxLensSearchEnabled: boolean;
   declare searchboxChromeRefreshTheming: boolean;
   declare searchboxSteadyStateShadow: boolean;
+  declare composeboxEnabled: boolean;
   declare composeButtonEnabled: boolean;
+  declare composeIcon: string;
   declare showThumbnail: boolean;
   declare private inputAriaLive_: string;
   declare private isLensSearchbox_: boolean;
@@ -823,12 +835,12 @@ export class SearchboxElement extends SearchboxElementBase {
   }
 
   private onComposeButtonClick_(e: MouseEvent) {
-    if (this.composeButtonEnabled &&
-        !loadTimeData.getBoolean('searchboxShowComposebox')) {
+    if (!this.composeboxEnabled) {
       // Construct navigation url.
       const searchParams = new URLSearchParams();
       searchParams.append('sourceid', 'chrome');
       searchParams.append('udm', '50');
+      searchParams.append('aep', DESKTOP_CHROME_NTP_REALBOX_ENTRY_POINT_VALUE);
       if (this.$.input.value) {
         searchParams.append('q', this.$.input.value);
       }
@@ -836,6 +848,10 @@ export class SearchboxElement extends SearchboxElementBase {
           new URL('/search', loadTimeData.getString('googleBaseUrl'));
       queryUrl.search = searchParams.toString();
       const href = queryUrl.href;
+
+      chrome.metricsPrivate.recordBoolean(
+          'NewTabPage.ComposeEntrypoint.Click.UserTextPresent',
+          !this.isInputEmpty());
 
       // Handle mouse events.
       e.preventDefault();

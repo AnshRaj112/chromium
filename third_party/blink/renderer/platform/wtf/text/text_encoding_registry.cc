@@ -161,8 +161,8 @@ static void BuildBaseTextCodecMaps() {
   g_text_codec_map = new TextCodecMap;
   g_text_encoding_name_map = new TextEncodingNameMap;
 
-  TextCodecLatin1::RegisterEncodingNames(AddToTextEncodingNameMap);
-  TextCodecLatin1::RegisterCodecs(AddToTextCodecMap);
+  blink::TextCodecLatin1::RegisterEncodingNames(AddToTextEncodingNameMap);
+  blink::TextCodecLatin1::RegisterCodecs(AddToTextCodecMap);
 
   TextCodecUTF8::RegisterEncodingNames(AddToTextEncodingNameMap);
   TextCodecUTF8::RegisterCodecs(AddToTextCodecMap);
@@ -175,8 +175,8 @@ static void BuildBaseTextCodecMaps() {
 }
 
 static void ExtendTextCodecMaps() {
-  TextCodecReplacement::RegisterEncodingNames(AddToTextEncodingNameMap);
-  TextCodecReplacement::RegisterCodecs(AddToTextCodecMap);
+  blink::TextCodecReplacement::RegisterEncodingNames(AddToTextEncodingNameMap);
+  blink::TextCodecReplacement::RegisterCodecs(AddToTextCodecMap);
 
   TextCodecCJK::RegisterEncodingNames(AddToTextEncodingNameMap);
   TextCodecCJK::RegisterCodecs(AddToTextCodecMap);

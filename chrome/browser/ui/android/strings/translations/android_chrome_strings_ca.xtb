@@ -109,6 +109,7 @@ Per veure més opcions de configuració que utilitzin dades per millorar la teva
 <translation id="1419753403124156396">Vols reiniciar Chrome?</translation>
 <translation id="1428770807407000502">Vols desactivar la sincronització?</translation>
 <translation id="1430915738399379752">Imprimeix</translation>
+<translation id="1433478348197382180">Mode de lectura</translation>
 <translation id="1435593198351412143">Obre els PDF automàticament</translation>
 <translation id="1437543266176261764">S'està executant a <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Organitza els productes que segueixes a Adreces d'interès</translation>
@@ -331,6 +332,7 @@ Només les persones que sàpiguen la teva frase de contrasenya podran llegir les
 <translation id="2524132927880411790">Ves a la Cerca per veu de l'aplicació de Google</translation>
 <translation id="2527209463677295330">Si inclous més text d'una pàgina, pots obtenir millors resultats</translation>
 <translation id="2527779675047087889">Amaga els continguts del porta-retalls</translation>
+<translation id="2531209299761896527">Pinça, mantén premut i arrossega per obrir pestanyes en una finestra nova</translation>
 <translation id="2532336938189706096">Visualització web</translation>
 <translation id="253498598929009420">El lloc web podrà veure el contingut de la teva pantalla</translation>
 <translation id="2535807170289627159">Totes les pestanyes</translation>
@@ -1079,7 +1081,6 @@ Només les persones que sàpiguen la teva frase de contrasenya podran llegir les
 <translation id="5956665950594638604">Obre Centre d'ajuda de Chrome en una pestanya nova</translation>
 <translation id="59577092665511740">Tria un compte.</translation>
 <translation id="5958275228015807058">Trobaràs els teus fitxers i les teves pàgines a Baixades</translation>
-<translation id="5958994127112619898">Simplifica la pàgina</translation>
 <translation id="5962718611393537961">Toca per replegar</translation>
 <translation id="5964869237734432770">Atura descripcions d'imatges</translation>
 <translation id="5975083100439434680">Redueix</translation>
@@ -1628,7 +1629,6 @@ Per canviar aquesta opció de configuració, <ph name="BEGIN_LINK" />suprimeix l
 <translation id="8137562778192957619">No caldrà que recordis aquesta contrasenya. Es desarà al gestor de contrasenyes de Google.</translation>
 <translation id="8152331954420209374">Ves a Lens</translation>
 <translation id="8163820386638255770">Per utilitzar i desar contrasenyes al teu Compte de Google, verifica la teva identitat</translation>
-<translation id="8179976553408161302">Retorn</translation>
 <translation id="8186512483418048923">Queden <ph name="FILES" /> fitxers</translation>
 <translation id="8190358571722158785">Queda 1 dia</translation>
 <translation id="8192765420340770300">Full inferior d'inici de sessió obert a alçada completa</translation>

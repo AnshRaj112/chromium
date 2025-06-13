@@ -223,6 +223,7 @@
 <translation id="3716540481907974026">ChromeOS Flexৰ সংস্কৰণ</translation>
 <translation id="3718181793972440140">ইয়াৰ ফলত এই ডিভাইচটোৰ পৰা ১টা বস্তু মচা হ’ব। আপোনাৰ ডেটা পাছত পুনৰুদ্ধাৰ কৰিবলৈ Chromeত <ph name="USER_EMAIL" /> হিচাপে ছাইন ইন কৰক।</translation>
 <translation id="3723744677043446310">{NUM_EXTENSIONS,plural, =1{Chromeএ আপোনাক এইটো আঁতৰাবলৈ চুপাৰিছ কৰে। <ph name="BEGIN_LINK" />সমৰ্থিত এক্সটেনশ্বনসমূহৰ বিষয়ে অধিক জানক<ph name="END_LINK" />}one{Chromeএ আপোনাক এইসমূহ আঁতৰাবলৈ চুপাৰিছ কৰে। <ph name="BEGIN_LINK" />সমৰ্থিত এক্সটেনশ্বনসমূহৰ বিষয়ে অধিক জানক<ph name="END_LINK" />}other{Chromeএ আপোনাক এইসমূহ আঁতৰাবলৈ চুপাৰিছ কৰে। <ph name="BEGIN_LINK" />সমৰ্থিত এক্সটেনশ্বনসমূহৰ বিষয়ে অধিক জানক<ph name="END_LINK" />}}</translation>
+<translation id="3756724684201900923">Chrome ইনষ্টল কৰাৰ বিষয়ে অধিক জানক</translation>
 <translation id="3780814664026482060">Chrome - <ph name="PAGE_TITLE" /></translation>
 <translation id="3785324443014631273">ছাইন ইন কৰোঁতে কিবা আসোঁৱাহ হোৱাৰ কাৰণে ChromeOS Flexএ আপোনাৰ ডেটা ছিংক কৰিব নোৱাৰিলে।</translation>
 <translation id="3795971588916395511">Google ChromeOS</translation>
@@ -455,7 +456,6 @@ Google Chromeএ আপোনাৰ ছেটিংসমূহ পুনৰু�
 <translation id="6831043979455480757">Translate</translation>
 <translation id="683440813066116847">mDNS ট্ৰেফিকক অনুমতি দিবলৈ Google Chrome বিটাৰ অন্তৰ্গামী নিয়ম।</translation>
 <translation id="684888714667046800">ইণ্টাৰনেটৰ লগত সংযোগ কৰিব পৰা নাই। আপুনি যদি কোনো ফায়াৰৱাল ব্যৱহাৰ কৰে, অনুগ্ৰহ কৰি অনুমতি দিয়া সূচীখনত <ph name="PRODUCT_EXE_NAME" /> থকাটো নিশ্চিত কৰক।</translation>
-<translation id="6851981911629679515">Chromeৰ JavaScript আৰু WebAssembly ইঞ্জিনত অতিৰিক্ত সুৰক্ষা অন কৰক</translation>
 <translation id="6877155553248388166">সন্ধান এলেকাৰ তলৰ সোঁফালৰ কোণ: <ph name="RIGHT" />% সোঁফালে, <ph name="BOTTOM" />% তললৈ</translation>
 <translation id="6881299373831449287">Chrome আপডে’ট কৰি থকা হৈছে</translation>
 <translation id="6885412569789873916">Chrome বিটা এপ্‌সমূহ</translation>

@@ -781,7 +781,6 @@ Berechtigungen, die du Apps bereits gewährt hast, gelten möglicherweise für d
 <translation id="1542524755306892917">Durch diese Option kann Google Assistant relevantere Antworten geben, wenn <ph name="SUPERVISED_USER_NAME" /> Fragen stellt.</translation>
 <translation id="1543284117603151572">Aus Edge importiert</translation>
 <translation id="1543538514740974167">Schneller hierherkommen</translation>
-<translation id="154420222899071768">Dein Passwort wurde nicht aktualisiert. Du solltest aber weiterhin mit deinem alten Passwort auf die Website zugreifen können.</translation>
 <translation id="1544588554445317666">Versuch, einen kürzeren Dateinamen oder einen anderen Ordner zu verwenden</translation>
 <translation id="1545177026077493356">Automatischer Kioskmodus</translation>
 <translation id="1545749641540134597">QR-Code scannen</translation>
@@ -2321,7 +2320,6 @@ Diese Aktion wirkt sich nicht auf Lesezeichen, Passwörter und den Verlauf aus.<
 <translation id="2588636910004461974">Geräte von <ph name="VENDOR_NAME" /></translation>
 <translation id="2589658397149952302">Drive-Dateien nie anzeigen</translation>
 <translation id="2593499352046705383">Erstelle vor der Installation auf jeden Fall ein Backup deiner Daten. Wenn du <ph name="DEVICE_OS" /> installierst, werden die Daten auf deiner Festplatte überschrieben. Weitere Informationen findest du unter g.co/flex/InstallGuide.</translation>
-<translation id="2594832159966169099">V8-Sicherheit verwalten</translation>
 <translation id="2597073208962000830">Nearby Share nutzt die Bluetooth-Suche, um Geräte in der Nähe zu finden.</translation>
 <translation id="2598136842498757793">Schaltflächen auf Symbolleiste anpassen</translation>
 <translation id="2598710988533271874">Neue Chrome-Version verfügbar</translation>
@@ -7007,7 +7005,6 @@ Du kannst dieser Aktion mehrere Schalter zuweisen.</translation>
 <translation id="594221546068848596">Mit <ph name="VISUAL_SEARCH_PROVIDER" /> auf der Seite suchen</translation>
 <translation id="5942779427914696408">Gerätesichtbarkeit</translation>
 <translation id="5943127421590245687">Deine Bestätigung war erfolgreich. Gib dein altes <ph name="DEVICE_TYPE" />-Passwort ein, um deine lokalen Daten zu entsperren und wiederherzustellen.</translation>
-<translation id="5943209617717087975"><ph name="THIRD_PARTY_NTP_MANAGER" /> verwaltet deine „Neuer Tab“-Seite</translation>
 <translation id="5945002094477276055"><ph name="FILE_NAME" /> könnte schädlich sein. Zum Scannen an Google Safe Browsing senden?</translation>
 <translation id="5945192511027649793">Touchpad deaktivieren</translation>
 <translation id="5945363896952315544">Auf deinem Sicherheitsschlüssel können keine weiteren Fingerabdrücke gespeichert werden. Wenn du einen neuen Fingerabdruck speichern möchtest, lösche einen vorhandenen.</translation>

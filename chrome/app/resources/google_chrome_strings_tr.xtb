@@ -219,6 +219,7 @@
 <translation id="3716540481907974026">ChromeOS Flex sürümü</translation>
 <translation id="3718181793972440140">Bu işlem, 1 öğeyi bu cihazdan silecektir. Verilerinizi daha sonra geri almak için Chrome'da <ph name="USER_EMAIL" /> hesabıyla oturum açın.</translation>
 <translation id="3723744677043446310">{NUM_EXTENSIONS,plural, =1{Chrome, bu dosyayı kaldırmanızı önerir. <ph name="BEGIN_LINK" />Desteklenen uzantılar hakkında daha fazla bilgi edinin.<ph name="END_LINK" />}other{Chrome, bunları kaldırmanızı önerir. <ph name="BEGIN_LINK" />Desteklenen uzantılar hakkında daha fazla bilgi edinin.<ph name="END_LINK" />}}</translation>
+<translation id="3756724684201900923">Chrome'u yükleme hakkında daha fazla bilgi</translation>
 <translation id="3780814664026482060">Chrome - <ph name="PAGE_TITLE" /></translation>
 <translation id="3785324443014631273">ChromeOS Flex, oturum açma hatası nedeniyle verilerinizi senkronize edemedi.</translation>
 <translation id="3795971588916395511">Google ChromeOS</translation>
@@ -448,7 +449,6 @@ Bazı özellikler kullanılamayabilir. Lütfen farklı bir profil dizini belirti
 <translation id="6831043979455480757">Çevir</translation>
 <translation id="683440813066116847">Google Chrome Canary'nin mDNS trafiğine izin vermeyi sağlayan gelen trafik kuralı.</translation>
 <translation id="684888714667046800">İnternete bağlanılamıyor. Güvenlik duvarı kullanıyorsanız lütfen <ph name="PRODUCT_EXE_NAME" /> dosyasının izin verilenler listesine eklendiğinden emin olun.</translation>
-<translation id="6851981911629679515">Chrome'un JavaScript ve WebAssembly motorunda ek korumayı etkinleştirin</translation>
 <translation id="6877155553248388166">arama alanının sağ alt köşesi: sağ %<ph name="RIGHT" />, alt %<ph name="BOTTOM" /></translation>
 <translation id="6881299373831449287">Chrome güncelleniyor</translation>
 <translation id="6885412569789873916">Chrome Beta Uygulamaları</translation>

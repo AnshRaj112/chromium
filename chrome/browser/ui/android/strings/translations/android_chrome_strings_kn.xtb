@@ -109,6 +109,7 @@
 <translation id="1419753403124156396">Chrome ಅನ್ನು ಮರುಪ್ರಾರಂಭಿಸಬೇಕೆ?</translation>
 <translation id="1428770807407000502">ಸಿಂಕ್‌ ಆಫ್‌ ಮಾಡಬೇಕೆ?</translation>
 <translation id="1430915738399379752">ಮುದ್ರಿಸು</translation>
+<translation id="1433478348197382180">ಓದುವ ಮೋಡ್</translation>
 <translation id="1435593198351412143">PDF ಗಳನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ತೆರೆಯಿರಿ</translation>
 <translation id="1437543266176261764"><ph name="APP_NAME" /> ನಲ್ಲಿ ರನ್ ಆಗುತ್ತಿದೆ</translation>
 <translation id="1448440926884431741">ನಿಮ್ಮ ಟ್ರ್ಯಾಕ್ ಮಾಡಿದ ಉತ್ಪನ್ನಗಳನ್ನು Bookmarks ನಲ್ಲಿ ಆಯೋಜಿಸಿ</translation>
@@ -1079,7 +1080,6 @@
 <translation id="5956665950594638604">ಹೊಸ ಟ್ಯಾಬ್‌ನಲ್ಲಿ Chrome ಸಹಾಯ ಕೇಂದ್ರ ತೆರೆಯಿರಿ</translation>
 <translation id="59577092665511740">ಖಾತೆಯೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ.</translation>
 <translation id="5958275228015807058">ಡೌನ್‌ಲೋಡ್‌ಗಳಲ್ಲಿ ನಿಮ್ಮ ಫೈಲ್‌ಗಳು ಮತ್ತು ಪುಟಗಳನ್ನು ಹುಡುಕಿ</translation>
-<translation id="5958994127112619898">ಸರಳತೆಯ ಪುಟ</translation>
 <translation id="5962718611393537961">ಕುಗ್ಗಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ</translation>
 <translation id="5964869237734432770">ಚಿತ್ರ ವಿವರಣೆಗಳನ್ನು ನಿಲ್ಲಿಸಿ</translation>
 <translation id="5975083100439434680">ಝೂಮ್ ಔಟ್</translation>
@@ -1628,7 +1628,6 @@
 <translation id="8137562778192957619">ನೀವು ಈ ಪಾಸ್‌ವರ್ಡ್ ನೆನಪಿಟ್ಟುಕೊಳ್ಳುವ ಅಗತ್ಯವಿಲ್ಲ. ಅದನ್ನು Google Password Manager ನಲ್ಲಿ ಸೇವ್ ಮಾಡಲಾಗುತ್ತದೆ</translation>
 <translation id="8152331954420209374">Lens ಗೆ ಹೋಗಿ</translation>
 <translation id="8163820386638255770">ನಿಮ್ಮ Google ಖಾತೆಯಲ್ಲಿ ಪಾಸ್‌ವರ್ಡ್‌ಗಳನ್ನು ಬಳಸಲು ಮತ್ತು ಸೇವ್ ಮಾಡಲು, ಇದು ನೀವೇ ಎಂದು ದೃಢೀಕರಿಸಿ</translation>
-<translation id="8179976553408161302">Enter</translation>
 <translation id="8186512483418048923"><ph name="FILES" /> ಬಾಕಿ ಉಳಿದಿರುವ ಫೈಲ್‌ಗಳು</translation>
 <translation id="8190358571722158785">1 ದಿನ ಉಳಿದಿದೆ</translation>
 <translation id="8192765420340770300">ಸೈನ್ ಇನ್ ಮಾಡುವ ಕೆಳಭಾಗದ ಶೀಟ್ ಪೂರ್ಣ ಎತ್ತರದಲ್ಲಿ ತೆರೆದಿದೆ</translation>

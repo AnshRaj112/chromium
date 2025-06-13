@@ -33,7 +33,7 @@ using ::optimization_guide::proto::BrowserAction;
 namespace {
 constexpr int kFakeContentNodeId = 123;
 constexpr char kActionResultHistogram[] =
-    "Actor.ActorCoordinator.Action.ResultCode";
+    "Actor.ExecutionEngine.Action.ResultCode";
 
 class FakeChromeRenderFrame : public chrome::mojom::ChromeRenderFrame {
  public:
@@ -95,9 +95,8 @@ class ExecutionEngineTest : public ChromeRenderViewHostTestHarness {
   ~ExecutionEngineTest() override = default;
 
   void SetUp() override {
-    scoped_feature_list_.InitWithFeaturesAndParameters(
-        /*enabled_features=*/{{features::kGlicActor,
-                               GetDefaultActorParamsForTesting()}},
+    scoped_feature_list_.InitWithFeatures(
+        /*enabled_features=*/{features::kGlicActor},
         /*disabled_features=*/{});
 
     ChromeRenderViewHostTestHarness::SetUp();

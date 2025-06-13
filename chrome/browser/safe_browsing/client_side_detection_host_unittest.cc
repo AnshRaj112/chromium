@@ -278,6 +278,7 @@ class FakePhishingDetector : public mojom::PhishingDetector {
   // mojom::PhishingDetector
   void StartPhishingDetection(
       const GURL& url,
+      safe_browsing::mojom::ClientSideDetectionType request_type,
       StartPhishingDetectionCallback callback) override {
     url_ = url;
     phishing_detection_started_ = true;
@@ -2680,7 +2681,8 @@ TEST_F(ClientSideDetectionHostScamDetectionTest,
   SetInquireOnDeviceModelCallback(/*should_return_response=*/false);
   SetSendClientReportPhishingRequestCallback(
       /*has_expected_brand_and_intent=*/false,
-      /*expected_no_info_reason=*/std::nullopt,
+      /*expected_no_info_reason=*/
+      IntelligentScanInfo::ON_DEVICE_MODEL_OUTPUT_MISSING,
       /*expected_llama_forced_trigger_info_trigger_url=*/std::nullopt,
       /*returned_is_phishing=*/false,
       /*returned_intelligent_scan_verdict=*/

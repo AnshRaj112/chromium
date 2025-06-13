@@ -223,6 +223,7 @@ Mae'n bosib na fydd rhai nodweddion ar gael ac ni fydd newidiadau o ran dewisiad
 <translation id="3716540481907974026">Fersiwn ChromeOS Flex</translation>
 <translation id="3718181793972440140">Bydd hyn yn dileu 1 eitem o'r ddyfais hon. I adfer eich data yn nes ymlaen, mewngofnodwch i Chrome fel <ph name="USER_EMAIL" />.</translation>
 <translation id="3723744677043446310">{NUM_EXTENSIONS,plural, =1{Mae Chrome yn argymell eich bod yn ei dynnu. <ph name="BEGIN_LINK" />Dysgu rhagor am estyniadau a gefnogir<ph name="END_LINK" />}zero{Mae Chrome yn argymell eich bod yn eu tynnu. <ph name="BEGIN_LINK" />Dysgu rhagor am estyniadau a gefnogir<ph name="END_LINK" />}two{Mae Chrome yn argymell eich bod yn eu tynnu. <ph name="BEGIN_LINK" />Dysgu rhagor am estyniadau a gefnogir<ph name="END_LINK" />}few{Mae Chrome yn argymell eich bod yn eu tynnu. <ph name="BEGIN_LINK" />Dysgu rhagor am estyniadau a gefnogir<ph name="END_LINK" />}many{Mae Chrome yn argymell eich bod yn eu tynnu. <ph name="BEGIN_LINK" />Dysgu rhagor am estyniadau a gefnogir<ph name="END_LINK" />}other{Mae Chrome yn argymell eich bod yn eu tynnu. <ph name="BEGIN_LINK" />Dysgu rhagor am estyniadau a gefnogir<ph name="END_LINK" />}}</translation>
+<translation id="3756724684201900923">Dysgu rhagor am osod Chrome</translation>
 <translation id="3780814664026482060">Chrome - <ph name="PAGE_TITLE" /></translation>
 <translation id="3785324443014631273">Ni allai ChromeOS Flex gysoni'ch data oherwydd gwall wrth fewngofnodi.</translation>
 <translation id="3795971588916395511">Google ChromeOS</translation>
@@ -455,7 +456,6 @@ Nid yw Google Chrome yn gallu adfer eich gosodiadau.</translation>
 <translation id="6831043979455480757">Cyfieithu</translation>
 <translation id="683440813066116847">Rheol dod i mewn ar gyfer Google Chrome Canary i ganiatáu traffig mDNS.</translation>
 <translation id="684888714667046800">Methu â chysylltu â'r Rhyngrwyd. Os ydych yn defnyddio mur cadarn, sicrhewch fod <ph name="PRODUCT_EXE_NAME" /> yn y rhestr ganiatáu.</translation>
-<translation id="6851981911629679515">Trowch amddiffyniad ychwanegol ymlaen yn injan JavaScript a WebAssembly Chrome</translation>
 <translation id="6877155553248388166">cornel dde isaf yr ardal chwilio: <ph name="RIGHT" />% i'r dde, <ph name="BOTTOM" />% ar y gwaelod</translation>
 <translation id="6881299373831449287">Wrthi'n diweddaru Chrome</translation>
 <translation id="6885412569789873916">Apiau Beta Chrome</translation>

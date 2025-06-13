@@ -219,6 +219,7 @@
 <translation id="3716540481907974026">ChromeOS Flex-version</translation>
 <translation id="3718181793972440140">Denne handling sletter ét element på denne enhed. Hvis du senere vil hente dine data igen, skal du logge ind på Chrome som <ph name="USER_EMAIL" />.</translation>
 <translation id="3723744677043446310">{NUM_EXTENSIONS,plural, =1{Chrome anbefaler, at du fjerner den. <ph name="BEGIN_LINK" />Få flere oplysninger om understøttede udvidelser<ph name="END_LINK" />}one{Chrome anbefaler, at du fjerner den. <ph name="BEGIN_LINK" />Få flere oplysninger om understøttede udvidelser<ph name="END_LINK" />}other{Chrome anbefaler, at du fjerner dem. <ph name="BEGIN_LINK" />Få flere oplysninger om understøttede udvidelser<ph name="END_LINK" />}}</translation>
+<translation id="3756724684201900923">Få flere oplysninger om installation af Chrome</translation>
 <translation id="3780814664026482060">Chrome – <ph name="PAGE_TITLE" /></translation>
 <translation id="3785324443014631273">ChromeOS Flex kunne ikke synkronisere dine data på grund af en fejl under login.</translation>
 <translation id="3795971588916395511">Google ChromeOS</translation>
@@ -447,7 +448,6 @@
 <translation id="6831043979455480757">Oversæt</translation>
 <translation id="683440813066116847">Indgående regel for Google Chrome Canary om at tillade mDNS-trafik.</translation>
 <translation id="684888714667046800">Der kunne ikke oprettes forbindelse til internettet. Hvis du bruger en firewall, skal du angive <ph name="PRODUCT_EXE_NAME" /> på tilladelseslisten.</translation>
-<translation id="6851981911629679515">Aktivér yderligere beskyttelse i JavaScript- og WebAssembly-maskinen i Chrome</translation>
 <translation id="6877155553248388166">nederste højre hjørne af søgeområdet: højre <ph name="RIGHT" /> %, nederste <ph name="BOTTOM" /> %</translation>
 <translation id="6881299373831449287">Opdaterer Chrome</translation>
 <translation id="6885412569789873916">Apps i Chrome beta</translation>

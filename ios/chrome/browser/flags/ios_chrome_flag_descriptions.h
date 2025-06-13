@@ -337,6 +337,9 @@ extern const char kFullscreenTransitionDescription[];
 extern const char kFullscreenSmoothScrollingName[];
 extern const char kFullscreenSmoothScrollingDescription[];
 
+extern const char kFullscreenScrollThresholdName[];
+extern const char kFullscreenScrollThresholdDescription[];
+
 extern const char kHomeMemoryImprovementsName[];
 extern const char kHomeMemoryImprovementsDescription[];
 
@@ -788,6 +791,9 @@ extern const char kSendUmaOverAnyNetworkDescription[];
 extern const char kSeparateProfilesForManagedAccountsName[];
 extern const char kSeparateProfilesForManagedAccountsDescription[];
 
+extern const char kShareExtensionForMultiprofileName[];
+extern const char kShareExtensionForMultiprofileDescription[];
+
 extern const char kSharedHighlightingIOSName[];
 extern const char kSharedHighlightingIOSDescription[];
 
@@ -862,9 +868,6 @@ extern const char kEnableLensOverlayDescription[];
 
 extern const char kEnableLensViewFinderUnifiedExperienceName[];
 extern const char kEnableLensViewFinderUnifiedExperienceDescription[];
-
-extern const char kEnableLensContextMenuUnifiedExperienceName[];
-extern const char kEnableLensContextMenuUnifiedExperienceDescription[];
 
 extern const char kTabGridNewTransitionsName[];
 extern const char kTabGridNewTransitionsDescription[];

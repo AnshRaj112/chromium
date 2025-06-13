@@ -109,6 +109,7 @@ Para conferir mais configurações que usam dados para melhorar sua experiência
 <translation id="1419753403124156396">Reiniciar o Chrome?</translation>
 <translation id="1428770807407000502">Desativar a sincronização?</translation>
 <translation id="1430915738399379752">Imprimir</translation>
+<translation id="1433478348197382180">Modo de leitura</translation>
 <translation id="1435593198351412143">Abrir PDFs automaticamente</translation>
 <translation id="1437543266176261764">Em execução no app <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Organize seus produtos monitorados nos favoritos</translation>
@@ -331,6 +332,7 @@ Só uma pessoa com sua senha longa pode ler seus dados criptografados. Essa senh
 <translation id="2524132927880411790">Acessar a pesquisa por voz do Google app</translation>
 <translation id="2527209463677295330">Ao incluir mais texto de uma página, você poderá ver resultados melhores</translation>
 <translation id="2527779675047087889">Ocultar conteúdo da área de transferência</translation>
+<translation id="2531209299761896527">Faça gesto de pinça, segure e arraste para abrir guias em uma nova janela</translation>
 <translation id="2532336938189706096">Visualização na Web</translation>
 <translation id="253498598929009420">O site terá acesso ao conteúdo da sua tela</translation>
 <translation id="2535807170289627159">Todas as guias</translation>
@@ -1080,7 +1082,6 @@ Só uma pessoa com sua senha longa pode ler seus dados criptografados. Essa senh
 <translation id="5956665950594638604">Abrir Central de Ajuda do Chrome em uma nova guia</translation>
 <translation id="59577092665511740">Escolha uma conta.</translation>
 <translation id="5958275228015807058">Encontre seus arquivos e páginas em Downloads</translation>
-<translation id="5958994127112619898">Página simplificada</translation>
 <translation id="5962718611393537961">Toque para recolher</translation>
 <translation id="5964869237734432770">Parar descrição de imagens</translation>
 <translation id="5975083100439434680">Diminuir zoom</translation>
@@ -1274,7 +1275,7 @@ Por exemplo, alguns sites podem responder a esse pedido mostrando anúncios que 
 <translation id="6734310707649923383">Você pode consultar ou excluir as páginas visitadas do histórico</translation>
 <translation id="6738867403308150051">Fazendo o download...</translation>
 <translation id="674388916582496364">É comum que os sites que você visita se lembrem dos seus interesses para personalizar a experiência. Os sites também podem armazenar informações sobre seus interesses com o Chrome.</translation>
-<translation id="6746338529702829275">Analise os dados da sua conta</translation>
+<translation id="6746338529702829275">Analise os dados da conta</translation>
 <translation id="6751521182688001123">Abrir rapidamente uma nova guia. Para editar este atalho, toque e pressione.</translation>
 <translation id="6754359471209693699">Começar nova pesquisa</translation>
 <translation id="6756507620369789050">Compartilhar feedback</translation>
@@ -1629,7 +1630,6 @@ Para mudar essa configuração, <ph name="BEGIN_LINK" />exclua os dados do Chrom
 <translation id="8137562778192957619">Você não precisa se lembrar dessa senha. Ela vai ficar salva no Gerenciador de senhas do Google.</translation>
 <translation id="8152331954420209374">Acessar o Lens</translation>
 <translation id="8163820386638255770">Confirme sua identidade para usar e salvar senhas na sua Conta do Google</translation>
-<translation id="8179976553408161302">Entrar</translation>
 <translation id="8186512483418048923"><ph name="FILES" /> arquivos restantes</translation>
 <translation id="8190358571722158785">Um dia restante</translation>
 <translation id="8192765420340770300">Página inferior de login aberta no tamanho máximo</translation>
@@ -1686,7 +1686,7 @@ Para mudar essa configuração, <ph name="BEGIN_LINK" />exclua os dados do Chrom
 <translation id="8402673309244746971">Acessar "Seguindo"</translation>
 <translation id="8413126021676339697">Mostrar histórico completo</translation>
 <translation id="8413795581997394485">Protege contra extensões, sites e downloads perigosos. Quando você acessa um site, o Chrome envia ao Google apenas uma parte ofuscada do URL por um servidor de privacidade que oculta seu endereço IP. Se um site fizer algo suspeito, o URL completo e partes do conteúdo da página também serão enviados.</translation>
-<translation id="8414396119627470038">Fazer login no <ph name="SITE_ETLD_PLUS_ONE" /> com <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /></translation>
+<translation id="8414396119627470038">Fazer login em <ph name="SITE_ETLD_PLUS_ONE" /> com <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /></translation>
 <translation id="8419144699778179708">Exclui o histórico, inclusive da caixa de pesquisa</translation>
 <translation id="8419244640277402268">Incluir</translation>
 <translation id="8422250855136581222">Nenhuma guia neste dispositivo</translation>

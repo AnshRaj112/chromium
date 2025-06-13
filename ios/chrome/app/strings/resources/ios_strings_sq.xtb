@@ -611,7 +611,6 @@ Shiko udhëzimet e motorit të kërkimit për fshirjen e historikut të kërkimi
 <translation id="3557336313807607643">Shto te kontaktet</translation>
 <translation id="355765753469272474">Zhbëj</translation>
 <translation id="3565930036634619844">Skeda. <ph name="TAB_INDEX" /> nga <ph name="NUMBER_OF_TABS" />.</translation>
-<translation id="3570693105179140209">Trokit dy herë për më shumë fjalëkalime.</translation>
 <translation id="3572607909481582402">Në "Llogarinë tënde të Google"</translation>
 <translation id="3575234738189584619">Kërko me "Lenten"</translation>
 <translation id="3575426792457739946">Kjo listë përfshin të gjitha profilet e ngarkuara.</translation>
@@ -654,7 +653,6 @@ Shiko udhëzimet e motorit të kërkimit për fshirjen e historikut të kërkimi
 <translation id="3779810277399252432">Nuk ka lidhje interneti.</translation>
 <translation id="3782614601387961027">Hiq paralajmërimin</translation>
 <translation id="3789841737615482174">Instalo</translation>
-<translation id="3795478177331815672">Skedat e hapura dhe grupet e hapura të skedave</translation>
 <translation id="380329542618494757">Emri</translation>
 <translation id="3803696231112616155">Ofro përkthimin për këtë sajt</translation>
 <translation id="3808311849069021992">Shfaq detajet e motorit të kërkimit</translation>
@@ -700,7 +698,6 @@ Shiko udhëzimet e motorit të kërkimit për fshirjen e historikut të kërkimi
 <translation id="3955740319737378355">U krye</translation>
 <translation id="3955822496205734389">Ke fjalëkalime të dobëta.</translation>
 <translation id="3958312024468322930">Zvarrite te stacioni në fund të ekranit bazë</translation>
-<translation id="3960218941754097036">Kërko për çdo gjë në ekranin tënd me "Lenten e Google"</translation>
 <translation id="3962326069546168954">Ruaj</translation>
 <translation id="3967327056943561740">Faqeshënuesit</translation>
 <translation id="3967822245660637423">Shkarkimi përfundoi</translation>
@@ -1446,6 +1443,7 @@ Në modalitetin "e fshehtë", sajtet nuk mund t'i përdorin kukit për të parë
 <translation id="6831043979455480757">Përkthe</translation>
 <translation id="6842136130964845393">Për t'u siguruar që mund të qasesh gjithmonë në fjalëkalimet e tua të ruajtura, verifiko që je ti</translation>
 <translation id="6851516051005285358">Kërko sajtin për desktop</translation>
+<translation id="6857446173140146664">Fshi sfondin</translation>
 <translation id="6858718102216837409">Shto gjuhën…</translation>
 <translation id="6858855187367714033">Skanuar</translation>
 <translation id="6859944681507688231">Për të skanuar një kod QR ose kartë krediti, aktivizo kamerën nga cilësimet.</translation>
@@ -1813,6 +1811,7 @@ Sajtet mund t'i përdorin kukit për të parë aktivitetin tënd të shfletimit 
 <translation id="8343993175958086504">Rezervo gjërat e tua dhe përdori në çdo pajisje.</translation>
 <translation id="8348530355586151720">Trokit te menyja me tri pika</translation>
 <translation id="8349305172487531364">Shiriti i faqeshënuesve</translation>
+<translation id="8363484128299778310">Rikuperimi i përkohshëm në rast problemi</translation>
 <translation id="8364563001733875155">Për të ndryshuar kodin tënd PIN, në fillim konfiguro kodin e kalimit në pajisjen tënde.</translation>
 <translation id="8366466717204352506">Kontrolli nuk është ekzekutuar asnjëherë</translation>
 <translation id="8368001212524806591">Monitoro çmimin</translation>

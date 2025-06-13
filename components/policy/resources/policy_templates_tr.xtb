@@ -499,11 +499,6 @@ PromptInTab olarak ayarlanırsa kullanıcının kimlik doğrulama süresi doldu�
       Bu durum, bellek baskısı ve yüksek verimlilik modunun silinme işleminde de geçerlidir.
       Silinmiş sayfa kaldırılır ve kaynakları tamamen geri alınır. İlişkili olduğu sekme, sekme şeridinde kalır ancak bu sekme görünür olduğunda tamamen yeniden yükleme işlemi tetiklenir.
       </translation>
-<translation id="1385786866699557535">Yönetilen profilde kurumsal rozet olarak kullanılacak resmin URL'sidir. URL bir resme yönlendirmelidir.
-
-Site simgesini (ör. https://www.google.com/favicon.ico) veya 48 x 48 pikselden küçük olmayan bir simgeyi kullanmanız önerilir.
-
-Bu politikanın yalnızca yönetilen tarayıcılar için geçerli olduğunu ve yönetilmeyen tarayıcılardaki yönetilen kullanıcı hesaplarını etkilemediğini unutmayın.</translation>
 <translation id="1386369130542976774">ChromeOS cihazların kullanılamayacağı haftalık aralıkları belirtir</translation>
 <translation id="138847842893090358">OS güncelleme durumunu bildirir</translation>
 <translation id="1389138080311956934">Maksimum bellek tasarrufu.</translation>
@@ -955,7 +950,6 @@ Joker karakterlere (<ph name="WILDCARD_VALUE" />) izin verilir.
 Hem engellenen hem de izin verilen politika kalıplarıyla eşleşen kaynaklar engellenir.
 Politika veya kullanıcı ayarları tarafından belirtilmeyen kaynakların bu API'yi çağırması için kullanıcı hareketinin olması gerekir.</translation>
 <translation id="1645793986494086629">Şema:</translation>
-<translation id="1647420986475965896">Adres çubuğundaki ve yeni sekme sayfası arama kutusundaki Yapay Zeka Modu arama önerileriyle ilgili ayarlar</translation>
 <translation id="1647558381546345298">Politika ayarlanırsa önbelleğe alınan medya dosyalarının diskte depolanması için <ph name="PRODUCT_NAME" /> tarafından kullanılan önbellek boyutu (kullanıcıların --media-cache-size flag'ini belirtip belirtmemesinden bağımsız olarak) yapılandırılır. Bu politikada belirtilen değer kesin bir sınır değil, daha ziyade önbellek sistemi için bir öneridir. Birkaç megabaytın altındaki değerler yukarı yuvarlanır.
 
       Politika değeri 0 olarak ayarlanırsa varsayılan önbellek boyutu kullanılır ve kullanıcılar bunu değiştiremez.
@@ -1644,25 +1638,6 @@ Bu politikanın normal kullanıcılar için ayarlanmadan bırakılması, işlevs
 <translation id="2180795125410219364">Home/End ayarları devre dışı</translation>
 <translation id="2180958780733364832">Gözetimsiz Mod'un kullanımını kontrol et</translation>
 <translation id="2182291258410176649">Yedekleme ve geri yüklemenin etkinleştirilip etkinleştirilmeyeceğine kullanıcı karar verir</translation>
-<translation id="2182945089357619926">Bu politikayla yöneticiler, belirli bir anahtar kelimeyle tetiklendiğinde adres çubuğunda arama önerileri ve sonuçlar gösteren bir kurumsal arama toplayıcı belirleyebilir. Kullanıcılar adres çubuğuna <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> alanında belirtilen anahtar kelimeyi başına @ ekleyerek veya eklemeden (ör. <ph name="SHORTCUT_EXAMPLE_SEARCH_AGGREGATOR_SETTINGS" />) yazıp Boşluk veya Sekme tuşuna basarak arama başlatabilir.
-
-Şu alanlar gereklidir: <ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, <ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, <ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />.
-
-<ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> alanı, adres çubuğunda kullanıcıya gösterilen arama motoru adına karşılık gelir.
-
-<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> alanı, kullanıcının aramayı tetiklemek için girdiği anahtar kelimeye karşılık gelir. Kısayol düz kelimeler ve karakterler içerebilir, ancak boşluk içeremez veya @ sembolüyle başlayamaz. Kısayollar benzersiz olmalıdır.
-
-<ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> alanı, aramanın yapılacağı URL'yi belirtir. Arama motoru sonuç sayfasının web adresini girin ve sorgu alanında <ph name="SEARCH_TERM_MARKER" /> öğesini kullanın.
-
-<ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> alanı, arama önerileri sağlayan URL'yi belirtir. Aksi takdirde POST isteği yapılır ve kullanıcının sorgusu, <ph name="SEARCH_SUGGEST_POST_PARAMS_QUERY_KEY" /> anahtarının altındaki POST parametrelerinde iletilir.
-
-<ph name="ICON_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> alanı, arama önerilerinde kullanılacak resmin URL'sini belirtir. Bu alan ayarlanmadığında varsayılan simge kullanılır. Site simgesi (ör. <ph name="ICON_URL_EXAMPLE" />) kullanılması önerilir. Desteklenen resim dosyası biçimleri: JPEG, PNG ve ICO.
-
-<ph name="REQUIRE_SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> alanı, arama önerilerini görmek için adres çubuğunun (<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />) gerekli olup olmadığını belirtir. Bu alan ayarlanmazsa adres çubuğu (<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />) gerekli değildir.
-
-<ph name="MS_WIN_NAME" /> işletim sisteminde bu politika yalnızca bir <ph name="MS_AD_NAME" /> veya "<ph name="MS_AAD_NAME" />" alan adına katılmış ya da "<ph name="CHROME_ENTERPRISE_CORE_NAME" />" öğesine kaydolmuş örneklerde kullanılabilir.
-
-<ph name="MAC_OS_NAME" /> işletim sisteminde bu politika yalnızca MDM ile çalışan, MCX aracılığıyla bir alan adına katılmış veya <ph name="CHROME_ENTERPRISE_CORE_NAME" /> öğesine kaydolmuş örneklerde kullanılabilir.</translation>
 <translation id="2183338188392346527">Cihazın çalışma zamanı sayaçlarını bildirme</translation>
 <translation id="2187372280917024033">İstenen DNS-over-HTTPS çözümleyicisinin URI şablonu. Birden fazla DNS-over-HTTPS çözümleyicisi belirlemek için karşılık gelen URI şablonlarını boşlukla ayırın. Bu politika, <ph name="DOH_TEMPLATES_POLICY_NAME" /> politikasına çok benzer ve belirtilmesi halinde onu geçersiz kılar.
 <ph name="DOH_TEMPLATES_POLICY_NAME" /> politikasının aksine bu politika, kimlik bilgilerinin belirtilmesini destekler.
@@ -1963,9 +1938,6 @@ ilk (gösterilme sırasına göre) girişten türetilebilir veya bu başarısız
 <translation id="2377059627106831967">Yapay zeka modellerini daha iyi hale getirmeden üretken yapay zeka özet penceresi gruplandırmasına izin ver.</translation>
 <translation id="2377109572344699022">Direct Sockets API'nin kullanımını kontrol et</translation>
 <translation id="2382672620906337383">JavaScript setTimeout(), daha yüksek bir iç içe yerleştirme eşiğine ulaşılana kadar zaman aşımına uğramaz.</translation>
-<translation id="2384233438419344179">Politikanın Etkin değerine ayarlanması tarayıcının adres çubuğundaki alan adına ait olmayan web sayfası öğelerinin çerez yerleştirmesini engeller. Politikanın Devre Dışı değerine ayarlanması bu öğelerin çerez yerleştirmesine izin verir ve kullanıcıların bu ayarı değiştirmelerini önler.
-
-      Politika ayarlanmadan bırakılırsa üçüncü taraf çerezlerine izin verilir, ancak kullanıcılar bu ayarı değiştirebilir.</translation>
 <translation id="2386362615870139244">Ekran uyandırma kilitlerine izin ver</translation>
 <translation id="2387469539700985783">Bu politikanın Android tarafından gerçekleştirilen raporlama işlemi üzerinde hiçbir etkisi yoktur.</translation>
 <translation id="2388701318721126001">Bu politika devre dışı bırakılırsa kullanıcının <ph name="PRODUCT_OS_NAME" /> duvar kağıdı resmi, Google Fotoğraflar albümünden seçilemez.
@@ -2321,6 +2293,7 @@ yeni başlatılan oluşturucu işlemleri yansıtır.</translation>
       Politika ayarlanmazsa <ph name="GET_ALL_SCREENS_MEDIA_NAME" />, hiçbir web uygulaması tarafından kullanılamaz.
 Bu politika, gizliliği artırmak için, politika değerinin oturum ortasında güncellenmesini desteklemez. Bu nedenle, değişiklikler yalnızca kullanıcı çıkış yapıp tekrar giriş yaptıktan sonra geçerli olur.
 Kullanıcılar, oturum başlangıcında izin verilmediyse giriş yaptıktan sonra başka hiçbir sayfanın, ekran görüntüsü almayacağından emin olabilir.</translation>
+<translation id="2614156176932194496">Adres çubuğundaki ve Yeni Sekme sayfası arama kutusundaki Google'ın Yapay Zeka Modu entegrasyonlarıyla ilgili ayarlar.</translation>
 <translation id="2615240493030733717">Saat dilimi bilgisi raporlama</translation>
 <translation id="2619258867868873629"><ph name="PRODUCT_OS_NAME" /> cihazlardaki "PDF olarak kaydet" hedefinin yanı sıra "Google Drive'a kaydet" hedefi</translation>
 <translation id="262035875928535253"><ph name="PRODUCT_NAME" /> tarafından <ph name="PASSWORD_MANAGER_NAME" /> hizmetinin devre dışı bırakılacağı alanların listesini yapılandırın. Bu durumda Kaydet ve Doldur iş akışları devre dışı bırakılır ve bu web sitelerindeki şifreler kaydedilemez veya web formlarında otomatik olarak doldurulamaz.
@@ -2416,16 +2389,6 @@ Sistem, AAAA kayıtlarını yalnızca küresel bir IPv6 ana makinesinden cihaza 
 <translation id="2702682139813393777">Windows yerel mesajlaşma ana makinelerini, cmd.exe aracılığıyla başlatmaya zorla</translation>
 <translation id="270582584528242502">Çıkmaya çalışan kullanıcılara uyarı iletişimi gösterme</translation>
 <translation id="2706708761587205154">Yalnızca PIN ile yazdırmaya izin ver</translation>
-<translation id="2706972066112233185">Bu politika, adres çubuğundaki ve yeni sekme sayfası arama kutusundaki Yapay Zeka Modu önerileri bölümünü kontrol eder.
-
-Bu özellik, bu politika ile devre dışı bırakılmadığı sürece varsayılan arama motoru Google olan herkes tarafından kullanılabilir.
-
-Politika ayarlanmadan bırakılırsa davranışı <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" /> politikasına göre belirlenir.
-
-Politika, 0 - Etkin değerine ayarlanır veya ayarlanmadan bırakılırsa bu özellik kullanıcılara sunulur. Politika, 1 - Devre Dışı değerine ayarlanırsa bu özellik kullanılamaz.
-
-0 = Özelliğin kullanılmasına izin verir
-1 = Özelliğe izin vermez.</translation>
 <translation id="2707733461906745082">Profil Ayırma</translation>
 <translation id="2707873794476722903">Güvenli Tarama standart modda etkin.</translation>
 <translation id="2709516037105925701">Otomatik doldurma</translation>
@@ -4069,7 +4032,6 @@ Bu politika yalnızca kullanıcı politikası olarak ayarlanabilir.
 
  Politika ayarlanmazsa ya da boş veya geçersiz bir değere ayarlanırsa yazdırma işi isteklerine ilave bir <ph name="CLIENT_INFO_IPP_ATTRIBUTE" /> değeri eklenmez.
 </translation>
-<translation id="3895626555961466729">Yapay Zeka Modu önerilerine izin ver.</translation>
 <translation id="3896591584655529057">Geçiş anahtarlarının, şifre yöneticisi kullanılarak kaydedilmesini etkinleştir</translation>
 <translation id="3896751141670591496">Politika Etkin değerine ayarlanır veya ayarlanmadan bırakılırsa Chrome'u başlatmak için tehlikeli olabilecek komut satırı işaretleri kullanıldığında güvenlik uyarıları gösterilir.
 
@@ -4175,11 +4137,6 @@ Not: Bu ayar sonucunda ana makine ve istemci tarafında her iki tarafın destekl
 [1] https://www.w3.org/TR/reporting-1/#endpoint</translation>
 <translation id="398294729592983401">Kullanıcıların, cihazlarında <ph name="PRIVACY_SANDBOX_NAME" /> Dijital Parmak İzi Koruması ayarını etkinleştirmesine veya devre dışı bırakmasına izin ver.</translation>
 <translation id="3983162212222338509">Sistem DNS çözümlemesi, sistem yapılandırmasına ve özellik bayraklarına bağlı olarak ağ işleminin içinde veya dışında ya da kısmen içinde kısmen dışında çalıştırılabilir.</translation>
-<translation id="3986500787181481802">Bu politika, yönetilen tarayıcıları belirtmek için kullanılan özel etiketi kontrol eder. Yönetilen tarayıcılarda bu etiket, Yeni Sekme sayfasının altbilgi bölümündeki yönetim sorumluluk reddi beyanında gösterilir. Özel etiket çevrilmez.
-
-Bu politika uygulandığında 16 karakterden uzun olan tüm dizeler "..." ile kısaltılır. Lütfen uzun adlar kullanmaktan kaçının.
-
-Bu politikanın yalnızca yönetilen tarayıcılar için geçerli olduğunu ve yönetilmeyen tarayıcılardaki yönetilen kullanıcı hesaplarını etkilemediğini unutmayın.</translation>
 <translation id="3986700049001404598">Kullanıcıların, Chrome görev yöneticisini kullanarak işlemleri sona erdirmesine izin ver</translation>
 <translation id="398884292557092447">Politika True (Doğru) değerine ayarlanır veya ayarlanmadan bırakılırsa kullanıcılar, kullanıcı arayüzünde kredi kartları için otomatik doldurma önerilerini kontrol edebilirler.
 
@@ -4430,6 +4387,15 @@ Politika <ph name="DISABLE_UNPUBLISHED" /> (1) değerine ayarlanırsa Chrome Web
 
           Bu politika ayarlanmadan bırakılırsa giriş ekranında sözlü geri bildirim başlangıçta devre dışı bırakılır, ancak kullanıcılar istedikleri zaman etkinleştirebilirler.</translation>
 <translation id="4173974507809462880">Oturum açma sırasında dokunmatik alan kaydırma yönü ekranını göster</translation>
+<translation id="4175770453187201981">Bu politika, adres çubuğundaki ve Yeni Sekme sayfası arama kutusundaki Google'ın Yapay Zeka Modu entegrasyonlarını kontrol eder.
+
+Bu özelliğe erişebilmek için kullanıcının varsayılan arama motoru olarak Google ayarlanmış olmalıdır.
+
+0/ayarlanmadı = Kullanıcılar özelliği kullanabilir.
+
+1 = Kullanıcılar özelliği kullanamaz.
+
+Politika ayarlanmadan bırakılırsa davranışı <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" /> politikasına göre belirlenir.</translation>
 <translation id="417956245902013347">Giriş ekranında metin vurgulama kutusu erişilebilirlik özelliğini etkinleştirin.
 
           Bu politika true (doğru) değerine ayarlanırsa giriş ekranında metin vurgulama kutusu her zaman etkin olur.
@@ -4740,6 +4706,7 @@ Bu politika, M112 sürümünde kaldırılmıştır.</translation>
 
       Bu politikanın yürürlüğe girmesi için ek kurulum gerekir. Daha fazla bilgi için lütfen https://support.google.com/chrome/a?p=chrome_enterprise_connector_policies_setting adresini ziyaret edin.</translation>
 <translation id="4402887080007986374">Edu Coexistence Hizmet Şartları'nın geçerli sürümü</translation>
+<translation id="4405712318246131640">Yapay Zeka Modu entegrasyonlarına izin verme.</translation>
 <translation id="4408428864159735559">Önceden yapılandırılmış ağ dosyası paylaşımlarının listesi.</translation>
 <translation id="4410236409016356088">Ağ bant genişliğini daraltmayı etkinleştir</translation>
 <translation id="4410361389637971319">Yalıtılmış web uygulaması kaynaklarının Direct Sockets'ı kullanmasına izin ver</translation>
@@ -6541,6 +6508,7 @@ Politika ayarlanmaz veya boş bir listeye ayarlanırsa <ph name="GET_SCANNER_LIS
 <translation id="5601503069213153581">PIN</translation>
 <translation id="5605676983184673391">Kiosk oturumlarında Chrome Uygulamalarının çalışmasına izin ver.</translation>
 <translation id="5607021831414604820">Cihazın depolama alanı durumu raporlamasını etkinleştir</translation>
+<translation id="5607808178576647930">Yapay Zeka Modu entegrasyonlarına izin ver.</translation>
 <translation id="5608114828230655271">Varsayılan cihaz davranışı</translation>
 <translation id="5609294254185484756">Yönetilen misafir oturumları (MGS) için <ph name="SYSTEM_FEATURES_DISABLE_LIST_POLICY_NAME" /> içindeki devre dışı bırakılan özelliklerle ilgili kullanıcı deneyimini kontrol eder.
 
@@ -10494,7 +10462,6 @@ Eski teknolojiler hakkında daha fazla bilgiyi https://chromestatus.com/features
       <ph name="TAB_CAPTURE_ALLOWED_BY_ORIGINS_POLICY_NAME" />,
       <ph name="SAME_ORIGIN_TAB_CAPTURE_ALLOWED_BY_ORIGINS_POLICY_NAME" />.
       </translation>
-<translation id="8309511882585098865">Yapay Zeka Modu önerilerine izin verme.</translation>
 <translation id="8310392396850884147">CORS joker karakter olmayan istek başlıklarını destekle.</translation>
 <translation id="8312129124898414409">Web sitelerinin anahtar oluşturma işlevini kullanmasına izin verilip verilmeyeceğini ayarlamanıza olanak tanır. Anahtar oluşturma işlevini kullanma izni ya tüm web siteleri için verilebilir ya da hepsi için reddedilebilir.
 

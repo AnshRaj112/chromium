@@ -174,6 +174,11 @@ BASE_DECLARE_FEATURE(kEnableAmbientAuthenticationInGuestSession);
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kEnableAmbientAuthenticationInIncognito);
 
+#if BUILDFLAG(IS_ANDROID)
+COMPONENT_EXPORT(CHROME_FEATURES)
+BASE_DECLARE_FEATURE(kEnableExclusiveAccessManager);
+#endif
+
 #if BUILDFLAG(IS_CHROMEOS)
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kEnterpriseReportingInChromeOS);
@@ -192,7 +197,10 @@ COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGeoLanguage);
 COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlicActor);
 COMPONENT_EXPORT(CHROME_FEATURES)
 extern const base::FeatureParam<base::TimeDelta>(
-    kGlicActorActorObservationDelay);
+    kGlicActorPageStabilityLocalTimeout);
+COMPONENT_EXPORT(CHROME_FEATURES)
+extern const base::FeatureParam<base::TimeDelta>(
+    kGlicActorPageStabilityTimeout);
 
 #if BUILDFLAG(ENABLE_GLIC)
 COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlic);
@@ -309,12 +317,6 @@ COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlicRollout);
 COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlicClosedCaptioning);
 
 COMPONENT_EXPORT(CHROME_FEATURES)
-BASE_DECLARE_FEATURE(kGlicPageContextEligibility);
-COMPONENT_EXPORT(CHROME_FEATURES)
-extern const base::FeatureParam<bool>
-    kGlicPageContextEligibilityAllowNoMetadata;
-
-COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kGlicUnloadOnClose);
 
 // Causes certain glic API calls to fail or defer when the panel
@@ -346,6 +348,9 @@ extern const base::FeatureParam<int> kGlicPanelResetOnSessionTimeoutDelayH;
 
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kGlicWebClientUnresponsiveMetrics);
+
+COMPONENT_EXPORT(CHROME_FEATURES)
+BASE_DECLARE_FEATURE(kGlicUseShaderCache);
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
 COMPONENT_EXPORT(CHROME_FEATURES)

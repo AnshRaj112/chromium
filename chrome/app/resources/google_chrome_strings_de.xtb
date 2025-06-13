@@ -219,6 +219,7 @@
 <translation id="3716540481907974026">Chrome OS Flex-Version</translation>
 <translation id="3718181793972440140">Dadurch wird 1 Element von diesem Gerät gelöscht. Wenn du deine Daten später abrufen möchtest, melde dich als <ph name="USER_EMAIL" /> in Chrome an.</translation>
 <translation id="3723744677043446310">{NUM_EXTENSIONS,plural, =1{Chrome empfiehlt, sie zu entfernen. <ph name="BEGIN_LINK" />Weitere Informationen zu unterstützten Erweiterungen<ph name="END_LINK" />}other{Chrome empfiehlt, sie zu entfernen. <ph name="BEGIN_LINK" />Weitere Informationen zu unterstützten Erweiterungen<ph name="END_LINK" />}}</translation>
+<translation id="3756724684201900923">Weitere Informationen zur Installation von Chrome</translation>
 <translation id="3780814664026482060">Chrome – <ph name="PAGE_TITLE" /></translation>
 <translation id="3785324443014631273">Chrome OS Flex konnte deine Daten aufgrund eines Fehlers bei der Anmeldung nicht synchronisieren.</translation>
 <translation id="3795971588916395511">Google ChromeOS</translation>
@@ -446,7 +447,6 @@
 <translation id="6831043979455480757">Übersetzen</translation>
 <translation id="683440813066116847">Eingangsregel für die Zulassung von mDNS-Verkehr in Google Chrome Canary</translation>
 <translation id="684888714667046800">Internetverbindung kann nicht hergestellt werden. Wenn du eine Firewall verwendest, achte darauf, dass <ph name="PRODUCT_EXE_NAME" /> auf der Zulassungsliste steht.</translation>
-<translation id="6851981911629679515">Zusätzlichen Schutz in der JavaScript- und WebAssembly-Engine von Chrome aktivieren</translation>
 <translation id="6877155553248388166">Rechte untere Ecke des Suchbereichs: rechts <ph name="RIGHT" /> %, unten <ph name="BOTTOM" /> %</translation>
 <translation id="6881299373831449287">Chrome wird aktualisiert</translation>
 <translation id="6885412569789873916">Chrome Beta-Apps</translation>

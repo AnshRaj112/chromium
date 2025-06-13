@@ -161,16 +161,6 @@ chromium-metrics-reviews@google.com.
   <int value="3" label="FFR was accepted"/>
 </enum>
 
-<enum name="AutofillAiSaveOrUpdatePromptResult">
-  <int value="0" label="The prompt was for closed due to an unknown reason"/>
-  <int value="1" label="The prompt was accepted"/>
-  <int value="2" label="The user clicked the cancel button"/>
-  <int value="3"
-      label="The user closed the prompt (via the close button or the ESC)"/>
-  <int value="4" label="The user did not interact with the prompt"/>
-  <int value="5" label="The prompt was closed due to losing focus"/>
-</enum>
-
 <enum name="AutofillAlternativeNameFieldValueCharacterSet">
   <int value="0" label="Katakana"/>
   <int value="1" label="Hiragana"/>
@@ -3245,6 +3235,16 @@ Called by update_autofill_enums.py.-->
   <int value="1" label="Suppressed"/>
 </enum>
 
+<!-- LINT.IfChange(CardBenefitFormEvent) -->
+
+<enum name="CardBenefitFormEvent">
+  <int value="1"
+      label="Suggestions containing cards with a benefit available were shown
+             when the user had two or more server cards (once)"/>
+</enum>
+
+<!-- LINT.ThenChange(/components/autofill/core/browser/metrics/payments/card_metadata_metrics.h:CardBenefitFormEvent) -->
+
 <enum name="CardInfoRetrievalEnrolledLoggingEvent">
   <int value="0" label="Suggestions shown"/>
   <int value="1" label="Suggestions shown (once)"/>
@@ -3301,6 +3301,16 @@ Called by update_autofill_enums.py.-->
   <int value="3"
       label="FalseNegative: overall_type=not email, submitted text matches
              email"/>
+</enum>
+
+<enum name="EntitySaveOrUpdatePromptResult">
+  <int value="0" label="The prompt was for closed due to an unknown reason"/>
+  <int value="1" label="The prompt was accepted"/>
+  <int value="2" label="The user clicked the cancel button"/>
+  <int value="3"
+      label="The user closed the prompt (via the close button or the ESC)"/>
+  <int value="4" label="The user did not interact with the prompt"/>
+  <int value="5" label="The prompt was closed due to losing focus"/>
 </enum>
 
 <enum name="FastCheckoutCacheStateForIsTriggerFormSupported">
@@ -4039,6 +4049,10 @@ Called by update_autofill_enums.py.-->
   <int value="67" label="Loyalty card entry"/>
   <int value="68" label="Manage Loyalty Cards information"/>
   <int value="69" label="(Obsolete) Home and Work address suggestion"/>
+  <int value="70" label="Backup password suggestion"/>
+  <int value="71"
+      label="Suggestion to try a backup credential in case of login failure"/>
+  <int value="72" label="Footer with multiline freeform text"/>
 </enum>
 
 <!-- LINT.ThenChange(/components/autofill/core/browser/suggestions/suggestion_type.h:SuggestionType) -->
@@ -4061,8 +4075,9 @@ Called by update_autofill_enums.py.-->
 
 <enum name="TouchToFill.LoyaltyCard.Outcome">
   <int value="0" label="Loyalty card selected from the sheet"/>
-  <int value="1" label="Manage passes option selected"/>
-  <int value="2" label="Bottom sheet dismissed"/>
+  <int value="1" label="Google Wallet settings option is selected"/>
+  <int value="2" label="Manage loyalty cards option selected"/>
+  <int value="3" label="Bottom sheet dismissed"/>
 </enum>
 
 <enum name="TouchToFill.PaymentMethod.TriggerOutcome">

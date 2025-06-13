@@ -496,11 +496,6 @@
       这适用于内存压力和高效率模式舍弃。
       系统会卸载已舍弃的页面并完全回收其资源。与该页面关联的标签页会保留在标签栏中，但切换到它会触发完全重新加载。
       </translation>
-<translation id="1385786866699557535">指向特定图片的网址，该图片将用作受管浏览器的企业标记。该网址必须指向图片。
-
-建议使用网站图标（例如 https://www.google.com/favicon.ico）或不小于 48 x 48 像素的图标。
-
-请注意，此政策只会应用于受管浏览器，对使用非受管浏览器的受管用户没有影响。</translation>
 <translation id="1386369130542976774">指定 ChromeOS 设备每周哪些时段无法使用</translation>
 <translation id="138847842893090358">报告操作系统更新状态</translation>
 <translation id="1389138080311956934">尽可能节省内存。</translation>
@@ -935,7 +930,6 @@ First-Party Set 中的所有网站都必须是采用 HTTPS 协议的可注册网
 同时符合已屏蔽和允许的政策格式的源将被禁止。
 政策或用户设置均未指定的源需要使用以往用户手势才能调用此 API。</translation>
 <translation id="1645793986494086629">架构：</translation>
-<translation id="1647420986475965896">地址栏和新标签页搜索框中的 AI 模式搜索建议设置</translation>
 <translation id="1647558381546345298">通过设置此政策，您可以配置 <ph name="PRODUCT_NAME" /> 在磁盘上存储缓存媒体文件时使用的缓存大小；无论用户是否指定了 --media-cache-size 标记，Google Chrome 都会使用您在此政策中设定的缓存大小。此政策所指定的值并非硬性限值，而是针对缓存系统提出的建议值。任何低于几兆字节的值都会被向上舍入。
 
       如果此政策的值为 0，系统将使用默认缓存大小，而且用户无法更改该默认值。
@@ -1615,25 +1609,6 @@ First-Party Set 中的所有网站都必须是采用 HTTPS 协议的可注册网
 <translation id="2180795125410219364">Home/End 设置已停用</translation>
 <translation id="2180958780733364832">控制对无头模式的使用权限</translation>
 <translation id="2182291258410176649">用户可决定是否启用备份和恢复服务</translation>
-<translation id="2182945089357619926">管理员可以通过此政策指定企业搜索聚合器，当用户在地址栏中输入特定关键字时，该聚合器会在地址栏中提供搜索建议和结果。用户只需在地址栏中输入 <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> 字段中指定的关键字（可以带 @ 前缀，例如 <ph name="SHORTCUT_EXAMPLE_SEARCH_AGGREGATOR_SETTINGS" />，也可以不带 @ 前缀），然后按空格键或 Tab 键，即可发起搜索。
-
-以下字段是必填字段：<ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" />、<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />、<ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />、<ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />。
-
-<ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> 字段对应于地址栏中向用户显示的搜索引擎名称。
-
-<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> 字段对应于用户输入的用于触发搜索的关键字。快捷字词可以包含纯文字和字符，但不得包含空格，也不得以 @ 符号开头。快捷字词不得重复。
-
-<ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> 字段用于指定要在哪个网址中进行搜索。输入搜索引擎结果页面的网址，然后使用 <ph name="SEARCH_TERM_MARKER" /> 代替搜索查询。
-
-<ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> 字段用于指定提供搜索建议的网址。Chrome 将发出 POST 请求，并通过键名为 <ph name="SEARCH_SUGGEST_POST_PARAMS_QUERY_KEY" /> 的 POST 参数传递用户的搜索查询。
-
-“<ph name="ICON_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />”字段用于指定将在搜索建议中使用的图片的网址。如果此字段未设置，Chrome 将使用默认图标。建议使用网站图标（示例：<ph name="ICON_URL_EXAMPLE" />）。支持的图片文件格式包括：JPEG、PNG 和 ICO。
-
-“<ph name="REQUIRE_SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />”字段用于指定是否需要地址栏<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />才能查看搜索建议。如果此字段未经设置，则地址栏<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />不是必需的。
-
-在 <ph name="MS_WIN_NAME" /> 上，此政策仅适用于已加入 <ph name="MS_AD_NAME" /> 网域的实例、已加入 <ph name="MS_AAD_NAME" /> 的实例或已在 <ph name="CHROME_ENTERPRISE_CORE_NAME" />中注册的实例。
-
-在 <ph name="MAC_OS_NAME" /> 上，此政策仅适用于通过 MDM 进行管理的实例、已通过 MCX 加入网域的实例或已在 <ph name="CHROME_ENTERPRISE_CORE_NAME" />中注册的实例。</translation>
 <translation id="2183338188392346527">不报告设备运行时计数器数据</translation>
 <translation id="2187372280917024033">此政策用于指定所需 DNS-over-HTTPS 解析器的 URI 模板。若要指定多个 DNS-over-HTTPS 解析器，请使用空格分隔相应的 URI 模板。此政策与 <ph name="DOH_TEMPLATES_POLICY_NAME" /> 非常相似，并会覆盖后者（若已指定）。
 与 <ph name="DOH_TEMPLATES_POLICY_NAME" /> 政策相反，此政策支持指定身份信息。
@@ -1923,9 +1898,6 @@ IPv4 地址的前缀为 0010；IPv6 地址的前缀为 0020。对于双栈网络
 <translation id="2377059627106831967">允许使用生成式 AI 概览窗口分组功能，但不用其改进 AI 模型。</translation>
 <translation id="2377109572344699022">控制对 Direct Sockets API 的使用</translation>
 <translation id="2382672620906337383">在达到某个更高的嵌套阈值之后，JavaScript setTimeout() 才会被强制设为下限值。</translation>
-<translation id="2384233438419344179">如果此政策已启用，系统会阻止来自浏览器地址栏所含网域之外的网页元素设置 Cookie。如果此政策已停用，系统会允许这些元素设置 Cookie，并会阻止用户更改此设置。
-
-      如果此政策未设置，系统会开启第三方 Cookie，但用户可以更改此设置。</translation>
 <translation id="2386362615870139244">允许使用屏幕唤醒锁定</translation>
 <translation id="2387469539700985783">此政策对 Android 完成的报告没有任何影响。</translation>
 <translation id="2388701318721126001">如果此政策处于停用状态，用户将无法从 Google 相册中的相册选择<ph name="PRODUCT_OS_NAME" />壁纸图片。
@@ -2266,6 +2238,7 @@ IPv4 地址的前缀为 0010；IPv6 地址的前缀为 0020。对于双栈网络
       如果未设置此政策，则任何 Web 应用都不能使用 <ph name="GET_ALL_SCREENS_MEDIA_NAME" />。
 为了加强隐私保护，此政策不支持在会话期间更新政策值，因此只有用户退出并重新登录后，相关更改才会生效。
 如果在会话启动时已禁止截取界面，用户可以确信在其登录后，任何其他应用都将无法截取界面。</translation>
+<translation id="2614156176932194496">地址栏和新标签页搜索框的 Google AI 模式集成设置。</translation>
 <translation id="2615240493030733717">报告时区信息</translation>
 <translation id="2619258867868873629">“另存为 PDF”目的地和 <ph name="PRODUCT_OS_NAME" /> 设备上的“保存到 Google 云端硬盘”目的地</translation>
 <translation id="262035875928535253">配置 <ph name="PRODUCT_NAME" /> 应在哪些网域中停用<ph name="PASSWORD_MANAGER_NAME" />。这意味着“保存和填充”工作流程将被停用，以确保无法将这些网站的密码保存或自动填充到网页表单中。
@@ -2361,15 +2334,6 @@ IPv4 地址的前缀为 0010；IPv6 地址的前缀为 0020。对于双栈网络
 <translation id="2702682139813393777">强制通过 cmd.exe 启动 Windows 原生消息传递主机</translation>
 <translation id="270582584528242502">在用户尝试退出时不显示警告对话框</translation>
 <translation id="2706708761587205154">仅允许在有 PIN 码的情况下打印</translation>
-<translation id="2706972066112233185">此政策用于控制地址栏和新标签页搜索框中的 AI 模式建议部分。
-
-此功能面向所有将 Google 设为默认搜索引擎的用户提供，除非此政策已将其停用。
-
-如果此政策未设置，其行为将由 <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" /> 政策决定。
-
-如果此政策设为 0（即已启用）或未设置，用户将可以使用此功能。如果此政策设为 1（即已停用），此功能将不可用。
-
-0 表示允许使用此功能，1 表示不允许使用此功能。</translation>
 <translation id="2707733461906745082">资料分离</translation>
 <translation id="2707873794476722903">“安全浏览”功能会处于开启状态且会在标准模式下运行。</translation>
 <translation id="2709516037105925701">自动填充</translation>
@@ -3962,7 +3926,6 @@ Microsoft Outlook 卡片需要由管理员进行额外配置。如需详细了�
 
  如果此政策未设置或设为空值/无效值，系统将不会向打印任务请求中添加额外的<ph name="CLIENT_INFO_IPP_ATTRIBUTE" />值。
 </translation>
-<translation id="3895626555961466729">允许使用 AI 模式建议。</translation>
 <translation id="3896591584655529057">允许使用密码管理工具保存通行密钥</translation>
 <translation id="3896751141670591496">如果已启用或未设置此政策，当您使用可能不安全的命令行 flag 启动 Chrome 时，系统会显示安全警告。
 
@@ -4067,11 +4030,6 @@ Microsoft Outlook 卡片需要由管理员进行额外配置。如需详细了�
 [1] https://www.w3.org/TR/reporting-1/#endpoint</translation>
 <translation id="398294729592983401">允许用户在设备上开启或关闭 <ph name="PRIVACY_SANDBOX_NAME" /> 数字“指纹”收集保护设置。</translation>
 <translation id="3983162212222338509">系统 DNS 解析可能在网络进程中运行，也可能在网络进程外运行，或部分在网络进程中、部分在网络进程外运行，具体取决于系统配置和功能标志。</translation>
-<translation id="3986500787181481802">此政策可控制用于标识受管浏览器的自定义标签。对于受管浏览器，此标签会显示在“新标签页”页面页脚的管理免责声明中。系统不会翻译该自定义标签。
-
-应用此政策后，任何超过 16 个字符的字符串都会被截断，并在末尾添加“…”。请避免使用过长的名称。
-
-请注意，此政策只会应用于受管浏览器，对使用非受管浏览器的受管用户没有影响。</translation>
 <translation id="3986700049001404598">允许用户通过 Chrome 任务管理器终止进程</translation>
 <translation id="398884292557092447">如果此政策设为 True 或未设置，则用户可以控制界面中的信用卡信息自动填充建议。
 
@@ -4316,6 +4274,15 @@ Microsoft Outlook 卡片需要由管理员进行额外配置。如需详细了�
 
           如果您未设置此政策，语音反馈在登录屏幕上最初会处于停用状态，但用户可随时启用它。</translation>
 <translation id="4173974507809462880">在用户登录期间显示触控板滚动方向界面</translation>
+<translation id="4175770453187201981">此政策用于控制地址栏和新标签页搜索框的 Google AI 模式集成。
+
+如需使用此功能，必须将 Google 设为用户的默认搜索引擎。
+
+0/未设置表示用户可以使用此功能。
+
+1 表示用户将无法使用此功能。
+
+如果此政策未设置，其行为将由 <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" /> 政策决定。</translation>
 <translation id="417956245902013347">在登录屏幕上启用“插入符号突出显示”无障碍功能。
 
           如果此政策设为 true、“插入符号突出显示”在登录屏幕上将始终处于启用状态。
@@ -4619,6 +4586,7 @@ Microsoft Outlook 卡片需要由管理员进行额外配置。如需详细了�
 
       此政策需要额外的设置才能生效，请访问 https://support.google.com/chrome/a?p=chrome_enterprise_connector_policies_setting 了解详情。</translation>
 <translation id="4402887080007986374">《Edu Coexistence 服务条款》的有效版本</translation>
+<translation id="4405712318246131640">不允许集成 AI 模式。</translation>
 <translation id="4408428864159735559">预先配置的网络文件共享列表。</translation>
 <translation id="4410236409016356088">启用网络带宽限制功能</translation>
 <translation id="4410361389637971319">允许独立式 Web 应用源使用 Direct Sockets</translation>
@@ -6385,6 +6353,7 @@ Microsoft SharePoint 和 OneDrive 卡片需要由管理员进行额外配置。�
 <translation id="5601503069213153581">PIN 码</translation>
 <translation id="5605676983184673391">允许 Chrome 应用在自助服务终端会话中运行。</translation>
 <translation id="5607021831414604820">启用设备存储状态报告功能</translation>
+<translation id="5607808178576647930">允许集成 AI 模式。</translation>
 <translation id="5608114828230655271">默认设备行为</translation>
 <translation id="5609294254185484756">此政策用于针对受管访客会话 (MGS) 控制 <ph name="SYSTEM_FEATURES_DISABLE_LIST_POLICY_NAME" /> 中所列已停用功能的用户体验。
 
@@ -10216,7 +10185,6 @@ Related Website Set 中的所有网站都必须是采用 HTTPS 协议的可注�
 
       如果此政策已停用，对屏幕共享 API 的所有调用都会失败并会返回错误；但在以下情况下，系统将不会考虑此政策（相应网站将能够使用屏幕共享 API）：该网站与 <ph name="SCREEN_CAPTURE_ALLOWED_BY_ORIGINS_POLICY_NAME" />、<ph name="WINDOW_CAPTURE_ALLOWED_BY_ORIGINS_POLICY_NAME" />、<ph name="TAB_CAPTURE_ALLOWED_BY_ORIGINS_POLICY_NAME" /> 或 <ph name="SAME_ORIGIN_TAB_CAPTURE_ALLOWED_BY_ORIGINS_POLICY_NAME" /> 政策中的来源格式匹配。
       </translation>
-<translation id="8309511882585098865">不允许使用 AI 模式建议。</translation>
 <translation id="8310392396850884147">支持 CORS 非通配符式请求标头。</translation>
 <translation id="8312129124898414409">可让您设置是否允许网站使用密钥生成功能。您可以允许或禁止所有网站使用密钥生成功能。
 

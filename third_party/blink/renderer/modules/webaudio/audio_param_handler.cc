@@ -102,7 +102,7 @@ bool IsNonNegativeAudioParamTime(double time,
     return true;
   }
 
-  exception_state.ThrowRangeError(WTF::StrCat(
+  exception_state.ThrowRangeError(StrCat(
       {message,
        " must be a finite non-negative number: ", String::Number(time)}));
   return false;
@@ -115,7 +115,7 @@ bool IsPositiveAudioParamTime(double time,
     return true;
   }
 
-  exception_state.ThrowRangeError(WTF::StrCat(
+  exception_state.ThrowRangeError(StrCat(
       {message, " must be a finite positive number: ", String::Number(time)}));
   return false;
 }
@@ -148,6 +148,49 @@ bool HasSetTargetConverged(float value,
   }
 
   return false;
+}
+
+// Computes the value of a linear ramp event at time t with the given event
+// parameters.
+float LinearRampAtTime(double t,
+                       float value1,
+                       double time1,
+                       float value2,
+                       double time2) {
+  return value1 + (value2 - value1) * (t - time1) / (time2 - time1);
+}
+
+// Computes the value of an exponential ramp event at time t with the given
+// event parameters.
+float ExponentialRampAtTime(double t,
+                            float value1,
+                            double time1,
+                            float value2,
+                            double time2) {
+  DCHECK(!std::isnan(value1) && std::isfinite(value1));
+  DCHECK(!std::isnan(value2) && std::isfinite(value2));
+
+  return (value1 == 0.0f || std::signbit(value1) != std::signbit(value2))
+             ? value1
+             : value1 *
+                   fdlibm::pow(value2 / value1, (t - time1) / (time2 - time1));
+}
+
+// Compute the value of a set curve event at time t with the given event
+// parameters.
+float ValueCurveAtTime(double t,
+                       double time1,
+                       double duration,
+                       const float* curve_data,
+                       unsigned curve_length) {
+  double curve_index = (curve_length - 1) / duration * (t - time1);
+  unsigned k = std::min(static_cast<unsigned>(curve_index), curve_length - 1);
+  unsigned k1 = std::min(k + 1, curve_length - 1);
+  float c0 = curve_data[k];
+  float c1 = curve_data[k1];
+  float delta = std::min(curve_index - k, 1.0);
+
+  return c0 + (c1 - c0) * delta;
 }
 
 }  // namespace
@@ -410,7 +453,7 @@ void AudioParamHandler::CalculateTimelineValues(float* values,
 String AudioParamHandler::EventToString(const ParamEvent& event) const {
   // The default arguments for most automation methods is the value and the
   // time.
-  String args = WTF::StrCat(
+  String args = StrCat(
       {String::Number(event.Value()), ", ", String::Number(event.Time(), 16)});
 
   // Get a nice printable name for the event and update the args if necessary.
@@ -428,14 +471,13 @@ String AudioParamHandler::EventToString(const ParamEvent& event) const {
     case ParamEvent::Type::kSetTarget:
       s = "setTargetAtTime";
       // This has an extra time constant arg
-      args =
-          WTF::StrCat({args, ", ", String::Number(event.TimeConstant(), 16)});
+      args = StrCat({args, ", ", String::Number(event.TimeConstant(), 16)});
       break;
     case ParamEvent::Type::kSetValueCurve:
       s = "setValueCurveAtTime";
       // Replace the default arg, using "..." to denote the curve argument.
-      args = WTF::StrCat({"..., ", String::Number(event.Time(), 16), ", ",
-                          String::Number(event.Duration(), 16)});
+      args = StrCat({"..., ", String::Number(event.Time(), 16), ", ",
+                     String::Number(event.Duration(), 16)});
       break;
     case ParamEvent::Type::kCancelValues:
     case ParamEvent::Type::kSetValueCurveEnd:
@@ -445,60 +487,7 @@ String AudioParamHandler::EventToString(const ParamEvent& event) const {
       NOTREACHED();
   };
 
-  return WTF::StrCat({s, "(", args, ")"});
-}
-
-// Computes the value of a linear ramp event at time t with the given event
-// parameters.
-float AudioParamHandler::LinearRampAtTime(double t,
-                                          float value1,
-                                          double time1,
-                                          float value2,
-                                          double time2) {
-  return value1 + (value2 - value1) * (t - time1) / (time2 - time1);
-}
-
-// Computes the value of an exponential ramp event at time t with the given
-// event parameters.
-float AudioParamHandler::ExponentialRampAtTime(double t,
-                                               float value1,
-                                               double time1,
-                                               float value2,
-                                               double time2) {
-  DCHECK(!std::isnan(value1) && std::isfinite(value1));
-  DCHECK(!std::isnan(value2) && std::isfinite(value2));
-
-  return (value1 == 0.0f || std::signbit(value1) != std::signbit(value2))
-             ? value1
-             : value1 *
-                   fdlibm::pow(value2 / value1, (t - time1) / (time2 - time1));
-}
-
-// Compute the value of a set target event at time t with the given event
-// parameters.
-float AudioParamHandler::TargetValueAtTime(double t,
-                                           float value1,
-                                           double time1,
-                                           float value2,
-                                           float time_constant) {
-  return value2 + (value1 - value2) * fdlibm::exp(-(t - time1) / time_constant);
-}
-
-// Compute the value of a set curve event at time t with the given event
-// parameters.
-float AudioParamHandler::ValueCurveAtTime(double t,
-                                          double time1,
-                                          double duration,
-                                          const float* curve_data,
-                                          unsigned curve_length) {
-  double curve_index = (curve_length - 1) / duration * (t - time1);
-  unsigned k = std::min(static_cast<unsigned>(curve_index), curve_length - 1);
-  unsigned k1 = std::min(k + 1, curve_length - 1);
-  float c0 = curve_data[k];
-  float c1 = curve_data[k1];
-  float delta = std::min(curve_index - k, 1.0);
-
-  return c0 + (c1 - c0) * delta;
+  return StrCat({s, "(", args, ")"});
 }
 
 std::unique_ptr<AudioParamHandler::ParamEvent>
@@ -621,7 +610,7 @@ AudioParamHandler::ParamEvent::ParamEvent(
     double call_time,
     double time_constant,
     double duration,
-    Vector<float>& curve,
+    const Vector<float>& curve,
     double curve_points_per_second,
     float curve_end_value,
     std::unique_ptr<ParamEvent> saved_event)
@@ -787,7 +776,7 @@ void AudioParamHandler::ExponentialRampToValueAtTime(
   }
 
   if (!value) {
-    exception_state.ThrowRangeError(WTF::StrCat(
+    exception_state.ThrowRangeError(StrCat(
         {"The float target value provided (", String::Number(value),
          ") should not be in the range (",
          String::Number(-std::numeric_limits<float>::denorm_min()), ", ",
@@ -845,9 +834,14 @@ void AudioParamHandler::SetValueCurveAtTime(const Vector<float>& curve,
   }
 
   base::AutoLock locker(events_lock_);
-  InsertEvent(ParamEvent::CreateSetValueCurveEvent(curve, time, duration),
-              exception_state);
-
+  bool result =
+      InsertEvent(ParamEvent::CreateSetValueCurveEvent(curve, time, duration),
+                  exception_state);
+  // `InsertEvent` will have already thrown an exception for us if `result` is
+  // false.
+  if (!result) {
+    return;
+  }
   // Insert a setValueAtTime event too to establish an event so that all
   // following events will process from the end of the curve instead of the
   // beginning.
@@ -856,7 +850,7 @@ void AudioParamHandler::SetValueCurveAtTime(const Vector<float>& curve,
               exception_state);
 }
 
-void AudioParamHandler::InsertEvent(std::unique_ptr<ParamEvent> event,
+bool AudioParamHandler::InsertEvent(std::unique_ptr<ParamEvent> event,
                                     ExceptionState& exception_state) {
   TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("webaudio.audionode"),
                "AudioParamHandler::InsertEvent");
@@ -889,7 +883,7 @@ void AudioParamHandler::InsertEvent(std::unique_ptr<ParamEvent> event,
   if (events_.empty()) {
     events_.insert(0, std::move(event));
     new_events_.insert(events_[0].get());
-    return;
+    return true;
   }
 
   // Most of the time, we must insert after the last event. If the time of the
@@ -933,9 +927,9 @@ void AudioParamHandler::InsertEvent(std::unique_ptr<ParamEvent> event,
           // start/end of the event, it's an error.
           exception_state.ThrowDOMException(
               DOMExceptionCode::kNotSupportedError,
-              WTF::StrCat({EventToString(*event), " overlaps ",
-                           EventToString(*events_[i])}));
-          return;
+              StrCat({EventToString(*event), " overlaps ",
+                      EventToString(*events_[i])}));
+          return false;
         }
       } else {
         // Here we handle existing events of types other than
@@ -946,9 +940,9 @@ void AudioParamHandler::InsertEvent(std::unique_ptr<ParamEvent> event,
             events_[i]->Time() < end_time) {
           exception_state.ThrowDOMException(
               DOMExceptionCode::kNotSupportedError,
-              WTF::StrCat({EventToString(*event), " overlaps ",
-                           EventToString(*events_[i])}));
-          return;
+              StrCat({EventToString(*event), " overlaps ",
+                      EventToString(*events_[i])}));
+          return false;
         }
       }
       if (events_[i]->Time() < insert_time) {
@@ -978,9 +972,9 @@ void AudioParamHandler::InsertEvent(std::unique_ptr<ParamEvent> event,
             event->Time() >= events_[i]->Time() && event->Time() < end_time) {
           exception_state.ThrowDOMException(
               DOMExceptionCode::kNotSupportedError,
-              WTF::StrCat({EventToString(*event), " overlaps ",
-                           EventToString(*events_[i])}));
-          return;
+              StrCat({EventToString(*event), " overlaps ",
+                      EventToString(*events_[i])}));
+          return false;
         }
       }
       if (events_[i]->Time() < insert_time) {
@@ -995,6 +989,7 @@ void AudioParamHandler::InsertEvent(std::unique_ptr<ParamEvent> event,
 
   events_.insert(insertion_idx, std::move(event));
   new_events_.insert(events_[insertion_idx].get());
+  return true;
 }
 
 bool AudioParamHandler::HasValues(size_t current_frame,

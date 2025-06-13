@@ -368,6 +368,16 @@ inline constexpr base::FeatureParam<bool> kPageActionsMigrationManagePasswords(
     "manage_passwords",
     false);
 
+inline constexpr base::FeatureParam<bool> kPageActionsMigrationCookieControls(
+    &kPageActionsMigration,
+    "cookie_controls",
+    false);
+
+inline constexpr base::FeatureParam<bool> kPageActionsMigrationAutofillAddress(
+    &kPageActionsMigration,
+    "autofill_address",
+    false);
+
 // Determines whether the "save password" page action displays different UI if
 // the user has said to never save passwords for that site.
 BASE_DECLARE_FEATURE(kSavePasswordsContextualUi);

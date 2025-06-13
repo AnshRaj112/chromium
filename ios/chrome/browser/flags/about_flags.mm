@@ -732,14 +732,6 @@ const FeatureEntry::FeatureVariation kContextualPanelEntrypointArmVariations[] =
          std::size(kContextualPanelSmallIPHWithBlueHighlightArm), nullptr},
 };
 
-const FeatureEntry::FeatureParam kIdentityDiscAccountMenuWithSettings[] = {
-    {kShowSettingsInAccountMenuParam, "true"},
-};
-const FeatureEntry::FeatureVariation kIdentityDiscAccountMenuVariations[] = {
-    {" - with settings button", kIdentityDiscAccountMenuWithSettings,
-     std::size(kIdentityDiscAccountMenuWithSettings), nullptr},
-};
-
 const FeatureEntry::FeatureParam kIdentityConfirmationSnackbarTestingConfig[] =
     {{"IdentityConfirmationMinDisplayInterval1", "0"},
      {"IdentityConfirmationMinDisplayInterval2", "0"},
@@ -1171,6 +1163,24 @@ const FeatureEntry::FeatureVariation kFullscreenTransitionVariations[] = {
     {"Medium offset", kMediumFullscreenTransitionOffset,
      std::size(kMediumFullscreenTransitionOffset), nullptr}};
 
+const FeatureEntry::FeatureParam kFullscreenScrollThreshold1[] = {
+    {web::features::kFullscreenScrollThresholdAmount, "1"}};
+const FeatureEntry::FeatureParam kFullscreenScrollThreshold5[] = {
+    {web::features::kFullscreenScrollThresholdAmount, "5"}};
+const FeatureEntry::FeatureParam kFullscreenScrollThreshold10[] = {
+    {web::features::kFullscreenScrollThresholdAmount, "10"}};
+const FeatureEntry::FeatureParam kFullscreenScrollThreshold20[] = {
+    {web::features::kFullscreenScrollThresholdAmount, "20"}};
+const FeatureEntry::FeatureVariation kFullscreenScrollThresholdVariations[] = {
+    {"1px", kFullscreenScrollThreshold1, std::size(kFullscreenScrollThreshold1),
+     nullptr},
+    {"5px", kFullscreenScrollThreshold5, std::size(kFullscreenScrollThreshold5),
+     nullptr},
+    {"10px", kFullscreenScrollThreshold10,
+     std::size(kFullscreenScrollThreshold10), nullptr},
+    {"20px", kFullscreenScrollThreshold20,
+     std::size(kFullscreenScrollThreshold20), nullptr}};
+
 const FeatureEntry::FeatureParam
     kDeprecateFeedHeaderVariationRemoveFeedLabel[] = {
         {kDeprecateFeedHeaderParameterRemoveLabel, "true"}};
@@ -1463,6 +1473,12 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kFullscreenSmoothScrollingName,
      flag_descriptions::kFullscreenSmoothScrollingDescription, flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(web::features::kSmoothScrollingDefault)},
+    {"fullscreen-scroll-threshold",
+     flag_descriptions::kFullscreenScrollThresholdName,
+     flag_descriptions::kFullscreenScrollThresholdDescription, flags_ui::kOsIos,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(web::features::kFullscreenScrollThreshold,
+                                    kFullscreenScrollThresholdVariations,
+                                    "FullscreenScrollThreshold")},
     {"webpage-default-zoom-from-dynamic-type",
      flag_descriptions::kWebPageDefaultZoomFromDynamicTypeName,
      flag_descriptions::kWebPageDefaultZoomFromDynamicTypeDescription,
@@ -1580,11 +1596,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      FEATURE_WITH_PARAMS_VALUE_TYPE(kContentPushNotifications,
                                     kContentPushNotificationsVariations,
                                     "ContentPushNotifications")},
-    {"enable-lens-context-menu-unified-experience",
-     flag_descriptions::kEnableLensContextMenuUnifiedExperienceName,
-     flag_descriptions::kEnableLensContextMenuUnifiedExperienceDescription,
-     flags_ui::kOsIos,
-     FEATURE_VALUE_TYPE(kEnableLensContextMenuUnifiedExperience)},
     {"enable-lens-in-omnibox-copied-image",
      flag_descriptions::kEnableLensInOmniboxCopiedImageName,
      flag_descriptions::kEnableLensInOmniboxCopiedImageDescription,
@@ -1998,9 +2009,7 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
     {"identity-disc-account-menu",
      flag_descriptions::kIdentityDiscAccountMenuName,
      flag_descriptions::kIdentityDiscAccountMenuDescription, flags_ui::kOsIos,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(kIdentityDiscAccountMenu,
-                                    kIdentityDiscAccountMenuVariations,
-                                    "IdentityDiscAccountMenu")},
+     FEATURE_VALUE_TYPE(kIdentityDiscAccountMenu)},
     {"identity-confirmation-snackbar",
      flag_descriptions::kIdentityConfirmationSnackbarName,
      flag_descriptions::kIdentityConfirmationSnackbarDescription,
@@ -2706,6 +2715,11 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      commerce::flag_descriptions::kShoppingAlternateServerName,
      commerce::flag_descriptions::kShoppingAlternateServerDescription,
      flags_ui::kOsIos, FEATURE_VALUE_TYPE(commerce::kShoppingAlternateServer)},
+    {"share-extension-for-multiprofile",
+     flag_descriptions::kShareExtensionForMultiprofileName,
+     flag_descriptions::kShareExtensionForMultiprofileDescription,
+     flags_ui::kOsIos, FEATURE_VALUE_TYPE(kShareExtensionForMultiprofile)},
+
 };
 
 bool SkipConditionalFeatureEntry(const flags_ui::FeatureEntry& entry) {

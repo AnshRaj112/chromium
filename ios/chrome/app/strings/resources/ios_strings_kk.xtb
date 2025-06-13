@@ -611,7 +611,6 @@
 <translation id="3557336313807607643">Контактілерге қосу</translation>
 <translation id="355765753469272474">Қайтару</translation>
 <translation id="3565930036634619844">Қойынды. <ph name="TAB_INDEX" />/<ph name="NUMBER_OF_TABS" />.</translation>
-<translation id="3570693105179140209">Басқа құпия сөздерді көру үшін екі рет түртіңіз.</translation>
 <translation id="3572607909481582402">Google аккаунтыңызда</translation>
 <translation id="3575234738189584619">Lens арқылы іздеу</translation>
 <translation id="3575426792457739946">Бұл тізімде жүктелген барлық профиль берілген.</translation>
@@ -654,7 +653,6 @@
 <translation id="3779810277399252432">Интернет байланысы жоқ.</translation>
 <translation id="3782614601387961027">Ескертуді жабу</translation>
 <translation id="3789841737615482174">Орнату</translation>
-<translation id="3795478177331815672">Ашық қойындылар мен қойындылар топтары</translation>
 <translation id="380329542618494757">Аты</translation>
 <translation id="3803696231112616155">Осы сайтты аудару ұсынысы</translation>
 <translation id="3808311849069021992">Іздеу жүйесінің мәліметтерін көрсету</translation>
@@ -700,7 +698,6 @@
 <translation id="3955740319737378355">Дайын</translation>
 <translation id="3955822496205734389">Оңай құпия сөздеріңіз бар.</translation>
 <translation id="3958312024468322930">Оны негізгі экранның төменгі жағындағы бекіту аймағына сүйреп апарыңыз</translation>
-<translation id="3960218941754097036">Экраныңыздағы кез келген нәрсені Google Lens арқылы іздеңіз</translation>
 <translation id="3962326069546168954">Сақтау</translation>
 <translation id="3967327056943561740">Бетбелгілер</translation>
 <translation id="3967822245660637423">Жүктеп алынды</translation>
@@ -1446,6 +1443,7 @@ Handoff функциясы параметрлердің жалпы бөлімі�
 <translation id="6831043979455480757">Аудару</translation>
 <translation id="6842136130964845393">Сақталған құпия сөздеріңізді әрқашан пайдалана алатыныңызға көз жеткізу үшін, жеке басыңызды растаңыз.</translation>
 <translation id="6851516051005285358">Сайттың компьютерлік нұсқасын сұрау</translation>
+<translation id="6857446173140146664">Фонды жою</translation>
 <translation id="6858718102216837409">Тіл қосу</translation>
 <translation id="6858855187367714033">Сканерленген</translation>
 <translation id="6859944681507688231">QR кодын немесе несиелік картасын сканерлеу үшін параметрлерден камераны іске қосыңыз.</translation>
@@ -1813,6 +1811,7 @@ Handoff функциясы параметрлердің жалпы бөлімі�
 <translation id="8343993175958086504">Деректердің сақтық көшірмесін жасап, оларды кез келген құрылғыда пайдаланыңыз.</translation>
 <translation id="8348530355586151720">Үш нүктелі мәзірді түртіңіз.</translation>
 <translation id="8349305172487531364">Бетбелгілер жолағы</translation>
+<translation id="8363484128299778310">Қате туындаған жағдайға қалпына келтірудің уақытша құпия сөзі</translation>
 <translation id="8364563001733875155">PIN кодын өзгерту үшін алдымен құрылғыда рұқсат кодын орнатыңыз.</translation>
 <translation id="8366466717204352506">Ешқашан тексерілмеді</translation>
 <translation id="8368001212524806591">Бағаларды біліп жүру</translation>

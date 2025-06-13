@@ -43,6 +43,9 @@
 #include "components/autofill/core/browser/filling/field_filling_skip_reason.h"
 #include "components/autofill/core/browser/form_structure.h"
 #include "components/autofill/core/browser/foundations/autofill_client.h"
+#include "components/autofill/core/browser/integrators/autofill_ai/autofill_ai_import_utils.h"
+#include "components/autofill/core/browser/integrators/autofill_ai/autofill_ai_suggestions.h"
+#include "components/autofill/core/browser/integrators/autofill_ai/autofill_ai_utils.h"
 #include "components/autofill/core/browser/logging/log_manager.h"
 #include "components/autofill/core/browser/ml_model/autofill_ai/autofill_ai_model_executor.h"
 #include "components/autofill/core/browser/permissions/autofill_ai/autofill_ai_permission_utils.h"
@@ -62,10 +65,7 @@
 #include "components/autofill/core/common/signatures.h"
 #include "components/autofill/core/common/unique_ids.h"
 #include "components/autofill_ai/core/browser/autofill_ai_client.h"
-#include "components/autofill_ai/core/browser/autofill_ai_import_utils.h"
-#include "components/autofill_ai/core/browser/autofill_ai_utils.h"
 #include "components/autofill_ai/core/browser/metrics/autofill_ai_logger.h"
-#include "components/autofill_ai/core/browser/suggestion/autofill_ai_suggestions.h"
 #include "components/strings/grit/components_strings.h"
 #include "ui/base/l10n/l10n_util.h"
 
@@ -329,7 +329,7 @@ bool AutofillAiManager::MaybeImportForm(const FormStructure& form) {
 void AutofillAiManager::HandleSavePromptResult(
     const GURL& form_url,
     const autofill::EntityInstance& entity,
-    AutofillAiClient::SaveOrUpdatePromptResult result) {
+    AutofillAiClient::EntitySaveOrUpdatePromptResult result) {
   if (!result.entity) {
     if (result.did_user_decline) {
       AddStrikeForSaveAttempt(form_url, entity);
@@ -348,7 +348,7 @@ void AutofillAiManager::HandleSavePromptResult(
 
 void AutofillAiManager::HandleUpdatePromptResult(
     const base::Uuid& entity_uuid,
-    AutofillAiClient::SaveOrUpdatePromptResult result) {
+    AutofillAiClient::EntitySaveOrUpdatePromptResult result) {
   if (!result.entity) {
     if (result.did_user_decline) {
       AddStrikeForUpdateAttempt(entity_uuid);
@@ -398,8 +398,8 @@ std::vector<autofill::Suggestion> AutofillAiManager::GetSuggestions(
     return {};
   }
 
-  return CreateFillingSuggestions(*form_structure, trigger_field, entities,
-                                  autofill_client.GetAppLocale());
+  return autofill::CreateFillingSuggestions(
+      *form_structure, trigger_field, entities, autofill_client.GetAppLocale());
 }
 
 bool AutofillAiManager::ShouldDisplayIph(autofill::FormGlobalId form,

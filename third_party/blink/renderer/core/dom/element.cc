@@ -136,6 +136,7 @@
 #include "third_party/blink/renderer/core/editing/visible_selection.h"
 #include "third_party/blink/renderer/core/event_type_names.h"
 #include "third_party/blink/renderer/core/events/focus_event.h"
+#include "third_party/blink/renderer/core/events/gesture_event.h"
 #include "third_party/blink/renderer/core/events/interest_event.h"
 #include "third_party/blink/renderer/core/events/keyboard_event.h"
 #include "third_party/blink/renderer/core/execution_context/agent.h"
@@ -494,10 +495,9 @@ void EnqueueAutofocus(Element& element) {
     window->AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
         mojom::ConsoleMessageSource::kSecurity,
         mojom::ConsoleMessageLevel::kError,
-        WTF::StrCat({"Blocked autofocusing on a <",
-                     element.TagQName().ToString(),
-                     "> element because the element's frame is sandboxed and "
-                     "the 'allow-scripts' permission is not set."})));
+        StrCat({"Blocked autofocusing on a <", element.TagQName().ToString(),
+                "> element because the element's frame is sandboxed and the "
+                "'allow-scripts' permission is not set."})));
     return;
   }
 
@@ -511,9 +511,8 @@ void EnqueueAutofocus(Element& element) {
     window->AddConsoleMessage(MakeGarbageCollected<ConsoleMessage>(
         mojom::ConsoleMessageSource::kSecurity,
         mojom::ConsoleMessageLevel::kError,
-        WTF::StrCat({"Blocked autofocusing on a <",
-                     element.TagQName().ToString(),
-                     "> element in a cross-origin subframe."})));
+        StrCat({"Blocked autofocusing on a <", element.TagQName().ToString(),
+                "> element in a cross-origin subframe."})));
     return;
   }
 
@@ -1643,7 +1642,8 @@ void Element::DefaultEventHandler(Event& event) {
           GetDocument().GetExecutionContext())) {
     if (InterestTargetElement() || GetInterestInvoker() ||
         GetInterestState() != InterestState::kNoInterest) [[unlikely]] {
-      // Handle new `interesttarget` activation via mouse or keyboard.
+      // Handle new `interesttarget` activation via mouse, keyboard, or long-
+      // press.
       String type = event.type();
       if (auto* mouse_event = DynamicTo<MouseEvent>(event)) {
         if (!mouse_event->FromTouch()) {
@@ -1665,6 +1665,16 @@ void Element::DefaultEventHandler(Event& event) {
             HandleInterestTargetHoverOrFocus(InterestTargetSource::kBlur);
           }
         }
+      }
+      if (IsA<GestureEvent>(event) &&
+          type == event_type_names::kGesturelongpress) {
+        // Delays don't apply to long-press, since the "long press" has a
+        // built-in delay. Just show interest immediately in this case. This
+        // follows the same path used by context-menu activations on link
+        // elements.
+        // TODO(crbug.com/364669918): Touchscreen / long-press still needs a
+        // unit test.
+        ShowInterestNow();
       }
     }
     if (GetInterestState() != InterestState::kNoInterest) [[unlikely]] {
@@ -8116,8 +8126,8 @@ void Element::setOuterHTML(const String& html,
   if (!parent) {
     exception_state.ThrowDOMException(
         DOMExceptionCode::kNoModificationAllowedError,
-        WTF::StrCat({"This element's parent is of type '", p->nodeName(),
-                     "', which is not an element node."}));
+        StrCat({"This element's parent is of type '", p->nodeName(),
+                "', which is not an element node."}));
     return;
   }
 
@@ -8189,9 +8199,9 @@ Node* Element::InsertAdjacent(const String& where,
 
   exception_state.ThrowDOMException(
       DOMExceptionCode::kSyntaxError,
-      WTF::StrCat({"The value provided ('", where,
-                   "') is not one of 'beforeBegin', 'afterBegin', "
-                   "'beforeEnd', or 'afterEnd'."}));
+      StrCat({"The value provided ('", where,
+              "') is not one of 'beforeBegin', 'afterBegin', 'beforeEnd', or "
+              "'afterEnd'."}));
   return nullptr;
 }
 
@@ -8324,9 +8334,9 @@ static Node* ContextNodeForInsertion(const String& where,
   }
   exception_state.ThrowDOMException(
       DOMExceptionCode::kSyntaxError,
-      WTF::StrCat({"The value provided ('", where,
-                   "') is not one of 'beforeBegin', 'afterBegin', "
-                   "'beforeEnd', or 'afterEnd'."}));
+      StrCat({"The value provided ('", where,
+              "') is not one of 'beforeBegin', 'afterBegin', 'beforeEnd', or "
+              "'afterEnd'."}));
   return nullptr;
 }
 
@@ -8797,7 +8807,7 @@ bool Element::ShouldStoreComputedStyle(const ComputedStyle& style) const {
   //   not in order to make changes in the accessibility tree among many other
   //   things. In order to do this, we set a bit on the select while we still
   //   have access to the computed style here.
-  if (HTMLSelectElement::IsPopoverForAppearanceBase(this)) {
+  if (HTMLSelectElement::IsPopoverPickerElement(this)) {
     HTMLSelectElement* select = To<HTMLSelectElement>(OwnerShadowHost());
     if (const ComputedStyle* select_style = select->GetComputedStyle()) {
       // The picker isn't allowed to have appearance:base-select unless the
@@ -9554,7 +9564,7 @@ bool Element::CanGeneratePseudoElement(PseudoId pseudo_id) const {
       if (const auto* option = DynamicTo<HTMLOptionElement>(e)) {
         if (const HTMLSelectElement* select = option->OwnerSelectElement()) {
           if (select->UsesMenuList()) {
-            return select->IsAppearanceBasePicker();
+            return select->PickerIsPopover();
           } else {
             return select->IsAppearanceBase();
           }

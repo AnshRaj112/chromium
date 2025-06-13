@@ -4,6 +4,7 @@
 
 #import "ui/accessibility/platform/browser_accessibility_cocoa.h"
 
+#include <Availability.h>
 #include <execinfo.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -74,8 +75,15 @@ NSString* const
     NSAccessibilityUIElementCountForSearchPredicateParameterizedAttribute =
         @"AXUIElementCountForSearchPredicate";
 NSString* const
-    NSAccessibilityUIElementsForSearchPredicateParameterizedAttribute =
+    CrNSAccessibilityUIElementsForSearchPredicateParameterizedAttribute =
+#if !defined(__MAC_26_0) || __MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_26_0
         @"AXUIElementsForSearchPredicate";
+#else
+        // This is public as of the macOS 26 SDK. When macOS 26 is the minimum,
+        // eliminate the compatibility Cr* name and transition use sites
+        // directly to the NS* name.
+    NSAccessibilityUIElementsForSearchPredicateParameterizedAttribute;
+#endif
 
 // Private attributes for text markers.
 NSString* const NSAccessibilityStartTextMarkerAttribute = @"AXStartTextMarker";
@@ -201,7 +209,15 @@ NSString* const NSAccessibilityValueAutofillAvailableAttribute =
 // const NSAccessibilityValueAutofillTypeAttribute = @"AXValueAutofillType";
 
 // Actions.
-NSString* const NSAccessibilityScrollToVisibleAction = @"AXScrollToVisible";
+NSString* const CrNSAccessibilityScrollToVisibleAction =
+#if !defined(__MAC_26_0) || __MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_26_0
+    @"AXScrollToVisible";
+#else
+    // This is public as of the macOS 26 SDK. When macOS 26 is the minimum,
+    // eliminate the compatibility Cr* name and transition use sites directly to
+    // the NS* name.
+    NSAccessibilityScrollToVisibleAction;
+#endif
 
 // A mapping from an accessibility attribute to its method name.
 NSDictionary* gAttributeToMethodNameMap = nil;
@@ -602,9 +618,8 @@ bool ui::IsNSRange(id value) {
                             "BrowserAccessibilityCocoa::needsToUpdateChildren",
                             !!_children);
 
-  if (![self nodeDelegate]) {
+  if (![self instanceActive])
     return nil;
-  }
   if (!_children) {
     base::AutoReset<bool> set_getting_children(&_gettingChildren, true);
     // PlatformChildCount may add extra mac nodes if the node requires them.
@@ -641,7 +656,7 @@ bool ui::IsNSRange(id value) {
   // This function may be called in the middle of -accessibilityChildren if
   // this node adds extra mac nodes while its children are being requested. If
   // _gettingChildren is true, we don't need to do anything here.
-  if (![self nodeDelegate] || _gettingChildren) {
+  if (![self instanceActive] || _gettingChildren) {
     return;
   }
   _children = nil;
@@ -1145,7 +1160,6 @@ bool ui::IsNSRange(id value) {
 - (NSString*)AXRole {
   return [self role];
 }
-
 - (NSString*)role {
   if (![self instanceActive]) {
     TRACE_EVENT0("accessibility", "BrowserAccessibilityCocoa::role nil");
@@ -2191,7 +2205,7 @@ bool ui::IsNSRange(id value) {
 
   if ([attribute
           isEqualToString:
-              NSAccessibilityUIElementsForSearchPredicateParameterizedAttribute]) {
+              CrNSAccessibilityUIElementsForSearchPredicateParameterizedAttribute]) {
     OneShotAccessibilityTreeSearch search(_owner);
     if (InitializeAccessibilityTreeSearch(&search, parameter)) {
       size_t count = search.CountMatches();
@@ -2371,7 +2385,7 @@ bool ui::IsNSRange(id value) {
     NSAccessibilityBoundsForRangeParameterizedAttribute,
     NSAccessibilityStringForRangeParameterizedAttribute,
     NSAccessibilityUIElementCountForSearchPredicateParameterizedAttribute,
-    NSAccessibilityUIElementsForSearchPredicateParameterizedAttribute,
+    CrNSAccessibilityUIElementsForSearchPredicateParameterizedAttribute,
     NSAccessibilitySelectTextWithCriteriaParameterizedAttribute
   ] mutableCopy];
 
@@ -2419,7 +2433,7 @@ bool ui::IsNSRange(id value) {
 
   NSMutableArray* actions = [NSMutableArray
       arrayWithObjects:NSAccessibilityShowMenuAction,
-                       NSAccessibilityScrollToVisibleAction, nil];
+                       CrNSAccessibilityScrollToVisibleAction, nil];
 
   // VoiceOver expects the "press" action to be first.
   if (_owner->IsClickable())
@@ -2722,7 +2736,7 @@ bool ui::IsNSRange(id value) {
     // LINT.ThenChange(accessibilityPerformPress)
   } else if ([action isEqualToString:NSAccessibilityShowMenuAction]) {
     manager->ShowContextMenu(*actionTarget);
-  } else if ([action isEqualToString:NSAccessibilityScrollToVisibleAction]) {
+  } else if ([action isEqualToString:CrNSAccessibilityScrollToVisibleAction]) {
     ui::AXPlatformNodeBase* mac_obj =
         [base::apple::ObjCCastStrict<BrowserAccessibilityCocoa>(
             actionTarget->GetNativeViewAccessible().Get()) node];
@@ -2941,6 +2955,18 @@ bool ui::IsNSRange(id value) {
     return focus;
 
   return _owner;
+}
+
+- (BOOL)isAccessibilityElement {
+  if (![self instanceActive])
+    return NO;
+
+  if ([self internalRole] == ax::mojom::Role::kImage &&
+      _owner->HasExplicitlyEmptyName()) {
+    return NO;
+  }
+
+  return [super isAccessibilityElement];
 }
 
 @end

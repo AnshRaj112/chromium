@@ -268,7 +268,7 @@ class LocationBarMediator
         mBrowserControlsStateProvider = browserControlsStateProvider;
         mOfflineDownloader = offlineDownloader;
 
-        mIsComposeplateEnabled = ChromeFeatureList.sAndroidComposeplate.isEnabled();
+        mIsComposeplateEnabled = ComposeplateUtils.isComposeplateEnabled(mIsTablet);
     }
 
     /**
@@ -749,9 +749,12 @@ class LocationBarMediator
                 || !mTabModelSelectorSupplier.hasValue()) return;
 
         Tab tab = mTabModelSelectorSupplier.get().getCurrentTab();
-        if (tab == null || tab.isIncognito()) return;
+        if (tab == null || tab.isIncognito() || !mTemplateUrlServiceSupplier.hasValue()) return;
 
-        tab.loadUrl(new LoadUrlParams(ComposeplateUtils.getComposeplateURL()));
+        GURL url = mTemplateUrlServiceSupplier.get().getComposeplateUrl();
+        if (url == null) return;
+
+        tab.loadUrl(new LoadUrlParams(url));
     }
 
     /** package */
@@ -1313,7 +1316,7 @@ class LocationBarMediator
         }
 
         // When this method is called on UI inflation, return false as the native is not ready.
-        if (!mNativeInitialized || mIsTablet) {
+        if (!mNativeInitialized) {
             return false;
         }
 

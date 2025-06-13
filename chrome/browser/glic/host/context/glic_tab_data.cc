@@ -7,7 +7,6 @@
 #include <optional>
 #include <utility>
 
-#include "base/functional/overloaded.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/favicon/content/content_favicon_driver.h"
@@ -22,10 +21,8 @@ namespace glic {
 
 TabDataObserver::TabDataObserver(
     content::WebContents* web_contents,
-    bool observe_current_page_only,
     base::RepeatingCallback<void(glic::mojom::TabDataPtr)> tab_data_changed)
     : content::WebContentsObserver(web_contents),
-      observe_current_page_only_(observe_current_page_only),
       tab_data_changed_(std::move(tab_data_changed)) {
   if (web_contents) {
     auto* favicon_driver =
@@ -57,11 +54,7 @@ void TabDataObserver::ClearObservation() {
 }
 
 void TabDataObserver::PrimaryPageChanged(content::Page& page) {
-  if (observe_current_page_only_) {
-    ClearObservation();
-  } else {
-    SendUpdate();
-  }
+  SendUpdate();
 }
 
 void TabDataObserver::TitleWasSetForMainFrame(

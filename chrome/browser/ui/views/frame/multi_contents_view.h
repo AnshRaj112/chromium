@@ -19,6 +19,7 @@
 class BrowserView;
 class ContentsWebView;
 class MultiContentsResizeArea;
+class MultiContentsViewDelegate;
 class MultiContentsViewDropTargetController;
 class MultiContentsViewMiniToolbar;
 class MultiContentsDropTargetView;
@@ -45,15 +46,6 @@ class MultiContentsView : public views::View,
  public:
   DECLARE_CLASS_ELEMENT_IDENTIFIER_VALUE(kMultiContentsViewElementId);
 
-  class Delegate {
-   public:
-    virtual ~Delegate() = default;
-
-    virtual void WebContentsFocused(content::WebContents* contents) = 0;
-    virtual void ResizeWebContents(double ratio) = 0;
-    virtual void ReverseWebContents() = 0;
-  };
-
   struct ViewWidths {
     double start_width = 0;
     double resize_width = 0;
@@ -63,7 +55,7 @@ class MultiContentsView : public views::View,
   static constexpr int kSplitViewContentInset = 8;
 
   MultiContentsView(BrowserView* browser_view,
-                    std::unique_ptr<Delegate> delegate);
+                    std::unique_ptr<MultiContentsViewDelegate> delegate);
   MultiContentsView(const MultiContentsView&) = delete;
   MultiContentsView& operator=(const MultiContentsView&) = delete;
   ~MultiContentsView() override;
@@ -160,7 +152,7 @@ class MultiContentsView : public views::View,
   void UpdateContentsBorderAndOverlay();
 
   raw_ptr<BrowserView> browser_view_;
-  std::unique_ptr<Delegate> delegate_;
+  std::unique_ptr<MultiContentsViewDelegate> delegate_;
 
   // Holds ContentsContainerViews, when not in a split view the second
   // ContentsContainerView is not visible.

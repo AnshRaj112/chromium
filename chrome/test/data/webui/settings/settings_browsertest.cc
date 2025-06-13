@@ -522,8 +522,7 @@ IN_PROC_BROWSER_TEST_F(SettingsTest, RelaunchConfirmationDialog) {
 }
 #endif
 
-// TODO(crbug.com/40719198): Flaky on all OSes. Enable the test.
-IN_PROC_BROWSER_TEST_F(SettingsTest, DISABLED_ResetPage) {
+IN_PROC_BROWSER_TEST_F(SettingsTest, ResetPage) {
   RunTest("settings/reset_page_test.js", "mocha.run()");
 }
 
@@ -1013,13 +1012,8 @@ IN_PROC_BROWSER_TEST_F(SettingsPrivacyGuideTest, MAYBE_3pcdOff) {
 }
 
 // Privacy guide integration tests.
-// TODO(crbug.com/40899379): Re-enable when no longer flaky.
-#if (BUILDFLAG(IS_LINUX) && !defined(NDEBUG))
-#define MAYBE_Integration DISABLED_Integration
-#else
-#define MAYBE_Integration Integration
-#endif
-IN_PROC_BROWSER_TEST_F(SettingsBrowserTest, MAYBE_Integration) {
+// TODO(crbug.com/424171352); Re-enable this test.
+IN_PROC_BROWSER_TEST_F(SettingsBrowserTest, DISABLED_Integration) {
   RunTest("settings/privacy_guide_integration_test.js", "mocha.run()");
 }
 

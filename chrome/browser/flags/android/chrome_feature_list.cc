@@ -144,6 +144,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &features::kBoardingPassDetector,
     &features::kContextMenuEmptySpace,
     &features::kDisplayEdgeToEdgeFullscreen,
+    &features::kEnableExclusiveAccessManager,
     &features::kHttpsFirstBalancedMode,
     &features::kNetworkServiceInProcess,
     &features::kElasticOverscroll,
@@ -381,6 +382,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kTabGroupParityBottomSheetAndroid,
     &kTabletTabStripAnimation,
     &kToolbarPhoneCleanup,
+    &kTabFreezeOnUndoableClosureKillSwitch,
     &kTabStateFlatBuffer,
     &kTabStripContextMenuAndroid,
     &kTabStripDensityChangeAndroid,
@@ -459,8 +461,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &syncer::kWebApkBackupAndRestoreBackend,
     &syncer::kUnoPhase2FollowUp,
     &syncer::kSyncEnablePasswordsSyncErrorMessageAlternative,
-    &tab_groups::kTabGroupSyncAndroid,
-    &tab_groups::kTabGroupSyncAutoOpenKillSwitch,
     &tab_groups::kUseAlternateHistorySyncIllustration,
     &visited_url_ranking::features::kGroupSuggestionService,
     &visited_url_ranking::features::kVisitedURLRankingService,
@@ -1259,6 +1259,10 @@ BASE_FEATURE(kTabletTabStripAnimation,
 
 BASE_FEATURE(kToolbarPhoneCleanup,
              "ToolbarPhoneCleanup",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kTabFreezeOnUndoableClosureKillSwitch,
+             "TabFreezeOnUndoableClosureKillSwitch",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabStateFlatBuffer,

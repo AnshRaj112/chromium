@@ -295,7 +295,7 @@
 <translation id="1482372785911828880">極細</translation>
 <translation id="1482879811280872320">單車運動</translation>
 <translation id="1483493594462132177">傳送</translation>
-<translation id="1484449009683144042">這項 AI 撰寫輔助功能仍在實驗階段，提供的建議不一定符合需求。<ph name="BEGIN_LINK" />瞭解詳情<ph name="END_LINK" /></translation>
+<translation id="1484449009683144042">這項 AI 撰寫輔助功能仍在實驗階段，內容可能不符合需求。<ph name="BEGIN_LINK" />瞭解詳情<ph name="END_LINK" /></translation>
 <translation id="1486096554574027028">搜尋密碼</translation>
 <translation id="1492194039220927094">政策通知推送：</translation>
 <translation id="1495677929897281669">返回分頁</translation>
@@ -521,6 +521,7 @@
 <translation id="1863257867908022953">紙匣 12</translation>
 <translation id="1864927262126810325">來自 <ph name="SOURCE_NAME" /></translation>
 <translation id="186539747722034544">有線電視與衛星電視業者</translation>
+<translation id="1866757068250903512">控管名為「<ph name="READERNAME" />」的驗證裝置和搭配使用的智慧卡</translation>
 <translation id="1870473978371099486">私人家教服務</translation>
 <translation id="1871208020102129563">Proxy 設定為使用固定的 Proxy 伺服器，而非 .pac 指令碼網址。</translation>
 <translation id="1871284979644508959">必填欄位</translation>
@@ -758,7 +759,7 @@
 <translation id="2265356434276802347">這項政策最多只能包含 <ph name="MAX_ITEMS_LIMIT" /> 個精選項目。</translation>
 <translation id="2266175583972138136">卡片福利依相關條款規定</translation>
 <translation id="2267047181501709434">正在驗證你的身分...</translation>
-<translation id="2268044343513325586">修正搜尋</translation>
+<translation id="2268044343513325586">調整文字</translation>
 <translation id="2268966938956566076"><ph name="MINUTES" /> 分鐘後上傳</translation>
 <translation id="2270484714375784793">電話號碼</translation>
 <translation id="2276057643614339130">列印基底</translation>
@@ -865,6 +866,7 @@
             <ph name="LIST_ITEM" />在表單中輸入的資訊
           <ph name="END_LIST" /></translation>
 <translation id="2448295565072560657">登入時連接至這部裝置的周邊裝置</translation>
+<translation id="2450019289047528273">Google 錢包中的付款方式和其他資訊</translation>
 <translation id="2451607499823206582">追蹤中</translation>
 <translation id="2452098632681057184">生態學與環境</translation>
 <translation id="2452837234288608067">無法協助，請再試一次。</translation>
@@ -967,7 +969,7 @@
 <translation id="2612993535136743634">儲存在裝置和 Google 帳戶中的所有安全碼都會刪除</translation>
 <translation id="2616412942031748191">搜尋引擎最佳化與行銷</translation>
 <translation id="2618206371527040026">學術研討會與出版品</translation>
-<translation id="2619052155095999743">Insert 鍵</translation>
+<translation id="2619052155095999743">插入</translation>
 <translation id="2622754869869445457">你最近使用的分頁</translation>
 <translation id="2625385379895617796">你的時鐘時間過快</translation>
 <translation id="262745152991669301">可以要求連線至 USB 裝置</translation>
@@ -1044,6 +1046,7 @@
 <translation id="2743934314332613923">要更新駕照嗎？</translation>
 <translation id="2759299890026163685">請確認網路連線穩定，然後再試一次</translation>
 <translation id="2759825833388495838">在「<ph name="APP_NAME" />」中填入密碼</translation>
+<translation id="2760805590727089264">MM/YY</translation>
 <translation id="2764001903315068341">漫畫</translation>
 <translation id="2765217105034171413">小</translation>
 <translation id="2768397283109119044">你嘗試連線至 <ph name="DOMAIN" />，但伺服器提供的憑證核發名稱無效。該名稱是系統保留的 IP 位址或內部主機名稱。</translation>
@@ -1128,7 +1131,7 @@
 <translation id="2940418897281183211">PNG 圖片</translation>
 <translation id="2941878205777356567">Envelope 9 x 12 in</translation>
 <translation id="2941952326391522266">伺服器無法證明其屬於 <ph name="DOMAIN" /> 網域；其安全性憑證來自 <ph name="DOMAIN2" /> 網域。這可能是因為設定錯誤，或有攻擊者攔截你的連線所致。</translation>
-<translation id="2942492342931589800">非正式</translation>
+<translation id="2942492342931589800">輕鬆</translation>
 <translation id="2942515540157583425">資訊科技與技術相關工作</translation>
 <translation id="2943895734390379394">上傳時間：</translation>
 <translation id="2947281105969315778">你必須能夠登入 Chrome，才能分享或加入分頁群組</translation>
@@ -1383,6 +1386,7 @@
 <translation id="3362968246557010467">這項政策是從已淘汰的 <ph name="OLD_POLICY" /> 政策自動複製而來。請改用這項政策。</translation>
 <translation id="3364869320075768271"><ph name="URL" /> 要求使用你的虛擬實境裝置和資料</translation>
 <translation id="3369192424181595722">時鐘錯誤</translation>
+<translation id="3370855919511944393">錢包設定</translation>
 <translation id="3371064404604898522">將 Chrome 設為預設瀏覽器</translation>
 <translation id="3371186787117738282">已新增<ph name="ATTRIBUTE_NAME" /></translation>
 <translation id="337363190475750230">已取消佈建</translation>

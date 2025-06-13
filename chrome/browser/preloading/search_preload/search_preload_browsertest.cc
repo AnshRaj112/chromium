@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <limits>
 #include <string>
 
 #include "base/functional/bind.h"
 #include "base/path_service.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
-#include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/preloading/chrome_preloading.h"
+#include "chrome/browser/preloading/prefetch/search_prefetch/field_trial_settings.h"
 #include "chrome/browser/preloading/prefetch/search_prefetch/search_preload_test_response_utils.h"
 #include "chrome/browser/preloading/search_preload/search_preload_features.h"
 #include "chrome/browser/preloading/search_preload/search_preload_service.h"
-#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/test/base/chrome_test_utils.h"
@@ -26,20 +26,15 @@
 #include "components/omnibox/browser/omnibox.mojom.h"
 #include "components/search_engines/template_url_data.h"
 #include "components/search_engines/template_url_service.h"
-#include "content/public/browser/network_service_instance.h"
 #include "content/public/browser/preload_pipeline_info.h"
-#include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_features.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/prefetch_test_util.h"
 #include "content/public/test/prerender_test_util.h"
-#include "net/base/network_interfaces.h"
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
-#include "services/network/public/mojom/network_context.mojom.h"
-#include "services/network/public/mojom/network_service.mojom.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace {
@@ -435,7 +430,9 @@ class SearchPreloadBrowserTest : public SearchPreloadBrowserTestBase {
             },
             {
                 features::kDsePreload2,
-                {},
+                {
+                    {"kDsePreload2DeviceMemoryThresholdMiB", "0"},
+                },
             },
             {
                 features::kDsePreload2OnPress,
@@ -946,6 +943,41 @@ IN_PROC_BROWSER_TEST_F(
             ParseNoVarySearchData(R"(key-order, params, except=("q"))"));
 }
 
+class SearchPreloadBrowserTest_DeviceMemoryThreshold
+    : public SearchPreloadBrowserTestBase {
+  void InitFeatures(
+      base::test::ScopedFeatureList& scoped_feature_list) override {
+    scoped_feature_list.InitWithFeaturesAndParameters(
+        {
+            {
+                features::kPrefetchPrerenderIntegration,
+                {},
+            },
+            {
+                features::kDsePreload2,
+                {
+                    {"kDsePreload2DeviceMemoryThresholdMiB",
+                     base::NumberToString(std::numeric_limits<int>::max())},
+                },
+            },
+            {
+                features::kDsePreload2OnPress,
+                {
+                    {"kDsePreload2OnPressMouseDown", "true"},
+                    {"kDsePreload2OnPressUpOrDownArrowButton", "true"},
+                    {"kDsePreload2OnPressTouchDown", "true"},
+                },
+            },
+        },
+        /*disabled_features=*/{});
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(SearchPreloadBrowserTest_DeviceMemoryThreshold,
+                       FeatureIsDisabledIfDeviceMemoryIsSmallerThanThreshold) {
+  ASSERT_FALSE(features::IsDsePreload2Enabled());
+}
+
 class SearchPreloadBrowserTest_Limit : public SearchPreloadBrowserTestBase {
   void InitFeatures(
       base::test::ScopedFeatureList& scoped_feature_list) override {
@@ -958,6 +990,7 @@ class SearchPreloadBrowserTest_Limit : public SearchPreloadBrowserTestBase {
             {
                 features::kDsePreload2,
                 {
+                    {"kDsePreload2DeviceMemoryThresholdMiB", "0"},
                     {"kDsePreload2MaxPrefetch", "2"},
                 },
             },
@@ -1127,10 +1160,7 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadBrowserTest_Limit,
   check("four", true, {"one", "two"});
 }
 
-// Test suite to check preloading shared dictionary.
-class SearchPreloadBrowserTest_SharedDictionary
-    : public SearchPreloadBrowserTestBase {
- public:
+class SearchPreloadBrowserTest_Ttl : public SearchPreloadBrowserTestBase {
   void InitFeatures(
       base::test::ScopedFeatureList& scoped_feature_list) override {
     scoped_feature_list.InitWithFeaturesAndParameters(
@@ -1142,49 +1172,19 @@ class SearchPreloadBrowserTest_SharedDictionary
             {
                 features::kDsePreload2,
                 {
-                    {"kDsePreload2OnSuggestSharedDictionaryTtl", "10ms"},
+                    {"kDsePreload2DeviceMemoryThresholdMiB", "0"},
+                    {"kDsePreload2MaxPrefetch", "2"},
+                    {"kDsePreload2PrefetchTtl", "1000ms"},
                 },
             },
         },
         /*disabled_features=*/{});
   }
-
-  bool HasPreloadedSharedDictionaryInfo() {
-    bool result = false;
-    base::RunLoop run_loop;
-    GetProfile()
-        .GetDefaultStoragePartition()
-        ->GetNetworkContext()
-        ->HasPreloadedSharedDictionaryInfoForTesting(
-            base::BindLambdaForTesting([&](bool value) {
-              result = value;
-              run_loop.Quit();
-            }));
-    run_loop.Run();
-    return result;
-  }
-
-  void SendMemoryPressureToNetworkService() {
-    content::GetNetworkService()->OnMemoryPressure(
-        base::MemoryPressureListener::MemoryPressureLevel::
-            MEMORY_PRESSURE_LEVEL_CRITICAL);
-    // To make sure that OnMemoryPressure has been received by the network
-    // service, send a GetNetworkList IPC and wait for the result.
-    base::RunLoop run_loop;
-    content::GetNetworkService()->GetNetworkList(
-        net::INCLUDE_HOST_SCOPE_VIRTUAL_INTERFACES,
-        base::BindLambdaForTesting(
-            [&](const std::optional<net::NetworkInterfaceList>&
-                    interface_list) { run_loop.Quit(); }));
-    run_loop.Run();
-  }
 };
 
-// `SearchPreloadService` preloads shared dictionary
-// `OnAutocompleteResultChanged()`.
-IN_PROC_BROWSER_TEST_F(SearchPreloadBrowserTest_SharedDictionary,
-                       PreloadDictionayAndDiscard) {
-  SetUpTemplateURLService(/*prefetch_likely_navigations=*/true);
+// Prefetch expires after `kDsePreload2PrefetchTtl`.
+IN_PROC_BROWSER_TEST_F(SearchPreloadBrowserTest_Ttl, PrefetchExpiresAfterTtl) {
+  SetUpTemplateURLService();
   SetUpSearchPreloadService({
       .no_vary_search_data_cache = R"(key-order, params, except=("q"))",
   });
@@ -1196,23 +1196,45 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadBrowserTest_SharedDictionary,
   std::string search_terms = original_query;
   SearchUrls urls = GetSearchUrls(search_terms);
 
-  ChangeAutocompleteResult(original_query, search_terms, PrefetchHint::kEnabled,
-                           PrerenderHint::kDisabled);
+  {
+    content::test::TestPrefetchWatcher watcher;
 
-  EXPECT_TRUE(HasPreloadedSharedDictionaryInfo());
-  WaitForDuration(base::Milliseconds(11));
-  EXPECT_FALSE(HasPreloadedSharedDictionaryInfo());
+    ChangeAutocompleteResult(original_query, search_terms,
+                             PrefetchHint::kEnabled, PrerenderHint::kDisabled);
+
+    watcher.WaitUntilPrefetchResponseCompleted(std::nullopt,
+                                               urls.prefetch_on_suggest);
+  }
+
+  EXPECT_EQ(1, request_collector().CountByPath(urls.prefetch_on_suggest));
+  EXPECT_EQ(0, request_collector().CountByPath(urls.prerender));
+
+  WaitForDuration(base::Milliseconds(1001));
+
+  // Navigate.
+  ASSERT_TRUE(content::NavigateToURL(&GetWebContents(), urls.navigation));
+
+  // Prefetch is not used.
+  EXPECT_EQ(1, request_collector().CountByPath(urls.prefetch_on_suggest));
+  EXPECT_EQ(1, request_collector().CountByPath(urls.navigation));
 }
 
-// `SearchPreloadService` doesn't preload shared dictionary under high memory
-// pressure.
-IN_PROC_BROWSER_TEST_F(SearchPreloadBrowserTest_SharedDictionary,
-                       DoNotPreloadDictionayUnderMemoryPressure) {
-  SetUpTemplateURLService(/*prefetch_likely_navigations=*/true);
+// Scenario:
+//
+// - A user inputs "hello".
+// - Autocomplete suggests to prerender "hello".
+// - `SearchPreloadService` starts prefetch with query "?q=hello&pf=cs...".
+// - `SearchPreloadService` starts prerender with query "?q=hello...".
+// - Prefetch is expired.
+//   - Prerender is still available because it already used the prefetch result.
+// - A user navigates to a page with query "?q=hello&..."
+// - Prerender is used.
+IN_PROC_BROWSER_TEST_F(SearchPreloadBrowserTest_Ttl,
+                       PrerenderIsAvailableAfterPrefetchTtl) {
+  SetUpTemplateURLService();
   SetUpSearchPreloadService({
       .no_vary_search_data_cache = R"(key-order, params, except=("q"))",
   });
-  SendMemoryPressureToNetworkService();
 
   ASSERT_TRUE(content::NavigateToURL(
       &GetWebContents(), embedded_test_server()->GetURL("/empty.html")));
@@ -1221,17 +1243,46 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadBrowserTest_SharedDictionary,
   std::string search_terms = original_query;
   SearchUrls urls = GetSearchUrls(search_terms);
 
-  ChangeAutocompleteResult(original_query, search_terms, PrefetchHint::kEnabled,
-                           PrerenderHint::kDisabled);
+  {
+    content::test::TestPrefetchWatcher watcher;
+    content::test::PrerenderHostRegistryObserver registry_observer(
+        GetWebContents());
 
-  EXPECT_FALSE(HasPreloadedSharedDictionaryInfo());
+    ChangeAutocompleteResult(original_query, search_terms,
+                             PrefetchHint::kEnabled, PrerenderHint::kEnabled);
+
+    watcher.WaitUntilPrefetchResponseCompleted(std::nullopt,
+                                               urls.prefetch_on_suggest);
+
+    registry_observer.WaitForTrigger(urls.prerender);
+    prerender_helper().WaitForPrerenderLoadCompletion(GetWebContents(),
+                                                      urls.prerender);
+  }
+
+  EXPECT_EQ(1, request_collector().CountByPath(urls.prefetch_on_suggest));
+  EXPECT_EQ(0, request_collector().CountByPath(urls.prerender));
+
+  WaitForDuration(base::Milliseconds(1001));
+
+  // Navigate.
+  content::test::PrerenderHostObserver prerender_observer(GetWebContents(),
+                                                          urls.prerender);
+  NavigateToPrerenderedResult(urls.navigation);
+  prerender_observer.WaitForActivation();
+
+  // Prerender is used.
+  EXPECT_EQ(1, request_collector().CountByPath(urls.prefetch_on_suggest));
+  EXPECT_EQ(0, request_collector().CountByPath(urls.navigation));
+
+  histogram_tester().ExpectUniqueSample(
+      "Prerender.Experimental.PrerenderHostFinalStatus.Embedder_"
+      "DefaultSearchEngine",
+      alternative_content::PrerenderFinalStatus::kActivated, 1);
 }
 
-// `SearchPreloadService` preloads shared dictionary, and discards on high
-// memory pressure.
-IN_PROC_BROWSER_TEST_F(SearchPreloadBrowserTest_SharedDictionary,
-                       PreloadedDictionayDiscardedByMemoryPressure) {
-  SetUpTemplateURLService(/*prefetch_likely_navigations=*/true);
+// Limit cares TTL; expired prefetch is not counted.
+IN_PROC_BROWSER_TEST_F(SearchPreloadBrowserTest_Ttl, LimitCaresTtl) {
+  SetUpTemplateURLService();
   SetUpSearchPreloadService({
       .no_vary_search_data_cache = R"(key-order, params, except=("q"))",
   });
@@ -1239,16 +1290,36 @@ IN_PROC_BROWSER_TEST_F(SearchPreloadBrowserTest_SharedDictionary,
   ASSERT_TRUE(content::NavigateToURL(
       &GetWebContents(), embedded_test_server()->GetURL("/empty.html")));
 
-  std::string original_query = "hello";
-  std::string search_terms = original_query;
-  SearchUrls urls = GetSearchUrls(search_terms);
+  auto check = [&](std::string original_query,
+                   const bool is_triggered_expected) {
+    request_collector().Reset();
 
-  ChangeAutocompleteResult(original_query, search_terms, PrefetchHint::kEnabled,
-                           PrerenderHint::kDisabled);
+    std::string search_terms = original_query;
+    SearchUrls urls = GetSearchUrls(search_terms);
 
-  EXPECT_TRUE(HasPreloadedSharedDictionaryInfo());
-  SendMemoryPressureToNetworkService();
-  EXPECT_FALSE(HasPreloadedSharedDictionaryInfo());
+    {
+      content::test::TestPrefetchWatcher watcher;
+
+      ChangeAutocompleteResult(original_query, search_terms,
+                               PrefetchHint::kEnabled,
+                               PrerenderHint::kDisabled);
+
+      if (is_triggered_expected) {
+        watcher.WaitUntilPrefetchResponseCompleted(std::nullopt,
+                                                   urls.prefetch_on_suggest);
+      }
+    }
+
+    EXPECT_EQ(is_triggered_expected,
+              request_collector().CountByPath(urls.prefetch_on_suggest));
+    EXPECT_EQ(0, request_collector().CountByPath(urls.prerender));
+  };
+
+  check("one", true);
+  check("two", true);
+  check("three", false);
+  WaitForDuration(base::Milliseconds(1001));
+  check("four", true);
 }
 
 }  // namespace

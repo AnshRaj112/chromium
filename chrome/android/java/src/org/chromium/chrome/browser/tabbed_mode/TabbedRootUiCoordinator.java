@@ -181,6 +181,7 @@ import org.chromium.chrome.browser.ui.desktop_windowing.AppHeaderCoordinator;
 import org.chromium.chrome.browser.ui.desktop_windowing.AppHeaderUtils;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeController;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeControllerFactory;
+import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.browser.ui.signin.FullscreenSigninPromoLauncher;
 import org.chromium.chrome.browser.ui.system.StatusBarColorController.StatusBarColorProvider;
@@ -196,6 +197,7 @@ import org.chromium.components.browser_ui.widget.MenuOrKeyboardActionController;
 import org.chromium.components.browser_ui.widget.TouchEventObserver;
 import org.chromium.components.browser_ui.widget.loading.LoadingFullscreenCoordinator;
 import org.chromium.components.browser_ui.widget.scrim.ScrimManager;
+import org.chromium.components.browser_ui.widget.scrim.ScrimManager.ScrimClient;
 import org.chromium.components.collaboration.CollaborationService;
 import org.chromium.components.feature_engagement.FeatureConstants;
 import org.chromium.components.feature_engagement.Tracker;
@@ -376,6 +378,9 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
      * @param manualFillingComponentSupplier Supplies the {@link ManualFillingComponent} for
      *     interacting with non-popup filling UI.
      * @param edgeToEdgeManager Manages core edge-to-edge state and logic.
+     * @param bookmarkManagerOpenerSupplier Supplies {@link BookmarkManagerOpener}.
+     * @param xrSpaceModeObservableSupplier Supplies current XR space mode status. True for XR full
+     *     space mode, false otherwise.
      */
     public TabbedRootUiCoordinator(
             @NonNull AppCompatActivity activity,
@@ -424,7 +429,8 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
             @NonNull ObservableSupplier<Integer> overviewColorSupplier,
             @NonNull ManualFillingComponentSupplier manualFillingComponentSupplier,
             @NonNull EdgeToEdgeManager edgeToEdgeManager,
-            @NonNull ObservableSupplier<BookmarkManagerOpener> bookmarkManagerOpenerSupplier) {
+            @NonNull ObservableSupplier<BookmarkManagerOpener> bookmarkManagerOpenerSupplier,
+            @Nullable ObservableSupplier<Boolean> xrSpaceModeObservableSupplier) {
         super(
                 activity,
                 onOmniboxFocusChangedListener,
@@ -464,7 +470,8 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                 backPressManager,
                 savedInstanceState,
                 overviewColorSupplier,
-                edgeToEdgeManager);
+                edgeToEdgeManager,
+                xrSpaceModeObservableSupplier);
         mInsetObserver = insetObserver;
         mBackButtonShouldCloseTabFn = backButtonShouldCloseTabFn;
         mSendToBackground = sendToBackground;
@@ -1021,7 +1028,8 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
 
     @Override
     protected ScrimManager buildScrimWidget() {
-        ScrimManager scrimManager = new ScrimManager(mActivity, mCoordinator);
+        ScrimManager scrimManager =
+                new ScrimManager(mActivity, mCoordinator, ScrimClient.TABBED_ROOT_UI_COORDINATOR);
         scrimManager
                 .getStatusBarColorSupplier()
                 .addObserver(mStatusBarColorController::setScrimColor);
@@ -1566,7 +1574,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
 
     @Override
     protected boolean supportsEdgeToEdge() {
-        return EdgeToEdgeControllerFactory.isSupportedConfiguration(mActivity);
+        return EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(mActivity);
     }
 
     public StatusIndicatorCoordinator getStatusIndicatorCoordinatorForTesting() {
@@ -1744,8 +1752,10 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                             /* heightChangeCallback= */ (height) -> updateTopControlsHeight(),
                             mProfileSupplier,
                             /* viewStub= */ mActivity.findViewById(R.id.bookmark_bar_stub),
+                            mActivityTabProvider.get(),
                             mBookmarkOpener,
-                            mBookmarkManagerOpenerSupplier);
+                            mBookmarkManagerOpenerSupplier,
+                            mTopControlsStacker);
         }
 
         if (mToolbarManager != null) {
