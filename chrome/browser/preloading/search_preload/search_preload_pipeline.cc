@@ -52,7 +52,8 @@ bool SearchPreloadPipeline::StartPrefetch(
     base::WeakPtr<SearchPreloadService> search_preload_service,
     const GURL& prefetch_url,
     content::PreloadingPredictor predictor,
-    const std::optional<net::HttpNoVarySearchData>& no_vary_search_hint) {
+    const std::optional<net::HttpNoVarySearchData>& no_vary_search_hint,
+    bool is_navigation_likely) {
   // Don't trigger prefetch if already triggered and is alive.
   //
   // TODO(crbug.com/394213503): Reconsider the behavior when prefetch is already
@@ -91,8 +92,14 @@ bool SearchPreloadPipeline::StartPrefetch(
       /*holdback_status_override=*/std::nullopt,
       /*ttl=*/features::kDsePreload2PrefetchTtl.Get());
   CHECK(prefetch_handle_);
-  prefetch_handle_->SetOnPrefetchHeadReceived(base::BindRepeating(
+  prefetch_handle_->SetOnPrefetchHeadReceivedCallback(base::BindRepeating(
       &SearchPreloadService::OnPrefetchHeadReceived, search_preload_service));
+  if (!is_navigation_likely) {
+    prefetch_handle_->SetOnPrefetchCompletedOrFailedCallback(
+        base::BindRepeating(
+            &SearchPreloadService::OnOnSuggestPrefetchCompletedOrFailed,
+            search_preload_service));
+  }
 
   return true;
 }

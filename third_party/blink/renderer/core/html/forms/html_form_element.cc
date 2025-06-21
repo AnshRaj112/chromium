@@ -590,7 +590,7 @@ void HTMLFormElement::ScheduleFormSubmission(
 
 FormData* HTMLFormElement::ConstructEntryList(
     HTMLFormControlElement* submit_button,
-    const WTF::TextEncoding& encoding) {
+    const TextEncoding& encoding) {
   if (is_constructing_entry_list_) {
     return nullptr;
   }
@@ -1200,7 +1200,7 @@ void HTMLFormElement::UseCountPropertyAccess(
     v8::Local<v8::Name>& v8_property_name,
     const v8::PropertyCallbackInfo<v8::Value>& info) {
   bool hasPropertyInPrototypeChain =
-      !info.Holder()
+      !info.HolderV2()
            ->GetRealNamedPropertyInPrototypeChain(
                info.GetIsolate()->GetCurrentContext(), v8_property_name)
            .IsEmpty();

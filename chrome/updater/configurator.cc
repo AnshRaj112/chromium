@@ -44,7 +44,6 @@
 #include "components/update_client/unzip/in_process_unzipper.h"
 #include "components/update_client/unzipper.h"
 #include "components/version_info/version_info.h"
-#include "event_logger.h"
 #include "url/gurl.h"
 
 #if BUILDFLAG(IS_WIN)
@@ -87,6 +86,7 @@ Configurator::Configurator(scoped_refptr<UpdaterPrefs> prefs,
       event_logger_(
           RemoteEventLoggingAllowed(
               scope,
+              persisted_data_->GetAppIds(),
               external_constants->GetEventLoggingPermissionProvider())
               ? UpdaterEventLogger::Create(
                     std::make_unique<RemoteLoggingDelegate>(
@@ -203,7 +203,8 @@ Configurator::GetNetworkFetcherFactory() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!network_fetcher_factory_) {
     network_fetcher_factory_ = base::MakeRefCounted<NetworkFetcherFactory>(
-        PolicyServiceProxyConfiguration::Get(policy_service_));
+        PolicyServiceProxyConfiguration::Get(policy_service_),
+        GetEventLogger());
   }
   return network_fetcher_factory_;
 }

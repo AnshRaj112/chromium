@@ -406,6 +406,7 @@ class CONTENT_EXPORT WebContentsImpl
   RenderViewHostImpl* GetRenderViewHost() override;
   RenderWidgetHostView* GetRenderWidgetHostView() override;
   RenderWidgetHostView* GetTopLevelRenderWidgetHostView() override;
+  RenderWidgetHost* FindWidgetAtPoint(const gfx::PointF& point) override;
   void ClosePage() override;
   std::optional<SkColor> GetThemeColor() override;
   std::optional<SkColor> GetBackgroundColor() override;
@@ -762,8 +763,8 @@ class CONTENT_EXPORT WebContentsImpl
   void UnrecoverableAccessibilityError() override;
   device::mojom::GeolocationContext* GetGeolocationContext() override;
   device::mojom::WakeLockContext* GetWakeLockContext() override;
-#if BUILDFLAG(IS_ANDROID)
-  void GetNFC(RenderFrameHost*,
+#if BUILDFLAG(IS_ANDROID) || (BUILDFLAG(IS_IOS) && !BUILDFLAG(IS_IOS_TVOS))
+  void GetNFC(RenderFrameHostImpl*,
               mojo::PendingReceiver<device::mojom::NFC>) override;
 #endif
   bool CanEnterFullscreenMode(RenderFrameHostImpl* requesting_frame) override;
@@ -881,6 +882,8 @@ class CONTENT_EXPORT WebContentsImpl
   void IsClipboardPasteAllowedWrapperCallback(
       IsClipboardPasteAllowedCallback callback,
       std::optional<ClipboardPasteData> clipboard_paste_data);
+  std::optional<std::vector<std::u16string>> GetClipboardTypesIfPolicyApplied(
+      const ui::ClipboardSequenceNumberToken& seqno) override;
   void OnPageScaleFactorChanged(PageImpl& source) override;
   void BindScreenOrientation(
       RenderFrameHost* rfh,
@@ -2490,7 +2493,7 @@ class CONTENT_EXPORT WebContentsImpl
 
   bool updating_web_preferences_ = false;
 
-#if BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(IS_ANDROID) || (BUILDFLAG(IS_IOS) && !BUILDFLAG(IS_IOS_TVOS))
   std::unique_ptr<NFCHost> nfc_host_;
 #endif
 

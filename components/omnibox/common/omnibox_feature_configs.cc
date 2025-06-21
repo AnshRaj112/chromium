@@ -120,6 +120,10 @@ ContextualSearch::ContextualSearch() {
       base::FeatureParam<bool>(&kContextualSuggestionsAblateOthersWhenPresent,
                                "AblateSearchOnly", false)
           .Get();
+  contextual_suggestions_ablate_url_only =
+      base::FeatureParam<bool>(&kContextualSuggestionsAblateOthersWhenPresent,
+                               "AblateUrlOnly", false)
+          .Get();
   starter_pack_page = feature_enabled(kStarterPackPage);
   contextual_zero_suggest_lens_fulfillment =
       feature_enabled(kContextualZeroSuggestLensFulfillment);
@@ -196,6 +200,21 @@ Toolbelt::Toolbelt() {
   always_include_lens_action =
       base::FeatureParam<bool>(&kOmniboxToolbelt, "AlwaysIncludeLensAction",
                                false)
+          .Get();
+  show_ai_search_action =
+      base::FeatureParam<bool>(&kOmniboxToolbelt, "ShowAiSearchAction", false)
+          .Get();
+  show_lens_action =
+      base::FeatureParam<bool>(&kOmniboxToolbelt, "ShowLensAction", false)
+          .Get();
+  show_bookmarks_action =
+      base::FeatureParam<bool>(&kOmniboxToolbelt, "ShowBookmarksAction", false)
+          .Get();
+  show_tabs_action =
+      base::FeatureParam<bool>(&kOmniboxToolbelt, "ShowTabsAction", false)
+          .Get();
+  show_history_action =
+      base::FeatureParam<bool>(&kOmniboxToolbelt, "ShowHistoryAction", false)
           .Get();
 }
 
@@ -355,6 +374,10 @@ SearchAggregatorProvider::SearchAggregatorProvider() {
   scoring_people_score_boost =
       base::FeatureParam<int>(&kSearchAggregatorProvider,
                               "scoring_people_score_boost", 100)
+          .Get();
+  scoring_people_email_match_score_boost =
+      base::FeatureParam<int>(&kSearchAggregatorProvider,
+                              "scoring_people_email_match_score_boost", 400)
           .Get();
   scoring_prefer_contents_over_queries =
       base::FeatureParam<bool>(&kSearchAggregatorProvider,

@@ -221,11 +221,13 @@ class MODULES_EXPORT BaseRenderingContext2D : public CanvasRenderingContext,
   gfx::ColorSpace GetColorSpace() const final {
     return color_params_.GetGfxColorSpace();
   }
+  bool IsAccelerated() const final;
   void PageVisibilityChanged() override {}
   void RestoreCanvasMatrixClipStack(cc::PaintCanvas* c) const final;
   void Reset() override;
-  CanvasResourceProvider* PaintRenderingResultsToCanvas(
-      SourceDrawingBuffer) final;
+  scoped_refptr<StaticBitmapImage> PaintRenderingResultsToSnapshot(
+      SourceDrawingBuffer source_buffer,
+      FlushReason reason) final;
 
   void SetTryRestoreContextIntervalForTesting(base::TimeDelta delay) {
     try_restore_context_interval_ = delay;

@@ -398,8 +398,8 @@ BASE_FEATURE(kWebrtcMediaCapabilitiesParameters,
 
 // Controls the persistent license support for protected media that uses
 // widevine.
-BASE_FEATURE(kWidvinePersistentLicenseSupport,
-             "WidvinePersistentLicenseSupport",
+BASE_FEATURE(kWidevinePersistentLicenseSupport,
+             "WidevinePersistentLicenseSupport",
 #if BUILDFLAG(ENABLE_LIBRARY_CDMS)
              // TODO(crbug.com/423458074): This will rollout slowly as an
              // experiment eventually becoming disabled by default.
@@ -870,7 +870,7 @@ const base::FeatureParam<std::string> kMediaFoundationClearKeyCdmPathForTesting{
 // Enables the On-Device Web Speech feature on supported devices.
 BASE_FEATURE(kOnDeviceWebSpeech,
              "OnDeviceWebSpeech",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables the Live Caption feature on supported devices.
 BASE_FEATURE(kLiveCaption, "LiveCaption", base::FEATURE_ENABLED_BY_DEFAULT);
@@ -1727,10 +1727,10 @@ BASE_FEATURE(kMediaFoundationAcceleratedEncodeOnArm64,
 #if BUILDFLAG(IS_WIN)
 BASE_FEATURE(kMediaFoundationD3DVideoProcessing,
              "MediaFoundationD3DVideoProcessing",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kMediaFoundationSharedImageEncode,
              "MediaFoundationSharedImageEncode",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
 // Controls whether muted media stream audio should continue to render.

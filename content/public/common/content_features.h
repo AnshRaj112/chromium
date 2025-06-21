@@ -63,6 +63,7 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(
     kBrokerFileOperationsOnDiskCacheInNetworkService);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kCacheControlNoStoreEnterBackForwardCache);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kCapturedSurfaceControlKillswitch);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kCheckSiteInstanceOnHistoryNavigation);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(
     kClearCrossSiteCrossBrowsingContextGroupWindowName);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kCompositeBGColorAnimation);
@@ -202,6 +203,11 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kRegionCaptureOfOtherTabs);
 #endif
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kRenderDocument);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kRenderDocumentCompositorReuse);
+#if BUILDFLAG(IS_ANDROID)
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kRendererProcessLimitOnAndroid);
+CONTENT_EXPORT BASE_DECLARE_FEATURE_PARAM(size_t,
+                                          kRendererProcessLimitOnAndroidCount);
+#endif
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kRestrictThreadPoolInBackground);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSetIsolatesPriority);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kSpareRendererProcessPriority);
@@ -272,6 +278,7 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kUseContextSnapshot);
 #endif
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kUnrestrictedSharedArrayBuffer);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kVerifyDidCommitParams);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kValidateCommitOriginAtCommit);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kV8VmFuture);
 #if BUILDFLAG(IS_ANDROID)
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kV8HighEndAndroid);

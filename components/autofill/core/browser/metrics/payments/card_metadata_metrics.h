@@ -60,12 +60,53 @@ enum class CardMetadataLoggingEvent {
 // page load. These values are persisted to logs. Entries should not be
 // renumbered and numeric values should never be reused.
 enum class CardBenefitFormEvent {
-  // TODO(crbug.com/417228483): "0" is reserved for `kBenefitSuggestionShown`.
+  // TODO(crbug.com/417228483): "0" is reserved for
+  // `kSuggestionWithBenefitShown`.
+
   // Suggestions containing cards with a benefit available were shown when the
   // user had two or more server cards.
-  kBenefitSuggestionShownWithMultipleServerCards = 1,
+  kSuggestionWithBenefitShownWithMultipleServerCards = 1,
 
-  kMaxValue = kBenefitSuggestionShownWithMultipleServerCards
+  // TODO(crbug.com/417228483): "2" is reserved for
+  // `kSuggestionWithBenefitSelected`.
+
+  // TODO(crbug.com/417228483): "3" is reserved for
+  // `kSuggestionWithoutBenefitSelected`.
+
+  // A suggestion of a masked server card with a benefit available was selected
+  // when the user had two or more server cards.
+  kSuggestionWithBenefitSelectedWithMultipleServerCards = 4,
+
+  // TODO(crbug.com/417323667): "5" is reserved for
+  // `kSuggestionWithoutBenefitSelectedWithMultipleServerCards`.
+
+  // TODO(crbug.com/417323667): "6" is reserved for
+  // `kSuggestionWithBenefitFilled`.
+
+  // TODO(crbug.com/417323667): "7" is reserved for
+  // `kSuggestionWithoutBenefitFilled`.
+
+  // A suggestion of a masked server card with a benefit available was filled
+  // when the user had two or more server cards.
+  kSuggestionWithBenefitFilledWithMultipleServerCards = 8,
+
+  // TODO(crbug.com/417323667): "9" is reserved for
+  // `kSuggestionWithoutBenefitFilledWithMultipleServerCards`.
+
+  // TODO(crbug.com/417323667): "10" is reserved for
+  // `kSuggestionWithBenefitSubmitted`.
+
+  // TODO(crbug.com/417323667): "11" is reserved for
+  // `kSuggestionWithoutBenefitSubmitted`.
+
+  // A suggestion of a masked server card with a benefit available was submitted
+  // when the user had two or more server cards.
+  kSuggestionWithBenefitSubmittedWithMultipleServerCards = 12,
+
+  // TODO(crbug.com/417323667): "13" is reserved for
+  // `kSuggestionWithoutBenefitSubmittedWithMultipleServerCards`.
+
+  kMaxValue = kSuggestionWithBenefitSubmittedWithMultipleServerCards
 };
 
 // LINT.ThenChange(/tools/metrics/histograms/metadata/autofill/enums.xml:CardBenefitFormEvent)
@@ -180,6 +221,12 @@ void LogIsCreditCardBenefitsEnabledAtStartup(bool enabled);
 void LogBenefitFormEventToAllBenefitHistograms(
     const base::flat_map<int64_t, std::string>&
         instrument_ids_to_available_benefit_sources,
+    CardBenefitFormEvent event);
+
+// Log the given `event` to the general benefit histogram, as well as to the
+// `benefit_source`'s specific subhistogram.
+void LogBenefitFormEventToAllBenefitHistograms(
+    const std::string& benefit_source,
     CardBenefitFormEvent event);
 
 // Log the given `event` for card benefits on a benefit source level.

@@ -6,7 +6,9 @@
 
 #include <algorithm>
 
+#include "base/check_deref.h"
 #include "base/feature_list.h"
+#include "base/notreached.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -17,6 +19,7 @@
 #include "chrome/browser/ui/views/frame/multi_contents_view_delegate.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
+#include "chrome/browser/ui/views/frame/scrim_view.h"
 #include "chrome/browser/ui/views/frame/top_container_background.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -26,6 +29,10 @@
 
 DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(MultiContentsView,
                                       kMultiContentsViewElementId);
+DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(MultiContentsView,
+                                      kStartContainerViewScrimElementId);
+DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(MultiContentsView,
+                                      kEndContainerViewScrimElementId);
 
 MultiContentsView::MultiContentsView(
     BrowserView* browser_view,
@@ -42,6 +49,8 @@ MultiContentsView::MultiContentsView(
   contents_container_views_[0]
       ->GetContentsView()
       ->set_is_primary_web_contents_for_window(true);
+  contents_container_views_[0]->GetScrimView()->SetProperty(
+      views::kElementIdentifierKey, kStartContainerViewScrimElementId);
 
   resize_area_ = AddChildView(std::make_unique<MultiContentsResizeArea>(this));
   resize_area_->SetVisible(false);
@@ -49,6 +58,8 @@ MultiContentsView::MultiContentsView(
   contents_container_views_.push_back(
       AddChildView(std::make_unique<ContentsContainerView>(browser_view_)));
   contents_container_views_[1]->SetVisible(false);
+  contents_container_views_[1]->GetScrimView()->SetProperty(
+      views::kElementIdentifierKey, kEndContainerViewScrimElementId);
 
   for (auto* contents_container_view : contents_container_views_) {
     web_contents_focused_subscriptions_.push_back(
@@ -62,7 +73,6 @@ MultiContentsView::MultiContentsView(
 
   drop_target_view_ =
       AddChildView(std::make_unique<MultiContentsDropTargetView>(*delegate_));
-  drop_target_view_->SetVisible(false);
   drop_target_controller_ =
       std::make_unique<MultiContentsViewDropTargetController>(
           *drop_target_view_);
@@ -70,9 +80,9 @@ MultiContentsView::MultiContentsView(
 
 MultiContentsView::~MultiContentsView() {
   drop_target_controller_.reset();
-  auto* drop_target_view = drop_target_view_.get();
   drop_target_view_ = nullptr;
-  RemoveChildViewT(drop_target_view);
+  resize_area_ = nullptr;
+  RemoveAllChildViews();
 }
 
 ContentsWebView* MultiContentsView::GetActiveContentsView() {
@@ -137,6 +147,13 @@ void MultiContentsView::UpdateSplitRatio(double ratio) {
 
   start_ratio_ = ratio;
   InvalidateLayout();
+}
+
+void MultiContentsView::SetInactiveScrimVisibility(bool show_inactive_scrim) {
+  if (show_inactive_scrim_ != show_inactive_scrim) {
+    show_inactive_scrim_ = show_inactive_scrim;
+    UpdateContentsBorderAndOverlay();
+  }
 }
 
 void MultiContentsView::ExecuteOnEachVisibleContentsView(
@@ -213,13 +230,35 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
 
   const gfx::Rect available_space(width, height);
   ViewWidths widths = GetViewWidths(available_space);
+
+  gfx::Rect drop_target_rect(widths.drop_target_width,
+                             available_space.height());
   gfx::Rect start_rect(available_space.origin(),
                        gfx::Size(widths.start_width, available_space.height()));
-  const gfx::Rect resize_rect(
+  gfx::Rect resize_rect(
       start_rect.top_right(),
       gfx::Size(widths.resize_width, available_space.height()));
   gfx::Rect end_rect(resize_rect.top_right(),
                      gfx::Size(widths.end_width, available_space.height()));
+
+  if (drop_target_view_->side().has_value()) {
+    switch (drop_target_view_->side().value()) {
+      case MultiContentsDropTargetView::DropSide::START:
+        // If the drop target view will show at the start, shift everything
+        // over.
+        start_rect.set_x(start_rect.x() + widths.drop_target_width);
+        resize_rect.set_x(resize_rect.x() + widths.drop_target_width);
+        end_rect.set_x(resize_rect.x() + widths.drop_target_width);
+        drop_target_rect.set_origin(available_space.origin());
+        break;
+      case MultiContentsDropTargetView::DropSide::END:
+        drop_target_rect.set_origin(end_rect.top_right());
+        break;
+      default:
+        NOTREACHED();
+    }
+  }
+
   if (IsInSplitView()) {
     start_rect.Inset(start_contents_view_inset_);
     end_rect.Inset(end_contents_view_inset_);
@@ -234,11 +273,9 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
                                      contents_container_views_[1]->GetVisible(),
                                      end_rect);
 
-  // TODO(crbug.com/394369035): The used drop target view is a placeholder, and
-  // therefore will never be visible. The actual drop target view will be
-  // added later.
-  layouts.child_layouts.emplace_back(drop_target_view_.get(), false,
-                                     gfx::Rect(0, 0, 0, 0));
+  layouts.child_layouts.emplace_back(drop_target_view_.get(),
+                                     drop_target_view_->GetVisible(),
+                                     drop_target_rect);
 
   layouts.host_size = gfx::Size(width, height);
   return layouts;
@@ -257,24 +294,29 @@ MultiContentsView::ViewWidths MultiContentsView::GetViewWidths(
         available_space.width() - widths.start_width - widths.resize_width;
   } else {
     CHECK(!contents_container_views_[1]->GetVisible());
-    widths.start_width = available_space.width();
+    widths.drop_target_width = drop_target_view_->GetPreferredWidth();
+
+    // TODO(crbug.com/394369035): Drop targets currently don't scale with
+    // browser size. Consider adding a min width value.
+    widths.start_width = available_space.width() - widths.drop_target_width;
   }
   return ClampToMinWidth(widths);
 }
 
 MultiContentsView::ViewWidths MultiContentsView::ClampToMinWidth(
     ViewWidths widths) const {
+  if (!IsInSplitView()) {
+    // Don't clamp if in a single-view state, where other views should be 0
+    // width.
+    return widths;
+  }
+
   const int min_percentage =
       kMinWebContentsWidthPercentage * browser_view_->GetBounds().width();
   const int min_fixed_value = min_contents_width_for_testing_.has_value()
                                   ? min_contents_width_for_testing_.value()
                                   : kMinWebContentsWidth;
   const int min_width = std::min(min_fixed_value, min_percentage);
-  if (!IsInSplitView()) {
-    // Don't clamp if in a single-view state, where other views should be 0
-    // width.
-    return widths;
-  }
   if (widths.start_width < min_width) {
     const double diff = min_width - widths.start_width;
     widths.start_width += diff;
@@ -291,7 +333,8 @@ void MultiContentsView::UpdateContentsBorderAndOverlay() {
   for (auto* contents_container_view : contents_container_views_) {
     const bool is_active =
         contents_container_view->GetContentsView() == GetActiveContentsView();
-    contents_container_view->UpdateBorderAndOverlay(IsInSplitView(), is_active);
+    contents_container_view->UpdateBorderAndOverlay(IsInSplitView(), is_active,
+                                                    show_inactive_scrim_);
   }
 }
 

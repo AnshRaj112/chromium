@@ -575,9 +575,7 @@ struct SkiaRenderer::DrawQuadParams {
 
   SkPath draw_region_in_path() const {
     if (draw_region) {
-      return SkPath::Polygon(draw_region->points.data(),
-                             std::size(draw_region->points),
-                             /*isClosed=*/true);
+      return SkPath::Polygon(draw_region->points, /*isClosed=*/true);
     }
     return SkPath();
   }
@@ -2158,8 +2156,7 @@ SkiaRenderer::BypassMode SkiaRenderer::CalculateBypassParams(
     // The draw region was determined by the RPDQ's geometry, so map the
     // quadrilateral to the bypass'ed quad's coordinate space so that BSP
     // splitting is still respected.
-    rpdq_to_bypass.mapPoints(params->draw_region->points.data(),
-                             std::size(params->draw_region->points));
+    rpdq_to_bypass.mapPoints(params->draw_region->points);
   }
 
   std::optional<gfx::RectF> bypassed_quad_clip_rect;
@@ -2855,7 +2852,8 @@ void SkiaRenderer::DrawTileDrawQuad(const TileDrawQuad* quad,
   // images won't be fully filled so use the unclipped texture coords. On
   // interior tiles or left/top tiles, the image has been filled with
   // overlapping content so the entire image is valid for sampling.
-  gfx::RectF valid_texel_bounds(gfx::SizeF(quad->texture_size));
+  gfx::RectF valid_texel_bounds(gfx::SizeF(
+      resource_provider()->GetResourceBackedSize(quad->resource_id)));
   if (quad->IsRightEdge()) {
     // Restrict the width to match far side of texture coords
     valid_texel_bounds.set_width(quad->tex_coord_rect.right());

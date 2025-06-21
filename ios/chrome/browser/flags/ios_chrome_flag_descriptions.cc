@@ -639,11 +639,6 @@ const char kIOSDockingPromoDescription[] =
     "When enabled, the user will be presented an animated, instructional "
     "promo showing how to move Chrome to their native iOS dock.";
 
-extern const char kIOSEnableDeleteAllSavedCredentialsName[] =
-    "Enable delete all saved credentials in PWM";
-extern const char kIOSEnableDeleteAllSavedCredentialsDescription[] =
-    "When enabled, the delete all data button in PWM will be presented.";
-
 const char kIOSEnablePasswordManagerTrustedVaultWidgetName[] =
     "Enable password settings encryption error widget";
 const char kIOSEnablePasswordManagerTrustedVaultWidgetDescription[] =
@@ -768,6 +763,10 @@ const char kNotificationCollisionManagementName[] =
 const char kNotificationCollisionManagementDescription[] =
     "Enables delays to notifications to space them out more";
 
+const char kNTPMIAEntrypointName[] = "Entrypoint for MIA in the new tab page";
+const char kNTPMIAEntrypointDescription[] =
+    "Selects which variant of the MIA entrypoint is used in the new tab page";
+
 const char kIOSSharedHighlightingColorChangeName[] =
     "IOS Shared Highlighting color change";
 const char kIOSSharedHighlightingColorChangeDescription[] =
@@ -821,10 +820,6 @@ const char kLensClearcutBackgroundUploadEnabledName[] =
     "Lens clearcut background upload";
 const char kLensClearcutBackgroundUploadEnabledDescription[] =
     "Enables uploading of clearcut logs in the background.";
-
-const char kLensClearcutLoggerFastQosEnabledName[] =
-    "Lens clearcut logger fast QOS";
-const char kLensClearcutLoggerFastQosEnabledDescription[] = "Enables fast QOS.";
 
 const char kLensExactMatchesEnabledName[] = "Lens exact matches enabled";
 const char kLensExactMatchesEnabledDescription[] =
@@ -1226,10 +1221,6 @@ const char kProvisionalNotificationAlertName[] =
 const char kProvisionalNotificationAlertDescription[] =
     "Shows an alert to the user when app notification settings are changed but "
     "only provisonal notifications are enabled";
-
-const char kIpadZpsSuggestionMatchesLimitName[] = "Ipad Zps Suggestions limit";
-const char kIpadZpsSuggestionMatchesLimitDescription[] =
-    "Change the zps suggestion limit";
 
 const char kIPHPriceNotificationsWhileBrowsingName[] =
     "Price Tracking IPH Display";

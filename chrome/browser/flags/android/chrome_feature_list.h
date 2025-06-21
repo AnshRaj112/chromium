@@ -240,11 +240,14 @@ BASE_DECLARE_FEATURE(kTabArchivalDragDropAndroid);
 BASE_DECLARE_FEATURE(kTabCollectionAndroid);
 BASE_DECLARE_FEATURE(kTabSwitcherDragDropAndroid);
 BASE_DECLARE_FEATURE(kTabSwitcherForeignFaviconSupport);
+BASE_DECLARE_FEATURE(kTabSwitcherGroupSuggestionsAndroid);
+BASE_DECLARE_FEATURE(kTabSwitcherGroupSuggestionsTestModeAndroid);
 BASE_DECLARE_FEATURE(kTabWindowManagerReportIndicesMismatch);
 BASE_DECLARE_FEATURE(kHideTabletToolbarDownloadButton);
 BASE_DECLARE_FEATURE(kTestDefaultDisabled);
 BASE_DECLARE_FEATURE(kTestDefaultEnabled);
 BASE_DECLARE_FEATURE(kTopControlsRefactor);
+BASE_DECLARE_FEATURE(kTouchToSearchCallout);
 BASE_DECLARE_FEATURE(kTraceBinderIpc);
 BASE_DECLARE_FEATURE(kStartSurfaceReturnTime);
 BASE_DECLARE_FEATURE(kUmaBackgroundSessions);
@@ -299,6 +302,11 @@ constexpr base::FeatureParam<std::string> kQuickDeleteAndroidSurveyTriggerId(
     &kQuickDeleteAndroidSurvey,
     "trigger_id",
     /*default_value=*/"");
+
+constexpr base::FeatureParam<bool> kTouchToSearchCalloutTextVariant(
+    &kTouchToSearchCallout,
+    "text_variant",
+    /*default_value=*/false);
 
 }  // namespace android
 }  // namespace chrome

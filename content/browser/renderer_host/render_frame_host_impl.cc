@@ -35,6 +35,7 @@
 #include "base/metrics/metrics_hashes.h"
 #include "base/metrics/user_metrics.h"
 #include "base/no_destructor.h"
+#include "base/notimplemented.h"
 #include "base/notreached.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/process/kill.h"
@@ -63,6 +64,7 @@
 #include "components/input/input_router.h"
 #include "components/input/timeout_monitor.h"
 #include "components/input/utils.h"
+#include "components/tracing/common/tracing_switches.h"
 #include "components/viz/common/features.h"
 #include "content/browser/about_url_loader_factory.h"
 #include "content/browser/accessibility/render_accessibility_host.h"
@@ -232,6 +234,7 @@
 #include "mojo/public/cpp/bindings/struct_ptr.h"
 #include "mojo/public/cpp/bindings/urgent_message_scope.h"
 #include "mojo/public/cpp/system/data_pipe.h"
+#include "net/base/isolation_info.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "net/base/schemeful_site.h"
 #include "net/cookies/cookie_setting_override.h"
@@ -347,13 +350,6 @@
 #endif
 
 namespace features {
-
-// Evict when accessibility events occur while in back/forward cache.
-// Disabling on all platforms since https://crbug.com/1341507 has been addressed
-// and no significant crashes are happening with experiments.
-BASE_FEATURE(kEvictOnAXEvents,
-             "EvictOnAXEvents",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kDoNotEvictOnAXLocationChange,
              "DoNotEvictOnAXLocationChange",
@@ -3840,14 +3836,6 @@ RenderFrameHostImpl::AccessibilityGetAcceleratedWidget() {
 
 gfx::NativeViewAccessible
 RenderFrameHostImpl::AccessibilityGetNativeViewAccessible() {
-  if (base::FeatureList::IsEnabled(features::kEvictOnAXEvents) &&
-      IsInactiveAndDisallowActivation(
-          DisallowActivationReasonId::kAXGetNativeView)) {
-    // |AccessibilityGetNativeViewAccessible()| should be only accessible when
-    // we process AX events. Otherwise this should not be used while in
-    // back/forward cache and the document should be evicted.
-    return gfx::NativeViewAccessible();
-  }
   RenderWidgetHostViewBase* view = static_cast<RenderWidgetHostViewBase*>(
       render_view_host_->GetWidget()->GetView());
   if (view)
@@ -5168,7 +5156,11 @@ net::IsolationInfo RenderFrameHostImpl::ComputeIsolationInfoInternal(
         delegate_->GetPartitionedPopinOpenerProperties().site_for_cookies;
   }
 
-  // Walk up the frame tree to check SiteForCookies.
+  std::optional<net::IsolationInfo::FrameAncestorRelation>
+      candidate_frame_ancestor_relation =
+          net::IsolationInfo::FrameAncestorRelation::kSameOrigin;
+
+  // Walk up the frame tree to check SiteForCookies and FrameAncestorRelation.
   //
   // If |request_type| is kOther, then IsolationInfo is being computed
   // for subresource requests. Check/compute starting from the frame itself.
@@ -5186,6 +5178,10 @@ net::IsolationInfo RenderFrameHostImpl::ComputeIsolationInfoInternal(
         rfh == this ? frame_origin : rfh->last_committed_origin_;
     net::SchemefulSite cur_site = net::SchemefulSite(cur_origin);
 
+    candidate_frame_ancestor_relation =
+        net::IsolationInfo::ComputeNewFrameAncestorRelation(
+            candidate_frame_ancestor_relation, cur_origin, top_frame_origin);
+
     candidate_site_for_cookies.CompareWithFrameTreeSiteAndRevise(cur_site);
   }
 
@@ -5201,9 +5197,10 @@ net::IsolationInfo RenderFrameHostImpl::ComputeIsolationInfoInternal(
 
   std::optional<base::UnguessableToken> nonce =
       ComputeNonce(is_credentialless, fenced_frame_nonce_for_navigation);
-  return net::IsolationInfo::Create(request_type, top_frame_origin,
-                                    frame_origin, candidate_site_for_cookies,
-                                    nonce);
+  return net::IsolationInfo::Create(
+      request_type, top_frame_origin, frame_origin, candidate_site_for_cookies,
+      nonce, net::NetworkIsolationPartition::kGeneral,
+      candidate_frame_ancestor_relation);
 }
 
 std::optional<base::UnguessableToken> RenderFrameHostImpl::ComputeNonce(
@@ -8533,7 +8530,7 @@ void RenderFrameHostImpl::SendAccessibilityEventsToManager(
 
 void RenderFrameHostImpl::ExerciseAccessibilityForTest() {
 #if AX_FAIL_FAST_BUILD()
-  // When running a debugging/sanitizer build with
+  // When running a debugging/sanitizer build (but not a perf test) with
   // --force-renderer-accessibility, exercise the properties for every node, to
   // ensure no crashes or assertions are triggered. This helpfully runs for all
   // web tests on builder linux-blink-web-tests-force-accessibility-rel, as well
@@ -8546,7 +8543,8 @@ void RenderFrameHostImpl::ExerciseAccessibilityForTest() {
            ->GetBoolAttribute(ax::mojom::BoolAttribute::kBusy) &&
       ++count <= g_max_ax_tree_exercise_iterations) {
     base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-    if (command_line->HasSwitch(::switches::kForceRendererAccessibility)) {
+    if (command_line->HasSwitch(::switches::kForceRendererAccessibility) &&
+        !command_line->HasSwitch(switches::kTraceStartupOwner)) {
       std::unique_ptr<ui::AXTreeFormatter> formatter(
           AXInspectFactory::CreatePlatformFormatter());
       formatter->SetPropertyFilters({{"*", ui::AXPropertyFilter::ALLOW}});
@@ -8570,10 +8568,8 @@ bool RenderFrameHostImpl::IsInactiveAndDisallowActivation(uint64_t reason) {
     case LifecycleStateImpl::kInBackForwardCache: {
       // This function should not be called with kAXEvent when the page is in
       // back/forward cache, because |HandleAXevents()| will continue to process
-      // accessibility events without evicting unless the kEvictOnAXEvents flag
-      // is on.
-      if (!base::FeatureList::IsEnabled(features::kEvictOnAXEvents))
-        CHECK_NE(reason, kAXEvent);
+      // accessibility events without evicting.
+      CHECK_NE(reason, kAXEvent);
       // This function should not be called with kAXLocationChange when the
       // page is in back/forward cache, because `HandleAXLocationChange()` will
       // continue to process accessibility location changes unless
@@ -8613,21 +8609,6 @@ bool RenderFrameHostImpl::IsInactiveAndDisallowActivation(uint64_t reason) {
     case LifecycleStateImpl::kActive:
       return false;
   }
-}
-
-bool RenderFrameHostImpl::IsInactiveAndDisallowActivationForAXEvents(
-    const std::vector<ui::AXEvent>& events) {
-  DCHECK(base::FeatureList::IsEnabled(features::kEvictOnAXEvents));
-  if (lifecycle_state_ != LifecycleStateImpl::kInBackForwardCache) {
-    return IsInactiveAndDisallowActivation(
-        DisallowActivationReasonId::kAXEvent);
-  }
-  // If the lifecycle state is |LifecycleStateImpl::kInBackForwardCache|, we
-  // cannot handle accessibility events any more. We should evict the entry.
-  BackForwardCacheCanStoreDocumentResult can_store_flat;
-  can_store_flat.NoDueToAXEvents(events);
-  EvictFromBackForwardCacheWithFlattenedReasons(can_store_flat);
-  return true;
 }
 
 void RenderFrameHostImpl::EvictFromBackForwardCache(
@@ -11235,21 +11216,13 @@ void RenderFrameHostImpl::HandleAXEvents(
   // TODO(accessibility): we should probably consolidate these two params.
   updates_and_events.ax_tree_id = tree_id;
 
-  if (base::FeatureList::IsEnabled(features::kEvictOnAXEvents)) {
-    // If the flag is on, evict the bfcache entry now that AX events are
-    // received.
-    if (IsInactiveAndDisallowActivationForAXEvents(updates_and_events.events)) {
-      return;
-    }
-  } else {
-    // If the page is in back/forward cache, do not return early and continue to
-    // apply AX tree updates.
-    // TODO(crbug.com/40841648): Define and implement the behavior for
-    // when the page is prerendering, too.
-    if (!IsInBackForwardCache() &&
-        IsInactiveAndDisallowActivation(DisallowActivationReasonId::kAXEvent)) {
-      return;
-    }
+  // If the page is in back/forward cache, do not return early and continue to
+  // apply AX tree updates.
+  // TODO(crbug.com/40841648): Define and implement the behavior for
+  // when the page is prerendering, too.
+  if (!IsInBackForwardCache() &&
+      IsInactiveAndDisallowActivation(DisallowActivationReasonId::kAXEvent)) {
+    return;
   }
 
   GetOrCreateBrowserAccessibilityManager();
@@ -14071,7 +14044,7 @@ void RenderFrameHostImpl::CreateDedicatedWorkerHostFactory(
       std::move(receiver));
 }
 
-#if BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(IS_ANDROID) || (BUILDFLAG(IS_IOS) && !BUILDFLAG(IS_IOS_TVOS))
 void RenderFrameHostImpl::BindNFCReceiver(
     mojo::PendingReceiver<device::mojom::NFC> receiver) {
   delegate_->GetNFC(this, std::move(receiver));
@@ -16532,9 +16505,9 @@ void RenderFrameHostImpl::PostMessageEvent(
     ReceivedDelegatedCapability(message.delegated_capability);
 
   // This is always called from either another renderer (through RemoteFrame) or
-  // from the embedder itself. As such, we nullify the parent task ID here, to
+  // from the embedder itself. As such, we nullify the task state ID here, to
   // prevent this information from leaking between renderers.
-  message.parent_task_id = std::nullopt;
+  message.task_state_id = std::nullopt;
 
   GetAssociatedLocalFrame()->PostMessageEvent(
       source_token, source_origin, target_origin, std::move(message));
@@ -17790,6 +17763,12 @@ void RenderFrameHostImpl::IsClipboardPasteAllowedByPolicy(
 void RenderFrameHostImpl::OnTextCopiedToClipboard(
     const std::u16string& copied_text) {
   delegate_->OnTextCopiedToClipboard(this, copied_text);
+}
+
+std::optional<std::vector<std::u16string>>
+  RenderFrameHostImpl::GetClipboardTypesIfPolicyApplied(
+      const ui::ClipboardSequenceNumberToken& seqno) {
+  return delegate_->GetClipboardTypesIfPolicyApplied(seqno);
 }
 
 RenderFrameHostImpl* RenderFrameHostImpl::GetParentOrOuterDocument() const {

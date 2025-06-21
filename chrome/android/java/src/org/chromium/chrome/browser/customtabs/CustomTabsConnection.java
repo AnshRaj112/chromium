@@ -12,7 +12,6 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Binder;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Process;
 import android.os.SystemClock;
@@ -1084,12 +1083,19 @@ public class CustomTabsConnection {
      * @param session The Binder object identifying a session.
      * @param url The URL the tab is for.
      * @param referrer The referrer to use for |url|.
+     * @param intentDataProvider The {@link BrowserServicesIntentDataProvider} created from the
+     *     Custom Tabs Intent.
      * @return The hidden tab, or null.
      */
     public @Nullable HiddenTabHolder.HiddenTab takeHiddenTab(
-            @Nullable SessionHolder<?> session, String url, Intent intent) {
+            @Nullable SessionHolder<?> session,
+            String url,
+            BrowserServicesIntentDataProvider intentDataProvider) {
         return mHiddenTabHolder.takeHiddenTab(
-                session, mClientManager.getIgnoreFragmentsForSession(session), url, intent);
+                session,
+                mClientManager.getIgnoreFragmentsForSession(session),
+                url,
+                intentDataProvider);
     }
 
     /**
@@ -1917,7 +1923,7 @@ public class CustomTabsConnection {
         // cgroups a process is part of can be queried by reading /proc/<pid>/cgroup, which is
         // world-readable.
         String cgroupFilename = "/proc/" + pid + "/cgroup";
-        String controllerName = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? "cpuset" : "cpu";
+        String controllerName = "cpuset";
         try (BufferedReader reader = new BufferedReader(new FileReader(cgroupFilename))) {
             String line = null;
             while ((line = reader.readLine()) != null) {

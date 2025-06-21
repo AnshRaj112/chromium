@@ -18,6 +18,7 @@
 <translation id="1054745118061919935">Ao continuar, você concorda com os <ph name="BEGIN_LINK" />Termos de Serviço<ph name="END_LINK" />.</translation>
 <translation id="10614374240317010">Nunca salvas</translation>
 <translation id="1062138828266376352">O PIN não foi alterado. Confira sua conexão de Internet e tente de novo.</translation>
+<translation id="1063070031224282617">Escolha onde salvar "<ph name="BEGIN_BOLD" /><ph name="FILENAME" /><ph name="END_BOLD" />" (<ph name="FILE_SIZE" />)</translation>
 <translation id="1072476005125066234">Avaliações com base nos seus interesses</translation>
 <translation id="1074827084851510304">Você está prestes a excluir {password_count} senhas e a lista de sites e apps em que escolheu nunca salvar informações de login. As contas que você criou em sites e apps não serão excluídas.</translation>
 <translation id="1076421457278169141">Código lido</translation>
@@ -47,7 +48,7 @@
 <translation id="1179890706672152411">O armazenamento está cheio</translation>
 <translation id="1181037720776840403">Remover</translation>
 <translation id="1190609913194133056">Central de Notificações</translation>
-<translation id="1201402288615127009">Próxima</translation>
+<translation id="1201402288615127009">Avançar</translation>
 <translation id="1204075260022434100">{count,plural, =1{Favorito salvo em "{title}" na conta {email}}one{{count} favorito salvo em "{title}" na conta {email}}other{{count} favoritos salvos em "{title}" na conta {email}}}</translation>
 <translation id="120431140543679678">Seguir</translation>
 <translation id="1207493287814084192">17h30</translation>
@@ -58,7 +59,7 @@
 <translation id="1253032109800629289">Ocultar "Receber notificações de monitoramento de preço"</translation>
 <translation id="1258491128795710625">O que há de novo</translation>
 <translation id="1262724000444746916">Ocultar "Adicionar aos favoritos"</translation>
-<translation id="1263231323834454256">Lista de Leitura</translation>
+<translation id="1263231323834454256">Lista de leitura</translation>
 <translation id="1263433075299269530">Sua última guia aberta</translation>
 <translation id="1264156759663453185">O texto selecionado é muito grande para a tradução parcial.</translation>
 <translation id="1264974993859112054">Esportes</translation>
@@ -133,7 +134,7 @@
 <translation id="1509960214886564027">Os recursos de muitos sites podem apresentar falhas</translation>
 <translation id="1513858653616922153">Excluir senha</translation>
 <translation id="1517166097004694782">Ocultar "Continuar com esta guia"</translation>
-<translation id="1520027731907768768">Receba alertas de redução no preço para os produtos que você monitora.</translation>
+<translation id="1520027731907768768">Receba alertas de redução no preço dos produtos que você monitora.</translation>
 <translation id="1521366073263497277">Acesse a grade de guias</translation>
 <translation id="1521774566618522728">Ativo hoje</translation>
 <translation id="1524563461097350801">Agora não</translation>
@@ -203,13 +204,14 @@
 <translation id="1819374301217551116">Monitoramento e informações sobre preços</translation>
 <translation id="1820195936249950412">Faça login com uma conta válida</translation>
 <translation id="1820259098641718022">Adicionada à lista de leitura</translation>
-<translation id="1824490729233982311">Veja alertas quando você receber guias de outros dispositivos.</translation>
+<translation id="1824490729233982311">Receba alertas quando chegarem guias de outros dispositivos.</translation>
 <translation id="1827529786398596735">Toque na tela inicial e mantenha-a pressionada.</translation>
 <translation id="1832848789136765277">Para garantir o acesso aos seus dados sincronizados, confirme sua identidade</translation>
 <translation id="1836891464494477513">{count,plural, =1{Favorito salvo na sua Conta do Google {email}}one{Favorito salvo na sua Conta do Google {email}}other{Favoritos salvos na sua Conta do Google {email}}}</translation>
 <translation id="1838089197478136166">Abrir na Carteira?</translation>
 <translation id="183878838231635348">Este card mostra os problemas de privacidade ou segurança que a Confirmação de segurança detecta automaticamente.</translation>
 <translation id="1845230888742614096">Manter grupo</translation>
+<translation id="1853692000353488670">Nova guia anônima</translation>
 <translation id="1854463785401910334">Pesquisar guias abertas</translation>
 <translation id="1861067954551502701">{count,plural, =1{{position} de {count} senha}one{{position} de {count} senha}other{{position} de {count} senhas}}</translation>
 <translation id="1861262398884155592">Esta pasta está vazia</translation>
@@ -545,6 +547,7 @@ Veja as instruções do seu mecanismo de pesquisa para excluir o histórico de p
 <translation id="3227137524299004712">Microfone</translation>
 <translation id="3235063766008841141">Utilizada em um fraudulento e encontrada em uma violação de dados</translation>
 <translation id="3235242129752692527">Edite os detalhes do evento e toque em "Salvar".</translation>
+<translation id="323863549127671026">Guias e grupos de guias abertos</translation>
 <translation id="3240426699337459095">Link copiado</translation>
 <translation id="3244271242291266297">MM</translation>
 <translation id="3245429137663807393">Se você também compartilhar os relatórios de uso do Chrome, eles vão incluir os URLs acessados</translation>
@@ -592,6 +595,7 @@ Veja as instruções do seu mecanismo de pesquisa para excluir o histórico de p
 <translation id="3476450923187944815">Acesse suas senhas em outros apps.</translation>
 <translation id="3488501490964659223">As guias foram fechadas e os dados de navegação foram excluídos. Sua conta foi desconectada</translation>
 <translation id="3493531032208478708"><ph name="BEGIN_LINK" />Saiba mais<ph name="END_LINK" /> sobre o conteúdo sugerido</translation>
+<translation id="349446645805573740">Escolha onde salvar "<ph name="BEGIN_BOLD" /><ph name="FILENAME" /><ph name="END_BOLD" />"</translation>
 <translation id="3504377992102007712">Configurações</translation>
 <translation id="35083190962747987">Abrir ${url}</translation>
 <translation id="3511519535430890904">Adicionar proteção à navegação</translation>
@@ -623,6 +627,7 @@ Veja as instruções do seu mecanismo de pesquisa para excluir o histórico de p
 <translation id="3596414637720633074">Bloquear cookies de terceiros na navegação anônima</translation>
 <translation id="3602260545951981695">Escolha "Proteção reforçada"</translation>
 <translation id="3608436266458100337">Modo leitor</translation>
+<translation id="3610041351087301930">Ocultar leitor</translation>
 <translation id="3622175633937495219">Pesquisar no histórico (<ph name="COUNT" /> encontrados)</translation>
 <translation id="3625008969091706597">Deslize a borda da tela para voltar.</translation>
 <translation id="362709345066740529">Personalize os cards, o feed e muito mais</translation>
@@ -690,6 +695,7 @@ Veja as instruções do seu mecanismo de pesquisa para excluir o histórico de p
 <translation id="3922395466317605522">Personalizar menu</translation>
 <translation id="3929457972718048006">Endereços</translation>
 <translation id="3931215329146376310">{count,plural, =1{Nova senha para este site}one{Nova senha para este site}other{Novas senhas para este site}}</translation>
+<translation id="3934905113567851655">Faça um gesto de pinça para redimensionar</translation>
 <translation id="3940195383040445971">Monitorar preço nas guias</translation>
 <translation id="3941941395924123592">{COUNT,plural, =1{Fechar {COUNT} guia}one{Fechar {COUNT} guia}other{Fechar {COUNT} guias}}</translation>
 <translation id="3948600256434252210">Deslize para a direita para entrar no modo de navegação anônima.</translation>
@@ -964,7 +970,6 @@ Veja as instruções do seu mecanismo de pesquisa para excluir o histórico de p
 <translation id="4979397965658815378">Faça login com sua Conta do Google para ter seus favoritos, senhas, histórico e outras configurações em todos os seus dispositivos</translation>
 <translation id="4985921635659180565">Não é possível cancelar a exclusão programada de um arquivo.</translation>
 <translation id="498624032394115435">Qualquer pessoa com o link pode editar todas as guias.</translation>
-<translation id="4989065233040279145">Escolha um local para salvar <ph name="FILENAME" /></translation>
 <translation id="499122600724363620"><ph name="NAME" />, <ph name="EMAIL" />, gerenciado pela sua organização.</translation>
 <translation id="4992255726304765516">Cor do grupo de guias <ph name="COLOR" /></translation>
 <translation id="5005498671520578047">Copiar senha</translation>
@@ -1064,6 +1069,7 @@ Veja as instruções do seu mecanismo de pesquisa para excluir o histórico de p
 <translation id="5431252637281434233">Sua conta será desconectada</translation>
 <translation id="543338862236136125">Editar senha</translation>
 <translation id="5433691172869980887">Nome de usuário copiado</translation>
+<translation id="5437480232219631455">Você pode abrir o Gemini aqui</translation>
 <translation id="5439618055789623719">Conta conectada: <ph name="USER_EMAIL" /></translation>
 <translation id="5443636120437209490">Melhor navegação por padrão</translation>
 <translation id="5444892875087332195">Favoritos</translation>
@@ -1642,7 +1648,7 @@ Na navegação anônima, eles não podem usar cookies para ver suas atividades d
 <translation id="7695953765525234038">Barra de pesquisa</translation>
 <translation id="7696316012653762532">Opções para traduzir a página</translation>
 <translation id="7700527812567437847">Pesquisar na tela com o Google Lens</translation>
-<translation id="7701040980221191251">Não há</translation>
+<translation id="7701040980221191251">Nenhum</translation>
 <translation id="7708994397325774423">Acesse todas as suas senhas</translation>
 <translation id="7711440461521638739">Você não está reutilizando senhas</translation>
 <translation id="7712361583414030698">Mostrando a versão off-line</translation>
@@ -1650,7 +1656,6 @@ Na navegação anônima, eles não podem usar cookies para ver suas atividades d
 <translation id="7724085059277147439">{count,plural, =1{Item salvo na sua Conta do Google {email}}one{Item salvo na sua Conta do Google {email}}other{Itens salvos na sua Conta do Google {email}}}</translation>
 <translation id="7729458878441927652">Para conferir as guias dos seus outros dispositivos, sincronize-as com o histórico.</translation>
 <translation id="7730020510075123961">Não, juntar dados</translation>
-<translation id="7730973429297233609">Selecione a conta que você quer usar para salvar o arquivo <ph name="FILENAME" /> (<ph name="FILESIZE" />)</translation>
 <translation id="7733646263819020771"><ph name="BOOKMRK_NAME" />. Somente neste dispositivo.</translation>
 <translation id="7744192722284567281">Encontrada em uma violação de dados</translation>
 <translation id="7749790401023484470">Você não selecionou nenhum texto.</translation>
@@ -1698,6 +1703,7 @@ Na navegação anônima, eles não podem usar cookies para ver suas atividades d
 <translation id="7925108652071887026">Dados do preenchimento automático</translation>
 <translation id="7926975587469166629">Apelido do cartão</translation>
 <translation id="7927711904086083099">Não selecionado</translation>
+<translation id="7927902634113905831">Selecione a conta que você quer usar para salvar "<ph name="BEGIN_BOLD" /><ph name="FILENAME" /><ph name="END_BOLD" />" (<ph name="FILESIZE" />)</translation>
 <translation id="7930998711684428189">Avisa se suas senhas foram expostas em uma violação de dados.</translation>
 <translation id="7933880123415105005">Pesquisar no <ph name="SEARCH_PROVIDER" /></translation>
 <translation id="7938254975914653459">FaceTime</translation>
@@ -1834,7 +1840,6 @@ Eles também podem usar cookies para ver sua atividade de navegação em diferen
 <translation id="8428045167754449968">Cidade</translation>
 <translation id="8428213095426709021">Configurações</translation>
 <translation id="8428634594422941299">Entendi</translation>
-<translation id="8430694217306051839">Escolha um local para salvar <ph name="FILENAME" /> (<ph name="FILE_SIZE" />)</translation>
 <translation id="8434837876193928924">Detalhes do grupo de guias</translation>
 <translation id="8438566539970814960">Melhorar as pesquisas e a navegação</translation>
 <translation id="8439758443371991593">Ocultar "Adicionar à Lista de leitura"</translation>
@@ -2060,7 +2065,7 @@ Eles também podem usar cookies para ver sua atividade de navegação em diferen
 <translation id="945522503751344254">Enviar comentários</translation>
 <translation id="94870150074703282">Excluir grupo?</translation>
 <translation id="952704832371081537">Cancelar</translation>
-<translation id="954667170699278022">Lista de Leitura</translation>
+<translation id="954667170699278022">Lista de leitura</translation>
 <translation id="959066944189734975">Você está seguindo este canal: <ph name="CHANNEL_NAME" /></translation>
 <translation id="961856697154696964">Excluir dados de navegação</translation>
 <translation id="963102227019621224">Atividade na Web e de apps</translation>

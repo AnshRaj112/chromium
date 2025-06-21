@@ -1983,9 +1983,8 @@ static inline String CanonicalizedTitle(
   bool pending_whitespace = false;
   for (size_t i = 0; i < characters.size(); ++i) {
     UChar32 c = characters[i];
-    if ((c <= WTF::unicode::kSpaceCharacter &&
-         c != WTF::unicode::kLineTabulationCharacter) ||
-        c == WTF::unicode::kDeleteCharacter) {
+    if ((c <= uchar::kSpace && c != uchar::kLineTabulation) ||
+        c == uchar::kDelete) {
       if (builder_index != 0)
         pending_whitespace = true;
     } else {
@@ -2436,7 +2435,7 @@ static void AssertLayoutTreeUpdated(Node& root,
         node = FlatTreeTraversal::NextSkippingChildren(*node);
         continue;
       }
-      // Check pseudo elements.
+      // Check pseudo-elements.
       AssertLayoutTreeUpdatedForPseudoElements(*element);
     }
 
@@ -7355,7 +7354,7 @@ void Document::SetEncodingData(const DocumentEncodingData& new_data) {
     std::string original_bytes = title_element_->textContent().Latin1();
     std::unique_ptr<TextCodec> codec = NewTextCodec(new_data.Encoding());
     String correctly_decoded_title = codec->Decode(
-        base::as_byte_span(original_bytes), WTF::FlushBehavior::kDataEOF);
+        base::as_byte_span(original_bytes), FlushBehavior::kDataEOF);
     title_element_->setTextContent(correctly_decoded_title);
   }
 

@@ -53,6 +53,7 @@
 <translation id="1662146548738125461">Tietoa ChromeOS Flexistä</translation>
 <translation id="1674870198290878346">Avaa linkki Chromen inco&amp;gnito-ikkunassa</translation>
 <translation id="1682634494516646069">Chrome ei voi lukea tietohakemistoaan <ph name="USER_DATA_DIRECTORY" /> tai kirjoittaa siihen</translation>
+<translation id="1688214853608504530">Kun kirjoitat osoitepalkkiin tai hakukenttään, Chrome lähettää kirjoittamasi tekstin organisaatiosi haku-, tekoäly- ja agenttityökaluille, jotta saat ehdotuksia.</translation>
 <translation id="1698376642261615901">Google Chrome on verkkoselain, jolla voit avata verkkosivuja ja sovelluksia salamannopeasti. Se on nopea, vakaa ja helppokäyttöinen. Selaa verkkoa turvallisemmin Google Chromen haittaohjelma- ja tietojenkalastelusuojauksen avulla.</translation>
 <translation id="1713301662689114961">{0,plural, =1{Chrome käynnistetään uudelleen tunnin kuluttua}other{Chrome käynnistetään uudelleen # tunnin kuluttua}}</translation>
 <translation id="1722488837206509557">Näin voit valita käytettävissä olevista laitteista ja näyttää niillä sisältöä.</translation>
@@ -61,6 +62,7 @@
 <translation id="178701303897325119">Tätä laajennusta ei enää tueta. Chrome suosittelee poistamaan sen.</translation>
 <translation id="1812689907177901597">Poistamalla tämän käytöstä voit kirjautua Google-sivustoille, esim. Gmailiin, kirjautumatta Chromeen.</translation>
 <translation id="1821644463306970002">{NUM_TABS,plural, =1{Chrome suosittelee selainta hidastavan välilehden keskeyttämistä}other{Chrome suosittelee selainta hidastavien välilehtien keskeyttämistä}}</translation>
+<translation id="1832046143430087831">Nopeuttaa sivustoja Chromen V8-moottorilla, mutta heikentää Chromen suojaa hyökkäyksiä vastaan. Tämä asetus on poissa päältä.</translation>
 <translation id="1838374766361614909">Tyhjennä haku</translation>
 <translation id="1860536484129686729">Chrome tarvitsee oikeuden käyttää kameraasi tällä sivustolla.</translation>
 <translation id="1873233029667955273">Google Chrome ei ole oletusselain.</translation>
@@ -443,6 +445,7 @@
 <translation id="6718739135284199302">Chromen nopeuttaminen</translation>
 <translation id="6735387454586646204">ChromeOS Flexin järjestelmä</translation>
 <translation id="6750954913813541382">Chrome lähettää selaimeen kirjoittamasi tekstin Googlelle kirjoitusvirheiden korjaamiseksi</translation>
+<translation id="6760235774835597023">Nopeuttaa sivustoja Chromen V8-moottorilla, mutta heikentää Chromen suojaa hyökkäyksiä vastaan. Tämä asetus on päällä.</translation>
 <translation id="677276454032249905">Suljetaanko Chrome silti?</translation>
 <translation id="6794858689789885890">Poista laitteen sivustodata aina, kun suljet Chromen</translation>
 <translation id="6831043979455480757">Käännä</translation>

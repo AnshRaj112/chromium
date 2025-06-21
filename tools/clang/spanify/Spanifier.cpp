@@ -84,6 +84,7 @@ enum Precedence {
   kAdaptBinaryOperationPrecedence,
   kEmitSingleVariableSpanPrecedence,
   kAdaptBinaryPlusEqOperationPrecedence,
+  kRewriteUnaryOperationPrecedence,
   // Higher priority (stronger ties to the target)
 };
 
@@ -932,6 +933,36 @@ static void AdaptBinaryOpInMacro(const MatchFinder::MatchResult& result,
                                    ")", source_manager));
 }
 
+// Closes an open `base::span(` if present.
+// Returns a `.subspan(` opener.
+// Opens a `base::checked_cast(` if necessary.
+static std::string CreateSubspanOpener(
+    std::string_view prefix,
+    const SubspanExprReplacement* subspan_expr_replacement) {
+  std::string_view maybe_checked_cast_opener = "";
+  if (const auto* replacement =
+          std::get_if<CheckedCastReplacement>(subspan_expr_replacement)) {
+    maybe_checked_cast_opener = replacement->opener.text;
+  }
+  return llvm::formatv("{0}.subspan({1}", prefix, maybe_checked_cast_opener);
+}
+
+// Returns a `.subspan(` closer.
+// Closes an open `base::checked_cast(` if necessary,
+// or appends a `u` to the integer literal expression.
+static std::string CreateSubspanCloser(
+    const SubspanExprReplacement* subspan_expr_replacement) {
+  std::string_view maybe_closer = "";
+  if (const auto* replacement =
+          std::get_if<RangedReplacement>(subspan_expr_replacement)) {
+    maybe_closer = replacement->text;
+  } else if (const auto* replacement = std::get_if<CheckedCastReplacement>(
+                 subspan_expr_replacement)) {
+    maybe_closer = replacement->closer.text;
+  }
+  return llvm::formatv("{0})", maybe_closer);
+}
+
 static void AdaptBinaryOperation(const MatchFinder::MatchResult& result) {
   const clang::SourceManager& source_manager = *result.SourceManager;
   const auto* binary_operation =
@@ -984,24 +1015,31 @@ static void AdaptBinaryOperation(const MatchFinder::MatchResult& result) {
   // becomes
   //
   // a .subspan( b
+  const auto* binary_op_RHS =
+      GetNodeOrCrash<clang::Expr>(result, "binary_op_rhs", __FUNCTION__);
+  const auto subspan_expr_replacement =
+      GetSubspanExprReplacement(binary_op_RHS, result, key);
+
+  // Close the open `base::span(` expression if present.
+  std::string_view prefix = rhs_array_type ? ")" : "";
+  std::string subspan_opener =
+      CreateSubspanOpener(prefix, &subspan_expr_replacement);
+
   const clang::SourceLocation binary_operator_begin =
       GetBinaryOperationOperatorLoc(binary_operation, result);
   EmitReplacement(
       key,
       GetReplacementDirective(
           {binary_operator_begin, binary_operator_begin.getLocWithOffset(1)},
-          llvm::formatv("{0}.subspan(", rhs_array_type ? ")" : ""),
-          source_manager, -kAdaptBinaryOperationPrecedence));
+          subspan_opener, source_manager, -kAdaptBinaryOperationPrecedence));
 
-  const auto* binary_op_RHS =
-      GetNodeOrCrash<clang::Expr>(result, "binary_op_rhs", __FUNCTION__);
   const clang::SourceRange operator_rhs_range = getExprRange(
       binary_op_RHS, source_manager, result.Context->getLangOpts());
 
-  // Insert the closing right parenthesis.
+  std::string subspan_closer = CreateSubspanCloser(&subspan_expr_replacement);
   EmitReplacement(key, GetReplacementDirective(
-                           operator_rhs_range.getEnd(), ")", source_manager,
-                           -kAdaptBinaryOperationPrecedence));
+                           operator_rhs_range.getEnd(), subspan_closer,
+                           source_manager, -kAdaptBinaryOperationPrecedence));
 
   // It's possible we emitted a rewrite that creates a temporary but
   // unnamed `base::span` (issue 408018846). This could end up being
@@ -1031,28 +1069,31 @@ static void AdaptBinaryPlusEqOperation(const MatchFinder::MatchResult& result) {
       getExprRange(binary_op_RHS, source_manager, lang_opts);
   auto source_range = clang::SourceRange(lhs_expr_range.getEnd(),
                                          binary_op_rhs_range.getBegin());
+
+  const std::string& key = GetRHS(result);
+
+  auto subspan_arg_fixup =
+      GetSubspanExprReplacement(binary_op_RHS, result, key);
   std::string lhs_expr_text =
       clang::Lexer::getSourceText(
           clang::CharSourceRange::getCharRange(lhs_expr_range), source_manager,
           lang_opts)
           .str();
-  std::string binary_op_rhs_text =
-      clang::Lexer::getSourceText(
-          clang::CharSourceRange::getCharRange(binary_op_rhs_range),
-          source_manager, lang_opts)
-          .str();
-
-  const std::string& key = GetRHS(result);
-
-  EmitReplacement(
-      key, GetReplacementDirective(
-               source_range, "=" + lhs_expr_text + ".subspan(", source_manager,
-               kAdaptBinaryPlusEqOperationPrecedence));
 
   EmitReplacement(key,
                   GetReplacementDirective(
-                      clang::SourceRange(binary_op_rhs_range.getEnd()), ")",
-                      source_manager, -kAdaptBinaryPlusEqOperationPrecedence));
+                      source_range,
+                      CreateSubspanOpener(
+                          std::string(llvm::formatv("= {0}", lhs_expr_text)),
+                          &subspan_arg_fixup),
+                      source_manager, kAdaptBinaryPlusEqOperationPrecedence));
+
+  std::string subspan_closer = CreateSubspanCloser(&subspan_arg_fixup);
+
+  EmitReplacement(
+      key, GetReplacementDirective(
+               clang::SourceRange(binary_op_rhs_range.getEnd()), subspan_closer,
+               source_manager, -kAdaptBinaryPlusEqOperationPrecedence));
 }
 
 // Handles boolean operations that need to be adapted after a span rewrite.
@@ -1465,9 +1506,101 @@ static std::string getNodeFromSizeExpr(const clang::Expr* size_expr,
 }
 
 // Rewrite:
+//   `ptr++` or `++ptr`
+// Into:
+//   `base::PreIncrementSpan(span)` or `base::PostIncrementSpan(span)`.
+void RewriteUnaryOperation(const MatchFinder::MatchResult& result) {
+  const clang::SourceManager& source_manager = *result.SourceManager;
+  const auto& lang_opts = result.Context->getLangOpts();
+
+  const clang::Expr* operand = nullptr;
+  bool is_prefix = false;
+  clang::SourceLocation operator_loc;
+
+  if (const auto* unary_op =
+          result.Nodes.getNodeAs<clang::UnaryOperator>("unaryOperator")) {
+    operand = unary_op->getSubExpr();
+    is_prefix = unary_op->isPrefix();
+    operator_loc = unary_op->getOperatorLoc();
+  } else if (const auto* cxx_op_call =
+                 result.Nodes.getNodeAs<clang::CXXOperatorCallExpr>(
+                     "raw_ptr_operator++")) {
+    operand = cxx_op_call->getArg(0);
+    const auto* method_decl =
+        clang::dyn_cast<clang::CXXMethodDecl>(cxx_op_call->getCalleeDecl());
+    assert(method_decl);
+    // For CXXOperatorCallExpr, prefix increment has 0 parameters (e.g.,
+    // operator++()) postfix increment has 1 parameter (e.g., operator++(int)).
+    is_prefix = (method_decl->getNumParams() == 0);
+    operator_loc = cxx_op_call->getOperatorLoc();
+  }
+
+  if (!operand) {
+    // This block should ideally not be reached if matchers are well-defined.
+    llvm::errs()
+        << "\n"
+        << "Error: RewriteUnaryOperation() encountered an unexpected match.\n"
+        << "Expected a unaryOperator or raw_ptr_operator++ to be bound.\n";
+    DumpMatchResult(result);
+    assert(false && "Unexpected match in RewriteUnaryOperation()");
+    return;
+  }
+
+  assert(operator_loc.isValid());
+
+  // Get the source range of the operand (the 'ptr' part).
+  clang::SourceRange operand_range =
+      getExprRange(operand->IgnoreParenImpCasts(), source_manager, lang_opts);
+  assert(operand_range.isValid());
+
+  clang::SourceLocation operator_end_loc = clang::Lexer::getLocForEndOfToken(
+      operator_loc, 0, source_manager, lang_opts);
+  assert(operator_end_loc.isValid());
+  clang::SourceRange op_token_range(operator_loc, operator_end_loc);
+
+  std::string begin_insert_text;
+  clang::SourceRange begin_replacement_range;
+  clang::SourceRange end_replacement_range;
+
+  if (is_prefix) {
+    begin_insert_text = "base::preIncrementSpan(";
+    // Replace the '++' with "base::preIncrementSpan(".
+    begin_replacement_range = op_token_range;
+    // Insert ")" at the end of the operand.
+    end_replacement_range =
+        clang::SourceRange(operand_range.getEnd(), operand_range.getEnd());
+  } else {
+    begin_insert_text = "base::postIncrementSpan(";
+    // Insert "base::postIncrementSpan(" at the beginning of the operand.
+    begin_replacement_range =
+        clang::SourceRange(operand_range.getBegin(), operand_range.getBegin());
+    // Replace "++"" with ")".
+    end_replacement_range = op_token_range;
+  }
+
+  assert(begin_replacement_range.isValid());
+  assert(end_replacement_range.isValid());
+
+  const std::string key = GetRHS(result);
+
+  EmitReplacement(key, GetReplacementDirective(
+                           begin_replacement_range, begin_insert_text,
+                           source_manager, kRewriteUnaryOperationPrecedence));
+
+  EmitReplacement(
+      key, GetReplacementDirective(end_replacement_range, ")", source_manager,
+                                   -kRewriteUnaryOperationPrecedence));
+
+  EmitReplacement(key,
+                  GetIncludeDirective(operand_range, source_manager,
+                                      kBaseAutoSpanificationHelperIncludePath));
+}
+
+// Rewrite:
 //   `sizeof(c_array)`
 // Into:
-//  `std_array.size() * sizeof(element_size)`.
+//   `base::SpanificationSizeofForStdArray(std_array)`
+// Tests are in: array-tests-original.cc
 void RewriteArraySizeof(const MatchFinder::MatchResult& result) {
   clang::SourceManager& source_manager = *result.SourceManager;
 
@@ -1492,18 +1625,19 @@ void RewriteArraySizeof(const MatchFinder::MatchResult& result) {
     end_offset = name.getAsString().length();
   }
 
+  const std::string& key = GetRHS(result);
   const clang::SourceRange replacement_range = {
       sizeof_expr->getBeginLoc(),
       sizeof_expr->getEndLoc().getLocWithOffset(end_offset)};
-
-  // The outer-most parentheses are redundant for most cases. But it's
-  // necessary in cases like "x / sizeof(c_array)", which is unlikely though.
-  std::string replacement_text = llvm::formatv(
-      "({0}.size() * sizeof(decltype({0})::value_type))", array_decl_as_string);
-  std::string replacement_directive = GetReplacementDirective(
-      replacement_range, std::move(replacement_text), source_manager);
-
-  EmitReplacement(GetRHS(result), replacement_directive);
+  EmitReplacement(key,
+                  GetReplacementDirective(
+                      replacement_range,
+                      llvm::formatv("base::SpanificationSizeofForStdArray({0})",
+                                    array_decl_as_string),
+                      source_manager));
+  EmitReplacement(key,
+                  GetIncludeDirective(replacement_range, source_manager,
+                                      kBaseAutoSpanificationHelperIncludePath));
 }
 
 // Add `.data()` at the frontier of a span change. This is applied if the node
@@ -2730,14 +2864,15 @@ class Spanifier {
     // not. Investigate?
     const auto reinterpret_cast_wrapper = optionally(hasParent(
         cxxReinterpretCastExpr(
-            cxxReinterpretCastExpr(hasDestinationType(qualType(pointsTo(
+            hasDestinationType(qualType(pointsTo(
                 qualType(anyOf(qualType(asString("uint8_t"))
                                    .bind("reinterpret_cast_to_bytes"),
                                qualType(isAnyCharacter())
                                    .bind("reinterpret_cast_to_bytes"),
                                qualType(isInteger())
                                    .bind("reinterpret_cast_to_integral_type")))
-                    .bind("target_type"))))))
+                    .bind("target_type")))),
+            unless(raw_ptr_plugin::isInMacroLocation()))
             .bind("reinterpret_cast")));
 
     // Defines nodes that contain size information, these include:
@@ -2933,6 +3068,19 @@ class Spanifier {
                                          parmVarDecl())))));
     Match(buffer_to_external_func, AppendDataCall);
 
+    // Handles unary arithmetic operations (pre/post increment)
+    auto unary_op = traverse(
+        clang::TK_IgnoreUnlessSpelledInSource,
+        expr(ignoringParenCasts(anyOf(
+                 unaryOperator(hasOperatorName("++"), hasUnaryOperand(rhs_expr))
+                     .bind("unaryOperator"),
+                 cxxOperatorCallExpr(
+                     callee(cxxMethodDecl(ofClass(hasName("raw_ptr")))),
+                     hasOperatorName("++"), hasArgument(0, rhs_expr))
+                     .bind("raw_ptr_operator++"))))
+            .bind("unary_op"));
+    Match(unary_op, RewriteUnaryOperation);
+
     // Handles expressions of the form:
     // a + m, a + n + m, ...
     // which need to be rewritten to:
@@ -3092,6 +3240,11 @@ class Spanifier {
             expr(conditionalOperator(hasFalseExpression(rhs_expr_variations))),
             lhs_param)));
     Match(var_passed_in_constructor2, MatchAdjacency);
+
+    // Handles member field initializers.
+    auto field_init = fieldDecl(lhs_field, has(rhs_expr_variations),
+                                unless(isExpansionInSystemHeader()));
+    Match(field_init, MatchAdjacency);
 
     // handles Obj o{temp} when Obj has no constructor.
     // This creates a link between the expr and the underlying field.

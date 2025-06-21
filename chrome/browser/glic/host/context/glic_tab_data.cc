@@ -4,9 +4,13 @@
 
 #include "chrome/browser/glic/host/context/glic_tab_data.h"
 
+#include <cstdint>
 #include <optional>
 #include <utility>
+// #include <cstring>
 
+#include "base/check_op.h"
+#include "base/containers/span.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/favicon/content/content_favicon_driver.h"
@@ -30,6 +34,10 @@ TabDataObserver::TabDataObserver(
     if (favicon_driver) {
       favicon_driver->AddObserver(this);
     }
+    tab_detach_subscription_ =
+        tabs::TabInterface::GetFromContents(web_contents)
+            ->RegisterWillDetach(base::BindRepeating(
+                &TabDataObserver::OnTabWillDetach, base::Unretained(this)));
   }
 }
 
@@ -51,6 +59,7 @@ void TabDataObserver::ClearObservation() {
     }
   }
   Observe(nullptr);
+  tab_detach_subscription_ = {};
 }
 
 void TabDataObserver::PrimaryPageChanged(content::Page& page) {
@@ -73,6 +82,13 @@ void TabDataObserver::OnFaviconUpdated(
     bool icon_url_changed,
     const gfx::Image& image) {
   SendUpdate();
+}
+
+void TabDataObserver::OnTabWillDetach(tabs::TabInterface* tab,
+                                      tabs::TabInterface::DetachReason reason) {
+  if (reason == tabs::TabInterface::DetachReason::kDelete) {
+    ClearObservation();
+  }
 }
 
 int GetTabId(content::WebContents* web_contents) {
@@ -139,6 +155,25 @@ base::expected<tabs::TabInterface*, std::string> FocusedTabData::GetFocus()
     return focus();
   }
   return base::unexpected(std::get<1>(data_));
+}
+
+bool FaviconEquals(const ::SkBitmap& a, const ::SkBitmap& b) {
+  if (&a == &b) {
+    return true;
+  }
+  // Compare image properties.
+  if (a.info() != b.info()) {
+    return false;
+  }
+  // Compare image pixels.
+  for (int y = 0; y < a.height(); ++y) {
+    for (int x = 0; x < a.width(); ++x) {
+      if (a.getColor(x, y) != b.getColor(x, y)) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 }  // namespace glic

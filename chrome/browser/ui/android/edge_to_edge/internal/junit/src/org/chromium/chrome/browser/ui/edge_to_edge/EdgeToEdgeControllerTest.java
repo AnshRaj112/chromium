@@ -70,6 +70,7 @@ import org.chromium.chrome.browser.layouts.LayoutType;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabObserver;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeControllerImpl.SupportedConfigurationSwitch;
+import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils.EdgeToEdgeDebuggingInfo;
 import org.chromium.chrome.browser.ui.native_page.NativePage;
 import org.chromium.components.browser_ui.edge_to_edge.EdgeToEdgeManager;
 import org.chromium.components.browser_ui.edge_to_edge.EdgeToEdgePadAdjuster;
@@ -104,8 +105,14 @@ public class EdgeToEdgeControllerTest {
     private static final int BOTTOM_INSET = 59;
     private static final int BOTTOM_INSET_LANDSCAPE = 54;
     private static final int BOTTOM_KEYBOARD_INSET = 150;
+    private static final int GESTURE_SWIPE_INSET = 45;
     private static final Insets NAVIGATION_BAR_INSETS = Insets.of(0, 0, 0, BOTTOM_INSET);
     private static final Insets STATUS_BAR_INSETS = Insets.of(0, TOP_INSET, 0, 0);
+    private static final Insets SYSTEM_GESTURE_INSETS_FOR_GESTURE_NAV =
+            Insets.of(GESTURE_SWIPE_INSET, TOP_INSET, GESTURE_SWIPE_INSET, BOTTOM_INSET);
+    private static final Insets MANDATORY_SYSTEM_GESTURE_INSETS =
+            Insets.of(0, TOP_INSET, 0, BOTTOM_INSET);
+
     private static final Insets SYSTEM_INSETS = Insets.of(0, TOP_INSET, 0, BOTTOM_INSET);
     private static final Insets SYSTEM_INSETS_LANDSCAPE =
             Insets.of(0, TOP_INSET_LANDSCAPE, 0, BOTTOM_INSET_LANDSCAPE);
@@ -115,10 +122,16 @@ public class EdgeToEdgeControllerTest {
 
     private static final WindowInsetsCompat SYSTEM_BARS_WINDOW_INSETS =
             new WindowInsetsCompat.Builder()
-                    .setInsets(WindowInsetsCompat.Type.navigationBars(), NAVIGATION_BAR_INSETS)
                     .setInsets(WindowInsetsCompat.Type.statusBars(), STATUS_BAR_INSETS)
+                    .setInsets(WindowInsetsCompat.Type.navigationBars(), NAVIGATION_BAR_INSETS)
                     .setInsets(WindowInsetsCompat.Type.systemBars(), SYSTEM_INSETS)
                     .setInsets(WindowInsetsCompat.Type.ime(), IME_INSETS_NO_KEYBOARD)
+                    .setInsets(
+                            WindowInsetsCompat.Type.systemGestures(),
+                            SYSTEM_GESTURE_INSETS_FOR_GESTURE_NAV)
+                    .setInsets(
+                            WindowInsetsCompat.Type.mandatorySystemGestures(),
+                            MANDATORY_SYSTEM_GESTURE_INSETS)
                     .build();
 
     private static final WindowInsetsCompat SYSTEM_BARS_WINDOW_INSETS_WITH_KEYBOARD =
@@ -127,6 +140,12 @@ public class EdgeToEdgeControllerTest {
                     .setInsets(WindowInsetsCompat.Type.statusBars(), STATUS_BAR_INSETS)
                     .setInsets(WindowInsetsCompat.Type.systemBars(), SYSTEM_INSETS)
                     .setInsets(WindowInsetsCompat.Type.ime(), IME_INSETS_KEYBOARD)
+                    .setInsets(
+                            WindowInsetsCompat.Type.systemGestures(),
+                            SYSTEM_GESTURE_INSETS_FOR_GESTURE_NAV)
+                    .setInsets(
+                            WindowInsetsCompat.Type.mandatorySystemGestures(),
+                            MANDATORY_SYSTEM_GESTURE_INSETS)
                     .build();
 
     private static final WindowInsetsCompat SYSTEM_BARS_TOP_INSETS_ONLY =
@@ -140,6 +159,26 @@ public class EdgeToEdgeControllerTest {
                     .setInsets(WindowInsetsCompat.Type.statusBars(), STATUS_BAR_INSETS)
                     .setInsets(WindowInsetsCompat.Type.navigationBars(), NAVIGATION_BAR_INSETS)
                     .setInsets(WindowInsetsCompat.Type.tappableElement(), NAVIGATION_BAR_INSETS)
+                    .setInsets(
+                            WindowInsetsCompat.Type.systemGestures(),
+                            MANDATORY_SYSTEM_GESTURE_INSETS)
+                    .setInsets(
+                            WindowInsetsCompat.Type.mandatorySystemGestures(),
+                            MANDATORY_SYSTEM_GESTURE_INSETS)
+                    .setInsets(WindowInsetsCompat.Type.systemBars(), SYSTEM_INSETS)
+                    .build();
+
+    private static final WindowInsetsCompat SYSTEM_BARS_NEITHER_TAPPABLE_NOR_GESTURE_NAV =
+            new WindowInsetsCompat.Builder()
+                    .setInsets(WindowInsetsCompat.Type.statusBars(), STATUS_BAR_INSETS)
+                    .setInsets(WindowInsetsCompat.Type.navigationBars(), NAVIGATION_BAR_INSETS)
+                    .setInsets(WindowInsetsCompat.Type.tappableElement(), Insets.NONE)
+                    .setInsets(
+                            WindowInsetsCompat.Type.systemGestures(),
+                            MANDATORY_SYSTEM_GESTURE_INSETS)
+                    .setInsets(
+                            WindowInsetsCompat.Type.mandatorySystemGestures(),
+                            MANDATORY_SYSTEM_GESTURE_INSETS)
                     .setInsets(WindowInsetsCompat.Type.systemBars(), SYSTEM_INSETS)
                     .build();
 
@@ -176,6 +215,7 @@ public class EdgeToEdgeControllerTest {
     @Mock private BrowserControlsStateProvider mBrowserControlsStateProvider;
     @Mock private LayoutManager mLayoutManager;
     @Mock private FullscreenManager mFullscreenManager;
+    @Mock private EdgeToEdgeDebuggingInfo mEdgeToEdgeDebuggingInfo;
 
     @Implements(EdgeToEdgeControllerFactory.class)
     static class ShadowEdgeToEdgeControllerFactory extends EdgeToEdgeControllerFactory {
@@ -236,7 +276,8 @@ public class EdgeToEdgeControllerTest {
                         mEdgeToEdgeManager,
                         mBrowserControlsStateProvider,
                         mLayoutManagerSupplier,
-                        mFullscreenManager);
+                        mFullscreenManager,
+                        mEdgeToEdgeDebuggingInfo);
         verify(mEdgeToEdgeStateProvider, times(1)).acquireSetDecorFitsSystemWindowToken();
 
         if (!EdgeToEdgeUtils.isEdgeToEdgeEverywhereEnabled()) {
@@ -447,7 +488,8 @@ public class EdgeToEdgeControllerTest {
                                 mEdgeToEdgeManager,
                                 mBrowserControlsStateProvider,
                                 mLayoutManagerSupplier,
-                                mFullscreenManager);
+                                mFullscreenManager,
+                                null);
         assertNotNull(liveController);
         liveController.setIsOptedIntoEdgeToEdgeForTesting(true);
         liveController.setIsDrawingToEdgeForTesting(true);
@@ -1068,19 +1110,56 @@ public class EdgeToEdgeControllerTest {
 
     @Test
     @EnableFeatures(ChromeFeatureList.EDGE_TO_EDGE_MONITOR_CONFIGURATIONS)
-    public void drawToEdge_configurationChanges() {
+    public void drawToEdge_configurationChanges_tappable() {
+        EdgeToEdgeUtils.setHas3ButtonNavBarForTesting(null);
+
         assertTrue(EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(mActivity));
         when(mLayoutManager.getActiveLayoutType()).thenReturn(LayoutType.BROWSING);
         when(mTab.isNativePage()).thenReturn(false);
         mTabProvider.set(mTab);
 
+        assertTrue(EdgeToEdgeControllerImpl.isSupportedByConfiguration(mActivity, mInsetObserver));
         mEdgeToEdgeControllerImpl.handleWindowInsets(mViewMock, SYSTEM_BARS_WINDOW_INSETS);
         assertTrue(mEdgeToEdgeControllerImpl.isDrawingToEdge());
 
         // Simulate a tappable navigation bar.
-        EdgeToEdgeUtils.setHas3ButtonNavBarForTesting(true);
-        assertFalse(EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(mActivity));
+        when(mInsetObserver.getLastRawWindowInsets()).thenReturn(SYSTEM_BARS_WITH_TAPPABLE_NAVBAR);
+
+        assertFalse(EdgeToEdgeControllerImpl.isSupportedByConfiguration(mActivity, mInsetObserver));
         mEdgeToEdgeControllerImpl.handleWindowInsets(mViewMock, SYSTEM_BARS_WITH_TAPPABLE_NAVBAR);
+        assertFalse(
+                "Drawing to edge should be false when the configuration is not supported.",
+                mEdgeToEdgeControllerImpl.isDrawingToEdge());
+        assertFalse(
+                "Page opted into edge-to-edge should be false when the configuration is not"
+                        + " supported.",
+                mEdgeToEdgeControllerImpl.isPageOptedIntoEdgeToEdge());
+        assertEquals(
+                Insets.of(0, TOP_INSET, 0, BOTTOM_INSET),
+                mEdgeToEdgeControllerImpl.getAppliedContentViewPaddingForTesting());
+    }
+
+    @Test
+    @EnableFeatures(ChromeFeatureList.EDGE_TO_EDGE_MONITOR_CONFIGURATIONS)
+    public void drawToEdge_configurationChanges_neitherTappableNorGesture() {
+        EdgeToEdgeUtils.setHas3ButtonNavBarForTesting(null);
+
+        assertTrue(EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(mActivity));
+        when(mLayoutManager.getActiveLayoutType()).thenReturn(LayoutType.BROWSING);
+        when(mTab.isNativePage()).thenReturn(false);
+        mTabProvider.set(mTab);
+
+        assertTrue(EdgeToEdgeControllerImpl.isSupportedByConfiguration(mActivity, mInsetObserver));
+        mEdgeToEdgeControllerImpl.handleWindowInsets(mViewMock, SYSTEM_BARS_WINDOW_INSETS);
+        assertTrue(mEdgeToEdgeControllerImpl.isDrawingToEdge());
+
+        // Simulate a tappable navigation bar.
+        when(mInsetObserver.getLastRawWindowInsets())
+                .thenReturn(SYSTEM_BARS_NEITHER_TAPPABLE_NOR_GESTURE_NAV);
+
+        assertFalse(EdgeToEdgeControllerImpl.isSupportedByConfiguration(mActivity, mInsetObserver));
+        mEdgeToEdgeControllerImpl.handleWindowInsets(
+                mViewMock, SYSTEM_BARS_NEITHER_TAPPABLE_NOR_GESTURE_NAV);
         assertFalse(
                 "Drawing to edge should be false when the configuration is not supported.",
                 mEdgeToEdgeControllerImpl.isDrawingToEdge());
@@ -1121,6 +1200,20 @@ public class EdgeToEdgeControllerTest {
         assertTrue(
                 "Has tappable nav bar is seen, so check should be true.",
                 EdgeToEdgeUtils.hasTappableNavigationBar(window));
+    }
+
+    @Test
+    public void firstContentfulPaint_uploadDebuggingReport() {
+        // Standard setup of a Web Tab ToEdge
+        when(mTab.isNativePage()).thenReturn(false);
+        mTabProvider.set(mTab);
+        verifyInteractions(mTab);
+
+        WebContentsObserver webContentsObserver =
+                mEdgeToEdgeControllerImpl.getWebContentsObserver();
+        assertNotNull(webContentsObserver);
+        webContentsObserver.firstContentfulPaintInPrimaryMainFrame(null);
+        verify(mEdgeToEdgeDebuggingInfo).uploadReport();
     }
 
     void assertToEdgeExpectations() {

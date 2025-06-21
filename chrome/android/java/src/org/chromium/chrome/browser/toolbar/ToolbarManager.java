@@ -142,7 +142,6 @@ import org.chromium.chrome.browser.toolbar.back_button.BackButtonCoordinator;
 import org.chromium.chrome.browser.toolbar.bottom.BottomControlsContentDelegate;
 import org.chromium.chrome.browser.toolbar.bottom.BottomControlsCoordinator;
 import org.chromium.chrome.browser.toolbar.bottom.ScrollingBottomViewResourceFrameLayout;
-import org.chromium.chrome.browser.toolbar.extensions.ExtensionToolbarManager;
 import org.chromium.chrome.browser.toolbar.home_button.HomeButtonCoordinator;
 import org.chromium.chrome.browser.toolbar.home_page_button.HomePageButtonsCoordinator;
 import org.chromium.chrome.browser.toolbar.load_progress.LoadProgressCoordinator;
@@ -153,6 +152,7 @@ import org.chromium.chrome.browser.toolbar.optional_button.ButtonDataProvider;
 import org.chromium.chrome.browser.toolbar.top.ActionModeController;
 import org.chromium.chrome.browser.toolbar.top.ActionModeController.ActionBarDelegate;
 import org.chromium.chrome.browser.toolbar.top.NavigationPopup;
+import org.chromium.chrome.browser.toolbar.top.OptionalBrowsingModeButtonController;
 import org.chromium.chrome.browser.toolbar.top.TabSwitcherActionMenuCoordinator;
 import org.chromium.chrome.browser.toolbar.top.ToggleTabStackButton;
 import org.chromium.chrome.browser.toolbar.top.ToggleTabStackButtonCoordinator;
@@ -171,6 +171,7 @@ import org.chromium.chrome.browser.ui.appmenu.AppMenuCoordinator;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuDelegate;
 import org.chromium.chrome.browser.ui.appmenu.MenuButtonDelegate;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeController;
+import org.chromium.chrome.browser.ui.extensions.ExtensionService;
 import org.chromium.chrome.browser.ui.native_page.NativePage;
 import org.chromium.chrome.browser.ui.system.StatusBarColorController;
 import org.chromium.chrome.browser.ui.theme.BrandedColorScheme;
@@ -320,7 +321,6 @@ public class ToolbarManager
 
     private ToggleTabStackButtonCoordinator mTabSwitcherButtonCoordinator;
     private @Nullable BackButtonCoordinator mBackButtonCoordinator;
-    private @Nullable ExtensionToolbarManager mExtensionToolbarManager;
 
     private final BrowserStateBrowserControlsVisibilityDelegate mControlsVisibilityDelegate;
     private int mFullscreenFocusToken = TokenHolder.INVALID_TOKEN;
@@ -759,6 +759,7 @@ public class ToolbarManager
             ActivityTabProvider tabProvider,
             ScrimManager scrimManager,
             ToolbarActionModeCallback toolbarActionModeCallback,
+            @Nullable ExtensionService extensionService,
             FindToolbarManager findToolbarManager,
             ObservableSupplier<Profile> profileSupplier,
             ObservableSupplier<BookmarkModel> bookmarkModelSupplier,
@@ -1652,17 +1653,17 @@ public class ToolbarManager
         mWindowAndroid.setProgressBarConfigProvider(mProgressBarConfigProvider);
         initializeToolbarPositionController();
 
-        ViewStub extensionToolbarStub =
-                controlContainer.findViewById(R.id.extension_toolbar_container_stub);
-        if (extensionToolbarStub != null) {
-            mExtensionToolbarManager =
-                    ExtensionToolbarManager.maybeCreate(
-                            mActivity,
-                            extensionToolbarStub,
-                            windowAndroid,
-                            profileSupplier,
-                            tabProvider,
-                            browsingModeThemeColorProvider);
+        if (extensionService != null) {
+            ViewStub extensionToolbarStub =
+                    controlContainer.findViewById(R.id.extension_toolbar_container_stub);
+            if (extensionToolbarStub != null) {
+                extensionService.inflateExtensionToolbar(
+                        mActivity,
+                        extensionToolbarStub,
+                        windowAndroid,
+                        tabProvider,
+                        browsingModeThemeColorProvider);
+            }
         }
 
         mXrSpaceModeObservableSupplier = xrSpaceModeObservableSupplier;
@@ -2272,10 +2273,6 @@ public class ToolbarManager
             mUpdateMenuItemHelper.registerObserver(mMenuStateObserver);
         }
 
-        if (mExtensionToolbarManager != null) {
-            mExtensionToolbarManager.initializeWithNative();
-        }
-
         mInitializedWithNative = true;
         mTabModelSelector.getCurrentTabModelSupplier().addObserver(mCurrentTabModelObserver);
         refreshSelectedTab(mActivityTabProvider.get());
@@ -2350,6 +2347,15 @@ public class ToolbarManager
      */
     public void updateCustomActionButton(int index, Drawable drawable, String description) {
         mToolbar.updateCustomActionButton(index, drawable, description);
+    }
+
+    /**
+     * Sets the delegate for the optional button.
+     *
+     * @param delegate The {@link OptionalBrowsingModeButtonController.Delegate}.
+     */
+    public void setOptionalButtonDelegate(OptionalBrowsingModeButtonController.Delegate delegate) {
+        mToolbar.setOptionalButtonDelegate(delegate);
     }
 
     /** Call to tear down all of the toolbar dependencies. */
@@ -2479,11 +2485,6 @@ public class ToolbarManager
         if (mTabSwitcherButtonCoordinator != null) {
             mTabSwitcherButtonCoordinator.destroy();
             mTabSwitcherButtonCoordinator = null;
-        }
-
-        if (mExtensionToolbarManager != null) {
-            mExtensionToolbarManager.destroy();
-            mExtensionToolbarManager = null;
         }
 
         if (mCallbackController != null) {

@@ -24,11 +24,11 @@
 #import "components/omnibox/browser/omnibox_popup_selection.h"
 #import "components/omnibox/common/omnibox_focus_state.h"
 #import "ios/chrome/browser/omnibox/model/omnibox_text_model.h"
-#import "ios/chrome/browser/omnibox/model/omnibox_view_ios.h"
 #import "third_party/metrics_proto/omnibox_event.pb.h"
 #import "ui/base/window_open_disposition.h"
 #import "url/gurl.h"
 
+@class OmniboxAutocompleteController;
 class OmniboxControllerIOS;
 class OmniboxPopupViewIOS;
 @class OmniboxTextController;
@@ -36,7 +36,6 @@ class OmniboxPopupViewIOS;
 class OmniboxEditModelIOS {
  public:
   OmniboxEditModelIOS(OmniboxControllerIOS* controller,
-                      OmniboxViewIOS* view,
                       OmniboxTextModel* text_model);
   virtual ~OmniboxEditModelIOS();
   OmniboxEditModelIOS(const OmniboxEditModelIOS&) = delete;
@@ -45,6 +44,11 @@ class OmniboxEditModelIOS {
   void set_popup_view(OmniboxPopupViewIOS* popup_view);
   OmniboxPopupViewIOS* get_popup_view() { return popup_view_; }
   const OmniboxPopupViewIOS* get_popup_view() const { return popup_view_; }
+
+  void set_omnibox_autocomplete_controller(
+      OmniboxAutocompleteController* omnibox_autocomplete_controller) {
+    omnibox_autocomplete_controller_ = omnibox_autocomplete_controller;
+  }
 
   metrics::OmniboxEventProto::PageClassification GetPageClassification() const;
 
@@ -88,10 +92,6 @@ class OmniboxEditModelIOS {
     return text_model_->user_input_in_progress;
   }
 
-  // Sets the state of user_input_in_progress_, and notifies the observer if
-  // that state has changed.
-  void SetInputInProgress(bool in_progress);
-
   // Resets the permanent display texts `url_for_editing_` to those provided by
   // the controller. Returns true if the display text shave changed and the
   // change should be immediately user-visible, because either the user is not
@@ -112,11 +112,6 @@ class OmniboxEditModelIOS {
   // Reverts the edit model back to its unedited state (permanent text showing,
   // no user input in progress).
   void Revert();
-
-  // Directs the popup to start autocomplete.  Makes use of the `view_` text and
-  // selection, so make sure to set those before calling StartAutocomplete().
-  void StartAutocomplete(bool has_selected_text,
-                         bool prevent_inline_autocomplete);
 
   // Opens given selection. Most kinds of selection invoke an action or
   // otherwise call `OpenMatch`, but some may `AcceptInput` which is not
@@ -147,12 +142,6 @@ class OmniboxEditModelIOS {
   // Called when the view is gaining focus.
   void OnSetFocus();
 
-  // Starts a request for zero-prefix suggestions if no query is currently
-  // running and the popup is closed. This can be called multiple times without
-  // harm, since it will early-exit if an earlier request is in progress or
-  // done.
-  void StartZeroSuggestRequest(bool user_clobbered_permanent_text = false);
-
   // Called when the user pastes in text.
   void OnPaste();
 
@@ -180,7 +169,7 @@ class OmniboxEditModelIOS {
   // necessary, and returns true if any significant changes occurred.  Note that
   // `text_change.text_differs` may be set even if `text_change.old_text` ==
   // `text_change.new_text`, e.g. if we've just committed an IME composition.
-  bool OnAfterPossibleChange(const OmniboxViewIOS::StateChanges& state_changes);
+  bool OnAfterPossibleChange(const OmniboxStateChanges& state_changes);
 
   std::u16string GetUserTextForTesting() const {
     return text_model_->user_text;
@@ -283,22 +272,15 @@ class OmniboxEditModelIOS {
   // Owns this.
   raw_ptr<OmniboxControllerIOS> controller_;
 
-  // Owns `OmniboxControllerIOS` which owns this.
-  raw_ptr<OmniboxViewIOS> view_;
-
   // The omnibox text model containing the text state.
   raw_ptr<OmniboxTextModel> text_model_;
 
   // The text controller.
   __weak OmniboxTextController* text_controller_ = nil;
 
-  // The initial text representing the current URL suitable for editing.
-  std::u16string url_for_editing_;
+  // The autocomplete controller.
+  __weak OmniboxAutocompleteController* omnibox_autocomplete_controller_ = nil;
 
-  // Used to know what should be displayed. Updated when e.g. the popup
-  // selection changes, the results change, on navigation, on tab switch etc; it
-  // should always be up-to-date.
-  AutocompleteMatch current_match_;
   // The popup view is nullptr when there's no popup, and is non-null when
   // a popup view exists (i.e. between calls to `set_popup_view`).
   raw_ptr<OmniboxPopupViewIOS> popup_view_ = nullptr;

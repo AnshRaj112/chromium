@@ -38,15 +38,35 @@ std::pair<gfx::Point, gfx::Point> GetSnappedPointsForTextLine(
           gfx::Point(decoration_rect.right(), mid_y)};
 }
 
-bool ShouldUseStrokeForTextLine(StrokeStyle stroke_style) {
-  switch (stroke_style) {
-    case kSolidStroke:
-    case kDoubleStroke:
-      return false;
-    case kDottedStroke:
-    case kDashedStroke:
-    case kWavyStroke:
-      return true;
+void DrawLineAsStroke(GraphicsContext& context,
+                      const gfx::RectF& line_rect,
+                      const StyledStrokeData& styled_stroke,
+                      const AutoDarkMode& auto_dark_mode,
+                      const cc::PaintFlags* paint_flags) {
+  auto [start, end] = GetSnappedPointsForTextLine(line_rect);
+  context.DrawLine(start, end, styled_stroke, auto_dark_mode, true,
+                   paint_flags);
+}
+
+void DrawLineAsRect(GraphicsContext& context,
+                    const gfx::RectF& line_rect,
+                    const AutoDarkMode& auto_dark_mode,
+                    const cc::PaintFlags* paint_flags) {
+  if (paint_flags) {
+    // In SVG (inferred by a non-null `paint_flags`), we don't snap the line
+    // to get better scaling behavior. See crbug.com/1270336.
+    context.DrawRect(gfx::RectFToSkRect(line_rect), *paint_flags,
+                     auto_dark_mode);
+  } else {
+    // Avoid anti-aliasing lines. Currently, these are always horizontal.
+    // Round to nearest pixel to match text and other content.
+    const gfx::RectF snapped_line_rect = SnapYAxis(line_rect);
+
+    cc::PaintFlags flags = context.FillFlags();
+    // Text lines are drawn using the stroke color.
+    flags.setColor(context.StrokeFlags().getColor4f());
+    context.DrawRect(gfx::RectFToSkRect(snapped_line_rect), flags,
+                     auto_dark_mode);
   }
 }
 
@@ -62,49 +82,65 @@ void DecorationLinePainter::DrawLineForText(
   if (width <= 0) {
     return;
   }
+  DrawLineForText(context, DecorationRect(pt, width, styled_stroke.Thickness()),
+                  styled_stroke, auto_dark_mode, paint_flags);
+}
 
-  gfx::RectF line_rect = DecorationRect(pt, width, styled_stroke.Thickness());
-
-  auto stroke_style = styled_stroke.Style();
-  DCHECK_NE(stroke_style, kWavyStroke);
-  if (ShouldUseStrokeForTextLine(stroke_style)) {
-    auto [start, end] = GetSnappedPointsForTextLine(line_rect);
-    context.DrawLine(start, end, styled_stroke, auto_dark_mode, true,
-                     paint_flags);
-  } else {
-    if (paint_flags) {
-      // In SVG (inferred by a non-null `paint_flags`), we don't snap the line
-      // to get better scaling behavior. See crbug.com/1270336.
-      context.DrawRect(gfx::RectFToSkRect(line_rect), *paint_flags,
-                       auto_dark_mode);
-    } else {
-      // Avoid anti-aliasing lines. Currently, these are always horizontal.
-      // Round to nearest pixel to match text and other content.
-      line_rect = SnapYAxis(line_rect);
-
-      cc::PaintFlags flags = context.FillFlags();
-      // Text lines are drawn using the stroke color.
-      flags.setColor(context.StrokeFlags().getColor4f());
-      context.DrawRect(gfx::RectFToSkRect(line_rect), flags, auto_dark_mode);
-    }
+void DecorationLinePainter::DrawLineForText(
+    GraphicsContext& context,
+    const gfx::RectF& line_rect,
+    const StyledStrokeData& styled_stroke,
+    const AutoDarkMode& auto_dark_mode,
+    const cc::PaintFlags* paint_flags) {
+  CHECK_GT(line_rect.width(), 0);
+  switch (styled_stroke.Style()) {
+    case kSolidStroke:
+    case kDoubleStroke:
+      DrawLineAsRect(context, line_rect, auto_dark_mode, paint_flags);
+      break;
+    case kDottedStroke:
+    case kDashedStroke:
+      DrawLineAsStroke(context, line_rect, styled_stroke, auto_dark_mode,
+                       paint_flags);
+      break;
+    case kWavyStroke:
+      NOTREACHED();
   }
 }
 
-Path DecorationLinePainter::GetPathForTextLine(const gfx::PointF& pt,
-                                               float width,
-                                               float stroke_thickness,
-                                               StrokeStyle stroke_style) {
-  DCHECK_NE(stroke_style, kWavyStroke);
-  const gfx::RectF line_rect = DecorationRect(pt, width, stroke_thickness);
-  PathBuilder builder;
-  if (ShouldUseStrokeForTextLine(stroke_style)) {
-    auto [start, end] = GetSnappedPointsForTextLine(line_rect);
-    builder.MoveTo(gfx::PointF(start));
-    builder.LineTo(gfx::PointF(end));
-  } else {
-    builder.AddRect(SnapYAxis(line_rect));
+gfx::RectF DecorationLinePainter::Bounds(
+    const TextDecorationInfo& decoration_info) {
+  const gfx::PointF start_point = decoration_info.StartPoint();
+  switch (decoration_info.StrokeStyle()) {
+    case kDottedStroke:
+    case kDashedStroke: {
+      const gfx::RectF line_rect =
+          DecorationRect(start_point, decoration_info.Width(),
+                         decoration_info.ResolvedThickness());
+      const float thickness = roundf(line_rect.height());
+      auto [start, end] = GetSnappedPointsForTextLine(line_rect);
+      return gfx::RectF(start.x(), start.y() - thickness / 2,
+                        end.x() - start.x(), thickness);
+    }
+    case kWavyStroke:
+      // Returns the wavy bounds, which is the same size as the wavy paint rect
+      // but at the origin needed by the actual decoration, for the global
+      // transform.
+      return decoration_info.WavyPaintRect();
+    case kDoubleStroke: {
+      const float double_offset = decoration_info.DoubleOffset();
+      const float thickness = decoration_info.ResolvedThickness();
+      if (double_offset > 0) {
+        return gfx::RectF(start_point.x(), start_point.y(),
+                          decoration_info.Width(), double_offset + thickness);
+      }
+      return gfx::RectF(start_point.x(), start_point.y() + double_offset,
+                        decoration_info.Width(), -double_offset + thickness);
+    }
+    case kSolidStroke:
+      return DecorationRect(start_point, decoration_info.Width(),
+                            decoration_info.ResolvedThickness());
   }
-  return builder.Finalize();
 }
 
 void DecorationLinePainter::Paint(const Color& color,
@@ -145,9 +181,9 @@ void DecorationLinePainter::Paint(const Color& color,
 
 void DecorationLinePainter::PaintWavyTextDecoration(
     const AutoDarkMode& auto_dark_mode) {
-  // The wavy line is larger than the line, as we add whole waves before and
-  // after the line in TextDecorationInfo::PrepareWavyStrokePath().
-  gfx::PointF origin = decoration_info_.Bounds().origin();
+  // The wavy paint rect, which has the height of the wavy tile rect but the
+  // width needed by the actual decoration, for the DrawRect operation.
+  const gfx::RectF paint_rect = decoration_info_.WavyPaintRect();
 
   cc::PaintFlags flags;
   flags.setAntiAlias(true);
@@ -156,13 +192,9 @@ void DecorationLinePainter::PaintWavyTextDecoration(
       gfx::RectFToSkRect(decoration_info_.WavyTileRect()), SkTileMode::kRepeat,
       SkTileMode::kDecal, nullptr));
 
-  // We need this because of the clipping we're doing below, as we paint both
-  // overlines and underlines here. That clip would hide the overlines, when
-  // painting the underlines.
   GraphicsContextStateSaver state_saver(context_);
-  context_.SetShouldAntialias(true);
-  context_.Translate(origin.x(), origin.y());
-  context_.DrawRect(gfx::RectFToSkRect(decoration_info_.WavyPaintRect()), flags,
+  context_.Translate(paint_rect.x(), paint_rect.y());
+  context_.DrawRect(gfx::RectFToSkRect(gfx::RectF(paint_rect.size())), flags,
                     auto_dark_mode);
 }
 

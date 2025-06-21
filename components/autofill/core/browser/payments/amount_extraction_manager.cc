@@ -16,7 +16,6 @@
 #include "components/autofill/core/browser/field_types.h"
 #include "components/autofill/core/browser/foundations/autofill_driver.h"
 #include "components/autofill/core/browser/foundations/browser_autofill_manager.h"
-#include "components/autofill/core/browser/integrators/optimization_guide/autofill_optimization_guide.h"
 #include "components/autofill/core/browser/metrics/payments/amount_extraction_metrics.h"
 #include "components/autofill/core/browser/payments/amount_extraction_heuristic_regexes.h"
 #include "components/autofill/core/browser/payments/bnpl_manager.h"
@@ -109,7 +108,7 @@ AmountExtractionManager::GetEligibleFeatures(const SuggestionsContext& context,
   }
 
   const DenseSet<EligibleFeature> eligible_features =
-      CheckEligiblilityForFeaturesRequiringAmountExtraction();
+      CheckEligibilityForFeaturesRequiringAmountExtraction();
 
   // Run after all other feature eligibilities are checked to only check feature
   // flag for eligible users.
@@ -213,7 +212,7 @@ void AmountExtractionManager::OnTimeoutReached() {
 }
 
 DenseSet<AmountExtractionManager::EligibleFeature>
-AmountExtractionManager::CheckEligiblilityForFeaturesRequiringAmountExtraction()
+AmountExtractionManager::CheckEligibilityForFeaturesRequiringAmountExtraction()
     const {
   DenseSet<EligibleFeature> eligible_features;
 

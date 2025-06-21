@@ -16,7 +16,7 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/no_destructor.h"
-#include "base/notreached.h"
+#include "base/notimplemented.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/timer/timer.h"
@@ -58,7 +58,6 @@
 #include "chrome/browser/ui/user_education/browser_user_education_interface.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/passwords/manage_passwords_page_action_controller.h"
-#include "chrome/browser/ui/views/passwords/password_change/password_change_credential_leak_bubble_view.h"
 #include "chrome/browser/web_applications/web_app_utils.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/grit/branded_strings.h"
@@ -469,6 +468,7 @@ void ManagePasswordsUIController::OnCredentialLeak(
 
     password_change_service->OfferPasswordChangeUi(
         details.origin, details.username, details.password, web_contents());
+    UpdateBubbleAndIconVisibility();
     return;
   }
 
@@ -721,7 +721,10 @@ ManagePasswordsUIController::GetPasswordFeatureManager() {
 }
 
 password_manager::ui::State ManagePasswordsUIController::GetState() const {
-  if (IsPasswordChangeOngoing()) {
+  PasswordChangeDelegate* delegate = GetPasswordChangeDelegate();
+  if (delegate &&
+      delegate->GetCurrentState() ==
+          PasswordChangeDelegate::State::kPasswordSuccessfullyChanged) {
     return password_manager::ui::State::PASSWORD_CHANGE_STATE;
   }
   return passwords_data_.state();
@@ -1183,7 +1186,6 @@ void ManagePasswordsUIController::UpdateBubbleAndIconVisibility() {
     browser->window()->UpdatePageActionIcon(
         PageActionIconType::kManagePasswords);
   }
-  browser->window()->UpdatePageActionIcon(PageActionIconType::kChangePassword);
 }
 
 AccountChooserPrompt* ManagePasswordsUIController::CreateAccountChooser(

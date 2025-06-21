@@ -106,6 +106,7 @@ Si elle est désactivée, la fonctionnalité de correction automatique est désa
       Si ce paramètre n'est pas configuré, le répertoire de profil par défaut est utilisé.</translation>
 <translation id="1053981429146436598">Groupe de règles liées aux paramètres des requêtes à un réseau privé.  Consultez https://wicg.github.io/private-network-access/.</translation>
 <translation id="1059069692400941670">Désactiver l'importation du moteur de recherche par défaut à la première exécution</translation>
+<translation id="1060020040574767394">Configurer les paramètres de filigrane personnalisés</translation>
 <translation id="1062011392452772310">Activer l'attestation à distance pour l'appareil</translation>
 <translation id="1062407476771304334">Remplacer</translation>
 <translation id="1063860513136880926">Si cette règle est activée, les utilisateurs ne peuvent pas faire de captures d'écran avec des raccourcis clavier ni avec des API d'extension. Si elle est désactivée ou qu'elle n'est pas configurée, les captures d'écran sont autorisées.
@@ -493,6 +494,7 @@ Si cette règle n'est pas configurée pour un site, alors la règle <ph name="DE
 <translation id="1379689277107868399">Si la règle est définie sur "DoNotPrompt" ou n'est pas configurée, <ph name="PRODUCT_NAME" /> n'invite pas automatiquement l'utilisateur à s'authentifier de nouveau auprès du navigateur.
 
 Si elle est définie sur "PromptInTab", lorsque l'authentification de l'utilisateur expire, un nouvel onglet avec la page de connexion Google s'ouvre immédiatement. Cela ne se produit que si la <ph name="CHROME_SYNC_NAME" /> est utilisée.</translation>
+<translation id="1384040387986918863">Opacité du remplissage du texte du filigrane, de 0 (transparent) à 100 (opaque).</translation>
 <translation id="1384459581748403878">Référence : <ph name="REFERENCE_URL" /></translation>
 <translation id="1384594066274112751">Cette règle détermine que toute URL correspondant à un ou plusieurs des formats qu'elle spécifie (avec le format de filtre <ph name="URL_BLOCKLIST_POLICY_NAME" />) ne sera jamais supprimée par le navigateur.
       Cela s'applique à la suppression de la pression sur la mémoire et du mode Haute efficacité.
@@ -506,11 +508,6 @@ Si elle est définie sur "PromptInTab", lorsque l'authentification de l'utilisat
       Si vous désactivez cette règle, les utilisateurs ne peuvent pas imprimer sur <ph name="CLOUD_PRINT_NAME" /> à partir de la boîte de dialogue d'impression de <ph name="PRODUCT_NAME" />.
 
       Pour que les destinations <ph name="CLOUD_PRINT_NAME" /> restent visibles, cette règle doit être activée, et <ph name="POLICY_ENUM_PRINTERTYPEDENYLIST_CLOUD" /> ne doit pas être inclus dans la règle <ph name="PRINTER_TYPE_DENY_LIST_POLICY_NAME" />.</translation>
-<translation id="1390901586107713894">Permet de déterminer quelles extensions les utilisateurs ne peuvent PAS installer. Les extensions déjà installées, mais qui sont bloquées, sont désactivées sans que l'utilisateur puisse les activer. Elles sont automatiquement réactivées dès que vous les retirez de la liste de blocage.
-
-          Si vous saisissez la valeur "*" dans la liste de blocage, toutes les extensions sont bloquées, sauf si elles sont spécifiquement répertoriées dans la liste d'autorisation.
-
-          Si cette règle n'est pas configurée, les utilisateurs peuvent installer n'importe quelle extension dans <ph name="PRODUCT_NAME" />.</translation>
 <translation id="1392703142209771447">Expression régulière correspondant à l'ID de l'imprimante.</translation>
 <translation id="1393485621820363363">Imprimantes d'appareils d'entreprise activées</translation>
 <translation id="1395505489889158859">Autorisez l'envoi du nom d'utilisateur et du nom de fichier aux imprimantes en natif</translation>
@@ -1099,6 +1096,15 @@ Cette règle n'a aucun effet si l'option permettant de conserver les données de
       La liste apparaîtra dans le même ordre dans la section "Classer les langues selon vos préférences" dans chrome://settings/languages. Les utilisateurs ne pourront pas supprimer ni réorganiser les langues définies par la règle, mais pourront en ajouter sous celles définies. Les utilisateurs auront un contrôle total de la langue de l'UI du navigateur et des paramètres de traduction/du correcteur orthographique, sauf si d'autres règles s'appliquent.
 
       Si cette règle n'est pas définie, les utilisateurs peuvent manipuler toute la liste des langues préférées.</translation>
+<translation id="180243155313050440">Cette règle permet de définir un libellé personnalisé servant à indiquer un navigateur géré. Pour les navigateurs gérés, ce libellé sera affiché dans un avis de non-responsabilité de gestion, dans le pied de page de la page "Nouvel onglet". Le libellé personnalisé ne sera pas traduit.
+
+Lorsque cette règle est appliquée, les chaînes de plus de 16 caractères sont tronquées par un "...". Veuillez éviter d'utiliser des noms étendus.
+
+Notez que cette règle ne s'applique qu'aux navigateurs gérés. Elle n'aura donc aucune incidence pour les utilisateurs gérés sur les navigateurs non gérés.
+
+Sous <ph name="MS_WIN_NAME" />, cette règle n'est disponible que sur les instances associées à un domaine <ph name="MS_AD_NAME" />, à <ph name="MS_AAD_NAME" /> ou qui bénéficient de la <ph name="CHROME_ENTERPRISE_CORE_NAME" />.
+
+Sous <ph name="MAC_OS_NAME" />, cette règle n'est disponible que sur les instances gérées via MDM, associées à un domaine via MCX ou qui bénéficient de la <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="1803646570632580723">Liste des applications épinglées à afficher dans le lanceur d'applications</translation>
 <translation id="1808715480127969042">Bloquer les cookies sur ces sites</translation>
 <translation id="1810261428246410396">Autoriser le partage de connexion instantané</translation>
@@ -1788,6 +1794,13 @@ Si cette règle est désactivée ou qu'elle n'est pas configurée, les utilisate
       Les utilisateurs ne peuvent ni modifier, ni ignorer ce paramètre.
 
       Remarque : Cette règle entraîne l'ajout de l'en-tête "X-GoogApps-Allowed-Domains" à toutes les requêtes HTTP et HTTPS sur tous les domaines google.com (comme indiqué sur https://support.google.com/a/answer/1668854).</translation>
+<translation id="2287414160388710497">Permet aux administrateurs de personnaliser l'apparence des filigranes appliqués par les règles de Protection contre la perte de données. Cela inclut la définition de l'opacité du remplissage/du contour et de la taille de la police.
+Si cette règle ou certaines valeurs ne sont pas définies, Chrome utilisera son comportement par défaut pour les filigranes.
+Les valeurs par défaut sont les suivantes : opacité du remplissage à 4, opacité du contour à 6 et taille de police à 24.
+
+L'opacité du remplissage est un pourcentage compris entre 0 (totalement transparent) et 100 (totalement opaque).
+L'opacité du contour est un pourcentage compris entre 0 (totalement transparent) et 100 (totalement opaque).
+La taille de police est indiquée en points.</translation>
 <translation id="2288506601233091655">Ne pas autoriser la suppression de l'historique des tâches d'impression</translation>
 <translation id="2289688405312849186">Compte principal de l'utilisateur "user@realm". L'espace réservé <ph name="LOGIN_ID_PLACEHOLDER" /> est remplacé par le nom d'utilisateur "user". L'espace réservé <ph name="LOGIN_EMAIL_PLACEHOLDER" /> est remplacé par le compte principal complet "user@realm".</translation>
 <translation id="2290270645214705008">Si cette règle est désactivée, le service hôte d'accès à distance ne peut pas être démarré ni configuré pour accepter les connexions entrantes.  Cette règle ne concerne pas les cas d'assistance à distance.
@@ -2527,6 +2540,7 @@ Cette règle ne peut être configurée que comme règle relative aux utilisateur
 <translation id="288448261660192095">Si cette règle est activée, les appareils d'entrée et de sortie physiques des hôtes d'accès à distance sont désactivés pendant une connexion à distance.
 
       Si cette règle est désactivée ou qu'elle n'est pas configurée, l'utilisateur local et l'utilisateur à distance peuvent interagir avec l'hôte tant que ce celui-ci est partagé.</translation>
+<translation id="288463102030083286">Configuration de filigrane personnalisée</translation>
 <translation id="2884765974461416016">Désactiver le partage des applis Android vers les applis Web.</translation>
 <translation id="2886215882246310669">Permet de spécifier si <ph name="PRODUCT_OS_NAME" /> autorise ou non l'ajout de nouveaux comptes utilisateur Family Link sur l'appareil.
       Cette règle n'est utile que si elle combinée avec la règle <ph name="DEVICE_USER_ALLOWLIST_POLICY_NAME" />. Elle autorise les comptes Family Link en plus de ceux figurant dans la liste d'autorisation.
@@ -3139,6 +3153,7 @@ Si <ph name="NTPCARDSVISIBLE" /> est désactivé, la carte Outlook ne s'affiche 
 <translation id="3278042410658310805">Désactiver la lecture vocale sur l'écran de connexion et permettre à l'utilisateur à l'activer temporairement</translation>
 <translation id="328347261792478720">Par défaut, le navigateur propose à l'utilisateur des recommandations personnalisées de contenus multimédias. Si cette règle est désactivée, l'utilisateur ne bénéficie pas de ces recommandations. Si cette règle est activée ou qu'elle n'est pas configurée, l'utilisateur peut voir ces recommandations.</translation>
 <translation id="3284094172359247914">Contrôler l'utilisation de l'API WebUSB</translation>
+<translation id="3285231260918855067">Opacité du contour du texte du filigrane, de 0 (transparent) à 100 (opaque).</translation>
 <translation id="3286159327013237833">Activer les clics automatiques sur l'écran de connexion</translation>
 <translation id="3288595667065905535">Version disponible</translation>
 <translation id="3291940794983537008">Paramètres des fonctionnalités d'IA générative des outils de développement</translation>
@@ -4471,6 +4486,15 @@ Sous <ph name="MS_WIN_NAME" />, cette règle n'est disponible que sur les instan
 <translation id="4297483555396496700">Les utilisateurs ne sont autorisés à modifier la version de l'appareil que si cette règle est définie sur "True". Si elle est définie sur "False" ou si elle n'est pas configurée, les utilisateurs peuvent modifier la version.
 
 La configuration de la règle <ph name="CHROME_OS_RELEASE_CHANNEL_POLICY_NAME" /> n'est effective que si la règle <ph name="CHROME_OS_RELEASE_CHANNEL_DELEGATED_POLICY_NAME" /> est définie sur "False".</translation>
+<translation id="4297774573405304484">URL d'une image qui servira de badge d'entreprise pour un navigateur géré. L'URL doit renvoyer vers une image.
+
+Nous vous recommandons d'utiliser le favicon (exemple : https://www.google.com/favicon.ico) ou une icône d'au moins 48 x 48 px.
+
+Notez que cette règle ne s'applique qu'aux navigateurs gérés. Elle n'aura donc aucune incidence pour les utilisateurs gérés sur les navigateurs non gérés.
+
+Sous <ph name="MS_WIN_NAME" />, cette règle n'est disponible que sur les instances associées à un domaine <ph name="MS_AD_NAME" />, à <ph name="MS_AAD_NAME" /> ou qui bénéficient de la <ph name="CHROME_ENTERPRISE_CORE_NAME" />.
+
+Sous <ph name="MAC_OS_NAME" />, cette règle n'est disponible que sur les instances gérées via MDM, associées à un domaine via MCX ou qui bénéficient de la <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="4301478455179579340">Signature d'une appli native lors de l'installation d'une progressive web app</translation>
 <translation id="4303167373847512281">Autoriser le mode développeur</translation>
 <translation id="4307116964468610577">La règle prolonge la durée de vie de la batterie d'un système en ne la chargeant entièrement qu'une fois par jour. Le reste de la journée, la batterie est maintenue dans un état de charge réduit qui est mieux adapté au stockage, même lorsque le système est branché sur une source d'alimentation.
@@ -4948,6 +4972,27 @@ La configuration de la règle <ph name="CHROME_OS_RELEASE_CHANNEL_POLICY_NAME" /
 
       Si une règle ne figure pas dans la liste et qu'il y a conflit entre plusieurs sources, champs d'application ou niveaux, la règle ayant la plus haute priorité s'applique.</translation>
 <translation id="4646739075621507361">Transmettre les tâches d'impression</translation>
+<translation id="4649231830965908577">Cette règle permet aux administrateurs de définir un agrégateur de recherche d'entreprise dédié qui fournira des recommandations et des résultats de recherche dans l'omnibox (barre d'adresse) et le champ de recherche de la page "Nouvel onglet".
+
+Par défaut, les suggestions de recherche d'entreprise seront mélangées et affichées avec les recommandations <ph name="PRODUCT_NAME" /> habituelles. Les utilisateurs peuvent limiter explicitement leur recherche à l'agrégateur de recherche d'entreprise en saisissant le mot clé indiqué dans le champ <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, avec ou sans le préfixe @ (par exemple, <ph name="SHORTCUT_EXAMPLE_SEARCH_AGGREGATOR_SETTINGS" />), puis en appuyant sur la barre d'espace ou la touche Tabulation dans l'omnibox. Les recherches d'entreprise ciblées (déclenchées par un mot clé) ne sont actuellement compatibles que dans l'omnibox et non dans le champ de recherche de la page "Nouvel onglet".
+
+Les champs suivants sont obligatoires : <ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, <ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> et <ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />.
+
+Le champ <ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> correspond au nom du moteur de recherche que l'utilisateur verra dans la barre d'adresse.
+
+Le champ <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> correspond au mot clé que l'utilisateur saisit pour déclencher la recherche. Le raccourci peut contenir des mots et caractères bruts, mais il ne peut pas inclure d'espaces ni commencer par le symbole @. Les raccourcis doivent être uniques.
+
+Le champ <ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> spécifie l'URL sur laquelle effectuer la recherche. Saisissez l'adresse Web de la page de résultats du moteur de recherche, et utilisez <ph name="SEARCH_TERM_MARKER" /> à la place de la requête.
+
+Le champ <ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> indique l'URL qui fournit des suggestions de recherche. Une requête POST sera envoyée et la requête de l'utilisateur sera transmise dans les paramètres POST sous la clé <ph name="SEARCH_SUGGEST_POST_PARAMS_QUERY_KEY" />.
+
+Le champ <ph name="ICON_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> indique l'URL d'une image qui sera utilisée dans les suggestions de recherche. Si ce champ n'est pas défini, une icône par défaut sera utilisée. Nous vous recommandons d'utiliser un favicon (exemple : <ph name="ICON_URL_EXAMPLE" />). Formats de fichiers image acceptés : JPEG, PNG et ICO.
+
+Le champ <ph name="REQUIRE_SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> indique si le <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> de la barre d'adresse est requis pour afficher les recommandations de recherche. Si nécessaire, les suggestions ne s'afficheront pas dans le champ de recherche de la page "Nouvel onglet", mais continueront de s'afficher dans l'omnibox (barre d'adresse) en mode de recherche ciblée. Si ce champ n'est pas défini, le <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> de la barre d'adresse n'est pas requis.
+
+Sous <ph name="MS_WIN_NAME" />, cette règle n'est disponible que sur les instances associées à un domaine <ph name="MS_AD_NAME" />, à <ph name="MS_AAD_NAME" /> ou qui bénéficient de <ph name="CHROME_ENTERPRISE_CORE_NAME" />.
+
+Sous <ph name="MAC_OS_NAME" />, cette règle n'est disponible que sur les instances gérées via MDM, associées à un domaine via MCX ou qui bénéficient de <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="4649395978608361979">Destinations des imprimantes locales</translation>
 <translation id="4650044303940238102">Paramètres de polices locales</translation>
 <translation id="4650759511838826572">Désactiver les schémas de protocole d'URL</translation>
@@ -8262,9 +8307,15 @@ Sous <ph name="MS_WIN_NAME" />, cette règle n'est disponible que sur les instan
 <translation id="6795485990775913659">Autoriser l'impression sans code uniquement</translation>
 <translation id="6796215185873669533">Appliquez les paramètres par défaut du navigateur pour la version de la chaîne user-agent.</translation>
 <translation id="6800181452282128474">Ne pas envoyer de requêtes aux serveurs Quirks</translation>
+<translation id="6801739506172328815">Taille de police du texte en filigrane en points.</translation>
 <translation id="6802412020718145539">La visionneuse de PDF utilise l'architecture iFrame hors processus.</translation>
 <translation id="68031099365512050">Signaler l'état audio</translation>
 <translation id="680356860463873420">Ne pas autoriser les utilisateurs à employer Plugin VM</translation>
+<translation id="6807707420322335446">Si cette règle est activée, les éléments de page Web qui ne font pas partie du domaine indiqué dans la barre d'adresse du navigateur ne peuvent pas placer de cookies. Si cette règle est désactivée, ces éléments sont autorisés à placer des cookies, et les utilisateurs ne peuvent pas modifier ce paramètre.
+
+      Si cette règle n'est pas configurée, les cookies tiers sont autorisés, mais les utilisateurs peuvent modifier ce paramètre.
+
+      Remarque : cette règle ne s'applique pas en mode navigation privée, où les cookies tiers sont bloqués et ne peuvent être autorisés qu'au niveau du site. Pour autoriser les cookies au niveau du site, utilisez la règle <ph name="COOKIES_ALLOWED_FOR_URLS_POLICY_NAME" />.</translation>
 <translation id="6810445994095397827">Bloquer JavaScript sur ces sites</translation>
 <translation id="6813263547126514821">Démarrage et arrêt</translation>
 <translation id="681446116407619279">Modèles d'authentification compatibles</translation>
@@ -10429,6 +10480,11 @@ Si cette règle est définie sur <ph name="PROVISION_MANAGED_CLIENT_CERTIFICATE_
       Si cette règle n'est pas configurée, les utilisateurs peuvent contrôler si <ph name="PRODUCT_NAME" /> est le navigateur par défaut et, dans le cas contraire, si une notification doit être affichée pour les en informer.
 
       Remarque (pour les administrateurs <ph name="MS_WIN_NAME" />) : Ce paramètre ne peut être activé que pour les ordinateurs sous Windows 7. Pour les versions ultérieures, vous devez déployer un fichier d'associations d'applications par défaut qui définisse <ph name="PRODUCT_NAME" /> comme le gestionnaire des protocoles <ph name="HTTPS_PROTOCOL" /> et <ph name="HTTP_PROTOCOL" /> (et éventuellement du protocole <ph name="FTP_PROTOCOL" /> ainsi que d'autres formats de fichiers). Pour en savoir plus, consultez l'aide de Chrome à l'adresse https://support.google.com/chrome?p=make_chrome_default_win.</translation>
+<translation id="8437836857126992452">Permet de déterminer quelles extensions les utilisateurs ne peuvent PAS installer. Les extensions déjà installées, mais qui sont bloquées, sont désactivées sans que l'utilisateur puisse les activer. Elles sont automatiquement réactivées dès que vous les retirez de la liste de blocage.
+
+          Si vous saisissez la valeur "*" dans la liste de blocage, toutes les extensions sont bloquées par défaut. Les extensions explicitement listées dans la liste d'autorisation sont autorisées si elles sont signées (empaquetées). Toutes les extensions non empaquetées sont bloquées.
+
+          Si cette règle n'est pas configurée, les utilisateurs peuvent installer n'importe quelle extension dans <ph name="PRODUCT_NAME" />.</translation>
 <translation id="8441105784056442638">Activer la fonctionnalité de restauration complète</translation>
 <translation id="844322176712318428">Autoriser l'API Translator</translation>
 <translation id="8444157920689124099">Activer le chiffrement lié à l'appli</translation>

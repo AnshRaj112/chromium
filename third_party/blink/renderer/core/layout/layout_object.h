@@ -42,11 +42,11 @@
 #include "third_party/blink/renderer/core/dom/element.h"
 #include "third_party/blink/renderer/core/editing/forward.h"
 #include "third_party/blink/renderer/core/html_names.h"
-#include "third_party/blink/renderer/core/inspector/inspector_trace_events.h"
 #include "third_party/blink/renderer/core/layout/geometry/physical_rect.h"
 #include "third_party/blink/renderer/core/layout/geometry/transform_state.h"
 #include "third_party/blink/renderer/core/layout/hit_test_phase.h"
 #include "third_party/blink/renderer/core/layout/inline/caret_rect.h"
+#include "third_party/blink/renderer/core/layout/layout_invalidation_reason.h"
 #include "third_party/blink/renderer/core/layout/layout_object_child_list.h"
 #include "third_party/blink/renderer/core/layout/map_coordinates_flags.h"
 #include "third_party/blink/renderer/core/layout/min_max_sizes.h"
@@ -1682,8 +1682,8 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
   // Returns true if this object is a proper descendant of any list marker.
   bool IsInListMarker() const;
 
-  // The pseudo element style can be cached or uncached. Use the cached method
-  // if the pseudo element doesn't respect any pseudo classes (and therefore
+  // The pseudo-element style can be cached or uncached. Use the cached method
+  // if the pseudo-element doesn't respect any pseudo-classes (and therefore
   // has no concept of changing state). The cached pseudo style always inherits
   // from the originating element's style (because we can cache only one
   // version), while the uncached pseudo style can inherit from any style.
@@ -1723,7 +1723,7 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
 
   // Returns the styled node that caused the generation of this layoutObject.
   // This is the same as node() except for layoutObjects of :before, :after and
-  // :first-letter pseudo elements for which their parent node is returned.
+  // :first-letter pseudo-elements for which their parent node is returned.
   Node* GeneratingNode() const {
     NOT_DESTROYED();
     return IsPseudoElement() ? GetNode()->ParentOrShadowHostNode() : GetNode();
@@ -1900,9 +1900,11 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
 
   void MarkContainerChainForLayout(bool schedule_relayout = true);
   void MarkParentForSpannerOrOutOfFlowPositionedChange();
-  void SetNeedsLayout(LayoutInvalidationReasonForTracing,
-                      MarkingBehavior = kMarkContainerChain);
-  void SetNeedsLayoutAndFullPaintInvalidation(
+  // Need to include layout_object_inlines.h to use this.
+  inline void SetNeedsLayout(LayoutInvalidationReasonForTracing,
+                             MarkingBehavior = kMarkContainerChain);
+  // Need to include layout_object_inlines.h to use this.
+  inline void SetNeedsLayoutAndFullPaintInvalidation(
       LayoutInvalidationReasonForTracing,
       MarkingBehavior = kMarkContainerChain);
 
@@ -1916,18 +1918,12 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
   void SetIntrinsicLogicalWidthsDirty(MarkingBehavior = kMarkContainerChain);
   void ClearIntrinsicLogicalWidthsDirty();
 
-  void SetNeedsLayoutAndIntrinsicWidthsRecalc(
-      LayoutInvalidationReasonForTracing reason) {
-    NOT_DESTROYED();
-    SetNeedsLayout(reason);
-    SetIntrinsicLogicalWidthsDirty();
-  }
-  void SetNeedsLayoutAndIntrinsicWidthsRecalcAndFullPaintInvalidation(
-      LayoutInvalidationReasonForTracing reason) {
-    NOT_DESTROYED();
-    SetNeedsLayoutAndFullPaintInvalidation(reason);
-    SetIntrinsicLogicalWidthsDirty();
-  }
+  // Need to include layout_object_inlines.h to use this.
+  inline void SetNeedsLayoutAndIntrinsicWidthsRecalc(
+      LayoutInvalidationReasonForTracing reason);
+  // Need to include layout_object_inlines.h to use this.
+  inline void SetNeedsLayoutAndIntrinsicWidthsRecalcAndFullPaintInvalidation(
+      LayoutInvalidationReasonForTracing reason);
 
   // Returns false when certain font changes (e.g., font-face rule changes, web
   // font loaded, etc) have occurred, in which case |this| needs relayout.
@@ -3025,6 +3021,25 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     bitfields_.SetInsideBlockingWheelEventHandler(inside);
   }
 
+  void MarkSoftNavigationContextChanged();
+  void MarkDescendantSoftNavigationContextChanged();
+  bool SoftNavigationContextChanged() const {
+    NOT_DESTROYED();
+    return bitfields_.SoftNavigationContextChanged();
+  }
+  bool DescendantSoftNavigationContextChanged() const {
+    NOT_DESTROYED();
+    return bitfields_.DescendantSoftNavigationContextChanged();
+  }
+  bool ShouldInheritSoftNavigationContext() const {
+    NOT_DESTROYED();
+    return bitfields_.ShouldInheritSoftNavigationContext();
+  }
+  void SetShouldInheritSoftNavigationContext(bool should_inherit) {
+    NOT_DESTROYED();
+    bitfields_.SetShouldInheritSoftNavigationContext(should_inherit);
+  }
+
   // Painters can use const methods only, except for these explicitly declared
   // methods.
   class CORE_EXPORT MutableForPainting {
@@ -3118,6 +3133,10 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     void SetShouldAssumePaintOffsetTranslationForLayoutShiftTracking(bool b) {
       layout_object_
           .SetShouldAssumePaintOffsetTranslationForLayoutShiftTracking(b);
+    }
+
+    void SetShouldInheritSoftNavigationContext(bool b) {
+      layout_object_.SetShouldInheritSoftNavigationContext(b);
     }
 
     void FragmentCountChanged() {
@@ -3802,6 +3821,9 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
           inside_blocking_wheel_event_handler_(false),
           blocking_wheel_event_handler_changed_(true),
           descendant_blocking_wheel_event_handler_changed_(false),
+          soft_navigation_context_changed_(true),
+          descendant_soft_navigation_context_changed_(false),
+          should_inherit_soft_navigation_context_(true),
           is_effective_root_scroller_(false),
           is_global_root_scroller_(false),
           registered_as_first_line_image_observer_(false),
@@ -4053,6 +4075,26 @@ class CORE_EXPORT LayoutObject : public GarbageCollected<LayoutObject>,
     ADD_BOOLEAN_BITFIELD(descendant_blocking_wheel_event_handler_changed_,
                          DescendantBlockingWheelEventHandlerChanged);
 
+    // Set when the associated SoftNavigationContext changes, which is used to
+    // ensure |should_inherit_soft_navigation_context_| is updated for this
+    // object and its descendants.
+    ADD_BOOLEAN_BITFIELD(soft_navigation_context_changed_,
+                         SoftNavigationContextChanged);
+
+    // Set when a descendant's associated SoftNavigationContext changes, which
+    // implies |ShouldInheritSoftNavigationContext| needs to be recomputed. This
+    // is used to ensure the PrePaint tree walk processes objects with
+    // |soft_navigation_context_changed_|.
+    ADD_BOOLEAN_BITFIELD(descendant_soft_navigation_context_changed_,
+                         DescendantSoftNavigationContextChanged);
+
+    // Whether the associated node inherits its SoftNavigationContext from its
+    // parent. Used during the PrePaint walk to help determine when the context
+    // being pushed down to descendants needs to change. The actual context
+    // mapping is stored in SoftNavigationPaintAttributionTracker.
+    ADD_BOOLEAN_BITFIELD(should_inherit_soft_navigation_context_,
+                         ShouldInheritSoftNavigationContext);
+
     // See page/scrolling/README.md for an explanation of root scroller and how
     // it works.
     ADD_BOOLEAN_BITFIELD(is_effective_root_scroller_, IsEffectiveRootScroller);
@@ -4288,40 +4330,6 @@ inline bool LayoutObject::IsScrollButtonOrMarkerContent() const {
 inline bool LayoutObject::IsBeforeOrAfterContent() const {
   NOT_DESTROYED();
   return IsBeforeContent() || IsAfterContent();
-}
-
-// setNeedsLayout() won't cause full paint invalidations as
-// setNeedsLayoutAndFullPaintInvalidation() does. Otherwise the two methods are
-// identical.
-inline void LayoutObject::SetNeedsLayout(
-    LayoutInvalidationReasonForTracing reason,
-    MarkingBehavior mark_parents) {
-  NOT_DESTROYED();
-#if DCHECK_IS_ON()
-  DCHECK(!IsSetNeedsLayoutForbidden());
-#endif
-  bool already_needed_layout = bitfields_.SelfNeedsFullLayout();
-  SetSelfNeedsFullLayout(true);
-  SetNeedsOverflowRecalc();
-  SetSubgridMinMaxSizesCacheDirty(true);
-  SetTableColumnConstraintDirty(true);
-  if (!already_needed_layout) {
-    DEVTOOLS_TIMELINE_TRACE_EVENT_INSTANT_WITH_CATEGORIES(
-        TRACE_DISABLED_BY_DEFAULT("devtools.timeline.invalidationTracking"),
-        "LayoutInvalidationTracking",
-        inspector_layout_invalidation_tracking_event::Data, this, reason);
-    if (mark_parents == kMarkContainerChain) {
-      MarkContainerChainForLayout();
-    }
-  }
-}
-
-inline void LayoutObject::SetNeedsLayoutAndFullPaintInvalidation(
-    LayoutInvalidationReasonForTracing reason,
-    MarkingBehavior mark_parents) {
-  NOT_DESTROYED();
-  SetNeedsLayout(reason, mark_parents);
-  SetShouldDoFullPaintInvalidation();
 }
 
 inline void LayoutObject::ClearNeedsLayoutWithoutPaintInvalidation() {

@@ -10,7 +10,7 @@ namespace enterprise_connectors {
 
 BASE_FEATURE(kEnableAsyncUploadAfterVerdict,
              "EnableAsyncUploadAfterVerdict",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEnableResumableUploadOnConsumerScan,
              "EnableResumableUploadOnConsumerScan",
@@ -36,4 +36,8 @@ BASE_FEATURE_PARAM(size_t,
                    "max_file_size_mb",
                    /*default_value=*/50);
 
+// Controls whether encrypted file upload is enabled.
+BASE_FEATURE(kEnableEncryptedFileUpload,
+             "EnableEncryptedFileUpload",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 }  // namespace enterprise_connectors

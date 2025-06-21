@@ -576,7 +576,7 @@ public class ReaderModeManager extends EmptyTabObserver implements UserData {
                                 resources.getString(R.string.reader_mode_message_title))
                         .with(
                                 MessageBannerProperties.ICON_RESOURCE_ID,
-                                R.drawable.ic_mobile_friendly)
+                                R.drawable.ic_mobile_friendly_24dp)
                         .with(
                                 MessageBannerProperties.PRIMARY_BUTTON_TEXT,
                                 resources.getString(R.string.reader_mode_message_button))
@@ -624,11 +624,16 @@ public class ReaderModeManager extends EmptyTabObserver implements UserData {
         // button for this site on other tabs.
         removeUrlFromMutedSites(mDistillerUrl);
 
-        if (!SysUtils.isLowEndDevice()) {
+        if (!SysUtils.isLowEndDevice() && !shouldUseRegularTabsForDistillation()) {
             distillInCustomTab();
         } else {
             navigateToReaderMode();
         }
+        RecordUserAction.record("MobileReaderModeActivated");
+    }
+
+    private boolean shouldUseRegularTabsForDistillation() {
+        return DomDistillerFeatures.sReaderModeDistillInApp.isEnabled();
     }
 
     /** Navigate the current tab to a Reader Mode URL. */

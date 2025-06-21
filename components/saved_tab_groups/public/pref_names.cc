@@ -45,6 +45,14 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterBooleanPref(prefs::kDidSyncTabGroupsInLastSession, false);
   registry->RegisterBooleanPref(prefs::kDidEnableSharedTabGroupsInLastSession,
                                 false);
+  registry->RegisterBooleanPref(
+      prefs::kEligibleForVersionOutOfDateInstantMessage, false);
+  registry->RegisterBooleanPref(
+      prefs::kEligibleForVersionOutOfDatePersistentMessage, false);
+  registry->RegisterBooleanPref(prefs::kEligibleForVersionUpdatedMessage,
+                                false);
+  registry->RegisterBooleanPref(prefs::kHasShownAnyVersionOutOfDateMessage,
+                                false);
 }
 
 void KeepAccountSettingsPrefsOnlyForUsers(

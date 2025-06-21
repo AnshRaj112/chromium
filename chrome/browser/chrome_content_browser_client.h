@@ -457,6 +457,11 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   bool AreThirdPartyCookiesGenerallyAllowed(
       content::BrowserContext* browser_context,
       content::WebContents* web_contents) override;
+  void PrewarmServiceWorkerRegistrationForDSE(
+      content::BrowserContext* browser_context,
+      content::ServiceWorkerContext& service_worker_context) override;
+  static std::optional<int>&
+  PrewarmServiceWorkerRegistrationForDSECalledCountForTesting();
   bool CanSendSCTAuditingReport(
       content::BrowserContext* browser_context) override;
   void OnNewSCTAuditingReportSent(
@@ -1206,6 +1211,9 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       std::optional<ukm::SourceId> ukm_source_id,
       content::KeepAliveRequestTracker::IsContextDetachedCallback
           is_context_detached_callback) override;
+
+  std::optional<std::vector<std::u16string>> GetClipboardTypesIfPolicyApplied(
+      const ui::ClipboardSequenceNumberToken& seqno) override;
 
  protected:
   static bool HandleWebUI(GURL* url, content::BrowserContext* browser_context);

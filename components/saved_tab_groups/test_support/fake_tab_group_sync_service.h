@@ -5,6 +5,8 @@
 #ifndef COMPONENTS_SAVED_TAB_GROUPS_TEST_SUPPORT_FAKE_TAB_GROUP_SYNC_SERVICE_H_
 #define COMPONENTS_SAVED_TAB_GROUPS_TEST_SUPPORT_FAKE_TAB_GROUP_SYNC_SERVICE_H_
 
+#include <vector>
+
 #include "base/observer_list.h"
 #include "components/saved_tab_groups/public/saved_tab_group.h"
 #include "components/saved_tab_groups/public/tab_group_sync_service.h"
@@ -115,6 +117,7 @@ class FakeTabGroupSyncService : public TabGroupSyncService {
   std::unique_ptr<std::vector<SavedTabGroup>>
   TakeSharedTabGroupsAvailableAtStartupForMessaging() override;
   bool HadSharedTabGroupsLastSession(bool open_shared_tab_groups) override;
+  VersioningMessageController* GetVersioningMessageController() override;
   void OnLastTabClosed(const SavedTabGroup& saved_tab_group) override;
   void AddObserver(Observer* observer) override;
   void RemoveObserver(Observer* observer) override;

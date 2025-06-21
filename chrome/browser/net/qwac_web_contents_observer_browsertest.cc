@@ -8,10 +8,12 @@
 #include "base/functional/bind.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/bind.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "base/test/test_future.h"
 #include "chrome/browser/net/system_network_context_manager.h"
 #include "chrome/test/base/chrome_test_utils.h"
 #include "chrome/test/base/platform_browser_test.h"
+#include "components/security_state/content/security_state_tab_helper.h"
 #include "content/public/browser/network_service_instance.h"
 #include "content/public/common/content_features.h"
 #include "content/public/test/browser_test.h"
@@ -170,6 +172,33 @@ class QwacWebContentsObserverTestBase : public PlatformBrowserTest {
     return QwacWebContentsObserver::QwacStatus::GetForPage(
         web_contents()->GetPrimaryPage());
   }
+
+  scoped_refptr<net::X509Certificate> VisibleSecurityStateTwoQwac() {
+    SecurityStateTabHelper* helper =
+        SecurityStateTabHelper::FromWebContents(web_contents());
+    if (!helper) {
+      ADD_FAILURE() << "Failed to load SecurityStateTabHelper";
+      return nullptr;
+    }
+    std::unique_ptr<security_state::VisibleSecurityState>
+        visible_security_state = helper->GetVisibleSecurityState();
+    if (!visible_security_state) {
+      ADD_FAILURE() << "SecurityStateTabHelper has no VisibleSecurityState";
+      return nullptr;
+    }
+    return visible_security_state->two_qwac;
+  }
+
+  void ExpectHistogramSample(
+      const base::HistogramTester& histograms,
+      QwacWebContentsObserver::QwacLinkProcessingResult result) {
+    histograms.ExpectUniqueSample("Net.CertVerifier.Qwac.2QwacLinkProcessing",
+                                  result, 1u);
+  }
+
+  void ExpectNoHistogramSample(const base::HistogramTester& histograms) {
+    histograms.ExpectTotalCount("Net.CertVerifier.Qwac.2QwacLinkProcessing", 0);
+  }
 };
 
 class QwacWebContentsObserverDisabledBrowserTest
@@ -192,10 +221,13 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverDisabledBrowserTest,
   auto test_server_handle = embedded_https_test_server().StartAndReturnHandle();
   ASSERT_TRUE(test_server_handle.is_valid());
 
+  base::HistogramTester histograms;
   EXPECT_TRUE(content::NavigateToURL(
       web_contents(), embedded_https_test_server().GetURL("/main")));
 
   EXPECT_FALSE(GetCurrentPageQwacStatus());
+  EXPECT_FALSE(VisibleSecurityStateTwoQwac());
+  ExpectNoHistogramSample(histograms);
 }
 
 class QwacWebContentsObserverBrowserTest
@@ -273,11 +305,12 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
       /*eutl_cert=*/
       binding_builder.GetRootBuilder()->GetX509Certificate().get());
 
-  EXPECT_TRUE(content::NavigateToURL(
-      web_contents(),
-      embedded_https_test_server().GetURL("www.example.com", "/main")));
-
   {
+    base::HistogramTester histograms;
+    EXPECT_TRUE(content::NavigateToURL(
+        web_contents(),
+        embedded_https_test_server().GetURL("www.example.com", "/main")));
+
     auto* status = GetCurrentPageQwacStatus();
     ASSERT_TRUE(status);
     ASSERT_TRUE(WaitForStatusFinished(status));
@@ -288,26 +321,49 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
     EXPECT_TRUE(status->tls_cert()->EqualsExcludingChain(tls_leaf.get()));
     EXPECT_EQ(1, main_page_handler.request_count());
     EXPECT_EQ(1, qwac_handler.request_count());
+
+    auto visible_security_state_two_qwac = VisibleSecurityStateTwoQwac();
+    EXPECT_TRUE(visible_security_state_two_qwac);
+    EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
+        visible_security_state_two_qwac.get()));
+
+    ExpectHistogramSample(
+        histograms,
+        QwacWebContentsObserver::QwacLinkProcessingResult::kValid2Qwac);
   }
 
-  // Navigate to a different page without a qwac.
-  EXPECT_TRUE(content::NavigateToURL(
-      web_contents(),
-      embedded_https_test_server().GetURL("www.example.com", "/main_noqwac")));
-  EXPECT_FALSE(GetCurrentPageQwacStatus());
-
-  // Now go back to the previous page. If BFCache is enabled, qwac status
-  // should still be available and not need to be re-fetched, otherwise it
-  // should be re-fetched successfully.
-  ASSERT_TRUE(HistoryGoBack(web_contents()));
+  {
+    base::HistogramTester histograms;
+    // Navigate to a different page without a qwac.
+    EXPECT_TRUE(content::NavigateToURL(
+        web_contents(), embedded_https_test_server().GetURL("www.example.com",
+                                                            "/main_noqwac")));
+    EXPECT_FALSE(GetCurrentPageQwacStatus());
+    EXPECT_FALSE(VisibleSecurityStateTwoQwac());
+    ExpectHistogramSample(
+        histograms,
+        QwacWebContentsObserver::QwacLinkProcessingResult::kNoQwacLinkHeader);
+  }
 
   {
+    base::HistogramTester histograms;
+    // Now go back to the previous page. If BFCache is enabled, qwac status
+    // should still be available and not need to be re-fetched, otherwise it
+    // should be re-fetched successfully.
+    ASSERT_TRUE(HistoryGoBack(web_contents()));
+
     auto* status = GetCurrentPageQwacStatus();
     ASSERT_TRUE(status);
     if (base::FeatureList::IsEnabled(features::kBackForwardCache)) {
       ASSERT_TRUE(status->is_finished());
+      ExpectHistogramSample(histograms,
+                            QwacWebContentsObserver::QwacLinkProcessingResult::
+                                kQwacStatusAlreadyPresent);
     } else {
       ASSERT_TRUE(WaitForStatusFinished(status));
+      ExpectHistogramSample(
+          histograms,
+          QwacWebContentsObserver::QwacLinkProcessingResult::kValid2Qwac);
     }
     ASSERT_TRUE(status->verified_2qwac_cert());
     EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
@@ -316,6 +372,11 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
     EXPECT_TRUE(status->tls_cert()->EqualsExcludingChain(tls_leaf.get()));
     EXPECT_EQ(1, main_page_handler.request_count());
     EXPECT_EQ(1, qwac_handler.request_count());
+
+    auto visible_security_state_two_qwac = VisibleSecurityStateTwoQwac();
+    EXPECT_TRUE(visible_security_state_two_qwac);
+    EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
+        visible_security_state_two_qwac.get()));
   }
 }
 
@@ -345,11 +406,12 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
       /*eutl_cert=*/
       binding_builder.GetRootBuilder()->GetX509Certificate().get());
 
-  EXPECT_TRUE(content::NavigateToURL(
-      web_contents(),
-      embedded_https_test_server().GetURL("www.example.com", "/main")));
-
   {
+    base::HistogramTester histograms;
+    EXPECT_TRUE(content::NavigateToURL(
+        web_contents(),
+        embedded_https_test_server().GetURL("www.example.com", "/main")));
+
     auto* status = GetCurrentPageQwacStatus();
     ASSERT_TRUE(status);
     ASSERT_TRUE(WaitForStatusFinished(status));
@@ -360,6 +422,15 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
     EXPECT_TRUE(status->tls_cert()->EqualsExcludingChain(tls_leaf.get()));
     EXPECT_EQ(1, main_page_handler.request_count());
     EXPECT_EQ(1, qwac_handler.request_count());
+
+    auto visible_security_state_two_qwac = VisibleSecurityStateTwoQwac();
+    EXPECT_TRUE(visible_security_state_two_qwac);
+    EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
+        visible_security_state_two_qwac.get()));
+
+    ExpectHistogramSample(
+        histograms,
+        QwacWebContentsObserver::QwacLinkProcessingResult::kValid2Qwac);
   }
 
   // Navigate to a different page without a qwac.
@@ -367,15 +438,17 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
       web_contents(),
       embedded_https_test_server().GetURL("www.example.com", "/main_noqwac")));
   EXPECT_FALSE(GetCurrentPageQwacStatus());
-
-  // Now navigate to the original page URL again.
-  // The page and the 2-QWAC should be in HTTP cache, so the page and qwac
-  // status should be loaded without reloading either from the http server.
-  EXPECT_TRUE(content::NavigateToURL(
-      web_contents(),
-      embedded_https_test_server().GetURL("www.example.com", "/main")));
+  EXPECT_FALSE(VisibleSecurityStateTwoQwac());
 
   {
+    base::HistogramTester histograms;
+    // Now navigate to the original page URL again.
+    // The page and the 2-QWAC should be in HTTP cache, so the page and qwac
+    // status should be loaded without reloading either from the http server.
+    EXPECT_TRUE(content::NavigateToURL(
+        web_contents(),
+        embedded_https_test_server().GetURL("www.example.com", "/main")));
+
     auto* status = GetCurrentPageQwacStatus();
     ASSERT_TRUE(status);
     ASSERT_TRUE(WaitForStatusFinished(status));
@@ -386,6 +459,15 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
     EXPECT_TRUE(status->tls_cert()->EqualsExcludingChain(tls_leaf.get()));
     EXPECT_EQ(1, main_page_handler.request_count());
     EXPECT_EQ(1, qwac_handler.request_count());
+
+    auto visible_security_state_two_qwac = VisibleSecurityStateTwoQwac();
+    EXPECT_TRUE(visible_security_state_two_qwac);
+    EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
+        visible_security_state_two_qwac.get()));
+
+    ExpectHistogramSample(
+        histograms,
+        QwacWebContentsObserver::QwacLinkProcessingResult::kValid2Qwac);
   }
 }
 
@@ -413,22 +495,28 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
         /*eutl_cert=*/
         binding_builder.GetRootBuilder()->GetX509Certificate().get());
 
+    base::HistogramTester histograms;
     EXPECT_TRUE(content::NavigateToURL(
         web_contents(),
         embedded_https_test_server().GetURL("www.example.com", "/main")));
 
-    {
-      auto* status = GetCurrentPageQwacStatus();
-      ASSERT_TRUE(status);
-      ASSERT_TRUE(WaitForStatusFinished(status));
-      ASSERT_TRUE(status->verified_2qwac_cert());
-      EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
-          binding_builder.GetLeafBuilder()
-              ->GetX509CertificateFullChain()
-              .get()));
-      ASSERT_TRUE(status->tls_cert());
-      EXPECT_TRUE(status->tls_cert()->EqualsExcludingChain(tls_leaf.get()));
-    }
+    auto* status = GetCurrentPageQwacStatus();
+    ASSERT_TRUE(status);
+    ASSERT_TRUE(WaitForStatusFinished(status));
+    ASSERT_TRUE(status->verified_2qwac_cert());
+    EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
+        binding_builder.GetLeafBuilder()->GetX509CertificateFullChain().get()));
+    ASSERT_TRUE(status->tls_cert());
+    EXPECT_TRUE(status->tls_cert()->EqualsExcludingChain(tls_leaf.get()));
+
+    auto visible_security_state_two_qwac = VisibleSecurityStateTwoQwac();
+    EXPECT_TRUE(visible_security_state_two_qwac);
+    EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
+        visible_security_state_two_qwac.get()));
+
+    ExpectHistogramSample(
+        histograms,
+        QwacWebContentsObserver::QwacLinkProcessingResult::kValid2Qwac);
 
     // Save the port number and release the `test_server_handle`, shutting down
     // the existing test server.
@@ -462,15 +550,16 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
       /*eutl_cert=*/
       binding_builder_2.GetRootBuilder()->GetX509Certificate().get());
 
-  // Reload the page.
-  content::TestNavigationObserver reload_observer(
-      web_contents(),
-      /*expected_number_of_navigations=*/1);
-  web_contents()->GetController().Reload(content::ReloadType::BYPASSING_CACHE,
-                                         /*check_for_repost=*/false);
-  reload_observer.Wait();
-
   {
+    base::HistogramTester histograms;
+    // Reload the page.
+    content::TestNavigationObserver reload_observer(
+        web_contents(),
+        /*expected_number_of_navigations=*/1);
+    web_contents()->GetController().Reload(content::ReloadType::BYPASSING_CACHE,
+                                           /*check_for_repost=*/false);
+    reload_observer.Wait();
+
     auto* status = GetCurrentPageQwacStatus();
     ASSERT_TRUE(status);
     ASSERT_TRUE(WaitForStatusFinished(status));
@@ -482,6 +571,15 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
             .get()));
     ASSERT_TRUE(status->tls_cert());
     EXPECT_TRUE(status->tls_cert()->EqualsExcludingChain(tls_leaf_2.get()));
+
+    auto visible_security_state_two_qwac = VisibleSecurityStateTwoQwac();
+    EXPECT_TRUE(visible_security_state_two_qwac);
+    EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
+        visible_security_state_two_qwac.get()));
+
+    ExpectHistogramSample(
+        histograms,
+        QwacWebContentsObserver::QwacLinkProcessingResult::kValid2Qwac);
   }
 }
 
@@ -526,15 +624,22 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
     EXPECT_TRUE(status->tls_cert()->EqualsExcludingChain(tls_leaf.get()));
     EXPECT_EQ(1, main_page_handler.request_count());
     EXPECT_EQ(1, qwac_handler.request_count());
+
+    auto visible_security_state_two_qwac = VisibleSecurityStateTwoQwac();
+    EXPECT_TRUE(visible_security_state_two_qwac);
+    EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
+        visible_security_state_two_qwac.get()));
   }
 
-  // Navigate to a different URL with the same page.
-  // Since the page didn't change, the qwac status should still be available
-  // and not need to be re-fetched.
-  EXPECT_TRUE(content::NavigateToURL(
-      web_contents(),
-      embedded_https_test_server().GetURL("www.example.com", "/main#anchor")));
   {
+    base::HistogramTester histograms;
+    // Navigate to a different URL with the same page.
+    // Since the page didn't change, the qwac status should still be available
+    // and not need to be re-fetched.
+    EXPECT_TRUE(content::NavigateToURL(
+        web_contents(), embedded_https_test_server().GetURL("www.example.com",
+                                                            "/main#anchor")));
+
     auto* status = GetCurrentPageQwacStatus();
     ASSERT_TRUE(status);
     ASSERT_TRUE(status->is_finished());
@@ -545,6 +650,14 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
     EXPECT_TRUE(status->tls_cert()->EqualsExcludingChain(tls_leaf.get()));
     EXPECT_EQ(1, main_page_handler.request_count());
     EXPECT_EQ(1, qwac_handler.request_count());
+
+    auto visible_security_state_two_qwac = VisibleSecurityStateTwoQwac();
+    EXPECT_TRUE(visible_security_state_two_qwac);
+    EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
+        visible_security_state_two_qwac.get()));
+
+    // Same-page navigations are not histogrammed.
+    ExpectNoHistogramSample(histograms);
   }
 }
 
@@ -584,6 +697,11 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
       binding_builder.GetLeafBuilder()->GetX509CertificateFullChain().get()));
   ASSERT_TRUE(status->tls_cert());
   EXPECT_TRUE(status->tls_cert()->EqualsExcludingChain(tls_leaf.get()));
+
+  auto visible_security_state_two_qwac = VisibleSecurityStateTwoQwac();
+  EXPECT_TRUE(visible_security_state_two_qwac);
+  EXPECT_TRUE(status->verified_2qwac_cert()->EqualsIncludingChain(
+      visible_security_state_two_qwac.get()));
 }
 
 IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
@@ -598,6 +716,7 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
   auto test_server_handle = embedded_https_test_server().StartAndReturnHandle();
   ASSERT_TRUE(test_server_handle.is_valid());
 
+  base::HistogramTester histograms;
   EXPECT_TRUE(content::NavigateToURL(
       web_contents(),
       embedded_https_test_server().GetURL("www.example.com", "/main"),
@@ -607,6 +726,10 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
   // The QWAC link header was present on a redirect, but not on the final page
   // load, so no QwacStatus should be created.
   EXPECT_FALSE(GetCurrentPageQwacStatus());
+  EXPECT_FALSE(VisibleSecurityStateTwoQwac());
+  ExpectHistogramSample(
+      histograms,
+      QwacWebContentsObserver::QwacLinkProcessingResult::kNoQwacLinkHeader);
 }
 
 IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
@@ -626,6 +749,7 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
   auto test_server_handle = embedded_https_test_server().StartAndReturnHandle();
   ASSERT_TRUE(test_server_handle.is_valid());
 
+  base::HistogramTester histograms;
   EXPECT_TRUE(content::NavigateToURL(
       web_contents(),
       embedded_https_test_server().GetURL("www.example.com", "/main")));
@@ -637,6 +761,10 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
   ASSERT_TRUE(status);
   ASSERT_TRUE(WaitForStatusFinished(status));
   EXPECT_FALSE(status->verified_2qwac_cert());
+  EXPECT_FALSE(VisibleSecurityStateTwoQwac());
+  ExpectHistogramSample(
+      histograms,
+      QwacWebContentsObserver::QwacLinkProcessingResult::kDownloadFailed);
 }
 
 IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
@@ -655,6 +783,7 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
   auto test_server_handle = embedded_https_test_server().StartAndReturnHandle();
   ASSERT_TRUE(test_server_handle.is_valid());
 
+  base::HistogramTester histograms;
   EXPECT_TRUE(content::NavigateToURL(
       web_contents(),
       embedded_https_test_server().GetURL("www.example.com", "/main")));
@@ -662,7 +791,11 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
   // Since the initial QWAC url was cross-origin, the fetch is never started
   // and no QwacStatus should be created.
   EXPECT_FALSE(GetCurrentPageQwacStatus());
+  EXPECT_FALSE(VisibleSecurityStateTwoQwac());
   EXPECT_EQ(1, main_page_handler.request_count());
+  ExpectHistogramSample(histograms,
+                        QwacWebContentsObserver::QwacLinkProcessingResult::
+                            kNonrelativeQwacLinkUrl);
 }
 
 IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
@@ -675,6 +808,7 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
   auto test_server_handle = embedded_https_test_server().StartAndReturnHandle();
   ASSERT_TRUE(test_server_handle.is_valid());
 
+  base::HistogramTester histograms;
   EXPECT_TRUE(content::NavigateToURL(
       web_contents(),
       embedded_https_test_server().GetURL("www.example.com", "/main")));
@@ -684,6 +818,10 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest,
   ASSERT_TRUE(WaitForStatusFinished(status));
   EXPECT_FALSE(status->verified_2qwac_cert());
   EXPECT_EQ(1, qwac_handler.request_count());
+  EXPECT_FALSE(VisibleSecurityStateTwoQwac());
+  ExpectHistogramSample(
+      histograms,
+      QwacWebContentsObserver::QwacLinkProcessingResult::kDownloadFailed);
 }
 
 IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest, NotFetchedForHttp) {
@@ -694,12 +832,57 @@ IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest, NotFetchedForHttp) {
   auto test_server_handle = embedded_test_server()->StartAndReturnHandle();
   ASSERT_TRUE(test_server_handle.is_valid());
 
+  base::HistogramTester histograms;
   EXPECT_TRUE(content::NavigateToURL(
       web_contents(),
       embedded_test_server()->GetURL("www.example.com", "/main")));
 
   EXPECT_FALSE(GetCurrentPageQwacStatus());
+  EXPECT_FALSE(VisibleSecurityStateTwoQwac());
   EXPECT_EQ(1, main_page_handler.request_count());
+  ExpectNoHistogramSample(histograms);
+}
+
+IN_PROC_BROWSER_TEST_F(QwacWebContentsObserverBrowserTest, TestInvalidBinding) {
+  ASSERT_TRUE(embedded_https_test_server().InitializeAndListen());
+
+  net::TwoQwacCertBindingBuilder binding_builder;
+  auto tls_leaf = embedded_https_test_server().GetCertificate();
+  ASSERT_TRUE(tls_leaf);
+  binding_builder.SetBoundCerts(
+      {std::string(base::as_string_view(tls_leaf->cert_span()))});
+  // Serve a 2-QWAC with an invalid signature.
+  ServeResponseHandler qwac_handler(
+      embedded_https_test_server(), "/qwac",
+      binding_builder.GetJWSWithInvalidSignature(), "application/jose");
+
+  ServePageWithQwacHeaderHandler main_page_handler(embedded_https_test_server(),
+                                                   "/main", "/qwac");
+  auto test_server_handle =
+      embedded_https_test_server().StartAcceptingConnectionsAndReturnHandle();
+  ASSERT_TRUE(test_server_handle.is_valid());
+
+  InstallCRSUpdate(
+      /*root_cert=*/embedded_https_test_server().GetRoot().get(),
+      /*eutl_cert=*/
+      binding_builder.GetRootBuilder()->GetX509Certificate().get());
+
+  base::HistogramTester histograms;
+  EXPECT_TRUE(content::NavigateToURL(
+      web_contents(),
+      embedded_https_test_server().GetURL("www.example.com", "/main")));
+
+  auto* status = GetCurrentPageQwacStatus();
+  ASSERT_TRUE(status);
+  ASSERT_TRUE(WaitForStatusFinished(status));
+  EXPECT_FALSE(status->verified_2qwac_cert());
+  ASSERT_TRUE(status->tls_cert());
+  EXPECT_TRUE(status->tls_cert()->EqualsExcludingChain(tls_leaf.get()));
+  EXPECT_EQ(1, main_page_handler.request_count());
+  EXPECT_EQ(1, qwac_handler.request_count());
+  ExpectHistogramSample(histograms,
+                        QwacWebContentsObserver::QwacLinkProcessingResult::
+                            k2QwacVerificationFailed);
 }
 
 // TODO(crbug.com/392931069): Test that qwac is not fetched after clicking

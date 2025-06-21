@@ -222,6 +222,7 @@
 <translation id="3954172517175569325">Os contrasinais, métodos de pago e enderezos que gardes na túa Conta de Google quitaranse deste dispositivo. Para usalos de novo en Chromium, volve iniciar sesión.</translation>
 <translation id="395904275706073188">Non se poden ler as páxinas protexidas. Proba con outra.</translation>
 <translation id="3962647064319009959">Descubre como te protexe Chromium</translation>
+<translation id="3971865010372729242">Cando escribas na barra de enderezos ou na caixa de busca, Chromium enviará o que escribas ás ferramentas de busca, de IA e de axente da túa organización para ofrecerche suxestións.</translation>
 <translation id="3975724895399328945">Sobre &amp;Google Chrome for Testing</translation>
 <translation id="3997429360543082038">Acerca de Chromium OS</translation>
 <translation id="4019629340646866719">Chromium OS é posible grazas a <ph name="BEGIN_LINK_CROS_OSS" />software de código aberto<ph name="END_LINK_CROS_OSS" /> adicional, igual que o <ph name="BEGIN_LINK_LINUX_OSS" />contorno de programación de Linux<ph name="END_LINK_LINUX_OSS" />.</translation>
@@ -344,6 +345,7 @@
 <translation id="5775198138441669627">Se esqueciches a frase de acceso ou queres cambiar esta opción de configuración, <ph name="SETTINGS_LINK" /> os datos de Chromium da túa conta</translation>
 <translation id="5800158606660203929">Personalizar e controlar Chromium. Define Chromium como navegador predeterminado.</translation>
 <translation id="5809516625706423866">Non se puido establecer conexión con Internet. Erro: HTTP 401 (acceso non autorizado). Revisa a configuración do proxy.</translation>
+<translation id="5817952762723416573">Acelera os sitios co motor V8 de Chromium, pero fai que Chromium sexa un pouco menos resistente aos ataques. Esta opción de configuración está desactivada.</translation>
 <translation id="5821520528363214608">Actualiza Chromium para poder usar e gardar os seus datos na túa Conta de Google</translation>
 <translation id="5824893331272123205">Non se puido cargar este panel; téntao de novo</translation>
 <translation id="5862307444128926510">Dámosche a benvida a Chromium</translation>
@@ -433,6 +435,7 @@
 <translation id="6729124504294600478">Para beneficiarte da personalización e doutras funcións, inclúe Chromium en Actividade web e das aplicacións e servizos de Google vinculados</translation>
 <translation id="6734291798041940871">Chromium xa está instalado para todos os usuarios no teu ordenador.</translation>
 <translation id="674245979920622322">Levas un tempo sen entrar. Chromium quitou os seguintes permisos: <ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> e <ph name="COUNT" /> máis</translation>
+<translation id="6751374565094704799">Acelera os sitios co motor V8 de Chromium, pero fai que Chromium sexa un pouco menos resistente aos ataques. Esta opción de configuración está activada.</translation>
 <translation id="67706546131546258">Chromium recomenda analizar este ficheiro porque pode ser perigoso.</translation>
 <translation id="6779406956731413166">Chromium OS é posible grazas a <ph name="BEGIN_LINK_CROS_OSS" />software de código aberto<ph name="END_LINK_CROS_OSS" /> adicional.</translation>
 <translation id="6831043979455480757">Traducir</translation>

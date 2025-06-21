@@ -25,12 +25,14 @@
 #include "cc/layers/heads_up_display_layer_impl.h"
 #include "cc/layers/layer_impl.h"
 #include "cc/layers/mirror_layer_impl.h"
+#include "cc/layers/nine_patch_layer_impl.h"
 #include "cc/layers/nine_patch_thumb_scrollbar_layer_impl.h"
 #include "cc/layers/painted_scrollbar_layer_impl.h"
 #include "cc/layers/picture_layer_impl.h"
 #include "cc/layers/solid_color_scrollbar_layer_impl.h"
 #include "cc/layers/surface_layer_impl.h"
 #include "cc/layers/texture_layer_impl.h"
+#include "cc/layers/ui_resource_layer_impl.h"
 #include "cc/layers/view_transition_content_layer_impl.h"
 #include "cc/tiles/picture_layer_tiling.h"
 #include "cc/trees/layer_tree_impl.h"
@@ -748,12 +750,32 @@ void SerializeSolidColorScrollbarLayerExtra(
   extra->color = layer.color();
 }
 
+void SerializeUIResourceLayerExtra(UIResourceLayerImpl& layer,
+                                   viz::mojom::UIResourceLayerExtraPtr& extra) {
+  extra->ui_resource_id = layer.ui_resource_id();
+  extra->image_bounds = layer.image_bounds();
+  extra->uv_top_left = layer.uv_top_left();
+  extra->uv_bottom_right = layer.uv_bottom_right();
+}
+
 void SerializeViewTransitionContentLayerExtra(
     ViewTransitionContentLayerImpl& layer,
     viz::mojom::ViewTransitionContentLayerExtraPtr& extra) {
   extra->resource_id = layer.resource_id();
   extra->is_live_content_layer = layer.is_live_content_layer();
   extra->max_extents_rect = layer.max_extents_rect();
+}
+
+void SerializeNinePatchLayerExtra(NinePatchLayerImpl& layer,
+                                  viz::mojom::NinePatchLayerExtraPtr& extra) {
+  extra->image_aperture = layer.quad_generator().image_aperture();
+  extra->border = layer.quad_generator().border();
+  extra->layer_occlusion = layer.quad_generator().output_occlusion();
+  extra->fill_center = layer.quad_generator().fill_center();
+  extra->ui_resource_id = layer.ui_resource_id();
+  extra->image_bounds = layer.image_bounds();
+  extra->uv_top_left = layer.uv_top_left();
+  extra->uv_bottom_right = layer.uv_bottom_right();
 }
 
 void SerializeSurfaceLayerExtra(SurfaceLayerImpl& layer,
@@ -839,6 +861,14 @@ void SerializeLayer(LayerImpl& layer,
               std::move(nine_patch_thumb_scrollbar_layer_extra));
       break;
     }
+    case mojom::LayerType::kNinePatch: {
+      auto nine_patch_layer_extra = viz::mojom::NinePatchLayerExtra::New();
+      SerializeNinePatchLayerExtra(static_cast<NinePatchLayerImpl&>(layer),
+                                   nine_patch_layer_extra);
+      wire.layer_extra = viz::mojom::LayerExtra::NewNinePatchLayerExtra(
+          std::move(nine_patch_layer_extra));
+      break;
+    }
     case mojom::LayerType::kPaintedScrollbar: {
       auto painted_scrollbar_layer_extra =
           viz::mojom::PaintedScrollbarLayerExtra::New();
@@ -858,6 +888,11 @@ void SerializeLayer(LayerImpl& layer,
       wire.layer_extra =
           viz::mojom::LayerExtra::NewSolidColorScrollbarLayerExtra(
               std::move(solid_color_scrollbar_layer_extra));
+      break;
+    }
+    case mojom::LayerType::kSolidColor: {
+      // This is intentionally empty, as there are no extra properties
+      // to serialize for SolidColorLayerImpls.
       break;
     }
     case mojom::LayerType::kSurface: {
@@ -892,6 +927,14 @@ void SerializeLayer(LayerImpl& layer,
                                  context_provider);
       wire.layer_extra = viz::mojom::LayerExtra::NewTextureLayerExtra(
           std::move(texture_layer_extra));
+      break;
+    }
+    case mojom::LayerType::kUIResource: {
+      auto ui_resource_layer_extra = viz::mojom::UIResourceLayerExtra::New();
+      SerializeUIResourceLayerExtra(static_cast<UIResourceLayerImpl&>(layer),
+                                    ui_resource_layer_extra);
+      wire.layer_extra = viz::mojom::LayerExtra::NewUiResourceLayerExtra(
+          std::move(ui_resource_layer_extra));
       break;
     }
     case mojom::LayerType::kViewTransitionContent: {
@@ -1224,9 +1267,12 @@ void VizLayerContext::UpdateDisplayTreeFrom(
   update->background_color = tree.background_color();
 
   const ViewportPropertyIds& property_ids = tree.viewport_property_ids();
+  update->elastic_overscroll = tree.elastic_overscroll()->Current(true);
   update->overscroll_elasticity_transform =
       property_ids.overscroll_elasticity_transform;
   update->page_scale_transform = property_ids.page_scale_transform;
+  update->display_transform_hint = tree.display_transform_hint();
+  update->max_safe_area_inset_bottom = tree.max_safe_area_inset_bottom();
   update->inner_scroll = property_ids.inner_scroll;
   update->outer_clip = property_ids.outer_clip;
   update->outer_scroll = property_ids.outer_scroll;

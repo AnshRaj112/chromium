@@ -127,6 +127,12 @@ gfx::ColorSpace GPUCanvasContext::GetColorSpace() const {
   return PredefinedColorSpaceToGfxColorSpace(color_space_);
 }
 
+bool GPUCanvasContext::IsAccelerated() const {
+  auto* resource_provider = Host()->GetResourceProviderForWebGPU();
+  return resource_provider ? resource_provider->IsAccelerated()
+                           : Host()->ShouldTryToUseGpuRaster();
+}
+
 void GPUCanvasContext::Stop() {
   ReplaceDrawingBuffer(/*destroy_swap_buffers*/ true);
   stopped_ = true;
@@ -191,12 +197,12 @@ scoped_refptr<StaticBitmapImage> GPUCanvasContext::GetImage(FlushReason) {
 CanvasResourceProvider* GPUCanvasContext::PaintRenderingResultsToCanvas(
     SourceDrawingBuffer source_buffer) {
   if (!swap_buffers_) {
-    return Host()->ResourceProvider();
+    return Host()->GetResourceProviderForWebGPU();
   }
 
-  if (Host()->ResourceProvider() &&
-      Host()->ResourceProvider()->Size() != swap_buffers_->Size()) {
-    Host()->DiscardResourceProvider();
+  if (Host()->GetResourceProviderForWebGPU() &&
+      Host()->GetResourceProviderForWebGPU()->Size() != swap_buffers_->Size()) {
+    Host()->DiscardResources();
   }
 
   CanvasResourceProvider* resource_provider =
@@ -242,6 +248,16 @@ CanvasResourceProvider* GPUCanvasContext::PaintRenderingResultsToCanvas(
 
   CopyTextureToResourceProvider(texture, resource_provider);
   return resource_provider;
+}
+
+scoped_refptr<StaticBitmapImage>
+GPUCanvasContext::PaintRenderingResultsToSnapshot(
+    SourceDrawingBuffer source_buffer,
+    FlushReason reason) {
+  CanvasResourceProvider* provider =
+      PaintRenderingResultsToCanvas(source_buffer);
+
+  return provider ? provider->Snapshot(reason) : nullptr;
 }
 
 bool GPUCanvasContext::CopyRenderingResultsToVideoFrame(

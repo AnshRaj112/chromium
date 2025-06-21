@@ -267,11 +267,6 @@ BASE_FEATURE(kAllowUndamagedNonrootRenderPassToSkip,
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
-// If enabled, complex occluders are generated for quads with rounded corners,
-BASE_FEATURE(kComplexOccluderForQuadsWithRoundedCorners,
-             "ComplexOccluderForQuadsWithRoundedCorners",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Allow SurfaceAggregator to merge render passes when they contain quads that
 // require overlay (e.g. protected video). See usage in |EmitSurfaceContent|.
 BASE_FEATURE(kAllowForceMergeRenderPassWithRequireOverlayQuads,
@@ -421,6 +416,13 @@ BASE_FEATURE(kBatchResourceRelease,
              "BatchResourceRelease",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// When enabled, BeginFrameSource will not send a `BeginFrameArgs::MISSED` in
+// response to `AddObserver`. As these consistently miss deadlines, and increase
+// latency and jank. Instead the client will receive the next BeginFrame.
+BASE_FEATURE(kNoLateBeginFrames,
+             "NoLateBeginFrames",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Stops BeginFrame issue to use |last_vsync_interval_| instead of the current
 // set of BeginFrameArgs.
 // TODO(b/333940735): Should be removed if the issue isn't fixed.
@@ -532,12 +534,6 @@ bool ShouldOnBeginFrameThrottleVideo() {
   return base::FeatureList::IsEnabled(features::kOnBeginFrameThrottleVideo);
 }
 
-bool IsComplexOccluderForQuadsWithRoundedCornersEnabled() {
-  static bool enabled = base::FeatureList::IsEnabled(
-      features::kComplexOccluderForQuadsWithRoundedCorners);
-  return enabled;
-}
-
 bool ShouldDrawImmediatelyWhenInteractive() {
   return base::FeatureList::IsEnabled(
       features::kDrawImmediatelyWhenInteractive);
@@ -586,7 +582,9 @@ bool ShouldRemoveRedirectionBitmap() {
   // can take the Swiftshader rendering path, which also needs the Redirection
   // Bitmap. On devices with DComp disabled, ANGLE draws to the redirection
   // bitmap via a blit swap chain, so check for the command line switch as well.
-  return base::win::GetVersion() >= base::win::Version::WIN11 &&
+  // 22H2 is specified because it is the lowest version supporting DWM system
+  // backdrop.
+  return base::win::GetVersion() >= base::win::Version::WIN11_22H2 &&
          base::FeatureList::IsEnabled(kRemoveRedirectionBitmap) &&
          !base::CommandLine::ForCurrentProcess()->HasSwitch(
              switches::kOverrideUseSoftwareGLForTests) &&

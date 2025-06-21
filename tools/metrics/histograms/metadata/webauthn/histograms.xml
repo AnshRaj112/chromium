@@ -63,7 +63,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebAuthentication.Android.CredManPrepareRequest"
-    enum="CredManPrepareRequestEnum" expires_after="2025-10-12">
+    enum="CredManPrepareRequestEnum" expires_after="2025-12-14">
   <owner>derinel@google.com</owner>
   <owner>kenrb@chromium.org</owner>
   <summary>
@@ -83,7 +83,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="WebAuthentication.Android.Fido2VsPasskeyCache.CredentialCountDifference"
-    units="passkeys" expires_after="2025-10-12">
+    units="passkeys" expires_after="2025-12-14">
   <owner>derinel@google.com</owner>
   <owner>chrome-webauthn@google.com</owner>
   <summary>
@@ -96,7 +96,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="WebAuthentication.Android.Fido2VsPasskeyCache.CredentialCountDifference.{RpType}"
-    units="passkeys" expires_after="2025-10-12">
+    units="passkeys" expires_after="2025-12-14">
   <owner>derinel@google.com</owner>
   <owner>chrome-webauthn@google.com</owner>
   <summary>
@@ -139,7 +139,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebAuthentication.Android.Fido2VsPasskeyCache.SuccessState"
-    enum="SuccessState" expires_after="2025-10-12">
+    enum="SuccessState" expires_after="2025-12-14">
   <owner>derinel@google.com</owner>
   <owner>chrome-webauthn@google.com</owner>
   <summary>
@@ -150,7 +150,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="WebAuthentication.Android.Fido2VsPasskeyCache.{RequestType}FasterMs"
-    units="ms" expires_after="2025-10-12">
+    units="ms" expires_after="2025-12-14">
   <owner>derinel@google.com</owner>
   <owner>chrome-webauthn@google.com</owner>
   <summary>
@@ -167,7 +167,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="WebAuthentication.Android.Fido2VsPasskeyCache.{RequestType}FasterMs.{RpType}"
-    units="ms" expires_after="2025-10-12">
+    units="ms" expires_after="2025-12-14">
   <owner>derinel@google.com</owner>
   <owner>chrome-webauthn@google.com</owner>
   <summary>
@@ -188,7 +188,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebAuthentication.Android.NonDiscoverableCredentialsFound"
-    enum="Boolean" expires_after="2025-10-12">
+    enum="Boolean" expires_after="2025-12-14">
   <owner>derinel@google.com</owner>
   <owner>kenrb@chromium.org</owner>
   <summary>
@@ -247,7 +247,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebAuthentication.ConditionalUiPasskeyCount" units="passkeys"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>kenrb@chromium.org</owner>
   <owner>nsatragno@chromium.org</owner>
   <owner>chrome-webauthn@google.com</owner>
@@ -342,7 +342,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebAuthentication.GetAssertion.Immediate.EnclaveReady"
-    enum="Boolean" expires_after="2025-11-26">
+    enum="Boolean" expires_after="2025-11-30">
   <owner>derinel@google.com</owner>
   <owner>chrome-webauthn@google.com</owner>
   <summary>
@@ -352,9 +352,20 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="WebAuthentication.GetAssertion.Immediate.RejectionReason"
+    enum="WebAuthenticationImmediateMediationRejectionReason"
+    expires_after="2025-11-30">
+  <owner>derinel@google.com</owner>
+  <owner>chrome-webauthn@google.com</owner>
+  <summary>
+    Records the reason why a WebAuthn get() request with immediate mediation was
+    rejected by the browser before showing any UI.
+  </summary>
+</histogram>
+
 <histogram
     name="WebAuthentication.GetAssertion.Immediate.TimeoutWhileWaitingForUi"
-    enum="Boolean" expires_after="2025-11-09">
+    enum="Boolean" expires_after="2025-11-30">
   <owner>derinel@google.com</owner>
   <owner>chrome-webauthn@google.com</owner>
   <summary>
@@ -428,7 +439,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="WebAuthentication.IsUVPlatformAuthenticatorAvailable2"
-    enum="Boolean" expires_after="2025-10-12">
+    enum="Boolean" expires_after="2025-12-14">
   <owner>kenrb@chromium.org</owner>
   <owner>martinkr@google.com</owner>
   <summary>
@@ -474,6 +485,30 @@ chromium-metrics-reviews@google.com.
   <summary>
     Records the transport used when an authenticator responds with success to a
     WebAuthentication MakeCredential request.
+  </summary>
+</histogram>
+
+<histogram name="WebAuthentication.MechanismSorter.DeduplicationHappened"
+    enum="Boolean" expires_after="2025-11-30">
+  <owner>derinel@google.com</owner>
+  <owner>chrome-webauthn@google.com</owner>
+  <summary>
+    For a given WebAuthn request, records whether any credentials for the same
+    account were deduplicated. This is recorded for get requests with immediate
+    mediation.
+  </summary>
+</histogram>
+
+<histogram name="WebAuthentication.MechanismSorter.SelectedMechanismType"
+    enum="WebAuthenticationMechanismDeduplicatedType"
+    expires_after="2025-11-30">
+  <owner>derinel@google.com</owner>
+  <owner>chrome-webauthn@google.com</owner>
+  <summary>
+    Records the type of the credential that was selected for an account after
+    deduplication. This is recorded for each account that had more than one
+    credential (i.e. when deduplication happened). This is recorded for get
+    requests with immediate mediation.
   </summary>
 </histogram>
 

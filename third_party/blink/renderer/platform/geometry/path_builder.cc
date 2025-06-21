@@ -71,7 +71,7 @@ void AddCurvedCorner(SkPath& path, const Corner& corner) {
   // Start the path from the beginning of the curve.
   path.lineTo(gfx::PointFToSkPoint(corner.Start()));
 
-  if (corner.IsStraight()) {
+  if (corner.IsStraight() || corner.IsEmpty()) {
     // Straight or very close to it, draw two lines.
     path.lineTo(gfx::PointFToSkPoint(corner.Outer()));
     path.lineTo(gfx::PointFToSkPoint(corner.End()));
@@ -252,7 +252,8 @@ PathBuilder& PathBuilder::AddContouredRect(
 
   // This would include the outer border of the rect, as well as shadow and
   // margin.
-  if (origin_rect == target_rect) {
+  if (origin_rect == target_rect ||
+      contoured_rect.GetCornerCurvature().IsHyperellipse()) {
     // A rect with no insets/outsets, we can draw all the corners and not worry
     // about intersections.
     const Corner top_right_corner = contoured_rect.TopRightCorner();
@@ -274,42 +275,68 @@ PathBuilder& PathBuilder::AddContouredRect(
     const Corner top_left_corner = contoured_rect.TopLeftCorner();
     MoveTo(top_right_corner.Start());
     AddCorner(top_right_corner);
-    LineTo(gfx::LineF(outer_rect.top_right(), outer_rect.bottom_right())
-               .IntersectionWith({top_right_corner.QuadraticControlPoint(),
-                                  top_right_corner.End()})
-               .value_or(top_right_corner.End()));
+    if (!top_right_corner.IsHyperellipse()) {
+      LineTo(gfx::LineF(outer_rect.top_right(), outer_rect.bottom_right())
+                 .IntersectionWith({top_right_corner.QuadraticControlPoint(),
+                                    top_right_corner.End()})
+                 .value_or(
+                     gfx::PointF(outer_rect.right(), origin_rect.Rect().y())));
+    }
 
-    LineTo(gfx::LineF(outer_rect.top_right(), outer_rect.bottom_right())
-               .IntersectionWith({bottom_right_corner.QuadraticControlPoint(),
-                                  bottom_right_corner.Start()})
-               .value_or(bottom_right_corner.Start()));
+    if (!bottom_right_corner.IsHyperellipse()) {
+      LineTo(gfx::LineF(outer_rect.top_right(), outer_rect.bottom_right())
+                 .IntersectionWith({bottom_right_corner.QuadraticControlPoint(),
+                                    bottom_right_corner.Start()})
+                 .value_or(gfx::PointF(outer_rect.right(),
+                                       origin_rect.Rect().bottom())));
+    }
+
     AddCorner(bottom_right_corner);
-    LineTo(gfx::LineF(outer_rect.bottom_left(), outer_rect.bottom_right())
-               .IntersectionWith({bottom_right_corner.QuadraticControlPoint(),
-                                  bottom_right_corner.End()})
-               .value_or(bottom_right_corner.End()));
-    LineTo(gfx::LineF(outer_rect.bottom_left(), outer_rect.bottom_right())
-               .IntersectionWith({bottom_left_corner.QuadraticControlPoint(),
-                                  bottom_left_corner.Start()})
-               .value_or(bottom_left_corner.Start()));
+
+    if (!bottom_right_corner.IsHyperellipse()) {
+      LineTo(gfx::LineF(outer_rect.bottom_left(), outer_rect.bottom_right())
+                 .IntersectionWith({bottom_right_corner.QuadraticControlPoint(),
+                                    bottom_right_corner.End()})
+                 .value_or(gfx::PointF(origin_rect.Rect().right(),
+                                       outer_rect.bottom())));
+    }
+    if (!bottom_left_corner.IsHyperellipse()) {
+      LineTo(gfx::LineF(outer_rect.bottom_left(), outer_rect.bottom_right())
+                 .IntersectionWith({bottom_left_corner.QuadraticControlPoint(),
+                                    bottom_left_corner.Start()})
+                 .value_or(
+                     gfx::PointF(origin_rect.Rect().x(), outer_rect.bottom())));
+    }
     AddCorner(bottom_left_corner);
-    LineTo(gfx::LineF(outer_rect.bottom_left(), outer_rect.origin())
-               .IntersectionWith({bottom_left_corner.QuadraticControlPoint(),
-                                  bottom_left_corner.End()})
-               .value_or(bottom_left_corner.End()));
-    LineTo(gfx::LineF(outer_rect.bottom_left(), outer_rect.origin())
-               .IntersectionWith({top_left_corner.QuadraticControlPoint(),
-                                  top_left_corner.Start()})
-               .value_or(top_left_corner.Start()));
+    if (!bottom_left_corner.IsHyperellipse()) {
+      LineTo(gfx::LineF(outer_rect.bottom_left(), outer_rect.origin())
+                 .IntersectionWith({bottom_left_corner.QuadraticControlPoint(),
+                                    bottom_left_corner.End()})
+                 .value_or(
+                     gfx::PointF(outer_rect.x(), origin_rect.Rect().bottom())));
+    }
+    if (!top_left_corner.IsHyperellipse()) {
+      LineTo(
+          gfx::LineF(outer_rect.bottom_left(), outer_rect.origin())
+              .IntersectionWith({top_left_corner.QuadraticControlPoint(),
+                                 top_left_corner.Start()})
+              .value_or(gfx::PointF(outer_rect.x(), origin_rect.Rect().y())));
+    }
     AddCorner(top_left_corner);
-    LineTo(gfx::LineF(outer_rect.top_right(), outer_rect.origin())
-               .IntersectionWith({top_left_corner.QuadraticControlPoint(),
-                                  top_left_corner.End()})
-               .value_or(top_left_corner.End()));
-    LineTo(gfx::LineF(outer_rect.top_right(), outer_rect.origin())
-               .IntersectionWith({top_right_corner.QuadraticControlPoint(),
-                                  top_right_corner.Start()})
-               .value_or(top_right_corner.Start()));
+    if (!top_left_corner.IsHyperellipse()) {
+      LineTo(
+          gfx::LineF(outer_rect.top_right(), outer_rect.origin())
+              .IntersectionWith({top_left_corner.QuadraticControlPoint(),
+                                 top_left_corner.End()})
+              .value_or(gfx::PointF(origin_rect.Rect().x(), outer_rect.y())));
+    }
+    if (!top_right_corner.IsHyperellipse()) {
+      LineTo(gfx::LineF(outer_rect.top_right(), outer_rect.origin())
+                 .IntersectionWith({top_right_corner.QuadraticControlPoint(),
+                                    top_right_corner.Start()})
+                 .value_or(
+                     gfx::PointF(origin_rect.Rect().right(), outer_rect.y())));
+    }
     Close();
     current_path_.reset();
     return *this;
@@ -336,7 +363,7 @@ PathBuilder& PathBuilder::AddContouredRect(
   ContouredRect origin_contoured_rect(origin_rect,
                                       contoured_rect.GetCornerCurvature());
 
-  if (!origin_rect.GetRadii().TopRight().IsZero()) {
+  if (!origin_rect.GetRadii().TopRight().IsEmpty()) {
     SkPath path;
     path.moveTo(infinite_rect.left(), infinite_rect.top());
     AddCurvedCorner(path, contoured_rect.TopRightCorner());
@@ -346,7 +373,7 @@ PathBuilder& PathBuilder::AddContouredRect(
     op_builder.add(path, kIntersect_SkPathOp);
   }
 
-  if (!origin_rect.GetRadii().BottomRight().IsZero()) {
+  if (!origin_rect.GetRadii().BottomRight().IsEmpty()) {
     SkPath path;
     path.moveTo(infinite_rect.right(), infinite_rect.top());
     AddCurvedCorner(path, contoured_rect.BottomRightCorner());
@@ -356,7 +383,7 @@ PathBuilder& PathBuilder::AddContouredRect(
     op_builder.add(path, kIntersect_SkPathOp);
   }
 
-  if (!origin_rect.GetRadii().BottomLeft().IsZero()) {
+  if (!origin_rect.GetRadii().BottomLeft().IsEmpty()) {
     SkPath path;
     path.moveTo(infinite_rect.right(), infinite_rect.bottom());
     AddCurvedCorner(path, contoured_rect.BottomLeftCorner());
@@ -366,7 +393,7 @@ PathBuilder& PathBuilder::AddContouredRect(
     op_builder.add(path, kIntersect_SkPathOp);
   }
 
-  if (!origin_rect.GetRadii().TopLeft().IsZero()) {
+  if (!origin_rect.GetRadii().TopLeft().IsEmpty()) {
     SkPath path;
     path.moveTo(infinite_rect.left(), infinite_rect.bottom());
     AddCurvedCorner(path, contoured_rect.TopLeftCorner());
@@ -377,7 +404,8 @@ PathBuilder& PathBuilder::AddContouredRect(
   }
 
   SkPath result;
-  CHECK(op_builder.resolve(&result));
+  CHECK(op_builder.resolve(&result))
+      << contoured_rect.ToString() << " " << origin_rect.ToString();
   builder_.addPath(result);
   current_path_.reset();
   return *this;

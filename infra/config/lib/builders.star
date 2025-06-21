@@ -88,7 +88,7 @@ os = struct(
     MAC_14 = os_enum(os_category.MAC, "Mac-14"),
     MAC_DEFAULT = os_enum(os_category.MAC, "Mac-15"),
     MAC_ANY = os_enum(os_category.MAC, "Mac"),
-    MAC_BETA = os_enum(os_category.MAC, "Mac-15"),
+    MAC_BETA = os_enum(os_category.MAC, "Mac-15|Mac-26"),
     WINDOWS_10 = os_enum(os_category.WINDOWS, "Windows-10"),
     # TODO(crbug.com/41492657): remove after slow compile issue resolved.
     WINDOWS_10_1909 = os_enum(os_category.WINDOWS, "Windows-10-18363"),
@@ -965,10 +965,13 @@ def builder(
 
     additional_exclusions = register_gn_args(builder_group, bucket, name, gn_args, use_siso)
 
-    builder_config_settings = defaults.get_value(
-        "builder_config_settings",
-        builder_config_settings,
-    )
+    if builder_spec or mirrors:
+        builder_config_settings = defaults.get_value(
+            "builder_config_settings",
+            builder_config_settings,
+        )
+    elif builder_config_settings == args.DEFAULT:
+        builder_config_settings = None
     register_builder_config(
         bucket,
         name,

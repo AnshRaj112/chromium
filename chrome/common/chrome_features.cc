@@ -195,14 +195,6 @@ BASE_FEATURE(kDataLeakPreventionFilesRestriction,
 #endif
 
 #if !BUILDFLAG(IS_ANDROID)
-// Enables a revamped Delete Browsing Data dialog. This includes UI changes and
-// removal of the bulk password deletion option from the dialog.
-BASE_FEATURE(kDbdRevampDesktop,
-             "DbdRevampDesktop",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#endif  // !BUILDFLAG(IS_ANDROID)
-
-#if !BUILDFLAG(IS_ANDROID)
 // Whether to allow installed-by-default web apps to be installed or not.
 BASE_FEATURE(kPreinstalledWebAppInstallation,
              "DefaultWebAppInstallation",
@@ -442,6 +434,35 @@ BASE_FEATURE_PARAM(double,
                    &kGlicUserStatusCheck,
                    "glic-user-status-request-delay-jitter",
                    0.005);
+
+constexpr base::FeatureParam<GlicEnterpriseCheckStrategy>::Option
+    kGlicEnterpriseCheckStrategyOptions[] = {
+        {GlicEnterpriseCheckStrategy::kPolicy, "policy"},
+        {GlicEnterpriseCheckStrategy::kManaged, "managed"},
+};
+BASE_FEATURE_ENUM_PARAM(GlicEnterpriseCheckStrategy,
+                        kGlicUserStatusEnterpriseCheckStrategy,
+                        &kGlicUserStatusCheck,
+                        "glic-user-status-enterprise-check-strategy",
+                        GlicEnterpriseCheckStrategy::kManaged,
+                        &kGlicEnterpriseCheckStrategyOptions);
+
+// When true, the Glic API exposes a method to propose refreshing the
+// user status.
+BASE_FEATURE_PARAM(bool,
+                   kGlicUserStatusRefreshApi,
+                   &kGlicUserStatusCheck,
+                   "glic-user-status-refresh-api",
+                   true);
+
+// The minimum time between user status update requests, when triggered by
+// the Glic API (or another reason that might occur frequently).
+BASE_FEATURE_PARAM(base::TimeDelta,
+                   kGlicUserStatusThrottleInterval,
+                   &kGlicUserStatusCheck,
+                   "glic-user-status-throttle-interval",
+                   base::Seconds(5));
+
 BASE_FEATURE(kGlicFreURLConfig,
              "GlicFreURLConfig",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -479,6 +500,12 @@ BASE_FEATURE_PARAM(std::string,
                    &kGlicLearnMoreURLConfig,
                    "glic-shortcuts-tab-access-toggle-learn-more-url",
                    "");
+BASE_FEATURE_PARAM(
+    std::string,
+    kGlicTabAccessToggleLearnMoreURLDataProtected,
+    &kGlicLearnMoreURLConfig,
+    "glic-shortcuts-tab-access-toggle-learn-more-url-data-protected",
+    "");
 BASE_FEATURE_PARAM(std::string,
                    kGlicSettingsPageLearnMoreURL,
                    &kGlicLearnMoreURLConfig,
@@ -602,13 +629,9 @@ BASE_FEATURE(kGlicExplicitBackgroundColor,
 // Features to experiment with resetting the panel default location.
 BASE_FEATURE(kGlicPanelResetTopChromeButton,
              "GlicPanelResetTopChromeButton",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-const base::FeatureParam<bool> kGlicPanelResetTopChromeButtonOnOpen{
-    &kGlicPanelResetTopChromeButton, "glic-panel-reset-on-open", true};
-const base::FeatureParam<bool> kGlicPanelResetTopChromeButtonAnimate{
-    &kGlicPanelResetTopChromeButton, "glic-panel-reset-animate", false};
+             base::FEATURE_ENABLED_BY_DEFAULT);
 const base::FeatureParam<int> kGlicPanelResetTopChromeButtonDelayMs{
-    &kGlicPanelResetTopChromeButton, "glic-panel-reset-delay-ms", 2000};
+    &kGlicPanelResetTopChromeButton, "glic-panel-reset-delay-ms", 2500};
 BASE_FEATURE(kGlicPanelResetOnStart,
              "GlicPanelResetOnStart",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -620,11 +643,32 @@ BASE_FEATURE(kGlicPanelResetOnSessionTimeout,
              base::FEATURE_DISABLED_BY_DEFAULT);
 const base::FeatureParam<int> kGlicPanelResetOnSessionTimeoutDelayH{
     &kGlicPanelResetOnSessionTimeout,
-    "glic-panel-reset-session-timeout-delay-h", 0};
+    "glic-panel-reset-session-timeout-delay-h", 24};
 
 BASE_FEATURE(kGlicWebClientUnresponsiveMetrics,
              "GlicWebClientUnresponsiveMetrics",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kGlicTabGlow, "GlicTabGlow", base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kGlicParameterizedShader,
+             "GlicParameterizedShader",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+extern const base::FeatureParam<std::string> kGlicParameterizedShaderColors{
+    &kGlicParameterizedShader, "glic-parameterized-shader-colors", ""};
+extern const base::FeatureParam<std::string> kGlicParameterizedShaderFloats{
+    &kGlicParameterizedShader, "glic-parameterized-shader-floats", ""};
+
+BASE_FEATURE(kGlicMultiTab, "GlicMultiTab", base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kGlicTabFocusDataDedupDebounce,
+             "GlicTabFocusDataDedupDebounce",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+const base::FeatureParam<int> kGlicTabFocusDataDebounceDelayMs{
+    &kGlicTabFocusDataDedupDebounce, "glic-tab-focus-data-debounce-delay-ms",
+    5};
+const base::FeatureParam<int> kGlicTabFocusDataMaxDebounces{
+    &kGlicTabFocusDataDedupDebounce, "glic-tab-focus-data-max-debounces", 5};
 
 #endif  // BUILDFLAG(ENABLE_GLIC)
 

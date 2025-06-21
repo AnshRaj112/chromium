@@ -13,6 +13,7 @@
 #include "base/time/time.h"
 #include "chrome/common/actor/actor_logging.h"
 #include "chrome/common/chrome_features.h"
+#include "chrome/renderer/actor/tool_base.h"
 #include "content/public/renderer/render_frame.h"
 #include "third_party/blink/public/web/web_document.h"
 #include "third_party/blink/public/web/web_frame_widget.h"
@@ -58,9 +59,16 @@ PageStabilityMonitor::PageStabilityMonitor(RenderFrame& frame)
 
 PageStabilityMonitor::~PageStabilityMonitor() = default;
 
-void PageStabilityMonitor::WaitForStable(base::OnceClosure callback) {
+void PageStabilityMonitor::WaitForStable(const ToolBase& tool,
+                                         int32_t task_id,
+                                         Journal& journal,
+                                         base::OnceClosure callback) {
   CHECK_EQ(state_, State::kInitial);
   CHECK(!is_stable_callback_);
+  journal_entry_ =
+      journal.CreatePendingAsyncEntry(task_id, "PageStability", "");
+
+  minimum_end_time_ = base::TimeTicks::Now() + tool.MinimumObservationDelay();
 
   is_stable_callback_ = std::move(callback);
 
@@ -132,7 +140,19 @@ void PageStabilityMonitor::MoveToState(State new_state) {
       render_frame()
           ->GetTaskRunner(blink::TaskType::kIdleTask)
           ->PostTask(FROM_HERE,
-                     PostMoveToStateClosure(State::kWaitForVisualStateRequest));
+                     PostMoveToStateClosure(State::kEnsureMinimumDelay));
+      break;
+    }
+    case State::kEnsureMinimumDelay: {
+      if (base::TimeTicks::Now() < minimum_end_time_) {
+        base::TimeDelta time_remaining =
+            minimum_end_time_ - base::TimeTicks::Now();
+        PostMoveToStateClosure(State::kWaitForVisualStateRequest,
+                               /*delay=*/time_remaining)
+            .Run();
+      } else {
+        MoveToState(State::kWaitForVisualStateRequest);
+      }
       break;
     }
     case State::kWaitForVisualStateRequest: {
@@ -140,27 +160,31 @@ void PageStabilityMonitor::MoveToState(State new_state) {
           render_frame()->GetWebFrame()->LocalRoot()->FrameWidget();
       if (!widget->InsertVisualStateRequest(
               PostMoveToStateClosure(State::kInvokeCallback))) {
-        ACTOR_LOG() << "Failed to wait for new frame presentation due to no "
-                       "compositor.";
+        journal_entry_->EndEntry(
+            "Failed to wait for new frame presentation due to no "
+            "compositor.");
         MoveToState(State::kInvokeCallback);
       }
       break;
     }
     case State::kTimeoutGlobal: {
-      ACTOR_LOG() << "Timed out waiting for page stability.";
+      journal_entry_->EndEntry("Timed out waiting for page stability.");
       MoveToState(State::kInvokeCallback);
       break;
     }
     case State::kTimeoutMainThread: {
-      ACTOR_LOG() << "Timed out waiting for page stability - main thread to "
-                     "produce a thread.";
+      journal_entry_->EndEntry(
+          "Timed out waiting for page stability - main thread to "
+          "produce a thread.");
       MoveToState(State::kInvokeCallback);
       break;
     }
     case State::kInvokeCallback: {
       // Ensure we release the network idle callback slot.
       network_idle_callback_.Cancel();
-      std::move(is_stable_callback_).Run();
+      // Call the callback on a separate task.
+      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE, std::move(is_stable_callback_));
       MoveToState(State::kDone);
       break;
     }
@@ -211,6 +235,10 @@ void PageStabilityMonitor::DCheckStateTransition(State old_state,
               State::kWaitForMainThreadIdle,
               State::kTimeoutGlobal}},
           {State::kWaitForMainThreadIdle, {
+              State::kEnsureMinimumDelay,
+              State::kTimeoutMainThread,
+              State::kTimeoutGlobal}},
+          {State::kEnsureMinimumDelay, {
               State::kWaitForVisualStateRequest,
               State::kTimeoutMainThread,
               State::kTimeoutGlobal}},

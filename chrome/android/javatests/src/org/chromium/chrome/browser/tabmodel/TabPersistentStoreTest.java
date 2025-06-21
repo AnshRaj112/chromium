@@ -47,7 +47,6 @@ import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.base.test.util.HistogramWatcher;
 import org.chromium.base.test.util.Matchers;
-import org.chromium.base.test.util.MinAndroidSdkLevel;
 import org.chromium.chrome.browser.app.ChromeActivity;
 import org.chromium.chrome.browser.app.metrics.LaunchCauseMetrics;
 import org.chromium.chrome.browser.app.tabmodel.AsyncTabParamsManagerSingleton;
@@ -214,7 +213,19 @@ public class TabPersistentStoreTest {
                                     TestTabModelSelector.this,
                                     tabRemover,
                                     /* supportUndo= */ true,
-                                    /* isArchivedTabModel= */ true);
+                                    /* isArchivedTabModel= */ false) {
+                                @Override
+                                public void initializeNative(
+                                        int activityType, boolean isArchivedTabModel) {
+                                    // Skip setting up the TabModelObserverJniBridge by using
+                                    // isArchivedTabModel = true. This test uses MockTab which has
+                                    // no native pointer while still initializing the native half of
+                                    // the TabModel leading to crashes from the
+                                    // TabModelObserverJniBridge. It needs to be refactored.
+                                    super.initializeNative(
+                                            activityType, /* isArchivedTabModel= */ true);
+                                }
+                            };
                         }
                     };
             TabModelImpl regularTabModel = ThreadUtils.runOnUiThreadBlocking(callable);
@@ -236,18 +247,18 @@ public class TabPersistentStoreTest {
                                     NO_RESTORE_TYPE,
                                     this,
                                     incognitoTabRemover));
-            TabUngrouperFactory factory =
-                    (isIncognitoBranded, tabGroupModelFilterSupplier) ->
-                            new PassthroughTabUngrouper(tabGroupModelFilterSupplier);
-            initialize(regularTabModel, incognitoTabModel, factory);
+            initialize(
+                    TabModelHolderFactory.createTabModelHolderForTesting(regularTabModel),
+                    TabModelHolderFactory.createIncognitoTabModelHolderForTesting(
+                            incognitoTabModel));
         }
 
         @Override
         public void requestToShowTab(Tab tab, @TabSelectionType int type) {}
 
         @Override
-        public boolean isSessionRestoreInProgress() {
-            return false;
+        public boolean isTabModelRestored() {
+            return true;
         }
     }
 
@@ -1410,7 +1421,6 @@ public class TabPersistentStoreTest {
     @Test
     @SmallTest
     @Feature({"TabPersistentStore", "MultiWindow"})
-    @MinAndroidSdkLevel(24)
     public void testDuplicateTabIdsOnColdStart() throws Exception {
         final TabModelMetaDataInfo info = TestTabModelDirectory.TAB_MODEL_METADATA_V5_NO_M18;
 

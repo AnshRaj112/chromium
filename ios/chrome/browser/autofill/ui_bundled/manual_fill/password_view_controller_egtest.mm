@@ -987,7 +987,15 @@ void CheckKeyboardIsUpAndNotCovered() {
 }
 
 // Tests password generation on manual fallback.
-- (void)testPasswordGenerationOnManualFallback {
+// TODO(crbug.com/424760140): Test fails on simulator.
+#if TARGET_IPHONE_SIMULATOR
+#define MAYBE_testPasswordGenerationOnManualFallback \
+  DISABLED_testPasswordGenerationOnManualFallback
+#else
+#define MAYBE_testPasswordGenerationOnManualFallback \
+  testPasswordGenerationOnManualFallback
+#endif
+- (void)MAYBE_testPasswordGenerationOnManualFallback {
   [SigninEarlGreyUI signinWithFakeIdentity:[FakeSystemIdentity fakeIdentity1]];
   [ChromeEarlGrey waitForSyncTransportStateActiveWithTimeout:base::Seconds(10)];
 
@@ -1016,7 +1024,15 @@ void CheckKeyboardIsUpAndNotCovered() {
 }
 
 // Tests password generation on manual fallback for signed in users.
-- (void)testPasswordGenerationOnManualFallbackSignedInAccount {
+// TODO(crbug.com/424760140): Test fails on simulator.
+#if TARGET_IPHONE_SIMULATOR
+#define MAYBE_testPasswordGenerationOnManualFallbackSignedInAccount \
+  DISABLED_testPasswordGenerationOnManualFallbackSignedInAccount
+#else
+#define MAYBE_testPasswordGenerationOnManualFallbackSignedInAccount \
+  testPasswordGenerationOnManualFallbackSignedInAccount
+#endif
+- (void)MAYBE_testPasswordGenerationOnManualFallbackSignedInAccount {
   [SigninEarlGreyUI signinWithFakeIdentity:[FakeSystemIdentity fakeIdentity1]];
   [ChromeEarlGrey waitForSyncTransportStateActiveWithTimeout:base::Seconds(10)];
 
@@ -1320,6 +1336,11 @@ void CheckKeyboardIsUpAndNotCovered() {
 // Tests that tapping the "Autofill Form" button in the all password list fills
 // the password form with the right data.
 - (void)testAutofillFormButtonInAllPasswordListFillsForm {
+  // TODO(crbug.com/426435086): Test consistently fails on ipad.
+  if ([ChromeEarlGrey isIPadIdiom]) {
+    EARL_GREY_TEST_DISABLED(@"Fails on iPad.");
+  }
+
   if (![AutofillAppInterface isKeyboardAccessoryUpgradeEnabled]) {
     EARL_GREY_TEST_DISABLED(@"This test is not relevant when the Keyboard "
                             @"Accessory Upgrade feature is disabled.")

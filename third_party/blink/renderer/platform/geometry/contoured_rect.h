@@ -5,6 +5,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_PLATFORM_GEOMETRY_CONTOURED_RECT_H_
 #define THIRD_PARTY_BLINK_RENDERER_PLATFORM_GEOMETRY_CONTOURED_RECT_H_
 
+#include <array>
 #include <optional>
 
 #include "third_party/blink/renderer/platform/geometry/float_rounded_rect.h"
@@ -137,7 +138,11 @@ class PLATFORM_EXPORT ContouredRect {
       return curvature_ == CornerCurvature::kNotch;
     }
     constexpr bool IsConcave() const { return curvature_ < 1; }
+    constexpr bool IsHyperellipse() const { return curvature_ >= 2; }
     constexpr bool IsZero() const { return Start() == End(); }
+    constexpr bool IsEmpty() const {
+      return v1().Length() == 0 || v2().Length() == 0;
+    }
     constexpr bool operator==(const Corner&) const = default;
 
     // Invert the curvature

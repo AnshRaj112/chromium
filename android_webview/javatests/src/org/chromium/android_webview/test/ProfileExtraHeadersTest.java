@@ -568,6 +568,9 @@ public class ProfileExtraHeadersTest extends AwParameterizedTest {
     @Feature({"AndroidWebView"})
     @Test
     public void willAttachHeaderOnCrossOriginResourceRequests() throws Exception {
+        // Explicitly enable image loading to make the test resilient against external settings
+        // changes (e.g. variations).
+        ThreadUtils.runOnUiThreadBlocking(() -> mAwContents.getSettings().setImagesEnabled(true));
         String mainContentTemplate =
                 """
             <!DOCTYPE html>
@@ -587,6 +590,7 @@ public class ProfileExtraHeadersTest extends AwParameterizedTest {
 
             mActivityTestRule.loadUrlSync(
                     mAwContents, mContentsClient.getOnPageFinishedHelper(), mainUrl);
+
             HTTPRequest lastRequest = server.getLastRequest("/index.html");
             Assert.assertEquals("", lastRequest.headerValue("X-ApplicationHeader"));
 

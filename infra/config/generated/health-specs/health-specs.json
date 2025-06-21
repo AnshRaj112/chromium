@@ -300,27 +300,6 @@
           }
         ]
       },
-      "Android FYI Release (Nexus 5X)": {
-        "contact_team_email": "chrome-gpu-infra@google.com",
-        "problem_specs": [
-          {
-            "name": "Unhealthy",
-            "period_days": 7,
-            "score": 5,
-            "thresholds": {
-              "_default": "_default"
-            }
-          },
-          {
-            "name": "Low Value",
-            "period_days": 90,
-            "score": 1,
-            "thresholds": {
-              "_default": "_default"
-            }
-          }
-        ]
-      },
       "Android FYI Release (Pixel 2)": {
         "contact_team_email": "chrome-gpu-infra@google.com",
         "problem_specs": [
@@ -427,27 +406,6 @@
         ]
       },
       "Android FYI Release (Samsung S23)": {
-        "contact_team_email": "chrome-gpu-infra@google.com",
-        "problem_specs": [
-          {
-            "name": "Unhealthy",
-            "period_days": 7,
-            "score": 5,
-            "thresholds": {
-              "_default": "_default"
-            }
-          },
-          {
-            "name": "Low Value",
-            "period_days": 90,
-            "score": 1,
-            "thresholds": {
-              "_default": "_default"
-            }
-          }
-        ]
-      },
-      "Android Release (Nexus 5X)": {
         "contact_team_email": "chrome-gpu-infra@google.com",
         "problem_specs": [
           {
@@ -921,49 +879,7 @@
           }
         ]
       },
-      "Dawn Android arm DEPS Release (Nexus 5X)": {
-        "contact_team_email": "chrome-gpu-infra@google.com",
-        "problem_specs": [
-          {
-            "name": "Unhealthy",
-            "period_days": 7,
-            "score": 5,
-            "thresholds": {
-              "_default": "_default"
-            }
-          },
-          {
-            "name": "Low Value",
-            "period_days": 90,
-            "score": 1,
-            "thresholds": {
-              "_default": "_default"
-            }
-          }
-        ]
-      },
       "Dawn Android arm DEPS Release (Pixel 4)": {
-        "contact_team_email": "chrome-gpu-infra@google.com",
-        "problem_specs": [
-          {
-            "name": "Unhealthy",
-            "period_days": 7,
-            "score": 5,
-            "thresholds": {
-              "_default": "_default"
-            }
-          },
-          {
-            "name": "Low Value",
-            "period_days": 90,
-            "score": 1,
-            "thresholds": {
-              "_default": "_default"
-            }
-          }
-        ]
-      },
-      "Dawn Android arm Release (Nexus 5X)": {
         "contact_team_email": "chrome-gpu-infra@google.com",
         "problem_specs": [
           {
@@ -6657,6 +6573,27 @@
           }
         ]
       },
+      "android-16-x64-rel": {
+        "contact_team_email": "clank-engprod@google.com",
+        "problem_specs": [
+          {
+            "name": "Unhealthy",
+            "period_days": 7,
+            "score": 5,
+            "thresholds": {
+              "_default": "_default"
+            }
+          },
+          {
+            "name": "Low Value",
+            "period_days": 90,
+            "score": 1,
+            "thresholds": {
+              "_default": "_default"
+            }
+          }
+        ]
+      },
       "android-androidx-packager": {
         "contact_team_email": "clank-build@google.com",
         "problem_specs": [
@@ -8861,7 +8798,7 @@
           }
         ]
       },
-      "ios-blink-dbg-fyi": {
+      "ios-blink-rel-fyi": {
         "problem_specs": [
           {
             "name": "Unhealthy",

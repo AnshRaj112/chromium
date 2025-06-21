@@ -31,11 +31,6 @@ class ReminderNotificationClient : public PushNotificationClient {
   std::optional<UIBackgroundFetchResult> HandleNotificationReception(
       NSDictionary<NSString*, id>* notification) override;
   NSArray<UNNotificationCategory*>* RegisterActionableNotifications() override;
-  void OnSceneActiveForegroundBrowserReady() override;
-
-  // Called when the scene becomes "active foreground" and the browser is
-  // ready. The closure will be called when all async operations are done.
-  void OnSceneActiveForegroundBrowserReady(base::OnceClosure closure);
 
  private:
   // Returns true if the client is permitted to schedule notifications.
@@ -47,6 +42,15 @@ class ReminderNotificationClient : public PushNotificationClient {
   // Called when the relevant permissions Pref changes.
   void OnPermissionsPrefChanged();
 
+  // Schedules new reminder notifications based on the current reminder data in
+  // Prefs.
+  void ScheduleNewReminders();
+
+  // Schedules new reminder notifications if they don't already exist in the
+  // notification center.
+  void ScheduleNewRemindersIfNeeded(
+      NSArray<UNNotificationRequest*>* pending_requests);
+
   // Cancels all pending reminder notifications.
   void CancelAllNotifications(base::OnceClosure completion_handler);
 
@@ -56,14 +60,15 @@ class ReminderNotificationClient : public PushNotificationClient {
       base::OnceClosure completion_handler,
       NSArray<UNNotificationRequest*>* requests);
 
-  // Schedules all notifications based on the current state of Prefs.
-  void ScheduleNotificationsFromPrefs();
-
   // Schedules a single reminder notification for `reminder_url` using
   // `reminder_details`.
   void ScheduleNotification(const GURL& reminder_url,
                             const base::Value::Dict& reminder_details,
                             std::string_view profile_name);
+
+  // Called upon completion of scheduling a single notification. Removes the
+  // corresponding Pref entry for `scheduled_url` if scheduling was successful.
+  void OnNotificationScheduled(const GURL& scheduled_url, NSError* error);
 
   // Used to assert that asynchronous callback are invoked on the correct
   // sequence.

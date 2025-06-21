@@ -1876,7 +1876,7 @@ typedef std::pair<SessionID, TableViewURLItem*> RecentlyClosedTableViewItemPair;
   [self.presentationDelegate showActiveRegularTabFromRecentTabs];
 }
 
-#pragma mark - Accessibility
+#pragma mark - UIAccessibilityAction
 
 - (BOOL)accessibilityPerformEscape {
   [self.presentationDelegate showActiveRegularTabFromRecentTabs];
@@ -1903,7 +1903,7 @@ typedef std::pair<SessionID, TableViewURLItem*> RecentlyClosedTableViewItemPair;
 }
 
 - (void)keyCommand_close {
-  base::RecordAction(base::UserMetricsAction("MobileKeyCommandClose"));
+  base::RecordAction(base::UserMetricsAction(kMobileKeyCommandClose));
   [self.presentationDelegate showActiveRegularTabFromRecentTabs];
 }
 

@@ -209,6 +209,7 @@ source_set("browser_tests") {
       "//chrome/browser/ui/webui/whats_new",
       "//components/bookmarks/browser",
       "//components/bookmarks/managed",
+      "//components/browsing_data/core",
       "//components/commerce/core:account_checker_test_support",
       "//components/commerce/core:feature_list",
       "//components/commerce/core:shopping_service_test_support",
@@ -269,7 +270,10 @@ source_set("browser_tests") {
   }
 
   if (!is_android && !is_chromeos) {
-    deps += [ "//chrome/browser/ui/toasts" ]
+    deps += [
+      "//chrome/browser/ui/toasts",
+      "//chrome/browser/ui/webui/signin:signin_utils",
+    ]
   }
 }
 

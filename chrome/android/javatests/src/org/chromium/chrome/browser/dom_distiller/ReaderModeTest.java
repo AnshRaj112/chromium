@@ -14,6 +14,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import static org.chromium.base.test.transit.Triggers.noopTo;
 import static org.chromium.chrome.browser.dom_distiller.ReaderModeManager.DOM_DISTILLER_SCHEME;
 
 import android.app.Activity;
@@ -35,12 +36,12 @@ import org.mockito.junit.MockitoRule;
 
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.ThreadUtils;
-import org.chromium.base.test.transit.Condition;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
 import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Features.DisableFeatures;
+import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.app.ChromeActivity;
@@ -61,6 +62,7 @@ import org.chromium.chrome.test.transit.dom_distiller.ReaderModePreferencesDialo
 import org.chromium.chrome.test.util.ChromeTabUtils;
 import org.chromium.chrome.test.util.MenuUtils;
 import org.chromium.components.dom_distiller.core.DistilledPagePrefs;
+import org.chromium.components.dom_distiller.core.DomDistillerFeatures;
 import org.chromium.components.dom_distiller.core.DomDistillerService;
 import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
 import org.chromium.components.messages.MessageDispatcher;
@@ -148,7 +150,24 @@ public class ReaderModeTest implements CustomMainActivityStart {
 
     @Test
     @MediumTest
-    @DisabledTest(message = "https://crbug.com/423966068")
+    @EnableFeatures(DomDistillerFeatures.READER_MODE_DISTILL_IN_APP)
+    public void testReaderModeInRegularTab() throws TimeoutException {
+        mDownloadTestRule.loadUrl(mURL);
+
+        Tab originalTab = mDownloadTestRule.getActivity().getActivityTab();
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> {
+                    originalTab
+                            .getUserDataHost()
+                            .getUserData(ReaderModeManager.USER_DATA_KEY)
+                            .activateReaderMode();
+                });
+        waitForDistillation(PAGE_TITLE, originalTab);
+    }
+
+    @Test
+    @MediumTest
+    @DisabledTest(message = "https://crbug.com/423646543")
     public void testReaderModeInCct_Downloaded() throws TimeoutException {
         mDownloadTestRule.loadUrl(mURL);
         Tab originalTab = mDownloadTestRule.getActivity().getActivityTab();
@@ -334,27 +353,35 @@ public class ReaderModeTest implements CustomMainActivityStart {
         DistilledPagePrefs prefs = getDistilledPagePrefs();
         prefs.addObserver(mTestObserver);
 
-        Condition.waitFor(new TabBackgroundColorCondition(tab, "\"rgb(255, 255, 255)\""));
+        noopTo().waitForConditions(new TabBackgroundColorCondition(tab, "\"rgb(255, 255, 255)\""));
 
         ReaderModePreferencesDialog dialog = ReaderModePreferencesDialog.open(activity);
 
         // Test setting background color
-        dialog.pickColorDark(new TabBackgroundColorCondition(tab, "\"rgb(32, 33, 36)\""));
-        dialog.pickColorSepia(new TabBackgroundColorCondition(tab, "\"rgb(254, 247, 224)\""));
-        dialog.pickColorLight(new TabBackgroundColorCondition(tab, "\"rgb(255, 255, 255)\""));
+        dialog.darkButtonElement
+                .clickTo()
+                .waitForConditions(new TabBackgroundColorCondition(tab, "\"rgb(32, 33, 36)\""));
+        dialog.sepiaButtonElement
+                .clickTo()
+                .waitForConditions(new TabBackgroundColorCondition(tab, "\"rgb(254, 247, 224)\""));
+        dialog.lightButtonElement
+                .clickTo()
+                .waitForConditions(new TabBackgroundColorCondition(tab, "\"rgb(255, 255, 255)\""));
         verify(mTestObserver, times(3)).onChangeTheme(anyInt());
 
         // Test setting font size
-        Condition.waitFor(new TabFontSizeCondition(tab, "\"14px\""));
+        noopTo().waitForConditions(new TabFontSizeCondition(tab, "\"14px\""));
         // Max is 200% font size.
-        dialog.setFontSizeSliderToMax(new TabFontSizeCondition(tab, "\"28px\""));
+        dialog.setFontSizeSliderToMaxTo()
+                .waitForConditions(new TabFontSizeCondition(tab, "\"28px\""));
         // Min is 50% font size.
-        dialog.setFontSizeSliderToMin(new TabFontSizeCondition(tab, "\"7px\""));
+        dialog.setFontSizeSliderToMinTo()
+                .waitForConditions(new TabFontSizeCondition(tab, "\"7px\""));
         verify(mTestObserver, times(2)).onChangeFontScaling(anyFloat());
 
         // TODO(crbug.com/40125950): change font family as well.
 
-        dialog.pressBackToClose();
+        dialog.pressBackTo().dropCarryOn();
     }
 
     /**

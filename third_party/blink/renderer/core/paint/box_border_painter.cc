@@ -815,53 +815,49 @@ void ClipOutHalfCornerWithMiter(GraphicsContext& context,
   const CornerInfo& other_corner_of_same_side = corners[1];
   const gfx::PointF& opposite_corner = corners[2].outer.Outer();
   const gfx::PointF& adjacent_corner = corners[3].outer.Outer();
-  const gfx::PointF& miter_line_a = corner_to_slice.outer.Outer();
-  const gfx::PointF& miter_line_b = corner_to_slice.unadjusted_inner_edge;
+  const gfx::LineF miter_line(corner_to_slice.outer.Outer(),
+                              corner_to_slice.unadjusted_inner_edge);
 
   // When the corners intersect, we check if the intersection of the
   // nearest tangent line of the superellipse intersects with the miter line,
   // and whether that intersection is inside the other corner's bounding box.
-  // If so, that overlap might be visible, so we clip out a pentagon that
+  // If so, that overlap might be visible, so we clip out a hexagon that
   // starts from the miter incision and continues back at the tangent.
-  if (corner_to_slice.inner.Intersects(other_corner_of_same_side.inner)) {
-    const gfx::PointF inner_tangent_of_other_corner =
-        other_corner_of_same_side.inner.IsConcave()
-            ? other_corner_of_same_side.inner.End() +
-                  gfx::LineF(other_corner_of_same_side.outer.End(),
-                             other_corner_of_same_side.inner.End())
-                      .Normal()
-            : other_corner_of_same_side.inner.Start();
-    const std::optional<gfx::PointF> intersection_between_hull_and_miter =
-        gfx::LineF(inner_tangent_of_other_corner,
-                   other_corner_of_same_side.inner.End())
-            .IntersectionWith({miter_line_a, miter_line_b});
-    if (intersection_between_hull_and_miter.has_value() &&
-        other_corner_of_same_side.inner.BoundingBox().InclusiveContains(
-            *intersection_between_hull_and_miter)) {
-      const gfx::PointF intersection_between_hull_and_opposite_edge =
-          gfx::LineF(inner_tangent_of_other_corner,
-                     other_corner_of_same_side.inner.End())
-              .IntersectionWith(
-                  {other_corner_of_same_side.outer.Outer(), opposite_corner})
-              .value_or(other_corner_of_same_side.inner.Center());
-      // Clip out a pentagon that cuts out the part of the corner that should
-      // not be rendered with the current side's color. The pentagon cuts this
-      // corner at the miter, meets the other corner at the tangent, and
-      // continues to the opposite corners to make sure all necessary parts of
-      // this corner are cut. By meeting the other corner at the hull we ensure
-      // that no visible part of that curner are cut.
-      context.ClipPath(PathBuilder()
-                           .MoveTo(corner_to_slice.outer.Outer())
-                           .LineTo(*intersection_between_hull_and_miter)
-                           .LineTo(intersection_between_hull_and_opposite_edge)
-                           .LineTo(opposite_corner)
-                           .LineTo(adjacent_corner)
-                           .Close()
-                           .Finalize()
-                           .GetSkPath(),
-                       antialias_mode, SkClipOp::kDifference);
-      return;
-    }
+  const gfx::LineF inner_tangent_of_other_corner(
+      other_corner_of_same_side.inner.End(),
+      other_corner_of_same_side.inner.IsConcave()
+          ? other_corner_of_same_side.inner.QuadraticControlPoint()
+          : other_corner_of_same_side.inner.Start());
+  const std::optional<gfx::PointF> intersection_between_tangent_and_miter =
+      inner_tangent_of_other_corner.IntersectionWith(miter_line);
+  if (intersection_between_tangent_and_miter.has_value() &&
+      other_corner_of_same_side.inner.BoundingBox().InclusiveContains(
+          *intersection_between_tangent_and_miter)) {
+    const std::optional<gfx::PointF>
+        intersection_between_tangent_and_opposite_edge =
+            inner_tangent_of_other_corner.IntersectionWith(
+                {other_corner_of_same_side.outer.Outer(),
+                 other_corner_of_same_side.outer.Start()});
+    // Clip out a hexagon that cuts out the part of the corner that should
+    // not be rendered with the current side's color. The hexagon cuts this
+    // corner at the miter, meets the other corner at the tangent, and
+    // continues to the opposite corners to make sure all necessary parts of
+    // this corner are cut. By meeting the other corner at the hull we ensure
+    // that no visible part of that curner are cut.
+    context.ClipPath(
+        PathBuilder()
+            .MoveTo(corner_to_slice.outer.Outer())
+            .LineTo(*intersection_between_tangent_and_miter)
+            .LineTo(intersection_between_tangent_and_opposite_edge.value_or(
+                other_corner_of_same_side.inner.Center()))
+            .LineTo(opposite_corner)
+            .LineTo(adjacent_corner)
+            .LineTo(corner_to_slice.outer.Start())
+            .Close()
+            .Finalize()
+            .GetSkPath(),
+        antialias_mode, SkClipOp::kDifference);
+    return;
   }
 
   // When the corners of this side don't intersect, clip a triangle that goes
@@ -869,8 +865,7 @@ void ClipOutHalfCornerWithMiter(GraphicsContext& context,
   const gfx::Vector2dF unadjusted_offset =
       corner_to_slice.unadjusted_inner_edge - corner_to_slice.outer.Outer();
   const gfx::PointF miter_hypot =
-      gfx::LineF(corner_to_slice.outer.Outer(),
-                 corner_to_slice.unadjusted_inner_edge)
+      miter_line
           .IntersectionWith({opposite_corner + unadjusted_offset,
                              adjacent_corner + unadjusted_offset})
           .value_or(opposite_corner);
@@ -908,38 +903,51 @@ void ExtendInnerCornerToIncludePaddingEdgeIfNeeded(CornerInfo& corner) {
                         corner.inner.Curvature());
 }
 
+gfx::RectF UnionInnerCornersAndEdge(const CornerInfo& corner1,
+                                    const CornerInfo& corner2) {
+  return gfx::UnionRectsEvenIfEmpty(
+      gfx::UnionRects(corner1.inner.BoundingBox(), corner2.inner.BoundingBox()),
+      gfx::BoundingRect(corner1.unadjusted_inner_edge,
+                        corner2.unadjusted_inner_edge));
+}
+
 void ClipBorderSidePolygonFromCorners(GraphicsContext& context,
                                       std::array<CornerInfo, 4> corners,
                                       AntiAliasingMode first_antialias,
                                       AntiAliasingMode second_antialias,
-                                      const gfx::Vector2dF& width_vector) {
-  // The outer corner might be perpendicular to the inner corner when a concave
-  // outline, so to extend it all the way to one border-width distance from the
-  // outer edge, we need to expand it by (at least) width*2. The extra 1.1 is to
-  // allow for stroke expansion, e.g. for dashed stroke.
-  const gfx::Vector2dF outer_edge_outset =
-      gfx::ScaleVector2d(width_vector, 2 * 1.1);
+                                      const gfx::Vector2dF& width_vector,
+                                      bool needs_miters) {
+  const gfx::RectF opposite_bounding_box =
+      UnionInnerCornersAndEdge(corners[2], corners[3]);
+  if (UnionInnerCornersAndEdge(corners[0], corners[1])
+          .Intersects(opposite_bounding_box)) {
+    // Clip the full side, including the two full corners, to avoid overlapping
+    // with the other sides.
+    context.ClipPath(PathBuilder()
+                         .MoveTo(corners[0].outer.Outer())
+                         .LineTo(corners[0].outer.Start())
+                         .AddCorner(corners[0].inner)
+                         .LineTo(corners[0].outer.End() + width_vector)
+                         .LineTo(corners[1].outer.Start() + width_vector)
+                         .AddCorner(corners[1].inner)
+                         .LineTo(corners[1].outer.End())
+                         .LineTo(corners[1].outer.Outer())
+                         .Close()
+                         .MoveTo(corners[1].outer.Outer())
+                         .LineTo(corners[0].outer.Outer())
+                         .LineTo(corners[0].outer.Outer() + width_vector)
+                         .LineTo(corners[1].outer.Outer() + width_vector)
+                         .Close()
+                         .Finalize()
+                         .GetSkPath(),
+                     kAntiAliased);
+  } else {
+    context.ClipOut(opposite_bounding_box);
+  }
 
-  // Clip the full side, including the two full corners, to avoid overlapping
-  // with the other sides.
-  context.ClipPath(PathBuilder()
-                       .MoveTo(corners[0].outer.Outer() - outer_edge_outset)
-                       .LineTo(corners[0].outer.Start())
-                       .AddCorner(corners[0].inner)
-                       .LineTo(corners[0].outer.End() + width_vector)
-                       .LineTo(corners[1].outer.Start() + width_vector)
-                       .AddCorner(corners[1].inner)
-                       .LineTo(corners[1].outer.End())
-                       .LineTo(corners[1].outer.Outer() - outer_edge_outset)
-                       .Close()
-                       .MoveTo(corners[1].outer.Outer() - outer_edge_outset)
-                       .LineTo(corners[0].outer.Outer() - outer_edge_outset)
-                       .LineTo(corners[0].outer.Outer() + width_vector)
-                       .LineTo(corners[1].outer.Outer() + width_vector)
-                       .Close()
-                       .Finalize()
-                       .GetSkPath(),
-                   kAntiAliased);
+  if (!needs_miters) {
+    return;
+  }
 
   ExtendInnerCornerToIncludePaddingEdgeIfNeeded(corners[0]);
   ExtendInnerCornerToIncludePaddingEdgeIfNeeded(corners[1]);
@@ -948,6 +956,7 @@ void ClipBorderSidePolygonFromCorners(GraphicsContext& context,
   CornerInfo second_corner_reversed{corners[1].outer.Reverse(),
                                     corners[1].inner.Reverse(),
                                     corners[1].unadjusted_inner_edge};
+
   ClipOutHalfCornerWithMiter(
       context, {corners[0], second_corner_reversed, corners[2], corners[3]},
       first_antialias);
@@ -1776,6 +1785,12 @@ void BoxBorderPainter::ClipBorderSidePolygonCloseToEdges(
       .outer = outer_.BottomLeftCorner(),
       .inner = inner_.BottomLeftCorner(),
       .unadjusted_inner_edge = inner_.Rect().bottom_left()};
+
+  const EBorderStyle border_style = Edge(side).BorderStyle();
+  const bool needs_miters = !is_uniform_color_ || !is_uniform_style_ ||
+                            border_style == EBorderStyle::kGroove ||
+                            border_style == EBorderStyle::kRidge;
+
   switch (side) {
     case BoxSide::kTop:
       ClipBorderSidePolygonFromCorners(
@@ -1783,7 +1798,8 @@ void BoxBorderPainter::ClipBorderSidePolygonCloseToEdges(
           {top_left_corner_info, top_right_corner_info,
            bottom_right_corner_info, bottom_left_corner_info},
           antialias_top_or_left, antialias_right_or_bottom,
-          gfx::Vector2dF(0, inner_.Rect().y() - outer_.Rect().y()));
+          gfx::Vector2dF(0, inner_.Rect().y() - outer_.Rect().y()),
+          needs_miters);
       break;
     case BoxSide::kRight:
       ClipBorderSidePolygonFromCorners(
@@ -1791,7 +1807,8 @@ void BoxBorderPainter::ClipBorderSidePolygonCloseToEdges(
           {top_right_corner_info, bottom_right_corner_info,
            bottom_left_corner_info, top_left_corner_info},
           antialias_top_or_left, antialias_right_or_bottom,
-          gfx::Vector2dF(inner_.Rect().right() - outer_.Rect().right(), 0));
+          gfx::Vector2dF(inner_.Rect().right() - outer_.Rect().right(), 0),
+          needs_miters);
       break;
     case BoxSide::kBottom:
       ClipBorderSidePolygonFromCorners(
@@ -1799,7 +1816,8 @@ void BoxBorderPainter::ClipBorderSidePolygonCloseToEdges(
           {bottom_right_corner_info, bottom_left_corner_info,
            top_left_corner_info, top_right_corner_info},
           antialias_right_or_bottom, antialias_top_or_left,
-          gfx::Vector2dF(0, inner_.Rect().bottom() - outer_.Rect().bottom()));
+          gfx::Vector2dF(0, inner_.Rect().bottom() - outer_.Rect().bottom()),
+          needs_miters);
       break;
     case BoxSide::kLeft:
       ClipBorderSidePolygonFromCorners(
@@ -1807,7 +1825,8 @@ void BoxBorderPainter::ClipBorderSidePolygonCloseToEdges(
           {bottom_left_corner_info, top_left_corner_info, top_right_corner_info,
            bottom_right_corner_info},
           antialias_right_or_bottom, antialias_top_or_left,
-          gfx::Vector2dF(inner_.Rect().x() - outer_.Rect().x(), 0));
+          gfx::Vector2dF(inner_.Rect().x() - outer_.Rect().x(), 0),
+          needs_miters);
       break;
   }
 }

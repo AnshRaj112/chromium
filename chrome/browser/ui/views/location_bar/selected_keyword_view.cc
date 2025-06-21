@@ -41,28 +41,27 @@ SelectedKeywordView::KeywordLabelNames
 SelectedKeywordView::GetKeywordLabelNames(const std::u16string& keyword,
                                           const TemplateURLService* service) {
   KeywordLabelNames names;
-  if (service) {
-    const TemplateURL* template_url =
-        service->GetTemplateURLForKeyword(keyword);
-    bool is_extension_keyword = false;
-    bool is_gemini_keyword = false;
-    bool is_page_keyword =
-        template_url &&
-        template_url->starter_pack_id() == TemplateURLStarterPackData::kPage;
-    names.short_name = service->GetKeywordShortName(
-        keyword, &is_extension_keyword, &is_gemini_keyword);
-    if (is_gemini_keyword) {
-      names.full_name = l10n_util::GetStringFUTF16(
-          IDS_OMNIBOX_SELECTED_KEYWORD_ASK_TEXT, names.short_name);
-    } else if (is_extension_keyword) {
-      names.full_name = names.short_name;
-    } else if (is_page_keyword) {
-      names.full_name =
-          l10n_util::GetStringUTF16(IDS_STARTER_PACK_PAGE_KEYWORD_TEXT);
-    } else {
-      names.full_name = l10n_util::GetStringFUTF16(IDS_OMNIBOX_KEYWORD_TEXT_MD,
-                                                   names.short_name);
-    }
+  if (!service)
+    return names;
+
+  const TemplateURL* template_url = service->GetTemplateURLForKeyword(keyword);
+  names.short_name =
+      template_url ? template_url->AdjustedShortNameForLocaleDirection() : u"";
+
+  if (template_url && template_url->starter_pack_id() ==
+                          template_url_starter_pack_data::kGemini) {
+    names.full_name = l10n_util::GetStringFUTF16(
+        IDS_OMNIBOX_SELECTED_KEYWORD_ASK_TEXT, names.short_name);
+  } else if (template_url && template_url->starter_pack_id() ==
+                                 template_url_starter_pack_data::kPage) {
+    names.full_name =
+        l10n_util::GetStringUTF16(IDS_STARTER_PACK_PAGE_KEYWORD_TEXT);
+  } else if (template_url &&
+             template_url->type() == TemplateURL::OMNIBOX_API_EXTENSION) {
+    names.full_name = names.short_name;
+  } else {
+    names.full_name = l10n_util::GetStringFUTF16(IDS_OMNIBOX_KEYWORD_TEXT_MD,
+                                                 names.short_name);
   }
   return names;
 }
@@ -113,15 +112,15 @@ void SelectedKeywordView::SetCustomImage(const gfx::Image& image) {
           ->GetTemplateURLForKeyword(keyword_);
 
   auto* vector_icon = &vector_icons::kSearchIcon;
-  if (template_url &&
-      template_url->starter_pack_id() == TemplateURLStarterPackData::kGemini) {
+  if (template_url && template_url->starter_pack_id() ==
+                          template_url_starter_pack_data::kGemini) {
     vector_icon = &omnibox::kSparkIcon;
   } else if (history_embeddings::IsHistoryEmbeddingsEnabledForProfile(
                  profile_) &&
              history_embeddings::GetFeatureParameters().omnibox_scoped &&
              template_url &&
              template_url->starter_pack_id() ==
-                 TemplateURLStarterPackData::kHistory) {
+                 template_url_starter_pack_data::kHistory) {
     vector_icon = &omnibox::kSearchSparkIcon;
   } else if (template_url &&
              template_url->policy_origin() ==

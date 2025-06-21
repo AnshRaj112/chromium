@@ -18,6 +18,7 @@
 <translation id="1054745118061919935">選擇繼續即表示您同意《<ph name="BEGIN_LINK" />服務條款<ph name="END_LINK" />》。</translation>
 <translation id="10614374240317010">一律不儲存</translation>
 <translation id="1062138828266376352">你的 PIN 碼並未變更。請檢查網路連線，然後再試一次</translation>
+<translation id="1063070031224282617">請選擇「<ph name="FILENAME" />」(<ph name="FILE_SIZE" />) 的儲存位置<ph name="BEGIN_BOLD" /><ph name="END_BOLD" /></translation>
 <translation id="1072476005125066234">依興趣喜好顯示的評論</translation>
 <translation id="1074827084851510304">你即將刪除 {password_count} 組密碼，以及你選擇一律不儲存登入資訊的網站和應用程式清單。你為網站和應用程式建立的帳戶不會遭到刪除。</translation>
 <translation id="1076421457278169141">已掃描圖碼/條碼</translation>
@@ -210,6 +211,7 @@
 <translation id="1838089197478136166">要在「錢包」中開啟嗎？</translation>
 <translation id="183878838231635348">這張資訊卡會顯示安全檢查功能自動偵測到的隱私權或安全性問題。</translation>
 <translation id="1845230888742614096">保留群組</translation>
+<translation id="1853692000353488670">新增無痕式分頁</translation>
 <translation id="1854463785401910334">在開啟的分頁中搜尋</translation>
 <translation id="1861067954551502701">{count,plural, =1{第 {position} 組密碼，共 {count} 個}other{第 {position} 組密碼，共 {count} 個}}</translation>
 <translation id="1861262398884155592">這個資料夾是空的</translation>
@@ -236,7 +238,7 @@
 <translation id="1956138802718275401">從主畫面快速查詢密碼</translation>
 <translation id="1959441496380398824">按住所需日期。</translation>
 <translation id="1962348300797608157"><ph name="BEGIN_BOLD" /><ph name="FULL_NAME" /><ph name="END_BOLD" />已將 <ph name="WEBSITE" /> 的密碼分享給你</translation>
-<translation id="1962969542251276847">鎖定螢幕</translation>
+<translation id="1962969542251276847">螢幕鎖定</translation>
 <translation id="1963976881984600709">標準防護</translation>
 <translation id="1966313166384086081">網站資料</translation>
 <translation id="1967461193809857427">{count,plural, =1{要接續使用先前在 Android 上開啟的分頁嗎？}other{要接續使用先前在 Android 上開啟的分頁嗎？}}</translation>
@@ -545,6 +547,7 @@
 <translation id="3227137524299004712">麥克風</translation>
 <translation id="3235063766008841141">曾在詐騙網站上輸入，並發生資料侵害事件</translation>
 <translation id="3235242129752692527">編輯活動詳細資料，然後輕觸「儲存」。</translation>
+<translation id="323863549127671026">目前開啟的分頁和分頁群組</translation>
 <translation id="3240426699337459095">連結已複製</translation>
 <translation id="3244271242291266297">月</translation>
 <translation id="3245429137663807393">如果你一併提供 Chrome 使用報告，這些報告中會包含你造訪的網址</translation>
@@ -592,6 +595,7 @@
 <translation id="3476450923187944815">存取其他應用程式的密碼。</translation>
 <translation id="3488501490964659223">已關閉分頁並刪除瀏覽資料。系統已將你登出</translation>
 <translation id="3493531032208478708"><ph name="BEGIN_LINK" />進一步瞭解<ph name="END_LINK" />建議的內容</translation>
+<translation id="349446645805573740">請選擇「<ph name="FILENAME" />」<ph name="BEGIN_BOLD" /><ph name="END_BOLD" />的儲存位置</translation>
 <translation id="3504377992102007712">設定</translation>
 <translation id="35083190962747987">開啟 ${url}</translation>
 <translation id="3511519535430890904">新增瀏覽防護功能</translation>
@@ -623,6 +627,7 @@
 <translation id="3596414637720633074">在無痕模式中封鎖第三方 Cookie</translation>
 <translation id="3602260545951981695">選擇「強化防護」</translation>
 <translation id="3608436266458100337">閱讀器模式</translation>
+<translation id="3610041351087301930">隱藏閱讀器模式</translation>
 <translation id="3622175633937495219">搜尋歷史記錄 (找到 <ph name="COUNT" /> 項結果)</translation>
 <translation id="3625008969091706597">只要在邊緣滑動即可返回上一個畫面。</translation>
 <translation id="362709345066740529">在這裡自訂資訊卡、動態消息等</translation>
@@ -690,6 +695,7 @@
 <translation id="3922395466317605522">自訂選單</translation>
 <translation id="3929457972718048006">地址</translation>
 <translation id="3931215329146376310">{count,plural, =1{這個網站的新密碼}other{這個網站的新密碼}}</translation>
+<translation id="3934905113567851655">雙指撥動即可調整大小</translation>
 <translation id="3940195383040445971">在分頁上追蹤價格</translation>
 <translation id="3941941395924123592">{COUNT,plural, =1{關閉 {COUNT} 個分頁}other{關閉 {COUNT} 個分頁}}</translation>
 <translation id="3948600256434252210">向右滑動即可使用無痕模式瀏覽。</translation>
@@ -964,7 +970,6 @@
 <translation id="4979397965658815378">只要登入 Google 帳戶，即可在你的所有裝置上使用自己的書籤、密碼、歷史記錄和其他設定。</translation>
 <translation id="4985921635659180565">檔案排定刪除時間後就無法取消。</translation>
 <translation id="498624032394115435">知道連結的使用者都可以編輯所有分頁。</translation>
-<translation id="4989065233040279145">選擇「<ph name="FILENAME" />」的儲存位置</translation>
 <translation id="499122600724363620"><ph name="NAME" />，<ph name="EMAIL" />，該帳戶由貴機構管理。</translation>
 <translation id="4992255726304765516">分頁群組顏色：<ph name="COLOR" /></translation>
 <translation id="5005498671520578047">複製密碼</translation>
@@ -1064,6 +1069,7 @@
 <translation id="5431252637281434233">系統會將你登出</translation>
 <translation id="543338862236136125">修改密碼</translation>
 <translation id="5433691172869980887">已複製使用者名稱</translation>
+<translation id="5437480232219631455">這裡可以開啟 Gemini</translation>
 <translation id="5439618055789623719">目前的登入身分是 <ph name="USER_EMAIL" /></translation>
 <translation id="5443636120437209490">設為預設瀏覽器，上網體驗再進化</translation>
 <translation id="5444892875087332195">書籤</translation>
@@ -1650,7 +1656,6 @@
 <translation id="7724085059277147439">{count,plural, =1{這個項目已儲存到 Google 帳戶 ({email})}other{這些項目已儲存到 Google 帳戶 ({email})}}</translation>
 <translation id="7729458878441927652">如要查看其他裝置上的分頁，請同步處理分頁和歷史記錄。</translation>
 <translation id="7730020510075123961">否，合併資料</translation>
-<translation id="7730973429297233609">選取要用來儲存 <ph name="FILENAME" /> (<ph name="FILESIZE" />) 的帳戶</translation>
 <translation id="7733646263819020771"><ph name="BOOKMRK_NAME" />。僅在這部裝置上。</translation>
 <translation id="7744192722284567281">發生資料侵害事件</translation>
 <translation id="7749790401023484470">未選取任何文字。</translation>
@@ -1698,6 +1703,7 @@
 <translation id="7925108652071887026">自動填入資料</translation>
 <translation id="7926975587469166629">卡片暱稱</translation>
 <translation id="7927711904086083099">未選取</translation>
+<translation id="7927902634113905831">請選取要用來儲存「<ph name="FILENAME" />」(<ph name="FILESIZE" />) 的帳戶<ph name="BEGIN_BOLD" /><ph name="END_BOLD" /></translation>
 <translation id="7930998711684428189">可在密碼因資料侵害事件遭到外洩時顯示警告訊息。</translation>
 <translation id="7933880123415105005">使用「<ph name="SEARCH_PROVIDER" />」搜尋</translation>
 <translation id="7938254975914653459">FaceTime</translation>
@@ -1834,7 +1840,6 @@
 <translation id="8428045167754449968">鄉/鎮/市/區</translation>
 <translation id="8428213095426709021">設定</translation>
 <translation id="8428634594422941299">我知道了</translation>
-<translation id="8430694217306051839">選擇「<ph name="FILENAME" />」(<ph name="FILE_SIZE" />) 的儲存位置</translation>
 <translation id="8434837876193928924">分頁群組詳細資料</translation>
 <translation id="8438566539970814960">改善搜尋和瀏覽體驗</translation>
 <translation id="8439758443371991593">隱藏「加入閱讀清單」</translation>

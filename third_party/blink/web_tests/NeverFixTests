@@ -124,6 +124,11 @@ crbug.com/613672 [ Mac ] external/wpt/pointerevents/coalesced_events_attributes_
 crbug.com/613672 [ Mac ] external/wpt/pointerevents/pointerevent_after_target_appended.html?touch [ Skip ]
 crbug.com/613672 [ Mac ] external/wpt/pointerevents/pointerevent_after_target_removed.html?touch [ Skip ]
 crbug.com/613672 [ Mac ] external/wpt/pointerevents/pointerevent_contextmenu_is_a_pointerevent.html?touch [ Skip ]
+crbug.com/613672 [ Mac ] external/wpt/pointerevents/pointerevent_element_haspointercapture.html?touch [ Skip ]
+crbug.com/613672 [ Mac ] external/wpt/pointerevents/pointerevent_element_haspointercapture_release_pending_capture.html?touch [ Skip ]
+crbug.com/613672 [ Mac ] external/wpt/pointerevents/pointerevent_releasepointercapture_release_right_after_capture.html?touch [ Skip ]
+crbug.com/613672 [ Mac ] external/wpt/pointerevents/pointerevent_setpointercapture_override_pending_capture_element.html?touch [ Skip ]
+crbug.com/613672 [ Mac ] external/wpt/pointerevents/pointerevent_setpointercapture_to_same_element_twice.html?touch [ Skip ]
 crbug.com/613672 [ Mac ] external/wpt/pointerevents/touch-action-with-swipe-dir-change.html?touch [ Skip ]
 crbug.com/613672 [ Mac ] fast/events/pointerevents/multi-pointer-event-in-slop-region.html [ Skip ]
 crbug.com/613672 [ Mac ] fast/events/pointerevents/pointer-event-in-slop-region.html [ Skip ]
@@ -1892,3 +1897,9 @@ crbug.com/41442253 [ Android ] external/wpt/clipboard-apis/async-navigator-clipb
 crbug.com/41442253 [ Fuchsia ] external/wpt/clipboard-apis/async-navigator-clipboard-change-event.tentative.https.html [ Skip ]
 crbug.com/41442253 [ Mac ] external/wpt/clipboard-apis/async-navigator-clipboard-change-event.tentative.https.html [ Skip ]
 crbug.com/41442253 [ iOS18-simulator ] external/wpt/clipboard-apis/async-navigator-clipboard-change-event.tentative.https.html [ Skip ]
+
+# These tests are run exclusively in the prefetch-proxy VirtualTestSuite.
+virtual/prefetch/external/wpt/speculation-rules/prefetch/anonymous-client.https.html [ Skip ]
+virtual/prefetch/external/wpt/speculation-rules/prefetch/cross-origin-cookies-anonymous-client-ip-duplicate.https.html [ Skip ]
+virtual/prefetch-sw/external/wpt/speculation-rules/prefetch/anonymous-client.https.html [ Skip ]
+virtual/prefetch-sw/external/wpt/speculation-rules/prefetch/cross-origin-cookies-anonymous-client-ip-duplicate.https.html [ Skip ]

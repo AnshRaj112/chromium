@@ -420,11 +420,17 @@
       <message name="IDS_DOWNLOAD_NOTIFICATION_PAUSED" desc="Download notification to be displayed when a download pauses.">
         Download paused
       </message>
+      <message name="IDS_DOWNLOAD_NOTIFICATION_DANGEROUS_BLOCKED" desc="Download notification to be displayed when a download has been blocked for being dangerous.">
+        Dangerous download blocked
+      </message>
       <message name="IDS_DOWNLOAD_NOTIFICATION_PAUSE_BUTTON" desc="Text on the button that pauses a download.">
         Pause
       </message>
       <message name="IDS_DOWNLOAD_NOTIFICATION_RESUME_BUTTON" desc="Text on the button that resumes a paused download.">
         Resume
+      </message>
+      <message name="IDS_DOWNLOAD_NOTIFICATION_DELETE_FROM_HISTORY_BUTTON" desc="Text on the button that deletes a download from history.">
+        Delete from history
       </message>
       <message name="IDS_DOWNLOAD_UI_DETERMINATE_BYTES" desc="Appears in a notification when a user starts downloading a file. Indicates the number of bytes downloaded out of the total file size. E.g. 3/7 MB [downloaded]. As appropriate for your language, use '/' or 'of'; and change word order as needed.">
         <ph name="BYTES_DOWNLOADED_WITH_UNITS">%1$s<ex>12.2 MB</ex></ph> / <ph name="FILE_SIZE_WITH_UNITS">%2$s<ex>20.3 GB</ex></ph>
@@ -1325,6 +1331,12 @@
       </message>
       <message name="IDS_NTP_CUSTOMIZATION_FEED_BOTTOM_SHEET" desc="Accessibility string to announce the currently displaying bottom sheet is the feed bottom sheet.">
         Discover feed bottom sheet
+      </message>
+      <message name="IDS_NTP_CUSTOMIZATION_TURN_ON_FEED_SETTINGS" desc="Accessibility string to announce the currently selected item is a toggle to control the visibility of the discover feed section." is_accessibility_with_no_ui="true">
+        Turn on discover feed
+      </message>
+      <message name="IDS_NTP_CUSTOMIZATION_SHOW_MORE" desc="Accessibility string that describes clicking on the currently selected item will show more details about it." is_accessibility_with_no_ui="true">
+        Show More
       </message>
 
       <!-- Time Last Accessed strings -->

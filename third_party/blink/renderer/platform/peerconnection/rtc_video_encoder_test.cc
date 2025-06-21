@@ -15,6 +15,7 @@
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/scoped_refptr.h"
+#include "base/notimplemented.h"
 #include "base/notreached.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/task/sequenced_task_runner.h"
@@ -127,7 +128,9 @@ class FakeNativeBufferI420 : public blink::WebRtcVideoFrameAdapter {
  public:
   FakeNativeBufferI420(int width, int height, bool allow_to_i420)
       : blink::WebRtcVideoFrameAdapter(
-            media::VideoFrame::CreateBlackFrame(gfx::Size(480, 360))),
+            media::VideoFrame::CreateBlackFrame(gfx::Size(480, 360)),
+            base::MakeRefCounted<WebRtcVideoFrameAdapter::SharedResources>(
+                nullptr)),
         width_(width),
         height_(height),
         allow_to_i420_(allow_to_i420),
@@ -1317,8 +1320,12 @@ TEST_F(RTCVideoEncoderEncodeTest, SoftwareFallbackOnBadEncodeInput) {
   ASSERT_EQ(WEBRTC_VIDEO_CODEC_OK,
             rtc_encoder_->InitEncode(&codec, kVideoEncoderSettings));
 
+#if !BUILDFLAG(IS_WIN)
   auto frame = media::VideoFrame::CreateBlackFrame(
       gfx::Size(kInputFrameWidth, kInputFrameHeight));
+#else
+  auto frame = media::VideoFrame::CreateEOSFrame();
+#endif
   frame->set_timestamp(base::Milliseconds(1));
   webrtc::scoped_refptr<webrtc::VideoFrameBuffer> frame_adapter(
       new webrtc::RefCountedObject<WebRtcVideoFrameAdapter>(

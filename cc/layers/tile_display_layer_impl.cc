@@ -87,7 +87,6 @@ void TileDisplayLayerImpl::Tiling::SetTileSize(const gfx::Size& size) {
   }
 
   tiling_data_.SetMaxTextureSize(size);
-  tiles_.clear();
 }
 
 void TileDisplayLayerImpl::Tiling::SetTilingRect(const gfx::Rect& rect) {
@@ -96,7 +95,6 @@ void TileDisplayLayerImpl::Tiling::SetTilingRect(const gfx::Rect& rect) {
   }
 
   tiling_data_.SetTilingRect(rect);
-  tiles_.clear();
 }
 
 void TileDisplayLayerImpl::Tiling::SetTileContents(const TileIndex& key,
@@ -200,8 +198,7 @@ void TileDisplayLayerImpl::AppendQuads(const AppendQuadsContext& context,
     return;
   }
 
-  const float max_contents_scale =
-      tilings_.empty() ? 1.0f : tilings_.front()->contents_scale_key();
+  const float max_contents_scale = tilings_.front()->contents_scale_key();
 
   // If this layer is used as a backdrop filter, don't create and append a quad
   // as that will be done in RenderSurfaceImpl::AppendQuads.
@@ -277,9 +274,8 @@ void TileDisplayLayerImpl::AppendQuads(const AppendQuadsContext& context,
         quad->SetNew(shared_quad_state, offset_geometry_rect,
                      offset_visible_geometry_rect, needs_blending,
                      resource->resource_id, texture_rect,
-                     iter.CurrentTiling()->tile_size(),
                      /*nearest_neighbor=*/false,
-                     /*enable_edge_aa=*/false);
+                     !layer_tree_impl()->settings().enable_edge_anti_aliasing);
         has_draw_quad = true;
       } else if (auto color = iter->solid_color()) {
         has_draw_quad = true;
@@ -317,8 +313,7 @@ void TileDisplayLayerImpl::GetContentsResourceId(
   CHECK(is_backdrop_filter_mask_);
   CHECK_EQ(tilings_.size(), 1u);
 
-  const float max_contents_scale =
-      tilings_.empty() ? 1.0f : tilings_.front()->contents_scale_key();
+  const float max_contents_scale = tilings_.front()->contents_scale_key();
   gfx::Rect content_rect =
       gfx::ScaleToEnclosingRect(gfx::Rect(bounds()), max_contents_scale);
   const auto ideal_scale = GetIdealContentsScale();

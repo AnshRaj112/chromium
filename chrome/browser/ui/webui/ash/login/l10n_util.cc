@@ -150,7 +150,7 @@ base::Value::List GetLanguageList(
        it != language_index.end(); ++it) {
     const std::string& language_id = it->first;
 
-    const std::string lang = l10n_util::GetLanguage(language_id);
+    const std::string_view lang = l10n_util::GetLanguage(language_id);
 
     // Ignore non-specific codes.
     if (lang.empty() || lang == language_id) {
@@ -161,12 +161,13 @@ base::Value::List GetLanguageList(
       // Language is supported. No need to replace
       continue;
     }
-    std::string resolved_locale;
-    if (!l10n_util::CheckAndResolveLocale(language_id, &resolved_locale)) {
+    const std::optional<std::string> resolved_locale =
+        l10n_util::CheckAndResolveLocale(language_id);
+    if (!resolved_locale) {
       continue;
     }
 
-    if (!base::Contains(base_language_codes, resolved_locale)) {
+    if (!base::Contains(base_language_codes, *resolved_locale)) {
       // Resolved locale is not supported.
       continue;
     }
@@ -337,8 +338,9 @@ void GetKeyboardLayoutsForResolvedLocale(
 // "selected" only if loaded_locale is a backup for "requested_locale".
 std::string CalculateSelectedLanguage(const std::string& requested_locale,
                                       const std::string& loaded_locale) {
-  std::string resolved_locale;
-  if (!l10n_util::CheckAndResolveLocale(requested_locale, &resolved_locale)) {
+  const std::optional<std::string> resolved_locale =
+      l10n_util::CheckAndResolveLocale(requested_locale);
+  if (!resolved_locale) {
     return loaded_locale;
   }
 

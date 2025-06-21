@@ -71,8 +71,12 @@ using content::WaitForDOMContentLoaded;
 using content::WeakDocumentPtr;
 using content::WebContents;
 using content::WebContentsObserver;
+using optimization_guide::proto::Action;
+using optimization_guide::proto::Actions;
+using optimization_guide::proto::ActionsResult;
 using optimization_guide::proto::BrowserAction;
 using optimization_guide::proto::ClickAction;
+using optimization_guide::proto::CreateTabAction;
 using optimization_guide::proto::NavigateAction;
 using tabs::TabInterface;
 
@@ -142,9 +146,15 @@ class ActorToolsTest : public InProcessBrowserTest {
     host_resolver()->AddRule("*", "127.0.0.1");
     ASSERT_TRUE(embedded_test_server()->Start());
     ASSERT_TRUE(embedded_https_test_server().Start());
-    auto execution_engine = std::make_unique<ExecutionEngine>(
-        browser()->profile(), browser()->GetActiveTabInterface());
+    auto execution_engine = InitializeExecutionEngine();
+    ExecutionEngine* raw_execution_engine = execution_engine.get();
     actor_task_ = std::make_unique<ActorTask>(std::move(execution_engine));
+    raw_execution_engine->SetOwner(actor_task_.get());
+  }
+
+  virtual std::unique_ptr<ExecutionEngine> InitializeExecutionEngine() {
+    return std::make_unique<ExecutionEngine>(
+        browser()->profile(), browser()->GetActiveTabInterface());
   }
 
   void SetUpCommandLine(base::CommandLine* command_line) override {
@@ -189,9 +199,30 @@ class ActorToolsTest : public InProcessBrowserTest {
         .ExtractString();
   }
 
+  ActorTask& actor_task() const {
+    CHECK(actor_task_);
+    return *actor_task_.get();
+  }
+
  private:
   ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<ActorTask> actor_task_;
+};
+
+// ActorToolsTest but using the V2 ExecutionEngine API.
+// TODO(crbug.com/411462297): All tests should eventually use the V2 API and the
+// original test harness should be migrated to the new API. New tests should use
+// this harness.
+class ActorToolsTestV2 : public ActorToolsTest {
+ public:
+  ActorToolsTestV2() = default;
+  ~ActorToolsTestV2() override = default;
+  explicit ActorToolsTestV2(const ActorToolsTest&) = delete;
+  ActorToolsTestV2& operator=(const ActorToolsTestV2&) = delete;
+
+  std::unique_ptr<ExecutionEngine> InitializeExecutionEngine() override {
+    return std::make_unique<ExecutionEngine>(browser()->profile());
+  }
 };
 
 // ===============================================
@@ -331,7 +362,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinate) {
 
   // Send a click to a (0,0) coordinate inside the document.
   {
-    BrowserAction action = MakeClick(*main_frame(), gfx::Point(0, 0));
+    BrowserAction action = MakeClick(gfx::Point(0, 0));
     TestFuture<mojom::ActionResultPtr> result;
     execution_engine().Act(action, result.GetCallback());
     ExpectOkResult(result);
@@ -346,7 +377,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinate) {
     gfx::Point click_point = gfx::ToFlooredPoint(
         GetCenterCoordinatesOfElementWithId(web_contents(), "clickable"));
 
-    BrowserAction action = MakeClick(*main_frame(), click_point);
+    BrowserAction action = MakeClick(click_point);
     TestFuture<mojom::ActionResultPtr> result;
     execution_engine().Act(action, result.GetCallback());
     ExpectOkResult(result);
@@ -370,7 +401,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinateOffScreen) {
   // Send a click to a negative coordinate offscreen.
   {
     gfx::Point negative_offscreen = {-1, 0};
-    BrowserAction action = MakeClick(*main_frame(), negative_offscreen);
+    BrowserAction action = MakeClick(negative_offscreen);
     TestFuture<mojom::ActionResultPtr> result_fail;
     execution_engine().Act(action, result_fail.GetCallback());
     ExpectErrorResult(result_fail,
@@ -384,7 +415,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_SentToCoordinateOffScreen) {
   {
     gfx::Point positive_offscreen = gfx::ToFlooredPoint(
         GetCenterCoordinatesOfElementWithId(web_contents(), "offscreen"));
-    BrowserAction action = MakeClick(*main_frame(), positive_offscreen);
+    BrowserAction action = MakeClick(positive_offscreen);
     TestFuture<mojom::ActionResultPtr> result_fail;
     execution_engine().Act(action, result_fail.GetCallback());
     ExpectErrorResult(result_fail,
@@ -408,7 +439,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ClickTool_ViewportCoordinate) {
     gfx::Point click_point = gfx::ToFlooredPoint(
         GetCenterCoordinatesOfElementWithId(web_contents(), "offscreen"));
 
-    BrowserAction action = MakeClick(*main_frame(), click_point);
+    BrowserAction action = MakeClick(click_point);
     TestFuture<mojom::ActionResultPtr> result;
     execution_engine().Act(action, result.GetCallback());
     ExpectOkResult(result);
@@ -729,7 +760,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_TextInputAtCoordinate) {
   {
     gfx::Point type_point = gfx::ToFlooredPoint(
         GetCenterCoordinatesOfElementWithId(web_contents(), "input"));
-    BrowserAction action = MakeType(*main_frame(), type_point, typed_string,
+    BrowserAction action = MakeType(type_point, typed_string,
                                     /*follow_by_enter=*/true);
 
     TestFuture<mojom::ActionResultPtr> result;
@@ -743,7 +774,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_TextInputAtCoordinate) {
   {
     gfx::Point type_point = gfx::ToFlooredPoint(
         GetCenterCoordinatesOfElementWithId(web_contents(), "editableDiv"));
-    BrowserAction action = MakeType(*main_frame(), type_point, typed_string,
+    BrowserAction action = MakeType(type_point, typed_string,
                                     /*follow_by_enter=*/true);
 
     TestFuture<mojom::ActionResultPtr> result;
@@ -774,7 +805,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_EventsSentToCoordinates) {
     // Send 'a'. Ensure a click event is observed first on element at the
     // coordinate.
     std::string typed_string = "a";
-    BrowserAction action = MakeType(*main_frame(), type_point, typed_string,
+    BrowserAction action = MakeType(type_point, typed_string,
                                     /*follow_by_enter=*/false);
 
     TestFuture<mojom::ActionResultPtr> result;
@@ -801,7 +832,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_EventsSentToCoordinates) {
     // Send 'a'. Ensure a click event is observed first on element at the
     // coordinate.
     std::string typed_string = "a";
-    BrowserAction action = MakeType(*main_frame(), type_point, typed_string,
+    BrowserAction action = MakeType(type_point, typed_string,
                                     /*follow_by_enter=*/false);
 
     TestFuture<mojom::ActionResultPtr> result;
@@ -838,7 +869,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest,
   // Send 'a'. Ensure a click event is observed first on element at the
   // coordinate.
   std::string typed_string = "a";
-  BrowserAction action = MakeType(*main_frame(), type_point, typed_string,
+  BrowserAction action = MakeType(type_point, typed_string,
                                   /*follow_by_enter=*/false);
 
   TestFuture<mojom::ActionResultPtr> result;
@@ -870,8 +901,8 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_SentToOffScreenCoordinates) {
 
   // Send 'a' to an offscreen coordinate and observe failure.
   std::string typed_string = "a";
-  BrowserAction action = MakeType(*main_frame(), gfx::Point(-1, 0),
-                                  typed_string, /*follow_by_enter=*/false);
+  BrowserAction action =
+      MakeType(gfx::Point(-1, 0), typed_string, /*follow_by_enter=*/false);
 
   TestFuture<mojom::ActionResultPtr> result;
   execution_engine().Act(action, result.GetCallback());
@@ -1039,7 +1070,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, MouseMoveTool_MoveToCoordinate) {
   // Move mouse over #first DIV
   gfx::Point move_point = gfx::ToFlooredPoint(
       GetCenterCoordinatesOfElementWithId(web_contents(), "first"));
-  BrowserAction action = MakeMouseMove(*main_frame(), move_point);
+  BrowserAction action = MakeMouseMove(move_point);
 
   TestFuture<mojom::ActionResultPtr> result;
   execution_engine().Act(action, result.GetCallback());
@@ -1064,7 +1095,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest,
   {
     gfx::Point move_point = gfx::ToFlooredPoint(
         GetCenterCoordinatesOfElementWithId(web_contents(), "offscreen"));
-    BrowserAction action = MakeMouseMove(*main_frame(), move_point);
+    BrowserAction action = MakeMouseMove(move_point);
 
     TestFuture<mojom::ActionResultPtr> result;
     execution_engine().Act(action, result.GetCallback());
@@ -1311,7 +1342,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ScrollTool_CSSZoom) {
 class ActorToolsTestDSF2 : public ActorToolsTest {
  public:
   ActorToolsTestDSF2() = default;
-  explicit ActorToolsTestDSF2(const ActorToolsTest&) = delete;
+  explicit ActorToolsTestDSF2(const ActorToolsTestDSF2&) = delete;
   ActorToolsTestDSF2& operator=(const ActorToolsTestDSF2&) = delete;
 
   ~ActorToolsTestDSF2() override = default;
@@ -1370,6 +1401,45 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ScrollTool_ZeroIdTargetsViewport) {
                   EvalJs(web_contents(), "window.scrollY").ExtractDouble());
 }
 
+// Test that a scroll on a page with scroll-behavior:smooth returns success if
+// an animation was started, even though it may not have instantly scrolled.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, ScrollTool_SmoothScrollSucceeds) {
+  const GURL url =
+      embedded_test_server()->GetURL("/actor/scrollable_page.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  float scroll_offset_y = 300;
+  int scroller = GetDOMNodeId(*main_frame(), "#smoothscroller").value();
+  BrowserAction action = MakeScroll(*main_frame(), scroller,
+                                    /*scroll_offset_x=*/0, scroll_offset_y);
+
+  TestFuture<mojom::ActionResultPtr> result;
+  execution_engine().Act(action, result.GetCallback());
+  ExpectOkResult(result);
+}
+
+// Test that a scroll on a page with scroll-behavior:smooth returns failure if
+// trying to scroll in a direction with no scrollable extent.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, ScrollTool_SmoothScrollAtExtent) {
+  const GURL url =
+      embedded_test_server()->GetURL("/actor/scrollable_page.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // Scroll to the scroller's full extent.
+  ASSERT_TRUE(ExecJs(web_contents(),
+                     "document.querySelector('#smoothscroller').scrollTo({top:"
+                     "10000, behavior:'instant'})"));
+
+  float scroll_offset_y = 300;
+  int scroller = GetDOMNodeId(*main_frame(), "#smoothscroller").value();
+  BrowserAction action = MakeScroll(*main_frame(), scroller,
+                                    /*scroll_offset_x=*/0, scroll_offset_y);
+
+  TestFuture<mojom::ActionResultPtr> result;
+  execution_engine().Act(action, result.GetCallback());
+  ExpectErrorResult(result, mojom::ActionResultCode::kScrollOffsetDidNotChange);
+}
+
 // ===============================================
 // Drag and Release Tool
 // ===============================================
@@ -1390,7 +1460,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, DragAndReleaseTool_Range) {
                    range_rect.y() + thumb_padding);
   gfx::Point end = gfx::ToFlooredPoint(range_rect.CenterPoint());
 
-  BrowserAction action = MakeDragAndRelease(*main_frame(), start, end);
+  BrowserAction action = MakeDragAndRelease(start, end);
 
   TestFuture<mojom::ActionResultPtr> result_success;
   execution_engine().Act(action, result_success.GetCallback());
@@ -1421,7 +1491,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, DragAndReleaseTool_Events) {
   gfx::Point start(target_rect.x() + kPadding, target_rect.y() + kPadding);
   gfx::Point end = start + delta;
 
-  BrowserAction action = MakeDragAndRelease(*main_frame(), start, end);
+  BrowserAction action = MakeDragAndRelease(start, end);
 
   TestFuture<mojom::ActionResultPtr> result_success;
   execution_engine().Act(action, result_success.GetCallback());
@@ -1453,7 +1523,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, DragAndReleaseTool_Offscreen) {
                      range_rect.y() + thumb_padding);
     gfx::Point end = gfx::ToFlooredPoint(range_rect.CenterPoint());
 
-    BrowserAction action = MakeDragAndRelease(*main_frame(), start, end);
+    BrowserAction action = MakeDragAndRelease(start, end);
     TestFuture<mojom::ActionResultPtr> result;
     execution_engine().Act(action, result.GetCallback());
     ExpectErrorResult(result,
@@ -1476,7 +1546,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, DragAndReleaseTool_Offscreen) {
                      range_rect.y() + thumb_padding);
     gfx::Point end = gfx::ToFlooredPoint(range_rect.CenterPoint());
 
-    BrowserAction action = MakeDragAndRelease(*main_frame(), start, end);
+    BrowserAction action = MakeDragAndRelease(start, end);
     TestFuture<mojom::ActionResultPtr> result_success;
     execution_engine().Act(action, result_success.GetCallback());
     ExpectOkResult(result_success);
@@ -2180,6 +2250,60 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, WaitTool) {
 }
 
 // ===============================================
+// Tab Management Tool
+// ===============================================
+
+IN_PROC_BROWSER_TEST_F(ActorToolsTestV2,
+                       TabManagementTool_CreateForegroundTab) {
+  // Navigate the starting tab so it can be differentiated from the new tab.
+  const GURL start_tab_url =
+      embedded_test_server()->GetURL("/actor/blank.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), start_tab_url));
+
+  const int initial_tab_count = browser()->tab_strip_model()->GetTabCount();
+
+  Actions actions;
+  actions.set_task_id(actor_task().id().GetUnsafeValue());
+  CreateTabAction* create_tab = actions.add_actions()->mutable_create_tab();
+  create_tab->set_foreground(true);
+  create_tab->set_window_id(browser()->session_id().id());
+
+  TestFuture<ActionsResult> result;
+  execution_engine().Act(actions, result.GetCallback());
+  EXPECT_EQ(result.Get().action_result(),
+            static_cast<int>(mojom::ActionResultCode::kOk));
+
+  EXPECT_EQ(initial_tab_count + 1, browser()->tab_strip_model()->GetTabCount());
+  EXPECT_EQ(GURL("about:blank"),
+            browser()->tab_strip_model()->GetActiveWebContents()->GetURL());
+}
+
+IN_PROC_BROWSER_TEST_F(ActorToolsTestV2,
+                       TabManagementTool_CreateBackgroundTab) {
+  // Navigate the starting tab so it can be differentiated from the new tab.
+  const GURL start_tab_url =
+      embedded_test_server()->GetURL("/actor/blank.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), start_tab_url));
+
+  const int initial_tab_count = browser()->tab_strip_model()->GetTabCount();
+
+  Actions actions;
+  actions.set_task_id(actor_task().id().GetUnsafeValue());
+  CreateTabAction* create_tab = actions.add_actions()->mutable_create_tab();
+  create_tab->set_foreground(false);
+  create_tab->set_window_id(browser()->session_id().id());
+
+  TestFuture<ActionsResult> result;
+  execution_engine().Act(actions, result.GetCallback());
+  EXPECT_EQ(result.Get().action_result(),
+            static_cast<int>(mojom::ActionResultCode::kOk));
+
+  EXPECT_EQ(initial_tab_count + 1, browser()->tab_strip_model()->GetTabCount());
+  EXPECT_EQ(start_tab_url,
+            browser()->tab_strip_model()->GetActiveWebContents()->GetURL());
+}
+
+// ===============================================
 // Tool-Agnostic Tests
 // ===============================================
 
@@ -2201,9 +2325,12 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, InvokeToolInInactiveFrame) {
   WeakDocumentPtr first_rfh = main_frame()->GetWeakDocumentPtr();
   ASSERT_TRUE(first_rfh.AsRenderFrameHostIfValid()->IsActive());
 
+  std::optional<int> body_id = GetDOMNodeId(*main_frame(), "body");
+  ASSERT_TRUE(body_id);
+
   // Create an action that targets the first document.
   BrowserAction action =
-      MakeClick(*first_rfh.AsRenderFrameHostIfValid(), gfx::Point(10, 10));
+      MakeClick(*first_rfh.AsRenderFrameHostIfValid(), body_id.value());
 
   // Navigate to the second document - we expect this should put the first
   // document into the BFCache rather than destroying the RenderFrameHost.
@@ -2215,6 +2342,36 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, InvokeToolInInactiveFrame) {
   TestFuture<mojom::ActionResultPtr> result;
   execution_engine().Act(action, result.GetCallback());
   ExpectErrorResult(result, mojom::ActionResultCode::kFrameWentAway);
+}
+
+// Basic test to ensure sending a click to an element in a same-site subframe
+// works.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, InvokeToolSameSiteSubframe) {
+  const GURL url =
+      embedded_https_test_server().GetURL("/actor/positioned_iframe.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const GURL subframe_url = embedded_https_test_server().GetURL(
+      "/actor/page_with_clickable_element.html");
+  ASSERT_TRUE(NavigateIframeToURL(web_contents(), "iframe", subframe_url));
+
+  RenderFrameHost* subframe =
+      ChildFrameAt(web_contents()->GetPrimaryMainFrame(), 0);
+  ASSERT_FALSE(subframe->IsCrossProcessSubframe());
+  ASSERT_TRUE(subframe);
+
+  // Send a click to the button in the subframe.
+  std::optional<int> button_id =
+      GetDOMNodeIdFromSubframe(*subframe, "#iframe", "button#clickable");
+  ASSERT_TRUE(button_id);
+  BrowserAction action = MakeClick(*subframe, button_id.value());
+
+  TestFuture<mojom::ActionResultPtr> result;
+  execution_engine().Act(action, result.GetCallback());
+  ExpectOkResult(result);
+
+  // Ensure the button's event handler was invoked.
+  EXPECT_EQ(true, EvalJs(subframe, "button_clicked"));
 }
 
 }  // namespace

@@ -6,6 +6,7 @@
 #define CHROME_BROWSER_ENTERPRISE_CONNECTORS_ANALYSIS_CONTENT_ANALYSIS_DIALOG_DELEGATE_H_
 
 #include "base/functional/callback_forward.h"
+#include "base/memory/raw_ptr.h"
 #include "chrome/browser/enterprise/connectors/analysis/content_analysis_delegate_base.h"
 #include "chrome/browser/enterprise/connectors/analysis/content_analysis_views.h"
 #include "chrome/browser/safe_browsing/cloud_content_scanning/deep_scanning_utils.h"
@@ -67,6 +68,7 @@ class ContentAnalysisDialogDelegate : public views::DialogDelegate,
   views::Widget* GetWidget() override;
   const views::Widget* GetWidget() const override;
   ui::mojom::ModalType GetModalType() const override;
+  views::View* GetContentsView() override;
 
   // ContentAnalysisBaseView::Delegate:
   int GetTopImageId() const override;
@@ -133,6 +135,10 @@ class ContentAnalysisDialogDelegate : public views::DialogDelegate,
   void AddJustificationTextLengthToDialog();
 
   void LearnMoreLinkClickedCallback(const ui::Event& event);
+
+  // Returns a newly created side icon. The created views are set to
+  // `side_icon_image_` and `side_icon_spinner_`.
+  std::unique_ptr<views::View> CreateSideIcon();
 
   // Views above the buttons. `contents_view_` owns every other view.
   raw_ptr<views::BoxLayoutView> contents_view_ = nullptr;

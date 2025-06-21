@@ -53,6 +53,7 @@
 <translation id="1662146548738125461">Despre sistemul de operare Chrome Flex</translation>
 <translation id="1674870198290878346">Deschide linkul într-o fereastră Chrome inco&amp;gnito</translation>
 <translation id="1682634494516646069">Google Chrome nu poate citi și scrie în directorul propriu de date: <ph name="USER_DATA_DIRECTORY" /></translation>
+<translation id="1688214853608504530">Când introduci text în bara de adrese sau în caseta de căutare, Chrome trimite ceea ce introduci către instrumentele de căutare, AI și de agent ale organizației tale pentru a primi sugestii.</translation>
 <translation id="1698376642261615901">Google Chrome este un browser web care rulează pagini web și aplicații cu o viteză extraordinară. Este rapid, stabil și ușor de utilizat. Navigați pe web beneficiind de mai multă siguranță datorită protecției împotriva programelor malware și a phishingului, care este încorporată în Google Chrome.</translation>
 <translation id="1713301662689114961">{0,plural, =1{Chrome se va relansa într-o oră}few{Chrome se va relansa în # ore}other{Chrome se va relansa în # de ore}}</translation>
 <translation id="1722488837206509557">Astfel, vei putea să selectezi dintre dispozitivele disponibile și să afișezi conținut pe acestea.</translation>
@@ -61,6 +62,7 @@
 <translation id="178701303897325119">Extensia nu mai este acceptată. Chrome recomandă să o elimini.</translation>
 <translation id="1812689907177901597">Dacă dezactivezi, te poți conecta la site-uri Google ca Gmail fără a te conecta la Chrome</translation>
 <translation id="1821644463306970002">{NUM_TABS,plural, =1{Chrome recomandă să întrerupi fila care încetinește browserul}few{Chrome recomandă să întrerupi filele care încetinesc browserul}other{Chrome recomandă să întrerupi filele care încetinesc browserul}}</translation>
+<translation id="1832046143430087831">Accelerează site-urile cu motorul V8 din Chrome, dar reduce ușor rezistența Chrome la atacuri. Setarea este dezactivată.</translation>
 <translation id="1838374766361614909">Șterge căutarea</translation>
 <translation id="1860536484129686729">Chrome are nevoie de permisiune ca să acceseze camera foto pentru acest site</translation>
 <translation id="1873233029667955273">Google Chrome nu este browserul prestabilit</translation>
@@ -443,6 +445,7 @@
 <translation id="6718739135284199302">Crește eficiența în Chrome</translation>
 <translation id="6735387454586646204">ChromeOS Flex</translation>
 <translation id="6750954913813541382">Pentru a corecta erorile de scriere, Chrome trimite la Google textul pe care îl introduci în browser</translation>
+<translation id="6760235774835597023">Accelerează site-urile cu motorul V8 din Chrome, dar reduce ușor rezistența Chrome la atacuri. Setarea este activată.</translation>
 <translation id="677276454032249905">Ieși din Chrome oricum?</translation>
 <translation id="6794858689789885890">Șterge întotdeauna datele privind site-urile de pe dispozitiv când închizi Chrome</translation>
 <translation id="6831043979455480757">Tradu</translation>

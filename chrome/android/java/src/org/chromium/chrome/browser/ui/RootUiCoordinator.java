@@ -152,6 +152,7 @@ import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeControllerFactory;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils.EdgeToEdgeDebuggingInfo;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils.MissingNavbarInsetsReason;
+import org.chromium.chrome.browser.ui.extensions.ExtensionService;
 import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
 import org.chromium.chrome.browser.ui.native_page.NativePage;
 import org.chromium.chrome.browser.ui.system.StatusBarColorController;
@@ -241,6 +242,8 @@ public class RootUiCoordinator
     protected @Nullable FindToolbarManager mFindToolbarManager;
     private @Nullable FindToolbarObserver mFindToolbarObserver;
 
+    private @Nullable ExtensionService mExtensionService;
+
     private OverlayPanelManager mOverlayPanelManager;
     private OverlayPanelManager.OverlayPanelManagerObserver mOverlayPanelManagerObserver;
 
@@ -313,7 +316,11 @@ public class RootUiCoordinator
     protected StatusBarColorController mStatusBarColorController;
     protected final Supplier<SnackbarManager> mSnackbarManagerSupplier;
     protected final ObservableSupplierImpl<EdgeToEdgeController> mEdgeToEdgeControllerSupplier;
-    private final EdgeToEdgeDebuggingInfo mEdgeToEdgeDebuggingInfo = new EdgeToEdgeDebuggingInfo();
+    private final EdgeToEdgeDebuggingInfo mEdgeToEdgeDebuggingInfo =
+            new EdgeToEdgeDebuggingInfo(
+                    (info) ->
+                            ChromePureJavaExceptionReporter.reportJavaExceptionFromMsg(
+                                    info, /* isWarning= */ true));
     protected Destroyable mEdgeToEdgeBottomChin;
     protected final @ActivityType int mActivityType;
     protected final Supplier<Boolean> mIsInOverviewModeSupplier;
@@ -483,12 +490,8 @@ public class RootUiCoordinator
                 mActivityLifecycleDispatcher,
                 mActivityTabProvider,
                 mTabObscuringHandlerSupplier.get());
-        // While Autofill is supported on Android O, meaningful Autofill interactions in Chrome
-        // require the compatibility mode introduced in Android P.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            new AutofillSessionLifetimeController(
-                    activity, mActivityLifecycleDispatcher, mActivityTabProvider);
-        }
+        new AutofillSessionLifetimeController(
+                activity, mActivityLifecycleDispatcher, mActivityTabProvider);
         mProfileSupplier = profileSupplier;
         mBookmarkModelSupplier = bookmarkModelSupplier;
         mTabBookmarkerSupplier = tabBookmarkerSupplier;
@@ -641,6 +644,11 @@ public class RootUiCoordinator
             mToolbarManager = null;
         }
 
+        if (mExtensionService != null) {
+            mExtensionService.destroy();
+            mExtensionService = null;
+        }
+
         if (mAdaptiveToolbarUiCoordinator != null) {
             mAdaptiveToolbarUiCoordinator.destroy();
             mAdaptiveToolbarUiCoordinator = null;
@@ -781,6 +789,7 @@ public class RootUiCoordinator
     public void onInflationComplete() {
         mScrimManager = buildScrimWidget();
         mScrimManagerSupplier.set(mScrimManager);
+        mExtensionService = ExtensionService.maybeCreate(mProfileSupplier);
         initFindToolbarManager();
         initializeToolbar();
     }
@@ -861,7 +870,7 @@ public class RootUiCoordinator
     }
 
     public void onResumeWithNative() {
-        dumpEdgeToEdgeDebuggingInfo("onResumeWithNative");
+        addToEdgeToEdgeDebuggingInfo("onResumeWithNative");
     }
 
     protected boolean showWebSearchInActionMode() {
@@ -1501,6 +1510,7 @@ public class RootUiCoordinator
                             mActivityTabProvider,
                             mScrimManager,
                             mActionModeControllerCallback,
+                            mExtensionService,
                             mFindToolbarManager,
                             mProfileSupplier,
                             mBookmarkModelSupplier,
@@ -1866,7 +1876,8 @@ public class RootUiCoordinator
                             mEdgeToEdgeManager,
                             mBrowserControlsManager,
                             mLayoutManagerSupplier,
-                            mFullscreenManager);
+                            mFullscreenManager,
+                            mEdgeToEdgeDebuggingInfo);
             mEdgeToEdgeControllerSupplier.set(mEdgeToEdgeController);
             mEdgeToEdgeBottomChin = createEdgeToEdgeBottomChin();
 
@@ -1910,7 +1921,7 @@ public class RootUiCoordinator
         mEdgeToEdgeDebuggingInfo.setMissingNavBarInsetsReason(reason);
     }
 
-    private void dumpEdgeToEdgeDebuggingInfo(String callSite) {
+    private void addToEdgeToEdgeDebuggingInfo(String callSite) {
         if (!ChromeFeatureList.sEdgeToEdgeDebugging.isEnabled()
                 || mEdgeToEdgeDebuggingInfo.isUsed()) {
             return;
@@ -1918,15 +1929,12 @@ public class RootUiCoordinator
 
         boolean hasEdgeToEdgeController = mEdgeToEdgeControllerSupplier.get() != null;
         boolean isSupportedConfiguration = EdgeToEdgeUtils.isEdgeToEdgeBottomChinEnabled(mActivity);
-        mEdgeToEdgeDebuggingInfo.buildDebugReport(
-                mActivity.getWindow(),
-                mWindowAndroid,
+        mEdgeToEdgeDebuggingInfo.addToDebugReport(
+                callSite,
                 hasEdgeToEdgeController,
                 isSupportedConfiguration,
-                callSite,
-                (info) ->
-                        ChromePureJavaExceptionReporter.reportJavaExceptionFromMsg(
-                                info, /* isWarning= */ true));
+                mActivity != null ? mActivity.getWindow() : null,
+                mWindowAndroid);
     }
 
     /** Create a bottom chin for Edge-to-Edge. */
@@ -1992,6 +2000,14 @@ public class RootUiCoordinator
     /** @return The {@link SnackbarManager} for the {@link BottomSheetController}. */
     public SnackbarManager getBottomSheetSnackbarManager() {
         return mBottomSheetSnackbarManager;
+    }
+
+    /**
+     * @return The {@link ExtensionService} that handles extensions. null if extensions are not
+     *     supported on this build.
+     */
+    public @Nullable ExtensionService getExtensionService() {
+        return mExtensionService;
     }
 
     /**

@@ -472,8 +472,10 @@ void DownloadToolbarUIController::Init() {
       this, browser_view_->browser(), bubble_controller_.get());
 }
 
-void DownloadToolbarUIController::TearDownPreBrowserViewDestruction() {
+void DownloadToolbarUIController::TearDownPreBrowserWindowDestruction() {
   immersive_revealed_lock_.reset();
+  // DownloadDisplayController depends on BrowserView.
+  controller_.reset();
   browser_view_ = nullptr;
 }
 

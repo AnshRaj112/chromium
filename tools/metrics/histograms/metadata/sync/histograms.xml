@@ -175,7 +175,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Sync.AssociateWindowsTime.On{Type}" units="ms"
-    expires_after="2025-06-22">
+    expires_after="2026-06-01">
   <owner>skym@chromium.org</owner>
   <owner>ckitagawa@chromium.org</owner>
   <summary>
@@ -263,7 +263,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Sync.BatchUpload.Requests3" enum="SyncDataTypes"
-    expires_after="2025-10-13">
+    expires_after="2025-12-14">
   <owner>ankushkush@google.com</owner>
   <owner>src/components/sync/OWNERS</owner>
   <summary>
@@ -364,8 +364,8 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram
-    name="Sync.BookmarkModelMerger.Comparison{OptionalPreviouslySyncingGaiaId}.{SubtreeSelection}.{GroupingKey}{OptionalBookmarkCount}"
-    enum="LegacyBookmarkSetComparisonOutcome" expires_after="2025-11-23">
+    name="Sync.BookmarkModelMerger.Comparison2{OptionalPreviouslySyncingGaiaId}.{SubtreeSelection}.{GroupingKey}{OptionalBookmarkCount}"
+    enum="BookmarkSetComparisonOutcome" expires_after="2025-11-23">
   <owner>mastiz@chromium.org</owner>
   <owner>droger@chromium.org</owner>
   <summary>
@@ -445,8 +445,79 @@ chromium-metrics-reviews@google.com.
 
 </histogram>
 
+<histogram
+    name="Sync.BookmarkModelMerger.Comparison{OptionalPreviouslySyncingGaiaId}.{SubtreeSelection}.{GroupingKey}{OptionalBookmarkCount}"
+    enum="LegacyBookmarkSetComparisonOutcome" expires_after="2025-11-23">
+  <owner>mastiz@chromium.org</owner>
+  <owner>droger@chromium.org</owner>
+  <summary>
+    NOTE: Prefer analyzing analogous metrics whose name starts with
+    Sync.BookmarkModelMerger.Comparison2 for newer browser versions, starting
+    with M138. This histogram is analogous but the buckets are slightly
+    different, as a result of a bug in the original implementation.
+
+    Records the result of comparing URL bookmarks stored locally with those
+    downloaded from the Sync server. This particular metric variant considers
+    {SubtreeSelection} using {GroupingKey} as uniqueness key when finding
+    matches across local and account bookmarks.
+
+    Recorded on desktop platforms (excluding ChromeOS) only when bookmark sync
+    (legacy Full Sync) is turned on and after account bookmarks are downloaded
+    from the Sync
+    server{OptionalPreviouslySyncingGaiaId}{OptionalBookmarkCount}.
+  </summary>
+  <token key="OptionalPreviouslySyncingGaiaId">
+    <variant name="" summary=""/>
+    <variant name=".DiffersPreviousGaiaId"
+        summary=", for the case where the user (gaia ID) currently turning on
+                 bookmark sync is different to the one that had previously
+                 turned sync on"/>
+    <variant name=".MatchesPreviousGaiaId"
+        summary=", for the case where the user (gaia ID) currently turning on
+                 bookmark sync is the same as the one that had previously
+                 turned sync on"/>
+    <variant name=".NoPreviousGaiaId"
+        summary=", for the case where sync was never turned on before in the
+                 current browser profile"/>
+  </token>
+  <token key="SubtreeSelection">
+    <variant name="ConsideringAllBookmarks" summary="the entire bookmark tree"/>
+    <variant name="UnderBookmarksBar"
+        summary="desdendants of the Bookmarks Bar"/>
+  </token>
+  <token key="GroupingKey">
+    <variant name="ByUrl" summary="the bookmark's URL"/>
+    <variant name="ByUrlAndTitle" summary="&lt;URL, title&gt;"/>
+    <variant name="ByUrlAndTitleAndPath"
+        summary="&lt;URL, title, path&gt; (where the path contains ancestor's
+                 titles)"/>
+    <variant name="ByUrlAndTitleAndPathAndUuid"
+        summary="&lt;URL, title, path, UUID&gt; (where the path contains
+                 ancestor's titles)"/>
+    <variant name="ByUrlAndUuid" summary="&lt;URL, UUID&gt;"/>
+  </token>
+  <token key="OptionalBookmarkCount">
+    <variant name="" summary=""/>
+    <variant name=".1000OrMoreLocalUrlBookmarks"
+        summary=", only if there were 1,000 or more URL bookmarks stored
+                 locally and relevant in this metric variant (prior to any
+                 grouping based on uniqueness keys)"/>
+    <variant name=".Between1And19LocalUrlBookmarks"
+        summary=", only if there were between 1 and 19 (both inclusive) URL
+                 bookmarks stored locally and relevant in this metric variant
+                 (prior to any grouping based on uniqueness keys)"/>
+    <variant name=".Between20and999LocalUrlBookmarks"
+        summary=", only if there were between 20 and 999 (both inclusive) URL
+                 bookmarks stored locally and relevant in this metric variant
+                 (prior to any grouping based on uniqueness keys)"/>
+    <variant name=".ZeroLocalUrlBookmarks"
+        summary=", only if there were no URL bookmarks stored locally that
+                 are relevant in this metric variant"/>
+  </token>
+</histogram>
+
 <histogram name="Sync.BookmarkModelMerger.PreviouslySyncingGaiaId"
-    enum="PreviouslySyncingGaiaIdInfoForMetrics" expires_after="2025-10-11">
+    enum="PreviouslySyncingGaiaIdInfoForMetrics" expires_after="2025-12-14">
   <owner>mastiz@chromium.org</owner>
   <owner>droger@chromium.org</owner>
   <summary>
@@ -766,7 +837,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="Sync.Crypto.CustomPassphraseKeyDerivationMethodStateOnStartup"
     enum="SyncCustomPassphraseKeyDerivationMethodState"
-    expires_after="2025-09-15">
+    expires_after="2025-12-14">
   <owner>mmoskvitin@google.com</owner>
   <owner>treib@chromium.org</owner>
   <summary>
@@ -800,7 +871,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Sync.CryptographerReady" enum="SyncCryptographerReadyState"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>mmoskvitin@google.com</owner>
   <owner>mastiz@chromium.org</owner>
   <summary>
@@ -898,7 +969,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Sync.DataTypeConfigurationTime.{StorageType}{SyncDataType}"
-    units="ms" expires_after="2025-10-12">
+    units="ms" expires_after="2025-12-14">
   <owner>rushans@google.com</owner>
   <owner>mastiz@chromium.org</owner>
   <summary>
@@ -941,7 +1012,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Sync.DataTypeEntityConflictResolution{SyncDataType}"
-    enum="SyncConflictResolution" expires_after="2025-10-12">
+    enum="SyncConflictResolution" expires_after="2025-12-14">
   <owner>rushans@google.com</owner>
   <owner>src/components/sync/OWNERS</owner>
   <summary>
@@ -965,7 +1036,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Sync.DataTypeMemoryKB{SyncDataType}" units="KB"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>mastiz@chromium.org</owner>
   <owner>rushans@google.com</owner>
   <summary>
@@ -1146,7 +1217,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Sync.DataTypeUpdateDrop.{Reason}" enum="SyncDataTypes"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>treib@chromium.org</owner>
   <owner>rushans@google.com</owner>
   <summary>
@@ -1332,7 +1403,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Sync.History.DatabaseError" enum="SyncHistoryDatabaseError"
-    expires_after="2025-07-27">
+    expires_after="2026-07-27">
   <owner>treib@chromium.org</owner>
   <owner>mastiz@chromium.org</owner>
   <summary>
@@ -2002,7 +2073,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Sync.SelectedTypesInTransportMode" enum="SyncDataTypes"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>treib@chromium.org</owner>
   <owner>mastiz@chromium.org</owner>
   <summary>

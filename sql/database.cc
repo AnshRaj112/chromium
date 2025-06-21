@@ -39,6 +39,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/no_destructor.h"
+#include "base/not_fatal_until.h"
 #include "base/notimplemented.h"
 #include "base/notreached.h"
 #include "base/sequence_checker.h"
@@ -68,6 +69,7 @@
 #include "sql/sqlite_result_code_values.h"
 #include "sql/statement.h"
 #include "sql/statement_id.h"
+#include "sql/streaming_blob_handle.h"
 #include "sql/transaction.h"
 #include "third_party/perfetto/include/perfetto/tracing/traced_proto.h"
 #include "third_party/sqlite/sqlite3.h"
@@ -216,6 +218,33 @@ void RecordOpenDatabaseFailureReason(const std::string& histogram_tag,
                                      OpenDatabaseFailedReason reason) {
   base::UmaHistogramEnumeration(
       base::StrCat({"Sql.Database.Open.FailureReason.", histogram_tag}),
+      reason);
+}
+
+// These values are persisted to logs. Entries should not be renumbered and
+// numeric values should never be reused.
+// LINT.IfChange(RazeDatabaseFailedReason)
+enum class RazeDatabaseFailedReason {
+  kPoisoned = 0,
+  kPendingTransaction = 1,
+  kCantOpenInMemory = 2,
+  kAutoVacuumFailed = 3,
+  kSchemaFailed = 4,
+  kLocked = 5,
+  kTruncateFailed = 6,
+  kBackupFailed = 7,
+  kPageSizeFailed = 8,
+  kUnknownError = 9,
+  kCheckpointFailed = 10,
+  kMaxValue = kCheckpointFailed
+};
+
+// LINT.ThenChange(//tools/metrics/histograms/metadata/sql/enums.xml)
+// Reports the reason for a failure in Database::Raze(...).
+void RecordRazeDatabaseFailureReason(const std::string& histogram_tag,
+                                     RazeDatabaseFailedReason reason) {
+  base::UmaHistogramEnumeration(
+      base::StrCat({"Sql.Database.Raze.FailureReason.", histogram_tag}),
       reason);
 }
 
@@ -463,6 +492,10 @@ void Database::CloseInternal(bool forced) {
 
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
+  CHECK_EQ(outstanding_blob_count_, 0U)
+      << "All StreamingBlobHandles should be destroyed before closing "
+         "sql::Database";
+
   // TODO(shess): Calling "PRAGMA journal_mode = DELETE" at this point
   // will delete the -journal file.  For ChromiumOS or other more
   // embedded systems, this is probably not appropriate, whereas on
@@ -513,8 +546,10 @@ void Database::CloseInternal(bool forced) {
     db_ = nullptr;
     auto sqlite_result_code = ToSqliteResultCode(sqlite3_close(raw_db));
 
-    DCHECK_NE(sqlite_result_code, SqliteResultCode::kBusy)
-        << "sqlite3_close() called while prepared statements are still alive";
+    CHECK_NE(sqlite_result_code, SqliteResultCode::kBusy,
+             base::NotFatalUntil::M141)
+        << "sqlite3_close() called while resources (statements, blobs, etc) "
+           "are still alive";
     DCHECK_EQ(sqlite_result_code, SqliteResultCode::kOk)
         << "sqlite3_close() failed in an unexpected way: "
         << sqlite3_errmsg(raw_db);
@@ -1091,9 +1126,7 @@ void Database::TrimMemory() {
 
 // Create an in-memory database with the existing database's page
 // size, then backup that database over the existing database.
-bool Database::Raze() {
-  TRACE_EVENT0("sql", "Database::Raze");
-
+bool Database::RazeInternal() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
   std::optional<base::ScopedBlockingCall> scoped_blocking_call;
@@ -1101,12 +1134,16 @@ bool Database::Raze() {
 
   if (!db_) {
     DCHECK(poisoned_) << "Cannot raze null db";
+    RecordRazeDatabaseFailureReason(histogram_tag_,
+                                    RazeDatabaseFailedReason::kPoisoned);
     return false;
   }
 
   DCHECK_GE(transaction_nesting_, 0);
   if (transaction_nesting_ > 0) {
     DLOG(FATAL) << "Cannot raze within a transaction";
+    RecordRazeDatabaseFailureReason(
+        histogram_tag_, RazeDatabaseFailedReason::kPendingTransaction);
     return false;
   }
 
@@ -1118,6 +1155,8 @@ bool Database::Raze() {
       "RazeNullDB");
   if (!null_db.OpenInMemory()) {
     DLOG(FATAL) << "Unable to open in-memory database.";
+    RecordRazeDatabaseFailureReason(
+        histogram_tag_, RazeDatabaseFailedReason::kCantOpenInMemory);
     return false;
   }
 
@@ -1129,6 +1168,8 @@ bool Database::Raze() {
   // would be to create an actual filesystem database, which is
   // unfortunate.
   if (!null_db.Execute("PRAGMA auto_vacuum = 1")) {
+    RecordRazeDatabaseFailureReason(
+        histogram_tag_, RazeDatabaseFailedReason::kAutoVacuumFailed);
     return false;
   }
 #endif
@@ -1141,6 +1182,8 @@ bool Database::Raze() {
   // database to the new version of the database, incremented by one
   // so that other readers see the schema change and act accordingly.
   if (!null_db.Execute("PRAGMA schema_version = 1")) {
+    RecordRazeDatabaseFailureReason(histogram_tag_,
+                                    RazeDatabaseFailedReason::kSchemaFailed);
     return false;
   }
 
@@ -1168,6 +1211,8 @@ bool Database::Raze() {
 
   // The destination database was locked.
   if (sqlite_result_code == SqliteResultCode::kBusy) {
+    RecordRazeDatabaseFailureReason(histogram_tag_,
+                                    RazeDatabaseFailedReason::kLocked);
     return false;
   }
 
@@ -1182,11 +1227,15 @@ bool Database::Raze() {
     sqlite3_file* file = GetSqliteVfsFile();
     if (!file || file->pMethods->xTruncate(file, 0) != SQLITE_OK) {
       DLOG(FATAL) << "Failed to truncate file.";
+      RecordRazeDatabaseFailureReason(
+          histogram_tag_, RazeDatabaseFailedReason::kTruncateFailed);
       return false;
     }
 
     sqlite_result_code = BackupDatabaseForRaze(null_db.db_, db_);
     if (sqlite_result_code != SqliteResultCode::kDone) {
+      RecordRazeDatabaseFailureReason(histogram_tag_,
+                                      RazeDatabaseFailedReason::kBackupFailed);
       return false;
     }
   }
@@ -1200,6 +1249,8 @@ bool Database::Raze() {
     const std::string page_size_sql = base::StrCat(
         {"PRAGMA page_size=", base::NumberToString(options_.page_size_)});
     if (!Execute(page_size_sql)) {
+      RecordRazeDatabaseFailureReason(
+          histogram_tag_, RazeDatabaseFailedReason::kPageSizeFailed);
       return false;
     }
     // Page size isn't changed until the database is vacuumed.
@@ -1211,6 +1262,9 @@ bool Database::Raze() {
 
     sqlite_result_code = BackupDatabaseForRaze(null_db.db_, db_);
     if (sqlite_result_code != SqliteResultCode::kDone) {
+      RecordRazeDatabaseFailureReason(histogram_tag_,
+                                      RazeDatabaseFailedReason::kBackupFailed);
+
       return false;
     }
   }
@@ -1218,6 +1272,8 @@ bool Database::Raze() {
   if (sqlite_result_code != SqliteResultCode::kDone) {
     NOTIMPLEMENTED() << "Unhandled sqlite3_backup_step() error: "
                      << sqlite_result_code;
+    RecordRazeDatabaseFailureReason(histogram_tag_,
+                                    RazeDatabaseFailedReason::kUnknownError);
     return false;
   }
 
@@ -1225,7 +1281,23 @@ bool Database::Raze() {
   // file.
   // The database can still contain old data if the Checkpoint fails so fail the
   // Raze.
-  return CheckpointDatabase();
+  if (!CheckpointDatabase()) {
+    RecordRazeDatabaseFailureReason(
+        histogram_tag_, RazeDatabaseFailedReason::kCheckpointFailed);
+    return false;
+  }
+
+  return true;
+}
+
+bool Database::Raze() {
+  TRACE_EVENT0("sql", "Database::Raze");
+
+  base::ElapsedTimer raze_timer;
+  bool result = RazeInternal();
+  RecordTimingHistogram("Sql.Database.RazeTime.", raze_timer.Elapsed());
+
+  return result;
 }
 
 bool Database::RazeAndPoison() {
@@ -1714,6 +1786,43 @@ scoped_refptr<Database::StatementRef> Database::GetStatementImpl(
   DCHECK(sqlite_statement) << "No SQL statement in string: " << sql;
 
   return base::MakeRefCounted<StatementRef>(this, sqlite_statement, true);
+}
+
+std::optional<StreamingBlobHandle> Database::GetStreamingBlob(
+    base::cstring_view table,
+    base::cstring_view column,
+    int64_t row_id,
+    bool readonly) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!db_) {
+    DCHECK(poisoned_) << "Illegal use of Database without a db";
+    return std::nullopt;
+  }
+
+  sqlite3_blob* blob_handle = nullptr;
+  auto sqlite_result_code =
+      sqlite3_blob_open(db_, kSqliteMainDatabaseName, table.c_str(),
+                        column.c_str(), row_id, readonly ? 0 : 1, &blob_handle);
+  if (sqlite_result_code != SQLITE_OK) {
+    OnSqliteError(ToSqliteErrorCode(ToSqliteResultCode((sqlite_result_code))),
+                  nullptr, "-- sqlite3_blob_open()");
+
+    return std::nullopt;
+  }
+
+  CHECK(blob_handle);
+  ++outstanding_blob_count_;
+  return StreamingBlobHandle(base::PassKey<Database>(), blob_handle,
+                             base::BindOnce(&Database::OnStreamingBlobClosed,
+                                            weak_factory_.GetWeakPtr()));
+}
+
+void Database::OnStreamingBlobClosed(SqliteResultCode result,
+                                     const char* error_source) {
+  --outstanding_blob_count_;
+  if (handling_error_nesting_ == 0 && !IsSqliteSuccessCode(result)) {
+    OnSqliteError(ToSqliteErrorCode(result), nullptr, error_source);
+  }
 }
 
 std::string Database::GetSchema() {
@@ -2356,10 +2465,24 @@ void Database::StatementRefDeleted(StatementRef* ref) {
 void Database::OnSqliteError(SqliteErrorCode sqlite_error_code,
                              sql::Statement* statement,
                              const char* sql_statement) {
-  TRACE_EVENT0("sql", "Database::OnSqliteError");
+  TRACE_EVENT1("sql", "Database::OnSqliteError", "sqlite_error_code",
+               sqlite_error_code);
 
   DCHECK_NE(statement != nullptr, sql_statement != nullptr)
       << __func__ << " should either get a Statement or a raw SQL string";
+
+  base::WeakPtr<Database> weak_this =
+      weak_factory_lifetime_tracker_.GetWeakPtr();
+  ++handling_error_nesting_;
+
+  // Use `base::UmaHistogramSparse` because sqlite result codes aren't
+  // sequential. The large integers they represent make it so that the
+  // non-sparse histograms end up with too many buckets.
+  if (!histogram_tag().empty()) {
+    base::UmaHistogramSparse(
+        base::StrCat({"Sql.Database.Statement.Error.", histogram_tag()}),
+        static_cast<int>(sqlite_error_code));
+  }
 
   // Log errors for developers.
   //
@@ -2402,7 +2525,10 @@ void Database::OnSqliteError(SqliteErrorCode sqlite_error_code,
     // subtle source of use-after-frees. See https://crbug.com/254584.
     ErrorCallback error_callback_copy = error_callback_;
     error_callback_copy.Run(static_cast<int>(sqlite_error_code), statement);
-    return;
+  }
+
+  if (weak_this) {
+    --weak_this->handling_error_nesting_;
   }
 }
 

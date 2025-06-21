@@ -158,6 +158,12 @@ struct ContextualSearch : Config<ContextualSearch> {
   // (non-contextual) zero suggest matches altogether.
   bool contextual_suggestions_ablate_search_only;
 
+  // Whether to restrict the ablation logic, triggered via
+  // `contextual_suggestions_ablate_others_when_present`, such that we only
+  // remove URL suggestions, instead of removing all (non-contextual) zero
+  // suggest matches altogether.
+  bool contextual_suggestions_ablate_url_only;
+
   // Whether the starter pack page scope is enabled.
   bool starter_pack_page;
 
@@ -236,6 +242,16 @@ struct Toolbelt : Config<Toolbelt> {
   // toolbelt. When this is false, the regular triggering conditions apply
   // so the action can sometimes be included or sometimes not.
   bool always_include_lens_action;
+
+  // Some of the variants we want to experiment with want a subset of actions.
+  // For flexibility, may as well make all the actions finch params.
+  bool show_ai_search_action;
+  // Disabling `show_lens_action` takes precedence over
+  // `always_include_lens_action`.
+  bool show_lens_action;
+  bool show_bookmarks_action;
+  bool show_tabs_action;
+  bool show_history_action;
 };
 
 // If enabled, adjusts the indentation of the omnibox input and matches to fix
@@ -354,6 +370,7 @@ struct SearchAggregatorProvider : Config<SearchAggregatorProvider> {
   int scoring_score_per_weak_text_match;
   int scoring_max_text_score;
   int scoring_people_score_boost;
+  int scoring_people_email_match_score_boost;
   bool scoring_prefer_contents_over_queries;
   size_t scoring_scoped_max_low_quality_matches;
   size_t scoring_unscoped_max_low_quality_matches;

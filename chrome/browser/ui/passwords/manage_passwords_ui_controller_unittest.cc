@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
+
 #include <map>
 #include <memory>
 #include <optional>
@@ -30,7 +32,6 @@
 #include "chrome/browser/ui/passwords/credential_leak_dialog_controller.h"
 #include "chrome/browser/ui/passwords/credential_manager_dialog_controller.h"
 #include "chrome/browser/ui/passwords/manage_passwords_icon_view.h"
-#include "chrome/browser/ui/passwords/manage_passwords_ui_controller_mock.h"
 #include "chrome/browser/ui/passwords/password_dialog_prompts.h"
 #include "chrome/browser/ui/passwords/passwords_model_delegate.h"
 #include "chrome/test/base/browser_with_test_window_test.h"
@@ -1946,7 +1947,7 @@ TEST_F(ManagePasswordsUIControllerTest, OpenPasskeyNotAcceptedBubble) {
       password_manager::ui::PASSKEY_NOT_ACCEPTED_STATE);
 }
 
-TEST_F(ManagePasswordsUIControllerTest, PasswordChangeOngoing) {
+TEST_F(ManagePasswordsUIControllerTest, PasswordChangeFinishedSuccessfully) {
   PasswordChangeServiceFactory::GetInstance()->SetTestingFactory(
       profile(),
       base::BindLambdaForTesting([](content::BrowserContext* context)
@@ -1967,10 +1968,13 @@ TEST_F(ManagePasswordsUIControllerTest, PasswordChangeOngoing) {
 
   // Emulate password change flow has started.
   PasswordChangeDelegateMock mock_delegate;
+  EXPECT_CALL(mock_delegate, GetCurrentState)
+      .WillOnce(
+          Return(PasswordChangeDelegate::State::kWaitingForChangePasswordForm));
   EXPECT_CALL(*password_change_service, GetPasswordChangeDelegate)
       .WillOnce(Return(&mock_delegate));
 
-  ASSERT_EQ(password_manager::ui::PASSWORD_CHANGE_STATE,
+  ASSERT_EQ(password_manager::ui::PENDING_PASSWORD_STATE,
             controller()->GetState());
 
   // Password change flow has finished successfully. The state should change to

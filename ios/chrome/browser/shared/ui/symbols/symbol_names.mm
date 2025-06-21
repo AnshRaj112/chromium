@@ -81,6 +81,7 @@ NSString* const kTabGroupsSymbol = @"square.grid.2x2";
 NSString* const kLanguageSymbol = @"language";
 NSString* const kLocationSymbol = @"location";
 NSString* const kPasswordSymbol = @"password";
+NSString* const kCropSymbol = @"crop";
 #if !BUILDFLAG(IS_IOS_MACCATALYST)
 NSString* const kMulticolorPasswordSymbol = @"multicolor_password";
 #endif  // BUILDFLAG(IS_IOS_MACCATALYST)
@@ -298,6 +299,9 @@ NSString* const kShieldedEnvelope = @"envelope.badge.shield.half.filled";
 NSString* const kReaderModeSymbolPreIOS18 = @"doc.plaintext";
 NSString* const kReaderModeSymbolPostIOS18 = @"text.page";
 NSString* const kCircleBadgeFill = @"circlebadge.fill";
+NSString* const kCounterClockWiseSymbol =
+    @"clock.arrow.trianglehead.counterclockwise.rotate.90";
+NSString* const kTextSparkSymbol = @"text_spark";
 
 // Names of the default symbol being non-monochrome by default. When using them,
 // you probably want to set their color to monochrome.

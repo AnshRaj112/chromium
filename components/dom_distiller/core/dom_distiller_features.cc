@@ -38,24 +38,19 @@ constexpr base::FeatureParam<bool> kReaderModeUseReadabilityUseDisiller{
     &kReaderModeUseReadability, /*name=*/"use_distiller",
     /*default_value=*/false};
 
-bool ShouldReadabilityDistiller() {
+bool ShouldUseReadabilityDistiller() {
   return base::FeatureList::IsEnabled(kReaderModeUseReadability) &&
          kReaderModeUseReadabilityUseDisiller.Get();
-}
-
-constexpr base::FeatureParam<bool> kReaderModeUseReadabilityUseHeuristic{
-    &kReaderModeUseReadability, /*name=*/"use_heuristic",
-    /*default_value=*/false};
-
-bool ShouldReadabilityHeuristic() {
-  return base::FeatureList::IsEnabled(kReaderModeUseReadability) &&
-         kReaderModeUseReadabilityUseHeuristic.Get();
 }
 
 #if BUILDFLAG(IS_ANDROID)
 // Feature declarations below -- alphabetical order.
 BASE_FEATURE(kReaderModeAutoDistill,
              "ReaderModeAutoDistill",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kReaderModeDistillInApp,
+             "ReaderModeDistillInApp",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kReaderModeImprovements,
@@ -65,8 +60,8 @@ BASE_FEATURE(kReaderModeImprovements,
 namespace android {
 static jlong JNI_DomDistillerFeatureMap_GetNativeMap(JNIEnv* env) {
   static const base::Feature* const kFeaturesExposedToJava[] = {
-      &kReaderModeAutoDistill, &kReaderModeImprovements,
-      &kReaderModeUseReadability};
+      &kReaderModeAutoDistill, &kReaderModeDistillInApp,
+      &kReaderModeImprovements, &kReaderModeUseReadability};
   static base::NoDestructor<base::android::FeatureMap> kFeatureMap(
       kFeaturesExposedToJava);
   return reinterpret_cast<jlong>(kFeatureMap.get());

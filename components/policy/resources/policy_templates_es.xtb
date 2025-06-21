@@ -106,6 +106,7 @@ Si se inhabilita esta política, no se permitirá la función de autocorrección
       Si no se establece esta política, se utilizará el directorio de perfil predeterminado.</translation>
 <translation id="1053981429146436598">Un grupo de políticas relacionadas con los ajustes de solicitudes de redes privadas.  Consulta https://wicg.github.io/private-network-access/.</translation>
 <translation id="1059069692400941670">Inhabilitar la importación del buscador predeterminado en la primera ejecución</translation>
+<translation id="1060020040574767394">Configurar los ajustes de marca de agua personalizada</translation>
 <translation id="1062011392452772310">Habilitar confirmación remota para el dispositivo</translation>
 <translation id="1062407476771304334">Reemplazar</translation>
 <translation id="1063860513136880926">Si se habilita esta política, no se permitirá hacer capturas de pantalla mediante combinaciones de teclas ni APIs de extensión. Si se inhabilita esta política o no se establece, se permitirán las capturas de pantalla.
@@ -493,6 +494,7 @@ Si no se establece esta política para un sitio, se le aplicará la política de
 <translation id="1379689277107868399">Si a esta política se le asigna el valor "DoNotPrompt" o no se define, <ph name="PRODUCT_NAME" /> no solicitará automáticamente al usuario que se vuelva a autenticar en el navegador.
 
 Si se le asigna el valor "PromptInTab", cuando la autenticación del usuario caduque, se abrirá inmediatamente una nueva pestaña con la página de inicio de sesión de Google. Esto solo ocurre si se usa <ph name="CHROME_SYNC_NAME" />.</translation>
+<translation id="1384040387986918863">Opacidad del relleno del texto de la marca de agua, de 0 (transparente) a 100 (opaco).</translation>
 <translation id="1384459581748403878">Referencia: <ph name="REFERENCE_URL" /></translation>
 <translation id="1384594066274112751">Esta política impide que el navegador descarte cualquier URL que coincida con uno o varios de los patrones que se especifiquen (usando el formato de filtro <ph name="URL_BLOCKLIST_POLICY_NAME" />).
       Esto se aplica al descarte de la presión de memoria y del modo Alta eficiencia.
@@ -506,11 +508,6 @@ Si se le asigna el valor "PromptInTab", cuando la autenticación del usuario cad
       Si se inhabilita la política, los usuarios no pueden imprimir en <ph name="CLOUD_PRINT_NAME" /> desde el cuadro de diálogo de impresión de <ph name="PRODUCT_NAME" />.
 
       Para que los destinos de <ph name="CLOUD_PRINT_NAME" /> sean visibles, se debe habilitar esta política y no se debe incluir <ph name="POLICY_ENUM_PRINTERTYPEDENYLIST_CLOUD" /> en la política <ph name="PRINTER_TYPE_DENY_LIST_POLICY_NAME" />.</translation>
-<translation id="1390901586107713894">Permite especificar las extensiones que los usuarios no pueden instalar. Si se bloquea una extensión ya instalada, se inhabilitará y el usuario no podrá habilitarla. Si una extensión que se había inhabilitado porque estaba en la lista de bloqueados se quita de esa lista, volverá a habilitarse automáticamente.
-
-          Si el valor de una lista de bloqueados es un asterisco (*), se bloquearán todas las extensiones excepto las que estén incluidas explícitamente en la lista de permitidos.
-
-          Si no se asigna ningún valor a esta política, el usuario podrá instalar cualquier extensión en <ph name="PRODUCT_NAME" />.</translation>
 <translation id="1392703142209771447">Expresión regular con la que debe coincidir el ID de impresora.</translation>
 <translation id="1393485621820363363">Impresoras de dispositivos de empresa habilitadas</translation>
 <translation id="1395505489889158859">Habilitar el envío de nombres de usuario y de archivo a impresoras nativas</translation>
@@ -1100,6 +1097,15 @@ Esta política no tendrá efecto si la opción de conservar los datos de navegac
       La lista aparecerá en el mismo orden en la sección "Ordena los idiomas según tus preferencias" (en chrome://settings/languages). Los usuarios no podrán eliminar los idiomas establecidos por la política ni cambiar su orden, pero podrán añadir idiomas al final de la lista. Los usuarios tendrán el control total de los ajustes de traducción, del corrector ortográfico y del idioma de la interfaz del navegador, a menos que otras políticas los definan.
 
       Si no se establece esta política, los usuarios podrán gestionar la lista completa de idiomas preferidos.</translation>
+<translation id="180243155313050440">Esta política controla una etiqueta personalizada que se utiliza para indicar que un navegador está gestionado. En los navegadores gestionados, esta etiqueta se mostrará en un aviso de gestión en el pie de la página Nueva pestaña. La etiqueta personalizada no se traducirá.
+
+Cuando se aplique esta política, las cadenas que superen los 16 caracteres se truncarán con "...". No uses nombres muy largos.
+
+Ten en cuenta que esta política solo se aplica a los navegadores gestionados, por lo que no afectará a los usuarios gestionados que usen navegadores no gestionados.
+
+En <ph name="MS_WIN_NAME" />, esta política solo está disponible en instancias que estén vinculadas a un dominio de <ph name="MS_AD_NAME" /> o a <ph name="MS_AAD_NAME" />, o que se hayan registrado en <ph name="CHROME_ENTERPRISE_CORE_NAME" />.
+
+En <ph name="MAC_OS_NAME" />, esta política solo está disponible en instancias que se gestionen mediante MDM, que estén vinculadas a un dominio a través de MCX o que se hayan registrado en <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="1803646570632580723">Lista de aplicaciones fijadas que deben aparecer en la barra de aplicaciones</translation>
 <translation id="1808715480127969042">Bloquear cookies en estos sitios</translation>
 <translation id="1810261428246410396">Permitir conexión compartida instantánea.</translation>
@@ -1789,6 +1795,13 @@ Si se inhabilita esta política o no se establece, los usuarios podrán transfer
       Los usuarios no podrán modificar ni anular este ajuste.
 
       Nota: Esta política provoca que el encabezado X-GoogApps-Allowed-Domains se añada a todas las solicitudes HTTP y HTTPS en todos los dominios de google.com, como se describe en https://support.google.com/a/answer/1668854.</translation>
+<translation id="2287414160388710497">Permite a los administradores personalizar el aspecto de las marcas de agua aplicadas por las reglas de Prevención de la pérdida de datos (DLP). Esto incluye establecer la opacidad del relleno o del contorno y el tamaño de la fuente.
+Si no se define esta política o algunos valores, Chrome usará su comportamiento predeterminado para las marcas de agua.
+Los valores predeterminados son: opacidad del relleno 4, opacidad del contorno 6 y tamaño de la fuente 24.
+
+La opacidad del relleno es un porcentaje que va del 0 (totalmente transparente) al 100 (totalmente opaco).
+La opacidad del contorno es un porcentaje que va del 0 (totalmente transparente) al 100 (totalmente opaco).
+El tamaño de la fuente se especifica en puntos.</translation>
 <translation id="2288506601233091655">No permitir que se elimine el historial de trabajos de impresión</translation>
 <translation id="2289688405312849186">Cuenta principal del usuario: "usuario@dominio". El marcador de posición <ph name="LOGIN_ID_PLACEHOLDER" /> se reemplazará por el nombre de usuario "usuario". El marcador de posición <ph name="LOGIN_EMAIL_PLACEHOLDER" /> se reemplazará por la cuenta principal completa "usuario@dominio".</translation>
 <translation id="2290270645214705008">Si se inhabilita esta política, el servicio de host de acceso remoto no se podrá iniciar ni configurar para que acepte conexiones entrantes.  Esta política no afecta a las situaciones de asistencia remota.
@@ -2530,6 +2543,7 @@ Esta política solo se puede establecer como política de usuarios basada en la 
 <translation id="288448261660192095">Si se habilita esta política, los dispositivos físicos de entrada y salida del host de acceso remoto se inhabilitarán durante la conexión remota.
 
       Si se inhabilita esta política o no se le asigna ningún valor, los usuarios locales y los remotos podrán interactuar con el host cuando este se encuentre en modo compartido.</translation>
+<translation id="288463102030083286">Configuración de marca de agua personalizada</translation>
 <translation id="2884765974461416016">Inhabilitar la opción de compartir de Android a aplicación web.</translation>
 <translation id="2886215882246310669">Controla si <ph name="PRODUCT_OS_NAME" /> permite añadir nuevas cuentas de usuario de Family Link en el dispositivo.
       Esta política solo es útil si se combina con <ph name="DEVICE_USER_ALLOWLIST_POLICY_NAME" />. Permite añadir cuentas de Family Link, así como las cuentas que se definan en la lista de permitidas.
@@ -3142,6 +3156,7 @@ Si se inhabilita <ph name="NTPCARDSVISIBLE" />, no se mostrará la tarjeta de Ou
 <translation id="3278042410658310805">Inhabilitar los mensajes de voz en la pantalla de inicio de sesión y permitir que el usuario los habilite temporalmente</translation>
 <translation id="328347261792478720">De forma predeterminada, el navegador mostrará recomendaciones de contenido multimedia personalizadas al usuario. Si se inhabilita esta política, no se mostrarán estas recomendaciones al usuario. Si se habilita esta política o no se establece, se mostrarán recomendaciones de contenido multimedia al usuario.</translation>
 <translation id="3284094172359247914">Controlar el uso de la API WebUSB</translation>
+<translation id="3285231260918855067">Opacidad del contorno del texto de la marca de agua, de 0 (transparente) a 100 (opaco).</translation>
 <translation id="3286159327013237833">Habilitar el clic automático en la pantalla de inicio de sesión</translation>
 <translation id="3288595667065905535">Canal de lanzamiento</translation>
 <translation id="3291940794983537008">Configuración de las funciones de IA generativa de DevTools</translation>
@@ -4485,6 +4500,15 @@ En <ph name="MS_WIN_NAME" />, esta política solo está disponible en instancias
 <translation id="4297483555396496700">Los usuarios solo pueden cambiar el canal de lanzamiento del dispositivo si se le asigna el valor True a esta política. Si se le asigna el valor False o no se establece, los usuarios no podrán cambiar el canal.
 
 Establecer <ph name="CHROME_OS_RELEASE_CHANNEL_POLICY_NAME" /> solo tendrá efecto si se le asigna el valor False a <ph name="CHROME_OS_RELEASE_CHANNEL_DELEGATED_POLICY_NAME" />.</translation>
+<translation id="4297774573405304484">La URL de una imagen que se usará como insignia de la empresa en un navegador gestionado. La URL debe dirigir a una imagen.
+
+Se recomienda usar el icono de página (por ejemplo, https://www.google.com/favicon.ico) o un icono de al menos 48x48 px.
+
+Ten en cuenta que esta política solo se aplica a los navegadores gestionados, por lo que no afectará a los usuarios gestionados que usen navegadores no gestionados.
+
+En <ph name="MS_WIN_NAME" />, esta política solo está disponible en instancias que estén vinculadas a un dominio de <ph name="MS_AD_NAME" /> o a <ph name="MS_AAD_NAME" />, o que se hayan registrado en <ph name="CHROME_ENTERPRISE_CORE_NAME" />.
+
+En <ph name="MAC_OS_NAME" />, esta política solo está disponible en instancias que se gestionen mediante MDM, que estén vinculadas a un dominio a través de MCX o que se hayan registrado en <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="4301478455179579340">Firma de aplicaciones nativas durante la instalación de aplicaciones web progresivas</translation>
 <translation id="4303167373847512281">Permitir el modo Desarrollador</translation>
 <translation id="4307116964468610577">Esta política alarga la vida útil de las baterías de un sistema cargándolas por completo solo una vez al día. El resto del día, las baterías mantienen un estado de carga inferior que es beneficioso para su almacenamiento, incluso cuando el sistema está conectado a una fuente de alimentación.
@@ -4962,6 +4986,27 @@ Establecer <ph name="CHROME_OS_RELEASE_CHANNEL_POLICY_NAME" /> solo tendrá efec
 
       Si una política no está en la lista y hay conflicto entre fuentes, permisos o niveles, la política con más prioridad se aplicará.</translation>
 <translation id="4646739075621507361">Informar de los trabajos de impresión</translation>
+<translation id="4649231830965908577">Esta política permite a los administradores definir un agregador empresarial de búsqueda determinado que proporcionará recomendaciones y resultados de búsqueda en el omnibox (barra de direcciones) y en el cuadro de búsqueda de la página Nueva pestaña.
+
+De forma predeterminada, las sugerencias de búsqueda empresariales se combinarán y se mostrarán junto con las recomendaciones normales de <ph name="PRODUCT_NAME" />. Los usuarios pueden limitar explícitamente su búsqueda solo al agregador de búsqueda empresarial escribiendo la palabra clave especificada en el campo <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> con o sin el prefijo @ (por ejemplo, <ph name="SHORTCUT_EXAMPLE_SEARCH_AGGREGATOR_SETTINGS" />) y, después, pulsando la barra espaciadora o Tabulador en el omnibox. Las búsquedas empresariales limitadas (activadas por una palabra clave) solo se admiten en el omnibox y no en el cuadro de búsqueda de la página Nueva pestaña.
+
+Los siguientes campos son obligatorios: <ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, <ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, <ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />.
+
+El campo <ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> corresponde al nombre del buscador que se muestra al usuario en la barra de direcciones.
+
+El campo <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> corresponde a la palabra clave que introduce el usuario para activar la búsqueda. El acceso directo puede incluir palabras y caracteres sin formato, pero no puede incluir espacios ni empezar por el símbolo @. Los accesos directos deben ser únicos.
+
+El campo <ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> especifica la URL en la que se va a buscar. Introduce la dirección web de la página de resultados del buscador y utiliza <ph name="SEARCH_TERM_MARKER" /> en lugar de la consulta.
+
+El campo <ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> especifica la URL que proporciona sugerencias de búsqueda. Se hará una solicitud POST y la consulta del usuario se pasará en los parámetros POST con la clave <ph name="SEARCH_SUGGEST_POST_PARAMS_QUERY_KEY" />.
+
+El campo <ph name="ICON_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> especifica la URL de una imagen que se usará en las sugerencias de búsqueda. Si no se define este campo, se usará un icono predeterminado. Se recomienda usar un icono de página (por ejemplo, <ph name="ICON_URL_EXAMPLE" />). Formatos de archivo de imagen admitidos: JPEG, PNG e ICO.
+
+El campo <ph name="REQUIRE_SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> especifica si se requiere el <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> de la barra de direcciones para ver recomendaciones de búsqueda. Si es necesario, las sugerencias no se mostrarán en el cuadro de búsqueda de la página Nueva pestaña, pero seguirán apareciendo en el omnibox (barra de direcciones) en el modo de búsqueda limitada. Si no se define este campo, no se requiere el <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> de la barra de direcciones.
+
+En <ph name="MS_WIN_NAME" />, esta política solo está disponible en instancias que estén vinculadas a un dominio de <ph name="MS_AD_NAME" /> o a <ph name="MS_AAD_NAME" />, o que se hayan registrado en <ph name="CHROME_ENTERPRISE_CORE_NAME" />.
+
+En <ph name="MAC_OS_NAME" />, esta política solo está disponible en instancias que se gestionen mediante MDM, que estén vinculadas a un dominio a través de MCX o que se hayan registrado en <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="4649395978608361979">Destinos en impresoras locales</translation>
 <translation id="4650044303940238102">Ajustes de fuentes locales</translation>
 <translation id="4650759511838826572">Inhabilitar esquemas de protocolo de URL</translation>
@@ -6673,6 +6718,9 @@ En <ph name="MS_WIN_NAME" />, esta política solo está disponible en instancias
 <translation id="5740636973289452345">Habilitar informes de datos sobre extensiones y complementos</translation>
 <translation id="5740716956489996914">Usar el comportamiento predeterminado para definir si los sitios web pueden enviar solicitudes a endpoints de la red local</translation>
 <translation id="5741110260062082926">Inhabilitar Orca</translation>
+<translation id="5746126833785204233">Si se habilita esta política, se recogerán los registros a nivel de la aplicación de kiosco cuando se esté ejecutando una aplicación de kiosco en el dispositivo. Se recogerán registros de todos los tipos de aplicaciones de kiosco.
+Estos registros se almacenarán en un archivo kiosk_apps.log independiente.
+Si no se define esta política o se inhabilita, no se recogerán los registros a nivel de la aplicación de kiosco.</translation>
 <translation id="5746149754419996562">Habilita la presencia de widgets Glanceables en <ph name="PRODUCT_OS_NAME" />. Concretamente, esto afecta a los widgets a los que se puede acceder mediante el chip de fecha de la estantería.
 Si se habilita esta política, se habilitarán los widgets Glanceables en <ph name="PRODUCT_OS_NAME" />.
 Si esta política se inhabilita o no se define, no se habilitarán los widgets Glanceables en <ph name="PRODUCT_OS_NAME" />.</translation>
@@ -8304,9 +8352,15 @@ En <ph name="MS_WIN_NAME" />, esta política solo está disponible en instancias
 <translation id="6795485990775913659">Permitir imprimir solo sin PIN</translation>
 <translation id="6796215185873669533">Asigna el valor predeterminado de la configuración del navegador a la versión de la cadena user-agent.</translation>
 <translation id="6800181452282128474">No realizar consultas a Quirks Servers</translation>
+<translation id="6801739506172328815">Tamaño de la fuente del texto de la marca de agua en puntos.</translation>
 <translation id="6802412020718145539">El visor de PDFs usa la arquitectura OOPIF.</translation>
 <translation id="68031099365512050">Informar sobre el estado del audio</translation>
 <translation id="680356860463873420">No permitir que los usuarios utilicen un PluginVm</translation>
+<translation id="6807707420322335446">Si se habilita esta política, los elementos de páginas web que no pertenezcan al dominio que aparece en la barra de direcciones del navegador no podrán establecer cookies. Si se inhabilita esta política, esos elementos podrán establecer cookies y los usuarios no podrán cambiar esta opción.
+
+      Si no se establece, se permitirán las cookies de terceros, pero los usuarios podrán cambiar esta opción.
+
+      Nota: Esta política no se aplica en el modo Incógnito, donde las cookies de terceros están bloqueadas y solo se pueden permitir a nivel de sitio. Para permitir las cookies a nivel de sitio, usa la política <ph name="COOKIES_ALLOWED_FOR_URLS_POLICY_NAME" />.</translation>
 <translation id="6810445994095397827">Bloquear JavaScript en estos sitios</translation>
 <translation id="6813263547126514821">Encendido y apagado</translation>
 <translation id="681446116407619279">Esquemas de autenticación admitidos</translation>
@@ -8449,6 +8503,7 @@ Si no se define la política <ph name="DEVICE_POWER_BATTERY_CHARGING_OPTIMIZATIO
 <translation id="6907778402784621686">Permite bloquear el contenido no seguro en estos sitios web</translation>
 <translation id="6908335885425855120">Usar el visor de PDFs de iframe fuera de proceso</translation>
 <translation id="6908640907898649429">Permite configurar el proveedor de búsquedas predeterminadas. Puedes especificar el proveedor de búsquedas predeterminadas que utilizarán los usuarios o inhabilitar las búsquedas predeterminadas.</translation>
+<translation id="6910715067772088598">Inhabilitar registros de la aplicación de kiosco</translation>
 <translation id="6913068954484253496">Permitir que <ph name="PRODUCT_NAME" /> se conecte a dispositivos de transmisión de todas las direcciones IP.</translation>
 <translation id="6915493311660114995">Si se habilita esta política, <ph name="PRODUCT_NAME" /> permitirá las solicitudes de Web Authentication de los sitios web que tengan certificados TLS con errores (por ejemplo, sitios web que no se consideren seguros).
 
@@ -8524,6 +8579,7 @@ Esta política se eliminará en el futuro, cuando se haya lanzado por completo l
       Si no se establece, no habrá impresoras de dispositivo y se ignorarán las otras políticas <ph name="DEVICE_PRINTERS_POLICY_PATTERN" />.</translation>
 <translation id="69525503251220566">Parámetro que proporciona una función de búsqueda por imágenes para el proveedor de búsquedas predeterminado</translation>
 <translation id="6953102253399571439">Habilitar de manera predeterminada la impresión con PIN</translation>
+<translation id="695532899547292238">Habilitar la recogida de registros de la aplicación de kiosco</translation>
 <translation id="6956272732789158625">No permitir que los sitios utilicen la generación de claves</translation>
 <translation id="6960996423652450945">Inhabilitar el resaltado del cursor de texto en la pantalla de inicio de sesión</translation>
 <translation id="6961602002757991199">Si se define esta política como una URL válida, <ph name="PRODUCT_NAME" /> descargará la lista de sitios web de esa URL y aplicará las reglas como si se hubieran configurado con la política <ph name="BROWSER_SWITCHER_URL_GREYLIST_POLICY_NAME" />. Estas políticas evitarán que <ph name="PRODUCT_NAME" /> y el navegador alternativo se abran entre sí.
@@ -9330,6 +9386,7 @@ Si no se define esta política, no se permitirán excepciones de <ph name="FLOAT
 <translation id="7586199729147257934">Habilita el aprovisionamiento de certificados de cliente para navegadores gestionados</translation>
 <translation id="7587345076013230465">Pedir al usuario que seleccione el certificado de cliente cuando la política de selección automática encuentre coincidencias con varios certificados en la pantalla de inicio de sesión</translation>
 <translation id="7587921466180902617">Habilitar dogfood de Grabación de pantalla para usuarios de Family Link</translation>
+<translation id="7588140323025689972">Habilitar registros de la aplicación de kiosco</translation>
 <translation id="7595074040612182185">Si se establece la política, podrás definir una lista de patrones de URL donde se especifique qué sitios podrían mostrar imágenes.
 
       Si no se establece la política, <ph name="DEFAULT_IMAGES_SETTING_ENABLED_POLICY_NAME" /> se aplicará a todos los sitios, si se ha definido. Si no, se aplicará la configuración personal del usuario.
@@ -10485,6 +10542,11 @@ Si se le asigna el valor 0 (<ph name="PROVISION_MANAGED_CLIENT_CERTIFICATE_FOR_B
       Si no se le asigna ningún valor, <ph name="PRODUCT_NAME" /> permitirá a los usuarios controlar si es el navegador predeterminado y, en caso contrario, si deberían aparecer las notificaciones de usuario.
 
       Nota para los administradores de <ph name="MS_WIN_NAME" />: Si se activa este ajuste, solo funcionará en dispositivos con Windows 7. Para versiones de Windows posteriores, tendrás que implementar un archivo de "asociaciones de aplicaciones predeterminadas" que haga que <ph name="PRODUCT_NAME" /> gestione los protocolos <ph name="HTTPS_PROTOCOL" /> y <ph name="HTTP_PROTOCOL" /> (y, opcionalmente, el protocolo <ph name="FTP_PROTOCOL" /> y otros formatos de archivo). Consulta la Ayuda de Chrome (https://support.google.com/chrome?p=make_chrome_default_win).</translation>
+<translation id="8437836857126992452">Permite especificar las extensiones que los usuarios no pueden instalar. Si se bloquea una extensión ya instalada, se inhabilitará y el usuario no podrá habilitarla. Si una extensión que se había inhabilitado porque estaba en la lista de bloqueados se quita de esa lista, volverá a habilitarse automáticamente.
+
+          Si el valor de una lista de extensiones bloqueadas es un asterisco (*), se bloquearán todas las extensiones de forma predeterminada. Las extensiones que se incluyen explícitamente en la lista de permitidas se permiten si están firmadas (comprimidas). Todas las extensiones descomprimidas están bloqueadas.
+
+          Si no se asigna ningún valor a esta política, el usuario podrá instalar cualquier extensión en <ph name="PRODUCT_NAME" />.</translation>
 <translation id="8441105784056442638">Habilitar la función de restauración completa</translation>
 <translation id="844322176712318428">Permitir la API Translator</translation>
 <translation id="8444157920689124099">Habilitar el cifrado para aplicaciones</translation>

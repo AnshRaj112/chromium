@@ -78,6 +78,19 @@ BASE_FEATURE(kAutofillAiIgnoreGeoIp,
              "AutofillAiIgnoreGeoIp",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// If enabled, `*_TAG` types are replaced with dynamic attribute assignments.
+//
+// For example, if the feature is disabled, a passport name field requires a
+// `PASSPORT_NAME_TAG` prediction along with a classical `NAME_*` type.
+//
+// If the feature is enabled, `PASSPORT_NAME_TAG` is ignored and the assignment
+// to the passport entity is derived from the surrounding fields.
+//
+// TODO(crbug.com/422563282): Clean up when launched.
+BASE_FEATURE(kAutofillAiNoTagTypes,
+             "AutofillAiNoTagTypes",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, the client may trigger the server model for AutofillAI type
 // predictions.
 BASE_FEATURE(kAutofillAiServerModel,
@@ -131,7 +144,6 @@ BASE_FEATURE(kAutofillAiVoteForFormatStringsFromMultipleFields,
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables the second iteration AutofillAI.
-// This feature is independent of `autofill_ai::kAutofillAi`.
 BASE_FEATURE(kAutofillAiWithDataSchema,
              "AutofillAiWithDataSchema",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -444,6 +456,13 @@ BASE_FEATURE(kAutofillSupportPhoneticNameForJP,
 // Enables using custom name model with last name prefixes support.
 BASE_FEATURE(kAutofillSupportLastNamePrefix,
              "AutofillSupportLastNamePrefix",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables splitting two-part zip codes into two fields while filling and
+// importing split zip codes from two adjacent fields.
+// TODO(crbug.com/369503318): Clean up when launched.
+BASE_FEATURE(kAutofillSupportSplitZipCode,
+             "AutofillSupportSplitZipCode",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // When enabled, the form field parser won't try to match other attributes if

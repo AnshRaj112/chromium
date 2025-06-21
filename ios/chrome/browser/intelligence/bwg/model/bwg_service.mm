@@ -6,14 +6,20 @@
 
 #import <memory>
 
+#import "base/metrics/histogram_functions.h"
+#import "components/prefs/pref_service.h"
 #import "components/signin/public/identity_manager/identity_manager.h"
+#import "ios/chrome/browser/intelligence/bwg/metrics/bwg_metrics.h"
+#import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/signin/model/authentication_service.h"
 #import "ios/public/provider/chrome/browser/bwg/bwg_api.h"
 
 BwgService::BwgService(AuthenticationService* auth_service,
-                       signin::IdentityManager* identity_manager) {
+                       signin::IdentityManager* identity_manager,
+                       PrefService* pref_service) {
   auth_service_ = auth_service;
   identity_manager_ = identity_manager;
+  pref_service_ = pref_service;
 }
 
 BwgService::~BwgService() = default;
@@ -26,14 +32,20 @@ void BwgService::PresentOverlayOnViewController(
 }
 
 bool BwgService::IsEligibleForBWG() {
-  // TODO(crbug.com/419066154): Check other conditions, such as enterprise.
-
   AccountCapabilities capabilities =
       identity_manager_
           ->FindExtendedAccountInfo(identity_manager_->GetPrimaryAccountInfo(
               signin::ConsentLevel::kSignin))
           .capabilities;
 
-  return capabilities.can_use_model_execution_features() ==
-         signin::Tribool::kTrue;
+  bool can_use_model_execution =
+      capabilities.can_use_model_execution_features() == signin::Tribool::kTrue;
+  bool is_disabled_by_policy =
+      pref_service_->GetInteger(prefs::kGeminiEnabledByPolicy) == 1;
+
+  bool is_eligible = can_use_model_execution && !is_disabled_by_policy;
+
+  base::UmaHistogramBoolean(kEligibilityHistogram, is_eligible);
+
+  return is_eligible;
 }

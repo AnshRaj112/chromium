@@ -19,7 +19,6 @@
 #include "base/metrics/field_trial_params.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
-#include "components/optimization_guide/core/model_execution/feature_keys.h"
 #include "components/optimization_guide/core/optimization_guide_enums.h"
 #include "components/optimization_guide/proto/hints.pb.h"
 #include "components/optimization_guide/proto/model_execution.pb.h"
@@ -36,8 +35,6 @@ COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 BASE_DECLARE_FEATURE(kOptimizationHints);
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 BASE_DECLARE_FEATURE(kRemoteOptimizationGuideFetching);
-COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
-BASE_DECLARE_FEATURE(kRemoteOptimizationGuideFetchingAnonymousDataConsent);
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 BASE_DECLARE_FEATURE(kOptimizationGuideFetchingForSRP);
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
@@ -193,11 +190,6 @@ bool IsOptimizationHintsEnabled();
 // Service is enabled. This controls the fetching of both hints and models.
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 bool IsRemoteFetchingEnabled();
-
-// Returns true if the feature to fetch data for users that have consented to
-// anonymous data collection is enabled but are not Data Saver users.
-COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
-bool IsRemoteFetchingForAnonymousDataConsentEnabled();
 
 // Returns true if the feature to use push notifications is enabled.
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)

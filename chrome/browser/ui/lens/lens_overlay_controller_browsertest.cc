@@ -2613,6 +2613,7 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
 // panel browsertest file.
 IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
                        SidePanel_SearchURLClickWithTextDirective) {
+  base::HistogramTester histogram_tester;
   WaitForPaint();
 
   // State should start in off.
@@ -2678,6 +2679,12 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
   // Verify the loading state was never set.
   EXPECT_EQ(test_side_panel_coordinator->side_panel_loading_set_to_true_, 0);
   EXPECT_EQ(test_side_panel_coordinator->side_panel_loading_set_to_false_, 0);
+
+  // Record the text directive result.
+  histogram_tester.ExpectTotalCount("Lens.Overlay.TextDirectiveResult", 1);
+  histogram_tester.ExpectUniqueSample(
+      "Lens.Overlay.TextDirectiveResult",
+      lens::LensOverlayTextDirectiveResult::kOpenedInNewTab, 1);
 }
 
 // TODO(crbug.com/413042395): This test is not testing overlay logic, but
@@ -2685,6 +2692,7 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
 // panel browsertest file.
 IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
                        SidePanel_LinkClickWithTextDirective_TextIsPresent) {
+  base::HistogramTester histogram_tester;
   WaitForPaint();
 
   // State should start in off.
@@ -2774,6 +2782,15 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
     EXPECT_TRUE(highlighter->GetTextDirective() == "select" ||
                 highlighter->GetTextDirective() == "element");
   }
+  EXPECT_TRUE(base::test::RunUntil([&]() {
+    return histogram_tester.GetBucketCount(
+               "Lens.Overlay.TextDirectiveResult",
+               lens::LensOverlayTextDirectiveResult::kFoundOnPage) == 1;
+  }));
+  histogram_tester.ExpectTotalCount("Lens.Overlay.TextDirectiveResult", 1);
+  histogram_tester.ExpectUniqueSample(
+      "Lens.Overlay.TextDirectiveResult",
+      lens::LensOverlayTextDirectiveResult::kFoundOnPage, 1);
 }
 
 // TODO(crbug.com/413042395): This test is not testing overlay logic, but
@@ -2790,6 +2807,7 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserTest,
 IN_PROC_BROWSER_TEST_F(
     LensOverlayControllerBrowserTest,
     MAYBE_SidePanel_LinkClickWithTextDirective_TextIsMissing) {
+  base::HistogramTester histogram_tester;
   WaitForPaint();
 
   // State should start in off.
@@ -2869,6 +2887,10 @@ IN_PROC_BROWSER_TEST_F(
                            kCheckSidePanelToastShownScript)
         .ExtractBool();
   }));
+  histogram_tester.ExpectTotalCount("Lens.Overlay.TextDirectiveResult", 1);
+  histogram_tester.ExpectUniqueSample(
+      "Lens.Overlay.TextDirectiveResult",
+      lens::LensOverlayTextDirectiveResult::kNotFoundOnPage, 1);
 }
 
 // TODO(crbug.com/413042395): This test is not testing overlay logic, but
@@ -2885,6 +2907,7 @@ IN_PROC_BROWSER_TEST_F(
 IN_PROC_BROWSER_TEST_F(
     LensOverlayControllerBrowserTest,
     MAYBE_SidePanel_LinkClickWithTextDirective_TextIsIncomplete) {
+  base::HistogramTester histogram_tester;
   WaitForPaint();
 
   // State should start in off.
@@ -2964,6 +2987,10 @@ IN_PROC_BROWSER_TEST_F(
                            kCheckSidePanelToastShownScript)
         .ExtractBool();
   }));
+  histogram_tester.ExpectTotalCount("Lens.Overlay.TextDirectiveResult", 1);
+  histogram_tester.ExpectUniqueSample(
+      "Lens.Overlay.TextDirectiveResult",
+      lens::LensOverlayTextDirectiveResult::kNotFoundOnPage, 1);
 }
 
 // TODO(crbug.com/413042395): This test is not testing overlay logic, but
@@ -4571,10 +4598,8 @@ class LensOverlayControllerEntrypointsBrowserTest
   void SetupFeatureList() override {
     std::vector<base::test::FeatureRefAndParams> enabled_features = {
         {lens::features::kLensOverlay, {}},
-        {lens::features::kLensOverlayContextualSearchbox,
-         {
-
-         }},
+        {lens::features::kLensOverlayContextualSearchbox, {}},
+        {lens::features::kLensOverlayOmniboxEntryPoint, {}},
         {lens::features::kLensOverlaySurvey, {}},
         {lens::features::kLensOverlaySidePanelOpenInNewTab, {}}};
     if (IsPageActionsMigrationEnabled()) {
@@ -5226,8 +5251,10 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserFullscreenDisabled,
       [&]() { return controller->state() == State::kOverlay; }));
 
   // Enter into fullscreen mode.
-  FullscreenController* fullscreen_controller =
-      browser()->exclusive_access_manager()->fullscreen_controller();
+  FullscreenController* fullscreen_controller = browser()
+                                                    ->GetFeatures()
+                                                    .exclusive_access_manager()
+                                                    ->fullscreen_controller();
   content::WebContents* tab_web_contents =
       browser()->tab_strip_model()->GetActiveWebContents();
   fullscreen_controller->EnterFullscreenModeForTab(
@@ -5252,8 +5279,10 @@ IN_PROC_BROWSER_TEST_F(LensOverlayControllerBrowserFullscreenDisabled,
       IDC_CONTENT_CONTEXT_LENS_OVERLAY));
 
   // Enter into fullscreen mode.
-  FullscreenController* fullscreen_controller =
-      browser()->exclusive_access_manager()->fullscreen_controller();
+  FullscreenController* fullscreen_controller = browser()
+                                                    ->GetFeatures()
+                                                    .exclusive_access_manager()
+                                                    ->fullscreen_controller();
   content::WebContents* tab_web_contents =
       browser()->tab_strip_model()->GetActiveWebContents();
   fullscreen_controller->EnterFullscreenModeForTab(

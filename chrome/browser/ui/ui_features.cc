@@ -209,7 +209,7 @@ BASE_FEATURE(kPinnedCastButton,
 // toolbar.
 BASE_FEATURE(kEnterpriseProfileBadgingForAvatar,
              "EnterpriseProfileBadgingForAvatar",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables enterprise profile badging for managed profiles on the toolbar avatar
 // and in the profile menu. On managed profiles, a building icon will be used as
@@ -299,7 +299,7 @@ BASE_FEATURE(kUsePortalAccentColor,
 
 BASE_FEATURE(kPageSpecificDataDialogRelatedInstalledAppsSection,
              "PageSpecificDataDialogRelatedInstalledAppsSection",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEnableManagementPromotionBanner,
              "EnableManagementPromotionBanner",

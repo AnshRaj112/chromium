@@ -106,6 +106,8 @@ class ServiceWorkerGlobalScopeProxy final : public WebServiceWorkerContextProxy,
   bool IsWindowInteractionAllowed() override;
   void PauseEvaluation() override;
   void ResumeEvaluation() override;
+  void DeferPrepareForEvaluation() override;
+  void RunDeferredPrepareForEvaluation() override;
   mojom::blink::ServiceWorkerFetchHandlerType FetchHandlerType() override;
   bool HasHidEventHandlers() override;
   bool HasUsbEventHandlers() override;
@@ -129,7 +131,6 @@ class ServiceWorkerGlobalScopeProxy final : public WebServiceWorkerContextProxy,
   void DidFetchScript() override;
   void DidFailToFetchClassicScript() override;
   void DidFailToFetchModuleScript() override;
-  void WillPrepareForEvaluation() override;
   void WillEvaluateScript() override;
   void DidEvaluateTopLevelScript(bool success) override;
   void DidCloseWorkerGlobalScope() override;

@@ -220,6 +220,7 @@
 <translation id="3954172517175569325">Les contrasenyes, les formes de pagament i les adreces que hagis desat al teu Compte de Google se suprimiran d'aquest dispositiu. Per tornar-les a utilitzar a Chromium, inicia la sessió de nou.</translation>
 <translation id="395904275706073188">Les pàgines protegides no es poden llegir. Prova una altra pàgina.</translation>
 <translation id="3962647064319009959">Informació sobre com et protegeix Chromium</translation>
+<translation id="3971865010372729242">Quan escrius a la barra d'adreces o al quadre de cerca, Chromium envia el que escrius a les eines de cerca, d'IA i d'agent de la teva organització per obtenir suggeriments.</translation>
 <translation id="3975724895399328945">Sobre &amp;Google Chrome for Testing</translation>
 <translation id="3997429360543082038">Sobre Chromium OS</translation>
 <translation id="4019629340646866719">Chromium OS és possible gràcies a <ph name="BEGIN_LINK_CROS_OSS" />programari lliure<ph name="END_LINK_CROS_OSS" /> addicional, igual que l‘<ph name="BEGIN_LINK_LINUX_OSS" />entorn de desenvolupament de Linux<ph name="END_LINK_LINUX_OSS" />.</translation>
@@ -342,6 +343,7 @@
 <translation id="5775198138441669627">Si has oblidat la frase de contrasenya o vols canviar aquesta opció de configuració, <ph name="SETTINGS_LINK" /> les dades de Chromium del teu compte</translation>
 <translation id="5800158606660203929">Personalitza i controla Chromium. Defineix Chromium com a navegador predeterminat.</translation>
 <translation id="5809516625706423866">No es pot connectar a Internet. Error d'HTTP "401 Unauthorized". Comprova la configuració del servidor intermediari.</translation>
+<translation id="5817952762723416573">Agilitza els llocs web amb el motor V8 de Chromium, però fa que Chromium sigui una mica menys resistent als atacs. Aquesta opció de configuració està desactivada.</translation>
 <translation id="5821520528363214608">Per utilitzar i desar les dades de Chromium al teu Compte de Google, actualitza Chromium</translation>
 <translation id="5824893331272123205">Aquest tauler no s'ha pogut carregar. Torna-ho a provar.</translation>
 <translation id="5862307444128926510">Us donem la benvinguda a Chromium</translation>
@@ -431,6 +433,7 @@
 <translation id="6729124504294600478">Per obtenir personalització i altres funcions, inclou Chromium a Activitat al web i en aplicacions i als serveis de Google enllaçats</translation>
 <translation id="6734291798041940871">Ja tens instal·lat Chromium per a tots els usuaris de l'ordinador.</translation>
 <translation id="674245979920622322">No l'has visitat recentment. Chromium ha suprimit <ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> i <ph name="COUNT" /> elements més.</translation>
+<translation id="6751374565094704799">Agilitza els llocs web amb el motor V8 de Chromium, però fa que Chromium sigui una mica menys resistent als atacs. Aquesta opció de configuració està activada.</translation>
 <translation id="67706546131546258">Chromium recomana que s'analitzi aquest fitxer perquè pot ser perillós.</translation>
 <translation id="6779406956731413166">Chromium OS és possible gràcies a <ph name="BEGIN_LINK_CROS_OSS" />programari lliure addicional<ph name="END_LINK_CROS_OSS" />.</translation>
 <translation id="6831043979455480757">Tradueix</translation>

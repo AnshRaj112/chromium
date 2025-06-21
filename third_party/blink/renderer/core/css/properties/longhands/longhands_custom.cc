@@ -17,7 +17,6 @@
 #include "third_party/blink/renderer/core/css/css_font_variation_value.h"
 #include "third_party/blink/renderer/core/css/css_function_value.h"
 #include "third_party/blink/renderer/core/css/css_gap_decoration_property_utils.h"
-#include "third_party/blink/renderer/core/css/css_grid_auto_repeat_value.h"
 #include "third_party/blink/renderer/core/css/css_grid_template_areas_value.h"
 #include "third_party/blink/renderer/core/css/css_identifier_value.h"
 #include "third_party/blink/renderer/core/css/css_identifier_value_mappings.h"
@@ -604,7 +603,8 @@ const CSSValue* AnimationTimeline::CSSValueFromComputedStyleInternal(
     const LayoutObject*,
     bool allow_visited_style,
     CSSValuePhase value_phase) const {
-  return ComputedStyleUtils::ValueForAnimationTimelineList(style.Animations());
+  return ComputedStyleUtils::ValueForAnimationTimelineList(style.Animations(),
+                                                           style);
 }
 
 const CSSValue* AnimationTimeline::InitialValue() const {
@@ -760,7 +760,7 @@ const CSSValue* AnimationTriggerTimeline::CSSValueFromComputedStyleInternal(
     bool allow_visited_style,
     CSSValuePhase value_phase) const {
   return ComputedStyleUtils::ValueForAnimationTriggerTimelineList(
-      style.Animations());
+      style.Animations(), style);
 }
 
 const CSSValue* AnimationTriggerTimeline::InitialValue() const {
@@ -4904,7 +4904,7 @@ const CSSValue* GridAutoColumns::CSSValueFromComputedStyleInternal(
     const LayoutObject* layout_object,
     bool allow_visited_style,
     CSSValuePhase value_phase) const {
-  return ComputedStyleUtils::ValueForGridAutoTrackList(style.GridAutoColumns(),
+  return ComputedStyleUtils::ValueForGridAutoTrackList(kForColumns,
                                                        layout_object, style);
 }
 
@@ -4992,8 +4992,8 @@ const CSSValue* GridAutoRows::CSSValueFromComputedStyleInternal(
     const LayoutObject* layout_object,
     bool allow_visited_style,
     CSSValuePhase value_phase) const {
-  return ComputedStyleUtils::ValueForGridAutoTrackList(style.GridAutoRows(),
-                                                       layout_object, style);
+  return ComputedStyleUtils::ValueForGridAutoTrackList(kForRows, layout_object,
+                                                       style);
 }
 
 const CSSValue* GridAutoRows::InitialValue() const {
@@ -6212,7 +6212,7 @@ const CSSValue* LetterSpacing::ParseSingleValue(
     CSSParserTokenStream& stream,
     const CSSParserContext& context,
     const CSSParserLocalContext&) const {
-  return css_parsing_utils::ParseSpacing(stream, context);
+  return css_parsing_utils::ParseLetterSpacing(stream, context);
 }
 
 const CSSValue* LetterSpacing::CSSValueFromComputedStyleInternal(
@@ -6220,6 +6220,16 @@ const CSSValue* LetterSpacing::CSSValueFromComputedStyleInternal(
     const LayoutObject*,
     bool allow_visited_style,
     CSSValuePhase value_phase) const {
+  if (RuntimeEnabledFeatures::CSSLetterSpacingPercentageEnabled()) {
+    const Length& spacing = style.SpecifiedLetterSpacing();
+    if (spacing.IsFixed()) {
+      if (spacing.IsZero()) {
+        return CSSIdentifierValue::Create(CSSValueID::kNormal);
+      }
+      return ZoomAdjustedPixelValue(spacing.Pixels(), style);
+    }
+    return CSSPrimitiveValue::Create(spacing, style.Zoom());
+  }
   if (!style.LetterSpacing()) {
     return CSSIdentifierValue::Create(CSSValueID::kNormal);
   }
@@ -6683,23 +6693,6 @@ const CSSValue* MaskType::CSSValueFromComputedStyleInternal(
   return CSSIdentifierValue::Create(style.MaskType());
 }
 
-const CSSValue* MasonryAutoTracks::ParseSingleValue(
-    CSSParserTokenStream& stream,
-    const CSSParserContext& context,
-    const CSSParserLocalContext&) const {
-  return css_parsing_utils::ConsumeGridTrackList(
-      stream, context, css_parsing_utils::TrackListType::kGridAuto);
-}
-
-const CSSValue* MasonryAutoTracks::CSSValueFromComputedStyleInternal(
-    const ComputedStyle& style,
-    const LayoutObject* layout_object,
-    bool allow_visited_style,
-    CSSValuePhase value_phase) const {
-  return ComputedStyleUtils::ValueForGridAutoTrackList(
-      style.MasonryAutoTracks(), layout_object, style);
-}
-
 const CSSValue* MasonryDirection::CSSValueFromComputedStyleInternal(
     const ComputedStyle& style,
     const LayoutObject*,
@@ -6730,63 +6723,6 @@ const CSSValue* ItemTolerance::CSSValueFromComputedStyleInternal(
     CSSValuePhase value_phase) const {
   return ComputedStyleUtils::ValueForItemTolerance(style.ItemTolerance(),
                                                    style);
-}
-
-const CSSValue* MasonryTemplateTracks::ParseSingleValue(
-    CSSParserTokenStream& stream,
-    const CSSParserContext& context,
-    const CSSParserLocalContext&) const {
-  return css_parsing_utils::ConsumeGridTemplatesRowsOrColumns(stream, context);
-}
-
-bool MasonryTemplateTracks::IsLayoutDependent(
-    const ComputedStyle* style,
-    LayoutObject* layout_object) const {
-  return layout_object && layout_object->IsLayoutMasonry();
-}
-
-const CSSValue* MasonryTemplateTracks::CSSValueFromComputedStyleInternal(
-    const ComputedStyle& style,
-    const LayoutObject* layout_object,
-    bool allow_visited_style,
-    CSSValuePhase value_phase) const {
-  return ComputedStyleUtils::ValueForMasonryTrackList(layout_object, style);
-}
-
-const CSSValue* MasonryTemplateTracks::InitialValue() const {
-  auto* list = CSSValueList::CreateSpaceSeparated();
-  list->Append(*CSSIdentifierValue::Create(CSSValueID::kAuto));
-  return list;
-}
-
-const CSSValue* MasonryTrackEnd::ParseSingleValue(
-    CSSParserTokenStream& stream,
-    const CSSParserContext& context,
-    const CSSParserLocalContext&) const {
-  return css_parsing_utils::ConsumeGridLine(stream, context);
-}
-
-const CSSValue* MasonryTrackEnd::CSSValueFromComputedStyleInternal(
-    const ComputedStyle& style,
-    const LayoutObject*,
-    bool allow_visited_style,
-    CSSValuePhase value_phase) const {
-  return ComputedStyleUtils::ValueForGridPosition(style.MasonryTrackEnd());
-}
-
-const CSSValue* MasonryTrackStart::ParseSingleValue(
-    CSSParserTokenStream& stream,
-    const CSSParserContext& context,
-    const CSSParserLocalContext&) const {
-  return css_parsing_utils::ConsumeGridLine(stream, context);
-}
-
-const CSSValue* MasonryTrackStart::CSSValueFromComputedStyleInternal(
-    const ComputedStyle& style,
-    const LayoutObject*,
-    bool allow_visited_style,
-    CSSValuePhase value_phase) const {
-  return ComputedStyleUtils::ValueForGridPosition(style.MasonryTrackStart());
 }
 
 const CSSValue* MathShift::CSSValueFromComputedStyleInternal(
@@ -8063,30 +7999,8 @@ void PositionTryFallbacks::ApplyValue(StyleResolverState& state,
   }
   HeapVector<PositionTryFallback> fallbacks;
   for (const auto& fallback : To<CSSValueList>(value)) {
-    DCHECK(!IsA<CSSFunctionValue>(fallback.Get()))
-        << "position-area( <position-area> ) was deprecated/removed";
-    // <'position-area'>
-    if (IsA<CSSValuePair>(fallback.Get()) ||
-        IsA<CSSIdentifierValue>(fallback.Get())) {
-      blink::PositionArea position_area =
-          StyleBuilderConverter::ConvertPositionArea(state, *fallback.Get());
-      fallbacks.push_back(PositionTryFallback(position_area));
-      continue;
-    }
-    // [<dashed-ident> || <try-tactic>]
-    const ScopedCSSName* scoped_name = nullptr;
-    TryTacticList tactic_list = {TryTactic::kNone};
-    wtf_size_t tactic_index = 0;
-    for (const auto& name_or_tactic : To<CSSValueList>(*fallback)) {
-      if (const auto* name = DynamicTo<CSSCustomIdentValue>(*name_or_tactic)) {
-        scoped_name = StyleBuilderConverter::ConvertCustomIdent(state, *name);
-        continue;
-      }
-      CHECK_LT(tactic_index, tactic_list.size());
-      tactic_list[tactic_index++] =
-          To<CSSIdentifierValue>(*name_or_tactic).ConvertTo<TryTactic>();
-    }
-    fallbacks.push_back(PositionTryFallback(scoped_name, tactic_list));
+    fallbacks.push_back(StyleBuilderConverter::ConvertSinglePositionTryFallback(
+        state, *fallback));
   }
   DCHECK(!fallbacks.empty());
   state.StyleBuilder().SetPositionTryFallbacks(
@@ -12031,7 +11945,7 @@ const CSSValue* WordSpacing::ParseSingleValue(
     CSSParserTokenStream& stream,
     const CSSParserContext& context,
     const CSSParserLocalContext&) const {
-  return css_parsing_utils::ParseSpacing(stream, context);
+  return css_parsing_utils::ParseWordSpacing(stream, context);
 }
 
 const CSSValue* WordSpacing::CSSValueFromComputedStyleInternal(

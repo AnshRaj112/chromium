@@ -99,7 +99,6 @@ Browser* GetBrowserFromInstantMessage(
     case CollaborationEvent::TAB_GROUP_REMOVED:
     case CollaborationEvent::UNDEFINED:
     case CollaborationEvent::COLLABORATION_REMOVED:
-    case CollaborationEvent::VERSION_OUT_OF_DATE:
       use_first_available_browser = true;
       break;
   }
@@ -171,8 +170,16 @@ void CollaborationGroupInfoBarDelegate::ClearCollaborationGroupInfobars(
   const auto& infobars = infobar_manager->infobars();
   for (int i = static_cast<int>(infobars.size()) - 1; i >= 0; --i) {
     infobars::InfoBar* infobar = infobars[i];
+
+    InfoBarIOS* infobar_ios = static_cast<InfoBarIOS*>(infobar);
+    if (infobar_ios->infobar_type() !=
+        InfobarType::kInfobarTypeCollaborationGroup) {
+      continue;
+    }
+
     CollaborationGroupInfoBarDelegate* delegate =
-        static_cast<CollaborationGroupInfoBarDelegate*>(infobar->delegate());
+        static_cast<CollaborationGroupInfoBarDelegate*>(
+            infobar_ios->delegate());
     if (!delegate) {
       continue;
     }
@@ -252,8 +259,6 @@ std::u16string CollaborationGroupInfoBarDelegate::GetButtonLabel(
     case CollaborationEvent::COLLABORATION_ADDED:
     case CollaborationEvent::COLLABORATION_REMOVED:
     case CollaborationEvent::COLLABORATION_MEMBER_REMOVED:
-    case CollaborationEvent::VERSION_OUT_OF_DATE:
-      // TODO(crbug.com/422424386): Implement for versioning.
       return l10n_util::GetStringUTF16(
           IDS_IOS_COLLABORATION_GROUP_DEFAULT_PRIMARY_TOOLBAR_BUTTON);
   }
@@ -277,8 +282,6 @@ bool CollaborationGroupInfoBarDelegate::Accept() {
     case CollaborationEvent::COLLABORATION_ADDED:
     case CollaborationEvent::COLLABORATION_REMOVED:
     case CollaborationEvent::COLLABORATION_MEMBER_REMOVED:
-    case CollaborationEvent::VERSION_OUT_OF_DATE:
-      // TODO(crbug.com/422424386): Implement for versioning.
       break;
   }
 
@@ -353,8 +356,6 @@ UIImage* CollaborationGroupInfoBarDelegate::GetSymbolImage() {
       break;
     case CollaborationEvent::TAB_GROUP_REMOVED:
     case CollaborationEvent::COLLABORATION_REMOVED:
-    case CollaborationEvent::VERSION_OUT_OF_DATE:
-      // TODO(crbug.com/422424386): Implement for versioning.
       symbolName = kTabGroupsSymbol;
       break;
   }

@@ -222,6 +222,7 @@ Bluetooth түзмөктөрүн изилдөө үчүн Bluetooth'ду пайд
 <translation id="3954172517175569325">Google аккаунтуңузга сактаган сырсөздөрүңүз, төлөм ыкмаларыңыз жана даректериңиз бул түзмөктөн өчүрүлөт. Аларды Chromium'да кайра колдонуу үчүн кайра кириңиз.</translation>
 <translation id="395904275706073188">Корголгон барактарды окууга болбойт. Башка баракты колдонуп көрүңүз.</translation>
 <translation id="3962647064319009959">Chromium коопсуздугуңузду кантип камсыздаганын билип алыңыз</translation>
+<translation id="3971865010372729242">Дарек тилкесине же издөө кутучасына жазганыңызда, Chromium сизге ылайыктуу нерселерди сунуштоо максатында сурамды уюмуңуздун издөө куралына, ЖИге жана агенттик куралдарга жөнөтөт.</translation>
 <translation id="3975724895399328945">&amp;Google Chrome for Testing жөнүндө</translation>
 <translation id="3997429360543082038">ChromiumOS жөнүндө</translation>
 <translation id="4019629340646866719">ChromiumOS тутуму, <ph name="BEGIN_LINK_LINUX_OSS" />Linux'ту өнүктүрүү чөйрөсү<ph name="END_LINK_LINUX_OSS" /> сыяктуу, кошумча <ph name="BEGIN_LINK_CROS_OSS" />баштапкы коду ачык программалык камсыздоонун<ph name="END_LINK_CROS_OSS" /> жардамы менен иштейт.</translation>
@@ -344,6 +345,7 @@ Bluetooth түзмөктөрүн изилдөө үчүн Bluetooth'ду пайд
 <translation id="5775198138441669627">Эгер сыр сүйлөмүңүздү унутуп калсаңыз же бул параметрди өзгөрткүңүз келсе, аккаунтуңуздагы Chromium маалыматын <ph name="SETTINGS_LINK" /></translation>
 <translation id="5800158606660203929">Chromium'ду ыңгайлаштырып, көзөмөлдөңүз. Chromium'ду демейки серепчи катары коюңуз.</translation>
 <translation id="5809516625706423866">Интернетке туташуу мүмкүн болбой жатат. HTTP 401 Уруксат берилген эмес. Прокси конфигурациясын текшериңиз.</translation>
+<translation id="5817952762723416573">Chromium'дун V8 каражаты менен сайттардын жүктөлүшүн тездетет, бирок Chromium'дун чабуулдарга туруктуулугун начарлатат. Бул параметр өчүк.</translation>
 <translation id="5821520528363214608">Chromium'дагы маалыматты колдонуп жана Google аккаунтуңузга сактоо үчүн Chromium'ду жаңыртыңыз</translation>
 <translation id="5824893331272123205">Бул панель жүктөлгөн жок, кайталап көрүңүз</translation>
 <translation id="5862307444128926510">Chromium'га кош келиңиз</translation>
@@ -433,6 +435,7 @@ Bluetooth түзмөктөрүн изилдөө үчүн Bluetooth'ду пайд
 <translation id="6729124504294600478">Жекелештирүүнү жана башка функцияларды пайдалануу үчүн Chromium'ду Колдонмолор жана Интернеттеги аракеттер таржымалына жана байланышкан Google кызматтарына кошуңуз</translation>
 <translation id="6734291798041940871">Chromium компьютериңиздин бардык колдонуучулары үчүн орнотулуп коюлган.</translation>
 <translation id="674245979920622322">Акыркы убакта кирген жоксуз. Chromium <ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> жана дагы <ph name="COUNT" /> уруксатты өчүрдү</translation>
+<translation id="6751374565094704799">Chromium'дун V8 каражаты менен сайттардын жүктөлүшүн тездетет, бирок Chromium'дун чабуулдарга туруктуулугун начарлатат. Бул параметр күйүк.</translation>
 <translation id="67706546131546258">Chromium бул файлды текшерүүнү сунуштайт. Ал кооптуу болушу мүмкүн.</translation>
 <translation id="6779406956731413166">ChromiumOS тутуму кошумча <ph name="BEGIN_LINK_CROS_OSS" />баштапкы коду ачык программалык камсыздоонун<ph name="END_LINK_CROS_OSS" /> жардамы менен, иштейт.</translation>
 <translation id="6831043979455480757">Которуу</translation>

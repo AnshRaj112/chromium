@@ -181,9 +181,6 @@ class CORE_EXPORT OffscreenCanvas final
   }
   bool IsOpaque() const final;
 
-  // overrides CanvasImageSource::IsAccelerated()
-  bool IsAccelerated() const final;
-
   // overrides CanvasRenderingContextHost::EnableAccelerationForCanvas2D()
   bool EnableAccelerationForCanvas2D() final;
 
@@ -261,7 +258,6 @@ class CORE_EXPORT OffscreenCanvas final
   static ContextFactoryVector& RenderingContextFactories();
   static CanvasRenderingContextFactory* GetRenderingContextFactory(int);
 
-  CanvasResourceProvider* GetOrCreateResourceProviderForCanvas2DOrImageBitmap();
   void RecordIdentifiabilityMetric(const blink::IdentifiableSurface& surface,
                                    const IdentifiableToken& token) const;
 

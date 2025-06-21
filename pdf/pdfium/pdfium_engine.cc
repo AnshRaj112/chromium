@@ -30,6 +30,7 @@
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/notimplemented.h"
 #include "base/notreached.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/strings/string_number_conversions.h"
@@ -1445,6 +1446,10 @@ bool PDFiumEngine::OnLeftMouseDown(const blink::WebMouseEvent& event) {
   }
   SetFieldFocus(FocusFieldType::kNoFocus);
 
+#if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
+  client_->MaybeShowSearchifyInProgress();
+#endif
+
   if (point_data.area != PDFiumPage::TEXT_AREA) {
     return true;  // Return true so WebKit doesn't do its own highlighting.
   }
@@ -1910,6 +1915,10 @@ void PDFiumEngine::StartFind(const std::u16string& text, bool case_sensitive) {
     client_->NotifyNumberOfFindResultsChanged(0, true);
     return;
   }
+
+#if BUILDFLAG(ENABLE_SCREEN_AI_SERVICE)
+  client_->MaybeShowSearchifyInProgress();
+#endif
 
   bool first_search = (current_find_text_ != text);
   int character_to_start_searching_from = 0;
@@ -4663,9 +4672,8 @@ std::vector<gfx::Rect> PDFiumEngine::GetSelectionRects() {
   for (auto& selection : selection_) {
     std::vector<gfx::Rect> screen_rects = selection.GetScreenRects(
         GetVisibleRect().origin(), current_zoom_, GetCurrentOrientation());
-    for (auto& screen_rect : screen_rects) {
-      selection_rects.push_back(screen_rect);
-    }
+    selection_rects.insert(selection_rects.end(), screen_rects.begin(),
+                           screen_rects.end());
   }
   return selection_rects;
 }

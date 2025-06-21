@@ -17,6 +17,7 @@
 #include "base/json/json_reader.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/user_metrics.h"
+#include "base/notimplemented.h"
 #include "base/notreached.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
@@ -1407,7 +1408,7 @@ void PeopleHandler::HandleSetChromeSigninUserChoice(
   CHECK_NE(user_choice, ChromeSigninUserChoice::kNoChoice);
 
   CHECK(args[1].is_string());
-  std::string signed_in_email = args[1].GetString();
+  const std::string& signed_in_email = args[1].GetString();
   CHECK(!signed_in_email.empty());
 
   AccountInfo account =

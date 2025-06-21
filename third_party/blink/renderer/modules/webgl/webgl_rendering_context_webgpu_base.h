@@ -5,6 +5,7 @@
 #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_WEBGL_WEBGL_RENDERING_CONTEXT_WEBGPU_BASE_H_
 #define THIRD_PARTY_BLINK_RENDERER_MODULES_WEBGL_WEBGL_RENDERING_CONTEXT_WEBGPU_BASE_H_
 
+#include <array>
 #include <memory>
 
 #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
@@ -1275,10 +1276,12 @@ class MODULES_EXPORT WebGLRenderingContextWebGPUBase
   void SetHdrMetadata(const gfx::HDRMetadata& hdr_metadata) override;
 
   bool IsComposited() const override;
+  bool IsAccelerated() const override;
   bool IsPaintable() const override;
   void PageVisibilityChanged() override;
-  CanvasResourceProvider* PaintRenderingResultsToCanvas(
-      SourceDrawingBuffer) override;
+  scoped_refptr<StaticBitmapImage> PaintRenderingResultsToSnapshot(
+      SourceDrawingBuffer source_buffer,
+      FlushReason reason) override;
   bool CopyRenderingResultsToVideoFrame(
       WebGraphicsContext3DVideoFramePool*,
       SourceDrawingBuffer,

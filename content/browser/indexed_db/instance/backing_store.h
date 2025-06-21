@@ -160,18 +160,13 @@ class BackingStore {
         int64_t index_id,
         const blink::IndexedDBKey& key,
         const RecordIdentifier& record) = 0;
-    // The returned key will be invalid if it was not found.
-    [[nodiscard]] virtual StatusOr<blink::IndexedDBKey> GetPrimaryKeyViaIndex(
-        int64_t object_store_id,
-        int64_t index_id,
-        const blink::IndexedDBKey& key) = 0;
-    // Returns the primary key of a record if it is found in the index with
-    // index key value `key`. Returns a "none" key (!IsValid()) if not found.
-    // Returns a `Status` on database error.
-    [[nodiscard]] virtual StatusOr<blink::IndexedDBKey> KeyExistsInIndex(
-        int64_t object_store_id,
-        int64_t index_id,
-        const blink::IndexedDBKey& key) = 0;
+    // Returns the primary key of the first record (sorted by primary key) in
+    // the index with key value `key`, if found. Returns a "none" key
+    // (!IsValid()) if not found. Returns a `Status` on database error.
+    [[nodiscard]] virtual StatusOr<blink::IndexedDBKey>
+    GetFirstPrimaryKeyForIndexKey(int64_t object_store_id,
+                                  int64_t index_id,
+                                  const blink::IndexedDBKey& key) = 0;
     [[nodiscard]] virtual StatusOr<uint32_t> GetObjectStoreKeyCount(
         int64_t object_store_id,
         blink::IndexedDBKeyRange key_range) = 0;
@@ -214,13 +209,12 @@ class BackingStore {
     // keys are valid, advances the cursor to the row for `key` or `key` and
     // `primary_key`. Returns true on success, or false if no eligible row was
     // found. Returns an error if there was a DB error.
+    virtual StatusOr<bool> Continue() = 0;
     virtual StatusOr<bool> Continue(const blink::IndexedDBKey& key,
                                     const blink::IndexedDBKey& primary_key) = 0;
     virtual StatusOr<bool> Advance(uint32_t count) = 0;
     // Clone may return a nullptr if cloning fails for any reason.
     virtual std::unique_ptr<Cursor> Clone() const = 0;
-
-    StatusOr<bool> Continue() { return Continue({}, {}); }
   };
 
   virtual ~BackingStore() = default;

@@ -99,6 +99,8 @@ public interface AppMenuHandler {
      */
     AppMenuButtonHelper createAppMenuButtonHelper();
 
-    /** Call to cause a redraw when an item in the app menu changes. */
-    void invalidateAppMenu();
+    /**
+     * @return {@link AppMenuPropertiesDelegate} that builds the menu list.
+     */
+    AppMenuPropertiesDelegate getMenuPropertiesDelegate();
 }

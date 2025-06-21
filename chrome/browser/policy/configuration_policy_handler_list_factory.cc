@@ -603,6 +603,11 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kDisable3DAPIs,
     prefs::kDisable3DAPIs,
     base::Value::Type::BOOLEAN },
+#if !BUILDFLAG(IS_CHROMEOS)
+  { key::kEnableUnsafeSwiftShader,
+    prefs::kEnableUnsafeSwiftShader,
+    base::Value::Type::BOOLEAN },
+#endif
   { key::kDisableScreenshots,
     prefs::kDisableScreenshots,
     base::Value::Type::BOOLEAN },
@@ -2091,6 +2096,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kDeviceAttributesAllowedForOrigins,
     prefs::kDeviceAttributesAllowedForOrigins,
     base::Value::Type::LIST },
+  { key::kKioskApplicationLogCollectionEnabled,
+    prefs::kKioskApplicationLogCollectionEnabled,
+    base::Value::Type::BOOLEAN},
   { key::kKioskBrowserPermissionsAllowedForOrigins,
     prefs::kKioskBrowserPermissionsAllowedForOrigins,
     base::Value::Type::LIST },
@@ -2132,11 +2140,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::BOOLEAN },
   { key::kRemoteAccessHostAllowEnterpriseRemoteSupportConnections,
     prefs::kRemoteAccessHostAllowEnterpriseRemoteSupportConnections,
-    base::Value::Type::BOOLEAN },
-  // We avoid checking for BUILDFLAG(ENABLE_NACL) since we may want the policy
-  // to exist (deprecated) even if NACL is no longer being built.
-  { key::kDeviceNativeClientForceAllowed,
-    prefs::kDeviceNativeClientForceAllowed,
     base::Value::Type::BOOLEAN },
   { key::kKioskActiveWiFiCredentialsScopeChangeEnabled,
     prefs::kKioskActiveWiFiCredentialsScopeChangeEnabled,
@@ -2332,6 +2335,12 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kLocalNetworkAccessRestrictionsEnabled,
     prefs::kManagedLocalNetworkAccessRestrictionsEnabled,
     base::Value::Type::BOOLEAN },
+  { key::kLocalNetworkAccessAllowedForUrls,
+    prefs::kManagedLocalNetworkAccessAllowedForUrls,
+    base::Value::Type::LIST },
+  { key::kLocalNetworkAccessBlockedForUrls,
+    prefs::kManagedLocalNetworkAccessBlockedForUrls,
+    base::Value::Type::LIST },
 #endif  // !BUILDFLAG(IS_ANDROID)
 #if !BUILDFLAG(IS_CHROMEOS)
   { key::kCAPlatformIntegrationEnabled,
@@ -2388,7 +2397,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kAIModeSettings,
     omnibox::kAIModeSettings,
     base::Value::Type::INTEGER },
-
 };
 // clang-format on
 

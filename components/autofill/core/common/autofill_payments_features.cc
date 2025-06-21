@@ -53,10 +53,22 @@ BASE_FEATURE(kAutofillEnableBuyNowPayLater,
              "AutofillEnableBuyNowPayLater",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// When enabled, buy now pay later (BNPL) for Klarna in Autofill will be
+// offered.
+BASE_FEATURE(kAutofillEnableBuyNowPayLaterForKlarna,
+             "AutofillEnableBuyNowPayLaterForKlarna",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // When enabled, buy now pay later (BNPL) data will be synced to Chrome clients.
 BASE_FEATURE(kAutofillEnableBuyNowPayLaterSyncing,
              "AutofillEnableBuyNowPayLaterSyncing",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// When enabled, buy now pay later (BNPL) data for Klarna will be synced to
+// Chrome clients.
+BASE_FEATURE(kAutofillEnableBuyNowPayLaterSyncingForKlarna,
+             "AutofillEnableBuyNowPayLaterSyncingForKlarna",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // When enabled, card benefits offered by American Express will be shown in
 // Payments Autofill UI.
@@ -130,11 +142,17 @@ BASE_FEATURE(kAutofillEnableCvcStorageAndFillingStandaloneFormEnhancement,
              "AutofillEnableCvcStorageAndFillingStandaloneFormEnhancement",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// When enabled, in-product help UI will be shown the first time a card added
+// outside of Chrome appears in Autofill card suggestions."
+BASE_FEATURE(kAutofillEnableDownstreamCardAwarenessIph,
+             "AutofillEnableDownstreamCardAwarenessIph",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // When enabled, card flat rate benefit will not be shown on merchants in the
 // blocklist.
 BASE_FEATURE(kAutofillEnableFlatRateCardBenefitsBlocklist,
              "AutofillEnableFlatRateCardBenefitsBlocklist",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When enabled, flat rate card benefits sourced from Curinos will be shown in
 // Payments Autofill UI.

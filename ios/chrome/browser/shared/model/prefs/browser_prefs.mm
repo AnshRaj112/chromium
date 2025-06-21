@@ -203,6 +203,8 @@ inline constexpr char kVariationsLimitedEntropySyntheticTrialSeed[] =
     "variations_limited_entropy_synthetic_trial_seed";
 inline constexpr char kVariationsLimitedEntropySyntheticTrialSeedV2[] =
     "variations_limited_entropy_synthetic_trial_seed_v2";
+inline constexpr char kGaiaCookiePeriodicReportTimeDeprecated[] =
+    "gaia_cookie.periodic_report_time";
 
 // Migrates a boolean pref from source to target PrefService.
 void MigrateBooleanPref(std::string_view pref_name,
@@ -511,9 +513,6 @@ void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
 
   registry->RegisterIntegerPref(prefs::kIosCredentialProviderPromoSource, 0);
 
-  registry->RegisterBooleanPref(
-      prefs::kIosCredentialProviderPromoHasRegisteredWithPromoManager, false);
-
   registry->RegisterBooleanPref(prefs::kIosCredentialProviderPromoPolicyEnabled,
                                 true);
 
@@ -615,6 +614,8 @@ void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
   registry->RegisterTimePref(
       prefs::kWaitingForMultiProfileForcedMigrationTimestamp, base::Time());
 
+  registry->RegisterTimePref(prefs::kNextSSORecallTime, base::Time());
+
   // Deprecated 07/2024 (migrated to profile prefs).
   registry->RegisterTimePref(prefs::kTabPickupLastDisplayedTime, base::Time());
   registry->RegisterStringPref(prefs::kTabPickupLastDisplayedURL,
@@ -681,6 +682,10 @@ void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
   registry->RegisterUint64Pref(kVariationsLimitedEntropySyntheticTrialSeed, 0);
   registry->RegisterUint64Pref(kVariationsLimitedEntropySyntheticTrialSeedV2,
                                0);
+
+  // Deprecated 06/2025.
+  registry->RegisterBooleanPref(
+      prefs::kIosCredentialProviderPromoHasRegisteredWithPromoManager, false);
 }
 
 void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
@@ -1032,6 +1037,8 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
 
   registry->RegisterIntegerPref(omnibox::kAIModeSettings, 0);
 
+  registry->RegisterIntegerPref(prefs::kGeminiEnabledByPolicy, 0);
+
   // Deprecated 09/2024 (migrated to localState prefs).
   registry->RegisterBooleanPref(prefs::kIncognitoInterstitialEnabled, false);
 
@@ -1086,6 +1093,9 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterTimePref(kSyncLastSyncedTime, base::Time());
   registry->RegisterTimePref(kSyncLastPollTime, base::Time());
   registry->RegisterTimeDeltaPref(kSyncPollInterval, base::TimeDelta());
+
+  // Deprecated 06/2025.
+  registry->RegisterDoublePref(kGaiaCookiePeriodicReportTimeDeprecated, 0);
 }
 
 // This method should be periodically pruned of year+ old migrations.
@@ -1131,6 +1141,10 @@ void MigrateObsoleteLocalStatePrefs(PrefService* prefs) {
   // Added 06/2025.
   prefs->ClearPref(kVariationsLimitedEntropySyntheticTrialSeed);
   prefs->ClearPref(kVariationsLimitedEntropySyntheticTrialSeedV2);
+
+  // Added 06/2025.
+  prefs->ClearPref(
+      prefs::kIosCredentialProviderPromoHasRegisteredWithPromoManager);
 }
 
 // This method should be periodically pruned of year+ old migrations.
@@ -1281,6 +1295,13 @@ void MigrateObsoleteProfilePrefs(PrefService* prefs) {
   prefs->ClearPref(kSyncLastSyncedTime);
   prefs->ClearPref(kSyncLastPollTime);
   prefs->ClearPref(kSyncPollInterval);
+
+  // Added 06/2025.
+  prefs->ClearPref(kGaiaCookiePeriodicReportTimeDeprecated);
+
+  // Added 06/2025.
+  prefs->ClearPref(safety_check_prefs::kSafetyCheckInMagicStackDisabledPref);
+  prefs->ClearPref(tab_resumption_prefs::kTabResumptionDisabledPref);
 }
 
 void MigrateObsoleteUserDefault() {

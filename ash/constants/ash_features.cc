@@ -119,12 +119,6 @@ BASE_FEATURE(kAutoScreenBrightness,
              "AutoScreenBrightness",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables collection of autocorrect strings for federated analytics via Private
-// Heavy Hitters (PHH).
-BASE_FEATURE(kAutocorrectFederatedPhh,
-             "AutocorrectFederatedPhh",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Enables params tuning experiment for autocorrect on ChromeOS.
 BASE_FEATURE(kAutocorrectParamsTuning,
              "AutocorrectParamsTuning",
@@ -314,7 +308,7 @@ BASE_FEATURE(kBocaCaptionToggle,
 // client for Spotlight within the Boca SWA.
 BASE_FEATURE(kBocaSpotlightRobotRequester,
              "BocaSpotlightRobotRequester",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables or disables enforcing sequential execution for Boca insert activity.
 BASE_FEATURE(kBocaSequentialInsertActivity,
@@ -1523,11 +1517,6 @@ BASE_FEATURE(kHelpAppWelcomeTips,
 // Enable ChromeOS hibernation features.
 BASE_FEATURE(kHibernate, "Hibernate", base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables image search for productivity launcher.
-BASE_FEATURE(kProductivityLauncherImageSearch,
-             "ProductivityLauncherImageSearch",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables a warning about connecting to hidden WiFi networks.
 // https://crbug.com/903908
 BASE_FEATURE(kHiddenNetworkWarning,
@@ -2156,11 +2145,6 @@ BASE_FEATURE(kOobeSoftwareUpdate,
              "OobeSoftwareUpdate",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables the Gaia info screen in OOBE.
-BASE_FEATURE(kOobeGaiaInfoScreen,
-             "OobeGaiaInfoScreen",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // If enabled, TouchPadScreen will be shown in CHOOBE.
 // enabling this without enabling OobeChoobe flag will have no effect
 BASE_FEATURE(kOobeTouchpadScroll,
@@ -2641,7 +2625,7 @@ BASE_FEATURE(kFeatureManagementSeaPen,
 // Enables sea pen text input feature in the personalization app.
 BASE_FEATURE(kSeaPenTextInput,
              "SeaPenTextInput",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables sea pen text input translation feature.
 BASE_FEATURE(kSeaPenTextInputTranslation,
@@ -4163,8 +4147,7 @@ bool IsLockScreenNotificationsEnabled() {
 }
 
 bool IsProductivityLauncherImageSearchEnabled() {
-  return base::FeatureList::IsEnabled(kProductivityLauncherImageSearch) &&
-         base::FeatureList::IsEnabled(kFeatureManagementLocalImageSearch);
+  return base::FeatureList::IsEnabled(kFeatureManagementLocalImageSearch);
 }
 
 bool IsMacAddressRandomizationEnabled() {
@@ -4251,10 +4234,6 @@ bool IsOfflineItemsInNotificationsEnabled() {
 
 bool AreOngoingProcessesEnabled() {
   return base::FeatureList::IsEnabled(kOngoingProcesses);
-}
-
-bool IsOobeGaiaInfoScreenEnabled() {
-  return base::FeatureList::IsEnabled(kOobeGaiaInfoScreen);
 }
 
 bool IsOobeJellyEnabled() {

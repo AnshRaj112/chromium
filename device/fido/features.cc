@@ -103,11 +103,6 @@ BASE_FEATURE(kWebAuthnAmbientSignin,
              "WebAuthenticationAmbientSignin",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// This is a deprecation flag. Disabled in M136. Remove in or after M139.
-BASE_FEATURE(kWebAuthnHybridLinking,
-             "WebAuthenticationHybridLinking",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // This is a deprecation flag. It is now enabled by default, but we want to
 // disable it eventually.
 // Must not be disabled until kWebAuthnHybridLinking is disabled by default.
@@ -218,10 +213,10 @@ BASE_FEATURE(kWebAuthnImmediateGetAutoselect,
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_MAC)
-// Disabled by default. Feature not yet implemented.
+// Default enabled in M139. Remove in or after M142.
 BASE_FEATURE(kWebAuthnLargeBlobForICloudKeychain,
              "WebAuthenticationLargeBlobICloudKeychain",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_MAC)
 
 }  // namespace device

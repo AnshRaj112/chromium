@@ -16,7 +16,6 @@
 #include "third_party/blink/renderer/core/style/computed_style_constants.h"
 #include "third_party/blink/renderer/platform/fonts/font_baseline.h"
 #include "third_party/blink/renderer/platform/geometry/layout_unit.h"
-#include "third_party/blink/renderer/platform/geometry/path.h"
 #include "third_party/blink/renderer/platform/geometry/physical_offset.h"
 #include "third_party/blink/renderer/platform/graphics/styled_stroke_data.h"
 #include "third_party/blink/renderer/platform/wtf/allocator/allocator.h"
@@ -165,9 +164,6 @@ class CORE_EXPORT TextDecorationInfo {
   void ComputeWavyLineData(gfx::RectF& pattern_rect,
                            cc::PaintRecord& tile_record) const;
 
-  gfx::RectF BoundsForDottedOrDashed() const;
-  gfx::RectF BoundsForWavy() const;
-  Path PrepareDottedOrDashedStrokePath() const;
   bool IsSpellingOrGrammarError() const {
     return line_data_.line == TextDecorationLine::kSpellingError ||
            line_data_.line == TextDecorationLine::kGrammarError;
@@ -238,9 +234,6 @@ class CORE_EXPORT TextDecorationInfo {
     TextDecorationLine line;
     float line_offset;
     float double_offset;
-
-    // Only used for kDotted and kDashed lines.
-    std::optional<Path> stroke_path;
 
     // Only used for kWavy lines.
     int wavy_offset_factor;

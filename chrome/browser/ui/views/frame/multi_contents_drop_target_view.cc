@@ -6,6 +6,7 @@
 
 #include "base/memory/raw_ptr.h"
 #include "chrome/app/vector_icons/vector_icons.h"
+#include "chrome/browser/ui/ui_features.h"
 #include "ui/base/dragdrop/drag_drop_types.h"
 #include "ui/base/dragdrop/os_exchange_data.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -36,7 +37,6 @@ namespace {
 
 constexpr float kInnerCornerRadius = 6;
 constexpr int kOuterPadding = 8;
-constexpr int kInnerPadding = 8;
 constexpr int kIconSize = 24;
 constexpr int kAnimationDurationMs = 450;
 
@@ -48,6 +48,7 @@ DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(MultiContentsDropTargetView,
 MultiContentsDropTargetView::MultiContentsDropTargetView(
     DropDelegate& drop_delegate)
     : views::AnimationDelegateViews(this), drop_delegate_(drop_delegate) {
+  SetVisible(false);
   SetProperty(views::kElementIdentifierKey, kMultiContentsDropTargetElementId);
   SetLayoutManager(std::make_unique<views::FlexLayout>())
       ->SetOrientation(views::LayoutOrientation::kVertical)
@@ -70,7 +71,8 @@ MultiContentsDropTargetView::MultiContentsDropTargetView(
       ->SetOrientation(views::LayoutOrientation::kVertical)
       .SetMainAxisAlignment(views::LayoutAlignment::kCenter)
       .SetCrossAxisAlignment(views::LayoutAlignment::kCenter)
-      .SetInteriorMargin(gfx::Insets(kInnerPadding))
+      .SetInteriorMargin(
+          gfx::Insets(features::kSideBySideDropTargetInnerPadding.Get()))
       .SetDefault(
           views::kFlexBehaviorKey,
           views::FlexSpecification(views::MinimumFlexSizeRule::kScaleToZero,
@@ -97,6 +99,13 @@ bool MultiContentsDropTargetView::IsClosing() const {
   return animation_.IsClosing();
 }
 
+int MultiContentsDropTargetView::GetPreferredWidth() const {
+  if (!GetVisible()) {
+    return 0;
+  }
+  return GetAnimationValue() * GetPreferredSize().width();
+}
+
 void MultiContentsDropTargetView::AnimationProgressed(
     const gfx::Animation* animation) {
   InvalidateLayout();
@@ -110,12 +119,20 @@ void MultiContentsDropTargetView::AnimationEnded(
   InvalidateLayout();
 }
 
-void MultiContentsDropTargetView::Show() {
+void MultiContentsDropTargetView::Show(DropSide side) {
+  side_ = side;
   UpdateVisibility(true);
 }
 
 void MultiContentsDropTargetView::Hide() {
   UpdateVisibility(false);
+}
+
+void MultiContentsDropTargetView::SetVisible(bool visible) {
+  if (!visible) {
+    side_.reset();
+  }
+  views::View::SetVisible(visible);
 }
 
 void MultiContentsDropTargetView::UpdateVisibility(bool should_be_open) {
@@ -184,10 +201,12 @@ void MultiContentsDropTargetView::DoDrop(
     const ui::DropTargetEvent& event,
     ui::mojom::DragOperation& output_drag_op,
     std::unique_ptr<ui::LayerTreeOwner> drag_image_layer_owner) {
+  CHECK(side_.has_value());
+  DropSide side = side_.value();
   Hide();
   auto urls = event.data().GetURLs(ui::FilenameToURLPolicy::CONVERT_FILENAMES);
   CHECK(urls.has_value());
-  drop_delegate_->HandleLinkDrop(urls.value());
+  drop_delegate_->HandleLinkDrop(side, urls.value());
 }
 
 BEGIN_METADATA(MultiContentsDropTargetView)

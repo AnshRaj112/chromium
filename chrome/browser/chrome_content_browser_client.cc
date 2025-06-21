@@ -32,6 +32,7 @@
 #include "base/metrics/field_trial_params.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/no_destructor.h"
+#include "base/notimplemented.h"
 #include "base/notreached.h"
 #include "base/path_service.h"
 #include "base/stl_util.h"
@@ -232,6 +233,7 @@
 #include "components/enterprise/common/proto/connectors.pb.h"
 #include "components/enterprise/content/clipboard_restriction_service.h"
 #include "components/enterprise/content/pref_names.h"
+#include "components/enterprise/data_controls/content/browser/last_replaced_clipboard_data.h"
 #include "components/error_page/common/error.h"
 #include "components/error_page/common/error_page_switches.h"
 #include "components/error_page/common/localized_error.h"
@@ -323,6 +325,7 @@
 #include "content/public/browser/permission_descriptor_util.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
+#include "content/public/browser/service_worker_context.h"
 #include "content/public/browser/site_isolation_mode.h"
 #include "content/public/browser/site_isolation_policy.h"
 #include "content/public/browser/sms_fetcher.h"
@@ -340,6 +343,7 @@
 #include "content/public/common/content_descriptors.h"
 #include "content/public/common/content_features.h"
 #include "content/public/common/content_switches.h"
+#include "content/public/common/origin_util.h"
 #include "content/public/common/url_utils.h"
 #include "content/public/common/window_container_type.mojom-shared.h"
 #include "device/fido/features.h"
@@ -775,6 +779,11 @@ bool g_disable_advanced_protection_caching_for_tests = false;
 
 BASE_FEATURE(kSkipPagehideInCommitForDSENavigation,
              "SkipPagehideInCommitForDSENavigation",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Warm up the ServiceWorker registration for DSE.
+BASE_FEATURE(kPrewarmServiceWorkerRegistrationForDSE,
+             "PrewarmServiceWorkerRegistrationForDSE",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // A small ChromeBrowserMainExtraParts that invokes a callback when threads are
@@ -1399,12 +1408,7 @@ void ChromeContentBrowserClient::RegisterLocalStatePrefs(
   registry->RegisterIntegerPref(prefs::kSCTAuditingHashdanceReportCount, 0);
   registry->RegisterBooleanPref(prefs::kDataURLWhitespacePreservationEnabled,
                                 true);
-#if BUILDFLAG(IS_CHROMEOS)
-  registry->RegisterBooleanPref(prefs::kNativeClientForceAllowed, false);
-  registry->RegisterBooleanPref(prefs::kDeviceNativeClientForceAllowed, false);
-  registry->RegisterBooleanPref(prefs::kDeviceNativeClientForceAllowedCache,
-                                false);
-#endif  // BUILDFLAG(IS_CHROMEOS)
+  registry->RegisterBooleanPref(prefs::kEnableUnsafeSwiftShader, false);
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_ANDROID)
   registry->RegisterBooleanPref(prefs::kOutOfProcessSystemDnsResolutionEnabled,
                                 true);
@@ -2610,9 +2614,8 @@ bool ChromeContentBrowserClient::IsIsolatedContextAllowedForUrl(
 void ChromeContentBrowserClient::CheckGetAllScreensMediaAllowed(
     content::RenderFrameHost* render_frame_host,
     base::OnceCallback<void(bool)> callback) {
-  capture_policy::CheckGetAllScreensMediaAllowed(
-      render_frame_host->GetMainFrame()->GetLastCommittedOrigin().GetURL(),
-      std::move(callback));
+  std::move(callback).Run(capture_policy::IsMultiScreenCaptureAllowed(
+      render_frame_host->GetMainFrame()->GetLastCommittedOrigin().GetURL()));
 }
 
 bool ChromeContentBrowserClient::IsFileAccessAllowed(
@@ -2930,6 +2933,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
         extensions::switches::kDisableExtensionsHttpThrottling,
         extensions::switches::kEnableExperimentalExtensionApis,
         extensions::switches::kExtensionsOnChromeURLs,
+        extensions::switches::kExtensionsOnExtensionURLs,
         extensions::switches::kSetExtensionThrottleTestParams,  // For tests
                                                                 // only.
         extensions::switches::kAllowlistedExtensionID,
@@ -3765,6 +3769,61 @@ bool ChromeContentBrowserClient::AreThirdPartyCookiesGenerallyAllowed(
     return true;
   }
   return !cookie_settings->ShouldBlockThirdPartyCookies();
+}
+
+void ChromeContentBrowserClient::PrewarmServiceWorkerRegistrationForDSE(
+    content::BrowserContext* browser_context,
+    content::ServiceWorkerContext& service_worker_context) {
+  TRACE_EVENT(
+      "ServiceWorker",
+      "ChromeContentBrowserClient::PrewarmServiceWorkerRegistrationForDSE");
+
+  if (ChromeContentBrowserClient::
+          PrewarmServiceWorkerRegistrationForDSECalledCountForTesting()) {
+    CHECK_IS_TEST();
+    ++(*ChromeContentBrowserClient::
+           PrewarmServiceWorkerRegistrationForDSECalledCountForTesting());
+  }
+
+  if (!base::FeatureList::IsEnabled(kPrewarmServiceWorkerRegistrationForDSE)) {
+    return;
+  }
+
+  Profile* profile = Profile::FromBrowserContext(browser_context);
+
+  if (!profile) {
+    return;
+  }
+
+  TemplateURLService* template_url_service =
+      TemplateURLServiceFactory::GetForProfile(profile);
+
+  if (!template_url_service) {
+    return;
+  }
+
+  GURL url =
+      template_url_service->GenerateSearchURLForDefaultSearchProvider(u"");
+
+  if (!content::OriginCanAccessServiceWorkers(url)) {
+    return;
+  }
+
+  const blink::StorageKey key =
+      blink::StorageKey::CreateFirstParty(url::Origin::Create(url));
+
+  if (!service_worker_context.MaybeHasRegistrationForStorageKey(key)) {
+    return;
+  }
+
+  service_worker_context.CheckHasServiceWorker(url, key, base::DoNothing());
+}
+
+// static
+std::optional<int>& ChromeContentBrowserClient::
+    PrewarmServiceWorkerRegistrationForDSECalledCountForTesting() {
+  static std::optional<int> call_count;
+  return call_count;
 }
 
 bool ChromeContentBrowserClient::CanSendSCTAuditingReport(
@@ -8744,4 +8803,17 @@ ChromeContentBrowserClient::MaybeCreateKeepAliveRequestTracker(
         is_context_detached_callback) {
   return ChromeKeepAliveRequestTracker::MaybeCreateKeepAliveRequestTracker(
       request, ukm_source_id, std::move(is_context_detached_callback));
+}
+
+std::optional<std::vector<std::u16string>>
+ChromeContentBrowserClient::GetClipboardTypesIfPolicyApplied(
+    const ui::ClipboardSequenceNumberToken& seqno) {
+  const data_controls::LastReplacedClipboardData& last_replaced_data =
+      data_controls::GetLastReplacedClipboardData();
+
+  if (last_replaced_data.seqno == seqno) {
+    return last_replaced_data.GetAvailableTypes();
+  }
+
+  return std::nullopt;
 }

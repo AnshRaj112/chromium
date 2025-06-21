@@ -6,6 +6,7 @@
 
 #include <optional>
 
+#include "base/i18n/rtl.h"
 #include "chrome/app/vector_icons/vector_icons.h"
 #include "chrome/browser/favicon/favicon_utils.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
@@ -22,6 +23,8 @@
 #include "chrome/grit/generated_resources.h"
 #include "components/url_formatter/url_formatter.h"
 #include "content/public/browser/web_contents.h"
+#include "third_party/skia/include/core/SkMatrix.h"
+#include "third_party/skia/include/core/SkPath.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
@@ -51,33 +54,6 @@ constexpr int kMiniToolbarOutlineCornerRadius = 8;
 tabs::TabInterface* GetTabInterface(content::WebContents* web_contents) {
   return web_contents ? tabs::TabInterface::GetFromContents(web_contents)
                       : nullptr;
-}
-
-ui::ColorId GetAlertStatusColor(tabs::TabAlert alert,
-                                const ui::ColorProvider* color_provider) {
-  if (color_provider) {
-    switch (alert) {
-      case tabs::TabAlert::MEDIA_RECORDING:
-      case tabs::TabAlert::AUDIO_RECORDING:
-      case tabs::TabAlert::VIDEO_RECORDING:
-      case tabs::TabAlert::DESKTOP_CAPTURING:
-        return kColorTabAlertMediaRecordingActiveFrameActive;
-      case tabs::TabAlert::TAB_CAPTURING:
-      case tabs::TabAlert::PIP_PLAYING:
-      case tabs::TabAlert::GLIC_ACCESSING:
-        return kColorTabAlertPipPlayingActiveFrameActive;
-      case tabs::TabAlert::AUDIO_PLAYING:
-      case tabs::TabAlert::AUDIO_MUTING:
-      case tabs::TabAlert::BLUETOOTH_CONNECTED:
-      case tabs::TabAlert::BLUETOOTH_SCAN_ACTIVE:
-      case tabs::TabAlert::USB_CONNECTED:
-      case tabs::TabAlert::HID_CONNECTED:
-      case tabs::TabAlert::SERIAL_CONNECTED:
-      case tabs::TabAlert::VR_PRESENTING_IN_HEADSET:
-        return kColorTabAlertAudioPlayingActiveFrameActive;
-    }
-  }
-  return gfx::kPlaceholderColor;
 }
 }  // namespace
 
@@ -193,24 +169,7 @@ void MultiContentsViewMiniToolbar::TabChangedAt(content::WebContents* contents,
 void MultiContentsViewMiniToolbar::OnBoundsChanged(
     const gfx::Rect& previous_bounds) {
   // Clip the curved inner side of the mini toolbar.
-  const gfx::Rect local_bounds = GetLocalBounds();
-  SkPath path;
-  const float corner_radius = kMiniToolbarOutlineCornerRadius;
-  path.moveTo(0, local_bounds.height());
-  path.lineTo(0, local_bounds.height() - kContentOutlineThickness);
-  path.arcTo(corner_radius, corner_radius, 0, SkPath::kSmall_ArcSize,
-             SkPathDirection::kCCW, corner_radius,
-             local_bounds.height() - corner_radius);
-  path.lineTo(corner_radius, corner_radius * 2);
-  path.arcTo(corner_radius, corner_radius, 270.0f, SkPath::kSmall_ArcSize,
-             SkPathDirection::kCW, corner_radius * 2, corner_radius);
-  path.lineTo(local_bounds.width() - corner_radius, corner_radius);
-  path.arcTo(8, 8, 0, SkPath::kSmall_ArcSize, SkPathDirection::kCCW,
-             local_bounds.width() - kContentOutlineThickness, 0);
-  path.lineTo(local_bounds.width(), 0);
-  path.lineTo(local_bounds.width(), local_bounds.height());
-  path.lineTo(0, local_bounds.height());
-  SetClipPath(path);
+  SetClipPath(GetPath(/*border_stroke_only=*/false));
 }
 
 void MultiContentsViewMiniToolbar::OnPaint(gfx::Canvas* canvas) {
@@ -224,20 +183,7 @@ void MultiContentsViewMiniToolbar::OnPaint(gfx::Canvas* canvas) {
       kColorMulitContentsViewInactiveContentOutline));
   flags.setStyle(cc::PaintFlags::kStroke_Style);
   flags.setAntiAlias(true);
-  const float corner_radius = kMiniToolbarOutlineCornerRadius;
-  const gfx::Rect local_bounds = GetLocalBounds();
-  SkPath path;
-  path.moveTo(0, local_bounds.height() - kContentOutlineThickness);
-  path.arcTo(corner_radius, corner_radius, 0, SkPath::kSmall_ArcSize,
-             SkPathDirection::kCCW, corner_radius,
-             local_bounds.height() - corner_radius);
-  path.lineTo(corner_radius, corner_radius * 2);
-  path.arcTo(corner_radius, corner_radius, 270.0f, SkPath::kSmall_ArcSize,
-             SkPathDirection::kCW, corner_radius * 2, corner_radius);
-  path.lineTo(local_bounds.width() - corner_radius, corner_radius);
-  path.arcTo(corner_radius, corner_radius, 0, SkPath::kSmall_ArcSize,
-             SkPathDirection::kCCW,
-             local_bounds.width() - kContentOutlineThickness, 0);
+  SkPath path = GetPath(/*border_stroke_only=*/true);
   canvas->DrawPath(path, flags);
 }
 
@@ -252,6 +198,37 @@ void MultiContentsViewMiniToolbar::OnThemeChanged() {
         interface->GetTabFeatures()->tab_alert_controller();
     OnAlertStatusIndicatorChanged(tab_alert_controller->GetAlertToShow());
   }
+}
+
+SkPath MultiContentsViewMiniToolbar::GetPath(bool border_stroke_only) const {
+  const float corner_radius = kMiniToolbarOutlineCornerRadius;
+  const gfx::Rect local_bounds = GetLocalBounds();
+  SkPath path;
+  path.moveTo(0, local_bounds.height() - kContentOutlineThickness);
+  path.arcTo(corner_radius, corner_radius, 0, SkPath::kSmall_ArcSize,
+             SkPathDirection::kCCW, corner_radius,
+             local_bounds.height() - corner_radius);
+  path.lineTo(corner_radius, corner_radius * 2);
+  path.arcTo(corner_radius, corner_radius, 270.0f, SkPath::kSmall_ArcSize,
+             SkPathDirection::kCW, corner_radius * 2, corner_radius);
+  path.lineTo(local_bounds.width() - corner_radius, corner_radius);
+  path.arcTo(corner_radius, corner_radius, 0, SkPath::kSmall_ArcSize,
+             SkPathDirection::kCCW,
+             local_bounds.width() - kContentOutlineThickness, 0);
+  if (!border_stroke_only) {
+    path.lineTo(local_bounds.width(), 0);
+    path.lineTo(local_bounds.width(), local_bounds.height());
+    path.lineTo(0, local_bounds.height());
+    path.lineTo(0, local_bounds.height() - kContentOutlineThickness);
+  }
+  if (base::i18n::IsRTL()) {
+    // Mirror if in RTL.
+    gfx::Point center = local_bounds.CenterPoint();
+    SkMatrix flip;
+    flip.setScale(-1, 1, center.x(), center.y());
+    path.transform(flip);
+  }
+  return path;
 }
 
 void MultiContentsViewMiniToolbar::RegisterTabAlertSubscription() {
@@ -269,8 +246,9 @@ void MultiContentsViewMiniToolbar::RegisterTabAlertSubscription() {
 void MultiContentsViewMiniToolbar::OnAlertStatusIndicatorChanged(
     std::optional<tabs::TabAlert> new_alert) {
   if (new_alert.has_value()) {
-    ui::ColorId color =
-        GetAlertStatusColor(new_alert.value(), GetColorProvider());
+    ui::ColorId color = GetColorProvider() ? tabs::GetAlertIndicatorColor(
+                                                 new_alert.value(), true, true)
+                                           : gfx::kPlaceholderColor;
     alert_state_indicator_->SetImage(
         tabs::GetAlertImageModel(new_alert.value(), color));
     alert_state_indicator_->SetTooltipText(
@@ -349,7 +327,7 @@ void MultiContentsViewMiniToolbar::OpenSplitViewMenu() {
                           static_cast<views::MenuButtonController*>(
                               menu_button_->button_controller()),
                           menu_button_->GetAnchorBoundsInScreen(),
-                          views::MenuAnchorPosition::kTopRight,
+                          views::MenuAnchorPosition::kBubbleTopLeft,
                           ui::mojom::MenuSourceType::kNone);
 }
 

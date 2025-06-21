@@ -23,6 +23,7 @@
 #include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/not_fatal_until.h"
+#include "base/notimplemented.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/metrics/histogram_tester.h"
@@ -496,13 +497,13 @@ class MockVirtualCardEnrollmentManager
       InitVirtualCardEnroll,
       (const CreditCard& credit_card,
        VirtualCardEnrollmentSource virtual_card_enrollment_source,
+       VirtualCardEnrollmentManager::VirtualCardEnrollmentFieldsLoadedCallback
+           virtual_card_enrollment_fields_loaded_callback,
        std::optional<payments::GetDetailsForEnrollmentResponseDetails>
            get_details_for_enrollment_response_details,
        PrefService* user_prefs,
        VirtualCardEnrollmentManager::RiskAssessmentFunction
-           risk_assessment_function,
-       VirtualCardEnrollmentManager::VirtualCardEnrollmentFieldsLoadedCallback
-           virtual_card_enrollment_fields_loaded_callback),
+           risk_assessment_function),
       (override));
 };
 

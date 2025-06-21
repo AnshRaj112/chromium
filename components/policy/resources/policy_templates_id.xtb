@@ -106,6 +106,7 @@ Jika kebijakan ini disetel ke Nonaktif, fitur koreksi otomatis tidak akan diizin
       Jika setelan ini tidak disetel, direktori profil default akan digunakan.</translation>
 <translation id="1053981429146436598">Kumpulan kebijakan yang terkait dengan setelan permintaan jaringan pribadi.  Lihat https://wicg.github.io/private-network-access/.</translation>
 <translation id="1059069692400941670">Nonaktifkan impor mesin telusur default saat browser pertama kali dijalankan</translation>
+<translation id="1060020040574767394">Konfigurasi Setelan Watermark Kustom</translation>
 <translation id="1062011392452772310">Mengaktifkan pengesahan jarak jauh untuk perangkat tersebut</translation>
 <translation id="1062407476771304334">Ganti</translation>
 <translation id="1063860513136880926">Jika kebijakan disetel ke Aktif, screenshot yang diambil dengan pintasan keyboard
@@ -511,6 +512,7 @@ Jika kebijakan ini disetel, pengoptimalan JavaScript akan diaktifkan untuk situs
 <translation id="1379689277107868399">Jika kebijakan ini disetel ke DoNotPrompt atau tidak disetel, <ph name="PRODUCT_NAME" /> tidak akan otomatis meminta pengguna untuk melakukan autentikasi ulang ke browser.
 
 Jika kebijakan ini disetel ke PromptInTab, tab baru dengan halaman login Google akan langsung dibuka ketika masa berlaku autentikasi pengguna berakhir. Hal ini hanya terjadi jika menggunakan <ph name="CHROME_SYNC_NAME" />.</translation>
+<translation id="1384040387986918863">Opasitas isian teks watermark, dari 0 (transparan) hingga 100 (buram).</translation>
 <translation id="1384459581748403878">Referensi: <ph name="REFERENCE_URL" /></translation>
 <translation id="1384594066274112751">Kebijakan ini membuat URL apa pun yang cocok dengan satu atau beberapa pola yang ditentukan (menggunakan format filter <ph name="URL_BLOCKLIST_POLICY_NAME" />) tidak akan dihapus oleh browser.
       Kebijakan ini berlaku untuk menghentikan tekanan memori dan mode efisiensi tinggi.
@@ -524,11 +526,6 @@ Jika kebijakan ini disetel ke PromptInTab, tab baru dengan halaman login Google 
       Jika kebijakan disetel ke Nonaktif, pengguna tidak akan dapat mencetak ke <ph name="CLOUD_PRINT_NAME" /> dari dialog pencetakan <ph name="PRODUCT_NAME" />.
 
       Agar tujuan <ph name="CLOUD_PRINT_NAME" /> tetap dapat ditemukan, kebijakan ini harus ditetapkan ke Aktif dan <ph name="POLICY_ENUM_PRINTERTYPEDENYLIST_CLOUD" /> tidak boleh dimasukkan ke kebijakan <ph name="PRINTER_TYPE_DENY_LIST_POLICY_NAME" />.</translation>
-<translation id="1390901586107713894">Memungkinkan Anda menentukan ekstensi mana yang TIDAK dapat diinstal pengguna. Ekstensi yang sudah diinstal akan dinonaktifkan jika diblokir, tanpa memberikan opsi kepada pengguna untuk mengaktifkannya. Setelah ekstensi yang dinonaktifkan dihapus dari daftar yang tidak diizinkan, ekstensi akan kembali diaktifkan secara otomatis.
-
-          Nilai '*' untuk daftar yang tidak diizinkan berarti semua ekstensi diblokir kecuali tercantum secara eksplisit dalam daftar yang diizinkan.
-
-          Jika kebijakan ini tidak disetel, pengguna dapat menginstal ekstensi apa pun di <ph name="PRODUCT_NAME" />.</translation>
 <translation id="1392703142209771447">Ekspresi reguler untuk mencocokkan ID printer.</translation>
 <translation id="1393485621820363363">Mengaktifkan printer perangkat perusahaan</translation>
 <translation id="1395505489889158859">Aktifkan pengiriman nama pengguna dan nama file ke printer native</translation>
@@ -1170,6 +1167,15 @@ Kebijakan ini tidak akan berpengaruh jika opsi untuk menyimpan data penjelajahan
       Urutan daftar akan muncul dalam urutan yang sama di bagian "Urutkan bahasa berdasarkan preferensi Anda" di chrome://settings/languages. Pengguna tidak akan dapat menghapus atau mengurutkan ulang bahasa yang ditetapkan oleh kebijakan, tetapi akan dapat menambahkan bahasa di bawah daftar yang ditetapkan oleh kebijakan. Pengguna juga akan memiliki kontrol penuh atas setelan bahasa UI dan terjemahan/periksa ejaan browser, kecuali diterapkan oleh kebijakan lainnya.
 
       Jika kebijakan tidak disetel, pengguna akan dapat memanipulasi seluruh daftar bahasa pilihan.</translation>
+<translation id="180243155313050440">Kebijakan ini mengontrol label khusus yang digunakan untuk menunjukkan browser terkelola. Untuk browser terkelola, label ini akan ditampilkan dalam pernyataan penyangkalan pengelolaan di footer pada halaman Tab Baru. Label khusus tidak akan diterjemahkan.
+
+Saat kebijakan ini diterapkan, string apa pun yang melebihi 16 karakter akan dipotong dengan “...”. Jangan gunakan nama yang terlalu panjang.
+
+Perhatikan bahwa kebijakan ini hanya diterapkan untuk browser terkelola, sehingga tidak akan memengaruhi pengguna terkelola di browser tidak terkelola.
+
+Di <ph name="MS_WIN_NAME" />, kebijakan ini hanya tersedia pada instance yang dihubungkan ke domain <ph name="MS_AD_NAME" />, dihubungkan ke <ph name="MS_AAD_NAME" />, atau didaftarkan di <ph name="CHROME_ENTERPRISE_CORE_NAME" />.
+
+Di <ph name="MAC_OS_NAME" />, kebijakan ini hanya tersedia pada instance yang dikelola melalui MDM, dihubungkan ke domain melalui MCX, atau didaftarkan di <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="1803646570632580723">Daftar aplikasi tersemat untuk ditampilkan pada peluncur</translation>
 <translation id="1808715480127969042">Blokir cookie di situs ini</translation>
 <translation id="1810261428246410396">Izinkan Tethering Instan untuk digunakan.</translation>
@@ -1873,6 +1879,13 @@ Jika kebijakan disetel ke Nonaktif atau tidak disetel, pengguna akan dapat mentr
       Pengguna tidak dapat mengubah atau mengganti setelan ini.
 
       Catatan: Kebijakan ini menyebabkan header X-GoogApps-Allowed-Domains ditambahkan ke semua permintaan HTTP dan HTTPS di semua domain google.com, seperti yang dijelaskan di https://support.google.com/a/answer/1668854.</translation>
+<translation id="2287414160388710497">Mengizinkan administrator menyesuaikan tampilan watermark yang diterapkan oleh aturan Pencegahan Kebocoran Data (DLP). Kebijakan ini mencakup menyetel opasitas isian/garis tepi, dan menentukan ukuran font.
+Jika kebijakan ini atau beberapa nilainya tidak disetel, Chrome akan menggunakan perilaku watermark default.
+Nilai default: opasitas isian 4, opasitas garis tepi 6, dan ukuran font 24.
+
+'Opasitas Isian' adalah persentase dari 0 (sepenuhnya transparan) hingga 100 (sepenuhnya buram).
+'Opasitas Garis Tepi' adalah persentase dari 0 (sepenuhnya transparan) hingga 100 (sepenuhnya buram).
+'FontSize' ditentukan dalam satuan poin.</translation>
 <translation id="2288506601233091655">Jangan izinkan histori tugas pencetakan dihapus</translation>
 <translation id="2289688405312849186">Akun utama pengguna 'user@realm'. Placeholder <ph name="LOGIN_ID_PLACEHOLDER" /> diganti dengan nama pengguna 'user'. Placeholder <ph name="LOGIN_EMAIL_PLACEHOLDER" /> diganti dengan akun utama penuh 'user@realm'.</translation>
 <translation id="2290270645214705008">Jika kebijakan ini disetel ke Nonaktif, layanan host akses jarak jauh tidak dapat dimulai atau dikonfigurasi untuk menerima koneksi masuk.  Kebijakan ini tidak memengaruhi skenario dukungan jarak jauh.
@@ -2659,6 +2672,7 @@ Kebijakan ini hanya dapat disetel sebagai kebijakan pengguna cloud.</translation
 <translation id="288448261660192095">Jika disetel ke Aktif, perangkat input dan output fisik host akses jarak jauh akan dinonaktifkan selama koneksi jarak jauh berlangsung.
 
       Jika kebijakan disetel ke Nonaktif atau tidak disetel, pengguna lokal dan jarak jauh akan diizinkan untuk berinteraksi dengan host saat host dibagikan.</translation>
+<translation id="288463102030083286">Konfigurasi Watermark Kustom</translation>
 <translation id="2884765974461416016">Nonaktifkan berbagi Aplikasi Android ke Aplikasi Web.</translation>
 <translation id="2886215882246310669">Mengontrol apakah <ph name="PRODUCT_OS_NAME" /> mengizinkan akun pengguna Family Link baru ditambahkan ke perangkat atau tidak.
       Kebijakan ini hanya berguna jika digunakan bersama <ph name="DEVICE_USER_ALLOWLIST_POLICY_NAME" />. Ini akan mengizinkan akun Family Link ditambahkan ke akun yang ditentukan dalam daftar yang diizinkan.
@@ -3297,6 +3311,7 @@ Jika <ph name="NTPCARDSVISIBLE" /> disetel ke nonaktif, Kartu Outlook tidak akan
 <translation id="3278042410658310805">Nonaktifkan respons lisan di layar login dan izinkan pengguna mengaktifkannya untuk sementara</translation>
 <translation id="328347261792478720">Secara default, browser akan menampilkan rekomendasi media yang dipersonalisasi kepada pengguna. Jika kebijakan ini disetel ke Nonaktif, rekomendasi ini akan disembunyikan dari pengguna. Jika kebijakan ini disetel ke Aktif atau tidak disetel, rekomendasi media akan ditampilkan kepada pengguna.</translation>
 <translation id="3284094172359247914">Penggunaan kontrol WebUSB API</translation>
+<translation id="3285231260918855067">Opasitas garis tepi teks watermark, dari 0 (transparan) hingga 100 (buram).</translation>
 <translation id="3286159327013237833">Aktifkan klik otomatis di layar login</translation>
 <translation id="3288595667065905535">Saluran rilis</translation>
 <translation id="3291940794983537008">Setelan untuk Fitur AI Generatif DevTools</translation>
@@ -4683,6 +4698,15 @@ Di <ph name="MS_WIN_NAME" />, kebijakan ini hanya tersedia di instance yang dihu
 <translation id="4297483555396496700">Jika kebijakan ini disetel ke Benar (True), pengguna hanya akan diizinkan mengubah saluran rilis perangkat. Jika kebijakan ini disetel ke Salah (False) atau tidak disetel, pengguna tidak akan diizinkan mengubah saluran.
 
 Menyetel <ph name="CHROME_OS_RELEASE_CHANNEL_POLICY_NAME" /> hanya akan berpengaruh jika <ph name="CHROME_OS_RELEASE_CHANNEL_DELEGATED_POLICY_NAME" /> disetel ke Salah (False).</translation>
+<translation id="4297774573405304484">URL ke gambar yang akan digunakan sebagai badge perusahaan untuk browser terkelola. URL harus mengarah ke gambar.
+
+Sebaiknya gunakan favicon (contoh: https://www.google.com/favicon.ico) atau ikon yang tidak lebih kecil dari 48x48 piksel.
+
+Perhatikan bahwa kebijakan ini hanya diterapkan untuk browser terkelola, sehingga tidak akan memengaruhi pengguna terkelola di browser tidak terkelola.
+
+Di <ph name="MS_WIN_NAME" />, kebijakan ini hanya tersedia pada instance yang dihubungkan ke domain <ph name="MS_AD_NAME" />, dihubungkan ke <ph name="MS_AAD_NAME" />, atau didaftarkan di <ph name="CHROME_ENTERPRISE_CORE_NAME" />.
+
+Di <ph name="MAC_OS_NAME" />, kebijakan ini hanya tersedia pada instance yang dikelola melalui MDM, dihubungkan ke domain melalui MCX, atau didaftarkan di <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="4301478455179579340">Penandatanganan aplikasi native selama penginstalan Progressive Web Application</translation>
 <translation id="4303167373847512281">Izinkan mode developer</translation>
 <translation id="4307116964468610577">Kebijakan ini memperpanjang masa pakai baterai sistem dengan mengisi daya baterai hingga kapasitas penuh hanya sekali per hari. Selama sisa hari tersebut, baterai berada dalam status pengisian daya lambat dan lebih baik untuk penyimpanan daya, bahkan ketika sistem dicolokkan ke sumber listrik.
@@ -5167,6 +5191,27 @@ Menyetel <ph name="CHROME_OS_RELEASE_CHANNEL_POLICY_NAME" /> hanya akan berpenga
 
       Jika suatu kebijakan tidak tercantum dalam daftar dan terdapat pertentangan antara sumber, cakupan, atau level, kebijakan dengan prioritas tertinggi akan diterapkan.</translation>
 <translation id="4646739075621507361">Laporkan tugas pencetakan</translation>
+<translation id="4649231830965908577">Kebijakan ini memungkinkan administrator menyetel agregator penelusuran perusahaan khusus yang akan memberikan rekomendasi dan hasil penelusuran dalam omnibox (kolom URL) dan kotak penelusuran di halaman Tab Baru.
+
+Secara default, saran penelusuran perusahaan akan digabungkan dan ditampilkan bersamaan dengan rekomendasi <ph name="PRODUCT_NAME" /> reguler. Pengguna dapat secara eksplisit membatasi penelusurannya hanya pada agregator penelusuran perusahaan dengan mengetik kata kunci yang ditentukan di kolom <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> dengan atau tanpa imbuhan @ (mis. <ph name="SHORTCUT_EXAMPLE_SEARCH_AGGREGATOR_SETTINGS" />), lalu tekan Spasi atau Tab di omnibox. Penelusuran perusahaan terbatas (yang dipicu oleh kata kunci) saat ini hanya didukung di omnibox dan tidak didukung di kotak penelusuran pada halaman Tab Baru.
+
+Kolom berikut diperlukan: <ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, <ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />, <ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />.
+
+Kolom <ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> sesuai dengan nama mesin telusur yang ditampilkan kepada pengguna di kolom URL.
+
+Kolom <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> sesuai dengan kata kunci yang dimasukkan pengguna untuk memicu penelusuran. Pintasan dapat berisi kata dan karakter biasa, tetapi tidak boleh menyertakan spasi atau diawali dengan simbol @. Pintasan harus unik.
+
+Kolom <ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> menentukan URL yang akan ditelusuri. Masukkan alamat web untuk halaman hasil mesin telusur, lalu gunakan <ph name="SEARCH_TERM_MARKER" /> sebagai pengganti kueri.
+
+Kolom <ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> menentukan URL yang menyediakan saran penelusuran. Permintaan POST akan dibuat dan kueri pengguna akan diteruskan dalam parameter POST di bagian kunci <ph name="SEARCH_SUGGEST_POST_PARAMS_QUERY_KEY" />.
+
+Kolom <ph name="ICON_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> menentukan URL ke gambar yang akan digunakan di saran penelusuran. Ikon default akan digunakan jika kolom ini tidak disetel. Sebaiknya gunakan favicon (contoh <ph name="ICON_URL_EXAMPLE" />). Format file gambar yang didukung: JPEG, PNG, dan ICO.
+
+Kolom <ph name="REQUIRE_SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> menentukan apakah <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> kolom URL diperlukan untuk melihat rekomendasi penelusuran. Jika diperlukan, saran tidak akan ditampilkan di kotak penelusuran pada halaman Tab Baru, tetapi akan tetap ditampilkan di omnibox (kolom URL) dalam mode penelusuran terbatas. Jika kolom ini tidak disetel, <ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" /> kolom URL tidak diperlukan.
+
+Di <ph name="MS_WIN_NAME" />, kebijakan ini hanya tersedia pada instance yang dihubungkan ke domain <ph name="MS_AD_NAME" />, dihubungkan ke <ph name="MS_AAD_NAME" />, atau didaftarkan di <ph name="CHROME_ENTERPRISE_CORE_NAME" />.
+
+Di <ph name="MAC_OS_NAME" />, kebijakan ini hanya tersedia pada instance yang dikelola melalui MDM, dihubungkan ke domain melalui MCX, atau didaftarkan di <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="4649395978608361979">Tujuan printer lokal</translation>
 <translation id="4650044303940238102">Setelan Font Lokal</translation>
 <translation id="4650759511838826572">Nonaktifkan skema protokol URL</translation>
@@ -8637,9 +8682,15 @@ Di <ph name="MS_WIN_NAME" />, kebijakan ini hanya tersedia di instance yang dihu
 <translation id="6795485990775913659">Hanya izinkan pencetakan tanpa PIN</translation>
 <translation id="6796215185873669533">Mengembalikan setelan browser untuk versi string Agen Pengguna ke defaultnya.</translation>
 <translation id="6800181452282128474">Jangan kueri Server Quirks</translation>
+<translation id="6801739506172328815">Ukuran font teks watermark dalam satuan poin.</translation>
 <translation id="6802412020718145539">Penampil PDF menggunakan arsitektur OOPIF.</translation>
 <translation id="68031099365512050">Laporkan status audio</translation>
 <translation id="680356860463873420">Jangan izinkan pengguna menggunakan PluginVm</translation>
+<translation id="6807707420322335446">Jika kebijakan disetel ke Aktif, elemen halaman web yang tidak berasal dari domain di kolom URL browser tidak dapat menyetel cookie. Jika kebijakan disetel ke Nonaktif, elemen tersebut akan dapat menyetel cookie dan pengguna tidak dapat mengubah setelan ini.
+
+      Jika kebijakan tidak disetel, cookie pihak ketiga akan diizinkan, tetapi pengguna dapat mengubah setelan ini.
+
+      Catatan: Kebijakan ini tidak berlaku di mode Samaran, tempat cookie pihak ketiga diblokir dan hanya dapat diizinkan di tingkat situs. Untuk mengizinkan cookie di tingkat situs, gunakan kebijakan <ph name="COOKIES_ALLOWED_FOR_URLS_POLICY_NAME" />.</translation>
 <translation id="6810445994095397827">Blokir JavaScript di situs ini</translation>
 <translation id="6813263547126514821">Daya dan penonaktifan</translation>
 <translation id="681446116407619279">Skema autentikasi yang didukung</translation>
@@ -10908,6 +10959,11 @@ mengonfigurasi pintasan.</translation>
       Jika kebijakan tidak ditetapkan, <ph name="PRODUCT_NAME" /> akan mengizinkan pengguna mengontrol apakah browser merupakan default dan, jika tidak, apakah notifikasi pengguna seharusnya muncul.
 
       Catatan: Untuk administrator <ph name="MS_WIN_NAME" />, mengaktifkan setelan ini hanya akan berfungsi pada mesin yang menjalankan Windows 7. Untuk versi setelahnya, Anda harus men-deploy file "asosiasi aplikasi default" yang menjadikan <ph name="PRODUCT_NAME" /> sebagai pengendali untuk protokol <ph name="HTTPS_PROTOCOL" /> dan <ph name="HTTP_PROTOCOL" /> (dan secara opsional, protokol <ph name="FTP_PROTOCOL" /> dan format file lainnya). Lihat Bantuan Chrome ( https://support.google.com/chrome?p=make_chrome_default_win ).</translation>
+<translation id="8437836857126992452">Memungkinkan Anda menentukan ekstensi mana yang TIDAK dapat diinstal pengguna. Ekstensi yang sudah diinstal akan dinonaktifkan jika diblokir, tanpa memberikan opsi kepada pengguna untuk mengaktifkannya. Setelah ekstensi yang dinonaktifkan dihapus dari daftar yang tidak diizinkan, ekstensi akan kembali diaktifkan secara otomatis.
+
+          Nilai '*' untuk daftar yang tidak diizinkan berarti semua ekstensi diblokir secara default. Ekstensi yang tercantum secara eksplisit dalam daftar yang diizinkan akan diizinkan jika sudah ditandatangani (dikemas). Semua ekstensi mode developer akan diblokir.
+
+          Jika kebijakan ini tidak disetel, pengguna dapat menginstal ekstensi apa pun di <ph name="PRODUCT_NAME" />.</translation>
 <translation id="8441105784056442638">Mengaktifkan fitur pemulihan penuh</translation>
 <translation id="844322176712318428">Mengizinkan Translator API</translation>
 <translation id="8444157920689124099">Aktifkan Enkripsi yang Terikat Aplikasi</translation>

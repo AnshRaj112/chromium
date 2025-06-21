@@ -7,7 +7,7 @@
 #include "chrome/browser/ui/browser_actions.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/passwords/manage_passwords_test.h"
-#include "chrome/browser/ui/passwords/manage_passwords_ui_controller_mock.h"
+#include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
 #include "chrome/browser/ui/toolbar/pinned_toolbar/pinned_toolbar_actions_model.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -125,12 +125,6 @@ IN_PROC_BROWSER_TEST_P(ManagePasswordsIconViewTest, CloseOnClick) {
       ui::test::InteractionTestUtil::InputType::kDontCare);
   // Wait for the command execution to close the bubble.
   content::RunAllPendingInMessageLoop();
-}
-
-IN_PROC_BROWSER_TEST_P(ManagePasswordsIconViewTest, PasswordChangeState) {
-  SetupPasswordChange();
-  EXPECT_EQ(password_manager::ui::PASSWORD_CHANGE_STATE, ViewState());
-  EXPECT_FALSE(GetIcon()->GetVisible());
 }
 
 IN_PROC_BROWSER_TEST_P(ManagePasswordsIconViewTestToolbarPinningOnly,

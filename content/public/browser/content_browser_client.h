@@ -262,6 +262,7 @@ class RenderFrameHost;
 class RenderProcessHost;
 class ResponsivenessCalculatorDelegate;
 class SerialDelegate;
+class ServiceWorkerContext;
 class SiteInstance;
 class SpeculationHostDelegate;
 class SpeechRecognitionManagerDelegate;
@@ -1284,6 +1285,12 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual bool AreThirdPartyCookiesGenerallyAllowed(
       content::BrowserContext* browser_context,
       content::WebContents* web_contents);
+
+  // Prewarms the ServiceWorker registration of the DefaultSearchEngine (DSE) by
+  // prefetching it from the database.
+  virtual void PrewarmServiceWorkerRegistrationForDSE(
+      BrowserContext* browser_context,
+      ServiceWorkerContext& service_worker_context);
 
   // Allows the embedder to implement policy for whether an SCT auditing report
   // should be sent.
@@ -3312,6 +3319,14 @@ class CONTENT_EXPORT ContentBrowserClient {
       std::optional<ukm::SourceId> ukm_source_id,
       KeepAliveRequestTracker::IsContextDetachedCallback
           is_context_detached_callback);
+
+  // Allows embedder to override the clipboard types if a policy has inspected
+  // or modified the clipboard content. This is called by the browser process
+  // when a renderer needs to read available formats. Returns `std::nullopt` if
+  // there is no override for the current clipboard state.
+  virtual std::optional<std::vector<std::u16string>>
+  GetClipboardTypesIfPolicyApplied(
+      const ui::ClipboardSequenceNumberToken& seqno);
 };
 
 }  // namespace content

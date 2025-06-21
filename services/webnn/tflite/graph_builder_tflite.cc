@@ -1451,7 +1451,8 @@ GraphBuilderTflite::CanFuseActivationAndGetOutput(OperandId output_operand_id) {
 }
 
 std::optional<GraphBuilderTflite::TensorInfo>
-GraphBuilderTflite::CanFuseQuantizeAndGetOutput(const mojom::Clamp& clamp) {
+GraphBuilderTflite::CanFuseQuantizeAndGetOutput(const mojom::Clamp& clamp,
+                                                bool is_emulated) {
   if (!IsDequantizeOutput(clamp.input_operand_id)) {
     return std::nullopt;
   }
@@ -1476,6 +1477,17 @@ GraphBuilderTflite::CanFuseQuantizeAndGetOutput(const mojom::Clamp& clamp) {
     return std::nullopt;
   }
 
+  // For emulated clamp, it is emulated with min and max operations, which
+  // requires the input and output to have the same scale and zero_point.
+  // https://ai.google.dev/edge/litert/models/quantization_spec#int8_quantized_operator_specifications
+  if (is_emulated) {
+    const mojom::QuantizeLinear& output_quantize =
+        GetQuantizeOp(next_op->first);
+    if (!IsSameScaleAndZeroPoint(input_dequantize, output_quantize)) {
+      return std::nullopt;
+    }
+  }
+
   return SerializeQuantizedOutput(*next_op);
 }
 
@@ -1488,12 +1500,6 @@ GraphBuilderTflite::CanFuseQuantizeAndGetOutput(
   if (!IsDequantizeOutput(conv2d.input_operand_id) ||
       !IsDequantizeOutput(conv2d.filter_operand_id) ||
       !conv2d.bias_operand_id || !IsDequantizeOutput(*conv2d.bias_operand_id)) {
-    return std::nullopt;
-  }
-
-  // TODO(crbug.com/401281047): Support quantization fusion for transposed
-  // conv2d.
-  if (conv2d.kind != mojom::Conv2d::Kind::kDirect) {
     return std::nullopt;
   }
 
@@ -1511,7 +1517,7 @@ GraphBuilderTflite::CanFuseQuantizeAndGetOutput(
     return std::nullopt;
   }
 
-  // Bias must be int32 and have all-zero zero-points.
+  // Bias must be int32 for conv2d and convTranspose2d.
   // https://source.chromium.org/chromium/chromium/src/+/main:third_party/tflite/src/tensorflow/lite/kernels/conv.cc;l=384;drc=e433dac46a0bb8ffa4b6e600d4d94751768392c0
   const mojom::DequantizeLinear& bias_dequantize =
       GetDequantizeOp(*conv2d.bias_operand_id);
@@ -1519,13 +1525,20 @@ GraphBuilderTflite::CanFuseQuantizeAndGetOutput(
       OperandDataType::kInt32) {
     return std::nullopt;
   }
-  auto bias_zero_point_constant_it =
-      constant_operands_->find(bias_dequantize.zero_point_operand_id);
-  CHECK(bias_zero_point_constant_it != constant_operands_->end());
+  // The bias must have all-zero zero-points for conv2d and int8 input
+  // convTranspose2d.
+  // https://source.chromium.org/chromium/chromium/src/+/main:third_party/tflite/src/tensorflow/lite/kernels/transpose_conv.cc;drc=dde56340610b37d2f2696b654be50a74dd25ff84;l=319
+  if (conv2d.kind == mojom::Conv2d::Kind::kDirect ||
+      (conv2d.kind == mojom::Conv2d::Kind::kTransposed &&
+       quantized_type == OperandDataType::kInt8)) {
+    auto bias_zero_point_constant_it =
+        constant_operands_->find(bias_dequantize.zero_point_operand_id);
+    CHECK(bias_zero_point_constant_it != constant_operands_->end());
 
-  for (uint8_t byte : bias_zero_point_constant_it->second->ByteSpan()) {
-    if (byte != 0) {
-      return std::nullopt;
+    for (uint8_t byte : bias_zero_point_constant_it->second->ByteSpan()) {
+      if (byte != 0) {
+        return std::nullopt;
+      }
     }
   }
 
@@ -1832,6 +1845,99 @@ GraphBuilderTflite::CanFuseQuantizeAndGetOutput(const mojom::Gather& gather) {
   const mojom::QuantizeLinear& output_quantize = GetQuantizeOp(next_op->first);
   if (!IsSameScaleAndZeroPoint(input_dequantize, output_quantize)) {
     return std::nullopt;
+  }
+
+  return SerializeQuantizedOutput(*next_op);
+}
+
+std::optional<GraphBuilderTflite::TensorInfo>
+GraphBuilderTflite::CanFuseQuantizeAndGetOutput(const mojom::Gemm& gemm) {
+  // TODO(crbug.com/372932099): Fuse quantized gemm when gemm.alpha or gemm.beta
+  // isn't 1.0.
+  if (!IsDequantizeOutput(gemm.a_operand_id) ||
+      !IsDequantizeOutput(gemm.b_operand_id) || gemm.alpha != 1.0f ||
+      gemm.beta != 1.0f) {
+    return std::nullopt;
+  }
+
+  // The a operand scale and output scale have to be scaler, see quantization
+  // requirements of FULLY_CONNECTED at
+  // https://ai.google.dev/edge/litert/models/quantization_spec#int8_quantized_operator_specifications
+  const mojom::DequantizeLinear& a_dequantize =
+      GetDequantizeOp(gemm.a_operand_id);
+  const mojom::DequantizeLinear& b_dequantize =
+      GetDequantizeOp(gemm.b_operand_id);
+  const OperandDataType quantized_type =
+      GetOperand(a_dequantize.input_operand_id).descriptor.data_type();
+  // TODO(crbug.com/425746878): Support int4 quantization for b operand.
+  if (!IsInts8AndScalarScale(a_dequantize) ||
+      GetOperand(b_dequantize.input_operand_id).descriptor.data_type() !=
+          quantized_type) {
+    return std::nullopt;
+  }
+
+  // The c operand must be optional or int32 data type.
+  // https://source.chromium.org/chromium/chromium/src/+/main:third_party/tflite/src/tensorflow/lite/kernels/fully_connected.cc;drc=7930f629a820b2233128fb591789f4d8a41be8d9;l=216
+  if (gemm.c_operand_id) {
+    if (!IsDequantizeOutput(*gemm.c_operand_id)) {
+      return std::nullopt;
+    }
+    const mojom::DequantizeLinear& c_dequantize =
+        GetDequantizeOp(*gemm.c_operand_id);
+    if (GetOperand(c_dequantize.input_operand_id).descriptor.data_type() !=
+        OperandDataType::kInt32) {
+      return std::nullopt;
+    }
+  }
+
+  std::optional<std::pair<OperationId, QuantizateParametersOffset>> next_op =
+      IsNextOpQuantize(gemm.output_operand_id, {quantized_type});
+  if (!next_op) {
+    return std::nullopt;
+  }
+  const mojom::QuantizeLinear& output_quantize = GetQuantizeOp(next_op->first);
+  if (!IsInts8AndScalarScale(output_quantize)) {
+    return std::nullopt;
+  }
+
+  // Only Int8 is supported for per-channel quantization.
+  // https://source.chromium.org/chromium/chromium/src/+/main:third_party/tflite/src/tensorflow/lite/kernels/fully_connected.cc;l=446;drc=997022c9de8c1e4ed9081b8789c1057d0fce0e28
+  size_t number_of_b_scale =
+      GetOperand(b_dequantize.scale_operand_id).descriptor.NumberOfElements();
+  const bool per_channel_quantization = number_of_b_scale != 1;
+  if (per_channel_quantization && quantized_type != OperandDataType::kInt8) {
+    return std::nullopt;
+  }
+  // The transpose operation will be inserted if gemm.b_transpose is false, but
+  // quantized transpose only supports per-tensor quantization.
+  // https://source.chromium.org/chromium/chromium/src/+/main:services/webnn/tflite/graph_builder_tflite.cc;drc=87413efa62e18726d73e7f283efef63d4bfd1023;l=4581
+  if (per_channel_quantization && !gemm.b_transpose) {
+    return std::nullopt;
+  }
+
+  // The a_scale * b_scale should be about the same as c_scale for per-tensor
+  // quantization.
+  // https://source.chromium.org/chromium/chromium/src/+/main:third_party/tflite/src/tensorflow/lite/kernels/kernel_util.cc;l=303;drc=492dc9719f6e1845f4f5c0553cd5c7651115f671
+  if (!per_channel_quantization && gemm.c_operand_id) {
+    base::span<const float> a_scale_values =
+        GetConstantValue<float>(a_dequantize.scale_operand_id);
+    base::span<const float> b_scale_values =
+        GetConstantValue<float>(b_dequantize.scale_operand_id);
+    const mojom::DequantizeLinear& c_dequantize =
+        GetDequantizeOp(*gemm.c_operand_id);
+    base::span<const float> c_scale_values =
+        GetConstantValue<float>(c_dequantize.scale_operand_id);
+    base::span<const float> output_scale_values =
+        GetConstantValue<float>(output_quantize.scale_operand_id);
+    const double a_scale = static_cast<double>(a_scale_values[0]);
+    const double output_scale = static_cast<double>(output_scale_values[0]);
+    auto a_product_b =
+        base::MakeCheckedNum<double>(a_scale) * b_scale_values[0];
+    auto scale_diff = a_product_b - static_cast<double>(c_scale_values[0]);
+    scale_diff = scale_diff.Abs() / output_scale;
+    if (!scale_diff.IsValid() || scale_diff.ValueOrDie() > 0.02) {
+      return std::nullopt;
+    }
   }
 
   return SerializeQuantizedOutput(*next_op);
@@ -2339,6 +2445,35 @@ GraphBuilderTflite::CanFuseQuantizeForActivationOperation(const OpType& op) {
   return next_op;
 }
 
+bool GraphBuilderTflite::CanFuseDequantizeForLogicalElementWiseBinary(
+    const mojom::ElementWiseBinary& binary) {
+  if (!IsDequantizeOutput(binary.lhs_operand_id) ||
+      !IsDequantizeOutput(binary.rhs_operand_id)) {
+    return false;
+  }
+
+  // The input operands should be dequantized from ints8.
+  // https://source.chromium.org/chromium/chromium/src/+/main:third_party/tflite/src/tensorflow/lite/kernels/comparisons.cc;l=388;drc=e76cd1dd569db9198eb674102f00a718a752487d
+  const mojom::DequantizeLinear& lhs_dequantize =
+      GetDequantizeOp(binary.lhs_operand_id);
+  const mojom::DequantizeLinear& rhs_dequantize =
+      GetDequantizeOp(binary.rhs_operand_id);
+  const OperandDataType quantized_type =
+      GetOperand(lhs_dequantize.input_operand_id).descriptor.data_type();
+  if (!DataTypeConstraint::kInts8.Has(quantized_type) ||
+      GetOperand(rhs_dequantize.input_operand_id).descriptor.data_type() !=
+          quantized_type) {
+    return false;
+  }
+
+  // The inputs should have same scale/zero_point.
+  if (!IsSameScaleAndZeroPoint(lhs_dequantize, rhs_dequantize)) {
+    return false;
+  }
+
+  return true;
+}
+
 bool GraphBuilderTflite::IsDequantizeOutput(OperandId operand_id) {
   return lazy_serialized_dequantize_operations_.contains(operand_id);
 }
@@ -2552,22 +2687,25 @@ GraphBuilderTflite::TensorInfo GraphBuilderTflite::SerializeQuantizedOutput(
                                    quantize_op_info.second);
 }
 
+template <typename OpType>
+  requires(std::is_same_v<OpType, mojom::DequantizeLinear> ||
+           std::is_same_v<OpType, mojom::QuantizeLinear>)
 bool GraphBuilderTflite::IsSameScaleAndZeroPoint(
-    const mojom::DequantizeLinear& input_dequantize,
-    const mojom::QuantizeLinear& output_quantize) {
-  base::span<const float> input_scale_values =
-      GetConstantValue<float>(input_dequantize.scale_operand_id);
-  base::span<const float> output_scale_values =
-      GetConstantValue<float>(output_quantize.scale_operand_id);
-  if (!std::ranges::equal(input_scale_values, output_scale_values)) {
+    const mojom::DequantizeLinear& dequantize,
+    const OpType& op) {
+  base::span<const float> a_scale_values =
+      GetConstantValue<float>(dequantize.scale_operand_id);
+  base::span<const float> b_scale_values =
+      GetConstantValue<float>(op.scale_operand_id);
+  if (!std::ranges::equal(a_scale_values, b_scale_values)) {
     return false;
   }
 
-  base::FixedArray<int64_t> input_zero_point_values =
-      GetConstantInt64Value(input_dequantize.zero_point_operand_id);
-  base::FixedArray<int64_t> output_zero_point_values =
-      GetConstantInt64Value(output_quantize.zero_point_operand_id);
-  if (!std::ranges::equal(input_zero_point_values, output_zero_point_values)) {
+  base::FixedArray<int64_t> a_zero_point_values =
+      GetConstantInt64Value(dequantize.zero_point_operand_id);
+  base::FixedArray<int64_t> b_zero_point_values =
+      GetConstantInt64Value(op.zero_point_operand_id);
+  if (!std::ranges::equal(a_zero_point_values, b_zero_point_values)) {
     return false;
   }
 
@@ -3281,7 +3419,8 @@ GraphBuilderTflite::TensorIndex GraphBuilderTflite::InsertTransposeOperation(
     output_shape[i] = input_tensor_info.dimensions[permutation[i]];
   }
   const TensorIndex output_tensor_index =
-      SerializeTemporaryTensor(output_shape, input_tensor_info.data_type);
+      SerializeTemporaryTensor(output_shape, input_tensor_info.data_type,
+                               input_tensor_info.quantize_params);
   operators_.emplace_back(
       SerializeTransposeOperation(input_tensor_info.index, output_tensor_index,
                                   input_tensor_info.dimensions, permutation));
@@ -3485,25 +3624,61 @@ auto GraphBuilderTflite::SerializeSubGraphMaxMin(
     TensorIndex output_tensor_index,
     base::span<const DataType> min_values,
     base::span<const DataType> max_values) -> OperatorOffset {
+  const std::array<int32_t, 1> min_values_dimensions = {
+      base::checked_cast<int32_t>(min_values.size())};
   const TensorIndex min_value_tensor_index =
-      SerializeTensorWithBuffer<DataType>(
-          /*buffer=*/min_values,
-          /*dimensions=*/std::array<int32_t, 1>{
-              base::checked_cast<int32_t>(min_values.size())});
+      SerializeTensorWithBuffer<DataType>(min_values, min_values_dimensions);
+
+  // If `input_tensor_info.quantize_params` is not null, it means the
+  // `min_values` and `max_values` should be quantized to the same data type
+  // with input to meet the requirements of QDQ fusion.
+  TensorIndex maybe_quantized_min_value_tensor_index = min_value_tensor_index;
+  if (!input_tensor_info.quantize_params.IsNull()) {
+    maybe_quantized_min_value_tensor_index = SerializeTemporaryTensor(
+        min_values_dimensions, input_tensor_info.data_type,
+        input_tensor_info.quantize_params);
+    const OperatorCodeIndex operator_code_index =
+        GetOperatorCodeIndex(::tflite::BuiltinOperator_QUANTIZE);
+    const std::array<TensorIndex, 1> quantize_inputs = {min_value_tensor_index};
+    const std::array<TensorIndex, 1> quantize_outputs = {
+        maybe_quantized_min_value_tensor_index};
+    operators_.emplace_back(::tflite::CreateOperator(
+        builder_, operator_code_index,
+        builder_.CreateVector<TensorIndex>(quantize_inputs),
+        builder_.CreateVector<TensorIndex>(quantize_outputs)));
+  }
+
   const TensorIndex output_tensor_index_of_max = SerializeTemporaryTensor(
-      input_tensor_info.dimensions, input_tensor_info.data_type);
+      input_tensor_info.dimensions, input_tensor_info.data_type,
+      input_tensor_info.quantize_params);
   operators_.emplace_back(SerializeBinaryOperation(
       ::tflite::BuiltinOperator_MAXIMUM, input_tensor_info.index,
-      min_value_tensor_index, output_tensor_index_of_max));
+      maybe_quantized_min_value_tensor_index, output_tensor_index_of_max));
 
+  const std::array<int32_t, 1> max_values_dimensions = {
+      base::checked_cast<int32_t>(max_values.size())};
   const TensorIndex max_value_tensor_index =
-      SerializeTensorWithBuffer<DataType>(
-          /*buffer=*/max_values,
-          /*dimensions=*/std::array<int32_t, 1>{
-              base::checked_cast<int32_t>(max_values.size())});
-  return SerializeBinaryOperation(::tflite::BuiltinOperator_MINIMUM,
-                                  output_tensor_index_of_max,
-                                  max_value_tensor_index, output_tensor_index);
+      SerializeTensorWithBuffer<DataType>(max_values, max_values_dimensions);
+
+  TensorIndex maybe_quantized_max_value_tensor_index = max_value_tensor_index;
+  if (!input_tensor_info.quantize_params.IsNull()) {
+    maybe_quantized_max_value_tensor_index = SerializeTemporaryTensor(
+        max_values_dimensions, input_tensor_info.data_type,
+        input_tensor_info.quantize_params);
+    const OperatorCodeIndex operator_code_index =
+        GetOperatorCodeIndex(::tflite::BuiltinOperator_QUANTIZE);
+    const std::array<TensorIndex, 1> quantize_inputs = {max_value_tensor_index};
+    const std::array<TensorIndex, 1> quantize_outputs = {
+        maybe_quantized_max_value_tensor_index};
+    operators_.emplace_back(::tflite::CreateOperator(
+        builder_, operator_code_index,
+        builder_.CreateVector<TensorIndex>(quantize_inputs),
+        builder_.CreateVector<TensorIndex>(quantize_outputs)));
+  }
+
+  return SerializeBinaryOperation(
+      ::tflite::BuiltinOperator_MINIMUM, output_tensor_index_of_max,
+      maybe_quantized_max_value_tensor_index, output_tensor_index);
 }
 
 auto GraphBuilderTflite::SerializeClamp(const mojom::Clamp& clamp)
@@ -3517,7 +3692,7 @@ auto GraphBuilderTflite::SerializeClamp(const mojom::Clamp& clamp)
       GetClampOperatorCode(min_value, max_value);
   const bool is_emulated = !operator_code.has_value();
   std::optional<TensorInfo> quantized_output =
-      is_emulated ? std::nullopt : CanFuseQuantizeAndGetOutput(clamp);
+      CanFuseQuantizeAndGetOutput(clamp, is_emulated);
   const bool fuse_dequantize = quantized_output.has_value();
   ASSIGN_OR_RETURN(const TensorInfo& input_tensor_info,
                    SerializeInputTensorInfo(
@@ -3792,6 +3967,7 @@ auto GraphBuilderTflite::SerializeElementWiseBinary(
     const mojom::ElementWiseBinary& op)
     -> base::expected<OperatorOffset, std::string> {
   std::optional<TensorInfo> quantized_output;
+  bool fuse_dequantize_for_logical = false;
   const OperandDescriptor& lhs_operand_descriptor =
       GetOperand(op.lhs_operand_id).descriptor;
   const OperandDescriptor& rhs_operand_descriptor =
@@ -3842,31 +4018,43 @@ auto GraphBuilderTflite::SerializeElementWiseBinary(
       CHECK(context_properties_.data_type_limits.equal_input.SupportsAll(
           {lhs_operand_descriptor, rhs_operand_descriptor}));
       code = ::tflite::BuiltinOperator_EQUAL;
+      fuse_dequantize_for_logical =
+          CanFuseDequantizeForLogicalElementWiseBinary(op);
       break;
     case mojom::ElementWiseBinary::Kind::kGreater:
       CHECK(context_properties_.data_type_limits.greater_input.SupportsAll(
           {lhs_operand_descriptor, rhs_operand_descriptor}));
       code = ::tflite::BuiltinOperator_GREATER;
+      fuse_dequantize_for_logical =
+          CanFuseDequantizeForLogicalElementWiseBinary(op);
       break;
     case mojom::ElementWiseBinary::Kind::kGreaterOrEqual:
       CHECK(context_properties_.data_type_limits.greater_or_equal_input
                 .SupportsAll({lhs_operand_descriptor, rhs_operand_descriptor}));
       code = ::tflite::BuiltinOperator_GREATER_EQUAL;
+      fuse_dequantize_for_logical =
+          CanFuseDequantizeForLogicalElementWiseBinary(op);
       break;
     case mojom::ElementWiseBinary::Kind::kLesser:
       CHECK(context_properties_.data_type_limits.lesser_input.SupportsAll(
           {lhs_operand_descriptor, rhs_operand_descriptor}));
       code = ::tflite::BuiltinOperator_LESS;
+      fuse_dequantize_for_logical =
+          CanFuseDequantizeForLogicalElementWiseBinary(op);
       break;
     case mojom::ElementWiseBinary::Kind::kLesserOrEqual:
       CHECK(context_properties_.data_type_limits.lesser_or_equal_input
                 .SupportsAll({lhs_operand_descriptor, rhs_operand_descriptor}));
       code = ::tflite::BuiltinOperator_LESS_EQUAL;
+      fuse_dequantize_for_logical =
+          CanFuseDequantizeForLogicalElementWiseBinary(op);
       break;
     case mojom::ElementWiseBinary::Kind::kNotEqual:
       CHECK(context_properties_.data_type_limits.not_equal_input.SupportsAll(
           {lhs_operand_descriptor, rhs_operand_descriptor}));
       code = ::tflite::BuiltinOperator_NOT_EQUAL;
+      fuse_dequantize_for_logical =
+          CanFuseDequantizeForLogicalElementWiseBinary(op);
       break;
     case mojom::ElementWiseBinary::Kind::kLogicalAnd:
       CHECK(context_properties_.data_type_limits.logical_and_input.SupportsAll(
@@ -3888,7 +4076,8 @@ auto GraphBuilderTflite::SerializeElementWiseBinary(
       break;
   }
 
-  const bool fuse_dequantize = quantized_output.has_value();
+  const bool fuse_dequantize =
+      quantized_output.has_value() || fuse_dequantize_for_logical;
 
   ASSIGN_OR_RETURN(const TensorInfo& lhs_tensor_info,
                    SerializeInputTensorInfo(
@@ -3899,57 +4088,59 @@ auto GraphBuilderTflite::SerializeElementWiseBinary(
                        op.rhs_operand_id, /*quantize_params=*/0,
                        /*operation_supports_float16=*/false, fuse_dequantize));
 
-  const TensorInfo output_tensor_info =
-      SerializeOutputTensorInfo(op.output_operand_id);
-
-  if (IsLogicalElementWiseBinary(op.kind)) {
-    TensorIndex lhs_tensor_index = lhs_tensor_info.index;
-    TensorIndex rhs_tensor_index = rhs_tensor_info.index;
-    if (op.kind == mojom::ElementWiseBinary::Kind::kLogicalAnd ||
-        op.kind == mojom::ElementWiseBinary::Kind::kLogicalOr ||
-        op.kind == mojom::ElementWiseBinary::Kind::kLogicalXor) {
-      // The data types of the inputs for these binary logical operators are
-      // uint8 in WebNN. However, TFLite requires them to be bools, so we need
-      // to cast the inputs to temporary bool tensors, perform the actual
-      // operation.
-      CHECK_EQ(lhs_tensor_info.data_type, ::tflite::TensorType_UINT8);
-      lhs_tensor_index = SerializeTemporaryTensor(lhs_tensor_info.dimensions,
-                                                  ::tflite::TensorType_BOOL);
-      operators_.emplace_back(SerializeCastOperation(
-          lhs_tensor_info.index,
-          /*input_tensor_type=*/::tflite::TensorType_UINT8, lhs_tensor_index,
-          /*output_tensor_type=*/::tflite::TensorType_BOOL));
-
-      CHECK_EQ(rhs_tensor_info.data_type, ::tflite::TensorType_UINT8);
-      rhs_tensor_index = SerializeTemporaryTensor(rhs_tensor_info.dimensions,
-                                                  ::tflite::TensorType_BOOL);
-      operators_.emplace_back(SerializeCastOperation(
-          rhs_tensor_info.index,
-          /*input_tensor_type=*/::tflite::TensorType_UINT8, rhs_tensor_index,
-          /*output_tensor_type=*/::tflite::TensorType_BOOL));
-    }
-
-    // The data types of the output for all the binary logical operators are
-    // uint8 in WebNN. However, TFLite returns bools, so we need to cast the
-    // output to uint8.
-    CHECK_EQ(output_tensor_info.data_type, ::tflite::TensorType_UINT8);
-    TensorIndex output_tensor_bool_index = SerializeTemporaryTensor(
-        output_tensor_info.dimensions, ::tflite::TensorType_BOOL);
-
-    operators_.emplace_back(SerializeBinaryOperation(
-        code, lhs_tensor_index, rhs_tensor_index, output_tensor_bool_index));
-
-    // Cast the output from bool to uint8, since that's what WebNN expects back.
-    return SerializeCastOperation(
-        output_tensor_bool_index,
-        /*input_tensor_type=*/::tflite::TensorType_BOOL,
-        output_tensor_info.index,
-        /*output_tensor_type=*/output_tensor_info.data_type);
+  //  Return early for non-logical element-wise binary operations, because they
+  //  don't need to insert cast operation.
+  if (!IsLogicalElementWiseBinary(op.kind)) {
+    return SerializeBinaryOperation(
+        code, lhs_tensor_info.index, rhs_tensor_info.index,
+        quantized_output
+            ? quantized_output->index
+            : SerializeOutputTensorInfo(op.output_operand_id).index);
   }
 
-  return SerializeBinaryOperation(
-      code, lhs_tensor_info.index, rhs_tensor_info.index,
-      quantized_output ? quantized_output->index : output_tensor_info.index);
+  const TensorInfo output_tensor_info =
+      SerializeOutputTensorInfo(op.output_operand_id);
+  TensorIndex lhs_tensor_index = lhs_tensor_info.index;
+  TensorIndex rhs_tensor_index = rhs_tensor_info.index;
+  if (op.kind == mojom::ElementWiseBinary::Kind::kLogicalAnd ||
+      op.kind == mojom::ElementWiseBinary::Kind::kLogicalOr ||
+      op.kind == mojom::ElementWiseBinary::Kind::kLogicalXor) {
+    // The data types of the inputs for these binary logical operators are
+    // uint8 in WebNN. However, TFLite requires them to be bools, so we need
+    // to cast the inputs to temporary bool tensors, perform the actual
+    // operation.
+    CHECK_EQ(lhs_tensor_info.data_type, ::tflite::TensorType_UINT8);
+    lhs_tensor_index = SerializeTemporaryTensor(lhs_tensor_info.dimensions,
+                                                ::tflite::TensorType_BOOL);
+    operators_.emplace_back(SerializeCastOperation(
+        lhs_tensor_info.index,
+        /*input_tensor_type=*/::tflite::TensorType_UINT8, lhs_tensor_index,
+        /*output_tensor_type=*/::tflite::TensorType_BOOL));
+
+    CHECK_EQ(rhs_tensor_info.data_type, ::tflite::TensorType_UINT8);
+    rhs_tensor_index = SerializeTemporaryTensor(rhs_tensor_info.dimensions,
+                                                ::tflite::TensorType_BOOL);
+    operators_.emplace_back(SerializeCastOperation(
+        rhs_tensor_info.index,
+        /*input_tensor_type=*/::tflite::TensorType_UINT8, rhs_tensor_index,
+        /*output_tensor_type=*/::tflite::TensorType_BOOL));
+  }
+
+  // The data types of the output for all the binary logical operators are
+  // uint8 in WebNN. However, TFLite returns bools, so we need to cast the
+  // output to uint8.
+  CHECK_EQ(output_tensor_info.data_type, ::tflite::TensorType_UINT8);
+  TensorIndex output_tensor_bool_index = SerializeTemporaryTensor(
+      output_tensor_info.dimensions, ::tflite::TensorType_BOOL);
+
+  operators_.emplace_back(SerializeBinaryOperation(
+      code, lhs_tensor_index, rhs_tensor_index, output_tensor_bool_index));
+
+  // Cast the output from bool to uint8, since that's what WebNN expects back.
+  return SerializeCastOperation(
+      output_tensor_bool_index,
+      /*input_tensor_type=*/::tflite::TensorType_BOOL, output_tensor_info.index,
+      /*output_tensor_type=*/output_tensor_info.data_type);
 }
 
 auto GraphBuilderTflite::SerializeElementWiseUnary(
@@ -4451,8 +4642,31 @@ auto GraphBuilderTflite::SerializeGemm(const mojom::Gemm& gemm)
       {GetOperand(gemm.a_operand_id).descriptor,
        GetOperand(gemm.b_operand_id).descriptor}));
 
+  // The TFLite fully connected operator only supports a 1-D bias tensor with
+  // `output_channels` dimensions.
+  // https://source.chromium.org/chromium/chromium/src/+/main:third_party/tflite/src/tensorflow/lite/kernels/fully_connected.cc;drc=7930f629a820b2233128fb591789f4d8a41be8d9;l=425
+  bool is_emulated_c_expression = false;
+  if (gemm.c_operand_id) {
+    const std::vector<uint32_t>& output_shape =
+        GetOperand(gemm.output_operand_id).descriptor.shape();
+    CHECK_EQ(output_shape.size(), 2u);
+    const uint32_t output_channels = output_shape[1];
+    const std::vector<uint32_t>& c_shape =
+        GetOperand(*gemm.c_operand_id).descriptor.shape();
+    if (c_shape.size() != 1 || c_shape[0] != output_channels) {
+      is_emulated_c_expression = true;
+    }
+  }
+
+  std::optional<TensorInfo> quantized_output =
+      is_emulated_c_expression ? std::nullopt
+                               : CanFuseQuantizeAndGetOutput(gemm);
+  const bool fuse_dequantize = quantized_output.has_value();
   ASSIGN_OR_RETURN(const TensorInfo& a_tensor_info,
-                   SerializeInputTensorInfo(gemm.a_operand_id));
+                   SerializeInputTensorInfo(
+                       gemm.a_operand_id,
+                       /*quantize_params=*/0,
+                       /*operation_supports_float16=*/false, fuse_dequantize));
   TensorIndex a_tensor_index = a_tensor_info.index;
   // The permutation transpose first or second 2-D tensor.
   static constexpr std::array<uint32_t, 2> permutation = {1u, 0u};
@@ -4480,7 +4694,10 @@ auto GraphBuilderTflite::SerializeGemm(const mojom::Gemm& gemm)
   // input_channels], so the Transpose operator need to be inserted before
   // Gemm When bTranspose option is false.
   ASSIGN_OR_RETURN(const TensorInfo& b_tensor_info,
-                   SerializeInputTensorInfo(gemm.b_operand_id));
+                   SerializeInputTensorInfo(
+                       gemm.b_operand_id,
+                       /*quantize_params=*/0,
+                       /*operation_supports_float16=*/false, fuse_dequantize));
   TensorIndex b_tensor_index = b_tensor_info.index;
   if (!gemm.b_transpose) {
     b_tensor_index = InsertTransposeOperation(b_tensor_info, permutation);
@@ -4488,15 +4705,29 @@ auto GraphBuilderTflite::SerializeGemm(const mojom::Gemm& gemm)
   std::vector<TensorIndex> fully_connected_inputs = {a_tensor_index,
                                                      b_tensor_index};
 
-  const TensorInfo output_tensor_info =
-      SerializeOutputTensorInfo(gemm.output_operand_id);
-  CHECK_EQ(output_tensor_info.dimensions.size(), 2u);
+  TensorIndex output_tensor_index;
+  std::vector<int32_t> output_tensor_dimensions;
+  ::tflite::TensorType output_tensor_type;
+  if (fuse_dequantize) {
+    output_tensor_index = quantized_output->index;
+  } else {
+    const TensorInfo output_tensor_info =
+        SerializeOutputTensorInfo(gemm.output_operand_id);
+    CHECK_EQ(output_tensor_info.dimensions.size(), 2u);
+    output_tensor_index = output_tensor_info.index;
+    output_tensor_dimensions = std::move(output_tensor_info.dimensions);
+    output_tensor_type = output_tensor_info.data_type;
+  }
   std::optional<TensorIndex> c_tensor_index;
   if (gemm.c_operand_id && gemm.beta != 0.0f) {
     CHECK(context_properties_.data_type_limits.gemm_c.Supports(
         GetOperand(gemm.c_operand_id.value()).descriptor));
-    ASSIGN_OR_RETURN(const TensorInfo& c_tensor_info,
-                     SerializeInputTensorInfo(*gemm.c_operand_id));
+    ASSIGN_OR_RETURN(
+        const TensorInfo& c_tensor_info,
+        SerializeInputTensorInfo(*gemm.c_operand_id,
+                                 /*quantize_params=*/0,
+                                 /*operation_supports_float16=*/false,
+                                 fuse_dequantize));
     c_tensor_index = c_tensor_info.index;
     if (gemm.beta != 1.0f) {
       const TensorIndex beta_tensor_index = SerializeTensorWithBuffer<float>(
@@ -4510,37 +4741,33 @@ auto GraphBuilderTflite::SerializeGemm(const mojom::Gemm& gemm)
       c_tensor_index = output_tensor_index_of_mul;
     }
 
-    // The TFLite fully connected operator only supports a 1-D bias tensor with
-    // `output_channels` dimensions.
-    const int32_t output_channels = output_tensor_info.dimensions[1];
-    if (c_tensor_info.dimensions.size() == 1 &&
-        c_tensor_info.dimensions[0] == output_channels) {
+    if (!is_emulated_c_expression) {
       fully_connected_inputs.push_back(*c_tensor_index);
     }
   }
 
   // Add the `beta * C` subexpression if it's not fused into FULLY_CONNECTED
   // operator.
-  const bool addition_c_expression =
-      c_tensor_index && fully_connected_inputs.size() == 2;
-  TensorIndex output_tensor_index = output_tensor_info.index;
-  if (addition_c_expression) {
-    output_tensor_index = SerializeTemporaryTensor(
-        output_tensor_info.dimensions, output_tensor_info.data_type);
+  TensorIndex addition_c_tensor_index = output_tensor_index;
+  if (is_emulated_c_expression) {
+    CHECK(!fuse_dequantize);
+    addition_c_tensor_index =
+        SerializeTemporaryTensor(output_tensor_dimensions, output_tensor_type);
   }
   const OperatorCodeIndex operator_code_index =
       GetOperatorCodeIndex(::tflite::BuiltinOperator_FULLY_CONNECTED);
-  const std::array<TensorIndex, 1> op_outputs = {output_tensor_index};
+  const std::array<TensorIndex, 1> op_outputs = {addition_c_tensor_index};
   OperatorOffset operator_offset = ::tflite::CreateOperator(
       builder_, operator_code_index,
       builder_.CreateVector<TensorIndex>(fully_connected_inputs),
       builder_.CreateVector<TensorIndex>(op_outputs));
 
-  if (addition_c_expression) {
+  if (is_emulated_c_expression) {
+    CHECK(!fuse_dequantize);
     operators_.push_back(operator_offset);
     operator_offset = SerializeBinaryOperation(
-        ::tflite::BuiltinOperator_ADD, output_tensor_index, *c_tensor_index,
-        output_tensor_info.index);
+        ::tflite::BuiltinOperator_ADD, addition_c_tensor_index, *c_tensor_index,
+        output_tensor_index);
   }
   return operator_offset;
 }

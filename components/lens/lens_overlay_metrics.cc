@@ -44,6 +44,8 @@ std::string InvocationSourceToString(
       return "HomeworkActionChip";
     case LensOverlayInvocationSource::kAIHub:
       return "AIHub";
+    case LensOverlayInvocationSource::kFREPromo:
+      return "FREPromo";
   }
 }
 
@@ -408,6 +410,10 @@ void RecordTimeToFirstInteraction(
       event.SetOmniboxContextualSuggestion(
           time_to_first_interaction.InMilliseconds());
       break;
+    case lens::LensOverlayInvocationSource::kFREPromo:
+      // First interaction for Lens Overlay is already recorded and sliced by invocation
+      // source.
+      break;
   }
   event.SetFirstInteractionType(static_cast<int64_t>(first_interaction_type))
       .Record(ukm::UkmRecorder::Get());
@@ -520,6 +526,11 @@ void RecordSidePanelMenuOptionSelected(
     lens::LensOverlaySidePanelMenuOption menu_option) {
   base::UmaHistogramEnumeration(
       "Lens.Overlay.SidePanel.SelectedMoreInfoMenuOption", menu_option);
+}
+
+void RecordHandleTextDirectiveResult(
+    lens::LensOverlayTextDirectiveResult result) {
+  base::UmaHistogramEnumeration("Lens.Overlay.TextDirectiveResult", result);
 }
 
 }  // namespace lens

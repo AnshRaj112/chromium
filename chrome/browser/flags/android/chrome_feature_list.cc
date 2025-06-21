@@ -43,7 +43,6 @@
 #include "components/feed/feed_feature_list.h"
 #include "components/history/core/browser/features.h"
 #include "components/history_clusters/core/features.h"
-#include "components/invalidation/impl/invalidation_switches.h"
 #include "components/language/core/common/language_experiments.h"
 #include "components/ntp_tiles/features.h"
 #include "components/offline_pages/core/offline_page_feature.h"
@@ -129,6 +128,8 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &data_sharing::features::kDataSharingFeature,
     &data_sharing::features::kDataSharingJoinOnly,
     &data_sharing::features::kDataSharingNonProductionEnvironment,
+    &data_sharing::features::kSharedDataTypesKillSwitch,
+    &data_sharing::features::kDataSharingEnableUpdateChromeUI,
     &download::features::kEnableSavePackageForOffTheRecord,
     &download::features::kSmartSuggestionForLargeDownloads,
     &base::features::kCollectAndroidFrameTimelineMetrics,
@@ -396,10 +397,13 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kTabCollectionAndroid,
     &kTabSwitcherDragDropAndroid,
     &kTabSwitcherForeignFaviconSupport,
+    &kTabSwitcherGroupSuggestionsAndroid,
+    &kTabSwitcherGroupSuggestionsTestModeAndroid,
     &kTabWindowManagerReportIndicesMismatch,
     &kTestDefaultDisabled,
     &kTestDefaultEnabled,
     &kTopControlsRefactor,
+    &kTouchToSearchCallout,
     &kTraceBinderIpc,
     &kStartSurfaceReturnTime,
     &kUmaBackgroundSessions,
@@ -437,7 +441,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &privacy_sandbox::kPrivacySandboxSettings4,
     &privacy_sandbox::kPrivacySandboxAdTopicsContentParity,
     &privacy_sandbox::kPrivacySandboxSentimentSurvey,
-    &privacy_sandbox::kPrivacySandboxCctAdsNoticeSurvey,
     &privacy_sandbox::kTrackingProtectionUserBypassPwa,
     &privacy_sandbox::kTrackingProtectionUserBypassPwaTrigger,
     &safe_browsing::kHashPrefixRealTimeLookups,
@@ -1303,7 +1306,7 @@ BASE_FEATURE(kTabSwitcherColorBlendAnimate,
 
 BASE_FEATURE(kTabArchivalDragDropAndroid,
              "TabArchivalDragDropAndroid",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabCollectionAndroid,
              "TabCollectionAndroid",
@@ -1316,6 +1319,14 @@ BASE_FEATURE(kTabSwitcherDragDropAndroid,
 BASE_FEATURE(kTabSwitcherForeignFaviconSupport,
              "TabSwitcherForeignFaviconSupport",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kTabSwitcherGroupSuggestionsAndroid,
+             "TabSwitcherGroupSuggestionsAndroid",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kTabSwitcherGroupSuggestionsTestModeAndroid,
+             "TabSwitcherGroupSuggestionsTestModeAndroid",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabWindowManagerReportIndicesMismatch,
              "TabWindowManagerReportIndicesMismatch",
@@ -1332,6 +1343,10 @@ BASE_FEATURE(kTestDefaultEnabled,
 // Enables the use of the refactored Top Controls approach on Android.
 BASE_FEATURE(kTopControlsRefactor,
              "TopControlsRefactor",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kTouchToSearchCallout,
+             "TouchToSearchCallout",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTraceBinderIpc,

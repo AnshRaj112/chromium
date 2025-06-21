@@ -1473,9 +1473,7 @@ class CORE_EXPORT Document : public ContainerNode,
   void FinishedParsing();
 
   void SetEncodingData(const DocumentEncodingData& new_data);
-  const WTF::TextEncoding& Encoding() const {
-    return encoding_data_.Encoding();
-  }
+  const TextEncoding& Encoding() const { return encoding_data_.Encoding(); }
 
   bool EncodingWasDetectedHeuristically() const {
     return encoding_data_.WasDetectedHeuristically();
@@ -2868,7 +2866,7 @@ class CORE_EXPORT Document : public ContainerNode,
   // is distinct from popover_pointerdown_target_ because the same pointer
   // action could trigger light dismiss on a containing popover and not a
   // containing dialog, or vice versa. This will be nullptr for a click on
-  // the ::backdrop pseudo element for a dialog.
+  // the ::backdrop pseudo-element for a dialog.
   Member<const HTMLDialogElement> dialog_pointerdown_target_;
   // A set of popovers for which hidePopover() has been called, but animations
   // are still running.

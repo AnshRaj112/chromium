@@ -7,14 +7,12 @@
 
 #include <memory>
 
-#include "cc/layers/texture_layer.h"
-#include "third_party/blink/renderer/platform/graphics/flush_reason.h"
-#include "third_party/blink/renderer/platform/graphics/opacity_mode.h"
+#include "base/check.h"
 #include "third_party/blink/renderer/platform/platform_export.h"
 #include "ui/gfx/geometry/size.h"
-#include "ui/gfx/hdr_metadata.h"
 
 namespace cc {
+class Layer;
 class PaintCanvas;
 }  // namespace cc
 
@@ -63,14 +61,11 @@ class PLATFORM_EXPORT CanvasResourceHost {
 
   virtual bool LowLatencyEnabled() const { return false; }
 
-  CanvasResourceProvider* ResourceProvider() const {
-    return resource_provider_.get();
-  }
+  virtual CanvasResourceProvider* GetResourceProviderForCanvas2D() const = 0;
 
-  std::unique_ptr<CanvasResourceProvider> ReplaceResourceProvider(
-      std::unique_ptr<CanvasResourceProvider>);
-
-  virtual void DiscardResourceProvider();
+  virtual std::unique_ptr<CanvasResourceProvider>
+      ReplaceResourceProviderForCanvas2D(
+          std::unique_ptr<CanvasResourceProvider>) = 0;
 
   virtual bool IsPageVisible() const = 0;
 
@@ -80,9 +75,6 @@ class PLATFORM_EXPORT CanvasResourceHost {
 
   bool ShouldTryToUseGpuRaster() const;
   void SetPreferred2DRasterMode(RasterModeHint);
-
-  // Actual RasterMode used for rendering 2d primitives.
-  RasterMode GetRasterMode() const;
 
   // Called when the CC texture layer that this instance is holding (if any)
   // should be cleared. Subclasses that can hold a CC texture layer should
@@ -94,7 +86,6 @@ class PLATFORM_EXPORT CanvasResourceHost {
   virtual bool TransferToGPUTextureWasInvoked() { return false; }
 
  private:
-  std::unique_ptr<CanvasResourceProvider> resource_provider_;
   RasterModeHint preferred_2d_raster_mode_ = RasterModeHint::kPreferCPU;
   gfx::Size size_;
 };

@@ -6,6 +6,8 @@
 
 #include "base/callback_list.h"
 #include "base/feature_list.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/metrics/histogram_functions.h"
@@ -49,15 +51,32 @@
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/common/chrome_features.h"
 #include "components/content_settings/core/common/content_settings_types.h"
+#include "components/metrics/metrics_service.h"
 #include "components/prefs/pref_service.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/browser/guest_view/web_view/web_view_guest.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
 #include "mojo/public/cpp/bindings/message.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/gfx/geometry/mojom/geometry.mojom.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/views/widget/widget.h"
+
+namespace mojo {
+
+// Specializes a Mojo EqualsTraits to allow equality checks of SkBitmaps, so
+// that `FocusedTabData` can be compared for equality. Given the unoptimized
+// nature of the image comparison logic, this trait is being made available only
+// within this compilation unit.
+template <>
+struct EqualsTraits<::SkBitmap> {
+  static bool Equals(const ::SkBitmap& a, const ::SkBitmap& b) {
+    return glic::FaviconEquals(a, b);
+  }
+};
+
+}  // namespace mojo
 
 namespace glic {
 
@@ -220,6 +239,54 @@ class BrowserIsOpenCalculator : public BrowserListObserver {
   int open_browser_count_ = 0;
 };
 
+// Does time-based debouncing and cache-based deduping of FocusedTabData
+// updates.
+// TODO(b/424242331): Debouncing & deduping should happen closer to where
+// focused tab updates are generated.
+// TODO(b/424242331): This logic should be moved to a separate file and be made
+// more generic and configurable.
+class DebouncerDeduper {
+ public:
+  using DataCallback = void(glic::mojom::FocusedTabDataPtr);
+
+  DebouncerDeduper(base::TimeDelta debounce_delay,
+                   int max_debounces,
+                   base::RepeatingCallback<DataCallback> callback)
+      : max_debounces_(max_debounces),
+        update_callback_(callback),
+        debounce_timer_(FROM_HERE,
+                        debounce_delay,
+                        base::BindRepeating(&DebouncerDeduper::MaybeSendUpdate,
+                                            base::Unretained(this))),
+        remaining_debounces_(max_debounces_) {}
+  ~DebouncerDeduper() = default;
+
+  void HandleUpdate(const glic::mojom::FocusedTabDataPtr data) {
+    next_data_candidate_ = data.Clone();
+    if (remaining_debounces_ > 0) {
+      remaining_debounces_--;
+      debounce_timer_.Reset();
+    }
+  }
+
+ private:
+  void MaybeSendUpdate() {
+    if (next_data_candidate_ != last_sent_data_) {
+      last_sent_data_ = next_data_candidate_->Clone();
+      update_callback_.Run(std::move(next_data_candidate_));
+    }
+    next_data_candidate_ = nullptr;
+    remaining_debounces_ = max_debounces_;
+  }
+
+  const int max_debounces_;
+  base::RepeatingCallback<DataCallback> update_callback_;
+  base::RetainingOneShotTimer debounce_timer_;
+  int remaining_debounces_;
+  glic::mojom::FocusedTabDataPtr last_sent_data_;
+  glic::mojom::FocusedTabDataPtr next_data_candidate_;
+};
+
 mojom::WebClientSizingMode GetWebClientSizingMode() {
   return base::FeatureList::IsEnabled(features::kGlicSizingFitWindow)
              ? glic::mojom::WebClientSizingMode::kFitWindow
@@ -294,6 +361,18 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
                             base::Unretained(this)));
     glic_service_->window_controller().AddStateObserver(this);
 
+    if (base::FeatureList::IsEnabled(
+            features::kGlicTabFocusDataDedupDebounce)) {
+      const base::TimeDelta debounce_delay =
+          base::Milliseconds(features::kGlicTabFocusDataDebounceDelayMs.Get());
+      const int max_debounces = features::kGlicTabFocusDataMaxDebounces.Get();
+      debouncer_deduper_ = std::make_unique<DebouncerDeduper>(
+          debounce_delay, max_debounces,
+          base::BindRepeating(
+              &GlicWebClientHandler::NotifyWebClientFocusedTabChanged,
+              base::Unretained(this)));
+    }
+
     focus_changed_subscription_ =
         glic_sharing_manager_->AddFocusedTabChangedCallback(
             base::BindRepeating(&GlicWebClientHandler::OnFocusedTabChanged,
@@ -365,6 +444,9 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
         base::FeatureList::IsEnabled(features::kGlicClosedCaptioning);
     state->closed_captioning_setting_enabled =
         pref_service_->GetBoolean(prefs::kGlicClosedCaptioningEnabled);
+    state->enable_maybe_refresh_user_status =
+        base::FeatureList::IsEnabled(features::kGlicUserStatusCheck) &&
+        features::kGlicUserStatusRefreshApi.Get();
 
     std::move(callback).Run(std::move(state));
   }
@@ -792,8 +874,7 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
 
     if (base::FeatureList::IsEnabled(features::kGlicApiActivationGating)) {
       if (cached_focused_tab_data_) {
-        web_client_->NotifyFocusedTabChanged(
-            std::move(cached_focused_tab_data_));
+        MaybeNotifyFocusedTabChanged(std::move(cached_focused_tab_data_));
       }
       cached_focused_tab_data_ = nullptr;
     }
@@ -823,8 +904,11 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
       return;
     }
 
+    // TODO(crbug.com/424472586): Pass supported tools to service from web
+    // client.
     glic_service_->FetchZeroStateSuggestions(
         is_fre.value_or(false),
+        /*supported_tools=*/{},
         base::BindOnce(
             [](GetZeroStateSuggestionsForFocusedTabCallback callback,
                base::TimeTicks start,
@@ -835,6 +919,17 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
               std::move(callback).Run(std::move(suggestions));
             },
             std::move(callback), base::TimeTicks::Now()));
+  }
+
+  void MaybeRefreshUserStatus() override {
+    if (!base::FeatureList::IsEnabled(features::kGlicUserStatusCheck) ||
+        !features::kGlicUserStatusRefreshApi.Get()) {
+      receiver_.ReportBadMessage(
+          "Client should not call MaybeRefreshUserStatus without the "
+          "GlicUserStatusCheck feature enabled with the refresh API.");
+      return;
+    }
+    glic_service_->enabling().UpdateUserStatusWithThrottling();
   }
 
   void OnOsPermissionSettingChanged(ContentSettingsType content_type,
@@ -889,8 +984,7 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
       cached_focused_tab_data_ = CreateFocusedTabData(focused_tab_data);
       return;
     }
-    web_client_->NotifyFocusedTabChanged(
-        CreateFocusedTabData(focused_tab_data));
+    MaybeNotifyFocusedTabChanged(CreateFocusedTabData(focused_tab_data));
   }
 
   void OnFocusedTabDataChanged(const glic::mojom::TabData* tab_data) {
@@ -902,7 +996,7 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
           glic::mojom::FocusedTabData::NewFocusedTab(tab_data->Clone());
       return;
     }
-    web_client_->NotifyFocusedTabChanged(
+    MaybeNotifyFocusedTabChanged(
         glic::mojom::FocusedTabData::NewFocusedTab(tab_data->Clone()));
   }
 
@@ -915,6 +1009,19 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     return base::FeatureList::IsEnabled(
                features::kGlicGetUserProfileInfoApiActivationGating) &&
            !active_state_calculator_.IsActive();
+  }
+
+  void MaybeNotifyFocusedTabChanged(
+      glic::mojom::FocusedTabDataPtr focused_tab_data) {
+    if (debouncer_deduper_) {
+      debouncer_deduper_->HandleUpdate(std::move(focused_tab_data));
+      return;
+    }
+    NotifyWebClientFocusedTabChanged(std::move(focused_tab_data));
+  }
+
+  void NotifyWebClientFocusedTabChanged(glic::mojom::FocusedTabDataPtr data) {
+    web_client_->NotifyFocusedTabChanged(std::move(data));
   }
 
   glic::mojom::FocusedTabDataPtr cached_focused_tab_data_ = nullptr;
@@ -936,6 +1043,7 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   std::unique_ptr<system_permission_settings::ScopedObservation>
       system_permission_settings_observation_;
   std::vector<base::OnceClosure> on_get_user_profile_info_activation_callbacks_;
+  std::unique_ptr<DebouncerDeduper> debouncer_deduper_;
 };
 
 GlicPageHandler::GlicPageHandler(
@@ -1011,6 +1119,11 @@ content::RenderFrameHost* GlicPageHandler::GetGuestMainFrame() {
 
 void GlicPageHandler::ClosePanel() {
   GetGlicService()->ClosePanel();
+}
+
+void GlicPageHandler::OpenProfilePickerAndClosePanel() {
+  glic::GlicProfileManager::GetInstance()->ShowProfilePicker();
+  GetGlicService()->window_controller().Close();
 }
 
 void GlicPageHandler::SignInAndClosePanel() {

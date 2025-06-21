@@ -7,6 +7,7 @@
 
 #include <vector>
 
+#include "base/memory/raw_ptr.h"
 #include "build/build_config.h"
 #include "content/public/browser/page_navigator.h"
 
@@ -98,6 +99,9 @@ class BrowserWindowInterface : public content::PageNavigator {
   // The following methods will be removed in the future.
 
 #if !BUILDFLAG(IS_ANDROID)
+  // Returns nullptr if no browser window with the given session ID exists.
+  static BrowserWindowInterface* FromSessionID(const SessionID& session_id);
+
   // The contents of the active tab is rendered in a views::WebView. When the
   // active tab switches, the contents of the views::WebView is modified, but
   // the instance itself remains the same.
@@ -182,6 +186,7 @@ class BrowserWindowInterface : public content::PageNavigator {
   //   that is conceptually a BrowserWindowFeature and needs access to other
   //   BrowserWindowFeature.
   virtual BrowserWindowFeatures& GetFeatures() = 0;
+  virtual const BrowserWindowFeatures& GetFeatures() const = 0;
 
   // Returns the web contents modal dialog host pertaining to this
   // BrowserWindow.

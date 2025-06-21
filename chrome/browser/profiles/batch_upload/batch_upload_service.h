@@ -6,8 +6,10 @@
 #define CHROME_BROWSER_PROFILES_BATCH_UPLOAD_BATCH_UPLOAD_SERVICE_H_
 
 #include <memory>
+#include <vector>
 
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
 #include "base/timer/timer.h"
 #include "components/keyed_service/core/keyed_service.h"

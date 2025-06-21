@@ -253,19 +253,6 @@ std::optional<FeatureConfig> GetClientSideFeatureConfig(
     return config;
   }
 
-  if (kIPHExperimentalAIPromoFeature.name == feature->name) {
-    FeatureConfig config;
-    config.valid = true;
-    config.availability = Comparator(ANY, 0);
-    config.session_rate = Comparator(EQUAL, 0);
-    // Show the IPH once per year.
-    config.trigger = EventConfig("iph_experimental_ai_promo_trigger",
-                                 Comparator(EQUAL, 0), 360, 360);
-    config.used = EventConfig("iph_experimental_ai_promo_shown",
-                              Comparator(EQUAL, 0), 360, 360);
-    return config;
-  }
-
   if (kIPHBatterySaverModeFeature.name == feature->name) {
     // Show promo once a year when the battery saver toolbar icon is visible.
     FeatureConfig config;
@@ -1900,6 +1887,25 @@ std::optional<FeatureConfig> GetClientSideFeatureConfig(
                               feature_engagement::kMaxStoragePeriod);
     config.snooze_params.snooze_interval = 1;
     config.snooze_params.max_limit = 3;
+
+    return config;
+  }
+  if (kIPHAutofillEnableLoyaltyCardsFeature.name == feature->name) {
+    // A config that allows autofill loyalty card IPH to be shown
+    // only one time when the user first encounter the feature.
+    FeatureConfig config;
+    config.valid = true;
+    config.availability = Comparator(ANY, 0);
+    config.session_rate = Comparator(EQUAL, 0);
+    config.session_rate_impact.type = SessionRateImpact::Type::ALL;
+    config.trigger = EventConfig("keyboard_accessory_loyalty_cards_iph_trigger",
+                                 Comparator(LESS_THAN, 1),
+                                 feature_engagement::kMaxStoragePeriod,
+                                 feature_engagement::kMaxStoragePeriod);
+    config.used =
+        EventConfig("keyboard_accessory_loyalty_cards_autofilled",
+                    Comparator(EQUAL, 0), feature_engagement::kMaxStoragePeriod,
+                    feature_engagement::kMaxStoragePeriod);
 
     return config;
   }

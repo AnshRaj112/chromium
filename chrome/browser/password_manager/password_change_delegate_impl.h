@@ -8,6 +8,7 @@
 #include <string>
 
 #include "base/functional/callback_helpers.h"
+#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "base/time/time.h"
@@ -49,9 +50,6 @@ class PasswordChangeDelegateImpl : public PasswordChangeDelegate {
   PasswordChangeDelegateImpl& operator=(const PasswordChangeDelegateImpl&) =
       delete;
 
-  // Sets `kOfferingPasswordChange` state and triggers the leak check bubble.
-  void OfferPasswordChangeUi();
-
   base::WeakPtr<PasswordChangeDelegate> AsWeakPtr() override;
 
 #if defined(UNIT_TEST)
@@ -71,7 +69,6 @@ class PasswordChangeDelegateImpl : public PasswordChangeDelegate {
   bool IsPasswordChangeOngoing(content::WebContents* web_contents) override;
   State GetCurrentState() const override;
   void Stop() override;
-  void Restart() override;
   void OpenPasswordChangeTab() override;
   void OnPasswordFormSubmission(content::WebContents* web_contents) override;
   void OnOtpFieldDetected(content::WebContents* web_contents) override;
@@ -84,10 +81,6 @@ class PasswordChangeDelegateImpl : public PasswordChangeDelegate {
 
   void OnTabWillDetach(tabs::TabInterface* tab_interface,
                        tabs::TabInterface::DetachReason reason);
-
-  // Opens the tab for password change and start looking for change password
-  // form.
-  void StartPasswordChange();
 
   // Updates `current_state_` and notifies `observers_`.
   void UpdateState(State new_state);

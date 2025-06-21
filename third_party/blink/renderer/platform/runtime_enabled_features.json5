@@ -1137,6 +1137,11 @@
       status: "stable",
     },
     {
+      // Let transforms affect anchor() and anchor-size() functions.
+      name: "CSSAnchorWithTransforms",
+      status: "experimental",
+    },
+    {
       // Whether <image> values are allowed as counter style <symbol>
       name: "CSSAtRuleCounterStyleImageSymbols",
     },
@@ -1216,7 +1221,13 @@
     {
       // https://drafts.csswg.org/css-borders-4/#corner-shaping
       name: "CSSCornerShape",
+      status: "stable",
+    },
+    {
+      // https://drafts.csswg.org/css-borders-4/#corner-shaping
+      name: "CSSCornersShorthand",
       status: "experimental",
+      depends_on: ["CSSCornerShape"],
     },
     {
       // Unprefixed cross-fade() (in addition to the existing -webkit-cross-fade()).
@@ -1305,12 +1316,24 @@
       status: "stable",
     },
     {
+      // Support for the interest-delay shorthand property.
+      // The longhands are controlled by HTMLInterestForAttribute. The
+      // shorthand is controlled separately since shorthands can not be enabled
+      // by an origin trial.
+      name: "CSSInterestDelayShorthand",
+      status: "experimental",
+    },
+    {
       // https://chromestatus.com/feature/6289894144212992
       name: "CSSKeyframesRuleLength",
       status: "stable",
     },
     {
       name: "CSSLayoutAPI",
+      status: "experimental",
+    },
+    {
+      name: "CSSLetterSpacingPercentage",
       status: "experimental",
     },
     {
@@ -1373,7 +1396,7 @@
       status: "stable",
     },
     {
-      // For ::column pseudo element for fragment styling.
+      // For ::column pseudo-element for fragment styling.
       // https://github.com/flackr/carousel/blob/main/fragmentation/README.md
       name: "CSSPseudoColumn",
       status: "stable",
@@ -1398,14 +1421,14 @@
       status: "test",
     },
     {
-      // For ::scroll-up-button and ::scroll-down-button pseudo elements for Carousel.
+      // For ::scroll-up-button and ::scroll-down-button pseudo-elements for Carousel.
       // https://github.com/flackr/carousel/tree/main/scroll-button
       name: "CSSPseudoScrollButtons",
       status: "stable",
       depends_on: ["PseudoElementsFocusable"],
     },
     {
-      // For ::scroll-marker and ::scroll-marker-group pseudo elements for Carousel.
+      // For ::scroll-marker and ::scroll-marker-group pseudo-elements for Carousel.
       // https://github.com/flackr/carousel/tree/main/scroll-marker
       name: "CSSPseudoScrollMarkers",
       status: "stable",
@@ -1826,12 +1849,6 @@
       name: "DisplayCutoutAPI",
       base_feature: "none",
       public: true,
-    },
-    {
-      // Scale very large height and width of HTML Element
-      // to allow DnD.
-      name: "DnDScaleHeightAndWidthToMaxDimension",
-      status: "stable",
     },
     {
       name: "DocumentCookie",
@@ -2395,6 +2412,11 @@
       name: "FontFamilyStyleMatchingCTMigration",
     },
     {
+      // crbug.com/40398871
+      name: "FontFeatureSettingsDescriptor",
+      status: "experimental",
+    },
+    {
       name: "FontPresentWin",
       status: "stable",
     },
@@ -2780,7 +2802,7 @@
     },
     {
       name: "InstallOnDeviceSpeechRecognition",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "IntegrityPolicyScript",
@@ -2904,6 +2926,10 @@
       status: "stable",
     },
     {
+      name: "LayoutNewReplacedLogic",
+      status: "stable",
+    },
+    {
       name: "LayoutNGShapeCache",
       status: "stable",
       base_feature: "LayoutNGShapeCache",
@@ -3002,6 +3028,10 @@
     },
     {
       name: "MacCharacterFallbackCache",
+      status: "stable",
+    },
+    {
+      name: "MacDisableCtrlHomeEnd",
       status: "stable",
     },
     {
@@ -3226,6 +3256,7 @@
       name: "NavigationId",
       status: "experimental",
       origin_trial_feature_name: "SoftNavigationHeuristics",
+      implied_by: ["SoftNavigationHeuristics"],
     },
     {
       name: "NavigatorContentUtils",
@@ -3255,11 +3286,6 @@
       // on delegatesFocus shadow hosts. This flag can be removed in M127 if
       // things are stable.
       name: "NewGetFocusableAreaBehavior",
-      status: "stable",
-    },
-    {
-      // crbug.com/380107555
-      name: "NodeInUAShadowRootUnderAnonymousBlockFlow",
       status: "stable",
     },
     {
@@ -3322,6 +3348,10 @@
       base_feature: "none",
     },
     {
+      name: "NumberInputFullWidthChars",
+      status: "stable",
+    },
+    {
       name: "ObservableAPI",
       status: "stable",
       public: true,
@@ -3344,7 +3374,7 @@
     },
     {
       name: "OnDeviceWebSpeechAvailable",
-      status: "experimental",
+      status: "stable",
     },
     {
       // This flag makes the <option> element's label attribute render the
@@ -3682,7 +3712,7 @@
       public: true,
     },
     // Adds a web setting to disable CSS ScrollbarColor, ScrollbarWidth, and
-    // legacy ::-webkit-scrollbar* pseudo element styling.
+    // legacy ::-webkit-scrollbar* pseudo-element styling.
     {
       name: "PreferDefaultScrollbarStyles",
     },
@@ -3830,7 +3860,7 @@
       is_protected_feature: "true",
     },
     {
-      // Allowing pseudo elements to have focus.
+      // Allowing pseudo-elements to have focus.
       name: "PseudoElementsFocusable",
       status: "stable",
     },
@@ -3972,6 +4002,13 @@
         "default": "experimental"},
     },
     {
+      // This feature acts as a kill switch for ISO-2022-JP auto-detection.
+      // This will be shipped in M139, and it can be removed in M141.
+      // See https://chromestatus.com/feature/6576566521561088.
+      name: "RemoveCharsetAutoDetectionForISO2022JP",
+      status: "stable",
+    },
+    {
       name: "RemoveDanglingMarkupInTarget",
       status: "stable",
     },
@@ -4047,6 +4084,10 @@
     {
       name: "ResourceTimingFinalResponseHeadersStart",
       status: "stable",
+    },
+    {
+      name: "ResourceTimingInitiator",
+      status: "experimental",
     },
     {
       name: "ResourceTimingUseCORSForBodySizes",
@@ -4206,7 +4247,6 @@
       // https://github.com/whatwg/html/pull/10869
       // https://github.com/whatwg/dom/pull/1341
       name: "ScopedCustomElementRegistry",
-      status: "experimental",
     },
     {
       // https://github.com/WICG/view-transitions/blob/main/scoped-transitions.md
@@ -4242,7 +4282,7 @@
     },
     {
       name: "ScrollAnchorPriorityCandidateSubtree",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "ScrollbarColor",
@@ -4631,6 +4671,10 @@
       depends_on: ["SoftNavigationDetection"],
     },
     {
+      name: "SoftNavigationDetectionPrePaintBasedAttribution",
+      depends_on: ["SoftNavigationDetection"],
+    },
+    {
       name: "SoftNavigationHeuristics",
       status: "experimental",
       origin_trial_allows_third_party: true,
@@ -4760,6 +4804,10 @@
     {
       name: "SvgTransformOnNestedSvgElement",
       status: "stable",
+    },
+    {
+      name: "SvgUseInstancesAttributeSync",
+      status: "stable"
     },
     {
       name: "SynthesizedKeyboardEventsForAccessibilityActions",
@@ -5043,6 +5091,13 @@
       public: true,
     },
     {
+      // Traverse flat tree to find start and end of paragraph in delete
+      // selection to handle slot distribution in details.
+      // See https://crbug.com/413595949
+      name: "TraverseFlatTreeToHandleSlots",
+      status: "stable",
+    },
+    {
       // Ensures symbols are treated as word boundaries during traversal.
       // See https://crbug.com/40252642
       name: "TreatSymbolsAsWordBoundary",
@@ -5175,6 +5230,11 @@
       status: "stable",
     },
     {
+      // Fix for https://crbug.com/421314614
+      name: "UseSelectionInDOMTreeAnchorInExtendSelection",
+      status: "stable"
+    },
+    {
       name: "UseShadowHostStyleCheckEditable",
       status: "stable",
     },
@@ -5198,6 +5258,10 @@
       // This is a performance improvement which has slight visual differences.
       // Enabled in M137. http://crbug.com/334963179
       name: "ValidationBubbleNoForcedLayout",
+      status: "stable",
+    },
+    {
+      name: "VideoAspectRatioNaturalDimension",
       status: "stable",
     },
     {
@@ -5350,14 +5414,6 @@
     {
       name: "WebAuthAuthenticatorAttachment",
       status: "test",
-    },
-    // Aligns the error thrown by navigator.credentials.create in a
-    // cross-origin iframe with no user activation to be correct to the
-    // webauthn spec whether or not the 'payment' extension is specified. See
-    // https://crbug.com/41484826
-    {
-      name: "WebAuthenticationAlignErrorTypeForPaymentCredentialCreate",
-      status: "stable",
     },
     // Prototyping https://github.com/w3c/webauthn/issues/2144
     {
@@ -5587,7 +5643,7 @@
     {
       name: "WebNFC",
       public: true,
-      status: {"Android": "stable", "default": "test"},
+      status: {"Android": "stable", "iOS": "stable", "default": "test"},
       base_feature: "none",
     },
     {

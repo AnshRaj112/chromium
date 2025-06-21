@@ -41,7 +41,6 @@
 #import "components/feature_engagement/public/feature_list.h"
 #import "components/feed/feed_feature_list.h"
 #import "components/history/core/browser/features.h"
-#import "components/invalidation/impl/invalidation_switches.h"
 #import "components/ntp_tiles/features.h"
 #import "components/ntp_tiles/switches.h"
 #import "components/omnibox/browser/omnibox_field_trial.h"
@@ -141,6 +140,29 @@ const FeatureEntry::Choice
         {"200", signin::kWaitThresholdMillisecondsForCapabilitiesApi, "200"},
         {"500", signin::kWaitThresholdMillisecondsForCapabilitiesApi, "500"},
         {"5000", signin::kWaitThresholdMillisecondsForCapabilitiesApi, "5000"},
+};
+
+const FeatureEntry::FeatureParam
+    kNTPMIAEntrypointOmniboxContainedSingleButton[] = {
+        {kNTPMIAEntrypointParam,
+         kNTPMIAEntrypointParamOmniboxContainedSingleButton}};
+const FeatureEntry::FeatureParam kNTPMIAEntrypointOmniboxContainedInline[] = {
+    {kNTPMIAEntrypointParam, kNTPMIAEntrypointParamOmniboxContainedInline}};
+const FeatureEntry::FeatureParam
+    kNTPMIAEntrypointOmniboxContainedEnlargedFakebox[] = {
+        {kNTPMIAEntrypointParam,
+         kNTPMIAEntrypointParamOmniboxContainedEnlargedFakebox}};
+
+const FeatureEntry::FeatureVariation kNTPMIAEntrypointVariations[] = {
+    {"A: Contained in Omnibox, single button",
+     kNTPMIAEntrypointOmniboxContainedSingleButton,
+     std::size(kNTPMIAEntrypointOmniboxContainedSingleButton), nullptr},
+    {"B: Contained in Omnibox, inline with Voice and Lens",
+     kNTPMIAEntrypointOmniboxContainedInline,
+     std::size(kNTPMIAEntrypointOmniboxContainedInline), nullptr},
+    {"C: Contained in Omnibox, enlarged fakebox",
+     kNTPMIAEntrypointOmniboxContainedEnlargedFakebox,
+     std::size(kNTPMIAEntrypointOmniboxContainedEnlargedFakebox), nullptr},
 };
 
 const FeatureEntry::FeatureParam kOmniboxUIMaxAutocompleteMatches3[] = {
@@ -999,24 +1021,6 @@ const FeatureEntry::FeatureVariation kIOSSoftLockVariations[] = {
     {" - No delay", kIOSSoftLockNoDelay, std::size(kIOSSoftLockNoDelay),
      nullptr}};
 
-// Ipad ZPS limit.
-const FeatureEntry::FeatureParam kIpadZPSOmniboxWith20Total0Trends[] = {
-    {OmniboxFieldTrial::kIpadAdditionalTrendingQueries.name, "0"},
-    {OmniboxFieldTrial::kIpadZPSLimit.name, "20"},
-};
-
-const FeatureEntry::FeatureParam kIpadZPSOmniboxWith20Total5Trends[] = {
-    {OmniboxFieldTrial::kIpadAdditionalTrendingQueries.name, "5"},
-    {OmniboxFieldTrial::kIpadZPSLimit.name, "20"},
-};
-
-constexpr FeatureEntry::FeatureVariation kIpadZpsLimitVariants[] = {
-    {"20 total zps, 0 Trends on NTP", kIpadZPSOmniboxWith20Total0Trends,
-     std::size(kIpadZPSOmniboxWith20Total0Trends), nullptr},
-    {"20 total zps, 5 Trends on NTP", kIpadZPSOmniboxWith20Total5Trends,
-     std::size(kIpadZPSOmniboxWith20Total0Trends), nullptr},
-};
-
 const FeatureEntry::FeatureParam
     kIOSStartTimeStartupRemediationsSaveNTPWebStateArm[] = {
         {kIOSStartTimeStartupRemediationsSaveNTPWebState, "true"},
@@ -1398,6 +1402,14 @@ const FeatureEntry::FeatureVariation kOmniboxMobileParityVariations[] = {
      kOmniboxMobileParityEnableFeedForGoogleOnly,
      std::size(kOmniboxMobileParityEnableFeedForGoogleOnly), nullptr}};
 
+const FeatureEntry::FeatureParam kPageActionMenuDirectEntryPoint[] = {
+    {kPageActionMenuDirectEntryPointParam, "true"},
+};
+const FeatureEntry::FeatureVariation kPageActionMenuVariations[] = {
+    {"Direct Entry Point", kPageActionMenuDirectEntryPoint,
+     std::size(kPageActionMenuDirectEntryPoint), nullptr},
+};
+
 // To add a new entry, add to the end of kFeatureEntries. There are four
 // distinct types of entries:
 // . ENABLE_DISABLE_VALUE: entry is either enabled, disabled, or uses the
@@ -1491,13 +1503,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
     {"webpage-text-zoom-ipad", flag_descriptions::kWebPageTextZoomIPadName,
      flag_descriptions::kWebPageTextZoomIPadDescription, flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(web::kWebPageTextZoomIPad)},
-    {"omnibox-ipad-zps-limit",
-     flag_descriptions::kIpadZpsSuggestionMatchesLimitName,
-     flag_descriptions::kIpadZpsSuggestionMatchesLimitDescription,
-     flags_ui::kOsIos,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(omnibox::kIpadZeroSuggestMatches,
-                                    kIpadZpsLimitVariants,
-                                    "OmniboxBundledExperimentV1")},
     {"omnibox-ui-max-autocomplete-matches",
      flag_descriptions::kOmniboxUIMaxAutocompleteMatchesName,
      flag_descriptions::kOmniboxUIMaxAutocompleteMatchesDescription,
@@ -1535,12 +1540,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kScreenTimeIntegrationDescription, flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(kScreenTimeIntegration)},
 #endif
-    {"ios-enable-delete-all-saved-credentials",
-     flag_descriptions::kIOSEnableDeleteAllSavedCredentialsName,
-     flag_descriptions::kIOSEnableDeleteAllSavedCredentialsDescription,
-     flags_ui::kOsIos,
-     FEATURE_VALUE_TYPE(
-         password_manager::features::kIOSEnableDeleteAllSavedCredentials)},
     {"ios-shared-highlighting-color-change",
      flag_descriptions::kIOSSharedHighlightingColorChangeName,
      flag_descriptions::kIOSSharedHighlightingColorChangeDescription,
@@ -2342,10 +2341,6 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kLensClearcutBackgroundUploadEnabledDescription,
      flags_ui::kOsIos,
      FEATURE_VALUE_TYPE(kLensClearcutBackgroundUploadEnabled)},
-    {"lens-clearcut-logger-fast-qos-enabled",
-     flag_descriptions::kLensClearcutLoggerFastQosEnabledName,
-     flag_descriptions::kLensClearcutLoggerFastQosEnabledDescription,
-     flags_ui::kOsIos, FEATURE_VALUE_TYPE(kLensClearcutLoggerFastQosEnabled)},
     {"set-up-list-shortened-duration",
      flag_descriptions::kSetUpListShortenedDurationName,
      flag_descriptions::kSetUpListShortenedDurationDescription,
@@ -2540,6 +2535,11 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kNotificationCollisionManagementName,
      flag_descriptions::kNotificationCollisionManagementDescription,
      flags_ui::kOsIos, FEATURE_VALUE_TYPE(kNotificationCollisionManagement)},
+    {"ntp-mia-entrypoint", flag_descriptions::kNTPMIAEntrypointName,
+     flag_descriptions::kNTPMIAEntrypointDescription, flags_ui::kOsIos,
+     FEATURE_WITH_PARAMS_VALUE_TYPE(kNTPMIAEntrypoint,
+                                    kNTPMIAEntrypointVariations,
+                                    "kNTPMIAEntrypoint")},
     {"ios-one-tap-mini-map-remove-section-breaks",
      flag_descriptions::kIOSOneTapMiniMapRemoveSectionBreaksName,
      flag_descriptions::kIOSOneTapMiniMapRemoveSectionBreaksDescription,
@@ -2557,7 +2557,9 @@ const flags_ui::FeatureEntry kFeatureEntries[] = {
      flags_ui::kOsIos, FEATURE_VALUE_TYPE(kLensOverlayNavigationHistory)},
     {"page-action-menu", flag_descriptions::kPageActionMenuName,
      flag_descriptions::kPageActionMenuDescription, flags_ui::kOsIos,
-     FEATURE_VALUE_TYPE(kPageActionMenu)},
+     FEATURE_WITH_PARAMS_VALUE_TYPE(kPageActionMenu,
+                                    kPageActionMenuVariations,
+                                    "IOSPageActionMenu")},
     {"bwg-promo-consent", flag_descriptions::kBWGPromoConsentName,
      flag_descriptions::kBWGPromoConsentDescription, flags_ui::kOsIos,
      FEATURE_WITH_PARAMS_VALUE_TYPE(kBWGPromoConsent,

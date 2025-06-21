@@ -514,9 +514,10 @@ void ServiceWorkerGlobalScope::Initialize(
   // TODO(nhiroki): Clarify mappings between the steps 4.8-4.11 and
   // implementation.
 
-  pending_prepare_for_evaluation_ = true;
-  if (!pause_evaluation_) {
-    PrepareForEvaluationIfNeeded();
+  // This should be called after OriginTrialContext::AddTokens() to install
+  // origin trial features in JavaScript's global object.
+  if (!defer_prepare_for_evaluation_) {
+    ScriptController()->PrepareForEvaluation();
   }
 }
 
@@ -1714,10 +1715,8 @@ void ServiceWorkerGlobalScope::InitializeGlobalScope(
   ancestor_frame_type_ = ancestor_frame_type;
 
   global_scope_initialized_ = true;
-  if (!pause_evaluation_) {
-    PrepareForEvaluationIfNeeded();
+  if (!pause_evaluation_)
     ReadyToRunWorkerScript();
-  }
 
   storage_key_ = storage_key;
 }
@@ -1733,10 +1732,23 @@ void ServiceWorkerGlobalScope::ResumeEvaluation() {
   DCHECK(IsContextThread());
   DCHECK(pause_evaluation_);
   pause_evaluation_ = false;
-  if (global_scope_initialized_) {
-    PrepareForEvaluationIfNeeded();
+  if (global_scope_initialized_)
     ReadyToRunWorkerScript();
-  }
+}
+
+void ServiceWorkerGlobalScope::DeferPrepareForEvaluation() {
+  DCHECK(IsContextThread());
+  CHECK(!defer_prepare_for_evaluation_);
+
+  defer_prepare_for_evaluation_ = true;
+}
+
+void ServiceWorkerGlobalScope::RunDeferredPrepareForEvaluation() {
+  DCHECK(IsContextThread());
+  CHECK(defer_prepare_for_evaluation_);
+
+  defer_prepare_for_evaluation_ = false;
+  ScriptController()->PrepareForEvaluation();
 }
 
 void ServiceWorkerGlobalScope::DispatchInstallEvent(
@@ -2826,22 +2838,6 @@ void ServiceWorkerGlobalScope::RemoveItemFromRaceNetworkRequests(
   if (info) {
     race_network_requests_.erase(info->token);
   }
-}
-
-void ServiceWorkerGlobalScope::PrepareForEvaluationIfNeeded() {
-  DCHECK(!pause_evaluation_);
-
-  if (!pending_prepare_for_evaluation_) {
-    return;
-  }
-  pending_prepare_for_evaluation_ = false;
-
-  // Allows `ContextFeatureSettings` to update before preparing script engine.
-  ReportingProxy().WillPrepareForEvaluation();
-
-  // This should be called after OriginTrialContext::AddTokens() to install
-  // origin trial features in JavaScript's global object.
-  ScriptController()->PrepareForEvaluation();
 }
 
 }  // namespace blink

@@ -147,6 +147,12 @@
       <message name="IDS_IOS_ACCNAME_LENS" desc="The accessibility label for the Lens visual search button in the location bar [Length: unlimited]">
         Lens visual search
       </message>
+      <message name="IDS_IOS_ACCNAME_MIA" desc="The accessibility label for the AI Mode search button on the new tab page [Length: unlimited]">
+        Ask AI mode
+      </message>
+      <message name="IDS_IOS_ACCNAME_NEW_INCOGNITO_TAB" desc="The accessibility label for the new incognito tab button on the new tab page [Length: unlimited]">
+        New incognito tab
+      </message>
       <message name="IDS_IOS_ACCNAME_RELOAD" desc="The accessibility label for the reload button [Length: unlimited] [iOS only]">
         Reload
       </message>
@@ -3071,6 +3077,21 @@ See your search engine’s instructions for deleting your search history, if app
       <message name="IDS_IOS_INTENTS_URL_PARAMETER" desc="The URL the user would like to pass as input parameter to Shortcuts that require a URL as input [iOS only].">
         URL
       </message>
+      <message name="IDS_IOS_INTERACTIVE_LENS_OVERLAY_PROMO_BUBBLE_TEXT" desc="The text for the IPH bubble in interactive lens overlay promo in the First Run Experience.">
+        Try circling or tapping the picture to search
+      </message>
+      <message name="IDS_IOS_INTERACTIVE_LENS_OVERLAY_PROMO_SKIP_BUTTON" desc="The text for the button that allows users to skip the interactive lens overlay promo in the First Run Experience.">
+        Skip
+      </message>
+      <message name="IDS_IOS_INTERACTIVE_LENS_OVERLAY_PROMO_START_BROWSING_BUTTON" desc="The text for the button that allows users to start browsing after the interactive lens overlay promo in the First Run Experience.">
+        Start browsing
+      </message>
+      <message name="IDS_IOS_INTERACTIVE_LENS_OVERLAY_PROMO_SUBTITLE" desc="The subtitle for the interactive lens overlay promo in the First Run Experience.">
+        You can now open Google Lens from your address bar and search anything you see
+      </message>
+      <message name="IDS_IOS_INTERACTIVE_LENS_OVERLAY_PROMO_TITLE" desc="The title for the interactive lens overlay promo in the First Run Experience.">
+        Search anything on your screen
+      </message>
       <message name="IDS_IOS_IPH_BUBBLE_GOT_IT" desc="Label of a button that appears in an in-product help Tip. Pressing this button will dismiss the last Tip.">
         Got it
       </message>
@@ -5195,6 +5216,12 @@ While in Incognito, sites can't use cookies to see your browsing activity across
       </message>
       <message name="IDS_IOS_REVIEWS_OMNIBOX_ACTION_ACCESSIBILITY_LABEL" desc="The accessibility label for the Reviews suggestion action button  [iOS only]">
         Read customer evaluations of products, services, or experience to help inform your decisions with reviews
+      </message>
+      <message name="IDS_IOS_SAFARI_IMPORT_ENTRY_POINT_SECONDARY_ACTION" desc="Safari import entry point screen - Button text to create a reminder to import data from Safari. [iOS only]">
+        Remind me later
+      </message>
+      <message name="IDS_IOS_SAFARI_IMPORT_ENTRY_POINT_TITLE" desc="Safari import entry point screen - Title.">
+        Bring your data from Safari
       </message>
       <message name="IDS_IOS_SAFETY_CHECK_COMPACT_DESCRIPTION_COMPROMISED_PASSWORD" desc="Tag label description displayed for the Safety Check module in the Magic Stack when the Password check finds a compromised password issue. [iOS only]">
         You have compromised passwords.

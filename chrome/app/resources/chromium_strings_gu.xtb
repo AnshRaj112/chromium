@@ -222,6 +222,7 @@
 <translation id="3954172517175569325">તમે તમારા Google એકાઉન્ટમાં સાચવેલા તમારા પાસવર્ડ, ચુકવણી પદ્ધતિઓ અને સરનામા આ ડિવાઇસમાંથી કાઢી નાખવામાં આવશે. Chromiumમાં તેનો ફરીથી ઉપયોગ કરવા માટે, પાછું સાઇન ઇન કરો.</translation>
 <translation id="395904275706073188">સંરક્ષિત પેજ વાંચી શકાતા નથી. કોઈ અલગ પેજ અજમાવી જુઓ.</translation>
 <translation id="3962647064319009959">Chromiumની તમને સલામત રાખવાની રીત વિશે જાણો</translation>
+<translation id="3971865010372729242">તમે જ્યારે ઍડ્રેસ બાર અથવા શોધ બૉક્સમાં ટાઇપ કરો છો, ત્યારે સૂચનો મેળવવા માટે Chromium તમે જે ટાઇપ કરો છો તેને તમારી સંસ્થાના શોધ, AI અને એજન્ટ ટૂલ પર મોકલે છે.</translation>
 <translation id="3975724895399328945">Google Chrome for Testing વિશે</translation>
 <translation id="3997429360543082038">ChromiumOS વિશે</translation>
 <translation id="4019629340646866719"><ph name="BEGIN_LINK_LINUX_OSS" />Linux ડેવલપમેન્ટ એન્વાયરમેન્ટ<ph name="END_LINK_LINUX_OSS" />ની જેમ, ChromiumOSને વધારાના <ph name="BEGIN_LINK_CROS_OSS" />ઓપન સૉર્સ સૉફ્ટવેર<ph name="END_LINK_CROS_OSS" /> દ્વારા શક્ય બનાવવામાં આવ્યું છે.</translation>
@@ -248,6 +249,7 @@
 <translation id="4281844954008187215">સેવાની શરતો</translation>
 <translation id="4285930937574705105">અમઉલ્લેખિત ભૂલને કારણે ઇન્સ્ટોલેશન નિષ્ફળ થયું. જો Chromium હાલમાં ચાલી રહ્યું હોય, તો તેને બંધ કરો અને ફરી પ્રયાસ કરો.</translation>
 <translation id="4304713468139749426">પાસવર્ડ મેનેજર</translation>
+<translation id="4334241893986177674">આ સ્ક્રીનશૉટ શોધો</translation>
 <translation id="4334294535648607276">ડાઉનલોડ પૂર્ણ.</translation>
 <translation id="439358628917130594"><ph name="MANAGER" /> માટે જરૂરી છે કે તમે આ ડિવાઇસનો ઉપયોગ કરતા પહેલાં નીચે આપેલી સેવાની શરતો વાંચો અને તેને સ્વીકારો. આ શરતો ChromiumOSની શરતોમાં વધારો કરતી નથી, તેમાં ફેરફાર કરતી નથી અથવા તેને મર્યાદિત કરતી નથી.</translation>
 <translation id="4407044323746248786">છતાં પણ Chromiumમાંથી બહાર નિકળવું છે?</translation>
@@ -344,6 +346,7 @@
 <translation id="5775198138441669627">જો તમે તમારો પાસફ્રેઝ ભૂલી ગયા હો અથવા આ સેટિંગ બદલવા માગતા હો, તો તમારા એકાઉન્ટમાંનો Chromiumનો ડેટા <ph name="SETTINGS_LINK" /></translation>
 <translation id="5800158606660203929">Chromiumને કસ્ટમાઇઝ અને તેનું નિયંત્રણ કરો. Chromiumને તમારા ડિફૉલ્ટ બ્રાઉઝર તરીકે સેટ કરો.</translation>
 <translation id="5809516625706423866">ઇન્ટરનેટ સાથે કનેક્ટ કરી શકતા નથી. HTTP 401 અનધિકૃત. કૃપા કરીને તમારું પ્રૉક્સી કન્ફિગ્યુરેશન ચેક કરો.</translation>
+<translation id="5817952762723416573">Chromiumના V8 એન્જિન વડે સાઇટની ગતિ વધારે છે પરંતુ Chromiumને અટૅક સામે થોડું ઓછું પ્રતિરોધક બનાવે છે. આ સેટિંગ બંધ છે.</translation>
 <translation id="5821520528363214608">તમારા Google એકાઉન્ટમાં Chromiumના ડેટાનો ઉપયોગ કરવા અને તેને સાચવવા માટે, Chromium અપડેટ કરો</translation>
 <translation id="5824893331272123205">આ પૅનલ લોડ કરી શકાઇ નથી, ફરી પ્રયાસ કરો</translation>
 <translation id="5862307444128926510">Chromium માં સ્વાગત છે</translation>
@@ -433,6 +436,7 @@
 <translation id="6729124504294600478">મનગમતું બનાવવાની અને અન્ય સુવિધાઓ મેળવવા માટે, Chromiumનો વેબ અને ઍપ ઍક્ટિવિટી અને લિંક કરેલી Google સેવાઓમાં સમાવેશ કરો</translation>
 <translation id="6734291798041940871">Chromium, તમારા કમ્પ્યુટર પર તમામ વપરાશકર્તાઓ માટે પહેલાંથી ઇન્સ્ટૉલ કરેલ છે.</translation>
 <translation id="674245979920622322">તમે તાજેતરમાં આ સાઇટની મુલાકાત લીધી નથી. Chromium દ્વારા <ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> અને <ph name="COUNT" />ની પરવાનગીઓ કાઢી નાખવામાં આવી</translation>
+<translation id="6751374565094704799">Chromiumના V8 એન્જિન વડે સાઇટની ગતિ વધારે છે પરંતુ Chromiumને અટૅક સામે થોડું ઓછું પ્રતિરોધક બનાવે છે. આ સેટિંગ ચાલુ છે.</translation>
 <translation id="67706546131546258">Chromium આ ફાઇલને સ્કૅન કરવાનો સુઝાવ આપે છે, કારણ કે તે જોખમકારક હોઈ શકે છે.</translation>
 <translation id="6779406956731413166">ChromiumOSને વધારાના <ph name="BEGIN_LINK_CROS_OSS" />ઓપન સૉર્સ સૉફ્ટવેર<ph name="END_LINK_CROS_OSS" /> દ્વારા શક્ય બનાવવામાં આવ્યું છે.</translation>
 <translation id="6831043979455480757">અનુવાદ કરો</translation>

@@ -34,11 +34,23 @@ class FakeCanvasResourceHost : public CanvasResourceHost {
   void SetIsHibernating(bool is_hibernating) {
     is_hibernating_ = is_hibernating;
   }
+
+  CanvasResourceProvider* GetResourceProviderForCanvas2D() const override {
+    return resource_provider_.get();
+  }
+  std::unique_ptr<CanvasResourceProvider> ReplaceResourceProviderForCanvas2D(
+      std::unique_ptr<CanvasResourceProvider> provider) override {
+    auto old_provider = std::move(resource_provider_);
+    resource_provider_ = std::move(provider);
+    return old_provider;
+  }
+
   size_t GetMemoryUsage() const override { return 0; }
   CanvasResourceProvider* GetOrCreateCanvasResourceProviderForCanvas2D()
       override {
-    if (ResourceProvider())
-      return ResourceProvider();
+    if (GetResourceProviderForCanvas2D()) {
+      return GetResourceProviderForCanvas2D();
+    }
     constexpr auto kShouldInitialize =
         CanvasResourceProvider::ShouldInitialize::kCallClear;
     std::unique_ptr<CanvasResourceProvider> provider;
@@ -62,9 +74,9 @@ class FakeCanvasResourceHost : public CanvasResourceHost {
           gfx::ColorSpace::CreateSRGB(), kShouldInitialize, this);
     }
 
-    ReplaceResourceProvider(std::move(provider));
+    resource_provider_ = std::move(provider);
 
-    return ResourceProvider();
+    return GetResourceProviderForCanvas2D();
   }
 
   void SetPageVisible(bool visible) {
@@ -75,6 +87,7 @@ class FakeCanvasResourceHost : public CanvasResourceHost {
   }
 
  private:
+  std::unique_ptr<CanvasResourceProvider> resource_provider_;
   bool page_visible_ = true;
   bool is_hibernating_ = false;
 };

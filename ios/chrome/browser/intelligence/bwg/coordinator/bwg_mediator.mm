@@ -7,6 +7,7 @@
 #import <memory>
 
 #import "base/metrics/histogram_functions.h"
+#import "base/strings/sys_string_conversions.h"
 #import "components/prefs/pref_service.h"
 #import "ios/chrome/browser/intelligence/bwg/coordinator/bwg_mediator_delegate.h"
 #import "ios/chrome/browser/intelligence/bwg/metrics/bwg_metrics.h"
@@ -17,6 +18,10 @@
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/model/web_state_list/web_state_list.h"
+#import "ios/chrome/browser/shared/public/commands/application_commands.h"
+#import "ios/chrome/browser/shared/public/commands/command_dispatcher.h"
+#import "ios/chrome/browser/shared/public/commands/open_new_tab_command.h"
+#import "url/gurl.h"
 
 @interface BWGMediator ()
 
@@ -91,6 +96,13 @@
   [_delegate dismissBWGFlow];
 }
 
+// Open a new tab page given a URL.
+- (void)openNewTabWithURL:(const GURL&)URL {
+  OpenNewTabCommand* command = [OpenNewTabCommand commandWithURLFromChrome:URL];
+  [HandlerForProtocol(_browser->GetCommandDispatcher(), ApplicationCommands)
+      openURLInNewTab:command];
+}
+
 #pragma mark - Private
 
 // Prepares BWG overlay.
@@ -102,13 +114,15 @@
 
   // Configure the callback to be executed once the page context is ready.
   __weak __typeof(self) weakSelf = self;
-  base::OnceCallback<void(
-      std::unique_ptr<optimization_guide::proto::PageContext>)>
-      page_context_completion_callback = base::BindOnce(
-          ^void(std::unique_ptr<optimization_guide::proto::PageContext>
-                    page_context) {
+  base::OnceCallback<void(PageContextWrapperCallbackResponse)>
+      page_context_completion_callback =
+          base::BindOnce(^void(PageContextWrapperCallbackResponse response) {
             BWGMediator* strongSelf = weakSelf;
-            [strongSelf openBWGOverlayForPage:std::move(page_context)];
+            // TODO(crbug.com/422506000): Handle PageContextWrapper error
+            // states, and pipe them down.
+            if (response.has_value()) {
+              [strongSelf openBWGOverlayForPage:std::move(response.value())];
+            }
             strongSelf->_pageContextWrapper = nil;
           });
 

@@ -106,6 +106,7 @@
       如果您未设置此政策，系统将会使用默认的个人资料目录。</translation>
 <translation id="1053981429146436598">一组与专用网络请求设置相关的政策。请参阅 https://wicg.github.io/private-network-access/。</translation>
 <translation id="1059069692400941670">禁止在首次运行时导入默认搜索引擎</translation>
+<translation id="1060020040574767394">配置自定义水印设置</translation>
 <translation id="1062011392452772310">为设备启用远程认证</translation>
 <translation id="1062407476771304334">替换</translation>
 <translation id="1063860513136880926">启用此政策会禁止使用键盘快捷键或扩展程序 API 截屏。停用或不设置此政策则会允许截屏。
@@ -491,6 +492,7 @@
 <translation id="1379689277107868399">如果此政策设为 DoNotPrompt 或未设置，<ph name="PRODUCT_NAME" /> 不会自动提示用户重新向浏览器验证身份。
 
 如果此政策设为 PromptInTab，当用户的身份验证到期时，系统会立即在新标签页中打开 Google 登录页面。这种情况仅发生于使用 <ph name="CHROME_SYNC_NAME" />时。</translation>
+<translation id="1384040387986918863">水印文字的填充不透明度，范围为 0（透明）到 100（不透明）。</translation>
 <translation id="1384459581748403878">参考页面：<ph name="REFERENCE_URL" /></translation>
 <translation id="1384594066274112751">此政策旨在确保与其指定（使用 <ph name="URL_BLOCKLIST_POLICY_NAME" /> 过滤器格式）的一个或多个格式匹配的任何网址都绝不会被浏览器舍弃。
       这适用于内存压力和高效率模式舍弃。
@@ -504,11 +506,6 @@
       如果此政策已停用，用户将无法通过 <ph name="PRODUCT_NAME" /> 的打印对话框使用 <ph name="CLOUD_PRINT_NAME" />进行打印。
 
       若要使 <ph name="CLOUD_PRINT_NAME" />目的地能被用户发现，则必须确保此政策已启用且 <ph name="PRINTER_TYPE_DENY_LIST_POLICY_NAME" /> 政策中不包含“<ph name="POLICY_ENUM_PRINTERTYPEDENYLIST_CLOUD" />”。</translation>
-<translation id="1390901586107713894">让您能够指定禁止用户安装的扩展程序。系统会停用被屏蔽的已安装扩展程序，而且用户无法以任何方式启用这些扩展程序。如果某个因被列入屏蔽名单而遭停用的扩展程序被从屏蔽名单中移除了，系统会自动重新启用该扩展程序。
-
-          屏蔽名单值“*”表示所有扩展程序都已被屏蔽，除非是许可名单中明确列出的扩展程序。
-
-          如果此政策未设置，用户便能在 <ph name="PRODUCT_NAME" /> 中安装任一款扩展程序。</translation>
 <translation id="1392703142209771447">用于匹配打印机 ID 的正则表达式。</translation>
 <translation id="1393485621820363363">已启用企业设备打印机</translation>
 <translation id="1395505489889158859">允许向原生打印机发送用户名和文件名</translation>
@@ -1091,6 +1088,7 @@ First-Party Set 中的所有网站都必须是采用 HTTPS 协议的可注册网
       该列表将按同样的顺序显示在 chrome://settings/languages 页面内的“根据您的偏好设置对语言进行排序”部分中。用户将无法移除或重新排列此政策设定的语言，但能在这些语言下方添加语言。此外，用户还能完全控制浏览器的界面语言和翻译/拼写检查设置，除非其他政策已强制执行这些设置。
 
       如果此政策未设置，用户便可操控整个首选语言列表。</translation>
+<translation id="180243155313050440">此政策可控制用于标识受管浏览器的自定义标签。对于受管浏览器，此标签会显示在“新标签页”页面页脚的管理免责声明中。系统不会翻译此自定义标签。应用此政策后，任何超过 16 个字符的字符串都会被截断，并在末尾添加“…”。请避免使用过长的名称。请注意，此政策仅适用于受管浏览器，对使用非受管浏览器的受管用户没有影响。在 <ph name="MS_WIN_NAME" /> 上，此政策仅适用于已加入 <ph name="MS_AD_NAME" /> 网域的实例、已加入 <ph name="MS_AAD_NAME" /> 的实例，或已注册 <ph name="CHROME_ENTERPRISE_CORE_NAME" />的实例。在 <ph name="MAC_OS_NAME" /> 上，此政策仅适用于通过 MDM 进行管理的实例、已通过 MCX 加入网域的实例或已在 <ph name="CHROME_ENTERPRISE_CORE_NAME" />中注册的实例。</translation>
 <translation id="1803646570632580723">要在启动程序中显示的固定应用的列表</translation>
 <translation id="1808715480127969042">在这些网站上阻止 Cookie</translation>
 <translation id="1810261428246410396">允许使用即时网络共享功能。</translation>
@@ -1778,6 +1776,13 @@ IPv4 地址的前缀为 0010；IPv6 地址的前缀为 0020。对于双栈网络
       用户无法更改或覆盖此设置。
 
       请注意：此政策会致使系统将 X-GoogApps-Allowed-Domains 标头附加到向所有 google.com 网域发送的所有 HTTP 和 HTTPS 请求中，如 https://support.google.com/a/answer/1668854 中所述。</translation>
+<translation id="2287414160388710497">允许管理员自定义数据泄露防护 (DLP) 规则应用的水印外观。这包括设置填充/轮廓不透明度，以及定义字体大小。
+如果未设置此政策或某些值，Chrome 将使用其默认水印行为。
+默认值如下：填充不透明度为 4，轮廓不透明度为 6，字体大小为 24。
+
+“填充不透明度”是介于 0（完全透明）到 100（完全不透明）之间的百分比。
+“轮廓不透明度”是介于 0（完全透明）到 100（完全不透明）之间的百分比。
+“FontSize”以磅为单位。</translation>
 <translation id="2288506601233091655">不允许删除打印任务记录</translation>
 <translation id="2289688405312849186">用户的主账号“user@realm”。占位符 <ph name="LOGIN_ID_PLACEHOLDER" /> 会被用户名“user”取代。占位符 <ph name="LOGIN_EMAIL_PLACEHOLDER" /> 会被完整主账号“user@realm”取代。</translation>
 <translation id="2290270645214705008">如果此政策已停用，系统将无法启动远程访问主机服务，也无法将该服务配置为接受传入连接。此政策不影响远程支持场景。
@@ -2516,6 +2521,7 @@ IPv4 地址的前缀为 0010；IPv6 地址的前缀为 0020。对于双栈网络
 <translation id="288448261660192095">如果此政策已启用，在远程连接期间，系统会关闭远程访问主机的物理输入和输出设备。
 
       如果此政策已停用或未设置，本地用户和远程用户都能在访问期间与远程访问主机交互。</translation>
+<translation id="288463102030083286">自定义水印配置</translation>
 <translation id="2884765974461416016">停用 Android 应用至 Web 应用分享功能。</translation>
 <translation id="2886215882246310669">控制 <ph name="PRODUCT_OS_NAME" />是否允许在设备上添加新的 Family Link 用户账号。
       此政策只能与 <ph name="DEVICE_USER_ALLOWLIST_POLICY_NAME" /> 结合使用。除了许可名单中所指定的账号外，该政策允许添加 Family Link 账号。
@@ -3126,6 +3132,7 @@ Microsoft Outlook 卡片需要由管理员进行额外配置。如需详细了�
 <translation id="3278042410658310805">为登录屏幕停用语音反馈，并允许用户暂时启用它</translation>
 <translation id="328347261792478720">默认情况下，浏览器会显示为用户量身定制的媒体推荐内容。如果此政策已停用，系统将对用户隐藏这些推荐内容。如果此政策已启用或未设置，系统则会向用户显示媒体推荐内容。</translation>
 <translation id="3284094172359247914">控制对 WebUSB API 的使用</translation>
+<translation id="3285231260918855067">水印文字的轮廓不透明度，范围为 0（透明）到 100（不透明）。</translation>
 <translation id="3286159327013237833">允许在登录屏幕上自动点击</translation>
 <translation id="3288595667065905535">发布版</translation>
 <translation id="3291940794983537008">开发者工具生成式 AI 功能的设置</translation>
@@ -4454,6 +4461,7 @@ Microsoft Outlook 卡片需要由管理员进行额外配置。如需详细了�
 <translation id="4297483555396496700">如果此政策设为 True，用户只能更改设备的发布渠道；如果设为 False 或未设置，则用户将无法更改渠道。
 
 仅当 <ph name="CHROME_OS_RELEASE_CHANNEL_DELEGATED_POLICY_NAME" /> 设为 False 时，设置 <ph name="CHROME_OS_RELEASE_CHANNEL_POLICY_NAME" /> 才会产生影响。</translation>
+<translation id="4297774573405304484">指向特定图片的网址，该图片将用作受管浏览器的企业标记。此网址必须指向图片。建议使用网站图标（例如 https://www.google.com/favicon.ico）或不小于 48 x 48 像素的图标。请注意，此政策仅适用于受管浏览器，对使用非受管浏览器的受管用户没有影响。在 <ph name="MS_WIN_NAME" /> 上，此政策仅适用于已加入 <ph name="MS_AD_NAME" /> 网域的实例、已加入 <ph name="MS_AAD_NAME" /> 的实例，或已注册 <ph name="CHROME_ENTERPRISE_CORE_NAME" />的实例。在 <ph name="MAC_OS_NAME" /> 上，此政策仅适用于通过 MDM 进行管理的实例、已通过 MCX 加入网域的实例或已在 <ph name="CHROME_ENTERPRISE_CORE_NAME" />中注册的实例。</translation>
 <translation id="4301478455179579340">在安装渐进式 Web 应用期间对原生应用进行签名</translation>
 <translation id="4303167373847512281">允许使用开发者模式</translation>
 <translation id="4307116964468610577">此政策允许系统电池每天只充满 1 次，以延长它的使用寿命。除了用来将电池充满的时间，在当天的其余时间内，电池始终都不会充到 100%，即使系统已接通电源也是如此，这样更利于储电。
@@ -4918,6 +4926,27 @@ Microsoft Outlook 卡片需要由管理员进行额外配置。如需详细了�
 
       如果某项政策不在列表中，而且来源、范围或级别之间存在冲突，系统将会应用优先级最高的政策。</translation>
 <translation id="4646739075621507361">报告打印任务</translation>
+<translation id="4649231830965908577">管理员可以通过此政策指定企业搜索聚合器，当用户在多功能框（地址栏）和“新标签页”页面上的搜索框中输入关键字时，该聚合器会提供搜索建议和结果。
+
+默认情况下，企业搜索建议会与常规的 <ph name="PRODUCT_NAME" /> 建议混合显示。用户可以在多功能框中输入“<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />”字段中指定的关键字（可以带 @ 前缀，例如 <ph name="SHORTCUT_EXAMPLE_SEARCH_AGGREGATOR_SETTINGS" />，也可以不带 @ 前缀），然后按空格键或 Tab 键，即可明确将搜索范围限定为企业搜索聚合器。目前，系统仅支持在多功能框中进行范围限定的企业搜索（由关键字触发），而不支持在“新标签页”页面上的搜索框中进行此类搜索。
+
+以下字段是必填字段：<ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" />、<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />、<ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />、<ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />。
+
+“<ph name="NAME_SEARCH_AGGREGATOR_SETTINGS_FIELD" />”字段对应于地址栏中向用户显示的搜索引擎名称。
+
+“<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />”字段对应于用户输入的用于触发搜索的关键字。快捷字词可以包含纯文字和字符，但不得包含空格，也不得以 @ 符号开头。快捷字词不得重复。
+
+“<ph name="SEARCH_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />”字段用于指定要在哪个网址中进行搜索。输入搜索引擎结果页面的网址，然后使用<ph name="SEARCH_TERM_MARKER" />代替搜索查询。
+
+“<ph name="SUGGEST_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />”字段用于指定提供搜索建议的网址。Chrome 将发出 POST 请求，并通过键名为<ph name="SEARCH_SUGGEST_POST_PARAMS_QUERY_KEY" />的 POST 参数传递用户的搜索查询。
+
+“<ph name="ICON_URL_SEARCH_AGGREGATOR_SETTINGS_FIELD" />”字段用于指定将在搜索建议中使用的图片的网址。如果此字段未设置，Chrome 将使用默认图标。建议使用网站图标（示例：<ph name="ICON_URL_EXAMPLE" />）。支持的图片文件格式包括：JPEG、PNG 和 ICO。
+
+“<ph name="REQUIRE_SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />”字段用于指定是否需要地址栏<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />才能查看搜索建议。如果需要，建议不会显示在“新标签页”页面上的搜索框中，但会继续显示在范围限定搜索模式下的多功能框（地址栏）中。如果此字段未经设置，则地址栏<ph name="SHORTCUT_SEARCH_AGGREGATOR_SETTINGS_FIELD" />不是必需的。
+
+在 <ph name="MS_WIN_NAME" /> 上，此政策仅适用于已加入 <ph name="MS_AD_NAME" /> 网域的实例、已加入 <ph name="MS_AAD_NAME" /> 的实例或已在 <ph name="CHROME_ENTERPRISE_CORE_NAME" />中注册的实例。
+
+在 <ph name="MAC_OS_NAME" /> 上，此政策仅适用于通过 MDM 进行管理的实例、已通过 MCX 加入网域的实例或已在 <ph name="CHROME_ENTERPRISE_CORE_NAME" />中注册的实例。</translation>
 <translation id="4649395978608361979">本地打印机目的地</translation>
 <translation id="4650044303940238102">本地字体设置</translation>
 <translation id="4650759511838826572">停用网址协议架构</translation>
@@ -8201,9 +8230,15 @@ Origin-Agent-Cluster HTTP 标头可控制是将某个文档隔离在以源为键
 <translation id="6795485990775913659">仅允许在没有 PIN 码的情况下打印</translation>
 <translation id="6796215185873669533">将 User-Agent 字符串版本默认设为浏览器设置。</translation>
 <translation id="6800181452282128474">不向 Quirks Server 发送查询</translation>
+<translation id="6801739506172328815">水印文字的字体大小（以磅为单位）。</translation>
 <translation id="6802412020718145539">PDF 查看器使用 OOPIF 架构。</translation>
 <translation id="68031099365512050">报告音频状态</translation>
 <translation id="680356860463873420">不允许用户使用 PluginVm</translation>
+<translation id="6807707420322335446">如果此政策已启用，网页元素只要不属于浏览器地址栏中的网域，就无法设置 Cookie。如果此政策已停用，系统会允许这些元素设置 Cookie，并会阻止用户更改此设置。
+
+      如果此政策未设置，系统会允许使用第三方 Cookie，但用户可以更改此设置。
+
+      注意：此政策不适用于无痕模式。在无痕模式下，第三方 Cookie 会被屏蔽，并且只能在网站级别允许使用。如需在网站级别允许使用 Cookie，请使用 <ph name="COOKIES_ALLOWED_FOR_URLS_POLICY_NAME" /> 政策。</translation>
 <translation id="6810445994095397827">在这些网站上阻止 JavaScript</translation>
 <translation id="6813263547126514821">电源和关机</translation>
 <translation id="681446116407619279">支持的身份验证方案</translation>
@@ -10349,6 +10384,11 @@ Related Website Set 中的所有网站都必须是采用 HTTPS 协议的可注�
       如果您不设置此政策，<ph name="PRODUCT_NAME" /> 会让用户控制是否将它设置为默认浏览器，以及是否在它不是默认浏览器的情况下显示用户通知。
 
       <ph name="MS_WIN_NAME" /> 管理员需要注意：只能在运行 Windows 7 的设备中开启此设置。在运行更高版本的设备中，您必须部署一个“默认应用关联”文件，使 <ph name="PRODUCT_NAME" /> 成为 <ph name="HTTPS_PROTOCOL" /> 和 <ph name="HTTP_PROTOCOL" /> 协议的处理程序（也可成为 <ph name="FTP_PROTOCOL" /> 协议和其他文件格式的处理程序）。请参阅 Chrome 帮助文章 ( https://support.google.com/chrome?p=make_chrome_default_win )。</translation>
+<translation id="8437836857126992452">让您能够指定禁止用户安装的扩展程序。系统会停用被屏蔽的已安装扩展程序，而且用户无法以任何方式启用这些扩展程序。从屏蔽名单中移除某个因被列入屏蔽名单而遭停用的扩展程序后，系统会自动重新启用该扩展程序。
+
+          屏蔽名单值“*”表示所有扩展程序都已被默认屏蔽。如果扩展程序已签名（已打包），则系统会允许使用许可名单中明确列出的扩展程序。所有未打包的扩展程序都已被屏蔽。
+
+          如果此政策未设置，用户便能在 <ph name="PRODUCT_NAME" /> 中安装任一款扩展程序。</translation>
 <translation id="8441105784056442638">启用“完全还原”功能</translation>
 <translation id="844322176712318428">允许使用 Translator API</translation>
 <translation id="8444157920689124099">启用应用绑定加密</translation>

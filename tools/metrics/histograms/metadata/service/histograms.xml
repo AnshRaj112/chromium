@@ -331,7 +331,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ServiceWorker.Database.DestroyDatabaseResult"
-    enum="ServiceWorkerDatabaseStatus" expires_after="2025-10-13">
+    enum="ServiceWorkerDatabaseStatus" expires_after="2025-12-14">
   <owner>yyanagisawa@google.com</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -351,14 +351,14 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ServiceWorker.Database.ReadResult"
-    enum="ServiceWorkerDatabaseStatus" expires_after="2025-10-13">
+    enum="ServiceWorkerDatabaseStatus" expires_after="2025-12-14">
   <owner>yyanagisawa@google.com</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>Records result of read operations in ServiceWorkerDatabase.</summary>
 </histogram>
 
 <histogram name="ServiceWorker.Database.WriteResult"
-    enum="ServiceWorkerDatabaseStatus" expires_after="2025-10-13">
+    enum="ServiceWorkerDatabaseStatus" expires_after="2025-12-14">
   <owner>yyanagisawa@google.com</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -586,6 +586,7 @@ chromium-metrics-reviews@google.com.
     expires_after="2026-05-20">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     Execution time of FindRegistrationForClientUrl until continuation is called.
     The metric is not recorded during startup.
@@ -702,6 +703,7 @@ chromium-metrics-reviews@google.com.
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     The time taken from (a) renderer process sends an IPC message to notify that
     a resource loading request needs to be fall back to network, to (b) browser
@@ -720,7 +722,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="ServiceWorker.LoadTiming.MainFrame.MainResource.FetchHandlerEndToResponseReceived{EmbeddedWorkerInitialStatus}"
-    units="ms" expires_after="2025-10-13">
+    units="ms" expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -784,6 +786,7 @@ chromium-metrics-reviews@google.com.
     units="ms" expires_after="2025-12-07">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     The time taken from (a) the start of finding service worker registration, to
     (b) reading response body is completed. Recorded when a fetch event handler
@@ -804,6 +807,7 @@ chromium-metrics-reviews@google.com.
     units="ms" expires_after="2025-12-07">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     The time taken from (a) the start of finding service worker registration, to
     (b) browser process received the IPC. Recorded when no fetch event handler
@@ -824,6 +828,7 @@ chromium-metrics-reviews@google.com.
     units="ms" expires_after="2025-12-07">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     The time taken from (a) the start of finding service worker registration, to
     (b) the start of a navigation request.
@@ -843,6 +848,7 @@ chromium-metrics-reviews@google.com.
     units="ms" expires_after="2025-10-19">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     The time taken from (a) a resource loading request is routed to service
     worker path, to (b) a service worker is ready to handle the request.
@@ -910,6 +916,7 @@ chromium-metrics-reviews@google.com.
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     The time taken from (a) response headers from service worker are received,
     to (b) reading response body is completed. Recorded when a fetch event
@@ -946,6 +953,7 @@ chromium-metrics-reviews@google.com.
     units="ms" expires_after="2025-08-01">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     The time taken from (a) the start of a navigation request, to (b) reading
     response body is completed. Recorded when a fetch event handler handled the
@@ -966,6 +974,7 @@ chromium-metrics-reviews@google.com.
     units="ms" expires_after="2025-08-01">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     The time taken from (a) the start of a navigation request, to (b) browser
     process received the IPC. Recorded when no fetch event handler provided a
@@ -987,6 +996,7 @@ chromium-metrics-reviews@google.com.
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     The time taken from (a) the start of a navigation request, to (b) the
     request is forwarded to a service worker code path.
@@ -1007,6 +1017,7 @@ chromium-metrics-reviews@google.com.
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     The time taken from (a) browser process sends an IPC message to dispatch a
     fetch event, to (b) a renderer process received the IPC message and is about
@@ -1153,7 +1164,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ServiceWorker.MainFrame.MainResource.FetchResult"
-    enum="ServiceWorkerFetchEventResult" expires_after="2025-10-12">
+    enum="ServiceWorkerFetchEventResult" expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -1164,7 +1175,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ServiceWorker.MaybeStartWorker.Purpose"
-    enum="ServiceWorkerMetrics.EventType" expires_after="2025-10-13">
+    enum="ServiceWorkerMetrics.EventType" expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -1220,6 +1231,7 @@ chromium-metrics-reviews@google.com.
     units="ms" expires_after="2025-10-12">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     Execution time of FindRegistrationForClientUrl until continuation is called.
     It is recorded only once on browser startup.
@@ -1315,7 +1327,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ServiceWorker.RouterEvaluator.ConditionDepth" units="count"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -1364,7 +1376,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ServiceWorker.RouterEvaluator.OrConditionWidth" units="count"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -1466,7 +1478,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="ServiceWorker.StartTiming.ClockConsistency{ServiceWorker_StartSituation2}"
-    enum="CrossProcessTimeDelta" expires_after="2025-10-13">
+    enum="CrossProcessTimeDelta" expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -1671,7 +1683,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="ServiceWorker.StartWorker.Time{ServiceWorker_StartSituationDoNotUse}"
-    units="ms" expires_after="2025-10-12">
+    units="ms" expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
@@ -1742,7 +1754,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="ServiceWorker.Storage.FindForClientUrlInDB.ScopeCountForStorageKey"
-    units="count" expires_after="2025-10-12">
+    units="count" expires_after="2025-12-14">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -1755,6 +1767,7 @@ chromium-metrics-reviews@google.com.
     expires_after="2025-10-08">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     Execution time of ServiceWorkerStorage::FindForClientUrlInDB which is used
     by FindRegistrationForClientUrl.
@@ -1775,6 +1788,7 @@ chromium-metrics-reviews@google.com.
     expires_after="2025-11-30">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     Execution time of ServiceWorkerStorage::ReadInitialDataFromDB which reads
     RegisteredStorageKey from a database.
@@ -1786,6 +1800,7 @@ chromium-metrics-reviews@google.com.
     units="ms" expires_after="2025-12-07">
   <owner>chikamune@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     The cache creation time of service worker registration key on UI thread.
     Includes asynchronous call, thread hopping and the time of
@@ -2029,7 +2044,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ServiceWorkerCache.ErrorStorageType"
-    enum="CacheStorageErrorStorageType" expires_after="2025-10-13">
+    enum="CacheStorageErrorStorageType" expires_after="2025-12-14">
   <owner>ayui@chromium.org</owner>
   <owner>chrome-owp-storage@google.com</owner>
   <summary>
@@ -2133,7 +2148,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Worker.BrowserProcess.DevToolsCreateTime" units="ms"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -2143,7 +2158,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Worker.BrowserProcess.StartScriptLoadTime" units="ms"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -2154,7 +2169,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Worker.BrowserProcess.WorkerHostCreateTime" units="ms"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -2165,7 +2180,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Worker.DevTools.AgentHost.Size" units="count"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>
@@ -2228,7 +2243,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Worker.TopLevelScript.WorkerHostCreatedTime" units="ms"
-    expires_after="2025-10-12">
+    expires_after="2025-12-14">
   <owner>yyanagisawa@chromium.org</owner>
   <owner>chrome-worker@google.com</owner>
   <summary>

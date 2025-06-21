@@ -785,21 +785,6 @@ content::WebContents* ExtensionBrowserTest::GetActiveWebContents() const {
   return chrome_test_utils::GetActiveWebContents(this);
 }
 
-Profile* ExtensionBrowserTest::GetOrCreateIncognitoProfile() {
-  Profile* incognito_profile =
-      profile()->GetPrimaryOTRProfile(/*create_if_needed=*/true);
-
-#if BUILDFLAG(IS_ANDROID)
-  // Ensure ExtensionSystem is properly initialized for `incognito_profile`
-  // in split mode.
-  // TODO(crbug.com/356905053): Remove this workaround when the proper
-  // extension runtime is implemented on Android.
-  util::InitExtensionSystemForIncognitoSplit(incognito_profile);
-#endif
-
-  return incognito_profile;
-}
-
 base::FilePath ExtensionBrowserTest::PackExtension(
     const base::FilePath& dir_path,
     int extra_run_flags) {
@@ -1110,6 +1095,14 @@ content::WebContents* ExtensionBrowserTest::web_contents() {
 
 ExtensionService* ExtensionBrowserTest::extension_service() {
   return ExtensionSystem::Get(profile())->extension_service();
+}
+
+void ExtensionBrowserTest::UseHttpsTestServer() {
+  https_test_server_ = std::make_unique<net::EmbeddedTestServer>(
+      net::EmbeddedTestServer::TYPE_HTTPS);
+  https_test_server_.get()->AddDefaultHandlers(GetChromeTestDataDir());
+  https_test_server_.get()->SetSSLConfig(
+      net::EmbeddedTestServer::CERT_TEST_NAMES);
 }
 
 }  // namespace extensions

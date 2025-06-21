@@ -41,6 +41,7 @@
 #include "chrome/browser/devtools/devtools_window.h"
 #include "chrome/browser/download/bubble/download_bubble_prefs.h"
 #include "chrome/browser/enterprise/data_protection/data_protection_navigation_observer.h"
+#include "chrome/browser/enterprise/watermark/settings.h"
 #include "chrome/browser/enterprise/watermark/watermark_view.h"
 #include "chrome/browser/extensions/browser_extension_window_controller.h"
 #include "chrome/browser/extensions/extension_util.h"
@@ -92,7 +93,6 @@
 #include "chrome/browser/ui/sync/one_click_signin_links_delegate_impl.h"
 #include "chrome/browser/ui/tabs/alert/tab_alert.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/collaboration_messaging_tab_data.h"
-#include "chrome/browser/ui/tabs/saved_tab_groups/shared_tab_group_feedback_controller.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -832,30 +832,6 @@ class BrowserViewLayoutDelegateImpl : public BrowserViewLayoutDelegate {
     return active_tab && active_tab->IsSplit();
   }
 
-  void UpdateSplitViewInsets() override {
-    CHECK(browser_view_->multi_contents_view());
-
-    bool side_panel_visible = browser_view_->unified_side_panel()->GetVisible();
-    bool right_aligned = browser_view_->unified_side_panel()->IsRightAligned();
-    bool infobar_visible = browser_view_->infobar_container()->GetVisible();
-
-    browser_view_->multi_contents_view()
-        ->start_contents_view_inset()
-        .set_left(side_panel_visible && !right_aligned
-                      ? 0
-                      : MultiContentsView::kSplitViewContentInset)
-        .set_top(!infobar_visible ? 0
-                                  : MultiContentsView::kSplitViewContentInset);
-
-    browser_view_->multi_contents_view()
-        ->end_contents_view_inset()
-        .set_right(side_panel_visible && right_aligned
-                       ? 0
-                       : MultiContentsView::kSplitViewContentInset)
-        .set_top(!infobar_visible ? 0
-                                  : MultiContentsView::kSplitViewContentInset);
-  }
-
   ExclusiveAccessBubbleViews* GetExclusiveAccessBubble() const override {
     return browser_view_->exclusive_access_bubble();
   }
@@ -1217,7 +1193,7 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
 }
 
 BrowserView::~BrowserView() {
-  browser_->GetFeatures().TearDownPreBrowserViewDestruction();
+  browser_->GetFeatures().TearDownPreBrowserWindowDestruction();
 
   // Remove the layout manager to avoid dangling. This needs to be earlier than
   // other cleanups that destroy views referenced in the layout manager.
@@ -3216,17 +3192,6 @@ void BrowserView::MaybeShowReadingListInSidePanelIPH() {
   }
 }
 
-void BrowserView::MaybeShowExperimentalAIIPH() {
-  if (!browser()->is_type_normal()) {
-    return;
-  }
-  auto* opt_guide_service =
-      OptimizationGuideKeyedServiceFactory::GetForProfile(browser_->profile());
-  if (opt_guide_service && opt_guide_service->ShouldShowExperimentalAIPromo()) {
-    MaybeShowFeaturePromo(feature_engagement::kIPHExperimentalAIPromoFeature);
-  }
-}
-
 void BrowserView::MaybeShowTabStripToolbarButtonIPH() {
   if (!browser()->is_type_normal()) {
     return;
@@ -3711,7 +3676,7 @@ void BrowserView::PreHandleDragUpdate(const content::DropData& drop_data,
                                       const gfx::PointF& point) {
   if (multi_contents_view_) {
     multi_contents_view_->drop_target_controller().OnWebContentsDragUpdate(
-        drop_data, point);
+        drop_data, point, IsInSplitView());
   }
 }
 
@@ -4251,6 +4216,14 @@ std::u16string BrowserView::GetAccessibleTabLabel(int index,
 #else
         NOTREACHED();
 #endif
+      case tabs::TabAlert::GLIC_SHARING:
+#if BUILDFLAG(ENABLE_GLIC)
+        title =
+            l10n_util::GetStringFUTF16(IDS_TAB_AX_LABEL_GLIC_SHARING, title);
+        break;
+#else
+        NOTREACHED();
+#endif
     }
   }
 
@@ -4786,13 +4759,12 @@ void BrowserView::ShowSplitView(bool focus_active_view) {
   const int relative_active_position = active_index - first_split_tab_index;
   multi_contents_view_->SetActiveIndex(relative_active_position);
 
+  multi_contents_view_->UpdateSplitRatio(
+      split_data->visual_data()->split_ratio());
+
   if (focus_active_view) {
     multi_contents_view_->GetActiveContentsView()->RequestFocus();
   }
-
-  // Update visual information for the split.
-  multi_contents_view_->UpdateSplitRatio(
-      split_data->visual_data()->split_ratio());
 }
 
 void BrowserView::HideSplitView() {
@@ -4816,6 +4788,14 @@ void BrowserView::UpdateActiveTabInSplitView() {
       browser_->tab_strip_model()->GetIndexOfTab(first_tab);
   const int relative_active_position = active_index - first_split_tab_index;
   multi_contents_view_->SetActiveIndex(relative_active_position);
+
+  // When active tab changes inside a split, it's generally due to focus change.
+  // However, there are cases where inactive tab can be activated without a
+  // focus change e.g. using tab shortcuts and in these cases update focus.
+  if (GetWidget()->IsActive() &&
+      multi_contents_view_->GetInactiveContentsView()->HasFocus()) {
+    multi_contents_view_->GetActiveContentsView()->RequestFocus();
+  }
 }
 
 void BrowserView::UpdateContentsInSplitView(
@@ -5345,7 +5325,7 @@ void BrowserView::AddedToWidget() {
           std::make_unique<BrowserViewLayoutDelegateImpl>(this), this,
           window_scrim_view_, top_container_, web_app_frame_toolbar_,
           web_app_window_title_, tab_strip_region_view_, tabstrip_, toolbar_,
-          infobar_container_, contents_container_,
+          infobar_container_, contents_container_, multi_contents_view_,
           left_aligned_side_panel_separator_, unified_side_panel_,
           right_aligned_side_panel_separator_, side_panel_rounded_corner_,
           immersive_mode_controller_.get(), contents_separator_));
@@ -5364,11 +5344,6 @@ void BrowserView::AddedToWidget() {
     browser_->GetFeatures().download_toolbar_ui_controller()->Init();
   }
 
-  if (auto* shared_tab_group_feedback_controller =
-          browser_->GetFeatures().shared_tab_group_feedback_controller()) {
-    shared_tab_group_feedback_controller->Init();
-  }
-
   frame_->OnBrowserViewInitViewsComplete();
   frame_->GetFrameView()->UpdateMinimumSize();
   using_native_frame_ = frame_->ShouldUseNativeFrame();
@@ -5382,16 +5357,6 @@ void BrowserView::AddedToWidget() {
       base::BindOnce(&BrowserView::MaybeShowReadingListInSidePanelIPH,
                      GetAsWeakPtr()),
       base::Minutes(5));
-
-  // Show the promo delayed after a while at startup. This is not the right way
-  // to show delayed promos, as this does not take user actions into account
-  // such as user typing, user navigating, while the promo is displayed. Contact
-  // the user education team for the right approach.
-  base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
-      FROM_HERE,
-      base::BindOnce(&BrowserView::MaybeShowExperimentalAIIPH, GetAsWeakPtr()),
-      user_education::features::GetSessionStartGracePeriod() +
-          base::Minutes(5));
 
   // Accessible name of the tab is dependent on the visibility state of the chip
   // view, so it needs to be made aware of any changes.
@@ -6056,7 +6021,7 @@ void BrowserView::ShowAvatarBubbleFromAvatarButton(bool is_source_accelerator) {
   }
 
   // Default behavior -- show the profile menu.
-  ProfileMenuCoordinator::GetOrCreateForBrowser(browser())->Show(
+  browser()->GetFeatures().profile_menu_coordinator()->Show(
       is_source_accelerator);
 }
 
@@ -6356,7 +6321,7 @@ bool BrowserView::CanUserExitFullscreen() const {
 ///////////////////////////////////////////////////////////////////////////////
 // BrowserView, ExclusiveAccessBubbleViewsContext implementation:
 ExclusiveAccessManager* BrowserView::GetExclusiveAccessManager() {
-  return browser_->exclusive_access_manager();
+  return browser_->GetFeatures().exclusive_access_manager();
 }
 
 ui::AcceleratorProvider* BrowserView::GetAcceleratorProvider() {
@@ -6526,7 +6491,10 @@ bool BrowserView::IsBrowserAWebApp() const {
 
 void BrowserView::ApplyWatermarkSettings(const std::string& watermark_text) {
   if (watermark_view_) {
-    watermark_view_->SetString(watermark_text);
+    PrefService* prefs = browser_->profile()->GetPrefs();
+    watermark_view_->SetString(watermark_text,
+                               enterprise_watermark::GetFillColor(prefs),
+                               enterprise_watermark::GetOutlineColor(prefs));
   }
 }
 

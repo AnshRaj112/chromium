@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 import './file_carousel.js';
+import './icons.html.js';
+import '//resources/cr_elements/cr_icon_button/cr_icon_button.js';
 
 import {loadTimeData} from '//resources/js/load_time_data.js';
 import {CrLitElement} from '//resources/lit/v3_0/lit.rollup.js';
 
 import type {ComposeboxPageHandlerRemote} from '../composebox.mojom-webui.js';
+import {recordLoadDuration} from '../metrics_utils.js';
+import {WindowProxy} from '../window_proxy.js';
 
 import type {ComposeboxFile} from './common.js';
 import {getCss} from './composebox.css.js';
@@ -16,9 +20,11 @@ import type {ComposeboxFileCarouselElement} from './file_carousel.js';
 
 export interface ComposeboxElement {
   $: {
-    attachmentUploader: HTMLInputElement,
+    fileInput: HTMLInputElement,
+    fileUploadButton: HTMLElement,
     carousel: ComposeboxFileCarouselElement,
-    imageUploader: HTMLInputElement,
+    imageInput: HTMLInputElement,
+    imageUploadButton: HTMLElement,
     input: HTMLInputElement,
   };
 }
@@ -41,6 +47,14 @@ export class ComposeboxElement extends CrLitElement {
       attachmentFileTypes_: {type: String},
       files_: {type: Array},
       imageFileTypes_: {type: String},
+      submitEnabled_: {
+        reflect: true,
+        type: Boolean,
+      },
+      submitting_: {
+        reflect: true,
+        type: Boolean,
+      },
     };
   }
 
@@ -49,7 +63,8 @@ export class ComposeboxElement extends CrLitElement {
   protected accessor files_: ComposeboxFile[] = [];
   protected accessor imageFileTypes_: string =
       loadTimeData.getString('composeboxImageFileTypes');
-
+  protected accessor submitEnabled_: boolean = false;
+  protected accessor submitting_: boolean = false;
   private maxFileSize_: number =
       loadTimeData.getInteger('composeboxFileMaxSize');
   private pageHandler_: ComposeboxPageHandlerRemote;
@@ -58,6 +73,16 @@ export class ComposeboxElement extends CrLitElement {
     super();
     this.pageHandler_ = ComposeboxProxyImpl.getInstance().handler;
     this.pageHandler_.notifySessionStarted();
+    recordLoadDuration(
+        'NewTabPage.Composebox.FromNTPLoadToSessionStart',
+        WindowProxy.getInstance().now());
+  }
+
+  override connectedCallback() {
+    super.connectedCallback();
+    this.$.input.addEventListener('input', () => {
+      this.submitEnabled_ = this.$.input.value.length > 0;
+    });
   }
 
   protected onDeleteFile_(e: CustomEvent) {
@@ -82,9 +107,8 @@ export class ComposeboxElement extends CrLitElement {
         newFiles.push({
           uuid: this.createUuid(),
           name: file.name,
-          objectUrl: e.target === this.$.imageUploader ?
-              URL.createObjectURL(file) :
-              null,
+          objectUrl:
+              e.target === this.$.imageInput ? URL.createObjectURL(file) : null,
           type: file.type,
         });
         // TODO(crbug.com/422559977): Upload the file.
@@ -95,6 +119,14 @@ export class ComposeboxElement extends CrLitElement {
     input.value = '';
   }
 
+  protected openImageUpload_() {
+    this.$.imageInput.click();
+  }
+
+  protected openFileUpload_() {
+    this.$.fileInput.click();
+  }
+
   private createUuid(): string {
     return BigInt
         .asUintN(
@@ -102,6 +134,21 @@ export class ComposeboxElement extends CrLitElement {
             BigInt(`0x${crypto.randomUUID().replace(/-/g, '')}`),
             )
         .toString();
+  }
+
+  protected onCancelClick_() {
+    if (this.$.input.value.length > 0) {
+      this.$.input.value = '';
+      // TODO(rtatum@): Send request to handler to clear file cache.
+      this.files_ = [];
+      this.submitEnabled_ = false;
+    } else {
+      this.fire('toggle-composebox');
+    }
+  }
+
+  protected onSubmitClick_() {
+    this.submitting_ = true;
   }
 }
 

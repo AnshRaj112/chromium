@@ -16,6 +16,7 @@
 #include "components/omnibox/browser/base_search_provider.h"
 #include "components/omnibox/browser/omnibox.mojom-shared.h"
 #include "components/search_engines/template_url_service.h"
+#include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/preloading_data.h"
 #include "content/public/browser/web_contents.h"
 
@@ -54,14 +55,41 @@ WEB_CONTENTS_USER_DATA_KEY_IMPL(SearchPreloadPipelineManager);
 
 SearchPreloadPipelineManager::SearchPreloadPipelineManager(
     content::WebContents* web_contents)
-    : content::WebContentsUserData<SearchPreloadPipelineManager>(
-          *web_contents) {
+    : content::WebContentsUserData<SearchPreloadPipelineManager>(*web_contents),
+      content::WebContentsObserver(web_contents) {
   auto* preloading_data =
       content::PreloadingData::GetOrCreateForWebContents(web_contents);
   SetIsNavigationInDomainCallback(preloading_data);
 }
 
 SearchPreloadPipelineManager::~SearchPreloadPipelineManager() = default;
+
+void SearchPreloadPipelineManager::DidFinishNavigation(
+    content::NavigationHandle* navigation_handle) {
+  const bool is_primary_main_frame_navigation =
+      navigation_handle->HasCommitted() &&
+      navigation_handle->IsInPrimaryMainFrame() &&
+      !navigation_handle->IsSameDocument();
+  if (!is_primary_main_frame_navigation) {
+    return;
+  }
+
+  content::BrowserContext* browser_context =
+      GetWebContents().GetBrowserContext();
+  if (!browser_context) {
+    return;
+  }
+
+  // Invalidate a pipeline if it is likely used.
+  std::optional<GURL> maybe_canonical_url = GetCanonicalUrlForSearchPreload(
+      *browser_context, navigation_handle->GetURL());
+  if (!maybe_canonical_url.has_value()) {
+    return;
+  }
+  const GURL& canonical_url = maybe_canonical_url.value();
+
+  pipelines_.erase(canonical_url);
+}
 
 void SearchPreloadPipelineManager::ClearPreloads() {
   pipelines_.clear();
@@ -169,7 +197,8 @@ void SearchPreloadPipelineManager::OnAutocompleteResultChangedProcessOne(
                               /*is_navigation_likely=*/false);
   pipelines_[canonical_url]->StartPrefetch(
       GetWebContents(), search_preload_service, prefetch_url,
-      chrome_preloading_predictor::kDefaultSearchEngine, no_vary_search_hint);
+      chrome_preloading_predictor::kDefaultSearchEngine, no_vary_search_hint,
+      /*is_navigation_likely=*/false);
 
   // Trigger prerender without waiting prefetch.
   //
@@ -289,7 +318,8 @@ bool SearchPreloadPipelineManager::OnNavigationLikely(
   pipelines_[canonical_url]->UpdateConfidence(GetWebContents(), 100);
   return pipelines_[canonical_url]->StartPrefetch(
       GetWebContents(), search_preload_service, prefetch_url, predictor,
-      no_vary_search_hint);
+      no_vary_search_hint,
+      /*is_navigation_likely=*/true);
 }
 
 bool SearchPreloadPipelineManager::InvalidatePipelineForTesting(

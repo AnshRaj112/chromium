@@ -6,14 +6,8 @@ package org.chromium.chrome.browser.tabmodel;
 
 import static org.chromium.build.NullUtil.assumeNonNull;
 
-import android.app.Activity;
-import android.content.Intent;
-
-import androidx.annotation.VisibleForTesting;
-
 import com.google.common.collect.ImmutableList;
 
-import org.chromium.base.ContextUtils;
 import org.chromium.base.MathUtils;
 import org.chromium.base.ObserverList;
 import org.chromium.base.TraceEvent;
@@ -24,13 +18,9 @@ import org.chromium.build.annotations.EnsuresNonNullIf;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
-import org.chromium.chrome.browser.WarmupManager;
-import org.chromium.chrome.browser.app.tab_activity_glue.ReparentingTask;
 import org.chromium.chrome.browser.flags.ActivityType;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.homepage.HomepageManager;
-import org.chromium.chrome.browser.multiwindow.MultiInstanceManager;
-import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabCreationState;
@@ -40,17 +30,13 @@ import org.chromium.chrome.browser.tab.TabUtils;
 import org.chromium.chrome.browser.tab_ui.TabContentManager;
 import org.chromium.chrome.browser.tabmodel.NextTabPolicy.NextTabPolicySupplier;
 import org.chromium.chrome.browser.tabmodel.PendingTabClosureManager.PendingTabClosureDelegate;
-import org.chromium.chrome.browser.tabwindow.TabWindowManager;
-import org.chromium.content_public.browser.LoadUrlParams;
+import org.chromium.chrome.browser.tasks.tab_management.MoveTabUtils;
 import org.chromium.content_public.browser.WebContents;
-import org.chromium.content_public.common.ResourceRequestBody;
-import org.chromium.ui.mojom.WindowOpenDisposition;
-import org.chromium.url.GURL;
-import org.chromium.url.Origin;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -83,13 +69,14 @@ public class TabModelImpl extends TabModelJniBridge {
     private final TabContentManager mTabContentManager;
     private final TabModelDelegate mModelDelegate;
     private final TabRemover mTabRemover;
-    private final ObserverList<TabModelObserver> mObservers;
+    private final ObserverList<TabModelObserver> mObservers = new ObserverList<>();
     private final NextTabPolicySupplier mNextTabPolicySupplier;
     private final AsyncTabParamsManager mAsyncTabParamsManager;
     private final ObservableSupplierImpl<@Nullable Tab> mCurrentTabSupplier =
             new ObservableSupplierImpl<>();
     private final ObservableSupplierImpl<Integer> mTabCountSupplier =
             new ObservableSupplierImpl<>();
+    private final boolean mIsArchivedTabModel;
 
     /** This specifies the current {@link Tab} in {@link #mTabs}. */
     private int mIndex = INVALID_TAB_INDEX;
@@ -181,7 +168,7 @@ public class TabModelImpl extends TabModelJniBridge {
             TabRemover tabRemover,
             boolean supportUndo,
             boolean isArchivedTabModel) {
-        super(profile, activityType, isArchivedTabModel);
+        super(profile);
         mRegularTabCreator = regularTabCreator;
         mIncognitoTabCreator = incognitoTabCreator;
         mOrderController = orderController;
@@ -196,10 +183,10 @@ public class TabModelImpl extends TabModelJniBridge {
             mPendingTabClosureManager =
                     new PendingTabClosureManager(this, new PendingTabClosureDelegateImpl());
         }
-        mObservers = new ObserverList<>();
+        mIsArchivedTabModel = isArchivedTabModel;
         // The call to initializeNative() should be as late as possible, as it results in calling
         // observers on the native side, which may in turn call |addObserver()| on this object.
-        initializeNative(profile);
+        initializeNative(activityType, isArchivedTabModel);
     }
 
     @Override
@@ -413,6 +400,7 @@ public class TabModelImpl extends TabModelJniBridge {
 
     @Override
     public @Nullable Tab getNextTabIfClosed(int id, boolean uponExit) {
+        if (mIsArchivedTabModel) return null;
         return getNextTabIfClosed(id, uponExit, TabCloseType.SINGLE);
     }
 
@@ -750,6 +738,11 @@ public class TabModelImpl extends TabModelJniBridge {
         return retVal == -1 ? INVALID_TAB_INDEX : retVal;
     }
 
+    @Override
+    public Iterator<Tab> iterator() {
+        return ReadOnlyIterator.maybeCreate(mTabs.iterator());
+    }
+
     // TODO(aurimas): Move this method to TabModelSelector when notifications move there.
     private int getLastId(@TabSelectionType int type) {
         if (type == TabSelectionType.FROM_CLOSE || type == TabSelectionType.FROM_EXIT) {
@@ -781,6 +774,7 @@ public class TabModelImpl extends TabModelJniBridge {
     // This function is complex and its behavior depends on persisted state, including mIndex.
     @Override
     public void setIndex(int i, final @TabSelectionType int type) {
+        if (mIsArchivedTabModel) return;
         try {
             TraceEvent.begin("TabModelImpl.setIndex");
             int lastId = getLastId(type);
@@ -962,131 +956,8 @@ public class TabModelImpl extends TabModelJniBridge {
     }
 
     @Override
-    protected void forceCloseAllTabs() {
-        // Tests need to use forceCloseTabs here. If a native test has left a shared tab group open
-        // the protections of TabRemover#closeTabs will kick in and when trying to close all tabs
-        // and we won't actually close all tabs.
-        getTabRemover().forceCloseTabs(TabClosureParams.closeAllTabs().build());
-        commitAllTabClosures();
-    }
-
-    @Override
-    protected boolean closeTabAt(int index) {
-        @Nullable Tab tab = getTabAt(index);
-        if (tab == null) return false;
-
-        // This behavior is safe for existing native callers (devtools, and a few niche features).
-        // If this is ever to be used more regularly from native the ability to specify
-        // `allowDialog` should be exposed.
-        getTabRemover()
-                .closeTabs(
-                        TabClosureParams.closeTab(tab).allowUndo(false).build(),
-                        /* allowDialog= */ false);
-        return true;
-    }
-
-    /** Used to restore tabs from native. */
-    @Override
-    protected boolean createTabWithWebContents(
-            Tab parent, Profile profile, WebContents webContents, boolean select) {
-        return getTabCreator(profile.isOffTheRecord())
-                        .createTabWithWebContents(
-                                parent,
-                                webContents,
-                                select
-                                        ? TabLaunchType.FROM_RECENT_TABS_FOREGROUND
-                                        : TabLaunchType.FROM_RECENT_TABS)
-                != null;
-    }
-
-    @Override
-    public void openNewTab(
-            Tab parent,
-            GURL url,
-            @Nullable Origin initiatorOrigin,
-            String extraHeaders,
-            ResourceRequestBody postData,
-            int disposition,
-            boolean persistParentage,
-            boolean isRendererInitiated) {
-        if (parent.isClosing()) return;
-
-        boolean incognito = parent.isIncognito();
-        @TabLaunchType int tabLaunchType = TabLaunchType.FROM_LONGPRESS_FOREGROUND;
-
-        switch (disposition) {
-            case WindowOpenDisposition.NEW_WINDOW: // fall through
-            case WindowOpenDisposition.NEW_FOREGROUND_TAB:
-                tabLaunchType =
-                        parent.getTabGroupId() == null
-                                ? TabLaunchType.FROM_LONGPRESS_FOREGROUND
-                                : TabLaunchType.FROM_LONGPRESS_FOREGROUND_IN_GROUP;
-                break;
-            case WindowOpenDisposition.NEW_POPUP: // fall through
-            case WindowOpenDisposition.NEW_BACKGROUND_TAB:
-                tabLaunchType =
-                        parent.getTabGroupId() == null
-                                ? TabLaunchType.FROM_LONGPRESS_BACKGROUND
-                                : TabLaunchType.FROM_LONGPRESS_BACKGROUND_IN_GROUP;
-                break;
-            case WindowOpenDisposition.OFF_THE_RECORD:
-                incognito = true;
-                break;
-            default:
-                assert false;
-        }
-
-        LoadUrlParams loadUrlParams = new LoadUrlParams(url);
-        loadUrlParams.setInitiatorOrigin(initiatorOrigin);
-        loadUrlParams.setVerbatimHeaders(extraHeaders);
-        loadUrlParams.setPostData(postData);
-        loadUrlParams.setIsRendererInitiated(isRendererInitiated);
-        getTabCreator(incognito)
-                .createNewTab(loadUrlParams, tabLaunchType, persistParentage ? parent : null);
-    }
-
-    @Override
-    public Tab createNewTabForDevTools(GURL url, boolean newWindow) {
-        LoadUrlParams loadParams = new LoadUrlParams(url);
-        @TabLaunchType int launchType = TabLaunchType.FROM_CHROME_UI;
-        if (!newWindow
-                || MultiWindowUtils.getInstanceCount() >= MultiWindowUtils.getMaxInstances()) {
-            return assumeNonNull(
-                    getTabCreator(/* incognito= */ false)
-                            .createNewTab(loadParams, launchType, null));
-        }
-
-        // Creating a new window is asynchronous on Android, so create a background tab that we can
-        // return immediately and reparent it into a new window.
-        WarmupManager warmupManager = WarmupManager.getInstance();
-        Tab parentTab = TabModelUtils.getCurrentTab(this);
-        // WARNING: parentTab could be null if all tabs were closed; however, getting an activity
-        // context from this class is infeasible for the remaining code. For now this seems to
-        // not be called from a 0-tab state.
-        assumeNonNull(parentTab);
-        Profile profile = parentTab.getProfile();
-        warmupManager.createRegularSpareTab(profile);
-        Tab tab = warmupManager.takeSpareTab(profile, /* initiallyHidden= */ false, launchType);
-        tab.loadUrl(loadParams);
-
-        MultiInstanceManager.onMultiInstanceModeStarted();
-        Intent intent =
-                MultiWindowUtils.createNewWindowIntent(
-                        parentTab.getContext(),
-                        TabWindowManager.INVALID_WINDOW_ID,
-                        /* preferNew= */ true,
-                        /* openAdjacently= */ true,
-                        /* addTrustedIntentExtras= */ true);
-
-        Activity activity = ContextUtils.activityFromContext(parentTab.getContext());
-
-        ReparentingTask.from(tab)
-                .begin(
-                        activity,
-                        intent,
-                        /* startActivityOptions= */ null,
-                        /* finalizeCallback= */ null);
-        return tab;
+    protected TabCreator getTabCreator(boolean incognito) {
+        return incognito ? mIncognitoTabCreator : mRegularTabCreator;
     }
 
     @Override
@@ -1096,12 +967,13 @@ public class TabModelImpl extends TabModelJniBridge {
 
     @Override
     public int index() {
+        if (mIsArchivedTabModel) return INVALID_TAB_INDEX;
         return mIndex;
     }
 
     @Override
     protected boolean isSessionRestoreInProgress() {
-        return mModelDelegate.isSessionRestoreInProgress();
+        return !mModelDelegate.isTabModelRestored();
     }
 
     @Override
@@ -1124,52 +996,17 @@ public class TabModelImpl extends TabModelJniBridge {
     }
 
     @Override
-    public int getTabCountNavigatedInTimeWindow(long beginTimeMs, long endTimeMs) {
-        return getTabsNavigatedInTimeWindow(beginTimeMs, endTimeMs).size();
-    }
-
-    @Override
-    public void closeTabsNavigatedInTimeWindow(long beginTimeMs, long endTimeMs) {
-        List<Tab> tabsToClose = getTabsNavigatedInTimeWindow(beginTimeMs, endTimeMs);
-        if (tabsToClose.isEmpty()) return;
-
-        var params =
-                TabClosureParams.closeTabs(tabsToClose)
-                        .allowUndo(false)
-                        .saveToTabRestoreService(false)
-                        .build();
-
-        getTabRemover().closeTabs(params, /* allowDialog= */ false);
-
-        // Open a new tab if all tabs are closed.
-        for (Tab tab : mTabs) {
-            if (!tab.isCustomTab()) {
-                return;
-            }
+    public void moveTabToIndex(int index, int newIndex) {
+        Tab tab = getTabAt(index);
+        if (tab != null) {
+            TabGroupModelFilter filter = TabModelUtils.getTabGroupModelFilterByTab(tab);
+            assumeNonNull(filter);
+            MoveTabUtils.moveSingleTab(this, filter, tab, index, newIndex);
         }
-        getTabCreator(false).launchNtp();
     }
 
     @Override
-    public void openTabProgrammatically(GURL url, int index) {
-        LoadUrlParams loadParams = new LoadUrlParams(url);
-
-        getTabCreator()
-                .createNewTab(
-                        loadParams,
-                        TabLaunchType.FROM_TAB_LIST_INTERFACE,
-                        /* parent= */ null,
-                        index);
-    }
-
-    @Override
-    public Tab[] getAllTabs() {
-        Tab[] tabs = new Tab[mTabs.size()];
-        return mTabs.toArray(tabs);
-    }
-
-    @VisibleForTesting
-    List<Tab> getTabsNavigatedInTimeWindow(long beginTimeMs, long endTimeMs) {
+    public List<Tab> getTabsNavigatedInTimeWindow(long beginTimeMs, long endTimeMs) {
         List<Tab> tabList = new ArrayList<>();
         for (Tab tab : mTabs) {
             if (tab.isCustomTab()) continue;
@@ -1183,24 +1020,16 @@ public class TabModelImpl extends TabModelJniBridge {
         return tabList;
     }
 
+    @Override
+    public Tab[] getAllTabs() {
+        Tab[] tabs = new Tab[mTabs.size()];
+        return mTabs.toArray(tabs);
+    }
+
     private void notifyOnFinishingMultipleTabClosure(
             List<Tab> tabs, boolean saveToTabRestoreService) {
         for (TabModelObserver obs : mObservers) {
             obs.onFinishingMultipleTabClosure(tabs, saveToTabRestoreService);
         }
-    }
-
-    /**
-     * Returns the {@link TabCreator} for the given {@link Profile}.
-     *
-     * <p>Please note that, the {@link TabCreator} and {@TabModelImpl} are separate instances for
-     * {@link ChromeTabbedActivity} and {@link CustomTabActivity} across both regular and Incognito
-     * modes which allows us to pass the boolean directly.
-     *
-     * @param incognito A boolean to indicate whether to return IncognitoTabCreator or
-     *     RegularTabCreator.
-     */
-    private TabCreator getTabCreator(boolean incognito) {
-        return incognito ? mIncognitoTabCreator : mRegularTabCreator;
     }
 }

@@ -74,8 +74,7 @@ static const UChar kTable[256] = {
     0x00F8, 0x00F9, 0x00FA, 0x00FB, 0x00FC, 0x00FD, 0x00FE, 0x00FF   // F8-FF
 };
 
-void TextCodecLatin1::RegisterEncodingNames(
-    WTF::EncodingNameRegistrar registrar) {
+void TextCodecLatin1::RegisterEncodingNames(EncodingNameRegistrar registrar) {
   // Taken from the alias table at https://encoding.spec.whatwg.org/
   registrar("windows-1252", "windows-1252");
   registrar("ANSI_X3.4-1968", "windows-1252");
@@ -97,29 +96,21 @@ void TextCodecLatin1::RegisterEncodingNames(
 }
 
 static std::unique_ptr<TextCodec> NewStreamingTextDecoderWindowsLatin1(
-    const WTF::TextEncoding&,
-    const void*) {
+    const TextEncoding&) {
   return std::make_unique<TextCodecLatin1>();
 }
 
-void TextCodecLatin1::RegisterCodecs(WTF::TextCodecRegistrar registrar) {
-  registrar("windows-1252", NewStreamingTextDecoderWindowsLatin1, nullptr);
+void TextCodecLatin1::RegisterCodecs(TextCodecRegistrar registrar) {
+  registrar("windows-1252", NewStreamingTextDecoderWindowsLatin1);
 
   // ASCII and Latin-1 both decode as Windows Latin-1 although they retain
   // unique identities.
-  registrar("ISO-8859-1", NewStreamingTextDecoderWindowsLatin1, nullptr);
-  registrar("US-ASCII", NewStreamingTextDecoderWindowsLatin1, nullptr);
+  registrar("ISO-8859-1", NewStreamingTextDecoderWindowsLatin1);
+  registrar("US-ASCII", NewStreamingTextDecoderWindowsLatin1);
 }
 
-// TODO(crbug.com/422768753): Remove these `using` directives.
-using WTF::AlignToMachineWord;
-using WTF::CopyASCIIMachineWord;
-using WTF::IsAlignedToMachineWord;
-using WTF::IsAllASCII;
-using WTF::MachineWord;
-
 String TextCodecLatin1::Decode(base::span<const uint8_t> bytes,
-                               WTF::FlushBehavior,
+                               FlushBehavior,
                                bool,
                                bool&) {
   if (bytes.empty()) {
@@ -144,7 +135,7 @@ String TextCodecLatin1::Decode(base::span<const uint8_t> bytes,
           if (!IsAllASCII<LChar>(chunk))
             goto useLookupTable;
 
-          CopyASCIIMachineWord(destination, source);
+          CopyAsciiMachineWord(destination, source);
           source += sizeof(MachineWord);
           destination += sizeof(MachineWord);
         }
@@ -196,7 +187,7 @@ upConvertTo16Bit:
           if (!IsAllASCII<LChar>(chunk))
             goto useLookupTable16;
 
-          CopyASCIIMachineWord(destination16, source);
+          CopyAsciiMachineWord(destination16, source);
           source += sizeof(MachineWord);
           destination16 += sizeof(MachineWord);
         }
@@ -220,8 +211,8 @@ upConvertTo16Bit:
 template <typename CharType>
 static std::string EncodeComplexWindowsLatin1(
     base::span<const CharType> char_data,
-    WTF::UnencodableHandling handling) {
-  DCHECK_NE(handling, WTF::kNoUnencodables);
+    UnencodableHandling handling) {
+  DCHECK_NE(handling, UnencodableHandling::kNoUnencodables);
   const auto* characters = char_data.data();
   const wtf_size_t length = base::checked_cast<wtf_size_t>(char_data.size());
   wtf_size_t target_length = length;
@@ -267,7 +258,7 @@ static std::string EncodeComplexWindowsLatin1(
 
 template <typename CharType>
 std::string TextCodecLatin1::EncodeCommon(base::span<const CharType> characters,
-                                          WTF::UnencodableHandling handling) {
+                                          UnencodableHandling handling) {
   std::string string(characters.size(), '\0');
 
   // Convert the string a fast way and simultaneously do an efficient check to
@@ -287,12 +278,12 @@ std::string TextCodecLatin1::EncodeCommon(base::span<const CharType> characters,
 }
 
 std::string TextCodecLatin1::Encode(base::span<const UChar> characters,
-                                    WTF::UnencodableHandling handling) {
+                                    UnencodableHandling handling) {
   return EncodeCommon(characters, handling);
 }
 
 std::string TextCodecLatin1::Encode(base::span<const LChar> characters,
-                                    WTF::UnencodableHandling handling) {
+                                    UnencodableHandling handling) {
   return EncodeCommon(characters, handling);
 }
 

@@ -711,10 +711,15 @@ class MODULES_EXPORT WebGLRenderingContextBase
 
   // CanvasRenderingContext implementation.
   bool IsComposited() const override { return true; }
+  bool IsAccelerated() const override;
   bool UsingSwapChain() const override;
   void PageVisibilityChanged() override;
-  CanvasResourceProvider* PaintRenderingResultsToCanvas(
-      SourceDrawingBuffer) override;
+  void SizeChanged() override;
+  std::unique_ptr<CanvasResourceProvider> CreateCanvasResourceProvider()
+      override;
+  scoped_refptr<StaticBitmapImage> PaintRenderingResultsToSnapshot(
+      SourceDrawingBuffer source_buffer,
+      FlushReason reason) override;
   void ClearMarkedCanvasDirty() override { marked_canvas_dirty_ = false; }
   scoped_refptr<CanvasResource> PaintRenderingResultsToResource(
       bool was_dirty,
@@ -1956,9 +1961,10 @@ class MODULES_EXPORT WebGLRenderingContextBase
                                 Platform::ContextType context_type,
                                 Platform::GraphicsInfo* graphics_info);
 
-  CanvasResourceProvider* PaintRenderingResultsToCanvasInternal(
+  CanvasResourceProvider* GetOrCreateCanvasResourceProvider();
+  CanvasResourceProvider* PaintRenderingResultsToCanvas(
       SourceDrawingBuffer source_buffer,
-      bool& resource_provider_was_updated);
+      bool* resource_provider_was_updated = nullptr);
   void TexImageHelperMediaVideoFrame(
       TexImageParams,
       WebGLTexture*,
@@ -2006,6 +2012,10 @@ class MODULES_EXPORT WebGLRenderingContextBase
   bool checkProgramCompletionQueryAvailable(WebGLProgram* program,
                                             bool* completed);
   static constexpr unsigned int kMaxProgramCompletionQueries = 128u;
+
+  // `did_fail_to_create_resource_provider_` prevents repeated attempts in
+  // allocating resources after the first attempt failed.
+  bool did_fail_to_create_resource_provider_ = false;
 
   // Support for KHR_parallel_shader_compile.
   //

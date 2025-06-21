@@ -629,6 +629,7 @@ android_library(
   resources_package = "org.chromium.chrome.test"
 
   sources = [
+    "src/org/chromium/chrome/browser/contextualsearch/ContextualSearchCalloutTest.java",
     "src/org/chromium/chrome/browser/contextualsearch/ContextualSearchCriticalTest.java",
     "src/org/chromium/chrome/browser/contextualsearch/ContextualSearchFakeServer.java",
     "src/org/chromium/chrome/browser/contextualsearch/ContextualSearchHistogramTest.java",
@@ -1323,6 +1324,7 @@ android_library("chrome_test_java_org.chromium.chrome.browser.tabmodel") {
     "src/org/chromium/chrome/browser/tabmodel/ContextMenuLoadUrlParamsTest.java",
     "src/org/chromium/chrome/browser/tabmodel/IncognitoTabModelTest.java",
     "src/org/chromium/chrome/browser/tabmodel/MultiInstanceMigrationTest.java",
+    "src/org/chromium/chrome/browser/tabmodel/TabCollectionTabModelImplTest.java",
     "src/org/chromium/chrome/browser/tabmodel/TabGroupsTest.java",
     "src/org/chromium/chrome/browser/tabmodel/TabModelImplTest.java",
     "src/org/chromium/chrome/browser/tabmodel/TabModelMergingTest.java",
@@ -1704,6 +1706,7 @@ android_library(
     "src/org/chromium/chrome/browser/customtabs/CustomTabLaunchCauseMetricsTest.java",
     "src/org/chromium/chrome/browser/customtabs/features/minimizedcustomtab/MinimizedCardCoordinatorTest.java",
     "src/org/chromium/chrome/browser/customtabs/features/minimizedcustomtab/MinimizedCardViewBinderTest.java",
+    "src/org/chromium/chrome/browser/customtabs/features/toolbar/CustomTabToolbarButtonsViewBinderTest.java",
   ]
 
   deps = [ ":common_unit_test_deps_java" ]
@@ -1721,7 +1724,10 @@ android_library("chrome_unit_test_java_org.chromium.chrome.browser.download") {
     "src/org/chromium/chrome/browser/download/dialogs/DownloadLocationDialogTest.java",
   ]
 
-  deps = [ ":common_unit_test_deps_java" ]
+  deps = [
+    ":common_unit_test_deps_java",
+    "//components/download/public/common:public_java",
+  ]
 }
 
 android_library("chrome_unit_test_java_org.chromium.chrome.browser.share") {

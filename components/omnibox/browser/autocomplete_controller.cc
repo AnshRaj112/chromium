@@ -1043,7 +1043,8 @@ void AutocompleteController::SetMatchDestinationURL(
 
   // Append an extra header to navigations from the @gemini scope.
   const TemplateURL* turl = match->GetTemplateURL(template_url_service_, false);
-  if (turl && turl->starter_pack_id() == TemplateURLStarterPackData::kGemini &&
+  if (turl &&
+      turl->starter_pack_id() == template_url_starter_pack_data::kGemini &&
       !encoded_search_terms.empty() &&
       net::HttpUtil::IsValidHeaderValue(encoded_search_terms)) {
     DCHECK(net::HttpUtil::IsValidHeaderName(kOmniboxGeminiHeader));
@@ -1132,7 +1133,7 @@ bool AutocompleteController::ShouldRunProvider(
          keyword_turl->policy_origin() ==
              TemplateURLData::PolicyOrigin::kSearchAggregator)) {
       if (keyword_turl->starter_pack_id() ==
-          TemplateURLStarterPackData::kPage) {
+          template_url_starter_pack_data::kPage) {
         return provider->type() == AutocompleteProvider::TYPE_CONTEXTUAL_SEARCH;
       }
       switch (provider->type()) {
@@ -1150,7 +1151,7 @@ bool AutocompleteController::ShouldRunProvider(
         // @Bookmarks starter pack scope - run only the bookmarks provider.
         case AutocompleteProvider::TYPE_BOOKMARK:
           return (keyword_turl->starter_pack_id() ==
-                  TemplateURLStarterPackData::kBookmarks);
+                  template_url_starter_pack_data::kBookmarks);
 
         // @History starter pack scope - run the history providers & featured
         // search for embeddings IPH suggestions.
@@ -1159,12 +1160,12 @@ bool AutocompleteController::ShouldRunProvider(
         case AutocompleteProvider::TYPE_HISTORY_EMBEDDINGS:
         case AutocompleteProvider::TYPE_FEATURED_SEARCH:
           return (keyword_turl->starter_pack_id() ==
-                  TemplateURLStarterPackData::kHistory);
+                  template_url_starter_pack_data::kHistory);
 
         // @Tabs starter pack scope - run the open tab provider.
         case AutocompleteProvider::TYPE_OPEN_TAB:
           return (keyword_turl->starter_pack_id() ==
-                  TemplateURLStarterPackData::kTabs);
+                  template_url_starter_pack_data::kTabs);
 
         case AutocompleteProvider::TYPE_ENTERPRISE_SEARCH_AGGREGATOR:
           return keyword_turl->policy_origin() ==
@@ -1245,7 +1246,8 @@ GURL AutocompleteController::ComputeURLFromSearchTermsArgs(
   // Skip search term replacement when in the @gemini scope.
   // TODO(crbug.com/41494524): Replace this logic with a proper fix to support
   // keywords that do not do search term replacement in omnibox.
-  if (template_url->starter_pack_id() == TemplateURLStarterPackData::kGemini) {
+  if (template_url->starter_pack_id() ==
+      template_url_starter_pack_data::kGemini) {
     return GURL(OmniboxFieldTrial::kGeminiUrlOverride.Get());
   }
 
@@ -1699,7 +1701,8 @@ void AutocompleteController::AttachActions() {
             template_url_service_, &keyword_input);
     // Attach the contextual search fulfillment actions in the @page keyword
     // mode.
-    if (keyword_turl->starter_pack_id() == TemplateURLStarterPackData::kPage) {
+    if (keyword_turl->starter_pack_id() ==
+        template_url_starter_pack_data::kPage) {
       internal_result_.AttachContextualSearchFulfillmentActionToMatches();
       return;
     }
@@ -1752,7 +1755,26 @@ void AutocompleteController::UpdateAssociatedKeywords(
                          const std::u16string& keyword_text,
                          const std::u16string& keyword) {
     // There shouldn't be duplicate keywords.
-    CHECK(!added_keywords.count(keyword));
+    if (added_keywords.count(keyword)) {
+      std::string debug_string = base::StringPrintf(
+          "Input [%s]. Duplicate keyword attached, "
+          "([contents] [description] [provider] [keyword]) : "
+          "([%s] [%s] [%s] [%s]). "
+          "Existing matches and keywords are: ",
+          base::UTF16ToUTF8(input_.text()).c_str(),
+          base::UTF16ToUTF8(match.contents).c_str(),
+          base::UTF16ToUTF8(match.description).c_str(),
+          match.provider ? match.provider->GetName() : "null",
+          base::UTF16ToUTF8(keyword).c_str());
+      for (const AutocompleteMatch& m : *result) {
+        debug_string += base::StringPrintf(
+            "([%s] [%s] [%s] [%s]), ", base::UTF16ToUTF8(m.contents).c_str(),
+            base::UTF16ToUTF8(m.description).c_str(),
+            m.provider ? m.provider->GetName() : "null",
+            base::UTF16ToUTF8(m.fill_into_edit).c_str());
+      }
+      CHECK(!added_keywords.count(keyword)) << debug_string;
+    }
     added_keywords.insert(keyword);
     match.associated_keyword = std::make_unique<AutocompleteMatch>(
         keyword_provider_->CreateVerbatimMatch(keyword_text, keyword, input_));

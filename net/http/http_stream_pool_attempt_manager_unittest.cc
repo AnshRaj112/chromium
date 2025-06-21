@@ -18,6 +18,7 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/notreached.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "base/test/test_future.h"
@@ -153,8 +154,7 @@ class Preconnector {
             stream_key.socket_tag(), stream_key.network_anonymization_key(),
             stream_key.secure_dns_policy(),
             stream_key.disable_cert_network_fetches(),
-            alternative_service_info_, is_http1_allowed_, load_flags_,
-            proxy_info_,
+            alternative_service_info_, allowed_alpns_, load_flags_, proxy_info_,
             NetLogWithSource::Make(
                 pool.http_network_session()->net_log(),
                 NetLogSourceType::HTTP_STREAM_JOB_CONTROLLER)),
@@ -192,7 +192,7 @@ class Preconnector {
   size_t num_streams_ = 1;
 
   AlternativeServiceInfo alternative_service_info_;
-  bool is_http1_allowed_ = true;
+  NextProtoSet allowed_alpns_ = NextProtoSet::All();
   ProxyInfo proxy_info_ = ProxyInfo::Direct();
   int load_flags_ = 0;
 
@@ -241,8 +241,8 @@ class StreamRequester : public HttpStreamRequest::Delegate {
     return *this;
   }
 
-  StreamRequester& set_is_http1_allowed(bool is_http1_allowed) {
-    is_http1_allowed_ = is_http1_allowed;
+  StreamRequester& set_allowed_alpns(NextProtoSet allowed_alpns) {
+    allowed_alpns_ = allowed_alpns;
     return *this;
   }
 
@@ -294,8 +294,7 @@ class StreamRequester : public HttpStreamRequest::Delegate {
             stream_key.socket_tag(), stream_key.network_anonymization_key(),
             stream_key.secure_dns_policy(),
             stream_key.disable_cert_network_fetches(),
-            alternative_service_info_, is_http1_allowed_, load_flags_,
-            proxy_info_,
+            alternative_service_info_, allowed_alpns_, load_flags_, proxy_info_,
             NetLogWithSource::Make(
                 pool.http_network_session()->net_log(),
                 NetLogSourceType::HTTP_STREAM_JOB_CONTROLLER)),
@@ -423,7 +422,7 @@ class StreamRequester : public HttpStreamRequest::Delegate {
 
   bool enable_ip_based_pooling_ = true;
   bool enable_alternative_services_ = true;
-  bool is_http1_allowed_ = true;
+  NextProtoSet allowed_alpns_ = NextProtoSet::All();
   int load_flags_ = 0;
   ProxyInfo proxy_info_ = ProxyInfo::Direct();
   AlternativeServiceInfo alternative_service_info_;
@@ -6333,11 +6332,13 @@ TEST_F(HttpStreamPoolAttemptManagerTest, DisallowH1) {
   socket_factory()->AddSocketDataProvider(&data);
 
   StreamRequester requester;
-  requester.set_is_http1_allowed(false);
+  requester.set_allowed_alpns(
+      NextProtoSet({NextProto::kProtoHTTP2, NextProto::kProtoQUIC}));
 
   requester.RequestStream(pool());
   requester.WaitForResult();
-  EXPECT_THAT(requester.result(), Optional(IsError(ERR_H2_OR_QUIC_REQUIRED)));
+  EXPECT_THAT(requester.result(),
+              Optional(IsError(ERR_ALPN_NEGOTIATION_FAILED)));
 }
 
 // Tests that a bad proxy is reported to a ProxyResolutionService when falling
@@ -6670,6 +6671,124 @@ TEST_F(HttpStreamPoolAttemptManagerTest,
   // The TCP attempt should be aborted.
   EXPECT_EQ(requester.negotiated_protocol(), NextProto::kProtoQUIC);
   EXPECT_EQ(group.ActiveStreamSocketCount(), 0u);
+}
+
+// Tests that TLS Trust Anchor IDs are not sent when the feature flag is
+// disabled.
+TEST_F(HttpStreamPoolAttemptManagerTest, TrustAnchorIDsDisabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndDisableFeature(features::kTLSTrustAnchorIDs);
+
+  SSLContextConfig config = ssl_config_service()->GetSSLContextConfig();
+  config.trust_anchor_ids = {{0x01, 0x02, 0x03}, {0x02, 0x02}, {0x04, 0x04}};
+  ssl_config_service()->UpdateSSLConfigAndNotify(config);
+
+  SequencedSocketData data;
+  socket_factory()->AddSocketDataProvider(&data);
+  SSLSocketDataProvider ssl(ASYNC, OK);
+  // Trust Anchor IDs should not be sent because the feature is disabled.
+  ssl.expected_trust_anchor_ids = std::vector<uint8_t>();
+  socket_factory()->AddSSLSocketDataProvider(&ssl);
+
+  resolver()
+      ->AddFakeRequest()
+      ->add_endpoint(ServiceEndpointBuilder()
+                         .add_v4("192.0.2.1")
+                         .set_trust_anchor_ids({{0x02, 0x02}, {0x05, 0x06}})
+                         .endpoint())
+      .CompleteStartSynchronously(OK);
+
+  base::HistogramTester histogram_tester;
+  StreamRequester requester;
+  requester.set_destination(kDefaultDestination).RequestStream(pool());
+
+  requester.WaitForResult();
+  EXPECT_THAT(requester.result(), Optional(IsOk()));
+  histogram_tester.ExpectUniqueSample("Net.SSL_Connection_Error_TrustAnchorIDs",
+                                      OK, 1);
+  histogram_tester.ExpectTotalCount("Net.SSL_Connection_Latency_TrustAnchorIDs",
+                                    1);
+  histogram_tester.ExpectUniqueSample(
+      "Net.SSL.TrustAnchorIDsResult",
+      SSLClientSocket::TrustAnchorIDsResult::kSuccessInitial, 1);
+}
+
+// Tests that TLS Trust Anchor IDs are sent when the feature flag is enabled.
+TEST_F(HttpStreamPoolAttemptManagerTest, TrustAnchorIDs) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(features::kTLSTrustAnchorIDs);
+
+  SSLContextConfig config = ssl_config_service()->GetSSLContextConfig();
+  config.trust_anchor_ids = {{0x01, 0x02, 0x03}, {0x02, 0x02}, {0x04, 0x04}};
+  ssl_config_service()->UpdateSSLConfigAndNotify(config);
+
+  SequencedSocketData data;
+  socket_factory()->AddSocketDataProvider(&data);
+  SSLSocketDataProvider ssl(ASYNC, OK);
+  // The expected Trust Anchor IDs are the intersection of the Trust Anchor IDs
+  // that Chrome trusts (set on SSLContextConfig above) and the Trust Anchor IDs
+  // provided by the server in DNS (set on the endpoint metadata below), in TLS
+  // wire format.
+  ssl.expected_trust_anchor_ids = {{0x02, 0x02, 0x02}};
+  socket_factory()->AddSSLSocketDataProvider(&ssl);
+
+  resolver()
+      ->AddFakeRequest()
+      ->add_endpoint(ServiceEndpointBuilder()
+                         .add_v4("192.0.2.1")
+                         .set_trust_anchor_ids({{0x02, 0x02}, {0x05, 0x06}})
+                         .endpoint())
+      .CompleteStartSynchronously(OK);
+
+  base::HistogramTester histogram_tester;
+  StreamRequester requester;
+  requester.set_destination(kDefaultDestination).RequestStream(pool());
+
+  requester.WaitForResult();
+  EXPECT_THAT(requester.result(), Optional(IsOk()));
+  histogram_tester.ExpectUniqueSample("Net.SSL_Connection_Error_TrustAnchorIDs",
+                                      OK, 1);
+  histogram_tester.ExpectTotalCount("Net.SSL_Connection_Latency_TrustAnchorIDs",
+                                    1);
+  histogram_tester.ExpectUniqueSample(
+      "Net.SSL.TrustAnchorIDsResult",
+      SSLClientSocket::TrustAnchorIDsResult::kSuccessInitial, 1);
+}
+
+// Tests that TLS Trust Anchor IDs are sent even when ECH is disabled.
+TEST_F(HttpStreamPoolAttemptManagerTest, TrustAnchorIDsEnabledWithECHDisabled) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(features::kTLSTrustAnchorIDs);
+
+  SSLContextConfig config = ssl_config_service()->GetSSLContextConfig();
+  config.trust_anchor_ids = {{0x01, 0x02, 0x03}, {0x02, 0x02}, {0x04, 0x04}};
+  ssl_config_service()->UpdateSSLConfigAndNotify(config);
+
+  SetEchEnabled(false);
+
+  SequencedSocketData data;
+  socket_factory()->AddSocketDataProvider(&data);
+  SSLSocketDataProvider ssl(ASYNC, OK);
+  // The expected Trust Anchor IDs are the intersection of the Trust Anchor IDs
+  // that Chrome trusts (set on SSLContextConfig above) and the Trust Anchor IDs
+  // provided by the server in DNS (set on the endpoint metadata below), in TLS
+  // wire format.
+  ssl.expected_trust_anchor_ids = {{0x02, 0x02, 0x02}};
+  socket_factory()->AddSSLSocketDataProvider(&ssl);
+
+  resolver()
+      ->AddFakeRequest()
+      ->add_endpoint(ServiceEndpointBuilder()
+                         .add_v4("192.0.2.1")
+                         .set_trust_anchor_ids({{0x02, 0x02}, {0x05, 0x06}})
+                         .endpoint())
+      .CompleteStartSynchronously(OK);
+
+  StreamRequester requester;
+  requester.set_destination(kDefaultDestination).RequestStream(pool());
+
+  requester.WaitForResult();
+  EXPECT_THAT(requester.result(), Optional(IsOk()));
 }
 
 TEST_F(HttpStreamPoolAttemptManagerTest, JobAllowH2Only) {

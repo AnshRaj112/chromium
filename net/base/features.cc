@@ -307,7 +307,7 @@ BASE_FEATURE_PARAM(int,
                    kTcpPortRandomizationWinVersionMinimum,
                    &kTcpPortRandomizationWin,
                    "TcpPortRandomizationWinVersionMinimum",
-                   static_cast<int>(base::win::Version::WIN10_20H1));
+                   static_cast<int>(base::win::Version::WIN11_22H2));
 
 BASE_FEATURE(kTcpPortReuseMetricsWin,
              "TcpPortReuseMetricsWin",
@@ -533,6 +533,11 @@ const base::FeatureParam<bool> kIpPrivacyDisableForEnterpriseByDefault{
     /*name=*/"IpPrivacyDisableForEnterpriseByDefault",
     /*default_value=*/false};
 
+const base::FeatureParam<bool> kIpPrivacyEnableIppInDevTools{
+    &kEnableIpProtectionProxy,
+    /*name=*/"IpPrivacyEnableIppInDevTools",
+    /*default_value=*/false};
+
 BASE_FEATURE(kExcludeLargeBodyReports,
              "ExcludeLargeReportBodies",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -681,12 +686,6 @@ BASE_FEATURE(kFurtherOptimizeParsingDataUrls,
              "FurtherOptimizeParsingDataUrls",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// TODO(crbug.com/347047841): Remove this flag when we branch for M131 or later,
-// if we haven't had to turn this off.
-BASE_FEATURE(kLegacyPKCS1ForTLS13,
-             "LegacyPKCS1ForTLS13",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kKeepWhitespaceForDataUrls,
              "KeepWhitespaceForDataUrls",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -791,5 +790,21 @@ BASE_FEATURE(kRestrictAbusePortsOnLocalhost,
 BASE_FEATURE(kTLSTrustAnchorIDs,
              "TLSTrustAnchorIDs",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kTcpConnectionPoolSizeTrial,
+             "TcpConnectionPoolSizeTrial",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE_PARAM(int,
+                   kTcpConnectionPoolSizeTrialNormal,
+                   &kTcpConnectionPoolSizeTrial,
+                   "TcpConnectionPoolSizeTrialNormal",
+                   256);
+
+BASE_FEATURE_PARAM(int,
+                   kTcpConnectionPoolSizeTrialWebSocket,
+                   &kTcpConnectionPoolSizeTrial,
+                   "TcpConnectionPoolSizeTrialWebSocket",
+                   256);
 
 }  // namespace net::features

@@ -88,7 +88,7 @@ inline constexpr base::FeatureParam<PreloadTopChromeWebUIMode>
     kPreloadTopChromeWebUIMode(
         &kPreloadTopChromeWebUI,
         kPreloadTopChromeWebUIModeName,
-        PreloadTopChromeWebUIMode::kPreloadOnMakeContents,
+        PreloadTopChromeWebUIMode::kPreloadOnWarmup,
         &kPreloadTopChromeWebUIModeOptions);
 
 // If smart preload is enabled, the preload WebUI is determined by historical
@@ -144,6 +144,19 @@ BASE_DECLARE_FEATURE(kScrimForBrowserWindowModal);
 BASE_DECLARE_FEATURE(KScrimForTabModal);
 
 BASE_DECLARE_FEATURE(kSideBySide);
+
+// The delay before showing the drop target for the side-by-side drag-and-drop
+// entrypoint.
+inline constexpr base::FeatureParam<base::TimeDelta>
+    kSideBySideShowDropTargetDelay(&kSideBySide,
+                                   "SideBySideShowDropTargetDelay",
+                                   base::Seconds(1));
+
+// The padding inside the drop target that determines the overall width.
+inline constexpr base::FeatureParam<int> kSideBySideDropTargetInnerPadding(
+    &kSideBySide,
+    "SideBySideDropTargetInnerPadding",
+    37);
 
 BASE_DECLARE_FEATURE(kSideBySideLinkMenuNewBadge);
 

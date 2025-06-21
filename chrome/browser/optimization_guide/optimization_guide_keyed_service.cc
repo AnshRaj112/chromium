@@ -53,7 +53,6 @@
 #include "components/optimization_guide/core/hints/top_host_provider.h"
 #include "components/optimization_guide/core/model_execution/feature_keys.h"
 #include "components/optimization_guide/core/model_execution/model_broker_client.h"
-#include "components/optimization_guide/core/model_execution/model_execution_features.h"
 #include "components/optimization_guide/core/model_execution/model_execution_features_controller.h"
 #include "components/optimization_guide/core/model_execution/model_execution_manager.h"
 #include "components/optimization_guide/core/model_execution/on_device_asset_manager.h"
@@ -286,7 +285,6 @@ void OptimizationGuideKeyedService::Initialize() {
   // profile's store and do not fetch any new hints or models.
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory;
   base::WeakPtr<optimization_guide::OptimizationGuideStore> hint_store;
-  base::FilePath model_downloads_dir;
   if (profile->IsOffTheRecord()) {
     OptimizationGuideKeyedService* original_ogks =
         OptimizationGuideKeyedServiceFactory::GetForProfile(
@@ -348,13 +346,8 @@ void OptimizationGuideKeyedService::Initialize() {
   prediction_manager_ = std::make_unique<optimization_guide::PredictionManager>(
       optimization_guide::ChromePredictionModelStore::GetInstance(),
       url_loader_factory, profile->GetPrefs(), profile->IsOffTheRecord(),
-      g_browser_process->GetApplicationLocale(), model_downloads_dir,
+      g_browser_process->GetApplicationLocale(),
       optimization_guide_logger_.get(),
-      base::BindOnce(
-          &OptimizationGuideKeyedService::BackgroundDownloadServiceProvider,
-          // It's safe to use |base::Unretained(this)| here because
-          // |this| owns |prediction_manager_|.
-          base::Unretained(this)),
       base::BindRepeating(
           &OptimizationGuideKeyedService::ComponentUpdatesEnabledProvider,
           // It's safe to use |base::Unretained(this)| here because
@@ -708,7 +701,8 @@ OptimizationGuideKeyedService::GetModelExecutionFeaturesController() {
 
 void OptimizationGuideKeyedService::AllowUnsignedUserForTesting(
     optimization_guide::UserVisibleFeatureKey feature) {
-  model_execution_features_controller_->AllowUnsignedUserForTesting(feature);  // IN-TEST
+  model_execution_features_controller_->AllowUnsignedUserForTesting(
+      feature);  // IN-TEST
 }
 
 bool OptimizationGuideKeyedService::ShouldFeatureBeCurrentlyEnabledForUser(
@@ -774,34 +768,6 @@ bool OptimizationGuideKeyedService::IsSettingVisible(
 #endif
 
   return model_execution_features_controller_->IsSettingVisible(feature);
-}
-
-bool OptimizationGuideKeyedService::ShouldShowExperimentalAIPromo() const {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!model_execution_features_controller_) {
-    return false;
-  }
-  if (!base::FeatureList::IsEnabled(optimization_guide::features::internal::
-                                        kExperimentalAIIPHPromoRampUp)) {
-    return false;
-  }
-  // At least one of the two features should be visible to user in settings, and
-  // not currently enabled.
-  if (model_execution_features_controller_->IsSettingVisible(
-          optimization_guide::UserVisibleFeatureKey::kTabOrganization) &&
-      !model_execution_features_controller_
-           ->ShouldFeatureBeCurrentlyEnabledForUser(
-               optimization_guide::UserVisibleFeatureKey::kTabOrganization)) {
-    return true;
-  }
-  if (model_execution_features_controller_->IsSettingVisible(
-          optimization_guide::UserVisibleFeatureKey::kWallpaperSearch) &&
-      !model_execution_features_controller_
-           ->ShouldFeatureBeCurrentlyEnabledForUser(
-               optimization_guide::UserVisibleFeatureKey::kWallpaperSearch)) {
-    return true;
-  }
-  return false;
 }
 
 void OptimizationGuideKeyedService::AddModelExecutionSettingsEnabledObserver(

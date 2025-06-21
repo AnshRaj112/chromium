@@ -189,6 +189,12 @@ class MODULES_EXPORT ServiceWorkerGlobalScope final
   // PauseEvaluation() is called.
   void ResumeEvaluation();
 
+  // Defers `PrepareForEvaluation()` until `RunDeferredPrepareForEvaluation` is
+  // called.
+  void DeferPrepareForEvaluation();
+  // Run deferred preparing for worker script evaluation.
+  void RunDeferredPrepareForEvaluation();
+
   // Creates a ServiceWorkerEventQueue::StayAwakeToken to ensure that the idle
   // timer won't be triggered while any of these are alive.
   std::unique_ptr<ServiceWorkerEventQueue::StayAwakeToken>
@@ -633,8 +639,6 @@ class MODULES_EXPORT ServiceWorkerGlobalScope final
       const KURL& request_url);
   void RemoveItemFromRaceNetworkRequests(int fetch_event_id);
 
-  void PrepareForEvaluationIfNeeded();
-
   Member<ServiceWorkerClients> clients_;
   Member<ServiceWorkerRegistration> registration_;
   Member<::blink::ServiceWorker> service_worker_;
@@ -754,9 +758,8 @@ class MODULES_EXPORT ServiceWorkerGlobalScope final
   // ResumeEvaluation() evaluates the top level script when this flag is true.
   bool global_scope_initialized_ = false;
 
-  // Whether `ScriptController()->PrepareForEvaluation()` should be called after
-  // evaluation is resumed.
-  bool pending_prepare_for_evaluation_ = false;
+  // Whether `PrepareForEvaluation` should be deferred.
+  bool defer_prepare_for_evaluation_ = false;
 
   // Connected by the ServiceWorkerHost in the browser process and by the
   // controllees. |controller_bindings_| should be destroyed before

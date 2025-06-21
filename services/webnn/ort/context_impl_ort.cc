@@ -65,10 +65,12 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*clamp_input=*/
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*concat_inputs=*/{},
-       /*conv2d_input=*/{},
-       /*conv2d_bias=*/{},
-       /*conv_transpose2d_input=*/{},
-       /*conv_transpose2d_bias=*/{},
+       /*conv2d_input=*/{DataTypeConstraint::kFloat16To32, {3, 8}},
+       /*conv2d_bias=*/
+       {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(1)},
+       /*conv_transpose2d_input=*/{DataTypeConstraint::kFloat16To32, {3, 8}},
+       /*conv_transpose2d_bias=*/
+       {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(1)},
        /*cumulative_sum_input=*/{},
        /*dequantize_linear_input=*/{},
        /*dequantize_linear_scale=*/{},
@@ -162,7 +164,11 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*reduce_sum_square_input=*/{},
        /*relu_input=*/{DataTypeConstraint::kFloat16To32Int8To64, kMaxRank},
        /*resample2d_input=*/{},
-       /*reshape_input=*/{},
+       // TODO(crbug.com/425151000): Add int4/uint4 support for reshape once the
+       // related ORT issue is fixed.
+       // https://github.com/microsoft/onnxruntime/issues/24285
+       /*reshape_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*reverse_input=*/{},
        /*scatter_elements_input=*/{},
        /*scatter_elements_indices=*/{},
@@ -171,13 +177,13 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*scatter_nd_updates=*/{},
        /*sigmoid_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*slice_input=*/{},
-       /*softmax_input=*/{},
+       /*softmax_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*softplus_input=*/{},
        /*softsign_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*split_input=*/{},
        /*tanh_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*tile_input=*/{},
-       /*transpose_input=*/{},
+       /*transpose_input=*/{SupportedDataTypes::All(), kMaxRank},
        /*triangular_input=*/{},
        /*where_condition=*/{},
        /*where_value=*/{}});

@@ -44,6 +44,7 @@
 #include "third_party/blink/renderer/core/layout/layout_multi_column_flow_thread.h"
 #include "third_party/blink/renderer/core/layout/layout_multi_column_set.h"
 #include "third_party/blink/renderer/core/layout/layout_multi_column_spanner_placeholder.h"
+#include "third_party/blink/renderer/core/layout/layout_object_inlines.h"
 #include "third_party/blink/renderer/core/layout/layout_result.h"
 #include "third_party/blink/renderer/core/layout/layout_utils.h"
 #include "third_party/blink/renderer/core/layout/layout_video.h"
@@ -86,7 +87,6 @@
 #include "third_party/blink/renderer/core/mathml/mathml_under_over_element.h"
 #include "third_party/blink/renderer/core/paint/paint_layer.h"
 #include "third_party/blink/renderer/core/paint/paint_layer_scrollable_area.h"
-#include "third_party/blink/renderer/core/paint/transform_utils.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 #include "third_party/blink/renderer/platform/text/writing_mode.h"
 #include "third_party/blink/renderer/platform/wtf/allocator/allocator.h"
@@ -388,7 +388,7 @@ void AttachScrollMarkers(LayoutObject& parent,
   }
 
   const LayoutBox* parent_box = DynamicTo<LayoutBox>(&parent);
-  // If this is a multicol container, look for ::column::scroll-marker pseudo
+  // If this is a multicol container, look for ::column::scroll-marker pseudo-
   // elements, and attach them.
   if (parent_box && parent_box->IsFragmentationContextRoot()) {
     if (const ColumnPseudoElementsVector* column_pseudos =
@@ -1612,38 +1612,6 @@ LogicalSize BlockNode::GetReplacedAspectRatio() const {
     return Style().LogicalAspectRatio();
   }
   return LogicalSize();
-}
-
-std::optional<gfx::Transform> BlockNode::GetTransformForChildFragment(
-    const PhysicalBoxFragment& child_fragment,
-    PhysicalSize size) const {
-  const auto* child_layout_object = child_fragment.GetLayoutObject();
-  DCHECK(child_layout_object);
-
-  if (!child_layout_object->ShouldUseTransformFromContainer(box_))
-    return std::nullopt;
-
-  std::optional<gfx::Transform> fragment_transform;
-  if (!child_fragment.IsOnlyForNode()) {
-    // If we're fragmented, there's no correct transform stored for
-    // us. Calculate it now.
-    fragment_transform.emplace();
-    fragment_transform->MakeIdentity();
-    const PhysicalRect reference_box = ComputeReferenceBox(child_fragment);
-    child_fragment.Style().ApplyTransform(
-        *fragment_transform, box_, reference_box,
-        ComputedStyle::kIncludeTransformOperations,
-        ComputedStyle::kIncludeTransformOrigin,
-        ComputedStyle::kIncludeMotionPath,
-        ComputedStyle::kIncludeIndependentTransformProperties);
-  }
-
-  gfx::Transform transform;
-  child_layout_object->GetTransformFromContainer(
-      box_, PhysicalOffset(), transform, &size,
-      base::OptionalToPtr(fragment_transform));
-
-  return transform;
 }
 
 bool BlockNode::HasNonVisibleBlockOverflow() const {

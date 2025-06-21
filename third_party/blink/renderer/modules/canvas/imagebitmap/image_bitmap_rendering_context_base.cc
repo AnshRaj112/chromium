@@ -42,17 +42,18 @@ ImageBitmapRenderingContextBase::getHTMLOrOffscreenCanvas() const {
 void ImageBitmapRenderingContextBase::Reset() {
   CHECK(Host());
   CHECK(Host()->IsOffscreenCanvas());
-  Host()->DiscardResourceProvider();
+  Host()->DiscardResources();
 }
 
 void ImageBitmapRenderingContextBase::Stop() {
   image_layer_bridge_->Dispose();
 }
 
-CanvasResourceProvider*
-ImageBitmapRenderingContextBase::PaintRenderingResultsToCanvas(
-    SourceDrawingBuffer) {
-  return Host()->ResourceProvider();
+scoped_refptr<StaticBitmapImage>
+ImageBitmapRenderingContextBase::PaintRenderingResultsToSnapshot(
+    SourceDrawingBuffer source_buffer,
+    FlushReason reason) {
+  return GetImage(reason);
 }
 
 void ImageBitmapRenderingContextBase::Dispose() {
@@ -134,6 +135,12 @@ bool ImageBitmapRenderingContextBase::CanCreateCanvas2dResourceProvider()
                ->GetOrCreateResourceProviderForImageBitmap();
 }
 
+bool ImageBitmapRenderingContextBase::IsAccelerated() const {
+  auto* resource_provider = Host()->GetResourceProviderForImageBitmap();
+  return resource_provider ? resource_provider->IsAccelerated()
+                           : Host()->ShouldTryToUseGpuRaster();
+}
+
 bool ImageBitmapRenderingContextBase::PushFrame() {
   DCHECK(Host());
   DCHECK(Host()->IsOffscreenCanvas());
@@ -146,11 +153,12 @@ bool ImageBitmapRenderingContextBase::PushFrame() {
   }
   cc::PaintFlags paint_flags;
   paint_flags.setBlendMode(SkBlendMode::kSrc);
-  Host()->ResourceProvider()->Canvas().drawImage(
+  OffscreenCanvas* canvas = static_cast<OffscreenCanvas*>(Host());
+  canvas->GetResourceProviderForImageBitmap()->Canvas().drawImage(
       image->PaintImageForCurrentFrame(), 0, 0, SkSamplingOptions(),
       &paint_flags);
   scoped_refptr<CanvasResource> resource =
-      Host()->ResourceProvider()->ProduceCanvasResource(
+      canvas->GetResourceProviderForImageBitmap()->ProduceCanvasResource(
           FlushReason::kNon2DCanvas);
   Host()->PushFrame(
       std::move(resource),

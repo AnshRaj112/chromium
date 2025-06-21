@@ -120,6 +120,13 @@ class SupervisedUserService : public KeyedService {
   // on the UI thread.
   SupervisedUserURLFilter* GetURLFilter() const;
 
+  // Returns true if the user is supervised locally (e.g. on the device).
+  // Currently, local supervision is only supported on Android.
+  bool IsSupervisedLocally() const;
+  // Returns true if the user is supervised locally (e.g. on the device) and
+  // requested browser content to be filtered.
+  bool IsLocalContentFilteringEnabled() const;
+
   std::optional<Custodian> GetCustodian() const;
   std::optional<Custodian> GetSecondCustodian() const;
 
@@ -152,8 +159,17 @@ class SupervisedUserService : public KeyedService {
       SupervisedUserSettingsService& settings_service,
       syncer::SyncService* sync_service,
       std::unique_ptr<SupervisedUserURLFilter> url_filter,
-      std::unique_ptr<SupervisedUserService::PlatformDelegate>
-          platform_delegate);
+      std::unique_ptr<SupervisedUserService::PlatformDelegate> platform_delegate
+#if BUILDFLAG(IS_ANDROID)
+      ,
+      // The default arguments are substituted with live
+      // ContentFiltersObserverBridge instances.
+      std::unique_ptr<ContentFiltersObserverBridge>
+          browser_content_filters_observer = nullptr,
+      std::unique_ptr<ContentFiltersObserverBridge>
+          search_content_filters_observer = nullptr
+#endif
+  );
 
  private:
   // Activates the service which controls managed settings of url filtering and
@@ -206,6 +222,8 @@ class SupervisedUserService : public KeyedService {
 
   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
 
+  std::unique_ptr<SupervisedUserURLFilter> url_filter_;
+
   // Manages the status of parental controls and notifies this instance when the
   // state changes.
   SupervisedControlsState controls_state_;
@@ -225,14 +243,14 @@ class SupervisedUserService : public KeyedService {
 
 #if BUILDFLAG(IS_ANDROID)
   // Observers for the content filters
-  ContentFiltersObserverBridge browser_content_filters_observer_;
-  ContentFiltersObserverBridge search_content_filters_observer_;
+  std::unique_ptr<ContentFiltersObserverBridge>
+      browser_content_filters_observer_;
+  std::unique_ptr<ContentFiltersObserverBridge>
+      search_content_filters_observer_;
 #endif  // BUILDFLAG(IS_ANDROID)
 
   // True only when |Shutdown()| method has been called.
   bool did_shutdown_ = false;
-
-  std::unique_ptr<SupervisedUserURLFilter> url_filter_;
 
   // Manages remote web approvals.
   RemoteWebApprovalsManager remote_web_approvals_manager_;

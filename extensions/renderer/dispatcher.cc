@@ -81,7 +81,6 @@
 #include "extensions/renderer/module_system.h"
 #include "extensions/renderer/native_extension_bindings_system.h"
 #include "extensions/renderer/renderer_extension_registry.h"
-#include "extensions/renderer/renderer_frame_context_data.h"
 #include "extensions/renderer/safe_builtins.h"
 #include "extensions/renderer/script_context.h"
 #include "extensions/renderer/script_context_set.h"
@@ -585,6 +584,9 @@ void Dispatcher::DidInitializeServiceWorkerContextOnWorkerThread(
   if (!script_url.SchemeIs(kExtensionScheme))
     return;
 
+  // Defer `PrepareForEvaluation` until `ModuleSystem` is created.
+  context_proxy->DeferPrepareForEvaluation();
+
   {
     base::AutoLock lock(service_workers_paused_for_on_loaded_message_lock_);
     ExtensionId extension_id =
@@ -603,7 +605,7 @@ void Dispatcher::DidInitializeServiceWorkerContextOnWorkerThread(
   }
 }
 
-void Dispatcher::WillPrepareForEvaluationOnWorkerThread(
+void Dispatcher::WillEvaluateServiceWorkerOnWorkerThread(
     blink::WebServiceWorkerContextProxy* context_proxy,
     v8::Local<v8::Context> v8_context,
     int64_t service_worker_version_id,
@@ -625,6 +627,13 @@ void Dispatcher::WillPrepareForEvaluationOnWorkerThread(
         ServiceWorkerContextState::kScriptUrlIsNotExtensionScheme;
     return;
   }
+
+  // Runs the deferred `PrepareForEvaluation` before this returns.
+  base::ScopedClosureRunner run_at_return(base::BindOnce(
+      [](blink::WebServiceWorkerContextProxy* context_proxy) {
+        context_proxy->RunDeferredPrepareForEvaluation();
+      },
+      context_proxy));
 
   const Extension* extension =
       RendererExtensionRegistry::Get()->GetExtensionOrAppByURL(script_url);
@@ -731,28 +740,13 @@ void Dispatcher::WillPrepareForEvaluationOnWorkerThread(
   RequireGuestViewModules(context);
 #endif
 
+  WorkerThreadDispatcher::GetServiceWorkerData()->Init();
   g_worker_script_context_set.Get().Insert(base::WrapUnique(context));
 
   const base::TimeDelta elapsed = base::TimeTicks::Now() - start_time;
   UMA_HISTOGRAM_TIMES(
       "Extensions.DidInitializeServiceWorkerContextOnWorkerThread2", elapsed);
   service_worker_context_state = ServiceWorkerContextState::kInitialized;
-}
-
-void Dispatcher::WillEvaluateServiceWorkerOnWorkerThread() {
-  const int thread_id = content::WorkerThread::GetCurrentId();
-  CHECK_NE(thread_id, kMainThreadId);
-
-  // `WillPrepareForEvaluationOnWorkerThread` should have run and updated
-  // `service_worker_context_state`.
-  CHECK_NE(service_worker_context_state,
-           extensions::ServiceWorkerContextState::kDefault);
-
-  if (service_worker_context_state != ServiceWorkerContextState::kInitialized) {
-    return;
-  }
-
-  WorkerThreadDispatcher::GetServiceWorkerData()->Init();
 }
 
 void Dispatcher::WillReleaseScriptContext(
@@ -784,9 +778,6 @@ void Dispatcher::DidStartServiceWorkerContextOnWorkerThread(
   const int thread_id = content::WorkerThread::GetCurrentId();
   CHECK_NE(thread_id, kMainThreadId);
   auto* service_worker_data = WorkerThreadDispatcher::GetServiceWorkerData();
-  const ExtensionId& extension_id =
-      service_worker_data->context()->GetExtensionID();
-  CHECK(!extension_id.empty());
   if (base::FeatureList::IsEnabled(
           kSpeculativeFixForServiceWorkerDataInDidStartServiceWorkerContext)) {
     // `service_worker_data` can be nullptr if the extension is already unloaded
@@ -796,12 +787,18 @@ void Dispatcher::DidStartServiceWorkerContextOnWorkerThread(
     // `thread_state_` or `requested_to_terminate_` to confirm we're in
     // termination when `service_worker_data` is false here.
     if (service_worker_data) {
+      const ExtensionId& extension_id =
+          service_worker_data->context()->GetExtensionID();
+      CHECK(!extension_id.empty());
       service_worker_data->GetServiceWorkerHost()->DidStartServiceWorkerContext(
           extension_id, *service_worker_data->activation_sequence(),
           service_worker_scope, service_worker_version_id, thread_id);
     }
   } else {
     CHECK(service_worker_data);
+    const ExtensionId& extension_id =
+        service_worker_data->context()->GetExtensionID();
+    CHECK(!extension_id.empty());
     service_worker_data->GetServiceWorkerHost()->DidStartServiceWorkerContext(
         extension_id, *service_worker_data->activation_sequence(),
         service_worker_scope, service_worker_version_id, thread_id);

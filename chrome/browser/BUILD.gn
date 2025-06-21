@@ -149,6 +149,35 @@ source_set("global_features") {
   ]
 }
 
+source_set("flags") {
+  sources = [
+    "about_flags.h",
+    "flag_descriptions.h",
+  ]
+  public_deps = [
+    "//base",
+    "//base:debugging_buildflags",
+    "//build:branding_buildflags",
+    "//build:buildflag_header_h",
+    "//chrome/common:buildflags",
+    "//components/compose:buildflags",
+    "//components/enterprise/buildflags",
+    "//components/nacl/common:buildflags",
+    "//components/paint_preview/buildflags",
+    "//components/signin/public/base:signin_buildflags",
+    "//components/webui/flags",
+    "//content/public/common",
+    "//device/vr/buildflags",
+    "//extensions/buildflags",
+    "//media:media_buildflags",
+    "//net:buildflags",
+    "//pdf:buildflags",
+    "//printing/buildflags",
+    "//skia:buildflags",
+    "//third_party/blink/public/common:buildflags",
+  ]
+}
+
 source_set("shell_integration") {
   sources = [ "shell_integration.h" ]
   deps = [
@@ -163,7 +192,6 @@ source_set("shell_integration") {
 static_library("browser") {
   sources = [
     "about_flags.cc",
-    "about_flags.h",
     "accessibility/accessibility_labels_service.cc",
     "accessibility/accessibility_labels_service.h",
     "accessibility/accessibility_labels_service_factory.cc",
@@ -548,7 +576,6 @@ static_library("browser") {
     "first_party_sets/first_party_sets_policy_service_factory.cc",
     "first_party_sets/first_party_sets_policy_service_factory.h",
     "flag_descriptions.cc",
-    "flag_descriptions.h",
     "font_family_cache.cc",
     "font_family_cache.h",
     "gcm/gcm_product_util.cc",
@@ -2052,6 +2079,10 @@ static_library("browser") {
     "//chrome/browser/ui/search_engines",
     "//chrome/browser/ui/side_search",
 
+    # TODO(crbug.com/369436587): Remove this dependency when
+    # c/b/policy/configuration_policy_handler_list_factory.cc gets modularized.
+    "//chrome/browser/ui/toolbar/chrome_labs",
+
     # TODO(417228688): Remove this dependency when both chrome/browser/serial and
     # chrome/browser/profiles/profile_manager.h get modularized.
     "//chrome/browser/infobars",
@@ -2438,9 +2469,9 @@ static_library("browser") {
     "//components/tab_groups",
     "//components/tpcd/metadata/browser",
     "//components/tpcd/metadata/browser:prefs",
-    "//components/tracing:background_tracing_metrics_provider",
     "//components/tracing:background_tracing_utils",
     "//components/tracing:tracing_config",
+    "//components/tracing:tracing_metrics",
     "//components/translate/content/browser",
     "//components/translate/core/browser",
     "//components/translate/core/common",
@@ -3207,8 +3238,6 @@ static_library("browser") {
       "profiles/profile_manager_android.cc",
       "profiles/profile_manager_android.h",
       "readaloud/android/read_aloud_features.cc",
-      "readaloud/android/synthetic_trial.cc",
-      "readaloud/android/synthetic_trial.h",
       "safe_browsing/android/notification_content_detection_manager_android.cc",
       "safe_browsing/android/notification_content_detection_manager_android.h",
       "safe_browsing/android/password_reuse_controller_android.cc",
@@ -3315,7 +3344,6 @@ static_library("browser") {
       # TODO(crbug.com/40261269): Move to its own target in touch_to_fill/.
       "touch_to_fill/autofill/android/touch_to_fill_delegate_android_impl.cc",
       "touch_to_fill/autofill/android/touch_to_fill_delegate_android_impl.h",
-      "touch_to_fill/autofill/android/touch_to_fill_payment_method_controller.h",
       "touch_to_fill/autofill/android/touch_to_fill_payment_method_controller_impl.cc",
       "touch_to_fill/autofill/android/touch_to_fill_payment_method_controller_impl.h",
       "touch_to_fill/password_manager/touch_to_fill_controller.cc",
@@ -3483,7 +3511,6 @@ static_library("browser") {
       "//components/image_fetcher/core:metrics",
       "//components/infobars/android",
       "//components/installedapp/android",
-      "//components/invalidation/impl:feature_list",
       "//components/javascript_dialogs/android:jni_headers",
       "//components/language/android:language_bridge",
       "//components/location/android:settings",
@@ -3651,8 +3678,6 @@ static_library("browser") {
       "apps/intent_helper/intent_chip_display_prefs.h",
       "autocomplete/tab_matcher_desktop.cc",
       "autocomplete/tab_matcher_desktop.h",
-      "autofill_ai/chrome_autofill_ai_client.cc",
-      "autofill_ai/chrome_autofill_ai_client.h",
       "badging/badge_manager.cc",
       "badging/badge_manager.h",
       "badging/badge_manager_delegate.h",
@@ -4263,8 +4288,6 @@ static_library("browser") {
       "upgrade_detector/build_state.cc",
       "upgrade_detector/build_state.h",
       "upgrade_detector/upgrade_detector.cc",
-      "upgrade_detector/upgrade_detector.h",
-      "upgrade_detector/upgrade_observer.h",
       "upgrade_detector/version_history_client.cc",
       "upgrade_detector/version_history_client.h",
       "usb/usb_connection_tracker.cc",
@@ -4483,6 +4506,7 @@ static_library("browser") {
       "//chrome/browser/ui/webui/top_chrome:impl",
       "//chrome/browser/ui/webui/whats_new",
       "//chrome/browser/ui/webui/whats_new:impl",
+      "//chrome/browser/upgrade_detector",
       "//chrome/browser/upgrade_detector:build_state_observer",
       "//chrome/browser/web_applications",
       "//chrome/browser/web_applications:features",
@@ -4495,7 +4519,6 @@ static_library("browser") {
       "//components/app_constants",
       "//components/autofill/core/browser",
       "//components/autofill/core/common",
-      "//components/autofill_ai/core/browser",
       "//components/cbor",
       "//components/commerce/core:cart_db_content_proto",
       "//components/commerce/core:discounts_db_content_proto",
@@ -5494,6 +5517,7 @@ static_library("browser") {
       "//chrome/browser/chromeos/upload_office_to_cloud",
       "//chrome/browser/chromeos/video_conference",
       "//chrome/browser/enterprise/connectors/device_trust/attestation/ash",
+      "//chrome/browser/extensions/api/enterprise_networking_attributes",
       "//chrome/browser/nearby_sharing:share_target",
       "//chrome/browser/nearby_sharing/certificates",
       "//chrome/browser/nearby_sharing/client",
@@ -6010,6 +6034,7 @@ static_library("browser") {
       "//chrome/browser/chromeos/reporting",
       "//chrome/browser/chromeos/tablet_mode",
       "//chrome/browser/chromeos/upload_office_to_cloud",
+      "//chrome/browser/extensions/api/enterprise_networking_attributes",
       "//chrome/browser/policy:onc",
       "//chrome/browser/support_tool/ash",
       "//chrome/browser/ui/ash/accelerator",
@@ -6447,6 +6472,7 @@ static_library("browser") {
       "//chrome/app:chrome_exe_main_exports",
       "//chrome/app/theme:chrome_unscaled_resources_grit",
       "//chrome/browser/os_crypt",
+      "//chrome/browser/platform_experience:prefs",
       "//chrome/browser/shortcuts",
       "//chrome/browser/web_applications/chrome_pwa_launcher:util",
       "//chrome/browser/win:cloud_synced_folder_checker",
@@ -7808,6 +7834,8 @@ static_library("browser") {
       # They should be removed.
       "extensions/desktop_android/desktop_android_extension_host_delegate.cc",
       "extensions/desktop_android/desktop_android_extension_host_delegate.h",
+      "extensions/extension_menu_delegate_android.cc",
+      "extensions/extension_menu_delegate_android.h",
     ]
 
     deps += [
@@ -8494,6 +8522,13 @@ static_library("browser_public_dependencies") {
     # //chrome/browser:browser needing to include 2 separate targets, we include
     # generated files here.
     ":browser_generated_files",
+
+    # To avoid that the huge amount of source files that include either
+    # "about_flags.h" or "flag_description.h" to depend directly on //c/b:flags
+    # for now, it is added temporarily as a public dependency of //c/b:b.
+    #
+    # TODO(crbug.com/369436587): Make all targets that include these headers to depend directly //c/b:flags.
+    ":flags",
 
     # //chrome/browser/ui and //chrome/browser are semantically the same target,
     # and thus their public dependencies are shared.

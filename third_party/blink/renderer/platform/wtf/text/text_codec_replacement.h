@@ -15,16 +15,16 @@ namespace blink {
 // the same as UTF-8; and for a non-empty input the decoder emits U+FFFD and
 // terminates. See: https://encoding.spec.whatwg.org/#replacement and
 // https://encoding.spec.whatwg.org/#output-encodings
-class TextCodecReplacement final : public WTF::TextCodecUTF8 {
+class TextCodecReplacement final : public TextCodecUtf8 {
  public:
   TextCodecReplacement();
 
-  static void RegisterEncodingNames(WTF::EncodingNameRegistrar);
-  static void RegisterCodecs(WTF::TextCodecRegistrar);
+  static void RegisterEncodingNames(EncodingNameRegistrar);
+  static void RegisterCodecs(TextCodecRegistrar);
 
  private:
   String Decode(base::span<const uint8_t> data,
-                WTF::FlushBehavior,
+                FlushBehavior,
                 bool stop_on_error,
                 bool& saw_error) override;
 

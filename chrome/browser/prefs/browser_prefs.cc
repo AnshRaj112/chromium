@@ -51,6 +51,7 @@
 #include "chrome/browser/notifications/notifier_state_tracker.h"
 #include "chrome/browser/notifications/platform_notification_service_impl.h"
 #include "chrome/browser/permissions/quiet_notification_permission_ui_state.h"
+#include "chrome/browser/platform_experience/prefs.h"
 #include "chrome/browser/policy/developer_tools_policy_handler.h"
 #include "chrome/browser/prefs/chrome_pref_service_factory.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
@@ -1139,6 +1140,18 @@ inline constexpr char kVariationsLimitedEntropySyntheticTrialSeed[] =
     "variations_limited_entropy_synthetic_trial_seed";
 inline constexpr char kVariationsLimitedEntropySyntheticTrialSeedV2[] =
     "variations_limited_entropy_synthetic_trial_seed_v2";
+inline constexpr char kGaiaCookiePeriodicReportTimeDeprecated[] =
+    "gaia_cookie.periodic_report_time";
+
+#if BUILDFLAG(IS_CHROMEOS)
+// Deprecated 06/2025.
+inline constexpr char kNativeClientForceAllowed[] =
+    "native_client_force_allowed";
+inline constexpr char kDeviceNativeClientForceAllowed[] =
+    "device_native_client_force_allowed";
+inline constexpr char kDeviceNativeClientForceAllowedCache[] =
+    "device_native_client_force_allowed_cache";
+#endif  // BUILDFLAG(IS_CHROMEOS)
 
 // Register local state used only for migration (clearing or moving to a new
 // key).
@@ -1260,6 +1273,13 @@ void RegisterLocalStatePrefsForMigration(PrefRegistrySimple* registry) {
   registry->RegisterUint64Pref(kVariationsLimitedEntropySyntheticTrialSeed, 0);
   registry->RegisterUint64Pref(kVariationsLimitedEntropySyntheticTrialSeedV2,
                                0);
+
+#if BUILDFLAG(IS_CHROMEOS)
+  // Deprecated 06/2025
+  registry->RegisterBooleanPref(kNativeClientForceAllowed, false);
+  registry->RegisterBooleanPref(kDeviceNativeClientForceAllowed, false);
+  registry->RegisterBooleanPref(kDeviceNativeClientForceAllowedCache, false);
+#endif  // BUILDFLAG(IS_CHROMEOS)
 }
 
 // Register prefs used only for migration (clearing or moving to a new key).
@@ -1629,6 +1649,7 @@ void RegisterProfilePrefsForMigration(
 
   // Deprecated 06/2025
   registry->RegisterBooleanPref(kStorageGarbageCollect, false);
+  registry->RegisterDoublePref(kGaiaCookiePeriodicReportTimeDeprecated, 0);
 }
 
 }  // namespace
@@ -1912,6 +1933,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
   // TODO(b/328668317): Default pref should be set to true once this is
   // launched.
   registry->RegisterBooleanPref(prefs::kOsUpdateHandlerEnabled, false);
+  platform_experience::prefs::RegisterPrefs(*registry);
 #endif  // BUILDFLAG(IS_WIN) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
 
 #if BUILDFLAG(ENABLE_PDF)
@@ -2552,6 +2574,13 @@ void MigrateObsoleteLocalStatePrefs(PrefService* local_state) {
   local_state->ClearPref(kVariationsLimitedEntropySyntheticTrialSeed);
   local_state->ClearPref(kVariationsLimitedEntropySyntheticTrialSeedV2);
 
+#if BUILDFLAG(IS_CHROMEOS)
+  // Added 06/2025
+  local_state->ClearPref(kNativeClientForceAllowed);
+  local_state->ClearPref(kDeviceNativeClientForceAllowed);
+  local_state->ClearPref(kDeviceNativeClientForceAllowedCache);
+#endif
+
   // Please don't delete the following line. It is used by PRESUBMIT.py.
   // END_MIGRATE_OBSOLETE_LOCAL_STATE_PREFS
 
@@ -2958,6 +2987,7 @@ void MigrateObsoleteProfilePrefs(PrefService* profile_prefs,
 
   // Added 06/2025.
   profile_prefs->ClearPref(kStorageGarbageCollect);
+  profile_prefs->ClearPref(kGaiaCookiePeriodicReportTimeDeprecated);
 
   // Please don't delete the following line. It is used by PRESUBMIT.py.
   // END_MIGRATE_OBSOLETE_PROFILE_PREFS

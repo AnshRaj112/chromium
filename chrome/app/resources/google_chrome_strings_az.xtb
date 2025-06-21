@@ -55,6 +55,7 @@ Bəzi funksiyalar əlçatmaz ola bilər ki, nəticədə tərcihlərə edilən d�
 <translation id="1662146548738125461">ChromeOS Flex haqqında</translation>
 <translation id="1674870198290878346">Linki Gizli Chrome Pəncərəsində açın</translation>
 <translation id="1682634494516646069">Google Chrome öz data direktoriyasını oxuya və yaza bilmir:  <ph name="USER_DATA_DIRECTORY" /></translation>
+<translation id="1688214853608504530">Ünvan zolağına və ya axtarış xanasına yazdığınız zaman Chrome təkliflər təqdim etmək üçün yazdıqlarınızı təşkilatın axtarış, Sİ və agent alətlərinə göndərir.</translation>
 <translation id="1698376642261615901">Google Chrome saytları və tətbiqləri ildırım sürətilə açan veb brauzerdir. Sürətlidir, stabildir və istifadə üçün rahatdır. Google Chrome daxilindəki virusdan və fişinqdən qorunma bacarığı ilə internetdə özünüzü tam təhlükəsiz hiss edin.</translation>
 <translation id="1713301662689114961">{0,plural, =1{Chrome bir saata yenidən başlayacaq}other{Chrome # saata yenidən başlayacaq}}</translation>
 <translation id="1722488837206509557">Bu, əlçatan cihazlardan seçim etmək və oradakı kontenti göstərmək imkanı verəcək.</translation>
@@ -63,6 +64,7 @@ Bəzi funksiyalar əlçatmaz ola bilər ki, nəticədə tərcihlərə edilən d�
 <translation id="178701303897325119">Bu artırma artıq dəstəklənmir. Chrome onu silməyinizi tövsiyə edir.</translation>
 <translation id="1812689907177901597">Bunu deaktiv etməklə Chrome'a giriş etmədən Gmail kimi Google saytlarına daxil ola bilərsiniz</translation>
 <translation id="1821644463306970002">{NUM_TABS,plural, =1{Chrome brauzeri yavaşladan tabı durdurmağı tövsiyə edir}other{Chrome brauzeri yavaşladan tabları durdurmağı tövsiyə edir}}</translation>
+<translation id="1832046143430087831">Chrome-un V8 mühərriki ilə saytları sürətləndirir, lakin Chrome-un hücumlara qarşı müqavimətini bir qədər azaldır. Bu ayar deaktivdir.</translation>
 <translation id="1838374766361614909">Axtarışı təmizləyin</translation>
 <translation id="1860536484129686729">Chrome bu sayt üçün kameraya giriş tələb edir</translation>
 <translation id="1873233029667955273">Google Chrome defolt brauzeriniz deyil</translation>
@@ -447,6 +449,7 @@ Bəzi funksiyalar əlçatmaz ola bilər. Xüsusi profil direktoriyası göstəri
 <translation id="6718739135284199302">Chrome'u sürətli edin</translation>
 <translation id="6735387454586646204">ChromeOS Flex Sistemi</translation>
 <translation id="6750954913813541382">Orfoqrafik səhvləri düzəltmək üçün Chrome brauzerində yazdığınız mətni Google'a göndərir</translation>
+<translation id="6760235774835597023">Chrome-un V8 mühərriki ilə saytları sürətləndirir, lakin Chrome-un hücumlara qarşı müqavimətini bir qədər azaldır. Bu ayar aktivdir.</translation>
 <translation id="677276454032249905">Chrome'dan istənilən hada çıxılsın?</translation>
 <translation id="6794858689789885890">Chrome-u bağladıqda sayt datasını cihazdan silin</translation>
 <translation id="6831043979455480757">Tərcümə et</translation>

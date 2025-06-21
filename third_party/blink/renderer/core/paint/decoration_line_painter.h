@@ -25,18 +25,21 @@ class DecorationLinePainter final {
                         const TextDecorationInfo& decoration_info)
       : context_(context), decoration_info_(decoration_info) {}
 
+  static gfx::RectF Bounds(const TextDecorationInfo&);
+
   void Paint(const Color& color, const cc::PaintFlags* flags = nullptr);
 
+  static void DrawLineForText(GraphicsContext& context,
+                              const gfx::RectF& line_rect,
+                              const StyledStrokeData& styled_stroke,
+                              const AutoDarkMode& auto_dark_mode,
+                              const cc::PaintFlags* paint_flags = nullptr);
   static void DrawLineForText(GraphicsContext&,
                               const gfx::PointF& pt,
                               float width,
                               const StyledStrokeData& styled_stroke,
                               const AutoDarkMode& auto_dark_mode,
                               const cc::PaintFlags* paint_flags = nullptr);
-  static Path GetPathForTextLine(const gfx::PointF& pt,
-                                 float width,
-                                 float stroke_thickness,
-                                 StrokeStyle stroke_style);
 
  private:
   void PaintWavyTextDecoration(const AutoDarkMode&);

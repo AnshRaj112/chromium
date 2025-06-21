@@ -11,6 +11,7 @@
 #include "base/debug/dump_without_crashing.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/metrics/histogram_macros.h"
+#include "base/notimplemented.h"
 #include "base/notreached.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
@@ -1438,6 +1439,15 @@ void PrefetchContainer::OnPrefetchComplete(
     }
   }
 
+  std::optional<int> response_code = std::nullopt;
+  if (net_error == net::OK && GetNonRedirectHead() &&
+      GetNonRedirectHead()->headers) {
+    response_code = GetNonRedirectHead()->headers->response_code();
+  }
+  for (auto& observer : observers_) {
+    observer.OnPrefetchCompletedOrFailed(completion_status, response_code);
+  }
+
   if (GetPrefetchResponseCompletedCallbackForTesting()) {
     GetPrefetchResponseCompletedCallbackForTesting().Run(  // IN-TEST
         GetWeakPtr());
@@ -1730,7 +1740,7 @@ void PrefetchContainer::MakeResourceRequest(
 
   auto priority = [&] {
     if (IsSpeculationRuleType(prefetch_type_.trigger_type())) {
-      // This may seem inverted (surely eager prefetches would be higher
+      // This may seem inverted (surely immediate prefetches would be higher
       // priority), but the fact that we're doing this at all for more
       // conservative candidates suggests a strong engagement signal.
       //
@@ -1745,7 +1755,7 @@ void PrefetchContainer::MakeResourceRequest(
           return net::RequestPriority::MEDIUM;
         case blink::mojom::SpeculationEagerness::kModerate:
           return net::RequestPriority::LOW;
-        case blink::mojom::SpeculationEagerness::kEager:
+        case blink::mojom::SpeculationEagerness::kImmediate:
           return net::RequestPriority::IDLE;
       }
     } else {

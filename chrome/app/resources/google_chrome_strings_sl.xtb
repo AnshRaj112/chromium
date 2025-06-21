@@ -57,6 +57,7 @@ Nekatere funkcije morda niso na voljo in spremembe nastavitev ne bodo shranjene.
 <translation id="1682634494516646069">Google Chrome ne more brati svojega imenika s podatki ali pisati vanj:
 
 <ph name="USER_DATA_DIRECTORY" /></translation>
+<translation id="1688214853608504530">Ko vnašate v naslovno vrstico ali iskalno polje, Chrome vaše vnose pošlje v orodja za iskanje, orodja z umetno inteligenco in agentska orodja organizacije zaradi prejemanja predlogov.</translation>
 <translation id="1698376642261615901">Google Chrome je spletni brskalnik, ki bliskovito odpira spletna mesta in izvaja programe. Je hiter, stabilen in preprost za uporabo. V Google Chrome je vgrajena zaščita pred zlonamerno programsko opremo in lažnim predstavljanjem, kar omogoča varnejše brskanje v spletu.</translation>
 <translation id="1713301662689114961">{0,plural, =1{Chrome se bo znova zagnal čez eno uro}one{Chrome se bo znova zagnal čez # uro}two{Chrome se bo znova zagnal čez # uri}few{Chrome se bo znova zagnal čez # ure}other{Chrome se bo znova zagnal čez # ur}}</translation>
 <translation id="1722488837206509557">Tako boste lahko izbirali med razpoložljivimi napravami in v njih prikazali vsebino.</translation>
@@ -65,6 +66,7 @@ Nekatere funkcije morda niso na voljo in spremembe nastavitev ne bodo shranjene.
 <translation id="178701303897325119">Ta razširitev ni več podprta. Chrome priporoča, da jo odstranite.</translation>
 <translation id="1812689907177901597">Če to izklopite, se lahko prijavite na Googlovih spletnih mestih, kot je Gmail, ne da bi se morali prijaviti v Chrome</translation>
 <translation id="1821644463306970002">{NUM_TABS,plural, =1{Chrome priporoča, da začasno zaustavite zavihek, ki upočasnjuje brskalnik}one{Chrome priporoča, da začasno zaustavite zavihke, ki upočasnjujejo brskalnik}two{Chrome priporoča, da začasno zaustavite zavihke, ki upočasnjujejo brskalnik}few{Chrome priporoča, da začasno zaustavite zavihke, ki upočasnjujejo brskalnik}other{Chrome priporoča, da začasno zaustavite zavihke, ki upočasnjujejo brskalnik}}</translation>
+<translation id="1832046143430087831">S Chromovim mehanizmom V8 pospešite delovanje spletnih mest, vendar je Chrome zato nekoliko manj odporen proti napadom. Ta nastavitev je izklopljena.</translation>
 <translation id="1838374766361614909">Čiščenje iskanja</translation>
 <translation id="1860536484129686729">Chrome potrebuje dovoljenje za dostop do fotoaparata za to spletno mesto</translation>
 <translation id="1873233029667955273">Google Chrome ni privzeti brskalnik</translation>
@@ -451,6 +453,7 @@ Google Chrome ne more obnoviti vaših nastavitev.</translation>
 <translation id="6718739135284199302">Pospešite Chrome</translation>
 <translation id="6735387454586646204">Sistem ChromeOS Flex</translation>
 <translation id="6750954913813541382">Chrome zaradi odpravljanja napak pri črkovanju Googlu pošlje besedilo, ki ga vnesete v brskalnik</translation>
+<translation id="6760235774835597023">S Chromovim mehanizmom V8 pospešite delovanje spletnih mest, vendar je Chrome zato nekoliko manj odporen proti napadom. Ta nastavitev je vklopljena.</translation>
 <translation id="677276454032249905">Želite vseeno zapreti Chrome?</translation>
 <translation id="6794858689789885890">Podatki spletnih mest se vedno izbrišejo iz naprave, ko zaprete Chrome</translation>
 <translation id="6831043979455480757">Prevedi</translation>

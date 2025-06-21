@@ -20,6 +20,7 @@ import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.sync.R;
 import org.chromium.components.browser_ui.widget.MaterialSwitchWithTitleAndSummary;
+import org.chromium.components.signin.base.CoreAccountInfo;
 import org.chromium.components.sync.DataType;
 import org.chromium.components.sync.LocalDataDescription;
 import org.chromium.ui.modaldialog.DialogDismissalCause;
@@ -58,10 +59,11 @@ public final class BatchUploadDialogCoordinator {
             Context context,
             HashMap<Integer, LocalDataDescription> localDataDescriptionsMap,
             ModalDialogManager dialogManager,
+            CoreAccountInfo accountInfo,
             Listener listener) {
         ThreadUtils.assertOnUiThread();
         new BatchUploadDialogCoordinator(
-                context, localDataDescriptionsMap, dialogManager, listener);
+                context, localDataDescriptionsMap, dialogManager, accountInfo, listener);
     }
 
     @VisibleForTesting
@@ -70,6 +72,7 @@ public final class BatchUploadDialogCoordinator {
             Context context,
             HashMap<Integer, LocalDataDescription> localDataDescriptionsMap,
             ModalDialogManager dialogManager,
+            CoreAccountInfo accountInfo,
             Listener listener) {
         mContext = context;
         mDialogManager = dialogManager;
@@ -80,19 +83,23 @@ public final class BatchUploadDialogCoordinator {
                 new PropertyModel.Builder(ModalDialogProperties.ALL_KEYS)
                         .with(
                                 ModalDialogProperties.TITLE,
+                                mContext.getString(R.string.batch_upload_dialog_title))
+                        // TODO(crbug.com/354922852): Handle accounts with non-displayable email
+                        // address.
+                        .with(
+                                ModalDialogProperties.MESSAGE_PARAGRAPH_1,
                                 mContext.getString(
-                                        R.string.account_settings_bulk_upload_dialog_title))
+                                        R.string.batch_upload_dialog_description,
+                                        accountInfo.getEmail()))
                         .with(
                                 ModalDialogProperties.POSITIVE_BUTTON_TEXT,
-                                mContext.getString(
-                                        R.string.account_settings_bulk_upload_dialog_save_button))
+                                mContext.getString(R.string.batch_upload_dialog_save_button))
                         .with(
                                 ModalDialogProperties.BUTTON_STYLES,
                                 ModalDialogProperties.ButtonStyles.PRIMARY_FILLED_NEGATIVE_OUTLINE)
                         .with(
                                 ModalDialogProperties.NEGATIVE_BUTTON_TEXT,
-                                mContext.getString(
-                                        R.string.account_settings_bulk_upload_dialog_cancel_button))
+                                mContext.getString(R.string.batch_upload_dialog_cancel_button))
                         .with(ModalDialogProperties.CANCEL_ON_TOUCH_OUTSIDE, true)
                         .with(ModalDialogProperties.CUSTOM_VIEW, view)
                         .with(
@@ -106,8 +113,8 @@ public final class BatchUploadDialogCoordinator {
                         context,
                         view,
                         DataType.BOOKMARKS,
-                        R.id.account_settings_bulk_upload_dialog_bookmarks,
-                        R.plurals.account_settings_bulk_upload_dialog_bookmarks,
+                        R.id.batch_upload_dialog_bookmarks,
+                        R.plurals.batch_upload_dialog_bookmarks,
                         localDataDescriptionsMap);
 
         mReadingListSwitch =
@@ -115,13 +122,13 @@ public final class BatchUploadDialogCoordinator {
                         context,
                         view,
                         DataType.READING_LIST,
-                        R.id.account_settings_bulk_upload_dialog_reading_list,
-                        R.plurals.account_settings_bulk_upload_dialog_reading_list,
+                        R.id.batch_upload_dialog_reading_list,
+                        R.plurals.batch_upload_dialog_reading_list,
                         localDataDescriptionsMap);
         // If the Reading List switch is shown, and the Bookmarks switch is shown above, then the
         // Reading List top separator should be shown.
         if (mReadingListSwitch != null && mBookmarkSwitch != null) {
-            view.findViewById(R.id.account_settings_bulk_upload_dialog_reading_list_top_separator)
+            view.findViewById(R.id.batch_upload_dialog_reading_list_top_separator)
                     .setVisibility(View.VISIBLE);
         }
 
@@ -130,13 +137,13 @@ public final class BatchUploadDialogCoordinator {
                         context,
                         view,
                         DataType.PASSWORDS,
-                        R.id.account_settings_bulk_upload_dialog_passwords,
-                        R.plurals.account_settings_bulk_upload_dialog_passwords,
+                        R.id.batch_upload_dialog_passwords,
+                        R.plurals.batch_upload_dialog_passwords,
                         localDataDescriptionsMap);
         // If the Passwords switch is shown, and there's at least one switch shown above, then the
         // Passwords top separator should be shown.
         if (mPasswordsSwitch != null && (mReadingListSwitch != null || mBookmarkSwitch != null)) {
-            view.findViewById(R.id.account_settings_bulk_upload_dialog_passwords_top_separator)
+            view.findViewById(R.id.batch_upload_dialog_passwords_top_separator)
                     .setVisibility(View.VISIBLE);
         }
     }

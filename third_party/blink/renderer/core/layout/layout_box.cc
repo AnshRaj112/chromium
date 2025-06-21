@@ -3199,7 +3199,9 @@ PhysicalRect LayoutBox::LocalCaretRect(int caret_offset,
   // They never refer to children.
   // FIXME: Paint the carets inside empty blocks differently than the carets
   // before/after elements.
-  LayoutUnit caret_width = GetFrameView()->CaretWidth();
+  // TODO(crbug.com/353713061): Add support for caret-shape: underscore and
+  // caret-shape: block cases.
+  LayoutUnit caret_width = GetFrameView()->BarCaretWidth();
   LogicalSize size(LogicalWidth(), LogicalHeight());
 
   LayoutUnit caret_block_size = size.block_size;
@@ -4361,6 +4363,11 @@ namespace {
 template <typename Function>
 void ForEachAnchorQueryOnContainer(const LayoutBox& box, Function func) {
   const LayoutObject* container = box.Container();
+  if (!container) {
+    // This is not supposed to be possible, but it is (crbug.com/424420492).
+    DCHECK(false);
+    return;
+  }
   if (container->IsLayoutBlock()) {
     for (const PhysicalBoxFragment& fragment :
          To<LayoutBlock>(container)->PhysicalFragments()) {

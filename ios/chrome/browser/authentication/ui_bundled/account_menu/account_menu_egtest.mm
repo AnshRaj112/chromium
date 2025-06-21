@@ -7,6 +7,7 @@
 #import "base/strings/sys_string_conversions.h"
 #import "base/test/ios/wait_util.h"
 #import "ios/chrome/browser/authentication/ui_bundled/account_menu/account_menu_constants.h"
+#import "ios/chrome/browser/authentication/ui_bundled/separate_profiles_util.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey_ui_test_util.h"
 #import "ios/chrome/browser/bookmarks/ui_bundled/bookmark_earl_grey.h"
@@ -75,6 +76,15 @@ id<GREYMatcher> snackbarMessageMatcher(FakeSystemIdentity* identity) {
 @end
 
 @implementation AccountMenuTestCase
+
++ (void)setUpForTestCase {
+  [SigninEarlGrey setUseFakeResponsesForProfileSeparationPolicyRequests];
+}
+
++ (void)tearDown {
+  [SigninEarlGrey clearUseFakeResponsesForProfileSeparationPolicyRequests];
+  [super tearDown];
+}
 
 - (AppLaunchConfiguration)appConfigurationForTestCase {
   AppLaunchConfiguration config = [super appConfigurationForTestCase];
@@ -478,6 +488,9 @@ id<GREYMatcher> snackbarMessageMatcher(FakeSystemIdentity* identity) {
                                           kAccountMenuSecondaryAccountButtonId)]
       performAction:grey_tap()];
 
+  if ([SigninEarlGrey areSeparateProfilesForManagedAccountsEnabled]) {
+    WaitForEnterpriseOnboardingScreen();
+  }
   // Tap on Continue button to acknowledge signing in with a managed account.
   [[EarlGrey
       selectElementWithMatcher:
@@ -485,6 +498,14 @@ id<GREYMatcher> snackbarMessageMatcher(FakeSystemIdentity* identity) {
               grey_text(l10n_util::GetNSString(
                   IDS_IOS_MANAGED_SIGNIN_WITH_USER_POLICY_CONTINUE_BUTTON_LABEL)),
               grey_interactable(), nil)] performAction:grey_tap()];
+
+  if ([SigninEarlGrey areSeparateProfilesForManagedAccountsEnabled]) {
+    // Dismiss the history sync screen.
+    [ChromeEarlGrey waitForMatcher:HistoryScreenMatcher()];
+    [[EarlGrey selectElementWithMatcher:chrome_test_util::
+                                            PromoScreenSecondaryButtonMatcher()]
+        performAction:grey_tap()];
+  }
 
   [self assertSnackbarShownAndDismissItWithIdentity:kManagedIdentity1];
   [SigninEarlGrey verifySignedInWithFakeIdentity:kManagedIdentity1];
@@ -511,6 +532,10 @@ id<GREYMatcher> snackbarMessageMatcher(FakeSystemIdentity* identity) {
                        grey_sufficientlyVisible(), nil)]
         performAction:grey_tap()];
   }
+
+  if ([SigninEarlGrey areSeparateProfilesForManagedAccountsEnabled]) {
+    WaitForEnterpriseOnboardingScreen();
+  }
   // Tap on Continue button to acknowledge signing in with a managed account.
   [[EarlGrey
       selectElementWithMatcher:
@@ -518,6 +543,14 @@ id<GREYMatcher> snackbarMessageMatcher(FakeSystemIdentity* identity) {
               grey_text(l10n_util::GetNSString(
                   IDS_IOS_MANAGED_SIGNIN_WITH_USER_POLICY_CONTINUE_BUTTON_LABEL)),
               grey_interactable(), nil)] performAction:grey_tap()];
+
+  if ([SigninEarlGrey areSeparateProfilesForManagedAccountsEnabled]) {
+    // Dismiss the history sync screen.
+    [ChromeEarlGrey waitForMatcher:HistoryScreenMatcher()];
+    [[EarlGrey selectElementWithMatcher:chrome_test_util::
+                                            PromoScreenSecondaryButtonMatcher()]
+        performAction:grey_tap()];
+  }
 
   [self assertSnackbarShownAndDismissItWithIdentity:kManagedIdentity2];
   [self assertAccountMenuIsNotShown];
@@ -681,10 +714,9 @@ id<GREYMatcher> snackbarMessageMatcher(FakeSystemIdentity* identity) {
       performAction:grey_tap()];
 
   // Tap on kPrimaryIdentity confirm remove button.
-  [[EarlGrey
-      selectElementWithMatcher:chrome_test_util::ButtonWithAccessibilityLabelId(
-                                   IDS_IOS_REMOVE_ACCOUNT_LABEL)]
-      performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:
+                 chrome_test_util::ActionSheetItemWithAccessibilityLabelId(
+                     IDS_IOS_REMOVE_ACCOUNT_LABEL)] performAction:grey_tap()];
 
   [SigninEarlGrey verifySignedOut];
 

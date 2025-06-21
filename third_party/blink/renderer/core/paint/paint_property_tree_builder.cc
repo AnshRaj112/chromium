@@ -50,6 +50,7 @@
 #include "third_party/blink/renderer/core/layout/table/layout_table.h"
 #include "third_party/blink/renderer/core/layout/table/layout_table_row.h"
 #include "third_party/blink/renderer/core/layout/table/layout_table_section.h"
+#include "third_party/blink/renderer/core/layout/transform_utils.h"
 #include "third_party/blink/renderer/core/page/link_highlight.h"
 #include "third_party/blink/renderer/core/page/page.h"
 #include "third_party/blink/renderer/core/page/scrolling/snap_coordinator.h"
@@ -68,7 +69,6 @@
 #include "third_party/blink/renderer/core/paint/paint_property_tree_printer.h"
 #include "third_party/blink/renderer/core/paint/pre_paint_disable_side_effects_scope.h"
 #include "third_party/blink/renderer/core/paint/svg_root_painter.h"
-#include "third_party/blink/renderer/core/paint/transform_utils.h"
 #include "third_party/blink/renderer/core/paint/view_painter.h"
 #include "third_party/blink/renderer/core/style/computed_style_base_constants.h"
 #include "third_party/blink/renderer/core/style/computed_style_constants.h"
@@ -461,6 +461,9 @@ static bool NeedsScrollAndScrollTranslation(
   // if the offset/position is non-zero.
   if (!scrollable_area->ScrollPosition().IsOrigin() ||
       !scrollable_area->GetScrollOffset().IsZero()) {
+    return true;
+  }
+  if (!scrollable_area->CanPropagateScroll()) {
     return true;
   }
   return false;
@@ -1695,7 +1698,7 @@ FragmentPaintPropertyTreeBuilder::ParentForViewTransitionPseudoEffect() const {
 
   Element& scope = pseudo->UltimateOriginatingElement();
   if (scope.IsDocumentElement()) {
-    // The transition pseudo element doesn't draw into the LayoutView's
+    // The transition pseudo-element doesn't draw into the LayoutView's
     // effect, but rather as its sibling. So this re-parents the effect to
     // whatever the grand-parent effect was. Note that it doesn't matter
     // whether the grand-parent is the root stacking context or something
@@ -1721,7 +1724,7 @@ FragmentPaintPropertyTreeBuilder::ParentForViewTransitionPseudoEffect() const {
     return context_.current_effect;
   }
 
-  // Make the effect node for the ::view-transition pseudo element a sibling of
+  // Make the effect node for the ::view-transition pseudo-element a sibling of
   // the ViewTransitionEffect for the scope element. The ViewTransitionEffect is
   // guaranteed to exist (see ViewTransition::NeedsViewTransitionEffectNode).
   auto* scope_vt_effect = scope_properties->ViewTransitionEffect();

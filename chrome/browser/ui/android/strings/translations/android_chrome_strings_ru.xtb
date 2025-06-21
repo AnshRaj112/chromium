@@ -109,7 +109,6 @@
 <translation id="1419753403124156396">Перезапустить Chrome?</translation>
 <translation id="1428770807407000502">Отключить синхронизацию?</translation>
 <translation id="1430915738399379752">Печать</translation>
-<translation id="1433478348197382180">Режим чтения</translation>
 <translation id="1435593198351412143">Открывать PDF-файлы автоматически</translation>
 <translation id="1437543266176261764">Выполняется в <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Упорядочивайте отслеживаемые товары в закладках</translation>
@@ -150,7 +149,7 @@
 <translation id="1641113438599504367">Безопасный просмотр</translation>
 <translation id="164269334534774161">Эта офлайн-копия страницы была создана <ph name="CREATION_TIME" /></translation>
 <translation id="1644574205037202324">История</translation>
-<translation id="1645262572857218659">Войдите с аккаунтом <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /></translation>
+<translation id="1645262572857218659">Вход с аккаунтом <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /></translation>
 <translation id="1671236975893690980">Ожидание скачивания…</translation>
 <translation id="1672586136351118594">Больше не показывать</translation>
 <translation id="1680919990519905526">Найти в Покупках через Google Объектив <ph name="BEGIN_NEW" />Новинка<ph name="END_NEW" /></translation>
@@ -341,6 +340,7 @@
 <translation id="2546283357679194313">Файлы сookie и данные сайтов</translation>
 <translation id="2547843573592965873">Блокировка профиля защищает ваши данные в автомобиле, включая пароли, транзакции и другие сведения, сохраненные в аккаунте Google.</translation>
 <translation id="254973855621628293">Пароли, сохраненные на этом устройстве</translation>
+<translation id="2566471851103108967">{FILE_COUNT,plural, =1{Заблокировано скачивание опасного файла}one{Заблокировано скачивание # опасного файла}few{Заблокировано скачивание # опасных файлов}many{Заблокировано скачивание # опасных файлов}other{Заблокировано скачивание # опасного файла}}</translation>
 <translation id="2567385386134582609">ИЗОБРАЖЕНИЕ</translation>
 <translation id="2569733278091928697">Вы сможете легко управлять медиаконтентом, сеансами в режиме инкогнито, скачанными файлами и не только.</translation>
 <translation id="2571711316400087311">Предлагать отправлять страницы на других языках в Google Переводчик</translation>
@@ -354,7 +354,6 @@
 <translation id="260403163289591229">Вы подписаны</translation>
 <translation id="2604446170045642109">Вы можете отключить тёмную тему для сайтов.</translation>
 <translation id="2607441479295509868">Выполнен выход. Чтобы вам были доступны закладки, пароли и другие данные в аккаунте, нужно снова в него войти.</translation>
-<translation id="2612676031748830579">Номер карты</translation>
 <translation id="2620314865574742210"><ph name="NAME" /> предоставляет вам доступ к общему объекту</translation>
 <translation id="2625189173221582860">Пароль скопирован</translation>
 <translation id="2630630219780173487">Вы можете запретить этим сайтам отправлять уведомления.</translation>
@@ -481,6 +480,7 @@
 <translation id="3172472771272043251">{PASSWORDS_COUNT,plural, =1{1 пароль и другие данные доступны только на этом устройстве. Сохраните их в своем аккаунте Google (<ph name="ACCOUNT_EMAIL" />), чтобы использовать на других устройствах.}one{# пароль и другие данные доступны только на этом устройстве. Сохраните их в своем аккаунте Google (<ph name="ACCOUNT_EMAIL" />), чтобы использовать на других устройствах.}few{# пароля и другие данные доступны только на этом устройстве. Сохраните их в своем аккаунте Google (<ph name="ACCOUNT_EMAIL" />), чтобы использовать на других устройствах.}many{# паролей и другие данные доступны только на этом устройстве. Сохраните их в своем аккаунте Google (<ph name="ACCOUNT_EMAIL" />), чтобы использовать на других устройствах.}other{# пароля и другие данные доступны только на этом устройстве. Сохраните их в своем аккаунте Google (<ph name="ACCOUNT_EMAIL" />), чтобы использовать на других устройствах.}}</translation>
 <translation id="3187472288455401631">Оценка эффективности рекламы</translation>
 <translation id="3189635831478931757">Группа вкладок "<ph name="GROUP_TITLE" />"</translation>
+<translation id="3200536777393523575">Закрыть текущее окно?</translation>
 <translation id="3207960819495026254">Добавлено в закладки.</translation>
 <translation id="3208584281581115441">Проверить сейчас</translation>
 <translation id="3211426585530211793">Удалено: <ph name="ITEM_TITLE" /></translation>
@@ -546,7 +546,6 @@
 <translation id="3513019849832307207">Присоединиться и открыть</translation>
 <translation id="3513704683820682405">Дополненная реальность</translation>
 <translation id="3516053221628030540">Перейти в Google Play</translation>
-<translation id="351672147489633468">{NUM_REVOKED_PERMISSIONS,plural, =1{Разрешения на уведомления отозваны у 1 сайта, который вы давно не посещали.}one{Разрешения на уведомления отозваны у # сайта, который вы давно не посещали.}few{Разрешения на уведомления отозваны у # сайтов, которые вы давно не посещали.}many{Разрешения на уведомления отозваны у # сайтов, которые вы давно не посещали.}other{Разрешения на уведомления отозваны у # сайта, которые вы давно не посещали.}}</translation>
 <translation id="3518985090088779359">Продолжить</translation>
 <translation id="3519014757432845220">Отправляйте контент уведомлений и URL сайтов в Google. Это поможет нам улучшать защиту от спама. Контент могут проверять специалисты.</translation>
 <translation id="3521388823983121502">Не удалось войти через <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /></translation>
@@ -675,6 +674,7 @@
 <translation id="4116038641877404294">Скачивайте страницы и открывайте их без подключения к Интернету</translation>
 <translation id="4121654769234887259">Вам не нужно запоминать этот пароль. Он будет сохранен в Google Менеджере паролей для аккаунта <ph name="USERNAME" />.</translation>
 <translation id="4124152339699379357">Развернутое на весь экран окно с разрешениями на уведомления</translation>
+<translation id="4129668596244365470">{NUM_REVOKED_PERMISSIONS,plural, =1{Уведомления от этого сайта больше не будут приходить в Chrome. Вы можете проверить и изменить настройки.}one{Уведомления от этих сайтов больше не будут приходить в Chrome. Вы можете проверить и изменить настройки.}few{Уведомления от этих сайтов больше не будут приходить в Chrome. Вы можете проверить и изменить настройки.}many{Уведомления от этих сайтов больше не будут приходить в Chrome. Вы можете проверить и изменить настройки.}other{Уведомления от этих сайтов больше не будут приходить в Chrome. Вы можете проверить и изменить настройки.}}</translation>
 <translation id="4132137475637520539">Разрешить присоединяться всем, у кого есть ссылка</translation>
 <translation id="4135200667068010335">Список устройств для отправки вкладки закрыт.</translation>
 <translation id="4137746084635924146">Текущий язык устройства</translation>
@@ -715,6 +715,7 @@
 <translation id="4298388696830689168">Связанные сайты</translation>
 <translation id="4300632303535881174">Перейти на предыдущую страницу</translation>
 <translation id="4303044213806199882">chrome_screenshot_<ph name="CURRENT_TIMESTAMP_MS" /></translation>
+<translation id="4306489587293957491">Ввести</translation>
 <translation id="4307992518367153382">Основные</translation>
 <translation id="4311652497846705514">Открыть PDF-файл?</translation>
 <translation id="4320177379694898372">Нет подключения к Интернету</translation>
@@ -724,6 +725,7 @@
 <translation id="4351244548802238354">Закрыть</translation>
 <translation id="4352287748243729941">Использовать пароль (<ph name="PROVIDER" />)?</translation>
 <translation id="4355272626458588338">Добавьте важные для вас страницы в закладки, чтобы легко возвращаться к ним.</translation>
+<translation id="4356503491090073318">Номер карты*</translation>
 <translation id="4357206670025518404">+<ph name="COUNT_NUMBER" /></translation>
 <translation id="4359809482106103048">Общие сведения о безопасности</translation>
 <translation id="4378154925671717803">Телефон</translation>
@@ -741,6 +743,7 @@
 <translation id="4425140285732600465">Вы отслеживаете цену на этот товар. Если на одном из сайтов она снизится, вы получите уведомление.</translation>
 <translation id="4425173294238317796">Экран с просьбой подтвердить создание ключа доступа</translation>
 <translation id="442518031075347249">Вы больше не сможете использовать виртуальную карту для оплаты через Google Pay. Подробнее <ph name="BEGIN_LINK1" />о виртуальных картах<ph name="END_LINK1" />…</translation>
+<translation id="442577985493096785">{TAB_COUNT,plural, =1{Вкладка "<ph name="TAB_TITLE" />" и ещё <ph name="TAB_COUNT_ONE" /> вкладка будут закрыты.}one{Вкладка "<ph name="TAB_TITLE" />" и ещё <ph name="TAB_COUNT_MANY" /> вкладка будут закрыты.}few{Вкладка "<ph name="TAB_TITLE" />" и ещё <ph name="TAB_COUNT_MANY" /> вкладки будут закрыты.}many{Вкладка "<ph name="TAB_TITLE" />" и ещё <ph name="TAB_COUNT_MANY" /> вкладок будут закрыты.}other{Вкладка "<ph name="TAB_TITLE" />" и ещё <ph name="TAB_COUNT_MANY" /> вкладки будут закрыты.}}</translation>
 <translation id="4426508677408162512">Все закладки</translation>
 <translation id="4430277756566635951">Выбор аккаунта. Сейчас выбран <ph name="EMAIL" />.</translation>
 <translation id="4452411734226507615">Закрыть вкладку "<ph name="TAB_TITLE" />"</translation>
@@ -750,6 +753,7 @@
 <translation id="4479972344484327217">Установка модуля "<ph name="MODULE" />" для Chrome…</translation>
 <translation id="4484496141267039529">Нет подключения. Повторите попытку позже.</translation>
 <translation id="4487967297491345095">Все данные приложения Chrome, включая файлы, настройки, аккаунты и базы данных, будут безвозвратно удалены.</translation>
+<translation id="4494315997125191493">Чтобы открыть все окна, нажмите "Управление".</translation>
 <translation id="4494806687727322324">Администратор разрешил сохранять пароли.</translation>
 <translation id="4508528996305412043">Меню карточки из ленты открыто целиком</translation>
 <translation id="4509741852167209430">Чтобы оценивать эффективность рекламы, сайты обмениваются некоторыми типами данных, например сведениями о том, сделали ли вы покупку после посещения сайта.</translation>
@@ -790,6 +794,7 @@
 <translation id="4668279686271488041">Данные для оценки эффективности рекламы регулярно удаляются с вашего устройства.</translation>
 <translation id="4668347365065281350">Все данные, хранимые на устройстве сайтами, включая файлы cookie.</translation>
 <translation id="4678082183394354975">Тёмная тема для сайтов включена в Chrome.</translation>
+<translation id="4682306524980568490">Невозможно открыть все окна. Максимальное количество: <ph name="MAX_INSTANCE_COUNT" /></translation>
 <translation id="4684427112815847243">Синхронизировать все</translation>
 <translation id="4685741273709472646">Выберите из списка</translation>
 <translation id="4687718960473379118">Реклама, предлагаемая сайтами</translation>
@@ -874,6 +879,7 @@
 <translation id="4987271110129728827">Не удается найти страницу. Проверьте, правильно ли введен запрос, или выполните поиск в интернете.</translation>
 <translation id="4988526792673242964">Страницы</translation>
 <translation id="4991110219272367918">Нижний экран, с помощью которого можно одобрить или заблокировать сайт, закрыт</translation>
+<translation id="4996042648402406470">Получить</translation>
 <translation id="4996095658297597226">Использовать предложенный пароль?</translation>
 <translation id="5001388021414335527">Подписаться на этот сайт</translation>
 <translation id="5004416275253351869">Отслеживание действий в Google</translation>
@@ -892,6 +898,7 @@
 <translation id="506254248375231072">Нет вкладок</translation>
 <translation id="5062960805900435602">Предупреждение об объединении паролей закрыто</translation>
 <translation id="5075939510584558547">Сохранение без шифрования</translation>
+<translation id="5082172173036123513">Неактивные окна удаляются навсегда после шести месяцев отсутствия активности.</translation>
 <translation id="5085038751173179818">Войдите на этот сайт и в Chrome, чтобы синхронизировать закладки и другую информацию на своих устройствах.</translation>
 <translation id="5091199029769593641">Скоро, открывая новую вкладку, вы будете видеть статьи с сайта "<ph name="SITE_NAME" />". Сайты, на которые вы подписаны, сохранены в вашем аккаунте Google. Управлять ими можно в настройках рекомендаций.</translation>
 <translation id="509429900233858213">Произошла ошибка.</translation>
@@ -924,10 +931,12 @@
 <translation id="5210286577605176222">Перейти к предыдущей вкладке</translation>
 <translation id="5210365745912300556">Закрыть вкладку</translation>
 <translation id="5215957675041756913">Управление данными и аккаунтом</translation>
+<translation id="5218324087477576825">Номер карты (обязательно)</translation>
 <translation id="5221437554987713282"><ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> и другие <ph name="SEPARATOR" /> Chrome отозвал эти разрешения у сайта, так как вы давно его не посещали</translation>
 <translation id="5222676887888702881">Выйти</translation>
 <translation id="5226378907213531272">Вам нужно будет разблокировать экран при каждом использовании автомобиля.</translation>
 <translation id="5227554086496586518">Нажмите, чтобы увидеть результаты поиска</translation>
+<translation id="5229736206150093143">Последние результаты</translation>
 <translation id="5233638681132016545">Новая вкладка</translation>
 <translation id="5235196193381275927">Не удалось войти в систему.</translation>
 <translation id="5246093389635966745">Изменить кнопку на панели инструментов</translation>
@@ -936,6 +945,7 @@
 <translation id="5267572070504076962">Чтобы обеспечить защиту от опасных сайтов, включите Безопасный просмотр.</translation>
 <translation id="5271967389191913893">Не удается открыть скачанный контент.</translation>
 <translation id="5273031377282080577">Этим параметром управляет ваш администратор.</translation>
+<translation id="5287338992381051621">{NUM_REVOKED_PERMISSIONS,plural, =1{Уведомления от одного неиспользуемого сайта отключены}one{Уведомления от # неиспользуемого сайта отключены}few{Уведомления от # неиспользуемых сайтов отключены}many{Уведомления от # неиспользуемых сайтов отключены}other{Уведомления от # неиспользуемого сайта отключены}}</translation>
 <translation id="5292796745632149097">Куда отправить</translation>
 <translation id="5301876394151419436">Вы вошли как <ph name="EMAIL" />. Синхронизацию можно в любой момент отключить в настройках. Google может использовать историю браузера для персонализации Поиска и других сервисов.</translation>
 <translation id="5304593522240415983">Это поле нужно заполнить</translation>
@@ -944,7 +954,7 @@
 <translation id="5316947901395241499">Администратор запретил сохранять пароли.</translation>
 <translation id="5317780077021120954">Сохранить</translation>
 <translation id="5319359161174645648">Google рекомендует браузер Chrome</translation>
-<translation id="5326246328175179736">Невозможно войти в этот аккаунт.</translation>
+<translation id="5326246328175179736">Невозможно войти с этим аккаунтом</translation>
 <translation id="5327248766486351172">Имя</translation>
 <translation id="5328542107300944283">Войдите на сайт с аккаунтом <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /></translation>
 <translation id="5342314432463739672">Запросы разрешений</translation>
@@ -1124,7 +1134,7 @@
 <translation id="6138832295072039549">Изменить настройки сайта можно здесь</translation>
 <translation id="6140912465461743537">Страна/регион</translation>
 <translation id="6142183503755612900">Вы в любой момент можете изменить выбор в настройках.</translation>
-<translation id="6143892791267458416">и закрываются через <ph name="DAYS_ARCHIVED" /> дн</translation>
+<translation id="6143892791267458416">\u0020и закрываются через <ph name="DAYS_ARCHIVED" /> дн</translation>
 <translation id="6146563240635539929">Видео</translation>
 <translation id="614890671148262506">Всегда разрешать уведомления от этого сайта</translation>
 <translation id="6150320133806434356">Закладка сохранена</translation>
@@ -1282,7 +1292,9 @@
 <translation id="676305334223455055">Войдите в аккаунт, чтобы получать контент на основе своих интересов.</translation>
 <translation id="6764137532716892442">Общая группа вкладок "<ph name="GROUP_TITLE" />" с новыми действиями</translation>
 <translation id="6767294960381293877">Список устройств для отправки вкладки развернут на половину экрана.</translation>
+<translation id="6783664456110886353">{TAB_COUNT,plural, =1{<ph name="INCOGNITO_TAB_COUNT" /> вкладка инкогнито и ещё <ph name="TAB_COUNT_ONE" /> вкладка будут закрыты.}one{<ph name="INCOGNITO_TAB_COUNT" /> вкладка инкогнито и ещё <ph name="TAB_COUNT_MANY" /> вкладка будут закрыты.}few{<ph name="INCOGNITO_TAB_COUNT" /> вкладка инкогнито и ещё <ph name="TAB_COUNT_MANY" /> вкладки будут закрыты.}many{<ph name="INCOGNITO_TAB_COUNT" /> вкладка инкогнито и ещё <ph name="TAB_COUNT_MANY" /> вкладок будут закрыты.}other{<ph name="INCOGNITO_TAB_COUNT" /> вкладка инкогнито и ещё <ph name="TAB_COUNT_MANY" /> вкладки будут закрыты.}}</translation>
 <translation id="6785476624617658922">Дополнительные условия использования Chrome и Chrome OS</translation>
+<translation id="6786747875388722282">Расширения</translation>
 <translation id="6795633245022906657">Открыть новую вкладку. Чтобы изменить функцию кнопки, перейдите в настройки.</translation>
 <translation id="679588508577699489">Сделайте Chrome браузером по умолчанию</translation>
 <translation id="679956319013005046">Чтобы выбрать другой сервис автозаполнения, сначала добавьте этот сервис в <ph name="BEGIN_LINK" />настройках Android<ph name="END_LINK" />.</translation>
@@ -1548,6 +1560,7 @@
 <translation id="7844171778363018843">Данные для синхронизации не выбраны</translation>
 <translation id="7846161022626028328">Произошла ошибка. Повторите попытку.</translation>
 <translation id="7846296061357476882">Сервисы Google</translation>
+<translation id="784652447248278262">Текущее окно</translation>
 <translation id="784934925303690534">Временной диапазон</translation>
 <translation id="7851858861565204677">Другие устройства</translation>
 <translation id="7853202427316060426">Действия</translation>
@@ -1576,6 +1589,7 @@
 <translation id="7965838025086216108">Вы можете использовать сохраненные пароли на любых устройствах. Они сохраняются в Google Менеджере паролей для аккаунта <ph name="ACCOUNT" />.</translation>
 <translation id="7968014550143838305">Добавлено в список для чтения.</translation>
 <translation id="7968982339740310781">Просмотреть сведения</translation>
+<translation id="7969391000881506217">Срок действия*</translation>
 <translation id="7971136598759319605">Последние действия: 1 день назад</translation>
 <translation id="7975379999046275268">Просмотреть страницу <ph name="BEGIN_NEW" />Новинка<ph name="END_NEW" /></translation>
 <translation id="7977451675950311423">Предупреждает, если вы используете пароль, скомпрометированный в результате утечки данных.</translation>
@@ -1627,6 +1641,7 @@
 <translation id="813082847718468539">Сведения о сайте</translation>
 <translation id="8135406045838672858">Скачанные PDF-файлы автоматически открываются в приложении "<ph name="APP_NAME" />"</translation>
 <translation id="8137562778192957619">Вам не нужно запоминать этот пароль. Он будет сохранен в Google Менеджере паролей.</translation>
+<translation id="8146563639948412265">Максимальное число окон, которые можно открыть: <ph name="MAX_WINDOW_COUNT" />. Чтобы восстановить окно, закройте активные или неактивные окна (<ph name="WINDOW_COUNT" />).</translation>
 <translation id="8152331954420209374">Открыть Объектив</translation>
 <translation id="8163820386638255770">Чтобы использовать и сохранять пароли в аккаунте Google, подтвердите свою личность.</translation>
 <translation id="8186512483418048923">Осталось файлов: <ph name="FILES" /></translation>
@@ -1650,7 +1665,6 @@
 <translation id="8244387390464017490">Настроить стр. быстр. дост.</translation>
 <translation id="8250920743982581267">Документы</translation>
 <translation id="8255617931166444521">С помощью файлов cookie сайт может только определять, какие действия вы совершали на нем.</translation>
-<translation id="8256087213273124136">Ваша подписка на уведомления в Chrome отменена</translation>
 <translation id="8258999165172757081">Добавлено</translation>
 <translation id="8259179246279078674">Так как предзагруженные страницы зашифрованы, Google ничего не узнает об их содержимом. Серверы Google получат сведения о том, какие сайты анонимно предзагружены. Эта информация используется только для предварительной загрузки страниц и не связана с другими данными из вашего аккаунта Google.</translation>
 <translation id="8260126382462817229">Снова войдите в аккаунт</translation>
@@ -1735,6 +1749,7 @@
 <translation id="8565021320663436446">Удалить пользователя <ph name="MEMBER_FULL_NAME" />?</translation>
 <translation id="8570677896027847510">Невозможно безопасно скачать файл</translation>
 <translation id="8571213806525832805">Последние 4 недели</translation>
+<translation id="8580435650274205305">Срок действия (обязательно)</translation>
 <translation id="8582529315803410153">Здесь вы найдете свои вкладки с других устройств</translation>
 <translation id="8585103689515290060">Сервисы автозаполнения</translation>
 <translation id="859046281437143747">Нажмите кнопку "Ещё" и выберите пункт "Отслеживание цен"</translation>
@@ -1758,7 +1773,6 @@
 <translation id="8688183792442786085">Выбранная вкладка "<ph name="TAB_TITLE" />"</translation>
 <translation id="8693232767599693749">Посмотреть в Режиме чтения?</translation>
 <translation id="8697753151306746444">Начните демонстрацию экрана или окна</translation>
-<translation id="869891660844655955">Срок действия</translation>
 <translation id="8699120352855309748">Не предлагать переводить страницы на этих языках</translation>
 <translation id="8712637175834984815">OK</translation>
 <translation id="8715286883001906001">Установите более надежные пароли в аккаунте Google</translation>
@@ -1794,7 +1808,7 @@
 <translation id="8856931513242997049">Закрытое окно с разрешениями на уведомления</translation>
 <translation id="8863714995118816041">Разрешения снова предоставлены для сайта <ph name="SITE_NAME" />.</translation>
 <translation id="8865415417596392024">Данные Chrome в вашем аккаунте</translation>
-<translation id="8888527824584402177">Вкладки, которые вы не использовали в течение <ph name="DAYS_INACTIVE" /> дн., переносятся сюда<ph name="AUTODELETE_SECTION" />. Чтобы изменить этот параметр, перейдите в <ph name="SETTINGS_TITLE" />.</translation>
+<translation id="8888527824584402177">Вкладки, которые вы не использовали в течение <ph name="DAYS_INACTIVE" /> дн., переносятся сюда<ph name="AUTODELETE_SECTION" />. <ph name="SETTINGS_TITLE" /> можно изменить.</translation>
 <translation id="8890668505403261809">Поиск по вкладкам инкогнито</translation>
 <translation id="8898822736010347272">Отправлять в Google URL и контент некоторых посещенных страниц, а также определенную информацию о системе (это помогает обнаруживать новые угрозы и защищать всех пользователей интернета)</translation>
 <translation id="8903921497873541725">Увеличить</translation>

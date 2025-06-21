@@ -57,6 +57,7 @@
 <translation id="1682634494516646069">‏Google Chrome اپنے ڈیٹا ڈائریکٹری کو پڑھ یا اس میں لکھ نہیں سکتا ہے:
 
 <ph name="USER_DATA_DIRECTORY" /></translation>
+<translation id="1688214853608504530">‏جب آپ ایڈریس بار یا تلاش کے خانہ میں ٹائپ کرتے ہیں تو Chrome آپ کی تنظیم کی تلاش، AI اور ایجنٹ ٹولز کو تجاویز حاصل کرنے کے لیے بھیجتا ہے۔</translation>
 <translation id="1698376642261615901">‏Google Chrome ایک ایسا ویب براؤزر ہے جو ویب صفحات اور ایپلیکیشنز کو روشنی کی رفتار سے چلاتا ہے۔ یہ تیز، مستحکم اور استعمال میں آسان ہے۔ Google Chrome میں پہلے سے شامل میلویئر اور فریب دہی تحفظ کے ساتھ ویب کو مزید محفوظ طور پر براؤز کریں۔</translation>
 <translation id="1713301662689114961">{0,plural, =1{‏ایک گھنٹے میں Chrome دوبارہ لانچ ہوگا}other{‏# گھنٹے میں Chrome دوبارہ لانچ ہوگا}}</translation>
 <translation id="1722488837206509557">یہ آپ کو دستیاب آلات میں سے انتخاب کرنے اور ان پر مواد ڈسپلے کرنے کی اجازت دے گا۔</translation>
@@ -65,6 +66,7 @@
 <translation id="178701303897325119">‏یہ ایکسٹینشنز اب مزید تعاون یافتہ نہیں ہے۔ اس کے بجائے Chrome تجویز کرتا ہے کہ آپ اسے ہٹا دیں</translation>
 <translation id="1812689907177901597">‏اسے آف کر کے، آپ Chrome میں سائن ان کیے بغیر Gmail جیسی Google سائٹس میں سائن ان کر سکتے ہیں</translation>
 <translation id="1821644463306970002">{NUM_TABS,plural, =1{‏‫Chrome آپ کے براؤزر کی رفتار کو کم کرنے والے ٹیب کو روکنے کی تجویز دیتا ہے}other{‏‫Chrome آپ کے براؤزر کی رفتار کو کم کرنے والے ٹیبز کو روکنے کی تجویز دیتا ہے}}</translation>
+<translation id="1832046143430087831">‏‫Chrome کے V8 انجن کے ساتھ سائٹس کو تیز رفتار بناتا ہے لیکن Chrome کو حملوں کے خلاف قدرے کم مزاحم بناتا ہے۔ یہ ترتیب آف ہے۔</translation>
 <translation id="1838374766361614909">تلاش صاف کریں</translation>
 <translation id="1860536484129686729">‏Chrome کو اس سائٹ کیلئے آپ کے کیمرے تک رسائی کی اجازت درکار ہے</translation>
 <translation id="1873233029667955273">‏Google Chrome آپ کا ڈیفالٹ براؤزر نہیں ہے</translation>
@@ -269,6 +271,7 @@
 <translation id="4326552909330437744">{NUM_TABS,plural, =1{‏‫Chrome آپ کے براؤزر کی رفتار کو کم کرنے والے ٹیب کو روکنے کی تجویز دیتا ہے}other{‏‫Chrome آپ کے براؤزر کی رفتار کو کم کرنے والے ٹیبز کو روکنے کی تجویز دیتا ہے}}</translation>
 <translation id="4328355335528187361">Google Chrome Dev (mDNS-In)‎</translation>
 <translation id="4329315893554541805">‏ذاتی نوعيت سازی اور ديگر خصوصيات حاصل کرنے کے ليے ويب اور ايپ سرگرمی اور لنک کردہ Google سروسز ميں Chrome شامل کريں</translation>
+<translation id="4334241893986177674">اس اسکرین شاٹ کو تلاش کریں</translation>
 <translation id="4334294535648607276">ڈاؤن لوڈ مکمل ہوگیا۔</translation>
 <translation id="4337324600316876133">‏مستقبل میں Google Chrome اپ ڈیٹس حاصل کرنے کے لیے آپ کو macOS 12 یا اس کے بعد کے ورژن کی ضرورت ہوگی۔ یہ کمپیوٹر macOS 11 کا استعمال کر رہا ہے۔</translation>
 <translation id="4343195214584226067">‏<ph name="EXTENSION_NAME" /> کو Chrome میں شامل کر دیا گیا ہے</translation>
@@ -450,6 +453,7 @@ Google Chrome آپ کی ترتیبات کو بازیافت کرنے سے قاص�
 <translation id="6718739135284199302">‏Chrome کو تیز تر بنائیں</translation>
 <translation id="6735387454586646204">‏ChromeOS Flex سسٹم</translation>
 <translation id="6750954913813541382">‏املا کی غلطیوں کو درست کرنے کے لیے، آپ براؤزر میں جو متن ٹائپ کرتے ہیں، Chrome اسے Google کو بھیج دیتا ہے</translation>
+<translation id="6760235774835597023">‏‫Chrome کے V8 انجن کے ساتھ سائٹس کو تیز رفتار بناتا ہے لیکن Chrome کو حملوں کے خلاف قدرے کم مزاحم بناتا ہے۔ یہ ترتیب آن ہے۔</translation>
 <translation id="677276454032249905">‏بہر حال Chrome کو بند کریں؟</translation>
 <translation id="6794858689789885890">‏جب آپ Chrome کو بند کرتے ہیں تو ہمیشہ اپنے آلے سے سائٹ کا ڈیٹا حذف کریں</translation>
 <translation id="6831043979455480757">ترجمہ کریں</translation>

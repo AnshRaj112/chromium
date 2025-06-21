@@ -281,12 +281,8 @@ All changes to this list should go through Blink's feature review process: http:
     mask-repeat
     mask-size
     mask-type
-    masonry-auto-tracks
     masonry-direction
     masonry-fill
-    masonry-template-tracks
-    masonry-track-end
-    masonry-track-start
     math-depth
     math-shift
     math-style
@@ -661,7 +657,40 @@ All changes to this list should go through Blink's feature review process: http:
     container
         container-name
         container-type
+    corner-block-end-shape
+        corner-end-end-shape
+        corner-end-start-shape
+    corner-block-start-shape
+        corner-start-end-shape
+        corner-start-start-shape
+    corner-bottom-shape
+        corner-bottom-left-shape
+        corner-bottom-right-shape
+    corner-inline-end-shape
+        corner-end-end-shape
+        corner-start-end-shape
+    corner-inline-start-shape
+        corner-end-start-shape
+        corner-start-start-shape
+    corner-left-shape
+        corner-bottom-left-shape
+        corner-top-left-shape
+    corner-right-shape
+        corner-bottom-right-shape
+        corner-top-right-shape
     corner-shape
+        corner-bottom-left-shape
+        corner-bottom-right-shape
+        corner-top-left-shape
+        corner-top-right-shape
+    corner-top-shape
+        corner-top-left-shape
+        corner-top-right-shape
+    corners
+        border-bottom-left-radius
+        border-bottom-right-radius
+        border-top-left-radius
+        border-top-right-radius
         corner-bottom-left-shape
         corner-bottom-right-shape
         corner-top-left-shape
@@ -778,9 +807,6 @@ All changes to this list should go through Blink's feature review process: http:
     masonry-flow
         masonry-direction
         masonry-fill
-    masonry-track
-        masonry-track-end
-        masonry-track-start
     offset
         offset-anchor
         offset-distance

@@ -195,6 +195,7 @@ source_set("test_utils") {
     ":version_header",
     "//base",
     "//base/test:test_support",
+    "//build:branding_buildflags",
     "//chrome/enterprise_companion/device_management_storage:device_management_storage",
     "//testing/gtest",
   ]
@@ -286,7 +287,7 @@ test("enterprise_companion_integration_tests") {
     ":version_header",
     "//base",
     "//base/test:test_support",
-    "//base/test:test_support",
+    "//build:branding_buildflags",
     "//chrome/enterprise_companion/device_management_storage",
     "//chrome/enterprise_companion/proto",
     "//chrome/enterprise_companion/telemetry_logger/proto",
@@ -312,6 +313,11 @@ test("enterprise_companion_integration_tests") {
     data_deps += [ ":enterprise_companion_test" ]
   } else if (is_linux) {
     data_deps += [ ":enterprise_companion_test" ]
+  }
+
+  if (!is_chrome_branded) {
+    data_deps +=
+        [ "//third_party/enterprise_companion:old_enterprise_companion" ]
   }
 
   data_deps += [ ":integration_test_service_files" ]
@@ -468,9 +474,10 @@ group("all") {
 }
 
 if (is_mac && !is_component_build && enable_dsyms) {
+  _symbols_sources = [ "$root_out_dir/$enterprise_companion_product_full_name.app/Contents/MacOS/$enterprise_companion_product_full_name" ]
   action("syms") {
     script = "//build/redirect_stdout.py"
-    sources = [ "$root_out_dir/$enterprise_companion_product_full_name.app/Contents/MacOS/$enterprise_companion_product_full_name" ]
+    sources = _symbols_sources
     _dump_syms =
         "//third_party/breakpad:dump_syms($host_system_allocator_toolchain)"
     public_deps = [
@@ -493,6 +500,19 @@ if (is_mac && !is_component_build && enable_dsyms) {
                  "$root_out_dir/$enterprise_companion_product_full_name.app/Contents/MacOS/$enterprise_companion_product_full_name",
                  root_build_dir),
            ]
+  }
+
+  action("syms_archive") {
+    script = "//chrome/tools/build/mac/archive_symbols.py"
+    sources = _symbols_sources
+    deps = [ ":syms" ]
+    _output =
+        "$root_out_dir/$enterprise_companion_product_full_name.dSYM.tar.bz2"
+    outputs = [ _output ]
+    args = [ rebase_path(_output, root_out_dir) ] +
+           rebase_path(
+               [ "$root_out_dir/$enterprise_companion_product_full_name.dSYM" ],
+               root_out_dir)
   }
 }
 
@@ -517,9 +537,10 @@ artifact_zip("enterprise_companion_zip") {
     ]
     if (!is_component_build && enable_dsyms) {
       # Build symbols but do not include them in the archive. In official
-      # builds, the symbols built alongside the archive will be uploaded to the
-      # crash servers via symupload.
-      deps += [ ":syms" ]
+      # builds, breakpad symbols built alongside the archive will be uploaded to
+      # the crash servers via symupload and native symbols will be archived in
+      # chrome-unsigned.
+      deps += [ ":syms_archive" ]
     }
   } else if (is_win) {
     inputs = [ "$root_build_dir/enterprise_companion.exe" ]

@@ -50,6 +50,7 @@
 #include "base/numerics/checked_math.h"
 #include "base/task/single_thread_task_runner.h"
 #include "cc/animation/animation_timeline.h"
+#include "cc/base/features.h"
 #include "cc/input/main_thread_scrolling_reason.h"
 #include "cc/input/scroll_snap_data.h"
 #include "cc/input/scroll_utils.h"
@@ -91,6 +92,7 @@
 #include "third_party/blink/renderer/core/layout/custom_scrollbar.h"
 #include "third_party/blink/renderer/core/layout/layout_custom_scrollbar_part.h"
 #include "third_party/blink/renderer/core/layout/layout_embedded_content.h"
+#include "third_party/blink/renderer/core/layout/layout_object_inlines.h"
 #include "third_party/blink/renderer/core/layout/layout_theme.h"
 #include "third_party/blink/renderer/core/layout/layout_view.h"
 #include "third_party/blink/renderer/core/layout/legacy_layout_tree_walking.h"
@@ -1371,6 +1373,24 @@ bool PaintLayerScrollableArea::HasVerticalOverflow() const {
   return ScrollHeight().Round() > client_height.Round();
 }
 
+bool PaintLayerScrollableArea::CanPropagateScroll() const {
+  if (!base::FeatureList::IsEnabled(
+          ::features::kOverscrollBehaviorRespectedOnAllScrollContainers)) {
+    return true;
+  }
+  auto* box = GetLayoutBox();
+  // TODO(crbug.com/425353152): Remove the visibility check.
+  if (!box || !box->IsScrollContainer() ||
+      box->StyleRef().Visibility() != EVisibility::kVisible) {
+    return true;
+  }
+  if (box->StyleRef().OverscrollBehaviorX() != EOverscrollBehavior::kAuto ||
+      box->StyleRef().OverscrollBehaviorY() != EOverscrollBehavior::kAuto) {
+    return false;
+  }
+  return true;
+}
+
 // This function returns true if the given box requires overflow scrollbars (as
 // opposed to the viewport scrollbars managed by VisualViewport).
 static bool CanHaveOverflowScrollbars(const LayoutBox& box) {
@@ -2554,6 +2574,8 @@ void PaintLayerScrollableArea::UpdateScrollableAreaSet() {
     frame_view->RemoveScrollAnchoringScrollableArea(this);
   }
 
+  // TODO(crbug.com/425353152): Should be able to scroll invisible scroll
+  // containers.
   bool is_visible =
       GetLayoutBox()->StyleRef().Visibility() == EVisibility::kVisible;
   bool did_scroll_overflow = scrolls_overflow_;
@@ -2567,6 +2589,17 @@ void PaintLayerScrollableArea::UpdateScrollableAreaSet() {
   }
 
   scrolls_overflow_ = has_overflow && is_visible;
+
+  if (GetLayoutBox()->IsScrollContainer() && !scrolls_overflow_ &&
+      (GetLayoutBox()->StyleRef().OverscrollBehaviorX() !=
+           EOverscrollBehavior::kAuto ||
+       GetLayoutBox()->StyleRef().OverscrollBehaviorY() !=
+           EOverscrollBehavior::kAuto)) {
+    UseCounter::Count(
+        GetLayoutBox()->GetDocument(),
+        WebFeature::kOverscrollBehaviorOnNonScrollableScrollContainer);
+  }
+
   if (did_scroll_overflow == ScrollsOverflow())
     return;
 

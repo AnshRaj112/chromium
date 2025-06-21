@@ -10,44 +10,32 @@
 #include "content/browser/indexed_db/indexed_db_value.h"
 #include "content/browser/indexed_db/instance/sqlite/database_connection.h"
 #include "content/browser/indexed_db/status.h"
-#include "sql/transaction.h"
 
 namespace content::indexed_db::sqlite {
 
 BackingStoreTransactionImpl::BackingStoreTransactionImpl(
     base::WeakPtr<DatabaseConnection> db,
-    std::unique_ptr<sql::Transaction> transaction,
     blink::mojom::IDBTransactionDurability durability,
     blink::mojom::IDBTransactionMode mode)
-    : db_(std::move(db)),
-      transaction_(std::move(transaction)),
-      durability_(durability),
-      mode_(mode) {}
+    : db_(std::move(db)), durability_(durability), mode_(mode) {}
 
 BackingStoreTransactionImpl::~BackingStoreTransactionImpl() = default;
 
 void BackingStoreTransactionImpl::Begin(std::vector<PartitionedLock> locks) {
-  // TODO(crbug.com/40253999): How do we surface the error if this call fails?
-  CHECK(transaction_->Begin());
-  db_->OnTransactionBegin(PassKey(), *this);
+  locks_ = std::move(locks);
+  db_->BeginTransaction(PassKey(), *this);
 }
 
 Status BackingStoreTransactionImpl::CommitPhaseOne(BlobWriteCallback callback) {
-  return std::move(callback).Run(
-      BlobWriteResult::kRunPhaseTwoAndReturnResult,
-      storage::mojom::WriteBlobToFileResult::kSuccess);
+  return db_->CommitTransactionPhaseOne(PassKey(), *this, std::move(callback));
 }
 
 Status BackingStoreTransactionImpl::CommitPhaseTwo() {
-  db_->OnBeforeTransactionCommit(PassKey(), *this);
-  transaction_->Commit();
-  db_->OnTransactionCommit(PassKey(), *this);
-  return Status::OK();
+  return db_->CommitTransactionPhaseTwo(PassKey(), *this);
 }
 
 void BackingStoreTransactionImpl::Rollback() {
-  transaction_->Rollback();
-  db_->OnTransactionRollback(PassKey(), *this);
+  return db_->RollBackTransaction(PassKey(), *this);
 }
 
 Status BackingStoreTransactionImpl::SetDatabaseVersion(int64_t version) {
@@ -64,8 +52,7 @@ Status BackingStoreTransactionImpl::CreateObjectStore(
 }
 
 Status BackingStoreTransactionImpl::DeleteObjectStore(int64_t object_store_id) {
-  NOTIMPLEMENTED();
-  return Status::InvalidArgument("Not implemented");
+  return db_->DeleteObjectStore(PassKey(), object_store_id);
 }
 
 Status BackingStoreTransactionImpl::RenameObjectStore(
@@ -116,9 +103,8 @@ StatusOr<BackingStore::RecordIdentifier> BackingStoreTransactionImpl::PutRecord(
 
 Status BackingStoreTransactionImpl::DeleteRange(
     int64_t object_store_id,
-    const blink::IndexedDBKeyRange&) {
-  NOTIMPLEMENTED();
-  return Status::InvalidArgument("Not implemented");
+    const blink::IndexedDBKeyRange& range) {
+  return db_->DeleteRange(object_store_id, range);
 }
 
 StatusOr<int64_t> BackingStoreTransactionImpl::GetKeyGeneratorCurrentNumber(
@@ -153,20 +139,12 @@ Status BackingStoreTransactionImpl::PutIndexDataForRecord(
 }
 
 StatusOr<blink::IndexedDBKey>
-BackingStoreTransactionImpl::GetPrimaryKeyViaIndex(
+BackingStoreTransactionImpl::GetFirstPrimaryKeyForIndexKey(
     int64_t object_store_id,
     int64_t index_id,
     const blink::IndexedDBKey& key) {
   NOTIMPLEMENTED();
   return base::unexpected(Status::InvalidArgument("not implemented"));
-}
-
-StatusOr<blink::IndexedDBKey> BackingStoreTransactionImpl::KeyExistsInIndex(
-    int64_t object_store_id,
-    int64_t index_id,
-    const blink::IndexedDBKey& key) {
-  NOTIMPLEMENTED();
-  return base::unexpected(Status::InvalidArgument("Not implemented"));
 }
 
 StatusOr<uint32_t> BackingStoreTransactionImpl::GetObjectStoreKeyCount(
@@ -188,18 +166,18 @@ StatusOr<std::unique_ptr<BackingStore::Cursor>>
 BackingStoreTransactionImpl::OpenObjectStoreKeyCursor(
     int64_t object_store_id,
     const blink::IndexedDBKeyRange& key_range,
-    blink::mojom::IDBCursorDirection) {
-  NOTIMPLEMENTED();
-  return base::unexpected(Status::InvalidArgument("Not implemented"));
+    blink::mojom::IDBCursorDirection direction) {
+  return db_->OpenObjectStoreCursor(PassKey(), object_store_id, key_range,
+                                    direction, /*key_only=*/true);
 }
 
 StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>>
 BackingStoreTransactionImpl::OpenObjectStoreCursor(
     int64_t object_store_id,
     const blink::IndexedDBKeyRange& key_range,
-    blink::mojom::IDBCursorDirection) {
-  NOTIMPLEMENTED();
-  return base::unexpected(Status::InvalidArgument("Not implemented"));
+    blink::mojom::IDBCursorDirection direction) {
+  return db_->OpenObjectStoreCursor(PassKey(), object_store_id, key_range,
+                                    direction, /*key_only=*/false);
 }
 
 StatusOr<std::unique_ptr<indexed_db::BackingStore::Cursor>>
@@ -229,7 +207,8 @@ blink::mojom::IDBValuePtr BackingStoreTransactionImpl::BuildMojoValue(
     mojo_value->bits = std::move(value.bits);
   }
   if (!value.external_objects.empty()) {
-    NOTIMPLEMENTED();
+    mojo_value->external_objects =
+        db_->CreateAllExternalObjects(PassKey(), value.external_objects);
   }
   return mojo_value;
 }

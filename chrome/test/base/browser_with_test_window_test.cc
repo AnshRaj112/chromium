@@ -135,7 +135,7 @@ void BrowserWithTestWindowTest::TearDown() {
   // Close the browser tabs and destroy the browser and window instances.
   if (browser_) {
     browser_->tab_strip_model()->CloseAllTabs();
-    browser_->GetFeatures().TearDownPreBrowserViewDestruction();
+    browser_->GetFeatures().TearDownPreBrowserWindowDestruction();
     browser_.reset();
   }
   window_.reset();
@@ -303,7 +303,7 @@ std::unique_ptr<Browser> BrowserWithTestWindowTest::CreateBrowser(
     params.type = browser_type;
   }
   params.window = browser_window;
-  return std::unique_ptr<Browser>(Browser::Create(params));
+  return Browser::DeprecatedCreateOwnedForTesting(params);
 }
 
 #if BUILDFLAG(IS_CHROMEOS)
