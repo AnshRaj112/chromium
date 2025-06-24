@@ -4,6 +4,7 @@
 
 #include "third_party/blink/renderer/modules/webgpu/gpu_canvas_context.h"
 
+#include "base/metrics/histogram_functions.h"
 #include "components/viz/common/resources/shared_image_format_utils.h"
 #include "gpu/command_buffer/client/raster_interface.h"
 #include "gpu/config/gpu_finch_features.h"
@@ -128,7 +129,7 @@ gfx::ColorSpace GPUCanvasContext::GetColorSpace() const {
 }
 
 bool GPUCanvasContext::IsAccelerated() const {
-  auto* resource_provider = Host()->GetResourceProviderForWebGPU();
+  auto* resource_provider = resource_provider_.get();
   return resource_provider ? resource_provider->IsAccelerated()
                            : Host()->ShouldTryToUseGpuRaster();
 }
@@ -168,6 +169,11 @@ void GPUCanvasContext::Reshape(int width, int height) {
   Host()->SetNeedsCompositingUpdate();
 }
 
+void GPUCanvasContext::Dispose() {
+  resource_provider_.reset();
+  CanvasRenderingContext::Dispose();
+}
+
 scoped_refptr<StaticBitmapImage> GPUCanvasContext::GetImage(FlushReason) {
   if (!swap_buffers_) {
     return nullptr;
@@ -194,19 +200,44 @@ scoped_refptr<StaticBitmapImage> GPUCanvasContext::GetImage(FlushReason) {
   return SnapshotInternal(front_buffer_texture->GetTexture());
 }
 
+CanvasResourceProvider* GPUCanvasContext::GetOrCreateCanvasResourceProvider() {
+  auto* provider = resource_provider_.get();
+  if (!provider && !did_fail_to_create_resource_provider_) {
+    if (Host()->IsValidImageSize()) {
+      if (SharedGpuContext::IsGpuCompositingEnabled()) {
+        resource_provider_ = CanvasResourceProvider::CreateWebGPUImageProvider(
+            Host()->Size(), GetSharedImageFormat(), GetAlphaType(),
+            GetColorSpace(), gpu::SharedImageUsageSet(), Host());
+      }
+      Host()->UpdateMemoryUsage();
+      provider = resource_provider_.get();
+    }
+    if (!provider) {
+      did_fail_to_create_resource_provider_ = true;
+    } else if (provider->IsValid()) {
+      base::UmaHistogramBoolean("Blink.Canvas.ResourceProviderIsAccelerated",
+                                provider->IsAccelerated());
+      base::UmaHistogramEnumeration("Blink.Canvas.ResourceProviderType",
+                                    provider->GetType());
+    }
+  }
+  return provider;
+}
+
 CanvasResourceProvider* GPUCanvasContext::PaintRenderingResultsToCanvas(
     SourceDrawingBuffer source_buffer) {
   if (!swap_buffers_) {
-    return Host()->GetResourceProviderForWebGPU();
+    return resource_provider_.get();
   }
 
-  if (Host()->GetResourceProviderForWebGPU() &&
-      Host()->GetResourceProviderForWebGPU()->Size() != swap_buffers_->Size()) {
+  if (resource_provider_.get() &&
+      resource_provider_.get()->Size() != swap_buffers_->Size()) {
+    resource_provider_.reset();
     Host()->DiscardResources();
   }
 
   CanvasResourceProvider* resource_provider =
-      Host()->GetOrCreateCanvasResourceProviderForWebGPU();
+      GetOrCreateCanvasResourceProvider();
   if (!resource_provider) {
     return nullptr;
   }
@@ -271,6 +302,11 @@ bool GPUCanvasContext::CopyRenderingResultsToVideoFrame(
 
   return swap_buffers_->CopyToVideoFrame(frame_pool, src_buffer,
                                          dst_color_space, std::move(callback));
+}
+
+void GPUCanvasContext::SizeChanged() {
+  did_fail_to_create_resource_provider_ = false;
+  resource_provider_.reset();
 }
 
 bool GPUCanvasContext::PushFrame() {

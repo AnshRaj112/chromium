@@ -112,6 +112,7 @@
 <translation id="5556417849629758491">स्क्रिनको सिरानको नजिक रहेको 'स्टोरसम्बन्धी जानकारी हेर्नुहोस्' नामक विकल्प</translation>
 <translation id="5627941783489838464">ट्याबसम्बन्धी कुनै पनि नयाँ जानकारी छैन</translation>
 <translation id="5656738671621697952">{TABS_COUNT,plural, =1{Chrome को <ph name="TABS_COUNT_ONE" /> लिंक}other{Chrome का <ph name="TABS_COUNT_MANY" /> वटा लिंक}}</translation>
+<translation id="5746204836956568669">अझ छिटो काम गर्न <ph name="NUMBER_OF_TABS" /> वटा ट्याब समूहबद्ध गर्ने हो?</translation>
 <translation id="58326064309361797">ट्याबहरूलाई समूहबद्ध गर्न तिनीहरूलाई ड्र्याग गर्नुहोस्</translation>
 <translation id="5901630391730855834">पहेँलो</translation>
 <translation id="5972844218283131174">सबैको चयन रद्द गर्नुहोस्</translation>
@@ -192,6 +193,7 @@
 <translation id="8374451057714760401">{NUM_MONTHS,plural, =1{<ph name="NUM_MONTHS_ONE" /> महिनाअघि अपडेट गरिएको}other{<ph name="NUM_MONTHS_MANY" /> महिनाअघि अपडेट गरिएको}}</translation>
 <translation id="8398929769197326728">नयाँ फोल्डर - <ph name="CURRENT_TIMESTAMP_MS" /></translation>
 <translation id="8428213095426709021">सेटिङहरू</translation>
+<translation id="855081842937141170">ट्याबलाई पिन गर्नुहोस्</translation>
 <translation id="8633025649649592204">हालसालैको क्रियाकलाप</translation>
 <translation id="8712637175834984815">भयो</translation>
 <translation id="8714939927607906138">अझ कम मूल्य</translation>
@@ -200,7 +202,6 @@
 <translation id="875848103419578654">{NUM_MONTHS,plural, =1{<ph name="NUM_MONTHS_ONE" /> महिनाअघि बनाइएको}other{<ph name="NUM_MONTHS_MANY" /> महिनाअघि बनाइएको}}</translation>
 <translation id="8813708480179818649">समूहबाट ट्याब हटाउनुहोस्</translation>
 <translation id="8820741577754260431">आफ्ना ट्याबहरूमा मूल्य घटेको कुरासम्बन्धी जानकारी हेर्नुहोस्</translation>
-<translation id="883379923675618699">Chrome ले तपाईंले ३ महिनादेखि प्रयोग नगरेका निष्क्रिय ट्याबहरूको खण्डमा रहेका वस्तुहरू स्वतः बन्द गर्छ। तपाईं अहिले वा जुनसुकै बेला सेटिङमा गई यसलाई अफ गर्न सक्नुहुन्छ।</translation>
 <translation id="8887921976452567404">तपाईंका बन्द गरिएका ट्याब र समूहहरू "हालसालैका ट्याबहरू" खण्ड र "ट्याब समूहहरू" खण्डमा गई फेरि खोल्न सकिन्छ।</translation>
 <translation id="8915916167043355778">सबै बन्द गर्नुहोस्</translation>
 <translation id="9090098097337832354">यो स्टोरसम्बन्धी जानकारी बन्द गरिएको छ</translation>

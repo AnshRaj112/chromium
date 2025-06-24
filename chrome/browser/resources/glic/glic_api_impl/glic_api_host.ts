@@ -18,7 +18,7 @@ import type {BrowserProxy} from '../browser_proxy.js';
 import {ContentSettingsType} from '../content_settings_types.mojom-webui.js';
 import type {FocusedTabData as FocusedTabDataMojo, GetTabContextOptionsMojoType as TabContextOptionsMojo, OpenPanelInfo as OpenPanelInfoMojo, OpenSettingsOptions as OpenSettingsOptionsMojo, PanelOpeningData as PanelOpeningDataMojo, PanelState as PanelStateMojo, ScrollToSelector as ScrollToSelectorMojo, TabContextMojoType as TabContextMojo, TabData as TabDataMojo, WebClientHandlerInterface, WebClientInterface} from '../glic.mojom-webui.js';
 import {SettingsPageField as SettingsPageFieldMojo, WebClientHandlerRemote, WebClientMode, WebClientReceiver, WebClientSizingMode} from '../glic.mojom-webui.js';
-import type {ActInFocusedTabParams, DraggableArea, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, Screenshot, ScrollToParams, TabContextOptions, WebPageData, ZeroStateSuggestions} from '../glic_api/glic_api.js';
+import type {ActInFocusedTabParams, DraggableArea, Journal, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, Screenshot, ScrollToParams, TabContextOptions, WebPageData, ZeroStateSuggestions} from '../glic_api/glic_api.js';
 import {ActInFocusedTabErrorReason, CaptureScreenshotErrorReason, DEFAULT_INNER_TEXT_BYTES_LIMIT, DEFAULT_PDF_SIZE_LIMIT, ScrollToErrorReason} from '../glic_api/glic_api.js';
 import {ObservableValue} from '../observable.js';
 import type {ObservableValueReadOnly} from '../observable.js';
@@ -207,6 +207,21 @@ class WebClientImpl implements WebClientInterface {
     this.sender.requestNoResponse(
         'glicWebClientNotifyOsHotkeyStateChanged', {hotkey});
   }
+
+  notifyPinnedTabsChanged(tabData: TabDataMojo[]): void {
+    const extras = new ResponseExtras();
+    this.sender.requestNoResponse(
+        'glicWebClientNotifyPinnedTabsChanged',
+        {tabData: tabData.map((x) => tabDataToClient(x, extras))},
+        extras.transfers);
+  }
+
+  notifyPinnedTabDataChanged(tabData: TabDataMojo): void {
+    const extras = new ResponseExtras();
+    this.sender.requestNoResponse(
+        'glicWebClientNotifyPinnedTabDataChanged',
+        {tabData: tabDataToClient(tabData, extras)}, extras.transfers);
+  }
 }
 
 // Handles all requests to the host.
@@ -343,6 +358,33 @@ class HostMessageHandler implements HostMessageHandlerInterface {
     return {
       tabContextResult: tabContextResult,
     };
+  }
+
+  async glicBrowserGetContextFromTab(
+      request: {tabId: string, options: TabContextOptions},
+      extras: ResponseExtras):
+      Promise<{tabContextResult: TabContextResultPrivate}> {
+    const {result: {errorReason, tabContext}} =
+        await this.handler.getContextFromTab(
+            tabIdFromClient(request.tabId),
+            tabContextOptionsFromClient(request.options));
+    if (!tabContext) {
+      throw new Error(`tabContext failed: ${errorReason}`);
+    }
+    const tabContextResult = tabContextToClient(tabContext, extras);
+
+    return {
+      tabContextResult: tabContextResult,
+    };
+  }
+
+  async glicBrowserSetMaximumNumberOfPinnedTabs(request: {
+    requestedMax: number,
+  }): Promise<{effectiveMax: number}> {
+    const requestedMax = request.requestedMax >= 0 ? request.requestedMax : 0;
+    const {effectiveMax} =
+        await this.handler.setMaximumNumberOfPinnedTabs(requestedMax);
+    return {effectiveMax};
   }
 
   async glicBrowserActInFocusedTab(
@@ -508,6 +550,56 @@ class HostMessageHandler implements HostMessageHandlerInterface {
     this.handler.onSessionTerminated();
   }
 
+  glicBrowserLogBeginAsyncEvent(request: {
+    asyncEventId: number,
+    taskId: number,
+    event: string,
+    details: string,
+  }): void {
+    this.handler.logBeginAsyncEvent(
+        BigInt(request.asyncEventId), request.taskId, request.event,
+        request.details);
+  }
+
+  glicBrowserLogEndAsyncEvent(request: {asyncEventId: number, details: string}):
+      void {
+    this.handler.logEndAsyncEvent(
+        BigInt(request.asyncEventId), request.details);
+  }
+
+  glicBrowserLogInstantEvent(
+      request: {taskId: number, event: string, details: string}): void {
+    this.handler.logInstantEvent(
+        request.taskId, request.event, request.details);
+  }
+
+  glicBrowserJournalClear(): void {
+    this.handler.journalClear();
+  }
+
+  async glicBrowserJournalSnapshot(
+      request: {clear: boolean},
+      extras: ResponseExtras): Promise<{journal: Journal}> {
+    const result = await this.handler.journalSnapshot(request.clear);
+    const journalArray = new Uint8Array(result.journal.data);
+    extras.addTransfer(journalArray.buffer);
+    return {
+      journal: {
+        data: journalArray.buffer,
+      },
+    };
+  }
+
+  glicBrowserJournalStart(
+      request: {maxBytes: number, captureScreenshots: boolean}): void {
+    this.handler.journalStart(
+        BigInt(request.maxBytes), request.captureScreenshots);
+  }
+
+  glicBrowserJournalStop(): void {
+    this.handler.journalStop();
+  }
+
   glicBrowserOnResponseRated(request: {positive: boolean}): void {
     this.handler.onResponseRated(request.positive);
   }
@@ -601,6 +693,21 @@ class HostMessageHandler implements HostMessageHandlerInterface {
 
   glicBrowserGetOsMicrophonePermissionStatus(): Promise<{enabled: boolean}> {
     return this.handler.getOsMicrophonePermissionStatus();
+  }
+
+  glicBrowserPinTabs(request: {tabIds: string[]}):
+      Promise<{pinnedAll: boolean}> {
+    return this.handler.pinTabs(request.tabIds.map((x) => tabIdFromClient(x)));
+  }
+
+  glicBrowserUnpinTabs(request: {tabIds: string[]}):
+      Promise<{unpinnedAll: boolean}> {
+    return this.handler.unpinTabs(
+        request.tabIds.map((x) => tabIdFromClient(x)));
+  }
+
+  glicBrowserUnpinAllTabs(): void {
+    this.handler.unpinAllTabs();
   }
 
   async glicBrowserGetZeroStateSuggestionsForFocusedTab(request: {
@@ -932,6 +1039,14 @@ function tabIdToClient(tabId: number): string {
   return `${tabId}`;
 }
 
+function tabIdFromClient(tabId: string): number {
+  const parsed = parseInt(tabId);
+  if (Number.isNaN(parsed)) {
+    return 0;
+  }
+  return parsed;
+}
+
 function optionalWindowIdToClient(windowId: number|null): string|undefined {
   if (windowId === null) {
     return undefined;
@@ -997,6 +1112,7 @@ function tabDataToClient(tabData: TabDataMojo|null, extras: ResponseExtras):
     }
   }
 
+  const isObservable = optionalToClient(tabData.isObservable);
   return {
     tabId: tabIdToClient(tabData.tabId),
     windowId: windowIdToClient(tabData.windowId),
@@ -1004,6 +1120,7 @@ function tabDataToClient(tabData: TabDataMojo|null, extras: ResponseExtras):
     title: optionalToClient(tabData.title),
     favicon,
     documentMimeType: tabData.documentMimeType,
+    isObservable,
   };
 }
 

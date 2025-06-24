@@ -112,6 +112,8 @@ NSString* const kPasswordManagerTrustedVaultWidgetPromoImage =
     @"password_manager_trusted_vault_widget_promo";
 NSString* const kPasswordManagerTrustedVaultWidgetPromoDisabledImage =
     @"password_manager_trusted_vault_widget_promo_disabled";
+NSString* const kPhoneSparkleSymbol = @"phone_sparkle";
+NSString* const kTextSearchSymbol = @"text_search";
 
 // Custom symbol names which can be configured with a color palette.
 NSString* const kIncognitoCircleFillSymbol = @"incognito_circle_fill";
@@ -212,6 +214,7 @@ NSString* const kExpandSymbol = @"arrow.up.left.and.arrow.down.right";
 NSString* const kBackSymbol = @"arrow.backward";
 NSString* const kForwardSymbol = @"arrow.forward";
 NSString* const kPersonFillSymbol = @"person.fill";
+NSString* const kPersonClockFillSymbol = @"person.badge.clock.fill";
 NSString* const kMailFillSymbol = @"envelope.fill";
 NSString* const kPhoneFillSymbol = @"phone.fill";
 NSString* const kDownloadPromptFillSymbol = @"arrow.down.to.line.circle.fill";

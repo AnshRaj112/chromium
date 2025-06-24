@@ -3042,7 +3042,6 @@ interface GPUAdapter
     attribute @@toStringTag
     getter features
     getter info
-    getter isFallbackAdapter
     getter limits
     method constructor
     method requestDevice
@@ -3503,7 +3502,7 @@ interface HTMLAnchorElement : HTMLElement
     getter href
     getter hrefTranslate
     getter hreflang
-    getter interestTargetElement
+    getter interestForElement
     getter name
     getter origin
     getter password
@@ -3533,7 +3532,7 @@ interface HTMLAnchorElement : HTMLElement
     setter href
     setter hrefTranslate
     setter hreflang
-    setter interestTargetElement
+    setter interestForElement
     setter name
     setter password
     setter pathname
@@ -3560,7 +3559,7 @@ interface HTMLAreaElement : HTMLElement
     getter host
     getter hostname
     getter href
-    getter interestTargetElement
+    getter interestForElement
     getter noHref
     getter origin
     getter password
@@ -3585,7 +3584,7 @@ interface HTMLAreaElement : HTMLElement
     setter host
     setter hostname
     setter href
-    setter interestTargetElement
+    setter interestForElement
     setter noHref
     setter password
     setter pathname
@@ -3688,7 +3687,7 @@ interface HTMLButtonElement : HTMLElement
     getter formMethod
     getter formNoValidate
     getter formTarget
-    getter interestTargetElement
+    getter interestForElement
     getter labels
     getter name
     getter popoverTargetAction
@@ -3710,7 +3709,7 @@ interface HTMLButtonElement : HTMLElement
     setter formMethod
     setter formNoValidate
     setter formTarget
-    setter interestTargetElement
+    setter interestForElement
     setter name
     setter popoverTargetAction
     setter popoverTargetElement
@@ -3918,6 +3917,7 @@ interface HTMLElement : Element
     getter onwheel
     getter outerText
     getter popover
+    getter scrollParent
     getter spellcheck
     getter style
     getter tabIndex
@@ -5628,6 +5628,18 @@ interface IntegrityViolationReportBody : ReportBody
     getter destination
     getter documentURL
     getter reportOnly
+    method constructor
+    method toJSON
+interface InteractionContentfulPaint : PerformanceEntry
+    attribute @@toStringTag
+    getter element
+    getter id
+    getter loadTime
+    getter paintTime
+    getter presentationTime
+    getter renderTime
+    getter size
+    getter url
     method constructor
     method toJSON
 interface InterestEvent : Event
@@ -8226,12 +8238,12 @@ interface Rewriter
 interface SVGAElement : SVGGraphicsElement
     attribute @@toStringTag
     getter href
-    getter interestTargetElement
+    getter interestForElement
     getter rel
     getter relList
     getter target
     method constructor
-    setter interestTargetElement
+    setter interestForElement
     setter rel
     setter relList
 interface SVGAngle
@@ -9698,6 +9710,8 @@ interface SnapEvent : Event
     method constructor
 interface SoftNavigationEntry : PerformanceEntry
     attribute @@toStringTag
+    getter paintTime
+    getter presentationTime
     method constructor
 interface SourceBuffer : EventTarget
     attribute @@toStringTag

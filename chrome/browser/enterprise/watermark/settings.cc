@@ -7,6 +7,7 @@
 #include "base/command_line.h"
 #include "base/logging.h"
 #include "base/strings/string_number_conversions.h"
+#include "chrome/browser/enterprise/watermark/watermark_features.h"
 #include "chrome/common/channel_info.h"
 #include "components/enterprise/connectors/core/connectors_prefs.h"
 #include "components/prefs/pref_service.h"
@@ -40,8 +41,8 @@ int GetOpacity(const PrefService* prefs,
   int percent_value = prefs->GetInteger(pref_name);
   base::CommandLine* cmd = base::CommandLine::ForCurrentProcess();
   if (cmd->HasSwitch(cmd_opacity_percent_flag) &&
-      (chrome::GetChannel() != version_info::Channel::STABLE ||
-       chrome::GetChannel() != version_info::Channel::BETA)) {
+      chrome::GetChannel() != version_info::Channel::STABLE &&
+      chrome::GetChannel() != version_info::Channel::BETA) {
     int percent_from_flag;
     if (base::StringToInt(cmd->GetSwitchValueASCII(cmd_opacity_percent_flag),
                           &percent_from_flag)) {
@@ -64,12 +65,16 @@ SkColor GetDefaultFillColor() {
 
 SkColor GetDefaultOutlineColor() {
   return SkColorSetA(
-      kBaseFillRGB,
+      kBaseOutlineRGB,
       PercentageToSkAlpha(
-          enterprise_connectors::kWatermarkStyleFillOpacityDefault));
+          enterprise_connectors::kWatermarkStyleOutlineOpacityDefault));
 }
 
 SkColor GetFillColor(const PrefService* prefs) {
+  if (!base::FeatureList::IsEnabled(
+          enterprise_watermark::kEnableWatermarkCustomization)) {
+    return GetDefaultFillColor();
+  }
   int alpha =
       GetOpacity(prefs, enterprise_connectors::kWatermarkStyleFillOpacityPref,
                  kWatermarkFillOpacityPercentFlag);
@@ -77,10 +82,13 @@ SkColor GetFillColor(const PrefService* prefs) {
 }
 
 SkColor GetOutlineColor(const PrefService* prefs) {
+  if (!base::FeatureList::IsEnabled(
+          enterprise_watermark::kEnableWatermarkCustomization)) {
+    return GetDefaultOutlineColor();
+  }
   int alpha = GetOpacity(
       prefs, enterprise_connectors::kWatermarkStyleOutlineOpacityPref,
       kWatermarkOutlineOpacityPercentFlag);
   return SkColorSetA(kBaseOutlineRGB, alpha);
 }
-
 }  // namespace enterprise_watermark

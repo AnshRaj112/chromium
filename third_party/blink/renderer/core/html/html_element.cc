@@ -97,6 +97,7 @@
 #include "third_party/blink/renderer/core/html/html_dimension.h"
 #include "third_party/blink/renderer/core/html/html_document.h"
 #include "third_party/blink/renderer/core/html/html_frame_owner_element.h"
+#include "third_party/blink/renderer/core/html/html_menu_item_element.h"
 #include "third_party/blink/renderer/core/html/html_menu_list_element.h"
 #include "third_party/blink/renderer/core/html/html_slot_element.h"
 #include "third_party/blink/renderer/core/html/html_template_element.h"
@@ -123,6 +124,7 @@
 #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
 #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 #include "third_party/blink/renderer/platform/scheduler/public/post_cancellable_task.h"
+#include "third_party/blink/renderer/platform/text/bidi_paragraph.h"
 #include "third_party/blink/renderer/platform/wtf/std_lib_extras.h"
 
 namespace blink {
@@ -1906,9 +1908,9 @@ void HTMLElement::HidePopoverInternal(
     // If this is the target of an active interest invoker, closing the popover
     // constitutes an automatic loss of interest in the invoker.
     if (Element* upstream_invoker = GetInterestInvoker()) {
-      DCHECK(RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
+      DCHECK(RuntimeEnabledFeatures::HTMLInterestForAttributeEnabled(
           GetDocument().GetExecutionContext()));
-      DCHECK_EQ(upstream_invoker->InterestTargetElement(), this);
+      DCHECK_EQ(upstream_invoker->InterestForElement(), this);
       DCHECK_NE(upstream_invoker->GetInvokerData()->GetInterestState(),
                 InterestState::kNoInterest);
       upstream_invoker->LoseInterestNow(this);
@@ -2107,6 +2109,17 @@ const HTMLElement* NearestTargetPopoverForInvoker(
         PopoverAncestorOptionsSet()) {
   return NearestMatchingAncestor(
       node, ancestor_options, [](const Node* test_node) -> const HTMLElement* {
+        // First, see if `test_node` is a menu item element pointing to a
+        // popover (likely a menu list, but it could be any HTMLElement).
+        auto* menu_item = DynamicTo<HTMLMenuItemElement>(test_node);
+        auto* menu_target =
+            menu_item ? DynamicTo<HTMLElement>(menu_item->commandForElement())
+                      : nullptr;
+        if (menu_target) {
+          return menu_target;
+        }
+
+        // Next, see if `test_node` is a form control or button element.
         auto* form_element =
             DynamicTo<HTMLFormControlElement>(const_cast<Node*>(test_node));
         if (!form_element) {
@@ -2164,7 +2177,8 @@ const HTMLElement* HTMLElement::FindTopmostPopoverAncestor(
     CHECK(new_popover);
     CHECK(new_popover->IsPopover());
     CHECK_NE(new_popover->PopoverType(), PopoverValueType::kManual);
-    CHECK(!new_popover->popoverOpen());
+    CHECK(!new_popover->popoverOpen() ||
+          IsA<HTMLMenuListElement>(new_popover_or_top_layer_element));
   } else {
     CHECK(!new_popover);
     CHECK(!new_popovers_invoker);
@@ -2221,18 +2235,24 @@ const HTMLElement* HTMLElement::FindTopmostPopoverAncestor(
 const HTMLElement* HTMLElement::TopLayerElementPopoverAncestor(
     Element& top_layer_element,
     TopLayerElementType top_layer_element_type) {
-  CHECK(top_layer_element_type != TopLayerElementType::kPopover);
+  bool is_menulist = IsA<HTMLMenuListElement>(top_layer_element);
+  CHECK(top_layer_element_type != TopLayerElementType::kPopover || is_menulist);
   Document& document = top_layer_element.GetDocument();
+  // If top_layer_element is an open menulist popover, find its invoker.
+  // Since "normal" popovers don't go through this code path (see the
+  // CHECK above), pass `nullptr` otherwise.
+  Element* new_popovers_invoker =
+      is_menulist ? top_layer_element.GetPopoverData()->invoker() : nullptr;
   // Check the hint stack first.
   if (auto* ancestor = FindTopmostPopoverAncestor(
-          top_layer_element, document.PopoverHintStack(), nullptr,
+          top_layer_element, document.PopoverHintStack(), new_popovers_invoker,
           top_layer_element_type)) {
     return ancestor;
   }
   // Then the auto stack.
-  return FindTopmostPopoverAncestor(top_layer_element,
-                                    document.PopoverAutoStack(), nullptr,
-                                    top_layer_element_type);
+  return FindTopmostPopoverAncestor(
+      top_layer_element, document.PopoverAutoStack(), new_popovers_invoker,
+      top_layer_element_type);
 }
 
 namespace {
@@ -2674,6 +2694,40 @@ void HTMLElement::AdjustDirectionAutoAfterRecalcAssignedNodes() {
   AdjustDirectionalityIfNeededAfterChildrenChanged(fakeChange);
 }
 
+// https://html.spec.whatwg.org/multipage/dom.html#directionality-of-the-attribute
+const AtomicString& HTMLElement::GetDirectionalAttribute(
+    const QualifiedName& attr_name,
+    TextDirection& direction_result) {
+  // This CHECK() could eventually allow everything in
+  // https://html.spec.whatwg.org/multipage/dom.html#directionality-capable-attribute
+  // but for now it only allows what we use.
+  CHECK(attr_name == html_names::kTitleAttr);
+
+  const AtomicString& result = FastGetAttribute(attr_name);
+  if (!result.IsNull()) {
+    TextDirection direction = TextDirection::kLtr;
+    if (RuntimeEnabledFeatures::AttributeDirectionalityEnabled()) {
+      direction = CachedDirectionality();
+    }
+
+    if (const LayoutObject* layout_object = GetLayoutObject()) {
+      // Note that this isn't part of the HTML spec's concept, but we've
+      // always honored CSS directionality for the title attribute.
+      direction = layout_object->StyleRef().Direction();
+    }
+    if (RuntimeEnabledFeatures::AttributeDirectionalityEnabled() &&
+        HasDirectionAuto()) {
+      if (const std::optional<TextDirection> string_direction =
+              BidiParagraph::BaseDirectionForString(result)) {
+        direction = *string_direction;
+      }
+    }
+    direction_result = direction;
+  }
+
+  return result;
+}
+
 Node::InsertionNotificationRequest HTMLElement::InsertedInto(
     ContainerNode& insertion_point) {
   // Process the superclass first to ensure that `InActiveDocument()` is
@@ -3028,6 +3082,18 @@ int HTMLElement::offsetHeightForBinding() {
     result = AdjustedOffsetForZoom(layout_object->OffsetHeight());
   }
   return result;
+}
+
+Element* HTMLElement::unclosedScrollParent() {
+  GetDocument().UpdateStyleAndLayoutForNode(this,
+                                            DocumentUpdateReason::kJavaScript);
+
+  LayoutObject* layout_object = GetLayoutObject();
+  if (!layout_object) {
+    return nullptr;
+  }
+
+  return layout_object->ScrollParent(this);
 }
 
 Element* HTMLElement::unclosedOffsetParent() {

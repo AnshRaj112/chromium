@@ -948,7 +948,7 @@
 <translation id="5145331109270917438">수정된 날짜</translation>
 <translation id="5154917547274118687">메모리</translation>
 <translation id="5160857336552977725"><ph name="DEVICE_TYPE" />에 로그인</translation>
-<translation id="5168185087976003268">배터리 상태</translation>
+<translation id="5168185087976003268">배터리 성능 상태</translation>
 <translation id="5170568018924773124">폴더 열기</translation>
 <translation id="517075088756846356">업데이트를 계속하려면 <ph name="DEVICE_NAME" />에서 전원 케이블을 분리했다가 다시 연결하세요.</translation>
 <translation id="5180108905184566358">바오밥나무</translation>
@@ -1436,7 +1436,6 @@
 <translation id="7302860742311162920">ICCID</translation>
 <translation id="7305884605064981971">EDGE</translation>
 <translation id="7308203371573257315">Chromebook 도움말 포럼에서 전문가에게 문의하기</translation>
-<translation id="7309823890857024809">유리 꽃병에 꽂힌 양귀비 줄기 몇 가닥을 그린 검은색 배경의 미니멀한 정물화</translation>
 <translation id="7311368985037279727">키보드 색상</translation>
 <translation id="7317831949569936035">학교 등록</translation>
 <translation id="7319430975418800333">A3</translation>

@@ -237,8 +237,11 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
   }
 
   // Hide the toolbars and the floating button, so they can fade in the first
-  // time there's a transition into this view controller.
-  [self hideToolbars];
+  // time there's a transition into this view controller. Not hidden for the new
+  // tab grid transitions.
+  if (!IsNewTabGridTransitionsEnabled()) {
+    [self hideToolbars];
+  }
 
   if (@available(iOS 17, *)) {
     NSArray<UITrait>* traits = TraitCollectionSetForTraits(nil);
@@ -396,9 +399,13 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
 #pragma mark - TabGridTransitionLayoutProviding
 
 - (TabGridTransitionLayout*)transitionLayout {
+  TabGridPage activePage = self.activePage;
+  BaseGridViewController* activeGrid =
+      [self gridViewControllerForPage:activePage];
   TabGridTransitionItem* activeCell =
-      [self transitionItemForActiveCellWithActivePage:self.activePage];
-  return [TabGridTransitionLayout layoutWithActiveCell:activeCell];
+      [self transitionItemForActiveCellWithActivePage:activePage];
+  return [TabGridTransitionLayout layoutWithActiveCell:activeCell
+                                            activeGrid:activeGrid];
 }
 
 #pragma mark - Public Methods
@@ -417,7 +424,10 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
   if (animated && self.transitionCoordinator) {
     [self animateToolbarsForAppearance];
   } else {
-    [self showToolbars];
+    // The new tab grid transitions don't hide the toolbars, so no need to show.
+    if (!IsNewTabGridTransitionsEnabled()) {
+      [self showToolbars];
+    }
   }
   [self broadcastIncognitoContentVisibility];
 
@@ -454,7 +464,10 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
   if (animated && self.transitionCoordinator) {
     [self animateToolbarsForDisappearance];
   } else {
-    [self hideToolbars];
+    // The new tab grid transitions don't hide the toolbars.
+    if (!IsNewTabGridTransitionsEnabled()) {
+      [self hideToolbars];
+    }
   }
 
   self.viewVisible = NO;
@@ -959,8 +972,19 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
     [topToolbar.topAnchor
         constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
     [topToolbar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-    [topToolbar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor]
+    [topToolbar.trailingAnchor
+        constraintEqualToAnchor:self.view.trailingAnchor],
   ]];
+
+#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+  if (@available(iOS 26, *)) {
+    UIScrollEdgeElementContainerInteraction* edgeEffect =
+        [[UIScrollEdgeElementContainerInteraction alloc] init];
+    edgeEffect.edge = UIRectEdgeTop;
+    edgeEffect.scrollView = self.scrollView;
+    [topToolbar addInteraction:edgeEffect];
+  }
+#endif
 }
 
 // Adds the bottom toolbar and sets constraints.
@@ -980,6 +1004,16 @@ NSUInteger GetPageIndexFromPage(TabGridPage page) {
 
   [self.layoutGuideCenter referenceView:bottomToolbar
                               underName:kTabGridBottomToolbarGuide];
+
+#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+  if (@available(iOS 26, *)) {
+    UIScrollEdgeElementContainerInteraction* edgeEffect =
+        [[UIScrollEdgeElementContainerInteraction alloc] init];
+    edgeEffect.edge = UIRectEdgeBottom;
+    edgeEffect.scrollView = self.scrollView;
+    [bottomToolbar addInteraction:edgeEffect];
+  }
+#endif
 }
 
 // Adds the PinnedTabsViewController and sets constraints.

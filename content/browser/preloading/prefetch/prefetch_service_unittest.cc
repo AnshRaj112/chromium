@@ -537,6 +537,7 @@ class PrefetchServiceTestBase : public PrefetchingMetricsTestBase {
         test::kPreloadingEmbedderHistgramSuffixForTesting, referrer,
         std::move(referring_origin),
         /*no_vary_search_hint=*/std::nullopt,
+        /*priority=*/std::nullopt,
         PreloadPipelineInfo::Create(
             /*planned_max_preloading_type=*/PreloadingType::kPrefetch),
         /*attempt=*/nullptr);
@@ -555,7 +556,7 @@ class PrefetchServiceTestBase : public PrefetchingMetricsTestBase {
       bool should_disable_block_until_head_timeout = false) {
     return browser_context()->StartBrowserPrefetchRequest(
         url, test::kPreloadingEmbedderHistgramSuffixForTesting, true,
-        no_vary_search_data, additional_headers,
+        no_vary_search_data, PrefetchPriority::kHighest, additional_headers,
         std::move(request_status_listener), ttl,
         /*should_append_variations_header=*/true,
         should_disable_block_until_head_timeout);
@@ -585,15 +586,24 @@ class PrefetchServiceTestBase : public PrefetchingMetricsTestBase {
     VerifyCommonRequestState(url, {});
   }
 
-  void VerifyCommonRequestStateForEmbedders(
+  void VerifyCommonRequestStateForWebContentsPrefetch(
       const GURL& url,
       const VerifyCommonRequestStateOptions& options) {
-    VerifyCommonRequestState(
-        url, {.expected_priority =
-                  base::FeatureList::IsEnabled(
-                      features::kPrefetchNetworkPriorityForEmbedders)
-                      ? net::RequestPriority::MEDIUM
-                      : net::RequestPriority::IDLE});
+    VerifyCommonRequestStateOptions options_override = options;
+    options_override.expected_priority =
+        base::FeatureList::IsEnabled(
+            features::kPrefetchNetworkPriorityForEmbedders)
+            ? net::RequestPriority::MEDIUM
+            : net::RequestPriority::IDLE;
+    VerifyCommonRequestState(url, options_override);
+  }
+
+  void VerifyCommonRequestStateForBrowserContextPrefetch(
+      const GURL& url,
+      const VerifyCommonRequestStateOptions& options) {
+    VerifyCommonRequestStateOptions options_override = options;
+    options_override.expected_priority = net::RequestPriority::HIGHEST;
+    VerifyCommonRequestState(url, options_override);
   }
 
   void VerifyCommonRequestState(
@@ -1329,7 +1339,7 @@ TEST_P(PrefetchServiceTest, SuccessCase_Browser) {
                                      std::move(request_status_listener));
   task_environment()->RunUntilIdle();
 
-  VerifyCommonRequestStateForEmbedders(
+  VerifyCommonRequestStateForBrowserContextPrefetch(
       GURL("https://example.com?b=1"),
       {.use_prefetch_proxy = false,
        .additional_headers = request_additional_headers});
@@ -1407,7 +1417,7 @@ TEST_P(PrefetchServiceTest, SuccessCase_Browser_NoVarySearch) {
                                      std::move(request_status_listener));
   task_environment()->RunUntilIdle();
 
-  VerifyCommonRequestStateForEmbedders(
+  VerifyCommonRequestStateForBrowserContextPrefetch(
       GURL("https://example.com?a=1"),
       {.use_prefetch_proxy = false,
        .additional_headers = request_additional_headers});
@@ -1472,8 +1482,8 @@ TEST_P(PrefetchServiceTest, FailureCase_Browser_ServerErrorResponseCode) {
                                      std::move(request_status_listener));
   task_environment()->RunUntilIdle();
 
-  VerifyCommonRequestStateForEmbedders(GURL("https://example.com?b=1"),
-                                       {.use_prefetch_proxy = false});
+  VerifyCommonRequestStateForBrowserContextPrefetch(
+      GURL("https://example.com?b=1"), {.use_prefetch_proxy = false});
 
   EXPECT_FALSE(probe_listener->GetPrefetchStartFailedCalled());
   EXPECT_FALSE(probe_listener->GetPrefetchResponseCompletedCalled());
@@ -1532,8 +1542,8 @@ TEST_P(PrefetchServiceTest, FailureCase_Browser_NetError) {
                                      std::move(request_status_listener));
   task_environment()->RunUntilIdle();
 
-  VerifyCommonRequestStateForEmbedders(GURL("https://example.com?c=1"),
-                                       {.use_prefetch_proxy = false});
+  VerifyCommonRequestStateForBrowserContextPrefetch(
+      GURL("https://example.com?c=1"), {.use_prefetch_proxy = false});
   MakeResponseAndWait(net::HTTP_OK, net::ERR_FAILED, kHTMLMimeType,
                       /*use_prefetch_proxy=*/false,
                       {{"X-Testing", "Hello World"}}, kHTMLBody);
@@ -1619,7 +1629,7 @@ TEST_P(PrefetchServiceTest, BrowserContextPrefetchRespectsTTL) {
                                      base::Minutes(5));
   task_environment()->RunUntilIdle();
 
-  VerifyCommonRequestStateForEmbedders(
+  VerifyCommonRequestStateForBrowserContextPrefetch(
       GURL("https://example.com?b=1"),
       {.use_prefetch_proxy = false,
        .additional_headers = request_additional_headers});
@@ -1681,8 +1691,8 @@ TEST_P(PrefetchServiceTest, SuccessCase_Embedder) {
       MakePrefetchFromEmbedder(GURL("https://example.com"), prefetch_type);
   task_environment()->RunUntilIdle();
 
-  VerifyCommonRequestStateForEmbedders(GURL("https://example.com"),
-                                       {.use_prefetch_proxy = false});
+  VerifyCommonRequestStateForWebContentsPrefetch(GURL("https://example.com"),
+                                                 {.use_prefetch_proxy = false});
   MakeResponseAndWait(net::HTTP_OK, net::OK, kHTMLMimeType,
                       /*use_prefetch_proxy=*/false,
                       {{"X-Testing", "Hello World"}}, kHTMLBody);
@@ -1735,8 +1745,8 @@ TEST_P(PrefetchServiceTest,
                                             /*use_prefetch_proxy=*/false));
   task_environment()->RunUntilIdle();
 
-  VerifyCommonRequestStateForEmbedders(GURL("https://example.com"),
-                                       {.use_prefetch_proxy = false});
+  VerifyCommonRequestStateForWebContentsPrefetch(GURL("https://example.com"),
+                                                 {.use_prefetch_proxy = false});
   MakeResponseAndWait(net::HTTP_OK, net::OK, kHTMLMimeType,
                       /*use_prefetch_proxy=*/false,
                       {{"X-Testing", "Hello World"}}, kHTMLBody);
@@ -3473,8 +3483,8 @@ TEST_P(PrefetchServiceTest, NoVarySearchSuccessCase_Embedder) {
                                             /*use_prefetch_proxy=*/false));
   task_environment()->RunUntilIdle();
 
-  VerifyCommonRequestStateForEmbedders(GURL("https://example.com?a=1"),
-                                       {.use_prefetch_proxy = false});
+  VerifyCommonRequestStateForWebContentsPrefetch(
+      GURL("https://example.com?a=1"), {.use_prefetch_proxy = false});
   MakeResponseAndWait(
       net::HTTP_OK, net::OK, kHTMLMimeType,
       /*use_prefetch_proxy=*/false,
@@ -4172,7 +4182,7 @@ class PrefetchServiceAlwaysBlockUntilHeadTest
               {"prefetch_container_lifetime_s", "-1"},
               {"prefetch_timeout_ms", "10000"},
               // Initialize timeouts > 0ms for testing purposes.
-              {"block_until_head_timeout_eager_prefetch", "1000"},
+              {"block_until_head_timeout_immediate_prefetch", "1000"},
               {"block_until_head_timeout_moderate_prefetch", "1000"},
               {"block_until_head_timeout_conservative_prefetch", "1000"},
           }}},
@@ -5494,8 +5504,8 @@ TEST_P(PrefetchServiceDisableBlockUntilHeadTimeoutTest,
           /*should_disable_block_until_head_timeout=*/false);
   task_environment()->RunUntilIdle();
 
-  VerifyCommonRequestStateForEmbedders(GURL("https://example.com"),
-                                       {.use_prefetch_proxy = false});
+  VerifyCommonRequestStateForBrowserContextPrefetch(
+      GURL("https://example.com"), {.use_prefetch_proxy = false});
 
   // Simulate a navigation. The prefetch should not be served after a timeout.
   std::unique_ptr<NavigationResult> navigation_result =
@@ -5548,8 +5558,8 @@ TEST_P(PrefetchServiceDisableBlockUntilHeadTimeoutTest,
           /*should_disable_block_until_head_timeout=*/true);
   task_environment()->RunUntilIdle();
 
-  VerifyCommonRequestStateForEmbedders(GURL("https://example.com"),
-                                       {.use_prefetch_proxy = false});
+  VerifyCommonRequestStateForBrowserContextPrefetch(
+      GURL("https://example.com"), {.use_prefetch_proxy = false});
 
   // Simulate a navigation. The prefetch still blocks the navigation, after the
   // default timeout/
@@ -5587,6 +5597,74 @@ TEST_P(PrefetchServiceDisableBlockUntilHeadTimeoutTest,
           "Prefetch.BlockUntilHeadDuration.PerMatchingCandidate.NotServed.%s",
           metrics_suffix),
       0);
+}
+
+// Tests that browsing data removal for prefetch is performed per 1) its
+// `referring_origin` 2) if that is std::nullopt, then prefetch url.
+TEST_P(PrefetchServiceTest, PrefetchEviction) {
+  base::HistogramTester histogram_tester;
+
+  struct TestCase {
+    const std::optional<url::Origin> referring_origin;
+    const GURL prefetch_url;
+  };
+  const std::vector<TestCase> test_cases = {
+      {url::Origin::Create(GURL("https://a.test")), GURL("https://a.test/0")},
+      {url::Origin::Create(GURL("https://a.test")), GURL("https://b.test/1")},
+      {url::Origin::Create(GURL("https://b.test")), GURL("https://a.test/2")},
+      {url::Origin::Create(GURL("https://b.test")), GURL("https://b.test/3")},
+      {std::nullopt, GURL("https://a.test/4")},
+      {std::nullopt, GURL("https://b.test/5")},
+  };
+
+  MakePrefetchService(
+      std::make_unique<testing::NiceMock<MockPrefetchServiceDelegate>>(
+          /*num_on_prefetch_likely_calls=*/std::nullopt));
+  PrefetchService* prefetch_service =
+      BrowserContextImpl::From(browser_context())->GetPrefetchService();
+
+  std::vector<std::unique_ptr<PrefetchHandle>> handles;
+  for (const auto& test_case : test_cases) {
+    handles.push_back(
+        MakePrefetchFromEmbedder(test_case.prefetch_url,
+                                 PrefetchType(PreloadingTriggerType::kEmbedder,
+                                              /*use_prefetch_proxy=*/false),
+                                 /*referrer=*/{}, test_case.referring_origin));
+  }
+  task_environment()->RunUntilIdle();
+
+  // Evict prefetches from "a.test". The prefetch for "a.test" with no
+  // `referring_origin` should also be removed.
+  auto filter_builder = BrowsingDataFilterBuilder::Create(
+      BrowsingDataFilterBuilder::Mode::kDelete);
+  filter_builder->AddOrigin(url::Origin::Create(GURL("https://a.test")));
+  auto filter = filter_builder->BuildStorageKeyFilter();
+  prefetch_service->EvictPrefetchesForBrowsingDataRemoval(
+      filter, PrefetchStatus::kPrefetchEvictedAfterBrowsingDataRemoved);
+  task_environment()->RunUntilIdle();
+  EXPECT_FALSE(handles[0]->IsAlive());
+  EXPECT_FALSE(handles[1]->IsAlive());
+  EXPECT_FALSE(handles[4]->IsAlive());
+  EXPECT_TRUE(handles[2]->IsAlive());
+  EXPECT_TRUE(handles[3]->IsAlive());
+  EXPECT_TRUE(handles[5]->IsAlive());
+  histogram_tester.ExpectUniqueSample(
+      "Preloading.Prefetch.PrefetchStatus",
+      PrefetchStatus::kPrefetchEvictedAfterBrowsingDataRemoved, 3);
+
+  // Attempt to clear all the cache. The remaining prefetches are also removed.
+  prefetch_service->EvictPrefetchesForBrowsingDataRemoval(
+      BrowsingDataFilterBuilder::Create(
+          BrowsingDataFilterBuilder::Mode::kPreserve)
+          ->BuildStorageKeyFilter(),
+      PrefetchStatus::kPrefetchEvictedAfterBrowsingDataRemoved);
+  task_environment()->RunUntilIdle();
+  EXPECT_FALSE(handles[2]->IsAlive());
+  EXPECT_FALSE(handles[3]->IsAlive());
+  EXPECT_FALSE(handles[5]->IsAlive());
+  histogram_tester.ExpectUniqueSample(
+      "Preloading.Prefetch.PrefetchStatus",
+      PrefetchStatus::kPrefetchEvictedAfterBrowsingDataRemoved, 6);
 }
 
 // Tests that the prefetch eviction for eligible but not started triggers (i.e.
@@ -7646,6 +7724,7 @@ class PrefetchServiceAddPrefetchContainerTest
         prefetch_url, std::move(prefetch_type), blink::mojom::Referrer(),
         std::make_optional(SpeculationRulesTags()),
         /*no_vary_search_hint=*/std::nullopt,
+        /*priority=*/std::nullopt,
         /*prefetch_document_manager=*/nullptr,
         PreloadPipelineInfo::Create(planned_max_preloading_type),
         attempt->GetWeakPtr());
@@ -7920,10 +7999,10 @@ TEST_P(PrefetchServiceTest, PrefetchScheduler_Prioritize) {
           base::BindRepeating([](const PrefetchContainer& prefetch_container) {
             if (prefetch_container.GetURL().possibly_invalid_spec().ends_with(
                     "?prioritize=1")) {
-              return PrefetchPriority::kHighTest;
+              return PrefetchSchedulerPriority::kHighTest;
             }
 
-            return PrefetchPriority::kBase;
+            return PrefetchSchedulerPriority::kBase;
           }));
 
   const auto url_1 = GURL("https://example.com/one");
@@ -8000,10 +8079,10 @@ TEST_P(PrefetchServiceTest, PrefetchScheduler_Prioritize_Async) {
           base::BindRepeating([](const PrefetchContainer& prefetch_container) {
             if (prefetch_container.GetURL().possibly_invalid_spec().ends_with(
                     "?prioritize=1")) {
-              return PrefetchPriority::kHighTest;
+              return PrefetchSchedulerPriority::kHighTest;
             }
 
-            return PrefetchPriority::kBase;
+            return PrefetchSchedulerPriority::kBase;
           }));
 
   const auto url_1 = GURL("https://example.com/one");
@@ -8064,10 +8143,10 @@ TEST_P(PrefetchServiceTest, PrefetchScheduler_Burst) {
           base::BindRepeating([](const PrefetchContainer& prefetch_container) {
             if (prefetch_container.GetURL().possibly_invalid_spec().ends_with(
                     "?burst=1")) {
-              return PrefetchPriority::kBurstTest;
+              return PrefetchSchedulerPriority::kBurstTest;
             }
 
-            return PrefetchPriority::kBase;
+            return PrefetchSchedulerPriority::kBase;
           }));
 
   const auto url_1 = GURL("https://example.com/one");
@@ -8169,10 +8248,10 @@ TEST_P(PrefetchServiceTest, PrefetchScheduler_BurstTakesPriority) {
           base::BindRepeating([](const PrefetchContainer& prefetch_container) {
             if (prefetch_container.GetURL().possibly_invalid_spec().ends_with(
                     "?burst=1")) {
-              return PrefetchPriority::kBurstTest;
+              return PrefetchSchedulerPriority::kBurstTest;
             }
 
-            return PrefetchPriority::kBase;
+            return PrefetchSchedulerPriority::kBase;
           }));
 
   const auto url_1 = GURL("https://example.com/one");
@@ -8274,10 +8353,10 @@ TEST_P(PrefetchServiceTest, PrefetchScheduler_BurstTakesPriority_Async) {
           base::BindRepeating([](const PrefetchContainer& prefetch_container) {
             if (prefetch_container.GetURL().possibly_invalid_spec().ends_with(
                     "?burst=1")) {
-              return PrefetchPriority::kBurstTest;
+              return PrefetchSchedulerPriority::kBurstTest;
             }
 
-            return PrefetchPriority::kBase;
+            return PrefetchSchedulerPriority::kBase;
           }));
 
   const auto url_1 = GURL("https://example.com/one");

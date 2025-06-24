@@ -12,7 +12,6 @@
 #include "base/strings/stringprintf.h"
 #include "base/trace_event/process_memory_dump.h"
 #include "build/build_config.h"
-#include "gpu/command_buffer/client/gpu_memory_buffer_manager.h"
 #include "gpu/ipc/common/gpu_memory_buffer_impl_shared_memory.h"
 #include "ui/gfx/buffer_format_util.h"
 #include "ui/gfx/buffer_usage_util.h"
@@ -216,8 +215,7 @@ bool GpuMemoryBufferSupport::IsConfigurationSupportedForTest(
   }
 
   if (type == gfx::SHARED_MEMORY_BUFFER) {
-    return GpuMemoryBufferImplSharedMemory::IsConfigurationSupported(format,
-                                                                     usage);
+    return GpuMemoryBufferImplSharedMemory::IsUsageSupported(usage);
   }
 
   NOTREACHED();
@@ -230,9 +228,9 @@ GpuMemoryBufferSupport::CreateGpuMemoryBufferImplFromHandle(
     gfx::BufferFormat format,
     gfx::BufferUsage usage,
     GpuMemoryBufferImpl::DestructionCallback callback,
-    gpu::GpuMemoryBufferManager* gpu_memory_buffer_manager,
-    scoped_refptr<base::UnsafeSharedMemoryPool> pool,
-    base::span<uint8_t> premapped_memory) {
+    GpuMemoryBufferImpl::CopyNativeBufferToShMemCallback
+        copy_native_buffer_to_shmem_callback,
+    scoped_refptr<base::UnsafeSharedMemoryPool> pool) {
   switch (handle.type) {
     case gfx::SHARED_MEMORY_BUFFER:
       return GpuMemoryBufferImplSharedMemory::CreateFromHandle(
@@ -252,7 +250,7 @@ GpuMemoryBufferSupport::CreateGpuMemoryBufferImplFromHandle(
     case gfx::DXGI_SHARED_HANDLE:
       return GpuMemoryBufferImplDXGI::CreateFromHandle(
           std::move(handle), size, format, usage, std::move(callback),
-          gpu_memory_buffer_manager, std::move(pool), premapped_memory);
+          std::move(copy_native_buffer_to_shmem_callback), std::move(pool));
 #endif
 #if BUILDFLAG(IS_ANDROID)
     case gfx::ANDROID_HARDWARE_BUFFER:

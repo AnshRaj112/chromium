@@ -168,9 +168,9 @@ void StringImpl::DestroyIfNeeded() const {
 }
 
 unsigned StringImpl::ComputeASCIIFlags() const {
-  ASCIIStringAttributes ascii_attributes = VisitCharacters(
-      *this, [](auto chars) { return CharacterAttributes(chars); });
-  uint32_t new_flags = ASCIIStringAttributesToFlags(ascii_attributes);
+  blink::AsciiStringAttributes ascii_attributes = VisitCharacters(
+      *this, [](auto chars) { return blink::CharacterAttributes(chars); });
+  uint32_t new_flags = AsciiStringAttributesToFlags(ascii_attributes);
   const uint32_t previous_flags =
       hash_and_flags_.fetch_or(new_flags, std::memory_order_relaxed);
   static constexpr uint32_t mask =
@@ -340,12 +340,12 @@ scoped_refptr<StringImpl> StringImpl::Create(
 
 scoped_refptr<StringImpl> StringImpl::Create(
     base::span<const LChar> characters,
-    ASCIIStringAttributes ascii_attributes) {
+    blink::AsciiStringAttributes ascii_attributes) {
   scoped_refptr<StringImpl> ret = Create(characters);
   if (!characters.empty()) {
     // If length is 0 then `ret` is empty_ and should not have its
     // attributes calculated or changed.
-    uint32_t new_flags = ASCIIStringAttributesToFlags(ascii_attributes);
+    uint32_t new_flags = AsciiStringAttributesToFlags(ascii_attributes);
     ret->hash_and_flags_.fetch_or(new_flags, std::memory_order_relaxed);
   }
 
@@ -447,11 +447,13 @@ class StringImplAllocator {
 };
 
 scoped_refptr<StringImpl> StringImpl::LowerASCII() {
-  return ConvertASCIICase(*this, LowerConverter(), StringImplAllocator());
+  return blink::ConvertAsciiCase(*this, blink::LowerConverter(),
+                                 StringImplAllocator());
 }
 
 scoped_refptr<StringImpl> StringImpl::UpperASCII() {
-  return ConvertASCIICase(*this, UpperConverter(), StringImplAllocator());
+  return blink::ConvertAsciiCase(*this, blink::UpperConverter(),
+                                 StringImplAllocator());
 }
 
 scoped_refptr<StringImpl> StringImpl::Fill(UChar character) {
@@ -634,7 +636,7 @@ ALWAYS_INLINE scoped_refptr<StringImpl> StringImpl::RemoveCharacters(
     return this;
   }
 
-  StringBuffer<CharType> data(characters.size());
+  blink::StringBuffer<CharType> data(characters.size());
   auto to = data.Span();
   size_t outc = i;
 
@@ -679,7 +681,7 @@ scoped_refptr<StringImpl> StringImpl::Remove(wtf_size_t start,
   return VisitCharacters(
       *this, [start, length_to_remove, removed_end](auto chars) {
         using CharType = decltype(chars)::value_type;
-        StringBuffer<CharType> buffer(chars.size() - length_to_remove);
+        blink::StringBuffer<CharType> buffer(chars.size() - length_to_remove);
         auto [before, after] = buffer.Span().split_at(start);
         CopyChars(before, chars.first(start));
         CopyChars(after, chars.subspan(removed_end));
@@ -692,7 +694,7 @@ inline scoped_refptr<StringImpl> StringImpl::SimplifyMatchedCharactersToSpace(
     base::span<const CharType> from,
     UCharPredicate predicate,
     StripBehavior strip_behavior) {
-  StringBuffer<CharType> data(length_);
+  blink::StringBuffer<CharType> data(length_);
 
   size_t outc = 0;
   bool changed_to_space = false;

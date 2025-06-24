@@ -42,6 +42,8 @@ ContextProperties ContextImplOrt::GetContextProperties() {
       std::numeric_limits<int32_t>::max();
 
   static constexpr SupportedRanks kMaxRank = SupportedRanks::UpTo(8);
+  static constexpr SupportedRanks kMaxNonScalarRank =
+      SupportedRanks::NonScalarUpTo(8);
 
   static constexpr SupportedDataTypes kFloat16To32Int32To64{
       OperandDataType::kFloat32, OperandDataType::kFloat16,
@@ -57,14 +59,18 @@ ContextProperties ContextImplOrt::GetContextProperties() {
       /*tensor_byte_length_limit=*/kTensorByteLengthLimit,
       {/*input=*/SupportedDataTypes::All(),
        /*constant=*/SupportedDataTypes::All(),
-       /*arg_min_max_input=*/{},
-       /*arg_min_max_output=*/{},
+       /*arg_min_max_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxNonScalarRank},
+       // ONNX ArgMin/Max only supports int64 output, int32 output is supported
+       // by inserting a cast operator.
+       /*arg_min_max_output=*/DataTypeConstraint::kInt32To64,
        /*batch_normalization_input=*/{},
        /*batch_normalization_mean=*/{},
        /*cast_input=*/{SupportedDataTypes::All(), kMaxRank},
        /*clamp_input=*/
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
-       /*concat_inputs=*/{},
+       /*concat_inputs=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxNonScalarRank},
        /*conv2d_input=*/{DataTypeConstraint::kFloat16To32, {3, 8}},
        /*conv2d_bias=*/
        {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(1)},
@@ -114,7 +120,8 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*sqrt_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*tan_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*elu_input=*/{},
-       /*expand_input=*/{},
+       /*expand_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*gather_input=*/{},
        /*gather_indices=*/{},
        /*gather_elements_input=*/{},
@@ -135,7 +142,7 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*instance_normalization_input=*/{},
        /*instance_normalization_scale=*/{},
        /*layer_normalization_input=*/{},
-       /*leaky_relu_input=*/{},
+       /*leaky_relu_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*linear_input=*/{},
        /*lstm_input=*/{},
        /*lstm_bias=*/{},
@@ -149,7 +156,7 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        {DataTypeConstraint::kFloat16To32, {3, 8}},
        /*max_pool2d_input=*/
        {kInts8Float16To32, {3, 8}},
-       /*prelu_input=*/{},
+       /*prelu_input=*/{DataTypeConstraint::kFloat16To32Ints32To64, kMaxRank},
        /*quantize_linear_input=*/{},
        /*quantize_linear_zero_point=*/{},
        /*reduce_l1_input=*/{},
@@ -180,7 +187,8 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*softmax_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*softplus_input=*/{},
        /*softsign_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
-       /*split_input=*/{},
+       /*split_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxNonScalarRank},
        /*tanh_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*tile_input=*/{},
        /*transpose_input=*/{SupportedDataTypes::All(), kMaxRank},

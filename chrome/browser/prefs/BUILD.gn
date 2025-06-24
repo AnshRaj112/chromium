@@ -60,6 +60,7 @@ source_set("impl") {
     ":prefs",
     ":util",
     "//chrome/browser:browser_process",
+    "//chrome/browser:flags",
     "//chrome/browser/devtools",
     "//chrome/browser/media/prefs",
     "//chrome/browser/media/router:media_router_feature",
@@ -99,6 +100,7 @@ source_set("impl") {
     "//components/domain_reliability:prefs",
     "//components/enterprise/browser/identifiers",
     "//components/enterprise/connectors/core",
+    "//components/feature_engagement/public:prefs",
     "//components/fingerprinting_protection_filter/common",
     "//components/fingerprinting_protection_filter/common:prefs",
     "//components/history_clusters/core",
@@ -289,6 +291,7 @@ source_set("impl") {
     ]
   } else {
     deps += [
+      "//chrome/browser/contextual_cueing",
       "//chrome/browser/promos:utils",
       "//chrome/browser/screen_ai:prefs",
       "//chrome/browser/search/background",

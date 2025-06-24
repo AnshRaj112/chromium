@@ -155,7 +155,8 @@ class CORE_EXPORT WindowPerformance final : public Performance,
   void AddLayoutShiftEntry(LayoutShift*);
   void AddVisibilityStateEntry(bool is_visible, base::TimeTicks start_time);
   void AddSoftNavigationEntry(const AtomicString& name,
-                              base::TimeTicks start_time);
+                              base::TimeTicks start_time,
+                              const DOMPaintTimingInfo& paint_timing_info);
 
   // PageVisibilityObserver
   void PageVisibilityChanged() override;
@@ -168,8 +169,14 @@ class CORE_EXPORT WindowPerformance final : public Performance,
       base::TimeTicks load_time,
       const AtomicString& id,
       const String& url,
-      Element*,
-      bool is_triggered_by_soft_navigation);
+      Element*);
+  void OnInteractionContentfulPaintUpdated(
+      std::optional<DOMPaintTimingInfo> paint_timing_info,
+      uint64_t paint_size,
+      base::TimeTicks load_time,
+      const AtomicString& id,
+      const String& url,
+      Element*);
 
   void Trace(Visitor*) const override;
 

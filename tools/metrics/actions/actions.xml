@@ -3605,6 +3605,13 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="Android.ManualTranslate">
+  <owner>jinsukkim@chromium.org</owner>
+  <description>
+    Translation is manually requested via menu or toolbar button.
+  </description>
+</action>
+
 <action name="Android.MergeState.ColdStart">
   <owner>twellington@chromium.org</owner>
   <description>
@@ -9381,6 +9388,13 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="CustomTabs.OpenInBrowser">
+  <owner>jinsukkim@google.com</owner>
+  <description>
+    Emitted by CCT when the URL in CCT is opened in browser.
+  </description>
+</action>
+
 <action name="CustomTabs.StartedInitially">
   <owner>tedchoc@chromium.org</owner>
   <description>
@@ -9424,6 +9438,14 @@ should be able to be added at any place in this file.
     User tapped the Open in Browser button on the toolbar in custom tabs. Note
     that taps on overflow menu item with same function are recorded under
     CustomTabsMenuOpenInChrome.
+  </description>
+</action>
+
+<action name="CustomTabs.ToolbarShareClicked">
+  <owner>jinsukkim@google.com</owner>
+  <description>
+    User tapped the Share button on the toolbar in custom tabs. Note that taps
+    on overflow menu item with same function are recorded under MobileMenuShare.
   </description>
 </action>
 
@@ -15924,6 +15946,68 @@ should be able to be added at any place in this file.
   <description>
     Reported when Clear Browsing Data Settings UI was dismissed using swipe down
     gesture. iOS only.
+  </description>
+</action>
+
+<action name="IOSCollaborationInitJoin">
+  <owner>lpromero@google.com</owner>
+  <owner>gambard@chromium.org</owner>
+  <description>Reported when trying to join a shared tab group.</description>
+</action>
+
+<action name="IOSCollaborationInitLeaveOrDelete">
+  <owner>lpromero@google.com</owner>
+  <owner>gambard@chromium.org</owner>
+  <description>
+    Reported when trying to leave or delete shared tab group.
+  </description>
+</action>
+
+<action name="IOSCollaborationInitShareAndManage">
+  <owner>lpromero@google.com</owner>
+  <owner>gambard@chromium.org</owner>
+  <description>
+    Reported when trying to share a tab group or manage it, if already shared.
+  </description>
+</action>
+
+<action name="IOSCollaborationShowDeleteDialog">
+  <owner>lpromero@google.com</owner>
+  <owner>gambard@chromium.org</owner>
+  <description>
+    Reported when showing the flow to delete a shared tab group.
+  </description>
+</action>
+
+<action name="IOSCollaborationShowJoinDialog">
+  <owner>lpromero@google.com</owner>
+  <owner>gambard@chromium.org</owner>
+  <description>
+    Reported when showing the flow to join a shared tab group.
+  </description>
+</action>
+
+<action name="IOSCollaborationShowLeaveDialog">
+  <owner>lpromero@google.com</owner>
+  <owner>gambard@chromium.org</owner>
+  <description>
+    Reported when showing the flow to leave a shared tab group.
+  </description>
+</action>
+
+<action name="IOSCollaborationShowManageDialog">
+  <owner>lpromero@google.com</owner>
+  <owner>gambard@chromium.org</owner>
+  <description>
+    Reported when showing the flow to manage a shared tab group.
+  </description>
+</action>
+
+<action name="IOSCollaborationShowShareDialog">
+  <owner>lpromero@google.com</owner>
+  <owner>gambard@chromium.org</owner>
+  <description>
+    Reported when showing the flow to share a tab group.
   </description>
 </action>
 
@@ -46188,6 +46272,14 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="TrackingProtections.Bubble.ReloadingTimeout">
+  <owner>michelleabreo@google.com</owner>
+  <owner>koilos@google.com</owner>
+  <description>
+    Tracking protections bubble closed due to reloading timeout.
+  </description>
+</action>
+
 <action name="TrackingProtections.Bubble.SendFeedback">
   <owner>michelleabreo@google.com</owner>
   <owner>koilos@google.com</owner>
@@ -49490,6 +49582,10 @@ should be able to be added at any place in this file.
       label="For iOSFeedSwipeStaticFeature feature"/>
   <suffix name="iOSHistoryOnOverflowMenuFeature"
       label="For iOSHistoryOnOverflowMenuFeature feature"/>
+  <suffix name="iOSHomepageCustomizationNewBadge"
+      label="For iOSHomepageCustomizationNewBadge feature"/>
+  <suffix name="iOSHomepageLensNewBadge"
+      label="For iOSHomepageLensNewBadge feature"/>
   <suffix name="iOSInlineEnhancedSafeBrowsingPromoFeature"
       label="For Enhanced Safe Browsing Promo feature"/>
   <suffix name="iOSLensOverlayEntrypointTip"

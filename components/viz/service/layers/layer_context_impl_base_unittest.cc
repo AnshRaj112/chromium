@@ -99,6 +99,12 @@ void LayerContextImplTest::SetUp() {
       compositor_frame_sink_support_.get(), /*draw_mode_is_gpu=*/true);
 }
 
+void LayerContextImplTest::RecreateLayerContextImplWithParams(
+    bool draw_mode_is_gpu) {
+  layer_context_impl_ = LayerContextImpl::CreateForTesting(
+      compositor_frame_sink_support_.get(), draw_mode_is_gpu);
+}
+
 void LayerContextImplTest::ResetTestState() {
   // Property tree node IDs and layers are reinitialized in
   // CreateDefaultUpdate if first_update_ is true.
@@ -132,6 +138,10 @@ void LayerContextImplTest::AddDefaultPropertyUpdates(
   update->external_page_scale_factor = kDefaultExternalPageScaleFactor;
   update->device_scale_factor = kDefaultDeviceScaleFactor;
   update->painted_device_scale_factor = kDefaultPaintedDeviceScaleFactor;
+
+  update->top_controls_shown_ratio =
+      LayerContextImplTest::kDefaultTopControlsShownRatio;
+  update->bottom_controls_shown_ratio = kDefaultBottomControlsShownRatio;
 
   update->num_transform_nodes = next_transform_id_;
   update->num_clip_nodes = next_clip_id_;

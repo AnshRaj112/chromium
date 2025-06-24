@@ -383,7 +383,7 @@ int SimpleEntryImpl::ReadData(int stream_index,
   }
 
   if (stream_index < 0 || stream_index >= kSimpleEntryStreamCount ||
-      buf_len < 0) {
+      offset < 0 || buf_len < 0) {
     if (net_log_.IsCapturing()) {
       NetLogReadWriteComplete(
           net_log_, net::NetLogEventType::SIMPLE_CACHE_ENTRY_READ_END,
@@ -795,7 +795,7 @@ void SimpleEntryImpl::OpenEntryInternal(
   auto results = std::make_unique<SimpleEntryCreationResults>(
       SimpleEntryStat(last_used_, data_size_, sparse_data_size_));
 
-  int32_t trailer_prefetch_size = -1;
+  uint32_t trailer_prefetch_size = 0;
   base::Time last_used_time;
   if (SimpleBackendImpl* backend = backend_.get()) {
     if (cache_type_ == net::APP_CACHE) {
@@ -902,7 +902,7 @@ void SimpleEntryImpl::OpenOrCreateEntryInternal(
   auto results = std::make_unique<SimpleEntryCreationResults>(
       SimpleEntryStat(last_used_, data_size_, sparse_data_size_));
 
-  int32_t trailer_prefetch_size = -1;
+  uint32_t trailer_prefetch_size = 0;
   base::Time last_used_time;
   if (SimpleBackendImpl* backend = backend_.get()) {
     if (cache_type_ == net::APP_CACHE) {
@@ -1004,7 +1004,7 @@ int SimpleEntryImpl::ReadDataInternal(bool sync_possible,
                                   net::ERR_FAILED);
   }
   DCHECK_EQ(STATE_READY, state_);
-  if (offset >= GetDataSize(stream_index) || offset < 0 || !buf_len) {
+  if (offset >= GetDataSize(stream_index) || !buf_len) {
     // If there is nothing to read, we bail out before setting state_ to
     // STATE_IO_PENDING (so ScopedOperationRunner might start us on next op
     // here).

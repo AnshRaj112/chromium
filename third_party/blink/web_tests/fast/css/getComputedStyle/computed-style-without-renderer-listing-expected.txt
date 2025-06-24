@@ -110,6 +110,7 @@ border-left-width: 0px
 border-right-color: rgb(0, 0, 0)
 border-right-style: none
 border-right-width: 0px
+border-shape: none
 border-spacing: 0px
 border-start-end-radius: 0px
 border-start-start-radius: 0px
@@ -230,8 +231,8 @@ inset-block-start: auto
 inset-inline-end: auto
 inset-inline-start: auto
 interactivity: auto
-interest-target-hide-delay: 0.5s
-interest-target-show-delay: 0.5s
+interest-hide-delay: 0.5s
+interest-show-delay: 0.5s
 interpolate-size: numeric-only
 isolation: auto
 item-tolerance: normal

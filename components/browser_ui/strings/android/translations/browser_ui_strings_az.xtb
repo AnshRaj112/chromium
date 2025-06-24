@@ -25,6 +25,7 @@ Qabaqcıl Qoruma bu Chrome ayarlarına nəzarət edir:
 <translation id="129382876167171263">Veb saytların yadda saxladığı fayllar burada görünür</translation>
 <translation id="131112695174432497">Reklamın fərdiləşdirilməsinə təsir edən data silinir</translation>
 <translation id="1317194122196776028">Bu saytı unudun</translation>
+<translation id="1323433172918577554">Digərlərinə baxın</translation>
 <translation id="1333965224356556482">Saytlara məkanınıza baxmaq icazəsi verməyin</translation>
 <translation id="1343356790768851700">Bu sayt bəyəndiklərinizi müəyyənləşdirir və sonra digər saytlara reklam təklif edir</translation>
 <translation id="1369915414381695676"><ph name="SITE_NAME" /> saytı əlavə edildi</translation>
@@ -35,6 +36,7 @@ Qabaqcıl Qoruma bu Chrome ayarlarına nəzarət edir:
 <translation id="1409338233051621926">Tətbiqlər, sonra Defolt tətbiqlər seçiminə toxunun</translation>
 <translation id="1415402041810619267">URL tam deyil</translation>
 <translation id="1415855080660575082">Chrome-un son tabları cihazla paylaşmasına icazə verməklə tətbiq siyahısında və axtarış nəticələrində onları görə bilərsiniz. Bunu istənilən vaxt Chrome ayarlarında aktiv və ya deaktiv edə bilərsiniz.</translation>
+<translation id="1432650420699700107">Saytlar lokal şəbəkənizdəki hər hansı cihaza qoşulmaq istəyə bilər</translation>
 <translation id="1448064542941920355">Zoom'u azaldın</translation>
 <translation id="1464044141348608623">Saytlara cihazınızdan nə zaman aktiv şəkildə istifadə etdiyinizi bilmək icazəsi verməyin</translation>
 <translation id="146867109637325312">{COUNT,plural, =1{<ph name="SITE_COUNT" /> sayt}other{<ph name="SITE_COUNT" /> sayt}}</translation>
@@ -253,6 +255,7 @@ Qabaqcıl Qoruma bu Chrome ayarlarına nəzarət edir:
 <translation id="3955321697524543127">Saytlara USB cihazlarına qoşulmaq icazəsi verməyin</translation>
 <translation id="3965467402665811906">Saytlar haqqınızda yadda saxlanılan məlumatdan istifadə etmək istəyə bilər</translation>
 <translation id="3967822245660637423">Endirmə tamamdır</translation>
+<translation id="3969869202926863008">Lokal şəbəkə girişi</translation>
 <translation id="3981465354637804599">Saytlar adətən ödənişsiz kontent və xidmətlər təqdim etmək üçün reklamlar göstərir. Lakin bəzi saytlar müdaxilə edən və aldadıcı reklamlar göstərir.</translation>
 <translation id="3987993985790029246">Linki kopyalayın</translation>
 <translation id="3991845972263764475"><ph name="BYTES_DOWNLOADED_WITH_UNITS" /> / ?</translation>
@@ -462,6 +465,7 @@ Qabaqcıl Qoruma bu Chrome ayarlarına nəzarət edir:
 <translation id="6554732001434021288">Son ziyarət <ph name="NUM_DAYS" /> gün əvvəl olub</translation>
 <translation id="656065428026159829">Daha çoxuna baxın</translation>
 <translation id="6561560012278703671">Səssiz mesajlaşmadan istifadə edin (bildirişlər sizi narahat etməyəcək)</translation>
+<translation id="6565144332292237355">Saytlar bu funksiyadan lokal şəbəkənizdəki hər hansı cihazı axtarmaq və ona qoşulmaq üçün istifadə edə bilər</translation>
 <translation id="6593061639179217415">Masaüstü saytı</translation>
 <translation id="659938948789980540">{COUNT,plural, =1{<ph name="RWS_MEMBERS_COUNT" /> <ph name="RWS_OWNER" /> saytı üçün kukilərə icazə verilir}other{<ph name="RWS_MEMBERS_COUNT" /> <ph name="RWS_OWNER" /> saytı üçün kukilərə icazə verilir}}</translation>
 <translation id="6608650720463149374"><ph name="GIGABYTES" /> GB</translation>

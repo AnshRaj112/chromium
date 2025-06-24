@@ -72,8 +72,9 @@ constexpr int kIphRelevance = 5000;
 // Returns relevance for starter pack suggestions.
 int StarterPackRelevance(
     template_url_starter_pack_data::StarterPackId starter_pack_id) {
-  // TODO(crbug.com/421415393) 1460 reserved for ai mode starter pack.
   switch (starter_pack_id) {
+    case template_url_starter_pack_data::StarterPackId::kAiMode:
+      return 1460;
     case template_url_starter_pack_data::StarterPackId::kGemini:
       return 1459;
     case template_url_starter_pack_data::StarterPackId::kHistory:
@@ -94,8 +95,7 @@ int StarterPackRelevance(
 // Returns description for starter pack suggestions.
 std::u16string StarterPackDescription(const AutocompleteInput& input,
                                       const TemplateURL& template_url) {
-  if (template_url.starter_pack_id() ==
-      template_url_starter_pack_data::kGemini) {
+  if (template_url.is_ask_starter_pack()) {
     return l10n_util::GetStringFUTF16(IDS_OMNIBOX_INSTANT_KEYWORD_ASK_TEXT,
                                       template_url.keyword(),
                                       template_url.short_name());
@@ -308,6 +308,7 @@ void FeaturedSearchProvider::AddFeaturedKeywordMatches(
     } else if (turl->featured_by_policy() &&
                IsEnterpriseSearchAggregatorTemplateURLEnabled(
                    *turl, client_->IsOffTheRecord()) &&
+               turl->is_active() == TemplateURLData::ActiveStatus::kTrue &&
                enterprise_count < kMaxEnterpriseSuggestions) {
       AddFeaturedEnterpriseSearchMatch(*turl, input);
       enterprise_count++;
@@ -503,14 +504,16 @@ void FeaturedSearchProvider::AddEnterpriseSearchAggregatorIPHMatch() {
 bool FeaturedSearchProvider::ShouldShowFeaturedEnterpriseSiteSearchIPHMatch()
     const {
   // Conditions to show the IPH for featured Enterprise search:
-  // - There is at least one featured site search engine set by policy.
+  // - There is at least one active featured site search engine set by policy.
   // - The user has not deleted the IPH suggestion and we have not shown it more
   //   than the accepted limit during this session.
   // - The user has not successfully used at least one featured engine.
   TemplateURLService::TemplateURLVector featured_engines;
   for (TemplateURL* turl :
        template_url_service_->GetFeaturedEnterpriseSiteSearchEngines()) {
-    featured_engines.push_back(turl);
+    if (turl->is_active() == TemplateURLData::ActiveStatus::kTrue) {
+      featured_engines.push_back(turl);
+    }
   }
   return !featured_engines.empty() &&
          ShouldShowIPH(IphType::kFeaturedEnterpriseSiteSearch) &&
@@ -523,7 +526,9 @@ void FeaturedSearchProvider::AddFeaturedEnterpriseSiteSearchIPHMatch() {
   std::vector<std::string> sites;
   for (const TemplateURL* turl :
        template_url_service_->GetFeaturedEnterpriseSiteSearchEngines()) {
-    sites.push_back(url_formatter::StripWWW(GURL(turl->url()).host()));
+    if (turl->is_active() == TemplateURLData::ActiveStatus::kTrue) {
+      sites.push_back(url_formatter::StripWWW(GURL(turl->url()).host()));
+    }
   }
   std::ranges::sort(sites);
   AddIPHMatch(IphType::kFeaturedEnterpriseSiteSearch,

@@ -852,9 +852,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kWebHidBlockedForUrls,
     prefs::kManagedWebHidBlockedForUrls,
     base::Value::Type::LIST },
-  { key::kWebRtcEventLogCollectionAllowed,
-    prefs::kWebRtcEventLogCollectionAllowed,
-    base::Value::Type::BOOLEAN },
   { key::kWebRtcIPHandling,
     prefs::kWebRTCIPHandlingPolicy,
     base::Value::Type::STRING },
@@ -1025,6 +1022,9 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     base::Value::Type::STRING },
   { key::kEnableMediaRouter,
     prefs::kEnableMediaRouter,
+    base::Value::Type::BOOLEAN },
+  { key::kWebRtcEventLogCollectionAllowed,
+    prefs::kWebRtcEventLogCollectionAllowed,
     base::Value::Type::BOOLEAN },
   { key::kWebRtcUdpPortRange,
     prefs::kWebRTCUDPPortRange,
@@ -2331,10 +2331,11 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kCACertificateManagementAllowed,
     prefs::kCACertificateManagementAllowed,
     base::Value::Type::INTEGER },
-  // TODO(crbug.com/400455013): Add LNA support on Android
+#endif  // !BUILDFLAG(IS_ANDROID)
   { key::kLocalNetworkAccessRestrictionsEnabled,
     prefs::kManagedLocalNetworkAccessRestrictionsEnabled,
     base::Value::Type::BOOLEAN },
+#if !BUILDFLAG(IS_ANDROID)
   { key::kLocalNetworkAccessAllowedForUrls,
     prefs::kManagedLocalNetworkAccessAllowedForUrls,
     base::Value::Type::LIST },

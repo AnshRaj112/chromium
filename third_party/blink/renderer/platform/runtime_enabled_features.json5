@@ -188,7 +188,7 @@
     // readable in the browserprocess via RuntimeFeatureStateReadContext.
     // TODO(crbug.com/1377000): this feature does not support origin trial
     // tokens provided in HTTP headers. Any tokens provided via HTTP header will
-    // be dropped.
+    // be dropped. Please inform developers they must embed the token in HTML.
     browser_process_read_access: {
       default: false,
       value_type: "bool",
@@ -198,7 +198,7 @@
     // should be writable in the browserprocess via RuntimeFeatureStateContext.
     // TODO(crbug.com/1377000): this feature does not support origin trial
     // tokens provided in HTTP headers. Any tokens provided via HTTP header will
-    // be dropped.
+    // be dropped. Please inform developers they must embed the token in HTML.
     browser_process_read_write_access: {
       default: false,
       value_type: "bool",
@@ -530,6 +530,10 @@
       name: "AsyncSetCookie",
     },
     {
+      name: "AttributeDirectionality",
+      status: "stable",
+    },
+    {
       name: "AttributionReporting",
       status: "stable",
       base_feature: "none",
@@ -810,7 +814,7 @@
       // crbug.com/389726691.
       name: "CanvasTextNg",
       origin_trial_feature_name: "CanvasTextNg",
-      status: "experimental",
+      status: "stable",
     },
     {
       // Kill switch for https://crbug.com/330506337.
@@ -953,6 +957,11 @@
     },
     {
       name: "CollapseZeroWidthSpaceWhenReuseItem",
+      status: "stable",
+    },
+    {
+      // Killswitch for https://crbug.com/414827239
+      name: "ColorInputDatalistLooksNormal",
       status: "stable",
     },
     {
@@ -1160,6 +1169,12 @@
       // https://chromestatus.com/feature/5125388091260928
       name: "CSSBackgroundClipUnprefix",
       status: "stable",
+    },
+    // https://chromestatus.com/feature/5459864205393920
+    {
+      // https://chromestatus.com/feature/5125388091260928
+      name: "CSSBorderShape",
+      status: "experimental",
     },
     {
       // Support CSS Values Level 4 calc simplification and serialization
@@ -2514,6 +2529,17 @@
       depends_on: ["GetDisplayMedia"],
       status: "experimental",
     },
+    // When a Web application calls getDisplayMedia() and asks for audio,
+    // allow a hint to be provided as to whether the Web application is
+    // interested in audio being among the options offered to the user
+    // on window display surfaces.
+    //
+    // https://www.w3.org/TR/screen-capture/#dom-displaymediastreamoptions-windowaudio
+    {
+      name: "GetDisplayMediaWindowAudioCapture",
+      status: "experimental",
+      browser_process_read_write_access: true,
+    },
     {
       name: "GroupEffect",
       status: "test",
@@ -2593,6 +2619,10 @@
       depends_on: ["HTMLCommandAttributes"],
       status: "stable",
     },
+    {
+      name: "HTMLElementScrollParent",
+      status: "experimental",
+    },
     // The `<embed>` should follow the specification, layout is not forced
     // when the `type` attribute is set to `image`.
     // https://html.spec.whatwg.org/C/#the-embed-element
@@ -2614,33 +2644,33 @@
       name: "HTMLImageElementActualNaturalSize",
       status: "test",
     },
-    // Adds support for the experimental `interesttarget`
+    // Adds support for the experimental `interestfor`
     // attributes, as specified in the open-ui "Interest Invokers" explainer.
     // https://open-ui.org/components/interest-invokers.explainer/
     {
-      name: "HTMLInterestTargetAttribute",
+      name: "HTMLInterestForAttribute",
       status: "experimental",
-      origin_trial_feature_name: "HTMLInterestTargetAttribute",
+      origin_trial_feature_name: "HTMLInterestForAttribute",
       origin_trial_allows_third_party: true,
     },
     // Enables the "context menu item only" behavior mode for the
-    // `interesttarget` API. In this mode, the context menu is displayed in the
+    // `interestfor` API. In this mode, the context menu is displayed in the
     // "normal" location, but an additional line item is added to the menu which
     // allows the user to show interest. This is enabled by default, but depends
-    // on HTMLInterestTargetAttribute.
+    // on HTMLInterestForAttribute.
     {
-      name: "HTMLInterestTargetContextMenuItemOnly",
+      name: "HTMLInterestForContextMenuItemOnly",
       status: "stable",
-      depends_on: ["HTMLInterestTargetAttribute"],
+      depends_on: ["HTMLInterestForAttribute"],
     },
     // If this flag is enabled, the "partial interest" concept for the
-    // `interesttarget` API is not used. When an interest invoker is focused,
+    // `interestfor` API is not used. When an interest invoker is focused,
     // the target immediately gets full interest, regardless of whether it
     // contains focusable content. This is primarily to test the behavior with
     // users, to see which is the best.
     {
-      name: "HTMLInterestTargetNoPartialInterest",
-      depends_on: ["HTMLInterestTargetAttribute"],
+      name: "HTMLInterestForNoPartialInterest",
+      depends_on: ["HTMLInterestForAttribute"],
     },
     {
       // A flag, just for local testing to make the
@@ -3825,6 +3855,11 @@
       status: "test",
       base_feature: "none",
     },
+    // Promisify programmatic scroll methods in Element and Window.
+    // https://crbug.com/41406914
+    {
+      name: "ProgrammaticScrollPromise",
+    },
     {
       // Propagate overscroll-behavior from the root element rather than the
       // body element. crbug.com/41453796
@@ -3978,8 +4013,9 @@
       // createElement and attribute related DOM APIs.
       // https://github.com/whatwg/dom/pull/1079
       // http://crbug.com/40228234
+      // https://chromestatus.com/feature/6278918763708416
       name: "RelaxDOMValidNames",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "RelOpenerBcgDependencyHint",
@@ -4364,7 +4400,7 @@
     },
     {
       name: "SecurePaymentConfirmationAvailabilityAPI",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "SecurePaymentConfirmationBrowserBoundKeys",

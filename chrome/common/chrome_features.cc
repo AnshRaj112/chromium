@@ -659,8 +659,6 @@ extern const base::FeatureParam<std::string> kGlicParameterizedShaderColors{
 extern const base::FeatureParam<std::string> kGlicParameterizedShaderFloats{
     &kGlicParameterizedShader, "glic-parameterized-shader-floats", ""};
 
-BASE_FEATURE(kGlicMultiTab, "GlicMultiTab", base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kGlicTabFocusDataDedupDebounce,
              "GlicTabFocusDataDedupDebounce",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -670,6 +668,7 @@ const base::FeatureParam<int> kGlicTabFocusDataDebounceDelayMs{
 const base::FeatureParam<int> kGlicTabFocusDataMaxDebounces{
     &kGlicTabFocusDataDedupDebounce, "glic-tab-focus-data-max-debounces", 5};
 
+BASE_FEATURE(kGlicAssetsV2, "GlicAssetsV2", base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
 // Force Privacy Guide to be available even if it would be unavailable
@@ -989,6 +988,12 @@ BASE_FEATURE(kImmersiveFullscreenPWAs,
              base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_MAC)
 
+// If enabled, enables API-specific interventions for web content rendered in
+// Incognito profiles.
+BASE_FEATURE(kIncognitoFingerprintingInterventions,
+             "IncognitoFingerprintingInterventions",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 #if BUILDFLAG(IS_WIN)
 // A feature that controls whether Chrome warns about incompatible applications.
 // This feature requires Windows 10 or higher to work because it depends on
@@ -1168,11 +1173,6 @@ BASE_FEATURE(kOverridePrefetchOnSingleton,
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS)
-// Skips requesting the Parent Access Code for reauth.
-BASE_FEATURE(kSkipParentAccessCodeForReauth,
-             "SkipParentAccessCodeForReauth",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enable support for "Plugin VMs" on Chrome OS.
 BASE_FEATURE(kPluginVm, "PluginVm", base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
@@ -1834,10 +1834,6 @@ BASE_FEATURE(kWin10AcceleratedDefaultBrowserFlow,
 #endif  // BUILDFLAG(IS_WIN)
 
 #if BUILDFLAG(IS_CHROMEOS)
-bool IsParentAccessCodeForReauthEnabled() {
-  return !base::FeatureList::IsEnabled(kSkipParentAccessCodeForReauth);
-}
-
 // A feature to indicate whether setting wake time >24hours away is supported by
 // the platform's RTC.
 // TODO(b/187516317): Remove when the issue is resolved in FW.

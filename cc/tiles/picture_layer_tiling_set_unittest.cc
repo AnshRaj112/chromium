@@ -93,17 +93,9 @@ TEST(PictureLayerTilingSetTest, TilingRange) {
   EXPECT_EQ(2u, high_res_range.end);
 
   between_high_and_low_res_range = set_without_low_res->GetTilingRange(
-      PictureLayerTilingSet::BETWEEN_HIGH_AND_LOW_RES);
+      PictureLayerTilingSet::LOWER_THAN_HIGH_RES);
   EXPECT_EQ(2u, between_high_and_low_res_range.start);
   EXPECT_EQ(4u, between_high_and_low_res_range.end);
-
-  low_res_range =
-      set_without_low_res->GetTilingRange(PictureLayerTilingSet::LOW_RES);
-  EXPECT_EQ(0u, low_res_range.end - low_res_range.start);
-
-  lower_than_low_res_range = set_without_low_res->GetTilingRange(
-      PictureLayerTilingSet::LOWER_THAN_LOW_RES);
-  EXPECT_EQ(0u, lower_than_low_res_range.end - lower_than_low_res_range.start);
 
   std::unique_ptr<TestablePictureLayerTilingSet> set_with_only_high_res =
       CreateTilingSet(&client);
@@ -122,17 +114,9 @@ TEST(PictureLayerTilingSetTest, TilingRange) {
   EXPECT_EQ(1u, high_res_range.end);
 
   between_high_and_low_res_range = set_with_only_high_res->GetTilingRange(
-      PictureLayerTilingSet::BETWEEN_HIGH_AND_LOW_RES);
+      PictureLayerTilingSet::LOWER_THAN_HIGH_RES);
   EXPECT_EQ(0u, between_high_and_low_res_range.end -
                     between_high_and_low_res_range.start);
-
-  low_res_range =
-      set_with_only_high_res->GetTilingRange(PictureLayerTilingSet::LOW_RES);
-  EXPECT_EQ(0u, low_res_range.end - low_res_range.start);
-
-  lower_than_low_res_range = set_with_only_high_res->GetTilingRange(
-      PictureLayerTilingSet::LOWER_THAN_LOW_RES);
-  EXPECT_EQ(0u, lower_than_low_res_range.end - lower_than_low_res_range.start);
 }
 
 class PictureLayerTilingSetTestWithResources : public testing::Test {

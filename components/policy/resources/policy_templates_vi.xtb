@@ -278,6 +278,7 @@ Nếu bạn không đặt chính sách này thì hành vi của chính sách s�
 <translation id="1207301487141109411">Ngăn tính năng lựa chọn hình đại diện của người dùng khỏi hệ thống tệp, máy ảnh và hồ sơ trên Google</translation>
 <translation id="1209096923317019235">Chỉ định ứng dụng làm trình xử lý mặc định cho đuôi tệp được chỉ định</translation>
 <translation id="120937472976628837">Báo cáo thông tin về quạt</translation>
+<translation id="1211037010406094410">Cho phép sử dụng SwiftShader để dự phòng WebGL bằng phần mềm</translation>
 <translation id="1214639335214075459">Bật tính năng giải mã video có tăng tốc phần cứng GPU</translation>
 <translation id="1214942205301731697">Không cho phép sử dụng chế độ nhà phát triển trên trang tiện ích</translation>
 <translation id="1216919699175573511">Bật tính năng hỗ trợ cho Signed HTTP Exchange (SXG)</translation>
@@ -3498,11 +3499,6 @@ Nếu bạn đặt chính sách này, <ph name="DEVELOPER_TOOLS_AVAILABILITY_POL
       Nếu bạn không đặt chính sách này, sẽ không có mức hạn chế nào được áp dụng.</translation>
 <translation id="3531084733660068324">Cài đặt tính năng giám sát của cha mẹ</translation>
 <translation id="3532827558833318911">Xoá thông tin đăng nhập bằng mật khẩu</translation>
-<translation id="353291262171579310">Chính sách này kiểm soát chế độ hiển thị của thông báo quản lý trong phần chân trang của Trang thẻ mới (NTP). Theo mặc định, phần chân trang NTP sẽ hiển thị thông tin khi trình duyệt được một tổ chức quản lý (được biểu thị bằng biểu tượng toà nhà và dòng chữ "Được quản lý bởi [tên miền]"). Bạn có thể tuỳ chỉnh nội dung này bằng chính sách <ph name="ENTERPRISE_CUSTOM_LABEL_FOR_BROWSER" /> và <ph name="ENTERPRISE_LOGO_URL_FOR_BROWSER" />.
-
-Nếu bạn không đặt chính sách này hoặc đặt thành true (đúng), thì trình duyệt được quản lý sẽ hiển thị thông báo "Được quản lý bởi…" kèm theo biểu tượng.
-
-Nếu bạn đặt chính sách này thành false (sai), thì thông báo quản lý sẽ bị ẩn.</translation>
 <translation id="353611922042274900">Luôn hiển thị thông tin hệ thống trên màn hình đăng nhập</translation>
 <translation id="3536263244905016305">Tắt tính năng tối ưu hóa Web Proxy Auto-Discovery (WPAD) (Tự động phát hiện proxy web)</translation>
 <translation id="3539103206548425861">Nếu bạn đặt chính sách này, thì video sẽ tự động phát (mà không cần người dùng cho phép) nội dung âm thanh trong <ph name="PRODUCT_NAME" />. Nếu bạn đặt chính sách <ph name="AUTOPLAY_ALLOWED_POLICY_NAME" /> thành True, thì chính sách này sẽ không có hiệu lực. Nếu bạn đặt chính sách <ph name="AUTOPLAY_ALLOWED_POLICY_NAME" /> thành False, thì các mẫu URL bạn thiết lập trong chính sách này vẫn có thể phát. Nếu chính sách này thay đổi trong khi <ph name="PRODUCT_NAME" /> đang chạy, chính sách chỉ áp dụng cho các thẻ mới mở.
@@ -3621,6 +3617,15 @@ Nếu bạn không đặt chính sách này thì hành vi của chính sách s�
 
 Để biết thêm thông tin về cách xử lý dữ liệu cho các tính năng AI tạo sinh, vui lòng truy cập https://support.google.com/chrome/a?p=generative_ai_settings.</translation>
 <translation id="3606571057705314194">Tắt bộ chọn hồ sơ khi khởi động</translation>
+<translation id="3607797531311171116">Một chính sách kiểm soát việc liệu có dùng SwiftShader làm phương án dự phòng cho WebGL khi không thể tăng tốc GPU phần cứng hay không.
+
+SwiftShader đã được dùng để hỗ trợ WebGL trên các hệ thống không có tính năng tăng tốc GPU như hệ thống không có giao diện người dùng hoặc máy ảo nhưng đã ngừng hoạt động do vấn đề bảo mật. Bắt đầu từ phiên bản M139, sẽ không thể tạo ngữ cảnh WebGL trong những trường hợp mà lẽ ra đã sử dụng SwiftShader. Chính sách này cho phép trình duyệt hoặc quản trị viên tạm thời hoãn việc ngừng hoạt động.
+
+Nếu bạn đặt chính sách này thành Bật, SwiftShader sẽ được dùng làm phương án dự phòng WebGL bằng phần mềm.
+
+Nếu bạn đặt chính sách này thành Tắt hoặc không đặt chính sách này, có thể không tạo được ngữ cảnh WebGL nếu không có tính năng tăng tốc GPU phần cứng. Các trang web có thể hoạt động không đúng cách nếu không xử lý tốt lỗi tạo ngữ cảnh WebGL.
+
+Đây là chính sách tạm thời và sẽ bị loại bỏ trong tương lai.</translation>
 <translation id="3608206578291537084">Bật quy trình báo cáo đã mã hoá</translation>
 <translation id="3608281460204780443">Hiển thị biểu tượng Cửa hàng Chrome trực tuyến trong trình chạy <ph name="PRODUCT_OS_NAME" /> và trên trang thẻ mới</translation>
 <translation id="3612482251405108708">Tự động bắt đầu xác thực lại trực tuyến trên màn hình khoá</translation>
@@ -5460,6 +5465,7 @@ Bạn không nên tắt tính năng giải mã video có tăng tốc phần cứ
           Nếu bạn đặt chính sách này, thì người dùng sẽ không thể thay đổi hay ghi đè chính sách.
 
           Nếu bạn không đặt chính sách này, thì ban đầu, chế độ đơn âm sẽ tắt trên màn hình đăng nhập nhưng người dùng có thể bật bất cứ lúc nào.</translation>
+<translation id="493253860646951791">Bật tuỳ chọn hỗ trợ phương án dự phòng WebGL bằng SwiftShader không an toàn</translation>
 <translation id="4933301190614090397">Kiểm soát thời lượng (tính bằng giây) được phép đối với các yêu cầu giữ kết nối khi tắt trình duyệt.
 
       Khi được chỉ định, chính sách này có thể chặn việc tắt trình duyệt trong khoảng thời gian tối đa bằng số giây đã chỉ định,
@@ -6181,25 +6187,6 @@ Nếu bạn đặt giá trị này thành true (đúng) hoặc không đặt, th
 
 Nếu bạn đặt chính sách này thành false (sai), thì người dùng sẽ không thể truy cập vào tính năng này.</translation>
 <translation id="5377606826822211923">Kiểm soát việc người dùng sử dụng ứng dụng Android từ những nguồn không tin cậy</translation>
-<translation id="5377826248281933035">Chính sách này cung cấp một danh sách trang web mà người dùng có thể nhanh chóng tìm kiếm bằng cách sử dụng lối tắt trong thanh địa chỉ. Người dùng có thể bắt đầu tìm kiếm bằng cách nhập lối tắt hoặc @lốitắt (ví dụ: @côngviệc) vào thanh địa chỉ, sau đó nhấn phím cách hoặc phím Tab.
-
-Các trường sau đây là trường bắt buộc cho mỗi trang web: <ph name="NAME_SITE_SEARCH_SETTINGS_FIELD" />, <ph name="SHORTCUT_SITE_SEARCH_SETTINGS_FIELD" />, <ph name="URL_SITE_SEARCH_SETTINGS_FIELD" />.
-
-Trường <ph name="NAME_SITE_SEARCH_SETTINGS_FIELD" /> tương ứng với tên trang web hoặc tên công cụ tìm kiếm sẽ hiển thị cho người dùng trong thanh địa chỉ.
-
-<ph name="SHORTCUT_SITE_SEARCH_SETTINGS_FIELD" /> có thể chứa các từ và ký tự thuần tuý, nhưng không được chứa dấu cách hoặc bắt đầu bằng ký hiệu @. Lối tắt cũng phải là lối tắt duy nhất.
-
-Đối với mỗi mục nhập, trường <ph name="URL_SITE_SEARCH_SETTINGS_FIELD" /> chỉ định URL của công cụ tìm kiếm được dùng trong quá trình tìm kiếm với từ khoá tương ứng. URL đó phải chứa chuỗi <ph name="SEARCH_TERM_MARKER" />. Chuỗi này sẽ được thay bằng cụm từ tìm kiếm của người dùng trong truy vấn. Các mục nhập không hợp lệ và các mục nhập có lối tắt trùng lặp sẽ bị bỏ qua.
-
-Các mục nhập tìm kiếm trên trang web được định cấu hình là mục nổi bật sẽ hiển thị trong thanh địa chỉ khi người dùng nhập "@". Có thể chọn tối đa ba mục nhập làm mục nổi bật.
-
-Người dùng không thể chỉnh sửa hoặc vô hiệu hoá các mục nhập tìm kiếm trên trang web do chính sách đặt, nhưng có thể thêm lối tắt mới cho cùng một URL. Ngoài ra, người dùng không thể tạo mục nhập tìm kiếm mới trên trang web bằng lối tắt đã được tạo trước đó thông qua chính sách này.
-
-Trong trường hợp xung đột với lối tắt mà người dùng đã tạo trước đó, thì chế độ cài đặt của người dùng sẽ được ưu tiên. Tuy nhiên, người dùng vẫn có thể kích hoạt lựa chọn do chính sách tạo bằng cách nhập "@" vào thanh tìm kiếm. Ví dụ: Nếu người dùng đã xác định "côngviệc" là lối tắt đến URL1 và chính sách xác định "côngviệc" là lối tắt đến URL2, thì việc nhập "côngviệc" vào thanh tìm kiếm sẽ kích hoạt thao tác tìm kiếm đến URL1 nhưng việc nhập "@côngviệc" vào thanh tìm kiếm sẽ kích hoạt thao tác tìm kiếm đến URL2.
-
-Trên <ph name="MS_WIN_NAME" />, chính sách này chỉ có trên các phiên bản đã liên kết với một miền <ph name="MS_AD_NAME" />, <ph name="MS_AAD_NAME" /> hoặc đã đăng ký <ph name="CHROME_ENTERPRISE_CORE_NAME" />.
-
-Trên <ph name="MAC_OS_NAME" />, chính sách này chỉ có trên các phiên bản được quản lý qua MDM (Quản lý thiết bị di động), đã liên kết với một miền qua MCX hoặc đã đăng ký <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="537786648513450280">Kiểm soát việc thiết bị dùng ứng dụng Android từ các nguồn không tin cậy</translation>
 <translation id="5378885577701865339">Tắt tính năng bảng nhớ tạm dùng chung</translation>
 <translation id="538108065117008131">Cho phép <ph name="PRODUCT_FRAME_NAME" /> xử lý các loại nội dung sau.</translation>
@@ -7773,13 +7760,6 @@ sẽ gặp sự cố và chỉ sử dụng độ phân giải vị trí dựa tr
 <translation id="6371005337713685988">Cài đặt tính năng Nhóm trang web có liên quan</translation>
 <translation id="6371561334154580937">Hiển thị hộp thoại đăng xuất khi cửa sổ cuối cùng đóng lại.</translation>
 <translation id="6372105930898423193">Cho phép bật lại tính năng AppCache ngay cả khi tính năng này tắt theo mặc định.</translation>
-<translation id="6372676668820850849">Chính sách này kiểm soát việc có cho phép phân vùng bộ nhớ của bên thứ ba theo mặc định hay không.
-
-Nếu bạn đặt chính sách này thành 1 – AllowPartitioning (Cho phép phân vùng) hoặc không đặt chính sách này thì tính năng phân vùng bộ nhớ của bên thứ ba sẽ được cho phép theo mặc định. Có thể sử dụng các phương thức khác để ghi đè giá trị mặc định này cho những nguồn gốc cấp cao nhất cụ thể.
-
-Nếu bạn đặt chính sách này thành 2 – BlockPartitioning (Chặn phân vùng), tính năng phân vùng bộ nhớ của bên thứ ba sẽ bị vô hiệu hoá trong mọi ngữ cảnh.
-
-Hãy sử dụng <ph name="THIRD_PARTY_STORAGE_PARTITIONING_BLOCKED_FOR_ORIGINS_POLICY_NAME" /> để vô hiệu hoá tính năng phân vùng bộ nhớ của bên thứ ba cho những nguồn gốc cấp cao nhất cụ thể. Vui lòng truy cập vào https://developers.google.com/privacy-sandbox/cookies/storage-partitioning để biết thông tin chi tiết về tính năng phân vùng bộ nhớ của bên thứ ba.</translation>
 <translation id="6373299801585455337">Bật tính năng báo cáo thông tin về CPU của thiết bị</translation>
 <translation id="6374945506685352202">Danh sách chặn các loại cài đặt tiện ích</translation>
 <translation id="6376540107659524656">Tắt SSH trong Ứng dụng hệ thống thiết bị đầu cuối</translation>
@@ -8056,6 +8036,7 @@ Bạn có thể điều chỉnh thời gian chờ ở trạng thái rảnh trư�
 <translation id="6513453889192806240">Độ trễ https</translation>
 <translation id="6515357889978918016">Hình ảnh <ph name="PLUGIN_VM_NAME" /></translation>
 <translation id="6518102411616460786">Chờ để kênh đích bắt kịp phiên bản hiện tại trong quá trình hạ cấp kênh</translation>
+<translation id="6518286606938091609">Tắt tuỳ chọn hỗ trợ phương án dự phòng WebGL bằng SwiftShader không an toàn</translation>
 <translation id="6518894783486860562">Vì lý do bảo mật, API web
 <ph name="SHOW_SUBAPPS_APP_API_NAME" />,
 <ph name="SHOW_SUBAPPS_REMOVE_API_NAME" /> và
@@ -9369,13 +9350,6 @@ thì hệ thống sẽ bật tính năng đọc to.</translation>
 <translation id="7463934096276667908">Bật API toàn màn hình có tiền tố dành cho video</translation>
 <translation id="7464058117970792805">Bật chế độ xem trước bản in</translation>
 <translation id="7464991223784276288">Hạn chế cookie so khớp các URL với phiên hiện tại</translation>
-<translation id="7467748623079596345">Chính sách này cho phép bạn thiết lập danh sách các mẫu URL chỉ định nguồn gốc cấp cao nhất mà trong đó tính năng phân vùng bộ nhớ của bên thứ ba (phân vùng bộ nhớ iframe tách biệt nhiều nguồn gốc) nên bị vô hiệu hoá.
-
-Nếu bạn không đặt chính sách này hoặc nếu một nguồn gốc cấp cao nhất không khớp với một trong các mẫu URL thì <ph name="DEFAULT_THIRD_PARTY_STORAGE_PARTITIONING_SETTING_POLICY_NAME" /> sẽ được áp dụng.
-
-Vui lòng truy cập https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns để biết thông tin chi tiết về các mẫu hợp lệ. Xin lưu ý rằng các mẫu bạn liệt kê ở đây được xử lý như nguồn gốc, chứ không phải URL. Vì vậy, bạn không cần chỉ định đường dẫn.
-
-Vui lòng truy cập vào https://developers.google.com/privacy-sandbox/cookies/storage-partitioning để biết thông tin chi tiết về tính năng phân vùng bộ nhớ của bên thứ ba.</translation>
 <translation id="7468182772656807573">Việc đặt chính sách này sẽ xác định tần suất gửi thông tin theo dõi gói mạng, tính bằng mili giây. Khoảng thời gian là từ 30 giây đến 24 giờ. Các giá trị không nằm trong khoảng này sẽ được xếp vào khoảng này.
 
       Nếu bạn không đặt chính sách này, khoảng thời gian mặc định là 3 phút sẽ được áp dụng.</translation>
@@ -10326,13 +10300,6 @@ lỗi tương ứng sẽ xảy ra.
 Trên <ph name="MS_WIN_NAME" />, chính sách này chỉ có trên các phiên bản đã liên kết với một miền <ph name="MS_AD_NAME" />, <ph name="MS_AAD_NAME" /> hoặc đã đăng ký <ph name="CHROME_ENTERPRISE_CORE_NAME" />.
 
 Trên <ph name="MAC_OS_NAME" />, chính sách này chỉ có trên các phiên bản được quản lý qua MDM (Quản lý thiết bị di động), đã liên kết với một miền qua MCX hoặc đã đăng ký <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
-<translation id="8213475033260328041">Chọn lưu trữ dữ liệu được áp dụng từ <ph name="PRODUCT_NAME" /> ở một vị trí địa lý cụ thể.
-
-Nếu bạn không đặt chính sách này hoặc đặt thành <ph name="DATA_REGION_SETTING_NO_PREFERENCE_OPTION_NAME" /> (giá trị 0) thì dữ liệu được áp dụng có thể được lưu trữ ở vị trí địa lý bất kỳ.
-
-Nếu bạn đặt chính sách này thành <ph name="DATA_REGION_SETTING_UNITED_STATES_OPTION_NAME" /> (giá trị 1) thì dữ liệu được áp dụng sẽ được lưu trữ ở Hoa Kỳ.
-
-Nếu bạn đặt chính sách này thành <ph name="DATA_REGION_SETTING_EUROPE_OPTION_NAME" /> (giá trị 2) thì dữ liệu được áp dụng sẽ được lưu trữ ở Châu Âu.</translation>
 <translation id="8213770777756919897">Lưu ý rằng chúng tôi không dùng chính sách này nữa và sẽ xóa khỏi <ph name="PRODUCT_OS_NAME" /> phiên bản 85. Thay vào đó, vui lòng sử dụng <ph name="POWER_MANAGEMENT_IDLE_SETTINGS_POLICY_NAME" />.
 
           Khi bạn đặt, chính sách này sẽ chỉ định hành động mà <ph name="PRODUCT_OS_NAME" /> thực hiện khi người dùng tạm vắng trong khoảng thời gian cho trước theo thời gian chờ khi tạm vắng. Bạn có thể định cấu hình riêng biệt khoảng thời gian này.

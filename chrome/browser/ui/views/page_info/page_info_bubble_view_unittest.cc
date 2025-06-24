@@ -52,6 +52,7 @@
 #include "components/permissions/permission_recovery_success_rate_tracker.h"
 #include "components/permissions/permission_uma_util.h"
 #include "components/permissions/permission_util.h"
+#include "components/prefs/testing_pref_service.h"
 #include "components/privacy_sandbox/privacy_sandbox_features.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/strings/grit/privacy_sandbox_strings.h"
@@ -424,7 +425,7 @@ class ScopedWebContentsTestHelper {
   content::WebContents* web_contents() { return web_contents_; }
   Profile* profile() { return profile_; }
   TestingPrefServiceSimple* local_state() {
-    return testing_profile_manager_.local_state()->Get();
+    return TestingBrowserProcess::GetGlobal()->GetTestingLocalState();
   }
 
  private:

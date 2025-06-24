@@ -105,6 +105,7 @@ borderRight
 borderRightColor
 borderRightStyle
 borderRightWidth
+borderShape
 borderSpacing
 borderStartEndRadius
 borderStartStartRadius
@@ -277,9 +278,9 @@ insetInline
 insetInlineEnd
 insetInlineStart
 interactivity
-interestTargetDelay
-interestTargetHideDelay
-interestTargetShowDelay
+interestDelay
+interestHideDelay
+interestShowDelay
 interpolateSize
 isolation
 item

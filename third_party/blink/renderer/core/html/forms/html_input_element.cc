@@ -310,7 +310,7 @@ bool HTMLInputElement::IsKeyboardFocusableSlow(
     UpdateBehavior update_behavior) const {
   // Interest invoker targets with partial interest aren't keyboard focusable.
   if (IsInPartialInterestPopover()) {
-    CHECK(RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
+    CHECK(RuntimeEnabledFeatures::HTMLInterestForAttributeEnabled(
         GetDocument().GetExecutionContext()));
     return false;
   }
@@ -1182,9 +1182,8 @@ unsigned HTMLInputElement::size() const {
   return size_;
 }
 
-bool HTMLInputElement::SizeShouldIncludeDecoration(int& preferred_size) const {
-  return input_type_view_->SizeShouldIncludeDecoration(kDefaultSize,
-                                                       preferred_size);
+bool HTMLInputElement::GetSizeWithDecoration(int& preferred_size) const {
+  return input_type_view_->GetSizeWithDecoration(kDefaultSize, preferred_size);
 }
 
 void HTMLInputElement::CloneNonAttributePropertiesFrom(const Element& source,

@@ -13,6 +13,7 @@
 
 @protocol AutocompleteSuggestion;
 @class OmniboxAutocompleteController;
+class OmniboxClient;
 class OmniboxControllerIOS;
 class OmniboxEditModelIOS;
 @protocol OmniboxFocusDelegate;
@@ -41,6 +42,7 @@ class OmniboxEditModelIOS;
 /// Temporary initializer, used during the refactoring. crbug.com/390409559
 - (instancetype)initWithOmniboxController:
                     (OmniboxControllerIOS*)omniboxController
+                            omniboxClient:(OmniboxClient*)omniboxClient
                          omniboxEditModel:(OmniboxEditModelIOS*)omniboxEditModel
                          omniboxTextModel:(OmniboxTextModel*)omniboxTextModel
                             inLensOverlay:(BOOL)inLensOverlay
@@ -84,6 +86,16 @@ class OmniboxEditModelIOS;
 /// Reverts the text model back to its unedited state (permanent text showing,
 /// no user input in progress).
 - (void)revertState;
+
+/// Copies a match corresponding to the current text into `match`, and
+/// populates `alternate_nav_url` as well if it's not nullptr. If the popup
+/// is closed, the match is generated from the autocomplete classifier.
+- (void)getInfoForCurrentText:(AutocompleteMatch*)match
+       alternateNavigationURL:(GURL*)alternateNavigationURL;
+
+/// Sets the user_text_ to `text`. Also enters user-input-in-progress mode.
+/// Virtual for testing.
+- (void)setUserText:(const std::u16string&)text;
 
 #pragma mark - Autocomplete event
 

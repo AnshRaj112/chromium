@@ -28,9 +28,8 @@ struct A {
   // base::span<int> buffer4 = getPtr();
   base::span<int> buffer4 = getPtr();
   // Expected rewrite:
-  // base::span<const int> buffer5 = base::span<const int, 1>(&default_value,
-  // 1u);
-  base::span<const int> buffer5 = base::span<const int, 1>(&default_value, 1u);
+  // base::span<const int> buffer5 = base::span_from_ref(default_value);
+  base::span<const int> buffer5 = base::span_from_ref(default_value);
   // Expected rewrite:
   // base::span<const int> buffer6 = default_data;
   base::span<const int> buffer6 = default_data;

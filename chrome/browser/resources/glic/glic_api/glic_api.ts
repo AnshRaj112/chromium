@@ -178,6 +178,20 @@ export declare interface GlicBrowserHost {
       (options: TabContextOptions): Promise<TabContextResult>;
 
   /**
+   * Similar to `getContextFromFocusedTab`, but returns context from the given
+   * tab. Can fail if the tab is not pinned or focused.
+   */
+  getContextFromTab?
+      (tabId: string, options: TabContextOptions): Promise<TabContextResult>;
+
+  /**
+   * Sets the maximum number of supported pinned tabs. Should not be called
+   * more than once. Chrome may not be able to support the given number, so
+   * the applied limit is returned.
+   */
+  setMaximumNumberOfPinnedTabs?(numTabs: number): Promise<number>;
+
+  /**
    * @deprecated Use CreateTask and PerformActions instead.
    *
    * Inform Chrome about an action. Chrome Takes an action based on the
@@ -368,22 +382,6 @@ export declare interface GlicBrowserHost {
   isBrowserOpen?(): ObservableValue<boolean>;
 
   /**
-   * @deprecated Use `getFocusedTabStateV2` instead. This function returns a
-   * TabData on success but no information at all on failure. V2 solves this by
-   * returning error codes to signal why no focus was available.
-   *
-   * Returns the observable state of the currently focused tab. Updates are sent
-   * whenever the focus changes due to the user switching tabs or navigating the
-   * current focused tab.
-   *
-   * @returns An ObservableValue for `TabData` values that will be updated when
-   *          a new tab is focused or the current tab is navigated. The value
-   *          will be `undefined` if there's no active tab or it cannot be
-   *          focused (i.e. the URL is ineligible for tab context sharing).
-   */
-  getFocusedTabState?(): ObservableValue<TabData|undefined>;
-
-  /**
    * Returns the observable state of the currently focused tab. Updates are sent
    * whenever:
    * - The user switches active tabs, which causes a change in `tabId`.
@@ -479,6 +477,9 @@ export declare interface GlicBrowserHost {
    */
   setAudioDucking?(enabled: boolean): void;
 
+  /** Returns an object that holds journal-related functionality. */
+  getJournalHost?(): GlicBrowserHostJournal;
+
   /** Returns an object that holds metrics-related functionality. */
   getMetrics?(): GlicBrowserHostMetrics;
 
@@ -542,6 +543,41 @@ export declare interface GlicBrowserHost {
    * disabled.
    */
   maybeRefreshUserStatus?(): void;
+
+  /**
+   * Attempts to pin the given tabs. Can fail if any of the tabs cannot be
+   * found, if the number of pinned tabs exceeds the allowed limit or if the tab
+   * is already pinned. Return value is true if all tabs were pinned, but if
+   * a false value does not mean that no tabs were pinned. The updated set of
+   * pinned tabs will asynchronously be available via getPinnedTabs.
+   */
+  pinTabs?(tabIds: string[]): Promise<boolean>;
+
+  /**
+   * Attempts to unpin the given tabs. Can fail if the any of the tabs cannot be
+   * found, or if the tab isn't pinned. Return value is true if all tabs were
+   * unpinned. A false value does not mean that no tabs were unpinned. The
+   * updated set of pinned tabs will asynchronously be available via
+   * getPinnedTabs.
+   */
+  unpinTabs?(tabIds: string[]): Promise<boolean>;
+
+  /**
+   * Unpins all currently pinned tabs.
+   */
+  unpinAllTabs?(): void;
+
+  /**
+   * Gets TabData for the current set of pinned tabs. The focused tab may also
+   * be pinned. That is getFocusedTabStateV2 could have a focused tab that is
+   * also in the set of focused tabs. Also fires when TabData for a pinned tab
+   * is updated (eg, due to a change of favicon, title, URL, or observability).
+   * There is a delay between pinning and unpinning and updates to the set of
+   * pinned tabs that will be vended by this API. Callers should not expect that
+   * this will be synchronously reflected since this will require a round trip
+   * to chrome in order to attempt to pin.
+   */
+  getPinnedTabs?(): ObservableValue<TabData[]>;
 }
 /** Fields of interest from the system settings page. */
 export type OsPermissionType = 'media'|'geolocation';
@@ -633,6 +669,69 @@ export enum WebClientMode {
   TEXT = 0,
   /** Audio operation mode. */
   AUDIO = 1,
+}
+
+/** An encoded journal. */
+export declare interface Journal {
+  /**
+   * Encoded journal data. ArrayBuffer is transferable, so it should be copied
+   * more efficiently over postMessage.
+   */
+  data: ArrayBuffer;
+}
+
+/**
+ * Provides journal related functionality to the Glic web client.
+ * This allows the web client to log entries into the journal and
+ * to get a serialized capture (`snapshot`) of the journal.
+ * To listen to new events to the journal `start` must
+ * be called before any events can be serialized to the journal.
+ * `start` does not need to be called before events are logged to
+ * the journal as there may be other sinks of the journal that
+ * wish to receive events.
+ */
+export declare interface GlicBrowserHostJournal {
+  /**
+   * Logs the start of an async event to the journal. A corresponding
+   * endAsyncEvent must be called to terminate this event.
+   */
+  beginAsyncEvent(
+      asynEventId: number, taskId: number, event: string,
+      details: string): void;
+
+  /**
+   * Clears the contents of a started journal. No-op if a journal was not
+   * started.
+   */
+  clear(): void;
+
+  /**
+   * Logs the end of an async event to the journal. A corresponding
+   * `beginAsyncEvent` must have been previously called.
+   */
+  endAsyncEvent(asyncEventId: number, details: string): void;
+
+  /**
+   * Logs an instant event to the journal.
+   */
+  instantEvent(taskId: number, event: string, details: string): void;
+
+  /**
+   * Requests a snapshot of the current contents of the journal. Optionally
+   * clear the journal after taking the snapshot.
+   */
+  snapshot(clear: boolean): Promise<Journal>;
+
+  /**
+   * Requests a journal to start logging. Calls to `snapshot`, `clear` or `stop`
+   * can be made after this.
+   */
+  start(maxBytes: number, captureScreenshots: boolean): void;
+
+  /**
+   * Requests journal stop logging.
+   */
+  stop(): void;
 }
 
 /** Data sent back to the host about the opening of the panel. */
@@ -910,6 +1009,13 @@ export declare interface TabData {
    * for it to be available.
    */
   documentMimeType?: string;
+  /**
+   * Whether the tab is audible or visible. Specifically this is the visibility
+   * of the WebContents as returned by: `WebContents::GetVisibility`. If the
+   * visibility is either VISIBLE or OCCLUDED, we consider the web contents to
+   * be visible.
+   */
+  isObservable?: boolean;
 }
 
 /**
@@ -1315,6 +1421,7 @@ export interface BackwardsCompatibleTypes {
   documentData: DocumentData;
   draggableArea: DraggableArea;
   focusedTabData: FocusedTabData;
+  glicBrowserHostJournal: GlicBrowserHostJournal;
   glicBrowserHostMetrics: GlicBrowserHostMetrics;
   hostRegistry: GlicHostRegistry;
   imageOriginAnnotations: ImageOriginAnnotations;

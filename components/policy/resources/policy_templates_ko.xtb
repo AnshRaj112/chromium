@@ -278,6 +278,7 @@
 <translation id="1207301487141109411">로컬 파일 시스템, 카메라, Google 프로필에서 사용자 아바타 선택을 차단합니다.</translation>
 <translation id="1209096923317019235">앱을 지정된 파일 확장자에 대한 기본 핸들러로 할당합니다.</translation>
 <translation id="120937472976628837">팬 정보 보고</translation>
+<translation id="1211037010406094410">SwiftShader를 사용하여 소프트웨어 WebGL 대체 허용</translation>
 <translation id="1214639335214075459">GPU 하드웨어 동영상 디코딩 사용 설정</translation>
 <translation id="1214942205301731697">확장 프로그램 페이지에서 개발자 모드의 사용 허용 안함</translation>
 <translation id="1216919699175573511">서명된 HTTP 교환(SXG) 지원 사용 설정</translation>
@@ -3495,11 +3496,6 @@ URL 패턴은 <ph name="DIRECT_SOCKETS_ALLOWED_FOR_URLS_POLICY_NAME" />와 충�
       정책을 설정하지 않으면 제한사항이 적용되지 않습니다.</translation>
 <translation id="3531084733660068324">Parental Supervision 설정</translation>
 <translation id="3532827558833318911">로그인 비밀번호 삭제</translation>
-<translation id="353291262171579310">이 정책은 새 탭 페이지(NTP) 바닥글에 관리 알림을 표시할지를 제어합니다. 기본적으로 NTP 바닥글에는 브라우저가 조직에서 관리되는 경우 정보가 표시됩니다(건물 아이콘 및 '[도메인 이름]에서 관리함'으로 표시됨). <ph name="ENTERPRISE_CUSTOM_LABEL_FOR_BROWSER" /> 및 <ph name="ENTERPRISE_LOGO_URL_FOR_BROWSER" /> 정책을 사용하여 맞춤설정할 수 있습니다.
-
-정책을 설정하지 않거나 true로 설정하면 관리 브라우저에 아이콘과 함께 '다음에서 관리함…' 알림이 표시됩니다.
-
-이 정책을 False로 설정하면 관리 알림이 숨겨집니다.</translation>
 <translation id="353611922042274900">로그인 화면에 시스템 정보를 항상 표시</translation>
 <translation id="3536263244905016305">WPAD(웹 프록시 자동 검색) 최적화 사용 중지</translation>
 <translation id="3539103206548425861">정책을 설정하면 <ph name="PRODUCT_NAME" />에서 동영상이 사용자 동의 없이 오디오 콘텐츠와 함께 자동으로 재생될 수 있습니다. <ph name="AUTOPLAY_ALLOWED_POLICY_NAME" /> 정책을 True로 설정하면 이 정책은 적용되지 않습니다. <ph name="AUTOPLAY_ALLOWED_POLICY_NAME" /> 정책을 False로 설정하면 이 정책에 설정된 URL 패턴은 계속해서 재생할 수 있습니다. <ph name="PRODUCT_NAME" />을 실행하는 동안 이 정책을 변경하면 새로 열린 탭에만 적용됩니다.
@@ -3617,6 +3613,15 @@ URL 패턴은 <ph name="DIRECT_SOCKETS_ALLOWED_FOR_URLS_POLICY_NAME" />와 충�
 
 생성형 AI 기능의 데이터 처리에 관한 자세한 내용은 https://support.google.com/chrome/a?p=generative_ai_settings 페이지를 참고하세요.</translation>
 <translation id="3606571057705314194">시작 시 프로필 선택도구 사용 안함</translation>
+<translation id="3607797531311171116">하드웨어 GPU 가속을 사용할 수 없는 경우 SwiftShader를 WebGL 대체로 사용할지 여부를 제어하는 정책입니다.
+
+SwiftShader는 헤드리스 시스템 또는 가상 머신과 같이 GPU 가속화가 없는 시스템에서 WebGL을 지원하는 데 사용되었지만 보안 문제로 인해 지원 중단되었습니다. M139부터는 SwiftShader를 사용했을 경우 WebGL 컨텍스트 생성이 실패합니다. 이 정책을 사용하면 브라우저 또는 관리자가 지원 중단을 일시적으로 연기할 수 있습니다.
+
+정책을 사용으로 설정하면 SwiftShader가 소프트웨어 WebGL 대체로 사용됩니다.
+
+정책을 사용 중지로 설정하거나 설정하지 않으면 하드웨어 GPU 가속을 사용할 수 없는 경우 WebGL 컨텍스트 생성이 실패할 수 있습니다. WebGL 컨텍스트 생성 실패를 적절하게 처리하지 않으면 웹페이지가 제대로 작동하지 않을 수 있습니다.
+
+이는 임시 정책으로 향후 삭제될 예정입니다.</translation>
 <translation id="3608206578291537084">암호화된 보고 파이프라인을 사용 설정합니다.</translation>
 <translation id="3608281460204780443"><ph name="PRODUCT_OS_NAME" /> 런처와 새 탭 페이지에 Chrome 웹 스토어 아이콘 표시</translation>
 <translation id="3612482251405108708">잠금 화면에서 온라인 재인증 자동 시작</translation>
@@ -5431,6 +5436,7 @@ None으로 설정하거나 설정하지 않으면 ARC 앱에서 <ph name="PRODUC
           이 정책이 설정되면 사용자가 변경하거나 재정의할 수 없습니다.
 
           이 정책이 설정되지 않으면 처음에는 로그인 화면에서 모노 오디오가 사용되지 않지만 나중에 사용자가 언제든지 사용 설정할 수 있습니다.</translation>
+<translation id="493253860646951791">안전하지 않은 SwiftShader WebGL 대체 지원 사용 설정</translation>
 <translation id="4933301190614090397">브라우저 종료 시 연결 유지 요청에 허용되는 길이(초)를 설정합니다.
 
       지정하면 지정된 초만큼 브라우저 종료가 차단되어 연결 유지(https://fetch.spec.whatwg.org/#request-keepalive-flag) 요청을 처리할 수 있습니다.
@@ -6141,25 +6147,6 @@ URL 패턴 목록과 처리 유형 쌍을 받습니다. URL 패턴이 순서대�
 
 false로 설정되면 기능에 액세스할 수 없습니다.</translation>
 <translation id="5377606826822211923">사용자를 위해 신뢰할 수 없는 출처의 Android 앱 사용 제어</translation>
-<translation id="5377826248281933035">이 정책은 사용자가 주소 표시줄에서 단축어를 사용하여 빠르게 검색할 수 있는 사이트 목록을 제공합니다. 사용자는 주소 표시줄에 단축어 또는 @shortcut(예: @work)을 입력한 다음 스페이스바 또는 Tab 키를 눌러 검색을 시작할 수 있습니다.
-
-각 사이트에는 <ph name="NAME_SITE_SEARCH_SETTINGS_FIELD" />, <ph name="SHORTCUT_SITE_SEARCH_SETTINGS_FIELD" />, <ph name="URL_SITE_SEARCH_SETTINGS_FIELD" /> 입력란이 필요합니다.
-
-<ph name="NAME_SITE_SEARCH_SETTINGS_FIELD" /> 입력란은 주소 표시줄에서 사용자에게 표시될 사이트 또는 검색엔진 이름에 해당합니다.
-
-<ph name="SHORTCUT_SITE_SEARCH_SETTINGS_FIELD" /> 입력란은 일반 단어와 문자를 포함할 수 있지만 공백을 포함하거나 @ 기호로 시작할 수 없습니다. 또한 단축어는 고유해야 합니다.
-
-각 항목의 <ph name="URL_SITE_SEARCH_SETTINGS_FIELD" /> 입력란에 따라 해당 키워드로 검색하는 동안 사용되는 검색엔진의 URL이 지정됩니다. URL은 <ph name="SEARCH_TERM_MARKER" /> 문자열을 포함해야 하며, 이 문자열은 쿼리 시 사용자의 검색어로 대체됩니다. 잘못된 입력과 단축어가 중복된 항목은 무시됩니다.
-
-추천으로 구성된 사이트 검색 항목은 사용자가 '@' 기호를 입력하면 주소 표시줄에 표시됩니다. 추천 항목은 최대 3개까지 선택할 수 있습니다.
-
-사용자는 정책에 의해 설정된 사이트 검색 항목을 수정하거나 사용 중지할 수 없지만 동일한 URL에 대한 새 단축어를 추가할 수는 있습니다. 또한 사용자는 이전에 이 정책을 통해 만든 단축어로 새 사이트 검색 항목을 만들 수 없습니다.
-
-사용자가 이전에 만든 단축어와 충돌하는 경우 사용자 설정이 우선 적용됩니다. 그러나 검색창에 '@'을 입력하면 정책으로 만든 옵션을 트리거할 수 있습니다. 예를 들어 사용자가 이미 'work'를 URL1의 단축어로 정의했고 정책으로 'work'를 URL2의 단축어로 정의한 경우, 검색창에 'work'를 입력하면 URL1에 대한 검색이 트리거되지만 검색창에 '@work'를 입력하면 URL2에 대한 검색이 트리거됩니다.
-
-<ph name="MS_WIN_NAME" />의 경우 이 정책은 <ph name="MS_AD_NAME" /> 도메인에 연결되거나, <ph name="MS_AAD_NAME" />에 연결되거나, <ph name="CHROME_ENTERPRISE_CORE_NAME" />에 등록된 인스턴스에서만 사용할 수 있습니다.
-
-<ph name="MAC_OS_NAME" />의 경우 이 정책은 MDM을 통해 관리되거나, MCX를 통해 도메인에 연결되거나, <ph name="CHROME_ENTERPRISE_CORE_NAME" />에 등록된 인스턴스에서만 사용할 수 있습니다.</translation>
 <translation id="537786648513450280">기기에서 신뢰할 수 없는 출처의 Android 앱 사용 제어</translation>
 <translation id="5378885577701865339">공유 클립보드 기능 사용 중지</translation>
 <translation id="538108065117008131"><ph name="PRODUCT_FRAME_NAME" />이(가) 다음 콘텐츠 유형을 다루도록 허용</translation>
@@ -6773,6 +6760,9 @@ URL 패턴은 <ph name="DIRECT_SOCKETS_PRIVATE_NETWORK_ACCESS_BLOCKED_FOR_URLS_P
 <translation id="5740636973289452345">확장 프로그램 및 플러그인 정보 보고 사용</translation>
 <translation id="5740716956489996914">웹사이트에서 네트워크 엔드포인트에 요청 여부를 결정할 때 기본 동작을 사용합니다</translation>
 <translation id="5741110260062082926">Orca 사용 중지</translation>
+<translation id="5746126833785204233">정책을 사용으로 설정하면 기기에서 키오스크 애플리케이션이 실행될 때 키오스크 애플리케이션 수준 로그가 수집됩니다. 모든 키오스크 애플리케이션 유형에 대한 로그가 수집됩니다.
+이러한 로그는 별도의 kiosk_apps.log 파일에 저장됩니다.
+정책을 설정하지 않거나 사용 중지로 설정하면 키오스크 애플리케이션 수준 로그가 수집되지 않습니다.</translation>
 <translation id="5746149754419996562"><ph name="PRODUCT_OS_NAME" />에서 한눈에 보기 위젯을 사용하도록 설정합니다. 구체적으로는 앱 표시줄의 날짜 칩을 통해 액세스할 수 있는 위젯입니다.
 이 정책을 사용 설정하면 <ph name="PRODUCT_OS_NAME" />에서 한눈에 보기가 사용 설정됩니다.
 이 정책을 사용 중지하거나 설정하지 않으면 <ph name="PRODUCT_OS_NAME" />에서 한눈에 보기가 사용 설정되지 않습니다.</translation>
@@ -7704,13 +7694,6 @@ Origin-Agent-Cluster: 헤더가 설정되지 않았을 때 M111의 기본값은 
 <translation id="6371005337713685988">관련 웹사이트 세트 설정</translation>
 <translation id="6371561334154580937">마지막 창 종료 시 로그아웃 대화상자 표시</translation>
 <translation id="6372105930898423193">기본으로 사용 중지되어 있는 경우에도 AppCache 기능이 다시 사용 설정되도록 허용합니다.</translation>
-<translation id="6372676668820850849">이 정책은 서드 파티 저장용량 파티셔닝을 기본적으로 허용할지 여부를 제어합니다.
-
-정책을 1 - AllowPartitioning으로 설정하거나 설정하지 않으면 서드 파티 저장용량 파티셔닝이 기본적으로 허용됩니다. 이 기본값은 다른 방법으로 특정 최상위 출처에 대해 재정의될 수 있습니다.
-
-정책을 2 - BlockPartitioning으로 설정하면 모든 컨텍스트에서 서드 파티 저장용량 파티셔닝이 사용 중지됩니다.
-
-<ph name="THIRD_PARTY_STORAGE_PARTITIONING_BLOCKED_FOR_ORIGINS_POLICY_NAME" />를 사용하여 특정 최상위 출처에 대한 서드 파티 저장용량 파티셔닝을 사용 중지합니다. 서드 파티 저장용량 파티셔닝에 관한 자세한 내용은 https://developers.google.com/privacy-sandbox/cookies/storage-partitioning 페이지를 참고하세요.</translation>
 <translation id="6373299801585455337">기기 CPU 정보 보고 사용 설정</translation>
 <translation id="6374945506685352202">확장 프로그램 설치 유형 차단 목록</translation>
 <translation id="6376540107659524656">터미널 시스템 앱에서 SSH를 사용 중지합니다.</translation>
@@ -7983,6 +7966,7 @@ URL 패턴이 <ph name="SERIAL_ASK_FOR_URLS_POLICY_NAME" />와 충돌하는 경�
 <translation id="6513453889192806240">HTTPS 지연 시간</translation>
 <translation id="6515357889978918016"><ph name="PLUGIN_VM_NAME" /> 이미지</translation>
 <translation id="6518102411616460786">채널 다운그레이드 시 보완할 대상 채널 대기</translation>
+<translation id="6518286606938091609">안전하지 않은 SwiftShader WebGL 대체 지원 사용 중지</translation>
 <translation id="6518894783486860562">보안상의 이유로 <ph name="SHOW_SUBAPPS_APP_API_NAME" />, <ph name="SHOW_SUBAPPS_REMOVE_API_NAME" />, <ph name="SHOW_SUBAPPS_LIST_API_NAME" /> 웹 API에는 이전 사용자 동작('임시 활성화') 호출을 요구하며, 호출하지 않을 경우 실패합니다. 또한 사용자에게 확인 대화상자를 통해 작업을 확인하라는 메시지가 표시됩니다.
 
 이 정책을 설정하면 관리자는 이전 사용자 동작 없이 또는 사용자에게 확인을 요청하지 않고도 이러한 API를 호출하는 출처를 지정할 수 있습니다.
@@ -8558,6 +8542,7 @@ False로 설정하거나 설정하지 않으면 레이아웃을 사용할 수 �
 <translation id="6907778402784621686">이 사이트에서 안전하지 않은 콘텐츠 차단</translation>
 <translation id="6908335885425855120">프로세스 외부 iframe PDF 뷰어 사용</translation>
 <translation id="6908640907898649429">기본 검색 공급자를 설정합니다. 사용자가 사용할 기본 검색 공급자를 지정하거나 기본 검색을 사용 중지하도록 선택할 수 있습니다.</translation>
+<translation id="6910715067772088598">키오스크 애플리케이션 로그 사용 중지</translation>
 <translation id="6913068954484253496"><ph name="PRODUCT_NAME" />에서 모든 IP 주소의 Cast 기기에 연결하도록 허용</translation>
 <translation id="6915493311660114995">정책을 사용 설정하면 <ph name="PRODUCT_NAME" />에서 오류가 있는 TLS 인증서가 있는 웹사이트(안전하지 않은 것으로 간주되는 웹사이트)의 웹 인증 요청을 허용합니다.
 
@@ -8633,6 +8618,7 @@ URL 패턴은 <ph name="CONTROLLED_FRAME_ALLOWED_FOR_URLS_POLICY_NAME" />와 충
       정책을 설정하지 않는 경우 기기 프린터가 사용되지 않으면 다른 <ph name="DEVICE_PRINTERS_POLICY_PATTERN" /> 정책이 무시됩니다.</translation>
 <translation id="69525503251220566">기본 검색엔진에 이미지로 검색 기능을 제공하는 매개변수</translation>
 <translation id="6953102253399571439">기본적으로 PIN 인쇄 사용</translation>
+<translation id="695532899547292238">키오스크 애플리케이션 로그 수집 사용 설정</translation>
 <translation id="6956272732789158625">모든 사이트에서 키 생성 사용 허용 안함</translation>
 <translation id="6960996423652450945">로그인 화면에서 캐럿 강조표시 사용 안함</translation>
 <translation id="6961602002757991199">이 정책을 유효한 URL로 설정하면 <ph name="PRODUCT_NAME" />이 URL로부터 사이트 목록을 다운로드하며 <ph name="BROWSER_SWITCHER_URL_GREYLIST_POLICY_NAME" /> 정책으로 규칙이 설정된 경우와 동일한 규칙을 적용합니다. 이 정책은 <ph name="PRODUCT_NAME" />과 대체 브라우저가 서로를 열지 못하게 합니다.
@@ -9308,13 +9294,6 @@ true로 설정하면 <ph name="PRODUCT_NAME" />에서는
 <translation id="7463934096276667908">접두사가 있는 동영상 전체 화면 API를 사용 설정합니다.</translation>
 <translation id="7464058117970792805">인쇄 미리보기 사용 설정</translation>
 <translation id="7464991223784276288">일치하는 URL의 쿠키를 현재 세션으로 제한</translation>
-<translation id="7467748623079596345">이 정책을 사용하면 서드 파티 저장용량 파티셔닝(교차 출처 iframe 저장용량의 파티셔닝)을 사용 중지해야 하는 최상위 출처를 지정하는 URL 패턴 목록을 설정할 수 있습니다.
-
-정책을 설정하지 않거나 최상위 출처가 URL 패턴 중 하나와 일치하지 않으면 <ph name="DEFAULT_THIRD_PARTY_STORAGE_PARTITIONING_SETTING_POLICY_NAME" />이 적용됩니다.
-
-유효한 패턴에 관해 자세히 알아보려면 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns 페이지를 참고하세요. 여기에 명시된 패턴은 URL이 아닌 출처로 취급되므로 경로를 지정해서는 안 됩니다.
-
-서드 파티 저장용량 파티셔닝에 관한 자세한 내용은 https://developers.google.com/privacy-sandbox/cookies/storage-partitioning 페이지를 참고하세요.</translation>
 <translation id="7468182772656807573">정책을 설정하면 모니터링 네트워크 패킷을 전송할 빈도를 밀리초 단위로 결정할 수 있습니다. 간격은 30초부터 24시간 범위이며 이 범위를 벗어나는 값은 범위에 들어가도록 조정됩니다.
 
       정책이 설정되지 않으면 기본 간격인 3분이 적용됩니다.</translation>
@@ -9463,6 +9442,7 @@ true로 설정하면 <ph name="PRODUCT_NAME" />에서는
 <translation id="7586199729147257934">관리 브라우저의 클라이언트 인증서 프로비저닝 사용 설정</translation>
 <translation id="7587345076013230465">자동 선택 정책과 일치하는 인증서가 여러 개 있을 때마다 로그인 화면에서 사용자에게 클라이언트 인증서를 선택하라는 메시지 표시</translation>
 <translation id="7587921466180902617">Family Link 사용자용 스크린캐스트 dogfood 사용 설정</translation>
+<translation id="7588140323025689972">키오스크 애플리케이션 로그 사용 설정</translation>
 <translation id="7595074040612182185">정책을 설정하면 이미지를 표시할 수 있는 사이트를 지정하는 URL 패턴 목록을 설정할 수 있습니다.
 
       정책을 설정하지 않았을 때 <ph name="DEFAULT_IMAGES_SETTING_ENABLED_POLICY_NAME" />이 설정되어 있으면 모든 사이트에 적용되며 설정되지 않으면 사용자의 개인 설정이 적용됩니다.
@@ -10249,13 +10229,6 @@ False로 설정하면 로그인 화면이 표시될 때 개인 정보 보호 화
 <ph name="MS_WIN_NAME" />의 경우 이 정책은 <ph name="MS_AD_NAME" /> 도메인에 연결되거나, <ph name="MS_AAD_NAME" />에 연결되거나, <ph name="CHROME_ENTERPRISE_CORE_NAME" />에 등록된 인스턴스에서만 사용할 수 있습니다.
 
 <ph name="MAC_OS_NAME" />의 경우 이 정책은 MDM을 통해 관리되거나, MCX를 통해 도메인에 연결되거나, <ph name="CHROME_ENTERPRISE_CORE_NAME" />에 등록된 인스턴스에서만 사용할 수 있습니다.</translation>
-<translation id="8213475033260328041"><ph name="PRODUCT_NAME" />의 적용되는 데이터를 특정 지리적 위치에 저장하도록 선택하세요.
-
-정책을 설정하지 않거나 <ph name="DATA_REGION_SETTING_NO_PREFERENCE_OPTION_NAME" />(값 0)(으)로 설정하면 적용되는 데이터가 아무 지리적 위치에 저장될 수 있습니다.
-
-정책을 <ph name="DATA_REGION_SETTING_UNITED_STATES_OPTION_NAME" />(값 1)(으)로 설정하면 적용되는 데이터가 미국에 저장됩니다.
-
-정책을 <ph name="DATA_REGION_SETTING_EUROPE_OPTION_NAME" />(값 2)(으)로 설정하면 적용되는 데이터가 유럽에 저장됩니다.</translation>
 <translation id="8213770777756919897">이 정책은 지원이 중단되었으며 <ph name="PRODUCT_OS_NAME" /> 버전 85에서 삭제될 예정입니다. 대신 <ph name="POWER_MANAGEMENT_IDLE_SETTINGS_POLICY_NAME" /> 정책을 사용하세요.
 
           이 정책이 설정되어 있으면 사용자가 유휴 지연 시간으로 지정된 시간 동안 유휴 상태에 있을 때 <ph name="PRODUCT_OS_NAME" />에서 실행할 작업을 지정하며, 유휴 지연 시간은 별도로 설정할 수 있습니다.

@@ -1628,6 +1628,8 @@ _CONFIG = [
         ],
         # This class needs access to ui/gl classes for driver loading.
         'allowed': [
+            'angle::InitializePlatform',
+            'angle::ResetPlatform',
             'dawn::wire::client::GetProcs',
             'gfx::ExtensionSet',
             'gfx::MakeExtensionSet',
@@ -1645,9 +1647,13 @@ _CONFIG = [
         'paths': [
             'third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc',
         ],
-        # This class needs access to a GPU driver bug workaround entry.
+        # This class needs access to various GPU-related functionality.
         'allowed': [
+            'gfx::BufferFormat',
             'gpu::ENABLE_WEBGL_TIMER_QUERY_EXTENSIONS',
+            'gpu::IsImageFromGpuMemoryBufferFormatSupported',
+            'gpu::IsImageSizeValidForGpuMemoryBufferFormat',
+            'viz::SinglePlaneSharedImageFormatToBufferFormat',
         ],
     },
     {
@@ -2192,6 +2198,15 @@ _CONFIG = [
             'net::Error',
             'net::MutableNetworkTrafficAnnotationTag',
             'net::NetworkTrafficAnnotationTag',
+        ]
+    },
+    {
+        'paths': [
+            'third_party/blink/renderer/modules/webtransport/',
+        ],
+        'allowed': [
+            'net::Error',
+            'net::IPEndPoint',
         ]
     },
     {

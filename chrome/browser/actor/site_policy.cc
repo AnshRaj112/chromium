@@ -17,6 +17,8 @@
 #include "chrome/browser/actor/actor_features.h"
 #include "chrome/browser/actor/aggregated_journal.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/lookalikes/lookalike_url_service.h"
+#include "chrome/browser/lookalikes/lookalike_url_service_factory.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service.h"
 #include "chrome/browser/optimization_guide/optimization_guide_keyed_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
@@ -46,10 +48,11 @@ class DecisionWrapper {
   DecisionWrapper(AggregatedJournal& journal,
                   const GURL& url,
                   TaskId task_id,
+                  std::string_view event_name,
                   DecisionCallback callback)
       : callback_(std::move(callback)),
         journal_entry_(
-            journal.CreatePendingAsyncEntry(url, task_id, "MayActOnTab", "")) {}
+            journal.CreatePendingAsyncEntry(url, task_id, event_name, "")) {}
 
   void Reject(std::string_view reason) {
     journal_entry_->EndEntry(reason);
@@ -173,6 +176,25 @@ void MayActOnUrl(const GURL& url,
     }
   }
 
+  auto* lookalike_service = LookalikeUrlServiceFactory::GetForProfile(profile);
+  LookalikeUrlService::LookalikeUrlCheckResult lookalike_result =
+      lookalike_service->CheckUrlForLookalikes(
+          url, lookalike_service->GetLatestEngagedSites(),
+          /*stop_checking_on_allowlist_or_ignore=*/true);
+  if (lookalike_result.action_type != lookalikes::LookalikeActionType::kNone &&
+      lookalike_result.action_type !=
+          lookalikes::LookalikeActionType::kRecordMetrics) {
+    // Out of caution, do not act on lookalike domains.
+    // For now, we just accept the possibility of false positives.
+    // Note that this is partially redundant in the case where the lookalike
+    // detection shows an interstitial, since we don't act on interstitials.
+    // However, it may be that the navigation is allowed and a safety tip is
+    // shown instead. We consider that sufficient cause for concern for actor
+    // code.
+    decision_wrapper->Reject("Lookalike domain");
+    return;
+  }
+
   if (auto* optimization_guide_decider =
           OptimizationGuideKeyedServiceFactory::GetForProfile(profile);
       optimization_guide_decider &&
@@ -209,7 +231,7 @@ void MayActOnTab(const tabs::TabInterface& tab,
 
   const GURL& url = web_contents.GetPrimaryMainFrame()->GetLastCommittedURL();
   std::unique_ptr<DecisionWrapper> decision_wrapper =
-      std::make_unique<DecisionWrapper>(journal, url, task_id,
+      std::make_unique<DecisionWrapper>(journal, url, task_id, "MayActOnTab",
                                         std::move(callback));
 
   if (web_contents.GetPrimaryMainFrame()->IsErrorDocument()) {
@@ -232,6 +254,17 @@ void MayActOnTab(const tabs::TabInterface& tab,
   MayActOnUrl(url,
               Profile::FromBrowserContext(web_contents.GetBrowserContext()),
               std::move(decision_wrapper));
+}
+
+void MayActOnUrl(const GURL& url,
+                 Profile* profile,
+                 AggregatedJournal& journal,
+                 TaskId task_id,
+                 DecisionCallback callback) {
+  std::unique_ptr<DecisionWrapper> decision_wrapper =
+      std::make_unique<DecisionWrapper>(journal, url, task_id, "MayActOnUrl",
+                                        std::move(callback));
+  MayActOnUrl(url, profile, std::move(decision_wrapper));
 }
 
 }  // namespace actor

@@ -2373,6 +2373,9 @@ Your Google account may have other forms of browsing history like searches and a
       <message name="IDS_DOWNLOAD_WARNING_BYPASS_DIALOG_ACTION_LEARN_MORE" desc="Label for the button to open a help page about download warnings.">
         Learn more
       </message>
+      <message name="IDS_DOWNLOAD_WARNING_BYPASS_DIALOG_ACTION_LEARN_MORE_ACCESSIBILITY_DESCRIPTION" desc="Accessibility description for the button to open a help page about download warnings.">
+        Learn more about why Chrome blocks some files
+      </message>
 
       <!-- Download Home dangerous warning -->
       <message name="IDS_DOWNLOAD_WARNING_HEED_MENU_ACTION_DELETE" desc="Label for the menu item to heed a download warning shown in the downloads list by removing the file from download history.">
@@ -2729,7 +2732,10 @@ Your Google account may have other forms of browsing history like searches and a
         Save data in your Google Account
       </message>
       <message name="IDS_BATCH_UPLOAD_DIALOG_DESCRIPTION" desc="The text appears as a note in a confirmation dialog where the user can choose to save some data to their Google Account. When data is saved to the Google Account, it's backed up safely and is available on any device where they're signed in to Chrome. This note explains where the user can go to view and manage individual items. like individual bookmarks or passwords.">
-        You can choose what data to save in your Google Account, <ph name="ACCOUNT_EMAIL">%1$s<ex>elisa.g.beckett@gmail.com</ex></ph>.\nYou can also view and manage these items in your bookmarks, reading list, or password manager
+        You can choose what data to save in your Google Account, <ph name="ACCOUNT_EMAIL">%1$s<ex>elisa.g.beckett@gmail.com</ex></ph>.\nYou can also view and manage these items in your bookmarks, reading list, or password manager.
+      </message>
+      <message name="IDS_BATCH_UPLOAD_DIALOG_DESCRIPTION_NON_DISPLAYABLE_PROFILE_DATA" desc="The text appears as a note in a confirmation dialog where the user can choose to save some data to their Google Account. When data is saved to the Google Account, it's backed up safely and is available on any device where they're signed in to Chrome. This note explains where the user can go to view and manage individual items. like individual bookmarks or passwords.">
+        You can choose what data to save in your Google Account.\nYou can also view and manage these items in your bookmarks, reading list, or password manager.
       </message>
       <message name="IDS_BATCH_UPLOAD_DIALOG_BOOKMARKS" desc="One of the data types that we allow uploading through a confirmation dialog where the user can choose to save some data to their Google Account. When data is saved to the Google Account, it's backed up safely and is available on any device where they're signed in to Chrome.">
         {ITEMS_COUNT, plural,
@@ -3101,6 +3107,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
 
       <message name="IDS_MENU_LISTEN_TO_THIS_PAGE_IPH" desc="The in-product-help message that encourages users to use the Listen to this Page feature in the app menu">
         You can listen to this page
+      </message>
+      <message name="IDS_MENU_LISTEN_TO_THIS_PAGE_WITH_AI_IPH" desc="The in-product-help message that encourages users to listen to this page in Audio Overivew mode in the app menu">
+        Listen to this page with AI
       </message>
 
       <message name="IDS_MENU_PRINT" desc="Menu item for printing the current page. [CHAR_LIMIT=27]">
@@ -4390,6 +4399,12 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_MENU_MOVE_TO_OTHER_WINDOW" desc="Menu item for moving the current tab into the other window. [CHAR_LIMIT=27]">
         Move to other window
       </message>
+      <message name="IDS_MENU_MOVE_TAB_TO_OTHER_WINDOW" desc="Menu item for moving the current tab into another window. [CHAR_LIMIT=27]">
+        Move tab to another window
+      </message>
+      <message name="IDS_MENU_MOVE_GROUP_TO_OTHER_WINDOW" desc="Menu item for moving the current tab group into another window. [CHAR_LIMIT=27]">
+        Move group to another window
+      </message>
       <message name="IDS_MENU_MANAGE_ALL_WINDOWS" desc="Menu item for bringing up instance switcher UI. [CHAR_LIMIT=27]">
         Manage windows (<ph name="INSTANCE_COUNTS">%1$d<ex>3</ex></ph>)
       </message>
@@ -4535,6 +4550,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
       <message name="IDS_MENU_PIN_TAB" desc="Menu item for pinning a tab.">
         Pin tab
+      </message>
+      <message name="IDS_MENU_ITEM_CONTENT_FILTER_HELP_CENTER_LINK" desc="Menu item to explain that the content filter is on and to direct the user to the help center article about content filters. Only available when the content filter is on.">
+        Content filter is on
       </message>
 
       <!-- Bookmarks strings -->
@@ -5742,23 +5760,6 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
       <message name="IDS_MODULE_INSTALL_FAILURE_TEXT" desc="Text shown on an infobar when Chrome failed to install a dynamic feature module.">
         Unable to install <ph name="module">%1$s<ex>augmented reality</ex></ph> for Chrome
-      </message>
-
-      <!-- Custom Context Menu Informations -->
-      <message name="IDS_CONTEXTMENU_PAGE_TITLE" desc="The title of a context menu tab when the item pressed contains more than one type. This indicates that all the actions are related to the page.">
-        PAGE
-      </message>
-      <message name="IDS_CONTEXTMENU_IMAGE_TITLE" desc="The title of a context menu tab when the item pressed contains more than one type. This indicates that all the actions are related to the image.">
-        IMAGE
-      </message>
-      <message name="IDS_CONTEXTMENU_LINK_TITLE" desc="The title of a context menu tab when the item pressed contains more than one type. This indicates that all the actions are related to the link.">
-        LINK
-      </message>
-      <message name="IDS_CONTEXTMENU_VIDEO_TITLE" desc="The title of a context menu tab when the item pressed contains more than one type. This indicates that all the actions are related to a video.">
-        VIDEO
-      </message>
-      <message name="IDS_CONTEXTMENU_DEVELOPER_TITLE" desc="The title of a context menu tab when the item pressed contains more than one type. This indicates that all the actions are related to tools for developers.">
-        DEVELOPER
       </message>
 
       <!-- Multi-instance Switcher Dialog strings -->

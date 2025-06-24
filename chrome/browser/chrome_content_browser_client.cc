@@ -346,7 +346,6 @@
 #include "content/public/common/origin_util.h"
 #include "content/public/common/url_utils.h"
 #include "content/public/common/window_container_type.mojom-shared.h"
-#include "device/fido/features.h"
 #include "device/vr/buildflags/buildflags.h"
 #include "extensions/browser/browser_frame_context_data.h"
 #include "extensions/buildflags/buildflags.h"
@@ -2900,9 +2899,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
       // Make the WebAuthenticationRemoteDesktopAllowedOrigins policy enable the
       // experimental WebAuthenticationRemoteDesktopSupport Blink runtime
       // feature.
-      if (base::FeatureList::IsEnabled(
-              device::kWebAuthnRemoteDesktopAllowedOriginsPolicy) &&
-          !prefs->GetList(webauthn::pref_names::kRemoteDesktopAllowedOrigins)
+      if (!prefs->GetList(webauthn::pref_names::kRemoteDesktopAllowedOrigins)
                .empty()) {
         command_line->AppendSwitch(switches::kWebAuthRemoteDesktopSupport);
       }
@@ -4794,6 +4791,12 @@ void ChromeContentBrowserClient::OverrideWebPreferences(
   web_prefs->always_show_context_menu_on_touch =
       base::FeatureList::IsEnabled(::features::kContextMenuEmptySpace);
 #endif
+
+  web_prefs->api_based_fingerprinting_interventions_enabled =
+      base::FeatureList::IsEnabled(
+          features::kIncognitoFingerprintingInterventions) &&
+      Profile::FromBrowserContext(web_contents->GetBrowserContext())
+          ->IsIncognitoProfile();
 }
 
 bool ChromeContentBrowserClientParts::OverrideWebPreferencesAfterNavigation(
@@ -7667,15 +7670,12 @@ ChromeContentBrowserClient::ShouldOverridePrivateNetworkRequestPolicy(
   }
 #endif
 
-// TODO(crbug.com/400455013): Add LNA support on Android
-#if !BUILDFLAG(IS_ANDROID)
   Profile* profile = Profile::FromBrowserContext(browser_context);
   if (profile->GetPrefs()->GetBoolean(
           prefs::kManagedLocalNetworkAccessRestrictionsEnabled)) {
     return content::ContentBrowserClient::PrivateNetworkRequestPolicyOverride::
         kBlockInsteadOfWarn;
   }
-#endif
 
   return content::ContentBrowserClient::PrivateNetworkRequestPolicyOverride::
       kDefault;

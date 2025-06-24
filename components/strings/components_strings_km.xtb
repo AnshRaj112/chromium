@@ -1444,6 +1444,7 @@
 <translation id="343474037147570563">ឯកសារ​ដែលអ្នក​បង្ហោះ ឬ​ភ្ជាប់​ត្រូវបានផ្ញើ​ទៅ Google Cloud ឬ​ភាគីទីបី​ដើម្បីវិភាគ។ ឧទាហរណ៍ ឯកសារទាំងនោះ​អាចត្រូវបានស្កេន ដើម្បីរកមើល​ទិន្នន័យ​រសើប ឬ​កម្មវិធីគ្រោះថ្នាក់ និង​អាច​ត្រូវបាន​រក្សាទុក​ដោយផ្អែកតាម​គោលការណ៍​របស់ក្រុមហ៊ុន ហើយអ្នកគ្រប់គ្រងរបស់អ្នកអាចមើលឃើញឯកសារទាំងនោះ។</translation>
 <translation id="3435557549311968410">បន្តបន្ទាប់ (ខាងខ្លី)</translation>
 <translation id="3435738964857648380">សុវត្ថិភាព</translation>
+<translation id="3436118221454753036">សួរមុខងារ AI</translation>
 <translation id="3440783957068352691">ការ៉េ</translation>
 <translation id="3441653493275994384">អេក្រង់</translation>
 <translation id="3443504041532578451">ឌីសអុបទិក (សាទីន)</translation>
@@ -1765,7 +1766,6 @@
 <translation id="3961148744525529027">សន្លឹកកម្មវិធី​គ្រប់គ្រងការបង់ប្រាក់​បានបើកពាក់កណ្ដាល</translation>
 <translation id="3962859241508114581">សំនៀងមុន</translation>
 <translation id="3963721102035795474">របៀបកម្មវិធីអាន</translation>
-<translation id="3964661563329879394">{COUNT,plural, =0{គ្មាន}=1{ពីទំព័រ 1 }other{ពីទំព័រ # }}</translation>
 <translation id="3965672182149944205">រក្សាទុក​អាសយដ្ឋាន​ទេ?</translation>
 <translation id="3966044442021752214">សុវត្ថិភាពផលិតផល</translation>
 <translation id="3969869202926863008">សិទ្ធិចូលប្រើ​បណ្ដាញ​មូលដ្ឋាន</translation>
@@ -2034,6 +2034,7 @@
 <translation id="4372948949327679948">តម្លៃ <ph name="VALUE_TYPE" /> បានរំពឹងទុក។</translation>
 <translation id="437620492464254965">ទ្វារ និង​បង្អួច</translation>
 <translation id="4377125064752653719">អ្នកបានព្យាយាមទៅកាន់ <ph name="DOMAIN" /> ប៉ុន្តែវិញ្ញាបនប័ត្រដែលម៉ាស៊ីនមេបានបង្ហាញត្រូវបានបញ្ឈប់សុពលភាពដោយអ្នកចេញផ្សាយរបស់វា។ វាមានន័យថាអត្តសញ្ញាណសម្គាល់សុវត្ថិភាពដែលម៉ាស៊ីនមេបានបង្ហាញមិនអាចជឿជាក់បានទាំងស្រុងទេ។ អ្នកប្រហែលជាអាចកំពុងទំនាក់ទំនងជាមួយអ្នកវាយប្រហារ។</translation>
+<translation id="4377869186417956230">ប្ដូរទៅជា​កាតសមាជិក​ទាំងអស់​នៅក្រោម​ធាតុម៉ឺនុយ​នេះ។</translation>
 <translation id="4378154925671717803">ទូរស័ព្ទ</translation>
 <translation id="4382484599443659549">PDF</translation>
 <translation id="4382833368532556056">ចាប់ពី​ពេលនេះ សូមរក្សាទុក​ឯកសារ​របស់អ្នក​ទៅ​ទំហំផ្ទុក​លើ​ពពក</translation>
@@ -4022,6 +4023,7 @@
 <translation id="7761159795823346334">អនុញ្ញាត​ឱ្យប្រើ​កាមេរ៉ា​ដែរទេ?</translation>
 <translation id="7761701407923456692">វិញ្ញាបនប័ត្ររបស់ម៉ាស៊ីនមេមិនត្រូវគ្នានឹង URL នេះទេ។</translation>
 <translation id="7764225426217299476">បន្ថែមអាសយដ្ឋាន</translation>
+<translation id="7765158879357617694">ផ្លាស់ទី</translation>
 <translation id="7766518757692125295">ស្រទាប់ខាងក្រៅ</translation>
 <translation id="7767278989746220252">ធ្លាក្នុងផ្ទះ ស្មៅ និង​សួនច្បារ</translation>
 <translation id="776749070095465053">ក្រណាត់</translation>
@@ -4358,6 +4360,7 @@
 <translation id="8364627913115013041">មិនបានកំណត់។</translation>
 <translation id="8366057325711477500">ព័ត៌មាន​ពិភពលោក</translation>
 <translation id="836616551641291797">ស្វែងយល់​បន្ថែម​អំពី​របៀបដែល​កម្មវិធីរុករកតាមអ៊ីនធឺណិត​របស់​អ្នក​ត្រូវ​បាន​គ្រប់គ្រង</translation>
+<translation id="8367705492654390392">សួរ​អ្វីម្យ៉ាង</translation>
 <translation id="8368001212524806591">តាម​ដាន​តម្លៃ​</translation>
 <translation id="8368027906805972958">ឧបករណ៍ដែល​មិនស្គាល់ ឬ​មិនអាច​ប្រើបាន (<ph name="DEVICE_ID" />)</translation>
 <translation id="8368476060205742148">សេវាកម្ម Google Play</translation>
@@ -4672,6 +4675,7 @@
 <translation id="8926389886865778422">កុំសួរម្តងទៀត</translation>
 <translation id="8932102934695377596">ម៉ោងរបស់អ្នកដើរយឺត</translation>
 <translation id="893332455753468063">បញ្ចូល​ឈ្មោះ</translation>
+<translation id="8938242527120341116">តម្រង​ខ្លឹមសារ​របស់​ឧបករណ៍​អ្នក​បាន​ទប់ស្កាត់ <ph name="BLOCKED_URL" /></translation>
 <translation id="8942355029279167844">អ្នកគ្រប់គ្រង​របស់អ្នកបាន​អនុញ្ញាតឱ្យ <ph name="APP_NAME" /> ប្រមូលទិន្នន័យ​វិភាគ ដើម្បីកែលម្អបទពិសោធន៍ប្រើប្រាស់​ផលិតផល។ សូមមើល <ph name="BEGIN_LINK" />https://www.parallels.com/pcep<ph name="END_LINK" /> ដើម្បីទទួលបាន​ព័ត៌មានបន្ថែម។</translation>
 <translation id="8943282376843390568">លឿងខ្ចី</translation>
 <translation id="8949410982325929394">សម្ដីសំដៅ</translation>
@@ -4876,6 +4880,7 @@
 <translation id="963837307749850257">អ្នកប្រើប្រាស់​ទាំងអស់</translation>
 <translation id="964050462028070434">គ្រប់គ្រង​ពាក្យសម្ងាត់ និង​កូដសម្ងាត់…</translation>
 <translation id="969892804517981540">លេខកំណែផ្លូវការ</translation>
+<translation id="97054401902912338">ស្វែងយល់​បន្ថែម​អំពី​តម្រង​ខ្លឹមសារ</translation>
 <translation id="973788791897303708">ក្រុមផ្ទាំងនេះ​ពេញហើយ</translation>
 <translation id="975560348586398090">{COUNT,plural, =0{គ្មាន}=1{ធាតុ 1}other{ធាតុ #}}</translation>
 <translation id="976522784004777030">5 x 8 in</translation>

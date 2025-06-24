@@ -29,21 +29,18 @@
 #import "url/gurl.h"
 
 @class OmniboxAutocompleteController;
+class OmniboxClient;
 class OmniboxControllerIOS;
-class OmniboxPopupViewIOS;
 @class OmniboxTextController;
 
 class OmniboxEditModelIOS {
  public:
   OmniboxEditModelIOS(OmniboxControllerIOS* controller,
+                      OmniboxClient* client,
                       OmniboxTextModel* text_model);
   virtual ~OmniboxEditModelIOS();
   OmniboxEditModelIOS(const OmniboxEditModelIOS&) = delete;
   OmniboxEditModelIOS& operator=(const OmniboxEditModelIOS&) = delete;
-
-  void set_popup_view(OmniboxPopupViewIOS* popup_view);
-  OmniboxPopupViewIOS* get_popup_view() { return popup_view_; }
-  const OmniboxPopupViewIOS* get_popup_view() const { return popup_view_; }
 
   void set_omnibox_autocomplete_controller(
       OmniboxAutocompleteController* omnibox_autocomplete_controller) {
@@ -100,10 +97,6 @@ class OmniboxEditModelIOS {
 
   // Returns the permanent display text for the current page and Omnibox state.
   std::u16string GetPermanentDisplayText() const;
-
-  // Sets the user_text_ to `text`. Also enters user-input-in-progress mode.
-  // Virtual for testing.
-  virtual void SetUserText(const std::u16string& text);
 
   // Invoked any time the text may have changed in the edit. Notifies the
   // controller.
@@ -259,18 +252,15 @@ class OmniboxEditModelIOS {
                  const std::u16string& pasted_text,
                  base::TimeTicks match_selection_timestamp = base::TimeTicks());
 
-  // Copies a match corresponding to the current text into `match`, and
-  // populates `alternate_nav_url` as well if it's not nullptr. If the popup
-  // is closed, the match is generated from the autocomplete classifier.
-  void GetInfoForCurrentText(AutocompleteMatch* match,
-                             GURL* alternate_nav_url) const;
-
   // Returns view text if there is a view. Until the model is made the
   // primary data source, this should not be called when there's no view.
   std::u16string GetText() const;
 
   // Owns this.
   raw_ptr<OmniboxControllerIOS> controller_;
+
+  // The omnibox client.
+  raw_ptr<OmniboxClient> client_;
 
   // The omnibox text model containing the text state.
   raw_ptr<OmniboxTextModel> text_model_;
@@ -280,10 +270,6 @@ class OmniboxEditModelIOS {
 
   // The autocomplete controller.
   __weak OmniboxAutocompleteController* omnibox_autocomplete_controller_ = nil;
-
-  // The popup view is nullptr when there's no popup, and is non-null when
-  // a popup view exists (i.e. between calls to `set_popup_view`).
-  raw_ptr<OmniboxPopupViewIOS> popup_view_ = nullptr;
 
   base::WeakPtrFactory<OmniboxEditModelIOS> weak_factory_{this};
 };

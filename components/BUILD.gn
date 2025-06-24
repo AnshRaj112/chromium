@@ -10,7 +10,6 @@ import("//components/compose/features.gni")
 import("//components/enterprise/buildflags/buildflags.gni")
 import("//components/guest_contents/common/buildflags.gni")
 import("//components/guest_view/buildflags/buildflags.gni")
-import("//components/nacl/features.gni")
 import("//components/optimization_guide/features.gni")
 import("//components/safe_browsing/buildflags.gni")
 import("//components/services/on_device_translation/buildflags/features.gni")
@@ -424,10 +423,6 @@ test("components_unittests") {
     deps += [ "//components/ui_devtools/views:unit_tests" ]
   }
 
-  if (enable_nacl) {
-    deps += [ "//components/nacl/browser:unit_tests" ]
-  }
-
   if (is_fuchsia) {
     deps += [
       "//components/fuchsia_component_support:unit_tests",
@@ -573,6 +568,7 @@ test("components_unittests") {
       "//components/commerce/ios/browser:unit_tests",
       "//components/crash/core/app:unit_tests",
       "//components/feed/core/v2/public/ios:feed_ios_unit_tests",
+      "//components/fingerprinting_protection_filter/ios:unit_tests",
       "//components/image_fetcher/ios:unit_tests",
       "//components/language/ios/browser:unit_tests",
       "//components/password_manager/core/common:unit_tests",
@@ -1053,6 +1049,7 @@ if (use_blink) {
       "dom_distiller/content/browser/test/dom_distiller_js_browsertest.cc",
       "dom_distiller/content/browser/test/test_util.cc",
       "dom_distiller/content/browser/test/test_util.h",
+      "optimization_guide/content/browser/frame_metadata_observer_browsertest.cc",
       "optimization_guide/content/browser/page_content_proto_provider_browsertest.cc",
       "optimization_guide/content/renderer/page_text_agent_browsertest.cc",
       "paint_preview/renderer/paint_preview_recorder_browsertest.cc",
@@ -1152,6 +1149,7 @@ if (use_blink) {
     if (is_ios) {
       entitlements_path = "//content/app/ios/appex/app.entitlements"
       deps += [
+        "//components/test:optimization_guide_test_bundle_data",
         "//content/test/ios/appex:test_content_process_bundle",
         "//content/test/ios/appex:test_gpu_process_bundle",
         "//content/test/ios/appex:test_network_process_bundle",

@@ -471,13 +471,6 @@ BASE_FEATURE(kClipboardHistoryLongpress,
              "ClipboardHistoryLongpress",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// If enabled when the user copies a URL that is present in the primary user
-// profile's browsing history, the clipboard history menu will show the page
-// title as part of the URL's menu item.
-BASE_FEATURE(kClipboardHistoryUrlTitles,
-             "ClipboardHistoryUrlTitles",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Controls enabling/disabling conch.
 BASE_FEATURE(kConch, "Conch", base::FEATURE_DISABLED_BY_DEFAULT);
 
@@ -1669,7 +1662,7 @@ BASE_FEATURE(kImprovedLoginErrorHandling,
 // management warning bubble.
 BASE_FEATURE(kImprovedManagementDisclosure,
              "ImprovedManagementDisclosure",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables Instant Hotspot on Nearby. b/303121363.
 BASE_FEATURE(kInstantHotspotOnNearby,
@@ -2489,14 +2482,6 @@ BASE_FEATURE(kProjectorUseUSMForS3,
              "ProjectorUseUSMForS3",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// controls whether projector uses dynamic colors.
-BASE_FEATURE(kProjectorDynamicColors,
-             "ProjectorDynamicColors",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// controls whether the projector app uses updated styles and ui components.
-BASE_FEATURE(kProjectorGm3, "ProjectorGm3", base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Controls whether the projector app uses the latest endpoint for retrieving
 // playback urls.
 BASE_FEATURE(kProjectorUseDVSPlaybackEndpoint,
@@ -2799,9 +2784,14 @@ BASE_FEATURE(kFeatureManagementFeatureAwareDeviceDemoMode,
              "FeatureManagementFeatureAwareDeviceDemoMode",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Disable the demo mode app orientation locked in landscape.
+// Enables the demo mode app orientation locked in landscape.
 BASE_FEATURE(kDemoModeAppLandscapeLocked,
              "DemoModeAppLandscapeLocked",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables the ToS Notification in demo mode signed-in sessions.
+BASE_FEATURE(kDemoSessionToSNotification,
+             "DemoSessionToSNotification",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // The pref kSecondaryGoogleAccountSigninAllowed is set to false in Demo Mode.
@@ -3551,10 +3541,6 @@ bool IsClipboardHistoryLongpressEnabled() {
   return base::FeatureList::IsEnabled(kClipboardHistoryLongpress);
 }
 
-bool IsClipboardHistoryUrlTitlesEnabled() {
-  return base::FeatureList::IsEnabled(kClipboardHistoryUrlTitles);
-}
-
 bool IsContinuousOverviewScrollAnimationEnabled() {
   return base::FeatureList::IsEnabled(kContinuousOverviewScrollAnimation);
 }
@@ -3662,6 +3648,10 @@ bool IsEapGtcWifiAuthenticationEnabled() {
 
 bool IsDemoModeAppLandscapeLockedEnabled() {
   return base::FeatureList::IsEnabled(kDemoModeAppLandscapeLocked);
+}
+
+bool IsDemoSessionToSNotificationEnabled() {
+  return base::FeatureList::IsEnabled(kDemoSessionToSNotification);
 }
 
 bool IsDemoModeSecondaryGoogleAccountSigninAllowedFalse() {
@@ -4423,16 +4413,6 @@ bool IsProjectorV2Enabled() {
 
 bool IsProjectorUseUSMForS3Enabled() {
   return base::FeatureList::IsEnabled(kProjectorUseUSMForS3);
-}
-
-bool IsProjectorDynamicColorsEnabled() {
-  // For Projector, Gm3 requires dynamic colors.
-  return base::FeatureList::IsEnabled(kProjectorDynamicColors) ||
-         base::FeatureList::IsEnabled(kProjectorGm3);
-}
-
-bool IsProjectorGm3Enabled() {
-  return base::FeatureList::IsEnabled(kProjectorGm3);
 }
 
 bool IsProjectorUseDVSPlaybackEndpointEnabled() {

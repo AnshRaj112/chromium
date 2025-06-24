@@ -45,6 +45,8 @@ CONTENT_EXPORT extern const base::FeatureParam<int>
     kAndroidSpareRendererMemoryThreshold;
 CONTENT_EXPORT extern const base::FeatureParam<bool>
     kAndroidSpareRendererKillWhenBackgrounded;
+CONTENT_EXPORT extern const base::FeatureParam<bool>
+    kAndroidSpareRendererOnlyForNavigation;
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kAttachUnownedInnerWebContents);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kAudioServiceLaunchOnStartup);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kAudioServiceOutOfProcess);
@@ -281,7 +283,7 @@ CONTENT_EXPORT BASE_DECLARE_FEATURE(kVerifyDidCommitParams);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kValidateCommitOriginAtCommit);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kV8VmFuture);
 #if BUILDFLAG(IS_ANDROID)
-CONTENT_EXPORT BASE_DECLARE_FEATURE(kV8HighEndAndroid);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kV8AndroidDesktopHighEndConfig);
 #endif
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebAppSystemMediaControls);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebAssemblyBaseline);
@@ -304,6 +306,9 @@ CONTENT_EXPORT extern const base::FeatureParam<bool>
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebUIJSErrorReportingExtended);
 #endif
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebUsb);
+CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebViewPrefetchHighestPrefetchPriority);
+CONTENT_EXPORT extern const base::FeatureParam<size_t>
+    kWebViewPrefetchHighestPrefetchPriorityBurstLimit;
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebXr);
 CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebPermissionsApi);
 

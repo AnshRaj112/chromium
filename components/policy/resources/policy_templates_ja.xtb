@@ -3361,11 +3361,6 @@ URL パターンは、<ph name="DIRECT_SOCKETS_ALLOWED_FOR_URLS_POLICY_NAME" /> 
       ポリシーを未設定のままにした場合、制限は適用されません。</translation>
 <translation id="3531084733660068324">保護者向け管理ツールの設定</translation>
 <translation id="3532827558833318911">パスワード ログインを消去する</translation>
-<translation id="353291262171579310">このポリシーでは、新しいタブページ（NTP）のフッターに管理に関する通知を表示するかどうかを制御します。デフォルトでは、ブラウザが組織によって管理されている場合、NTP フッターに情報（建物のアイコンと「[ドメイン名] によって管理されています」）が表示されます。これは、<ph name="ENTERPRISE_CUSTOM_LABEL_FOR_BROWSER" /> ポリシーと <ph name="ENTERPRISE_LOGO_URL_FOR_BROWSER" /> ポリシーを使用してカスタマイズできます。
-
-このポリシーを未設定のままにするか true に設定した場合は、管理対象ブラウザに「… によって管理されています」という通知とアイコンが表示されます。
-
-このポリシーを false に設定した場合、管理に関する通知は表示されません。</translation>
 <translation id="353611922042274900">ログイン画面に常にシステム情報を表示する</translation>
 <translation id="3536263244905016305">ウェブプロキシ自動検出（WAPD）の最適化を無効にする</translation>
 <translation id="3539103206548425861">このポリシーでは、動画を音声コンテンツとともに <ph name="PRODUCT_NAME" /> で自動再生できるようにします（ユーザーの同意は確認されません）。<ph name="AUTOPLAY_ALLOWED_POLICY_NAME" /> ポリシーが True に設定されている場合、このポリシーは無視されます。<ph name="AUTOPLAY_ALLOWED_POLICY_NAME" /> ポリシーが False に設定されている場合は、このポリシーで設定した URL パターンであれば再生が可能です。<ph name="PRODUCT_NAME" /> の実行中にこのポリシーを変更した場合、変更内容は新しく開かれるタブにのみ適用されます。
@@ -5852,25 +5847,6 @@ URL パターンと処理タイプの組み合わせのリストを指定しま�
 
 false に設定した場合、教師はこの機能にアクセスできません。</translation>
 <translation id="5377606826822211923">信頼できない提供元の Android アプリの使用をユーザー単位で管理する</translation>
-<translation id="5377826248281933035">このポリシーでは、ユーザーがアドレスバーでショートカットを使用してすばやく検索できるサイトのリストを指定します。ユーザーはアドレスバーにショートカットまたは @ショートカット（「@仕事」など）を入力し、Space キーまたは Tab キーを押して検索を開始できます。
-
-サイトごとに、<ph name="NAME_SITE_SEARCH_SETTINGS_FIELD" />、<ph name="SHORTCUT_SITE_SEARCH_SETTINGS_FIELD" />、<ph name="URL_SITE_SEARCH_SETTINGS_FIELD" /> のフィールドを指定する必要があります。
-
-<ph name="NAME_SITE_SEARCH_SETTINGS_FIELD" /> フィールドには、アドレスバーに表示するサイト名または検索エンジン名を指定します。
-
-<ph name="SHORTCUT_SITE_SEARCH_SETTINGS_FIELD" /> には通常の単語や文字を指定できますが、スペースを含めたり、先頭に「@」記号を付けたりすることはできません。また、ショートカットは一意にする必要があります。
-
-各エントリの <ph name="URL_SITE_SEARCH_SETTINGS_FIELD" /> フィールドには、対応するキーワードでの検索に使用する検索エンジンの URL を指定します。この URL には <ph name="SEARCH_TERM_MARKER" /> という文字列を含める必要があります。この文字列は、クエリの送信時にユーザーが指定した検索キーワードに置き換えられます。無効なエントリや、ショートカットが重複しているエントリは無視されます。
-
-ユーザーがアドレスバーに「@」と入力すると、おすすめに設定したサイト内検索のエントリが表示されます。おすすめのエントリは 3 つまで選択できます。
-
-ユーザーは、ポリシーで設定されたサイト内検索のエントリを編集したり無効にしたりすることはできませんが、同じ URL に新しいショートカットを追加することはできます。また、ユーザーは、このポリシーで作成したショートカットを使用して、サイト内検索のエントリを新たに作成することはできません。
-
-ユーザーが事前に作成したショートカットと競合する場合は、ユーザーの設定が優先されます。ただし、ユーザーが検索バーに「@」と入力すると、ポリシーで作成したオプションがトリガーされます。たとえば、ユーザーが「仕事」を URL1 のショートカットにすでに定義していて、ポリシーで「仕事」を URL2 のショートカットに定義した場合、検索バーに「仕事」と入力すると URL1 の検索がトリガーされますが、「@仕事」と入力すると、URL2 の検索がトリガーされます。
-
-<ph name="MS_WIN_NAME" /> では、<ph name="MS_AD_NAME" /> ドメインに追加されたインスタンス、<ph name="MS_AAD_NAME" /> に追加されたインスタンス、または <ph name="CHROME_ENTERPRISE_CORE_NAME" /> に登録されているインスタンスでのみこのポリシーを使用できます。
-
-<ph name="MAC_OS_NAME" /> では、MDM を介して管理されるインスタンス、MCX を介してドメインに追加されたインスタンス、または <ph name="CHROME_ENTERPRISE_CORE_NAME" /> に登録されているインスタンスでのみこのポリシーを使用できます。</translation>
 <translation id="537786648513450280">信頼できない提供元の Android アプリの使用をデバイス単位で管理する</translation>
 <translation id="5378885577701865339">クリップボードの共有機能を無効にする</translation>
 <translation id="538108065117008131"><ph name="PRODUCT_FRAME_NAME" /> に対して次のコンテンツ タイプの処理を許可する</translation>
@@ -7329,13 +7305,6 @@ Origin-Agent-Cluster HTTP ヘッダーは、オリジンキー エージェン�
 <translation id="6371005337713685988">関連ウェブサイト セットの設定</translation>
 <translation id="6371561334154580937">最後のウィンドウを閉じたときにログアウト ダイアログを表示する</translation>
 <translation id="6372105930898423193">AppCache 機能がデフォルトで無効になっている場合でも有効化を許可します。</translation>
-<translation id="6372676668820850849">このポリシーでは、サードパーティのストレージ パーティションをデフォルトで許可するかどうかを制御します。
-
-このポリシーを「1 - AllowPartitioning」に設定するか未設定のままにした場合、サードパーティのストレージ パーティションはデフォルトで許可されます。特定の最上位のオリジンに対しては、このデフォルトを他の方法でオーバーライドできます。
-
-このポリシーを「2 - BlockPartitioning」に設定した場合、サードパーティのストレージ パーティションはすべてのコンテキストで無効になります。
-
-特定の最上位のオリジンに対してサードパーティのストレージ パーティションを無効にするには、<ph name="THIRD_PARTY_STORAGE_PARTITIONING_BLOCKED_FOR_ORIGINS_POLICY_NAME" /> を使用します。サードパーティのストレージ パーティションについて詳しくは、https://developers.google.com/privacy-sandbox/cookies/storage-partitioning をご覧ください。</translation>
 <translation id="6373299801585455337">デバイスの CPU 情報レポートを有効にする</translation>
 <translation id="6374945506685352202">拡張機能のインストール タイプの拒否リスト</translation>
 <translation id="6376540107659524656">Terminal System App の SSH を無効にする</translation>
@@ -8816,13 +8785,6 @@ EphemeralNetworkPolicies 機能がデフォルトで有効になると、この�
 <translation id="7463934096276667908">接頭辞付きの動画の全画面 API を有効にします</translation>
 <translation id="7464058117970792805">印刷プレビューを有効にする</translation>
 <translation id="7464991223784276288">一致する URL からの Cookie を現在のセッションに限定する</translation>
-<translation id="7467748623079596345">このポリシーでは、サードパーティのストレージ パーティション（クロスオリジンの iframe ストレージのパーティション）を無効にする最上位のオリジンの URL パターンのリストを指定できます。
-
-このポリシーを未設定のままにするか、最上位のオリジンが指定した URL パターンに一致しない場合は、<ph name="DEFAULT_THIRD_PARTY_STORAGE_PARTITIONING_SETTING_POLICY_NAME" /> が適用されます。
-
-有効なパターンについて詳しくは、https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns をご覧ください。ここで指定したパターンは URL ではなくオリジンとして扱われるため、パスは指定しないでください。
-
-サードパーティのストレージ パーティションについて詳しくは、https://developers.google.com/privacy-sandbox/cookies/storage-partitioning をご覧ください。</translation>
 <translation id="7468182772656807573">このポリシーの設定により、監視ネットワーク パケットの送信間隔（ミリ秒単位）が決定されます。間隔の範囲は 30 秒～24 時間です。範囲外の値を設定しても、範囲内の値に修正されます。
 
       設定しなかった場合は、デフォルトの 3 分間隔が適用されます。</translation>
@@ -9720,13 +9682,6 @@ false に設定した場合、管理対象のネットワークに接続され�
 <ph name="MS_WIN_NAME" /> では、<ph name="MS_AD_NAME" /> ドメインに追加されたインスタンス、<ph name="MS_AAD_NAME" /> に追加されたインスタンス、または <ph name="CHROME_ENTERPRISE_CORE_NAME" /> に登録されているインスタンスでのみこのポリシーを使用できます。
 
 <ph name="MAC_OS_NAME" /> では、MDM を介して管理されるインスタンス、MCX を介してドメインに追加されたインスタンス、または <ph name="CHROME_ENTERPRISE_CORE_NAME" /> に登録されているインスタンスでのみこのポリシーを使用できます。</translation>
-<translation id="8213475033260328041"><ph name="PRODUCT_NAME" /> の対象となるデータを保存する地理的位置を設定します。
-
-このポリシーを未設定のままにするか <ph name="DATA_REGION_SETTING_NO_PREFERENCE_OPTION_NAME" />（値 0）に設定した場合、対象となるデータはどの地理的位置にも保存できます。
-
-このポリシーを <ph name="DATA_REGION_SETTING_UNITED_STATES_OPTION_NAME" />（値 1）に設定した場合、対象となるデータは米国に保存されます。
-
-このポリシーを <ph name="DATA_REGION_SETTING_EUROPE_OPTION_NAME" />（値 2）に設定した場合、対象となるデータはヨーロッパに保存されます。</translation>
 <translation id="8213770777756919897">このポリシーはサポートが終了しており、<ph name="PRODUCT_OS_NAME" /> バージョン 85 で削除されます。代わりに <ph name="POWER_MANAGEMENT_IDLE_SETTINGS_POLICY_NAME" /> を使用してください。
 
           このポリシーを設定した場合は、アイドル状態になってから一定の時間（アイドル待ちとして指定された時間）が経過すると、<ph name="PRODUCT_OS_NAME" /> で指定の操作が行われます。アイドル待ちの時間は別途設定できます。

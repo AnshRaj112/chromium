@@ -21,7 +21,6 @@ import("//components/captive_portal/core/features.gni")
 import("//components/compose/features.gni")
 import("//components/enterprise/buildflags/buildflags.gni")
 import("//components/lens/features.gni")
-import("//components/nacl/features.gni")
 import("//components/offline_pages/buildflags/features.gni")
 import("//components/optimization_guide/features.gni")
 import("//components/os_crypt/sync/features.gni")
@@ -209,11 +208,9 @@ static_library("browser") {
     "assist_ranker/assist_ranker_service_factory.cc",
     "assist_ranker/assist_ranker_service_factory.h",
     "autocomplete/autocomplete_classifier_factory.cc",
-    "autocomplete/autocomplete_classifier_factory.h",
     "autocomplete/chrome_autocomplete_provider_client.cc",
     "autocomplete/chrome_autocomplete_provider_client.h",
     "autocomplete/chrome_autocomplete_scheme_classifier.cc",
-    "autocomplete/chrome_autocomplete_scheme_classifier.h",
     "autocomplete/document_suggestions_service_factory.cc",
     "autocomplete/document_suggestions_service_factory.h",
     "autocomplete/enterprise_search_aggregator_suggestions_service_factory.cc",
@@ -1832,6 +1829,11 @@ static_library("browser") {
     "//chrome/browser/ui/page_info:impl",
     "//chrome/browser/ui/prefs:impl",
     "//chrome/browser/ui/safety_hub:impl",
+    "//chrome/browser/ui/toolbar:impl",
+
+    # TODO(crbug.com/369436587): Remove this dependency when
+    # c/b/translate/chrome_translate_client.h gets modularized.
+    "//chrome/browser/ui/toolbar/pinned_toolbar:impl",
     "//chrome/browser/ui/webui/bluetooth_internals",
     "//chrome/browser/updates/announcement_notification:impl",
 
@@ -1903,6 +1905,7 @@ static_library("browser") {
     ":active_use_util",
     ":browser_process",
     ":expired_flags_list",
+    ":flags",
     ":font_pref",
     ":global_features",
     ":k_anonymity_storage_proto",
@@ -1931,6 +1934,7 @@ static_library("browser") {
     "//chrome/browser/affiliations",
     "//chrome/browser/ai",
     "//chrome/browser/ai:impl",
+    "//chrome/browser/autocomplete",
     "//chrome/browser/autofill",
     "//chrome/browser/background:background",
     "//chrome/browser/background:impl",
@@ -2093,6 +2097,11 @@ static_library("browser") {
     "//chrome/browser/ui/tab_contents:impl",
     "//chrome/browser/ui/tabs:tabs_public",
     "//chrome/browser/ui/tabs/tab_group_home:constants",
+    "//chrome/browser/ui/toolbar:impl",
+
+    # TODO(crbug.com/369436587): Remove this circular dependency when
+    # c/b/translate/chrome_translate_client.h gets modularized.
+    "//chrome/browser/ui/toolbar/pinned_toolbar:impl",
     "//chrome/browser/ui/webui",
     "//chrome/browser/ui/webui:configs",
     "//chrome/browser/ui/webui/about",
@@ -3283,6 +3292,7 @@ static_library("browser") {
       "ssl/known_interception_disclosure_infobar.h",
       "supervised_user/android/favicon_fetcher.cc",
       "supervised_user/android/favicon_fetcher.h",
+      "supervised_user/android/supervised_user_service_bridge.cc",
       "supervised_user/android/supervised_user_service_platform_delegate.cc",
       "supervised_user/android/supervised_user_service_platform_delegate.h",
       "supervised_user/android/supervised_user_web_content_handler_impl.cc",
@@ -3439,6 +3449,7 @@ static_library("browser") {
       "//chrome/browser/serial/android:jni_headers",
       "//chrome/browser/signin/services/android:jni_headers",
       "//chrome/browser/ssl/android:jni_headers",
+      "//chrome/browser/supervised_user:supervised_user_service_bridge_jni_headers",
       "//chrome/browser/supervised_user:supervised_user_service_platform_delegate_jni_headers",
       "//chrome/browser/supervised_user:website_parent_approval_jni_headers",
       "//chrome/browser/sync/android:jni_headers",
@@ -4584,6 +4595,10 @@ static_library("browser") {
     # Any circular includes must depend on the target
     # "browser_public_dependencies".
     allow_circular_includes_from += [
+      # TODO(crbug.com/426554250): This needs //chrome/browser/lookalikes which is
+      # not yet modularized.
+      "//chrome/browser/actor:impl",
+
       # TODO(crbug.com/40251079): Remove circular dependencies.
       "//chrome/browser/apps/app_service",
 
@@ -7813,14 +7828,19 @@ static_library("browser") {
         "//services/accessibility/public/mojom",
         "//ui/events/ozone/layout:layout",
 
-        # TODO(crbug.com/40227502): Currently EnterpriseDeviceAttributes
-        # internally uses profile manager. We should get rid of it.
+        # For allow_circular_includes_from below.
+        "//chrome/browser/chromeos/extensions/login_screen/login",
         "//chrome/browser/extensions/api/enterprise_device_attributes",
+        "//chrome/browser/extensions/api/enterprise_login",
       ]
       allow_circular_includes_from += [
         # TODO(crbug.com/40227502): Currently EnterpriseDeviceAttributes
         # internally uses profile manager. We should get rid of it.
         "//chrome/browser/extensions/api/enterprise_device_attributes",
+
+        # For chrome::AttemptUserExit().
+        "//chrome/browser/chromeos/extensions/login_screen/login",
+        "//chrome/browser/extensions/api/enterprise_login",
       ]
     }
   }
@@ -7934,16 +7954,6 @@ static_library("browser") {
       "notifications/screen_lock_notification_blocker.cc",
       "notifications/screen_lock_notification_blocker.h",
     ]
-  }
-
-  if (enable_nacl) {
-    sources += [
-      "nacl_host/nacl_browser_delegate_impl.cc",
-      "nacl_host/nacl_browser_delegate_impl.h",
-      "nacl_host/nacl_infobar_delegate.cc",
-      "nacl_host/nacl_infobar_delegate.h",
-    ]
-    deps += [ "//components/nacl/browser" ]
   }
 
   if (enable_offline_pages) {
@@ -8523,13 +8533,6 @@ static_library("browser_public_dependencies") {
     # generated files here.
     ":browser_generated_files",
 
-    # To avoid that the huge amount of source files that include either
-    # "about_flags.h" or "flag_description.h" to depend directly on //c/b:flags
-    # for now, it is added temporarily as a public dependency of //c/b:b.
-    #
-    # TODO(crbug.com/369436587): Make all targets that include these headers to depend directly //c/b:flags.
-    ":flags",
-
     # //chrome/browser/ui and //chrome/browser are semantically the same target,
     # and thus their public dependencies are shared.
     "//base",
@@ -9035,10 +9038,6 @@ grit("resources") {
 
   if (safe_browsing_mode == 1) {
     deps += [ "//chrome/browser/resources/reset_password:build_ts" ]
-  }
-
-  if (enable_nacl || is_mac) {
-    deps += [ "//chrome/browser/resources/about_nacl:build_ts" ]
   }
 }
 

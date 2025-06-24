@@ -215,7 +215,7 @@ public abstract class TabOverflowMenuCoordinator<T> {
     protected @Nullable TabGroupSyncService mTabGroupSyncService;
 
     private final @LayoutRes int mMenuLayout;
-    private final Context mContext;
+    private final @Nullable Context mContext;
     private final OnItemClickedCallback<T> mOnItemClickedCallback;
     private @Nullable OverflowMenuHolder<T> mMenuHolder;
 
@@ -233,7 +233,7 @@ public abstract class TabOverflowMenuCoordinator<T> {
             Supplier<TabModel> tabModelSupplier,
             @Nullable TabGroupSyncService tabGroupSyncService,
             CollaborationService collaborationService,
-            Context context) {
+            @Nullable Context context) {
         mMenuLayout = menuLayout;
         mOnItemClickedCallback = onItemClickedCallback;
         mTabModelSupplier = tabModelSupplier;
@@ -385,7 +385,9 @@ public abstract class TabOverflowMenuCoordinator<T> {
         ModelList modelList = new ModelList();
         configureMenuItems(modelList, id);
         // Apply offset from the background.
-        offsetPopupRect(mContext, isIncognito, anchorViewRectProvider.getRect());
+        if (mContext != null) {
+            offsetPopupRect(mContext, isIncognito, anchorViewRectProvider.getRect());
+        }
         mMenuHolder =
                 new OverflowMenuHolder<>(
                         anchorViewRectProvider,
@@ -443,6 +445,7 @@ public abstract class TabOverflowMenuCoordinator<T> {
      * @return The DP measure {@param dimenRes}, converted to px.
      */
     protected int getDimensionPixelSize(@DimenRes int dimenRes) {
+        assert mContext != null : "context needs to be non-null to get pixel size";
         return mContext.getResources().getDimensionPixelSize(dimenRes);
     }
 

@@ -77,7 +77,7 @@ void AsyncDomStorageDatabase::RunBatchDatabaseTasks(
                         base::debug::Alias(&context);
                         size_t batch_task_count = tasks.size();
                         size_t iteration_count = 0;
-                        size_t current_batch_size = 0;
+                        size_t current_batch_size = batch.ApproximateSize();
                         base::debug::Alias(&batch_task_count);
                         base::debug::Alias(&iteration_count);
                         base::debug::Alias(&current_batch_size);
@@ -88,7 +88,7 @@ void AsyncDomStorageDatabase::RunBatchDatabaseTasks(
                               batch.ApproximateSize() - current_batch_size;
                           base::UmaHistogramCustomCounts(
                               "Storage.DomStorage."
-                              "BatchTaskGrowthSizeBytes",
+                              "BatchTaskGrowthSizeBytes2",
                               growth, 1, 100 * 1024 * 1024, 50);
                           const size_t kTargetBatchSizesMB[] = {20, 100, 500};
                           for (size_t batch_size_mb : kTargetBatchSizesMB) {
@@ -98,11 +98,12 @@ void AsyncDomStorageDatabase::RunBatchDatabaseTasks(
                                 batch.ApproximateSize() >= target_batch_size) {
                               base::UmaHistogramCounts10000(
                                   base::StringPrintf("Storage.DomStorage."
-                                                     "IterationsToReach%zuMB",
+                                                     "IterationsToReach%zuMB2",
                                                      batch_size_mb),
                                   iteration_count);
                             }
                           }
+                          current_batch_size = batch.ApproximateSize();
                         }
                         return db.Commit(&batch);
                       },

@@ -192,6 +192,7 @@
 <translation id="8374451057714760401">{NUM_MONTHS,plural, =1{<ph name="NUM_MONTHS_ONE" /> ай бұрын жаңартылды.}other{<ph name="NUM_MONTHS_MANY" /> ай бұрын жаңартылды.}}</translation>
 <translation id="8398929769197326728">Жаңа қалта – <ph name="CURRENT_TIMESTAMP_MS" /></translation>
 <translation id="8428213095426709021">Параметрлер</translation>
+<translation id="855081842937141170">Қойындыны бекіту</translation>
 <translation id="8633025649649592204">Соңғы іс-әрекеттер</translation>
 <translation id="8712637175834984815">Түсінікті</translation>
 <translation id="8714939927607906138">Арзанырақ</translation>
@@ -200,7 +201,6 @@
 <translation id="875848103419578654">{NUM_MONTHS,plural, =1{<ph name="NUM_MONTHS_ONE" /> ай бұрын жасалды.}other{<ph name="NUM_MONTHS_MANY" /> ай бұрын жасалды.}}</translation>
 <translation id="8813708480179818649">Қойындыны топтан өшіру</translation>
 <translation id="8820741577754260431">Баға төмендеген кезде, оны қойындыдан көріңіз.</translation>
-<translation id="883379923675618699">Chrome әрекетсіз бөлімдегі сіз 3 ай қолданбаған элементтерді автоматты түрде жабады. Бұл функцияны параметрлерде кез келген уақытта өшіре аласыз.</translation>
 <translation id="8887921976452567404">Жабылған қойындылар мен топтарды "Соңғы қойындылар" және "Қойындылар топтары" бөлімдерінен қайта ашуға болады.</translation>
 <translation id="8915916167043355778">Барлығын жабу</translation>
 <translation id="9090098097337832354">Бұл дүкеннің жабық екендігі туралы ақпарат</translation>

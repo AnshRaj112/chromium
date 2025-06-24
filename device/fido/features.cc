@@ -49,11 +49,12 @@ BASE_FEATURE(kWebAuthCableExtensionAnywhere,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_ANDROID)
-// Enabled in M132. Remove in or after M135 or when the comparison histograms
-// are not needed anymore.
-BASE_FEATURE(kWebAuthnAndroidUsePasskeyCache,
-             "WebAuthenticationAndroidUsePasskeyCache",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Not yet enabled by default.
+BASE_FEATURE(kWebAuthnAndroidPasskeyCacheMigration,
+             "WebAuthenticationAndroidPasskeyCacheMigration",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 #endif  // BUILDFLAG(IS_ANDROID)
 
 // Enabled in M118. Remove in or after M121.
@@ -155,11 +156,6 @@ BASE_FEATURE(kWebAuthnNoAccountTimeout,
 // Default enabled in M134. Remove in or after M137.
 BASE_FEATURE(kSyncSecurityDomainBeforePINRenewal,
              "kWebAuthenticationSyncSecurityDomainBeforePINRenewal",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Default enabled in M136. Remove in or after M139.
-BASE_FEATURE(kWebAuthnRemoteDesktopAllowedOriginsPolicy,
-             "WebAuthenticationRemoteDesktopAllowedOriginsPolicy",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Default enabled in M135. Remove in or after M138.

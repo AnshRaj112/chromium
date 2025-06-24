@@ -34,6 +34,8 @@
 #include "components/feature_engagement/internal/feature_config_event_storage_validator.h"
 #include "components/feature_engagement/internal/in_memory_event_store.h"
 #include "components/feature_engagement/internal/init_aware_event_model.h"
+#include "components/feature_engagement/internal/multiple_event_model_provider.h"
+#include "components/feature_engagement/internal/multiple_event_model_writer.h"
 #include "components/feature_engagement/internal/never_availability_model.h"
 #include "components/feature_engagement/internal/never_event_storage_validator.h"
 #include "components/feature_engagement/internal/noop_display_lock_controller.h"
@@ -50,7 +52,9 @@
 #include "components/feature_engagement/public/feature_list.h"
 #include "components/feature_engagement/public/group_constants.h"
 #include "components/feature_engagement/public/group_list.h"
+#include "components/feature_engagement/public/pref_names.h"
 #include "components/leveldb_proto/public/proto_database_provider.h"
+#include "components/prefs/pref_service.h"
 
 namespace feature_engagement {
 
@@ -134,7 +138,8 @@ std::unique_ptr<Tracker> CreateDemoModeTracker(
       std::make_unique<NeverAvailabilityModel>(), std::move(configuration),
       std::make_unique<NoopDisplayLockController>(),
       std::make_unique<OnceConditionValidator>(),
-      std::make_unique<SystemTimeProvider>(), nullptr, nullptr);
+      std::make_unique<SystemTimeProvider>(), nullptr, nullptr, nullptr,
+      nullptr);
 }
 
 // This method is declared in
@@ -143,6 +148,8 @@ std::unique_ptr<Tracker> CreateDemoModeTracker(
 // static
 std::unique_ptr<Tracker> Tracker::Create(
     const base::FilePath& storage_dir,
+    const base::FilePath& device_storage_dir,
+    PrefService* pref_service,
     const scoped_refptr<base::SequencedTaskRunner>& background_task_runner,
     leveldb_proto::ProtoDatabaseProvider* db_provider,
     std::unique_ptr<TrackerEventExporter> event_exporter,
@@ -167,6 +174,8 @@ std::unique_ptr<Tracker> Tracker::Create(
       leveldb_proto::ProtoDbType::FEATURE_ENGAGEMENT_EVENT, event_storage_dir,
       background_task_runner);
 
+  auto profile_event_db = event_db.get();
+
   auto event_store =
       std::make_unique<PersistentEventStore>(std::move(event_db));
 
@@ -184,8 +193,7 @@ std::unique_ptr<Tracker> Tracker::Create(
 
   auto event_model =
       std::make_unique<InitAwareEventModel>(std::move(raw_event_model));
-  auto event_model_provider =
-      std::make_unique<SingleEventModelProvider>(std::move(event_model));
+
   auto condition_validator =
       std::make_unique<FeatureConfigConditionValidator>();
   auto time_provider = std::make_unique<SystemTimeProvider>();
@@ -202,11 +210,48 @@ std::unique_ptr<Tracker> Tracker::Create(
   auto availability_model = std::make_unique<AvailabilityModelImpl>(
       std::move(availability_store_loader));
 
+  std::unique_ptr<EventModelProvider> event_model_provider;
+  std::unique_ptr<EventStorageMigration> event_storage_migration;
+  if (IsOnDeviceStorageEnabled()) {
+    base::FilePath device_event_storage_dir =
+        device_storage_dir.AppendASCII(std::string(kEventDBName));
+    auto device_event_db = db_provider->GetUniqueDB<Event>(
+        leveldb_proto::ProtoDbType::FEATURE_ENGAGEMENT_EVENT,
+        device_event_storage_dir, background_task_runner);
+
+    // If the migration is completed, we don't need to migrate the data.
+    // TODO(crbug.com/426624087): Remove this and all the code related to it
+    // once the migration is completed.
+    event_storage_migration = std::make_unique<EventStorageMigration>(
+        profile_event_db, device_event_db.get());
+
+    auto device_event_store =
+        std::make_unique<PersistentEventStore>(std::move(device_event_db));
+
+    auto device_event_storage_validator =
+        std::make_unique<FeatureConfigEventStorageValidator>();
+    device_event_storage_validator->InitializeFeatures(
+        GetAllFeatures(), GetAllGroups(), *configuration);
+
+    auto device_raw_event_model = std::make_unique<EventModelImpl>(
+        std::move(device_event_store),
+        std::move(device_event_storage_validator));
+
+    auto device_event_model = std::make_unique<InitAwareEventModel>(
+        std::move(device_raw_event_model));
+    event_model_provider = std::make_unique<MultipleEventModelProvider>(
+        std::move(event_model), std::move(device_event_model));
+  } else {
+    event_model_provider =
+        std::make_unique<SingleEventModelProvider>(std::move(event_model));
+  }
+
   return std::make_unique<TrackerImpl>(
       std::move(event_model_provider), std::move(availability_model),
       std::move(configuration), std::make_unique<DisplayLockControllerImpl>(),
       std::move(condition_validator), std::move(time_provider),
-      std::move(event_exporter), std::move(session_controller));
+      std::move(event_exporter), std::move(session_controller),
+      std::move(event_storage_migration), pref_service);
 }
 
 TrackerImpl::TrackerImpl(
@@ -217,7 +262,9 @@ TrackerImpl::TrackerImpl(
     std::unique_ptr<ConditionValidator> condition_validator,
     std::unique_ptr<TimeProvider> time_provider,
     std::unique_ptr<TrackerEventExporter> event_exporter,
-    std::unique_ptr<SessionController> session_controller)
+    std::unique_ptr<SessionController> session_controller,
+    std::unique_ptr<EventStorageMigration> event_storage_migration,
+    PrefService* pref_service)
     : event_model_provider_(std::move(event_model_provider)),
       availability_model_(std::move(availability_model)),
       configuration_(std::move(configuration)),
@@ -225,14 +272,33 @@ TrackerImpl::TrackerImpl(
       condition_validator_(std::move(condition_validator)),
       time_provider_(std::move(time_provider)),
       event_exporter_(std::move(event_exporter)),
-      session_controller_(std::move(session_controller)) {
-  event_model_provider_->Initialize(
-      base::BindOnce(&TrackerImpl::OnEventModelInitializationFinished,
+      session_controller_(std::move(session_controller)),
+      event_storage_migration_(std::move(event_storage_migration)),
+      pref_service_(pref_service) {
+  availability_model_->Initialize(
+      base::BindOnce(&TrackerImpl::OnAvailabilityModelInitializationFinished,
                      weak_ptr_factory_.GetWeakPtr()),
       time_provider_->GetCurrentDay());
 
-  availability_model_->Initialize(
-      base::BindOnce(&TrackerImpl::OnAvailabilityModelInitializationFinished,
+  // If the migration is not completed, we need to migrate the data from the
+  // profile db to the device db.
+  if (event_storage_migration_ &&
+      !pref_service_->GetBoolean(
+          kFeatureEngagementProfileToDeviceMigrationCompleted)) {
+    event_storage_migration_->Migrate(
+        base::BindOnce(&TrackerImpl::OnEventStorageMigrationFinished,
+                       weak_ptr_factory_.GetWeakPtr()));
+    return;
+  }
+
+  if (IsOnDeviceStorageEnabled()) {
+    // If the migration was completed, log the status.
+    EventStorageMigration::RecordMigrationStatus(
+        EventStorageMigration::EventStorageMigrationStatus::kNotRequired);
+  }
+
+  event_model_provider_->Initialize(
+      base::BindOnce(&TrackerImpl::OnEventModelInitializationFinished,
                      weak_ptr_factory_.GetWeakPtr()),
       time_provider_->GetCurrentDay());
 }
@@ -549,6 +615,23 @@ void TrackerImpl::OnEventModelInitializationFinished(bool success) {
   } else {
     MaybePostInitializedCallbacks();
   }
+}
+
+void TrackerImpl::OnEventStorageMigrationFinished(bool success) {
+  DVLOG(2) << "Event storage migration result = " << success;
+
+  if (success) {
+    pref_service_->SetBoolean(
+        kFeatureEngagementProfileToDeviceMigrationCompleted, true);
+  }
+
+  // Initialize the event model provider.
+  event_model_provider_->Initialize(
+      base::BindOnce(&TrackerImpl::OnEventModelInitializationFinished,
+                     weak_ptr_factory_.GetWeakPtr()),
+      time_provider_->GetCurrentDay());
+
+  event_storage_migration_ = nullptr;
 }
 
 void TrackerImpl::OnAvailabilityModelInitializationFinished(bool success) {

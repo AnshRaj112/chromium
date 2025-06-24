@@ -267,6 +267,7 @@ FillDataType GetEventTypeFromSingleFieldSuggestionType(SuggestionType type) {
     case SuggestionType::kAccountStoragePasswordEntry:
     case SuggestionType::kAddressEntry:
     case SuggestionType::kAddressEntryOnTyping:
+    case SuggestionType::kAllLoyaltyCardsEntry:
     case SuggestionType::kAllSavedPasswordsEntry:
     case SuggestionType::kManageAddress:
     case SuggestionType::kManageAutofillAi:
@@ -3201,7 +3202,8 @@ std::vector<Suggestion> BrowserAutofillManager::GetAvailableSuggestions(
           } else {
             ExtendEmailSuggestionsWithLoyaltyCardSuggestions(
                 suggestions, *valuables_manager,
-                client().GetLastCommittedPrimaryMainFrameURL());
+                client().GetLastCommittedPrimaryMainFrameURL(),
+                autofill_field->is_autofilled());
           }
         }
       }

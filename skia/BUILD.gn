@@ -50,8 +50,8 @@ rust_static_library("bridge_rust_side") {
   deps = [
     ":path_bridge",
     "//third_party/rust/font_types/v0_9:lib",
-    "//third_party/rust/read_fonts/v0_29:lib",
-    "//third_party/rust/skrifa/v0_31:lib",
+    "//third_party/rust/read_fonts/v0_30:lib",
+    "//third_party/rust/skrifa/v0_32:lib",
   ]
   configs -= [ "//build/config/compiler:chromium_code" ]
   configs += [
@@ -263,7 +263,6 @@ component("skia") {
     "ext/skia_memory_dump_provider.h",
     "ext/skia_trace_memory_dump_impl.h",
     "ext/skia_utils_base.h",
-    "fontations_feature.h",
     "rusty_png_feature.h",
   ]
   sources = [
@@ -295,7 +294,6 @@ component("skia") {
     "ext/skia_memory_dump_provider.cc",
     "ext/skia_trace_memory_dump_impl.cc",
     "ext/skia_utils_base.cc",
-    "fontations_feature.cc",
     "rusty_png_feature.cc",
   ]
   if (is_ios) {
@@ -594,7 +592,8 @@ component("skia") {
     # Blink includes Skia's JPEG encoder and decoder which pdf uses.
     assert(use_blink)
     deps += [
-      "//third_party:freetype_harfbuzz",
+      # Needed for HarfBuzz hb_subet subsetting.
+      "//third_party/harfbuzz-ng",
       "//third_party/zlib",
     ]
     public += skia_pdf_public

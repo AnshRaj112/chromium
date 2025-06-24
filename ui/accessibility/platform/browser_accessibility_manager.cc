@@ -131,7 +131,7 @@ BrowserAccessibilityManager* BrowserAccessibilityManager::FromID(
   // `BrowserAccessibility`) corresponding to each `AXNode` in its managed tree,
   // then we can't cast it to one that does, in this case a
   // `BrowserAccessibilityManager`.
-  if (!manager || !manager->IsPlatformTreeManager()) {
+  if (!manager || !manager->is_platform_tree_manager()) {
     return nullptr;
   }
   return static_cast<BrowserAccessibilityManager*>(manager);
@@ -281,7 +281,7 @@ BrowserAccessibility* BrowserAccessibilityManager::GetFromAXNode(
     // `BrowserAccessibility`) corresponding to each `AXNode` in its managed
     // tree, then we can't cast it to one that does, in this case a
     // `BrowserAccessibilityManager`.
-    if (manager->IsPlatformTreeManager()) {
+    if (manager->is_platform_tree_manager()) {
       return static_cast<const BrowserAccessibilityManager*>(manager)
           ->GetFromID(node->id());
     }
@@ -323,7 +323,7 @@ BrowserAccessibilityManager::GetParentNodeFromParentTreeAsBrowserAccessibility()
   // generated content, which is currently not a platform tree manager. In those
   // cases, we should return nullptr since doing the cast will fail and result
   // in undefined behavior.
-  if (IsRootFrameManager() || !IsPlatformTreeManager()) {
+  if (IsRootFrameManager() || !is_platform_tree_manager()) {
     return nullptr;
   }
   BrowserAccessibilityManager* parent_manager_wrapper =
@@ -1630,8 +1630,8 @@ void BrowserAccessibilityManager::OnNodeReparented(AXTree* tree, AXNode* node) {
 
 void BrowserAccessibilityManager::OnAtomicUpdateStarting(
     AXTree* tree,
-    const std::set<AXNodeID>& deleted_node_ids,
-    const std::set<AXNodeID>& reparented_node_ids) {
+    const absl::flat_hash_set<AXNodeID>& deleted_node_ids,
+    const absl::flat_hash_set<AXNodeID>& reparented_node_ids) {
   for (const auto& id : deleted_node_ids) {
     id_wrapper_map_.erase(id);
     popup_root_ids_.erase(id);
@@ -1903,7 +1903,7 @@ float BrowserAccessibilityManager::GetPageScaleFactor() const {
 void BrowserAccessibilityManager::CollectChangedNodesAndParentsForAtomicUpdate(
     AXTree* tree,
     const std::vector<AXTreeObserver::Change>& changes,
-    std::set<AXPlatformNode*>* nodes_needing_update) {
+    absl::flat_hash_set<AXPlatformNode*>* nodes_needing_update) {
   // The nodes that need to be updated are all of the nodes that were changed,
   // plus some parents.
   for (const auto& change : changes) {

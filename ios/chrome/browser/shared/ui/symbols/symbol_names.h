@@ -102,6 +102,8 @@ extern NSString* const kEllipsisSquareFillSymbol;
 extern NSString* const kMagnifyingglassSparkSymbol;
 extern NSString* const kPasswordManagerTrustedVaultWidgetPromoImage;
 extern NSString* const kPasswordManagerTrustedVaultWidgetPromoDisabledImage;
+extern NSString* const kPhoneSparkleSymbol;
+extern NSString* const kTextSearchSymbol;
 
 // Custom symbol names which can be configured with a color palette. iOS 15+
 // only.
@@ -202,6 +204,7 @@ extern NSString* const kExpandSymbol;
 extern NSString* const kBackSymbol;
 extern NSString* const kForwardSymbol;
 extern NSString* const kPersonFillSymbol;
+extern NSString* const kPersonClockFillSymbol;
 extern NSString* const kMailFillSymbol;
 extern NSString* const kPhoneFillSymbol;
 extern NSString* const kDownloadPromptFillSymbol;

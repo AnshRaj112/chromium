@@ -18,9 +18,11 @@
 #include "chrome/browser/tab_contents/tab_util.h"
 #include "chrome/browser/ui/autofill/autofill_client_provider.h"
 #include "chrome/browser/ui/autofill/autofill_client_provider_factory.h"
+#include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
 #include "chrome/browser/ui/passwords/password_change_ui_controller.h"
+#include "chrome/browser/ui/passwords/ui_utils.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/autofill/core/browser/logging/log_manager.h"
 #include "components/autofill/core/common/form_data.h"
@@ -44,7 +46,9 @@
 
 namespace {
 
-using password_manager::BrowserSavePasswordProgressLogger;
+using ::password_manager::BrowserSavePasswordProgressLogger;
+
+constexpr base::TimeDelta kToastDisplayTime = base::Seconds(8);
 
 void LogPasswordFormDetectedMetric(bool form_detected,
                                    base::TimeDelta time_delta) {
@@ -131,7 +135,8 @@ PasswordChangeDelegateImpl::PasswordChangeDelegateImpl(
       originator_(tab_interface->GetContents()),
       profile_(Profile::FromBrowserContext(originator_->GetBrowserContext())),
       ui_controller_(
-          std::make_unique<PasswordChangeUIController>(this, tab_interface)) {
+          std::make_unique<PasswordChangeUIController>(this, tab_interface)),
+      last_committed_url_(originator_->GetLastCommittedURL()) {
   tab_will_detach_subscription_ = tab_interface->RegisterWillDetach(
       base::BindRepeating(&PasswordChangeDelegateImpl::OnTabWillDetach,
                           weak_ptr_factory_.GetWeakPtr()));
@@ -270,6 +275,20 @@ void PasswordChangeDelegateImpl::OpenPasswordChangeTab() {
   tabs_strip->AppendWebContents(std::move(executor_), /*foreground*/ true);
 }
 
+void PasswordChangeDelegateImpl::OpenPasswordDetails() {
+  CHECK(originator_);
+
+  if (last_committed_url_ == originator_->GetLastCommittedURL()) {
+    ManagePasswordsUIController::FromWebContents(originator_)
+        ->ShowChangePasswordBubble();
+  } else {
+    NavigateToPasswordDetailsPage(
+        chrome::FindBrowserWithTab(originator_),
+        base::UTF16ToUTF8(GetDisplayOrigin()),
+        password_manager::ManagePasswordsReferrer::kPasswordChangeInfoBubble);
+  }
+}
+
 void PasswordChangeDelegateImpl::AddObserver(Observer* observer) {
   observers_.AddObserver(observer);
 }
@@ -314,6 +333,15 @@ void PasswordChangeDelegateImpl::UpdateState(State new_state) {
     logger->LogNumber(
         BrowserSavePasswordProgressLogger::STRING_PASSWORD_CHANGE_STATE_CHANGED,
         static_cast<int>(new_state));
+  }
+
+  // In case the password change was canceled or finished successfully, the flow
+  // and the respective UI should be stopped after a specified timeout.
+  if (current_state_ == State::kCanceled ||
+      current_state_ == State::kPasswordSuccessfullyChanged) {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE, base::BindOnce(&PasswordChangeDelegate::Stop, AsWeakPtr()),
+        kToastDisplayTime);
   }
 }
 

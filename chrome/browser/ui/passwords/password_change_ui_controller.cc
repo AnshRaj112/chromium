@@ -32,14 +32,13 @@
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/bubble/bubble_dialog_model_host.h"
 #include "ui/views/bubble/bubble_frame_view.h"
+#include "ui/views/vector_icons.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_delegate.h"
 
 namespace {
 
 using ToastOptions = PasswordChangeToast::ToastOptions;
-
-constexpr base::TimeDelta kToastDisplayTime = base::Seconds(4);
 
 // Creates dialog offering password change to the user. `with_privacy_notice`
 // specifies whether an additional privacy paragraph should be displayed.
@@ -241,7 +240,7 @@ PasswordChangeUIController::GetDialogOrToastConfiguration(
       return ToastOptions(
           l10n_util::GetStringUTF16(
               IDS_PASSWORD_MANAGER_UI_PASSWORD_CHANGED_TITLE),
-          vector_icons::kPasswordManagerIcon,
+          views::kMenuCheckIcon,
           l10n_util::GetStringUTF16(
               IDS_PASSWORD_MANAGER_UI_VIEW_DETAILS_BUTTON),
           base::BindOnce(&PasswordChangeUIController::ShowPasswordDetails,
@@ -335,28 +334,15 @@ void PasswordChangeUIController::StartPasswordChangeFlow() {
 }
 
 void PasswordChangeUIController::ShowPasswordDetails() {
-  // TODO(crbug.com/338254375): Open password changed successfully bubble when
-  // applicable.
-  NavigateToPasswordDetailsPage(
-      chrome::FindBrowserWithTab(tab_interface_->GetContents()),
-      base::UTF16ToUTF8(password_change_delegate_->GetDisplayOrigin()),
-      password_manager::ManagePasswordsReferrer::kPasswordChangeInfoBubble);
-
   CHECK(password_change_delegate_);
+
+  password_change_delegate_->OpenPasswordDetails();
   password_change_delegate_->Stop();
 }
 
 void PasswordChangeUIController::CancelPasswordChange() {
   CHECK(password_change_delegate_);
   password_change_delegate_->CancelPasswordChangeFlow();
-
-  // Post delayed task to stop password change. This will destroy the
-  // controller.
-  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
-      FROM_HERE,
-      base::BindOnce(&PasswordChangeDelegate::Stop,
-                     password_change_delegate_->AsWeakPtr()),
-      kToastDisplayTime);
 }
 
 void PasswordChangeUIController::NavigateToPasswordChangeSettings() {

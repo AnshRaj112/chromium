@@ -7,6 +7,8 @@
 #import "base/check.h"
 #import "base/functional/callback.h"
 #import "base/functional/callback_helpers.h"
+#import "base/metrics/user_metrics.h"
+#import "base/metrics/user_metrics_action.h"
 #import "base/strings/sys_string_conversions.h"
 #import "components/collaboration/public/collaboration_flow_type.h"
 #import "components/collaboration/public/collaboration_service.h"
@@ -134,6 +136,19 @@ IOSCollaborationControllerDelegate::IOSCollaborationControllerDelegate(
   CHECK(favicon_loader_);
   CHECK(favicons_grid_configurator_);
   CHECK(base_view_controller_);
+  switch (flow_type_) {
+    case FlowType::kJoin:
+      base::RecordAction(base::UserMetricsAction("IOSCollaborationInitJoin"));
+      break;
+    case FlowType::kShareOrManage:
+      base::RecordAction(
+          base::UserMetricsAction("IOSCollaborationInitShareOrManage"));
+      break;
+    case FlowType::kLeaveOrDelete:
+      base::RecordAction(
+          base::UserMetricsAction("IOSCollaborationInitLeaveOrDelete"));
+      break;
+  }
 }
 
 IOSCollaborationControllerDelegate::~IOSCollaborationControllerDelegate() {
@@ -170,10 +185,7 @@ void IOSCollaborationControllerDelegate::ShowError(const ErrorInfo& error,
   NSString* title = base::SysUTF8ToNSString(error.error_header);
   NSString* message = base::SysUTF8ToNSString(error.error_body);
 
-  auto alert_action = base::CallbackToBlock(
-      base::BindOnce(&IOSCollaborationControllerDelegate::ErrorAccepted,
-                     weak_ptr_factory_.GetWeakPtr(), std::move(result)));
-  // Make sure to present it on top of any visible view.
+  // Make sure to present the alert on top of any visible view.
   UIViewController* top_view_controller =
       top_view_controller::TopPresentedViewControllerFrom(
           base_view_controller_);
@@ -183,10 +195,37 @@ void IOSCollaborationControllerDelegate::ShowError(const ErrorInfo& error,
                                                    browser:browser_
                                                      title:title
                                                    message:message];
-  [alert_coordinator_
-      addItemWithTitle:l10n_util::GetNSString(IDS_IOS_SHARED_GROUP_ERROR_GOT_IT)
-                action:alert_action
-                 style:UIAlertActionStyleDefault];
+
+  if (error.type() == ErrorInfo::Type::kUpdateChromeUiForVersionOutOfDate) {
+    auto update_action = base::CallbackToBlock(
+        base::BindOnce(&IOSCollaborationControllerDelegate::Update,
+                       weak_ptr_factory_.GetWeakPtr(), std::move(result)));
+    [alert_coordinator_
+        addItemWithTitle:
+            l10n_util::GetNSString(
+                IDS_COLLABORATION_CHROME_OUT_OF_DATE_ERROR_DIALOG_UPDATE_BUTTON)
+                  action:update_action
+                   style:UIAlertActionStyleDefault];
+
+    auto dismiss_action = base::CallbackToBlock(
+        base::BindOnce(&IOSCollaborationControllerDelegate::ErrorAccepted,
+                       weak_ptr_factory_.GetWeakPtr(), std::move(result)));
+    [alert_coordinator_
+        addItemWithTitle:
+            l10n_util::GetNSString(
+                IDS_COLLABORATION_CHROME_OUT_OF_DATE_ERROR_DIALOG_NOT_NOW_BUTTON)
+                  action:dismiss_action
+                   style:UIAlertActionStyleCancel];
+  } else {
+    auto alert_action = base::CallbackToBlock(
+        base::BindOnce(&IOSCollaborationControllerDelegate::ErrorAccepted,
+                       weak_ptr_factory_.GetWeakPtr(), std::move(result)));
+    [alert_coordinator_ addItemWithTitle:l10n_util::GetNSString(
+                                             IDS_IOS_SHARED_GROUP_ERROR_GOT_IT)
+                                  action:alert_action
+                                   style:UIAlertActionStyleDefault];
+  }
+
   [alert_coordinator_ start];
 }
 
@@ -374,6 +413,8 @@ void IOSCollaborationControllerDelegate::ShowLeaveDialog(
     return;
   }
 
+  base::RecordAction(
+      base::UserMetricsAction("IOSCollaborationShowLeaveDialog"));
   ShowLeaveOrDeleteDialog(either_id, std::move(result));
 }
 
@@ -384,6 +425,8 @@ void IOSCollaborationControllerDelegate::ShowDeleteDialog(
     return;
   }
 
+  base::RecordAction(
+      base::UserMetricsAction("IOSCollaborationShowDeleteDialog"));
   ShowLeaveOrDeleteDialog(either_id, std::move(result));
 }
 
@@ -576,6 +619,14 @@ void IOSCollaborationControllerDelegate::ErrorAccepted(ResultCallback result) {
   std::move(result).Run(CollaborationControllerDelegate::Outcome::kSuccess);
 }
 
+void IOSCollaborationControllerDelegate::Update(ResultCallback result) {
+  CommandDispatcher* dispatcher = browser_->GetCommandDispatcher();
+  id<ApplicationCommands> application_handler =
+      HandlerForProtocol(dispatcher, ApplicationCommands);
+  [application_handler showAppStorePage];
+  std::move(result).Run(CollaborationControllerDelegate::Outcome::kSuccess);
+}
+
 const TabGroup* IOSCollaborationControllerDelegate::GetLocalGroup(
     const tab_groups::EitherGroupID& either_id) {
   if (!tab_group_sync_service_) {
@@ -658,6 +709,7 @@ void IOSCollaborationControllerDelegate::ConfigureAndJoinTabGroup(
     const std::string& group_title,
     ResultCallback result,
     NSArray<ShareKitPreviewItem*>* preview_items) {
+  base::RecordAction(base::UserMetricsAction("IOSCollaborationShowJoinDialog"));
   ShareKitJoinConfiguration* config = [[ShareKitJoinConfiguration alloc] init];
   config.token = token;
   config.baseViewController = base_view_controller_;
@@ -704,6 +756,8 @@ void IOSCollaborationControllerDelegate::ConfigureAndShareTabGroup(
     return;
   }
 
+  base::RecordAction(
+      base::UserMetricsAction("IOSCollaborationShowShareDialog"));
   share_screen_callback_ = std::move(result);
 
   ShareKitShareGroupConfiguration* config =
@@ -743,6 +797,8 @@ void IOSCollaborationControllerDelegate::ConfigureAndManageTabGroup(
     return;
   }
 
+  base::RecordAction(
+      base::UserMetricsAction("IOSCollaborationShowManageDialog"));
   ShareKitManageConfiguration* config =
       [[ShareKitManageConfiguration alloc] init];
   config.baseViewController = base_view_controller_;

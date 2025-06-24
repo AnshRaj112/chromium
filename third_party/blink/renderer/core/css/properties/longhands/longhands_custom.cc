@@ -72,6 +72,7 @@
 #include "third_party/blink/renderer/core/style/reference_offset_path_operation.h"
 #include "third_party/blink/renderer/core/style/shape_clip_path_operation.h"
 #include "third_party/blink/renderer/core/style/shape_offset_path_operation.h"
+#include "third_party/blink/renderer/core/style/style_border_shape.h"
 #include "third_party/blink/renderer/core/style/style_overflow_clip_margin.h"
 #include "third_party/blink/renderer/core/style/style_svg_resource.h"
 #include "third_party/blink/renderer/core/style_property_shorthand.h"
@@ -1841,6 +1842,48 @@ const CSSValue* BorderTopWidth::CSSValueFromComputedStyleInternal(
   return ZoomAdjustedPixelValue(style.BorderTopWidth(), style);
 }
 
+const CSSValue* BorderShape::ParseSingleValue(
+    CSSParserTokenStream& stream,
+    const CSSParserContext& context,
+    const CSSParserLocalContext&) const {
+  if (stream.Peek().GetType() == kIdentToken &&
+      stream.Peek().Id() == CSSValueID::kNone) {
+    return css_parsing_utils::ConsumeIdent(stream);
+  }
+
+  // TODO(nrosenthal) parse the <<geometry-box>>.
+  CSSValue* outer_shape = css_parsing_utils::ConsumeBasicShape(stream, context);
+  if (!outer_shape) {
+    return nullptr;
+  }
+
+  CSSValue* inner_shape = css_parsing_utils::ConsumeBasicShape(stream, context);
+  return inner_shape
+             ? MakeGarbageCollected<CSSValuePair>(
+                   outer_shape, inner_shape, CSSValuePair::kDropIdenticalValues)
+             : outer_shape;
+}
+
+const CSSValue* BorderShape::CSSValueFromComputedStyleInternal(
+    const ComputedStyle& style,
+    const LayoutObject*,
+    bool allow_visited_style,
+    CSSValuePhase value_phase) const {
+  if (!style.HasBorderShape()) {
+    return CSSIdentifierValue::Create(CSSValueID::kNone);
+  }
+  const StyleBorderShape& border_shape = *style.BorderShape();
+  const CSSValue* outer_shape =
+      ValueForBasicShape(style, &border_shape.OuterShape());
+  if (!border_shape.HasSeparateInnerShape()) {
+    return outer_shape;
+  }
+
+  return MakeGarbageCollected<CSSValuePair>(
+      outer_shape, ValueForBasicShape(style, &border_shape.InnerShape()),
+      CSSValuePair::kDropIdenticalValues);
+}
+
 const CSSValue* Bottom::ParseSingleValue(
     CSSParserTokenStream& stream,
     const CSSParserContext& context,
@@ -3136,11 +3179,11 @@ void Content::ApplyValue(StyleResolverState& state,
       builder.SetContent(MakeGarbageCollected<NoneContentData>());
     } else if (identifier_value->GetValueID() ==
                    CSSValueID::kInternalPartialInterestContent &&
-               RuntimeEnabledFeatures::HTMLInterestTargetAttributeEnabled(
+               RuntimeEnabledFeatures::HTMLInterestForAttributeEnabled(
                    state.GetDocument().GetExecutionContext())) {
       String hint_text = state.GetDocument().GetCachedLocale().QueryString(
           IDS_PARTIAL_INTEREST_TARGET_ACTIVATION_HINT,
-          Element::GetPartialInterestTargetActivationHotkey());
+          Element::GetPartialInterestForActivationHotkey());
       auto* content =
           MakeGarbageCollected<TextContentData>(StrCat({"{", hint_text, "}"}));
       auto* alt_content = MakeGarbageCollected<AltTextContentData>(hint_text);
@@ -5182,7 +5225,7 @@ const CSSValue* Height::CSSValueFromComputedStyleInternal(
                                                              style);
 }
 
-const CSSValue* InterestTargetShowDelay::ParseSingleValue(
+const CSSValue* InterestShowDelay::ParseSingleValue(
     CSSParserTokenStream& stream,
     const CSSParserContext& context,
     const CSSParserLocalContext& local_context) const {
@@ -5190,16 +5233,16 @@ const CSSValue* InterestTargetShowDelay::ParseSingleValue(
       stream, context, CSSPrimitiveValue::ValueRange::kNonNegative);
 }
 
-const CSSValue* InterestTargetShowDelay::CSSValueFromComputedStyleInternal(
+const CSSValue* InterestShowDelay::CSSValueFromComputedStyleInternal(
     const ComputedStyle& style,
     const LayoutObject* layout_object,
     bool allow_visited_style,
     CSSValuePhase value_phase) const {
-  return CSSNumericLiteralValue::Create(style.InterestTargetShowDelay(),
+  return CSSNumericLiteralValue::Create(style.InterestShowDelay(),
                                         CSSPrimitiveValue::UnitType::kSeconds);
 }
 
-const CSSValue* InterestTargetHideDelay::ParseSingleValue(
+const CSSValue* InterestHideDelay::ParseSingleValue(
     CSSParserTokenStream& stream,
     const CSSParserContext& context,
     const CSSParserLocalContext& local_context) const {
@@ -5207,12 +5250,12 @@ const CSSValue* InterestTargetHideDelay::ParseSingleValue(
       stream, context, CSSPrimitiveValue::ValueRange::kNonNegative);
 }
 
-const CSSValue* InterestTargetHideDelay::CSSValueFromComputedStyleInternal(
+const CSSValue* InterestHideDelay::CSSValueFromComputedStyleInternal(
     const ComputedStyle& style,
     const LayoutObject* layout_object,
     bool allow_visited_style,
     CSSValuePhase value_phase) const {
-  return CSSNumericLiteralValue::Create(style.InterestTargetHideDelay(),
+  return CSSNumericLiteralValue::Create(style.InterestHideDelay(),
                                         CSSPrimitiveValue::UnitType::kSeconds);
 }
 

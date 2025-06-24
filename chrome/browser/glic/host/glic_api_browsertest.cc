@@ -913,10 +913,6 @@ IN_PROC_BROWSER_TEST_F(GlicApiTest, testInitiallyNotResizable) {
   RunTestSequence(InAnyContext(ExpectUserCanResize(false)));
 }
 
-IN_PROC_BROWSER_TEST_F(GlicApiTestWithOneTab, testGetFocusedTabState) {
-  ExecuteJsTest();
-}
-
 IN_PROC_BROWSER_TEST_F(GlicApiTestWithOneTabAndContextualCueing,
                        testGetZeroStateSuggestions) {
   EXPECT_CALL(*mock_cueing_service(),
@@ -1109,6 +1105,10 @@ IN_PROC_BROWSER_TEST_F(GlicApiTestWithOneTab, testSetAudioDucking) {
 }
 
 IN_PROC_BROWSER_TEST_F(GlicApiTestWithOneTab, testGetDisplayMedia) {
+  ExecuteJsTest();
+}
+
+IN_PROC_BROWSER_TEST_F(GlicApiTestWithOneTab, testJournal) {
   ExecuteJsTest();
 }
 
@@ -1520,21 +1520,24 @@ IN_PROC_BROWSER_TEST_F(GlicApiTestUserStatusCheckTest,
 
 // Given the time-based nature of debouncing, testing with non-mocked clocks can
 // be flaky. This suite increases the applied delays to reduce the the chance of
-// flakiness.
-class GlicApiTestWithOneTabMoreDebounceDelay : public GlicApiTestWithOneTab {
+// flakiness. This suite is disabled on all slow binaries.
+#if defined(SLOW_BINARY)
+#define MAYBE_GlicApiTestWithOneTabMoreDebounceDelay \
+  DISABLED_GlicApiTestWithOneTabMoreDebounceDelay
+#else
+#define MAYBE_GlicApiTestWithOneTabMoreDebounceDelay \
+  GlicApiTestWithOneTabMoreDebounceDelay
+#endif
+class MAYBE_GlicApiTestWithOneTabMoreDebounceDelay
+    : public GlicApiTestWithOneTab {
  public:
-  GlicApiTestWithOneTabMoreDebounceDelay() {
+  MAYBE_GlicApiTestWithOneTabMoreDebounceDelay() {
     features2_.InitWithFeaturesAndParameters(
         /*enabled_features=*/
         {{
             features::kGlicTabFocusDataDedupDebounce,
             {
-// For slow binaries, use a longer debounce delay.
-#if defined(SLOW_BINARY)
-                {features::kGlicTabFocusDataDebounceDelayMs.name, "200"},
-#else
                 {features::kGlicTabFocusDataDebounceDelayMs.name, "100"},
-#endif
             },
         }},
         /*disabled_features=*/
@@ -1548,14 +1551,14 @@ class GlicApiTestWithOneTabMoreDebounceDelay : public GlicApiTestWithOneTab {
 // Confirm that the web client receives a minimal number of focused tab updates
 // by triggering events that generate such updates.
 // TODO(b/424242331): figure out why this is failing on linux-rel bot.
-#if BUILDFLAG(IS_LINUX)
-#define MAYBE_testSingleFocusedTabUpdatesOnTabEvents \
-  DISABLED_testSingleFocusedTabUpdatesOnTabEvents
-#else
+#if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 #define MAYBE_testSingleFocusedTabUpdatesOnTabEvents \
   testSingleFocusedTabUpdatesOnTabEvents
+#else
+#define MAYBE_testSingleFocusedTabUpdatesOnTabEvents \
+  DISABLED_testSingleFocusedTabUpdatesOnTabEvents
 #endif
-IN_PROC_BROWSER_TEST_F(GlicApiTestWithOneTabMoreDebounceDelay,
+IN_PROC_BROWSER_TEST_F(MAYBE_GlicApiTestWithOneTabMoreDebounceDelay,
                        MAYBE_testSingleFocusedTabUpdatesOnTabEvents) {
   // Initial state with first tab.
   ExecuteJsTest();

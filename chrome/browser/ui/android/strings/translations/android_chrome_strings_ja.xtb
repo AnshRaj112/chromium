@@ -74,6 +74,7 @@
 <translation id="1298077576058087471">最大 60% のデータを節約、今日のニュースもチェック</translation>
 <translation id="1303339473099049190">お探しのパスワードが見つかりません。誤字や脱字がないかご確認のうえ、もう一度お試しください。</translation>
 <translation id="1303507811548703290"><ph name="DOMAIN" /> - <ph name="DEVICE_NAME" /> から送信</translation>
+<translation id="1310482092992808703">タブをグループ化</translation>
 <translation id="1318262688555255786">ウェブページ「<ph name="PAGE_TITLE" />」へのリンクを共有します。ソース: <ph name="PAGE_URL" /></translation>
 <translation id="1320912611264252795">ブックマーク保存フロー フォルダが画面全体に表示されています</translation>
 <translation id="1327257854815634930">ナビゲーション履歴が開いています</translation>
@@ -129,7 +130,6 @@ Chrome を使いやすくするためにデータを使用するその他の設�
 <translation id="1521774566618522728">最終同期: 今日</translation>
 <translation id="153446405401665083">Chrome の新しいバージョンをご利用いただけます</translation>
 <translation id="1540012742443808215">現在アドレスバーは上部にあります</translation>
-<translation id="1543379346429265919">{BOOKMARKS_COUNT,plural, =1{1 件のブックマークがこのデバイスのみに保存されています。他のデバイスで使用するには、Google アカウント（<ph name="ACCOUNT_EMAIL" />）に保存してください。}other{# 件のブックマークがこのデバイスのみに保存されています。他のデバイスで使用するには、Google アカウント（<ph name="ACCOUNT_EMAIL" />）に保存してください。}}</translation>
 <translation id="1544084554881119930">お支払い方法と住所は暗号化されません。また、Chrome の閲覧履歴は同期されません。
 パスフレーズを知っているユーザーだけが暗号化されたデータを見ることができます。パスフレーズは Google には送信されず、保存されることもありません。パスフレーズを忘れた場合や、この設定を変更する場合は、<ph name="BEGIN_LINK" />アカウントの Chrome データを消去<ph name="END_LINK" />してください。</translation>
 <translation id="1544826120773021464">Google アカウントを管理するには、[アカウントを管理] をタップします。</translation>
@@ -144,7 +144,6 @@ Chrome を使いやすくするためにデータを使用するその他の設�
 <translation id="1598163867407640634"><ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> を使用して <ph name="SITE_ETLD_PLUS_ONE" /> を利用</translation>
 <translation id="160275202205869636">オンにすると、Google アカウントのデータが使用、保存されます。オフにすると、データはこのデバイスのみに保存されます。</translation>
 <translation id="1628019612362412531">{NUM_SELECTED,plural, =1{選択された 1 件のアイテムを削除します}other{選択された # 件のアイテムを削除します}}</translation>
-<translation id="163206315857427258">{BOOKMARKS_COUNT,plural, =1{1 件のブックマークとその他の項目がこのデバイスのみに保存されています。他のデバイスで使用するには、Google アカウント（<ph name="ACCOUNT_EMAIL" />）に保存してください。}other{# 件のブックマークとその他の項目がこのデバイスのみに保存されています。他のデバイスで使用するには、Google アカウント（<ph name="ACCOUNT_EMAIL" />）に保存してください。}}</translation>
 <translation id="1639239467298939599">読み込んでいます</translation>
 <translation id="1641113438599504367">セーフ ブラウジング</translation>
 <translation id="164269334534774161">このページの <ph name="CREATION_TIME" /> のオフライン コピーを表示しています</translation>
@@ -477,7 +476,6 @@ Chrome を使いやすくするためにデータを使用するその他の設�
 <translation id="316694332262407393">Chrome はここですでに実行中です。</translation>
 <translation id="3167258285411721858"><ph name="HOST_NAME" /> のモバイルサイトをリクエストできます</translation>
 <translation id="3169472444629675720">Discover</translation>
-<translation id="3172472771272043251">{PASSWORDS_COUNT,plural, =1{1 件のパスワードとその他のアイテムがこのデバイスのみに保存されています。他のデバイスで使用するには、Google アカウント（<ph name="ACCOUNT_EMAIL" />）に保存してください。}other{# 件のパスワードとその他のアイテムがこのデバイスのみに保存されています。他のデバイスで使用するには、Google アカウント（<ph name="ACCOUNT_EMAIL" />）に保存してください。}}</translation>
 <translation id="3187472288455401631">広告の測定</translation>
 <translation id="3189635831478931757"><ph name="GROUP_TITLE" /> タブグループ</translation>
 <translation id="3200536777393523575">現在のウィンドウを閉じますか？</translation>
@@ -898,7 +896,6 @@ Chrome を使いやすくするためにデータを使用するその他の設�
 <translation id="506254248375231072">タブはありません</translation>
 <translation id="5062960805900435602">パスワードの統合に関するお知らせが閉じられています</translation>
 <translation id="5075939510584558547">暗号化せずに保存</translation>
-<translation id="5082172173036123513">6 か月間使用しなかったウィンドウは、完全に削除されます。</translation>
 <translation id="5085038751173179818">このサイトと Chrome にログインすると、すべてのデバイスで同じブックマークやその他の設定を使用できます</translation>
 <translation id="5091199029769593641">まもなく、新しいタブを開くと、<ph name="SITE_NAME" /> のストーリーが表示されるようになります。フォローしたサイトは Google アカウントに保存され、Discover の設定で管理できます。</translation>
 <translation id="509429900233858213">エラーが発生しました。</translation>
@@ -1161,7 +1158,6 @@ Chrome を使いやすくするためにデータを使用するその他の設�
 たとえば一部のウェブサイトでは、このリクエストに対して、ユーザーが過去にアクセスしたウェブサイトとは関係のない広告が表示されます。トラッキングを拒否しても、実際のところ多くのウェブサイトではユーザーの閲覧データが収集され利用されています。その用途としては、セキュリティの強化や、コンテンツ、サービス、広告、おすすめの表示、レポート統計情報の作成などが挙げられます。</translation>
 <translation id="6247557882553405851">Google パスワード マネージャー</translation>
 <translation id="6251449557817521191">Chrome 履歴がここに表示されます</translation>
-<translation id="6253680439349691381">{ITEMS_COUNT,plural, =1{1 件のアイテムがこのデバイスのみに保存されています。他のデバイスで使用するには、Google アカウント（<ph name="ACCOUNT_EMAIL" />）に保存してください。}other{# 件のアイテムがこのデバイスのみに保存されています。他のデバイスで使用するには、Google アカウント（<ph name="ACCOUNT_EMAIL" />）に保存してください。}}</translation>
 <translation id="6254139308321626268">PDF ファイルを表示しています</translation>
 <translation id="6255809143828972562">Chrome のツールを使って、自分で管理しながら安全にブラウジングできます</translation>
 <translation id="6264376385120300461">ダウンロードを続行</translation>
@@ -1427,7 +1423,6 @@ Chrome を使いやすくするためにデータを使用するその他の設�
 <translation id="7293429513719260019">言語を選択</translation>
 <translation id="729975465115245577">お使いのデバイスにはパスワード ファイルを保存するためのアプリがインストールされていません。</translation>
 <translation id="7304072650267745798">お使いの Android デバイスにも、同様の設定が含まれていることがあります。Chrome と Android デバイスでこの設定が有効になっている場合、ユーザーが利用するウェブサイトやアプリ間で広告の効果が測定される可能性があります。</translation>
-<translation id="7304806746406660416">{PASSWORDS_COUNT,plural, =1{1 件のパスワードがこのデバイスのみに保存されています。他のデバイスで使用するには、Google アカウント（<ph name="ACCOUNT_EMAIL" />）に保存してください。}other{# 件のパスワードがこのデバイスのみに保存されています。他のデバイスで使用するには、Google アカウント（<ph name="ACCOUNT_EMAIL" />）に保存してください。}}</translation>
 <translation id="7304873321153398381">オフラインです。Chrome でパスワードを確認できません。</translation>
 <translation id="7313188324932846546">タップして同期を設定する</translation>
 <translation id="7314734791127433392">パスワードを確認できません</translation>
@@ -1641,7 +1636,6 @@ Chrome を使いやすくするためにデータを使用するその他の設�
 <translation id="813082847718468539">サイト情報を表示</translation>
 <translation id="8135406045838672858">ダウンロードした PDF を <ph name="APP_NAME" /> で自動的に開きます</translation>
 <translation id="8137562778192957619">このパスワードを覚えておく必要はありません。パスワードは Google パスワード マネージャーに保存されます。</translation>
-<translation id="8146563639948412265">同時に開くことができるウィンドウは最大 <ph name="MAX_WINDOW_COUNT" /> 個です。ウィンドウを復元するには、アクティブなウィンドウまたはアクティブでないウィンドウを <ph name="WINDOW_COUNT" /> 個閉じてください。</translation>
 <translation id="8152331954420209374">レンズに移動</translation>
 <translation id="8163820386638255770">Google アカウントでパスワードを使用、保存するには、本人確認を行ってください</translation>
 <translation id="8186512483418048923">残り <ph name="FILES" /> ファイル</translation>
@@ -1882,7 +1876,6 @@ Chrome を使いやすくするためにデータを使用するその他の設�
 <translation id="9169507124922466868">ナビゲーション履歴が半分開いています</translation>
 <translation id="918419812064856259">Chrome Beta</translation>
 <translation id="9190276265094487094">同期しているすべてのデバイスから履歴にアクセスして、作業の続きを行うことができます</translation>
-<translation id="9191906083913361689">これらのアイテムは、ブックマーク、リーディング リスト、またはパスワード マネージャーで表示、管理することもできます</translation>
 <translation id="9199368092038462496">{NUM_MINS,plural, =1{前回の確認: 1 分前}other{前回の確認: # 分前}}</translation>
 <translation id="9204021776105550328">削除しています</translation>
 <translation id="9204836675896933765">残り 1 ファイル</translation>

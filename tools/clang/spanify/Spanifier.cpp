@@ -1103,15 +1103,17 @@ static void AdaptBinaryPlusEqOperation(const MatchFinder::MatchResult& result) {
 static void DecaySpanToBooleanOp(const MatchFinder::MatchResult& result) {
   const clang::SourceManager& source_manager = *result.SourceManager;
   const std::string& key = GetRHS(result);
-  const auto* operand =
-      result.Nodes.getNodeAs<clang::Expr>("boolean_op_operand");
 
   if (const auto* logical_not_op =
           result.Nodes.getNodeAs<clang::UnaryOperator>("logical_not_op")) {
+    const clang::SourceRange logical_not_range{
+        logical_not_op->getBeginLoc(),
+        logical_not_op->getBeginLoc().getLocWithOffset(1)};
     EmitReplacement(
-        key, GetReplacementDirective(logical_not_op->getSourceRange(), "",
-                                     source_manager));
+        key, GetReplacementDirective(logical_not_range, "", source_manager));
   } else {
+    const auto* operand =
+        result.Nodes.getNodeAs<clang::Expr>("boolean_op_operand");
     EmitReplacement(key, GetReplacementDirective(operand->getBeginLoc(), "!",
                                                  source_manager));
   }
@@ -1300,15 +1302,13 @@ void EmitContainerPointerRewrites(const MatchFinder::MatchResult& result,
 static void EmitSingleVariableSpan(const std::string& key,
                                    const MatchFinder::MatchResult& result) {
   const clang::SourceManager& source_manager = *result.SourceManager;
-  const clang::ASTContext& ast_context = *result.Context;
-  const auto& lang_opts = ast_context.getLangOpts();
+  const auto& lang_opts = result.Context->getLangOpts();
 
-  const auto* expr = result.Nodes.getNodeAs<clang::Expr>("address_expr");
-  const auto* operand_decl = result.Nodes.getNodeAs<clang::DeclaratorDecl>(
-      "address_expr_operand_decl");
+  const auto* expr =
+      result.Nodes.getNodeAs<clang::UnaryOperator>("address_expr");
   const auto* operand_expr =
       result.Nodes.getNodeAs<clang::Expr>("address_expr_operand");
-  if (!expr || !operand_decl || !operand_expr) {
+  if (!expr || !operand_expr) {
     llvm::errs()
         << "\n"
            "Error: EmitSingleVariableSpan() encountered an unexpected match.\n";
@@ -1316,16 +1316,19 @@ static void EmitSingleVariableSpan(const std::string& key,
     assert(false && "Unexpected match in EmitSingleVariableSpan()");
   }
 
-  clang::SourceRange expr_range = {expr->getBeginLoc()};
-  std::string type = GetTypeAsString(operand_decl->getType(), ast_context);
-  std::string replacement_text = llvm::formatv("base::span<{0}, 1>(", type);
-  EmitReplacement(
-      key, GetReplacementDirective(expr_range, replacement_text, source_manager,
-                                   kEmitSingleVariableSpanPrecedence));
+  // This range is just one character, covering the '&' symbol.
+  clang::SourceLocation ampersand_loc = expr->getOperatorLoc();
+  clang::SourceRange ampersand_range = {
+      ampersand_loc, clang::Lexer::getLocForEndOfToken(
+                         ampersand_loc, 0u, source_manager, lang_opts)};
+
+  EmitReplacement(key, GetReplacementDirective(
+                           ampersand_range, "base::span_from_ref(",
+                           source_manager, kEmitSingleVariableSpanPrecedence));
   EmitReplacement(
       key, GetReplacementDirective(
                getExprRange(operand_expr, source_manager, lang_opts).getEnd(),
-               ", 1u)", source_manager, -kEmitSingleVariableSpanPrecedence));
+               ")", source_manager, -kEmitSingleVariableSpanPrecedence));
 }
 
 // Rewrites unsafe third-party member function calls to helper macro calls.
@@ -1563,15 +1566,15 @@ void RewriteUnaryOperation(const MatchFinder::MatchResult& result) {
   clang::SourceRange end_replacement_range;
 
   if (is_prefix) {
-    begin_insert_text = "base::preIncrementSpan(";
-    // Replace the '++' with "base::preIncrementSpan(".
+    begin_insert_text = "base::PreIncrementSpan(";
+    // Replace the '++' with "base::PreIncrementSpan(".
     begin_replacement_range = op_token_range;
     // Insert ")" at the end of the operand.
     end_replacement_range =
         clang::SourceRange(operand_range.getEnd(), operand_range.getEnd());
   } else {
-    begin_insert_text = "base::postIncrementSpan(";
-    // Insert "base::postIncrementSpan(" at the beginning of the operand.
+    begin_insert_text = "base::PostIncrementSpan(";
+    // Insert "base::PostIncrementSpan(" at the beginning of the operand.
     begin_replacement_range =
         clang::SourceRange(operand_range.getBegin(), operand_range.getBegin());
     // Replace "++"" with ")".
@@ -2263,7 +2266,8 @@ std::string getNodeFromArrayDecl(const clang::TypeLoc* type_loc,
   std::string additional_replacement;
   if (init_string_literal) {
     assert(original_element_type->isAnyCharacterType());
-    if (original_element_type.isConstant(ast_context)) {
+    if (original_element_type.isConstant(ast_context) ||
+        IsConstexpr(array_decl)) {
       replacement_text = llvm::formatv(
           "{0} {1}", GetStringViewType(new_element_type, ast_context),
           array_variable_as_string);
@@ -2836,19 +2840,24 @@ class Spanifier {
             has(memberExpr().bind("data_member_expr")))
             .bind("member_data_call");
 
-    // Matchers |&var| where |var| is a local variable, a parameter or member
-    // field. Doesn't match when |var| is a function.
+    auto has_std_array_type = hasType(hasCanonicalType(hasDeclaration(
+        classTemplateSpecializationDecl(hasName("::std::array")))));
+
+    // Array excluded because it might be used as a buffer with >1 size.
+    auto single_var_span_exclusions =
+        unless(anyOf(exclusions, hasType(arrayType()), hasType(functionType()),
+                     has_std_array_type));
+
+    // Matches |&var| where |var| is a local variable, a parameter or member
+    // field. Doesn't match when |var| is a function or an array.
     auto buff_address_from_single_var =
         unaryOperator(
             hasOperatorName("&"),
             hasUnaryOperand(anyOf(
-                declRefExpr(to(anyOf(varDecl(unless(exclusions))
-                                         .bind("address_expr_operand_decl"),
-                                     parmVarDecl(unless(exclusions))
-                                         .bind("address_expr_operand_decl"))))
+                declRefExpr(to(anyOf(varDecl(single_var_span_exclusions),
+                                     parmVarDecl(single_var_span_exclusions))))
                     .bind("address_expr_operand"),
-                memberExpr(member(fieldDecl(unless(exclusions))
-                                      .bind("address_expr_operand_decl")))
+                memberExpr(member(fieldDecl(single_var_span_exclusions)))
                     .bind("address_expr_operand"))))
             .bind("address_expr");
 
@@ -2966,7 +2975,8 @@ class Spanifier {
                  // Unsafe pointer arithmetic:
                  binaryOperation(
                      anyOf(hasOperatorName("+="), hasOperatorName("+")),
-                     hasLHS(lhs_expr_variations)),
+                     hasLHS(lhs_expr_variations),
+                     hasRHS(expr(hasType(isInteger())))),
                  unaryOperator(hasOperatorName("++"),
                                hasUnaryOperand(lhs_expr_variations)),
                  // Unsafe base::raw_ptr arithmetic:
@@ -2996,15 +3006,6 @@ class Spanifier {
             .bind("deref_expr"));
     Match(deref_expression, DecaySpanToPointer);
 
-    auto rhs_exprs_without_size_nodes_ignoring_non_spelled_nodes =
-        traverse(clang::TK_IgnoreUnlessSpelledInSource,
-                 expr(rhs_exprs_without_size_nodes));
-    auto raw_ptr_op_bool = cxxMemberCallExpr(
-        on(expr().bind("boolean_op_operand")),
-        callee(cxxMethodDecl(hasName("operator bool"),
-                             ofClass(hasName("raw_ptr")))),
-        has(memberExpr(has(expr(ignoringParenCasts(
-            rhs_exprs_without_size_nodes_ignoring_non_spelled_nodes))))));
     // Handles boolean operations that need to be adapted after a span rewrite.
     //   if(expr) => if(!expr.empty())
     //   if(!expr) => if(expr.empty())
@@ -3015,17 +3016,21 @@ class Spanifier {
     // `clang::TK_IgnoreUnlessSpelledInSource`, while very useful in simplifying
     // the matchers, wouldn't detect boolean operations on pointers hence the
     // need for a hybrid traversal mode in this matcher.
-    auto boolean_op = expr(
-        anyOf(
-            implicitCastExpr(
-                hasCastKind(clang::CastKind::CK_PointerToBoolean),
-                hasSourceExpression(
-                    expr(
-                        rhs_exprs_without_size_nodes_ignoring_non_spelled_nodes)
-                        .bind("boolean_op_operand"))),
-            raw_ptr_op_bool),
-        optionally(hasParent(
-            unaryOperator(hasOperatorName("!")).bind("logical_not_op"))));
+    auto boolean_op_operand =
+        traverse(clang::TK_IgnoreUnlessSpelledInSource,
+                 expr(rhs_exprs_without_size_nodes).bind("boolean_op_operand"));
+    auto raw_ptr_op_bool_call_expr =
+        cxxMemberCallExpr(on(boolean_op_operand),
+                          callee(cxxMethodDecl(hasName("operator bool"),
+                                               ofClass(hasName("raw_ptr")))));
+    auto boolean_op = traverse(
+        clang::TK_AsIs,
+        expr(anyOf(implicitCastExpr(
+                       hasCastKind(clang::CastKind::CK_PointerToBoolean),
+                       hasSourceExpression(boolean_op_operand)),
+                   implicitCastExpr(has(raw_ptr_op_bool_call_expr))),
+             optionally(hasParent(
+                 unaryOperator(hasOperatorName("!")).bind("logical_not_op")))));
     Match(boolean_op, DecaySpanToBooleanOp);
 
     // This is needed to remove the `.get()` call on raw_ptr from rewritten

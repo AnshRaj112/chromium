@@ -22,6 +22,7 @@
 #include "cc/animation/animation_timeline.h"
 #include "cc/animation/keyframe_effect.h"
 #include "cc/debug/rendering_stats_instrumentation.h"
+#include "cc/input/browser_controls_offset_manager.h"
 #include "cc/layers/layer_impl.h"
 #include "cc/layers/mirror_layer_impl.h"
 #include "cc/layers/nine_patch_layer_impl.h"
@@ -679,6 +680,8 @@ void UpdateTileDisplayLayerExtra(const mojom::TileDisplayLayerExtraPtr& extra,
                                  cc::TileDisplayLayerImpl& layer) {
   layer.SetSolidColor(extra->solid_color);
   layer.SetIsBackdropFilterMask(extra->is_backdrop_filter_mask);
+  layer.SetIsDirectlyCompositedImage(extra->is_directly_composited_image);
+  layer.SetNearestNeighbor(extra->nearest_neighbor);
 }
 
 base::expected<void, std::string> UpdateLayer(const mojom::Layer& wire,
@@ -1780,6 +1783,7 @@ base::expected<void, std::string> LayerContextImpl::DoUpdateDisplayTree(
   if (layers.elastic_overscroll()->SetCurrent(update->elastic_overscroll)) {
     layers.set_needs_update_draw_properties();
   }
+  layers.SetBrowserControlsParams(update->browser_controls_params);
   layers.set_display_transform_hint(update->display_transform_hint);
   layers.SetMaxSafeAreaInsetBottom(update->max_safe_area_inset_bottom);
   layers.set_painted_device_scale_factor(update->painted_device_scale_factor);
@@ -1787,6 +1791,15 @@ base::expected<void, std::string> LayerContextImpl::DoUpdateDisplayTree(
   if (update->local_surface_id_from_parent) {
     layers.SetLocalSurfaceIdFromParent(*update->local_surface_id_from_parent);
   }
+
+  if (!(update->top_controls_shown_ratio >= 0 &&
+        update->top_controls_shown_ratio <= 1 &&
+        update->bottom_controls_shown_ratio >= 0 &&
+        update->bottom_controls_shown_ratio <= 1)) {
+    return base::unexpected("Invalid top/bottom controls shown ratios");
+  }
+  host_impl_->SetCurrentBrowserControlsShownRatio(
+      update->top_controls_shown_ratio, update->bottom_controls_shown_ratio);
 
   host_impl_->SetViewportDamage(update->viewport_damage_rect);
 

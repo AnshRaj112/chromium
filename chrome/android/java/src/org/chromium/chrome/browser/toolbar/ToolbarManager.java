@@ -243,7 +243,7 @@ public class ToolbarManager
     private final ObservableSupplierImpl<Boolean> mHomepageNonNtpSupplier =
             new ObservableSupplierImpl<>();
     private final ObservableSupplier<Boolean> mOmniboxFocusStateSupplier;
-    private final ObservableSupplierImpl<Boolean> mIsNtpShowingSupplier =
+    private final ObservableSupplierImpl<Boolean> mIsNtpWithFakeboxShowingSupplier =
             new ObservableSupplierImpl<>();
     private final ObservableSupplierImpl<Boolean> mFindInPageShowingSupplier =
             new ObservableSupplierImpl<>(false);
@@ -374,7 +374,7 @@ public class ToolbarManager
     private final FormFieldFocusedSupplier mFormFieldFocusedSupplier =
             new FormFieldFocusedSupplier();
     private final View mProgressBarContainer;
-    private @Nullable ObservableSupplier<Integer> mBookmarkBarHeightSupplier;
+    private @Nullable Supplier<Integer> mBookmarkBarHeightSupplier;
     private boolean mInTabSwitcherTransition;
     private final boolean mIsNewTabPageCustomizationToolbarButtonEnabled;
 
@@ -1742,7 +1742,9 @@ public class ToolbarManager
             return;
         }
 
-        mIsNtpShowingSupplier.set(getNewTabPageForCurrentTab() != null);
+        mIsNtpWithFakeboxShowingSupplier.set(
+                getNewTabPageForCurrentTab() != null
+                        && getNewTabPageForCurrentTab().isLocationBarShownInNtp());
         mIsTabSwitcherFinishedShowingSupplier.set(
                 mLayoutStateProvider != null
                         ? mLayoutStateProvider.getActiveLayoutType() == LayoutType.TAB_SWITCHER
@@ -1759,7 +1761,7 @@ public class ToolbarManager
                 new ToolbarPositionController(
                         mBrowserControlsSizer,
                         ContextUtils.getAppSharedPreferences(),
-                        mIsNtpShowingSupplier,
+                        mIsNtpWithFakeboxShowingSupplier,
                         mIsTabSwitcherFinishedShowingSupplier,
                         mOmniboxFocusStateSupplier,
                         mFormFieldFocusedSupplier,
@@ -2986,9 +2988,10 @@ public class ToolbarManager
     private void checkIfNtpShowingWithNoPendingLoad() {
         boolean isNtpUrl = UrlUtilities.isNtpUrl(mLocationBarModel.getCurrentGurl());
         if (isNtpUrl && getNewTabPageForCurrentTab() != null) {
-            mIsNtpShowingSupplier.set(true);
+            mIsNtpWithFakeboxShowingSupplier.set(
+                    getNewTabPageForCurrentTab().isLocationBarShownInNtp());
         } else {
-            mIsNtpShowingSupplier.set(false);
+            mIsNtpWithFakeboxShowingSupplier.set(false);
             maybeShowBottomToolbarIph();
         }
     }
@@ -3216,12 +3219,12 @@ public class ToolbarManager
     }
 
     /**
-     * Sets the supplier which provides the current height of the bookmark bar.
+     * Sets a Supplier which provides the current height of the bookmark bar when read.
      *
-     * @param bookmarkBarHeightSupplier the supplier which provides the current height.
+     * @param bookmarkBarHeightSupplier the Supplier to fetch the current height.
      */
     public void setBookmarkBarHeightSupplier(
-            @Nullable ObservableSupplier<Integer> bookmarkBarHeightSupplier) {
+            @Nullable Supplier<Integer> bookmarkBarHeightSupplier) {
         mBookmarkBarHeightSupplier = bookmarkBarHeightSupplier;
     }
 

@@ -27,14 +27,17 @@ namespace {
 using google::protobuf::Descriptor;
 using google::protobuf::FieldDescriptor;
 using google::protobuf::FileDescriptor;
+using google::protobuf::OneofDescriptor;
 using google::protobuf::compiler::GeneratorContext;
+using google::protobuf::compiler::cpp::UnderscoresToCamelCase;
 using google::protobuf::io::Printer;
 using google::protobuf::io::ZeroCopyOutputStream;
 
 struct ProtoExtrasGeneratorOptions {
-  bool generate_to_value_serialization;
-  bool generate_stream_operator;
-  bool protobuf_full_support;
+  bool generate_to_value_serialization = false;
+  bool generate_stream_operator = false;
+  bool generate_equality = false;
+  bool protobuf_full_support = false;
 };
 
 void FieldToValueFunction(const FieldDescriptor& field, Printer* printer) {
@@ -79,7 +82,7 @@ void FieldToValueFunction(const FieldDescriptor& field, Printer* printer) {
   printer->Print(conversion_function());
 }
 
-void CreateSerializationDefinitions(
+void CreateToValueSerializationDefinitions(
     const Descriptor& message,
     Printer* printer,
     const ProtoExtrasGeneratorOptions& options) {
@@ -135,11 +138,132 @@ void CreateSerializationDefinitions(
       R"(
 base::DictValue Serialize(const $message_type$& message) {
   base::DictValue dict;
-  if (!message.unknown_fields().empty()) {
-    ::proto_extras::SerializeUnknownFields(message, dict);
-  }
+  // For MessageLite, unknown_fields() returns std::string.
+  // For Message, unknown_fields() returns UnknownFieldSet.
+  // The appropriate SerializeUnknownFields overload will be called.
+  ::proto_extras::SerializeUnknownFields(message, dict);
   $serialize_fields$
   return dict;
+}
+)");
+}
+
+void CreateOstreamDefinition(const Descriptor& message,
+                             Printer* printer,
+                             const ProtoExtrasGeneratorOptions& options) {
+  std::string message_type =
+      google::protobuf::compiler::cpp::ClassName(&message);
+  printer->Emit({{"message_type", message_type}},
+                R"(
+std::ostream& operator<<(std::ostream& out, const $message_type$& message) {
+  // This relies on Serialize() from *.to_value.h.
+  return out << Serialize(message).DebugString();
+}
+)");
+}
+
+void CreateEqualityOperatorDefinition(
+    const Descriptor& message,
+    Printer* printer,
+    const ProtoExtrasGeneratorOptions& options) {
+  std::string message_type =
+      google::protobuf::compiler::cpp::ClassName(&message);
+  printer->Emit(
+      {{"message_type", message_type},
+       {"compare_fields",
+        [&]() {
+          // If protobuf_full_support is enabled, use MessageDifferencerEquals
+          // to compare the messages as the messages should be full Message
+          // types.
+          if (options.protobuf_full_support) {
+            printer->Print(
+                "if (!::proto_extras::MessageDifferencerEquals(lhs, rhs)) "
+                "return false;\n");
+            return;
+          }
+          printer->Print(
+              "if (lhs.unknown_fields() != rhs.unknown_fields()) return "
+              "false;\n");
+
+          // Compare oneof fields using a switch statement.
+          for (int i = 0; i < message.oneof_decl_count(); ++i) {
+            const OneofDescriptor* oneof = message.oneof_decl(i);
+            printer->Emit(
+                {{"oneof_name", oneof->name()},
+                 {"message_type", message_type},
+                 {"captital_oneof_name", base::ToUpperASCII(oneof->name())},
+                 {"body",
+                  [&]() {
+                    for (int j = 0; j < oneof->field_count(); ++j) {
+                      const FieldDescriptor* field = oneof->field(j);
+                      std::string field_name(field->lowercase_name());
+                      std::string case_name = UnderscoresToCamelCase(
+                          field->lowercase_name(), /*cap_next_letter=*/true);
+
+                      printer->Emit(
+                          {
+                              {"message_type", message_type},
+                              {"case_name", case_name},
+                              {"field_name", field_name},
+                          },
+                          R"(
+          case $message_type$::k$case_name$:
+            if (lhs.$field_name$() != rhs.$field_name$()) return false;
+            break;
+      )");
+                    }
+                  }}},
+                R"(
+  if (lhs.$oneof_name$_case() != rhs.$oneof_name$_case()) return false;
+  switch (lhs.$oneof_name$_case()) {
+    $body$
+    case $message_type$::$captital_oneof_name$_NOT_SET:
+      break;
+  }
+)");
+          }
+
+          // Compare non-oneof fields.
+          for (int j = 0; j < message.field_count(); j++) {
+            const FieldDescriptor& field = *message.field(j);
+            // Skip fields that are part of a oneof, as they are handled above.
+            if (field.containing_oneof()) {
+              continue;
+            }
+
+            std::string field_name(field.lowercase_name());
+
+            if (field.is_repeated()) {
+              printer->Emit({{"field_name", field_name}},
+                            R"(
+  if (lhs.$field_name$().size() != rhs.$field_name$().size()) return false;
+  for (int i = 0; i < lhs.$field_name$().size(); ++i) {
+    if (lhs.$field_name$()[i] != rhs.$field_name$()[i]) return false;
+  }
+)");
+            } else if (field.has_presence()) {
+              printer->Emit({{"field_name", field_name}},
+                            R"(
+  if (lhs.has_$field_name$() != rhs.has_$field_name$()) return false;
+  if (lhs.has_$field_name$() && lhs.$field_name$() != rhs.$field_name$()) return false;
+)");
+            } else {
+              printer->Emit({{"field_name", field_name}},
+                            R"(
+  if (lhs.$field_name$() != rhs.$field_name$()) return false;
+)");
+            }
+          }
+        }}},
+      R"(
+bool operator==(const $message_type$& lhs, const $message_type$& rhs) {
+  if (&lhs == &rhs) return true;
+  $compare_fields$
+  return true;
+}
+
+bool operator!=(const $message_type$& lhs, const $message_type$& rhs) {
+  return !(lhs == rhs);
 }
 )");
 }
@@ -150,27 +274,42 @@ class ProtoExtrasGenerator : public google::protobuf::compiler::CodeGenerator {
   ~ProtoExtrasGenerator() override = default;
 
   bool Generate(const FileDescriptor* file,
-                const std::string& options,  // Options from build system
+                const std::string& command_line_options,
                 GeneratorContext* context,
                 std::string* error) const override {
     CHECK(file);
 
     ProtoExtrasGeneratorOptions generator_options{
-        .generate_to_value_serialization =
-            !base::Contains(options, "omit_to_value_serialization"),
+        .generate_to_value_serialization = base::Contains(
+            command_line_options, "generate_to_value_serialization"),
         .generate_stream_operator =
-            !base::Contains(options, "omit_stream_operators"),
+            base::Contains(command_line_options, "generate_stream_operator"),
+        .generate_equality =
+            base::Contains(command_line_options, "generate_equality"),
         .protobuf_full_support =
-            base::Contains(options, "protobuf_full_support"),
+            base::Contains(command_line_options, "protobuf_full_support"),
     };
-    CHECK(generator_options.generate_to_value_serialization ||
+    // The current design of this library assumes that only one of the
+    // serialization options is enabled.
+    CHECK(generator_options.generate_to_value_serialization ^
+          generator_options.generate_equality ^
           generator_options.generate_stream_operator);
 
     base::FilePath proto_file_path = base::FilePath::FromASCII(file->name());
+    base::FilePath::StringType file_suffix;
+    if (generator_options.generate_to_value_serialization) {
+      file_suffix = FILE_PATH_LITERAL(".to_value");
+    } else if (generator_options.generate_stream_operator) {
+      file_suffix = FILE_PATH_LITERAL(".ostream");
+    } else {
+      CHECK(generator_options.generate_equality);
+      file_suffix = FILE_PATH_LITERAL(".equal");
+    }
+
     base::FilePath h_file_path =
-        proto_file_path.ReplaceExtension(FILE_PATH_LITERAL("extras.h"));
-    base::FilePath cc_file_path =
-        proto_file_path.ReplaceExtension(FILE_PATH_LITERAL("extras.cc"));
+        proto_file_path.ReplaceExtension(file_suffix + FILE_PATH_LITERAL(".h"));
+    base::FilePath cc_file_path = proto_file_path.ReplaceExtension(
+        file_suffix + FILE_PATH_LITERAL(".cc"));
 
     const std::unique_ptr<ZeroCopyOutputStream> h_stream(
         context->Open(h_file_path.AsUTF8Unsafe()));
@@ -209,7 +348,7 @@ class ProtoExtrasGenerator : public google::protobuf::compiler::CodeGenerator {
                }
              }},
         },
-        R"(// Generated by the proto_to_extras plugin.  DO NOT EDIT!
+        R"(// Generated by the proto_extras plugin. DO NOT EDIT!
 // source: $proto_file_path$
 
 #ifndef $include_guard$
@@ -228,7 +367,6 @@ $function_declarations$
 
     // Determine the #includes for the implementation file.
     std::set<std::string> impl_system_includes;
-    // Always have the header and pb.h for the message.
     std::set<std::string> impl_user_includes = {
         h_file_path.AsUTF8Unsafe(),
         proto_file_path.ReplaceExtension(FILE_PATH_LITERAL("pb.h"))
@@ -236,6 +374,10 @@ $function_declarations$
     };
     if (generator_options.generate_stream_operator) {
       impl_system_includes.insert("<ostream>");
+      impl_user_includes.insert(
+          {proto_file_path.ReplaceExtension(FILE_PATH_LITERAL("to_value.h"))
+               .AsUTF8Unsafe(),
+           "base/values.h"});
     }
     if (generator_options.generate_to_value_serialization) {
       impl_user_includes.insert({"base/base64.h", "base/values.h",
@@ -244,10 +386,17 @@ $function_declarations$
     for (int i = 0; i < file->dependency_count(); i++) {
       base::FilePath dependency_proto_file_path =
           base::FilePath::FromASCII(file->dependency(i)->name());
-      impl_user_includes.insert(
-          dependency_proto_file_path
-              .ReplaceExtension(FILE_PATH_LITERAL("extras.h"))
-              .AsUTF8Unsafe());
+      if (generator_options.generate_to_value_serialization) {
+        impl_user_includes.insert(
+            dependency_proto_file_path
+                .ReplaceExtension(FILE_PATH_LITERAL("to_value.h"))
+                .AsUTF8Unsafe());
+      } else if (generator_options.generate_equality) {
+        impl_user_includes.insert(
+            dependency_proto_file_path
+                .ReplaceExtension(FILE_PATH_LITERAL("equal.h"))
+                .AsUTF8Unsafe());
+      }
     }
     if (generator_options.protobuf_full_support) {
       impl_user_includes.insert(
@@ -276,7 +425,7 @@ $function_declarations$
                }
              }},
         },
-        R"(// Generated by the proto_to_extras plugin.  DO NOT EDIT!
+        R"(// Generated by the proto_extras plugin. DO NOT EDIT!
 // source: $proto_file_path$
 
 $includes$
@@ -303,13 +452,16 @@ $function_definitions$
           "$m$& message);\n",
           "m", message_type);
     }
+    if (options.generate_equality) {
+      printer->Print("bool operator==(const $m$& lhs, const $m$& rhs);\n", "m",
+                     message_type);
+    }
     for (int i = 0; i < message.nested_type_count(); i++) {
       if (!PrintFunctionDeclarations(*message.nested_type(i), printer, error,
                                      options)) {
         return false;
       }
     }
-
     return true;
   }
 
@@ -319,17 +471,13 @@ $function_definitions$
       std::string* error,
       const ProtoExtrasGeneratorOptions& options) const {
     if (options.generate_to_value_serialization) {
-      CreateSerializationDefinitions(message, printer, options);
+      CreateToValueSerializationDefinitions(message, printer, options);
     }
     if (options.generate_stream_operator) {
-      std::string message_type =
-          google::protobuf::compiler::cpp::ClassName(&message);
-      printer->Emit({{"message_type", message_type}},
-                    R"(
-std::ostream& operator<<(std::ostream& out, const $message_type$& message) {
-  return out << Serialize(message).DebugString();
-}
-)");
+      CreateOstreamDefinition(message, printer, options);
+    }
+    if (options.generate_equality) {
+      CreateEqualityOperatorDefinition(message, printer, options);
     }
 
     for (int i = 0; i < message.nested_type_count(); i++) {
@@ -338,7 +486,6 @@ std::ostream& operator<<(std::ostream& out, const $message_type$& message) {
         return false;
       }
     }
-
     return true;
   }
 };

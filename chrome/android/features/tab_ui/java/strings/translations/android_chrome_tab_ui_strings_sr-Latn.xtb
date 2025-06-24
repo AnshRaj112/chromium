@@ -112,6 +112,7 @@
 <translation id="5556417849629758491">Pregledajte informacije o prodavnici, opciju koja je dostupna u vrhu ekrana</translation>
 <translation id="5627941783489838464">Nema ažuriranja kartica</translation>
 <translation id="5656738671621697952">{TABS_COUNT,plural, =1{<ph name="TABS_COUNT_ONE" /> link iz Chrome-a}one{<ph name="TABS_COUNT_MANY" /> link iz Chrome-a}few{<ph name="TABS_COUNT_MANY" /> linka iz Chrome-a}other{<ph name="TABS_COUNT_MANY" /> linkova iz Chrome-a}}</translation>
+<translation id="5746204836956568669">Želite da grupišete kartice (<ph name="NUMBER_OF_TABS" />) da bi radile brže?</translation>
 <translation id="58326064309361797">Prevucite kartice da biste ih grupisali</translation>
 <translation id="5901630391730855834">Žuta</translation>
 <translation id="5972844218283131174">Opozovi sve</translation>
@@ -192,6 +193,7 @@
 <translation id="8374451057714760401">{NUM_MONTHS,plural, =1{Ažurirano je pre <ph name="NUM_MONTHS_ONE" /> mesec}one{Ažurirano je pre <ph name="NUM_MONTHS_MANY" /> mesec}few{Ažurirano je pre <ph name="NUM_MONTHS_MANY" /> meseca}other{Ažurirano je pre <ph name="NUM_MONTHS_MANY" /> meseci}}</translation>
 <translation id="8398929769197326728">Novi folder – <ph name="CURRENT_TIMESTAMP_MS" /></translation>
 <translation id="8428213095426709021">Podešavanja</translation>
+<translation id="855081842937141170">Zakači karticu</translation>
 <translation id="8633025649649592204">Nedavna aktivnost</translation>
 <translation id="8712637175834984815">Važi</translation>
 <translation id="8714939927607906138">Niža cena</translation>
@@ -200,7 +202,6 @@
 <translation id="875848103419578654">{NUM_MONTHS,plural, =1{Napravljeno je pre <ph name="NUM_MONTHS_ONE" /> mesec}one{Napravljeno je pre <ph name="NUM_MONTHS_MANY" /> mesec}few{Napravljeno je pre <ph name="NUM_MONTHS_MANY" /> meseca}other{Napravljeno je pre <ph name="NUM_MONTHS_MANY" /> meseca}}</translation>
 <translation id="8813708480179818649">Uklonite karticu iz grupe</translation>
 <translation id="8820741577754260431">Pregledajte sniženja na karticama</translation>
-<translation id="883379923675618699">Chrome automatski zatvara stavke u odeljku Neaktivno koje niste koristili 3 meseca. To možete da isključite odmah ili bilo kada u Podešavanjima.</translation>
 <translation id="8887921976452567404">Zatvorene kartice i grupe možete ponovo da otvorite u odeljku Nedavne kartice i odeljku Grupe kartica.</translation>
 <translation id="8915916167043355778">Zatvorite sve</translation>
 <translation id="9090098097337832354">Informacije o ovoj prodavnici su zatvorene</translation>

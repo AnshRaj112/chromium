@@ -513,6 +513,13 @@ def _crossbench_loading(estimated_runtime=60, arguments=None):
                           arguments=arguments)
 
 
+def _crossbench_embedder(estimated_runtime=20, arguments=None):
+  return CrossbenchConfig('embedder.crossbench',
+                          'embedder',
+                          estimated_runtime=estimated_runtime,
+                          arguments=arguments)
+
+
 _CROSSBENCH_JETSTREAM_SPEEDOMETER = frozenset([
     _jetstream2_crossbench(),
     _speedometer3_crossbench(),
@@ -575,6 +582,19 @@ _CROSSBENCH_WEBVIEW = frozenset([
             '"PageLoad.PaintTiming.NavigationToFirstContentfulPaint":["mean"]}}',
             '--repetitions=50',
             '--stories=cnn',
+        ]
+    ),
+    _crossbench_embedder(
+        estimated_runtime=900,
+        arguments=[
+            '--wpr=crossbench_android_embedder_000.wprgo',
+            '--skip-wpr-script-injection',
+            '--embedder=com.google.android.googlequicksearchbox',
+            '--splashscreen=skip',
+            '--cuj-config=../../third_party/crossbench/config/team/woa/embedder_cuj_config.hjson',
+            '--probe-config=../../clank/android_webview/tools/crossbench_config/'
+            'agsa_probe_config.hjson',
+            '--repetitions=50',
         ]
     ),
 ])
@@ -650,15 +670,19 @@ _MAC_M1_MINI_2020_BENCHMARK_CONFIGS = PerfSuite(
         'v8.runtime_stats.top_25',
     ]).Add([
         'jetstream2-minorms',
+        'jetstream2-no-field-trials',
         'speedometer2-minorms',
         'speedometer3-minorms',
+        'speedometer3-no-field-trials',
     ]).Repeat([
         'speedometer2',
         'rendering.desktop.notracing',
     ], 2).Repeat([
         'speedometer3',
+        'speedometer3-no-field-trials',
     ], 6).Repeat([
         'jetstream2',
+        'jetstream2-no-field-trials',
     ], 11)
 _MAC_M1_MINI_2020_PGO_BENCHMARK_CONFIGS = PerfSuite([
     _GetBenchmarkConfig('jetstream2', pageset_repeat=11),

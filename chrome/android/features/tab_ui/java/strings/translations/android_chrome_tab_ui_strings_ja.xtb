@@ -192,6 +192,7 @@
 <translation id="8374451057714760401">{NUM_MONTHS,plural, =1{<ph name="NUM_MONTHS_ONE" /> か月前に更新}other{<ph name="NUM_MONTHS_MANY" /> か月前に更新}}</translation>
 <translation id="8398929769197326728">新しいフォルダ - <ph name="CURRENT_TIMESTAMP_MS" /></translation>
 <translation id="8428213095426709021">設定</translation>
+<translation id="855081842937141170">タブを固定</translation>
 <translation id="8633025649649592204">最近のアクティビティ</translation>
 <translation id="8712637175834984815">理解した</translation>
 <translation id="8714939927607906138">値下げ</translation>
@@ -200,7 +201,6 @@
 <translation id="875848103419578654">{NUM_MONTHS,plural, =1{<ph name="NUM_MONTHS_ONE" /> か月前に作成}other{<ph name="NUM_MONTHS_MANY" /> か月前に作成}}</translation>
 <translation id="8813708480179818649">グループからタブを削除</translation>
 <translation id="8820741577754260431">タブで値下げ情報を確認します</translation>
-<translation id="883379923675618699">3 か月間使用されていないセクションのアイテムを自動的に終了します。この設定は [設定] でいつでもオフにできます。</translation>
 <translation id="8887921976452567404">閉じたタブとグループは、[最近使ったタブ] と [タブグループ] で再度開くことができます。</translation>
 <translation id="8915916167043355778">すべて閉じる</translation>
 <translation id="9090098097337832354">このショップに関する情報は非表示になっています</translation>

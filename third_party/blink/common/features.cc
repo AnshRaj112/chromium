@@ -792,7 +792,7 @@ BASE_FEATURE(kFencedFramesAutomaticBeaconCredentials,
 
 BASE_FEATURE(kFencedFramesCrossOriginAutomaticBeaconData,
              "FencedFramesCrossOriginAutomaticBeaconData",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls functionality related to network revocation/local unpartitioned
 // data access in fenced frames.
@@ -1107,6 +1107,10 @@ BASE_FEATURE_ENUM_PARAM(ForceDarkImageClassifier,
                         "classifier_policy",
                         ForceDarkImageClassifier::kUseBlinkSettings,
                         &forcedark_image_classifier_policy_options);
+
+BASE_FEATURE(kFrameMetadataObserver,
+             "FrameMetadataObserver",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables the frequency capping for detecting large sticky ads.
 // Large-sticky-ads are those ads that stick to the bottom of the page
@@ -2669,6 +2673,10 @@ BASE_FEATURE(kWebRtcUseCaptureBeginTimestamp,
 
 BASE_FEATURE(kWebRtcAudioSinkUseTimestampAligner,
              "WebRtcAudioSinkUseTimestampAligner",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kWebRtcPqcForDtls,
+             "WebRtcPqcForDtls",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enable borderless mode for desktop PWAs. go/borderless-mode

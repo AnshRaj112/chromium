@@ -74,9 +74,17 @@ chromium-metrics-reviews@google.com.
     <variant name="DropScrollToHighlight"/>
     <variant name="EnableDragResize"/>
     <variant name="GetContextFromFocusedTab"/>
+    <variant name="GetContextFromTab"/>
     <variant name="GetOsMicrophonePermissionStatus"/>
     <variant name="GetUserProfileInfo"/>
     <variant name="GetZeroStateSuggestionsForFocusedTab"/>
+    <variant name="JournalClear"/>
+    <variant name="JournalSnapshot"/>
+    <variant name="JournalStart"/>
+    <variant name="JournalStop"/>
+    <variant name="LogBeginAsyncEvent"/>
+    <variant name="LogEndAsyncEvent"/>
+    <variant name="LogInstantEvent"/>
     <variant name="MaybeRefreshUserStatus"/>
     <variant name="OnRequestStarted"/>
     <variant name="OnResponseRated"/>
@@ -87,6 +95,7 @@ chromium-metrics-reviews@google.com.
     <variant name="OpenGlicSettingsPage"/>
     <variant name="OpenOsPermissionSettingsMenu"/>
     <variant name="PauseActorTask"/>
+    <variant name="PinTabs"/>
     <variant name="RefreshSignInCookies"/>
     <variant name="ResizeWindow"/>
     <variant name="ResumeActorTask"/>
@@ -95,6 +104,7 @@ chromium-metrics-reviews@google.com.
     <variant name="SetClosedCaptioningState"/>
     <variant name="SetContextAccessIndicator"/>
     <variant name="SetLocationPermissionState"/>
+    <variant name="SetMaximumNumberOfPinnedTabs"/>
     <variant name="SetMicrophonePermissionState"/>
     <variant name="SetMinimumWidgetSize"/>
     <variant name="SetSyntheticExperimentState"/>
@@ -102,6 +112,8 @@ chromium-metrics-reviews@google.com.
     <variant name="SetWindowDraggableAreas"/>
     <variant name="ShowProfilePicker"/>
     <variant name="StopActorTask"/>
+    <variant name="UnpinAllTabs"/>
+    <variant name="UnpinTabs"/>
     <variant name="WebClientCreated"/>
     <variant name="WebClientInitialized"/>
   </token>

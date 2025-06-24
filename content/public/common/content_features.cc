@@ -72,6 +72,10 @@ const base::FeatureParam<int> kAndroidSpareRendererMemoryThreshold{
 const base::FeatureParam<bool> kAndroidSpareRendererKillWhenBackgrounded{
     &kAndroidWarmUpSpareRendererWithTimeout, "kill_when_backgrounded", false};
 
+// Only allow the navigation related allocation to use the spare renderer.
+const base::FeatureParam<bool> kAndroidSpareRendererOnlyForNavigation{
+    &kAndroidWarmUpSpareRendererWithTimeout, "only_for_navigation", false};
+
 // Whether to allow attaching an inner WebContents not owned by the outer
 // WebContents. This is for prototyping purposes and should not be enabled in
 // production.
@@ -1252,9 +1256,14 @@ BASE_FEATURE(kValidateCommitOriginAtCommit,
 BASE_FEATURE(kV8VmFuture, "V8VmFuture", base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_ANDROID)
-// Enables V8 to use more memory on high-end Android devices.
-BASE_FEATURE(kV8HighEndAndroid,
-             "V8HighEndAndroid",
+// Enables V8 to use a set of experimental optimizations for Android Desktop.
+// This feature flag is intended to control various performance-related
+// tweaks.
+//
+// TODO(crbug.com/425860368): This feature may need to be updated or removed
+// based on the evolution of V8's performance features for high-end devices.
+BASE_FEATURE(kV8AndroidDesktopHighEndConfig,
+             "V8AndroidDesktopHighEndConfig",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif
 
@@ -1373,6 +1382,18 @@ BASE_FEATURE(kWebUIJSErrorReportingExtended,
 // Controls whether the WebUSB API is enabled:
 // https://wicg.github.io/webusb
 BASE_FEATURE(kWebUsb, "WebUSB", base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Apply `PrefetchPriority::kHighest` for Webview Prefetch API.
+BASE_FEATURE(kWebViewPrefetchHighestPrefetchPriority,
+             "WebViewPrefetchHighestPrefetchPriority",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Set an additional `PrefetchScheduler` burst limit for
+// `PrefetchPriority::kHighest` prefetches.
+constexpr base::FeatureParam<size_t>
+    kWebViewPrefetchHighestPrefetchPriorityBurstLimit{
+        &kWebViewPrefetchHighestPrefetchPriority,
+        "WebViewPrefetchHighestPrefetchPriorityBurstLimit", 1};
 
 // Controls whether the WebXR Device API is enabled.
 BASE_FEATURE(kWebXr, "WebXR", base::FEATURE_ENABLED_BY_DEFAULT);

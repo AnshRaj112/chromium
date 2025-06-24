@@ -55,18 +55,13 @@ std::optional<std::string> CheckAndResolveLocale(
 //
 // Returns the locale used by the Application.  First we use the value from the
 // command line (--lang), second we try the value in the prefs file (passed in
-// as |pref_locale|), finally, we fall back on the system locale. We only return
+// as `pref_locale`), finally, we fall back on the system locale. We only return
 // a value if there's a corresponding resource DLL for the locale.  Otherwise,
-// we fall back to en-us. |set_icu_locale| determines whether the resulting
+// we fall back to en-us. `set_icu_locale` determines whether the resulting
 // locale is set as the default ICU locale before returning it.
 COMPONENT_EXPORT(UI_BASE)
-std::string GetApplicationLocale(const std::string& pref_locale,
-                                 bool set_icu_locale);
-
-// Convenience version of GetApplicationLocale() that sets the resulting locale
-// as the default ICU locale before returning it.
-COMPONENT_EXPORT(UI_BASE)
-std::string GetApplicationLocale(const std::string& pref_locale);
+std::string GetApplicationLocale(std::string_view pref_locale,
+                                 bool set_icu_locale = true);
 
 // Returns true if a display name for |locale| is available in the locale
 // |display_locale|.
@@ -116,8 +111,7 @@ std::string NormalizeLocale(std::string_view locale);
 // It includes the current locale in the result.
 // sr_Cyrl_RS generates sr_Cyrl_RS, sr_Cyrl and sr.
 COMPONENT_EXPORT(UI_BASE)
-void GetParentLocales(const std::string& current_locale,
-                      std::vector<std::string>* parent_locales);
+std::vector<std::string> GetParentLocales(std::string_view current_locale);
 
 // Checks if a string is plausibly a syntactically-valid locale string,
 // for cases where we want the valid input to be a locale string such as
@@ -266,7 +260,7 @@ const std::vector<std::string>& GetAvailableICULocales();
 // This is similar to CheckAndResolveLocale, except that it excludes some
 // languages from being shown.
 COMPONENT_EXPORT(UI_BASE)
-bool IsUserFacingUILocale(const std::string& locale);
+bool IsUserFacingUILocale(std::string_view locale);
 
 // Returns the subset of locales from GetAcceptLanguages which we should show
 // to the user as a supported UI locale.
@@ -283,18 +277,18 @@ void GetAcceptLanguagesForLocale(const std::string& display_locale,
 COMPONENT_EXPORT(UI_BASE)
 void GetAcceptLanguages(std::vector<std::string>* locale_codes);
 
-// Returns true if |locale| is in a predefined |AcceptLanguageList|.
+// Returns true if `locale` is in a predefined `kAcceptLanguageList`.
 COMPONENT_EXPORT(UI_BASE)
 bool IsPossibleAcceptLanguage(std::string_view locale);
 
-// Returns true if |locale| is in a predefined |AcceptLanguageList| and
-// a display name for the |locale| is available in the locale |display_locale|.
+// Returns true if `locale` is in a predefined `kAcceptLanguageList` and
+// a display name for the `locale` is available in the locale `display_locale`.
 COMPONENT_EXPORT(UI_BASE)
-bool IsAcceptLanguageDisplayable(const std::string& display_locale,
-                                 const std::string& locale);
+bool IsAcceptLanguageDisplayable(std::string_view display_locale,
+                                 std::string_view locale);
 
 // Filters the input vector of languages. Returns only those in the
-// |AcceptLanguageList|.
+// `kAcceptLanguageList`.
 COMPONENT_EXPORT(UI_BASE)
 std::vector<std::string> KeepAcceptedLanguages(
     base::span<const std::string> languages);

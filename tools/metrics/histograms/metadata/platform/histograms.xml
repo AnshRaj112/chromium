@@ -793,7 +793,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Platform.Emmc.LifeUsed.{Type}" enum="EmmcLifeUsed"
-    expires_after="2025-10-19">
+    expires_after="2025-12-21">
   <owner>gwendal@google.com</owner>
   <owner>chromeos-storage@google.com</owner>
   <summary>
@@ -1036,6 +1036,19 @@ chromium-metrics-reviews@google.com.
     whether the API request was successful. Once the hardware data has been
     successfully transmitted to the server, no further transmission or related
     checks will be performed for the next 24 hours.
+  </summary>
+</histogram>
+
+<histogram name="Platform.FlexInstalledViaFlexor" units="installed"
+    expires_after="2026-01-31">
+  <owner>tbrandston@google.com</owner>
+  <owner>chromeos-flex-eng@google.com</owner>
+  <summary>
+    Sent once when a ChromeOS Flex device sees that it was installed via Flexor.
+
+    When a ChromeOS Flex device is installed via Flexor, a file is created on
+    the stateful partition. If the file exists at boot, we delete it and emit
+    this metric. (If we fail to delete the file, we don't emit the metric.)
   </summary>
 </histogram>
 
@@ -1856,7 +1869,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Platform.Missive.StorageUsage" units="MiB"
-    expires_after="2025-10-19">
+    expires_after="2025-12-21">
   <owner>lbaraz@chromium.org</owner>
   <owner>cros-reporting-team@google.com</owner>
   <summary>
@@ -2369,7 +2382,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Platform.Storage.Nvme.PercentageUsed" units="%"
-    expires_after="2025-10-19">
+    expires_after="2025-12-21">
   <owner>asavery@chromium.org</owner>
   <owner>gwendal@chromium.org</owner>
   <owner>chromeos-storage@google.com</owner>

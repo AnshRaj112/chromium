@@ -278,6 +278,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
     private @Nullable BookmarkBarCoordinator mBookmarkBarCoordinator;
     private @Nullable BookmarkBarVisibilityProvider mBookmarkBarVisibilityProvider;
     private @Nullable BookmarkBarVisibilityObserver mBookmarkBarVisibilityObserver;
+    private @Nullable Supplier<Integer> mBookmarkBarHeightSupplier;
     private @Nullable LoadingFullscreenCoordinator mLoadingFullscreenCoordinator;
     private @Nullable BookmarkOpener mBookmarkOpener;
     private final @NonNull ObservableSupplier<BookmarkManagerOpener> mBookmarkManagerOpenerSupplier;
@@ -1273,9 +1274,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                         : 0;
         final int tabStripHeight = mToolbarManager.getTabStripHeightSupplier().get();
         final int bookmarkBarHeight =
-                mBookmarkBarCoordinator != null
-                        ? mBookmarkBarCoordinator.getHeightSupplier().get()
-                        : 0;
+                mBookmarkBarCoordinator != null ? mBookmarkBarCoordinator.getTopControlHeight() : 0;
         topControlsNewHeight =
                 bookmarkBarHeight + toolbarHeight + tabStripHeight + mStatusIndicatorHeight;
         if (tabStripHeight > 0 && !isTablet) {
@@ -1386,6 +1385,9 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
 
     @Override
     protected Destroyable createEdgeToEdgeBottomChin() {
+        boolean defaultVisibility =
+                !DeviceFormFactor.isNonMultiDisplayContextOnTablet(mActivity)
+                        || EdgeToEdgeUtils.defaultVisibilityOfBottomChinOnTablet(mActivity);
         SystemBarColorHelper bottomChinColorHelper =
                 EdgeToEdgeControllerFactory.createBottomChin(
                         mActivity.findViewById(R.id.edge_to_edge_bottom_chin),
@@ -1396,7 +1398,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                         mEdgeToEdgeControllerSupplier.get(),
                         mBottomControlsStacker,
                         mFullscreenManager,
-                        DeviceFormFactor.isNonMultiDisplayContextOnTablet(mActivity));
+                        defaultVisibility);
         mSystemBarColorHelperSupplier.set(bottomChinColorHelper);
         return bottomChinColorHelper;
     }
@@ -1754,7 +1756,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                     new BookmarkBarCoordinator(
                             mActivity,
                             mBrowserControlsManager,
-                            /* heightChangeCallback= */ (height) -> updateTopControlsHeight(),
+                            /* heightChangeCallback= */ result -> updateTopControlsHeight(),
                             mProfileSupplier,
                             /* viewStub= */ mActivity.findViewById(R.id.bookmark_bar_stub),
                             mActivityTabProvider.get(),
@@ -1764,11 +1766,11 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
             if (mBookmarkBarVisibilityProvider != null) {
                 mBookmarkBarVisibilityProvider.addObserver(mBookmarkBarCoordinator);
             }
+            mBookmarkBarHeightSupplier = mBookmarkBarCoordinator::getTopControlHeight;
         }
 
         if (mToolbarManager != null) {
-            mToolbarManager.setBookmarkBarHeightSupplier(
-                    mBookmarkBarCoordinator.getHeightSupplier());
+            mToolbarManager.setBookmarkBarHeightSupplier(mBookmarkBarHeightSupplier);
         }
     }
 

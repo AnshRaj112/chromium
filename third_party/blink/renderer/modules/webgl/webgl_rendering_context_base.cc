@@ -230,6 +230,99 @@ enum class WebGLANGLEImplementation {
 constexpr base::TimeDelta kDurationBetweenRestoreAttempts = base::Seconds(1);
 const int kMaxGLErrorsAllowedToConsole = 256;
 
+// This ResourceProvider is used for low-latency WebGL to pass the drawing
+// buffer's SharedImage directly through to the canvas via
+// ExternalCanvasResource for use cases such as compositing and snapshotting.
+class CanvasResourceProviderPassThrough final : public CanvasResourceProvider {
+ public:
+  CanvasResourceProviderPassThrough(
+      gfx::Size size,
+      viz::SharedImageFormat format,
+      SkAlphaType alpha_type,
+      const gfx::ColorSpace& color_space,
+      base::WeakPtr<WebGraphicsContext3DProviderWrapper>
+          context_provider_wrapper,
+      CanvasResourceHost* resource_host)
+      : CanvasResourceProvider(kPassThrough,
+                               size,
+                               format,
+                               alpha_type,
+                               color_space,
+                               std::move(context_provider_wrapper),
+                               resource_host) {}
+
+  ~CanvasResourceProviderPassThrough() override = default;
+  bool IsValid() const final { return true; }
+  bool IsAccelerated() const final { return true; }
+  bool SupportsDirectCompositing() const override { return true; }
+  bool IsSingleBuffered() const override { return true; }
+
+ private:
+  void ImportResource(
+      scoped_refptr<ExternalCanvasResource>&& resource) override {
+    resource_ = resource;
+  }
+
+  scoped_refptr<CanvasResource> ProduceCanvasResource(FlushReason) final {
+    return resource_;
+  }
+
+  sk_sp<SkSurface> CreateSkSurface() const override { NOTREACHED(); }
+
+  scoped_refptr<StaticBitmapImage> Snapshot(FlushReason,
+                                            ImageOrientation) override {
+    if (IsGpuContextLost() || !resource_) {
+      return nullptr;
+    }
+    return resource_->Bitmap();
+  }
+
+ private:
+  scoped_refptr<ExternalCanvasResource> resource_;
+};
+
+bool CanCreatePassThroughProvider(
+    gfx::Size size,
+    viz::SharedImageFormat format,
+    base::WeakPtr<WebGraphicsContext3DProviderWrapper>
+        context_provider_wrapper) {
+  // SharedGpuContext::IsGpuCompositingEnabled can potentially replace the
+  // context_provider_wrapper, so it's important to call that first as it can
+  // invalidate the weak pointer.
+  if (!SharedGpuContext::IsGpuCompositingEnabled() ||
+      !context_provider_wrapper) {
+    return false;
+  }
+
+  const auto& capabilities =
+      context_provider_wrapper->ContextProvider().GetCapabilities();
+  if (size.width() > capabilities.max_texture_size ||
+      size.height() > capabilities.max_texture_size) {
+    return false;
+  }
+
+  const auto& shared_image_capabilities =
+      context_provider_wrapper->ContextProvider()
+          .SharedImageInterface()
+          ->GetCapabilities();
+
+  const gfx::BufferFormat buffer_format =
+      viz::SinglePlaneSharedImageFormatToBufferFormat(format);
+  bool gmb_allowed =
+      gpu::IsImageSizeValidForGpuMemoryBufferFormat(size, buffer_format) &&
+      gpu::IsImageFromGpuMemoryBufferFormatSupported(buffer_format,
+                                                     capabilities);
+
+  // Either swap_chain or gpu memory buffer should be enabled for this be used.
+  // TODO(crbug.com/404887530) : Remove or Rename `gmb_allowed` since
+  // CanvasResourceProvider no longer uses GMBs.
+  if (!shared_image_capabilities.shared_image_swap_chain && !gmb_allowed) {
+    return false;
+  }
+
+  return true;
+}
+
 base::Lock& WebGLContextLimitLock() {
   DEFINE_THREAD_SAFE_STATIC_LOCAL(base::Lock, lock, ());
   return lock;
@@ -1695,6 +1788,11 @@ bool WebGLRenderingContextBase::PushFrameNoCopy() {
   return submitted_frame;
 }
 
+void WebGLRenderingContextBase::Dispose() {
+  resource_provider_.reset();
+  CanvasRenderingContext::Dispose();
+}
+
 bool WebGLRenderingContextBase::PushFrameWithCopy() {
   bool submitted_frame = false;
 
@@ -1868,7 +1966,7 @@ void WebGLRenderingContextBase::MarkLayerComposited() {
 }
 
 bool WebGLRenderingContextBase::IsAccelerated() const {
-  auto* resource_provider = Host()->GetResourceProviderForWebGL();
+  auto* resource_provider = resource_provider_.get();
   return resource_provider ? resource_provider->IsAccelerated()
                            : Host()->ShouldTryToUseGpuRaster();
 }
@@ -1884,6 +1982,7 @@ void WebGLRenderingContextBase::PageVisibilityChanged() {
 
 void WebGLRenderingContextBase::SizeChanged() {
   did_fail_to_create_resource_provider_ = false;
+  resource_provider_.reset();
 }
 
 scoped_refptr<StaticBitmapImage>
@@ -1907,7 +2006,7 @@ WebGLRenderingContextBase::PaintRenderingResultsToResource(
   }
   PaintRenderingResultsToCanvas(source_buffer);
   if (has_dispatcher && was_dirty && GetOrCreateCanvasResourceProvider()) {
-    return Host()->GetResourceProviderForWebGL()->ProduceCanvasResource(reason);
+    return resource_provider_.get()->ProduceCanvasResource(reason);
   }
   return nullptr;
 }
@@ -1943,9 +2042,19 @@ WebGLRenderingContextBase::CreateCanvasResourceProvider() {
       // If either SwapChain is enabled or WebGLImage mode is enabled, we can
       // try a passthrough provider.
       DCHECK(Host()->LowLatencyEnabled());
-      provider = CanvasResourceProvider::CreatePassThroughProvider(
-          Host()->Size(), format, alpha_type, color_space,
-          SharedGpuContext::ContextProviderWrapper(), Host());
+      if (CanCreatePassThroughProvider(
+              Host()->Size(), format,
+              SharedGpuContext::ContextProviderWrapper())) {
+        // Note: Unlike other CanvasResourceProvider subclasses, a
+        // CanvasResourceProviderPassThrough instance is always valid and does
+        // not require clearing as part of initialization (both of these being
+        // due to the fact that it simply delegates the internal parts of the
+        // resource to the drawing buffer).
+        provider = std::make_unique<CanvasResourceProviderPassThrough>(
+            Host()->Size(), format, alpha_type, color_space,
+            SharedGpuContext::ContextProviderWrapper(), Host());
+        CHECK(provider->IsValid());
+      }
     }
     if (!provider) {
       // If PassThrough failed, try a SharedImage with usage display enabled.
@@ -1992,11 +2101,12 @@ WebGLRenderingContextBase::CreateCanvasResourceProvider() {
 
 CanvasResourceProvider*
 WebGLRenderingContextBase::GetOrCreateCanvasResourceProvider() {
-  auto* provider = Host()->GetResourceProviderForWebGL();
+  auto* provider = resource_provider_.get();
   if (!provider && !did_fail_to_create_resource_provider_) {
     if (Host()->IsValidImageSize()) {
-      Host()->SetResourceProviderForWebGL(CreateCanvasResourceProvider());
-      provider = Host()->GetResourceProviderForWebGL();
+      resource_provider_ = CreateCanvasResourceProvider();
+      Host()->UpdateMemoryUsage();
+      provider = resource_provider_.get();
     }
     if (!provider) {
       did_fail_to_create_resource_provider_ = true;
@@ -2021,23 +2131,22 @@ WebGLRenderingContextBase::PaintRenderingResultsToCanvas(
   }
 
   if (isContextLost() || !GetDrawingBuffer()) {
-    return Host()->GetResourceProviderForWebGL();
+    return resource_provider_.get();
   }
 
   bool must_clear_now = ClearIfComposited(kClearCallerOther) != kSkipped;
 
-  if (Host()->GetResourceProviderForWebGL() &&
-      Host()->GetResourceProviderForWebGL()->Size() !=
-          GetDrawingBuffer()->Size()) {
+  if (resource_provider_.get() &&
+      resource_provider_.get()->Size() != GetDrawingBuffer()->Size()) {
+    resource_provider_.reset();
     Host()->DiscardResources();
   }
 
   // The host's ResourceProvider is purged to save memory when the tab
   // is backgrounded.
 
-  if (!must_paint_to_canvas_ && !must_clear_now &&
-      Host()->GetResourceProviderForWebGL()) {
-    return Host()->GetResourceProviderForWebGL();
+  if (!must_paint_to_canvas_ && !must_clear_now && resource_provider_.get()) {
+    return resource_provider_.get();
   }
 
   must_paint_to_canvas_ = false;
@@ -2076,7 +2185,7 @@ WebGLRenderingContextBase::PaintRenderingResultsToCanvas(
     return resource_provider;
 
   bool copy_succeeded = CopyRenderingResultsFromDrawingBuffer(
-      Host()->GetResourceProviderForWebGL(), source_buffer);
+      resource_provider_.get(), source_buffer);
   if (resource_provider_was_updated != nullptr) {
     *resource_provider_was_updated = copy_succeeded;
   }
@@ -9174,7 +9283,7 @@ int WebGLRenderingContextBase::AllocatedBufferCountPerPixel() {
     return buffer_count;
   }
 
-  auto* provider = Host()->GetResourceProviderForWebGL();
+  auto* provider = resource_provider_.get();
   if (provider) {
     buffer_count++;
     if (provider->IsAccelerated()) {

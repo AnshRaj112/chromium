@@ -116,6 +116,7 @@
 #include "components/enterprise/browser/identifiers/identifiers_prefs.h"
 #include "components/enterprise/buildflags/buildflags.h"
 #include "components/enterprise/connectors/core/connectors_prefs.h"
+#include "components/feature_engagement/public/pref_names.h"
 #include "components/fingerprinting_protection_filter/common/fingerprinting_protection_filter_constants.h"
 #include "components/fingerprinting_protection_filter/common/prefs.h"
 #include "components/history_clusters/core/history_clusters_prefs.h"
@@ -277,6 +278,7 @@
 #include "components/permissions/contexts/geolocation_permission_context_android.h"
 #include "components/webapps/browser/android/install_prompt_prefs.h"
 #else  // BUILDFLAG(IS_ANDROID)
+#include "chrome/browser/contextual_cueing/contextual_cueing_prefs.h"
 #include "chrome/browser/device_api/device_service_impl.h"
 #include "chrome/browser/gcm/gcm_product_util.h"
 #include "chrome/browser/hid/hid_policy_allowed_devices.h"
@@ -548,148 +550,6 @@ namespace {
 
 // Please keep the list of deprecated prefs in chronological order. i.e. Add to
 // the bottom of the list, not here at the top.
-
-#if BUILDFLAG(IS_WIN)
-// Deprecated 06/2024
-constexpr char kOsCryptAppBoundFixedData3PrefName[] =
-    "os_crypt.app_bound_fixed_data3";
-#endif  // BUILDFLAG(IS_WIN)
-
-#if BUILDFLAG(IS_CHROMEOS)
-// Deprecated 05/2024.
-// A preference to keep track of the device registered time.
-constexpr char kDeviceRegisteredTime[] = "DeviceRegisteredTime";
-constexpr char kArcKioskDictionaryName[] = "arc-kiosk";
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-#if !BUILDFLAG(IS_ANDROID)
-// Deprecated 05/2024
-inline constexpr char kSearchEnginesStudyGroup[] =
-    "search_engines.client_side_study_group";
-#endif
-
-#if !BUILDFLAG(IS_ANDROID)
-// Deprecated 05/2024
-// Pref name for the whether whats new refresh page has been shown
-// successfully.
-inline constexpr char kHasShownRefreshWhatsNew[] =
-    "browser.has_shown_refresh_2023_whats_new";
-#endif
-
-#if BUILDFLAG(IS_CHROMEOS)
-// Deprecated 05/2024
-// A boolean pref which determines if you can pause mouse keys with a
-// keyboard shortcut.
-inline constexpr char kAccessibilityMouseKeysShortcutToPauseEnabled[] =
-    "settings.a11y.mouse_keys.ctrl_to_pause_enabled";
-// A boolean pref which determines if mouse keys is automatically disabled in
-// text fields.
-inline constexpr char kAccessibilityMouseKeysDisableInTextFields[] =
-    "settings.a11y.mouse_keys.disable_in_text_fields";
-// A boolean pref which determines whether screen magnifier should center
-// the text input focus.
-inline constexpr char kAccessibilityScreenMagnifierCenterFocus[] =
-    "settings.a11y.screen_magnifier_center_focus";
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-// Deprecated 05/2024.
-constexpr char kBlockTruncatedCookies[] = "profile.cookie_block_truncated";
-
-// Deprecated 05/2024
-inline constexpr char kDefaultSearchProviderChoiceLocationPrefName[] =
-    "default_search_provider_data.choice_location";
-
-// Deprecated 05/2024.
-inline constexpr char kSyncCachedTrustedVaultAutoUpgradeDebugInfo[] =
-    "sync.cached_trusted_vault_auto_upgrade_debug_info";
-
-// Deprecated 05/2024.
-inline constexpr char kAutologinEnabled[] = "autologin.enabled";
-inline constexpr char kReverseAutologinRejectedEmailList[] =
-    "reverse_autologin.rejected_email_list";
-
-// Deprecated 06/2024.
-inline constexpr char kTrackingProtectionOnboardingNoticeFirstRequested[] =
-    "tracking_protection.tracking_protection_onboarding_notice_first_requested";
-inline constexpr char kTrackingProtectionOnboardingNoticeLastRequested[] =
-    "tracking_protection.tracking_protection_onboarding_notice_last_requested";
-
-// Deprecated 06/2024.
-#if !BUILDFLAG(IS_ANDROID)
-inline constexpr char kAccessibilityReadAnythingOmniboxIconLabelShownCount[] =
-    "settings.a11y.read_anything.omnibox_icon_label_shown_count";
-
-// Deprecated 06/2024.
-inline constexpr char kAccessibilityPdfOcrAlwaysActive[] =
-    "settings.a11y.pdf_ocr_always_active";
-#endif
-
-// Deprecated 06/2024.
-inline constexpr char kTrackingProtectionOffboarded[] =
-    "tracking_protection.tracking_protection_offboarded";
-inline constexpr char kTrackingProtectionOffboardedSince[] =
-    "tracking_protection.tracking_protection_offboarded_since";
-inline constexpr char kTrackingProtectionOffboardingAckAction[] =
-    "tracking_protection.tracking_protection_offboarding_ack_action";
-
-#if BUILDFLAG(IS_CHROMEOS)
-// Deprecated 06/2024.
-constexpr std::array<const char*, 12u>
-    kHoldingSpaceWallpaperNudgeTimesOfFirstInteraction = {
-        "ash.holding_space.wallpaper_nudge.interaction_time."
-        "DroppedFileOnHoldingSpace.first_time",
-        "ash.holding_space.wallpaper_nudge.interaction_time."
-        "DroppedFileOnWallpaper.first_time",
-        "ash.holding_space.wallpaper_nudge.interaction_time."
-        "DraggedFileOverWallpaper.first_time",
-        "ash.holding_space.wallpaper_nudge.interaction_time.OpenedHoldingSpace."
-        "first_time",
-        "ash.holding_space.wallpaper_nudge.interaction_time."
-        "PinnedFileFromAnySource.first_time",
-        "ash.holding_space.wallpaper_nudge.interaction_time."
-        "PinnedFileFromContextMenu.first_time",
-        "ash.holding_space.wallpaper_nudge.interaction_time."
-        "PinnedFileFromFilesApp.first_time",
-        "ash.holding_space.wallpaper_nudge.interaction_time."
-        "PinnedFileFromHoldingSpaceDrop.first_time",
-        "ash.holding_space.wallpaper_nudge.interaction_time."
-        "PinnedFileFromPinButton.first_time",
-        "ash.holding_space.wallpaper_nudge.interaction_time."
-        "PinnedFileFromWallpaperDrop.first_time",
-        "ash.holding_space.wallpaper_nudge.interaction_time.UsedOtherItem."
-        "first_time",
-        "ash.holding_space.wallpaper_nudge.interaction_time.UsedPinnedItem."
-        "first_time",
-};
-
-// Deprecated 06/2024.
-constexpr char kHoldingSpaceWallpaperNudgeLastTimeNudgeShownCounterfactual[] =
-    "ash.holding_space.wallpaper_nudge.last_shown_time_counterfactual";
-constexpr char kHoldingSpaceWallpaperNudgeLastTimeNudgeShown[] =
-    "ash.holding_space.wallpaper_nudge.last_shown_time";
-constexpr char kHoldingSpaceWallpaperNudgeNudgeShownCountCounterfactual[] =
-    "ash.holding_space.wallpaper_nudge.shown_count_counterfactual";
-constexpr char kHoldingSpaceWallpaperNudgeNudgeShownCount[] =
-    "ash.holding_space.wallpaper_nudge.shown_count";
-constexpr char kHoldingSpaceWallpaperNudgeUserEligibleForNudge[] =
-    "ash.holding_space.wallpaper_nudge.user_eligible";
-constexpr char kHoldingSpaceWallpaperNudgeUserFirstEligibleSessionTime[] =
-    "ash.holding_space.wallpaper_nudge.first_eligible_session_time";
-
-// Deprecated 06/2024.
-constexpr char kLocalUserFilesMigrationEnabled[] =
-    "filebrowser.local_user_files_migration_enabled";
-
-// Deprecated 06/2024.
-constexpr char kBirchUseRecentTabs[] = "ash.birch.use_recent_tabs";
-constexpr char kBirchUseLastActive[] = "ash.birch.use_last_active";
-constexpr char kBirchUseMostVisited[] = "ash.birch.use_most_visited";
-constexpr char kBirchUseSelfShare[] = "ash.birch.use_self_share";
-#endif
-
-// Deprecated 06/2024
-constexpr char kDefaultSearchProviderChoicePending[] =
-    "default_search_provider.engine_choice_pending";
 
 // Deprecated 07/2024
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
@@ -1153,36 +1013,15 @@ inline constexpr char kDeviceNativeClientForceAllowedCache[] =
     "device_native_client_force_allowed_cache";
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
+// Deprecated 06/2025.
+inline constexpr char kLastUsedPairingFromSyncPublicKey[] =
+    "webauthn.last_used_pairing_from_sync_public_key";
+inline constexpr char kWebAuthnCablePairingsPrefName[] =
+    "webauthn.cablev2_pairings";
+
 // Register local state used only for migration (clearing or moving to a new
 // key).
 void RegisterLocalStatePrefsForMigration(PrefRegistrySimple* registry) {
-#if BUILDFLAG(IS_WIN)
-  // Deprecated 06/2024.
-  registry->RegisterStringPref(kOsCryptAppBoundFixedData3PrefName,
-                               std::string());
-#endif
-
-#if BUILDFLAG(IS_CHROMEOS)
-  // Deprecated 05/2024.
-  registry->RegisterTimePref(kDeviceRegisteredTime, base::Time());
-  registry->RegisterDictionaryPref(kArcKioskDictionaryName);
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-#if !BUILDFLAG(IS_ANDROID)
-  // Deprecated 05/2024.
-  registry->RegisterStringPref(kSearchEnginesStudyGroup, std::string());
-#endif
-
-#if !BUILDFLAG(IS_ANDROID)
-  // Deprecated 05/2024.
-  registry->RegisterBooleanPref(kHasShownRefreshWhatsNew, false);
-#endif
-
-#if BUILDFLAG(IS_CHROMEOS)
-  // Deprecated 06/2024.
-  registry->RegisterBooleanPref(kLocalUserFilesMigrationEnabled, false);
-#endif
-
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
   // Deprecated 07/2024.
   registry->RegisterStringPref(kFirstRunStudyGroup, std::string());
@@ -1296,80 +1135,6 @@ void RegisterProfilePrefsForMigration(
                              base::Time());
 
   chrome_browser_net::secure_dns::RegisterProbesSettingBackupPref(registry);
-
-#if BUILDFLAG(IS_CHROMEOS)
-  // Deprecated 05/2024.
-  registry->RegisterBooleanPref(kAccessibilityMouseKeysShortcutToPauseEnabled,
-                                true);
-  registry->RegisterBooleanPref(kAccessibilityMouseKeysDisableInTextFields,
-                                true);
-  registry->RegisterBooleanPref(kAccessibilityScreenMagnifierCenterFocus, true);
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-  // Deprecated 05/2024.
-  registry->RegisterBooleanPref(kBlockTruncatedCookies, true);
-
-  // Deprecated 05/2024
-  registry->RegisterIntegerPref(
-      kDefaultSearchProviderChoiceLocationPrefName,
-      static_cast<int>(search_engines::ChoiceMadeLocation::kOther));
-
-  // Deprecated 05/2024.
-  registry->RegisterStringPref(kSyncCachedTrustedVaultAutoUpgradeDebugInfo, "");
-
-  // Deprecated 05/2024.
-  registry->RegisterBooleanPref(kAutologinEnabled, true);
-  registry->RegisterListPref(kReverseAutologinRejectedEmailList);
-
-  // Deprecated 06/2024.
-  registry->RegisterTimePref(kTrackingProtectionOnboardingNoticeFirstRequested,
-                             base::Time());
-  registry->RegisterTimePref(kTrackingProtectionOnboardingNoticeLastRequested,
-                             base::Time());
-
-// Deprecated 06/2024.
-#if !BUILDFLAG(IS_ANDROID)
-  registry->RegisterIntegerPref(
-      kAccessibilityReadAnythingOmniboxIconLabelShownCount, 0);
-
-  // Deprecated 06/2024.
-  registry->RegisterBooleanPref(kAccessibilityPdfOcrAlwaysActive, true);
-#endif
-
-  // Deprecated 06/2024.
-  registry->RegisterBooleanPref(kTrackingProtectionOffboarded, false);
-  registry->RegisterTimePref(kTrackingProtectionOffboardedSince, base::Time());
-  registry->RegisterIntegerPref(kTrackingProtectionOffboardingAckAction, 0);
-
-#if BUILDFLAG(IS_CHROMEOS)
-  // Deprecated 06/2024.
-  for (const char* pref : kHoldingSpaceWallpaperNudgeTimesOfFirstInteraction) {
-    registry->RegisterTimePref(pref, base::Time());
-  }
-
-  // Deprecated 06/2024.
-  registry->RegisterBooleanPref(kHoldingSpaceWallpaperNudgeUserEligibleForNudge,
-                                false);
-  registry->RegisterTimePref(
-      kHoldingSpaceWallpaperNudgeLastTimeNudgeShownCounterfactual,
-      base::Time());
-  registry->RegisterTimePref(kHoldingSpaceWallpaperNudgeLastTimeNudgeShown,
-                             base::Time());
-  registry->RegisterTimePref(
-      kHoldingSpaceWallpaperNudgeUserFirstEligibleSessionTime, base::Time());
-  registry->RegisterUint64Pref(
-      kHoldingSpaceWallpaperNudgeNudgeShownCountCounterfactual, 0u);
-  registry->RegisterUint64Pref(kHoldingSpaceWallpaperNudgeNudgeShownCount, 0u);
-
-  // Deprecated 06/2024
-  registry->RegisterBooleanPref(kBirchUseRecentTabs, true);
-  registry->RegisterBooleanPref(kBirchUseLastActive, true);
-  registry->RegisterBooleanPref(kBirchUseMostVisited, true);
-  registry->RegisterBooleanPref(kBirchUseSelfShare, true);
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-  // Deprecated 06/2024.
-  registry->RegisterBooleanPref(kDefaultSearchProviderChoicePending, false);
 
 #if !BUILDFLAG(IS_ANDROID)
   // Deprecated 07/2024
@@ -1650,6 +1415,8 @@ void RegisterProfilePrefsForMigration(
   // Deprecated 06/2025
   registry->RegisterBooleanPref(kStorageGarbageCollect, false);
   registry->RegisterDoublePref(kGaiaCookiePeriodicReportTimeDeprecated, 0);
+  registry->RegisterListPref(kWebAuthnCablePairingsPrefName);
+  registry->RegisterStringPref(kLastUsedPairingFromSyncPublicKey, "");
 }
 
 }  // namespace
@@ -1712,6 +1479,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
   ProfileAttributesStorage::RegisterPrefs(registry);
   ProfileNetworkContextService::RegisterLocalStatePrefs(registry);
   profiles::RegisterPrefs(registry);
+  feature_engagement::RegisterLocalStatePrefs(registry);
 #if BUILDFLAG(IS_ANDROID)
   PushMessagingServiceImpl::RegisterPrefs(registry);
 #endif
@@ -2147,6 +1915,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   captions::LiveTranslateController::RegisterProfilePrefs(registry);
   ChromeAuthenticatorRequestDelegate::RegisterProfilePrefs(registry);
   commerce::CommerceUiTabHelper::RegisterProfilePrefs(registry);
+  contextual_cueing::prefs::RegisterProfilePrefs(registry);
   DeviceServiceImpl::RegisterProfilePrefs(registry);
   DriveService::RegisterProfilePrefs(registry);
   extensions::TabsCaptureVisibleTabFunction::RegisterProfilePrefs(registry);
@@ -2344,9 +2113,6 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   registry->RegisterBooleanPref(
       webauthn::pref_names::kRemoteProxiedRequestsAllowed, false);
 
-  registry->RegisterStringPref(
-      webauthn::pref_names::kLastUsedPairingFromSyncPublicKey, "");
-
   registry->RegisterIntegerPref(
       webauthn::pref_names::kEnclaveFailedPINAttemptsCount, 0);
 
@@ -2371,11 +2137,10 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   registry->RegisterBooleanPref(
       prefs::kAccessibilityMainNodeAnnotationsEnabled, false,
       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+#endif  // !BUILDFLAG(IS_ANDROID)
 
-  // TODO(crbug.com/400455013): Add LNA support on Android
   registry->RegisterBooleanPref(
       prefs::kManagedLocalNetworkAccessRestrictionsEnabled, false);
-#endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
   registry->RegisterBooleanPref(prefs::kVirtualKeyboardResizesLayoutByDefault,
@@ -2452,32 +2217,6 @@ void MigrateObsoleteLocalStatePrefs(PrefService* local_state) {
 
   // BEGIN_MIGRATE_OBSOLETE_LOCAL_STATE_PREFS
   // Please don't delete the preceding line. It is used by PRESUBMIT.py.
-
-#if BUILDFLAG(IS_WIN)
-  // Deprecated 06/2024.
-  local_state->ClearPref(kOsCryptAppBoundFixedData3PrefName);
-#endif
-
-#if BUILDFLAG(IS_CHROMEOS)
-  // Added 05/2024.
-  local_state->ClearPref(kDeviceRegisteredTime);
-  local_state->ClearPref(kArcKioskDictionaryName);
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-#if !BUILDFLAG(IS_ANDROID)
-  // Added 05/2024.
-  local_state->ClearPref(kSearchEnginesStudyGroup);
-#endif
-
-#if !BUILDFLAG(IS_ANDROID)
-  // Added 05/2024.
-  local_state->ClearPref(kHasShownRefreshWhatsNew);
-#endif
-
-// Added 06/2024.
-#if BUILDFLAG(IS_CHROMEOS)
-  local_state->ClearPref(kLocalUserFilesMigrationEnabled);
-#endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(ENABLE_DICE_SUPPORT)
   // Added 07/2024.
@@ -2644,81 +2383,6 @@ void MigrateObsoleteProfilePrefs(PrefService* profile_prefs,
       std::make_unique<
           password_manager_android_util::PasswordManagerUtilBridge>());
 #endif
-
-#if BUILDFLAG(IS_CHROMEOS)
-  // Added 05/2024.
-  profile_prefs->ClearPref(kAccessibilityMouseKeysShortcutToPauseEnabled);
-  profile_prefs->ClearPref(kAccessibilityMouseKeysDisableInTextFields);
-  profile_prefs->ClearPref(kAccessibilityScreenMagnifierCenterFocus);
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-  // Added 05/2024.
-  profile_prefs->ClearPref(kBlockTruncatedCookies);
-
-  // Added 05/2024
-  profile_prefs->ClearPref(kDefaultSearchProviderChoiceLocationPrefName);
-
-  // Added 05/2024.
-  profile_prefs->ClearPref(kSyncCachedTrustedVaultAutoUpgradeDebugInfo);
-
-  // Added 05/2024.
-  profile_prefs->ClearPref(kAutologinEnabled);
-  profile_prefs->ClearPref(kReverseAutologinRejectedEmailList);
-
-  // Added 06/2024.
-  profile_prefs->ClearPref(kTrackingProtectionOnboardingNoticeFirstRequested);
-  profile_prefs->ClearPref(kTrackingProtectionOnboardingNoticeLastRequested);
-
-  // Added 06/2024.
-#if !BUILDFLAG(IS_ANDROID)
-  profile_prefs->ClearPref(
-      kAccessibilityReadAnythingOmniboxIconLabelShownCount);
-
-  // Added 06/2024.
-  profile_prefs->ClearPref(kAccessibilityPdfOcrAlwaysActive);
-#endif
-
-  // Added 06/2024.
-  profile_prefs->ClearPref(kTrackingProtectionOffboarded);
-  profile_prefs->ClearPref(kTrackingProtectionOffboardedSince);
-  profile_prefs->ClearPref(kTrackingProtectionOffboardingAckAction);
-
-#if BUILDFLAG(IS_CHROMEOS)
-  // Added 06/2024.
-  for (const char* pref : kHoldingSpaceWallpaperNudgeTimesOfFirstInteraction) {
-    profile_prefs->ClearPref(pref);
-  }
-
-  // Added 06/2024.
-  profile_prefs->ClearPref(kHoldingSpaceWallpaperNudgeUserEligibleForNudge);
-  profile_prefs->ClearPref(
-      kHoldingSpaceWallpaperNudgeLastTimeNudgeShownCounterfactual);
-  profile_prefs->ClearPref(kHoldingSpaceWallpaperNudgeLastTimeNudgeShown);
-  profile_prefs->ClearPref(
-      kHoldingSpaceWallpaperNudgeUserFirstEligibleSessionTime);
-  profile_prefs->ClearPref(
-      kHoldingSpaceWallpaperNudgeNudgeShownCountCounterfactual);
-  profile_prefs->ClearPref(kHoldingSpaceWallpaperNudgeNudgeShownCount);
-
-  // Added 06/2024.
-  profile_prefs->ClearPref(kBirchUseRecentTabs);
-  profile_prefs->ClearPref(kBirchUseLastActive);
-  profile_prefs->ClearPref(kBirchUseMostVisited);
-  profile_prefs->ClearPref(kBirchUseSelfShare);
-#endif  // BUILDFLAG(IS_CHROMEOS)
-
-#if BUILDFLAG(ENABLE_DICE_SUPPORT)
-  // Added 06/2024.
-  syncer::SyncPrefs::MaybeMigrateAutofillToPerAccountPref(profile_prefs);
-#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
-
-#if BUILDFLAG(IS_ANDROID)
-  // Added 06/2024
-  feed::prefs::MigrateObsoleteFeedExperimentPref_Jun_2024(profile_prefs);
-#endif  // BUILDFLAG(IS_ANDROID)
-
-  // Added 06/2024.
-  profile_prefs->ClearPref(kDefaultSearchProviderChoicePending);
 
 #if !BUILDFLAG(IS_ANDROID)
   // Added 07/2024.
@@ -2988,6 +2652,8 @@ void MigrateObsoleteProfilePrefs(PrefService* profile_prefs,
   // Added 06/2025.
   profile_prefs->ClearPref(kStorageGarbageCollect);
   profile_prefs->ClearPref(kGaiaCookiePeriodicReportTimeDeprecated);
+  profile_prefs->ClearPref(kWebAuthnCablePairingsPrefName);
+  profile_prefs->ClearPref(kLastUsedPairingFromSyncPublicKey);
 
   // Please don't delete the following line. It is used by PRESUBMIT.py.
   // END_MIGRATE_OBSOLETE_PROFILE_PREFS

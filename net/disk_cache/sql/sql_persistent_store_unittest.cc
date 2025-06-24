@@ -19,8 +19,10 @@
 #include "base/strings/stringprintf.h"
 #include "base/task/thread_pool.h"
 #include "base/test/bind.h"
+#include "base/test/metrics/histogram_tester.h"
 #include "base/test/task_environment.h"
 #include "base/test/test_file_util.h"
+#include "base/test/test_future.h"
 #include "net/base/cache_type.h"
 #include "net/base/io_buffer.h"
 #include "net/disk_cache/sql/cache_entry_key.h"
@@ -70,17 +72,9 @@ class SqlPersistentStoreTest : public testing::Test {
 
   // Initializes the store and waits for the operation to complete.
   SqlPersistentStore::Error Init() {
-    base::RunLoop run_loop;
-    SqlPersistentStore::Error result;
-    store_->Initialize(base::BindOnce(
-        [](base::RunLoop* run_loop, SqlPersistentStore::Error* result,
-           SqlPersistentStore::Error error) {
-          *result = error;
-          run_loop->Quit();
-        },
-        &run_loop, &result));
-    run_loop.Run();
-    return result;
+    base::test::TestFuture<SqlPersistentStore::Error> future;
+    store_->Initialize(future.GetCallback());
+    return future.Get();
   }
 
   void CreateAndInitStore() {
@@ -111,30 +105,16 @@ class SqlPersistentStoreTest : public testing::Test {
 
   // Synchronously gets the entry count.
   int32_t GetEntryCount() {
-    base::RunLoop run_loop;
-    int32_t result = 0;
-    store_->GetEntryCount(base::BindOnce(
-        [](base::RunLoop* run_loop, int32_t* result, int32_t count) {
-          *result = count;
-          run_loop->Quit();
-        },
-        &run_loop, &result));
-    run_loop.Run();
-    return result;
+    base::test::TestFuture<int32_t> future;
+    store_->GetEntryCount(future.GetCallback());
+    return future.Get();
   }
 
   // Synchronously gets the total size of all entries.
   int64_t GetSizeOfAllEntries() {
-    base::RunLoop run_loop;
-    int64_t result = 0;
-    store_->GetSizeOfAllEntries(base::BindOnce(
-        [](base::RunLoop* run_loop, int64_t* result, int64_t size) {
-          *result = size;
-          run_loop->Quit();
-        },
-        &run_loop, &result));
-    run_loop.Run();
-    return result;
+    base::test::TestFuture<int64_t> future;
+    store_->GetSizeOfAllEntries(future.GetCallback());
+    return future.Get();
   }
 
   // Ensures all tasks on the background thread have completed.
@@ -169,63 +149,65 @@ class SqlPersistentStoreTest : public testing::Test {
 
   // Synchronous wrapper for CreateEntry.
   SqlPersistentStore::EntryInfoOrError CreateEntry(const CacheEntryKey& key) {
-    base::RunLoop run_loop;
-    std::optional<SqlPersistentStore::EntryInfoOrError> maybe_result;
-    store_->CreateEntry(key,
-                        base::BindLambdaForTesting(
-                            [&](SqlPersistentStore::EntryInfoOrError result) {
-                              maybe_result = std::move(result);
-                              run_loop.Quit();
-                            }));
-    run_loop.Run();
-    CHECK(maybe_result.has_value());
-    return std::move(*maybe_result);
+    base::test::TestFuture<SqlPersistentStore::EntryInfoOrError> future;
+    store_->CreateEntry(key, future.GetCallback());
+    return future.Take();
   }
 
   // Synchronous wrapper for OpenEntry.
   SqlPersistentStore::OptionalEntryInfoOrError OpenEntry(
       const CacheEntryKey& key) {
-    base::RunLoop run_loop;
-    std::optional<SqlPersistentStore::OptionalEntryInfoOrError> maybe_result;
-    store_->OpenEntry(
-        key, base::BindLambdaForTesting(
-                 [&](SqlPersistentStore::OptionalEntryInfoOrError result) {
-                   maybe_result = std::move(result);
-                   run_loop.Quit();
-                 }));
-    run_loop.Run();
-    CHECK(maybe_result.has_value());
-    return std::move(*maybe_result);
+    base::test::TestFuture<SqlPersistentStore::OptionalEntryInfoOrError> future;
+    store_->OpenEntry(key, future.GetCallback());
+    return future.Take();
   }
 
   // Synchronous wrapper for OpenOrCreateEntry.
   SqlPersistentStore::EntryInfoOrError OpenOrCreateEntry(
       const CacheEntryKey& key) {
-    base::RunLoop run_loop;
-    std::optional<SqlPersistentStore::EntryInfoOrError> maybe_result;
-    store_->OpenOrCreateEntry(
-        key, base::BindLambdaForTesting(
-                 [&](SqlPersistentStore::EntryInfoOrError result) {
-                   maybe_result = std::move(result);
-                   run_loop.Quit();
-                 }));
-    run_loop.Run();
-    CHECK(maybe_result.has_value());
-    return std::move(*maybe_result);
+    base::test::TestFuture<SqlPersistentStore::EntryInfoOrError> future;
+    store_->OpenOrCreateEntry(key, future.GetCallback());
+    return future.Take();
+  }
+
+  // Synchronous wrapper for DoomEntry.
+  SqlPersistentStore::Error DoomEntry(const CacheEntryKey& key,
+                                      const base::UnguessableToken& token) {
+    base::test::TestFuture<SqlPersistentStore::Error> future;
+    store_->DoomEntry(key, token, future.GetCallback());
+    return future.Get();
+  }
+
+  // Synchronous wrapper for DeleteDoomedEntry.
+  SqlPersistentStore::Error DeleteDoomedEntry(
+      const CacheEntryKey& key,
+      const base::UnguessableToken& token) {
+    base::test::TestFuture<SqlPersistentStore::Error> future;
+    store_->DeleteDoomedEntry(key, token, future.GetCallback());
+    return future.Get();
+  }
+
+  // Synchronous wrapper for DeleteLiveEntry.
+  SqlPersistentStore::Error DeleteLiveEntry(const CacheEntryKey& key) {
+    base::test::TestFuture<SqlPersistentStore::Error> future;
+    store_->DeleteLiveEntry(key, future.GetCallback());
+    return future.Get();
   }
 
   // Synchronous wrapper for DeleteAllEntries.
   SqlPersistentStore::Error DeleteAllEntries() {
-    base::RunLoop run_loop;
-    std::optional<SqlPersistentStore::Error> maybe_result;
-    store_->DeleteAllEntries(
-        base::BindLambdaForTesting([&](SqlPersistentStore::Error result) {
-          maybe_result = result;
-          run_loop.Quit();
-        }));
-    run_loop.Run();
-    CHECK(maybe_result.has_value());
-    return *maybe_result;
+    base::test::TestFuture<SqlPersistentStore::Error> future;
+    store_->DeleteAllEntries(future.GetCallback());
+    return future.Get();
+  }
+
+  // Synchronous wrapper for OpenLatestEntryBeforeResId.
+  SqlPersistentStore::OptionalEntryInfoWithIdAndKey OpenLatestEntryBeforeResId(
+      int64_t res_id) {
+    base::test::TestFuture<SqlPersistentStore::OptionalEntryInfoWithIdAndKey>
+        future;
+    store_->OpenLatestEntryBeforeResId(res_id, future.GetCallback());
+    return future.Take();
   }
 
   // Helper to count rows in the resource table.
@@ -234,6 +216,17 @@ class SqlPersistentStoreTest : public testing::Test {
     sql::Statement s(db->GetUniqueStatement("SELECT COUNT(*) FROM resources"));
     CHECK(s.Step());
     return s.ColumnInt(0);
+  }
+
+  // Helper to count doomed rows in the resource table.
+  int64_t CountDoomedResourcesTable(const CacheEntryKey& key) {
+    auto db = ManuallyOpenDatabase();
+    sql::Statement s(db->GetUniqueStatement(
+        "SELECT COUNT(*) FROM resources WHERE cache_key=? AND doomed=?"));
+    s.BindString(0, key.string());
+    s.BindBool(1, true);  // doomed = true
+    CHECK(s.Step());
+    return s.ColumnInt64(0);
   }
 
   base::test::TaskEnvironment task_environment_{
@@ -655,6 +648,368 @@ TEST_F(SqlPersistentStoreTest, OpenEntryInvalidToken) {
             SqlPersistentStore::Error::kInvalidData);
 }
 
+TEST_F(SqlPersistentStoreTest, DoomEntrySuccess) {
+  CreateAndInitStore();
+  const CacheEntryKey kKeyToDoom("key-to-doom");
+  const CacheEntryKey kKeyToKeep("key-to-keep");
+  const int64_t size_to_doom =
+      kSqlBackendStaticResourceSize + kKeyToDoom.string().size();
+  const int64_t size_to_keep =
+      kSqlBackendStaticResourceSize + kKeyToKeep.string().size();
+
+  // Create two entries.
+  auto create_result_to_doom = CreateEntry(kKeyToDoom);
+  ASSERT_TRUE(create_result_to_doom.has_value());
+  auto create_result_to_keep = CreateEntry(kKeyToKeep);
+  ASSERT_TRUE(create_result_to_keep.has_value());
+
+  const auto token_to_doom = create_result_to_doom->token;
+  ASSERT_EQ(GetEntryCount(), 2);
+  ASSERT_EQ(GetSizeOfAllEntries(), size_to_doom + size_to_keep);
+
+  // Doom one of the entries.
+  ASSERT_EQ(DoomEntry(kKeyToDoom, token_to_doom),
+            SqlPersistentStore::Error::kOk);
+
+  // Verify that the entry count and size are updated, reflecting that one entry
+  // was logically removed.
+  EXPECT_EQ(GetEntryCount(), 1);
+  EXPECT_EQ(GetSizeOfAllEntries(), size_to_keep);
+
+  // Verify the doomed entry can no longer be opened.
+  auto open_doomed_result = OpenEntry(kKeyToDoom);
+  ASSERT_TRUE(open_doomed_result.has_value());
+  EXPECT_FALSE(open_doomed_result->has_value());
+
+  // Verify the other entry can still be opened.
+  auto open_kept_result = OpenEntry(kKeyToKeep);
+  ASSERT_TRUE(open_kept_result.has_value());
+  ASSERT_TRUE(open_kept_result->has_value());
+  EXPECT_EQ((*open_kept_result)->token, create_result_to_keep->token);
+
+  // Verify the doomed entry still exists in the table but is marked as doomed,
+  // and the other entry is unaffected.
+  ClearStore();
+  EXPECT_EQ(CountResourcesTable(), 2);
+  EXPECT_EQ(CountDoomedResourcesTable(kKeyToDoom), 1);
+  EXPECT_EQ(CountDoomedResourcesTable(kKeyToKeep), 0);
+}
+
+TEST_F(SqlPersistentStoreTest, DoomEntryFailsNotFound) {
+  CreateAndInitStore();
+  const CacheEntryKey kKey("non-existent-key");
+  ASSERT_EQ(GetEntryCount(), 0);
+
+  // Attempt to doom an entry that doesn't exist.
+  auto result = DoomEntry(kKey, base::UnguessableToken::Create());
+  ASSERT_EQ(result, SqlPersistentStore::Error::kNotFound);
+
+  // Verify that the counts remain unchanged.
+  EXPECT_EQ(GetEntryCount(), 0);
+  EXPECT_EQ(GetSizeOfAllEntries(), 0);
+}
+
+TEST_F(SqlPersistentStoreTest, DoomEntryFailsWrongToken) {
+  CreateAndInitStore();
+  const CacheEntryKey kKey1("key1");
+  const CacheEntryKey kKey2("key2");
+  const int64_t size1 = kSqlBackendStaticResourceSize + kKey1.string().size();
+  const int64_t size2 = kSqlBackendStaticResourceSize + kKey2.string().size();
+
+  // Create two entries.
+  auto create_result1 = CreateEntry(kKey1);
+  ASSERT_TRUE(create_result1.has_value());
+  auto create_result2 = CreateEntry(kKey2);
+  ASSERT_TRUE(create_result2.has_value());
+  ASSERT_EQ(GetEntryCount(), 2);
+
+  // Attempt to doom key1 with an incorrect token.
+  auto result = DoomEntry(kKey1, base::UnguessableToken::Create());
+  ASSERT_EQ(result, SqlPersistentStore::Error::kNotFound);
+
+  // Verify that the counts remain unchanged and both entries can still be
+  // opened.
+  EXPECT_EQ(GetEntryCount(), 2);
+  EXPECT_EQ(GetSizeOfAllEntries(), size1 + size2);
+
+  auto open_result1 = OpenEntry(kKey1);
+  ASSERT_TRUE(open_result1.has_value());
+  ASSERT_TRUE(open_result1->has_value());
+  EXPECT_EQ((*open_result1)->token, create_result1->token);
+
+  auto open_result2 = OpenEntry(kKey2);
+  ASSERT_TRUE(open_result2.has_value());
+  ASSERT_TRUE(open_result2->has_value());
+  EXPECT_EQ((*open_result2)->token, create_result2->token);
+}
+
+TEST_F(SqlPersistentStoreTest, DoomEntryWithCorruptSizeRecovers) {
+  CreateAndInitStore();
+  const CacheEntryKey kKeyToCorrupt("key-to-corrupt");
+  const CacheEntryKey kKeyToKeep("key-to-keep");
+  const int64_t keep_key_size = kKeyToKeep.string().size();
+  const int64_t expected_size_after_recovery =
+      kSqlBackendStaticResourceSize + keep_key_size;
+
+  // Create one entry to keep, and one to corrupt and doom.
+  auto create_corrupt_result = CreateEntry(kKeyToCorrupt);
+  ASSERT_TRUE(create_corrupt_result.has_value());
+  ASSERT_TRUE(CreateEntry(kKeyToKeep).has_value());
+  ASSERT_EQ(GetEntryCount(), 2);
+  const auto token_to_doom = create_corrupt_result->token;
+  ClearStore();
+
+  // Manually open the database and corrupt the `bytes_usage` for one entry
+  // to an extreme value that will cause an overflow during calculation.
+  {
+    auto db = ManuallyOpenDatabase();
+    sql::Statement statement(db->GetUniqueStatement(
+        "UPDATE resources SET bytes_usage = ? WHERE cache_key = ?"));
+    statement.BindInt64(0, std::numeric_limits<int64_t>::min());
+    statement.BindString(1, kKeyToCorrupt.string());
+    ASSERT_TRUE(statement.Run());
+  }
+
+  // Re-initialize the store with the corrupted database.
+  CreateAndInitStore();
+
+  // Doom the entry with the corrupted size. This will trigger an overflow in
+  // `total_size_delta`, causing `!total_size_delta.IsValid()` to be true.
+  // The store should recover by recalculating its state from the database.
+  ASSERT_EQ(DoomEntry(kKeyToCorrupt, token_to_doom),
+            SqlPersistentStore::Error::kOk);
+
+  // Verify that recovery was successful. The entry count should be 1 (for the
+  // entry we kept), and the total size should be correctly calculated for
+  // that single remaining entry, ignoring the corrupted value.
+  EXPECT_EQ(GetEntryCount(), 1);
+  EXPECT_EQ(GetSizeOfAllEntries(), expected_size_after_recovery);
+
+  // Verify the state on disk.
+  ClearStore();
+  // Both entries should still exist in the table.
+  EXPECT_EQ(CountResourcesTable(), 2);
+  // The corrupted entry should be marked as doomed.
+  EXPECT_EQ(CountDoomedResourcesTable(kKeyToCorrupt), 1);
+  // The other entry should be unaffected.
+  EXPECT_EQ(CountDoomedResourcesTable(kKeyToKeep), 0);
+}
+
+TEST_F(SqlPersistentStoreTest, DeleteDoomedEntrySuccess) {
+  CreateAndInitStore();
+  const CacheEntryKey kKey("my-key");
+
+  // Create and doom an entry.
+  auto create_result = CreateEntry(kKey);
+  ASSERT_TRUE(create_result.has_value());
+  const auto token = create_result->token;
+  ASSERT_EQ(DoomEntry(kKey, token), SqlPersistentStore::Error::kOk);
+  ASSERT_EQ(GetEntryCount(), 0);
+  ClearStore();
+  ASSERT_EQ(CountResourcesTable(), 1);
+  CreateAndInitStore();
+
+  // Delete the doomed entry.
+  ASSERT_EQ(DeleteDoomedEntry(kKey, token), SqlPersistentStore::Error::kOk);
+
+  // Verify the entry is now physically gone from the database.
+  ClearStore();
+  EXPECT_EQ(CountResourcesTable(), 0);
+}
+
+TEST_F(SqlPersistentStoreTest, DeleteDoomedEntryFailsOnLiveEntry) {
+  CreateAndInitStore();
+  const CacheEntryKey kKey("my-key");
+
+  // Create a live entry.
+  auto create_result = CreateEntry(kKey);
+  ASSERT_TRUE(create_result.has_value());
+  const auto token = create_result->token;
+  ASSERT_EQ(GetEntryCount(), 1);
+
+  // Attempt to delete it with DeleteDoomedEntry. This should fail because the
+  // entry is not marked as doomed.
+  auto result = DeleteDoomedEntry(kKey, token);
+  ASSERT_EQ(result, SqlPersistentStore::Error::kNotFound);
+
+  // Verify the entry still exists.
+  EXPECT_EQ(GetEntryCount(), 1);
+  ClearStore();
+  EXPECT_EQ(CountResourcesTable(), 1);
+}
+
+TEST_F(SqlPersistentStoreTest, DeleteLiveEntrySuccess) {
+  CreateAndInitStore();
+  const CacheEntryKey kKeyToDelete("key-to-delete");
+  const CacheEntryKey kKeyToKeep("key-to-keep");
+  const int64_t size_to_delete =
+      kSqlBackendStaticResourceSize + kKeyToDelete.string().size();
+  const int64_t size_to_keep =
+      kSqlBackendStaticResourceSize + kKeyToKeep.string().size();
+
+  // Create two entries.
+  ASSERT_TRUE(CreateEntry(kKeyToDelete).has_value());
+  auto create_result_to_keep = CreateEntry(kKeyToKeep);
+  ASSERT_TRUE(create_result_to_keep.has_value());
+  ASSERT_EQ(GetEntryCount(), 2);
+  ASSERT_EQ(GetSizeOfAllEntries(), size_to_delete + size_to_keep);
+
+  // Delete one of the live entries.
+  ASSERT_EQ(DeleteLiveEntry(kKeyToDelete), SqlPersistentStore::Error::kOk);
+
+  // Verify the cache is updated correctly.
+  EXPECT_EQ(GetEntryCount(), 1);
+  EXPECT_EQ(GetSizeOfAllEntries(), size_to_keep);
+
+  // Verify the deleted entry cannot be opened.
+  auto open_deleted_result = OpenEntry(kKeyToDelete);
+  ASSERT_TRUE(open_deleted_result.has_value());
+  EXPECT_FALSE(open_deleted_result->has_value());
+
+  // Verify the other entry can still be opened.
+  auto open_kept_result = OpenEntry(kKeyToKeep);
+  ASSERT_TRUE(open_kept_result.has_value());
+  ASSERT_TRUE(open_kept_result->has_value());
+  EXPECT_EQ((*open_kept_result)->token, create_result_to_keep->token);
+
+  // Verify the entry is physically gone from the database.
+  ClearStore();
+  EXPECT_EQ(CountResourcesTable(), 1);
+}
+
+TEST_F(SqlPersistentStoreTest, DeleteLiveEntryFailsNotFound) {
+  CreateAndInitStore();
+  const CacheEntryKey kKey("non-existent-key");
+  ASSERT_EQ(GetEntryCount(), 0);
+
+  // Attempt to delete an entry that doesn't exist.
+  auto result = DeleteLiveEntry(kKey);
+  ASSERT_EQ(result, SqlPersistentStore::Error::kNotFound);
+}
+
+TEST_F(SqlPersistentStoreTest, DeleteLiveEntryFailsOnDoomedEntry) {
+  CreateAndInitStore();
+  const CacheEntryKey kDoomedKey("doomed-key");
+  const CacheEntryKey kLiveKey("live-key");
+  const int64_t live_key_size =
+      kSqlBackendStaticResourceSize + kLiveKey.string().size();
+
+  // Create one live entry and one entry that will be doomed.
+  auto create_doomed_result = CreateEntry(kDoomedKey);
+  ASSERT_TRUE(create_doomed_result.has_value());
+  ASSERT_TRUE(CreateEntry(kLiveKey).has_value());
+
+  // Doom one of the entries.
+  ASSERT_EQ(DoomEntry(kDoomedKey, create_doomed_result->token),
+            SqlPersistentStore::Error::kOk);
+  // After dooming, one entry is live, one is doomed (logically removed).
+  ASSERT_EQ(GetEntryCount(), 1);
+  ASSERT_EQ(GetSizeOfAllEntries(), live_key_size);
+
+  // Attempt to delete the doomed entry with DeleteLiveEntry. This should fail
+  // because it's not "live".
+  auto result = DeleteLiveEntry(kDoomedKey);
+  ASSERT_EQ(result, SqlPersistentStore::Error::kNotFound);
+
+  // Verify that the live entry was not affected.
+  EXPECT_EQ(GetEntryCount(), 1);
+  auto open_live_result = OpenEntry(kLiveKey);
+  ASSERT_TRUE(open_live_result.has_value());
+  ASSERT_TRUE(open_live_result->has_value());
+
+  // Verify the doomed entry still exists in the table (as doomed), and the
+  // live entry is also present.
+  ClearStore();
+  EXPECT_EQ(CountResourcesTable(), 2);
+  EXPECT_EQ(CountDoomedResourcesTable(kDoomedKey), 1);
+  EXPECT_EQ(CountDoomedResourcesTable(kLiveKey), 0);
+}
+
+TEST_F(SqlPersistentStoreTest, DeleteLiveEntryWithCorruptTokenRecovers) {
+  CreateAndInitStore();
+  const CacheEntryKey kKeyToCorrupt("key-to-corrupt-token");
+  const CacheEntryKey kKeyToKeep("key-to-keep");
+  const int64_t keep_key_size = kKeyToKeep.string().size();
+  const int64_t expected_size_after_recovery =
+      kSqlBackendStaticResourceSize + keep_key_size;
+
+  // Create one entry to keep, and one to corrupt and delete.
+  ASSERT_TRUE(CreateEntry(kKeyToCorrupt).has_value());
+  ASSERT_TRUE(CreateEntry(kKeyToKeep).has_value());
+  ASSERT_EQ(GetEntryCount(), 2);
+  ClearStore();
+
+  // Manually open the database and corrupt the token for one entry so that
+  // it becomes invalid.
+  {
+    auto db = ManuallyOpenDatabase();
+    sql::Statement statement(db->GetUniqueStatement(
+        "UPDATE resources SET token_high = 0, token_low = 0 WHERE cache_key = "
+        "?"));
+    statement.BindString(0, kKeyToCorrupt.string());
+    ASSERT_TRUE(statement.Run());
+  }
+
+  // Re-initialize the store with the corrupted database.
+  CreateAndInitStore();
+
+  // Delete the entry with the corrupted token. This will trigger the
+  // `corruption_detected` path, forcing a full recalculation.
+  ASSERT_EQ(DeleteLiveEntry(kKeyToCorrupt), SqlPersistentStore::Error::kOk);
+
+  // Verify that recovery was successful. The entry count and total size
+  // should now reflect only the entry that was kept.
+  EXPECT_EQ(GetEntryCount(), 1);
+  EXPECT_EQ(GetSizeOfAllEntries(), expected_size_after_recovery);
+
+  // Verify the state on disk. Only the un-corrupted entry should remain.
+  ClearStore();
+  EXPECT_EQ(CountResourcesTable(), 1);
+}
+
+TEST_F(SqlPersistentStoreTest, DeleteLiveEntryWithCorruptSizeRecovers) {
+  CreateAndInitStore();
+  const CacheEntryKey kKeyToCorrupt("key-to-corrupt-size");
+  const CacheEntryKey kKeyToKeep("key-to-keep");
+  const int64_t keep_key_size = kKeyToKeep.string().size();
+  const int64_t expected_size_after_recovery =
+      kSqlBackendStaticResourceSize + keep_key_size;
+
+  // Create one entry to keep, and one to corrupt and delete.
+  ASSERT_TRUE(CreateEntry(kKeyToCorrupt).has_value());
+  ASSERT_TRUE(CreateEntry(kKeyToKeep).has_value());
+  ASSERT_EQ(GetEntryCount(), 2);
+  ClearStore();
+
+  // Manually open the database and corrupt the `bytes_usage` for one entry
+  // to an extreme value that will cause an underflow during calculation.
+  {
+    auto db = ManuallyOpenDatabase();
+    sql::Statement statement(db->GetUniqueStatement(
+        "UPDATE resources SET bytes_usage = ? WHERE cache_key = ?"));
+    statement.BindInt64(0, std::numeric_limits<int64_t>::max());
+    statement.BindString(1, kKeyToCorrupt.string());
+    ASSERT_TRUE(statement.Run());
+  }
+
+  // Re-initialize the store with the corrupted database.
+  CreateAndInitStore();
+
+  // Delete the entry with the corrupted size. This will trigger an underflow
+  // in `total_size_delta`, causing `!total_size_delta.IsValid()` to be true.
+  // The store should recover by recalculating its state from the database.
+  ASSERT_EQ(DeleteLiveEntry(kKeyToCorrupt), SqlPersistentStore::Error::kOk);
+
+  // Verify that recovery was successful. The entry count and total size
+  // should now reflect only the entry that was kept.
+  EXPECT_EQ(GetEntryCount(), 1);
+  EXPECT_EQ(GetSizeOfAllEntries(), expected_size_after_recovery);
+
+  // Verify the state on disk. Only the un-corrupted entry should remain.
+  ClearStore();
+  EXPECT_EQ(CountResourcesTable(), 1);
+}
+
 TEST_F(SqlPersistentStoreTest, DeleteAllEntriesNonEmpty) {
   CreateAndInitStore();
   const CacheEntryKey kKey1("key1");
@@ -845,6 +1200,152 @@ TEST_F(SqlPersistentStoreTest, StaticResourceSizeEstimation) {
          "be too conservative.";
 }
 
+TEST_F(SqlPersistentStoreTest, OpenLatestEntryBeforeResIdEmptyCache) {
+  CreateAndInitStore();
+  auto result = OpenLatestEntryBeforeResId(std::numeric_limits<int64_t>::max());
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(SqlPersistentStoreTest, OpenLatestEntryBeforeResIdSingleEntry) {
+  CreateAndInitStore();
+  const CacheEntryKey kKey("my-key");
+
+  auto create_result = CreateEntry(kKey);
+  ASSERT_TRUE(create_result.has_value());
+
+  // Open the first (and only) entry.
+  auto next_result1 =
+      OpenLatestEntryBeforeResId(std::numeric_limits<int64_t>::max());
+  ASSERT_TRUE(next_result1.has_value());
+  EXPECT_EQ(next_result1->key, kKey);
+  EXPECT_EQ(next_result1->info.token, create_result->token);
+  EXPECT_TRUE(next_result1->info.opened);
+  EXPECT_EQ(next_result1->info.body_end, 0);
+  ASSERT_NE(next_result1->info.head, nullptr);
+  EXPECT_EQ(next_result1->info.head->size(), 0);
+
+  // Try to open again, should be no more entries.
+  auto next_result2 = OpenLatestEntryBeforeResId(next_result1->res_id);
+  EXPECT_FALSE(next_result2.has_value());
+}
+
+TEST_F(SqlPersistentStoreTest, OpenLatestEntryBeforeResIdMultipleEntries) {
+  CreateAndInitStore();
+  const CacheEntryKey kKey1("key1");
+  const CacheEntryKey kKey2("key2");
+  const CacheEntryKey kKey3("key3");
+
+  auto create_result1 = CreateEntry(kKey1);
+  ASSERT_TRUE(create_result1.has_value());
+  auto create_result2 = CreateEntry(kKey2);
+  ASSERT_TRUE(create_result2.has_value());
+  auto create_result3 = CreateEntry(kKey3);
+  ASSERT_TRUE(create_result3.has_value());
+
+  // Entries should be returned in reverse order of creation (descending
+  // res_id).
+  auto next_result =
+      OpenLatestEntryBeforeResId(std::numeric_limits<int64_t>::max());
+  ASSERT_TRUE(next_result.has_value());
+  EXPECT_EQ(next_result->key, kKey3);
+  EXPECT_EQ(next_result->info.token, create_result3->token);
+  const int64_t res_id3 = next_result->res_id;
+
+  next_result = OpenLatestEntryBeforeResId(res_id3);
+  ASSERT_TRUE(next_result.has_value());
+  EXPECT_EQ(next_result->key, kKey2);
+  EXPECT_EQ(next_result->info.token, create_result2->token);
+  const int64_t res_id2 = next_result->res_id;
+
+  next_result = OpenLatestEntryBeforeResId(res_id2);
+  ASSERT_TRUE(next_result.has_value());
+  EXPECT_EQ(next_result->key, kKey1);
+  EXPECT_EQ(next_result->info.token, create_result1->token);
+  const int64_t res_id1 = next_result->res_id;
+
+  next_result = OpenLatestEntryBeforeResId(res_id1);
+  EXPECT_FALSE(next_result.has_value());
+}
+
+TEST_F(SqlPersistentStoreTest, OpenLatestEntryBeforeResIdSkipsDoomed) {
+  CreateAndInitStore();
+  const CacheEntryKey kKey1("key1");
+  const CacheEntryKey kKeyToDoom("key-to-doom");
+  const CacheEntryKey kKey3("key3");
+
+  auto create_result1 = CreateEntry(kKey1);
+  ASSERT_TRUE(create_result1.has_value());
+  auto create_result_doomed = CreateEntry(kKeyToDoom);
+  ASSERT_TRUE(create_result_doomed.has_value());
+  auto create_result3 = CreateEntry(kKey3);
+  ASSERT_TRUE(create_result3.has_value());
+
+  // Doom the middle entry.
+  ASSERT_EQ(DoomEntry(kKeyToDoom, create_result_doomed->token),
+            SqlPersistentStore::Error::kOk);
+
+  // OpenLatestEntryBeforeResId should skip the doomed entry.
+  auto next_result =
+      OpenLatestEntryBeforeResId(std::numeric_limits<int64_t>::max());
+  ASSERT_TRUE(next_result.has_value());
+  EXPECT_EQ(next_result->key, kKey3);  // Should be kKey3
+  const int64_t res_id3 = next_result->res_id;
+
+  next_result = OpenLatestEntryBeforeResId(res_id3);
+  ASSERT_TRUE(next_result.has_value());
+  EXPECT_EQ(next_result->key, kKey1);  // Should skip kKeyToDoom and get kKey1
+  const int64_t res_id1 = next_result->res_id;
+
+  next_result = OpenLatestEntryBeforeResId(res_id1);
+  EXPECT_FALSE(next_result.has_value());
+}
+
+TEST_F(SqlPersistentStoreTest, OpenLatestEntryBeforeResIdSkipsInvalidToken) {
+  CreateAndInitStore();
+  const CacheEntryKey kKeyValidBefore("valid-before");
+  const CacheEntryKey kKeyInvalid("invalid-token-key");
+  const CacheEntryKey kKeyValidAfter("valid-after");
+
+  ASSERT_TRUE(CreateEntry(kKeyValidBefore).has_value());
+  auto create_invalid_result = CreateEntry(kKeyInvalid);
+  ASSERT_TRUE(create_invalid_result.has_value());
+  auto create_valid_after_result = CreateEntry(kKeyValidAfter);
+  ASSERT_TRUE(create_valid_after_result.has_value());
+
+  ClearStore();  // Close the store to modify DB directly.
+
+  // Manually corrupt the token for kKeyInvalid.
+  {
+    auto db = ManuallyOpenDatabase();
+    sql::Statement statement(db->GetUniqueStatement(
+        "UPDATE resources SET token_high=0, token_low=0 WHERE cache_key=?"));
+    statement.BindString(0, kKeyInvalid.string());
+    ASSERT_TRUE(statement.Run());
+  }
+
+  CreateAndInitStore();  // Re-open the store.
+
+  // kKeyValidAfter should be returned first.
+  auto next_result =
+      OpenLatestEntryBeforeResId(std::numeric_limits<int64_t>::max());
+  ASSERT_TRUE(next_result.has_value());
+  EXPECT_EQ(next_result->key, kKeyValidAfter);
+
+  base::HistogramTester histogram_tester;
+  // kKeyInvalid should be skipped, kKeyValidBefore should be next.
+  next_result = OpenLatestEntryBeforeResId(next_result->res_id);
+  ASSERT_TRUE(next_result.has_value());
+  EXPECT_EQ(next_result->key, kKeyValidBefore);
+  // Verify that kInvalidData was recorded in the histogram when skipping.
+  histogram_tester.ExpectUniqueSample(
+      "Net.SqlDiskCache.Backend.OpenLatestEntryBeforeResId.Result",
+      SqlPersistentStore::Error::kInvalidData, 1);
+
+  // No more valid entries.
+  next_result = OpenLatestEntryBeforeResId(next_result->res_id);
+  EXPECT_FALSE(next_result.has_value());
+}
+
 TEST_F(SqlPersistentStoreTest, InitializeCallbackNotRunOnStoreDestruction) {
   CreateStore();
   bool callback_run = false;
@@ -908,6 +1409,59 @@ TEST_F(SqlPersistentStoreTest,
   EXPECT_FALSE(callback_run);
 }
 
+TEST_F(SqlPersistentStoreTest, DoomEntryCallbackNotRunOnStoreDestruction) {
+  CreateAndInitStore();
+  const CacheEntryKey kKey("my-key");
+  auto create_result = CreateEntry(kKey);
+  ASSERT_TRUE(create_result.has_value());
+
+  bool callback_run = false;
+  store_->DoomEntry(kKey, create_result->token,
+                    base::BindLambdaForTesting([&](SqlPersistentStore::Error) {
+                      callback_run = true;
+                    }));
+  store_.reset();
+  FlushPendingTask();
+
+  EXPECT_FALSE(callback_run);
+}
+
+TEST_F(SqlPersistentStoreTest,
+       DeleteDoomedEntryCallbackNotRunOnStoreDestruction) {
+  CreateAndInitStore();
+  const CacheEntryKey kKey("my-key");
+  auto create_result = CreateEntry(kKey);
+  ASSERT_TRUE(create_result.has_value());
+  ASSERT_EQ(DoomEntry(kKey, create_result->token),
+            SqlPersistentStore::Error::kOk);
+
+  bool callback_run = false;
+  store_->DeleteDoomedEntry(
+      kKey, create_result->token,
+      base::BindLambdaForTesting(
+          [&](SqlPersistentStore::Error) { callback_run = true; }));
+  store_.reset();
+  FlushPendingTask();
+
+  EXPECT_FALSE(callback_run);
+}
+
+TEST_F(SqlPersistentStoreTest,
+       DeleteLiveEntryCallbackNotRunOnStoreDestruction) {
+  CreateAndInitStore();
+  const CacheEntryKey kKey("my-key");
+  ASSERT_TRUE(CreateEntry(kKey).has_value());
+
+  bool callback_run = false;
+  store_->DeleteLiveEntry(
+      kKey, base::BindLambdaForTesting(
+                [&](SqlPersistentStore::Error) { callback_run = true; }));
+  store_.reset();
+  FlushPendingTask();
+
+  EXPECT_FALSE(callback_run);
+}
+
 TEST_F(SqlPersistentStoreTest,
        DeleteAllEntriesCallbackNotRunOnStoreDestruction) {
   CreateAndInitStore();
@@ -915,6 +1469,23 @@ TEST_F(SqlPersistentStoreTest,
 
   store_->DeleteAllEntries(base::BindLambdaForTesting(
       [&](SqlPersistentStore::Error) { callback_run = true; }));
+  store_.reset();
+  FlushPendingTask();
+
+  EXPECT_FALSE(callback_run);
+}
+
+TEST_F(SqlPersistentStoreTest,
+       OpenLatestEntryBeforeResIdCallbackNotRunOnStoreDestruction) {
+  CreateAndInitStore();
+  bool callback_run = false;
+
+  store_->OpenLatestEntryBeforeResId(
+      std::numeric_limits<int64_t>::max(),
+      base::BindLambdaForTesting(
+          [&](SqlPersistentStore::OptionalEntryInfoWithIdAndKey) {
+            callback_run = true;
+          }));
   store_.reset();
   FlushPendingTask();
 

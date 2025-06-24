@@ -339,11 +339,11 @@ public class TabModelImpl extends TabModelJniBridge {
 
     @Override
     public void moveTab(int id, int newIndex) {
-        newIndex = MathUtils.clamp(newIndex, 0, mTabs.size());
+        newIndex = MathUtils.clamp(newIndex, 0, mTabs.size() - 1);
 
         int curIndex = TabModelUtils.getTabIndexById(this, id);
 
-        if (curIndex == INVALID_TAB_INDEX || curIndex == newIndex || curIndex + 1 == newIndex) {
+        if (curIndex == INVALID_TAB_INDEX || curIndex == newIndex) {
             return;
         }
 
@@ -351,7 +351,6 @@ public class TabModelImpl extends TabModelJniBridge {
         commitAllTabClosures();
 
         Tab tab = mTabs.remove(curIndex);
-        if (curIndex < newIndex) --newIndex;
 
         assert tab != null : "Attempting to move a tab that is null.";
         mTabs.add(newIndex, tab);
@@ -369,6 +368,16 @@ public class TabModelImpl extends TabModelJniBridge {
         }
 
         for (TabModelObserver obs : mObservers) obs.didMoveTab(tab, newIndex, curIndex);
+    }
+
+    @Override
+    public void pinTab(int tabId) {
+        // TODO(crbug.com/426530785): Implement this method.
+    }
+
+    @Override
+    public void unpinTab(int tabId) {
+        // TODO(crbug.com/426530785): Implement this method.
     }
 
     private @Nullable Tab findTabInAllTabModels(int tabId) {

@@ -112,6 +112,7 @@
 <translation id="5556417849629758491">સ્ટોરની માહિતી જુઓ, વિકલ્પ સ્ક્રીનની ટોચની નજીક ઉપલબ્ધ છે</translation>
 <translation id="5627941783489838464">ટૅબ સંબંધી કોઈ અપડેટ નથી</translation>
 <translation id="5656738671621697952">{TABS_COUNT,plural, =1{Chromeમાંથી <ph name="TABS_COUNT_ONE" /> લિંક}one{Chromeમાંથી <ph name="TABS_COUNT_MANY" /> લિંક}other{Chromeમાંથી <ph name="TABS_COUNT_MANY" /> લિંક}}</translation>
+<translation id="5746204836956568669">વધુ ઝડપથી કામ કરવા માટે <ph name="NUMBER_OF_TABS" />ને ગ્રૂપ કરીએ?</translation>
 <translation id="58326064309361797">ટૅબનું ગ્રૂપ બનાવવા માટે તેને ખેંચો</translation>
 <translation id="5901630391730855834">પીળો</translation>
 <translation id="5972844218283131174">તમામને નાપસંદ કરો</translation>
@@ -192,6 +193,7 @@
 <translation id="8374451057714760401">{NUM_MONTHS,plural, =1{<ph name="NUM_MONTHS_ONE" /> મહિના પહેલાં અપડેટ કરવામાં આવ્યું}one{<ph name="NUM_MONTHS_MANY" /> મહિના પહેલાં અપડેટ કરવામાં આવ્યું}other{<ph name="NUM_MONTHS_MANY" /> મહિના પહેલાં અપડેટ કરવામાં આવ્યું}}</translation>
 <translation id="8398929769197326728">નવું ફોલ્ડર - <ph name="CURRENT_TIMESTAMP_MS" /></translation>
 <translation id="8428213095426709021">સેટિંગ</translation>
+<translation id="855081842937141170">ટૅબ પિન કરો</translation>
 <translation id="8633025649649592204">તાજેતરની પ્રવૃત્તિ</translation>
 <translation id="8712637175834984815">સમજાઈ ગયું</translation>
 <translation id="8714939927607906138">ઓછી કિંમત</translation>
@@ -200,7 +202,6 @@
 <translation id="875848103419578654">{NUM_MONTHS,plural, =1{<ph name="NUM_MONTHS_ONE" /> મહિના પહેલાં બનાવ્યું}one{<ph name="NUM_MONTHS_MANY" /> મહિના પહેલાં બનાવ્યું}other{<ph name="NUM_MONTHS_MANY" /> મહિના પહેલાં બનાવ્યું}}</translation>
 <translation id="8813708480179818649">ગ્રૂપમાંથી ટૅબ કાઢી નાખો</translation>
 <translation id="8820741577754260431">તમારી ટૅબ પર કિંમતમાં ઘટાડા વિશેની માહિતી જુઓ</translation>
-<translation id="883379923675618699">Chrome નિષ્ક્રિય વિભાગમાંની આઇટમને ઑટોમૅટિક રીતે બંધ કરે છે, જેનો તમારા 3 મહિનામાં ઉપયોગ ન કર્યો હોય. તમે સેટિંગમાં જઈને આને અત્યારે અથવા કોઈપણ સમયે બંધ કરી શકો છો.</translation>
 <translation id="8887921976452567404">તમારા બંધ થયેલા ટૅબ અને ગ્રૂપ તાજેતરના ટૅબ વિભાગ અને ટૅબના ગ્રૂપ વિભાગમાંથી ફરીથી ખોલી શકાય છે.</translation>
 <translation id="8915916167043355778">બધા બંધ કરો</translation>
 <translation id="9090098097337832354">આ સ્ટોર વિશેની માહિતી બતાવવાની બંધ કરી છે</translation>

@@ -447,6 +447,10 @@
       "external/wpt/css/css-inline/text-box-trim/text-box-trim-line-clamp-002.html",
       "external/wpt/css/css-text/white-space/text-wrap-balance-005.html",
       "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-001.html",
+      "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-002.html",
+      "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-003.html",
+      "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-004.html",
+      "external/wpt/css/css-text/white-space/text-wrap-pretty-line-clamp-crash-001.html",
       "fast/deprecated-flexbox/dynamically-change-line-clamp.html",
       "fast/deprecated-flexbox/line-clamp-crash.html",
       "fast/deprecated-flexbox/line-clamp-removed-dynamically.html",
@@ -744,6 +748,12 @@
       "external/wpt/css/css-overflow/line-clamp",
       "external/wpt/css/css-overflow/parsing",
       "external/wpt/css/css-inline/text-box-trim/text-box-trim-line-clamp-001.html",
+      "external/wpt/css/css-text/white-space/text-wrap-balance-005.html",
+      "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-001.html",
+      "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-002.html",
+      "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-003.html",
+      "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-004.html",
+      "external/wpt/css/css-text/white-space/text-wrap-pretty-line-clamp-crash-001.html",
       "fast/overflow"
     ],
     "args": [
@@ -1676,7 +1686,7 @@
     "expires": "never"
   },
   {
-    "prefix": "interest-target-no-partial-interest",
+    "prefix": "interest-for-no-partial-interest",
     "owners": [
       "masonf@chromium.org"
     ],
@@ -1686,10 +1696,10 @@
       "Win"
     ],
     "bases": [
-      "external/wpt/html/semantics/the-button-element/interest-target"
+      "external/wpt/html/semantics/the-button-element/interest-for"
     ],
     "args": [
-      "--enable-blink-features=HTMLInterestTargetNoPartialInterest,HTMLInterestTargetAttribute"
+      "--enable-blink-features=HTMLInterestForNoPartialInterest,HTMLInterestForAttribute"
     ],
     "expires": "Dec 1, 2025"
   },
@@ -2055,6 +2065,19 @@
       "--use-gpu-in-tests"
     ],
     "expires": "Dec 1, 2024"
+  },
+  {
+    "prefix": "network-service-scheduler",
+    "owners": ["hayato@chromium.org"],
+    "platforms": ["Android", "Mac", "Win", "Linux"],
+    "bases": [
+      "external/wpt/fetch/api/",
+      "external/wpt/loading/"
+    ],
+    "args": [
+      "--enable-features=NetworkServiceScheduler"
+    ],
+    "expires": "Jun 20, 2026"
   },
   "This suite is incompatible with the default WPT Origin Isolation mode of ",
   "Site Isolation (see",
@@ -5906,5 +5929,24 @@
       "--force-color-profile=display-p3-d65"
     ],
     "expires": "Jul 1, 2026"
+  },
+  {
+    "prefix": "script-src-hashes-v1-enabled",
+    "owners": [
+      "carlosil@chromium.org",
+      "meacer@chromium.org"
+    ],
+    "platforms": [
+      "Linux",
+      "Mac",
+      "Win"
+    ],
+    "bases": [
+      "external/wpt/content-security-policy/unsafe-eval/tentative"
+    ],
+    "args": [
+      "--enable-features=ScriptSrcHashesV1"
+    ],
+    "expires": "Aug 1, 2025"
   }
 ]

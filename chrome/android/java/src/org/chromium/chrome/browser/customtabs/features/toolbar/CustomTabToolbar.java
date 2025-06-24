@@ -22,6 +22,7 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.SpannableString;
@@ -62,6 +63,7 @@ import androidx.core.widget.ImageViewCompat;
 import org.chromium.base.Callback;
 import org.chromium.base.CallbackController;
 import org.chromium.base.ObserverList;
+import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.supplier.ObservableSupplierImpl;
 import org.chromium.base.supplier.Supplier;
@@ -152,6 +154,7 @@ import org.chromium.url.GURL;
 
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /** The Toolbar layout to be used for a custom tab. This is used for both phone and tablet UIs. */
 public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickListener {
@@ -240,13 +243,22 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
         /** A handler for taps on the omnibox, or null if the default handler should be used. */
         @Nullable public Consumer<Tab> tapHandler;
 
+        /**
+         * A handler for taps on the omnibox.
+         * The function returns true if the tap was handled, false otherwise.
+         */
+        public Function<Tab, Boolean> tapHandlerWithVerification;
+
+
         public OmniboxParams(
                 SearchActivityClient searchClient,
                 String clientPackageName,
-                @Nullable Consumer<Tab> tapHandler) {
+                @Nullable Consumer<Tab> tapHandler,
+                Function<Tab, Boolean> tapHandlerWithVerification) {
             this.searchClient = searchClient;
             this.clientPackageName = clientPackageName;
             this.tapHandler = tapHandler;
+            this.tapHandlerWithVerification = tapHandlerWithVerification;
         }
     }
 
@@ -1476,11 +1488,21 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
         private boolean initializeOptionalButton() {
             if (mOptionalButtonCoordinator != null) return true;
 
-            if (!ChromeFeatureList.sCctAdaptiveButton.isEnabled()
-                    || hasMultipleDevButtons()
-                    || CustomTabsConnection.getInstance()
-                            .shouldEnableOmniboxForIntent(mIntentDataProvider)) {
+            if (!ChromeFeatureList.sCctAdaptiveButton.isEnabled()) return false;
+            if (hasMultipleDevButtons()) {
+                RecordHistogram.recordEnumeratedHistogram(
+                        "CustomTabs.AdaptiveToolbarButton.HiddenReason",
+                        CustomTabMtbHiddenReason.NO_BUTTON_SPACE,
+                        CustomTabMtbHiddenReason.COUNT);
+                return false;
+            }
+            if (CustomTabsConnection.getInstance()
+                    .shouldEnableOmniboxForIntent(mIntentDataProvider)) {
                 // We disable the optional button when omnibox in CCT is on.
+                RecordHistogram.recordEnumeratedHistogram(
+                        "CustomTabs.AdaptiveToolbarButton.HiddenReason",
+                        CustomTabMtbHiddenReason.OMNIBOX_ENABLED,
+                        CustomTabMtbHiddenReason.COUNT);
                 return false;
             }
 
@@ -1558,6 +1580,14 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
                 firstButton.setPaddingRelative(
                         paddingStart, /* top= */ 0, /* end= */ 0, /* bottom= */ 0);
             }
+            if (ChromeFeatureList.getFieldTrialParamByFeatureAsBoolean(
+                    ChromeFeatureList.CCT_ADAPTIVE_BUTTON_TEST_SWITCH, "always-animate", false)) {
+                mOptionalButtonCoordinator.setAlwaysShowActionChip(true);
+            }
+            if (ChromeFeatureList.getFieldTrialParamByFeatureAsBoolean(
+                    ChromeFeatureList.CCT_ADAPTIVE_BUTTON_TEST_SWITCH, "hide-button", false)) {
+                mButtonVisibilityRule.setHidingOptionalButton();
+            }
             return true;
         }
 
@@ -1574,13 +1604,27 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
         }
 
         private void updateOptionalButton(ButtonData buttonData) {
-            if ((mOptionalButtonCoordinator == null && !initializeOptionalButton())
-                    || mButtonVisibilityRule.isSuppressed(ButtonId.MTB)) {
-                // See if we should show an indicator if optional button cannot be shown. This check
-                // needs to be invoked _after_ optional button initialization is attempted, in order
-                // to determine its visibility in case it gets hidden due to toolbar width/button
-                // count constraints.
-                maybeShowActionMenuIndicator(buttonData.getButtonSpec().getButtonVariant());
+            boolean showOptionalButton = true;
+            if (mOptionalButtonCoordinator == null) showOptionalButton = initializeOptionalButton();
+            if (showOptionalButton && mButtonVisibilityRule.isSuppressed(ButtonId.MTB)) {
+                showOptionalButton = false;
+                RecordHistogram.recordEnumeratedHistogram(
+                        "CustomTabs.AdaptiveToolbarButton.HiddenReason",
+                        CustomTabMtbHiddenReason.TOOLBAR_WIDTH_LIMIT,
+                        CustomTabMtbHiddenReason.COUNT);
+            }
+            var buttonVariant = buttonData.getButtonSpec().getButtonVariant();
+            if (showOptionalButton) {
+                RecordHistogram.recordEnumeratedHistogram(
+                        "CustomTab.AdaptiveToolbarButton.Shown",
+                        buttonVariant,
+                        AdaptiveToolbarButtonVariant.MAX_VALUE);
+            } else {
+                // See if we should show an indicator (a dot) if optional button cannot be shown.
+                // This check needs to be invoked _after_ optional button initialization is
+                // attempted, in order to determine its visibility in case it gets hidden due to
+                // toolbar width/button count constraints.
+                maybeShowActionMenuIndicator(buttonVariant);
                 return;
             }
             Tab tab = getCurrentTab();
@@ -1588,6 +1632,23 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
                 mTrackerSupplier.set(TrackerFactory.getTrackerForProfile(tab.getProfile()));
             }
             mOptionalButtonCoordinator.updateButton(buttonData, isIncognitoBranded());
+            setOptionalButtonBackgroundInset();
+        }
+
+        // Modify the inset of the optional background drawable to match that of the icon secondary
+        // background.
+        private void setOptionalButtonBackgroundInset() {
+            View optionalButton = findViewById(R.id.optional_toolbar_button);
+            LayerDrawable backgroundDrawable = (LayerDrawable) optionalButton.getBackground();
+            int height = getDimensionPixelSize(R.dimen.custom_tabs_adaptive_button_bg_height);
+            int left = getDimensionPixelSize(R.dimen.custom_tabs_adaptive_button_bg_padding_start);
+            int right = getDimensionPixelSize(R.dimen.custom_tabs_adaptive_button_bg_padding_end);
+            backgroundDrawable.setLayerHeight(/* index= */ 0, height);
+            backgroundDrawable.setLayerInset(/* index= */ 0, left, /* t= */ 0, right, /* b= */ 0);
+        }
+
+        private int getDimensionPixelSize(@DimenRes int dimenId) {
+            return getResources().getDimensionPixelSize(dimenId);
         }
 
         // Display a (blue) dot on the overflow menu icon for the optional button that cannot be
@@ -2516,6 +2577,9 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
                     v -> {
                         RecordUserAction.record("CustomTabs.OmniboxClicked");
                         var tab = getCurrentTab();
+                        if (omniboxParams.tapHandlerWithVerification.apply(tab)) {
+                            return;
+                        }
                         if (omniboxParams.tapHandler != null) {
                             omniboxParams.tapHandler.accept(tab);
                         } else {

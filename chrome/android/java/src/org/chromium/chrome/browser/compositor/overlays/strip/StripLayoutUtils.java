@@ -4,17 +4,18 @@
 
 package org.chromium.chrome.browser.compositor.overlays.strip;
 
+import static org.chromium.build.NullUtil.assumeNonNull;
+
 import android.content.Context;
 import android.text.TextUtils;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-
 import org.chromium.base.MathUtils;
 import org.chromium.base.Token;
 import org.chromium.base.supplier.Supplier;
+import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
@@ -30,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+@NullMarked
 public class StripLayoutUtils {
     // Position Constants.
     // The bottom indicator should align with the contents of the last tab in group. This value is
@@ -62,7 +64,7 @@ public class StripLayoutUtils {
      * @return Whether the two tabs are not related, and at least one is grouped.
      */
     public static boolean notRelatedAndEitherTabInGroup(
-            TabGroupModelFilter modelFilter, @NonNull Tab tab1, @NonNull Tab tab2) {
+            TabGroupModelFilter modelFilter, Tab tab1, Tab tab2) {
         return !Objects.equals(tab1.getTabGroupId(), tab2.getTabGroupId())
                 && (modelFilter.isTabInTabGroup(tab1) || modelFilter.isTabInTabGroup(tab2));
     }
@@ -88,9 +90,6 @@ public class StripLayoutUtils {
      */
     public static int getNumOfTabsInGroup(
             TabGroupModelFilter modelFilter, StripLayoutGroupTitle stripLayoutGroupTitle) {
-        if (stripLayoutGroupTitle == null) {
-            return 0;
-        }
         return modelFilter.getTabCountForGroup(stripLayoutGroupTitle.getTabGroupId());
     }
 
@@ -102,7 +101,7 @@ public class StripLayoutUtils {
      */
     public static boolean isNonTrailingTabInGroup(
             TabGroupModelFilter modelFilter, TabModel tabModel, StripLayoutTab stripTab) {
-        Tab tab = tabModel.getTabById(stripTab.getTabId());
+        Tab tab = assumeNonNull(tabModel.getTabById(stripTab.getTabId()));
         if (modelFilter.isTabInTabGroup(tab)) {
             List<Tab> relatedTabs = modelFilter.getRelatedTabList(tab.getId());
             Tab lastTab = relatedTabs.get(relatedTabs.size() - 1);
@@ -116,7 +115,7 @@ public class StripLayoutUtils {
      * @param rootId The root ID for the tab group title we're searching for.
      * @return The {@link StripLayoutGroupTitle} with the given root ID. {@code null} otherwise.
      */
-    public static StripLayoutGroupTitle findGroupTitle(
+    public static @Nullable StripLayoutGroupTitle findGroupTitle(
             StripLayoutGroupTitle[] groupTitles, int rootId) {
         for (int i = 0; i < groupTitles.length; i++) {
             final StripLayoutGroupTitle groupTitle = groupTitles[i];
@@ -130,8 +129,8 @@ public class StripLayoutUtils {
      * @param tabGroupId The {@link Token} for the tab group title we're searching for.
      * @return The {@link StripLayoutGroupTitle} with the {@link Token}. {@code null} otherwise.
      */
-    public static StripLayoutGroupTitle findGroupTitle(
-            StripLayoutGroupTitle[] groupTitles, Token tabGroupId) {
+    public static @Nullable StripLayoutGroupTitle findGroupTitle(
+            StripLayoutGroupTitle[] groupTitles, @Nullable Token tabGroupId) {
         for (int i = 0; i < groupTitles.length; i++) {
             final StripLayoutGroupTitle groupTitle = groupTitles[i];
             if (groupTitle.getTabGroupId().equals(tabGroupId)) return groupTitle;
@@ -146,7 +145,7 @@ public class StripLayoutUtils {
      * @return The {@link StripLayoutGroupTitle} with the given tab group ID. {@code null}
      *     otherwise.
      */
-    static StripLayoutGroupTitle findGroupTitleByCollaborationId(
+    static @Nullable StripLayoutGroupTitle findGroupTitleByCollaborationId(
             StripLayoutGroupTitle[] groupTitles,
             String collaborationId,
             TabGroupSyncService tabGroupSyncService) {
@@ -286,7 +285,7 @@ public class StripLayoutUtils {
      * @param includeGroupTitles Whether to include group title when finding view.
      * @return View at x position.{@code null} if no view at position or if input criteria not met.
      */
-    public static StripLayoutView findViewAtPositionX(
+    public static @Nullable StripLayoutView findViewAtPositionX(
             StripLayoutView[] views, float x, boolean includeGroupTitles) {
         for (StripLayoutView view : views) {
             float leftEdge;

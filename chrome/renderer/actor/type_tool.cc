@@ -50,6 +50,12 @@ using ::blink::WebString;
 
 namespace {
 
+// Typing into input fields often causes custom made dropdowns to appear and
+// update content. These are often updated via async tasks that try to detect
+// when a user has finished typing. Delay observation to try to ensure the page
+// stability monitor kicks in only after these tasks have invoked.
+constexpr base::TimeDelta kObservationDelay = base::Seconds(1);
+
 // Structure to hold the mapping
 struct KeyInfo {
   char16_t key_code;
@@ -221,7 +227,7 @@ WebInputEventResult TypeTool::CreateAndDispatchKeyEvent(
   key_event.unmodified_text[0] = key_params.unmodified_text;
 
   WebInputEventResult result =
-      frame_->GetWebFrame()->LocalRoot()->FrameWidget()->HandleInputEvent(
+      frame_->GetWebFrame()->FrameWidget()->HandleInputEvent(
           WebCoalescedInputEvent(key_event, ui::LatencyInfo()));
 
   return result;
@@ -273,7 +279,7 @@ mojom::ActionResultPtr TypeTool::Execute() {
         std::get<gfx::PointF>(validated_result->target);
     mojom::ActionResultPtr result = CreateAndDispatchClick(
         blink::WebMouseEvent::Button::kLeft, 1, coordinate,
-        frame_->GetWebFrame()->LocalRoot()->FrameWidget());
+        frame_->GetWebFrame()->FrameWidget());
 
     // Cancel rest of typing if initial click failed.
     if (!IsOk(*result)) {
@@ -322,9 +328,13 @@ std::string TypeTool::DebugString() const {
                          action_->follow_by_enter);
 }
 
+base::TimeDelta TypeTool::ExecutionObservationDelay() const {
+  return kObservationDelay;
+}
+
 TypeTool::ValidatedResult TypeTool::Validate() const {
   CHECK(frame_->GetWebFrame());
-  CHECK(frame_->GetWebFrame()->LocalRoot()->FrameWidget());
+  CHECK(frame_->GetWebFrame()->FrameWidget());
 
   mojom::ToolTargetPtr& target = action_->target;
   CHECK(target);

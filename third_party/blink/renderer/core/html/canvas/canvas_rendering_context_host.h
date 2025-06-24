@@ -67,6 +67,9 @@ class CORE_EXPORT CanvasRenderingContextHost : public GarbageCollectedMixin,
   virtual DispatchEventResult HostDispatchEvent(Event*) = 0;
   virtual const KURL& GetExecutionContextUrl() const = 0;
 
+  virtual void UpdateMemoryUsage() = 0;
+  virtual size_t GetMemoryUsage() const = 0;
+
   // If WebGL1 is disabled by enterprise policy or command line switch.
   virtual bool IsWebGL1Enabled() const = 0;
   // If WebGL2 is disabled by enterprise policy or command line switch.
@@ -101,11 +104,7 @@ class CORE_EXPORT CanvasRenderingContextHost : public GarbageCollectedMixin,
 
   // Partial CanvasResourceHost implementation
   void InitializeForRecording(cc::PaintCanvas*) const final;
-  CanvasResourceProvider* GetOrCreateCanvasResourceProviderForCanvas2D()
-      override;
-  void PageVisibilityChanged() override;
-
-  CanvasResourceProvider* GetOrCreateCanvasResourceProviderForWebGPU();
+  virtual void PageVisibilityChanged();
 
   bool IsWebGL() const;
   bool IsWebGPU() const;
@@ -140,22 +139,6 @@ class CORE_EXPORT CanvasRenderingContextHost : public GarbageCollectedMixin,
 
   bool IsContextLost() const override;
 
-  // `resource_provider_` must be null.
-  void SetResourceProviderForWebGL(
-      std::unique_ptr<CanvasResourceProvider> resource_provider) {
-    CHECK(IsWebGL());
-    CHECK(!resource_provider_for_webgl_);
-    resource_provider_for_webgl_ = std::move(resource_provider);
-    UpdateMemoryUsage();
-  }
-  CanvasResourceProvider* GetResourceProviderForWebGL() const {
-    CHECK(IsWebGL());
-    return resource_provider_for_webgl_.get();
-  }
-  CanvasResourceProvider* GetResourceProviderForWebGPU() const {
-    CHECK(IsWebGPU());
-    return resource_provider_for_webgpu_.get();
-  }
   CanvasResourceProvider* GetResourceProviderForCanvas2D() const override {
     CHECK(IsRenderingContext2D());
     return resource_provider_for_canvas2d_.get();
@@ -166,7 +149,11 @@ class CORE_EXPORT CanvasRenderingContextHost : public GarbageCollectedMixin,
   }
 
   std::unique_ptr<CanvasResourceProvider> ReplaceResourceProviderForCanvas2D(
-      std::unique_ptr<CanvasResourceProvider>) override;
+      std::unique_ptr<CanvasResourceProvider>);
+  void ResetResourceProviderForCanvas2D() override {
+    ReplaceResourceProviderForCanvas2D(nullptr);
+  }
+
   virtual void DiscardResources();
 
   void FlushRecordingForCanvas2D(FlushReason reason);
@@ -209,13 +196,9 @@ class CORE_EXPORT CanvasRenderingContextHost : public GarbageCollectedMixin,
   bool did_fail_to_create_resource_provider_ = false;
 
  private:
-  void CreateCanvasResourceProvider2D();
-  void CreateCanvasResourceProviderWebGPU();
 
   std::unique_ptr<CanvasResourceProvider> resource_provider_for_canvas2d_;
   std::unique_ptr<CanvasResourceProvider> resource_provider_for_image_bitmap_;
-  std::unique_ptr<CanvasResourceProvider> resource_provider_for_webgl_;
-  std::unique_ptr<CanvasResourceProvider> resource_provider_for_webgpu_;
   bool did_record_canvas_size_to_uma_ = false;
   HostType host_type_ = HostType::kNone;
 };

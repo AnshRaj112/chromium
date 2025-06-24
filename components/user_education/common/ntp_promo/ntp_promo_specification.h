@@ -14,18 +14,19 @@
 #include "base/functional/callback_forward.h"
 #include "base/functional/callback_helpers.h"
 #include "components/strings/grit/components_strings.h"
+#include "components/user_education/common/ntp_promo/ntp_promo_identifier.h"
 #include "components/user_education/common/user_education_metadata.h"
 
 class Browser;
 class Profile;
-namespace user_education {
 
-using NtpPromoIdentifier = std::string;
+namespace user_education {
 
 // Visual content of the promo, for consumption by the UI.
 class NtpPromoContent {
  public:
   NtpPromoContent() = delete;
+  NtpPromoContent(const NtpPromoContent&);
   NtpPromoContent(NtpPromoContent&&) noexcept;
   ~NtpPromoContent();
   NtpPromoContent(std::string_view icon_name,
@@ -69,6 +70,10 @@ class NtpPromoSpecification {
                         user_education::Metadata);
 
   const NtpPromoContent& content() const { return content_; }
+  EligibilityCallback eligibility_callback() const {
+    return eligibility_callback_;
+  }
+  ActionCallback action_callback() const { return action_callback_; }
   const std::string& id() const { return id_; }
   const base::flat_set<NtpPromoIdentifier>& show_after() const {
     return show_after_;

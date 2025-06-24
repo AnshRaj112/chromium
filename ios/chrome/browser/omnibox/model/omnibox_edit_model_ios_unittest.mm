@@ -35,7 +35,6 @@
 #import "ios/chrome/browser/omnibox/model/omnibox_controller_ios.h"
 #import "ios/chrome/browser/omnibox/model/omnibox_text_controller.h"
 #import "ios/chrome/browser/omnibox/model/test_omnibox_edit_model_ios.h"
-#import "ios/chrome/browser/omnibox/model/test_omnibox_popup_view_ios.h"
 #import "testing/gmock/include/gmock/gmock.h"
 #import "testing/gtest/include/gtest/gtest.h"
 #import "testing/platform_test.h"
@@ -58,29 +57,6 @@ using testing::SaveArg;
 namespace ui {
 struct AXNodeData;
 }
-
-namespace {
-
-void OpenUrlFromEditBox(OmniboxControllerIOS* controller,
-                        TestOmniboxEditModelIOS* model,
-                        const std::u16string url_text,
-                        bool is_autocompleted) {
-  AutocompleteMatch match(
-      controller->autocomplete_controller()->search_provider(), 0, false,
-      AutocompleteMatchType::OPEN_TAB);
-  match.destination_url = GURL(url_text);
-  match.allowed_to_be_default_match = true;
-  if (is_autocompleted) {
-    match.inline_autocompletion = url_text;
-  } else {
-    model->SetUserText(url_text);
-  }
-  model->OnSetFocus();
-  model->OpenMatchForTesting(match, WindowOpenDisposition::CURRENT_TAB, GURL(),
-                             std::u16string(), 0);
-}
-
-}  // namespace
 
 // Mocking the text controller to not rely on the textfield view.
 @interface TestOmniboxTextController : OmniboxTextController
@@ -115,6 +91,30 @@ void OpenUrlFromEditBox(OmniboxControllerIOS* controller,
 
 @end
 
+namespace {
+
+void OpenUrlFromEditBox(OmniboxControllerIOS* controller,
+                        TestOmniboxEditModelIOS* model,
+                        TestOmniboxTextController* text_controller,
+                        const std::u16string url_text,
+                        bool is_autocompleted) {
+  AutocompleteMatch match(
+      controller->autocomplete_controller()->search_provider(), 0, false,
+      AutocompleteMatchType::OPEN_TAB);
+  match.destination_url = GURL(url_text);
+  match.allowed_to_be_default_match = true;
+  if (is_autocompleted) {
+    match.inline_autocompletion = url_text;
+  } else {
+    [text_controller setUserText:url_text];
+  }
+  model->OnSetFocus();
+  model->OpenMatchForTesting(match, WindowOpenDisposition::CURRENT_TAB, GURL(),
+                             std::u16string(), 0);
+}
+
+}  // namespace
+
 class OmniboxEditModelIOSTest : public PlatformTest {
  public:
   OmniboxEditModelIOSTest() {
@@ -125,10 +125,11 @@ class OmniboxEditModelIOSTest : public PlatformTest {
     omnibox_text_model_ =
         std::make_unique<OmniboxTextModel>(omnibox_client_.get());
     omnibox_edit_model_ = std::make_unique<TestOmniboxEditModelIOS>(
-        omnibox_controller_.get(), /*pref_service=*/nullptr,
-        omnibox_text_model_.get());
+        omnibox_controller_.get(), omnibox_client_.get(),
+        /*pref_service=*/nullptr, omnibox_text_model_.get());
     omnibox_text_controller_ = [[TestOmniboxTextController alloc]
         initWithOmniboxController:omnibox_controller_.get()
+                    omniboxClient:omnibox_client_.get()
                  omniboxEditModel:omnibox_edit_model_.get()
                  omniboxTextModel:omnibox_text_model_.get()
                     inLensOverlay:NO];
@@ -153,7 +154,7 @@ class OmniboxEditModelIOSTest : public PlatformTest {
 TEST_F(OmniboxEditModelIOSTest, DISABLED_InlineAutocompleteText) {
   // Test if the model updates the inline autocomplete text in the view.
   EXPECT_EQ(std::u16string(), omnibox_text_model_->inline_autocompletion);
-  model()->SetUserText(u"he");
+  [omnibox_text_controller_ setUserText:u"he"];
   model()->OnPopupDataChanged(u"llo", std::u16string(), {});
   EXPECT_EQ(u"hello", [omnibox_text_controller_ displayedText]);
   EXPECT_EQ(u"llo", omnibox_text_model_->inline_autocompletion);
@@ -172,7 +173,7 @@ TEST_F(OmniboxEditModelIOSTest, DISABLED_InlineAutocompleteText) {
   EXPECT_EQ(std::u16string(), [omnibox_text_controller_ displayedText]);
   EXPECT_EQ(std::u16string(), omnibox_text_model_->inline_autocompletion);
 
-  model()->SetUserText(u"he");
+  [omnibox_text_controller_ setUserText:u"he"];
   model()->OnPopupDataChanged(u"llo", std::u16string(), {});
   EXPECT_EQ(u"hello", [omnibox_text_controller_ displayedText]);
   EXPECT_EQ(u"llo", omnibox_text_model_->inline_autocompletion);
@@ -198,7 +199,7 @@ TEST_F(OmniboxEditModelIOSTest, AlternateNavHasHTTP) {
       .WillOnce(SaveArg<10>(&alternate_nav_match));
 
   model()->OnSetFocus();  // Avoids DCHECK in OpenMatch().
-  model()->SetUserText(u"http://abcd");
+  [omnibox_text_controller_ setUserText:u"http://abcd"];
   model()->OpenMatchForTesting(match, WindowOpenDisposition::CURRENT_TAB,
                                alternate_nav_url, std::u16string(), 0);
   EXPECT_TRUE(
@@ -208,7 +209,7 @@ TEST_F(OmniboxEditModelIOSTest, AlternateNavHasHTTP) {
               OnAutocompleteAccept(_, _, _, _, _, _, _, _, _, _, _))
       .WillOnce(SaveArg<10>(&alternate_nav_match));
 
-  model()->SetUserText(u"abcd");
+  [omnibox_text_controller_ setUserText:u"abcd"];
   model()->OpenMatchForTesting(match, WindowOpenDisposition::CURRENT_TAB,
                                alternate_nav_url, std::u16string(), 0);
   EXPECT_TRUE(
@@ -278,17 +279,22 @@ TEST_F(OmniboxEditModelIOSTest, IPv4AddressPartsCount) {
   constexpr char kIPv4AddressPartsCountHistogramName[] =
       "Omnibox.IPv4AddressPartsCount";
   // Hostnames shall not be recorded.
-  OpenUrlFromEditBox(controller(), model(), u"http://example.com", false);
+  OpenUrlFromEditBox(controller(), model(), omnibox_text_controller_,
+                     u"http://example.com", false);
   histogram_tester.ExpectTotalCount(kIPv4AddressPartsCountHistogramName, 0);
 
   // Autocompleted navigations shall not be recorded.
-  OpenUrlFromEditBox(controller(), model(), u"http://127.0.0.1", true);
+  OpenUrlFromEditBox(controller(), model(), omnibox_text_controller_,
+                     u"http://127.0.0.1", true);
   histogram_tester.ExpectTotalCount(kIPv4AddressPartsCountHistogramName, 0);
 
   // Test IPv4 parts are correctly counted.
-  OpenUrlFromEditBox(controller(), model(), u"http://127.0.0.1", false);
-  OpenUrlFromEditBox(controller(), model(), u"http://127.1/test.html", false);
-  OpenUrlFromEditBox(controller(), model(), u"http://127.0.1", false);
+  OpenUrlFromEditBox(controller(), model(), omnibox_text_controller_,
+                     u"http://127.0.0.1", false);
+  OpenUrlFromEditBox(controller(), model(), omnibox_text_controller_,
+                     u"http://127.1/test.html", false);
+  OpenUrlFromEditBox(controller(), model(), omnibox_text_controller_,
+                     u"http://127.0.1", false);
   EXPECT_THAT(
       histogram_tester.GetAllSamples(kIPv4AddressPartsCountHistogramName),
       testing::ElementsAre(base::Bucket(2, 1), base::Bucket(3, 1),

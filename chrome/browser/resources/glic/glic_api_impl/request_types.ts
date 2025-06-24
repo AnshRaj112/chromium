@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import {type WebClientInitialState} from '../glic.mojom-webui.js';
-import type {ActInFocusedTabParams, ActInFocusedTabResult, AnnotatedPageData, ChromeVersion, DraggableArea, ErrorReasonTypes, ErrorWithReason, FocusedTabDataHasFocus, FocusedTabDataHasNoFocus, OpenPanelInfo, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, PdfDocumentData, Screenshot, ScrollToParams, TabContextOptions, TabContextResult, TabData, UserProfileInfo, ZeroStateSuggestions} from '../glic_api/glic_api.js';
+import type {ActInFocusedTabParams, ActInFocusedTabResult, AnnotatedPageData, ChromeVersion, DraggableArea, ErrorReasonTypes, ErrorWithReason, FocusedTabDataHasFocus, FocusedTabDataHasNoFocus, Journal, OpenPanelInfo, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, PdfDocumentData, Screenshot, ScrollToParams, TabContextOptions, TabContextResult, TabData, UserProfileInfo, ZeroStateSuggestions} from '../glic_api/glic_api.js';
 
 /*
 This file defines messages sent over postMessage in-between the Glic WebUI
@@ -69,6 +69,23 @@ export declare interface HostRequestTypes {
     },
     response: {
       tabContextResult: TabContextResultPrivate,
+    },
+  };
+  glicBrowserGetContextFromTab: {
+    request: {
+      tabId: string,
+      options: TabContextOptions,
+    },
+    response: {
+      tabContextResult: TabContextResultPrivate,
+    },
+  };
+  glicBrowserSetMaximumNumberOfPinnedTabs: {
+    request: {
+      requestedMax: number,
+    },
+    response: {
+      effectiveMax: number,
     },
   };
   glicBrowserActInFocusedTab: {
@@ -174,6 +191,43 @@ export declare interface HostRequestTypes {
       enabled: boolean,
     },
   };
+  glicBrowserLogBeginAsyncEvent: {
+    request: {
+      asyncEventId: number,
+      taskId: number,
+      event: string,
+      details: string,
+    },
+  };
+  glicBrowserLogEndAsyncEvent: {
+    request: {
+      asyncEventId: number,
+      details: string,
+    },
+  };
+  glicBrowserLogInstantEvent: {
+    request: {
+      taskId: number,
+      event: string,
+      details: string,
+    },
+  };
+  glicBrowserJournalClear: {};
+  glicBrowserJournalSnapshot: {
+    request: {
+      clear: boolean,
+    },
+    response: {
+      journal: Journal,
+    },
+  };
+  glicBrowserJournalStart: {
+    request: {
+      maxBytes: number,
+      captureScreenshots: boolean,
+    },
+  };
+  glicBrowserJournalStop: {};
   glicBrowserOnUserInputSubmitted: {
     request: {
       mode: number,
@@ -204,6 +258,23 @@ export declare interface HostRequestTypes {
       enabled: boolean,
     },
   };
+  glicBrowserPinTabs: {
+    request: {
+      tabIds: string[],
+    },
+    response: {
+      pinnedAll: boolean,
+    },
+  };
+  glicBrowserUnpinTabs: {
+    request: {
+      tabIds: string[],
+    },
+    response: {
+      unpinnedAll: boolean,
+    },
+  };
+  glicBrowserUnpinAllTabs: {};
   glicBrowserGetZeroStateSuggestionsForFocusedTab: {
     request: {
       isFirstRun?: boolean,
@@ -288,6 +359,16 @@ export declare interface WebClientRequestTypes {
       hotkey: string,
     },
   };
+  glicWebClientNotifyPinnedTabsChanged: {
+    request: {
+      tabData: TabDataPrivate[],
+    },
+  };
+  glicWebClientNotifyPinnedTabDataChanged: {
+    request: {
+      tabData: TabDataPrivate,
+    },
+  };
 }
 
 
@@ -310,6 +391,8 @@ type HostRequestEnumNamesType = {
     ClosePanelAndShutdown: 0,
     ShowProfilePicker: 0,
     GetContextFromFocusedTab: 0,
+    GetContextFromTab: 0,
+    SetMaximumNumberOfPinnedTabs: 0,
     ActInFocusedTab: 0,
     StopActorTask: 0,
     PauseActorTask: 0,
@@ -328,6 +411,13 @@ type HostRequestEnumNamesType = {
     AttachPanel: 0,
     DetachPanel: 0,
     SetAudioDucking: 0,
+    LogBeginAsyncEvent: 0,
+    LogEndAsyncEvent: 0,
+    LogInstantEvent: 0,
+    JournalClear: 0,
+    JournalSnapshot: 0,
+    JournalStart: 0,
+    JournalStop: 0,
     OnUserInputSubmitted: 0,
     OnRequestStarted: 0,
     OnResponseStarted: 0,
@@ -338,6 +428,9 @@ type HostRequestEnumNamesType = {
     SetSyntheticExperimentState: 0,
     OpenOsPermissionSettingsMenu: 0,
     GetOsMicrophonePermissionStatus: 0,
+    PinTabs: 0,
+    UnpinTabs: 0,
+    UnpinAllTabs: 0,
     GetZeroStateSuggestionsForFocusedTab: 0,
     SetClosedCaptioningSetting: 0,
     DropScrollToHighlight: 0,

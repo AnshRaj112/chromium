@@ -428,7 +428,9 @@ URLLoader::URLLoader(
       has_fetch_streaming_upload_body_(
           url_loader_util::HasFetchStreamingUploadBody(request)),
       accept_ch_frame_interceptor_(AcceptCHFrameInterceptor::MaybeCreate(
-          std::move(accept_ch_frame_observer))),
+          std::move(accept_ch_frame_observer),
+          // TODO(crbug.com/406407746): update in the coming CL.
+          /*enabled_client_hints=*/std::nullopt)),
       allow_cookies_from_browser_(
           request.trusted_params &&
           request.trusted_params->allow_cookies_from_browser),
@@ -1799,10 +1801,6 @@ int32_t URLLoader::GetProcessId() const {
   return factory_params_->process_id;
 }
 
-void URLLoader::SetEnableReportingRawHeaders(bool allow) {
-  enable_reporting_raw_headers_ = allow;
-}
-
 uint32_t URLLoader::GetResourceType() const {
   return resource_type_;
 }
@@ -2190,19 +2188,9 @@ void URLLoader::DispatchOnRawResponse() {
     return;
   }
 
-  // This is gated by enable_reporting_raw_headers_ to be backwards compatible
-  // with the old report_raw_headers behavior, where we wouldn't even send
-  // raw_response_headers_ to the trusted browser process based devtools
-  // instrumentation. This is observed in the case of HSTS redirects, where
-  // url_request_->response_headers has the HSTS redirect headers, like
-  // Non-Authoritative-Reason, but raw_response_headers_ has something else
-  // which doesn't include HSTS information. This is tested by
-  // DevToolsTest.TestRawHeadersWithRedirectAndHSTS.
-  // TODO(crbug.com/40781698): Remove enable_reporting_raw_headers_
   const net::HttpResponseHeaders* response_headers =
-      raw_response_headers_ && enable_reporting_raw_headers_
-          ? raw_response_headers_.get()
-          : url_request_->response_headers();
+      raw_response_headers_ ? raw_response_headers_.get()
+                            : url_request_->response_headers();
   std::vector<network::mojom::HttpRawHeaderPairPtr> header_array =
       ResponseHeaderToRawHeaderPairs(*response_headers);
 
