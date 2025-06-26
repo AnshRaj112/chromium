@@ -645,9 +645,6 @@ public final class ProductionSupportedFlagList {
                 GwpAsanFeatures.EXTREME_LIGHTWEIGHT_UAF_DETECTOR,
                 "Enables the Extreme Lightweight UAF Detector."),
         Flag.baseFeature(
-                CcFeatures.USE_MAP_RECT_FOR_PIXEL_MOVEMENT,
-                "Enables the usage of MapRect for computing filter pixel movement."),
-        Flag.baseFeature(
                 "UseAAudioInput",
                 "Enables the use of AAudio for capturing audio input. (Android Q+ only)"),
         Flag.baseFeature(
@@ -760,9 +757,6 @@ public final class ProductionSupportedFlagList {
         Flag.baseFeature(
                 MediaFeatures.BUILT_IN_HLS_PLAYER,
                 "Switches the HLS demuxer implementation from MediaPlayer to an internal one"),
-        Flag.baseFeature(
-                MediaFeatures.BUILT_IN_HLS_MP4,
-                "Enabled the playback of HLS renditions which use the mp4 container"),
         Flag.baseFeature(
                 MediaFeatures.LIBVPX_USE_CHROME_THREADS,
                 "Attaches libvpx threads to the chromium thread system."),

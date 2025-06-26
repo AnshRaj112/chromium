@@ -1280,8 +1280,16 @@ LayoutBlockFlow* LayoutObject::FragmentItemsContainer() const {
 
 LayoutBox* LayoutObject::ContainingNGBox() const {
   NOT_DESTROYED();
-  if (Parent() && Parent()->IsMedia()) {
-    return To<LayoutBox>(Parent());
+  if (auto* parent = Parent()) {
+    // Media and Canvas elements may have children that participate
+    // in layout with fragments that need invalidation after subtree layout.
+    if (parent->IsMedia()) {
+      return To<LayoutBox>(parent);
+    }
+    if (parent->IsCanvas() &&
+        RuntimeEnabledFeatures::CanvasDrawElementEnabled()) {
+      return To<LayoutBox>(parent);
+    }
   }
   LayoutBlock* containing_block = ContainingBlock();
   if (!containing_block)
@@ -4149,9 +4157,8 @@ void LayoutObject::DestroyAndCleanupAnonymousWrappers(
 
 void LayoutObject::Destroy() {
   NOT_DESTROYED();
-  DCHECK(
-      g_allow_destroying_layout_object_in_finalizer ||
-      !ThreadState::IsSweepingOnOwningThread(*ThreadStateStorage::Current()));
+  DCHECK(g_allow_destroying_layout_object_in_finalizer ||
+         !ThreadState::Current()->IsSweepingOnOwningThread());
 
   // Mark as being destroyed to avoid trouble with merges in |RemoveChild()| and
   // other house keepings.
@@ -5370,7 +5377,7 @@ void ShowLayoutTree(const blink::LayoutObject* object1,
     while (root->Parent())
       root = root->Parent();
     if (object1) {
-      StringBuilder string_builder;
+      blink::StringBuilder string_builder;
       root->DumpLayoutTreeAndMark(string_builder, object1, "*", object2, "-",
                                   0);
       DLOG(INFO) << "\n" << string_builder.ToString().Utf8();

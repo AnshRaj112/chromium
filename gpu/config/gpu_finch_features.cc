@@ -224,7 +224,6 @@ BASE_FEATURE(kEnableDrDc,
              base::FEATURE_ENABLED_BY_DEFAULT
 #elif BUILDFLAG(IS_MAC)
              // DrDC will not be running if Graphite is disabled on Mac.
-             // Feature incomplete. DO NOT ENABLE!
              base::FEATURE_DISABLED_BY_DEFAULT
 #else
              // NOT SUPPORTED. DO NOT ENABLE!
@@ -270,11 +269,6 @@ const base::FeatureParam<std::string> kWebGPUUnsafeFeatures{
 // Note that the comma should be URL-encoded.
 const base::FeatureParam<std::string> kWGSLUnsafeFeatures{
     &kWebGPUService, "UnsafeWGSLFeatures", ""};
-
-BASE_FEATURE(kWebGPUUseTintIR,
-             "WebGPUUseTintIR",
-             base::FEATURE_ENABLED_BY_DEFAULT
-);
 
 BASE_FEATURE(kWebGPUUseVulkanMemoryModel,
              "WebGPUUseVulkanMemoryModel",

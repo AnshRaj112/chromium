@@ -150,7 +150,6 @@ source_set("ipc_common_sources") {
   deps = [
     "//base",
     "//components/viz/common:shared_image_format",
-    "//gpu/command_buffer/client:client_gmb_manager",
     "//gpu/command_buffer/common:common_sources",
     "//gpu/config:config_sources",
     "//third_party/libyuv",
@@ -315,21 +314,6 @@ mojom("gpu_channel_mojom") {
   export_class_attribute = "GPU_EXPORT"
   export_header = "gpu/gpu_export.h"
   cpp_configs = [ "//gpu:gpu_implementation" ]
-}
-
-mojom("gmb_interface") {
-  generate_java = true
-  visibility = [
-    "//gpu/*",
-    "//services/*",
-  ]
-  sources = [ "client_gmb_interface.mojom" ]
-  deps = [
-    ":surface_handle",
-    "//mojo/public/mojom/base",
-    "//ui/gfx/geometry/mojom",
-    "//ui/gfx/mojom",
-  ]
 }
 
 mojom("shared_image_pool_client_interface") {

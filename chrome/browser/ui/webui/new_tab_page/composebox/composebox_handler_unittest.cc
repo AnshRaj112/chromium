@@ -4,6 +4,7 @@
 
 #include "chrome/browser/ui/webui/new_tab_page/composebox/composebox_handler.h"
 
+#include "base/test/task_environment.h"
 #include "base/version_info/channel.h"
 #include "chrome/browser/ui/webui/new_tab_page/composebox/composebox.mojom.h"
 #include "components/omnibox/composebox/composebox_query_controller.h"
@@ -49,6 +50,9 @@ class ComposeboxHandlerTest : public testing::Test {
   MockQueryController& query_controller() { return *query_controller_; }
 
  private:
+  base::test::TaskEnvironment task_environment_{
+      base::test::TaskEnvironment::ThreadPoolExecutionMode::QUEUED,
+      base::test::TaskEnvironment::TimeSource::MOCK_TIME};
   std::unique_ptr<ComposeboxHandler> handler_;
   network::TestURLLoaderFactory test_factory_;
   scoped_refptr<network::SharedURLLoaderFactory> shared_url_loader_factory_;
@@ -58,4 +62,9 @@ class ComposeboxHandlerTest : public testing::Test {
 TEST_F(ComposeboxHandlerTest, NotifySessionStarted) {
   EXPECT_CALL(query_controller(), NotifySessionStarted).Times(1);
   handler().NotifySessionStarted();
+}
+
+TEST_F(ComposeboxHandlerTest, NotifySessionAbandoned) {
+  EXPECT_CALL(query_controller(), NotifySessionAbandoned).Times(1);
+  handler().NotifySessionAbandoned();
 }

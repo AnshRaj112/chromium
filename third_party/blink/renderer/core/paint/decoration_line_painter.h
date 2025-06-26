@@ -17,7 +17,6 @@ struct AutoDarkMode;
 class Color;
 class GraphicsContext;
 class StyledStrokeData;
-class TextDecorationInfo;
 
 // Defines a "wave" for painting a kWavyStroke. See the .cc file for a detailed
 // description.
@@ -39,8 +38,7 @@ struct DecorationGeometry {
                                  const gfx::RectF& line,
                                  float double_offset,
                                  int wavy_offset_factor,
-                                 const WaveDefinition* custom_wave,
-                                 const Color& line_color);
+                                 const WaveDefinition* custom_wave);
 
   float Thickness() const { return line.height(); }
 
@@ -50,8 +48,7 @@ struct DecorationGeometry {
 
   // Only used for kWavy lines.
   int wavy_offset_factor = 0;
-  gfx::RectF wavy_pattern_rect;
-  cc::PaintRecord wavy_tile_record;
+  WaveDefinition wavy_wave;
 
   bool antialias = false;
 };
@@ -62,13 +59,15 @@ class DecorationLinePainter final {
   STACK_ALLOCATED();
 
  public:
-  DecorationLinePainter(GraphicsContext& context,
-                        const TextDecorationInfo& decoration_info)
-      : context_(context), decoration_info_(decoration_info) {}
+  explicit DecorationLinePainter(GraphicsContext& context)
+      : context_(context) {}
 
   static gfx::RectF Bounds(const DecorationGeometry&);
 
-  void Paint(const Color& color, const cc::PaintFlags* flags = nullptr);
+  void Paint(const DecorationGeometry&,
+             const Color& color,
+             const AutoDarkMode& auto_dark_mode,
+             const cc::PaintFlags* flags = nullptr);
 
   static void DrawLineForText(GraphicsContext& context,
                               const gfx::RectF& line_rect,
@@ -77,10 +76,11 @@ class DecorationLinePainter final {
                               const cc::PaintFlags* paint_flags = nullptr);
 
  private:
-  void PaintWavyTextDecoration(const DecorationGeometry&, const AutoDarkMode&);
+  void PaintWavyTextDecoration(const DecorationGeometry&,
+                               const Color&,
+                               const AutoDarkMode&);
 
   GraphicsContext& context_;
-  const TextDecorationInfo& decoration_info_;
 };
 
 }  // namespace blink

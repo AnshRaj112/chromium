@@ -588,8 +588,8 @@ void RootCompositorFrameSinkImpl::DidNotProduceFrame(
 
 void RootCompositorFrameSinkImpl::BindLayerContext(
     mojom::PendingLayerContextPtr context,
-    bool draw_mode_is_gpu) {
-  support_->BindLayerContext(*context, draw_mode_is_gpu);
+    mojom::LayerContextSettingsPtr settings) {
+  support_->BindLayerContext(*context, std::move(settings));
 }
 
 #if BUILDFLAG(IS_ANDROID)

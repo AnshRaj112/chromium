@@ -254,11 +254,13 @@ std::string ConstructAvailableAutocompletion(
   return result.str();
 }
 
+#if !BUILDFLAG(IS_ANDROID)
 // Returns whether this match is provided by an extension in unscoped mode.
 bool IsUnscopedExtensionMatch(const AutocompleteMatch& match) {
   return match.provider && match.provider->type() ==
                                AutocompleteProvider::TYPE_UNSCOPED_EXTENSION;
 }
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 // Returns which rich autocompletion type, if any, had (or would have had for
 // counterfactual variations) an impact; i.e. whether the top scoring rich
@@ -555,6 +557,7 @@ AutocompleteController::AutocompleteController(
       zero_suggest_provider_(nullptr),
       on_device_head_provider_(nullptr),
       history_fuzzy_provider_(nullptr),
+      contextual_search_provider_(nullptr),
       stop_timer_duration_(kAutocompleteDefaultStopTimerDuration),
       notify_changed_debouncer_(false, 200),
       is_cros_launcher_(is_cros_launcher),
@@ -1307,8 +1310,9 @@ void AutocompleteController::InitializeAsyncProviders(int provider_types) {
     providers_.push_back(unscoped_extension_provider_.get());
   }
   if (provider_types & AutocompleteProvider::TYPE_CONTEXTUAL_SEARCH) {
-    providers_.push_back(
-        new ContextualSearchProvider(provider_client_.get(), this));
+    contextual_search_provider_ =
+        new ContextualSearchProvider(provider_client_.get(), this);
+    providers_.push_back(contextual_search_provider_.get());
   }
 }
 
@@ -1701,7 +1705,7 @@ void AutocompleteController::AttachActions() {
             template_url_service_, &keyword_input);
     // Attach the contextual search fulfillment actions in the @page keyword
     // mode.
-    if (keyword_turl->starter_pack_id() ==
+    if (keyword_turl && keyword_turl->starter_pack_id() ==
         template_url_starter_pack_data::kPage) {
       internal_result_.AttachContextualSearchFulfillmentActionToMatches();
       return;
@@ -1840,6 +1844,9 @@ void AutocompleteController::UpdateAssociatedKeywords(
 
 void AutocompleteController::UpdateKeywordDescriptions(
     AutocompleteResult* result) {
+  // No need to update the description on Android since description for plain
+  // text match is not allowed.
+#if !BUILDFLAG(IS_ANDROID)
   // The Lens searchbox does not require the search engine name description
   // label since all suggestions will be from a single source.
   // TODO(crbug.com/338094774): Remove this Lens-specific change and implement a
@@ -1882,9 +1889,6 @@ void AutocompleteController::UpdateKeywordDescriptions(
           i->description_class.push_back(
               ACMatchClassification(0, ACMatchClassification::DIM));
         }
-#if BUILDFLAG(IS_ANDROID)
-        i->UpdateJavaDescription();
-#endif
 
         last_keyword = i->keyword;
         last_contextual = is_contextual;
@@ -1893,6 +1897,7 @@ void AutocompleteController::UpdateKeywordDescriptions(
       last_keyword.clear();
     }
   }
+#endif  // !BUILDFLAG(IS_ANDROID)
 }
 
 void AutocompleteController::UpdateSearchboxStats(AutocompleteResult* result) {

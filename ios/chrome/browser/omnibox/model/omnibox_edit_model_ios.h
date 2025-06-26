@@ -49,12 +49,6 @@ class OmniboxEditModelIOS {
 
   metrics::OmniboxEventProto::PageClassification GetPageClassification() const;
 
-  // Returns the match for the current text. If the user has not edited the text
-  // this is the match corresponding to the permanent text. Returns the
-  // alternate nav URL, if `alternate_nav_url` is non-NULL and there is such a
-  // URL. Virtual for testing.
-  virtual AutocompleteMatch CurrentMatch(GURL* alternate_nav_url) const;
-
   // Returns true if the current edit contents will be treated as a
   // URL/navigation, as opposed to a search.
   bool CurrentTextIsURL() const;
@@ -88,19 +82,6 @@ class OmniboxEditModelIOS {
   bool user_input_in_progress() const {
     return text_model_->user_input_in_progress;
   }
-
-  // Resets the permanent display texts `url_for_editing_` to those provided by
-  // the controller. Returns true if the display text shave changed and the
-  // change should be immediately user-visible, because either the user is not
-  // editing or the edit does not have focus.
-  bool ResetDisplayTexts();
-
-  // Returns the permanent display text for the current page and Omnibox state.
-  std::u16string GetPermanentDisplayText() const;
-
-  // Invoked any time the text may have changed in the edit. Notifies the
-  // controller.
-  void OnChanged();
 
   // Reverts the edit model back to its unedited state (permanent text showing,
   // no user input in progress).
@@ -142,27 +123,6 @@ class OmniboxEditModelIOS {
   bool is_pasting() const {
     return text_model_->paste_state == OmniboxPasteState::kPasting;
   }
-
-  // Called when any relevant data changes.  This rolls together several
-  // separate pieces of data into one call so we can update all the UI
-  // efficiently. Specifically, it's invoked for autocompletion.
-  //   `inline_autocompletion` is the autocompletion.
-  //   `additional_text` is additional omnibox text to be displayed adjacent to
-  //     the omnibox view.
-  //   `new_match` is the selected match when the user is changing selection,
-  //     the default match if the user is typing, or an empty match when
-  //     selecting a header.
-  // Virtual to allow testing.
-  virtual void OnPopupDataChanged(const std::u16string& inline_autocompletion,
-                                  const std::u16string& additional_text,
-                                  const AutocompleteMatch& new_match);
-
-  // Called by the OmniboxViewIOS after something changes, with details about
-  // what state changes occurred.  Updates internal state, updates the popup if
-  // necessary, and returns true if any significant changes occurred.  Note that
-  // `text_change.text_differs` may be set even if `text_change.old_text` ==
-  // `text_change.new_text`, e.g. if we've just committed an IME composition.
-  bool OnAfterPossibleChange(const OmniboxStateChanges& state_changes);
 
   std::u16string GetUserTextForTesting() const {
     return text_model_->user_text;

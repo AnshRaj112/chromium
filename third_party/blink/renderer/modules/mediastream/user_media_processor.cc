@@ -701,7 +701,6 @@ void UserMediaProcessor::SetupAudioInput() {
   StreamControls* const stream_controls =
       current_request_info_->stream_controls();
   stream_controls->exclude_system_audio = request->exclude_system_audio();
-  stream_controls->window_audio_preference = request->window_audio_preference();
 
   stream_controls->suppress_local_audio_playback =
       request->suppress_local_audio_playback();
@@ -1780,6 +1779,13 @@ MediaStreamSource* UserMediaProcessor::InitializeAudioSourceObject(
   capabilities.auto_gain_control = {true, false};
   capabilities.noise_suppression = {true, false};
   capabilities.voice_isolation = {true, false};
+
+  if (RuntimeEnabledFeatures::RestrictOwnAudioEnabled()) {
+    if (device.type == mojom::blink::MediaStreamType::DISPLAY_AUDIO_CAPTURE) {
+      capabilities.restrict_own_audio = {true, false};
+    }
+  }
+
   capabilities.sample_size = {
       media::SampleFormatToBitsPerChannel(media::kSampleFormatS16),  // min
       media::SampleFormatToBitsPerChannel(media::kSampleFormatS16)   // max

@@ -18,12 +18,6 @@
 #endif  // defined(ARCH_CPU_ARM_FAMILY)
 
 namespace ash::features {
-// Enables the UI and logic that minimizes the amount of time the device spends
-// at full battery. This preserves battery lifetime.
-BASE_FEATURE(kAdaptiveCharging,
-             "AdaptiveCharging",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables the UI for additional on-device parental controls that can be used to
 // enable or block ARC++ apps.
 BASE_FEATURE(kOnDeviceAppControls,
@@ -854,21 +848,6 @@ BASE_FEATURE(kEnterpriseReportingUI,
 // Controls whether ephemeral network configuration policies are respected.
 BASE_FEATURE(kEphemeralNetworkPolicies,
              "kEphemeralNetworkPolicies",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables Device End Of Lifetime incentive notifications.
-BASE_FEATURE(kEolIncentive, "EolIncentive", base::FEATURE_DISABLED_BY_DEFAULT);
-
-const base::FeatureParam<EolIncentiveParam>::Option eol_incentive_options[] = {
-    {EolIncentiveParam::kNoOffer, "no_offer"},
-    {EolIncentiveParam::kOffer, "offer"},
-    {EolIncentiveParam::kOfferWithWarning, "offer_with_warning"}};
-const base::FeatureParam<EolIncentiveParam> kEolIncentiveParam{
-    &kEolIncentive, "incentive_type", EolIncentiveParam::kNoOffer,
-    &eol_incentive_options};
-
-BASE_FEATURE(kEolIncentiveSettings,
-             "EolIncentiveSettings",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Control whether the eSIM activation dialog supports submitting an empty code.
@@ -2077,7 +2056,7 @@ BASE_FEATURE(kNotificationsInContextMenu,
 // Enables showing OfflineItems in Notifications.
 BASE_FEATURE(kOfflineItemsInNotifications,
              "OfflineItemsInNotifications",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls whether to enable on-device grammar check service.
 BASE_FEATURE(kOnDeviceGrammarCheck,
@@ -3337,10 +3316,6 @@ bool Is16DesksEnabled() {
   return base::FeatureList::IsEnabled(kFeatureManagement16Desks);
 }
 
-bool IsAdaptiveChargingEnabled() {
-  return base::FeatureList::IsEnabled(kAdaptiveCharging);
-}
-
 bool IsOnDeviceAppControlsEnabled() {
   return base::FeatureList::IsEnabled(kOnDeviceAppControls);
 }
@@ -3669,10 +3644,6 @@ bool IsEcheSWADebugModeEnabled() {
 
 bool IsEcheSWAMeasureLatencyEnabled() {
   return base::FeatureList::IsEnabled(kEcheSWAMeasureLatency);
-}
-
-bool IsEOLIncentiveEnabled() {
-  return base::FeatureList::IsEnabled(kEolIncentive);
 }
 
 bool IsESimEmptyActivationCodeSupportEnabled() {

@@ -151,21 +151,21 @@ class OmniboxEditModelIOSTest : public PlatformTest {
   std::unique_ptr<TestOmniboxEditModelIOS> omnibox_edit_model_;
 };
 
-TEST_F(OmniboxEditModelIOSTest, DISABLED_InlineAutocompleteText) {
+TEST_F(OmniboxEditModelIOSTest, InlineAutocompleteText) {
   // Test if the model updates the inline autocomplete text in the view.
   EXPECT_EQ(std::u16string(), omnibox_text_model_->inline_autocompletion);
   [omnibox_text_controller_ setUserText:u"he"];
-  model()->OnPopupDataChanged(u"llo", std::u16string(), {});
+  [omnibox_text_controller_ onPopupDataChanged:u"llo"
+                                additionalText:std::u16string()
+                                      newMatch:{}];
   EXPECT_EQ(u"hello", [omnibox_text_controller_ displayedText]);
   EXPECT_EQ(u"llo", omnibox_text_model_->inline_autocompletion);
 
-  std::u16string text_before = u"he";
-  std::u16string text_after = u"hel";
-  OmniboxStateChanges state_changes{&text_before, &text_after, 3,    3,
-                                    false,        true,        false};
-  model()->OnAfterPossibleChange(state_changes);
+  [omnibox_text_controller_ setUserText:u"hel"];
   EXPECT_EQ(std::u16string(), omnibox_text_model_->inline_autocompletion);
-  model()->OnPopupDataChanged(u"lo", std::u16string(), {});
+  [omnibox_text_controller_ onPopupDataChanged:u"lo"
+                                additionalText:std::u16string()
+                                      newMatch:{}];
   EXPECT_EQ(u"hello", [omnibox_text_controller_ displayedText]);
   EXPECT_EQ(u"lo", omnibox_text_model_->inline_autocompletion);
 
@@ -174,7 +174,9 @@ TEST_F(OmniboxEditModelIOSTest, DISABLED_InlineAutocompleteText) {
   EXPECT_EQ(std::u16string(), omnibox_text_model_->inline_autocompletion);
 
   [omnibox_text_controller_ setUserText:u"he"];
-  model()->OnPopupDataChanged(u"llo", std::u16string(), {});
+  [omnibox_text_controller_ onPopupDataChanged:u"llo"
+                                additionalText:std::u16string()
+                                      newMatch:{}];
   EXPECT_EQ(u"hello", [omnibox_text_controller_ displayedText]);
   EXPECT_EQ(u"llo", omnibox_text_model_->inline_autocompletion);
 }
@@ -221,13 +223,13 @@ TEST_F(OmniboxEditModelIOSTest, CurrentMatch) {
   {
     location_bar_model()->set_url(GURL("http://www.example.com/"));
     location_bar_model()->set_url_for_display(u"example.com");
-    model()->ResetDisplayTexts();
+    [omnibox_text_controller_ resetDisplayTexts];
     model()->Revert();
 
     EXPECT_EQ(u"http://www.example.com/",
               [omnibox_text_controller_ displayedText]);
 
-    AutocompleteMatch match = model()->CurrentMatch(nullptr);
+    AutocompleteMatch match = [omnibox_text_controller_ currentMatch:nullptr];
     EXPECT_EQ(AutocompleteMatchType::URL_WHAT_YOU_TYPED, match.type);
     EXPECT_TRUE(model()->CurrentTextIsURL());
     EXPECT_EQ("http://www.example.com/", match.destination_url.spec());
@@ -238,13 +240,13 @@ TEST_F(OmniboxEditModelIOSTest, CurrentMatch) {
   {
     location_bar_model()->set_url(GURL("https://www.google.com/"));
     location_bar_model()->set_url_for_display(u"google.com");
-    model()->ResetDisplayTexts();
+    [omnibox_text_controller_ resetDisplayTexts];
     model()->Revert();
 
     EXPECT_EQ(u"https://www.google.com/",
               [omnibox_text_controller_ displayedText]);
 
-    AutocompleteMatch match = model()->CurrentMatch(nullptr);
+    AutocompleteMatch match = [omnibox_text_controller_ currentMatch:nullptr];
     EXPECT_EQ(AutocompleteMatchType::URL_WHAT_YOU_TYPED, match.type);
     EXPECT_TRUE(model()->CurrentTextIsURL());
 
@@ -257,14 +259,14 @@ TEST_F(OmniboxEditModelIOSTest, DisplayText) {
   location_bar_model()->set_url(GURL("https://www.example.com/"));
   location_bar_model()->set_url_for_display(u"example.com");
 
-  EXPECT_TRUE(model()->ResetDisplayTexts());
+  EXPECT_TRUE([omnibox_text_controller_ resetDisplayTexts]);
   model()->Revert();
 
   EXPECT_TRUE(model()->CurrentTextIsURL());
 
   // iOS OmniboxEditModel always provides the full URL as the OmniboxView
   // permanent display text.
-  EXPECT_EQ(u"https://www.example.com/", model()->GetPermanentDisplayText());
+  EXPECT_EQ(u"https://www.example.com/", omnibox_text_model_->url_for_editing);
   EXPECT_EQ(u"https://www.example.com/",
             [omnibox_text_controller_ displayedText]);
   EXPECT_FALSE(model()->user_input_in_progress());

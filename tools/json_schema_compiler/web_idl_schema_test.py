@@ -187,6 +187,7 @@ class WebIdlSchemaTest(unittest.TestCase):
     self.assertEqual(
         {
             'name': 'callback',
+            'optional': True,
             'parameters': [{
                 'type': 'string'
             }],
@@ -195,6 +196,7 @@ class WebIdlSchemaTest(unittest.TestCase):
     self.assertEqual(
         {
             'name': 'callback',
+            'optional': True,
             'parameters': [{
                 'optional': True,
                 'type': 'string'
@@ -204,19 +206,23 @@ class WebIdlSchemaTest(unittest.TestCase):
     self.assertEqual(
         {
             'name': 'callback',
+            'optional': True,
             'parameters': [{
                 '$ref': 'ExampleType'
             }],
             'type': 'promise'
         }, getFunctionAsyncReturn(schema, 'customTypePromiseReturn'))
-    self.assertEqual({
-        'name': 'callback',
-        'parameters': [],
-        'type': 'promise'
-    }, getFunctionAsyncReturn(schema, 'undefinedPromiseReturn'))
     self.assertEqual(
         {
             'name': 'callback',
+            'optional': True,
+            'parameters': [],
+            'type': 'promise'
+        }, getFunctionAsyncReturn(schema, 'undefinedPromiseReturn'))
+    self.assertEqual(
+        {
+            'name': 'callback',
+            'optional': True,
             'parameters': [{
                 'type': 'array',
                 'items': {
@@ -228,6 +234,7 @@ class WebIdlSchemaTest(unittest.TestCase):
     self.assertEqual(
         {
             'name': 'callback',
+            'optional': True,
             'parameters': [{
                 'type': 'array',
                 'items': {
@@ -304,6 +311,7 @@ class WebIdlSchemaTest(unittest.TestCase):
     # A function without a preceding comment has no 'description' key.
     self.assertTrue('description' not in getFunction(schema, 'noDescription'))
 
+    # Basic single and multi-line function comments.
     self.assertEqual(
         'One line description.',
         getFunction(schema, 'oneLineDescription').get('description'))
@@ -315,6 +323,7 @@ class WebIdlSchemaTest(unittest.TestCase):
         ' paragraph tags.</p>',
         getFunction(schema, 'paragraphedDescription').get('description'))
 
+    # Function with parameter comments.
     function = getFunction(schema, 'parameterComments')
     self.assertEqual('This function has parameter comments.',
                      function.get('description'))
@@ -339,13 +348,14 @@ class WebIdlSchemaTest(unittest.TestCase):
             '$ref': 'ExampleType'
         }, function_parameters[1])
 
-    promise_function = getFunction(schema, 'namedPromiseReturn')
+    # Basic descriptions on a promise returning async function.
+    promise_function = getFunction(schema, 'describedPromiseReturn')
     self.assertEqual(
         ('Promise returning function, with a comment that provides the name and'
          ' description of the value the promise resolves to.'),
         promise_function.get('description'))
-    promise_function_parameters = getFunctionParameters(schema,
-                                                        'namedPromiseReturn')
+    promise_function_parameters = getFunctionParameters(
+        schema, 'describedPromiseReturn')
     self.assertEqual(1, len(promise_function_parameters))
     self.assertEqual(
         {
@@ -356,11 +366,13 @@ class WebIdlSchemaTest(unittest.TestCase):
         promise_function_parameters[0],
     )
     promise_function_async_return = getFunctionAsyncReturn(
-        schema, 'namedPromiseReturn')
+        schema, 'describedPromiseReturn')
     self.assertEqual(
         {
             'name':
             'callback',
+            'optional':
+            True,
             'type':
             'promise',
             'parameters': [{
@@ -372,9 +384,23 @@ class WebIdlSchemaTest(unittest.TestCase):
                 ('A description for the value the promise resolves to: with'
                  ' an extra colon for good measure.'),
             }],
-        },
-        promise_function_async_return,
-    )
+        }, promise_function_async_return)
+
+    # Promise returning function with just a name for the promise value and no
+    # further description.
+    named_promise_function_async_return = getFunctionAsyncReturn(
+        schema, 'namedPromiseReturn')
+    self.assertEqual(
+        {
+            'name': 'callback',
+            'optional': True,
+            'type': 'promise',
+            'parameters': [{
+                'type': 'boolean',
+                'name': 'justAName'
+            }],
+        }, named_promise_function_async_return)
+
 
   # Tests that API events are processed as expected.
   def testEvents(self):
@@ -644,6 +670,31 @@ class WebIdlSchemaTest(unittest.TestCase):
         schema['description'],
     )
 
+  # Tests that a function defined with the requiredCallback extended attribute
+  # does not have the returns_async field marked as optional after processing.
+  # Note: These are only relevant to contexts which don't support promise based
+  # calls, or for specific functions which still do not support promises.
+  def testRequiredCallbackFunction(self):
+    idl = web_idl_schema.Load('test/web_idl/required_callback_function.idl')
+    self.assertEqual(1, len(idl))
+    self.assertEqual(
+        {
+            'name': 'callback',
+            'parameters': [{
+                'type': 'string'
+            }],
+            'type': 'promise'
+        }, getFunctionAsyncReturn(idl[0], 'requiredCallbackFunction'))
+    self.assertEqual(
+        {
+            'name': 'callback',
+            'optional': True,
+            'parameters': [{
+                'type': 'string'
+            }],
+            'type': 'promise'
+        }, getFunctionAsyncReturn(idl[0], 'notRequiredCallbackFunction'))
+
   # Tests that extended attributes being listed on the the line previous to a
   # node come through correctly and don't throw off and associated descriptions.
   # TODO(crbug.com/340297705): Add checks for functions here once support for
@@ -666,7 +717,7 @@ class WebIdlSchemaTest(unittest.TestCase):
         'test/web_idl/all_platforms_on_namespace.idl')
     self.assertEqual(1, len(platforms_schema))
     self.assertEqual('allPlatformsAPI', platforms_schema[0]['namespace'])
-    expected = ['chromeos', 'fuchsia', 'linux', 'mac', 'win']
+    expected = ['chromeos', 'desktop_android', 'fuchsia', 'linux', 'mac', 'win']
     self.assertEqual(expected, platforms_schema[0]['platforms'])
 
   # Tests that an API interface with just chromeos listed in the platforms

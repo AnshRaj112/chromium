@@ -699,7 +699,6 @@ static_library("test_support") {
       "//components/pdf/browser",
       "//extensions/browser/api:extensions_api_client",
       "//pdf:features",
-      "//services/network/public/cpp:ip_address_space_overrides_test_utils",
     ]
   }
 
@@ -825,8 +824,6 @@ static_library("test_support") {
       "../browser/lookalikes/lookalike_test_helper.h",
       "../browser/net/profile_network_context_service_test_utils.cc",
       "../browser/net/profile_network_context_service_test_utils.h",
-      "../browser/net/proxy_test_utils.cc",
-      "../browser/net/proxy_test_utils.h",
       "../browser/performance_manager/test_support/fake_child_process_tuning_delegate.cc",
       "../browser/performance_manager/test_support/fake_child_process_tuning_delegate.h",
       "../browser/performance_manager/test_support/fake_frame_throttling_delegate.cc",
@@ -1182,10 +1179,6 @@ static_library("test_support") {
 
   if (enable_offline_pages) {
     public_deps += [ "//components/offline_pages/core:test_support" ]
-  }
-
-  if (enable_ppapi) {
-    public_deps += [ "//ppapi/shared_impl" ]
   }
 
   if (enable_compose) {
@@ -1635,6 +1628,9 @@ source_set("platform_browser_tests") {
       "//extensions/browser/updater",
       "//ui/webui:test_support",
     ]
+    if (!is_android) {
+      deps += [ "//chrome/browser/ui/search:test_support_ui" ]
+    }
     data += [
       "//chrome/test/data/extensions/",
       "//extensions/test/data/",
@@ -3529,6 +3525,7 @@ if (!is_android) {
       "../browser/ui/views/download/download_item_view_browsertest.cc",
       "../browser/ui/views/extensions/extension_install_dialog_view_supervised_browsertest.cc",
       "../browser/ui/views/eye_dropper/eye_dropper_browsertest.cc",
+      "../browser/ui/views/file_system_access/file_system_access_restore_permission_bubble_view_browsertest.cc",
       "../browser/ui/views/file_system_access/file_system_access_test_utils.cc",
       "../browser/ui/views/file_system_access/file_system_access_test_utils.h",
       "../browser/ui/views/frame/multi_contents_view_browsertest.cc",
@@ -3865,6 +3862,7 @@ if (!is_android) {
       "//chrome/browser/contextual_cueing",
       "//chrome/browser/contextual_cueing:impl",
       "//chrome/browser/infobars:test_support",
+      "//chrome/browser/supervised_user",
       "//chrome/browser/ui/extensions",
       "//chrome/browser/ui/search",
       "//chrome/browser/ui/toolbar",
@@ -4313,22 +4311,6 @@ if (!is_android) {
       sources += [
         "../browser/plugins/plugin_info_host_impl_browsertest.cc",
         "../browser/plugins/plugin_response_interceptor_url_loader_throttle_browsertest.cc",
-      ]
-    }
-
-    if (enable_ppapi) {
-      sources += [
-        "ppapi/ppapi_browsertest.cc",
-        "ppapi/ppapi_filechooser_browsertest.cc",
-      ]
-      deps += [ "//ppapi/shared_impl:test_support" ]
-
-      # TODO(thakis): Why do these need copying in browser_tests?
-      # content_browsertests uses the non-copied files instead.
-      data_deps += [
-        "//ppapi:copy_test_files",
-        "//ppapi:copy_test_files2",
-        "//ppapi:ppapi_tests",
       ]
     }
 
@@ -4785,6 +4767,8 @@ if (!is_android) {
         "//chrome/browser/ui/global_error:test_support",
         "//chrome/browser/ui/hid",
         "//chrome/browser/ui/javascript_dialogs",
+        "//chrome/browser/ui/search:test_support_ui",
+        "//chrome/browser/ui/supervised_user",
         "//chrome/browser/web_applications/extensions",
         "//chrome/common/extensions/api",
         "//chrome/services/media_gallery_util/public/cpp:browser_tests",
@@ -5778,6 +5762,7 @@ if (!is_android) {
       deps += [
         "../browser/enterprise/connectors/test:test_support",
         "//chrome/browser:main_extra_parts",
+        "//chrome/browser/ui/supervised_user",
       ]
     }
 
@@ -8053,7 +8038,6 @@ test("unit_tests") {
       "../browser/ui/views/autofill/update_address_profile_view_unittest.cc",
       "../browser/ui/views/data_sharing/data_sharing_utils_unittest.cc",
       "../browser/ui/views/exclusive_access_bubble_views_unittest.cc",
-      "../browser/ui/views/file_system_access/file_system_access_restore_permission_bubble_view_unittest.cc",
       "../browser/ui/views/passwords/manage_passwords_view_unittest.cc",
       "../browser/ui/views/passwords/move_to_account_store_bubble_view_unittest.cc",
       "../browser/ui/views/passwords/password_bubble_view_test_base.cc",
@@ -8206,6 +8190,7 @@ test("unit_tests") {
       "//chrome/browser/ui/extensions",
       "//chrome/browser/ui/extensions:unit_tests",
       "//chrome/browser/ui/safety_hub",
+      "//chrome/browser/ui/search:test_support_ui",
       "//chrome/browser/ui/search:unit_tests",
       "//chrome/browser/ui/startup:startup_tab",
       "//chrome/browser/ui/tabs:tab_group",
@@ -9166,7 +9151,6 @@ test("unit_tests") {
       "../common/extensions/manifest_tests/extension_manifests_validapp_unittest.cc",
       "../common/extensions/manifest_tests/extension_manifests_web_accessible_resources_unittest.cc",
       "../common/extensions/manifest_tests/extension_manifests_web_unittest.cc",
-      "../common/extensions/manifest_tests/extension_manifests_webview_accessible_resources_unittest.cc",
       "../common/extensions/manifest_tests/permissions_parser_unittest.cc",
       "../common/extensions/manifest_unittest.cc",
       "../common/extensions/permissions/chrome_api_permissions_unittest.cc",
@@ -9380,6 +9364,9 @@ test("unit_tests") {
       "../common/extensions/api/url_handlers/url_handlers_parser_unittest.cc",
       "../common/extensions/chrome_extensions_client_unittest.cc",
       "../common/extensions/extension_unittest.cc",
+
+      # Desktop Android does not support webview.
+      "../common/extensions/manifest_tests/extension_manifests_webview_accessible_resources_unittest.cc",
       "../common/extensions/permissions/permission_set_unittest.cc",
       "../common/extensions/sync_type_unittest.cc",
       "../renderer/extensions/api/extension_hooks_delegate_unittest.cc",
@@ -9428,6 +9415,7 @@ test("unit_tests") {
     deps += [
       "//chrome/browser/affiliations",
       "//chrome/browser/extensions/api/cookies:helpers",
+      "//chrome/browser/supervised_user",
       "//chrome/browser/ui/global_error:test_support",
       "//chrome/browser/ui/web_applications:unit_tests",
       "//chrome/browser/web_applications:unit_tests",
@@ -9813,6 +9801,7 @@ test("unit_tests") {
   } else if (safe_browsing_mode == 2 && is_android) {
     sources += [
       "../browser/component_updater/real_time_url_checks_allowlist_component_installer_unittest.cc",
+      "../browser/safe_browsing/android/client_side_detection_intelligent_scan_delegate_android_unittest.cc",
       "../browser/safe_browsing/android/password_reuse_controller_android_unittest.cc",
       "../browser/safe_browsing/download_protection/rate_limiting_key_manager_unittest.cc",
       "../browser/safe_browsing/safe_browsing_pref_change_handler_android_unittest.cc",
@@ -10012,10 +10001,6 @@ test("unit_tests") {
       "../browser/plugins/plugin_info_host_impl_unittest.cc",
       "../browser/plugins/plugin_prefs_unittest.cc",
     ]
-  }
-
-  if (enable_ppapi) {
-    sources += [ "../common/pepper_permission_util_unittest.cc" ]
   }
 
   if (enable_printing) {
@@ -10612,8 +10597,6 @@ if (!is_android) {
       "../browser/ssl/cert_verifier_browser_test.h",
       "../browser/ssl/cert_verifier_platform_browser_test.cc",
       "../browser/ssl/cert_verifier_platform_browser_test.h",
-      "../browser/ui/search/ntp_test_utils.cc",
-      "../browser/ui/search/ntp_test_utils.h",
       "../browser/ui/test/test_browser_closed_waiter.cc",
       "../browser/ui/test/test_browser_closed_waiter.h",
       "../browser/ui/views/autofill/payments/card_unmask_prompt_view_tester_views.cc",
@@ -10848,26 +10831,6 @@ if (!is_android) {
         "base/window_contents_as_string_win.h",
       ]
       deps += [ "//chrome/browser/os_crypt" ]
-    }
-
-    if (enable_ppapi) {
-      sources += [
-        "ppapi/ppapi_test.cc",
-        "ppapi/ppapi_test.h",
-        "ppapi/ppapi_test_select_file_dialog_factory.cc",
-        "ppapi/ppapi_test_select_file_dialog_factory.h",
-      ]
-      deps += [
-        "//chrome/browser/content_settings:content_settings_factory",
-        "//ppapi/shared_impl",
-      ]
-
-      data = [
-        "//ppapi/tests/test_case.html",
-        "//ppapi/tests/test_case.html.mock-http-headers",
-        "//ppapi/tests/test_page.css",
-        "//ppapi/tests/test_page.css.mock-http-headers",
-      ]
     }
 
     if (enable_extensions) {
@@ -11403,12 +11366,6 @@ if (!is_android && !is_chromeos_device) {
             [ "//chrome/browser/resources/chromeos/accessibility:build" ]
         data += [ "$root_out_dir/resources/chromeos/" ]
       }
-    }
-
-    if (enable_ppapi) {
-      sources += [ "ppapi/ppapi_interactive_browsertest.cc" ]
-      deps += [ "//ppapi/shared_impl:test_support" ]
-      data_deps += [ "//ppapi:ppapi_tests" ]
     }
 
     if (is_linux) {

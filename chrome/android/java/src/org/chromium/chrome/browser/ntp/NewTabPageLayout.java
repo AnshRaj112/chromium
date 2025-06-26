@@ -239,7 +239,7 @@ public class NewTabPageLayout extends LinearLayout
         mWindowAndroid = windowAndroid;
         mIsTablet = isTablet;
         mTabStripHeightSupplier = tabStripHeightSupplier;
-        mIsComposeplateEnabled = ComposeplateUtils.isComposeplateEnabled(mIsTablet);
+        mIsComposeplateEnabled = ComposeplateUtils.isComposeplateEnabled(mIsTablet, profile);
         if (mIsComposeplateEnabled) {
             mComposeplateUrlSupplier = composeplateUrlSupplier;
         }
@@ -368,12 +368,15 @@ public class NewTabPageLayout extends LinearLayout
                     mFakeSearchBox.getPaddingTop(),
                     mFakeSearchBox.getPaddingEnd(),
                     mFakeSearchBox.getPaddingBottom());
+            mFakeSearchBoxEditText.setTextAppearance(
+                    R.style.TextAppearance_FakeSearchBoxTextMedium);
         } else {
             mFakeSearchBox.setPaddingRelative(
                     getResources().getDimensionPixelSize(R.dimen.fake_search_box_start_padding),
                     mFakeSearchBox.getPaddingTop(),
                     mFakeSearchBox.getPaddingEnd(),
                     mFakeSearchBox.getPaddingBottom());
+            mFakeSearchBoxEditText.setTextAppearance(R.style.TextAppearance_FakeSearchBoxText);
         }
     }
 

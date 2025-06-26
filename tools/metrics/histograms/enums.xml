@@ -9937,6 +9937,7 @@ from previous Chrome versions.
       label="SafeBrowsingGooglePlayProtectPrompt:disabled"/>
   <int value="-1505988176"
       label="AutofillEnableMultipleRequestInVirtualCardDownstreamEnrollment:enabled"/>
+  <int value="-1505837896" label="MacCatapLoopbackAudioForCast:disabled"/>
   <int value="-1505836593" label="ImprovedIncognitoScreenshot:disabled"/>
   <int value="-1505222604" label="ClearIdentityInCanMakePaymentEvent:disabled"/>
   <int value="-1505076171" label="AutomaticUsbDetach:enabled"/>
@@ -10023,6 +10024,7 @@ from previous Chrome versions.
   <int value="-1477491889" label="cast-streaming-force-enable-hardware-vp9"/>
   <int value="-1476930281" label="Windows10CustomTitlebar:enabled"/>
   <int value="-1475773986" label="FeedBoCSigninInterstitial:enabled"/>
+  <int value="-1475681031" label="AutomotiveBackButtonBarStreamline:enabled"/>
   <int value="-1474724634"
       label="OverrideLanguagePrefsForHrefTranslate:enabled"/>
   <int value="-1473878093" label="HideArcMediaNotifications:disabled"/>
@@ -12915,7 +12917,6 @@ from previous Chrome versions.
   <int value="-398012541"
       label="CertificateTransparency2022PolicyAllCerts:enabled"/>
   <int value="-397959190" label="ClipboardHistory:enabled"/>
-  <int value="-397404057" label="SiteInstanceGroupsForDataUrls:enabled"/>
   <int value="-397392156" label="FtpProtocol:disabled"/>
   <int value="-396994784" label="enable-vr-shell"/>
   <int value="-396568607" label="KerberosSettingsSection:enabled"/>
@@ -14516,6 +14517,7 @@ from previous Chrome versions.
   <int value="199225530" label="EnableLazyLoadImageForInvisiblePage:disabled"/>
   <int value="199237368" label="RenameJourneys:disabled"/>
   <int value="200347243" label="WebVRExperimentalRendering:disabled"/>
+  <int value="200711930" label="PictureInPictureShowWindowAnimation:disabled"/>
   <int value="201203491"
       label="ReduceUserAgentAndroidVersionDeviceModel:enabled"/>
   <int value="201343576" label="enable-password-change-support:enabled"/>
@@ -15080,6 +15082,7 @@ from previous Chrome versions.
   <int value="400239639" label="PrivacySandboxAdsAPIsOverride:enabled"/>
   <int value="400272381" label="LazyFrameLoading:disabled"/>
   <int value="400322063" label="ash-disable-screen-orientation-lock"/>
+  <int value="400748924" label="PictureInPictureShowWindowAnimation:enabled"/>
   <int value="400836553" label="ImeKoreanOnlyModeSwitchOnRightAlt:enabled"/>
   <int value="401640536" label="ShouldFreezeSelf:enabled"/>
   <int value="401983950" label="enable-spdy4"/>
@@ -15223,6 +15226,7 @@ from previous Chrome versions.
   <int value="453102772" label="OfflinePagesLoadSignalCollecting:disabled"/>
   <int value="453427119" label="EcheSWADisableStunServer:enabled"/>
   <int value="453601558" label="SupportToolScreenshot:enabled"/>
+  <int value="453842846" label="OmniboxRestoreInvisibleFocusOnly:enabled"/>
   <int value="454106312" label="UsernameFirstFlowFilling:enabled"/>
   <int value="454282924"
       label="AutofillEnableShowSaveCardSecurelyMessage:disabled"/>
@@ -15808,6 +15812,7 @@ from previous Chrome versions.
   <int value="680773835" label="EnablePolicyTestPage:enabled"/>
   <int value="681622885" label="FullscreenExitUI:enabled"/>
   <int value="682549212" label="ash-enable-cursor-motion-blur"/>
+  <int value="682563468" label="AutomotiveBackButtonBarStreamline:disabled"/>
   <int value="682916740" label="PdfUnseasoned:disabled"/>
   <int value="683013217" label="AllowPopupsDuringPageUnload:disabled"/>
   <int value="683366957" label="ExoSurroundingTextOffset:disabled"/>
@@ -17518,7 +17523,6 @@ from previous Chrome versions.
   <int value="1306473273" label="BluetoothFlossCoredump:enabled"/>
   <int value="1307003774" label="AutofillEnableCompanyName:disabled"/>
   <int value="1307402891" label="ReadAloud:enabled"/>
-  <int value="1308474501" label="SiteInstanceGroupsForDataUrls:disabled"/>
   <int value="1308512803" label="WebAuthenticationPasskeyUpgrade:disabled"/>
   <int value="1308537004" label="force-pnacl-subzero"/>
   <int value="1308583017" label="PrefetchFontLookupTables:disabled"/>
@@ -18167,6 +18171,7 @@ from previous Chrome versions.
   <int value="1544887706" label="IPH_ExtensionsRequestAccessButton:enabled"/>
   <int value="1546652609" label="SharingHubDesktopOmnibox:disabled"/>
   <int value="1547049944" label="ScalableIph:enabled"/>
+  <int value="1547184359" label="MacCatapLoopbackAudioForScreenShare:disabled"/>
   <int value="1547588151" label="AllowUserInstalledChromeApps:disabled"/>
   <int value="1548680958" label="PdfCr23:disabled"/>
   <int value="1548776701" label="AllBookmarks:disabled"/>
@@ -18335,6 +18340,7 @@ from previous Chrome versions.
   <int value="1612446645" label="enable-weak-memorycache"/>
   <int value="1612871297" label="WebPayments:disabled"/>
   <int value="1612974229" label="allow-insecure-localhost"/>
+  <int value="1613071194" label="MacCatapLoopbackAudioForCast:enabled"/>
   <int value="1613179749" label="WebAuthenticationCableDisco:disabled"/>
   <int value="1613738524" label="ForceAppLanguagePrompt:enabled"/>
   <int value="1613762235" label="ReadAnythingImagesViaAlgorithm:enabled"/>
@@ -18656,6 +18662,7 @@ from previous Chrome versions.
   <int value="1724706885" label="EnableEdgeDetection:disabled"/>
   <int value="1724800383" label="AsmJsToWebAssembly:disabled"/>
   <int value="1725438666" label="NewStyleNotifications:enabled"/>
+  <int value="1725912175" label="MacCatapLoopbackAudioForScreenShare:enabled"/>
   <int value="1726197412" label="FencedFramesDefaultMode:disabled"/>
   <int value="1726474125"
       label="AccessibilityDictationKeyboardImprovements:disabled"/>
@@ -19564,6 +19571,7 @@ from previous Chrome versions.
   <int value="2050985807" label="AllowPopupsDuringPageUnload:enabled"/>
   <int value="2051403297" label="ShowBluetoothDeviceBattery:disabled"/>
   <int value="2051886966" label="PwaInstallUseBottomSheet:enabled"/>
+  <int value="2052553086" label="OmniboxRestoreInvisibleFocusOnly:disabled"/>
   <int value="2053269084" label="EcheLauncher:disabled"/>
   <int value="2053479012" label="PersistDeviceBoundSessions:disabled"/>
   <int value="2054616439" label="OmniboxMobileParityUpdate:enabled"/>

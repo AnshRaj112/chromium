@@ -40,6 +40,13 @@ BASE_FEATURE(kAutofillAddressSuggestionsOnTyping,
              "AutofillAddressSuggestionsOnTyping",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Feature flag controlling the display of surveys when a user declines the
+// save prompt of Autofill address and a user does not have any address stored.
+// The goal is to understand the reason and work towards improving acceptance.
+BASE_FEATURE(kAutofillAddressUserDeclinedSaveSurvey,
+             "AutofillAddressUserDeclinedSaveSurvey",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Feature flag to control the displaying of an ongoing hats survey that
 // measures users perception of Autofill. Differently from other surveys,
 // the Autofill user perception survey will not have a specific target
@@ -317,12 +324,6 @@ BASE_FEATURE(kAutofillOptimizeFormExtraction,
 BASE_FEATURE(kAutofillFixSplitCreditCardImport,
              "AutofillFixSplitCreditCardImport",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// If enabled, empty autofill settings fields will be correctly saved.
-// TODO: crbug.com/402020076 - Clean up when confirmed that this is safe.
-BASE_FEATURE(kAutofillFixEmptyFieldAndroidSettingsBug,
-             "AutofillFixEmptyFieldAndroidSettingsBug",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, autofill will use FormFieldData::DeepEqual instead of deprecated
 // SameFieldAs().

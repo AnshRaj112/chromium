@@ -90,7 +90,7 @@ const char kOmniboxFocusResultedInNavigation[] =
   }
   // If Siri is thinking, treat that as user input being in progress.  It is
   // unsafe to modify the text field while voice entry is pending.
-  if (_omniboxEditModel->ResetDisplayTexts()) {
+  if ([self resetDisplayTexts]) {
     // Revert everything to the baseline look.
     [self revertAll];
   } else if (!_omniboxEditModel->has_focus()) {
@@ -99,7 +99,7 @@ const char kOmniboxFocusResultedInNavigation[] =
     // not currently focused.
     NSAttributedString* as = [[NSMutableAttributedString alloc]
         initWithString:base::SysUTF16ToNSString(
-                           _omniboxEditModel->GetPermanentDisplayText())];
+                           _omniboxTextModel->url_for_editing)];
     [self.textField setText:as userTextLength:[as length]];
   }
 }
@@ -212,9 +212,7 @@ const char kOmniboxFocusResultedInNavigation[] =
   // away during the model revert anyways.
   [self.omniboxAutocompleteController stopAutocompleteWithClearSuggestions:YES];
 
-  if (_omniboxEditModel) {
-    _omniboxEditModel->OnChanged();
-  }
+  [self onTextChanged];
 }
 
 - (std::u16string)displayedText {
@@ -307,6 +305,77 @@ const char kOmniboxFocusResultedInNavigation[] =
   [self getInfoForCurrentText:&_omniboxTextModel->current_match
        alternateNavigationURL:nullptr];
   _omniboxTextModel->paste_state = OmniboxPasteState::kNone;
+}
+
+- (AutocompleteMatch)currentMatch:(GURL*)alternateNavURL {
+  // If we have a valid match use it. Otherwise get one for the current text.
+  AutocompleteMatch match = _omniboxTextModel->current_match;
+  if (!match.destination_url.is_valid()) {
+    [self getInfoForCurrentText:&match alternateNavigationURL:alternateNavURL];
+  } else if (alternateNavURL) {
+    AutocompleteProviderClient* provider_client =
+        _omniboxController->autocomplete_controller()
+            ->autocomplete_provider_client();
+    *alternateNavURL = AutocompleteResult::ComputeAlternateNavUrl(
+        _omniboxTextModel->input, match, provider_client);
+  }
+  return match;
+}
+
+- (void)onTextChanged {
+  // Don't call CurrentMatch() when there's no editing, as in this case we'll
+  // never actually use it.  This avoids running the autocomplete providers (and
+  // any systems they then spin up) during startup.
+  const AutocompleteMatch& current_match =
+      _omniboxTextModel->user_input_in_progress ? [self currentMatch:nullptr]
+                                                : AutocompleteMatch();
+
+  _omniboxClient->OnTextChanged(
+      current_match, _omniboxTextModel->user_input_in_progress,
+      _omniboxTextModel->user_text,
+      _omniboxController->autocomplete_controller()->result(),
+      _omniboxTextModel->HasFocus());
+}
+
+- (void)onPopupDataChanged:(const std::u16string&)inlineAutocompletion
+            additionalText:(const std::u16string&)additionalText
+                  newMatch:(const AutocompleteMatch&)newMatch {
+  _omniboxTextModel->current_match = newMatch;
+  _omniboxTextModel->inline_autocompletion = inlineAutocompletion;
+
+  const std::u16string& userText = _omniboxTextModel->user_input_in_progress
+                                       ? _omniboxTextModel->user_text
+                                       : _omniboxTextModel->input.text();
+
+  [self
+      updateAutocompleteIfTextChanged:userText
+                       autocompletion:_omniboxTextModel->inline_autocompletion];
+  [self setAdditionalText:additionalText];
+
+  // We need to invoke this in case the destination url changed (as could
+  // happen when control is toggled).
+  [self onTextChanged];
+}
+
+- (bool)resetDisplayTexts {
+  const std::u16string old_display_text = _omniboxTextModel->url_for_editing;
+  if (_omniboxClient) {
+    _omniboxTextModel->url_for_editing = _omniboxClient->GetFormattedFullURL();
+  }
+  // When there's new permanent text, and the user isn't interacting with the
+  // omnibox, we want to revert the edit to show the new text.  We could simply
+  // define "interacting" as "the omnibox has focus", but we still allow updates
+  // when the omnibox has focus as long as the user hasn't begun editing, and
+  // isn't seeing zerosuggestions (because changing this text would require
+  // changing or hiding those suggestions).  When the omnibox doesn't have
+  // focus, we assume the user may have abandoned their interaction and it's
+  // always safe to change the text; this also prevents someone toggling "Show
+  // URL" (which sounds as if it might be persistent) from seeing just that URL
+  // forever afterwards.
+  return (_omniboxTextModel->url_for_editing != old_display_text) &&
+         (!_omniboxTextModel->HasFocus() ||
+          (!_omniboxTextModel->user_input_in_progress &&
+           !_omniboxAutocompleteController.hasSuggestions));
 }
 
 #pragma mark - Autocomplete events
@@ -811,8 +880,8 @@ const char kOmniboxFocusResultedInNavigation[] =
     [self startAutocompleteAfterEdit];
   }
 
-  if (notifyTextChanged && _omniboxEditModel) {
-    _omniboxEditModel->OnChanged();
+  if (notifyTextChanged) {
+    [self onTextChanged];
   }
 
   [self setCaretPos:caretPos];
@@ -891,19 +960,20 @@ const char kOmniboxFocusResultedInNavigation[] =
   OmniboxStateChanges state_changes =
       _omniboxTextModel->GetStateChanges(_stateBeforeChange, newState);
 
-  const BOOL something_changed =
-      _omniboxEditModel &&
-      _omniboxEditModel->OnAfterPossibleChange(state_changes);
+  const BOOL somethingChanged =
+      _omniboxTextModel->UpdateStateAfterPossibleChange(state_changes);
 
-  if (_omniboxEditModel) {
-    _omniboxEditModel->OnChanged();
+  if (somethingChanged) {
+    [self startAutocompleteAfterEdit];
   }
+
+  [self onTextChanged];
 
   // TODO(crbug.com/379695536): Find a different place to call this. Give the
   // omnibox a chance to update the alignment for a text direction change.
   [self.textField updateTextDirection];
 
-  return something_changed;
+  return somethingChanged;
 }
 
 @end

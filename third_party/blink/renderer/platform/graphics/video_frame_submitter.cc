@@ -149,8 +149,9 @@ class VideoFrameSubmitter::FrameSinkBundleProxy
     bundle_->DidNotProduceFrame(frame_sink_id_.sink_id(), ack);
   }
 
-  void BindLayerContext(viz::mojom::blink::PendingLayerContextPtr context,
-                        bool draw_mode_is_gpu) override {}
+  void BindLayerContext(
+      viz::mojom::blink::PendingLayerContextPtr context,
+      viz::mojom::blink::LayerContextSettingsPtr settings) override {}
 
 #if BUILDFLAG(IS_ANDROID)
   void SetThreads(const WTF::Vector<viz::Thread>& threads) override {

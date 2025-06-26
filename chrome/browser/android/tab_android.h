@@ -28,7 +28,6 @@
 #include "components/tab_groups/token_id.h"
 #include "components/tabs/public/split_tab_id.h"
 #include "components/tabs/public/tab_interface.h"
-#include "tab_android_data_provider.h"
 
 class GURL;
 class Profile;
@@ -101,6 +100,7 @@ class TabAndroid : public tabs::TabInterface,
       override;
 
   base::android::ScopedJavaLocalRef<jobject> GetJavaObject();
+  base::android::ScopedJavaLocalRef<jobject> GetJavaObject() const;
 
   // Return the WebContents, if any, currently owned by this TabAndroid.
   content::WebContents* web_contents() const { return web_contents_.get(); }
@@ -288,5 +288,19 @@ class TabAndroid : public tabs::TabInterface,
   const base::WeakPtr<Profile> profile_;
   base::WeakPtrFactory<TabAndroid> weak_ptr_factory_{this};
 };
+
+namespace jni_zero {
+template <>
+inline TabAndroid* FromJniType<TabAndroid*>(JNIEnv* env,
+                                            const JavaRef<jobject>& j_object) {
+  return j_object.is_null() ? nullptr : TabAndroid::GetNativeTab(env, j_object);
+}
+template <>
+inline ScopedJavaLocalRef<jobject> ToJniType<TabAndroid>(
+    JNIEnv* env,
+    const TabAndroid& tab) {
+  return tab.GetJavaObject();
+}
+}  // namespace jni_zero
 
 #endif  // CHROME_BROWSER_ANDROID_TAB_ANDROID_H_

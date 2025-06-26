@@ -222,9 +222,11 @@ void PageHandler::OnModelAssetsLoaded(
   params->performance_hint = performance_hint;
   GetService().LoadModel(
       std::move(params), std::move(model),
-      base::BindOnce(&PageHandler::OnModelLoaded,
-                     weak_ptr_factory_.GetWeakPtr(), std::move(callback),
-                     std::move(weights)));
+      mojo::WrapCallbackWithDefaultInvokeIfNotRun(
+          base::BindOnce(&PageHandler::OnModelLoaded,
+                         weak_ptr_factory_.GetWeakPtr(), std::move(callback),
+                         std::move(weights)),
+          on_device_model::mojom::LoadModelResult::kFailedToLoadLibrary));
 }
 
 void PageHandler::OnModelLoaded(
@@ -263,6 +265,20 @@ void PageHandler::GetDevicePerformanceInfo(
           std::move(callback),
           on_device_model::mojom::DevicePerformanceInfo::New()));
 #endif
+}
+
+void PageHandler::GetDefaultModelPath(GetDefaultModelPathCallback callback) {
+  auto* component_manager =
+      optimization_guide_keyed_service_->GetComponentManager();
+  auto debug_state =
+      component_manager->GetDebugState(base::PassKey<PageHandler>());
+
+  if (!debug_state.state_) {
+    std::move(callback).Run(std::nullopt);
+    return;
+  }
+
+  std::move(callback).Run(debug_state.state_->GetInstallDirectory());
 }
 
 void PageHandler::OnLogMessageAdded(

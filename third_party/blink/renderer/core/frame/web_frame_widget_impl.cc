@@ -1669,19 +1669,6 @@ void WebFrameWidgetImpl::StartPageScaleAnimation(const gfx::Point& destination,
       destination, use_anchor, new_page_scale, duration);
 }
 
-void WebFrameWidgetImpl::RequestBeginMainFrameNotExpected(bool request) {
-  if (!View()->does_composite())
-    return;
-  widget_base_->LayerTreeHost()->RequestBeginMainFrameNotExpected(request);
-}
-
-void WebFrameWidgetImpl::DidCommitAndDrawCompositorFrame() {
-  ForEachLocalFrameControlledByWidget(
-      local_root_->GetFrame(), [](WebLocalFrameImpl* local_frame) {
-        local_frame->Client()->DidCommitAndDrawCompositorFrame();
-      });
-}
-
 void WebFrameWidgetImpl::DidObserveFirstScrollDelay(
     base::TimeDelta first_scroll_delay,
     base::TimeTicks first_scroll_timestamp) {

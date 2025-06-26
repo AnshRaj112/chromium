@@ -9412,6 +9412,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_READING_MODE_FONT_RESET" desc="Label for button that resets the font size of the reading mode feature back to the default font setting.">
         Reset
       </message>
+      <message name="IDS_READING_MODE_FONT_RESET_TOOLTIP" desc="Tooltip for the 'Reset' font size button in reading mode.">
+        Reset to default zoom level
+      </message>
       <message name="IDS_READING_MODE_TURN_HIGHLIGHT_OFF" desc="Tooltip label for button that turns off highlighting in Read Aloud.">
         Turn off highlight
       </message>
@@ -12829,9 +12832,6 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
       <message name="IDS_MEDIA_WINDOW_CAPTURE_NOTIFICATION_TEXT" desc="label used in screen capture notification UI to show the screen sharing status when the stream is consumed by the same app initiating the window picker">
         <ph name="APP_NAME">$1<ex>html5rocks.com</ex></ph> is sharing a window.
       </message>
-      <message name="IDS_MEDIA_WINDOW_CAPTURE_WITH_AUDIO_NOTIFICATION_TEXT" desc="label used in screen capture notification UI to show the screen sharing status when the stream is consumed by the same app initiating the window picker">
-        <ph name="APP_NAME">$1<ex>html5rocks.com</ex></ph> is sharing a window and audio.
-      </message>
       <message name="IDS_MEDIA_TAB_CAPTURE_NOTIFICATION_TEXT" desc="label used in screen capture notification UI to show the screen sharing status when the stream is consumed by the same app initiating the window picker">
         <ph name="APP_NAME">$1<ex>html5rocks.com</ex></ph> is sharing a Chrome tab.
       </message>
@@ -13066,7 +13066,7 @@ Check your passwords anytime in <ph name="GOOGLE_PASSWORD_MANAGER">$1<ex>Google 
           "<ph name="NAME">$1<ex>Google Cast</ex></ph>" is saved only to this device. To use it on your other devices, save it in your account.
         </message>
         <message name="IDS_BOOKMARK_UPLOAD_MOVE_TO_ACCOUNT_DIALOG_SUBTITLE" desc="Subtitle for the upload dialog that offers the user to move a bookmark from their device to their signed-in account.">
-          "<ph name="LOCAL_BOOKMARK">$1<ex>Local Bookmark</ex></ph>" is saved only to this device. To use it on your other devices, save it in your account.
+          “<ph name="LOCAL_BOOKMARK">$1<ex>Local Bookmark</ex></ph>“ is saved only to this device. To use it on your other devices, save it to “<ph name="ACCOUNT_FOLDER">$2<ex>Account Bookmarks</ex></ph>” in your account.
         </message>
         <message name="IDS_EXTENSIONS_MOVE_TO_ACCOUNT_DIALOG_OK_BUTTON_LABEL" desc="Text of the button that triggers the upload of a local extension to the signed in user's account in the extension upload dialog.">
           Save in account
@@ -16075,9 +16075,6 @@ Please help our engineers fix this problem. Tell us what happened right before y
       <message name="IDS_DESKTOP_MEDIA_PICKER_AUDIO_SHARE_HINT_TAB_OR_SCREEN" desc="Text for the audio-sharing label in the window picker dialog, which is displayed when attempting to share a window, and audio is only supported for tabs and screens.">
         To share audio, share a tab or screen instead
       </message>
-      <message name="IDS_DESKTOP_MEDIA_PICKER_AUDIO_SHARE_HINT_TAB_OR_WINDOW" desc="Text for the audio-sharing label in the window picker dialog, which is displayed when attempting to share a screen, and audio is only supported for tabs and windows.">
-        To share audio, share a tab or window instead
-      </message>
       <message name="IDS_DESKTOP_MEDIA_PICKER_SOURCE_TYPE_SCREEN" desc="Text for the button on the window picker dialog, clicking which takes one to full screen sharing" meaning="Refers to the device's entire screen. Short for 'share the entire screen'.">
         Entire Screen
       </message>
@@ -19051,6 +19048,19 @@ Please help our engineers fix this problem. Tell us what happened right before y
     <if expr="not is_android">
       <message name="IDS_GLIC_BUTTON_CXMENU_UNPIN" desc="Name of the Glic button context menu item for unpinning Glic.">
         Unpin
+      </message>
+    </if>
+
+    <!-- New Tab Page browser feature promotions. -->
+    <if expr="not is_android">
+      <message name="IDS_NTP_CUSTOMIZATION_PROMO" desc="The text shown in the body of the New Tab Page browser customization promotion">
+        Customize Chrome to give your browser a new look
+      </message>
+      <message name="IDS_NTP_EXTENSIONS_PROMO" desc="The text shown in the body of the New Tab Page extensions promotion">
+        Add extensions to stay organized, simplify tasks, and enhance your browsing
+      </message>
+      <message name="IDS_NTP_SIGN_IN_PROMO" desc="The text shown in the body of the New Tab Page sign in promotion">
+        Sign in to Chrome to get your passwords and more on all your devices
       </message>
     </if>
 

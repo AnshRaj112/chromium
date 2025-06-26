@@ -6,6 +6,7 @@ source_set("model") {
   sources = [
     "bwg_service.h",
     "bwg_service.mm",
+    "bwg_session_delegate.h",
   ]
   deps = [
     "//components/keyed_service/core",
@@ -14,6 +15,7 @@ source_set("model") {
     "//ios/chrome/browser/intelligence/bwg/metrics",
     "//ios/chrome/browser/intelligence/bwg/model:config",
     "//ios/chrome/browser/intelligence/proto_wrappers",
+    "//ios/chrome/browser/shared/model/application_context",
     "//ios/chrome/browser/shared/model/prefs:pref_names",
     "//ios/chrome/browser/signin/model:authentication_service",
     "//ios/chrome/browser/signin/model:authentication_service_factory",

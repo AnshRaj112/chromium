@@ -11,6 +11,7 @@
 #import <memory>
 
 class AuthenticationService;
+@protocol SingleSignOnService;
 
 namespace ios::provider {
 enum class BWGPageContextState;
@@ -19,6 +20,8 @@ enum class BWGPageContextState;
 namespace optimization_guide::proto {
 class PageContext;
 }  // namespace optimization_guide::proto
+
+@protocol BWGSessionDelegate;
 
 // BWGConfiguration is a configuration class that holds all the data necessary
 // to start the BWG overlay.
@@ -31,14 +34,20 @@ class PageContext;
 // calls to the getter will return a nullptr.
 @property(nonatomic, assign)
     std::unique_ptr<optimization_guide::proto::PageContext>
-        pageContext;
+        uniquePageContext;
 
 // The authentication service to be used.
 @property(nonatomic, assign) AuthenticationService* authService;
 
+// The SingleSignOnService instance.
+@property(nonatomic, strong) id<SingleSignOnService> singleSignOnService;
+
 // The state of the BWG PageContext.
 @property(nonatomic, assign)
     ios::provider::BWGPageContextState BWGPageContextState;
+
+// Delegate for BWG events.
+@property(nonatomic, weak) id<BWGSessionDelegate> BWGSessionDelegate;
 
 @end
 

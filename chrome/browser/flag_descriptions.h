@@ -13,7 +13,6 @@
 #include "chrome/common/buildflags.h"
 #include "components/compose/buildflags.h"
 #include "components/enterprise/buildflags/buildflags.h"
-#include "components/nacl/common/buildflags.h"
 #include "components/paint_preview/buildflags/buildflags.h"
 #include "components/signin/public/base/signin_buildflags.h"
 #include "components/webui/flags/feature_entry.h"
@@ -700,8 +699,6 @@ extern const char kContextMenuEmptySpaceDescription[];
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
 extern const char kContextualCueingName[];
 extern const char kContextualCueingDescription[];
-extern const char kGlicZeroStateSuggestionsName[];
-extern const char kGlicZeroStateSuggestionsDescription[];
 extern const char kGlicActorName[];
 extern const char kGlicActorDescription[];
 extern const char kGlicPanelResetTopChromeButtonName[];
@@ -1846,6 +1843,9 @@ extern const char kOmniboxMaxURLMatchesDescription[];
 extern const char kOmniboxDynamicMaxAutocompleteName[];
 extern const char kOmniboxDynamicMaxAutocompleteDescription[];
 
+extern const char kOmniboxRestoreInvisibleFocusOnlyName[];
+extern const char kOmniboxRestoreInvisibleFocusOnlyDescription[];
+
 extern const char kOptimizationGuideDebugLogsName[];
 extern const char kOptimizationGuideDebugLogsDescription[];
 
@@ -2266,9 +2266,6 @@ extern const char kSideBySideDescription[];
 extern const char kSidePanelResizingFlagId[];
 extern const char kSidePanelResizingName[];
 extern const char kSidePanelResizingDescription[];
-
-extern const char kSiteInstanceGroupsForDataUrlsName[];
-extern const char kSiteInstanceGroupsForDataUrlsDescription[];
 
 extern const char kDefaultSiteInstanceGroupsName[];
 extern const char kDefaultSiteInstanceGroupsDescription[];
@@ -2845,6 +2842,9 @@ extern const char kAndroidThemeModuleDescription[];
 extern const char kAppSpecificHistoryName[];
 extern const char kAppSpecificHistoryDescription[];
 
+extern const char kAutomotiveBackButtonBarStreamlineName[];
+extern const char kAutomotiveBackButtonBarStreamlineDescription[];
+
 extern const char kAuxiliaryNavigationStaysInBrowserName[];
 extern const char kAuxiliaryNavigationStaysInBrowserDescription[];
 
@@ -3235,9 +3235,6 @@ extern const char kTabStripDensityChangeAndroidDescription[];
 extern const char kTabStripGroupDragDropAndroidName[];
 extern const char kTabStripGroupDragDropAndroidDescription[];
 
-extern const char kTabStripGroupReorderAndroidName[];
-extern const char kTabStripGroupReorderAndroidDescription[];
-
 extern const char kTabStripIncognitoMigrationName[];
 extern const char kTabStripIncognitoMigrationDescription[];
 
@@ -3359,6 +3356,9 @@ extern const char kInfiniteTabsFreezingDescription[];
 
 extern const char kMemoryPurgeOnFreezeLimitName[];
 extern const char kMemoryPurgeOnFreezeLimitDescription[];
+
+extern const char kPictureInPictureShowWindowAnimationName[];
+extern const char kPictureInPictureShowWindowAnimationDescription[];
 
 extern const char kReadAnythingImagesViaAlgorithmName[];
 extern const char kReadAnythingImagesViaAlgorithmDescription[];
@@ -3606,12 +3606,6 @@ extern const char kLaunchWindowsNativeHostsDirectlyDescription[];
 #endif  // ENABLE_EXTENSIONS
 
 #if BUILDFLAG(ENABLE_PRINTING)
-inline constexpr char kFastEnumeratePrintersName[] =
-    "Use faster method for printer enumeration";
-inline constexpr char kFastEnumeratePrintersDescription[] =
-    "When enumerating printers, use a faster method to acquire the basic "
-    "information for each printer.";
-
 extern const char kPrintWithPostScriptType42FontsName[];
 extern const char kPrintWithPostScriptType42FontsDescription[];
 
@@ -3640,14 +3634,14 @@ extern const char kImmersiveFullscreenDescription[];
 extern const char kMacAccessibilityAPIMigrationName[];
 extern const char kMacAccessibilityAPIMigrationDescription[];
 
-extern const char kMacCatapSystemAudioLoopbackCaptureName[];
-extern const char kMacCatapSystemAudioLoopbackCaptureDescription[];
+extern const char kMacCatapLoopbackAudioForCastName[];
+extern const char kMacCatapLoopbackAudioForCastDescription[];
+
+extern const char kMacCatapLoopbackAudioForScreenShareName[];
+extern const char kMacCatapLoopbackAudioForScreenShareDescription[];
 
 extern const char kMacImeLiveConversionFixName[];
 extern const char kMacImeLiveConversionFixDescription[];
-
-extern const char kMacLoopbackAudioForScreenShareName[];
-extern const char kMacLoopbackAudioForScreenShareDescription[];
 
 extern const char kMacPWAsNotificationAttributionName[];
 extern const char kMacPWAsNotificationAttributionDescription[];
@@ -4480,15 +4474,6 @@ extern const char kEnableNearbyBluetoothClassicAdvertisingDescription[];
 extern const char kEnableNearbyMdnsName[];
 extern const char kEnableNearbyMdnsDescription[];
 
-extern const char kEnableNearbyWebRtcName[];
-extern const char kEnableNearbyWebRtcDescription[];
-
-extern const char kEnableNearbyWifiDirectName[];
-extern const char kEnableNearbyWifiDirectDescription[];
-
-extern const char kEnableNearbyWifiLanName[];
-extern const char kEnableNearbyWifiLanDescription[];
-
 extern const char kNearbyPresenceName[];
 extern const char kNearbyPresenceDescription[];
 
@@ -4894,9 +4879,6 @@ extern const char kWaylandPerWindowScalingDescription[];
 extern const char kWaylandSessionManagementName[];
 extern const char kWaylandSessionManagementDescription[];
 
-extern const char kWaylandTextInputV3Name[];
-extern const char kWaylandTextInputV3Description[];
-
 extern const char kWaylandUiScalingName[];
 extern const char kWaylandUiScalingDescription[];
 #endif  // BUILDFLAG(IS_LINUX)
@@ -4960,20 +4942,6 @@ extern const char kChromeWideEchoCancellationDescription[];
 extern const char kDcheckIsFatalName[];
 extern const char kDcheckIsFatalDescription[];
 #endif  // BUILDFLAG(DCHECK_IS_CONFIGURABLE)
-
-#if BUILDFLAG(ENABLE_NACL)
-extern const char kNaclName[];
-extern const char kNaclDescription[];
-
-extern const char kVerboseLoggingInNaclName[];
-extern const char kVerboseLoggingInNaclDescription[];
-extern const char kVerboseLoggingInNaclChoiceDefault[];
-extern const char kVerboseLoggingInNaclChoiceLow[];
-extern const char kVerboseLoggingInNaclChoiceMedium[];
-extern const char kVerboseLoggingInNaclChoiceHigh[];
-extern const char kVerboseLoggingInNaclChoiceHighest[];
-extern const char kVerboseLoggingInNaclChoiceDisabled[];
-#endif  // ENABLE_NACL
 
 #if BUILDFLAG(ENABLE_OOP_PRINTING)
 extern const char kEnableOopPrintDriversName[];

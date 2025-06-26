@@ -240,7 +240,6 @@
 #include "net/base/schemeful_site.h"
 #include "net/cookies/cookie_setting_override.h"
 #include "net/net_buildflags.h"
-#include "ppapi/buildflags/buildflags.h"
 #include "render_frame_host_impl.h"
 #include "services/metrics/public/cpp/ukm_builders.h"
 #include "services/metrics/public/cpp/ukm_source_id.h"
@@ -334,10 +333,6 @@
 
 #if BUILDFLAG(IS_MAC)
 #include "content/browser/renderer_host/popup_menu_helper_mac.h"
-#endif
-
-#if BUILDFLAG(ENABLE_PPAPI)
-#include "content/browser/renderer_host/render_frame_host_impl_ppapi_support.h"
 #endif
 
 #if BUILDFLAG(USE_EXTERNAL_POPUP_MENU)
@@ -3926,9 +3921,10 @@ bool RenderFrameHostImpl::AccessibilityIsWebContentSource() {
 
 ui::AXPlatformNodeId RenderFrameHostImpl::GetOrCreateAXNodeUniqueId(
     ui::AXNodeID ax_node_id) {
-  auto iter = ax_unique_ids_.find(ax_node_id);
-  if (iter == ax_unique_ids_.end()) {
-    iter = ax_unique_ids_.emplace(ax_node_id, ui::AXUniqueId::Create()).first;
+  auto [iter, inserted] =
+      ax_unique_ids_.try_emplace(ax_node_id, ui::AXUniqueId::CreateInvalid());
+  if (inserted) {
+    iter->second = ui::AXUniqueId::Create();
   }
   return iter->second;
 }
@@ -5913,8 +5909,7 @@ RenderFrameHostImpl::BackForwardCacheDisablingFeatures
 RenderFrameHostImpl::GetBackForwardCacheDisablingFeatures() const {
   BackForwardCacheDisablingFeatures features;
   for (const auto& details : GetBackForwardCacheBlockingDetails()) {
-    features.Put(static_cast<blink::scheduler::WebSchedulerTrackedFeature>(
-        details->feature));
+    features.Put(details->feature);
   }
   return features;
 }
@@ -5934,7 +5929,7 @@ RenderFrameHostImpl::GetBackForwardCacheBlockingDetails() const {
     // Browser reported features do not have JS location details. Create a
     // blocking details struct with only the feature filled.
     auto details_ptr = blink::mojom::BlockingDetails::New();
-    details_ptr->feature = static_cast<uint32_t>(it.first);
+    details_ptr->feature = it.first;
     combined_details_list.push_back(std::move(details_ptr));
   }
   return combined_details_list;
@@ -12974,15 +12969,6 @@ void RenderFrameHostImpl::UpdateAccessibilityMode() {
     // platform nodes corresponding to the blink nodes will have the same IDs.
   }
 }
-
-#if BUILDFLAG(ENABLE_PPAPI)
-RenderFrameHostImplPpapiSupport& RenderFrameHostImpl::GetPpapiSupport() {
-  if (!ppapi_support_) {
-    ppapi_support_ = std::make_unique<RenderFrameHostImplPpapiSupport>(*this);
-  }
-  return *ppapi_support_;
-}
-#endif
 
 void RenderFrameHostImpl::RequestAXTreeSnapshot(
     AXTreeSnapshotCallback callback,

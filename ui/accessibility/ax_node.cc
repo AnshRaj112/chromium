@@ -134,7 +134,8 @@ AXNode* AXNode::GetUnignoredChildAtIndex(size_t index) const {
   // TODO(nektar): Should DCHECK that this node is not ignored.
   DCHECK(!tree_->GetTreeUpdateInProgressState());
 
-  for (auto it = UnignoredChildrenBegin(); it != UnignoredChildrenEnd(); ++it) {
+  for (auto it = UnignoredChildrenBegin(), end = UnignoredChildrenEnd();
+       it != end; ++it) {
     if (index == 0)
       return it.get();
     --index;
@@ -1159,8 +1160,8 @@ const std::u16string& AXNode::GetHypertext() const {
     static const base::NoDestructor<std::u16string> embedded_character_str(
         AXNode::kEmbeddedObjectCharacterUTF16);
     auto first = UnignoredChildrenCrossingTreeBoundaryBegin();
-    for (auto iter = first; iter != UnignoredChildrenCrossingTreeBoundaryEnd();
-         ++iter) {
+    for (auto iter = first, end = UnignoredChildrenCrossingTreeBoundaryEnd();
+         iter != end; ++iter) {
       // Similar to Firefox, we don't expose text nodes in IAccessible2 and ATK
       // hypertext with the embedded object character. We copy all of their text
       // instead.
@@ -1332,8 +1333,9 @@ std::ostream& operator<<(std::ostream& stream, const AXNode& node) {
   if (node.GetUnignoredChildCountCrossingTreeBoundary()) {
     stream << " unignored_child_ids=";
     bool needs_comma = false;
-    for (auto it = node.UnignoredChildrenBegin();
-         it != node.UnignoredChildrenEnd(); ++it) {
+    for (auto it = node.UnignoredChildrenBegin(),
+              end = node.UnignoredChildrenEnd();
+         it != end; ++it) {
       if (needs_comma) {
         stream << ",";
       } else {
@@ -1555,7 +1557,7 @@ AXNode::GetExtraMacNodes() const {
   return &table_info->extra_mac_nodes;
 }
 
-#if BUILDFLAG(IS_LINUX)
+#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN)
 AXNode* AXNode::GetExtraAnnouncementNode(
     ax::mojom::AriaNotificationPriority priority_property) const {
   if (!tree_->extra_announcement_nodes()) {
@@ -1570,7 +1572,7 @@ AXNode* AXNode::GetExtraAnnouncementNode(
   }
   NOTREACHED();
 }
-#endif  // BUILDFLAG(IS_LINUX)
+#endif  // BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN)
 
 bool AXNode::IsGenerated() const {
   bool is_generated_node = id() < 0 && id() > kInitialEmptyDocumentRootNodeID;
@@ -1583,7 +1585,7 @@ bool AXNode::IsGenerated() const {
       GetRole() == ax::mojom::Role::kColumn ||
       GetRole() == ax::mojom::Role::kTableHeaderContainer;
   DCHECK_EQ(is_generated_node, is_extra_mac_node_role);
-#elif BUILDFLAG(IS_LINUX)
+#elif BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_WIN)
   //  On Linux, generated nodes are always children of the root.
   if (GetParent() && GetParent()->GetManager()) {
     DCHECK(GetParent()->GetManager()->IsRoot());

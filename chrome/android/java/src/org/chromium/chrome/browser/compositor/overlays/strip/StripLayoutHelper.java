@@ -43,7 +43,6 @@ import androidx.annotation.ColorInt;
 import androidx.annotation.StringRes;
 import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.content.res.AppCompatResources;
-import androidx.core.content.res.ResourcesCompat;
 
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.Callback;
@@ -2028,10 +2027,7 @@ public class StripLayoutHelper
                         && !mReorderDelegate.getInReorderMode()
                         && (Math.abs(x - mDelayedReorderInitialX) > INITIATE_REORDER_DRAG_THRESHOLD
                                 || !isViewContextMenuShowing());
-        boolean canReorderViewType =
-                !(mDelayedReorderView instanceof StripLayoutGroupTitle)
-                        || ChromeFeatureList.isEnabled(ChromeFeatureList.TAB_STRIP_GROUP_REORDER);
-        if (shouldTriggerReorder && canReorderViewType) {
+        if (shouldTriggerReorder) {
             if (isViewContextMenuShowing()) dismissContextMenu();
             // Intentionally start the reorder at the initial long-press x. The difference from the
             // current event (accumulatedDeltaX in step 3) will then "snap" the interacting view to
@@ -3855,7 +3851,7 @@ public class StripLayoutHelper
         //  to invalid a11y node. Replace with official strings when available.
         String description = "Placeholder Tab";
         String title = "Placeholder";
-        tab.setAccessibilityDescription(description, title, ResourcesCompat.ID_NULL);
+        tab.setAccessibilityDescription(description, title, Resources.ID_NULL);
 
         pushPropertiesToTab(tab);
 

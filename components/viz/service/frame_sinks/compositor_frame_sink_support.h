@@ -134,7 +134,7 @@ class VIZ_SERVICE_EXPORT CompositorFrameSinkSupport
   void SetBundle(const FrameSinkBundleId& bundle_id);
 
   void BindLayerContext(mojom::PendingLayerContext& context,
-                        bool draw_mode_is_gpu);
+                        mojom::LayerContextSettingsPtr settings);
   void SetThreads(bool from_untrusted_client,
                   std::vector<Thread> unverified_threads);
 

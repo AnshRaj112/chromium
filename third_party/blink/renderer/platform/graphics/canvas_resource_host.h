@@ -18,22 +18,9 @@ namespace blink {
 
 class CanvasResourceProvider;
 
-// Specifies whether the provider should rasterize paint commands on the CPU
-// or GPU. This is used to support software raster with GPU compositing.
-enum class RasterMode {
-  kGPU,
-  kCPU,
-};
-
-enum class RasterModeHint {
-  kPreferGPU,
-  kPreferCPU,
-};
-
 class PLATFORM_EXPORT CanvasResourceHost {
  public:
-  explicit CanvasResourceHost(gfx::Size size);
-  virtual ~CanvasResourceHost();
+  virtual ~CanvasResourceHost() = default;
 
   virtual void NotifyGpuContextLost() = 0;
   // TODO(crbug.com/399587138): Delete once `cc::Layer` related code is moved to
@@ -49,9 +36,6 @@ class PLATFORM_EXPORT CanvasResourceHost {
   // properties. This is a no-op if `this` is not an HTMLCanvasElement.
   virtual void InitializeLayerWithCSSProperties(cc::Layer* layer) {}
 
-  gfx::Size Size() const { return size_; }
-  virtual void SetSize(gfx::Size size) { size_ = size; }
-
   virtual bool LowLatencyEnabled() const { return false; }
 
   virtual CanvasResourceProvider* GetResourceProviderForCanvas2D() const = 0;
@@ -64,9 +48,6 @@ class PLATFORM_EXPORT CanvasResourceHost {
   virtual bool PrintedInCurrentTask() const = 0;
   virtual bool IsHibernating() const { return false; }
 
-  bool ShouldTryToUseGpuRaster() const;
-  void SetPreferred2DRasterMode(RasterModeHint);
-
   // Called when the CC texture layer that this instance is holding (if any)
   // should be cleared. Subclasses that can hold a CC texture layer should
   // override this method. Should only be called if the context is
@@ -75,10 +56,6 @@ class PLATFORM_EXPORT CanvasResourceHost {
 
   virtual void SetTransferToGPUTextureWasInvoked() {}
   virtual bool TransferToGPUTextureWasInvoked() { return false; }
-
- private:
-  RasterModeHint preferred_2d_raster_mode_ = RasterModeHint::kPreferCPU;
-  gfx::Size size_;
 };
 
 }  // namespace blink

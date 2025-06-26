@@ -1035,6 +1035,14 @@
       status: "stable",
     },
     {
+      // Fix for https://crbug.com/40659076. When enabled, queryCommandState for
+      // 'subscript' or 'superscript' with a caret selection will consider
+      // ancestor <sub> or <sup> elements, matching the behavior for range
+      // selections.
+      name: "ConsiderSubOrSuperScriptAncestorAlignForCaretSelection",
+      status: "stable"
+    },
+    {
       name: "ContactsManager",
       status:  {"Android": "stable", "default": "test"},
     },
@@ -1635,7 +1643,7 @@
     },
     {
       name: "CSSTypedArithmetic",
-      status: "experimental",
+      status: "stable",
     },
     // Support for `user-select:contain`.
     {
@@ -1769,6 +1777,13 @@
       name: "DialogNewFocusBehavior",
       status: "experimental",
       depends_on: ["NewGetFocusableAreaBehavior"],
+    },
+    {
+      // Prevents <form method=dialog> from submitting across shadow boundaries
+      // when looking for an ancestor <dialog> element.
+      // https://issues.chromium.org/issues/40229445
+      name: "DialogSubmitShadowBoundaries",
+      status: "stable",
     },
     {
       name: "DigitalGoods",
@@ -2282,11 +2297,6 @@
       status: "stable",
     },
     {
-      // crbug.com/408309951
-      name: "FindNestedAnnotationFix",
-      status: "stable",
-    },
-    {
       // crbug.com/409358630
       name: "FindOrphanAnnotationFix",
       status: "stable",
@@ -2482,13 +2492,6 @@
       status: "stable",
     },
     {
-     // TODO(crbug.com/389587444): Remove this feature after M134 is stable.
-     // Form-associated custom elements should check isFocusable on the
-     // focus delegate if the shadow host has delegatesFocus=true.
-     name: "FormValidationCustomElementsDelegatesFocusFix",
-     status: "stable",
-    },
-    {
       name: "FractionalScrollOffsets",
       base_feature: "none",
       public: true,
@@ -2529,17 +2532,6 @@
       depends_on: ["GetDisplayMedia"],
       status: "experimental",
     },
-    // When a Web application calls getDisplayMedia() and asks for audio,
-    // allow a hint to be provided as to whether the Web application is
-    // interested in audio being among the options offered to the user
-    // on window display surfaces.
-    //
-    // https://www.w3.org/TR/screen-capture/#dom-displaymediastreamoptions-windowaudio
-    {
-      name: "GetDisplayMediaWindowAudioCapture",
-      status: "experimental",
-      browser_process_read_write_access: true,
-    },
     {
       name: "GroupEffect",
       status: "test",
@@ -2556,10 +2548,6 @@
         "ChromeOS": "stable",
         "default": "experimental",
       },
-    },
-    {
-      name: "HarfBuzzBufferPool",
-      status: "stable",
     },
     {
       name: "HasUAVisualTransition",
@@ -2782,10 +2770,6 @@
       status: "experimental",
     },
     {
-      name: "InputEventConstructorThrows",
-      status: "stable",
-    },
-    {
       // The HTML parser inserts a </select> end tag before inserting <input>
       // when parsing inside of a <select> tag. We want to allow <input> inside
       // <select>, but it isn't web compatible enough. This flag allows <input>
@@ -3000,10 +2984,6 @@
       origin_trial_feature_name: "LimitThirdPartyCookies",
       status: "experimental",
       base_feature: "none",
-    },
-    {
-      name: "LineBreakEarlyReturn",
-      status: "stable",
     },
     {
       name: "ListItemWithCounterSetNotSetExplicitValue",
@@ -3701,11 +3681,6 @@
       name: "PlaceholderVisibility",
       status: "stable",
     },
-    {
-      // crbug.com/389726691.
-      name: "PlainTextPainter",
-      status: "stable",
-    },
     // This is a reverse OT used for a phased deprecation.
     // https://crbug.com/918374
     {
@@ -4145,7 +4120,11 @@
     },
     {
       name: "RestrictOwnAudio",
-      status: "experimental",
+      status: {
+        "Win": "experimental",
+        "Mac": "experimental",
+        "default": "",
+      },
     },
     {
       name: "RestrictTabFocusForHiddenSVGElements",
@@ -4322,10 +4301,6 @@
     },
     {
       name: "ScrollbarColor",
-      status: "stable",
-    },
-    {
-      name: "ScrollbarGutterFixedPosBugfix",
       status: "stable",
     },
     {
@@ -4559,6 +4534,13 @@
       name: "SerialPortConnected",
       status: {"Android": "", "default": "experimental"},
       base_feature: "none",
+    },
+    {
+      // Support for Service Worker background sync APIs in Dedicated Workers.
+      // See https://chromestatus.com/feature/6497653025931264
+      // See https://issues.chromium.org/issues/40364838
+      name: "ServiceWorkerBackgroundSyncInDedicatedWorker",
+      depends_on: ["ServiceWorkerInDedicatedWorker"],
     },
     {
       name: "ServiceWorkerClientLifecycleState",
@@ -4951,10 +4933,6 @@
       status: "stable",
     },
     {
-      name: "TextAutoSizingDisabledOnFlexbox",
-      status: "stable",
-    },
-    {
       name: "TextDetector",
       status: "experimental",
     },
@@ -5340,6 +5318,10 @@
       status: "stable",
     },
     {
+      name: "ViewTransitionAnimationDelayInherit",
+      status: "experimental",
+    },
+    {
       name: "ViewTransitionLongCallbackTimeoutForTesting",
       status: "test",
     },
@@ -5349,6 +5331,11 @@
     },
     {
       name: "VisibilityCollapseColumn",
+    },
+    {
+      // When enabled, makes links `:visited` even when the visit results in an
+      // HTTP error response code (4XX-5XX).
+      name: "VisitedLinksOnErrorNavigation",
     },
     {
       name: "VisualViewportOnScrollEnd",
@@ -5609,10 +5596,6 @@
       name: "WebGLOnWebGPU",
     },
     {
-      name: "WebGPUAdapterInfoIsFallbackAdapter",
-      status: "stable",
-    },
-    {
       // Launch feature flag for WebGPU Compatibility Mode
       // https://chromestatus.com/feature/6436406437871616
       name: "WebGPUCompatibilityMode",
@@ -5620,10 +5603,6 @@
       status: "experimental",
       // Also enabled as part of all experimental WebGPU features.
       implied_by: ["WebGPUExperimentalFeatures"],
-    },
-    {
-      name: "WebGPUCopyBufferToBufferOverload",
-      status: "stable",
     },
     {
       // WebGPU developer features are deliberately not enabled by experimental

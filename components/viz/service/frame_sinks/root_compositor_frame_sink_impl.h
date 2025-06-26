@@ -130,7 +130,7 @@ class VIZ_SERVICE_EXPORT RootCompositorFrameSinkImpl
       SubmitCompositorFrameSyncCallback callback) override;
   void NotifyNewLocalSurfaceIdExpectedWhilePaused() override;
   void BindLayerContext(mojom::PendingLayerContextPtr context,
-                        bool draw_mode_is_gpu) override;
+                        mojom::LayerContextSettingsPtr settings) override;
 #if BUILDFLAG(IS_ANDROID)
   void SetThreads(const std::vector<Thread>& threads) override;
 #endif

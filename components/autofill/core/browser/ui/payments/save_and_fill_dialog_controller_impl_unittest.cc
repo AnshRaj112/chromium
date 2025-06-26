@@ -82,4 +82,41 @@ TEST_F(SaveAndFillDialogControllerImplTest, CorrectStringsAreReturned) {
 }
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
+TEST_F(SaveAndFillDialogControllerImplTest, IsValidCvc) {
+  // Empty CVC is valid since it's optional.
+  EXPECT_TRUE(controller()->IsValidCvc(u""));
+
+  // Valid 3-digit CVC.
+  EXPECT_TRUE(controller()->IsValidCvc(u"123"));
+
+  // Valid 4-digit CVC.
+  EXPECT_TRUE(controller()->IsValidCvc(u"1234"));
+
+  // CVC with less than 3 digits is invalid.
+  EXPECT_FALSE(controller()->IsValidCvc(u"12"));
+  EXPECT_FALSE(controller()->IsValidCvc(u"1"));
+
+  // CVC with more than 4 digits is invalid.
+  EXPECT_FALSE(controller()->IsValidCvc(u"12345"));
+
+  // CVC with non-digit characters is invalid.
+  EXPECT_FALSE(controller()->IsValidCvc(u"12A"));
+  EXPECT_FALSE(controller()->IsValidCvc(u"ABC"));
+  EXPECT_FALSE(controller()->IsValidCvc(u"1 3"));
+}
+
+TEST_F(SaveAndFillDialogControllerImplTest, IsValidNameOnCard) {
+  EXPECT_TRUE(controller()->IsValidNameOnCard(u"John Doe"));
+  EXPECT_TRUE(controller()->IsValidNameOnCard(u"Jane A. Smith-Jones"));
+  EXPECT_TRUE(controller()->IsValidNameOnCard(u"O'Malley"));
+
+  // The name on card field is required for this flow so an empty name is
+  // considered invalid.
+  EXPECT_FALSE(controller()->IsValidNameOnCard(u""));
+  EXPECT_FALSE(controller()->IsValidNameOnCard(u"John123"));
+  EXPECT_FALSE(controller()->IsValidNameOnCard(u"Invalid@Name"));
+  EXPECT_FALSE(
+      controller()->IsValidNameOnCard(u"This name is way too long for a card"));
+}
+
 }  // namespace autofill

@@ -24,31 +24,8 @@ bool TestOmniboxEditModelIOS::PopupIsOpen() const {
   return popup_is_open_;
 }
 
-AutocompleteMatch TestOmniboxEditModelIOS::CurrentMatch(
-    GURL* alternate_nav_url) const {
-  if (override_current_match_) {
-    return *override_current_match_;
-  }
-
-  return OmniboxEditModelIOS::CurrentMatch(alternate_nav_url);
-}
-
 void TestOmniboxEditModelIOS::SetPopupIsOpen(bool open) {
   popup_is_open_ = open;
-}
-
-void TestOmniboxEditModelIOS::SetCurrentMatchForTest(
-    const AutocompleteMatch& match) {
-  override_current_match_ = std::make_unique<AutocompleteMatch>(match);
-}
-
-void TestOmniboxEditModelIOS::OnPopupDataChanged(
-    const std::u16string& inline_autocompletion,
-    const std::u16string& additional_text,
-    const AutocompleteMatch& match) {
-  OmniboxEditModelIOS::OnPopupDataChanged(inline_autocompletion,
-                                          additional_text, match);
-  text_ = inline_autocompletion;
 }
 
 PrefService* TestOmniboxEditModelIOS::GetPrefService() {

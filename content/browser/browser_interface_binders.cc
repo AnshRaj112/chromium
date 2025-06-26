@@ -367,7 +367,7 @@ void BindSharedWorkerConnector(
   SharedWorkerConnectorImpl::Create(host->GetGlobalId(), std::move(receiver));
 }
 
-#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+#if BUILDFLAG(IS_ANDROID) || (BUILDFLAG(IS_IOS) && !BUILDFLAG(IS_IOS_TVOS))
 void BindDateTimeChooserForFrame(
     RenderFrameHost* host,
     mojo::PendingReceiver<blink::mojom::DateTimeChooser> receiver) {
@@ -1260,7 +1260,7 @@ void PopulateBinderMapWithContext(
   RegisterWebUIControllerInterfaceBinder<webxr::mojom::WebXrInternalsHandler,
                                          WebXrInternalsUI>(map);
 #endif
-#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+#if BUILDFLAG(IS_ANDROID) || (BUILDFLAG(IS_IOS) && !BUILDFLAG(IS_IOS_TVOS))
   map->Add<blink::mojom::DateTimeChooser>(
       base::BindRepeating(&BindDateTimeChooserForFrame));
 #endif
@@ -1481,6 +1481,18 @@ void PopulateBinderMapWithContext(
       &RenderProcessHostImpl::CreatePermissionService, host));
   map->Add<blink::mojom::FileBackedBlobFactory>(BindWorkerReceiverForOrigin(
       &RenderProcessHostImpl::BindFileBackedBlobFactory, host));
+
+  if (base::FeatureList::IsEnabled(
+          blink::features::kServiceWorkerInDedicatedWorker) &&
+      base::FeatureList::IsEnabled(
+          blink::features::kServiceWorkerBackgroundSyncInDedicatedWorker)) {
+    map->Add<blink::mojom::OneShotBackgroundSyncService>(
+        BindWorkerReceiverForOrigin(
+            &RenderProcessHostImpl::CreateOneShotSyncService, host));
+    map->Add<blink::mojom::PeriodicBackgroundSyncService>(
+        BindWorkerReceiverForOrigin(
+            &RenderProcessHostImpl::CreatePeriodicSyncService, host));
+  }
 }
 
 void PopulateBinderMap(DedicatedWorkerHost* host, mojo::BinderMap* map) {

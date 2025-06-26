@@ -52,11 +52,6 @@ BASE_FEATURE(kOptimizationHints,
              "OptimizationHints",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables fetching from a remote Optimization Guide Service.
-BASE_FEATURE(kRemoteOptimizationGuideFetching,
-             "OptimizationHintsFetching",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables the prediction of optimization targets.
 BASE_FEATURE(kOptimizationTargetPrediction,
              "OptimizationTargetPrediction",
@@ -235,44 +230,10 @@ base::TimeDelta PageTextExtractionOutstandingRequestsGracePeriod() {
       kPageTextExtraction, "outstanding_requests_grace_period_ms", 1000));
 }
 
-bool ShouldBatchUpdateHintsForActiveTabsAndTopHosts() {
-  if (base::FeatureList::IsEnabled(kRemoteOptimizationGuideFetching)) {
-    // Batch update active tabs should only apply to non-desktop platforms.
-    return GetFieldTrialParamByFeatureAsBool(kRemoteOptimizationGuideFetching,
-                                             "batch_update_hints_for_top_hosts",
-                                             enabled_by_default_mobile_only);
-  }
-  return false;
-}
-
 size_t MaxResultsForSRPFetch() {
   static int max_urls = GetFieldTrialParamByFeatureAsInt(
       kOptimizationGuideFetchingForSRP, "max_urls_for_srp_fetch", 10);
   return max_urls;
-}
-
-size_t MaxHostsForOptimizationGuideServiceHintsFetch() {
-  return GetFieldTrialParamByFeatureAsInt(
-      kRemoteOptimizationGuideFetching,
-      "max_hosts_for_optimization_guide_service_hints_fetch", 30);
-}
-
-size_t MaxUrlsForOptimizationGuideServiceHintsFetch() {
-  return GetFieldTrialParamByFeatureAsInt(
-      kRemoteOptimizationGuideFetching,
-      "max_urls_for_optimization_guide_service_hints_fetch", 30);
-}
-
-size_t MaxHostsForRecordingSuccessfullyCovered() {
-  return GetFieldTrialParamByFeatureAsInt(
-      kRemoteOptimizationGuideFetching,
-      "max_hosts_for_recording_successfully_covered", 200);
-}
-
-base::TimeDelta StoredFetchedHintsFreshnessDuration() {
-  return base::Days(GetFieldTrialParamByFeatureAsInt(
-      kRemoteOptimizationGuideFetching,
-      "max_store_duration_for_featured_hints_in_days", 1));
 }
 
 std::string GetOptimizationGuideServiceAPIKey() {
@@ -284,29 +245,6 @@ std::string GetOptimizationGuideServiceAPIKey() {
   }
 
   return google_apis::GetAPIKey();
-}
-
-GURL GetOptimizationGuideServiceGetHintsURL() {
-  // Command line override takes priority.
-  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-  if (command_line->HasSwitch(switches::kOptimizationGuideServiceGetHintsURL)) {
-    // Assume the command line switch is correct and return it.
-    return GURL(command_line->GetSwitchValueASCII(
-        switches::kOptimizationGuideServiceGetHintsURL));
-  }
-
-  std::string url = base::GetFieldTrialParamValueByFeature(
-      kRemoteOptimizationGuideFetching, "optimization_guide_service_url");
-  if (url.empty() || !GURL(url).SchemeIs(url::kHttpsScheme)) {
-    if (!url.empty()) {
-      LOG(WARNING)
-          << "Empty or invalid optimization_guide_service_url provided: "
-          << url;
-    }
-    return GURL(kOptimizationGuideServiceGetHintsDefaultURL);
-  }
-
-  return GURL(url);
 }
 
 GURL GetOptimizationGuideServiceGetModelsURL() {
@@ -345,10 +283,6 @@ bool IsModelQualityLoggingEnabledForFeature(
   return metadata->LoggingEnabledViaFieldTrial();
 }
 
-bool IsRemoteFetchingEnabled() {
-  return base::FeatureList::IsEnabled(kRemoteOptimizationGuideFetching);
-}
-
 bool IsSRPFetchingEnabled() {
   return base::FeatureList::IsEnabled(kOptimizationGuideFetchingForSRP);
 }
@@ -357,104 +291,10 @@ bool IsPushNotificationsEnabled() {
   return base::FeatureList::IsEnabled(kPushNotifications);
 }
 
-int MaxServerBloomFilterByteSize() {
-  return base::GetFieldTrialParamByFeatureAsInt(
-      kOptimizationHints, "max_bloom_filter_byte_size", 250 * 1024 /* 250KB */);
-}
-
-base::TimeDelta GetHostHintsFetchRefreshDuration() {
-  return base::Hours(GetFieldTrialParamByFeatureAsInt(
-      kRemoteOptimizationGuideFetching, "hints_fetch_refresh_duration_in_hours",
-      1));
-}
-
-base::TimeDelta GetActiveTabsFetchRefreshDuration() {
-  return base::Hours(GetFieldTrialParamByFeatureAsInt(
-      kRemoteOptimizationGuideFetching,
-      "active_tabs_fetch_refresh_duration_in_hours", 1));
-}
-
-base::TimeDelta GetActiveTabsStalenessTolerance() {
-  // 90 days initially chosen since that's how long local history lasts for.
-  return base::Days(GetFieldTrialParamByFeatureAsInt(
-      kRemoteOptimizationGuideFetching,
-      "active_tabs_staleness_tolerance_in_days", 90));
-}
-
-size_t MaxConcurrentBatchUpdateFetches() {
-  // If overridden, this needs to be large enough where we do not thrash the
-  // inflight batch update fetches since if we approach the limit here, we will
-  // abort the oldest batch update fetch that is in flight.
-  return GetFieldTrialParamByFeatureAsInt(kRemoteOptimizationGuideFetching,
-                                          "max_concurrent_batch_update_fetches",
-                                          20);
-}
-
-size_t MaxConcurrentPageNavigationFetches() {
-  // If overridden, this needs to be large enough where we do not thrash the
-  // inflight page navigations since if we approach the limit here, we will
-  // abort the oldest page navigation fetch that is in flight.
-  return GetFieldTrialParamByFeatureAsInt(
-      kRemoteOptimizationGuideFetching,
-      "max_concurrent_page_navigation_fetches", 20);
-}
-
-base::TimeDelta ActiveTabsHintsFetchRandomMinDelay() {
-  return base::Seconds(GetFieldTrialParamByFeatureAsInt(
-      kRemoteOptimizationGuideFetching, "fetch_random_min_delay_secs", 30));
-}
-
-base::TimeDelta ActiveTabsHintsFetchRandomMaxDelay() {
-  return base::Seconds(GetFieldTrialParamByFeatureAsInt(
-      kRemoteOptimizationGuideFetching, "fetch_random_max_delay_secs", 60));
-}
-
-base::TimeDelta StoredHostModelFeaturesFreshnessDuration() {
-  return base::Days(GetFieldTrialParamByFeatureAsInt(
-      kOptimizationTargetPrediction,
-      "max_store_duration_for_host_model_features_in_days", 7));
-}
-
-base::TimeDelta StoredModelsValidDuration() {
-  // TODO(crbug.com/40191801) This field should not be changed without VERY
-  // careful consideration. This is the default duration for models that do not
-  // specify retention, so changing this can cause models to be removed and
-  // refetch would only apply to newer models. Any feature relying on the model
-  // would have a period of time without a valid model, and would need to push a
-  // new version.
-  return base::Days(GetFieldTrialParamByFeatureAsInt(
-      kOptimizationTargetPrediction, "valid_duration_for_models_in_days", 30));
-}
-
-base::TimeDelta URLKeyedHintValidCacheDuration() {
-  return base::Seconds(GetFieldTrialParamByFeatureAsInt(
-      kOptimizationHints, "max_url_keyed_hint_valid_cache_duration_in_seconds",
-      60 * 60 /* 1 hour */));
-}
-
-size_t MaxHostsForOptimizationGuideServiceModelsFetch() {
-  return GetFieldTrialParamByFeatureAsInt(
-      kOptimizationTargetPrediction,
-      "max_hosts_for_optimization_guide_service_models_fetch", 30);
-}
-
-size_t MaxHostModelFeaturesCacheSize() {
-  return GetFieldTrialParamByFeatureAsInt(
-      kOptimizationTargetPrediction, "max_host_model_features_cache_size", 100);
-}
-
 size_t MaxHostKeyedHintCacheSize() {
   size_t max_host_keyed_hint_cache_size = GetFieldTrialParamByFeatureAsInt(
       kOptimizationHints, "max_host_keyed_hint_cache_size", 30);
   return max_host_keyed_hint_cache_size;
-}
-
-size_t MaxURLKeyedHintCacheSize() {
-  size_t max_url_keyed_hint_cache_size = GetFieldTrialParamByFeatureAsInt(
-      kOptimizationHints, "max_url_keyed_hint_cache_size", 50);
-  DCHECK_GE(max_url_keyed_hint_cache_size,
-            MaxUrlsForOptimizationGuideServiceHintsFetch());
-  return max_url_keyed_hint_cache_size;
 }
 
 bool ShouldPersistHintsToDisk() {
@@ -508,16 +348,6 @@ OptimizationTypeSet GetAllowedOptimizationTypesForProactivePersonalization() {
     }
   }
   return allowed_optimization_types;
-}
-
-bool ShouldOverrideOptimizationTargetDecisionForMetricsPurposes(
-    proto::OptimizationTarget optimization_target) {
-  if (optimization_target != proto::OPTIMIZATION_TARGET_PAINFUL_PAGE_LOAD) {
-    return false;
-  }
-
-  return base::GetFieldTrialParamByFeatureAsBool(
-      kOptimizationTargetPrediction, "painful_page_load_metrics_only", false);
 }
 
 base::TimeDelta PredictionModelFetchRandomMinDelay() {
@@ -579,12 +409,6 @@ bool IsUnrestrictedModelDownloadingEnabled() {
   return base::GetFieldTrialParamByFeatureAsBool(
       kOptimizationGuideModelDownloading, "unrestricted_model_downloading",
       true);
-}
-
-base::TimeDelta GetOnloadDelayForHintsFetching() {
-  return base::Milliseconds(GetFieldTrialParamByFeatureAsInt(
-      kRemoteOptimizationGuideFetching, "onload_delay_for_hints_fetching_ms",
-      0));
 }
 
 bool ShouldMetadataValidationFetchHostKeyed() {

@@ -138,20 +138,10 @@ BASE_FEATURE(kOnDeviceHeadProviderIncognito,
 BASE_FEATURE(kOnDeviceHeadProviderNonIncognito,
              "OmniboxOnDeviceHeadProviderNonIncognito",
              ENABLED);
-BASE_FEATURE(kOnDeviceHeadProviderKorean,
-             "OmniboxOnDeviceHeadProviderKorean",
-             DISABLED);
 BASE_FEATURE(kOnDeviceTailModel, "OmniboxOnDeviceTailModel", DISABLED);
 BASE_FEATURE(kOnDeviceTailEnableEnglishModel,
              "OmniboxOnDeviceTailEnableEnglishModel",
              ENABLED);
-
-// If enabled, the relevant AutocompleteProviders will store "title" data in
-// AutocompleteMatch::contents and "URL" data in AutocompleteMatch::description
-// for URL-based omnibox suggestions (see crbug.com/1202964 for more details).
-BASE_FEATURE(kStoreTitleInContentsAndUrlInDescription,
-             "OmniboxStoreTitleInContentsAndUrlInDescription",
-             DISABLED);
 
 // Feature used to fetch document suggestions.
 BASE_FEATURE(kDocumentProvider,

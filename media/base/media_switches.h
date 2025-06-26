@@ -300,7 +300,8 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kLiveCaptionWebAudio);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kLiveTranslate);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kLogSodaLoadFailures);
 #if BUILDFLAG(IS_MAC)
-MEDIA_EXPORT BASE_DECLARE_FEATURE(kMacLoopbackAudioForScreenShare);
+MEDIA_EXPORT BASE_DECLARE_FEATURE(kMacCatapLoopbackAudioForCast);
+MEDIA_EXPORT BASE_DECLARE_FEATURE(kMacCatapLoopbackAudioForScreenShare);
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseSCContentSharingPicker);
 #endif  // BUILDFLAG(IS_MAC)
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kMediaCapabilitiesQueryGpuFactories);
@@ -413,11 +414,6 @@ MEDIA_EXPORT BASE_DECLARE_FEATURE(kUseAudioManagerMaxChannelLayout);
 // the media-player based HLS player will NOT be used. This will roll out first
 // on android, but will eventually land in desktop chrome as well.
 MEDIA_EXPORT BASE_DECLARE_FEATURE(kBuiltInHlsPlayer);
-
-// This feature enables the buildin hls player to play and demux additional
-// media containers, including Fragmented and unfragmented MP4, as well as
-// raw AAC bytestreams. It does nothing if kBuiltInHlsPlayer is disabled.
-MEDIA_EXPORT BASE_DECLARE_FEATURE(kBuiltInHlsMP4);
 #endif  // BUILDFLAG(ENABLE_HLS_DEMUXER)
 
 #if BUILDFLAG(USE_LINUX_VIDEO_ACCELERATION)

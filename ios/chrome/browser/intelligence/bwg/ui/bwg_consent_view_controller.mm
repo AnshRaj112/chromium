@@ -330,8 +330,8 @@ const char kFootnoteLinkURLManagedAccount[] = "https://gmail.com";
 // Creates the secondary button.
 - (UIButton*)createSecondaryButton {
   UIButton* secondaryButton = [BWGUIUtils
-      createSecondaryButtonWithTitle:
-          l10n_util::GetNSString(IDS_IOS_BWG_FIRST_RUN_SECONDARY_BUTTON)];
+      createSecondaryButtonWithTitle:l10n_util::GetNSString(
+                                         IDS_IOS_BWG_PROMO_SECONDARY_BUTTON)];
   [secondaryButton addTarget:self
                       action:@selector(didTapSecondaryButton:)
             forControlEvents:UIControlEventTouchUpInside];
@@ -346,7 +346,7 @@ const char kFootnoteLinkURLManagedAccount[] = "https://gmail.com";
 
 // Did tap the secondary button.
 - (void)didTapSecondaryButton:(UIButton*)sender {
-  [self.mutator didConsentBWG];
+  [self.mutator didRefuseBWGConsent];
 }
 
 #pragma mark - UITextViewDelegate

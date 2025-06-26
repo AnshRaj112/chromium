@@ -96,62 +96,12 @@ OmniboxEditModelIOS::GetPageClassification() const {
   return client_->GetPageClassification(/*is_prefetch=*/false);
 }
 
-AutocompleteMatch OmniboxEditModelIOS::CurrentMatch(
-    GURL* alternate_nav_url) const {
-  // If we have a valid match use it. Otherwise get one for the current text.
-  AutocompleteMatch match = text_model_->current_match;
-  if (!match.destination_url.is_valid()) {
-    [text_controller_ getInfoForCurrentText:&match
-                     alternateNavigationURL:alternate_nav_url];
-  } else if (alternate_nav_url) {
-    AutocompleteProviderClient* provider_client =
-        autocomplete_controller()->autocomplete_provider_client();
-    *alternate_nav_url = AutocompleteResult::ComputeAlternateNavUrl(
-        text_model_->input, match, provider_client);
-  }
-  return match;
-}
-
-bool OmniboxEditModelIOS::ResetDisplayTexts() {
-  const std::u16string old_display_text = GetPermanentDisplayText();
-  text_model_->url_for_editing = client_->GetFormattedFullURL();
-  // When there's new permanent text, and the user isn't interacting with the
-  // omnibox, we want to revert the edit to show the new text.  We could simply
-  // define "interacting" as "the omnibox has focus", but we still allow updates
-  // when the omnibox has focus as long as the user hasn't begun editing, and
-  // isn't seeing zerosuggestions (because changing this text would require
-  // changing or hiding those suggestions).  When the omnibox doesn't have
-  // focus, we assume the user may have abandoned their interaction and it's
-  // always safe to change the text; this also prevents someone toggling "Show
-  // URL" (which sounds as if it might be persistent) from seeing just that URL
-  // forever afterwards.
-  return (GetPermanentDisplayText() != old_display_text) &&
-         (!has_focus() ||
-          (!text_model_->user_input_in_progress && !PopupIsOpen()));
-}
-
-std::u16string OmniboxEditModelIOS::GetPermanentDisplayText() const {
-  return text_model_->url_for_editing;
-}
-
-void OmniboxEditModelIOS::OnChanged() {
-  // Don't call CurrentMatch() when there's no editing, as in this case we'll
-  // never actually use it.  This avoids running the autocomplete providers (and
-  // any systems they then spin up) during startup.
-  const AutocompleteMatch& current_match = text_model_->user_input_in_progress
-                                               ? CurrentMatch(nullptr)
-                                               : AutocompleteMatch();
-
-  client_->OnTextChanged(current_match, text_model_->user_input_in_progress,
-                         text_model_->user_text,
-                         autocomplete_controller()->result(), has_focus());
-}
-
 bool OmniboxEditModelIOS::CurrentTextIsURL() const {
   // If !user_text_model_->inputin_progress_, we can determine if the text is a
   // URL without starting the autocomplete system. This speeds browser startup.
   return !text_model_->user_input_in_progress ||
-         !AutocompleteMatch::IsSearchType(CurrentMatch(nullptr).type);
+         !AutocompleteMatch::IsSearchType(
+             [text_controller_ currentMatch:nullptr].type);
 }
 
 void OmniboxEditModelIOS::AdjustTextForCopy(int sel_min,
@@ -163,7 +113,8 @@ void OmniboxEditModelIOS::AdjustTextForCopy(int sel_min,
       /*has_user_modified_text=*/text_model_->user_input_in_progress ||
           *text != text_model_->url_for_editing,
       /*is_keyword_selected=*/false,
-      PopupIsOpen() ? std::optional<AutocompleteMatch>(CurrentMatch(nullptr))
+      PopupIsOpen() ? std::optional<AutocompleteMatch>(
+                          [text_controller_ currentMatch:nullptr])
                     : std::nullopt,
       client_, url_from_text, write_url);
 }
@@ -225,41 +176,6 @@ void OmniboxEditModelIOS::OpenMatchForTesting(
             pasted_text, match_selection_timestamp);
 }
 
-void OmniboxEditModelIOS::OnPopupDataChanged(
-    const std::u16string& inline_autocompletion,
-    const std::u16string& additional_text,
-    const AutocompleteMatch& new_match) {
-  text_model_->current_match = new_match;
-  text_model_->inline_autocompletion = inline_autocompletion;
-
-  const std::u16string& user_text = text_model_->user_input_in_progress
-                                        ? text_model_->user_text
-                                        : text_model_->input.text();
-
-  [text_controller_
-      updateAutocompleteIfTextChanged:user_text
-                       autocompletion:text_model_->inline_autocompletion];
-  [text_controller_ setAdditionalText:additional_text];
-
-  // We need to invoke OnChanged in case the destination url changed (as could
-  // happen when control is toggled).
-  OnChanged();
-}
-
-bool OmniboxEditModelIOS::OnAfterPossibleChange(
-    const OmniboxStateChanges& state_changes) {
-  bool state_changed =
-      text_model_->UpdateStateAfterPossibleChange(state_changes);
-
-  if (!state_changed) {
-    return false;
-  }
-
-  [text_controller_ startAutocompleteAfterEdit];
-
-  return true;
-}
-
 bool OmniboxEditModelIOS::PopupIsOpen() const {
   return omnibox_autocomplete_controller_.hasSuggestions;
 }
@@ -285,7 +201,7 @@ void OmniboxEditModelIOS::AcceptInput(
     base::TimeTicks match_selection_timestamp) {
   // Get the URL and transition type for the selected entry.
   GURL alternate_nav_url;
-  AutocompleteMatch match = CurrentMatch(&alternate_nav_url);
+  AutocompleteMatch match = [text_controller_ currentMatch:&alternate_nav_url];
 
   if (!match.destination_url.is_valid()) {
     return;

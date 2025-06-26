@@ -1344,9 +1344,6 @@ const char kContextMenuEmptySpaceDescription[] =
 const char kContextualCueingName[] = "Contextual cueing";
 const char kContextualCueingDescription[] =
     "Enables the contextual cueing system to support showing actions.";
-const char kGlicZeroStateSuggestionsName[] = "Glic zero state suggestions";
-const char kGlicZeroStateSuggestionsDescription[] =
-    "Enables zero state suggestions in Glic.";
 const char kGlicActorName[] = "Glic actor";
 const char kGlicActorDescription[] = "Enables the Glic actor.";
 const char kGlicPanelResetTopChromeButtonName[] =
@@ -3202,6 +3199,12 @@ const char kOmniboxDynamicMaxAutocompleteDescription[] =
     "Configures the maximum number of autocomplete matches displayed in the "
     "Omnibox UI dynamically based on the number of URL matches.";
 
+const char kOmniboxRestoreInvisibleFocusOnlyName[] =
+    "Omnibox Restore Invisible Focus Only";
+const char kOmniboxRestoreInvisibleFocusOnlyDescription[] =
+    "Only restore omnibox ofucs if invisible focus is used. Implemented for "
+    "Split View (#side-by-side).";
+
 const char kOptimizationGuideDebugLogsName[] =
     "Enable optimization guide debug logs";
 const char kOptimizationGuideDebugLogsDescription[] =
@@ -3980,12 +3983,6 @@ const char kSidePanelResizingName[] = "Side Panel Resizing";
 const char kSidePanelResizingDescription[] =
     "Allows users to resize the side panel and persist the width across "
     "browser sessions.";
-
-const char kSiteInstanceGroupsForDataUrlsName[] =
-    "SiteInstanceGroups for data: URLs";
-const char kSiteInstanceGroupsForDataUrlsDescription[] =
-    "Put data: URL subframes in a separate SiteInstance from the initiator, "
-    "but in the same SiteInstanceGroup, and thus the same process.";
 
 const char kDefaultSiteInstanceGroupsName[] = "Default SiteInstanceGroups";
 const char kDefaultSiteInstanceGroupsDescription[] =
@@ -4887,6 +4884,12 @@ const char kAppSpecificHistoryName[] = "Allow app specific history";
 const char kAppSpecificHistoryDescription[] =
     "If enabled, history results will also be categorized by application.";
 
+const char kAutomotiveBackButtonBarStreamlineName[] =
+    "AutomotiveBackButtonBarStreamline";
+const char kAutomotiveBackButtonBarStreamlineDescription[] =
+    "If enabled, streamline the Android Automotive back button bar on CaRMA "
+    "devices when not in full screen.";
+
 const char kAuxiliaryNavigationStaysInBrowserName[] =
     "Prevent app opening for auxiliary navigations that start in the browser";
 const char kAuxiliaryNavigationStaysInBrowserDescription[] =
@@ -5532,11 +5535,6 @@ const char kTabStripGroupDragDropAndroidDescription[] =
     "into another window in split-screen mode or create a new window by "
     "dropping it on the edge of Chrome.";
 
-const char kTabStripGroupReorderAndroidName[] = "Tab Strip Group Reorder";
-const char kTabStripGroupReorderAndroidDescription[] =
-    "Enables long-pressing on tab strip tab group indicators to enter reorder "
-    "mode. Users will then be able to drag the tab group to reorder it.";
-
 const char kTabStripIncognitoMigrationName[] =
     "Tab Strip Incognito switcher migration to toolbar";
 const char kTabStripIncognitoMigrationDescription[] =
@@ -5697,6 +5695,12 @@ const char kDelayMediaSinkDiscoveryDescription[] =
     "Delay the browser background discovery of Cast and DIAL devices until "
     "users have interacted with the Cast UI or visited a site supporting Cast "
     "SDK or Remote Playback API.";
+
+const char kPictureInPictureShowWindowAnimationName[] =
+    "Picture-in-Picture show window animation";
+const char kPictureInPictureShowWindowAnimationDescription[] =
+    "When enabled, Picture-in-Picture windows will use a fade-in show "
+    "animation. On Windows OS this is a no-op.";
 
 const char kShowCastPermissionRejectedErrorName[] =
     "Show the permission rejected error message in the Cast/GMC UI.";
@@ -6236,28 +6240,21 @@ const char kMacAccessibilityAPIMigrationName[] = "Mac A11y API Migration";
 const char kMacAccessibilityAPIMigrationDescription[] =
     "Enables the migration to the new Cocoa accessibility API.";
 
-const char kMacCatapSystemAudioLoopbackCaptureName[] =
-    "Mac Core Audio Tap System Loopback Capture";
-const char kMacCatapSystemAudioLoopbackCaptureDescription[] =
-    "Enable system audio loopback capture using the macOS CoreAudio tap API on "
-    "macOS 14.2+. For system audio loopback to be enabled in "
-    "getDisplayMedia(), the feature 'MacLoopbackAudioForScreenShare' must also "
-    "be enabled.";
+const char kMacCatapLoopbackAudioForCastName[] =
+    "Mac Core Audio Tap System Loopback Capture for Cast";
+const char kMacCatapLoopbackAudioForCastDescription[] =
+    "Enable system audio loopback capture for Cast using the macOS CoreAudio "
+    "tap API on macOS 14.2+.";
+
+const char kMacCatapLoopbackAudioForScreenShareName[] =
+    "Mac Core Audio Tap System Loopback Capture for Screen Sharing";
+const char kMacCatapLoopbackAudioForScreenShareDescription[] =
+    "Enable system audio loopback capture for screen share using the macOS "
+    "CoreAudio tap API on macOS 14.2+.";
 
 const char kMacImeLiveConversionFixName[] = "Mac IME Live Conversion";
 const char kMacImeLiveConversionFixDescription[] =
     "A fix for the Live Conversion feature of Japanese IME.";
-
-const char kMacLoopbackAudioForScreenShareName[] =
-    "Mac System Audio Loopback for Screen Sharing";
-const char kMacLoopbackAudioForScreenShareDescription[] =
-    "Enables system audio sharing when using getDisplayMedia() for screen "
-    "sharing. This requires loopback audio capture to be enabled. On macOS "
-    "13-14, ScreenCaptureKit loopback capture is enabled by default. If "
-    "'MacSckSystemAudioLoopbackOverride' is enabled, ScreenCaptureKit "
-    "loopback capture can be used on all macOS versions that support it. "
-    "On macOS 14.2+, CoreAudio tap loopback capture will be used if the "
-    "'MacCatapSystemAudioLoopbackCapture' feature is enabled.";
 
 const char kMacPWAsNotificationAttributionName[] =
     "Mac PWA notification attribution";
@@ -7653,18 +7650,6 @@ const char kEnableNearbyMdnsName[] = "Nearby mDNS Discovery";
 const char kEnableNearbyMdnsDescription[] =
     "Enables Nearby discovery over mDNS.";
 
-const char kEnableNearbyWebRtcName[] = "Nearby WebRTC";
-const char kEnableNearbyWebRtcDescription[] =
-    "Enables Nearby transfers over WebRTC.";
-
-const char kEnableNearbyWifiDirectName[] = "Nearby WiFi Direct";
-const char kEnableNearbyWifiDirectDescription[] =
-    "Enables Nearby transfers over WiFi Direct.";
-
-const char kEnableNearbyWifiLanName[] = "Nearby WiFi LAN";
-const char kEnableNearbyWifiLanDescription[] =
-    "Enables Nearby transfers over WiFi LAN.";
-
 const char kNearbyPresenceName[] = "Nearby Presence";
 const char kNearbyPresenceDescription[] =
     "Enables Nearby Presence for scanning and discovery of nearby devices.";
@@ -8357,10 +8342,6 @@ const char kWaylandSessionManagementName[] = "Wayland session management";
 const char kWaylandSessionManagementDescription[] =
     "Enable Wayland's xx/xdg-session-management-v1 experimental support.";
 
-const char kWaylandTextInputV3Name[] = "Wayland text-input-v3";
-const char kWaylandTextInputV3Description[] =
-    "Enable Wayland's text-input-v3 experimental support.";
-
 const char kWaylandUiScalingName[] = "Wayland UI scaling";
 const char kWaylandUiScalingDescription[] =
     "Enable experimental support for text scaling in the Wayland backend "
@@ -8473,23 +8454,6 @@ const char kDcheckIsFatalDescription[] =
     "By default Chrome will evaluate in this build, but only log failures, "
     "rather than crashing. If enabled, DCHECKs will crash the calling process.";
 #endif  // BUILDFLAG(DCHECK_IS_CONFIGURABLE)
-
-#if BUILDFLAG(ENABLE_NACL)
-const char kNaclName[] = "Native Client";
-const char kNaclDescription[] =
-    "Support Native Client for all web applications, even those that were not "
-    "installed from the Chrome Web Store.";
-const char kVerboseLoggingInNaclName[] = "Verbose logging in Native Client";
-const char kVerboseLoggingInNaclDescription[] =
-    "Control the level of verbose logging in Native Client modules for "
-    "debugging purposes.";
-const char kVerboseLoggingInNaclChoiceDefault[] = "Default";
-const char kVerboseLoggingInNaclChoiceLow[] = "Low";
-const char kVerboseLoggingInNaclChoiceMedium[] = "Medium";
-const char kVerboseLoggingInNaclChoiceHigh[] = "High";
-const char kVerboseLoggingInNaclChoiceHighest[] = "Highest";
-const char kVerboseLoggingInNaclChoiceDisabled[] = "Disabled";
-#endif  // ENABLE_NACL
 
 #if BUILDFLAG(ENABLE_OOP_PRINTING)
 const char kEnableOopPrintDriversName[] =

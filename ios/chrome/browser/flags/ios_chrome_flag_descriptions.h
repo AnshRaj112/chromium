@@ -382,9 +382,6 @@ extern const char kIOSKeyboardAccessoryUpgradeDescription[];
 extern const char kIOSKeyboardAccessoryUpgradeForIPadName[];
 extern const char kIOSKeyboardAccessoryUpgradeForIPadDescription[];
 
-extern const char kIOSKeyboardAccessoryUpgradeShortManualFillMenuName[];
-extern const char kIOSKeyboardAccessoryUpgradeShortManualFillMenuDescription[];
-
 extern const char kIOSOneTapMiniMapRemoveSectionBreaksName[];
 extern const char kIOSOneTapMiniMapRemoveSectionBreaksDescription[];
 
@@ -469,8 +466,17 @@ extern const char
 extern const char
     kLensBlockFetchObjectsInteractionRPCsOnSeparateHandshakeDescription[];
 
+extern const char kLensCameraNoStillOutputRequiredName[];
+extern const char kLensCameraNoStillOutputRequiredDescription[];
+
+extern const char kLensCameraUnbinnedCaptureFormatsPreferredName[];
+extern const char kLensCameraUnbinnedCaptureFormatsPreferredDescription[];
+
 extern const char kLensClearcutBackgroundUploadEnabledName[];
 extern const char kLensClearcutBackgroundUploadEnabledDescription[];
+
+extern const char kLensContinuousZoomEnabledName[];
+extern const char kLensContinuousZoomEnabledDescription[];
 
 extern const char kLensExactMatchesEnabledName[];
 extern const char kLensExactMatchesEnabledDescription[];
@@ -483,6 +489,9 @@ extern const char kLensFiltersAblationModeEnabledDescription[];
 
 extern const char kLensGestureTextSelectionDisabledName[];
 extern const char kLensGestureTextSelectionDisabledDescription[];
+
+extern const char kLensInitialLvfZoomLevel90PercentName[];
+extern const char kLensInitialLvfZoomLevel90PercentDescription[];
 
 extern const char kLensInkMultiSampleModeDisabledName[];
 extern const char kLensInkMultiSampleModeDisabledDescription[];
@@ -537,6 +546,9 @@ extern const char kLensSingleTapTextSelectionDisabledDescription[];
 
 extern const char kLensTranslateToggleModeEnabledName[];
 extern const char kLensTranslateToggleModeEnabledDescription[];
+
+extern const char kLensTripleCameraEnabledName[];
+extern const char kLensTripleCameraEnabledDescription[];
 
 extern const char kLensUnaryApisWithHttpTransportEnabledName[];
 extern const char kLensUnaryApisWithHttpTransportEnabledDescription[];

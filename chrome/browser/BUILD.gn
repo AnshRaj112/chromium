@@ -3003,6 +3003,7 @@ static_library("browser") {
       "commerce/android/shopping_service_factory_android.cc",
       "commerce/price_tracking/android/price_tracking_notification_bridge.cc",
       "commerce/price_tracking/android/price_tracking_notification_bridge.h",
+      "composeplate/android/composeplate_utils.cc",
       "content_extraction/android/inner_text_bridge.cc",
       "data_sharing/android/data_sharing_service_factory_android.cc",
       "data_sharing/android/data_sharing_ui_delegate_android.cc",
@@ -3391,6 +3392,7 @@ static_library("browser") {
       "//chrome/browser/commerce/merchant_viewer:merchant_signal_db",
       "//chrome/browser/commerce/merchant_viewer:merchant_viewer_data_manager",
       "//chrome/browser/commerce/merchant_viewer/android:jni_headers",
+      "//chrome/browser/composeplate/android:jni_headers",
       "//chrome/browser/consent_auditor/android:jni_headers",
       "//chrome/browser/content_extraction/android:jni_headers",
       "//chrome/browser/device_reauth/android:jni_headers",
@@ -8093,22 +8095,6 @@ static_library("browser") {
     ]
   }
 
-  if (enable_ppapi) {
-    sources += [
-      "renderer_host/pepper/chrome_browser_pepper_host_factory.cc",
-      "renderer_host/pepper/chrome_browser_pepper_host_factory.h",
-      "renderer_host/pepper/pepper_isolated_file_system_message_filter.cc",
-      "renderer_host/pepper/pepper_isolated_file_system_message_filter.h",
-    ]
-    deps += [
-      "//ppapi/host",
-      "//ppapi/proxy:ipc",
-    ]
-    if (is_chromeos) {
-      deps += [ "//chromeos/ash/components/cryptohome" ]
-    }
-  }
-
   if (enable_plugins || is_android) {
     sources += [
       "plugins/plugin_observer_common.cc",
@@ -8269,10 +8255,9 @@ static_library("browser") {
   }
 
   if (enable_extensions_core) {
-    sources += [
-      "supervised_user/supervised_user_extensions_metrics_recorder.cc",
-      "supervised_user/supervised_user_extensions_metrics_recorder.h",
-    ]
+    sources +=
+        [ "supervised_user/supervised_user_extensions_metrics_recorder.cc" ]
+    deps += [ "//chrome/browser/supervised_user" ]
   }
 
   if (enable_extensions) {
@@ -8287,6 +8272,7 @@ static_library("browser") {
 
     deps += [
       "//chrome/browser/ui/extensions",
+      "//chrome/browser/ui/supervised_user",
 
       # TODO(crbug.com/420905611): Remove this circular dependency when:
       # - c/b/app_mode/app_mode_utils.h,

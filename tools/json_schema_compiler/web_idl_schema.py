@@ -450,14 +450,17 @@ class PromiseType(TypedProperty):
   def Process(self) -> dict:
     if self.type_node.GetProperty('NULLABLE'):
       self.properties['optional'] = True
-    # If the descriptions use the 'PromiseValue' key, we use that to extract a
-    # name and description for the typed value the promise will resolve to. The
-    # comment consists of the name to use, followed by a colon + space and then
-    # the description string.
+    # If the descriptions use the 'PromiseValue' key, we use that to extract the
+    # name and any description for the typed value the promise will resolve to.
+    # The comment consists of the name to use, followed by an optional
+    # description string indicated by a colon + space and then the description.
     if self.descriptions and 'PromiseValue' in self.descriptions:
-      name, description = self.descriptions['PromiseValue'].split(': ', 1)
-      self.properties['name'] = name
-      self.properties['description'] = description
+      name_and_description = self.descriptions['PromiseValue'].split(': ', 1)
+      self.properties['name'] = name_and_description.pop(0)
+      # We only add the promise value description if one was included in the
+      # comment after the name.
+      if name_and_description:
+        self.properties['description'] = name_and_description.pop()
     return self.properties
 
 
@@ -508,6 +511,12 @@ class Operation:
     if (description_data.description):
       properties['description'] = description_data.description
 
+    callback_optional = True
+    for extended_attribute in GetExtendedAttributes(self.node):
+      attribute_name = extended_attribute.GetName()
+      if attribute_name == 'requiredCallback':
+        callback_optional = False
+
     parameters = []
     arguments_node = self.node.GetOneOf('Arguments')
     for argument in arguments_node.GetListOf('Argument'):
@@ -523,6 +532,15 @@ class Operation:
       # This is an Undefined return, so we don't add anything.
       pass
     elif 'type' in return_type and return_type['type'] == 'promise':
+      # TODO(tjudkins): The optionality of the callback is only relevant for
+      # contexts that don't support promise based calls and for the few
+      # functions which don't support promise based calls, as the callback is
+      # always inherently optional when using a promise based call instead. It
+      # would be nice to just get rid of the 'optional' property here and always
+      # treat it as optional when we remove the context restrictions for promise
+      # based calls.
+      if callback_optional:
+        return_type['optional'] = True
       # For legacy reasons Promise based returns are represented on a
       # "returns_async" property.
       properties['returns_async'] = return_type

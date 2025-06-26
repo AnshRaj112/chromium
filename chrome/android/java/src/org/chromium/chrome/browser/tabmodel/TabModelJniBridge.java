@@ -107,7 +107,7 @@ public abstract class TabModelJniBridge implements TabModelInternal {
 
     @Override
     @CalledByNative
-    public abstract @Nullable Tab getTabAt(int index);
+    public abstract @JniType("TabAndroid*") @Nullable Tab getTabAt(int index);
 
     @Override
     public Profile getProfile() {
@@ -144,6 +144,12 @@ public abstract class TabModelJniBridge implements TabModelInternal {
             TabModelJniBridgeJni.get()
                     .tabAddedToModel(mNativeTabModelJniBridge, TabModelJniBridge.this, tab);
         }
+    }
+
+    protected void duplicateTabForTesting(int index) {
+        TabModelJniBridgeJni.get()
+                .duplicateTabForTesting( // IN-TEST
+                        mNativeTabModelJniBridge, TabModelJniBridge.this, index);
     }
 
     /**
@@ -281,7 +287,8 @@ public abstract class TabModelJniBridge implements TabModelInternal {
      * @return The created tab or null if the tab could not be created.
      */
     @CalledByNative
-    private @Nullable Tab createNewTabForDevTools(GURL url, boolean newWindow) {
+    private @JniType("TabAndroid*") @Nullable Tab createNewTabForDevTools(
+            GURL url, boolean newWindow) {
         LoadUrlParams loadParams = new LoadUrlParams(url);
         @TabLaunchType int launchType = TabLaunchType.FROM_CHROME_UI;
         if (!newWindow
@@ -361,7 +368,7 @@ public abstract class TabModelJniBridge implements TabModelInternal {
         getTabRemover().closeTabs(params, /* allowDialog= */ false);
 
         // Open a new tab if all tabs are closed.
-        for (Tab tab : getAllTabs()) {
+        for (Tab tab : this) {
             if (!tab.isCustomTab()) {
                 return;
             }
@@ -392,11 +399,27 @@ public abstract class TabModelJniBridge implements TabModelInternal {
                         index);
     }
 
+    /**
+     * Duplicates the tab at the given index to the next adjacent index. An out-of-bounds index is
+     * ignored.
+     *
+     * @param index Index of the tab to duplicate.
+     */
+    @CalledByNative
+    public void duplicateTab(int index, WebContents webContents) {
+        // TODO(crbug.com/415351293): Copy pinned state once implemented.
+        Tab tab = getTabAt(index);
+        if (tab == null) return;
+
+        getTabCreator()
+                .createTabWithWebContents(tab, webContents, TabLaunchType.FROM_TAB_LIST_INTERFACE);
+    }
+
     @CalledByNative
     protected abstract void moveTabToIndex(int index, int newIndex);
 
     @CalledByNative
-    protected abstract Tab[] getAllTabs();
+    protected abstract @JniType("std::vector<TabAndroid*>") List<Tab> getAllTabs();
 
     @NativeMethods
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
@@ -412,6 +435,12 @@ public abstract class TabModelJniBridge implements TabModelInternal {
 
         void destroy(long nativeTabModelJniBridge, TabModelJniBridge caller);
 
-        void tabAddedToModel(long nativeTabModelJniBridge, TabModelJniBridge caller, Tab tab);
+        void tabAddedToModel(
+                long nativeTabModelJniBridge,
+                TabModelJniBridge caller,
+                @JniType("TabAndroid*") Tab tab);
+
+        void duplicateTabForTesting( // IN-TEST
+                long nativeTabModelJniBridge, TabModelJniBridge caller, int index);
     }
 }

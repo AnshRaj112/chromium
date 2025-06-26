@@ -427,18 +427,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="Printing.CUPS.UnknownPpdColorModel" enum="Boolean"
-    expires_after="2025-07-27">
-  <owner>awscreen@chromium.org</owner>
-  <owner>thestig@chromium.org</owner>
-  <summary>
-    Records instances in which print preview encounters an unknown PPD color
-    model. Recorded after print settings are received from print preview. Note
-    that this this histogram expired on 2021-02-01 and was extended on
-    2021-03-30.
-  </summary>
-</histogram>
-
 <histogram name="Printing.CUPS.UsbSetupSource" enum="UsbPrinterSetupSource"
     expires_after="2025-09-27">
   <owner>gavinwill@chromium.org</owner>
@@ -474,19 +462,6 @@ chromium-metrics-reviews@google.com.
     setup is attempted from the print preview dialog. Only recorded on Chrome
     OS. Printer setup results go into either this histogram or the
     Printing.CUPS.PrinterSetupResult.PrintPreview histogram - not both.
-  </summary>
-</histogram>
-
-<histogram name="Printing.EnumeratePrinters.BasicInfo.Registry"
-    enum="BooleanSuccess" expires_after="2025-11-30">
-  <owner>awscreen@chromium.org</owner>
-  <owner>thestig@chromium.org</owner>
-  <summary>
-    When enumerating the list of printers on Windows, records an instance for
-    using the Windows registry to fill in extra printer details that are
-    unavailable from the fast Print Spooler API call. Each instance is
-    successful only if a registry entry for a printer is located that
-    corresponds with the printer returned by the Print Spooler API.
   </summary>
 </histogram>
 

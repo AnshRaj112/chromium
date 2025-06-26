@@ -5732,7 +5732,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="BookmarkBar_ContextMenu_Move">
-  <owner>amelies@chromium.org</owner>
+  <owner>amelies@google.com</owner>
   <owner>chrome-signin-team@google.com</owner>
   <description>
     The user decided to move one or more bookmarks using the context menu (e.g.
@@ -9987,12 +9987,6 @@ should be able to be added at any place in this file.
     User opened the site exception edit dialog by clicking on a site in the
     SingleCategoryPreferences page for Desktop site. Android only.
   </description>
-</action>
-
-<action name="DesktopSplitView_Create">
-  <owner>agale@google.com</owner>
-  <owner>chrome-desktop-ui@google.com</owner>
-  <description>Recorded when the user creates a split view.</description>
 </action>
 
 <action name="Destination_Application_Edit">
@@ -39845,7 +39839,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="Signin_Impression_FromAddressBubble">
-  <owner>amelies@chromium.com</owner>
+  <owner>amelies@google.com</owner>
   <description>
     Recorded when showing sign in entry in the saving address bubble.
   </description>
@@ -40550,7 +40544,7 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="Signin_Signin_FromAddressBubble">
-  <owner>amelies@chromium.com</owner>
+  <owner>amelies@google.com</owner>
   <description>
     Recorded on sign in start from access point
     signin_metrics::AccessPoint::kAddressBubble.

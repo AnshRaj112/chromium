@@ -56,6 +56,7 @@
 #include "components/plus_addresses/features.h"
 #include "components/policy/core/common/features.h"
 #include "components/privacy_sandbox/privacy_sandbox_features.h"
+#include "components/regional_capabilities/regional_capabilities_switches.h"
 #include "components/safe_browsing/core/common/features.h"
 #include "components/saved_tab_groups/public/features.h"
 #include "components/segmentation_platform/public/features.h"
@@ -232,6 +233,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kAppSpecificHistory,
     &kAsyncNotificationManager,
     &kAsyncNotificationManagerForDownload,
+    &kAutomotiveBackButtonBarStreamline,
     &kAuxiliarySearchDonation,
     &kBatchTabRestore,
     &kBlockIntentsWhileLocked,
@@ -274,6 +276,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kCCTReportPrerenderEvents,
     &kCCTResizableForThirdParties,
     &kCCTRevampedBranding,
+    &kCCTShowTabFix,
     &kCCTTabModalDialog,
     &kCCTToolbarRefactor,
     &kChangeUnfocusedPriority,
@@ -304,6 +307,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kEdgeToEdgeMonitorConfigurations,
     &kEdgeToEdgeSafeAreaConstraint,
     &kEdgeToEdgeTablet,
+    &kEdgeToEdgeUseBackupNavbarInsets,
     &kEdgeToEdgeWebOptIn,
     &kEducationalTipDefaultBrowserPromoCard,
     &kEmptyTabListAnimationKillSwitch,
@@ -375,6 +379,8 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kRightEdgeGoesForwardGestureNav,
     &kSearchInCCT,
     &kSearchInCCTAlternateTapHandling,
+    &kSearchInCCTIfEnabledByEmbedder,
+    &kSearchInCCTAlternateTapHandlingIfEnabledByEmbedder,
     &kSearchResumptionModuleAndroid,
     &kSettingsSingleActivity,
     &kShareCustomActionsInCCT,
@@ -391,7 +397,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kTabStripContextMenuAndroid,
     &kTabStripDensityChangeAndroid,
     &kTabStripGroupDragDropAndroid,
-    &kTabStripGroupReorderAndroid,
     &kTabStripIncognitoMigration,
     &kTabStripLayoutOptimization,
     &kTabStripTransitionInDesktopWindow,
@@ -466,6 +471,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &sensitive_content::features::kSensitiveContentWhileSwitchingTabs,
     &supervised_user::kPropagateDeviceContentFiltersToSupervisedUser,
     &switches::kForceStartupSigninPromo,
+    &switches::kMitigateLegacySearchEnginePromoOverlap,
     &sync_sessions::kOptimizeAssociateWindowsAndroid,
     &syncer::kWebApkBackupAndRestoreBackend,
     &syncer::kUnoPhase2FollowUp,
@@ -673,6 +679,10 @@ BASE_FEATURE(kAsyncNotificationManagerForDownload,
              "AsyncNotificationManagerForDownload",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kAutomotiveBackButtonBarStreamline,
+             "AutomotiveBackButtonBarStreamline",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kAuxiliarySearchDonation,
              "AuxiliarySearchDonation",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -842,6 +852,8 @@ BASE_FEATURE(kCCTRevampedBranding,
              "CCTRevampedBranding",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kCCTShowTabFix, "CCTShowTabFix", base::FEATURE_ENABLED_BY_DEFAULT);
+
 BASE_FEATURE(kCCTTabModalDialog,
              "CCTTabModalDialog",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -963,6 +975,10 @@ BASE_FEATURE(kEdgeToEdgeSafeAreaConstraint,
 BASE_FEATURE(kEdgeToEdgeTablet,
              "EdgeToEdgeTablet",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kEdgeToEdgeUseBackupNavbarInsets,
+             "EdgeToEdgeUseBackupNavbarInsets",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEdgeToEdgeWebOptIn,
              "EdgeToEdgeWebOptIn",
@@ -1298,10 +1314,6 @@ BASE_FEATURE(kTabStripGroupDragDropAndroid,
              "TabStripGroupDragDropAndroid",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kTabStripGroupReorderAndroid,
-             "TabStripGroupReorderAndroid",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kTabStripLayoutOptimization,
              "TabStripLayoutOptimization",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1376,6 +1388,14 @@ BASE_FEATURE(kSearchInCCT, "SearchInCCT", base::FEATURE_DISABLED_BY_DEFAULT);
 BASE_FEATURE(kSearchInCCTAlternateTapHandling,
              "SearchInCCTAlternateTapHandling",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kSearchInCCTIfEnabledByEmbedder,
+             "SearchInCCTIfEnabledByEmbedder",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kSearchInCCTAlternateTapHandlingIfEnabledByEmbedder,
+             "SearchInCCTAlternateTapHandlingIfEnabledByEmbedder",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kSearchResumptionModuleAndroid,
              "SearchResumptionModuleAndroid",
