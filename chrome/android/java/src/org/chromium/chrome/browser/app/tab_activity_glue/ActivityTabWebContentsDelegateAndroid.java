@@ -22,6 +22,7 @@ import org.chromium.base.ActivityState;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.ContextUtils;
 import org.chromium.base.Log;
+import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.base.supplier.Supplier;
 import org.chromium.blink.mojom.DisplayMode;
@@ -203,8 +204,12 @@ public class ActivityTabWebContentsDelegateAndroid extends TabWebContentsDelegat
         if (mTab.isClosing()) return false;
 
         boolean openingPopup =
-                PopupCreator.arePopupsEnabled(mActivity)
+                PopupCreator.arePopupsEnabled(mTab.getWindowAndroid().getDisplay())
                         && (disposition == WindowOpenDisposition.NEW_POPUP);
+        if (disposition == WindowOpenDisposition.NEW_POPUP) {
+            RecordHistogram.recordBooleanHistogram(
+                    "Android.MultiWindowMode.PopupOpensInNewWindow", openingPopup);
+        }
 
         // Auxiliary navigations starting in a PWA will always cause a tab reparenting, we
         // want to prevent UI effects caused by adding the Tab to the TabModel.
@@ -275,7 +280,6 @@ public class ActivityTabWebContentsDelegateAndroid extends TabWebContentsDelegat
                 tabGroupModelFilter.mergeListOfTabsToGroup(
                         Arrays.asList(newTab), sourceTab, /* notify= */ false);
                 if (mChromeActivityNativeDelegate != null) {
-                    assert newTab.getRootId() == sourceTab.getRootId();
                     assert Objects.equals(newTab.getTabGroupId(), sourceTab.getTabGroupId());
                     assert tabGroupModelFilter
                             .getTabsInGroup(newTab.getTabGroupId())

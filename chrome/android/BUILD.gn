@@ -325,6 +325,7 @@ if (_is_default_toolchain) {
       "$google_play_services_package:google_play_services_vision_common_java",
       "$google_play_services_package:google_play_services_vision_java",
       "//base:content_uri_utils_java",
+      "//base:flagged_apis_java",
       "//base:service_loader_java",
       "//base:task_executor_java",
       "//base/version_info/android:version_constants_java",
@@ -1182,6 +1183,10 @@ if (_is_default_toolchain) {
       "//components/segmentation_platform/public:junit",
       "//components/translate/content/android:junit",
     ]
+
+    if (enable_extensions_core) {
+      deps += [ "//chrome/browser/ui/android/extensions:junit" ]
+    }
   }
 
   # Files used by chrome integration and unit javatests.
@@ -1410,6 +1415,7 @@ if (_is_default_toolchain) {
       "//components/browser_ui/site_settings/android:javatests",
       "//components/language/android:javatests",
       "//components/paint_preview/player/android:javatests",
+      "//components/payments/content/android:javatests",
       "//components/privacy_sandbox/android:javatests",
       "//services:services_javatests",
       "//third_party/android_deps/local_modifications/preconditions/javatests",
@@ -3404,7 +3410,7 @@ if (_is_default_toolchain) {
   template("libchrome_impl") {
     chrome_common_shared_library(target_name) {
       sources = [ "../browser/android/chrome_entry_point.cc" ]
-      deps = []
+      deps = [ "//base:jni_onload" ]
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
@@ -3450,6 +3456,7 @@ template("libmonochrome_tmpl") {
     sources = [ "../browser/android/monochrome_entry_point.cc" ]
     deps = [
       "//android_webview",
+      "//base:jni_onload",
       "//components/crash/android:crashpad_main",
     ]
     if (defined(invoker.deps)) {

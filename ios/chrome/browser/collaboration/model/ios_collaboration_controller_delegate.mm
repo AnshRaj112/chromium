@@ -39,6 +39,7 @@
 #import "ios/chrome/browser/share_kit/model/share_kit_service_factory.h"
 #import "ios/chrome/browser/share_kit/model/share_kit_share_group_configuration.h"
 #import "ios/chrome/browser/shared/coordinator/alert/alert_coordinator.h"
+#import "ios/chrome/browser/shared/coordinator/scene/scene_state.h"
 #import "ios/chrome/browser/shared/model/browser/browser.h"
 #import "ios/chrome/browser/shared/model/web_state_list/tab_group.h"
 #import "ios/chrome/browser/shared/public/commands/application_commands.h"
@@ -197,19 +198,25 @@ void IOSCollaborationControllerDelegate::ShowError(const ErrorInfo& error,
                                                    message:message];
 
   if (error.type() == ErrorInfo::Type::kUpdateChromeUiForVersionOutOfDate) {
+    auto split_result_callback = base::SplitOnceCallback(std::move(result));
+
     auto update_action = base::CallbackToBlock(
         base::BindOnce(&IOSCollaborationControllerDelegate::Update,
-                       weak_ptr_factory_.GetWeakPtr(), std::move(result)));
+                       weak_ptr_factory_.GetWeakPtr(),
+                       std::move(split_result_callback.first)));
     [alert_coordinator_
         addItemWithTitle:
             l10n_util::GetNSString(
                 IDS_COLLABORATION_CHROME_OUT_OF_DATE_ERROR_DIALOG_UPDATE_BUTTON)
                   action:update_action
-                   style:UIAlertActionStyleDefault];
+                   style:UIAlertActionStyleDefault
+               preferred:YES
+                 enabled:YES];
 
     auto dismiss_action = base::CallbackToBlock(
         base::BindOnce(&IOSCollaborationControllerDelegate::ErrorAccepted,
-                       weak_ptr_factory_.GetWeakPtr(), std::move(result)));
+                       weak_ptr_factory_.GetWeakPtr(),
+                       std::move(split_result_callback.second)));
     [alert_coordinator_
         addItemWithTitle:
             l10n_util::GetNSString(
@@ -465,7 +472,22 @@ void IOSCollaborationControllerDelegate::PromoteTabGroup(
 }
 
 void IOSCollaborationControllerDelegate::PromoteCurrentScreen() {
-  // TODO(crbug.com/399595276): Implement this.
+  if (!browser_) {
+    return;
+  }
+  SceneState* scene_state = browser_->GetSceneState();
+  UISceneActivationRequestOptions* options =
+      [[UISceneActivationRequestOptions alloc] init];
+  UISceneSessionActivationRequest* request = [UISceneSessionActivationRequest
+      requestWithSession:scene_state.scene.session];
+  request.options = options;
+  [[UIApplication sharedApplication]
+      activateSceneSessionForRequest:request
+                        errorHandler:^(NSError* error) {
+                          LOG(ERROR) << base::SysNSStringToUTF8(
+                              error.localizedDescription);
+                          NOTREACHED();
+                        }];
 }
 
 void IOSCollaborationControllerDelegate::OnFlowFinished() {

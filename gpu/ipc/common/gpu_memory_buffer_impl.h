@@ -33,22 +33,14 @@ class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImpl : public gfx::GpuMemoryBuffer {
   // Overridden from gfx::GpuMemoryBuffer:
   gfx::Size GetSize() const override;
   gfx::BufferFormat GetFormat() const override;
-  gfx::GpuMemoryBufferId GetId() const override;
-  void OnMemoryDump(
-      base::trace_event::ProcessMemoryDump* pmd,
-      const base::trace_event::MemoryAllocatorDumpGuid& buffer_dump_guid,
-      uint64_t tracing_process_id,
-      int importance) const override;
 
  protected:
-  GpuMemoryBufferImpl(gfx::GpuMemoryBufferId id,
-                      const gfx::Size& size,
+  GpuMemoryBufferImpl(const gfx::Size& size,
                       gfx::BufferFormat format,
                       DestructionCallback callback);
 
   void AssertMapped();
 
-  const gfx::GpuMemoryBufferId id_;
   const gfx::Size size_;
   const gfx::BufferFormat format_;
   DestructionCallback callback_;

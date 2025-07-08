@@ -107,7 +107,7 @@ BASE_FEATURE(kAttributionDebugReportingCookieDeprecationTesting,
 #if BUILDFLAG(IS_ANDROID)
 BASE_FEATURE(kPrivacySandboxAttestationsLoadFromAPKAsset,
              "PrivacySandboxAttestationsLoadFromAPKAsset",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_ANDROID)
 
 BASE_FEATURE(kPrivateAggregationDebugReportingCookieDeprecationTesting,
@@ -140,6 +140,10 @@ BASE_FEATURE(kIpProtectionUx,
 
 BASE_FEATURE(kActUserBypassUx,
              "ActUserBypassUx",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kActUserBypassSpinnerShownAfterReload,
+             "ActUserBypassSpinnerShownAfterReload",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTrackingProtectionContentSettingFor3pcb,
@@ -215,7 +219,7 @@ const base::FeatureParam<std::string> kPrivacySandboxSentimentSurveyTriggerId{
 
 BASE_FEATURE(kPrivacySandboxAdsApiUxEnhancements,
              "PrivacySandboxAdsApiUxEnhancements",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kPrivacySandboxAllowPromptForBlocked3PCookies,
              "PrivacySandboxAllowPromptForBlocked3PCookies",

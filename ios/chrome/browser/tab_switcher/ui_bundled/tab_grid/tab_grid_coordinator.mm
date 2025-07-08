@@ -106,6 +106,7 @@
 #import "ios/chrome/browser/sync/model/sync_service_factory.h"
 #import "ios/chrome/browser/synced_sessions/model/distant_session.h"
 #import "ios/chrome/browser/synced_sessions/model/synced_sessions_util.h"
+#import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/chrome_app_bar_prototype.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/grid/base_grid_view_controller.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/grid/grid_commands.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/grid/grid_constants.h"
@@ -301,6 +302,8 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
   ProceduralBlock _guidedTourCompletionBlock;
   // The coordinator to sign-in from recent tabs.
   SigninCoordinator* _signinCoordinator;
+  // App bar for the prototype.
+  ChromeAppBarPrototype* _appBar;
 }
 // Superclass property.
 @synthesize baseViewController = _baseViewController;
@@ -745,9 +748,10 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
       determineTabGridTransitionTypeWithAnimationEnabled:animationEnabled];
 
   Browser* browser = isIncognito ? self.incognitoBrowser : self.regularBrowser;
-  BOOL isNTP = IsUrlNtp(
-      browser->GetWebStateList()->GetActiveWebState()->GetVisibleURL());
-  BOOL isRegularBrowserNTP = !isIncognito && isNTP;
+  web::WebState* activeWebState =
+      browser->GetWebStateList()->GetActiveWebState();
+  BOOL isRegularBrowserNTP = !isIncognito && activeWebState &&
+                             IsUrlNtp(activeWebState->GetVisibleURL());
 
   self.transitionHandler = [[TabGridTransitionHandler alloc]
           initWithTransitionType:transitionType
@@ -907,6 +911,25 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
       std::move(delegate), tabGroup->tab_group_id(), entryPoint);
 }
 
+- (void)prototypeGeminiCallback {
+  CHECK(IsDiamondPrototypeEnabled());
+}
+
+- (void)prototypeNewTabCallback {
+  CHECK(IsDiamondPrototypeEnabled());
+}
+
+- (void)prototypeTabGridCallback {
+  CHECK(IsDiamondPrototypeEnabled());
+  if (self.bvcContainer) {
+    id<ApplicationCommands> applicationHandler =
+        HandlerForProtocol(self.dispatcher, ApplicationCommands);
+    [applicationHandler displayTabGridInMode:TabGridOpeningMode::kDefault];
+  } else {
+    [self exitTabGrid];
+  }
+}
+
 #pragma mark - ChromeCoordinator
 
 - (void)start {
@@ -953,6 +976,20 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
   [_toolbarsCoordinator start];
   self.baseViewController.topToolbar = _toolbarsCoordinator.topToolbar;
   self.baseViewController.bottomToolbar = _toolbarsCoordinator.bottomToolbar;
+
+  if (IsDiamondPrototypeEnabled()) {
+    _appBar = [[ChromeAppBarPrototype alloc] init];
+    [_appBar.askGeminiButton addTarget:self
+                                action:@selector(prototypeGeminiCallback)
+                      forControlEvents:UIControlEventTouchUpInside];
+    [_appBar.openNewTabButton addTarget:self
+                                 action:@selector(prototypeNewTabCallback)
+                       forControlEvents:UIControlEventTouchUpInside];
+    [_appBar.tabGridButton addTarget:self
+                              action:@selector(prototypeTabGridCallback)
+                    forControlEvents:UIControlEventTouchUpInside];
+    [self.baseViewController setAppBar:_appBar];
+  }
 
   _regularGridCoordinator = [[RegularGridCoordinator alloc]
       initWithBaseViewController:self.baseViewController
@@ -1584,11 +1621,17 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
     NSString* previousString = self.historyCoordinator.searchTerms;
     [weakSelf.historyCoordinator stop];
     weakSelf.historyCoordinator = nil;
-    [self setActiveMode:TabGridMode::kSearch];
-    // When setting TabGridMode to kSearch, the string in the search bar
-    // is initialized to an empty string, so we override with the previous
-    // string
-    [self.baseViewController.topToolbar setSearchBarText:previousString];
+    // Only if current page is TabGridPageRegularTabs, restore TabGridMode to
+    // kSearch to keep the tab search filter is still active, as we set
+    // TabGridMode to kNormal before opening history search. For other pages,
+    // there is no need to restore kSearch mode.
+    if (weakSelf.baseViewController.currentPage == TabGridPageRegularTabs) {
+      [weakSelf setActiveMode:TabGridMode::kSearch];
+      // When setting TabGridMode to kSearch, the string in the search bar
+      // is initialized to an empty string, so we override with the previous
+      // string
+      [weakSelf.baseViewController.topToolbar setSearchBarText:previousString];
+    }
   }];
 }
 

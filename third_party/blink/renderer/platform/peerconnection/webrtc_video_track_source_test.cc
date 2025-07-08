@@ -13,8 +13,7 @@
 #include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "components/viz/common/resources/shared_image_format_utils.h"
-// TODO(crbug.com/421746653): Remove.
-#include "gpu/command_buffer/client/fake_gpu_memory_buffer.h"
+#include "gpu/command_buffer/client/client_shared_image.h"
 #include "gpu/command_buffer/client/test_shared_image_interface.h"
 #include "media/base/format_utils.h"
 #include "media/base/media_switches.h"
@@ -61,8 +60,7 @@ TEST(WebRtcVideoTrackSourceRefreshFrameTest, CallsRefreshFrame) {
 
 class WebRtcVideoTrackSourceTest
     : public ::testing::TestWithParam<
-          std::tuple<media::VideoFrame::StorageType, media::VideoPixelFormat>>,
-      public gpu::FakeGpuMemoryBuffer::MapCallbackController {
+          std::tuple<media::VideoFrame::StorageType, media::VideoPixelFormat>> {
  public:
   WebRtcVideoTrackSourceTest()
       : shared_resources_(
@@ -99,7 +97,7 @@ class WebRtcVideoTrackSourceTest
     media::VideoPixelFormat pixel_format;
   };
 
-  void RegisterCallback(base::OnceCallback<void(bool)> result_cb) override {
+  void RegisterCallback(base::OnceCallback<void(bool)> result_cb) {
     map_callbacks_.push_back(std::move(result_cb));
   }
 
@@ -132,11 +130,13 @@ class WebRtcVideoTrackSourceTest
     // Setting some default usage in order to get a mappable shared image.
     auto si_usage = gpu::SHARED_IMAGE_USAGE_CPU_WRITE_ONLY |
                     gpu::SHARED_IMAGE_USAGE_DISPLAY_READ;
-    auto shared_image = test_sii_->CreateSharedImageWithMapCallbackController(
+    auto shared_image = test_sii_->CreateSharedImageWithAsyncMapControl(
         {viz::GetSharedImageFormat(*buffer_format), frame_parameters.coded_size,
          gfx::ColorSpace(), gpu::SharedImageUsageSet(si_usage),
          "WebRtcVideoTrackSourceTest"},
-        gfx::BufferUsage::GPU_READ_CPU_READ_WRITE, premapped, this);
+        gfx::BufferUsage::GPU_READ_CPU_READ_WRITE, premapped,
+        base::BindRepeating(&WebRtcVideoTrackSourceTest::RegisterCallback,
+                            base::Unretained(this)));
     CHECK(shared_image) << "Failed to create a mappable shared image.";
     auto frame = media::VideoFrame::WrapMappableSharedImage(
         std::move(shared_image), test_sii_->GenVerifiedSyncToken(),

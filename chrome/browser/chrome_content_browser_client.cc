@@ -63,7 +63,6 @@
 #include "chrome/browser/btm/btm_browser_signin_detector.h"
 #include "chrome/browser/btm/stateful_bounce_counter.h"
 #include "chrome/browser/child_process_host_flags.h"
-#include "chrome/browser/chrome_browser_main_extra_parts_nacl_deprecation.h"
 #include "chrome/browser/chrome_content_browser_client_binder_policies.h"
 #include "chrome/browser/chrome_content_browser_client_navigation_throttles.h"
 #include "chrome/browser/chrome_content_browser_client_parts.h"
@@ -198,7 +197,6 @@
 #include "chrome/common/env_vars.h"
 #include "chrome/common/google_url_loader_throttle.h"
 #include "chrome/common/logging_chrome.h"
-#include "chrome/common/ppapi_utils.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/profiler/main_thread_stack_sampling_profiler.h"
 #include "chrome/common/profiler/process_type.h"
@@ -331,7 +329,6 @@
 #include "content/public/browser/tts_controller.h"
 #include "content/public/browser/tts_platform.h"
 #include "content/public/browser/url_loader_request_interceptor.h"
-#include "content/public/browser/vpn_service_proxy.h"
 #include "content/public/browser/weak_document_ptr.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_delegate.h"
@@ -525,6 +522,8 @@
 #include "chrome/browser/chromeos/policy/dlp/dlp_scoped_file_access_delegate.h"
 #include "chrome/browser/chromeos/tablet_mode/chrome_content_browser_client_tablet_mode_part.h"
 #include "chrome/browser/file_system_access/cloud_identifier/cloud_identifier_util_cros.h"
+#include "chrome/browser/media/webrtc/multi_capture/multi_capture_usage_indicator_service.h"
+#include "chrome/browser/media/webrtc/multi_capture/multi_capture_usage_indicator_service_factory.h"
 #include "chrome/browser/policy/system_features_disable_list_policy_handler.h"
 #include "chrome/browser/smart_card/chromeos_smart_card_delegate.h"
 #include "chrome/browser/web_applications/chromeos_web_app_experiments.h"
@@ -1220,7 +1219,8 @@ void MaybeAddCondition(
 #if BUILDFLAG(IS_CHROMEOS)
 void NotifyMultiCaptureStarted(const std::string& label,
                                content::WebContents* web_contents,
-                               const webapps::AppId* app_id) {
+                               const webapps::AppId* app_id,
+                               content::BrowserContext* browser_context) {
   const url::Origin origin =
       url::Origin::Create(web_contents->GetLastCommittedURL());
   if (app_id) {
@@ -1232,19 +1232,27 @@ void NotifyMultiCaptureStarted(const std::string& label,
                 ->registrar_unsafe()
                 .GetAppShortName(*app_id),
             origin);
-  } else {
-    // TODO(b/319317165): Remove this case once the pivot to web apps is
-    // complete.
-    CHECK_DEREF(ash::Shell::Get())
-        .multi_capture_service()
-        ->NotifyMultiCaptureStarted(label, origin);
+
+    if (base::FeatureList::IsEnabled(
+            chromeos::features::kMultiCaptureReworkedUsageIndicators)) {
+      CHECK_DEREF(multi_capture::MultiCaptureUsageIndicatorServiceFactory::
+                      GetForBrowserContext(web_contents->GetBrowserContext()))
+          .MultiCaptureStarted(label, *app_id);
+    }
   }
 }
 
-void NotifyMultiCaptureStopped(const std::string& label) {
+void NotifyMultiCaptureStopped(const std::string& label,
+                               content::BrowserContext* browser_context) {
   CHECK_DEREF(ash::Shell::Get())
       .multi_capture_service()
       ->NotifyMultiCaptureStopped(label);
+  if (base::FeatureList::IsEnabled(
+          chromeos::features::kMultiCaptureReworkedUsageIndicators)) {
+    CHECK_DEREF(multi_capture::MultiCaptureUsageIndicatorServiceFactory::
+                    GetForBrowserContext(browser_context))
+        .MultiCaptureStopped(label);
+  }
 }
 
 bool IsSubAppsPermissionGrantedByAdmins(content::WebContents* contents) {
@@ -1701,9 +1709,6 @@ ChromeContentBrowserClient::CreateBrowserMainParts(bool is_integration_test) {
   main_parts->AddParts(
       std::make_unique<ChromeBrowserMainExtraPartsOptimizationGuide>());
 
-  main_parts->AddParts(
-      std::make_unique<ChromeBrowserMainExtraPartsNaclDeprecation>());
-
   return main_parts;
 }
 
@@ -2148,14 +2153,14 @@ void ChromeContentBrowserClient::GetAdditionalViewSourceSchemes(
 network::mojom::IPAddressSpace
 ChromeContentBrowserClient::DetermineAddressSpaceFromURL(const GURL& url) {
   if (url.SchemeIs(chrome::kChromeSearchScheme)) {
-    return network::mojom::IPAddressSpace::kLocal;
+    return network::mojom::IPAddressSpace::kLoopback;
   }
   if (url.SchemeIs(dom_distiller::kDomDistillerScheme)) {
     return network::mojom::IPAddressSpace::kPublic;
   }
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   if (url.SchemeIs(extensions::kExtensionScheme)) {
-    return network::mojom::IPAddressSpace::kLocal;
+    return network::mojom::IPAddressSpace::kLoopback;
   }
 #endif
 
@@ -2922,7 +2927,6 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
         variations::switches::kEnableBenchmarking,
         variations::switches::kEnableBenchmarkingApi,
         switches::kEnableDistillabilityService,
-        switches::kEnableNaCl,
         switches::kEnableNetBenchmarking,
         switches::kExtensionAiDataCollection,
         switches::kExtensionExperimentalActor,
@@ -4908,17 +4912,6 @@ ChromeContentBrowserClient::GetLocalTracesDirectory() {
   return user_data_dir;
 }
 
-std::unique_ptr<content::VpnServiceProxy>
-ChromeContentBrowserClient::GetVpnServiceProxy(
-    content::BrowserContext* browser_context) {
-#if BUILDFLAG(ENABLE_EXTENSIONS)
-  return ChromeContentBrowserClientExtensionsPart::GetVpnServiceProxy(
-      browser_context);
-#else
-  return nullptr;
-#endif
-}
-
 std::unique_ptr<ui::SelectFilePolicy>
 ChromeContentBrowserClient::CreateSelectFilePolicy(WebContents* web_contents) {
   return std::make_unique<ChromeSelectFilePolicy>(web_contents);
@@ -5438,28 +5431,6 @@ ChromeContentBrowserClient::CreateTracingDelegate() {
 
 bool ChromeContentBrowserClient::IsSystemWideTracingEnabled() {
   return ChromeTracingDelegate::IsSystemWideTracingEnabled();
-}
-
-bool ChromeContentBrowserClient::IsPluginAllowedToCallRequestOSFileHandle(
-    content::BrowserContext* browser_context,
-    const GURL& url) {
-#if BUILDFLAG(ENABLE_PLUGINS) && BUILDFLAG(ENABLE_EXTENSIONS)
-  return ChromeContentBrowserClientPluginsPart::
-      IsPluginAllowedToCallRequestOSFileHandle(browser_context, url);
-#else
-  return false;
-#endif
-}
-
-bool ChromeContentBrowserClient::IsPluginAllowedToUseDevChannelAPIs(
-    content::BrowserContext* browser_context,
-    const GURL& url) {
-#if BUILDFLAG(ENABLE_PLUGINS) && BUILDFLAG(ENABLE_EXTENSIONS)
-  return ChromeContentBrowserClientPluginsPart::
-      IsPluginAllowedToUseDevChannelAPIs(browser_context, url);
-#else
-  return false;
-#endif
 }
 
 void ChromeContentBrowserClient::InitOnUIThread() {
@@ -6884,7 +6855,7 @@ bool ChromeContentBrowserClient::HandleWebUI(
 
   if (IsDisabledInternalWebUI(*url)) {
     GURL::Replacements replacements;
-    std::string query("host=" + url->host());
+    std::string query("host=" + url->spec());
     replacements.SetQueryStr(query);
     *url = GURL(chrome::kChromeUIInternalDebugPagesDisabledURL)
                .ReplaceComponents(replacements);
@@ -8339,20 +8310,20 @@ void ChromeContentBrowserClient::NotifyMultiCaptureStateChanged(
     content::GlobalRenderFrameHostId capturer_rfh_id,
     const std::string& label,
     MultiCaptureChanged state) {
+  content::WebContents* const web_contents = WebContents::FromRenderFrameHost(
+      RenderFrameHost::FromID(capturer_rfh_id));
+  if (!web_contents) {
+    return;
+  }
+
   switch (state) {
     case MultiCaptureChanged::kStarted: {
-      content::WebContents* const web_contents =
-          WebContents::FromRenderFrameHost(
-              RenderFrameHost::FromID(capturer_rfh_id));
-      if (!web_contents) {
-        return;
-      }
       NotifyMultiCaptureStarted(
-          label, web_contents,
-          web_app::WebAppTabHelper::GetAppId(web_contents));
+          label, web_contents, web_app::WebAppTabHelper::GetAppId(web_contents),
+          web_contents->GetBrowserContext());
     } break;
     case MultiCaptureChanged::kStopped:
-      NotifyMultiCaptureStopped(label);
+      NotifyMultiCaptureStopped(label, web_contents->GetBrowserContext());
       break;
   }
 }
@@ -8424,12 +8395,13 @@ void ChromeContentBrowserClient::BindAIManager(
 
 #if BUILDFLAG(ENABLE_ON_DEVICE_TRANSLATION)
 void ChromeContentBrowserClient::BindTranslationManager(
+    content::RenderProcessHost* host,
     content::BrowserContext* browser_context,
     base::SupportsUserData* context_user_data,
     const url::Origin& origin,
     mojo::PendingReceiver<blink::mojom::TranslationManager> receiver) {
   on_device_translation::TranslationManagerImpl::Bind(
-      browser_context, context_user_data, origin, std::move(receiver));
+      host, browser_context, context_user_data, origin, std::move(receiver));
 }
 #endif
 

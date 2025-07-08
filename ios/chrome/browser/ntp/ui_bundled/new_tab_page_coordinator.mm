@@ -89,8 +89,8 @@
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_shortcuts_handler.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_utils.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_view_controller.h"
-#import "ios/chrome/browser/omnibox/model/placeholder_service.h"
-#import "ios/chrome/browser/omnibox/model/placeholder_service_factory.h"
+#import "ios/chrome/browser/omnibox/model/placeholder_service/placeholder_service.h"
+#import "ios/chrome/browser/omnibox/model/placeholder_service/placeholder_service_factory.h"
 #import "ios/chrome/browser/overscroll_actions/ui_bundled/overscroll_actions_controller.h"
 #import "ios/chrome/browser/search_engines/model/template_url_service_factory.h"
 #import "ios/chrome/browser/shared/coordinator/layout_guide/layout_guide_util.h"
@@ -459,9 +459,9 @@
 - (void)stopIfNeeded {
   WebStateList* webStateList = self.browser->GetWebStateList();
   for (int i = 0; i < webStateList->count(); i++) {
-    NewTabPageTabHelper* iterNtpHelper =
+    NewTabPageTabHelper* NTPHelper =
         NewTabPageTabHelper::FromWebState(webStateList->GetWebStateAt(i));
-    if (iterNtpHelper->IsActive()) {
+    if (NTPHelper && NTPHelper->IsActive()) {
       return;
     }
   }
@@ -656,10 +656,12 @@
       self.componentFactory;
   self.logoVendor = ios::provider::CreateLogoVendor(browser, self.webState);
   self.NTPViewController = [componentFactory NTPViewController];
-  self.headerViewController = [componentFactory headerViewController];
+  self.headerViewController =
+      [componentFactory headerViewControllerForProfile:self.profile];
   self.NTPMediator =
       [componentFactory NTPMediatorForBrowser:browser
                      identityDiscImageUpdater:self.headerViewController];
+  self.NTPViewController.mutator = self.NTPMediator;
   self.contentSuggestionsCoordinator =
       [componentFactory contentSuggestionsCoordinatorForBrowser:browser];
   self.feedMetricsRecorder =
@@ -737,6 +739,7 @@
   headerViewController.toolbarDelegate = self.toolbarDelegate;
   headerViewController.baseViewController = self.baseViewController;
   headerViewController.NTPMetricsRecorder = self.NTPMetricsRecorder;
+  headerViewController.mutator = self.NTPMediator;
   [headerViewController setLogoVendor:self.logoVendor];
 }
 
@@ -810,7 +813,6 @@
   self.NTPViewController.feedMetricsRecorder = self.feedMetricsRecorder;
   self.NTPViewController.helpHandler =
       HandlerForProtocol(self.browser->GetCommandDispatcher(), HelpCommands);
-  self.NTPViewController.mutator = self.NTPMediator;
 }
 
 // Configures the `_tabGroupIndicatorCoordinator` and sets the
@@ -935,19 +937,8 @@
     return;
   }
 
-  PrefService* localState = GetApplicationContext()->GetLocalState();
-  if (localState->GetInteger(
-          prefs::kNTPHomeCustomizationNewBadgeImpressionCount) <=
-      kCustomizationNewBadgeMaxImpressionCount) {
-    base::RecordAction(
-        base::UserMetricsAction(kNTPCustomizationNewBadgeTappedAction));
-    // Set the new badge impression count to `INT_MAX` to ensure it isn't shown
-    // again, even if we increase the max impression count.
-    localState->SetInteger(prefs::kNTPHomeCustomizationNewBadgeImpressionCount,
-                           INT_MAX);
-
-    [self.headerViewController hideBadgeOnCustomizationMenu];
-  }
+  // Hide the 'new' badge for the current session after being tapped.
+  [self.headerViewController hideBadgeOnCustomizationMenu];
 
   [self.NTPMetricsRecorder recordHomeCustomizationMenuOpenedFromEntrypoint:
                                HomeCustomizationEntrypoint::kMain];
@@ -1063,6 +1054,9 @@
   [self updateFeedLayout];
   [self cancelOmniboxEdit];
   [self.NTPViewController setContentOffsetToTop];
+
+  _headerViewController.isGoogleDefaultSearchEngine =
+      [self isGoogleDefaultSearchEngine];
 }
 
 #pragma mark - ContentSuggestionsDelegate
@@ -1602,12 +1596,6 @@
               .empty();
 }
 
-// Update the state, to take into account that the account menu coordinator is
-// stopped.
-- (void)showAccountMenuDidFinish {
-  [self stopAccountMenuCoordinator];
-}
-
 // Update the state, to take into account that the signin coordinator
 // coordinator is stopped.
 - (void)showSigninCommandDidFinish {
@@ -1648,9 +1636,6 @@
 // Updates the NTP to take into account a change in module visibility
 - (void)handleChangeInModules {
   DCHECK(self.NTPViewController);
-
-  _headerViewController.isGoogleDefaultSearchEngine =
-      [self isGoogleDefaultSearchEngine];
 
   [self.NTPViewController resetViewHierarchy];
 
@@ -1924,6 +1909,8 @@
 
 - (void)openLensViewFinder {
   [self.NTPMetricsRecorder recordLensTapped];
+  feature_engagement::TrackerFactory::GetForProfile(self.profile)
+      ->NotifyEvent(feature_engagement::events::kIOSLensButtonUsed);
   TriggerHapticFeedbackForSelectionChange();
   OpenLensInputSelectionCommand* command = [[OpenLensInputSelectionCommand
       alloc]
@@ -1937,8 +1924,9 @@
 }
 
 - (void)openMIA {
-  OpenNewTabCommand* command =
-      [OpenNewTabCommand commandWithURLFromChrome:GetURLForMIA()];
+  [self.NTPMetricsRecorder recordMIATapped];
+  OpenNewTabCommand* command = [OpenNewTabCommand
+      commandWithURLFromChrome:GetUrlForAim(self.templateURLService)];
   id<ApplicationCommands> applicationHandler = HandlerForProtocol(
       self.browser->GetCommandDispatcher(), ApplicationCommands);
   [applicationHandler openURLInNewTab:command];
@@ -1965,6 +1953,7 @@
 }
 
 - (void)openIncognitoSearch {
+  [self.NTPMetricsRecorder recordIncognitoTapped];
   OpenNewTabCommand* command = [OpenNewTabCommand commandWithIncognito:YES];
   command.shouldFocusOmnibox = YES;
   id<ApplicationCommands> applicationHandler = HandlerForProtocol(

@@ -284,10 +284,6 @@
 #include "content/public/common/profiling_utils.h"
 #endif
 
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-#include "content/public/browser/browser_message_filter.h"
-#endif
-
 // VLOG additional statements in Fuchsia release builds.
 #if BUILDFLAG(IS_FUCHSIA)
 #define MAYBEVLOG VLOG
@@ -3524,7 +3520,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
       switches::kProfilingAtStart,
       switches::kProfilingFile,
       switches::kProfilingFlush,
-      switches::kRegisterPepperPlugins,
       switches::kRemoteDebuggingPipe,
       switches::kRemoteDebuggingPort,
       switches::kRendererStartupDialog,
@@ -4348,12 +4343,6 @@ RenderProcessHostImpl::StartRtpDump(bool incoming,
 IPC::ChannelProxy* RenderProcessHostImpl::GetChannel() {
   return channel_.get();
 }
-
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-void RenderProcessHostImpl::AddFilter(BrowserMessageFilter* filter) {
-  channel_->AddFilter(filter->GetFilter());
-}
-#endif
 
 bool RenderProcessHostImpl::FastShutdownStarted() {
   return fast_shutdown_started_;

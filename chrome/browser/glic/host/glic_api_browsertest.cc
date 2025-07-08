@@ -892,39 +892,29 @@ IN_PROC_BROWSER_TEST_F(GlicApiTest, testEnableDragResize) {
   RunTestSequence(OpenGlicWindow(GlicWindowMode::kDetached,
                                  GlicInstrumentMode::kHostAndContents));
   ExecuteJsTest();
-  ASSERT_TRUE(base::test::RunUntil([&]() {
-    return window_controller().GetGlicWidget()->widget_delegate()->CanResize();
-  }));
+  RunTestSequence(WaitForCanResizeEnabled(/*enabled=*/true));
 }
 
-// This test is flaky on Mac (crbug.com/414584725).
-#if BUILDFLAG(IS_MAC)
-#define MAYBE_testDisableDragResize DISABLED_testDisableDragResize
-#else
-#define MAYBE_testDisableDragResize testDisableDragResize
-#endif
-IN_PROC_BROWSER_TEST_F(GlicApiTest, MAYBE_testDisableDragResize) {
+IN_PROC_BROWSER_TEST_F(GlicApiTest, testDisableDragResize) {
   // Check the default resize setting here.
   RunTestSequence(OpenGlicWindow(GlicWindowMode::kDetached,
                                  GlicInstrumentMode::kHostAndContents),
-                  ExpectUserCanResize(true));
+                  WaitForCanResizeEnabled(/*enabled=*/true));
   ExecuteJsTest();
-  ASSERT_TRUE(base::test::RunUntil([&]() {
-    return !window_controller().GetGlicWidget()->widget_delegate()->CanResize();
-  }));
+  RunTestSequence(WaitForCanResizeEnabled(/*enabled=*/false));
 }
 
 IN_PROC_BROWSER_TEST_F(GlicApiTest, testInitiallyNotResizable) {
   RunTestSequence(OpenGlicWindow(GlicWindowMode::kDetached,
                                  GlicInstrumentMode::kHostAndContents));
   ExecuteJsTest();
-  RunTestSequence(InAnyContext(ExpectUserCanResize(false)));
+  RunTestSequence(WaitForCanResizeEnabled(/*enabled=*/false));
 }
 
 IN_PROC_BROWSER_TEST_F(GlicApiTestWithOneTabAndContextualCueing,
                        testGetZeroStateSuggestions) {
   EXPECT_CALL(*mock_cueing_service(),
-              GetContextualGlicZeroStateSuggestions(_, _, _, _))
+              GetContextualGlicZeroStateSuggestionsForFocusedTab(_, _, _, _))
       .Times(1);
 
   ExecuteJsTest();
@@ -933,7 +923,7 @@ IN_PROC_BROWSER_TEST_F(GlicApiTestWithOneTabAndContextualCueing,
 IN_PROC_BROWSER_TEST_F(GlicApiTestWithOneTabAndContextualCueing,
                        testGetZeroStateSuggestionsFailsWhenHidden) {
   EXPECT_CALL(*mock_cueing_service(),
-              GetContextualGlicZeroStateSuggestions(_, _, _, _))
+              GetContextualGlicZeroStateSuggestionsForFocusedTab(_, _, _, _))
       .Times(0);
 
   ExecuteJsTest();

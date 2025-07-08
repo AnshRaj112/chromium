@@ -81,7 +81,6 @@ using DismissViewCallback = SystemIdentityManager::DismissViewCallback;
     ManageSyncSettingsCommandHandler,
     ManageSyncSettingsTableViewControllerPresentationDelegate,
     PersonalizeGoogleServicesCoordinatorDelegate,
-    SettingsNavigationControllerDelegate,
     SignoutActionSheetCoordinatorDelegate,
     SyncErrorSettingsCommandHandler,
     TrustedVaultReauthenticationCoordinatorDelegate> {
@@ -190,24 +189,11 @@ using DismissViewCallback = SystemIdentityManager::DismissViewCallback;
 
 - (void)stop {
   [super stop];
-  [self stopAddAccountCoordinator];
   [self.mediator disconnect];
-  [self stopBulkUpload];
-  [self stopManageAccountsCoordinator];
-  [self stopAccountMenuCoordinator];
-  [self stopTrustedVaultReauthenticationCoordinator];
   self.mediator = nil;
   self.viewController = nil;
-  [_syncEncryptionPassphraseTableViewController settingsWillBeDismissed];
-  _syncEncryptionPassphraseTableViewController = nil;
-  [_syncEncryptionTableViewController settingsWillBeDismissed];
-  _syncEncryptionTableViewController = nil;
-
+  [self stopChildren];
   _syncObserver.reset();
-  [self.signoutActionSheetCoordinator stop];
-  _signoutActionSheetCoordinator = nil;
-
-  [self stopPersonalizedGoogleServicesCoordinator];
 }
 
 #pragma mark - Properties
@@ -221,6 +207,24 @@ using DismissViewCallback = SystemIdentityManager::DismissViewCallback;
 }
 
 #pragma mark - Private
+
+// Stops properly all views opened by the current coordinator.
+- (void)stopChildren {
+  [self stopBulkUpload];
+  [self stopManageAccountsCoordinator];
+  [self stopAccountMenuCoordinator];
+  [self stopTrustedVaultReauthenticationCoordinator];
+  [self stopAddAccountCoordinator];
+  [self stopSignoutActionSheetCoordinator];
+  [self stopPersonalizedGoogleServicesCoordinator];
+
+  // The view controller below don’t have coordinator, so they must be stopped
+  // with `settingsWillBeDismissed`.
+  [_syncEncryptionPassphraseTableViewController settingsWillBeDismissed];
+  _syncEncryptionPassphraseTableViewController = nil;
+  [_syncEncryptionTableViewController settingsWillBeDismissed];
+  _syncEncryptionTableViewController = nil;
+}
 
 - (void)stopAddAccountCoordinator {
   [_addAccountCoordinator stop];
@@ -237,6 +241,12 @@ using DismissViewCallback = SystemIdentityManager::DismissViewCallback;
   _manageAccountsCoordinator.delegate = nil;
   [_manageAccountsCoordinator stop];
   _manageAccountsCoordinator = nil;
+}
+
+- (void)stopSignoutActionSheetCoordinator {
+  [self.signoutActionSheetCoordinator stop];
+  _signoutActionSheetCoordinator.delegate = nil;
+  _signoutActionSheetCoordinator = nil;
 }
 
 - (void)resetDismissAccountDetailsController {
@@ -265,6 +275,7 @@ using DismissViewCallback = SystemIdentityManager::DismissViewCallback;
   if (_settingsAreDismissed) {
     return;
   }
+  [self stopChildren];
   if (self.viewController.navigationController) {
     if (!_dismissWebAndAppSettingDetailsController.is_null()) {
       std::move(_dismissWebAndAppSettingDetailsController)
@@ -427,8 +438,7 @@ using DismissViewCallback = SystemIdentityManager::DismissViewCallback;
 
 // Handles signout operation with `success` or failure.
 - (void)handleSignOutCompleted:(BOOL)success {
-  [self.signoutActionSheetCoordinator stop];
-  self.signoutActionSheetCoordinator = nil;
+  [self stopSignoutActionSheetCoordinator];
   if (success) {
     [self closeManageSyncSettings];
   }
@@ -634,19 +644,6 @@ using DismissViewCallback = SystemIdentityManager::DismissViewCallback;
 - (void)bulkUploadCoordinatorShouldStop:(BulkUploadCoordinator*)coordinator {
   DCHECK_EQ(coordinator, _bulkUploadCoordinator);
   [self stopBulkUpload];
-}
-
-#pragma mark - SettingsNavigationControllerDelegate
-
-- (void)closeSettings {
-  [_baseNavigationController.presentingViewController
-      dismissViewControllerAnimated:YES
-                         completion:nil];
-  [self.delegate manageSyncSettingsCoordinatorWasRemoved:self];
-}
-
-- (void)settingsWasDismissed {
-  [self.delegate manageSyncSettingsCoordinatorWasRemoved:self];
 }
 
 #pragma mark - TrustedVaultReauthenticationCoordinatorDelegate

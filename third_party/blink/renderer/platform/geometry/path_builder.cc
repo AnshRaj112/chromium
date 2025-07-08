@@ -222,10 +222,6 @@ PathBuilder& PathBuilder::AddPath(const Path& src,
 
 PathBuilder& PathBuilder::AddRoundedRect(const FloatRoundedRect& rect,
                                          bool clockwise) {
-  if (rect.IsEmpty()) {
-    return *this;
-  }
-
   builder_.addRRect(SkRRect(rect),
                     clockwise ? SkPathDirection::kCW : SkPathDirection::kCCW,
                     /* start at upper-left after corner radius */ 0);
@@ -250,9 +246,7 @@ PathBuilder& PathBuilder::AddContouredRect(
   }
   const FloatRoundedRect& origin_rect = contoured_rect.GetOriginRect();
 
-  // This would include the outer border of the rect, as well as shadow and
-  // margin.
-  if (origin_rect == target_rect) {
+  auto DrawAsSinglePath = [&]() {
     // A rect with no insets/outsets, we can draw all the corners and not worry
     // about intersections.
     const Corner top_right_corner = contoured_rect.TopRightCorner();
@@ -263,9 +257,15 @@ PathBuilder& PathBuilder::AddContouredRect(
     AddCurvedCorner(builder_, contoured_rect.TopLeftCorner());
     Close();
     current_path_.reset();
+  };
+
+  if (origin_rect == target_rect) {
+    DrawAsSinglePath();
     return *this;
   }
 
+  // This would include the outer border of the rect, as well as shadow and
+  // margin.
   if (target_rect.Rect().Contains(origin_rect.Rect())) {
     const gfx::RectF& outer_rect = target_rect.Rect();
     const Corner top_right_corner = contoured_rect.TopRightCorner();
@@ -403,9 +403,11 @@ PathBuilder& PathBuilder::AddContouredRect(
   }
 
   SkPath result;
-  CHECK(op_builder.resolve(&result))
-      << contoured_rect.ToString() << " " << origin_rect.ToString();
-  builder_.addPath(result);
+  if (op_builder.resolve(&result)) {
+    builder_.addPath(result);
+  } else {
+    DrawAsSinglePath();
+  }
   current_path_.reset();
   return *this;
 }

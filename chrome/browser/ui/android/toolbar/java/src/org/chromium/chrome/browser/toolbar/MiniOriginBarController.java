@@ -179,7 +179,10 @@ public class MiniOriginBarController implements Observer {
                                                         .KEYBOARD_ANIMATION_CANCELLED_BY_USER
                                                 : MiniOriginEvent.KEYBOARD_ANIMATION_ENDED),
                         this::updateAnimationProgress,
-                        this::waitingForImeAnimationToStart);
+                        this::waitingForImeAnimationToStart,
+                        controlContainer.getToolbarHeight()
+                                - mContext.getResources()
+                                        .getDimensionPixelSize(R.dimen.mini_origin_bar_height));
         mInsetObserver.addWindowInsetsAnimationListener(mWindowInsetsAnimationListener);
 
         mIsFormFieldFocusedObserver =
@@ -407,7 +410,8 @@ public class MiniOriginBarController implements Observer {
                 return switch (miniOriginEvent) {
                     case MiniOriginEvent.ACCESSORY_SHEET_APPEARED -> MiniOriginState
                             .SHOWING_WITH_ACCESSORY_SHEET;
-                    case MiniOriginEvent.CONTROLS_POSITION_BECAME_TOP -> MiniOriginState.NOT_READY;
+                    case MiniOriginEvent.CONTROLS_POSITION_BECAME_TOP,
+                            MiniOriginEvent.FORM_FIELD_LOST_FOCUS -> MiniOriginState.NOT_READY;
                     case MiniOriginEvent.KEYBOARD_ANIMATION_PREPARED -> MiniOriginState.ANIMATING;
                     case MiniOriginEvent.KEYBOARD_DISAPPEARED ->
                     // Skip our animation if we get a keyboard disappearance event before the
@@ -479,6 +483,9 @@ public class MiniOriginBarController implements Observer {
         private @Nullable WindowInsetsAnimationCompat mAnimation;
         private boolean mIsCancelledPredictiveBack;
 
+        // The height of the keyboard that should trigger an early end to a hide animation.
+        private final int mEarlyEndingHeight;
+
         MiniOriginWindowInsetsAnimationListener(
                 KeyboardVisibilityDelegate keyboardVisibilityDelegate,
                 ViewGroup containerView,
@@ -486,7 +493,8 @@ public class MiniOriginBarController implements Observer {
                 Runnable animationPreparedSignal,
                 Callback<Boolean> animationEndedSignal,
                 Callback<Float> animationProgressSignal,
-                BooleanSupplier waitingForAnimation) {
+                BooleanSupplier waitingForAnimation,
+                int earlyEndingHeight) {
             mKeyboardVisibilityDelegate = keyboardVisibilityDelegate;
             mContainerView = containerView;
             mTranslationSupplier = translationSupplier;
@@ -495,6 +503,7 @@ public class MiniOriginBarController implements Observer {
             mAnimationEndedSignal = animationEndedSignal;
             mAnimationProgressSignal = animationProgressSignal;
             mWaitingForAnimation = waitingForAnimation;
+            mEarlyEndingHeight = earlyEndingHeight;
         }
 
         @Override
@@ -536,7 +545,8 @@ public class MiniOriginBarController implements Observer {
             int translation = mFinalKeyboardHeight - currentKeyboardHeight;
 
             // Compensate for the system bars height only when hiding the keyboard.
-            if (mFinalKeyboardHeight == 0) {
+            boolean hidingKeyboard = mFinalKeyboardHeight == 0;
+            if (hidingKeyboard) {
                 int systemBarsHeight =
                         windowInsetsCompat.getInsets(WindowInsetsCompat.Type.systemBars()).bottom;
                 translation += systemBarsHeight;
@@ -553,6 +563,9 @@ public class MiniOriginBarController implements Observer {
                     getMinimizationFractionForInterpolatedFraction(
                             mAnimation.getInterpolatedFraction());
             mAnimationProgressSignal.onResult(minimizationFraction);
+            if (hidingKeyboard && Math.abs(translation) <= mEarlyEndingHeight) {
+                onEnd(mAnimation);
+            }
         }
 
         @Override

@@ -18,11 +18,8 @@
 #include "chrome/browser/preloading/prefetch/search_prefetch/search_prefetch_service_factory.h"
 #include "chrome/browser/preloading/prerender/prerender_utils.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "components/omnibox/browser/autocomplete_match.h"
 #include "components/page_load_metrics/browser/navigation_handle_user_data.h"
-#include "components/search_engines/template_url.h"
-#include "components/search_engines/template_url_service.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/preloading.h"
@@ -40,8 +37,6 @@ const char kHistogramPrerenderPredictionStatusDefaultSearchEngine[] =
     "Prerender.Experimental.PredictionStatus.DefaultSearchEngine";
 const char kHistogramPrerenderPredictionStatusDirectUrlInput[] =
     "Prerender.Experimental.PredictionStatus.DirectUrlInput";
-const char kHistogramPrerenderNTPIsPrerenderingSrpUrl[] =
-    "Prerender.IsPrerenderingSRPUrl.Embedder_NewTabPage";
 }  // namespace internal
 
 namespace {
@@ -61,15 +56,6 @@ content::PreloadingFailureReason ToPreloadingFailureReason(
       static_cast<int>(status) +
       static_cast<int>(content::PreloadingFailureReason::
                            kPreloadingFailureReasonContentEnd));
-}
-
-bool IsSearchUrl(content::WebContents& web_contents, const GURL& url) {
-  auto* profile = Profile::FromBrowserContext(web_contents.GetBrowserContext());
-  TemplateURLService* template_url_service =
-      TemplateURLServiceFactory::GetForProfile(profile);
-  return template_url_service &&
-         template_url_service->IsSearchResultsPageFromDefaultSearchProvider(
-             url);
 }
 
 }  // namespace
@@ -181,90 +167,6 @@ void PrerenderManager::DidFinishNavigation(
 }
 
 base::WeakPtr<content::PrerenderHandle>
-PrerenderManager::StartPrerenderNewTabPage(
-    const GURL& prerendering_url,
-    content::PreloadingPredictor predictor) {
-  // Helpers to create content::PreloadingAttempt.
-  auto* preloading_data =
-      content::PreloadingData::GetOrCreateForWebContents(web_contents());
-  content::PreloadingURLMatchCallback same_url_matcher =
-      content::PreloadingData::GetSameURLMatcher(prerendering_url);
-
-  content::PreloadingAttempt* preloading_attempt =
-      preloading_data->AddPreloadingAttempt(
-          predictor, content::PreloadingType::kPrerender,
-          std::move(same_url_matcher),
-          web_contents()->GetPrimaryMainFrame()->GetPageUkmSourceId());
-
-  bool is_search_url = IsSearchUrl(*web_contents(), prerendering_url);
-  base::UmaHistogramBoolean(
-      internal::kHistogramPrerenderNTPIsPrerenderingSrpUrl, is_search_url);
-  if (is_search_url) {
-    preloading_attempt->SetEligibility(ToPreloadingEligibility(
-        ChromePreloadingEligibility::KDisallowSearchUrl));
-    return nullptr;
-  }
-
-  // New Tab Page only allow https protocol.
-  if (!prerendering_url.SchemeIs("https")) {
-    preloading_attempt->SetEligibility(
-        content::PreloadingEligibility::kHttpsOnly);
-    return nullptr;
-  }
-
-  if (new_tab_page_prerender_handle_) {
-    if (new_tab_page_prerender_handle_->GetInitialPrerenderingUrl() ==
-        prerendering_url) {
-      // In case a prerender is already present for the URL, prerendering is
-      // eligible but mark triggering outcome as a duplicate.
-      preloading_attempt->SetEligibility(
-          content::PreloadingEligibility::kEligible);
-
-      MarkPreloadingAttemptAsDuplicate(preloading_attempt);
-      return new_tab_page_prerender_handle_->GetWeakPtr();
-    }
-    new_tab_page_prerender_handle_.reset();
-  }
-
-  base::RepeatingCallback<void(content::NavigationHandle&)>
-      prerender_navigation_handle_callback =
-          base::BindRepeating(&page_load_metrics::NavigationHandleUserData::
-                                  AttachNewTabPageNavigationHandleUserData);
-
-  new_tab_page_prerender_handle_ = web_contents()->StartPrerendering(
-      prerendering_url, content::PreloadingTriggerType::kEmbedder,
-      prerender_utils::kNewTabPageMetricSuffix,
-      /*additional_headers=*/net::HttpRequestHeaders(),
-      /*no_vary_search_hint=*/std::nullopt,
-      ui::PageTransitionFromInt(ui::PAGE_TRANSITION_AUTO_BOOKMARK),
-      /*should_warm_up_compositor=*/
-      base::FeatureList::IsEnabled(
-          features::kPrerender2WarmUpCompositorForNewTabPage),
-      /*should_prepare_paint_tree=*/false,
-      content::PreloadingHoldbackStatus::kUnspecified,
-      content::PreloadPipelineInfo::Create(
-          /*planned_max_preloading_type=*/content::PreloadingType::kPrerender),
-      preloading_attempt,
-      /*url_match_predicate=*/{},
-      std::move(prerender_navigation_handle_callback));
-
-  return new_tab_page_prerender_handle_
-             ? new_tab_page_prerender_handle_->GetWeakPtr()
-             : nullptr;
-}
-
-void PrerenderManager::StopPrerenderNewTabPage(
-    base::WeakPtr<content::PrerenderHandle> prerender_handle) {
-  if (!prerender_handle) {
-    return;
-  }
-  CHECK(new_tab_page_prerender_handle_);
-  CHECK_EQ(prerender_handle.get(),
-           new_tab_page_prerender_handle_->GetWeakPtr().get());
-  new_tab_page_prerender_handle_.reset();
-}
-
-base::WeakPtr<content::PrerenderHandle>
 PrerenderManager::StartPrerenderDirectUrlInput(
     const GURL& prerendering_url,
     content::PreloadingAttempt& preloading_attempt) {
@@ -302,7 +204,8 @@ PrerenderManager::StartPrerenderDirectUrlInput(
       content::PreloadPipelineInfo::Create(
           /*planned_max_preloading_type=*/content::PreloadingType::kPrerender),
       &preloading_attempt,
-      /*url_match_predicate=*/{}, /*prerender_navigation_handle_callback=*/{});
+      /*url_match_predicate=*/{}, /*prerender_navigation_handle_callback=*/{},
+      /*allow_reuse=*/false);
 
   if (direct_url_input_prerender_handle_) {
     return direct_url_input_prerender_handle_->GetWeakPtr();
@@ -353,7 +256,8 @@ bool PrerenderManager::MaybeStartPrewarmSearchResult() {
           [](const GURL& url, const std::optional<content::UrlMatchType>&) {
             return false;
           }),
-      /*prerender_navigation_handle_callback=*/{});
+      /*prerender_navigation_handle_callback=*/{},
+      /*allow_reuse=*/true);
 
   return search_prewarm_handle_ != nullptr;
 }
@@ -402,7 +306,8 @@ void PrerenderManager::StartPrerenderSearchResult(
               /*planned_max_preloading_type=*/content::PreloadingType::
                   kPrerender),
           preloading_attempt.get(), std::move(url_match_predicate),
-          /*prerender_navigation_handle_callback=*/{});
+          /*prerender_navigation_handle_callback=*/{},
+          /*allow_reuse=*/true);
 
   if (prerender_handle) {
     CHECK(!search_prerender_task_)
@@ -483,8 +388,6 @@ void PrerenderManager::ResetPrerenderHandlesOnPrimaryPageChanged(
 
     search_prerender_task_.reset();
   }
-
-  new_tab_page_prerender_handle_.reset();
 }
 
 bool PrerenderManager::ResetSearchPrerenderTaskIfNecessary(

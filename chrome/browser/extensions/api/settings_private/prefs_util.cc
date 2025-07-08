@@ -200,6 +200,8 @@ const PrefsUtil::TypedPrefMap& PrefsUtil::GetAllowlistedKeys() {
     BUILDFLAG(IS_CHROMEOS)
   (*s_allowlist)[autofill::prefs::kAutofillBnplEnabled] =
       settings_api::PrefType::kBoolean;
+  (*s_allowlist)[autofill::prefs::kAutofillAiOptInStatus] =
+      settings_api::PrefType::kBoolean;
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
         // BUILDFLAG(IS_CHROMEOS)
   (*s_allowlist)[payments::kCanMakePaymentEnabled] =
@@ -1285,9 +1287,6 @@ const PrefsUtil::TypedPrefMap& PrefsUtil::GetAllowlistedKeys() {
   (*s_allowlist)
       [optimization_guide::prefs::kHistorySearchEnterprisePolicyAllowed] =
           settings_api::PrefType::kNumber;
-  (*s_allowlist)[optimization_guide::prefs::
-                     kPasswordChangeSubmissionEnterprisePolicyAllowed] =
-      settings_api::PrefType::kNumber;
   (*s_allowlist)[optimization_guide::prefs::
                      kProductSpecificationsEnterprisePolicyAllowed] =
       settings_api::PrefType::kNumber;

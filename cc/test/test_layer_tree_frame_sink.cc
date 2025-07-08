@@ -115,12 +115,6 @@ class TestLayerTreeFrameSink::TestCompositorFrameSinkImpl
       std::optional<viz::HitTestRegionList> hit_test_region_list,
       uint64_t submit_time) override {}
   void DidNotProduceFrame(const viz::BeginFrameAck& begin_frame_ack) override {}
-  void SubmitCompositorFrameSync(
-      const viz::LocalSurfaceId& local_surface_id,
-      viz::CompositorFrame frame,
-      std::optional<viz::HitTestRegionList> hit_test_region_list,
-      uint64_t submit_time,
-      SubmitCompositorFrameSyncCallback callback) override {}
   void NotifyNewLocalSurfaceIdExpectedWhilePaused() override {}
   void BindLayerContext(viz::mojom::PendingLayerContextPtr context,
                         viz::mojom::LayerContextSettingsPtr settings) override;
@@ -341,7 +335,13 @@ void TestLayerTreeFrameSink::DidNotProduceFrame(const viz::BeginFrameAck& ack,
   DebugScopedSetImplThread impl(task_runner_provider_);
   DCHECK(!ack.has_damage);
   DCHECK(ack.frame_id.IsSequenceValid());
-  support_->DidNotProduceFrame(ack);
+  // When this sink is detached, it'll destroy it's support_ and then
+  // TestInProcessContextProvider, which then destroys RasterInProcessContext,
+  // where a runloop can deliver a DidNotProduceFrame call to this sink class
+  // and trigger a nullptr crash without this check.
+  if (support_) {
+    support_->DidNotProduceFrame(ack);
+  }
 }
 
 void TestLayerTreeFrameSink::DidReceiveCompositorFrameAck(

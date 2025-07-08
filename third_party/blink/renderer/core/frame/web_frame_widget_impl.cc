@@ -175,18 +175,14 @@
 #include "ui/gfx/geometry/point.h"
 #endif
 
-namespace WTF {
+namespace blink {
 
 template <>
-struct CrossThreadCopier<blink::WebFrameWidgetImpl::PromiseCallbacks>
+struct CrossThreadCopier<WebFrameWidgetImpl::PromiseCallbacks>
     : public CrossThreadCopierByValuePassThrough<
-          blink::WebFrameWidgetImpl::PromiseCallbacks> {
+          WebFrameWidgetImpl::PromiseCallbacks> {
   STATIC_ONLY(CrossThreadCopier);
 };
-
-}  // namespace WTF
-
-namespace blink {
 
 namespace {
 
@@ -454,6 +450,12 @@ void WebFrameWidgetImpl::Close(DetachReason detach_reason) {
   // prevent delaying the navigation commit, as releasing the LayerTreeView
   // resources blocks on the compositor thread.
   bool delay_release =
+#if BUILDFLAG(IS_ANDROID)
+      // Don't delay if synchronous compositing is enabled, since it doesn't
+      // expect async deletion.
+      !Platform::Current()
+           ->IsSynchronousCompositingEnabledForAndroidWebView() &&
+#endif
       (base::FeatureList::IsEnabled(
            blink::features::kDelayLayerTreeViewDeletionOnLocalSwap) &&
        detach_reason == DetachReason::kNavigation);
@@ -841,9 +843,19 @@ void WebFrameWidgetImpl::BindWidgetCompositor(
 void WebFrameWidgetImpl::BindInputTargetClient(
     mojo::PendingReceiver<viz::mojom::blink::InputTargetClient> receiver) {
   // Both Browser and Viz attempts to bind this interface. There can be at max
-  // two remotes one for each Browser and Viz, so this check ensures we are not
-  // going past the 2 limit.
-  CHECK_LT(input_target_receivers_.size(), 2u);
+  // two remotes one for each Browser and Viz.
+  // Note: In some cases where GPU restarts due to a crash, there might be a
+  // race between BindInputTargetClient call from the new GPU process and the
+  // renderer running the disconnect handlers on input_target_receivers_ for the
+  // destroyed GPU process, implying there may be 3 receivers transiently. See
+  // crbug.com/424109284 for more details.
+  if (input_target_receivers_.size() >= 2) {
+    // TODO(424109284): Cleanup after investigation.
+    SCOPED_CRASH_KEY_STRING64(
+        "crbug424109284", "receivers_size",
+        base::NumberToString(input_target_receivers_.size()));
+    base::debug::DumpWithoutCrashing();
+  }
   input_target_receivers_.Add(
       std::move(receiver),
       local_root_->GetTaskRunner(TaskType::kInternalInputBlocking));
@@ -4881,7 +4893,8 @@ bool WebFrameWidgetImpl::UpdateScreenRects(
 }
 
 void WebFrameWidgetImpl::EnqueueMoveEvent() {
-  if (!RuntimeEnabledFeatures::WindowOnMoveEventEnabled()) {
+  if (!RuntimeEnabledFeatures::
+          DesktopPWAsAdditionalWindowingControlsEnabled()) {
     return;
   }
 

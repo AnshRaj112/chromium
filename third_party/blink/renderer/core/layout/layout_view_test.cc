@@ -62,7 +62,7 @@ TEST_F(LayoutViewTest, DisplayNoneFrame) {
   EXPECT_FALSE(view->CanHaveChildren());
   EXPECT_FALSE(frame_doc->documentElement()->GetComputedStyle());
 
-  frame_doc->body()->setInnerHTML(R"HTML(
+  frame_doc->body()->SetInnerHTMLWithoutTrustedTypes(R"HTML(
     <div id="div"></div>
   )HTML");
 
@@ -241,7 +241,9 @@ TEST_P(LayoutViewHitTestTest, BlockInInlineBelowBottom) {
 // See editing/pasteboard/drag-drop-list.html
 TEST_P(LayoutViewHitTestTest, BlockInInlineWithListItem) {
   LoadAhem();
-  InsertStyleElement("body { margin: 0px; font: 10px/15px Ahem; }");
+  InsertStyleElement(
+      "body { margin: 0px; font: 10px/15px Ahem; }"
+      "li { list-style-position : inside; }");
   SetBodyInnerHTML("<li id=target><span><div id=inner>abc</div></span>");
   const auto& target = *GetElementById("target");
   const auto& span = *target.firstChild();

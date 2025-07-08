@@ -140,6 +140,10 @@ bool IsSupportedAccessPoint(signin_metrics::AccessPoint access_point) {
     case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
     case signin_metrics::AccessPoint::kNonModalSigninPasswordPromo:
     case signin_metrics::AccessPoint::kNonModalSigninBookmarkPromo:
+    case signin_metrics::AccessPoint::kUserManagerWithPrefilledEmail:
+    case signin_metrics::AccessPoint::kEnterpriseManagementDisclaimerAtStartup:
+    case signin_metrics::AccessPoint::
+        kEnterpriseManagementDisclaimerAfterBrowserFocus:
       return false;
   }
 }
@@ -240,6 +244,10 @@ void RecordImpressionsTilSigninButtonsHistogramForAccessPoint(
     case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
     case signin_metrics::AccessPoint::kNonModalSigninPasswordPromo:
     case signin_metrics::AccessPoint::kNonModalSigninBookmarkPromo:
+    case signin_metrics::AccessPoint::kUserManagerWithPrefilledEmail:
+    case signin_metrics::AccessPoint::kEnterpriseManagementDisclaimerAtStartup:
+    case signin_metrics::AccessPoint::
+        kEnterpriseManagementDisclaimerAfterBrowserFocus:
       NOTREACHED() << "Unexpected value for access point "
                    << static_cast<int>(access_point);
   }
@@ -341,6 +349,10 @@ void RecordImpressionsTilXButtonHistogramForAccessPoint(
     case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
     case signin_metrics::AccessPoint::kNonModalSigninPasswordPromo:
     case signin_metrics::AccessPoint::kNonModalSigninBookmarkPromo:
+    case signin_metrics::AccessPoint::kUserManagerWithPrefilledEmail:
+    case signin_metrics::AccessPoint::kEnterpriseManagementDisclaimerAtStartup:
+    case signin_metrics::AccessPoint::
+        kEnterpriseManagementDisclaimerAfterBrowserFocus:
       NOTREACHED() << "Unexpected value for access point "
                    << static_cast<int>(access_point);
   }
@@ -431,6 +443,10 @@ const char* DisplayedCountPreferenceKey(
     case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
     case signin_metrics::AccessPoint::kNonModalSigninPasswordPromo:
     case signin_metrics::AccessPoint::kNonModalSigninBookmarkPromo:
+    case signin_metrics::AccessPoint::kUserManagerWithPrefilledEmail:
+    case signin_metrics::AccessPoint::kEnterpriseManagementDisclaimerAtStartup:
+    case signin_metrics::AccessPoint::
+        kEnterpriseManagementDisclaimerAfterBrowserFocus:
       return nullptr;
   }
 }
@@ -520,6 +536,10 @@ const char* AlreadySeenSigninViewPreferenceKey(
     case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
     case signin_metrics::AccessPoint::kNonModalSigninPasswordPromo:
     case signin_metrics::AccessPoint::kNonModalSigninBookmarkPromo:
+    case signin_metrics::AccessPoint::kUserManagerWithPrefilledEmail:
+    case signin_metrics::AccessPoint::kEnterpriseManagementDisclaimerAtStartup:
+    case signin_metrics::AccessPoint::
+        kEnterpriseManagementDisclaimerAfterBrowserFocus:
       return nullptr;
   }
 }

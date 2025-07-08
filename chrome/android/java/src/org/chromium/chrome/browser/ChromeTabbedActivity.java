@@ -261,6 +261,7 @@ import org.chromium.chrome.browser.tasks.tab_management.TabsSettings;
 import org.chromium.chrome.browser.tasks.tab_management.archived_tabs_auto_delete_promo.ArchivedTabsAutoDeletePromoManager;
 import org.chromium.chrome.browser.toolbar.ToolbarIntentMetadata;
 import org.chromium.chrome.browser.toolbar.ToolbarManager;
+import org.chromium.chrome.browser.toolbar.extensions.ExtensionToolbarCoordinator;
 import org.chromium.chrome.browser.toolbar.top.ToolbarControlContainer;
 import org.chromium.chrome.browser.toolbar.top.tab_strip.StripVisibilityState;
 import org.chromium.chrome.browser.ui.AppLaunchDrawBlocker;
@@ -269,12 +270,12 @@ import org.chromium.chrome.browser.ui.RootUiCoordinator;
 import org.chromium.chrome.browser.ui.appmenu.AppMenuPropertiesDelegate;
 import org.chromium.chrome.browser.ui.desktop_windowing.AppHeaderUtils;
 import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils;
-import org.chromium.chrome.browser.ui.extensions.ExtensionService;
 import org.chromium.chrome.browser.ui.searchactivityutils.SearchActivityClient;
 import org.chromium.chrome.browser.ui.searchactivityutils.SearchActivityExtras.IntentOrigin;
 import org.chromium.chrome.browser.ui.signin.BottomSheetSigninAndHistorySyncConfig;
 import org.chromium.chrome.browser.ui.signin.account_picker.AccountPickerBottomSheetStrings;
 import org.chromium.chrome.browser.ui.signin.history_sync.HistorySyncConfig;
+import org.chromium.chrome.browser.undo_tab_close_snackbar.TabUndoBarController;
 import org.chromium.chrome.browser.undo_tab_close_snackbar.UndoBarController;
 import org.chromium.chrome.browser.usage_stats.UsageStatsService;
 import org.chromium.chrome.browser.util.ChromeAccessibilityUtil;
@@ -482,7 +483,7 @@ public class ChromeTabbedActivity extends ChromeActivity {
     private final AppLaunchDrawBlocker mAppLaunchDrawBlocker;
 
     private @Nullable MultiInstanceManager mMultiInstanceManager;
-    private UndoBarController mUndoBarPopupController;
+    private TabUndoBarController mUndoBarPopupController;
     private LayoutManagerChrome mLayoutManager;
     private ViewGroup mContentContainer;
     private ToolbarControlContainer mControlContainer;
@@ -884,7 +885,7 @@ public class ChromeTabbedActivity extends ChromeActivity {
                             mRootUiCoordinator::getTopUiThemeColorProvider,
                             createHubLayoutDependencyHolder(),
                             getCompositorViewHolderSupplier(),
-                            getContentView(),
+                            getContentView().findViewById(R.id.coordinator),
                             getToolbarManager(),
                             mRootUiCoordinator.getScrimManager().getScrimVisibilitySupplier());
             mLayoutStateProviderSupplier.set(mLayoutManager);
@@ -935,7 +936,8 @@ public class ChromeTabbedActivity extends ChromeActivity {
                             mRootUiCoordinator.getDataSharingTabManager(),
                             mRootUiCoordinator.getBottomSheetController(),
                             mRootUiCoordinator.getShareDelegateSupplier(),
-                            getXrSpaceModeObservableSupplier());
+                            getXrSpaceModeObservableSupplier(),
+                            mRootUiCoordinator.getTopControlsStacker());
             mLayoutStateProviderSupplier.set(mLayoutManager);
         }
     }
@@ -2680,7 +2682,7 @@ public class ChromeTabbedActivity extends ChromeActivity {
                 };
 
         mUndoBarPopupController =
-                new UndoBarController(this, mTabModelSelector, this, dialogVisibilitySupplier);
+                new TabUndoBarController(this, mTabModelSelector, this, dialogVisibilitySupplier);
 
         // TODO(crbug.com/376668040): Remove this once enough time has passed
         // most clients have upgraded to have colors.
@@ -3033,7 +3035,6 @@ public class ChromeTabbedActivity extends ChromeActivity {
                                         TabLaunchType.FROM_CHROME_UI),
                 getModalDialogManager(),
                 getSnackbarManager(),
-                mRootUiCoordinator.getExtensionService(),
                 mRootUiCoordinator.getIncognitoReauthControllerSupplier(),
                 mRootUiCoordinator.getReadAloudControllerSupplier());
     }
@@ -3183,7 +3184,12 @@ public class ChromeTabbedActivity extends ChromeActivity {
         }
         if (mWindowId == INVALID_WINDOW_ID) {
             Log.i(TAG, "Window ID not allocated. Finishing the activity");
-            Toast.makeText(this, R.string.max_number_of_windows, Toast.LENGTH_LONG).show();
+            String text =
+                    getResources()
+                            .getString(
+                                    R.string.max_number_of_windows,
+                                    MultiWindowUtils.getMaxInstances());
+            Toast.makeText(this, text, Toast.LENGTH_LONG).show();
             recordMaxWindowLimitExceededHistogram(/* limitExceeded= */ true);
             return false;
         } else {
@@ -3202,6 +3208,13 @@ public class ChromeTabbedActivity extends ChromeActivity {
         recordMaxWindowLimitExceededHistogram(/* limitExceeded= */ false);
 
         return super.isStartedUpCorrectly(intent);
+    }
+
+    /**
+     * @return The allocated windowId of the activity for testing purposes.
+     */
+    public int getWindowIdForTesting() {
+        return mWindowId;
     }
 
     private void logIntentInfo(Intent intent) {
@@ -4023,10 +4036,11 @@ public class ChromeTabbedActivity extends ChromeActivity {
 
         if (Boolean.TRUE.equals(result)) return result;
 
-        @Nullable ExtensionService extensionService = mRootUiCoordinator.getExtensionService();
-        if (extensionService != null) {
+        ExtensionToolbarCoordinator extensionToolbarCoordinator =
+                mRootUiCoordinator.getToolbarManager().getExtensionToolbarCoordinator();
+        if (extensionToolbarCoordinator != null) {
             // Handle extension shortcuts.
-            if (extensionService.dispatchKeyEvent(event)) {
+            if (extensionToolbarCoordinator.dispatchKeyEvent(event)) {
                 result = true;
             }
         }

@@ -20,6 +20,7 @@
 #include "gpu/command_buffer/common/shared_image_trace_utils.h"
 #include "gpu/ipc/common/exported_shared_image.mojom-shared.h"
 #include "gpu/ipc/common/gpu_memory_buffer_handle_info.h"
+#include "gpu/ipc/common/gpu_memory_buffer_impl.h"
 #include "third_party/skia/include/core/SkImageInfo.h"
 #include "third_party/skia/include/core/SkPixmap.h"
 #include "ui/gfx/color_space.h"
@@ -39,7 +40,7 @@ class VideoFrame;
 }  // namespace media
 
 namespace viz {
-class CopyOutputTextureResult;
+class CopyOutputSharedImageResult;
 }  // namespace viz
 
 namespace gpu {
@@ -147,14 +148,6 @@ class GPU_COMMAND_BUFFER_CLIENT_EXPORT ClientSharedImage
   // GpuMemoryBuffer.
   gfx::GpuMemoryBufferHandle CloneGpuMemoryBufferHandle() const;
 
-#if BUILDFLAG(IS_APPLE)
-  // Sets the color space in which the native buffer backing this SharedImage
-  // should be interpreted when used as an overlay. Note that this will not
-  // impact texturing from the buffer. Used only for SharedImages backed by a
-  // client-accessible IOSurface.
-  void SetColorSpaceOnNativeBuffer(const gfx::ColorSpace& color_space);
-#endif
-
   // Returns the GL texture target to use for this SharedImage.
   uint32_t GetTextureTarget();
 
@@ -217,14 +210,32 @@ class GPU_COMMAND_BUFFER_CLIENT_EXPORT ClientSharedImage
   static scoped_refptr<ClientSharedImage> CreateForTesting(
       SharedImageUsageSet usage);
   static scoped_refptr<ClientSharedImage> CreateForTesting(
+      const SharedImageMetadata& metadata);
+  static scoped_refptr<ClientSharedImage> CreateForTesting(
       const SharedImageMetadata& metadata,
       uint32_t texture_target);
+
+  using AsyncMapCompletionCallback = base::OnceCallback<void(bool)>;
 
   static scoped_refptr<ClientSharedImage> CreateForTesting(
       const Mailbox& mailbox,
       const SharedImageMetadata& metadata,
       const SyncToken& sync_token,
       std::unique_ptr<gfx::GpuMemoryBuffer> gpu_memory_buffer,
+      gfx::BufferUsage buffer_usage,
+      scoped_refptr<SharedImageInterfaceHolder> sii_holder);
+
+  // Used to control execution of `MapAsync()` completion callbacks. On a
+  // `MapAsync()` invocation the completion callback will be passed to this
+  // callback, which can execute it as the test requires.
+  using AsyncMapInvokedCallback =
+      base::RepeatingCallback<void(AsyncMapCompletionCallback)>;
+  static scoped_refptr<ClientSharedImage> CreateForTesting(
+      const Mailbox& mailbox,
+      const SharedImageMetadata& metadata,
+      const SyncToken& sync_token,
+      bool premapped,
+      const AsyncMapInvokedCallback& callback,
       gfx::BufferUsage buffer_usage,
       scoped_refptr<SharedImageInterfaceHolder> sii_holder);
 
@@ -266,6 +277,17 @@ class GPU_COMMAND_BUFFER_CLIENT_EXPORT ClientSharedImage
   friend class SharedImageTexture;
   ~ClientSharedImage();
 
+  // static
+  std::unique_ptr<GpuMemoryBufferImpl> CreateGpuMemoryBufferImplFromHandle(
+      gfx::GpuMemoryBufferHandle handle,
+      const gfx::Size& size,
+      gfx::BufferFormat format,
+      gfx::BufferUsage usage,
+      GpuMemoryBufferImpl::CopyNativeBufferToShMemCallback
+          copy_native_buffer_to_shmem_callback =
+              GpuMemoryBufferImpl::CopyNativeBufferToShMemCallback(),
+      scoped_refptr<base::UnsafeSharedMemoryPool> pool = nullptr);
+
   // This constructor is used only when importing an owned ClientSharedImage,
   // which should only be done via implementations of
   // SharedImageInterface::ImportSharedImage().
@@ -289,7 +311,7 @@ class GPU_COMMAND_BUFFER_CLIENT_EXPORT ClientSharedImage
   // SharedImageInterface.
   explicit ClientSharedImage(ExportedSharedImage exported_si);
 
-  friend class ::viz::CopyOutputTextureResult;
+  friend class ::viz::CopyOutputSharedImageResult;
   // Creates unowned (no `sii_holder`) `ClientSharedImage`
   explicit ClientSharedImage(const Mailbox& mailbox,
                              const SharedImageInfo& info);

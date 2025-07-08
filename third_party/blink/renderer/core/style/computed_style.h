@@ -1127,7 +1127,7 @@ class ComputedStyle final : public ComputedStyleBase {
   }
 
   // Grid axis utility functions, usable in Grid and Masonry.
-  const NGGridTrackList& AutoTracks(
+  const GridTrackList& AutoTracks(
       GridTrackSizingDirection track_direction) const {
     return (track_direction == kForColumns) ? GridAutoColumns()
                                             : GridAutoRows();
@@ -1346,7 +1346,7 @@ class ComputedStyle final : public ComputedStyleBase {
            BorderBottomWidth();
   }
   bool HasBorderDecoration() const {
-    return HasBorder() || BorderImage().HasImage();
+    return HasBorder() || BorderImage().HasImage() || HasBorderShape();
   }
   bool HasBorderRadius() const {
     if (!BorderTopLeftRadius().Width().IsZero()) {
@@ -1943,6 +1943,12 @@ class ComputedStyle final : public ComputedStyleBase {
   bool VisibleToHitTesting() const {
     return Visibility() == EVisibility::kVisible &&
            UsedPointerEvents() != EPointerEvents::kNone;
+  }
+
+  // returns `true` is the element has a non-identity transform, `false`
+  // otherwise.
+  bool HasNonIdentityTransformOperation() const {
+    return HasTransformOperations() && !Transform().IsIdentityOrTranslation();
   }
 
   // Animation utility functions.

@@ -90,6 +90,13 @@
 
       如果設定這項政策，系統將一律以這項政策第一個值指定的語言代碼顯示登入畫面 (為了日後的相容性，系統會將政策定義為清單)。  如果未設定這項政策，或將政策設定為空白清單，系統將以上一個使用者工作階段的語言代碼顯示登入畫面。  如果這項政策設定的值不是有效的語言代碼，系統則將以備用語言代碼 (目前為 en-US) 顯示登入畫面。</translation>
 <translation id="1050158007881386475">停用裝置主機板狀態回報功能</translation>
+<translation id="1050897390688148222">有了智慧鏡頭重疊功能，只要使用目前頁面的螢幕截圖或提出相關問題，就能透過 Google 搜尋相關資訊。使用這項功能前需要先啟用。
+
+除非這項政策設為停用，否則只要使用者將預設搜尋引擎設為 Google，就能使用這項功能。
+
+如果將政策設為「0 - 允許」或未設定，使用者就能存取這項功能。如果將政策設為「1 - 不允許」，使用者就無法存取這項功能。
+
+從 <ph name="PRODUCT_NAME" /> 140 版開始，如果未設定這項政策，系統會根據 <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" /> 政策決定其行為。</translation>
 <translation id="1052499923181221200">除非 SamlInSessionPasswordChangeEnabled 設為 True，否則這項政策沒有影響。
       如果將該項政策設為 True，且將本政策設為 14 (舉例而言)，系統會在 14 天前通知 SAML 使用者，表示密碼即將在特定日期到期。
       這樣一來，使用者即可立即在工作階段中變更和更新密碼，以免密碼到期。
@@ -134,6 +141,11 @@
 <translation id="1077675271127011209">停用使用量和當機相關資料的報告功能</translation>
 <translation id="1079498696402787191">如果 TLS 握手程序中允許使用雜湊，則使用預設值。</translation>
 <translation id="1079801999187584280">禁止使用開發人員工具</translation>
+<translation id="1081263326166769685">如果將這項政策設為啟用，<ph name="PRODUCT_OS_NAME" /> 會將使用指標和診斷資料 (包括當機報告) 回報給 Google。如果設為停用，系統會關閉指標和診斷資料的報告功能。
+
+如果是受管理的裝置，系統預設會啟用這項政策，並將指標傳送給 Google。
+
+如果是未受管理的裝置，使用者可以在未設定政策時決定是否要傳送指標。</translation>
 <translation id="1082802595100075771">讓使用者選擇使用去識別化的 Google 服務，針對無標籤圖片提供自動產生的說明</translation>
 <translation id="1084697375611053264">在清單中指定哪些第三方網頁應用程式網域可使用 <ph name="DESK_API_NAME" /> 控管 <ph name="PRODUCT_OS_NAME" /> 桌面。清單中的網址模式必須符合 https://developer.chrome.com/docs/extensions/mv3/manifest/externally_connectable/#reference 中為「matches」屬性定義的格式。</translation>
 <translation id="1087057100912843460">允許更新</translation>
@@ -270,9 +282,6 @@
       如果不設定這項政策，使用者不會自動登入。</translation>
 <translation id="1193653806129988688">禁止使用者透過 <ph name="PRODUCT_OS_NAME" /> 註冊機制兌換優惠</translation>
 <translation id="1197437816436565375">你無法強制 Android 應用程式使用 Proxy。有一部分 Proxy 設定可供 Android 應用程式使用，而 Android 應用程式可選擇是否使用。詳情請參閱 <ph name="PROXY_MODE_POLICY_NAME" /> 政策。</translation>
-<translation id="1198183996903759302">如果將這項政策設為 True (或將 <ph name="HARDWARE_ACCELERATION_MODE_ENABLED_POLICY_NAME" /> 設為 False)，網頁將無法存取 WebGL API，且外掛程式將無法使用 Pepper 3D API。
-
-      如果將這項政策設為 False 或不設定，網頁將可使用 WebGL API，且外掛程式將可使用 Pepper 3D API，但瀏覽器在預設設定下，仍可能需要指令列引數，才能使用這些 API。</translation>
 <translation id="1198458955128279215">使用功能發布計畫的預設行為。</translation>
 <translation id="1202216683470826356">在新分頁中顯示卡片</translation>
 <translation id="1203676252390737801">每個網址的 WebRTC IP 處理方式</translation>
@@ -467,7 +476,6 @@
 
 建議只有在第三方軟體發生相容性問題，導致列印服務無法在 LPAC 沙箱內正常運作時，才停用這項政策。</translation>
 <translation id="1369698103169067223">系統不會替使用者啟用 Glanceables。</translation>
-<translation id="1371626834351873151">系統將為所有來源啟用使用者代理程式縮減功能。</translation>
 <translation id="1371851989348083665">允許在網站上使用 <ph name="ASSISTANT_PRODUCT_NAME" /></translation>
 <translation id="1372618949173323717">停用 JavaScript</translation>
 <translation id="1376119291123231789">啟用進階充電模式</translation>
@@ -799,6 +807,11 @@
       如果尚未針對某個網站設定這項政策，該網站就會套用 <ph name="DEFAULT_WINDOW_PLACEMENT_SETTING_POLICY_NAME" /> 已設定的政策；在後者亦未設定的情況下，網站則會依循瀏覽器的預設權限設定，使用者則能依網站選擇這項權限。</translation>
 <translation id="1574258262373444557">不採用 <ph name="AES_KL_NAME" /> 做為加密使用者儲存空間的加密演算法 (如果支援)</translation>
 <translation id="1575015449587326319">OnFileDownloaded Chrome Enterprise Connector 的配置政策</translation>
+<translation id="1575714464739424740">這項政策控管是否要在無痕模式下，為使用者啟用 <ph name="PRIVACY_SANDBOX_NAME" /> 數位指紋採集防護設定。
+
+如果將這項政策設為停用，將為使用者關閉數位指紋採集防護功能設定。
+如果將這項政策設為啟用，會在無痕模式下為使用者開啟數位指紋採集防護功能設定。
+如果未設定這項政策，使用者可透過使用者介面設定，開啟或關閉無痕模式下的數位指紋採集防護功能。預設狀態為 False 或停用，代表會關閉數位指紋採集防護功能。</translation>
 <translation id="1576797364335927541">停用「<ph name="ALR_FEATURE_NAME" />」</translation>
 <translation id="1577162851453388235">Direct Sockets API 可以使用 TCP 和 UDP 與任意端點通訊。
 詳情請參閱 https://github.com/WICG/direct-sockets。
@@ -827,6 +840,11 @@
 <translation id="1595013560176869154">如果啟用這項政策，使用者將可使用低強度 PIN 碼。低強度 PIN 碼的特徵如下：由完全相同的數字組成 (例如 1111)、以 1 為單位遞增或遞減的數字 (例如 1234 或 4321)，以及常見的 PIN 碼。如果停用這項政策，使用者將無法設定容易破解的低強度 PIN 碼。
 
       如果不設定這項政策，使用者設定低強度 PIN 碼時，系統會顯示警告，而非錯誤訊息。</translation>
+<translation id="1596396758769156412">如果停用或未設定這項政策，<ph name="PRODUCT_OS_NAME" /> 裝置將拒絕附近藍牙外接裝置發出的「Just Works」配對要求。
+
+如果啟用這項政策，<ph name="PRODUCT_OS_NAME" /> 裝置就會接受附近藍牙周邊裝置發出的「Just Works」配對要求。
+
+注意：這項政策只會在使用者登入後生效，未登入者不受限制。</translation>
 <translation id="1597684038583138808">啟用快速解答的定義功能</translation>
 <translation id="1598258379228800626">在登入畫面上啟用鍵盤焦點醒目顯示功能</translation>
 <translation id="1599424828227887013">在 Android 裝置上為指定來源啟用網站隔離</translation>
@@ -1038,6 +1056,17 @@
       想進一步瞭解有效的<ph name="URL_LABEL" />模式，請參閱 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。<ph name="WILDCARD_VALUE" /> 不是這項政策許可的值。</translation>
 <translation id="1755310913456007816">採用現有的線上撤銷檢查設定</translation>
 <translation id="1760951637494635692">允許這些網站上的 Serial API</translation>
+<translation id="1764415246330773476">這項政策可控管新分頁頁面 (NTP) 頁尾管理聲明的顯示設定。根據預設，如果瀏覽器是由機構管理 (標有建築物圖示和「由 [網域名稱] 管理」字樣)，NTP 頁尾會顯示相關資訊。你可以使用 <ph name="ENTERPRISE_CUSTOM_LABEL_FOR_BROWSER" /> 和 <ph name="ENTERPRISE_LOGO_URL_FOR_BROWSER" /> 政策進行自訂。
+
+如果將這項政策設為 True 或未設定，受管理瀏覽器就會顯示「由…管理」的聲明和圖示。
+
+如果將這項政策設為 False，系統就會隱藏管理聲明。
+
+請注意，這項政策只會套用到受管理的瀏覽器，不會影響非受管理瀏覽器的受管理使用者。
+
+如果 <ph name="MS_WIN_NAME" /> 執行個體要使用這項政策，必須加入 <ph name="MS_AD_NAME" /> 網域或 <ph name="MS_AAD_NAME" />，或者註冊 <ph name="CHROME_ENTERPRISE_CORE_NAME" />。
+
+如果 <ph name="MAC_OS_NAME" /> 執行個體要使用這項政策，必須透過行動裝置管理 (MDM) 軟體管理、透過 MCX 加入網域，或者註冊 <ph name="CHROME_ENTERPRISE_CORE_NAME" />。</translation>
 <translation id="1765503534110351026">這項政策已遭淘汰，請改用 <ph name="PROXY_SETTINGS_POLICY_NAME" />。
 
        如果設定這項政策，<ph name="PRODUCT_NAME" /> 會略過此處所列主機的 Proxy。只有在 <ph name="PROXY_SETTINGS_POLICY_NAME" /> 政策未設定，且你為 <ph name="PROXY_MODE_POLICY_NAME" /> 選取 <ph name="PROXY_MODE_ENUM_FIXED_SERVERS" /> 或 <ph name="PROXY_MODE_ENUM_PAC_SCRIPT" /> 時，這項政策才會生效。
@@ -1074,15 +1103,6 @@
       設定完成後，chrome://settings/languages 的「根據你的偏好設定排列語言順序」部分就會顯示同樣的順序。使用者將無法移除或調整這項政策設定的語言與順序，但可以在這類語言底下新增其他語言。使用者也能全面控管瀏覽器的 UI 語言和翻譯/拼字檢查設定，但前提是其他政策未強制執行相關設定。
 
       如果不設定這項政策，使用者就能完全控制偏好語言清單。</translation>
-<translation id="180243155313050440">這項政策會控管用於表示是否為受管理瀏覽器的自訂標籤。如果是受管理的瀏覽器，「新分頁」頁面頁尾的管理免責事項就會顯示這個標籤。系統不會翻譯自訂標籤。
-
-套用這項政策後，任何長度超過 16 個半形字元的字串都會以「...」截斷。請勿使用過長的名稱。
-
-請注意，這項政策只會套用到受管理的瀏覽器，不會影響非受管理瀏覽器的受管理使用者。
-
-在 <ph name="MS_WIN_NAME" /> 上，這項政策適用的執行個體必須加入 <ph name="MS_AD_NAME" /> 網域或 <ph name="MS_AAD_NAME" />，或者註冊 <ph name="CHROME_ENTERPRISE_CORE_NAME" />。
-
-在 <ph name="MAC_OS_NAME" /> 上，這項政策適用的執行個體必須透過行動裝置管理 (MDM) 軟體管理、透過 MCX 加入網域，或者註冊 <ph name="CHROME_ENTERPRISE_CORE_NAME" />。</translation>
 <translation id="1803646570632580723">要顯示在啟動器中的固定應用程式清單</translation>
 <translation id="1808715480127969042">封鎖這些網站的 Cookie</translation>
 <translation id="1810261428246410396">允許使用即時網路共用功能。</translation>
@@ -1311,7 +1331,6 @@
 <translation id="1977581177449752640">如果設定這項政策，遠端存取主機會使用用戶端憑證和指定核發機構一般名稱 (CN)，向 <ph name="REMOTE_ACCESS_HOST_TOKEN_VALIDATION_URL_POLICY_NAME" /> 進行驗證。如要使用任何可用的用戶端憑證，請將其設為 <ph name="WILDCARD_VALUE" />。如果設為空白或不設定，系統會停用這項功能。</translation>
 <translation id="1984934843478301531">應用程式啟動自動化作業</translation>
 <translation id="1985545260037812875">在登入時顯示「顯示大小」設定畫面</translation>
-<translation id="1985598967415986700">使用者代理程式縮減功能可透過 Field-Trials 和 Origin-Trials 功能控管。</translation>
 <translation id="1987789058026551147">啟用裝置資訊站工作階段回報功能</translation>
 <translation id="1988345404999458987">為可用的印表機伺服器提供設定。
 
@@ -1434,15 +1453,6 @@
         如果將這項政策設為停用，系統會停用工作階段中的 Kiosk Chrome 應用程式更新作業 (該作業會使用擴充功能資訊清單中的更新網址)，且只會保留 CRX 預先擷取做為更新機制。如果將這項政策設為啟用或不設定，使用者將可執行工作階段中的 Kiosk Chrome 應用程式更新作業。
         </translation>
 <translation id="2082205219176343977">設定裝置的最低 Chrome 版本限制。</translation>
-<translation id="2083016623552073519">啟用即時字幕翻譯。字幕會傳送給 Google 進行翻譯。
-
-如果將這項政策設為啟用，即時翻譯將一律開啟。
-
-如果將這項政策設為停用，即時翻譯將一律關閉。
-
-如果將這項政策設為強制套用，使用者將無法變更或覆寫。
-
-如果未設定這項政策，系統預設會停用即時翻譯，但使用者隨時可以啟用這項功能。</translation>
 <translation id="20838788335877967">停用使用者識別資訊報告功能</translation>
 <translation id="208566302163036794">封鎖已停用的功能</translation>
 <translation id="2086040449830622332">啟用 LPAC 沙箱的列印服務</translation>
@@ -1595,6 +1605,7 @@
 <translation id="2180958780733364832">控管無頭模式的使用權限</translation>
 <translation id="2182291258410176649">使用者可決定是否要啟用備份與還原功能</translation>
 <translation id="2183338188392346527">不回報裝置執行階段計數器</translation>
+<translation id="2187361040843865450">接受「Just Works」藍牙配對要求</translation>
 <translation id="2187372280917024033">所需 DNS-over-HTTPS 解析器的 URI 範本。如要指定多個 DNS-over-HTTPS 解析器，請以半形空格分隔對應的 URI 範本。這項政策與 <ph name="DOH_TEMPLATES_POLICY_NAME" /> 很相似，如果指定這項政策，系統將覆寫後者。
 與 <ph name="DOH_TEMPLATES_POLICY_NAME" /> 政策相比，這項政策支援指定身分識別資訊。
 指定 ID 的方式是使用變數預留位置，這些預留位置會替換為 <ph name="PRODUCT_NAME" /> 中的使用者或裝置資訊。系統不會以純文字格式將 ID 傳送至 DNS 伺服器，而是以 <ph name="SHA256" /> 演算法和大寫十六進位編碼進行雜湊處理。
@@ -1659,6 +1670,7 @@
 
       如果設為 <ph name="VARIATIONS_DISABLED_OPTION_NAME" /> (值為 2)，使用者無法在登入畫面上將任何變化版本套用到瀏覽器。請注意，這個模式可能會讓 <ph name="PRODUCT_OS_NAME" />開發人員無法及時提供重大安全性修正項目，因此不建議使用。</translation>
 <translation id="2215746393279570703">浮動單一登入 (SSO) 設定</translation>
+<translation id="2219724363635419721">停用即時字幕</translation>
 <translation id="2221779615493499989">回報已註冊裝置上的使用者網路狀態。
 
       如果將這項政策設為 False，系統不會回報這項資訊。
@@ -1888,6 +1900,15 @@
 <translation id="2377059627106831967">允許使用生成式 AI 總覽視窗分組功能，但不協助改善 AI 模型。</translation>
 <translation id="2377109572344699022">控管 Direct Sockets API 使用權限</translation>
 <translation id="2382672620906337383">系統要在達到較高巢狀閾值後，才會延遲 JavaScript setTimeout()。</translation>
+<translation id="2383521405943565490">這項政策可控管是否預設允許使用第三方儲存空間分區。
+
+如果將這項政策設為 1 - AllowPartitioning 或不設定，系統預設會允許使用第三方儲存空間分區，但特定頂層來源可能會透過其他方式覆寫這項預設值。
+
+如果將這項政策設為 2 - BlockPartitioning，系統會為所有情境停用第三方儲存空間分區。
+
+你可以使用 <ph name="THIRD_PARTY_STORAGE_PARTITIONING_BLOCKED_FOR_ORIGINS_POLICY_NAME" /> 停用特定頂層來源的第三方儲存空間分區。如要進一步瞭解第三方儲存空間分區，請參閱 https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。
+
+這項政策將於 Chrome 145 中移除，建議改用 requestStorageAccess 方法：https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccess。如要提供意見，請前往 https://crbug.com/425248669。</translation>
 <translation id="2386362615870139244">允許使用螢幕喚醒鎖</translation>
 <translation id="2387469539700985783">這項政策對 Android 應用程式製作的報表沒有影響。</translation>
 <translation id="2388701318721126001">如果停用這項政策，使用者就無法從 Google 相簿選取 <ph name="PRODUCT_OS_NAME" /> 桌布圖像。
@@ -2140,6 +2161,7 @@
 <translation id="2568488785376704318">這項政策已遭淘汰，請改用 <ph name="REMOTE_ACCESS_HOST_DOMAIN_LIST_POLICY_NAME" /> 政策。</translation>
 <translation id="2570059561924004903">停用互動朗讀功能</translation>
 <translation id="2570181623957732921">為清單中的第三方網域啟用 <ph name="DESK_API_NAME" /></translation>
+<translation id="2573850437942404034">不允許</translation>
 <translation id="2575198840408498393">停用漫遊設定檔建立功能</translation>
 <translation id="25765864042030871"><ph name="UNLOAD_EVENT_NAME" />事件處理常式即將淘汰。這類處理常式是否會觸發，取決於<ph name="UNLOAD_EVENT_NAME" />事件的「<ph name="PERMISSIONS_POLICY_NAME" />」。目前，政策預設為允許觸發，但日後會逐漸改為禁止觸發，而網站也必須透過「<ph name="PERMISSIONS_POLICY_NAME" />」標頭明確啟用這類處理常式。你可以透過這項企業政策，選擇不採用這個逐步淘汰機制，方法是強制將預設設定維持在啟用狀態。
 
@@ -2781,7 +2803,6 @@
           這個政策為選擇性，如果你並未設定這項政策，系統就不會取代任何搜尋字詞。
 
           只有當你啟用「DefaultSearchProviderEnabled」政策時，這項政策才會生效。</translation>
-<translation id="305106159605171619">使用者代理程式縮減功能已停用，且並未透過 Field-Trials 或 Origin-Trials 功能啟用。</translation>
 <translation id="3053265701996417839">Microsoft Windows 7</translation>
 <translation id="3057459316145779761">不允許使用 Chrome for Testing</translation>
 <translation id="3059687162224942925">在 NTP 頁尾顯示管理聲明</translation>
@@ -2863,6 +2884,7 @@
 
       想進一步瞭解有效的<ph name="URL_LABEL" />模式，請參閱 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。這項政策只會根據來源進行比對，因此會忽略網址模式中的路徑。</translation>
 <translation id="3112501357749061018">驗證伺服器時，<ph name="PRODUCT_NAME" /> 應信任的 TLS 憑證清單，但有附加的限制條件。如果沒有特定類型的限制，則允許使用該類型的任何名稱。憑證必須採用 base64 編碼，每個憑證至少須指定一個限制條件。</translation>
+<translation id="3113283011165145080">允許 <ph name="PRODUCT_NAME" /> 決定</translation>
 <translation id="3118552207903834734">允許使用者設定裝置主機名稱</translation>
 <translation id="3122082892722698079">控管可使用不安全內容的例外網站</translation>
 <translation id="3125472566440502628">停用隨選朗讀功能</translation>
@@ -3276,7 +3298,6 @@ Microsoft Outlook 資訊卡需要額外的管理員設定。想進一步瞭解�
       未來內嵌登入將完整支援所有 SSO 登入流程，屆時我們會移除這項實驗性設定。</translation>
 <translation id="3435178885391813398">不允許使用掃描器。</translation>
 <translation id="3435796032110614169">允許刪除列印工作的歷史記錄</translation>
-<translation id="3435896845095436175">啟用</translation>
 <translation id="3436217793443508863">使用電池供電時的閒置時間長度 (以毫秒為單位)。如果使用者在這段時間內沒有任何動作，系統就會鎖定螢幕</translation>
 <translation id="3437924696598384725">允許使用者管理 VPN 連線</translation>
 <translation id="3441664787678256816">允許與這部裝置建立企業遠端支援連線</translation>
@@ -3721,6 +3742,7 @@ SwiftShader 曾在沒有 GPU 加速功能的系統 (例如無頭系統或虛擬�
       如未設定這些政策，使用者可自行選擇 Proxy 設定。</translation>
 <translation id="3758249152301468420">停用開發人員工具</translation>
 <translation id="3758910737665387561">允許裝置使用 PluginVm</translation>
+<translation id="3759342194253299115">允許使用者在裝置上，開啟或關閉無痕模式下的 <ph name="PRIVACY_SANDBOX_NAME" /> 數位指紋採集防護設定。</translation>
 <translation id="3759650373178711405">除非將 <ph name="RESTORE_ON_STARTUP_POLICY_NAME" /> 政策設為一律還原先前工作階段的網址，否則你可以透過 <ph name="COOKIES_SESSION_ONLY_FOR_URLS_POLICY_NAME" /> 政策建立網址模式清單，用來指定網站是否可為單一工作階段設定 Cookie。
 
       如果未設定這項政策，系統會針對所有網站使用 <ph name="DEFAULT_COOKIES_SETTINGS_POLICY_NAME" /> (如果已設定)；否則系統會套用使用者的個人設定。如果網址不符合指定的模式，系統也會使用預設值。
@@ -3890,6 +3912,7 @@ SwiftShader 曾在沒有 GPU 加速功能的系統 (例如無頭系統或虛擬�
 
       如果未設定這項政策，則可使用 SPDY。</translation>
 <translation id="3885896818093825047">允許設定 <ph name="MICROSOFT_ONE_DRIVE_NAME" /></translation>
+<translation id="388940400023402072">在無痕模式下啟用 <ph name="PRIVACY_SANDBOX_NAME" /> 數位指紋採集防護功能。</translation>
 <translation id="3889458462150559611">允許網站以不安全的方式向任何網路端點發出要求。</translation>
 <translation id="388999630001435491">僅允許 <ph name="PRODUCT_NAME" /> 透過私人 IP 位址連線到裝置</translation>
 <translation id="3891175633496805812">停用 wilco 診斷與遙測控制器</translation>
@@ -4007,7 +4030,6 @@ SwiftShader 曾在沒有 GPU 加速功能的系統 (例如無頭系統或虛擬�
 <translation id="3982849521386211220">允許你在清單中設定 Reporting API 端點[1]，指定可傳送企業報告的位置。
 
 [1] https://www.w3.org/TR/reporting-1/#endpoint</translation>
-<translation id="398294729592983401">允許使用者在裝置上開啟或關閉 <ph name="PRIVACY_SANDBOX_NAME" /> 數位指紋採集防護設定。</translation>
 <translation id="3983162212222338509">系統 DNS 解析可能會在網路服務內部或外部執行，也可能部分在內部執行，部分在外部執行，實際情況取決於系統設定和功能旗標。</translation>
 <translation id="3986700049001404598">允許使用者透過 Chrome 工作管理員結束程序</translation>
 <translation id="398884292557092447">如果將這項政策設為 True 或不設定，使用者將可控管 UI 中的信用卡自動填入建議。
@@ -4529,7 +4551,6 @@ SwiftShader 曾在沒有 GPU 加速功能的系統 (例如無頭系統或虛擬�
 <translation id="4389073105055031853">允許使用者管理所有憑證</translation>
 <translation id="4389091865841123886">使用 TPM 機制設定遠端證明。</translation>
 <translation id="4389113579547582722">允許顯示 App Store 評分宣傳</translation>
-<translation id="4394049700291259645">停用</translation>
 <translation id="4395619678972620537">如果啟用這項政策，WebRTC 對等互連可降級至傳輸層安全標準 (TLS)/DTLS 通訊協定的過時版本 (DTLS 1.0、TLS 1.0 和 TLS 1.1)。
       如果停用或不設定這項政策，則會停用這些傳輸層安全標準 (TLS)/DTLS 版本。
 
@@ -4590,6 +4611,17 @@ SwiftShader 曾在沒有 GPU 加速功能的系統 (例如無頭系統或虛擬�
 <translation id="4426986640594727372">允許系統地理位置存取權</translation>
 <translation id="4427173305799125784">PDF 檢視器無法為 PDF 加註</translation>
 <translation id="4432762137771104529">啟用安全瀏覽模式的進階回報功能</translation>
+<translation id="4432772502174730966">這項政策會定義所有相關生成式 AI 功能的預設設定。舉例來說，如果將這項政策的值設為 1，1 就會是所有相關生成式 AI 功能的預設設定值。這不會影響任何手動設定的政策值。這項設定會定義 Chrome 中涵蓋的生成式 AI 功能預設值。如要查看相關功能的完整清單，請前往 https://support.google.com/chrome/a?p=generative_ai_settings。
+
+0 = 允許使用這項功能，並允許 Google 運用相關資料改良 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改良 AI 模型。預設值為 0，但以下註明的情形除外。
+
+1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改良模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
+
+2 = 不允許使用這項功能。
+
+如果相關的 Chrome 功能沒有等同政策值，系統會使用較高但最接近的值。部分政策 (例如 <ph name="GEMINI_SETTINGS_POLICY_NAME" />) 只會有「允許」和「不允許」兩種狀態。如果將 <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" /> 政策設為 0 或 1，系統將允許使用這項功能；如果將政策設為 2，就會禁止使用。請參閱各項功能的說明文件，進一步瞭解這項政策中的值如何影響該功能。
+
+如要進一步瞭解生成式 AI 功能的資料處理方式，請前往 https://support.google.com/chrome/a?p=generative_ai_settings。</translation>
 <translation id="443454694385851356">舊版 (不安全)</translation>
 <translation id="4435032708588431506">允許 QUIC</translation>
 <translation id="443665821428652897">瀏覽器關閉時清除網站資料 (已淘汰)</translation>
@@ -4745,6 +4777,7 @@ SwiftShader 曾在沒有 GPU 加速功能的系統 (例如無頭系統或虛擬�
 
       如果不設定這項政策，使用者將可停用系統上安裝的任何外掛程式。</translation>
 <translation id="4549695018986780856">資訊清單 v2 已啟用</translation>
+<translation id="4549729301485728119">預設值取決於其他因素</translation>
 <translation id="4554651132977135445">使用者政策回送處理模式</translation>
 <translation id="4554991346503872538">一律不提供翻譯</translation>
 <translation id="4555850956567117258">為使用者啟用遠端認證機制</translation>
@@ -4852,6 +4885,7 @@ SwiftShader 曾在沒有 GPU 加速功能的系統 (例如無頭系統或虛擬�
       * 如果將 <ph name="FILTER_PLACEHOLDER" /> 設為 <ph name="EMPTY_DICTIONARY" />，則瀏覽器在選取用戶端憑證時不會受到額外限制。請注意，由網路伺服器所提供的篩選器仍然適用。
 
       如果未設定這項政策，Chrome 不會自動選取任何網站的用戶端憑證。</translation>
+<translation id="4607499333275488034">在無痕模式下停用 <ph name="PRIVACY_SANDBOX_NAME" /> 數位指紋採集防護功能。</translation>
 <translation id="4611983465824842867">不在不安全表單上顯示警告或停用自動填入功能</translation>
 <translation id="4615003180013429835">網站清單剖析模式</translation>
 <translation id="4615436471607987736">自 M131 起，這項政策已淘汰。針對 beforeunload 事件顯示的確認對話方塊行為，這項政策為兩個相關修正項目提供暫時不採用的選項。
@@ -4988,11 +5022,6 @@ SwiftShader 曾在沒有 GPU 加速功能的系統 (例如無頭系統或虛擬�
 <translation id="468822697351680932">使用 Internet Explorer SiteList 政策做為規則來源</translation>
 <translation id="4693190628432874457">啟用裝置位置回報功能</translation>
 <translation id="4693779768620889402">可支援擴充功能的目的地</translation>
-<translation id="4693861751987983072">如果將這項政策設為啟用，<ph name="PRODUCT_OS_NAME" /> 會將使用指標和診斷資料 (包括當機報告) 回報給 Google。如果設為停用，系統會關閉指標和診斷資料的報告功能。
-
-如果是受管理的裝置，系統預設會啟用這項政策，並將指標傳送給 Google。
-
-如果是未受管理的裝置，使用者可以決定是否要傳送指標。</translation>
 <translation id="4694138212536142867">啟用裝置硬體狀態回報功能</translation>
 <translation id="4697581738794063407">控管網址參數篩選器功能</translation>
 <translation id="4698895924806859508">不要回報網路事件</translation>
@@ -5360,6 +5389,15 @@ SwiftShader 曾在沒有 GPU 加速功能的系統 (例如無頭系統或虛擬�
 
 如未針對網站設定這項政策，該網站就會套用 <ph name="DEFAULT_JAVA_SCRIPT_OPTIMIZER_SETTING_POLICY_NAME" /> 的政策；如果已設定這項政策，該網站就會啟用 JavaScript 最佳化。</translation>
 <translation id="4960597185231686653">布林值標記，表示螢幕小鍵盤是否能提供語音輸入功能。</translation>
+<translation id="49677896192199414">啟用即時字幕功能。
+
+如果將這項政策設為啟用，將一律開啟即時字幕。
+
+如果將這項政策設為停用，將一律關閉即時字幕。
+
+如果將這項政策設為強制套用，使用者將無法變更或覆寫。
+
+如果不設定這項政策，預設會停用即時字幕，但使用者隨時可以啟用這項功能。</translation>
 <translation id="4970046075219007744">允許網頁應用程式要求使用者授予透過 File Handling API 存取特定類型檔案的權限</translation>
 <translation id="4970855112942626932">禁止登入瀏覽器</translation>
 <translation id="4974091268178043378">Chrome OS 色彩模式</translation>
@@ -5439,6 +5477,7 @@ SwiftShader 曾在沒有 GPU 加速功能的系統 (例如無頭系統或虛擬�
 <ph name="MAC_OS_NAME" /> 執行個體必須透過行動裝置管理 (MDM) 軟體管理、透過 MCX 加入網域，或者註冊 <ph name="CHROME_ENTERPRISE_CORE_NAME" />，才能使用這項政策。</translation>
 <translation id="5037749623252479780">已停用 PageUp/PageDown 設定</translation>
 <translation id="5039110755072335605">CORS 非萬用字元要求標頭支援</translation>
+<translation id="5039804452771397117">允許</translation>
 <translation id="504116558738617678">只有在裝置未受管理或只有一位使用者時，才顯示磁碟空間不足的警告</translation>
 <translation id="5041315457555330432">除非開啟 CastAllowAllIPs 功能，否則僅允許 <ph name="PRODUCT_NAME" /> 透過私人 IP 位址連線到裝置。</translation>
 <translation id="504689994545234073">允許使用者在本機儲存檔案</translation>
@@ -6121,8 +6160,18 @@ SwiftShader 曾在沒有 GPU 加速功能的系統 (例如無頭系統或虛擬�
 <translation id="5476152378885134514">禁止這些網站使用剪貼簿</translation>
 <translation id="5479841110985196412">啟用無障礙虛擬鍵盤</translation>
 <translation id="5480380613778757009">如果停用或不設定這項政策，當受管理訪客工作階段結束後，系統就會立即重設在此期間配置的所有顯示設定。如果將這項政策設為 True，系統就會在受管理的訪客工作階段結束後保留顯示屬性。</translation>
+<translation id="548137908954174608">啟用即時字幕</translation>
 <translation id="5483012943408894695">不適用不安全來源相關限制的來源或主機名稱模式</translation>
 <translation id="5483065054530244863">允許本機信任錨點核發的 SHA-1 簽署憑證</translation>
+<translation id="5485491014653571963">你可以透過這項設定允許整合 Gemini 應用程式。
+
+0/未設定 = 使用者可以運用 Gemini 整合。
+
+1 = 使用者無法運用 Gemini 整合。
+
+如果未設定這項政策，系統會根據 <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" /> 政策決定其行為。
+
+詳情請參閱說明中心文章：https://support.google.com/chrome/a?p=gemini_in_chrome。</translation>
 <translation id="5486352219019836984">如果啟用這項政策，系統預設會建議啟用匿名回報功能，將 <ph name="PRODUCT_NAME" /> 的使用情形和當機相關資料以匿名方式回報給 Google。使用者仍可變更這項設定。
 
 如果停用這項政策，系統會停用匿名回報功能，不會將任何使用情形或當機相關資料提供給 Google。使用者將無法變更這項設定。
@@ -6318,17 +6367,6 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 如果不設定這項政策，系統會禁止所有網域透過 PDF 檢視器存取 file:// 網址。</translation>
 <translation id="5585424654425017599">允許整合</translation>
 <translation id="5586942249556966598">不要處理</translation>
-<translation id="5595355842329604596">這項政策會定義所有相關生成式 AI 功能的預設設定。舉例來說，如果將這項政策的值設為 1，1 就會是所有相關生成式 AI 功能的預設設定值。這不會影響任何手動設定的政策值。這項設定會定義 <ph name="GEMINI_SETTINGS_POLICY_NAME" /> 和相關的 Chrome 生成式 AI 功能預設值。如要查看相關功能的完整清單，請前往 https://support.google.com/chrome/a?p=generative_ai_settings。
-
-0 = 允許使用這項功能，並允許 Google 運用相關資料改善 AI 模型。相關資料可能包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋 (視功能而定)。這些資料也可能會送交專人審查，以改進 AI 模型。預設值為 0，但以下註明的情形除外。
-
-1 = 允許使用這項功能，但不允許 Google 運用使用者的內容 (包括提示詞、輸入內容、輸出內容、來源資料和文字意見回饋) 改良模型。如果是 <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" />管理的企業版使用者，以及 <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> 管理的教育版帳戶，預設值為 1。
-
-2 = 不允許使用這項功能。
-
-如果相關的 Chrome 功能沒有等同政策值，系統會使用較高但最接近的值。部分政策 (例如 <ph name="GEMINI_SETTINGS_POLICY_NAME" />) 只會有「允許」和「不允許」兩種狀態。如果將 <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" /> 政策設為 0 或 1，系統將允許使用這項功能；如果將政策設為 2，就會禁止使用。請參閱各項功能的說明文件，進一步瞭解這項政策中的值如何影響該功能。
-
-如要進一步瞭解生成式 AI 功能的資料處理方式，請前往 https://support.google.com/chrome/a?p=generative_ai_settings。</translation>
 <translation id="5597542113049786516">這項政策會控制網頁是否可以使用內建的 AI API (例如 <ph name="LANGUAGE_MODEL_API_NAME" />、<ph name="SUMMARIZATION_API_NAME" />、<ph name="WRITER_API_NAME" /> 和 <ph name="REWRITER_API_NAME" />)。
 
 如果將這項政策設為啟用或不設定，就會啟用這些 API 的使用權限。
@@ -6483,7 +6521,6 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 <translation id="5670249935663090320">如果將這項政策設為啟用或不設定，系統會開啟 <ph name="PRODUCT_NAME" />，使用者可以從應用程式選單、頁面內容選單、支援投放裝置網站的媒體控制選項，以及投放裝置工具列圖示 (如有顯示) 中啟動。
 
 如果將這項政策設為停用，系統會關閉 <ph name="PRODUCT_NAME" />。</translation>
-<translation id="5673254755365419402">啟用 <ph name="PRIVACY_SANDBOX_NAME" /> 數位指紋採集防護功能。</translation>
 <translation id="567377007899266033">如果將這項政策設為 True，系統會將政策觸發的主要擴充功能安裝事件報告傳送給 Google。如果將這項政策設為 False，則系統不會擷取任何事件。如果不設定這項政策，預設值為 True。</translation>
 <translation id="5673780539191375049">設定 <ph name="PRODUCT_OS_NAME" /> 裝置上自動重新載入使用者驗證流程的時間間隔 (以分鐘為單位)。這項政策的作用是，判斷裝置閒置一段時間後，驗證流程中使用的部分服務是否到期。
 
@@ -6547,6 +6584,7 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 <translation id="5722577409367087850">載入擴充功能</translation>
 <translation id="5728154254076636808">允許建立 <ph name="PRODUCT_NAME" /> 設定檔資料的漫遊複本</translation>
 <translation id="5729308727912841256">Kerberos 密碼。<ph name="PASSWORD_PLACEHOLDER" /> 預留位置會由登入密碼取代。</translation>
+<translation id="5730610899971390601">拒絕「Just Works」藍牙配對要求</translation>
 <translation id="5732972008943405952">首次執行時從預設瀏覽器匯入自動填入表單資料</translation>
 <translation id="5733040281451845496">如果將這項政策設為啟用，系統會等到電源管理工作階段中出現第一項使用者活動後，才開始套用延遲時間和工作階段長度限制。
 
@@ -6905,7 +6943,6 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 詳情請參閱 <ph name="DEFAULT_DIRECT_SOCKETS_SETTING_POLICY_NAME" />、<ph name="DIRECT_SOCKETS_ALLOWED_FOR_URLS_POLICY_NAME" /> 和 <ph name="DIRECT_SOCKETS_BLOCKED_FOR_URLS_POLICY_NAME" />。
 
 這項政策只會套用至新的連線嘗試，不會導致現有連線失效。</translation>
-<translation id="5981932073854958705">選擇是否要啟用 <ph name="PRIVACY_SANDBOX_NAME" /> 數位指紋採集防護功能。</translation>
 <translation id="5983274643567559194">已停用為「刪除」動作設定捷徑的功能。</translation>
 <translation id="5984099692320899605">不要使用 NTLM 驗證</translation>
 <translation id="5984237109586500246">接受以 Signed HTTP Exchange 技術提供的網路內容</translation>
@@ -7030,6 +7067,7 @@ Microsoft SharePoint 和 OneDrive 資訊卡需要額外的管理員設定。想�
 在停止支援這個 API 的過程中，如果你遇到相關問題，可以使用這項政策。如果你必須使用這項政策，請前往 crbug.com 回報錯誤及說明用途，並將 {blundell、vasilyt}@chromium.org 加入郵件副本。這項政策可持續使用到 <ph name="PRODUCT_NAME" /> 114 版本，之後將完全停止支援這個 API。
 
 注意：在瀏覽器執行期間，只有新啟動的轉譯器程序會套用這項政策的變更。</translation>
+<translation id="6083281887050888160">啟用「Just Works」藍牙配對</translation>
 <translation id="6083631234867522991">Windows (Windows 用戶端)：</translation>
 <translation id="6087413944876892918">使用 <ph name="HAPPY_EYEBALLS_V3" /> 演算法</translation>
 <translation id="608788685013546076">設定用電尖峰轉移電池閾值 (以百分比為單位)</translation>
@@ -7342,15 +7380,6 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 來源必須是使用 <ph name="WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" /> 或 <ph name="ISOLATED_WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" /> (自 125 版起) 政策強制安裝的網頁應用程式，或是設為資訊站應用程式的網頁應用程式。如需 Device Attributes API 規格，請參閱 https://wicg.github.io/WebApiDevice/device_attributes。
 
 如要進一步瞭解有效的<ph name="URL_LABEL" />模式 (自 127 版起)，請前往 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。<ph name="WILDCARD_VALUE" /> 不是這項政策許可的值。</translation>
-<translation id="6286385444341934784">設定這項政策後，可允許整合 Gemini 應用程式。
-
-0/未設定 = 使用者可以使用 Gemini 整合。
-
-1 = 使用者無法使用 Gemini 整合。
-
-如果未設定這項政策，系統會根據 <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" /> 政策決定其行為。
-
-詳情請參閱 Chrome Enterprise 版本資訊 (https://support.google.com/chrome/a/answer/7679408)。</translation>
 <translation id="6287128640500683781">允許任何使用者登入</translation>
 <translation id="6287310684159482272">Cookie 設定</translation>
 <translation id="6287742528823584153">啟用<ph name="PRODUCT_NAME" />服務，並在登入時啟動遠端桌面</translation>
@@ -7611,11 +7640,6 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 <translation id="6440051664870270040">允許同時在多個網站中進行瀏覽及開啟彈出式視窗</translation>
 <translation id="6441781723322254041">允許截斷的 Cookie</translation>
 <translation id="6446366416439249472">停用透過行動網路連線執行 Google 雲端硬碟同步功能</translation>
-<translation id="6447628816682315403">這項政策控管是否為使用者啟用 <ph name="PRIVACY_SANDBOX_NAME" /> 數位指紋採集防護功能設定。
-
-如果將這項政策設為停用，系統將為使用者關閉數位指紋採集防護功能設定。
-如果將這項政策設為啟用，系統會為使用者開啟數位指紋採集防護功能設定。
-如果未設定這項政策，使用者可在使用者介面設定中開啟或關閉數位指紋採集防護功能。預設狀態為 False 或停用，代表數位指紋採集防護功能預設不開啟。</translation>
 <translation id="6447948611083700881">備份與還原功能已停用</translation>
 <translation id="6449476513004303784">不允許使用者管理憑證</translation>
 <translation id="6449541189334851559">如果啟用 <ph name="GOOGLE_CALENDAR_NAME" />整合，<ph name="PRODUCT_OS_NAME" /> 使用者將可擷取 <ph name="GOOGLE_CALENDAR_NAME" />活動，然後填入系統狀態列中的 <ph name="PRODUCT_OS_NAME" /> 日曆小工具。
@@ -7974,6 +7998,7 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 <translation id="6665670272107384733">設定使用者使用快速解鎖功能時需輸入密碼的頻率</translation>
 <translation id="6667586534922258705">在登入畫面和鎖定畫面上啟用密碼顯示按鈕</translation>
 <translation id="6667636336079341367">允許使用掃描器，但不協助改善 AI 模型。</translation>
+<translation id="6669244130218275293">選擇是否要在無痕模式下啟用 <ph name="PRIVACY_SANDBOX_NAME" /> 數位指紋採集防護功能。</translation>
 <translation id="6669691206059842248">設定每個擴充功能的額外 OAuth 重新導向網址</translation>
 <translation id="6669700740683748046">這項功能可讓系統在網址列中顯示完整網址。
       如果將這項政策設為 True，系統會在網址列中顯示完整網址 (包括網路通訊協定和子網域)。
@@ -7996,6 +8021,15 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 
 如果將這項政策設為 False，系統會停用將流量轉送至 Crostini 容器的通訊埠轉送功能。</translation>
 <translation id="6677291257287862684">在登入畫面上啟用相黏鍵</translation>
+<translation id="6677886356657067286">你可以透過這項政策設定網址模式清單，指定哪些頂層來源應停用第三方儲存空間分區 (跨來源 iframe 儲存空間分區)。
+
+如果未設定這項政策，或是頂層來源不符合任一網址模式，系統就會套用 <ph name="DEFAULT_THIRD_PARTY_STORAGE_PARTITIONING_SETTING_POLICY_NAME" />。
+
+如想進一步瞭解有效的模式，請參閱 https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns。請注意，系統會將這裡列出的模式視為來源而非網址，因此請勿指定路徑。
+
+如要進一步瞭解第三方儲存空間分區，請參閱 https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。
+
+這項政策將於 Chrome 145 中移除，建議改用 requestStorageAccess 方法：https://developer.mozilla.org/en-US/docs/Web/API/Document/requestStorageAccess。如要提供意見，請前往 https://crbug.com/425248669。</translation>
 <translation id="668153983584136017">自 M103 起，系統預設為啟用更新版 GREASE 演算法，因此這項政策已淘汰。
 啟用使用者代理程式用戶端提示 GREASE Update 功能後，瀏覽器會依照最新的規格採用適當的使用者代理程式 GREASE 演算法。
       如果網站會限制要求中可包含的字元，更新的規格可能會導致某些網站無法正常運作。詳情請參閱規格說明：https://wicg.github.io/ua-client-hints/#grease
@@ -8543,6 +8577,13 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 <translation id="7046113122884041950">不允許使用 Smart Lock</translation>
 <translation id="7046997898355294677">顯示隱私權聲明直到使用者關閉為止</translation>
 <translation id="7047495632846973438">指定要檢查或略過螢幕擷取權限政策。</translation>
+<translation id="7053807509123417914">這項政策控管用於表示受管理瀏覽器的自訂標籤。如果是受管理的瀏覽器，新分頁頁尾的管理免責事項會顯示這個標籤。系統不會翻譯自訂標籤。
+
+請注意，這項政策只會套用到受管理的瀏覽器，不會影響非受管理瀏覽器的受管理使用者。
+
+<ph name="MS_WIN_NAME" /> 執行個體必須加入 <ph name="MS_AD_NAME" /> 網域或 <ph name="MS_AAD_NAME" />，或者註冊 <ph name="CHROME_ENTERPRISE_CORE_NAME" />，才能使用這項政策。
+
+<ph name="MAC_OS_NAME" /> 執行個體必須透過行動裝置管理 (MDM) 軟體管理、透過 MCX 加入網域，或者註冊 <ph name="CHROME_ENTERPRISE_CORE_NAME" />，才能使用這項政策。</translation>
 <translation id="7055022222176591388">禁止執行過期的 <ph name="FLASH_PLUGIN_NAME" /></translation>
 <translation id="7056040036973126753">系統可能會將網域可靠性資料傳送給 Google，實際情況取決於 Chrome 使用者指標 (UMA) 政策</translation>
 <translation id="7062803946218028349">允許啟用 Phone Hub</translation>
@@ -8686,6 +8727,11 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 
       系統可識別的連線類型 ID 包括 <ph name="CONNECTION_TYPE_ETHERNET_NAME" />、<ph name="CONNECTION_TYPE_WIFI_NAME" /> 和 <ph name="CONNECTION_TYPE_CELLULAR_NAME" />。</translation>
 <translation id="7150722575502017208">不要求比對本機使用者和遠端存取主機擁有者</translation>
+<translation id="7150775293604912624">如果將這項政策設為 True，<ph name="PRODUCT_NAME" /> 就能自動播放媒體；如果將這項政策設為 False，<ph name="PRODUCT_NAME" /> 就不會自動播放媒體。
+
+如果未設定這項政策，<ph name="PRODUCT_NAME" /> 不會自動播放媒體。不過，你可以針對特定網址模式，使用 <ph name="AUTOPLAY_ALLOWLIST_POLICY_NAME" /> 政策變更這項設定。
+
+如果這項政策在 <ph name="PRODUCT_NAME" /> 執行時有變動，變更只會適用於新開啟的分頁。</translation>
 <translation id="7151366515472588710">用戶端不得解譯這項資料，應將資料原封不動地轉送。DMServer 會使用 policy_version 驗證其政策系統是否符合 Chrome OS 裝置。</translation>
 <translation id="7152640356717355643">啟用裝置網路介面回報功能</translation>
 <translation id="7153786895642570081">這項政策會控管 EphemeralNetworkPolicies 功能的啟用設定。
@@ -9094,12 +9140,6 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 
       日後也可以使用 <ph name="LACROS_AVAILABILITY_LACROS_ONLY_VALUE" /> 一值，將 <ph name="LACROS_NAME" /> 設為 <ph name="PRODUCT_OS_NAME" /> 中唯一可用的瀏覽器。</translation>
 <translation id="751071954873065775">選取要預先下載的可下載內容 (DLC)</translation>
-<translation id="7512065400265675158">已排定縮減「<ph name="USER_AGENT_HEADER_NAME" />」要求標頭。為了方便測試及提高相容性，這項政策可以為所有網站啟用縮減功能，或停用來源試用或實際測試設定以啟用這項功能。
-
-      如要進一步瞭解「<ph name="USER_AGENT_REDUCTION_FEATURE_NAME" />」和其時間軸，請閱讀這篇文章：
-
-      https://blog.chromium.org/2021/09/user-agent-reduction-origin-trial-and-dates.html
-      </translation>
 <translation id="7512514325152952954">系統可透過 HTTP (而非 HTTPS) 下載 <ph name="PRODUCT_OS_NAME" /> 的自動更新酬載。這可讓 HTTP 以未加密方式快取 HTTP 下載內容。
 
 如果將這項政策設為 True，<ph name="PRODUCT_OS_NAME" /> 將嘗試透過 HTTP 下載自動更新酬載。如果設為 False 或未設定，系統則會透過 HTTPS 下載自動更新酬載。</translation>
@@ -9484,6 +9524,9 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
 <translation id="7841883965249733328">停用複合型內容自動升級</translation>
 <translation id="7845130996290850593">啟用 Kerberos</translation>
 <translation id="7846952520291088817">會在 WebRTC ICE 候選項目中顯示本機 IP 的網址</translation>
+<translation id="7847374643492493038">如果將這項政策設為 True (或將 <ph name="HARDWARE_ACCELERATION_MODE_ENABLED_POLICY_NAME" /> 設為 False)，網頁將無法存取 WebGL API。
+
+      如果將這項政策設為 False 或不設定，網頁將可使用 WebGL API，瀏覽器的預設設定仍可能需要指令列引數，才能使用這些 API。</translation>
 <translation id="7848641140449742406">OS 設定</translation>
 <translation id="7850846808758624237">如果將這項政策設為啟用，瀏覽器會在首次執行時，從先前的預設瀏覽器中匯入首頁。如果將這項政策設為停用或不設定，瀏覽器首次執行時不會匯入首頁。
 
@@ -10164,6 +10207,7 @@ Origin-Agent-Cluster HTTP 標頭會控制文件要在 origin-keyed 代理程式�
           如果不設定這項政策，內容更具體的政策行為將不會受到影響。</translation>
 <translation id="8350643689940867542">停用政策資料報告功能</translation>
 <translation id="835283681355955417">回報周邊裝置詳細資料</translation>
+<translation id="8353189903603611009">除非是 <ph name="AUTOPLAY_ALLOWLIST_POLICY_NAME" /> 政策許可的網址，否則不允許 Chrome 自動播放媒體</translation>
 <translation id="8354001669131263433">自 M132 起，這項政策將與附帶前置字串的影片專用全螢幕 API 一同移除。
 
 如果將這項政策設為「<ph name="ENABLED_VALUE_NAME" />」，就能透過 JavaScript 使用附帶前置字串的影片專用全螢幕 API，例如 Video.webkitEnterFullscreen()。
@@ -10442,7 +10486,6 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
 <translation id="8544465954173828789">允許將簡訊從手機同步至 Chromebook。</translation>
 <translation id="8549906780629620346">啟用帳戶救援服務</translation>
 <translation id="855182606166519378">使用者不得啟動韌體更新</translation>
-<translation id="855291439519960768">停用 <ph name="PRIVACY_SANDBOX_NAME" /> 數位指紋採集防護功能。</translation>
 <translation id="8553491595730354263">遠端存取主機接受用戶端連線時，允許使用 PIN 碼和配對驗證方式</translation>
 <translation id="8553955290407912156">你可以透過這項政策建立網址模式清單，用於指定無法要求使用者授予 HID 裝置存取權的網站。
 
@@ -10531,6 +10574,7 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
           指定政策值時需以毫秒為單位。</translation>
 <translation id="8592363656632862875">不要下載模型</translation>
 <translation id="859579553230883285">停用使用者的 <ph name="PRIVACY_SANDBOX_NAME" /> 網站建議廣告設定。</translation>
+<translation id="8596784129804979039">使用網路服務沙箱的預設設定</translation>
 <translation id="8597758693275075382">在安裝期間要傳送到 VM 的 SMBIOS 原始設備製造商 (OEM) 字串 (預設為空白清單)。</translation>
 <translation id="8598786284856179541">啟用版本資訊報告功能</translation>
 <translation id="859937827887158048">不允許自動點對點下載更新</translation>
@@ -10639,12 +10683,6 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
 
       要進一步瞭解 JavaScript/ECMAScript 媒體類型，請前往 https://html.spec.whatwg.org/multipage/scripting.html#scriptingLanguage。
       </translation>
-<translation id="8668202868357089313">透過智慧鏡頭重疊功能，使用者可與目前網頁的螢幕截圖 (疊加在實際網頁內容上) 互動，使用 Google 搜尋相關資訊。
-
-此功能無法透過使用者設定項操控，通常會提供給所有將預設搜尋引擎設為 Google 的使用者，除非這項政策設為停用。
-
-如果將政策設為「0 - 啟用」或未設定，使用者將可以存取這項功能。
-如果將政策設為「1 - 停用」，使用者將無法存取這項功能。</translation>
 <translation id="8668928485126473293">你可以設定 <ph name="PRODUCT_NAME" /> 是否要在執行 V8 JavaScript 引擎時，啟用進階 JavaScript 最佳化功能。
 
 如果停用 JavaScript 最佳化功能 (將這項政策的值設為 2)，<ph name="PRODUCT_NAME" /> 顯示網路內容的速度可能會變慢。
@@ -10673,11 +10711,6 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
 這項政策是設定 ID 與 VM 設定的對應關係。透過設定安裝 VM 時，VM 會永久關聯至該設定 ID，且該設定中的任何執行階段政策都會套用至 VM。系統可能會在相同裝置上以相同設定安裝多個 VM。</translation>
 <translation id="8685018726115727387">不允許在第一次執行時匯入瀏覽記錄</translation>
 <translation id="8685024486845674965">密碼遭到重複使用時，會觸發密碼保護警告</translation>
-<translation id="8685680544554917389">如果將這項政策設為 True，<ph name="PRODUCT_NAME" /> 即可自動播放媒體。如果將這項政策設為 False，<ph name="PRODUCT_NAME" /> 不會自動播放媒體。
-
-       根據預設，<ph name="PRODUCT_NAME" /> 不會自動播放媒體。不過，你可以針對特定網址模式，使用 <ph name="AUTOPLAY_ALLOWLIST_POLICY_NAME" /> 政策來變更這項設定。
-
-      如果這項政策在 <ph name="PRODUCT_NAME" /> 執行時有所變動，變更只會套用到新開啟的分頁。</translation>
 <translation id="8685748277907759932">禁止使用「輕觸搜尋」功能</translation>
 <translation id="8686700500128191717">啟用裝置使用者回報功能</translation>
 <translation id="8687958770985542440">重新啟用 Web Components v0 API，直到 M84 版為止。</translation>
@@ -10709,6 +10742,17 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
 <translation id="8705895771006864851">如果將這項政策設為 True，系統會適時在 <ph name="PRODUCT_NAME" /> 中顯示整合式翻譯工具列，為使用者提供翻譯功能。使用者也可以按一下滑鼠右鍵開啟內容選單，選擇其中的翻譯選項。如果將這項政策設為 False，系統會關閉所有內建的翻譯功能。
 
       如果設定這項政策，使用者將無法變更此功能。如果不設定，使用者將可變更這項設定。</translation>
+<translation id="8707290517123095787">啟用即時字幕翻譯。字幕會傳送給 Google 進行翻譯。
+
+如果將這項政策設為啟用，將一律開啟即時翻譯。
+
+如果將這項政策設為停用，將一律關閉即時翻譯。
+
+如果將這項政策設為強制套用，使用者將無法變更或覆寫。
+
+如果不設定這項政策，預設會停用即時翻譯，但使用者隨時可以啟用這項功能。
+
+如果將 <ph name="LIVE_CAPTION_ENABLED_POLICY_NAME" /> 設為停用，無論這項政策的設定為何，都會停用即時翻譯。</translation>
 <translation id="8707790573162457301">在登入期間執行自動清理磁碟作業</translation>
 <translation id="8712609946151927008">安排每週暫停時段</translation>
 <translation id="8713535263782304771">停用安全瀏覽功能</translation>
@@ -10859,6 +10903,7 @@ https://developers.google.com/privacy-sandbox/cookies/storage-partitioning。</t
 <translation id="8840243776706727185">NewBaseUrlInheritanceBehavior 功能已停用</translation>
 <translation id="8842208363354615697">允許啟用僅限 HTTPS 模式</translation>
 <translation id="8843331294082716286">不要向使用者顯示 <ph name="PRIVACY_SANDBOX_NAME" /> 提示。</translation>
+<translation id="884855199714673326">允許遠端存取主機決定</translation>
 <translation id="885147810817138322">向使用者顯示媒體推薦內容</translation>
 <translation id="8852579753940989645">啟用轉譯器程式碼完整性功能</translation>
 <translation id="8854571659927427063">如果將這項政策設為啟用，瀏覽器會在首次執行時，從先前的預設瀏覽器中匯入書籤。如果將這項政策設為停用或不設定，瀏覽器首次執行時不會匯入任何書籤。

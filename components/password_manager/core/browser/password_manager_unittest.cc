@@ -516,7 +516,7 @@ class PasswordManagerTestBase : public testing::Test {
   void TearDown() override {
     // The PasswordManager may own objects that keep raw pointers for the
     // password store - therefore reset it first.
-    manager_.reset();
+    ResetManager();
     mock_match_helper_ = nullptr;
     if (account_store_) {
       account_store_->ShutdownOnUIThread();
@@ -524,6 +524,14 @@ class PasswordManagerTestBase : public testing::Test {
     }
     store_->ShutdownOnUIThread();
     store_ = nullptr;
+  }
+
+  void ResetManager() {
+    // A member of `PasswordAutofillManager` (`UndoPasswordChangeController`)
+    // may keep a pointer to `PasswordFormCache` to unsubscribe from observing
+    // parsed forms. This call should happen before the cache is destroyed.
+    password_autofill_manager_.reset();
+    manager_.reset();
   }
 
   // Whether to set up the account-scoped PasswordStore.
@@ -627,8 +635,8 @@ class PasswordManagerTestBase : public testing::Test {
 
   PasswordForm MakeAndroidCredential() {
     PasswordForm android_form;
-    android_form.url = GURL("android://hash@google.com");
-    android_form.signon_realm = "android://hash@google.com";
+    android_form.url = GURL("android://hash@google.com/");
+    android_form.signon_realm = "android://hash@google.com/";
     android_form.username_value = u"google";
     android_form.password_value = u"password";
     android_form.in_store = PasswordForm::Store::kProfileStore;
@@ -995,7 +1003,7 @@ TEST_P(PasswordManagerTest,
                                     {form_data.renderer_id()}, {});
 
   // Delete password manager to record metrics.
-  manager_.reset();
+  ResetManager();
 
   // Verify that the filling assistance is correctly recorded as manually
   // autofilled.
@@ -1706,7 +1714,7 @@ TEST_P(PasswordManagerTest, FormSubmitWhenPasswordsCannotBeSaved) {
   task_environment_.RunUntilIdle();
   // Objects owned by the manager may keep references to the store - therefore
   // destroy the manager prior to store destruction.
-  manager_.reset();
+  ResetManager();
   store->ShutdownOnUIThread();
 }
 
@@ -1744,7 +1752,7 @@ TEST_P(PasswordManagerTest,
   task_environment_.RunUntilIdle();
   // Objects owned by the manager may keep references to the store - therefore
   // destroy the manager prior to store destruction.
-  manager_.reset();
+  ResetManager();
   store->ShutdownOnUIThread();
 }
 
@@ -1843,7 +1851,7 @@ TEST_P(PasswordManagerTest,
   task_environment_.RunUntilIdle();
   // Objects owned by the manager may keep references to the store - therefore
   // destroy the manager prior to store destruction.
-  manager_.reset();
+  ResetManager();
   store->ShutdownOnUIThread();
 }
 
@@ -1882,7 +1890,7 @@ TEST_P(PasswordManagerTest,
   task_environment_.RunUntilIdle();
   // Objects owned by the manager may keep references to the store - therefore
   // destroy the manager prior to store destruction.
-  manager_.reset();
+  ResetManager();
   store->ShutdownOnUIThread();
 }
 #endif
@@ -1922,7 +1930,7 @@ TEST_P(PasswordManagerTest, BrokenPasswordStorePreventsMutingCredentials) {
   task_environment_.RunUntilIdle();
   // Objects owned by the manager may keep references to the store - therefore
   // destroy the manager prior to store destruction.
-  manager_.reset();
+  ResetManager();
   store->ShutdownOnUIThread();
 }
 
@@ -3330,7 +3338,7 @@ TEST_P(PasswordManagerTest, ManualFallbackForSaving) {
   // Two PasswordFormManagers instances hold references to a shared
   // PasswordFormMetrics recorder. These need to be freed to flush the metrics
   // into the test_ukm_recorder.
-  manager_.reset();
+  ResetManager();
   form_manager_to_save.reset();
 
   // Verify that the last state is recorded.
@@ -6358,7 +6366,7 @@ TEST_P(PasswordManagerTest, FormSubmittedRecordsSubmission) {
 
   // Reset the manager to also cause the form manager to reset which leads
   // to the metrics being recorded.
-  manager_.reset();
+  ResetManager();
   histogram_tester.ExpectUniqueSample(
       "PasswordManager.FormSubmissionsVsSavePrompts",
       metrics_util::SaveFlowStep::kFormSubmitted, 1);
@@ -6398,7 +6406,7 @@ TEST_P(PasswordManagerTest, FormClearedRecordsSubmission) {
 
   // Reset the manager to also cause the form manager to reset which leads
   // to the metrics being recorded.
-  manager_.reset();
+  ResetManager();
   histogram_tester.ExpectUniqueSample(
       "PasswordManager.FormSubmissionsVsSavePrompts",
       metrics_util::SaveFlowStep::kFormSubmitted, 1);
@@ -6418,7 +6426,7 @@ TEST_P(PasswordManagerTest, DynamicFormSubmissionRecordsSubmission) {
 
   // Reset the manager to also cause the form manager to reset which leads
   // to the metrics being recorded.
-  manager_.reset();
+  ResetManager();
   histogram_tester.ExpectUniqueSample(
       "PasswordManager.FormSubmissionsVsSavePrompts",
       metrics_util::SaveFlowStep::kFormSubmitted, 1);
@@ -6441,7 +6449,7 @@ TEST_P(PasswordManagerTest,
 
   // Reset the manager to also cause the form manager to reset which leads
   // to the metrics being recorded.
-  manager_.reset();
+  ResetManager();
   histogram_tester.ExpectTotalCount(
       "PasswordManager.FormSubmissionsVsSavePrompts", 0);
 }
@@ -6469,7 +6477,7 @@ TEST_P(PasswordManagerTest, FormSubmittedDoesntRecordSubmissionIfBlocklisted) {
   OnPasswordFormSubmitted(form.form_data);
   // Reset the manager to also cause the form manager to reset which leads
   // to the metrics being recorded.
-  manager_.reset();
+  ResetManager();
   histogram_tester.ExpectTotalCount(
       "PasswordManager.FormSubmissionsVsSavePrompts", 0);
 }
@@ -6493,7 +6501,7 @@ TEST_P(PasswordManagerTest,
 
   // Reset the manager to also cause the form manager to reset which leads
   // to the metrics being recorded.
-  manager_.reset();
+  ResetManager();
   histogram_tester.ExpectTotalCount(
       "PasswordManager.FormSubmissionsVsSavePrompts", 0);
 }
@@ -6520,9 +6528,8 @@ TEST_P(PasswordManagerTest, MarksHasPasswordFormForFirstCctPageLoad) {
 }
 #endif
 
-TEST_P(PasswordManagerTest, OnResourceLoadingFailedResetsSubmittedManager) {
-  base::test::ScopedFeatureList feature_list(
-      features::kFailedLoginDetectionBasedOnResourceLoadingErrors);
+TEST_P(PasswordManagerTest, OnResourceLoadingFailed) {
+  base::HistogramTester histogram_tester;
   std::vector<FormData> observed;
   FormData form_data(MakeSimpleFormData());
   observed.push_back(form_data);
@@ -6535,35 +6542,16 @@ TEST_P(PasswordManagerTest, OnResourceLoadingFailedResetsSubmittedManager) {
 
   manager()->OnResourceLoadingFailed(&driver_, form_data.url());
 
-  EXPECT_FALSE(manager()->GetSubmittedManagerForTest());
-}
+  EXPECT_TRUE(manager()->GetSubmittedManagerForTest());
 
-TEST_P(PasswordManagerTest,
-       OnResourceLoadingFailedForSameTLDResetsSubmittedManager) {
-  base::test::ScopedFeatureList feature_list(
-      features::kFailedLoginDetectionBasedOnResourceLoadingErrors);
-  std::vector<FormData> observed;
-  FormData form_data(MakeSimpleFormData());
-  form_data.set_url(GURL("https://example.com/"));
-  observed.push_back(form_data);
-  manager()->OnPasswordFormsParsed(&driver_, observed);
-  manager()->OnPasswordFormsRendered(&driver_, observed);
-  task_environment_.RunUntilIdle();
-
-  EXPECT_CALL(client_, IsSavingAndFillingEnabled).WillRepeatedly(Return(true));
-  OnPasswordFormSubmitted(form_data);
-
-  manager()->OnResourceLoadingFailed(&driver_,
-                                     GURL("https://login.example.com/"));
-
-  EXPECT_FALSE(manager()->GetSubmittedManagerForTest());
+  histogram_tester.ExpectUniqueSample("PasswordManager.FailedLoginDetected",
+                                      true, 1);
 }
 
 TEST_P(PasswordManagerTest, OnResourceLoadingFailedWithDifferentDriver) {
   // Submitted manager shouldn't be reset based on failed resource load when
   // drivers don't match.
-  base::test::ScopedFeatureList feature_list(
-      features::kFailedLoginDetectionBasedOnResourceLoadingErrors);
+  base::HistogramTester histogram_tester;
   std::vector<FormData> observed;
   FormData form_data(MakeSimpleFormData());
   observed.push_back(form_data);
@@ -6578,13 +6566,14 @@ TEST_P(PasswordManagerTest, OnResourceLoadingFailedWithDifferentDriver) {
   manager()->OnResourceLoadingFailed(&fake_driver, form_data.url());
 
   EXPECT_TRUE(manager()->GetSubmittedManagerForTest());
+
+  histogram_tester.ExpectTotalCount("PasswordManager.FailedLoginDetected", 0);
 }
 
 TEST_P(PasswordManagerTest, OnResourceLoadingFailedWithDifferentOrigin) {
   // Submitted manager shouldn't be reset based on failed resource load for a
   // different origin.
-  base::test::ScopedFeatureList feature_list(
-      features::kFailedLoginDetectionBasedOnResourceLoadingErrors);
+  base::HistogramTester histogram_tester;
   std::vector<FormData> observed;
   FormData form_data(MakeSimpleFormData());
   observed.push_back(form_data);
@@ -6598,34 +6587,12 @@ TEST_P(PasswordManagerTest, OnResourceLoadingFailedWithDifferentOrigin) {
   manager()->OnResourceLoadingFailed(&driver_, GURL("https://example.com/"));
 
   EXPECT_TRUE(manager()->GetSubmittedManagerForTest());
-}
 
-TEST_P(PasswordManagerTest, OnResourceLoadingFailedFeatureDisabled) {
-  // When the kFailedLoginDetectionBasedOnResourceLoadingErrors submitted
-  // manager shouldn't be reset based on failed resource load.
-  base::test::ScopedFeatureList feature_list;
-  feature_list.InitAndDisableFeature(
-      features::kFailedLoginDetectionBasedOnResourceLoadingErrors);
-
-  std::vector<FormData> observed;
-  FormData form_data(MakeSimpleFormData());
-  observed.push_back(form_data);
-  manager()->OnPasswordFormsParsed(&driver_, observed);
-  manager()->OnPasswordFormsRendered(&driver_, observed);
-  task_environment_.RunUntilIdle();
-
-  EXPECT_CALL(client_, IsSavingAndFillingEnabled).WillRepeatedly(Return(true));
-  OnPasswordFormSubmitted(form_data);
-
-  manager()->OnResourceLoadingFailed(&driver_, form_data.url());
-
-  EXPECT_TRUE(manager()->GetSubmittedManagerForTest());
+  histogram_tester.ExpectTotalCount("PasswordManager.FailedLoginDetected", 0);
 }
 
 TEST_P(PasswordManagerTest, LoginFormClearingIsConsideredFailedLoginAttempt) {
-  base::test::ScopedFeatureList feature_list(
-      features::kFailedLoginDetectionBasedOnFormClearEvent);
-
+  base::HistogramTester histogram_tester;
   PasswordForm form(MakeSimpleForm());
   FormData form_data = form.form_data;
   std::vector<FormData> observed = {form_data};
@@ -6647,8 +6614,11 @@ TEST_P(PasswordManagerTest, LoginFormClearingIsConsideredFailedLoginAttempt) {
   manager()->OnPasswordFormCleared(&driver_, form.form_data);
   task_environment_.RunUntilIdle();
 
-  // Verify submitted manager is reset.
-  EXPECT_FALSE(manager()->GetSubmittedManagerForTest());
+  // Submitted manager shouldn't get reset.
+  EXPECT_TRUE(manager()->GetSubmittedManagerForTest());
+
+  histogram_tester.ExpectUniqueSample("PasswordManager.FailedLoginDetected",
+                                      true, 1);
 }
 
 INSTANTIATE_TEST_SUITE_P(, PasswordManagerTest, ::testing::Bool());

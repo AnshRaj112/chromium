@@ -24,6 +24,7 @@ import android.util.Size;
 import androidx.annotation.ColorInt;
 
 import org.chromium.base.Callback;
+import org.chromium.base.Token;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.task.PostTask;
 import org.chromium.base.task.TaskTraits;
@@ -39,12 +40,14 @@ import org.chromium.chrome.browser.tab_ui.TabCardThemeUtil;
 import org.chromium.chrome.browser.tab_ui.TabContentManager;
 import org.chromium.chrome.browser.tab_ui.TabContentManagerThumbnailProvider;
 import org.chromium.chrome.browser.tab_ui.TabListFaviconProvider;
+import org.chromium.chrome.browser.tab_ui.TabListFaviconProvider.TabFaviconMetadata;
 import org.chromium.chrome.browser.tab_ui.ThumbnailProvider;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.theme.SurfaceColorUpdateUtils;
 import org.chromium.chrome.tab_ui.R;
 import org.chromium.components.browser_ui.styles.SemanticColorUtils;
 import org.chromium.components.tab_groups.TabGroupColorId;
+import org.chromium.url.GURL;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +61,21 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 @NullMarked
 public class MultiThumbnailCardProvider implements ThumbnailProvider {
+    /**
+     * The metadata details for a thumbnail item as part of a multi thumbnail card representation.
+     * This object represents both real {@link Tab}s and {@link SavedTabGroupTab}s. If the tab field
+     * is null, a SavedTabGroupTab is being referenced.
+     */
+    private static class ThumbnailItemMetadata {
+        public final @Nullable Tab tab;
+        public final GURL url;
+
+        ThumbnailItemMetadata(@Nullable Tab tab, GURL url) {
+            this.tab = tab;
+            this.url = url;
+        }
+    }
+
     private final TabContentManager mTabContentManager;
     private final TabContentManagerThumbnailProvider mTabContentManagerThumbnailProvider;
     private final ObservableSupplier<@Nullable TabGroupModelFilter>
@@ -75,7 +93,6 @@ public class MultiThumbnailCardProvider implements ThumbnailProvider {
     private final Paint mFaviconBackgroundPaint;
     private final Paint mSelectedEmptyThumbnailPaint;
     private final Paint mSelectedTextPaint;
-    private final int mFaviconBackgroundPaintColor;
 
     private @ColorInt int mMiniThumbnailPlaceholderColor;
     private @Nullable @ColorInt Integer mGroupTintedMiniThumbnailPlaceholderColor;
@@ -139,7 +156,9 @@ public class MultiThumbnailCardProvider implements ThumbnailProvider {
             @TabGroupColorId Integer actualColorId = null;
             boolean isIncognito = initialTab.isIncognitoBranded();
             if (filter != null && filter.isTabInTabGroup(initialTab)) {
-                actualColorId = filter.getTabGroupColorWithFallback(initialTab.getRootId());
+                Token tabGroupId = initialTab.getTabGroupId();
+                assumeNonNull(tabGroupId);
+                actualColorId = filter.getTabGroupColorWithFallback(tabGroupId);
             }
             mResolvedEmptyPlaceholderColor =
                     TabCardThemeUtil.getMiniThumbnailPlaceholderColor(
@@ -226,24 +245,22 @@ public class MultiThumbnailCardProvider implements ThumbnailProvider {
             mCanvas.drawColor(Color.TRANSPARENT);
 
             // Initialize Tabs.
-            TabGroupModelFilter filter = mCurrentTabGroupModelFilterSupplier.get();
-            assumeNonNull(filter);
-            List<Tab> relatedTabList = filter.getRelatedTabList(initialTab.getId());
-            int relatedTabCount = relatedTabList.size();
+            List<ThumbnailItemMetadata> thumbnailItemList = getThumbnailItems(initialTab);
+            int relatedTabCount = thumbnailItemList.size();
             boolean showPlus = relatedTabCount > MAX_THUMBNAIL_COUNT;
             int tabsToShow = showPlus ? MAX_THUMBNAIL_COUNT - 1 : relatedTabCount;
-            Tab[] tabs = new Tab[MAX_THUMBNAIL_COUNT];
-            mText = showPlus ? "+" + (relatedTabList.size() - tabsToShow) : null;
+            ThumbnailItemMetadata[] thumbnailItems = new ThumbnailItemMetadata[MAX_THUMBNAIL_COUNT];
+            mText = showPlus ? "+" + (thumbnailItemList.size() - tabsToShow) : null;
             mThumbnailsToFetch.set(tabsToShow);
             for (int i = 0; i < tabsToShow; i++) {
-                tabs[i] = relatedTabList.get(i);
+                thumbnailItems[i] = thumbnailItemList.get(i);
             }
 
             // Fetch and draw all.
             for (int i = 0; i < MAX_THUMBNAIL_COUNT; i++) {
-                Tab tab = tabs[i];
+                ThumbnailItemMetadata thumbnailItem = thumbnailItems[i];
                 RectF thumbnailRect = mThumbnailRects.get(i);
-                if (tab != null) {
+                if (thumbnailItem != null) {
                     // Create final copies to get lambda captures to compile.
                     final int index = i;
                     final Size tabThumbnailSize =
@@ -253,26 +270,20 @@ public class MultiThumbnailCardProvider implements ThumbnailProvider {
                     // Fetching the favicon after getting the live thumbnail would lead to
                     // visible flicker.
                     final AtomicReference<Drawable> lastFavicon = new AtomicReference<>();
-                    mTabContentManager.getTabThumbnailWithCallback(
-                            tab.getId(),
-                            tabThumbnailSize,
-                            thumbnail -> {
-                                if (tab.isClosing() || tab.isDestroyed()) return;
+                    if (thumbnailItem.tab != null) {
+                        Tab tab = thumbnailItem.tab;
+                        mTabContentManager.getTabThumbnailWithCallback(
+                                tab.getId(),
+                                tabThumbnailSize,
+                                thumbnail -> {
+                                    if (tab.isClosing() || tab.isDestroyed()) return;
 
-                                drawThumbnailBitmapOnCanvasWithFrame(thumbnail, index);
-                                if (lastFavicon.get() != null) {
-                                    drawFaviconThenMaybeSendBack(lastFavicon.get(), index);
-                                } else {
-                                    mTabListFaviconProvider.getFaviconDrawableForTabAsync(
-                                            tab,
-                                            (Drawable favicon) -> {
-                                                if (tab.isClosing() || tab.isDestroyed()) return;
-
-                                                lastFavicon.set(favicon);
-                                                drawFaviconThenMaybeSendBack(favicon, index);
-                                            });
-                                }
-                            });
+                                    drawFavicon(thumbnail, index, lastFavicon, thumbnailItem);
+                                });
+                    } else {
+                        // TODO(crbug.com/412776442): Implement when SavedTabGroups are included.
+                        assert false : "Not reached.";
+                    }
                 } else {
                     drawThumbnailBitmapOnCanvasWithFrame(null, i);
                     if (mText != null && i == 3) {
@@ -359,6 +370,45 @@ public class MultiThumbnailCardProvider implements ThumbnailProvider {
             initializeRects(mContext);
             initializeAndStartFetching(mInitialTab);
         }
+
+        private List<ThumbnailItemMetadata> getThumbnailItems(Tab initialTab) {
+            List<ThumbnailItemMetadata> thumbnailItems = new ArrayList<>();
+            TabGroupModelFilter filter = mCurrentTabGroupModelFilterSupplier.get();
+            assumeNonNull(filter);
+            List<Tab> relatedTabList = filter.getRelatedTabList(initialTab.getId());
+            for (Tab tab : relatedTabList) {
+                thumbnailItems.add(new ThumbnailItemMetadata(tab, tab.getUrl()));
+            }
+
+            return thumbnailItems;
+        }
+
+        private void drawFavicon(
+                @Nullable Bitmap thumbnail,
+                int index,
+                AtomicReference<Drawable> lastFavicon,
+                ThumbnailItemMetadata thumbnailItem) {
+            Tab tab = thumbnailItem.tab;
+            drawThumbnailBitmapOnCanvasWithFrame(thumbnail, index);
+            if (lastFavicon.get() != null) {
+                drawFaviconThenMaybeSendBack(lastFavicon.get(), index);
+            } else {
+                mTabListFaviconProvider.getFaviconDrawableForTabAsync(
+                        new TabFaviconMetadata(
+                                assumeNonNull(tab),
+                                thumbnailItem.url,
+                                tab.isIncognitoBranded(),
+                                tab.getTabGroupId() != null),
+                        (Drawable favicon) -> {
+                            if (tab != null) {
+                                if (tab.isClosing() || tab.isDestroyed()) return;
+                            }
+
+                            lastFavicon.set(favicon);
+                            drawFaviconThenMaybeSendBack(favicon, index);
+                        });
+            }
+        }
     }
 
     public MultiThumbnailCardProvider(
@@ -429,10 +479,10 @@ public class MultiThumbnailCardProvider implements ThumbnailProvider {
                 TabCardThemeUtil.getTabGroupNumberTextColor(
                         context, false, true, /* colorId */ null));
 
-        mFaviconBackgroundPaintColor = context.getColor(R.color.favicon_background_color);
         mFaviconBackgroundPaint = new Paint();
         mFaviconBackgroundPaint.setAntiAlias(true);
-        mFaviconBackgroundPaint.setColor(mFaviconBackgroundPaintColor);
+        mFaviconBackgroundPaint.setColor(
+                TabUiThemeProvider.getFaviconBackgroundColor(context, /* isIncognito= */ false));
         mFaviconBackgroundPaint.setStyle(Paint.Style.FILL);
         mFaviconBackgroundPaint.setShadowLayer(
                 resources.getDimension(R.dimen.tab_grid_thumbnail_favicon_background_radius),

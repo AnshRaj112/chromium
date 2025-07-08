@@ -126,6 +126,7 @@
 #include "components/autofill/core/browser/studies/autofill_experiments.h"
 #include "components/autofill/core/browser/suggestions/addresses/address_suggestion_generator.h"
 #include "components/autofill/core/browser/suggestions/payments/iban_suggestion_generator.h"
+#include "components/autofill/core/browser/suggestions/payments/merchant_promo_code_suggestion_generator.h"
 #include "components/autofill/core/browser/suggestions/payments/payments_suggestion_generator.h"
 #include "components/autofill/core/browser/suggestions/suggestion.h"
 #include "components/autofill/core/browser/suggestions/suggestion_hiding_reason.h"
@@ -424,6 +425,7 @@ bool IsTriggerSourceOnlyRelevantForCompose(
     case AutofillSuggestionTriggerSource::kPasswordManagerProcessedFocusedField:
     case AutofillSuggestionTriggerSource::kAutofillAi:
     case AutofillSuggestionTriggerSource::kPlusAddressUpdatedInBrowserProcess:
+    case AutofillSuggestionTriggerSource::kProactivePasswordRecovery:
       return false;
   }
 }
@@ -1168,6 +1170,8 @@ void BrowserAutofillManager::OnAskForValuesToFillImpl(
   // TODO(crbug.com/409962888): Populate `suggestion_generators_` here.
   suggestion_generators_.emplace_back(
       std::make_unique<IbanSuggestionGenerator>());
+  suggestion_generators_.emplace_back(
+      std::make_unique<MerchantPromoCodeSuggestionGenerator>());
 
   SuggestionsContext context = BuildSuggestionsContext(
       form, form_structure, field, autofill_field, trigger_source);
@@ -1517,7 +1521,7 @@ void BrowserAutofillManager::GenerateSuggestionsAndMaybeShowUIPhase2(
       return;
     }
 
-    client().GetAutocompleteHistoryManager()->CancelPendingQueries();
+    client().GetAutocompleteHistoryManager()->CancelPendingQuery();
     std::move(on_suggestions_returned).Run(field.global_id(), {});
   } else {
     std::move(on_single_field_suggestions_callback)
@@ -1840,6 +1844,7 @@ void BrowserAutofillManager::FillOrPreviewCreditCardForm(
       case AutofillTriggerSource::kManualFallback:
       case AutofillTriggerSource::kAutofillAi:
       case AutofillTriggerSource::kNone:
+      case AutofillTriggerSource::kProactivePasswordRecovery:
         NOTREACHED();
     }
   }();
@@ -2988,6 +2993,19 @@ std::vector<Suggestion> BrowserAutofillManager::GetCreditCardSuggestions(
   return suggestions;
 }
 
+std::vector<Suggestion> BrowserAutofillManager::GetLoyaltyCardSuggestions(
+    const GURL& url,
+    const FormFieldData& trigger_field) {
+  ValuablesDataManager* valuables_manager = client().GetValuablesDataManager();
+  if (!valuables_manager) {
+    return {};
+  }
+  metrics_->loyalty_card_form_event_logger.OnDidPollSuggestions(
+      trigger_field.global_id());
+  return GetSuggestionsForLoyaltyCards(*valuables_manager, url,
+                                       trigger_field.is_autofilled());
+}
+
 // TODO(crbug.com/40219607) Eliminate and replace with a listener?
 // Should we do the same with all the other BrowserAutofillManager events?
 void BrowserAutofillManager::OnBeforeProcessParsedForms() {
@@ -3198,13 +3216,12 @@ std::vector<Suggestion> BrowserAutofillManager::GetAvailableSuggestions(
                 client().GetValuablesDataManager()) {
           if (suggestions.empty()) {
             suggestions = GetLoyaltyCardSuggestions(
-                *valuables_manager,
-                client().GetLastCommittedPrimaryMainFrameURL());
+                client().GetLastCommittedPrimaryMainFrameURL(), field);
           } else {
             ExtendEmailSuggestionsWithLoyaltyCardSuggestions(
-                suggestions, *valuables_manager,
+                *valuables_manager,
                 client().GetLastCommittedPrimaryMainFrameURL(),
-                autofill_field->is_autofilled());
+                field.is_autofilled(), suggestions);
           }
         }
       }
@@ -3218,12 +3235,8 @@ std::vector<Suggestion> BrowserAutofillManager::GetAvailableSuggestions(
               features::kAutofillEnableLoyaltyCardsFilling)) {
         // Only loyalty card numbers filling is supported.
         if (autofill_field->Type().GetStorableType() == LOYALTY_MEMBERSHIP_ID) {
-          if (ValuablesDataManager* valuables_manager =
-                  client().GetValuablesDataManager()) {
-            suggestions = GetLoyaltyCardSuggestions(
-                *valuables_manager,
-                client().GetLastCommittedPrimaryMainFrameURL());
-          }
+          suggestions = GetLoyaltyCardSuggestions(
+              client().GetLastCommittedPrimaryMainFrameURL(), field);
         }
       }
       break;

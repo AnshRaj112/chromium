@@ -38,6 +38,7 @@
 #include "components/download/public/common/download_features.h"
 #include "components/embedder_support/android/util/cdn_utils.h"
 #include "components/enterprise/data_controls/core/browser/features.h"
+#include "components/facilitated_payments/core/features/features.h"
 #include "components/feature_engagement/public/feature_constants.h"
 #include "components/feature_engagement/public/feature_list.h"
 #include "components/feed/feed_feature_list.h"
@@ -111,6 +112,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &autofill::features::kAutofillEnableSupportForHomeAndWork,
     &autofill::features::kAutofillRetryImageFetchOnFailure,
     &autofill::features::kAutofillEnableLoyaltyCardsFilling,
+    &autofill::features::kAutofillEnableSeparatePixPreferenceItem,
     &base::features::kBackgroundThreadPoolFieldTrial,
     &blink::features::kBackForwardTransitions,
     &blink::features::kDynamicSafeAreaInsets,
@@ -215,10 +217,10 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kAndroidOpenPdfInlineBackport,
     &kAndroidPdfAssistContent,
     &kAndroidTabGroupsColorUpdateGM3,
+    &kAndroidTabHighlighting,
     &kAndroidShowRestoreTabsPromoOnFREBypassedKillSwitch,
     &kAndroidSurfaceColorUpdate,
     &kAndroidTabDeclutterArchiveAllButActiveTab,
-    &kAndroidTabDeclutterArchiveDuplicateTabs,
     &kAndroidTabDeclutterArchiveTabGroups,
     &kAndroidTabDeclutterAutoDelete,
     &kAndroidTabDeclutterAutoDeleteKillSwitch,
@@ -228,6 +230,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kAndroidTabSkipSaveTabsKillswitch,
     &kAndroidThemeModule,
     &kAndroidToolbarScrollAblation,
+    &kAndroidUseAdminsForEnterpriseInfo,
     &kAndroidWindowPopupLargeScreen,
     &kAnimatedImageDragShadow,
     &kAppSpecificHistory,
@@ -364,6 +367,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kReadAloud,
     &kReadAloudAudioOverviews,
     &kReadAloudAudioOverviewsFeedback,
+    &kReadAloudAudioOverviewsSkipDisclaimerWhenPossible,
     &kReadAloudInOverflowMenuInCCT,
     &kReadAloudInMultiWindow,
     &kReadAloudBackgroundPlayback,
@@ -399,6 +403,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kTabStripGroupDragDropAndroid,
     &kTabStripIncognitoMigration,
     &kTabStripLayoutOptimization,
+    &kTabStripMouseCloseResizeDelay,
     &kTabStripTransitionInDesktopWindow,
     &kTabSwitcherColorBlendAnimate,
     &kTabArchivalDragDropAndroid,
@@ -410,6 +415,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kTabWindowManagerReportIndicesMismatch,
     &kTestDefaultDisabled,
     &kTestDefaultEnabled,
+    &kThirdPartyDisableChromeAutofillSettingsScreen,
     &kToolbarPhoneAnimationRefactor,
     &kTopControlsRefactor,
     &kTouchToSearchCallout,
@@ -430,6 +436,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &language::kCctAutoTranslate,
     &language::kDetailedLanguageSettings,
     &optimization_guide::features::kPushNotifications,
+    &payments::facilitated::kFacilitatedPaymentsEnableA2APayment,
     &page_info::kPageInfoAboutThisSiteMoreLangs,
     &password_manager::features::kBiometricAuthIdentityCheck,
     &password_manager::features::kBiometricTouchToFill,
@@ -607,6 +614,10 @@ BASE_FEATURE(kAndroidTabGroupsColorUpdateGM3,
              "AndroidTabGroupsColorUpdateGM3",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kAndroidTabHighlighting,
+             "AndroidTabHighlighting",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kAndroidShowRestoreTabsPromoOnFREBypassedKillSwitch,
              "AndroidShowRestoreTabsPromoOnFREBypassedKillSwitch",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -618,10 +629,6 @@ BASE_FEATURE(kAndroidSurfaceColorUpdate,
 BASE_FEATURE(kAndroidTabDeclutterArchiveAllButActiveTab,
              "AndroidTabDeclutterArchiveAllButActiveTab",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kAndroidTabDeclutterArchiveDuplicateTabs,
-             "AndroidTabDeclutterArchiveDuplicateTabs",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAndroidTabDeclutterArchiveTabGroups,
              "AndroidTabDeclutterArchiveTabGroups",
@@ -657,6 +664,10 @@ BASE_FEATURE(kAndroidThemeModule,
 
 BASE_FEATURE(kAndroidToolbarScrollAblation,
              "AndroidToolbarScrollAblation",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kAndroidUseAdminsForEnterpriseInfo,
+             "AndroidUseAdminsForEnterpriseInfo",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAndroidWindowPopupLargeScreen,
@@ -1198,6 +1209,10 @@ BASE_FEATURE(kReadAloudAudioOverviewsFeedback,
              "ReadAloudAudioOverviewsFeedback",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kReadAloudAudioOverviewsSkipDisclaimerWhenPossible,
+             "ReadAloudAudioOverviewsSkipDisclaimerWhenPossible",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kReadAloudInOverflowMenuInCCT,
              "ReadAloudInOverflowMenuInCCT",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -1318,6 +1333,10 @@ BASE_FEATURE(kTabStripLayoutOptimization,
              "TabStripLayoutOptimization",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kTabStripMouseCloseResizeDelay,
+             "TabStripMouseCloseResizeDelay",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 BASE_FEATURE(kTabStripTransitionInDesktopWindow,
              "TabStripTransitionInDesktopWindow",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -1365,6 +1384,14 @@ BASE_FEATURE(kTestDefaultDisabled,
 BASE_FEATURE(kTestDefaultEnabled,
              "TestDefaultEnabled",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// If the user configured Chrome to use 3P autofill and this feature is enabled,
+// Chrome will disable the preferences in the "Payment methods" and "Addresses
+// and more" screen in the Chrome settings that don't apply in third party mode
+// and would confuse the user.
+BASE_FEATURE(kThirdPartyDisableChromeAutofillSettingsScreen,
+             "ThirdPartyDisableChromeAutofillSettingsScreen",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kToolbarPhoneAnimationRefactor,
              "ToolbarPhoneAnimationRefactor",

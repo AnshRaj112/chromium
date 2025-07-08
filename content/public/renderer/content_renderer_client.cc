@@ -261,11 +261,6 @@ ContentRendererClient::CreateSpeechRecognitionClient(
 }
 #endif
 
-bool ContentRendererClient::IsPluginAllowedToUseCameraDeviceAPI(
-    const GURL& url) {
-  return false;
-}
-
 bool ContentRendererClient::AllowScriptExtensionForServiceWorker(
     const url::Origin& script_origin) {
   return false;
@@ -295,8 +290,10 @@ blink::WebFrame* ContentRendererClient::FindFrame(
   return nullptr;
 }
 
-bool ContentRendererClient::IsSafeRedirectTarget(const GURL& from_url,
-                                                 const GURL& to_url) {
+bool ContentRendererClient::IsSafeRedirectTarget(
+    const GURL& from_url,
+    const GURL& to_url,
+    const std::optional<url::Origin>& request_initiator) {
   return true;
 }
 

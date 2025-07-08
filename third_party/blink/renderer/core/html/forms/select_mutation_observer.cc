@@ -161,79 +161,13 @@ void SelectMutationObserver::AddDescendantDisallowedErrorToNode(Node& node) {
     if (!IsAllowedInteractiveElement(node)) {
       select_->IncreaseContentModelViolationCount();
     }
-    if (RuntimeEnabledFeatures::
-            CustomizableSelectElementAccessibilityIssuesEnabled()) {
-      Document& document = select_->GetDocument();
-      AuditsIssue::ReportElementAccessibilityIssue(
-          &document, node.GetDomNodeId(), issue_reason,
-          /* has_disallowed_attributes = */ HasTabIndexAttribute(node) ||
-              IsContenteditable(node));
-    }
-    node.AddConsoleMessage(mojom::blink::ConsoleMessageSource::kRecommendation,
-                           mojom::blink::ConsoleMessageLevel::kError,
-                           GetMessageForReason(issue_reason));
+    Document& document = select_->GetDocument();
+    AuditsIssue::ReportElementAccessibilityIssue(
+        &document, node.GetDomNodeId(), issue_reason,
+        /* has_disallowed_attributes = */ HasTabIndexAttribute(node) ||
+            IsContenteditable(node));
     RecordIssueByType(issue_reason);
   }
-}
-
-String SelectMutationObserver::GetMessageForReason(
-    ElementAccessibilityIssueReason issue_reason) {
-  switch (issue_reason) {
-    case ElementAccessibilityIssueReason::kDisallowedSelectChild:
-      return FormatElementMessage(
-          "<select>", "a ",
-          "an <optgroup> with a <legend> element or <option> elements");
-    case ElementAccessibilityIssueReason::kDisallowedOptGroupChild:
-      return FormatElementMessage("<optgroup>", "an ",
-                                  "the <legend> or <option> elements");
-    case ElementAccessibilityIssueReason::kNonPhrasingContentOptionChild:
-      return "Non-phrasing content was found within an <option> element. The "
-             "<option> element allows only non-interactive phrasing content, "
-             "text, and <div> elements as its children. The semantics of "
-             "non-phrasing content elements do not make sense as children of "
-             "an <option>, and such semantics will largely be ignored by "
-             "assistive technology since they are inappropriate in this "
-             "context. Consider removing or changing such elements to one of "
-             "the allowed phrasing content elements.";
-    case ElementAccessibilityIssueReason::kInteractiveContentOptionChild:
-      return FormatInteractiveElementMessage("<option>", "an ", g_empty_string);
-    case ElementAccessibilityIssueReason::kInteractiveContentLegendChild:
-      return FormatInteractiveElementMessage(
-          "<legend>", "a ",
-          "Interactive elements are not allowed children of a <legend> "
-          "element when used within an <optgroup> element. ");
-    case ElementAccessibilityIssueReason::kValidChild:
-    default:
-      NOTREACHED();
-  }
-}
-
-String SelectMutationObserver::FormatElementMessage(const String& element,
-                                                    const String& article,
-                                                    const String& example) {
-  return "An element which is not allowed in the content model of the " +
-         element + " element was found within " + article + element +
-         " element. These elements will not consistently be accessible to "
-         "people navigating by keyboard or using assistive technology. If "
-         "using disallowed elements for layout structure and styling, "
-         "consider using the allowed <div> element instead. Any text "
-         "existing within the " +
-         element +
-         " element should either be removed or relocated to a valid element "
-         "that allows text descendants, e.g., " +
-         example + ".";
-}
-
-String SelectMutationObserver::FormatInteractiveElementMessage(
-    const String& element,
-    const String& article,
-    const String& context) {
-  return "An interactive element which is not allowed in the content model "
-         "of the " +
-         element + " element was found within " + article + element +
-         " element. " + context +
-         "These elements will not consistently be accessible to people "
-         "navigating by keyboard or using assistive technology.";
 }
 
 bool SelectMutationObserver::IsAllowedInteractiveElement(Node& node) {

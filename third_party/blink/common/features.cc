@@ -146,6 +146,10 @@ BASE_FEATURE(kBFCacheOpenBroadcastChannel,
              "BFCacheOpenBroadcastChannel",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kBFCacheWithSharedWorker,
+             "BFCacheWithSharedWorker",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kBackForwardCacheDWCOnJavaScriptExecution,
              "BackForwardCacheDWCOnJavaScriptExecution",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -656,7 +660,12 @@ BASE_FEATURE_PARAM(bool,
 
 BASE_FEATURE(kDelayLayerTreeViewDeletionOnLocalSwap,
              "DelayLayerTreeViewDeletionOnLocalSwap",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_ANDROID)
+             base::FEATURE_ENABLED_BY_DEFAULT
+#else
+             base::FEATURE_DISABLED_BY_DEFAULT
+#endif
+);
 
 BASE_FEATURE_PARAM(base::TimeDelta,
                    kDelayLayerTreeViewDeletionOnLocalSwapTaskDelayParam,
@@ -673,7 +682,7 @@ BASE_FEATURE(kDevToolsImprovedNetworkError,
 
 BASE_FEATURE(kDirectCompositorThreadIpc,
              "DirectCompositorThreadIpc",
-#if BUILDFLAG(IS_ANDROID)
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
              base::FEATURE_ENABLED_BY_DEFAULT
 #else
              base::FEATURE_DISABLED_BY_DEFAULT
@@ -692,6 +701,12 @@ BASE_FEATURE(kDiscardInputEventsToRecentlyMovedFrames,
 // signal that the renderer has sent a frame to cc (https://crbug.com/40057499).
 BASE_FEATURE(kDropInputEventsWhilePaintHolding,
              "DropInputEventsWhilePaintHolding",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Extends console.timestamp to support adding deep-links into the DevTools
+// Performance Panel, which (when clicked) call into a DevTools extension.
+BASE_FEATURE(kEnableDevtoolsDeepLinkViaExtensibilityApi,
+             "EnableDevtoolsDeepLinkViaExtensibilityApi",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEstablishGpuChannelAsync,
@@ -728,13 +743,7 @@ BASE_FEATURE_ENUM_PARAM(
 // window's top-level site.
 BASE_FEATURE(kEnforceNoopenerOnBlobURLNavigation,
              "EnforceNoopenerOnBlobURLNavigation",
-// TODO(crbug.com/421810301): Temporarily disable this feature on ChromeOS due
-// to a regression.
-#if BUILDFLAG(IS_CHROMEOS)
-             base::FEATURE_DISABLED_BY_DEFAULT);
-#else
              base::FEATURE_ENABLED_BY_DEFAULT);
-#endif
 
 BASE_FEATURE(kEventTimingIgnorePresentationTimeFromUnexpectedFrameSource,
              "EventTimingIgnorePresentationTimeFromUnexpectedFrameSource",
@@ -1127,6 +1136,11 @@ BASE_FEATURE(kFrequencyCappingForOverlayPopupDetection,
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGMSCoreEmoji, "GMSCoreEmoji", base::FEATURE_ENABLED_BY_DEFAULT);
+
+// If enabled, then display audio track permission failures are ignored.
+BASE_FEATURE(kGetDisplayMediaIgnoreAudioPermissionFailures,
+             "GetDisplayMediaIgnoreAudioPermissionFailures",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_FUCHSIA)
 // Defers device selection until after permission is granted.
@@ -2619,6 +2633,12 @@ BASE_FEATURE(kUnloadBlocklisted,
 BASE_FEATURE(kUrgentMainFrameForInput,
              "UrgentMainFrameForInput",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Flag guard for changes in how navigation code handles the URL to commit.
+// https://crbug.com/422803238
+BASE_FEATURE(kUseCommitUrlInsteadOfRedirectUrl,
+             "UseCommitUrlInsteadOfRedirectUrl",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Uses page viewport instead of frame viewport in the Largest Contentful Paint
 // heuristic where images occupying the full viewport are ignored.

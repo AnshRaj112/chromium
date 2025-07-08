@@ -48,6 +48,8 @@ void PostTaskForActCallback(
 }
 
 void OnFetchPageContext(
+    const GURL& url,
+    mojo_base::ProtoWrapperBytes::PassKey proto_pass_key,
     std::unique_ptr<actor::AggregatedJournal::PendingAsyncEntry> journal_entry,
     mojom::WebClientHandler::ActInFocusedTabCallback callback,
     base::WeakPtr<actor::ExecutionEngine> execution_engine,
@@ -64,6 +66,15 @@ void OnFetchPageContext(
       tab_context_result->get_tab_context()->annotated_page_data &&
       tab_context_result->get_tab_context()
           ->annotated_page_data->annotated_page_content.has_value()) {
+    auto byte_span =
+        tab_context_result->get_tab_context()
+            ->annotated_page_data->annotated_page_content->byte_span(
+                proto_pass_key);
+    if (byte_span.has_value()) {
+      journal_entry->GetJournal().LogAnnotatedPageContent(
+          url, journal_entry->GetTaskId(), byte_span.value());
+    }
+
     execution_engine->DidObserveContext(
         tab_context_result->get_tab_context()
             ->annotated_page_data->annotated_page_content.value());
@@ -71,7 +82,7 @@ void OnFetchPageContext(
 
   if (tab_context_result->get_tab_context()->viewport_screenshot) {
     journal_entry->GetJournal().LogScreenshot(
-        GURL::EmptyGURL(), journal_entry->GetTaskId(),
+        url, journal_entry->GetTaskId(),
         tab_context_result->get_tab_context()->viewport_screenshot->mime_type,
         tab_context_result->get_tab_context()->viewport_screenshot->data);
   }
@@ -114,8 +125,7 @@ void GlicActorController::Act(
   }
 
   // Create a new task if one doesn't exist already.
-  if (!actor_task_ ||
-      actor_task_->GetState() == actor::ActorTask::State::kFinished) {
+  if (!GetCurrentTask()) {
     starting_task_ = true;
     optimization_guide::proto::BrowserStartTask start_task;
     start_task.set_tab_id(action.tab_id());
@@ -132,7 +142,7 @@ void GlicActorController::Act(
 }
 
 void GlicActorController::OnTaskStartedForAct(
-    const optimization_guide::proto::BrowserAction& action,
+    optimization_guide::proto::BrowserAction action,
     const mojom::GetTabContextOptions& options,
     mojom::WebClientHandler::ActInFocusedTabCallback callback,
     optimization_guide::proto::BrowserStartTaskResult result) {
@@ -145,9 +155,9 @@ void GlicActorController::OnTaskStartedForAct(
     return;
   }
 
-  actor_task_ = actor::ActorKeyedService::Get(profile_)->GetTask(
-      actor::TaskId(result.task_id()));
-  CHECK(actor_task_);
+  CHECK(GetCurrentTask());
+
+  action.set_task_id(GetCurrentTask()->id().value());
 
   ActImpl(action, options, std::move(callback));
 }
@@ -155,33 +165,33 @@ void GlicActorController::OnTaskStartedForAct(
 // TODO(mcnee): Determine if we need additional mechanisms, within the browser,
 // to stop a task.
 void GlicActorController::StopTask(actor::TaskId task_id) {
-  if (!GetExecutionEngine() ||
-      actor_task_->GetState() == actor::ActorTask::State::kFinished) {
+  actor::ActorTask* task = GetCurrentTask();
+  if (!task) {
     return;
   }
-  actor_task_->Stop();
+  actor::ActorKeyedService::Get(profile_.get())->StopTask(task->id());
 }
 
 void GlicActorController::PauseTask(actor::TaskId task_id) {
-  if (!actor_task_) {
+  actor::ActorTask* task = GetCurrentTask();
+  if (!task) {
     return;
   }
-  actor_task_->Pause();
+  task->Pause();
 }
 
 void GlicActorController::ResumeTask(
     actor::TaskId task_id,
     const mojom::GetTabContextOptions& context_options,
     glic::mojom::WebClientHandler::ResumeActorTaskCallback callback) {
-  if (!actor_task_ ||
-      actor_task_->GetState() != actor::ActorTask::State::kPausedByClient) {
+  actor::ActorTask* task = GetCurrentTask();
+  if (!task || task->GetState() != actor::ActorTask::State::kPausedByClient) {
     std::move(callback).Run(mojom::GetContextResult::NewErrorReason(
         std::string("task does not exist or was not paused")));
     return;
   }
-  actor_task_->Resume();
-  tabs::TabInterface* tab_of_resumed_task =
-      GetExecutionEngine()->GetTabOfCurrentTask();
+  task->Resume();
+  tabs::TabInterface* tab_of_resumed_task = task->GetTabForObservation();
   if (!tab_of_resumed_task) {
     std::move(callback).Run(glic::mojom::GetContextResult::NewErrorReason(
         std::string("tab does not exist")));
@@ -224,31 +234,16 @@ void GlicActorController::OnResponseStopped() {
   current_request_.reset();
 }
 
-bool GlicActorController::IsExecutionEngineActingOnTab(
-    const content::WebContents* wc) const {
-  return GetExecutionEngine() && actor_task_ &&
-         actor_task_->GetState() != actor::ActorTask::State::kFinished &&
-         GetExecutionEngine()->GetTabOfCurrentTask()->GetContents() == wc;
-}
-
-actor::ExecutionEngine& GlicActorController::GetExecutionEngineForTesting(
-    tabs::TabInterface* tab) {
-  if (!actor_task_) {
-    auto task = std::make_unique<actor::ActorTask>(
-        std::make_unique<actor::ExecutionEngine>(profile_, tab));
-    actor_task_ = task.get();
-    actor::ActorKeyedService::Get(profile_.get())->AddTask(std::move(task));
-  }
-  return *actor_task_->GetExecutionEngine();
-}
-
 void GlicActorController::ActImpl(
     const optimization_guide::proto::BrowserAction& action,
     const mojom::GetTabContextOptions& options,
     mojom::WebClientHandler::ActInFocusedTabCallback callback) const {
-  actor::ExecutionEngine::ActionResultCallback action_callback = base::BindOnce(
-      &GlicActorController::OnActionFinished, GetWeakPtr(),
-      actor::TaskId(action.task_id()), options, std::move(callback));
+  actor::ActorTask* task = GetCurrentTask();
+  CHECK(task);
+
+  actor::ExecutionEngine::ActionResultCallback action_callback =
+      base::BindOnce(&GlicActorController::OnActionFinished, GetWeakPtr(),
+                     task->id(), options, std::move(callback));
 
   GetExecutionEngine()->Act(action, std::move(action_callback));
 }
@@ -264,7 +259,11 @@ void GlicActorController::OnActionFinished(
     return;
   }
 
-  tabs::TabInterface* tab = GetExecutionEngine()->GetTabOfCurrentTask();
+  actor::ActorTask* task =
+      actor::ActorKeyedService::Get(profile_)->GetTask(task_id);
+  CHECK(task);
+
+  tabs::TabInterface* tab = task->GetTabForObservation();
   actor::AggregatedJournal& journal =
       actor::ActorKeyedService::Get(profile_)->GetJournal();
 
@@ -274,17 +273,18 @@ void GlicActorController::OnActionFinished(
   // with GlicKeyedService::GetContextFromFocusedTab(). It's not clear yet if
   // the same permission checks, etc. should apply here.
   if (tab) {
-    auto journal_entry = journal.CreatePendingAsyncEntry(
-        tab->GetContents()->GetLastCommittedURL(), task_id, "FetchPageContext",
-        "");
+    const GURL& url = tab->GetContents()->GetLastCommittedURL();
+    auto journal_entry =
+        journal.CreatePendingAsyncEntry(url, task_id, "FetchPageContext", "");
 
     FetchPageContext(
         tab, options, /*include_actionable_data=*/true,
-        base::BindOnce(OnFetchPageContext, std::move(journal_entry),
-                       std::move(callback),
+        base::BindOnce(OnFetchPageContext, url,
+                       mojo_base::ProtoWrapperBytes::GetPassKey(),
+                       std::move(journal_entry), std::move(callback),
                        GetExecutionEngine()->GetWeakPtr()));
   } else {
-    journal.Log(GURL(), task_id, "FetchPageContext", "Tab is gone");
+    journal.Log(GURL::EmptyGURL(), task_id, "FetchPageContext", "Tab is gone");
     PostTaskForActCallback(std::move(callback),
                            mojom::ActInFocusedTabErrorReason::kTargetNotFound);
   }
@@ -300,9 +300,15 @@ base::WeakPtr<GlicActorController> GlicActorController::GetWeakPtr() {
 }
 
 actor::ExecutionEngine* GlicActorController::GetExecutionEngine() const {
-  if (!actor_task_) {
+  actor::ActorTask* task = GetCurrentTask();
+  if (!task) {
     return nullptr;
   }
-  return actor_task_->GetExecutionEngine();
+  return task->GetExecutionEngine();
 }
+
+actor::ActorTask* GlicActorController::GetCurrentTask() const {
+  return actor::ActorKeyedService::Get(profile_)->GetMostRecentTask();
+}
+
 }  // namespace glic

@@ -3457,7 +3457,7 @@ void CSSAnimations::TransitionEventDelegate::OnEventCondition(
 }
 
 void CSSAnimations::TransitionEventDelegate::EnqueueEvent(
-    const WTF::AtomicString& type,
+    const AtomicString& type,
     const AnimationTimeDelta& elapsed_time) {
   String property_name =
       property_.IsCSSCustomProperty()
@@ -3528,6 +3528,13 @@ bool CSSAnimations::IsAnimationAffectingProperty(const CSSProperty& property) {
     case CSSPropertyID::kTextCombineUpright:
     case CSSPropertyID::kTextOrientation:
     case CSSPropertyID::kTimelineScope:
+    case CSSPropertyID::kTimelineTriggerName:
+    case CSSPropertyID::kTimelineTriggerBehavior:
+    case CSSPropertyID::kTimelineTriggerRangeStart:
+    case CSSPropertyID::kTimelineTriggerRangeEnd:
+    case CSSPropertyID::kTimelineTriggerExitRangeStart:
+    case CSSPropertyID::kTimelineTriggerExitRangeEnd:
+    case CSSPropertyID::kTimelineTriggerTimeline:
     case CSSPropertyID::kTransition:
     case CSSPropertyID::kTransitionBehavior:
     case CSSPropertyID::kTransitionDelay:

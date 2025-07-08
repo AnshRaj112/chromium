@@ -227,7 +227,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="NewTabPage.Click" enum="NTPElement" expires_after="2025-10-26">
+<histogram name="NewTabPage.Click" enum="NTPElement" expires_after="2025-12-28">
   <owner>romanarora@chromium.org</owner>
   <owner>tiborg@chromium.org</owner>
   <owner>chrome-desktop-ntp@google.com</owner>
@@ -240,7 +240,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.Collections.IdOnLoad" enum="NTPCollectionId"
-    expires_after="2025-10-26">
+    expires_after="2025-12-28">
   <owner>danpeng@google.com</owner>
   <owner>pauladedeji@google.com</owner>
   <owner>chrome-desktop-ntp@google.com</owner>
@@ -249,6 +249,19 @@ chromium-metrics-reviews@google.com.
     per NTP. Note that even if the user has Google as their default search
     engine, Incognito and Guest mode NTPs are not considered 1P and don't log
     this histogram.
+  </summary>
+</histogram>
+
+<histogram name="NewTabPage.Composebox.ConfigParseSuccess" enum="Boolean"
+    expires_after="2026-06-17">
+  <owner>mahmadi@google.com</owner>
+  <owner>rtatum@google.com</owner>
+  <owner>chrome-desktop-ntp@google.com</owner>
+  <summary>
+    Recorded the first time the NTP composebox feature is accessed (on the first
+    NTP load) and the configuration proto feature parameter is set to a
+    non-empty value. This metric records whether the config proto was
+    successfully parsed from the base64-encoded string.
   </summary>
 </histogram>
 
@@ -411,7 +424,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.Customization.{ModuleToggleState}"
-    enum="ModuleType" expires_after="2025-08-31">
+    enum="ModuleType" expires_after="2026-01-20">
   <owner>hanxi@chromium.org</owner>
   <owner>yanlinghu@google.com</owner>
   <owner>clank-start@google.com</owner>
@@ -509,7 +522,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.CustomizeShortcutAction"
-    enum="NTPCustomizeShortcutAction" expires_after="2025-10-26">
+    enum="NTPCustomizeShortcutAction" expires_after="2025-12-28">
   <owner>romanarora@chromium.org</owner>
   <owner>tiborg@chromium.org</owner>
   <owner>chrome-desktop-ntp@google.com</owner>
@@ -616,6 +629,18 @@ chromium-metrics-reviews@google.com.
     open Customize Chrome while it is already open. Opening Customize Chrome
     from inside the side panel is tracked by
     &quot;SidePanel.CustomizeChrome.ShowTriggered&quot;.
+  </summary>
+</histogram>
+
+<histogram name="NewTabPage.Footer.NoticeItem" enum="FooterNoticeItem"
+    expires_after="2025-12-27">
+  <owner>pauladedeji@google.com</owner>
+  <owner>tiborg@chromium.org</owner>
+  <owner>esalma@google.com</owner>
+  <owner>chrome-desktop-ntp@google.com</owner>
+  <summary>
+    Logs type of footer notice shown in New Tab Footer when a new tab page is
+    opened.
   </summary>
 </histogram>
 
@@ -809,6 +834,7 @@ chromium-metrics-reviews@google.com.
   <owner>romanarora@chromium.org</owner>
   <owner>tiborg@chromium.org</owner>
   <owner>chrome-desktop-ntp@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     Histogram of the time, in milliseconds, it took for the NTP to load all of
     its tiles since navigation start. {NewTabPageTimings}
@@ -907,7 +933,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.MainUi.ShownTime" units="ms"
-    expires_after="2025-10-26">
+    expires_after="2025-12-28">
   <owner>romanarora@chromium.org</owner>
   <owner>tiborg@chromium.org</owner>
   <owner>chrome-desktop-ntp@google.com</owner>
@@ -1081,7 +1107,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.Module.LongClick" enum="ModuleTypeOnStartAndNTP"
-    expires_after="2025-07-20">
+    expires_after="2026-01-20">
   <owner>hanxi@chromium.org</owner>
   <owner>xinyiji@chromium.org</owner>
   <summary>
@@ -1105,7 +1131,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.Modules.Disabled{Interaction}" enum="NtpModules"
-    expires_after="2025-10-26">
+    expires_after="2025-12-28">
   <owner>romanarora@chromium.org</owner>
   <owner>tiborg@chromium.org</owner>
   <owner>chrome-desktop-ntp@google.com</owner>
@@ -1549,7 +1575,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.NavigationOrActivationToFirstContentfulPaint"
-    units="ms" expires_after="2025-10-26">
+    units="ms" expires_after="2025-12-28">
   <owner>robertlin@chromium.org</owner>
   <owner>chrome-prerendering@google.com</owner>
   <summary>
@@ -1577,7 +1603,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.NavigationOrActivationToLargestContentfulPaint"
-    units="ms" expires_after="2025-10-26">
+    units="ms" expires_after="2025-12-28">
   <owner>robertlin@chromium.org</owner>
   <owner>chrome-prerendering@google.com</owner>
   <summary>
@@ -1913,7 +1939,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.SuggestionsImpression{NewTabPageIconTypes}"
-    enum="MostVisitedTileIndex" expires_after="2025-10-26">
+    enum="MostVisitedTileIndex" expires_after="2025-12-28">
   <owner>romanarora@chromium.org</owner>
   <owner>tiborg@chromium.org</owner>
   <owner>chrome-desktop-ntp@google.com</owner>
@@ -1927,7 +1953,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.SuggestionsImpression{NewTabPageProviders}"
-    enum="MostVisitedTileIndex" expires_after="2025-10-26">
+    enum="MostVisitedTileIndex" expires_after="2025-12-28">
   <owner>romanarora@chromium.org</owner>
   <owner>tiborg@chromium.org</owner>
   <owner>chrome-desktop-ntp@google.com</owner>
@@ -2206,7 +2232,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.WallpaperSearch.GetResultProcessingLatency"
-    units="ms" expires_after="2025-10-26">
+    units="ms" expires_after="2025-12-28">
   <owner>pauladedeji@google.com</owner>
   <owner>tiborg@chromium.org</owner>
   <owner>rtatum@google.com</owner>
@@ -2249,7 +2275,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.WallpaperSearch.SetRecentThemeProcessingLatency"
-    units="ms" expires_after="2025-10-26">
+    units="ms" expires_after="2025-12-28">
   <owner>pauladedeji@google.com</owner>
   <owner>tiborg@chromium.org</owner>
   <owner>rtatum@google.com</owner>
@@ -2264,7 +2290,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="NewTabPage.WallpaperSearch.SetResultThemeProcessingLatency"
-    units="ms" expires_after="2025-10-26">
+    units="ms" expires_after="2025-12-28">
   <owner>pauladedeji@google.com</owner>
   <owner>tiborg@chromium.org</owner>
   <owner>rtatum@google.com</owner>
@@ -2290,7 +2316,7 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="NewTabPage.Width" units="pixels" expires_after="2025-11-02">
+<histogram name="NewTabPage.Width" units="pixels" expires_after="2026-01-04">
   <owner>romanarora@chromium.org</owner>
   <owner>tiborg@chromium.org</owner>
   <owner>chrome-desktop-ntp@google.com</owner>

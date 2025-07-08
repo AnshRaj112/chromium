@@ -1076,7 +1076,7 @@ ColorParseResult Canvas2DRecorderContext::ParseColorOrCurrentColor(
                : kDefaultTextLinkColors;
     // TODO(40946458): Don't use default length resolver here!
     const ResolveColorValueContext context{
-        .length_resolver = CSSToLengthConversionData(/*element=*/nullptr),
+        .conversion_data = CSSToLengthConversionData(/*element=*/nullptr),
         .text_link_colors = text_link_colors,
         .used_color_scheme = color_scheme_,
         .color_provider = GetColorProvider(),
@@ -1399,6 +1399,17 @@ void Canvas2DRecorderContext::setGlobalAlpha(double alpha) {
                                                 alpha);
   }
   state.SetGlobalAlpha(alpha);
+}
+
+double Canvas2DRecorderContext::globalHDRHeadroom() const {
+  return GetState().GlobalHDRHeadroom();
+}
+
+void Canvas2DRecorderContext::setGlobalHDRHeadroom(double h) {
+  if (h < 0.f) {
+    return;
+  }
+  GetState().SetGlobalHDRHeadroom(h);
 }
 
 String Canvas2DRecorderContext::globalCompositeOperation() const {
@@ -2472,7 +2483,7 @@ void Canvas2DRecorderContext::drawImage(CanvasImageSource* image_source,
 
   ValidateStateStack();
 
-  WillDrawImage(image_source);
+  WillDrawImage(image_source, image && image->IsTextureBacked());
 
   if (!origin_tainted_by_content_ && WouldTaintCanvasOrigin(image_source)) {
     SetOriginTaintedByContent();
@@ -2794,7 +2805,7 @@ void Canvas2DRecorderContext::drawMesh(
       index_buffer->GetBuffer();
   CHECK_NE(index_data, nullptr);
 
-  WillDrawImage(image_source);
+  WillDrawImage(image_source, image && image->IsTextureBacked());
 
   if (!origin_tainted_by_content_ && WouldTaintCanvasOrigin(image_source)) {
     SetOriginTaintedByContent();

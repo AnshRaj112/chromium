@@ -31,7 +31,7 @@ ChangePasswordFormWaiter::ChangePasswordFormWaiter(
     content::WebContents* web_contents,
     PasswordFormFoundCallback callback)
     : web_contents_(web_contents), callback_(std::move(callback)) {
-  GetFormCache(web_contents).SetObserver(weak_ptr_factory_.GetWeakPtr());
+  GetFormCache(web_contents).AddObserver(this);
   if (web_contents->IsDocumentOnLoadCompletedInPrimaryMainFrame()) {
     DocumentOnLoadCompletedInPrimaryMainFrame();
   } else {
@@ -41,7 +41,7 @@ ChangePasswordFormWaiter::ChangePasswordFormWaiter(
 
 ChangePasswordFormWaiter::~ChangePasswordFormWaiter() {
   CHECK(web_contents_);
-  GetFormCache(web_contents_).ResetObserver();
+  GetFormCache(web_contents_).RemoveObserver(this);
 }
 
 void ChangePasswordFormWaiter::OnPasswordFormParsed(
@@ -53,8 +53,10 @@ void ChangePasswordFormWaiter::OnPasswordFormParsed(
       form_manager->GetParsedObservedForm();
   CHECK(parsed_form);
 
-  // Change password form shouldn't contain username field.
-  if (parsed_form->username_element_renderer_id) {
+  // Change password form shouldn't contain username field. This doesn't apply
+  // to <form>-less forms.
+  if (parsed_form->form_data.renderer_id() &&
+      parsed_form->username_element_renderer_id) {
     return;
   }
 
@@ -63,9 +65,10 @@ void ChangePasswordFormWaiter::OnPasswordFormParsed(
     return;
   }
 
-  // Either confirmation password or the old password must be present in a
-  // change password form.
-  if (!parsed_form->confirmation_password_element_renderer_id &&
+  // If there are multiple fields, either confirmation password or the old
+  // password must be present in a change password form.
+  if (parsed_form->form_data.fields().size() > 1 &&
+      !parsed_form->confirmation_password_element_renderer_id &&
       !parsed_form->password_element_renderer_id) {
     return;
   }
@@ -77,11 +80,11 @@ void ChangePasswordFormWaiter::OnPasswordFormParsed(
 
 void ChangePasswordFormWaiter::DocumentOnLoadCompletedInPrimaryMainFrame() {
   if (timeout_timer_.IsRunning()) {
-    return;
+    // Page is still loading, reset the timer.
+    timeout_timer_.Reset();
   }
-  timeout_timer_.Start(
-      FROM_HERE, ChangePasswordFormWaiter::kChangePasswordFormWaitingTimeout,
-      this, &ChangePasswordFormWaiter::OnTimeout);
+  timeout_timer_.Start(FROM_HERE, kChangePasswordFormWaitingTimeout, this,
+                       &ChangePasswordFormWaiter::OnTimeout);
 }
 
 void ChangePasswordFormWaiter::OnTimeout() {

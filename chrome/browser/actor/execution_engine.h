@@ -30,10 +30,6 @@ namespace mojo_base {
 class ProtoWrapper;
 }
 
-namespace content {
-class WebContents;
-}  // namespace content
-
 namespace tabs {
 class TabInterface;
 }  // namespace tabs
@@ -46,7 +42,9 @@ namespace actor {
 
 class ActorTask;
 class ToolRequest;
+namespace ui {
 class UiEventDispatcher;
+}
 
 // Coordinates the execution of a multi-step task.
 class ExecutionEngine {
@@ -62,7 +60,7 @@ class ExecutionEngine {
   //     v
   // StartAction -> UiPreTool -> ToolController -> UiPostTool -> Complete
   //     ^                                            |                |
-  //     |____________________________________________|__(test only?)__|
+  //     |____________________________________________|________________|
   //
   // Complete may also be reached directly from other states in case of error.
   enum class State {
@@ -86,8 +84,7 @@ class ExecutionEngine {
 
   static std::unique_ptr<ExecutionEngine> CreateForTesting(
       Profile* profile,
-      std::unique_ptr<UiEventDispatcher> ui_event_dispatcher,
-      tabs::TabInterface* tab);
+      std::unique_ptr<ui::UiEventDispatcher> ui_event_dispatcher);
 
   // This cannot be in the constructor as we first construct the
   // ExecutionEngine, then the ActorTask.
@@ -97,15 +94,6 @@ class ExecutionEngine {
 
   // Cancels any in-progress actions with the reason: "kTaskPaused".
   void CancelOngoingActions(mojom::ActionResultCode reason);
-
-  // Returns the tab associated with the current task if it exists.
-  tabs::TabInterface* GetTabOfCurrentTask() const;
-
-  // Returns true if a task is currently active.
-  bool HasTask() const;
-
-  // Returns true if a task is currently active in `tab`.
-  bool HasTaskForTab(const content::WebContents* tab) const;
 
   // Performs the next action in the current task.
   void Act(const optimization_guide::proto::BrowserAction& action,
@@ -132,8 +120,7 @@ class ExecutionEngine {
   class NewTabWebContentsObserver;
   // Used by tests only.
   ExecutionEngine(Profile* profile,
-                  std::unique_ptr<UiEventDispatcher> ui_event_dispatcher,
-                  tabs::TabInterface* tab);
+                  std::unique_ptr<ui::UiEventDispatcher> ui_event_dispatcher);
 
   void SetState(State state);
 
@@ -214,7 +201,7 @@ class ExecutionEngine {
   // Created when task_ is set. Handles execution details for an individual tool
   // request.
   std::unique_ptr<ToolController> tool_controller_;
-  std::unique_ptr<UiEventDispatcher> ui_event_dispatcher_;
+  std::unique_ptr<ui::UiEventDispatcher> ui_event_dispatcher_;
 
   // A sequence of actions that the model has requested. When it is finished
   // being processed it is reset.

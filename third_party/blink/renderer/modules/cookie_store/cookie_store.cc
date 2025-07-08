@@ -93,8 +93,11 @@ std::unique_ptr<net::CanonicalCookie> ToCanonicalCookie(
   // Trying to set `__http-` prefixed cookie will be rejected further down by
   // CreateSanitizedCookie regardless of the condition below. Its role is to
   // provide a more meaningful exception message than "Cookie was malformed..".
-  const bool is_http_prefix = name.StartsWithIgnoringASCIICase("__http-");
+  const bool is_http_prefix =
+      base::FeatureList::IsEnabled(net::features::kPrefixCookieHttp) &&
+      name.StartsWithIgnoringASCIICase("__http-");
   const bool is_host_http_prefix =
+      base::FeatureList::IsEnabled(net::features::kPrefixCookieHostHttp) &&
       name.StartsWithIgnoringASCIICase("__hosthttp-");
   if (is_http_prefix || is_host_http_prefix) {
     StringBuilder builder;
@@ -104,7 +107,8 @@ std::unique_ptr<net::CanonicalCookie> ToCanonicalCookie(
     exception_state.ThrowTypeError(builder.ToString());
     return nullptr;
   }
-  const bool is_host_prefixed_cookie = name.StartsWith("__Host-");
+  const bool is_host_prefixed_cookie =
+      name.StartsWithIgnoringASCIICase("__host-");
   if (!options->domain().IsNull()) {
     if (is_host_prefixed_cookie) {
       exception_state.ThrowTypeError(

@@ -194,8 +194,9 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
     private boolean mShouldHighlightCookieControlsIcon;
     private int mBlockingStatus3pcd;
     private BrowserServicesIntentDataProvider mIntentDataProvider;
-    private Supplier<AppMenuHandler> mAppMenuHandler;
+    private Supplier<AppMenuHandler> mAppMenuHandler = () -> null;
     private AppMenuObserver mAppMenuObserver;
+    private Activity mActivity;
 
     private final Handler mTaskHandler = new Handler();
     private final ButtonVisibilityRule mButtonVisibilityRule =
@@ -490,6 +491,7 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
             Activity activity,
             Supplier<AppMenuHandler> appMenuHandler,
             BrowserServicesIntentDataProvider intentDataProvider) {
+        mActivity = activity;
         mAppMenuHandler = appMenuHandler;
         if (mIntentDataProvider == null) {
             mIntentDataProvider = intentDataProvider;
@@ -838,6 +840,14 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
         if (!mIntentDataProvider.isOptionalButtonSupported()) return;
 
         mLocationBar.updateOptionalButton(buttonData);
+    }
+
+    @Override
+    protected void hideOptionalButton() {
+        if (ChromeFeatureList.sCctToolbarRefactor.isEnabled()) return;
+        if (!mIntentDataProvider.isOptionalButtonSupported()) return;
+
+        mLocationBar.hideOptionalButton();
     }
 
     /** Resets optional button internal state. */
@@ -1190,7 +1200,7 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
         super.onConfigurationChanged(newConfig);
         mLocationBar.addButtonsVisibilityUpdater();
         mLocationBarModel.notifyTitleChanged();
-        mLocationBarModel.notifyUrlChanged();
+        mLocationBarModel.notifyUrlChanged(false);
         mLocationBarModel.notifyPrimaryColorChanged();
     }
 
@@ -1564,10 +1574,9 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
                     new OptionalButtonCoordinator(
                             optionalButton,
                             /* userEducationHelper= */ () -> {
-                                Tab currentTab = getCurrentTab();
                                 return new UserEducationHelper(
-                                        currentTab.getWindowAndroid().getActivity().get(),
-                                        () -> currentTab.getProfile(),
+                                        mActivity,
+                                        () -> getCurrentTab().getProfile(),
                                         new Handler());
                             },
                             /* transitionRoot= */ CustomTabToolbar.this,
@@ -1657,6 +1666,14 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
             }
             mOptionalButtonCoordinator.updateButton(buttonData, isIncognitoBranded());
             setOptionalButtonBackgroundInset();
+        }
+
+        private void hideOptionalButton() {
+            if (mOptionalButtonCoordinator == null
+                    || mOptionalButtonCoordinator.getViewVisibility() == View.GONE) {
+                return;
+            }
+            mOptionalButtonCoordinator.hideButton();
         }
 
         // Modify the inset of the optional background drawable to match that of the icon secondary
@@ -2114,7 +2131,7 @@ public class CustomTabToolbar extends ToolbarLayout implements View.OnLongClickL
         }
 
         @Override
-        public void onUrlChanged() {
+        public void onUrlChanged(boolean isTabChanging) {
             updateUrlBar();
         }
 

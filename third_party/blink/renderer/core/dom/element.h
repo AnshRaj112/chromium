@@ -134,6 +134,8 @@ class StyleRecalcContext;
 class StyleScopeData;
 class TextVisitor;
 class V8UnionBooleanOrScrollIntoViewOptions;
+class V8UnionStringLegacyNullToEmptyStringOrTrustedHTML;
+class V8UnionStringOrTrustedHTML;
 class ComputedStyleBuilder;
 class StyleAdjuster;
 
@@ -413,7 +415,7 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   void setAttribute(AtomicString name,
                     String value,
                     ExceptionState& exception_state = ASSERT_NO_EXCEPTION) {
-    WTF::AtomicStringTable::WeakResult weak_lowercase_name =
+    AtomicStringTable::WeakResult weak_lowercase_name =
         WeakLowercaseIfNecessary(name);
     SetAttributeHinted(std::move(name), weak_lowercase_name, std::move(value),
                        exception_state);
@@ -423,7 +425,7 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   void setAttribute(AtomicString name,
                     const V8TrustedType* trusted_string,
                     ExceptionState& exception_state) {
-    WTF::AtomicStringTable::WeakResult weak_lowercase_name =
+    AtomicStringTable::WeakResult weak_lowercase_name =
         WeakLowercaseIfNecessary(name);
     SetAttributeHinted(std::move(name), weak_lowercase_name, trusted_string,
                        exception_state);
@@ -459,7 +461,7 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   //   document, then set qualifiedName to qualifiedName in ASCII lowercase.
   //   https://dom.spec.whatwg.org/#concept-element-attributes-get-by-name
   AtomicString LowercaseIfNecessary(AtomicString) const;
-  WTF::AtomicStringTable::WeakResult WeakLowercaseIfNecessary(
+  AtomicStringTable::WeakResult WeakLowercaseIfNecessary(
       const AtomicString&) const;
 
   // NoncedElement implementation: this is only used by HTMLElement and
@@ -1073,14 +1075,6 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
     kAssertNoLayoutUpdates,
   };
 
-  // Whether the element is clickable. This checks for whether the node is
-  // a clickable control (e.g. form control elements) or has activation
-  // behavior. It also checks for whether the node has a click handler.
-  // Note: this should not be taken as a guarantee that the element is
-  // clickable; this is used as a heuristic to determine whether the element
-  // is likely to be clickable.
-  bool IsMaybeClickable();
-
   // Focusability logic:
   //   IsFocusable: true if the element can be focused via element.focus().
   //   IsMouseFocusable: true if clicking on the element will focus it.
@@ -1151,6 +1145,12 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
           command != CommandEventType::kNone);
     return false;
   }
+
+  // These are slightly different than e.g. checking popover->popoverOpen(),
+  // because they also catch the case where the element *was* open as a popover
+  // or dialog, but is in the process of transitioning out of the top layer.
+  bool IsPopoverInTopLayer();
+  bool IsDialogInTopLayer();
 
   // If this element is a triggering element for an *open* popover, in one of
   // several ways, this returns the targeted popover. These forms of triggering
@@ -1243,21 +1243,35 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   void insertAdjacentText(const String& where,
                           const String& text,
                           ExceptionState&);
+  void InsertAdjacentHTMLWithoutTrustedTypes(const String& where,
+                                             const String& html,
+                                             ExceptionState&);
   void insertAdjacentHTML(const String& where,
-                          const String& html,
+                          const V8UnionStringOrTrustedHTML* html,
                           ExceptionState&);
 
-  String innerHTML() const;
-  String outerHTML() const;
-  void setInnerHTML(const String&, ExceptionState& = ASSERT_NO_EXCEPTION);
-  void setOuterHTML(const String&, ExceptionState& = ASSERT_NO_EXCEPTION);
+  String GetInnerHTMLString() const;
+  String GetOuterHTMLString() const;
+  void SetInnerHTMLWithoutTrustedTypes(const String&,
+                                       ExceptionState& = ASSERT_NO_EXCEPTION);
+  void SetOuterHTMLWithoutTrustedTypes(const String&,
+                                       ExceptionState& = ASSERT_NO_EXCEPTION);
+
+  V8UnionStringLegacyNullToEmptyStringOrTrustedHTML* innerHTML() const;
+  V8UnionStringLegacyNullToEmptyStringOrTrustedHTML* outerHTML() const;
+  void setInnerHTML(const V8UnionStringLegacyNullToEmptyStringOrTrustedHTML*,
+                    ExceptionState&);
+  void setOuterHTML(const V8UnionStringLegacyNullToEmptyStringOrTrustedHTML*,
+                    ExceptionState&);
 
   // The setHTMLUnsafe method is like `setInnerHTML()` except that a) it parses
   // declarative shadow DOM by default, and b) will eventually have a second
   // argument to set Sanitizer parameters.
   // See https://github.com/whatwg/html/pull/9538.
-  void setHTMLUnsafe(const String& html, ExceptionState& = ASSERT_NO_EXCEPTION);
-  void setHTMLUnsafe(const String& html,
+  void SetHTMLUnsafeWithoutTrustedTypes(const String& html,
+                                        ExceptionState& = ASSERT_NO_EXCEPTION);
+  void setHTMLUnsafe(const V8UnionStringOrTrustedHTML* html, ExceptionState&);
+  void setHTMLUnsafe(const V8UnionStringOrTrustedHTML* html,
                      SetHTMLUnsafeOptions*,
                      ExceptionState&);
   void setHTML(const String& html, SetHTMLOptions*, ExceptionState&);
@@ -1756,7 +1770,7 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   GCedHeapVector<Member<Element>>* ElementsFromAttributeOrInternals(
       const QualifiedName& attribute) const;
 
-  bool IsClickableControl() { return IsClickableControl(this); }
+  bool IsClickableFormControlNode() const;
 
  protected:
   bool HasElementData() const { return static_cast<bool>(element_data_); }
@@ -2163,23 +2177,22 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
   // the `hint` can be constructed from calling AtomicString::Impl().
   const AtomicString& GetAttributeHinted(
       const AtomicString& name,
-      WTF::AtomicStringTable::WeakResult hint) const;
+      AtomicStringTable::WeakResult hint) const;
   void RemoveAttributeHinted(const AtomicString& name,
-                             WTF::AtomicStringTable::WeakResult hint);
-  void SynchronizeAttributeHinted(
-      const AtomicString& name,
-      WTF::AtomicStringTable::WeakResult hint) const;
+                             AtomicStringTable::WeakResult hint);
+  void SynchronizeAttributeHinted(const AtomicString& name,
+                                  AtomicStringTable::WeakResult hint) const;
   void SetAttributeHinted(AtomicString name,
-                          WTF::AtomicStringTable::WeakResult hint,
+                          AtomicStringTable::WeakResult hint,
                           String value,
                           ExceptionState& = ASSERT_NO_EXCEPTION);
   void SetAttributeHinted(AtomicString name,
-                          WTF::AtomicStringTable::WeakResult hint,
+                          AtomicStringTable::WeakResult hint,
                           const V8TrustedType* trusted_string,
                           ExceptionState& exception_state);
   std::pair<wtf_size_t, const QualifiedName> LookupAttributeQNameHinted(
       AtomicString name,
-      WTF::AtomicStringTable::WeakResult hint) const;
+      AtomicStringTable::WeakResult hint) const;
   wtf_size_t ValidateAttributeIndex(wtf_size_t index,
                                     const QualifiedName& qname) const;
 
@@ -2267,9 +2280,8 @@ class CORE_EXPORT Element : public ContainerNode, public Animatable {
       const ComputedStyle& new_style,
       const ComputedStyle* parent_style) const;
 
-  // This checks that the feature KeyboardFocusableScrollers is enabled and
-  // element is a scroller. This will call IsScrollableNode, which might update
-  // layout.
+  // This checks that the element is a scroller by calling IsScrollableNode,
+  // which might update layout.
   // If UpdateBehavior::kNoneForAccessibility argument is passed, which should
   // only be used by a11y code, layout updates will never be performed.
   bool CanBeKeyboardFocusableScroller(

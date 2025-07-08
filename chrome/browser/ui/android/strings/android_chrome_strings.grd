@@ -1138,11 +1138,8 @@ For more settings that use data to improve your Chrome experience, go to <ph nam
       <message name="IDS_CONTEXTUAL_SEARCH_SEE_BETTER_RESULTS_SUMMARY" desc="Summary for the see better results switch in Contextual Search preference.">
         By including more of a page’s text, you might see better results
       </message>
-      <message name="IDS_CONTEXTUAL_SEARCH_CALLOUT_TEXT" desc="The text for a button, which when pressed opens the latest search results for the currently selected text.">
-        Latest results
-      </message>
-      <message name="IDS_CONTEXTUAL_SEARCH_CALLOUT_TEXT_VARIANT" desc="The text for a button, which when pressed allows the user to see more information about the currently selected text.">
-        See more
+      <message name="IDS_CONTEXTUAL_SEARCH_CALLOUT_IPH" desc="Text shown on in-product-help bubble to inform a user that dragging up on the panel will expand it, opening the latest search results for the currently selected text.">
+        Drag up to see search results
       </message>
       <message name="IDS_DO_NOT_TRACK_TITLE" desc="Title for the 'Do Not Track' preference. Please leave the 'Do Not Track' part in English according to the glossary.">
         Send a “Do Not Track” request
@@ -1976,7 +1973,7 @@ Your Google account may have other forms of browsing history like searches and a
         =1 {Unsubscribed from one unused site}
         other {Unsubscribed from # unused sites}}
       </message>
-      <message name="IDS_SAFETY_HUB_UNSUBSCRIBED_NOTIFICATIONS_NOTIFICATION_MESSAGE" desc="Message for the notification sent from Safety Hub for telling the user that some notifications have been unsubscribed.">
+      <message name="IDS_SAFETY_HUB_UNSUBSCRIBED_NOTIFICATIONS_NOTIFICATION_MESSAGE" desc="Message for the notification sent from Safety Hub for telling the user that some notifications have been unsubscribed." meaning="This message informs about notification permissions having been revoked from one or more sites and explains that the user can review and manage [those notification permission revocations] by either clicking on this message or on the Review button below it.">
         {NUM_REVOKED_PERMISSIONS, plural,
         =1 {Chrome stopped notifications from this site. You can review and manage.}
         other {Chrome stopped notifications from these sites. You can review and manage.}}
@@ -2203,10 +2200,16 @@ Your Google account may have other forms of browsing history like searches and a
         Download anyway
       </message>
       <message name="IDS_DANGEROUS_DOWNLOAD_DIALOG_TEXT" desc="Warning message shown on a dialog to ask user to validate the download of a dangerous file.">
-        Do you want to download <ph name="FILE_NAME">%1$s<ex>malware.exe</ex></ph> anyway?
+        Do you want to download "<ph name="FILE_NAME">^1<ex>malware.exe</ex></ph>" anyway?
+      </message>
+      <message name="IDS_DANGEROUS_DOWNLOAD_DIALOG_TEXT_WITH_DOMAIN" desc="Warning message shown on a dialog to ask user to validate the download of a dangerous file, including the domain of the download.">
+        Do you want to download "<ph name="FILE_NAME">^1<ex>malware.exe</ex></ph>" from <ph name="DOWNLOAD_DOMAIN">^2<ex>badsite.com</ex></ph> anyway?
       </message>
       <message name="IDS_DANGEROUS_DOWNLOAD_DIALOG_TEXT_WITH_SIZE" desc="Warning message shown on a dialog to ask user to validate the download of a dangerous file, with size information.">
-        Do you want to download <ph name="FILE_NAME">%1$s<ex>malware.exe</ex></ph> (<ph name="FILE_SIZE">%2$s<ex>100MB</ex></ph>) anyway?
+        Do you want to download "<ph name="FILE_NAME">^1<ex>malware.exe</ex></ph>" (<ph name="FILE_SIZE">^2<ex>100MB</ex></ph>) anyway?
+      </message>
+      <message name="IDS_DANGEROUS_DOWNLOAD_DIALOG_TEXT_WITH_SIZE_AND_DOMAIN" desc="Warning message shown on a dialog to ask user to validate the download of a dangerous file, with size information and the domain of the download.">
+        Do you want to download "<ph name="FILE_NAME">^1<ex>malware.exe</ex></ph>" (<ph name="FILE_SIZE">^2<ex>100MB</ex></ph>) from <ph name="DOWNLOAD_DOMAIN">^3<ex>badsite.com</ex></ph> anyway?
       </message>
       <message name="IDS_DANGEROUS_DOWNLOAD_DIALOG_TITLE" desc="Title of the dialog for asking user to confirm a dangerous download">
         File might be harmful
@@ -2602,6 +2605,9 @@ Your Google account may have other forms of browsing history like searches and a
       <message name="IDS_SYNC_BOOKMARKS" desc="Title for preference which enables sync'ing of bookmarks. [CHAR_LIMIT=32]">
         Bookmarks
       </message>
+      <message name="IDS_SYNC_EXTENSIONS" desc="Title for preference which enables sync'ing of Chrome browser extensions. [CHAR_LIMIT=32]">
+        Extensions
+      </message>
       <message name="IDS_SYNC_HISTORY" desc="Title for preference which enables sync'ing of history data. [CHAR_LIMIT=32]">
         History
       </message>
@@ -2640,6 +2646,9 @@ Your Google account may have other forms of browsing history like searches and a
       </message>
       <message name="IDS_ACCOUNT_SECTION_BOOKMARKS_TOGGLE" desc="Bookmarks, one of the data types that we allow syncing. Shown on next to the toggle that controls whether bookmarks should be saved in the Google Account and synced across devices.">
         Bookmarks
+      </message>
+      <message name="IDS_ACCOUNT_SECTION_EXTENSIONS_TOGGLE" desc="Chrome browser extensions, one of the data types that we allow syncing. Shown on next to the toggle that controls whether extensions should be saved in the Google Account and synced across devices.">
+        Extensions
       </message>
       <message name="IDS_ACCOUNT_SECTION_READING_LIST_TOGGLE" desc="Reading List, one of the data types that we allow syncing. Shown on next to the toggle that controls whether reading list should be saved in the Google Account and synced across devices.">
         Reading list
@@ -2824,24 +2833,6 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
       <message name="IDS_SYNC_LOADING" desc="Preference title to let the user change their encryption password. [CHAR_LIMIT=20]">
         Loading…
-      </message>
-      <message name="IDS_SYNC_IMPORT_DATA_PROMPT" desc="Prompt for the user to choose how they want to handle their existing sync data">
-         You have bookmarks, history, passwords, and other settings from <ph name ="FROM_ACCOUNT">%1$s<ex>johndoe@old.com</ex></ph>.
-      </message>
-      <message name="IDS_SYNC_IMPORT_DATA_PROMPT_WITHOUT_PASSWORDS" desc="Prompt for the user to choose how they want to handle their existing sync data. Similar to IDS_SYNC_IMPORT_DATA_PROMPT but without mentioning passwords.">
-         You have bookmarks, history, and other settings from <ph name ="FROM_ACCOUNT">%1$s<ex>johndoe@old.com</ex></ph>.
-      </message>
-      <message name="IDS_SYNC_IMPORT_EXISTING_DATA" desc="Option to import existing data to the newly selected sync account">
-        Combine my data
-      </message>
-      <message name="IDS_SYNC_IMPORT_EXISTING_DATA_SUBTEXT" desc="Subtext describing what happens if the user elects to import existing data to the newly selected sync account">
-        Add existing data to <ph name="TO_ACCOUNT">%1$s<ex>johndoe@new.com</ex></ph>.
-      </message>
-      <message name="IDS_SYNC_KEEP_EXISTING_DATA_SEPARATE" desc="Option to keep the existing data separate from the newly selected sync account">
-        Keep my data separate
-      </message>
-      <message name="IDS_SYNC_KEEP_EXISTING_DATA_SEPARATE_SUBTEXT_EXISTING_DATA" desc="Subtext describing what happens if the user elects to keep the existing data separate signing into a new account after have previously being signed into a different account then signed out.">
-        Delete existing data.
       </message>
 
       <!-- Hint of sync error solution strings -->
@@ -5345,13 +5336,13 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
         Unsupported number of Chrome instances.
       </message>
       <message name="IDS_MAX_NUMBER_OF_WINDOWS" desc="Toast message for when the user has tried to start more than 5 instances of Chrome window.">
-        You can have up to 5 windows.
+        You can have up to <ph name="MAX_WINDOW_COUNT">%1$d</ph> windows.
       </message>
       <message name="IDS_MAX_NUMBER_OF_WINDOWS_INSTANCE_SWITCHER_V2_ACTIVE_TAB" desc="Message to notify the user that a new window cannot be created because the total number of persisted instances exceeds the window limit.">
-        You can have up to <ph name="MAX_WINDOW_COUNT">%1$d</ph> total windows. To open a new window, reduce the total number of windows across active and inactive to <ph name="MAX_WINDOW_COUNT_MINUS_ONE">%2$d</ph> or fewer.
+        To open a new window, reduce the total number of windows across active and inactive to <ph name="MAX_WINDOW_COUNT_MINUS_ONE">%1$d</ph> or fewer.
       </message>
       <message name="IDS_MAX_NUMBER_OF_WINDOWS_INSTANCE_SWITCHER_V2_INACTIVE_TAB" desc="Message to notify the user thata window cannot be restored because the total number of persisted instances exceeds the window limit.">
-        You can have up to <ph name="MAX_WINDOW_COUNT">%1$d</ph> total windows. To restore a new window, reduce the total number of windows across active and inactive to <ph name="MAX_WINDOW_COUNT_MINUS_ONE">%2$d</ph> or fewer. Inactive windows are deleted after 6 months.
+        To restore a new window, reduce the total number of windows across active and inactive to <ph name="MAX_WINDOW_COUNT_MINUS_ONE">%1$d</ph> or fewer. Inactive windows are deleted after 6 months.
       </message>
       <message name="IDS_TAB_DROPPED_DIFFERENT_MODEL" desc="Toast that appears when a tab is dropped into tab strip with a different profile (regular v.s. incognito).">
         You can find all open tabs in the tab switcher
@@ -5820,6 +5811,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
       <message name="IDS_INSTANCE_SWITCHER_CLOSE_CONFIRM_DELETED_TABS_ONE" desc="The phrase used in the message when there is a single tab to delete.">
         The tab <ph name="TAB_TITLE">%1$s<ex>YouTube</ex></ph> will be closed
+      </message>
+      <message name="IDS_INSTANCE_SWITCHER_CLOSE_CONFIRM_DELETED_TABS_ONE_V2" desc="The phrase used in the message when there is a single tab to delete.">
+        <ph name="TAB_TITLE">%1$s<ex>YouTube</ex></ph> will be closed
       </message>
       <message name="IDS_INSTANCE_SWITCHER_CLOSE_CONFIRM_DELETED_TABS_MANY" desc="The phrase used in the message when there are multiple tabs to delete.">
         {TAB_COUNT, plural,

@@ -27,7 +27,8 @@ constexpr const char kEventEmitterTypeName[] = "Event";
 
 }  // namespace
 
-gin::WrapperInfo EventEmitter::kWrapperInfo = {gin::kEmbedderNativeGin};
+gin::DeprecatedWrapperInfo EventEmitter::kWrapperInfo = {
+    gin::kEmbedderNativeGin};
 
 EventEmitter::EventEmitter(bool supports_filters,
                            std::unique_ptr<APIEventListeners> listeners,
@@ -40,7 +41,7 @@ EventEmitter::~EventEmitter() = default;
 
 gin::ObjectTemplateBuilder EventEmitter::GetObjectTemplateBuilder(
     v8::Isolate* isolate) {
-  return Wrappable<EventEmitter>::GetObjectTemplateBuilder(isolate)
+  return DeprecatedWrappable<EventEmitter>::GetObjectTemplateBuilder(isolate)
       .SetMethod("addListener", &EventEmitter::AddListener)
       .SetMethod("removeListener", &EventEmitter::RemoveListener)
       .SetMethod("hasListener", &EventEmitter::HasListener)
@@ -67,7 +68,7 @@ v8::Local<v8::Value> EventEmitter::FireSync(
     v8::Local<v8::Context> context,
     v8::LocalVector<v8::Value>* args,
     mojom::EventFilteringInfoPtr filter) {
-  DCHECK(context == context->GetIsolate()->GetCurrentContext());
+  DCHECK(context == v8::Isolate::GetCurrent()->GetCurrentContext());
   return DispatchSync(context, args, std::move(filter));
 }
 
@@ -210,7 +211,7 @@ v8::Local<v8::Value> EventEmitter::DispatchSync(
       listeners_->GetListeners(std::move(filter), context);
 
   JSRunner* js_runner = JSRunner::Get(context);
-  v8::Isolate* isolate = context->GetIsolate();
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
   DCHECK(context == isolate->GetCurrentContext());
 
   // Gather results from each listener as we go along. This should only be
@@ -273,7 +274,7 @@ void EventEmitter::DispatchAsync(v8::Local<v8::Context> context,
                                  v8::LocalVector<v8::Value>* args,
                                  mojom::EventFilteringInfoPtr filter,
                                  v8::Local<v8::Function> callback) {
-  v8::Isolate* isolate = context->GetIsolate();
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
   v8::HandleScope handle_scope(isolate);
   v8::Context::Scope context_scope(context);
 

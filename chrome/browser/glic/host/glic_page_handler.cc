@@ -58,6 +58,7 @@
 #include "components/metrics/metrics_service.h"
 #include "components/prefs/pref_service.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
+#include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/browser/guest_view/web_view/web_view_guest.h"
 #include "mojo/public/cpp/bindings/callback_helpers.h"
@@ -569,6 +570,20 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     }
   }
 
+  void GetZeroStateSuggestionsAndSubscribe(
+      bool has_active_subscription,
+      mojom::ZeroStateSuggestionsOptionsPtr options,
+      GetZeroStateSuggestionsAndSubscribeCallback callback) override {
+    if (ShouldDoApiActivationGating()) {
+      std::move(callback).Run(nullptr);
+      return;
+    }
+
+    glic_service_->zero_state_suggestions_manager().ObserveZeroStateSuggestions(
+        has_active_subscription, options->is_first_run,
+        options->supported_tools, std::move(callback));
+  }
+
   void CreateTab(const ::GURL& url,
                  bool open_in_background,
                  const std::optional<int32_t> window_id,
@@ -692,6 +707,15 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
       return;
     }
     glic_sharing_manager_->UnpinAllTabs();
+  }
+
+  void CreateTask(CreateTaskCallback callback) override {
+    glic_service_->CreateTask(std::move(callback));
+  }
+
+  void PerformActions(const std::vector<uint8_t>& actions_proto,
+                      PerformActionsCallback callback) override {
+    glic_service_->PerformActions(actions_proto, std::move(callback));
   }
 
   void ActInFocusedTab(const std::vector<uint8_t>& action_proto,
@@ -1071,6 +1095,12 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
         MaybeNotifyFocusedTabChanged(std::move(cached_focused_tab_data_));
       }
       cached_focused_tab_data_ = nullptr;
+
+      if (cached_zero_state_suggestions_) {
+        web_client_->NotifyZeroStateSuggestionsChanged(
+            std::move(cached_zero_state_suggestions_),
+            std::move(cached_zero_state_suggestions_options_));
+      }
     }
   }
 
@@ -1079,6 +1109,16 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     if (web_client_) {
       web_client_->NotifyBrowserIsOpenChanged(is_open);
     }
+  }
+
+  void GetPinCandidates(glic::mojom::GetPinCandidatesOptionsPtr options,
+                        GetPinCandidatesCallback callback) override {
+    if (ShouldDoApiActivationGating()) {
+      std::vector<glic::mojom::TabDataPtr> no_results;
+      std::move(callback).Run(std::move(no_results));
+      return;
+    }
+    glic_sharing_manager_->GetPinCandidates(*options, std::move(callback));
   }
 
   void GetZeroStateSuggestionsForFocusedTab(
@@ -1126,6 +1166,19 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     glic_service_->enabling().UpdateUserStatusWithThrottling();
   }
 
+  void IsDebuggerAttached(IsDebuggerAttachedCallback callback) override {
+    content::RenderFrameHost* guest_main_frame =
+        page_handler_->GetGuestMainFrame();
+    if (!guest_main_frame) {
+      std::move(callback).Run(false);
+      return;
+    }
+    content::WebContents* guest_web_contents =
+        content::WebContents::FromRenderFrameHost(guest_main_frame);
+    std::move(callback).Run(
+        content::DevToolsAgentHost::IsDebuggerAttached(guest_web_contents));
+  }
+
   void OnOsPermissionSettingChanged(ContentSettingsType content_type,
                                     bool is_blocked) {
     // Ignore other content types.
@@ -1157,6 +1210,19 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     web_client_->NotifyPinnedTabDataChanged(tab_data->Clone());
   }
 
+  void NotifyZeroStateSuggestionsChanged(
+      glic::mojom::ZeroStateSuggestionsV2Ptr suggestions,
+      mojom::ZeroStateSuggestionsOptionsPtr options) {
+    if (ShouldDoApiActivationGating()) {
+      cached_zero_state_suggestions_ = std::move(suggestions);
+      cached_zero_state_suggestions_options_ = std::move(options);
+      return;
+    }
+
+    web_client_->NotifyZeroStateSuggestionsChanged(std::move(suggestions),
+                                                   std::move(options));
+  }
+
  private:
   void Uninstall() {
     SetAudioDucking(false, base::DoNothing());
@@ -1171,6 +1237,7 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     pinned_tabs_changed_subscription_ = {};
     pinned_tab_data_changed_subscription_ = {};
     browser_attach_observation_.reset();
+    glic_service_->zero_state_suggestions_manager().Reset();
   }
 
   void WebClientDisconnected() { Uninstall(); }
@@ -1244,6 +1311,9 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
   }
 
   glic::mojom::FocusedTabDataPtr cached_focused_tab_data_ = nullptr;
+  glic::mojom::ZeroStateSuggestionsV2Ptr cached_zero_state_suggestions_;
+  glic::mojom::ZeroStateSuggestionsOptionsPtr
+      cached_zero_state_suggestions_options_;
   PrefChangeRegistrar pref_change_registrar_;
   PrefChangeRegistrar local_state_pref_change_registrar_;
   raw_ptr<Profile> profile_;
@@ -1376,6 +1446,29 @@ void GlicPageHandler::WebUiStateChanged(glic::mojom::WebUiState new_state) {
 void GlicPageHandler::AllowedChanged() {
   page_->SetProfileReadyState(GlicEnabling::GetProfileReadyState(
       Profile::FromBrowserContext(browser_context_)));
+}
+
+void GlicPageHandler::ZeroStateSuggestionChanged(
+    std::optional<std::vector<std::string>> returned_suggestions,
+    mojom::ZeroStateSuggestionsOptions returned_options) {
+  if (!web_client_handler_) {
+    return;
+  }
+  auto suggestions_v2 = mojom::ZeroStateSuggestionsV2::New();
+  std::vector<mojom::SuggestionContentPtr> output_suggestions;
+  if (returned_suggestions) {
+    for (const std::string& suggestion_string : returned_suggestions.value()) {
+      output_suggestions.push_back(
+          mojom::SuggestionContent::New(suggestion_string));
+    }
+    suggestions_v2->suggestions = std::move(output_suggestions);
+  }
+  auto options = mojom::ZeroStateSuggestionsOptions::New();
+  options->is_first_run = std::move(returned_options.is_first_run);
+  options->supported_tools = std::move(returned_options.supported_tools);
+
+  web_client_handler_->NotifyZeroStateSuggestionsChanged(
+      std::move(suggestions_v2), std::move(options));
 }
 
 }  // namespace glic

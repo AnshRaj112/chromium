@@ -570,13 +570,13 @@ LayoutUnit ComputeInlineSizeForFragmentInternal(
       return Length::MinContent();
     }
     if (space.InlineAutoBehavior() == AutoSizeBehavior::kStretchExplicit) {
-      return Length::FillAvailable();
+      return Length::Stretch();
     }
     if (may_apply_aspect_ratio) {
       return Length::FitContent();
     }
     if (space.InlineAutoBehavior() == AutoSizeBehavior::kStretchImplicit) {
-      return Length::FillAvailable();
+      return Length::Stretch();
     }
     DCHECK_EQ(space.InlineAutoBehavior(), AutoSizeBehavior::kFitContent);
     return Length::FitContent();
@@ -843,13 +843,13 @@ LayoutUnit ComputeBlockSizeForFragmentInternal(
       return Length::FitContent();
     }
     if (space.BlockAutoBehavior() == AutoSizeBehavior::kStretchExplicit) {
-      return Length::FillAvailable();
+      return Length::Stretch();
     }
     if (may_apply_aspect_ratio) {
       return Length::FitContent();
     }
     if (space.BlockAutoBehavior() == AutoSizeBehavior::kStretchImplicit) {
-      return Length::FillAvailable();
+      return Length::Stretch();
     }
     DCHECK_EQ(space.BlockAutoBehavior(), AutoSizeBehavior::kFitContent);
     return Length::FitContent();
@@ -1049,6 +1049,9 @@ LogicalSize ComputeReplacedSizeInternal(const BlockNode& node,
                                  ReplacedSizeMode::kIgnoreBlockLengths)
           .block_size;
     }
+    if (natural_size) {
+      return natural_size->block_size;
+    }
     return kIndefiniteSize;
   };
 
@@ -1091,7 +1094,7 @@ LogicalSize ComputeReplacedSizeInternal(const BlockNode& node,
               ? Length::FitContent()
               : Length::Auto();
       const Length& auto_block_length = space.IsBlockAutoBehaviorStretch()
-                                            ? Length::FillAvailable()
+                                            ? Length::Stretch()
                                             : non_stretch_length;
       const LayoutUnit block_size =
           RuntimeEnabledFeatures::LayoutNewReplacedLogicEnabled()
@@ -1185,7 +1188,7 @@ LogicalSize ComputeReplacedSizeInternal(const BlockNode& node,
               ? Length::FitContent()
               : Length::Auto();
       const Length& auto_length = space.IsInlineAutoBehaviorStretch()
-                                      ? Length::FillAvailable()
+                                      ? Length::Stretch()
                                       : non_stretch_length;
       const LayoutUnit inline_size =
           ResolveMainInlineLength(space, style, border_padding, MinMaxSizesFunc,
@@ -1219,7 +1222,7 @@ LogicalSize ComputeReplacedSizeInternal(const BlockNode& node,
       size = ResolveMainInlineLength(
           space, style, border_padding,
           [](SizeType) -> MinMaxSizesResult { NOTREACHED(); },
-          Length::FillAvailable(), /* auto_length */ nullptr,
+          Length::Stretch(), /* auto_length */ nullptr,
           /* override_available_size */ kIndefiniteSize);
     }
     if (RuntimeEnabledFeatures::LayoutNewReplacedLogicEnabled()) {
@@ -1924,8 +1927,9 @@ LayoutUnit ClampIntrinsicBlockSize(
   DCHECK(!node.IsTable());
 
   const LayoutUnit intrinsic_block_size =
-      CalculateIntrinsicBlockSizeIgnoringChildren(node,
-                                                  border_scrollbar_padding);
+      CalculateIntrinsicBlockSizeIgnoringChildren(
+          node, border_scrollbar_padding,
+          /*children_have_geometry=*/true);
   if (intrinsic_block_size != kIndefiniteSize) {
     return intrinsic_block_size;
   }
@@ -1984,7 +1988,8 @@ std::optional<MinMaxSizesResult> CalculateMinMaxSizesIgnoringChildren(
 
 LayoutUnit CalculateIntrinsicBlockSizeIgnoringChildren(
     const BlockNode& node,
-    const BoxStrut& border_scrollbar_padding) {
+    const BoxStrut& border_scrollbar_padding,
+    bool children_have_geometry) {
   // Check if the intrinsic size was overridden.
   const LayoutUnit override_size = node.OverrideIntrinsicContentBlockSize();
   if (override_size != kIndefiniteSize) {
@@ -1992,7 +1997,8 @@ LayoutUnit CalculateIntrinsicBlockSizeIgnoringChildren(
   }
 
   // Check if we have a "default" size (a <textarea>).
-  const LayoutUnit default_block_size = node.DefaultIntrinsicContentBlockSize();
+  const LayoutUnit default_block_size =
+      node.DefaultIntrinsicContentBlockSize(children_have_geometry);
   if (default_block_size != kIndefiniteSize) {
     // <textarea>'s intrinsic size should ignore scrollbar existence.
     if (node.IsTextArea()) {

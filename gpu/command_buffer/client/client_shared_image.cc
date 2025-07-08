@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifdef UNSAFE_BUFFERS_BUILD
+// TODO(crbug.com/40285824): Remove this and convert code to safer constructs.
+#pragma allow_unsafe_buffers
+#endif
+
 #include "gpu/command_buffer/client/client_shared_image.h"
 
 #include <GLES2/gl2.h>
@@ -28,11 +33,104 @@
 #include "mojo/public/cpp/bindings/callback_helpers.h"
 #include "ui/gfx/buffer_format_util.h"
 #include "ui/gfx/buffer_types.h"
+#include "ui/gfx/buffer_usage_util.h"
 #include "ui/gfx/gpu_memory_buffer.h"
+
+#if BUILDFLAG(IS_MAC)
+#include "gpu/ipc/common/gpu_memory_buffer_impl_io_surface.h"
+#endif
+
+#if BUILDFLAG(IS_OZONE)
+#include "gpu/ipc/common/gpu_memory_buffer_impl_native_pixmap.h"
+#include "ui/ozone/public/client_native_pixmap_factory_ozone.h"
+#include "ui/ozone/public/ozone_platform.h"
+#endif
+
+#if BUILDFLAG(IS_WIN)
+#include "gpu/ipc/common/gpu_memory_buffer_impl_dxgi.h"
+#endif
 
 namespace gpu {
 
 namespace {
+
+class FakeGpuMemoryBuffer : public gfx::GpuMemoryBuffer {
+ public:
+  FakeGpuMemoryBuffer() = delete;
+  FakeGpuMemoryBuffer(
+      const gfx::Size& size,
+      gfx::BufferFormat format,
+      bool premapped,
+      const ClientSharedImage::AsyncMapInvokedCallback& callback)
+      : size_(size),
+        format_(format),
+        premapped_(premapped),
+        async_map_invoked_callback_(callback) {
+    int num_planes = gfx::NumberOfPlanesForLinearBufferFormat(format_);
+    size_t allocation_size = 0;
+    for (int plane_index = 0; plane_index < num_planes; plane_index++) {
+      size_t height_in_pixels;
+      CHECK(gfx::PlaneHeightForBufferFormatChecked(
+          GetSize().height(), GetFormat(), plane_index, &height_in_pixels));
+      allocation_size += stride(plane_index) * height_in_pixels;
+    }
+
+    data_ = std::vector<uint8_t>(allocation_size);
+
+    handle_.type = gfx::SHARED_MEMORY_BUFFER;
+  }
+
+  FakeGpuMemoryBuffer(const FakeGpuMemoryBuffer&) = delete;
+  FakeGpuMemoryBuffer& operator=(const FakeGpuMemoryBuffer&) = delete;
+
+  ~FakeGpuMemoryBuffer() override = default;
+
+  bool Map() override { return true; }
+
+  void MapAsync(base::OnceCallback<void(bool)> result_cb) override {
+    if (premapped_) {
+      std::move(result_cb).Run(true);
+      return;
+    }
+    async_map_invoked_callback_.Run(std::move(result_cb));
+  }
+
+  bool AsyncMappingIsNonBlocking() const override { return true; }
+
+  void* memory(size_t plane) override {
+    DCHECK_LT(plane, gfx::NumberOfPlanesForLinearBufferFormat(format_));
+    auto* data_ptr = data_.data();
+    data_ptr += gfx::BufferOffsetForBufferFormat(GetSize(), GetFormat(), plane);
+    return data_ptr;
+  }
+
+  void Unmap() override {}
+
+  gfx::Size GetSize() const override { return size_; }
+
+  gfx::BufferFormat GetFormat() const override { return format_; }
+
+  int stride(size_t plane) const override {
+    DCHECK_LT(plane, gfx::NumberOfPlanesForLinearBufferFormat(GetFormat()));
+    return gfx::RowSizeForBufferFormat(GetSize().width(), GetFormat(), plane);
+  }
+
+  gfx::GpuMemoryBufferType GetType() const override {
+    return gfx::SHARED_MEMORY_BUFFER;
+  }
+
+  gfx::GpuMemoryBufferHandle CloneHandle() const override {
+    return handle_.Clone();
+  }
+
+ private:
+  gfx::Size size_;
+  gfx::BufferFormat format_;
+  std::vector<uint8_t> data_;
+  gfx::GpuMemoryBufferHandle handle_;
+  bool premapped_ = true;
+  ClientSharedImage::AsyncMapInvokedCallback async_map_invoked_callback_;
+};
 
 class ScopedMappingSharedMemoryMapping
     : public ClientSharedImage::ScopedMapping {
@@ -219,6 +317,52 @@ uint32_t ComputeTextureTargetForSharedImage(
 }  // namespace
 
 // static
+std::unique_ptr<GpuMemoryBufferImpl>
+ClientSharedImage::CreateGpuMemoryBufferImplFromHandle(
+    gfx::GpuMemoryBufferHandle handle,
+    const gfx::Size& size,
+    gfx::BufferFormat format,
+    gfx::BufferUsage usage,
+    GpuMemoryBufferImpl::CopyNativeBufferToShMemCallback
+        copy_native_buffer_to_shmem_callback,
+    scoped_refptr<base::UnsafeSharedMemoryPool> pool) {
+  switch (handle.type) {
+    case gfx::SHARED_MEMORY_BUFFER:
+      return GpuMemoryBufferImplSharedMemory::CreateFromHandle(
+          std::move(handle), size, format, usage, base::DoNothing());
+#if BUILDFLAG(IS_MAC)
+    case gfx::IO_SURFACE_BUFFER:
+      return GpuMemoryBufferImplIOSurface::CreateFromHandle(
+          std::move(handle), size, format, usage, base::DoNothing());
+#endif
+#if BUILDFLAG(IS_OZONE)
+    case gfx::NATIVE_PIXMAP: {
+      // NOTE: This is not used beyond the lifetime of CreateFromHandle().
+      auto client_native_pixmap_factory =
+          ui::CreateClientNativePixmapFactoryOzone();
+      return GpuMemoryBufferImplNativePixmap::CreateFromHandle(
+          client_native_pixmap_factory.get(), std::move(handle), size, format,
+          usage, base::DoNothing());
+    }
+#endif
+#if BUILDFLAG(IS_WIN)
+    case gfx::DXGI_SHARED_HANDLE:
+      return GpuMemoryBufferImplDXGI::CreateFromHandle(
+          std::move(handle), size, format, usage, base::DoNothing(),
+          std::move(copy_native_buffer_to_shmem_callback), std::move(pool));
+#endif
+#if BUILDFLAG(IS_ANDROID)
+    case gfx::ANDROID_HARDWARE_BUFFER:
+      return nullptr;
+#endif
+    default:
+      // TODO(dcheng): Remove default case (https://crbug.com/676224).
+      NOTREACHED() << gfx::BufferFormatToString(format) << ", "
+                   << gfx::BufferUsageToString(usage);
+  }
+}
+
+// static
 std::unique_ptr<ClientSharedImage::ScopedMapping>
 ClientSharedImage::ScopedMapping::Create(
     SharedImageMetadata metadata,
@@ -331,15 +475,14 @@ ClientSharedImage::ClientSharedImage(
       sii_holder_(std::move(sii_holder)),
       texture_target_(exported_si.texture_target_) {
   if (exported_si.buffer_handle_) {
-    gpu_memory_buffer_ =
-        GpuMemoryBufferSupport().CreateGpuMemoryBufferImplFromHandle(
-            std::move(exported_si.buffer_handle_.value()), metadata_.size,
-            viz::SharedImageFormatToBufferFormatRestrictedUtils::ToBufferFormat(
-                metadata_.format),
-            exported_si.buffer_usage_.value(), base::DoNothing(),
-            base::BindRepeating(
-                &ClientSharedImage::CopyNativeGmbToSharedMemoryAsync,
-                base::Unretained(this)));
+    gpu_memory_buffer_ = CreateGpuMemoryBufferImplFromHandle(
+        std::move(exported_si.buffer_handle_.value()), metadata_.size,
+        viz::SharedImageFormatToBufferFormatRestrictedUtils::ToBufferFormat(
+            metadata_.format),
+        exported_si.buffer_usage_.value(),
+        base::BindRepeating(
+            &ClientSharedImage::CopyNativeGmbToSharedMemoryAsync,
+            base::Unretained(this)));
   }
   CHECK(!mailbox_.IsZero());
   CHECK(sii_holder_);
@@ -356,15 +499,14 @@ ClientSharedImage::ClientSharedImage(ExportedSharedImage exported_si)
       buffer_usage_(exported_si.buffer_usage_),
       texture_target_(exported_si.texture_target_) {
   if (exported_si.buffer_handle_) {
-    gpu_memory_buffer_ =
-        GpuMemoryBufferSupport().CreateGpuMemoryBufferImplFromHandle(
-            std::move(exported_si.buffer_handle_.value()), metadata_.size,
-            viz::SharedImageFormatToBufferFormatRestrictedUtils::ToBufferFormat(
-                metadata_.format),
-            exported_si.buffer_usage_.value(), base::DoNothing(),
-            base::BindRepeating(
-                &ClientSharedImage::CopyNativeGmbToSharedMemoryAsync,
-                base::Unretained(this)));
+    gpu_memory_buffer_ = CreateGpuMemoryBufferImplFromHandle(
+        std::move(exported_si.buffer_handle_.value()), metadata_.size,
+        viz::SharedImageFormatToBufferFormatRestrictedUtils::ToBufferFormat(
+            metadata_.format),
+        exported_si.buffer_usage_.value(),
+        base::BindRepeating(
+            &ClientSharedImage::CopyNativeGmbToSharedMemoryAsync,
+            base::Unretained(this)));
   }
   CHECK(!mailbox_.IsZero());
 #if !BUILDFLAG(IS_FUCHSIA)
@@ -383,18 +525,16 @@ ClientSharedImage::ClientSharedImage(
       metadata_(info.meta),
       debug_label_(info.debug_label),
       creation_sync_token_(sync_token),
-      gpu_memory_buffer_(
-          GpuMemoryBufferSupport().CreateGpuMemoryBufferImplFromHandle(
-              std::move(handle_info.handle),
-              handle_info.size,
-              viz::SharedImageFormatToBufferFormatRestrictedUtils::
-                  ToBufferFormat(handle_info.format),
-              handle_info.buffer_usage,
-              base::DoNothing(),
-              base::BindRepeating(
-                  &ClientSharedImage::CopyNativeGmbToSharedMemoryAsync,
-                  base::Unretained(this)),
-              std::move(shared_memory_pool))),
+      gpu_memory_buffer_(CreateGpuMemoryBufferImplFromHandle(
+          std::move(handle_info.handle),
+          handle_info.size,
+          viz::SharedImageFormatToBufferFormatRestrictedUtils::ToBufferFormat(
+              handle_info.format),
+          handle_info.buffer_usage,
+          base::BindRepeating(
+              &ClientSharedImage::CopyNativeGmbToSharedMemoryAsync,
+              base::Unretained(this)),
+          std::move(shared_memory_pool))),
       buffer_usage_(handle_info.buffer_usage),
       sii_holder_(std::move(sii_holder)) {
   CHECK(!mailbox.IsZero());
@@ -408,6 +548,7 @@ ClientSharedImage::ClientSharedImage(const Mailbox& mailbox,
                                      const SharedImageInfo& info)
     : mailbox_(mailbox), metadata_(info.meta), debug_label_(info.debug_label) {
   CHECK(!mailbox.IsZero());
+  texture_target_ = GL_TEXTURE_2D;
 }
 
 ClientSharedImage::~ClientSharedImage() {
@@ -466,14 +607,6 @@ gfx::GpuMemoryBufferHandle ClientSharedImage::CloneGpuMemoryBufferHandle()
   CHECK(gpu_memory_buffer_);
   return gpu_memory_buffer_->CloneHandle();
 }
-
-#if BUILDFLAG(IS_APPLE)
-void ClientSharedImage::SetColorSpaceOnNativeBuffer(
-    const gfx::ColorSpace& color_space) {
-  CHECK(gpu_memory_buffer_);
-  gpu_memory_buffer_->SetColorSpace(color_space);
-}
-#endif
 
 uint32_t ClientSharedImage::GetTextureTarget() {
 #if !BUILDFLAG(IS_FUCHSIA)
@@ -614,6 +747,12 @@ scoped_refptr<ClientSharedImage> ClientSharedImage::CreateSoftwareForTesting() {
 
 // static
 scoped_refptr<ClientSharedImage> ClientSharedImage::CreateForTesting(
+    const SharedImageMetadata& metadata) {
+  return CreateForTesting(metadata, GL_TEXTURE_2D);  // IN-TEST
+}
+
+// static
+scoped_refptr<ClientSharedImage> ClientSharedImage::CreateForTesting(
     viz::SharedImageFormat format,
     uint32_t texture_target) {
   SharedImageMetadata metadata;
@@ -662,6 +801,31 @@ scoped_refptr<ClientSharedImage> ClientSharedImage::CreateForTesting(
   auto client_si = base::MakeRefCounted<ClientSharedImage>(
       mailbox, info, sync_token, sii_holder, gpu_memory_buffer->GetType());
   client_si->gpu_memory_buffer_ = std::move(gpu_memory_buffer);
+  client_si->buffer_usage_ = buffer_usage;
+  return client_si;
+}
+
+// static
+scoped_refptr<ClientSharedImage> ClientSharedImage::CreateForTesting(
+    const Mailbox& mailbox,
+    const SharedImageMetadata& metadata,
+    const SyncToken& sync_token,
+    bool premapped,
+    const AsyncMapInvokedCallback& callback,
+    gfx::BufferUsage buffer_usage,
+    scoped_refptr<SharedImageInterfaceHolder> sii_holder) {
+  SharedImageInfo info(metadata, "CSICreateForTesting");
+
+  // Create a FakeGpuMemoryBuffer.
+  auto buffer_format =
+      viz::SharedImageFormatToBufferFormatRestrictedUtils::ToBufferFormat(
+          metadata.format);
+  auto fake_gmb = std::make_unique<FakeGpuMemoryBuffer>(
+      metadata.size, buffer_format, premapped, callback);
+
+  auto client_si = base::MakeRefCounted<ClientSharedImage>(
+      mailbox, info, sync_token, sii_holder, fake_gmb->GetType());
+  client_si->gpu_memory_buffer_ = std::move(fake_gmb);
   client_si->buffer_usage_ = buffer_usage;
   return client_si;
 }

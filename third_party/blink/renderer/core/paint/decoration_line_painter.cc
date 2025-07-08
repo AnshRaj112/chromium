@@ -4,6 +4,8 @@
 
 #include "third_party/blink/renderer/core/paint/decoration_line_painter.h"
 
+#include "cc/paint/paint_flags.h"
+#include "cc/paint/paint_record.h"
 #include "third_party/blink/renderer/platform/geometry/path_builder.h"
 #include "third_party/blink/renderer/platform/geometry/stroke_data.h"
 #include "third_party/blink/renderer/platform/graphics/graphics_context.h"
@@ -210,11 +212,10 @@ class WavyGeometry {
 };
 
 gfx::RectF WavyGeometry::PaintRect(const DecorationGeometry& geometry) const {
-  // The offset from the local origin is the (wavy) double offset and the
-  // origin of the wavy pattern rect (around minus half the amplitude).
-  gfx::PointF origin =
-      geometry.line.origin() + bounds_.OffsetFromOrigin() +
-      gfx::Vector2dF{0.f, geometry.double_offset * geometry.wavy_offset_factor};
+  // The offset from the local origin is the wavy offset and the origin of the
+  // wavy pattern rect (around minus half the amplitude).
+  gfx::PointF origin = geometry.line.origin() + bounds_.OffsetFromOrigin() +
+                       gfx::Vector2dF{0.f, geometry.wavy_offset};
   // Get the height of the wavy tile, and the width of the decoration.
   gfx::SizeF size(geometry.line.width(), bounds_.height());
   return {origin, size};
@@ -263,7 +264,7 @@ const WavyGeometry& GetWavyGeometry(const DecorationGeometry& line_geometry) {
 DecorationGeometry DecorationGeometry::Make(StrokeStyle style,
                                             const gfx::RectF& line,
                                             float double_offset,
-                                            int wavy_offset_factor,
+                                            float wavy_offset,
                                             const WaveDefinition* custom_wave) {
   DecorationGeometry geometry;
   geometry.style = style;
@@ -273,31 +274,9 @@ DecorationGeometry DecorationGeometry::Make(StrokeStyle style,
   if (geometry.style == kWavyStroke) {
     geometry.wavy_wave =
         custom_wave ? *custom_wave : MakeWave(geometry.Thickness());
-    geometry.wavy_offset_factor = wavy_offset_factor;
+    geometry.wavy_offset = wavy_offset;
   }
   return geometry;
-}
-
-void DecorationLinePainter::DrawLineForText(
-    GraphicsContext& context,
-    const gfx::RectF& line_rect,
-    const StyledStrokeData& styled_stroke,
-    const AutoDarkMode& auto_dark_mode,
-    const cc::PaintFlags* paint_flags) {
-  CHECK_GT(line_rect.width(), 0);
-  switch (styled_stroke.Style()) {
-    case kSolidStroke:
-    case kDoubleStroke:
-      DrawLineAsRect(context, line_rect, auto_dark_mode, paint_flags);
-      break;
-    case kDottedStroke:
-    case kDashedStroke:
-      DrawLineAsStroke(context, line_rect, styled_stroke, auto_dark_mode,
-                       paint_flags);
-      break;
-    case kWavyStroke:
-      NOTREACHED();
-  }
 }
 
 gfx::RectF DecorationLinePainter::Bounds(const DecorationGeometry& geometry) {
@@ -342,19 +321,23 @@ void DecorationLinePainter::Paint(const DecorationGeometry& geometry,
       PaintWavyTextDecoration(geometry, color, auto_dark_mode);
       break;
     case kDottedStroke:
-    case kDashedStroke:
-      context_.SetShouldAntialias(geometry.antialias);
-      [[fallthrough]];
-    case kSolidStroke:
-    case kDoubleStroke: {
+    case kDashedStroke: {
       StyledStrokeData styled_stroke;
       styled_stroke.SetStyle(geometry.style);
       styled_stroke.SetThickness(geometry.Thickness());
 
+      context_.SetShouldAntialias(geometry.antialias);
       context_.SetStrokeColor(color);
 
-      DrawLineForText(context_, geometry.line, styled_stroke, auto_dark_mode,
-                      flags);
+      DrawLineAsStroke(context_, geometry.line, styled_stroke, auto_dark_mode,
+                       flags);
+      break;
+    }
+    case kSolidStroke:
+    case kDoubleStroke:
+      context_.SetStrokeColor(color);
+
+      DrawLineAsRect(context_, geometry.line, auto_dark_mode, flags);
 
       if (geometry.style == kDoubleStroke) {
         const gfx::RectF second_line_rect =
@@ -362,7 +345,6 @@ void DecorationLinePainter::Paint(const DecorationGeometry& geometry,
         DrawLineAsRect(context_, second_line_rect, auto_dark_mode, flags);
       }
       break;
-    }
   }
 }
 

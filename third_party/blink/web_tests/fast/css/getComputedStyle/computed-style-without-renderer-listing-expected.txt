@@ -385,7 +385,7 @@ table-layout: auto
 text-align: start
 text-align-last: auto
 text-anchor: start
-text-autospace: normal
+text-autospace: no-autospace
 text-box-edge: auto
 text-box-trim: none
 text-decoration: none solid rgb(0, 0, 0)
@@ -409,6 +409,13 @@ text-underline-position: auto
 text-wrap-mode: wrap
 text-wrap-style: auto
 timeline-scope: none
+timeline-trigger-behavior: once
+timeline-trigger-exit-range-end: auto
+timeline-trigger-exit-range-start: auto
+timeline-trigger-name: none
+timeline-trigger-range-end: normal
+timeline-trigger-range-start: normal
+timeline-trigger-timeline: auto
 top: auto
 touch-action: auto
 transform: none

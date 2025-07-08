@@ -76,10 +76,6 @@
 #include "content/public/common/profiling_utils.h"
 #endif
 
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-#include "content/public/browser/browser_message_filter.h"
-#endif
-
 namespace content {
 namespace {
 
@@ -287,12 +283,6 @@ void BrowserChildProcessHostImpl::ForceShutdown() {
   g_child_process_list.Get().remove(this);
   child_process_host_->ForceShutdown();
 }
-
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-void BrowserChildProcessHostImpl::AddFilter(BrowserMessageFilter* filter) {
-  child_process_host_->AddFilter(filter->GetFilter());
-}
-#endif
 
 void BrowserChildProcessHostImpl::LaunchWithFileData(
     std::unique_ptr<SandboxedProcessLauncherDelegate> delegate,

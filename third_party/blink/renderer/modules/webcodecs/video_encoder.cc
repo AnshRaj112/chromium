@@ -106,17 +106,13 @@
 #include "media/video/vpx_video_encoder.h"
 #endif
 
-namespace WTF {
+namespace blink {
 
 template <>
 struct CrossThreadCopier<media::EncoderStatus>
     : public CrossThreadCopierPassThrough<media::EncoderStatus> {
   STATIC_ONLY(CrossThreadCopier);
 };
-
-}  // namespace WTF
-
-namespace blink {
 
 using EncoderType = media::VideoEncodeAccelerator::Config::EncoderType;
 
@@ -1385,14 +1381,13 @@ void VideoEncoder::ProcessReconfigure(Request* request) {
 
     self->active_config_ = req->config;
 
-    auto output_cb =
-        ConvertToBaseRepeatingCallback(WTF::CrossThreadBindRepeating(
-            &VideoEncoder::CallOutputCallback,
-            MakeUnwrappingCrossThreadWeakHandle(self),
-            // We can't use |active_config_| from |this| because it can change
-            // by the time the callback is executed.
-            MakeUnwrappingCrossThreadHandle(self->active_config_.Get()),
-            self->reset_count_));
+    auto output_cb = ConvertToBaseRepeatingCallback(CrossThreadBindRepeating(
+        &VideoEncoder::CallOutputCallback,
+        MakeUnwrappingCrossThreadWeakHandle(self),
+        // We can't use |active_config_| from |this| because it can change
+        // by the time the callback is executed.
+        MakeUnwrappingCrossThreadHandle(self->active_config_.Get()),
+        self->reset_count_));
 
     if (!self->encoder_metrics_provider_) {
       self->encoder_metrics_provider_ =

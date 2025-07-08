@@ -39,7 +39,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.AfterStartupTaskDelayedUntilTime" units="ms"
-    expires_after="2025-10-26">
+    expires_after="2026-01-04">
   <owner>michaeln@chromium.org</owner>
   <summary>
     Time from the process creation until deferred after-startup tasks began
@@ -239,7 +239,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.Android.Cold.TimeToFirstVisibleContent" units="ms"
-    expires_after="2025-11-02">
+    expires_after="2026-01-04">
   <owner>yfriedman@chromium.org</owner>
   <owner>pasko@chromium.org</owner>
   <owner>fredmello@chromium.org</owner>
@@ -256,7 +256,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.Android.Cold.TimeToFirstVisibleContent2" units="ms"
-    expires_after="2025-11-02">
+    expires_after="2026-01-04">
   <owner>yfriedman@chromium.org</owner>
   <owner>pasko@chromium.org</owner>
   <owner>fredmello@chromium.org</owner>
@@ -469,7 +469,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.Android.GURLEnsureMainDexInitialized" units="ms"
-    expires_after="2025-10-26">
+    expires_after="2025-12-28">
   <owner>mthiesse@chromium.org</owner>
   <owner>yfriedman@chromium.org</owner>
   <summary>
@@ -516,7 +516,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.Android.MainIntentIsColdStart" enum="Boolean"
-    expires_after="2025-10-26">
+    expires_after="2025-12-28">
   <owner>nafisabedin@google.com</owner>
   <owner>yfriedman@chromium.org</owner>
   <summary>
@@ -536,7 +536,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.Android.PrivacySandbox.AdsNoticeCCTAppIDCheck"
-    enum="Boolean" expires_after="2025-10-26">
+    enum="Boolean" expires_after="2025-12-28">
   <owner>jacobstanley@google.com</owner>
   <owner>koilos@google.com</owner>
   <summary>
@@ -588,7 +588,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.BrowserMainRunnerImplInitializeLongTime" units="ms"
-    expires_after="2025-10-26">
+    expires_after="2025-12-28">
   <owner>robliao@chromium.org</owner>
   <summary>
     The amount of time that elapsed during BrowserMainRunnerImpl::Initialize.
@@ -692,7 +692,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Startup.BrowserWindow.FirstPaint" units="ms"
-    expires_after="2025-10-26">
+    expires_after="2025-12-28">
   <owner>gab@chromium.org</owner>
   <owner>mblsha@yandex-team.ru</owner>
   <summary>

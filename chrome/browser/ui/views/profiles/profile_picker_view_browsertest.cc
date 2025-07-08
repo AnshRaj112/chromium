@@ -527,8 +527,10 @@ class ProfilePickerCreationFlowBrowserTest
 
   static bool HasPromoBeenShown(Browser* browser,
                                 const base::Feature& feature) {
-    return browser->window()->IsFeaturePromoActive(feature) ||
-           browser->window()->IsFeaturePromoQueued(feature);
+    return BrowserUserEducationInterface::From(browser)->IsFeaturePromoActive(
+               feature) ||
+           BrowserUserEducationInterface::From(browser)->IsFeaturePromoQueued(
+               feature);
   }
 
   // Returns true if the profile switch IPH has been shown.
@@ -698,6 +700,15 @@ IN_PROC_BROWSER_TEST_F(ProfilePickerCreationFlowBrowserTest, ShowChoice) {
   EXPECT_NE(delegate->GetWindowTitle(), delegate->GetAccessibleWindowTitle());
   WaitForLoadStop(GURL("chrome://profile-picker/new-profile"));
   EXPECT_NE(delegate->GetWindowTitle(), delegate->GetAccessibleWindowTitle());
+}
+
+IN_PROC_BROWSER_TEST_F(ProfilePickerCreationFlowBrowserTest,
+                       ShowChoiceWithInitialEmail) {
+  constexpr char kEmail[] = "test@gmail.com";
+  ProfilePicker::Show(ProfilePicker::Params::FromStartupWithEmail(kEmail));
+  EXPECT_TRUE(ProfilePicker::IsOpen());
+  WaitForPickerWidgetCreated();
+  WaitForLoadStop(GetSigninChromeSyncDiceUrl(kEmail));
 }
 
 IN_PROC_BROWSER_TEST_F(ProfilePickerCreationFlowBrowserTest,

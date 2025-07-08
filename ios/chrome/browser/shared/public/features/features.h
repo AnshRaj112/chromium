@@ -17,33 +17,6 @@ namespace base {
 class TimeDelta;
 }  // namespace base
 
-// Feature flag to enable personalized messaging for Default Browser First Run,
-// Set Up List, and video promos.
-BASE_DECLARE_FEATURE(kSegmentedDefaultBrowserPromo);
-
-// Name of the parameter that controls the experiment type for the Segmented
-// Default Browser promo, determining whether or not the Default Browser promo
-// is animated.
-extern const char kSegmentedDefaultBrowserExperimentType[];
-
-// Defines the different experiment arms for the Segmented Default Browser
-// promo, which determine if the Default Browser promo is animated.
-enum class SegmentedDefaultBrowserExperimentType {
-  // The experiment arm that shows the static Default Browser promo.
-  kStaticPromo = 0,
-  // The experiment arm that show the animated Default Browser promo.
-  kAnimatedPromo = 1,
-};
-
-// Whether personalized messaging for Default Browser First Run, Set Up List,
-// and video promos is enabled.
-bool IsSegmentedDefaultBrowserPromoEnabled();
-
-// Returns the experiment type for the Segmented Default Browser promo, which
-// determines whether or not the promo is animated.
-SegmentedDefaultBrowserExperimentType
-SegmentedDefaultBrowserExperimentTypeEnabled();
-
 // Feature flag to enable the Keyboard Accessory Upgrade for iPads.
 BASE_DECLARE_FEATURE(kIOSKeyboardAccessoryUpgradeForIPad);
 
@@ -520,14 +493,8 @@ extern const char kDeliveredNAUMaxPerSession[];
 // Feature flag to enable a more stable fullscreen.
 BASE_DECLARE_FEATURE(kFullscreenImprovement);
 
-// Feature flag to enable Tab Group Sync.
-BASE_DECLARE_FEATURE(kTabGroupSync);
-
 // Whether the tab groups should be syncing.
 bool IsTabGroupSyncEnabled();
-
-// Feature flag to enable Tab Group Indicator.
-BASE_DECLARE_FEATURE(kTabGroupIndicator);
 
 // Whether the Tab Group Indicator feature is enabled.
 bool IsTabGroupIndicatorEnabled();
@@ -540,6 +507,13 @@ bool IsNewSyncOptInIllustration();
 
 // Feature flag to disable Lens LVF features.
 BASE_DECLARE_FEATURE(kDisableLensCamera);
+
+// Feature flag that allows the Auto-deletion feature to clear all downloaded
+// files scheduled for deletion on every application startup, regardless of when
+// the file was downloaded. This feature is intended for testing-only.
+BASE_DECLARE_FEATURE(kDownloadAutoDeletionClearFilesOnEveryStartup);
+
+bool isDownloadAutoDeletionTestingFeatureEnabled();
 
 // YES when the Downloads Auto Deletion feature is enabled.
 BASE_DECLARE_FEATURE(kDownloadAutoDeletionFeatureEnabled);
@@ -777,6 +751,16 @@ bool IsBlueDotOnToolsMenuButtoneEnabled();
 // Feature flag to assign each managed account to its own separate profile.
 // DO NOT CHECK DIRECTLY, use AreSeparateProfilesForManagedAccountsEnabled()!
 BASE_DECLARE_FEATURE(kSeparateProfilesForManagedAccounts);
+
+// Feature param for kSeparateProfilesForManagedAccountsForceMigration to
+// specify how much time to wait before force-migrating the primary managed
+// account to its own separate profile.
+extern const base::FeatureParam<base::TimeDelta>
+    kMultiProfileMigrationGracePeriod;
+
+// Feature flag to control force-migrating the primary managed account to its
+// own separate profile.
+BASE_DECLARE_FEATURE(kSeparateProfilesForManagedAccountsForceMigration);
 
 // Kill switch to turn off `kSeparateProfilesForManagedAccounts`, even if
 // multiple profiles already exist.
@@ -1074,5 +1058,17 @@ bool IsFeedbackIncludeGWSVariationsEnabled();
 
 // Whether the `kDefaultBrowserPromoPropensityModel` feature is enabled.
 bool IsDefaultBrowserPromoPropensityModelEnabled();
+
+// Feature flag to enable the trusted vault provisional notification.
+BASE_DECLARE_FEATURE(kIOSTrustedVaultNotification);
+
+// Returns whether `kIOSTrustedVaultNotification` is enabled.
+bool IsIOSTrustedVaultNotificationEnabled();
+
+// Feature flag for diamond prototype
+BASE_DECLARE_FEATURE(kDiamondPrototype);
+
+// Whether the diamond prototype is enabled.
+bool IsDiamondPrototypeEnabled();
 
 #endif  // IOS_CHROME_BROWSER_SHARED_PUBLIC_FEATURES_FEATURES_H_

@@ -206,13 +206,13 @@ BASE_FEATURE(kReduceAcceptLanguageHTTP,
 // See: https://wicg.github.io/private-network-access/#cors-preflight
 BASE_FEATURE(kPrivateNetworkAccessPreflightShortTimeout,
              "PrivateNetworkAccessPreflightShortTimeout",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // When kPrivateNetworkAccessPermissionPrompt is enabled, public secure websites
 // are allowed to access private insecure subresources with user's permission.
 BASE_FEATURE(kPrivateNetworkAccessPermissionPrompt,
              "PrivateNetworkAccessPermissionPrompt",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables Local Network Access checks.
 // Blocks local network requests without user permission to prevent exploitation
@@ -233,6 +233,16 @@ BASE_FEATURE_PARAM(bool,
                    &kLocalNetworkAccessChecks,
                    /*name=*/"LocalNetworkAccessChecksWarn",
                    /*default_value=*/true);
+
+// Enables Local Network Access checks for WebRTC.
+// Blocks local network requests without user permission to prevent exploitation
+// of vulnerable local devices.
+//
+// Public explainer:
+// https://github.com/explainers-by-googlers/local-network-access
+BASE_FEATURE(kLocalNetworkAccessChecksWebRTC,
+             "LocalNetworkAccessChecksWebRTC",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, then the network service will parse the Cookie-Indices header.
 // This does not currently control changing cache behavior according to the
@@ -584,7 +594,7 @@ BASE_FEATURE(kGetCookiesOnSet,
 
 BASE_FEATURE(kIncreaseCookieAccessCacheSize,
              "IncreaseCookieAccessCacheSize",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE_PARAM(int,
                    kCookieAccessCacheSize,
@@ -642,5 +652,10 @@ BASE_FEATURE_PARAM(size_t,
 BASE_FEATURE(kNetworkServiceTaskScheduler,
              "NetworkServiceTaskScheduler",
              base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE_PARAM(bool,
+                   kNetworkServiceTaskSchedulerURLLoader,
+                   &kNetworkServiceTaskScheduler,
+                   "url_loader",
+                   false);
 
 }  // namespace network::features

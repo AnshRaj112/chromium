@@ -10,6 +10,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
 
+import static org.chromium.ui.listmenu.ListMenuItemProperties.CLICK_LISTENER;
 import static org.chromium.ui.listmenu.ListMenuItemProperties.ENABLED;
 import static org.chromium.ui.listmenu.ListMenuItemProperties.MENU_ITEM_ID;
 import static org.chromium.ui.listmenu.ListMenuItemProperties.TITLE;
@@ -17,6 +18,7 @@ import static org.chromium.ui.listmenu.ListMenuItemProperties.TITLE;
 import android.app.Activity;
 import android.graphics.Rect;
 import android.view.View;
+import android.view.Window;
 
 import androidx.annotation.Nullable;
 import androidx.test.ext.junit.rules.ActivityScenarioRule;
@@ -566,7 +568,7 @@ public class ContextMenuCoordinatorTest {
 
     private ListItem createListItem(@Item int item, boolean enabled) {
         final PropertyModel model =
-                new PropertyModel.Builder(MENU_ITEM_ID, TITLE, ENABLED)
+                new PropertyModel.Builder(MENU_ITEM_ID, TITLE, ENABLED, CLICK_LISTENER)
                         .with(MENU_ITEM_ID, ChromeContextMenuItem.getMenuId(item))
                         .with(ENABLED, enabled)
                         .with(
@@ -631,7 +633,9 @@ public class ContextMenuCoordinatorTest {
                         /* additionalNavigationParams= */ null);
 
         final WindowAndroid windowAndroid = Mockito.mock(WindowAndroid.class);
+        final Window window = Mockito.mock(Window.class);
         doReturn(new WeakReference<>(mActivity)).when(windowAndroid).getActivity();
+        doReturn(window).when(windowAndroid).getWindow();
 
         List<ModelList> rawItems = new ArrayList<>();
 

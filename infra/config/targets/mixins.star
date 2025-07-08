@@ -530,6 +530,13 @@ targets.mixin(
 )
 
 targets.mixin(
+    name = "skylab-40-tests-per-shard",
+    skylab = targets.skylab(
+        cros_test_max_in_shard = 40,
+    ),
+)
+
+targets.mixin(
     name = "skylab-20-tests-per-shard",
     skylab = targets.skylab(
         cros_test_max_in_shard = 20,
@@ -863,6 +870,13 @@ targets.mixin(
             "gce": "1",
         },
     ),
+)
+
+targets.mixin(
+    name = "gpu_gtest_common_args",
+    android_args = [
+        targets.magic_args.ANDROID_DESKTOP_FORCE_MAIN_USER,
+    ],
 )
 
 targets.mixin(
@@ -1953,7 +1967,7 @@ targets.mixin(
             targets.cipd_package(
                 package = "infra/tools/mac_toolchain/${platform}",
                 location = ".",
-                revision = "git_revision:a18b7d95d26f3c6bf9591978b19cf0ca8268ac7d",
+                revision = "git_revision:4c7290150d1c360cecc6a93c0214dc531585c3ab",
             ),
         ],
     ),
@@ -2613,12 +2627,12 @@ targets.mixin(
     generate_pyl_entry = False,
     args = [
         "--xcode-build-version",
-        "17a5241e",
+        "17a5241o",
     ],
     swarming = targets.swarming(
         named_caches = [
             swarming.cache(
-                name = "xcode_ios_17a5241e",
+                name = "xcode_ios_17a5241o",
                 path = "Xcode.app",
             ),
         ],

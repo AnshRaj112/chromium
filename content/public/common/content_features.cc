@@ -709,6 +709,12 @@ BASE_FEATURE(kPrefetchPrerenderIntegration,
 // If explicitly disabled, prefetch proxy is not used.
 BASE_FEATURE(kPrefetchProxy, "PrefetchProxy", base::FEATURE_ENABLED_BY_DEFAULT);
 
+// If enabled, the feature allows the prerender host to be reused for the
+// future same-site page prerender if marked as reusable.
+BASE_FEATURE(kPrerender2ReuseHost,
+             "Prerender2ReuseHost",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, browser-initiated prefetch is allowed.
 // Please see crbug.com/40946257 for more details.
 BASE_FEATURE(kPrefetchBrowserInitiatedTriggers,
@@ -783,7 +789,7 @@ BASE_FEATURE(kPrivateNetworkAccessRespectPreflightResults,
 // See: https://wicg.github.io/private-network-access/#cors-preflight
 BASE_FEATURE(kPrivateNetworkAccessSendPreflights,
              "PrivateNetworkAccessSendPreflights",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables origin-keyed processes by default, unless origins opt out using
 // Origin-Agent-Cluster: ?0. This feature only takes effect if the Blink feature
@@ -1296,6 +1302,11 @@ BASE_FEATURE(kElementCaptureOfOtherTabs,
 BASE_FEATURE(kEnableExperimentalWebAssemblyJSPI,
              "WebAssemblyExperimentalJSPI",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables WebAssembly Shared-Everything Threads.
+BASE_FEATURE(kEnableExperimentalWebAssemblySharedEverything,
+             "WebAssemblyExperimentalSharedEverything",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enable WebAssembly lazy compilation (JIT on first call).
 BASE_FEATURE(kWebAssemblyLazyCompilation,

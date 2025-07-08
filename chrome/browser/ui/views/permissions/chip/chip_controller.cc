@@ -21,6 +21,7 @@
 #include "chrome/browser/ui/views/content_setting_bubble_contents.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
+#include "chrome/browser/ui/views/page_info/page_info_bubble_specification.h"
 #include "chrome/browser/ui/views/page_info/page_info_bubble_view.h"
 #include "chrome/browser/ui/views/permissions/chip/permission_dashboard_controller.h"
 #include "chrome/browser/ui/views/permissions/chip/permission_dashboard_view.h"
@@ -343,8 +344,6 @@ void ChipController::ShowPermissionUi(
                                                   weak_factory_.GetWeakPtr()));
   }
 
-  request_chip_shown_time_ = base::TimeTicks::Now();
-
   // The permission prompt bubble has its own accessibility announcement. We
   // should not announce the chip.
   if (!permission_prompt_model_->ShouldBubbleStartOpen()) {
@@ -471,35 +470,34 @@ void ChipController::ShowPageInfoDialog() {
   // Prevent chip from collapsing while prompt bubble is open.
   ResetTimers();
 
-  auto initialized_callback =
-      GetPageInfoDialogCreatedCallbackForTesting()
-          ? std::move(GetPageInfoDialogCreatedCallbackForTesting())
-          : base::DoNothing();
+  std::unique_ptr<PageInfoBubbleSpecification> specification =
+      PageInfoBubbleSpecification::Builder(
+          chip_, chip_->GetWidget()->GetNativeWindow(), contents,
+          entry->GetVirtualURL())
+          .AddInitializedCallback(
+              GetPageInfoDialogCreatedCallbackForTesting()
+                  ? std::move(GetPageInfoDialogCreatedCallbackForTesting())
+                  : base::DoNothing())
+          .AddPageInfoClosingCallback(
+              base::BindOnce(&ChipController::OnPageInfoBubbleClosed,
+                             weak_factory_.GetWeakPtr()))
+          .Build();
 
-  views::BubbleDialogDelegateView* bubble =
-      PageInfoBubbleView::CreatePageInfoBubble(
-          chip_, gfx::Rect(), chip_->GetWidget()->GetNativeWindow(), contents,
-          entry->GetVirtualURL(), std::move(initialized_callback),
-          base::BindOnce(&ChipController::OnPageInfoBubbleClosed,
-                         weak_factory_.GetWeakPtr()),
-          /*allow_extended_site_info=*/true);
+  views::BubbleDialogDelegateView* const bubble =
+      PageInfoBubbleView::CreatePageInfoBubble(std::move(specification));
   bubble->GetWidget()->Show();
   bubble_tracker_.SetView(bubble);
-  permissions::PermissionUmaUtil::RecordPageInfoDialogAccessType(
-      permissions::PageInfoDialogAccessType::CONFIRMATION_CHIP_CLICK);
 }
 
 void ChipController::OnPageInfoBubbleClosed(
     views::Widget::ClosedReason closed_reason,
     bool reload_prompt) {
-  GetLocationBarView()->ResetConfirmationChipShownTime();
   HideChip();
 }
 
 void ChipController::CollapseConfirmation() {
   is_confirmation_showing_ = false;
   is_waiting_for_confirmation_collapse_ = true;
-  GetLocationBarView()->ResetConfirmationChipShownTime();
   chip_->AnimateCollapse(
       gfx::Animation::RichAnimationDuration(base::Milliseconds(75)));
 }
@@ -645,7 +643,7 @@ void ChipController::OpenPermissionPromptBubble() {
     raw_ptr<PermissionPromptBubbleBaseView> prompt_bubble =
         CreatePermissionPromptBubbleView(
             browser, permission_prompt_model_->GetDelegate(),
-            request_chip_shown_time_, PermissionPromptStyle::kChip);
+            PermissionPromptStyle::kChip);
     bubble_tracker_.SetView(prompt_bubble);
     prompt_bubble->Show();
   } else if (permission_prompt_model_->GetPromptStyle() ==
@@ -685,11 +683,6 @@ void ChipController::ClosePermissionPromptBubbleWithReason(
     views::Widget::ClosedReason reason) {
   DCHECK(IsBubbleShowing());
   GetBubbleWidget()->CloseWithReason(reason);
-}
-
-void ChipController::RecordRequestChipButtonPressed(const char* recordKey) {
-  base::UmaHistogramMediumTimes(
-      recordKey, base::TimeTicks::Now() - request_chip_shown_time_);
 }
 
 void ChipController::ObservePromptBubble() {
@@ -737,19 +730,6 @@ void ChipController::OnPromptExpired() {
 }
 
 void ChipController::OnRequestChipButtonPressed() {
-  if (permission_prompt_model_ &&
-      (!IsBubbleShowing() ||
-       permission_prompt_model_->ShouldBubbleStartOpen())) {
-    // Only record if its the first interaction.
-    if (permission_prompt_model_->GetPromptStyle() ==
-        PermissionPromptStyle::kChip) {
-      RecordRequestChipButtonPressed("Permissions.Chip.TimeToInteraction");
-    } else if (permission_prompt_model_->GetPromptStyle() ==
-               PermissionPromptStyle::kQuietChip) {
-      RecordRequestChipButtonPressed("Permissions.QuietChip.TimeToInteraction");
-    }
-  }
-
   if (IsBubbleShowing()) {
     // A mouse click on chip while a permission prompt is open should dismiss
     // the prompt and collapse the chip

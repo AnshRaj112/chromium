@@ -4,7 +4,9 @@
 
 #include "chrome/browser/actor/tools/tab_management_tool.h"
 
+#include "base/functional/callback_forward.h"
 #include "base/notimplemented.h"
+#include "chrome/browser/actor/actor_task.h"
 #include "chrome/browser/actor/tools/observation_delay_controller.h"
 #include "chrome/browser/actor/tools/tool_callbacks.h"
 #include "chrome/browser/ui/browser.h"
@@ -45,6 +47,8 @@ void TabManagementTool::Validate(ValidateCallback callback) {
 }
 
 void TabManagementTool::Invoke(InvokeCallback callback) {
+  callback_ = std::move(callback);
+
   // TODO(crbug.com/411462297): Only the create action is hooked up and
   // implemented.
   switch (action_) {
@@ -55,10 +59,16 @@ void TabManagementTool::Invoke(InvokeCallback callback) {
           BrowserWindowInterface::FromSessionID(
               SessionID::FromSerializedValue(window_id_.value()));
       if (!browser_window_interface) {
-        PostResponseTask(std::move(callback),
+        PostResponseTask(std::move(callback_),
                          MakeResult(mojom::ActionResultCode::kWindowWentAway));
         return;
       }
+
+      // The observer is removed in the TabStripModelObserver's destructor.
+      browser_window_interface->GetTabStripModel()->AddObserver(this);
+
+      // Watch for the window going away as well so we don't wait indefinitely.
+      browser_list_observation_.Observe(BrowserList::GetInstance());
 
       // Open a blank tab.
       browser_window_interface->OpenGURL(GURL(url::kAboutBlankURL),
@@ -69,12 +79,10 @@ void TabManagementTool::Invoke(InvokeCallback callback) {
     case kClose:
       CHECK(target_tab_.has_value());
       NOTIMPLEMENTED() << "ActivateTab and CloseTab not yet implemented";
-      PostResponseTask(std::move(callback),
+      PostResponseTask(std::move(callback_),
                        MakeResult(mojom::ActionResultCode::kError));
       return;
   }
-
-  PostResponseTask(std::move(callback), MakeOkResult());
 }
 
 std::string TabManagementTool::DebugString() const {
@@ -95,6 +103,40 @@ std::string TabManagementTool::JournalEvent() const {
 std::unique_ptr<ObservationDelayController>
 TabManagementTool::GetObservationDelayer() const {
   return nullptr;
+}
+
+void TabManagementTool::UpdateTaskAfterInvoke(ActorTask& task) const {
+  if (action_ == kCreate) {
+    if (did_create_tab_handle_) {
+      task.AddToTabSet(*did_create_tab_handle_);
+    }
+  }
+}
+
+void TabManagementTool::OnTabStripModelChanged(
+    TabStripModel* tab_strip_model,
+    const TabStripModelChange& change,
+    const TabStripSelectionChange& selection) {
+  if (change.type() == TabStripModelChange::kInserted) {
+    if (callback_) {
+      CHECK_GT(change.GetInsert()->contents.size(), 0ul);
+      did_create_tab_handle_ = change.GetInsert()->contents[0].tab->GetHandle();
+      PostResponseTask(std::move(callback_), MakeOkResult());
+    }
+  }
+}
+
+void TabManagementTool::OnBrowserRemoved(Browser* browser) {
+  // If the window is destroyed in the interval after a create tab has been
+  // invoked but before the tab's been added, this ensures we don't hang waiting
+  // for the new tab.
+  if (action_ == kCreate) {
+    CHECK(window_id_);
+    if (callback_ && browser->GetSessionID().id() == window_id_.value()) {
+      PostResponseTask(std::move(callback_),
+                       MakeResult(mojom::ActionResultCode::kWindowWentAway));
+    }
+  }
 }
 
 }  // namespace actor

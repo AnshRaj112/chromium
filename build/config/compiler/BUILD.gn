@@ -5,6 +5,7 @@
 import("//build/buildflag_header.gni")
 import("//build/config/android/config.gni")
 import("//build/config/c++/c++.gni")
+import("//build/config/c++/modules.gni")
 import("//build/config/chrome_build.gni")
 import("//build/config/chromeos/args.gni")
 import("//build/config/clang/clang.gni")
@@ -569,6 +570,10 @@ config("compiler") {
       } else {
         cflags += [ "-fno-sized-deallocation" ]
       }
+    }
+
+    if (diagnostics_print_source_range_info && !is_win) {
+      cflags += [ "-fdiagnostics-print-source-range-info" ]
     }
   }
 
@@ -1762,6 +1767,29 @@ config("clang_warning_suppression") {
   }
 }
 
+# Enable bounds checks when indexing directly (i.e. not via a pointer)
+# into C arrays. This aligns with libc++ hardening for
+# `std::array::operator[]`.
+#
+# UBSan already includes these checks and more.
+# GCC does not appear to support these flags.
+#
+# This config appears to tip "ASan Debug (32-bit x86 with V8-ARM)" just
+# over the brink and prevent ASan from grabbing its necessary 512 MB of
+# address space. (N.B. the issue is not seen on its release counterpart,
+# and it might have been possible to mitigate with
+# `is_component_build = false`.)
+#
+# See also: https://crbug.com/40891132#comment10
+config("sanitize_c_array_bounds") {
+  if (!is_ubsan && is_clang && !(is_asan && target_cpu == "x86")) {
+    cflags = [
+      "-fsanitize=array-bounds",
+      "-fsanitize-trap=array-bounds",
+    ]
+  }
+}
+
 config("rustc_revision") {
   if (rustc_revision != "") {
     # Similar to the above config, this is here so that all files get recompiled
@@ -1800,37 +1828,25 @@ config("compiler_arm") {
 
 config("libcxx_module") {
   if (use_libcxx_modules) {
-    modulemap = rebase_path(
-            "${root_gen_dir}/third_party/libc++/src/include/module.modulemap",
-            root_build_dir)
+    cflags_cc =
+        [
+          "-fmodules",
+          "-fno-implicit-module-maps",
+          "-fno-implicit-modules",
 
-    cflags_cc = [
-      "-fmodules",
-      "-fmodule-map-file=" + modulemap,
-      "-fbuiltin-module-map",
-      "-fno-implicit-module-maps",
-      "-fno-implicit-modules",
+          "-Xclang",
+          "-fmodules-local-submodule-visibility",  # required for builtins
 
-      "-Xclang",
-      "-fmodules-local-submodule-visibility",  # required for builtins
+          # TODO(crbug.com/1456385): Figure out if this can be removed.
+          "-Wno-modules-ambiguous-internal-linkage",
 
-      # TODO(crbug.com/1456385): Figure out if this can be removed.
-      "-Wno-modules-ambiguous-internal-linkage",
+          # TODO(crbug.com/40440396): Clean up.
+          "-Wno-modules-import-nested-redundant",
 
-      # TODO(crbug.com/40440396): Clean up.
-      "-Wno-modules-import-nested-redundant",
-
-      # Needed to allow using builtin modules when the headers are
-      # unnecessarily using extern "C".
-      "-Wno-module-import-in-extern-c",
-    ]
-
-    if (is_linux || is_chromeos) {
-      sysroot_modulemap =
-          rebase_path(SYSROOT_MODULEMAP, root_build_dir)
-
-      cflags_cc += [ "-fmodule-map-file=" + sysroot_modulemap ]
-    }
+          # Needed to allow using builtin modules when the headers are
+          # unnecessarily using extern "C".
+          "-Wno-module-import-in-extern-c",
+        ] + module_map_flags
   }
 }
 
@@ -1924,9 +1940,6 @@ config("treat_warnings_as_errors") {
   # Note we apply the actual lint flags in config("compiler"). All warnings
   # are suppressed in third-party crates.
   rustflags = [ "-Dwarnings" ]
-
-  # TODO(crbug.com/424424323): Clean up and enable.
-  rustflags += [ "-Amismatched_lifetime_syntaxes" ]
 }
 
 # tot_warnings ----------------------------------------------------------------
@@ -2107,12 +2120,6 @@ config("default_warnings") {
       ]
     }
 
-    if (default_toolchain != "//build/toolchain/cros:target" &&
-        !llvm_android_mainline) {
-      # TODO(crbug.com/417996267): Fix and re-enable
-      cflags += [ "-Wno-character-conversion" ]
-    }
-
     if (is_component_build && use_clang_warning_suppression_file && !is_win) {
       # Warn for globally unique objects which might get duplicated if built
       # into different components, due to hidden visibility. Only applicable
@@ -2174,6 +2181,9 @@ config("default_warnings") {
   # an error by default eventually; see
   # https://github.com/rust-lang/rust/issues/71668
   rustflags = [ "-Dunsafe_op_in_unsafe_fn" ]
+
+  # TODO(crbug.com/424424323): Clean up and enable.
+  rustflags += [ "-Amismatched_lifetime_syntaxes" ]
 }
 
 # prevent_unsafe_narrowing ----------------------------------------------------

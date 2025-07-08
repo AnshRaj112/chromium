@@ -137,7 +137,8 @@ class VisibilityObserver : public views::ViewObserver {
   ~VisibilityObserver() override { observed_view_->RemoveObserver(this); }
 
   void OnViewVisibilityChanged(views::View* view_or_ancestor,
-                               views::View* starting_view) override {
+                               views::View* starting_view,
+                               bool visible) override {
     UpdateWasDrawn();
   }
 
@@ -516,9 +517,8 @@ TEST_F(AssistantPageViewTest,
   EXPECT_HAS_FOCUS(input_text_field());
 }
 
-// TODO(b/234164113): Test is flaky.
 TEST_F(AssistantPageViewTest,
-       DISABLED_ShouldFocusMicWhenSubmittingSuggestionChipInVoiceMode) {
+       ShouldFocusMicWhenSubmittingSuggestionChipInVoiceMode) {
   ShowAssistantUi();
   ash::SuggestionChipView* suggestion_chip =
       CreateAndGetSuggestionChip("<suggestion chip query>");

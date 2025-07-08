@@ -79,6 +79,7 @@
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/render_widget_host_observer.h"
+#include "content/public/browser/screen_orientation_delegate.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/weak_document_ptr.h"
 #include "content/public/browser/web_contents.h"
@@ -3508,9 +3509,10 @@ void TestNavigationManager::ResumeIfPaused() {
 
   navigation_paused_ = false;
 
-  request_->GetNavigationThrottleRegistryForTesting()
-      ->GetNavigationThrottleRunnerForTesting()
-      .CallResumeForTesting();
+  auto* registry = request_->GetNavigationThrottleRegistryForTesting();
+  ASSERT_EQ(1u, registry->GetDeferringThrottles().size());
+  registry->ResumeProcessingNavigationEvent(
+      *registry->GetDeferringThrottles().cbegin());
 }
 
 bool TestNavigationManager::ShouldMonitorNavigation(NavigationHandle* handle) {

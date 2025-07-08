@@ -278,6 +278,10 @@ BASE_FEATURE(kWebGPUEnableRangeAnalysisForRobustness,
              "WebGPUEnableRangeAnalysisForRobustness",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kWebGPUUseSpirv14,
+            "WebGPUUseSpirv14",
+            base::FEATURE_DISABLED_BY_DEFAULT);
+
 #if BUILDFLAG(IS_ANDROID)
 
 const base::FeatureParam<std::string> kVulkanBlockListByHardware{
@@ -588,11 +592,11 @@ bool IsSkiaGraphiteSupportedByDevice(const base::CommandLine* command_line) {
                               model_name_split->variant == 1;
     if (!is_imac_15_1) {
       static constexpr struct {
-        const char* category;
+        std::string category;
         int32_t min_supported_model;
       } kModelSupportData[] = {
           {"MacBookPro", 13}, {"MacBookAir", 8}, {"MacBook", 9},
-          {"iMac", 17},       {"MacPro", 6},
+          {"iMac", 17},       {"MacPro", 6},     {"Macmini", 8},
       };
       for (const auto& [category, min_supported_model] : kModelSupportData) {
         if (model_name_split->category == category) {
@@ -716,6 +720,9 @@ bool IsDrDcEnabled() {
 
 #elif BUILDFLAG(IS_MAC)
   if (!IsSkiaGraphiteEnabled(base::CommandLine::ForCurrentProcess())) {
+    return false;
+  }
+  if (base::mac::MacOSVersion() < 13'00'00) {
     return false;
   }
 #endif

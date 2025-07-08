@@ -63,17 +63,11 @@ class SchemeHostPort;
 
 namespace content {
 
-class RendererPpapiHost;
 class RenderFrame;
 
 // Base class for objects that want to filter incoming IPCs, and also get
 // notified of changes to the frame.
-class CONTENT_EXPORT RenderFrameObserver
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-    : public IPC::Listener,
-      public IPC::Sender
-#endif
-{
+class CONTENT_EXPORT RenderFrameObserver {
  public:
   RenderFrameObserver(const RenderFrameObserver&) = delete;
   RenderFrameObserver& operator=(const RenderFrameObserver&) = delete;
@@ -82,9 +76,6 @@ class CONTENT_EXPORT RenderFrameObserver
   // always null-check each call to render_frame() because the RenderFrame can
   // go away at any time.
   virtual void OnDestruct() = 0;
-
-  // Called when a Pepper plugin is created.
-  virtual void DidCreatePepperPlugin(RendererPpapiHost* host) {}
 
   // Called when a load is explicitly stopped by the user or browser.
   virtual void OnStop() {}
@@ -373,27 +364,11 @@ class CONTENT_EXPORT RenderFrameObserver
   virtual bool SetUpDroppedFramesReporting(
       base::ReadOnlySharedMemoryRegion& shared_memory_dropped_frames);
 
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-  // IPC::Listener implementation.
-  bool OnMessageReceived(const IPC::Message& message) override;
-
-  // IPC::Sender implementation.
-  bool Send(IPC::Message* message) override;
-#endif
-
   RenderFrame* render_frame() const;
-
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-  int routing_id() const { return routing_id_; }
-#endif
 
  protected:
   explicit RenderFrameObserver(RenderFrame* render_frame);
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-  ~RenderFrameObserver() override;
-#else
   virtual ~RenderFrameObserver();
-#endif
 
  private:
   friend class RenderFrameImpl;
@@ -403,11 +378,6 @@ class CONTENT_EXPORT RenderFrameObserver
   void RenderFrameGone();
 
   raw_ptr<RenderFrame> render_frame_;
-
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-  // The routing ID of the associated RenderFrame.
-  int routing_id_ = MSG_ROUTING_NONE;
-#endif
 };
 
 }  // namespace content

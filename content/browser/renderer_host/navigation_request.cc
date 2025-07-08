@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "base/auto_reset.h"
+#include "base/check_is_test.h"
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/containers/span.h"
@@ -100,6 +101,7 @@
 #include "content/browser/scoped_active_url.h"
 #include "content/browser/security/coop/cross_origin_opener_policy_reporter.h"
 #include "content/browser/service_worker/service_worker_client.h"
+#include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/browser/service_worker/service_worker_context_wrapper.h"
 #include "content/browser/service_worker/service_worker_main_resource_handle.h"
 #include "content/browser/shared_storage/shared_storage_header_observer.h"
@@ -5149,7 +5151,13 @@ void NavigationRequest::OnRequestFailedInternal(
   // try to delete this NavigationRequest along with it.
   render_frame_host_ = std::nullopt;
 
-  ssl_info_ = status.ssl_info;
+  // Do not update ssl_info_ on HTTP_RESPONSE_CODE_FAILURE (e.g., HTTP 4xx/5xx
+  // errors). In these cases, URLLoaderCompletionStatus does not have ssl_info.
+  // The existing ssl_info_ should be preserved by design, so the certificate is
+  // retained for error pages, ensuring correct security UI and metrics.
+  if (status.error_code != net::ERR_HTTP_RESPONSE_CODE_FAILURE) {
+    ssl_info_ = status.ssl_info;
+  }
 
   devtools_instrumentation::OnNavigationRequestFailed(*this, status);
 
@@ -6288,6 +6296,19 @@ void NavigationRequest::CommitErrorPage(
     commit_params_->force_new_document_sequence_number = true;
   }
 
+  // If the outermost main frame is performing an error navigation, capture the
+  // state of fenced frames rendered in the viewport before the entire FrameTree
+  // is torn down. We have to do this now, because the renderer will change the
+  // visibility of its frames after receiving the commit.
+  if (previous_rfh->IsOutermostMainFrame() && !IsSameDocument()) {
+    auto* monitor =
+        PageUserData<FencedFrameViewportMonitor>::GetOrCreateForPage(
+            previous_rfh->GetPage());
+    if (monitor) {
+      monitor->ComputeSameSiteFencedFrameMaximumBeforePrimaryPageChange();
+    }
+  }
+
   PopulateDocumentTokenForCrossDocumentNavigation();
   // Use a separate cache shard, and no cookies, for error pages.
   isolation_info_for_subresources_ =
@@ -6438,6 +6459,20 @@ void NavigationRequest::CommitNavigation() {
     // We want to record this for the frame that we are navigating away from.
     old_frame_host->RecordNavigationSuddenTerminationHandlers();
   }
+
+  // If the outermost main frame is being navigated, capture the state of fenced
+  // frames rendered in the viewport before the entire FrameTree is torn down.
+  // We have to do this now, because the renderer will change the visibility of
+  // its frames after receiving the commit.
+  if (old_frame_host->IsOutermostMainFrame() && !IsSameDocument()) {
+    auto* monitor =
+        PageUserData<FencedFrameViewportMonitor>::GetOrCreateForPage(
+            old_frame_host->GetPage());
+    if (monitor) {
+      monitor->ComputeSameSiteFencedFrameMaximumBeforePrimaryPageChange();
+    }
+  }
+
   if (IsServedFromBackForwardCache() || IsPrerenderedPageActivation()) {
     CommitPageActivation();
     return;
@@ -8468,6 +8503,50 @@ NavigationRequest::TakeWebFeaturesToLog() {
   std::vector<blink::mojom::WebFeature> result;
   result.swap(web_features_to_log_);
   return result;
+}
+
+void NavigationRequest::set_keep_alive_url_loader_factory_context(
+    base::WeakPtr<KeepAliveURLLoaderService::FactoryContext> factory_context) {
+  if (did_set_keep_alive_url_loader_factory_context_for_testing_) {
+    // A unit test set a fake context already. Use that instead of the passed in
+    // context.
+    CHECK_IS_TEST();
+    CHECK(keep_alive_url_loader_factory_context_);
+    CHECK_NE(keep_alive_url_loader_factory_context_.get(),
+             factory_context.get());
+    return;
+  }
+  CHECK(!keep_alive_url_loader_factory_context_);
+  keep_alive_url_loader_factory_context_ = factory_context;
+}
+
+void NavigationRequest::set_fetch_later_loader_factory_context(
+    base::WeakPtr<KeepAliveURLLoaderService::FactoryContext> factory_context) {
+  if (did_set_fetch_later_url_loader_factory_context_for_testing_) {
+    // A unit test set a fake context already. Use that instead of the passed in
+    // context.
+    CHECK_IS_TEST();
+    CHECK(fetch_later_loader_factory_context_);
+    CHECK_NE(fetch_later_loader_factory_context_.get(), factory_context.get());
+    return;
+  }
+  fetch_later_loader_factory_context_ = factory_context;
+}
+
+void NavigationRequest::SetKeepAliveURLLoaderFactoryContextForTesting(
+    base::WeakPtr<KeepAliveURLLoaderService::FactoryContext> factory_context) {
+  CHECK(!keep_alive_url_loader_factory_context_);
+  did_set_keep_alive_url_loader_factory_context_for_testing_ = true;
+  keep_alive_url_loader_factory_context_ = factory_context;
+  CHECK(keep_alive_url_loader_factory_context_);
+}
+
+void NavigationRequest::SetFetchLaterLoaderFactoryContextForTesting(
+    base::WeakPtr<KeepAliveURLLoaderService::FactoryContext> factory_context) {
+  CHECK(!fetch_later_loader_factory_context_);
+  did_set_fetch_later_url_loader_factory_context_for_testing_ = true;
+  fetch_later_loader_factory_context_ = factory_context;
+  CHECK(fetch_later_loader_factory_context_);
 }
 
 void NavigationRequest::ReadyToCommitNavigation(bool is_error) {

@@ -9,6 +9,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import static org.chromium.components.browser_ui.widget.ListItemBuilder.buildSimpleMenuItem;
+
 import androidx.annotation.ColorRes;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.IdRes;
@@ -61,17 +63,17 @@ public class ListItemBuilderUnitTest {
     public void testBuild_withAllProperties_nonIncognito() {
         ListItemBuilder builder =
                 new ListItemBuilder()
-                        .setTitle(FAKE_TITLE_STRING)
-                        .setTitleRes(FAKE_TITLE_ID)
-                        .setMenuId(FAKE_MENU_ID)
-                        .setStartIconId(FAKE_START_ICON_ID)
-                        .setEndIconId(FAKE_END_ICON_ID)
-                        .setEnabled(false)
-                        .setContentDescription(FAKE_CONTENT_DESC)
-                        .setIsTextEllipsizedAtEnd(true)
-                        .setIsIncognito(false)
-                        .setIconTintColorStateList(FAKE_TINT_ID)
-                        .setTextAppearanceStyle(FAKE_STYLE_ID);
+                        .withTitle(FAKE_TITLE_STRING)
+                        .withTitleRes(FAKE_TITLE_ID)
+                        .withMenuId(FAKE_MENU_ID)
+                        .withStartIconRes(FAKE_START_ICON_ID)
+                        .withEndIconRes(FAKE_END_ICON_ID)
+                        .withEnabled(false)
+                        .withContentDescription(FAKE_CONTENT_DESC)
+                        .withIsTextEllipsizedAtEnd(true)
+                        .withIsIncognito(false)
+                        .withIconTintColorStateList(FAKE_TINT_ID)
+                        .withTextAppearanceStyle(FAKE_STYLE_ID);
 
         ListItem listItem = builder.build();
         PropertyModel model = listItem.model;
@@ -99,7 +101,16 @@ public class ListItemBuilderUnitTest {
 
     @Test
     public void testBuild_titleIdOnly() {
-        ListItem listItem = new ListItemBuilder().setTitleRes(FAKE_TITLE_ID).build();
+        ListItem listItem = new ListItemBuilder().withTitleRes(FAKE_TITLE_ID).build();
+        PropertyModel model = listItem.model;
+
+        assertEquals(FAKE_TITLE_ID, model.get(ListMenuItemProperties.TITLE_ID));
+        assertNull(model.get(ListMenuItemProperties.TITLE));
+    }
+
+    @Test
+    public void testBuildSimpleMenuItem() {
+        ListItem listItem = buildSimpleMenuItem(FAKE_TITLE_ID);
         PropertyModel model = listItem.model;
 
         assertEquals(FAKE_TITLE_ID, model.get(ListMenuItemProperties.TITLE_ID));
@@ -108,7 +119,7 @@ public class ListItemBuilderUnitTest {
 
     @Test
     public void testBuild_incognito_withDefaults() {
-        ListItem listItem = new ListItemBuilder().setIsIncognito(true).build();
+        ListItem listItem = new ListItemBuilder().withIsIncognito(true).build();
         PropertyModel model = listItem.model;
 
         assertEquals(
@@ -123,9 +134,9 @@ public class ListItemBuilderUnitTest {
     public void testBuild_incognito_withCustomStyles() {
         ListItem listItem =
                 new ListItemBuilder()
-                        .setIsIncognito(true)
-                        .setTextAppearanceStyle(FAKE_STYLE_ID)
-                        .setIconTintColorStateList(FAKE_TINT_ID)
+                        .withIsIncognito(true)
+                        .withTextAppearanceStyle(FAKE_STYLE_ID)
+                        .withIconTintColorStateList(FAKE_TINT_ID)
                         .build();
         PropertyModel model = listItem.model;
 

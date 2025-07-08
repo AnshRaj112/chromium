@@ -315,6 +315,12 @@ BASE_FEATURE(kBocaTranslateToggle,
              "BocaTranslateToggle",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enables or disables migration to `BabelOrcaSpeechRecognizerClient` for
+// speech recognition.
+BASE_FEATURE(kBocaMigrateSpeechRecongnizerClient,
+             "BocaMigrateSpeechRecongnizerClient",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 BASE_FEATURE(kCrosSwitcher, "CrosSwitcher", base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Indicates whether the camera super resolution is supported. Note that this
@@ -472,7 +478,7 @@ BASE_FEATURE(kConch, "Conch", base::FEATURE_DISABLED_BY_DEFAULT);
 // choose.
 BASE_FEATURE(kConchExpandTranscriptionLanguage,
              "ConchExpandTranscriptionLanguage",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, conch will provide available GenAI features.
 BASE_FEATURE(kConchGenAi, "ConchGenAi", base::FEATURE_ENABLED_BY_DEFAULT);
@@ -784,7 +790,7 @@ BASE_FEATURE(kEnableRFC8925, "EnableRFC8925", base::FEATURE_ENABLED_BY_DEFAULT);
 // Enable the DNS proxy service running in root network namespace for ChromeOS.
 BASE_FEATURE(kEnableRootNsDnsProxy,
              "EnableRootNsDnsProxy",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enable the shortcut to toggle whether the camera is enabled/disabled in
 // Settings > Privacy controls.
@@ -1111,17 +1117,6 @@ BASE_FEATURE(kIgnoreDeviceFlexArcEnabledPolicy,
 // flag controls if we are allowed to launch the service observing the policy
 // and if we show the user selectable UI when the policy is enabled.
 BASE_FEATURE(kFloatingSso, "FloatingSso", base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Enables or disables Floating Workspace feature on ChromeOS
-BASE_FEATURE(kFloatingWorkspace,
-             "FloatingWorkspace",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Maximum delay to wait for restoring Floating Workspace after login.
-constexpr base::FeatureParam<base::TimeDelta>
-    kFloatingWorkspaceMaxTimeAvailableForRestoreAfterLogin{
-        &kFloatingWorkspace, "MaxTimeAvailableForRestoreAfterLogin",
-        base::Seconds(3)};
 
 // Enables or disables Floating Workspace V2 feature on ChromeOS
 BASE_FEATURE(kFloatingWorkspaceV2,
@@ -1783,7 +1778,7 @@ BASE_FEATURE(kFeatureManagementLocalImageSearch,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables lobster feature.
-BASE_FEATURE(kLobster, "Lobster", base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kLobster, "Lobster", base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enabling this testing flag will force the Lobster disclaimer screen to be
 // shown every time Lobster is triggered, even if users have previously approved
@@ -1817,7 +1812,7 @@ BASE_FEATURE(kLobsterFileNamingImprovement,
 // Enables lobster restriction based on the current active IME.
 BASE_FEATURE(kLobsterDisabledByInvalidIME,
              "LobsterDisabledByInvalidIME",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Controls lobster availability on managed accounts.
 BASE_FEATURE(kLobsterForManagedUsers,
@@ -1825,7 +1820,7 @@ BASE_FEATURE(kLobsterForManagedUsers,
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables lobster i18n response.
-BASE_FEATURE(kLobsterI18n, "LobsterI18n", base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kLobsterI18n, "LobsterI18n", base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables lobster entry point in quick insert zero state.
 BASE_FEATURE(kLobsterQuickInsertZeroState,
@@ -1994,11 +1989,6 @@ BASE_FEATURE(kMultiCalendarSupport,
              "MultiCalendarSupport",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables multi-zone rgb keyboard customization.
-BASE_FEATURE(kMultiZoneRgbKeyboard,
-             "MultiZoneRgbKeyboard",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables Nearby Presence for scanning and discovery of nearby devices.
 BASE_FEATURE(kNearbyPresence,
              "NearbyPresence",
@@ -2056,7 +2046,7 @@ BASE_FEATURE(kNotificationsInContextMenu,
 // Enables showing OfflineItems in Notifications.
 BASE_FEATURE(kOfflineItemsInNotifications,
              "OfflineItemsInNotifications",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Controls whether to enable on-device grammar check service.
 BASE_FEATURE(kOnDeviceGrammarCheck,
@@ -3152,12 +3142,6 @@ BASE_FEATURE(kWifiConcurrency,
              "WifiConcurrency",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Controls whether to enable the syncing of deletes of Wi-Fi configurations.
-// This only controls sending delete events to the Chrome Sync server.
-BASE_FEATURE(kWifiSyncAllowDeletes,
-             "WifiSyncAllowDeletes",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Controls whether to enable syncing of Wi-Fi configurations between
 // ChromeOS and a connected Android phone.
 BASE_FEATURE(kWifiSyncAndroid,
@@ -3491,6 +3475,10 @@ bool IsBocaTranslateToggleEnabled() {
   return base::FeatureList::IsEnabled(kBocaTranslateToggle);
 }
 
+bool IsBocaMigrateSpeechRecognizerClientEnabled() {
+  return base::FeatureList::IsEnabled(kBocaMigrateSpeechRecongnizerClient);
+}
+
 bool IsBrightnessControlInSettingsEnabled() {
   return base::FeatureList::IsEnabled(kEnableBrightnessControlInSettings);
 }
@@ -3764,10 +3752,6 @@ bool ShouldIgnoreDeviceFlexArcEnabledPolicy() {
 
 bool IsFloatingSsoAllowed() {
   return base::FeatureList::IsEnabled(kFloatingSso);
-}
-
-bool IsFloatingWorkspaceEnabled() {
-  return base::FeatureList::IsEnabled(kFloatingWorkspace);
 }
 
 bool IsFloatingWorkspaceV2Enabled() {
@@ -4121,10 +4105,6 @@ bool IsMinimumChromeVersionEnabled() {
 
 bool IsMultiCalendarSupportEnabled() {
   return base::FeatureList::IsEnabled(kMultiCalendarSupport);
-}
-
-bool IsMultiZoneRgbKeyboardEnabled() {
-  return base::FeatureList::IsEnabled(kMultiZoneRgbKeyboard);
 }
 
 bool IsEcheLauncherEnabled() {

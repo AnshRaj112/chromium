@@ -3210,21 +3210,19 @@ AccessibilityExpanded AXNodeObject::IsExpanded() const {
   // popovertarget, but takes precedence in the case of conflicting markup as
   // the HTML spec invokers commandfor functionality first, and only
   // popovertarget after, if commandfor was not executed.
-  if (RuntimeEnabledFeatures::HTMLCommandAttributesEnabled()) {
-    if (auto* button = DynamicTo<HTMLButtonElement>(element)) {
-      const AtomicString& action =
-          button->FastGetAttribute(html_names::kCommandAttr);
-      CommandEventType type = button->GetCommandEventType(action);
-      if (HTMLElement* command_for =
-              DynamicTo<HTMLElement>(button->commandForElement())) {
-        bool is_valid_popover_command =
-            command_for->IsValidBuiltinPopoverCommand(*button, type);
-        bool is_child = button->IsDescendantOrShadowDescendantOf(command_for);
-        // Buttons for popovers should indicate the expanded/collapsed state.
-        if (is_valid_popover_command && !is_child) {
-          return command_for->popoverOpen() ? kExpandedExpanded
-                                            : kExpandedCollapsed;
-        }
+  if (auto* button = DynamicTo<HTMLButtonElement>(element)) {
+    const AtomicString& action =
+        button->FastGetAttribute(html_names::kCommandAttr);
+    CommandEventType type = button->GetCommandEventType(action);
+    if (HTMLElement* command_for =
+            DynamicTo<HTMLElement>(button->commandForElement())) {
+      bool is_valid_popover_command =
+          command_for->IsValidBuiltinPopoverCommand(*button, type);
+      bool is_child = button->IsDescendantOrShadowDescendantOf(command_for);
+      // Buttons for popovers should indicate the expanded/collapsed state.
+      if (is_valid_popover_command && !is_child) {
+        return command_for->popoverOpen() ? kExpandedExpanded
+                                          : kExpandedCollapsed;
       }
     }
   }
@@ -4850,15 +4848,19 @@ bool AXNodeObject::OnNativeSetValueAction(const String& string) {
 //
 
 String AXNodeObject::GetName(ax::mojom::blink::NameFrom& name_from,
-                             AXObjectVector* name_objects) const {
-  String name = AXObject::GetName(name_from, name_objects);
+                             AXObjectVector* name_objects,
+                             AXNodeObject::NameSources* name_sources) const {
+  String name = AXObject::GetName(name_from, name_objects, name_sources);
 
   // Fields inside a datetime control need to merge the field name with
   // the name of the <input> element.
   if (RoleValue() == ax::mojom::blink::Role::kSpinButton &&
       DatetimeAncestor()) {
-    name_objects->clear();
-    String input_name = DatetimeAncestor()->GetName(name_from, name_objects);
+    if (name_objects) {
+      name_objects->clear();
+    }
+    String input_name =
+        DatetimeAncestor()->GetName(name_from, name_objects, name_sources);
     if (!input_name.empty())
       return StrCat({name, " ", input_name});
   }
@@ -4922,7 +4924,8 @@ String AXNodeObject::GetName(ax::mojom::blink::NameFrom& name_from,
     const AXObject* scroll_target =
         AXObjectCache().Get(element->parentElement());
     ax::mojom::blink::NameFrom name_source;
-    return scroll_target ? scroll_target->GetName(name_source, nullptr) : "";
+    return scroll_target ? scroll_target->GetName(name_source, nullptr, nullptr)
+                         : "";
   }
 
   return name;
@@ -7416,7 +7419,7 @@ String AXNodeObject::Description(
     // with the description of the <input> element.
     const AXObject* datetime_ancestor = DatetimeAncestor();
     ax::mojom::blink::NameFrom datetime_ancestor_name_from;
-    datetime_ancestor->GetName(datetime_ancestor_name_from, nullptr);
+    datetime_ancestor->GetName(datetime_ancestor_name_from, nullptr, nullptr);
     if (description_objects)
       description_objects->clear();
     String ancestor_description = DatetimeAncestor()->Description(

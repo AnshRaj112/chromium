@@ -257,9 +257,9 @@ class BrowserAutofillManager : public AutofillManager {
   bool ShouldUploadForm(const FormStructure& form);
 
   // Handles the loyalty card specific logic after a field is filled.
-  void LogAndRecordLoyaltyCardFill(const LoyaltyCard& loyalty_card,
-                                   const FormGlobalId& form_id,
-                                   const FieldGlobalId& field_id);
+  virtual void LogAndRecordLoyaltyCardFill(const LoyaltyCard& loyalty_card,
+                                           const FormGlobalId& form_id,
+                                           const FieldGlobalId& field_id);
 
   // Returns the last form the autofill manager considered in this frame.
   virtual const FormData& last_query_form() const;
@@ -421,6 +421,12 @@ class BrowserAutofillManager : public AutofillManager {
       const FormFieldData& trigger_field,
       const AutofillField& autofill_trigger_field,
       autofill_metrics::SuggestionRankingContext& ranking_context);
+
+  // Returns a list of suggestions from the stored loyalty cards for the given
+  // `url` and value of `trigger_field`
+  std::vector<Suggestion> GetLoyaltyCardSuggestions(
+      const GURL& url,
+      const FormFieldData& trigger_field);
 
   // Fills or previews `form` with the information in `credit_card`.
   // `autofill_field` is the field that triggered the filling operation.

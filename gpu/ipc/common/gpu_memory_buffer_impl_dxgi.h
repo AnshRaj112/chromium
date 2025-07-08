@@ -25,13 +25,9 @@
 #include "ui/gfx/color_space.h"
 #include "ui/gfx/gpu_memory_buffer.h"
 
-namespace media {
-class GpuMemoryBufferTrackerWin;
-}
-
 namespace gpu {
 
-class GpuMemoryBufferSupport;
+class ClientSharedImage;
 
 // Implementation of GPU memory buffer based on dxgi textures.
 class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImplDXGI
@@ -44,6 +40,16 @@ class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImplDXGI
 
   static constexpr gfx::GpuMemoryBufferType kBufferType =
       gfx::DXGI_SHARED_HANDLE;
+
+  static std::unique_ptr<GpuMemoryBufferImplDXGI> CreateFromHandleForTesting(
+      gfx::GpuMemoryBufferHandle handle,
+      const gfx::Size& size,
+      gfx::BufferFormat format,
+      gfx::BufferUsage usage,
+      DestructionCallback callback) {
+    return CreateFromHandle(std::move(handle), size, format, usage,
+                            std::move(callback));
+  }
 
   static base::OnceClosure AllocateForTesting(
       const gfx::Size& size,
@@ -77,9 +83,7 @@ class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImplDXGI
   const gfx::DXGIHandleToken& GetToken() const;
 
  private:
-  // TODO(crbug.com/40264379): Remove the need for this.
-  friend media::GpuMemoryBufferTrackerWin;
-  friend GpuMemoryBufferSupport;
+  friend ClientSharedImage;
 
   static std::unique_ptr<GpuMemoryBufferImplDXGI> CreateFromHandle(
       gfx::GpuMemoryBufferHandle handle,
@@ -92,7 +96,6 @@ class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImplDXGI
       scoped_refptr<base::UnsafeSharedMemoryPool> pool = nullptr);
 
   GpuMemoryBufferImplDXGI(
-      gfx::GpuMemoryBufferId id,
       const gfx::Size& size,
       gfx::BufferFormat format,
       DestructionCallback callback,

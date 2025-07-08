@@ -40,6 +40,10 @@ inline constexpr char kBottomOmniboxByDefault[] =
 inline constexpr char kBrowserLockdownModeEnabled[] =
     "ios.browser_lockdown_mode_enabled";
 
+// A map of sessionID (clientID) to sub-dictionaries of conversationID
+// (serverID) and creation timestamp.
+inline constexpr char kBwgSessionMap[] = "ios.bwg.session_map";
+
 // A map of profile data directory to cached information. This cache can
 // be used to display information about profiles without actually having
 // to load them.
@@ -788,6 +792,10 @@ inline constexpr char kNextSSORecallTime[] = "ios.next_sso_recall_time";
 // An integer determining the enabled status of Gemini by policy.
 // 0 means Gemini is enabled (default), and 1 means it's disabled.
 inline constexpr char kGeminiEnabledByPolicy[] = "ios.gemini_enabled_by_policy";
+
+// A boolean specifying if the multi-profile force-migration is done.
+inline constexpr char kMultiProfileForcedMigrationDone[] =
+    "ios.multi_profile_forced_migration_done";
 
 }  // namespace prefs
 

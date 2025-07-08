@@ -31,7 +31,6 @@
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/crash_keys.h"
 #include "chrome/common/media/cdm_registration.h"
-#include "chrome/common/ppapi_utils.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/grit/common_resources.h"
 #include "chrome/grit/generated_resources.h"
@@ -129,7 +128,6 @@ void ChromeContentClient::AddPlugins(
 
   content::ContentPluginInfo pdf_info;
   pdf_info.is_internal = true;
-  pdf_info.is_out_of_process = true;
   pdf_info.name = kPDFPluginName;
   pdf_info.description = kPDFPluginDescription;
   pdf_info.path = base::FilePath(ChromeContentClient::kPDFInternalPluginPath);
@@ -200,6 +198,8 @@ void ChromeContentClient::AddAdditionalSchemes(Schemes* schemes) {
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   schemes->extension_schemes.push_back(extensions::kExtensionScheme);
 #endif
+
+  schemes->isolated_app_schemes.push_back(chrome::kIsolatedAppScheme);
 
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   schemes->savable_schemes.push_back(extensions::kExtensionScheme);
@@ -323,23 +323,24 @@ void ChromeContentClient::ExposeInterfacesToBrowser(
   // Sets up the client side of the multi-process heap profiler service.
   // TODO(crbug.com/40915258): Hook up chrome://memory-internals to the
   // in-process heap profiler, and delete this service.
-  binders->Add<heap_profiling::mojom::ProfilingClient>(
-      base::BindRepeating(
+  binders
+      ->Add<heap_profiling::mojom::ProfilingClient>(
+
           [](mojo::PendingReceiver<heap_profiling::mojom::ProfilingClient>
                  receiver) {
             static base::NoDestructor<heap_profiling::ProfilingClient>
                 profiling_client;
             profiling_client->BindToInterface(std::move(receiver));
-          }),
-      io_task_runner);
+          },
+          io_task_runner);
 
   // Sets up the simplified in-process heap profiler, if it's enabled.
   const auto* heap_profiler_controller =
       heap_profiling::HeapProfilerController::GetInstance();
   if (heap_profiler_controller && heap_profiler_controller->IsEnabled()) {
     binders->Add<heap_profiling::mojom::SnapshotController>(
-        base::BindRepeating(&heap_profiling::ChildProcessSnapshotController::
-                                CreateSelfOwnedReceiver),
+        &heap_profiling::ChildProcessSnapshotController::
+            CreateSelfOwnedReceiver,
         // ChildProcessSnapshotController calls into HeapProfilerController,
         // which can only be accessed on this sequence.
         base::SequencedTaskRunner::GetCurrentDefault());

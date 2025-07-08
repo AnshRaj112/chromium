@@ -18,6 +18,7 @@ methods for dependency traversal.
 
 import functools
 import json
+import os
 
 # Types that should never be used as a dependency of another build config.
 _ROOT_TYPES = frozenset([
@@ -31,20 +32,6 @@ _COLLECTS_RESOURCES_TYPES = frozenset([
     'android_apk',
     'android_app_bundle_module',
     'dist_aar',
-    'robolectric_binary',
-])
-
-_COLLECTS_DEVICE_CLASSPATH_TYPES = frozenset([
-    'android_apk',
-    'android_app_bundle_module',
-    'android_app_bundle',
-    'dist_jar',  # dist_dex uses this.
-])
-
-_COLLECTS_HOST_CLASSPATH_TYPES = frozenset([
-    'dist_aar',
-    'dist_jar',
-    'java_binary',
     'robolectric_binary',
 ])
 
@@ -68,6 +55,16 @@ _CLASSPATH_TYPES = frozenset([
 # Track inputs for use in depfiles.
 _input_paths = []
 
+# By default scripts are run from the output directory, otherwise call
+# set_output_dir() before using methods in this module.
+_output_dir_path = ''
+
+
+def set_output_dir(path):
+  """Resolve paths relative to this directory."""
+  global _output_dir_path
+  _output_dir_path = path
+
 
 def all_read_file_paths():
   """Returns a list of all paths read by _get_json()."""
@@ -76,6 +73,7 @@ def all_read_file_paths():
 
 def _get_json(path):
   """Reads a JSON file and records the path for depfile tracking."""
+  path = os.path.join(_output_dir_path, path)
   _input_paths.append(path)
   with open(path, encoding='utf-8') as f:
     config = json.load(f)
@@ -290,6 +288,18 @@ class DepsList(_HashableList):
     return [p[key_name] for p in self if key_name in p]
 
 
+def _extract_native_libraries_from_runtime_deps(path):
+  """Extracts a list of .so paths from a runtime_deps file."""
+  with open(os.path.join(_output_dir_path, path), encoding='utf-8') as f:
+    lines = f.read().splitlines()
+  ret = [
+      os.path.normpath(l.replace('lib.unstripped/', '')) for l in lines
+      if l.endswith('.so')
+  ]
+  ret.reverse()
+  return ret
+
+
 class ParamsJson(dict):
   """A dictionary-like view of a .params.json file with helper methods."""
 
@@ -323,13 +333,26 @@ class ParamsJson(dict):
     """Returns True if the target type collects Android resources."""
     return self.type in _COLLECTS_RESOURCES_TYPES
 
-  def collects_device_classpath(self):
-    """Returns True if the target type collects a device-side classpath."""
-    return self.type in _COLLECTS_DEVICE_CLASSPATH_TYPES
+  def collects_dex_paths(self):
+    """Returns True if the target type collects transitive .dex files."""
+    if self.type in ('dist_aar', 'dist_jar'):
+      return self.supports_android()
+    if self.is_bundle_module():
+      return not self.get('proguard_enabled')
+    return self.is_apk()
 
-  def collects_host_classpath(self):
-    """Returns True if the target type collects a host-side classpath."""
-    return self.type in _COLLECTS_HOST_CLASSPATH_TYPES
+  def collects_processed_classpath(self):
+    """Returns True if the target type collects the processed classpath."""
+    if self.get('dex_needs_classpath'):
+      return True
+    if self.type in ('dist_aar', 'dist_jar', 'java_binary',
+                     'robolectric_binary'):
+      return True
+    if self.is_apk() or self.is_bundle() or self.is_bundle_module():
+      # Required for is_bundle_module only because write_build_config.py uses
+      # them as inputs.
+      return self.get('proguard_enabled', False)
+    return False
 
   def collects_native_libraries(self):
     """Returns True if the target type collects native libraries."""
@@ -366,11 +389,13 @@ class ParamsJson(dict):
 
   def requires_android(self):
     """Returns True if the target requires the Android platform."""
+    if self.type.startswith('android') or self.type == 'dist_aar':
+      return True
     return self.is_resource_type or self.get('requires_android', False)
 
   def supports_android(self):
     """Returns True if the target supports the Android platform."""
-    return self.get('supports_android', True)
+    return self.requires_android() or self.get('supports_android', True)
 
   def _direct_deps(self):
     """Returns only the direct dependencies (from `deps_configs`)."""
@@ -418,13 +443,23 @@ class ParamsJson(dict):
       return get_params(path)
     return None
 
+  @functools.cache  # pylint: disable=method-cache-max-size-none
   def module_deps(self):
     """For a bundle, returns the ParamsJson for all module dependencies."""
-    return self.deps().of_type('android_app_bundle_module')
+    deps = sorted(self.deps().of_type('android_app_bundle_module'),
+                  key=lambda x: x['module_name'])
+    if not self.is_bundle():
+      return deps
+    base_module = self.base_module()
+    ret = {base_module: 1}
+    ret.update(
+        dict.fromkeys(x for x in deps if x.parent_module() is base_module))
+    ret.update(dict.fromkeys(deps))
+    return list(ret)
 
   def parent_module(self):
     """For a bundle module, returns its direct parent module."""
-    assert self.is_bundle_module()
+    assert self.is_bundle_module(), 'got: ' + self.type
     module_deps = self.module_deps()
 
     if self['module_name'] == 'base':
@@ -440,6 +475,10 @@ class ParamsJson(dict):
 
   def base_module(self):
     """For a bundle module, returns the root 'base' module."""
+    if self.is_bundle():
+      return next(x for x in self.deps() if x.get('module_name') == 'base')
+
+    assert self.is_bundle_module(), 'got: ' + self.type
     # Find the base split.
     ret = self
     while not ret.is_base_module():
@@ -457,3 +496,13 @@ class ParamsJson(dict):
     if self.is_library():
       return self.deps().of_type('android_resources')
     return self.deps().recursive_resource_deps().of_type('android_resources')
+
+  def native_libraries(self):
+    if path := self.get('shared_libraries_runtime_deps_file'):
+      return _extract_native_libraries_from_runtime_deps(path)
+    return []
+
+  def secondary_abi_native_libraries(self):
+    if path := self.get('secondary_abi_shared_libraries_runtime_deps_file'):
+      return _extract_native_libraries_from_runtime_deps(path)
+    return []

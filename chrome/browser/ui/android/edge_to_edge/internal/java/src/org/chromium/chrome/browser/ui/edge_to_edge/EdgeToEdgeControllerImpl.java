@@ -663,10 +663,21 @@ public class EdgeToEdgeControllerImpl
             builder.setInsets(WindowInsetsCompat.Type.statusBars(), Insets.NONE);
             builder.setInsets(WindowInsetsCompat.Type.captionBar(), Insets.NONE);
         }
+        Insets mandatorySystemGestures =
+                windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures());
         if (mAppliedContentViewPadding.bottom == 0) {
             builder.setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.NONE);
+            builder.setInsets(WindowInsetsCompat.Type.tappableElement(), Insets.NONE);
             builder.setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE);
+            mandatorySystemGestures =
+                    Insets.of(
+                            mandatorySystemGestures.left,
+                            mandatorySystemGestures.top,
+                            mandatorySystemGestures.right,
+                            0);
         }
+        builder.setInsets(
+                WindowInsetsCompat.Type.mandatorySystemGestures(), mandatorySystemGestures);
         return builder.build();
     }
 
@@ -895,14 +906,22 @@ public class EdgeToEdgeControllerImpl
     private static Insets getSystemInsets(
             WindowInsetsCompat windowInsets, boolean hasSeenNonZeroNavigationBarInsets) {
         Insets systemBarInsets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+
+        if (!EdgeToEdgeUtils.isUseBackupNavbarInsetsEnabled()) return systemBarInsets;
+
         if (systemBarInsets.left == 0
                 && systemBarInsets.right == 0
                 && systemBarInsets.bottom == 0) {
             @Nullable Insets backupNavbarInsets =
-                    EdgeToEdgeUtils.getBackupNavbarInsets(
+                    EdgeToEdgeManager.getBackupNavbarInsets(
                             hasSeenNonZeroNavigationBarInsets,
                             windowInsets,
-                            BackupNavbarInsetsCallSite.EDGE_TO_EDGE_CONTROLLER);
+                            BackupNavbarInsetsCallSite.EDGE_TO_EDGE_CONTROLLER,
+                            EdgeToEdgeFieldTrialImpl.getBackupNavbarInsetsOverrides(),
+                            ChromeFeatureList.sEdgeToEdgeUseBackupNavbarInsetsUseTappable
+                                    .getValue(),
+                            ChromeFeatureList.sEdgeToEdgeUseBackupNavbarInsetsUseGestures
+                                    .getValue());
             // If applicable, apply backup navbar insets to the left, right, and bottom (not the
             // top, as that's always the status bar).
             if (backupNavbarInsets != null) {

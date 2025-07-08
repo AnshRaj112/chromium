@@ -5,8 +5,6 @@
 #ifndef CHROME_BROWSER_PASSWORD_MANAGER_PASSWORD_CHANGE_DELEGATE_H_
 #define CHROME_BROWSER_PASSWORD_MANAGER_PASSWORD_CHANGE_DELEGATE_H_
 
-#include <string>
-
 #include "base/observer_list_types.h"
 
 namespace content {
@@ -19,6 +17,7 @@ class PasswordChangeDelegate {
   // Internal state of a password change flow. Corresponds to
   // `PasswordChangeFlowState` in enums.xml. These values are persisted to logs.
   // Entries should not be renumbered and numeric values should never be reused.
+  // LINT.IfChange(State)
   enum class State {
     // Password change is being offered to the user, waiting from the to accept
     // or reject it.
@@ -52,6 +51,7 @@ class PasswordChangeDelegate {
 
     kMaxValue = kCanceled,
   };
+  // LINT.ThenChange(/tools/metrics/histograms/metadata/password/enums.xml:PasswordChangeFlowState)
 
   // An interface used to notify clients (observers) of delegate state. Register
   // the observer via `PasswordChangeDelegate::AddObserver`.
@@ -100,15 +100,12 @@ class PasswordChangeDelegate {
 
   virtual void OnOtpFieldDetected(content::WebContents* web_contents) = 0;
 
+  // Called when the user declines the initial dialog offering password change.
+  virtual void OnPasswordChangeDeclined() = 0;
+
   // Adds/removes an observer.
   virtual void AddObserver(Observer* observer) = 0;
   virtual void RemoveObserver(Observer* observer) = 0;
-
-  // Getters for current domain where password change is ongoing, username and a
-  // newly generated password. Password exists only after it was generated.
-  virtual std::u16string GetDisplayOrigin() const = 0;
-  virtual const std::u16string& GetUsername() const = 0;
-  virtual const std::u16string& GetGeneratedPassword() const = 0;
 
   virtual base::WeakPtr<PasswordChangeDelegate> AsWeakPtr() = 0;
 };

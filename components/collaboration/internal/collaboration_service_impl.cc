@@ -469,11 +469,9 @@ CollaborationStatus CollaborationServiceImpl::GetCollaborationStatus() {
   }
 #endif
 
-  // Disable for automotive users.
-  if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_AUTOMOTIVE &&
-      !base::FeatureList::IsEnabled(
-          data_sharing::features::kCollaborationAutomotive)) {
-    return CollaborationStatus::kDisabled;
+  // Check if device policy allow sync.
+  if (current_status_.sync_status == SyncStatus::kSyncDisabledByEnterprise) {
+    return CollaborationStatus::kDisabledForPolicy;
   }
 
   // TODO(haileywang): Support collaboration status updates.

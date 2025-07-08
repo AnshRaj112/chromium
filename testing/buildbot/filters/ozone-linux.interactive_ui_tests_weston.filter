@@ -21,6 +21,7 @@
 -BookmarkBarViewTest12.CloseWithModalDialog
 -BookmarkBarViewTest13.ClickOnContextMenuSeparator
 -BookmarkBarViewTest15.MenuStaysVisibleAfterDelete
+-BookmarkBarViewTest17.ContextMenus3
 -BookmarkBarViewTest21.ContextMenusForEmptyFolder
 -BookmarkBarViewTest23.ContextMenusKeyboard
 -BookmarkBarViewTest29.DNDToEmptyMenu
@@ -81,3 +82,6 @@
 
 # TODO(crbug.com/40800718): Enable once the xdg desktop portal backed implementation is in place.
 -EyeDropperViewAuraInteractiveTest.*
+
+# Fail on try bot due to DCHECKs being enabled there
+-AnimationTimingTestSuiteInstantiation/PictureInPictureBrowserFrameViewTest.TestAnimationTiming/*

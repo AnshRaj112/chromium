@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import {type WebClientInitialState} from '../glic.mojom-webui.js';
-import type {ActInFocusedTabParams, ActInFocusedTabResult, AnnotatedPageData, ChromeVersion, DraggableArea, ErrorReasonTypes, ErrorWithReason, FocusedTabDataHasFocus, FocusedTabDataHasNoFocus, Journal, OpenPanelInfo, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, PdfDocumentData, Screenshot, ScrollToParams, TabContextOptions, TabContextResult, TabData, UserProfileInfo, ZeroStateSuggestions} from '../glic_api/glic_api.js';
+import type {ActInFocusedTabParams, ActInFocusedTabResult, AnnotatedPageData, ChromeVersion, DraggableArea, ErrorReasonTypes, ErrorWithReason, FocusedTabDataHasFocus, FocusedTabDataHasNoFocus, GetPinCandidatesOptions, Journal, OpenPanelInfo, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, PdfDocumentData, Screenshot, ScrollToParams, TabContextOptions, TabContextResult, TabData, UserProfileInfo, ZeroStateSuggestions, ZeroStateSuggestionsOptions, ZeroStateSuggestionsV2} from '../glic_api/glic_api.js';
 
 /*
 This file defines messages sent over postMessage in-between the Glic WebUI
@@ -86,6 +86,19 @@ export declare interface HostRequestTypes {
     },
     response: {
       effectiveMax: number,
+    },
+  };
+  glicBrowserCreateTask: {
+    response: {
+      taskId: number,
+    },
+  };
+  glicBrowserPerformActions: {
+    request: {
+      actions: ArrayBuffer,
+    },
+    response: {
+      actionsResult: ArrayBuffer,
     },
   };
   glicBrowserActInFocusedTab: {
@@ -276,6 +289,14 @@ export declare interface HostRequestTypes {
     },
   };
   glicBrowserUnpinAllTabs: {};
+  glicBrowserGetPinCandidates: {
+    request: {
+      options: GetPinCandidatesOptions,
+    },
+    response: {
+      candidates: TabDataPrivate[],
+    },
+  };
   glicBrowserGetZeroStateSuggestionsForFocusedTab: {
     request: {
       isFirstRun?: boolean,
@@ -285,6 +306,16 @@ export declare interface HostRequestTypes {
     },
   };
   glicBrowserMaybeRefreshUserStatus: {};
+
+  glicBrowserGetZeroStateSuggestionsAndSubscribe: {
+    request: {
+      hasActiveSubscription: boolean,
+      options: ZeroStateSuggestionsOptions,
+    },
+    response: {
+      suggestions?: ZeroStateSuggestionsV2,
+    },
+  };
 }
 
 // Types of requests to the GlicWebClient.
@@ -370,6 +401,12 @@ export declare interface WebClientRequestTypes {
       tabData: TabDataPrivate,
     },
   };
+  glicWebClientZeroStateSuggestionsChanged: {
+    request: {
+      suggestions: ZeroStateSuggestionsV2,
+      options: ZeroStateSuggestionsOptions,
+    },
+  };
 }
 
 
@@ -432,11 +469,15 @@ type HostRequestEnumNamesType = {
     PinTabs: 0,
     UnpinTabs: 0,
     UnpinAllTabs: 0,
+    GetPinCandidates: 0,
     GetZeroStateSuggestionsForFocusedTab: 0,
+    GetZeroStateSuggestionsAndSubscribe: 0,
     SetClosedCaptioningSetting: 0,
     DropScrollToHighlight: 0,
     MaybeRefreshUserStatus: 0,
     OnClosedCaptionsShown: 0,
+    CreateTask: 0,
+    PerformActions: 0,
   };
   return apiRequestTypes;
   // LINT.ThenChange(//tools/metrics/histograms/metadata/glic/histograms.xml:ApiRequestType)

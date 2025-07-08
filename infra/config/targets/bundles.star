@@ -1483,6 +1483,7 @@ targets.bundle(
     name = "chromium_android_cast_receiver",
     additional_compile_targets = [
         "cast_browser_apk",
+        "cast_browser_dist_aar",
     ],
 )
 
@@ -5088,7 +5089,7 @@ targets.bundle(
         targets.bundle(
             targets = "ios_blink_tests",
             variants = [
-                "SIM_IPHONE_15_18_4",
+                "SIM_IPHONE_15_26_0",
             ],
         ),
     ],
@@ -5308,8 +5309,6 @@ targets.bundle(
                 "xcodebuild_sim_runner",
             ],
             variants = [
-                "SIM_IPAD_AIR_5TH_GEN_17_5",
-                "SIM_IPAD_AIR_6TH_GEN_18_2",
                 "SIM_IPAD_PRO_6TH_GEN_17_5",
                 "SIM_IPAD_PRO_7TH_GEN_18_2",
                 "SIM_IPHONE_14_17_5",
@@ -5505,6 +5504,7 @@ targets.bundle(
 targets.bundle(
     name = "ios_failing_screen_size_dependent_tests",
     targets = [
+        "ios_chrome_unittests",
         "ios_web_inttests",
         "ios_web_unittests",
     ],
@@ -5573,7 +5573,6 @@ targets.bundle(
         "base_unittests",
         "components_unittests",
         "gfx_unittests",
-        "ios_chrome_unittests",
         "ios_web_view_inttests",
         "ios_web_view_unittests",
         "skia_unittests",
@@ -5617,8 +5616,6 @@ targets.bundle(
                 "xcodebuild_sim_runner",
             ],
             variants = [
-                "SIM_IPAD_AIR_5TH_GEN_17_5",
-                "SIM_IPAD_AIR_6TH_GEN_18_2",
                 "SIM_IPAD_PRO_6TH_GEN_17_5",
                 "SIM_IPAD_PRO_7TH_GEN_18_2",
                 "SIM_IPHONE_14_17_5",
@@ -5666,10 +5663,11 @@ targets.bundle(
             ],
         ),
         targets.bundle(
-            targets = "ios_eg2_cq_tests",
+            targets = "ios_vm_eg2_cq_tests",
             mixins = [
                 "xcodebuild_sim_runner",
                 "record_failed_tests",
+                "mac_15_vm_optional",
             ],
             variants = [
                 "SIM_IPAD_AIR_5TH_GEN_17_5",
@@ -5721,9 +5719,10 @@ targets.bundle(
             ],
         ),
         targets.bundle(
-            targets = "ios_eg2_cq_tests",
+            targets = "ios_vm_eg2_cq_tests",
             mixins = [
                 "xcodebuild_sim_runner",
+                "mac_15_vm_optional",
             ],
             variants = [
                 "SIM_IPHONE_14_17_5",
@@ -5740,6 +5739,25 @@ targets.bundle(
             ],
         ),
     ],
+)
+
+# This is essentially ios_eg2_cq_tests but runs on more shards,
+# because VM has slightly worse performance than bare metal.
+# TODO(crbug.com/427497507): remove once we have launced more VMs.
+targets.bundle(
+    name = "ios_vm_eg2_cq_tests",
+    targets = [
+        "ios_eg2_cq_tests",
+    ],
+    per_test_modifications = {
+        "ios_chrome_integration_eg2tests_module": [
+            targets.mixin(
+                swarming = targets.swarming(
+                    shards = 9,
+                ),
+            ),
+        ],
+    },
 )
 
 targets.bundle(

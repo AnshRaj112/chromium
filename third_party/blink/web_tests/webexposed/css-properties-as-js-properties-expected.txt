@@ -535,6 +535,14 @@ textWrap
 textWrapMode
 textWrapStyle
 timelineScope
+timelineTrigger
+timelineTriggerBehavior
+timelineTriggerExitRangeEnd
+timelineTriggerExitRangeStart
+timelineTriggerName
+timelineTriggerRangeEnd
+timelineTriggerRangeStart
+timelineTriggerTimeline
 top
 touchAction
 transform

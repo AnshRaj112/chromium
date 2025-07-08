@@ -18,7 +18,6 @@
 #include "chrome/common/buildflags.h"
 #include "device/vr/buildflags/buildflags.h"
 #include "extensions/buildflags/buildflags.h"
-#include "ppapi/buildflags/buildflags.h"
 #include "printing/buildflags/buildflags.h"
 #include "ui/base/buildflags.h"
 
@@ -74,6 +73,7 @@ extern const char kBoardingPassDetectorUrlParamName[];
 COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kBorealis);
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kBrowserAppInstanceTracking);
+COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kShowBorealisMotd);
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 #if BUILDFLAG(CHROME_ROOT_STORE_CERT_MANAGEMENT_UI)
@@ -127,6 +127,10 @@ BASE_DECLARE_FEATURE(kDesktopTaskManagerEndProcessDisabledForExtension);
 
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kChromeStructuredMetrics);
+
+// TODO(crbug.com/419817061): Remove this flag when launch is complete.
+COMPONENT_EXPORT(CHROME_FEATURES)
+BASE_DECLARE_FEATURE(kCreateProfileIfNoneExists);
 
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kDesktopPWAsElidedExtensionsMenu);
@@ -191,6 +195,7 @@ BASE_DECLARE_FEATURE(kForcedAppRelaunchOnPlaceholderUpdate);
 COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGeoLanguage);
 
 COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlicActor);
+COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlicActorUiStateManager);
 COMPONENT_EXPORT(CHROME_FEATURES)
 extern const base::FeatureParam<base::TimeDelta>(
     kGlicActorPageStabilityLocalTimeout);
@@ -293,6 +298,9 @@ COMPONENT_EXPORT(CHROME_FEATURES)
 extern const base::FeatureParam<int> kGlicClientResponsivenessCheckTimeoutMs;
 COMPONENT_EXPORT(CHROME_FEATURES)
 extern const base::FeatureParam<int> kGlicClientUnresponsiveUiMaxTimeMs;
+COMPONENT_EXPORT(CHROME_FEATURES)
+extern const base::FeatureParam<bool>
+    kGlicClientResponsivenessCheckIgnoreWhenDebuggerAttached;
 
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kGlicKeyboardShortcutNewBadge);
@@ -309,6 +317,8 @@ COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlicDebugWebview);
 COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlicScrollTo);
 COMPONENT_EXPORT(CHROME_FEATURES)
 extern const base::FeatureParam<bool> kGlicScrollToEnforceDocumentId;
+COMPONENT_EXPORT(CHROME_FEATURES)
+extern const base::FeatureParam<bool> kGlicScrollToPDF;
 
 COMPONENT_EXPORT(CHROME_FEATURES) BASE_DECLARE_FEATURE(kGlicSizingFitWindow);
 
@@ -382,6 +392,9 @@ extern const base::FeatureParam<int> kGlicTabFocusDataMaxDebounces;
 
 COMPONENT_EXPORT(CHROME_FEATURES)
 BASE_DECLARE_FEATURE(kGlicAssetsV2);
+
+COMPONENT_EXPORT(CHROME_FEATURES)
+BASE_DECLARE_FEATURE(kGlicFaviconDataUrls);
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
 COMPONENT_EXPORT(CHROME_FEATURES)

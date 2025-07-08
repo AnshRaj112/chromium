@@ -263,12 +263,12 @@ _BANNED_JAVA_FUNCTIONS: Sequence[BanRule] = (
         False,
     ),
     BanRule(
-        pattern=(r'IS_DESKTOP_ANDROID'),
+        pattern=(r'/((DeviceInfo\.isDesktop\()|IS_DESKTOP_ANDROID)'),
         explanation=(
-            'Do not add new uses of IS_DESKTOP_ANDROID build flag until you '
-            'have the approval of tedchoc@ or twellington@. '
-            'Background: it is highly important to reduce the divergence of '
-            'features across platforms. '
+            'Do not add new uses of IS_DESKTOP_ANDROID build flag or '
+            'DeviceInfo.isDesktop() until you have the approval of tedchoc@ or '
+            'twellington@. Background: it is highly important to reduce the '
+            'divergence of features across platforms. '
             'Allowances may be granted to only the directories below: '
             '[build/, chrome/, components/, extensions/, infra/, tools/] ',
             'Note: in particular we need to avoid components shared with '
@@ -2410,7 +2410,9 @@ _KNOWN_ROBOTS = set() | set('%s@appspot.gserviceaccount.com' % s for s in (
                     'chops-security-borg',
                     'chops-security-cronjobs-cpesuggest')) | set(
                         '%s@chromeos-release-bot.iam.gserviceaccount.com' % s
-                        for s in ('chromeos-ci-release', ))
+                        for s in ('chromeos-ci-release', )) | set(
+                        '%s@chromeos-bot.iam.gserviceaccount.com' % s
+                        for s in ('chromeos-ci-prod', ))
 
 _INVALID_GRD_FILE_LINE = [(r'<file lang=.* path=.*',
                            'Path should come before lang in GRD files.')]

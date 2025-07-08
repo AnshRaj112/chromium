@@ -13,6 +13,7 @@
 <translation id="1073417869336441572">Hjálpaðu okkur að bæta Chrome með því að segja okkur hvers vegna þú leyfðir fótspor þriðju aðila. <ph name="BEGIN_LINK" />Senda ábendingu<ph name="END_LINK" /></translation>
 <translation id="1074758928858737435">Þú getur beðið um að sjá borðtölvuútgáfu vefsvæða</translation>
 <translation id="1085696779717592361">Nota Chrome sjálfgefið</translation>
+<translation id="1178015372320901893">Blað neðst í flýtileiðunum mínum</translation>
 <translation id="1178581264944972037">Gera hlé</translation>
 <translation id="1181037720776840403">Fjarlægja</translation>
 <translation id="1192844206376121885">Þetta eyðir öllum gögnum og fótsporum sem <ph name="ORIGIN" /> hefur vistað.</translation>
@@ -61,6 +62,7 @@
 <translation id="1703666494654169921">Ekki leyfa vefsvæðum að nota sýndarveruleikatæki eða -gögn</translation>
 <translation id="1704230497453185209">Ekki leyfa vefsvæðum að spila hljóð</translation>
 <translation id="1717218214683051432">Hreyfiskynjarar</translation>
+<translation id="1717996979683942279">Þegar kveikt er á þessu geta vefsvæði beðið um stjórna á gluggum á öllum skjáunum þínum. Þegar slökkt er á þessu geta vefsvæði ekki stjórnað gluggum á skjáunum þínum.</translation>
 <translation id="1743802530341753419">Spyrja áður en vefsvæðum er leyft að tengjast við tæki (mælt með)</translation>
 <translation id="1777815584158991902">Blað neðst á tillögustraumi</translation>
 <translation id="1779089405699405702">Afkóðun mynda</translation>
@@ -69,6 +71,7 @@
 <translation id="1799920918471566157">Ábendingar fyrir Chrome</translation>
 <translation id="1816835383954230954">Þegar kveikt er á því virkar Chrome hraðar og eiginleikar sem nota JavaScript ættu að virka sem skyldi. Þegar slökkt er á því dregur það úr afköstum en auðveldar V8 að verjast árásum.</translation>
 <translation id="1818308510395330587">Til að leyfa <ph name="APP_NAME" /> að nota AR þarftu einnig að kveikja á myndavél í <ph name="BEGIN_LINK" />stillingum Android<ph name="END_LINK" />.</translation>
+<translation id="1881806992065048905">Neðsta blað nýrrar flipasíðu</translation>
 <translation id="1887786770086287077">Slökkt er á aðgangi að staðsetningu fyrir þetta tæki. Kveiktu á honum í <ph name="BEGIN_LINK" />stillingum Android<ph name="END_LINK" />.</translation>
 <translation id="1906181697255754968">Vefsvæði opna yfirleitt skrár og möppur í tækinu þínu til að nota eiginleika eins og að vista það sem þú gerðir sjálfkrafa</translation>
 <translation id="1915307458270490472">Leggja á</translation>
@@ -117,6 +120,7 @@
 <translation id="2402980924095424747"><ph name="MEGABYTES" /> MB</translation>
 <translation id="2404630663942400771">{PERMISSIONS_SUMMARY_ALLOWED,plural, =1{„<ph name="PERMISSION_1" />“, „<ph name="PERMISSION_2" />“ og <ph name="NUM_MORE" /> í viðbót leyft}one{„<ph name="PERMISSION_1" />“, „<ph name="PERMISSION_2" />“ og <ph name="NUM_MORE" /> í viðbót leyft}other{„<ph name="PERMISSION_1" />“, „<ph name="PERMISSION_2" />“ og <ph name="NUM_MORE" /> í viðbót leyft}}</translation>
 <translation id="2410940059315936967">Vefsvæði sem þú skoðar getur fellt inn efni frá öðrum vefsvæðum, til dæmis myndir, auglýsingar og texta. Fótspor sem viðkomandi önnur vefsvæði nota kallast fótspor þriðju aðila.</translation>
+<translation id="2433507940547922241">Útlit</translation>
 <translation id="2434158240863470628">Niðurhali lokið <ph name="SEPARATOR" /> <ph name="BYTES_DOWNLOADED" /></translation>
 <translation id="2438120137003069591">Þú leyfðir þessu vefsvæði að nota fótspor þriðju aðila tímabundið. Þetta þýðir minni vernd við vefskoðun en líklegra er að eiginleikar vefsvæðisins virki sem skyldi. <ph name="BEGIN_LINK" />Senda ábendingu<ph name="END_LINK" /></translation>
 <translation id="244264527810019436">Eiginleikar sumra vefsvæða virka e.t.v. ekki í huliðsstillingu</translation>
@@ -129,6 +133,7 @@
 <translation id="2490684707762498678">Stýrt af <ph name="APP_NAME" /></translation>
 <translation id="2498359688066513246">Hjálp og ábendingar</translation>
 <translation id="2501278716633472235">Fara til baka</translation>
+<translation id="2533138527374486328">Ef kveikt er á þessu geta vefsvæði beðið um að tengjast hvaða tæki sem er á staðarnetinu þínu. Þegar slökkt er á þessu geta vefsvæði ekki tengst tækjum á staðarnetinu þínu.</translation>
 <translation id="2546283357679194313">Fótspor og gögn vefsvæða</translation>
 <translation id="2570922361219980984">Einnig er slökkt á aðgangi að staðsetningu fyrir þetta tæki. Kveiktu á honum í <ph name="BEGIN_LINK" />stillingum Android<ph name="END_LINK" />.</translation>
 <translation id="257931822824936280">Stækkað – smelltu til að minnka.</translation>
@@ -152,6 +157,7 @@
 <translation id="2789132527330338807">Vefsvæði geta beðið um að búa til þrívíddarkort af umhverfi þínu eða rekja stöðu myndavélar</translation>
 <translation id="2790501146643349491">Þegar kveikt er á þessu geta vefsvæði sem nýlega var lokað lokið við að senda og taka á móti gögnum. Þegar slökkt er á þessu geta vefsvæði sem nýlega var lokað ekki lokið við að senda og taka á móti gögnum.</translation>
 <translation id="2795716239552913152">Vefsvæði nota yfirleitt staðsetningu þína fyrir viðeigandi eiginleika eða upplýsingar eins og staðbundnar fréttir eða verslanir í nágrenninu</translation>
+<translation id="2800760947029405028">Hlaða inn mynd</translation>
 <translation id="2802908157808345702">Ekki leyfa vefsvæðum að senda sprettiglugga og nota framsendingu</translation>
 <translation id="2814830417943086299">Chrome sýnir núna nýlega flipa á forritalista og í leitarniðurstöðum tækisins. Þú getur slökkt á þessu hvenær sem er í stillingum Chrome.</translation>
 <translation id="2822354292072154809">Viltu örugglega endurstilla allar heimildir vefsvæða fyrir „<ph name="CHOSEN_OBJECT_NAME" />“?</translation>
@@ -167,6 +173,7 @@
 <translation id="2968755619301702150">Vottorðaskoðari</translation>
 <translation id="2979365474350987274">Fótspor þriðju aðila eru takmörkuð</translation>
 <translation id="2990583317361835189">Ekki leyfa vefsvæðum að nota hreyfiskynjara</translation>
+<translation id="3004438526346162184">Vefsvæði geta notað þennan eiginleika til að stjórna gluggum á öllum skjáunum þínum</translation>
 <translation id="3008272652534848354">Endurstilla heimildir</translation>
 <translation id="301521992641321250">Sjálfkrafa lokað á</translation>
 <translation id="3064871050034234884">Vefsvæði mega spila hljóð</translation>
@@ -237,6 +244,7 @@
 <translation id="3779154269823594982">Breyta aðgangsorðum</translation>
 <translation id="3797520601150691162">Ekki nota dökkt þema fyrir tiltekið vefsvæði</translation>
 <translation id="3803367742635802571">Vefsvæði sem þú skoðar gætu hætt að virka sem skyldi</translation>
+<translation id="3816118180265633665">Litirnir í Chrome</translation>
 <translation id="381841723434055211">Símanúmer</translation>
 <translation id="3826050100957962900">Innskráning þriðja aðila</translation>
 <translation id="3835233591525155343">Tækjanotkun þín</translation>
@@ -322,6 +330,7 @@
 <translation id="4882919381756638075">Vefsvæði nota yfirleitt hljóðnemann fyrir samskiptaeiginleika eins og myndspjall</translation>
 <translation id="4883854917563148705">Ekki er hægt að endurstilla stýrðar stillingar</translation>
 <translation id="4887024562049524730">Spyrja áður en vefsvæði nota sýndarveruleikatæki og -gögn (ráðlagt)</translation>
+<translation id="4934780484581617878">Gluggastjórnun</translation>
 <translation id="4936863036653376783">Þú finnur hópana þína í flipahópahlutanum í öllum þínum tækjum</translation>
 <translation id="4945443401464700059"><ph name="SITE" /> hefur ekki leyfi til að nota upplýsingarnar þínar á</translation>
 <translation id="4953688446973710931">Þegar kveikt er á þessu geta vefsvæði beðið um að fá að hlaða niður mörgum skrám. Þegar slökkt er á þessu geta vefsvæði ekki hlaðið niður mörgum skrám.</translation>
@@ -329,6 +338,7 @@
 <translation id="4972737347717125191">Vefsvæði geta beðið um leyfi til að nota sýndarveruleikatæki og -gögn</translation>
 <translation id="497421865427891073">Áfram</translation>
 <translation id="4976702386844183910">Síðast skoðað <ph name="DATE" /></translation>
+<translation id="4978178243417029856">Nánar um tillögustraum</translation>
 <translation id="4994033804516042629">Engir tengiliðir fundust</translation>
 <translation id="4996978546172906250">Deila með</translation>
 <translation id="5001526427543320409">Fótspor þriðju aðila</translation>
@@ -424,6 +434,7 @@
 <translation id="5968921426641056619">Sláðu inn vefslóð</translation>
 <translation id="5975083100439434680">Minnka aðdrátt</translation>
 <translation id="5976059395673079613"><ph name="PERMISSION" /> – <ph name="WARNING_MESSAGE" /></translation>
+<translation id="5998071268779572583">Kveikja á tillögustraumi</translation>
 <translation id="6015775454662021376">Stjórnaðu aðgangi þessa vefsvæðis að tækinu þínu</translation>
 <translation id="6040143037577758943">Loka</translation>
 <translation id="6042308850641462728">Meira</translation>
@@ -431,6 +442,7 @@
 <translation id="6071501408666570960">Þú skráist hugsanlega út af þessu vefsvæði</translation>
 <translation id="6085954183010297841">Eyða leyfi til að breyta skrám? <ph name="FILE" /></translation>
 <translation id="6120483543004435978">Þegar kveikt er á þessu geta vefsvæði beðið um að fá að vita hvenær þú ert að nota tækið með virkum hætti. Þegar slökkt er á þessu geta vefsvæði ekki vitað hvenær þú ert að nota tækið með virkum hætti.</translation>
+<translation id="615886654739818377">Ekki leyfa vefsvæðum að stjórna gluggum á öllum skjáunum</translation>
 <translation id="6165508094623778733">Frekari upplýsingar</translation>
 <translation id="6171020522141473435">Þegar kveikt er á þessu geta vefsvæði beðið um að fá að nota Bluetooth-tæki. Þegar slökkt er á þessu geta vefsvæði ekki notað Bluetooth-tæki.</translation>
 <translation id="6177128806592000436">Tenging þín við þetta vefsvæði er ekki örugg</translation>
@@ -452,6 +464,7 @@
 <translation id="6398765197997659313">Hætta að nota allan skjáinn</translation>
 <translation id="640163077447496506">Rennur út í dag</translation>
 <translation id="6405650995156823521"><ph name="FIRST_PART" /> • <ph name="SECOND_PART" /></translation>
+<translation id="6413980879783180524">Þemasöfn</translation>
 <translation id="6439114592976064011">Loka á að vefsvæði fái að nota sýndarveruleikatækið og -gögnin þín</translation>
 <translation id="6447842834002726250">Fótspor</translation>
 <translation id="6452138246455930388">Verðlækkun í opnum flipa, úr <ph name="OLD_PRICE" /> í <ph name="NEW_PRICE" />, <ph name="PRODUCT_NAME" /> <ph name="DOMAIN_NAME" /></translation>
@@ -463,6 +476,7 @@
 <translation id="6545864417968258051">Bluetooth-leit</translation>
 <translation id="6552800053856095716">{PERMISSIONS_SUMMARY_BLOCKED,plural, =1{Lokað er fyrir „<ph name="PERMISSION_1" />“, „<ph name="PERMISSION_2" />“ og <ph name="NUM_MORE" /> í viðbót}one{Lokað er fyrir „<ph name="PERMISSION_1" />“, „<ph name="PERMISSION_2" />“ og <ph name="NUM_MORE" /> í viðbót}other{Lokað er fyrir „<ph name="PERMISSION_1" />“, „<ph name="PERMISSION_2" />“ og <ph name="NUM_MORE" /> í viðbót}}</translation>
 <translation id="6554732001434021288">Síðast opnað fyrir <ph name="NUM_DAYS" /> dögum</translation>
+<translation id="6557290421156335491">Flýtileiðirnar mínar</translation>
 <translation id="656065428026159829">Sjá meira</translation>
 <translation id="6561560012278703671">Nota hljóðlátari skilaboð (útilokar truflun af tilkynningum)</translation>
 <translation id="6565144332292237355">Vefsvæði geta notað þennan eiginleika til að leita að og tengjast hvaða tæki sem er á staðarnetinu þínu</translation>
@@ -511,6 +525,7 @@
 <translation id="7188508872042490670">Vefsvæðagögn í tækinu</translation>
 <translation id="7201549776650881587">Þessi aðgerð eyðir öllum gögnum og fótsporum sem eru vistuð á öllum vefsvæðum undir <ph name="ORIGIN" /> eða í forriti þess á heimaskjánum hjá þér</translation>
 <translation id="7203150201908454328">Stækkað</translation>
+<translation id="7213166370492037743">Vefsvæði mega ekki tengjast neinu tæki á staðarnetinu þínu.</translation>
 <translation id="7219254577985949841">Eyða vefsvæðagögnum?</translation>
 <translation id="723171743924126238">Veldu myndir</translation>
 <translation id="7243246278722455312">Sérsníða blað neðst á síðu nýrra flipa</translation>
@@ -548,11 +563,13 @@
 <translation id="7681597159868843240">Yfirleitt nota vefsvæði hreyfiskynjara tækisins fyrir eiginleika á borð við sýndarveruleika eða hreystimælingar</translation>
 <translation id="7688240020069572972">Fela ábendingarspjald Chrome</translation>
 <translation id="7719367874908701697">Síðuaðdráttur</translation>
+<translation id="775043444390799886">Afturkalla heimild</translation>
 <translation id="7759147511335618829">Stjórn og endurforritun MIDI-tækja</translation>
 <translation id="7781829728241885113">Í gær</translation>
 <translation id="7791543448312431591">Bæta við</translation>
 <translation id="780301667611848630">Nei, takk</translation>
 <translation id="7804248752222191302">Vefsvæði er að nota myndavélina</translation>
+<translation id="7805832099057502789">Neðsta blað nýrrar flipasíðu er opnað í fullri hæð</translation>
 <translation id="7807060072011926525">Frá Google</translation>
 <translation id="7815680994978050279">Lokað á hættulegt niðurhal</translation>
 <translation id="7835852323729233924">Spilar efni</translation>
@@ -572,9 +589,11 @@
 <translation id="802154636333426148">Niðurhal mistókst</translation>
 <translation id="8042586301629853791">Raða eftir:</translation>
 <translation id="8051193500142930381">Eiginleikar sem þurfa myndavél munu ekki virka</translation>
+<translation id="8056330801132235235">Sjálfgefin stilling Chrome</translation>
 <translation id="8067883171444229417">Spila myndskeið</translation>
 <translation id="8068648041423924542">Ekki er hægt að velja vottorðið.</translation>
 <translation id="8077120325605624147">Öll vefsvæði sem þú heimsækir mega birta þér hvaða auglýsingar sem er</translation>
+<translation id="80798452873915119">Vefsvæði geta beðið um að stjórna gluggum á öllum skjáum</translation>
 <translation id="8087000398470557479">Þetta efni er frá <ph name="DOMAIN_NAME" />, birt af Google.</translation>
 <translation id="8088603949666785339">Fleiri valkostir í <ph name="BANNER_TITLE" /></translation>
 <translation id="8112925981674547014">Sjá flipa á forritalista</translation>
@@ -624,6 +643,7 @@
 <translation id="8549127125482561383">Hvernig á að sýna beiðnir</translation>
 <translation id="8558480467877843976">Núna geturðu notað Chrome hvenær sem þú skoðar eða ýtir á tengil í skilaboðum, skjölum og öðrum forritum.</translation>
 <translation id="857943718398505171">Leyft (ráðlagt)</translation>
+<translation id="8580511488901768832">blað neðst í flýtileiðunum mínum opnað í fullri hæð</translation>
 <translation id="8593422116412089302">Þegar kveikt er á þessu geta vefsvæði beðið um að fá að nota upplýsingar sem þau hafa vistað um þig. Þegar slökkt er á þessu geta vefsvæði ekki beðið þig um að fá að nota upplýsingar sem þau hafa vistað um þig.</translation>
 <translation id="8609465669617005112">Færa upp</translation>
 <translation id="8617611086246832542">Þegar kveikt er á þessu er tölvuútgáfa vefsvæða sýnd. Þegar slökkt er á þessu er símaútgáfa vefsvæða sýnd.</translation>

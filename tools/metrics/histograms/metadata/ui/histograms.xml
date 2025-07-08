@@ -219,7 +219,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="ContextMenu.Shown{Type}" enum="BooleanPresent"
-    expires_after="2025-10-26">
+    expires_after="2025-12-28">
   <owner>mpearson@chromium.org</owner>
   <owner>twellington@chromium.org</owner>
   <owner>clank-app-team@google.com</owner>
@@ -352,7 +352,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="RenderTextHarfBuzz.ShapeRunsWithFallbackFontsTime" units="ms"
-    expires_after="2025-09-14">
+    expires_after="2026-01-04">
   <owner>dayeung@chromium.org</owner>
   <owner>etienneb@chromium.org</owner>
   <summary>
@@ -570,7 +570,7 @@ features through Chrome Labs. -->
 </histogram>
 
 <histogram name="WebUI.Settings.PathVisited" enum="WebUISettingsPathHashes"
-    expires_after="2025-10-26">
+    expires_after="2025-12-28">
   <owner>dschuyler@chromium.org</owner>
   <owner>tbuckley@chromium.org</owner>
   <owner>bettes@chromium.org</owner>
@@ -626,6 +626,7 @@ features through Chrome Labs. -->
     expires_after="2025-12-14">
   <owner>kerenzhu@chromium.org</owner>
   <owner>chrome-webui-for-features@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     Measures the time elapsed from the initiation of a WebUI request to its
     first contentful paint. This metric applies to the main frame documents of
@@ -639,6 +640,7 @@ features through Chrome Labs. -->
     expires_after="2025-12-14">
   <owner>kerenzhu@chromium.org</owner>
   <owner>chrome-webui-for-features@google.com</owner>
+  <improvement direction="LOWER_IS_BETTER"/>
   <summary>
     Measures the time elapsed from the initiation of a WebUI request to its
     largest contentful paint. This metric applies to the main frame documents of
@@ -771,14 +773,14 @@ features through Chrome Labs. -->
 </histogram>
 
 <histogram name="WrenchMenu.MenuAction" enum="WrenchMenuAction"
-    expires_after="2025-10-26">
+    expires_after="2025-12-28">
   <owner>ainslie@chromium.org</owner>
   <owner>edwardjung@chromium.org</owner>
   <summary>Number of times that each menu item is clicked.</summary>
 </histogram>
 
 <histogram name="WrenchMenu.TimeToAction.{Action}" units="ms"
-    expires_after="2025-10-26">
+    expires_after="2025-12-28">
   <owner>ainslie@chromium.org</owner>
   <owner>edwardjung@chromium.org</owner>
   <summary>

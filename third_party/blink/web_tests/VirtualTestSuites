@@ -102,7 +102,7 @@
   {
     "prefix": "attribution-reporting-debug-mode",
     "owners": [
-      "johnidel@chromium.org"
+      "apaseltiner@chromium.org"
     ],
     "platforms": [
       "Linux",
@@ -118,7 +118,7 @@
       "--enable-features=AggregationServiceMultipleCloudProviders:allowlist/https%3A%2F%2Fweb-platform%2Etest%3A8444%2Chttps%3A%2F%2Fwww1%2Eweb-platform%2Etest%3A8444,FencedFramesLocalUnpartitionedDataAccess,ExemptUrlFromNetworkRevocationForTesting",
       "--enable-blink-features=FencedFramesDefaultMode"
     ],
-    "expires": "Jul 2, 2025"
+    "expires": "Jul 2, 2026"
   },
   {
     "prefix": "attribution-reporting-in-browser-migration",
@@ -417,7 +417,11 @@
       "external/wpt/css/css-animations/responsive/column-rule-color-001.html",
       "external/wpt/web-animations/animation-model/animation-types/accumulation-per-property-001.html",
       "external/wpt/web-animations/animation-model/animation-types/addition-per-property-001.html",
-      "external/wpt/web-animations/animation-model/animation-types/interpolation-per-property-001.html"],
+      "external/wpt/web-animations/animation-model/animation-types/interpolation-per-property-001.html",
+      "external/wpt/css/css-multicol/multicol-nested-column-rule-002.html",
+      "external/wpt/css/css-break/out-of-flow-in-multicolumn-109.html",
+      "external/wpt/css/css-break/out-of-flow-in-multicolumn-098.html",
+      "external/wpt/css/css-break/out-of-flow-in-multicolumn-097.html"],
     "args": ["--disable-blink-features=CSSGapDecoration"],
     "expires": "June 1, 2026",
     "owners": ["samomekarajr@microsoft.com", "almaher@microsoft.com", "javiercon@microsoft.com"]
@@ -564,7 +568,7 @@
       "--blink-settings=preferredColorScheme=0,forceDarkModeEnabled=true",
       "--dark-mode-settings=ImageClassifierPolicy=1"
     ],
-    "expires": "Jul 1, 2025"
+    "expires": "Jul 1, 2026"
   },
   {
     "prefix": "dark-mode-default",
@@ -584,7 +588,7 @@
     "args": [
       "--blink-settings=preferredColorScheme=0,forceDarkModeEnabled=true"
     ],
-    "expires": "Jul 1, 2025"
+    "expires": "Jul 1, 2026"
   },
   {
     "prefix": "dark-mode-images-filter-all",
@@ -604,7 +608,7 @@
       "--blink-settings=preferredColorScheme=0,forceDarkModeEnabled=true",
       "--dark-mode-settings=ImagePolicy=0"
     ],
-    "expires": "Jul 1, 2025"
+    "expires": "Jul 1, 2026"
   },
   {
     "prefix": "dark-mode-images-filter-none",
@@ -624,7 +628,7 @@
       "--blink-settings=preferredColorScheme=0,forceDarkModeEnabled=true",
       "--dark-mode-settings=ImagePolicy=1"
     ],
-    "expires": "Jul 1, 2025"
+    "expires": "Jul 1, 2026"
   },
   {
     "prefix": "dbsc-enabled",
@@ -667,24 +671,6 @@
       "alexnj@google.com",
       "chikamune@chromium.org"
     ]
-  },
-  {
-    "prefix": "delegates-focus-text-control-disabled",
-    "owners": [
-      "dizhangg@google.com"
-    ],
-    "platforms": [
-      "Linux",
-      "Mac",
-      "Win"
-    ],
-    "bases": [
-      "external/wpt/shadow-dom/focus/text-selection-with-delegatesFocus-text-control.html"
-    ],
-    "args": [
-      "--disable-features=DelegatesFocusTextControlFix"
-    ],
-    "expires": "Jul 1, 2025"
   },
   {
     "prefix": "devtools-improved-network-error",
@@ -1301,11 +1287,10 @@
       "--enable-threaded-compositing",
       "--disable-features=RasterInducingScroll"
     ],
-    "expires": "Jul 1, 2025",
+    "expires": "Jul 1, 2026",
     "owners": [
       "gastonr@microsoft.com",
-      "gerchiko@microsoft.com",
-      "yshalivskyy@microsoft.com"
+      "gerchiko@microsoft.com"
     ]
   },
   {
@@ -1361,7 +1346,7 @@
     "args": [
       "--enable-blink-features=MeasureMemory,ForceEagerMeasureMemory"
     ],
-    "expires": "Jul 1, 2025"
+    "expires": "Jul 1, 2027"
   },
   {
     "prefix": "force-renderer-accessibility",
@@ -1432,7 +1417,7 @@
       "--enable-blink-features=ForcedColors",
       "--enable-blink-features=CSSGapDecoration"
     ],
-    "expires": "Jul 1, 2025"
+    "expires": "Jul 1, 2026"
   },
   {
     "prefix": "fractional-scroll-offsets",
@@ -1557,7 +1542,7 @@
     "args": [
       "--enable-gpu-rasterization"
     ],
-    "expires": "Jul 1, 2025"
+    "expires": "never"
   },
   {
     "prefix": "hdr",
@@ -1896,25 +1881,24 @@
     ]
   },
   {
-    "prefix": "lna",
+    "prefix": "lna-webrtc",
     "platforms": [
       "Linux",
       "Mac",
       "Win"
     ],
     "bases": [
-      "external/wpt/fetch/local-network-access"
+      "fast/peerconnection"
     ],
     "args": [
-      "--enable-features=LocalNetworkAccessChecks:LocalNetworkAccessChecksWarn/false"
+      "--enable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebRTC"
     ],
-    "exclusive_tests": "ALL",
     "owners": [
       "cthomp@chromium.org",
       "hchao@chromium.org",
       "chrome-secure-web-and-net@chromium.org"
     ],
-    "expires": "Oct 2, 2025"
+    "expires": "Dec 2, 2025"
   },
   {
     "prefix": "log-dns-prefetch-and-preconnect",
@@ -2065,19 +2049,6 @@
       "--use-gpu-in-tests"
     ],
     "expires": "Dec 1, 2024"
-  },
-  {
-    "prefix": "network-service-task-scheduler",
-    "owners": ["hayato@chromium.org"],
-    "platforms": ["Android", "Mac", "Win", "Linux"],
-    "bases": [
-      "external/wpt/fetch/api/",
-      "external/wpt/loading/"
-    ],
-    "args": [
-      "--enable-features=NetworkServiceTaskScheduler"
-    ],
-    "expires": "Jun 20, 2026"
   },
   "This suite is incompatible with the default WPT Origin Isolation mode of ",
   "Site Isolation (see",
@@ -2494,29 +2465,6 @@
     ],
     "args": [
       "--disable-features=LocalNetworkAccessChecks"
-    ],
-    "exclusive_tests": "ALL",
-    "owners": [
-      "cthomp@chromium.org",
-      "hchao@chromium.org",
-      "chrome-secure-web-and-net@chromium.org"
-    ],
-    "expires": "July 31, 2025"
-  },
-  {
-    "prefix": "pna-permission",
-    "platforms": [
-      "Linux",
-      "Mac",
-      "Win"
-    ],
-    "bases": [
-      "external/wpt/fetch/private-network-access"
-    ],
-    "args": [
-      "--enable-features=PrivateNetworkAccessPermissionPrompt",
-      "--disable-features=LocalNetworkAccessChecks",
-      "--enable-blink-features=PrivateNetworkAccessPermissionPrompt"
     ],
     "exclusive_tests": "ALL",
     "owners": [
@@ -4449,6 +4397,20 @@
     ]
   },
   {
+    "prefix": "enable-shared-worker-bfcache",
+    "owners": ["annasato@chromium.org"],
+    "platforms": ["Mac", "Win", "Linux"],
+    "bases": [
+      "wpt_internal/shared-worker/back-forward-cache/shared-worker-allows-bfcache.window.js",
+      "wpt_internal/shared-worker/back-forward-cache/shared-worker-evict-on-message.window.js"
+    ],
+    "exclusive_tests": "ALL",
+    "args": [
+      "--enable-features=BFCacheWithSharedWorker"
+    ],
+    "expires": "Jun 10, 2026"
+  },
+  {
     "prefix": "target-device-scale-factor-2",
     "owners": [
       "leimy@google.com"
@@ -5055,7 +5017,7 @@
     "args": [
       "--js-flags=--wasm-tiering-budget=100 --allow-natives-syntax"
     ],
-    "expires": "Jul 1, 2025"
+    "expires": "never"
   },
   {
     "prefix": "web-bluetooth-new-permissions-backend",
@@ -5076,10 +5038,12 @@
     ],
     "expires": "Jan 1, 2026"
   },
+  "--webauthn-remote-desktop-support can be toggled with enterprise policies, ",
+  "so we need to support this long term.",
   {
     "prefix": "webauthn-remote-desktop-client-override",
     "owners": [
-      "martinkr@chromium.org"
+      "chrome-webauthn@google.com"
     ],
     "platforms": [
       "Linux",
@@ -5092,7 +5056,7 @@
     "args": [
       "--webauthn-remote-desktop-support"
     ],
-    "expires": "Jul 1, 2025"
+    "expires": "never"
   },
   "This individual test must be run separately from others, because it makes a",
   "huge memory allocation that often causes OOM if other tests have run in the",

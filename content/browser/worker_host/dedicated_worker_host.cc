@@ -28,6 +28,7 @@
 #include "content/browser/renderer_host/private_network_access_util.h"
 #include "content/browser/renderer_host/render_frame_host_impl.h"
 #include "content/browser/service_worker/service_worker_client.h"
+#include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/browser/service_worker/service_worker_main_resource_handle.h"
 #include "content/browser/storage_partition_impl.h"
 #include "content/browser/url_loader_factory_params_helper.h"
@@ -840,6 +841,15 @@ void DedicatedWorkerHost::CreateBlobUrlStoreProvider(
   storage_partition_impl->GetBlobUrlRegistry()->AddReceiver(
       GetStorageKey(), renderer_origin_, GetProcessHost()->GetDeprecatedID(),
       std::move(receiver),
+      /*context_type_for_debugging=*/"Dedicated Worker",
+      base::BindRepeating(
+          [](base::WeakPtr<DedicatedWorkerHost> host) -> std::string {
+            if (!host) {
+              return "destroyed DedicatedWorkerHost";
+            }
+            return host->GetStorageKey().GetDebugString();
+          },
+          weak_factory_.GetWeakPtr()),
       base::BindRepeating(
           [](base::WeakPtr<DedicatedWorkerHost> host) -> bool {
             if (!host) {

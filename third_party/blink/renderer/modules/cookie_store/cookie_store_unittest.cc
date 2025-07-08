@@ -8,7 +8,9 @@
 #include "base/task/task_runner.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
+#include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
+#include "net/base/features.h"
 #include "net/base/isolation_info.h"
 #include "net/cookies/canonical_cookie.h"
 #include "net/cookies/cookie_monster.h"
@@ -200,6 +202,9 @@ TEST_F(CookieStoreTest, SetWithMixedCaseDomain) {
 }
 
 TEST_F(CookieStoreTest, SetWithHttpPrefix) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(net::features::kPrefixCookieHttp);
+
   V8TestingScope v8_testing_scope((KURL(kDefaultUrl)));
   CookieStore* cookie_store = CreateCookieStore(v8_testing_scope);
 
@@ -230,6 +235,9 @@ TEST_F(CookieStoreTest, SetWithHttpPrefix) {
 }
 
 TEST_F(CookieStoreTest, SetWithHostHttpPrefix) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(net::features::kPrefixCookieHostHttp);
+
   V8TestingScope v8_testing_scope((KURL(kDefaultUrl)));
   CookieStore* cookie_store = CreateCookieStore(v8_testing_scope);
 
@@ -265,7 +273,7 @@ TEST_F(CookieStoreTest, SetWithHostPrefixAndDomain) {
 
   ScriptState* script_state = v8_testing_scope.GetScriptState();
   ASSERT_TRUE(script_state);
-  ExceptionState exception_state(v8_testing_scope.GetIsolate());
+  DummyExceptionStateForTesting exception_state;
 
   std::vector<net::CanonicalCookie> got = GetAllCookies();
   EXPECT_TRUE(got.empty());
@@ -280,6 +288,8 @@ TEST_F(CookieStoreTest, SetWithHostPrefixAndDomain) {
   ScriptPromiseTester promise_tester(script_state, promise, &exception_state);
   promise_tester.WaitUntilSettled();
   EXPECT_TRUE(exception_state.HadException());
+  EXPECT_EQ("Cookies with \"__Host-\" prefix cannot have a domain",
+            exception_state.Message());
   EXPECT_TRUE(promise_tester.IsRejected());
   got = GetAllCookies();
   EXPECT_EQ(0u, got.size());

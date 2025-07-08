@@ -552,7 +552,7 @@ int AutofillProfile::Compare(const AutofillProfile& profile) const {
 
   // When adding field types, ensure that they don't need to be added here and
   // update the last checked value.
-  static_assert(FieldType::MAX_VALID_FIELD_TYPE == 200,
+  static_assert(FieldType::MAX_VALID_FIELD_TYPE == 203,
                 "New field type needs to be reviewed for inclusion in the "
                 "profile comparison logic.");
 
@@ -1253,7 +1253,9 @@ bool AutofillProfile::FinalizeAfterImport() {
 }
 
 AutofillProfile AutofillProfile::ConvertToAccountProfile() const {
-  DCHECK_EQ(record_type(), RecordType::kLocalOrSyncable);
+  DCHECK(record_type() == RecordType::kLocalOrSyncable ||
+         record_type() == RecordType::kAccountHome ||
+         record_type() == RecordType::kAccountWork);
   AutofillProfile account_profile = *this;
   // Since GUIDs are assumed to be unique across all profile record types, a new
   // GUID is assigned.

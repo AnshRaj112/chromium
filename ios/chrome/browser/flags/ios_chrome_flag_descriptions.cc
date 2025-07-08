@@ -161,12 +161,6 @@ const char kAutofillPaymentsSheetV2Description[] =
     "When enabled, the V2 of the payments suggestion bottom sheet will be "
     "used.";
 
-const char kPasswordSuggestionBottomSheetV2Name[] =
-    "Enable the password suggestion bottom sheet V2";
-const char kPasswordSuggestionBottomSheetV2Description[] =
-    "When enabled, the V2 of the password suggestion bottom sheet will be "
-    "used.";
-
 const char kAutofillLocalSaveCardBottomSheetName[] =
     "Enable save card bottomsheet for local save";
 const char kAutofillLocalSaveCardBottomSheetDescription[] =
@@ -198,11 +192,6 @@ const char kAutofillShowManualFillForVirtualCardsName[] =
 const char kAutofillShowManualFillForVirtualCardsDescription[] =
     "When enabled, Autfoill will show the manual fill view directly on form "
     "focusing events for virtual cards.";
-
-const char kAutofillStickyInfobarName[] = "Sticky Autofill Infobar";
-const char kAutofillStickyInfobarDescription[] =
-    "Makes the Address Infobar sticky to only dismiss on navigation from user "
-    "gesture.";
 
 const char kAutofillThrottleDocumentFormScanName[] =
     "Throttle Autofill Document Form Scans";
@@ -404,6 +393,17 @@ const char kDataSharingJoinOnlyName[] = "Data Sharing Join Only";
 const char kDataSharingJoinOnlyDescription[] =
     "Enabled Data Sharing Joining flow related UI and features.";
 
+// LINT.IfChange(DataSharingVersioning)
+// Data Sharing versioning test scenarios.
+const char kDataSharingVersioningStatesName[] =
+    "Data Sharing Versioning Test Scenarios";
+const char kDataSharingVersioningStatesDescription[] =
+    "Testing multiple scenarios for versioning.";
+const char kDataSharingSharedDataTypesEnabled[] = "Version out-of-date, no UI";
+const char kDataSharingSharedDataTypesEnabledWithUi[] =
+    "Version out-of-date, show UI ";
+// LINT.ThenChange(//chrome/browser/flag_descriptions.cc:DataSharingVersioning)
+
 const char kDefaultBrowserBannerPromoName[] = "Default Browser banner promo";
 const char kDefaultBrowserBannerPromoDescription[] =
     "When enabled, the default browser banner promo will show when conditions "
@@ -433,6 +433,13 @@ const char kDetectMainThreadFreezeDescription[] =
     "A crash report will be uploaded if the main thread is frozen more than "
     "the time specified by this flag.";
 
+extern const char kDownloadAutoDeletionClearFilesOnEveryStartupName[] =
+    "Enable Download Auto-Deletion Testing Mode";
+extern const char kDownloadAutoDeletionClearFilesOnEveryStartupDescription[] =
+    "When enabled, the Auto-deletion feature wil clear all downloaded files "
+    "scheduled for deletion on every application startup, regardless of when "
+    "the file was downloaded. This feature is intended for testing-only.";
+
 extern const char kDownloadAutoDeletionName[] = "Enable Download Auto Deletion";
 extern const char kDownloadAutoDeletionDescription[] =
     "When enabled, files downloaded on the device can be scheduled to be "
@@ -446,6 +453,9 @@ const char kEnableFeedHeaderSettingsName[] =
     "Enables the feed header settings.";
 const char kEnableFeedHeaderSettingsDescription[] =
     "When enabled, some UI elements of the feed header can be modified.";
+
+const char kDiamondPrototypeName[] = "Enable the diamon prototype";
+const char kDiamondPrototypeDescription[] = "Turn on prototype for diamond.";
 
 const char kDisableAutofillStrikeSystemName[] =
     "Disable the Autofill strike system";
@@ -493,6 +503,22 @@ const char kEnableFeedCardMenuSignInPromoName[] =
 const char kEnableFeedCardMenuSignInPromoDescription[] =
     "Display a sign-in promotion UI when signed out users click on "
     "personalization options within the feed card menu.";
+
+// LINT.IfChange(FingerprintingProtectionFlagDescriptions)
+const char kEnableFingerprintingProtectionBlocklistName[] =
+    "Enable Fingerprinting Protection Blocklist In Regular Browsing";
+const char kEnableFingerprintingProtectionBlocklistDescription[] =
+    "Enable Fingerprinting Protection which may block fingerprinting "
+    "resources from loading in a 3p context. This flag applies only outside of "
+    "Incognito mode.";
+
+const char kEnableFingerprintingProtectionBlocklistInIncognitoName[] =
+    "Enable Fingerprinting Protection Blocklist In Incognito";
+const char kEnableFingerprintingProtectionBlocklistInIncognitoDescription[] =
+    "Enable Fingerprinting Protection which may block fingerprinting "
+    "resources from loading in a 3p context. This flag applies only in "
+    "Incognito mode.";
+// LINT.ThenChange(//chrome/browser/flag_descriptions.cc:FingerprintingProtectionFlagDescriptions)
 
 const char kEnableTraitCollectionRegistrationName[] =
     "Enable Customizable Trait Registration";
@@ -786,6 +812,12 @@ const char kIOSStartTimeStartupRemediationsName[] =
 const char kIOSStartTimeStartupRemediationsDescription[] =
     "Enables potential remediations for startup regressions caused by the "
     "reduction of Bling Start time from 6 hours to 4.";
+
+const char kIOSTrustedVaultNotificationName[] =
+    "Enable the trusted vault notification on iOS";
+const char kIOSTrustedVaultNotificationDescription[] =
+    "When enabled and when the trusted vault key is missing, the provisional "
+    "notification will be delivered.";
 
 const char kIOSReactivationNotificationsName[] = "Reactivation Notifications";
 const char kIOSReactivationNotificationsDescription[] =
@@ -1267,6 +1299,16 @@ const char kReaderModePageEligibilityHeuristicDescription[] =
     "Enables Reader Mode heuristic to hide/show the tools menu entrypoint "
     "depending on page eligibility.";
 
+const char kReaderModeReadabilityHeuristicName[] =
+    "Enables Readability heuristic for Reader Mode";
+const char kReaderModeReadabilityHeuristicDescription[] =
+    "Enables Readability heuristic for Reader Mode UI.";
+
+const char kReaderModeReadabilityDistillerName[] =
+    "Enables Readability distiller for Reader Mode";
+const char kReaderModeReadabilityDistillerDescription[] =
+    "Enables Readability distiller for Reader Mode UI.";
+
 const char kRefactorToolbarsSizeName[] = "Refactor toolbars size";
 const char kRefactorToolbarsSizeDescription[] =
     "When enabled, the toolbars size does not use broadcaster but observers.";
@@ -1338,12 +1380,6 @@ const char kSegmentationPlatformTipsEphemeralCardName[] =
     "Enable Tips (Magic Stack)";
 const char kSegmentationPlatformTipsEphemeralCardDescription[] =
     "When enabled, the Tips module will be displayed in the Magic Stack.";
-
-const char kSegmentedDefaultBrowserPromoName[] =
-    "Enable Personalized Messaging in Default Browser Promos";
-const char kSegmentedDefaultBrowserPromoDescription[] =
-    "Enables Default Browser promos with personalized messaging (using "
-    "Segmentation Platform).";
 
 const char kSendTabToSelfIOSPushNotificationsName[] =
     "Send tab to self iOS push notifications";
@@ -1460,6 +1496,9 @@ const char kTabGroupSyncName[] = "Enable Tab Group Sync";
 const char kTabGroupSyncDescription[] =
     "When enabled, tab groups are synced between syncing devices. Requires "
     "#tab-groups-on-ipad to also be enabled on iPad.";
+
+const char kTaiyakiName[] = "Taiyaki";
+const char kTaiyakiDescription[] = "Enables Taiyaki.";
 
 const char kStartSurfaceName[] = "Start Surface";
 const char kStartSurfaceDescription[] =

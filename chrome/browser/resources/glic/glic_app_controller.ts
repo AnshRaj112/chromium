@@ -371,7 +371,7 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
     switch (result) {
       case PrepareForClientResult.kSuccess:
         break;
-      case PrepareForClientResult.kUnknownError:
+      case PrepareForClientResult.kErrorResyncingCookies:
         console.warn('prepareForClient in beginLoad() failed.');
         this.setState(WebUiState.kError);
         return;
@@ -611,6 +611,7 @@ export class GlicAppController implements PageInterface, WebviewDelegate,
     } else {
       switch (this.profileReadyState) {
         case ProfileReadyState.kUnknownError:
+        case ProfileReadyState.kIneligible:
           this.setState(WebUiState.kUnavailable);
           break;
         case ProfileReadyState.kSignInRequired:

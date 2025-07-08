@@ -31,7 +31,27 @@ ViewAccessibilityAXTreeSource::~ViewAccessibilityAXTreeSource() = default;
 
 void ViewAccessibilityAXTreeSource::HandleAccessibleAction(
     const ui::AXActionData& action) {
-  // TODO(accessibility): Implement.
+  int id = action.target_node_id;
+
+  // In Views, we only support setting the selection within a single node,
+  // not across multiple nodes like on the web.
+  if (action.action == ax::mojom::Action::kSetSelection) {
+    CHECK_EQ(action.anchor_node_id, action.focus_node_id);
+    id = action.anchor_node_id;
+  }
+
+  // TODO(crbug.com/40672441): Add a convenience virtual function
+  // HandleAccessibleAction on ViewAccessibility once AXVirtualView, a subclass
+  // of ViewAccessibility, doesn't need to extend the AXPlatformNodeDelegate
+  // anymore -- there's currently a function with a conflicting name.
+  if (ViewAccessibility* node = GetFromId(id)) {
+    if (View* view = node->view()) {
+      view->HandleAccessibleAction(action);
+    } else if (AXVirtualView* virtual_view =
+                   static_cast<AXVirtualView*>(node)) {
+      virtual_view->HandleAccessibleAction(action);
+    }
+  }
 }
 
 bool ViewAccessibilityAXTreeSource::GetTreeData(
@@ -52,12 +72,15 @@ ViewAccessibility* ViewAccessibilityAXTreeSource::GetFromId(int32_t id) const {
 }
 
 int32_t ViewAccessibilityAXTreeSource::GetId(ViewAccessibility* node) const {
+  if (!node) {
+    return ui::kInvalidAXNodeID;
+  }
   return node->GetUniqueId();
 }
 
 void ViewAccessibilityAXTreeSource::CacheChildrenIfNeeded(
     ViewAccessibility* node) {
-  if (cache_->HasCachedChildren(node)) {
+  if (!node || cache_->HasCachedChildren(node)) {
     return;
   }
   cache_->CacheChildrenIfNeeded(node);
@@ -65,63 +88,96 @@ void ViewAccessibilityAXTreeSource::CacheChildrenIfNeeded(
 
 size_t ViewAccessibilityAXTreeSource::GetChildCount(
     ViewAccessibility* node) const {
+  if (!node) {
+    return 0;
+  }
   return node->GetChildren().size();
 }
 
 ViewAccessibility* ViewAccessibilityAXTreeSource::ChildAt(
     ViewAccessibility* node,
     size_t index) const {
+  if (!node) {
+    return nullptr;
+  }
+
   auto children = node->GetChildren();
   if (index >= children.size()) {
     return nullptr;
   }
+
   return children[index];
 }
 
 void ViewAccessibilityAXTreeSource::ClearChildCache(ViewAccessibility* node) {
+  if (!node) {
+    return;
+  }
   cache_->RemoveFromChildCache(node);
 }
 
 ViewAccessibility* ViewAccessibilityAXTreeSource::GetParent(
     ViewAccessibility* node) const {
-  if (node->GetUniqueId() == root_id_) {
+  if (!node || node->GetUniqueId() == root_id_) {
     return nullptr;
   }
-
   return node->GetUnignoredParent();
 }
 
 bool ViewAccessibilityAXTreeSource::IsIgnored(ViewAccessibility* node) const {
-  return false;
+  if (!node) {
+    return false;
+  }
+  return node->GetIsIgnored();
 }
 
 bool ViewAccessibilityAXTreeSource::IsEqual(ViewAccessibility* node1,
                                             ViewAccessibility* node2) const {
-  // TODO(accessibility): Implement.
-  return false;
+  if (!node1 || !node2) {
+    return false;
+  }
+  return node1->GetUniqueId() == node2->GetUniqueId();
 }
 
 ViewAccessibility* ViewAccessibilityAXTreeSource::GetNull() const {
-  // TODO(accessibility): Implement.
   return nullptr;
 }
 
 std::string ViewAccessibilityAXTreeSource::GetDebugString(
     ViewAccessibility* node) const {
-  // TODO(accessibility): Implement.
-  return std::string();
+  if (!node) {
+    return "null";
+  }
+  return node->GetDebugString();
 }
 
 void ViewAccessibilityAXTreeSource::SerializeNode(
     ViewAccessibility* node,
     ui::AXNodeData* out_data) const {
-  // TODO(accessibility): Implement.
+  if (!node || !out_data) {
+    return;
+  }
+  node->GetAccessibleNodeData(out_data);
 }
 
 std::string ViewAccessibilityAXTreeSource::ToString(ViewAccessibility* root,
                                                     std::string prefix) {
-  // TODO(accessibility): Implement.
-  return std::string();
+  if (!root) {
+    return prefix + "null\n";
+  }
+
+  ui::AXNodeData data;
+  SerializeNode(root, &data);
+  std::string output = prefix + data.ToString() + '\n';
+
+  auto children = root->GetChildren();
+
+  prefix += prefix[0];
+  for (auto child : children) {
+    output += ToString(child, prefix);
+  }
+
+  return output;
 }
 
 }  // namespace views

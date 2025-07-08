@@ -18,7 +18,6 @@ import("//extensions/buildflags/buildflags.gni")
 import("//media/media_options.gni")
 import("//net/features.gni")
 import("//pdf/features.gni")
-import("//ppapi/buildflags/buildflags.gni")
 import("//printing/buildflags/buildflags.gni")
 import("//services/screen_ai/buildflags/features.gni")
 import("//ui/base/ui_features.gni")
@@ -51,9 +50,7 @@ declare_args() {
 
   # Hangout services is an extension that adds extra features to Hangouts.
   # It is enableable separately to facilitate testing.
-  # TODO(crbug.com/424596489): Enable on desktop Android once the
-  # enterprise.hardwarePlatform and webrtcLoggingPrivate APIs are supported.
-  enable_hangout_services_extension = is_chrome_branded && !is_desktop_android
+  enable_hangout_services_extension = is_chrome_branded
 
   enable_service_discovery = (enable_mdns && !is_android) || is_mac
 

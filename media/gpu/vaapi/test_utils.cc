@@ -20,7 +20,7 @@
 #include "ui/gfx/buffer_format_util.h"
 
 #if BUILDFLAG(IS_CHROMEOS)
-#include "media/gpu/test/local_gpu_memory_buffer_manager.h"
+#include "media/gpu/test/test_gbm_buffer_manager.h"
 #endif
 
 namespace media {
@@ -158,33 +158,32 @@ class NativePixmapMapping {
   virtual gfx::Size GetSize() const = 0;
 };
 
-class GpuMemoryBufferMapping : public NativePixmapMapping {
+class GbmBufferMapping : public NativePixmapMapping {
  public:
-  static std::unique_ptr<GpuMemoryBufferMapping> CreateGpuMemoryBufferMapping(
+  static std::unique_ptr<GbmBufferMapping> CreateGbmBufferMapping(
       gfx::NativePixmapHandle& handle,
       const gfx::Size& size,
       const gfx::BufferFormat& format) {
-    std::unique_ptr<LocalGpuMemoryBufferManager> gbm_buffer_manager =
-        std::make_unique<LocalGpuMemoryBufferManager>();
-    std::unique_ptr<TestGmbBuffer> gbm_buffer =
+    std::unique_ptr<TestGbmBufferManager> gbm_buffer_manager =
+        std::make_unique<TestGbmBufferManager>();
+    std::unique_ptr<TestGbmBuffer> gbm_buffer =
         gbm_buffer_manager->ImportDmaBuf(handle, size, format);
 
     if (!gbm_buffer->Map()) {
-      LOG(ERROR) << "Failed to map GPU memory buffer!";
+      LOG(ERROR) << "Failed to map GBM buffer!";
       return nullptr;
     }
 
-    return std::make_unique<GpuMemoryBufferMapping>(
-        std::move(gbm_buffer_manager), std::move(gbm_buffer));
+    return std::make_unique<GbmBufferMapping>(std::move(gbm_buffer_manager),
+                                              std::move(gbm_buffer));
   }
 
-  GpuMemoryBufferMapping(
-      std::unique_ptr<LocalGpuMemoryBufferManager> gbm_buffer_manager,
-      std::unique_ptr<TestGmbBuffer> gbm_buffer)
+  GbmBufferMapping(std::unique_ptr<TestGbmBufferManager> gbm_buffer_manager,
+                   std::unique_ptr<TestGbmBuffer> gbm_buffer)
       : gbm_buffer_manager_(std::move(gbm_buffer_manager)),
         gbm_buffer_(std::move(gbm_buffer)) {}
 
-  ~GpuMemoryBufferMapping() override { gbm_buffer_->Unmap(); }
+  ~GbmBufferMapping() override { gbm_buffer_->Unmap(); }
 
   raw_ptr<uint8_t> GetData(size_t plane_idx) const override {
     return static_cast<uint8_t*>(gbm_buffer_->memory(plane_idx));
@@ -199,11 +198,11 @@ class GpuMemoryBufferMapping : public NativePixmapMapping {
  private:
   // It's very important these two objects are initialized in this order,
   // because C++ guarantees they will be destroyed in the reverse order.
-  // Unfortunately, the destructor for TestGmbBuffer calls the GBM
-  // device that gets destroyed by the LocalGpuMemoryBufferManager destructor,
+  // Unfortunately, the destructor for TestGbmBuffer calls the GBM
+  // device that gets destroyed by the TestGbmBufferManager destructor,
   // so there is an order we need to do this in to prevent a segfault.
-  const std::unique_ptr<LocalGpuMemoryBufferManager> gbm_buffer_manager_;
-  const std::unique_ptr<TestGmbBuffer> gbm_buffer_;
+  const std::unique_ptr<TestGbmBufferManager> gbm_buffer_manager_;
+  const std::unique_ptr<TestGbmBuffer> gbm_buffer_;
 };
 
 class Tile4Mapping : public NativePixmapMapping {
@@ -235,12 +234,12 @@ class Tile4Mapping : public NativePixmapMapping {
     CHECK_EQ(handle.modifier, I915_FORMAT_MOD_4_TILED);
     handle.modifier = gfx::NativePixmapHandle::kNoModifier;
 
-    LocalGpuMemoryBufferManager gbm_buffer_manager;
-    std::unique_ptr<TestGmbBuffer> gbm_buffer =
+    TestGbmBufferManager gbm_buffer_manager;
+    std::unique_ptr<TestGbmBuffer> gbm_buffer =
         gbm_buffer_manager.ImportDmaBuf(handle, size, format);
 
     if (!gbm_buffer->Map()) {
-      LOG(ERROR) << "Failed to map GPU memory buffer!";
+      LOG(ERROR) << "Failed to map GBM buffer!";
       return nullptr;
     }
 
@@ -330,8 +329,7 @@ std::unique_ptr<NativePixmapMapping> CreateNativePixmapMapping(
     return Tile4Mapping::CreateTile4Mapping(handle, size, format);
   }
 
-  return GpuMemoryBufferMapping::CreateGpuMemoryBufferMapping(handle, size,
-                                                              format);
+  return GbmBufferMapping::CreateGbmBufferMapping(handle, size, format);
 }
 
 struct NativePixmapDecodedImage : public DecodedImage {

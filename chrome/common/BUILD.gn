@@ -204,9 +204,6 @@ static_library("common_lib") {
     "//components/language_detection/content/common",
     "//components/metrics",
     "//components/metrics:net",
-    "//components/nacl/common:buildflags",
-    "//components/nacl/common:process_type",
-    "//components/nacl/common:switches",
     "//components/net_log",
     "//components/network_session_configurator/common",
     "//components/ntp_tiles",
@@ -389,19 +386,6 @@ static_library("common_lib") {
     frameworks = [ "ServiceManagement.framework" ]
   }
 
-  if (enable_plugins) {
-    sources += [
-      "ppapi_utils.cc",
-      "ppapi_utils.h",
-    ]
-  }
-  if (enable_plugins && enable_extensions) {
-    sources += [
-      "pepper_permission_util.cc",
-      "pepper_permission_util.h",
-    ]
-  }
-
   if (enable_library_cdms) {
     deps += [ "//media/cdm:cdm_paths" ]  # Needed by chrome_content_client.cc
 
@@ -538,7 +522,6 @@ static_library("url_constants") {
     "//components/commerce/core:commerce_constants",
     "//components/history_clusters/history_clusters_internals/webui:constants",
     "//components/lens:buildflags",
-    "//components/nacl/common:buildflags",
     "//components/optimization_guide/optimization_guide_internals/webui:url_constants",
     "//components/password_manager/content/common",
     "//components/safe_browsing/core/common",
@@ -577,7 +560,6 @@ static_library("constants") {
     "//build:branding_buildflags",
     "//build:chromeos_buildflags",
     "//components/bookmarks/common",
-    "//components/nacl/common:switches",
     "//components/offline_pages/buildflags",
     "//components/policy/core/common:policy_path_constants",
     "//extensions/buildflags",

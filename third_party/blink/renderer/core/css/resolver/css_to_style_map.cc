@@ -839,4 +839,64 @@ TimelineOffsetOrAuto CSSToStyleMap::MapAnimationTriggerExitRangeEnd(
   return TimelineOffsetOrAuto(MapAnimationRange(state, value, 100));
 }
 
+Persistent<const ScopedCSSName> CSSToStyleMap::MapAnimationTimelineTriggerName(
+    StyleResolverState& state,
+    const CSSValue& value) {
+  DCHECK(value.IsScopedValue());
+  if (auto* ident = DynamicTo<CSSIdentifierValue>(value)) {
+    DCHECK(ident->GetValueID() == CSSValueID::kNone);
+    return nullptr;
+  }
+  if (auto* custom_ident = DynamicTo<CSSCustomIdentValue>(value)) {
+    return MakeGarbageCollected<ScopedCSSName>(
+        custom_ident->ComputeIdent(state.CssToLengthConversionData()),
+        custom_ident->GetTreeScope());
+  }
+  return nullptr;
+}
+
+EAnimationTriggerBehavior CSSToStyleMap::MapAnimationTimelineTriggerBehavior(
+    StyleResolverState& state,
+    const CSSValue& value) {
+  return MapAnimationTriggerBehavior(state, value);
+}
+
+std::optional<TimelineOffset>
+CSSToStyleMap::MapAnimationTimelineTriggerRangeStart(StyleResolverState& state,
+                                                     const CSSValue& value) {
+  return MapAnimationRange(state, value, 0);
+}
+
+std::optional<TimelineOffset>
+CSSToStyleMap::MapAnimationTimelineTriggerRangeEnd(StyleResolverState& state,
+                                                   const CSSValue& value) {
+  return MapAnimationRange(state, value, 100);
+}
+
+TimelineOffsetOrAuto CSSToStyleMap::MapAnimationTimelineTriggerExitRangeStart(
+    StyleResolverState& state,
+    const CSSValue& value) {
+  if (auto* ident = DynamicTo<CSSIdentifierValue>(value);
+      ident && ident->GetValueID() == CSSValueID::kAuto) {
+    return TimelineOffsetOrAuto();
+  }
+  return TimelineOffsetOrAuto(MapAnimationRange(state, value, 0));
+}
+
+TimelineOffsetOrAuto CSSToStyleMap::MapAnimationTimelineTriggerExitRangeEnd(
+    StyleResolverState& state,
+    const CSSValue& value) {
+  if (auto* ident = DynamicTo<CSSIdentifierValue>(value);
+      ident && ident->GetValueID() == CSSValueID::kAuto) {
+    return TimelineOffsetOrAuto();
+  }
+  return TimelineOffsetOrAuto(MapAnimationRange(state, value, 100));
+}
+
+StyleTimeline CSSToStyleMap::MapAnimationTimelineTriggerTimeline(
+    StyleResolverState& state,
+    const CSSValue& value) {
+  return MapAnimationTimeline(state, value);
+}
+
 }  // namespace blink

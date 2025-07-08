@@ -36,7 +36,6 @@
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "chrome/browser/ui/unload_controller.h"
 #include "chrome/browser/ui/unowned_user_data/unowned_user_data_host.h"
-#include "chrome/browser/ui/user_education/browser_user_education_interface.h"
 #include "components/paint_preview/buildflags/buildflags.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/sessions/core/session_id.h"
@@ -64,15 +63,12 @@
 #endif
 
 class BackgroundContents;
-class BreadcrumbManagerBrowserAgent;
 class BrowserActions;
-class BrowserContentSettingBubbleModelDelegate;
 class BrowserLiveTabContext;
 class BrowserView;
 class BrowserWindow;
 class BrowserWindowFeatures;
 class FindBarController;
-class OverscrollPrefManager;
 class Profile;
 class ScopedKeepAlive;
 class ScopedProfileKeepAlive;
@@ -96,10 +92,6 @@ struct DropData;
 class NavigationHandle;
 class SessionStorageNamespace;
 }  // namespace content
-
-namespace extensions {
-class ExtensionBrowserWindowHelper;
-}  // namespace extensions
 
 namespace gfx {
 class Image;
@@ -489,10 +481,6 @@ class Browser : public TabStripModelObserver,
   bool should_trigger_session_restore() const {
     return should_trigger_session_restore_;
   }
-  BrowserContentSettingBubbleModelDelegate*
-  content_setting_bubble_model_delegate() {
-    return content_setting_bubble_model_delegate_.get();
-  }
   BrowserLiveTabContext* live_tab_context() { return live_tab_context_.get(); }
   const web_app::AppBrowserController* app_controller() const {
     return app_controller_.get();
@@ -851,7 +839,6 @@ class Browser : public TabStripModelObserver,
   ImmersiveModeController* GetImmersiveModeController() override;
   BrowserActions* GetActions() override;
   Type GetType() const override;
-  BrowserUserEducationInterface* GetUserEducationInterface() override;
   web_app::AppBrowserController* GetAppBrowserController() override;
   std::vector<tabs::TabInterface*> GetAllTabInterfaces() override;
   Browser* GetBrowserForMigrationOnly() override;
@@ -1409,10 +1396,6 @@ class Browser : public TabStripModelObserver,
   // Dialog box used for opening and saving files.
   scoped_refptr<ui::SelectFileDialog> select_file_dialog_;
 
-  // Helper which implements the ContentSettingBubbleModel interface.
-  std::unique_ptr<BrowserContentSettingBubbleModelDelegate>
-      content_setting_bubble_model_delegate_;
-
   // Helper which implements the LiveTabContext interface.
   std::unique_ptr<BrowserLiveTabContext> live_tab_context_;
 
@@ -1432,10 +1415,6 @@ class Browser : public TabStripModelObserver,
 
   std::string user_title_;
 
-  // Listens for browser-related breadcrumb events to be added to crash reports.
-  std::unique_ptr<BreadcrumbManagerBrowserAgent>
-      breadcrumb_manager_browser_agent_;
-
   std::unique_ptr<ScopedKeepAlive> keep_alive_;
 
   WarnBeforeClosingCallback warn_before_closing_callback_;
@@ -1452,11 +1431,6 @@ class Browser : public TabStripModelObserver,
   // when enabled, disables certain functionality that a web browser would
   // never typically disable.
   bool on_task_locked_ = false;
-#endif
-
-#if BUILDFLAG(ENABLE_EXTENSIONS)
-  std::unique_ptr<extensions::ExtensionBrowserWindowHelper>
-      extension_browser_window_helper_;
 #endif
 
   const base::ElapsedTimer creation_timer_;
@@ -1476,10 +1450,6 @@ class Browser : public TabStripModelObserver,
   // If true, the browser window was created as a tab modal pop-up. This is
   // determined by the NavigateParams::is_tab_modal_popup_deprecated.
   bool is_tab_modal_popup_deprecated_ = false;
-
-#if defined(USE_AURA)
-  std::unique_ptr<OverscrollPrefManager> overscroll_pref_manager_;
-#endif
 
   int force_show_bookmark_bar_flags_ = ForceShowBookmarkBarFlag::kNone;
 

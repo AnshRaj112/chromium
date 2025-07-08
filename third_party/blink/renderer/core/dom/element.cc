@@ -51,6 +51,7 @@
 #include "third_party/blink/renderer/bindings/core/v8/v8_scroll_to_options.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_shadow_root_init.h"
 #include "third_party/blink/renderer/bindings/core/v8/v8_union_boolean_scrollintoviewoptions.h"
+#include "third_party/blink/renderer/bindings/core/v8/v8_union_stringlegacynulltoemptystring_trustedhtml.h"
 #include "third_party/blink/renderer/core/accessibility/ax_context.h"
 #include "third_party/blink/renderer/core/accessibility/ax_object_cache.h"
 #include "third_party/blink/renderer/core/animation/css/css_animations.h"
@@ -1525,6 +1526,45 @@ InterestInvokerTargetData* Element::GetInterestInvokerTargetData() const {
   return nullptr;
 }
 
+bool Element::IsPopoverInTopLayer() {
+  auto& document = GetDocument();
+  DCHECK_EQ(IsInTopLayer(), document.TopLayerElements().Contains(this));
+  if (!IsInTopLayer()) {
+    return false;
+  }
+  auto* popover = DynamicTo<HTMLElement>(this);
+  if (!popover || !popover->IsPopover()) {
+    return false;
+  }
+  if (popover->popoverOpen()) {
+    return true;
+  }
+  // This could be a popover that is transitioning out of the top layer.
+  auto top_layer_reason = document.IsScheduledForTopLayerRemoval(this);
+  return top_layer_reason.has_value() &&
+         top_layer_reason.value() == Document::TopLayerReason::kPopover;
+}
+
+bool Element::IsDialogInTopLayer() {
+  auto& document = GetDocument();
+  DCHECK_EQ(IsInTopLayer(), document.TopLayerElements().Contains(this));
+  if (!IsInTopLayer()) {
+    return false;
+  }
+  auto* dialog = DynamicTo<HTMLDialogElement>(this);
+  if (!dialog) {
+    return false;
+  }
+  if (dialog->IsModal()) {
+    DCHECK(document.TopLayerElements().Contains(dialog));
+    return true;
+  }
+  // This could be a modal dialog that is transitioning out of the top layer.
+  auto top_layer_reason = document.IsScheduledForTopLayerRemoval(this);
+  return top_layer_reason &&
+         top_layer_reason.value() == Document::TopLayerReason::kDialog;
+}
+
 // If this element is a triggering element for an *open* popover, in one of
 // several ways, this returns the target popover. These forms of triggering
 // are supported:
@@ -1786,8 +1826,7 @@ bool Element::HasAttributeIgnoringNamespace(
   if (!HasElementData()) {
     return false;
   }
-  WTF::AtomicStringTable::WeakResult hint =
-      WeakLowercaseIfNecessary(local_name);
+  AtomicStringTable::WeakResult hint = WeakLowercaseIfNecessary(local_name);
   SynchronizeAttributeHinted(local_name, hint);
   if (hint.IsNull()) {
     return false;
@@ -3036,9 +3075,7 @@ void Element::ClientQuads(Vector<gfx::QuadF>& quads) const {
     // If stroke is desired, we can update this to use AbsoluteQuads, below.
     if (const auto* svg_graphics_element =
             DynamicTo<SVGGraphicsElement>(this)) {
-      if (RuntimeEnabledFeatures::
-              RestrictGetBoundingClientRectForHiddenSVGElementsEnabled() &&
-          svg_graphics_element->IsNonRendered(element_layout_object)) {
+      if (svg_graphics_element->IsNonRendered(element_layout_object)) {
         return;
       }
 
@@ -3200,7 +3237,7 @@ bool Element::toggleAttribute(const AtomicString& qualified_name,
   // an HTML document, then set qualifiedName to qualifiedName in ASCII
   // lowercase.
   AtomicString lowercase_name = LowercaseIfNecessary(qualified_name);
-  WTF::AtomicStringTable::WeakResult hint(lowercase_name.Impl());
+  AtomicStringTable::WeakResult hint(lowercase_name.Impl());
   // 3. Let attribute be the first attribute in the context object’s attribute
   // list whose qualified name is qualifiedName, and null otherwise.
   SynchronizeAttributeHinted(lowercase_name, hint);
@@ -3243,7 +3280,7 @@ bool Element::toggleAttribute(const AtomicString& qualified_name,
   // an HTML document, then set qualifiedName to qualifiedName in ASCII
   // lowercase.
   AtomicString lowercase_name = LowercaseIfNecessary(qualified_name);
-  WTF::AtomicStringTable::WeakResult hint(lowercase_name.Impl());
+  AtomicStringTable::WeakResult hint(lowercase_name.Impl());
   // 3. Let attribute be the first attribute in the context object’s attribute
   // list whose qualified name is qualifiedName, and null otherwise.
   SynchronizeAttributeHinted(lowercase_name, hint);
@@ -6101,8 +6138,7 @@ const ComputedStyle* Element::RecalcHighlightStyles(
   const StyleHighlightData* parent_highlights =
       parent_style ? &parent_style->HighlightData() : nullptr;
 
-  if (UsesHighlightPseudoInheritance(kPseudoIdSelection) &&
-      new_style.HasPseudoElementStyle(kPseudoIdSelection)) {
+  if (new_style.HasPseudoElementStyle(kPseudoIdSelection)) {
     const ComputedStyle* highlight_parent =
         parent_highlights ? parent_highlights->Selection() : nullptr;
     if (ShouldRecalcHighlightPseudoStyle(highlight_recalc, highlight_parent,
@@ -6115,7 +6151,6 @@ const ComputedStyle* Element::RecalcHighlightStyles(
   }
 
   if (RuntimeEnabledFeatures::SearchTextHighlightPseudoEnabled() &&
-      UsesHighlightPseudoInheritance(kPseudoIdSearchText) &&
       new_style.HasPseudoElementStyle(kPseudoIdSearchText)) {
     const ComputedStyle* highlight_parent_current =
         parent_highlights ? parent_highlights->SearchTextCurrent() : nullptr;
@@ -6139,8 +6174,7 @@ const ComputedStyle* Element::RecalcHighlightStyles(
     }
   }
 
-  if (UsesHighlightPseudoInheritance(kPseudoIdTargetText) &&
-      new_style.HasPseudoElementStyle(kPseudoIdTargetText)) {
+  if (new_style.HasPseudoElementStyle(kPseudoIdTargetText)) {
     const ComputedStyle* highlight_parent =
         parent_highlights ? parent_highlights->TargetText() : nullptr;
     if (ShouldRecalcHighlightPseudoStyle(highlight_recalc, highlight_parent,
@@ -6152,8 +6186,7 @@ const ComputedStyle* Element::RecalcHighlightStyles(
     }
   }
 
-  if (UsesHighlightPseudoInheritance(kPseudoIdSpellingError) &&
-      new_style.HasPseudoElementStyle(kPseudoIdSpellingError)) {
+  if (new_style.HasPseudoElementStyle(kPseudoIdSpellingError)) {
     const ComputedStyle* highlight_parent =
         parent_highlights ? parent_highlights->SpellingError() : nullptr;
     if (ShouldRecalcHighlightPseudoStyle(highlight_recalc, highlight_parent,
@@ -6165,8 +6198,7 @@ const ComputedStyle* Element::RecalcHighlightStyles(
     }
   }
 
-  if (UsesHighlightPseudoInheritance(kPseudoIdGrammarError) &&
-      new_style.HasPseudoElementStyle(kPseudoIdGrammarError)) {
+  if (new_style.HasPseudoElementStyle(kPseudoIdGrammarError)) {
     const ComputedStyle* highlight_parent =
         parent_highlights ? parent_highlights->GrammarError() : nullptr;
     if (ShouldRecalcHighlightPseudoStyle(highlight_recalc, highlight_parent,
@@ -6178,8 +6210,7 @@ const ComputedStyle* Element::RecalcHighlightStyles(
     }
   }
 
-  if (UsesHighlightPseudoInheritance(kPseudoIdHighlight) &&
-      new_style.HasPseudoElementStyle(kPseudoIdHighlight)) {
+  if (new_style.HasPseudoElementStyle(kPseudoIdHighlight)) {
     RecalcCustomHighlightPseudoStyle(style_recalc_context, highlight_recalc,
                                      builder, parent_highlights, new_style);
   }
@@ -6965,8 +6996,7 @@ Attr* Element::getAttributeNode(const AtomicString& local_name) {
   if (!HasElementData()) {
     return nullptr;
   }
-  WTF::AtomicStringTable::WeakResult hint =
-      WeakLowercaseIfNecessary(local_name);
+  AtomicStringTable::WeakResult hint = WeakLowercaseIfNecessary(local_name);
   SynchronizeAttributeHinted(local_name, hint);
   const Attribute* attribute =
       GetElementData()->Attributes().FindHinted(local_name, hint);
@@ -6994,8 +7024,7 @@ bool Element::hasAttribute(const AtomicString& local_name) const {
   if (!HasElementData()) {
     return false;
   }
-  WTF::AtomicStringTable::WeakResult hint =
-      WeakLowercaseIfNecessary(local_name);
+  AtomicStringTable::WeakResult hint = WeakLowercaseIfNecessary(local_name);
   SynchronizeAttributeHinted(local_name, hint);
   return GetElementData()->Attributes().FindHinted(local_name, hint);
 }
@@ -7483,9 +7512,6 @@ bool Element::HasSpatialNavigationFocusHeuristics() const {
 
 bool Element::CanBeKeyboardFocusableScroller(
     UpdateBehavior update_behavior) const {
-  if (!GetDocument().KeyboardFocusableScrollersEnabled()) {
-    return false;
-  }
   // A node is scrollable depending on its layout size. As such, it is important
   // to have up to date style and layout before calling IsScrollableNode.
   // However, some lifecycle stages don't allow update here so we use
@@ -7649,16 +7675,13 @@ bool Element::IsMouseFocusable(UpdateBehavior update_behavior) const {
   return true;
 }
 
-bool Element::IsMaybeClickable() {
-  if (IsClickableControl(this)) {
+bool Element::IsClickableFormControlNode() const {
+  auto* form_control_element = DynamicTo<HTMLFormControlElement>(this);
+  if (form_control_element && form_control_element->FormControlType() !=
+                                  mojom::blink::FormControlType::kFieldset) {
     return true;
   }
-
-  if (WillRespondToMouseClickEvents()) {
-    return true;
-  }
-
-  return HasSpatialNavigationFocusHeuristics();
+  return false;
 }
 
 bool Element::IsFocusable(UpdateBehavior update_behavior) const {
@@ -8149,12 +8172,22 @@ void Element::DispatchFocusOutEvent(
       new_focused_element, source_capabilities));
 }
 
-String Element::innerHTML() const {
+String Element::GetInnerHTMLString() const {
   return CreateMarkup(this, kChildrenOnly);
 }
 
-String Element::outerHTML() const {
+String Element::GetOuterHTMLString() const {
   return CreateMarkup(this);
+}
+
+V8UnionStringLegacyNullToEmptyStringOrTrustedHTML* Element::innerHTML() const {
+  return MakeGarbageCollected<
+      V8UnionStringLegacyNullToEmptyStringOrTrustedHTML>(GetInnerHTMLString());
+}
+
+V8UnionStringLegacyNullToEmptyStringOrTrustedHTML* Element::outerHTML() const {
+  return MakeGarbageCollected<
+      V8UnionStringLegacyNullToEmptyStringOrTrustedHTML>(GetOuterHTMLString());
 }
 
 void Element::SetInnerHTMLInternal(
@@ -8189,15 +8222,26 @@ void Element::SetInnerHTMLInternal(
   }
 }
 
-void Element::setInnerHTML(const String& html,
-                           ExceptionState& exception_state) {
-  probe::BreakableLocation(GetExecutionContext(), "Element.setInnerHTML");
+void Element::SetInnerHTMLWithoutTrustedTypes(const String& html,
+                                              ExceptionState& exception_state) {
   SetInnerHTMLInternal(html, ParseDeclarativeShadowRoots::kDontParse,
                        ForceHtml::kDontForce, exception_state);
 }
 
-void Element::setOuterHTML(const String& html,
-                           ExceptionState& exception_state) {
+void Element::setInnerHTML(
+    const V8UnionStringLegacyNullToEmptyStringOrTrustedHTML* html,
+    ExceptionState& exception_state) {
+  probe::BreakableLocation(GetExecutionContext(), "Element.setInnerHTML");
+  String compliant_html = TrustedTypesCheckForHTML(
+      html, GetExecutionContext(), "Element", "innerHTML", exception_state);
+  if (exception_state.HadException()) {
+    return;
+  }
+  SetInnerHTMLWithoutTrustedTypes(compliant_html, exception_state);
+}
+
+void Element::SetOuterHTMLWithoutTrustedTypes(const String& html,
+                                              ExceptionState& exception_state) {
   Node* p = parentNode();
   if (!p) {
     exception_state.ThrowDOMException(
@@ -8245,6 +8289,17 @@ void Element::setOuterHTML(const String& html,
       return;
     }
   }
+}
+
+void Element::setOuterHTML(
+    const V8UnionStringLegacyNullToEmptyStringOrTrustedHTML* html,
+    ExceptionState& exception_state) {
+  String compliant_html = TrustedTypesCheckForHTML(
+      html, GetExecutionContext(), "Element", "outerHTML", exception_state);
+  if (exception_state.HadException()) {
+    return;
+  }
+  SetOuterHTMLWithoutTrustedTypes(compliant_html, exception_state);
 }
 
 // Step 4 of http://domparsing.spec.whatwg.org/#insertadjacenthtml()
@@ -8437,9 +8492,10 @@ void Element::insertAdjacentText(const String& where,
   InsertAdjacent(where, GetDocument().createTextNode(text), exception_state);
 }
 
-void Element::insertAdjacentHTML(const String& where,
-                                 const String& markup,
-                                 ExceptionState& exception_state) {
+void Element::InsertAdjacentHTMLWithoutTrustedTypes(
+    const String& where,
+    const String& markup,
+    ExceptionState& exception_state) {
   Node* context_node = ContextNodeForInsertion(where, this, exception_state);
   if (!context_node) {
     return;
@@ -8465,6 +8521,18 @@ void Element::insertAdjacentHTML(const String& where,
     return;
   }
   InsertAdjacent(where, fragment, exception_state);
+}
+
+void Element::insertAdjacentHTML(const String& where,
+                                 const V8UnionStringOrTrustedHTML* html,
+                                 ExceptionState& exception_state) {
+  String compliant_html =
+      TrustedTypesCheckForHTML(html, GetExecutionContext(), "Element",
+                               "insertAdjacentHTML", exception_state);
+  if (exception_state.HadException()) {
+    return;
+  }
+  InsertAdjacentHTMLWithoutTrustedTypes(where, compliant_html, exception_state);
 }
 
 void Element::setPointerCapture(PointerId pointer_id,
@@ -8812,7 +8880,7 @@ const ComputedStyle* Element::EnsureOwnComputedStyle(
     DCHECK_EQ(style_request.type, StyleRequest::kForComputedStyle);
     style_request.search_text_request = StyleRequest::kNotCurrent;
   }
-  if (UsesHighlightPseudoInheritance(pseudo_element_specifier)) {
+  if (IsHighlightPseudoElement(pseudo_element_specifier)) {
     const ComputedStyle* highlight_element_style = nullptr;
     if (Element* parent = LayoutTreeBuilderTraversal::ParentElement(*this)) {
       highlight_element_style =
@@ -9482,7 +9550,7 @@ const ComputedStyle* Element::CachedStyleForPseudoElement(
     const AtomicString& pseudo_argument) {
   // Highlight pseudos are resolved into StyleHighlightData during originating
   // style recalc, and should never be stored in StyleCachedData.
-  DCHECK(!UsesHighlightPseudoInheritance(pseudo_id));
+  DCHECK(!IsHighlightPseudoElement(pseudo_id));
 
   const ComputedStyle* style = GetComputedStyle();
 
@@ -9514,7 +9582,7 @@ const ComputedStyle* Element::UncachedStyleForPseudoElement(
     const StyleRequest& request) {
   // Highlight pseudos are resolved into StyleHighlightData during originating
   // style recalc, where we have the actual StyleRecalcContext.
-  DCHECK(!UsesHighlightPseudoInheritance(request.pseudo_id));
+  DCHECK(!IsHighlightPseudoElement(request.pseudo_id));
 
   return StyleForPseudoElement(
       StyleRecalcContext::FromInclusiveAncestors(*this), request);
@@ -11615,15 +11683,15 @@ bool Element::checkVisibility(CheckVisibilityOptions* options) const {
   return true;
 }
 
-WTF::AtomicStringTable::WeakResult Element::WeakLowercaseIfNecessary(
+AtomicStringTable::WeakResult Element::WeakLowercaseIfNecessary(
     const AtomicString& name) const {
   if (name.IsLowerASCII()) [[likely]] {
-    return WTF::AtomicStringTable::WeakResult(name);
+    return AtomicStringTable::WeakResult(name);
   }
   if (IsHTMLElement() && IsA<HTMLDocument>(GetDocument())) [[likely]] {
-    return WTF::AtomicStringTable::Instance().WeakFindLowercase(name);
+    return AtomicStringTable::Instance().WeakFindLowercase(name);
   }
-  return WTF::AtomicStringTable::WeakResult(name);
+  return AtomicStringTable::WeakResult(name);
 }
 
 // Note, SynchronizeAttributeHinted is safe to call between a WeakFind() and
@@ -11639,7 +11707,7 @@ WTF::AtomicStringTable::WeakResult Element::WeakLowercaseIfNecessary(
 // without worry for UaF or false positives.
 void Element::SynchronizeAttributeHinted(
     const AtomicString& local_name,
-    WTF::AtomicStringTable::WeakResult hint) const {
+    AtomicStringTable::WeakResult hint) const {
   // This version of SynchronizeAttribute() is streamlined for the case where
   // you don't have a full QualifiedName, e.g when called from DOM API.
   if (!HasElementData()) {
@@ -11668,7 +11736,7 @@ void Element::SynchronizeAttributeHinted(
 
 const AtomicString& Element::GetAttributeHinted(
     const AtomicString& name,
-    WTF::AtomicStringTable::WeakResult hint) const {
+    AtomicStringTable::WeakResult hint) const {
   if (!HasElementData()) {
     return g_null_atom;
   }
@@ -11682,7 +11750,7 @@ const AtomicString& Element::GetAttributeHinted(
 
 std::pair<wtf_size_t, const QualifiedName> Element::LookupAttributeQNameHinted(
     AtomicString name,
-    WTF::AtomicStringTable::WeakResult hint) const {
+    AtomicStringTable::WeakResult hint) const {
   if (!HasElementData()) {
     return std::make_pair(kNotFound,
                           QualifiedName(LowercaseIfNecessary(std::move(name))));
@@ -11796,7 +11864,7 @@ void Element::SetSynchronizedLazyAttribute(const QualifiedName& name,
 }
 
 void Element::SetAttributeHinted(AtomicString local_name,
-                                 WTF::AtomicStringTable::WeakResult hint,
+                                 AtomicStringTable::WeakResult hint,
                                  String value,
                                  ExceptionState& exception_state) {
   bool is_valid = RuntimeEnabledFeatures::RelaxDOMValidNamesEnabled()
@@ -11829,7 +11897,7 @@ void Element::SetAttributeHinted(AtomicString local_name,
 }
 
 void Element::SetAttributeHinted(AtomicString local_name,
-                                 WTF::AtomicStringTable::WeakResult hint,
+                                 AtomicStringTable::WeakResult hint,
                                  const V8TrustedType* trusted_string,
                                  ExceptionState& exception_state) {
   if (!Document::IsValidName(local_name)) {
@@ -11982,7 +12050,7 @@ Attr* Element::setAttributeNode(Attr* attr_node,
 }
 
 void Element::RemoveAttributeHinted(const AtomicString& name,
-                                    WTF::AtomicStringTable::WeakResult hint) {
+                                    AtomicStringTable::WeakResult hint) {
   if (!HasElementData()) {
     return;
   }
@@ -12224,18 +12292,36 @@ void Element::AdjustContainerTimingIfNeededAfterChildrenChanged(
       SelfOrAncestorHasContainerTiming() /* has_container_timing */);
 }
 
-void Element::setHTMLUnsafe(const String& html,
-                            ExceptionState& exception_state) {
+void Element::SetHTMLUnsafeWithoutTrustedTypes(
+    const String& html,
+    ExceptionState& exception_state) {
   UseCounter::Count(GetDocument(), WebFeature::kHTMLUnsafeMethods);
   SetInnerHTMLInternal(html, ParseDeclarativeShadowRoots::kParse,
                        ForceHtml::kForce, exception_state);
 }
 
-void Element::setHTMLUnsafe(const String& html,
+void Element::setHTMLUnsafe(const V8UnionStringOrTrustedHTML* html,
+                            ExceptionState& exception_state) {
+  UseCounter::Count(GetDocument(), WebFeature::kHTMLUnsafeMethods);
+  String compliant_html = TrustedTypesCheckForHTML(
+      html, GetExecutionContext(), "Element", "setHTMLUnsafe", exception_state);
+  if (exception_state.HadException()) {
+    return;
+  }
+  SetInnerHTMLInternal(compliant_html, ParseDeclarativeShadowRoots::kParse,
+                       ForceHtml::kForce, exception_state);
+}
+
+void Element::setHTMLUnsafe(const V8UnionStringOrTrustedHTML* html,
                             SetHTMLUnsafeOptions* options,
                             ExceptionState& exception_state) {
   CHECK(RuntimeEnabledFeatures::SanitizerAPIEnabled());
-  SetInnerHTMLInternal(html, ParseDeclarativeShadowRoots::kParse,
+  String compliant_html = TrustedTypesCheckForHTML(
+      html, GetExecutionContext(), "Element", "setHTMLUnsafe", exception_state);
+  if (exception_state.HadException()) {
+    return;
+  }
+  SetInnerHTMLInternal(compliant_html, ParseDeclarativeShadowRoots::kParse,
                        ForceHtml::kForce, exception_state);
   SanitizerAPI::SanitizeUnsafeInternal(this, options, exception_state);
 }

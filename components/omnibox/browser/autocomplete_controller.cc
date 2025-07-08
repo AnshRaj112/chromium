@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <map>
 #include <memory>
 #include <numeric>
@@ -1486,7 +1487,7 @@ void AutocompleteController::UpdateResult(UpdateType update_type,
       autocomplete_provider_client()->IsPagePaywalled());
   const bool mia_enabled =
       omnibox_feature_configs::MiaZPS::Get().enabled &&
-      omnibox::IsMiaAllowedByPolicy(provider_client_->GetPrefs());
+      omnibox::IsAimAllowedByPolicy(provider_client_->GetPrefs());
 
   if (update_type == UpdateType::kSyncPass ||
       update_type == UpdateType::kAsyncPass ||
@@ -1620,6 +1621,7 @@ void AutocompleteController::PostProcessMatches() {
   UpdateTailSuggestPrefix(&internal_result_);
   MaybeRemoveCompanyEntityImages(&internal_result_);
   MaybeCleanSuggestionsForKeywordMode(input_, &internal_result_);
+  MaybeCleanIphSuggestions(&internal_result_);
 
   // Notify providers which of their matches were shown. If we end up with more
   // providers to notify, we should add `RegisterDisplayedMatches()` to the
@@ -1706,7 +1708,7 @@ void AutocompleteController::AttachActions() {
     // Attach the contextual search fulfillment actions in the @page keyword
     // mode.
     if (keyword_turl && keyword_turl->starter_pack_id() ==
-        template_url_starter_pack_data::kPage) {
+                            template_url_starter_pack_data::kPage) {
       internal_result_.AttachContextualSearchFulfillmentActionToMatches();
       return;
     }
@@ -2737,19 +2739,43 @@ void AutocompleteController::MaybeCleanSuggestionsForKeywordMode(
     result->EraseMatchesWhere([](const AutocompleteMatch& match) {
       // When the input is '@' exactly, keep only the trivial search, starter
       // pack, and featured enterprise suggestions.
-      return match.contents != u"@" && !match.associated_keyword;
+      return match.contents != u"@" && !match.associated_keyword &&
+             !match.IsToolbelt();
     });
-    // Simple sort is needed to restore verbatim '@' search as top/default
-    // match because a different default, e.g. "@hill", might have previously
-    // occupied the top spot while '@' was demoted below others.
-    std::sort(result->begin(), result->end(), AutocompleteMatch::MoreRelevant);
-    // Put first defaultable match in top position since relevance
-    // ranking alone doesn't guarantee it.
-    auto default_match = std::find_if(
-        result->begin(), result->end(),
-        [](const auto& m) { return m.allowed_to_be_default_match; });
-    if (default_match != result->begin() && default_match != result->end()) {
-      std::rotate(result->begin(), default_match, default_match + 1);
+    if (omnibox_feature_configs::Toolbelt::Get().enabled) {
+      // Sort is needed to restore verbatim '@' search as top/default match
+      // because a different default, e.g. "@hill", might have previously
+      // occupied the top spot while '@' was demoted below others. The
+      // comparison here achieves this without direct vector manipulation,
+      // and also considers `GetSortingOrder` to put toolbelt match last.
+      std::sort(
+          result->begin(), result->end(),
+          [](const AutocompleteMatch& match1, const AutocompleteMatch& match2) {
+            return std::forward_as_tuple(
+                       match1.type !=
+                           AutocompleteMatchType::SEARCH_WHAT_YOU_TYPED,
+                       match1.GetSortingOrder(), -match1.relevance,
+                       match1.contents) <
+                   std::forward_as_tuple(
+                       match2.type !=
+                           AutocompleteMatchType::SEARCH_WHAT_YOU_TYPED,
+                       match2.GetSortingOrder(), -match2.relevance,
+                       match2.contents);
+          });
+    } else {
+      // Simple sort is needed to restore verbatim '@' search as top/default
+      // match because a different default, e.g. "@hill", might have previously
+      // occupied the top spot while '@' was demoted below others.
+      std::sort(result->begin(), result->end(),
+                AutocompleteMatch::MoreRelevant);
+      // Put first defaultable match in top position since relevance
+      // ranking alone doesn't guarantee it.
+      auto default_match = std::find_if(
+          result->begin(), result->end(),
+          [](const auto& m) { return m.allowed_to_be_default_match; });
+      if (default_match != result->begin() && default_match != result->end()) {
+        std::rotate(result->begin(), default_match, default_match + 1);
+      }
     }
   }
 
@@ -2773,5 +2799,17 @@ void AutocompleteController::MaybeCleanSuggestionsForKeywordMode(
         result->match_at(i)->actions.clear();
       }
     }
+  }
+}
+
+void AutocompleteController::MaybeCleanIphSuggestions(
+    AutocompleteResult* result) {
+  bool has_toolbelt = std::ranges::any_of(result->begin(), result->end(),
+                                          &AutocompleteMatch::IsToolbelt);
+  if (has_toolbelt) {
+    result->EraseMatchesWhere([](const auto& match) {
+      return match.IsIphSuggestion() &&
+             match.iph_type != IphType::kHistoryEmbeddingsDisclaimer;
+    });
   }
 }

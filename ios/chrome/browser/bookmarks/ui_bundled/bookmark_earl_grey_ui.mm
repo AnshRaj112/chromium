@@ -305,9 +305,9 @@ id<GREYMatcher> SearchIconButton() {
       performAction:grey_tap()];
 
   // Tap on Open All.
-  [[EarlGrey
-      selectElementWithMatcher:ButtonWithAccessibilityLabelId(buttonLabelId)]
-      performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:
+                 chrome_test_util::AlertItemWithAccessibilityLabelId(
+                     buttonLabelId)] performAction:grey_tap()];
 }
 
 - (void)verifyContextMenuForSingleURLWithEditEnabled:(BOOL)editEnabled {
@@ -530,8 +530,10 @@ id<GREYMatcher> SearchIconButton() {
 
   // The search bar should not be visible when the illustrated empty state is
   // shown.
-  [[EarlGrey selectElementWithMatcher:grey_accessibilityTrait(
-                                          UIAccessibilityTraitSearchField)]
+  [[EarlGrey
+      selectElementWithMatcher:grey_allOf(grey_accessibilityTrait(
+                                              UIAccessibilityTraitSearchField),
+                                          grey_sufficientlyVisible(), nil)]
       assertWithMatcher:grey_nil()];
 }
 
@@ -596,9 +598,9 @@ id<GREYMatcher> SearchIconButton() {
                                    [BookmarkEarlGreyUI contextBarMoreString])]
       performAction:grey_tap()];
 
-  [[EarlGrey
-      selectElementWithMatcher:ButtonWithAccessibilityLabelId(menuButtonId)]
-      performAction:grey_tap()];
+  [[EarlGrey selectElementWithMatcher:
+                 chrome_test_util::ActionSheetItemWithAccessibilityLabelId(
+                     menuButtonId)] performAction:grey_tap()];
 
   // Verify that the edit page (editor) is present.
   [[EarlGrey selectElementWithMatcher:grey_accessibilityID(editorId)]

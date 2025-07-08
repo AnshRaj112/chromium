@@ -405,6 +405,28 @@ void RecordProvisionalSaveFailure(
   }
 }
 
+void HandleFailedLoginDetectionForPasswordChange(
+    PasswordManagerDriver* driver,
+    PasswordFormManager* submitted_manager,
+    ukm::SourceId ukm_id) {
+  CHECK(submitted_manager);
+
+  if (DidLoginWithChangedPassword(submitted_manager)) {
+    base::UmaHistogramBoolean(kLogInWithPasswordChangeSubmissionHistogram,
+                              false);
+    ukm::builders::PasswordManager_ChangeSubmission(ukm_id)
+        .SetLogInWithPasswordChangeSubmission(false)
+        .Record(ukm::UkmRecorder::Get());
+  }
+
+  // Proactive recovery on mobile will be implemented via touch to fill instead.
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+  // Create a copy of the submitted form because it will soon be destroyed.
+  driver->GetPasswordAutofillManager()->OnLoginPotentiallyFailed(
+      *submitted_manager->GetSubmittedForm());
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
+}
+
 }  // namespace
 
 // static
@@ -828,10 +850,8 @@ void PasswordManager::OnPasswordFormCleared(
   // If it's neither change or reset form it must be a sign-in or a sign-up
   // form. Check if login should be considered failed in this case.
   if (relevant_field_cleared(
-          manager->GetSubmittedForm()->password_element_renderer_id) &&
-      base::FeatureList::IsEnabled(
-          features::kFailedLoginDetectionBasedOnFormClearEvent)) {
-    OnLoginFailed(logger.get());
+          manager->GetSubmittedForm()->password_element_renderer_id)) {
+    OnLoginPotentiallyFailed(driver, logger.get());
   }
 }
 
@@ -956,10 +976,7 @@ void PasswordManager::OnResourceLoadingFailed(PasswordManagerDriver* driver,
     logger->LogMessage(Logger::STRING_RESOURCE_FAILED_LOADING_LOGIN_FAILED);
   }
 
-  if (base::FeatureList::IsEnabled(
-          features::kFailedLoginDetectionBasedOnResourceLoadingErrors)) {
-    OnLoginFailed(logger.get());
-  }
+  OnLoginPotentiallyFailed(driver, logger.get());
 }
 
 void PasswordManager::OnPasswordFormsParsed(
@@ -1381,7 +1398,7 @@ void PasswordManager::OnPasswordFormsRendered(
   // If the server throws an internal error, access denied page, page not
   // found etc. after a login attempt, we do not save the credentials.
   if (client_->WasLastNavigationHTTPError()) {
-    OnLoginFailed(logger.get());
+    OnLoginFailed(driver, logger.get());
     return;
   }
 
@@ -1419,7 +1436,7 @@ void PasswordManager::OnPasswordFormsRendered(
           logger->LogFormData(Logger::STRING_PASSWORD_FORM_REAPPEARED,
                               form_data);
         }
-        OnLoginFailed(logger.get());
+        OnLoginFailed(driver, logger.get());
         return;
       }
     }
@@ -1565,28 +1582,37 @@ void PasswordManager::OnLoginSuccessful() {
   ResetSubmittedManager();
 }
 
-void PasswordManager::OnLoginFailed(BrowserSavePasswordProgressLogger* logger) {
+void PasswordManager::OnLoginFailed(PasswordManagerDriver* driver,
+                                    BrowserSavePasswordProgressLogger* logger) {
   if (logger) {
     logger->LogMessage(Logger::STRING_DECISION_DROP);
   }
 
   PasswordFormManager* submitted_manager = GetSubmittedManager();
-  DCHECK(submitted_manager);
+  CHECK(submitted_manager);
   submitted_manager->GetMetricsRecorder()->LogSubmitFailed();
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
   MaybeTriggerHatsSurvey(*submitted_manager);
 #endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
-
-  if (DidLoginWithChangedPassword(submitted_manager)) {
-    base::UmaHistogramBoolean(kLogInWithPasswordChangeSubmissionHistogram,
-                              false);
-    ukm::builders::PasswordManager_ChangeSubmission(client_->GetUkmSourceId())
-        .SetLogInWithPasswordChangeSubmission(false)
-        .Record(ukm::UkmRecorder::Get());
-  }
+  HandleFailedLoginDetectionForPasswordChange(driver, submitted_manager,
+                                              client_->GetUkmSourceId());
 
   ResetSubmittedManager();
+  base::UmaHistogramBoolean("PasswordManager.FailedLoginDetected", false);
+}
+
+void PasswordManager::OnLoginPotentiallyFailed(
+    PasswordManagerDriver* driver,
+    BrowserSavePasswordProgressLogger* logger) {
+  if (logger) {
+    logger->LogMessage(Logger::STRING_PASSWORD_POTENTIALLY_FAILED_LOGIN);
+  }
+
+  HandleFailedLoginDetectionForPasswordChange(driver, GetSubmittedManager(),
+                                              client_->GetUkmSourceId());
+
+  base::UmaHistogramBoolean("PasswordManager.FailedLoginDetected", true);
 }
 
 void PasswordManager::ProcessAutofillPredictions(

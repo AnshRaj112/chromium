@@ -595,6 +595,7 @@ _CROSSBENCH_WEBVIEW = frozenset([
             '--probe-config=../../clank/android_webview/tools/crossbench_config/'
             'agsa_probe_config.hjson',
             '--repetitions=50',
+            '--http-request-timeout=15s',
         ]
     ),
 ])
@@ -1115,8 +1116,22 @@ FUCHSIA_PERF_NELSON = PerfPlatform('fuchsia-perf-nsn',
                                    1,
                                    'fuchsia',
                                    is_fyi=True)
+FUCHSIA_PERF_NELSON_PGO = PerfPlatform(
+    'fuchsia-perf-nsn-pgo',
+    '',
+    _FUCHSIA_PERF_SMARTDISPLAY_BENCHMARK_CONFIGS,
+    1,
+    'fuchsia',
+    is_fyi=True)
 FUCHSIA_PERF_SHERLOCK = PerfPlatform(
     'fuchsia-perf-shk',
+    '',
+    _FUCHSIA_PERF_SMARTDISPLAY_BENCHMARK_CONFIGS,
+    1,
+    'fuchsia',
+    is_fyi=True)
+FUCHSIA_PERF_SHERLOCK_PGO = PerfPlatform(
+    'fuchsia-perf-shk-pgo',
     '',
     _FUCHSIA_PERF_SMARTDISPLAY_BENCHMARK_CONFIGS,
     1,

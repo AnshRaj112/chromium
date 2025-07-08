@@ -253,11 +253,6 @@ class CONTENT_EXPORT RenderFrameImpl
       blink::mojom::PolicyContainerPtr policy_container,
       bool is_for_nested_main_frame);
 
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-  // Returns the RenderFrameImpl for the given routing ID.
-  static RenderFrameImpl* FromRoutingID(int routing_id);
-#endif
-
   // Just like RenderFrame::FromWebFrame but returns the implementation.
   static RenderFrameImpl* FromWebFrame(blink::WebFrame* web_frame);
 
@@ -340,32 +335,14 @@ class CONTENT_EXPORT RenderFrameImpl
   // gone, and clean up code that depends on it.
   bool in_frame_tree() { return in_frame_tree_; }
 
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-  // IPC::Sender
-  bool Send(IPC::Message* msg) override;
-
-  // IPC::Listener
-  bool OnMessageReceived(const IPC::Message& msg) override;
-
-#define LEGACY_IPC_OVERRIDE override
-#else
-#define LEGACY_IPC_OVERRIDE
-#endif
-
   void OnAssociatedInterfaceRequest(const std::string& interface_name,
-                                    mojo::ScopedInterfaceEndpointHandle handle)
-      LEGACY_IPC_OVERRIDE;
-
-#undef LEGACY_IPC_OVERRIDE
+                                    mojo::ScopedInterfaceEndpointHandle handle);
 
   // RenderFrame implementation:
   RenderFrame* GetMainRenderFrame() override;
   RenderAccessibility* GetRenderAccessibility() override;
   std::unique_ptr<AXTreeSnapshotter> CreateAXTreeSnapshotter(
       ui::AXMode ax_mode) override;
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-  int GetRoutingID() override;
-#endif
   blink::WebLocalFrame* GetWebFrame() override;
   const blink::WebLocalFrame* GetWebFrame() const override;
   blink::WebView* GetWebView() override;
@@ -485,6 +462,7 @@ class CONTENT_EXPORT RenderFrameImpl
       std::unique_ptr<blink::PendingURLLoaderFactoryBundle>
           subresource_loader_factories,
       const blink::DocumentToken& document_token,
+      const base::UnguessableToken& devtools_navigation_token,
       blink::mojom::PolicyContainerPtr policy_container,
       mojom::AlternativeErrorPageOverrideInfoPtr alternative_error_page_info,
       mojom::NavigationClient::CommitFailedNavigationCallback
@@ -1070,7 +1048,8 @@ class CONTENT_EXPORT RenderFrameImpl
       ui::PageTransition transition,
       const network::ParsedPermissionsPolicy& permissions_policy_header,
       const blink::DocumentPolicyFeatureState& document_policy_header,
-      const std::optional<base::UnguessableToken>& embedding_token);
+      const std::optional<base::UnguessableToken>& embedding_token,
+      std::optional<blink::PageState> previous_page_state);
 
   // Updates the navigation history depending on the passed parameters.
   // This could result either in the creation of a new entry or a modification
@@ -1247,10 +1226,6 @@ class CONTENT_EXPORT RenderFrameImpl
   bool in_frame_tree_;
 
   blink::LocalFrameToken frame_token_;
-
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-  const int routing_id_;
-#endif
 
   const int process_label_id_;
 

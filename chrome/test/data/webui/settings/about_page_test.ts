@@ -6,7 +6,7 @@
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import type {SettingsAboutPageElement} from 'chrome://settings/settings.js';
 import {AboutPageBrowserProxyImpl, LifetimeBrowserProxyImpl, Router, routes} from 'chrome://settings/settings.js';
-import {assertTrue} from 'chrome://webui-test/chai_assert.js';
+import {assertEquals, assertFalse, assertTrue} from 'chrome://webui-test/chai_assert.js';
 
 import {TestAboutPageBrowserProxy} from './test_about_page_browser_proxy.js';
 import {TestLifetimeBrowserProxy} from './test_lifetime_browser_proxy.js';
@@ -25,14 +25,9 @@ import type {PromoteUpdaterStatus} from 'chrome://settings/settings.js';
 // <if expr="not is_chromeos">
 import {UpdateStatus} from 'chrome://settings/settings.js';
 import {webUIListenerCallback} from 'chrome://resources/js/cr.js';
-import {assertFalse, assertNotEquals} from 'chrome://webui-test/chai_assert.js';
+import {assertNotEquals} from 'chrome://webui-test/chai_assert.js';
 import {isVisible, eventToPromise} from 'chrome://webui-test/test_util.js';
 // </if>
-
-// <if expr="_google_chrome or not is_chromeos">
-import {assertEquals} from 'chrome://webui-test/chai_assert.js';
-// </if>
-
 // clang-format on
 
 // <if expr="not is_chromeos">
@@ -327,6 +322,18 @@ suite('AllBuilds', function() {
     assertTrue(!!page.shadowRoot!.querySelector('#help'));
     page.shadowRoot!.querySelector<HTMLElement>('#help')!.click();
     return aboutBrowserProxy.whenCalled('openHelpPage');
+  });
+
+  test('searchContents', async function() {
+    let result = await page.searchContents('foo');
+    assertFalse(result.canceled);
+    assertEquals(0, result.matchCount);
+    assertFalse(result.wasClearSearch);
+
+    result = await page.searchContents('');
+    assertFalse(result.canceled);
+    assertEquals(0, result.matchCount);
+    assertTrue(result.wasClearSearch);
   });
 });
 

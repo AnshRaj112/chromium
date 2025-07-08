@@ -33,10 +33,18 @@ public class ModalDialogProperties {
     public interface Controller {
         /**
          * Handle click event of the buttons on the dialog.
+         *
          * @param model The dialog model that is associated with this click event.
          * @param buttonType The type of the button.
          */
         void onClick(PropertyModel model, @ButtonType int buttonType);
+
+        /**
+         * Handle check event of the checkbox on the dialog.
+         *
+         * @param isChecked Whether the checkbox is checked.
+         */
+        default void onCheckboxChecked(boolean isChecked) {}
 
         /**
          * Handle dismiss event when the dialog is dismissed by actions on the dialog. Note that it
@@ -45,6 +53,7 @@ public class ModalDialogProperties {
          * clicked), because the dismissal cause can be different values depending on modal dialog
          * type and mode of presentation (e.g. it could be unknown on VR but a specific value on
          * non-VR).
+         *
          * @param model The dialog model that is associated with this dismiss event.
          * @param dismissalCause The reason of the dialog being dismissed.
          * @see DialogDismissalCause
@@ -183,6 +192,18 @@ public class ModalDialogProperties {
     public static final WritableObjectPropertyKey<View> CUSTOM_BUTTON_BAR_VIEW =
             new WritableObjectPropertyKey<>();
 
+    /**
+     * The text of the checkbox of the dialog. Setting this key to a non-empty string will make the
+     * checkbox visible. Setting this key to an empty string will set the checkbox visibility to
+     * GONE.
+     */
+    public static final WritableObjectPropertyKey<String> CHECKBOX_TEXT =
+            new WritableObjectPropertyKey<>();
+
+    /** The checked state of the checkbox of the dialog. */
+    public static final WritableBooleanPropertyKey CHECKBOX_CHECKED =
+            new WritableBooleanPropertyKey();
+
     /** The text on the positive button. */
     public static final WritableObjectPropertyKey<String> POSITIVE_BUTTON_TEXT =
             new WritableObjectPropertyKey<>();
@@ -313,6 +334,8 @@ public class ModalDialogProperties {
                 MESSAGE_PARAGRAPHS,
                 CUSTOM_VIEW,
                 CUSTOM_BUTTON_BAR_VIEW,
+                CHECKBOX_TEXT,
+                CHECKBOX_CHECKED,
                 POSITIVE_BUTTON_TEXT,
                 POSITIVE_BUTTON_CONTENT_DESCRIPTION,
                 POSITIVE_BUTTON_DISABLED,
@@ -336,6 +359,6 @@ public class ModalDialogProperties {
                 HORIZONTAL_MARGIN,
                 VERTICAL_MARGIN,
                 PADDING,
-                BLOCK_INPUTS,
+                BLOCK_INPUTS
             };
 }

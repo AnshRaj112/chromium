@@ -36,6 +36,7 @@ CryptoModulePasswordDialogTest.*
 *DataControlsDialogUiTest.*
 DeepScanningFailureModalDialogTest.*
 DiscountBubbleViewBrowserTest.*
+DiceMigrationServicePixelBrowserTest.*
 *DiceWebSigninInterceptionBubblePixelTest.InvokeUi_*
 *DiceWebSigninInterceptionBubbleV1SyncPromoPixelTest.InvokeUi_*
 *DiceWebSigninInterceptionBubbleV2PixelTest.InvokeUi_*
@@ -142,10 +143,12 @@ SecurePaymentConfirmationDialogViewTest.InvokeUi_*
 SessionCrashedBubbleViewTest.*
 *SharedPasswordsNotificationBubbleInteractiveUiTest.*
 SharedTabGroupInteractiveUiTest.SharedTabGroupIn*
+SingleBookmarkUploadDialogPixelTest.InvokeUi
 SplitTabButtonInteractiveTest.ButtonUpdatesOnSplit
 SyncConfirmationUIDialogPixelTest.*
 SyncConfirmationUIWindowPixelTest.*
 SyncPassphraseDialogBrowserTest.*
+TabDialogManagerPixelTest.*
 TabGroupEditorBubbleViewDialogBrowserTest.*
 TabGroupShortcutsInteractiveTest.Screenshot*
 TabHoverCardBubbleViewDialogBrowserTest.*

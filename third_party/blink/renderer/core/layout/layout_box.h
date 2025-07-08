@@ -28,6 +28,7 @@
 #include "base/check_op.h"
 #include "base/dcheck_is_on.h"
 #include "base/gtest_prod_util.h"
+#include "base/memory/stack_allocated.h"
 #include "base/notreached.h"
 #include "third_party/blink/public/mojom/scroll/scroll_into_view_params.mojom-blink-forward.h"
 #include "third_party/blink/renderer/core/core_export.h"
@@ -449,7 +450,8 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
   // Returns element-native intrinsic size. Returns kIndefiniteSize if no such
   // size.
   LayoutUnit DefaultIntrinsicContentInlineSize() const;
-  LayoutUnit DefaultIntrinsicContentBlockSize() const;
+  LayoutUnit DefaultIntrinsicContentBlockSize(
+      bool children_have_geometry) const;
 
   // IE extensions. Used to calculate offsetWidth/Height. Overridden by inlines
   // (LayoutFlow) to return the remaining width on a given line (and the height
@@ -668,6 +670,8 @@ class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
 
     // Note: We can't use std::views.  It's banned in Chromium.
     class CORE_EXPORT Iterator {
+      STACK_ALLOCATED();
+
      public:
       using iterator_category = std::forward_iterator_tag;
       using value_type = PhysicalBoxFragment;

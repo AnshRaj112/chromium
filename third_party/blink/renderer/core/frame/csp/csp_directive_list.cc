@@ -52,7 +52,7 @@ String GetRawDirectiveForMessage(
 
 String GetSha256String(const String& content) {
   DigestValue digest;
-  StringUTF8Adaptor utf8_content(content);
+  StringUtf8Adaptor utf8_content(content);
   bool digest_success = ComputeDigest(kHashAlgorithmSha256,
                                       base::as_byte_span(utf8_content), digest);
   if (!digest_success) {
@@ -949,7 +949,7 @@ CSPCheckResult CSPDirectiveListAllowFromSource(
     }
     if (base::FeatureList::IsEnabled(
             network::features::kCSPScriptSrcHashesInV1) &&
-        CheckURLHash(url, directive.source_list)) {
+        CheckURLHash(url_before_redirects, directive.source_list)) {
       return CSPCheckResult::Allowed();
     }
   }
@@ -1123,7 +1123,7 @@ void FillInCSPHashValues(
     return;
   }
 
-  StringUTF8Adaptor utf8_source(source,
+  StringUtf8Adaptor utf8_source(source,
                                 Utf8ConversionMode::kStrictReplacingErrors);
 
   for (const auto& algorithm_map : kAlgorithmMap) {

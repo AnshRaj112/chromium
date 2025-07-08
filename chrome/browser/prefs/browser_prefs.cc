@@ -20,6 +20,7 @@
 #include "chrome/browser/accessibility/invert_bubble_prefs.h"
 #include "chrome/browser/accessibility/page_colors.h"
 #include "chrome/browser/accessibility/prefers_default_scrollbar_styles_prefs.h"
+#include "chrome/browser/actor/ui/actor_ui_state_manager_prefs.h"
 #include "chrome/browser/browser_process_impl.h"
 #include "chrome/browser/chrome_content_browser_client.h"
 #include "chrome/browser/component_updater/component_updater_prefs.h"
@@ -94,7 +95,6 @@
 #include "chrome/browser/ui/webui/policy/policy_ui.h"
 #include "chrome/browser/ui/webui/print_preview/policy_settings.h"
 #include "chrome/browser/updates/announcement_notification/announcement_notification_service.h"
-#include "chrome/browser/user_education/browser_user_education_storage_service.h"
 #include "chrome/browser/webauthn/chrome_authenticator_request_delegate.h"
 #include "chrome/browser/webauthn/webauthn_pref_names.h"
 #include "chrome/common/buildflags.h"
@@ -202,7 +202,6 @@
 #include "extensions/buildflags/buildflags.h"
 #include "net/http/http_server_properties_manager.h"
 #include "pdf/buildflags.h"
-#include "ppapi/buildflags/buildflags.h"
 #include "printing/buildflags/buildflags.h"
 #include "rlz/buildflags/buildflags.h"
 
@@ -317,6 +316,7 @@
 #include "chrome/browser/ui/webui/side_panel/read_anything/read_anything_prefs.h"
 #include "chrome/browser/ui/webui/tab_search/tab_search_prefs.h"
 #include "chrome/browser/upgrade_detector/upgrade_detector.h"
+#include "chrome/browser/user_education/browser_user_education_storage_service.h"
 #include "components/headless/policy/headless_mode_prefs.h"
 #include "components/lens/lens_overlay_permission_utils.h"
 #include "components/live_caption/live_caption_controller.h"
@@ -1018,6 +1018,14 @@ inline constexpr char kLastUsedPairingFromSyncPublicKey[] =
     "webauthn.last_used_pairing_from_sync_public_key";
 inline constexpr char kWebAuthnCablePairingsPrefName[] =
     "webauthn.cablev2_pairings";
+inline constexpr char kSyncedDefaultSearchProviderGUID[] =
+    "default_search_provider.synced_guid";
+
+// Deprecated 07/2025.
+inline constexpr char kFirstSyncCompletedInFullSyncMode[] =
+    "sync.first_full_sync_completed";
+inline constexpr char kGoogleServicesSecondLastSyncingGaiaId[] =
+    "google.services.second_last_gaia_id";
 
 // Register local state used only for migration (clearing or moving to a new
 // key).
@@ -1412,11 +1420,17 @@ void RegisterProfilePrefsForMigration(
   registry->RegisterDictionaryPref(kSharingVapidKey);
   registry->RegisterBooleanPref(kHasSeenWelcomePage, false);
 
-  // Deprecated 06/2025
+  // Deprecated 06/2025.
   registry->RegisterBooleanPref(kStorageGarbageCollect, false);
   registry->RegisterDoublePref(kGaiaCookiePeriodicReportTimeDeprecated, 0);
   registry->RegisterListPref(kWebAuthnCablePairingsPrefName);
   registry->RegisterStringPref(kLastUsedPairingFromSyncPublicKey, "");
+  registry->RegisterStringPref(kSyncedDefaultSearchProviderGUID, std::string());
+
+  // Deprecated 07/2025.
+  registry->RegisterBooleanPref(kFirstSyncCompletedInFullSyncMode, false);
+  registry->RegisterStringPref(kGoogleServicesSecondLastSyncingGaiaId,
+                               std::string());
 }
 
 }  // namespace
@@ -2121,6 +2135,8 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
   tabs::RegisterProfilePrefs(registry);
 
   CertificateManagerPageHandler::RegisterProfilePrefs(registry);
+
+  actor::ui::RegisterProfilePrefs(registry);
 #endif  // !BUILDFLAG(IS_ANDROID)
 
   registry->RegisterBooleanPref(webauthn::pref_names::kAllowWithBrokenCerts,
@@ -2654,6 +2670,11 @@ void MigrateObsoleteProfilePrefs(PrefService* profile_prefs,
   profile_prefs->ClearPref(kGaiaCookiePeriodicReportTimeDeprecated);
   profile_prefs->ClearPref(kWebAuthnCablePairingsPrefName);
   profile_prefs->ClearPref(kLastUsedPairingFromSyncPublicKey);
+  profile_prefs->ClearPref(kSyncedDefaultSearchProviderGUID);
+
+  // Added 07/2025.
+  profile_prefs->ClearPref(kFirstSyncCompletedInFullSyncMode);
+  profile_prefs->ClearPref(kGoogleServicesSecondLastSyncingGaiaId);
 
   // Please don't delete the following line. It is used by PRESUBMIT.py.
   // END_MIGRATE_OBSOLETE_PROFILE_PREFS

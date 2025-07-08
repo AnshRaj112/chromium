@@ -19,26 +19,6 @@
 #import "ios/chrome/common/channel_info.h"
 #import "ui/base/device_form_factor.h"
 
-BASE_FEATURE(kSegmentedDefaultBrowserPromo,
-             "SegmentedDefaultBrowserPromo",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-const char kSegmentedDefaultBrowserExperimentType[] =
-    "SegmentedDefaultBrowserExperimentType";
-
-bool IsSegmentedDefaultBrowserPromoEnabled() {
-  return base::FeatureList::IsEnabled(kSegmentedDefaultBrowserPromo);
-}
-
-SegmentedDefaultBrowserExperimentType
-SegmentedDefaultBrowserExperimentTypeEnabled() {
-  return static_cast<SegmentedDefaultBrowserExperimentType>(
-      base::GetFieldTrialParamByFeatureAsInt(
-          kSegmentedDefaultBrowserPromo, kSegmentedDefaultBrowserExperimentType,
-          /*default_value=*/
-          (int)SegmentedDefaultBrowserExperimentType::kStaticPromo));
-}
-
 BASE_FEATURE(kIOSKeyboardAccessoryUpgradeForIPad,
              "IOSKeyboardAccessoryUpgradeForIPad",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -440,7 +420,7 @@ BASE_FEATURE(kIOSChooseFromDrive,
 
 BASE_FEATURE(kIOSChooseFromDriveSimulatedClick,
              "IOSChooseFromDriveSimulatedClick",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kIOSDownloadNoUIUpdateInBackground,
              "IOSDownloadNoUIUpdateInBackground",
@@ -500,24 +480,13 @@ BASE_FEATURE(kFullscreenImprovement,
              "FullscreenImprovement",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kTabGroupSync, "TabGroupSync", base::FEATURE_ENABLED_BY_DEFAULT);
-
 bool IsTabGroupSyncEnabled() {
-  if (ui::GetDeviceFormFactor() == ui::DEVICE_FORM_FACTOR_TABLET) {
-    return base::FeatureList::IsEnabled(kTabGroupSync);
-  }
   return true;
 }
 
-BASE_FEATURE(kTabGroupIndicator,
-             "TabGroupIndicator",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 bool IsTabGroupIndicatorEnabled() {
-  if (ui::GetDeviceFormFactor() != ui::DEVICE_FORM_FACTOR_TABLET) {
-    return true;
-  }
-  return base::FeatureList::IsEnabled(kTabGroupIndicator);
+  return true;
 }
 
 BASE_FEATURE(kNewSyncOptInIllustration,
@@ -531,6 +500,15 @@ bool IsNewSyncOptInIllustration() {
 BASE_FEATURE(kDisableLensCamera,
              "DisableLensCamera",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kDownloadAutoDeletionClearFilesOnEveryStartup,
+             "DownloadAutoDeletionClearFilesOnEveryStartup",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool isDownloadAutoDeletionTestingFeatureEnabled() {
+  return base::FeatureList::IsEnabled(
+      kDownloadAutoDeletionClearFilesOnEveryStartup);
+}
 
 BASE_FEATURE(kDownloadAutoDeletionFeatureEnabled,
              "DownloadAutoDeletionFeatureEnabled",
@@ -918,6 +896,16 @@ BASE_FEATURE(kSeparateProfilesForManagedAccounts,
              "SeparateProfilesForManagedAccounts",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Feature parameter for kSeparateProfilesForManagedAccountsForceMigration.
+constexpr base::FeatureParam<base::TimeDelta> kMultiProfileMigrationGracePeriod{
+    &kSeparateProfilesForManagedAccountsForceMigration,
+    /*name=*/"MultiProfileMigrationGracePeriod",
+    /*default_value=*/base::Days(90)};
+
+BASE_FEATURE(kSeparateProfilesForManagedAccountsForceMigration,
+             "SeparateProfilesForManagedAccountsForceMigration",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kSeparateProfilesForManagedAccountsKillSwitch,
              "SeparateProfilesForManagedAccountsKillSwitch",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1188,7 +1176,7 @@ constexpr base::FeatureParam<double>
 
 BASE_FEATURE(kIOSOneTapMiniMapRemoveSectionsBreaks,
              "IOSOneTapMiniMapRemoveSectionsBreaks",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kIOSMiniMapUniversalLink,
              "IOSMiniMapUniversalLink",
@@ -1224,7 +1212,7 @@ bool IsNTPBackgroundCustomizationEnabled() {
 
 BASE_FEATURE(kRunDefaultStatusCheck,
              "RunDefaultStatusCheck",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 bool IsRunDefaultStatusCheckEnabled() {
   return base::FeatureList::IsEnabled(kRunDefaultStatusCheck);
@@ -1285,4 +1273,23 @@ bool IsFeedbackIncludeGWSVariationsEnabled() {
 bool IsDefaultBrowserPromoPropensityModelEnabled() {
   return base::FeatureList::IsEnabled(
       segmentation_platform::features::kDefaultBrowserPromoPropensityModel);
+}
+
+BASE_FEATURE(kIOSTrustedVaultNotification,
+             "IOSTrustedVaultNotification",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool IsIOSTrustedVaultNotificationEnabled() {
+  return base::FeatureList::IsEnabled(kIOSTrustedVaultNotification);
+}
+
+BASE_FEATURE(kDiamondPrototype,
+             "DiamondPrototype",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+bool IsDiamondPrototypeEnabled() {
+  if (ui::GetDeviceFormFactor() != ui::DEVICE_FORM_FACTOR_PHONE) {
+    return false;
+  }
+  return base::FeatureList::IsEnabled(kDiamondPrototype);
 }

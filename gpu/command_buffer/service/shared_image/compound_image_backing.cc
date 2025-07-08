@@ -399,6 +399,12 @@ SharedImageUsageSet CompoundImageBacking::GetGpuSharedImageUsage(
     // See: |GetShmSharedImageUsage|
     usage.RemoveAll(SharedImageUsageSet(gpu::SHARED_IMAGE_USAGE_CPU_READ));
   }
+  if (usage.Has(SHARED_IMAGE_USAGE_CPU_WRITE_ONLY)) {
+    // Remove CPU_WRITE usage since it was previously moved to the shmem
+    // backing. See: |GetShmSharedImageUsage|
+    usage.RemoveAll(
+        SharedImageUsageSet(gpu::SHARED_IMAGE_USAGE_CPU_WRITE_ONLY));
+  }
 
   return usage;
 }
@@ -450,7 +456,7 @@ std::unique_ptr<SharedImageBacking> CompoundImageBacking::CreateSharedMemory(
 
   auto buffer_format = ToBufferFormat(format);
   auto handle = GpuMemoryBufferImplSharedMemory::CreateGpuMemoryBuffer(
-      gfx::GpuMemoryBufferId(0), size, buffer_format, buffer_usage);
+      size, buffer_format, buffer_usage);
 
   SharedMemoryRegionWrapper shm_wrapper;
   if (!shm_wrapper.Initialize(handle, size, buffer_format)) {

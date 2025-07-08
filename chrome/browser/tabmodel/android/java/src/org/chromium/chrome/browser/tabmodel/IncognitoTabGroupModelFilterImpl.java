@@ -37,6 +37,33 @@ public class IncognitoTabGroupModelFilterImpl implements TabGroupModelFilterInte
 
     private final ObserverList<TabGroupModelFilterObserver> mObservers = new ObserverList<>();
     private final IncognitoTabModelInternal mIncognitoTabModel;
+    private final TabUngrouper mTabUngrouperProxy =
+            new TabUngrouper() {
+                @Override
+                public void ungroupTabs(
+                        List<Tab> tabs,
+                        boolean trailing,
+                        boolean allowDialog,
+                        @Nullable TabModelActionListener listener) {
+                    if (mCurrentFilter == null) return;
+                    mCurrentFilter
+                            .getTabUngrouper()
+                            .ungroupTabs(tabs, trailing, allowDialog, listener);
+                }
+
+                @Override
+                public void ungroupTabGroup(
+                        Token tabGroupId,
+                        boolean trailing,
+                        boolean allowDialog,
+                        @Nullable TabModelActionListener listener) {
+                    if (mCurrentFilter == null) return;
+                    mCurrentFilter
+                            .getTabUngrouper()
+                            .ungroupTabGroup(tabGroupId, trailing, allowDialog, listener);
+                }
+            };
+
     private @Nullable TabGroupModelFilterInternal mCurrentFilter;
 
     public IncognitoTabGroupModelFilterImpl(IncognitoTabModelInternal incognitoTabModel) {
@@ -176,12 +203,6 @@ public class IncognitoTabGroupModelFilterImpl implements TabGroupModelFilterInte
     }
 
     @Override
-    public @Nullable Token getTabGroupIdFromRootId(@TabId int rootId) {
-        if (mCurrentFilter == null) return null;
-        return mCurrentFilter.getTabGroupIdFromRootId(rootId);
-    }
-
-    @Override
     public List<Tab> getRelatedTabList(@TabId int tabId) {
         if (mCurrentFilter == null) return Collections.emptyList();
         return mCurrentFilter.getRelatedTabList(tabId);
@@ -263,8 +284,7 @@ public class IncognitoTabGroupModelFilterImpl implements TabGroupModelFilterInte
 
     @Override
     public TabUngrouper getTabUngrouper() {
-        if (mCurrentFilter == null) return new EmptyTabUngrouper();
-        return mCurrentFilter.getTabUngrouper();
+        return mTabUngrouperProxy;
     }
 
     @Override

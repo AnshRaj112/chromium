@@ -38,10 +38,6 @@ BASE_FEATURE(kBundledSecuritySettings,
              "BundledSecuritySettings",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kClientSideDetectionAcceptHCAllowlist,
-             "ClientSideDetectionAcceptHCAllowlist",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kClientSideDetectionBrandAndIntentForScamDetection,
              "ClientSideDetectionBrandAndIntentForScamDetection",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -155,7 +151,7 @@ BASE_FEATURE(kEnhancedSafeBrowsingPromo,
 
 BASE_FEATURE(kEnterpriseFileSystemAccessDeepScan,
              "EnterpriseFileSystemAccessDeepScan",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEnterprisePasswordReuseUiRefresh,
              "EnterprisePasswordReuseUiRefresh",
@@ -181,17 +177,12 @@ BASE_FEATURE(kExtensionTelemetryFileDataForCommandLineExtensions,
              "SafeBrowsingExtensionTelemetryFileDataForCommandLineExtensions",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kExtensionTelemetryForEnterprise,
-             "SafeBrowsingExtensionTelemetryForEnterprise",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-constexpr base::FeatureParam<int>
-    kExtensionTelemetryEnterpriseReportingIntervalSeconds{
-        &kExtensionTelemetryForEnterprise, "EnterpriseReportingIntervalSeconds",
-        /*default_value=*/300};
-
 BASE_FEATURE(kExternalAppRedirectTelemetry,
              "SafeBrowsingExternalAppRedirectTelemetry",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kGlobalCacheListForGatingNotificationProtections,
+             "GlobalCacheListForGatingNotificationProtections",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGoogleStandardDeviceBoundSessionCredentials,
@@ -358,7 +349,6 @@ base::Value::List GetFeatureStatusList() {
       &kEnhancedSafeBrowsingPromo,
       &kEnterprisePasswordReuseUiRefresh,
       &kExtensionTelemetryDeclarativeNetRequestActionSignal,
-      &kExtensionTelemetryForEnterprise,
       &kExternalAppRedirectTelemetry,
       &kHashPrefixRealTimeLookups,
       &kLocalIpAddressInEvents,

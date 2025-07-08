@@ -27,6 +27,7 @@ import org.chromium.chrome.browser.flags.ChromeFeatureList;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabCreationState;
+import org.chromium.chrome.browser.tab.TabId;
 import org.chromium.chrome.browser.tab.TabLaunchType;
 import org.chromium.chrome.browser.tab.TabStateAttributes;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncFeatures;
@@ -173,7 +174,7 @@ public class TabGroupModelFilterImpl implements TabGroupModelFilterInternal, Tab
     }
 
     @Override
-    public void moveRelatedTabs(int id, int newIndex) {
+    public void moveRelatedTabs(@TabId int id, int newIndex) {
         List<Tab> tabs = getRelatedTabList(id);
         TabModel tabModel = getTabModel();
         newIndex = MathUtils.clamp(newIndex, 0, tabModel.getCount());
@@ -187,12 +188,13 @@ public class TabGroupModelFilterImpl implements TabGroupModelFilterInternal, Tab
             observer.willMoveTabGroup(curIndex, newIndex);
         }
 
+        int offset = 0;
         for (Tab tab : tabs) {
             if (tabModel.indexOf(tab) == -1) {
                 assert false : "Tried to move a tab from another model!";
                 continue;
             }
-            tabModel.moveTab(tab.getId(), newIndex >= curIndex ? newIndex : newIndex++);
+            tabModel.moveTab(tab.getId(), newIndex >= curIndex ? newIndex : newIndex + offset++);
         }
     }
 
@@ -506,6 +508,8 @@ public class TabGroupModelFilterImpl implements TabGroupModelFilterInternal, Tab
     public void moveTabOutOfGroupInDirection(int sourceTabId, boolean trailing) {
         TabModel tabModel = getTabModel();
         Tab sourceTab = tabModel.getTabByIdChecked(sourceTabId);
+        if (sourceTab.getTabGroupId() == null) return;
+
         int sourceIndex = tabModel.indexOf(sourceTab);
         int oldRootId = sourceTab.getRootId();
         TabGroup sourceTabGroup = assumeNonNull(mRootIdToGroupMap.get(oldRootId));
@@ -1403,16 +1407,18 @@ public class TabGroupModelFilterImpl implements TabGroupModelFilterInternal, Tab
     @Override
     public void setTabGroupTitle(int rootId, @Nullable String title) {
         TabGroupTitleUtils.storeTabGroupTitle(rootId, title);
+        Token tabGroupId = getTabGroupIdFromRootId(rootId);
         for (TabGroupModelFilterObserver observer : mGroupFilterObserver) {
-            observer.didChangeTabGroupTitle(rootId, title);
+            observer.didChangeTabGroupTitle(rootId, tabGroupId, title);
         }
     }
 
     @Override
     public void deleteTabGroupTitle(int rootId) {
         TabGroupTitleUtils.deleteTabGroupTitle(rootId);
+        Token tabGroupId = getTabGroupIdFromRootId(rootId);
         for (TabGroupModelFilterObserver observer : mGroupFilterObserver) {
-            observer.didChangeTabGroupTitle(rootId, null);
+            observer.didChangeTabGroupTitle(rootId, tabGroupId, null);
         }
     }
 
@@ -1431,33 +1437,37 @@ public class TabGroupModelFilterImpl implements TabGroupModelFilterInternal, Tab
     @Override
     public void setTabGroupColor(int rootId, @TabGroupColorId int color) {
         TabGroupColorUtils.storeTabGroupColor(rootId, color);
+        Token tabGroupId = getTabGroupIdFromRootId(rootId);
         for (TabGroupModelFilterObserver observer : mGroupFilterObserver) {
-            observer.didChangeTabGroupColor(rootId, color);
+            observer.didChangeTabGroupColor(rootId, tabGroupId, color);
         }
     }
 
     @Override
     public void deleteTabGroupColor(int rootId) {
         TabGroupColorUtils.deleteTabGroupColor(rootId);
+        Token tabGroupId = getTabGroupIdFromRootId(rootId);
         for (TabGroupModelFilterObserver observer : mGroupFilterObserver) {
-            observer.didChangeTabGroupColor(rootId, TabGroupColorId.GREY);
+            observer.didChangeTabGroupColor(rootId, tabGroupId, TabGroupColorId.GREY);
         }
     }
 
     @Override
     public void setTabGroupCollapsed(int rootId, boolean isCollapsed, boolean animate) {
         TabGroupCollapsedUtils.storeTabGroupCollapsed(rootId, isCollapsed);
+        Token tabGroupId = getTabGroupIdFromRootId(rootId);
         for (TabGroupModelFilterObserver observer : mGroupFilterObserver) {
-            observer.didChangeTabGroupCollapsed(rootId, isCollapsed, animate);
+            observer.didChangeTabGroupCollapsed(rootId, tabGroupId, isCollapsed, animate);
         }
     }
 
     @Override
     public void deleteTabGroupCollapsed(int rootId) {
         TabGroupCollapsedUtils.deleteTabGroupCollapsed(rootId);
+        Token tabGroupId = getTabGroupIdFromRootId(rootId);
         for (TabGroupModelFilterObserver observer : mGroupFilterObserver) {
             observer.didChangeTabGroupCollapsed(
-                    rootId, /* isCollapsed= */ false, /* animate= */ false);
+                    rootId, tabGroupId, /* isCollapsed= */ false, /* animate= */ false);
         }
     }
 
@@ -1479,8 +1489,7 @@ public class TabGroupModelFilterImpl implements TabGroupModelFilterInternal, Tab
         return mGroupIdToRootIdMap.getOrDefault(stableId, Tab.INVALID_TAB_ID);
     }
 
-    @Override
-    public @Nullable Token getTabGroupIdFromRootId(int rootId) {
+    private @Nullable Token getTabGroupIdFromRootId(int rootId) {
         TabGroup tabGroup = mRootIdToGroupMap.get(rootId);
         if (tabGroup == null) return null;
 

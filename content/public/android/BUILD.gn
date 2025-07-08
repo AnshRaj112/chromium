@@ -436,7 +436,10 @@ android_library("content_full_java") {
   ]
 
   if (enable_screen_capture) {
-    sources += [ "java/src/org/chromium/content_public/browser/media/capture/ScreenCapture.java" ]
+    sources += [
+      "java/src/org/chromium/content_public/browser/media/capture/ImageHandler.java",
+      "java/src/org/chromium/content_public/browser/media/capture/ScreenCapture.java",
+    ]
     deps += [ "//third_party/androidx:androidx_activity_activity_java" ]
   }
 
@@ -737,6 +740,7 @@ robolectric_binary("content_junit_tests") {
     "junit/src/org/chromium/content/browser/webcontents/WebContentsImplTest.java",
     "junit/src/org/chromium/content/browser/webcontents/WebContentsObserverProxyTest.java",
     "junit/src/org/chromium/content_public/browser/MessagePayloadTest.java",
+    "junit/src/org/chromium/content_public/browser/media/capture/ImageHandlerTest.java",
   ]
 
   deps = [

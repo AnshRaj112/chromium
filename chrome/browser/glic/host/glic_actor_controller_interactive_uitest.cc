@@ -12,6 +12,8 @@
 #include "base/test/bind.h"
 #include "base/test/protobuf_matchers.h"
 #include "base/test/scoped_feature_list.h"
+#include "chrome/browser/actor/actor_keyed_service.h"
+#include "chrome/browser/actor/actor_task.h"
 #include "chrome/browser/actor/actor_test_util.h"
 #include "chrome/browser/actor/execution_engine.h"
 #include "chrome/browser/devtools/devtools_window_testing.h"
@@ -70,6 +72,11 @@ class GlicActorControllerUiTest : public test::InteractiveGlicTest {
     // Add rule for resolving cross origin host names.
     InteractiveGlicTest::SetUpOnMainThread();
     host_resolver()->AddRule("*", "127.0.0.1");
+  }
+
+  const actor::ActorTask* GetActorTask() {
+    auto* actor_service = actor::ActorKeyedService::Get(browser()->profile());
+    return actor_service->GetTask(task_id_);
   }
 
   // Executes a BrowserAction and verifies it succeeds. Optionally takes an
@@ -166,10 +173,15 @@ class GlicActorControllerUiTest : public test::InteractiveGlicTest {
   auto StartActorTaskInNewTab(const GURL& task_url,
                               ui::ElementIdentifier new_tab_id) {
     BrowserAction start_navigate = actor::MakeNavigate(task_url.spec());
-
     return Steps(InstrumentNextTab(new_tab_id),
                  ExecuteAction(start_navigate, AnnotationsOnlyContextOptions()),
-                 WaitForWebContentsReady(new_tab_id, task_url));
+                 WaitForWebContentsReady(new_tab_id, task_url), Do([this]() {
+                   auto* actor_service =
+                       actor::ActorKeyedService::Get(browser()->profile());
+                   actor::ActorTask* task = actor_service->GetMostRecentTask();
+                   CHECK(task);
+                   task_id_ = task->id();
+                 }));
   }
 
   // After invoking APIs that don't return promises, we round trip to both the
@@ -191,6 +203,8 @@ class GlicActorControllerUiTest : public test::InteractiveGlicTest {
   }
 
   // Stops a running task by calling the glic StopActorTask API.
+  // TODO(crbug.com/411462297): This needs to use the correct task_id but the
+  // implementation of stopActorTask currently ignores the argument.
   auto StopActorTask() {
     return Steps(InAnyContext(WithElement(
                      kGlicContentsElementId,
@@ -376,13 +390,8 @@ class GlicActorControllerUiTest : public test::InteractiveGlicTest {
   // Check ExecutionEngine caches the last apc observation.
   auto CheckExecutionEngineHasAnnotatedPageContentCache() {
     return Steps(Do([&]() {
-      GlicKeyedService* glic_service =
-          GlicKeyedServiceFactory::GetGlicKeyedService(browser()->GetProfile());
-      ASSERT_TRUE(glic_service);
-
       const AnnotatedPageContent& cached_apc =
-          *glic_service->GetExecutionEngineForTesting(/*tab=*/nullptr)
-               .GetLastObservedPageContent();
+          *GetActorTask()->GetExecutionEngine()->GetLastObservedPageContent();
       EXPECT_THAT(*annotated_page_content_, EqualsProto(cached_apc));
     }));
   }
@@ -425,6 +434,7 @@ class GlicActorControllerUiTest : public test::InteractiveGlicTest {
     NOTREACHED() << "Label [" << label << "] not found in page.";
   }
 
+  actor::TaskId task_id_;
   base::test::ScopedFeatureList scoped_feature_list_;
   std::unique_ptr<AnnotatedPageContent> annotated_page_content_;
 };

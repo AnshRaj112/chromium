@@ -396,7 +396,8 @@ bool AreValidRegisterProtocolHandlerArguments(
     return false;
   }
 
-  blink::URLSyntaxErrorCode code = blink::IsValidCustomHandlerURLSyntax(url);
+  blink::URLSyntaxErrorCode code =
+      blink::IsValidCustomHandlerURLSyntax(url, security_level);
   if (code != blink::URLSyntaxErrorCode::kNoError) {
     return false;
   }
@@ -1397,7 +1398,9 @@ WebContentsImpl::WebContentsImpl(BrowserContext* browser_context)
       is_overlay_content_(false),
       showing_context_menu_(false),
       prerender_host_registry_(std::make_unique<PrerenderHostRegistry>(*this)),
-      compositor_frame_sink_grouping_id_(base::UnguessableToken::Create()) {
+      compositor_frame_sink_grouping_id_(base::UnguessableToken::Create()),
+      fenced_frame_viewport_observer_(
+          std::make_unique<FencedFrameViewportObserver>(this)) {
   TRACE_EVENT0("content", "WebContentsImpl::WebContentsImpl");
   WebContentsOfBrowserContext::Attach(*this);
   node_.SetFocusedFrameTree(&primary_frame_tree_);
@@ -3621,8 +3624,6 @@ const blink::web_pref::WebPreferences WebContentsImpl::ComputeWebPreferences(
                          !command_line.HasSwitch(switches::kDisableWebGL) &&
                          !command_line.HasSwitch(switches::kDisableWebGL2);
 
-  prefs.pepper_3d_enabled = !command_line.HasSwitch(switches::kDisablePepper3d);
-
   prefs.allow_file_access_from_file_urls =
       command_line.HasSwitch(switches::kAllowFileAccessFromFiles);
 
@@ -3780,10 +3781,6 @@ const blink::web_pref::WebPreferences WebContentsImpl::ComputeWebPreferences(
 
 #if BUILDFLAG(IS_ANDROID)
   prefs.device_scale_adjustment = GetDeviceScaleAdjustment(min_width_in_dp);
-
-  if (base::FeatureList::IsEnabled(blink::features::kForceOffTextAutosizing)) {
-    prefs.text_autosizing_enabled = false;
-  }
 #endif  // BUILDFLAG(IS_ANDROID)
 
   // GuestViews in the same StoragePartition need to find each other's frames.
@@ -4957,11 +4954,9 @@ blink::mojom::DisplayMode WebContentsImpl::GetDisplayMode() const {
 void WebContentsImpl::RequestToLockPointer(
     RenderWidgetHostImpl* render_widget_host,
     bool user_gesture,
-    bool last_unlocked_by_target,
-    bool privileged) {
-  OPTIONAL_TRACE_EVENT2("content", "WebContentsImpl::RequestPointerLock",
-                        "render_widget_host", render_widget_host, "privileged",
-                        privileged);
+    bool last_unlocked_by_target) {
+  OPTIONAL_TRACE_EVENT1("content", "WebContentsImpl::RequestPointerLock",
+                        "render_widget_host", render_widget_host);
   if (render_widget_host->frame_tree()->is_fenced_frame()) {
     // The renderer should have checked and disallowed the request for fenced
     // frames in PointerLockController and dispatched pointerlockerror. Ignore
@@ -4977,14 +4972,6 @@ void WebContentsImpl::RequestToLockPointer(
           blink::mojom::PointerLockResult::kAlreadyLocked);
       return;
     }
-  }
-
-  if (privileged) {
-    DCHECK(!GetOuterWebContents());
-    pointer_lock_widget_ = render_widget_host;
-    render_widget_host->GotResponseToPointerLockRequest(
-        blink::mojom::PointerLockResult::kSuccess);
-    return;
   }
 
   bool widget_in_frame_tree = false;
@@ -9453,9 +9440,8 @@ void WebContentsImpl::RecursivelyConstructAXTree(
     std::vector<ui::AXNodeData>& nodes) {
   nodes.push_back(node->data());
 
-  for (auto iter = node->AllChildrenBegin(); iter != node->AllChildrenEnd();
-       ++iter) {
-    RecursivelyConstructAXTree(&(*iter), nodes);
+  for (ui::AXNode* child : node->GetAllChildren()) {
+    RecursivelyConstructAXTree(child, nodes);
   }
 }
 
@@ -11989,7 +11975,8 @@ std::unique_ptr<PrerenderHandle> WebContentsImpl::StartPrerendering(
                                  const std::optional<UrlMatchType>&)>
         url_match_predicate,
     base::RepeatingCallback<void(NavigationHandle&)>
-        prerender_navigation_handle_callback) {
+        prerender_navigation_handle_callback,
+    bool allow_reuse) {
   PrerenderAttributes attributes(
       prerendering_url, trigger_type, embedder_histogram_suffix,
       /*speculation_rules_params=*/std::nullopt, content::Referrer(),
@@ -11999,7 +11986,8 @@ std::unique_ptr<PrerenderHandle> WebContentsImpl::StartPrerendering(
       std::move(url_match_predicate),
       std::move(prerender_navigation_handle_callback),
       base::WrapRefCounted(
-          static_cast<PreloadPipelineInfoImpl*>(preload_pipeline_info.get())));
+          static_cast<PreloadPipelineInfoImpl*>(preload_pipeline_info.get())),
+      allow_reuse);
 #if BUILDFLAG(IS_ANDROID)
   attributes.additional_headers = std::move(additional_headers);
 #else

@@ -50,11 +50,6 @@ BASE_FEATURE(kBlinkExtensionKiosk,
              "BlinkExtensionKiosk",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enables handling of key press event in background.
-BASE_FEATURE(kCrosAppsBackgroundEventHandling,
-             "CrosAppsBackgroundEventHandling",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // Enables the use of cros-component UI elements. Contact:
 // cros-jellybean-team@google.com.
 BASE_FEATURE(kCrosComponents,
@@ -150,7 +145,7 @@ BASE_FEATURE(kFeatureManagementMahi,
 // Does nothing if "Mahi" and "FeatureManagementMahi" are disabled.
 BASE_FEATURE(kMahiPanelResizable,
              "MahiPanelResizable",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls whether mahi sends url when making request to the server.
 BASE_FEATURE(kMahiSendingUrl,
@@ -166,12 +161,12 @@ BASE_FEATURE(kMahiDebugging,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Controls enabling / disabling the pompano feature.
-BASE_FEATURE(kPompano, "Pompano", base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kPompano, "Pompano", base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls enabling / disabling the summary of selected text feature.
 BASE_FEATURE(kMahiSummarizeSelected,
              "MahiSummarizeSelected",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls whether NotebookLM is preinstalled.
 BASE_FEATURE(kNotebookLmAppPreinstall,

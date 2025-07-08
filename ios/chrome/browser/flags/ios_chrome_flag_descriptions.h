@@ -100,9 +100,6 @@ extern const char kAutofillIsolatedWorldForJavascriptIOSDescription[];
 extern const char kAutofillPaymentsSheetV2Name[];
 extern const char kAutofillPaymentsSheetV2Description[];
 
-extern const char kPasswordSuggestionBottomSheetV2Name[];
-extern const char kPasswordSuggestionBottomSheetV2Description[];
-
 extern const char kAutofillLocalSaveCardBottomSheetName[];
 extern const char kAutofillLocalSaveCardBottomSheetDescription[];
 
@@ -117,9 +114,6 @@ extern const char kAutofillSaveCardBottomSheetDescription[];
 
 extern const char kAutofillShowManualFillForVirtualCardsName[];
 extern const char kAutofillShowManualFillForVirtualCardsDescription[];
-
-extern const char kAutofillStickyInfobarName[];
-extern const char kAutofillStickyInfobarDescription[];
 
 extern const char kAutofillThrottleDocumentFormScanName[];
 extern const char kAutofillThrottleDocumentFormScanDescription[];
@@ -226,6 +220,12 @@ extern const char kDataSharingDebugLogsDescription[];
 extern const char kDataSharingJoinOnlyName[];
 extern const char kDataSharingJoinOnlyDescription[];
 
+// Data Sharing versioning test scenarios.
+extern const char kDataSharingVersioningStatesName[];
+extern const char kDataSharingVersioningStatesDescription[];
+extern const char kDataSharingSharedDataTypesEnabled[];
+extern const char kDataSharingSharedDataTypesEnabledWithUi[];
+
 extern const char kDefaultBrowserBannerPromoName[];
 extern const char kDefaultBrowserBannerPromoDescription[];
 
@@ -240,6 +240,9 @@ extern const char kDeprecateFeedHeaderExperimentDescription[];
 
 extern const char kDetectMainThreadFreezeName[];
 extern const char kDetectMainThreadFreezeDescription[];
+
+extern const char kDownloadAutoDeletionClearFilesOnEveryStartupName[];
+extern const char kDownloadAutoDeletionClearFilesOnEveryStartupDescription[];
 
 extern const char kDownloadAutoDeletionName[];
 extern const char kDownloadAutoDeletionDescription[];
@@ -258,6 +261,9 @@ extern const char kEnableFeedCardMenuSignInPromoDescription[];
 
 extern const char kEnableTraitCollectionRegistrationName[];
 extern const char kEnableTraitCollectionRegistrationDescription[];
+
+extern const char kDiamondPrototypeName[];
+extern const char kDiamondPrototypeDescription[];
 
 extern const char kDisableAutofillStrikeSystemName[];
 extern const char kDisableAutofillStrikeSystemDescription[];
@@ -279,6 +285,13 @@ extern const char kEnableDiscoverFeedDiscoFeedEndpointDescription[];
 
 extern const char kEnableFeedAblationName[];
 extern const char kEnableFeedAblationDescription[];
+
+extern const char kEnableFingerprintingProtectionBlocklistName[];
+extern const char kEnableFingerprintingProtectionBlocklistDescription[];
+
+extern const char kEnableFingerprintingProtectionBlocklistInIncognitoName[];
+extern const char
+    kEnableFingerprintingProtectionBlocklistInIncognitoDescription[];
 
 extern const char kEnableiPadFeedGhostCardsName[];
 extern const char kEnableiPadFeedGhostCardsDescription[];
@@ -399,6 +412,9 @@ extern const char kIOSPasswordBottomSheetAutofocusDescription[];
 
 extern const char kIOSProactivePasswordGenerationBottomSheetName[];
 extern const char kIOSProactivePasswordGenerationBottomSheetDescription[];
+
+extern const char kIOSTrustedVaultNotificationName[];
+extern const char kIOSTrustedVaultNotificationDescription[];
 
 extern const char kInvalidateSearchEngineChoiceOnDeviceRestoreDetectionName[];
 extern const char
@@ -741,6 +757,12 @@ extern const char kReaderModeDebugInfoDescription[];
 extern const char kReaderModePageEligibilityHeuristicName[];
 extern const char kReaderModePageEligibilityHeuristicDescription[];
 
+extern const char kReaderModeReadabilityHeuristicName[];
+extern const char kReaderModeReadabilityHeuristicDescription[];
+
+extern const char kReaderModeReadabilityDistillerName[];
+extern const char kReaderModeReadabilityDistillerDescription[];
+
 // Title and description for the flag to refactor the toolbarsSize.
 extern const char kRefactorToolbarsSizeName[];
 extern const char kRefactorToolbarsSizeDescription[];
@@ -784,9 +806,6 @@ extern const char
 
 extern const char kSegmentationPlatformTipsEphemeralCardName[];
 extern const char kSegmentationPlatformTipsEphemeralCardDescription[];
-
-extern const char kSegmentedDefaultBrowserPromoName[];
-extern const char kSegmentedDefaultBrowserPromoDescription[];
 
 extern const char kSendTabToSelfIOSPushNotificationsName[];
 extern const char kSendTabToSelfIOSPushNotificationsDescription[];
@@ -859,6 +878,9 @@ extern const char kTabGroupIndicatorDescription[];
 
 extern const char kTabGroupSyncName[];
 extern const char kTabGroupSyncDescription[];
+
+extern const char kTaiyakiName[];
+extern const char kTaiyakiDescription[];
 
 extern const char kTFLiteLanguageDetectionName[];
 extern const char kTFLiteLanguageDetectionDescription[];

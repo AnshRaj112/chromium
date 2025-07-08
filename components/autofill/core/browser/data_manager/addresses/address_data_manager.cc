@@ -194,28 +194,9 @@ std::vector<const AutofillProfile*> AddressDataManager::GetProfilesByRecordType(
 std::vector<const AutofillProfile*> AddressDataManager::GetProfilesToSuggest()
     const {
   if (!IsAutofillProfileEnabled()) {
-    return std::vector<const AutofillProfile*>{};
+    return {};
   }
-  DenseSet<AutofillProfile::RecordType> kHomeAndWorkRecordTypes = {
-      AutofillProfile::RecordType::kAccountHome,
-      AutofillProfile::RecordType::kAccountWork};
-  auto record_types = DenseSet<AutofillProfile::RecordType>::all();
-  record_types.erase_all(kHomeAndWorkRecordTypes);
-  std::vector<const AutofillProfile*> profiles =
-      GetProfilesByRecordType(record_types, ProfileOrder::kHighestFrecencyDesc);
-  if (!base::FeatureList::IsEnabled(
-          features::kAutofillEnableSupportForHomeAndWork)) {
-    return profiles;
-  }
-  // H/W are always ranked last, with Home above Work.
-  static_assert(AutofillProfile::RecordType::kAccountHome <
-                AutofillProfile::RecordType::kAccountWork);
-  for (AutofillProfile::RecordType record_type : kHomeAndWorkRecordTypes) {
-    std::vector<const AutofillProfile*> profile =
-        GetProfilesByRecordType(record_type);
-    profiles.insert(profiles.end(), profile.begin(), profile.end());
-  }
-  return profiles;
+  return GetProfiles(ProfileOrder::kHighestFrecencyDesc);
 }
 
 std::vector<const AutofillProfile*> AddressDataManager::GetProfilesForSettings()
@@ -823,7 +804,8 @@ void AddressDataManager::RemoveProfileImpl(const std::string& guid,
 
   ongoing_profile_changes_[guid].emplace_back(
       AutofillProfileChange(
-          profile->IsAccountProfile() && is_deduplication_initiated
+          (profile->IsAccountProfile() && is_deduplication_initiated) ||
+                  profile->IsHomeAndWorkProfile()
               ? AutofillProfileChange::HIDE_IN_AUTOFILL
               : AutofillProfileChange::REMOVE,
           guid, *profile),

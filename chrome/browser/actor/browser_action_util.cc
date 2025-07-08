@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "base/notimplemented.h"
+#include "chrome/browser/actor/shared_types.h"
 #include "chrome/browser/actor/tools/click_tool_request.h"
 #include "chrome/browser/actor/tools/drag_and_release_tool_request.h"
 #include "chrome/browser/actor/tools/history_tool_request.h"
@@ -68,28 +69,26 @@ TabHandle GetTabHandle(const T& action, TabInterface* deprecated_fallback_tab) {
   return tab_handle;
 }
 
-std::optional<PageToolRequest::Target> ToPageToolTarget(
+std::optional<PageTarget> ToPageTarget(
     const optimization_guide::proto::ActionTarget& target) {
   // A valid target must have either a coordinate or a
   // document_identifier-dom_node_id pair.
   if (target.has_coordinate()) {
-    return PageToolRequest::Target(
+    return PageTarget(
         gfx::Point(target.coordinate().x(), target.coordinate().y()));
   } else {
     if (!target.has_content_node_id() || !target.has_document_identifier()) {
       return std::nullopt;
     }
-    return PageToolRequest::Target(
-        {target.content_node_id(),
-         target.document_identifier().serialized_token()});
+    return PageTarget(
+        DomNode{.node_id = target.content_node_id(),
+                .document_identifier =
+                    target.document_identifier().serialized_token()});
   }
 }
 std::unique_ptr<ToolRequest> CreateClickRequest(
     const ClickAction& action,
     TabInterface* deprecated_fallback_tab) {
-  using ClickCount = ClickToolRequest::ClickCount;
-  using ClickType = ClickToolRequest::ClickType;
-
   TabHandle tab_handle = GetTabHandle(action, deprecated_fallback_tab);
 
   if (!action.has_target() || !action.has_click_count() ||
@@ -97,13 +96,13 @@ std::unique_ptr<ToolRequest> CreateClickRequest(
     return nullptr;
   }
 
-  ClickCount count;
+  MouseClickCount count;
   switch (action.click_count()) {
     case apc::ClickAction_ClickCount_SINGLE:
-      count = ClickCount::kSingle;
+      count = MouseClickCount::kSingle;
       break;
     case apc::ClickAction_ClickCount_DOUBLE:
-      count = ClickCount::kDouble;
+      count = MouseClickCount::kDouble;
       break;
     case apc::ClickAction_ClickCount_UNKNOWN_CLICK_COUNT:
     case apc::
@@ -111,17 +110,17 @@ std::unique_ptr<ToolRequest> CreateClickRequest(
     case apc::
         ClickAction_ClickCount_ClickAction_ClickCount_INT_MAX_SENTINEL_DO_NOT_USE_:
       // TODO(crbug.com/412700289): Revert once this is set.
-      count = ClickCount::kSingle;
+      count = MouseClickCount::kSingle;
       break;
   }
 
-  ClickType type;
+  MouseClickType type;
   switch (action.click_type()) {
     case apc::ClickAction_ClickType_LEFT:
-      type = ClickType::kLeft;
+      type = MouseClickType::kLeft;
       break;
     case apc::ClickAction_ClickType_RIGHT:
-      type = ClickType::kRight;
+      type = MouseClickType::kRight;
       break;
     case apc::
         ClickAction_ClickType_ClickAction_ClickType_INT_MIN_SENTINEL_DO_NOT_USE_:
@@ -129,11 +128,11 @@ std::unique_ptr<ToolRequest> CreateClickRequest(
         ClickAction_ClickType_ClickAction_ClickType_INT_MAX_SENTINEL_DO_NOT_USE_:
     case apc::ClickAction_ClickType_UNKNOWN_CLICK_TYPE:
       // TODO(crbug.com/412700289): Revert once this is set.
-      type = ClickType::kLeft;
+      type = MouseClickType::kLeft;
       break;
   }
 
-  auto target = ToPageToolTarget(action.target());
+  auto target = ToPageTarget(action.target());
   if (!target.has_value()) {
     return nullptr;
   }
@@ -175,7 +174,7 @@ std::unique_ptr<ToolRequest> CreateTypeRequest(
       break;
   }
 
-  auto target = ToPageToolTarget(action.target());
+  auto target = ToPageTarget(action.target());
   if (!target.has_value()) {
     return nullptr;
   }
@@ -196,9 +195,9 @@ std::unique_ptr<ToolRequest> CreateScrollRequest(
     return nullptr;
   }
 
-  std::optional<PageToolRequest::Target> target;
+  std::optional<PageTarget> target;
   if (action.has_target()) {
-    target = ToPageToolTarget(action.target());
+    target = ToPageTarget(action.target());
   } else {
     // Scroll action may omit a target which means "target the viewport".
     TabInterface* tab = tab_handle.Get();
@@ -210,8 +209,9 @@ std::unique_ptr<ToolRequest> CreateScrollRequest(
             tab->GetContents()->GetPrimaryMainFrame())
             ->serialized_token();
 
-    target.emplace(PageToolRequest::Target(
-        {/*dom_node_id=*/kRootElementDomNodeId, document_identifier}));
+    target.emplace(
+        PageTarget(DomNode{.node_id = kRootElementDomNodeId,
+                           .document_identifier = document_identifier}));
   }
 
   if (!target) {
@@ -254,7 +254,7 @@ std::unique_ptr<ToolRequest> CreateMoveMouseRequest(
     return nullptr;
   }
 
-  auto target = ToPageToolTarget(action.target());
+  auto target = ToPageTarget(action.target());
   if (!target.has_value()) {
     return nullptr;
   }
@@ -272,12 +272,12 @@ std::unique_ptr<ToolRequest> CreateDragAndReleaseRequest(
     return nullptr;
   }
 
-  auto from_target = ToPageToolTarget(action.from_target());
+  auto from_target = ToPageTarget(action.from_target());
   if (!from_target.has_value()) {
     return nullptr;
   }
 
-  auto to_target = ToPageToolTarget(action.to_target());
+  auto to_target = ToPageTarget(action.to_target());
   if (!to_target.has_value()) {
     return nullptr;
   }
@@ -295,7 +295,7 @@ std::unique_ptr<ToolRequest> CreateSelectRequest(
     return nullptr;
   }
 
-  auto target = ToPageToolTarget(action.target());
+  auto target = ToPageTarget(action.target());
   if (!target.has_value()) {
     return nullptr;
   }
@@ -467,6 +467,9 @@ std::unique_ptr<ToolRequest> CreateToolRequest(
       break;
     case optimization_guide::proto::Action::ACTION_NOT_SET:
       ACTOR_LOG() << "Action Type Not Set!";
+      break;
+    default:
+      NOTIMPLEMENTED();
       break;
   }
 

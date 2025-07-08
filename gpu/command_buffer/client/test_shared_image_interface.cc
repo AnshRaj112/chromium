@@ -53,7 +53,6 @@ gfx::GpuMemoryBufferHandle CreateGMBHandle(
     const gfx::BufferFormat& buffer_format,
     const gfx::Size& size,
     gfx::BufferUsage buffer_usage) {
-  static int last_handle_id = 0;
   size_t buffer_size = 0u;
   CHECK(
       gfx::BufferSizeForBufferFormatChecked(size, buffer_format, &buffer_size));
@@ -62,7 +61,6 @@ gfx::GpuMemoryBufferHandle CreateGMBHandle(
   CHECK(shared_memory_region.IsValid());
 
   gfx::GpuMemoryBufferHandle handle(std::move(shared_memory_region));
-  handle.id = gfx::GpuMemoryBufferId(last_handle_id++);
   handle.offset = 0;
   handle.stride = static_cast<uint32_t>(
       gfx::RowSizeForBufferFormat(size.width(), buffer_format, 0));
@@ -434,22 +432,12 @@ void TestSharedImageInterface::WaitSyncToken(const SyncToken& sync_token) {
 }
 
 scoped_refptr<ClientSharedImage>
-TestSharedImageInterface::CreateSharedImageWithMapCallbackController(
+TestSharedImageInterface::CreateSharedImageWithAsyncMapControl(
     const SharedImageInfo& si_info,
     gfx::BufferUsage buffer_usage,
     bool premapped,
-    FakeGpuMemoryBuffer::MapCallbackController* controller) {
-  CHECK(controller);
-
-  // Create a FakeGpuMemoryBuffer.
-  auto buffer_format =
-      viz::SharedImageFormatToBufferFormatRestrictedUtils::ToBufferFormat(
-          si_info.meta.format);
-  auto fake_gmb = std::make_unique<FakeGpuMemoryBuffer>(
-      si_info.meta.size, buffer_format, premapped, controller);
-
+    const ClientSharedImage::AsyncMapInvokedCallback& callback) {
   Mailbox mailbox;
-  // Create a ClientSharedImage with a FakeGpuMemoryBuffer.
   {
     base::AutoLock locked(lock_);
     mailbox = Mailbox::Generate();
@@ -457,7 +445,7 @@ TestSharedImageInterface::CreateSharedImageWithMapCallbackController(
   }
 
   auto image = ClientSharedImage::CreateForTesting(
-      mailbox, si_info.meta, GenUnverifiedSyncToken(), std::move(fake_gmb),
+      mailbox, si_info.meta, GenUnverifiedSyncToken(), premapped, callback,
       buffer_usage, holder_);
   return image;
 }

@@ -84,6 +84,7 @@
 #include "third_party/blink/renderer/core/timing/performance_entry.h"
 #include "third_party/blink/renderer/core/timing/performance_event_timing.h"
 #include "third_party/blink/renderer/core/timing/performance_long_animation_frame_timing.h"
+#include "third_party/blink/renderer/core/timing/performance_navigation_timing.h"
 #include "third_party/blink/renderer/core/timing/performance_observer.h"
 #include "third_party/blink/renderer/core/timing/performance_paint_timing.h"
 #include "third_party/blink/renderer/core/timing/performance_timing.h"
@@ -616,10 +617,7 @@ void WindowPerformance::EventTimingProcessingStart(
   // Set prevent_counting_as_interaction to true for all the event entries when
   // the selection autoscroll happens at the current event presentation frame
   // or the previous frame.
-  if (RuntimeEnabledFeaturesBase::
-          EventTimingSelectionAutoScrollNoInteractionIdEnabled()) {
-    reporting_info.prevent_counting_as_interaction |= IsAutoscrollActive();
-  }
+  reporting_info.prevent_counting_as_interaction |= IsAutoscrollActive();
 
   // We always have a Hit test target before starting event dispatch.  During
   // event dispatch we might change target via event retargetting or
@@ -694,11 +692,11 @@ void WindowPerformance::EventTimingProcessingEnd(
 #endif  // BUILDFLAG(IS_MAC)
   }
 
-  if (event.target()) {
-    // `event->target()` is assigned as part of EventDispatch, and will be unset
-    // whenever we skip dispatch. (See: crbug.com/1367329).
-    // Note: target may be dom detached, and even GC-ed, before Observer fires.
-    entry->SetTarget(event.target()->ToNode());
+  if (EventTarget* raw_target = event.RawTarget()) {
+    // `event->RawTarget()` is assigned as part of EventDispatch, and will be
+    // unset whenever we skip dispatch. (See: crbug.com/1367329). Note: target
+    // may be dom detached, and even GC-ed, before Observer fires.
+    entry->SetTarget(raw_target->ToNode());
   }
 
   // Request presentation time first, because this might increment presentation
@@ -1224,6 +1222,12 @@ void WindowPerformance::NotifyAndAddEventTimingBuffer(
                           enqueued_to_main_thread_time, flow_id);
     }
 
+    // Add EventTimingMeasurementComplete trace event to report when Event
+    // Timing was measured and reported to the Performance Timeline. This helps
+    // track the delay between frame presentation and timeline reporting.
+    TRACE_EVENT_INSTANT("latency", "EventTimingMeasurementComplete", track_id,
+                        base::TimeTicks::Now(), flow_id);
+
     TRACE_EVENT_BEGIN(
         "latency", "EventProcessing", track_id,
         entry->GetEventTimingReportingInfo()->processing_start_time, flow_id,
@@ -1456,11 +1460,7 @@ void WindowPerformance::PageVisibilityChangedWithTimestamp(
   // invisible.
   if (!GetPage()->IsPageVisible()) {
     last_hidden_timestamp_ = visibility_change_timestamp;
-
-    if (RuntimeEnabledFeaturesBase::
-            ReportEventTimingAtVisibilityChangeEnabled()) {
-      FlushEventTimingsOnPageHidden();
-    }
+    FlushEventTimingsOnPageHidden();
   }
   AddVisibilityStateEntry(GetPage()->IsPageVisible(),
                           visibility_change_timestamp);

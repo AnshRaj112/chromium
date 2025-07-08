@@ -56,6 +56,7 @@
 #include "components/autofill/core/browser/data_model/payments/bnpl_issuer.h"
 #include "components/autofill/core/browser/data_model/payments/credit_card.h"
 #include "components/autofill/core/browser/data_model/payments/iban.h"
+#include "components/autofill/core/browser/data_model/valuables/loyalty_card.h"
 #include "components/autofill/core/browser/data_quality/addresses/profile_token_quality.h"
 #include "components/autofill/core/browser/data_quality/addresses/profile_token_quality_test_api.h"
 #include "components/autofill/core/browser/data_quality/validation.h"
@@ -854,7 +855,6 @@ class MockTouchToFillDelegate : public TouchToFillDelegate {
   static std::unique_ptr<MockTouchToFillDelegate> Create(
       BrowserAutofillManager* manager) {
     auto delegate = std::make_unique<NiceMock<MockTouchToFillDelegate>>();
-    ON_CALL(*delegate, GetManager()).WillByDefault(Return(manager));
     ON_CALL(*delegate, IsShowingTouchToFill()).WillByDefault(Return(false));
     return delegate;
   }
@@ -864,10 +864,9 @@ class MockTouchToFillDelegate : public TouchToFillDelegate {
   MockTouchToFillDelegate& operator=(const MockTouchToFillDelegate&) = delete;
   ~MockTouchToFillDelegate() override = default;
 
-  MOCK_METHOD(BrowserAutofillManager*, GetManager, (), (override));
   MOCK_METHOD(bool,
               IntendsToShowTouchToFill,
-              (FormGlobalId, FieldGlobalId, const FormData&),
+              (FormGlobalId, FieldGlobalId),
               (override));
   MOCK_METHOD(bool,
               TryToShowTouchToFill,
@@ -890,7 +889,7 @@ class MockTouchToFillDelegate : public TouchToFillDelegate {
               (override));
   MOCK_METHOD(void,
               LoyaltyCardSuggestionSelected,
-              (const std::string& loyalty_card_number),
+              (const LoyaltyCard& loyalty_card),
               (override));
   MOCK_METHOD(void, OnDismissed, (bool dismissed_by_user), (override));
   MOCK_METHOD(void,

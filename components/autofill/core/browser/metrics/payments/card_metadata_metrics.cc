@@ -267,11 +267,13 @@ void LogCardWithMetadataFormEventMetric(
   }
 }
 
-void LogCardWithBenefitFormEventMetric(
-    CardMetadataLoggingEvent event,
-    const CardMetadataLoggingContext& context) {
+void LogCardBenefitFormEventMetrics(CardMetadataLoggingEvent event,
+                                    const CardMetadataLoggingContext& context) {
   switch (event) {
     case CardMetadataLoggingEvent::kShown: {
+      LogBenefitFormEventToAllBenefitHistograms(
+          context.instrument_ids_to_available_benefit_sources,
+          CardBenefitFormEvent::kSuggestionWithBenefitShown);
       if (context.masked_server_card_count >= 2) {
         LogBenefitFormEventToAllBenefitHistograms(
             context.instrument_ids_to_available_benefit_sources,
@@ -285,6 +287,9 @@ void LogCardWithBenefitFormEventMetric(
     }
     case CardMetadataLoggingEvent::kSelected:
       if (context.SelectedCardHasBenefitAvailable()) {
+        LogBenefitFormEventToAllBenefitHistograms(
+            context.selected_benefit_source,
+            CardBenefitFormEvent::kSuggestionWithBenefitSelected);
         if (context.masked_server_card_count >= 2) {
           LogBenefitFormEventToAllBenefitHistograms(
               context.selected_benefit_source,
@@ -294,6 +299,12 @@ void LogCardWithBenefitFormEventMetric(
         LogBenefitFormEventToBenefitSourceHistogramDeprecated(
             context.selected_benefit_source,
             FORM_EVENT_SUGGESTION_FOR_SERVER_CARD_WITH_BENEFIT_AVAILABLE_SELECTED_ONCE);
+      } else {
+        if (context.masked_server_card_count >= 2) {
+          LogBenefitFormEventToMainBenefitHistogram(
+              CardBenefitFormEvent::
+                  kSuggestionWithoutBenefitSelectedWithMultipleServerCards);
+        }
       }
       LogBenefitFormEventForAllBenefitSourcesWithBenefitAvailableDeprecated(
           context.instrument_ids_to_available_benefit_sources,
@@ -301,6 +312,9 @@ void LogCardWithBenefitFormEventMetric(
       break;
     case CardMetadataLoggingEvent::kFilled:
       if (context.SelectedCardHasBenefitAvailable()) {
+        LogBenefitFormEventToAllBenefitHistograms(
+            context.selected_benefit_source,
+            CardBenefitFormEvent::kSuggestionWithBenefitFilled);
         if (context.masked_server_card_count >= 2) {
           LogBenefitFormEventToAllBenefitHistograms(
               context.selected_benefit_source,
@@ -310,6 +324,12 @@ void LogCardWithBenefitFormEventMetric(
         LogBenefitFormEventToBenefitSourceHistogramDeprecated(
             context.selected_benefit_source,
             FORM_EVENT_SUGGESTION_FOR_SERVER_CARD_WITH_BENEFIT_AVAILABLE_FILLED_ONCE);
+      } else {
+        if (context.masked_server_card_count >= 2) {
+          LogBenefitFormEventToMainBenefitHistogram(
+              CardBenefitFormEvent::
+                  kSuggestionWithoutBenefitFilledWithMultipleServerCards);
+        }
       }
       LogBenefitFormEventForAllBenefitSourcesWithBenefitAvailableDeprecated(
           context.instrument_ids_to_available_benefit_sources,
@@ -317,6 +337,9 @@ void LogCardWithBenefitFormEventMetric(
       break;
     case CardMetadataLoggingEvent::kSubmitted:
       if (context.SelectedCardHasBenefitAvailable()) {
+        LogBenefitFormEventToAllBenefitHistograms(
+            context.selected_benefit_source,
+            CardBenefitFormEvent::kSuggestionWithBenefitSubmitted);
         if (context.masked_server_card_count >= 2) {
           LogBenefitFormEventToAllBenefitHistograms(
               context.selected_benefit_source,
@@ -326,6 +349,12 @@ void LogCardWithBenefitFormEventMetric(
         LogBenefitFormEventToBenefitSourceHistogramDeprecated(
             context.selected_benefit_source,
             FORM_EVENT_SUGGESTION_FOR_SERVER_CARD_WITH_BENEFIT_AVAILABLE_SUBMITTED_ONCE);
+      } else {
+        if (context.masked_server_card_count >= 2) {
+          LogBenefitFormEventToMainBenefitHistogram(
+              CardBenefitFormEvent::
+                  kSuggestionWithoutBenefitSubmittedWithMultipleServerCards);
+        }
       }
       LogBenefitFormEventForAllBenefitSourcesWithBenefitAvailableDeprecated(
           context.instrument_ids_to_available_benefit_sources,

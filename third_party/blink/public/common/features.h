@@ -105,6 +105,11 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
 // If enabled, open broadcast channels do not block back/forward cache.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kBFCacheOpenBroadcastChannel);
 
+// If enabled, back/forward cache is enabled for pages using shared worker, and
+// the page will be evicted from BFCache if it receives a message from the
+// shared worker while cached.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kBFCacheWithSharedWorker);
+
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kBackForwardCacheDWCOnJavaScriptExecution);
 
@@ -382,6 +387,9 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kDiscardInputEventsToRecentlyMovedFrames);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kDropInputEventsWhilePaintHolding);
+
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
+    kEnableDevtoolsDeepLinkViaExtensibilityApi);
 
 // Enables establishing the GPU channel asnchronously when requesting a new
 // layer tree frame sink.
@@ -663,6 +671,10 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kFrequencyCappingForOverlayPopupDetection);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kGMSCoreEmoji);
+
+// If enabled, then display audio track permission failures are ignored.
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
+    kGetDisplayMediaIgnoreAudioPermissionFailures);
 
 #if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_FUCHSIA)
 // Defers device selection until after permission is granted.
@@ -1752,6 +1764,8 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kUnloadBlocklisted);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kUrgentMainFrameForInput);
+
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kUseCommitUrlInsteadOfRedirectUrl);
 
 // Uses page viewport instead of frame viewport in the Largest Contentful Paint
 // heuristic where images occupying the full viewport are ignored.

@@ -594,13 +594,6 @@ TemplateURLService::~TemplateURLService() {
 // static
 void TemplateURLService::RegisterProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
-#if BUILDFLAG(IS_IOS) || BUILDFLAG(IS_ANDROID)
-  uint32_t flags = PrefRegistry::NO_REGISTRATION_FLAGS;
-#else
-  uint32_t flags = user_prefs::PrefRegistrySyncable::SYNCABLE_PREF;
-#endif
-  registry->RegisterStringPref(prefs::kSyncedDefaultSearchProviderGUID,
-                               std::string(), flags);
   registry->RegisterStringPref(prefs::kDefaultSearchProviderGUID,
                                std::string());
   registry->RegisterBooleanPref(prefs::kDefaultSearchProviderEnabled, true);
@@ -1877,7 +1870,8 @@ std::optional<syncer::ModelError> TemplateURLService::ProcessSyncChanges(
     const base::Location& from_here,
     const syncer::SyncChangeList& change_list) {
   if (!models_associated_) {
-    return syncer::ModelError(FROM_HERE, "Models not yet associated.");
+    return syncer::ModelError(
+        FROM_HERE, syncer::ModelError::Type::kSearchEngineModelsNotAssociated);
   }
   DCHECK(loaded_);
 
@@ -1915,8 +1909,10 @@ std::optional<syncer::ModelError> TemplateURLService::ProcessSyncChanges(
           (base::FeatureList::IsEnabled(
                syncer::kSeparateLocalAndAccountSearchEngines) &&
            !existing_turl->GetAccountData())) {
-        // Can't DELETE a non-existent engine.
-        error = syncer::ModelError(FROM_HERE, error_msg);
+        // Can't DELETE a non-existent engine at the account level.
+        error = syncer::ModelError(
+            FROM_HERE, syncer::ModelError::Type::
+                           kSearchEngineDeleteNonExistentAtAccountLevel);
         continue;
       }
 
@@ -1998,7 +1994,8 @@ std::optional<syncer::ModelError> TemplateURLService::MergeDataAndStartSyncing(
 
   // Disable sync if we failed to load.
   if (load_failed_) {
-    return syncer::ModelError(FROM_HERE, "Local database load failed.");
+    return syncer::ModelError(
+        FROM_HERE, syncer::ModelError::Type::kSearchEngineLocalDbLoadFailed);
   }
 
   sync_processor_ = std::move(sync_processor);
@@ -2478,28 +2475,11 @@ void TemplateURLService::Init() {
   }
 
   pref_change_registrar_.Init(&prefs_.get());
-  if (base::FeatureList::IsEnabled(switches::kSearchEngineChoiceTrigger)) {
-    // We migrate `kSyncedDefaultSearchProviderGUID` to
-    // `kDefaultSearchProviderGUID` if the latter was never set.
-    if (!prefs_->HasPrefPath(prefs::kDefaultSearchProviderGUID)) {
-      prefs_->SetString(
-          prefs::kDefaultSearchProviderGUID,
-          prefs_->GetString(prefs::kSyncedDefaultSearchProviderGUID));
-    }
-
     pref_change_registrar_.Add(
         prefs::kDefaultSearchProviderGUID,
         base::BindRepeating(
             &TemplateURLService::OnDefaultSearchProviderGUIDChanged,
             base::Unretained(this)));
-  } else {
-    // TODO(b/364828491): Deprecate `kSyncedDefaultSearchProviderGUID`.
-    pref_change_registrar_.Add(
-        prefs::kSyncedDefaultSearchProviderGUID,
-        base::BindRepeating(
-            &TemplateURLService::OnDefaultSearchProviderGUIDChanged,
-            base::Unretained(this)));
-  }
 
   DefaultSearchManager::Source source = DefaultSearchManager::FROM_USER;
   const TemplateURLData* dse =

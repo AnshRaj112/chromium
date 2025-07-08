@@ -116,7 +116,7 @@ public class TabSwitcherLayoutPTTest {
     @Rule
     public ChromeRenderTestRule mRenderTestRule =
             ChromeRenderTestRule.Builder.withPublicCorpus()
-                    .setRevision(9)
+                    .setRevision(10) // Update the favicon background color.
                     .setBugComponent(ChromeRenderTestRule.Component.UI_BROWSER_MOBILE_HUB)
                     .build();
 
@@ -246,7 +246,7 @@ public class TabSwitcherLayoutPTTest {
 
         tabSwitcherStation = pageStation.openRegularTabSwitcher();
 
-        mRenderTestRule.render(cta.findViewById(R.id.pane_frame), "3_native_tabs_v3");
+        mRenderTestRule.render(cta.findViewById(R.id.pane_frame), "3_native_tabs_v4");
 
         RegularNewTabPageStation previousPage =
                 tabSwitcherStation.leaveHubToPreviousTabViaBack(

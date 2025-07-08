@@ -958,7 +958,8 @@ void FrameSchedulerImpl::UpdateQueuePolicy(
   // Override the frozen state for queues that should run while in BFCache. This
   // allows tasks like eviction-triggering messages to be processed, while still
   // freezing the queue for other reasons (e.g., to save resources).
-  if (queue_frozen && queue->CanRunInBFCache() &&
+  if (base::FeatureList::IsEnabled(features::kBFCacheWithSharedWorker) &&
+      queue_frozen && queue->CanRunInBFCache() &&
       parent_page_scheduler_->IsInBackForwardCache()) {
     queue_frozen = false;
   }

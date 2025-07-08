@@ -1042,18 +1042,6 @@ void LensOverlayController::ClearRegionSelection() {
   page_->ClearRegionSelection();
 }
 
-void LensOverlayController::ClearAllSelections() {
-  if (page_) {
-    page_->ClearAllSelections();
-  }
-  initialization_data_->selected_region_.reset();
-  initialization_data_->selected_region_bitmap_.reset();
-  initialization_data_->selected_text_.reset();
-  if (!IsContextualSearchbox()) {
-    lens_selection_type_ = lens::UNKNOWN_SELECTION_TYPE;
-  }
-}
-
 void LensOverlayController::OnSearchboxFocusChanged(bool focused) {
   if (!focused) {
     return;
@@ -1066,10 +1054,9 @@ void LensOverlayController::OnSearchboxFocusChanged(bool focused) {
       // If the live page is showing and the searchbox becomes focused, showing
       // intent to issue a new query, upload the new page content for
       // contextualization.
-      // TODO(crbug.com/418856988): Replace this with a call that starts
-      // contextualization without the unneeded callback.
       GetContextualizationController()->TryUpdatePageContextualization(
-          base::DoNothing());
+          base::BindOnce(&LensOverlayController::NotifyPageContentUpdated,
+                         weak_factory_.GetWeakPtr()));
     }
   }
 }
@@ -1109,8 +1096,17 @@ void LensOverlayController::IssueLensRequest(
   MaybeOpenSidePanel();
   GetLensSessionMetricsLogger()->RecordTimeToFirstInteraction(
       lens::LensOverlayFirstInteractionType::kRegionSelect);
-  state_ = State::kOverlayAndResults;
-  MaybeLaunchSurvey();
+
+  // TODO(crbug.com/428208291): The overlay can be in the live page and results
+  // state and this could be a query coming from the back stack which would make
+  // setting this to kOverlayAndResults incorrect. Check if the overlay is
+  // currently in that state to determine if this should be set to
+  // kOverlayAndResults or not. This should be fixed by moving the functionality
+  // to make Lens requests to a more appropriate location.
+  if (state_ != State::kLivePageAndResults) {
+    state_ = State::kOverlayAndResults;
+    MaybeLaunchSurvey();
+  }
 }
 
 void LensOverlayController::IssueMultimodalRequest(
@@ -2573,6 +2569,10 @@ void LensOverlayController::HideOverlay() {
   auto* contents_web_view = tab_->GetBrowserWindowInterface()->GetWebView();
   CHECK(contents_web_view);
   contents_web_view->SetEnabled(true);
+}
+
+void LensOverlayController::HideOverlayAndMaybeSetLivePageState() {
+  HideOverlay();
 
   // If the side panel is open, set the overlay state to kLivePageAndResults.
   if (results_side_panel_coordinator_->IsSidePanelBound()) {
@@ -2669,6 +2669,36 @@ void LensOverlayController::UpdateNavigationMetrics() {
   GetLensSessionMetricsLogger()->OnPageNavigation();
 }
 
+void LensOverlayController::ClearAllSelections() {
+  if (state_ == State::kOff) {
+    return;
+  }
+
+  if (page_) {
+    page_->ClearAllSelections();
+  }
+  initialization_data_->selected_region_.reset();
+  initialization_data_->selected_region_bitmap_.reset();
+  initialization_data_->selected_text_.reset();
+  if (!IsContextualSearchbox()) {
+    lens_selection_type_ = lens::UNKNOWN_SELECTION_TYPE;
+  }
+}
+
+void LensOverlayController::HandleRegionBitmapCreated(
+    const SkBitmap& region_bitmap) {
+  // Do not update the selected region bitmap if the overlay is off or if the
+  // region bitmap is already set. This is only enabled when the back to page
+  // feature is enabled.
+  if (state_ == State::kOff ||
+      !initialization_data_->selected_region_bitmap_.drawsNothing() ||
+      !lens::features::IsLensOverlayBackToPageEnabled()) {
+    return;
+  }
+
+  initialization_data_->selected_region_bitmap_ = region_bitmap;
+}
+
 bool LensOverlayController::IsUrlEligibleForTutorialIPH(const GURL& url) {
   if (!tutorial_iph_url_matcher_) {
     return false;
@@ -2722,15 +2752,15 @@ bool LensOverlayController::IsUrlEligibleForTutorialIPH(const GURL& url) {
 }
 
 void LensOverlayController::ShowTutorialIPH() {
-  if (auto* user_ed =
-          tab_->GetBrowserWindowInterface()->GetUserEducationInterface()) {
+  if (auto* user_ed = BrowserUserEducationInterface::From(
+          tab_->GetBrowserWindowInterface())) {
     user_ed->MaybeShowFeaturePromo(feature_engagement::kIPHLensOverlayFeature);
   }
 }
 
 void LensOverlayController::NotifyUserEducationAboutOverlayUsed() {
-  if (auto* user_ed =
-          tab_->GetBrowserWindowInterface()->GetUserEducationInterface()) {
+  if (auto* user_ed = BrowserUserEducationInterface::From(
+          tab_->GetBrowserWindowInterface())) {
     user_ed->NotifyFeaturePromoFeatureUsed(
         feature_engagement::kIPHLensOverlayFeature,
         FeaturePromoFeatureUsedAction::kClosePromoIfPresent);

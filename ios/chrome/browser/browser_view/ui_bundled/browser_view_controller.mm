@@ -1301,6 +1301,9 @@ enum HeaderBehaviour {
 // Returns 0 if the toolbar should be hidden.
 - (CGFloat)secondaryToolbarHeightWithInset {
   CGFloat height = self.toolbarCoordinator.expandedSecondaryToolbarHeight;
+  if (IsDiamondPrototypeEnabled()) {
+    return height;
+  }
   if (!height) {
     return 0.0;
   }
@@ -2260,6 +2263,10 @@ enum HeaderBehaviour {
 
             [weakSelf executeAndClearForegroundTabWasAddedCompletionBlock:YES];
           }));
+    } else {
+      if (isNTP && isIncognito) {
+        [omniboxHandler focusOmniboxForVoiceOver];
+      }
     }
     return;
   }
@@ -2782,6 +2789,10 @@ enum HeaderBehaviour {
   [_sideSwipeCoordinator setEnabled:YES];
   _lensOverlayVisible = NO;
   self.contentArea.accessibilityElementsHidden = self.contentAreaObstructed;
+}
+
+- (void)lensOverlayDidReadjustPresentation {
+  [self.omniboxCommandsHandler cancelOmniboxEdit];
 }
 
 - (NSDirectionalEdgeInsets)presentationInsetsForLensOverlay {

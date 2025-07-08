@@ -24,13 +24,15 @@ ContextImplOrt::ContextImplOrt(
     WebNNContextProviderImpl* context_provider,
     mojom::CreateContextOptionsPtr options,
     ScopedOrtEnv env,
-    scoped_refptr<SessionOptions> session_options)
+    scoped_refptr<SessionOptions> session_options,
+    bool is_external_data_supported)
     : WebNNContextImpl(std::move(receiver),
                        context_provider,
                        GetContextProperties(),
                        std::move(options)),
       env_(std::move(env)),
-      session_options_(std::move(session_options)) {}
+      session_options_(std::move(session_options)),
+      is_external_data_supported_(is_external_data_supported) {}
 
 ContextImplOrt::~ContextImplOrt() = default;
 
@@ -52,6 +54,11 @@ ContextProperties ContextImplOrt::GetContextProperties() {
   static constexpr SupportedDataTypes kInts8Float16To32 = {
       OperandDataType::kUint8, OperandDataType::kInt8,
       OperandDataType::kFloat16, OperandDataType::kFloat32};
+
+  static constexpr SupportedDataTypes kFloat16To32Uint8Int32To64 = {
+      OperandDataType::kFloat16, OperandDataType::kFloat32,
+      OperandDataType::kUint8, OperandDataType::kInt32,
+      OperandDataType::kInt64};
 
   return ContextProperties(
       InputOperandLayout::kNchw, Resample2DAxes::kChannelsFirst,
@@ -94,17 +101,26 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*min_input=*/
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*pow_input=*/{kFloat16To32Int32To64, kMaxRank},
-       /*equal_input=*/{},
-       /*greater_input=*/{},
-       /*greater_or_equal_input=*/{},
-       /*lesser_input=*/{},
-       /*lesser_or_equal_input=*/{},
-       /*not_equal_input=*/{},
-       /*logical_and_input=*/{},
-       /*logical_or_input=*/{},
-       /*logical_xor_input=*/{},
-       /*logical_not_input=*/{},
-       /*logical_output=*/{},
+       /*equal_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
+       /*greater_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
+       /*greater_or_equal_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
+       /*lesser_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
+       /*lesser_or_equal_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
+       /*not_equal_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
+       /*logical_and_input=*/
+       {DataTypeConstraint::kUint8, kMaxRank},
+       /*logical_or_input=*/
+       {DataTypeConstraint::kUint8, kMaxRank},
+       /*logical_xor_input=*/
+       {DataTypeConstraint::kUint8, kMaxRank},
+       /*logical_not_input=*/{DataTypeConstraint::kUint8, kMaxRank},
+       /*logical_output=*/DataTypeConstraint::kUint8,
        /*abs_input=*/{DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*ceil_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*cos_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
@@ -129,8 +145,10 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxNonScalarRank},
        /*gather_elements_indices=*/
        {DataTypeConstraint::kInt32To64, kMaxNonScalarRank},
-       /*gather_nd_input=*/{},
-       /*gather_nd_indices=*/{},
+       /*gather_nd_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxNonScalarRank},
+       /*gather_nd_indices=*/
+       {DataTypeConstraint::kInt32To64, kMaxNonScalarRank},
        /*gelu_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*gemm_a=*/
        {DataTypeConstraint::kFloat16To32Ints32To64, SupportedRanks::Exactly(2)},
@@ -151,14 +169,12 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*lstm_bias=*/{},
        /*lstm_cell_input=*/{},
        /*lstm_cell_bias=*/{},
-       /*matmul_input=*/{},
-       /*pad_input=*/{},
-       /*average_pool2d_input=*/
-       {DataTypeConstraint::kFloat16To32, {3, 8}},
-       /*l2_pool2d_input=*/
-       {DataTypeConstraint::kFloat16To32, {3, 8}},
-       /*max_pool2d_input=*/
-       {kInts8Float16To32, {3, 8}},
+       /*matmul_input=*/{DataTypeConstraint::kFloat16To32Ints32To64, kMaxRank},
+       /*pad_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxNonScalarRank},
+       /*average_pool2d_input=*/{DataTypeConstraint::kFloat16To32, {3, 8}},
+       /*l2_pool2d_input=*/{DataTypeConstraint::kFloat16To32, {3, 8}},
+       /*max_pool2d_input=*/{kInts8Float16To32, {3, 8}},
        /*prelu_input=*/{DataTypeConstraint::kFloat16To32Ints32To64, kMaxRank},
        /*quantize_linear_input=*/{},
        /*quantize_linear_zero_point=*/{},
@@ -179,27 +195,35 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        // https://github.com/microsoft/onnxruntime/issues/24285
        /*reshape_input=*/
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
-       /*reverse_input=*/{},
+       /*reverse_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*scatter_elements_input=*/
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxNonScalarRank},
        /*scatter_elements_indices=*/
        {DataTypeConstraint::kInt32To64, kMaxNonScalarRank},
-       /*scatter_nd_input=*/{},
-       /*scatter_nd_indices=*/{},
-       /*scatter_nd_updates=*/{},
+       /*scatter_nd_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxNonScalarRank},
+       /*scatter_nd_indices=*/
+       {DataTypeConstraint::kInt32To64, kMaxNonScalarRank},
+       /*scatter_nd_updates=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*sigmoid_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
-       /*slice_input=*/{},
+       /*slice_input=*/
+       {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*softmax_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*softplus_input=*/{},
        /*softsign_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*split_input=*/
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxNonScalarRank},
        /*tanh_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
-       /*tile_input=*/{},
+       /*tile_input=*/{DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*transpose_input=*/{SupportedDataTypes::All(), kMaxRank},
        /*triangular_input=*/{},
-       /*where_condition=*/{},
-       /*where_value=*/{}});
+       /*where_condition=*/{DataTypeConstraint::kUint8, kMaxRank},
+       // TODO(crbug.com/429859156): ORT CPU EP should support int8, uint32, and
+       // uint64 for where operation.
+       /*where_value=*/
+       {kFloat16To32Uint8Int32To64, kMaxRank}});
 }
 
 base::WeakPtr<WebNNContextImpl> ContextImplOrt::AsWeakPtr() {

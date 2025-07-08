@@ -191,7 +191,6 @@ class WebIdlSchemaTest(unittest.TestCase):
             'parameters': [{
                 'type': 'string'
             }],
-            'type': 'promise'
         }, getFunctionAsyncReturn(schema, 'stringPromiseReturn'))
     self.assertEqual(
         {
@@ -201,7 +200,6 @@ class WebIdlSchemaTest(unittest.TestCase):
                 'optional': True,
                 'type': 'string'
             }],
-            'type': 'promise'
         }, getFunctionAsyncReturn(schema, 'nullablePromiseReturn'))
     self.assertEqual(
         {
@@ -210,14 +208,12 @@ class WebIdlSchemaTest(unittest.TestCase):
             'parameters': [{
                 '$ref': 'ExampleType'
             }],
-            'type': 'promise'
         }, getFunctionAsyncReturn(schema, 'customTypePromiseReturn'))
     self.assertEqual(
         {
             'name': 'callback',
             'optional': True,
             'parameters': [],
-            'type': 'promise'
         }, getFunctionAsyncReturn(schema, 'undefinedPromiseReturn'))
     self.assertEqual(
         {
@@ -229,7 +225,6 @@ class WebIdlSchemaTest(unittest.TestCase):
                     'type': 'integer'
                 }
             }],
-            'type': 'promise'
         }, getFunctionAsyncReturn(schema, 'longSequencePromiseReturn'))
     self.assertEqual(
         {
@@ -241,7 +236,6 @@ class WebIdlSchemaTest(unittest.TestCase):
                     '$ref': 'ExampleType'
                 }
             }],
-            'type': 'promise'
         }, getFunctionAsyncReturn(schema, 'customTypeSequencePromiseReturn'))
 
   # Tests function parameters are processed as expected.
@@ -304,8 +298,6 @@ class WebIdlSchemaTest(unittest.TestCase):
     }], getFunctionParameters(schema, 'takesOptionalCustomType'))
 
   # Tests function descriptions are processed as expected.
-  # TODO(crbug.com/379052294): Add testcases for function return descriptions
-  # once support for those are added to the processor.
   def testFunctionDescriptions(self):
     schema = self.idl_basics
     # A function without a preceding comment has no 'description' key.
@@ -373,8 +365,8 @@ class WebIdlSchemaTest(unittest.TestCase):
             'callback',
             'optional':
             True,
-            'type':
-            'promise',
+            'description':
+            'General description for the promise return.',
             'parameters': [{
                 '$ref':
                 'ExampleType',
@@ -394,13 +386,21 @@ class WebIdlSchemaTest(unittest.TestCase):
         {
             'name': 'callback',
             'optional': True,
-            'type': 'promise',
             'parameters': [{
                 'type': 'boolean',
                 'name': 'justAName'
             }],
         }, named_promise_function_async_return)
 
+    # Function with a return and simple comment describing it.
+    return_function = getFunction(schema, 'describedReturnFunction')
+    self.assertEqual(
+        'General function description for the describedReturnFunction.',
+        return_function.get('description'))
+    return_function_returns_value = getFunctionReturn(
+        schema, 'describedReturnFunction')
+    self.assertEqual('Description for the returns object itself.',
+                     return_function_returns_value.get('description'))
 
   # Tests that API events are processed as expected.
   def testEvents(self):
@@ -683,7 +683,6 @@ class WebIdlSchemaTest(unittest.TestCase):
             'parameters': [{
                 'type': 'string'
             }],
-            'type': 'promise'
         }, getFunctionAsyncReturn(idl[0], 'requiredCallbackFunction'))
     self.assertEqual(
         {
@@ -692,13 +691,10 @@ class WebIdlSchemaTest(unittest.TestCase):
             'parameters': [{
                 'type': 'string'
             }],
-            'type': 'promise'
         }, getFunctionAsyncReturn(idl[0], 'notRequiredCallbackFunction'))
 
   # Tests that extended attributes being listed on the the line previous to a
   # node come through correctly and don't throw off and associated descriptions.
-  # TODO(crbug.com/340297705): Add checks for functions here once support for
-  # processing their descriptions is complete.
   def testPreviousLineExtendedAttributes(self):
     idl = web_idl_schema.Load('test/web_idl/preceding_extended_attributes.idl')
     self.assertEqual(1, len(idl))
@@ -710,6 +706,15 @@ class WebIdlSchemaTest(unittest.TestCase):
         schema['description'],
     )
 
+    function = getFunction(schema, 'functionExample')
+    self.assertEqual('Description on a function.', function.get('description'))
+    async_return = getFunctionAsyncReturn(schema, 'functionExample')
+    # The extended attribute on the function causes 'optional': True to not be
+    # present on the async return.
+    self.assertNotIn('optional', async_return)
+    self.assertEqual('Promise return description.',
+                     async_return.get('description'))
+
   # Tests that an API interface with the platforms extended attribute has these
   # values in a platforms attribute after processing.
   def testAllPlatformsOnNamespace(self):
@@ -717,7 +722,7 @@ class WebIdlSchemaTest(unittest.TestCase):
         'test/web_idl/all_platforms_on_namespace.idl')
     self.assertEqual(1, len(platforms_schema))
     self.assertEqual('allPlatformsAPI', platforms_schema[0]['namespace'])
-    expected = ['chromeos', 'desktop_android', 'fuchsia', 'linux', 'mac', 'win']
+    expected = ['chromeos', 'desktop_android', 'linux', 'mac', 'win']
     self.assertEqual(expected, platforms_schema[0]['platforms'])
 
   # Tests that an API interface with just chromeos listed in the platforms

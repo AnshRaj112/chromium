@@ -12,7 +12,7 @@ namespace actor {
 using ::tabs::TabHandle;
 
 TypeToolRequest::TypeToolRequest(TabHandle tab_handle,
-                                 const Target& target,
+                                 const PageTarget& target,
                                  std::string_view text,
                                  bool follow_by_enter,
                                  Mode mode)
@@ -33,8 +33,6 @@ std::string TypeToolRequest::JournalEvent() const {
 
 mojom::ToolActionPtr TypeToolRequest::ToMojoToolAction() const {
   auto type = mojom::TypeAction::New();
-
-  type->target = PageToolRequest::ToMojoToolTarget(GetTarget());
 
   type->text = text;
   type->follow_by_enter = follow_by_enter;

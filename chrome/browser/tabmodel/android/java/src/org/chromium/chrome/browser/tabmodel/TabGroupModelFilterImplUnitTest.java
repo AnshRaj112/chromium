@@ -538,19 +538,14 @@ public class TabGroupModelFilterImplUnitTest {
     public void rootIdToStableIdAndBackConversion() {
         // Test existing IDs.
         assertEquals(TAB2_ROOT_ID, mTabGroupModelFilter.getRootIdFromTabGroupId(TAB2_TAB_GROUP_ID));
-        assertEquals(TAB2_TAB_GROUP_ID, mTabGroupModelFilter.getTabGroupIdFromRootId(TAB2_ROOT_ID));
-
-        assertEquals(null, mTabGroupModelFilter.getTabGroupIdFromRootId(TAB1_ROOT_ID));
 
         // Test non-existing IDs.
         assertEquals(
                 Tab.INVALID_TAB_ID,
                 mTabGroupModelFilter.getRootIdFromTabGroupId(new Token(93L, 42L)));
-        assertEquals(null, mTabGroupModelFilter.getTabGroupIdFromRootId(1000));
 
         // Test null/invalid inputs.
         assertEquals(Tab.INVALID_TAB_ID, mTabGroupModelFilter.getRootIdFromTabGroupId(null));
-        assertEquals(null, mTabGroupModelFilter.getTabGroupIdFromRootId(Tab.INVALID_TAB_ID));
     }
 
     @Test
@@ -2383,14 +2378,15 @@ public class TabGroupModelFilterImplUnitTest {
     @Test
     public void testSetTabGroupTitle() {
         mTabGroupModelFilter.setTabGroupTitle(TAB2_ROOT_ID, "Foo");
-        verify(mTabGroupModelFilterObserver).didChangeTabGroupTitle(TAB2_ROOT_ID, "Foo");
+        verify(mTabGroupModelFilterObserver)
+                .didChangeTabGroupTitle(TAB2_ROOT_ID, TAB2_TAB_GROUP_ID, "Foo");
     }
 
     @Test
     public void testDeleteTabGroupTitle() {
         mTabGroupModelFilter.deleteTabGroupTitle(TAB2_ROOT_ID);
         verify(mTabGroupModelFilterObserver)
-                .didChangeTabGroupTitle(TAB2_ROOT_ID, /* newTitle= */ null);
+                .didChangeTabGroupTitle(TAB2_ROOT_ID, TAB2_TAB_GROUP_ID, /* newTitle= */ null);
     }
 
     @Test
@@ -2410,7 +2406,7 @@ public class TabGroupModelFilterImplUnitTest {
     public void testSetTabGroupColor() {
         mTabGroupModelFilter.setTabGroupColor(TAB2_ROOT_ID, TabGroupColorId.GREY);
         verify(mTabGroupModelFilterObserver)
-                .didChangeTabGroupColor(TAB2_ROOT_ID, TabGroupColorId.GREY);
+                .didChangeTabGroupColor(TAB2_ROOT_ID, TAB2_TAB_GROUP_ID, TabGroupColorId.GREY);
     }
 
     @Test
@@ -2418,7 +2414,10 @@ public class TabGroupModelFilterImplUnitTest {
         mTabGroupModelFilter.setTabGroupCollapsed(TAB2_ROOT_ID, /* isCollapsed= */ true);
         verify(mTabGroupModelFilterObserver)
                 .didChangeTabGroupCollapsed(
-                        TAB2_ROOT_ID, /* isCollapsed= */ true, /* animate= */ false);
+                        TAB2_ROOT_ID,
+                        TAB2_TAB_GROUP_ID,
+                        /* isCollapsed= */ true,
+                        /* animate= */ false);
     }
 
     @Test
@@ -2427,7 +2426,10 @@ public class TabGroupModelFilterImplUnitTest {
                 TAB2_ROOT_ID, /* isCollapsed= */ true, /* animate= */ false);
         verify(mTabGroupModelFilterObserver)
                 .didChangeTabGroupCollapsed(
-                        TAB2_ROOT_ID, /* isCollapsed= */ true, /* animate= */ false);
+                        TAB2_ROOT_ID,
+                        TAB2_TAB_GROUP_ID,
+                        /* isCollapsed= */ true,
+                        /* animate= */ false);
     }
 
     @Test
@@ -2435,7 +2437,10 @@ public class TabGroupModelFilterImplUnitTest {
         mTabGroupModelFilter.deleteTabGroupCollapsed(TAB2_ROOT_ID);
         verify(mTabGroupModelFilterObserver)
                 .didChangeTabGroupCollapsed(
-                        TAB2_ROOT_ID, /* isCollapsed= */ false, /* animate= */ false);
+                        TAB2_ROOT_ID,
+                        TAB2_TAB_GROUP_ID,
+                        /* isCollapsed= */ false,
+                        /* animate= */ false);
     }
 
     @Test

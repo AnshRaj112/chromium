@@ -60,6 +60,7 @@ void ActorTask::Stop() {
         mojom::ActionResultCode::kTaskWentAway);
   }
   SetState(State::kFinished);
+  end_time_ = base::Time::Now();
 }
 
 void ActorTask::Pause() {
@@ -83,6 +84,10 @@ bool ActorTask::IsPaused() const {
   return GetState() == State::kPausedByClient;
 }
 
+base::Time ActorTask::GetEndTime() const {
+  return end_time_;
+}
+
 std::ostream& operator<<(std::ostream& os, const ActorTask::State& state) {
   using enum ActorTask::State;
   switch (state) {
@@ -102,6 +107,25 @@ std::ostream& operator<<(std::ostream& os, const ActorTask::State& state) {
 base::CallbackListSubscription ActorTask::RegisterTaskStateChange(
     TaskStateChangeCallback callback) {
   return task_state_change_callback_list_.Add(std::move(callback));
+}
+
+void ActorTask::AddToTabSet(tabs::TabHandle tab_handle) {
+  tab_handles_.insert(tab_handle);
+}
+
+bool ActorTask::HasActedOnTab(tabs::TabHandle tab) const {
+  return tab_handles_.contains(tab);
+}
+
+tabs::TabInterface* ActorTask::GetTabForObservation() const {
+  CHECK_EQ(tab_handles_.size(), 1ul);
+  for (const tabs::TabHandle& handle : tab_handles_) {
+    if (tabs::TabInterface* tab = handle.Get()) {
+      return tab;
+    }
+  }
+
+  return nullptr;
 }
 
 }  // namespace actor

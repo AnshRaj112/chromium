@@ -14,6 +14,7 @@
 #include "third_party/blink/renderer/core/paint/text_paint_style.h"
 #include "third_party/blink/renderer/core/style/computed_style.h"
 #include "third_party/blink/renderer/platform/geometry/length_functions.h"
+#include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 
 namespace blink {
 
@@ -70,7 +71,7 @@ inline bool ShouldUseDecoratingBox(const ComputedStyle& style) {
 }
 
 float ComputeDecorationThickness(
-    const TextDecorationThickness text_decoration_thickness,
+    const TextDecorationThickness& text_decoration_thickness,
     float computed_font_size,
     const SimpleFontData* font_data) {
   const float auto_underline_thickness = computed_font_size / 10.f;
@@ -274,17 +275,17 @@ void TextDecorationInfo::SetLineData(TextDecorationLine line,
                                      float line_offset) {
   const float double_offset_from_thickness = ResolvedThickness() + 1.0f;
   float double_offset;
-  int wavy_offset_factor;
+  float wavy_offset;
   switch (line) {
     case TextDecorationLine::kUnderline:
     case TextDecorationLine::kSpellingError:
     case TextDecorationLine::kGrammarError:
       double_offset = double_offset_from_thickness;
-      wavy_offset_factor = 1;
+      wavy_offset = double_offset_from_thickness;
       break;
     case TextDecorationLine::kOverline:
       double_offset = -double_offset_from_thickness;
-      wavy_offset_factor = 1;
+      wavy_offset = -double_offset_from_thickness;
       break;
     case TextDecorationLine::kLineThrough:
       // Floor double_offset in order to avoid double-line gap to appear
@@ -292,7 +293,7 @@ void TextDecorationInfo::SetLineData(TextDecorationLine line,
       // is drawn because of rounding downstream in
       // GraphicsContext::DrawLineForText.
       double_offset = floorf(double_offset_from_thickness);
-      wavy_offset_factor = 0;
+      wavy_offset = 0;
       break;
     case TextDecorationLine::kNone:
     case TextDecorationLine::kBlink:
@@ -321,7 +322,7 @@ void TextDecorationInfo::SetLineData(TextDecorationLine line,
       gfx::PointF(local_origin_) + gfx::Vector2dF(0, line_offset);
   line_geometry_ = DecorationGeometry::Make(
       style, gfx::RectF(start_point, gfx::SizeF(width_, ResolvedThickness())),
-      double_offset, wavy_offset_factor, base::OptionalToPtr(spelling_wave));
+      double_offset, wavy_offset, base::OptionalToPtr(spelling_wave));
   line_geometry_.antialias = antialias;
 }
 
@@ -435,18 +436,19 @@ float TextDecorationInfo::ComputeThickness() const {
     return 1.f * decorating_box_style_->EffectiveZoom();
 #endif
   }
-  return ComputeUnderlineThickness(decoration.Thickness(),
-                                   decorating_box_style_);
+  return ComputeUnderlineThickness(decoration.Thickness());
 }
 
 float TextDecorationInfo::ComputeUnderlineThickness(
-    const TextDecorationThickness& applied_decoration_thickness,
-    const ComputedStyle* decorating_box_style) const {
+    const TextDecorationThickness& applied_decoration_thickness) const {
   float thickness = 0;
-  if (flipped_underline_position_ ==
+  if (RuntimeEnabledFeatures::
+          SvgTextCentralBaselineTextDecorationFixEnabled() ||
+      flipped_underline_position_ ==
           ResolvedUnderlinePosition::kNearAlphabeticBaselineAuto ||
       flipped_underline_position_ ==
-          ResolvedUnderlinePosition::kNearAlphabeticBaselineFromFont) {
+          ResolvedUnderlinePosition::kNearAlphabeticBaselineFromFont ||
+      !decorating_box_style_) {
     thickness = ComputeDecorationThickness(applied_decoration_thickness,
                                            computed_font_size_, font_data_);
   } else {
@@ -454,15 +456,9 @@ float TextDecorationInfo::ComputeUnderlineThickness(
     // decorating box.
     // Only for non-Roman for now for the performance implications.
     // https:// drafts.csswg.org/css-text-decor-3/#decorating-box
-    if (decorating_box_style) {
-      thickness = ComputeDecorationThickness(
-          applied_decoration_thickness,
-          decorating_box_style->ComputedFontSize(),
-          decorating_box_style->GetFont()->PrimaryFont());
-    } else {
-      thickness = ComputeDecorationThickness(applied_decoration_thickness,
-                                             computed_font_size_, font_data_);
-    }
+    thickness = ComputeDecorationThickness(
+        applied_decoration_thickness, decorating_box_style_->ComputedFontSize(),
+        decorating_box_style_->GetFont()->PrimaryFont());
   }
   const float minimum_thickness = minimum_thickness_is_one_ ? 1.0f : 0.0f;
   return std::max(minimum_thickness, thickness);

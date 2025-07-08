@@ -512,7 +512,8 @@ class PrerenderBrowserTest : public ContentBrowserTest,
             /*planned_max_preloading_type=*/PreloadingType::kPrerender),
         preloading_attempt,
         /*url_match_predicate=*/{},
-        /*prerender_navigation_handle_callback=*/{});
+        /*prerender_navigation_handle_callback=*/{},
+        /*allow_reuse=*/false);
   }
 
   bool AddTestUtilJS(RenderFrameHost* host) {
@@ -2543,12 +2544,12 @@ enum class BodySize { kSmall, kLarge };
 class PrerenderAndPrefetchBrowserTest
     : public PrerenderBrowserTest,
       public testing::WithParamInterface<
-          std::tuple<PrerenderingResult, BodySize, PrefetchReusableForTests>> {
+          std::tuple<PrerenderingResult, BodySize>> {
  public:
   // Provides meaningful param names instead of /0, /1, ...
   static std::string DescribeParams(
       const testing::TestParamInfo<ParamType>& info) {
-    auto [prerendering_result, body_size, prefetch_reusable] = info.param;
+    auto [prerendering_result, body_size] = info.param;
     std::stringstream params_description;
     switch (prerendering_result) {
       case PrerenderingResult::kSuccess:
@@ -2566,37 +2567,19 @@ class PrerenderAndPrefetchBrowserTest
         params_description << "_LargeBody";
         break;
     }
-    switch (prefetch_reusable) {
-      case PrefetchReusableForTests::kEnabled:
-        params_description << "_PrefetchReusableEnabled";
-        break;
-      case PrefetchReusableForTests::kDisabled:
-        params_description << "_PrefetchReusableDisabled";
-        break;
-    }
     return params_description.str();
   }
 
  private:
   void SetUp() override {
-    std::vector<base::test::FeatureRefAndParams> enabled_features;
-    std::vector<base::test::FeatureRef> disabled_features;
-
-    switch (std::get<PrefetchReusableForTests>(GetParam())) {
-      case PrefetchReusableForTests::kDisabled:
-        disabled_features.push_back(features::kPrefetchReusable);
-        break;
-      case PrefetchReusableForTests::kEnabled:
-        // Set the limit to the size of `/cacheable_long.html` - 1, to check
-        // that exceeding the limit by 1 byte disallows reuse.
-        enabled_features.push_back(
-            {features::kPrefetchReusable,
-             {{features::kPrefetchReusableBodySizeLimit.name, "102118"}}});
-        break;
-    }
-
-    sub_feature_list_.InitWithFeaturesAndParameters(enabled_features,
-                                                    disabled_features);
+    sub_feature_list_.InitWithFeaturesAndParameters(
+        {
+            {features::kPrefetchTesting,
+             {
+                 {features::kPrefetchReusableBodySizeLimit.name, "102118"},
+             }},
+        },
+        {});
     PrerenderBrowserTest::SetUp();
   }
 
@@ -2677,8 +2660,7 @@ IN_PROC_BROWSER_TEST_P(PrerenderAndPrefetchBrowserTest,
       ExpectFinalStatusForSpeculationRule(
           PrerenderFinalStatus::kCancelAllHostsForTesting);
 
-      if (std::get<1>(GetParam()) == BodySize::kSmall &&
-          std::get<2>(GetParam()) == PrefetchReusableForTests::kEnabled) {
+      if (std::get<1>(GetParam()) == BodySize::kSmall) {
         // The prefetched result should be still used for navigation for small
         // body, because it fits within PrefetchDataPipeTee buffer limit.
         EXPECT_EQ(GetRequestCount(kPrerenderingUrl), 1);
@@ -2711,8 +2693,7 @@ INSTANTIATE_TEST_SUITE_P(
     PrerenderAndPrefetchBrowserTest,
     testing::Combine(testing::Values(PrerenderingResult::kSuccess,
                                      PrerenderingResult::kFailed),
-                     testing::Values(BodySize::kSmall, BodySize::kLarge),
-                     testing::ValuesIn(PrefetchReusableValuesForTests())),
+                     testing::Values(BodySize::kSmall, BodySize::kLarge)),
     PrerenderAndPrefetchBrowserTest::DescribeParams);
 
 // Tests that the speculationrules-triggered prerender would be destroyed after
@@ -5992,17 +5973,11 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, ActivationDoesntRunThrottles) {
     auto* request =
         NavigationRequest::From(prerender_manager.GetNavigationHandle());
     ASSERT_TRUE(request->IsDeferredForTesting());
-    ASSERT_EQ(1u, request->GetNavigationThrottleRegistryForTesting()
-                      ->GetDeferringThrottles()
-                      .size());
-    EXPECT_TRUE(request->GetNavigationThrottleRegistryForTesting()
-                    ->GetDeferringThrottles()
-                    .contains(throttle));
+    auto* registry = request->GetNavigationThrottleRegistryForTesting();
+    ASSERT_EQ(1u, registry->GetDeferringThrottles().size());
+    EXPECT_TRUE(registry->GetDeferringThrottles().contains(throttle));
+    registry->ResumeProcessingNavigationEvent(throttle);
     throttle = nullptr;
-
-    request->GetNavigationThrottleRegistryForTesting()
-        ->GetNavigationThrottleRunnerForTesting()
-        .CallResumeForTesting();
     ASSERT_TRUE(prerender_manager.WaitForNavigationFinished());
 
     FrameTreeNodeId host_id = GetHostForUrl(kPrerenderingUrl);
@@ -12408,7 +12383,8 @@ PrerenderEmbedderTriggeredCrossOriginRedirectionPage(
           PreloadPipelineInfo::Create(
               /*planned_max_preloading_type=*/PreloadingType::kPrerender),
           /*preloading_attempt=*/nullptr, /*url_match_predicate=*/{},
-          /*prerender_navigation_handle_callback=*/{});
+          /*prerender_navigation_handle_callback=*/{},
+          /*allow_reuse=*/false);
   EXPECT_TRUE(prerender_handle);
   test::PrerenderTestHelper::WaitForPrerenderLoadCompletion(web_contents,
                                                             prerendering_url);
@@ -13561,11 +13537,11 @@ IN_PROC_BROWSER_TEST_F(PrerenderFencedFrameBrowserTest,
   TestNavigationObserver nav_observer(web_contents(), kNumNavigations);
 
   ASSERT_TRUE(NavigateToURL(shell(), kInitialUrl));
+  EXPECT_EQ(kInitialUrl, nav_observer.last_navigation_url());
 
   // Start a prerender.
   FrameTreeNodeId host_id = AddPrerender(kPrerenderingUrl);
   auto* prerendered_rfh = GetPrerenderedMainFrameHost(host_id);
-  EXPECT_EQ(kPrerenderingUrl, nav_observer.last_navigation_url());
   EXPECT_TRUE(ExecJs(prerendered_rfh,
                      JsReplace(kAddFencedFrameScript, kFencedFrameUrl)));
   // Since we've deferred creating the fenced frame delegate, we should see no

@@ -53,7 +53,6 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_finder.h"
-#include "chrome/browser/ui/browser_user_data.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/exclusive_access/exclusive_access_manager.h"
@@ -2639,7 +2638,9 @@ class LensOverlayBrowserTest : public LensBrowserBaseTest {
  protected:
   void SetUp() override {
     base::test::ScopedFeatureList feature_list;
-    feature_list.InitWithFeatures({lens::features::kLensOverlay}, {});
+    feature_list.InitWithFeatures(
+        {lens::features::kLensOverlay},
+        {lens::features::kLensOverlayKeyboardSelection});
 
     // This does not use LensBrowserBaseTest::SetUp because that
     // function does its own conflicting initialization of a FeatureList.

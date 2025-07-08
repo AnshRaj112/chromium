@@ -63,6 +63,10 @@ const CGFloat kFakeboxHighlightAlpha = 0.06;
 // Height margin of the fake location bar.
 const CGFloat kFakeLocationBarHeightMargin = 2;
 
+// When the placeholder text in the fakebox doesn't fit, the font shrinks to fit
+// the string. This is the minimum allowed factor by which it shrinks.
+const CGFloat kFakeboxMinimumFontScaleFactor = 0.3;
+
 // The constants for the constraints affecting the end button; either Lens or
 // Voice Search, depending on if Lens is enabled.
 const CGFloat kEndButtonFakeboxTrailingSpace = 13.0;
@@ -70,15 +74,19 @@ const CGFloat kEndButtonNormalSizeFakeboxWithBadgeTrailingSpace = 7.0;
 const CGFloat kEndButtonMIAEnlargedFakebox = 20.0;
 const CGFloat kEndButtonOmniboxTrailingSpace = 7.0;
 
+// Distance between the trailing fakebox icon and the placeholder text.
+const CGFloat kHintLabelFakeboxTrailingSpace = 12.0f;
+
 // The constants for the constraints the leading-edge aligned UI elements.
 const CGFloat kHintLabelFakeboxLeadingSpace = 28.0;
-const CGFloat kHintLabelFakeboxLeadingSpaceWithIcon = 49.0;
-
+const CGFloat kHintLabelFakeboxLeadingSpaceWithIcon = 42.0;
 const CGFloat kHintLabelOmniboxLeadingSpace = 20.0;
-const CGFloat kHintLabelOmniboxLeadingSpaceWithIcon = 39.0;
+const CGFloat kHintLabelOmniboxLeadingSpaceWithIcon = 42.0;
 
-const CGFloat kFakeboxImageLeadingSpace = 22.0;
-const CGFloat kFakeboxImageSize = 16.0;
+// The constants for the search engine image.
+const CGFloat kFakeboxImageLeadingSpace = 13.0;
+const CGFloat kOmniboxImageLeadingSpace = 22.0;
+const CGFloat kFakeboxImageSize = 20.0;
 
 // The amount to inset the Fakebox from the rest of the modules on Home, when
 // Large Fakebox is enabled.
@@ -115,13 +123,9 @@ const CGFloat kMIACircleAnimationSizeNormal = 40.0;
 // the fakebox.
 const CGFloat kMIACircleAnimationSizeEnlarged = 48.0;
 
-// The amount to inset the Fakebox from the rest of the modules on Home.
-CGFloat FakeboxHorizontalMargin(id<UITraitEnvironment> environment) {
-  if (IsSplitToolbarMode(environment) && ShouldEnlargeLogoAndFakebox()) {
-    return kLargeFakeboxHorizontalMargin;
-  }
-  return 0.0;
-}
+// The amount of invisible padding added to the MIA button when displayed as a
+// single button to avoid missing touches.
+const CGFloat kMIAButtonTouchAreaExtend = 5.0;
 
 // Returns the top color of the Fakebox's gradient background.
 UIColor* FakeboxTopColor() {
@@ -227,6 +231,11 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
 @property(nonatomic, strong) NSLayoutConstraint* fakeLocationBarTopConstraint;
 @property(nonatomic, strong)
     NSLayoutConstraint* fakeLocationBarHeightConstraint;
+
+// Constraint between the search field's leading edge and the search engine
+// logo.
+@property(nonatomic, strong) NSLayoutConstraint* leadingLogoConstraint;
+
 @property(nonatomic, strong) NSLayoutConstraint* hintLabelLeadingConstraint;
 @property(nonatomic, strong) NSLayoutConstraint* hintLabelTrailingConstraint;
 // View used to add on-touch highlight to the fake omnibox.
@@ -243,6 +252,8 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
 @property(nonatomic, readonly) BOOL shouldShowMIAEntrypoint;
 // Whether the fakebox is enlarged due to a MIA entry point variation.
 @property(nonatomic, readonly) BOOL useMIAEnlargedFakebox;
+// The amount to inset the Fakebox from the rest of the modules on Home.
+@property(nonatomic, readonly) CGFloat fakeboxHorizontalMargin;
 
 @end
 
@@ -274,6 +285,8 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   // Maintains the MIA circle animation.
   id<LottieAnimation> _miaAnimation;
   UIView* _miaAnimationView;
+  // Whether MIA is allowed by policy.
+  BOOL _MIAAllowedByPolicy;
 }
 
 #pragma mark - Public
@@ -394,6 +407,8 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
 
   // Hint label.
   self.searchHintLabel = [[UILabel alloc] init];
+  self.searchHintLabel.adjustsFontSizeToFitWidth = true;
+  self.searchHintLabel.minimumScaleFactor = kFakeboxMinimumFontScaleFactor;
   content_suggestions::ConfigureSearchHintLabel(
       self.searchHintLabel, searchField, self.placeholderText);
   [self updateHintLabelFonts];
@@ -443,10 +458,10 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
       constraintEqualToAnchor:searchField.topAnchor];
   self.fakeLocationBarLeadingConstraint = [self.fakeLocationBar.leadingAnchor
       constraintEqualToAnchor:searchField.leadingAnchor
-                     constant:FakeboxHorizontalMargin(self)];
+                     constant:self.fakeboxHorizontalMargin];
   self.fakeLocationBarTrailingConstraint = [self.fakeLocationBar.trailingAnchor
       constraintEqualToAnchor:searchField.trailingAnchor
-                     constant:FakeboxHorizontalMargin(self)];
+                     constant:self.fakeboxHorizontalMargin];
   self.fakeLocationBarHeightConstraint = [self.fakeLocationBar.heightAnchor
       constraintEqualToConstant:content_suggestions::FakeOmniboxHeight()];
   [NSLayoutConstraint activateConstraints:@[
@@ -454,16 +469,6 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
     self.fakeLocationBarLeadingConstraint,
     self.fakeLocationBarTrailingConstraint,
     self.fakeLocationBarHeightConstraint,
-  ]];
-
-  UIView* referenceView = _buttonStack.arrangedSubviews.firstObject;
-  self.hintLabelTrailingConstraint = [self.searchHintLabel.trailingAnchor
-      constraintLessThanOrEqualToAnchor:referenceView.leadingAnchor];
-  self.hintLabelTrailingConstraint.priority = UILayoutPriorityDefaultHigh;
-  [NSLayoutConstraint activateConstraints:@[
-    [referenceView.centerYAnchor
-        constraintEqualToAnchor:self.fakeLocationBar.centerYAnchor],
-    self.hintLabelTrailingConstraint,
   ]];
 
   [self addSearchEngineLogoIfNeededToSearchField:searchField];
@@ -481,9 +486,11 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   logoView.translatesAutoresizingMaskIntoConstraints = NO;
   AddSquareConstraints(logoView, kFakeboxImageSize);
 
+  self.leadingLogoConstraint = [logoView.leadingAnchor
+      constraintEqualToAnchor:searchField.leadingAnchor
+                     constant:kOmniboxImageLeadingSpace];
   [NSLayoutConstraint activateConstraints:@[
-    [logoView.leadingAnchor constraintEqualToAnchor:searchField.leadingAnchor
-                                           constant:kFakeboxImageLeadingSpace],
+    self.leadingLogoConstraint,
     [logoView.centerYAnchor constraintEqualToAnchor:searchField.centerYAnchor
                                            constant:-2.0],
 
@@ -514,7 +521,7 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   }
 
   if (self.miaButton) {
-    content_suggestions::ConfigureInlineMIAButton(self.miaButton, useColorIcon);
+    content_suggestions::ConfigureMIAButton(self.miaButton, useColorIcon);
   }
 }
 
@@ -593,7 +600,19 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   CGFloat hintLabelScalingExtraOffset =
       (_currentHintLabelScale - 1) *
       self.searchHintLabel.intrinsicContentSize.width * 0.5;
-  self.hintLabelTrailingConstraint.constant = -hintLabelScalingExtraOffset;
+
+  // If MIA animation view is shown then add an aditional spacing to avoid any
+  // overlap with the label.
+  self.hintLabelTrailingConstraint.constant = -hintLabelScalingExtraOffset -
+                                              [self miaButtonHintLabelOffset] -
+                                              kHintLabelFakeboxTrailingSpace;
+
+  // Animate the leading image from its fakebox position to its scrolled omnibox
+  // position linearly. When `percent` is 0, the fakebox is displayed in the
+  // middle of the screen; when it's 1, the fakebox is fully scrolled up.
+  self.leadingLogoConstraint.constant =
+      kFakeboxImageLeadingSpace * (1 - percent) +
+      kOmniboxImageLeadingSpace * percent;
 
   CGFloat fakeOmniboxHeight = content_suggestions::FakeOmniboxHeight();
   CGFloat locationBarHeight = content_suggestions::PinnedFakeOmniboxHeight();
@@ -622,6 +641,9 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
 
     self.separator.alpha = 0;
 
+    _buttonStack.directionalLayoutMargins = NSDirectionalEdgeInsetsMake(
+        0, 0, 0, [self endButtonFakeboxTrailingSpace]);
+
     _lastAnimationPercent = percent;
     return;
   }
@@ -647,7 +669,7 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
 
   // Calculate the amount to shrink the width and height of background so that
   // it's where the focused adapative toolbar focuses.
-  CGFloat horizontalMargin = FakeboxHorizontalMargin(self);
+  CGFloat horizontalMargin = self.fakeboxHorizontalMargin;
   self.fakeLocationBarLeadingConstraint.constant = Interpolate(
       horizontalMargin,
       safeAreaInsets.left + kExpandedLocationBarHorizontalMargin, percent);
@@ -809,6 +831,10 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   return [_buttonStack snapshotViewAfterScreenUpdates:NO];
 }
 
+- (void)setMIAAllowedByPolicy:(BOOL)policyAllowed {
+  _MIAAllowedByPolicy = policyAllowed;
+}
+
 #pragma mark - UITraitEnvironment
 
 #if !defined(__IPHONE_17_0) || __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_17_0
@@ -887,7 +913,7 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
         [ExtendedTouchTargetButton buttonWithType:UIButtonTypeSystem];
     [self.miaButton
         setAccessibilityLabel:l10n_util::GetNSString(IDS_IOS_ACCNAME_MIA)];
-    [self.miaButton setAccessibilityIdentifier:@"MIA"];
+    [self.miaButton setAccessibilityIdentifier:kNTPMIAIdentifier];
 
     [_buttonStack addArrangedSubview:self.miaButton];
     if (self.useInlineMIA) {
@@ -926,6 +952,7 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
                                                .userInterfaceStyle];
 
   [self addActionsToFakeboxButtons];
+  [self updateHintLabelTrailingConstraint];
 }
 
 // Registers the actions for the fakebox buttons.
@@ -942,6 +969,26 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   [self.miaButton addTarget:self
                      action:@selector(openMIA)
            forControlEvents:UIControlEventTouchUpInside];
+}
+
+// Updates the trailing constraint of the label to the nearest button stack
+// element.
+- (void)updateHintLabelTrailingConstraint {
+  UIView* referenceView = _buttonStack.arrangedSubviews.firstObject;
+  if (!referenceView) {
+    return;
+  }
+
+  self.hintLabelTrailingConstraint = [self.searchHintLabel.trailingAnchor
+      constraintLessThanOrEqualToAnchor:referenceView.leadingAnchor
+                               constant:-[self miaButtonHintLabelOffset] -
+                                        kHintLabelFakeboxTrailingSpace];
+  self.hintLabelTrailingConstraint.priority = UILayoutPriorityDefaultHigh;
+  [NSLayoutConstraint activateConstraints:@[
+    [referenceView.centerYAnchor
+        constraintEqualToAnchor:self.fakeLocationBar.centerYAnchor],
+    self.hintLabelTrailingConstraint,
+  ]];
 }
 
 // Gets the fonts for the pinned and unpinned fakebox hint label, and sets
@@ -1117,16 +1164,37 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   }
 }
 
+- (UIView*)hitTest:(CGPoint)point withEvent:(UIEvent*)event {
+  // When MIA appears as a solitary button, expand its active touch zone to
+  // ensure all nearby taps are registered.
+  if (self.useSingleButtonMIA) {
+    CGRect miaButtonFrameInHeader = [self.miaButton convertRect:self.bounds
+                                                         toView:self];
+    UIEdgeInsets touchAreaExtend = UIEdgeInsetsMake(
+        -kMIAButtonTouchAreaExtend, -kMIAButtonTouchAreaExtend,
+        -kMIAButtonTouchAreaExtend, -kMIAButtonTouchAreaExtend);
+
+    CGRect extendedTouchArea =
+        UIEdgeInsetsInsetRect(miaButtonFrameInHeader, touchAreaExtend);
+
+    if (CGRectContainsPoint(extendedTouchArea, point)) {
+      return self.miaButton;
+    }
+  }
+
+  return [super hitTest:point withEvent:event];
+}
+
 #pragma mark - MIA
 
 - (BOOL)useInlineMIA {
-  return self.isGoogleDefaultSearchEngine &&
+  return self.isGoogleDefaultSearchEngine && _MIAAllowedByPolicy &&
          GetNTPMIAEntrypointVariation() ==
              NTPMIAEntrypointVariation::kOmniboxContainedInline;
 }
 
 - (BOOL)useSingleButtonMIA {
-  return self.isGoogleDefaultSearchEngine &&
+  return self.isGoogleDefaultSearchEngine && _MIAAllowedByPolicy &&
          ShowOnlyMIAEntrypointInNTPFakebox();
 }
 
@@ -1163,12 +1231,27 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   if (!self.miaButton) {
     return;
   }
+
+  if (UIAccessibilityIsReduceMotionEnabled()) {
+    return;
+  }
+
   _miaAnimationView = [self createMIAAnimationView];
   _miaAnimationView.userInteractionEnabled = NO;
+  _miaAnimationView.alpha =
+      MIAAnimationOpacityForScrollProgress(_lastAnimationPercent);
   [_miaAnimation play];
   [self.miaButton addSubview:_miaAnimationView];
   AddSameCenterConstraints(_miaAnimationView, self.miaButton);
   AddSizeConstraints(_miaAnimationView, [self miaAnimationSize]);
+}
+
+- (CGFloat)miaButtonHintLabelOffset {
+  if (self.useSingleButtonMIA && _miaAnimationView) {
+    return ([self miaAnimationSize].width / 2);
+  }
+
+  return 0;
 }
 
 // The size for the animation view dependant on the fakebox size.
@@ -1183,10 +1266,19 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
 }
 
 - (BOOL)useMIAEnlargedFakebox {
-  return self.isGoogleDefaultSearchEngine && ShouldEnlargeNTPFakeboxForMIA();
+  return self.isGoogleDefaultSearchEngine && ShouldEnlargeNTPFakeboxForMIA() &&
+         self.shouldShowMIAEntrypoint;
 }
 
 #pragma mark - helpers
+
+- (CGFloat)fakeboxHorizontalMargin {
+  if (IsSplitToolbarMode(self) && ShouldEnlargeLogoAndFakebox() &&
+      !ShouldEnlargeNTPFakeboxForMIA()) {
+    return kLargeFakeboxHorizontalMargin;
+  }
+  return 0.0;
+}
 
 - (CGFloat)hintLabelFakeboxLeadingSpace {
   if (base::FeatureList::IsEnabled(omnibox::kOmniboxMobileParityUpdate)) {

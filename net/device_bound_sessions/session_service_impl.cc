@@ -196,7 +196,8 @@ SessionServiceImpl::GetSessionsForSite(const SchemefulSite& site) {
     if (now >= curit->second->expiry_date()) {
       // Since this deletion is not due to a request, we do not need to
       // provide a per-request callback here.
-      DeleteSessionAndNotifyInternal(curit, base::NullCallback());
+      DeleteSessionAndNotifyInternal(DeletionReason::kExpired, curit,
+                                     base::NullCallback());
     } else {
       curit->second->RecordAccess();
     }
@@ -267,8 +268,10 @@ void SessionServiceImpl::DeferRequestForRefresh(
   it->second.emplace_back(request, std::move(callback));
 
   auto* session = GetSession(session_key);
+  CHECK(session, base::NotFatalUntil::M147);
+  // TODO(crbug.com/417770933): Remove this block.
   if (!session) {
-    // If we can't find the session, clear the `session_key.id` in the map
+    // If we can't find the session, clear the `session_key` in the map
     // and continue all related requests. We can call this a fatal error
     // because the session has already been deleted.
     UnblockDeferredRequests(session_key, RefreshResult::kFatalError);
@@ -303,7 +306,7 @@ void SessionServiceImpl::DeferRequestForRefresh(
                          request->device_bound_session_access_callback()));
     } else {
       UnblockDeferredRequests(session_key, RefreshResult::kFatalError);
-      DeleteSessionAndNotify(session_key,
+      DeleteSessionAndNotify(DeletionReason::kFailedToRestoreKey, session_key,
                              request->device_bound_session_access_callback());
     }
 
@@ -385,6 +388,7 @@ void SessionServiceImpl::GetAllSessionsAsync(
 }
 
 void SessionServiceImpl::DeleteSessionAndNotify(
+    DeletionReason reason,
     const SessionKey& session_key,
     SessionService::OnAccessCallback per_request_callback) {
   auto it = unpartitioned_sessions_.find(session_key);
@@ -392,7 +396,7 @@ void SessionServiceImpl::DeleteSessionAndNotify(
     return;
   }
 
-  DeleteSessionAndNotifyInternal(it, per_request_callback);
+  DeleteSessionAndNotifyInternal(reason, it, per_request_callback);
 }
 
 Session* SessionServiceImpl::GetSession(const SessionKey& session_key) const {
@@ -414,6 +418,7 @@ void SessionServiceImpl::AddSession(const SchemefulSite& site,
 }
 
 void SessionServiceImpl::DeleteAllSessions(
+    DeletionReason reason,
     std::optional<base::Time> created_after_time,
     std::optional<base::Time> created_before_time,
     base::RepeatingCallback<bool(const url::Origin&, const net::SchemefulSite&)>
@@ -427,7 +432,7 @@ void SessionServiceImpl::DeleteAllSessions(
     if (SessionMatchesFilter(curit->first.site, *curit->second,
                              created_after_time, created_before_time,
                              origin_and_site_matcher)) {
-      DeleteSessionAndNotifyInternal(curit, base::NullCallback());
+      DeleteSessionAndNotifyInternal(reason, curit, base::NullCallback());
     }
   }
 
@@ -446,8 +451,12 @@ base::ScopedClosureRunner SessionServiceImpl::AddObserver(
 }
 
 void SessionServiceImpl::DeleteSessionAndNotifyInternal(
+    DeletionReason reason,
     SessionServiceImpl::SessionsMap::iterator it,
     SessionService::OnAccessCallback per_request_callback) {
+  base::UmaHistogramEnumeration("Net.DeviceBoundSessions.DeletionReason",
+                                reason);
+
   if (session_store_) {
     session_store_->DeleteSession(it->first);
   }
@@ -514,19 +523,9 @@ SessionError::ErrorType SessionServiceImpl::OnRegistrationCompleteInternal(
     OnAccessCallback on_access_callback,
     base::expected<SessionParams, SessionError> params_or_error) {
   if (!params_or_error.has_value()) {
-    // There was a failure attempting to register. This registration
-    // request could be used to clean up an existing session if the
-    // server returned `"continue": false` in the JSON. In that case, we
-    // need to delete the session. In all other cases, we failed to
-    // create a new session, so there's nothing to clean up.
-    const SessionError& error = params_or_error.error();
-    if (error.type == SessionError::ErrorType::kServerRequestedTermination &&
-        error.session_id.has_value()) {
-      Session::Id session_id(*error.session_id);
-      DeleteSessionAndNotify(SessionKey{error.site, std::move(session_id)},
-                             on_access_callback);
-    }
-    return error.type;
+    // We failed to create a new session, so there's nothing to clean
+    // up.
+    return params_or_error.error().type;
   }
 
   const SessionParams& params = *params_or_error;
@@ -551,33 +550,25 @@ SessionError::ErrorType SessionServiceImpl::OnRefreshRequestCompletionInternal(
     const SessionKey& session_key,
     base::expected<SessionParams, SessionError> params_or_error) {
   // If refresh succeeded:
-  // 1. update the session by adding a new session and deleting the old one
+  // 1. update the session by adding a new session, replacing the old one
   // 2. restart the deferred requests.
   //
   // Note that we notified `on_access_callback` about `session_key.id` already,
   // so we only need to notify the callback about other sessions.
-  //
-  // TODO(crbug.com/353766139): check if add/delete update will cause some race,
-  // for example, if the the old session_id is still in use while deleting it.
-  // Is it service's responsibility to keep the session_id same with the one in
-  // received JSON which parsed as result_result->params?
   if (params_or_error.has_value()) {
     auto session_or_error = Session::CreateIfValid(*params_or_error);
     if (!session_or_error.has_value()) {
       // New parameters are invalid, terminate the session.
-      DeleteSessionAndNotify(session_key, on_access_callback);
+      DeleteSessionAndNotify(DeletionReason::kInvalidSessionParams, session_key,
+                             on_access_callback);
       UnblockDeferredRequests(session_key, RefreshResult::kFatalError);
       return session_or_error.error().type;
     }
 
     std::unique_ptr<Session> new_session = std::move(*session_or_error);
     CHECK(new_session);
+    CHECK_EQ(new_session->id(), session_key.id);
 
-    // Delete old session.
-    DeleteSessionAndNotify(session_key, new_session->id() == session_key.id
-                                            ? base::NullCallback()
-                                            : on_access_callback);
-    // Add the new session.
     SchemefulSite new_site(
         url::Origin::Create(GURL(params_or_error->fetcher_url)));
     if (new_session->id() != session_key.id) {
@@ -590,9 +581,7 @@ SessionError::ErrorType SessionServiceImpl::OnRefreshRequestCompletionInternal(
     UnblockDeferredRequests(session_key, RefreshResult::kRefreshed);
   } else if (const SessionError& error = params_or_error.error();
              error.IsFatal()) {
-    Session::Id session_to_terminate =
-        error.session_id ? Session::Id(*error.session_id) : session_key.id;
-    DeleteSessionAndNotify(SessionKey{error.site, session_to_terminate},
+    DeleteSessionAndNotify(DeletionReason::kRefreshFatalError, session_key,
                            on_access_callback);
     UnblockDeferredRequests(session_key, RefreshResult::kFatalError);
   } else {
@@ -613,7 +602,8 @@ void SessionServiceImpl::OnSessionKeyRestored(
     Session::KeyIdOrError key_id_or_error) {
   if (!key_id_or_error.has_value()) {
     UnblockDeferredRequests(session_key, RefreshResult::kFatalError);
-    DeleteSessionAndNotify(session_key, on_access_callback);
+    DeleteSessionAndNotify(DeletionReason::kFailedToUnwrapKey, session_key,
+                           on_access_callback);
     return;
   }
 

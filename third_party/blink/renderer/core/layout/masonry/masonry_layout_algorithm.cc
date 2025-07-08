@@ -491,10 +491,9 @@ wtf_size_t MasonryLayoutAlgorithm::ComputeAutomaticRepetitions() const {
       style.MasonryTrackSizingDirection();
   const bool is_for_columns = masonry_track_sizing_direction == kForColumns;
 
-  // TODO(almaher): Update the name of NGGridTrackList to GridTrackList.
-  const NGGridTrackList& track_list =
-      is_for_columns ? style.GridTemplateColumns().track_list
-                     : style.GridTemplateRows().track_list;
+  const GridTrackList& track_list = is_for_columns
+                                        ? style.GridTemplateColumns().track_list
+                                        : style.GridTemplateRows().track_list;
 
   if (!track_list.HasAutoRepeater()) {
     return 0;
@@ -508,6 +507,7 @@ wtf_size_t MasonryLayoutAlgorithm::ComputeAutomaticRepetitions() const {
   const LayoutUnit gutter_size = GridTrackSizingAlgorithm::CalculateGutterSize(
       style, masonry_available_size_, masonry_track_sizing_direction);
 
+  // TODO(almaher): Pass in a value to use for auto sized tracks.
   return CalculateAutomaticRepetitions(
       track_list, gutter_size,
       is_for_columns ? masonry_available_size_.inline_size

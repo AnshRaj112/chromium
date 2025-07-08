@@ -301,6 +301,12 @@ namespace content {
 
 namespace {
 
+// Feature to combine the UpdateState IPC that's sent during commit time with
+// the DidCommit* IPCs. See: http://crbug.com/424829233
+BASE_FEATURE(kReducePageStateIpcs,
+             "ReducePageStateIpcs",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 const int kExtraCharsBeforeAndAfterSelection = 100;
 const size_t kMaxURLLogChars = 1024;
 const char kCommitRenderFrame[] = "Navigation.CommitRenderFrame";
@@ -316,12 +322,6 @@ const char kCommitRenderFrame[] = "Navigation.CommitRenderFrame";
 constexpr base::TimeDelta kDelaySecondsForContentStateSyncHidden =
     base::Seconds(5);
 constexpr base::TimeDelta kDelaySecondsForContentStateSync = base::Seconds(1);
-
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-using RoutingIDFrameMap = absl::flat_hash_map<int, RenderFrameImpl*>;
-static base::LazyInstance<RoutingIDFrameMap>::DestructorAtExit
-    g_routing_id_frame_map = LAZY_INSTANCE_INITIALIZER;
-#endif
 
 using FrameMap = absl::flat_hash_map<blink::WebFrame*, RenderFrameImpl*>;
 base::LazyInstance<FrameMap>::DestructorAtExit g_frame_map =
@@ -1552,22 +1552,6 @@ RenderFrameImpl* RenderFrameImpl::Create(
     return new RenderFrameImpl(std::move(params));
 }
 
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-// static
-RenderFrame* RenderFrame::FromRoutingID(int routing_id) {
-  return RenderFrameImpl::FromRoutingID(routing_id);
-}
-
-// static
-RenderFrameImpl* RenderFrameImpl::FromRoutingID(int routing_id) {
-  DCHECK(RenderThread::IsMainThread());
-  auto iter = g_routing_id_frame_map.Get().find(routing_id);
-  if (iter != g_routing_id_frame_map.Get().end())
-    return iter->second;
-  return nullptr;
-}
-#endif
-
 // static
 RenderFrameImpl* RenderFrameImpl::CreateMainFrame(
     AgentSchedulingGroup& agent_scheduling_group,
@@ -1914,9 +1898,6 @@ RenderFrameImpl::RenderFrameImpl(CreateParams params)
       unique_name_helper_(&unique_name_frame_adapter_),
       in_frame_tree_(false),
       frame_token_(params.frame_token),
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-      routing_id_(params.routing_id),
-#endif
       process_label_id_(
           tracing::TrackNameRecorder::GetInstance()->GetNewProcessLabelId()),
       selection_text_offset_(0),
@@ -1952,12 +1933,6 @@ RenderFrameImpl::RenderFrameImpl(CreateParams params)
 
   // Must call after binding our own remote interfaces.
   media_factory_.SetupMojo();
-
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-  std::pair<RoutingIDFrameMap::iterator, bool> result =
-      g_routing_id_frame_map.Get().insert(std::make_pair(routing_id_, this));
-  CHECK(result.second) << "Inserting a duplicate item.";
-#endif
 }
 
 mojom::FrameHost* RenderFrameImpl::GetFrameHost() {
@@ -1981,15 +1956,7 @@ RenderFrameImpl::~RenderFrameImpl() {
 
   tracing::TrackNameRecorder::GetInstance()->RemoveProcessLabel(
       process_label_id_);
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-  g_routing_id_frame_map.Get().erase(routing_id_);
-#endif
-  agent_scheduling_group_->RemoveFrameRoute(frame_token_
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-                                            ,
-                                            routing_id_
-#endif
-  );
+  agent_scheduling_group_->RemoveFrameRoute(frame_token_);
 }
 
 void RenderFrameImpl::Initialize(blink::WebFrame* parent) {
@@ -2025,9 +1992,6 @@ void RenderFrameImpl::Initialize(blink::WebFrame* parent) {
       GetTaskRunner(blink::TaskType::kInternalNavigationAssociated));
   agent_scheduling_group_->AddFrameRoute(
       frame_token_,
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-      routing_id_,
-#endif
       this, GetTaskRunner(blink::TaskType::kInternalNavigationAssociated));
 }
 
@@ -2053,31 +2017,6 @@ void RenderFrameImpl::ScriptedPrint() {
   for (auto& observer : observers_)
     observer.ScriptedPrint(user_initiated);
 }
-
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-bool RenderFrameImpl::Send(IPC::Message* message) {
-  return agent_scheduling_group_->Send(message);
-}
-
-bool RenderFrameImpl::OnMessageReceived(const IPC::Message& msg) {
-  // We may get here while detaching, when the WebFrame has been deleted.  Do
-  // not process any messages in this state.
-  if (!frame_)
-    return false;
-
-  DCHECK(!frame_->GetDocument().IsNull());
-
-  GetContentClient()->SetActiveURL(
-      frame_->GetDocument().Url(),
-      frame_->Top()->GetSecurityOrigin().ToString().Utf8());
-
-  for (auto& observer : observers_) {
-    if (observer.OnMessageReceived(msg))
-      return true;
-  }
-  return false;
-}
-#endif
 
 void RenderFrameImpl::OnAssociatedInterfaceRequest(
     const std::string& interface_name,
@@ -2346,12 +2285,6 @@ std::unique_ptr<AXTreeSnapshotter> RenderFrameImpl::CreateAXTreeSnapshotter(
     ui::AXMode ax_mode) {
   return std::make_unique<AXTreeSnapshotterImpl>(this, ax_mode);
 }
-
-#if BUILDFLAG(CONTENT_ENABLE_LEGACY_IPC)
-int RenderFrameImpl::GetRoutingID() {
-  return routing_id_;
-}
-#endif
 
 blink::WebLocalFrame* RenderFrameImpl::GetWebFrame() {
   DCHECK(frame_);
@@ -3029,6 +2962,7 @@ void RenderFrameImpl::CommitFailedNavigation(
     std::unique_ptr<blink::PendingURLLoaderFactoryBundle>
         subresource_loader_factories,
     const blink::DocumentToken& document_token,
+    const base::UnguessableToken& devtools_navigation_token,
     blink::mojom::PolicyContainerPtr policy_container,
     mojom::AlternativeErrorPageOverrideInfoPtr alternative_error_page_info,
     mojom::NavigationClient::CommitFailedNavigationCallback callback) {
@@ -3092,8 +3026,7 @@ void RenderFrameImpl::CommitFailedNavigation(
   commit_params->content_settings =
       blink::CreateDefaultRendererContentSettings();
   auto navigation_params = std::make_unique<WebNavigationParams>(
-      document_token,
-      /*devtools_navigation_token=*/base::UnguessableToken::Create(),
+      document_token, devtools_navigation_token,
       /*base_auction_nonce=*/base::Uuid::GenerateRandomV4());
   FillNavigationParamsRequest(*common_params, *commit_params,
                               navigation_params.get());
@@ -4901,7 +4834,8 @@ RenderFrameImpl::MakeDidCommitProvisionalLoadParams(
     ui::PageTransition transition,
     const network::ParsedPermissionsPolicy& permissions_policy_header,
     const blink::DocumentPolicyFeatureState& document_policy_header,
-    const std::optional<base::UnguessableToken>& embedding_token) {
+    const std::optional<base::UnguessableToken>& embedding_token,
+    std::optional<blink::PageState> previous_page_state) {
   WebDocumentLoader* document_loader = frame_->GetDocumentLoader();
   const WebURLResponse& response = document_loader->GetWebResponse();
 
@@ -4983,6 +4917,10 @@ RenderFrameImpl::MakeDidCommitProvisionalLoadParams(
   // should_update_history.
   params->should_update_history =
       !document_loader->HasUnreachableURL() && response.HttpStatusCode() != 404;
+
+  if (previous_page_state.has_value()) {
+    params->previous_page_state = previous_page_state;
+  }
 
   // Make navigation state a part of the DidCommitProvisionalLoad message so
   // that committed entry has it at all times.  Send a single HistoryItem for
@@ -5149,9 +5087,11 @@ void RenderFrameImpl::UpdateStateForCommit(
       DocumentState::FromDocumentLoader(frame_->GetDocumentLoader());
   NavigationState* navigation_state = document_state->navigation_state();
 
-  // We need to update the last committed session history entry with state for
-  // the previous page. Do this before updating the current history item.
-  SendUpdateState();
+  if (!base::FeatureList::IsEnabled(kReducePageStateIpcs)) {
+    // We need to update the last committed session history entry with state for
+    // the previous page. Do this before updating the current history item.
+    SendUpdateState();
+  }
 
   UpdateNavigationHistory(commit_type);
 
@@ -5193,6 +5133,15 @@ void RenderFrameImpl::DidCommitNavigationInternal(
     mojom::DidCommitSameDocumentNavigationParamsPtr same_document_params,
     const std::optional<base::UnguessableToken>& embedding_token) {
   DCHECK(!(same_document_params && interface_params));
+
+  // The pre-navigation page state needs to be saved before
+  // UpdateStateForCommit() since that call will update the current history
+  // item.
+  std::optional<blink::PageState> previous_page_state = std::nullopt;
+  if (base::FeatureList::IsEnabled(kReducePageStateIpcs) &&
+      !GetWebFrame()->GetCurrentHistoryItem().IsNull()) {
+    previous_page_state = GetWebFrame()->CurrentHistoryItemToPageState();
+  }
   UpdateStateForCommit(commit_type, transition);
 
   if (GetBlinkPreferences().renderer_wide_named_frame_lookup)
@@ -5200,7 +5149,7 @@ void RenderFrameImpl::DidCommitNavigationInternal(
 
   auto params = MakeDidCommitProvisionalLoadParams(
       commit_type, transition, permissions_policy_header,
-      document_policy_header, embedding_token);
+      document_policy_header, embedding_token, previous_page_state);
   NavigationState* navigation_state =
       DocumentState::FromDocumentLoader(frame_->GetDocumentLoader())
           ->navigation_state();

@@ -4,6 +4,8 @@
 
 #include "ui/android/fake_modal_dialog_manager_bridge.h"
 
+#include <vector>
+
 #include "base/android/jni_android.h"
 #include "ui/android/window_android.h"
 
@@ -37,6 +39,17 @@ void FakeModalDialogManagerBridge::ClickPositiveButton() {
 void FakeModalDialogManagerBridge::ClickNegativeButton() {
   JNIEnv* env = base::android::AttachCurrentThread();
   Java_FakeModalDialogManager_clickNegativeButton(env, j_fake_manager_);
+}
+
+void FakeModalDialogManagerBridge::ToggleCheckbox() {
+  JNIEnv* env = base::android::AttachCurrentThread();
+  Java_FakeModalDialogManager_toggleCheckbox(env, j_fake_manager_);
+}
+
+bool FakeModalDialogManagerBridge::IsCheckboxChecked() {
+  JNIEnv* env = base::android::AttachCurrentThread();
+  return static_cast<bool>(
+      Java_FakeModalDialogManager_isCheckboxChecked(env, j_fake_manager_));
 }
 
 int FakeModalDialogManagerBridge::GetButtonStyles() {

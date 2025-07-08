@@ -1755,9 +1755,10 @@ class DiceBrowserTestWithChromeSigninIPH
             user_education::HelpBubbleView::kHelpBubbleElementIdForTesting),
         CheckResult(
             [this]() {
-              return browser()->window()->IsFeaturePromoActive(
-                  feature_engagement::
-                      kIPHExplicitBrowserSigninPreferenceRememberedFeature);
+              return BrowserUserEducationInterface::From(browser())
+                  ->IsFeaturePromoActive(
+                      feature_engagement::
+                          kIPHExplicitBrowserSigninPreferenceRememberedFeature);
             },
             false));
   }
@@ -1801,9 +1802,10 @@ IN_PROC_BROWSER_TEST_F(DiceBrowserTestWithChromeSigninIPH,
 
   // IPH not showing yet, waiting for the name.
   ASSERT_TRUE(account_info.given_name.empty());
-  EXPECT_FALSE(browser()->window()->IsFeaturePromoActive(
-      feature_engagement::
-          kIPHExplicitBrowserSigninPreferenceRememberedFeature));
+  EXPECT_FALSE(
+      BrowserUserEducationInterface::From(browser())->IsFeaturePromoActive(
+          feature_engagement::
+              kIPHExplicitBrowserSigninPreferenceRememberedFeature));
 
   // IPH shown after receiving the name.
   SimulateExtendedAccountInfoFetched();
@@ -1821,9 +1823,10 @@ IN_PROC_BROWSER_TEST_F(DiceBrowserTestWithChromeSigninIPH,
       "Signin.SignIn.Completed",
       signin_metrics::AccessPoint::kSigninChoiceRemembered, 2);
   SimulateExtendedAccountInfoFetched();
-  EXPECT_FALSE(browser()->window()->IsFeaturePromoActive(
-      feature_engagement::
-          kIPHExplicitBrowserSigninPreferenceRememberedFeature));
+  EXPECT_FALSE(
+      BrowserUserEducationInterface::From(browser())->IsFeaturePromoActive(
+          feature_engagement::
+              kIPHExplicitBrowserSigninPreferenceRememberedFeature));
 
   // The IPH can be reshown two weeks after the signout.
   RunTestSequence(AdvanceTime(kIPHReshowDelay));
@@ -1831,9 +1834,10 @@ IN_PROC_BROWSER_TEST_F(DiceBrowserTestWithChromeSigninIPH,
   SimulateWebSigninMainAccount();
   SimulateExtendedAccountInfoFetched();
   // IPH does not reshow yet, because the delay was before the signout event.
-  EXPECT_FALSE(browser()->window()->IsFeaturePromoActive(
-      feature_engagement::
-          kIPHExplicitBrowserSigninPreferenceRememberedFeature));
+  EXPECT_FALSE(
+      BrowserUserEducationInterface::From(browser())->IsFeaturePromoActive(
+          feature_engagement::
+              kIPHExplicitBrowserSigninPreferenceRememberedFeature));
   SignoutAndResetState();
   // Wait 2 weeks after the signout event (by overriding the last signout date).
   SigninPrefs(*browser()->profile()->GetPrefs())
@@ -1899,10 +1903,21 @@ IN_PROC_BROWSER_TEST_F(DiceManageAccountBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(DiceManageAccountBrowserTest,
                        ClearManagedProfileOnStartup) {
-  // Initial profile should have been deleted as sign-in and sign out were no
-  // longer allowed.
   PrefService* local_state = g_browser_process->local_state();
   DCHECK(local_state);
+
+  // Initial profile should have been deleted as sign-in and sign out were no
+  // longer allowed. If the profile has not yet been deleted, wait for the pref
+  // to be updated.
+  if (local_state->GetList(prefs::kProfilesDeleted).empty()) {
+    base::RunLoop run_loop;
+    PrefChangeRegistrar pref_registrar;
+    pref_registrar.Init(local_state);
+    // Quit the run loop when the 'kProfilesDeleted' pref changes.
+    pref_registrar.Add(prefs::kProfilesDeleted, run_loop.QuitClosure());
+    run_loop.Run();
+  }
+
   const base::Value::List& deleted_profiles =
       local_state->GetList(prefs::kProfilesDeleted);
   EXPECT_EQ(1U, deleted_profiles.size());

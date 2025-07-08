@@ -63,7 +63,6 @@
     "android-cronet-x86-dbg": "ci/android-cronet-x86-dbg/gn-args.json",
     "android-cronet-x86-rel": "ci/android-cronet-x86-rel/gn-args.json",
     "android-mte-arm64-rel": "ci/android-mte-arm64-rel/gn-args.json",
-    "android-pie-x86-rel": "ci/android-pie-x86-rel/gn-args.json",
     "android-webview-13-x64-hostside-rel": "ci/android-webview-13-x64-hostside-rel/gn-args.json",
     "android-x86-rel": "ci/android-x86-rel/gn-args.json"
   },
@@ -127,6 +126,12 @@
   },
   "chromium.build.fyi": {
     "Mac Builder Siso FYI": "build/Mac Builder Siso FYI/gn-args.json"
+  },
+  "chromium.build.test": {
+    "linux-rbe-trusted-test": "build/linux-rbe-trusted-test/gn-args.json",
+    "linux-rbe-untrusted-test": "build/linux-rbe-untrusted-test/gn-args.json",
+    "win-rbe-trusted-test": "build/win-rbe-trusted-test/gn-args.json",
+    "win-rbe-untrusted-test": "build/win-rbe-untrusted-test/gn-args.json"
   },
   "chromium.cft": {
     "linux-rel-cft": "ci/linux-rel-cft/gn-args.json",
@@ -473,7 +478,7 @@
   },
   "chromium.webrtc.fyi": {
     "WebRTC Chromium FYI Android Builder": "webrtc.fyi/WebRTC Chromium FYI Android Builder/gn-args.json",
-    "WebRTC Chromium FYI Android Builder ARM64 (dbg)": "webrtc.fyi/WebRTC Chromium FYI Android Builder ARM64 (dbg)/gn-args.json",
+    "WebRTC Chromium FYI Android Builder (dbg)": "webrtc.fyi/WebRTC Chromium FYI Android Builder (dbg)/gn-args.json",
     "WebRTC Chromium FYI Linux Builder": "webrtc.fyi/WebRTC Chromium FYI Linux Builder/gn-args.json",
     "WebRTC Chromium FYI Linux Builder (dbg)": "webrtc.fyi/WebRTC Chromium FYI Linux Builder (dbg)/gn-args.json",
     "WebRTC Chromium FYI Mac Builder": "webrtc.fyi/WebRTC Chromium FYI Mac Builder/gn-args.json",

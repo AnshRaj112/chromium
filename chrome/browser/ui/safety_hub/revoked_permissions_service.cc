@@ -19,6 +19,7 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/engagement/site_engagement_service_factory.h"
 #include "chrome/browser/ui/safety_hub/safety_hub_prefs.h"
+#include "chrome/browser/ui/safety_hub/safety_hub_result.h"
 #include "chrome/browser/ui/safety_hub/safety_hub_service.h"
 #include "chrome/browser/ui/safety_hub/safety_hub_util.h"
 #include "chrome/common/chrome_features.h"
@@ -27,14 +28,17 @@
 #include "components/content_settings/core/browser/content_settings_uma_util.h"
 #include "components/content_settings/core/browser/content_settings_utils.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
+#include "components/content_settings/core/browser/permission_settings_registry.h"
 #include "components/content_settings/core/browser/website_settings_info.h"
 #include "components/content_settings/core/browser/website_settings_registry.h"
 #include "components/content_settings/core/common/content_settings.h"
 #include "components/content_settings/core/common/content_settings_pattern.h"
 #include "components/content_settings/core/common/content_settings_types.h"
+#include "components/content_settings/core/common/content_settings_utils.h"
 #include "components/content_settings/core/common/features.h"
 #include "components/permissions/constants.h"
 #include "components/permissions/permission_uma_util.h"
+#include "components/permissions/permission_util.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_service.h"
 #include "components/safe_browsing/core/common/features.h"
@@ -343,7 +347,7 @@ void RevokedPermissionsService::MaybeStartRepeatedUpdates() {
   }
 }
 
-std::unique_ptr<SafetyHubService::Result>
+std::unique_ptr<SafetyHubResult>
 RevokedPermissionsService::InitializeLatestResultImpl() {
   return GetRevokedPermissions();
 }
@@ -611,13 +615,13 @@ void RevokedPermissionsService::DeletePatternFromRevokedPermissionList(
       ContentSettingsType::REVOKED_UNUSED_SITE_PERMISSIONS, {});
 }
 
-base::OnceCallback<std::unique_ptr<SafetyHubService::Result>()>
+base::OnceCallback<std::unique_ptr<SafetyHubResult>()>
 RevokedPermissionsService::GetBackgroundTask() {
   return base::BindOnce(&RevokedPermissionsService::UpdateOnBackgroundThread,
                         clock_, base::WrapRefCounted(hcsm()));
 }
 
-std::unique_ptr<SafetyHubService::Result>
+std::unique_ptr<SafetyHubResult>
 RevokedPermissionsService::UpdateOnBackgroundThread(
     base::Clock* clock,
     const scoped_refptr<HostContentSettingsMap> hcsm) {
@@ -662,9 +666,8 @@ RevokedPermissionsService::UpdateOnBackgroundThread(
   return std::move(result);
 }
 
-std::unique_ptr<SafetyHubService::Result>
-RevokedPermissionsService::UpdateOnUIThread(
-    std::unique_ptr<SafetyHubService::Result> result) {
+std::unique_ptr<SafetyHubResult> RevokedPermissionsService::UpdateOnUIThread(
+    std::unique_ptr<SafetyHubResult> result) {
   auto* interim_result = static_cast<RevokedPermissionsResult*>(result.get());
   recently_unused_permissions_ = interim_result->GetRecentlyUnusedPermissions();
   if (IsUnusedSiteAutoRevocationEnabled()) {
@@ -856,8 +859,8 @@ void RevokedPermissionsService::RevokeUnusedPermissions() {
          permission_itr != unused_site_permissions.end();) {
       const ContentSettingEntry& entry = *permission_itr;
       // Check if the current permission can be auto revoked.
-      if (!content_settings::CanBeAutoRevoked(entry.type,
-                                              entry.source.setting_value)) {
+      if (!content_settings::CanBeAutoRevoked(
+              /*type=*/entry.type, /*value=*/entry.source.setting_value)) {
         permission_itr++;
         continue;
       }

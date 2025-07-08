@@ -37,8 +37,6 @@
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/crash_keys.h"
-#include "chrome/common/pepper_permission_util.h"
-#include "chrome/common/ppapi_utils.h"
 #include "chrome/common/profiler/chrome_thread_group_profiler_client.h"
 #include "chrome/common/profiler/chrome_thread_profiler_client.h"
 #include "chrome/common/profiler/core_unwinders.h"
@@ -144,7 +142,6 @@
 #include "mojo/public/cpp/bindings/remote.h"
 #include "net/base/net_errors.h"
 #include "pdf/buildflags.h"
-#include "ppapi/buildflags/buildflags.h"
 #include "printing/buildflags/buildflags.h"
 #include "services/network/public/cpp/is_potentially_trustworthy.h"
 #include "services/service_manager/public/cpp/interface_provider.h"
@@ -232,11 +229,6 @@
 #include "chrome/renderer/plugins/chrome_plugin_placeholder.h"
 #endif  // BUILDFLAG(ENABLE_PLUGINS)
 
-#if BUILDFLAG(ENABLE_PPAPI)
-#include "chrome/renderer/pepper/pepper_helper.h"
-#include "ppapi/shared_impl/ppapi_switches.h"  // nogncheck crbug.com/1125897
-#endif
-
 #if BUILDFLAG(ENABLE_PRINTING)
 #include "chrome/renderer/printing/chrome_print_render_frame_helper_delegate.h"
 #include "components/printing/renderer/print_render_frame_helper.h"  // nogncheck
@@ -294,13 +286,6 @@ using UsesKeyboardAccessoryForSuggestions =
     autofill::AutofillAgent::UsesKeyboardAccessoryForSuggestions;
 
 namespace {
-
-// Allow PPAPI for Android Runtime for Chromium. (See crbug.com/383937)
-#if BUILDFLAG(ENABLE_PLUGINS)
-const char* const kPredefinedAllowedCameraDeviceOrigins[] = {
-    "6EAED1924DB611B6EEF2A664BD077BE7EAD33B8F",
-    "4EB74897CB187C7633357C2FE832E0AD6A44883A"};
-#endif
 
 #if BUILDFLAG(ENABLE_PDF)
 std::vector<url::Origin> GetAdditionalPdfInternalPluginAllowedOrigins() {
@@ -372,10 +357,6 @@ ChromeContentRendererClient::ChromeContentRendererClient()
   EnsureExtensionsClientInitialized();
   ChromeExtensionsRendererClient::Create();
 #endif
-#if BUILDFLAG(ENABLE_PLUGINS)
-  for (const char* origin : kPredefinedAllowedCameraDeviceOrigins)
-    allowed_camera_device_origins_.insert(origin);
-#endif
 }
 
 ChromeContentRendererClient::~ChromeContentRendererClient() = default;
@@ -430,6 +411,8 @@ void ChromeContentRendererClient::RenderThreadStarted() {
   extensions_renderer_client->RenderThreadStarted();
   WebSecurityPolicy::RegisterURLSchemeAsExtension(
       WebString::FromASCII(extensions::kExtensionScheme));
+  WebSecurityPolicy::RegisterURLSchemeAsIsolatedApp(
+      WebString::FromASCII(chrome::kIsolatedAppScheme));
   WebSecurityPolicy::RegisterURLSchemeAsCodeCacheWithHashing(
       WebString::FromASCII(extensions::kExtensionScheme));
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
@@ -603,10 +586,6 @@ void ChromeContentRendererClient::RenderFrameCreated(
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   extensions::ExtensionsRendererClient::Get()->RenderFrameCreated(render_frame,
                                                                   registry);
-#endif
-
-#if BUILDFLAG(ENABLE_PPAPI)
-  new PepperHelper(render_frame);
 #endif
 
 #if BUILDFLAG(SAFE_BROWSING_DB_LOCAL) || BUILDFLAG(SAFE_BROWSING_DB_REMOTE)
@@ -1101,25 +1080,6 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
 }
 #endif  // BUILDFLAG(ENABLE_PLUGINS)
 
-// For NaCl content handling plugins, the NaCl manifest is stored in an
-// additonal 'nacl' param associated with the MIME type.
-//  static
-GURL ChromeContentRendererClient::GetNaClContentHandlerURL(
-    const std::string& actual_mime_type,
-    const content::WebPluginInfo& plugin) {
-  // Look for the manifest URL among the MIME type's additonal parameters.
-  for (const auto& mime_type : plugin.mime_types) {
-    if (mime_type.mime_type == actual_mime_type) {
-      for (const auto& p : mime_type.additional_params) {
-        if (p.name == u"nacl")
-          return GURL(p.value);
-      }
-      break;
-    }
-  }
-  return GURL();
-}
-
 void ChromeContentRendererClient::GetInterface(
     const std::string& interface_name,
     mojo::ScopedMessagePipeHandle interface_pipe) {
@@ -1227,9 +1187,6 @@ bool ChromeContentRendererClient::ShouldNotifyServiceWorkerOnWebSocketActivity(
 blink::ProtocolHandlerSecurityLevel
 ChromeContentRendererClient::GetProtocolHandlerSecurityLevel(
     const url::Origin& origin) {
-  if (origin.scheme() == chrome::kIsolatedAppScheme) {
-    return blink::ProtocolHandlerSecurityLevel::kSameOrigin;
-  }
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   return extensions::ExtensionsRendererClient::Get()
       ->GetProtocolHandlerSecurityLevel();
@@ -1310,16 +1267,6 @@ ChromeContentRendererClient::CreatePrescientNetworking(
       render_frame);
 }
 
-#if BUILDFLAG(ENABLE_PLUGINS) && BUILDFLAG(ENABLE_EXTENSIONS)
-bool ChromeContentRendererClient::IsExtensionOrSharedModuleAllowed(
-    const GURL& url,
-    const std::set<std::string>& allowlist) {
-  const extensions::ExtensionSet* extension_set =
-      extensions::RendererExtensionRegistry::Get()->GetMainThreadExtensionSet();
-  return ::IsExtensionOrSharedModuleAllowed(url, extension_set, allowlist);
-}
-#endif
-
 #if BUILDFLAG(ENABLE_SPELLCHECK)
 void ChromeContentRendererClient::InitSpellCheck() {
   spellcheck_ = std::make_unique<SpellCheck>(this);
@@ -1398,22 +1345,6 @@ ChromeContentRendererClient::CreateSpeechRecognitionClient(
   return std::make_unique<ChromeSpeechRecognitionClient>(render_frame);
 }
 #endif  // BUILDFLAG(ENABLE_SPEECH_SERVICE)
-
-bool ChromeContentRendererClient::IsPluginAllowedToUseCameraDeviceAPI(
-    const GURL& url) {
-#if BUILDFLAG(ENABLE_PLUGINS) && BUILDFLAG(ENABLE_EXTENSIONS)
-#if BUILDFLAG(ENABLE_PPAPI)
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnablePepperTesting))
-    return true;
-#endif  // BUILDFLAG(ENABLE_PPAPI)
-
-  if (IsExtensionOrSharedModuleAllowed(url, allowed_camera_device_origins_))
-    return true;
-#endif
-
-  return false;
-}
 
 void ChromeContentRendererClient::RunScriptsAtDocumentStart(
     content::RenderFrame* render_frame) {
@@ -1586,8 +1517,10 @@ blink::WebFrame* ChromeContentRendererClient::FindFrame(
 #endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
 }
 
-bool ChromeContentRendererClient::IsSafeRedirectTarget(const GURL& upstream_url,
-                                                       const GURL& target_url) {
+bool ChromeContentRendererClient::IsSafeRedirectTarget(
+    const GURL& upstream_url,
+    const GURL& target_url,
+    const std::optional<url::Origin>& request_initiator) {
 #if BUILDFLAG(ENABLE_EXTENSIONS_CORE)
   if (target_url.SchemeIs(extensions::kExtensionScheme)) {
     const extensions::Extension* extension =
@@ -1596,10 +1529,8 @@ bool ChromeContentRendererClient::IsSafeRedirectTarget(const GURL& upstream_url,
     if (!extension) {
       return false;
     }
-    // TODO(solomonkinard): Use initiator_origin and add tests.
     if (extensions::WebAccessibleResourcesInfo::IsResourceWebAccessibleRedirect(
-            extension, target_url, /*initiator_origin=*/std::nullopt,
-            upstream_url)) {
+            extension, target_url, request_initiator, upstream_url)) {
       return true;
     }
     return extension->guid() == upstream_url.host();

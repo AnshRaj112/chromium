@@ -75,7 +75,7 @@ BASE_FEATURE(kMediaRecorderEnableMp4Muxer,
 
 BASE_FEATURE(kMediaRecorderSeekableWebm,
              "MediaRecorderSeekableWebm",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 namespace {
 
@@ -1211,7 +1211,7 @@ void MediaRecorderHandler::OnVideoEncodingError(
 
 void MediaRecorderHandler::OnStarted() {
   if (recorder_) {
-    recorder_->OnStarted();
+    recorder_->MaybeEmitStartEvent();
   }
 }
 

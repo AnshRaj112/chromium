@@ -41,6 +41,10 @@ import org.chromium.cc.input.BrowserControlsState;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsOffsetTagsInfo;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
+import org.chromium.chrome.browser.browser_controls.TopControlLayer;
+import org.chromium.chrome.browser.browser_controls.TopControlsStacker;
+import org.chromium.chrome.browser.browser_controls.TopControlsStacker.TopControlType;
+import org.chromium.chrome.browser.browser_controls.TopControlsStacker.TopControlVisibility;
 import org.chromium.chrome.browser.compositor.LayerTitleCache;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManagerHost;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManagerImpl;
@@ -50,7 +54,7 @@ import org.chromium.chrome.browser.compositor.layouts.components.CompositorButto
 import org.chromium.chrome.browser.compositor.layouts.components.CompositorButton.ButtonType;
 import org.chromium.chrome.browser.compositor.layouts.components.TintedCompositorButton;
 import org.chromium.chrome.browser.compositor.layouts.eventfilter.AreaMotionEventFilter;
-import org.chromium.chrome.browser.compositor.layouts.eventfilter.MotionEventHandler;
+import org.chromium.chrome.browser.compositor.layouts.eventfilter.AreaMotionEventHandler;
 import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutView.StripLayoutViewOnClickHandler;
 import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutView.StripLayoutViewOnKeyboardFocusHandler;
 import org.chromium.chrome.browser.compositor.overlays.strip.reorder.TabStripDragHandler;
@@ -125,7 +129,8 @@ public class StripLayoutHelperManager
                 PauseResumeWithNativeObserver,
                 TabStripTransitionDelegate,
                 TopResumedActivityChangedObserver,
-                AppHeaderObserver {
+                AppHeaderObserver,
+                TopControlLayer {
     /**
      * POD type that contains the necessary tab model info on startup. Used in the startup flicker
      * fix experiment where we create a placeholder tab strip on startup to mitigate jank as tabs
@@ -257,11 +262,12 @@ public class StripLayoutHelperManager
     private final Callback<Integer> mStripVisibilityStateObserver;
     private final ObservableSupplierImpl<Integer> mStripVisibilityStateSupplier;
     private final @Nullable ObservableSupplier<Boolean> mXrSpaceModeObservableSupplier;
+    private final TopControlsStacker mTopControlsStacker;
 
     // Drag-Drop
     private @Nullable TabStripDragHandler mTabStripDragHandler;
 
-    private class TabStripEventHandler implements MotionEventHandler {
+    private class TabStripEventHandler implements AreaMotionEventHandler {
         @Override
         public void onDown(float x, float y, int buttons) {
             if (DragDropGlobalState.hasValue()) {
@@ -354,8 +360,8 @@ public class StripLayoutHelperManager
         }
 
         @Override
-        public void onHoverExit() {
-            getActiveStripLayoutHelper().onHoverExit();
+        public void onHoverExit(boolean inArea) {
+            getActiveStripLayoutHelper().onHoverExit(inArea);
         }
 
         @Override
@@ -438,6 +444,7 @@ public class StripLayoutHelperManager
      * @param shareDelegateSupplier Supplies {@link ShareDelegate} to share tab URLs.
      * @param xrSpaceModeObservableSupplier Supplies current XR space mode status. True for XR full
      *     space mode, false otherwise.
+     * @param topControlsStacker The {@link TopControlsStacker} to add |this| as a control to.
      */
     public StripLayoutHelperManager(
             Context context,
@@ -462,7 +469,8 @@ public class StripLayoutHelperManager
             DataSharingTabManager dataSharingTabManager,
             BottomSheetController bottomSheetController,
             Supplier<ShareDelegate> shareDelegateSupplier,
-            @Nullable ObservableSupplier<Boolean> xrSpaceModeObservableSupplier) {
+            @Nullable ObservableSupplier<Boolean> xrSpaceModeObservableSupplier,
+            TopControlsStacker topControlsStacker) {
         mContext = context;
         Resources res = context.getResources();
         mManagerHost = managerHost;
@@ -608,6 +616,9 @@ public class StripLayoutHelperManager
         }
 
         mXrSpaceModeObservableSupplier = xrSpaceModeObservableSupplier;
+
+        mTopControlsStacker = topControlsStacker;
+        mTopControlsStacker.addControl(this);
     }
 
     @EnsuresNonNullIf("mDesktopWindowStateManager")
@@ -744,6 +755,7 @@ public class StripLayoutHelperManager
         if (mDesktopWindowStateManager != null) {
             mDesktopWindowStateManager.removeObserver(this);
         }
+        mTopControlsStacker.removeControl(this);
     }
 
     /** Mark whether tab strip is hidden by a height transition. */
@@ -764,7 +776,7 @@ public class StripLayoutHelperManager
     @Override
     public void onPauseWithNative() {
         // Clear any persisting tab strip hover state when the activity is paused.
-        getActiveStripLayoutHelper().onHoverExit();
+        getActiveStripLayoutHelper().onHoverExit(/* inTabStrip= */ false);
     }
 
     private void handleModelSelectorButtonClick() {
@@ -1683,5 +1695,26 @@ public class StripLayoutHelperManager
 
     private boolean isActivityInXrFullSpaceModeNow() {
         return mXrSpaceModeObservableSupplier != null && mXrSpaceModeObservableSupplier.get();
+    }
+
+    // TopControlLayer implementation:
+
+    @Override
+    public @TopControlType int getTopControlType() {
+        return TopControlType.TABSTRIP;
+    }
+
+    @Override
+    public int getTopControlHeight() {
+        // Height is stored in DP, so multiply by mDensity to convert to pixels.
+        return (int) (getHeight() * mDensity);
+    }
+
+    @Override
+    public int getTopControlVisibility() {
+        // TODO(crbug.com/417238089): Possibly add way to notify stacker of visibility changes.
+        return getStripVisibilityState() == StripVisibilityState.VISIBLE
+                ? TopControlVisibility.VISIBLE
+                : TopControlVisibility.HIDDEN;
     }
 }

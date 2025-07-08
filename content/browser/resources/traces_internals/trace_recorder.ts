@@ -4,6 +4,8 @@
 
 import '//resources/cr_elements/cr_button/cr_button.js';
 import '//resources/cr_elements/cr_toast/cr_toast.js';
+import '//resources/cr_elements/cr_collapse/cr_collapse.js';
+import '//resources/cr_elements/cr_expand_button/cr_expand_button.js';
 
 import type {CrToastElement} from '//resources/cr_elements/cr_toast/cr_toast.js';
 import {assert} from '//resources/js/assert.js';
@@ -51,16 +53,25 @@ export class TraceRecorderElement extends CrLitElement {
       tracingState: {type: String},
       traceCategories: {type: Array},
       trackEventConfig: {type: Object},
+      categoriesExpanded_: {type: Boolean},
+      bufferUsage: {type: Number},
+      hadDataLoss: {type: Boolean},
     };
   }
 
   private browserProxy_: TracesBrowserProxy = TracesBrowserProxy.getInstance();
+
   // Bound method for router events
   private boundLoadConfigFromUrl_ = this.loadConfigFromUrl_.bind(this);
   // Bound method for onTraceComplete listener
   private boundOnTraceComplete_ = this.onTraceComplete_.bind(this);
+  // Bound method for buffer usage polling
+  private readonly boundPollBufferUsage_ = this.pollBufferUsage_.bind(this);
+
   // Property to store the listener ID for onTraceComplete
   private onTraceCompleteListenerId_: number|null = null;
+  // ID for the polling interval
+  private bufferPollIntervalId_: number|null = null;
   private encodedConfigString: string = '';
 
   protected accessor traceConfig: Uint8Array = new Uint8Array();
@@ -69,6 +80,9 @@ export class TraceRecorderElement extends CrLitElement {
   protected accessor tracingState: TracingState = TracingState.IDLE;
   protected accessor traceCategories: TraceCategory[] = [];
   protected accessor trackEventConfig: TrackEventConfig|undefined;
+  protected accessor categoriesExpanded_: boolean = false;
+  protected accessor bufferUsage: number = 0;
+  protected accessor hadDataLoss: boolean = false;
 
   override connectedCallback() {
     super.connectedCallback();
@@ -96,11 +110,7 @@ export class TraceRecorderElement extends CrLitElement {
     return this.tracingState === TracingState.IDLE && !!this.traceConfig;
   }
 
-  protected get isStopTracingEnabled(): boolean {
-    return this.tracingState === TracingState.RECORDING;
-  }
-
-  protected get isCloneTraceEnabled(): boolean {
+  protected get isRecording(): boolean {
     return this.tracingState === TracingState.RECORDING;
   }
 
@@ -119,9 +129,18 @@ export class TraceRecorderElement extends CrLitElement {
     }
   }
 
+  private async pollBufferUsage_(): Promise<void> {
+    const {success, percentFull, dataLoss} =
+        await this.browserProxy_.handler.getBufferUsage();
+
+    if (success) {
+      this.bufferUsage = percentFull;
+      this.hadDataLoss = dataLoss;
+    }
+  }
+
   protected async startTracing_(): Promise<void> {
     const bigBufferConfig = this.decodeBase64ToBigBuffer_();
-
     if (!bigBufferConfig) {
       return;
     }
@@ -138,10 +157,17 @@ export class TraceRecorderElement extends CrLitElement {
       this.tracingState = TracingState.IDLE;
     } else {
       this.tracingState = TracingState.RECORDING;
+      this.bufferPollIntervalId_ =
+          window.setInterval(this.boundPollBufferUsage_, 1000);
     }
   }
 
   protected async stopTracing_(): Promise<void> {
+    if (this.bufferPollIntervalId_ !== null) {
+      window.clearInterval(this.bufferPollIntervalId_);
+      this.bufferPollIntervalId_ = null;
+    }
+
     // Set state to STOPPING to indicate an ongoing operation.
     this.tracingState = TracingState.STOPPING;
 
@@ -155,6 +181,10 @@ export class TraceRecorderElement extends CrLitElement {
   protected async cloneTraceSession_(): Promise<void> {
     const {trace} = await this.browserProxy_.handler.cloneTraceSession();
     this.downloadData_(trace);
+  }
+
+  protected onCategoriesExpandedChanged_(e: CustomEvent<{value: boolean}>) {
+    this.categoriesExpanded_ = e.detail.value;
   }
 
   protected isEnabled(categoryName: string): boolean {
@@ -210,8 +240,13 @@ export class TraceRecorderElement extends CrLitElement {
   private async loadTraceCategories_(): Promise<void> {
     const {categories} =
         await this.browserProxy_.handler.getTrackEventCategories();
+    const disabledPrefix = 'disabled-by-default-';
     this.traceCategories =
-        categories.filter((category: TraceCategory) => !category.isGroup);
+        categories.filter((category: TraceCategory) => !category.isGroup)
+            .sort(
+                (a, b) =>
+                    a.name.replace(disabledPrefix, '')
+                        .localeCompare(b.name.replace(disabledPrefix, '')));
   }
 
   // Decodes a Base64 string into a Uint8Array.
@@ -239,6 +274,13 @@ export class TraceRecorderElement extends CrLitElement {
   }
 
   private onTraceComplete_(trace: BigBuffer|null): void {
+    if (this.bufferPollIntervalId_ !== null) {
+      window.clearInterval(this.bufferPollIntervalId_);
+      this.bufferPollIntervalId_ = null;
+    }
+    this.bufferUsage = 0;
+    this.hadDataLoss = false;
+
     this.downloadData_(trace);
 
     // Crucially, only set to IDLE here after the trace has been

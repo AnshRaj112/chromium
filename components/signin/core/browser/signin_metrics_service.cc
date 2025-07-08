@@ -192,6 +192,10 @@ void MaybeRecordWebSigninToChromeSigninTimes(
     case signin_metrics::AccessPoint::kManagedProfileAutoSigninIos:
     case signin_metrics::AccessPoint::kNonModalSigninPasswordPromo:
     case signin_metrics::AccessPoint::kNonModalSigninBookmarkPromo:
+    case signin_metrics::AccessPoint::kUserManagerWithPrefilledEmail:
+    case signin_metrics::AccessPoint::kEnterpriseManagementDisclaimerAtStartup:
+    case signin_metrics::AccessPoint::
+        kEnterpriseManagementDisclaimerAfterBrowserFocus:
       return;
   }
 

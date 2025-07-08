@@ -6,10 +6,19 @@
 #define COMPONENTS_OMNIBOX_COMPOSEBOX_TEST_COMPOSEBOX_QUERY_CONTROLLER_H_
 
 #include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "base/functional/callback.h"
 #include "components/endpoint_fetcher/endpoint_fetcher.h"
 #include "composebox_query_controller.h"
+#include "third_party/lens_server_proto/lens_overlay_server.pb.h"
+
+namespace lens {
+class LensOverlayClientContext;
+}  // namespace lens
 
 class FakeEndpointFetcher : public endpoint_fetcher::EndpointFetcher {
  public:
@@ -32,7 +41,9 @@ class TestComposeboxQueryController : public ComposeboxQueryController {
   explicit TestComposeboxQueryController(
       signin::IdentityManager* identity_manager,
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
-      version_info::Channel channel);
+      version_info::Channel channel,
+      std::string locale,
+      TemplateURLService* template_url_service);
   ~TestComposeboxQueryController() override;
 
   // Mutators.
@@ -83,6 +94,17 @@ class TestComposeboxQueryController : public ComposeboxQueryController {
     return it->second.get();
   }
 
+  // Gets the last sent file upload request.
+  std::optional<lens::LensOverlayServerRequest> last_sent_file_upload_request()
+      const {
+    return last_sent_file_upload_request_;
+  }
+
+  // Gets the client context used for the requests.
+  lens::LensOverlayClientContext client_context() const {
+    return ComposeboxQueryController::CreateClientContext();
+  }
+
  protected:
   std::unique_ptr<endpoint_fetcher::EndpointFetcher> CreateEndpointFetcher(
       std::string request_string,
@@ -110,6 +132,9 @@ class TestComposeboxQueryController : public ComposeboxQueryController {
 
   // The last url for which a fetch request was sent by the query controller.
   GURL last_sent_fetch_url_;
+
+  // The last sent file upload request.
+  std::optional<lens::LensOverlayServerRequest> last_sent_file_upload_request_;
 };
 
 #endif  // COMPONENTS_OMNIBOX_COMPOSEBOX_TEST_COMPOSEBOX_QUERY_CONTROLLER_H_

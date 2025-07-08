@@ -43,10 +43,8 @@
 #include "third_party/perfetto/include/perfetto/tracing/traced_value_forward.h"
 
 namespace blink {
-class CodePointIterator;
-}
 
-namespace WTF {
+class CodePointIterator;
 
 #define DISPATCH_CASE_OP(case_sensitivity, op, args)  \
   ((case_sensitivity == kTextCaseSensitive) ? op args \
@@ -108,7 +106,7 @@ class WTF_EXPORT String {
   void swap(String& o) { impl_.swap(o.impl_); }
 
   template <typename CharType>
-  static String Adopt(blink::StringBuffer<CharType>& buffer) {
+  static String Adopt(StringBuffer<CharType>& buffer) {
     if (!buffer.length())
       return StringImpl::empty_;
     return String(buffer.Release());
@@ -176,12 +174,6 @@ class WTF_EXPORT String {
     return impl_->Characters16();
   }
 
-  ALWAYS_INLINE const void* Bytes() const {
-    if (!impl_)
-      return nullptr;
-    return impl_->Bytes();
-  }
-
   bool Is8Bit() const { return impl_->Is8Bit(); }
 
   [[nodiscard]] std::string Ascii() const;
@@ -208,12 +200,12 @@ class WTF_EXPORT String {
 
   // `begin()` and `end()` return iterators for `UChar32`, neither `UChar` nor
   // `LChar`. If you'd like to iterate code units, use `[]` and `length()`.
-  blink::CodePointIterator begin() const;
-  blink::CodePointIterator end() const;
+  CodePointIterator begin() const;
+  CodePointIterator end() const;
 
   template <typename IntegerType>
   static String Number(IntegerType number) {
-    IntegerToStringConverter<IntegerType> converter(number);
+    WTF::IntegerToStringConverter<IntegerType> converter(number);
     return StringImpl::Create(converter.Span());
   }
 
@@ -679,12 +671,6 @@ void String::AppendTo(BufferType& result,
   impl_->AppendTo(result, position, length);
 }
 
-template <typename T>
-struct HashTraits;
-// Defined in string_hash.h.
-template <>
-struct HashTraits<String>;
-
 // Shared global empty string.
 WTF_EXPORT extern const String& g_empty_string;
 WTF_EXPORT extern const String& g_empty_string16_bit;
@@ -724,16 +710,28 @@ inline StringView::StringView(const String& string LIFETIME_BOUND,
 inline StringView::StringView(const String& string LIFETIME_BOUND)
     : StringView(string.Impl()) {}
 
+template <typename T>
+struct HashTraits;
+// Defined in string_hash.h.
+template <>
+struct HashTraits<String>;
+
+}  // namespace blink
+
+namespace WTF {
+
+// TODO(crbug.com/422768753): Remove these`using` directives.
+using blink::CodeUnitCompare;
+using blink::CodeUnitCompareIgnoringASCIICase;
+using blink::CodeUnitCompareLessThan;
+using blink::EqualIgnoringNullity;
+using blink::g_empty_string;
+using blink::g_xmlns_with_colon;
+using blink::NewlineThenWhitespaceStringsTable;
+using blink::String;
 }  // namespace WTF
 
 WTF_ALLOW_MOVE_AND_INIT_WITH_MEM_FUNCTIONS(String)
-
-using WTF::Equal;
-using WTF::Find;
-using WTF::g_empty_string;
-using WTF::g_empty_string16_bit;
-using WTF::String;
-using WTF::Utf8ConversionMode;
 
 #include "third_party/blink/renderer/platform/wtf/text/string_operators.h"
 #endif  // THIRD_PARTY_BLINK_RENDERER_PLATFORM_WTF_TEXT_WTF_STRING_H_

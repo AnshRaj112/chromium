@@ -6,6 +6,7 @@ package org.chromium.content.browser;
 
 import android.os.Handler;
 
+import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.process_launcher.ChildProcessConnection;
 import org.chromium.build.BuildConfig;
 import org.chromium.build.annotations.NullMarked;
@@ -68,8 +69,9 @@ public class ChildProcessRanking implements Iterable<ChildProcessConnection> {
         // important or that it only has waived binding.
         public boolean shouldBeInLowRankGroup() {
             boolean inViewport = visible && (frameDepth == 0 || intersectsViewport);
-            return (isSpareRenderer && ChildProcessRanking.isSpareRendererOfLowestRanking())
-                    || (importance <= ChildProcessImportance.PERCEPTIBLE && !inViewport);
+            return !inViewport
+                    && ((isSpareRenderer && ChildProcessRanking.isSpareRendererOfLowestRanking())
+                            || (importance <= ChildProcessImportance.PERCEPTIBLE));
         }
     }
 
@@ -297,6 +299,23 @@ public class ChildProcessRanking implements Iterable<ChildProcessConnection> {
     public @Nullable ChildProcessConnection getLowestRankedConnection() {
         if (mRankings.isEmpty()) return null;
         return mRankings.get(mRankings.size() - 1).connection;
+    }
+
+    public void recordProcessRanking() {
+        int lowRankCount = 0;
+        int highRankCount = 0;
+        for (int i = 0; i < mRankings.size(); ++i) {
+            ConnectionWithRank connection = mRankings.get(i);
+            if (connection.shouldBeInLowRankGroup()) {
+                lowRankCount++;
+            } else {
+                highRankCount++;
+            }
+        }
+        RecordHistogram.recordCount1000Histogram(
+                "Android.ChildProcessRanking.LowRank.Count", lowRankCount);
+        RecordHistogram.recordCount1000Histogram(
+                "Android.ChildProcessRanking.HighRank.Count", highRankCount);
     }
 
     private int indexOf(ChildProcessConnection connection) {

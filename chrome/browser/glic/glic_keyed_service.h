@@ -16,6 +16,7 @@
 #include "base/memory/raw_ptr.h"
 #include "chrome/browser/actor/task_id.h"
 #include "chrome/browser/glic/glic_enabling.h"
+#include "chrome/browser/glic/glic_zero_state_suggestions_manager.h"
 #include "chrome/browser/glic/host/context/glic_sharing_manager.h"
 #include "chrome/browser/glic/host/glic.mojom.h"
 #include "chrome/browser/glic/widget/glic_window_controller.h"
@@ -117,6 +118,8 @@ class GlicKeyedService : public KeyedService {
   // Virtual for testing.
   virtual bool IsWindowDetached() const;
 
+  bool IsWindowOrFreShowing() const;
+
   // Private API for the glic WebUI.
 
   // CreateTab is used by both the FRE page and the glic web client to open a
@@ -154,6 +157,10 @@ class GlicKeyedService : public KeyedService {
     return is_context_access_indicator_enabled_;
   }
 
+  void CreateTask(mojom::WebClientHandler::CreateTaskCallback callback);
+  void PerformActions(const std::vector<uint8_t>& actions_proto,
+                      mojom::WebClientHandler::PerformActionsCallback callback);
+
   void ActInFocusedTab(
       const std::vector<uint8_t>& action_proto,
       const mojom::GetTabContextOptions& options,
@@ -175,8 +182,6 @@ class GlicKeyedService : public KeyedService {
   // `tab`. This can be used by callers to customize certain behaviour that
   // might interfere with the ExecutionEngine.
   bool IsExecutionEngineActingOnTab(const content::WebContents* tab) const;
-
-  actor::ExecutionEngine& GetExecutionEngineForTesting(tabs::TabInterface* tab);
 
   void CaptureScreenshot(
       glic::mojom::WebClientHandler::CaptureScreenshotCallback callback);
@@ -203,6 +208,9 @@ class GlicKeyedService : public KeyedService {
       base::MemoryPressureListener::MemoryPressureLevel level);
 
   Host& host() { return *host_; }
+  GlicZeroStateSuggestionsManager& zero_state_suggestions_manager() {
+    return *zero_state_suggestions_manager_;
+  }
   // Returns whether this process host is either the Glic FRE WebUI or the Glic
   // main WebUI.
   bool IsProcessHostForGlic(content::RenderProcessHost* process_host);
@@ -249,6 +257,8 @@ class GlicKeyedService : public KeyedService {
   std::unique_ptr<GlicActorController> actor_controller_;
   std::unique_ptr<base::MemoryPressureListener> memory_pressure_listener_;
   std::unique_ptr<GlicOcclusionNotifier> occlusion_notifier_;
+  std::unique_ptr<GlicZeroStateSuggestionsManager>
+      zero_state_suggestions_manager_;
   base::OnceCallback<void()> preload_callback_;
 
   // Unowned

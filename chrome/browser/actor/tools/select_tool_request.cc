@@ -12,7 +12,7 @@ namespace actor {
 using ::tabs::TabHandle;
 
 SelectToolRequest::SelectToolRequest(TabHandle tab_handle,
-                                     const Target& target,
+                                     const PageTarget& target,
                                      std::string_view value)
     : PageToolRequest(tab_handle, target), value_(value) {}
 
@@ -29,7 +29,6 @@ std::string SelectToolRequest::JournalEvent() const {
 mojom::ToolActionPtr SelectToolRequest::ToMojoToolAction() const {
   auto select = mojom::SelectAction::New();
 
-  select->target = PageToolRequest::ToMojoToolTarget(GetTarget());
   select->value = value_;
 
   return mojom::ToolAction::NewSelect(std::move(select));

@@ -44,13 +44,12 @@ uint32_t LockFlags(gfx::BufferUsage usage) {
 }  // namespace
 
 GpuMemoryBufferImplIOSurface::GpuMemoryBufferImplIOSurface(
-    gfx::GpuMemoryBufferId id,
     const gfx::Size& size,
     gfx::BufferFormat format,
     DestructionCallback callback,
     gfx::GpuMemoryBufferHandle handle,
     uint32_t lock_flags)
-    : GpuMemoryBufferImpl(id, size, format, std::move(callback)),
+    : GpuMemoryBufferImpl(size, format, std::move(callback)),
       handle_(std::move(handle)),
       lock_flags_(lock_flags) {}
 
@@ -96,8 +95,7 @@ GpuMemoryBufferImplIOSurface::CreateFromHandle(
 #endif
 
   return base::WrapUnique(new GpuMemoryBufferImplIOSurface(
-      handle.id, size, format, std::move(callback), handle.Clone(),
-      LockFlags(usage)));
+      size, format, std::move(callback), handle.Clone(), LockFlags(usage)));
 }
 
 // static
@@ -106,9 +104,7 @@ base::OnceClosure GpuMemoryBufferImplIOSurface::AllocateForTesting(
     gfx::BufferFormat format,
     gfx::BufferUsage usage,
     gfx::GpuMemoryBufferHandle* handle) {
-  gfx::GpuMemoryBufferId kBufferId(1);
   handle->type = gfx::IO_SURFACE_BUFFER;
-  handle->id = kBufferId;
   handle->io_surface = gfx::CreateIOSurface(size, format);
   DCHECK(handle->io_surface);
   return base::DoNothing();
@@ -176,18 +172,6 @@ int GpuMemoryBufferImplIOSurface::stride(size_t plane) const {
   return handle_.io_surface_plane_strides[plane];
 #else
   return IOSurfaceGetBytesPerRowOfPlane(handle_.io_surface.get(), plane);
-#endif
-}
-
-void GpuMemoryBufferImplIOSurface::SetColorSpace(
-    const gfx::ColorSpace& color_space) {
-  if (color_space == color_space_)
-    return;
-  color_space_ = color_space;
-#if BUILDFLAG(IS_IOS)
-  NOTIMPLEMENTED();
-#else
-  IOSurfaceSetColorSpace(handle_.io_surface.get(), color_space);
 #endif
 }
 

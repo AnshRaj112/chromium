@@ -610,9 +610,11 @@ static void AdjustStyleForHTMLElement(ComputedStyleBuilder& builder,
     return;
   }
 
-  if (IsA<HTMLUListElement>(element) || IsA<HTMLOListElement>(element)) {
-    builder.SetIsInsideListElement();
-    return;
+  if (!RuntimeEnabledFeatures::ListStylePositionQuirkStandardEnabled()) {
+    if (IsA<HTMLUListElement>(element) || IsA<HTMLOListElement>(element)) {
+      builder.SetIsInsideListElement();
+      return;
+    }
   }
 
   if (builder.Display() == EDisplay::kContents) {
@@ -1190,8 +1192,7 @@ void StyleAdjuster::AdjustComputedStyle(StyleResolverState& state,
   // The computed value of currentColor for highlight pseudos is the
   // color that would have been used if no highlights were applied,
   // i.e. the originating element's color.
-  if (state.UsesHighlightPseudoInheritance() &&
-      state.OriginatingElementStyle()) {
+  if (state.IsForHighlight() && state.OriginatingElementStyle()) {
     const ComputedStyle* originating_style = state.OriginatingElementStyle();
     if (builder.ColorIsCurrentColor()) {
       builder.SetColor(originating_style->Color());

@@ -69,8 +69,10 @@ class BackingStore {
     // Memory-cached metadata for this database.
     virtual const blink::IndexedDBDatabaseMetadata& GetMetadata() = 0;
 
-    // Generates a lock ID for the given object store.
-    virtual PartitionedLockId GetLockId(int64_t object_store_id) const = 0;
+    // Generates the lock ID key for the given object store. Not called on
+    // SQLite backing stores.
+    virtual std::string GetObjectStoreLockIdKey(
+        int64_t object_store_id) const = 0;
 
     // Creates a transaction on this database.
     virtual std::unique_ptr<Transaction> CreateTransaction(
@@ -215,8 +217,12 @@ class BackingStore {
     virtual StatusOr<bool> Continue(const blink::IndexedDBKey& key,
                                     const blink::IndexedDBKey& primary_key) = 0;
     virtual StatusOr<bool> Advance(uint32_t count) = 0;
-    // Clone may return a nullptr if cloning fails for any reason.
-    virtual std::unique_ptr<Cursor> Clone() const = 0;
+
+    // Saves the current position of the cursor.
+    virtual void SavePosition() = 0;
+    // Attempts to reset the cursor to the last saved position. The cursor
+    // may not be in a valid state if this returns false.
+    virtual bool TryResetToLastSavedPosition() = 0;
   };
 
   virtual ~BackingStore() = default;

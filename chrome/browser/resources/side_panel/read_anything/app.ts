@@ -239,14 +239,6 @@ export class AppElement extends AppElementBase implements
       }
     };
 
-    this.$.containerScroller.onscroll = () => {
-      chrome.readingMode.onScroll(this.scrollingOnSelection_);
-      this.scrollingOnSelection_ = false;
-      if (this.isReadAloudEnabled_) {
-        this.speechController_.onScroll();
-      }
-    };
-
     // Pass copy commands to main page. Copy commands will not work if they are
     // disabled on the main page.
     document.oncopy = () => {
@@ -396,6 +388,14 @@ export class AppElement extends AppElementBase implements
 
     this.appendChildSubtrees_(element, nodeId);
     return element;
+  }
+
+  protected onContainerScroll_() {
+    chrome.readingMode.onScroll(this.scrollingOnSelection_);
+    this.scrollingOnSelection_ = false;
+    if (this.isReadAloudEnabled_) {
+      this.speechController_.onScroll();
+    }
   }
 
   // TODO: crbug.com/40910704- Potentially hide links during distillation.
@@ -551,15 +551,24 @@ export class AppElement extends AppElementBase implements
     this.isDocsLoadMoreButtonVisible_ =
         chrome.readingMode.isDocsLoadMoreButtonVisible;
 
-    container.scrollTop = 0;
     this.hasContent_ = true;
     container.appendChild(node);
     this.updateImages_();
 
     // If the previous reading position still exists and we haven't reached the
     // end of speech, keep that spot.
+    let setPreviousReadingPosition = false;
     if (this.isReadAloudEnabled_) {
-      this.speechController_.setPreviousReadingPositionIfExists();
+      setPreviousReadingPosition =
+          this.speechController_.setPreviousReadingPositionIfExists();
+    }
+
+    if (!setPreviousReadingPosition) {
+      // Scroll back to the top after we've drawn as long as we aren't keeping
+      // the reading position from before.
+      requestAnimationFrame(() => {
+        this.$.containerScroller.scrollTop = 0;
+      });
     }
   }
 
@@ -675,7 +684,7 @@ export class AppElement extends AppElementBase implements
   }
 
   protected updateLinks_() {
-    if (!this.shadowRoot) {
+    if (!this.shadowRoot || !this.hasContent_) {
       return;
     }
 
@@ -697,7 +706,8 @@ export class AppElement extends AppElementBase implements
   }
 
   protected updateImages_() {
-    if (!this.shadowRoot || !chrome.readingMode.imagesFeatureEnabled) {
+    if (!this.shadowRoot || !chrome.readingMode.imagesFeatureEnabled ||
+        !this.hasContent_) {
       return;
     }
 

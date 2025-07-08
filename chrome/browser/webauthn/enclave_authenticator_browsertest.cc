@@ -86,6 +86,7 @@
 #include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/blink/public/common/features.h"
 #include "ui/base/l10n/l10n_util.h"
 
 #if BUILDFLAG(IS_WIN)
@@ -112,6 +113,27 @@
 namespace {
 
 using trusted_vault::MockTrustedVaultThrottlingConnection;
+
+static constexpr char kMakeCredentialLargeBlob[] = R"((() => {
+  return navigator.credentials.create({ publicKey: {
+    rp: { name: "www.example.com" },
+    user: { id: new Uint8Array([0]), name: "foo", displayName: "" },
+    pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+    challenge: new Uint8Array([0]),
+    timeout: 10000,
+    authenticatorSelection: {
+      userVerification: "discouraged",
+      requireResidentKey: true
+    },
+    // Ask for large-blob support at registration time.
+    extensions: { largeBlob: { support: "preferred" } },
+  }}).then(c => {
+    const lb = c.getClientExtensionResults().largeBlob;
+    // Pass back the value we care about.
+    window.domAutomationController.send(
+        "largeblob " + (lb ? lb.supported : lb));
+  }, e => window.domAutomationController.send("error " + e));
+})())";
 
 static constexpr char kMakeCredentialUvDiscouraged[] = R"((() => {
   return navigator.credentials.create({ publicKey: {
@@ -323,6 +345,19 @@ static constexpr char kGetAssertionUvDiscouraged[] = R"((() => {
     timeout: 10000,
     userVerification: 'discouraged',
     allowCredentials: [],
+  }}).then(c => window.domAutomationController.send('webauthn: OK'),
+           e => window.domAutomationController.send('error ' + e));
+})())";
+
+static constexpr char kGetAssertionSecurityKey[] = R"((() => {
+  const credId = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+  return navigator.credentials.get({ publicKey: {
+    challenge: new Uint8Array([0]),
+    timeout: 10000,
+    userVerification: 'discouraged',
+    allowCredentials: [
+      {type: 'public-key', id: new Uint8Array(credId), transports: ["usb"]}
+    ],
   }}).then(c => window.domAutomationController.send('webauthn: OK'),
            e => window.domAutomationController.send('error ' + e));
 })())";
@@ -929,6 +964,12 @@ IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorBrowserTest, NonWebauthnRequest) {
+  if (base::FeatureList::IsEnabled(
+          blink::features::kSecurePaymentConfirmationBrowserBoundKeys)) {
+    GTEST_SKIP() << "With kSecurePaymentConfirmationBrowserBoundKeys the "
+                    "SecurePaymentConfirmationService directs the request to "
+                    "the internal authenticator.";
+  }
   if (!base::FeatureList::IsEnabled(features::kSecurePaymentConfirmation)) {
     // SPC is not enabled in this configuration and so the `payment` extension
     // in the Javascript will be ignored.
@@ -1877,6 +1918,35 @@ IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorBrowserTest, GpmEnclaveNeedsReauth) {
   EXPECT_EQ(browser()->tab_strip_model()->GetTabCount(), 2);
 }
 
+IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorBrowserTest,
+                       NoReauthButtonForSecurityKeyRequests) {
+  // Set the account state to a recoverable signin error.
+  auto* const identity_manager =
+      IdentityManagerFactory::GetForProfile(browser()->profile());
+  CoreAccountId account =
+      identity_manager->GetPrimaryAccountId(signin::ConsentLevel::kSignin);
+  signin::UpdatePersistentErrorOfRefreshTokenForAccount(
+      identity_manager, account,
+      GoogleServiceAuthError(GoogleServiceAuthError::INVALID_GAIA_CREDENTIALS));
+
+  // Add a passkey to make sure it's not shown.
+  AddTestPasskeyToModel();
+
+  // Make a get assertion request that has a USB-only list of transports.
+  content::WebContents* web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  content::DOMMessageQueue message_queue(web_contents);
+  content::ExecuteScriptAsync(web_contents, kGetAssertionSecurityKey);
+  delegate_observer()->WaitForUI();
+
+  // The reauth button should not be displayed.
+  EXPECT_FALSE(
+      std::ranges::any_of(dialog_model()->mechanisms, [](const auto& m) {
+        return std::holds_alternative<
+            AuthenticatorRequestDialogModel::Mechanism::SignInAgain>(m.type);
+      }));
+}
+
 // Tests that if the enclave is the default, but loading takes too long, the
 // user is sent to the mechanism selection screen instead.
 IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorBrowserTest,
@@ -2030,6 +2100,10 @@ IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorWithTimeout,
   // normally.
   SetVaultConnectionToTimeout();
 
+  // Ensure the enclave state is loaded before proceeding. Otherwise the
+  // timer could be advanced before the timeout is set.
+  WaitForEnclaveLoaded();
+
   // Wait for the transport availability to be enumerated. The UI won't be shown
   // yet because the enclave is not ready.
   content::ExecuteScriptAsync(web_contents, kMakeCredentialUvDiscouraged);
@@ -2080,6 +2154,10 @@ IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorWithTimeout,
       browser()->tab_strip_model()->GetActiveWebContents();
   content::DOMMessageQueue message_queue(web_contents);
   content::ExecuteScriptAsync(web_contents, kMakeCredentialUvDiscouraged);
+
+  // Ensure the enclave state is loaded before proceeding. Otherwise the
+  // timer could be advanced before the timeout is set.
+  WaitForEnclaveLoaded();
 
   // Wait for the transport availability to be enumerated. The UI won't be shown
   // yet because the enclave is not ready.
@@ -2208,9 +2286,6 @@ IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorBrowserTest, BiometricsInPWA) {
 #endif
 IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorBrowserTest,
                        MAYBE_NoGpmForCrossPlatformAttachment) {
-  EnableUVKeySupport();
-  SetTrustedVaultRecoverable();
-
   content::WebContents* web_contents =
       browser()->tab_strip_model()->GetActiveWebContents();
   content::DOMMessageQueue message_queue(web_contents);
@@ -2222,8 +2297,7 @@ IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorBrowserTest,
         return std::holds_alternative<
             AuthenticatorRequestDialogModel::Mechanism::Enclave>(m.type);
       }));
-  EXPECT_TRUE(
-      request_delegate()->enclave_controller_for_testing()->is_active());
+  EXPECT_FALSE(request_delegate()->enclave_controller_for_testing());
 }
 
 #if BUILDFLAG(IS_WIN) && defined(ARCH_CPU_ARM64)
@@ -4066,6 +4140,32 @@ IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorImmediateMediationBrowserTest,
       "WebAuthentication.GetAssertion.Immediate.EnclaveReady",
       /*sample=*/false,
       /*expected_bucket_count=*/1);
+}
+
+IN_PROC_BROWSER_TEST_F(EnclaveAuthenticatorBrowserTest,
+                       MakeCredential_LargeBlobSupported) {
+  // New empty vault.
+  SetTrustedVaultEmpty();
+
+  content::WebContents* const web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+
+  // Start JS create() call.
+  content::DOMMessageQueue queue(web_contents);
+  content::ExecuteScriptAsync(web_contents, kMakeCredentialLargeBlob);
+
+  delegate_observer()->WaitForUI();
+  EXPECT_EQ(dialog_model()->step(),
+            AuthenticatorRequestDialogModel::Step::kGPMCreatePasskey);
+  dialog_model()->OnGPMCreatePasskey();
+  EXPECT_EQ(dialog_model()->step(),
+            AuthenticatorRequestDialogModel::Step::kGPMCreatePin);
+  dialog_model()->OnGPMPinEntered(u"123456");
+
+  // Collect the JS result and verify the extension bit.
+  std::string script_result;
+  ASSERT_TRUE(queue.WaitForMessage(&script_result));
+  EXPECT_EQ(script_result, "\"largeblob true\"");
 }
 
 }  // namespace

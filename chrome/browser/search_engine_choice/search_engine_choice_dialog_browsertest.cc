@@ -102,8 +102,9 @@ class MockSearchEngineChoiceDialogService
       content::BrowserContext* context) {
     Profile* profile = Profile::FromBrowserContext(context);
 
-    if (!SearchEngineChoiceDialogServiceFactory::
-            IsProfileEligibleForChoiceScreenForTesting(CHECK_DEREF(profile))) {
+    if (SearchEngineChoiceDialogServiceFactory::
+            ComputeProfileEligibilityForTesting(CHECK_DEREF(profile)) !=
+        search_engines::SearchEngineChoiceScreenConditions::kEligible) {
       return nullptr;
     }
 
@@ -913,7 +914,8 @@ class SearchEngineRepromptBrowserTest
 
     feature_list_.InitWithFeaturesAndParameters(
         /* enabled_features= */
-        {{switches::kSearchEngineChoiceTrigger, std::move(field_trial_params)},
+        {{switches::kSearchEngineChoiceTriggerReprompt,
+          std::move(field_trial_params)},
          {switches::kInvalidateSearchEngineChoiceOnDeviceRestoreDetection, {}}},
         /* disabled_features= */ {});
   }

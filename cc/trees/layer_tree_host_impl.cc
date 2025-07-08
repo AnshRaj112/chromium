@@ -1158,6 +1158,10 @@ LayerTreeHostImpl::GetScopedEventMetricsMonitor(
   return events_metrics_manager_.GetScopedMonitor(std::move(done_callback));
 }
 
+void LayerTreeHostImpl::DidScrollForMetrics() {
+  return events_metrics_manager_.set_did_scroll(true);
+}
+
 void LayerTreeHostImpl::NotifyInputEvent(bool is_fling) {
   has_input_for_frame_interval_ = true;
   has_input_resetter_.Schedule();
@@ -2318,24 +2322,21 @@ void LayerTreeHostImpl::ReclaimResources(
   // it to the GPU process to free up the memory.
   MaybeFlushPendingWork();
 
-  if (base::FeatureList::IsEnabled(
-          features::kReclaimResourcesDelayedFlushInBackground)) {
-    // There are cases where the release callbacks executed from the call above
-    // don't actually free the GPU resource from this thread. For instance, for
-    // TextureLayer,
-    // TextureLayer::TransferableResourceHolder::~TransferableResourceHolder()
-    // posts a task to the main thread, and so flushing here is not sufficient.
-    //
-    // Ideally, we would not rely on a time-based delay, but given layering,
-    // threading and possibly unknown cases where the release can jump from
-    // thread to thread, this is likely a more practical solution. See
-    // crbug.com/1449271 for an example.
-    GetTaskRunner()->PostDelayedTask(
-        FROM_HERE,
-        base::BindOnce(&LayerTreeHostImpl::MaybeFlushPendingWork,
-                       weak_factory_.GetWeakPtr()),
-        base::Seconds(1));
-  }
+  // There are cases where the release callbacks executed from the call above
+  // don't actually free the GPU resource from this thread. For instance, for
+  // TextureLayer,
+  // TextureLayer::TransferableResourceHolder::~TransferableResourceHolder()
+  // posts a task to the main thread, and so flushing here is not sufficient.
+  //
+  // Ideally, we would not rely on a time-based delay, but given layering,
+  // threading and possibly unknown cases where the release can jump from
+  // thread to thread, this is likely a more practical solution. See
+  // crbug.com/1449271 for an example.
+  GetTaskRunner()->PostDelayedTask(
+      FROM_HERE,
+      base::BindOnce(&LayerTreeHostImpl::MaybeFlushPendingWork,
+                     weak_factory_.GetWeakPtr()),
+      base::Seconds(1));
 }
 
 void LayerTreeHostImpl::MaybeFlushPendingWork() {
@@ -4046,7 +4047,7 @@ void LayerTreeHostImpl::SetVisible(bool visible) {
   }
 
   // If we just became visible, we have to ensure that we draw high res tiles,
-  // to prevent checkerboard/low res flashes.
+  // to prevent checkerboard flashes.
   if (visible_) {
     // TODO(crbug.com/40410467): Replace with RequiresHighResToDraw.
     SetRequiresHighResToDraw();
@@ -4665,7 +4666,6 @@ void LayerTreeHostImpl::WillScrollContent(ElementId element_id) {
 void LayerTreeHostImpl::DidScrollContent(ElementId element_id,
                                          bool animated,
                                          const gfx::Vector2dF& scroll_delta) {
-  events_metrics_manager_.set_did_scroll(true);
   scroll_accumulated_this_frame_ += scroll_delta;
   frame_max_scroll_delta_ =
       std::max(std::abs(scroll_delta.x()), std::abs(scroll_delta.y()));

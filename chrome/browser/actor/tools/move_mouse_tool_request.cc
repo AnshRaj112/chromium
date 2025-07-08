@@ -12,7 +12,7 @@ namespace actor {
 using ::tabs::TabHandle;
 
 MoveMouseToolRequest::MoveMouseToolRequest(TabHandle tab_handle,
-                                           const Target& target)
+                                           const PageTarget& target)
     : PageToolRequest(tab_handle, target) {}
 
 MoveMouseToolRequest::~MoveMouseToolRequest() = default;
@@ -27,9 +27,6 @@ std::string MoveMouseToolRequest::JournalEvent() const {
 
 mojom::ToolActionPtr MoveMouseToolRequest::ToMojoToolAction() const {
   auto move_mouse = mojom::MouseMoveAction::New();
-
-  move_mouse->target = PageToolRequest::ToMojoToolTarget(GetTarget());
-
   return mojom::ToolAction::NewMouseMove(std::move(move_mouse));
 }
 

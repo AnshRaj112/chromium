@@ -8,6 +8,7 @@
 #include "chrome/browser/enterprise/data_controls/reporting_service.h"
 #include "chrome/browser/extensions/api/safe_browsing_private/safe_browsing_private_event_router.h"
 #include "chrome/browser/safe_browsing/cloud_content_scanning/deep_scanning_utils.h"
+#include "components/enterprise/connectors/core/common.h"
 
 namespace enterprise_connectors {
 
@@ -27,7 +28,7 @@ std::unique_ptr<ClipboardRequestHandler> ClipboardRequestHandler::Create(
     Profile* profile,
     GURL url,
     Type type,
-    safe_browsing::DeepScanAccessPoint access_point,
+    DeepScanAccessPoint access_point,
     ContentMetaData::CopiedTextSource clipboard_source,
     std::string source_content_area_email,
     std::string content_transfer_method,
@@ -66,7 +67,7 @@ ClipboardRequestHandler::ClipboardRequestHandler(
     Profile* profile,
     GURL url,
     Type type,
-    safe_browsing::DeepScanAccessPoint access_point,
+    DeepScanAccessPoint access_point,
     ContentMetaData::CopiedTextSource clipboard_source,
     std::string source_content_area_email,
     std::string content_transfer_method,
@@ -96,7 +97,7 @@ void ClipboardRequestHandler::ReportWarningBypass(
       type_ == Type::kText ? "Text data" : "Image data",
       /*download_digest_sha256*/ "", type_ == Type::kText ? "text/plain" : "",
       extensions::SafeBrowsingPrivateEventRouter::kTriggerWebContentUpload,
-      content_transfer_method_, access_point_, content_size_,
+      content_transfer_method_, content_size_,
       content_analysis_info_->referrer_chain(), response_, user_justification);
 }
 
@@ -172,9 +173,8 @@ void ClipboardRequestHandler::OnContentAnalysisResponse(
       /*download_digest_sha256*/ "", type_ == Type::kText ? "text/plain" : "",
       extensions::SafeBrowsingPrivateEventRouter::kTriggerWebContentUpload,
       content_transfer_method_,
-      content_analysis_info_->GetContentAreaAccountEmail(), access_point_,
-      content_size_, content_analysis_info_->referrer_chain(), result,
-      response_,
+      content_analysis_info_->GetContentAreaAccountEmail(), content_size_,
+      content_analysis_info_->referrer_chain(), result, response_,
       CalculateEventResult(content_analysis_info_->settings(),
                            request_handler_result.complies, should_warn));
 

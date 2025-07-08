@@ -203,6 +203,10 @@ BASE_FEATURE(kInterceptBubblesDismissibleByAvatarButton,
              "InterceptBubblesDismissibleByAvatarButton",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kOfferMigrationToDiceUsers,
+             "OfferMigrationToDiceUsers",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 #if BUILDFLAG(IS_IOS)
 
 BASE_FEATURE(kEnableIdentityInAuthError,
@@ -216,13 +220,11 @@ BASE_FEATURE(kEnableErrorBadgeOnIdentityDisc,
 BASE_FEATURE(kEnableASWebAuthenticationSession,
              "EnableASWebAuthenticationSession",
              base::FEATURE_ENABLED_BY_DEFAULT);
-#endif
 
-// Enables showing the enterprise dialog after every signin into a managed
-// account.
-BASE_FEATURE(kShowEnterpriseDialogForAllManagedAccountsSignin,
-             "ShowEnterpriseDialogForAllManagedAccountsSignin",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kAllowlistScopesForMdmErrors,
+             "AllowlistScopesForMdmErrors",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
 
 BASE_FEATURE(kEnableExtensionsExplicitBrowserSignin,
              "EnableExtensionsExplicitBrowserSignin",
@@ -254,7 +256,23 @@ BASE_FEATURE(kDeferWebSigninTrackerCreation,
 BASE_FEATURE(kSignInPromoMaterialNextUI,
              "SignInPromoMaterialNextUI",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Enables surveys to measure the effectiveness of the identity model.
+// These surveys would be displayed after interactions such as signin, profile
+// switching, etc.
+BASE_FEATURE(kChromeIdentitySurvey,
+             "ChromeIdentitySurvey",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+
+#if BUILDFLAG(ENABLE_DICE_SUPPORT)
+// Enables the management disclaimer for managed signed profiles. All signed in
+// profiles that never saw the management disclaimer will be shown the
+// management disclaimer when they open Chrome.
+BASE_FEATURE(kEnforceManagementDisclaimerAtStartup,
+             "EnforceManagementDisclaimerAtStartup",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
 
 }  // namespace switches
 

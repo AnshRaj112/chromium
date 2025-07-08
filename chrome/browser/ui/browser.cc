@@ -92,11 +92,9 @@
 #include "chrome/browser/ui/blocked_content/framebust_block_tab_helper.h"
 #include "chrome/browser/ui/bookmarks/bookmark_tab_helper.h"
 #include "chrome/browser/ui/bookmarks/bookmark_utils.h"
-#include "chrome/browser/ui/breadcrumb_manager_browser_agent.h"
 #include "chrome/browser/ui/browser_actions.h"
 #include "chrome/browser/ui/browser_command_controller.h"
 #include "chrome/browser/ui/browser_commands.h"
-#include "chrome/browser/ui/browser_content_setting_bubble_model_delegate.h"
 #include "chrome/browser/ui/browser_dialogs.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_list.h"
@@ -119,7 +117,6 @@
 #include "chrome/browser/ui/global_error/global_error_service.h"
 #include "chrome/browser/ui/global_error/global_error_service_factory.h"
 #include "chrome/browser/ui/location_bar/location_bar.h"
-#include "chrome/browser/ui/overscroll_pref_manager.h"
 #include "chrome/browser/ui/page_action/page_action_icon_type.h"
 #include "chrome/browser/ui/sad_tab.h"
 #include "chrome/browser/ui/search/search_tab_helper.h"
@@ -167,7 +164,6 @@
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/browser/bookmark_utils.h"
 #include "components/bookmarks/common/bookmark_pref_names.h"
-#include "components/breadcrumbs/core/breadcrumbs_status.h"
 #include "components/captive_portal/core/buildflags.h"
 #include "components/content_settings/browser/page_specific_content_settings.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
@@ -234,7 +230,6 @@
 #include "extensions/common/extension.h"
 #include "extensions/common/manifest_handlers/background_info.h"
 #include "net/base/filename_util.h"
-#include "ppapi/buildflags/buildflags.h"
 #include "third_party/blink/public/common/security/protocol_handler_security_level.h"
 #include "third_party/blink/public/mojom/frame/blocked_navigation_types.mojom.h"
 #include "third_party/blink/public/mojom/frame/frame.mojom.h"
@@ -274,10 +269,6 @@
 #include "components/captive_portal/content/captive_portal_tab_helper.h"
 #endif
 
-#if BUILDFLAG(ENABLE_EXTENSIONS)
-#include "chrome/browser/extensions/extension_browser_window_helper.h"
-#endif
-
 #if BUILDFLAG(ENABLE_PRINTING)
 #include "components/printing/browser/print_composite_client.h"
 #endif
@@ -306,6 +297,10 @@
 #include "chrome/browser/glic/glic_enabling.h"
 #include "chrome/browser/glic/glic_keyed_service.h"
 #endif
+
+#if defined(USE_AURA)
+#include "chrome/browser/ui/overscroll_pref_manager.h"
+#endif  // defined(USE_AURA)
 
 using base::UserMetricsAction;
 using content::NavigationController;
@@ -459,26 +454,14 @@ base::FunctionRef<bool(const Browser*)> MaybeLazyIsFullscreen(
                                               : &AlwaysReturnFalse;
 }
 
-bool IsActorExecutionEngineActingOnTab(Profile* profile,
-                                       const content::WebContents* tab) {
-  // TODO(crbug.com/411462297): Delete this code.
-#if BUILDFLAG(ENABLE_GLIC)
-  if (glic::GlicEnabling::IsEnabledByFlags()) {
-    if (const auto* glic_service = glic::GlicKeyedService::Get(profile);
-        glic_service && glic_service->IsExecutionEngineActingOnTab(tab)) {
-      return true;
-    }
-  }
-#endif
+bool IsActorOperatingOnWebContents(Profile* profile, content::WebContents* wc) {
   auto* actor_service = actor::ActorKeyedService::Get(profile);
-  if (actor_service) {
-    for (auto& [task_id, task] : actor_service->GetTasks()) {
-      if (task->GetExecutionEngine()->HasTaskForTab(tab)) {
-        return true;
-      }
-    }
+  if (!actor_service) {
+    return false;
   }
-  return false;
+
+  const auto* tab_interface = tabs::TabInterface::MaybeGetFromContents(wc);
+  return tab_interface && actor_service->IsAnyTaskActingOnTab(*tab_interface);
 }
 
 // TODO(crbug.com/382494946): Similar bespoke checks are used throughout the
@@ -665,29 +648,13 @@ Browser::Browser(const CreateParams& params)
           params.initial_visible_on_all_workspaces_state),
       creation_source_(params.creation_source),
       unload_controller_(this),
-      content_setting_bubble_model_delegate_(
-          new BrowserContentSettingBubbleModelDelegate(this)),
       live_tab_context_(new BrowserLiveTabContext(this)),
       app_controller_(web_app::MaybeCreateAppBrowserController(this)),
       bookmark_bar_state_(BookmarkBar::HIDDEN),
       browser_actions_(new BrowserActions(*this)),
       command_controller_(new chrome::BrowserCommandController(this)),
       window_has_shown_(false),
-      user_title_(params.user_title),
-      breadcrumb_manager_browser_agent_(
-          breadcrumbs::IsEnabled(g_browser_process->local_state())
-              ? std::make_unique<BreadcrumbManagerBrowserAgent>(this)
-              : nullptr)
-#if BUILDFLAG(ENABLE_EXTENSIONS)
-      ,
-      extension_browser_window_helper_(
-          std::make_unique<extensions::ExtensionBrowserWindowHelper>(this))
-#endif
-#if defined(USE_AURA)
-      ,
-      overscroll_pref_manager_(std::make_unique<OverscrollPrefManager>(this))
-#endif
-{
+      user_title_(params.user_title) {
   browser_actions_->InitializeBrowserActions();
 
   if (!profile_->IsOffTheRecord()) {
@@ -722,7 +689,7 @@ Browser::Browser(const CreateParams& params)
   // BrowserWindowFeatures need to be initialized before browser window
   // creation, so that the features can be used in creating components
   // in browser window.
-  features_ = BrowserWindowFeatures::CreateBrowserWindowFeatures();
+  features_ = std::make_unique<BrowserWindowFeatures>();
   features_->Init(this);
 
   SessionServiceBase* session_service =
@@ -770,7 +737,6 @@ Browser::~Browser() {
   // with destruction. Profile destruction will unload extensions and reentrant
   // calls to Browser:: should be avoided while it is being torn down.
   ThemeServiceFactory::GetForProfile(profile_)->RemoveObserver(this);
-  extension_browser_window_helper_.reset();
 
   // The tab strip should not have any tabs at this point.
   //
@@ -1307,10 +1273,6 @@ BrowserWindowInterface::Type Browser::GetType() const {
   return type_;
 }
 
-BrowserUserEducationInterface* Browser::GetUserEducationInterface() {
-  return window();
-}
-
 web_app::AppBrowserController* Browser::GetAppBrowserController() {
   return app_controller_.get();
 }
@@ -1511,7 +1473,10 @@ void Browser::FullscreenTopUIStateChanged() {
 }
 
 void Browser::OnFindBarVisibilityChanged() {
-  window()->UpdatePageActionIcon(PageActionIconType::kFind);
+  if (!IsPageActionMigrated(PageActionIconType::kFind)) {
+    window()->UpdatePageActionIcon(PageActionIconType::kFind);
+  }
+
   command_controller_->FindBarVisibilityChanged();
 }
 
@@ -1835,9 +1800,7 @@ void Browser::SetTopControlsGestureScrollInProgress(bool in_progress) {
 
 bool Browser::CanOverscrollContent() {
 #if defined(USE_AURA)
-  return !is_type_devtools() &&
-         base::FeatureList::IsEnabled(features::kOverscrollHistoryNavigation) &&
-         overscroll_pref_manager_->IsOverscrollHistoryNavigationEnabled();
+  return GetFeatures().overscroll_pref_manager()->CanOverscrollContent();
 #else
   return false;
 #endif
@@ -2381,7 +2344,7 @@ bool Browser::IsWebContentsCreationOverridden(
     const GURL& opener_url,
     const std::string& frame_name,
     const GURL& target_url) {
-  if (IsActorExecutionEngineActingOnTab(
+  if (IsActorOperatingOnWebContents(
           profile(), content::WebContents::FromRenderFrameHost(opener))) {
     // If an ExecutionEngine is acting on the opener, prevent it from creating
     // a new WebContents. We'll instead force the navigation to happen in the
@@ -2405,7 +2368,7 @@ WebContents* Browser::CreateCustomWebContents(
     const content::StoragePartitionConfig& partition_config,
     content::SessionStorageNamespace* session_storage_namespace) {
   if (auto* opener_contents = content::WebContents::FromRenderFrameHost(opener);
-      IsActorExecutionEngineActingOnTab(profile(), opener_contents)) {
+      IsActorOperatingOnWebContents(profile(), opener_contents)) {
     // If an ExecutionEngine is acting on the opener, we force the navigation
     // to happen in the same tab.
     content::NavigationController::LoadURLParams params(target_url);
@@ -2693,12 +2656,6 @@ blink::mojom::DisplayMode Browser::GetDisplayMode(
 
 blink::ProtocolHandlerSecurityLevel Browser::GetProtocolHandlerSecurityLevel(
     content::RenderFrameHost* requesting_frame) {
-  // WARNING: This must match the logic of
-  // ChromeContentRendererClient::GetProtocolHandlerSecurityLevel().
-  if (requesting_frame->GetLastCommittedOrigin().scheme() ==
-      chrome::kIsolatedAppScheme) {
-    return blink::ProtocolHandlerSecurityLevel::kSameOrigin;
-  }
   content::BrowserContext* context = requesting_frame->GetBrowserContext();
   extensions::ProcessMap* process_map = extensions::ProcessMap::Get(context);
   const Extension* owner_extension =
