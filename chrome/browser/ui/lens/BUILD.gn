@@ -66,6 +66,7 @@ source_set("lens") {
     "//content/public/browser",
     "//third_party/lens_server_proto:lens_overlay_proto",
     "//ui/base/mojom:ui_base_types",
+    "//ui/base/unowned_user_data",
     "//ui/views",
   ]
 
@@ -265,6 +266,7 @@ source_set("browser_tests") {
     "//third_party/lens_server_proto:lens_overlay_proto",
     "//ui/base",
     "//ui/base:types",
+    "//ui/base/unowned_user_data",
     "//ui/compositor",
     "//ui/events:events_base",
     "//ui/views",

@@ -692,11 +692,11 @@ void WindowPerformance::EventTimingProcessingEnd(
 #endif  // BUILDFLAG(IS_MAC)
   }
 
-  if (EventTarget* raw_target = event.RawTarget()) {
-    // `event->RawTarget()` is assigned as part of EventDispatch, and will be
-    // unset whenever we skip dispatch. (See: crbug.com/1367329). Note: target
-    // may be dom detached, and even GC-ed, before Observer fires.
-    entry->SetTarget(raw_target->ToNode());
+  if (event.target()) {
+    // `event->target()` is assigned as part of EventDispatch, and will be unset
+    // whenever we skip dispatch. (See: crbug.com/1367329).
+    // Note: target may be dom detached, and even GC-ed, before Observer fires.
+    entry->SetTarget(event.target()->ToNode());
   }
 
   // Request presentation time first, because this might increment presentation
@@ -1208,8 +1208,8 @@ void WindowPerformance::NotifyAndAddEventTimingBuffer(
     base::TimeTicks unsafe_start_time =
         entry->GetEventTimingReportingInfo()->creation_time;
     base::TimeTicks unsafe_end_time = entry->GetEndTime();
-    unsigned hash = WTF::GetHash(entry->name());
-    WTF::AddFloatToHash(hash, entry->startTime());
+    unsigned hash = GetHash(entry->name());
+    AddFloatToHash(hash, entry->startTime());
     auto track_id = perfetto::Track::ThreadScoped(this);
     auto flow_id = perfetto::Flow::FromPointer(entry);
     TRACE_EVENT_INSTANT("latency", "EventCreation", track_id,

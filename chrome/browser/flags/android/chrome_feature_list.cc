@@ -138,9 +138,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &download::features::kSmartSuggestionForLargeDownloads,
     &base::features::kCollectAndroidFrameTimelineMetrics,
     &download::features::kDownloadNotificationServiceUnifiedAPI,
-#if BUILDFLAG(ENABLE_DESKTOP_ANDROID_EXTENSIONS)
-    &extensions_features::kBlockInstallingExtensionsOnDesktopAndroid,
-#endif
     &features::kAndroidBcivBottomControls,
     &features::kAndroidBrowserControlsInViz,
     &features::kAndroidWebAppLaunchHandler,
@@ -208,8 +205,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kAndroidBottomToolbar,
     &kAndroidDumpOnScrollWithoutResource,
     &kAndroidElegantTextHeight,
-    &kAndroidKeyboardA11y,
-    &kAndroidMetaClickHistoryNavigation,
     &kAndroidNativePagesInNewTab,
     &kAndroidProgressBarVisualUpdate,
     &kAndroidNoVisibleHintForDifferentTLD,
@@ -572,14 +567,6 @@ BASE_FEATURE(kAndroidDumpOnScrollWithoutResource,
 
 BASE_FEATURE(kAndroidElegantTextHeight,
              "AndroidElegantTextHeight",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kAndroidKeyboardA11y,
-             "AndroidKeyboardA11y",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kAndroidMetaClickHistoryNavigation,
-             "AndroidMetaClickHistoryNavigation",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAndroidNativePagesInNewTab,

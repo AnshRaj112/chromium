@@ -5952,12 +5952,17 @@ CSSValue* ConsumeFontPalette(CSSParserTokenStream& stream,
   return ConsumeDashedIdent(stream, context);
 }
 
-CSSValueList* ConsumeFontFamily(CSSParserTokenStream& stream) {
+CSSValueList* ConsumeFontFamily(CSSParserTokenStream& stream,
+                                const CSSParserContext& context) {
   CSSValueList* list = CSSValueList::CreateCommaSeparated();
   do {
     CSSValue* parsed_value = ConsumeGenericFamily(stream);
     if (parsed_value) {
       list->Append(*parsed_value);
+      if (IsUseCounterEnabledForMode(context.Mode()) &&
+          IsIdent(*parsed_value, CSSValueID::kMath)) {
+        context.Count(WebDXFeature::kFontFamilyMath);
+      }
     } else {
       parsed_value = ConsumeFamilyName(stream);
       if (parsed_value) {
@@ -6609,6 +6614,8 @@ bool ConsumeGridTrackRepeatFunction(
       if (!track_size) {
         return false;
       }
+      // TODO(almaher): We need to adjust this to allow for other
+      // intrinsically sized repeats besides auto (like min-content).
       if (all_tracks_are_auto_repeat_or_fixed_sized) {
         // Whether repeat(auto-fill, auto) should be allowed, and if it should
         // apply to both grid and masonry is still in discussion in the CSSWG.
@@ -6859,6 +6866,8 @@ CSSValue* ConsumeGridTrackList(CSSParserTokenStream& stream,
       if (is_subgrid_track_list) {
         return nullptr;
       }
+      // TODO(almaher): We need to adjust this to allow intrinsic sized
+      // tracks alongside repeat(auto-fill, auto).
       if (all_tracks_are_auto_repeat_or_fixed_sized) {
         all_tracks_are_auto_repeat_or_fixed_sized =
             IsGridTrackFixedSized(*value);

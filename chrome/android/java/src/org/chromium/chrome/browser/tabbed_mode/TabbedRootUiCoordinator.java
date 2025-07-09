@@ -152,6 +152,8 @@ import org.chromium.chrome.browser.tab.TabAssociatedApp;
 import org.chromium.chrome.browser.tab.TabFavicon;
 import org.chromium.chrome.browser.tab.TabId;
 import org.chromium.chrome.browser.tab.TabLaunchType;
+import org.chromium.chrome.browser.tab_group_suggestion.toolbar.GroupSuggestionsButtonController;
+import org.chromium.chrome.browser.tab_group_suggestion.toolbar.GroupSuggestionsButtonControllerFactory;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncControllerImpl;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncFeatures;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
@@ -950,6 +952,13 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
     @Override
     protected AdaptiveToolbarBehavior createAdaptiveToolbarBehavior(
             Supplier<Tracker> trackerSupplier) {
+
+        Supplier<GroupSuggestionsButtonController> groupSuggestionsButtonControllerSupplier =
+                () -> {
+                    Profile profile = mProfileSupplier.get();
+                    return GroupSuggestionsButtonControllerFactory.getForProfile(profile);
+                };
+
         return new TabbedAdaptiveToolbarBehavior(
                 mActivity,
                 mActivityLifecycleDispatcher,
@@ -957,7 +966,9 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                 mTabBookmarkerSupplier,
                 mBookmarkModelSupplier,
                 mActivityTabProvider,
-                () -> addVoiceSearchAdaptiveButton(trackerSupplier));
+                () -> addVoiceSearchAdaptiveButton(trackerSupplier),
+                groupSuggestionsButtonControllerSupplier,
+                mTabModelSelectorSupplier.get().getTabGroupModelFilterProvider());
     }
 
     @Override
@@ -1276,8 +1287,15 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
         final int tabStripHeight = mToolbarManager.getTabStripHeightSupplier().get();
         final int bookmarkBarHeight =
                 mBookmarkBarCoordinator != null ? mBookmarkBarCoordinator.getTopControlHeight() : 0;
-        topControlsNewHeight =
-                bookmarkBarHeight + toolbarHeight + tabStripHeight + mStatusIndicatorHeight;
+
+        // When the refactor feature is enabled, fetch height from the TopControlsStacker.
+        if (ChromeFeatureList.isEnabled(ChromeFeatureList.TOP_CONTROLS_REFACTOR)) {
+            topControlsNewHeight = mTopControlsStacker.getVisibleTopControlsTotalHeight();
+        } else {
+            topControlsNewHeight =
+                    bookmarkBarHeight + toolbarHeight + tabStripHeight + mStatusIndicatorHeight;
+        }
+
         if (tabStripHeight > 0 && !isTablet) {
             String msg =
                     "Non-zero tab strip height found on non-tablet form factor. tabStripHeight="

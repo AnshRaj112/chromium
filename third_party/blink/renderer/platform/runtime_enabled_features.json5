@@ -414,6 +414,10 @@
       public: true,
     },
     {
+      name: "AliasWebkitFillAvailable",
+      status: "stable",
+    },
+    {
       name: "AlignZoomToCenter",
       status: "stable",
     },
@@ -1090,6 +1094,14 @@
       status: "stable",
     },
     {
+      // When enabled, allowlisting script urls and scripts used in eval via
+      // hashes will be supported in script-src. Controlled by the
+      // network::features::kCSPScriptSrcHashesInV1 flag.
+      // See crbug.com/392657736 for details.
+      name: "CSPHashesV1",
+      base_feature: "none",
+    },
+    {
       name: "CSPReportHash",
       status: "stable",
     },
@@ -1103,11 +1115,6 @@
       // and can be used in all properties.
       // https://drafts.csswg.org/css-values-5/#attr-notation
       name: "CSSAdvancedAttrFunction",
-      status: "stable",
-    },
-    {
-      // Enables alignment properties for block and inline out-of-flow elements.
-      name: "CSSAlignBlockAndInlineOutOfFlows",
       status: "stable",
     },
     {
@@ -3428,10 +3435,6 @@
       status: "stable",
     },
     {
-      name: "PaintHoldingForLocalIframes",
-      status: "stable",
-    },
-    {
       name: "PaintTimingMixin",
       status: "experimental",
     },
@@ -4739,6 +4742,11 @@
     {
       // crbug.com/325517313
       name: "TextDiffSplitFix",
+      status: "stable",
+    },
+    {
+      // crbug.com/40812040
+      name: "TextEmphasisLetterSpacing",
       status: "stable",
     },
     {

@@ -289,6 +289,10 @@ if (_is_default_toolchain) {
     if (enable_screen_capture) {
       deps += [ "//chrome/browser:screen_capture_java_resources" ]
     }
+
+    if (enable_extensions_core) {
+      deps += [ "//chrome/browser/ui/android/extensions:java_resources" ]
+    }
   }
 
   android_resources("java_overlay_resources") {
@@ -385,6 +389,7 @@ if (_is_default_toolchain) {
       "//chrome/browser/data_sharing:factory_java",
       "//chrome/browser/data_sharing:instant_message_delegate_factory_java",
       "//components/credential_management/android:java",
+      "//components/visited_url_ranking/public:public_java",
       "//google_apis/gaia/android:java",
 
       # TODO(ssid): Decouple dependency on internal library.

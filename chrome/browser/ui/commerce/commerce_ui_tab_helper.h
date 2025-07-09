@@ -17,6 +17,7 @@
 #include "components/commerce/core/shopping_service.h"
 #include "components/prefs/pref_registry_simple.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
 #include "ui/gfx/image/image.h"
 
 // TODO(https://crbug.com/362675963): Once //c/b/ui/views/commerce/ gets
@@ -44,6 +45,7 @@ class NavigationHandle;
 
 namespace tabs {
 class TabInterface;
+class TabModel;
 }
 
 namespace image_fetcher {
@@ -71,6 +73,9 @@ class CommerceUiTabHelper : public tabs::ContentsObservingTabFeature {
   ~CommerceUiTabHelper() override;
   CommerceUiTabHelper(const CommerceUiTabHelper& other) = delete;
   CommerceUiTabHelper& operator=(const CommerceUiTabHelper& other) = delete;
+
+  DECLARE_USER_DATA(CommerceUiTabHelper);
+  static CommerceUiTabHelper* From(tabs::TabModel* tab);
 
   static void RegisterProfilePrefs(PrefRegistrySimple* registry);
 
@@ -307,6 +312,7 @@ class CommerceUiTabHelper : public tabs::ContentsObservingTabFeature {
   // Coordinates the creation and the display of the discounts bubble view.
   std::unique_ptr<DiscountsBubbleCoordinator> discounts_bubble_coordinator_;
 
+  ui::ScopedUnownedUserData<CommerceUiTabHelper> scoped_unowned_user_data_;
   base::WeakPtrFactory<CommerceUiTabHelper> weak_ptr_factory_{this};
 };
 

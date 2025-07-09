@@ -193,6 +193,9 @@ void ServiceWorkerTaskQueue::DidStopServiceWorkerContext(
 
   ServiceWorkerState* worker_state = GetWorkerState(context_id);
   DCHECK(worker_state);
+  // We expect `ServiceWorkerState::OnStopping` to always be called before
+  // `DidStopServiceWorkerContext`.
+  CHECK(!worker_state->worker_id().has_value());
 
   if (worker_state->worker_id() != worker_id) {
     // We can see DidStopServiceWorkerContext right after DidInitialize and
@@ -467,20 +470,19 @@ void ServiceWorkerTaskQueue::OnWorkerStartFail(
   pending_storage_registrations_.erase(context_id.extension_id);
 }
 
-void ServiceWorkerTaskQueue::OnWorkerStop(
-    int64_t version_id,
-    const content::ServiceWorkerRunningInfo& worker_info) {
+void ServiceWorkerTaskQueue::OnWorkerStop(int64_t version_id,
+                                          const GURL& scope) {
   // TODO(crbug.com/40936639): Confirming this is true in order to allow for
   // synchronous notification of this status change.
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
   // Stop tracking the worker for extension API purposes.
-  const ExtensionId& extension_id = worker_info.scope.host();
+  const ExtensionId& extension_id = scope.host();
   ProcessManager::Get(browser_context_)
       ->StopTrackingServiceWorkerRunningInstance(extension_id, version_id);
 
   if (g_test_observer) {
-    g_test_observer->UntrackServiceWorkerState(worker_info.scope);
+    g_test_observer->UntrackServiceWorkerState(scope);
   }
 }
 

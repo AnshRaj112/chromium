@@ -60,6 +60,36 @@
     </template>
   </div>
 
+  <div slot="view" id="search">
+    <template is="dom-if" if="[[renderPlugin_(
+        routes_.SEARCH, lastRoute_, inSearchMode_)]]">
+      <settings-search-page-index prefs="{{prefs}}"
+          in-search-mode="[[inSearchMode_]]">
+      </settings-search-page-index>
+    </template>
+  </div>
+
+<if expr="not is_chromeos">
+  <template is="dom-if" if="[[showPage_(pageVisibility_.defaultBrowser)]]">
+    <div slot="view" id="defaultBrowser">
+      <template is="dom-if" if="[[renderPlugin_(
+          routes_.DEFAULT_BROWSER, lastRoute_, inSearchMode_)]]">
+        <settings-default-browser-page></settings-default-browser-page>
+      </template>
+    </div>
+  </template>
+</if>
+
+  <template is="dom-if" if="[[showPage_(pageVisibility_.onStartup)]]">
+    <div slot="view" id="onStartup">
+      <template is="dom-if" if="[[renderPlugin_(
+          routes_.ON_STARTUP, lastRoute_, inSearchMode_)]]">
+        <settings-on-startup-page prefs="{{prefs}}">
+        </settings-on-startup-page>
+      </template>
+    </div>
+  </template>
+
   <template is="dom-if" if="[[showPage_(pageVisibility_.languages)]]">
     <div slot="view" id="languages">
       <template is="dom-if" if="[[renderPlugin_(

@@ -60,7 +60,6 @@
 #include "ipc/ipc_logging.h"
 #include "ipc/ipc_platform_file.h"
 #include "ipc/ipc_sync_channel.h"
-#include "ipc/ipc_sync_message_filter.h"
 #include "mojo/core/embedder/scoped_ipc_support.h"
 #include "mojo/public/cpp/bindings/binder_map.h"
 #include "mojo/public/cpp/bindings/pending_receiver.h"
@@ -229,22 +228,6 @@ void TerminateSelfOnDisconnect(
 #endif  // IS_ANDROID && CLANG_PROFILING
 #endif
 }
-
-class SuicideOnChannelErrorFilter : public IPC::MessageFilter {
- public:
-  explicit SuicideOnChannelErrorFilter(
-      scoped_refptr<base::SequencedTaskRunner> io_task_runner)
-      : io_task_runner_(std::move(io_task_runner)) {}
-
-  // IPC::MessageFilter
-  void OnChannelError() override { TerminateSelfOnDisconnect(io_task_runner_); }
-
- protected:
-  ~SuicideOnChannelErrorFilter() override = default;
-
- private:
-  scoped_refptr<base::SequencedTaskRunner> io_task_runner_;
-};
 
 #endif  // OS(POSIX)
 
@@ -705,9 +688,6 @@ void ChildThreadImpl::Init(const Options& options) {
   child_process_host_ = mojo::SharedRemote<mojom::ChildProcessHost>(
       std::move(remote_host), GetIOTaskRunner());
 
-  if (options.with_legacy_ipc_channel)
-    sync_message_filter_ = channel_->CreateSyncMessageFilter();
-
   // In single process mode, browser-side tracing and memory will cover the
   // whole process including renderers.
   if (!IsInBrowserProcess()) {
@@ -747,13 +727,9 @@ void ChildThreadImpl::Init(const Options& options) {
   // and single-process mode.
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kProcessType)) {
-    if (options.with_legacy_ipc_channel) {
-      channel_->AddFilter(new SuicideOnChannelErrorFilter(GetIOTaskRunner()));
-    } else {
-      child_process_host_.set_disconnect_handler(
-          base::BindOnce(&TerminateSelfOnDisconnect, GetIOTaskRunner()),
-          GetIOTaskRunner());
-    }
+    child_process_host_.set_disconnect_handler(
+        base::BindOnce(&TerminateSelfOnDisconnect, GetIOTaskRunner()),
+        GetIOTaskRunner());
   }
 #endif
 
@@ -814,8 +790,6 @@ void ChildThreadImpl::Init(const Options& options) {
 
 ChildThreadImpl::~ChildThreadImpl() {
   if (channel_) {
-    channel_->RemoveFilter(sync_message_filter_.get());
-
     // The ChannelProxy object caches a pointer to the IPC thread, so need to
     // reset it as it's not guaranteed to outlive this object.
     // NOTE: this also has the side-effect of not closing the main IPC channel

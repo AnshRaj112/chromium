@@ -195,24 +195,6 @@ const char kAndroidBrowserControlsInVizDescription[] =
     "to top controls.";
 
 #if BUILDFLAG(IS_ANDROID)
-const char kAndroidKeyboardA11yName[] =
-    "Keyboard focus and navigation on Android";
-const char kAndroidKeyboardA11yDescription[] =
-    "Improves keyboard focus indication and keyboard navigation (including "
-    "keyboard shortcuts to move keyboard focus to different parts of the UI, "
-    "such as the tab strip, toolbar, and bookmarks bar.";
-#endif  // BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_ANDROID)
-const char kAndroidMetaClickHistoryNavigationName[] =
-    "Allows use of meta keys on forward/back history navigation arrows";
-const char kAndroidMetaClickHistoryNavigationDescription[] =
-    "Allows use of meta keys (ctrl+shift+click to open in new focused tab, "
-    "ctrl+click to open in new background tab, shift+click to open in new "
-    "window) on forward/back history navigation arrows";
-#endif  // BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_ANDROID)
 const char kAndroidNativePagesInNewTabName[] =
     "Open downloads, history and bookmarks in new tab";
 const char kAndroidNativePagesInNewTabDescription[] =
@@ -1767,11 +1749,6 @@ const char kEnableCanvasNoiseName[] =
 const char kEnableCanvasNoiseDescription[] =
     "Enable noising pixels when the contents of a canvas are read back by a "
     "script.";
-
-const char kEnableSuspendStateMachineName[] = "Enable suspend state machine";
-const char kEnableSuspendStateMachineDescription[] =
-    "Enables a fix for the suspend keyboard shortcut to more consistently "
-    "execute.";
 
 const char kEnableInputDeviceSettingsSplitName[] =
     "Enable input device settings split";
@@ -4323,6 +4300,9 @@ const char kTpcdMetadataGrantsName[] =
 const char kTpcdMetadataGrantsDescription[] =
     "Provides a control for enabling/disabling Third-Party Cookie Deprecation "
     "Metadata Grants (WRT its default state) for testing.";
+
+const char kActFeaturesName[] = "ACT Features";
+const char kActFeaturesDescription[] = "Enable ACT features";
 
 const char kTrackingProtection3pcdName[] = "Tracking Protection for 3PCD";
 const char kTrackingProtection3pcdDescription[] =
@@ -7152,11 +7132,6 @@ const char kEcheLauncherDescription[] =
 const char kEcheLauncherListViewName[] = "Enable Eche launcher list view";
 const char kEcheLauncherListViewDescription[] =
     "Convert Eche launcher from grid view to list view";
-
-const char kEcheLauncherIconsInMoreAppsButtonName[] =
-    "Enable app icons in the Eche launcher more apps button";
-const char kEcheLauncherIconsInMoreAppsButtonDescription[] =
-    "Show app icons in the Eche launcher more apps button";
 
 const char kEcheSWADebugModeName[] = "Enable Eche Debug Mode";
 const char kEcheSWADebugModeDescription[] =

@@ -2342,6 +2342,22 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, WaitTool_DontRecordActOnTask) {
 }
 
 // ===============================================
+// Attempt Login Tool
+// ===============================================
+
+// TODO(crbug.com/427817201): This tool is currently a no-op. Update this test
+// to do something meaningful once the tool is actually implemented.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, AttemptLoginTool) {
+  const GURL url = embedded_https_test_server().GetURL("/actor/blank.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  BrowserAction attempt_login = MakeAttemptLogin();
+  TestFuture<mojom::ActionResultPtr> result;
+  execution_engine().Act(attempt_login, result.GetCallback());
+  EXPECT_TRUE(result.Wait());
+}
+
+// ===============================================
 // Tab Management Tool
 // ===============================================
 
@@ -2360,10 +2376,9 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTestV2,
   create_tab->set_foreground(true);
   create_tab->set_window_id(browser()->session_id().id());
 
-  TestFuture<ActionsResult> result;
+  TestFuture<mojom::ActionResultPtr> result;
   execution_engine().Act(actions, result.GetCallback());
-  EXPECT_EQ(result.Get().action_result(),
-            static_cast<int>(mojom::ActionResultCode::kOk));
+  ExpectOkResult(result);
 
   EXPECT_EQ(initial_tab_count + 1, browser()->tab_strip_model()->GetTabCount());
   EXPECT_EQ(GURL("about:blank"),
@@ -2385,10 +2400,9 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTestV2,
   create_tab->set_foreground(false);
   create_tab->set_window_id(browser()->session_id().id());
 
-  TestFuture<ActionsResult> result;
+  TestFuture<mojom::ActionResultPtr> result;
   execution_engine().Act(actions, result.GetCallback());
-  EXPECT_EQ(result.Get().action_result(),
-            static_cast<int>(mojom::ActionResultCode::kOk));
+  ExpectOkResult(result);
 
   EXPECT_EQ(initial_tab_count + 1, browser()->tab_strip_model()->GetTabCount());
   EXPECT_EQ(start_tab_url,
@@ -2408,10 +2422,9 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTestV2, TabManagementTool_RecordActingOnTask) {
     create_tab->set_foreground(false);
     create_tab->set_window_id(browser()->session_id().id());
 
-    TestFuture<ActionsResult> result;
+    TestFuture<mojom::ActionResultPtr> result;
     execution_engine().Act(actions, result.GetCallback());
-    EXPECT_EQ(result.Get().action_result(),
-              static_cast<int>(mojom::ActionResultCode::kOk));
+    ExpectOkResult(result);
 
     EXPECT_EQ(actor_task().GetTabs().size(), 1ul);
 
@@ -2428,10 +2441,9 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTestV2, TabManagementTool_RecordActingOnTask) {
     create_tab->set_foreground(true);
     create_tab->set_window_id(browser()->session_id().id());
 
-    TestFuture<ActionsResult> result;
+    TestFuture<mojom::ActionResultPtr> result;
     execution_engine().Act(actions, result.GetCallback());
-    EXPECT_EQ(result.Get().action_result(),
-              static_cast<int>(mojom::ActionResultCode::kOk));
+    ExpectOkResult(result);
 
     EXPECT_EQ(actor_task().GetTabs().size(), 2ul);
 

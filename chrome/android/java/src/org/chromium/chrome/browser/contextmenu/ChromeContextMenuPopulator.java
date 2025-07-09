@@ -10,7 +10,6 @@ import static org.chromium.chrome.browser.contextmenu.ContextMenuItemWithIconBut
 import static org.chromium.chrome.browser.contextmenu.ContextMenuItemWithIconButtonProperties.END_BUTTON_IMAGE;
 import static org.chromium.chrome.browser.contextmenu.ContextMenuItemWithIconButtonProperties.END_BUTTON_MENU_ID;
 import static org.chromium.ui.listmenu.ListMenuItemProperties.ENABLED;
-import static org.chromium.ui.listmenu.ListMenuItemProperties.HOVER_LISTENER;
 import static org.chromium.ui.listmenu.ListMenuItemProperties.MENU_ITEM_ID;
 import static org.chromium.ui.listmenu.ListMenuItemProperties.TITLE;
 
@@ -21,8 +20,6 @@ import android.net.MailTo;
 import android.net.Uri;
 import android.text.TextUtils;
 import android.util.Pair;
-import android.view.MotionEvent;
-import android.view.View;
 import android.webkit.URLUtil;
 
 import androidx.annotation.IntDef;
@@ -86,6 +83,7 @@ import org.chromium.content_public.common.ContentUrlConstants;
 import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.base.DeviceInput;
 import org.chromium.ui.base.WindowAndroid;
+import org.chromium.ui.listmenu.ContextMenuSubmenuItemProperties;
 import org.chromium.ui.listmenu.ListItemType;
 import org.chromium.ui.listmenu.ListMenuItemProperties;
 import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
@@ -111,27 +109,6 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
     private static final String LENS_SUPPORT_STATUS_HISTOGRAM_NAME =
             "ContextMenu.LensSupportStatus";
     private final boolean mIsDownloadRestrictedByPolicy;
-    // Custom listener to set hover state so that the background color updates when user hovers or
-    // exits hover on the list item.
-    // This is normally handled by the View API if the view is clickable. However, the text views
-    // for context menu items are not clickable, to allow the list view to receive the click events.
-    // TODO(crbug.com/395024510): this is duplicating logic in Android framework (View.java), a
-    // proper fix would be changing to use RecycledView, or change to use a custom ViewBinder
-    // (instead of ListMenuItemViewBinder) where each item/TextView has its own click handler like
-    // AppMenu.
-    private final View.OnHoverListener mItemOnHoverListener =
-            (v, e) -> {
-                switch (e.getAction()) {
-                    case MotionEvent.ACTION_HOVER_ENTER:
-                        v.setHovered(true);
-                        return false;
-                    case MotionEvent.ACTION_HOVER_EXIT:
-                        v.setHovered(false);
-                        return false;
-                    default:
-                        return false;
-                }
-            };
 
     // True when the tracker indicates IPH in the form of "new" label needs to be shown.
     private @Nullable Boolean mShowEphemeralTabNewLabel;
@@ -637,7 +614,7 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
     }
 
     @Override
-    public boolean onItemSelected(int itemId) {
+    public boolean onItemSelected(int itemId, @Nullable ListItem menuItem) {
         if (itemId == R.id.contextmenu_open_in_new_tab) {
             recordContextMenuSelection(ContextMenuUma.Action.OPEN_IN_NEW_TAB);
             RecordUserAction.record("TabContextMenu.OpenInNewTab");
@@ -890,6 +867,10 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
             WebContents webContents = mItemDelegate.getWebContents();
             webContents.showInterestInElement(mParams.getInterestForNodeID());
         } else {
+            if (menuItem != null && menuItem.type == ListItemType.CONTEXT_MENU_ITEM_WITH_SUBMENU) {
+                // TODO(crbug.com/418807464): Implement submenu handling.
+                return true;
+            }
             assert false;
         }
 
@@ -1176,7 +1157,6 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                                 ChromeContextMenuItem.getTitle(
                                         mContext, getProfile(), item, showInProductHelp))
                         .with(ENABLED, enabled)
-                        .with(HOVER_LISTENER, mItemOnHoverListener)
                         .build();
         return new ListItem(ListItemType.CONTEXT_MENU_ITEM, model);
     }
@@ -1194,13 +1174,25 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                         .with(END_BUTTON_IMAGE, shareInfo.first)
                         .with(END_BUTTON_CONTENT_DESC, shareInfo.second)
                         .with(END_BUTTON_MENU_ID, ChromeContextMenuItem.getMenuId(iconButtonItem))
-                        .with(HOVER_LISTENER, mItemOnHoverListener)
                         .build();
         return new ListItem(ListItemType.CONTEXT_MENU_ITEM_WITH_ICON_BUTTON, model);
     }
 
+    @VisibleForTesting
+    ListItem createListItemWithSubmenu(String title, int menuItemId, List<ListItem> submenuItems) {
+        final PropertyModel model =
+                new PropertyModel.Builder(ContextMenuSubmenuItemProperties.ALL_KEYS)
+                        .with(ContextMenuSubmenuItemProperties.TITLE, title)
+                        .with(MENU_ITEM_ID, menuItemId)
+                        .with(ENABLED, true)
+                        .with(ContextMenuSubmenuItemProperties.SUBMENU_ITEMS, submenuItems)
+                        .build();
+        return new ListItem(ListItemType.CONTEXT_MENU_ITEM_WITH_SUBMENU, model);
+    }
+
     /**
      * Return the icon and name of the most recently shared app by certain app.
+     *
      * @param isLink Whether the item is SHARE_LINK.
      */
     private static Pair<Drawable, CharSequence> createRecentShareAppInfo(boolean isLink) {

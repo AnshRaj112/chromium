@@ -49,6 +49,13 @@
     "expiry_milestone": 135
   },
   {
+    "name": "act-features",
+    "owners": [
+      "fmacintosh@google.com"
+    ],
+    "expiry_milestone": 140
+  },
+  {
     "name": "adaptive-button-in-top-toolbar-page-summary",
     "owners": [ "salg@google.com", "chrome-segmentation-platform@google.com" ],
     "expiry_milestone": 140
@@ -242,16 +249,6 @@
     "name": "android-hub-search-tab-groups",
     "owners": [ "wylieb@google.com", "clank-tab-dev@google.com" ],
     "expiry_milestone": 140
-  },
-  {
-    "name": "android-keyboard-a11y",
-    "owners": [ "jhimawan@google.com", "clank-large-form-factors@google.com" ],
-    "expiry_milestone": 160
-  },
-  {
-    "name": "android-meta-click-history-navigation",
-    "owners": ["jhimawan@google.com"],
-    "expiry_milestone": 170
   },
   {
     "name": "android-native-pages-in-new-tab",
@@ -2438,11 +2435,6 @@
     "expiry_milestone": 125
   },
   {
-    "name": "eche-launcher-app-icon-in-more-apps-button",
-    "owners": ["joeantonetti@google.com"],
-    "expiry_milestone": 125
-  },
-  {
     "name": "eche-launcher-list-view",
     "owners": ["pushi@chromium.org"],
     "expiry_milestone": 125
@@ -3393,7 +3385,7 @@
   {
     "name": "enable-fast-ink-for-software-cursor",
     "owners": ["yichenz@chromium.org", "cros-sw-perf@google.com"],
-    "expiry_milestone": 140
+    "expiry_milestone": 145
   },
   {
     "name": "enable-fast-touchpad-click",
@@ -4280,14 +4272,6 @@
     "name": "enable-surface-control",
     "owners": [ "vikassoni@chromium.org", "vasilyt@chromium.org" ],
     "expiry_milestone": 150
-  },
-  {
-    "name": "enable-suspend-state-machine",
-    "owners": [
-      "dpad@google.com",
-      "cros-device-enablement@google.com"
-    ],
-    "expiry_milestone": 140
   },
   {
     "name": "enable-suspend-to-disk",

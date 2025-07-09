@@ -84,7 +84,7 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*conv_transpose2d_input=*/{DataTypeConstraint::kFloat16To32, {3, 8}},
        /*conv_transpose2d_bias=*/
        {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(1)},
-       /*cumulative_sum_input=*/{},
+       /*cumulative_sum_input=*/{kFloat16To32Int32To64, kMaxNonScalarRank},
        /*dequantize_linear_input=*/{},
        /*dequantize_linear_scale=*/{},
        /*dequantize_linear_zero_point=*/{},
@@ -164,7 +164,7 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*instance_normalization_scale=*/{},
        /*layer_normalization_input=*/{},
        /*leaky_relu_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
-       /*linear_input=*/{},
+       /*linear_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*lstm_input=*/{},
        /*lstm_bias=*/{},
        /*lstm_cell_input=*/{},

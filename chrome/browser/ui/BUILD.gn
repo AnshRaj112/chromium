@@ -388,7 +388,6 @@ static_library("ui") {
     "//chrome/browser/ui/toolbar:impl",
     "//chrome/browser/ui/toolbar/chrome_labs",
     "//chrome/browser/ui/translate",
-    "//chrome/browser/ui/unowned_user_data",
     "//chrome/browser/ui/webui",
     "//chrome/browser/ui/webui/about",
     "//chrome/browser/ui/webui/about:impl",
@@ -625,6 +624,7 @@ static_library("ui") {
     "//services/metrics/public/cpp:ukm_builders",
     "//services/network/public/mojom",
     "//services/preferences/public/cpp",
+    "//services/webnn:webnn_switches",
     "//skia",
     "//storage/browser",
     "//storage/common",
@@ -644,6 +644,7 @@ static_library("ui") {
     "//ui/base/accelerators/global_accelerator_listener:global_accelerator_listener",
     "//ui/base/clipboard",
     "//ui/base/ime",
+    "//ui/base/unowned_user_data",
     "//ui/compositor",
     "//ui/content_accelerators",
     "//ui/display",
@@ -1193,18 +1194,6 @@ static_library("ui") {
       "uma_browsing_activity_observer.h",
       "unload_controller.cc",
       "unload_controller.h",
-      "user_education/polling_idle_observer.cc",
-      "user_education/polling_idle_observer.h",
-      "user_education/recent_session_observer_impl.cc",
-      "user_education/recent_session_observer_impl.h",
-      "user_education/recent_session_policy.cc",
-      "user_education/recent_session_policy.h",
-      "user_education/show_promo_in_page.cc",
-      "user_education/show_promo_in_page.h",
-      "user_education/start_tutorial_in_page.cc",
-      "user_education/start_tutorial_in_page.h",
-      "user_education/user_education_types.cc",
-      "user_education/user_education_types.h",
       "views/eye_dropper/eye_dropper.cc",
       "views/eye_dropper/eye_dropper.h",
       "views/file_system_access/file_system_access_scroll_panel.cc",
@@ -1416,6 +1405,8 @@ static_library("ui") {
       "webui/side_panel/bookmarks/bookmarks_page_handler.h",
       "webui/side_panel/bookmarks/bookmarks_side_panel_ui.cc",
       "webui/side_panel/bookmarks/bookmarks_side_panel_ui.h",
+      "webui/side_panel/comments/comments_side_panel_ui.cc",
+      "webui/side_panel/comments/comments_side_panel_ui.h",
       "webui/side_panel/customize_chrome/customize_chrome_page_handler.cc",
       "webui/side_panel/customize_chrome/customize_chrome_page_handler.h",
       "webui/side_panel/customize_chrome/customize_chrome_ui.cc",
@@ -1846,6 +1837,10 @@ static_library("ui") {
       # TODO(crbug.com/430013958): Remove this circular dependency when
       # `translate_bubble_factory.cc` stop including c/b/ui/browser_window.h.
       "//chrome/browser/ui/translate:impl",
+
+      # TODO(crbug.com/430078439): Remove this circular dependency when
+      # .cc files stop including browser.h, browser_window.h and browser_navigator.h.
+      "//chrome/browser/ui/user_education:impl",
     ]
 
     if (is_mac) {
@@ -3814,8 +3809,6 @@ static_library("ui") {
       "views/desktop_capture/share_this_tab_source_view.h",
       "views/device_chooser_content_view.cc",
       "views/device_chooser_content_view.h",
-      "views/devtools_process_observer.cc",
-      "views/devtools_process_observer.h",
       "views/digital_credentials/digital_identity_bluetooth_manual_dialog_controller.cc",
       "views/digital_credentials/digital_identity_bluetooth_manual_dialog_controller.h",
       "views/digital_credentials/digital_identity_multi_step_dialog.cc",
@@ -4328,13 +4321,8 @@ static_library("ui") {
       "views/performance_controls/tab_list_row_view.h",
       "views/performance_controls/tab_list_view.cc",
       "views/performance_controls/tab_list_view.h",
-      "views/permissions/chip/chip_controller.cc",
-      "views/permissions/chip/chip_controller.h",
       "views/permissions/chip/multi_image_container.cc",
       "views/permissions/chip/multi_image_container.h",
-      "views/permissions/chip/permission_chip_theme.h",
-      "views/permissions/chip/permission_chip_view.cc",
-      "views/permissions/chip/permission_chip_view.h",
       "views/permissions/chip/permission_dashboard_controller.cc",
       "views/permissions/chip/permission_dashboard_controller.h",
       "views/permissions/chip/permission_dashboard_view.cc",
@@ -4384,7 +4372,6 @@ static_library("ui") {
       "views/permissions/permission_prompt_factory.cc",
       "views/permissions/permission_prompt_quiet_icon.cc",
       "views/permissions/permission_prompt_quiet_icon.h",
-      "views/permissions/permission_prompt_style.h",
       "views/picture_in_picture/picture_in_picture_bounds_change_animation.cc",
       "views/picture_in_picture/picture_in_picture_bounds_change_animation.h",
       "views/picture_in_picture/picture_in_picture_tucker.cc",
@@ -4867,6 +4854,9 @@ static_library("ui") {
       "//chrome/browser/ui/views/infobars",
       "//chrome/browser/ui/views/intent_picker:intent_picker_page_action",
       "//chrome/browser/ui/views/page_action",
+      "//chrome/browser/ui/views/permissions",
+      "//chrome/browser/ui/views/permissions/chip",
+      "//chrome/browser/ui/views/permissions/chip:impl",
       "//chrome/browser/ui/webui/app_service_internals",
       "//chrome/browser/ui/webui/autofill_ml_internals",
       "//chrome/browser/ui/webui/side_panel/customize_chrome",
@@ -4932,6 +4922,7 @@ static_library("ui") {
       "//chrome/browser/ui/views/bubble",
       "//chrome/browser/ui/commerce:impl",
       "//chrome/browser/ui/sharing_hub:impl",
+      "//chrome/browser/ui/views/permissions/chip:impl",
 
       # TODO(crbug.com/413572035): Remove circular dependency once/if
       # chrome_{typography,layout_provider} get modularized.
@@ -5716,7 +5707,6 @@ static_library("test_support") {
     "//chrome/browser/ui/autofill/payments:test_support",
     "//chrome/browser/ui/find_bar:test_support",
     "//chrome/browser/ui/toolbar:test_support",
-    "//chrome/browser/ui/unowned_user_data:unowned_user_data",
     "//components/omnibox/browser",
     "//components/password_manager/core/browser",
     "//components/payments/content",
@@ -5733,6 +5723,7 @@ static_library("test_support") {
     "//testing/gtest",
     "//ui/base",
     "//ui/base:test_support",
+    "//ui/base/unowned_user_data",
     "//ui/gfx:test_support",
     "//ui/shell_dialogs",
   ]

@@ -29,6 +29,7 @@ source_set("internal") {
       "//chrome/browser/media/router:media_router_feature",
       "//chrome/browser/profiles:profile",
       "//chrome/browser/ui:ui_features",
+      "//chrome/browser/ui/bookmarks:bookmarks",
       "//chrome/browser/ui/commerce",
       "//chrome/browser/ui/exclusive_access",
       "//chrome/browser/ui/extensions",
@@ -40,7 +41,6 @@ source_set("internal") {
       "//chrome/browser/ui/tabs/tab_strip_api",
       "//chrome/browser/ui/toasts",
       "//chrome/browser/ui/toolbar/chrome_labs",
-      "//chrome/browser/ui/unowned_user_data",
       "//chrome/browser/ui/views/download",
       "//chrome/browser/ui/views/new_tab_footer",
       "//chrome/browser/ui/views/side_panel",
@@ -54,6 +54,7 @@ source_set("internal") {
       "//components/profile_metrics",
       "//components/saved_tab_groups/public",
       "//components/search",
+      "//ui/base/unowned_user_data",
     ]
 
     if (is_win || is_mac) {

@@ -123,16 +123,6 @@ extern const char kAndroidBrowserControlsInVizName[];
 extern const char kAndroidBrowserControlsInVizDescription[];
 
 #if BUILDFLAG(IS_ANDROID)
-extern const char kAndroidKeyboardA11yName[];
-extern const char kAndroidKeyboardA11yDescription[];
-#endif  // BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_ANDROID)
-extern const char kAndroidMetaClickHistoryNavigationName[];
-extern const char kAndroidMetaClickHistoryNavigationDescription[];
-#endif  // BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_ANDROID)
 extern const char kAndroidNativePagesInNewTabName[];
 extern const char kAndroidNativePagesInNewTabDescription[];
 #endif  // BUILDFLAG(IS_ANDROID)
@@ -2476,6 +2466,9 @@ extern const char kTpcdTrialSettingsDescription[];
 extern const char kTopLevelTpcdTrialSettingsName[];
 extern const char kTopLevelTpcdTrialSettingsDescription[];
 
+extern const char kActFeaturesName[];
+extern const char kActFeaturesDescription[];
+
 extern const char kTrackingProtection3pcdName[];
 extern const char kTrackingProtection3pcdDescription[];
 
@@ -4172,9 +4165,6 @@ extern const char kEcheLauncherDescription[];
 
 extern const char kEcheLauncherListViewName[];
 extern const char kEcheLauncherListViewDescription[];
-
-extern const char kEcheLauncherIconsInMoreAppsButtonName[];
-extern const char kEcheLauncherIconsInMoreAppsButtonDescription[];
 
 extern const char kEcheSWADebugModeName[];
 extern const char kEcheSWADebugModeDescription[];

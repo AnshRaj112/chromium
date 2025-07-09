@@ -3646,6 +3646,21 @@
             ]
         }
     ],
+    "BocaMigrateSpeechRecongnizerClient": [
+        {
+            "platforms": [
+                "chromeos"
+            ],
+            "experiments": [
+                {
+                    "name": "Disabled",
+                    "disable_features": [
+                        "BocaMigrateSpeechRecongnizerClient"
+                    ]
+                }
+            ]
+        }
+    ],
     "BocaOnTaskLockedQuizMigration": [
         {
             "platforms": [
@@ -6536,6 +6551,21 @@
                     },
                     "enable_features": [
                         "ConfigurableV8CodeCacheHotHours"
+                    ]
+                }
+            ]
+        }
+    ],
+    "ContextualPageActionTabGrouping": [
+        {
+            "platforms": [
+                "android"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "ContextualPageActionTabGrouping"
                     ]
                 }
             ]
@@ -10734,6 +10764,24 @@
             ]
         }
     ],
+    "GlicAssetsUpdate": [
+        {
+            "platforms": [
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "GlicAssetsV2",
+                        "GlicParameterizedShader",
+                        "GlicThemeSync"
+                    ]
+                }
+            ]
+        }
+    ],
     "GlicClientResponsivenessCheckExtension": [
         {
             "platforms": [
@@ -11701,7 +11749,6 @@
     "HeapProfilerMultiKeyHashSet": [
         {
             "platforms": [
-                "android",
                 "chromeos",
                 "chromeos_lacros",
                 "ios",
@@ -11711,35 +11758,13 @@
             ],
             "experiments": [
                 {
-                    "name": "Enabled",
-                    "enable_features": [
-                        "HeapProfilerMultiKeyHashSet"
-                    ]
-                }
-            ]
-        }
-    ],
-    "HeapProfilingLoadFactor": [
-        {
-            "platforms": [
-                "android",
-                "chromeos",
-                "ios",
-                "linux",
-                "mac",
-                "windows"
-            ],
-            "experiments": [
-                {
-                    "name": "Enabled",
+                    "name": "EnabledMultiKey_20250708",
                     "params": {
-                        "browser-hash-set-load-factor": "0.7",
-                        "gpu-hash-set-load-factor": "0.7",
-                        "network-hash-set-load-factor": "0.7",
-                        "renderer-hash-set-load-factor": "0.7",
-                        "utility-hash-set-load-factor": "0.7"
+                        "nonstable-probability": "1.0",
+                        "stable-probability": "1.0"
                     },
                     "enable_features": [
+                        "HeapProfilerMultiKeyHashSet",
                         "HeapProfilerReporting"
                     ]
                 }
@@ -15427,6 +15452,25 @@
             ]
         }
     ],
+    "NavigationThrottleRegistryAttributeCache": [
+        {
+            "platforms": [
+                "android",
+                "chromeos",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "NavigationThrottleRegistryAttributeCache"
+                    ]
+                }
+            ]
+        }
+    ],
     "NearbyBleV2": [
         {
             "platforms": [
@@ -15589,9 +15633,18 @@
                 {
                     "name": "Enabled",
                     "params": {
-                        "url_loader": "true"
+                        "http_proxy_connect_job": "true",
+                        "http_stream_factory_job": "true",
+                        "http_stream_factory_job_controller": "true",
+                        "resource_scheduler": "true",
+                        "url_loader": "true",
+                        "url_request_error_job": "true",
+                        "url_request_http_job": "true",
+                        "url_request_job": "true",
+                        "url_request_redirect_job": "true"
                     },
                     "enable_features": [
+                        "NetTaskScheduler",
                         "NetworkServiceTaskScheduler"
                     ]
                 }
@@ -26422,6 +26475,23 @@
             ]
         }
     ],
+    "WebGPUUseSpirv14": [
+        {
+            "platforms": [
+                "android",
+                "android_webview",
+                "chromeos"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "WebGPUUseSpirv14"
+                    ]
+                }
+            ]
+        }
+    ],
     "WebGPUUseVulkanMemoryModel": [
         {
             "platforms": [
@@ -26950,6 +27020,24 @@
             ]
         }
     ],
+    "WebRTCColorAccuracy": [
+        {
+            "platforms": [
+                "chromeos",
+                "linux",
+                "mac",
+                "windows"
+            ],
+            "experiments": [
+                {
+                    "name": "Enabled",
+                    "enable_features": [
+                        "WebRTCColorAccuracy"
+                    ]
+                }
+            ]
+        }
+    ],
     "WebRtcAudioSinkUseTimestampAligner": [
         {
             "platforms": [
@@ -27050,19 +27138,19 @@
             ],
             "experiments": [
                 {
+                    "name": "Enabled_WithScriptStreaming",
+                    "enable_features": [
+                        "ScriptStreamingForNonHTTP",
+                        "WebUIInProcessResourceLoading"
+                    ]
+                },
+                {
                     "name": "Enabled_NoScriptStreaming",
                     "enable_features": [
                         "WebUIInProcessResourceLoading"
                     ],
                     "disable_features": [
                         "ScriptStreamingForNonHTTP"
-                    ]
-                },
-                {
-                    "name": "Enabled_WithScriptStreaming",
-                    "enable_features": [
-                        "ScriptStreamingForNonHTTP",
-                        "WebUIInProcessResourceLoading"
                     ]
                 }
             ]

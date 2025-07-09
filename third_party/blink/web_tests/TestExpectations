@@ -867,7 +867,6 @@ crbug.com/666433 external/wpt/css/css-text-decor/text-emphasis-style-filled-001.
 crbug.com/666433 external/wpt/css/css-text-decor/text-emphasis-style-open-001.xht [ Failure ]
 crbug.com/666433 external/wpt/css/css-text-decor/text-emphasis-style-shape-001.xht [ Failure ]
 crbug.com/666433 external/wpt/css/css-text-decor/text-emphasis-style-string-001.xht [ Failure ]
-crbug.com/1281289 external/wpt/css/css-text/letter-spacing/letter-spacing-211.html [ Failure ]
 crbug.com/666433 [ Linux ] external/wpt/css/css-text-decor/text-emphasis-color-property-001.html [ Failure ]
 crbug.com/666433 [ Linux ] external/wpt/css/css-text-decor/text-emphasis-color-property-001a.html [ Failure ]
 crbug.com/666433 [ Linux ] external/wpt/css/css-text-decor/text-emphasis-color-property-001b.html [ Failure ]
@@ -1108,11 +1107,16 @@ crbug.com/1076027 external/wpt/css/css-grid/masonry/tentative/gap/masonry-gap-00
 crbug.com/1076027 external/wpt/css/css-grid/masonry/tentative/intrinsic-sizing/* [ Crash Failure Skip ]
 crbug.com/1076027 external/wpt/css/css-grid/masonry/tentative/order/masonry-order-001.html [ Failure ]
 crbug.com/1076027 wpt_internal/css/css-masonry/column-auto-repeat-015.html [ Failure ]
+crbug.com/1076027 wpt_internal/css/css-masonry/column-auto-repeat-auto-005.html [ Failure ]
+crbug.com/1076027 wpt_internal/css/css-masonry/column-auto-repeat-auto-012.html [ Failure ]
 crbug.com/1076027 wpt_internal/css/css-masonry/column-explicit-placement-002.html [ Failure ]
 crbug.com/1076027 wpt_internal/css/css-masonry/row-auto-repeat-003.html [ Failure ]
 crbug.com/1076027 wpt_internal/css/css-masonry/row-auto-repeat-006.html [ Failure ]
 crbug.com/1076027 wpt_internal/css/css-masonry/row-auto-repeat-012.html [ Failure ]
 crbug.com/1076027 wpt_internal/css/css-masonry/row-auto-repeat-014.html [ Failure ]
+crbug.com/1076027 wpt_internal/css/css-masonry/row-auto-repeat-auto-005.html [ Failure ]
+crbug.com/1076027 wpt_internal/css/css-masonry/row-auto-repeat-auto-006.html [ Failure ]
+crbug.com/1076027 wpt_internal/css/css-masonry/row-auto-repeat-auto-012.html [ Failure ]
 crbug.com/1076027 wpt_internal/css/css-masonry/row-explicit-placement-006.html [ Failure ]
 # Masonry named line failures
 crbug.com/1076027 external/wpt/css/css-grid/masonry/tentative/grid-placement/masonry-grid-placement-named-lines-001.html [ Crash Failure ]
@@ -2360,6 +2364,7 @@ crbug.com/412200873 [ Win11 ] virtual/webnn-service-with-gpu/external/wpt/webnn/
 crbug.com/420746629 [ Win11 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/averagePool2d.https.any.html?gpu [ Failure ]  # Flaky output
 crbug.com/420746629 [ Win11 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/l2Pool2d.https.any.html?gpu [ Failure ]  # Flaky output
 crbug.com/420746629 [ Win11 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/maxPool2d.https.any.html?gpu [ Failure ]  # Flaky output
+crbug.com/429276267 [ Win11 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/tile.https.any.html?gpu [ Crash ]
 
 # `wdspec` tests
 external/wpt/webdriver/tests/classic/element_send_keys/interactability.py [ Failure ]  # Flaky output
@@ -6625,24 +6630,7 @@ crbug.com/1225773 external/wpt/html/webappapis/scripting/processing-model-2/unha
 crbug.com/1218100 [ Linux ] external/wpt/IndexedDB/idb-partitioned-coverage.sub.html [ Pass Timeout ]
 
 # To-be-fixed tests from the IndexedDB SQLite virtual suite.
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/idbfactory_open.any.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/idbfactory_open.any.serviceworker.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/idbfactory_open.any.sharedworker.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/idbfactory_open.any.worker.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/keyorder.any.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/keyorder.any.serviceworker.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/keyorder.any.sharedworker.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/keyorder.any.worker.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/open-request-queue.any.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/open-request-queue.any.serviceworker.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/open-request-queue.any.sharedworker.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/external/wpt/IndexedDB/open-request-queue.any.worker.html [ Crash Failure ]
-
-crbug.com/40253999 virtual/indexeddb_sqlite/storage/indexeddb/cursor-key-order.html [ Crash Failure ]
-crbug.com/40253999 virtual/indexeddb_sqlite/storage/indexeddb/database-deletepending-flag.html [ Crash ]
-crbug.com/40253999 virtual/indexeddb_sqlite/storage/indexeddb/deletedatabase-delayed-by-versionchange.html [ Crash ]
 crbug.com/40253999 virtual/indexeddb_sqlite/storage/indexeddb/exceptions.html [ Crash ]
-crbug.com/40253999 virtual/indexeddb_sqlite/storage/indexeddb/intversion-gated-on-delete.html [ Crash ]
 crbug.com/40253999 virtual/indexeddb_sqlite/storage/indexeddb/intversion-long-queue.html [ Crash ]
 crbug.com/40253999 virtual/indexeddb_sqlite/storage/indexeddb/open-ordering.html [ Crash ]
 # Gardener 2025-07-01
@@ -7209,8 +7197,6 @@ crbug.com/1472353 external/wpt/fedcm/fedcm-context.https.html [ Pass Timeout ]
 crbug.com/1404951 [ Win ] external/wpt/fedcm/fedcm-nonce-is-optional.https.html [ Pass Timeout ]
 
 crbug.com/1480054 [ Win ] external/wpt/fedcm/fedcm-loginhint.https.html [ Pass Timeout ]
-
-crbug.com/328129675 external/wpt/fedcm/fedcm-button-and-other-account/fedcm-button-mode-priority.tentative.https.html [ Pass Timeout ]
 
 # WebAssembly ESM integration is not yet implemented.
 crbug.com/40575658 external/wpt/wasm/webapi/esm-integration/exported-names.tentative.html [ Timeout ]
@@ -9263,8 +9249,10 @@ crbug.com/414257771 [ Mac ] external/wpt/notifications/shownotification.https.wi
 # Until ScriptSrcHashesV1 launches, these only pass in virtual tests.
 crbug.com/392657736 external/wpt/content-security-policy/unsafe-eval/tentative/eval-hashes-override-unsafe-eval.sub.html [ Failure ]
 crbug.com/392657736 external/wpt/content-security-policy/unsafe-eval/tentative/eval-allowed-by-hash.sub.html [ Failure ]
+crbug.com/392657736 external/wpt/content-security-policy/unsafe-eval/tentative/eval-blocked-report-contains-hash.html [ Failure ]
 crbug.com/392657736 virtual/script-src-hashes-v1-enabled/external/wpt/content-security-policy/unsafe-eval/tentative/eval-hashes-override-unsafe-eval.sub.html [ Pass ]
 crbug.com/392657736 virtual/script-src-hashes-v1-enabled/external/wpt/content-security-policy/unsafe-eval/tentative/eval-allowed-by-hash.sub.html [ Pass ]
+crbug.com/392657736 virtual/script-src-hashes-v1-enabled/external/wpt/content-security-policy/unsafe-eval/tentative/eval-blocked-report-contains-hash.html [ Pass ]
 
 # Gardener 2025-06-16
 crbug.com/424918655 [ Mac ] external/wpt/soft-navigation-heuristics/lcp/tentative/contracted-image.html [ Failure Pass ]
@@ -9302,3 +9290,29 @@ crbug.com/429440406 [ Win11-arm64 ] virtual/web-bluetooth-new-permissions-backen
 
 # Gardener 2025-07-04
 crbug.com/429413927 [ Linux ] inspector-protocol/dom/dom-issue-disallowed-select-descendants-delayed-display.js [ Failure Pass ]
+
+# Gardener 2025-07-09
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-on-cpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.html?cpu [ Failure Pass ]
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-on-cpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.serviceworker.html?cpu [ Failure Pass ]
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-on-cpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.sharedworker.html?cpu [ Failure Pass ]
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-on-cpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.worker.html?cpu [ Failure Pass ]
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-on-npu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.html?npu [ Failure Pass ]
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-on-npu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.serviceworker.html?npu [ Failure Pass ]
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-on-npu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.sharedworker.html?npu [ Failure Pass ]
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-on-npu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.worker.html?npu [ Failure Pass ]
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.html?gpu [ Failure Pass ]
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.serviceworker.html?gpu [ Failure Pass ]
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.sharedworker.html?gpu [ Failure Pass ]
+crbug.com/430344948 [ Mac14-arm64 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.worker.html?gpu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-on-cpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.html?cpu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-on-cpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.serviceworker.html?cpu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-on-cpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.sharedworker.html?cpu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-on-cpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.worker.html?cpu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-on-npu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.html?npu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-on-npu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.serviceworker.html?npu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-on-npu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.sharedworker.html?npu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-on-npu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.worker.html?npu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.html?gpu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.serviceworker.html?gpu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.sharedworker.html?gpu [ Failure Pass ]
+crbug.com/430344948 [ Mac15-arm64 ] virtual/webnn-service-with-gpu/external/wpt/webnn/conformance_tests/qdq_subgraph.https.any.worker.html?gpu [ Failure Pass ]

@@ -32,8 +32,6 @@ BASE_DECLARE_FEATURE(kAndroidBookmarkBar);
 BASE_DECLARE_FEATURE(kAndroidBottomToolbar);
 BASE_DECLARE_FEATURE(kAndroidDumpOnScrollWithoutResource);
 BASE_DECLARE_FEATURE(kAndroidElegantTextHeight);
-BASE_DECLARE_FEATURE(kAndroidKeyboardA11y);
-BASE_DECLARE_FEATURE(kAndroidMetaClickHistoryNavigation);
 BASE_DECLARE_FEATURE(kAndroidNativePagesInNewTab);
 BASE_DECLARE_FEATURE(kAndroidProgressBarVisualUpdate);
 BASE_DECLARE_FEATURE(kAndroidNoVisibleHintForDifferentTLD);
@@ -65,9 +63,6 @@ BASE_DECLARE_FEATURE(kAutomotiveBackButtonBarStreamline);
 BASE_DECLARE_FEATURE(kAuxiliarySearchDonation);
 BASE_DECLARE_FEATURE(kBackgroundThreadPool);
 BASE_DECLARE_FEATURE(kBatchTabRestore);
-#if BUILDFLAG(ENABLE_DESKTOP_ANDROID_EXTENSIONS)
-BASE_DECLARE_FEATURE(kBlockInstallingExtensionsOnDesktopAndroid);
-#endif
 BASE_DECLARE_FEATURE(kBlockIntentsWhileLocked);
 BASE_DECLARE_FEATURE(kBookmarkPaneAndroid);
 BASE_DECLARE_FEATURE(kBottomBrowserControlsRefactor);

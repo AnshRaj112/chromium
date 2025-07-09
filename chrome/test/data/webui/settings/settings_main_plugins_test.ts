@@ -52,12 +52,6 @@ suite('SettingsMain', function() {
       routes.PRIVACY,
       routes.PERFORMANCE,
       routes.APPEARANCE,
-      routes.SEARCH,
-      routes.ON_STARTUP,
-
-      // <if expr="not is_chromeos">
-      routes.DEFAULT_BROWSER,
-      // </if>
     ];
 
     for (const route of nonMigratedRoutes) {
@@ -69,6 +63,15 @@ suite('SettingsMain', function() {
     const migratedRoutes: Array<{route: Route, pluginTag: string}> = [
       // TODO(crbug.com/424223101): Update this list as more routes are
       // migrated.
+
+      {route: routes.SEARCH, pluginTag: 'settings-search-page-index'},
+      // <if expr="not is_chromeos">
+      {
+        route: routes.DEFAULT_BROWSER,
+        pluginTag: 'settings-default-browser-page',
+      },
+      // </if>
+      {route: routes.ON_STARTUP, pluginTag: 'settings-on-startup-page'},
       {route: routes.LANGUAGES, pluginTag: 'settings-languages-page-index'},
       {route: routes.DOWNLOADS, pluginTag: 'settings-downloads-page'},
       {route: routes.ACCESSIBILITY, pluginTag: 'settings-a11y-page-index'},

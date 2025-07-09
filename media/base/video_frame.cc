@@ -42,8 +42,10 @@
 #include "ui/gfx/buffer_format_util.h"
 #include "ui/gfx/geometry/point.h"
 
+#if BUILDFLAG(IS_CHROMEOS)
 // TODO(crbug.com/40263579): Remove.
-#include "ui/gfx/gpu_memory_buffer.h"
+#include "gpu/ipc/common/gpu_memory_buffer_impl_native_pixmap.h"
+#endif
 
 #if BUILDFLAG(IS_APPLE)
 #include <CoreVideo/CVPixelBuffer.h>
@@ -448,7 +450,7 @@ scoped_refptr<VideoFrame> VideoFrame::CreateFrameForMappableSIInternal(
 scoped_refptr<VideoFrame> VideoFrame::CreateFrameForGpuMemoryBufferInternal(
     const gfx::Rect& visible_rect,
     const gfx::Size& natural_size,
-    std::unique_ptr<gfx::GpuMemoryBuffer> gpu_memory_buffer,
+    std::unique_ptr<gpu::GpuMemoryBufferImplNativePixmap> gpu_memory_buffer,
     base::TimeDelta timestamp) {
   CHECK(gpu_memory_buffer);
 
@@ -478,31 +480,27 @@ scoped_refptr<VideoFrame> VideoFrame::CreateFrameForGpuMemoryBufferInternal(
         plane_size.width() * VideoFrame::BytesPerElement(*format, plane);
   }
   uint64_t modifier = gfx::NativePixmapHandle::kNoModifier;
-  bool is_native_buffer =
-      (gpu_memory_buffer->GetType() != gfx::SHARED_MEMORY_BUFFER);
-  if (is_native_buffer) {
-    const auto gmb_handle = gpu_memory_buffer->CloneHandle();
-    if (gmb_handle.is_null() ||
-        gmb_handle.native_pixmap_handle().planes.empty()) {
-      DLOG(ERROR) << "Failed to clone the GpuMemoryBufferHandle";
-      return nullptr;
-    }
-    const gfx::NativePixmapHandle& native_pixmap_handle =
-        gmb_handle.native_pixmap_handle();
-    if (native_pixmap_handle.planes.size() != num_planes) {
-      DLOG(ERROR) << "Invalid number of planes="
-                  << native_pixmap_handle.planes.size()
-                  << ", expected num_planes=" << num_planes;
-      return nullptr;
-    }
-    for (size_t i = 0; i < num_planes; ++i) {
-      const auto& plane = native_pixmap_handle.planes[i];
-      planes[i].stride = plane.stride;
-      planes[i].offset = plane.offset;
-      planes[i].size = plane.size;
-    }
-    modifier = native_pixmap_handle.modifier;
+  const auto gmb_handle = gpu_memory_buffer->CloneHandle();
+  if (gmb_handle.is_null() ||
+      gmb_handle.native_pixmap_handle().planes.empty()) {
+    DLOG(ERROR) << "Failed to clone the GpuMemoryBufferHandle";
+    return nullptr;
   }
+  const gfx::NativePixmapHandle& native_pixmap_handle =
+      gmb_handle.native_pixmap_handle();
+  if (native_pixmap_handle.planes.size() != num_planes) {
+    DLOG(ERROR) << "Invalid number of planes="
+                << native_pixmap_handle.planes.size()
+                << ", expected num_planes=" << num_planes;
+    return nullptr;
+  }
+  for (size_t i = 0; i < num_planes; ++i) {
+    const auto& plane = native_pixmap_handle.planes[i];
+    planes[i].stride = plane.stride;
+    planes[i].offset = plane.offset;
+    planes[i].size = plane.size;
+  }
+  modifier = native_pixmap_handle.modifier;
 
   const auto layout = VideoFrameLayout::CreateWithPlanes(
       *format, coded_size, std::move(planes),
@@ -850,32 +848,10 @@ scoped_refptr<VideoFrame> VideoFrame::WrapExternalYuvaData(
 scoped_refptr<VideoFrame> VideoFrame::WrapExternalGpuMemoryBuffer(
     const gfx::Rect& visible_rect,
     const gfx::Size& natural_size,
-    std::unique_ptr<gfx::GpuMemoryBuffer> gpu_memory_buffer,
+    std::unique_ptr<gpu::GpuMemoryBufferImplNativePixmap> gpu_memory_buffer,
     base::TimeDelta timestamp) {
-  return WrapExternalGpuMemoryBuffer(
-      visible_rect, natural_size, std::move(gpu_memory_buffer),
-      /*shared_image=*/nullptr, gpu::SyncToken(), timestamp);
-}
-
-// static
-scoped_refptr<VideoFrame> VideoFrame::WrapExternalGpuMemoryBuffer(
-    const gfx::Rect& visible_rect,
-    const gfx::Size& natural_size,
-    std::unique_ptr<gfx::GpuMemoryBuffer> gpu_memory_buffer,
-    scoped_refptr<gpu::ClientSharedImage> shared_image,
-    const gpu::SyncToken& sync_token,
-    base::TimeDelta timestamp) {
-  scoped_refptr<VideoFrame> frame = CreateFrameForGpuMemoryBufferInternal(
+  return CreateFrameForGpuMemoryBufferInternal(
       visible_rect, natural_size, std::move(gpu_memory_buffer), timestamp);
-  if (!frame) {
-    return nullptr;
-  }
-
-  if (shared_image) {
-    frame->acquire_sync_token_ = sync_token;
-    frame->shared_image_ = shared_image->MakeUnowned();
-  }
-  return frame;
 }
 #endif
 
@@ -1361,39 +1337,6 @@ bool VideoFrame::HasNativeGpuMemoryBuffer() const {
   }
 #endif
   return false;
-}
-
-gfx::GpuMemoryBuffer* VideoFrame::GetGpuMemoryBufferForTesting() const {
-#if !BUILDFLAG(IS_CHROMEOS)
-  return nullptr;
-#else
-  if (wrapped_frame_) {
-    return wrapped_frame_->GetGpuMemoryBufferForTesting();  // IN-TEST
-  }
-  return gpu_memory_buffer_.get();
-#endif
-}
-
-std::unique_ptr<VideoFrame::ScopedMapping> VideoFrame::MapGMBOrSharedImage()
-    const {
-  if (wrapped_frame_) {
-    return wrapped_frame_->MapGMBOrSharedImage();
-  }
-  if (is_mappable_si_enabled_) {
-    // If MappableSI is used, there must be a shared image.
-    CHECK(HasSharedImage());
-    if (auto mapping = shared_image_->Map()) {
-      return base::WrapUnique(
-          new VideoFrame::ScopedMapping(nullptr, std::move(mapping)));
-    }
-  }
-#if BUILDFLAG(IS_CHROMEOS)
-  if (gpu_memory_buffer_ && gpu_memory_buffer_->Map()) {
-    return base::WrapUnique(
-        new VideoFrame::ScopedMapping(gpu_memory_buffer_.get(), nullptr));
-  }
-#endif
-  return nullptr;
 }
 
 void VideoFrame::MapGMBOrSharedImageAsync(
@@ -1974,53 +1917,94 @@ std::vector<size_t> VideoFrame::CalculatePlaneSize() const {
   return CalculatePlaneSize(layout_);
 }
 
-VideoFrame::ScopedMapping::ScopedMapping(
-    gfx::GpuMemoryBuffer* gpu_memory_buffer,
-    std::unique_ptr<gpu::ClientSharedImage::ScopedMapping> scoped_mapping)
-    : gpu_memory_buffer_(gpu_memory_buffer),
-      scoped_mapping_(std::move(scoped_mapping)) {
-  // It should be backed by either one below.
-  CHECK_NE(!!gpu_memory_buffer, !!scoped_mapping_);
-}
-
-VideoFrame::ScopedMapping::~ScopedMapping() {
-  if (gpu_memory_buffer_) {
-    gpu_memory_buffer_->Unmap();
+class ScopedMappingSIImpl : public VideoFrame::ScopedMapping {
+ public:
+  ScopedMappingSIImpl(
+      std::unique_ptr<gpu::ClientSharedImage::ScopedMapping> scoped_mapping)
+      : scoped_mapping_(std::move(scoped_mapping)) {
+    CHECK(scoped_mapping_);
   }
+
+  ~ScopedMappingSIImpl() override = default;
+
+  uint8_t* Memory(uint32_t plane_index) override {
+    return static_cast<uint8_t*>(
+        scoped_mapping_->GetMemoryForPlane(plane_index).data());
+  }
+
+  base::span<uint8_t> GetMemoryAsSpan(uint32_t plane_index) override {
+    return scoped_mapping_->GetMemoryForPlane(plane_index);
+  }
+
+  size_t Stride(uint32_t plane_index) override {
+    return scoped_mapping_->Stride(plane_index);
+  }
+
+  gfx::Size Size() override { return scoped_mapping_->Size(); }
+
+ private:
+  std::unique_ptr<gpu::ClientSharedImage::ScopedMapping> scoped_mapping_;
+};
+
+#if BUILDFLAG(IS_CHROMEOS)
+class ScopedMappingGMBImpl : public VideoFrame::ScopedMapping {
+ public:
+  ScopedMappingGMBImpl(gpu::GpuMemoryBufferImplNativePixmap* gpu_memory_buffer)
+      : gpu_memory_buffer_(gpu_memory_buffer) {
+    CHECK(gpu_memory_buffer);
+  }
+
+  ~ScopedMappingGMBImpl() override { gpu_memory_buffer_->Unmap(); }
+
+  uint8_t* Memory(uint32_t plane_index) override {
+    return static_cast<uint8_t*>(gpu_memory_buffer_->memory(plane_index));
+  }
+
+  base::span<uint8_t> GetMemoryAsSpan(uint32_t plane_index) override {
+    return gpu_memory_buffer_->memory_span(plane_index);
+  }
+
+  size_t Stride(uint32_t plane_index) override {
+    return base::checked_cast<size_t>(gpu_memory_buffer_->stride(plane_index));
+  }
+
+  gfx::Size Size() override { return gpu_memory_buffer_->GetSize(); }
+
+ private:
+  // RAW_PTR_EXCLUSION: Performance reasons (based on analysis of MotionMark).
+  RAW_PTR_EXCLUSION gpu::GpuMemoryBufferImplNativePixmap* gpu_memory_buffer_ =
+      nullptr;
+};
+#endif
+
+std::unique_ptr<VideoFrame::ScopedMapping> VideoFrame::MapGMBOrSharedImage()
+    const {
+  if (wrapped_frame_) {
+    return wrapped_frame_->MapGMBOrSharedImage();
+  }
+  if (is_mappable_si_enabled_) {
+    // If MappableSI is used, there must be a shared image.
+    CHECK(HasSharedImage());
+    if (auto mapping = shared_image_->Map()) {
+      return base::WrapUnique(new ScopedMappingSIImpl(std::move(mapping)));
+    }
+  }
+#if BUILDFLAG(IS_CHROMEOS)
+  if (gpu_memory_buffer_ && gpu_memory_buffer_->Map()) {
+    return base::WrapUnique(new ScopedMappingGMBImpl(gpu_memory_buffer_.get()));
+  }
+#endif
+  return nullptr;
 }
 
-uint8_t* VideoFrame::ScopedMapping::Memory(uint32_t plane_index) {
-  return static_cast<uint8_t*>(
-      gpu_memory_buffer_
-          ? gpu_memory_buffer_->memory(plane_index)
-          : scoped_mapping_->GetMemoryForPlane(plane_index).data());
-}
-
-base::span<uint8_t> VideoFrame::ScopedMapping::GetMemoryAsSpan(
-    uint32_t plane_index) {
-  return gpu_memory_buffer_ ? gpu_memory_buffer_->memory_span(plane_index)
-                            : scoped_mapping_->GetMemoryForPlane(plane_index);
-}
-
-size_t VideoFrame::ScopedMapping::Stride(uint32_t plane_index) {
-  return gpu_memory_buffer_ ? base::checked_cast<size_t>(
-                                  gpu_memory_buffer_->stride(plane_index))
-                            : scoped_mapping_->Stride(plane_index);
-}
-
-gfx::Size VideoFrame::ScopedMapping::Size() {
-  return gpu_memory_buffer_ ? gpu_memory_buffer_->GetSize()
-                            : scoped_mapping_->Size();
-}
 #if BUILDFLAG(IS_CHROMEOS)
 void VideoFrame::MakeScopedMappingForGpuMemoryBuffer(
     base::OnceCallback<void(std::unique_ptr<VideoFrame::ScopedMapping>)>
         result_cb,
     bool success) const {
-  std::move(result_cb).Run(success
-                               ? base::WrapUnique(new VideoFrame::ScopedMapping(
-                                     gpu_memory_buffer_.get(), nullptr))
-                               : nullptr);
+  std::move(result_cb).Run(success ? base::WrapUnique(new ScopedMappingGMBImpl(
+                                         gpu_memory_buffer_.get()))
+                                   : nullptr);
 }
 #endif
 
@@ -2028,10 +2012,9 @@ void VideoFrame::WrapScopedSharedImageMapping(
     base::OnceCallback<void(std::unique_ptr<VideoFrame::ScopedMapping>)>
         result_cb,
     std::unique_ptr<gpu::ClientSharedImage::ScopedMapping> mapping) const {
-  std::move(result_cb).Run(mapping
-                               ? base::WrapUnique(new VideoFrame::ScopedMapping(
-                                     nullptr, std::move(mapping)))
-                               : nullptr);
+  std::move(result_cb).Run(
+      mapping ? base::WrapUnique(new ScopedMappingSIImpl(std::move(mapping)))
+              : nullptr);
 }
 
 }  // namespace media

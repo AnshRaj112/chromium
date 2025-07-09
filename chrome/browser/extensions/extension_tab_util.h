@@ -10,13 +10,11 @@
 #include <vector>
 
 #include "base/functional/callback.h"
+#include "base/types/expected.h"
 #include "chrome/browser/extensions/window_controller.h"
 
 // TODO(jamescook): Switch most of these guards to ENABLE_EXTENSIONS.
 #if !BUILDFLAG(IS_ANDROID)
-// gn check doesn't understand this conditional, hence the nogncheck directives
-// below.
-#include "base/types/expected.h"
 #include "base/values.h"
 #include "chrome/common/extensions/api/tab_groups.h"
 #include "chrome/common/extensions/api/tabs.h"
@@ -28,10 +26,12 @@
 #endif
 
 class Browser;
+class BrowserWindowInterface;
 class ExtensionFunction;
 class GURL;
 class Profile;
 class TabStripModel;
+
 namespace content {
 class BrowserContext;
 class WebContents;
@@ -56,36 +56,40 @@ class ExtensionTabUtil {
  public:
   static constexpr char kTabNotFoundError[] = "No tab with id: *.";
 
-#if !BUILDFLAG(IS_ANDROID)
-  // This file is slowly being ported to Android. For now, most of it is
-  // ifdef'd out.
   static constexpr char kNoCrashBrowserError[] =
       "I'm sorry. I'm afraid I can't do that.";
+#if !BUILDFLAG(IS_ANDROID)
   static constexpr char kCanOnlyMoveTabsWithinNormalWindowsError[] =
       "Tabs can only be moved to and from normal windows.";
   static constexpr char kCanOnlyMoveTabsWithinSameProfileError[] =
       "Tabs can only be moved between windows in the same profile.";
+#endif
   static constexpr char kNoCurrentWindowError[] = "No current window";
   static constexpr char kWindowNotFoundError[] = "No window with id: *.";
+#if !BUILDFLAG(IS_ANDROID)
   static constexpr char kTabStripNotEditableError[] =
       "Tabs cannot be edited right now (user may be dragging a tab).";
   static constexpr char kTabStripDoesNotSupportTabGroupsError[] =
       "Grouping is not supported by tabs in this window.";
+#endif
   static constexpr char kJavaScriptUrlsNotAllowedInExtensionNavigations[] =
       "JavaScript URLs are not allowed in API based extension navigations. Use "
       "chrome.scripting.executeScript instead.";
+#if !BUILDFLAG(IS_ANDROID)
   static constexpr char kBrowserWindowNotAllowed[] =
       "Browser windows not allowed.";
+#endif  // !BUILDFLAG(IS_ANDROID)
   static constexpr char kCannotNavigateToDevtools[] =
       "Cannot navigate to a devtools:// page without either the devtools or "
       "debugger permission.";
+#if !BUILDFLAG(IS_ANDROID)
   static constexpr char kLockedFullscreenModeNewTabError[] =
       "You cannot create new tabs while in locked fullscreen mode.";
+#endif  // !BUILDFLAG(IS_ANDROID)
   static constexpr char kCannotNavigateToChromeUntrusted[] =
       "Cannot navigate to a chrome-untrusted:// page.";
   static constexpr char kFileUrlsNotAllowedInExtensionNavigations[] =
       "Cannot navigate to a file URL without local file access.";
-#endif  // !BUILDFLAG(IS_ANDROID)
 
   static constexpr char kTabsKey[] = "tabs";
 
@@ -124,16 +128,18 @@ class ExtensionTabUtil {
       ExtensionFunction* function,
       const OpenTabParams& params,
       bool user_gesture);
+#endif
 
-  static int GetWindowId(Browser* browser);
+  static int GetWindowId(BrowserWindowInterface* browser);
+
+#if !BUILDFLAG(IS_ANDROID)
   static int GetWindowIdOfTabStripModel(const TabStripModel* tab_strip_model);
 #endif  // !BUILDFLAG(IS_ANDROID)
 
   static int GetTabId(const content::WebContents* web_contents);
   static int GetWindowIdOfTab(const content::WebContents* web_contents);
 
-#if !BUILDFLAG(IS_ANDROID)
-  static base::Value::List CreateTabList(Browser* browser,
+  static base::Value::List CreateTabList(BrowserWindowInterface* browser,
                                          const Extension* extension,
                                          mojom::ContextType context);
 
@@ -153,8 +159,7 @@ class ExtensionTabUtil {
       std::string* error_message);
 
   // Returns the tabs:: API constant for the window type of the `browser`.
-  static std::string GetBrowserWindowTypeText(Browser& browser);
-#endif  // !BUILDFLAG(IS_ANDROID)
+  static std::string GetBrowserWindowTypeText(BrowserWindowInterface& browser);
 
   // Creates a Tab object (see chrome/common/extensions/api/tabs.json) with
   // information about the state of a browser tab for the given `web_contents`.
@@ -174,7 +179,6 @@ class ExtensionTabUtil {
                                         const Extension* extension,
                                         TabStripModel* tab_strip,
                                         int tab_index);
-#if !BUILDFLAG(IS_ANDROID)
   // Creates a base::Value::Dict representing the window for the given
   // `browser`, and scrubs any privacy-sensitive data that `extension` does not
   // have access to. `populate_tab_behavior` determines whether tabs will be
@@ -182,15 +186,16 @@ class ExtensionTabUtil {
   // ScrubTabBehavior for the populated tabs data.
   // TODO(devlin): Convert this to a api::Windows::Window object.
   static base::Value::Dict CreateWindowValueForExtension(
-      Browser& browser,
+      BrowserWindowInterface& browser,
       const Extension* extension,
       WindowController::PopulateTabBehavior populate_tab_behavior,
       mojom::ContextType context);
 
+#if !BUILDFLAG(IS_ANDROID)
   // Creates a tab MutedInfo object (see chrome/common/extensions/api/tabs.json)
   // with information about the mute state of a browser tab.
   static api::tabs::MutedInfo CreateMutedInfo(content::WebContents* contents);
-#endif  // !BUILDFLAG(IS_ANDROID)
+#endif
 
   // Gets the level of scrubbing of tab data that needs to happen for a given
   // extension and web contents. This is the preferred way to get
@@ -217,11 +222,11 @@ class ExtensionTabUtil {
   static bool GetTabStripModel(const content::WebContents* web_contents,
                                TabStripModel** tab_strip_model,
                                int* tab_index);
+#endif  // !BUILDFLAG(IS_ANDROID)
 
   // Returns the active tab's WebContents if there is an active tab. Returns
   // null if there is no active tab.
-  static content::WebContents* GetActiveTab(Browser* browser);
-#endif  // !BUILDFLAG(IS_ANDROID)
+  static content::WebContents* GetActiveTab(BrowserWindowInterface* browser);
 
   // Any out parameter (`window`, `contents`, & `tab_index`) may be null.
   //
@@ -288,7 +293,6 @@ class ExtensionTabUtil {
                                      content::BrowserContext* browser_context,
                                      bool include_incognito);
 
-#if !BUILDFLAG(IS_ANDROID)
   // Takes `url_string` and returns a GURL which is either valid and absolute
   // or invalid. If `url_string` is not directly interpretable as a valid (it is
   // likely a relative URL) an attempt is made to resolve it. When `extension`
@@ -315,6 +319,7 @@ class ExtensionTabUtil {
       const Extension* extension,
       content::BrowserContext* browser_context);
 
+#if !BUILDFLAG(IS_ANDROID)
   // Opens a tab for the specified `web_contents`.
   static void CreateTab(std::unique_ptr<content::WebContents> web_contents,
                         const std::string& extension_id,
@@ -354,12 +359,12 @@ class ExtensionTabUtil {
   // Returns true if the given Browser can report tabs to extensions.
   // Example of Browsers which don't support tabs include apps and devtools.
   static bool BrowserSupportsTabs(Browser* browser);
+#endif  // !BUILDFLAG(IS_ANDROID)
 
   // Determines the loading status of the given `contents`. This needs to access
   // some non-const member functions of `contents`, but actually leaves it
   // unmodified.
   static api::tabs::TabStatus GetLoadingStatus(content::WebContents* contents);
-#endif  // !BUILDFLAG(IS_ANDROID)
 
   // Clears the back-forward cache for all active tabs across all browser
   // contexts.

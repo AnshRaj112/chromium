@@ -67,6 +67,7 @@ constexpr base::cstring_view kOpTypeClamp = "Clip";
 constexpr base::cstring_view kOpTypeConcat = "Concat";
 constexpr base::cstring_view kOpTypeConv2d = "Conv";
 constexpr base::cstring_view kOpTypeConvTranspose2d = "ConvTranspose";
+constexpr base::cstring_view kOpTypeCumulativeSum = "CumSum";
 constexpr base::cstring_view kOpTypeExpand = "Expand";
 constexpr base::cstring_view kOpTypeGather = "Gather";
 constexpr base::cstring_view kOpTypeGatherElements = "GatherElements";
@@ -640,6 +641,34 @@ void GraphBuilderOrt::AddConv2dOperation(const mojom::Conv2d& conv2d) {
   }
 }
 
+void GraphBuilderOrt::AddCumulativeSumOperation(
+    const mojom::CumulativeSum& cumulative_sum) {
+  const std::string node_name = GenerateNodeName(cumulative_sum.label);
+  const std::string input = GetOperandNameById(cumulative_sum.input_operand_id);
+  const std::string output =
+      GetOperandNameById(cumulative_sum.output_operand_id);
+
+  CHECK(context_properties_.data_type_limits.cumulative_sum_input.Supports(
+      GetOperand(cumulative_sum.input_operand_id).descriptor));
+
+  const std::string axis =
+      CreateScalarInitializer(base::checked_cast<int64_t>(cumulative_sum.axis));
+
+  constexpr base::cstring_view kAttrExclusive = "exclusive";
+  constexpr base::cstring_view kAttrReverse = "reverse";
+  std::array<ScopedOrtOpAttr, 2> attributes = {
+      model_editor_.CreateAttribute(
+          kAttrExclusive,
+          base::checked_cast<int64_t>(cumulative_sum.exclusive)),
+      model_editor_.CreateAttribute(
+          kAttrReverse, base::checked_cast<int64_t>(cumulative_sum.reversed))};
+
+  std::array<const char*, 2> inputs = {input.c_str(), axis.c_str()};
+  std::array<const char*, 1> outputs = {output.c_str()};
+  model_editor_.AddNode(kOpTypeCumulativeSum, node_name, inputs, outputs,
+                        attributes);
+}
+
 // TODO(crbug.com/426228071): Eliminate redundant cast ops for bool and uint8
 // data types conversion.
 void GraphBuilderOrt::AddLogicalBinaryOperation(
@@ -1091,6 +1120,40 @@ void GraphBuilderOrt::AddLeakyReluOperation(
       model_editor_.CreateAttribute(kAttrAlpha, leaky_relu.alpha)};
   model_editor_.AddNode(kOpTypeLeakyRelu, node_name, inputs, outputs,
                         attributes);
+}
+
+void GraphBuilderOrt::AddLinearOperation(const mojom::Linear& linear) {
+  const OperandDescriptor& input_descriptor =
+      GetOperand(linear.input_operand_id).descriptor;
+  CHECK(context_properties_.data_type_limits.linear_input.Supports(
+      input_descriptor));
+
+  // Emulate a linear operation using two ONNX nodes for expression `alpha * x +
+  // beta`.
+  const OperandDataType input_data_type = input_descriptor.data_type();
+  std::string alpha =
+      CreateScalarInitializerForFloat(input_data_type, linear.alpha);
+  std::string beta =
+      CreateScalarInitializerForFloat(input_data_type, linear.beta);
+
+  // Step 1: Create 'Mul' node (alpha * x)
+  const std::string mul_node_label = base::JoinString(
+      {kInserted, kOpTypeMul, kToEmulate, linear.label}, kUnderscore);
+  const std::string mul_node_name = GenerateNodeName(mul_node_label);
+  const std::string input = GetOperandNameById(linear.input_operand_id);
+  std::array<const char*, 2> mul_inputs = {input.c_str(), alpha.c_str()};
+  const std::string mul_output = GenerateOperandName();
+  std::array<const char*, 1> mul_outputs = {mul_output.c_str()};
+  model_editor_.AddNode(kOpTypeMul, mul_node_name, mul_inputs, mul_outputs);
+
+  // Step 2: Create 'Add' node (mul_output + beta)
+  const std::string add_node_label = base::JoinString(
+      {kInserted, kOpTypeAdd, kToEmulate, linear.label}, kUnderscore);
+  const std::string add_node_name = GenerateNodeName(add_node_label);
+  std::array<const char*, 2> add_inputs = {mul_output.c_str(), beta.c_str()};
+  const std::string output = GetOperandNameById(linear.output_operand_id);
+  std::array<const char*, 1> add_outputs = {output.c_str()};
+  model_editor_.AddNode(kOpTypeAdd, add_node_name, add_inputs, add_outputs);
 }
 
 void GraphBuilderOrt::AddMatMulOperation(const mojom::Matmul& matmul) {
@@ -1580,6 +1643,10 @@ GraphBuilderOrt::BuildModel() {
         AddConv2dOperation(*operation->get_conv2d());
         break;
       }
+      case mojom::Operation::Tag::kCumulativeSum: {
+        AddCumulativeSumOperation(*operation->get_cumulative_sum());
+        break;
+      }
       case mojom::Operation::Tag::kElementWiseBinary: {
         AddElementWiseBinaryOperation(*operation->get_element_wise_binary());
         break;
@@ -1635,6 +1702,10 @@ GraphBuilderOrt::BuildModel() {
       }
       case mojom::Operation::Tag::kLeakyRelu: {
         AddLeakyReluOperation(*operation->get_leaky_relu());
+        break;
+      }
+      case mojom::Operation::Tag::kLinear: {
+        AddLinearOperation(*operation->get_linear());
         break;
       }
       case mojom::Operation::Tag::kMatmul: {
@@ -1719,7 +1790,6 @@ GraphBuilderOrt::BuildModel() {
         break;
       }
       case mojom::Operation::Tag::kBatchNormalization:
-      case mojom::Operation::Tag::kCumulativeSum:
       case mojom::Operation::Tag::kDequantizeLinear:
       case mojom::Operation::Tag::kElu:
       case mojom::Operation::Tag::kGru:
@@ -1727,7 +1797,6 @@ GraphBuilderOrt::BuildModel() {
       case mojom::Operation::Tag::kHardSigmoid:
       case mojom::Operation::Tag::kInstanceNormalization:
       case mojom::Operation::Tag::kLayerNormalization:
-      case mojom::Operation::Tag::kLinear:
       case mojom::Operation::Tag::kLstm:
       case mojom::Operation::Tag::kLstmCell:
       case mojom::Operation::Tag::kQuantizeLinear:

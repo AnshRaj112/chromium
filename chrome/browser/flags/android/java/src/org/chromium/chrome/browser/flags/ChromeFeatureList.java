@@ -177,9 +177,6 @@ public abstract class ChromeFeatureList {
     public static final String ANDROID_DUMP_ON_SCROLL_WITHOUT_RESOURCE =
             "AndroidDumpOnScrollWithoutResource";
     public static final String ANDROID_ELEGANT_TEXT_HEIGHT = "AndroidElegantTextHeight";
-    public static final String ANDROID_KEYBOARD_A11Y = "AndroidKeyboardA11y";
-    public static final String ANDROID_META_CLICK_HISTORY_NAVIGATION =
-            "AndroidMetaClickHistoryNavigation";
     public static final String ANDROID_MINIMAL_UI_LARGE_SCREEN = "AndroidMinimalUiLargeScreen";
     public static final String ANDROID_NATIVE_PAGES_IN_NEW_TAB = "AndroidNativePagesInNewTab";
     public static final String ANDROID_NO_VISIBLE_HINT_FOR_DIFFERENT_TLD =
@@ -271,8 +268,6 @@ public abstract class ChromeFeatureList {
     public static final String BATCH_TAB_RESTORE = "BatchTabRestore";
     public static final String BCIV_BOTTOM_CONTROLS = "AndroidBcivBottomControls";
     public static final String BIOMETRIC_AUTH_IDENTITY_CHECK = "BiometricAuthIdentityCheck";
-    public static final String BLOCK_INSTALLING_EXTENSIONS_ON_DESKTOP_ANDROID =
-            "BlockInstallingExtensionsOnDesktopAndroid";
     public static final String BLOCK_INTENTS_WHILE_LOCKED = "BlockIntentsWhileLocked";
     public static final String BOARDING_PASS_DETECTOR = "BoardingPassDetector";
     public static final String BOOKMARK_PANE_ANDROID = "BookmarkPaneAndroid";
@@ -834,6 +829,11 @@ public abstract class ChromeFeatureList {
     public static final CachedFlag sCpaSpecUpdate =
             newCachedFlag(
                     CPA_SPEC_UPDATE, /* defaultValue= */ false, /* defaultValueInTests= */ true);
+    public static final CachedFlag sCpaTabGroupingButton =
+            newCachedFlag(
+                    CONTEXTUAL_PAGE_ACTION_TAB_GROUPING,
+                    /* defaultValue= */ false,
+                    /* defaultValueInTests= */ true);
     public static final CachedFlag sCrossDeviceTabPaneAndroid =
             newCachedFlag(CROSS_DEVICE_TAB_PANE_ANDROID, false);
     public static final CachedFlag sDisableInstanceLimit =
@@ -1100,6 +1100,7 @@ public abstract class ChromeFeatureList {
                     sCollectAndroidFrameTimelineMetrics,
                     sCommandLineOnNonRooted,
                     sCpaSpecUpdate,
+                    sCpaTabGroupingButton,
                     sCrossDeviceTabPaneAndroid,
                     sDisableInstanceLimit,
                     sDisplayEdgeToEdgeFullscreen,

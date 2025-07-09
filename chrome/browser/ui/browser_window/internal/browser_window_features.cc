@@ -22,6 +22,7 @@
 #include "chrome/browser/lens/region_search/lens_region_search_controller.h"
 #include "chrome/browser/media/router/media_router_feature.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/bookmarks/bookmark_bar_controller.h"
 #include "chrome/browser/ui/breadcrumb_manager_browser_agent.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_actions.h"
@@ -50,7 +51,6 @@
 #include "chrome/browser/ui/tabs/saved_tab_groups/session_service_tab_group_sync_observer.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/shared_tab_group_feedback_controller.h"
 #include "chrome/browser/ui/tabs/split_tab_scrim_controller.h"
-#include "chrome/browser/ui/tabs/split_tab_scrim_delegate.h"
 #include "chrome/browser/ui/tabs/tab_group_deletion_dialog_controller.h"
 #include "chrome/browser/ui/tabs/tab_list_bridge.h"
 #include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_service_impl.h"
@@ -131,6 +131,10 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
   // This is used only for the controllers which will be created on demand
   // later.
   browser_ = browser;
+
+  // Initialize bookmark bar controller for all browser types.
+  bookmark_bar_controller_ = std::make_unique<BookmarkBarController>(
+      *browser, *browser->GetTabStripModel());
 
   // Avoid passing `browser` directly to features. Instead, pass the minimum
   // necessary state or controllers necessary.
@@ -356,6 +360,13 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
         shared_tab_group_feedback_controller_->Init();
       }
     }
+
+    if (base::FeatureList::IsEnabled(features::kSideBySide)) {
+      if (browser_view) {
+        split_tab_scrim_controller_ =
+            std::make_unique<split_tabs::SplitTabScrimController>(browser_view);
+      }
+    }
   }
 
   synced_window_delegate_ =
@@ -440,14 +451,6 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
     if (media_router::MediaRouterEnabled(browser_view->browser()->profile())) {
       cast_browser_controller_ =
           std::make_unique<media_router::CastBrowserController>(
-              browser_view->browser());
-    }
-
-    if (base::FeatureList::IsEnabled(features::kSideBySide)) {
-      split_tab_scrim_controller_ =
-          std::make_unique<split_tabs::SplitTabScrimController>(
-              std::make_unique<split_tabs::SplitTabScrimDelegateImpl>(
-                  browser_view),
               browser_view->browser());
     }
   }
@@ -563,15 +566,16 @@ bool BrowserWindowFeatures::HasFindBarController() const {
 }
 
 // static
-UserDataFactoryWithOwner<BrowserWindowInterface>&
+ui::UserDataFactoryWithOwner<BrowserWindowInterface>&
 BrowserWindowFeatures::GetUserDataFactoryForTesting() {
   return GetUserDataFactory();
 }
 
 // static
-UserDataFactoryWithOwner<BrowserWindowInterface>&
+ui::UserDataFactoryWithOwner<BrowserWindowInterface>&
 BrowserWindowFeatures::GetUserDataFactory() {
-  static base::NoDestructor<UserDataFactoryWithOwner<BrowserWindowInterface>>
+  static base::NoDestructor<
+      ui::UserDataFactoryWithOwner<BrowserWindowInterface>>
       factory;
   return *factory;
 }

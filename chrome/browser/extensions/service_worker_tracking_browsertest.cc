@@ -368,9 +368,11 @@ IN_PROC_BROWSER_TEST_F(
 // the renderer stop notification first (but it could also happen in other ways)
 // and then ensures the browser stop notification doesn't try to doubly remove
 // the `WorkerId`.
+// TODO(crbug.com/40936639): remove this test once it's confirmed that
+// OnStopping is always called before DidStopServiceWorkerContext.
 IN_PROC_BROWSER_TEST_F(
     ServiceWorkerIdTrackingBrowserTest,
-    WorkerNotStalledInStopping_RemovedByRenderStopNotificationFirst) {
+    DISABLED_WorkerNotStalledInStopping_RemovedByRenderStopNotificationFirst) {
   ASSERT_NO_FATAL_FAILURE(LoadServiceWorkerExtensionAndOpenExtensionTab());
 
   // Get the soon to be stopped ("previous") worker's information.
@@ -408,7 +410,8 @@ IN_PROC_BROWSER_TEST_F(
 
   // Run the browser stop notification after the renderer stop notification, and
   // it should do nothing.
-  worker_state->OnStopped(previous_service_worker_id->version_id, sw_info);
+  worker_state->OnStopped(previous_service_worker_id->version_id,
+                          sw_info.scope);
 
   // Confirm after the browser stop notification that we are still no longer
   // tracking the worker.
@@ -564,9 +567,11 @@ IN_PROC_BROWSER_TEST_P(
 // Test that if a browser stop notification is received after the render stop
 // notification (since these things can be triggered independently)
 // the worker's browser and renderer readiness information remains not ready.
+// TODO(crbug.com/40936639): remove this test once it's confirmed that
+// OnStopping is always called before DidStopServiceWorkerContext.
 IN_PROC_BROWSER_TEST_P(
     ServiceWorkerStopTrackingBrowserTestWithOptimizeServiceWorkerStart,
-    OnStoppedUpdatesBrowserAndRendererState_AfterRenderStopNotification) {
+    DISABLED_OnStoppedUpdatesBrowserAndRendererState_AfterRenderStopNotification) {
   const bool wakeup_optimization_enabled = IsParamFeatureEnabled();
   const auto kExpectedBrowserState =
       wakeup_optimization_enabled ? ServiceWorkerState::BrowserState::kActive
@@ -611,7 +616,7 @@ IN_PROC_BROWSER_TEST_P(
             ServiceWorkerState::RendererState::kNotActive);
 
   // Simulate browser stop notification after the render stop notification.
-  worker_state->OnStopped(stopped_service_worker_id->version_id, sw_info);
+  worker_state->OnStopped(stopped_service_worker_id->version_id, sw_info.scope);
 
   // Confirm the worker state still exists, and browser and renderer state
   // remain not ready.

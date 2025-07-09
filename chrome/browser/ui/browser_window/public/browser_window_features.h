@@ -8,9 +8,9 @@
 #include <memory>
 
 #include "base/memory/raw_ptr.h"
-#include "chrome/browser/ui/unowned_user_data/user_data_factory.h"
 #include "chrome/common/buildflags.h"
 #include "extensions/buildflags/buildflags.h"
+#include "ui/base/unowned_user_data/user_data_factory.h"
 
 #if BUILDFLAG(ENABLE_GLIC)
 namespace glic {
@@ -19,6 +19,7 @@ class GlicIphController;
 }  // namespace glic
 #endif
 
+class BookmarkBarController;
 class BookmarksSidePanelCoordinator;
 class BreadcrumbManagerBrowserAgent;
 class Browser;
@@ -179,6 +180,10 @@ class BrowserWindowFeatures {
 
   BookmarksSidePanelCoordinator* bookmarks_side_panel_coordinator() {
     return bookmarks_side_panel_coordinator_.get();
+  }
+
+  BookmarkBarController* bookmark_bar_controller() {
+    return bookmark_bar_controller_.get();
   }
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
@@ -367,11 +372,12 @@ class BrowserWindowFeatures {
     return content_setting_bubble_model_delegate_.get();
   }
 
-  static UserDataFactoryWithOwner<BrowserWindowInterface>&
+  static ui::UserDataFactoryWithOwner<BrowserWindowInterface>&
   GetUserDataFactoryForTesting();
 
  private:
-  static UserDataFactoryWithOwner<BrowserWindowInterface>& GetUserDataFactory();
+  static ui::UserDataFactoryWithOwner<BrowserWindowInterface>&
+  GetUserDataFactory();
 
   // A collection of features specific to desktop versions of Chrome.
   std::unique_ptr<DesktopBrowserWindowCapabilities>
@@ -379,6 +385,8 @@ class BrowserWindowFeatures {
 
   // Features that are per-browser window will each have a controller. e.g.
   // std::unique_ptr<FooFeature> foo_feature_;
+
+  std::unique_ptr<BookmarkBarController> bookmark_bar_controller_;
 
   std::unique_ptr<BrowserInstantController> instant_controller_;
 

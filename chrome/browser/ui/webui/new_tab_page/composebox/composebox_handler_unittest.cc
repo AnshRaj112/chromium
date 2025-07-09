@@ -4,13 +4,22 @@
 
 #include "chrome/browser/ui/webui/new_tab_page/composebox/composebox_handler.h"
 
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "base/memory/raw_ptr.h"
+#include "base/test/gmock_move_support.h"
+#include "base/test/mock_callback.h"
 #include "base/version_info/channel.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/ui/webui/new_tab_page/composebox/composebox.mojom.h"
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/omnibox/composebox/composebox_query_controller.h"
+#include "components/omnibox/composebox/test_composebox_query_controller.h"
+#include "components/variations/variations_client.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_delegate.h"
@@ -29,12 +38,14 @@ class MockQueryController : public ComposeboxQueryController {
       scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
       version_info::Channel channel,
       std::string locale,
-      TemplateURLService* template_url_service)
+      TemplateURLService* template_url_service,
+      variations::VariationsClient* variations_client)
       : ComposeboxQueryController(identity_manager,
                                   url_loader_factory,
                                   channel,
                                   locale,
-                                  template_url_service) {}
+                                  template_url_service,
+                                  variations_client) {}
   ~MockQueryController() override = default;
 
   MOCK_METHOD(void, NotifySessionStarted, ());
@@ -86,9 +97,11 @@ class ComposeboxHandlerTest : public ChromeRenderViewHostTestHarness {
         template_url_service_->Add(std::make_unique<TemplateURL>(data));
     template_url_service_->SetUserSelectedDefaultSearchProvider(template_url);
 
+    fake_variations_client_ = std::make_unique<FakeVariationsClient>();
     auto query_controller_ptr = std::make_unique<MockQueryController>(
         /*identity_manager=*/nullptr, shared_url_loader_factory_,
-        version_info::Channel::UNKNOWN, "en-US", template_url_service_);
+        version_info::Channel::UNKNOWN, "en-US", template_url_service_,
+        fake_variations_client_.get());
     query_controller_ = query_controller_ptr.get();
     web_contents()->SetDelegate(&delegate_);
     handler_ = std::make_unique<ComposeboxHandler>(
@@ -110,11 +123,13 @@ class ComposeboxHandlerTest : public ChromeRenderViewHostTestHarness {
     template_url_service_ = nullptr;
     query_controller_ = nullptr;
     handler_.reset();
+    fake_variations_client_.reset();
     ChromeRenderViewHostTestHarness::TearDown();
   }
 
  private:
   std::unique_ptr<ComposeboxHandler> handler_;
+  std::unique_ptr<FakeVariationsClient> fake_variations_client_;
   network::TestURLLoaderFactory test_factory_;
   scoped_refptr<network::SharedURLLoaderFactory> shared_url_loader_factory_;
   raw_ptr<MockQueryController> query_controller_;
@@ -160,8 +175,15 @@ TEST_F(ComposeboxHandlerTest, AddFile_Pdf) {
   auto test_data_span = base::span<const uint8_t>(test_data);
   mojo_base::BigBuffer file_data(test_data_span);
 
-  EXPECT_CALL(query_controller(), StartFileUploadFlow).Times(1);
-  handler().AddFile(std::move(file_info), std::move(file_data));
+  base::MockCallback<ComposeboxHandler::AddFileCallback> callback;
+  std::unique_ptr<ComposeboxQueryController::FileInfo> controller_file_info;
+  base::UnguessableToken callback_token;
+  EXPECT_CALL(query_controller(), StartFileUploadFlow)
+      .WillOnce(MoveArg<0>(&controller_file_info));
+  EXPECT_CALL(callback, Run).WillOnce(testing::SaveArg<0>(&callback_token));
+  handler().AddFile(std::move(file_info), std::move(file_data), callback.Get());
+
+  EXPECT_EQ(callback_token, controller_file_info->file_token_);
 }
 
 TEST_F(ComposeboxHandlerTest, AddFile_Image) {
@@ -175,6 +197,13 @@ TEST_F(ComposeboxHandlerTest, AddFile_Image) {
   auto test_data_span = base::span<const uint8_t>(test_data);
   mojo_base::BigBuffer file_data(test_data_span);
 
-  EXPECT_CALL(query_controller(), StartFileUploadFlow).Times(1);
-  handler().AddFile(std::move(file_info), std::move(file_data));
+  base::MockCallback<ComposeboxHandler::AddFileCallback> callback;
+  std::unique_ptr<ComposeboxQueryController::FileInfo> controller_file_info;
+  base::UnguessableToken callback_token;
+  EXPECT_CALL(query_controller(), StartFileUploadFlow)
+      .WillOnce(MoveArg<0>(&controller_file_info));
+  EXPECT_CALL(callback, Run).WillOnce(testing::SaveArg<0>(&callback_token));
+  handler().AddFile(std::move(file_info), std::move(file_data), callback.Get());
+
+  EXPECT_EQ(callback_token, controller_file_info->file_token_);
 }
