@@ -207,7 +207,8 @@ void PageInfoCookiesContentView::
               &PageInfoCookiesContentView::
                   IncognitoTrackingProtectionSettingsLinkClicked,
               base::Unretained(this)),
-          PageInfoViewFactory::GetImageModel(vector_icons::kSettingsIcon),
+          PageInfoViewFactory::GetImageModel(
+              vector_icons::kSettingsChromeRefreshIcon),
           l10n_util::GetStringUTF16(
               IDS_PAGE_INFO_INCOGNITO_TRACKING_PROTECTION_SETTINGS_BUTTON_TITLE),
           l10n_util::GetStringUTF16(
@@ -379,6 +380,10 @@ void PageInfoCookiesContentView::SetIncognitoTrackingProtectionsDescription(
   }
   cookies_description_label_->SetText(l10n_util::GetStringUTF16(description));
   cookies_description_label_->SetVisible(true);
+  // Update styling to match subtitle text.
+  cookies_description_label_->SetDefaultTextStyle(views::style::STYLE_BODY_4);
+  cookies_description_label_->SetDefaultEnabledColorId(
+      kColorPageInfoSubtitleForeground);
 }
 
 void PageInfoCookiesContentView::SetCookiesDescription(

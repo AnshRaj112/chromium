@@ -94,6 +94,7 @@ chromium-metrics-reviews@google.com.
   <variant name="Compose" summary="Weights for On-Device Compose"/>
   <variant name="ContextualPageActionPriceTracking"
       summary="Contextual Page Action: Show price tracking"/>
+  <variant name="EduClassifier" summary="Education classifier"/>
   <variant name="ExperimentalEmbedder"
       summary="Embedder for performance experiments"/>
   <variant name="GeolocationPermissions"
@@ -192,6 +193,9 @@ chromium-metrics-reviews@google.com.
 </variants>
 
 <variants name="OptimizationType">
+  <variant name="A2AMerchantAllowlist"
+      summary="This optimization provides information about merchant URLs
+               that are eligible for A2A payments."/>
   <variant name="AboutThisSite"
       summary="Provides 'About this site' data about the site being visited"/>
   <variant name="AmericanExpressCreditCardFlightBenefits"
@@ -1464,13 +1468,16 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="OptimizationGuide.ModelExecutor.ModelLoadingDuration2.{OptimizationTarget}"
-    units="ms" expires_after="2025-01-26">
+    units="ms" expires_after="2025-11-09">
   <owner>wittman@chromium.org</owner>
   <owner>rajendrant@chromium.org</owner>
   <summary>
     Records the time duration it took to load a model file successfully for
     {OptimizationTarget}. Recorded once per model load attempt for
     {OptimizationTarget}.
+
+    Warning: this histogram was expired from 2025-01-26 to 2025-07-09; data may
+    be missing.
   </summary>
   <token key="OptimizationTarget" variants="OptimizationTarget"/>
 </histogram>

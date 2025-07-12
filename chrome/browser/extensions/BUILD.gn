@@ -160,6 +160,7 @@ source_set("extensions") {
     "api/storage/sync_value_store_cache.h",
     "api/storage/syncable_settings_storage.cc",
     "api/storage/syncable_settings_storage.h",
+    "api/tabs/tabs_api.cc",
     "api/tabs/tabs_api.h",
     "api/tabs/tabs_constants.h",
     "api/tabs/tabs_windows_api.cc",
@@ -524,6 +525,7 @@ source_set("extensions") {
     "//chrome/browser/resources:component_extension_resources",
     "//chrome/browser/safe_browsing",
     "//chrome/browser/safe_browsing:metrics_collector",
+    "//chrome/browser/signin",
     "//chrome/browser/ui:browser_navigator_params_headers",
     "//chrome/browser/ui/autofill",
     "//chrome/browser/ui/browser_window",
@@ -1536,11 +1538,7 @@ source_set("extensions") {
     }
 
     if (enable_glic) {
-      deps += [
-        "//chrome/browser/glic:glic",
-        "//chrome/browser/glic:impl",
-      ]
-      allow_circular_includes_from += [ "//chrome/browser/glic:impl" ]
+      deps += [ "//chrome/browser/glic:glic" ]
     }
 
     if (!is_android && !is_chromeos) {

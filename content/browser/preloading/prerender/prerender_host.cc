@@ -8,8 +8,6 @@
 #include <optional>
 
 #include "base/check_is_test.h"
-#include "base/debug/alias.h"
-#include "base/debug/dump_without_crashing.h"
 #include "base/feature_list.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/notreached.h"
@@ -567,39 +565,33 @@ bool PrerenderHost::StartPrerendering() {
     return false;
   }
 
+  NavigationRequest* navigation_request =
+      NavigationRequest::From(created_navigation_handle.get());
+
+  // In usual code path, `initial_navigation_id_` should be set by
+  // PrerenderNavigationThrottle during `LoadURLWithParams` above.
   if (initial_navigation_id_.has_value()) {
-    // In usual code path, `initial_navigation_id_` should be set by
-    // PrerenderNavigationThrottle during `LoadURLWithParams` above.
     CHECK_EQ(*initial_navigation_id_,
              created_navigation_handle->GetNavigationId());
     CHECK(begin_params_);
     CHECK(common_params_);
+  } else if (navigation_request->state() ==
+             NavigationRequest::WAITING_FOR_RENDERER_RESPONSE) {
+    // If a same-site prerender host is reused, the BeforeUnload handler maybe
+    // called and thus to cause the NavigationRequest::BeginNavigation to be
+    // delayed. The NavigationRequest state will be
+    // NavigationRequest::WAITING_FOR_RENDERER_RESPONSE in this case. This is
+    // not an error so we will wait for the SetInitialNavigation to be called
+    // afterwards.
+    CHECK(!begin_params_);
+    CHECK(!common_params_);
   } else {
-    // In some exceptional code path, such as the navigation failed due to CSP
-    // violations, PrerenderNavigationThrottle didn't run at this point. So,
-    // set the ID here.
-    initial_navigation_id_ = created_navigation_handle->GetNavigationId();
-    // `begin_params_` and `common_params_` is null here, but it doesn't matter
-    // as this branch is reached only when the initial navigation fails,
-    // so this PrerenderHost can't be activated.
-
-    // Original code assumes the case CSP prefetch-src blocks prerendering, but
-    // prefetch-src was already deprecated, but this code path seems still
-    // reachable. To be clarify the actual scenario, let's have the dump code.
-    // We may eventually return false for this code path to make things simple.
-    // TODO(crbug.com/40248615): Monitor reports and decide if we
-    // continue to have the `is_ready_for_activation_` check in
-    // CheckInitialPrerenderNavigationParamsCompatibleWithNavigation().
-    net::Error net_error = created_navigation_handle->GetNetErrorCode();
-    base::debug::Alias(&net_error);
-    base::debug::DumpWithoutCrashing();
+    // Prerender navigation failed before reaching the throttle for some reason.
+    // For example, `ContentBrowserClient::ShouldOverrideUrlLoading()` may block
+    // navigation.
+    return false;
   }
 
-  NavigationRequest* navigation_request =
-      NavigationRequest::From(created_navigation_handle.get());
-  // The initial navigation in the prerender frame tree should not wait for
-  // `beforeunload` in the old page, so BeginNavigation stage should be reached
-  // synchronously.
   CHECK_GE(navigation_request->state(),
            NavigationRequest::WAITING_FOR_RENDERER_RESPONSE);
   return true;

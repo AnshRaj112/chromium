@@ -29,6 +29,7 @@
 #include "chrome/browser/ui/browser_command_controller.h"
 #include "chrome/browser/ui/browser_content_setting_bubble_model_delegate.h"
 #include "chrome/browser/ui/browser_instant_controller.h"
+#include "chrome/browser/ui/browser_live_tab_context.h"
 #include "chrome/browser/ui/browser_location_bar_model_delegate.h"
 #include "chrome/browser/ui/browser_tab_menu_model_delegate.h"
 #include "chrome/browser/ui/browser_window.h"
@@ -110,6 +111,7 @@
 #endif
 
 #if BUILDFLAG(IS_WIN)
+#include "chrome/browser/ui/startup/default_browser_prompt/pin_infobar/pin_infobar_controller.h"
 #include "chrome/browser/ui/views/frame/windows_taskbar_icon_updater.h"
 #endif
 
@@ -245,6 +247,13 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
   if (base::FeatureList::IsEnabled(features::kPdfInfoBar)) {
     pdf_infobar_controller_ =
         std::make_unique<pdf::infobar::PdfInfoBarController>(browser);
+  }
+#endif
+
+#if BUILDFLAG(IS_WIN)
+  if (base::FeatureList::IsEnabled(features::kOfferPinToTaskbarInfoBar)) {
+    pin_infobar_controller_ =
+        std::make_unique<default_browser::PinInfoBarController>(browser);
   }
 #endif
 
@@ -390,6 +399,8 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
             browser->GetTabStripModel(), browser_view->GetWidget());
   }
 
+  live_tab_context_ = std::make_unique<BrowserLiveTabContext>(browser);
+
   if (browser->is_type_normal() || browser->is_type_app()) {
     toast_service_ = std::make_unique<ToastService>(browser);
   }
@@ -463,7 +474,8 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
   if (base::FeatureList::IsEnabled(ntp_features::kNtpFooter)) {
     new_tab_footer_controller_ =
         std::make_unique<new_tab_footer::NewTabFooterController>(
-            browser_view->browser(), browser_view->new_tab_footer_web_view());
+            browser_view->browser()->GetProfile(),
+            browser_view->GetContentsContainerViews());
   }
 
 #if BUILDFLAG(IS_WIN)
@@ -475,6 +487,7 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
 }
 
 void BrowserWindowFeatures::TearDownPreBrowserWindowDestruction() {
+  live_tab_context_.reset();
   upgrade_notification_controller_.reset();
   memory_saver_opt_in_iph_controller_.reset();
   lens_overlay_entry_point_controller_.reset();

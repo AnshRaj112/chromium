@@ -23,13 +23,24 @@ enum WrappablePointerTag : uint16_t {
   kFirstPointerTag = 1501,
   kAutomationPosition = 1501,          // ui::AutomationPosition
   kGamepadControllerBindings,          // content::GameControllerBindings
+  kChromePluginPlaceholder,            // ChromePluginPlaceholder
+  kDomAutomationController,            // content::DomAutomationController
+  kGpuBenchmarking,                    // content::GpuBenchmarking
+  kMojo,                               // ax::Mojo
+  kMojoHandle,                         // ax::MojoHandle
   kNetErrorPageController,             // NetErrorPageController
+  kPDFPluginPlaceholder,               // PDFPluginPlaceholder
+  kPluginPlaceholder,                  // plugins::PluginPlaceholder
   kReadAnythingAppController,          // ReadAnythingAppController
   kSearchBoxBindings,                  // SearchBoxBindings
+  kSkiaBenchmarking,                   // content::SkiaBenchmarking
+  kStatsCollectionController,          // content::StatsCollectionController
   kSupervisedUserErrorPageController,  // SupervisedUserErrorPageController
-  kTestObject,                         // gin::MyObject
+  kTextDecoder,                        // ax::TextDecoder
+  kTextEncoder,                        // ax::TextEncoder
+  kTestObject,                         // gin::TestGinObject
   kTestObject2,                        // gin::MyObject2
-  kLastPointerTag = kTestObject2
+  kLastPointerTag = kTestObject2,
 };
 
 static_assert(kLastPointerTag <

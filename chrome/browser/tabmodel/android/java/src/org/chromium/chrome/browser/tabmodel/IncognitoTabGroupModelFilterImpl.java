@@ -196,13 +196,6 @@ public class IncognitoTabGroupModelFilterImpl implements TabGroupModelFilterInte
     }
 
     @Override
-    @TabId
-    public int getRootIdFromTabGroupId(@Nullable Token tabGroupId) {
-        if (mCurrentFilter == null) return Tab.INVALID_TAB_ID;
-        return mCurrentFilter.getRootIdFromTabGroupId(tabGroupId);
-    }
-
-    @Override
     public List<Tab> getRelatedTabList(@TabId int tabId) {
         if (mCurrentFilter == null) return Collections.emptyList();
         return mCurrentFilter.getRelatedTabList(tabId);
@@ -335,6 +328,12 @@ public class IncognitoTabGroupModelFilterImpl implements TabGroupModelFilterInte
     }
 
     @Override
+    public @Nullable String getTabGroupTitle(Tab groupedTab) {
+        if (mCurrentFilter == null) return null;
+        return mCurrentFilter.getTabGroupTitle(groupedTab);
+    }
+
+    @Override
     public @Nullable String getTabGroupTitle(@TabId int rootId) {
         if (mCurrentFilter == null) return null;
         return mCurrentFilter.getTabGroupTitle(rootId);
@@ -380,6 +379,12 @@ public class IncognitoTabGroupModelFilterImpl implements TabGroupModelFilterInte
     public @TabGroupColorId int getTabGroupColorWithFallback(Token tabGroupId) {
         if (mCurrentFilter == null) return TabGroupColorId.GREY;
         return mCurrentFilter.getTabGroupColorWithFallback(tabGroupId);
+    }
+
+    @Override
+    public @TabGroupColorId int getTabGroupColorWithFallback(Tab groupedTab) {
+        if (mCurrentFilter == null) return TabGroupColorId.GREY;
+        return mCurrentFilter.getTabGroupColorWithFallback(groupedTab);
     }
 
     @Override

@@ -92,7 +92,7 @@ constexpr auto kLikelihoodUnspecified =
     PermissionUiSelector::PredictionGrantLikelihood::
         PermissionPrediction_Likelihood_DiscretizedLikelihood_DISCRETIZED_LIKELIHOOD_UNSPECIFIED;
 
-// This is the only server side reply that will tirgger quiet UI at the moment.
+// This is the only server side reply that will trigger quiet UI at the moment.
 constexpr auto kLikelihoodVeryUnlikely =
     PermissionUiSelector::PredictionGrantLikelihood::
         PermissionPrediction_Likelihood_DiscretizedLikelihood_VERY_UNLIKELY;
@@ -159,9 +159,15 @@ class PermissionsAiv3HandlerFake : public PermissionsAiv3Handler {
       optimization_guide::OptimizationGuideModelProvider* model_provider,
       optimization_guide::proto::OptimizationTarget optimization_target,
       RequestType request_type)
-      : PermissionsAiv3Handler(model_provider,
-                               optimization_target,
-                               request_type) {}
+      : PermissionsAiv3Handler(
+            model_provider,
+            optimization_target,
+            request_type,
+            // Somehow the browser tests are failing if these are not
+            // `GetCurrentDefault()` task runners.
+            base::SequencedTaskRunner::GetCurrentDefault(),
+            base::SequencedTaskRunner::GetCurrentDefault(),
+            std::make_unique<PermissionsAiv3Encoder>(request_type)) {}
 
   void OnModelUpdated(
       optimization_guide::proto::OptimizationTarget optimization_target,
@@ -180,9 +186,8 @@ class PermissionsAiv3HandlerFake : public PermissionsAiv3Handler {
     model_execute_run_loop_for_testing_.Quit();
   }
 
-  void ExecuteModel(
-      PermissionsAiv3Handler::ExecutionCallback callback,
-      std::unique_ptr<PermissionsAiv3Encoder::ModelInput> snapshot) override {
+  void ExecuteModel(PermissionsAiv3Handler::ExecutionCallback callback,
+                    std::unique_ptr<SkBitmap> snapshot) override {
     PermissionsAiv3Handler::ExecuteModel(
         base::BindOnce(&PermissionsAiv3HandlerFake::ExecuteModelWrapper,
                        weak_ptr_factory_.GetWeakPtr(), std::move(callback)),

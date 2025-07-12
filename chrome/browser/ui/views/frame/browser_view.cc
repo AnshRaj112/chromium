@@ -125,6 +125,7 @@
 #include "chrome/browser/ui/views/frame/browser_view_layout_delegate.h"
 #include "chrome/browser/ui/views/frame/contents_container_view.h"
 #include "chrome/browser/ui/views/frame/contents_layout_manager.h"
+#include "chrome/browser/ui/views/frame/contents_separator.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view_delegate.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view_drop_target_controller.h"
@@ -144,7 +145,6 @@
 #include "chrome/browser/ui/views/location_bar/intent_picker_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/location_bar/star_view.h"
-#include "chrome/browser/ui/views/new_tab_footer/footer_web_view.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
 #include "chrome/browser/ui/views/page_action/page_action_icon_controller.h"
 #include "chrome/browser/ui/views/page_action/page_action_icon_view.h"
@@ -290,7 +290,6 @@
 #include "ui/views/background.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/menu_button.h"
-#include "ui/views/controls/separator.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/controls/webview/webview.h"
 #include "ui/views/focus/external_focus_tracker.h"
@@ -536,28 +535,6 @@ class OverlayViewTargeterDelegate : public views::ViewTargeterDelegate {
     return std::ranges::any_of(children, hits_child);
   }
 };
-
-// This class uses a solid background instead of a views::Separator. The latter
-// is not guaranteed to fill its bounds and assumes being painted on an opaque
-// background (which is why it'd be OK to only partially fill its bounds). This
-// needs to fill its bounds to have the entire BrowserView painted.
-class ContentsSeparator : public views::View {
-  METADATA_HEADER(ContentsSeparator, views::View)
-
- public:
-  ContentsSeparator() {
-    SetBackground(
-        views::CreateSolidBackground(kColorToolbarContentAreaSeparator));
-
-    // BrowserViewLayout will respect either the height or width of this,
-    // depending on orientation, not simultaneously both.
-    SetPreferredSize(
-        gfx::Size(views::Separator::kThickness, views::Separator::kThickness));
-  }
-};
-
-BEGIN_METADATA(ContentsSeparator)
-END_METADATA
 
 bool ShouldShowWindowIcon(const Browser* browser,
                           bool app_uses_window_controls_overlay,
@@ -995,13 +972,6 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
   devtools_web_view->SetID(VIEW_ID_DEV_TOOLS_DOCKED);
   devtools_web_view->SetVisible(false);
 
-  std::unique_ptr<new_tab_footer::NewTabFooterWebView> new_tab_footer_web_view;
-  if (features::IsNtpFooterEnabledWithoutSideBySide()) {
-    new_tab_footer_web_view =
-        std::make_unique<new_tab_footer::NewTabFooterWebView>(browser_.get());
-    new_tab_footer_web_view->SetVisible(false);
-  }
-
   auto contents_container = std::make_unique<views::View>();
   devtools_web_view_ =
       contents_container->AddChildView(std::move(devtools_web_view));
@@ -1013,8 +983,7 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
   views::View* contents_view;
   if (base::FeatureList::IsEnabled(features::kSideBySide)) {
     auto multi_contents_view = std::make_unique<MultiContentsView>(
-        this, std::make_unique<MultiContentsViewDelegateImpl>(
-                  *browser_->tab_strip_model()));
+        this, std::make_unique<MultiContentsViewDelegateImpl>(*browser_));
     multi_contents_view_ =
         contents_container->AddChildView(std::move(multi_contents_view));
     multi_contents_view_->SetID(VIEW_ID_TAB_CONTAINER);
@@ -1026,17 +995,6 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
     contents_web_view_->SetID(VIEW_ID_TAB_CONTAINER);
     contents_web_view_->set_is_primary_web_contents_for_window(true);
     contents_view = contents_container_view_;
-  }
-
-  if (base::FeatureList::IsEnabled(ntp_features::kNtpFooter) &&
-      !base::FeatureList::IsEnabled(features::kSideBySide)) {
-    new_tab_footer_web_view_separator_ =
-        contents_container->AddChildView(std::make_unique<ContentsSeparator>());
-    new_tab_footer_web_view_separator_->SetProperty(
-        views::kElementIdentifierKey, kFooterWebViewSeparatorElementId);
-
-    new_tab_footer_web_view_ =
-        contents_container->AddChildView(std::move(new_tab_footer_web_view));
   }
 
   // Create the view that will house the Lens overlay. This view is visible but
@@ -1074,13 +1032,11 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
 #if BUILDFLAG(ENABLE_GLIC)
   contents_container->SetLayoutManager(std::make_unique<ContentsLayoutManager>(
       devtools_web_view_, devtools_scrim_view_, contents_view,
-      lens_overlay_view_, glic_border_, watermark_view_,
-      new_tab_footer_web_view_separator_, new_tab_footer_web_view_));
+      lens_overlay_view_, glic_border_, watermark_view_));
 #else
   contents_container->SetLayoutManager(std::make_unique<ContentsLayoutManager>(
       devtools_web_view_, devtools_scrim_view_, contents_view,
-      lens_overlay_view_, nullptr, watermark_view_,
-      new_tab_footer_web_view_separator_, new_tab_footer_web_view_));
+      lens_overlay_view_, nullptr, watermark_view_));
 #endif
 
   toolbar_ = top_container_->AddChildView(
@@ -1215,8 +1171,6 @@ BrowserView::~BrowserView() {
   window_scrim_view_ = nullptr;
   watermark_view_ = nullptr;
   glic_border_ = nullptr;
-  new_tab_footer_web_view_ = nullptr;
-  new_tab_footer_web_view_separator_ = nullptr;
   contents_container_ = nullptr;
   unified_side_panel_ = nullptr;
   right_aligned_side_panel_separator_ = nullptr;
@@ -1322,6 +1276,12 @@ ContentsContainerView* BrowserView::GetActiveContentsContainerView() {
     return multi_contents_view_->GetActiveContentsContainerView();
   }
   return contents_container_view_;
+}
+
+std::vector<ContentsContainerView*> BrowserView::GetContentsContainerViews() {
+  return multi_contents_view_
+             ? multi_contents_view_->contents_container_views()
+             : std::vector<ContentsContainerView*>{contents_container_view_};
 }
 
 #if BUILDFLAG(IS_MAC)
@@ -1699,25 +1659,10 @@ void BrowserView::SetTopControlsGestureScrollInProgress(bool in_progress) {
 
 std::vector<StatusBubble*> BrowserView::GetStatusBubbles() {
   std::vector<StatusBubble*> status_bubbles;
-  if (multi_contents_view_) {
-    if (multi_contents_view_->IsInSplitView()) {
-      if (StatusBubble* active_bubble =
-              multi_contents_view_->GetActiveContentsView()
-                  ->GetStatusBubble()) {
-        status_bubbles.push_back(active_bubble);
-      }
-      if (StatusBubble* inactive_bubble =
-              multi_contents_view_->GetInactiveContentsView()
-                  ->GetStatusBubble()) {
-        status_bubbles.push_back(inactive_bubble);
-      }
-    } else if (StatusBubble* active_bubble =
-                   multi_contents_view_->GetActiveContentsView()
-                       ->GetStatusBubble()) {
-      status_bubbles.push_back(active_bubble);
+  for (auto* contents_web_view : GetAllVisibleContentsWebViews()) {
+    if (StatusBubble* bubble = contents_web_view->GetStatusBubble()) {
+      status_bubbles.push_back(bubble);
     }
-  } else if (StatusBubble* bubble = contents_web_view_->GetStatusBubble()) {
-    status_bubbles.push_back(bubble);
   }
   return status_bubbles;
 }
@@ -2330,38 +2275,10 @@ void BrowserView::FullscreenStateChanging() {
 
 void BrowserView::FullscreenStateChanged() {
 #if BUILDFLAG(IS_CHROMEOS)
-  // Avoid using immersive mode in locked fullscreen as it allows the user to
-  // exit the locked mode. Keep immersive mode enabled if the webapp is locked
-  // for OnTask (only relevant for non-web browser scenarios).
-  // TODO(b/365146870): Remove once we consolidate locked fullscreen with
-  // OnTask.
-  bool avoid_using_immersive_mode =
-      platform_util::IsBrowserLockedFullscreen(browser_.get()) &&
-      !browser_->IsLockedForOnTask();
-
-  if (avoid_using_immersive_mode) {
-    immersive_mode_controller()->SetEnabled(false);
-  } else {
-    // Enable immersive before the browser refreshes its list of enabled
-    // commands.
-    // Enable immersive mode when entering browser fullscreen, unless it's in
-    // app mode or requested by an extension.
-    if (IsFullscreen()) {
-      auto* fullscreen_controller =
-          GetExclusiveAccessManager()->fullscreen_controller();
-
-      bool enable_immersive =
-          !IsRunningInAppMode() &&
-          !fullscreen_controller->IsExtensionFullscreenOrPending() &&
-          fullscreen_controller->IsFullscreenForBrowser();
-      immersive_mode_controller()->SetEnabled(enable_immersive);
-    } else if (!immersive_mode_controller()
-                    ->ShouldStayImmersiveAfterExitingFullscreen()) {
-      // Disable immersive mode if not required to stay immersive after exiting
-      // fullscreen.
-      immersive_mode_controller()->SetEnabled(false);
-    }
-  }
+  const auto* non_client_frame_view =
+      static_cast<BrowserNonClientFrameViewChromeOS*>(frame_->GetFrameView());
+  immersive_mode_controller()->SetEnabled(
+      non_client_frame_view->ShouldEnableImmersiveModeController());
 #endif
 
 #if BUILDFLAG(IS_MAC)
@@ -3007,10 +2924,11 @@ void BrowserView::TryNotifyWindowBoundsChanged(const gfx::Rect& widget_bounds) {
 
   last_widget_bounds_ = widget_bounds;
 
-  // `extension_window_controller()` may be null if we are in the process of
-  // creating the Browser. In that case, skip the notification.
+  // `extensions::BrowserExtensionWindowController::From()` may be null if we
+  // are in the process of creating the Browser. In that case, skip the
+  // notification.
   if (auto* const controller =
-          browser()->GetFeatures().extension_window_controller()) {
+          extensions::BrowserExtensionWindowController::From(browser())) {
     controller->NotifyWindowBoundsChanged();
   }
 }

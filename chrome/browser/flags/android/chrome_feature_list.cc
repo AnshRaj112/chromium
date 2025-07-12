@@ -203,14 +203,15 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kAndroidAppearanceSettings,
     &kAndroidBookmarkBar,
     &kAndroidBottomToolbar,
-    &kAndroidDumpOnScrollWithoutResource,
     &kAndroidElegantTextHeight,
     &kAndroidNativePagesInNewTab,
     &kAndroidProgressBarVisualUpdate,
     &kAndroidNoVisibleHintForDifferentTLD,
     &kAndroidOmniboxFocusedNewTabPage,
+    &kAndroidOpenIncognitoAsWindow,
     &kAndroidOpenPdfInlineBackport,
     &kAndroidPdfAssistContent,
+    &kAndroidPinnedTabs,
     &kAndroidTabGroupsColorUpdateGM3,
     &kAndroidTabHighlighting,
     &kAndroidShowRestoreTabsPromoOnFREBypassedKillSwitch,
@@ -306,7 +307,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kEdgeToEdgeSafeAreaConstraint,
     &kEdgeToEdgeTablet,
     &kEdgeToEdgeUseBackupNavbarInsets,
-    &kEdgeToEdgeWebOptIn,
     &kEducationalTipDefaultBrowserPromoCard,
     &kEmptyTabListAnimationKillSwitch,
     &kEnableXAxisActivityTransition,
@@ -317,11 +317,13 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kFullscreenInsetsApiMigration,
     &kFullscreenInsetsApiMigrationOnAutomotive,
     &kGridTabSwitcherSurfaceColorUpdate,
+    &kGridTabSwitcherUpdate,
     &kGroupNewTabWithParent,
     &kHeadlessTabModel,
     &kHideTabletToolbarDownloadButton,
     &kHistoryPaneAndroid,
     &kHomepageIsNewTabPagePolicyAndroid,
+    &kHubSlideAnimation,
     &kLegacyTabStateDeprecation,
     &kLockBackPressHandlerAtStart,
     &kIncognitoScreenshot,
@@ -393,14 +395,13 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kTabletTabStripAnimation,
     &kTabFreezeOnUndoableClosureKillSwitch,
     &kTabStateFlatBuffer,
-    &kTabStripContextMenuAndroid,
+    &kTabStorageSqlitePrototype,
     &kTabStripDensityChangeAndroid,
     &kTabStripGroupDragDropAndroid,
     &kTabStripIncognitoMigration,
     &kTabStripLayoutOptimization,
     &kTabStripMouseCloseResizeDelay,
     &kTabStripTransitionInDesktopWindow,
-    &kTabSwitcherColorBlendAnimate,
     &kTabArchivalDragDropAndroid,
     &kTabCollectionAndroid,
     &kTabSwitcherDragDropAndroid,
@@ -423,8 +424,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kUseLibunwindstackNativeUnwinderAndroid,
     &kWebOtpCrossDeviceSimpleString,
     &kWebApkMinShellVersion,
-    &kGridTabSwitcherUpdate,
-    &kAndroidPinnedTabs,
+
     &network::features::kLocalNetworkAccessChecks,
     &notifications::features::kUseChimeAndroidSdk,
     &paint_preview::kPaintPreviewDemo,
@@ -559,11 +559,7 @@ BASE_FEATURE(kAndroidBookmarkBar,
 
 BASE_FEATURE(kAndroidBottomToolbar,
              "AndroidBottomToolbar",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kAndroidDumpOnScrollWithoutResource,
-             "AndroidDumpOnScrollWithoutResource",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAndroidElegantTextHeight,
              "AndroidElegantTextHeight",
@@ -587,6 +583,10 @@ BASE_FEATURE(kAndroidNoVisibleHintForDifferentTLD,
 
 BASE_FEATURE(kAndroidOmniboxFocusedNewTabPage,
              "AndroidOmniboxFocusedNewTabPage",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kAndroidOpenIncognitoAsWindow,
+             "AndroidOpenIncognitoAsWindow",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAndroidOpenPdfInlineBackport,
@@ -828,6 +828,10 @@ BASE_FEATURE(kAndroidPinnedTabs,
              "AndroidPinnedTabs",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kHubSlideAnimation,
+             "HubSlideAnimation",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kCCTPrewarmTab, "CCTPrewarmTab", base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kCCTRealtimeEngagementEventsInBackground,
@@ -978,10 +982,6 @@ BASE_FEATURE(kEdgeToEdgeUseBackupNavbarInsets,
              "EdgeToEdgeUseBackupNavbarInsets",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kEdgeToEdgeWebOptIn,
-             "EdgeToEdgeWebOptIn",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kEducationalTipDefaultBrowserPromoCard,
              "EducationalTipDefaultBrowserPromoCard",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -1069,9 +1069,7 @@ BASE_FEATURE(kMayLaunchUrlUsesSeparateStoragePartition,
              "MayLaunchUrlUsesSeparateStoragePartition",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kMiniOriginBar,
-             "MiniOriginBar",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kMiniOriginBar, "MiniOriginBar", base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kMostVisitedTilesCustomization,
              "MostVisitedTilesCustomization",
@@ -1304,9 +1302,9 @@ BASE_FEATURE(kTabStateFlatBuffer,
              "TabStateFlatBuffer",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kTabStripContextMenuAndroid,
-             "TabStripContextMenuAndroid",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+BASE_FEATURE(kTabStorageSqlitePrototype,
+             "TabStorageSqlitePrototype",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabStripDensityChangeAndroid,
              "TabStripDensityChangeAndroid",
@@ -1331,10 +1329,6 @@ BASE_FEATURE(kTabStripTransitionInDesktopWindow,
 BASE_FEATURE(kTabStripIncognitoMigration,
              "TabStripIncognitoMigration",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kTabSwitcherColorBlendAnimate,
-             "TabSwitcherColorBlendAnimate",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabArchivalDragDropAndroid,
              "TabArchivalDragDropAndroid",

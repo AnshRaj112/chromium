@@ -28,8 +28,10 @@ import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.ntp_customization.BottomSheetDelegate;
 import org.chromium.chrome.browser.ntp_customization.NtpCustomizationConfigManager;
+import org.chromium.chrome.browser.ntp_customization.NtpCustomizationCoordinator.BottomSheetType;
 import org.chromium.chrome.browser.ntp_customization.R;
 import org.chromium.chrome.browser.ntp_customization.theme.NtpThemeCoordinator.NTPThemeBottomSheetSection;
+import org.chromium.chrome.browser.ntp_customization.theme.theme_collections.NtpThemeCollectionsCoordinator;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.components.browser_ui.share.ShareImageFileUtils;
 import org.chromium.ui.modelutil.PropertyModel;
@@ -49,6 +51,7 @@ public class NtpThemeMediator {
     private final NtpCustomizationConfigManager mNtpCustomizationConfigManager;
     private @Nullable ActivityResultRegistry mActivityResultRegistry;
     private @Nullable ActivityResultLauncher<String> mActivityResultLauncher;
+    private @Nullable NtpThemeCollectionsCoordinator mNtpThemeCollectionsCoordinator;
 
     public NtpThemeMediator(
             Context context,
@@ -82,6 +85,9 @@ public class NtpThemeMediator {
         mThemePropertyModel.set(LEARN_MORE_BUTTON_CLICK_LISTENER, null);
         mActivityResultLauncher = null;
         mActivityResultRegistry = null;
+        if (mNtpThemeCollectionsCoordinator != null) {
+            mNtpThemeCollectionsCoordinator.destroy();
+        }
     }
 
     /** Sets the on click listener for each theme bottom sheet section. */
@@ -92,12 +98,15 @@ public class NtpThemeMediator {
                             UPLOAD_IMAGE_KEY,
                             new ActivityResultContracts.GetContent(),
                             uri -> {
+                                // If users didn't select any file, the returned uri is null.
+                                if (uri == null) return;
+
                                 ShareImageFileUtils.getBitmapFromUriAsync(
                                         mContext,
                                         uri,
                                         bitmap -> {
                                             mNtpCustomizationConfigManager.onBackgroundChanged(
-                                                    mContext, bitmap);
+                                                    bitmap);
                                         });
                             });
         }
@@ -154,7 +163,7 @@ public class NtpThemeMediator {
     void handleChromeDefaultSectionClick(View view) {
         updateTrailingIconVisibilityForSectionType(CHROME_DEFAULT);
 
-        mNtpCustomizationConfigManager.onBackgroundChanged(mContext, /* imageBitmap= */ null);
+        mNtpCustomizationConfigManager.onBackgroundChanged(/* bitmap= */ null);
     }
 
     @VisibleForTesting
@@ -174,10 +183,21 @@ public class NtpThemeMediator {
     @VisibleForTesting
     void handleThemeCollectionsSectionClick(View view) {
         updateTrailingIconVisibilityForSectionType(THEME_COLLECTIONS);
+
+        if (mNtpThemeCollectionsCoordinator == null) {
+            mNtpThemeCollectionsCoordinator =
+                    new NtpThemeCollectionsCoordinator(mContext, mBottomSheetDelegate);
+        }
+        mBottomSheetDelegate.showBottomSheet(BottomSheetType.THEME_COLLECTIONS);
     }
 
     @VisibleForTesting
     void handleLearnMoreClick(View view) {
         launchUriActivity(view.getContext(), LEARN_MORE_CLICK_URL);
+    }
+
+    void setNtpThemeCollectionsCoordinatorForTesting(
+            NtpThemeCollectionsCoordinator ntpThemeCollectionsCoordinator) {
+        mNtpThemeCollectionsCoordinator = ntpThemeCollectionsCoordinator;
     }
 }

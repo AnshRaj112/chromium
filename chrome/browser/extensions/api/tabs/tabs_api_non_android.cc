@@ -64,6 +64,8 @@
 #include "chrome/browser/ui/browser_navigator_params.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/recently_audible_helper.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
@@ -184,31 +186,6 @@ constexpr char kWindowCreateCannotUseTabIdWithIwaError[] =
 constexpr char kWindowCreateCannotMoveIwaTabError[] =
     "The tab of an Isolated Web App cannot be moved to a new window.";
 
-template <typename T>
-class ApiParameterExtractor {
- public:
-  explicit ApiParameterExtractor(std::optional<T>& params) : params_(*params) {}
-  ~ApiParameterExtractor() = default;
-
-  bool populate_tabs() {
-    if (params_->query_options && params_->query_options->populate) {
-      return *params_->query_options->populate;
-    }
-    return false;
-  }
-
-  WindowController::TypeFilter type_filters() {
-    if (params_->query_options && params_->query_options->window_types) {
-      return WindowController::GetFilterFromWindowTypes(
-          *params_->query_options->window_types);
-    }
-    return WindowController::kNoWindowFilter;
-  }
-
- private:
-  raw_ref<T> params_;
-};
-
 // |error_message| can optionally be passed in and will be set with an
 // appropriate message if the tab cannot be found by id.
 bool GetTabById(int tab_id,
@@ -229,6 +206,25 @@ bool GetTabById(int tab_id,
   }
 
   return false;
+}
+
+// Returns the last active browser with the given `profile`. If
+// `include_incognito_information` is true, this will also return a browser
+// that crosses the incognito boundary.
+BrowserWindowInterface* GetLastActiveBrowserWithProfile(
+    Profile* profile,
+    bool include_incognito_information) {
+  std::vector<BrowserWindowInterface*> all_browsers =
+      GetBrowserWindowInterfacesOrderedByActivation();
+  for (auto* browser : all_browsers) {
+    if (browser->GetProfile() == profile ||
+        (include_incognito_information &&
+         profile->IsSameOrParent(browser->GetProfile()))) {
+      return browser;
+    }
+  }
+
+  return nullptr;
 }
 
 // Gets the WebContents for |tab_id| if it is specified. Otherwise get the
@@ -524,50 +520,6 @@ void ZoomModeToZoomSettings(ZoomController::ZoomMode zoom_mode,
 
 // Windows ---------------------------------------------------------------------
 
-ExtensionFunction::ResponseAction WindowsGetFunction::Run() {
-  std::optional<windows::Get::Params> params =
-      windows::Get::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-
-  ApiParameterExtractor<windows::Get::Params> extractor(params);
-  WindowController* window_controller = nullptr;
-  std::string error;
-  if (!windows_util::GetControllerFromWindowID(this, params->window_id,
-                                               extractor.type_filters(),
-                                               &window_controller, &error)) {
-    return RespondNow(Error(std::move(error)));
-  }
-
-  WindowController::PopulateTabBehavior populate_tab_behavior =
-      extractor.populate_tabs() ? WindowController::kPopulateTabs
-                                : WindowController::kDontPopulateTabs;
-  base::Value::Dict windows = window_controller->CreateWindowValueForExtension(
-      extension(), populate_tab_behavior, source_context_type());
-  return RespondNow(WithArguments(std::move(windows)));
-}
-
-ExtensionFunction::ResponseAction WindowsGetCurrentFunction::Run() {
-  std::optional<windows::GetCurrent::Params> params =
-      windows::GetCurrent::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-
-  ApiParameterExtractor<windows::GetCurrent::Params> extractor(params);
-  WindowController* window_controller = nullptr;
-  std::string error;
-  if (!windows_util::GetControllerFromWindowID(
-          this, extension_misc::kCurrentWindowId, extractor.type_filters(),
-          &window_controller, &error)) {
-    return RespondNow(Error(std::move(error)));
-  }
-
-  WindowController::PopulateTabBehavior populate_tab_behavior =
-      extractor.populate_tabs() ? WindowController::kPopulateTabs
-                                : WindowController::kDontPopulateTabs;
-  base::Value::Dict windows = window_controller->CreateWindowValueForExtension(
-      extension(), populate_tab_behavior, source_context_type());
-  return RespondNow(WithArguments(std::move(windows)));
-}
-
 ExtensionFunction::ResponseAction WindowsGetLastFocusedFunction::Run() {
   std::optional<windows::GetLastFocused::Params> params =
       windows::GetLastFocused::Params::Create(args());
@@ -583,7 +535,7 @@ ExtensionFunction::ResponseAction WindowsGetLastFocusedFunction::Run() {
        ++browser_iterator) {
     Browser* browser = *browser_iterator;
     if (windows_util::CanOperateOnWindow(
-            this, browser->GetFeatures().extension_window_controller(),
+            this, BrowserExtensionWindowController::From(browser),
             extractor.type_filters())) {
       last_focused_browser = browser;
       break;
@@ -1117,7 +1069,7 @@ ExtensionFunction::ResponseAction WindowsUpdateFunction::Run() {
 
   if (show_state != ui::mojom::WindowShowState::kFullscreen &&
       show_state != ui::mojom::WindowShowState::kDefault) {
-    browser->GetFeatures().extension_window_controller()->SetFullscreenMode(
+    BrowserExtensionWindowController::From(browser)->SetFullscreenMode(
         false, extension()->url());
   }
 
@@ -1133,7 +1085,7 @@ ExtensionFunction::ResponseAction WindowsUpdateFunction::Run() {
           browser->window()->IsMaximized()) {
         browser->window()->Restore();
       }
-      browser->GetFeatures().extension_window_controller()->SetFullscreenMode(
+      BrowserExtensionWindowController::From(browser)->SetFullscreenMode(
           true, extension()->url());
       break;
     case ui::mojom::WindowShowState::kNormal:
@@ -1236,28 +1188,6 @@ ExtensionFunction::ResponseAction TabsGetSelectedFunction::Run() {
                             tab_strip, tab_strip->active_index()))));
 }
 
-ExtensionFunction::ResponseAction TabsGetAllInWindowFunction::Run() {
-  std::optional<tabs::GetAllInWindow::Params> params =
-      tabs::GetAllInWindow::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-  // windowId defaults to "current" window.
-  int window_id = extension_misc::kCurrentWindowId;
-  if (params->window_id) {
-    window_id = *params->window_id;
-  }
-
-  std::string error;
-  WindowController* window_controller =
-      ExtensionTabUtil::GetControllerFromWindowID(
-          ChromeExtensionFunctionDetails(this), window_id, &error);
-  if (!window_controller) {
-    return RespondNow(Error(std::move(error)));
-  }
-
-  return RespondNow(WithArguments(
-      window_controller->CreateTabList(extension(), source_context_type())));
-}
-
 ExtensionFunction::ResponseAction TabsQueryFunction::Run() {
   std::optional<tabs::Query::Params> params =
       tabs::Query::Params::Create(args());
@@ -1307,36 +1237,42 @@ ExtensionFunction::ResponseAction TabsQueryFunction::Run() {
 
   base::Value::List result;
   Profile* profile = Profile::FromBrowserContext(browser_context());
-  Browser* last_active_browser =
-      chrome::FindAnyBrowser(profile, include_incognito_information());
+  BrowserWindowInterface* last_active_browser =
+      GetLastActiveBrowserWithProfile(profile, include_incognito_information());
 
   // Note that the current browser is allowed to be null: you can still query
   // the tabs in this case.
-  Browser* current_browser = nullptr;
-  WindowController* window_controller =
+  BrowserWindowInterface* current_browser = nullptr;
+  WindowController* current_window_controller =
       ChromeExtensionFunctionDetails(this).GetCurrentWindowController();
-  if (window_controller) {
-    current_browser = window_controller->GetBrowser();
+  if (current_window_controller) {
+    current_browser = current_window_controller->GetBrowserWindowInterface();
     // Note: current_browser may still be null.
   }
 
-  for (Browser* browser : *BrowserList::GetInstance()) {
-    if (!profile->IsSameOrParent(browser->profile())) {
+  std::vector<BrowserWindowInterface*> all_browsers =
+      GetBrowserWindowInterfacesOrderedByActivation();
+  // Historically, we queried browsers in reverse-activation order. Maintain
+  // that behavior (for now).
+  std::reverse(all_browsers.begin(), all_browsers.end());
+  for (auto* browser : all_browsers) {
+    if (!profile->IsSameOrParent(browser->GetProfile())) {
       continue;
     }
 
-    if (!browser->window()) {
+    if (!browser->GetWindow()) {
       continue;
     }
 
-    if (!include_incognito_information() && profile != browser->profile()) {
+    if (!include_incognito_information() && profile != browser->GetProfile()) {
       continue;
     }
 
-    if (!browser->GetFeatures()
-             .extension_window_controller()
-             ->IsVisibleToTabsAPIForExtension(
-                 extension(), /*allow_dev_tools_windows=*/false)) {
+    WindowController* window_controller =
+        BrowserExtensionWindowController::From(browser);
+    CHECK(window_controller);
+    if (!window_controller->IsVisibleToTabsAPIForExtension(
+            extension(), /*allow_dev_tools_windows=*/false)) {
       continue;
     }
 
@@ -1360,13 +1296,12 @@ ExtensionFunction::ResponseAction TabsQueryFunction::Run() {
     }
 
     if (!window_type.empty() &&
-        window_type != browser->GetFeatures()
-                           .extension_window_controller()
-                           ->GetWindowTypeText()) {
+        window_type != window_controller->GetWindowTypeText()) {
       continue;
     }
 
-    TabStripModel* tab_strip = browser->tab_strip_model();
+    TabStripModel* tab_strip =
+        browser->GetBrowserForMigrationOnly()->tab_strip_model();
     DCHECK(tab_strip);
     for (int i = 0; i < tab_strip->count(); ++i) {
       WebContents* web_contents = tab_strip->GetWebContentsAt(i);

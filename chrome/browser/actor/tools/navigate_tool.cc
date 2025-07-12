@@ -53,6 +53,7 @@ void NavigateTool::Validate(ValidateCallback callback) {
   }
 
   MayActOnUrl(url_,
+              /*allow_insecure_http=*/false,
               Profile::FromBrowserContext(web_contents()->GetBrowserContext()),
               journal(), task_id(),
               base::BindOnce(&MayActOnUrlToResult).Then(std::move(callback)));
@@ -61,7 +62,7 @@ void NavigateTool::Validate(ValidateCallback callback) {
 void NavigateTool::Invoke(InvokeCallback callback) {
   content::OpenURLParams params(
       url_, content::Referrer(), WindowOpenDisposition::CURRENT_TAB,
-      ui::PageTransition::PAGE_TRANSITION_AUTO_TOPLEVEL,
+      ::ui::PageTransition::PAGE_TRANSITION_AUTO_TOPLEVEL,
       false /* is_renderer_initiated */);
 
   CHECK(web_contents());

@@ -38,51 +38,11 @@ struct PossibleTypes {
   // The FieldTypes for which data on file matches the field's value.
   FieldTypeSet types;
 
-  // Indicates if the value is a known CVC value.
-  // TODO(crbug.com/429655113): Do we need this? If not, remove.
-  bool known_value = false;
+  // The format strings that match the field value.
+  // Format strings are determined only for Autofill AI dates and identification
+  // number (e.g., PASSPORT_NUMBER) affixes.
+  std::set<std::pair<FormatString_Type, std::u16string>> formats;
 };
-
-// Note that the `dates` and `formats` are not aligned (i.e., do not base::zip()
-// them!). They may even be of distinct size (see Example 2 of
-// ExtractDatesInFields()).
-struct DatesAndFormats {
-  DatesAndFormats();
-  DatesAndFormats(base::flat_set<data_util::Date> dates,
-                  base::flat_set<std::u16string> format_strings);
-  DatesAndFormats(const DatesAndFormats&) = delete;
-  DatesAndFormats& operator=(const DatesAndFormats&) = delete;
-  DatesAndFormats(DatesAndFormats&&);
-  DatesAndFormats& operator=(DatesAndFormats&&);
-  ~DatesAndFormats();
-
-  base::flat_set<data_util::Date> dates;
-  base::flat_set<std::u16string> formats;
-};
-
-// Looks for date values in `fields`. The returned map contains an entry for
-// each field whose value is either a complete date or part of a complete date.
-//
-// Example 1:
-// Input: One field with value "09/03/2025".
-// Returns: A map from the field's FieldGlobalId to:
-// - {.dates = {{2025,03,09}, {2025,09,03}},
-//    .format_strings = {u"DD/MM/YYYY", u"MM/DD/YYYY"}}.
-//
-// Example 2:
-// Input: One field with value "01/01/01".
-// Returns: A map from the field's FieldGlobalId to:
-// - {.dates = {{2001,01,01}},
-//    .format_strings = {u"DD/MM/YY", u"MM/DD/YY", u"YY/MM/DD"}}.
-//
-// Example 3:
-// Input: Three consecutive fields with values "09", "03", "2025", respectively.
-// Returns: A map from the three field's FieldGlobalIds to, respectively:
-// - {.dates = {{2025,03,09}, {2025,09,03}}, .format_strings = {u"DD", u"MM"}}
-// - {.dates = {{2025,03,09}, {2025,09,03}}, .format_strings = {u"DD", u"MM"}}
-// - {.dates = {{2025,03,09}, {2025,09,03}}, .format_strings = {u"YYYY"}}
-std::map<FieldGlobalId, DatesAndFormats> ExtractDatesInFields(
-    base::span<const std::unique_ptr<AutofillField>> fields);
 
 // For each submitted field in the `form_structure`, determines whether
 // `ADDRESS_HOME_STATE` is a possible matching type.
@@ -106,7 +66,6 @@ std::map<FieldGlobalId, DatesAndFormats> ExtractDatesInFields(
     base::span<const LoyaltyCard> loyalty_cards,
     const std::set<FieldGlobalId>& fields_that_match_state,
     std::u16string_view last_unlocked_credit_card_cvc,
-    const std::map<FieldGlobalId, DatesAndFormats>& dates_and_formats,
     const std::string& app_locale,
     base::span<const std::unique_ptr<AutofillField>> fields);
 
@@ -119,6 +78,11 @@ FieldTypeSet DetermineAvailableFieldTypes(
     base::span<const LoyaltyCard> loyalty_cards,
     std::u16string_view last_unlocked_credit_card_cvc,
     const std::string& app_locale);
+
+base::flat_set<std::pair<data_util::Date, PossibleTypes*>>
+FindDatesAndSetFormatStringsForTesting(
+    base::span<const std::unique_ptr<AutofillField>> fields,
+    base::span<PossibleTypes> possible_types);
 
 }  // namespace autofill
 

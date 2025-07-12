@@ -94,8 +94,7 @@ export class ComposeboxElement extends CrLitElement {
     this.eventTracker_.add(this.$.input, 'input', () => {
       this.submitEnabled_ = this.$.input.value.trim().length > 0;
     });
-    // Make the element focusable to receive keyboard events.
-    this.$.composebox.focus();
+    this.$.input.focus();
   }
 
   override disconnectedCallback() {
@@ -160,8 +159,8 @@ export class ComposeboxElement extends CrLitElement {
         newFileMap.set(token, {
           uuid: token,
           name: file.name,
-          objectUrl:
-              e.target === this.$.imageInput ? URL.createObjectURL(file) : null,
+          objectUrl: input === this.$.imageInput ? URL.createObjectURL(file) :
+                                                   null,
           type: file.type,
         });
       }
@@ -169,6 +168,7 @@ export class ComposeboxElement extends CrLitElement {
     this.files_ = newFileMap;
     // Clear the file input.
     input.value = '';
+    this.$.input.focus();
   }
 
   protected openImageUpload_() {
@@ -187,6 +187,12 @@ export class ComposeboxElement extends CrLitElement {
       this.submitEnabled_ = false;
     } else {
       this.notifySessionAbandoned_();
+    }
+  }
+
+  protected onInputKeydown_(e: KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey && this.submitEnabled_) {
+      this.onSubmitClick_(e);
     }
   }
 

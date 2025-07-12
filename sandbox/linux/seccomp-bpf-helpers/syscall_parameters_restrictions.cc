@@ -509,40 +509,6 @@ ResultExpr RestrictPipe2() {
       .Else(CrashSIGSYS());
 }
 
-SANDBOX_EXPORT bpf_dsl::ResultExpr RestrictSockRecvFlags(int sysno) {
-  size_t argIndex;
-  switch (sysno) {
-#if defined(__arm__) || \
-    (defined(ARCH_CPU_MIPS_FAMILY) && defined(ARCH_CPU_32_BITS))
-    case __NR_recv:
-      argIndex = 3;
-      break;
-#endif
-#if defined(__i386__) || defined(__x86_64__) || defined(__arm__) || \
-    defined(__mips__) || defined(__aarch64__)
-    case __NR_recvfrom:  // Could specify source.
-      argIndex = 3;
-      break;
-    case __NR_recvmsg:  // Could specify source.
-      argIndex = 2;
-      break;
-#endif
-    case __NR_recvmmsg:  // Could specify source.
-      argIndex = 3;
-      break;
-    default:
-      NOTREACHED();
-  }
-
-  // In particular, does not include MSG_OOB due to its history of security
-  // vulnerabilities, see crbug.com/428177287.
-  const Arg<int> flags(argIndex);
-  return If((flags &
-             ~(MSG_CMSG_CLOEXEC | MSG_DONTWAIT | MSG_PEEK | MSG_WAITALL)) == 0,
-            Allow())
-      .Else(CrashSIGSYS());
-}
-
 SANDBOX_EXPORT bpf_dsl::ResultExpr RestrictSockSendFlags(int sysno) {
   size_t argIndex;
   switch (sysno) {
@@ -572,6 +538,20 @@ SANDBOX_EXPORT bpf_dsl::ResultExpr RestrictSockSendFlags(int sysno) {
   // vulnerabilities, see crbug.com/428177287.
   const Arg<int> flags(argIndex);
   return If((flags & ~(MSG_DONTWAIT | MSG_NOSIGNAL)) == 0, Allow())
+      .Else(CrashSIGSYS());
+}
+
+SANDBOX_EXPORT bpf_dsl::ResultExpr RestrictMemfdCreate() {
+  const Arg<int> flags(1);
+  return If((flags & ~(MFD_CLOEXEC | MFD_ALLOW_SEALING)) == 0, Allow())
+      // ChromeOS uses ~0 as the flags to check if memfd_create exists (will
+      // return -EINVAL).
+      // https://source.chromium.org/chromium/chromium/src/+/main:mojo/core/channel_linux.cc;drc=c4987dbe36be309f8db36cba174310cb8a23e989;l=918
+      // Instead of doing something fancy to avoid this, just allow the syscall.
+      // ~0 will always be invalid; even if every flag bit gets a usage in the
+      // future, `flags` still encodes the huge page size which must be a power
+      // of 2, which it will not be if every bit is set.
+      .ElseIf(flags == ~0, Allow())
       .Else(CrashSIGSYS());
 }
 

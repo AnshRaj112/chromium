@@ -312,6 +312,7 @@ This will otherwise be blocked by your privacy settings. This will allow the con
 <translation id="1521655867290435174">Google Sheets</translation>
 <translation id="1524669537550112617">Furnished Rentals</translation>
 <translation id="1527263332363067270">Waiting for connection…</translation>
+<translation id="1527490370616010873">Google isn't your autofill provider. To enable these settings and use payment info from your Google Account, visit <ph name="BEGIN_LINK" />Autofill services settings<ph name="END_LINK" />.</translation>
 <translation id="1528311629279578926">The connection is blocked because it was initiated by a public page to connect to devices or servers on your private network. Reload this page to allow the connection.</translation>
 <translation id="1529789484829130889">Tray 8</translation>
 <translation id="1530707389502320859">The site that you just tried to visit looks fake. Attackers sometimes mimic sites by making small, hard-to-see changes to the URL.</translation>
@@ -1117,6 +1118,7 @@ This will otherwise be blocked by your privacy settings. This will allow the con
 <translation id="2902312830803030883">More actions</translation>
 <translation id="2903493209154104877">Addresses</translation>
 <translation id="290376772003165898">Page is not in <ph name="LANGUAGE" />?</translation>
+<translation id="2904180982022726666">Your organisation limits what you can share</translation>
 <translation id="2905107382358353958">Alert about new payment setting</translation>
 <translation id="2909946352844186028">A network change was detected.</translation>
 <translation id="2911255567212929079">Machine learning and artificial intelligence</translation>
@@ -4708,6 +4710,7 @@ Additional details:
 <translation id="8975263830901772334">Names of files that you print</translation>
 <translation id="8982884016487650216">Finished loading PDF</translation>
 <translation id="8983369100812962543">You can now resize the app</translation>
+<translation id="8984785270737450103">Sharing is currently turned off</translation>
 <translation id="8985112471026018799">Save card for faster checkout</translation>
 <translation id="8987245424886630962"><ph name="VIEW_CHROME_HISTORY_FOCUSED_FRIENDLY_MATCH_TEXT" />: press Tab then Enter to view your browsing history in Chrome</translation>
 <translation id="8987663052629670333">Photo Printing Services</translation>

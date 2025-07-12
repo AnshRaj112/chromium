@@ -236,6 +236,12 @@ BASE_FEATURE(kCreateProfileIfNoneExists,
              "CreateProfileIfNoneExists",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// When enabled, allows parsing of `tab_group_color_palette` theme key, else
+// ignores it.
+BASE_FEATURE(kCustomizeTabGroupColorPalette,
+             "CustomizeTabGroupColorPalette",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Moves the Extensions "puzzle piece" icon from the title bar into the app menu
 // for web app windows.
 BASE_FEATURE(kDesktopPWAsElidedExtensionsMenu,
@@ -352,6 +358,11 @@ const base::FeatureParam<base::TimeDelta> kGlicActorPageStabilityLocalTimeout{
 // The overall observation timeout when waiting on a renderer tool to complete.
 const base::FeatureParam<base::TimeDelta> kGlicActorPageStabilityTimeout{
     &kGlicActor, "glic-actor-page-stability-timeout", base::Seconds(10)};
+
+// Controls whether the task icon in the actor ui is enabled.
+BASE_FEATURE(kGlicActorTaskIcon,
+             "GlicActorTaskIcon",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if BUILDFLAG(ENABLE_GLIC)
 // Controls whether the Glic feature is enabled.
@@ -1844,7 +1855,7 @@ BASE_FEATURE(kWebAppManifestIconUpdating,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kWebAppUsePrimaryIcon,
-             "WebAppPrimaryIcon",
+             "WebAppUsePrimaryIcon",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // !BUILDFLAG(IS_ANDROID)
 

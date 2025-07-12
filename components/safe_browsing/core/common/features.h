@@ -19,7 +19,9 @@ namespace safe_browsing {
 // by feature name. See https://github.com/google/keep-sorted for
 // detailed semantics.
 //
+// clang-format off
 // keep-sorted start sticky_prefixes=["#if"] group_prefixes=["#else", "#endif", "extern const base::FeatureParam"] newline_separated=yes
+// clang-format on
 
 // Controls various parameters related to occasionally collecting ad samples,
 // for example to control how often collection should occur.
@@ -39,6 +41,10 @@ BASE_DECLARE_FEATURE(kClientSideDetectionDebuggingMetadataCache);
 
 // Extract only the visual features during the phishing classifier.
 BASE_DECLARE_FEATURE(kClientSideDetectionOnlyExtractVisualFeatures);
+
+BASE_DECLARE_FEATURE(kClientSideDetectionRetryLimit);
+
+extern const base::FeatureParam<int> kClientSideDetectionRetryLimitTime;
 
 // Pass the LlamaTriggerRuleInfo from RTLookupResponse to ClientPhishingRequest
 // if it exists and the force request mechanism occurs.
@@ -109,10 +115,6 @@ extern const base::FeatureParam<bool> kDelayedWarningsEnableMouseClicks;
 // Sends the WebProtect content scanning request to the corresponding regional
 // DLP endpoint based on ChromeDataRegionSetting policy.
 BASE_DECLARE_FEATURE(kDlpRegionalizedEndpoints);
-
-// Show referrer URL on download item on chrome://downloads page. This will
-// replace the downloads url.
-BASE_DECLARE_FEATURE(kDownloadsPageReferrerUrl);
 
 // Enables HaTS surveys for users encountering desktop download warnings on the
 // download bubble or the downloads page.

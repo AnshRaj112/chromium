@@ -9,7 +9,6 @@
 #include "chrome/browser/ui/tabs/tab_list_interface.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
 
-class BrowserWindowInterface;
 class TabStripModel;
 
 class TabListBridge : public TabListInterface {
@@ -22,13 +21,9 @@ class TabListBridge : public TabListInterface {
   TabListBridge& operator=(const TabListBridge&) = delete;
   ~TabListBridge() override;
 
-  // TODO(devlin): This should be accessible from a BrowserWindowInterface
-  // or the TabListInterface so that it can be shared in all builds that use
-  // the TabListInterface.
-  static TabListInterface* From(
-      BrowserWindowInterface* browser_window_interface);
-
   // TabListInterface:
+  int GetTabCount() const override;
+  int GetActiveIndex() const override;
   void OpenTab(const GURL& url, int index) override;
   void DiscardTab(tabs::TabHandle tab) override;
   void DuplicateTab(tabs::TabHandle tab) override;

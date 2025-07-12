@@ -309,12 +309,26 @@ class HeadlessModeScreencastTest : public HeadlessModeProtocolBrowserTest {
 
 HEADLESS_MODE_PROTOCOL_TEST_F(HeadlessModeScreencastTest,
                               ScreencastBasics,
-                              "sanity/screencast-basics.js")
+                              "shared/screencast-basics.js")
 HEADLESS_MODE_PROTOCOL_TEST_F(HeadlessModeScreencastTest,
                               ScreencastViewport,
-                              "sanity/screencast-viewport.js")
+                              "shared/screencast-viewport.js")
 
+HEADLESS_MODE_PROTOCOL_TEST(HiddenTargetCreate,
+                            "shared/hidden-target-create.js")
+HEADLESS_MODE_PROTOCOL_TEST(HiddenTargetClose, "shared/hidden-target-close.js")
+HEADLESS_MODE_PROTOCOL_TEST(HiddenTargetCreateInvalidParams,
+                            "shared/hidden-target-create-invalid-params.js")
+HEADLESS_MODE_PROTOCOL_TEST(HiddenTargetPageEnable,
+                            "shared/hidden-target-page-enable.js")
+
+HEADLESS_MODE_PROTOCOL_TEST(ChangeWindowSize, "shared/change-window-size.js")
+HEADLESS_MODE_PROTOCOL_TEST(ChangeWindowState, "shared/change-window-state.js")
+
+HEADLESS_MODE_PROTOCOL_TEST(WindowOuterSize, "shared/window-outer-size.js")
 HEADLESS_MODE_PROTOCOL_TEST(WindowInnerSize, "shared/window-inner-size.js")
+HEADLESS_MODE_PROTOCOL_TEST(WindowInnerSizeScaled,
+                            "shared/window-inner-size-scaled.js")
 
 HEADLESS_MODE_PROTOCOL_TEST(LargeBrowserWindowSize,
                             "shared/large-browser-window-size.js")
@@ -343,6 +357,21 @@ HEADLESS_MODE_PROTOCOL_TEST(FullscreenWindowSize,
 
 HEADLESS_MODE_PROTOCOL_TEST(PrintToPdfTinyPage,
                             "shared/print-to-pdf-tiny-page.js")
+
+HEADLESS_MODE_PROTOCOL_TEST(ScreenDetailsMultipleScreens,
+                            "shared/screen-details-multiple-screens.js")
+
+HEADLESS_MODE_PROTOCOL_TEST(ScreenDetailsRotationAngle,
+                            "shared/screen-details-rotation-angle.js")
+
+HEADLESS_MODE_PROTOCOL_TEST(ScreenDetailsPixelRatio,
+                            "shared/screen-details-pixel-ratio.js")
+
+HEADLESS_MODE_PROTOCOL_TEST(ScreenDetailsColorDepth,
+                            "shared/screen-details-color-depth.js")
+
+HEADLESS_MODE_PROTOCOL_TEST(ScreenDetailsWorkArea,
+                            "shared/screen-details-work-area.js")
 
 HEADLESS_MODE_PROTOCOL_TEST(RequestFullscreen, "shared/request-fullscreen.js")
 
@@ -442,5 +471,11 @@ HEADLESS_MODE_PROTOCOL_TEST(MAYBE_WindowZoomOnSecondaryScreen,
 
 HEADLESS_MODE_PROTOCOL_TEST(MAYBE_WindowZoomSizeMatchesWorkArea,
                             "shared/window-zoom-size-matches-work-area.js")
+
+HEADLESS_MODE_PROTOCOL_TEST(WindowScreenScaleFactor,
+                            "shared/window-screen-scale-factor.js")
+
+HEADLESS_MODE_PROTOCOL_TEST(WindowScreenSizeOrientation,
+                            "shared/window-screen-size-orientation.js")
 
 }  // namespace headless

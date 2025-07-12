@@ -627,7 +627,6 @@ Browser::Browser(const CreateParams& params)
           params.initial_visible_on_all_workspaces_state),
       creation_source_(params.creation_source),
       unload_controller_(this),
-      live_tab_context_(new BrowserLiveTabContext(this)),
       app_controller_(web_app::MaybeCreateAppBrowserController(this)),
       browser_actions_(new BrowserActions(*this)),
       command_controller_(new chrome::BrowserCommandController(this)),
@@ -744,12 +743,6 @@ Browser::~Browser() {
 
   if (service) {
     service->WindowClosed(session_id_);
-  }
-
-  sessions::TabRestoreService* tab_restore_service =
-      TabRestoreServiceFactory::GetForProfile(profile());
-  if (tab_restore_service) {
-    tab_restore_service->BrowserClosed(live_tab_context());
   }
 
   profile_pref_registrar_.Reset();
@@ -1256,6 +1249,10 @@ web_app::AppBrowserController* Browser::GetAppBrowserController() {
   return app_controller_.get();
 }
 
+const web_app::AppBrowserController* Browser::GetAppBrowserController() const {
+  return app_controller_.get();
+}
+
 std::vector<tabs::TabInterface*> Browser::GetAllTabInterfaces() {
   std::vector<tabs::TabInterface*> results;
   for (int index = 0; index < tab_strip_model_->count(); ++index) {
@@ -1365,7 +1362,7 @@ void Browser::OnWindowClosing() {
 #endif
 
   if (tab_restore_service && notify_restore_service) {
-    tab_restore_service->BrowserClosing(live_tab_context());
+    tab_restore_service->BrowserClosing(GetFeatures().live_tab_context());
   }
 
   BrowserList::NotifyBrowserCloseStarted(this);
@@ -1741,6 +1738,70 @@ void Browser::TabStripEmpty() {
   // result in closing this Browser. This can happen in the case of closing
   // the last Browser with ongoing downloads.
   window_->Close();
+}
+
+void Browser::OnSplitTabChanged(const SplitTabChange& change) {
+  switch (change.type) {
+    case SplitTabChange::Type::kAdded: {
+      for (std::pair<tabs::TabInterface*, int> split_tabs :
+           change.GetAddedChange()->tabs()) {
+        UpdateSplitTabSessionData(split_tabs.first, change.split_id);
+      }
+
+      UpdateSplitTabSessionVisualData(change.split_id);
+      break;
+    }
+    case SplitTabChange::Type::kVisualsChanged: {
+      // Update for ratio is done from resize from multicontent view delegate.
+      if (change.GetVisualsChange()->reason() !=
+          SplitTabChange::SplitVisualChangeReason::kRatioUpdated) {
+        UpdateSplitTabSessionVisualData(change.split_id);
+      }
+      break;
+    }
+
+    case SplitTabChange::Type::kContentsChanged: {
+      // No need to do anything here since split is still present and no visual
+      // information changed.
+      break;
+    }
+
+    case SplitTabChange::Type::kRemoved: {
+      for (std::pair<tabs::TabInterface*, int> split_tabs :
+           change.GetRemovedChange()->tabs()) {
+        UpdateSplitTabSessionData(split_tabs.first, std::nullopt);
+      }
+      break;
+    }
+  }
+}
+
+void Browser::UpdateSplitTabSessionData(
+    tabs::TabInterface* tab,
+    std::optional<split_tabs::SplitTabId> split_id) {
+  DCHECK(!IsRelevantToAppSessionService(type_));
+  SessionService* const session_service =
+      SessionServiceFactory::GetForProfile(profile_);
+  if (!session_service) {
+    return;
+  }
+
+  session_service->SetSplitTab(
+      session_id(), sessions::SessionTabHelper::IdForTab(tab->GetContents()),
+      std::move(split_id));
+}
+
+void Browser::UpdateSplitTabSessionVisualData(
+    const split_tabs::SplitTabId& split_id) {
+  SessionService* const session_service =
+      SessionServiceFactory::GetForProfile(profile());
+  if (!session_service) {
+    return;
+  }
+
+  const split_tabs::SplitTabVisualData* visual_data =
+      tab_strip_model()->GetSplitData(split_id)->visual_data();
+  session_service->SetSplitTabData(session_id(), split_id, visual_data);
 }
 
 void Browser::SetTopControlsShownRatio(content::WebContents* web_contents,

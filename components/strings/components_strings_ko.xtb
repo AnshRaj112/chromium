@@ -312,6 +312,7 @@
 <translation id="1521655867290435174">Google Sheets</translation>
 <translation id="1524669537550112617">풀옵션 임대</translation>
 <translation id="1527263332363067270">연결 대기 중...</translation>
+<translation id="1527490370616010873">Google은 자동 완성 제공업체가 아닙니다. 이 설정을 사용 설정하고 Google 계정의 결제 정보를 사용하려면 <ph name="BEGIN_LINK" />자동 완성 서비스 설정<ph name="END_LINK" />으로 이동하세요.</translation>
 <translation id="1528311629279578926">공개 페이지에서 비공개 네트워크에 있는 기기나 서버에 연결하려 했기 때문에 연결이 차단되었습니다. 연결을 허용하려면 이 페이지를 새로고침하세요.</translation>
 <translation id="1529789484829130889">트레이 8</translation>
 <translation id="1530707389502320859">방문하려고 한 사이트가 허위 사이트로 보입니다. 일부 공격자는 사이트의 URL을 알아채기 어려울 정도로 약간 변경하여 다른 사이트를 모방합니다.</translation>
@@ -1117,6 +1118,7 @@
 <translation id="2902312830803030883">추가 작업</translation>
 <translation id="2903493209154104877">주소</translation>
 <translation id="290376772003165898">페이지 언어가 <ph name="LANGUAGE" />가 아닌가요?</translation>
+<translation id="2904180982022726666">조직에서 내가 공유할 수 있는 항목을 제한합니다</translation>
 <translation id="2905107382358353958">새 결제 설정에 대한 알림</translation>
 <translation id="2909946352844186028">네트워크 변경이 감지되었습니다.</translation>
 <translation id="2911255567212929079">머신러닝 및 인공지능</translation>
@@ -3740,7 +3742,7 @@
 <translation id="7308436126008021607">백그라운드 동기화</translation>
 <translation id="7309058266849426521">Chrome에서 광고 개인 정보 보호 관리에 대해 자세히 알아보세요.</translation>
 <translation id="7310392214323165548">기기가 곧 다시 시작됩니다</translation>
-<translation id="7311244614769792472">검색결과 없음</translation>
+<translation id="7311244614769792472">검색 결과 없음</translation>
 <translation id="7311837626618954149">Chromium에서는 사이트가 서드 파티 쿠키를 사용하여 사용자의 탐색 활동을 추적하지 못하도록 사이트를 차단합니다.</translation>
 <translation id="7313107491291103073">정책 위반 가능성이 있는 사이트이므로 조직에서 신고했습니다.</translation>
 <translation id="7316521168101843192">Microsoft OneDrive에 파일 저장 중</translation>
@@ -4707,6 +4709,7 @@
 <translation id="8975263830901772334">인쇄하는 파일의 이름</translation>
 <translation id="8982884016487650216">PDF 로드 완료</translation>
 <translation id="8983369100812962543">이제 앱 크기를 조절할 수 있습니다.</translation>
+<translation id="8984785270737450103">현재 공유가 사용 중지됨</translation>
 <translation id="8985112471026018799">카드를 저장하고 더 빠르게 결제하세요</translation>
 <translation id="8987245424886630962"><ph name="VIEW_CHROME_HISTORY_FOCUSED_FRIENDLY_MATCH_TEXT" />, Tab을 누른 다음 Enter를 눌러 Chrome 방문 기록 보기</translation>
 <translation id="8987663052629670333">사진 인화 서비스</translation>

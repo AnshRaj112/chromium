@@ -5,6 +5,7 @@
 #import "ios/chrome/browser/intelligence/page_action_menu/ui/page_action_menu_view_controller.h"
 
 #import "build/branding_buildflags.h"
+#import "ios/chrome/browser/intelligence/bwg/utils/bwg_constants.h"
 #import "ios/chrome/browser/intelligence/page_action_menu/utils/ai_hub_constants.h"
 #import "ios/chrome/browser/intelligence/page_action_menu/utils/ai_hub_metrics.h"
 #import "ios/chrome/browser/reader_mode/model/features.h"
@@ -36,8 +37,11 @@ const CGFloat kButtonHeight = 60;
 // The point size of the icons for the small buttons.
 const CGFloat kSmallButtonIconSize = 18;
 
-// The padding of the small button.
+// The padding of the small buttons.
 const CGFloat kSmallButtonPadding = 8;
+
+// The opacity of the small buttons.
+const CGFloat kSmallButtonOpacity = 0.95;
 
 // The corner radius of the menu and its elements.
 const CGFloat kMenuCornerRadius = 20;
@@ -226,7 +230,7 @@ const CGFloat kLargeButtonImagePadding = 8;
                                                           kSmallButtonIconSize)
                           title:l10n_util::GetNSString(
                                     IDS_IOS_AI_HUB_LENS_LABEL)
-                    destructive:NO];
+                        enabled:[self isLensAvailable]];
   [lensButton addTarget:self
                  action:@selector(handleLensEntryPointTapped:)
        forControlEvents:UIControlEventTouchUpInside];
@@ -248,7 +252,7 @@ const CGFloat kLargeButtonImagePadding = 8;
     UIButton* readerModeButton =
         [self createSmallButtonWithIcon:readerModeImage
                                   title:readerModeLabelText
-                            destructive:_readerModeActive];
+                                enabled:YES];
     [readerModeButton addTarget:self
                          action:@selector(handleReaderModeTapped:)
                forControlEvents:UIControlEventTouchUpInside];
@@ -258,7 +262,7 @@ const CGFloat kLargeButtonImagePadding = 8;
         [self createSmallButtonWithIcon:[self askGeminiIcon]
                                   title:l10n_util::GetNSString(
                                             IDS_IOS_AI_HUB_GEMINI_LABEL)
-                            destructive:NO];
+                                enabled:YES];
     [BWGSmallButton addTarget:self
                        action:@selector(handleBWGTapped:)
              forControlEvents:UIControlEventTouchUpInside];
@@ -283,6 +287,8 @@ const CGFloat kLargeButtonImagePadding = 8;
   buttonConfiguration.image = [self askGeminiIcon];
   buttonConfiguration.imagePlacement = NSDirectionalRectEdgeLeading;
   buttonConfiguration.imagePadding = kLargeButtonImagePadding;
+  buttonConfiguration.baseForegroundColor =
+      [UIColor colorNamed:kSolidWhiteColor];
 
   // Set the font and text color as attributes.
   UIFont* font = PreferredFontForTextStyle(UIFontTextStyleHeadline);
@@ -305,14 +311,17 @@ const CGFloat kLargeButtonImagePadding = 8;
 }
 
 // Creates and returns a small button with an icon and a title for the label. If
-// `destructive` is YES, the button applies red styling.
+// the button is not `enabled`, a greyed out UI is shown and the tap target is
+// disabled.
 - (UIButton*)createSmallButtonWithIcon:(UIImage*)image
                                  title:(NSString*)title
-                           destructive:(BOOL)destructive {
+                               enabled:(BOOL)enabled {
   // Create the background config.
   UIBackgroundConfiguration* backgroundConfig =
       [UIBackgroundConfiguration clearConfiguration];
-  backgroundConfig.backgroundColor = [UIColor colorNamed:kBackgroundColor];
+  backgroundConfig.backgroundColor =
+      [[UIColor colorNamed:kPrimaryBackgroundColor]
+          colorWithAlphaComponent:kSmallButtonOpacity];
   backgroundConfig.cornerRadius = kButtonsCornerRadius;
 
   // Create the button config.
@@ -320,22 +329,23 @@ const CGFloat kLargeButtonImagePadding = 8;
       [UIButtonConfiguration filledButtonConfiguration];
   buttonConfiguration.image = image;
   buttonConfiguration.imagePlacement = NSDirectionalRectEdgeTop;
-  buttonConfiguration.baseForegroundColor =
-      destructive ? [UIColor colorNamed:kRed500Color]
-                  : [UIColor colorNamed:kBlue600Color];
+  buttonConfiguration.baseForegroundColor = [UIColor colorNamed:kBlue600Color];
   buttonConfiguration.background = backgroundConfig;
   buttonConfiguration.contentInsets = NSDirectionalEdgeInsetsMake(
       kSmallButtonPadding, 0, kSmallButtonPadding, 0);
 
   // Set the font and text color as attributes.
-  UIFont* font = PreferredFontForTextStyle(UIFontTextStyleSubheadline,
-                                           UIFontWeightRegular);
-  NSDictionary* titleAttributes = @{
-    NSFontAttributeName : font,
-    NSForegroundColorAttributeName : destructive
-        ? [UIColor colorNamed:kRed500Color]
-        : [UIColor colorNamed:kTextPrimaryColor]
-  };
+  NSMutableDictionary* titleAttributes = [[NSMutableDictionary alloc] init];
+  [titleAttributes
+      setObject:PreferredFontForTextStyle(UIFontTextStyleSubheadline,
+                                          UIFontWeightRegular)
+         forKey:NSFontAttributeName];
+  // If the button is enabled, override the text color. Otherwise, inherit the
+  // disabled font color.
+  if (enabled) {
+    [titleAttributes setObject:[UIColor colorNamed:kTextPrimaryColor]
+                        forKey:NSForegroundColorAttributeName];
+  }
   NSMutableAttributedString* string =
       [[NSMutableAttributedString alloc] initWithString:title];
   [string addAttributes:titleAttributes range:NSMakeRange(0, string.length)];
@@ -344,6 +354,8 @@ const CGFloat kLargeButtonImagePadding = 8;
   UIButton* button = [UIButton buttonWithConfiguration:buttonConfiguration
                                          primaryAction:nil];
   button.translatesAutoresizingMaskIntoConstraints = NO;
+
+  [button setEnabled:enabled];
 
   return button;
 }
@@ -359,15 +371,23 @@ const CGFloat kLargeButtonImagePadding = 8;
 #endif
 }
 
+// Whether the Lens overlay is currently available.
+- (BOOL)isLensAvailable {
+  return self.lensOverlayHandler != nil;
+}
+
+#pragma mark - Handlers
+
 // Dismisses this view controller and starts the BWG overlay.
 - (void)handleBWGTapped:(UIButton*)button {
   RecordAIHubAction(IOSAIHubAction::kGemini);
   PageActionMenuViewController* __weak weakSelf = self;
   [self.pageActionMenuHandler dismissPageActionMenuWithCompletion:^{
-    [weakSelf.BWGHandler startBWGFlow];
+    [weakSelf.BWGHandler startBWGFlowWithEntryPoint:bwg::EntryPoint::AIHub];
   }];
 }
 
+// Dismisses the view controller and starts the Lens overlay.
 - (void)handleLensEntryPointTapped:(UIButton*)button {
   RecordAIHubAction(IOSAIHubAction::kLens);
   PageActionMenuViewController* __weak weakSelf = self;
@@ -379,6 +399,7 @@ const CGFloat kLargeButtonImagePadding = 8;
   }];
 }
 
+// Dismisses the view controller and starts Reader mode.
 - (void)handleReaderModeTapped:(UIButton*)button {
   RecordAIHubAction(IOSAIHubAction::kReaderMode);
   PageActionMenuViewController* __weak weakSelf = self;

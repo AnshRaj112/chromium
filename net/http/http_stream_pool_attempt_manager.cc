@@ -519,6 +519,7 @@ void HttpStreamPool::AttemptManager::CancelTcpBasedAttempts(
 
 void HttpStreamPool::AttemptManager::OnJobComplete(Job* job) {
   preconnect_jobs_.erase(job);
+  limit_ignoring_jobs_.erase(job);
   ip_based_pooling_disabling_jobs_.erase(job);
   alternative_service_disabling_jobs_.erase(job);
 
@@ -1651,6 +1652,7 @@ void HttpStreamPool::AttemptManager::NotifyJobOfPreconnectComplete(
     raw_ptr<Job> job,
     int rv) {
   Job* raw_job = job.get();
+  limit_ignoring_jobs_.erase(raw_job);
   notified_jobs_.emplace(std::move(job));
   TRACE_EVENT_INSTANT("net.stream",
                       "AttemptManager::NotifyJobOfPreconnectComplete", track_,

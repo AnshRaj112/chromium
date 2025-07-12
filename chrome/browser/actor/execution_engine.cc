@@ -5,6 +5,8 @@
 #include "chrome/browser/actor/execution_engine.h"
 
 #include <cstddef>
+#include <memory>
+#include <optional>
 #include <utility>
 
 #include "base/check.h"
@@ -65,12 +67,22 @@ void PostTaskForActCallback(ExecutionEngine::ActionResultCallback callback,
       FROM_HERE, base::BindOnce(std::move(callback), std::move(result)));
 }
 
+void PostTaskForActCallback(ActorTask::ActCallback callback,
+                            mojom::ActionResultPtr result,
+                            std::optional<size_t> index_of_failed_action) {
+  UMA_HISTOGRAM_ENUMERATION("Actor.ExecutionEngine.Action.ResultCode",
+                            result->code);
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(std::move(callback), std::move(result),
+                                index_of_failed_action));
+}
+
 }  // namespace
 
 ExecutionEngine::ExecutionEngine(Profile* profile)
     : profile_(profile),
       journal_(ActorKeyedService::Get(profile)->GetJournal().GetSafeRef()),
-      ui_event_dispatcher_(ui::NewUiEventDispatcher()) {
+      ui_event_dispatcher_(ui::NewUiEventDispatcher(profile)) {
   CHECK(profile_);
   // Idempotent. Enables the action blocklist if it isn't already enabled.
   InitActionBlocklist(profile_.get());
@@ -80,7 +92,7 @@ ExecutionEngine::ExecutionEngine(Profile* profile, tabs::TabInterface* tab)
     : profile_(profile),
       journal_(ActorKeyedService::Get(profile)->GetJournal().GetSafeRef()),
       tab_(tab),
-      ui_event_dispatcher_(ui::NewUiEventDispatcher()) {
+      ui_event_dispatcher_(ui::NewUiEventDispatcher(profile)) {
   CHECK(profile_);
   // Idempotent. Enables the action blocklist if it isn't already enabled.
   InitActionBlocklist(profile_.get());
@@ -158,8 +170,18 @@ void ExecutionEngine::RegisterWithProfile(Profile* profile) {
 
 void ExecutionEngine::CancelOngoingActions(mojom::ActionResultCode reason) {
   if (!action_sequence_.empty()) {
-    CompleteActions(MakeResult(reason));
+    CompleteActions(MakeResult(reason), /*action_index=*/std::nullopt);
   }
+}
+
+void ExecutionEngine::FailCurrentTool(mojom::ActionResultCode reason) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  CHECK_NE(reason, mojom::ActionResultCode::kOk);
+  if (state_ != State::kToolController) {
+    return;
+  }
+
+  external_tool_failure_reason_ = reason;
 }
 
 void ExecutionEngine::Act(const BrowserAction& action,
@@ -187,27 +209,36 @@ void ExecutionEngine::Act(const BrowserAction& action,
     return;
   }
 
-  next_action_index_ = 0;
-  act_callback_ = std::move(callback);
-
-  absl::flat_hash_set<int32_t> acting_tab_handles;
-
-  action_sequence_.reserve(action.actions_size());
-  for (int i = 0; i < action.actions_size(); ++i) {
-    std::unique_ptr<ToolRequest> request =
-        CreateToolRequest(action.actions().at(i), tab_);
-    if (request) {
-      if (request->GetTabHandle() != tabs::TabHandle::Null()) {
-        acting_tab_handles.insert(request->GetTabHandle().raw_value());
-      }
-      action_sequence_.push_back(std::move(request));
-    } else {
-      journal_->Log(GURL::EmptyGURL(), task_->id(), "Act Failed",
-                    "Failed to convert ActionInformation proto to ToolRequest");
-      CompleteActions(MakeResult(mojom::ActionResultCode::kArgumentsInvalid));
-      return;
-    }
+  if (action.actions_size() <= 0) {
+    journal_->Log(LastCommittedURLOfCurrentTask(), task_->id(), "Act Failed",
+                  "Unable to perform action: proto contains no actions");
+    PostTaskForActCallback(
+        std::move(callback),
+        MakeResult(mojom::ActionResultCode::kEmptyActionSequence,
+                   "The BrowserAction proto had no actions"));
+    return;
   }
+
+  BuildToolRequestResult result = BuildToolRequest(action, tab_);
+  if (!result.has_value()) {
+    journal_->Log(GURL::EmptyGURL(), task_->id(), "Act Failed",
+                  "Failed to convert BrowserAction proto to ToolRequest");
+    PostTaskForActCallback(
+        std::move(callback),
+        MakeResult(mojom::ActionResultCode::kArgumentsInvalid,
+                   "Failed to convert BrowserAction proto to ToolRequest"));
+    return;
+  }
+
+  next_action_index_ = 0;
+  action_sequence_ = std::move(result.value());
+
+  // Adapt the callback in this path to the one used by the ToolRequest taking
+  // Act.
+  act_callback_ = base::BindOnce(
+      [](ActionResultCallback callback, mojom::ActionResultPtr result,
+         std::optional<size_t>) { std::move(callback).Run(std::move(result)); },
+      std::move(callback));
 
   if (state_ == State::kInit) {
     // This is the first Act() by this ExecutionEngine, so we should notify
@@ -220,8 +251,14 @@ void ExecutionEngine::Act(const BrowserAction& action,
     // TODO(crbug.com/420669167): This needs to support taking multiple tabs. Is
     // it even the right interface? Different sets of tabs might be acted on in
     // followup sequences...
+    absl::flat_hash_set<int32_t> acting_tab_handles;
+    for (const std::unique_ptr<ToolRequest>& request : action_sequence_) {
+      if (request->GetTabHandle() != tabs::TabHandle::Null()) {
+        acting_tab_handles.insert(request->GetTabHandle().raw_value());
+      }
+    }
+
     ui_event_dispatcher_->OnPreFirstAct(
-        profile_,
         ui::UiEventDispatcher::FirstActInfo{
             .task_id = task_->id(),
             .tab_handle = acting_tab_handles.empty()
@@ -237,17 +274,18 @@ void ExecutionEngine::Act(const BrowserAction& action,
   }
 }
 
-void ExecutionEngine::Act(const Actions& actions,
-                          ActionResultCallback callback) {
+void ExecutionEngine::Act(std::vector<std::unique_ptr<ToolRequest>>&& actions,
+                          ActorTask::ActCallback callback) {
   CHECK(base::FeatureList::IsEnabled(features::kGlicActor));
+  CHECK(!actions.empty());
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  CHECK_EQ(actions.task_id(), task_->id().value());
 
   if (task_->IsPaused()) {
     journal_->Log(LastCommittedURLOfCurrentTask(), task_->id(), "Act Failed",
                   "Unable to perform action: task is paused");
     PostTaskForActCallback(std::move(callback),
-                           MakeResult(mojom::ActionResultCode::kTaskPaused));
+                           MakeResult(mojom::ActionResultCode::kTaskPaused),
+                           std::nullopt);
     return;
   }
 
@@ -257,7 +295,8 @@ void ExecutionEngine::Act(const Actions& actions,
         "Unable to perform action: task already has action in progress");
     PostTaskForActCallback(std::move(callback),
                            MakeResult(mojom::ActionResultCode::kError,
-                                      "Task already has action in progress"));
+                                      "Task already has action in progress"),
+                           std::nullopt);
     return;
   }
 
@@ -266,23 +305,11 @@ void ExecutionEngine::Act(const Actions& actions,
 
   absl::flat_hash_set<int32_t> acting_tab_handles;
 
-  action_sequence_.reserve(actions.actions_size());
-  for (int i = 0; i < actions.actions_size(); ++i) {
-    // The tab for this path is always set from the proto.
-    // TODO(crbug.com/411462297): Once BrowserAction is removed
-    // CreateToolRequest will no longer take a fallback tab.
-    std::unique_ptr<ToolRequest> request = CreateToolRequest(
-        actions.actions().at(i), /*deprecated_fallback_tab=*/nullptr);
-    if (request) {
-      if (request->GetTabHandle() != tabs::TabHandle::Null()) {
-        acting_tab_handles.insert(request->GetTabHandle().raw_value());
-      }
-      action_sequence_.push_back(std::move(request));
-    } else {
-      journal_->Log(GURL::EmptyGURL(), task_->id(), "Act Failed",
-                    "Failed to convert ActionInformation proto to ToolRequest");
-      CompleteActions(MakeResult(mojom::ActionResultCode::kArgumentsInvalid));
-      return;
+  action_sequence_ = std::move(actions);
+  for (const std::unique_ptr<ToolRequest>& action : action_sequence_) {
+    CHECK(action);
+    if (action->GetTabHandle() != tabs::TabHandle::Null()) {
+      acting_tab_handles.insert(action->GetTabHandle().raw_value());
     }
   }
 
@@ -298,7 +325,6 @@ void ExecutionEngine::Act(const Actions& actions,
     // it even the right interface? Different sets of tabs might be acted on in
     // followup sequences...
     ui_event_dispatcher_->OnPreFirstAct(
-        profile_,
         ui::UiEventDispatcher::FirstActInfo{
             .task_id = task_->id(),
             .tab_handle = acting_tab_handles.empty()
@@ -315,21 +341,16 @@ void ExecutionEngine::Act(const Actions& actions,
 }
 
 void ExecutionEngine::KickOffNextAction(
-    mojom::ActionResultPtr previous_action_result) {
-  // TODO(crbug.com/425784083): Allowing the transition from Complete here is
-  // needed (at least) for some tests.
+    mojom::ActionResultPtr init_hooks_result) {
   DCHECK(state_ == State::kInit || state_ == State::kUiPostTool ||
          state_ == State::kComplete)
       << "Current state is " << StateToString(state_);
+  CHECK_LT(next_action_index_, action_sequence_.size());
 
-  // The previous action or init hooks errored out. Stop the chain.
-  if (!IsOk(*previous_action_result)) {
-    CompleteActions(std::move(previous_action_result));
-    return;
-  }
-
-  if (next_action_index_ >= action_sequence_.size()) {
-    CompleteActions(std::move(previous_action_result));
+  // The init hooks errored out.
+  if (init_hooks_result && !IsOk(*init_hooks_result)) {
+    CompleteActions(std::move(init_hooks_result),
+                    /*action_index=*/std::nullopt);
     return;
   }
 
@@ -352,7 +373,8 @@ void ExecutionEngine::SafetyChecksForNextAction() {
     journal_->Log(GURL::EmptyGURL(), task_->id(), "Act Failed",
                   "The tab is no longer present");
     CompleteActions(MakeResult(mojom::ActionResultCode::kTabWentAway,
-                               "The tab is no longer present."));
+                               "The tab is no longer present."),
+                    next_action_index_);
     return;
   }
 
@@ -375,7 +397,8 @@ void ExecutionEngine::DidFinishAsyncSafetyChecks(
     journal_->Log(GURL::EmptyGURL(), task_->id(), "Act Failed",
                   "The tab is no longer present");
     CompleteActions(MakeResult(mojom::ActionResultCode::kTabWentAway,
-                               "The tab is no longer present."));
+                               "The tab is no longer present."),
+                    next_action_index_);
     return;
   }
 
@@ -388,9 +411,9 @@ void ExecutionEngine::DidFinishAsyncSafetyChecks(
     // TODO(mcnee): Handle this gracefully.
     journal_->Log(LastCommittedURLOfCurrentTask(), task_id, "Act Failed",
                   "Acting after cross-origin navigation occurred");
-    CompleteActions(
-        MakeResult(mojom::ActionResultCode::kCrossOriginNavigation,
-                   "Acting after cross-origin navigation occurred"));
+    CompleteActions(MakeResult(mojom::ActionResultCode::kCrossOriginNavigation,
+                               "Acting after cross-origin navigation occurred"),
+                    next_action_index_);
     return;
   }
 
@@ -398,7 +421,8 @@ void ExecutionEngine::DidFinishAsyncSafetyChecks(
     journal_->Log(LastCommittedURLOfCurrentTask(), task_id, "Act Failed",
                   "URL blocked for actions");
     CompleteActions(MakeResult(mojom::ActionResultCode::kUrlBlocked,
-                               "URL blocked for actions"));
+                               "URL blocked for actions"),
+                    next_action_index_);
     return;
   }
 
@@ -414,14 +438,14 @@ void ExecutionEngine::ExecuteNextAction() {
 
   SetState(State::kUiPreTool);
   ui_event_dispatcher_->OnPreTool(
-      profile_, GetInProgressAction(),
+      GetInProgressAction(),
       base::BindOnce(&ExecutionEngine::FinishedUiPreTool, GetWeakPtr()));
 }
 
 void ExecutionEngine::FinishedUiPreTool(mojom::ActionResultPtr result) {
   DCHECK_EQ(state_, State::kUiPreTool);
   if (!IsOk(*result)) {
-    CompleteActions(std::move(result));
+    CompleteActions(std::move(result), InProgressActionIndex());
     return;
   }
 
@@ -434,14 +458,21 @@ void ExecutionEngine::FinishedUiPreTool(mojom::ActionResultPtr result) {
 void ExecutionEngine::FinishedToolController(mojom::ActionResultPtr result) {
   DCHECK_EQ(state_, State::kToolController);
   // The current action errored out. Stop the chain.
+  std::optional<mojom::ActionResultCode> external_tool_failure_reason;
+  std::swap(external_tool_failure_reason, external_tool_failure_reason_);
+  if (external_tool_failure_reason) {
+    CompleteActions(MakeResult(*external_tool_failure_reason),
+                    InProgressActionIndex());
+    return;
+  }
   if (!IsOk(*result)) {
-    CompleteActions(std::move(result));
+    CompleteActions(std::move(result), InProgressActionIndex());
     return;
   }
 
   SetState(State::kUiPostTool);
   ui_event_dispatcher_->OnPostTool(
-      profile_, GetInProgressAction(),
+      GetInProgressAction(),
       base::BindOnce(&ExecutionEngine::FinishedUiPostTool, GetWeakPtr()));
 }
 
@@ -449,10 +480,21 @@ void ExecutionEngine::FinishedUiPostTool(mojom::ActionResultPtr result) {
   DCHECK_EQ(state_, State::kUiPostTool);
   CHECK(!action_sequence_.empty());
 
-  KickOffNextAction(std::move(result));
+  if (!IsOk(*result)) {
+    CompleteActions(std::move(result), InProgressActionIndex());
+    return;
+  }
+
+  if (next_action_index_ >= action_sequence_.size()) {
+    CompleteActions(MakeOkResult(), std::nullopt);
+    return;
+  }
+
+  KickOffNextAction(/*init_hooks_result=*/nullptr);
 }
 
-void ExecutionEngine::CompleteActions(mojom::ActionResultPtr result) {
+void ExecutionEngine::CompleteActions(mojom::ActionResultPtr result,
+                                      std::optional<size_t> action_index) {
   CHECK(!action_sequence_.empty());
   CHECK(act_callback_);
 
@@ -464,7 +506,8 @@ void ExecutionEngine::CompleteActions(mojom::ActionResultPtr result) {
   }
 
   // TODO(crbug.com/411462297): Populate observation.
-  PostTaskForActCallback(std::move(act_callback_), std::move(result));
+  PostTaskForActCallback(std::move(act_callback_), std::move(result),
+                         action_index);
 
   action_sequence_.clear();
   next_action_index_ = 0;
@@ -488,7 +531,8 @@ void ExecutionEngine::OnTabWillDetach(tabs::TabInterface* tab,
     journal_->Log(LastCommittedURLOfCurrentTask(), task_->id(), "Act Failed",
                   "The tab is no longer present");
     CompleteActions(MakeResult(mojom::ActionResultCode::kTabWentAway,
-                               "The tab is no longer present."));
+                               "The tab is no longer present."),
+                    std::nullopt);
   }
 }
 
@@ -518,12 +562,16 @@ const ToolRequest& ExecutionEngine::GetNextAction() const {
   return *action_sequence_.at(next_action_index_).get();
 }
 
-const ToolRequest& ExecutionEngine::GetInProgressAction() const {
+size_t ExecutionEngine::InProgressActionIndex() const {
   CHECK(state_ == State::kUiPreTool || state_ == State::kToolController ||
         state_ == State::kUiPostTool)
       << "Current state is " << StateToString(state_);
   CHECK_GT(next_action_index_, 0ul);
-  return *action_sequence_.at(next_action_index_ - 1).get();
+  return next_action_index_ - 1;
+}
+
+const ToolRequest& ExecutionEngine::GetInProgressAction() const {
+  return *action_sequence_.at(InProgressActionIndex()).get();
 }
 
 std::ostream& operator<<(std::ostream& o, const ExecutionEngine::State& s) {

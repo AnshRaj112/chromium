@@ -7490,6 +7490,8 @@ data/indexeddb/fill_quota.html
 data/indexeddb/fill_up_5k.html
 data/indexeddb/force_close_event.html
 data/indexeddb/force_close_event.js
+data/indexeddb/index_deletion_regression_tests.html
+data/indexeddb/index_deletion_regression_tests.js
 data/indexeddb/index_test.html
 data/indexeddb/index_test.js
 data/indexeddb/key_path_test.html
@@ -7561,6 +7563,10 @@ data/indexeddb/write_4mb_blob.html
 data/indexeddb/write_and_read_blob.html
 data/indexeddb/write_and_read_large_value.html
 data/infinitely_loading_image.html
+data/inner_text/subframe-a.html
+data/inner_text/subframe-b.html
+data/inner_text/test1.html
+data/inner_text/test2.html
 data/input_box.html
 data/input_in_iframe.html
 data/interaction-mq-dynamic.html
@@ -7852,6 +7858,7 @@ data/media/too_many_web_media_players_intervention_test.html
 data/media/tulip2.webm
 data/media/video-player-autoplay.html
 data/media/video-player-autoplay.html.mock-http-headers
+data/media/video-player-pip.html
 data/media/video-player.html
 data/media/video_audio_element_capture_test.html
 data/media/video_capture_test.html

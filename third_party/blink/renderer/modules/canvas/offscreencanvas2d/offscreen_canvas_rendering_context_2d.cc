@@ -34,6 +34,8 @@
 #include "third_party/blink/renderer/platform/wtf/linked_hash_set.h"
 #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
 
+namespace blink {
+
 namespace {
 const size_t kHardMaxCachedFonts = 250;
 const size_t kMaxCachedFonts = 25;
@@ -67,8 +69,8 @@ class OffscreenFontCache {
   }
 
  private:
-  HashMap<blink::String, blink::FontDescription> fonts_resolved_;
-  LinkedHashSet<blink::String> font_lru_list_;
+  blink::HashMap<blink::String, blink::FontDescription> fonts_resolved_;
+  blink::LinkedHashSet<blink::String> font_lru_list_;
 };
 
 OffscreenFontCache& GetOffscreenFontCache() {
@@ -78,8 +80,6 @@ OffscreenFontCache& GetOffscreenFontCache() {
 }
 
 }  // namespace
-
-namespace blink {
 
 CanvasRenderingContext* OffscreenCanvasRenderingContext2D::Factory::Create(
     CanvasRenderingContextHost* host,

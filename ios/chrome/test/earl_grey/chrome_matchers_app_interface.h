@@ -556,7 +556,8 @@
 // Returns a matcher for the group cell created just now in the Tab Groups panel
 // for the given `group_name` and `tab_count`.
 + (id<GREYMatcher>)tabGroupsPanelCellWithName:(NSString*)groupName
-                                        count:(NSInteger)count;
+                                        count:(NSInteger)count
+                                       shared:(BOOL)shared;
 
 // Returns a matcher for the recent activity log cell at `index` in the recent
 // activity in the tab group.
@@ -732,6 +733,10 @@
 // carousel.
 + (id<GREYMatcher>)siteInfoDestinationButton;
 
+// Returns matcher for the translate destination button in the overflow menu
+// carousel.
++ (id<GREYMatcher>)translateDestinationButton;
+
 // Returns matcher for the downloads destination button in the overflow menu
 // carousel.
 + (id<GREYMatcher>)downloadsDestinationButton;
@@ -739,6 +744,10 @@
 // Returns matcher for the What's New destination button in the overflow menu
 // carousel.
 + (id<GREYMatcher>)whatsNewDestinationButton;
+
+// Matcher for Toolbar element item corresponding to the given accessibility ID
+// `button_id`.
++ (id<GREYMatcher>)toolbarButtonWithID:(NSString*)button_id;
 
 #pragma mark - Overflow Menu Actions
 

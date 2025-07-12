@@ -5,15 +5,18 @@
 package org.chromium.chrome.browser.ntp_customization;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
-
-import androidx.test.core.app.ApplicationProvider;
 
 import org.junit.After;
 import org.junit.Before;
@@ -27,71 +30,127 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import org.robolectric.annotation.Config;
 
+import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.BaseRobolectricTestRunner;
 import org.chromium.chrome.browser.ntp_customization.NtpCustomizationConfigManager.HomepageStateListener;
+import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
 
 /** Unit tests for {@link NtpCustomizationConfigManager}. */
 @RunWith(BaseRobolectricTestRunner.class)
 @Config(manifest = Config.NONE)
-/** Unit test for {@link NtpCustomizationConfigManager}. */
 public class NtpCustomizationConfigManagerUnitTest {
     @Rule public MockitoRule mMockitoRule = MockitoJUnit.rule();
     @Mock private HomepageStateListener mListener;
     @Captor private ArgumentCaptor<BitmapDrawable> mBitmapDrawableCaptor;
 
     private NtpCustomizationConfigManager mNtpCustomizationConfigManager;
-    private Context mContext;
 
     @Before
     public void setUp() {
-        mContext = ApplicationProvider.getApplicationContext();
-        mNtpCustomizationConfigManager = NtpCustomizationConfigManager.getInstance();
+        ThreadUtils.runOnUiThreadBlocking(
+                () -> mNtpCustomizationConfigManager = NtpCustomizationConfigManager.getInstance());
     }
 
     @After
     public void tearDown() {
         // Clean up listeners to not affect other tests.
         mNtpCustomizationConfigManager.removeListener(mListener);
+        mNtpCustomizationConfigManager.setBackgroundImageDrawableForTesting(null);
+
+        // Removes the newly generated file and cleans up SharedPreference.
+        NtpCustomizationUtils.resetSharedPreferenceForTesting();
+        NtpCustomizationUtils.deleteBackgroundImageFileImpl();
     }
 
     @Test
     public void testOnBackgroundChanged_withBitmap() {
         mNtpCustomizationConfigManager.addListener(mListener);
-        Bitmap bitmap = createBitmap();
+        verify(mListener).onBackgroundChanged(eq(null));
+        clearInvocations(mListener);
 
-        mNtpCustomizationConfigManager.onBackgroundChanged(mContext, bitmap);
+        Bitmap bitmap = createBitmap();
+        mNtpCustomizationConfigManager.onBackgroundChanged(bitmap);
 
         assertNotNull(mNtpCustomizationConfigManager.getBackgroundImageDrawable());
         assertEquals(
                 bitmap, mNtpCustomizationConfigManager.getBackgroundImageDrawable().getBitmap());
 
         verify(mListener).onBackgroundChanged(mBitmapDrawableCaptor.capture());
-        assertNotNull(mBitmapDrawableCaptor.getValue());
         assertEquals(bitmap, mBitmapDrawableCaptor.getValue().getBitmap());
     }
 
     @Test
     public void testOnBackgroundChanged_withNullBitmap() {
         mNtpCustomizationConfigManager.addListener(mListener);
+        verify(mListener).onBackgroundChanged(eq(null));
+        clearInvocations(mListener);
 
-        mNtpCustomizationConfigManager.onBackgroundChanged(mContext, null);
+        mNtpCustomizationConfigManager.onBackgroundChanged(null);
 
-        assertNull(mNtpCustomizationConfigManager.getBackgroundImageDrawable());
-        verify(mListener).onBackgroundChanged(mBitmapDrawableCaptor.capture());
-        assertNull(mBitmapDrawableCaptor.getValue());
+        verify(mListener).onBackgroundChanged(eq(null));
     }
 
     @Test
-    public void testAddAndRemoveListener() {
+    public void testAddAndRemoveBackgroundChangeListener() {
+        // Verifies that onBackgroundChanged() is called for the listener when it is added.
         mNtpCustomizationConfigManager.addListener(mListener);
+        verify(mListener).onBackgroundChanged(eq(null));
+        clearInvocations(mListener);
+
         Bitmap bitmap = createBitmap();
-
-        mNtpCustomizationConfigManager.onBackgroundChanged(mContext, bitmap);
+        mNtpCustomizationConfigManager.onBackgroundChanged(bitmap);
         verify(mListener).onBackgroundChanged(mBitmapDrawableCaptor.capture());
+        assertEquals(bitmap, mBitmapDrawableCaptor.getValue().getBitmap());
 
+        clearInvocations(mListener);
         mNtpCustomizationConfigManager.removeListener(mListener);
-        mNtpCustomizationConfigManager.onBackgroundChanged(mContext, null);
-        verify(mListener).onBackgroundChanged(mBitmapDrawableCaptor.capture());
+        mNtpCustomizationConfigManager.onBackgroundChanged(null);
+        verify(mListener, never()).onBackgroundChanged(any());
+    }
+
+    @Test
+    public void testAddAndRemoveMvtVisibilityListener() {
+        // Verifies the listener added is notified when the visibility if changed.
+        mNtpCustomizationConfigManager.addListener(mListener);
+        mNtpCustomizationConfigManager.setPrefIsMvtVisible(/* isMvtVisible= */ true);
+        verify(mListener).onMvtVisibilityChanged(eq(true));
+
+        // Removes listener and verifies it's not called.
+        clearInvocations(mListener);
+        mNtpCustomizationConfigManager.removeListener(mListener);
+        mNtpCustomizationConfigManager.setPrefIsMvtVisible(/* isMvtVisible= */ true);
+        mNtpCustomizationConfigManager.setPrefIsMvtVisible(/* isMvtVisible= */ false);
+        verify(mListener, never()).onMvtVisibilityChanged(anyBoolean());
+    }
+
+    @Test
+    public void testSetAndGetPrefMvtVisibility() {
+        // Verifies setPrefIsMvtVisible() sets the ChromeSharedPreferences properly and
+        // getPrefIsMvtVisible()
+        // gets the right value.
+        mNtpCustomizationConfigManager.addListener(mListener);
+        mNtpCustomizationConfigManager.setPrefIsMvtVisible(/* isMvtVisible= */ false);
+        assertFalse(
+                ChromeSharedPreferences.getInstance()
+                        .readBoolean(
+                                ChromePreferenceKeys.IS_MVT_VISIBLE, /* defaultValue= */ true));
+        assertFalse(mNtpCustomizationConfigManager.getPrefIsMvtVisible());
+        verify(mListener).onMvtVisibilityChanged(/* isMvtVisible= */ false);
+
+        mNtpCustomizationConfigManager.setPrefIsMvtVisible(/* isMvtVisible= */ true);
+        assertTrue(
+                ChromeSharedPreferences.getInstance()
+                        .readBoolean(
+                                ChromePreferenceKeys.IS_MVT_VISIBLE, /* defaultValue= */ true));
+        assertTrue(mNtpCustomizationConfigManager.getPrefIsMvtVisible());
+        verify(mListener).onMvtVisibilityChanged(/* isMvtVisible= */ true);
+    }
+
+    @Test
+    public void testDefaultPrefMvtVisibility() {
+        // Verifies the default value is true.
+        assertTrue(mNtpCustomizationConfigManager.getPrefIsMvtVisible());
     }
 
     private Bitmap createBitmap() {

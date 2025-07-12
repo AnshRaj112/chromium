@@ -292,11 +292,16 @@ InlineBoxState* InlineLayoutStateStack::OnBeginPlaceItems(
     box->fragment_start = 0;
   } else {
     // For the following lines, clear states that are not shared across lines.
-    for (InlineBoxState& box : stack_) {
+    for (wtf_size_t i = 0; i < stack_.size(); ++i) {
+      InlineBoxState& box = stack_[i];
       box.fragment_start = line_box->size();
       if (box.needs_box_fragment) {
         DCHECK_NE(&box, stack_.data());
-        AddBoxFragmentPlaceholder(&box, line_box, baseline_type);
+        float text_scale =
+            should_scale_line_height
+                ? FindTextScale(line_items, 0, stack_.size() - i - 1)
+                : 1.0f;
+        AddBoxFragmentPlaceholder(&box, text_scale, line_box, baseline_type);
       }
       if (!line_height_quirk)
         box.metrics = box.text_metrics;
@@ -342,12 +347,13 @@ InlineBoxState* InlineLayoutStateStack::OnOpenTag(
     const InlineItem& item,
     const InlineItemResult& item_result,
     FontBaseline baseline_type,
+    float text_scale,
     LogicalLineItems* line_box) {
   InlineBoxState* box =
       OnOpenTag(space, item, item_result, baseline_type, *line_box);
   box->needs_box_fragment = item.ShouldCreateBoxFragment();
   if (box->needs_box_fragment)
-    AddBoxFragmentPlaceholder(box, line_box, baseline_type);
+    AddBoxFragmentPlaceholder(box, text_scale, line_box, baseline_type);
   return box;
 }
 
@@ -457,6 +463,7 @@ void InlineLayoutStateStack::OnBlockInInline(const FontHeight& metrics,
 // from placeholders.
 void InlineLayoutStateStack::AddBoxFragmentPlaceholder(
     InlineBoxState* box,
+    float text_scale,
     LogicalLineItems* line_box,
     FontBaseline baseline_type) {
   DCHECK(box != stack_.data() &&
@@ -471,10 +478,16 @@ void InlineLayoutStateStack::AddBoxFragmentPlaceholder(
     // the line-height property.
     FontHeight metrics;
     if (const auto* font_data = box->font->PrimaryFont()) {
-      metrics =
-          is_svg_text_
-              ? font_data->GetFontMetrics().GetFloatFontHeight(baseline_type)
-              : font_data->GetFontMetrics().GetFontHeight(baseline_type);
+      if (text_scale != 1.0f) {
+        metrics = font_data->GetFontMetrics().GetFloatFontHeight(baseline_type);
+        metrics.ascent *= text_scale;
+        metrics.descent *= text_scale;
+      } else {
+        metrics =
+            is_svg_text_
+                ? font_data->GetFontMetrics().GetFloatFontHeight(baseline_type)
+                : font_data->GetFontMetrics().GetFontHeight(baseline_type);
+      }
     }
 
     // Extend the block direction of the box by borders and paddings. Inline
@@ -1372,33 +1385,30 @@ LogicalRubyColumn& InlineLayoutStateStack::CreateRubyColumn() {
 }
 
 #if DCHECK_IS_ON()
-void InlineLayoutStateStack::CheckSame(const InlineLayoutStateStack& other,
-                                       bool allow_metrics_mismatch) const {
+void InlineLayoutStateStack::CheckSame(
+    const InlineLayoutStateStack& other) const {
   // At the beginning of each line, box_data_list_ should be empty.
   DCHECK_EQ(box_data_list_.size(), 0u);
   DCHECK_EQ(other.box_data_list_.size(), 0u);
 
   DCHECK_EQ(stack_.size(), other.stack_.size());
   for (unsigned i = 0; i < stack_.size(); i++) {
-    stack_[i].CheckSame(other.stack_[i], allow_metrics_mismatch);
+    stack_[i].CheckSame(other.stack_[i]);
   }
 }
 
-void InlineBoxState::CheckSame(const InlineBoxState& other,
-                               bool allow_metrics_mismatch) const {
+void InlineBoxState::CheckSame(const InlineBoxState& other) const {
   DCHECK_EQ(fragment_start, other.fragment_start);
   DCHECK_EQ(item, other.item);
   DCHECK_EQ(style, other.style);
 
-  if (!allow_metrics_mismatch) {
-    DCHECK_EQ(metrics, other.metrics);
-    DCHECK_EQ(text_metrics, other.text_metrics);
-    DCHECK_EQ(text_top, other.text_top);
-    DCHECK_EQ(text_height, other.text_height);
-    if (!text_metrics.IsEmpty()) {
-      // |include_used_fonts| will be computed when computing |text_metrics|.
-      DCHECK_EQ(include_used_fonts, other.include_used_fonts);
-    }
+  DCHECK_EQ(metrics, other.metrics);
+  DCHECK_EQ(text_metrics, other.text_metrics);
+  DCHECK_EQ(text_top, other.text_top);
+  DCHECK_EQ(text_height, other.text_height);
+  if (!text_metrics.IsEmpty()) {
+    // |include_used_fonts| will be computed when computing |text_metrics|.
+    DCHECK_EQ(include_used_fonts, other.include_used_fonts);
   }
 
   DCHECK_EQ(needs_box_fragment, other.needs_box_fragment);

@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "content/public/test/browser_test_utils.h"
+
 #include "base/test/scoped_run_loop_timeout.h"
+#include "base/values.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/test/browser_test.h"
-#include "content/public/test/browser_test_utils.h"
 #include "content/public/test/content_browser_test.h"
 #include "content/public/test/content_browser_test_utils.h"
 #include "content/shell/browser/shell.h"
@@ -97,8 +99,8 @@ IN_PROC_BROWSER_TEST_F(EvalJsBrowserTest, EvalJsErrors) {
     EXPECT_FALSE(0 == result);
     EXPECT_FALSE(1 == result);
     EXPECT_FALSE("}}" == result);  // EXPECT_EQ should fail
-    EXPECT_FALSE("}}" != result);  // As should EXPECT_NE
-    EXPECT_FALSE(nullptr == result);
+    EXPECT_TRUE("}}" != result);
+    EXPECT_FALSE(base::Value() == result);
 
     std::string expected_error =
         "a JavaScript error: \"SyntaxError: Unexpected token '}'\"\n";

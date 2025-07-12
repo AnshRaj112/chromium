@@ -41,6 +41,14 @@ BASE_FEATURE_PARAM(int,
                    "ad-auction-signals-max-size-bytes",
                    10000);
 
+#if BUILDFLAG(IS_ANDROID)
+// If enabled, then use desktop page webprefs for Android devices that have
+// large displays, specifically tablets and desktops.
+BASE_FEATURE(kAndroidDesktopWebPrefsLargeDisplays,
+             "AndroidDesktopWebPrefsLargeDisplays",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif
+
 // Avoids copying ResourceRequest::TrustedParams when possible.
 BASE_FEATURE(kAvoidTrustedParamsCopies,
              "AvoidTrustedParamsCopies",
@@ -2361,7 +2369,12 @@ BASE_FEATURE(kScriptStreaming,
 // Enables script streaming for non-http scripts.
 BASE_FEATURE(kScriptStreamingForNonHTTP,
              "ScriptStreamingForNonHTTP",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_ANDROID)
+             base::FEATURE_DISABLED_BY_DEFAULT
+#else
+             base::FEATURE_ENABLED_BY_DEFAULT
+#endif
+);
 
 // Enables sending Sec-Purpose: "prefetch" header for rel="prefetch".
 BASE_FEATURE(kSecPurposePrefetchHeaderRelPrefetch,

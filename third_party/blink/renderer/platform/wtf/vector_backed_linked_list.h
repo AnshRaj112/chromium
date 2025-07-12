@@ -14,12 +14,17 @@
 #include "base/gtest_prod_util.h"
 #include "base/memory/stack_allocated.h"
 #include "third_party/blink/renderer/platform/wtf/allocator/partition_allocator.h"
+#include "third_party/blink/renderer/platform/wtf/gc_plugin.h"
 #include "third_party/blink/renderer/platform/wtf/hash_traits.h"
 #include "third_party/blink/renderer/platform/wtf/sanitizers.h"
 #include "third_party/blink/renderer/platform/wtf/vector.h"
 
-namespace WTF {
+namespace blink {
+template <typename ValueArg, typename TraitsArg, typename Allocator>
+class LinkedHashSet;
+}  // namespace blink
 
+namespace WTF {
 // VectorBackedLinkedList iterators are not invalidated by mutation of the
 // collection, unless they point to removed items. This means, for example, that
 // you can safely modify the container while iterating over it generally, as
@@ -77,12 +82,16 @@ class VectorBackedLinkedListNode {
   // VectorBackedLinkedList won't be initialized with memset.
   wtf_size_t prev_index_ = kNotFound;
   wtf_size_t next_index_ = kNotFound;
+  GC_PLUGIN_IGNORE("crbug.com/428987863")
   ValueType value_ = HashTraits<ValueType>::EmptyValue();
 };
 
+}  // namespace WTF
+namespace blink {
+
 template <typename ValueType, typename Allocator>
-struct VectorTraits<VectorBackedLinkedListNode<ValueType, Allocator>>
-    : VectorTraitsBase<VectorBackedLinkedListNode<ValueType, Allocator>> {
+struct VectorTraits<WTF::VectorBackedLinkedListNode<ValueType, Allocator>>
+    : VectorTraitsBase<WTF::VectorBackedLinkedListNode<ValueType, Allocator>> {
   STATIC_ONLY(VectorTraits);
 
   static const bool kNeedsDestruction =
@@ -100,6 +109,9 @@ struct VectorTraits<VectorBackedLinkedListNode<ValueType, Allocator>>
   static constexpr bool kCanTraceConcurrently =
       VectorTraits<ValueType>::kCanTraceConcurrently;
 };
+
+}  // namespace blink
+namespace WTF {
 
 template <typename ValueType, typename Traits, typename Allocator>
 class ConstructTraits<VectorBackedLinkedListNode<ValueType, Allocator>,
@@ -323,7 +335,7 @@ class VectorBackedLinkedList {
     }
   }
 
-  VectorType nodes_;
+  GC_PLUGIN_IGNORE("crbug.com/428987863") VectorType nodes_;
   static constexpr wtf_size_t kAnchorIndex = 0;
   // Anchor is not included in the free list, but it serves as the list's
   // terminator.
@@ -331,7 +343,7 @@ class VectorBackedLinkedList {
   wtf_size_t size_ = 0;
 
   template <typename T, typename U, typename V>
-  friend class LinkedHashSet;
+  friend class blink::LinkedHashSet;
   FRIEND_TEST_ALL_PREFIXES(VectorBackedLinkedListTest, Insert);
   FRIEND_TEST_ALL_PREFIXES(VectorBackedLinkedListTest, PushFront);
   FRIEND_TEST_ALL_PREFIXES(VectorBackedLinkedListTest, PushBack);
@@ -491,7 +503,7 @@ class VectorBackedLinkedListConstIterator {
 
  private:
   template <typename T, typename U, typename V>
-  friend class LinkedHashSet;
+  friend class blink::LinkedHashSet;
   template <typename T, typename Allocator>
   friend class VectorBackedLinkedList;
   friend class VectorBackedLinkedListIterator<VectorBackedLinkedListType>;
@@ -571,7 +583,7 @@ class VectorBackedLinkedListReverseIterator {
 
  private:
   template <typename T, typename U, typename V>
-  friend class LinkedHashSet;
+  friend class blink::LinkedHashSet;
   template <typename T, typename Allocator>
   friend class VectorBackedLinkedList;
 
@@ -636,7 +648,7 @@ class VectorBackedLinkedListConstReverseIterator
 
  private:
   template <typename T, typename U, typename V>
-  friend class LinkedHashSet;
+  friend class blink::LinkedHashSet;
   template <typename T, typename Allocator>
   friend class VectorBackedLinkedList;
   friend class VectorBackedLinkedListReverseIterator<

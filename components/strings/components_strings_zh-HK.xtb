@@ -312,6 +312,7 @@
 <translation id="1521655867290435174">Google 試算表</translation>
 <translation id="1524669537550112617">傢俱齊備的租盤</translation>
 <translation id="1527263332363067270">正在等待連線…</translation>
+<translation id="1527490370616010873">Google 並非你的自動填入服務供應商。如要啟用這些設定並使用 Google 帳戶中的付款資料，請前往「<ph name="BEGIN_LINK" />自動填入服務設定<ph name="END_LINK" />」。</translation>
 <translation id="1528311629279578926">由於公開頁面要連線至私人網絡上的裝置或伺服器，因此系統封鎖連線。請重新載入此頁面以允許連線。</translation>
 <translation id="1529789484829130889">紙匣 8</translation>
 <translation id="1530707389502320859">您剛才嘗試前往的網站可能是假網站。攻擊者有時會在網址中加入難以辨識的細微變更來仿冒網站。</translation>
@@ -1117,6 +1118,7 @@
 <translation id="2902312830803030883">更多操作</translation>
 <translation id="2903493209154104877">地址</translation>
 <translation id="290376772003165898">網頁的來源語言不是<ph name="LANGUAGE" />嗎？</translation>
+<translation id="2904180982022726666">你的機構對可分享的內容設有限制</translation>
 <translation id="2905107382358353958">新付款設定嘅警示</translation>
 <translation id="2909946352844186028">系統偵測到網絡變更。</translation>
 <translation id="2911255567212929079">機器學習和人工智能</translation>
@@ -4707,6 +4709,7 @@
 <translation id="8975263830901772334">您列印的檔案名稱</translation>
 <translation id="8982884016487650216">已完成載入 PDF</translation>
 <translation id="8983369100812962543">您現在可以調整應用程式大小</translation>
+<translation id="8984785270737450103">目前已關閉分享功能</translation>
 <translation id="8985112471026018799">儲存信用卡，加快結帳速度</translation>
 <translation id="8987245424886630962"><ph name="VIEW_CHROME_HISTORY_FOCUSED_FRIENDLY_MATCH_TEXT" />，㩒一下 Tab 鍵，然後㩒一下 Enter 鍵就可以睇您嘅 Chrome 瀏覽記錄</translation>
 <translation id="8987663052629670333">相片沖晒服務</translation>

@@ -210,7 +210,7 @@ BASE_FEATURE(kBocaOnTaskLockedQuizMigration,
 // Enables or disables Boca OnTask mute ARC audio requests on ChromeOS.
 BASE_FEATURE(kBocaOnTaskMuteArcAudio,
              "BocaOnTaskMuteArcAudio",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables or disables the Boca OnTask pod on ChromeOS.
 BASE_FEATURE(kBocaOnTaskPod, "BocaOnTaskPod", base::FEATURE_ENABLED_BY_DEFAULT);
@@ -1104,12 +1104,6 @@ BASE_FEATURE(kFlexAutoEnrollment,
 // Enables firmware updates from LVFS for ChromeOS Flex.
 BASE_FEATURE(kFlexFirmwareUpdate,
              "FlexFirmwareUpdate",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Controls whether to ignore policy setting for enabling VPN Apps
-// for ChromeOS Flex.
-BASE_FEATURE(kIgnoreDeviceFlexArcEnabledPolicy,
-             "IgnoreDeviceFlexArcEnabledPolicy",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Controls Floating SSO feature which can move cookies between ChromeOS
@@ -2036,11 +2030,6 @@ BASE_FEATURE(kNotificationScrollBar,
 // Enables notifications to be shown within context menus.
 BASE_FEATURE(kNotificationsInContextMenu,
              "NotificationsInContextMenu",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables showing OfflineItems in Notifications.
-BASE_FEATURE(kOfflineItemsInNotifications,
-             "OfflineItemsInNotifications",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Controls whether to enable on-device grammar check service.
@@ -3736,10 +3725,6 @@ bool IsFlexFirmwareUpdateEnabled() {
          base::FeatureList::IsEnabled(kFlexFirmwareUpdate);
 }
 
-bool ShouldIgnoreDeviceFlexArcEnabledPolicy() {
-  return base::FeatureList::IsEnabled(kIgnoreDeviceFlexArcEnabledPolicy);
-}
-
 bool IsFloatingSsoAllowed() {
   return base::FeatureList::IsEnabled(kFloatingSso);
 }
@@ -4153,10 +4138,6 @@ bool IsNotificationsInContextMenuEnabled() {
 
 bool IsNssDbClientCertsRollbackEnabled() {
   return base::FeatureList::IsEnabled(kEnableNssDbClientCertsRollback);
-}
-
-bool IsOfflineItemsInNotificationsEnabled() {
-  return base::FeatureList::IsEnabled(kOfflineItemsInNotifications);
 }
 
 bool AreOngoingProcessesEnabled() {

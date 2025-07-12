@@ -16,6 +16,11 @@ const char kAddAddressManuallyName[] =
 const char kAddAddressManuallyDescription[] =
     "When enabled, allows users to manually enter and save an address.";
 
+const char kAIMPrototypeName[] = "Enable the AIM prototype";
+const char kAIMPrototypeDescription[] =
+    "When enabled the AIM ZPS entrypoint will open the AIM prototype which "
+    "contains temporary UI exploration for AIM.";
+
 const char kAppBackgroundRefreshName[] = "Enable app background refresh";
 const char kAppBackgroundRefreshDescription[] =
     "Schedules app background refresh after some minimum period of time has "
@@ -224,13 +229,6 @@ const char kAutofillUseRendererIDsName[] =
 const char kAutofillUseRendererIDsDescription[] =
     "When enabled, Autofill logic uses unique numeric renderer IDs instead "
     "of string form and field identifiers in form filling logic.";
-
-const char kAutofillVcnEnrollRequestTimeoutName[] =
-    "Timeout for the credit card VCN enrollment request";
-const char kAutofillVcnEnrollRequestTimeoutDescription[] =
-    "When enabled, sets a client-side timeout on the Autofill credit card "
-    "VCN enrollment request. Upon timeout, the client will terminate the VCN "
-    "enrollment UI, but the request may still succeed server-side.";
 
 const char kAutofillVcnEnrollStrikeExpiryTimeName[] =
     "Expiry duration for VCN enrollment strikes";
@@ -1107,6 +1105,11 @@ const char kOmniboxMobileParityUpdateV2Name[] =
 const char kOmniboxMobileParityUpdateV2Description[] =
     "When set, applies certain assets to match Desktop visuals and "
     "descriptions";
+
+const char kOmniboxMobileParityUpdateV3Name[] =
+    "Omnibox Mobile parity update V3";
+const char kOmniboxMobileParityUpdateV3Description[] =
+    "When set, shows the search engine logo in the NTP";
 
 const char kOmniboxMlUrlScoreCachingName[] = "Omnibox ML URL Score Caching";
 const char kOmniboxMlUrlScoreCachingDescription[] =

@@ -203,6 +203,13 @@ const char kAndroidNativePagesInNewTabDescription[] =
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_ANDROID)
+const char kAndroidOpenIncognitoAsWindowName[] =
+    "Open incognito tabs in new window";
+const char kAndroidOpenIncognitoAsWindowDescription[] =
+    "Open regular and incognito tabs in separate windows.";
+#endif  // BUILDFLAG(IS_ANDROID)
+
+#if BUILDFLAG(IS_ANDROID)
 const char kAndroidProgressBarVisualUpdateName[] =
     "Enable updated progress bar";
 const char kAndroidProgressBarVisualUpdateDescription[] =
@@ -225,11 +232,6 @@ const char kAndroidWebAppLaunchHandlerDescription[] =
 #endif  // BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_CHROMEOS)
-const char kIgnoreDeviceFlexArcEnabledPolicyName[] =
-    "Ignore VPN Apps Enabling on ChromeOS Flex";
-const char kIgnoreDeviceFlexArcEnabledPolicyDescription[] =
-    "Allows users to disable VPN app enabling on ChromeOS Flex devices.";
-
 const char kAnnotatorModeName[] = "Enable annotator tool";
 const char kAnnotatorModeDescription[] =
     "Enables the tool for annotating across the OS.";
@@ -376,6 +378,13 @@ const char kCustomizeChromeWallpaperSearchInspirationCardName[] =
 const char kCustomizeChromeWallpaperSearchInspirationCardDescription[] =
     "Shows inspiration card in Customize Chrome Side Panel Wallpaper Search. "
     "Requires #customize-chrome-wallpaper-search to be enabled too.";
+
+const char kCustomizeTabGroupColorPaletteName[] =
+    "Customize tab group color palette";
+const char kCustomizeTabGroupColorPaletteDescription[] =
+    "Enables parsing of the `tab_group_color_palette` key in the "
+    "manifest.json file, which allows customization of the tab group color "
+    "palette. Disabling this flag will cause the key to be ignored.";
 
 const char kDataSharingName[] = "Data Sharing";
 const char kDataSharingDescription[] =
@@ -955,13 +964,6 @@ const char kAutofillUploadCardRequestTimeoutDescription[] =
     "upload request. Upon timeout, the client will terminate the upload UI, "
     "but the request may still succeed server-side.";
 
-const char kAutofillVcnEnrollRequestTimeoutName[] =
-    "Timeout for the credit card VCN enrollment request";
-const char kAutofillVcnEnrollRequestTimeoutDescription[] =
-    "When enabled, sets a client-side timeout on the Autofill credit card "
-    "VCN enrollment request. Upon timeout, the client will terminate the VCN "
-    "enrollment UI, but the request may still succeed server-side.";
-
 const char kAutofillVcnEnrollStrikeExpiryTimeName[] =
     "Expiry duration for VCN enrollment strikes";
 const char kAutofillVcnEnrollStrikeExpiryTimeDescription[] =
@@ -1441,12 +1443,6 @@ const char kManagedProfileRequiredInterstitialDescription[] =
     "required.";
 
 #if BUILDFLAG(IS_ANDROID)
-const char kEnterpriseUrlFilteringEventReportingOnAndroidName[] =
-    "Allow enterprise url filtering event reporting";
-const char kEnterpriseUrlFilteringEventReportingOnAndroidDescription[] =
-    "Enables enterprise url filtering event reporting when the "
-    "OnSecurityEventEnterpriseConnector policy is turned on ";
-
 const char kEnterpriseSecurityEventReportingOnAndroidName[] =
     "Allow enterprise security event reporting";
 const char kEnterpriseSecurityEventReportingOnAndroidDescription[] =
@@ -1976,11 +1972,11 @@ const char kEnableResamplingScrollEventsExperimentalPredictionDescription[] =
     "Predicts the scroll amount after the vsync time to more closely match "
     "when the frame is visible.";
 
-const char kEnableWebAppUpdateTokenParsingName[] =
-    "Enable update token parsing";
-const char kEnableWebAppUpdateTokenParsingDescription[] =
-    "Enables app updates to be detected through a change in the update token "
-    "field in the manifest";
+const char kEnableWebAppPredictableAppUpdatingName[] =
+    "Enable predictable app updating for PWAs";
+const char kEnableWebAppPredictableAppUpdatingDescription[] =
+    "Enables PWA updates to be more predictable by considering changes in icon "
+    "urls specified in the manifest";
 
 const char kEnableZeroCopyTabCaptureName[] = "Zero-copy tab capture";
 const char kEnableZeroCopyTabCaptureDescription[] =
@@ -3860,6 +3856,10 @@ const char kSplitTabStripDescription[] =
     "Splits pinned and unpinned tabs into separate TabStrips under the hood. "
     "Pure refactoring, no user-visible behavioral changes are included.";
 
+const char kTabStorageSqlitePrototypeName[] = "Tab Storage SQLite Prototype";
+const char kTabStorageSqlitePrototypeDescription[] =
+    "Enables a prototype for using SQLite for tab storage.";
+
 const char kDynamicSearchUpdateAnimationName[] =
     "Dynamic Search Result Update Animation";
 const char kDynamicSearchUpdateAnimationDescription[] =
@@ -4418,10 +4418,12 @@ const char kWallpaperSearchSettingsVisibilityName[] =
 const char kWallpaperSearchSettingsVisibilityDescription[] =
     "Shows wallpaper search settings in settings UI.";
 
+#if !BUILDFLAG(IS_ANDROID)
 const char kWebAppInstallationApiName[] = "Web App Installation API";
 const char kWebAppInstallationApiDescription[] =
     "Enables the Web App Installation API which allows web apps to be "
     "installed programmatically using navigator.install().";
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 #if !BUILDFLAG(IS_ANDROID)
 const char kWebAuthnUsePasskeyFromAnotherDeviceInContextMenuName[] =
@@ -5057,12 +5059,6 @@ const char kEdgeToEdgeTabletName[] = "EdgeToEdgeTablet";
 const char kEdgeToEdgeTabletDescription[] =
     "Enables the Android feature Edge-to-Edge on tablets";
 
-const char kEdgeToEdgeWebOptInName[] = "EdgeToEdgeWebOptIn";
-const char kEdgeToEdgeWebOptInDescription[] =
-    "Enables Chrome to draw below the Nav Bar on websites that have explicitly "
-    "opted into Edge-to-Edge. Requires DrawCutoutEdgeToEdge to also be "
-    "enabled. No effect when EdgeToEdgeBottomChin is disabled";
-
 const char kTabClosureMethodRefactorName[] = "Tab closure method refactor";
 const char kTabClosureMethodRefactorDescription[] =
     "Enables the refactored changes for tab closure methods where existing "
@@ -5071,6 +5067,10 @@ const char kTabClosureMethodRefactorDescription[] =
 const char kGridTabSwitcherUpdateName[] = "Grid tab switcher update";
 const char kGridTabSwitcherUpdateDescription[] =
     "Enables the visual changes in the grid tab switcher.";
+
+const char kHubSlideAnimationName[] = "Hub Slide Animation";
+const char kHubSlideAnimationDescription[] =
+    "Enables the slide animation on the hub when panes are switched.";
 
 const char kAndroidPinnedTabsName[] = "Android pinned tabs";
 const char kAndroidPinnedTabsDescription[] =
@@ -5484,10 +5484,6 @@ const char kTabGroupSyncDisableNetworkLayerName[] =
     "Tab Group Sync Disable Network Layer";
 const char kTabGroupSyncDisableNetworkLayerDescription[] =
     "Disables network layer of tab group sync.";
-
-const char kTabStripContextMenuAndroidName[] = "Tab Strip Context Menu Android";
-const char kTabStripContextMenuAndroidDescription[] =
-    "Enables context menus upon long-pressing on a tab on the tab strip.";
 
 const char kTabStripDensityChangeAndroidName[] = "Tab Strip Density Change";
 const char kTabStripDensityChangeAndroidDescription[] =
@@ -5959,6 +5955,10 @@ const char kNtpSafeBrowsingModuleDescription[] =
 const char kNtpSharepointModuleName[] = "NTP Sharepoint Module";
 const char kNtpSharepointModuleDescription[] =
     "Shows the Sharepoint module on the New Tab Page.";
+
+const char kNtpTabGroupsModuleName[] = "NTP Tab Groups Module";
+const char kNtpTabGroupsModuleDescription[] =
+    "Shows the Tab Groups module on the New Tab Page.";
 
 const char kNtpWallpaperSearchButtonName[] = "NTP Wallpaper Search Button";
 const char kNtpWallpaperSearchButtonDescription[] =
@@ -7611,12 +7611,6 @@ const char kNotificationsIgnoreRequireInteractionDescription[] =
     "Always timeout notifications, even if they are set with "
     "requireInteraction.";
 
-const char kOfflineItemsInNotificationsName[] =
-    "Background fetched items in Notifications";
-const char kOfflineItemsInNotificationsDescription[] =
-    "Show background fetched items in notifications instead of the download "
-    "shelf.";
-
 const char kOnDeviceAppControlsName[] = "On-device controls for apps";
 const char kOnDeviceAppControlsDescription[] =
     "Enables the on-device controls UI for blocking apps.";
@@ -8319,12 +8313,6 @@ const char kHideTabletToolbarDownloadButtonDescription[] =
 const char kShowNewTabAnimationsName[] = "Show New Tab Animations";
 const char kShowNewTabAnimationsDescription[] =
     "Shows new animations for creating tabs.";
-
-const char kTabSwitcherColorBlendAnimateName[] =
-    "Tab Switcher Color Blend Animation";
-const char kTabSwitcherColorBlendAnimateDescription[] =
-    "Animates the color transition between incognito and regular tab switcher "
-    "panes in the Hub.";
 
 #else
 const char kTaskManagerDesktopRefreshName[] = "Task Manager Desktop Refresh";

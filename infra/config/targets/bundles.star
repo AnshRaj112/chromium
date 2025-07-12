@@ -393,7 +393,6 @@ targets.bundle(
 targets.bundle(
     name = "android_cronet_clang_coverage_gtests",
     targets = [
-        "cronet_clang_coverage_additional_gtests",
         "cronet_gtests",
     ],
 )
@@ -6836,6 +6835,7 @@ targets.bundle(
     name = "tvos_tests",
     targets = [
         "base_unittests",
+        "components_unittests",
         "content_unittests",
     ],
     per_test_modifications = {
@@ -6843,6 +6843,12 @@ targets.bundle(
             args = [
                 "--test-launcher-bot-mode",
                 "--test-launcher-filter-file=testing/buildbot/filters/ios.base_unittests.filter",
+            ],
+        ),
+        "components_unittests": targets.mixin(
+            args = [
+                "--test-launcher-bot-mode",
+                "--test-launcher-filter-file=testing/buildbot/filters/ios.use_blink.components_unittests.filter",
             ],
         ),
         "content_unittests": targets.mixin(

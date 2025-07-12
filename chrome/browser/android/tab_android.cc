@@ -124,8 +124,16 @@ TabInterface* TabInterface::GetFromContents(
   return tab_android;
 }
 
+const TabInterface* TabInterface::GetFromContents(
+    const content::WebContents* web_contents) {
+  const auto* tab_android = TabAndroid::FromWebContents(web_contents);
+  CHECK(tab_android);
+  return tab_android;
+}
+
 // static
-TabInterface* MaybeGetFromContents(content::WebContents* web_contents) {
+TabInterface* TabInterface::MaybeGetFromContents(
+    content::WebContents* web_contents) {
   return TabAndroid::FromWebContents(web_contents);
 }
 
@@ -636,6 +644,12 @@ base::CallbackListSubscription TabAndroid::RegisterWillDeactivate(
 
 bool TabAndroid::IsVisible() const {
   return !IsHidden();
+}
+
+bool TabAndroid::IsSelected() const {
+  // TODO(https://crbug.com/404074503): Android does not yet support multi-tab
+  // selection, so for now, the only selected tab is the activated tab.
+  return IsActivated();
 }
 
 // TODO(crbug.com/409366905): Finish TabInterface implementation.

@@ -186,7 +186,9 @@ function createRoutes(): SettingsRoutes {
     r.SIGN_OUT.isNavigableDialog = true;
     r.IMPORT_DATA = r.PEOPLE.createChild('/importData');
     r.IMPORT_DATA.isNavigableDialog = true;
-    r.ACCOUNT = r.PEOPLE.createChild('/account');
+    if (loadTimeData.getBoolean('replaceSyncPromosWithSignInPromos')) {
+      r.ACCOUNT = r.PEOPLE.createChild('/account');
+    }
     // </if>
 
     r.SYNC = r.PEOPLE.createChild('/syncSetup');
@@ -231,7 +233,9 @@ function createRoutes(): SettingsRoutes {
     r.APPEARANCE = r.BASIC.createSection(
         '/appearance', 'appearance',
         loadTimeData.getString('appearancePageTitle'));
+    r.APPEARANCE.hasMigratedToPlugin = true;
     r.FONTS = r.APPEARANCE.createChild('/fonts');
+    r.FONTS.hasMigratedToPlugin = true;
   }
 
   if (visibility.autofill !== false) {
@@ -330,6 +334,7 @@ function createRoutes(): SettingsRoutes {
     r.PERFORMANCE = r.BASIC.createSection(
         '/performance', 'performance',
         loadTimeData.getString('performancePageTitle'));
+    r.PERFORMANCE.hasMigratedToPlugin = true;
   }
 
   return r as unknown as SettingsRoutes;

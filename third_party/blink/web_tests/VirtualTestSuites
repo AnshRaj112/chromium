@@ -316,7 +316,7 @@
     "args": [
       "--enable-features=CookieDeprecationFacilitatedTesting:label/label_test"
     ],
-    "expires": "Jul 6, 2025",
+    "expires": "Dec 6, 2025",
     "owners": [
       "linnan@chromium.org",
       "johnidel@chromium.org"
@@ -454,6 +454,7 @@
       "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-002.html",
       "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-003.html",
       "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-004.html",
+      "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-005.html",
       "external/wpt/css/css-text/white-space/text-wrap-pretty-line-clamp-crash-001.html",
       "fast/deprecated-flexbox/dynamically-change-line-clamp.html",
       "fast/deprecated-flexbox/line-clamp-crash.html",
@@ -739,6 +740,7 @@
       "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-002.html",
       "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-003.html",
       "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-004.html",
+      "external/wpt/css/css-text/white-space/text-wrap-balance-line-clamp-005.html",
       "external/wpt/css/css-text/white-space/text-wrap-pretty-line-clamp-crash-001.html",
       "fast/overflow"
     ],
@@ -1671,24 +1673,6 @@
     "expires": "never"
   },
   {
-    "prefix": "interest-for-no-partial-interest",
-    "owners": [
-      "masonf@chromium.org"
-    ],
-    "platforms": [
-      "Linux",
-      "Mac",
-      "Win"
-    ],
-    "bases": [
-      "external/wpt/html/semantics/the-button-element/interest-for"
-    ],
-    "args": [
-      "--enable-blink-features=HTMLInterestForNoPartialInterest,HTMLInterestForAttribute"
-    ],
-    "expires": "Dec 1, 2025"
-  },
-  {
     "prefix": "isolated-context",
     "platforms": [
       "Linux",
@@ -1745,9 +1729,11 @@
       "Win"
     ],
     "bases": [
+      "external/wpt/wasm/webapi/esm-integration/reuse-wasm-loaded-as-classic-script.tentative.html",
       "external/wpt/wasm/webapi/esm-integration/script-src-allows-source-phase-wasm.tentative.html",
       "external/wpt/wasm/webapi/esm-integration/source-phase.tentative.html",
       "external/wpt/wasm/webapi/esm-integration/source-phase-blocked-by-csp.tentative.html",
+      "external/wpt/wasm/webapi/esm-integration/source-phase-import-non-UTF8.tentative.html",
       "external/wpt/wasm/webapi/esm-integration/source-phase-preload.tentative.html",
       "external/wpt/wasm/webapi/esm-integration/wasm-import-wasm-export.tentative.html",
       "external/wpt/wasm/webapi/esm-integration/worker-import-source-phase.tentative.html",
@@ -2918,7 +2904,9 @@
     "bases": [
       "fast/events/synthetic-events",
       "fast/events/wheel/wheelevent-in-scrolling-div.html",
-      "fast/hidpi/static"
+      "fast/hidpi/static",
+      "external/wpt/css/css-ui/caret-shape-block-zoom.html",
+      "external/wpt/css/css-ui/caret-shape-block-color-001.html"
     ],
     "exclusive_tests": [
       "fast/hidpi/static"
@@ -2953,7 +2941,9 @@
       "fast/hidpi/static",
       "http/tests/csspaint/hidpi",
       "http/tests/inspector-protocol/page/page-captureScreenshot-clip-emulation.js",
-      "inspector-protocol/emulation/device-emulation-no-size.js"
+      "inspector-protocol/emulation/device-emulation-no-size.js",
+      "external/wpt/css/css-ui/caret-shape-block-zoom.html",
+      "external/wpt/css/css-ui/caret-shape-block-color-001.html"
     ],
     "exclusive_tests": [
       "fast/hidpi/static"
@@ -4158,25 +4148,6 @@
     "expires": "Jul 1, 2025"
   },
   {
-    "prefix": "single-import-map",
-    "platforms": [
-      "Linux",
-      "Mac",
-      "Win"
-    ],
-    "bases": [
-      "external/wpt/import-maps",
-      "wpt_internal/import-maps"
-    ],
-    "args": [
-      "--disable-blink-features=MultipleImportMaps"
-    ],
-    "owners": [
-      "yoavweiss@chromium.org"
-    ],
-    "expires": "Jul 1, 2025"
-  },
-  {
     "prefix": "single-renderer-process",
     "owners": [
       "nrosenthal@chromium.org",
@@ -4213,9 +4184,10 @@
       "--enable-blink-features=NonStandardAppearanceValueSliderVertical"
     ],
     "owners": [
-      "dizhangg@chromium.org"
+      "dizhangg@chromium.org",
+      "jarhar@chromium.org"
     ],
-    "expires": "Jul 1, 2025"
+    "expires": "Jul 1, 2026"
   },
   {
     "prefix": "soft-navigation-heuristics-pre-paint-attribution",
@@ -4526,7 +4498,7 @@
       "--text-contrast=0.97",
       "--text-gamma=1.97"
     ],
-    "expires": "July 1, 2025"
+    "expires": "never"
   },
   {
     "prefix": "text-size-adjust",

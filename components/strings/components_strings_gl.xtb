@@ -312,6 +312,7 @@ En caso contrario, a configuración de privacidade impedirao. Se o permites, o c
 <translation id="1521655867290435174">Follas de cálculo de Google</translation>
 <translation id="1524669537550112617">Alugueiro de mobiliario</translation>
 <translation id="1527263332363067270">Agardando pola conexión…</translation>
+<translation id="1527490370616010873">Google non é o teu provedor de autocompletado. Para activar estas opcións e usar a información de pago da túa Conta de Google, visita a <ph name="BEGIN_LINK" />configuración dos servizos de autocompletar<ph name="END_LINK" />.</translation>
 <translation id="1528311629279578926">Bloqueouse a conexión porque a iniciou unha páxina pública para conectarse a dispositivos ou servidores da túa rede privada. Volve cargar esta páxina para permitir a conexión.</translation>
 <translation id="1529789484829130889">Bandexa 8</translation>
 <translation id="1530707389502320859">O sitio que acabas de tentar visitar parece falso. Ás veces, os atacantes crean copias de sitios introducindo nos URL cambios pequenos e difíciles de ver.</translation>
@@ -1117,6 +1118,7 @@ En caso contrario, a configuración de privacidade impedirao. Se o permites, o c
 <translation id="2902312830803030883">Máis accións</translation>
 <translation id="2903493209154104877">Enderezos</translation>
 <translation id="290376772003165898">A páxina non está en <ph name="LANGUAGE" />?</translation>
+<translation id="2904180982022726666">A túa organización limita o que podes compartir</translation>
 <translation id="2905107382358353958">Alerta sobre unha nova configuración de pago</translation>
 <translation id="2909946352844186028">Detectouse un cambio de rede.</translation>
 <translation id="2911255567212929079">Aprendizaxe automática e intelixencia artificial</translation>
@@ -3854,7 +3856,7 @@ Detalles adicionais:
 <translation id="7485085230273446323">Empresas e industrias</translation>
 <translation id="7485870689360869515">Non se atoparon datos.</translation>
 <translation id="7486880426035242089">OneDrive</translation>
-<translation id="7489255442002627311"><ph name="BNPL_ISSUER_NAME" /> comprobará se cumpres os requisitos (este proceso non lle afectará á túa cualificación crediticia). Se os cumpres, <ph name="BNPL_ISSUER_NAME" /> ofrecerache varios plans de pago entre os que poderás escoller para completar a compra.</translation>
+<translation id="7489255442002627311"><ph name="BNPL_ISSUER_NAME" /> comprobará se cumpres os requisitos (este proceso non lle afectará á túa cualificación crediticia). Se os cumpres, <ph name="BNPL_ISSUER_NAME" /> ofrecerache varios plans de pagos entre os que poderás escoller para completar a compra.</translation>
 <translation id="7489392576326061356">Champús e acondicionadores</translation>
 <translation id="7495528107193238112">Este contido está bloqueado. Ponte en contacto co propietario do sitio para corrixir o problema.</translation>
 <translation id="749865518782565832">Fontanaría</translation>
@@ -4707,6 +4709,7 @@ Detalles adicionais:
 <translation id="8975263830901772334">Nomes dos ficheiros que imprimes</translation>
 <translation id="8982884016487650216">Carga do PDF completada</translation>
 <translation id="8983369100812962543">Xa podes cambiar o tamaño da aplicación</translation>
+<translation id="8984785270737450103">A opción de compartir está desactivada neste momento</translation>
 <translation id="8985112471026018799">Garda a tarxeta para tramitar a compra máis rapidamente</translation>
 <translation id="8987245424886630962"><ph name="VIEW_CHROME_HISTORY_FOCUSED_FRIENDLY_MATCH_TEXT" />. Para consultar o teu historial de navegación en Chrome, preme Tabulador e, a continuación, Introducir</translation>
 <translation id="8987663052629670333">Servizos de impresión de fotos</translation>

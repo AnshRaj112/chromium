@@ -107,11 +107,6 @@ static_library("ui") {
     "uninstall_browser_prompt.h",
     "view_ids.h",
     "webauthn/authenticator_request_dialog_view_controller.h",
-    "webid/account_selection_view.h",
-    "webid/identity_dialog_controller.cc",
-    "webid/identity_dialog_controller.h",
-    "webid/identity_ui_utils.cc",
-    "webid/identity_ui_utils.h",
     "webui/browsing_topics/browsing_topics_internals_page_handler.cc",
     "webui/browsing_topics/browsing_topics_internals_page_handler.h",
     "webui/browsing_topics/browsing_topics_internals_ui.cc",
@@ -342,6 +337,7 @@ static_library("ui") {
     "//chrome/browser/search_engine_choice",
     "//chrome/browser/search_engine_choice:impl",
     "//chrome/browser/search_engines",
+    "//chrome/browser/segmentation_platform",
     "//chrome/browser/share",
     "//chrome/browser/signin",
     "//chrome/browser/signin:identity_manager_provider",
@@ -388,6 +384,7 @@ static_library("ui") {
     "//chrome/browser/ui/toolbar:impl",
     "//chrome/browser/ui/toolbar/chrome_labs",
     "//chrome/browser/ui/translate",
+    "//chrome/browser/ui/webid",
     "//chrome/browser/ui/webui",
     "//chrome/browser/ui/webui/about",
     "//chrome/browser/ui/webui/about:impl",
@@ -1623,6 +1620,7 @@ static_library("ui") {
       "//chrome/browser/ui/webui/new_tab_footer",
       "//chrome/browser/ui/webui/new_tab_footer:impl",
       "//chrome/browser/ui/webui/new_tab_page/composebox",
+      "//chrome/browser/ui/webui/new_tab_page/ntp_promo",
       "//chrome/browser/ui/webui/privacy_sandbox",
       "//chrome/browser/ui/webui/searchbox",
       "//chrome/browser/ui/webui/settings",
@@ -1866,10 +1864,15 @@ static_library("ui") {
 
     if (enable_dice_support) {
       deps += [
+        "//chrome/browser/profiles/batch_upload",
+        "//chrome/browser/profiles/batch_upload:impl",
         "//chrome/browser/ui/webui/signin/signout_confirmation",
         "//chrome/browser/ui/webui/signin/signout_confirmation:signout_confirmation_impl",
       ]
-      allow_circular_includes_from += [ "//chrome/browser/ui/webui/signin/signout_confirmation:signout_confirmation_impl" ]
+      allow_circular_includes_from += [
+        "//chrome/browser/ui/webui/signin/signout_confirmation:signout_confirmation_impl",
+        "//chrome/browser/profiles/batch_upload:impl",
+      ]
     }
 
     if (enable_extensions) {
@@ -2145,6 +2148,7 @@ static_library("ui") {
       "//chrome/browser/ash/borealis",
       "//chrome/browser/ash/browser_delegate:impl",
       "//chrome/browser/ash/bruschetta",
+      "//chrome/browser/ash/cert_provisioning",
       "//chrome/browser/ash/child_accounts",
       "//chrome/browser/ash/child_accounts/on_device_controls",
       "//chrome/browser/ash/child_accounts/parent_access_code",
@@ -3916,6 +3920,8 @@ static_library("ui") {
       "views/frame/contents_container_view.h",
       "views/frame/contents_layout_manager.cc",
       "views/frame/contents_layout_manager.h",
+      "views/frame/contents_separator.cc",
+      "views/frame/contents_separator.h",
       "views/frame/contents_web_view.cc",
       "views/frame/contents_web_view.h",
       "views/frame/immersive_mode_controller.cc",
@@ -4131,6 +4137,8 @@ static_library("ui") {
       "views/overlay/hang_up_button.h",
       "views/overlay/minimize_button.cc",
       "views/overlay/minimize_button.h",
+      "views/overlay/overlay_controls_fade_animation.cc",
+      "views/overlay/overlay_controls_fade_animation.h",
       "views/overlay/overlay_window_image_button.cc",
       "views/overlay/overlay_window_image_button.h",
       "views/overlay/overlay_window_live_caption_dialog.cc",
@@ -4613,6 +4621,8 @@ static_library("ui") {
       "views/user_education/browser_help_bubble.h",
       "views/user_education/browser_help_bubble_event_relay.cc",
       "views/user_education/browser_help_bubble_event_relay.h",
+      "views/user_education/browser_ntp_promos.cc",
+      "views/user_education/browser_ntp_promos.h",
       "views/user_education/browser_user_education_service.cc",
       "views/user_education/browser_user_education_service.h",
       "views/user_education/custom_webui_help_bubble.cc",
@@ -4801,10 +4811,6 @@ static_library("ui") {
       "webauthn/webauthn_ui_helpers.cc",
       "webauthn/webauthn_ui_helpers.h",
       "window_name_prompt/window_name_prompt.cc",
-
-      # This test header is included because it contains forward declarations
-      # needed for "friend" statements for use in tests.
-      "translate/translate_bubble_test_utils.h",
     ]
 
     sources += get_target_outputs(":webui_name_variants")
@@ -4908,6 +4914,10 @@ static_library("ui") {
       "//ui/lottie",
       "//ui/views:buildflags",
     ]
+
+    # This dependency is needed because translate_bubble_view.h declares free-functions in
+    # translate_bubble_test_utils.h as `friend`.
+    deps += [ "//chrome/browser/ui/translate:test_support" ]
 
     # TODO(crbug.com/413572035): Move into build files of the actual modules depending
     # on this once they are fully modularized. eg: views/autofill, views/user_education.

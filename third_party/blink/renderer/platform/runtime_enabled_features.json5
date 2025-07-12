@@ -532,6 +532,7 @@
       // When enabled, perform async IPCs from CookieJar::SetCookie to the
       // network service.
       name: "AsyncSetCookie",
+      status: "stable",
     },
     {
       name: "AttributeDirectionality",
@@ -1035,6 +1036,16 @@
       status: "stable"
     },
     {
+      // See https://crbug.com/426067493 for details.
+      name: "ConsiderUpstreamPositionForFindingNextLine",
+      status: "stable",
+    },
+    {
+      // See https://crbug.com/40679713 for details.
+      name: "ConsiderUpstreamPositionForFindingPreviousLine",
+      status: "stable",
+    },
+    {
       name: "ContactsManager",
       status:  {"Android": "stable", "default": "test"},
     },
@@ -1174,7 +1185,7 @@
     {
       // Need a feature entry
       name: "CSSCaretShape",
-      status: "test",
+      status: "experimental",
     },
     {
       // Support case-sensitive attribute selector modifier
@@ -1246,7 +1257,7 @@
       // Include custom properties in CSSComputedStyleDeclaration::item/length.
       // https://crbug.com/949807
       name: "CSSEnumeratedCustomProperties",
-      status: "stable",
+      status: "test",
     },
     {
       name: "CSSExponentialFunctions",
@@ -1404,16 +1415,14 @@
       status: "stable",
     },
     {
+      name: "CSSPseudoElementInterface",
+      status: "experimental",
+    },
+    {
       // Enables the :has-slotted pseudo-selector.
       // https://chromestatus.com/feature/5134941143433216
       name: "CSSPseudoHasSlotted",
       status: "experimental",
-    },
-    {
-      // Enables the :open pseudo-selector.
-      // https://chromestatus.com/feature/5085419215781888
-      name: "CSSPseudoOpen",
-      status: "stable",
     },
     {
       // When an audio, video, or similar resource is "playing"
@@ -1490,6 +1499,11 @@
       // https://drafts.csswg.org/css-scroll-snap-2#scroll-initial-target
       name: "CSSScrollInitialTarget",
       status: "stable",
+    },
+    {
+      // https://github.com/w3c/csswg-drafts/issues/12122
+      name: "CSSScrollMarkerGroupModes",
+      status: "experimental",
     },
     {
       // https://drafts.csswg.org/css-scroll-snap-2/#scrollsnapchange
@@ -1955,13 +1969,6 @@
       status: "stable",
     },
     {
-      // Escapes "<" and ">" in attribute values. This was launched
-      // in M138, and this flag can be removed in M140.
-      // See: crbug.com/1175016
-      name: "EscapeLtGtInAttributes",
-      status: "stable",
-    },
-    {
       name: "EventTimingInteractionCount",
       status: "experimental",
     },
@@ -2342,7 +2349,7 @@
     {
       // crbug.com/40398871
       name: "FontFeatureSettingsDescriptor",
-      status: "experimental",
+      status: "stable",
     },
     {
       name: "FontMatchAliasesAsLastResort",
@@ -2365,7 +2372,7 @@
     {
       // crbug.com/40398871
       name: "FontVariationSettingsDescriptor",
-      status: "experimental",
+      status: "stable",
     },
     {
       // TODO(crbug.com/1231644): This flag is being kept (even though the
@@ -2482,7 +2489,7 @@
     },
     {
       name: "HighlightsFromPoint",
-      status: "test",
+      status: "stable",
     },
     {
       name: "HrefTranslate",
@@ -2554,15 +2561,6 @@
       status: "stable",
       depends_on: ["HTMLInterestForAttribute"],
     },
-    // If this flag is enabled, the "partial interest" concept for the
-    // `interestfor` API is not used. When an interest invoker is focused,
-    // the target immediately gets full interest, regardless of whether it
-    // contains focusable content. This is primarily to test the behavior with
-    // users, to see which is the best.
-    {
-      name: "HTMLInterestForNoPartialInterest",
-      depends_on: ["HTMLInterestForAttribute"],
-    },
     {
       // Prevents the HTMLLinkElement processing model from being invoked when
       // attributes are processed but their value doesn't change. See
@@ -2630,6 +2628,10 @@
     },
     {
       name: "IncomingCallNotifications",
+      origin_trial_feature_name: "IncomingCallNotifications",
+      origin_trial_os: [ "win" ],
+      origin_trial_allows_third_party: true,
+      base_feature: "IncomingCallNotifications",
     },
     {
        // When enabled, every traversable mainframe same-doc navigation will
@@ -3131,10 +3133,6 @@
     {
       name: "MulticolColumnWrapping",
       status: "experimental",
-    },
-    {
-      name: "MultipleImportMaps",
-      status: "stable",
     },
     {
       name: "NavigateEventCanTransition",
@@ -4604,6 +4602,10 @@
       status: "stable",
     },
     {
+      name: "SvgFeConvolveMatrixZeroDivisorBehavior",
+      status: "stable",
+    },
+    {
       name: "SvgIgnoreNegativeEllipseRadii",
       status: "stable",
     },
@@ -4653,6 +4655,14 @@
     {
       name: "TableIsAutoFixedLayout",
       status: "test",
+    },
+    {
+      name: "TabSizeAncestor",
+      status: "stable",
+    },
+    {
+      name: "TabSizeWithSpacing",
+      status: "stable",
     },
     {
       name: "TabWidthNegativePosition",
@@ -4835,6 +4845,10 @@
     // this feature, a long-press touch gesture can start either a drag or a
     // context-menu in Blink, not both (more precisely, a context menu is shown
     // only if a drag cannot be started).
+    // This feature is enabled by default in Android, where
+    // TouchDragOnShortPress is not shipped due to interactions with the OS that
+    // caused issues in the behavior.
+    // Please see https://issues.chromium.org/40823294
     {
       name: "TouchDragAndContextMenu",
       implied_by: ["TouchDragOnShortPress"],
@@ -4850,10 +4864,13 @@
       public: true,
     },
     // This feature makes touch dragging to occur at the short-press gesture,
-    // which occurs right before the long-press gesture.  This feature assumes
-    // that TouchDragAndContextMenu is enabled.
+    // which occurs right before the long-press gesture.
     {
       name: "TouchDragOnShortPress",
+      depends_on: ["TouchDragAndDrop"],
+      status: {
+        "Win": "stable",
+      },
     },
     // Many websites disable mouse support when touch APIs are available.  We'd
     // like to enable this always but can't until more websites fix this bug.
@@ -5157,8 +5174,9 @@
       name: "WarnOnContentVisibilityRenderAccess",
     },
     {
+      // https://chromestatus.com/feature/5183481574850560
       name: "WebAppInstallation",
-      status: "experimental",
+      status: {"Android": "", "default": "test"},
     },
     {
       name: "WebAppLaunchQueue",
@@ -5638,6 +5656,10 @@
     },
     {
       name: "WidthAndHeightAsPresentationAttributesOnNestedSvg",
+      status: "experimental",
+    },
+    {
+      name: "WidthAndHeightStylePropertiesOnUseAndSymbol",
       status: "experimental",
     },
     // If enabled, window.default[Ss]tatus will be supported. This is disabled

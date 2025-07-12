@@ -230,6 +230,7 @@
 <translation id="3785324443014631273">‏تعذَّر على ChromeOS Flex مزامنة البيانات بسبب حدوث خطأ أثناء تسجيل الدخول.</translation>
 <translation id="3795971588916395511">‏نظام التشغيل Chrome من Google</translation>
 <translation id="3809772425479558446">‏يتطلّب Google Chrome نظام التشغيل Windows 10 أو إصدارًا أحدث.</translation>
+<translation id="3810973564298564668">إدارة</translation>
 <translation id="383928141529488001">‏يجب منح Google Chrome الإذن بالوصول إلى البلوتوث لاستكشاف 
 الأجهزة التي تتضمّن بلوتوث. <ph name="IDS_SERIAL_DEVICE_CHOOSER_AUTHORIZE_BLUETOOTH_LINK" /></translation>
 <translation id="386202838227397562">‏يُرجى إغلاق كل نوافذ Google Chrome وإعادة المحاولة.</translation>
@@ -519,6 +520,7 @@
 <translation id="7583399374488819119">أداة تثبيت <ph name="COMPANY_NAME" /></translation>
 <translation id="7606334485649076285">‏نظام التشغيل ChromeOS Flex من Google</translation>
 <translation id="7626072681686626474">‏يشترط <ph name="MANAGER" /> قراءة بنود الخدمة التالية وقبولها قبل استخدام هذا الجهاز، مع العلم بأنّ هذه البنود لا توسِّع نطاق بنود نظام التشغيل Chrome من Google ولا تعدِّلها ولا تفرض قيودًا عليها.</translation>
+<translation id="7627609214560473136">‏لحماية بياناتك، يمكنك السماح لمتصفِّح Chrome بإزالة الأذونات من المواقع الإلكترونية التي لم تتم زيارتها مؤخرًا.</translation>
 <translation id="7629695634924605473">‏يتم إعلامك من خلال Chrome في حال تم اختراق كلمات المرور في أي وقت.</translation>
 <translation id="7641148173327520642">‏ضَبَط مشرف النظام Google Chrome لفتح <ph name="ALTERNATIVE_BROWSER_NAME" /> للوصول إلى <ph name="TARGET_URL_HOSTNAME" />.</translation>
 <translation id="7649070708921625228">مساعدة</translation>
@@ -605,6 +607,7 @@
 <translation id="8649026945479135076">‏غالبًا ما تتذكّر المواقع الإلكترونية التي تزورها المحتوى الذي يهمك، وذلك من أجل تخصيص تجربتك. يمكن أيضًا أن تخزّن المواقع الإلكترونية معلومات عن اهتماماتك في متصفّح Chrome.</translation>
 <translation id="8669527147644353129">‏مساعد Google Chrome</translation>
 <translation id="8679801911857917785">‏كما أنها تتحكم في الصفحة التي تظهر عند تشغيل Chrome.</translation>
+<translation id="8712637175834984815">حسنًا</translation>
 <translation id="8712767363896337380">‏أوشك التحديث على الانتهاء. أعِد تشغيل Chrome لإتمام التحديث.</translation>
 <translation id="8718062187489036808">‏الخروج من Chrome</translation>
 <translation id="873133009373065397">‏يتعذَّر على Google Chrome تحديد المتصفح التلقائي أو تعيينه</translation>

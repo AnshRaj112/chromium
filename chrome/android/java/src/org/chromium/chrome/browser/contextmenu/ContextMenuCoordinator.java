@@ -8,6 +8,8 @@ import static org.chromium.build.NullUtil.assertNonNull;
 import static org.chromium.build.NullUtil.assumeNonNull;
 import static org.chromium.chrome.browser.contextmenu.ContextMenuItemWithIconButtonProperties.END_BUTTON_CLICK_LISTENER;
 import static org.chromium.chrome.browser.contextmenu.ContextMenuItemWithIconButtonProperties.END_BUTTON_MENU_ID;
+import static org.chromium.ui.listmenu.ContextMenuSubmenuItemProperties.SUBMENU_ITEMS;
+import static org.chromium.ui.listmenu.ContextMenuSubmenuItemProperties.TITLE;
 import static org.chromium.ui.listmenu.ListMenuItemProperties.CLICK_LISTENER;
 import static org.chromium.ui.listmenu.ListMenuItemProperties.ENABLED;
 import static org.chromium.ui.listmenu.ListMenuItemProperties.MENU_ITEM_ID;
@@ -18,6 +20,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewStub;
 import android.view.Window;
+import android.widget.ListAdapter;
 import android.widget.ListView;
 
 import androidx.annotation.NonNull;
@@ -47,6 +50,7 @@ import org.chromium.content_public.browser.Visibility;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
 import org.chromium.ui.base.WindowAndroid;
+import org.chromium.ui.listmenu.ContextMenuSubmenuHeaderItemProperties;
 import org.chromium.ui.listmenu.ListItemType;
 import org.chromium.ui.modelutil.LayoutViewBuilder;
 import org.chromium.ui.modelutil.MVCListAdapter.ListItem;
@@ -349,7 +353,7 @@ public class ContextMenuCoordinator implements ContextMenuUi {
                         // actions performed on the current page.
                         /* hasHeader= */ !params.getOpenedFromHighlight() && !params.isPage());
 
-        ModelListAdapter adapter = getModelListAdapter(listItems);
+        ModelListAdapter adapter = createAdapter(listItems);
 
         mListView = menu.findViewById(R.id.context_menu_list_view);
         mListView.setAdapter(adapter);
@@ -389,7 +393,7 @@ public class ContextMenuCoordinator implements ContextMenuUi {
      * @return A configured {@link ModelListAdapter} ready to be set on the {@link ListView}.
      */
     @NonNull
-    static ModelListAdapter getModelListAdapter(ModelList listItems) {
+    static ModelListAdapter createAdapter(ModelList listItems) {
         ModelListAdapter adapter =
                 new ModelListAdapter(listItems) {
                     @Override
@@ -439,6 +443,10 @@ public class ContextMenuCoordinator implements ContextMenuUi {
                 ListItemType.CONTEXT_MENU_ITEM_WITH_SUBMENU,
                 new LayoutViewBuilder<>(R.layout.context_menu_submenu_parent_row),
                 ContextMenuItemWithSubmenuViewBinder::bind);
+        adapter.registerType(
+                ListItemType.CONTEXT_MENU_SUBMENU_HEADER,
+                new LayoutViewBuilder<>(R.layout.context_menu_submenu_header),
+                ContextMenuItemWithSubmenuHeaderViewBinder::bind);
 
         return adapter;
     }
@@ -548,8 +556,48 @@ public class ContextMenuCoordinator implements ContextMenuUi {
         }
 
         for (ListItem item : itemList) {
-            if (item.type == ListItemType.CONTEXT_MENU_ITEM
-                    || item.type == ListItemType.CONTEXT_MENU_ITEM_WITH_ICON_BUTTON) {
+            // Special case handling (for items whose callbacks don't use clickItem method)
+            if (item.model.containsKey(CLICK_LISTENER) && item.model.get(CLICK_LISTENER) != null) {
+                View.OnClickListener oldListener = item.model.get(CLICK_LISTENER);
+                item.model.set(
+                        CLICK_LISTENER,
+                        (view) -> {
+                            oldListener.onClick(view);
+                            dismiss();
+                        });
+                continue;
+            }
+            if (item.type == ListItemType.CONTEXT_MENU_ITEM_WITH_SUBMENU) {
+                item.model.set(
+                        CLICK_LISTENER,
+                        (view) -> {
+                            ListAdapter parentAdapter = mListView.getAdapter();
+                            ModelList modelList = new ModelList();
+                            // Add the clicked item as a header to the submenu
+                            final PropertyModel model =
+                                    new PropertyModel.Builder(
+                                                    ContextMenuSubmenuHeaderItemProperties.ALL_KEYS)
+                                            .with(
+                                                    ContextMenuSubmenuHeaderItemProperties.TITLE,
+                                                    item.model.get(TITLE))
+                                            .with(ENABLED, true)
+                                            .with(
+                                                    CLICK_LISTENER,
+                                                    (v) -> mListView.setAdapter(parentAdapter))
+                                            .build();
+                            modelList.add(
+                                    new ListItem(ListItemType.CONTEXT_MENU_SUBMENU_HEADER, model));
+
+                            for (ListItem listItem : item.model.get(SUBMENU_ITEMS)) {
+                                modelList.add(listItem);
+                            }
+                            if (modelList.isEmpty()) return;
+                            mListView.setAdapter(createAdapter(modelList));
+                        });
+                continue;
+            }
+            // Usual case handling
+            if (item.type != ListItemType.DIVIDER && item.type != ListItemType.HEADER) {
                 item.model.set(
                         CLICK_LISTENER,
                         (v) -> {

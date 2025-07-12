@@ -9,6 +9,9 @@
 #include "components/password_manager/core/browser/password_manager_buildflags.h"
 
 namespace password_manager::features {
+#if !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)  // Desktop
+BASE_FEATURE(kActorLogin, "ActorLogin", base::FEATURE_DISABLED_BY_DEFAULT);
+#endif  // !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS)
 
 #if BUILDFLAG(IS_ANDROID)
 BASE_FEATURE(kAndroidSmsOtpFilling,
@@ -34,6 +37,10 @@ BASE_FEATURE(kWebAuthnUsePasskeyFromAnotherDeviceInContextMenu,
 BASE_FEATURE(kBiometricTouchToFill,
              "BiometricTouchToFill",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kCheckIfSubmittedFormIdenticalToObserved,
+             "CheckIfSubmittedFormIdenticalToObserved",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kClearUndecryptablePasswords,
              "ClearUndecryptablePasswords",

@@ -12,6 +12,7 @@
 #include "third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom-shared.h"
 #include "third_party/blink/renderer/core/css/resolver/style_resolver.h"
 #include "third_party/blink/renderer/core/frame/local_frame.h"
+#include "third_party/blink/renderer/core/frame/settings.h"
 #include "third_party/blink/renderer/core/html/forms/html_input_element.h"
 #include "third_party/blink/renderer/core/inspector/console_message.h"
 #include "third_party/blink/renderer/core/layout/block_break_token.h"
@@ -50,6 +51,7 @@
 #include "third_party/blink/renderer/core/style/computed_style.h"
 #include "third_party/blink/renderer/core/style/fit_text.h"
 #include "third_party/blink/renderer/platform/heap/collection_support/clear_collection_scope.h"
+#include "third_party/blink/renderer/platform/wtf/text/strcat.h"
 
 namespace blink {
 
@@ -235,6 +237,17 @@ void PlaceRelativePositionedItems(const ConstraintSpace& constraint_space,
   }
 }
 
+// Show a console message with ConsoleMessage::Source::kRendering and
+// discard_duplicates==true.
+void AddConsoleMessage(const InlineNode node,
+                       ConsoleMessage::Level level,
+                       const String& message) {
+  node.GetDocument().AddConsoleMessage(
+      MakeGarbageCollected<ConsoleMessage>(ConsoleMessage::Source::kRendering,
+                                           level, message),
+      /* discard_duplicates */ true);
+}
+
 // Returns true if LogicalLineBuilder needs to scale line-height.
 bool ScaleLine(bool is_grow,
                float scale_factor,
@@ -270,8 +283,9 @@ bool ScaleLine(bool is_grow,
 //
 // `NOINLINE` prevents the size growth in the fuchsia-binary-size bot.
 NOINLINE bool FitLine(const InlineNode node, LineInfo& line_info) {
-  LayoutUnit epsilon =
-      LayoutUnit(2.0 * node.GetDocument().GetFrame()->DevicePixelRatio());
+  const double device_pixel_ratio =
+      node.GetDocument().GetFrame()->DevicePixelRatio();
+  LayoutUnit epsilon = LayoutUnit(2.0 * device_pixel_ratio);
   LayoutUnit original_width = line_info.Width();
   LayoutUnit container_width = line_info.AvailableWidth();
   LayoutUnit diff = container_width - original_width;
@@ -302,8 +316,14 @@ NOINLINE bool FitLine(const InlineNode node, LineInfo& line_info) {
   float scale_factor =
       (container_width - static_total_size) / flexible_total_size;
   auto limit = fit_text.SizeLimit();
-  // TODO(crbug.com/417306102): Needs to refer to the minimum font-size if
-  // !is_grow.
+  if (!is_grow) {
+    if (const auto* settings = node.GetDocument().GetSettings()) {
+      if (int min_size = settings->GetMinimumFontSize(); min_size > 0) {
+        float physical_min = min_size * device_pixel_ratio;
+        limit = limit ? std::max(*limit, physical_min) : physical_min;
+      }
+    }
+  }
 
   switch (fit_text.Method()) {
     case FitTextMethod::kScale:
@@ -315,8 +335,18 @@ NOINLINE bool FitLine(const InlineNode node, LineInfo& line_info) {
                        /* is_scaled_inline_only */ true, limit, line_info);
 
     case FitTextMethod::kFontSize:
+      AddConsoleMessage(
+          node, ConsoleMessage::Level::kInfo,
+          StrCat({"`text-", is_grow ? StringView("grow") : StringView("shrink"),
+                  ": ... font-size` is not implemented yet."}));
+      break;
+
     case FitTextMethod::kLetterSpacing:
-      NOTREACHED();
+      AddConsoleMessage(
+          node, ConsoleMessage::Level::kInfo,
+          StrCat({"`text-", is_grow ? StringView("grow") : StringView("shrink"),
+                  ": ... letter-spacing` is not implemented yet."}));
+      break;
   }
   return false;
 }
@@ -367,7 +397,7 @@ void InlineLayoutAlgorithm::PrepareBoxStates(
   // If the previous line was ::first-line, always rebuild because box states
   // have ::first-line styles.
   const InlineItems& items = line_info.ItemsData().items;
-  if (!break_token->UseFirstLineStyle()) {
+  if (!break_token->UseFirstLineStyle() && !apply_fit_text_) {
     box_states_ = context_->BoxStatesIfValidForItemIndex(
         items, break_token->StartItemIndex());
     if (box_states_) {
@@ -411,7 +441,7 @@ void InlineLayoutAlgorithm::CheckBoxStates(
                             baseline_type_, quirks_mode_,
                             should_scale_line_height, &line_box);
   DCHECK(box_states_);
-  box_states_->CheckSame(rebuilt, should_scale_line_height);
+  box_states_->CheckSame(rebuilt);
   context_->ReleaseTempLogicalLineItems(line_box);
 }
 #endif
@@ -1226,15 +1256,22 @@ const LayoutResult* InlineLayoutAlgorithm::Layout() {
           apply_text_grow = false;
         }
         if (apply_text_shrink) {
-          Node().GetDocument().AddConsoleMessage(
-              MakeGarbageCollected<ConsoleMessage>(
-                  ConsoleMessage::Source::kRendering,
-                  ConsoleMessage::Level::kInfo,
-                  "Disable `text-shrink` due to `float`, `initial-letter`, or "
-                  "ruby annotations."),
-              /* discard_duplicates */ true);
+          AddConsoleMessage(Node(), ConsoleMessage::Level::kInfo,
+                            "Disable `text-shrink` due to `float`, "
+                            "`initial-letter`, or ruby annotations.");
           apply_text_shrink = false;
         }
+      }
+
+      if (style.TextGrow().Target() == FitTextTarget::kConsistent) {
+        AddConsoleMessage(Node(), ConsoleMessage::Level::kInfo,
+                          "`text-grow: consistent` is not implemented yet.");
+        apply_text_grow = false;
+      }
+      if (style.TextShrink().Target() == FitTextTarget::kConsistent) {
+        AddConsoleMessage(Node(), ConsoleMessage::Level::kInfo,
+                          "`text-shrink: consistent` is not implemented yet.");
+        apply_text_shrink = false;
       }
     }
     apply_fit_text_ = apply_text_grow || apply_text_shrink;

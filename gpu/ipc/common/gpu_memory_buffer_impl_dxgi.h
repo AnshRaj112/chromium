@@ -23,7 +23,6 @@
 #include "gpu/ipc/common/gpu_ipc_common_export.h"
 #include "gpu/ipc/common/gpu_memory_buffer_impl.h"
 #include "ui/gfx/color_space.h"
-#include "ui/gfx/gpu_memory_buffer.h"
 
 namespace gpu {
 
@@ -45,9 +44,8 @@ class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImplDXGI
       gfx::GpuMemoryBufferHandle handle,
       const gfx::Size& size,
       gfx::BufferFormat format,
-      gfx::BufferUsage usage,
       DestructionCallback callback) {
-    return CreateFromHandle(std::move(handle), size, format, usage,
+    return CreateFromHandle(std::move(handle), size, format,
                             std::move(callback));
   }
 
@@ -89,7 +87,6 @@ class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImplDXGI
       gfx::GpuMemoryBufferHandle handle,
       const gfx::Size& size,
       gfx::BufferFormat format,
-      gfx::BufferUsage usage,
       DestructionCallback callback,
       CopyNativeBufferToShMemCallback copy_native_buffer_to_shmem_callback =
           CopyNativeBufferToShMemCallback(),

@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <memory>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "base/barrier_closure.h"
@@ -68,11 +69,14 @@
 #include "url/gurl.h"
 
 using content_settings::ContentSettingsInfo;
+using content_settings::ContentSettingsRegistry;
+using content_settings::PermissionSettingsInfo;
+using content_settings::PermissionSettingsRegistry;
 using content_settings::SettingSource;
 using content_settings::WebsiteSettingsInfo;
+using content_settings::WebsiteSettingsRegistry;
 
 namespace {
-
 typedef std::vector<content_settings::Rule> Rules;
 
 typedef std::pair<std::string, std::string> StringPair;
@@ -103,19 +107,32 @@ base::Value ProcessIncognitoInheritanceBehavior(
     base::Value value) {
   // Website setting inheritance can be completely disallowed.
   const WebsiteSettingsInfo* website_settings_info =
-      content_settings::WebsiteSettingsRegistry::GetInstance()->Get(
-          content_type);
+      WebsiteSettingsRegistry::GetInstance()->Get(content_type);
   if (website_settings_info &&
       website_settings_info->incognito_behavior() ==
           WebsiteSettingsInfo::DONT_INHERIT_IN_INCOGNITO) {
     return base::Value();
   }
 
-  // Content setting inheritance can be for settings, that are more permissive
-  // than the initial value of a content setting.
+  auto* permission_info =
+      PermissionSettingsRegistry::GetInstance()->Get(content_type);
+  if (permission_info) {
+    auto setting = permission_info->delegate().FromValue(value);
+    if (setting) {
+      auto inherited_setting =
+          permission_info->delegate().InheritInIncognito(setting.value());
+      if (inherited_setting) {
+        return permission_info->delegate().ToValue(inherited_setting.value());
+      }
+    }
+    return base::Value();
+  }
+
+  // TODO(crbug.com/425642101): Remove when ContentSettings are registered as
+  // PermissionSettings. Content setting inheritance can be for settings, that
+  // are more permissive than the initial value of a content setting.
   const ContentSettingsInfo* content_settings_info =
-      content_settings::ContentSettingsRegistry::GetInstance()->Get(
-          content_type);
+      ContentSettingsRegistry::GetInstance()->Get(content_type);
   if (content_settings_info) {
     ContentSettingsInfo::IncognitoBehavior behaviour =
         content_settings_info->incognito_behavior();
@@ -343,8 +360,9 @@ HostContentSettingsMap::HostContentSettingsMap(PrefService* prefs,
 // static
 void HostContentSettingsMap::RegisterProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
-  // Ensure the content settings are all registered.
+  // Ensure the content settings and PermissionSettings are all registered.
   content_settings::ContentSettingsRegistry::GetInstance();
+  content_settings::PermissionSettingsRegistry::GetInstance();
 
   // Register the prefs for the content settings providers.
   content_settings::DefaultProvider::RegisterProfilePrefs(registry);
@@ -595,7 +613,7 @@ void HostContentSettingsMap::SetNarrowestContentSetting(
     const GURL& primary_url,
     const GURL& secondary_url,
     ContentSettingsType type,
-    ContentSetting setting,
+    PermissionSetting setting,
     const content_settings::ContentSettingConstraints& constraints) {
   content_settings::PatternPair patterns =
       GetNarrowestPatterns(primary_url, secondary_url, type);
@@ -604,8 +622,8 @@ void HostContentSettingsMap::SetNarrowestContentSetting(
     return;
   }
 
-  SetContentSettingCustomScope(patterns.first, patterns.second, type, setting,
-                               constraints);
+  SetPermissionSettingCustomScope(patterns.first, patterns.second, type,
+                                  setting, constraints);
 }
 
 content_settings::PatternPair HostContentSettingsMap::GetNarrowestPatterns(
@@ -698,6 +716,52 @@ void HostContentSettingsMap::SetContentSettingDefaultScope(
 
   SetContentSettingCustomScope(primary_pattern, secondary_pattern, content_type,
                                setting, constraints);
+}
+
+void HostContentSettingsMap::SetPermissionSettingCustomScope(
+    const ContentSettingsPattern& primary_pattern,
+    const ContentSettingsPattern& secondary_pattern,
+    ContentSettingsType content_type,
+    std::optional<PermissionSetting> setting,
+    const content_settings::ContentSettingConstraints& constraints) {
+  // TODO(crbug.com/425642101): Register all content settings as permission
+  // settings to avoid this special case.
+  if (setting && std::get_if<ContentSetting>(&setting.value()) != nullptr) {
+    SetContentSettingCustomScope(primary_pattern, secondary_pattern,
+                                 content_type,
+                                 std::get<ContentSetting>(*setting));
+    return;
+  }
+
+  base::Value value;
+  if (setting) {
+    auto* info =
+        content_settings::PermissionSettingsRegistry::GetInstance()->Get(
+            content_type);
+    DCHECK(info->delegate().IsValid(*setting));
+    value = info->delegate().ToValue(*setting);
+  }
+  SetWebsiteSettingCustomScope(primary_pattern, secondary_pattern, content_type,
+                               std::move(value), constraints);
+}
+
+void HostContentSettingsMap::SetPermissionSettingDefaultScope(
+    const GURL& primary_url,
+    const GURL& secondary_url,
+    ContentSettingsType content_type,
+    std::optional<PermissionSetting> setting,
+    const content_settings::ContentSettingConstraints& constraints) {
+  content_settings::PatternPair patterns = GetPatternsForContentSettingsType(
+      primary_url, secondary_url, content_type);
+
+  ContentSettingsPattern primary_pattern = patterns.first;
+  ContentSettingsPattern secondary_pattern = patterns.second;
+  if (!primary_pattern.IsValid() || !secondary_pattern.IsValid()) {
+    return;
+  }
+
+  SetPermissionSettingCustomScope(primary_pattern, secondary_pattern,
+                                  content_type, setting, constraints);
 }
 
 base::WeakPtr<HostContentSettingsMap> HostContentSettingsMap::GetWeakPtr() {

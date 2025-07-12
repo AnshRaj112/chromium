@@ -36,6 +36,7 @@ import org.chromium.chrome.browser.tab_ui.TabContentManagerThumbnailProvider;
 import org.chromium.chrome.browser.tab_ui.TabListFaviconProvider;
 import org.chromium.chrome.browser.tab_ui.TabListFaviconProvider.TabFaviconMetadata;
 import org.chromium.chrome.browser.tab_ui.ThumbnailProvider;
+import org.chromium.chrome.browser.tab_ui.ThumbnailProvider.MultiThumbnailMetadata;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.components.browser_ui.widget.displaystyle.DisplayStyleObserver;
 import org.chromium.components.browser_ui.widget.displaystyle.HorizontalDisplayStyle;
@@ -251,7 +252,11 @@ public class SingleTabSwitcherOnNtpMediator {
         }
 
         mThumbnailProvider.getTabThumbnailWithCallback(
-                mMostRecentTab.getId(),
+                MultiThumbnailMetadata.createMetadataWithoutUrls(
+                        mMostRecentTab.getId(),
+                        mMostRecentTab.getTabGroupId() != null,
+                        mMostRecentTab.isIncognitoBranded(),
+                        /* tabGroupColor= */ null),
                 mThumbnailSize,
                 /* isSelected= */ false,
                 (@Nullable Drawable tabThumbnail) -> {

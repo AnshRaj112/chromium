@@ -1021,7 +1021,7 @@ const FeatureEntry::FeatureParam
         {"mode", "advanced_paint_attribution"}};
 const FeatureEntry::FeatureParam
     kSoftNavigationHeuristicsPrePaintBasedAttribution[] = {
-        {"mode", "pre_paint_based_attriubution"}};
+        {"mode", "pre_paint_based_attribution"}};
 
 const FeatureEntry::FeatureVariation kSoftNavigationHeuristicsVariations[] = {
     {"Basic (default)", kSoftNavigationHeuristicsBasic,
@@ -4116,23 +4116,6 @@ const FeatureEntry::FeatureVariation
          std::size(kAutofillUploadCardRequestTimeout_9Seconds), nullptr}};
 // LINT.ThenChange(//ios/chrome/browser/flags/about_flags.mm:AutofillUploadCardRequestTimeouts)
 
-// LINT.IfChange(AutofillVcnEnrollRequestTimeouts)
-const FeatureEntry::FeatureParam kAutofillVcnEnrollRequestTimeout_5Seconds[] = {
-    {"autofill_vcn_enroll_request_timeout_milliseconds", "5000"}};
-const FeatureEntry::FeatureParam
-    kAutofillVcnEnrollRequestTimeout_7Point5Seconds[] = {
-        {"autofill_vcn_enroll_request_timeout_milliseconds", "7500"}};
-const FeatureEntry::FeatureParam kAutofillVcnEnrollRequestTimeout_10Seconds[] =
-    {{"autofill_vcn_enroll_request_timeout_milliseconds", "10000"}};
-const FeatureEntry::FeatureVariation kAutofillVcnEnrollRequestTimeoutOptions[] =
-    {{"5 seconds", kAutofillVcnEnrollRequestTimeout_5Seconds,
-      std::size(kAutofillVcnEnrollRequestTimeout_5Seconds), nullptr},
-     {"7.5 seconds", kAutofillVcnEnrollRequestTimeout_7Point5Seconds,
-      std::size(kAutofillVcnEnrollRequestTimeout_7Point5Seconds), nullptr},
-     {"10 seconds", kAutofillVcnEnrollRequestTimeout_10Seconds,
-      std::size(kAutofillVcnEnrollRequestTimeout_10Seconds), nullptr}};
-// LINT.ThenChange(//ios/chrome/browser/flags/about_flags.mm:AutofillVcnEnrollRequestTimeouts)
-
 const FeatureEntry::FeatureParam
     kAutofillImprovedLabelsWithoutMainTextChanges[] = {
         {"autofill_improved_labels_without_main_text_changes", "true"},
@@ -4422,28 +4405,6 @@ const FeatureEntry::FeatureVariation kAudioDuckingAttenuationVariations[] = {
     {"attenuation 100", kAudioDuckingAttenuation_100,
      std::size(kAudioDuckingAttenuation_100), nullptr}};
 #endif  // !BUILDFLAG(IS_ANDROID)
-
-#if BUILDFLAG(IS_ANDROID)
-const FeatureEntry::FeatureParam kTabSwitcherColorBlendAnimateVariation1[] = {
-    {"animation_duration_ms", "240"},
-    {"animation_interpolator", "1"}};
-const FeatureEntry::FeatureParam kTabSwitcherColorBlendAnimateVariation2[] = {
-    {"animation_duration_ms", "400"},
-    {"animation_interpolator", "2"}};
-const FeatureEntry::FeatureParam kTabSwitcherColorBlendAnimateVariation3[] = {
-    {"animation_duration_ms", "200"},
-    {"animation_interpolator", "3"}};
-const FeatureEntry::FeatureVariation kTabSwitcherColorBlendAnimateVariations[] =
-    {{"Color Blend Animation Variation 1",
-      kTabSwitcherColorBlendAnimateVariation1,
-      std::size(kTabSwitcherColorBlendAnimateVariation1), nullptr},
-     {"Color Blend Animation Variation 2",
-      kTabSwitcherColorBlendAnimateVariation2,
-      std::size(kTabSwitcherColorBlendAnimateVariation2), nullptr},
-     {"Color Blend Animation Variation 3",
-      kTabSwitcherColorBlendAnimateVariation3,
-      std::size(kTabSwitcherColorBlendAnimateVariation3), nullptr}};
-#endif  // BUILDFLAG(IS_ANDROID)
 
 #if !BUILDFLAG(IS_ANDROID)
 const char kAccountStoragePrefsThemesAndSearchEnginesFeatures[] =
@@ -5505,10 +5466,6 @@ const FeatureEntry kFeatureEntries[] = {
      flag_descriptions::kSysUiShouldHoldbackTaskManagementName,
      flag_descriptions::kSysUiShouldHoldbackTaskManagementDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kSysUiShouldHoldbackTaskManagement)},
-    {"offline-items-in-notifications",
-     flag_descriptions::kOfflineItemsInNotificationsName,
-     flag_descriptions::kOfflineItemsInNotificationsDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kOfflineItemsInNotifications)},
 
 #endif  // BUILDFLAG(IS_CHROMEOS)
 #if (BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_ANDROID))
@@ -5925,9 +5882,6 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_WITH_PARAMS_VALUE_TYPE(chrome::android::kEdgeToEdgeTablet,
                                     kEdgeToEdgeTabletVariations,
                                     "EdgeToEdgeTablet")},
-    {"edge-to-edge-web-opt-in", flag_descriptions::kEdgeToEdgeWebOptInName,
-     flag_descriptions::kEdgeToEdgeWebOptInDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kEdgeToEdgeWebOptIn)},
     {"dynamic-safe-area-insets", flag_descriptions::kDynamicSafeAreaInsetsName,
      flag_descriptions::kDynamicSafeAreaInsetsDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(blink::features::kDynamicSafeAreaInsets)},
@@ -5982,6 +5936,11 @@ const FeatureEntry kFeatureEntries[] = {
     {"android-pinned-tabs", flag_descriptions::kAndroidPinnedTabsName,
      flag_descriptions::kAndroidPinnedTabsDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kAndroidPinnedTabs)},
+
+    // Hub slide animation.
+    {"hub-slide-animation", flag_descriptions::kHubSlideAnimationName,
+     flag_descriptions::kHubSlideAnimationDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kHubSlideAnimation)},
 
     {"tab-collection-android", flag_descriptions::kTabCollectionAndroidName,
      flag_descriptions::kTabCollectionAndroidDescription, kOsAndroid,
@@ -7238,6 +7197,13 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_VALUE_TYPE(tabs::kSplitTabStrip)},
 #endif
 
+#if BUILDFLAG(IS_ANDROID)
+    {"tab-storage-sqlite-prototype",
+     flag_descriptions::kTabStorageSqlitePrototypeName,
+     flag_descriptions::kTabStorageSqlitePrototypeDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kTabStorageSqlitePrototype)},
+#endif  // BUILDFLAG(IS_ANDROID)
+
 #if !BUILDFLAG(IS_ANDROID)
     {flag_descriptions::kSidePanelResizingFlagId,
      flag_descriptions::kSidePanelResizingName,
@@ -7448,6 +7414,10 @@ const FeatureEntry kFeatureEntries[] = {
      FEATURE_WITH_PARAMS_VALUE_TYPE(ntp_features::kNtpSharepointModule,
                                     kNtpSharepointModuleVariations,
                                     "DesktopNtpModules")},
+
+    {"ntp-tab-groups-module", flag_descriptions::kNtpTabGroupsModuleName,
+     flag_descriptions::kNtpTabGroupsModuleDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(ntp_features::kNtpTabGroupsModule)},
 
     {"ntp-wallpaper-search-button",
      flag_descriptions::kNtpWallpaperSearchButtonName,
@@ -7768,14 +7738,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"show-new-tab-animations", flag_descriptions::kShowNewTabAnimationsName,
      flag_descriptions::kShowNewTabAnimationsDescription, kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kShowNewTabAnimations)},
-
-    {"tab-switcher-color-blend-animate",
-     flag_descriptions::kTabSwitcherColorBlendAnimateName,
-     flag_descriptions::kTabSwitcherColorBlendAnimateDescription, kOsAndroid,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         chrome::android::kTabSwitcherColorBlendAnimate,
-         kTabSwitcherColorBlendAnimateVariations,
-         "TabSwitcherColorBlendAnimateVariations")},
 
 #endif  // BUILDFLAG(IS_ANDROID)
 
@@ -10083,11 +10045,6 @@ const FeatureEntry kFeatureEntries[] = {
      kOsAndroid,
      FEATURE_VALUE_TYPE(chrome::android::kTabGroupParityBottomSheetAndroid)},
 
-    {"tab-strip-context-menu-android",
-     flag_descriptions::kTabStripContextMenuAndroidName,
-     flag_descriptions::kTabStripContextMenuAndroidDescription, kOsAndroid,
-     FEATURE_VALUE_TYPE(chrome::android::kTabStripContextMenuAndroid)},
-
     {"tab-strip-density-change-android",
      flag_descriptions::kTabStripDensityChangeAndroidName,
      flag_descriptions::kTabStripDensityChangeAndroidDescription, kOsAndroid,
@@ -10555,11 +10512,6 @@ const FeatureEntry kFeatureEntries[] = {
     {"flex-firmware-update", flag_descriptions::kFlexFirmwareUpdateName,
      flag_descriptions::kFlexFirmwareUpdateDescription, kOsCrOS,
      FEATURE_VALUE_TYPE(ash::features::kFlexFirmwareUpdate)},
-
-    {"ignore-device-flex-arc-enabled-policy",
-     flag_descriptions::kIgnoreDeviceFlexArcEnabledPolicyName,
-     flag_descriptions::kIgnoreDeviceFlexArcEnabledPolicyDescription, kOsCrOS,
-     FEATURE_VALUE_TYPE(ash::features::kIgnoreDeviceFlexArcEnabledPolicy)},
 
     {"ipp-first-setup-for-usb-printers",
      flag_descriptions::kIppFirstSetupForUsbPrintersName,
@@ -11229,14 +11181,6 @@ const FeatureEntry kFeatureEntries[] = {
          kAutofillUploadCardRequestTimeoutOptions,
          "AutofillUploadCardRequestTimeout")},
 
-    {"autofill-vcn-enroll-request-timeout",
-     flag_descriptions::kAutofillVcnEnrollRequestTimeoutName,
-     flag_descriptions::kAutofillVcnEnrollRequestTimeoutDescription, kOsAll,
-     FEATURE_WITH_PARAMS_VALUE_TYPE(
-         autofill::features::kAutofillVcnEnrollRequestTimeout,
-         kAutofillVcnEnrollRequestTimeoutOptions,
-         "AutofillVcnEnrollRequestTimeout")},
-
     {"autofill-unmask-card-request-timeout",
      flag_descriptions::kAutofillUnmaskCardRequestTimeoutName,
      flag_descriptions::kAutofillUnmaskCardRequestTimeoutDescription, kOsAll,
@@ -11773,14 +11717,6 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
 #if BUILDFLAG(IS_ANDROID)
-    {"enterprise-url-filtering-event-reporting-on-android",
-     flag_descriptions::kEnterpriseUrlFilteringEventReportingOnAndroidName,
-     flag_descriptions::
-         kEnterpriseUrlFilteringEventReportingOnAndroidDescription,
-     kOsAndroid,
-     FEATURE_VALUE_TYPE(enterprise_connectors::
-                            kEnterpriseUrlFilteringEventReportingOnAndroid)},
-
     {"enterprise-security-event-reporting-on-android",
      flag_descriptions::kEnterpriseSecurityEventReportingOnAndroidName,
      flag_descriptions::kEnterpriseSecurityEventReportingOnAndroidDescription,
@@ -12206,10 +12142,10 @@ const FeatureEntry kFeatureEntries[] = {
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
         // BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
 
-    {"enable-web-app-update-token-parsing",
-     flag_descriptions::kEnableWebAppUpdateTokenParsingName,
-     flag_descriptions::kEnableWebAppUpdateTokenParsingDescription, kOsAll,
-     FEATURE_VALUE_TYPE(features::kWebAppEnableUpdateTokenParsing)},
+    {"enable-web-app-predictable-app-updating",
+     flag_descriptions::kEnableWebAppPredictableAppUpdatingName,
+     flag_descriptions::kEnableWebAppPredictableAppUpdatingDescription, kOsAll,
+     FEATURE_VALUE_TYPE(features::kWebAppPredictableAppUpdating)},
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
     {"root-scrollbar-follows-browser-theme",
@@ -12671,9 +12607,11 @@ const FeatureEntry kFeatureEntries[] = {
      PLATFORM_FEATURE_NAME_TYPE("CrOSLateBootCrasOutputPluginProcessor")},
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
+#if !BUILDFLAG(IS_ANDROID)
     {"web-app-installation-api", flag_descriptions::kWebAppInstallationApiName,
-     flag_descriptions::kWebAppInstallationApiDescription, kOsAll,
+     flag_descriptions::kWebAppInstallationApiDescription, kOsDesktop,
      FEATURE_VALUE_TYPE(blink::features::kWebAppInstallation)},
+#endif  // !BUILDFLAG(IS_ANDROID)
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_MAC) || \
     BUILDFLAG(IS_WIN)
@@ -12717,6 +12655,11 @@ const FeatureEntry kFeatureEntries[] = {
          autofill::features::kAutofillEnableBuyNowPayLaterSyncingForKlarna)},
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) ||
         // BUILDFLAG(IS_CHROMEOS)
+
+    {"customize-tab-group-color-palette",
+     flag_descriptions::kCustomizeTabGroupColorPaletteName,
+     flag_descriptions::kCustomizeTabGroupColorPaletteDescription, kOsDesktop,
+     FEATURE_VALUE_TYPE(features::kCustomizeTabGroupColorPalette)},
 
 #if !BUILDFLAG(IS_ANDROID)
     {"lens-overlay-permission-bubble-alt",
@@ -12809,6 +12752,11 @@ const FeatureEntry kFeatureEntries[] = {
      kOsAndroid,
      FEATURE_VALUE_TYPE(
          autofill::features::kAutofillEnableSeparatePixPreferenceItem)},
+
+    {"android-open-incognito-as-window",
+     flag_descriptions::kAndroidOpenIncognitoAsWindowName,
+     flag_descriptions::kAndroidOpenIncognitoAsWindowDescription, kOsAndroid,
+     FEATURE_VALUE_TYPE(chrome::android::kAndroidOpenIncognitoAsWindow)},
 #endif  // BUILDFLAG(IS_ANDROID)
 
     // Add new entries above this line.

@@ -561,69 +561,6 @@ BPF_DEATH_TEST_C(BaselinePolicy,
 }
 
 BPF_DEATH_TEST_C(BaselinePolicy,
-                 RecvFlagsFiltered,
-                 DEATH_SUCCESS(),
-                 BaselinePolicy) {
-  int fds[2];
-  PCHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
-
-  char buf[1];
-// Check allowlisted MSG_DONTWAIT with recv. Newer platforms don't have recv()
-// anymore.
-#if defined(__NR_recv)
-  syscall(__NR_recv, fds[0], &buf, 1, MSG_DONTWAIT);
-  PCHECK(errno == EWOULDBLOCK);  // same as EAGAIN
-#endif                           //  defined(__NR_recv)
-
-  // Check allowlisted MSG_DONTWAIT with recvfrom
-  syscall(__NR_recvfrom, fds[0], &buf, 1, MSG_DONTWAIT, nullptr, nullptr);
-  PCHECK(errno == EWOULDBLOCK);  // same as EAGAIN
-
-  // Check allowlisted MSG_DONTWAIT with recvmsg
-  struct msghdr msg = {};
-  syscall(__NR_recvmsg, fds[0], &msg, MSG_DONTWAIT);
-  PCHECK(errno == EWOULDBLOCK);  // same as EAGAIN
-}
-
-#if defined(__NR_recv)
-BPF_DEATH_TEST_C(BaselinePolicy,
-                 RecvFlagsFilteredMSG_OOB,
-                 DEATH_SEGV_MESSAGE(GetErrorMessageContentForTests()),
-                 BaselinePolicy) {
-  int fds[2];
-  PCHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
-
-  char buf[1];
-  // Specifically disallow MSG_OOB
-  syscall(__NR_recv, fds[0], &buf, 1, MSG_OOB);
-}
-#endif  //  defined(__NR_recv)
-
-BPF_DEATH_TEST_C(BaselinePolicy,
-                 RecvfromFlagsFilteredMSG_OOB,
-                 DEATH_SEGV_MESSAGE(GetErrorMessageContentForTests()),
-                 BaselinePolicy) {
-  int fds[2];
-  PCHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
-
-  char buf[1];
-  // Specifically disallow MSG_OOB
-  syscall(__NR_recvfrom, fds[0], &buf, 1, MSG_OOB, nullptr, nullptr);
-}
-
-BPF_DEATH_TEST_C(BaselinePolicy,
-                 RecvmsgFlagsFilteredMSG_OOB,
-                 DEATH_SEGV_MESSAGE(GetErrorMessageContentForTests()),
-                 BaselinePolicy) {
-  int fds[2];
-  PCHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
-  // Specifically disallow MSG_OOB
-  struct msghdr msg = {};
-  syscall(__NR_recvmsg, fds[0], &msg, MSG_DONTWAIT);
-  recvmsg(fds[0], &msg, MSG_OOB);
-}
-
-BPF_DEATH_TEST_C(BaselinePolicy,
                  SendFlagsFiltered,
                  DEATH_SUCCESS(),
                  BaselinePolicy) {
@@ -680,11 +617,38 @@ BPF_DEATH_TEST_C(BaselinePolicy,
   PCHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
   // Specifically disallow MSG_OOB
   struct msghdr msg = {};
-  syscall(__NR_sendmsg, fds[0], &msg, MSG_DONTWAIT);
-  recvmsg(fds[0], &msg, MSG_OOB);
+  syscall(__NR_sendmsg, fds[0], &msg, MSG_OOB);
 }
 
 #endif  // !defined(i386)
+
+BPF_DEATH_TEST_C(BaselinePolicy,
+                 MemfdCreateSuccess,
+                 DEATH_SUCCESS(),
+                 BaselinePolicy) {
+  int fd = syscall(__NR_memfd_create, "test_shared_memory", MFD_CLOEXEC);
+#if BUILDFLAG(IS_ANDROID)
+  if (fd == -1 && errno == ENOSYS) {
+    // Older version of Android that doesn't support memfds. Skip this test.
+    return;
+  }
+#endif
+  BPF_ASSERT_NE(fd, -1);
+
+  fd = syscall(__NR_memfd_create, "test_shared_memory2",
+               MFD_CLOEXEC | MFD_ALLOW_SEALING);
+  BPF_ASSERT_NE(fd, -1);
+}
+
+BPF_DEATH_TEST_C(BaselinePolicy,
+                 MemfdCreateCrash,
+                 DEATH_SEGV_MESSAGE(GetErrorMessageContentForTests()),
+                 BaselinePolicy) {
+  // This should crash
+  [[maybe_unused]] int fd =
+      syscall(__NR_memfd_create, "should_never_be_allocated",
+              MFD_CLOEXEC | MFD_HUGETLB);
+}
 
 }  // namespace
 

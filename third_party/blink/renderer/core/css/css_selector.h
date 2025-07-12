@@ -258,7 +258,6 @@ class CORE_EXPORT CSSSelector {
     kPseudoFocusWithin,
     kPseudoFullPageMedia,
     kPseudoHasInterest,
-    kPseudoHasPartialInterest,
     kPseudoHasSlotted,
     kPseudoHorizontal,
     kPseudoHover,
@@ -313,7 +312,6 @@ class CORE_EXPORT CSSSelector {
     kPseudoState,
     kPseudoTarget,
     kPseudoTargetOfInterest,
-    kPseudoTargetOfPartialInterest,
     kPseudoUnknown,
     // Something that was unparsable, but contained either a nesting
     // selector (&), or a :scope pseudo-class, and must therefore be kept
@@ -1033,15 +1031,13 @@ CSSSelector::RelationType ConvertRelationToRelative(
 // list, e.g. :is(), :where() etc.
 unsigned MaximumSpecificity(const CSSSelector* first_selector);
 
-}  // namespace blink
-
-namespace WTF {
 template <>
-struct VectorTraits<blink::CSSSelector> : VectorTraitsBase<blink::CSSSelector> {
+struct VectorTraits<CSSSelector> : VectorTraitsBase<CSSSelector> {
   static const bool kCanInitializeWithMemset = true;
   static const bool kCanClearUnusedSlotsWithMemset = true;
   static const bool kCanMoveWithMemcpy = true;
 };
-}  // namespace WTF
+
+}  // namespace blink
 
 #endif  // THIRD_PARTY_BLINK_RENDERER_CORE_CSS_CSS_SELECTOR_H_

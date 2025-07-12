@@ -145,9 +145,6 @@ ResultExpr EvaluateSyscallImpl(int fs_denied_errno,
     return Allow();
   }
 
-  if (SyscallSets::IsSockRecvOneMsg(sysno)) {
-    return RestrictSockRecvFlags(sysno);
-  }
 
   if (SyscallSets::IsSockSendOneMsg(sysno)) {
     return RestrictSockSendFlags(sysno);
@@ -301,9 +298,10 @@ ResultExpr EvaluateSyscallImpl(int fs_denied_errno,
   }
 
   // memfd_create is considered a file system syscall which below will be denied
-  // with fs_denied_errno, we need memfd_create for Mojo shared memory channels.
+  // with fs_denied_errno, we need memfd_create for Mojo shared memory channels
+  // and general shared memory.
   if (sysno == __NR_memfd_create) {
-    return Allow();
+    return RestrictMemfdCreate();
   }
 
   // The fstatat syscalls are file system syscalls, which will be denied below

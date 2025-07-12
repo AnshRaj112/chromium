@@ -151,7 +151,7 @@ struct InlineBoxState {
                           FontHeight& metrics);
 
 #if DCHECK_IS_ON()
-  void CheckSame(const InlineBoxState&, bool allow_metrics_mismatch) const;
+  void CheckSame(const InlineBoxState&) const;
 #endif
 };
 
@@ -190,6 +190,7 @@ class CORE_EXPORT InlineLayoutStateStack {
                             const InlineItem&,
                             const InlineItemResult&,
                             FontBaseline baseline_type,
+                            float text_scale,
                             LogicalLineItems* line_box);
 
   // Pop a box state stack.
@@ -259,8 +260,7 @@ class CORE_EXPORT InlineLayoutStateStack {
                           bool is_opaque);
 
 #if DCHECK_IS_ON()
-  void CheckSame(const InlineLayoutStateStack&,
-                 bool allow_metrics_mismatch) const;
+  void CheckSame(const InlineLayoutStateStack&) const;
 #endif
 
  private:
@@ -272,6 +272,7 @@ class CORE_EXPORT InlineLayoutStateStack {
                    FontBaseline);
 
   void AddBoxFragmentPlaceholder(InlineBoxState*,
+                                 float text_scale,
                                  LogicalLineItems*,
                                  FontBaseline);
   void AddBoxData(const ConstraintSpace&, InlineBoxState*, LogicalLineItems*);

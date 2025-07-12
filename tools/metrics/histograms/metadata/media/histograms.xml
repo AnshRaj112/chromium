@@ -1035,6 +1035,28 @@ chromium-metrics-reviews@google.com.
   </token>
 </histogram>
 
+<histogram name="Media.Audio.LoopbackReference.HadRuntimeError"
+    enum="BooleanRuntimeError" expires_after="2026-07-03">
+  <owner>henrika@google.com</owner>
+  <owner>fhernqvist@google.com</owner>
+  <owner>webrtc-audio-uma@google.com</owner>
+  <summary>
+    Reports if a loopback AEC reference audio input stream was closed due to a
+    runtime error or not. Only supported on Windows and Mac.
+  </summary>
+</histogram>
+
+<histogram name="Media.Audio.LoopbackReference.OpenResult"
+    enum="ReferenceOpenOutcome" expires_after="2026-07-03">
+  <owner>henrika@google.com</owner>
+  <owner>fhernqvist@google.com</owner>
+  <owner>webrtc-audio-uma@google.com</owner>
+  <summary>
+    Reports success/error cases for opening a loopback AEC reference audio input
+    stream on Windows or Mac.
+  </summary>
+</histogram>
+
 <histogram name="Media.Audio.Mac.AggregateDeviceCompositionPropertyIsNull"
     enum="Boolean" expires_after="2026-02-20">
   <owner>agpalak@chromium.org</owner>
@@ -4495,7 +4517,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Media.MediaDevices.SaltDatabaseErrors"
-    enum="SqliteLoggedResultCode" expires_after="2025-07-12">
+    enum="SqliteLoggedResultCode" expires_after="2026-07-06">
   <owner>guidou@chromium.org</owner>
   <owner>video-cmi-apis@google.com</owner>
   <summary>
@@ -7831,7 +7853,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Cast.Mdns.Channel.Open_Failure" units="ms"
-    expires_after="2025-07-22">
+    expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>mfoltz@chromium.org</owner>
   <owner>openscreen-eng@google.com</owner>
@@ -7842,40 +7864,13 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Cast.Mdns.Channel.Open_Success" units="ms"
-    expires_after="2025-07-22">
+    expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>mfoltz@chromium.org</owner>
   <owner>openscreen-eng@google.com</owner>
   <summary>
     Duration in milliseconds taken to successfully open a cast channel. Recorded
     when one opening channel attempt succeeds.
-  </summary>
-</histogram>
-
-<histogram name="MediaRouter.Cast.PendingUserAuthLatency" units="s"
-    expires_after="2025-08-20">
-  <owner>ahmedmoussa@google.com</owner>
-  <owner>muyaoxu@google.com</owner>
-  <owner>openscreen-eng@google.com</owner>
-  <summary>
-    In some scenarios casting doesn't start until the user approves it on the
-    receiver side. This histogram records the time it takes between requesting
-    to start casting and receiving a response from the receiver that it is now
-    waiting for user approval.
-  </summary>
-</histogram>
-
-<histogram name="MediaRouter.Cast.UserPromptWhenLaunchingCast"
-    enum="MediaRouterUserPromptWhenLaunchingCast" expires_after="2025-08-20">
-  <owner>ahmedmoussa@google.com</owner>
-  <owner>muyaoxu@google.com</owner>
-  <owner>openscreen-eng@google.com</owner>
-  <summary>
-    This histogram is recorded whenever the user attempts to start casting and a
-    receiver-side prompt is shown, and when the user disapproves it. The other
-    two cases, when the user approves it or when it times out, are not recorded.
-    As both these cases can be received without a prompt before it and this
-    should not be recorded.
   </summary>
 </histogram>
 
@@ -7907,7 +7902,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.CastStreaming.Session.Length.OffscreenTab"
-    units="ms" expires_after="2025-08-05">
+    units="ms" expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>openscreen-eng@google.com</owner>
   <summary>
@@ -7988,7 +7983,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Dial.AvailableDevicesCount" units="devices"
-    expires_after="2025-07-22">
+    expires_after="2026-07-10">
   <owner>mfoltz@chromium.org</owner>
   <owner>muyaoxu@google.com</owner>
   <owner>openscreen-eng@google.com</owner>
@@ -7999,7 +7994,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Dial.CreateRoute"
-    enum="MediaRouterDialCreateRouteResult" expires_after="2025-08-05">
+    enum="MediaRouterDialCreateRouteResult" expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>mfoltz@chromium.org</owner>
   <owner>openscreen-eng@google.com</owner>
@@ -8010,7 +8005,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Dial.DeviceDescriptionParsingResult"
-    enum="MediaRouterDeviceDescriptionParsingResult" expires_after="2025-08-05">
+    enum="MediaRouterDeviceDescriptionParsingResult" expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>mfoltz@chromium.org</owner>
   <owner>openscreen-eng@google.com</owner>
@@ -8033,7 +8028,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Dial.KnownDevicesCount" units="devices"
-    expires_after="2025-08-05">
+    expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>mfoltz@chromium.org</owner>
   <owner>openscreen-eng@google.com</owner>
@@ -8131,7 +8126,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Provider.JoinRoute.Result{MediaRouteProvider}"
-    enum="MediaRouteProviderResult" expires_after="2025-08-05">
+    enum="MediaRouteProviderResult" expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>mfoltz@chromium.org</owner>
   <owner>openscreen-eng@google.com</owner>
@@ -8147,7 +8142,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="MediaRouter.Provider.TerminateRoute.Result{MediaRouteProvider}"
-    enum="MediaRouteProviderResult" expires_after="2025-08-05">
+    enum="MediaRouteProviderResult" expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>mfoltz@chromium.org</owner>
   <owner>openscreen-eng@google.com</owner>
@@ -8210,7 +8205,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Source.CastingSource"
-    enum="MediaRouterSourceTypes" expires_after="2025-08-05">
+    enum="MediaRouterSourceTypes" expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>openscreen-eng@google.com</owner>
   <summary>
@@ -8220,7 +8215,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Ui.Android.DialogAction"
-    enum="MediaRouterAndroidDialogAction" expires_after="2025-08-05">
+    enum="MediaRouterAndroidDialogAction" expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>openscreen-eng@google.com</owner>
   <summary>
@@ -8232,7 +8227,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Ui.Android.DialogType"
-    enum="MediaRouterAndroidDialogType" expires_after="2025-08-05">
+    enum="MediaRouterAndroidDialogType" expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>openscreen-eng@google.com</owner>
   <summary>
@@ -8256,7 +8251,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram name="MediaRouter.Ui.Dialog.ActivationLocationAndCastMode"
     enum="MediaRouterDialogActivationLocationAndCastMode"
-    expires_after="2025-08-05">
+    expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>openscreen-eng@google.com</owner>
   <summary>
@@ -8276,7 +8271,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Ui.PermissionRejectedViewAction"
-    enum="MediaRouterUiPermissionRejectedViewEvents" expires_after="2025-08-10">
+    enum="MediaRouterUiPermissionRejectedViewEvents" expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>openscreen-eng@google.com</owner>
   <summary>
@@ -8286,7 +8281,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="MediaRouter.Ui.{DialogType}Dialog.LoadedWithData" units="ms"
-    expires_after="2025-07-06">
+    expires_after="2026-07-10">
   <owner>muyaoxu@google.com</owner>
   <owner>openscreen-eng@google.com</owner>
   <summary>

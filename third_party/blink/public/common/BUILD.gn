@@ -47,6 +47,7 @@ blink_python_runner("make_runtime_feature_state_contexts_headers") {
              "../../renderer/build/scripts/templates/runtime_feature_state_context.h.tmpl",
              "../../renderer/build/scripts/templates/runtime_feature_state_read_context.h.tmpl",
              "../../renderer/platform/runtime_enabled_features.json5",
+             "../../renderer/platform/runtime_enabled_features.override.json5",
            ]
 
   outputs = [
@@ -385,6 +386,10 @@ source_set("headers") {
   if (is_mac) {
     sources += [ "sandbox_support/sandbox_support_mac.h" ]
   }
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 if (is_android || is_win) {

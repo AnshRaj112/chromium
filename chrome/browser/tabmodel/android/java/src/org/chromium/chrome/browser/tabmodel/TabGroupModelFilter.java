@@ -77,19 +77,6 @@ public interface TabGroupModelFilter extends SupportsTabModelObserver {
     boolean tabGroupExists(@Nullable Token tabGroupId);
 
     /**
-     * Given a tab group's tab group ID, finds out the root ID, or {@link Tab.INVALID_TAB_ID} if the
-     * tab group doesn't exist in the model.
-     *
-     * @param tabGroupId The tab group ID to look for.
-     * @return The root ID of the tab group or {@link Tab.INVALID_TAB_ID} if the group isn't found
-     *     in the tab model.
-     * @deprecated Use a {@link Token} tab group ID instead.
-     */
-    @Deprecated
-    @TabId
-    int getRootIdFromTabGroupId(@Nullable Token tabGroupId);
-
-    /**
      * Returns the list of {@link Tab}s that are grouped with the given {@code tabId}.
      *
      * @param tabId The id of a {@link Tab} in the group.
@@ -244,6 +231,14 @@ public interface TabGroupModelFilter extends SupportsTabModelObserver {
     @Nullable String getTabGroupTitle(Token tabGroupId);
 
     /**
+     * {@see #getTabGroupTitle(Token)}. This looks up the tab group via {@code groupedTab}. This is
+     * primarily to be used if the tab group has already been closed. Prefer the {@link
+     * TabGroupTitleUtils#getDisplayableTitle} or {@link #getTabGroupTitle(Token)} method in most
+     * cases.
+     */
+    @Nullable String getTabGroupTitle(Tab groupedTab);
+
+    /**
      * @deprecated Use {@link #getTabGroupTitle(Token)} instead.
      */
     @Deprecated
@@ -290,6 +285,14 @@ public interface TabGroupModelFilter extends SupportsTabModelObserver {
      */
     @TabGroupColorId
     int getTabGroupColorWithFallback(Token tabGroupId);
+
+    /**
+     * {@see #getTabGroupColorWithFallback(Token)}. This looks up the tab group via {@code
+     * groupedTab}. This is primarily to be used if the tab group has already been closed. Prefer
+     * the {@link #getTabGroupColorWithFallback(Token)} method in most cases.
+     */
+    @TabGroupColorId
+    int getTabGroupColorWithFallback(Tab groupedTab);
 
     /**
      * @deprecated Use {@link #getTabGroupColorWithFallback(Token)} instead.

@@ -11,8 +11,10 @@ import 'chrome://resources/cr_elements/cr_shared_style.css.js';
 import 'chrome://resources/cr_elements/cr_view_manager/cr_view_manager.js';
 import 'chrome://resources/cr_elements/icons.html.js';
 import '../about_page/about_page.js';
+import '../appearance_page/appearance_page_index.js';
 import '../basic_page/basic_page.js';
 import '../on_startup_page/on_startup_page.js';
+import '../performance_page/performance_page_index.js';
 import '../search_page/search_page_index.js';
 // <if expr="not is_chromeos">
 import '../default_browser_page/default_browser_page.js';
@@ -53,8 +55,6 @@ function getTopLevelRoute() {
   return guestTopLevelRoute;
 }
 
-const TOP_LEVEL_EQUIVALENT_ROUTE: Route = getTopLevelRoute();
-
 export interface SettingsMainElement {
   $: {
     noSearchResults: HTMLElement,
@@ -85,7 +85,7 @@ export class SettingsMainElement extends SettingsMainElementBase {
 
       pageVisibility_: {
         type: Object,
-        value: pageVisibility || {},
+        value: () => pageVisibility || {},
       },
 
       lastRoute_: {
@@ -136,6 +136,8 @@ export class SettingsMainElement extends SettingsMainElementBase {
   declare private languages_?: LanguagesModel;
   // </if>
 
+  private topLevelEquivalentRoute_: Route = getTopLevelRoute();
+
   override connectedCallback() {
     super.connectedCallback();
 
@@ -157,7 +159,7 @@ export class SettingsMainElement extends SettingsMainElementBase {
     }
 
     const effectiveRoute =
-        route === routes.BASIC ? TOP_LEVEL_EQUIVALENT_ROUTE : route;
+        route === routes.BASIC ? this.topLevelEquivalentRoute_ : route;
 
     if (this.lastRoute_ === effectiveRoute) {
       // Nothing to do.
@@ -166,7 +168,7 @@ export class SettingsMainElement extends SettingsMainElementBase {
 
     this.lastRoute_ = effectiveRoute;
 
-    if (!route.hasMigratedToPlugin) {
+    if (!effectiveRoute.hasMigratedToPlugin) {
       // Case where the requested section still resides within the old
       // <settings-basic-page> element. Show that element, and let it handle
       // showing the correct content.

@@ -95,7 +95,7 @@ BASE_FEATURE(kAutofillEnableCardBenefitsForBmo,
 // When enabled, card benefits IPH will be shown in Payments Autofill UI.
 BASE_FEATURE(kAutofillEnableCardBenefitsIph,
              "AutofillEnableCardBenefitsIph",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When enabled, card benefit source will be synced to Chrome clients.
 BASE_FEATURE(kAutofillEnableCardBenefitsSourceSync,
@@ -342,15 +342,6 @@ const base::FeatureParam<int> kAutofillUploadCardRequestTimeoutMilliseconds{
 BASE_FEATURE(kAutofillUpstream,
              "AutofillUpstream",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// When enabled, adds a timeout on the network request for VcnEnroll requests.
-BASE_FEATURE(kAutofillVcnEnrollRequestTimeout,
-             "AutofillVcnEnrollRequestTimeout",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-const base::FeatureParam<int> kAutofillVcnEnrollRequestTimeoutMilliseconds{
-    &kAutofillVcnEnrollRequestTimeout,
-    "autofill_vcn_enroll_request_timeout_milliseconds",
-    /*default_value=*/6500};
 
 // When enabled, updates the VCN strike database with different values of
 // kExpiryTimeDelta as part of of the VCN strike optimization experiment.

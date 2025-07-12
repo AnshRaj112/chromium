@@ -2,13 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "base/notimplemented.h"
-#include "services/webnn/public/mojom/webnn_device.mojom-blink-forward.h"
-#include "third_party/blink/renderer/bindings/modules/v8/v8_ml_transpose_options.h"
-#ifdef UNSAFE_BUFFERS_BUILD
-// TODO(crbug.com/390223051): Remove C-library calls to fix the errors.
-#pragma allow_unsafe_libc_calls
-#endif
+#include "third_party/blink/renderer/modules/ml/webnn/ml_graph.h"
 
 #include <limits.h>
 
@@ -17,6 +11,7 @@
 #include <optional>
 #include <utility>
 
+#include "base/compiler_specific.h"
 #include "base/containers/span.h"
 #include "base/memory/raw_ref.h"
 #include "base/notimplemented.h"
@@ -34,6 +29,7 @@
 #include "services/webnn/public/cpp/operand_descriptor.h"
 #include "services/webnn/public/mojom/features.mojom-blink.h"
 #include "services/webnn/public/mojom/webnn_context_provider.mojom-blink.h"
+#include "services/webnn/public/mojom/webnn_device.mojom-blink-forward.h"
 #include "services/webnn/public/mojom/webnn_graph.mojom-blink.h"
 #include "services/webnn/public/mojom/webnn_graph_builder.mojom-blink.h"
 #include "services/webnn/public/mojom/webnn_tensor.mojom-blink.h"
@@ -59,6 +55,7 @@
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_operator_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_recurrent_network_activation.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_tensor_descriptor.h"
+#include "third_party/blink/renderer/bindings/modules/v8/v8_ml_transpose_options.h"
 #include "third_party/blink/renderer/bindings/modules/v8/v8_ml_triangular_options.h"
 #include "third_party/blink/renderer/core/dom/dom_exception.h"
 #include "third_party/blink/renderer/core/typed_arrays/array_buffer_view_helpers.h"
@@ -67,7 +64,6 @@
 #include "third_party/blink/renderer/core/typed_arrays/dom_typed_array.h"
 #include "third_party/blink/renderer/modules/ml/ml.h"
 #include "third_party/blink/renderer/modules/ml/ml_context.h"
-#include "third_party/blink/renderer/modules/ml/webnn/ml_graph.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_builder_test_utils.h"
 #include "third_party/blink/renderer/modules/ml/webnn/ml_graph_transform/ml_graph_transformer.h"
@@ -197,8 +193,8 @@ Vector<T> GetArrayBufferViewValues(
     MaybeShared<DOMArrayBufferView> array_buffer_view) {
   Vector<T> values(base::checked_cast<wtf_size_t>(
       array_buffer_view->byteLength() / array_buffer_view->TypeSize()));
-  memcpy(values.data(), array_buffer_view->BaseAddress(),
-         array_buffer_view->byteLength());
+  UNSAFE_TODO(memcpy(values.data(), array_buffer_view->BaseAddress(),
+                     array_buffer_view->byteLength()));
   return values;
 }
 
@@ -1797,6 +1793,54 @@ TEST_F(MLGraphTest, MLTransposeEliminationTransformerTest) {
   }
 
   {
+    {
+      DummyExceptionStateForTesting exception_state;
+      auto* builder = MLGraphBuilder::Create(scope.GetScriptState(), context,
+                                             exception_state);
+      ASSERT_THAT(builder, testing::NotNull());
+      // [a] -> transpose -> [b] -> transpose -> [c] -> relu -> [d]
+      //  b and d are graph outputs.
+
+      auto* a =
+          BuildInput(scope.GetScriptState(), builder, "a", {3, 4, 5},
+                     V8MLOperandDataType::Enum::kFloat32, exception_state);
+      auto* transpose_options = MLTransposeOptions::Create();
+      transpose_options->setPermutation({0, 2, 1});
+      auto* b = builder->transpose(a, transpose_options, exception_state);
+      ASSERT_THAT(b, testing::NotNull());
+      auto* transpose_options2 = MLTransposeOptions::Create();
+      transpose_options2->setPermutation({0, 2, 1});
+      auto* c = builder->transpose(b, transpose_options2, exception_state);
+      ASSERT_THAT(c, testing::NotNull());
+      auto* relu_options = MLOperatorOptions::Create();
+      auto* d = builder->relu(c, relu_options, exception_state);
+      ASSERT_THAT(d, testing::NotNull());
+      EXPECT_EQ(d->Shape(), std::vector<uint32_t>({3, 4, 5}));
+      MLNamedOperands named_outputs = {{"b", b}, {"d", d}};
+
+      auto* transpose_elimination_transformer =
+          MakeGarbageCollected<TransposeEliminationTransformer>(builder);
+      transpose_elimination_transformer->Transform(named_outputs);
+
+      // Expect no change in the graph.
+      EXPECT_EQ(b->Operator()->Inputs()[0], a);
+      EXPECT_EQ(c->Operator()->Inputs()[0], b);
+      EXPECT_EQ(d->Operator()->Inputs()[0], c);
+
+      auto [graph, error_name, error_message] =
+          BuildGraph(scope, builder, named_outputs);
+      ASSERT_THAT(graph, testing::NotNull());
+      const auto& inputs = graph->GetInputConstraints();
+      EXPECT_EQ(inputs.size(), static_cast<uint32_t>(1));
+      EXPECT_EQ(*inputs.at("a"), a->Descriptor());
+      const auto& outputs = graph->GetOutputConstraints();
+      EXPECT_EQ(outputs.size(), static_cast<uint32_t>(2));
+      EXPECT_EQ(*outputs.at("b"), b->Descriptor());
+      EXPECT_EQ(*outputs.at("d"), d->Descriptor());
+    }
+  }
+
+  {
     DummyExceptionStateForTesting exception_state;
     auto* builder = MLGraphBuilder::Create(scope.GetScriptState(), context,
                                            exception_state);
@@ -1854,6 +1898,52 @@ TEST_F(MLGraphTest, MLTransposeEliminationTransformerTest) {
     const auto& outputs = graph->GetOutputConstraints();
     EXPECT_EQ(outputs.size(), static_cast<uint32_t>(1));
     EXPECT_EQ(*outputs.at("d"), updated_c->Descriptor());
+  }
+
+  {
+    DummyExceptionStateForTesting exception_state;
+    auto* builder = MLGraphBuilder::Create(scope.GetScriptState(), context,
+                                           exception_state);
+    ASSERT_THAT(builder, testing::NotNull());
+
+    // [a] -> transpose -> [b] -> relu -> [c] -> transpose -> [d]
+    // c and d are graph outputs.
+    auto* a = BuildInput(scope.GetScriptState(), builder, "a", {3, 4, 5},
+                         V8MLOperandDataType::Enum::kFloat32, exception_state);
+    auto* transpose_options = MLTransposeOptions::Create();
+    transpose_options->setPermutation({0, 2, 1});
+    auto* b = builder->transpose(a, transpose_options, exception_state);
+    ASSERT_THAT(b, testing::NotNull());
+    auto* relu_options = MLOperatorOptions::Create();
+    auto* c = builder->relu(b, relu_options, exception_state);
+    ASSERT_THAT(c, testing::NotNull());
+    auto* transpose_options2 = MLTransposeOptions::Create();
+    transpose_options2->setPermutation({0, 2, 1});
+    auto* d = builder->transpose(c, transpose_options2, exception_state);
+    ASSERT_THAT(d, testing::NotNull());
+
+    EXPECT_EQ(d->Shape(), std::vector<uint32_t>({3, 4, 5}));
+    MLNamedOperands named_outputs = {{"c", c}, {"d", d}};
+
+    auto* transpose_elimination_transformer =
+        MakeGarbageCollected<TransposeEliminationTransformer>(builder);
+    transpose_elimination_transformer->Transform(named_outputs);
+
+    // Expect no change in the graph.
+    EXPECT_EQ(b->Operator()->Inputs()[0], a);
+    EXPECT_EQ(c->Operator()->Inputs()[0], b);
+    EXPECT_EQ(d->Operator()->Inputs()[0], c);
+
+    auto [graph, error_name, error_message] =
+        BuildGraph(scope, builder, named_outputs);
+    ASSERT_THAT(graph, testing::NotNull());
+    const auto& inputs = graph->GetInputConstraints();
+    EXPECT_EQ(inputs.size(), static_cast<uint32_t>(1));
+    EXPECT_EQ(*inputs.at("a"), a->Descriptor());
+    const auto& outputs = graph->GetOutputConstraints();
+    EXPECT_EQ(outputs.size(), static_cast<uint32_t>(2));
+    EXPECT_EQ(*outputs.at("c"), c->Descriptor());
+    EXPECT_EQ(*outputs.at("d"), d->Descriptor());
   }
 
   {

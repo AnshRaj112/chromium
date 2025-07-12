@@ -402,6 +402,10 @@ inline constexpr char kIosChooseFromDriveFilePickerPolicySettings[] =
 inline constexpr char kIosSavedThemeSpecificsIos[] =
     "ios.saved_theme_specifics_ios";
 
+// Dictionary pref storing user-uploaded background image path and framing data.
+inline constexpr char kIosUserUploadedBackground[] =
+    "ios.user_uploaded_background";
+
 // String preference containing the default account to use for saving images to
 // Google Photos.
 inline constexpr char kIosSaveToPhotosDefaultGaiaId[] =
@@ -779,6 +783,14 @@ inline constexpr char kIosSyncInfobarErrorLastDismissedTimestamp[] =
 
 // A boolean specifying whether the bwg consent form has been accepted.
 inline constexpr char kIOSBwgConsent[] = "ios.bwg.consent";
+
+// A boolean specifying whether the BWG precise location setting is enabled.
+inline constexpr char kIOSBWGPreciseLocationSetting[] =
+    "ios.bwg.precise.location.setting";
+
+// A boolean specifying whether the BWG page content setting is enabled.
+inline constexpr char kIOSBWGPageContentSetting[] =
+    "ios.bwg.page.content.setting";
 
 // A boolean specifying whether the BWG Promo was shown manually.
 inline constexpr char kIOSBWGManualPromo[] = "ios.bwg.manual_promo";

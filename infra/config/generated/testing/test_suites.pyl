@@ -2534,33 +2534,6 @@
       },
     },
 
-    'chromeos_tfc_tests': {
-      'chromeos_chrome_all_tast_tests_tfc': {
-        'mixins': [
-          'skylab-50-tests-per-shard',
-        ],
-        'variants': [
-          'CROS_RELEASE_LKGM',
-        ],
-      },
-      'chromeos_chrome_criticalstaging_tast_tests_tfc': {
-        'mixins': [
-          'skylab-50-tests-per-shard',
-        ],
-        'variants': [
-          'CROS_RELEASE_LKGM',
-        ],
-      },
-      'chromeos_chrome_disabled_tast_tests_tfc': {
-        'mixins': [
-          'skylab-20-tests-per-shard',
-        ],
-        'variants': [
-          'CROS_RELEASE_LKGM',
-        ],
-      },
-    },
-
     'chromeos_trogdor_skylab_tests': {
       'chromeos_chrome_all_tast_tests': {
         'mixins': [
@@ -2880,7 +2853,6 @@
     },
 
     'optimization_guide_mac_script_tests': {
-      'chrome_ai_wpt_tests_suite': {},
       'model_validation_tests_light_suite': {},
       'model_validation_tests_suite': {},
       'ondevice_stability_tests_suite': {},

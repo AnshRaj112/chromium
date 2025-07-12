@@ -222,8 +222,7 @@ bool WebAppBrowserController::HasReloadButton() const {
 }
 
 bool WebAppBrowserController::HasPendingUpdate() const {
-  if (!base::FeatureList::IsEnabled(
-          features::kWebAppEnableUpdateTokenParsing)) {
+  if (!base::FeatureList::IsEnabled(features::kWebAppPredictableAppUpdating)) {
     return false;
   }
   const WebApp* app = registrar().GetAppById(app_id());
@@ -380,6 +379,10 @@ gfx::ImageSkia WebAppBrowserController::GetHomeTabIcon() const {
 }
 
 gfx::ImageSkia WebAppBrowserController::GetFallbackHomeTabIcon() const {
+  return provider_->icon_manager().GetFaviconImageSkia(app_id());
+}
+
+gfx::ImageSkia WebAppBrowserController::GetAppMenuIcon() const {
   return provider_->icon_manager().GetFaviconImageSkia(app_id());
 }
 

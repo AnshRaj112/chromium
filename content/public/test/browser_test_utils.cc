@@ -98,7 +98,6 @@
 #include "content/public/test/test_utils.h"
 #include "content/test/did_commit_navigation_interceptor.h"
 #include "content/test/mock_commit_deferring_condition.h"
-#include "ipc/ipc_security_test_util.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
@@ -4172,13 +4171,9 @@ blink::mojom::BlobURLStore* BlobURLStoreInterceptor::GetForwardingInterface() {
 void BlobURLStoreInterceptor::Register(
     mojo::PendingRemote<blink::mojom::Blob> blob,
     const GURL& url,
-    // TODO(crbug.com/40775506): Remove these once experiment is over.
-    const base::UnguessableToken& unsafe_agent_cluster_id,
-    const std::optional<net::SchemefulSite>& unsafe_top_level_site,
     RegisterCallback callback) {
-  GetForwardingInterface()->Register(
-      std::move(blob), target_url_, unsafe_agent_cluster_id,
-      unsafe_top_level_site, std::move(callback));
+  GetForwardingInterface()->Register(std::move(blob), target_url_,
+                                     std::move(callback));
 }
 
 BlobURLStoreInterceptor::BlobURLStoreInterceptor(GURL target_url)

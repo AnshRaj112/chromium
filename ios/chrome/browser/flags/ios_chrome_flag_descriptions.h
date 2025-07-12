@@ -23,6 +23,9 @@ namespace flag_descriptions {
 extern const char kAddAddressManuallyName[];
 extern const char kAddAddressManuallyDescription[];
 
+extern const char kAIMPrototypeName[];
+extern const char kAIMPrototypeDescription[];
+
 extern const char kAppBackgroundRefreshName[];
 extern const char kAppBackgroundRefreshDescription[];
 
@@ -129,9 +132,6 @@ extern const char kAutofillUploadCardRequestTimeoutDescription[];
 
 extern const char kAutofillUseRendererIDsName[];
 extern const char kAutofillUseRendererIDsDescription[];
-
-extern const char kAutofillVcnEnrollRequestTimeoutName[];
-extern const char kAutofillVcnEnrollRequestTimeoutDescription[];
 
 extern const char kAutofillVcnEnrollStrikeExpiryTimeName[];
 extern const char kAutofillVcnEnrollStrikeExpiryTimeDescription[];
@@ -659,6 +659,9 @@ extern const char kOmniboxMobileParityUpdateDescription[];
 
 extern const char kOmniboxMobileParityUpdateV2Name[];
 extern const char kOmniboxMobileParityUpdateV2Description[];
+
+extern const char kOmniboxMobileParityUpdateV3Name[];
+extern const char kOmniboxMobileParityUpdateV3Description[];
 
 extern const char kOmniboxOnClobberFocusTypeOnIOSName[];
 extern const char kOmniboxOnClobberFocusTypeOnIOSDescription[];

@@ -8,15 +8,16 @@ import '//resources/cr_elements/cr_collapse/cr_collapse.js';
 import '//resources/cr_elements/cr_expand_button/cr_expand_button.js';
 
 import type {CrToastElement} from '//resources/cr_elements/cr_toast/cr_toast.js';
-import {assert} from '//resources/js/assert.js';
 import {CrRouter} from '//resources/js/cr_router.js';
 import {CrLitElement} from '//resources/lit/v3_0/lit.rollup.js';
 import type {BigBuffer} from '//resources/mojo/mojo/public/mojom/base/big_buffer.mojom-webui.js';
+import type {Token} from '//resources/mojo/mojo/public/mojom/base/token.mojom-webui.js';
 
 import {TraceConfig, TraceConfig_BufferConfig_FillPolicy} from './perfetto_config.js';
 import type {TrackEventConfig} from './perfetto_config.js';
 import {getCss} from './trace_recorder.css.js';
 import {getHtml} from './trace_recorder.html.js';
+import {downloadTraceData} from './trace_util.js';
 import {TracesBrowserProxy} from './traces_browser_proxy.js';
 import type {TraceCategory} from './traces_internals.mojom-webui.js';
 
@@ -48,12 +49,18 @@ export class TraceRecorderElement extends CrLitElement {
 
   static override get properties() {
     return {
-      traceConfig: {type: Object},
       toastMessage: {type: String},
       tracingState: {type: String},
-      traceCategories: {type: Array},
+      trackEventCategories: {type: Array},
+      trackEventTags: {type: Array},
+      privacyFilterEnabled_: {type: Boolean},
+      traceConfig: {type: Object},
       trackEventConfig: {type: Object},
+      enabledCategories: {type: Object},
+      enabledTags: {type: Object},
+      disabledTags: {type: Object},
       categoriesExpanded_: {type: Boolean},
+      tagsExpanded_: {type: Boolean},
       bufferUsage: {type: Number},
       hadDataLoss: {type: Boolean},
     };
@@ -77,17 +84,28 @@ export class TraceRecorderElement extends CrLitElement {
   protected accessor toastMessage: string = '';
   // Initialize the tracing state to IDLE.
   protected accessor tracingState: TracingState = TracingState.IDLE;
-  protected accessor traceCategories: TraceCategory[] = [];
+
+  protected accessor trackEventCategories: TraceCategory[] = [];
+  protected accessor trackEventTags: string[] = [];
+
+  protected accessor privacyFilterEnabled_: boolean = false;
+
   protected accessor traceConfig: TraceConfig|undefined;
   protected accessor trackEventConfig: TrackEventConfig|undefined;
+  protected accessor enabledCategories: Set<string> = new Set();
+  protected accessor enabledTags: Set<string> = new Set();
+  protected accessor disabledTags: Set<string> = new Set();
+
   protected accessor categoriesExpanded_: boolean = false;
+  protected accessor tagsExpanded_: boolean = false;
+
   protected accessor bufferUsage: number = 0;
   protected accessor hadDataLoss: boolean = false;
 
   override connectedCallback() {
     super.connectedCallback();
     this.loadConfigFromUrl_();
-    this.loadTraceCategories_();
+    this.loadEventCategories_();
     CrRouter.getInstance().addEventListener(
         'cr-router-path-changed', this.boundLoadConfigFromUrl_);
     this.onTraceCompleteListenerId_ =
@@ -148,8 +166,8 @@ export class TraceRecorderElement extends CrLitElement {
     // Set state to RECORDING immediately to disable start button.
     this.tracingState = TracingState.STARTING;
 
-    const {success} =
-        await this.browserProxy_.handler.startTraceSession(bigBufferConfig);
+    const {success} = await this.browserProxy_.handler.startTraceSession(
+        bigBufferConfig, this.privacyFilterEnabled_);
 
     if (!success) {
       this.showToast_('Failed to start tracing.');
@@ -179,91 +197,133 @@ export class TraceRecorderElement extends CrLitElement {
   }
 
   protected async cloneTraceSession_(): Promise<void> {
-    const {trace} = await this.browserProxy_.handler.cloneTraceSession();
-    this.downloadData_(trace);
+    const {trace, uuid} = await this.browserProxy_.handler.cloneTraceSession();
+    this.downloadData_(trace, uuid);
+  }
+
+  protected privacyFilterDidChange_(event: CustomEvent<boolean>) {
+    if (this.privacyFilterEnabled_ === event.detail) {
+      return;
+    }
+    this.privacyFilterEnabled_ = event.detail;
   }
 
   protected onCategoriesExpandedChanged_(e: CustomEvent<{value: boolean}>) {
     this.categoriesExpanded_ = e.detail.value;
   }
 
-  protected isEnabled(categoryName: string): boolean {
-    if (!this.trackEventConfig?.enabledCategories) {
-      return false;
+  protected onTagsExpandedChanged_(e: CustomEvent<{value: boolean}>) {
+    this.tagsExpanded_ = e.detail.value;
+  }
+
+  protected isCategoryEnabled(category: TraceCategory): boolean {
+    if (this.enabledCategories.has(category.name)) {
+      return true;
     }
-    return this.trackEventConfig.enabledCategories.includes(categoryName);
+    return this.isCategoryForced(category);
+  }
+
+  protected isCategoryForced(category: TraceCategory): boolean {
+    for (const tag of category.tags) {
+      if (this.disabledTags.has(tag)) {
+        return false;
+      }
+      if (this.enabledTags.has(tag)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  protected isTagEnabled(tagName: string): boolean {
+    return this.enabledTags.has(tagName);
+  }
+
+  protected isTagDisabled(tagName: string): boolean {
+    return this.disabledTags.has(tagName);
   }
 
   protected onCategoryChange_(event: Event, categoryName: string): void {
-    if (!this.trackEventConfig?.enabledCategories) {
+    if (!this.trackEventConfig) {
       return;
     }
     const isChecked = (event.target as HTMLInputElement).checked;
-    const enabledSet = new Set(this.trackEventConfig.enabledCategories);
 
     if (isChecked) {
-      enabledSet.add(categoryName);
+      this.enabledCategories.add(categoryName);
     } else {
-      enabledSet.delete(categoryName);
+      this.enabledCategories.delete(categoryName);
     }
-    this.trackEventConfig.enabledCategories = [...enabledSet];
+    this.trackEventConfig.enabledCategories = [...this.enabledCategories];
+    // Reset property to force UI update.
+    this.enabledCategories = new Set(this.trackEventConfig.enabledCategories);
 
     this.updateUrlFromConfig_();
   }
 
-  private getArrayFromBigBuffer(bigBuffer: BigBuffer): Uint8Array {
-    if (Array.isArray(bigBuffer.bytes)) {
-      return new Uint8Array(bigBuffer.bytes);
+  protected onTagsChange_(event: Event, tagName: string, enabled: boolean):
+      void {
+    if (!this.trackEventConfig) {
+      return;
     }
-    assert(!!bigBuffer.sharedMemory, 'sharedMemory must be defined here');
-    const sharedMemory = bigBuffer.sharedMemory;
-    const {buffer, result} =
-        sharedMemory.bufferHandle.mapBuffer(0, sharedMemory.size);
-    assert(result === Mojo.RESULT_OK, 'Could not map buffer');
-    return new Uint8Array(buffer);
+    const isChecked = (event.target as HTMLInputElement).checked;
+
+    const primarySet = enabled ? this.enabledTags : this.disabledTags;
+    const secondarySet = enabled ? this.disabledTags : this.enabledTags;
+    if (isChecked) {
+      primarySet.add(tagName);
+      secondarySet.delete(tagName);
+    } else {
+      primarySet.delete(tagName);
+    }
+    this.trackEventConfig.enabledTags = [...this.enabledTags];
+    this.trackEventConfig.disabledTags = [...this.disabledTags];
+    // Reset properties to force UI update.
+    this.enabledTags = new Set(this.trackEventConfig.enabledTags);
+    this.disabledTags = new Set(this.trackEventConfig.disabledTags);
+
+    this.updateUrlFromConfig_();
   }
 
-  private downloadData_(traceData: BigBuffer|null): void {
-    if (!traceData) {
+  private downloadData_(traceData: BigBuffer|null, uuid: Token|null): void {
+    if (!traceData || !uuid) {
       this.showToast_('Failed to download trace or no trace data.');
       return;
     }
     try {
-      const traceArray = this.getArrayFromBigBuffer(traceData);
-      const blob = new Blob([traceArray], {
-        type: 'application/octet-stream',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-
-      const now = new Date();
-      a.download = `${
-          now.toLocaleString(
-              /*locales=*/ undefined, {
-                hour: 'numeric',
-                minute: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-                hour12: true,
-              })}.gz`;
-      a.click();
+      downloadTraceData(traceData, uuid);
     } catch (e) {
       this.showToast_(`Error downloading trace: ${e}`);
     }
   }
 
-  private async loadTraceCategories_(): Promise<void> {
-    const {categories} =
+  private async loadEventCategories_(): Promise<void> {
+    let {categories} =
         await this.browserProxy_.handler.getTrackEventCategories();
+
+    // Filter category groups.
+    categories = categories.filter(category => !category.isGroup);
+
+    // Create a map to get unique categories by name, keeping the last one
+    // found.
+    categories = Array.from(categories
+                                .reduce(
+                                    (map, category) => {
+                                      map.set(category.name, category);
+                                      return map;
+                                    },
+                                    new Map<string, TraceCategory>())
+                                .values());
+
+    // Sort the unique categories and assign them.
     const disabledPrefix = 'disabled-by-default-';
-    this.traceCategories =
-        categories.filter((category: TraceCategory) => !category.isGroup)
-            .sort(
-                (a, b) =>
-                    a.name.replace(disabledPrefix, '')
-                        .localeCompare(b.name.replace(disabledPrefix, '')));
+    this.trackEventCategories = categories.sort(
+        (a, b) => a.name.replace(disabledPrefix, '')
+                      .localeCompare(b.name.replace(disabledPrefix, '')));
+
+    // Extract unique tags using flatMap and a Set.
+    this.trackEventTags =
+        [...new Set(categories.map(category => category.tags).flat())];
   }
 
   // Decodes a Base64 string into a Uint8Array.
@@ -303,7 +363,7 @@ export class TraceRecorderElement extends CrLitElement {
     return bigBuffer;
   }
 
-  private onTraceComplete_(trace: BigBuffer|null): void {
+  private onTraceComplete_(trace: BigBuffer|null, uuid: Token|null): void {
     if (this.bufferPollIntervalId_ !== null) {
       window.clearInterval(this.bufferPollIntervalId_);
       this.bufferPollIntervalId_ = null;
@@ -311,7 +371,7 @@ export class TraceRecorderElement extends CrLitElement {
     this.bufferUsage = 0;
     this.hadDataLoss = false;
 
-    this.downloadData_(trace);
+    this.downloadData_(trace, uuid);
 
     // Crucially, only set to IDLE here after the trace has been
     // processed/handled.
@@ -339,23 +399,26 @@ export class TraceRecorderElement extends CrLitElement {
 
     if (serializedConfig.length === 0) {
       this.initializeDefaultConfig_();
-      return;
-    }
+    } else {
+      try {
+        this.traceConfig = TraceConfig.decode(serializedConfig);
 
-    try {
-      this.traceConfig = TraceConfig.decode(serializedConfig);
-
-      const trackEventDataSource = this.traceConfig.dataSources?.find(
-          ds => ds.config?.trackEventConfig !== undefined);
-      if (trackEventDataSource) {
-        this.trackEventConfig = trackEventDataSource.config?.trackEventConfig;
-      } else {
-        this.trackEventConfig = this.createDefaultTrackEventConfig_();
-        this.setDataSource_(this.traceConfig, this.trackEventConfig);
+        const trackEventDataSource = this.traceConfig.dataSources?.find(
+            ds => ds.config?.trackEventConfig !== undefined);
+        if (trackEventDataSource) {
+          this.trackEventConfig = trackEventDataSource.config?.trackEventConfig;
+        } else {
+          this.trackEventConfig = this.createDefaultTrackEventConfig_();
+          this.setDataSource_(this.traceConfig, this.trackEventConfig);
+        }
+      } catch (e) {
+        this.showToast_(`Could not parse trace config: ${e}`);
+        this.initializeDefaultConfig_();
       }
-    } catch (e) {
-      this.showToast_(`Could not parse trace config: ${e}`);
     }
+    this.enabledCategories = new Set(this.trackEventConfig?.enabledCategories);
+    this.enabledTags = new Set(this.trackEventConfig?.enabledTags);
+    this.disabledTags = new Set(this.trackEventConfig?.disabledTags);
   }
 
   private updateUrlFromConfig_(): void {
@@ -403,9 +466,9 @@ export class TraceRecorderElement extends CrLitElement {
   private createDefaultTrackEventConfig_(): TrackEventConfig {
     return {
       enabledCategories: [],
-      disabledCategories: [],
+      disabledCategories: ['*'],
       enabledTags: [],
-      disabledTags: [],
+      disabledTags: ['slow', 'debug', 'sensitive'],
     };
   }
 

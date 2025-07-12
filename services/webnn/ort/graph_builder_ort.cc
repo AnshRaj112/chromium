@@ -80,6 +80,7 @@ constexpr base::cstring_view kOpTypeMatMul = "MatMul";
 constexpr base::cstring_view kOpTypePad = "Pad";
 constexpr base::cstring_view kOpTypePRelu = "PRelu";
 constexpr base::cstring_view kOpTypeRelu = "Relu";
+constexpr base::cstring_view kOpTypeResample2d = "Resize";
 constexpr base::cstring_view kOpTypeReshape = "Reshape";
 constexpr base::cstring_view kOpTypeScatterElements = "ScatterElements";
 constexpr base::cstring_view kOpTypeScatterND = "ScatterND";
@@ -97,6 +98,18 @@ constexpr base::cstring_view kOpTypeWhere = "Where";
 constexpr base::cstring_view kOpTypeAveragePool2d = "AveragePool";
 constexpr base::cstring_view kOpTypeMaxPool2d = "MaxPool";
 constexpr base::cstring_view kOpTypeLpPool2d = "LpPool";
+
+// Reduction operations
+constexpr char kOpTypeReduceL1[] = "ReduceL1";
+constexpr char kOpTypeReduceL2[] = "ReduceL2";
+constexpr char kOpTypeReduceLogSum[] = "ReduceLogSum";
+constexpr char kOpTypeReduceLogSumExp[] = "ReduceLogSumExp";
+constexpr char kOpTypeReduceMax[] = "ReduceMax";
+constexpr char kOpTypeReduceMean[] = "ReduceMean";
+constexpr char kOpTypeReduceMin[] = "ReduceMin";
+constexpr char kOpTypeReduceProd[] = "ReduceProd";
+constexpr char kOpTypeReduceSum[] = "ReduceSum";
+constexpr char kOpTypeReduceSumSquare[] = "ReduceSumSquare";
 
 constexpr std::string_view kInserted = "Inserted";
 constexpr std::string_view kToEmulate = "ToEmulate";
@@ -184,6 +197,70 @@ int64_t CalculateOutputPaddingSize(int64_t input_size,
   // re-compute it by using other attributes.
   CHECK(output_padding.IsValid());
   return output_padding.ValueOrDie();
+}
+
+void CheckReduceInputSupported(const DataTypeLimits& data_type_limits,
+                               mojom::Reduce::Kind kind,
+                               const OperandDescriptor& input_descriptor) {
+  switch (kind) {
+    case mojom::Reduce::Kind::kL1:
+      CHECK(data_type_limits.reduce_l1_input.Supports(input_descriptor));
+      break;
+    case mojom::Reduce::Kind::kL2:
+      CHECK(data_type_limits.reduce_l2_input.Supports(input_descriptor));
+      break;
+    case mojom::Reduce::Kind::kLogSum:
+      CHECK(data_type_limits.reduce_log_sum_input.Supports(input_descriptor));
+      break;
+    case mojom::Reduce::Kind::kLogSumExp:
+      CHECK(
+          data_type_limits.reduce_log_sum_exp_input.Supports(input_descriptor));
+      break;
+    case mojom::Reduce::Kind::kMax:
+      CHECK(data_type_limits.reduce_max_input.Supports(input_descriptor));
+      break;
+    case mojom::Reduce::Kind::kMean:
+      CHECK(data_type_limits.reduce_mean_input.Supports(input_descriptor));
+      break;
+    case mojom::Reduce::Kind::kMin:
+      CHECK(data_type_limits.reduce_min_input.Supports(input_descriptor));
+      break;
+    case mojom::Reduce::Kind::kProduct:
+      CHECK(data_type_limits.reduce_product_input.Supports(input_descriptor));
+      break;
+    case mojom::Reduce::Kind::kSum:
+      CHECK(data_type_limits.reduce_sum_input.Supports(input_descriptor));
+      break;
+    case mojom::Reduce::Kind::kSumSquare:
+      CHECK(
+          data_type_limits.reduce_sum_square_input.Supports(input_descriptor));
+      break;
+  }
+}
+
+std::string MapReduceKindToOrtOpType(mojom::Reduce::Kind kind) {
+  switch (kind) {
+    case mojom::Reduce::Kind::kL1:
+      return kOpTypeReduceL1;
+    case mojom::Reduce::Kind::kL2:
+      return kOpTypeReduceL2;
+    case mojom::Reduce::Kind::kLogSum:
+      return kOpTypeReduceLogSum;
+    case mojom::Reduce::Kind::kLogSumExp:
+      return kOpTypeReduceLogSumExp;
+    case mojom::Reduce::Kind::kMax:
+      return kOpTypeReduceMax;
+    case mojom::Reduce::Kind::kMean:
+      return kOpTypeReduceMean;
+    case mojom::Reduce::Kind::kMin:
+      return kOpTypeReduceMin;
+    case mojom::Reduce::Kind::kProduct:
+      return kOpTypeReduceProd;
+    case mojom::Reduce::Kind::kSum:
+      return kOpTypeReduceSum;
+    case mojom::Reduce::Kind::kSumSquare:
+      return kOpTypeReduceSumSquare;
+  }
 }
 
 }  // namespace
@@ -812,56 +889,49 @@ void GraphBuilderOrt::AddElementWiseBinaryOperation(
     case mojom::ElementWiseBinary::Kind::kEqual: {
       CHECK(data_type_limits.equal_input.SupportsAll(
           {lhs_descriptor, rhs_descriptor}));
-      AddLogicalBinaryOperation(element_wise_binary, kOpTypeEqual);
-      break;
+      return AddLogicalBinaryOperation(element_wise_binary, kOpTypeEqual);
     }
     case mojom::ElementWiseBinary::Kind::kNotEqual: {
       CHECK(data_type_limits.not_equal_input.SupportsAll(
           {lhs_descriptor, rhs_descriptor}));
-      AddLogicalNotEqualOperation(element_wise_binary);
-      break;
+      return AddLogicalNotEqualOperation(element_wise_binary);
     }
     case mojom::ElementWiseBinary::Kind::kGreater: {
       CHECK(data_type_limits.greater_input.SupportsAll(
           {lhs_descriptor, rhs_descriptor}));
-      AddLogicalBinaryOperation(element_wise_binary, kOpTypeGreater);
-      break;
+      return AddLogicalBinaryOperation(element_wise_binary, kOpTypeGreater);
     }
     case mojom::ElementWiseBinary::Kind::kGreaterOrEqual: {
       CHECK(data_type_limits.greater_or_equal_input.SupportsAll(
           {lhs_descriptor, rhs_descriptor}));
-      AddLogicalBinaryOperation(element_wise_binary, kOpTypeGreaterOrEqual);
-      break;
+      return AddLogicalBinaryOperation(element_wise_binary,
+                                       kOpTypeGreaterOrEqual);
     }
     case mojom::ElementWiseBinary::Kind::kLesser: {
       CHECK(data_type_limits.lesser_input.SupportsAll(
           {lhs_descriptor, rhs_descriptor}));
-      AddLogicalBinaryOperation(element_wise_binary, kOpTypeLesser);
-      break;
+      return AddLogicalBinaryOperation(element_wise_binary, kOpTypeLesser);
     }
     case mojom::ElementWiseBinary::Kind::kLesserOrEqual: {
       CHECK(data_type_limits.lesser_or_equal_input.SupportsAll(
           {lhs_descriptor, rhs_descriptor}));
-      AddLogicalBinaryOperation(element_wise_binary, kOpTypeLesserOrEqual);
-      break;
+      return AddLogicalBinaryOperation(element_wise_binary,
+                                       kOpTypeLesserOrEqual);
     }
     case mojom::ElementWiseBinary::Kind::kLogicalAnd: {
       CHECK(data_type_limits.logical_and_input.SupportsAll(
           {lhs_descriptor, rhs_descriptor}));
-      AddLogicalBinaryOperation(element_wise_binary, kOpTypeLogicalAnd);
-      break;
+      return AddLogicalBinaryOperation(element_wise_binary, kOpTypeLogicalAnd);
     }
     case mojom::ElementWiseBinary::Kind::kLogicalOr: {
       CHECK(data_type_limits.logical_or_input.SupportsAll(
           {lhs_descriptor, rhs_descriptor}));
-      AddLogicalBinaryOperation(element_wise_binary, kOpTypeLogicalOr);
-      break;
+      return AddLogicalBinaryOperation(element_wise_binary, kOpTypeLogicalOr);
     }
     case mojom::ElementWiseBinary::Kind::kLogicalXor: {
       CHECK(data_type_limits.logical_xor_input.SupportsAll(
           {lhs_descriptor, rhs_descriptor}));
-      AddLogicalBinaryOperation(element_wise_binary, kOpTypeLogicalXor);
-      break;
+      return AddLogicalBinaryOperation(element_wise_binary, kOpTypeLogicalXor);
     }
   }
 }
@@ -898,8 +968,7 @@ void GraphBuilderOrt::AddElementWiseUnaryOperation(
     }
     case mojom::ElementWiseUnary::Kind::kLogicalNot: {
       CHECK(data_type_limits.logical_not_input.Supports(input_descriptor));
-      AddLogicalNotOperation(element_wise_unary);
-      break;
+      return AddLogicalNotOperation(element_wise_unary);
     }
     case mojom::ElementWiseUnary::Kind::kNeg: {
       CHECK(data_type_limits.neg_input.Supports(input_descriptor));
@@ -1046,8 +1115,7 @@ void GraphBuilderOrt::AddGatherNDOperation(const mojom::GatherND& gather_nd) {
   std::string int64_indices =
       indices_descriptor.data_type() == OperandDataType::kInt64
           ? indices
-          : CreateCastNode(indices,
-                           WebnnToOnnxDataType(OperandDataType::kInt64));
+          : CreateCastNode(indices, ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64);
 
   // Clamp the indices operand to prevent out-of-bounds reading which will cause
   // ORT CPU EP to throw a runtime error.
@@ -1257,6 +1325,134 @@ void GraphBuilderOrt::AddPool2dOperation(const mojom::Pool2d& pool2d) {
   model_editor_.AddNode(op_type, node_name, inputs, outputs, attributes);
 }
 
+void GraphBuilderOrt::AddReduceOperation(const mojom::Reduce& reduce) {
+  const std::string input = GetOperandNameById(reduce.input_operand_id);
+  const std::string output = GetOperandNameById(reduce.output_operand_id);
+  std::vector<const char*> inputs = {input.c_str()};
+  std::array<const char*, 1> outputs = {output.c_str()};
+
+  CheckReduceInputSupported(context_properties_.data_type_limits, reduce.kind,
+                            GetOperand(reduce.input_operand_id).descriptor);
+
+  // According to
+  // https://webmachinelearning.github.io/webnn/#api-mlgraphbuilder-reduce,
+  // if axes is empty, WebNN applies reduction function to each value in the
+  // tensor individually with no dimensions reduced, but the ONNX reduction
+  // operations either reduce all dimensions or act as a no-op. So we need to
+  // emulate the behavior of reducing each value individually:
+  // 1. Element-wise log for reduceLogSum
+  // 2. Element-wise pow of 2 for reduceSumSquare
+  // 3. Element-wise abs for reduceL1 and reduceL2
+  // 4. No-op for other reduction operations e.g. reduceMin and reduceSum
+  //
+  // TODO(crbug.com/429272269): Remove the workaround for reduction operations
+  // when ORT issue is fixed.
+  if (reduce.axes.empty()) {
+    switch (reduce.kind) {
+      case mojom::Reduce::Kind::kLogSum: {
+        const std::string node_name = GenerateNodeName(base::JoinString(
+            {kInserted, kOpTypeLog, kToEmulate, reduce.label}, kUnderscore));
+        model_editor_.AddNode(kOpTypeLog, node_name, inputs, outputs);
+        return;
+      }
+      case mojom::Reduce::Kind::kSumSquare: {
+        const std::string node_name = GenerateNodeName(base::JoinString(
+            {kInserted, kOpTypePow, kToEmulate, reduce.label}, kUnderscore));
+        const std::string pow = CreateScalarInitializer<int64_t>(2);
+        inputs.push_back(pow.c_str());
+        model_editor_.AddNode(kOpTypePow, node_name, inputs, outputs);
+        return;
+      }
+      case mojom::Reduce::Kind::kL1:
+      case mojom::Reduce::Kind::kL2: {
+        const std::string node_name = GenerateNodeName(base::JoinString(
+            {kInserted, kOpTypeAbs, kToEmulate, reduce.label}, kUnderscore));
+        model_editor_.AddNode(kOpTypeAbs, node_name, inputs, outputs);
+        return;
+      }
+      case mojom::Reduce::Kind::kLogSumExp:
+      case mojom::Reduce::Kind::kMax:
+      case mojom::Reduce::Kind::kMean:
+      case mojom::Reduce::Kind::kMin:
+      case mojom::Reduce::Kind::kProduct:
+      case mojom::Reduce::Kind::kSum:
+        // Setting the `noop_with_empty_axes` attribute to 1 will make them act
+        // as a no-op.
+        break;
+    }
+  }
+
+  const std::string axes = CreateInt64InitializerForUint32Array(reduce.axes);
+  inputs.push_back(axes.c_str());
+
+  int64_t keepdims = reduce.keep_dimensions ? 1 : 0;
+  constexpr base::cstring_view kAttrKeepdims = "keepdims";
+
+  int64_t noop_with_empty_axes = 1;
+  constexpr base::cstring_view kAttrNoopWithEmptyAxes = "noop_with_empty_axes";
+
+  std::array<ScopedOrtOpAttr, 2> attributes = {
+      model_editor_.CreateAttribute(kAttrKeepdims, keepdims),
+      model_editor_.CreateAttribute(kAttrNoopWithEmptyAxes,
+                                    noop_with_empty_axes),
+  };
+
+  const std::string node_name = GenerateNodeName(reduce.label);
+  std::string reduce_op_type = MapReduceKindToOrtOpType(reduce.kind);
+  model_editor_.AddNode(reduce_op_type, node_name, inputs, outputs, attributes);
+}
+
+void GraphBuilderOrt::AddResample2dOperation(
+    const mojom::Resample2d& resample2d) {
+  const std::string node_name = GenerateNodeName(resample2d.label);
+  const std::string input = GetOperandNameById(resample2d.input_operand_id);
+  const std::string output = GetOperandNameById(resample2d.output_operand_id);
+
+  const OperandDescriptor& input_descriptor =
+      GetOperand(resample2d.input_operand_id).descriptor;
+  CHECK(context_properties_.data_type_limits.resample2d_input.Supports(
+      input_descriptor));
+
+  // Skip the input roi, which only takes effect when the coordinate
+  // transformation mode is set to "tf_crop_and_resize". Currently WebNN only
+  // supports "half_pixel", which is the default mode.
+  const std::string roi;
+  std::string scales;
+  std::string sizes;
+  if (resample2d.scales) {
+    // Each element of scales applies to a dimension of the input.
+    CHECK_EQ(input_descriptor.Rank(), 4u);
+    std::array<float, 4> scales_data = {1.f, 1.f, 1.f, 1.f};
+    CHECK_EQ(resample2d.axes.size(), 2u);
+    CHECK_EQ(resample2d.scales->size(), 2u);
+    scales_data.at(resample2d.axes[0]) = resample2d.scales->at(0);
+    scales_data.at(resample2d.axes[1]) = resample2d.scales->at(1);
+    scales = Create1DInitializer<float>(scales_data);
+  } else {
+    sizes = CreateInt64InitializerForUint32Array(
+        GetOperand(resample2d.output_operand_id).descriptor.shape());
+  }
+  std::array<const char*, 4> inputs = {input.c_str(), roi.c_str(),
+                                       scales.c_str(), sizes.c_str()};
+  std::array<const char*, 1> outputs = {output.c_str()};
+
+  constexpr base::cstring_view kAttrMode = "mode";
+  std::string mode;
+  switch (resample2d.mode) {
+    case mojom::Resample2d::InterpolationMode::kLinear:
+      mode = "linear";
+      break;
+    case mojom::Resample2d::InterpolationMode::kNearestNeighbor:
+      mode = "nearest";
+      break;
+  }
+  std::array<ScopedOrtOpAttr, 1> attributes = {
+      model_editor_.CreateAttribute(kAttrMode, mode)};
+
+  model_editor_.AddNode(kOpTypeResample2d, node_name, inputs, outputs,
+                        attributes);
+}
+
 void GraphBuilderOrt::AddReshapeOperation(const mojom::Reshape& reshape) {
   const std::string node_name = GenerateNodeName(reshape.label);
   const std::string input = GetOperandNameById(reshape.input_operand_id);
@@ -1369,8 +1565,7 @@ void GraphBuilderOrt::AddScatterNDOperation(
   std::string int64_indices =
       indices_descriptor.data_type() == OperandDataType::kInt64
           ? indices
-          : CreateCastNode(indices,
-                           WebnnToOnnxDataType(OperandDataType::kInt64));
+          : CreateCastNode(indices, ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64);
 
   // Clamp the indices operand to prevent out-of-bounds writing which will cause
   // ORT CPU EP to throw a runtime error.
@@ -1730,6 +1925,14 @@ GraphBuilderOrt::BuildModel() {
         AddUnaryOperation(*operation->get_relu(), kOpTypeRelu);
         break;
       }
+      case mojom::Operation::Tag::kReduce: {
+        AddReduceOperation(*operation->get_reduce());
+        break;
+      }
+      case mojom::Operation::Tag::kResample2d: {
+        AddResample2dOperation(*operation->get_resample2d());
+        break;
+      }
       case mojom::Operation::Tag::kReshape: {
         AddReshapeOperation(*operation->get_reshape());
         break;
@@ -1800,8 +2003,6 @@ GraphBuilderOrt::BuildModel() {
       case mojom::Operation::Tag::kLstm:
       case mojom::Operation::Tag::kLstmCell:
       case mojom::Operation::Tag::kQuantizeLinear:
-      case mojom::Operation::Tag::kReduce:
-      case mojom::Operation::Tag::kResample2d:
       case mojom::Operation::Tag::kSoftplus:
       case mojom::Operation::Tag::kTriangular:
         NOTREACHED() << "[WebNN] Unsupported operation.";

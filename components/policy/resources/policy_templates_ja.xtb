@@ -2446,6 +2446,13 @@ Android アプリの場合はパッケージ名（「com.google.android.gm」な
 このポリシーは、クラウド ユーザー ポリシーとしてのみ設定できます。</translation>
 <translation id="2846689894646472396">ネットワーク イベントの確認の間隔（ミリ秒単位）。</translation>
 <translation id="2847788524147474533">プラットフォームのマシンポリシーをクラウドのマシンポリシーより優先する</translation>
+<translation id="284877670305984807">このポリシーでは、周辺機器ではなくローカル マシンのファームウェアの更新をユーザーに許可するかどうかを設定します。
+
+      このポリシーを有効に設定した場合、デバイス所有者などのユーザーにファームウェアの更新を許可します。
+
+      このポリシーを無効に設定するか未設定のままにした場合は、すべてのユーザーがファームウェアを更新できます。
+
+      このポリシーは、<ph name="PRODUCT_OS_FLEX_NAME" /> デバイスの内部コンポーネントのファームウェアの更新に適用されます。<ph name="PRODUCT_OS_NAME" /> デバイスの内部コンポーネントのファームウェアの更新には適用されません。</translation>
 <translation id="2849051159985119151">AI モデルの改善は行わずに生成 AI 写真編集を許可する。</translation>
 <translation id="2849275596224278787">ログイン画面のシステムトレイ メニューにユーザー補助オプションを表示しない</translation>
 <translation id="2853649500575897584">ブラウザ プロセスで従来の拡張機能ポイントをブロックしない</translation>
@@ -4325,6 +4332,7 @@ URL パターンは、<ph name="CONTROLLED_FRAME_BLOCKED_FOR_URLS_POLICY_NAME" /
 <translation id="4192388905594723944">リモート アクセス クライアントの認証トークンを検証するための URL</translation>
 <translation id="4195119404667420672">ServiceWorker で制御される URL に SpeculationRules プリフェッチを送信できる。</translation>
 <translation id="4195698007674066525">パスワード入力時にデフォルトで数字キーボードを表示する</translation>
+<translation id="4198531346233984110">削減されたユーザー エージェント。</translation>
 <translation id="4203055629055264833">このポリシーを有効に設定するか未設定のままにした場合、ユーザーはツールバーのアイコンを切り替えることでサイドパネルにデフォルトの検索エンジンの最新の検索結果ページを表示できるようになります。
 
       このポリシーを無効に設定した場合、サイドパネルにデフォルトの検索エンジンの検索結果ページを表示するアイコンはツールバーから削除されます。</translation>
@@ -5172,7 +5180,6 @@ None（なし）に設定するか未設定のままにした場合、ARC アプ
 
       このポリシーが false に設定されているか未設定の場合、OS のアップデート情報はレポートされません。true に設定されている場合、OS のアップデート情報がレポートされます。</translation>
 <translation id="4857223512478723171">全画面モードを許可しない</translation>
-<translation id="4857888176748302062">オリジンにデバイス属性のクエリを許可する</translation>
 <translation id="4858735034935305895">全画面モードを許可する</translation>
 <translation id="4860900625632464759">ユーザーがスマートフォンと Chromebook の間で SMS メッセージを同期できるようにする</translation>
 <translation id="486146220825734683">ユーザーが Kerberos のパスワードを保存できないようにする</translation>
@@ -5645,6 +5652,8 @@ JavaScript の最適化ポリシーの例外は、サイトの詳細レベル（
       このポリシーを無効に設定すると、ユーザーにデバイスのロック解除のためのパスワード入力は求められません。
 
       このポリシーを未設定のままにした場合、ユーザーはデバイスのロック解除にパスワード入力を求めるかどうかを選択できます。</translation>
+<translation id="5194337341464164678"><ph name="USER_AGENT_HEADER_NAME" /> HTTP リクエスト ヘッダーは、Chrome 110 以降デフォルトで削減されており、サポート終了のトライアルは Chrome 113 で終了しました。プラットフォームの詳細情報を引き続き受け取るには、サポートが終了した詳細な User-Agent ヘッダーの代替となる User-Agent Client Hints に移行してください。https://web.dev/articles/migrate-to-ua-ch
+      </translation>
 <translation id="5194683382395300627">ウェブでの <ph name="ASSISTANT_PRODUCT_NAME" /> の使用を許可する（パスワードの自動変更を有効にするためなど）</translation>
 <translation id="5196630732055960309">File Handling API の使用を許可するウェブアプリを指定する</translation>
 <translation id="5205352023880027050">EphemeralNetworkPolicies 機能を有効にしない。</translation>
@@ -7265,11 +7274,6 @@ Origin-Agent-Cluster HTTP ヘッダーは、オリジンキー エージェン�
 <translation id="6282524907402492171"><ph name="CLOUD_PRINT_NAME" /> のサポート終了の警告を表示する</translation>
 <translation id="6282799760374509080">音声キャプチャを許可または拒否する</translation>
 <translation id="6284362063448764300">TLS 1.1</translation>
-<translation id="6286082501885452957">このポリシーを設定した場合、リストで指定したオリジンは Device Attributes API を使用してデバイスの属性（シリアル番号やホスト名など）を取得できます。
-
-オリジンは、<ph name="WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" /> ポリシーまたは <ph name="ISOLATED_WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" /> ポリシー（バージョン 125 以降）を使用して自動インストールされたウェブ アプリケーションか、キオスクアプリとして設定されたウェブ アプリケーションに対応している必要があります。Device Attributes API の仕様については、https://wicg.github.io/WebApiDevice/device_attributes をご覧ください。
-
-有効な <ph name="URL_LABEL" /> パターン（バージョン 127 以降）について詳しくは、https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns をご覧ください。このポリシーの値に「<ph name="WILDCARD_VALUE" />」は使用できません。</translation>
 <translation id="6287128640500683781">すべてのユーザーにログインを許可する</translation>
 <translation id="6287310684159482272">Cookie の設定</translation>
 <translation id="6287742528823584153"><ph name="PRODUCT_NAME" /> サービスを有効にして、ログイン時にリモートデスクを起動する</translation>
@@ -9074,6 +9078,7 @@ EphemeralNetworkPolicies 機能がデフォルトで有効になると、この�
 
           注: <ph name="DEVICE_LOGIN_SCREEN_LARGE_CURSOR_ENABLED" /> が指定されている場合はこのポリシーより優先されます。</translation>
 <translation id="7630403270894231662">新しいコードで WeeklyTimeChecked を使用します。</translation>
+<translation id="7631736894032434210">ユーザーに内部ファームウェアの更新を許可する</translation>
 <translation id="7632147323011514740">管理対象のゲスト セッションで ARC データ スナップショットの更新プロセスを開始できる間隔</translation>
 <translation id="7632724434767231364">GSSAPI ライブラリ名</translation>
 <translation id="7635106595080609261">このポリシーを有効に設定するか未設定のままにした場合、Chrome およびユーザーはファイル選択ダイアログを表示できます。
@@ -9731,6 +9736,7 @@ Internet Explorer の <ph name="IEEM_SITELIST_POLICY" /> ポリシーについ�
 <translation id="8168359201203671567">虹色のキーボード バックライト</translation>
 <translation id="8169452762291746260">デバイスの稼働状況の監視を無効にする</translation>
 <translation id="8170359860920320269">アダルト コンテンツのサイトを除外する</translation>
+<translation id="8170672421195760161">完全な（従来の）ユーザー エージェント。</translation>
 <translation id="8171262216089271568">ログイン画面で大きいカーソルを有効にする</translation>
 <translation id="8171924760436219650">ログイン画面でマウスのメインボタンを右に切り替える</translation>
 <translation id="81724933026241365">ユーザーがシャットダウン アイコンまたは物理的な電源ボタンを使用してデバイスの電源をオフにできるようにする</translation>

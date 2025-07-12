@@ -213,7 +213,8 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
       }
     }
     _tabImagesConfigurator =
-        std::make_unique<TabSnapshotAndFaviconConfigurator>(faviconLoader);
+        std::make_unique<TabSnapshotAndFaviconConfigurator>(
+            faviconLoader, SnapshotBrowserAgent::FromBrowser(browser));
   } else {
     _webStateList = nullptr;
     _profile = nullptr;
@@ -476,7 +477,7 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
     // Using `CloseAllWebStatesInGroup` will result in calling the web state
     // list observers which will take care of updating the consumer.
     CloseAllWebStatesInGroup(*groupWebStateList, group,
-                             WebStateList::CLOSE_USER_ACTION);
+                             WebStateList::ClosingReason::kUserAction);
   }
 }
 
@@ -1070,8 +1071,8 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
                                                   lastTab:itemID
                                                     group:group];
     } else {
-      self.webStateList->CloseWebStateAt(index,
-                                         WebStateList::CLOSE_USER_ACTION);
+      self.webStateList->CloseWebStateAt(
+          index, WebStateList::ClosingReason::kUserAction);
     }
     return;
   }
@@ -1104,7 +1105,8 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
                                  .identifier = itemID,
                                  .pinned_state = PinnedState::kAny,
                              });
-    itemWebStateList->CloseWebStateAt(index, WebStateList::CLOSE_USER_ACTION);
+    itemWebStateList->CloseWebStateAt(index,
+                                      WebStateList::ClosingReason::kUserAction);
   }
 }
 
@@ -1147,7 +1149,8 @@ web::WebState* WebStateWithSnapshotID(WebStateList& web_state_list,
         GridItemIdentifier* identifierToRemove = [GridItemIdentifier
             tabIdentifier:webStateList->GetWebStateAt(index)];
         [_selectedEditingItems removeItem:identifierToRemove];
-        webStateList->CloseWebStateAt(index, WebStateList::CLOSE_USER_ACTION);
+        webStateList->CloseWebStateAt(index,
+                                      WebStateList::ClosingReason::kUserAction);
       }
     }
   }

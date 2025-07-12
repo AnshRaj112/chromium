@@ -60,7 +60,7 @@ BASE_FEATURE(kOfferPinToTaskbarWhenSettingToDefault,
              base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kOfferPinToTaskbarInFirstRunExperience,
              "OfferPinToTaskbarInFirstRunExperience",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE(kOfferPinToTaskbarInfoBar,
              "OfferPinToTaskbarInfoBar",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -158,11 +158,6 @@ bool IsRestoringSplitViewEnabled() {
 BASE_FEATURE(kSideBySideLinkMenuNewBadge,
              "SideBySideLinkMenuNewBadge",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-bool IsNtpFooterEnabledWithoutSideBySide() {
-  return (base::FeatureList::IsEnabled(ntp_features::kNtpFooter) &&
-          !base::FeatureList::IsEnabled(features::kSideBySide));
-}
 
 BASE_FEATURE(kSidePanelResizing,
              "SidePanelResizing",
@@ -340,10 +335,6 @@ BASE_FEATURE(kNTPFooterBadgingPolicies,
 BASE_FEATURE(kEnterpriseManagementDisclaimerUsesCustomLabel,
              "EnterpriseManagementDisclaimerUsesCustomLabel",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kEnterpriseUpdatedProfileCreationScreen,
-             "EnterpriseUpdatedProfileCreationScreen",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kManagedProfileRequiredInterstitial,
              "ManagedProfileRequiredInterstitial",

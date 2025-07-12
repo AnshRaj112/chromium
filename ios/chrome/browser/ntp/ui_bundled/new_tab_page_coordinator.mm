@@ -374,6 +374,12 @@
   [self configureNTPViewController];
   [self configureTabGroupIndicator];
 
+  if (IsNTPBackgroundCustomizationEnabled()) {
+    // Ensure the initial background is applied after all components have been
+    // set up.
+    [self.NTPMediator updateBackground];
+  }
+
   self.started = YES;
 }
 
@@ -762,7 +768,8 @@
   NTPMediator.NTPContentDelegate = self;
   NTPMediator.headerConsumer = self.headerViewController;
   NTPMediator.consumer = self.NTPViewController;
-  if (base::FeatureList::IsEnabled(omnibox::kOmniboxMobileParityUpdate)) {
+  if (base::FeatureList::IsEnabled(omnibox::kOmniboxMobileParityUpdate) ||
+      base::FeatureList::IsEnabled(omnibox::kOmniboxMobileParityUpdateV2)) {
     PlaceholderService* placeholderService =
         ios::PlaceholderServiceFactory::GetForProfile(self.profile);
     NTPMediator.placeholderService = placeholderService;
@@ -1926,7 +1933,9 @@
 - (void)openMIA {
   [self.NTPMetricsRecorder recordMIATapped];
   OpenNewTabCommand* command = [OpenNewTabCommand
-      commandWithURLFromChrome:GetUrlForAim(self.templateURLService)];
+      commandWithURLFromChrome:GetUrlForAim(
+                                   self.templateURLService,
+                                   /*query_start_time=*/base::Time::Now())];
   id<ApplicationCommands> applicationHandler = HandlerForProtocol(
       self.browser->GetCommandDispatcher(), ApplicationCommands);
   [applicationHandler openURLInNewTab:command];

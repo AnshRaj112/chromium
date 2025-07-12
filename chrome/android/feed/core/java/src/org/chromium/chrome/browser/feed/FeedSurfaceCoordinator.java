@@ -520,18 +520,20 @@ public class FeedSurfaceCoordinator
             mRootView.addView(mNtpCustomizationButton);
         }
 
-        Drawable currentBackgroundDrawable = null;
         if (ChromeFeatureList.sNewTabPageCustomizationV2.isEnabled()) {
             mNtpCustomizationConfigManager = NtpCustomizationConfigManager.getInstance();
             mHomepageStateListener =
-                    backgroundDrawable -> {
-                        setBackground(backgroundDrawable);
+                    new NtpCustomizationConfigManager.HomepageStateListener() {
+                        @Override
+                        public void onBackgroundChanged(@Nullable Drawable backgroundDrawable) {
+                            setBackground(backgroundDrawable);
+                        }
                     };
 
             mNtpCustomizationConfigManager.addListener(mHomepageStateListener);
-            currentBackgroundDrawable = mNtpCustomizationConfigManager.getBackgroundImageDrawable();
+        } else {
+            setBackground(null);
         }
-        setBackground(currentBackgroundDrawable);
 
         mHandler = new Handler(Looper.getMainLooper());
 

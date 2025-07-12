@@ -55,13 +55,14 @@ class SegmentedBuffer;
 class SharedBuffer;
 class TextPosition;
 
-// TODO(crbug.com/422768753): Remove these `using` directives.
+// TODO(crbug.com/422768753): Remove this `using` directive.
 using blink::String;
-using blink::StringImpl;
 
 }  // namespace WTF
 
+namespace blink {
 using WTF::Vector;
+}  // namespace blink
 
 using WTF::SegmentedBuffer;
 using WTF::SharedBuffer;

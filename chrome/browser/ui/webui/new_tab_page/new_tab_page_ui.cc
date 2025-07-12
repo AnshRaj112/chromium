@@ -53,6 +53,7 @@
 #include "chrome/browser/ui/webui/new_tab_page/composebox/composebox_handler.h"
 #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.h"
 #include "chrome/browser/ui/webui/new_tab_page/ntp_pref_names.h"
+#include "chrome/browser/ui/webui/new_tab_page/ntp_promo/ntp_promo_handler.h"
 #include "chrome/browser/ui/webui/new_tab_page/untrusted_source.h"
 #include "chrome/browser/ui/webui/page_not_available_for_guest/page_not_available_for_guest_ui.h"
 #include "chrome/browser/ui/webui/sanitized_image_source.h"
@@ -456,6 +457,7 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(Profile* profile) {
        IDS_NTP_MICROSOFT_AUTHENTICATION_SUBHEADING},
       {"modulesMicrosoftAuthSignIn",
        IDS_NTP_MICROSOFT_AUTHENTICATION_SIGN_IN_BUTTON_TEXT},
+      {"modulesTabGroupsTitle", IDS_NTP_MODULES_TAB_GROUPS_TITLE},
 
       // Middle slot promo.
       {"undoDismissPromoButtonToast", IDS_NTP_UNDO_DISMISS_PROMO_BUTTON_TOAST},
@@ -475,6 +477,7 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(Profile* profile) {
        IDS_NTP_COMPOSE_FILE_UPLOAD_BUTTON_A11Y_LABEL},
       {"composeboxPlaceholderText", IDS_NTP_COMPOSE_PLACEHOLDER_TEXT},
       {"composeboxSubmitButtonTitle", IDS_NTP_COMPOSE_SUBMIT_BUTTON_A11Y_LABEL},
+      {"composeboxDeleteFileTitle", IDS_NTP_COMPOSE_DELETE_FILE_A11Y_LABEL},
   };
 
   source->AddLocalizedStrings(kStrings);
@@ -810,6 +813,15 @@ void NewTabPageUI::BindInterface(
   help_bubble_handler_factory_receiver_.Bind(std::move(pending_receiver));
 }
 
+void NewTabPageUI::BindInterface(
+    mojo::PendingReceiver<ntp_promo::mojom::NtpPromoHandlerFactory>
+        pending_receiver) {
+  if (ntp_promo_handler_factory_receiver_.is_bound()) {
+    ntp_promo_handler_factory_receiver_.reset();
+  }
+  ntp_promo_handler_factory_receiver_.Bind(std::move(pending_receiver));
+}
+
 void NewTabPageUI::CreatePageHandler(
     mojo::PendingRemote<new_tab_page::mojom::Page> pending_page,
     mojo::PendingReceiver<new_tab_page::mojom::PageHandler>
@@ -879,6 +891,13 @@ void NewTabPageUI::CreateHelpBubbleHandler(
       std::vector<ui::ElementIdentifier>{
           NewTabPageUI::kCustomizeChromeButtonElementId,
           NewTabPageUI::kModulesCustomizeIPHAnchorElement});
+}
+
+void NewTabPageUI::CreateNtpPromoHandler(
+    mojo::PendingRemote<ntp_promo::mojom::NtpPromoClient> client,
+    mojo::PendingReceiver<ntp_promo::mojom::NtpPromoHandler> handler) {
+  ntp_promo_handler_ =
+      NtpPromoHandler::Create(std::move(client), std::move(handler), profile_);
 }
 
 // OnColorProviderChanged can be called during the destruction process and

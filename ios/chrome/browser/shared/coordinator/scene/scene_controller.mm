@@ -265,6 +265,9 @@ const char kContextsToOpen[] = "IOS.NumberOfContextsToOpen";
 // The App Store page for Google Chrome.
 NSString* const kChromeAppStoreURL = @"https://apps.apple.com/app/id535886823";
 
+// String passed in the URL context to request to open it in a sign-out state.
+NSString* const kNoAccountId = @"No account";
+
 // Enum for IOS.NumberOfContextsToOpen histogram.
 // Keep in sync with "ContextsToOpen" in tools/metrics/histograms/enums.xml.
 enum class ContextsToOpen {
@@ -901,7 +904,7 @@ void OnListFamilyMembersResponse(
 
       std::optional<std::string> profileName;
 
-      if ([context.gaiaID isEqualToString:@"Default"]) {
+      if ([context.gaiaID isEqualToString:kNoAccountId]) {
         // Use the personal profile name if there is no GaiaID (this happens in
         // the sign-out scenario).
         profileName = GetApplicationContext()
@@ -991,14 +994,14 @@ void OnListFamilyMembersResponse(
       continue;
     }
 
-    if ([newGaiaID isEqualToString:@"Default"] && gaiaInApp) {
+    if ([newGaiaID isEqualToString:kNoAccountId] && gaiaInApp) {
       return
           [[WidgetContext alloc] initWithContext:context
                                           gaiaID:newGaiaID
                                             type:AccountSwitchType::kSignOut];
     }
     if (![newGaiaID isEqualToString:gaiaInApp] &&
-        ![newGaiaID isEqualToString:@"Default"]) {
+        ![newGaiaID isEqualToString:kNoAccountId]) {
       return [[WidgetContext alloc] initWithContext:context
                                              gaiaID:newGaiaID
                                                type:AccountSwitchType::kSignIn];
@@ -1373,7 +1376,7 @@ void OnListFamilyMembersResponse(
 
   if (base::FeatureList::IsEnabled(
           kMakeKeyAndVisibleBeforeMainCoordinatorStart)) {
-    [self.sceneState setRootViewControllerKeyAndVisible];
+    [self.sceneState.window makeKeyAndVisible];
   }
 
   _mainCoordinator = [[TabGridCoordinator alloc]
@@ -1391,7 +1394,7 @@ void OnListFamilyMembersResponse(
     // `mainCoordinator start` as it sets self.window.rootViewController to work
     // around crbug.com/850387, causing a flicker if -makeKeyAndVisible has been
     // called.
-    [self.sceneState setRootViewControllerKeyAndVisible];
+    [self.sceneState.window makeKeyAndVisible];
   }
 
   if (!self.sceneState.profileState.startupInformation.isFirstRun) {
@@ -2456,12 +2459,14 @@ using UserFeedbackDataCallback =
   }
 
   Browser* browser = self.mainInterface.browser;
-  self.settingsNavigationController =
-      [SettingsNavigationController accountsControllerForBrowser:browser
-                                                        delegate:self];
-  [baseViewController presentViewController:self.settingsNavigationController
-                                   animated:YES
-                                 completion:nil];
+  self.settingsNavigationController = [SettingsNavigationController
+             accountsControllerForBrowser:browser
+                       baseViewController:baseViewController
+                                 delegate:self
+                closeSettingsOnAddAccount:YES
+                        showSignoutButton:YES
+                           showDoneButton:NO
+      signoutDismissalByParentCoordinator:NO];
 }
 
 // TODO(crbug.com/41352590) : Remove Google services settings from

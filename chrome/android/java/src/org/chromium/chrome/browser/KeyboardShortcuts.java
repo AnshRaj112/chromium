@@ -880,7 +880,7 @@ public class KeyboardShortcuts {
                     shortcutDefinition.mPrimaryShortcut.mModifier);
         }
 
-        if (BookmarkBarUtils.isFeatureEnabled(context)) {
+        if (BookmarkBarUtils.isDeviceBookmarkBarCompatible(context)) {
             addShortcut(
                     context,
                     shortcutGroupsById.get(R.string.keyboard_shortcut_chrome_feature_group_header),
@@ -964,8 +964,8 @@ public class KeyboardShortcuts {
 
         RecordHistogram.recordEnumeratedHistogram(
                 AccessibilityState.isKnownScreenReaderEnabled()
-                        ? "Accessibility.Android.KeyboardShortcut.ScreenReaderRunning2"
-                        : "Accessibility.Android.KeyboardShortcut.NoScreenReader2",
+                        ? "Accessibility.Android.KeyboardShortcut.ScreenReaderRunning3"
+                        : "Accessibility.Android.KeyboardShortcut.NoScreenReader3",
                 semanticMeaning,
                 KeyboardShortcuts.KeyboardShortcutsSemanticMeaning.MAX_VALUE);
 

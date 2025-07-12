@@ -312,6 +312,7 @@ Pretējā gadījumā šī iespēja būtu liegta saskaņā ar jūsu konfidenciali
 <translation id="1521655867290435174">Google izklājlapas</translation>
 <translation id="1524669537550112617">Mēbelētu nekustamo īpašumu īre</translation>
 <translation id="1527263332363067270">Tiek gaidīta savienojuma izveide...</translation>
+<translation id="1527490370616010873">Google nav jūsu automātiskās aizpildes pakalpojumu sniedzējs. Lai iespējotu šos iestatījumus un izmantotu maksājuma informāciju no sava Google konta, pārejiet uz <ph name="BEGIN_LINK" />automātiskās aizpildes pakalpojumu iestatījumiem<ph name="END_LINK" />.</translation>
 <translation id="1528311629279578926">Savienojums ir bloķēts, jo tas tika uzsākts publiskā lapā, lai izveidotu savienojumu ar ierīcēm vai serveriem jūsu privātajā tīklā. Atkārtoti ielādējiet šo lapu, lai atļautu savienojumu.</translation>
 <translation id="1529789484829130889">8. paplāte</translation>
 <translation id="1530707389502320859">Vietne, ko tikko mēģinājāt apmeklēt, šķiet viltota. Uzbrucēji dažkārt atdarina vietnes, veicot nelielas un grūti pamanāmas izmaiņas vietrādī URL.</translation>
@@ -1117,6 +1118,7 @@ Pretējā gadījumā šī iespēja būtu liegta saskaņā ar jūsu konfidenciali
 <translation id="2902312830803030883">Citas darbības</translation>
 <translation id="2903493209154104877">Adreses</translation>
 <translation id="290376772003165898">Vai lapa nav šajā valodā: <ph name="LANGUAGE" />?</translation>
+<translation id="2904180982022726666">Jūsu organizācija ierobežo to, kādu saturu varat kopīgot</translation>
 <translation id="2905107382358353958">Brīdinājums par jaunu maksājumu iestatījumu</translation>
 <translation id="2909946352844186028">Konstatētas tīkla izmaiņas.</translation>
 <translation id="2911255567212929079">Mašīnmācīšanās un mākslīgais intelekts</translation>
@@ -4707,6 +4709,7 @@ Papildu informācija:
 <translation id="8975263830901772334">Drukāto failu nosaukumi</translation>
 <translation id="8982884016487650216">PDF faila ielāde ir pabeigta</translation>
 <translation id="8983369100812962543">Tagad varat mainīt lietotnes lielumu</translation>
+<translation id="8984785270737450103">Kopīgošana pašlaik ir izslēgta.</translation>
 <translation id="8985112471026018799">Kartes saglabāšana ātrākiem norēķiniem</translation>
 <translation id="8987245424886630962"><ph name="VIEW_CHROME_HISTORY_FOCUSED_FRIENDLY_MATCH_TEXT" />, lai skatītu pārlūkošanas vēsturi pārlūkā Chrome, nospiediet tabulēšanas taustiņu un pēc tam — taustiņu Enter</translation>
 <translation id="8987663052629670333">Fotogrāfiju drukāšanas pakalpojumi</translation>

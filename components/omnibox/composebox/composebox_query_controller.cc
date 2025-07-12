@@ -15,6 +15,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/bind_post_task.h"
 #include "base/task/thread_pool.h"
+#include "base/time/time.h"
 #include "components/lens/lens_features.h"
 #include "components/lens/lens_request_construction.h"
 #include "components/lens/ref_counted_lens_overlay_client_logs.h"
@@ -195,7 +196,9 @@ void ComposeboxQueryController::NotifySessionAbandoned() {
   cluster_info_endpoint_fetcher_.reset();
 }
 
-GURL ComposeboxQueryController::CreateAimUrl(const std::string& query_text) {
+GURL ComposeboxQueryController::CreateAimUrl(const std::string& query_text,
+                                             base::Time query_start_time) {
+  CHECK(cluster_info_.has_value());
   session_state_ = SessionState::kQuerySubmitted;
   if (!active_files_.empty()) {
     // Since multiple file upload isn't supported right now, use the last file
@@ -203,13 +206,14 @@ GURL ComposeboxQueryController::CreateAimUrl(const std::string& query_text) {
     // TODO(crbug.com/428967670): Support multiple file upload.
     const std::unique_ptr<FileInfo>& last_file = active_files_.rbegin()->second;
     return GetUrlForMultimodalAim(
-        template_url_service_, kEntrypointParameterValue,
+        template_url_service_, kEntrypointParameterValue, query_start_time,
+        cluster_info_->search_session_id(),
         request_id_generator_.GetNextRequestId(
             lens::RequestIdUpdateMode::kSearchUrl),
         last_file->mime_type_, base::UTF8ToUTF16(query_text));
   }
   return GetUrlForAim(template_url_service_, kEntrypointParameterValue,
-                      base::UTF8ToUTF16(query_text));
+                      query_start_time, base::UTF8ToUTF16(query_text));
 }
 
 void ComposeboxQueryController::AddObserver(FileUploadStatusObserver* obs) {
@@ -222,7 +226,8 @@ void ComposeboxQueryController::RemoveObserver(FileUploadStatusObserver* obs) {
 
 void ComposeboxQueryController::StartFileUploadFlow(
     std::unique_ptr<FileInfo> file_info,
-    scoped_refptr<base::RefCountedBytes> file_data) {
+    scoped_refptr<base::RefCountedBytes> file_data,
+    std::optional<composebox::ImageEncodingOptions> image_options) {
   CHECK_EQ(file_info->upload_status_, FileUploadStatus::kNotUploaded);
   const base::UnguessableToken& file_token = file_info->file_token_;
 
@@ -232,12 +237,13 @@ void ComposeboxQueryController::StartFileUploadFlow(
 
   UpdateFileUploadStatus(file_token, FileUploadStatus::kProcessing,
                          std::nullopt);
-  // Increment the request id sequence and image sequence id, regardless of
-  // whether this is an image or pdf upload.
-  // TODO(crbug.com/426855057): Update the request id generator with more
-  // customized logic for the composebox use case.
+
+  // Unlike image uploads,PDF uploads need to increment the long context id
+  // instead of the image sequence id.
   current_file_info.request_id_ = request_id_generator_.GetNextRequestId(
-      lens::RequestIdUpdateMode::kFullImageRequest);
+      current_file_info.mime_type_ == lens::MimeType::kPdf
+          ? lens::RequestIdUpdateMode::kPageContentRequest
+          : lens::RequestIdUpdateMode::kFullImageRequest);
 
   // Preparing for the file upload request requires multiple async flows to
   // complete before the request is ready to be send to the server. Start the
@@ -249,7 +255,7 @@ void ComposeboxQueryController::StartFileUploadFlow(
   // NotifySessionStarted().
   // Async Flow 2: Creating the file upload request.
   CreateFileUploadRequestBodyAndContinue(
-      file_token, std::move(file_data),
+      file_token, std::move(file_data), image_options,
       base::BindOnce(&ComposeboxQueryController::OnUploadFileRequestBodyReady,
                      weak_ptr_factory_.GetWeakPtr(), file_token));
 
@@ -442,6 +448,7 @@ void ComposeboxQueryController::UpdateFileUploadStatus(
 #if !BUILDFLAG(IS_IOS)
 void ComposeboxQueryController::ProcessDecodedImageAndContinue(
     lens::LensOverlayRequestId request_id,
+    const composebox::ImageEncodingOptions& image_options,
     RequestBodyProtoCreatedCallback callback,
     const SkBitmap& bitmap) {
   scoped_refptr<lens::RefCountedLensOverlayClientLogs> ref_counted_logs =
@@ -454,7 +461,7 @@ void ComposeboxQueryController::ProcessDecodedImageAndContinue(
     create_request_task_runner_->PostTaskAndReplyWithResult(
         FROM_HERE,
         base::BindOnce(&composebox::DownscaleAndEncodeBitmap, bitmap,
-                       ref_counted_logs),
+                       ref_counted_logs, image_options),
         base::BindOnce(&CreateFileUploadRequestProtoWithImageDataAndContinue,
                        request_id, CreateClientContext(), ref_counted_logs,
                        std::move(callback)));
@@ -465,6 +472,7 @@ void ComposeboxQueryController::ProcessDecodedImageAndContinue(
 void ComposeboxQueryController::CreateFileUploadRequestBodyAndContinue(
     const base::UnguessableToken& file_token,
     scoped_refptr<base::RefCountedBytes> file_data,
+    std::optional<composebox::ImageEncodingOptions> image_options,
     RequestBodyProtoCreatedCallback callback) {
   FileInfo* file_info = GetFileInfo(file_token);
   if (!file_info) {
@@ -484,6 +492,7 @@ void ComposeboxQueryController::CreateFileUploadRequestBodyAndContinue(
       break;
     case lens::MimeType::kImage:
 #if !BUILDFLAG(IS_IOS)
+      CHECK(image_options.has_value());
       data_decoder::DecodeImageIsolated(
           file_data->as_vector(), data_decoder::mojom::ImageCodec::kDefault,
           /*shrink_to_fit=*/false,
@@ -492,7 +501,7 @@ void ComposeboxQueryController::CreateFileUploadRequestBodyAndContinue(
           base::BindOnce(
               &ComposeboxQueryController::ProcessDecodedImageAndContinue,
               weak_ptr_factory_.GetWeakPtr(), *file_info->request_id_,
-              std::move(callback)));
+              image_options.value(), std::move(callback)));
 #endif  // !BUILDFLAG(IS_IOS)
       break;
     default:

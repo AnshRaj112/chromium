@@ -10,11 +10,34 @@
 #include "chrome/browser/actor/ui/actor_ui_tab_controller.h"
 #include "chrome/browser/actor/ui/ui_event.h"
 #include "chrome/common/actor.mojom-forward.h"
+#include "chrome/common/buildflags.h"
+#if BUILDFLAG(ENABLE_GLIC)
+#include "chrome/browser/glic/widget/glic_window_controller.h"
+#endif
 
 namespace actor::ui {
 using UiCompleteCallback = base::OnceCallback<void(mojom::ActionResultPtr)>;
+
+// ExpiryPeriod from when the user completes a task and when it should no longer
+// show on the ui
+// TODO(crbug.com/428014205): This is a placeholder value atm.
+static constexpr base::TimeDelta kCompletedTaskExpiryDelay = base::Minutes(3);
+static constexpr base::TimeDelta kProfileScopedUiUpdateDebounceDelay =
+    base::Milliseconds(500);
+
 class ActorUiStateManagerInterface {
  public:
+  // TODO(crbug.com/428014205): Once UX is determined for multiple tasks, states
+  // here may change.
+  enum class UiState {
+    // There are no active agent tasks on this profile.
+    kInactive,
+    // There are active agent tasks on this profile.
+    kActive,
+    // There are agent tasks that need attention, this includes agent pause &
+    // completed tasks within the kCompletedTaskExpiryDelay.
+    kCheckTasks,
+  };
   virtual ~ActorUiStateManagerInterface() = default;
 
   // Called whenever an actor task state changes.
@@ -29,10 +52,11 @@ class ActorUiStateManagerInterface {
   virtual void NotifyUiTabController(tabs::TabInterface& tab,
                                      const UiTabState& ui_tab_state) = 0;
 
-  // Shows toast that notifies user the agent is working in the background.
-  // Shows a maximum of kToastShownMax per profile.
-  // TODO(crbug.com/428014205): Define kToastShownMax.
-  virtual void MaybeShowToast() = 0;
+#if BUILDFLAG(ENABLE_GLIC)
+  // Called on glic window (floaty) state change.
+  virtual void OnGlicUpdateFloatyState(
+      glic::GlicWindowController::State floaty_state) = 0;
+#endif
 };
 
 }  // namespace actor::ui

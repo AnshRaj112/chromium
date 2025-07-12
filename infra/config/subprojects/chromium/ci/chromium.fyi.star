@@ -1626,6 +1626,7 @@ fyi_ios_builder(
         additional_compile_targets = [
             "base_unittests",
             "content_shell",
+            "components_unittests",
             "content_unittests",
         ],
         mixins = [
@@ -1843,7 +1844,7 @@ fyi_ios_builder(
         mixins = [
             "expand-as-isolated-script",
             "has_native_resultdb_integration",
-            "mac_15_arm64",
+            "mac_15_beta_arm64",
             "mac_toolchain",
             "out_dir_arg",
             "xcode_26_beta",
@@ -1957,7 +1958,7 @@ fyi_ios_builder(
         mixins = [
             "expand-as-isolated-script",
             "has_native_resultdb_integration",
-            "mac_15_arm64",
+            "mac_15_beta_arm64",
             "mac_toolchain",
             "out_dir_arg",
             "xcode_26_beta",
@@ -2018,7 +2019,7 @@ fyi_ios_builder(
         mixins = [
             "expand-as-isolated-script",
             "has_native_resultdb_integration",
-            "mac_15_arm64",
+            "mac_15_beta_arm64",
             "mac_toolchain",
             "out_dir_arg",
             "xcode_26_beta",

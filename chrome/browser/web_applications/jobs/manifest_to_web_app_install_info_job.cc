@@ -17,15 +17,16 @@
 #include "base/metrics/histogram_functions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/synchronization/lock.h"
+#include "chrome/browser/web_applications/icons/primary_icon_filter.h"
 #include "chrome/browser/web_applications/scope_extension_info.h"
 #include "chrome/browser/web_applications/web_app_constants.h"
+#include "chrome/browser/web_applications/web_app_icon_generator.h"
 #include "chrome/browser/web_applications/web_app_icon_operations.h"
 #include "chrome/browser/web_applications/web_app_install_info.h"
-// TODO(crbug.com/427565907): Remove dependency on install utils after all
-// functions have been migrated to this file.
 #include "chrome/browser/web_applications/web_app_install_utils.h"
 #include "chrome/browser/web_applications/web_app_utils.h"
 #include "chrome/browser/web_applications/web_contents/web_app_data_retriever.h"
+#include "chrome/common/chrome_features.h"
 #include "components/services/app_service/public/cpp/icon_info.h"
 #include "components/services/app_service/public/cpp/protocol_handler_info.h"
 #include "components/services/app_service/public/cpp/share_target.h"
@@ -525,8 +526,8 @@ void ManifestToWebAppInstallInfoJob::Start(
   }
 
   data_retriever_->GetIcons(
-      web_contents.get(), icon_urls_to_download, options_.skip_page_favicons,
-      options_.fail_all_if_any_fail,
+      web_contents.get(), icon_urls_to_download,
+      options_.download_page_favicons, options_.fail_all_if_any_fail,
       base::BindOnce(
           &ManifestToWebAppInstallInfoJob::OnIconsFetchedGetInstallInfo,
           weak_ptr_factory_.GetWeakPtr()));
@@ -569,11 +570,20 @@ void ManifestToWebAppInstallInfoJob::ParseManifestAndPopulateInfo() {
     install_info_->display_override = manifest_->display_override;
   }
 
-  UpdateWebAppInstallInfoIconsFromManifestIfNeeded(manifest_->icons,
-                                                   install_info_.get());
+  if (!options_.skip_primary_icon_download) {
+    if (base::FeatureList::IsEnabled(features::kWebAppUsePrimaryIcon)) {
+      std::optional<apps::IconInfo> primary_icon_metadata =
+          GetPrimaryIconsFromManifest(manifest_->icons);
+      if (primary_icon_metadata) {
+        install_info_->manifest_icons = {*primary_icon_metadata};
+      }
+    } else {
+      UpdateWebAppInstallInfoIconsFromManifestIfNeeded(manifest_->icons,
+                                                       install_info_.get());
+    }
+  }
 
   // TODO(crbug.com/40185556): Confirm incoming icons to write to install_info_.
-  // TODO(crbug.com/427565907): Move from web_app_install_utils.cc to here.
   PopulateFileHandlerInfoFromManifest(
       manifest_->file_handlers, install_info_->scope, install_info_.get());
 
@@ -661,7 +671,11 @@ void ManifestToWebAppInstallInfoJob::OnIconsFetchedGetInstallInfo(
     RecordIconUpdateMetrics(result, icons_http_results);
   }
 
-  PopulateProductIcons(install_info_.get(), &icons_map);
+  // Bypass populating product icons, even generated ones, if icons have not
+  // been downloaded.
+  if (!options_.skip_primary_icon_download) {
+    PopulateProductIcons(install_info_.get(), &icons_map);
+  }
   PopulateOtherIcons(install_info_.get(), icons_map);
   RecordDownloadedIconsResultAndHttpStatusCodes(result, icons_http_results);
   install_error_log_entry_.LogDownloadedIconsErrors(

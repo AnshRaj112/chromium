@@ -695,7 +695,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Tab.PullDownGesture" enum="PullDownGestureAction"
-    expires_after="2025-05-11">
+    expires_after="2026-05-11">
   <owner>gambard@chromium.org</owner>
   <owner>chromeleon@google.com</owner>
   <summary>
@@ -706,7 +706,8 @@ chromium-metrics-reviews@google.com.
     edge of the web page and continues scrolling in the same direction revealing
     a specific UI on the header with multiple actions icons. The user can then
     choose an action by scrolling left or right and lift the finger or cancel by
-    scrolling back up. This is currently an iOS specific feature.
+    scrolling back up. This is currently an iOS specific feature. Expired
+    2025-05. Revived July 2025.
   </summary>
 </histogram>
 
@@ -823,6 +824,17 @@ chromium-metrics-reviews@google.com.
   <summary>
     Records number of tabs within an archived tab group closed by pressing the X
     button on the tab group in the inactive surface.
+  </summary>
+</histogram>
+
+<histogram name="TabGroups.AutodeletePass.DurationMs" units="ms"
+    expires_after="2025-11-09">
+  <owner>bjfong@google.com</owner>
+  <owner>wylieb@google.com</owner>
+  <owner>evanluo@google.com</owner>
+  <owner>clank-tab-dev@google.com</owner>
+  <summary>
+    (Android only) Records the duration of an auto-delete pass for tab groups.
   </summary>
 </histogram>
 
@@ -1716,6 +1728,32 @@ chromium-metrics-reviews@google.com.
     includes both open and closed tab groups.
 
     Recorded on startup 10 seconds after TabGroupSyncService initialization.
+  </summary>
+</histogram>
+
+<histogram name="TabGroups.TabGroupAutoDeleted.TabCount" units="tabs"
+    expires_after="2025-11-09">
+  <owner>bjfong@google.com</owner>
+  <owner>wylieb@google.com</owner>
+  <owner>evanluo@google.com</owner>
+  <owner>clank-tab-dev@google.com</owner>
+  <summary>
+    (Android only) Records the number of tabs within a tab group that is
+    autodeleted.
+  </summary>
+</histogram>
+
+<histogram name="TabGroups.TabGroupAutoDeleteEligibilityCheck.AfterNDays"
+    units="days" expires_after="2025-11-09">
+  <owner>bjfong@google.com</owner>
+  <owner>wylieb@google.com</owner>
+  <owner>evanluo@google.com</owner>
+  <owner>clank-tab-dev@google.com</owner>
+  <summary>
+    (Android only) Records how old, in days, a tab group is when it's checked
+    for auto-deletion eligibility. Recorded at startup when the archived tab
+    model is loaded and at regular intervals after that (same cadence as tabs).
+    Only recorded if tab group declutter is enabled.
   </summary>
 </histogram>
 
