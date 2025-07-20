@@ -9,10 +9,11 @@ import("//build/config/ozone.gni")
 import("//build/config/ui.gni")
 import("//chrome/common/features.gni")
 import("//components/enterprise/buildflags/buildflags.gni")
+import("//components/safe_browsing/buildflags.gni")
+import("//content/public/common/features.gni")
 import("//extensions/buildflags/buildflags.gni")
 import("//mojo/public/tools/bindings/mojom.gni")
 import("//pdf/features.gni")
-import("//ppapi/buildflags/buildflags.gni")
 import("//printing/buildflags/buildflags.gni")
 import("//rlz/buildflags/buildflags.gni")
 import("//services/screen_ai/buildflags/features.gni")
@@ -213,6 +214,8 @@ source_set("extensions") {
     "chrome_extension_frame_host.h",
     "chrome_extension_function_details.cc",
     "chrome_extension_function_details.h",
+    "chrome_extension_host_delegate.cc",
+    "chrome_extension_host_delegate.h",
     "chrome_extension_registrar_delegate.cc",
     "chrome_extension_registrar_delegate.h",
     "chrome_extension_system.cc",
@@ -440,6 +443,8 @@ source_set("extensions") {
     "startup_helper.h",
     "sync/account_extension_tracker.cc",
     "sync/account_extension_tracker.h",
+    "sync/extension_local_data_batch_uploader.cc",
+    "sync/extension_local_data_batch_uploader.h",
     "sync/extension_sync_data.cc",
     "sync/extension_sync_data.h",
     "sync/extension_sync_service.cc",
@@ -515,6 +520,7 @@ source_set("extensions") {
     "//chrome/browser/google",
     "//chrome/browser/infobars",
     "//chrome/browser/lifetime:termination_notification",
+    "//chrome/browser/password_manager/factories",
     "//chrome/browser/prefetch",
     "//chrome/browser/prefs",
     "//chrome/browser/prefs:util",
@@ -530,7 +536,9 @@ source_set("extensions") {
     "//chrome/browser/ui/autofill",
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/extensions",
+    "//chrome/browser/ui/prefs",
     "//chrome/browser/ui/safety_hub",
+    "//chrome/browser/ui/tabs:tab_list_interface",
     "//chrome/browser/ui/toolbar",
     "//chrome/common",
     "//chrome/common/safe_browsing:proto",
@@ -612,6 +620,7 @@ source_set("extensions") {
       "api/tabs/tabs_api_android.cc",
       "api/tabs/tabs_event_router_android.cc",
       "api/tabs/tabs_event_router_android.h",
+      "chrome_extension_host_delegate_android.cc",
       "extension_disabled_ui_android.cc",
       "extension_error_ui_android.cc",
       "extension_error_ui_android.h",
@@ -623,6 +632,7 @@ source_set("extensions") {
     sources += [
       "api/chrome_extensions_api_client_non_android.cc",
       "api/tabs/tabs_api_non_android.cc",
+      "chrome_extension_host_delegate_non_android.cc",
     ]
     public_deps += [ "//components/app_icon_loader" ]
     deps += [ "//chrome/browser/ui/user_education" ]
@@ -773,8 +783,6 @@ source_set("extensions") {
       "app_tab_helper.h",
       "chrome_app_sorting.cc",
       "chrome_app_sorting.h",
-      "chrome_extension_host_delegate.cc",
-      "chrome_extension_host_delegate.h",
       "chrome_extensions_browser_interface_binders.cc",
       "chrome_extensions_browser_interface_binders.h",
       "chrome_kiosk_delegate.h",
@@ -930,6 +938,7 @@ source_set("extensions") {
       "//chrome/browser/ui/web_applications",
       "//chrome/browser/ui/window_sizer",
       "//chrome/browser/ui/zoom",
+      "//chrome/browser/webauthn",
 
       # Only for allow_circular_includes_from
       "//chrome/browser/apps/app_service/app_icon",
@@ -1050,7 +1059,6 @@ source_set("extensions") {
       "//google_apis",
       "//media:media_buildflags",
       "//pdf:buildflags",
-      "//ppapi/buildflags",
       "//printing/buildflags",
       "//rlz/buildflags",
       "//services/audio/public/cpp",
@@ -1127,6 +1135,7 @@ source_set("extensions") {
         "//chrome/browser/chromeos/policy/dlp",
         "//chrome/browser/chromeos/upload_office_to_cloud",
         "//chromeos/ash/components/browser_context_helper",
+        "//chromeos/ash/components/platform_keys",
         "//chromeos/components/kiosk",
         "//chromeos/components/mgs",
         "//chromeos/components/quick_answers/public/cpp:prefs",
@@ -1680,23 +1689,21 @@ source_set("chrome_extensions_browser_client") {
     "//chrome/browser/media/webrtc",
     "//chrome/browser/prefetch",
     "//chrome/browser/profiles/keep_alive",
-    "//chrome/browser/safe_browsing",
     "//chrome/browser/task_manager",
     "//chrome/browser/ui",
     "//components/content_settings/core/browser",
     "//components/embedder_support:user_agent",
     "//components/privacy_sandbox:privacy_sandbox_prefs",
     "//components/proxy_config",
-    "//components/safe_browsing/core/common:features",
     "//components/sessions",
     "//components/update_client",
+    "//extensions/browser/api/content_settings",
     "//extensions/browser/updater",
     "//extensions/browser/updater:keepalive",
   ]
 
   if (enable_desktop_android_extensions) {
-    sources +=
-        [ "desktop_android/desktop_android_extensions_browser_client.cc" ]
+    sources += [ "chrome_extensions_browser_client_android.cc" ]
 
     deps += [
       "//chrome/browser:browser_process",
@@ -1720,7 +1727,6 @@ source_set("chrome_extensions_browser_client") {
       "//chrome/browser/extensions",
       "//chrome/browser/extensions/api/runtime",
       "//chrome/browser/web_applications",
-      "//extensions/browser/api/content_settings",
     ]
 
     if (is_chromeos) {
@@ -1731,5 +1737,19 @@ source_set("chrome_extensions_browser_client") {
         "//chromeos/components/mgs",
       ]
     }
+  }
+
+  # TODO(crbug.com/417279245): Add extensions safe browsing to desktop Android,
+  # then enable this for safe_browsing_mode == 2 as well.
+  if (safe_browsing_mode == 1) {
+    sources += [
+      "chrome_safe_browsing_delegate.cc",
+      "chrome_safe_browsing_delegate.h",
+    ]
+
+    deps += [
+      "//chrome/browser/safe_browsing",
+      "//components/safe_browsing/core/common:features",
+    ]
   }
 }

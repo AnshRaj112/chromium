@@ -67,6 +67,7 @@ void InlineItemResult::Trace(Visitor* visitor) const {
   visitor->Trace(ruby_column);
   visitor->Trace(positioned_float);
   visitor->Trace(exclusion_space_before_position_float);
+  visitor->Trace(fit_text_scale);
 }
 
 String InlineItemResult::ToString(const String& ifc_text_content,
@@ -112,10 +113,9 @@ String InlineItemResult::ToString(const String& ifc_text_content,
   return builder.ToString();
 }
 
-float FindTextScale(const InlineItemResults& line_items,
-                    wtf_size_t start_index,
-                    wtf_size_t initial_nesting_level) {
-  float text_scale = 1.0f;
+FitTextBlockScale FindTextScaleInternal(const InlineItemResults& line_items,
+                                        wtf_size_t start_index,
+                                        wtf_size_t initial_nesting_level) {
   wtf_size_t level = initial_nesting_level;
   for (wtf_size_t i = start_index; i < line_items.size(); ++i) {
     auto item_type = line_items[i].item->Type();
@@ -128,12 +128,24 @@ float FindTextScale(const InlineItemResults& line_items,
       --level;
     } else if (item_type == InlineItem::kText) {
       if (level == 0) {
-        text_scale = line_items[i].fit_text_scale.scale;
+        if (const auto* fit_text_scale = line_items[i].fit_text_scale.Get()) {
+          float paint_scale = fit_text_scale->scale;
+          float font_scale = 1.0f;
+          const Font* scaled_font = fit_text_scale->font;
+          if (scaled_font) {
+            font_scale = scaled_font->GetFontDescription().ComputedSize() /
+                         line_items[i]
+                             .item->Style()
+                             ->GetFontDescription()
+                             .ComputedSize();
+          }
+          return {paint_scale, font_scale * paint_scale, scaled_font};
+        }
         break;
       }
     }
   }
-  return text_scale;
+  return {1.0f, 1.0f, nullptr};
 }
 
 }  // namespace blink

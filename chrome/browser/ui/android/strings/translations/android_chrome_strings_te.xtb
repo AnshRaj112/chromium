@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">మీరు PDFలను ఇక్కడ డౌన్‌లోడ్ చేయవచ్చు</translation>
 <translation id="107147699690128016">మీరు ఫైల్ ఎక్స్‌టెన్షన్‌ను మార్చితే, ఫైల్ వేరే అప్లికేషన్‌లో తెరవబడవచ్చు. అది మీ పరికరానికి హానికరంగా పరిణమించే అవకాశం ఉంటుంది.</translation>
 <translation id="1080365971383768617">మీ అన్ని పరికరాలలోని పాస్‌వర్డ్‌లు</translation>
-<translation id="1087176310396019910">స్పామ్ అయ్యే అవకాశం</translation>
 <translation id="1087799850623149508">అడ్రస్ బార్‌ను కిందికి తరలించడానికి మీరు నొక్కి, పట్టుకోవచ్చు</translation>
 <translation id="1089606299949659462">రివ్యూ పూర్తయింది!</translation>
 <translation id="1094555143448724771">మీ ఇతర పరికరాల నుండి ట్యాబ్‌లను చూడటానికి, మీ ట్యాబ్‌లను, హిస్టరీని సింక్ చేయండి</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">Chromeను రీస్టార్ట్ చేయాలా?</translation>
 <translation id="1428770807407000502">సింక్‌ను ఆఫ్ చేయాలా?</translation>
 <translation id="1430915738399379752">ప్రింట్</translation>
+<translation id="1433478348197382180">రీడింగ్ మోడ్</translation>
 <translation id="1435593198351412143">PDFలను ఆటోమేటిక్‌గా తెరవండి</translation>
 <translation id="1437543266176261764"><ph name="APP_NAME" />‌లో రన్ అవుతోంది</translation>
 <translation id="1448440926884431741">ట్రాక్ చేసిన మీ ప్రోడక్ట్‌లను బుక్‌మార్క్‌లలో ఆర్గనైజ్ చేయండి</translation>
@@ -720,6 +720,7 @@
 <translation id="4306489587293957491">Enter</translation>
 <translation id="4307992518367153382">ప్రాథమికాలు</translation>
 <translation id="4311652497846705514">PDFను తెరవాలా?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{స్పామ్ అయ్యే అవకాశం ఉంది}other{స్పామ్ అయ్యే అవకాశం ఉన్నవి (#)}}</translation>
 <translation id="4320177379694898372">ఇంటర్నెట్ కనెక్షన్ లేదు</translation>
 <translation id="4326079409704643112">మీ Google ఖాతాలో Chrome డేటాను ఉపయోగించడానికి, దానిలో డేటాను సేవ్ చేయడానికి, ఇది మీరేనని వెరిఫై చేయండి</translation>
 <translation id="433213510553688132">ఫాలో చేస్తున్నారు...</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">మీకు ఆసక్తి ఉన్న టాపిక్‌లను, సైట్‌లను మేనేజ్ చేయండి</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# గంట క్రితం}other{# గంటల క్రితం}}</translation>
 <translation id="5810288467834065221">కాపీరైట్ <ph name="YEAR" /> సర్వ హక్కులు Google LLCకి రిజర్వ్ అయ్యాయి.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{నోటిఫికేషన్‌ను చూడండి}other{నోటిఫికేషన్‌లను చూడండి}}</translation>
 <translation id="5814749351757353073">మీకు ఇష్టమైన సైట్‌ల గురించి తెలుసుకోండి</translation>
 <translation id="5823093032261493462">అయినా సరే మీరు <ph name="DOWNLOAD_DOMAIN" /> నుండి "<ph name="FILE_NAME" />"ను డౌన్‌లోడ్ చేసుకోవాలనుకుంటున్నారా?</translation>
 <translation id="5828921839638612740">మీరు Chrome సెట్టింగ్‌లలో డేటాను తొలగించవచ్చు</translation>
@@ -1166,6 +1168,7 @@
 <translation id="6255809143828972562">Chromeకు సంబంధించిన టూల్స్‌తో, మీరు సురక్షితంగా బ్రౌజ్ చేయవచ్చు, అలాగే కంట్రోల్‌లో ఉండవచ్చు</translation>
 <translation id="6264376385120300461">ఏదేమైనా డౌన్‌లోడ్ చేయండి</translation>
 <translation id="6264485186158353794">భద్రతకు తిరిగి వెళ్ళు</translation>
+<translation id="6267063201726531683">రీడింగ్ మోడ్ కింద ఉన్న షీట్</translation>
 <translation id="6277522088822131679">పేజీని ముద్రిస్తున్నప్పుడు సమస్య ఏర్పడింది. దయచేసి మళ్లీ ట్రై చేయండి.</translation>
 <translation id="6278428485366576908">థీమ్</translation>
 <translation id="6284472661216707937">మీ పరికరాలన్నింటిలో పాస్‌వర్డ్‌లు మూసివేయబడ్డాయి</translation>
@@ -1189,7 +1192,6 @@
 <translation id="6342069812937806050">ఇప్పుడే</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 మరియు మరో <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 మరియు మరో <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}}</translation>
 <translation id="6345878117466430440">చదివినట్లుగా గుర్తించు</translation>
-<translation id="6347010704471250799">నోటిఫికేషన్‌ను చూడండి</translation>
 <translation id="6356893102071098867">మీరు సరైన ఖాతాను ఎంచుకున్నారో లేదో చెక్ చేయండి</translation>
 <translation id="6363990818884053551">సింక్‌ను ప్రారంభించడానికి, అది మీరేనని వెరిఫై చేయండి</translation>
 <translation id="6364438453358674297">హిస్టరీ నుండి సూచనను తీసివేయాలా?</translation>

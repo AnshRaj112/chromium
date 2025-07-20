@@ -10,12 +10,6 @@ import("//testing/test.gni")
 import("//third_party/protobuf/proto_library.gni")
 import("//tools/ipc_fuzzer/ipc_fuzzer.gni")
 
-buildflag_header("ipc_buildflags") {
-  header = "ipc_buildflags.h"
-
-  flags = [ "IPC_MESSAGE_LOG_ENABLED=$enable_ipc_logging" ]
-}
-
 component("ipc") {
   sources = [
     # These are the param_traits sources needed by all platforms,
@@ -29,7 +23,6 @@ component("ipc") {
     "param_traits_macros.h",
     "param_traits_read_macros.h",
     "param_traits_write_macros.h",
-    "struct_constructor_macros.h",
     "tracing_helpers.h",
     "tracing_helpers_internal.h",
   ]
@@ -51,8 +44,6 @@ component("ipc") {
       "ipc_channel_reader.h",
       "ipc_listener.cc",
       "ipc_listener.h",
-      "ipc_logging.cc",
-      "ipc_logging.h",
       "ipc_message_macros.h",
       "ipc_message_pipe_reader.cc",
       "ipc_message_pipe_reader.h",
@@ -64,8 +55,6 @@ component("ipc") {
       "ipc_sender.h",
       "ipc_sync_channel.cc",
       "ipc_sync_channel.h",
-      "ipc_sync_message_filter.cc",
-      "ipc_sync_message_filter.h",
       "message_filter.cc",
       "message_filter.h",
       "message_filter_router.cc",
@@ -79,9 +68,9 @@ component("ipc") {
   defines = [ "IS_IPC_IMPL" ]
 
   public_deps = [
-    ":ipc_buildflags",
     ":message_support",
     ":mojom",
+    ":mojom_constants",
     ":native_handle_type_converters",
     ":param_traits",
     "//base",
@@ -152,7 +141,6 @@ component("message_support") {
   defines = [ "IPC_MESSAGE_SUPPORT_IMPL" ]
 
   public_deps = [
-    ":ipc_buildflags",
     ":param_traits",
     "//base",
     "//mojo/public/cpp/system",

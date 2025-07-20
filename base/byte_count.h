@@ -5,7 +5,9 @@
 #ifndef BASE_BYTE_COUNT_H_
 #define BASE_BYTE_COUNT_H_
 
+#include <compare>
 #include <cstdint>
+#include <type_traits>
 
 #include "base/numerics/checked_math.h"
 #include "base/numerics/safe_conversions.h"
@@ -78,21 +80,30 @@ class ByteCount {
     return ByteCount((CheckedNumeric<int64_t>(bytes_) / value).ValueOrDie());
   }
 
-  constexpr auto operator<=>(const ByteCount& other) const = default;
+  constexpr friend bool operator==(const ByteCount& a,
+                                   const ByteCount& b) = default;
+  constexpr friend auto operator<=>(const ByteCount& a,
+                                    const ByteCount& b) = default;
 
  private:
   int64_t bytes_ = 0;
 };
 
-constexpr ByteCount KiB(int64_t kib) {
+template <typename T>
+  requires std::is_integral_v<T>
+constexpr ByteCount KiB(T kib) {
   return ByteCount((CheckedNumeric<int64_t>(kib) * 1024).ValueOrDie());
 }
 
-constexpr ByteCount MiB(int64_t mib) {
+template <typename T>
+  requires std::is_integral_v<T>
+constexpr ByteCount MiB(T mib) {
   return ByteCount((CheckedNumeric<int64_t>(mib) * 1024 * 1024).ValueOrDie());
 }
 
-constexpr ByteCount GiB(int64_t gib) {
+template <typename T>
+  requires std::is_integral_v<T>
+constexpr ByteCount GiB(T gib) {
   return ByteCount(
       (CheckedNumeric<int64_t>(gib) * 1024 * 1024 * 1024).ValueOrDie());
 }

@@ -17,7 +17,6 @@ import("//media/media_options.gni")
 import("//mojo/features.gni")
 import("//mojo/public/tools/bindings/mojom.gni")
 import("//net/features.gni")
-import("//ppapi/buildflags/buildflags.gni")
 import("//printing/buildflags/buildflags.gni")
 import("//services/device/public/cpp/compute_pressure/buildflags.gni")
 import("//services/screen_ai/buildflags/features.gni")
@@ -301,6 +300,8 @@ static_library("test_support") {
     "../public/test/permissions_test_utils.h",
     "../public/test/policy_container_utils.cc",
     "../public/test/policy_container_utils.h",
+    "../public/test/preconnect_test_util.cc",
+    "../public/test/preconnect_test_util.h",
     "../public/test/prefetch_test_util.cc",
     "../public/test/prefetch_test_util.h",
     "../public/test/preloading_test_util.cc",
@@ -844,6 +845,10 @@ static_library("test_support") {
   if (is_fuchsia) {
     public_deps += [ "//third_party/fuchsia-sdk/sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp" ]
   }
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 # Fuchsia performance tests on smart displays use web_engine and a browser
@@ -1111,6 +1116,10 @@ static_library("browsertest_support") {
   }
 
   configs += [ "//v8:external_startup_data" ]
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 mojom("content_test_mojo_bindings") {
@@ -1507,6 +1516,7 @@ test("content_browsertests") {
     "../browser/indexed_db/indexed_db_browsertest.cc",
     "../browser/indexed_db/indexed_db_transaction_feature_observer_browsertest.cc",
     "../browser/interest_group/interest_group_browsertest.cc",
+    "../browser/internal_urls_browsertest.cc",
     "../browser/isolated_origin_browsertest.cc",
     "../browser/keyboard_lock_browsertest.cc",
     "../browser/keyboard_lock_browsertest.h",
@@ -1847,6 +1857,8 @@ test("content_browsertests") {
     "//components/favicon/content",
     "//components/fingerprinting_protection_filter/interventions/common:features",
     "//components/input",
+    "//components/metrics/dwa:dwa",
+    "//components/metrics/dwa:dwa_builders",
     "//components/network_session_configurator/common",
     "//components/os_crypt/async/browser:key_provider_interface",
     "//components/os_crypt/async/browser:test_support",
@@ -1910,7 +1922,6 @@ test("content_browsertests") {
     "//net:simple_quic_tools",
     "//net:test_support",
     "//pdf:buildflags",
-    "//ppapi/buildflags",
     "//services/audio/public/cpp",
     "//services/cert_verifier/public/mojom",
     "//services/data_decoder/public/cpp",
@@ -2390,6 +2401,10 @@ test("content_browsertests") {
       "//third_party/fuchsia-sdk/sdk/pkg/vulkan/client.shard.cml",
     ]
   }
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 grit("web_ui_mojo_test_resources") {
@@ -2670,6 +2685,7 @@ test("content_unittests") {
     "../browser/payments/payment_manager_unittest.cc",
     "../browser/permissions/embedded_permission_control_checker_unittest.cc",
     "../browser/permissions/permission_controller_impl_unittest.cc",
+    "../browser/permissions/permission_overrides_unittest.cc",
     "../browser/permissions/permission_service_context_unittest.cc",
     "../browser/permissions/permission_util_unittest.cc",
     "../browser/picture_in_picture/picture_in_picture_service_impl_unittest.cc",
@@ -2958,7 +2974,6 @@ test("content_unittests") {
     "../common/webid/identity_url_loader_throttle_unittest.cc",
     "../public/test/browser_task_environment_unittest.cc",
     "../public/test/no_renderer_crashes_assertion_unittest.cc",
-    "../public/test/permission_overrides_unittest.cc",
     "../public/test/permission_type_unittest.cc",
     "../public/test/referrer_unittest.cc",
     "../public/test/test_utils_unittest.cc",
@@ -3207,7 +3222,6 @@ test("content_unittests") {
     "//mojo/public/cpp/test_support:test_utils",
     "//net:extras",
     "//net:test_support",
-    "//ppapi/buildflags",
     "//services/audio/public/cpp:test_support",
     "//services/audio/public/mojom",
     "//services/data_decoder/public/cpp:test_support",
@@ -3574,6 +3588,10 @@ test("content_unittests") {
   if (is_castos || is_cast_android) {
     deps += [ "//chromecast:chromecast_buildflags" ]
   }
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 if (is_ios) {

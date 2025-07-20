@@ -5,6 +5,7 @@
 <translation id="1086486568852410168">Buscar con Google Lens</translation>
 <translation id="1143896152279775643">Tu contraseña se guardará en el Gestor de contraseñas de Google de <ph name="EMAIL" />.</translation>
 <translation id="1146503048444965320">Abrir nueva pestaña en Chrome</translation>
+<translation id="1158134713295836892">Gemini en Chrome</translation>
 <translation id="1166460004393506534">Eliminar los datos de navegación en Chrome</translation>
 <translation id="1179527450541388808">Accede más rápido a Chrome desde el Dock de la pantalla de inicio de tu iPad.</translation>
 <translation id="1180362651362502943">Sigue usando los datos de Chrome en tu cuenta de Google.</translation>
@@ -63,7 +64,6 @@ Notas importantes:
 <translation id="2423077901494354337">Ahora podrás sacar el máximo partido a Chrome en tu dispositivo.</translation>
 <translation id="2427791862912929107">Chrome incluye funciones que te ayudan a gestionar tus datos de Internet y la rapidez con la que puedes cargar páginas web.
 <ph name="BEGIN_LINK" />Más información<ph name="END_LINK" /></translation>
-<translation id="2444854139071078915">Para obtener fácilmente tus contraseñas guardadas en tus otras aplicaciones, usa Autocompletar en Chrome</translation>
 <translation id="2464852008153767546">{THRESHOLD,plural, =1{Ocurre cuando Chrome lleva {THRESHOLD} minuto sin usarse. Esto podría incluir el historial y la función Autocompletar.}other{Ocurre cuando Chrome lleva {THRESHOLD} minutos sin usarse. Esto podría incluir el historial y la función Autocompletar.}}</translation>
 <translation id="2561231791489583059">Usa Chrome como tu navegador predeterminado para protegerte de sitios peligrosos y mantener a salvo tus contraseñas</translation>
 <translation id="2574249610672786438">Inicia sesión en todos tus dispositivos para ver tus pestañas dondequiera que uses Chrome</translation>
@@ -144,7 +144,7 @@ Prueba a esperar unos minutos antes de cerrar sesión. Si cierras sesión ahora,
 <translation id="4840404732697892756">El Gestor de contraseñas de Google puede comprobar tus contraseñas si inicias sesión con tu cuenta de Google.</translation>
 <translation id="4903674399067644695">Esta tarjeta muestra sugerencias para aprovechar Chrome al máximo.</translation>
 <translation id="49200511069271369">Tu organización, <ph name="DOMAIN" />, gestiona la cuenta en la que has iniciado sesión y el modo en el que se puede usar Chrome. Tu administrador puede configurar o restringir ciertas funciones.</translation>
-<translation id="4925322001044117929">Usar Chrome en el iPad de forma predeterminada</translation>
+<translation id="4925322001044117929">Usar Chrome en iPad por defecto</translation>
 <translation id="498985224078955265">Para enviar esta pestaña a otro dispositivo, inicia sesión en Chrome en ambos dispositivos.</translation>
 <translation id="5030102366287574140">Chrome puede ayudarte a protegerte frente a brechas de seguridad de datos, sitios web no seguros y mucho más</translation>
 <translation id="5109169629909011627">Ver los marcadores de Chrome</translation>
@@ -219,7 +219,6 @@ Tus datos se han cifrado con tu frase de contraseña. Introdúcela para usar y g
 <translation id="6684809838922667136">Mejorar Chrome</translation>
 <translation id="6695698548122852044">{THRESHOLD,plural, =1{Ocurre cuando Chrome lleva {THRESHOLD} minuto sin usarse. Se eliminarán los datos guardados solo en este dispositivo mientras tenías la sesión iniciada. Esto podría incluir el historial y las contraseñas.}other{Ocurre cuando Chrome lleva {THRESHOLD} minutos sin usarse. Se eliminarán los datos guardados solo en este dispositivo mientras tenías la sesión iniciada. Esto podría incluir el historial y las contraseñas.}}</translation>
 <translation id="6709398533399187136">Tu contraseña se ha visto expuesta en una brecha de seguridad de datos. El Gestor de contraseñas de Google te recomienda que cambies esa contraseña ahora.</translation>
-<translation id="6788035488757621217">En los ajustes de tu dispositivo, abre <ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" /> y selecciona Chrome</translation>
 <translation id="6820553595690137150">El cifrado con frase de contraseña no incluye los métodos de pago ni las direcciones.
 
 Para cambiar este ajuste, <ph name="BEGIN_LINK" />elimina los datos de Chrome de tu cuenta<ph name="END_LINK" />.</translation>

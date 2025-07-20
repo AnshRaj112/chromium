@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">আপুনি PDFসমূহ ইয়াত ডাউনল’ড কৰিব পাৰে</translation>
 <translation id="107147699690128016">আপুনি যদি ফাইল এক্সটেনশ্বন সলনি কৰে ফাইলটো হয়তো বেলেগ এটা এপ্লিকেশ্বনত খুলিব আৰু সেয়া আপোনাৰ ডিভাইচটোৰ বাবে এক সম্ভাব্য বিপদ হ’ব পাৰে।</translation>
 <translation id="1080365971383768617">আপোনাৰ আটাইবোৰ ডিভাইচত পাছৱৰ্ড</translation>
-<translation id="1087176310396019910">সম্ভাব্য স্পাম</translation>
 <translation id="1087799850623149508">ঠিকনাৰ বাৰডাল একেবাৰে তললৈ নিবলৈ আপুনি স্পৰ্শ কৰি ধৰি ৰাখিব পাৰে</translation>
 <translation id="1089606299949659462">পৰ্যালোচনা সম্পূৰ্ণ হ’ল!</translation>
 <translation id="1094555143448724771">আপোনাৰ অন্য ডিভাইচৰ পৰা টেবসমূহ চাবলৈ, আপোনাৰ টেব আৰু ইতিহাস ছিংক কৰক</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">Chrome ৰিষ্টাৰ্ট কৰিবনে?</translation>
 <translation id="1428770807407000502">ছিংক অফ কৰিবনে?</translation>
 <translation id="1430915738399379752">প্ৰিণ্ট কৰক</translation>
+<translation id="1433478348197382180">পঢ়াৰ ম’ড</translation>
 <translation id="1435593198351412143">PDF স্বয়ংক্ৰিয়ভাৱে খোলে</translation>
 <translation id="1437543266176261764"><ph name="APP_NAME" />ত চলি আছে</translation>
 <translation id="1448440926884431741">আপুনি ট্ৰেক কৰা প্ৰ’ডাক্টসমূহ বুকমাৰ্কত শৃংখলাবদ্ধ কৰক</translation>
@@ -720,6 +720,7 @@
 <translation id="4306489587293957491">দিয়ক</translation>
 <translation id="4307992518367153382">মৌলিক</translation>
 <translation id="4311652497846705514">PDF খুলিব নেকি?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{সম্ভাব্য স্পাম}one{সম্ভাব্য স্পাম(# টা)}other{সম্ভাব্য স্পাম(# টা)}}</translation>
 <translation id="4320177379694898372">ইণ্টাৰনেট সংযোগ নাই</translation>
 <translation id="4326079409704643112">আপোনাৰ Google একাউণ্টত Chromeৰ ডেটা ব্যৱহাৰ আৰু ছেভ কৰিবলৈ, এয়া আপুনিয়েই বুলি সত্যাপন কৰক</translation>
 <translation id="433213510553688132">ফ’ল’ কৰি থকা হৈছে...</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">আপোনাৰ আগ্ৰহ থকা বিষয় আৰু ছাইটসমূহ পৰিচালনা কৰক</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{#ঘণ্টা পূৰ্বে}one{#ঘণ্টা পূৰ্বে}other{#ঘণ্টা পূৰ্বে}}</translation>
 <translation id="5810288467834065221">স্বত্বাধিকাৰ <ph name="YEAR" /> Google Inc। সর্বস্বত্ব সংৰক্ষিত।</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{জাননী দেখুৱাওক}one{জাননী দেখুৱাওক}other{জাননী দেখুৱাওক}}</translation>
 <translation id="5814749351757353073">আপোনাৰ প্ৰিয় ছাইটসমূহৰ জৰিয়তে আপ টু ডেট হৈ থাকক</translation>
 <translation id="5823093032261493462">আপুনি যিহ’লেও <ph name="DOWNLOAD_DOMAIN" />ৰ পৰা "<ph name="FILE_NAME" />" ডাউনল’ড কৰিব বিচাৰে নেকি?</translation>
 <translation id="5828921839638612740">আাপুনি Chromeৰ ছেটিংসমূহত এই ডেটা মচিব পাৰে</translation>
@@ -1168,6 +1170,7 @@
 <translation id="6255809143828972562">Chromeৰ সঁজুলিৰ জৰিয়তে, আপুনি সুৰক্ষিতভাৱে ব্ৰাউজ কৰি নিয়ন্ত্ৰণত থাকিব পাৰে</translation>
 <translation id="6264376385120300461">তথাপি ডাউনল’ড কৰক</translation>
 <translation id="6264485186158353794">পূৰ্বৱৰ্তী পৃষ্ঠাটোলৈ উভতি যাওক</translation>
+<translation id="6267063201726531683">ৰীডিং ম’ডৰ তলৰ শ্বীট</translation>
 <translation id="6277522088822131679">এই পৃষ্ঠাটো প্ৰিণ্ট কৰোঁতে কিবা সমস্যা হৈছিল। অনুগ্ৰহ কৰি আকৌ চেষ্টা কৰক।</translation>
 <translation id="6278428485366576908">থীম</translation>
 <translation id="6284472661216707937">আপোনাৰ আটাইবোৰ ডিভাইচত পাছৱৰ্ডসমূহ বন্ধ কৰা হ’ব</translation>
@@ -1191,7 +1194,6 @@
 <translation id="6342069812937806050">খন্তেক পূর্বে</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 আৰু <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> অধিক}one{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 আৰু <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> অধিক}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 আৰু <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> অধিক}}</translation>
 <translation id="6345878117466430440">পঢ়া হৈছে বুলি চিহ্নিত কৰক</translation>
-<translation id="6347010704471250799">জাননী দেখুৱাওক</translation>
 <translation id="6356893102071098867">আপুনি সঠিক একাউণ্টটো বাছনি কৰিছেনে নাই পৰীক্ষা কৰক</translation>
 <translation id="6363990818884053551">ছিংক আৰম্ভ কৰিবলৈ এয়া আপুনি বুলি সত্যাপন কৰক</translation>
 <translation id="6364438453358674297">ইতিহাসৰ পৰা পৰামৰ্শ আঁতৰাবনে?</translation>

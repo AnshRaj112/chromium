@@ -24,13 +24,6 @@
 
 namespace {
 
-// TODO(crbug.com/411462297): This is a short term hack. This code will be
-// deleted soon once StartTask stops creating new tabs implicitly. This adds a
-// 1-second delay to wait for about:blank to load. This can be replaced by ~100
-// lines of complex code that tries to precisely wait for navigation commit, but
-// that would be overkill.
-constexpr base::TimeDelta kDelayForNewTab = base::Seconds(1);
-
 void RunLater(base::OnceClosure task) {
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(FROM_HERE,
                                                               std::move(task));
@@ -117,73 +110,7 @@ TaskId ActorKeyedService::CreateTask() {
   auto execution_engine = std::make_unique<ExecutionEngine>(profile_.get());
   auto actor_task =
       std::make_unique<ActorTask>(profile_.get(), std::move(execution_engine));
-  TaskId task_id = AddActiveTask(std::move(actor_task));
-  actor_task_subscriptions_.emplace(
-      task_id, GetTask(task_id)->RegisterTaskStateChange(base::BindRepeating(
-                   &ActorKeyedService::OnActorTaskStateChanged,
-                   weak_ptr_factory_.GetWeakPtr())));
-  return task_id;
-}
-
-void ActorKeyedService::StartTask(
-    optimization_guide::proto::BrowserStartTask task,
-    base::OnceCallback<void(optimization_guide::proto::BrowserStartTaskResult)>
-        callback) {
-  // TODO(crbug.com/411462297): This is a short term hack. This code will be
-  // deleted soon once tab_id is removed.
-  tabs::TabHandle handle(task.tab_id());
-  if (!task.tab_id()) {
-    // Get the most recently active browser for this profile.
-    Browser* browser =
-        chrome::FindTabbedBrowser(profile_, /*match_original_profiles=*/false);
-    // If no browser exists create one.
-    if (!browser) {
-      browser = Browser::Create(
-          Browser::CreateParams(profile_, /*user_gesture=*/false));
-    }
-    // Create a new tab.
-    browser->OpenGURL(GURL(url::kAboutBlankURL),
-                      WindowOpenDisposition::NEW_FOREGROUND_TAB);
-    handle = browser->GetActiveTabInterface()->GetHandle();
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
-        FROM_HERE,
-        base::BindOnce(&ActorKeyedService::FinishStartTask,
-                       weak_ptr_factory_.GetWeakPtr(), handle,
-                       std::move(callback)),
-        kDelayForNewTab);
-    return;
-  }
-
-  FinishStartTask(handle, std::move(callback));
-}
-
-void ActorKeyedService::FinishStartTask(
-    tabs::TabHandle handle,
-    base::OnceCallback<void(optimization_guide::proto::BrowserStartTaskResult)>
-        callback) {
-  tabs::TabInterface* tab = handle.Get();
-  std::unique_ptr<actor::ExecutionEngine> execution_engine;
-  if (tab) {
-    execution_engine =
-        std::make_unique<actor::ExecutionEngine>(profile_.get(), tab);
-  } else {
-    execution_engine = std::make_unique<actor::ExecutionEngine>(profile_.get());
-  }
-
-  auto actor_task = std::make_unique<actor::ActorTask>(
-      profile_.get(), std::move(execution_engine));
-  actor::TaskId task_id = AddActiveTask(std::move(actor_task));
-  actor_task_subscriptions_.emplace(
-      task_id, GetTask(task_id)->RegisterTaskStateChange(base::BindRepeating(
-                   &ActorKeyedService::OnActorTaskStateChanged,
-                   weak_ptr_factory_.GetWeakPtr())));
-
-  optimization_guide::proto::BrowserStartTaskResult result;
-  result.set_task_id(task_id.value());
-  result.set_tab_id(handle.raw_value());
-  result.set_status(optimization_guide::proto::BrowserStartTaskResult::SUCCESS);
-  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-      FROM_HERE, base::BindOnce(std::move(callback), std::move(result)));
+  return AddActiveTask(std::move(actor_task));
 }
 
 void ActorKeyedService::RequestTabObservation(
@@ -333,8 +260,6 @@ void ActorKeyedService::StopTask(TaskId task_id) {
     auto ret = inactive_tasks_.insert(std::move(task));
     ret.position->second->Stop();
   }
-
-  actor_task_subscriptions_.erase(task_id);
 }
 
 ActorTask* ActorKeyedService::GetTask(TaskId task_id) {
@@ -355,11 +280,6 @@ ActorTask* ActorKeyedService::GetMostRecentTask() {
 
 ActorUiStateManagerInterface* ActorKeyedService::GetActorUiStateManager() {
   return actor_ui_state_manager_.get();
-}
-
-void ActorKeyedService::OnActorTaskStateChanged(TaskId task_id,
-                                                ActorTask::State task_state) {
-  GetActorUiStateManager()->OnActorTaskStateChange(task_id, task_state);
 }
 
 bool ActorKeyedService::IsAnyTaskActingOnTab(

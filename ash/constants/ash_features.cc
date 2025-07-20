@@ -533,7 +533,7 @@ BASE_FEATURE(kCrosPrivacyHub,
 // API keys for Geolocation resolution.
 BASE_FEATURE(kCrosSeparateGeoApiKey,
              "CrosSeparateGeoApiKey",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables cros safety service for trust and safety filtering for the text/image
 // output of on-device gen ai models.
@@ -762,11 +762,6 @@ BASE_FEATURE(kEnableExternalKeyboardsInDiagnostics,
 BASE_FEATURE(kEnableHostnameSetting,
              "EnableHostnameSetting",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables or disables keyboard backlight control in settings.
-BASE_FEATURE(kEnableKeyboardBacklightControlInSettings,
-             "EnableKeyboardBacklightControlInSettings",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enable keyboard rewriter fix.
 BASE_FEATURE(kEnableKeyboardRewriterFix,
@@ -1431,6 +1426,12 @@ BASE_FEATURE(kHeliumArcvmKiosk,
              "HeliumArcvmKiosk",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// Enables additional features (e.g. manual launch) for ARCVM Kiosk debugging.
+// Should stay disabled by default.
+BASE_FEATURE(kHeliumArcvmKioskDevMode,
+             "HeliumArcvmKioskDevMode",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, the Help app will render the App Detail Page and entry point.
 BASE_FEATURE(kHelpAppAppDetailPage,
              "HelpAppAppDetailPage",
@@ -1496,11 +1497,6 @@ BASE_FEATURE(kHideShelfControlsInTabletMode,
 BASE_FEATURE(kHindiInscriptLayout,
              "HindiInscriptLayout",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-// Enables suggestions in the pinned files section of Holding Space.
-BASE_FEATURE(kHoldingSpaceSuggestions,
-             "HoldingSpaceSuggestions",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kHomeButtonQuickAppAccess,
              "HomeButtonQuickAppAccess",
@@ -2487,7 +2483,7 @@ BASE_FEATURE(kReleaseNotesNotificationAlwaysEligible,
 // Enables rendering ARC notifications using ChromeOS notification framework
 BASE_FEATURE(kRenderArcNotificationsByChrome,
              "RenderArcNotificationsByChrome",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Allows the OS to unpin apps that were pinned by PinnedLauncherApps policy
 // but are no longer a part of it from shelf under specific conditions.
@@ -2541,9 +2537,7 @@ BASE_FEATURE(kScannerFeedbackToast,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables the scanner update.
-BASE_FEATURE(kScannerUpdate,
-             "ScannerUpdate",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kScannerUpdate, "ScannerUpdate", base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables / Disables the scanner feature from the feature management module.
 BASE_FEATURE(kFeatureManagementScanner,
@@ -2713,7 +2707,7 @@ BASE_FEATURE(kSingleCaCertVerificationPhase0,
 // fallback to the previous config.
 BASE_FEATURE(kSingleCaCertVerificationPhase1,
              "SingleCaCertVerificationPhase1",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Use a single CA cert for the EAP network if CA cert was selected, no
 // fallback.
@@ -2724,7 +2718,7 @@ BASE_FEATURE(kSingleCaCertVerificationPhase2,
 // Controls enabling/disabling the Sunfish feature.
 BASE_FEATURE(kSunfishFeature,
              "SunfishFeature",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables custom Demo Mode behavior on feature-aware devices, as controlled by
 // the feature management module.
@@ -3185,11 +3179,6 @@ BASE_FEATURE(kDeviceActiveClientChurnObservationNewDeviceMetadata,
              "DeviceActiveClientChurnObservationNewDeviceMetadata",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Enables settings to be split per device.
-BASE_FEATURE(kInputDeviceSettingsSplit,
-             "InputDeviceSettingsSplit",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // Enables bug fix for dead keys where there's no input field.
 // When enabled, keys are forwarded without dead key processing when there's no
 // input field.
@@ -3287,13 +3276,8 @@ bool IsAllowAmbientEQEnabled() {
   return base::FeatureList::IsEnabled(kAllowAmbientEQ);
 }
 
-bool IsAllowScrollSettingsEnabled() {
-  return IsInputDeviceSettingsSplitEnabled();
-}
-
 bool IsAltClickAndSixPackCustomizationEnabled() {
-  return IsInputDeviceSettingsSplitEnabled() &&
-         base::FeatureList::IsEnabled(kAltClickAndSixPackCustomization);
+  return base::FeatureList::IsEnabled(kAltClickAndSixPackCustomization);
 }
 
 bool IsAmbientEQDefaultOff() {
@@ -3554,13 +3538,8 @@ bool IsDisplayPerformanceModeEnabled() {
   return base::FeatureList::IsEnabled(kDisplayPerformanceMode);
 }
 
-bool IsInputDeviceSettingsSplitEnabled() {
-  return base::FeatureList::IsEnabled(kInputDeviceSettingsSplit);
-}
-
 bool IsPeripheralCustomizationEnabled() {
-  return base::FeatureList::IsEnabled(kPeripheralCustomization) &&
-         IsInputDeviceSettingsSplitEnabled();
+  return base::FeatureList::IsEnabled(kPeripheralCustomization);
 }
 
 bool IsPeripheralsLoggingEnabled() {
@@ -3872,27 +3851,17 @@ bool IsHeliumArcvmKioskEnabled() {
   return base::FeatureList::IsEnabled(kHeliumArcvmKiosk);
 }
 
+bool IsHeliumArcvmKioskDevModeEnabled() {
+  return IsHeliumArcvmKioskEnabled() &&
+         base::FeatureList::IsEnabled(kHeliumArcvmKioskDevMode);
+}
+
 bool IsHibernateEnabled() {
   return base::FeatureList::IsEnabled(kHibernate);
 }
 
 bool IsHideShelfControlsInTabletModeEnabled() {
   return base::FeatureList::IsEnabled(kHideShelfControlsInTabletMode);
-}
-
-bool IsHoldingSpaceSuggestionsEnabled() {
-  // If the holdback feature flag is enabled, the feature should be disabled,
-  // but only if the device is eligible for the study. Exclusion happens
-  // via hardware overlay, so it needs to be checked separately from the finch
-  // controlled holdback feature flag.
-  const bool device_excluded_from_holdback_study = base::FeatureList::IsEnabled(
-      kFeatureManagementShouldExcludeFromSysUiHoldback);
-  if (IsSysUiShouldHoldbackDriveIntegrationEnabled() &&
-      !device_excluded_from_holdback_study) {
-    return false;
-  }
-
-  return base::FeatureList::IsEnabled(kHoldingSpaceSuggestions);
 }
 
 bool IsHomeButtonQuickAppAccessEnabled() {
@@ -3959,11 +3928,6 @@ bool IsIsolatedWebAppKioskEnabled() {
 
 bool IsKerberosRememberPasswordByDefaultEnabled() {
   return base::FeatureList::IsEnabled(kKerberosRememberPasswordByDefault);
-}
-
-bool IsKeyboardBacklightControlInSettingsEnabled() {
-  return base::FeatureList::IsEnabled(
-      kEnableKeyboardBacklightControlInSettings);
 }
 
 bool IsKeyboardRewriterFixEnabled() {
@@ -4149,13 +4113,11 @@ bool IsOobeJellyEnabled() {
 }
 
 bool IsModifierSplitEnabled() {
-  return IsInputDeviceSettingsSplitEnabled() &&
-         base::FeatureList::IsEnabled(kModifierSplit);
+  return base::FeatureList::IsEnabled(kModifierSplit);
 }
 
 bool IsMouseImposterCheckEnabled() {
-  return base::FeatureList::IsEnabled(kMouseImposterCheck) &&
-         IsInputDeviceSettingsSplitEnabled();
+  return base::FeatureList::IsEnabled(kMouseImposterCheck);
 }
 
 bool IsSplitKeyboardRefactorEnabled() {

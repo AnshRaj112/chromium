@@ -69,6 +69,7 @@
 // view: http://dev.chromium.org/developers/design-documents/browser-window
 
 class AccessibilityFocusHighlight;
+class BookmarkBarController;
 class BookmarkBarView;
 class Browser;
 class ContentsContainerView;
@@ -81,6 +82,7 @@ class LocationBarView;
 class MultiContentsView;
 class ScrimView;
 class SidePanel;
+class TabDragDelegate;
 class TabSearchBubbleHost;
 class TabStrip;
 class TabStripRegionView;
@@ -184,8 +186,6 @@ class BrowserView : public BrowserWindow,
   const TopControlsSlideController* top_controls_slide_controller() const {
     return top_controls_slide_controller_.get();
   }
-
-  void SetDownloadShelfForTest(DownloadShelf* download_shelf);
 
   // Returns the constraining bounding box that should be used to lay out the
   // FindBar within. This is _not_ the size of the find bar, just the bounding
@@ -477,6 +477,9 @@ class BrowserView : public BrowserWindow,
   // Returns true if the browser is currently showing tabs in a split view.
   bool IsInSplitView() const;
 
+  // Returns the actor overlay view
+  views::View* GetActorOverlayView();
+
   // BrowserWindow:
   void Show() override;
   void ShowInactive() override;
@@ -621,10 +624,6 @@ class BrowserView : public BrowserWindow,
   void ShowOneClickSigninConfirmation(
       const std::u16string& email,
       base::OnceCallback<void(bool)> confirmed_callback) override;
-  // TODO(beng): Not an override, move somewhere else.
-  void SetDownloadShelfVisible(bool visible);
-  bool IsDownloadShelfVisible() const override;
-  DownloadShelf* GetDownloadShelf() override;
   views::View* GetTopContainer() override;
   views::View* GetLensOverlayView() override;
   DownloadBubbleUIController* GetDownloadBubbleUIController() override;
@@ -658,8 +657,6 @@ class BrowserView : public BrowserWindow,
   ExclusiveAccessContext* GetExclusiveAccessContext() override;
   std::string GetWorkspace() const override;
   bool IsVisibleOnAllWorkspaces() const override;
-  void HideDownloadShelf();
-  void UnhideDownloadShelf();
 
   void ShowEmojiPanel() override;
   void ShowCaretBrowsingDialog() override;
@@ -883,6 +880,9 @@ class BrowserView : public BrowserWindow,
   void Copy();
   void Paste();
 
+  // Returns a `TabDragHandler`, if any available, to handle a tab drag.
+  TabDragDelegate* GetTabDragDelegate(const gfx::Point& point_in_screen);
+
  protected:
   // Enumerates where the devtools are docked relative to the browser's main
   // web contents.
@@ -916,6 +916,13 @@ class BrowserView : public BrowserWindow,
   FRIEND_TEST_ALL_PREFIXES(PermissionChipUnitTest, AccessibleName);
 
   class AccessibilityModeObserver;
+
+  // Sets or clears the flags to force showing bookmark bar.
+  void SetForceShowBookmarkBarFlag(BookmarkBarController::ForceShowFlag flag);
+  void ClearForceShowBookmarkBarFlag(BookmarkBarController::ForceShowFlag flag);
+
+  // Returns the state of the bookmark bar.
+  BookmarkBar::State bookmark_bar_state() const;
 
   // Display the current active split view as a series of multiple side-by-side
   // web contents.
@@ -998,8 +1005,8 @@ class BrowserView : public BrowserWindow,
   void UpdateDevToolsForContents(content::WebContents* web_contents,
                                  bool update_devtools_web_contents);
 
-  // Updates various optional child Views, e.g. Bookmarks Bar, Info Bar or the
-  // Download Shelf in response to a change notification from the specified
+  // Updates various optional child Views, e.g. Bookmarks Bar, Info Bar
+  // in response to a change notification from the specified
   // |contents|. |contents| can be null. In this case, all optional UI will be
   // removed.
   void UpdateUIForContents(content::WebContents* contents);
@@ -1158,8 +1165,6 @@ class BrowserView : public BrowserWindow,
   // |  |------------------------------------------------------------|  |
   // |  |  contents_web_view_ (or multi_contents_view_ if defined)   |  |
   // |  --------------------------------------------------------------  |
-  // |------------------------------------------------------------------|
-  // | Active downloads (download_shelf_)                               |
   // --------------------------------------------------------------------
 
   // The view that manages the tab strip, toolbar, and sometimes the bookmark
@@ -1233,9 +1238,6 @@ class BrowserView : public BrowserWindow,
   // NativeView.
   raw_ptr<View> find_bar_host_view_ = nullptr;
 
-  // The download shelf.
-  raw_ptr<DownloadShelf> download_shelf_ = nullptr;
-
   // The InfoBarContainerView that contains InfoBars for the current tab.
   raw_ptr<InfoBarContainerView> infobar_container_ = nullptr;
 
@@ -1268,6 +1270,12 @@ class BrowserView : public BrowserWindow,
   // same bounds as the contents_web_view_, but also be above the
   // contents_web_view_.
   raw_ptr<views::View> lens_overlay_view_ = nullptr;
+
+  // The view that contains the Glic Actor Overlay. The Actor Overlay is a UI
+  // overlay that is shown on top of the web contents. It therefore must always
+  // have the same bounds as the contents_web_view_, but also be above the
+  // contents_web_view_.
+  raw_ptr<views::View> actor_overlay_view_ = nullptr;
 
   // The view that overlays a watermark on the contents container.
   raw_ptr<enterprise_watermark::WatermarkView> watermark_view_ = nullptr;

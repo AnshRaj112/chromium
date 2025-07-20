@@ -184,13 +184,6 @@ source_set("impl_for_embedder") {
 
   defines = [ "MOJO_SYSTEM_IMPL_IMPLEMENTATION" ]
   deps = [ "//crypto" ]
-  if (is_android) {
-    sources += [
-      "channel_binder.cc",
-      "channel_binder.h",
-    ]
-    deps += [ "//third_party/ashmem" ]
-  }
 
   if (is_win) {
     sources += [
@@ -280,6 +273,10 @@ source_set("test_sources") {
 
     deps += [ "//mojo/core/ports:tests" ]
   }
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 group("core_impl_for_fuzzers") {

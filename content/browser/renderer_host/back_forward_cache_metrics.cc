@@ -4,7 +4,6 @@
 
 #include "content/browser/renderer_host/back_forward_cache_metrics.h"
 
-#include "base/debug/alias.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/metrics/histogram_functions.h"
@@ -577,11 +576,14 @@ void BackForwardCacheMetrics::RecordHistoryNavigationUMA(
         "BackForwardCache.AllSites.HistoryNavigationOutcome.NotRestoredReason",
         reason);
     if (reason == NotRestoredReason::kRendererProcessKilled) {
-      DCHECK(renderer_killed_timestamp_);
-      DCHECK(navigated_away_from_main_document_timestamp_);
+      CHECK(renderer_killed_timestamp_);
+      // It's possible (https://crbug.com/427426299) for the renderer to be
+      // killed before we record this timestamp. In that case, record 0.
       base::TimeDelta time =
-          renderer_killed_timestamp_.value() -
-          navigated_away_from_main_document_timestamp_.value();
+          navigated_away_from_main_document_timestamp_
+              ? (renderer_killed_timestamp_.value() -
+                 navigated_away_from_main_document_timestamp_.value())
+              : base::Seconds(0);
       UMA_HISTOGRAM_LONG_TIMES(
           "BackForwardCache.Eviction.TimeUntilProcessKilled", time);
     }

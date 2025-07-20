@@ -17,6 +17,10 @@ BASE_FEATURE(kCctSignInPrompt,
              "CctSignInPrompt",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kForceHistoryOptInScreen,
+             "ForceHistoryOptInScreen",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Add history sync opt-in promo in the History Page.
 BASE_FEATURE(kHistoryPageHistorySyncPromo,
              "HistoryPageHistorySyncPromo",
@@ -129,7 +133,12 @@ BASE_FEATURE(kWebSigninLeadsToImplicitlySignedInState,
 // Enable experimental binding session credentials to the device.
 BASE_FEATURE(kEnableBoundSessionCredentials,
              "EnableBoundSessionCredentials",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+#if BUILDFLAG(IS_WIN)
+             base::FEATURE_ENABLED_BY_DEFAULT
+#else
+             base::FEATURE_DISABLED_BY_DEFAULT
+#endif
+);
 
 bool IsBoundSessionCredentialsEnabled(const PrefService* profile_prefs) {
   // Enterprise policy takes precedence over the feature value.
@@ -157,6 +166,13 @@ const base::FeatureParam<std::string>
     kEnableBoundSessionCredentialsExclusiveRegistrationPath{
         &kEnableBoundSessionCredentials, "exclusive-registration-path", ""};
 
+// Allows to disable the bound session credentials code in case of emergency.
+BASE_FEATURE(kBoundSessionCredentialsKillSwitch,
+             "BoundSessionCredentialsKillSwitch",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(ENABLE_BOUND_SESSION_CREDENTIALS)
+
+#if BUILDFLAG(ENABLE_DICE_SUPPORT)
 // Enables Chrome refresh tokens binding to a device.
 BASE_FEATURE(kEnableChromeRefreshTokenBinding,
              "EnableChromeRefreshTokenBinding",
@@ -171,17 +187,12 @@ bool IsChromeRefreshTokenBindingEnabled(const PrefService* profile_prefs) {
   return base::FeatureList::IsEnabled(kEnableChromeRefreshTokenBinding);
 }
 
-// Allows to disable the bound session credentials code in case of emergency.
-BASE_FEATURE(kBoundSessionCredentialsKillSwitch,
-             "BoundSessionCredentialsKillSwitch",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // When enabled, Chrome will always use the /IssueToken endpoint to fetch access
 // tokens, no matter if a refresh token is bound or not.
 BASE_FEATURE(kUseIssueTokenToFetchAccessTokens,
              "UseIssueTokenToFetchAccessTokens",
              base::FEATURE_DISABLED_BY_DEFAULT);
-#endif
+#endif  // BUILDFLAG(ENABLE_DICE_SUPPORT)
 
 BASE_FEATURE(kEnablePreferencesAccountStorage,
              "EnablePreferencesAccountStorage",
@@ -232,12 +243,7 @@ BASE_FEATURE(kAllowlistScopesForMdmErrors,
 
 BASE_FEATURE(kEnableExtensionsExplicitBrowserSignin,
              "EnableExtensionsExplicitBrowserSignin",
-#if BUILDFLAG(IS_IOS) || BUILDFLAG(IS_ANDROID)
-             base::FEATURE_ENABLED_BY_DEFAULT
-#else
-             base::FEATURE_DISABLED_BY_DEFAULT
-#endif
-);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 bool IsExtensionsExplicitBrowserSigninEnabled() {
   return base::FeatureList::IsEnabled(kEnableExtensionsExplicitBrowserSignin);
@@ -251,10 +257,6 @@ BASE_FEATURE(kSyncEnableBookmarksInTransportMode,
              base::FEATURE_DISABLED_BY_DEFAULT
 #endif  // BUILDFLAG(IS_IOS)
 );
-
-BASE_FEATURE(kDeferWebSigninTrackerCreation,
-             "DeferWebSigninTrackerCreation",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 BASE_FEATURE(kSignInPromoMaterialNextUI,
@@ -295,6 +297,14 @@ BASE_FEATURE(kChromeIdentitySurveySigninInterceptProfileSeparation,
 
 BASE_FEATURE(kChromeIdentitySurveySigninPromoBubbleDismissed,
              "ChromeIdentitySurveyBubbleSigninPromoDismissed",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kChromeIdentitySurveySwitchProfileFromProfileMenu,
+             "ChromeIdentitySurveySwitchProfileFromProfileMenus",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kChromeIdentitySurveySwitchProfileFromProfilePicker,
+             "ChromeIdentitySurveySwitchProfileFromProfilePicker",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 

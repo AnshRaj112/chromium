@@ -16,6 +16,7 @@
 #include "components/endpoint_fetcher/endpoint_fetcher.h"
 #include "components/lens/lens_overlay_mime_type.h"
 #include "components/lens/lens_overlay_request_id_generator.h"
+#include "components/omnibox/composebox/composebox_query.mojom.h"
 #include "components/search_engines/util.h"
 #include "components/variations/variations_client.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
@@ -50,22 +51,6 @@ enum class QueryControllerState {
   kClusterInfoInvalid = 3,
 };
 
-// Upload status of a file.
-enum class FileUploadStatus {
-  // Not uploaded.
-  kNotUploaded = 0,
-  // File being processed.
-  kProcessing = 1,
-  // Failed validation - Terminal for this file attempt.
-  kValidationFailed = 2,
-  // Request sent to Lens server.
-  kUploadStarted = 3,
-  // Server confirmed successful receipt.
-  kUploadSuccessful = 4,
-  // Server or network error during upload - Terminal for this file attempt.
-  kUploadFailed = 5,
-};
-
 // For upload error metrics.
 enum class FileUploadErrorType {
   // Unknown.
@@ -93,6 +78,7 @@ class IdentityManager;
 namespace composebox {
 // Image encoding options for an uploaded image.
 struct ImageEncodingOptions {
+  bool enable_webp_encoding;
   int max_size;
   int max_height;
   int max_width;
@@ -105,7 +91,8 @@ using OAuthHeadersCreatedCallback =
     base::OnceCallback<void(std::vector<std::string>)>;
 // Callback type alias for the request body proto created.
 using RequestBodyProtoCreatedCallback =
-    base::OnceCallback<void(lens::LensOverlayServerRequest)>;
+    base::OnceCallback<void(lens::LensOverlayServerRequest,
+                            std::optional<FileUploadErrorType>)>;
 // Callback type alias for the upload progress.
 using UploadProgressCallback =
     base::RepeatingCallback<void(uint64_t position, uint64_t total)>;
@@ -113,6 +100,7 @@ using UploadProgressCallback =
 using QueryControllerStateChangedCallback =
     base::RepeatingCallback<void(QueryControllerState state)>;
 // Callback for when the file upload status changes.
+using FileUploadStatus = composebox_query::mojom::FileUploadStatus;
 using FileUploadStatusChangedCallback =
     base::RepeatingCallback<void(std::string file_token,
                                  FileUploadStatus status)>;
@@ -215,7 +203,8 @@ class ComposeboxQueryController {
       version_info::Channel channel,
       std::string locale,
       TemplateURLService* template_url_service,
-      variations::VariationsClient* variations_client);
+      variations::VariationsClient* variations_client,
+      bool send_lns_surface);
   virtual ~ComposeboxQueryController();
 
   // Session management. Virtual for testing.
@@ -237,6 +226,11 @@ class ComposeboxQueryController {
       std::unique_ptr<FileInfo> file_info,
       scoped_refptr<base::RefCountedBytes> file_data,
       std::optional<composebox::ImageEncodingOptions> image_options);
+  // Removes file from file cache.
+  virtual bool DeleteFile(const base::UnguessableToken& file_token);
+
+  // Clear entire file cache.
+  virtual void ClearFiles();
 
  protected:
   // Returns the EndpointFetcher to use with the given params. Protected to
@@ -253,6 +247,10 @@ class ComposeboxQueryController {
   // Creates the client context for Lens requests. Protected to allow access
   // from tests.
   lens::LensOverlayClientContext CreateClientContext() const;
+
+  // Resets the request cluster info state. Protected to allow tests to
+  // override.
+  virtual void ResetRequestClusterInfoState();
 
   // The internal state of the query controller. Protected to allow tests to
   // access the state. Do not modify this state directly, use
@@ -316,8 +314,10 @@ class ComposeboxQueryController {
       RequestBodyProtoCreatedCallback callback);
 
   // Asynchronous handler for when the file upload request body is ready.
-  void OnUploadFileRequestBodyReady(const base::UnguessableToken& file_token,
-                                    lens::LensOverlayServerRequest request);
+  void OnUploadFileRequestBodyReady(
+      const base::UnguessableToken& file_token,
+      lens::LensOverlayServerRequest request,
+      std::optional<FileUploadErrorType> error_type);
 
   // Asynchronous handler for when the file upload request headers are ready.
   void OnUploadFileRequestHeadersReady(const base::UnguessableToken& file_token,
@@ -384,6 +384,11 @@ class ComposeboxQueryController {
 
   // Owned by the Profile, and thus guaranteed to outlive this instance.
   const raw_ptr<variations::VariationsClient> variations_client_;
+
+  // Whether or not to send the lns_surface parameter.
+  // TODO(crbug.com/430070871): Remove this once the server supports the
+  // `lns_surface` parameter.
+  bool send_lns_surface_ = false;
 
   base::WeakPtrFactory<ComposeboxQueryController> weak_ptr_factory_{this};
 };

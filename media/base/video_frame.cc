@@ -44,7 +44,8 @@
 
 #if BUILDFLAG(IS_CHROMEOS)
 // TODO(crbug.com/40263579): Remove.
-#include "gpu/ipc/common/gpu_memory_buffer_impl_native_pixmap.h"
+#include "gpu/ipc/common/legacy_gpu_memory_buffer_for_video.h"
+#include "ui/ozone/public/client_native_pixmap_factory_ozone.h"  // nogncheck
 #endif
 
 #if BUILDFLAG(IS_APPLE)
@@ -450,7 +451,7 @@ scoped_refptr<VideoFrame> VideoFrame::CreateFrameForMappableSIInternal(
 scoped_refptr<VideoFrame> VideoFrame::CreateFrameForGpuMemoryBufferInternal(
     const gfx::Rect& visible_rect,
     const gfx::Size& natural_size,
-    std::unique_ptr<gpu::GpuMemoryBufferImplNativePixmap> gpu_memory_buffer,
+    std::unique_ptr<gpu::LegacyGpuMemoryBufferForVideo> gpu_memory_buffer,
     base::TimeDelta timestamp) {
   CHECK(gpu_memory_buffer);
 
@@ -845,11 +846,20 @@ scoped_refptr<VideoFrame> VideoFrame::WrapExternalYuvaData(
 
 #if BUILDFLAG(IS_CHROMEOS)
 // static
-scoped_refptr<VideoFrame> VideoFrame::WrapExternalGpuMemoryBuffer(
+scoped_refptr<VideoFrame> VideoFrame::WrapExternalGpuMemoryBufferHandle(
     const gfx::Rect& visible_rect,
     const gfx::Size& natural_size,
-    std::unique_ptr<gpu::GpuMemoryBufferImplNativePixmap> gpu_memory_buffer,
+    gfx::ClientNativePixmapFactory* client_native_pixmap_factory,
+    gfx::GpuMemoryBufferHandle handle,
+    const gfx::Size& coded_size,
+    gfx::BufferFormat format,
+    gfx::BufferUsage usage,
     base::TimeDelta timestamp) {
+  CHECK_EQ(handle.type, gfx::GpuMemoryBufferType::NATIVE_PIXMAP);
+  auto gpu_memory_buffer =
+      gpu::LegacyGpuMemoryBufferForVideo::CreateFromHandleForVideoFrame(
+          client_native_pixmap_factory, std::move(handle), coded_size, format,
+          usage);
   return CreateFrameForGpuMemoryBufferInternal(
       visible_rect, natural_size, std::move(gpu_memory_buffer), timestamp);
 }
@@ -1357,11 +1367,9 @@ void VideoFrame::MapGMBOrSharedImageAsync(
   }
 #if BUILDFLAG(IS_CHROMEOS)
   if (gpu_memory_buffer_) {
-    // `base::Unretained()` is safe because of the requirement for callers to
-    // keep the VideoFrame alive until the callback executes.
-    gpu_memory_buffer_->MapAsync(
-        base::BindOnce(&VideoFrame::MakeScopedMappingForGpuMemoryBuffer,
-                       base::Unretained(this), std::move(result_cb)));
+    // LegacyGpuMemoryBufferForVideo supports only synchronous mapping.
+    MakeScopedMappingForGpuMemoryBuffer(std::move(result_cb),
+                                        gpu_memory_buffer_->Map());
     return;
   }
 #endif
@@ -1378,7 +1386,8 @@ bool VideoFrame::AsyncMappingIsNonBlocking() const {
     return shared_image_->AsyncMappingIsNonBlocking();
   }
 #if BUILDFLAG(IS_CHROMEOS)
-  return gpu_memory_buffer_->AsyncMappingIsNonBlocking();
+  // LegacyGpuMemoryBufferForVideo supports only synchronous mapping.
+  return false;
 #else
   NOTREACHED();
 #endif
@@ -1951,7 +1960,7 @@ class ScopedMappingSIImpl : public VideoFrame::ScopedMapping {
 #if BUILDFLAG(IS_CHROMEOS)
 class ScopedMappingGMBImpl : public VideoFrame::ScopedMapping {
  public:
-  ScopedMappingGMBImpl(gpu::GpuMemoryBufferImplNativePixmap* gpu_memory_buffer)
+  ScopedMappingGMBImpl(gpu::LegacyGpuMemoryBufferForVideo* gpu_memory_buffer)
       : gpu_memory_buffer_(gpu_memory_buffer) {
     CHECK(gpu_memory_buffer);
   }
@@ -1974,7 +1983,7 @@ class ScopedMappingGMBImpl : public VideoFrame::ScopedMapping {
 
  private:
   // RAW_PTR_EXCLUSION: Performance reasons (based on analysis of MotionMark).
-  RAW_PTR_EXCLUSION gpu::GpuMemoryBufferImplNativePixmap* gpu_memory_buffer_ =
+  RAW_PTR_EXCLUSION gpu::LegacyGpuMemoryBufferForVideo* gpu_memory_buffer_ =
       nullptr;
 };
 #endif

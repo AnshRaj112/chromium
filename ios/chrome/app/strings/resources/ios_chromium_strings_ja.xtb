@@ -91,7 +91,6 @@ Chromium を使いやすくするためにデータを使用するその他の�
 <translation id="3102849287235003384">すべてのウェブサイトで Google アカウントからログアウトするには、<ph name="BEGIN_LINK" />Chromium からログアウト<ph name="END_LINK" />します。</translation>
 <translation id="3115956258722352278">Chromium をデフォルトのブラウザに設定しますか？</translation>
 <translation id="3180939591219927904">[Chromium を終了するときにシークレット タブをロックする] をオンにします</translation>
-<translation id="3242612358525156339">デバイスの設定で [<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />] を開いて [Chromium] を選択します</translation>
 <translation id="328933489847748230">{count,plural, =1{現在 1 個の Chromium ウィンドウを表示しています}other{現在 {count} 個の Chromium ウィンドウを表示しています}}</translation>
 <translation id="3344973607274501920">Chromium でパスワードを確認できませんでした。インターネット接続を確認してみてください。</translation>
 <translation id="3366305173356742781">アカウントの Chromium データ</translation>
@@ -164,7 +163,6 @@ Chromium を使いやすくするためにデータを使用するその他の�
 <translation id="5042011327527167688">[Chromium で Google マップを使用して表示] をタップします。</translation>
 <translation id="5044871537677053278">Chromium では、住所を検出し、Google マップを使用して経路やローカル情報を表示しています。</translation>
 <translation id="5048140766121299007">[<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />] 設定で [Chromium] をオンに切り替えます</translation>
-<translation id="5048795749726991615">保存したパスワードを他のアプリでも簡単に利用するには、Chromium の自動入力を使用します</translation>
 <translation id="5053429694249468757">Chromium のデータを削除しています…</translation>
 <translation id="5071749685031362629">iOS 版 Chromium</translation>
 <translation id="5124429847818367226">ブラウジングするときや、メッセージ、ドキュメント、他のアプリのリンクをタップしたときに、常に Chromium が使えるようになります。</translation>
@@ -254,6 +252,7 @@ Chromium を使いやすくするためにデータを使用するその他の�
 
 パスフレーズを知っているユーザーだけが暗号化されたデータを見ることができます。パスフレーズは Google には送信されず、保存されることもありません。パスフレーズを忘れた場合や、この設定を変更する場合は、<ph name="BEGIN_LINK" />アカウントの Chromium データを削除<ph name="END_LINK" />してください。</translation>
 <translation id="7192111075364461693">現在、デバイスの設定で Chromium の通知がオフになっています。</translation>
+<translation id="7195217321165708458">Gemini in Chromium</translation>
 <translation id="7219205286115692265">iPad のホーム画面ドックから Chromium にすばやくアクセス。</translation>
 <translation id="7222001353246886083">Chromium で「${searchPhrase}」を検索</translation>
 <translation id="7228180817326917122">Chromium のヒント: アドレスバーの位置を選択</translation>

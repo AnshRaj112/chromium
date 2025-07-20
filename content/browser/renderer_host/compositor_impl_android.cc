@@ -19,7 +19,6 @@
 #include "base/command_line.h"
 #include "base/containers/contains.h"
 #include "base/functional/bind.h"
-#include "base/lazy_instance.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
@@ -106,8 +105,6 @@ gpu::SharedMemoryLimits GetCompositorContextSharedMemoryLimits(
 
 gpu::ContextCreationAttribs GetCompositorContextAttributes() {
   gpu::ContextCreationAttribs attributes;
-  attributes.bind_generates_resource = false;
-
   attributes.enable_raster_interface = true;
   attributes.enable_gles2_interface = false;
   attributes.enable_grcontext = false;
@@ -131,7 +128,6 @@ void CreateContextProviderAfterGpuChannelEstablished(
   constexpr bool support_locking = false;
 
   gpu::ContextCreationAttribs attributes;
-  attributes.bind_generates_resource = false;
   attributes.enable_gles2_interface = true;
 
   auto context_provider =

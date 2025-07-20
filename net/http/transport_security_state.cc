@@ -71,16 +71,21 @@ TransportSecurityState::HashedHost HashHost(
 
 // Returns true if the intersection of |a| and |b| is not empty. If either
 // |a| or |b| is empty, returns false.
-bool HashesIntersect(const HashValueVector& a, const HashValueVector& b) {
-  for (const auto& hash : a) {
-    if (base::Contains(b, hash))
+bool HashesIntersect(const absl::flat_hash_set<SHA256HashValue>& a,
+                     const std::vector<SHA256HashValue>& b) {
+  for (const auto& hash : b) {
+    if (a.contains(hash)) {
       return true;
+    }
   }
   return false;
 }
 
-bool AddHash(base::span<const uint8_t> sha256_hash, HashValueVector& out) {
-  out.emplace_back(sha256_hash);
+bool AddHash(base::span<const uint8_t> sha256_hash,
+             absl::flat_hash_set<SHA256HashValue>& out) {
+  SHA256HashValue value;
+  base::span(value).copy_from(sha256_hash);
+  out.insert(value);
   return true;
 }
 
@@ -328,7 +333,7 @@ bool TransportSecurityState::ShouldUpgradeToSSL(
 TransportSecurityState::PKPStatus TransportSecurityState::CheckPublicKeyPins(
     std::string_view host,
     bool is_issued_by_known_root,
-    const HashValueVector& public_key_hashes) {
+    const std::vector<SHA256HashValue>& public_key_hashes) {
   // Perform pin validation only if the server actually has public key pins.
   if (!HasPublicKeyPins(host)) {
     return PKPStatus::OK;
@@ -346,7 +351,7 @@ bool TransportSecurityState::HasPublicKeyPins(std::string_view host) {
 ct::CTRequirementsStatus TransportSecurityState::CheckCTRequirements(
     std::string_view host,
     bool is_issued_by_known_root,
-    const HashValueVector& public_key_hashes,
+    const std::vector<SHA256HashValue>& public_key_hashes,
     const X509Certificate* validated_certificate_chain,
     ct::CTPolicyCompliance policy_compliance) {
   // If CT is emergency disabled, we don't require CT for any host.
@@ -439,7 +444,11 @@ void TransportSecurityState::AddHPKPInternal(std::string_view host,
   pkp_state.last_observed = last_observed;
   pkp_state.expiry = expiry;
   pkp_state.include_subdomains = include_subdomains;
-  pkp_state.spki_hashes = hashes;
+  for (const auto& hash : hashes) {
+    if (hash.tag() == HASH_VALUE_SHA256) {
+      pkp_state.spki_hashes.insert(hash.sha256hashvalue());
+    }
+  }
 
   // Only store new state when HPKP is explicitly enabled. If it is
   // disabled, remove the state from the enabled hosts.
@@ -461,7 +470,7 @@ void TransportSecurityState::
 TransportSecurityState::PKPStatus TransportSecurityState::CheckPins(
     bool is_issued_by_known_root,
     const TransportSecurityState::PKPState& pkp_state,
-    const HashValueVector& hashes) {
+    const std::vector<SHA256HashValue>& hashes) {
   if (pkp_state.CheckPublicKeyPins(hashes)) {
     return PKPStatus::OK;
   }
@@ -610,9 +619,10 @@ bool TransportSecurityState::IsBuildTimely() {
 }
 
 TransportSecurityState::PKPStatus
-TransportSecurityState::CheckPublicKeyPinsImpl(std::string_view host,
-                                               bool is_issued_by_known_root,
-                                               const HashValueVector& hashes) {
+TransportSecurityState::CheckPublicKeyPinsImpl(
+    std::string_view host,
+    bool is_issued_by_known_root,
+    const std::vector<SHA256HashValue>& hashes) {
   PKPState pkp_state;
   bool found_state = GetPKPState(host, &pkp_state);
 
@@ -716,6 +726,8 @@ bool TransportSecurityState::GetStaticPKPState(std::string_view host,
         &g_hsts_source->pinsets[result.pinset_id];
 
     if (pinset->accepted_pins) {
+      // TODO(crbug.com/41286522): Try to change the preload code generator to
+      // generate the pins as `constexpr array<uint8_t, 32>` to simplify this.
       const char* const* sha256_hash = pinset->accepted_pins;
       while (*sha256_hash) {
         AddHash(UNSAFE_TODO(base::as_bytes(base::span<const char>(
@@ -886,7 +898,7 @@ TransportSecurityState::PinSetInfo::PinSetInfo(std::string hostname,
       include_subdomains_(std::move(include_subdomains)) {}
 
 bool TransportSecurityState::PKPState::CheckPublicKeyPins(
-    const HashValueVector& hashes) const {
+    const std::vector<SHA256HashValue>& hashes) const {
   // Validate that hashes is not empty. By the time this code is called (in
   // production), that should never happen, but it's good to be defensive.
   // And, hashes *can* be empty in some test scenarios.
@@ -910,7 +922,7 @@ bool TransportSecurityState::PKPState::CheckPublicKeyPins(
 }
 
 bool TransportSecurityState::PKPState::HasPublicKeyPins() const {
-  return spki_hashes.size() > 0 || bad_spki_hashes.size() > 0;
+  return !spki_hashes.empty() || !bad_spki_hashes.empty();
 }
 
 bool TransportSecurityState::IsStaticPKPListTimely() const {

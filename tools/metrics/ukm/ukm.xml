@@ -9083,7 +9083,7 @@ be describing additional metrics about the same event.
   <owner>payments-autofill-team@google.com</owner>
   <summary>
     An event that is logged after a likely Pix code is copied to the clipboard
-    on an allowlisted website.
+    on any website.
   </summary>
   <metric name="PixCodeCopied" enum="Boolean">
     <summary>
@@ -23859,6 +23859,19 @@ be describing additional metrics about the same event.
       content detection warning.
     </summary>
   </metric>
+  <metric name="SuspiciousScore">
+    <summary>
+      The 'suspicious' score given to notification contents that came from the
+      URL. Ranges from 0 to 100.
+    </summary>
+    <aggregation>
+      <history>
+        <statistics>
+          <quantiles type="std-percentiles"/>
+        </statistics>
+      </history>
+    </aggregation>
+  </metric>
 </event>
 
 <event name="Tab.Screenshot">
@@ -24787,7 +24800,7 @@ be describing additional metrics about the same event.
       </history>
     </aggregation>
   </metric>
-  <metric name="TimeToLargestContentfulPaint.Cold">
+  <metric name="TimeToLargestContentfulPaint2.Cold">
     <summary>
       The timestamp of the largest contentful paint, relative to the Activity
       initialization timestamp passed from android-browser-helper. Split by
@@ -24802,7 +24815,7 @@ be describing additional metrics about the same event.
       </history>
     </aggregation>
   </metric>
-  <metric name="TimeToLargestContentfulPaint.Warm">
+  <metric name="TimeToLargestContentfulPaint2.Warm">
     <summary>
       The timestamp of the largest contentful paint, relative to the Activity
       initialization timestamp passed from android-browser-helper. Split by

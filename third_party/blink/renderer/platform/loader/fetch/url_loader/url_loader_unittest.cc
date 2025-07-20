@@ -35,7 +35,6 @@
 #include "net/url_request/redirect_info.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/weak_wrapper_shared_url_loader_factory.h"
-#include "services/network/public/mojom/encoded_body_length.mojom-forward.h"
 #include "services/network/public/mojom/encoded_body_length.mojom.h"
 #include "services/network/public/mojom/fetch_api.mojom-shared.h"
 #include "services/network/public/mojom/url_loader_completion_status.mojom.h"
@@ -515,11 +514,11 @@ TEST_F(URLLoaderTest, ResponseAddressSpace) {
   KURL url("http://foo.example");
 
   network::mojom::URLResponseHead head;
-  head.response_address_space = network::mojom::IPAddressSpace::kPrivate;
+  head.response_address_space = network::mojom::IPAddressSpace::kLocal;
 
   WebURLResponse response = WebURLResponse::Create(url, head, true, -1);
 
-  EXPECT_EQ(network::mojom::IPAddressSpace::kPrivate, response.AddressSpace());
+  EXPECT_EQ(network::mojom::IPAddressSpace::kLocal, response.AddressSpace());
 }
 
 TEST_F(URLLoaderTest, ClientAddressSpace) {

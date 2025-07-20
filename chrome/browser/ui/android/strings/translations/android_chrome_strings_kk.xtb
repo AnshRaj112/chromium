@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">PDF құжаттарын осы жерден жүктеп алуға болады.</translation>
 <translation id="107147699690128016">Файл кеңейтімін өзгертсеңіз, файл басқа қолданбада ашылып, құрылғыны зақымдауы мүмкін.</translation>
 <translation id="1080365971383768617">Барлық құрылғыңыздағы құпия сөздер</translation>
-<translation id="1087176310396019910">Спам болуы мүмкін</translation>
 <translation id="1087799850623149508">Мекенжай жолағын төменге жылжыту үшін басып тұрсаңыз болады.</translation>
 <translation id="1089606299949659462">Тексерілді</translation>
 <translation id="1094555143448724771">Басқа құрылғылардағы қойындыларды көру үшін қойындылар мен журналды синхрондаңыз.</translation>
@@ -109,6 +108,7 @@ Chrome тәжірибесін жақсарту үшін деректерді қ�
 <translation id="1419753403124156396">Chrome браузерін қайта іске қосу керек пе?</translation>
 <translation id="1428770807407000502">Синхрондау өшірілсін бе?</translation>
 <translation id="1430915738399379752">Басып шығару</translation>
+<translation id="1433478348197382180">Оқу режимі</translation>
 <translation id="1435593198351412143">PDF файлдарын автоматты түрде ашу</translation>
 <translation id="1437543266176261764"><ph name="APP_NAME" /> қолданбасында орындалуда</translation>
 <translation id="1448440926884431741">Бақыланатын өнімдерді "Бетбелгілер" бөлімінен реттеңіз.</translation>
@@ -240,6 +240,7 @@ Chrome тәжірибесін жақсарту үшін деректерді қ�
 <translation id="2088833076121753253">Автотолтыру функциясын реттеуді аяқтау үшін Chrome браузерін қазір қайта іске қосыңыз. Қойындыларыңыз автоматты түрде қайта ашылады.</translation>
 <translation id="2091863218454846791">Шағын көрініс таңдалды</translation>
 <translation id="2093731487903423814">соңғы 15 минут</translation>
+<translation id="2096577711562668473">Автотолтыру қызметін өзгерту қажет пе?</translation>
 <translation id="2100273922101894616">Автоматты кіру</translation>
 <translation id="2109384632594340939">профиль суреті</translation>
 <translation id="2111511281910874386">Бетке өту</translation>
@@ -325,6 +326,7 @@ Chrome тәжірибесін жақсарту үшін деректерді қ�
 <translation id="2496180316473517155">Шолу журналы</translation>
 <translation id="2497852260688568942">Синхрондау мүмкіндігін әкімші өшіріп қойған</translation>
 <translation id="250020030759455918"><ph name="SITE_NAME" /> сайтына кіру күйін, браузерді пайдалану деректерін және Chrome-дағы сайт деректерін көресіз.</translation>
+<translation id="2502798195266898572">Толығымен ашылған оқу режимінің төменгі парақшасы</translation>
 <translation id="2510106555128151389"><ph name="WEBAPK_NAME" /> орнатылып жатыр…</translation>
 <translation id="2512234228327349533">Сатып алу опцияларын іздеу</translation>
 <translation id="2513403576141822879">Құпиялық, қауіпсіздік және дерек жинағына қатысты басқа да параметрлерді <ph name="BEGIN_LINK" />Синхрондау және Google қызметтері<ph name="END_LINK" /> бөлімінен қараңыз</translation>
@@ -720,6 +722,7 @@ Chrome тәжірибесін жақсарту үшін деректерді қ�
 <translation id="4306489587293957491">Енгізу</translation>
 <translation id="4307992518367153382">Негізгілер</translation>
 <translation id="4311652497846705514">PDF файлын ашу қажет пе?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Спам болуы мүмкін}other{Спам (#) болуы мүмкін}}</translation>
 <translation id="4320177379694898372">Интернет байланысы жоқ</translation>
 <translation id="4326079409704643112">Chrome деректерін Google аккаунтында пайдалану және сақтау үшін жеке басыңызды растаңыз.</translation>
 <translation id="433213510553688132">Жазылуда…</translation>
@@ -933,6 +936,7 @@ Google аккаунтының шолу тарихы басқа Google қызме
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{Файл жүктеп алынып жатыр…}other{# файл жүктеп алынып жатыр…}}</translation>
 <translation id="5210286577605176222">Алдыңғы қойындыға өту</translation>
 <translation id="5210365745912300556">Қойындыны жабу</translation>
+<translation id="5212800876504289412">Бұл өзгерісті аяқтау үшін Chrome-ды өшіріп қосыңыз. Өшіріп қосқан кезде, қойындылар автоматты түрде қайта ашылады.</translation>
 <translation id="5215957675041756913">Деректеріңіз бен аккаунтыңызды басқарыңыз</translation>
 <translation id="5218324087477576825">Карта нөмірін көрсету қажет</translation>
 <translation id="5221437554987713282"><ph name="PERMISSION_1" />, <ph name="PERMISSION_2" /> және т.б. <ph name="SEPARATOR" /> Chrome бұл рұқсаттарды өшірді, себебі сіз соңғы уақытта бұл сайтқа кірмегенсіз.</translation>
@@ -1058,8 +1062,10 @@ Google аккаунтының шолу тарихы басқа Google қызме
 <translation id="580893287573699959">Сізді қызықтыратын тақырыптар мен сайттарды басқару</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# сағат бұрын}other{# сағат бұрын}}</translation>
 <translation id="5810288467834065221">Copyright <ph name="YEAR" /> Google LLC. Барлық құқықтары қорғалған.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Хабарландыруды көрсету}other{Хабарландыруларды көрсету}}</translation>
 <translation id="5814749351757353073">Өзіңізге ұнайтын сайттарды бақылап жүріңіз</translation>
 <translation id="5823093032261493462">"<ph name="FILE_NAME" />" файлын <ph name="DOWNLOAD_DOMAIN" /> сайтынан сонда да жүктеп алу қажет пе?</translation>
+<translation id="5825135637446025843">Chrome өшіп қосылғаннан кейін, құпия сөздерді, кіру кілттерін, мекенжайларды, төлеу әдістері мен басқа ақпаратты автоматты түрде толтыру үшін жаңа провайдерде сақталған ақпаратыңыз қолданылады.</translation>
 <translation id="5828921839638612740">Деректерді Chrome параметрлерінде жоюға болады.</translation>
 <translation id="5829586821381540080"><ph name="FOLDER_NAME" /> қалтасына сақталды</translation>
 <translation id="583281660410589416">Белгісіз</translation>
@@ -1176,6 +1182,7 @@ Google аккаунтының шолу тарихы басқа Google қызме
 <translation id="6295158916970320988">Барлық сайттар</translation>
 <translation id="6296366034485697675">Экспорттау және жою</translation>
 <translation id="629730747756840877">Аккаунт</translation>
+<translation id="6300697579369314762">Жартылай ашылған оқу режимінің төменгі парақшасы</translation>
 <translation id="6301526076346731664">Әзірлеуші құралдарын ашу</translation>
 <translation id="6303969859164067831">Аккаунттан шығу және синхрондау функциясын өшіру</translation>
 <translation id="6307241780749477694">Бұл құрылғыдағы барлық құпия сөзді алу үшін жеке басыңызды растаңыз.</translation>
@@ -1192,7 +1199,6 @@ Google аккаунтының шолу тарихы басқа Google қызме
 <translation id="6342069812937806050">Қазір ғана</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 және тағы <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 және тағы <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}}</translation>
 <translation id="6345878117466430440">Оқылды деп белгілеу</translation>
-<translation id="6347010704471250799">Хабарландыруды көрсету</translation>
 <translation id="6356893102071098867">Дұрыс аккаунт таңдалғанын тексеріңіз.</translation>
 <translation id="6363990818884053551">Синхрондауды бастау үшін жеке басыңызды растаңыз.</translation>
 <translation id="6364438453358674297">Журналдың ұсынысын жою қажет пе?</translation>
@@ -1397,6 +1403,7 @@ Google аккаунтының шолу тарихы басқа Google қызме
 <translation id="71503698506017927">Құпия фразаны шифрлауға Google Pay қызметіндегі төлеу әдістері мен мекенжайлар кірмейді.
 
 Бұл параметрді өзгерту үшін <ph name="BEGIN_LINK" />аккаунтыңыздағы Chrome деректерін жойыңыз<ph name="END_LINK" />.</translation>
+<translation id="7151332203500147130">Жабылған оқу режимінің төменгі парақшасы</translation>
 <translation id="7165972437814027679">Chrome-ның кейбір файлдарды блоктау себептері туралы толық ақпарат</translation>
 <translation id="7168323970702333693"><ph name="USER_NAME" /> аккаунтымен кірдіңіз. Параметрлерді ашады.</translation>
 <translation id="7173114856073700355">Параметрлерді ашу</translation>

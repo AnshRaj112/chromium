@@ -371,10 +371,12 @@ static_library("prediction") {
     "delivery/prediction_model_override.h",
     "delivery/prediction_model_store.cc",
     "delivery/prediction_model_store.h",
+    "delivery/profile_download_service_tracker.h",
   ]
   deps = [
     ":core_util",
     ":features",
+    "//components/component_updater",
     "//components/crx_file",
     "//components/download/public/background_service:public",
     "//components/optimization_guide/optimization_guide_internals/webui:mojo_bindings",
@@ -623,6 +625,7 @@ source_set("delivery_unit_tests") {
     ":prediction",
     "//base",
     "//base/test:test_support",
+    "//components/component_updater",
     "//components/download/public/background_service/test:test_support",
     "//components/optimization_guide/proto:optimization_guide_proto",
     "//components/prefs:test_support",
@@ -703,6 +706,10 @@ source_set("model_execution_unit_tests") {
       "//third_party/tflite:buildflags",
     ]
   }
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 source_set("unit_tests") {

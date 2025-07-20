@@ -208,11 +208,6 @@ class CORE_EXPORT CanvasRenderingContext
   }
   void DidDraw(const SkIRect& dirty_rect, CanvasPerformanceMonitor::DrawType);
 
-  virtual std::unique_ptr<CanvasResourceProvider>
-  CreateCanvasResourceProvider() {
-    NOTREACHED();
-  }
-
   // Returns a StaticBitmapImage containing the current content, or nullptr if
   // it was not possible to obtain that content.
   virtual scoped_refptr<StaticBitmapImage> PaintRenderingResultsToSnapshot(
@@ -267,9 +262,10 @@ class CORE_EXPORT CanvasRenderingContext
   virtual void LoseContext(LostContextMode) {}
   virtual void SendContextLostEventIfNeeded() {}
 
-  // This method gets called at the end of script tasks that modified
-  // the contents of the canvas (called didDraw). It marks the completion
+  // These methods get called at the end of script tasks that modified
+  // the contents of the canvas (called didDraw). They mark the completion
   // of a presentable frame.
+  virtual void PreFinalizeFrame() {}
   virtual void FinalizeFrame(FlushReason) {}
 
   // Thread::TaskObserver implementation
@@ -286,6 +282,11 @@ class CORE_EXPORT CanvasRenderingContext
   virtual String GetIdFromControl(const Element* element) { return String(); }
   virtual int LayerCount() const { return 0; }
   virtual bool IsCanvas2DResourceValid() { NOTREACHED(); }
+  // If the ResourceProvider currently exists, replaces it with a newly-created
+  // CanvasResourceProvider.
+  virtual void DropAndRecreateExistingCanvas2DResourceProvider() {
+    NOTREACHED();
+  }
 
   virtual void setFontForTesting(const String&) { NOTREACHED(); }
 

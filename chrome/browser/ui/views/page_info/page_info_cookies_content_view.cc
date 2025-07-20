@@ -240,8 +240,7 @@ void PageInfoCookiesContentView::SyncSettingsLinkClicked(
   presenter_->OpenSyncSettingsView();
 }
 
-void PageInfoCookiesContentView::SetCookieInfo(
-    const CookiesNewInfo& cookie_info) {
+void PageInfoCookiesContentView::SetCookieInfo(const CookiesInfo& cookie_info) {
   if (IsTrackingProtectionsUi(cookie_info.controls_state)) {
     SetIncognitoTrackingProtectionsDescription(cookie_info.enforcement,
                                                cookie_info.controls_state);
@@ -380,10 +379,6 @@ void PageInfoCookiesContentView::SetIncognitoTrackingProtectionsDescription(
   }
   cookies_description_label_->SetText(l10n_util::GetStringUTF16(description));
   cookies_description_label_->SetVisible(true);
-  // Update styling to match subtitle text.
-  cookies_description_label_->SetDefaultTextStyle(views::style::STYLE_BODY_4);
-  cookies_description_label_->SetDefaultEnabledColorId(
-      kColorPageInfoSubtitleForeground);
 }
 
 void PageInfoCookiesContentView::SetCookiesDescription(

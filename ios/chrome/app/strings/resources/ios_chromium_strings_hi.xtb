@@ -90,7 +90,6 @@ Chromium के अनुभव को बेहतर बनाने के �
 <translation id="3102849287235003384">सभी वेबसाइटों पर, अपने Google खाते से साइन आउट करने के लिए, <ph name="BEGIN_LINK" />Chromium से साइन आउट करें<ph name="END_LINK" />.</translation>
 <translation id="3115956258722352278">क्या आपको Chromium को अपना डिफ़ॉल्ट ब्राउज़र बनाना है?</translation>
 <translation id="3180939591219927904">"Chromium बंद करने पर अपने गुप्त टैब लॉक करें" को चालू करें</translation>
-<translation id="3242612358525156339">अपने डिवाइस की सेटिंग में जाकर, "<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />" खोलें और "Chromium" चुनें</translation>
 <translation id="328933489847748230">{count,plural, =1{अभी Chromium की 1 विंडो दिखाई जा रही है}one{अभी Chromium की {count} विंडो दिखाई जा रही है}other{अभी Chromium की {count} विंडो दिखाई जा रही हैं}}</translation>
 <translation id="3344973607274501920">क्रोमियम आपके पासवर्ड की जांच नहीं कर सका. अपने इंटरनेट कनेक्शन की जांच करें.</translation>
 <translation id="3366305173356742781">आपके खाते में मौजूद Chromium का डेटा</translation>
@@ -163,7 +162,6 @@ Chromium के अनुभव को बेहतर बनाने के �
 <translation id="5042011327527167688">“Chromium पर Google Maps की मदद से देखें” पर टैप करें.</translation>
 <translation id="5044871537677053278">Chromium, पतों को खोजता है और आपको रास्ते बताने और स्थानीय जानकारी देने के लिए, Google Maps का इस्तेमाल करता है.</translation>
 <translation id="5048140766121299007">"<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />" की सेटिंग में जाकर, "Chromium" को चालू करें</translation>
-<translation id="5048795749726991615">सेव किए गए पासवर्ड को अन्य ऐप्लिकेशन में आसानी से इस्तेमाल करने के लिए, AutoFill के लिए Chromium चुनें</translation>
 <translation id="5053429694249468757">Chromium का डेटा मिटाया जा रहा है…</translation>
 <translation id="5071749685031362629">iOS के लिए Chromium</translation>
 <translation id="5124429847818367226">अब मैसेज, दस्तावेज़ों, और अन्य ऐप्लिकेशन में मौजूद लिंक को खोलकर सीधे Chromium पर जाया जा सकता है.</translation>
@@ -253,6 +251,7 @@ Chromium के अनुभव को बेहतर बनाने के �
 
 आपका एन्क्रिप्ट किया गया डेटा, सिर्फ़ वही व्यक्ति देख सकता है जिसके पास आपका लंबा पासवर्ड है. Google को लंबा पासवर्ड नहीं भेजा जाता और न ही Google इसे सेव करता है. अगर आपको अपना लंबा पासवर्ड याद नहीं है या आपको यह सेटिंग बदलनी है, तो <ph name="BEGIN_LINK" />अपने खाते में मौजूद Chromium का डेटा मिटाएं<ph name="END_LINK" />.</translation>
 <translation id="7192111075364461693">फ़िलहाल, आपके डिवाइस की सेटिंग में, Chromium की सूचनाएं भेजने की सुविधा बंद है.</translation>
+<translation id="7195217321165708458">Chromium में Gemini</translation>
 <translation id="7219205286115692265">अपने iPad के होम स्क्रीन डॉक से Chromium को तुरंत ऐक्सेस करें.</translation>
 <translation id="7222001353246886083">Chromium में ${searchPhrase} खोजें</translation>
 <translation id="7228180817326917122">Chromium के बारे में सलाह: पता बार के लिए जगह चुनें</translation>

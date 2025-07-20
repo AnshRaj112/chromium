@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">PDF-файлы можно скачивать здесь.</translation>
 <translation id="107147699690128016">Если вы сделаете это, файл может открыться в другом приложении и нанести вред устройству.</translation>
 <translation id="1080365971383768617">Пароли на всех ваших устройствах</translation>
-<translation id="1087176310396019910">Подозрение на спам</translation>
 <translation id="1087799850623149508">Чтобы переместить адресную строку вниз, нажмите на нее и удерживайте</translation>
 <translation id="1089606299949659462">Проверка выполнена</translation>
 <translation id="1094555143448724771">Синхронизируйте вкладки и историю. Тогда вам станут доступны вкладки, открытые на других ваших устройствах.</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">Перезапустить Chrome?</translation>
 <translation id="1428770807407000502">Отключить синхронизацию?</translation>
 <translation id="1430915738399379752">Печать</translation>
+<translation id="1433478348197382180">Режим чтения</translation>
 <translation id="1435593198351412143">Открывать PDF-файлы автоматически</translation>
 <translation id="1437543266176261764">Выполняется в <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Упорядочивайте отслеживаемые товары в закладках</translation>
@@ -451,7 +451,7 @@
 <translation id="2996809686854298943">Необходимо указать URL</translation>
 <translation id="3026955690410463085">Добавить ссылку</translation>
 <translation id="3027644380269727216">Подбирается на основе ваших действий на сайте. Параметр включен.</translation>
-<translation id="3027950907978057636">Из приложения "<ph name="APP_LABEL" />"</translation>
+<translation id="3027950907978057636"><ph name="APP_LABEL" /></translation>
 <translation id="3029276696788198026">Без предзагрузки</translation>
 <translation id="3029704984691124060">Кодовые фразы не совпадают</translation>
 <translation id="3036750288708366620"><ph name="BEGIN_LINK" />Справка<ph name="END_LINK" /></translation>
@@ -720,6 +720,7 @@
 <translation id="4306489587293957491">Ввести</translation>
 <translation id="4307992518367153382">Основные</translation>
 <translation id="4311652497846705514">Открыть PDF-файл?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Подозрение на спам}one{Подозрение на спам (#)}few{Подозрение на спам (#)}many{Подозрение на спам (#)}other{Подозрение на спам (#)}}</translation>
 <translation id="4320177379694898372">Нет подключения к Интернету</translation>
 <translation id="4326079409704643112">Чтобы использовать и сохранять данные Chrome в аккаунте Google, подтвердите свою личность.</translation>
 <translation id="433213510553688132">Подписка…</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">Управляйте темами и сайтами, которые вам интересны</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# час назад}one{# час назад}few{# часа назад}many{# часов назад}other{# часа назад}}</translation>
 <translation id="5810288467834065221">© Google LLC, <ph name="YEAR" />. Все права защищены.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Показать уведомление}one{Показать уведомления}few{Показать уведомления}many{Показать уведомления}other{Показать уведомления}}</translation>
 <translation id="5814749351757353073">Подпишитесь на любимые сайты</translation>
 <translation id="5823093032261493462">Все равно скачать файл <ph name="FILE_NAME" /> на странице <ph name="DOWNLOAD_DOMAIN" />?</translation>
 <translation id="5828921839638612740">Удалить данные можно в настройках Chrome.</translation>
@@ -1192,7 +1194,6 @@
 <translation id="6342069812937806050">только что</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" /> и ещё <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> адрес доставки}one{<ph name="SHIPPING_ADDRESS_PREVIEW" /> и ещё <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> адрес доставки}few{<ph name="SHIPPING_ADDRESS_PREVIEW" /> и ещё <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> адреса доставки}many{<ph name="SHIPPING_ADDRESS_PREVIEW" /> и ещё <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> адресов доставки}other{<ph name="SHIPPING_ADDRESS_PREVIEW" /> и ещё <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> адреса доставки}}</translation>
 <translation id="6345878117466430440">Отметить как прочитанное</translation>
-<translation id="6347010704471250799">Показывать уведомление</translation>
 <translation id="6356893102071098867">Убедитесь, что выбрали нужный аккаунт.</translation>
 <translation id="6363990818884053551">Чтобы включить синхронизацию, подтвердите свою личность.</translation>
 <translation id="6364438453358674297">Удалить подсказку из истории?</translation>
@@ -1701,7 +1702,7 @@
 <translation id="8398389123831319859">Чтобы перейти в режим инкогнито, нажмите дважды и удерживайте</translation>
 <translation id="8402673309244746971">Перейти к подпискам</translation>
 <translation id="8413126021676339697">Показать всю историю</translation>
-<translation id="8413795581997394485">Защита от сайтов, расширений и скачанных файлов, признанных опасными. Когда вы переходите на сайт, Chrome отправляет обфусцированную часть URL в Google через сервер обеспечения конфиденциальности, который скрывает ваш IP-адрес. Если сайт делает что-то подозрительное, передается полный URL и части контента со страницы.</translation>
+<translation id="8413795581997394485">Защита от сайтов, расширений и скачиваемых файлов, признанных опасными. Когда вы переходите на сайт, Chrome отправляет обфусцированную часть URL в Google через сервер обеспечения конфиденциальности, который скрывает ваш IP-адрес. Если сайт делает что-то подозрительное, передается полный URL и части контента со страницы.</translation>
 <translation id="8414396119627470038">Вход на сайт <ph name="SITE_ETLD_PLUS_ONE" /> с аккаунтом <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /></translation>
 <translation id="8419144699778179708">История будет удалена, в том числе в окне поиска</translation>
 <translation id="8419244640277402268">Да</translation>

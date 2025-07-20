@@ -16,8 +16,10 @@
 #include "base/feature_list.h"
 #include "base/no_destructor.h"
 #include "base/notreached.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/types/cxx23_to_underlying.h"
 #include "components/autofill/core/browser/field_type_utils.h"
 #include "components/autofill/core/browser/field_types.h"
@@ -28,6 +30,7 @@
 #include "components/autofill/core/common/autofill_features.h"
 #include "components/autofill/core/common/dense_set.h"
 #include "components/autofill/core/common/html_field_types.h"
+#include "components/autofill/core/common/logging/log_buffer.h"
 #include "components/autofill/core/common/signatures.h"
 
 namespace autofill {
@@ -255,6 +258,96 @@ std::string_view AutofillPredictionSourceToStringView(
 
 // LINT.ThenChange(/tools/metrics/histograms/metadata/autofill/histograms.xml:AutofillPredictionSources)
 
+Section Section::FromAutocomplete(Section::Autocomplete autocomplete) {
+  Section section;
+  if (autocomplete.section.empty() &&
+      autocomplete.mode == HtmlFieldMode::kNone) {
+    return section;
+  }
+  section.value_ = std::move(autocomplete);
+  return section;
+}
+
+Section Section::FromFieldIdentifier(
+    const FormFieldData& field,
+    base::flat_map<LocalFrameToken, size_t>& frame_token_ids) {
+  Section section;
+  // Set the section's value based on the field identifiers: the field's name,
+  // mapped frame id, renderer id. We do not use LocalFrameTokens but instead
+  // map them to consecutive integers using `frame_token_ids`, which uniquely
+  // identify a frame within a given FormStructure. Since we do not intend to
+  // compare sections from different FormStructures, this is sufficient.
+  //
+  // We intentionally do not include the LocalFrameToken in the section
+  // because frame tokens should not be sent to a renderer.
+  //
+  // TODO(crbug.com/40200532): Remove special handling of FrameTokens.
+  size_t generated_frame_id =
+      frame_token_ids.emplace(field.host_frame(), frame_token_ids.size())
+          .first->second;
+  section.value_ = FieldIdentifier(base::UTF16ToUTF8(field.name()),
+                                   generated_frame_id, field.renderer_id());
+  return section;
+}
+
+Section::Section() = default;
+
+Section::Section(const Section& section) = default;
+Section& Section::operator=(const Section& section) = default;
+
+Section::Section(Section&& section) = default;
+Section& Section::operator=(Section&& section) = default;
+
+Section::~Section() = default;
+
+Section::operator bool() const {
+  return !is_default();
+}
+
+bool Section::is_from_autocomplete() const {
+  return std::holds_alternative<Autocomplete>(value_);
+}
+
+bool Section::is_from_fieldidentifier() const {
+  return std::holds_alternative<FieldIdentifier>(value_);
+}
+
+bool Section::is_default() const {
+  return std::holds_alternative<Default>(value_);
+}
+
+std::string Section::ToString() const {
+  static constexpr char kDefaultSection[] = "-default";
+
+  std::string section_name;
+  if (const Autocomplete* autocomplete = std::get_if<Autocomplete>(&value_)) {
+    // To prevent potential section name collisions, append `kDefaultSection`
+    // suffix to fields without a `HtmlFieldMode`. Without this, 'autocomplete'
+    // attribute values "section--shipping street-address" and "shipping
+    // street-address" would have the same prefix.
+    section_name = autocomplete->section +
+                   (autocomplete->mode != HtmlFieldMode::kNone
+                        ? "-" + HtmlFieldModeToString(autocomplete->mode)
+                        : kDefaultSection);
+  } else if (const FieldIdentifier* f = std::get_if<FieldIdentifier>(&value_)) {
+    FieldIdentifier field_identifier = *f;
+    section_name = base::StrCat(
+        {field_identifier.field_name, "_",
+         base::NumberToString(field_identifier.local_frame_id), "_",
+         base::NumberToString(field_identifier.field_renderer_id.value())});
+  }
+
+  return section_name.empty() ? kDefaultSection : section_name;
+}
+
+LogBuffer& operator<<(LogBuffer& buffer, const Section& section) {
+  return buffer << section.ToString();
+}
+
+std::ostream& operator<<(std::ostream& os, const Section& section) {
+  return os << section.ToString();
+}
+
 AutofillField::AutofillField() {
   local_type_predictions_.fill(NO_SERVER_DATA);
 }
@@ -470,6 +563,8 @@ AutofillField::PredictionResult AutofillField::GetComputedPredictionResult()
   const HtmlFieldType html_type_local = html_type();
   const FieldType server_type_local = server_type();
   const FieldType heuristic_type_local = heuristic_type();
+  const FieldType password_classification_type_local =
+      heuristic_type(HeuristicSource::kPasswordManagerMachineLearning);
 
   // If autocomplete=tel/tel-* and server confirms it really is a phone field,
   // we always use the server prediction as html types are not very reliable.
@@ -565,10 +660,26 @@ AutofillField::PredictionResult AutofillField::GetComputedPredictionResult()
         believe_server && !(heuristic_type_local == LOYALTY_MEMBERSHIP_ID &&
                             server_type_local == UNKNOWN_TYPE);
 
+    // Password server predictions are ignored when the field is parsed to
+    // be an OTP field with the clientside model, as incorrect server
+    // password predictions are common in this case.
+    believe_server = believe_server &&
+                     !(password_classification_type_local == ONE_TIME_CODE &&
+                       GroupTypeOfFieldType(server_type_local) ==
+                           FieldTypeGroup::kPasswordField);
+
     if (believe_server) {
       return {AutofillType(server_type_local),
               AutofillPredictionSource::kServerCrowdsourcing};
     }
+  }
+
+  // If the field was classified as an OTP field by PasswordManager and
+  // `server_type_local` and `html_type_local` did not contradict it,
+  // return PasswordManager prediction.
+  if (password_classification_type_local == ONE_TIME_CODE) {
+    return {AutofillType(password_classification_type_local),
+            AutofillPredictionSource::kHeuristics};
   }
 
   return {AutofillType(heuristic_type_local),

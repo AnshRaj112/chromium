@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">你可在此下載 PDF</translation>
 <translation id="107147699690128016">如果變更副檔名，此檔案可能會在其他應用程式中開啟，並可能對裝置造成損害。</translation>
 <translation id="1080365971383768617">在所有裝置上都能使用自己的密碼</translation>
-<translation id="1087176310396019910">潛在垃圾內容</translation>
 <translation id="1087799850623149508">按住網址列即可移到底部</translation>
 <translation id="1089606299949659462">審核已完成！</translation>
 <translation id="1094555143448724771">如要查看其他裝置上的分頁，請同步處理分頁和記錄</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">重新啟動 Chrome 嗎？</translation>
 <translation id="1428770807407000502">要關閉同步功能嗎？</translation>
 <translation id="1430915738399379752">列印</translation>
+<translation id="1433478348197382180">閱讀模式</translation>
 <translation id="1435593198351412143">自動開啟 PDF</translation>
 <translation id="1437543266176261764">正在 <ph name="APP_NAME" /> 中執行</translation>
 <translation id="1448440926884431741">在「書籤」中整理追蹤的產品</translation>
@@ -720,6 +720,7 @@
 <translation id="4306489587293957491">輸入</translation>
 <translation id="4307992518367153382">基本</translation>
 <translation id="4311652497846705514">要開啟 PDF 嗎？</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{潛在垃圾內容}other{潛在垃圾內容 (#)}}</translation>
 <translation id="4320177379694898372">沒有互聯網連線</translation>
 <translation id="4326079409704643112">如要將 Chrome 的資料儲存至 Google 帳戶及使用這類資料，請驗證身分</translation>
 <translation id="433213510553688132">正在設定為追蹤…</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">管理感興趣的主題和網站</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# 小時前}other{# 小時前}}</translation>
 <translation id="5810288467834065221">版權所有 <ph name="YEAR" /> Google LLC。保留所有權利。</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{顯示通知}other{顯示通知}}</translation>
 <translation id="5814749351757353073">緊貼最喜愛網站的最新動態</translation>
 <translation id="5823093032261493462">確定要從 <ph name="DOWNLOAD_DOMAIN" /> 下載「<ph name="FILE_NAME" />」嗎？</translation>
 <translation id="5828921839638612740">你可以在 Chrome 設定中刪除資料</translation>
@@ -1168,6 +1170,7 @@
 <translation id="6255809143828972562">透過 Chrome 工具，你可安全瀏覽網絡，一切盡在掌握</translation>
 <translation id="6264376385120300461">仍要下載</translation>
 <translation id="6264485186158353794">返回安全連線</translation>
+<translation id="6267063201726531683">閱讀模式頁底面板</translation>
 <translation id="6277522088822131679">列印網頁時發生問題，請再試一次。</translation>
 <translation id="6278428485366576908">主題背景</translation>
 <translation id="6284472661216707937">「喺所有裝置度都可以用自己嘅密碼」說明閂咗</translation>
@@ -1191,7 +1194,6 @@
 <translation id="6342069812937806050">剛剛完成</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 和另外 <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> 個地址}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 和另外 <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> 個地址}}</translation>
 <translation id="6345878117466430440">標示為已閱讀</translation>
-<translation id="6347010704471250799">顯示通知</translation>
 <translation id="6356893102071098867">請確認所選的帳戶是否正確</translation>
 <translation id="6363990818884053551">如要開始同步，請驗證您的身分</translation>
 <translation id="6364438453358674297">從記錄中移除建議項目嗎？</translation>

@@ -28,11 +28,13 @@
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_feature.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_header_constants.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_shortcuts_handler.h"
+#import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_trait.h"
 #import "ios/chrome/browser/omnibox/public/omnibox_constants.h"
 #import "ios/chrome/browser/omnibox/public/omnibox_ui_features.h"
 #import "ios/chrome/browser/omnibox/ui/omnibox_container_view.h"
 #import "ios/chrome/browser/omnibox/ui/omnibox_text_field_ios.h"
 #import "ios/chrome/browser/shared/model/profile/features.h"
+#import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/ui/elements/extended_touch_target_button.h"
 #import "ios/chrome/browser/shared/ui/elements/new_feature_badge_view.h"
 #import "ios/chrome/browser/shared/ui/symbols/symbols.h"
@@ -129,10 +131,6 @@ const CGFloat kMIACircleAnimationSizeNormal = 40.0;
 // the fakebox.
 const CGFloat kMIACircleAnimationSizeEnlarged = 48.0;
 
-// The amount of invisible padding added to the MIA button when displayed as a
-// single button to avoid missing touches.
-const CGFloat kMIAButtonTouchAreaExtend = 5.0;
-
 // Returns the top color of the Fakebox's gradient background.
 UIColor* FakeboxTopColor() {
   return UIAccessibilityIsReduceTransparencyEnabled()
@@ -219,6 +217,33 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
 
 }  // namespace
 
+// `UIStackView` that allows the extended tap area of it's arranged subviews to
+// overflow it's touch area.
+@interface TouchAreaOverflowStackView : UIStackView
+
+@end
+
+@implementation TouchAreaOverflowStackView
+
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent*)event {
+  for (UIView* subview in self.arrangedSubviews) {
+    // We consider a touch valid and allow it to propagate if it falls within
+    // the bounds of any subview.
+    // This means that even if a touch visually appears outside the stack view,
+    // the `pointInside:withEvent:` method can correctly register it within a
+    // subview's touch area, especially where subviews might extend beyond and
+    // overflow the stack view's visual limits.
+    CGPoint convertedPoint = [self convertPoint:point toView:subview];
+    if ([subview pointInside:convertedPoint withEvent:event]) {
+      return YES;
+    }
+  }
+
+  return NO;
+}
+
+@end
+
 @interface NewTabPageHeaderView ()
 
 // The Lens button. May be null if Lens is not available.
@@ -291,8 +316,8 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   // Maintains the MIA circle animation.
   id<LottieAnimation> _miaAnimation;
   UIView* _miaAnimationView;
-  // Whether MIA is allowed by policy.
-  BOOL _MIAAllowedByPolicy;
+  // Whether AIM is allowed.
+  BOOL _isAIMAllowed;
 
   // The current NTP color palette.
   NewTabPageColorPalette* _colorPalette;
@@ -331,6 +356,12 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
         [weakSelf updateUIOnTraitChange:previousCollection];
       };
       [self registerForTraitChanges:traits withHandler:handler];
+      if (IsNTPBackgroundCustomizationEnabled()) {
+        NSArray<UITrait>* colorTraits =
+            TraitCollectionSetForTraits(@[ NewTabPageTrait.class ]);
+        [self registerForTraitChanges:colorTraits
+                           withAction:@selector(applyBackgroundColors)];
+      }
     }
   }
   return self;
@@ -443,7 +474,12 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
       setContentCompressionResistancePriority:UILayoutPriorityDefaultLow
                                       forAxis:UILayoutConstraintAxisHorizontal];
 
-  _buttonStack = [[UIStackView alloc] init];
+  // To ensure touch events are correctly forwarded to the buttons within the
+  // stack view use a stack view implementation that propagates touches to its
+  // subviews.
+  // Otherwise the stack view would 'clip' the extended touch areas of its inner
+  // buttons, preventing them from registering touches properly.
+  _buttonStack = [[TouchAreaOverflowStackView alloc] init];
   _buttonStack.translatesAutoresizingMaskIntoConstraints = NO;
   _buttonStack.alignment = UIStackViewAlignmentCenter;
   _buttonStack.spacing = kButtonSpacing;
@@ -564,7 +600,7 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
     percent = std::clamp<CGFloat>(
         animatingOffset / ntp_header::kAnimationDistance, 0, 1);
   }
-  if (!IsSplitToolbarMode(self)) {
+  if (CanShowTabStrip(self) || !IsSplitToolbarMode(self)) {
     // For ipad and landscape iphone, this makes the animation start slowly
     // and accelerate especially towards the end.
     percent = percent * percent;
@@ -626,7 +662,7 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   CGFloat fakeOmniboxHeight = content_suggestions::FakeOmniboxHeight();
   CGFloat locationBarHeight = content_suggestions::PinnedFakeOmniboxHeight();
 
-  if (!IsSplitToolbarMode(self)) {
+  if (CanShowTabStrip(self) || !IsSplitToolbarMode(self)) {
     // When Voiceover is running, if the header's alpha is set to 0, voiceover
     // can't scroll back to it, and it will never come back into view. To
     // prevent that, set the alpha to non-zero when the header is fully
@@ -807,6 +843,10 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
 
   _customizationMenuButton = customizationMenuButton;
   _customizationNewFeatureBadge = newBadgeView;
+
+  if (IsNTPBackgroundCustomizationEnabled()) {
+    [self applyBackgroundColors];
+  }
 }
 
 - (void)hideBadgeOnCustomizationMenu {
@@ -814,7 +854,7 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
 }
 
 - (void)updateTabGroupIndicatorAvailabilityWithOffset:(CGFloat)offset {
-  BOOL canShowTabStrip = IsRegularXRegularSizeClass(self);
+  BOOL canShowTabStrip = CanShowTabStrip(self);
   BOOL isAvailable = !IsCompactHeight(self) && !canShowTabStrip;
   _tabGroupIndicatorView.available = isAvailable;
 
@@ -840,20 +880,8 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   return [_buttonStack snapshotViewAfterScreenUpdates:NO];
 }
 
-- (void)setMIAAllowedByPolicy:(BOOL)policyAllowed {
-  _MIAAllowedByPolicy = policyAllowed;
-}
-
-- (void)updateBackgroundWithColorPalette:(NewTabPageColorPalette*)colorPalette {
-  _colorPalette = colorPalette;
-
-  if (colorPalette) {
-    [_fakeLocationBar setStartColor:colorPalette.omniboxColor
-                           endColor:colorPalette.omniboxColor];
-  } else {
-    [_fakeLocationBar setStartColor:FakeboxTopColor()
-                           endColor:FakeboxBottomColor()];
-  }
+- (void)setAIMAllowed:(BOOL)allowed {
+  _isAIMAllowed = allowed;
 }
 
 #pragma mark - UITraitEnvironment
@@ -920,6 +948,34 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
 
 #pragma mark - Private
 
+// Sets the background using the current color palette, or defaults if none is
+// set.
+- (void)applyBackgroundColors {
+  _colorPalette = [self.traitCollection objectForTrait:NewTabPageTrait.class];
+
+  if (_colorPalette) {
+    [_fakeLocationBar setStartColor:_colorPalette.omniboxColor
+                           endColor:_colorPalette.omniboxColor];
+
+    _customizationMenuButton.backgroundColor = _colorPalette.secondaryColor;
+    _customizationMenuButton.tintColor = _colorPalette.tintColor;
+  } else {
+    [_fakeLocationBar setStartColor:FakeboxTopColor()
+                           endColor:FakeboxBottomColor()];
+
+    UIColor* backgroundColor =
+        IsSignInButtonNoAvatarEnabled()
+            ? [[UIColor colorNamed:kSolidWhiteColor]
+                  colorWithAlphaComponent:0.75]
+            : [[UIColor colorNamed:@"fake_omnibox_solid_background_color"]
+                  colorWithAlphaComponent:0.8];
+    _customizationMenuButton.backgroundColor = backgroundColor;
+    _customizationMenuButton.tintColor = [UIColor
+        colorNamed:(IsSignInButtonNoAvatarEnabled() ? kBlue600Color
+                                                    : kTextSecondaryColor)];
+  }
+}
+
 // Empties the fakebox buttons stack.
 - (void)removeAllFakeboxButtonsFromStack {
   for (UIView* arrangedSubview in _buttonStack.arrangedSubviews) {
@@ -930,8 +986,13 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
 // Adds the necessary buttons to the fakebox stack.
 - (void)addFakeboxButtonsToStack {
   if (self.shouldShowMIAEntrypoint) {
-    self.miaButton =
+    ExtendedTouchTargetButton* miaButton =
         [ExtendedTouchTargetButton buttonWithType:UIButtonTypeSystem];
+    if (self.useSingleButtonMIA) {
+      miaButton.minimumDiameter = sqrt(2) * [self miaAnimationSize].width;
+    }
+    self.miaButton = miaButton;
+
     [self.miaButton
         setAccessibilityLabel:l10n_util::GetNSString(IDS_IOS_ACCNAME_MIA)];
     [self.miaButton setAccessibilityIdentifier:kNTPMIAIdentifier];
@@ -1074,12 +1135,12 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
       self.frame.size.height - content_suggestions::FakeToolbarHeight();
 
   // For non-split toolbar, the fake omnibox goes beneath the toolbar.
-  if (!IsSplitToolbarMode(self)) {
+  if (CanShowTabStrip(self) || !IsSplitToolbarMode(self)) {
     // The animation should start when the primary toolbar is met.
     offset += content_suggestions::FakeOmniboxHeight();
 
     // iPads pin slightly earlier than landscape iPhones.
-    if (IsRegularXRegularSizeClass(self)) {
+    if (CanShowTabStrip(self)) {
       offset -= content_suggestions::SearchFieldTopMargin();
     }
   }
@@ -1189,38 +1250,16 @@ CGFloat MIAAnimationOpacityForScrollProgress(CGFloat percent) {
   }
 }
 
-- (UIView*)hitTest:(CGPoint)point withEvent:(UIEvent*)event {
-  // When MIA appears as a solitary button, expand its active touch zone to
-  // ensure all nearby taps are registered.
-  if (self.useSingleButtonMIA) {
-    CGRect miaButtonFrameInHeader = [self.miaButton convertRect:self.bounds
-                                                         toView:self];
-    UIEdgeInsets touchAreaExtend = UIEdgeInsetsMake(
-        -kMIAButtonTouchAreaExtend, -kMIAButtonTouchAreaExtend,
-        -kMIAButtonTouchAreaExtend, -kMIAButtonTouchAreaExtend);
-
-    CGRect extendedTouchArea =
-        UIEdgeInsetsInsetRect(miaButtonFrameInHeader, touchAreaExtend);
-
-    if (CGRectContainsPoint(extendedTouchArea, point)) {
-      return self.miaButton;
-    }
-  }
-
-  return [super hitTest:point withEvent:event];
-}
-
 #pragma mark - MIA
 
 - (BOOL)useInlineMIA {
-  return self.isGoogleDefaultSearchEngine && _MIAAllowedByPolicy &&
+  return _isAIMAllowed &&
          GetNTPMIAEntrypointVariation() ==
              NTPMIAEntrypointVariation::kOmniboxContainedInline;
 }
 
 - (BOOL)useSingleButtonMIA {
-  return self.isGoogleDefaultSearchEngine && _MIAAllowedByPolicy &&
-         ShowOnlyMIAEntrypointInNTPFakebox();
+  return _isAIMAllowed && ShowOnlyMIAEntrypointInNTPFakebox();
 }
 
 - (BOOL)shouldShowMIAEntrypoint {

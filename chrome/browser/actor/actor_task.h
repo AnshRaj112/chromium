@@ -31,7 +31,6 @@ class UiEventDispatcher;
 // Represents a task that Chrome is executing on behalf of the user.
 class ActorTask {
  public:
-  using ActionResultCallback = base::OnceCallback<void(mojom::ActionResultPtr)>;
   using ActCallback =
       base::OnceCallback<void(mojom::ActionResultPtr, std::optional<size_t>)>;
 
@@ -41,6 +40,11 @@ class ActorTask {
   ActorTask(const ActorTask&) = delete;
   ActorTask& operator=(const ActorTask&) = delete;
   ~ActorTask();
+
+  static std::unique_ptr<ActorTask> CreateForTesting(
+      Profile* profile,
+      std::unique_ptr<ExecutionEngine> execution_engine,
+      std::unique_ptr<ui::UiEventDispatcher> ui_event_dispatcher);
 
   // Can only be called by ActorKeyedService
   void SetId(base::PassKey<ActorKeyedService>, TaskId id);
@@ -64,11 +68,6 @@ class ActorTask {
 
   base::Time GetEndTime() const;
 
-  // TODO(crbug.com/411462297): Deprecated, new callers should use the
-  // ToolRequest version below.
-  void Act(const optimization_guide::proto::BrowserAction& action,
-           ActionResultCallback callback);
-
   void Act(std::vector<std::unique_ptr<ToolRequest>>&& actions,
            ActCallback callback);
 
@@ -87,15 +86,10 @@ class ActorTask {
 
   ExecutionEngine* GetExecutionEngine() const;
 
-  // Register for this callback to detect changes to actor task states.
-  using TaskStateChangeCallback =
-      base::RepeatingCallback<void(TaskId, ActorTask::State)>;
-  base::CallbackListSubscription RegisterTaskStateChange(
-      TaskStateChangeCallback callback);
-
-  // Ensures the given tab handle is added (or already exists) in the set of
-  // tabs this task operates over.
-  void AddToTabSet(tabs::TabHandle tab);
+  // Add the given TabHandle to the set of tabs this task is operating over
+  // and notify the UI if this is a new tab for the task.
+  using AddTabCallback = base::OnceCallback<void(mojom::ActionResultPtr)>;
+  void AddTab(tabs::TabHandle tab, AddTabCallback callback);
 
   // Returns true if the given tab is part of this task's acting set.
   bool HasActedOnTab(tabs::TabHandle tab) const;
@@ -112,11 +106,13 @@ class ActorTask {
   }
 
  private:
+  // Used by tests only.
+  ActorTask(Profile* profile,
+            std::unique_ptr<ExecutionEngine> execution_engine,
+            std::unique_ptr<ui::UiEventDispatcher> ui_event_dispatcher);
   void OnFinishedAct(ActCallback callback,
                      mojom::ActionResultPtr result,
                      std::optional<size_t> index_of_failed_action);
-  void OnFinishedActDeprecated(ActionResultCallback callback,
-                               mojom::ActionResultPtr result);
 
   State state_ = State::kCreated;
   raw_ptr<Profile> profile_;
@@ -135,10 +131,7 @@ class ActorTask {
   // The set of all tabs this task has acted upon.
   absl::flat_hash_set<tabs::TabHandle> tab_handles_;
 
-  using TaskStateChangeCallbackList =
-      base::RepeatingCallbackList<void(TaskId, ActorTask::State)>;
-  TaskStateChangeCallbackList task_state_change_callback_list_;
-
+  base::WeakPtrFactory<ui::UiEventDispatcher> ui_weak_ptr_factory_;
   base::WeakPtrFactory<ActorTask> weak_ptr_factory_{this};
 };
 

@@ -224,12 +224,12 @@ NSString* const kAutoDeletionFileRemoval = @"AutoDeletionFileRemoval";
 // Constant for deferred default browser status API check.
 NSString* const kDefaultBrowserStatusCheck = @"DefaultBrowserStatusCheck";
 
-// Constant for enabling widgets for multi-profile.
-NSString* const kWidgetsForMultiprofileKey = @"WidgetsForMultiprofileKey";
-
 // Constant for enabling share extension for multi-profile.
 NSString* const kShareExtensionForMultiprofileKey =
     @"ShareExtensionForMultiprofileKey";
+
+// Constant for enabling  multi-profile.
+NSString* const kMultiprofileKey = @"MultiprofileKey";
 
 // Adapted from chrome/browser/ui/browser_init.cc.
 void RegisterComponentsForUpdate() {
@@ -1467,12 +1467,12 @@ std::string GetProfileNameForChoice(ProfileChoice choice,
           boolForKey:kWidgetKitRefreshFiveMinutes]),
       kFieldTrialVersionKey : @1,
     },
-    kWidgetsForMultiprofileKey : @{
-      kFieldTrialValueKey : @(IsWidgetsForMultiprofileEnabled()),
-      kFieldTrialVersionKey : @1,
-    },
     kShareExtensionForMultiprofileKey : @{
       kFieldTrialValueKey : @(IsShareExtensionForMultiprofileEnabled()),
+      kFieldTrialVersionKey : @1,
+    },
+    kMultiprofileKey : @{
+      kFieldTrialValueKey : @(AreSeparateProfilesForManagedAccountsEnabled()),
       kFieldTrialVersionKey : @1,
     },
   };

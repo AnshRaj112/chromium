@@ -51,10 +51,11 @@
 
 namespace gfx {
 struct GpuMemoryBufferHandle;
+class ClientNativePixmapFactory;
 }
 
 namespace gpu {
-class GpuMemoryBufferImplNativePixmap;
+class LegacyGpuMemoryBufferForVideo;
 }
 
 namespace media {
@@ -356,17 +357,16 @@ class MEDIA_EXPORT VideoFrame : public base::RefCountedThreadSafe<VideoFrame> {
       base::TimeDelta timestamp);
 
 #if BUILDFLAG(IS_CHROMEOS)
-  // Wraps |gpu_memory_buffer|. This will transfer ownership of
-  // |gpu_memory_buffer| to the returned VideoFrame.
-  // For use in contexts where the GPUMemoryBuffer has no SharedImage
-  // associated with it.
-  // NOTE: Clients who want to set a callback on the VideoFrame being destroyed
-  // should call SetReleaseMailboxCB() after creating the
-  // VideoFrame via this entrypoint.
-  static scoped_refptr<VideoFrame> WrapExternalGpuMemoryBuffer(
+  // Wraps |handle|. For use in contexts where the GPUMemoryBufferHandle has no
+  // SharedImage associated with it.
+  static scoped_refptr<VideoFrame> WrapExternalGpuMemoryBufferHandle(
       const gfx::Rect& visible_rect,
       const gfx::Size& natural_size,
-      std::unique_ptr<gpu::GpuMemoryBufferImplNativePixmap> gpu_memory_buffer,
+      gfx::ClientNativePixmapFactory* client_native_pixmap_factory,
+      gfx::GpuMemoryBufferHandle handle,
+      const gfx::Size& coded_size,
+      gfx::BufferFormat format,
+      gfx::BufferUsage usage,
       base::TimeDelta timestamp);
 #endif
 
@@ -830,7 +830,7 @@ class MEDIA_EXPORT VideoFrame : public base::RefCountedThreadSafe<VideoFrame> {
   static scoped_refptr<VideoFrame> CreateFrameForGpuMemoryBufferInternal(
       const gfx::Rect& visible_rect,
       const gfx::Size& natural_size,
-      std::unique_ptr<gpu::GpuMemoryBufferImplNativePixmap> gpu_memory_buffer,
+      std::unique_ptr<gpu::LegacyGpuMemoryBufferForVideo> gpu_memory_buffer,
       base::TimeDelta timestamp);
 
   void MakeScopedMappingForGpuMemoryBuffer(
@@ -920,7 +920,7 @@ class MEDIA_EXPORT VideoFrame : public base::RefCountedThreadSafe<VideoFrame> {
 
 #if BUILDFLAG(IS_CHROMEOS)
   // GPU memory buffer, if this frame is STORAGE_GPU_MEMORY_BUFFER.
-  std::unique_ptr<gpu::GpuMemoryBufferImplNativePixmap> gpu_memory_buffer_;
+  std::unique_ptr<gpu::LegacyGpuMemoryBufferForVideo> gpu_memory_buffer_;
 #endif
 
   // This field will be set by clients when using MappableSI instead of

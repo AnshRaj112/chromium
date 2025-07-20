@@ -91,7 +91,6 @@ Trước khi đăng xuất, hãy đợi một vài phút. Nếu bạn đăng xu�
 <translation id="3102849287235003384">Để đăng xuất khỏi Tài khoản Google trên tất cả trang web, hãy <ph name="BEGIN_LINK" />đăng xuất khỏi Chromium<ph name="END_LINK" />.</translation>
 <translation id="3115956258722352278">Đặt Chromium làm trình duyệt mặc định của bạn?</translation>
 <translation id="3180939591219927904">Bật chế độ "Khoá các thẻ ẩn danh khi bạn đóng Chromium"</translation>
-<translation id="3242612358525156339">Trong phần cài đặt của thiết bị, hãy mở "<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />" rồi chọn "Chromium"</translation>
 <translation id="328933489847748230">{count,plural, =1{Đang hiển thị 1 cửa sổ Chromium}other{Đang hiển thị {count} cửa sổ Chromium}}</translation>
 <translation id="3344973607274501920">Chromium không thể kiểm tra mật khẩu của bạn. Hãy thử kiểm tra kết nối Internet.</translation>
 <translation id="3366305173356742781">Dữ liệu Chromium trong tài khoản của bạn</translation>
@@ -164,7 +163,6 @@ Dữ liệu của bạn được mã hoá bằng cụm mật khẩu. Nhập cụ
 <translation id="5042011327527167688">Nhấn vào "Xem bằng Google Maps trên Chromium".</translation>
 <translation id="5044871537677053278">Chromium phát hiện các địa chỉ và sử dụng Google Maps để chỉ đường và cung cấp cho bạn thông tin địa phương.</translation>
 <translation id="5048140766121299007">Trong phần cài đặt "<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />", hãy bật "Chromium"</translation>
-<translation id="5048795749726991615">Để dễ dàng sử dụng mật khẩu đã lưu trong các ứng dụng khác, hãy dùng Chromium làm dịch vụ tự động điền</translation>
 <translation id="5053429694249468757">Đang xoá dữ liệu trên Chromium…</translation>
 <translation id="5071749685031362629">Chromium cho iOS</translation>
 <translation id="5124429847818367226">Giờ đây, bạn có thể dùng Chromium mỗi khi duyệt web hoặc nhấn vào các đường liên kết trong thư/tin nhắn, tài liệu và các ứng dụng khác.</translation>
@@ -254,6 +252,7 @@ Những yếu tố cần xem xét:
 
 Chỉ những người có cụm mật khẩu mới đọc được dữ liệu đã mã hoá của bạn. Cụm mật khẩu không được gửi tới Google hay được Google lưu trữ. Nếu bạn quên cụm mật khẩu hoặc muốn thay đổi chế độ cài đặt này, hãy <ph name="BEGIN_LINK" />xoá dữ liệu Chromium khỏi tài khoản của bạn<ph name="END_LINK" />.</translation>
 <translation id="7192111075364461693">Thông báo của Chromium hiện đang tắt trong phần cài đặt của thiết bị.</translation>
+<translation id="7195217321165708458">Gemini trong Chromium</translation>
 <translation id="7219205286115692265">Truy cập Chromium nhanh hơn từ thanh dock trên màn hình chính của iPad.</translation>
 <translation id="7222001353246886083">Tìm kiếm ${searchCluster} trong Chromium</translation>
 <translation id="7228180817326917122">Mẹo khi dùng Chromium: Chọn vị trí thanh địa chỉ</translation>

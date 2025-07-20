@@ -585,6 +585,7 @@ chromium-metrics-reviews@google.com.
   <int value="-2084645929" label="chrome://infobar-internals/"/>
   <int value="-2069349961" label="chrome://history-clusters-internals/"/>
   <int value="-2061366287" label="chrome://dev-ui-loader/"/>
+  <int value="-2038391710" label="chrome://tab-strip-internals/"/>
   <int value="-2034706497" label="chrome://net-internals/"/>
   <int value="-2031269077" label="chrome://signin-error/"/>
   <int value="-2025866230" label="chrome://usb-internals/"/>
@@ -721,6 +722,7 @@ chromium-metrics-reviews@google.com.
   <int value="-566908909" label="chrome://suggestions/"/>
   <int value="-548156607" label="chrome://feedback/"/>
   <int value="-543577801" label="chrome://history-side-panel.top-chrome/"/>
+  <int value="-543094310" label="chrome://watermark/"/>
   <int value="-532669066" label="chrome://traces/"/>
   <int value="-528306235" label="chrome://sync/"/>
   <int value="-525954994" label="chrome-untrusted://lens/"/>
@@ -779,6 +781,7 @@ chromium-metrics-reviews@google.com.
   <int value="187846858" label="chrome://lens-overlay/"/>
   <int value="232821835" label="chrome://optimization-guide-internals/"/>
   <int value="233807382" label="chrome://privacy-sandbox-base-dialog/"/>
+  <int value="248924104" label="chrome://actor-overlay/"/>
   <int value="253258497" label="chrome://components/"/>
   <int value="260253931" label="chrome://devices/"/>
   <int value="275260142" label="chrome://eoc-internals/"/>
@@ -884,6 +887,7 @@ chromium-metrics-reviews@google.com.
   <int value="1356087814" label="chrome://add-supervision/"/>
   <int value="1361577626" label="chrome://connectors-internals/"/>
   <int value="1371905827" label="chrome://flags/"/>
+  <int value="1382926998" label="chrome://color-pipeline-internals/"/>
   <int value="1384721582" label="chrome-untrusted://demo-mode-app/"/>
   <int value="1396129399" label="chrome://flash/"/>
   <int value="1397728473" label="chrome://crostini-installer/"/>

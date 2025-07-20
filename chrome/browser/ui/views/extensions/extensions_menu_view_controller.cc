@@ -13,6 +13,7 @@
 #include "base/notreached.h"
 #include "chrome/browser/extensions/extension_action_runner.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
+#include "chrome/browser/extensions/extension_ui_util.h"
 #include "chrome/browser/extensions/permissions/active_tab_permission_granter.h"
 #include "chrome/browser/extensions/permissions/site_permissions_helper.h"
 #include "chrome/browser/extensions/tab_helper.h"
@@ -128,16 +129,6 @@ ExtensionsMenuSitePermissionsPageView* GetSitePermissionsPage(
   return views::AsViewClass<ExtensionsMenuSitePermissionsPageView>(page);
 }
 
-// Returns whether `extension` cannot have its site access modified by the user
-// because of policy.
-bool HasEnterpriseForcedAccess(const extensions::Extension& extension,
-                               Profile& profile) {
-  extensions::ManagementPolicy* policy =
-      extensions::ExtensionSystem::Get(&profile)->management_policy();
-  return !policy->UserMayModifySettings(&extension, nullptr) ||
-         policy->MustRemainInstalled(&extension, nullptr);
-}
-
 // Returns whether the site permissions button should be visible.
 bool IsSitePermissionsButtonVisible(const extensions::Extension& extension,
                                     Profile& profile,
@@ -160,7 +151,9 @@ bool IsSitePermissionsButtonVisible(const extensions::Extension& extension,
       // Extension should only display the button when it's an enterprise
       // extension and has granted access.
       bool enterprise_forced_access =
-          HasEnterpriseForcedAccess(extension, profile);
+          extensions::ExtensionSystem::Get(&profile)
+              ->management_policy()
+              ->HasEnterpriseForcedAccess(extension);
       SitePermissionsHelper::SiteInteraction site_interaction =
           SitePermissionsHelper(&profile).GetSiteInteraction(extension,
                                                              &web_contents);
@@ -193,7 +186,9 @@ bool CanUserCustomizeExtensionSiteAccess(
     return false;
   }
 
-  if (HasEnterpriseForcedAccess(extension, profile)) {
+  if (extensions::ExtensionSystem::Get(&profile)
+          ->management_policy()
+          ->HasEnterpriseForcedAccess(extension)) {
     // Users can't customize the site access of enterprise-installed extensions.
     return false;
   }
@@ -579,7 +574,9 @@ void ExtensionsMenuViewController::UpdateMainPage(
         toolbar_model_->action_ids().end(),
         [this](const ToolbarActionsModel::ActionId extension_id) {
           auto* extension = GetExtension(browser_, extension_id);
-          return HasEnterpriseForcedAccess(*extension, *browser_->profile());
+          return extensions::ExtensionSystem::Get(browser_->profile())
+              ->management_policy()
+              ->HasEnterpriseForcedAccess(*extension);
         });
   };
   auto reload_required = [web_contents]() {
@@ -587,7 +584,8 @@ void ExtensionsMenuViewController::UpdateMainPage(
         ->IsReloadRequired();
   };
 
-  std::u16string current_site = GetCurrentHost(web_contents);
+  std::u16string current_site =
+      extensions::ui_util::GetFormattedHostForDisplay(*web_contents);
   int site_settings_label_id;
   bool is_site_settings_toggle_visible = false;
   bool is_site_settings_toggle_on = false;
@@ -672,8 +670,9 @@ void ExtensionsMenuViewController::UpdateMainPage(
     ExtensionMenuItemView::SitePermissionsButtonAccess
         site_permissions_button_access = GetSitePermissionsButtonAccess(
             *extension, *browser_->profile(), *toolbar_model_, *web_contents);
-    bool is_enterprise =
-        HasEnterpriseForcedAccess(*extension, *browser_->profile());
+    bool is_enterprise = extensions::ExtensionSystem::Get(browser_->profile())
+                             ->management_policy()
+                             ->HasEnterpriseForcedAccess(*extension);
     menu_item->Update(site_access_toggle_state, site_permissions_button_state,
                       site_permissions_button_access, is_enterprise);
   }
@@ -698,7 +697,8 @@ void ExtensionsMenuViewController::UpdateSitePermissionsPage(
   std::u16string extension_name = action_controller->GetActionName();
   ui::ImageModel extension_icon =
       action_controller->GetIcon(web_contents, gfx::Size(icon_size, icon_size));
-  std::u16string current_site = GetCurrentHost(web_contents);
+  std::u16string current_site =
+      extensions::ui_util::GetFormattedHostForDisplay(*web_contents);
   PermissionsManager::UserSiteAccess user_site_access =
       permissions_manager->GetUserSiteAccess(*extension, url);
   bool is_show_requests_toggle_on =
@@ -1004,7 +1004,9 @@ void ExtensionsMenuViewController::InsertMenuItemMainPage(
   Profile* profile = browser_->profile();
   content::WebContents* web_contents = GetActiveWebContents();
 
-  bool is_enterprise = HasEnterpriseForcedAccess(*extension, *profile);
+  bool is_enterprise = extensions::ExtensionSystem::Get(profile)
+                           ->management_policy()
+                           ->HasEnterpriseForcedAccess(*extension);
   ExtensionMenuItemView::SiteAccessToggleState site_access_toggle_state =
       GetSiteAccessToggleState(*extension, *profile, *toolbar_model_,
                                *web_contents);

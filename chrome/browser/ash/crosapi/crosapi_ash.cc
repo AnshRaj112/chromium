@@ -19,7 +19,6 @@
 #include "chrome/browser/ash/crosapi/file_system_provider_service_ash.h"
 #include "chrome/browser/ash/crosapi/keystore_service_ash.h"
 #include "chrome/browser/ash/crosapi/local_printer_ash.h"
-#include "chrome/browser/ash/crosapi/parent_access_ash.h"
 #include "chrome/browser/ash/crosapi/vpn_service_ash.h"
 #include "chrome/browser/ash/login/quick_unlock/quick_unlock_factory.h"
 #include "chrome/browser/ash/printing/print_preview/print_preview_webcontents_adapter_ash.h"
@@ -34,7 +33,6 @@
 #include "chromeos/ash/components/account_manager/account_manager_factory.h"
 #include "chromeos/ash/components/browser_context_helper/browser_context_helper.h"
 #include "chromeos/ash/components/telemetry_extension/diagnostics/diagnostics_service_ash.h"
-#include "chromeos/ash/components/telemetry_extension/events/telemetry_event_service_ash.h"
 #include "chromeos/ash/components/telemetry_extension/management/telemetry_management_service_ash.h"
 #include "chromeos/ash/components/telemetry_extension/routines/telemetry_diagnostic_routine_service_ash.h"
 #include "chromeos/ash/components/telemetry_extension/telemetry/probe_service_ash.h"
@@ -95,11 +93,8 @@ CrosapiAsh::CrosapiAsh()
           std::make_unique<FileSystemProviderServiceAsh>()),
       keystore_service_ash_(std::make_unique<KeystoreServiceAsh>()),
       local_printer_ash_(std::make_unique<LocalPrinterAsh>()),
-      parent_access_ash_(std::make_unique<ParentAccessAsh>()),
       telemetry_diagnostic_routine_service_ash_(
           std::make_unique<ash::TelemetryDiagnosticsRoutineServiceAsh>()),
-      telemetry_event_service_ash_(
-          std::make_unique<ash::TelemetryEventServiceAsh>()),
       telemetry_management_service_ash_(
           std::make_unique<ash::TelemetryManagementServiceAsh>()),
       probe_service_ash_(std::make_unique<ash::ProbeServiceAsh>()),
@@ -218,11 +213,6 @@ void CrosapiAsh::BindNetworkChange(
   NOTREACHED();
 }
 
-void CrosapiAsh::BindParentAccess(
-    mojo::PendingReceiver<mojom::ParentAccess> receiver) {
-  parent_access_ash_->BindReceiver(std::move(receiver));
-}
-
 void CrosapiAsh::BindReceiver(
     mojo::PendingReceiver<mojom::Crosapi> pending_receiver,
     CrosapiId crosapi_id,
@@ -256,11 +246,6 @@ void CrosapiAsh::BindSensorHalClient(
 void CrosapiAsh::BindTelemetryDiagnosticRoutinesService(
     mojo::PendingReceiver<mojom::TelemetryDiagnosticRoutinesService> receiver) {
   telemetry_diagnostic_routine_service_ash_->BindReceiver(std::move(receiver));
-}
-
-void CrosapiAsh::BindTelemetryEventService(
-    mojo::PendingReceiver<mojom::TelemetryEventService> receiver) {
-  telemetry_event_service_ash_->BindReceiver(std::move(receiver));
 }
 
 void CrosapiAsh::BindTelemetryManagementService(

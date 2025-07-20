@@ -22,7 +22,6 @@ import android.util.Pair;
 import android.util.SparseBooleanArray;
 import android.util.SparseIntArray;
 
-import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import org.chromium.base.ActivityState;
@@ -39,6 +38,8 @@ import org.chromium.base.shared_preferences.SharedPreferencesManager;
 import org.chromium.base.supplier.ObservableSupplier;
 import org.chromium.base.supplier.Supplier;
 import org.chromium.build.BuildConfig;
+import org.chromium.build.annotations.NullMarked;
+import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.app.tab_activity_glue.ReparentingTabGroupTask;
@@ -93,13 +94,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@NullMarked
 class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements ActivityStateListener {
     private static final String TAG = "MIMApi31";
     private static final String TAG_MULTI_INSTANCE = "MultiInstance";
     public static final int INVALID_TASK_ID = MultiWindowUtils.INVALID_TASK_ID;
     /* package */ static final long SIX_MONTHS_MS = TimeUnit.DAYS.toMillis(6 * 30);
     private static final String EMPTY_DATA = "";
-    private static MultiInstanceState sState;
+    private static @Nullable MultiInstanceState sState;
 
     @VisibleForTesting protected final int mMaxInstances;
 
@@ -108,7 +110,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
     // Instance ID for the activity associated with this manager.
     private int mInstanceId = INVALID_WINDOW_ID;
 
-    private Tab mActiveTab;
+    private @Nullable Tab mActiveTab;
     private final TabObserver mActiveTabObserver =
             new EmptyTabObserver() {
                 @Override
@@ -150,9 +152,11 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
                 prefs.readInt(
                         ChromePreferenceKeys.MULTI_INSTANCE_MAX_INSTANCE_LIMIT, mMaxInstances);
         if (mMaxInstances > prevInstanceLimit) {
-            // Reset SharedPref for instance limit downgrade if limit has increased.
+            // Reset SharedPrefs for instance limit downgrade if limit has increased.
             prefs.writeBoolean(
                     ChromePreferenceKeys.MULTI_INSTANCE_INSTANCE_LIMIT_DOWNGRADE_TRIGGERED, false);
+            prefs.writeBoolean(
+                    ChromePreferenceKeys.MULTI_INSTANCE_RESTORATION_MESSAGE_SHOWN, false);
         }
         prefs.writeInt(ChromePreferenceKeys.MULTI_INSTANCE_MAX_INSTANCE_LIMIT, mMaxInstances);
     }
@@ -259,7 +263,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
             // launching the new window adjacently. Otherwise, skip
             // FLAG_ACTIVITY_LAUNCH_ADJACENT to avoid a black screen caused by the source
             // window closing before the new one launches.
-            boolean openAdjacently = selector.getTotalTabCount() > 1;
+            boolean openAdjacently = assumeNonNull(selector).getTotalTabCount() > 1;
             moveAndReparentTabToNewWindow(
                     tab,
                     info.instanceId,
@@ -373,7 +377,6 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
     private void pauseObserversForGroupReparenting(TabGroupMetadata tabGroupMetadata) {
         // Temporarily disable sync service from observing local changes to prevent unintended
         // updates during tab group re-parenting.
-        @Nullable
         TabGroupSyncService syncService =
                 getTabGroupSyncService(
                         tabGroupMetadata.sourceWindowId, tabGroupMetadata.isIncognito);
@@ -386,7 +389,6 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
     }
 
     private void resumeSyncService(TabGroupMetadata tabGroupMetadata) {
-        @Nullable
         TabGroupSyncService syncService =
                 getTabGroupSyncService(
                         tabGroupMetadata.sourceWindowId, tabGroupMetadata.isIncognito);
@@ -448,8 +450,8 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
                             i,
                             taskId,
                             type,
-                            readUrl(i),
-                            readTitle(i),
+                            assumeNonNull(readUrl(i)),
+                            assumeNonNull(readTitle(i)),
                             readTabCount(i),
                             readIncognitoTabCount(i),
                             readIncognitoSelected(i),
@@ -747,7 +749,6 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
             Matcher matcher = pattern.matcher(prefKey);
             boolean matchFound = matcher.find();
             assert matchFound : "Key should be suffixed with the instance id.";
-            assumeNonNull(matcher.group(1));
             int id = Integer.parseInt(matcher.group(1));
             int taskIdFromMap = getTaskFromMap(id);
             boolean includeId =
@@ -857,7 +858,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
     }
 
     @VisibleForTesting
-    static Activity getActivityById(int id) {
+    static @Nullable Activity getActivityById(int id) {
         if (sActivitySupplierForTesting != null) {
             return sActivitySupplierForTesting.get();
         }
@@ -930,7 +931,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
     }
 
     @VisibleForTesting
-    static String readUrl(int index) {
+    static @Nullable String readUrl(int index) {
         return ChromeSharedPreferences.getInstance().readString(urlKey(index), null);
     }
 
@@ -949,7 +950,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
     }
 
     @VisibleForTesting
-    static String readTitle(int index) {
+    static @Nullable String readTitle(int index) {
         return ChromeSharedPreferences.getInstance().readString(titleKey(index), null);
     }
 
@@ -1155,19 +1156,22 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
     }
 
     @VisibleForTesting
-    void setupIntentForTabReparenting(Tab tab, Intent intent, Runnable finalizeCallback) {
+    void setupIntentForTabReparenting(Tab tab, Intent intent, @Nullable Runnable finalizeCallback) {
         ReparentingTask.from(tab).setupIntent(intent, finalizeCallback);
     }
 
     @VisibleForTesting
     void setupIntentForGroupReparenting(
-            TabGroupMetadata tabGroupMetadata, Intent intent, Runnable finalizeCallback) {
+            TabGroupMetadata tabGroupMetadata, Intent intent, @Nullable Runnable finalizeCallback) {
         ReparentingTabGroupTask.from(tabGroupMetadata).setupIntent(intent, finalizeCallback);
     }
 
     @VisibleForTesting
     void beginReparentingTab(
-            Tab tab, Intent intent, Bundle startActivityOptions, Runnable finalizeCallback) {
+            Tab tab,
+            Intent intent,
+            @Nullable Bundle startActivityOptions,
+            @Nullable Runnable finalizeCallback) {
         ReparentingTask.from(tab).begin(mActivity, intent, startActivityOptions, finalizeCallback);
     }
 
@@ -1194,11 +1198,13 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
     }
 
     private Profile getProfile() {
-        return mTabModelOrchestratorSupplier
-                .get()
-                .getTabModelSelector()
-                .getCurrentModel()
-                .getProfile();
+        var profile =
+                mTabModelOrchestratorSupplier
+                        .get()
+                        .getTabModelSelector()
+                        .getCurrentModel()
+                        .getProfile();
+        return assumeNonNull(profile);
     }
 
     @Override
@@ -1333,7 +1339,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
     }
 
     @Override
-    public void moveTabToWindow(Activity activity, Tab tab, int atIndex) {
+    public void moveTabToWindow(@Nullable Activity activity, Tab tab, int atIndex) {
         // Get the current instance and move tab there.
         InstanceInfo info = getInstanceInfoFor(activity);
         if (info != null) {
@@ -1345,7 +1351,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
 
     @Override
     public void moveTabGroupToWindow(
-            Activity activity, TabGroupMetadata tabGroupMetadata, int atIndex) {
+            @Nullable Activity activity, TabGroupMetadata tabGroupMetadata, int atIndex) {
         assert ChromeFeatureList.isEnabled(ChromeFeatureList.TAB_STRIP_GROUP_DRAG_DROP_ANDROID);
 
         // Get the current instance and move tab there.
@@ -1358,7 +1364,9 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
     }
 
     @VisibleForTesting
-    InstanceInfo getInstanceInfoFor(Activity activity) {
+    @Nullable InstanceInfo getInstanceInfoFor(@Nullable Activity activity) {
+        if (activity == null) return null;
+
         // Loop thru all instances to determine if the destination activity is present.
         int destinationWindowTaskId = INVALID_TASK_ID;
         for (int i : getAllPersistedInstanceIds()) {
@@ -1396,7 +1404,7 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
                     TabWindowManagerSingleton.getInstance().getTabModelSelectorById(instanceId);
             // Determine if the drag source Chrome instance window has any tabs including incognito
             // ones left so as to close if it is empty.
-            if (selector.getTotalTabCount() == 0) {
+            if (selector != null && selector.getTotalTabCount() == 0) {
                 Log.i(TAG, "Closing empty Chrome instance as no tabs exist.");
                 closeInstance(instanceId, INVALID_TASK_ID);
                 return true;
@@ -1419,7 +1427,6 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
         List<InstanceInfo> info = getInstanceInfo();
         if (info.size() != 1) return;
 
-        @Nullable
         TabModelSelector selector =
                 TabWindowManagerSingleton.getInstance()
                         .getTabModelSelectorById(info.get(0).instanceId);
@@ -1440,7 +1447,6 @@ class MultiInstanceManagerApi31 extends MultiInstanceManagerImpl implements Acti
 
     private @Nullable TabGroupModelFilter getTabGroupModelFilterByWindowId(
             int windowId, boolean isIncognito) {
-        @Nullable
         TabModelSelector selector =
                 TabWindowManagerSingleton.getInstance().getTabModelSelectorById(windowId);
         if (selector == null) {

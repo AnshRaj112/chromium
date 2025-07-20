@@ -69,6 +69,7 @@
 <translation id="1273416271143914096">{count,plural, =1{{count} парола}other{{count} пароли}}</translation>
 <translation id="1275718070701477396">Избрано</translation>
 <translation id="1285320974508926690">Този сайт да не се превежда никога</translation>
+<translation id="1287229685519872919">данните ви в Google Workspace</translation>
 <translation id="1291506870746876680">Разрешенията за сайта <ph name="BEGIN_BOLD" /><ph name="SITE_NAME" /><ph name="END_BOLD" /> ще бъдат изключени, когато го напуснете.</translation>
 <translation id="129553762522093515">Наскоро затворени</translation>
 <translation id="1296581780163690620">Да се изтегли ли файлът? (<ph name="FILE_SIZE" />)</translation>
@@ -157,6 +158,7 @@
 <translation id="1603718000246404895">{COUNT,plural, =1{1 адрес}other{# адреса}}</translation>
 <translation id="1605405588277479165">Изключено – не се препоръчва</translation>
 <translation id="1605658421715042784">Копиране на изображението</translation>
+<translation id="1606899876897213121">Затваряне на обобщението на скорошната активност</translation>
 <translation id="1612754831519568745">Функцията Безопасно сърфиране понастоящем е изключена. Получете защита срещу опасни сайтове, изтегляния и разширения.</translation>
 <translation id="1620510694547887537">Камера</translation>
 <translation id="1622717322707146952">Изберете „Добавяне към Google Календар“ или „Добавяне към Apple Calendar“.</translation>
@@ -407,6 +409,7 @@
 <translation id="2559843230610279254">Група раздели <ph name="GROUP_TITLE" />, съдържа <ph name="TABS_NUMBER" /> раздела.</translation>
 <translation id="2577522251608256362">Квартал</translation>
 <translation id="2579713773888829241">Споделени дискове</translation>
+<translation id="2583688836549072561">Група раздели „<ph name="GROUP_TITLE" />“, съдържа <ph name="TABS_NUMBER" /> раздела, нова активност.</translation>
 <translation id="2593272815202181319">Непропорционален</translation>
 <translation id="2601778637777010194">Проследяване на пониженията на цените на продукти</translation>
 <translation id="260378315836159338">В горната част на екрана докоснете +.</translation>
@@ -572,6 +575,7 @@
 <translation id="3273510436356991673">Персонализиране на началния екран</translation>
 <translation id="3277021493514034324">Адресът на сайта бе копиран</translation>
 <translation id="3280562213547448728">Гласово търсене</translation>
+<translation id="3302837541200840455"><ph name="TAB_TITLE" />, нова активност</translation>
 <translation id="3305294846493618482">още</translation>
 <translation id="3311748811247479259">Изключено</translation>
 <translation id="3312300514034250578">Подобрена защита от Безопасно сърфиране</translation>
@@ -714,6 +718,7 @@
 <translation id="3940195383040445971">Проследяване на цените в разделите</translation>
 <translation id="3941941395924123592">{COUNT,plural, =1{Затваряне на {COUNT} раздел}other{Затваряне на {COUNT} раздела}}</translation>
 <translation id="3948600256434252210">Можете да прекарате пръст надясно, за да сърфирате в режим „инкогнито“.</translation>
+<translation id="3949712484278252781">Разговорите ви с Gemini и <ph name="GOOGLE_WORKSPACE_DATA" /> няма да се преглеждат от проверяващи лица, нито ще се използват за подобряване на моделите на генеративен AI.</translation>
 <translation id="3950479158728806902">Автоматично създаване на ключ за достъп за по-бързо влизане в профила</translation>
 <translation id="3950820424414687140">Вход</translation>
 <translation id="3955740319737378355">Готово</translation>
@@ -745,7 +750,6 @@
 <translation id="4039829422386964954">Разглеждане на галерията</translation>
 <translation id="4042870976416480368">Търсене в страницата</translation>
 <translation id="4045441967987592849">Повторно отваряне</translation>
-<translation id="4045648459118332842">Получаване на запазените ви пароли с едно докосване във всяко приложение</translation>
 <translation id="4047337302138771011">Споделяне на паролите ви</translation>
 <translation id="4049419681095579435">Пратката вече се проследява</translation>
 <translation id="4049507953662678203">Уверете се, че сте свързани с мрежа, и опитайте отново.</translation>
@@ -1121,6 +1125,7 @@
 <translation id="555749644339804659">Паролите се проверяват…</translation>
 <translation id="5559567453458728487">Преобразуване на мерни единици, намерени в мрежата</translation>
 <translation id="556042886152191864">Бутон</translation>
+<translation id="5565871407246142825">Кредитни карти</translation>
 <translation id="5567439033041178034">НАУЧЕТЕ ПОВЕЧЕ</translation>
 <translation id="5572648434713976849">Ще получавате подобрени предложения в адресната лента</translation>
 <translation id="5576885723883013398">Нов прозорец</translation>
@@ -1603,7 +1608,6 @@
 <translation id="7412027924265291969">Напред</translation>
 <translation id="741204030948306876">Да, ще участвам</translation>
 <translation id="7417689656810783109">Преименуване на групата</translation>
-<translation id="7418703176995102827">Разговорите ви с Gemini и данните ви в Google Workspace няма да се преглеждат от проверяващи лица, нито ще се използват за подобряване на моделите на генеративен AI.</translation>
 <translation id="7419565702166471774">Винаги да се използват сигурни връзки</translation>
 <translation id="7425053386765766120">Добавяне на начин на плащане…</translation>
 <translation id="7425346204213733349">Промените в отметките, историята, паролите и другите ви настройки вече няма да се синхронизират с профила ви в Google. Съществуващите ви данни обаче ще продължат да се съхраняват в него.</translation>
@@ -1636,6 +1640,7 @@
 <translation id="7512909159512473473">Въвеждане на пропуск…</translation>
 <translation id="7514365320538308">Изтегляне</translation>
 <translation id="7514530647142300459">Продължете да използвате паролите в профила си в Google <ph name="EMAIL" /></translation>
+<translation id="7522587739845660862">Информацията за местоположението ви</translation>
 <translation id="7522948500476882302">Когато изтеглите файл, изберете той да бъде изтрит автоматично след 1 месец</translation>
 <translation id="7524055474074101597">Осъществявайте достъп до паролите си и други данни във всички приложения.</translation>
 <translation id="75362970626182391">Нова група раздели</translation>
@@ -1644,11 +1649,13 @@
 <translation id="7557508262441527045">Излязохте от профила си</translation>
 <translation id="7561196759112975576">Винаги</translation>
 <translation id="7561982940498449837">Затваряне на менюто</translation>
+<translation id="7566349809380613217">Отваряне на „<ph name="GROUP_TITLE" />“, споделена група от <ph name="NUMBER_OF_TABS" />, <ph name="CREATION_TEXT" /></translation>
 <translation id="7567579665882069209">Отметките са скрити</translation>
 <translation id="7577900504646297215">Управление на интересите</translation>
 <translation id="7582666837709186351">Използвайте камерата си, за да превеждате текст в снимки или от заобикалящата ви среда.</translation>
 <translation id="7582857256643797524">Тази настройка е активирана на устройството ви</translation>
 <translation id="7583004045319035904">Използвайте <ph name="BIOMETRIC_AUTHENITCATION_TYPE" /> за отключване на разделите в режим „инкогнито“.</translation>
+<translation id="7588149553568293500">Научете повече за възможностите за избор.</translation>
 <translation id="7596103009408415410">{COUNT,plural, =1{Искате ли да затворите {COUNT} неактивен раздел?}other{Искате ли да затворите {COUNT} неактивни раздела?}}</translation>
 <translation id="7598439272585186139">Получете допълнителна сигурност</translation>
 <translation id="7600965453749440009">Никога да не се превежда от <ph name="LANGUAGE" /></translation>
@@ -1908,7 +1915,6 @@
 <translation id="8560253818350321773">Първо да се показват често използваните елементи.</translation>
 <translation id="8561999115126307258">{count,plural, =1{{count} опция за парола е налице над клавиатурата ви.}other{{count} опции за парола са налице над клавиатурата ви.}}</translation>
 <translation id="8564894539416715395">Нов раздел в браузъра</translation>
-<translation id="8569414323292250522">Чатовете се преглеждат и използват за подобряване на AI на Google. Научете повече за възможностите за избор. Информацията за местоположението ви също се съхранява с активността ви.</translation>
 <translation id="8569721750632860947">Кой URL адрес искате да добавите към списъка си за четене?</translation>
 <translation id="8571213806525832805">Последните 4 седмици</translation>
 <translation id="8577056989960190117">Автоматично попълване на годината на валидност: <ph name="YEAR" /></translation>
@@ -2052,6 +2058,7 @@
 <translation id="9066097352053395362">Скриване на „Редактиране на отметката“</translation>
 <translation id="9070824521421603770">Ще излезете от профила си и разделите ще бъдат затворени</translation>
 <translation id="9072837124205571418">Групи раздели от всички устройства</translation>
+<translation id="9075970015528364598">Чатовете се преглеждат и използват за подобряване на AI на Google. <ph name="LEARN_ABOUT_CHOICES" /> <ph name="INFO_ABOUT_LOCATION" /> също се съхранява с активността ви.</translation>
 <translation id="9081058212938299310">Да се актуализира ли паролата за <ph name="USERNAME" />?</translation>
 <translation id="9083838294503912307">Включете синхронизирането, за да се възползвате от синхронизиране и персонализиране на всички устройства.</translation>
 <translation id="9084367296493549256">{count,plural, =1{Имате {count} ненадеждна парола, която може да представлява риск за сигурността ви. Коригирайте я сега, за да сте в безопасност.}other{Имате {count} ненадеждни пароли, които могат да представляват риск за сигурността ви. Коригирайте ги сега, за да сте в безопасност.}}</translation>

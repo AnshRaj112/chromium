@@ -128,10 +128,6 @@ extern const base::FeatureParam<std::string>
 // policy is no longer supported.
 BASE_DECLARE_FEATURE(kAllowLegacyMV2Extensions);
 
-// Controls whether server-side redirects are subject to extensions' web
-// accessible resource restrictions.
-BASE_DECLARE_FEATURE(kExtensionWARForRedirect);
-
 // If enabled, allows an extension to specify protocol_handlers keys in the
 // Manifest, registering a group of custom handlers so that the browser can
 // handle navigation requests to URLs with unknown schemes. This feature
@@ -233,9 +229,6 @@ BASE_DECLARE_FEATURE(kUseNewServiceWorkerTaskQueue);
 // Enables declarative net request rules to specify a header substitution action
 // type for modifying headers.
 BASE_DECLARE_FEATURE(kDeclarativeNetRequestHeaderSubstitution);
-
-// Show no warning banner when an extension uses CDP's `chrome.debugger`.
-BASE_DECLARE_FEATURE(kSilentDebuggerExtensionAPI);
 
 // Disables loading extensions via the `--disable-extensions-except` command
 // line switch.

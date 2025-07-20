@@ -235,8 +235,19 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram
+    name="Chrome.SystemNetworkContextManager.NetworkSandboxEarlyLaunchCrashed"
+    enum="Boolean" expires_after="2025-12-31">
+  <owner>wfh@chromium.org</owner>
+  <owner>mmenke@chromium.org</owner>
+  <summary>
+    Reported if the network service process crashed early in startup, before IPC
+    and mojo services are available.
+  </summary>
+</histogram>
+
+<histogram
     name="Chrome.SystemNetworkContextManager.NetworkSandboxLaunchFailed.ErrorCode"
-    enum="LaunchErrorCodes" expires_after="2023-12-31">
+    enum="LaunchErrorCodes" expires_after="2025-12-31">
   <owner>wfh@chromium.org</owner>
   <owner>mmenke@chromium.org</owner>
   <summary>
@@ -249,7 +260,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="Chrome.SystemNetworkContextManager.NetworkSandboxLaunchFailed.WinLastError"
-    enum="WinGetLastError" expires_after="2023-12-31">
+    enum="WinGetLastError" expires_after="2025-12-31">
   <owner>wfh@chromium.org</owner>
   <owner>mmenke@chromium.org</owner>
   <summary>
@@ -261,7 +272,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Chrome.SystemNetworkContextManager.NetworkSandboxState"
-    enum="NetworkSandboxState" expires_after="2025-08-31">
+    enum="NetworkSandboxState" expires_after="2025-12-31">
   <owner>wfh@chromium.org</owner>
   <owner>mmenke@chromium.org</owner>
   <summary>
@@ -293,7 +304,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="Chrome.Tabs.AnimationSmoothness.TabLoading" units="%"
-    expires_after="2025-11-09">
+    expires_after="2026-01-11">
   <owner>yichenz@chromium.org</owner>
   <owner>chromeos-wmp@google.com</owner>
   <summary>

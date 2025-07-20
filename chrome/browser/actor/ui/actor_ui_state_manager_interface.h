@@ -7,7 +7,7 @@
 
 #include "chrome/browser/actor/actor_task.h"
 #include "chrome/browser/actor/task_id.h"
-#include "chrome/browser/actor/ui/actor_ui_tab_controller.h"
+#include "chrome/browser/actor/ui/actor_ui_tab_controller_interface.h"
 #include "chrome/browser/actor/ui/ui_event.h"
 #include "chrome/common/actor.mojom-forward.h"
 #include "chrome/common/buildflags.h"
@@ -40,17 +40,15 @@ class ActorUiStateManagerInterface {
   };
   virtual ~ActorUiStateManagerInterface() = default;
 
-  // Called whenever an actor task state changes.
-  virtual void OnActorTaskStateChange(TaskId task_id,
-                                      ActorTask::State task_state) = 0;
+  // Handles a UiEvent that may be processed asynchronously.
+  virtual void OnUiEvent(AsyncUiEvent event, UiCompleteCallback callback) = 0;
+  // Handles a UiEvent that must be processed synchronously.
+  virtual void OnUiEvent(SyncUiEvent event) = 0;
 
-  // Called whenever a ui event occurs.
-  virtual void OnUiEvent(UiEvent event, UiCompleteCallback callback) = 0;
-
-  // Notifies the ActorUiTabController of a new `ui_tab_state`.
-  // Can be stubbed out to do nothing in tests.
-  virtual void NotifyUiTabController(tabs::TabInterface& tab,
-                                     const UiTabState& ui_tab_state) = 0;
+  // Gets the relevant UiTabController if the `tab`
+  // exists. Can be stubbed out to do nothing in tests.
+  virtual ActorUiTabControllerInterface* GetUiTabController(
+      tabs::TabInterface* tab) = 0;
 
 #if BUILDFLAG(ENABLE_GLIC)
   // Called on glic window (floaty) state change.

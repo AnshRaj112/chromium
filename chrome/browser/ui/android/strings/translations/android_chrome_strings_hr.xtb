@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">Ovdje možete preuzeti PDF datoteke</translation>
 <translation id="107147699690128016">Ako promijenite datotečni nastavak, datoteka bi se mogla otvoriti u nekoj drugoj aplikaciji i mogla bi izložiti vaš uređaj opasnosti.</translation>
 <translation id="1080365971383768617">Zaporke na svim vašim uređajima</translation>
-<translation id="1087176310396019910">Mogući neželjeni sadržaj</translation>
 <translation id="1087799850623149508">Možete dodirnuti i zadržati pritisak da biste adresnu traku premjestili na dno</translation>
 <translation id="1089606299949659462">Pregled je dovršen!</translation>
 <translation id="1094555143448724771">Kako biste vidjeli kartice s drugih uređaja, sinkronizirajte kartice i povijest</translation>
@@ -109,6 +108,7 @@ Više postavki koje upotrebljavaju podatke za poboljšanje vašeg doživljaja u 
 <translation id="1419753403124156396">Ponovo pokrenuti Chrome?</translation>
 <translation id="1428770807407000502">Želite li isključiti sinkronizaciju?</translation>
 <translation id="1430915738399379752">Ispis</translation>
+<translation id="1433478348197382180">Način čitanja</translation>
 <translation id="1435593198351412143">Automatsko otvaranje PDF-ova</translation>
 <translation id="1437543266176261764">Izvodi se u aplikaciji <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Praćene proizvode organizirajte u mapi Oznake</translation>
@@ -720,6 +720,7 @@ Vaše šifrirane podatke može pročitati samo osoba koja ima vašu šifru. Šif
 <translation id="4306489587293957491">Unesite</translation>
 <translation id="4307992518367153382">Osnove</translation>
 <translation id="4311652497846705514">Želite li otvoriti PDF?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Mogući neželjeni sadržaj}one{Mogući neželjeni sadržaji (#)}few{Mogući neželjeni sadržaji (#)}other{Mogući neželjeni sadržaji (#)}}</translation>
 <translation id="4320177379694898372">Nema internetske veze</translation>
 <translation id="4326079409704643112">Da biste upotrebljavali i spremali Chromeove podatke spremljene na vašem Google računu, potvrdite svoj identitet</translation>
 <translation id="433213510553688132">Praćenje...</translation>
@@ -1058,6 +1059,7 @@ Vaš Google račun može sadržavati druge oblike povijesti pregledavanja, na pr
 <translation id="580893287573699959">Upravljajte temama i web-lokacijama koja vas zanimaju</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{prije # sata}one{prije # sata}few{prije # sata}other{prije # sati}}</translation>
 <translation id="5810288467834065221">Autorska prava <ph name="YEAR" />. Google LLC. Sva prava pridržana.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Prikaži obavijest}one{Prikaži obavijesti}few{Prikaži obavijesti}other{Prikaži obavijesti}}</translation>
 <translation id="5814749351757353073">Pratite svoje omiljene web-lokacije</translation>
 <translation id="5823093032261493462">Želite li svejedno preuzeti datoteku <ph name="FILE_NAME" /> s domene <ph name="DOWNLOAD_DOMAIN" />?</translation>
 <translation id="5828921839638612740">Podatke možete izbrisati u postavkama Chromea</translation>
@@ -1168,6 +1170,7 @@ Na primjer, neke web-lokacije na taj zahtjev mogu odgovoriti tako da vam prikaž
 <translation id="6255809143828972562">Uz Chromeove alate možete sigurno pregledavati i zadržati kontrolu</translation>
 <translation id="6264376385120300461">Svejedno preuzmi</translation>
 <translation id="6264485186158353794">Natrag na sigurno</translation>
+<translation id="6267063201726531683">Donja tablica čitačkog načina</translation>
 <translation id="6277522088822131679">Pojavio se problem prilikom ispisivanja stranice. Pokušajte ponovo.</translation>
 <translation id="6278428485366576908">Tema</translation>
 <translation id="6284472661216707937">Zatvorene su zaporke na svim vašim uređajima</translation>
@@ -1191,7 +1194,6 @@ Na primjer, neke web-lokacije na taj zahtjev mogu odgovoriti tako da vam prikaž
 <translation id="6342069812937806050">Upravo sada</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 i još <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}one{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 i još <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}few{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 i još <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 i još <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}}</translation>
 <translation id="6345878117466430440">Označi kao pročitano</translation>
-<translation id="6347010704471250799">Prikaži obavijest</translation>
 <translation id="6356893102071098867">Provjerite jeste li odabrali odgovarajući račun</translation>
 <translation id="6363990818884053551">Za pokretanje sinkronizacije potvrdite da ste to vi.</translation>
 <translation id="6364438453358674297">Želite li ukloniti prijedlog iz povijesti?</translation>

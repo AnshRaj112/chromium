@@ -53,20 +53,6 @@ api::tabs::Tab CreateTabObjectHelper(content::WebContents* contents,
 
 // Windows ---------------------------------------------------------------------
 
-ExtensionFunction::ResponseAction WindowsGetLastFocusedFunction::Run() {
-  std::optional<windows::GetLastFocused::Params> params =
-      windows::GetLastFocused::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-  return RespondNow(Error(kWindowsNotImplemented));
-}
-
-ExtensionFunction::ResponseAction WindowsGetAllFunction::Run() {
-  std::optional<windows::GetAll::Params> params =
-      windows::GetAll::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-  return RespondNow(Error(kWindowsNotImplemented));
-}
-
 ExtensionFunction::ResponseAction WindowsCreateFunction::Run() {
   std::optional<windows::Create::Params> params =
       windows::Create::Params::Create(args());
@@ -81,21 +67,7 @@ ExtensionFunction::ResponseAction WindowsUpdateFunction::Run() {
   return RespondNow(Error(kWindowsNotImplemented));
 }
 
-ExtensionFunction::ResponseAction WindowsRemoveFunction::Run() {
-  std::optional<windows::Remove::Params> params =
-      windows::Remove::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-  return RespondNow(Error(kWindowsNotImplemented));
-}
-
 // Tabs ------------------------------------------------------------------------
-
-ExtensionFunction::ResponseAction TabsGetSelectedFunction::Run() {
-  std::optional<tabs::GetSelected::Params> params =
-      tabs::GetSelected::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-  return RespondNow(Error(kTabsNotImplemented));
-}
 
 ExtensionFunction::ResponseAction TabsQueryFunction::Run() {
   std::optional<tabs::Query::Params> params =
@@ -216,12 +188,6 @@ ExtensionFunction::ResponseAction TabsCreateFunction::Run() {
 ExtensionFunction::ResponseAction TabsDuplicateFunction::Run() {
   std::optional<tabs::Duplicate::Params> params =
       tabs::Duplicate::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-  return RespondNow(Error(kTabsNotImplemented));
-}
-
-ExtensionFunction::ResponseAction TabsGetFunction::Run() {
-  std::optional<tabs::Get::Params> params = tabs::Get::Params::Create(args());
   EXTENSION_FUNCTION_VALIDATE(params);
   return RespondNow(Error(kTabsNotImplemented));
 }

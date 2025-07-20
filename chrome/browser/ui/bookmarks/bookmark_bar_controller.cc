@@ -57,9 +57,13 @@ bool IsShowingNTP(content::WebContents* web_contents) {
 
 }  // namespace
 
+DEFINE_USER_DATA(BookmarkBarController);
+
 BookmarkBarController::BookmarkBarController(BrowserWindowInterface& browser,
                                              TabStripModel& tab_strip_model)
-    : browser_(browser), tab_strip_model_(tab_strip_model) {
+    : browser_(browser),
+      tab_strip_model_(tab_strip_model),
+      scoped_data_holder_(browser.GetUnownedUserDataHost(), *this) {
   tab_strip_model_->AddObserver(this);
 
   // Set up preference observer for bookmark bar visibility.
@@ -76,6 +80,12 @@ BookmarkBarController::BookmarkBarController(BrowserWindowInterface& browser,
 }
 
 BookmarkBarController::~BookmarkBarController() = default;
+
+BookmarkBarController* BookmarkBarController::From(
+    BrowserWindowInterface* browser_window_interface) {
+  return ui::ScopedUnownedUserData<BookmarkBarController>::Get(
+      browser_window_interface->GetUnownedUserDataHost());
+}
 
 void BookmarkBarController::SetForceShowBookmarkBarFlag(ForceShowFlag flag) {
   force_show_bookmark_bar_flags_ |= flag;
@@ -147,14 +157,13 @@ bool BookmarkBarController::ShouldShowBookmarkBar() const {
     return false;
   }
 
-  const tabs::TabInterface* active_tab = tab_strip_model_->GetActiveTab();
-  if (!active_tab || !active_tab->GetContents()) {
+  std::vector<tabs::TabInterface*> tabs = tab_strip_model_->GetForegroundTabs();
+  if (tabs.empty()) {
     return false;
   }
 
   bookmarks::BookmarkModel* bookmark_model =
-      BookmarkModelFactory::GetForBrowserContext(
-          active_tab->GetContents()->GetBrowserContext());
+      BookmarkModelFactory::GetForBrowserContext(profile);
   const bool has_bookmarks = bookmark_model && bookmark_model->HasBookmarks();
 
   tab_groups::TabGroupSyncService* tab_group_service =
@@ -167,18 +176,10 @@ bool BookmarkBarController::ShouldShowBookmarkBar() const {
     return false;
   }
 
-  // The bookmark bar is only shown on the NTP. If the active tab is part of a
-  // split, check if any tabs in the split are the NTP.
-  std::optional<split_tabs::SplitTabId> split_id = active_tab->GetSplit();
-  if (split_id.has_value()) {
-    std::vector<tabs::TabInterface*> split_tabs =
-        tab_strip_model_->GetSplitData(split_id.value())->ListTabs();
-    return std::any_of(
-        split_tabs.begin(), split_tabs.end(),
-        [](const auto& tab) { return IsShowingNTP(tab->GetContents()); });
-  }
-
-  return IsShowingNTP(active_tab->GetContents());
+  return std::any_of(
+      tabs.begin(), tabs.end(), [](const tabs::TabInterface* tab) {
+        return tab->GetContents() && IsShowingNTP(tab->GetContents());
+      });
 }
 
 void BookmarkBarController::OnTabStripModelChanged(

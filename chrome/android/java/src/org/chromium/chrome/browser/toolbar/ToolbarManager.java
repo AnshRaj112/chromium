@@ -1002,7 +1002,8 @@ public class ToolbarManager
                             mActivityTabProvider,
                             mTabModelSelectorSupplier,
                             browsingModeThemeColorProvider,
-                            mIncognitoStateProvider);
+                            mIncognitoStateProvider,
+                            profileSupplier);
         }
 
         NavigationPopup.HistoryDelegate historyDelegate =
@@ -1074,7 +1075,7 @@ public class ToolbarManager
                         this::shouldSuppressToolbarLongPress,
                         mActivityLifecycleDispatcher,
                         mWindowAndroid,
-                        () -> getUrlBarTextWithoutAutocomplete(),
+                        () -> mLocationBarModel.getUrlOfVisibleNavigationEntry(),
                         () -> getUrlBarViewRectProvider());
         OnLongClickListener onLongClickListener =
                 mToolbarLongPressMenuHandler.getOnLongClickListener();
@@ -1188,6 +1189,7 @@ public class ToolbarManager
                             DownloadUtils::downloadOfflinePage);
             toolbarLayout.setLocationBarCoordinator(locationBarCoordinator);
             toolbarLayout.setBrowserControlsVisibilityDelegate(mControlsVisibilityDelegate);
+            toolbarLayout.setBrowserControlsStateProvider(mBrowserControlsSizer);
             mLocationBar = locationBarCoordinator;
         }
 

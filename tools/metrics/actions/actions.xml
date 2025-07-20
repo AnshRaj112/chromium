@@ -12517,6 +12517,15 @@ should be able to be added at any place in this file.
   <description>Logged if the FRE is accepted.</description>
 </action>
 
+<action name="Glic.Fre.CheckAuthBeforeShowSync" not_user_triggered="true">
+  <owner>birnie@chromium.org</owner>
+  <owner>carlosk@chromium.org</owner>
+  <description>
+    Recorded each time the Glic FRE flow triggers the synchronous authentication
+    check.
+  </description>
+</action>
+
 <action name="Glic.Fre.ErrorPanelClosed">
   <owner>birnie@google.com</owner>
   <owner>erikchen@chromium.org</owner>
@@ -15579,6 +15588,23 @@ should be able to be added at any place in this file.
     Recorded when the user taps the Tab Resumption card in the Magic Stack
     (which opens the Tab Resumption URL) for the regular Tab Resumption module
     (no price drop or price tracking variant).
+  </description>
+</action>
+
+<action name="IOS.NilNavigationContextOnError">
+  <owner>justincohen@google.com</owner>
+  <owner>bling-fundamentals@google.com</owner>
+  <description>
+    Recorded after a WKWebView load error is triggered with a nil
+    NavigationContext.
+  </description>
+</action>
+
+<action name="IOS.NilWKNavigationOnError">
+  <owner>justincohen@google.com</owner>
+  <owner>bling-fundamentals@google.com</owner>
+  <description>
+    Recorded after a WKWebView load error is triggered with a nil WKNavigation.
   </description>
 </action>
 
@@ -36325,6 +36351,13 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="Settings.BWGSettings.BWGAppActivity">
+  <owner>joemerramos@google.com</owner>
+  <description>
+    Reported when user tap BWG App Activity row in Settings. iOS only.
+  </description>
+</action>
+
 <action name="Settings.ContentSettings">
   <owner>gambard@chromium.org</owner>
   <owner>sczs@chromium.org</owner>
@@ -38961,6 +38994,14 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="SidePanel.Comments.Shown">
+  <owner>mickeyburks@chromium.org</owner>
+  <owner>top-chrome-desktop-ui@google.com</owner>
+  <description>
+    Recorded when the comments side panel entry is shown.
+  </description>
+</action>
+
 <action name="SidePanel.Companion.Pinned.BySidePanelHeaderButton">
   <obsolete>Deprecated 11/2024. Companion was deprecated and removed.</obsolete>
   <owner>corising@chromium.org</owner>
@@ -40581,6 +40622,37 @@ should be able to be added at any place in this file.
   <owner>bzanotti@chromium.org</owner>
   <description>
     Recorded when the More button is shown on the sign in confirmation screen.
+  </description>
+</action>
+
+<action name="Signin_MultiProfileForcedMigration_DialogAcknowleged">
+  <owner>jood@google.com</owner>
+  <owner>treib@chromium.org</owner>
+  <owner>chrome-signin-team@google.com</owner>
+  <description>
+    Records when the user acknowledges the multi-profile forced migration
+    dialog. iOS only.
+  </description>
+</action>
+
+<action name="Signin_MultiProfileForcedMigration_DialogShown"
+    not_user_triggered="true">
+  <owner>jood@google.com</owner>
+  <owner>treib@chromium.org</owner>
+  <owner>chrome-signin-team@google.com</owner>
+  <description>
+    Records when the multi-profile forced migration dialog is shown to the user
+    which informs the user that the migration is done. iOS only.
+  </description>
+</action>
+
+<action name="Signin_MultiProfileForcedMigration_MigrationDone"
+    not_user_triggered="true">
+  <owner>jood@google.com</owner>
+  <owner>treib@chromium.org</owner>
+  <owner>chrome-signin-team@google.com</owner>
+  <description>
+    Records when the multi-profile forced migration is completed. iOS only.
   </description>
 </action>
 
@@ -45949,6 +46021,14 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="TabSwitcher.GroupSuggest">
+  <owner>mfiaz@google.com</owner>
+  <owner>clank-tab-dev@google.com</owner>
+  <description>
+    Recorded when a group suggestion is shown in the tab switcher.
+  </description>
+</action>
+
 <action name="TaskManagement.OpenInChromeActionButtonClicked">
   <obsolete>The button option was removed and code deleted.</obsolete>
   <owner>dfalcantara@chromium.org</owner>
@@ -50927,6 +51007,19 @@ should be able to be added at any place in this file.
   <suffix name="Yes"
       label="Recorded when user opts into auto delete through the promo."/>
   <affected-action name="Tabs.ArchivedTabAutoDeletePromo"/>
+</action-suffix>
+
+<action-suffix separator="." ordering="suffix">
+  <suffix name="Accepted"
+      label="Recorded when user accepts the group suggestion."/>
+  <suffix name="Dismissed"
+      label="Recorded when user dismisses the group suggestion."/>
+  <suffix name="Ignored"
+      label="Recorded when user ignores the group suggestion."/>
+  <suffix name="Invalidated"
+      label="Recorded when a group suggestion is considered invalid."/>
+  <suffix name="Shown" label="Recorded when a group suggestion is shown."/>
+  <affected-action name="TabSwitcher.GroupSuggest"/>
 </action-suffix>
 
 </actions>

@@ -34,7 +34,6 @@
 #include "ipc/ipc.mojom.h"
 #include "ipc/ipc_channel.h"
 #include "ipc/ipc_channel_mojo.h"
-#include "ipc/ipc_logging.h"
 #include "ipc/message_filter.h"
 #include "services/resource_coordinator/public/mojom/memory_instrumentation/constants.mojom.h"
 #include "services/service_manager/public/cpp/interface_provider.h"
@@ -52,9 +51,8 @@ ChildProcessHost::~ChildProcessHost() = default;
 
 // static
 std::unique_ptr<ChildProcessHost> ChildProcessHost::Create(
-    ChildProcessHostDelegate* delegate,
-    IpcMode ipc_mode) {
-  return base::WrapUnique(new ChildProcessHostImpl(delegate, ipc_mode));
+    ChildProcessHostDelegate* delegate) {
+  return base::WrapUnique(new ChildProcessHostImpl(delegate));
 }
 
 // static
@@ -111,31 +109,17 @@ base::FilePath ChildProcessHost::GetChildPath(int flags) {
   return child_path;
 }
 
-ChildProcessHostImpl::ChildProcessHostImpl(ChildProcessHostDelegate* delegate,
-                                           IpcMode ipc_mode)
-    : ipc_mode_(ipc_mode), delegate_(delegate), opening_channel_(false) {
-  if (ipc_mode_ == IpcMode::kLegacy) {
-    // In legacy mode, we only have an IPC Channel. Bind ChildProcess to a
-    // disconnected pipe so it quietly discards messages.
-    std::ignore = child_process_.BindNewPipeAndPassReceiver();
-    channel_ = IPC::ChannelMojo::Create(
-        mojo_invitation_->AttachMessagePipe(
-            kChildProcessReceiverAttachmentName),
-        IPC::Channel::MODE_SERVER, this,
-        base::SingleThreadTaskRunner::GetCurrentDefault(),
-        base::SingleThreadTaskRunner::GetCurrentDefault());
-  } else if (ipc_mode_ == IpcMode::kNormal) {
-    child_process_.Bind(mojo::PendingRemote<mojom::ChildProcess>(
-        mojo_invitation_->AttachMessagePipe(
-            kChildProcessReceiverAttachmentName),
-        /*version=*/0));
-    receiver_.Bind(mojo::PendingReceiver<mojom::ChildProcessHost>(
-        mojo_invitation_->AttachMessagePipe(
-            kChildProcessHostRemoteAttachmentName)));
-    receiver_.set_disconnect_handler(
-        base::BindOnce(&ChildProcessHostImpl::OnDisconnectedFromChildProcess,
-                       base::Unretained(this)));
-  }
+ChildProcessHostImpl::ChildProcessHostImpl(ChildProcessHostDelegate* delegate)
+    : delegate_(delegate), opening_channel_(false) {
+  child_process_.Bind(mojo::PendingRemote<mojom::ChildProcess>(
+      mojo_invitation_->AttachMessagePipe(kChildProcessReceiverAttachmentName),
+      /*version=*/0));
+  receiver_.Bind(mojo::PendingReceiver<mojom::ChildProcessHost>(
+      mojo_invitation_->AttachMessagePipe(
+          kChildProcessHostRemoteAttachmentName)));
+  receiver_.set_disconnect_handler(
+      base::BindOnce(&ChildProcessHostImpl::OnDisconnectedFromChildProcess,
+                     base::Unretained(this)));
 }
 
 ChildProcessHostImpl::~ChildProcessHostImpl() = default;
@@ -181,25 +165,21 @@ ChildProcessHostImpl::GetMojoInvitation() {
 }
 
 void ChildProcessHostImpl::CreateChannelMojo() {
-  // If in legacy mode, |channel_| is already initialized by the constructor
-  // not bound through the ChildProcess API.
-  if (ipc_mode_ != IpcMode::kLegacy) {
-    DCHECK(!channel_);
-    DCHECK_EQ(ipc_mode_, IpcMode::kNormal);
-    DCHECK(child_process_);
+  DCHECK(!channel_);
+  DCHECK(child_process_);
 
-    mojo::ScopedMessagePipeHandle bootstrap =
-        mojo_invitation_->AttachMessagePipe(kLegacyIpcBootstrapAttachmentName);
-    channel_ = IPC::ChannelMojo::Create(
-        std::move(bootstrap), IPC::Channel::MODE_SERVER, this,
-        base::SingleThreadTaskRunner::GetCurrentDefault(),
-        base::SingleThreadTaskRunner::GetCurrentDefault());
-  }
+  mojo::ScopedMessagePipeHandle bootstrap =
+      mojo_invitation_->AttachMessagePipe(kLegacyIpcBootstrapAttachmentName);
+  channel_ = IPC::ChannelMojo::Create(
+      std::move(bootstrap), IPC::Channel::MODE_SERVER, this,
+      base::SingleThreadTaskRunner::GetCurrentDefault(),
+      base::SingleThreadTaskRunner::GetCurrentDefault());
+
   DCHECK(channel_);
 
   // Since we're initializing a legacy IPC Channel, we will use its connection
-  // status to monitor child process lifetime instead of using the status of the
-  // `receiver_` endpoint.
+  // status to monitor child process lifetime instead of using the status of
+  // the `receiver_` endpoint.
   if (receiver_.is_bound()) {
     receiver_.set_disconnect_handler(base::NullCallback());
   }
@@ -214,13 +194,6 @@ bool ChildProcessHostImpl::InitChannel() {
   }
 
   delegate_->OnChannelInitialized(channel_.get());
-
-  // Make sure these messages get sent first.
-#if BUILDFLAG(IPC_MESSAGE_LOG_ENABLED)
-  bool enabled = IPC::Logging::GetInstance()->Enabled();
-  child_process_->SetIPCLoggingEnabled(enabled);
-#endif
-
   opening_channel_ = true;
 
   return true;
@@ -289,10 +262,6 @@ void ChildProcessHostImpl::Ping(PingCallback callback) {
 void ChildProcessHostImpl::BindHostReceiver(
     mojo::GenericPendingReceiver receiver) {
   delegate_->BindHostReceiver(std::move(receiver));
-}
-
-bool ChildProcessHostImpl::OnMessageReceived(const IPC::Message& msg) {
-  return false;
 }
 
 void ChildProcessHostImpl::OnChannelConnected(int32_t peer_pid) {

@@ -29,6 +29,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
+#include "base/trace_event/trace_event.h"
 #include "base/values.h"
 #include "crypto/openssl_util.h"
 #include "net/base/address_list.h"
@@ -43,7 +44,6 @@
 #include "net/base/reconnect_notifier.h"
 #include "net/base/session_usage.h"
 #include "net/base/trace_constants.h"
-#include "net/base/tracing.h"
 #include "net/base/url_util.h"
 #include "net/cert/cert_verifier.h"
 #include "net/dns/host_resolver.h"
@@ -1628,7 +1628,6 @@ void QuicSessionPool::OnJobComplete(
     Job* job,
     std::optional<base::TimeTicks> proxy_connect_start_time,
     int rv) {
-  auto iter = active_jobs_.find(job->key().session_key());
   if (proxy_connect_start_time) {
     HttpProxyConnectJob::EmitConnectLatency(
         NextProto::kProtoQUIC, ProxyServer::Scheme::SCHEME_QUIC,
@@ -1636,8 +1635,10 @@ void QuicSessionPool::OnJobComplete(
                 : HttpProxyConnectJob::HttpConnectResult::kError,
         base::TimeTicks::Now() - *proxy_connect_start_time);
   }
-
+  auto iter = active_jobs_.find(job->key().session_key());
   CHECK(iter != active_jobs_.end());
+  iter->second->set_is_deleting();
+
   if (rv == OK) {
     if (!has_quic_ever_worked_on_current_network_) {
       set_has_quic_ever_worked_on_current_network(true);

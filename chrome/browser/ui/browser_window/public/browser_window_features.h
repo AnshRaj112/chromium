@@ -19,6 +19,10 @@ class GlicIphController;
 }  // namespace glic
 #endif
 
+namespace actor::ui {
+class ActorOverlayWindowController;
+}  // namespace actor::ui
+
 class BookmarkBarController;
 class BookmarksSidePanelCoordinator;
 class BreadcrumbManagerBrowserAgent;
@@ -33,6 +37,7 @@ class BrowserView;
 class BrowserWindowInterface;
 class ChromeLabsCoordinator;
 class ColorProviderBrowserHelper;
+class CommentsSidePanelCoordinator;
 class CookieControlsBubbleCoordinator;
 class DataSharingBubbleController;
 class DesktopBrowserWindowCapabilities;
@@ -96,6 +101,7 @@ class ProductSpecificationsEntryPointController;
 
 namespace tabs {
 class GlicNudgeController;
+class GlicActorTaskIconController;
 }
 
 namespace tab_groups {
@@ -186,8 +192,8 @@ class BrowserWindowFeatures {
     return bookmarks_side_panel_coordinator_.get();
   }
 
-  BookmarkBarController* bookmark_bar_controller() {
-    return bookmark_bar_controller_.get();
+  CommentsSidePanelCoordinator* comments_side_panel_coordinator() {
+    return comments_side_panel_coordinator_.get();
   }
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
@@ -218,6 +224,10 @@ class BrowserWindowFeatures {
     return lens_overlay_entry_point_controller_.get();
   }
 
+  actor::ui::ActorOverlayWindowController* actor_overlay_window_controller() {
+    return actor_overlay_window_controller_.get();
+  }
+
   lens::LensRegionSearchController* lens_region_search_controller() {
     return lens_region_search_controller_.get();
   }
@@ -228,6 +238,10 @@ class BrowserWindowFeatures {
 
   tabs::GlicNudgeController* glic_nudge_controller() {
     return glic_nudge_controller_.get();
+  }
+
+  tabs::GlicActorTaskIconController* glic_actor_task_icon_controller() {
+    return glic_actor_task_icon_controller_.get();
   }
 
   TabStripModel* tab_strip_model() { return tab_strip_model_; }
@@ -428,6 +442,9 @@ class BrowserWindowFeatures {
   std::unique_ptr<BookmarksSidePanelCoordinator>
       bookmarks_side_panel_coordinator_;
 
+  std::unique_ptr<CommentsSidePanelCoordinator>
+      comments_side_panel_coordinator_;
+
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   std::unique_ptr<pdf::infobar::PdfInfoBarController> pdf_infobar_controller_;
 #endif
@@ -455,6 +472,12 @@ class BrowserWindowFeatures {
   std::unique_ptr<DownloadToolbarUIController> download_toolbar_ui_controller_;
 
   std::unique_ptr<tabs::GlicNudgeController> glic_nudge_controller_;
+
+  std::unique_ptr<tabs::GlicActorTaskIconController>
+      glic_actor_task_icon_controller_;
+
+  std::unique_ptr<actor::ui::ActorOverlayWindowController>
+      actor_overlay_window_controller_;
 
 #if BUILDFLAG(ENABLE_GLIC)
   std::unique_ptr<glic::GlicButtonController> glic_button_controller_;

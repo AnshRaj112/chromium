@@ -5,19 +5,20 @@
 #include "chrome/browser/actor/ui/event_dispatcher.h"
 
 #include <memory>
+#include <type_traits>
 #include <variant>
 
+#include "base/check_deref.h"
+#include "base/containers/circular_deque.h"
 #include "base/logging.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/strcat.h"
-#include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/actor/tools/tool_request.h"
 #include "chrome/browser/actor/ui/actor_ui_state_manager_interface.h"
 #include "chrome/browser/actor/ui/tool_request_variant.h"
 #include "chrome/browser/actor/ui/ui_event.h"
 #include "chrome/browser/actor/ui/ui_event_debugstring.h"
 #include "chrome/browser/actor/variant_visitor.h"
-#include "chrome/browser/profiles/profile.h"
 #include "chrome/common/actor/action_result.h"
 #include "content/public/browser/browser_context.h"
 
@@ -33,12 +34,16 @@ template <typename T>
 inline constexpr bool is_variant = is_variant_t<T>::value;
 
 template <typename T>
-auto NoUiEvents =
-    [](const T& tr) -> std::deque<UiEvent> { return std::deque<UiEvent>(); };
+using EventSequence = base::circular_deque<T>;
+
+template <typename T>
+auto NoUiEvents = [](const T& tr) -> EventSequence<AsyncUiEvent> {
+  return EventSequence<AsyncUiEvent>();
+};
 
 constexpr Visitor PreToolEventsFn{
     [](const ClickToolRequest& tr) {
-      return std::deque<UiEvent>{
+      return EventSequence<AsyncUiEvent>{
           MouseMove(tr.GetTabHandle(), tr.GetTarget()),
           MouseClick(tr.GetTabHandle(), tr.GetClickType(), tr.GetClickCount())};
     },
@@ -48,7 +53,8 @@ constexpr Visitor PreToolEventsFn{
     NoUiEvents<DragAndReleaseToolRequest>,
     NoUiEvents<HistoryToolRequest>,
     [](const MoveMouseToolRequest& tr) {
-      return std::deque<UiEvent>{MouseMove(tr.GetTabHandle(), tr.GetTarget())};
+      return EventSequence<AsyncUiEvent>{
+          MouseMove(tr.GetTabHandle(), tr.GetTarget())};
     },
     NoUiEvents<NavigateToolRequest>,
     NoUiEvents<ScrollToolRequest>,
@@ -66,14 +72,28 @@ constexpr Visitor PostToolEventsFn{
     NoUiEvents<TypeToolRequest>,           NoUiEvents<WaitToolRequest>,
     NoUiEvents<AttemptLoginToolRequest>};
 
+// TODO(crbug.com/425784083): Remove FirstActEventsFn once functionality moves
+// to ActorTaskChangeFn.
 constexpr Visitor FirstActEventsFn{
-    [](const UiEventDispatcher::FirstActInfo& info) {
-      auto events = std::deque<UiEvent>{StartTask(info.task_id)};
-      if (info.tab_handle.has_value()) {
-        events.emplace_back(
-            StartingToActOnTab(info.tab_handle.value(), info.task_id));
+    NoUiEvents<UiEventDispatcher::FirstActInfo>,
+};
+
+constexpr Visitor ActorTaskAsyncChangeFn{
+    [](const UiEventDispatcher::AddTab& c) {
+      return EventSequence<AsyncUiEvent>{
+          StartingToActOnTab(c.handle, c.task_id)};
+    },
+};
+
+constexpr Visitor ActorTaskSyncChangeFn{
+    [](const UiEventDispatcher::ChangeTaskState& c) {
+      auto seq = EventSequence<SyncUiEvent>{};
+      if (c.old_state == ActorTask::State::kCreated &&
+          c.new_state == ActorTask::State::kActing) {
+        seq.push_back(StartTask(c.task_id));
       }
-      return events;
+      seq.push_back(TaskStateChanged(c.task_id, c.new_state));
+      return seq;
     },
 };
 
@@ -93,6 +113,16 @@ struct VisitorTraits<PostToolEventsFn> {
 template <>
 struct VisitorTraits<FirstActEventsFn> {
   static constexpr const char* phase_name = "FirstAct";
+};
+
+template <>
+struct VisitorTraits<ActorTaskAsyncChangeFn> {
+  static constexpr const char* phase_name = "ActorTaskAsyncChange";
+};
+
+template <>
+struct VisitorTraits<ActorTaskSyncChangeFn> {
+  static constexpr const char* phase_name = "ActorTaskSyncChange";
 };
 
 template <typename T>
@@ -124,28 +154,42 @@ struct InputTraits<UiEventDispatcher::FirstActInfo> {
       };
 };
 
-std::variant<mojom::ActionResultPtr, ActorUiStateManagerInterface*>
-GetUiStateManager(Profile* profile) {
-  ActorKeyedService* actor_service = ActorKeyedService::Get(profile);
-  if (!actor_service) {
-    return MakeResult(mojom::ActionResultCode::kError,
-                      base::StrCat({"No ActorKeyedService found for profile ",
-                                    profile->GetDebugName()}));
-  }
+template <>
+struct InputTraits<UiEventDispatcher::ActorTaskAsyncChange> {
+  static constexpr const char* name = "ActorTaskAsyncChange";
+  static constexpr auto convert_fn = std::identity();
+  static constexpr auto debug_info =
+      [](const UiEventDispatcher::ActorTaskAsyncChange& change) {
+        constexpr Visitor DebugFn{[](const UiEventDispatcher::AddTab& c) {
+          return absl::StrFormat("AddTab task_id=%d tab=%d",
+                                 c.task_id.GetUnsafeValue(),
+                                 c.handle.raw_value());
+        }};
+        return std::visit(DebugFn, change);
+      };
+};
 
-  ActorUiStateManagerInterface* state_manager =
-      actor_service->GetActorUiStateManager();
-  if (!state_manager) {
-    return MakeResult(mojom::ActionResultCode::kError,
-                      base::StrCat({"No ActorUiStateManager found for profile ",
-                                    profile->GetDebugName()}));
-  }
-  return state_manager;
-}
+template <>
+struct InputTraits<UiEventDispatcher::ActorTaskSyncChange> {
+  static constexpr const char* name = "ActorTaskSyncChange";
+  static constexpr auto convert_fn = std::identity();
+  static constexpr auto debug_info =
+      [](const UiEventDispatcher::ActorTaskSyncChange& change) {
+        constexpr Visitor DebugFn{
+            [](const UiEventDispatcher::ChangeTaskState& c) {
+              return absl::StrFormat(
+                  "ChangeTaskState task_id=%d old_state=%s new_state=%s",
+                  c.task_id.GetUnsafeValue(), ToString(c.old_state),
+                  ToString(c.new_state));
+            }};
+        return std::visit(DebugFn, change);
+      };
+};
 
 class UiEventDispatcherImpl : public UiEventDispatcher {
  public:
-  explicit UiEventDispatcherImpl(Profile* profile) : profile_(profile) {}
+  explicit UiEventDispatcherImpl(ActorUiStateManagerInterface& ui_state_manager)
+      : ui_state_manager_(ui_state_manager) {}
   ~UiEventDispatcherImpl() override = default;
 
   void OnPreTool(const ToolRequest& tr, UiCompleteCallback callback) override {
@@ -161,41 +205,66 @@ class UiEventDispatcherImpl : public UiEventDispatcher {
     On<FirstActEventsFn>(first_act_info, std::move(callback));
   }
 
+  void OnActorTaskAsyncChange(const ActorTaskAsyncChange& change,
+                              UiCompleteCallback callback) override {
+    On<ActorTaskAsyncChangeFn>(change, std::move(callback));
+  }
+
+  void OnActorTaskSyncChange(const ActorTaskSyncChange& change) override {
+    On<ActorTaskSyncChangeFn>(change);
+  }
+
  private:
-  raw_ptr<Profile> profile_;
-  std::deque<UiEvent> events_;
+  raw_ref<ActorUiStateManagerInterface> ui_state_manager_;
+  std::variant<EventSequence<AsyncUiEvent>, EventSequence<SyncUiEvent>> events_;
   UiCompleteCallback overall_callback_;
-  raw_ptr<ActorUiStateManagerInterface> ui_state_manager_;
   base::WeakPtrFactory<UiEventDispatcherImpl> weak_ptr_factory_{this};
 
   void ResetAndComplete(mojom::ActionResultPtr result) {
     weak_ptr_factory_.InvalidateWeakPtrs();
-    ui_state_manager_ = nullptr;
-    events_.clear();
-    std::move(overall_callback_).Run(std::move(result));
+    std::visit([]<typename T>(EventSequence<T>& e) { return e.clear(); },
+               events_);
+    if (!overall_callback_.is_null()) {
+      std::move(overall_callback_).Run(std::move(result));
+    } else {
+      if (result->code != mojom::ActionResultCode::kOk) {
+        LOG(DFATAL) << ToDebugString(*result);
+      }
+    }
   }
 
+  // Takes async path.
   template <Visitor V, typename InputT>
   void On(const InputT& in, UiCompleteCallback callback) {
     VLOG(4) << VisitorTraits<V>::phase_name << "(" << InputTraits<InputT>::name
             << "): " << InputTraits<InputT>::debug_info(in);
-    GenerateAndSend<V>(InputTraits<InputT>::convert_fn(in),
-                       std::move(callback));
+    GenerateAndSend<V, AsyncUiEvent>(InputTraits<InputT>::convert_fn(in),
+                                     std::move(callback));
   }
 
-  template <Visitor V, typename ConvertedInputT>
+  // Takes synchronous path.
+  template <Visitor V, typename InputT>
+  void On(const InputT& in) {
+    VLOG(4) << VisitorTraits<V>::phase_name << "(" << InputTraits<InputT>::name
+            << "): " << InputTraits<InputT>::debug_info(in);
+    GenerateAndSend<V, SyncUiEvent>(InputTraits<InputT>::convert_fn(in),
+                                    UiCompleteCallback() /*=null*/);
+  }
+
+  template <Visitor V, typename EventT, typename ConvertedInputT>
   void GenerateAndSend(const ConvertedInputT& converted,
                        UiCompleteCallback callback) {
-    CHECK(events_.empty()) << "Unexpected: unprocessed UiEvents remaining";
-    auto result = GetUiStateManager(profile_);
-    if (std::holds_alternative<mojom::ActionResultPtr>(result)) {
-      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-          FROM_HERE,
-          base::BindOnce(std::move(callback),
-                         std::move(std::get<mojom::ActionResultPtr>(result))));
-      return;
+    CHECK(std::visit([]<typename T>(EventSequence<T>& e) { return e.empty(); },
+                     events_))
+        << "Unexpected: unprocessed UiEvents remaining";
+    if constexpr (std::is_same_v<EventT, AsyncUiEvent>) {
+      CHECK(!callback.is_null()) << "Callback not defined for AsyncUiEvent";
+      overall_callback_ = std::move(callback);
+    } else if constexpr (std::is_same_v<EventT, SyncUiEvent>) {
+      CHECK(callback.is_null()) << "Callback defined for SyncUiEvent";
+    } else {
+      static_assert(false, "Unknown type!");
     }
-    ui_state_manager_ = std::get<ActorUiStateManagerInterface*>(result);
 
     // Visit converted type to generate UiEvent sequence.
     if constexpr (is_variant<ConvertedInputT>) {
@@ -203,11 +272,16 @@ class UiEventDispatcherImpl : public UiEventDispatcher {
     } else {
       events_ = V(converted);
     }
-    overall_callback_ = std::move(callback);
-    MaybeSendNextEvent<V>(MakeOkResult());
+    // Send events either asynchronously or synchronously.
+    if constexpr (std::is_same_v<EventT, AsyncUiEvent>) {
+      MaybeSendNextEvent<V>(MakeOkResult());
+    } else if constexpr (std::is_same_v<EventT, SyncUiEvent>) {
+      SendAllEvents<V>();
+    }
   }
 
-  // Callback after each event is processed by ActorUiStateManager.
+  // Asynchronously send events.  Called back after each event is processed
+  // by ActorUiStateManager.
   template <Visitor V>
   void MaybeSendNextEvent(mojom::ActionResultPtr result) {
     if (result->code != mojom::ActionResultCode::kOk) {
@@ -216,24 +290,40 @@ class UiEventDispatcherImpl : public UiEventDispatcher {
       ResetAndComplete(std::move(result));
       return;
     }
-    if (events_.empty()) {
+    auto& events = std::get<EventSequence<AsyncUiEvent>>(events_);
+    if (events.empty()) {
       ResetAndComplete(MakeOkResult());
       return;
     }
 
-    const UiEvent event = std::move(events_.front());
-    events_.pop_front();
+    const AsyncUiEvent event = std::move(events.front());
+    events.pop_front();
     VLOG(4) << VisitorTraits<V>::phase_name
-            << "(UiEvent): " << DebugString(event);
+            << "(AsyncUiEvent): " << DebugString(event);
     ui_state_manager_->OnUiEvent(
         std::move(event),
         base::BindOnce(&UiEventDispatcherImpl::MaybeSendNextEvent<V>,
                        weak_ptr_factory_.GetWeakPtr()));
   }
+
+  // Synchronously send events.
+  template <Visitor V>
+  void SendAllEvents() {
+    auto& events = std::get<EventSequence<SyncUiEvent>>(events_);
+    while (!events.empty()) {
+      const SyncUiEvent event = std::move(events.front());
+      events.pop_front();
+      VLOG(4) << VisitorTraits<V>::phase_name
+              << "(SyncUiEvent): " << DebugString(event);
+      ui_state_manager_->OnUiEvent(std::move(event));
+    }
+    ResetAndComplete(MakeOkResult());
+  }
 };
 }  // namespace
 
-std::unique_ptr<UiEventDispatcher> NewUiEventDispatcher(Profile* profile) {
-  return std::make_unique<UiEventDispatcherImpl>(profile);
+std::unique_ptr<UiEventDispatcher> NewUiEventDispatcher(
+    ActorUiStateManagerInterface* ui_state_manager) {
+  return std::make_unique<UiEventDispatcherImpl>(CHECK_DEREF(ui_state_manager));
 }
 }  // namespace actor::ui

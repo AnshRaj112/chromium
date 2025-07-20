@@ -76,9 +76,6 @@ class NET_EXPORT_PRIVATE SqlEntryImpl final
   net::Error ReadyForSparseIO(CompletionOnceCallback callback) override;
   void SetLastUsedTimeForTest(base::Time time) override;
 
-  // Returns the last time the entry was used.
-  base::Time LastUsedTime() const { return last_used_; }
-
   // Returns the cache key of the entry.
   const CacheEntryKey& cache_key() const { return key_; }
 
@@ -91,12 +88,12 @@ class NET_EXPORT_PRIVATE SqlEntryImpl final
 
   bool doomed() const { return doomed_; }
 
+  // Updates the `last_used_` timestamp to the current time.
+  void UpdateLastUsed();
+
  private:
   friend class base::RefCounted<SqlEntryImpl>;
   ~SqlEntryImpl() override;
-
-  // Updates the `last_used_` timestamp to the current time.
-  void UpdateLastUsed();
 
   // Internal implementation for writing data to stream 1. This is called by
   // both `WriteData` and `WriteSparseData`. It forwards the write operation to

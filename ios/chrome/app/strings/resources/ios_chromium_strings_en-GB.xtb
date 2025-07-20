@@ -91,7 +91,6 @@ For more settings that use data to improve your Chromium experience, go to <ph n
 <translation id="3102849287235003384">To sign out of your Google Account on all websites, <ph name="BEGIN_LINK" />sign out of Chromium<ph name="END_LINK" />.</translation>
 <translation id="3115956258722352278">Make Chromium your default browser?</translation>
 <translation id="3180939591219927904">Turn on 'Lock Incognito tabs when you close Chromium'</translation>
-<translation id="3242612358525156339">From your device's settings, open '<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />' and select 'Chromium'</translation>
 <translation id="328933489847748230">{count,plural, =1{Now showing 1 Chromium window}other{Now showing {count} Chromium windows}}</translation>
 <translation id="3344973607274501920">Chromium couldn't check your passwords. Try checking your Internet connection.</translation>
 <translation id="3366305173356742781">Chromium data in your account</translation>
@@ -164,7 +163,6 @@ To change this setting, <ph name="BEGIN_LINK" />delete the Chromium data in your
 <translation id="5042011327527167688">Tap 'View with Google Maps on Chrome'</translation>
 <translation id="5044871537677053278">Chromium detects addresses and uses Google Maps to give you directions and local info.</translation>
 <translation id="5048140766121299007">From '<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />' settings, toggle 'Chromium' on</translation>
-<translation id="5048795749726991615">To get your saved passwords in your other apps easily, use Chromium for auto-fill</translation>
 <translation id="5053429694249468757">Deleting Chromium data…</translation>
 <translation id="5071749685031362629">Chromium for iOS</translation>
 <translation id="5124429847818367226">You can now use Chromium any time that you browse or tap links in messages, documents and other apps.</translation>
@@ -254,6 +252,7 @@ Things to consider:
 
 Only someone with your passphrase can read your encrypted data. The passphrase is not sent to or stored by Google. If you forget your passphrase or want to change this setting, <ph name="BEGIN_LINK" />delete the Chromium data in your account<ph name="END_LINK" />.</translation>
 <translation id="7192111075364461693">Chromium notifications are currently turned off in your device settings.</translation>
+<translation id="7195217321165708458">Gemini in Chromium</translation>
 <translation id="7219205286115692265">Access Chromium faster from your iPad's Home Screen Dock.</translation>
 <translation id="7222001353246886083">Search ${searchPhrase} in Chromium</translation>
 <translation id="7228180817326917122">Chromium tip: Choose your address bar position</translation>

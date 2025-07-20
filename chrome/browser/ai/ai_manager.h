@@ -25,7 +25,6 @@
 #include "mojo/public/cpp/bindings/pending_receiver.h"
 #include "mojo/public/cpp/bindings/receiver_set.h"
 #include "mojo/public/cpp/bindings/remote_set.h"
-#include "third_party/blink/public/mojom/ai/ai_common.mojom-forward.h"
 #include "third_party/blink/public/mojom/ai/ai_common.mojom.h"
 #include "third_party/blink/public/mojom/ai/ai_language_model.mojom-forward.h"
 #include "third_party/blink/public/mojom/ai/ai_manager.mojom.h"
@@ -68,12 +67,6 @@ class AIManager : public base::SupportsUserData::Data,
   size_t GetDownloadProgressObserversSizeForTesting() {
     return model_download_progress_manager_.GetNumberOfReporters();
   }
-
-  // Return the max top k value for the LanguageModel API. Note that this value
-  // won't exceed the max top k defined by the underlying on-device model.
-  uint32_t GetLanguageModelMaxTopK();
-  // Return the max temperature for the LanguageModel API.
-  float GetLanguageModelMaxTemperature();
 
   // Returns if all of the language codes in `languages` are supported.
   static bool IsLanguagesSupported(

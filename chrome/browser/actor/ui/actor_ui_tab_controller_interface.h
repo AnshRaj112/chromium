@@ -5,14 +5,16 @@
 #ifndef CHROME_BROWSER_ACTOR_UI_ACTOR_UI_TAB_CONTROLLER_INTERFACE_H_
 #define CHROME_BROWSER_ACTOR_UI_ACTOR_UI_TAB_CONTROLLER_INTERFACE_H_
 
-#include "chrome/browser/actor/ui/states/agent_overlay_state.h"
+#include "chrome/browser/actor/task_id.h"
+#include "chrome/browser/actor/ui/states/actor_overlay_state.h"
 #include "chrome/browser/actor/ui/states/handoff_button_state.h"
 
 namespace actor::ui {
+using UiResultCallback = base::OnceCallback<void(bool)>;
 
 struct UiTabState {
   bool operator==(const UiTabState& other) const = default;
-  AgentOverlayState agent_overlay;
+  ActorOverlayState actor_overlay;
   HandoffButtonState handoff_button;
 };
 
@@ -21,7 +23,17 @@ class ActorUiTabControllerInterface {
   virtual ~ActorUiTabControllerInterface() = default;
 
   // Called whenever the UiTabState changes.
-  virtual void OnUiTabStateChange(const UiTabState& ui_tab_state) = 0;
+  virtual void OnUiTabStateChange(const UiTabState& ui_tab_state,
+                                  UiResultCallback callback) = 0;
+
+  // Sets the last active task id actuating on this tab.
+  // TODO(crbug.com/425952887): At most one task should be acting on a tab at
+  // once. In the future we should implement a callback to halt agent execution
+  // if the active_task_id is already set and stop agent actuation.
+  virtual void SetActiveTaskId(TaskId task_id) = 0;
+  // Clears the last active task id actuating on this tab.
+  virtual void ClearActiveTaskId() = 0;
+  virtual base::WeakPtr<ActorUiTabControllerInterface> GetWeakPtr() = 0;
 };
 
 }  // namespace actor::ui

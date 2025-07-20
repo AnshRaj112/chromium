@@ -356,6 +356,11 @@ interface AudioWorkletNode : AudioNode
     getter port
     method constructor
     setter onprocessorerror
+interface AutomationDelegate
+    attribute @@toStringTag
+    method constructor
+    method registerTool
+    method unregisterTool
 interface BackForwardCacheRestoration : PerformanceEntry
     attribute @@toStringTag
     getter pageshowEventEnd
@@ -1447,6 +1452,11 @@ interface CountQueuingStrategy
     getter highWaterMark
     getter size
     method constructor
+interface CrashReportStorage
+    attribute @@toStringTag
+    method constructor
+    method remove
+    method set
 interface CreateMonitor : EventTarget
     attribute @@toStringTag
     getter ondownloadprogress
@@ -6443,7 +6453,6 @@ interface Navigator
     getter geolocation
     getter gpu
     getter hardwareConcurrency
-    getter identity
     getter ink
     getter keyboard
     getter language
@@ -12037,10 +12046,12 @@ namespace console
     attribute awConsole
     attribute globalThis
     attribute propertyNamesInGlobal
+    getter automationDelegate
     getter caches
     getter clientInformation
     getter closed
     getter cookieStore
+    getter crashReport
     getter credentialless
     getter crossOriginEmbedderPolicy
     getter crossOriginIsolated
@@ -12282,6 +12293,7 @@ namespace console
     method structuredClone
     method webkitCancelAnimationFrame
     method webkitRequestAnimationFrame
+    setter automationDelegate
     setter clientInformation
     setter devicePixelRatio
     setter event

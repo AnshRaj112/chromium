@@ -17,6 +17,7 @@
 #include "base/json/json_reader.h"
 #include "base/memory/ptr_util.h"
 #include "base/metrics/histogram_functions.h"
+#include "base/metrics/user_metrics.h"
 #include "base/no_destructor.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
@@ -315,7 +316,7 @@ SearchEngineChoiceService::GetStaticChoiceScreenConditions(
     return SearchEngineChoiceScreenConditions::kAlreadyCompleted;
   }
 
-  if (!regional_capabilities_service_->IsInEeaCountry()) {
+  if (!regional_capabilities_service_->IsInSearchEngineChoiceScreenRegion()) {
     return SearchEngineChoiceScreenConditions::kNotInRegionalScope;
   }
 
@@ -401,14 +402,49 @@ SearchEngineChoiceService::GetDynamicChoiceScreenConditions(
 
 void SearchEngineChoiceService::RecordStaticEligibility(
     SearchEngineChoiceScreenConditions condition) {
+  if (base::FeatureList::IsEnabled(
+          switches::kInvalidateSearchEngineChoiceOnDeviceRestoreDetection) &&
+      client_->IsDeviceRestoreDetectedInCurrentSession()) {
+    base::UmaHistogramEnumeration(
+        kChoiceScreenProfileInitConditionsPostRestoreHistogram, condition);
+  }
+
   base::UmaHistogramEnumeration(
       kSearchEngineChoiceScreenProfileInitConditionsHistogram, condition);
 }
 
 void SearchEngineChoiceService::RecordDynamicEligibility(
     SearchEngineChoiceScreenConditions condition) {
+  if (base::FeatureList::IsEnabled(
+          switches::kInvalidateSearchEngineChoiceOnDeviceRestoreDetection) &&
+      client_->IsDeviceRestoreDetectedInCurrentSession()) {
+    base::UmaHistogramEnumeration(
+        kChoiceScreenNavigationConditionsPostRestoreHistogram, condition);
+  }
+
   base::UmaHistogramEnumeration(
       kSearchEngineChoiceScreenNavigationConditionsHistogram, condition);
+}
+
+void SearchEngineChoiceService::RecordChoiceScreenEvent(
+    SearchEngineChoiceScreenEvents event) {
+  if (base::FeatureList::IsEnabled(
+          switches::kInvalidateSearchEngineChoiceOnDeviceRestoreDetection) &&
+      client_->IsDeviceRestoreDetectedInCurrentSession()) {
+    base::UmaHistogramEnumeration(kChoiceScreenEventsPostRestoreHistogram,
+                                  event);
+  }
+
+  base::UmaHistogramEnumeration(kSearchEngineChoiceScreenEventsHistogram,
+                                event);
+
+  if (event == SearchEngineChoiceScreenEvents::kChoiceScreenWasDisplayed ||
+      event == SearchEngineChoiceScreenEvents::kFreChoiceScreenWasDisplayed ||
+      event == SearchEngineChoiceScreenEvents::
+                   kProfileCreationChoiceScreenWasDisplayed) {
+    base::RecordAction(
+        base::UserMetricsAction("SearchEngineChoiceScreenShown"));
+  }
 }
 
 std::unique_ptr<search_engines::ChoiceScreenData>
@@ -444,8 +480,7 @@ void SearchEngineChoiceService::RecordChoiceMade(
 
   ClearSearchEngineChoiceInvalidation(*profile_prefs_);
 
-  // Don't modify the pref if the user is not in the EEA region.
-  if (!regional_capabilities_service_->IsInEeaCountry()) {
+  if (!regional_capabilities_service_->IsInSearchEngineChoiceScreenRegion()) {
     return;
   }
 
@@ -650,7 +685,7 @@ SearchEngineChoiceService::GetClientForTesting() {
 
 bool SearchEngineChoiceService::IsDsePropagationAllowedForGuest() const {
   if (client_->IsProfileEligibleForDseGuestPropagation()) {
-    return regional_capabilities_service_->IsInEeaCountry();
+    return regional_capabilities_service_->IsInSearchEngineChoiceScreenRegion();
   }
   return false;
 }

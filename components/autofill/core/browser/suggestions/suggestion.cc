@@ -154,6 +154,8 @@ std::string_view ConvertIconToPrintableString(Suggestion::Icon icon) {
       return "kBnpl";
     case Suggestion::Icon::kSaveAndFill:
       return "kSaveAndFill";
+    case Suggestion::Icon::kAndroidMessages:
+      return "kAndroidMessages";
   }
   NOTREACHED();
 }
@@ -349,11 +351,6 @@ Suggestion::Text& Suggestion::Text::operator=(const Text& other) = default;
 Suggestion::Text& Suggestion::Text::operator=(Text&& other) = default;
 
 Suggestion::Text::~Text() = default;
-
-Suggestion::Suggestion() = default;
-
-Suggestion::Suggestion(std::u16string main_text)
-    : main_text(std::move(main_text), Text::IsPrimary(true)) {}
 
 Suggestion::Suggestion(SuggestionType type) : type(type) {}
 

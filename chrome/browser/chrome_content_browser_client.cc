@@ -108,7 +108,6 @@
 #include "chrome/browser/net/profile_network_context_service.h"
 #include "chrome/browser/net/profile_network_context_service_factory.h"
 #include "chrome/browser/net/system_network_context_manager.h"
-#include "chrome/browser/optimization_guide/chrome_browser_main_extra_parts_optimization_guide.h"
 #include "chrome/browser/payments/payment_request_display_manager_factory.h"
 #include "chrome/browser/performance_manager/public/chrome_browser_main_extra_parts_performance_manager.h"
 #include "chrome/browser/performance_manager/public/chrome_content_browser_client_performance_manager_part.h"
@@ -235,6 +234,7 @@
 #include "components/error_page/common/error.h"
 #include "components/error_page/common/error_page_switches.h"
 #include "components/error_page/common/localized_error.h"
+#include "components/fingerprinting_protection_filter/common/fingerprinting_protection_filter_features.h"
 #include "components/google/core/common/google_switches.h"
 #include "components/heap_profiling/in_process/heap_profiler_controller.h"
 #include "components/keep_alive_registry/keep_alive_types.h"
@@ -360,7 +360,6 @@
 #include "net/ssl/ssl_cert_request_info.h"
 #include "net/ssl/ssl_private_key.h"
 #include "pdf/buildflags.h"
-#include "ppapi/buildflags/buildflags.h"
 #include "printing/buildflags/buildflags.h"
 #include "sandbox/policy/features.h"
 #include "sandbox/policy/mojom/sandbox.mojom.h"
@@ -1503,6 +1502,11 @@ void ChromeContentBrowserClient::RegisterProfilePrefs(
       prefs::kSubAppsAPIsAllowedWithoutGestureAndAuthorizationForOrigins);
 #endif
 
+#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_ANDROID)
+  registry->RegisterBooleanPref(
+      policy::policy_prefs::kProtectedContentIdentifiersAllowed, true);
+#endif
+
   registry->RegisterBooleanPref(prefs::kWebAudioOutputBufferingEnabled, false);
   registry->RegisterBooleanPref(prefs::kSharedWorkerBlobURLFixEnabled, true);
   registry->RegisterBooleanPref(
@@ -1513,6 +1517,7 @@ void ChromeContentBrowserClient::RegisterProfilePrefs(
   registry->RegisterBooleanPref(
       prefs::kClearWindowNameForNewBrowsingContextGroup, true);
   registry->RegisterBooleanPref(prefs::kPrefetchWithServiceWorkerEnabled, true);
+  registry->RegisterBooleanPref(prefs::kServiceWorkerAutoPreloadEnabled, true);
 }
 
 // static
@@ -1705,9 +1710,6 @@ ChromeContentBrowserClient::CreateBrowserMainParts(bool is_integration_test) {
 
   main_parts->AddParts(
       std::make_unique<ChromeBrowserMainExtraPartsSegmentationPlatform>());
-
-  main_parts->AddParts(
-      std::make_unique<ChromeBrowserMainExtraPartsOptimizationGuide>());
 
   return main_parts;
 }
@@ -3686,6 +3688,13 @@ bool ChromeContentBrowserClient::IsPrefetchWithServiceWorkerAllowed(
       prefs::kPrefetchWithServiceWorkerEnabled);
 }
 
+bool ChromeContentBrowserClient::IsServiceWorkerAutoPreloadAllowed(
+    content::BrowserContext* browser_context) {
+  Profile* profile = Profile::FromBrowserContext(browser_context);
+  return profile->GetPrefs()->GetBoolean(
+      prefs::kServiceWorkerAutoPreloadEnabled);
+}
+
 bool ChromeContentBrowserClient::IsServiceWorkerSyntheticResponseAllowed(
     content::BrowserContext* browser_context,
     const GURL& url) {
@@ -4627,6 +4636,17 @@ void ChromeContentBrowserClient::OverrideWebPreferences(
           web_prefs->web_app_scope = registrar.GetAppScope(app_id);
         }
 
+        // IWA can close windows with window management permission.
+        if (browser->app_controller()->IsIsolatedWebApp() &&
+            profile->GetPermissionController()
+                    ->GetPermissionStatusForCurrentDocument(
+                        content::PermissionDescriptorUtil::
+                            CreatePermissionDescriptorForPermissionType(
+                                blink::PermissionType::WINDOW_MANAGEMENT),
+                        web_contents->GetPrimaryMainFrame()) ==
+                blink::mojom::PermissionStatus::GRANTED) {
+          web_prefs->allow_scripts_to_close_windows = true;
+        }
 #if BUILDFLAG(IS_CHROMEOS)
         auto* system_app = browser->app_controller()->system_app();
         if (system_app) {
@@ -4754,6 +4774,12 @@ void ChromeContentBrowserClient::OverrideWebPreferences(
           features::kIncognitoFingerprintingInterventions) &&
       Profile::FromBrowserContext(web_contents->GetBrowserContext())
           ->IsIncognitoProfile();
+
+  web_prefs->content_based_fingerprinting_protection_enabled =
+      fingerprinting_protection_filter::features::
+          IsFingerprintingProtectionEnabledForIncognitoState(
+              Profile::FromBrowserContext(web_contents->GetBrowserContext())
+                  ->IsIncognitoProfile());
 }
 
 bool ChromeContentBrowserClientParts::OverrideWebPreferencesAfterNavigation(

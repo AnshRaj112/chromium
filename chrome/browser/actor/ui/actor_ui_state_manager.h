@@ -19,24 +19,25 @@ class TabInterface;
 }
 
 namespace actor::ui {
-
 class ActorUiStateManager : public ActorUiStateManagerInterface {
  public:
   explicit ActorUiStateManager(ActorKeyedService& actor_service);
   ~ActorUiStateManager() override;
 
   // ActorUiStateManagerInterface:
-  void OnActorTaskStateChange(TaskId task_id,
-                              ActorTask::State task_state) override;
-  void OnUiEvent(UiEvent event, UiCompleteCallback callback) override;
-  void NotifyUiTabController(tabs::TabInterface& tab,
-                             const UiTabState& ui_tab_state) override;
+  void OnUiEvent(AsyncUiEvent event, UiCompleteCallback callback) override;
+  void OnUiEvent(SyncUiEvent event) override;
+  ActorUiTabControllerInterface* GetUiTabController(
+      tabs::TabInterface* tab) override;
+
+// TODO(crbug.com/424495020): Post-task icon refactor, look into removing this
+// function from AUSM.
 #if BUILDFLAG(ENABLE_GLIC)
   void OnGlicUpdateFloatyState(
       glic::GlicWindowController::State floaty_state) override;
 #endif
 
-  // Returns the tabs associated with a given task id if it exists.
+  // Returns the tabs associated with a given task id.
   std::vector<tabs::TabInterface*> GetTabs(TaskId id);
 
   // Returns the current profile scoped ui state.
@@ -44,6 +45,7 @@ class ActorUiStateManager : public ActorUiStateManagerInterface {
 
  private:
   void MaybeUpdateProfileScopedUiState();
+  void OnActorTaskStateChange(TaskId task_id, ActorTask::State new_task_state);
 
   // Returns completed tasks within the kCompletedTaskExpiryDelay of the
   // `current_time`.

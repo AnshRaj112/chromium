@@ -27,6 +27,11 @@ Cette règle sera supprimée une fois que la fonctionnalité iFrame hors process
 <translation id="1011266755572744012">Indique le nombre maximal de feuilles que l'utilisateur est autorisé à imprimer par tâche d'impression.
 
       Si cette règle n'est pas configurée, aucune limitation n'est appliquée et l'utilisateur peut imprimer n'importe quel document.</translation>
+<translation id="1013949464926722411">Si cette règle est configurée, les origines listées ne sont pas autorisées à récupérer les attributs de l'appareil (comme le numéro de série ou le nom d'hôte) à l'aide de l'API Device Attributes.
+
+Les origines doivent correspondre aux applis Web qui sont isolées et installées d'office (à l'aide de la règle <ph name="ISOLATED_WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" />) ou configurées en tant qu'applis kiosque. Pour connaître les spécifications de l'API Device Attributes, veuillez consulter https://wicg.github.io/WebApiDevice/device_attributes.
+
+Pour en savoir plus sur les formats <ph name="URL_LABEL" /> valides, veuillez consulter https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns. La valeur <ph name="WILDCARD_VALUE" /> n'est pas acceptée pour cette règle.</translation>
 <translation id="101438888985615157">Faire pivoter l'écran de 180 degrés</translation>
 <translation id="1017967144265860778">Gestion de l'alimentation sur l'écran de connexion</translation>
 <translation id="1018427234617066902">Permet de forcer la vérification orthographique pour certaines langues. Les langues non reconnues dans la liste sont ignorées.
@@ -240,19 +245,6 @@ Pour en savoir plus sur la gestion des données pour les fonctionnalités d'IA 
       Si elle est désactivée, la boîte de dialogue d'interception de connexion ne s'ouvre pas.
       Dans ce cas, une boîte de dialogue s'affiche néanmoins si <ph name="MANAGED_ACCOUNTS_SIGNIN_RESTRICTION_POLICY_NAME" /> force la séparation des profils de comptes gérés.</translation>
 <translation id="1158844608156732189">Configuration Kerberos (une ligne par élément du tableau). Voir https://web.mit.edu/kerberos/krb5-1.12/doc/admin/conf_files/krb5_conf.html.</translation>
-<translation id="1159241725763211010">Lens Overlay permet aux utilisateurs de lancer des recherches Google en interagissant avec une capture d'écran de la page actuelle superposée au contenu Web réel. De plus, les utilisateurs peuvent lancer des recherches Google en fonction du contexte de la page actuelle. Pour fournir des réponses contextuelles, Lens Overlay envoie le contenu de la page à Google afin de répondre à la requête de l'utilisateur en tenant compte du contexte de la page sur laquelle il se trouve.
-
-Aucun paramètre utilisateur ne permet de contrôler cette fonctionnalité. Elle est généralement disponible pour tous les utilisateurs dont le moteur de recherche par défaut est Google, sauf si cette règle la désactive.
-
-0 = Permettre d'utiliser la fonctionnalité tout en autorisant Google à utiliser des données pertinentes pour améliorer ses modèles d'IA. Selon la fonctionnalité, les données pertinentes peuvent inclure des requêtes, des entrées, des sorties, des documents source et des commentaires écrits. Elles pourront également être examinées par des réviseurs humains dans le seul but d'améliorer les modèles d'IA. 0 est la valeur par défaut, sauf pour les exceptions ci-dessous.
-
-1 = Permettre d'utiliser la fonctionnalité, mais ne pas autoriser Google à améliorer ses modèles à l'aide du contenu des utilisateurs (y compris les requêtes, les entrées, les sorties, les documents source et les commentaires écrits). 1 est la valeur par défaut pour les utilisateurs de la version Enterprise gérés par <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" /> et pour les comptes Education gérés par <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" />.
-
-2 = Ne pas autoriser la fonctionnalité.
-
-Si la règle n'est pas configurée, son comportement est déterminé par la règle <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" />.
-
-Pour en savoir plus sur la gestion des données pour les fonctionnalités d'IA générative, veuillez consulter https://support.google.com/chrome/a?p=generative_ai_settings.</translation>
 <translation id="1160479894929412407">Autoriser le protocole QUIC</translation>
 <translation id="1160939557934457296">Désactiver l'accès au site lors de l'affichage de la page d'avertissement par le service de navigation sécurisée</translation>
 <translation id="1161685818042751282">Ne pas importer les certificats de serveur TLS ajoutés par l'utilisateur depuis les magasins de confiance de la plate-forme.</translation>
@@ -371,7 +363,6 @@ Toutefois, dans le cadre de cette règle, ces formats ne doivent pas inclure les
 <translation id="1262993197422487260">Ne pas présenter le bouton permettant d'afficher le mot de passe sur l'écran de connexion et de verrouillage</translation>
 <translation id="1265053460044691532">Limiter la durée pendant laquelle un utilisateur authentifié via SAML peut se connecter hors connexion</translation>
 <translation id="1265076559723566171">Contrôle les paramètres des utilisateurs Education</translation>
-<translation id="1268561791350382977">Autoriser Lens Overlay et améliorer les modèles d'IA.</translation>
 <translation id="1271811620059192171">Activer les groupes atomiques de règles</translation>
 <translation id="127264587838521316">Autorise les demandes d'installation d'extension de <ph name="PRODUCT_NAME" /></translation>
 <translation id="1272798957154751008">Activez la migration des appareils Chromad vers la gestion dans le cloud</translation>
@@ -1609,6 +1600,17 @@ Si cette règle n'est pas configurée : pour les utilisateurs standards, c'est 
 <translation id="2168397434410358693">Délai d'inactivité (secteur)</translation>
 <translation id="217013996107840632">Paramètres de ligne de commande pour basculer vers Chrome à partir du navigateur secondaire.</translation>
 <translation id="2170233653554726857">Activer l'optimisation WPAD</translation>
+<translation id="2170953111275398079">Cette règle définit si <ph name="PRODUCT_NAME" /> proposera ou non un algorithme d'accord de clé post-quantique dans TLS, en utilisant la norme ML-KEM du NIST. Avant <ph name="PRODUCT_NAME" /> 131, l'algorithme était Kyber, une version antérieure de la norme. Cela permet aux serveurs compatibles de protéger le trafic utilisateur contre les déchiffrement ultérieurs par des ordinateurs quantiques.
+
+Si cette règle est activée ou n'est pas configurée, <ph name="PRODUCT_NAME" /> proposera un accord de clé post-quantique dans les connexions TLS. Dans ce cas, le trafic utilisateur sera protégé contre les ordinateurs quantiques lorsqu'il communiquera avec des serveurs compatibles.
+
+Si cette règle est désactivée, <ph name="PRODUCT_NAME" /> ne proposera pas d'accord de clé post-quantique dans les connexions TLS. Dans ce cas, le trafic utilisateur ne sera pas protégé contre les ordinateurs quantiques.
+
+La proposition d'un accord de clé post-quantique est rétrocompatible. Les serveurs TLS et le middleware de mise en réseau existants devraient ignorer la nouvelle option et continuer à sélectionner les options précédentes.
+
+Toutefois, les appareils qui n'implémentent pas correctement TLS peuvent dysfonctionner lorsqu'ils reçoivent la nouvelle option. Par exemple, ils peuvent se déconnecter en réponse à des options non reconnues ou à des messages plus volumineux qui en résultent. Ces appareils ne sont pas prêts pour le post-quantique et interfèrent avec la transition post-quantique d'une entreprise. Le cas échéant, les administrateurs doivent contacter le fournisseur pour obtenir une solution.
+
+Cette règle est une mesure temporaire qui sera supprimée après la version 145 de <ph name="PRODUCT_NAME" />. Elle peut être activée pour vous permettre de tester des problèmes, ou désactivée pendant la résolution des problèmes.</translation>
 <translation id="2172201084331314152">Configurer les fonctionnalités à désactiver (Caméra, Paramètres du navigateur, Paramètres de l'OS, Numérisation, Web Store, Dessin, Explorer, Crosh, Galerie, Terminal, Enregistreur, Tâches d'impression, Raccourcis clavier, Gmail, Google Docs, Google Slides, Google Sheets, Google Drive, Google Keep, Google Agenda, Google Chat, YouTube, Google Maps, Calculatrice et Éditeur de texte)</translation>
 <translation id="2174946221763588594">Définit si les sites auxquels l'utilisateur accède sont autorisés à créer des sessions de réalité augmentée immersive avec <ph name="WEBXR_API_NAME" />.
 
@@ -2030,6 +2032,7 @@ Si elle n'est pas définie, l'écran de confidentialité est désactivé initial
 <translation id="2436302465999055995">Faire de <ph name="LACROS_NAME" /> le seul navigateur disponible (pas encore implémenté)</translation>
 <translation id="2439187682308339104">Interdire à tous les sites de demander l'accès aux appareils HID via l'API WebHID</translation>
 <translation id="2439733504887695659">Activer la fermeture des alertes de mot de passe compromis pour les identifiants saisis</translation>
+<translation id="2446029789419870019">Autoriser l'utilisation de la fonctionnalité et l'amélioration des modèles d'IA</translation>
 <translation id="2446244536806499267">Ne pas considérer l'utilisateur comme inactif pendant la lecture audio</translation>
 <translation id="2452225615952836461">Toujours utiliser des méthodes de requête en majuscules</translation>
 <translation id="2454228136871844693">Privilégier la stabilité.</translation>
@@ -2085,6 +2088,7 @@ Si cette règle est définie sur <ph name="POLICY_VALUE_VISIBLE" />, la fonction
 Si cette la règle est définie sur <ph name="POLICY_VALUE_DISABLEDE" />, la synchronisation de fichiers est désactivée si l'utilisateur l'avait auparavant activée. Cette fonctionnalité est masquée dans l'application Fichiers et dans les paramètres afin que l'utilisateur ne puisse pas la réactiver. Les fichiers existants que l'utilisateur avaient rendus disponibles hors connexion le resteront. L'utilisateur peut toujours rendre des éléments disponibles hors connexion, manuellement.
 
 Si cette règle n'est pas configurée, la valeur par défaut est <ph name="POLICY_VALUE_VISIBLE" />.</translation>
+<translation id="2488455166114458307">Autoriser l'API Device Attributes sur ces sites</translation>
 <translation id="2489558694350871332">Autoriser l'appareil à exécuter des machines virtuelles</translation>
 <translation id="2492240920793040106">Activer les rapports sur les informations système et du contenu de pages afin d'améliorer la navigation sécurisée</translation>
 <translation id="2496180316473517155">Historique de navigation</translation>
@@ -2202,6 +2206,7 @@ Si cette règle est définie sur "False", la fonctionnalité d'ensembles de site
 <translation id="2568488785376704318">Cette règle est obsolète. Veuillez utiliser la règle <ph name="REMOTE_ACCESS_HOST_DOMAIN_LIST_POLICY_NAME" /> à la place.</translation>
 <translation id="2570059561924004903">Désactiver la lecture vocale</translation>
 <translation id="2570181623957732921">Activer <ph name="DESK_API_NAME" /> pour une liste de domaines tiers</translation>
+<translation id="2571821662934804440">Autoriser l'utilisation de la fonctionnalité sans améliorer les modèles d'IA</translation>
 <translation id="2573850437942404034">Ne pas autoriser</translation>
 <translation id="2575198840408498393">Désactiver la création de profils itinérants</translation>
 <translation id="25765864042030871">Les gestionnaires d'événements <ph name="UNLOAD_EVENT_NAME" /> seront bientôt obsolètes. Leur déclenchement dépend de la règle <ph name="PERMISSIONS_POLICY_NAME" /> <ph name="UNLOAD_EVENT_NAME" />. Actuellement, ils sont autorisés par la règle par défaut. À l'avenir, ils seront progressivement interdits par défaut et les sites devront explicitement les activer à l'aide des en-têtes <ph name="PERMISSIONS_POLICY_NAME" />. Cette règle d'entreprise peut être utilisée pour refuser cet abandon progressif en forçant la valeur par défaut à rester activée.
@@ -2648,6 +2653,12 @@ Si cette règle est activée, la touche du Lanceur d'applications/de recherche p
       Sachez aussi qu'il s'agit d'une règle de "contournement" qui est censée être de courte durée.
       </translation>
 <translation id="2939335382784544151">Activer l'importation de l'historique de navigation à la première exécution</translation>
+<translation id="2939606629175440564">Cette règle permet de spécifier si une appli Web isolée installée d'office ou une appli kiosque a accès à l'API Device Attributes par défaut.
+Pour en savoir plus, veuillez consulter https://wicg.github.io/WebApiDevice/device_attributes.
+
+Si cette règle est définie sur "1" ou si elle n'est pas configurée, les applis Web isolées installées d'office et les applis kiosque peuvent utiliser l'API.
+
+Si cette règle est définie sur "2", les applis Web isolées installées d'office et les applis kiosque ne peuvent pas utiliser l'API.</translation>
 <translation id="2940127076681735544">Si cette règle est définie sur une URL valide, <ph name="PRODUCT_NAME" /> télécharge la liste des sites à partir de cette URL, puis applique les instructions comme si elles avaient été configurées avec la règle <ph name="SITELIST_POLICY_NAME" />.
 
       Si cette règle n'est pas configurée ou qu'elle est définie sur une URL non valide, <ph name="PRODUCT_NAME" /> n'utilise pas cette règle comme source d'instructions pour changer de navigateur.
@@ -2876,6 +2887,7 @@ Si cette règle est désactivée ou n'est pas configurée, la collecte et l'impo
 Le rapport contient l'état du profil ainsi que des informations sur l'utilisation, y compris, mais sans s'y limiter, la version de l'OS et du navigateur, les extensions installées et les règles applicables.
 
 Cette règle ne peut être configurée que comme règle relative aux utilisateurs du cloud.</translation>
+<translation id="3062559845875011810">Ne pas autoriser la fonctionnalité</translation>
 <translation id="3063302084011279315">Désactiver l'enregistreur d'écran</translation>
 <translation id="3063307261083019730">Interdire le stockage des pages avec un en-tête <ph name="CACHE_CONTROL_NO_STORE_NAME" /> dans le cache amélioré.</translation>
 <translation id="3064530882228745118">Utiliser la consultation CNAME lors de l'authentification Kerberos</translation>
@@ -3677,12 +3689,19 @@ Elle est toujours appliquée pour <ph name="PRODUCT_OS_NAME" />.</translation>
 <translation id="3647212518036289905">Permet de spécifier la bibliothèque GSSAPI à utiliser pour l'authentification HTTP. Vous pouvez indiquer le nom de la bibliothèque ou son chemin d'accès complet.
 
       Si cette règle n'est pas configurée, <ph name="PRODUCT_NAME" /> utilise un nom de bibliothèque par défaut.</translation>
+<translation id="3647756189889410780">https://github.com/WICG/service-worker-auto-preload
+La fonctionnalité ServiceWorkerAutoPreload envoie une requête réseau pour une ressource principale en même temps qu'elle lance le processus d'amorçage ServiceWorker.
+
+Si cette règle est activée ou qu'elle n'est pas configurée, <ph name="PRODUCT_NAME" /> active ServiceWorkerAutoPreload. La requête de navigation est automatiquement distribuée lors du démarrage de ServiceWorker dans certains scénarios, par exemple lorsque ServiceWorker n'est pas en cours d'exécution.
+
+Si cette règle est désactivée, <ph name="PRODUCT_NAME" /> n'activera pas ServiceWorkerAutoPreload. La requête de navigation est toujours distribuée après le démarrage de ServiceWorker.
+
+Cette règle est une mesure temporaire pour contrôler la fonctionnalité et sera supprimée dans M144.</translation>
 <translation id="3650122925429054129">Désactiver la mise en surbrillance du curseur sur l'écran de connexion</translation>
 <translation id="365093517647222762">Signale les données de télémétrie des sites Web pour les URL autorisées spécifiées par la règle <ph name="REPORT_WEBSITE_TELEMETRY_ALLOWLIST_POLICY_NAME" /> pour les utilisateurs affiliés.
 
 Si cette règle est configurée, des rapports de télémétrie de site Web sont créés pour les types de données de télémétrie spécifiés.
 Si cette règle n'est pas configurée, aucun rapport de données de télémétrie de site Web n'est créé.</translation>
-<translation id="3651483357891254380">Autoriser Lens Overlay sans améliorer les modèles d'IA.</translation>
 <translation id="3652670852519271837">Autoriser les sites à demander aux utilisateurs l'accès en lecture aux fichiers et répertoires via l'API File System</translation>
 <translation id="3653237928288822292">Icône du moteur de recherche par défaut</translation>
 <translation id="3654906736796256792">Autoriser l'exécution en bac à sable du processus audio</translation>
@@ -3841,6 +3860,10 @@ Pour connaître les restrictions concernant <ph name="PRIVATE_NETWORK_ACCESS" />
 <translation id="376375951585423504">Désactiver le quota persistant.</translation>
 <translation id="3765260570442823273">Durée du message d'avertissement avant la déconnexion pour cause d'inactivité</translation>
 <translation id="3766695867369523703">Autoriser le partitionnement du stockage tiers par défaut.</translation>
+<translation id="3770044943398389276">Par défaut, le service SSO flottant déplace uniquement les cookies persistants entre les appareils. Cette règle détermine si les cookies de session doivent également être inclus. Elle ne prend effet que lorsque la règle <ph name="FLOATING_SSO_ENABLED_POLICY_NAME" /> est activée.
+
+Lorsque cette règle est activée, le service SSO flottant synchronise les cookies de session et les cookies persistants.
+Lorsque cette règle est désactivée ou n'est pas configurée, le service SSO flottant ne synchronise que les cookies persistants.</translation>
 <translation id="3770407495263198786">Cette règle permet aux administrateurs de configurer une liste d'imprimantes pour leurs utilisateurs. La sélection de l'imprimante est effectuée la première fois que l'utilisateur lance une impression.
 
       Vous pouvez utiliser cette règle pour effectuer les opérations suivantes :
@@ -3941,6 +3964,7 @@ Sous <ph name="MS_WIN_NAME" />, cette règle n'est disponible que sur les instan
 
 Sous <ph name="MAC_OS_NAME" />, cette règle n'est disponible que sur les instances gérées via MDM, associées à un domaine via MCX ou qui bénéficient de <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="3845318141474759319">Autoriser le fond d'écran par IA générative sans améliorer les modèles d'IA</translation>
+<translation id="3848302969721895938">Désactiver ServiceWorkerAutoPreload</translation>
 <translation id="3849923496599301707">Forcer l'autorisation des applis Chrome en mode Kiosque</translation>
 <translation id="3851443303439635700">Contrôlez le seuil d'imbrication avant que la fonction JavaScript setTimeout() commence à être limitée</translation>
 <translation id="3854609566862485607">Cette règle permet de définir un libellé personnalisé servant à identifier les profils gérés. Pour les profils gérés, ce libellé s'affichera à côté de l'avatar dans la barre d'outils. Le libellé personnalisé ne sera pas traduit.
@@ -4215,6 +4239,19 @@ Principe de cette règle :
 * Si cette règle est définie sur "Filtrer les sites de contenus réservés aux adultes", les sites pornographiques sont filtrés
 
 Cette règle s'applique à la fois à l'URL vers laquelle l'utilisateur navigue et aux iFrames. La règle <ph name="URL_ALLOWLIST_POLICY_NAME" /> prévaut sur cette règle et peut être utilisée pour ignorer les évaluations de l'API Google Safe Search.</translation>
+<translation id="4049706391182174257">Cette règle contrôle la disponibilité de la fonctionnalité de changement automatique de mot de passe de <ph name="PRODUCT_NAME" />.
+
+Si elle est activée, un utilisateur peut déclencher un processus lors duquel le navigateur tente de modifier automatiquement son mot de passe sur un site Web. Ce processus est géré par l'IA générative. Le nouveau mot de passe est enregistré dans le gestionnaire de mots de passe du navigateur.
+
+0 = Permettre d'utiliser la fonctionnalité tout en autorisant Google à utiliser des données pertinentes pour améliorer ses modèles d'IA. Selon la fonctionnalité, les données pertinentes peuvent inclure des prompts, des entrées, des sorties, des sources et des retours écrits. Elles pourront également être examinées par des réviseurs humains afin d'améliorer les modèles d'IA. 0 est la valeur par défaut, sauf pour les exceptions ci-dessous.
+
+1 = Permettre d'utiliser la fonctionnalité, mais ne pas autoriser Google à améliorer ses modèles à l'aide du contenu des utilisateurs (y compris les prompts, les entrées, les sorties, les sources et les retours écrits). 1 est la valeur par défaut pour les utilisateurs de la version Enterprise gérés par la console d'administration Google et pour les comptes Education gérés par Google Workspace.
+
+2 = Ne pas autoriser la fonctionnalité.
+
+Si la règle n'est pas configurée, son comportement est déterminé par la règle GenAiDefaultSettings.
+
+Pour en savoir plus sur la gestion des données pour les fonctionnalités d'IA générative, veuillez consulter https://support.google.com/chrome/a?p=generative_ai_settings.</translation>
 <translation id="4051723201852944592">Détecter les fenêtres recouvertes</translation>
 <translation id="4052529125939620019">Charger l'extension du composant CryptoToken au démarrage</translation>
 <translation id="4053157306171963473">Désactiver les rapports sur le temps d'activité de l'appareil</translation>
@@ -4233,6 +4270,7 @@ Pour <ph name="PRODUCT_OS_NAME" />, cette règle est liée à l'attestation à d
 
 Pour en savoir plus sur les formats <ph name="URL_LABEL" /> valides, veuillez consulter https://support.google.com/chrome/a?p=url_blocklist_filter_format.</translation>
 <translation id="4070039109671307724">Divers</translation>
+<translation id="4071922398488395340">Inclure les cookies de session dans la fonctionnalité de service SSO flottant</translation>
 <translation id="4072225853834793549">Désactiver les raccourcis d'accessibilité sur l'écran de connexion</translation>
 <translation id="4074922053013383215">Économies de mémoire modérées.</translation>
 <translation id="4075675819066819571">Placer l'étagère sur le côté gauche de l'écran</translation>
@@ -4516,6 +4554,7 @@ Cette règle a été utilisée pour désactiver la mise à niveau automatique du
       Si cette règle n'est pas configurée, les sites Web peuvent demander l'accès. Toutefois, les utilisateurs peuvent modifier ce paramètre.</translation>
 <translation id="4275048399551500192">Ne pas afficher les commandes multimédias pour les sessions <ph name="PRODUCT_NAME" /> lancées par d'autres appareils</translation>
 <translation id="4278656834593750050">Activer les sons de recharge</translation>
+<translation id="4281322231545828290">Activer la modification automatique du mot de passe</translation>
 <translation id="4282243913059705499">Toujours afficher l'icône <ph name="PRODUCT_NAME" /> dans la barre d'outils</translation>
 <translation id="4285510855646731405">Google Agenda (compatible depuis la version 135)</translation>
 <translation id="4285674129118156176">Autoriser les utilisateurs non affiliés à utiliser ARC</translation>
@@ -4881,21 +4920,6 @@ Un appareil est considéré comme géré s'il utilise une version d'entreprise d
 <translation id="4557134566541205630">URL de la page Nouvel onglet du moteur de recherche par défaut</translation>
 <translation id="4558166110367609724">Ignorer les conditions d'utilisation et charger le navigateur automatiquement.</translation>
 <translation id="4559846397119102037">Autoriser l'utilisation de <ph name="LACROS_NAME" /></translation>
-<translation id="456018799964679771">Cette règle au niveau de l'appareil définit si <ph name="PRODUCT_OS_NAME" /> proposera ou non un algorithme d'accord de clé post-quantique dans TLS, en utilisant la norme ML-KEM du NIST. Avant <ph name="PRODUCT_OS_NAME" /> 131, l'algorithme était Kyber, une version antérieure de la norme. Cela permet aux serveurs compatibles de protéger le trafic utilisateur contre les déchiffrements ultérieurs par des ordinateurs quantiques.
-
-Si cette règle est activée, <ph name="PRODUCT_OS_NAME" /> proposera un accord de clé post-quantique dans les connexions TLS. Dans ce cas, le trafic utilisateur sera protégé contre les ordinateurs quantiques lorsqu'il communiquera avec des serveurs compatibles.
-
-Si cette règle est désactivée, <ph name="PRODUCT_OS_NAME" /> ne proposera pas d'accord de clé post-quantique dans les connexions TLS. Dans ce cas, le trafic utilisateur ne sera pas protégé contre les ordinateurs quantiques.
-
-Si cette règle n'est pas configurée, <ph name="PRODUCT_OS_NAME" /> suivra le processus de déploiement par défaut pour proposer un accord de clé post-quantique.
-
-La proposition de Kyber est rétrocompatible. Les serveurs TLS et le middleware de mise en réseau existants devraient ignorer la nouvelle option et continuer à sélectionner les options précédentes.
-
-Toutefois, les appareils qui n'implémentent pas correctement TLS peuvent dysfonctionner lorsqu'ils reçoivent la nouvelle option. Par exemple, ils peuvent se déconnecter en réponse à des options non reconnues ou à des messages plus volumineux qui en résultent. Ces appareils ne sont pas prêts pour le post-quantique et interfèrent avec la transition post-quantique d'une entreprise. Le cas échéant, les administrateurs doivent contacter le fournisseur pour obtenir une solution.
-
-Cette règle est une mesure temporaire qui sera supprimée après la version 141 de <ph name="PRODUCT_OS_NAME" />. Elle peut être activée pour vous permettre de tester des problèmes, ou désactivée pendant la résolution des problèmes.
-
-Cette règle prévaut sur la règle PostQuantumKeyAgreementEnabled si les deux sont configurées.</translation>
 <translation id="4561560385824323005">Autoriser les utilisateurs à sélectionner l'interface de bureau préconfigurée à charger</translation>
 <translation id="4561940244682063697">Ne pas autoriser les sites à inviter l'utilisateur à partager un flux vidéo de son écran</translation>
 <translation id="4562165737444703281">Autoriser les utilisateurs à [activer/configurer] le transfert de port Crostini</translation>
@@ -6042,6 +6066,11 @@ Les caractères génériques d'hôte globaux (par exemple, "*" ou "[*]") ne sont
 
 Remarque : Cette règle ne s'applique pas aux mises à niveau HSTS.</translation>
 <translation id="5297948043665200363">Autoriser l'utilisateur à rester connecté une fois que son compte n'est plus authentifié</translation>
+<translation id="5298594338496226089">Si cette règle est configurée, les origines listées sont autorisées à récupérer les attributs de l'appareil (comme le numéro de série ou le nom d'hôte) à l'aide de l'API Device Attributes.
+
+Les origines doivent correspondre aux applis Web installées d'office à l'aide de la règle <ph name="WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" /> ou <ph name="ISOLATED_WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" /> (depuis la version 125), ou configurées en tant qu'applis kiosque. Pour connaître les spécifications de l'API Device Attributes, veuillez consulter https://wicg.github.io/WebApiDevice/device_attributes.
+
+Pour en savoir plus sur les formats <ph name="URL_LABEL" /> valides (depuis la version 127), veuillez consulter https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns. La valeur <ph name="WILDCARD_VALUE" /> n'est pas acceptée pour cette règle.</translation>
 <translation id="5298949392804966105">Aucune restriction pour les comptes gérés</translation>
 <translation id="530111809849214840">Masquer l'option <ph name="GOOGLE_DRIVE_NAME" />.</translation>
 <translation id="530134925949808452">Heure locale à laquelle le quota d'utilisation est renouvelé.</translation>
@@ -6052,6 +6081,7 @@ Remarque : Cette règle ne s'applique pas aux mises à niveau HSTS.</translatio
 <translation id="5307432759655324440">Disponibilité du mode navigation privée</translation>
 <translation id="5308551343115571396">Une fois <ph name="LACROS_NAME" /> désactivé, nous essayons de conserver le plus de données utilisateur possible, tout en supprimant toutes les données du navigateur.</translation>
 <translation id="530949964068726932">Masquer les options d'accessibilité dans le menu de la barre d'état système</translation>
+<translation id="5309944663104291505">Ne pas autoriser les applis Web isolées installées d'office et les applis kiosque à utiliser l'API Device Attributes</translation>
 <translation id="5310544046492594469">Si cette règle est définie sur 0 (valeur par défaut), vous pouvez accéder aux outils pour les développeurs et à la Console JavaScript, sauf dans le cas d'extensions installées dans le cadre des règles de l'entreprise ou, depuis la version 114 et s'il s'agit d'un utilisateur géré, d'extensions intégrées au navigateur. Si elle est définie sur 1, vous pouvez accéder à ces outils et à cette console dans tous les cas, y compris si des extensions ont été installées dans le cadre des règles de l'entreprise. Si elle est définie sur 2, vous ne pouvez pas accéder aux outils pour les développeurs ni examiner des éléments de sites Web.
 
       En outre, les raccourcis clavier, ainsi que les options de menu ou de menu contextuel permettant d'ouvrir ces outils ou cette console sont désactivés.
@@ -6403,6 +6433,7 @@ Si <ph name="NTPCARDSVISIBLE" /> est désactivé, la carte SharePoint et OneDriv
 <translation id="5534235660122271432">Interdire l'écriture sur des périphériques de stockage externes</translation>
 <translation id="5535256585099022933">Définir l'intervalle du redémarrage</translation>
 <translation id="5537400155400537818">Désactivé : le zoom CSS fonctionne de la même manière qu'avant la spécification standard.</translation>
+<translation id="5537587542872235553">Autoriser les applis Web isolées installées d'office et les applis kiosque à utiliser l'API Device Attributes</translation>
 <translation id="553806128266843748">Flag booléen spécifiant si la limitation est activée.</translation>
 <translation id="5540885720415375851">Autoriser la détection des appareils en local</translation>
 <translation id="5542235730745104308">Si cette règle est définie sur "True", <ph name="PRODUCT_NAME" /> utilise les variantes de pages d'erreur intégrées (telles que "Page introuvable"). Si cette règle est définie sur "False", <ph name="PRODUCT_NAME" /> n'utilise jamais les variantes de pages d'erreur.
@@ -6613,6 +6644,7 @@ Si elle n'est pas définie ou que l'ancienneté de la version ne peut pas être 
 <translation id="5645779841392247734">Autoriser les cookies sur ces sites</translation>
 <translation id="5646234199535103501">Règle de configuration du connecteur Chrome Enterprise OnBulkDataEntry</translation>
 <translation id="5648016151508002741">Empêcher l'exécution de vérifications <ph name="OCSP_CRL_LABEL" /> en ligne</translation>
+<translation id="5648436277949979783">Contrôler l'utilisation de l'API Device Attributes</translation>
 <translation id="5649046890958064703">Si <ph name="PRINTERS_BLACKLIST" /> est choisi pour <ph name="DEVICE_PRINTERS_ACCESS_MODE_POLICY_NAME" />, le fait de définir <ph name="DEVICE_NATIVE_PRINTERS_BLACKLIST_POLICY_NAME" /> indique les imprimantes indisponibles pour les utilisateurs. Toutes les imprimantes sont proposées aux utilisateurs, sauf celles dont les ID sont répertoriés dans cette règle. Ces ID doivent correspondre à ceux indiqués dans les champs <ph name="ID_FIELD" /> ou <ph name="GUID_FIELD" /> du fichier spécifié dans la règle <ph name="DEVICE_PRINTERS_POLICY_NAME" />.
 
       Cette règle étant obsolète, veuillez utiliser la règle <ph name="DEVICE_PRINTERS_BLOCKLIST_POLICY_NAME" /> à la place.</translation>
@@ -6849,6 +6881,7 @@ Vous pouvez ajouter une autre restriction de compte avec la règle <ph name="MIC
 <translation id="5815129011704381141">Redémarrer automatiquement après une mise à jour</translation>
 <translation id="5815990343032461023">Ancien comportement : les applis Chrome Kiosk sont mises à jour par le système d'extension en utilisant l'URL de mise à jour issue du fichier manifeste d'extension, et en mettant en cache le gestionnaire au moyen de l'URL de mise à jour provenant de la règle</translation>
 <translation id="5816688024515869030">Désactiver le fournisseur <ph name="UIA_NAME" />.</translation>
+<translation id="581737504822041364">Autoriser ServiceWorker à distribuer des requêtes de navigation sans attendre son démarrage</translation>
 <translation id="5828008775808363753">Ne pas lancer le navigateur au démarrage</translation>
 <translation id="582857022372205358">Activer l'impression recto verso bord court</translation>
 <translation id="5830196507442186669">Autoriser les appareils à utiliser <ph name="BOREALIS_NAME" /> sur <ph name="PRODUCT_OS_NAME" /></translation>
@@ -7741,23 +7774,6 @@ Les fonctionnalités d'IA générative des outils de développement incluent les
 
 Pour en savoir plus sur la gestion des données pour les fonctionnalités d'IA générative, veuillez consulter https://support.google.com/chrome/a?p=generative_ai_settings.</translation>
 <translation id="6394350458541421998">Cette règle a été supprimée à partir de la version 29 de <ph name="PRODUCT_OS_NAME" />. Veuillez utiliser la règle PresentationScreenDimDelayScale à la place.</translation>
-<translation id="6397424663361748439">Règle permettant de contrôler si la fonctionnalité <ph name="IP_PROTECTION_NAME" /> de la <ph name="PRIVACY_SANDBOX_NAME" /> doit être activée.
-
-<ph name="IP_PROTECTION_NAME" /> est une fonctionnalité qui limite la disponibilité de l'adresse IP d'origine d'un utilisateur pour certaines requêtes réseau tierces effectuées en mode navigation privée, ce qui renforce la protection contre le suivi intersites pendant les sessions de navigation privée.
-
-Si la règle est désactivée, la fonctionnalité <ph name="IP_PROTECTION_NAME" /> sera désactivée et les utilisateurs ne pourront pas l'activer via les paramètres de l'UI.
-Si la règle est activée, la fonctionnalité <ph name="IP_PROTECTION_NAME" /> sera activée et les utilisateurs ne pourront pas la désactiver dans les paramètres de l'UI.
-Si cette règle n'est pas configurée, la fonctionnalité <ph name="IP_PROTECTION_NAME" /> sera activée par défaut et les utilisateurs pourront la contrôler sur leur appareil via les paramètres de l'UI.
-
-Voici quelques points à prendre en compte pour savoir si les entreprises doivent désactiver <ph name="IP_PROTECTION_NAME" /> :
-- Les résolutions DNS ne seront pas effectuées pour les requêtes qui sont acheminées via un proxy, ce qui peut avoir un impact sur la surveillance ou le filtrage basés sur le DNS.
-- Les applications d'entreprise pourraient ne pas fonctionner correctement lorsqu'elles sont utilisées en mode navigation privée si elles dépendent de requêtes vers des domaines (ou des sous-domaines de ces domaines) figurant dans la liste des domaines masqués (<ph name="MASKED_DOMAIN_LIST_URL" />) et exigent que ces requêtes proviennent de plages d'adresses IP spécifiques.
-- Il est possible que le trafic ne soit pas acheminé via un proxy en mode navigation privée dans certaines conditions, par exemple lorsque les utilisateurs lancent le mode navigation privée à partir d'un profil Chrome auquel ils ne sont pas connectés. En général, cette fonctionnalité nécessite que l'utilisateur soit connecté à Chrome avec un compte Google personnel au moment de lancer le mode navigation privée.
-- La liste des domaines de la liste des domaines masqués peut changer avec le temps. Les nouvelles versions sont automatiquement envoyées aux utilisateurs. Pour en savoir plus sur la liste des domaines masqués, consultez <ph name="MASKED_DOMAIN_LIST_CRITERIA_URL" />.
-
-Pour en savoir plus sur <ph name="IP_PROTECTION_NAME" />, consultez <ph name="IP_PROTECTION_README_URL" />.
-
-La fonctionnalité <ph name="IP_PROTECTION_NAME" /> ne sera pas lancée avant M139.</translation>
 <translation id="6397588391180665797">Signale la configuration du réseau des utilisateurs sur les appareils enregistrés.
 
       Si la règle est définie sur "False", ces infos ne seront pas transmises.
@@ -8316,7 +8332,6 @@ Cette règle est toujours appliquée pour <ph name="PRODUCT_OS_NAME" />.</transl
       Si elle est définie sur "True", <ph name="PLUGIN_VM_NAME" /> est activé pour l'appareil à condition que les autres paramètres l'y autorisent aussi. Les règles <ph name="PLUGIN_VM_ALLOWED_POLICY_NAME" /> et <ph name="USER_PLUGIN_VM_ALLOWED_POLICY_NAME" /> doivent être définies sur "True", et <ph name="PLUGIN_VM_LICENSE_KEY_POLICY_NAME" /> ou <ph name="PLUGIN_VM_USER_ID_POLICY_NAME" /> doivent être configurés de sorte à permettre l'exécution de <ph name="PLUGIN_VM_NAME" />.</translation>
 <translation id="6741318452269220158">Si cette règle est définie sur "True", Native Client peut continuer à s'exécuter même si cette technologie est désactivée par le comportement par défaut.
 Si cette règle est définie sur "False" ou qu'elle n'est pas configurée, c'est le comportement par défaut qui est appliqué.</translation>
-<translation id="6743006196954236593">Ne pas autoriser Lens Overlay.</translation>
 <translation id="6749641778238480311">Autoriser l'appel des API subApps sans geste préalable de l'utilisateur ni demander confirmation à celui-ci.</translation>
 <translation id="6750902920405577210">Liste des données de télémétrie à signaler sur les événements de modification de l'intensité du signal.
 
@@ -9173,6 +9188,7 @@ Si elle est définie sur "False" ou si elle n'est pas configurée, ces publicit�
       Pour en savoir plus sur les formats d'URL de site valides, veuillez consulter https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns. Les caractères génériques (<ph name="WILDCARD_VALUE" />) sont autorisés. Cette règle ne tient compte que de l'origine. Tout chemin d'accès dans le format d'URL est donc ignoré.
 
       Si cette règle n'est pas définie pour un site, alors la règle <ph name="DEFAULT_WINDOW_PLACEMENT_SETTING_POLICY_NAME" /> s'applique au site (si elle est définie). Sinon, les paramètres par défaut du navigateur s'appliquent, et les utilisateurs peuvent définir l'autorisation pour chaque site.</translation>
+<translation id="7358299261566939984">Activer ServiceWorkerAutoPreload</translation>
 <translation id="7358359585412734876">Activer <ph name="LACROS_NAME" /></translation>
 <translation id="7362566456990049303">Utilisateur uniquement</translation>
 <translation id="736486789939370545">Autoriser l'installation d'extensions externes</translation>
@@ -9234,6 +9250,19 @@ Si elle est définie sur "False", l'ancien comportement est activé.</translatio
 
       Si cette règle n'est pas configurée, ou si elle est définie sur "False", <ph name="TLS_FALSE_START" /> est activé. Si elle est définie sur "True", <ph name="TLS_FALSE_START" /> est désactivé.</translation>
 <translation id="7427607504279694910">Les journaux d'événements pour les installations d'applis Android ne sont pas partagés avec Google.</translation>
+<translation id="7431456748240652287">Cette règle au niveau de l'appareil définit si <ph name="PRODUCT_OS_NAME" /> proposera ou non un algorithme d'accord de clé post-quantique dans TLS, en utilisant la norme ML-KEM du NIST. Avant <ph name="PRODUCT_OS_NAME" /> 131, l'algorithme était Kyber, une version antérieure de la norme. Cela permet aux serveurs compatibles de protéger le trafic utilisateur contre les déchiffrement ultérieurs par des ordinateurs quantiques.
+
+Si cette règle est activée ou n'est pas configurée, <ph name="PRODUCT_OS_NAME" /> proposera un accord de clé post-quantique dans les connexions TLS. Dans ce cas, le trafic utilisateur sera protégé contre les ordinateurs quantiques lorsqu'il communiquera avec des serveurs compatibles.
+
+Si cette règle est désactivée, <ph name="PRODUCT_OS_NAME" /> ne proposera pas d'accord de clé post-quantique dans les connexions TLS. Dans ce cas, le trafic utilisateur ne sera pas protégé contre les ordinateurs quantiques.
+
+La proposition de Kyber est rétrocompatible. Les serveurs TLS et le middleware de mise en réseau existants devraient ignorer la nouvelle option et continuer à sélectionner les options précédentes.
+
+Toutefois, les appareils qui n'implémentent pas correctement TLS peuvent dysfonctionner lorsqu'ils reçoivent la nouvelle option. Par exemple, ils peuvent se déconnecter en réponse à des options non reconnues ou à des messages plus volumineux qui en résultent. Ces appareils ne sont pas prêts pour le post-quantique et interfèrent avec la transition post-quantique d'une entreprise. Le cas échéant, les administrateurs doivent contacter le fournisseur pour obtenir une solution.
+
+Cette règle est une mesure temporaire qui sera supprimée après la version 145 de <ph name="PRODUCT_OS_NAME" />. Elle peut être activée pour vous permettre de tester des problèmes, ou désactivée pendant la résolution des problèmes.
+
+Cette règle prévaut sur la règle PostQuantumKeyAgreementEnabled si les deux sont configurées.</translation>
 <translation id="7433253680989311514">Activer la disposition de clavier Hindi InScript</translation>
 <translation id="7433714841194914373">Activer la recherche instantanée</translation>
 <translation id="7434202861148928348">Configurer les noms de domaines requis pour les clients d'accès à distance</translation>
@@ -10075,19 +10104,6 @@ Cette règle n'a aucune incidence lorsque la règle <ph name="SCREENSAVER_LOCK_S
       Cette règle a été supprimée dans Chrome 88 et est ignorée si elle est définie.
 
       Pour en savoir plus, consultez l'article https://www.chromestatus.com/feature/5989473649164288.</translation>
-<translation id="8137301668000005268">Cette règle définit si <ph name="PRODUCT_NAME" /> proposera ou non un algorithme d'accord de clé post-quantique dans TLS, en utilisant la norme ML-KEM du NIST. Avant <ph name="PRODUCT_NAME" /> 131, l'algorithme était Kyber, une version antérieure de la norme. Cela permet aux serveurs compatibles de protéger le trafic utilisateur contre les déchiffrements ultérieurs par des ordinateurs quantiques.
-
-Si cette règle est activée, <ph name="PRODUCT_NAME" /> proposera un accord de clé post-quantique dans les connexions TLS. Dans ce cas, le trafic utilisateur sera protégé contre les ordinateurs quantiques lorsqu'il communiquera avec des serveurs compatibles.
-
-Si cette règle est désactivée, <ph name="PRODUCT_NAME" /> ne proposera pas d'accord de clé post-quantique dans les connexions TLS. Dans ce cas, le trafic utilisateur ne sera pas protégé contre les ordinateurs quantiques.
-
-Si cette règle n'est pas configurée, <ph name="PRODUCT_NAME" /> suivra le processus de déploiement par défaut pour proposer un accord de clé post-quantique.
-
-La proposition d'un accord de clé post-quantique est rétrocompatible. Les serveurs TLS et le middleware de mise en réseau existants devraient ignorer la nouvelle option et continuer à sélectionner les options précédentes.
-
-Toutefois, les appareils qui n'implémentent pas correctement TLS peuvent dysfonctionner lorsqu'ils reçoivent la nouvelle option. Par exemple, ils peuvent se déconnecter en réponse à des options non reconnues ou à des messages plus volumineux qui en résultent. Ces appareils ne sont pas prêts pour le post-quantique et interfèrent avec la transition post-quantique d'une entreprise. Le cas échéant, les administrateurs doivent contacter le fournisseur pour obtenir une solution.
-
-Cette règle est une mesure temporaire qui sera supprimée après la version 141 de <ph name="PRODUCT_NAME" />. Elle peut être activée pour vous permettre de tester des problèmes, ou désactivée pendant la résolution des problèmes.</translation>
 <translation id="8137443729340035928">À la connexion, demandez à l'utilisateur s'il veut restaurer la dernière session.</translation>
 <translation id="8141795997560411818">Cette règle n'empêche pas l'utilisateur de se servir de l'application Google Drive pour Android. Pour ce faire, vous devez également annuler l'autorisation d'installation de cette application.</translation>
 <translation id="8142894094385450823">Définir les paramètres régionaux recommandés pour une session gérée</translation>
@@ -11438,6 +11454,7 @@ Remarque : Pour le moment, seule la première entrée est prise en compte. Les 
 <translation id="9015952763003753868">Rendre la mise en correspondance <ph name="ACAM_HEADER_NAME" /> conforme dans les spécifications de la requête préliminaire <ph name="CORS" /></translation>
 <translation id="9020630127193895800">Rétroéclairage du clavier indigo</translation>
 <translation id="9025912013525357598">Conservation des espaces blancs dans les URL de données pour tous les types de contenus</translation>
+<translation id="9029815312472546960">Bloquer l'API Device Attributes sur ces sites</translation>
 <translation id="9031831501689819108">Activer Legacy Browser Support</translation>
 <translation id="9032595854515551464">Active le service <ph name="PRODUCT_NAME" /> V2 et lance le bureau à distance lors de la connexion</translation>
 <translation id="9034285085962866065">Autoriser la personnalisation des raccourcis système</translation>
@@ -11540,6 +11557,7 @@ Remarque : Le cache est vidé en cas de redémarrage de l'appareil. Les donnée
 <translation id="9073405975862312795">Si cette règle est activée ou qu'elle n'est pas configurée, les appareils enregistrés communiquent les périodes durant lesquelles ils sont utilisés.
 
       Si cette règle est désactivée, les appareils enregistrés n'enregistrent et ne communiquent pas ces périodes.</translation>
+<translation id="9075183018289926453">Ne pas synchroniser les cookies de session avec le service SSO flottant</translation>
 <translation id="9076477053438828079">Toujours afficher le nom et la photo des utilisateurs</translation>
 <translation id="9077227880520270584">Minuteur de connexion automatique au compte local de l'appareil</translation>
 <translation id="9079158199923156713">URL du logo de l'entreprise pour un profil géré</translation>

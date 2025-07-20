@@ -17,8 +17,6 @@
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "components/back_forward_cache/back_forward_cache_disable.h"
-#include "ui/gfx/animation/animation.h"
-#include "ui/gfx/animation/linear_animation.h"
 #include "components/tabs/public/tab_interface.h"
 #include "components/web_modal/modal_dialog_host.h"
 #include "components/web_modal/web_contents_modal_dialog_host.h"
@@ -28,6 +26,8 @@
 #include "ui/base/base_window.h"
 #include "ui/display/display.h"
 #include "ui/display/screen.h"
+#include "ui/gfx/animation/animation.h"
+#include "ui/gfx/animation/linear_animation.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/native_widget_types.h"
 #include "ui/views/widget/native_widget.h"
@@ -167,9 +167,17 @@ void ConfigureDesiredBoundsDelegate(
 }
 
 // The dialog widget should be visible if and only if the tab is in the
-// foreground and activated, and the host window is not minimized.
-bool GetDialogWidgetVisibility(bool activated, bool minimized) {
-  return activated && !minimized;
+// foreground and activated, the host window is not minimized and the client
+// also indicates visibility.
+bool GetWidgetVisibility(
+    bool activated,
+    bool minimized,
+    TabDialogManager::ShouldShowCallback& should_show_callback) {
+  bool should_show = true;
+  if (should_show_callback) {
+    should_show_callback.Run(should_show);
+  }
+  return activated && !minimized && should_show;
 }
 
 }  // namespace
@@ -178,7 +186,8 @@ bool GetDialogWidgetVisibility(bool activated, bool minimized) {
 // Widget. This class relies on the assumption that it is scoped to the lifetime
 // of a single tab, in a single browser, and that it will be destroyed
 // before the tab moves between browser windows.
-class BrowserWindowWidgetObserver : public views::WidgetObserver {
+class TabDialogManager::BrowserWindowWidgetObserver
+    : public views::WidgetObserver {
  public:
   BrowserWindowWidgetObserver(TabDialogManager* tab_dialog_manager,
                               TabInterface* tab_interface,
@@ -206,7 +215,10 @@ class BrowserWindowWidgetObserver : public views::WidgetObserver {
   void OnWidgetShowStateChanged(views::Widget* widget) override {
     bool minimized = widget->IsMinimized();
     bool activated = tab_->IsActivated();
-    dialog_widget_->SetVisible(GetDialogWidgetVisibility(activated, minimized));
+    auto* tab_dialog_manager = tab_->GetTabFeatures()->tab_dialog_manager();
+    dialog_widget_->SetVisible(
+        GetWidgetVisibility(activated, minimized,
+                            tab_dialog_manager->params_->should_show_callback));
   }
 
  private:
@@ -222,18 +234,22 @@ class BrowserWindowWidgetObserver : public views::WidgetObserver {
       browser_window_widget_observation_{this};
 };
 
+TabDialogManager::Params::Params() = default;
+
+TabDialogManager::Params::~Params() = default;
+
 TabDialogManager::TabDialogManager(TabInterface* tab_interface)
     : content::WebContentsObserver(tab_interface->GetContents()),
       tab_interface_(tab_interface) {
-  tab_did_enter_foreground_subscription_ =
+  tab_subscriptions_.push_back(
       tab_interface_->RegisterDidActivate(base::BindRepeating(
-          &TabDialogManager::TabDidEnterForeground, base::Unretained(this)));
-  tab_will_enter_background_subscription_ =
+          &TabDialogManager::TabDidEnterForeground, base::Unretained(this))));
+  tab_subscriptions_.push_back(
       tab_interface_->RegisterWillDeactivate(base::BindRepeating(
-          &TabDialogManager::TabWillEnterBackground, base::Unretained(this)));
-  tab_will_detach_subscription_ =
+          &TabDialogManager::TabWillEnterBackground, base::Unretained(this))));
+  tab_subscriptions_.push_back(
       tab_interface_->RegisterWillDetach(base::BindRepeating(
-          &TabDialogManager::TabWillDetach, base::Unretained(this)));
+          &TabDialogManager::TabWillDetach, base::Unretained(this))));
 }
 
 TabDialogManager::~TabDialogManager() = default;
@@ -261,10 +277,15 @@ void TabDialogManager::ShowDialog(views::Widget* widget,
   CHECK(!(params->animated && widget->is_autosized()))
       << "Animated widgets are not compatible with autosized.";
 
+  if (params_ && !params_->block_new_modal && widget_) {
+    CloseDialog();
+  }
   widget_ = widget;
   params_ = std::move(params);
   auto* browser_window_interface = tab_interface_->GetBrowserWindowInterface();
-  ConfigureDesiredBoundsDelegate(widget_.get(), browser_window_interface);
+  if (!params_->get_dialog_bounds) {
+    ConfigureDesiredBoundsDelegate(widget_.get(), browser_window_interface);
+  }
   UpdateModalDialogBounds();
   widget_->SetNativeWindowProperty(
       views::kWidgetIdentifierKey,
@@ -280,14 +301,14 @@ void TabDialogManager::ShowDialog(views::Widget* widget,
   }
   tab_dialog_widget_observer_ =
       std::make_unique<TabDialogWidgetObserver>(this, widget_.get());
-  showing_modal_ui_ = tab_interface_->ShowModalUI();
+  if (params_->block_new_modal) {
+    showing_modal_ui_ = tab_interface_->ShowModalUI();
+  }
   browser_window_widget_observer_ =
       std::make_unique<BrowserWindowWidgetObserver>(this, tab_interface_,
                                                     widget_.get());
-  bool minimized = browser_window_interface->GetWindow()->IsMinimized();
-  bool activated = tab_interface_->IsActivated();
   widget_->Show();
-  widget_->SetVisible(GetDialogWidgetVisibility(activated, minimized));
+  widget_->SetVisible(GetDialogWidgetVisibility());
 }
 
 std::unique_ptr<views::Widget> TabDialogManager::CreateAndShowDialog(
@@ -312,9 +333,23 @@ void TabDialogManager::CloseDialog() {
   }
 }
 
+bool TabDialogManager::MaybeActivateDialog() {
+  if (!widget_) {
+    return false;
+  }
+
+  if (GetDialogWidgetVisibility()) {
+    widget_->Activate();
+    return true;
+  }
+
+  return false;
+}
+
 void TabDialogManager::WidgetDestroyed(views::Widget* widget) {
   CHECK_EQ(widget, widget_.get());
   widget_ = nullptr;
+  params_.reset();
   showing_modal_ui_.reset();
   tab_dialog_widget_observer_.reset();
   scoped_ignore_input_events_.reset();
@@ -359,8 +394,13 @@ void TabDialogManager::UpdateModalDialogBounds() {
     return;
   }
 
-  gfx::Rect target_bounds =
-      GetModalDialogBounds(widget_.get(), host_browser_window, size);
+  gfx::Rect target_bounds;
+  if (params_->get_dialog_bounds) {
+    target_bounds = params_->get_dialog_bounds.Run();
+  } else {
+    target_bounds =
+        GetModalDialogBounds(widget_.get(), host_browser_window, size);
+  }
 
   if (params_->animated && gfx::Animation::ShouldRenderRichAnimation() &&
       widget_->IsVisible()) {
@@ -420,8 +460,7 @@ void TabDialogManager::TabDidEnterForeground(TabInterface* tab_interface) {
     if (parent_widget != widget_->parent()) {
       widget_->Reparent(parent_widget);
     }
-    widget_->SetVisible(
-        GetDialogWidgetVisibility(/*activated=*/true, widget_->IsMinimized()));
+    widget_->SetVisible(GetDialogWidgetVisibility());
     UpdateModalDialogBounds();
   }
 }
@@ -441,6 +480,15 @@ void TabDialogManager::TabWillDetach(TabInterface* tab_interface,
   if (widget_ && params_->close_on_detach) {
     CloseDialog();
   }
+}
+
+bool TabDialogManager::GetDialogWidgetVisibility() {
+  // The dialog widget should be visible if and only if the tab is in the
+  // foreground and activated, and the host window is not minimized.
+  return GetWidgetVisibility(
+      tab_interface_->IsActivated(),
+      tab_interface_->GetBrowserWindowInterface()->GetWindow()->IsMinimized(),
+      params_->should_show_callback);
 }
 
 void TabDialogManager::AnimationProgressed(const gfx::Animation* animation) {

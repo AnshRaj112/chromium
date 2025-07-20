@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//base/debug/debug.gni")
+import("//build/config/cast.gni")
 import("//build/config/chrome_build.gni")
 import("//build/config/features.gni")
 import("//build/config/ui.gni")
@@ -131,6 +132,7 @@ test("components_unittests") {
       "test/data/offline_pages/",
       "test/data/omnibox/",
       "test/data/optimization_guide/",
+      "test/data/page_content_annotations/",
       "test/data/paint_preview/",
       "test/data/password_manager/",
       "test/data/patch_service/",
@@ -776,7 +778,7 @@ test("components_unittests") {
     ]
   }
 
-  if (toolkit_views) {
+  if (toolkit_views && !is_castos) {
     deps += [ "//components/constrained_window:unit_tests" ]
   }
 
@@ -962,12 +964,14 @@ repack("components_tests_pak") {
     "$root_gen_dir/components/arc/input_overlay_resources.pak",
     "$root_gen_dir/components/autofill/core/browser/geo/autofill_address_rewriter_resources.pak",
     "$root_gen_dir/components/components_resources.pak",
+    "$root_gen_dir/components/components_resources_100_percent.pak",
     "$root_gen_dir/components/metrics/metrics_server_urls.pak",
     "$root_gen_dir/components/omnibox/resources/omnibox_pedal_synonyms_en-US.pak",
     "$root_gen_dir/components/plus_addresses/resources/strings/plus_addresses_strings_en-US.pak",
     "$root_gen_dir/components/strings/components_branded_strings_en-US.pak",
     "$root_gen_dir/components/strings/components_locale_settings_en-US.pak",
     "$root_gen_dir/components/strings/components_strings_en-US.pak",
+    "$root_gen_dir/third_party/libaddressinput/address_input_strings_en-US.pak",
   ]
 
   output = "$root_out_dir/components_tests_resources.pak"
@@ -981,6 +985,7 @@ repack("components_tests_pak") {
     "//components/plus_addresses/resources/strings",
     "//components/resources",
     "//components/strings",
+    "//third_party/libaddressinput:strings",
   ]
 }
 
@@ -1143,7 +1148,7 @@ if (use_blink) {
       data += [ "$root_out_dir/Content Shell.app/" ]
     }
 
-    if (toolkit_views && !is_mac) {
+    if (toolkit_views && !is_mac && !is_castos) {
       # TODO(crbug.com/349781050): Enable test on Mac.
       deps += [ "//components/constrained_window:browser_tests" ]
     }
@@ -1279,6 +1284,10 @@ if (use_blink) {
         "//sandbox",
       ]
     }
+
+    # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+    # enable the diagnostic by removing this line.
+    configs += [ "//build/config/compiler:no_exit_time_destructors" ]
   }
 
   test("components_perftests") {
@@ -1345,6 +1354,10 @@ if (use_blink) {
         "//crypto",
       ]
     }
+
+    # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+    # enable the diagnostic by removing this line.
+    configs += [ "//build/config/compiler:no_exit_time_destructors" ]
   }
 }
 if (is_android) {

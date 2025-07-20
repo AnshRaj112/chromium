@@ -153,6 +153,7 @@ import org.chromium.chrome.browser.latency_injection.StartupLatencyInjector;
 import org.chromium.chrome.browser.layouts.LayoutStateProvider;
 import org.chromium.chrome.browser.layouts.LayoutType;
 import org.chromium.chrome.browser.lifecycle.ActivityLifecycleDispatcher;
+import org.chromium.chrome.browser.lifecycle.NativeInitObserver;
 import org.chromium.chrome.browser.locale.LocaleManager;
 import org.chromium.chrome.browser.magic_stack.HomeModulesConfigManager;
 import org.chromium.chrome.browser.magic_stack.HomeModulesMetricsUtils;
@@ -463,6 +464,34 @@ public class ChromeTabbedActivity extends ChromeActivity {
                 }
 
                 @Override
+                public void closeAllIncognitoTabsOnInit() {
+                    // TODO(https://crbug.com/429478269): This approach creates a gap where
+                    // incognito tabs are loaded into the tab model, and some observers will be
+                    // notified through onTabStateInitialized with the incog tabs visible. This
+                    // should be fixed by adding support to the orchestrator to drop incog tabs
+                    // before finishing init.
+                    if (isActivityFinishingOrDestroyed()) {
+                        // No action needed.
+                    } else if (!didFinishNativeInitialization() || mTabModelSelector == null) {
+                        // TODO(https://crbug.com/429478269): Native init is likely not needed.
+                        ActivityLifecycleDispatcher dispatcher = getLifecycleDispatcher();
+                        dispatcher.register(
+                                new NativeInitObserver() {
+                                    @Override
+                                    public void onFinishNativeInitialization() {
+                                        dispatcher.unregister(this);
+                                        closeAllIncognitoTabs();
+                                    }
+                                });
+                    } else if (!mTabModelSelector.isTabStateInitialized()) {
+                        TabModelUtils.runOnTabStateInitialized(
+                                mTabModelSelector, (ignored) -> closeAllIncognitoTabs());
+                    } else {
+                        terminateIncognitoSession();
+                    }
+                }
+
+                @Override
                 public boolean isActiveModel() {
                     return getTabModelSelector().getModel(true).isActiveModel();
                 }
@@ -766,9 +795,14 @@ public class ChromeTabbedActivity extends ChromeActivity {
                         }
 
                         @Override
-                        public void multipleTabsPendingClosure(List<Tab> tabs, boolean isAllTabs) {
+                        public void multipleTabsPendingClosure(
+                                List<Tab> tabs,
+                                boolean isAllTabs,
+                                @TabClosingSource int closingSource) {
                             closeIfNoTabsAndHomepageEnabled(
-                                    true, /* shouldRemoveWindowWithZeroTabs= */ false);
+                                    true,
+                                    /* shouldRemoveWindowWithZeroTabs= */ closingSource
+                                            == TabClosingSource.TABLET_TAB_STRIP);
                         }
 
                         @Override
@@ -1361,7 +1395,7 @@ public class ChromeTabbedActivity extends ChromeActivity {
                 if (ChromeFeatureList.getFieldTrialParamByFeatureAsBoolean(
                         ChromeFeatureList.GROUP_SUGGESTION_SERVICE,
                         GroupSuggestionsPromotionCoordinator.CREATE_SUGGESTIONS_PROMOTION_UI_PARAM,
-                        true)) {
+                        false)) {
                     mGroupSuggestionsPromotionCoordinator =
                             new GroupSuggestionsPromotionCoordinator(
                                     this,
@@ -1619,7 +1653,12 @@ public class ChromeTabbedActivity extends ChromeActivity {
         String url = IntentHandler.getUrlFromIntent(intent);
         @TabOpenType int tabOpenType = IntentHandler.getTabOpenType(intent);
         int tabIdToBringToFront = IntentHandler.getBringTabToFrontId(intent);
-        if (url == null && tabIdToBringToFront == Tab.INVALID_TAB_ID) return false;
+        int tabId = IntentHandler.getTabId(intent);
+        boolean hasTabWaitingForReparenting =
+                AsyncTabParamsManagerSingleton.getInstance().hasParamsForTabId(tabId);
+        if (url == null
+                && tabIdToBringToFront == Tab.INVALID_TAB_ID
+                && !hasTabWaitingForReparenting) return false;
 
         LoadUrlParams loadUrlParams =
                 IntentHandler.createLoadUrlParamsForIntent(url, intent, mIntentHandlingTimeMs);
@@ -3541,6 +3580,12 @@ public class ChromeTabbedActivity extends ChromeActivity {
                     new LoadUrlParams(
                             SupervisedUserConstants.DEVICE_FILTERS_HELP_CENTER_URL,
                             PageTransition.AUTO_TOPLEVEL));
+        } else if (id == R.id.pin_tab_menu_id) {
+            TabModel tabModel = mTabModelSelector.getCurrentModel();
+            tabModel.pinTab(currentTab.getId());
+        } else if (id == R.id.unpin_tab_menu_id) {
+            TabModel tabModel = mTabModelSelector.getCurrentModel();
+            tabModel.unpinTab(currentTab.getId());
         } else {
             return super.onMenuOrKeyboardAction(id, fromMenu, triggeringMotion);
         }

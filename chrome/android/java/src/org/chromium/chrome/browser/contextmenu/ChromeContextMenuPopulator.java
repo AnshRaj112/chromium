@@ -108,6 +108,7 @@ import java.util.List;
 public class ChromeContextMenuPopulator implements ContextMenuPopulator {
     private static final int CUSTOM_MENU_ITEM_ID_START =
             1512; // Random id to avoid possible collisions.
+    private static final int MAX_CUSTOM_MENU_ITEMS = 4;
     private static final String TAG = "CCMenuPopulator";
     private static final String UMA_CONTEXTUAL_CUSTOM_ACTION_TYPE_SELECTED =
             "CustomTabs.ContextMenu.SelectedContextualCustomActionType";
@@ -350,6 +351,9 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
         mCustomActionMap = new SparseArray<>();
         mPendingIntentSender = new PendingIntentSender();
         if (ChromeFeatureList.sCctContextualMenuItems.isEnabled()) {
+            if (customContentActions.size() > MAX_CUSTOM_MENU_ITEMS) {
+                customContentActions = customContentActions.subList(0, MAX_CUSTOM_MENU_ITEMS);
+            }
             mCustomContentActions = customContentActions;
         } else {
             mCustomContentActions = List.of();
@@ -382,7 +386,11 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
 
     @VisibleForTesting
     boolean shouldShowEmptySpaceContextMenu() {
-        return DeviceInput.supportsPrecisionPointer()
+        // Enable empty space context menu for large screen devices, and devices
+        // (with any screen size) with input periperals attached.
+        return (DeviceFormFactor.isNonMultiDisplayContextOnTablet(mContext)
+                        || (DeviceInput.supportsPrecisionPointer()
+                                && DeviceInput.supportsKeyboard()))
                 && ChromeFeatureList.isEnabled(ChromeFeatureList.CONTEXT_MENU_EMPTY_SPACE);
     }
 
@@ -457,17 +465,6 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                         mShowEphemeralTabNewLabel = showNewLabel;
                     }
                 }
-
-                if (ChromeFeatureList.sCctContextualMenuItems.isEnabled()
-                        && mMode == ContextMenuMode.CUSTOM_TAB) {
-                    for (CustomContentAction action : mCustomContentActions) {
-                        if (action.getTargetType() == CustomTabsIntent.CONTENT_TARGET_TYPE_LINK) {
-                            mCustomActionMap.put(nextCustomMenuItemId, action);
-                            linkGroup.add(createCustomListItem(action, nextCustomMenuItemId));
-                            nextCustomMenuItemId++;
-                        }
-                    }
-                }
             }
             if (!MailTo.isMailTo(mParams.getLinkUrl().getSpec())
                     && !UrlUtilities.isTelScheme(mParams.getLinkUrl())) {
@@ -484,6 +481,16 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                                     Item.SAVE_LINK_AS,
                                     /* showInProductHelp= */ false,
                                     !mIsDownloadRestrictedByPolicy));
+                }
+                if (ChromeFeatureList.sCctContextualMenuItems.isEnabled()
+                        && mMode == ContextMenuMode.CUSTOM_TAB) {
+                    for (CustomContentAction action : mCustomContentActions) {
+                        if (action.getTargetType() == CustomTabsIntent.CONTENT_TARGET_TYPE_LINK) {
+                            mCustomActionMap.put(nextCustomMenuItemId, action);
+                            linkGroup.add(createCustomListItem(action, nextCustomMenuItemId));
+                            nextCustomMenuItemId++;
+                        }
+                    }
                 }
                 if (!mParams.isImage()
                         && BookmarkUtils.isReadingListSupported(mParams.getLinkUrl())) {
@@ -552,6 +559,17 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                                 !mIsDownloadRestrictedByPolicy));
             }
 
+            if (ChromeFeatureList.sCctContextualMenuItems.isEnabled()
+                    && mMode == ContextMenuMode.CUSTOM_TAB) {
+                for (CustomContentAction action : mCustomContentActions) {
+                    if (action.getTargetType() == CustomTabsIntent.CONTENT_TARGET_TYPE_IMAGE) {
+                        mCustomActionMap.put(nextCustomMenuItemId, action);
+                        imageGroup.add(createCustomListItem(action, nextCustomMenuItemId));
+                        nextCustomMenuItemId++;
+                    }
+                }
+            }
+
             if (mMode == ContextMenuMode.CUSTOM_TAB || mMode == ContextMenuMode.NORMAL) {
                 if (checkSupportsGoogleSearchByImage(isSrcDownloadableScheme)) {
                     // Determine which image search menu item would be shown.
@@ -568,17 +586,6 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                     LensMetrics.recordLensSupportStatus(
                             LENS_SUPPORT_STATUS_HISTOGRAM_NAME,
                             LensMetrics.LensSupportStatus.SEARCH_BY_IMAGE_UNAVAILABLE);
-                }
-            }
-
-            if (ChromeFeatureList.sCctContextualMenuItems.isEnabled()
-                    && mMode == ContextMenuMode.CUSTOM_TAB) {
-                for (CustomContentAction action : mCustomContentActions) {
-                    if (action.getTargetType() == CustomTabsIntent.CONTENT_TARGET_TYPE_IMAGE) {
-                        mCustomActionMap.put(nextCustomMenuItemId, action);
-                        imageGroup.add(createCustomListItem(action, nextCustomMenuItemId));
-                        nextCustomMenuItemId++;
-                    }
                 }
             }
 
@@ -707,6 +714,9 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                         CustomTabsIntent.CONTENT_TARGET_TYPE_LINK);
                 intent.putExtra(
                         CustomTabsIntent.EXTRA_TRIGGERED_CUSTOM_CONTENT_ACTION_ID, action.getId());
+                intent.putExtra(
+                        CustomTabsIntent.EXTRA_CONTEXT_LINK_URL, mParams.getLinkUrl().getSpec());
+                intent.putExtra(CustomTabsIntent.EXTRA_CONTEXT_LINK_TEXT, mParams.getLinkText());
                 try {
                     mPendingIntentSender.send(pendingIntent, mContext, 0, intent);
                 } catch (PendingIntent.CanceledException e) {
@@ -743,7 +753,18 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                                     action.getId());
                             intent.putExtra(
                                     CustomTabsIntent.EXTRA_CONTEXT_IMAGE_DATA_URI, imageUri);
-                            intent.setData(Uri.parse(mItemDelegate.getPageUrl().getSpec()));
+                            intent.putExtra(
+                                    CustomTabsIntent.EXTRA_CONTEXT_IMAGE_URL,
+                                    mParams.getSrcUrl().getSpec());
+                            intent.putExtra(
+                                    CustomTabsIntent.EXTRA_CONTEXT_IMAGE_ALT_TEXT,
+                                    getTitleOrGuessIfNotPresent());
+                            // We do not return the page url for image-link items since there is not
+                            // enough room in the context menu to display the page url along with
+                            // the other existing urls.
+                            if (!mParams.isAnchor()) {
+                                intent.setData(Uri.parse(mItemDelegate.getPageUrl().getSpec()));
+                            }
                             try {
                                 mPendingIntentSender.send(pendingIntent, mContext, 0, intent);
                             } catch (PendingIntent.CanceledException e) {
@@ -797,12 +818,7 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
             verifyGenericCopyImageActionIsAllowedByPolicy(
                     mParams.getSrcUrl().getSpec(),
                     () -> {
-                        String title = mParams.getTitleText();
-                        if (TextUtils.isEmpty(title)) {
-                            title =
-                                    URLUtil.guessFileName(
-                                            mParams.getSrcUrl().getSpec(), null, null);
-                        }
+                        String title = getTitleOrGuessIfNotPresent();
                         mItemDelegate.onOpenInEphemeralTab(mParams.getSrcUrl(), title);
                     });
         } else if (itemId == R.id.contextmenu_copy_image) {
@@ -1336,11 +1352,10 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
     }
 
     @VisibleForTesting
-    ListItem createListItemWithSubmenu(String title, int menuItemId, List<ListItem> submenuItems) {
+    ListItem createListItemWithSubmenu(String title, List<ListItem> submenuItems) {
         final PropertyModel model =
                 new PropertyModel.Builder(ContextMenuSubmenuItemProperties.ALL_KEYS)
-                        .with(ContextMenuSubmenuItemProperties.TITLE, title)
-                        .with(MENU_ITEM_ID, menuItemId)
+                        .with(TITLE, title)
                         .with(ENABLED, true)
                         .with(ContextMenuSubmenuItemProperties.SUBMENU_ITEMS, submenuItems)
                         .build();
@@ -1358,6 +1373,14 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                 // Use jpeg as a generic image type to be shared. Most apps accepting jpeg
                 // should also accept other image types.
                 : ShareHelper.getShareableIconAndNameForFileContentType("image/jpeg");
+    }
+
+    private String getTitleOrGuessIfNotPresent() {
+        String title = mParams.getTitleText();
+        if (TextUtils.isEmpty(title)) {
+            title = URLUtil.guessFileName(mParams.getSrcUrl().getSpec(), null, null);
+        }
+        return title;
     }
 
     /**

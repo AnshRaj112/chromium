@@ -482,7 +482,7 @@ void ReadAnythingAppController::OnNodeDataChanged(
 void ReadAnythingAppController::OnNodeWillBeDeleted(ui::AXTree* tree,
                                                     ui::AXNode* node) {
   ui::AXNodeID node_id = CHECK_DEREF(node).id();
-  if (model_.display_node_ids().contains(node_id)) {
+  if (model_.GetCurrentlyVisibleNodes()->contains(node_id)) {
     displayed_nodes_pending_deletion_.insert(node_id);
     if (IsReadAloudEnabled() && !read_aloud_model_.speech_playing()) {
       ExecuteJavaScript("chrome.readingMode.onNodeWillBeDeleted(" +
@@ -516,6 +516,25 @@ void ReadAnythingAppController::OnNodeDeleted(ui::AXTree* tree,
         DrawSelection();
       }
     }
+  }
+}
+
+void ReadAnythingAppController::OnTreeDataChanged(
+    ui::AXTree* tree,
+    const ui::AXTreeData& old_data,
+    const ui::AXTreeData& new_data) {
+  VLOG(1) << "Tree data changed for tree ID: " << tree->GetAXTreeID()
+          << "\n---- OLD DATA: " << old_data.tree_id << ": "
+          << old_data.ToString() << "\n---- NEW DATA: " << new_data.tree_id
+          << ": " << new_data.ToString();
+  // If we are waiting for the tree id of the active tree to be populated,
+  // distill once we have it.
+  if (waiting_for_tree_id_ && old_data.tree_id == ui::AXTreeIDUnknown() &&
+      new_data.tree_id != ui::AXTreeIDUnknown() &&
+      model_.active_tree_id() == tree->GetAXTreeID()) {
+    VLOG(1) << "OnTreeDataChanged populated the active tree ID: "
+            << new_data.tree_id;
+    Distill();
   }
 }
 
@@ -699,6 +718,12 @@ void ReadAnythingAppController::Distill(bool for_training_data) {
   model_.set_requires_distillation(false);
 
   ui::AXSerializableTree* tree = model_.GetActiveTree();
+  if (tree->GetAXTreeID() == ui::AXTreeIDUnknown()) {
+    VLOG(1)
+        << "Active tree's ID has not been populated yet, skipping distillation";
+    waiting_for_tree_id_ = true;
+    return;
+  }
   std::unique_ptr<
       ui::AXTreeSource<const ui::AXNode*, ui::AXTreeData*, ui::AXNodeData>>
       tree_source(tree->CreateTreeSource());
@@ -802,7 +827,8 @@ void ReadAnythingAppController::OnAXTreeDistilled(
     // an empty display node list. If that happens and there are content nodes,
     // we should recompute the display nodes again.
     bool should_recompute_display_nodes =
-        !model_.content_node_ids().empty() && model_.display_node_ids().empty();
+        !model_.content_node_ids().empty() &&
+        model_.GetCurrentlyVisibleNodes()->empty();
     VLOG(1) << "In OnAXTreeDistilled content node size: "
             << model_.content_node_ids().size()
             << " and display node size: " << model_.display_node_ids().size()
@@ -2088,8 +2114,8 @@ void ReadAnythingAppController::OnScrolledToBottom() {
   if (IsGoogleDocs()) {
     // Scroll to the last display node shown on the Reading Mode side panel
     // TODO (b/356935604): Investigate optimal scroll position
-    page_handler_->ScrollToTargetNode(model_.active_tree_id(),
-                                      *model_.display_node_ids().rbegin());
+    page_handler_->ScrollToTargetNode(
+        model_.active_tree_id(), *model_.GetCurrentlyVisibleNodes()->rbegin());
   }
 }
 

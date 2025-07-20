@@ -1295,8 +1295,6 @@ IN_PROC_BROWSER_TEST_F(SearchPrefetchServiceEnabledBrowserTest,
   CheckCorrectForwardingResultMetric(
       histogram_tester,
       StreamingSearchPrefetchURLLoader::ForwardingResult::kCompleted, 1);
-  histogram_tester.ExpectUniqueSample(
-      "Omnibox.SearchPrefetch.ServedToOnlyFromCacheRequest", false, 1);
 
   content::RenderFrameHost* frame = GetWebContents()->GetPrimaryMainFrame();
   EXPECT_EQ(
@@ -1807,6 +1805,8 @@ IN_PROC_BROWSER_TEST_P(SearchPrefetchServiceEnabledWithNVSBrowserTest,
   histogram_tester.ExpectUniqueSample(
       "Omnibox.SearchPrefetch.CacheAliasFallbackReason",
       CacheAliasSearchPrefetchURLLoader::FallbackReason::kErrorOnComplete, 1);
+  histogram_tester.ExpectTotalCount(
+      "Omnibox.SearchPrefetch.CacheAliasOnCompleteNetError", 1);
   histogram_tester.ExpectTotalCount(
       "Omnibox.SearchPrefetch.CacheAliasElapsedTimeToFallback", 1);
 }

@@ -9,13 +9,14 @@
 
 #include "base/android/application_status_listener.h"
 #include "base/functional/callback.h"
-#include "base/gtest_prod_util.h"
 #include "base/memory/weak_ptr.h"
 #include "components/facilitated_payments/core/browser/device_delegate.h"
 #include "components/facilitated_payments/core/browser/facilitated_payments_app_info_list.h"
 #include "content/public/browser/web_contents.h"
 
 namespace payments::facilitated {
+
+class DeviceDelegateAndroidTestApi;
 
 // Android implementation of `DeviceDelegate`.
 class DeviceDelegateAndroid : public DeviceDelegate {
@@ -32,30 +33,19 @@ class DeviceDelegateAndroid : public DeviceDelegate {
   // Opens the Pix account linking page in Google Wallet.
   void LaunchPixAccountLinkingPage() override;
 
-  // The `callback` is called after the Chrome app goes to background and then
-  // returns to the foreground. The `callback` is not called if the active tab
-  // that called this method is closed or if the app itself is closed.
-  void SetOnReturnToChromeCallback(base::OnceClosure callback) final;
+  // Starts observing the Chrome app status. Runs the `callback` if the Chrome
+  // app is moved to the background and then to the foreground. Stops observing
+  // after running the `callback`. The `callback` is not called if the active
+  // tab that called this method is closed or if the Chrome app itself is
+  // closed.
+  void SetOnReturnToChromeCallbackAndObserveAppState(
+      base::OnceClosure callback) final;
 
   std::unique_ptr<FacilitatedPaymentsAppInfoList> GetSupportedPaymentApps(
       const GURL& payment_link_url) override;
 
  private:
-  friend class DeviceDelegateAndroidTest;
-
-  FRIEND_TEST_ALL_PREFIXES(DeviceDelegateAndroidTest,
-                           ChromeGoesToBackgroundThenForeground_CallbackRun);
-  FRIEND_TEST_ALL_PREFIXES(
-      DeviceDelegateAndroidTest,
-      ChromeGoesToForegroundWithoutGoingToBackground_CallbackNotRun);
-  FRIEND_TEST_ALL_PREFIXES(DeviceDelegateAndroidTest,
-                           ChromeGoesToBackground_CallbackNotRun);
-  FRIEND_TEST_ALL_PREFIXES(
-      DeviceDelegateAndroidTest,
-      MultipleBackgroundForegroundCycles_CallbackRunOnlyOnce);
-  FRIEND_TEST_ALL_PREFIXES(
-      DeviceDelegateAndroidTest,
-      CallbackSetAfterChromeAlreadyInBackground_ThenForeground_CallbackNotRun);
+  friend class DeviceDelegateAndroidTestApi;
 
   // Called when the Chrome app's state changes.
   void OnApplicationStateChanged(base::android::ApplicationState state);
@@ -67,6 +57,9 @@ class DeviceDelegateAndroid : public DeviceDelegate {
   bool is_chrome_in_background_ = false;
   // Callback to be called when Chrome comes back to the foreground.
   base::OnceClosure on_return_to_chrome_callback_;
+  // A test-only callback that is run when `OnApplicationStateChanged` is
+  // called.
+  base::OnceClosure on_application_state_changed_callback_for_testing_;
 
   base::WeakPtrFactory<DeviceDelegateAndroid> weak_ptr_factory_{this};
 };

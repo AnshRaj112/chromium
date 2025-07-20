@@ -200,24 +200,27 @@ function createRoutes(): SettingsRoutes {
   if (visibility.ai !== false && loadTimeData.getBoolean('showAiPage')) {
     r.AI = r.BASIC.createSection(
         '/ai', 'ai', loadTimeData.getString('aiInnovationsPageTitle'));
+    r.AI.hasMigratedToPlugin = true;
     if (loadTimeData.getBoolean('showTabOrganizationControl')) {
       r.AI_TAB_ORGANIZATION = r.AI.createChild('/ai/tabOrganizer');
+      r.AI_TAB_ORGANIZATION.hasMigratedToPlugin = true;
     }
     if (loadTimeData.getBoolean('showHistorySearchControl')) {
       r.HISTORY_SEARCH = r.AI.createChild('/ai/historySearch');
+      r.HISTORY_SEARCH.hasMigratedToPlugin = true;
     }
     if (loadTimeData.getBoolean('showComposeControl')) {
       r.OFFER_WRITING_HELP = r.AI.createChild('/ai/helpMeWrite');
+      r.OFFER_WRITING_HELP.hasMigratedToPlugin = true;
     }
     if (loadTimeData.getBoolean('showCompareControl')) {
       r.COMPARE = r.AI.createChild('/ai/compareProducts');
+      r.COMPARE.hasMigratedToPlugin = true;
     }
     // <if expr="enable_glic">
     if (loadTimeData.getBoolean('showGlicSettings')) {
-      r.GLIC_SECTION = r.AI.createSection(
-          '/ai/glicSection', 'glicSection',
-          loadTimeData.getString('glicPageTitle'));
-      r.GEMINI = r.GLIC_SECTION.createChild('/ai/gemini');
+      r.GEMINI = r.AI.createChild('/ai/gemini');
+      r.GEMINI.hasMigratedToPlugin = true;
     }
     // </if>
   }
@@ -241,15 +244,20 @@ function createRoutes(): SettingsRoutes {
   if (visibility.autofill !== false) {
     r.AUTOFILL = r.BASIC.createSection(
         '/autofill', 'autofill', loadTimeData.getString('autofillPageTitle'));
+    r.AUTOFILL.hasMigratedToPlugin = true;
     r.PAYMENTS = r.AUTOFILL.createChild('/payments');
+    r.PAYMENTS.hasMigratedToPlugin = true;
     r.ADDRESSES = r.AUTOFILL.createChild('/addresses');
+    r.ADDRESSES.hasMigratedToPlugin = true;
 
     if (loadTimeData.getBoolean('showAutofillAiControl')) {
       r.AUTOFILL_AI = r.AUTOFILL.createChild('/autofillAi');
+      r.AUTOFILL_AI.hasMigratedToPlugin = true;
     }
 
     // <if expr="is_win or is_macosx">
     r.PASSKEYS = r.AUTOFILL.createChild('/passkeys');
+    r.PASSKEYS.hasMigratedToPlugin = true;
     // </if>
   }
 

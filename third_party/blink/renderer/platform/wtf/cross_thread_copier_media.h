@@ -38,14 +38,27 @@ namespace media {
 class AudioBus;
 class AudioParameters;
 struct AudioGlitchInfo;
-template <typename T>
-class TypedStatus;
 class VideoFrame;
 struct VideoCaptureFeedback;
 struct VideoTransformation;
 }  // namespace media
 
 namespace blink {
+
+class VideoTrackAdapterSettings;
+struct MediaStreamVideoSourceCallbacks;
+
+template <>
+struct CrossThreadCopier<VideoTrackAdapterSettings>
+    : public CrossThreadCopierPassThrough<VideoTrackAdapterSettings> {
+  STATIC_ONLY(CrossThreadCopier);
+};
+
+template <>
+struct CrossThreadCopier<MediaStreamVideoSourceCallbacks>
+    : public CrossThreadCopierPassThrough<MediaStreamVideoSourceCallbacks> {
+  STATIC_ONLY(CrossThreadCopier);
+};
 
 template <>
 struct CrossThreadCopier<media::AudioBus>
@@ -62,12 +75,6 @@ struct CrossThreadCopier<media::AudioParameters>
 template <>
 struct CrossThreadCopier<media::AudioGlitchInfo>
     : public CrossThreadCopierPassThrough<media::AudioGlitchInfo> {
-  STATIC_ONLY(CrossThreadCopier);
-};
-
-template <typename T>
-struct CrossThreadCopier<media::TypedStatus<T>>
-    : public CrossThreadCopierPassThrough<media::TypedStatus<T>> {
   STATIC_ONLY(CrossThreadCopier);
 };
 

@@ -1236,6 +1236,10 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual bool IsPrefetchWithServiceWorkerAllowed(
       content::BrowserContext* browser_context);
 
+  // Allow ServiceWorkerAutoPreload.
+  // https://github.com/WICG/service-worker-auto-preload
+  virtual bool IsServiceWorkerAutoPreloadAllowed(BrowserContext* context);
+
   // Returns whether the synthetic response with service worker is allowed for
   // the profile in a given context and URL. Not all URLs are actually invoke
   // synthetic response. The opt-in from the server is required to invoke the
@@ -1927,7 +1931,7 @@ class CONTENT_EXPORT ContentBrowserClient {
   // non-subresource requests, such as:
   //   -downloads
   //   -service worker script when starting a service worker. In that case, the
-  //    frame id will be MSG_ROUTING_NONE
+  //    frame id will be IPC::mojom::kRoutingIdNone
   virtual void RegisterNonNetworkSubresourceURLLoaderFactories(
       int render_process_id,
       int render_frame_id,
@@ -2118,12 +2122,11 @@ class CONTENT_EXPORT ContentBrowserClient {
   //
   // `process_id` is the ID of the process which hosts the initiator context.
   // `frame_routing_id` is the ID of the frame with which the initiator context
-  // is associated, or MSG_ROUTING_NONE if there is no associated frame.
-  // `url` is the destination URL and
-  // `initiator_origin` is the origin of the initiator context.
-  // When the connection is blocked, `callback` is called with `error`.
-  // `handshake_client` will be proxied to block the connection while
-  // handshaking.
+  // is associated, or IPC::mojom::kRoutingIdNone if there is no associated
+  // frame. `url` is the destination URL and `initiator_origin` is the origin of
+  // the initiator context. When the connection is blocked, `callback` is called
+  // with `error`. `handshake_client` will be proxied to block the connection
+  // while handshaking.
   using WillCreateWebTransportCallback = base::OnceCallback<void(
       mojo::PendingRemote<network::mojom::WebTransportHandshakeClient>
           handshake_client,
@@ -2295,8 +2298,23 @@ class CONTENT_EXPORT ContentBrowserClient {
   // Whether same-site RenderFrameHost swaps due to RenderDocument is allowed
   // for navigations from `rfh`. Embedders can choose to disallow this if there
   // are cases that are not correctly supported yet.
-  virtual bool ShouldAllowSameSiteRenderFrameHostChange(
-      const content::RenderFrameHost& rfh);
+  enum ShouldAllowSameSiteRenderFrameHostChangeResult {
+    // The embedder doesn't allow the same-site RenderFrameHost change.
+    kNotAllowed,
+    // The embedder allows the same-site RenderFrameHost change. Depending on
+    // the RenderDocument feature flag state in //content, this might not
+    // actually result in a RenderFrameHost change.
+    kAllowed,
+    // The embedder allows a same-site RenderFrameHost change on both main
+    // frames and subframes, regardless of the RenderDocument feature flag or
+    // parameter state in //content. This allows embedders to fully control
+    // RenderDocument behavior without setting RenderDocument feature flag or
+    // parameter.
+    kAllowedOverrideLevel
+  };
+
+  virtual ShouldAllowSameSiteRenderFrameHostChangeResult
+  ShouldAllowSameSiteRenderFrameHostChange(const content::RenderFrameHost& rfh);
 
   // Called on IO or UI thread to determine whether or not to allow load and
   // render MHTML page from http/https URLs.

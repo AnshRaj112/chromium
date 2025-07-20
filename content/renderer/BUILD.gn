@@ -8,7 +8,6 @@ import("//build/config/features.gni")
 import("//build/config/ui.gni")
 import("//content/common/features.gni")
 import("//media/media_options.gni")
-import("//ppapi/buildflags/buildflags.gni")
 import("//sandbox/features.gni")
 import("//services/screen_ai/buildflags/features.gni")
 import("//testing/libfuzzer/fuzzer_test.gni")
@@ -252,6 +251,7 @@ target(link_target_type, "renderer") {
     "//content/common:main_frame_counter",
     "//content/gpu:gpu_sources",
     "//content/public/child:child_sources",
+    "//content/public/common:buildflags",
     "//content/services/auction_worklet:auction_worklet",
     "//crypto",
     "//device/base/synchronization",
@@ -274,7 +274,6 @@ target(link_target_type, "renderer") {
     "//media/webrtc",
     "//mojo/public/cpp/bindings",
     "//net",
-    "//ppapi/buildflags",
     "//printing/buildflags",
     "//sandbox",
     "//services/audio/public/mojom",

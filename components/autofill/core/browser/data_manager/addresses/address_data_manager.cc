@@ -127,9 +127,10 @@ AddressDataManager::~AddressDataManager() {
 }
 
 void AddressDataManager::Shutdown() {
-  // These classes' sync observers needs to be unregistered.
+  // These classes' sync observers need to be unregistered.
   contact_info_precondition_checker_.reset();
   address_data_cleaner_.reset();
+  home_and_work_metadata_.reset();
 }
 
 void AddressDataManager::AddObserver(AddressDataManager::Observer* obs) {
@@ -162,8 +163,8 @@ void AddressDataManager::OnWebDataServiceRequestDone(
   if (!home_and_work_metadata_) {
     profiles_ = std::move(profiles_from_db);
   } else {
-    profiles_ =
-        home_and_work_metadata_->ApplyMetadata(std::move(profiles_from_db));
+    profiles_ = home_and_work_metadata_->ApplyMetadata(
+        std::move(profiles_from_db), !has_initial_load_finished_);
   }
 
   if (!has_initial_load_finished_) {
@@ -336,6 +337,9 @@ void AddressDataManager::RecordUseOf(const AutofillProfile& profile) {
   }
   AutofillProfile updated_profile = *adm_profile;
   updated_profile.RecordAndLogUse();
+  if (home_and_work_metadata_) {
+    home_and_work_metadata_->RecordProfileFill(updated_profile);
+  }
   UpdateProfile(updated_profile);
 }
 
@@ -486,8 +490,9 @@ void AddressDataManager::SetPrefService(PrefService* pref_service) {
     if (base::FeatureList::IsEnabled(
             features::kAutofillEnableSupportForHomeAndWork)) {
       home_and_work_metadata_ = std::make_unique<HomeAndWorkMetadataStore>(
-          pref_service_, base::BindRepeating(&AddressDataManager::LoadProfiles,
-                                             base::Unretained(this)));
+          pref_service_, sync_service_,
+          base::BindRepeating(&AddressDataManager::LoadProfiles,
+                              base::Unretained(this)));
     }
   }
 }
@@ -805,9 +810,9 @@ void AddressDataManager::RemoveProfileImpl(const std::string& guid,
     return;
   }
 
-  // Find the profile to remove.
-  // TODO(crbug.com/40258814): This shouldn't be necessary. Providing a `guid`
-  // to the `AutofillProfileChange()` should suffice for removals.
+  // Find the profile to remove. Even for removals the profile is a necessary
+  // part of the AutofillProfileChange, so downstream code an distinguish by
+  // RecordType.
   const AutofillProfile* profile =
       ProfileChangesAreOngoing(guid)
           ? &ongoing_profile_changes_[guid].back().first.data_model()

@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">PDF फ़ाइलें यहां से डाउनलोड की जा सकती हैं</translation>
 <translation id="107147699690128016">अगर आप फ़ाइल का एक्सटेंशन बदलते हैं, तो हो सकता है कि फ़ाइल अलग ऐप्लिकेशन में खुले. इससे आपके डिवाइस को नुकसान पहुंच सकता है.</translation>
 <translation id="1080365971383768617">आपके सभी डिवाइसों पर पासवर्ड</translation>
-<translation id="1087176310396019910">यह स्पैम हो सकता है</translation>
 <translation id="1087799850623149508">पता बार को सबसे नीचे ले जाने के लिए, उसे दबाकर रखें</translation>
 <translation id="1089606299949659462">समीक्षा पूरी हुई!</translation>
 <translation id="1094555143448724771">अपने अन्य डिवाइसों के टैब देखने के लिए, टैब और इतिहास को सिंक करें</translation>
@@ -109,6 +108,7 @@ Chrome के अनुभव को बेहतर बनाने के ल�
 <translation id="1419753403124156396">क्या Chrome को रीस्टार्ट करना है?</translation>
 <translation id="1428770807407000502">क्या आपको सिंक करने की सुविधा बंद करनी है?</translation>
 <translation id="1430915738399379752">प्रिंट करें</translation>
+<translation id="1433478348197382180">रीडिंग मोड</translation>
 <translation id="1435593198351412143">PDF फ़ाइलें अपने-आप खुलें</translation>
 <translation id="1437543266176261764"><ph name="APP_NAME" /> में चल रही है</translation>
 <translation id="1448440926884431741">ट्रैक किए गए प्रॉडक्ट को Bookmarks में व्यवस्थित करें</translation>
@@ -720,6 +720,7 @@ Chrome के अनुभव को बेहतर बनाने के ल�
 <translation id="4306489587293957491">डालें</translation>
 <translation id="4307992518367153382">बुनियादी चीज़ें</translation>
 <translation id="4311652497846705514">क्या आपको PDF फ़ाइल खोलनी है?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{यह सूचना स्पैम हो सकती है}one{यह सूचना स्पैम हो सकती है (#)}other{ये सूचनाएं स्पैम हो सकती हैं (#)}}</translation>
 <translation id="4320177379694898372">कोई इंटरनेट कनेक्‍शन नहीं</translation>
 <translation id="4326079409704643112">अपने Google खाते में Chrome डेटा का इस्तेमाल करने और सेव करने के लिए, अपनी पहचान की पुष्टि करें</translation>
 <translation id="433213510553688132">फ़ॉलो किया जा रहा है...</translation>
@@ -1058,6 +1059,7 @@ Chrome के अनुभव को बेहतर बनाने के ल�
 <translation id="580893287573699959">अपने पसंदीदा विषयों और साइटों को मैनेज करें</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# घंटा पहले}one{# घंटे पहले}other{# घंटे पहले}}</translation>
 <translation id="5810288467834065221">कॉपीराइट <ph name="YEAR" /> Google LLC. सर्वाधिकार सुरक्षित.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{सूचना दिखाएं}one{सूचना दिखाएं}other{सूचनाएं दिखाएं}}</translation>
 <translation id="5814749351757353073">अपनी पसंदीदा साइटें फ़ॉलो करते रहें</translation>
 <translation id="5823093032261493462">क्या आपको फिर भी <ph name="DOWNLOAD_DOMAIN" /> से "<ph name="FILE_NAME" />" को डाउनलोड करना है?</translation>
 <translation id="5828921839638612740">Chrome की सेटिंग में जाकर, डेटा को मिटाया जा सकता है</translation>
@@ -1168,6 +1170,7 @@ Chrome के अनुभव को बेहतर बनाने के ल�
 <translation id="6255809143828972562">Chrome के टूल के ज़रिए सुरक्षित तरीके से ब्राउज़िंग की जा सकती है. साथ ही, अपना डेटा भी कंट्रोल किया जा सकता है</translation>
 <translation id="6264376385120300461">फिर भी डाउनलोड करें</translation>
 <translation id="6264485186158353794">वापस सुरक्षित पेज पर जाएं</translation>
+<translation id="6267063201726531683">रीडिंग मोड में बॉटम शीट</translation>
 <translation id="6277522088822131679">पेज को प्रिंट करने में समस्या थी. कृपया फिर से प्रयास करें.</translation>
 <translation id="6278428485366576908">थीम</translation>
 <translation id="6284472661216707937">आपके सभी डिवाइसों पर पासवर्ड का मैसेज बंद हो गया है</translation>
@@ -1191,7 +1194,6 @@ Chrome के अनुभव को बेहतर बनाने के ल�
 <translation id="6342069812937806050">अभी</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 और <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> अन्य}one{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 और <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> अन्य}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 और <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> अन्य}}</translation>
 <translation id="6345878117466430440">'पढ़ा गया' के तौर पर मार्क करें</translation>
-<translation id="6347010704471250799">सूचना दिखाएं</translation>
 <translation id="6356893102071098867">देखें कि आपने सही खाता चुना है या नहीं</translation>
 <translation id="6363990818884053551">इसे चालू करने के लिए अपनी पहचान की पुष्टि करें</translation>
 <translation id="6364438453358674297">सुझाव को इतिहास से निकालें?</translation>

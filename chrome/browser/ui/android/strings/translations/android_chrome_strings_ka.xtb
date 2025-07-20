@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">PDF-ების ჩამოტვირთვა აქ შეგიძლიათ</translation>
 <translation id="107147699690128016">ფაილის გაფართოების შეცვლის შემთხვევაში, ფაილი შეიძლება გაიხსნას სხვა აპლიკაციაში და პოტენციურად შეუქმნას საფრთხე თქვენს მოწყობილობას.</translation>
 <translation id="1080365971383768617">პაროლები თქვენს ყველა მოწყობილობაზე</translation>
-<translation id="1087176310396019910">სავარაუდო სპამი</translation>
 <translation id="1087799850623149508">მისამართთა ზოლის ქვემოთ გადასატანად ხანგრძლივად შეეხეთ</translation>
 <translation id="1089606299949659462">გადახედვა დასრულდა!</translation>
 <translation id="1094555143448724771">სხვა მოწყობილობებიდან ჩანართების სანახავად დაასინქრონეთ თქვენი ჩანართები და ისტორია</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">გსურთ Chrome-ის გადატვირთვა?</translation>
 <translation id="1428770807407000502">გამოირთოს სინქრონიზაცია?</translation>
 <translation id="1430915738399379752">ბეჭდვა</translation>
+<translation id="1433478348197382180">წაკითხვის რეჟიმი</translation>
 <translation id="1435593198351412143">PDF-ების ავტომატურად გახსნა</translation>
 <translation id="1437543266176261764">გაშვებულია <ph name="APP_NAME" />-ში</translation>
 <translation id="1448440926884431741">ორგანიზებულად დაალაგეთ თვალმიდევნებული პროდუქტები „სანიშნეებში“</translation>
@@ -720,6 +720,7 @@
 <translation id="4306489587293957491">შეყვანა</translation>
 <translation id="4307992518367153382">ძირითადი</translation>
 <translation id="4311652497846705514">გსურთ PDF-ის გახსნა?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{სავარაუდო სპამი}other{სავარაუდო სპამი (#)}}</translation>
 <translation id="4320177379694898372">ინტერნეტთან კავშირი არ არის</translation>
 <translation id="4326079409704643112">თქვენს Google ანგარიშში Chrome-ის მონაცემები რომ გამოიყენოთ და შეინახოთ, დაადასტურეთ ვინაობა</translation>
 <translation id="433213510553688132">მიმდინარეობს თვალის მიდევნება...</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">მართეთ თემები და ვებსაიტები, რომლებიც გაინტერესებთ</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# საათის წინ}other{# საათის წინ}}</translation>
 <translation id="5810288467834065221">© <ph name="YEAR" />, Google LLC. ყველა უფლება დაცულია.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{შეტყობინების ჩვენება}other{შეტყობინებების ჩვენება}}</translation>
 <translation id="5814749351757353073">თვალყური ადევნეთ თქვენს რჩეულ საიტებს</translation>
 <translation id="5823093032261493462">მაინც გსურთ, ჩამოტვირთოთ „<ph name="FILE_NAME" />“ <ph name="DOWNLOAD_DOMAIN" />-დან?</translation>
 <translation id="5828921839638612740">მონაცემების წაშლა შეგიძლიათ Chrome-ის პარამეტრებიდან</translation>
@@ -1192,7 +1194,6 @@
 <translation id="6342069812937806050">ახლახან</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 და <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> სხვა}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 და <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> სხვა}}</translation>
 <translation id="6345878117466430440">წაკითხულად მონიშვნა</translation>
-<translation id="6347010704471250799">შეტყობინების ჩვენება</translation>
 <translation id="6356893102071098867">შეამოწმეთ, სწორი ანგარიში აირჩიეთ თუ არა</translation>
 <translation id="6363990818884053551">სინქრონიზაციის დასაწყებად დაადასტურეთ, რომ ეს თქვენ ხართ</translation>
 <translation id="6364438453358674297">ამოიშალოს შემოთავაზება ისტორიიდან?</translation>

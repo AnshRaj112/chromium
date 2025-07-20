@@ -57,14 +57,6 @@ const char kAutofillDisableSilentProfileUpdatesDescription[] =
     "When enabled, Autofill will not apply silent updates to address profiles. "
     "For testing purposes.";
 
-const char kAutofillDropNamesWithInvalidCharactersForCardUploadName[] =
-    "Drop names with invalid characters for credit card upload";
-const char kAutofillDropNamesWithInvalidCharactersForCardUploadDescription[] =
-    "When enabled, cardholder and address names considered during the credit "
-    "card upload flow will be cleared out if they contain characters "
-    "considered invalid by Google Payments, such as numbers or various "
-    "punctuation marks.";
-
 const char kAutofillEnableAllowlistForBmoCardCategoryBenefitsName[] =
     "Enable allowlist for showing category benefits for BMO cards";
 const char kAutofillEnableAllowlistForBmoCardCategoryBenefitsDescription[] =
@@ -94,6 +86,27 @@ const char kAutofillEnableCardInfoRuntimeRetrievalName[] =
 const char kAutofillEnableCardInfoRuntimeRetrievalDescription[] =
     "When enabled, runtime retrieval of CVC along with card number and expiry "
     "from issuer for enrolled cards will be enabled during form fill.";
+
+const char kAutofillEnableCvcStorageAndFillingName[] =
+    "Enable CVC storage and filling for payments autofill";
+const char kAutofillEnableCvcStorageAndFillingDescription[] =
+    "When enabled, we will store CVC for both local and server credit cards. "
+    "This will also allow the users to autofill their CVCs on checkout pages.";
+
+const char kAutofillEnableCvcStorageAndFillingEnhancementName[] =
+    "Enable CVC storage and filling enhancement for payments autofill";
+const char kAutofillEnableCvcStorageAndFillingEnhancementDescription[] =
+    "When enabled, will enhance CVV storage project. Provide better "
+    "suggestion, resolve conflict with COF project and add logging.";
+
+const char kAutofillEnableCvcStorageAndFillingStandaloneFormEnhancementName[] =
+    "Enable CVC storage and filling standalone form enhancement for payments "
+    "autofill";
+const char
+    kAutofillEnableCvcStorageAndFillingStandaloneFormEnhancementDescription[] =
+        "When enabled, this will enhance the CVV storage project. The "
+        "enhancement will enable CVV storage suggestions for standalone CVC "
+        "fields.";
 
 const char kAutofillEnableDynamicallyLoadingFieldsForAddressInputName[] =
     "Enable dynamically loading fields for address input";
@@ -692,6 +705,11 @@ const char kIOSKeyboardAccessoryUpgradeForIPadDescription[] =
     "When enabled, the upgraded keyboard accessory UI will be presented on "
     "iPads.";
 
+const char kIOSOmniboxAimShortcutName[] = "Enable the omnibox aim shortcut";
+const char kIOSOmniboxAimShortcutDescription[] =
+    "When enabled, an aim shortcut entrypoint will be displayed when the "
+    "omnibox is on edit mode.";
+
 const char kIOSOneTapMiniMapRemoveSectionBreaksName[] =
     "Remove section break for address detection.";
 const char kIOSOneTapMiniMapRemoveSectionBreaksDescription[] =
@@ -707,11 +725,6 @@ const char kIOSOneTapMiniMapRestrictionsName[] =
     "Revalidate detected addresses for one tap Mini Map.";
 const char kIOSOneTapMiniMapRestrictionsDescription[] =
     "Different restrictions to block false positive for one tap Mini Map.";
-
-const char kIOSPasskeysM2Name[] = "Enable the passkey syncing follow-ups";
-const char kIOSPasskeysM2Description[] =
-    "When enabled, the passkey syncing-related features will be available in "
-    "the app.";
 
 const char kIOSChooseFromDriveName[] = "IOS Choose from Drive";
 const char kIOSChooseFromDriveDescription[] =
@@ -1047,6 +1060,10 @@ const char kNTPViewHierarchyRepairName[] = "NTP View Hierarchy Repair";
 const char kNTPViewHierarchyRepairDescription[] =
     "Checks if NTP view hierarchy is broken and fixes it if necessary.";
 
+const char kOmniboxDRSPrototypeName[] = "Enable the Omnibox DRS prototype";
+const char kOmniboxDRSPrototypeDescription[] =
+    "Enables the omnibox dynamic response system prototype";
+
 const char kOmniboxGroupingFrameworkForZPSName[] =
     "Omnibox Grouping Framework for ZPS";
 const char kOmniboxGroupingFrameworkForZPSDescription[] =
@@ -1293,6 +1310,11 @@ const char kNotificationSettingsMenuItemDescription[] =
     "Displays the menu item for the notification controls inside the chrome "
     "settings UI.";
 
+const char kRcapsDynamicProfileCountryName[] = "Dynamic Profile Country";
+const char kRcapsDynamicProfileCountryDescription[] =
+    "When enabled, Chrome updates the country associated with "
+    "the profile on open";
+
 const char kReaderModeName[] = "Enables Reader Mode";
 const char kReaderModeDescription[] =
     "Enables Reader Mode UI and entry points.";
@@ -1317,6 +1339,12 @@ const char kReaderModeReadabilityDistillerName[] =
     "Enables Readability distiller for Reader Mode";
 const char kReaderModeReadabilityDistillerDescription[] =
     "Enables Readability distiller for Reader Mode UI.";
+
+const char kReaderModeDefaultBrowserPromoName[] =
+    "Enables the default browser promo with Reader Mode criteria";
+const char kReaderModeDefaultBrowserPromoDescription[] =
+    "Enables the Reader Mode eligibility criteria for displaying the default "
+    "browser promo and disables all other criteria.";
 
 const char kRefactorToolbarsSizeName[] = "Refactor toolbars size";
 const char kRefactorToolbarsSizeDescription[] =
@@ -1481,6 +1509,11 @@ const char kSupervisedUserLocalWebApprovalsName[] =
 const char kSupervisedUserLocalWebApprovalsDescription[] =
     "Enables parents to approve blocked websites on a child's device.";
 
+const char kSyncAutofillWalletCredentialDataName[] =
+    "Sync Autofill Wallet Credential Data";
+const char kSyncAutofillWalletCredentialDataDescription[] =
+    "When enabled, allows syncing of the autofill wallet credential data type.";
+
 const char kSyncSandboxName[] = "Use Chrome Sync sandbox";
 const char kSyncSandboxDescription[] =
     "Connects to the testing server for Chrome Sync.";
@@ -1604,12 +1637,6 @@ extern const char kWelcomeBackInFirstRunName[] = "Enable Welcome Back screen";
 extern const char kWelcomeBackInFirstRunDescription[] =
     "When enabled, returning users will see the Welcome Back screen after the "
     "First Run sequence.";
-
-extern const char kWidgetsForMultiprofileName[] =
-    "Enable Widgets for multiprofile";
-extern const char kWidgetsForMultiprofileDescription[] =
-    "When enabled, returning users will see the new per-account widget "
-    "implementation";
 
 const char kYoutubeIncognitoName[] =
     "Enable the opening of links from Youtube incognito in Chrome incognito";

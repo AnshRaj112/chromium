@@ -280,11 +280,6 @@ const char kCastStreamingForceDisableHardwareVp9[] =
 const char kCastStreamingForceEnableHardwareVp9[] =
     "cast-streaming-force-enable-hardware-vp9";
 
-#if !BUILDFLAG(IS_ANDROID)
-const char kCastMirroringTargetPlayoutDelay[] =
-    "cast-mirroring-target-playout-delay";
-#endif  // !BUILDFLAG(IS_ANDROID)
-
 }  // namespace switches
 
 namespace media {
@@ -755,6 +750,12 @@ BASE_FEATURE(kSpecCompliantCanPlayThrough,
              "SpecCompliantCanPlayThrough",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Suspends WebMediaPlayerImpl instances when the containing RenderFrame is
+// frozen. TODO(crbug.com/41161335): Remove in M143 after it goes stable.
+BASE_FEATURE(kSuspendMediaForFrozenFrames,
+             "SuspendMediaForFrozenFrames",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 // Disables the real audio output stream after silent audio has been delivered
 // for too long. Should save quite a bit of power in the muted video case.
 BASE_FEATURE(kSuspendMutedAudio,
@@ -1094,6 +1095,13 @@ BASE_FEATURE(kAVDColorSpaceChanges,
 BASE_FEATURE(kAllowNonSecureOverlays,
              "AllowNonSecureOverlays",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// Enables automatic Picture-in-Picture on Android for supported websites.
+// This triggers for active video playback or camera/microphone usage on sites
+// that have registered an auto picture-in-picture action.
+BASE_FEATURE(kAutoPictureInPictureAndroid,
+             "AutoPictureInPictureAndroid",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enables block model (LinearBlock) on supported devices.
 BASE_FEATURE(kMediaCodecBlockModel,

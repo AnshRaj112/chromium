@@ -4,7 +4,6 @@
 
 #include "services/webnn/ort/context_impl_ort.h"
 
-#include "base/notimplemented.h"
 #include "services/webnn/ort/buffer_content_ort.h"
 #include "services/webnn/ort/graph_impl_ort.h"
 #include "services/webnn/ort/tensor_impl_ort.h"
@@ -23,16 +22,16 @@ ContextImplOrt::ContextImplOrt(
     mojo::PendingReceiver<mojom::WebNNContext> receiver,
     WebNNContextProviderImpl* context_provider,
     mojom::CreateContextOptionsPtr options,
-    ScopedOrtEnv env,
-    scoped_refptr<SessionOptions> session_options,
-    bool is_external_data_supported)
+    scoped_refptr<Environment> env,
+    scoped_refptr<SessionOptions> session_options)
     : WebNNContextImpl(std::move(receiver),
                        context_provider,
                        GetContextProperties(),
                        std::move(options)),
       env_(std::move(env)),
       session_options_(std::move(session_options)),
-      is_external_data_supported_(is_external_data_supported) {}
+      is_external_data_supported_(
+          env_->IsExternalDataSupported(this->options().device)) {}
 
 ContextImplOrt::~ContextImplOrt() = default;
 
@@ -64,6 +63,10 @@ ContextProperties ContextImplOrt::GetContextProperties() {
       OperandDataType::kFloat16, OperandDataType::kFloat32,
       OperandDataType::kUint8, OperandDataType::kInt8, OperandDataType::kInt32};
 
+  static constexpr SupportedDataTypes kFloat16To32Int64 = {
+      OperandDataType::kFloat16, OperandDataType::kFloat32,
+      OperandDataType::kInt64};
+
   return ContextProperties(
       InputOperandLayout::kNchw, Resample2DAxes::kAny,
       BatchNormalizationAxis::kChannelsFirst,
@@ -75,8 +78,10 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        // ONNX ArgMin/Max only supports int64 output, int32 output is supported
        // by inserting a cast operator.
        /*arg_min_max_output=*/DataTypeConstraint::kInt32To64,
-       /*batch_normalization_input=*/{},
-       /*batch_normalization_mean=*/{},
+       /*batch_normalization_input=*/
+       {DataTypeConstraint::kFloat16To32, kMaxNonScalarRank},
+       /*batch_normalization_mean=*/
+       {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(1)},
        /*cast_input=*/{SupportedDataTypes::All(), kMaxRank},
        /*clamp_input=*/
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
@@ -139,7 +144,8 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*sin_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*sqrt_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*tan_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
-       /*elu_input=*/{},
+       /*elu_input=*/
+       {DataTypeConstraint::kFloat16To32, kMaxRank},
        /*expand_input=*/
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*gather_input=*/
@@ -162,10 +168,12 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*gru_bias=*/{},
        /*gru_cell_input=*/{},
        /*gru_cell_bias=*/{},
-       /*hard_sigmoid_input=*/{},
+       /*hard_sigmoid_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*hard_swish_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
-       /*instance_normalization_input=*/{},
-       /*instance_normalization_scale=*/{},
+       /*instance_normalization_input=*/
+       {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(4)},
+       /*instance_normalization_scale=*/
+       {DataTypeConstraint::kFloat16To32, SupportedRanks::Exactly(1)},
        /*layer_normalization_input=*/{},
        /*leaky_relu_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*linear_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
@@ -226,14 +234,14 @@ ContextProperties ContextImplOrt::GetContextProperties() {
        /*slice_input=*/
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*softmax_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
-       /*softplus_input=*/{},
+       /*softplus_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*softsign_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*split_input=*/
        {DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxNonScalarRank},
        /*tanh_input=*/{DataTypeConstraint::kFloat16To32, kMaxRank},
        /*tile_input=*/{DataTypeConstraint::kAllDataTypesAtLeast8bits, kMaxRank},
        /*transpose_input=*/{SupportedDataTypes::All(), kMaxRank},
-       /*triangular_input=*/{},
+       /*triangular_input=*/{kFloat16To32Int64, {2, 8}},
        /*where_condition=*/{DataTypeConstraint::kUint8, kMaxRank},
        // TODO(crbug.com/429859156): ORT CPU EP should support int8, uint32, and
        // uint64 for where operation.

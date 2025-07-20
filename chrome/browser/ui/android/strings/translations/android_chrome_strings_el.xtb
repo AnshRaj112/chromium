@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">Μπορείτε να κατεβάσετε PDF εδώ</translation>
 <translation id="107147699690128016">Εάν αλλάξετε την επέκταση αρχείου, το αρχείο μπορεί να ανοίξει σε διαφορετική εφαρμογή και να αποτελέσει δυνητικό κίνδυνο για τη συσκευή σας.</translation>
 <translation id="1080365971383768617">Κωδικοί πρόσβασης σε όλες τις συσκευές σας</translation>
-<translation id="1087176310396019910">Πιθανώς ανεπιθύμητο περιεχόμενο</translation>
 <translation id="1087799850623149508">Μπορείτε να αγγίξετε παρατεταμένα, για να μετακινήσετε τη γραμμή διευθύνσεων στο κάτω μέρος</translation>
 <translation id="1089606299949659462">Ο έλεγχος ολοκληρώθηκε!</translation>
 <translation id="1094555143448724771">Για να δείτε καρτέλες από τις άλλες συσκευές σας, συγχρονίστε τις καρτέλες και το ιστορικό σας</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">Θέλετε να επανεκκινήσετε το Chrome;</translation>
 <translation id="1428770807407000502">Απενεργοποίηση συγχρονισμού;</translation>
 <translation id="1430915738399379752">Εκτύπωση</translation>
+<translation id="1433478348197382180">Λειτουργία ανάγνωσης</translation>
 <translation id="1435593198351412143">Αυτόματο άνοιγμα PDF</translation>
 <translation id="1437543266176261764">Εκτελείται στην εφαρμογή <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Οργανώστε τα προϊόντα παρακολούθησης σε Σελιδοδείκτες</translation>
@@ -720,6 +720,7 @@
 <translation id="4306489587293957491">Εισαγωγή</translation>
 <translation id="4307992518367153382">Βασικά στοιχεία</translation>
 <translation id="4311652497846705514">Άνοιγμα PDF;</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Πιθανώς ανεπιθύμητο}other{Πιθανώς ανεπιθύμητα (#)}}</translation>
 <translation id="4320177379694898372">Χωρίς σύνδεση στο διαδίκτυο</translation>
 <translation id="4326079409704643112">Για να χρησιμοποιήσετε και να αποθηκεύσετε δεδομένα Chrome στον Λογαριασμό σας Google, επαληθεύστε την ταυτότητά σας</translation>
 <translation id="433213510553688132">Παρακολούθηση…</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">Διαχειριστείτε τα θέματα και τους ιστοτόπους που σας ενδιαφέρουν</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{Πριν από # ώρα}other{Πριν από # ώρες}}</translation>
 <translation id="5810288467834065221">Πνευματικά δικαιώματα <ph name="YEAR" /> Google LLC. Με την επιφύλαξη παντός δικαιώματος.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Εμφάνιση ειδοποίησης}other{Εμφάνιση ειδοποιήσεων}}</translation>
 <translation id="5814749351757353073">Ενημερωθείτε σχετικά με τους αγαπημένους σας ιστοτόπους</translation>
 <translation id="5823093032261493462">Θέλετε να κατεβάσετε ούτως ή άλλως το αρχείο <ph name="FILE_NAME" /> από τον ιστότοπο <ph name="DOWNLOAD_DOMAIN" />;</translation>
 <translation id="5828921839638612740">Μπορείτε να διαγράψετε τα δεδομένα στις ρυθμίσεις του Chrome</translation>
@@ -1168,6 +1170,7 @@
 <translation id="6255809143828972562">Με τα εργαλεία του Chrome, μπορείτε να περιηγείστε με ασφάλεια και να διατηρείτε τον έλεγχο</translation>
 <translation id="6264376385120300461">Να γίνει η λήψη ούτως ή άλλως</translation>
 <translation id="6264485186158353794">Πίσω στην ασφάλεια</translation>
+<translation id="6267063201726531683">Φύλλο κάτω μέρους λειτουργίας Ανάγνωσης</translation>
 <translation id="6277522088822131679">Παρουσιάστηκε ένα πρόβλημα κατά την εκτύπωση της σελίδας. Δοκιμάστε ξανά.</translation>
 <translation id="6278428485366576908">Θέμα</translation>
 <translation id="6284472661216707937">Το φύλλο "Κωδικοί πρόσβασης σε όλες τις συσκευές σας" έκλεισε</translation>
@@ -1191,7 +1194,6 @@
 <translation id="6342069812937806050">Μόλις τώρα</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 και <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> ακόμη}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 και <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> ακόμη}}</translation>
 <translation id="6345878117466430440">Επισήμανση ως αναγνωσμένο</translation>
-<translation id="6347010704471250799">Εμφάνιση ειδοποίησης</translation>
 <translation id="6356893102071098867">Ελέγξτε ότι έχετε επιλέξει τον σωστό λογαριασμό</translation>
 <translation id="6363990818884053551">Για να ξεκινήσετε τον συγχρονισμό, επαληθεύστε την ταυτότητά σας.</translation>
 <translation id="6364438453358674297">Κατάργηση πρότασης από το ιστορικό;</translation>

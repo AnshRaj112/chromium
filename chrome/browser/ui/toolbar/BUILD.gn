@@ -140,6 +140,7 @@ source_set("impl") {
       "//chrome/browser/ui/global_error",
       "//chrome/browser/ui/hats",
       "//chrome/browser/ui/lens",
+      "//chrome/browser/ui/profiles",
       "//chrome/browser/ui/safety_hub",
       "//chrome/browser/ui/tabs:tab_model",
       "//chrome/browser/ui/tabs:tab_strip",
@@ -324,6 +325,10 @@ if (!is_android) {
         "//chrome/install_static/test:test_support",
       ]
     }
+
+    # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+    # enable the diagnostic by removing this line.
+    configs += [ "//build/config/compiler:no_exit_time_destructors" ]
   }
 
   source_set("browser_tests") {

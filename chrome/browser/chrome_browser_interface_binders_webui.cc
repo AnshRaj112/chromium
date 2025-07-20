@@ -16,6 +16,8 @@
 #include "chrome/browser/ui/webui/bluetooth_internals/bluetooth_internals_ui.h"
 #include "chrome/browser/ui/webui/browsing_topics/browsing_topics_internals_ui.h"
 #include "chrome/browser/ui/webui/chrome_urls/chrome_urls_ui.h"
+#include "chrome/browser/ui/webui/connectors_internals/connectors_internals.mojom.h"
+#include "chrome/browser/ui/webui/connectors_internals/connectors_internals_ui.h"
 #include "chrome/browser/ui/webui/data_sharing_internals/data_sharing_internals_ui.h"
 #include "chrome/browser/ui/webui/engagement/site_engagement_ui.h"
 #include "chrome/browser/ui/webui/location_internals/location_internals.mojom.h"
@@ -50,8 +52,6 @@
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
     BUILDFLAG(IS_CHROMEOS)
-#include "chrome/browser/ui/webui/connectors_internals/connectors_internals.mojom.h"
-#include "chrome/browser/ui/webui/connectors_internals/connectors_internals_ui.h"
 #include "ui/webui/resources/cr_components/app_management/app_management.mojom.h"
 #endif
 
@@ -92,6 +92,7 @@
 #include "chrome/browser/ui/webui/app_service_internals/app_service_internals.mojom.h"
 #include "chrome/browser/ui/webui/app_service_internals/app_service_internals_ui.h"
 #include "chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_ui.h"
+#include "chrome/browser/ui/webui/color_pipeline_internals/color_pipeline_internals_ui.h"
 #include "chrome/browser/ui/webui/commerce/product_specifications_ui.h"
 #include "chrome/browser/ui/webui/commerce/shopping_insights_side_panel_ui.h"
 #include "chrome/browser/ui/webui/customize_buttons/customize_buttons.mojom.h"
@@ -106,8 +107,10 @@
 #include "chrome/browser/ui/webui/new_tab_footer/new_tab_footer.mojom.h"
 #include "chrome/browser/ui/webui/new_tab_footer/new_tab_footer_ui.h"
 #include "chrome/browser/ui/webui/new_tab_page/composebox/composebox.mojom.h"
+#include "chrome/browser/ui/webui/new_tab_page/composebox/composebox_fieldtrial.h"
 #include "chrome/browser/ui/webui/new_tab_page/new_tab_page.mojom.h"
 #include "chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.h"
+#include "chrome/browser/ui/webui/new_tab_page/ntp_promo/ntp_promo.mojom.h"
 #include "chrome/browser/ui/webui/new_tab_page_third_party/new_tab_page_third_party_ui.h"
 #include "chrome/browser/ui/webui/ntp_microsoft_auth/ntp_microsoft_auth_untrusted_ui.h"
 #include "chrome/browser/ui/webui/omnibox_popup/omnibox_popup_ui.h"
@@ -119,6 +122,8 @@
 #include "chrome/browser/ui/webui/search_engine_choice/search_engine_choice_ui.h"
 #include "chrome/browser/ui/webui/settings/settings_ui.h"
 #include "chrome/browser/ui/webui/side_panel/bookmarks/bookmarks_side_panel_ui.h"
+#include "chrome/browser/ui/webui/side_panel/comments/comments.mojom.h"
+#include "chrome/browser/ui/webui/side_panel/comments/comments_side_panel_ui.h"
 #include "chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome.mojom.h"
 #include "chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_ui.h"
 #include "chrome/browser/ui/webui/side_panel/customize_chrome/wallpaper_search/wallpaper_search.mojom.h"
@@ -139,8 +144,8 @@
 #include "components/commerce/core/mojom/shopping_service.mojom.h"  // nogncheck crbug.com/1125897
 #include "components/optimization_guide/core/optimization_guide_features.h"
 #include "components/page_image_service/mojom/page_image_service.mojom.h"
-#include "components/search/ntp_composebox_fieldtrial.h"
 #include "components/search/ntp_features.h"
+#include "components/user_education/common/user_education_features.h"
 #include "ui/webui/resources/cr_components/color_change_listener/color_change_listener.mojom.h"
 #include "ui/webui/resources/cr_components/customize_color_scheme_mode/customize_color_scheme_mode.mojom.h"
 #include "ui/webui/resources/cr_components/help_bubble/custom_help_bubble.mojom.h"
@@ -452,6 +457,10 @@ void PopulateChromeWebUIFrameBinders(
       data_sharing_internals::mojom::PageHandlerFactory,
       DataSharingInternalsUI>(map);
 
+  RegisterWebUIControllerInterfaceBinder<
+      connectors_internals::mojom::PageHandler,
+      enterprise_connectors::ConnectorsInternalsUI>(map);
+
 #if BUILDFLAG(ENABLE_GLIC)
   if (glic::GlicEnabling::IsProfileEligible(Profile::FromBrowserContext(
           render_frame_host->GetProcess()->GetBrowserContext()))) {
@@ -463,13 +472,6 @@ void PopulateChromeWebUIFrameBinders(
     RegisterWebUIControllerInterfaceBinder<glic::mojom::PageHandlerFactory,
                                            glic::GlicUI>(map);
   }
-#endif
-
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
-    BUILDFLAG(IS_CHROMEOS)
-  RegisterWebUIControllerInterfaceBinder<
-      connectors_internals::mojom::PageHandler,
-      enterprise_connectors::ConnectorsInternalsUI>(map);
 #endif
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -539,10 +541,10 @@ void PopulateChromeWebUIFrameBinders(
       SignoutConfirmationUI,
 #endif
       NewTabPageUI, OmniboxPopupUI, BookmarksSidePanelUI, CustomizeChromeUI,
-      UserEducationInternalsUI, ReadingListUI, TabSearchUI, WebuiGalleryUI,
-      HistoryClustersSidePanelUI, ShoppingInsightsSidePanelUI,
-      media_router::AccessCodeCastUI, commerce::ProductSpecificationsUI,
-      NewTabFooterUI>(map);
+      ColorPipelineInternalsUI, UserEducationInternalsUI, ReadingListUI,
+      TabSearchUI, WebuiGalleryUI, HistoryClustersSidePanelUI,
+      ShoppingInsightsSidePanelUI, media_router::AccessCodeCastUI,
+      commerce::ProductSpecificationsUI, NewTabFooterUI>(map);
 
   RegisterWebUIControllerInterfaceBinder<
       customize_buttons::mojom::CustomizeButtonsHandlerFactory, NewTabPageUI,
@@ -550,6 +552,11 @@ void PopulateChromeWebUIFrameBinders(
 
   RegisterWebUIControllerInterfaceBinder<
       new_tab_page::mojom::PageHandlerFactory, NewTabPageUI>(map);
+
+  if (user_education::features::NtpBrowserPromosEnabled()) {
+    RegisterWebUIControllerInterfaceBinder<
+        ntp_promo::mojom::NtpPromoHandlerFactory, NewTabPageUI>(map);
+  }
 
   RegisterWebUIControllerInterfaceBinder<
       new_tab_footer::mojom::NewTabFooterHandlerFactory, NewTabFooterUI>(map);
@@ -708,9 +715,9 @@ void PopulateChromeWebUIFrameBinders(
         file_suggestion::mojom::MicrosoftFilesPageHandler, NewTabPageUI>(map);
   }
 
-  if (ntp_composebox_fieldtrial::FeatureConfig::Get().enabled) {
+  if (ntp_composebox::FeatureConfig::Get().enabled) {
     RegisterWebUIControllerInterfaceBinder<
-        composebox::mojom::ComposeboxPageHandler, NewTabPageUI>(map);
+        composebox::mojom::PageHandlerFactory, NewTabPageUI>(map);
   }
 
 #if BUILDFLAG(IS_CHROMEOS)
@@ -724,6 +731,8 @@ void PopulateChromeWebUIFrameBinders(
   RegisterWebUIControllerInterfaceBinder<
       side_panel::mojom::BookmarksPageHandlerFactory, BookmarksSidePanelUI>(
       map);
+  RegisterWebUIControllerInterfaceBinder<comments::mojom::PageHandlerFactory,
+                                         CommentsSidePanelUI>(map);
 
   RegisterWebUIControllerInterfaceBinder<
       shopping_service::mojom::ShoppingServiceHandlerFactory,

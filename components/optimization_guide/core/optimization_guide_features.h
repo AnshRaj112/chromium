@@ -38,8 +38,6 @@ BASE_DECLARE_FEATURE(kOptimizationGuideFetchingForSRP);
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 BASE_DECLARE_FEATURE(kOptimizationTargetPrediction);
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
-BASE_DECLARE_FEATURE(kOptimizationGuideModelDownloading);
-COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 BASE_DECLARE_FEATURE(kPageTextExtraction);
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 BASE_DECLARE_FEATURE(kPushNotifications);
@@ -227,15 +225,6 @@ bool IsModelExecutionWatchdogEnabled();
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 base::TimeDelta ModelExecutionWatchdogDefaultTimeout();
 
-// Whether the ability to download models is enabled.
-COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
-bool IsModelDownloadingEnabled();
-
-// Returns whether unrestricted model downloading is enabled. If true, the
-// client should download models using highest priority.
-COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
-bool IsUnrestrictedModelDownloadingEnabled();
-
 // Returns whether the page entities model should be executed on page content
 // for a user using |locale| as their browser language.
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
@@ -404,10 +393,6 @@ double GetOnDeviceModelDefaultTemperature();
 
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
 std::vector<uint32_t> GetOnDeviceModelAllowedAdaptationRanks();
-
-// Whether the on-device model should be limited to running only on the CPU.
-COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)
-bool ForceCpuBackendForOnDeviceModel();
 
 // Returns whether the icon view should be enabled.
 COMPONENT_EXPORT(OPTIMIZATION_GUIDE_FEATURES)

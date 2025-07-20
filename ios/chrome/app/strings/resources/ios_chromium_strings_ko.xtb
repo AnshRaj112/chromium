@@ -91,7 +91,6 @@ Chromium 환경을 개선하는 데 데이터를 사용하는 설정을 더 보�
 <translation id="3102849287235003384">웹사이트에 로그인되어 있는 Google 계정에서 모두 로그아웃하려면 <ph name="BEGIN_LINK" />Chromium에서 로그아웃<ph name="END_LINK" />하세요.</translation>
 <translation id="3115956258722352278">Chromium을 기본 브라우저로 지정할까요?</translation>
 <translation id="3180939591219927904">'Chromium 종료 시 시크릿 탭 잠금'을 사용 설정합니다.</translation>
-<translation id="3242612358525156339">기기 설정에서 '<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />'을 열고 'Chromium'을 선택하세요</translation>
 <translation id="328933489847748230">{count,plural, =1{Chromium 창 1개 표시 중}other{Chromium 창 {count}개 표시 중}}</translation>
 <translation id="3344973607274501920">Chromium에서 비밀번호를 확인할 수 없습니다. 인터넷 연결 상태를 확인하세요.</translation>
 <translation id="3366305173356742781">사용자 계정의 Chromium 데이터</translation>
@@ -164,7 +163,6 @@ Chromium 환경을 개선하는 데 데이터를 사용하는 설정을 더 보�
 <translation id="5042011327527167688">'Chromium에서 Google 지도로 보기'를 탭합니다.</translation>
 <translation id="5044871537677053278">Chromium에서는 주소를 감지하고 Google 지도를 사용하여 경로 및 지역 정보를 제공합니다.</translation>
 <translation id="5048140766121299007">"<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />" 설정에서 'Chromium'을 사용 설정하세요</translation>
-<translation id="5048795749726991615">저장된 비밀번호를 다른 앱에서 쉽게 입력하려면 Chromium 자동 완성 기능을 사용하세요</translation>
 <translation id="5053429694249468757">Chromium 데이터 삭제 중…</translation>
 <translation id="5071749685031362629">iOS용 Chromium</translation>
 <translation id="5124429847818367226">이제 언제든지 메시지, 문서, 기타 앱에서 탐색하거나 링크를 탭하여 Chromium을 사용할 수 있습니다</translation>
@@ -246,7 +244,7 @@ Chromium 환경을 개선하는 데 데이터를 사용하는 설정을 더 보�
 <translation id="6887138405044152640">이 탭을 다른 기기로 보내려면 해당 기기에서 Chromium에 로그인하세요.</translation>
 <translation id="6911341667534646387">Google 계정의 Chromium 데이터를 계속 사용하세요.</translation>
 <translation id="7018284295775193585">Chromium을 업데이트할 수 없습니다.</translation>
-<translation id="7055269218854630176">내가 로그인한 계정과 Chromium이 사용될 수 있는 방식은 <ph name="DOMAIN" /> 조직에서 관리합니다. 관리자는 특정 기능을 설정하거나 제한할 수 있습니다</translation>
+<translation id="7055269218854630176">내가 로그인한 계정과 Chromium이 사용 방식은 <ph name="DOMAIN" /> 조직에서 관리합니다. 관리자는 특정 기능을 설정하거나 제한할 수 있습니다.</translation>
 <translation id="7099326575020694068">Chromium에서는 분할 모드에서 카메라를 사용할 수 없습니다.</translation>
 <translation id="7165402419892018581">자동 완성에 사용할 Chromium 선택</translation>
 <translation id="7175400662502680481">정보 유출로 인해 비밀번호가 노출되었습니다. 비밀번호 관리자에서 지금 바로 비밀번호를 변경하시기 바랍니다.</translation>
@@ -254,6 +252,7 @@ Chromium 환경을 개선하는 데 데이터를 사용하는 설정을 더 보�
 
 암호를 아는 사람만 암호화된 내 데이터를 읽을 수 있습니다. 암호는 Google로 전송되거나 Google에 저장되지 않습니다. 암호가 기억나지 않거나 이 설정을 변경하려면 <ph name="BEGIN_LINK" />계정의 Chromium 데이터를 삭제<ph name="END_LINK" />하세요.</translation>
 <translation id="7192111075364461693">현재 기기 설정에서 Chromium 알림이 사용 중지되어 있습니다.</translation>
+<translation id="7195217321165708458">Chromium의 Gemini</translation>
 <translation id="7219205286115692265">iPad의 홈 화면 도크에서 Chromium에 더 빠르게 액세스하세요.</translation>
 <translation id="7222001353246886083">Chromium에서 ${searchPhrase} 검색</translation>
 <translation id="7228180817326917122">Chromium 도움말: 주소 표시줄 위치 선택</translation>

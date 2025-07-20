@@ -39,6 +39,7 @@
 #include "base/time/clock.h"
 #include "base/time/time.h"
 #include "base/trace_event/common/trace_event_common.h"
+#include "base/trace_event/trace_event.h"
 #include "base/trace_event/trace_id_helper.h"
 #include "base/values.h"
 #include "net/base/auth.h"
@@ -47,7 +48,6 @@
 #include "net/base/load_timing_info.h"
 #include "net/base/net_errors.h"
 #include "net/base/trace_constants.h"
-#include "net/base/tracing.h"
 #include "net/base/transport_info.h"
 #include "net/base/upload_data_stream.h"
 #include "net/cert/cert_status_flags.h"
@@ -1126,13 +1126,14 @@ int HttpCache::Transaction::DoInitEntry() {
         first_nvs_cache_lookup_end_time_.is_null()) {
       first_nvs_cache_lookup_end_time_ = base::TimeTicks::Now();
     }
-  } else if (!first_nvs_cache_lookup_end_time_.is_null()) {
+  } else if (!first_nvs_cache_lookup_end_time_.is_null() &&
+             no_vary_search_use_result_ != NoVarySearchUseResult::kUsed) {
     // A NoVarySearchCache lookup succeeded earlier for this transaction, but
     // then for some reason the result was unusable. Record the time lost as a
     // result. See the histogram "HttpCache.NoVarySearch.UseResult" for
     // information about what went wrong.
     base::UmaHistogramTimes(
-        "HttpCache.NoVarySearch.NotUsableLostTime",
+        "HttpCache.NoVarySearch.NotUsableLostTime2",
         base::TimeTicks::Now() - first_nvs_cache_lookup_end_time_);
     first_nvs_cache_lookup_end_time_ = base::TimeTicks();
   }

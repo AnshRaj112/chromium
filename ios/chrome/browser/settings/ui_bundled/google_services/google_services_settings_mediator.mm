@@ -119,11 +119,6 @@ bool GetStatusForSigninPolicy() {
 // Preference value for the "Allow Chrome Sign-in" feature.
 @property(nonatomic, strong, readonly)
     PrefBackedBoolean* allowChromeSigninPreference;
-// Preference value for the "Help improve Chromium's features" for Wifi-Only.
-// TODO(crbug.com/40588486): Needs to create the UI to change from Wifi-Only to
-// always
-@property(nonatomic, strong, readonly)
-    PrefBackedBoolean* sendDataUsageWifiOnlyPreference;
 // Preference value for the "Make searches and browsing better" feature.
 @property(nonatomic, strong, readonly)
     PrefBackedBoolean* anonymizedDataCollectionPreference;
@@ -196,8 +191,6 @@ bool GetStatusForSigninPolicy() {
 - (void)disconnect {
   [_allowChromeSigninPreference stop];
   _allowChromeSigninPreference = nil;
-  [_sendDataUsageWifiOnlyPreference stop];
-  _sendDataUsageWifiOnlyPreference = nil;
   [_anonymizedDataCollectionPreference stop];
   _anonymizedDataCollectionPreference = nil;
   [_improveSearchSuggestionsPreference stop];
@@ -299,11 +292,7 @@ bool GetStatusForSigninPolicy() {
     }
   }
   if (notifyConsumer) {
-    TableViewModel* model = self.consumer.tableViewModel;
-    NSUInteger sectionIndex =
-        [model sectionForSectionIdentifier:NonPersonalizedSectionIdentifier];
-    NSIndexSet* indexSet = [NSIndexSet indexSetWithIndex:sectionIndex];
-    [self.consumer reloadSections:indexSet];
+    [self reloadUniqueSection];
   }
 }
 
@@ -414,6 +403,10 @@ bool GetStatusForSigninPolicy() {
 
 #pragma mark - Private
 
+- (void)reloadUniqueSection {
+  [self.consumer reload];
+}
+
 // Creates an item with a switch toggle.
 - (SyncSwitchItem*)switchItemWithItemType:(NSInteger)itemType
                              textStringID:(int)textStringID
@@ -476,17 +469,13 @@ bool GetStatusForSigninPolicy() {
   ItemType type = static_cast<ItemType>(item.type);
   switch (type) {
     case AllowChromeSigninItemType: {
-      [self handleUpdateIsSigninAllowedValue:value targetRect:targetRect];
+      [self handleUpdateIsSigninAllowedValue:value
+                                  targetRect:targetRect
+                                        item:syncSwitchItem];
       break;
     }
     case ImproveChromeItemType:
       self.sendDataUsagePreference.value = value;
-      // Don't set value if sendDataUsageWifiOnlyPreference has not been
-      // allocated.
-      if (value && self.sendDataUsageWifiOnlyPreference) {
-        // Should be wifi only, until https://crbug.com/872101 is fixed.
-        self.sendDataUsageWifiOnlyPreference.value = YES;
-      }
       break;
     case BetterSearchAndBrowsingItemType:
       self.anonymizedDataCollectionPreference.value = value;
@@ -518,13 +507,27 @@ bool GetStatusForSigninPolicy() {
              self.identityManager) == signin::Tribool::kTrue;
 }
 
+// The user toggled the "allow sign-in" toggle to `value`.
+// Register it, unless it requires a sign-out, in which case ask for
+// confirmation first.
 - (void)handleUpdateIsSigninAllowedValue:(BOOL)value
-                              targetRect:(CGRect)targetRect {
+                              targetRect:(CGRect)targetRect
+                                    item:(SyncSwitchItem*)item {
+  __weak __typeof(self) weakSelf = self;
   if (self.hasPrimaryIdentity) {
+    // If there is a primary identity, sign-in must be already on. So the value
+    // is toggled to off.
+    CHECK(!value, base::NotFatalUntil::M145);
     void (^completion)(BOOL, SceneState*) =
         ^(BOOL success, SceneState* scene_state) {
+          BOOL newValue = !success;
+          // The pref change is in this block in order to ensure it is done even
+          // if weakSelf was set to nil.
           GetApplicationContext()->GetLocalState()->SetBoolean(
-              prefs::kSigninAllowedOnDevice, success ? value : !value);
+              prefs::kSigninAllowedOnDevice, newValue);
+          [weakSelf signoutCompletionWithToggledToValue:newValue
+                                                success:success
+                                                   item:item];
         };
     [self.commandHandler showSignOutFromTargetRect:targetRect
                                         completion:completion];
@@ -532,4 +535,14 @@ bool GetStatusForSigninPolicy() {
     self.allowChromeSigninPreference.value = value;
   }
 }
+
+- (void)signoutCompletionWithToggledToValue:(BOOL)newValue
+                                    success:(BOOL)success
+                                       item:(SyncSwitchItem*)item {
+  if (!success) {
+    item.on = newValue;
+    [self reloadUniqueSection];
+  }
+}
+
 @end

@@ -119,6 +119,12 @@ BASE_FEATURE(kAudioWorkletThreadPool,
              "AudioWorkletThreadPool",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// If enabled, synthetic select metrics are logged.
+// See go/analyzing-synthetic-selects for more details.
+BASE_FEATURE(kAutofillEnableSyntheticSelectMetricsLogging,
+             "AutofillEnableSyntheticSelectMetricsLogging",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, WebFormElement applies the same special case to nested forms
 // as it does for the outermost form. The fix is relevant only to Autofill.
 // For other callers of HTMLFormElement::ListedElements(), which don't traverse
@@ -144,10 +150,6 @@ BASE_FEATURE_PARAM(bool,
                    &kAutoSpeculationRules,
                    "holdback",
                    false);
-
-BASE_FEATURE(kAvoidForcedLayoutOnInitialEmptyDocumentInSubframe,
-             "AvoidForcedLayoutOnInitialEmptyDocumentInSubframe",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // TODO(https://crbug.com/327075943): Delete this.
 BASE_FEATURE(kBFCacheOpenBroadcastChannel,
@@ -451,11 +453,6 @@ BASE_FEATURE(kClientHintsDeviceMemory_DEPRECATED,
 BASE_FEATURE(kClientHintsResourceWidth_DEPRECATED,
              "ClientHintsResourceWidth_DEPRECATED",
              base::FEATURE_ENABLED_BY_DEFAULT);
-
-// Enable `form-factor` client hint for XR devices.
-BASE_FEATURE(kClientHintsXRFormFactor,
-             "ClientHintsXRFormFactor",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Enable legacy `viewport-width` client hint.
 BASE_FEATURE(kClientHintsViewportWidth_DEPRECATED,
@@ -1995,6 +1992,10 @@ BASE_FEATURE(kNoForcedFrameUpdatesForWebTests,
              "NoForcedFrameUpdatesForWebTests",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kNoReferrerForPreloadFromSubresource,
+             "NoReferrerForPreloadFromSubresource",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 BASE_FEATURE(kNoThrottlingVisibleAgent,
              "NoThrottlingVisibleAgent",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -2027,10 +2028,6 @@ BASE_FEATURE(kOriginTrialStateHostApplyFeatureDiff,
 
 // Enable defer commits to avoid flash of unstyled content, for all navigations.
 BASE_FEATURE(kPaintHolding, "PaintHolding", base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kParkableImagesToDisk,
-             "ParkableImagesToDisk",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_CHROMEOS)
 // A parameter to exclude or not exclude CanvasFontCache from
@@ -2157,11 +2154,6 @@ BASE_FEATURE(kPrerender2EarlyDocumentLifecycleUpdate,
              "Prerender2EarlyDocumentLifecycleUpdate",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Enable limiting previews loading hints to specific resource types.
-BASE_FEATURE(kPreviewsResourceLoadingHintsSpecificResourceTypes,
-             "PreviewsResourceLoadingHintsSpecificResourceTypes",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 #if BUILDFLAG(IS_WIN)
 BASE_FEATURE(kPrewarmDefaultFontFamilies,
              "PrewarmDefaultFontFamilies",
@@ -2264,10 +2256,6 @@ BASE_FEATURE_PARAM(bool,
 BASE_FEATURE(kForceProduceCompileHints,
              "ForceProduceCompileHints",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-BASE_FEATURE(kConsumeCompileHints,
-             "ConsumeCompileHints",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kLocalCompileHints,
              "LocalCompileHints",
@@ -2644,6 +2632,11 @@ BASE_FEATURE(kEmulateLoadStartedForInspectorOncePerResource,
              "kEmulateLoadStartedForInspectorOncePerResource",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Whether force-showing popovers is enabled.
+BASE_FEATURE(kDevToolsAllowPopoverForcing,
+             "DevToolsAllowPopoverForcing",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 // If enabled, the usage of unload handlers causes a blocklisted reason for
 // BFCache. The purpose is to capture their source location.
 BASE_FEATURE(kUnloadBlocklisted,
@@ -2860,10 +2853,6 @@ BASE_FEATURE(kWorkerThreadRespectTermRequest,
              "WorkerThreadRespectTermRequest",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kNoReferrerForPreloadFromSubresource,
-             "NoReferrerForPreloadFromSubresource",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // When adding new features or constants for features, please keep the features
 // sorted by identifier name (e.g. `kAwesomeFeature`), and the constants for
 // that feature grouped with the associated feature.
@@ -2896,10 +2885,6 @@ bool IsFencedFramesEnabled() {
 bool IsParkableStringsToDiskEnabled() {
   // Always enabled as soon as compression is enabled.
   return base::FeatureList::IsEnabled(kCompressParkableStrings);
-}
-
-bool IsParkableImagesToDiskEnabled() {
-  return base::FeatureList::IsEnabled(kParkableImagesToDisk);
 }
 
 bool IsSetIntervalWithoutClampEnabled() {

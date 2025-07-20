@@ -16,7 +16,7 @@
 #include "base/system/sys_info.h"
 #include "base/task/bind_post_task.h"
 #include "chromeos/ash/experiences/arc/video_accelerator/arc_video_accelerator_util.h"
-#include "gpu/ipc/common/gpu_memory_buffer_impl_native_pixmap.h"
+#include "gpu/ipc/service/arc_shared_image_interface.h"
 #include "media/base/bitrate.h"
 #include "media/base/bitstream_buffer.h"
 #include "media/base/color_plane_layout.h"
@@ -47,9 +47,11 @@ constexpr size_t kMaxConcurrentClients = 8;
 size_t GpuArcVideoEncodeAccelerator::client_count_ = 0;
 
 GpuArcVideoEncodeAccelerator::GpuArcVideoEncodeAccelerator(
+    scoped_refptr<gpu::ArcSharedImageInterface> sii,
     const gpu::GpuPreferences& gpu_preferences,
     const gpu::GpuDriverBugWorkarounds& gpu_workarounds)
-    : gpu_preferences_(gpu_preferences),
+    : sii_(sii),
+      gpu_preferences_(gpu_preferences),
       gpu_workarounds_(gpu_workarounds),
       bitstream_buffer_serial_(0),
       client_native_pixmap_factory_(
@@ -204,16 +206,13 @@ void GpuArcVideoEncodeAccelerator::Encode(
     client_->NotifyError(Error::kInvalidArgumentError);
     return;
   }
-  auto gpu_memory_buffer =
-      gpu::GpuMemoryBufferImplNativePixmap::CreateFromHandle(
-          client_native_pixmap_factory_.get(), std::move(gmb_handle).value(),
-          coded_size_, *buffer_format,
-          gfx::BufferUsage::VEA_READ_CAMERA_AND_CPU_READ_WRITE,
-          base::NullCallback());
-
-  auto frame = media::VideoFrame::WrapExternalGpuMemoryBuffer(
-      gfx::Rect(visible_size_), visible_size_, std::move(gpu_memory_buffer),
+  auto frame = media::VideoFrame::WrapExternalGpuMemoryBufferHandle(
+      gfx::Rect(visible_size_), visible_size_,
+      client_native_pixmap_factory_.get(), std::move(gmb_handle).value(),
+      coded_size_, *buffer_format,
+      gfx::BufferUsage::VEA_READ_CAMERA_AND_CPU_READ_WRITE,
       base::Microseconds(timestamp));
+
   if (!frame) {
     DLOG(ERROR) << "Failed to create VideoFrame";
     client_->NotifyError(Error::kInvalidArgumentError);

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "base/barrier_closure.h"
+#include "base/feature_list.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/memory/raw_ptr.h"
@@ -14,6 +15,9 @@
 #include "build/build_config.h"
 #include "chrome/browser/chrome_content_browser_client.h"
 #include "chrome/browser/devtools/devtools_window_testing.h"
+#include "chrome/browser/media/media_engagement_service.h"
+#include "chrome/browser/media/media_engagement_service_factory.h"
+#include "chrome/browser/media/mock_media_engagement_service.h"
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "chrome/browser/platform_util.h"
 #include "chrome/browser/ui/browser.h"
@@ -27,6 +31,7 @@
 #include "chrome/browser/ui/views/overlay/toggle_microphone_button.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/media_session.h"
@@ -224,7 +229,15 @@ void WaitForTitle(content::WebContents* web_contents,
 class VideoPictureInPictureWindowControllerBrowserTest
     : public InProcessBrowserTest {
  public:
-  VideoPictureInPictureWindowControllerBrowserTest() = default;
+  VideoPictureInPictureWindowControllerBrowserTest()
+      : dependency_manager_subscription_(
+            BrowserContextDependencyManager::GetInstance()
+                ->RegisterCreateServicesCallbackForTesting(base::BindRepeating(
+                    &VideoPictureInPictureWindowControllerBrowserTest::
+                        SetTestingFactory,
+                    // base::Unretained() is safe because `this` outlives the
+                    // dependency manager subscription.
+                    base::Unretained(this)))) {}
 
   VideoPictureInPictureWindowControllerBrowserTest(
       const VideoPictureInPictureWindowControllerBrowserTest&) = delete;
@@ -253,6 +266,24 @@ class VideoPictureInPictureWindowControllerBrowserTest
   VideoOverlayWindowViews* GetOverlayWindow() {
     return static_cast<VideoOverlayWindowViews*>(
         window_controller()->GetWindowForTesting());
+  }
+
+  SimpleOverlayWindowImageButton* GetNextSlideButton() {
+    // For the updated controls, there's only one shared next button.
+    if (base::FeatureList::IsEnabled(
+            media::kVideoPictureInPictureControlsUpdate2024)) {
+      return GetOverlayWindow()->next_track_controls_view_for_testing();
+    }
+    return GetOverlayWindow()->next_slide_controls_view_for_testing();
+  }
+
+  SimpleOverlayWindowImageButton* GetPreviousSlideButton() {
+    // For the updated controls, there's only one shared previous button.
+    if (base::FeatureList::IsEnabled(
+            media::kVideoPictureInPictureControlsUpdate2024)) {
+      return GetOverlayWindow()->previous_track_controls_view_for_testing();
+    }
+    return GetOverlayWindow()->previous_slide_controls_view_for_testing();
   }
 
   void LoadTabAndEnterPictureInPicture(Browser* browser,
@@ -327,11 +358,33 @@ class VideoPictureInPictureWindowControllerBrowserTest
     views::test::ButtonTestApi(button).NotifyClick(event);
   }
 
+  MediaEngagementService* GetMediaEngagementService() const {
+    return MediaEngagementServiceFactory::GetForProfile(browser()->profile());
+  }
+
+  void SetExpectedHasHighEngagement(bool has_high_engagenent) const {
+    auto* mock_media_engagement_service =
+        static_cast<MockMediaEngagementService*>(GetMediaEngagementService());
+    EXPECT_CALL(*mock_media_engagement_service, HasHighEngagement(testing::_))
+        .WillRepeatedly(testing::Return(has_high_engagenent));
+  }
+
+  bool IsTrustedForMediaPlayback() {
+    return GetOverlayWindow()->IsTrustedForMediaPlayback();
+  }
+
+ protected:
+  void SetTestingFactory(content::BrowserContext* context) {
+    MediaEngagementServiceFactory::GetInstance()->SetTestingFactory(
+        context, base::BindRepeating(&BuildMockMediaEngagementService));
+  }
+
  private:
   raw_ptr<content::VideoPictureInPictureWindowController,
           AcrossTasksDanglingUntriaged>
       pip_window_controller_ = nullptr;
   MockVideoPictureInPictureWindowController mock_controller_;
+  base::CallbackListSubscription dependency_manager_subscription_;
 };
 
 // Checks the creation of the window controller, as well as basic window
@@ -423,8 +476,7 @@ class PictureInPicturePixelComparisonBrowserTest
     return gfx::PNGCodec::Decode(png_data.value());
   }
 
-  void TakeOverlayWindowScreenshot(const gfx::Size& window_size,
-                                   bool controls_visible) {
+  void TakeOverlayWindowScreenshot(const gfx::Size& window_size) {
     for (int i = 0; i < 2; ++i) {
       WidgetSizeChangeWaiter bounds_change_waiter(GetOverlayWindow(),
                                                   window_size);
@@ -435,8 +487,9 @@ class PictureInPicturePixelComparisonBrowserTest
       const auto initial_count = bounds_change_waiter.bounds_change_count();
 
       // Make sure native widget events won't unexpectedly hide or show the
-      // controls.
-      GetOverlayWindow()->ForceControlsVisibleForTesting(controls_visible);
+      // controls nor the title and scrim.
+      GetOverlayWindow()->ForceControlsVisibleForTesting(
+          /*controls_visible=*/false, /*title_and_scrim_visible=*/false);
 
       ui::Layer* const layer = GetOverlayWindow()->GetRootView()->layer();
       layer->CompleteAllAnimations();
@@ -521,7 +574,7 @@ IN_PROC_BROWSER_TEST_F(PictureInPicturePixelComparisonBrowserTest, VideoPlay) {
 
   ASSERT_EQ(true, EvalJs(active_web_contents, "play();"));
 
-  TakeOverlayWindowScreenshot({402, 268}, /*controls_visible=*/false);
+  TakeOverlayWindowScreenshot({402, 268});
 
   base::FilePath expected_image_path =
       GetFilePath(FILE_PATH_LITERAL("pixel_expected_video_play.png"));
@@ -1367,10 +1420,10 @@ IN_PROC_BROWSER_TEST_F(VideoPictureInPictureWindowControllerBrowserTest,
 }
 
 #if BUILDFLAG(IS_CHROMEOS)
-// Tests that the back-to-tab, close, and resize controls move properly as
-// the window changes quadrants.
+// Tests that the close and resize controls move properly as the window changes
+// quadrants.
 IN_PROC_BROWSER_TEST_F(VideoPictureInPictureWindowControllerBrowserTest,
-                       MovingQuadrantsMovesBackToTabAndResizeControls) {
+                       MovingQuadrantsMovesCloseAndResizeControls) {
   GURL test_page_url = ui_test_utils::GetTestUrl(
       base::FilePath(base::FilePath::kCurrentDirectory),
       base::FilePath(kPictureInPictureWindowSizePage));
@@ -1419,9 +1472,16 @@ IN_PROC_BROWSER_TEST_F(VideoPictureInPictureWindowControllerBrowserTest,
   resize_button_position =
       GetOverlayWindow()->resize_handle_position_for_testing();
 
-  // The close button should be in the top left corner.
-  EXPECT_GT(center.x(), close_button_position.x());
-  EXPECT_GT(center.y(), close_button_position.y());
+  if (base::FeatureList::IsEnabled(
+          media::kVideoPictureInPictureControlsUpdate2024)) {
+    // For the updated UI, the close button should not move.
+    EXPECT_LT(center.x(), close_button_position.x());
+    EXPECT_GT(center.y(), close_button_position.y());
+  } else {
+    // The close button should be in the top left corner.
+    EXPECT_GT(center.x(), close_button_position.x());
+    EXPECT_GT(center.y(), close_button_position.y());
+  }
   // The resize button should be in the top right corner.
   EXPECT_LT(center.x(), resize_button_position.x());
   EXPECT_GT(center.y(), resize_button_position.y());
@@ -1683,6 +1743,12 @@ class MediaSessionVideoPictureInPictureWindowControllerBrowserTest
 IN_PROC_BROWSER_TEST_F(
     MediaSessionVideoPictureInPictureWindowControllerBrowserTest,
     SkipAdButtonVisibility) {
+  // Skip for the updated UI, as it does not yet implement a skip ad button.
+  if (base::FeatureList::IsEnabled(
+          media::kVideoPictureInPictureControlsUpdate2024)) {
+    return;
+  }
+
   LoadTabAndEnterPictureInPicture(
       browser(), base::FilePath(kPictureInPictureWindowSizePage));
   ASSERT_NE(GetOverlayWindow(), nullptr);
@@ -1828,8 +1894,7 @@ IN_PROC_BROWSER_TEST_F(
   ASSERT_NE(GetOverlayWindow(), nullptr);
 
   // Next Slide button is not displayed initially.
-  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible(
-      {GetOverlayWindow()->next_slide_controls_view_for_testing()}, false));
+  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible({GetNextSlideButton()}, false));
 
   content::WebContents* active_web_contents =
       browser()->tab_strip_model()->GetActiveWebContents();
@@ -1838,14 +1903,12 @@ IN_PROC_BROWSER_TEST_F(
   // set.
   ASSERT_TRUE(ExecJs(active_web_contents,
                      "setMediaSessionActionHandler('nextslide');"));
-  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible(
-      {GetOverlayWindow()->next_slide_controls_view_for_testing()}, true));
+  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible({GetNextSlideButton()}, true));
 
   // Unset action handler and check that Next Slide button is not displayed.
   ASSERT_TRUE(ExecJs(active_web_contents,
                      "unsetMediaSessionActionHandler('nextslide');"));
-  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible(
-      {GetOverlayWindow()->next_slide_controls_view_for_testing()}, false));
+  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible({GetNextSlideButton()}, false));
 }
 
 // Tests that a Previous Slide button is displayed in the Picture-in-Picture
@@ -1857,8 +1920,8 @@ IN_PROC_BROWSER_TEST_F(
       browser(), base::FilePath(kPictureInPictureWindowSizePage));
 
   // Previous Slide button is not displayed initially.
-  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible(
-      {GetOverlayWindow()->previous_slide_controls_view_for_testing()}, false));
+  EXPECT_NO_FATAL_FAILURE(
+      AssertControlsVisible({GetPreviousSlideButton()}, false));
 
   content::WebContents* active_web_contents =
       browser()->tab_strip_model()->GetActiveWebContents();
@@ -1867,14 +1930,14 @@ IN_PROC_BROWSER_TEST_F(
   // been set.
   ASSERT_TRUE(ExecJs(active_web_contents,
                      "setMediaSessionActionHandler('previousslide');"));
-  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible(
-      {GetOverlayWindow()->previous_slide_controls_view_for_testing()}, true));
+  EXPECT_NO_FATAL_FAILURE(
+      AssertControlsVisible({GetPreviousSlideButton()}, true));
 
   // Unset action handler and check that Previous Slide button is not displayed.
   ASSERT_TRUE(ExecJs(active_web_contents,
                      "unsetMediaSessionActionHandler('previousslide');"));
-  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible(
-      {GetOverlayWindow()->previous_slide_controls_view_for_testing()}, false));
+  EXPECT_NO_FATAL_FAILURE(
+      AssertControlsVisible({GetPreviousSlideButton()}, false));
 }
 
 // Tests that clicking the Skip Ad button in the Picture-in-Picture window
@@ -1882,6 +1945,12 @@ IN_PROC_BROWSER_TEST_F(
 IN_PROC_BROWSER_TEST_F(
     MediaSessionVideoPictureInPictureWindowControllerBrowserTest,
     SkipAdHandlerCalled) {
+  // Skip for the updated UI, as it does not yet implement a skip ad button.
+  if (base::FeatureList::IsEnabled(
+          media::kVideoPictureInPictureControlsUpdate2024)) {
+    return;
+  }
+
   LoadTabAndEnterPictureInPicture(
       browser(), base::FilePath(kPictureInPictureWindowSizePage));
   content::WebContents* active_web_contents =
@@ -2016,8 +2085,7 @@ IN_PROC_BROWSER_TEST_F(
                        VideoOverlayWindowViews::PlaybackState::kPlaying);
 
   // Make sure the action handler is set before trying to invoke the action.
-  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible(
-      {GetOverlayWindow()->next_slide_controls_view_for_testing()}, true));
+  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible({GetNextSlideButton()}, true));
 
   // Simulates user clicking "Next Slide" and check the handler function is
   // called.
@@ -2041,8 +2109,8 @@ IN_PROC_BROWSER_TEST_F(
                        VideoOverlayWindowViews::PlaybackState::kPlaying);
 
   // Make sure the action handler is set before trying to invoke the action.
-  EXPECT_NO_FATAL_FAILURE(AssertControlsVisible(
-      {GetOverlayWindow()->previous_slide_controls_view_for_testing()}, true));
+  EXPECT_NO_FATAL_FAILURE(
+      AssertControlsVisible({GetPreviousSlideButton()}, true));
 
   // Simulates user clicking "Previous Slide" and check the handler function is
   // called.
@@ -2182,4 +2250,144 @@ IN_PROC_BROWSER_TEST_F(VideoPictureInPictureWindowControllerBrowserTest,
   // page title.
   ClickButton(hang_up_button);
   WaitForTitle(active_web_contents, u"hangup");
+}
+
+IN_PROC_BROWSER_TEST_F(VideoPictureInPictureWindowControllerBrowserTest,
+                       IsTrustedForMediaPlayback_FileScheme) {
+  LoadTabAndEnterPictureInPicture(
+      browser(), base::FilePath(kPictureInPictureWindowSizePage));
+  content::WebContents* active_web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(active_web_contents->GetLastCommittedURL().SchemeIsFile());
+
+  // Set MediaSession Play action handler to ensure a MediaSession routed frame
+  // is created.
+  ASSERT_TRUE(
+      ExecJs(active_web_contents, "setMediaSessionActionHandler('play');"));
+
+  // Verify that the overlay window is trusted for media playback.
+  EXPECT_TRUE(IsTrustedForMediaPlayback());
+}
+
+IN_PROC_BROWSER_TEST_F(VideoPictureInPictureWindowControllerBrowserTest,
+                       IsTrustedForMediaPlayback_LowEngagement) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(),
+      embedded_test_server()->GetURL(
+          "example.com", "/media/picture-in-picture/window-size.html")));
+
+  content::WebContents* active_web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(active_web_contents);
+
+  SetUpWindowController(active_web_contents);
+  ASSERT_TRUE(window_controller() != nullptr);
+
+  // Open Picture-in-Picture window.
+  ASSERT_EQ(true, EvalJs(active_web_contents, "enterPictureInPicture();"));
+  EXPECT_TRUE(window_controller()->GetWindowForTesting()->IsVisible());
+
+  ASSERT_TRUE(active_web_contents->GetLastCommittedURL().SchemeIsHTTPOrHTTPS());
+
+  // Set MediaSession Play action handler to ensure a MediaSession routed frame
+  // is created.
+  ASSERT_TRUE(
+      ExecJs(active_web_contents, "setMediaSessionActionHandler('play');"));
+
+  // Verify that the overlay window is not trusted for media playback.
+  SetExpectedHasHighEngagement(false);
+  EXPECT_FALSE(IsTrustedForMediaPlayback());
+}
+
+IN_PROC_BROWSER_TEST_F(VideoPictureInPictureWindowControllerBrowserTest,
+                       IsTrustedForMediaPlayback_HighEngagement) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(),
+      embedded_test_server()->GetURL(
+          "example.com", "/media/picture-in-picture/window-size.html")));
+
+  content::WebContents* active_web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(active_web_contents);
+
+  SetUpWindowController(active_web_contents);
+  ASSERT_TRUE(window_controller() != nullptr);
+
+  // Open Picture-in-Picture window.
+  ASSERT_EQ(true, EvalJs(active_web_contents, "enterPictureInPicture();"));
+  EXPECT_TRUE(window_controller()->GetWindowForTesting()->IsVisible());
+
+  ASSERT_TRUE(active_web_contents->GetLastCommittedURL().SchemeIsHTTPOrHTTPS());
+
+  // Set MediaSession Play action handler to ensure a MediaSession routed frame
+  // is created.
+  ASSERT_TRUE(
+      ExecJs(active_web_contents, "setMediaSessionActionHandler('play');"));
+
+  // Verify that the overlay window is trusted for media playback.
+  SetExpectedHasHighEngagement(true);
+  EXPECT_TRUE(IsTrustedForMediaPlayback());
+}
+
+IN_PROC_BROWSER_TEST_F(VideoPictureInPictureWindowControllerBrowserTest,
+                       IsTrustedForMediaPlayback_RemoteIframe) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(),
+      embedded_test_server()->GetURL(
+          "a.com", "/media/picture_in_picture/iframe-one-video.html")));
+
+  content::WebContents* active_web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(active_web_contents);
+  WaitForTitle(active_web_contents, u"iframe loaded");
+
+  SetUpWindowController(active_web_contents);
+  ASSERT_TRUE(window_controller() != nullptr);
+
+  // Get the render frame host for main_frame (a.com) and sub_frame (b.com).
+  auto* main_frame = active_web_contents->GetPrimaryMainFrame();
+  auto* sub_frame = ChildFrameAt(main_frame, 0);
+  ASSERT_TRUE(sub_frame);
+
+  // Set MediaSession Play action handler to ensure a MediaSession routed frame
+  // is created.
+  ASSERT_TRUE(ExecJs(sub_frame, "setMediaSessionPlayActionHandler();"));
+
+  // Add picture-in-picture event listener to sub frame.
+  ASSERT_TRUE(ExecJs(sub_frame, "addPictureInPictureEventListeners();"));
+
+  // Enter Picture-in-Picture from the iframe.
+  ASSERT_TRUE(ExecJs(main_frame, "enterPictureInPicture();"));
+  EXPECT_TRUE(window_controller()->GetWindowForTesting()->IsVisible());
+
+  // Verify that the overlay window is not trusted for media playback, even with
+  // high media engagement.
+  SetExpectedHasHighEngagement(true);
+  EXPECT_FALSE(IsTrustedForMediaPlayback());
+}
+
+IN_PROC_BROWSER_TEST_F(VideoPictureInPictureWindowControllerBrowserTest,
+                       IsTrustedForMediaPlayback_NoRoutedFrame) {
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(),
+      embedded_test_server()->GetURL(
+          "example.com", "/media/picture-in-picture/window-size.html")));
+
+  content::WebContents* active_web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(active_web_contents);
+
+  SetUpWindowController(active_web_contents);
+  ASSERT_TRUE(window_controller() != nullptr);
+
+  // Open Picture-in-Picture window.
+  ASSERT_EQ(true, EvalJs(active_web_contents, "enterPictureInPicture();"));
+  EXPECT_TRUE(window_controller()->GetWindowForTesting()->IsVisible());
+
+  ASSERT_TRUE(active_web_contents->GetLastCommittedURL().SchemeIsHTTPOrHTTPS());
+
+  // Verify that the overlay window is not trusted for media playback, even with
+  // high media engagement.
+  SetExpectedHasHighEngagement(true);
+  EXPECT_FALSE(IsTrustedForMediaPlayback());
 }

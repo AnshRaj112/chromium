@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/check_deref.h"
 #include "base/functional/bind.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string_util.h"
@@ -18,6 +19,7 @@
 #include "components/autofill/core/browser/metrics/autofill_metrics.h"
 #include "components/autofill/core/browser/studies/autofill_experiments.h"
 #include "components/autofill/core/browser/suggestions/suggestion.h"
+#include "components/autofill/core/browser/suggestions/suggestion_type.h"
 #include "components/autofill/core/browser/webdata/autocomplete/autocomplete_entry.h"
 #include "components/autofill/core/common/autofill_clock.h"
 #include "components/autofill/core/common/autofill_features.h"
@@ -44,13 +46,14 @@ AutocompleteHistoryManager::~AutocompleteHistoryManager() {
   CancelPendingQuery();
 }
 
-bool AutocompleteHistoryManager::OnGetSingleFieldSuggestions(
+void AutocompleteHistoryManager::OnGetSingleFieldSuggestions(
     const FormFieldData& field,
     const AutofillClient& client,
-    SingleFieldFillRouter::OnSuggestionsReturnedCallback&
+    SingleFieldFillRouter::OnSuggestionsReturnedCallback
         on_suggestions_returned) {
   if (!field.should_autocomplete()) {
-    return false;
+    std::move(on_suggestions_returned).Run(field.global_id(), {});
+    return;
   }
 
   CancelPendingQuery();
@@ -62,10 +65,10 @@ bool AutocompleteHistoryManager::OnGetSingleFieldSuggestions(
       IsInAutofillSuggestionsDisabledExperiment()) {
     SendSuggestions({}, QueryHandler(field.global_id(), field.value(),
                                      std::move(on_suggestions_returned)));
-    return true;
+    return;
   }
 
-  return GetFormValuesForElementName(field, on_suggestions_returned);
+  GetFormValuesForElementName(field, std::move(on_suggestions_returned));
 }
 
 void AutocompleteHistoryManager::OnWillSubmitFormWithFields(
@@ -104,32 +107,12 @@ void AutocompleteHistoryManager::OnRemoveCurrentSingleFieldSuggestion(
 
 void AutocompleteHistoryManager::OnSingleFieldSuggestionSelected(
     const Suggestion& suggestion) {
-  // Try to find the AutofillEntry associated with the given suggestion.
-  auto last_entries_iter = last_entries_.find(suggestion.main_text.value);
-  if (last_entries_iter == last_entries_.end()) {
-    // Not found, therefore nothing to do. Most likely there was a race
-    // condition, but it's not that big of a deal in the current scenario
-    // (logging metrics).
-    DUMP_WILL_BE_NOTREACHED();
-    return;
-  }
-
+  CHECK_EQ(suggestion.type, SuggestionType::kAutocompleteEntry);
+  const AutocompleteEntry& entry =
+      CHECK_DEREF(std::get_if<AutocompleteEntry>(&suggestion.payload));
   // The AutocompleteEntry was found, use it to log the DaysSinceLastUsed.
-  base::TimeDelta time_delta =
-      base::Time::Now() - last_entries_iter->second.date_last_used();
+  base::TimeDelta time_delta = base::Time::Now() - entry.date_last_used();
   AutofillMetrics::LogAutocompleteDaysSinceLastUse(time_delta.InDays());
-
-  // Log metric to give details on how likely users are to ignore an
-  // autocomplete suggestion based on when it was last used.
-  for (const auto& entry : last_entries_) {
-    if (entry.first == suggestion.main_text.value) {
-      continue;
-    }
-    base::TimeDelta unaccepted_suggestion_time_delta =
-        base::Time::Now() - entry.second.date_last_used();
-    AutofillMetrics::LogUnacceptedAutocompleteSuggestionDaysSinceLastUse(
-        unaccepted_suggestion_time_delta.InDays());
-  }
 }
 
 void AutocompleteHistoryManager::Init(
@@ -154,37 +137,9 @@ void AutocompleteHistoryManager::Init(
     if (version_info::GetMajorVersionNumberAsInt() > last_cleaned_version) {
       // Trigger the cleanup.
       profile_database_->RemoveExpiredAutocompleteEntries(base::BindOnce(
-          &AutocompleteHistoryManager::OnWebDataServiceRequestDone,
-          weak_ptr_factory_.GetWeakPtr(), std::nullopt));
+        &AutocompleteHistoryManager::OnAutofillCleanupReturned,
+        weak_ptr_factory_.GetWeakPtr()));
     }
-  }
-}
-
-void AutocompleteHistoryManager::OnWebDataServiceRequestDone(
-    std::optional<QueryHandler> query_handler,
-    WebDataServiceBase::Handle current_handle,
-    std::unique_ptr<WDTypedResult> result) {
-  DCHECK(current_handle);
-
-  if (!result) {
-    // Returning early here if |result| is null.  We've seen this happen on
-    // Linux due to NFS dismounting and causing sql failures.
-    // See http://crbug.com/68783.
-    return;
-  }
-
-  WDResultType result_type = result->GetType();
-  switch (result_type) {
-    case AUTOFILL_VALUE_RESULT:
-      DCHECK(query_handler);
-      OnAutofillValuesReturned(current_handle, std::move(result),
-            *std::move(query_handler));
-      break;
-    case AUTOFILL_CLEANUP_RESULT:
-      OnAutofillCleanupReturned(current_handle, std::move(result));
-      break;
-    default:
-      break;
   }
 }
 
@@ -196,20 +151,21 @@ bool AutocompleteHistoryManager::IsFieldNameMeaningfulForAutocomplete(
   return !MatchesRegex<kRegex>(name);
 }
 
-bool AutocompleteHistoryManager::GetFormValuesForElementName(
+void AutocompleteHistoryManager::GetFormValuesForElementName(
     const FormFieldData& field,
-    SingleFieldFillRouter::OnSuggestionsReturnedCallback&
+    SingleFieldFillRouter::OnSuggestionsReturnedCallback
         on_suggestions_returned) {
-  if (profile_database_) {
-    pending_query_ = profile_database_->GetFormValuesForElementName(
-        field.name(), field.value(), kMaxAutocompleteMenuItems,
-        base::BindOnce(&AutocompleteHistoryManager::OnWebDataServiceRequestDone,
-                       weak_ptr_factory_.GetWeakPtr(),
-                       QueryHandler(field.global_id(), field.value(),
-                                    std::move(on_suggestions_returned))));
-    return true;
+  if (!profile_database_) {
+    std::move(on_suggestions_returned).Run(field.global_id(), {});
+    return;
   }
-  return false;
+
+  pending_query_ = profile_database_->GetFormValuesForElementName(
+      field.name(), field.value(), kMaxAutocompleteMenuItems,
+      base::BindOnce(&AutocompleteHistoryManager::OnAutofillValuesReturned,
+                      weak_ptr_factory_.GetWeakPtr(),
+                      QueryHandler(field.global_id(), field.value(),
+                                  std::move(on_suggestions_returned))));
 }
 
 AutocompleteHistoryManager::QueryHandler::QueryHandler(
@@ -238,12 +194,11 @@ void AutocompleteHistoryManager::SendSuggestions(
       entries.size() == 1 && query_handler.prefix == entries[0].key().value();
 
   std::vector<Suggestion> suggestions;
-  last_entries_.clear();
-
   if (!hide_suggestions) {
     for (const AutocompleteEntry& entry : entries) {
-      suggestions.push_back(Suggestion(entry.key().value()));
-      last_entries_.insert({entry.key().value(), AutocompleteEntry(entry)});
+      suggestions.emplace_back(entry.key().value(),
+                               SuggestionType::kAutocompleteEntry);
+      suggestions.back().payload = entry;
     }
   }
 
@@ -252,10 +207,15 @@ void AutocompleteHistoryManager::SendSuggestions(
 }
 
 void AutocompleteHistoryManager::OnAutofillValuesReturned(
+    QueryHandler query_handler,
     WebDataServiceBase::Handle current_handle,
-    std::unique_ptr<WDTypedResult> result,
-    QueryHandler query_handler) {
-  DCHECK(result);
+    std::unique_ptr<WDTypedResult> result) {
+  if (!result) {
+    // Returning early here if `result` is null.  We've seen this happen on
+    // Linux due to NFS dismounting and causing sql failures.
+    // See http://crbug.com/68783.
+    return;
+  }
   DCHECK_EQ(AUTOFILL_VALUE_RESULT, result->GetType());
 
   if (!pending_query_ || *pending_query_ != current_handle) {

@@ -128,13 +128,14 @@ class Json5File(object):
     def load_override_file(self, file_path):
         assert file_path.endswith(".json5")
 
-        self.file_paths.append(file_path)
-
         name_dict = {}
         overrides_list = []
         with open(os.path.abspath(file_path), encoding='utf-8') as json5_file:
             doc = json5.loads(json5_file.read())
             items = doc["data"]
+            if len(items) > 0:
+                self.file_paths.append(file_path)
+
             if type(items) is list:
                 for item in items:
                     entry = self._get_entry(item)

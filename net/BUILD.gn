@@ -302,7 +302,6 @@ component("net") {
     "base/task/task_runner.cc",
     "base/task/task_runner.h",
     "base/trace_event_stub.h",
-    "base/tracing.h",
     "base/transport_info.cc",
     "base/transport_info.h",
     "base/upload_bytes_element_reader.cc",
@@ -1232,6 +1231,8 @@ component("net") {
     sources += [
       "device_bound_sessions/cookie_craving.cc",
       "device_bound_sessions/cookie_craving.h",
+      "device_bound_sessions/host_patterns.cc",
+      "device_bound_sessions/host_patterns.h",
       "device_bound_sessions/jwk_utils.cc",
       "device_bound_sessions/jwk_utils.h",
       "device_bound_sessions/registration_fetcher.cc",
@@ -1806,6 +1807,7 @@ component("net") {
       "disk_cache/sql/sql_entry_impl.h",
       "disk_cache/sql/sql_persistent_store.cc",
       "disk_cache/sql/sql_persistent_store.h",
+      "disk_cache/sql/sql_persistent_store_queries.h",
     ]
     deps += [ "//sql:sql" ]
   }
@@ -2341,6 +2343,10 @@ static_library("test_support") {
       "reporting/reporting_test_util.h",
     ]
   }
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 if (!is_ios && !is_android) {
@@ -3444,6 +3450,7 @@ target(_test_target_type, "net_unittests") {
   if (enable_device_bound_sessions) {
     sources += [
       "device_bound_sessions/cookie_craving_unittest.cc",
+      "device_bound_sessions/host_patterns_unittest.cc",
       "device_bound_sessions/jwk_utils_unittest.cc",
       "device_bound_sessions/mock_session_service.cc",
       "device_bound_sessions/mock_session_service.h",
@@ -3475,7 +3482,17 @@ target(_test_target_type, "net_unittests") {
       "disk_cache/sql/sql_backend_impl_unittest.cc",
       "disk_cache/sql/sql_persistent_store_unittest.cc",
     ]
+
+    # Platforms where sqlite_dev_shell is defined.
+    if (is_win || is_mac || is_linux || is_chromeos) {
+      sources += [ "disk_cache/sql/sql_persistent_store_queries_unittest.cc" ]
+      data_deps += [ "//third_party/sqlite:sqlite_dev_shell" ]
+    }
   }
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 # !is_android && !is_win && !is_mac

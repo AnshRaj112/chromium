@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">You can download PDFs here</translation>
 <translation id="107147699690128016">If you change the file extension, the file may open in a different application and potentially be a hazard to your device.</translation>
 <translation id="1080365971383768617">Passwords on all of your devices</translation>
-<translation id="1087176310396019910">Possible spam</translation>
 <translation id="1087799850623149508">You can touch and hold to move the address bar to the bottom</translation>
 <translation id="1089606299949659462">Review complete!</translation>
 <translation id="1094555143448724771">To see tabs from your other devices, sync your tabs and history</translation>
@@ -109,6 +108,7 @@ For more settings that use data to improve your Chrome experience, go to <ph nam
 <translation id="1419753403124156396">Restart Chrome?</translation>
 <translation id="1428770807407000502">Turn off sync?</translation>
 <translation id="1430915738399379752">Print</translation>
+<translation id="1433478348197382180">Reading mode</translation>
 <translation id="1435593198351412143">Automatically open PDFs</translation>
 <translation id="1437543266176261764">Running in <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Organise your tracked products in Bookmarks</translation>
@@ -720,6 +720,7 @@ Only someone with your passphrase can read your encrypted data. The passphrase i
 <translation id="4306489587293957491">Enter</translation>
 <translation id="4307992518367153382">Basics</translation>
 <translation id="4311652497846705514">Open PDF?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Possible spam}other{Possible spam (#)}}</translation>
 <translation id="4320177379694898372">No internet connection</translation>
 <translation id="4326079409704643112">To use and save Chrome data in your Google Account, verify that it's you</translation>
 <translation id="433213510553688132">Following…</translation>
@@ -1058,6 +1059,7 @@ Your Google Account may have other forms of browsing history such as searches an
 <translation id="580893287573699959">Manage the topics and sites that you're interested in</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# hour ago}other{# hours ago}}</translation>
 <translation id="5810288467834065221">Copyright <ph name="YEAR" /> Google LLC. All rights reserved.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Show notification}other{Show notifications}}</translation>
 <translation id="5814749351757353073">Keep up with your favourite sites</translation>
 <translation id="5823093032261493462">Do you want to download '<ph name="FILE_NAME" />' from <ph name="DOWNLOAD_DOMAIN" /> anyway?</translation>
 <translation id="5828921839638612740">You can delete the data in Chrome settings</translation>
@@ -1168,6 +1170,7 @@ For example, some websites may respond to this request by showing you ads that a
 <translation id="6255809143828972562">With tools from Chrome, you can browse safely and stay in control</translation>
 <translation id="6264376385120300461">Download anyway</translation>
 <translation id="6264485186158353794">Back to safety</translation>
+<translation id="6267063201726531683">Reading mode bottom sheet</translation>
 <translation id="6277522088822131679">There was a problem printing the page. Please try again.</translation>
 <translation id="6278428485366576908">Theme</translation>
 <translation id="6284472661216707937">Passwords on all your devices closed</translation>
@@ -1191,7 +1194,6 @@ For example, some websites may respond to this request by showing you ads that a
 <translation id="6342069812937806050">Just now</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 and <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> more}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 and <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> more}}</translation>
 <translation id="6345878117466430440">Mark as read</translation>
-<translation id="6347010704471250799">Show notification</translation>
 <translation id="6356893102071098867">Check that you chose the right account.</translation>
 <translation id="6363990818884053551">To start sync, verify that it's you</translation>
 <translation id="6364438453358674297">Remove suggestion from history?</translation>

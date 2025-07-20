@@ -6,8 +6,6 @@
 
 #include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
-#include "build/branding_buildflags.h"
-#include "build/build_config.h"
 
 namespace features {
 
@@ -138,15 +136,6 @@ BASE_FEATURE(kDevToolsSharedProcessInfobar,
              "DevToolsSharedProcessInfobar",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Let DevTools front-end log extensive VisualElements-style UMA metrics for
-// impressions and interactions.
-BASE_FEATURE(kDevToolsVeLogging,
-             "DevToolsVeLogging",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-// Run VE logging in a test mode
-const base::FeatureParam<bool> kDevToolsVeLoggingTesting{
-    &kDevToolsVeLogging, "testing", /*default_value=*/false};
-
 // Whether showing animation styles in the styles tab is enabled.
 BASE_FEATURE(kDevToolsAnimationStylesInStylesTab,
              "DevToolsAnimationStylesInStylesTab",
@@ -168,19 +157,6 @@ BASE_FEATURE(kDevToolsAiGeneratedTimelineLabels,
 BASE_FEATURE(kDevToolsNewPermissionDialog,
              "DevToolsNewPermissionDialog",
              base::FEATURE_ENABLED_BY_DEFAULT);
-
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-// If enabled, DevTools does not accept remote debugging connections unless
-// using a non-default user data dir via the --user-data-dir switch.
-BASE_FEATURE(kDevToolsDebuggingRestrictions,
-             "DevToolsDebuggingRestrictions",
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-             base::FEATURE_ENABLED_BY_DEFAULT
-#else
-             base::FEATURE_DISABLED_BY_DEFAULT
-#endif  // BUILDFLAG(GOOGLE_CHROME_BRANDING)
-);
-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 
 // Whether DevTools drawer can be toggled to vertical orientation.
 BASE_FEATURE(kDevToolsVerticalDrawer,

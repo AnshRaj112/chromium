@@ -131,6 +131,8 @@ BASE_DECLARE_FEATURE(kPreloadTopChromeWebUILessNavigations);
 
 BASE_DECLARE_FEATURE(kPressAndHoldEscToExitBrowserFullscreen);
 
+BASE_DECLARE_FEATURE(kReloadSelectionModel);
+
 BASE_DECLARE_FEATURE(kScrimForBrowserWindowModal);
 
 BASE_DECLARE_FEATURE(KScrimForTabModal);
@@ -139,7 +141,10 @@ BASE_DECLARE_FEATURE(kSideBySide);
 
 BASE_DECLARE_FEATURE_PARAM(base::TimeDelta, kSideBySideShowDropTargetDelay);
 
-BASE_DECLARE_FEATURE_PARAM(int, kSideBySideDropTargetInnerPadding);
+// Feature params for the width of the multi-contents drop target.
+BASE_DECLARE_FEATURE_PARAM(int, kSideBySideDropTargetMinWidth);
+BASE_DECLARE_FEATURE_PARAM(int, kSideBySideDropTargetMaxWidth);
+BASE_DECLARE_FEATURE_PARAM(int, kSideBySideDropTargetTargetWidthPercentage);
 
 enum class MiniToolbarActiveConfiguration {
   // Hides the toolbar in the active view.
@@ -328,6 +333,7 @@ BASE_DECLARE_FEATURE_PARAM(bool, kPageActionsMigrationManagePasswords);
 BASE_DECLARE_FEATURE_PARAM(bool, kPageActionsMigrationCookieControls);
 BASE_DECLARE_FEATURE_PARAM(bool, kPageActionsMigrationAutofillAddress);
 BASE_DECLARE_FEATURE_PARAM(bool, kPageActionsMigrationFind);
+BASE_DECLARE_FEATURE_PARAM(bool, kPageActionsMigrationCollaborationMessaging);
 
 // Determines whether the "save password" page action displays different UI if
 // the user has said to never save passwords for that site.

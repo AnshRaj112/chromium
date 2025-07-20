@@ -377,6 +377,9 @@ std::vector<CapturedSiteParams> GetCapturedSites(
   std::string json_text;
   if (!base::ReadFileToString(config_file_path, &json_text)) {
     LOG(WARNING) << "Could not read json file: " << config_file_path;
+    LOG(WARNING)
+        << "Did you forget to set checkout_chromium_autofill_test_dependencies "
+           "to True in .gclient and gclient sync?";
     return sites;
   }
   // Parse json text content to json value node.
@@ -2164,7 +2167,7 @@ bool TestRecipeReplayer::GetElementProperty(
                  "    }();"
                  "    return function(target){%s}(element);})();",
                  element_xpath.c_str(), get_property_function_body.c_str()));
-  if (result.error.empty() && result.value.is_string()) {
+  if (result.is_string()) {
     *property = result.ExtractString();
     return true;
   }
@@ -2241,13 +2244,12 @@ bool TestRecipeReplayer::PlaceFocusOnElement(
 
   content::EvalJsResult result =
       content::EvalJs(frame, focus_on_target_field_js);
-  if (result.error.empty() && result.value.is_bool() && result.ExtractBool()) {
+  if (result.error.empty() && result.is_bool() && result.ExtractBool()) {
     return true;
   } else {
     VLOG(1) << "Failed to focus element through script:"
             << (result.error.empty()
-                    ? (result.value.is_bool() ? "Not a valid bool"
-                                              : "Returned false")
+                    ? (result.is_bool() ? "Returned false" : "Not a valid bool")
                     : result.error);
 
     // Failing focusing on an element through script, use the less preferred

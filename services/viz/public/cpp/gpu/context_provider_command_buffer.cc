@@ -198,6 +198,8 @@ gpu::ContextResult ContextProviderCommandBuffer::BindToCurrentSequence() {
   } else if (attributes_.enable_raster_interface &&
              !attributes_.enable_gles2_interface &&
              !attributes_.enable_grcontext) {
+    CHECK(!attributes_.bind_generates_resource);
+
     // The raster helper writes the command buffer protocol.
     auto raster_helper =
         std::make_unique<gpu::raster::RasterCmdHelper>(command_buffer_.get());
@@ -218,7 +220,6 @@ gpu::ContextResult ContextProviderCommandBuffer::BindToCurrentSequence() {
     DCHECK(channel_);
     auto raster_impl = std::make_unique<gpu::raster::RasterImplementation>(
         raster_helper.get(), transfer_buffer.get(),
-        attributes_.bind_generates_resource,
         attributes_.lose_context_when_out_of_memory, command_buffer_.get(),
         channel_->image_decode_accelerator_proxy());
     bind_result_ = raster_impl->Initialize(memory_limits_);
@@ -241,6 +242,9 @@ gpu::ContextResult ContextProviderCommandBuffer::BindToCurrentSequence() {
     transfer_buffer_ = std::move(transfer_buffer);
     helper_ = std::move(raster_helper);
   } else {
+    // Temporary check to ensure nothing is using bind_generates_resource.
+    CHECK(!attributes_.bind_generates_resource);
+
     // The GLES2 helper writes the command buffer protocol.
     auto gles2_helper =
         std::make_unique<gpu::gles2::GLES2CmdHelper>(command_buffer_.get());

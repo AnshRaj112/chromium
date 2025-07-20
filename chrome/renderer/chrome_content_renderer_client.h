@@ -21,6 +21,7 @@
 #include "chrome/services/speech/buildflags/buildflags.h"
 #include "components/safe_browsing/buildflags.h"
 #include "components/spellcheck/spellcheck_buildflags.h"
+#include "content/public/common/buildflags.h"
 #include "content/public/renderer/content_renderer_client.h"
 #include "content/public/renderer/render_thread.h"
 #include "extensions/buildflags/buildflags.h"
@@ -28,7 +29,6 @@
 #include "media/media_buildflags.h"
 #include "mojo/public/cpp/bindings/generic_pending_receiver.h"
 #include "mojo/public/cpp/bindings/remote.h"
-#include "ppapi/buildflags/buildflags.h"
 #include "printing/buildflags/buildflags.h"
 #include "services/service_manager/public/cpp/local_interface_provider.h"
 #include "third_party/blink/public/common/thread_safe_browser_interface_broker_proxy.h"
@@ -225,6 +225,8 @@ class ChromeContentRendererClient
   std::unique_ptr<blink::WebLinkPreviewTriggerer> CreateLinkPreviewTriggerer()
       override;
 
+  bool IsContentBasedFingerprintingProtectionEnabled();
+
 #if BUILDFLAG(ENABLE_PLUGINS)
   static blink::WebPlugin* CreatePlugin(
       content::RenderFrame* render_frame,
@@ -277,6 +279,9 @@ class ChromeContentRendererClient
       subresource_filter_ruleset_dealer_;
   std::unique_ptr<fingerprinting_protection_filter::UnverifiedRulesetDealer>
       fingerprinting_protection_ruleset_dealer_;
+  // Copied from `blink::web_prefs::WebPreferences` whenever a new top-level
+  // main frame is created.
+  bool content_based_fingerprinting_protection_enabled_ = false;
 #if BUILDFLAG(SAFE_BROWSING_AVAILABLE)
   std::unique_ptr<safe_browsing::PhishingModelSetterImpl>
       phishing_model_setter_;

@@ -99,6 +99,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &autofill::features::kAutofillEnableRankingFormulaCreditCards,
     &autofill::features::kAutofillEnableCardBenefitsForAmericanExpress,
     &autofill::features::kAutofillEnableCardBenefitsForBmo,
+    &autofill::features::kAutofillEnableFlatRateCardBenefitsFromCurinos,
     &autofill::features::kAutofillEnablePaymentSettingsCardPromoAndScanCard,
     &autofill::features::kAutofillEnablePaymentSettingsCardPromoAndScanCard,
     &autofill::features::kAutofillThirdPartyModeContentProvider,
@@ -204,6 +205,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kAndroidBookmarkBar,
     &kAndroidBottomToolbar,
     &kAndroidElegantTextHeight,
+    &kAndroidFirstRunLaunchBounds,
     &kAndroidNativePagesInNewTab,
     &kAndroidProgressBarVisualUpdate,
     &kAndroidNoVisibleHintForDifferentTLD,
@@ -259,8 +261,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kCCTFixWarmup,
     &kCCTFreInSameTask,
     &kCCTIncognitoAvailableToThirdParty,
-    &kCCTIntentFeatureOverrides,
-    &kCCTMinimized,
     &kCCTMinimizedEnabledByDefault,
     &kCCTNavigationalPrefetch,
     &kCCTNestedSecurityIcon,
@@ -278,6 +278,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kCCTShowTabFix,
     &kCCTTabModalDialog,
     &kCCTToolbarRefactor,
+    &kCCTResetTimeoutEnabled,
     &kChangeUnfocusedPriority,
     &kDefaultBrowserPromoAndroid2,
     &kDisableInstanceLimit,
@@ -299,7 +300,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &kCpaSpecUpdate,
     &kCrossDeviceTabPaneAndroid,
     &kDeviceAuthenticatorAndroidx,
-    &kDrawKeyNativeEdgeToEdge,
     &kEdgeToEdgeBottomChin,
     &kEdgeToEdgeDebugging,
     &kEdgeToEdgeEverywhere,
@@ -472,7 +472,6 @@ const base::Feature* const kFeaturesExposedToJava[] = {
     &sensitive_content::features::kSensitiveContent,
     &sensitive_content::features::kSensitiveContentWhileSwitchingTabs,
     &supervised_user::kPropagateDeviceContentFiltersToSupervisedUser,
-    &switches::kForceStartupSigninPromo,
     &switches::kMitigateLegacySearchEnginePromoOverlap,
     &sync_sessions::kOptimizeAssociateWindowsAndroid,
     &syncer::kWebApkBackupAndRestoreBackend,
@@ -564,6 +563,10 @@ BASE_FEATURE(kAndroidBottomToolbar,
 BASE_FEATURE(kAndroidElegantTextHeight,
              "AndroidElegantTextHeight",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kAndroidFirstRunLaunchBounds,
+             "AndroidFirstRunLaunchBounds",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kAndroidNativePagesInNewTab,
              "AndroidNativePagesInNewTab",
@@ -778,12 +781,6 @@ BASE_FEATURE(kCCTIncognitoAvailableToThirdParty,
              "CCTIncognitoAvailableToThirdParty",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kCCTIntentFeatureOverrides,
-             "CCTIntentFeatureOverrides",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kCCTMinimized, "CCTMinimized", base::FEATURE_ENABLED_BY_DEFAULT);
-
 BASE_FEATURE(kCCTMinimizedEnabledByDefault,
              "CCTMinimizedEnabledByDefault",
              base::FEATURE_ENABLED_BY_DEFAULT);
@@ -862,6 +859,10 @@ BASE_FEATURE(kCCTTabModalDialog,
 
 BASE_FEATURE(kCCTToolbarRefactor,
              "CCTToolbarRefactor",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kCCTResetTimeoutEnabled,
+             "CCTResetTimeoutEnabled",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kChangeUnfocusedPriority,
@@ -948,10 +949,6 @@ BASE_FEATURE(kDefaultBrowserPromoAndroid2,
 // Android with androidx.biometric.
 BASE_FEATURE(kDeviceAuthenticatorAndroidx,
              "DeviceAuthenticatorAndroidx",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kDrawKeyNativeEdgeToEdge,
-             "DrawKeyNativeEdgeToEdge",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kEdgeToEdgeBottomChin,
@@ -1316,7 +1313,7 @@ BASE_FEATURE(kTabStripGroupDragDropAndroid,
 
 BASE_FEATURE(kTabStripLayoutOptimization,
              "TabStripLayoutOptimization",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabStripMouseCloseResizeDelay,
              "TabStripMouseCloseResizeDelay",

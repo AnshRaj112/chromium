@@ -589,6 +589,13 @@ NET_EXPORT extern const base::FeatureParam<bool>
 // the Network panel. Tracked at https://crbug.com/425645896.
 NET_EXPORT extern const base::FeatureParam<bool> kIpPrivacyEnableIppInDevTools;
 
+// Enables the ability for IP protection features to be gated in the Privacy
+// and Security Panel within DevTools. When this flag is disabled, the IP
+// Protection section will not be shown in the DevTools panel, allowing testing
+// and development of the IP Protection features before public release.
+NET_EXPORT extern const base::FeatureParam<bool>
+    kIpPrivacyEnableIppPanelInDevTools;
+
 // Maximum report body size (KB) to include in serialized reports. Bodies
 // exceeding this are omitted when kExcludeLargeBodyReports is enabled.  Use
 // Reporting.ReportBodySize UMA histogram to monitor report body sizes and
@@ -721,10 +728,6 @@ NET_EXPORT BASE_DECLARE_FEATURE(kFurtherOptimizeParsingDataUrls);
 // If enabled, unrecognized keys in a No-Vary-Search header will be ignored.
 // Otherwise, unrecognized keys are treated as if the header was invalid.
 NET_EXPORT BASE_DECLARE_FEATURE(kNoVarySearchIgnoreUnrecognizedKeys);
-
-// If enabled, then a cookie entry containing both encrypted and plaintext
-// values is considered invalid, and the entire eTLD group will be dropped.
-NET_EXPORT BASE_DECLARE_FEATURE(kEncryptedAndPlaintextValuesAreInvalid);
 
 // Kill switch for Static CT Log (aka Tiled Log aka Sunlight)
 // enforcements in Certificate Transparency policy checks. If disabled, SCTs

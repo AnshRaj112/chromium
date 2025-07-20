@@ -1011,6 +1011,7 @@ inline constexpr char kDeviceNativeClientForceAllowed[] =
     "device_native_client_force_allowed";
 inline constexpr char kDeviceNativeClientForceAllowedCache[] =
     "device_native_client_force_allowed_cache";
+inline constexpr char kIsFirstBootForNacl[] = "is_first_boot_for_nacl";
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 // Deprecated 06/2025.
@@ -1034,6 +1035,18 @@ inline constexpr char kAssistantNumSessionsWhereOnboardingShown[] =
 inline constexpr char kAssistantTimeOfLastInteraction[] =
     "ash.assistant.time_of_last_interaction";
 #endif
+
+// Deprecated 07/2025
+constexpr char kOptGuideModelFetcherLastFetchAttempt[] =
+    "optimization_guide.predictionmodelfetcher.last_fetch_attempt";
+constexpr char kOptGuideModelFetcherLastFetchSuccess[] =
+    "optimization_guide.predictionmodelfetcher.last_fetch_success";
+
+#if BUILDFLAG(IS_CHROMEOS)
+// Deprecated 07/2025.
+inline constexpr char kTimeOfFirstFilesAppChipPress[] =
+    "ash.holding_space.time_of_first_files_app_chip_press";
+#endif  // BUILDFLAG(IS_CHROMEOS)
 
 // Register local state used only for migration (clearing or moving to a new
 // key).
@@ -1134,6 +1147,7 @@ void RegisterLocalStatePrefsForMigration(PrefRegistrySimple* registry) {
   registry->RegisterBooleanPref(kNativeClientForceAllowed, false);
   registry->RegisterBooleanPref(kDeviceNativeClientForceAllowed, false);
   registry->RegisterBooleanPref(kDeviceNativeClientForceAllowedCache, false);
+  registry->RegisterBooleanPref(kIsFirstBootForNacl, true);
 #endif  // BUILDFLAG(IS_CHROMEOS)
 }
 
@@ -1445,6 +1459,15 @@ void RegisterProfilePrefsForMigration(
   registry->RegisterIntegerPref(kAssistantNumSessionsWhereOnboardingShown, 0);
   registry->RegisterTimePref(kAssistantTimeOfLastInteraction, base::Time());
 #endif
+
+  // Deprecated 07/2025
+  registry->RegisterInt64Pref(kOptGuideModelFetcherLastFetchAttempt, 0);
+  registry->RegisterInt64Pref(kOptGuideModelFetcherLastFetchSuccess, 0);
+
+#if BUILDFLAG(IS_CHROMEOS)
+  // Deprecated 07/2025.
+  registry->RegisterTimePref(kTimeOfFirstFilesAppChipPress, base::Time());
+#endif  // BUILDFLAG(IS_CHROMEOS)
 }
 
 }  // namespace
@@ -2351,6 +2374,7 @@ void MigrateObsoleteLocalStatePrefs(PrefService* local_state) {
   local_state->ClearPref(kNativeClientForceAllowed);
   local_state->ClearPref(kDeviceNativeClientForceAllowed);
   local_state->ClearPref(kDeviceNativeClientForceAllowedCache);
+  local_state->ClearPref(kIsFirstBootForNacl);
 #endif
 
   // Please don't delete the following line. It is used by PRESUBMIT.py.
@@ -2698,6 +2722,15 @@ void MigrateObsoleteProfilePrefs(PrefService* profile_prefs,
   profile_prefs->ClearPref(kAssistantNumSessionsWhereOnboardingShown);
   profile_prefs->ClearPref(kAssistantTimeOfLastInteraction);
 #endif
+
+  // Added 07/2025
+  profile_prefs->ClearPref(kOptGuideModelFetcherLastFetchAttempt);
+  profile_prefs->ClearPref(kOptGuideModelFetcherLastFetchSuccess);
+
+#if BUILDFLAG(IS_CHROMEOS)
+  // Added 07/2025.
+  profile_prefs->ClearPref(kTimeOfFirstFilesAppChipPress);
+#endif  // BUILDFLAG(IS_CHROMEOS)
 
   // Please don't delete the following line. It is used by PRESUBMIT.py.
   // END_MIGRATE_OBSOLETE_PROFILE_PREFS

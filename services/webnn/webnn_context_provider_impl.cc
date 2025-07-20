@@ -176,10 +176,10 @@ void WebNNContextProviderImpl::OnConnectionError(WebNNContextImpl* impl) {
 
 #if BUILDFLAG(IS_WIN)
 void WebNNContextProviderImpl::DestroyContextsAndKillGpuProcess(
-    std::string_view reason) {
+    const std::string& reason) {
   // Send the contexts lost reason to the renderer process.
   for (const auto& impl : impls_) {
-    impl->ResetReceiverWithReason(reason);
+    impl->OnLost(reason);
   }
 
   std::move(lose_all_contexts_callback_).Run();
@@ -211,7 +211,7 @@ void WebNNContextProviderImpl::CreateWebNNContext(
   base::expected<std::unique_ptr<WebNNContextImpl>, mojom::ErrorPtr>
       context_creation_results;
 
-  if (base::FeatureList::IsEnabled(mojom::features::kWebNNOnnxRuntime)) {
+  if (ort::ShouldCreateOrtContext(*options)) {
     context_creation_results = ort::CreateContextFromOptions(
         std::move(options), gpu_info_, std::move(receiver), this);
     if (!context_creation_results.has_value()) {

@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">Тут можна завантажувати файли PDF</translation>
 <translation id="107147699690128016">Якщо ви зміните розширення файлу, він може відкритися в іншому додатку або зашкодити пристрою.</translation>
 <translation id="1080365971383768617">Паролі на всіх ваших пристроях</translation>
-<translation id="1087176310396019910">Можливо, це спам</translation>
 <translation id="1087799850623149508">Щоб перемістити адресний рядок у нижню частину екрана, натисніть і утримуйте його</translation>
 <translation id="1089606299949659462">Перевірку завершено.</translation>
 <translation id="1094555143448724771">Увімкніть синхронізацію вкладок і історії, щоб переглядати вкладки з інших ваших пристроїв</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">Перезапустити Chrome?</translation>
 <translation id="1428770807407000502">Вимкнути синхронізацію?</translation>
 <translation id="1430915738399379752">Друк</translation>
+<translation id="1433478348197382180">Режим читання</translation>
 <translation id="1435593198351412143">Відкривати файли PDF автоматично</translation>
 <translation id="1437543266176261764">Запущено в додатку <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Впорядковуйте відстежувані товари в закладках</translation>
@@ -720,6 +720,7 @@
 <translation id="4306489587293957491">Ввести</translation>
 <translation id="4307992518367153382">Основні</translation>
 <translation id="4311652497846705514">Відкрити файл PDF?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Можливо, це спам}one{Можливо, це спам (#)}few{Можливо, це спам (#)}many{Можливо, це спам (#)}other{Можливо, це спам (#)}}</translation>
 <translation id="4320177379694898372">Немає з’єднання з Інтернетом</translation>
 <translation id="4326079409704643112">Щоб зберігати й використовувати дані Chrome в обліковому записі Google, підтвердьте свою особу</translation>
 <translation id="433213510553688132">Додавання до підписок…</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">Керуйте темами й сайтами, які вас цікавлять</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# годину тому}one{# годину тому}few{# години тому}many{# годин тому}other{# години тому}}</translation>
 <translation id="5810288467834065221">© Google LLC <ph name="YEAR" />. Усі права захищено.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Показати сповіщення}one{Показати сповіщення}few{Показати сповіщення}many{Показати сповіщення}other{Показати сповіщення}}</translation>
 <translation id="5814749351757353073">Стежте за улюбленими сайтами</translation>
 <translation id="5823093032261493462">Усе одно завантажити файл <ph name="FILE_NAME" /> із сайту <ph name="DOWNLOAD_DOMAIN" />?</translation>
 <translation id="5828921839638612740">Ви можете видалити дані в налаштуваннях Chrome</translation>
@@ -1168,6 +1170,7 @@
 <translation id="6255809143828972562">Безпечно переглядайте вебсторінки й керуйте налаштуваннями завдяки інструментам від Chrome</translation>
 <translation id="6264376385120300461">Усе одно завантажити</translation>
 <translation id="6264485186158353794">Повернутися на безпечну сторінку</translation>
+<translation id="6267063201726531683">Нижній екран режиму читання</translation>
 <translation id="6277522088822131679">Виникла проблема з друком цієї сторінки. Повторіть спробу.</translation>
 <translation id="6278428485366576908">Тема</translation>
 <translation id="6284472661216707937">Екран "Паролі на всіх ваших пристроях" закрито</translation>
@@ -1191,7 +1194,6 @@
 <translation id="6342069812937806050">Щойно</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 і ще <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}one{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 і ще <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}few{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 і ще <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}many{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 і ще <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 і ще <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}}</translation>
 <translation id="6345878117466430440">Позначити як прочитане</translation>
-<translation id="6347010704471250799">Показувати сповіщення</translation>
 <translation id="6356893102071098867">Переконайтеся, що ви вибрали правильний обліковий запис</translation>
 <translation id="6363990818884053551">Щоб почати синхронізацію, підтвердьте свою особу</translation>
 <translation id="6364438453358674297">Вилучити пропозицію з історії?</translation>

@@ -5,6 +5,7 @@
 <translation id="1086486568852410168">Search with Google Lens</translation>
 <translation id="1143896152279775643">Your password will be saved to Google Password Manager for <ph name="EMAIL" />.</translation>
 <translation id="1146503048444965320">Open new tab in Chrome</translation>
+<translation id="1158134713295836892">Gemini in Chrome</translation>
 <translation id="1166460004393506534">Delete browsing data in Chrome</translation>
 <translation id="1179527450541388808">Access Chrome faster from your iPad's home screen dock.</translation>
 <translation id="1180362651362502943">Keep using the Chrome data in your Google Account.</translation>
@@ -63,7 +64,6 @@ Things to consider:
 <translation id="2423077901494354337">You'll now get the most out of Chrome on your device.</translation>
 <translation id="2427791862912929107">Chrome has features that help you manage your Internet data and how quickly you're able to load web pages.
 <ph name="BEGIN_LINK" />Learn more<ph name="END_LINK" /></translation>
-<translation id="2444854139071078915">To get your saved passwords in your other apps easily, use Chrome for auto-fill</translation>
 <translation id="2464852008153767546">{THRESHOLD,plural, =1{This happens when Chrome isn't used for {THRESHOLD} minute. This could include history and autofill.}other{This happens when Chrome isn't used for {THRESHOLD} minutes. This could include history and autofill.}}</translation>
 <translation id="2561231791489583059">Use Chrome as your default browser to stay protected from dangerous sites and keep your passwords safe</translation>
 <translation id="2574249610672786438">To see your tabs from wherever you use Chrome, sign in on all of your devices</translation>
@@ -143,7 +143,7 @@ Try waiting a few minutes before signing out. If you sign out now, this data wil
 <translation id="484033449593719797">Not supported on Chrome beta</translation>
 <translation id="4840404732697892756">Google Password Manager can check your passwords when you sign in with your Google Account.</translation>
 <translation id="4903674399067644695">This card shows you suggestions on how to get the most out of Chrome.</translation>
-<translation id="49200511069271369">Your organisation, <ph name="DOMAIN" />, manages the account you're signing in to and how Chrome can be used. Your administrator can set up or restrict certain features.</translation>
+<translation id="49200511069271369">Your organisation, <ph name="DOMAIN" />, manages the account that you're signing in to and how Chrome can be used. Your administrator can set up or restrict certain features.</translation>
 <translation id="4925322001044117929">Use Chrome on iPad by default</translation>
 <translation id="498985224078955265">To send this tab to another device, sign in to Chrome on both devices.</translation>
 <translation id="5030102366287574140">Chrome can help keep you safe from data breaches, unsafe websites and more.</translation>
@@ -219,7 +219,6 @@ Your data is encrypted with your passphrase. Enter it to use and save Chrome dat
 <translation id="6684809838922667136">Make Chrome better</translation>
 <translation id="6695698548122852044">{THRESHOLD,plural, =1{This happens when Chrome isn't used for {THRESHOLD} minute. Data saved only to this device while you were signed in will be deleted. This could include history and passwords.}other{This happens when Chrome isn't used for {THRESHOLD} minutes. Data saved only to this device while you were signed in will be deleted. This could include history and passwords.}}</translation>
 <translation id="6709398533399187136">Your password was exposed in a data breach. Google Password Manager recommends changing it now.</translation>
-<translation id="6788035488757621217">From your device's settings, open '<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />' and select 'Chrome'</translation>
 <translation id="6820553595690137150">Passphrase encryption doesn't include payment methods and addresses.
 
 To change this setting, <ph name="BEGIN_LINK" />delete the Chrome data in your account<ph name="END_LINK" />.</translation>

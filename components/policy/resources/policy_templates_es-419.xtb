@@ -27,6 +27,11 @@ Esta política se quitará en el futuro, cuando se lance por completo la funció
 <translation id="1011266755572744012">Especifica la cantidad máxima de hojas que el usuario puede imprimir en un mismo trabajo de impresión.
 
       Si no se establece, no se aplicará ninguna limitación y el usuario podrá imprimir los documentos que quiera.</translation>
+<translation id="1013949464926722411">Si estableces la política, los orígenes enumerados no podrán obtener los atributos del dispositivo (p. ej., el número de serie o nombre de host) con la API de Device Attributes.
+
+Los orígenes deben corresponder a las apps web aisladas que se instalan de manera automática (con la política <ph name="ISOLATED_WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" />) o que están configuradas como aplicaciones de kiosco. Para conocer las especificaciones de la API de Device Attributes, consulta https://wicg.github.io/WebApiDevice/device_attributes.
+
+Para obtener información detallada sobre los patrones de <ph name="URL_LABEL" /> válidos, consulta https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns. <ph name="WILDCARD_VALUE" /> no es un valor aceptado para esta política.</translation>
 <translation id="101438888985615157">Rotar la pantalla 180 grados</translation>
 <translation id="1017967144265860778">Administración de energía en la pantalla de acceso</translation>
 <translation id="1018427234617066902">Permite la habilitación forzosa del corrector ortográfico de idiomas. Se omitirán los idiomas que no se reconozcan en la lista.
@@ -242,19 +247,6 @@ Para obtener más información sobre el manejo de datos de las funciones potenci
       Si se inhabilita, no se mostrará el diálogo de intercepción de acceso.
       Si se inhabilita y <ph name="MANAGED_ACCOUNTS_SIGNIN_RESTRICTION_POLICY_NAME" /> separa los perfiles de la cuenta administrada, se seguirá mostrando el diálogo.</translation>
 <translation id="1158844608156732189">Configuración de Kerberos (una línea por cada elemento del array), consulta https://web.mit.edu/kerberos/krb5-1.12/doc/admin/conf_files/krb5_conf.html.</translation>
-<translation id="1159241725763211010">La función Superposición de Lens permite a los usuarios realizar búsquedas en Google interactuando con una captura de pantalla de la página actual que se muestra sobre el contenido web real. Además, permite a los usuarios realizar búsquedas en Google que tengan en cuenta el contexto de la página actual. Para proporcionar respuestas contextuales, Superposición de Lens envía el contenido de la página a Google para responder la consulta del usuario según el contexto de la página en la que se encuentra.
-
-No hay un parámetro de configuración del usuario para controlar esta función. Por lo general, está disponible para todos los usuarios que tienen Google como motor de búsqueda predeterminado, a menos que esta política la inhabilite.
-
-0 = Permite que se use la función y que Google use datos pertinentes para mejorar sus modelos de IA. Los datos pertinentes pueden incluir instrucciones, entradas, resultados, materiales de origen y comentarios escritos, según la función. Es posible que personas revisen los datos para mejorar los modelos de IA. 0 es el valor predeterminado, excepto en los siguientes casos.
-
-1 = Permite que se use la función, pero no permite que Google mejore los modelos con el contenido de los usuarios (lo que incluye las instrucciones, las entradas, los resultados, los materiales de origen y los comentarios escritos). 1 es el valor predeterminado para los usuarios empresariales que administra <ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" /> y las cuentas de institución educativa que administra <ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" />.
-
-2 = No permite la función.
-
-Si no estableces la política, su comportamiento se determina según la política <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" />.
-
-Para obtener más información sobre el manejo de datos de las funciones potenciadas por IA generativa, consulta https://support.google.com/chrome/a?p=generative_ai_settings.</translation>
 <translation id="1160479894929412407">Permitir el protocolo QUIC</translation>
 <translation id="1160939557934457296">Inhabilita continuar desde la página de advertencia de Navegación segura.</translation>
 <translation id="1161685818042751282">No importar certificados de servidor TLS agregados por el usuario desde almacenes de confianza de la plataforma</translation>
@@ -374,7 +366,6 @@ que se instale.</translation>
 <translation id="1262993197422487260">No mostrar el botón para ver la contraseña en la pantalla de acceso o de bloqueo</translation>
 <translation id="1265053460044691532">Permite limitar el tiempo durante el cual un usuario autenticado mediante SAML puede acceder sin conexión.</translation>
 <translation id="1265076559723566171">Configuración de los controles para usuarios de EDU</translation>
-<translation id="1268561791350382977">Permitir Lens Overlay y mejorar los modelos de IA.</translation>
 <translation id="1271811620059192171">Habilitar grupos atómicos de políticas</translation>
 <translation id="127264587838521316">Habilita las solicitudes de instalación de extensiones de <ph name="PRODUCT_NAME" /></translation>
 <translation id="1272798957154751008">Habilitar la migración de los dispositivos Chromad a la administración de la nube</translation>
@@ -1689,6 +1680,17 @@ Si no estableces la política para los usuarios generales, equivale a habilitarl
 <translation id="2168397434410358693">Demora de inactividad con alimentación de CA</translation>
 <translation id="217013996107840632">Parámetros de la línea de comandos para cambiar del navegador alternativo</translation>
 <translation id="2170233653554726857">Habilitar optimización de WPAD</translation>
+<translation id="2170953111275398079">Esta política configura si <ph name="PRODUCT_NAME" /> ofrecerá un algoritmo de acuerdo de claves poscuántico en TLS, con el estándar ML-KEM NIST. Antes de la versión 131 de <ph name="PRODUCT_NAME" />, el algoritmo era Kyber, una iteración de borrador anterior del estándar. Esto permite admitir servidores para evitar que las computadoras cuánticas desencripten el tráfico de usuarios posteriormente.
+
+Si habilitas esta política o no la estableces, <ph name="PRODUCT_NAME" /> ofrecerá un acuerdo de claves poscuántico en las conexiones TLS. El tráfico de usuarios estará protegido contra las computadoras cuánticas cuando se comunique con servidores compatibles.
+
+Si la inhabilitas, <ph name="PRODUCT_NAME" /> no ofrecerá un acuerdo de claves poscuántico en las conexiones TLS. El tráfico de usuarios no estará protegido contra las computadoras cuánticas.
+
+La oferta del acuerdo de claves poscuántico es retrocompatible. Se espera que los servidores TLS existentes y el middleware de red ignoren la opción nueva y continúen seleccionando opciones anteriores.
+
+Sin embargo, es posible que los dispositivos que no implementan TLS correctamente no funcionen bien cuando se les ofrezca la opción nueva. Por ejemplo, es posible que se desconecten en respuesta a opciones no reconocidas o a mensajes más extensos. Estos dispositivos no están preparados para la poscuantificación y pueden interferir en la transición poscuántica de una empresa. Si se detectan errores, los administradores deben comunicarse con el proveedor para corregirlos.
+
+Esta política es una medida temporal y se quitará después de la versión 145 de <ph name="PRODUCT_NAME" />. Es posible se habilite para permitirte buscar errores y que se inhabilite mientras se resuelven.</translation>
 <translation id="2172201084331314152">Inhabilitar las funciones de cámara, configuración del navegador, configuración del SO, escaneo, Web Store, Canvas, Explorar, Crosh, Galería, Terminal, Grabadora, trabajos de impresión, Combinaciones de teclas, Gmail, Documentos de Google, Presentaciones de Google, Hojas de cálculo de Google, Google Drive, Google Keep, Calendario de Google, Google Chat, YouTube, Google Maps, Calculadora y editor de texto.</translation>
 <translation id="2174946221763588594">Determina si los sitios que visita el usuario pueden crear sesiones de realidad aumentada inmersiva mediante la <ph name="WEBXR_API_NAME" />.
 
@@ -2125,6 +2127,7 @@ Si no la estableces, inicialmente se inhabilitará la pantalla de privacidad, pe
 <translation id="2436302465999055995">Seleccionar <ph name="LACROS_NAME" /> como el único navegador disponible (aún no se implementó)</translation>
 <translation id="2439187682308339104">No permitir que ningún sitio solicite acceso a los dispositivos HID a través de la API de WebHID</translation>
 <translation id="2439733504887695659">Habilitar la opción de descartar las alertas de contraseña hackeada para las credenciales que hayas ingresado</translation>
+<translation id="2446029789419870019">Permitir el uso de la función y mejorar los modelos de IA</translation>
 <translation id="2446244536806499267">No considerar al usuario como inactivo mientras se reproduce un audio</translation>
 <translation id="2452225615952836461">Usar mayúsculas siempre en los métodos de solicitud</translation>
 <translation id="2454228136871844693">Optimiza la estabilidad.</translation>
@@ -2191,6 +2194,7 @@ sin conexión. El usuario aún puede hacer que los elementos estén disponibles 
 
 Si no estableces la política, <ph name="POLICY_VALUE_VISIBLE" /> es la
 selección predeterminada.</translation>
+<translation id="2488455166114458307">Permitir la API de Device Attributes en estos sitios</translation>
 <translation id="2489558694350871332">Permitir que el dispositivo ejecute máquinas virtuales</translation>
 <translation id="2492240920793040106">Habilitar los informes de información del sistema y el contenido de la página para ayudar a mejorar la Navegación segura</translation>
 <translation id="2496180316473517155">Historial de navegación</translation>
@@ -2313,6 +2317,7 @@ Si la estableces como falsa, se inhabilitará la función Conjuntos de sitios we
 <translation id="2568488785376704318">Esta política es obsoleta. En su lugar, utiliza <ph name="REMOTE_ACCESS_HOST_DOMAIN_LIST_POLICY_NAME" />.</translation>
 <translation id="2570059561924004903">Inhabilitar los comentarios por voz</translation>
 <translation id="2570181623957732921">Habilitar <ph name="DESK_API_NAME" /> para una lista de dominios de terceros</translation>
+<translation id="2571821662934804440">Permitir el uso de la función sin mejorar los modelos de IA</translation>
 <translation id="2573850437942404034">No permitir</translation>
 <translation id="2575198840408498393">Inhabilitar la creación de perfiles de roaming</translation>
 <translation id="25765864042030871">Los controladores del evento <ph name="UNLOAD_EVENT_NAME" /> dejarán de estar disponibles. Su activación depende de la <ph name="PERMISSIONS_POLICY_NAME" /> de <ph name="UNLOAD_EVENT_NAME" />. Actualmente, la política los admite de forma predeterminada. Paulatinamente, pasarán a estar inhabilitados de forma predeterminada, y los sitios deberán habilitarlos explícitamente mediante encabezados de la <ph name="PERMISSIONS_POLICY_NAME" />. Con esta política empresarial, se puede rechazar esta baja gradual. Para ello, se debe forzar que la configuración predeterminada permanezca habilitada.
@@ -2776,6 +2781,12 @@ comportamiento de las teclas de función, y los usuarios no podrán cambiar esta
       También ten en cuenta que esta es una política de "solución de emergencia" que está diseñada para ser de corta duración.
       </translation>
 <translation id="2939335382784544151">Habilitar la importación del historial de navegación en la primera ejecución</translation>
+<translation id="2939606629175440564">Si estableces la política, se especificará si una app web aislada o una aplicación de kiosco instalada de manera automática tiene acceso a la API de Device Attributes de forma predeterminada.
+Para obtener más información, consulta https://wicg.github.io/WebApiDevice/device_attributes.
+
+Si estableces la política en 1 o no la estableces, las apps web aisladas y las aplicaciones de kiosco instaladas de manera automática podrán usar la API.
+
+Si estableces la política en 2, se impedirá que las apps web aisladas y las aplicaciones de kiosco instaladas de manera automática usen la API.</translation>
 <translation id="2940127076681735544">Si estableces esta política con una URL válida, <ph name="PRODUCT_NAME" /> descargará la lista de sitios de esa URL y aplicará las reglas como si se hubieran configurado con la política <ph name="SITELIST_POLICY_NAME" />.
 
       Si no la estableces (o determinas una URL no válida), <ph name="PRODUCT_NAME" /> no utilizará la política como fuente de reglas para cambiar de navegador.
@@ -3008,6 +3019,7 @@ Si la inhabilitas o no la estableces, no se activará la recopilación y carga d
 El informe contiene datos de uso y estado del perfil, incluidas, sin limitaciones, la versión del SO y del navegador, las extensiones instaladas y las políticas aplicadas.
 
 Esta política solo se puede establecer como política del usuario basada en la nube.</translation>
+<translation id="3062559845875011810">No permitir la función</translation>
 <translation id="3063302084011279315">Inhabilitar Screencast</translation>
 <translation id="3063307261083019730">No permitir que las páginas con el encabezado <ph name="CACHE_CONTROL_NO_STORE_NAME" /> se almacenen en la memoria caché atrás/adelante</translation>
 <translation id="3064530882228745118">Usar la búsqueda de CNAME durante la autenticación de Kerberos</translation>
@@ -3829,12 +3841,20 @@ Esta política siempre será válida para <ph name="PRODUCT_OS_NAME" />.</transl
 <translation id="3647212518036289905">Si estableces la política, esta especificará qué biblioteca GSSAPI se debe usar para la autenticación HTTP. Puedes establecerla asignándole un nombre de biblioteca o una ruta completa.
 
       Si no estableces la política, <ph name="PRODUCT_NAME" /> usará un nombre de biblioteca predeterminado.</translation>
+<translation id="3647756189889410780">https://github.com/WICG/service-worker-auto-preload
+La función ServiceWorkerAutoPreload envía una solicitud de red para un recurso principal al mismo tiempo que inicia el proceso de inicio de ServiceWorker.
+
+Si habilitas la política o no la estableces,
+<ph name="PRODUCT_NAME" /> habilitará ServiceWorkerAutoPreload. La solicitud de navegación se envía automáticamente cuando se inicia ServiceWorker en algunos casos, p. ej., cuando ServiceWorker no se está ejecutando.
+
+Si se inhabilita esta política, <ph name="PRODUCT_NAME" /> no habilitará ServiceWorkerAutoPreload. La solicitud de navegación siempre se envía después de iniciar ServiceWorker.
+
+Esta política es una medida temporal para controlar la función y se quitará en la versión M144.</translation>
 <translation id="3650122925429054129">Inhabilitar la función para resaltar el cursor en la pantalla de acceso</translation>
 <translation id="365093517647222762">Informa datos de telemetría de sitios web para las URLs permitidas que se especifican en la política <ph name="REPORT_WEBSITE_TELEMETRY_ALLOWLIST_POLICY_NAME" /> para los usuarios afiliados.
 
 Si estableces la política, se controlarán los informes de telemetría de sitios web para determinados tipos de datos de telemetría.
 Si no la estableces, no se informarán los datos de telemetría de sitios web.</translation>
-<translation id="3651483357891254380">Permitir Lens Overlay sin mejorar los modelos de IA.</translation>
 <translation id="3652670852519271837">Permite que los sitios soliciten al usuario acceso de lectura a archivos y directorios a través de la API de File System</translation>
 <translation id="3653237928288822292">Ícono del proveedor de búsqueda predeterminado</translation>
 <translation id="3654906736796256792">Permite que se ejecute la zona de pruebas de audio</translation>
@@ -4015,6 +4035,10 @@ Para conocer las restricciones de <ph name="PRIVATE_NETWORK_ACCESS" />, consulta
 <translation id="376375951585423504">Inhabilitar la cuota persistente</translation>
 <translation id="3765260570442823273">Duración del mensaje que advierte al usuario que saldrá del navegador porque se encuentra inactivo</translation>
 <translation id="3766695867369523703">Permitir la partición de almacenamiento de terceros de forma predeterminada.</translation>
+<translation id="3770044943398389276">De forma predeterminada, SSO flotante solo transfiere las cookies persistentes entre dispositivos. Esta política controla si también se deben incluir las cookies de sesión. Solo tiene efecto cuando se habilita la política <ph name="FLOATING_SSO_ENABLED_POLICY_NAME" />.
+
+Si habilitas esta política, SSO flotante sincronizará las cookies de sesión y las persistentes.
+Si inhabilitas esta política o no la estableces, SSO flotante solo sincronizará las cookies persistentes.</translation>
 <translation id="3770407495263198786">Si estableces la política, los administradores podrán configurar una lista de impresoras para sus usuarios. Los usuarios eligen la impresora la primera vez que realizan una impresión.
 
       Esta política permite hacer lo siguiente:
@@ -4115,6 +4139,7 @@ En <ph name="MS_WIN_NAME" />, esta política solo está disponible en instancias
 
 En <ph name="MAC_OS_NAME" />, esta política solo está disponible en instancias administradas con MDM, vinculadas a un dominio a través de MCX o inscritas en <ph name="CHROME_ENTERPRISE_CORE_NAME" />.</translation>
 <translation id="3845318141474759319">Permitir Generative AI Wallpaper sin mejorar los modelos de IA</translation>
+<translation id="3848302969721895938">Inhabilitar ServiceWorkerAutoPreload</translation>
 <translation id="3849923496599301707">Forzar permisos de apps de Chrome en el modo Kiosco</translation>
 <translation id="3851443303439635700">Controlar el umbral de anidación antes de que la función de JavaScript setTimeout() comience a restringirse</translation>
 <translation id="3854609566862485607">Esta política controla una etiqueta personalizada que se usa para identificar perfiles administrados. En el caso de los perfiles administrados, esta etiqueta se mostrará junto al avatar en la barra de herramientas. No se traducirá la etiqueta personalizada.
@@ -4391,6 +4416,19 @@ Según el valor con el que establezcas la política, se obtendrán distintos com
 * Si aplicas filtros de contenido para adultos a los sitios, se filtrarán los sitios pornográficos
 
 La política se aplica a la URL a la que navega el usuario y a los iframes. La política <ph name="URL_ALLOWLIST_POLICY_NAME" /> tiene prioridad sobre esta política y se puede usar para anular los veredictos de la API de Google Safe Search.</translation>
+<translation id="4049706391182174257">Esta política controla la disponibilidad de la función de cambio de contraseña automatizado de <ph name="PRODUCT_NAME" />.
+
+Si se habilita, un usuario puede activar un proceso en el que el navegador intenta cambiar su contraseña en un sitio web de forma automática. La IA generativa administra este proceso. La nueva contraseña se guarda en el administrador de contraseñas del navegador.
+
+0 = Permite que se use la función y que Google use datos pertinentes para mejorar sus modelos de IA. Los datos pertinentes pueden incluir instrucciones, entradas, resultados, materiales de referencia y comentarios escritos, según la función. Es posible que personas revisen los datos para mejorar los modelos de IA. 0 es el valor predeterminado, excepto en los siguientes casos.
+
+1 = Permite que se use la función, pero no permite que Google mejore los modelos con el contenido de los usuarios (lo que incluye las instrucciones, las entradas, los resultados, los materiales de referencia y los comentarios escritos). 1 es el valor predeterminado para los usuarios empresariales que administra la Consola del administrador de Google y las cuentas de institución educativa que administra Google Workspace.
+
+2 = No permite la función.
+
+Si no estableces la política, su comportamiento se determina según la política GenAiDefaultSettings.
+
+Para obtener más información sobre el manejo de datos de las funciones potenciadas por IA generativa, consulta https://support.google.com/chrome/a?p=generative_ai_settings.</translation>
 <translation id="4051723201852944592">Habilita la oclusión de ventanas</translation>
 <translation id="4052529125939620019">Cargar la extensión del componente CryptoToken al iniciar el navegador</translation>
 <translation id="4053157306171963473">Inhabilitar los informes de tiempo de actividad del dispositivo</translation>
@@ -4412,6 +4450,7 @@ En <ph name="PRODUCT_OS_NAME" />, esta política está relacionada con la certif
 
 Para obtener información detallada sobre los patrones válidos de <ph name="URL_LABEL" />, consulta https://support.google.com/chrome/a?p=url_blocklist_filter_format.</translation>
 <translation id="4070039109671307724">Varios</translation>
+<translation id="4071922398488395340">Incluir cookies de sesión en la funcionalidad de SSO flotante</translation>
 <translation id="4072225853834793549">Inhabilitar los atajos de accesibilidad en la pantalla de acceso</translation>
 <translation id="4074922053013383215">Ahorro de memoria moderado.</translation>
 <translation id="4075675819066819571">Ubicar la biblioteca en el lado izquierdo de la pantalla</translation>
@@ -4718,6 +4757,7 @@ Esta política se usó para inhabilitar la actualización automática de conteni
       Si no la estableces, los sitios web podrán solicitar acceso, pero los usuarios también podrán cambiar esta configuración.</translation>
 <translation id="4275048399551500192">No mostrar los controles multimedia de las sesiones de <ph name="PRODUCT_NAME" /> que iniciaron otros dispositivos</translation>
 <translation id="4278656834593750050">Habilitar sonidos de carga</translation>
+<translation id="4281322231545828290">Habilitar el cambio de contraseña automatizado</translation>
 <translation id="4282243913059705499">Mostrar siempre el ícono <ph name="PRODUCT_NAME" /> en la barra de herramientas</translation>
 <translation id="4285510855646731405">Calendario de Google (compatible a partir de la versión 135)</translation>
 <translation id="4285674129118156176">Permitir que los usuarios no afiliados usen ARC</translation>
@@ -5083,21 +5123,6 @@ Un dispositivo se considera administrado si se utiliza una versión empresarial 
 <translation id="4557134566541205630">URL de la página Nueva pestaña del proveedor de búsqueda predeterminado</translation>
 <translation id="4558166110367609724">Omite automáticamente las Condiciones del Servicio y carga el navegador</translation>
 <translation id="4559846397119102037">Permitir el uso de <ph name="LACROS_NAME" /></translation>
-<translation id="456018799964679771">Esta política a nivel del dispositivo configura si <ph name="PRODUCT_OS_NAME" /> ofrecerá un algoritmo de acuerdo de claves poscuántico en TLS, con el estándar ML-KEM NIST. Antes de la versión 131 de <ph name="PRODUCT_OS_NAME" />, el algoritmo era Kyber, una iteración de borrador anterior del estándar. Esto permite admitir servidores para evitar que las computadoras cuánticas desencripten el tráfico de usuarios posteriormente.
-
-Si habilitas esta política, <ph name="PRODUCT_OS_NAME" /> ofrecerá un acuerdo de claves poscuántico en las conexiones TLS. El tráfico de usuarios estará protegido contra las computadoras cuánticas cuando se comunique con servidores compatibles.
-
-Si la inhabilitas, <ph name="PRODUCT_OS_NAME" /> no ofrecerá un acuerdo de claves poscuántico en las conexiones TLS. El tráfico de usuarios no estará protegido contra las computadoras cuánticas.
-
-Si no estableces esta política, <ph name="PRODUCT_OS_NAME" /> seguirá el proceso de lanzamiento predeterminado para ofrecer un acuerdo de claves poscuántico.
-
-La oferta de Kyber es retrocompatible. Se espera que los servidores TLS existentes y el middleware de red ignoren la opción nueva y continúen seleccionando opciones anteriores.
-
-Sin embargo, es posible que los dispositivos que no implementan TLS correctamente no funcionen bien cuando se les ofrezca la opción nueva. Por ejemplo, es posible que se desconecten en respuesta a opciones no reconocidas o a mensajes más extensos. Estos dispositivos no están preparados para la poscuantificación y pueden interferir en la transición poscuántica de una empresa. Si se detectan errores, los administradores deben comunicarse con el proveedor para corregirlos.
-
-Esta política es una medida temporal y se quitará después de la versión 141 de <ph name="PRODUCT_OS_NAME" />. Es posible se habilite para permitirte buscar errores y que se inhabilite mientras se resuelven.
-
-Si se configuran esta política y la política PostQuantumKeyAgreementEnabled, esta política tendrá prioridad.</translation>
 <translation id="4561560385824323005">Permitir que los usuarios seleccionen un diseño de escritorio preconfigurado para cargar</translation>
 <translation id="4561940244682063697">No permitir que los sitios soliciten que el usuario comparta una transmisión de video por Internet de su pantalla</translation>
 <translation id="4562165737444703281">Permite que los usuarios habiliten o configuren la redirección de puertos de Crostini</translation>
@@ -6301,6 +6326,11 @@ políticas específicas.
 
 Nota: Esta política no se aplica a las actualizaciones de HSTS.</translation>
 <translation id="5297948043665200363">Permitir que el usuario permanezca conectado después de que se anule la autenticación de su cuenta</translation>
+<translation id="5298594338496226089">Si estableces la política, los orígenes enumerados podrán obtener los atributos del dispositivo (p. ej., el número de serie o nombre de host) con la API de Device Attributes.
+
+Los orígenes deben corresponder a las aplicaciones web que se instalan de manera automática con la política <ph name="WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" /> o <ph name="ISOLATED_WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" /> (desde la versión 125) o que están configuradas como aplicaciones de kiosco. Para conocer las especificaciones de la API de Device Attributes, consulta https://wicg.github.io/WebApiDevice/device_attributes.
+
+Para obtener información detallada sobre los patrones de <ph name="URL_LABEL" /> válidos (desde la versión 127), consulta https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns. <ph name="WILDCARD_VALUE" /> no es un valor aceptado para esta política.</translation>
 <translation id="5298949392804966105">No hay restricciones en las cuentas administradas</translation>
 <translation id="530111809849214840">Ocultar la opción <ph name="GOOGLE_DRIVE_NAME" />.</translation>
 <translation id="530134925949808452">La hora del día en que se renueva la cuota de uso (en hora local).</translation>
@@ -6311,6 +6341,7 @@ Nota: Esta política no se aplica a las actualizaciones de HSTS.</translation>
 <translation id="5307432759655324440">Disponibilidad del modo incógnito</translation>
 <translation id="5308551343115571396">Después de inhabilitar <ph name="LACROS_NAME" />, intentaremos conservar la mayor cantidad de datos del usuario posible y quitar todos los datos de navegación.</translation>
 <translation id="530949964068726932">Ocultar las opciones de accesibilidad en el menú de la bandeja del sistema</translation>
+<translation id="5309944663104291505">No permitir que las apps web aisladas y las aplicaciones de kiosco instaladas de manera automática usen la API de Device Attributes</translation>
 <translation id="5310544046492594469">Si le asignas a la política el valor "0" (la opción predeterminada), podrás acceder a las herramientas para desarrolladores y la Consola de JavaScript. No obstante, no podrás hacerlo en el contexto de extensiones instaladas por una política empresarial ni, a partir de la versión 114 y si es un usuario administrado, de extensiones integradas en el navegador. Si le asignas a la política el valor "1", podrás acceder a las herramientas para desarrolladores y la Consola de JavaScript en todos los contextos, incluido el de extensiones instaladas por una política empresarial. Si le asignas a la política el valor "2", no podrás acceder a las herramientas para desarrolladores ni inspeccionar elementos de sitios web.
 
       Esta configuración también desactivará las combinaciones de teclas y las entradas del menú contextual o de cualquier menú que permiten abrir las herramientas para desarrolladores o la Consola de JavaScript.
@@ -6662,6 +6693,7 @@ Si inhabilitas <ph name="NTPCARDSVISIBLE" />, no se mostrará la tarjeta de Shar
 <translation id="5534235660122271432">Inhabilitar la escritura en los dispositivos de almacenamiento externo</translation>
 <translation id="5535256585099022933">Establecer el lapso para el reinicio</translation>
 <translation id="5537400155400537818">Inhabilitada: El zoom de CSS conserva su comportamiento heredado anterior al estándar.</translation>
+<translation id="5537587542872235553">Permitir que las apps web aisladas y las aplicaciones de kiosco instaladas de manera automática usen la API de Device Attributes</translation>
 <translation id="553806128266843748">Una función experimental booleana que indica si está habilitada la limitación de la red.</translation>
 <translation id="5540885720415375851">Permite el descubrimiento de dispositivos locales</translation>
 <translation id="5542235730745104308">Si estableces la política como verdadera, <ph name="PRODUCT_NAME" /> utilizará páginas de error alternativas integradas en el navegador (como "no se encontró la página"). Si la estableces como falsa, <ph name="PRODUCT_NAME" /> no utilizará nunca páginas de error alternativas.
@@ -6872,6 +6904,7 @@ Si no se establece o si no se puede determinar la antigüedad de lanzamiento, se
 <translation id="5645779841392247734">Permitir cookies en estos sitios</translation>
 <translation id="5646234199535103501">Política de configuración para Chrome Enterprise Connector OnBulkDataEntry</translation>
 <translation id="5648016151508002741">Impedir que se realicen verificaciones en línea de <ph name="OCSP_CRL_LABEL" /></translation>
+<translation id="5648436277949979783">Controlar el uso de la API de Device Attributes</translation>
 <translation id="5649046890958064703">Si eliges <ph name="PRINTERS_BLACKLIST" /> para <ph name="DEVICE_PRINTERS_ACCESS_MODE_POLICY_NAME" />, la configuración de <ph name="DEVICE_NATIVE_PRINTERS_BLACKLIST_POLICY_NAME" /> especificará las impresoras que no podrán utilizar los usuarios. Los usuarios podrán acceder a todas las impresoras, excepto aquellas con los ID mencionados en esta política. Los ID deben coincidir con los valores de los campos <ph name="ID_FIELD" /> o <ph name="GUID_FIELD" /> en el archivo que se especifica en <ph name="DEVICE_PRINTERS_POLICY_NAME" />.
 
       Esta política dejó de estar disponible; usa <ph name="DEVICE_PRINTERS_BLOCKLIST_POLICY_NAME" /> en su lugar.</translation>
@@ -7115,6 +7148,7 @@ Se podrán agregar más restricciones de cuentas con la política <ph name="MICR
 <translation id="5815129011704381141">Reinicia automáticamente después de la actualización.</translation>
 <translation id="5815990343032461023">Comportamiento heredado: las apps de Chrome para kiosco recibirán actualizaciones del sistema de extensiones (mediante las URL de actualización del manifiesto de la extensión) y del administrador del almacenamiento en caché (mediante las URL de actualización de la política)</translation>
 <translation id="5816688024515869030">Inhabilitar el proveedor de <ph name="UIA_NAME" />.</translation>
+<translation id="581737504822041364">Permitir que ServiceWorker envíe solicitudes de navegación sin esperar su inicio</translation>
 <translation id="5828008775808363753">No abrir el navegador al inicio</translation>
 <translation id="582857022372205358">Habilitar la impresión doble con bordes cortos</translation>
 <translation id="5830196507442186669">Permite que los dispositivos usen <ph name="BOREALIS_NAME" /> en <ph name="PRODUCT_OS_NAME" /></translation>
@@ -8084,23 +8118,6 @@ Las funciones potenciadas por IA generativa de Herramientas para desarrolladores
 
 Para obtener más información sobre el manejo de datos de las funciones potenciadas por IA generativa, consulta https://support.google.com/chrome/a?p=generative_ai_settings.</translation>
 <translation id="6394350458541421998">Esta política se eliminó a partir de la versión 29 de <ph name="PRODUCT_OS_NAME" />. Utiliza la política PresentationScreenDimDelayScale en su lugar.</translation>
-<translation id="6397424663361748439">Una política que controla si se debe activar la función <ph name="IP_PROTECTION_NAME" /> de <ph name="PRIVACY_SANDBOX_NAME" />.
-
-<ph name="IP_PROTECTION_NAME" /> es una función que limita la disponibilidad de la dirección IP original de un usuario para ciertas solicitudes de red de terceros realizadas mientras navega en modo Incógnito, lo que mejora las protecciones contra el seguimiento entre sitios durante las sesiones de navegación en Incógnito.
-
-Si inhabilitas la política, se desactivará <ph name="IP_PROTECTION_NAME" /> y los usuarios no podrán activar la función desde la configuración de la IU.
-Si la habilitas, se activará <ph name="IP_PROTECTION_NAME" /> y los usuarios no podrán desactivar la función desde la configuración de la IU.
-Si no estableces la política, se habilitará <ph name="IP_PROTECTION_NAME" /> de forma predeterminada y los usuarios podrán controlar la función en sus dispositivos desde la configuración de la IU.
-
-Algunas consideraciones sobre si las empresas deben inhabilitar <ph name="IP_PROTECTION_NAME" /> incluyen:
-- No se realizarán búsquedas de DNS para las solicitudes con proxy, lo que puede afectar la supervisión o el filtrado basado en DNS.
-- Es posible que las aplicaciones empresariales se interrumpan cuando se usan en modo Incógnito si dependen de solicitudes a dominios (o subdominios de esos dominios) de la lista de dominios enmascarados (<ph name="MASKED_DOMAIN_LIST_URL" />) y requieren que esas solicitudes provengan de rangos de direcciones IP específicos.
-- Es posible que el tráfico no se envíe mediante proxy en el modo Incógnito en ciertas condiciones, por ejemplo, cuando los usuarios abren el modo Incógnito desde un perfil de Chrome en el que no accedieron. En general, la función requiere que el usuario haya accedido a Chrome con una Cuenta de Google personal cuando inicia el modo Incógnito.
-- La lista de dominios en la lista de dominios enmascarados puede cambiar con el tiempo, y las versiones nuevas se envían a los usuarios automáticamente. Para obtener más información sobre la lista de dominios enmascarados, consulta <ph name="MASKED_DOMAIN_LIST_CRITERIA_URL" />.
-
-Para obtener más información sobre <ph name="IP_PROTECTION_NAME" />, consulta <ph name="IP_PROTECTION_README_URL" />.
-
-<ph name="IP_PROTECTION_NAME" /> se lanzará a más tardar en M139.</translation>
 <translation id="6397588391180665797">Informa a los usuarios sobre la configuración de red en dispositivos inscritos.
 
       Si estableces la política como falsa, no se informarán los eventos.
@@ -8679,7 +8696,6 @@ Esta política siempre será válida para <ph name="PRODUCT_OS_NAME" />.</transl
       Si estableces el valor "True", se habilitará <ph name="PLUGIN_VM_NAME" /> para el usuario, siempre y cuando lo permitan otras opciones de configuración. Para ejecutar <ph name="PLUGIN_VM_NAME" />, se debe establecer el valor "True" para <ph name="PLUGIN_VM_ALLOWED_POLICY_NAME" /> y <ph name="USER_PLUGIN_VM_ALLOWED_POLICY_NAME" />, y se deben configurar las políticas <ph name="PLUGIN_VM_LICENSE_KEY_POLICY_NAME" /> o <ph name="PLUGIN_VM_USER_ID_POLICY_NAME" />.</translation>
 <translation id="6741318452269220158">Si estableces la política como verdadera, Native Client podrá seguir ejecutándose aunque esté inhabilitado según el comportamiento predeterminado.
 Si la estableces como falsa o no la estableces, se usará el comportamiento predeterminado.</translation>
-<translation id="6743006196954236593">No permitir Lens Overlay.</translation>
 <translation id="6749641778238480311">Permitir que se llame a las APIs de subApps sin gestos previos del usuario y sin su confirmación.</translation>
 <translation id="6750902920405577210">Lista de los datos de telemetría que se informarán en los eventos de cambio de intensidad de la señal.
 
@@ -9583,6 +9599,7 @@ Esto reemplaza la política <ph name="WINDOW_PLACEMENT_BLOCKED_FOR_URLS_POLICY_N
       Para obtener información detallada sobre los patrones de URL de sitios válidos, consulta https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns. Se permite el uso de caracteres comodín (<ph name="WILDCARD_VALUE" />). Esta política solo establece coincidencias basadas en el origen; por lo tanto, se ignoran todas las rutas de acceso que se incluyan en el patrón de URL.
 
       Si no estableces esta política para un sitio, se aplicará la política de <ph name="DEFAULT_WINDOW_PLACEMENT_SETTING_POLICY_NAME" /> al sitio, si se establece. De lo contrario, el permiso seguirá la configuración predeterminada del navegador y permitirá a los usuarios escoger este permiso para cada sitio.</translation>
+<translation id="7358299261566939984">Habilitar ServiceWorkerAutoPreload</translation>
 <translation id="7358359585412734876">Habilitar <ph name="LACROS_NAME" /></translation>
 <translation id="7362566456990049303">Solo usuarios</translation>
 <translation id="736486789939370545">Permitir la instalación de extensiones externas</translation>
@@ -9644,6 +9661,19 @@ Si la estableces como falsa, se habilitará el comportamiento anterior.</transla
 
       Si la política se establece en false o no se configura, <ph name="TLS_FALSE_START" /> se habilitará. Si se establece en true, <ph name="TLS_FALSE_START" /> se inhabilitará.</translation>
 <translation id="7427607504279694910">Los registros de eventos de instalación de apps para Android no se comparten con Google</translation>
+<translation id="7431456748240652287">Esta política a nivel del dispositivo configura si <ph name="PRODUCT_OS_NAME" /> ofrecerá un algoritmo de acuerdo de claves poscuántico en TLS, con el estándar ML-KEM NIST. Antes de la versión 131 de <ph name="PRODUCT_OS_NAME" />, el algoritmo era Kyber, una iteración de borrador anterior del estándar. Esto permite admitir servidores para evitar que las computadoras cuánticas desencripten el tráfico de usuarios posteriormente.
+
+Si habilitas esta política o no la estableces, <ph name="PRODUCT_OS_NAME" /> ofrecerá un acuerdo de claves poscuántico en las conexiones TLS. El tráfico de usuarios estará protegido contra las computadoras cuánticas cuando se comunique con servidores compatibles.
+
+Si la inhabilitas, <ph name="PRODUCT_OS_NAME" /> no ofrecerá un acuerdo de claves poscuántico en las conexiones TLS. El tráfico de usuarios no estará protegido contra las computadoras cuánticas.
+
+La oferta de Kyber es retrocompatible. Se espera que los servidores TLS existentes y el middleware de red ignoren la opción nueva y continúen seleccionando opciones anteriores.
+
+Sin embargo, es posible que los dispositivos que no implementan TLS correctamente no funcionen bien cuando se les ofrezca la opción nueva. Por ejemplo, es posible que se desconecten en respuesta a opciones no reconocidas o a mensajes más extensos. Estos dispositivos no están preparados para la poscuantificación y pueden interferir en la transición poscuántica de una empresa. Si se detectan errores, los administradores deben comunicarse con el proveedor para corregirlos.
+
+Esta política es una medida temporal y se quitará después de la versión 145 de <ph name="PRODUCT_OS_NAME" />. Es posible se habilite para permitirte buscar errores y que se inhabilite mientras se resuelven.
+
+Si se configuran esta política y la política PostQuantumKeyAgreementEnabled, esta política tendrá prioridad.</translation>
 <translation id="7433253680989311514">Habilitar el diseño InScript Hindi</translation>
 <translation id="7433714841194914373">Habilitar Instant</translation>
 <translation id="7434202861148928348">Configurar los nombres de dominio obligatorios para clientes de acceso remoto</translation>
@@ -10517,19 +10547,6 @@ Esta política no tendrá ningún efecto si estableces la política <ph name="SC
       En la versión 88 de Chrome, se quitó esta política; si la estableces, se ignorará.
 
       Consulta https://www.chromestatus.com/feature/5989473649164288.</translation>
-<translation id="8137301668000005268">Esta política configura si <ph name="PRODUCT_NAME" /> ofrecerá un algoritmo de acuerdo de claves poscuántico en TLS, con el estándar ML-KEM NIST. Antes de la versión 131 de <ph name="PRODUCT_NAME" />, el algoritmo era Kyber, una iteración de borrador anterior del estándar. Esto permite admitir servidores para evitar que las computadoras cuánticas desencripten el tráfico de usuarios posteriormente.
-
-Si habilitas esta política, <ph name="PRODUCT_NAME" /> ofrecerá un acuerdo de claves poscuántico en las conexiones TLS. El tráfico de usuarios estará protegido contra las computadoras cuánticas cuando se comunique con servidores compatibles.
-
-Si la inhabilitas, <ph name="PRODUCT_NAME" /> no ofrecerá un acuerdo de claves poscuántico en las conexiones TLS. El tráfico de usuarios no estará protegido contra las computadoras cuánticas.
-
-Si no estableces esta política, <ph name="PRODUCT_NAME" /> seguirá el proceso de lanzamiento predeterminado para ofrecer un acuerdo de claves poscuántico.
-
-La oferta del acuerdo de claves poscuántico es retrocompatible. Se espera que los servidores TLS existentes y el middleware de red ignoren la opción nueva y continúen seleccionando opciones anteriores.
-
-Sin embargo, es posible que los dispositivos que no implementan TLS correctamente no funcionen bien cuando se les ofrezca la opción nueva. Por ejemplo, es posible que se desconecten en respuesta a opciones no reconocidas o a mensajes más extensos. Estos dispositivos no están preparados para la poscuantificación y pueden interferir en la transición poscuántica de una empresa. Si se detectan errores, los administradores deben comunicarse con el proveedor para corregirlos.
-
-Esta política es una medida temporal y se quitará después de la versión 141 de <ph name="PRODUCT_NAME" />. Es posible se habilite para permitirte buscar errores y que se inhabilite mientras se resuelven.</translation>
 <translation id="8137443729340035928">Preguntar al usuario si desea restablecer la última sesión al acceder</translation>
 <translation id="8141795997560411818">Esta política no impide que el usuario use la app de Google Drive de Android. Si deseas evitar el acceso a Google Drive, también debes inhabilitar la instalación de su app.</translation>
 <translation id="8142894094385450823">Establecer la configuración regional recomendada para una sesión administrada</translation>
@@ -11967,6 +11984,7 @@ Nota: Por el momento, solo se tendrá en cuenta la primera entrada. Las extensio
 <translation id="9015952763003753868">Hacer que las coincidencias de <ph name="ACAM_HEADER_NAME" /> en la especificación de solicitud preliminar <ph name="CORS" /> sean compatibles</translation>
 <translation id="9020630127193895800">Color índigo para la retroiluminación del teclado</translation>
 <translation id="9025912013525357598">Conservación de espacios en blanco de DataURL para todos los tipos de medio</translation>
+<translation id="9029815312472546960">Bloquear la API de Device Attributes en estos sitios</translation>
 <translation id="9031831501689819108">Habilitar la Compatibilidad con navegadores heredados</translation>
 <translation id="9032595854515551464">Habilitar el servicio de <ph name="PRODUCT_NAME" /> V2 y abrir el escritorio remoto al acceder</translation>
 <translation id="9034285085962866065">Permitir la personalización de combinaciones de teclas del sistema</translation>
@@ -12069,6 +12087,7 @@ Nota: Si reinicias el dispositivo, se borrará la memoria caché. Se almacenan e
 <translation id="9073405975862312795">Si habilitas la política o no la estableces, los dispositivos inscritos informarán los períodos cuando el usuario esté activo en el dispositivo.
 
       Si inhabilitas la política, los dispositivos inscritos no registrarán ni informarán los tiempos de actividad.</translation>
+<translation id="9075183018289926453">No sincronizar las cookies de sesión con SSO flotante</translation>
 <translation id="9076477053438828079">Mostrar siempre los nombres de usuario y las fotos</translation>
 <translation id="9077227880520270584">Temporizador para el acceso automático de la cuenta local del dispositivo</translation>
 <translation id="9079158199923156713">URL del logotipo de la empresa para un perfil administrado</translation>

@@ -31,8 +31,7 @@ class AutofillVirtualCardEnrollmentInfoBar : public infobars::ConfirmInfoBar {
 
   // Called when a link in the infobar text was clicked.
   void OnInfobarLinkClicked(JNIEnv* env,
-                            jobject obj,
-                            jstring url,
+                            const base::android::JavaRef<jstring>& url,
                             jint link_type);
 
  private:

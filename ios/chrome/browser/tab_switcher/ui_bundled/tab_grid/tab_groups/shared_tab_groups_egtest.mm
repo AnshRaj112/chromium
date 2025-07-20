@@ -339,17 +339,13 @@ void WaitForFakeJoinFlowView() {
       performAction:grey_tap()];
 
   // Open the menu and check elements while not shared.
-  [[EarlGrey
-      selectElementWithMatcher:grey_accessibilityID(
-                                   kTabGroupOverflowMenuButtonIdentifier)]
+  [[EarlGrey selectElementWithMatcher:TabGroupOverflowMenuButton()]
       performAction:grey_tap()];
-  [[EarlGrey
-      selectElementWithMatcher:ContextMenuItemWithAccessibilityLabelId(
-                                   IDS_IOS_CONTENT_CONTEXT_SHARELOCALGROUP)]
+  [[EarlGrey selectElementWithMatcher:ShareGroupButton()]
       assertWithMatcher:grey_sufficientlyVisible()];
-  [[EarlGrey
-      selectElementWithMatcher:grey_accessibilityID(
-                                   kTabGroupOverflowMenuButtonIdentifier)]
+
+  // Close the menu by tapping outside the menu area.
+  [[EarlGrey selectElementWithMatcher:CloseTabGroupButton()]
       performAction:grey_tap()];
 
   // Tap on the face pile to share the group.
@@ -368,21 +364,15 @@ void WaitForFakeJoinFlowView() {
   [ChromeEarlGrey waitForUIElementToDisappearWithMatcher:FakeShareFlowView()];
 
   // Open the menu and check elements while shared.
-  [[EarlGrey
-      selectElementWithMatcher:grey_accessibilityID(
-                                   kTabGroupOverflowMenuButtonIdentifier)]
+  [[EarlGrey selectElementWithMatcher:TabGroupOverflowMenuButton()]
       performAction:grey_tap()];
-  [[EarlGrey
-      selectElementWithMatcher:ContextMenuItemWithAccessibilityLabelId(
-                                   IDS_IOS_CONTENT_CONTEXT_MANAGESHAREDGROUP)]
+  [[EarlGrey selectElementWithMatcher:ManageGroupButton()]
       assertWithMatcher:grey_sufficientlyVisible()];
-  [[EarlGrey
-      selectElementWithMatcher:ContextMenuItemWithAccessibilityLabelId(
-                                   IDS_IOS_CONTENT_CONTEXT_RECENTACTIVITY)]
+  [[EarlGrey selectElementWithMatcher:RecentActivityButton()]
       assertWithMatcher:grey_sufficientlyVisible()];
-  [[EarlGrey
-      selectElementWithMatcher:grey_accessibilityID(
-                                   kTabGroupOverflowMenuButtonIdentifier)]
+
+  // Close the menu by tapping outside the menu area.
+  [[EarlGrey selectElementWithMatcher:CloseTabGroupButton()]
       performAction:grey_tap()];
 
   // Tap on the face pile to manage the group.
@@ -748,10 +738,9 @@ void WaitForFakeJoinFlowView() {
       performAction:grey_tap()];
   [[EarlGrey selectElementWithMatcher:KeepSharedConfirmationButton()]
       assertWithMatcher:grey_sufficientlyVisible()];
-  // Cancel.
-  [[EarlGrey selectElementWithMatcher:
-                 chrome_test_util::AlertItemWithAccessibilityLabelId(
-                     IDS_CANCEL)] performAction:grey_tap()];
+  // Cancel the action.
+  [[EarlGrey selectElementWithMatcher:KeepSharedConfirmationButton()]
+      performAction:grey_tap()];
   [ChromeEarlGrey waitForMainTabCount:1];
 
   // Close the tab by using the context menu and check the alert.
@@ -764,10 +753,9 @@ void WaitForFakeJoinFlowView() {
                             nil)] performAction:grey_tap()];
   [[EarlGrey selectElementWithMatcher:KeepSharedConfirmationButton()]
       assertWithMatcher:grey_sufficientlyVisible()];
-  // Cancel.
-  [[EarlGrey selectElementWithMatcher:
-                 chrome_test_util::AlertItemWithAccessibilityLabelId(
-                     IDS_CANCEL)] performAction:grey_tap()];
+  // Cancel the action.
+  [[EarlGrey selectElementWithMatcher:KeepSharedConfirmationButton()]
+      performAction:grey_tap()];
   [ChromeEarlGrey waitForMainTabCount:1];
 
   // Open the tab and try to close it with the tab grid icon context menu.
@@ -775,6 +763,14 @@ void WaitForFakeJoinFlowView() {
   [[EarlGrey selectElementWithMatcher:TabGridCellAtIndex(0)]
       performAction:grey_tap()];
   LongPressOn(chrome_test_util::ShowTabsButton());
+  if (@available(iOS 26, *)) {
+    // TODO(crbug.com/428928323): Investigate why the keyboard appears. Remove
+    // this workaround when it's not needed anymore.
+    // On iOS 26, the keyboard appears when the show tabs button is long pressed
+    // and it hides the elements behind. Close the keyboard by typing a return
+    // key.
+    [ChromeEarlGrey simulatePhysicalKeyboardEvent:@"\\n" flags:0];
+  }
   [[EarlGrey selectElementWithMatcher:
                  grey_allOf(chrome_test_util::ButtonWithAccessibilityLabelId(
                                 IDS_IOS_CONTENT_CONTEXT_CLOSETAB),
@@ -783,10 +779,9 @@ void WaitForFakeJoinFlowView() {
                             nil)] performAction:grey_tap()];
   [[EarlGrey selectElementWithMatcher:KeepSharedConfirmationButton()]
       assertWithMatcher:grey_sufficientlyVisible()];
-  // Cancel.
-  [[EarlGrey selectElementWithMatcher:
-                 chrome_test_util::AlertItemWithAccessibilityLabelId(
-                     IDS_CANCEL)] performAction:grey_tap()];
+  // Cancel the action.
+  [[EarlGrey selectElementWithMatcher:KeepSharedConfirmationButton()]
+      performAction:grey_tap()];
   [ChromeEarlGrey waitForMainTabCount:1];
 }
 
@@ -1100,11 +1095,9 @@ void WaitForFakeJoinFlowView() {
 
   // Open clear browsing data page.
   [ChromeEarlGreyUI openToolsMenu];
-  [[EarlGrey
-      selectElementWithMatcher:chrome_test_util::ButtonWithAccessibilityLabel(
-                                   l10n_util::GetNSString(
-                                       IDS_IOS_TOOLS_MENU_CLEAR_BROWSING_DATA))]
-      performAction:grey_tap()];
+  [ChromeEarlGreyUI
+      tapToolsMenuAction:grey_accessibilityLabel(l10n_util::GetNSString(
+                             IDS_IOS_TOOLS_MENU_CLEAR_BROWSING_DATA))];
   [[EarlGrey
       selectElementWithMatcher:chrome_test_util::ButtonWithAccessibilityLabel(
                                    l10n_util::GetNSString(

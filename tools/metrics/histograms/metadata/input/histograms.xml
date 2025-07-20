@@ -1591,7 +1591,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="InputMethod.PhysicalKeyboard.Japanese.Settings.AutoSwitchToHalfwidth"
-    enum="Boolean" expires_after="2025-11-01">
+    enum="Boolean" expires_after="2026-01-11">
   <owner>jhtin@chromium.org</owner>
   <owner>essential-inputs-team@google.com</owner>
   <summary>
@@ -2354,6 +2354,30 @@ chromium-metrics-reviews@google.com.
     Warning: this histogram was missing its entry until 2024-01; data may be
     missing.
   </summary>
+</histogram>
+
+<histogram name="Touch.DevicePosture.{Instance}" enum="PostureMode"
+    expires_after="2026-06-20">
+  <owner>robliao@chromium.org</owner>
+  <owner>arakeri@microsoft.com</owner>
+  <owner>wangsongjin@microsoft.com</owner>
+  <owner>gerchiko@microsoft.com</owner>
+  <owner>input-dev@chromium.org</owner>
+  <summary>
+    Records the device posture mode (tablet or desktop) usage patterns across
+    different device. This metric is only logged once per browser session when
+    initializing the singleton `TouchUiController` at startup. This metric is
+    only available on Windows. The metric is not logged on devices that have
+    explicitly disabled convertibility.
+
+    Startup: Records the device posture mode detected at browser startup.
+
+    Switch: Records the device posture mode is switched to another.
+  </summary>
+  <token key="Instance">
+    <variant name="Startup"/>
+    <variant name="Switch"/>
+  </token>
 </histogram>
 
 <histogram name="Untrusted.InputMethod.PhysicalKeyboard.VietnameseActions"

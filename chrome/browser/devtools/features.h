@@ -7,7 +7,6 @@
 
 #include "base/feature_list.h"
 #include "base/metrics/field_trial_params.h"
-#include "build/build_config.h"
 
 namespace features {
 
@@ -83,8 +82,6 @@ extern const base::FeatureParam<DevToolsFreestylerUserTier>
     kDevToolsAiCodeCompletionUserTier;
 
 BASE_DECLARE_FEATURE(kDevToolsSharedProcessInfobar);
-BASE_DECLARE_FEATURE(kDevToolsVeLogging);
-extern const base::FeatureParam<bool> kDevToolsVeLoggingTesting;
 
 BASE_DECLARE_FEATURE(kDevToolsAnimationStylesInStylesTab);
 
@@ -93,10 +90,6 @@ BASE_DECLARE_FEATURE(kDevToolsWellKnown);
 BASE_DECLARE_FEATURE(kDevToolsAiGeneratedTimelineLabels);
 
 BASE_DECLARE_FEATURE(kDevToolsNewPermissionDialog);
-
-#if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
-BASE_DECLARE_FEATURE(kDevToolsDebuggingRestrictions);
-#endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
 
 BASE_DECLARE_FEATURE(kDevToolsVerticalDrawer);
 

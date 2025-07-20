@@ -5,6 +5,7 @@
 <translation id="1086486568852410168">Google Lens ile ara</translation>
 <translation id="1143896152279775643">Şifreniz, <ph name="EMAIL" /> için Google Şifre Yöneticisi'ne kaydedilir.</translation>
 <translation id="1146503048444965320">Chrome'da yeni sekme aç</translation>
+<translation id="1158134713295836892">Chrome'da Gemini</translation>
 <translation id="1166460004393506534">Chrome'daki tarama verilerini silme</translation>
 <translation id="1179527450541388808">iPad'inizin ana ekran yuvasından Chrome'a daha hızlı erişin.</translation>
 <translation id="1180362651362502943">Google Hesabınızdaki Chrome verilerini kullanmaya devam edin.</translation>
@@ -63,7 +64,6 @@ Dikkate alınması gereken noktalar:
 <translation id="2423077901494354337">Artık cihazınızda Chrome'dan en iyi şekilde yararlanabileceksiniz.</translation>
 <translation id="2427791862912929107">Chrome internet verilerinizi yönetmenize ve web sayfalarını hızlı yükleyebilmenize yardımcı olacak özelliklere sahiptir.
 <ph name="BEGIN_LINK" />Daha fazla bilgi<ph name="END_LINK" /></translation>
-<translation id="2444854139071078915">Kayıtlı şifrelerinizi diğer uygulamalarınızda da kolayca görmek amacıyla Otomatik Doldurma için Chrome'u kullanın</translation>
 <translation id="2464852008153767546">{THRESHOLD,plural, =1{Bu işlem, Chrome {THRESHOLD} dakika boyunca kullanılmadığında gerçekleşir. Geçmiş ve otomatik doldurma da bu kapsamda yer alabilir.}other{Bu işlem, Chrome {THRESHOLD} dakika boyunca kullanılmadığında gerçekleşir Geçmiş ve otomatik doldurma da bu kapsamda yer alabilir.}}</translation>
 <translation id="2561231791489583059">Tehlikeli sitelere karşı koruma altında kalmak ve parolalarınızı güvende tutmak için varsayılan tarayıcınız olarak Chrome'u kullanın</translation>
 <translation id="2574249610672786438">Chrome kullandığınız her yerde sekmelerinizi görmek için tüm cihazlarınızda oturum açın.</translation>
@@ -219,7 +219,6 @@ Verileriniz parolanızla şifrelenir. Chrome verilerini kullanmak ve Google Hesa
 <translation id="6684809838922667136">Chrome'u daha iyi hale getirin</translation>
 <translation id="6695698548122852044">{THRESHOLD,plural, =1{Bu işlem, Chrome {THRESHOLD} dakika boyunca kullanılmadığında gerçekleşir. Yalnızca oturumunuz açıkken bu cihaza kaydedilen veriler silinir. Geçmiş ve şifreler bu kapsamda yer alabilir.}other{Bu işlem, Chrome {THRESHOLD} dakika boyunca kullanılmadığında gerçekleşir Yalnızca oturumunuz açıkken bu cihaza kaydedilen veriler silinir. Geçmiş ve şifreler bu kapsamda yer alabilir.}}</translation>
 <translation id="6709398533399187136">Şifreniz bir veri ihlali nedeniyle açığa çıktı. Google Şifre Yöneticisi bu şifreyi hemen değiştirmenizi öneriyor.</translation>
-<translation id="6788035488757621217">Cihazınızın ayarlar bölümünden "<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />" bölümünü açıp "Chrome"u seçin</translation>
 <translation id="6820553595690137150">Parolayla şifreleme, ödeme yöntemlerini ve adresleri kapsamaz.
 
 Bu ayarı değiştirmek için <ph name="BEGIN_LINK" />hesabınızdaki Chrome verilerini silin<ph name="END_LINK" />.</translation>
@@ -250,7 +249,7 @@ Veri kullanarak Chrome deneyiminizi iyileştiren daha fazla ayar görmek için <
 <translation id="7299681342915173313">Artık e-postalardaki, dokümanlardaki ve diğer uygulamalardaki bağlantıları tıkladığınızda Chrome'u kullanabilirsiniz.</translation>
 <translation id="7344094882820374540">Tehlikeli sitelere karşı Chrome'un en güçlü güvenlik özelliğinden yararlanın</translation>
 <translation id="7349129508108954623">Chrome'un, algılanan adreslerle ilgili yol tarifleri ve yerel bilgiler sağlaması için Google Haritalar'ı kullanmasına izin verin.</translation>
-<translation id="7371674917547846460">Faydalı Chrome ipuçlarını ve daha fazlasını takip edin.</translation>
+<translation id="7371674917547846460">Faydalı Chrome ipuçlarını ve yenilikleri takip edin.</translation>
 <translation id="7394108421562933108">Chrome'da Haritalar</translation>
 <translation id="7400722733683201933">Google Chrome hakkında</translation>
 <translation id="7466693328838535498">Arama widget'ları kutusuna Chrome yazın.</translation>

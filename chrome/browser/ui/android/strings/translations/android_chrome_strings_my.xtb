@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">PDF များကို ဤနေရာတွင် ဒေါင်းလုဒ်လုပ်နိုင်သည်</translation>
 <translation id="107147699690128016">ဖိုင်နောက်ဆက်တွဲကို ပြောင်းပါက ဖိုင်သည် အခြားအပလီကေးရှင်းတွင် ပွင့်သွားပြီး သင့်စက်အတွက် အန္တရာယ်ရှိနိုင်သည်။</translation>
 <translation id="1080365971383768617">သင့်စက်အားလုံးပေါ်ရှိ စကားဝှက်များ</translation>
-<translation id="1087176310396019910">စပမ်း ဖြစ်နိုင်သည်</translation>
 <translation id="1087799850623149508">လိပ်စာဘားကို အောက်ခြေသို့ရွှေ့ရန် ထိပြီးဖိထားနိုင်သည်</translation>
 <translation id="1089606299949659462">ပြန်စိစစ်ခြင်း ပြီးပြီ။</translation>
 <translation id="1094555143448724771">အခြားစက်များမှ တဘ်များကို ကြည့်ရန် တဘ်နှင့် မှတ်တမ်းများကို စင့်ခ်လုပ်ပါ</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">Chrome ကို ပြန်စမလား။</translation>
 <translation id="1428770807407000502">စင့်ခ်လုပ်ခြင်းကို ပိတ်မလား။</translation>
 <translation id="1430915738399379752">ပရင့်</translation>
+<translation id="1433478348197382180">ဖတ်ရှုမုဒ်</translation>
 <translation id="1435593198351412143">PDF များကို အလိုအလျောက်ဖွင့်ခြင်း</translation>
 <translation id="1437543266176261764"><ph name="APP_NAME" /> တွင် ဖွင့်ထားသည်</translation>
 <translation id="1448440926884431741">သင်စောင့်ကြည့်ထားသော ထုတ်ကုန်များကို ‘လိပ်စာများ’ တွင် စုစည်းနိုင်သည်</translation>
@@ -720,6 +720,7 @@
 <translation id="4306489587293957491">ရိုက်ထည့်ပါ</translation>
 <translation id="4307992518367153382">အခြေခံများ</translation>
 <translation id="4311652497846705514">PDF ကို ဖွင့်မလား။</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{စပမ်း ဖြစ်နိုင်သည်}other{စပမ်း ဖြစ်နိုင်သည် (# ခု)}}</translation>
 <translation id="4320177379694898372">အင်တာနက် ချိတ်ဆက်မှု မရှိ</translation>
 <translation id="4326079409704643112">သင်၏ Google Account ရှိ Chrome ဒေတာ သုံးရန်၊ သိမ်းရန် သင်ဖြစ်ကြောင်း အတည်ပြုပါ</translation>
 <translation id="433213510553688132">လိုက်ကြည့်နေသည်...</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">သင်စိတ်ဝင်စားသော အကြောင်းအရာများ၊ ဝဘ်ဆိုက်များကို စီမံနိုင်သည်</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{လွန်ခဲ့သည့် # နာရီက}other{လွန်ခဲ့သည့် # နာရီက}}</translation>
 <translation id="5810288467834065221">မူပိုင် <ph name="YEAR" /> Google LLC. မူပိုင်ခွင့်အားလုံး ယူထားသည်။</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{အကြောင်းကြားချက် ပြပါ}other{အကြောင်းကြားချက်များ ပြပါ}}</translation>
 <translation id="5814749351757353073">သင်၏အကြိုက်ဆုံးဝဘ်ဆိုက်များကို မျက်ခြည်မပြတ်ကြည့်ပါ</translation>
 <translation id="5823093032261493462">မည်သို့ပင်ဖြစ်စေ “<ph name="FILE_NAME" />” ကို <ph name="DOWNLOAD_DOMAIN" /> မှ ဒေါင်းလုဒ်လုပ်လိုသလား။</translation>
 <translation id="5828921839638612740">ဒေတာကို Chrome ဆက်တင်များတွင် ဖျက်နိုင်သည်</translation>
@@ -1167,6 +1169,7 @@
 <translation id="6255809143828972562">Chrome မှ တူးလ်များဖြင့် လုံခြုံစွာဘရောက်စ်လုပ်ပြီး ထိန်းချုပ်နိုင်သည်</translation>
 <translation id="6264376385120300461">မည်သို့ပင်ဖြစ်စေ ဒေါင်းလုဒ်လုပ်ရန်</translation>
 <translation id="6264485186158353794">လုံခြုံရာ နောက်သို့</translation>
+<translation id="6267063201726531683">စာဖတ်မုဒ် အောက်ခြေအပိုဆောင်း စာမျက်နှာ</translation>
 <translation id="6277522088822131679">စာမျက်နှာ ပရင်ထုတ်ရာတွင် ပြဿနာရှိသည်။ ကျေးဇူးပြု၍ နောက်မှ ကြိုးစားပါ။</translation>
 <translation id="6278428485366576908">အပြင်အဆင်</translation>
 <translation id="6284472661216707937">သင့်စက်အားလုံးရှိ စကားဝှက်များ ပိတ်ထားသည်</translation>
@@ -1190,7 +1193,6 @@
 <translation id="6342069812937806050">ယခုပင်</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 နှင့် နောက်ထပ် <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> ခု}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 နှင့် နောက်ထပ် <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> ခု}}</translation>
 <translation id="6345878117466430440">ဖတ်ပြီးဟု မှတ်သားရန်</translation>
-<translation id="6347010704471250799">အကြောင်းကြားချက်ပြခြင်း</translation>
 <translation id="6356893102071098867">မှန်ကန်သည့်အကောင့်ကို ရွေးထားခြင်းရှိ၊ မရှိ ကြည့်ပါ</translation>
 <translation id="6363990818884053551">စင့်ခ်စတင်ရန် သင်ဖြစ်ကြောင်းအတည်ပြုပါ</translation>
 <translation id="6364438453358674297">အကြံပေးချက်ကို မှတ်တမ်း ထဲမှ ဖယ်ရှားမလား?</translation>

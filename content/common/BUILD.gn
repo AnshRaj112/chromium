@@ -471,9 +471,6 @@ mojom("mojo_bindings") {
   }
 
   enabled_features = []
-  if (enable_ipc_logging) {
-    enabled_features += [ "ipc_logging" ]
-  }
   if (use_clang_profiling_inside_sandbox) {
     enabled_features += [ "clang_profiling_inside_sandbox" ]
   }
@@ -656,4 +653,19 @@ mojom("mojo_bindings") {
   export_class_attribute = "CONTENT_EXPORT"
   export_define = "CONTENT_IMPLEMENTATION=1"
   export_header = "content/common/content_export.h"
+}
+
+if (is_android) {
+  java_cpp_features("java_features_srcjar") {
+    # External code should depend on ":common_java" instead.
+    visibility = [ ":*" ]
+    sources = [ "//content/common/features.cc" ]
+    class_name = "org.chromium.content.common.ContentInternalFeatures"
+  }
+
+  android_library("common_java") {
+    # Right now, this only includes the Java features. But if we need more Java
+    # files, they should be added here as necessary.
+    srcjar_deps = [ ":java_features_srcjar" ]
+  }
 }

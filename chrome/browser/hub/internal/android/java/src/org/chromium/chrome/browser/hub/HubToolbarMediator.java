@@ -5,7 +5,6 @@
 package org.chromium.chrome.browser.hub;
 
 import static org.chromium.build.NullUtil.assumeNonNull;
-import static org.chromium.chrome.browser.hub.HubToolbarProperties.ACTION_BUTTON_DATA;
 import static org.chromium.chrome.browser.hub.HubToolbarProperties.APPLY_DELAY_FOR_SEARCH_BOX_ANIMATION;
 import static org.chromium.chrome.browser.hub.HubToolbarProperties.HUB_SEARCH_ENABLED_STATE;
 import static org.chromium.chrome.browser.hub.HubToolbarProperties.IS_INCOGNITO;
@@ -23,13 +22,11 @@ import android.content.res.Configuration;
 import android.view.View;
 
 import androidx.annotation.IntDef;
-import androidx.annotation.VisibleForTesting;
 import androidx.core.util.Pair;
 
 import org.chromium.base.Callback;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.supplier.ObservableSupplier;
-import org.chromium.base.supplier.TransitiveObservableSupplier;
 import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.hub.HubToolbarProperties.PaneButtonLookup;
@@ -37,7 +34,6 @@ import org.chromium.chrome.browser.ui.searchactivityutils.SearchActivityClient;
 import org.chromium.chrome.browser.ui.searchactivityutils.SearchActivityExtras.ResolutionType;
 import org.chromium.components.embedder_support.util.UrlConstants;
 import org.chromium.components.feature_engagement.Tracker;
-import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.modelutil.PropertyModel;
 import org.chromium.url.GURL;
 
@@ -89,8 +85,8 @@ public class HubToolbarMediator {
                         return;
                     }
 
-                    int screenWidthDp = mContext.getResources().getConfiguration().screenWidthDp;
-                    boolean showLoupe = isScreenWidthTablet(screenWidthDp);
+                    int screenWidthDp = configuration.screenWidthDp;
+                    boolean showLoupe = HubUtils.isScreenWidthTablet(screenWidthDp);
                     mPropertyModel.set(APPLY_DELAY_FOR_SEARCH_BOX_ANIMATION, false);
                     mPropertyModel.set(SEARCH_BOX_VISIBLE, !showLoupe);
                     mPropertyModel.set(SEARCH_LOUPE_VISIBLE, showLoupe);
@@ -101,10 +97,6 @@ public class HubToolbarMediator {
             };
 
     private final PropertyModel mPropertyModel;
-
-    private final Callback<FullButtonData> mOnActionButtonChangeCallback =
-            this::onActionButtonChange;
-    private @Nullable TransitiveObservableSupplier<Pane, FullButtonData> mActionButtonDataSupplier;
 
     private final Context mContext;
     private final PaneManager mPaneManager;
@@ -161,11 +153,6 @@ public class HubToolbarMediator {
         focusedPaneSupplier.addObserver(mOnFocusedPaneChange);
         rebuildPaneSwitcherButtonData();
 
-        mActionButtonDataSupplier =
-                new TransitiveObservableSupplier<>(
-                        focusedPaneSupplier, p -> p.getActionButtonDataSupplier());
-        mActionButtonDataSupplier.addObserver(mOnActionButtonChangeCallback);
-
         mPropertyModel.set(PANE_BUTTON_LOOKUP_CALLBACK, this::consumeButtonLookup);
 
         mPropertyModel.set(SEARCH_LISTENER, this::onSearchClicked);
@@ -176,10 +163,6 @@ public class HubToolbarMediator {
 
     /** Cleans up observers. */
     public void destroy() {
-        if (mActionButtonDataSupplier != null) {
-            mActionButtonDataSupplier.removeObserver(mOnActionButtonChangeCallback);
-            mActionButtonDataSupplier = null;
-        }
         mRemoveReferenceButtonObservers.forEach(Runnable::run);
         mRemoveReferenceButtonObservers.clear();
         mPaneManager.getFocusedPaneSupplier().removeObserver(mOnFocusedPaneChange);
@@ -208,10 +191,6 @@ public class HubToolbarMediator {
             }
         }
         return null;
-    }
-
-    private void onActionButtonChange(@Nullable FullButtonData actionButtonData) {
-        mPropertyModel.set(ACTION_BUTTON_DATA, actionButtonData);
     }
 
     private int findCachedPaneSwitcherIndex(@PaneId int paneId) {
@@ -331,12 +310,6 @@ public class HubToolbarMediator {
                 mPropertyModel.get(SEARCH_BOX_VISIBLE), mPropertyModel.get(IS_INCOGNITO));
     }
 
-    /** Utility to determine which UI variants to show based on device width. */
-    @VisibleForTesting
-    public static boolean isScreenWidthTablet(int screenWidthDp) {
-        return screenWidthDp >= DeviceFormFactor.MINIMUM_TABLET_WIDTH_DP;
-    }
-
     private void recordHubSearchEntrypointHistogram(boolean isSearchBox, boolean isIncognito) {
         // Based on the ComponentCallback#onConfigurationChanged logic for hub search, it is implied
         // that the search box and search loupe visibilities have opposite behaviors at any time.
@@ -356,5 +329,10 @@ public class HubToolbarMediator {
 
         RecordHistogram.recordEnumeratedHistogram(
                 "Android.HubSearch.SearchBoxEntrypointV2", action, HubSearchEntrypoint.NUM_ENTRIES);
+    }
+
+    /** Test-only method to trigger configuration change for testing purposes. */
+    void triggerConfigurationChangeForTesting(Configuration configuration) {
+        mComponentCallbacks.onConfigurationChanged(configuration);
     }
 }

@@ -152,6 +152,13 @@ class NET_EXPORT_PRIVATE SqlBackendImpl final : public Backend {
     return background_task_runner_;
   }
 
+  // Enables a strict corruption checking mode for testing purposes. When
+  // enabled, any detected database corruption will cause an immediate crash
+  // via a `CHECK` failure. This is primarily useful for fuzzers, which can more
+  // easily identify problematic inputs if the process fails fast, rather than
+  // silently recovering.
+  void EnableStrictCorruptionCheckForTesting();
+
  private:
   class IteratorImpl;
 
@@ -321,6 +328,13 @@ class NET_EXPORT_PRIVATE SqlBackendImpl final : public Backend {
   // gathers the keys of all active entries to prevent them from being evicted
   // and then delegates the actual eviction logic to the persistent store.
   void HandleTriggerEvictionOperation(
+      std::unique_ptr<ExclusiveOperationCoordinator::OperationHandle> handle);
+
+  // Handles the backend logic for `OnExternalCacheHit()`. This method is
+  // scheduled as a normal operation via the `ExclusiveOperationCoordinator`.
+  void HandleOnExternalCacheHitOperation(
+      const CacheEntryKey& key,
+      base::Time now,
       std::unique_ptr<ExclusiveOperationCoordinator::OperationHandle> handle);
 
   // Applies in-flight modifications to an entry's info.

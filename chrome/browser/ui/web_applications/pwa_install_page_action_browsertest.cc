@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "chrome/browser/ui/web_applications/pwa_install_page_action.h"
+
 #include <stddef.h>
 
 #include <memory>
@@ -36,6 +38,7 @@
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/location_bar/location_bar.h"
 #include "chrome/browser/ui/page_action/page_action_icon_type.h"
+#include "chrome/browser/ui/tabs/public/tab_features.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/ui_features.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -153,6 +156,18 @@ void PwaInstallIconChangeWaiter::VerifyIconVisibility(views::View* iconView,
   EXPECT_EQ(visible, iconView->GetVisible());
 }
 
+class MockRecordIgnoreDelegate : public page_actions::RecordIgnoreDelegate {
+ public:
+  MockRecordIgnoreDelegate() = default;
+  void RecordIgnore(const webapps::AppId& app_id, base::Time time) override {
+    ignore_was_called_ = true;
+  }
+  bool GetIgnoreWasCalled() { return ignore_was_called_; }
+
+ private:
+  bool ignore_was_called_ = false;
+};
+
 }  // namespace
 
 // Tests various cases that effect the visibility of the install icon in the
@@ -215,11 +230,6 @@ class PwaInstallViewBrowserTest : public extensions::ExtensionBrowserTest,
 
   void SetUpOnMainThread() override {
     extensions::ExtensionBrowserTest::SetUpOnMainThread();
-
-    pwa_install_view_ =
-        BrowserView::GetBrowserViewForBrowser(browser())
-            ->toolbar_button_provider()
-            ->GetPageActionIconView(PageActionIconType::kPwaInstall);
     EXPECT_FALSE(GetPageActionView()->GetVisible());
 
     web_contents_ = GetCurrentTab();
@@ -368,25 +378,24 @@ class PwaInstallViewBrowserTest : public extensions::ExtensionBrowserTest,
 
  protected:
   IconLabelBubbleView* GetPageActionView() {
-    if (IsMigrationEnabled()) {
-      return BrowserView::GetBrowserViewForBrowser(browser())
-          ->toolbar_button_provider()
-          ->GetPageActionView(kActionInstallPwa);
-
-    } else {
-      return pwa_install_view_;
-    }
+    return BrowserView::GetBrowserViewForBrowser(browser())
+        ->toolbar_button_provider()
+        ->GetPageActionView(kActionInstallPwa);
   }
   void ExecuteForTesting() {
     if (IsMigrationEnabled()) {
       web_app::ShowPwaInstallDialog(browser());
       return;
     }
-    pwa_install_view_->ExecuteForTesting();
+    auto* pwa_install_view =
+        BrowserView::GetBrowserViewForBrowser(browser())
+            ->toolbar_button_provider()
+            ->GetPageActionIconView(PageActionIconType::kPwaInstall);
+    pwa_install_view->ExecuteForTesting();
   }
-  void FastForwardAnimation(page_actions::PageActionView* view) {
+  void FastForwardAnimation(IconLabelBubbleView* view) {
     auto animation = std::make_unique<gfx::AnimationTestApi>(
-        &view->GetSlideAnimationForTesting());
+        &view->slide_animation_for_testing());
     auto now = base::TimeTicks::Now();
     animation->SetStartTime(now);
     animation->Step(now + base::Minutes(1));
@@ -397,32 +406,26 @@ class PwaInstallViewBrowserTest : public extensions::ExtensionBrowserTest,
         BrowserView::GetBrowserViewForBrowser(browser()));
   }
   void VerifyLabelVisibility(bool isVisible) {
+    auto* page_action_view = GetPageActionView();
+
     // In the legacy implementation, checking for is_animating_label is
     // equivalent to checking that the label is visible or being animated in.
     // This happens because while AnimateIn is used to show the label,
     // ResetSlideAnimation, which doesn't animate the label out,
     // is used to hide it.
     if (!IsMigrationEnabled()) {
-      EXPECT_EQ(GetPageActionView()->is_animating_label(), isVisible);
+      EXPECT_EQ(page_action_view->is_animating_label(), isVisible);
       return;
     }
 
-    FastForwardAnimation(BrowserView::GetBrowserViewForBrowser(browser())
-                             ->toolbar_button_provider()
-                             ->GetPageActionView(kActionInstallPwa));
-    EXPECT_EQ(BrowserView::GetBrowserViewForBrowser(browser())
-                  ->toolbar_button_provider()
-                  ->GetPageActionView(kActionInstallPwa)
-                  ->IsChipVisible(),
-              isVisible);
+    FastForwardAnimation(page_action_view);
+    EXPECT_EQ(page_action_view->ShouldShowLabel(), isVisible);
   }
 
   net::EmbeddedTestServer https_server_;
   std::string intercept_request_path_;
   std::string intercept_request_response_;
 
-  raw_ptr<PageActionIconView, AcrossTasksDanglingUntriaged> pwa_install_view_ =
-      nullptr;
   raw_ptr<content::WebContents, AcrossTasksDanglingUntriaged> web_contents_ =
       nullptr;
   raw_ptr<webapps::TestAppBannerManagerDesktop, AcrossTasksDanglingUntriaged>
@@ -891,10 +894,49 @@ IN_PROC_BROWSER_TEST_P(PwaInstallViewBrowserTest, PwaIntallIphIgnored) {
   bool installable = OpenTab(app_url).installable;
   ASSERT_TRUE(installable);
 
+  auto* const user_education = BrowserUserEducationInterface::From(browser());
+
   // IPH is not shown when the IPH is ignored recently.
-  EXPECT_FALSE(
-      BrowserUserEducationInterface::From(browser())->IsFeaturePromoActive(
-          feature_engagement::kIPHDesktopPwaInstallFeature));
+  EXPECT_FALSE(user_education->IsFeaturePromoQueued(
+                   feature_engagement::kIPHDesktopPwaInstallFeature) ||
+               user_education->IsFeaturePromoActive(
+                   feature_engagement::kIPHDesktopPwaInstallFeature));
+}
+
+IN_PROC_BROWSER_TEST_P(PwaInstallViewBrowserTest,
+                       OnCloseDoesntRecordIgnoreIfExecuting) {
+  if (!IsMigrationEnabled()) {
+    return;
+  }
+  PwaInstallPageActionController* pwa_install_controller =
+      browser()
+          ->GetActiveTabInterface()
+          ->GetTabFeatures()
+          ->pwa_install_page_action_controller();
+  pwa_install_controller->SetIsExecuting(true);
+
+  MockRecordIgnoreDelegate record_ignore;
+  pwa_install_controller->ExecuteOnIphClosedForTesting(GetInstallableAppURL(),
+                                                       &record_ignore);
+  EXPECT_FALSE(record_ignore.GetIgnoreWasCalled());
+}
+
+IN_PROC_BROWSER_TEST_P(PwaInstallViewBrowserTest,
+                       OnCloseRecordsIgnoreIfNotExecuting) {
+  if (!IsMigrationEnabled()) {
+    return;
+  }
+  PwaInstallPageActionController* pwa_install_controller =
+      browser()
+          ->GetActiveTabInterface()
+          ->GetTabFeatures()
+          ->pwa_install_page_action_controller();
+  ASSERT_FALSE(pwa_install_controller->GetIsExecuting());
+
+  MockRecordIgnoreDelegate record_ignore;
+  pwa_install_controller->ExecuteOnIphClosedForTesting(GetInstallableAppURL(),
+                                                       &record_ignore);
+  EXPECT_TRUE(record_ignore.GetIgnoreWasCalled());
 }
 
 IN_PROC_BROWSER_TEST_P(PwaInstallViewBrowserTest, IconViewAccessibleName) {

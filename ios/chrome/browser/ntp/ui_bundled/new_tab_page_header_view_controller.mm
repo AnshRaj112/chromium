@@ -24,6 +24,7 @@
 #import "ios/chrome/browser/ntp/model/new_tab_page_tab_helper.h"
 #import "ios/chrome/browser/ntp/shared/metrics/new_tab_page_metrics_recorder.h"
 #import "ios/chrome/browser/ntp/ui_bundled/logo_vendor.h"
+#import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_color_palette.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_constants.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_controller_delegate.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_feature.h"
@@ -33,6 +34,7 @@
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_header_view_controller_delegate.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_mutator.h"
 #import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_shortcuts_handler.h"
+#import "ios/chrome/browser/ntp/ui_bundled/new_tab_page_trait.h"
 #import "ios/chrome/browser/omnibox/ui/omnibox_container_view.h"
 #import "ios/chrome/browser/shared/model/profile/features.h"
 #import "ios/chrome/browser/shared/public/commands/help_commands.h"
@@ -135,8 +137,8 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
   NSLayoutConstraint* _identityDiscTrailingConstraint;
   // Constraint for the identity disc button's capsule-style width.
   NSLayoutConstraint* _identityDiscCapsuleWidthConstraint;
-  // Whether MIA is allowed by policy.
-  BOOL _MIAAllowedByPolicy;
+  // Whether AIM is allowed.
+  BOOL _isAIMAllowed;
   // The logo for the default search engine. This is owned by the caching system
   // backing this logo.
   __weak UIImage* _dseLogo;
@@ -162,6 +164,12 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
         [weakSelf updateUIOnTraitChange:previousCollection];
       };
       [self registerForTraitChanges:traits withHandler:handler];
+      if (IsNTPBackgroundCustomizationEnabled()) {
+        NSArray<UITrait>* colorTraits =
+            TraitCollectionSetForTraits(@[ NewTabPageTrait.class ]);
+        [self registerForTraitChanges:colorTraits
+                           withAction:@selector(applyBackgroundColors)];
+      }
     }
   }
   return self;
@@ -270,12 +278,12 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
   if (self.isShowing) {
     [self.headerView updateTabGroupIndicatorAvailabilityWithOffset:offset];
     CGFloat progress =
-        self.logoIsShowing || !IsRegularXRegularSizeClass(self)
+        self.logoIsShowing || !CanShowTabStrip(self)
             ? [self.headerView searchFieldProgressForOffset:offset]
             // RxR with no logo hides the fakebox, so always show the omnibox.
             : 1;
     [self updateLogoForOffset:offset];
-    if (!IsSplitToolbarMode(self)) {
+    if (CanShowTabStrip(self) || !IsSplitToolbarMode(self)) {
       [self.toolbarDelegate setScrollProgressForTabletOmnibox:progress];
     } else {
       // Ensure omnibox is reset when not a regular tablet.
@@ -327,7 +335,7 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
 
     self.headerView = [[NewTabPageHeaderView alloc]
         initWithUseNewBadgeForLensButton:_useNewBadgeForLensButton];
-    [self.headerView setMIAAllowedByPolicy:_MIAAllowedByPolicy];
+    [self.headerView setAIMAllowed:_isAIMAllowed];
     self.headerView.NTPShortcutsHandler = self.NTPShortcutsHandler;
     self.headerView.isGoogleDefaultSearchEngine =
         self.isGoogleDefaultSearchEngine;
@@ -368,6 +376,9 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
 
     [self.logoVendor fetchDoodle];
     self.headerView.tintAdjustmentMode = UIViewTintAdjustmentModeNormal;
+    if (IsNTPBackgroundCustomizationEnabled()) {
+      [self applyBackgroundColors];
+    }
   }
 }
 
@@ -592,17 +603,20 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
           : ntp_home::kCustomizationMenuIconSize);
   [customizationMenuButton setImage:icon forState:UIControlStateNormal];
 
-  UIColor* backgroundColor =
-      IsSignInButtonNoAvatarEnabled()
-          ? [[UIColor colorNamed:kSolidWhiteColor] colorWithAlphaComponent:0.75]
-          : [[UIColor colorNamed:@"fake_omnibox_solid_background_color"]
-                colorWithAlphaComponent:0.8];
-  customizationMenuButton.backgroundColor = backgroundColor;
+  if (!IsNTPBackgroundCustomizationEnabled()) {
+    UIColor* backgroundColor =
+        IsSignInButtonNoAvatarEnabled()
+            ? [[UIColor colorNamed:kSolidWhiteColor]
+                  colorWithAlphaComponent:0.75]
+            : [[UIColor colorNamed:@"fake_omnibox_solid_background_color"]
+                  colorWithAlphaComponent:0.8];
+    customizationMenuButton.backgroundColor = backgroundColor;
 
-  UIColor* tintColor = [UIColor
-      colorNamed:(IsSignInButtonNoAvatarEnabled() ? kBlue600Color
-                                                  : kTextSecondaryColor)];
-  customizationMenuButton.tintColor = tintColor;
+    UIColor* tintColor = [UIColor
+        colorNamed:(IsSignInButtonNoAvatarEnabled() ? kBlue600Color
+                                                    : kTextSecondaryColor)];
+    customizationMenuButton.tintColor = tintColor;
+  }
 
   customizationMenuButton.accessibilityIdentifier =
       kNTPCustomizationMenuButtonIdentifier;
@@ -633,17 +647,25 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
     button.imageView.layer.masksToBounds = YES;
     button.layer.cornerRadius = image.size.width;
   } else {
+    NewTabPageColorPalette* colorPalette =
+        IsNTPBackgroundCustomizationEnabled()
+            ? [self.traitCollection objectForTrait:NewTabPageTrait.class]
+            : nil;
     button.layer.cornerRadius = 0;
     [button setImage:nil forState:UIControlStateNormal];
     UIButtonConfiguration* config =
         [UIButtonConfiguration plainButtonConfiguration];
     config.background.backgroundColor =
-        [[UIColor colorNamed:kSolidWhiteColor] colorWithAlphaComponent:0.75];
+        colorPalette ? colorPalette.secondaryColor
+                     : [[UIColor colorNamed:kSolidWhiteColor]
+                           colorWithAlphaComponent:0.75];
     NSDictionary* attributes = @{
       NSFontAttributeName : PreferredFontForTextStyle(
           UIFontTextStyleSubheadline, UIFontWeightSemibold,
           kIdentityDiscMaxFontSize),
-      NSForegroundColorAttributeName : [UIColor colorNamed:kBlue600Color],
+      NSForegroundColorAttributeName : colorPalette
+          ? colorPalette.tintColor
+          : [UIColor colorNamed:kBlue600Color],
     };
     config.attributedTitle = [[NSAttributedString alloc]
         initWithString:l10n_util::GetNSString(IDS_IOS_SIGNIN_BUTTON_TEXT)
@@ -699,8 +721,7 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
       setConstant:content_suggestions::DoodleHeight(
                       self.logoVendor.showingLogo,
                       self.logoVendor.isShowingDoodle, self.traitCollection)];
-  self.fakeOmnibox.hidden =
-      IsRegularXRegularSizeClass(self) && !self.logoIsShowing;
+  self.fakeOmnibox.hidden = CanShowTabStrip(self) && !self.logoIsShowing;
   [self.headerView layoutIfNeeded];
   self.headerViewHeightConstraint.constant =
       content_suggestions::HeightForLogoHeader(self.logoIsShowing,
@@ -915,13 +936,9 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
   [self updateIdentityDiscAccessibilityLabelWithName:name email:email];
 }
 
-- (void)setMIAAllowedByPolicy:(BOOL)policyAllowed {
-  [_headerView setMIAAllowedByPolicy:policyAllowed];
-  _MIAAllowedByPolicy = policyAllowed;
-}
-
-- (void)updateBackgroundWithColorPalette:(NewTabPageColorPalette*)colorPalette {
-  [_headerView updateBackgroundWithColorPalette:colorPalette];
+- (void)setAIMAllowed:(BOOL)allowed {
+  [_headerView setAIMAllowed:allowed];
+  _isAIMAllowed = allowed;
 }
 
 #pragma mark - UserAccountImageUpdateDelegate
@@ -1002,6 +1019,12 @@ const CGFloat kIdentityDiscMaxFontSize = 24;
 }
 
 #pragma mark - Private
+
+// Sets the background using the current color palette, or defaults if none is
+// set.
+- (void)applyBackgroundColors {
+  [self updateIdentityDiscState];
+}
 
 - (void)setIsSignedIn:(BOOL)isSignedIn {
   BOOL wasSignedIn = _isSignedIn;

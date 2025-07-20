@@ -24,6 +24,7 @@ import org.chromium.cc.input.BrowserControlsState;
 import org.chromium.chrome.browser.app.tab_activity_glue.ActivityTabWebContentsDelegateAndroid;
 import org.chromium.chrome.browser.browser_controls.BrowserControlsStateProvider;
 import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider;
+import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider.CustomTabsUiType;
 import org.chromium.chrome.browser.browserservices.intents.WebappExtras;
 import org.chromium.chrome.browser.browserservices.permissiondelegation.InstalledWebappPermissionManager;
 import org.chromium.chrome.browser.browserservices.ui.controller.AuthTabVerifier;
@@ -283,6 +284,11 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
             }
             return false;
         }
+
+        @Override
+        protected boolean isPopup() {
+            return mIntentDataProvider.getUiType() == CustomTabsUiType.POPUP;
+        }
     }
 
     private final Activity mActivity;
@@ -489,6 +495,7 @@ public class CustomTabDelegateFactory implements TabDelegateFactory {
         TabModelSelector tabModelSelector = mTabModelSelectorSupplier.get();
         return new TabContextMenuItemDelegate(
                 mActivity,
+                mActivityType,
                 tab,
                 tabModelSelector,
                 mEphemeralTabCoordinatorSupplier,

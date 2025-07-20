@@ -67,6 +67,7 @@
 #include "chrome/browser/ui/actions/chrome_action_id.h"
 #include "chrome/browser/ui/autofill/autofill_bubble_base.h"
 #include "chrome/browser/ui/autofill/payments/save_card_ui.h"
+#include "chrome/browser/ui/bookmarks/bookmark_bar_controller.h"
 #include "chrome/browser/ui/bookmarks/bookmark_stats.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_command_controller.h"
@@ -113,7 +114,6 @@
 #include "chrome/browser/ui/views/color_provider_browser_helper.h"
 #include "chrome/browser/ui/views/download/bubble/download_toolbar_ui_controller.h"
 #include "chrome/browser/ui/views/download/download_in_progress_dialog_view.h"
-#include "chrome/browser/ui/views/download/download_shelf_view.h"
 #include "chrome/browser/ui/views/exclusive_access_bubble_views.h"
 #include "chrome/browser/ui/views/extensions/extension_keybinding_registry_views.h"
 #include "chrome/browser/ui/views/extensions/extensions_toolbar_container.h"
@@ -1029,14 +1029,23 @@ BrowserView::BrowserView(std::unique_ptr<Browser> browser)
   watermark_view_ = contents_container->AddChildView(
       std::make_unique<enterprise_watermark::WatermarkView>());
 
+  if (features::kGlicActorUiOverlay.Get()) {
+    auto actor_overlay_view = std::make_unique<views::View>();
+    actor_overlay_view->SetID(VIEW_ID_ACTOR_OVERLAY);
+    actor_overlay_view->SetVisible(false);
+    actor_overlay_view->SetLayoutManager(std::make_unique<views::FillLayout>());
+    actor_overlay_view_ =
+        contents_container->AddChildView(std::move(actor_overlay_view));
+  }
+
 #if BUILDFLAG(ENABLE_GLIC)
   contents_container->SetLayoutManager(std::make_unique<ContentsLayoutManager>(
       devtools_web_view_, devtools_scrim_view_, contents_view,
-      lens_overlay_view_, glic_border_, watermark_view_));
+      lens_overlay_view_, glic_border_, watermark_view_, actor_overlay_view_));
 #else
   contents_container->SetLayoutManager(std::make_unique<ContentsLayoutManager>(
       devtools_web_view_, devtools_scrim_view_, contents_view,
-      lens_overlay_view_, nullptr, watermark_view_));
+      lens_overlay_view_, nullptr, watermark_view_, actor_overlay_view_));
 #endif
 
   toolbar_ = top_container_->AddChildView(
@@ -1160,7 +1169,6 @@ BrowserView::~BrowserView() {
   contents_separator_ = nullptr;
   loading_bar_ = nullptr;
   find_bar_host_view_ = nullptr;
-  download_shelf_ = nullptr;
   infobar_container_ = nullptr;
   multi_contents_view_ = nullptr;
   contents_container_view_ = nullptr;
@@ -1177,6 +1185,7 @@ BrowserView::~BrowserView() {
   left_aligned_side_panel_separator_ = nullptr;
   side_panel_rounded_corner_ = nullptr;
   toolbar_button_provider_ = nullptr;
+  actor_overlay_view_ = nullptr;
 
   // Child views maintain PrefMember attributes that point to
   // OffTheRecordProfile's PrefService which gets deleted by ~Browser.
@@ -1228,10 +1237,6 @@ BrowserView* BrowserView::GetBrowserViewForBrowser(const Browser* browser) {
     return nullptr;
   }
   return GetBrowserViewForNativeWindow(browser->window()->GetNativeWindow());
-}
-
-void BrowserView::SetDownloadShelfForTest(DownloadShelf* download_shelf) {
-  download_shelf_ = download_shelf;
 }
 
 // static
@@ -1682,7 +1687,7 @@ void BrowserView::UpdateTitleBar() {
 void BrowserView::BookmarkBarStateChanged(
     BookmarkBar::AnimateChangeType change_type) {
   if (bookmark_bar_view_.get()) {
-    BookmarkBar::State new_state = browser_->bookmark_bar_state();
+    BookmarkBar::State new_state = bookmark_bar_state();
     bookmark_bar_view_->SetBookmarkBarState(new_state, change_type);
   }
 
@@ -1696,13 +1701,13 @@ void BrowserView::BookmarkBarStateChanged(
 }
 
 void BrowserView::TemporarilyShowBookmarkBar(base::TimeDelta duration) {
-  browser_->SetForceShowBookmarkBarFlag(
-      Browser::ForceShowBookmarkBarFlag::kTabGroupSaved);
+  SetForceShowBookmarkBarFlag(
+      BookmarkBarController::ForceShowFlag::kTabGroupSaved);
   temporary_bookmark_bar_timer_.Start(
       FROM_HERE, duration,
-      base::BindOnce(&Browser::ClearForceShowBookmarkBarFlag,
-                     browser_->AsWeakPtr(),
-                     Browser::ForceShowBookmarkBarFlag::kTabGroupSaved));
+      base::BindOnce(&BrowserView::ClearForceShowBookmarkBarFlag,
+                     GetAsWeakPtr(),
+                     BookmarkBarController::ForceShowFlag::kTabGroupSaved));
 }
 
 void BrowserView::UpdateDevTools() {
@@ -1895,7 +1900,7 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
   // callback to us and trigger layout.
   if (bookmark_bar_view_.get()) {
     bookmark_bar_view_->SetBookmarkBarState(
-        browser_->bookmark_bar_state(), BookmarkBar::DONT_ANIMATE_STATE_CHANGE);
+        bookmark_bar_state(), BookmarkBar::DONT_ANIMATE_STATE_CHANGE);
   }
 
   infobar_container_->ChangeInfoBarManager(
@@ -2514,6 +2519,18 @@ void BrowserView::TabDraggingStatusChanged(bool is_dragging) {
     contents_container_->DeprecatedLayoutImmediately();
   }
 #endif
+}
+
+TabDragDelegate* BrowserView::GetTabDragDelegate(
+    const gfx::Point& point_in_screen) {
+  if (!multi_contents_view_ || multi_contents_view_->IsInSplitView() ||
+      !multi_contents_view_->is_drag_and_drop_enabled()) {
+    return nullptr;
+  }
+  if (!multi_contents_view_->GetBoundsInScreen().Contains(point_in_screen)) {
+    return nullptr;
+  }
+  return &multi_contents_view_->drop_target_controller();
 }
 
 base::CallbackListSubscription BrowserView::AddOnLinkOpeningFromGestureCallback(
@@ -3339,14 +3356,8 @@ ShowTranslateBubbleResult BrowserView::ShowTranslateBubble(
     return ShowTranslateBubbleResult::BROWSER_WINDOW_MINIMIZED;
   }
 
-  views::Button* translate_icon;
-  if (IsPageActionMigrated(PageActionIconType::kTranslate)) {
-    translate_icon =
-        toolbar_button_provider()->GetPageActionView(kActionShowTranslate);
-  } else {
-    translate_icon = toolbar_button_provider()->GetPageActionIconView(
-        PageActionIconType::kTranslate);
-  }
+  views::Button* translate_icon =
+      toolbar_button_provider()->GetPageActionView(kActionShowTranslate);
 
   views::View* anchor_view =
       toolbar_button_provider()->GetAnchorView(kActionShowTranslate);
@@ -3372,14 +3383,8 @@ void BrowserView::StartPartialTranslate(const std::string& source_language,
       ->GetLanguageState()
       ->SetTranslateEnabled(true);
 
-  views::Button* translate_icon;
-  if (IsPageActionMigrated(PageActionIconType::kTranslate)) {
-    translate_icon =
-        toolbar_button_provider()->GetPageActionView(kActionShowTranslate);
-  } else {
-    translate_icon = toolbar_button_provider()->GetPageActionIconView(
-        PageActionIconType::kTranslate);
-  }
+  views::Button* translate_icon =
+      toolbar_button_provider()->GetPageActionView(kActionShowTranslate);
 
   CHECK_DEREF(browser_->GetFeatures().translate_bubble_controller())
       .StartPartialTranslate(
@@ -3398,41 +3403,16 @@ void BrowserView::ShowOneClickSigninConfirmation(
                                        std::move(confirmed_callback));
 }
 
-void BrowserView::SetDownloadShelfVisible(bool visible) {
-  DCHECK(download_shelf_);
-  browser_->UpdateDownloadShelfVisibility(visible);
-
-  // SetDownloadShelfVisible can force-close the shelf, so make sure we lay out
-  // everything correctly, as if the animation had finished. This doesn't
-  // matter for showing the shelf, as the show animation will do it.
-  ToolbarSizeChanged(false);
-}
-
-bool BrowserView::IsDownloadShelfVisible() const {
-  return download_shelf_ && download_shelf_->IsShowing();
-}
-
-DownloadShelf* BrowserView::GetDownloadShelf() {
-  // Don't show download shelf if download bubble is enabled, except that the
-  // shelf is already showing (this can happen if prefs were changed at
-  // runtime).
-  if (download::IsDownloadBubbleEnabled() && !download_shelf_) {
-    return nullptr;
-  }
-  if (!download_shelf_) {
-    download_shelf_ =
-        AddChildView(std::make_unique<DownloadShelfView>(browser_.get(), this));
-    GetBrowserViewLayout()->set_download_shelf(download_shelf_->GetView());
-  }
-  return download_shelf_;
-}
-
 views::View* BrowserView::GetTopContainer() {
   return top_container_;
 }
 
 views::View* BrowserView::GetLensOverlayView() {
   return lens_overlay_view_;
+}
+
+views::View* BrowserView::GetActorOverlayView() {
+  return actor_overlay_view_;
 }
 
 DownloadBubbleUIController* BrowserView::GetDownloadBubbleUIController() {
@@ -4209,14 +4189,6 @@ void BrowserView::EnsureFocusOrder() {
     infobar_container_->InsertAfterInFocusList(top_container_);
   }
 
-  // We want the download shelf to come after the contents container (which also
-  // contains the debug console, etc.) This prevents it from intruding into the
-  // focus order, but makes it easily accessible by using SHIFT-TAB (reverse
-  // focus traversal) from the toolbar/omnibox.
-  if (download_shelf_ && contents_container_) {
-    download_shelf_->GetView()->InsertAfterInFocusList(contents_container_);
-  }
-
 #if DCHECK_IS_ON()
   // Make sure we didn't create any cycles in the focus order.
   CheckFocusListForCycles(top_container_);
@@ -4624,6 +4596,22 @@ void BrowserView::CloseTabSearchBubble() {
   }
 }
 
+void BrowserView::SetForceShowBookmarkBarFlag(
+    BookmarkBarController::ForceShowFlag flag) {
+  BookmarkBarController::From(browser_.get())
+      ->SetForceShowBookmarkBarFlag(flag);
+}
+
+void BrowserView::ClearForceShowBookmarkBarFlag(
+    BookmarkBarController::ForceShowFlag flag) {
+  BookmarkBarController::From(browser_.get())
+      ->ClearForceShowBookmarkBarFlag(flag);
+}
+
+BookmarkBar::State BrowserView::bookmark_bar_state() const {
+  return BookmarkBarController::From(browser_.get())->bookmark_bar_state();
+}
+
 void BrowserView::ShowSplitView(bool focus_active_view) {
   CHECK(multi_contents_view_);
   const int active_index = browser_->tab_strip_model()->active_index();
@@ -4826,9 +4814,6 @@ void BrowserView::GetAccessiblePanes(std::vector<views::View*>* panes) {
   }
   if (infobar_container_) {
     panes->push_back(infobar_container_);
-  }
-  if (download_shelf_) {
-    panes->push_back(download_shelf_->GetView());
   }
   if (unified_side_panel_) {
     panes->push_back(unified_side_panel_);
@@ -5409,6 +5394,13 @@ void BrowserView::LoadingAnimationTimerCallback() {
 }
 
 void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+  // Loading callbacks may trigger during Widget destruction after it has closed
+  // (in response to visibility change callbacks for e.g.). In such cases early
+  // return to avoid dereferencing partially torn-down state.
+  if (!GetWidget() || GetWidget()->IsClosed()) {
+    return;
+  }
+
   if (GetSupportsTabStrip()) {
     // Loading animations are shown in the tab for tabbed windows. Update them
     // even if the tabstrip isn't currently visible so they're in the right
@@ -5465,7 +5457,7 @@ bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
         std::make_unique<BookmarkBarView>(browser_.get(), this);
     bookmark_bar_view_->set_owned_by_client(OwnedByClientPassKey());
     bookmark_bar_view_->SetBookmarkBarState(
-        browser_->bookmark_bar_state(), BookmarkBar::DONT_ANIMATE_STATE_CHANGE);
+        bookmark_bar_state(), BookmarkBar::DONT_ANIMATE_STATE_CHANGE);
     GetBrowserViewLayout()->set_bookmark_bar(bookmark_bar_view_.get());
   }
   // Don't change the visibility of the BookmarkBarView. BrowserViewLayout
@@ -5501,7 +5493,7 @@ bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
 
 bool BrowserView::MaybeShowInfoBar(WebContents* contents) {
   // TODO(beng): Remove this function once the interface between
-  //             InfoBarContainer, DownloadShelfView and WebContents and this
+  //             InfoBarContainer and WebContents and this
   //             view is sorted out.
   return true;
 }
@@ -6104,23 +6096,6 @@ void BrowserView::UpdateUIForTabFullscreen() {
 
 WebContents* BrowserView::GetWebContentsForExclusiveAccess() {
   return GetActiveWebContents();
-}
-
-void BrowserView::UnhideDownloadShelf() {
-  if (download_shelf_) {
-    download_shelf_->Unhide();
-  }
-}
-
-void BrowserView::HideDownloadShelf() {
-  if (download_shelf_) {
-    download_shelf_->Hide();
-  }
-
-  std::vector<StatusBubble*> status_bubbles = GetStatusBubbles();
-  for (StatusBubble* status_bubble : status_bubbles) {
-    status_bubble->Hide();
-  }
 }
 
 bool BrowserView::CanUserEnterFullscreen() const {

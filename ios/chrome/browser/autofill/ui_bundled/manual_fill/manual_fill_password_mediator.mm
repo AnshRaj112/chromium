@@ -302,8 +302,12 @@ std::vector<ManualFillCredentialAndPasswordForm> GetFilteredCredentials(
             ? NO
             : AreCredentialsAtIndicesConnected(credentials, i, i + 1);
 
+    ManualFillCredential* manualFillCredential =
+        credentials[i].manual_fill_credential;
+
     NSArray<UIAction*>* menuActions =
-        IsKeyboardAccessoryUpgradeEnabled()
+        IsKeyboardAccessoryUpgradeEnabled() &&
+                !manualFillCredential.isBackupCredential
             ? @[ [self createMenuEditActionForPassword:credentials[i]
                                                            .password_form] ]
             : @[];
@@ -312,11 +316,11 @@ std::vector<ManualFillCredentialAndPasswordForm> GetFilteredCredentials(
         base::i18n::MessageFormatter::FormatWithNamedArgs(
             l10n_util::GetStringUTF16(
                 IDS_IOS_MANUAL_FALLBACK_PASSWORD_CELL_INDEX),
-            "count", base::NumberToString(credentialCount), "position",
-            base::NumberToString(i + 1)));
+            "count", base::checked_cast<int>(credentialCount), "position",
+            base::checked_cast<int>(i + 1)));
 
     ManualFillCredentialItem* item = [[ManualFillCredentialItem alloc]
-                 initWithCredential:credentials[i].manual_fill_credential
+                 initWithCredential:manualFillCredential
           isConnectedToPreviousItem:isConnectedToPreviousItem
               isConnectedToNextItem:isConnectedToNextItem
                     contentInjector:self
@@ -432,10 +436,30 @@ std::vector<ManualFillCredentialAndPasswordForm> GetFilteredCredentials(
     createManualFillCredentialsFromPasswordForms:
         (std::vector<PasswordForm>)passwordForms {
   std::vector<ManualFillCredentialAndPasswordForm> credentials;
-  for (auto& passwordForm : passwordForms) {
+  for (const auto& passwordForm : passwordForms) {
     ManualFillCredential* manualFillCredential =
-        [[ManualFillCredential alloc] initWithPasswordForm:passwordForm];
-    credentials.push_back({manualFillCredential, std::move(passwordForm)});
+        [[ManualFillCredential alloc] initWithPasswordForm:passwordForm
+                                                  isBackup:NO];
+
+    // Create an additional ManualFillCredential for the backup password if
+    // existing.
+    std::optional<std::u16string> backupPassword =
+        passwordForm.GetPasswordBackup();
+    if (backupPassword &&
+        base::FeatureList::IsEnabled(
+            password_manager::features::kIOSFillRecoveryPassword)) {
+      PasswordForm tempPasswordForm = passwordForm;
+      tempPasswordForm.password_value = backupPassword.value();
+      ManualFillCredential* backupManualFillCredential =
+          [[ManualFillCredential alloc] initWithPasswordForm:tempPasswordForm
+                                                    isBackup:YES];
+
+      credentials.push_back({manualFillCredential, passwordForm});
+      credentials.push_back(
+          {backupManualFillCredential, std::move(passwordForm)});
+    } else {
+      credentials.push_back({manualFillCredential, std::move(passwordForm)});
+    }
   }
 
   return credentials;

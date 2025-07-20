@@ -134,26 +134,27 @@ class SqlBackendImpl::IteratorImpl : public Backend::Iterator {
     // Request the next entry from the persistent store. `res_id_iterator_`
     // keeps track of the last `res_id` returned, allowing the store to fetch
     // entries older than that.
+    // `handle` will be destroyed after executing
+    // `OnOpenLatestEntryBeforeResIdFinished()`, may be triggering queued
+    // operations.
     backend_->store_->OpenLatestEntryBeforeResId(
         res_id_iterator_,
         base::BindOnce(&IteratorImpl::OnOpenLatestEntryBeforeResIdFinished,
-                       weak_factory_.GetWeakPtr(), std::move(handle)));
+                       weak_factory_.GetWeakPtr())
+            .Then(DoNothingWithBoundHandle(std::move(handle))));
   }
 
   // Callback for `SqlPersistentStore::OpenLatestEntryBeforeResId`.
   void OnOpenLatestEntryBeforeResIdFinished(
-      std::unique_ptr<ExclusiveOperationCoordinator::OperationHandle> handle,
       SqlPersistentStore::OptionalEntryInfoWithIdAndKey result) {
     CHECK(callback_);
     if (!backend_) {
       std::move(callback_).Run(EntryResult::MakeError(net::ERR_FAILED));
-      // `handle` is destroyed here, may be triggering queued operations.
       return;
     }
     // If no more entries are found or an error occurred in the store.
     if (!result.has_value()) {
       std::move(callback_).Run(EntryResult::MakeError(net::ERR_FAILED));
-      // `handle` is destroyed here, may be triggering queued operations.
       return;
     }
     SqlPersistentStore::EntryInfoWithIdAndKey& entry_info = *result;
@@ -166,14 +167,6 @@ class SqlBackendImpl::IteratorImpl : public Backend::Iterator {
     // reuse the existing `SqlEntryImpl` instance.
     if (SqlEntryImpl* entry = backend_->GetActiveEntry(entry_info.key)) {
       entry->AddRef();
-      // Reset `handle` here to trigger queued operations. This is intended not
-      // to starve normal operations.
-      // TODO(crbug.com/422065015): Resetting the handle here introduces
-      // complexities, such as the possibility of passing a doomed entry to the
-      // callback, which makes the behavior harder to reason about. We should
-      // remove this handle reset once a more sophisticated scheduling mechanism
-      // is implemented in ExclusiveOperationCoordinator.
-      handle.reset();
       std::move(callback_).Run(EntryResult::MakeOpened(entry));
       return;
     }
@@ -207,14 +200,7 @@ class SqlBackendImpl::IteratorImpl : public Backend::Iterator {
               .insert(std::make_pair(entry_info.key,
                                      raw_ref<SqlEntryImpl>(*new_entry.get())))
               .second);
-    // Reset `handle` here to trigger queued operations. This is intended not to
-    // starve normal operations.
-    // TODO(crbug.com/422065015): Resetting the handle here introduces
-    // complexities, such as the possibility of passing a doomed entry to the
-    // callback, which makes the behavior harder to reason about. We should
-    // remove this handle reset once a more sophisticated scheduling mechanism
-    // is implemented in ExclusiveOperationCoordinator.
-    handle.reset();
+
     // Return the newly opened entry.
     std::move(callback_).Run(EntryResult::MakeOpened(new_entry.get()));
   }
@@ -508,7 +494,7 @@ void SqlBackendImpl::HandleDoomEntriesBetweenOperation(
   for (auto& it : active_entries_) {
     excluded_keys_vec.push_back(it.first);
     // Check if the active entry falls within the specified time range.
-    const base::Time last_used_time = it.second->LastUsedTime();
+    const base::Time last_used_time = it.second->GetLastUsed();
     if (last_used_time >= initial_time && last_used_time < end_time) {
       active_entries_to_be_doomed.push_back(&it.second.get());
     }
@@ -595,8 +581,28 @@ void SqlBackendImpl::GetStats(base::StringPairs* stats) {
 }
 
 void SqlBackendImpl::OnExternalCacheHit(const std::string& key) {
-  // TODO(crbug.com/422065015): Implement this method.
-  NOTIMPLEMENTED();
+  const CacheEntryKey entry_key(key);
+  if (auto it = active_entries_.find(entry_key); it != active_entries_.end()) {
+    it->second->UpdateLastUsed();
+    return;
+  }
+  const base::Time now = base::Time::Now();
+  in_flight_entry_modifications_[entry_key].emplace_back(
+      base::UnguessableToken(), now);
+  exclusive_operation_coordinator_.PostOrRunNormalOperation(
+      entry_key,
+      base::BindOnce(&SqlBackendImpl::HandleOnExternalCacheHitOperation,
+                     weak_factory_.GetWeakPtr(), entry_key, now));
+}
+
+void SqlBackendImpl::HandleOnExternalCacheHitOperation(
+    const CacheEntryKey& key,
+    base::Time now,
+    std::unique_ptr<ExclusiveOperationCoordinator::OperationHandle> handle) {
+  store_->UpdateEntryLastUsed(
+      key, now,
+      WrapErrorCallbackToPopInFlightEntryModification(key, base::DoNothing())
+          .Then(DoNothingWithBoundHandle(std::move(handle))));
 }
 
 void SqlBackendImpl::OnOptionalEntryOperationFinished(
@@ -829,7 +835,8 @@ void SqlBackendImpl::ApplyInFlightEntryModifications(
     return;
   }
   for (const auto& modification : it->second) {
-    if (modification.token == entry_info.token) {
+    if (modification.token.is_empty() ||
+        modification.token == entry_info.token) {
       if (modification.last_used.has_value()) {
         entry_info.last_used = *modification.last_used;
       }
@@ -914,6 +921,10 @@ void SqlBackendImpl::HandleTriggerEvictionOperation(
   store_->StartEviction(
       std::move(excluded_keys),
       base::BindOnce([](SqlPersistentStore::Error result) {}));
+}
+
+void SqlBackendImpl::EnableStrictCorruptionCheckForTesting() {
+  store_->EnableStrictCorruptionCheckForTesting();  // IN-TEST
 }
 
 SqlBackendImpl::InFlightEntryModification::InFlightEntryModification(

@@ -26,6 +26,9 @@ extern const char kAddAddressManuallyDescription[];
 extern const char kAIMPrototypeName[];
 extern const char kAIMPrototypeDescription[];
 
+extern const char kOmniboxDRSPrototypeName[];
+extern const char kOmniboxDRSPrototypeDescription[];
+
 extern const char kAppBackgroundRefreshName[];
 extern const char kAppBackgroundRefreshDescription[];
 
@@ -44,10 +47,6 @@ extern const char kAutofillDisableProfileUpdatesDescription[];
 extern const char kAutofillDisableSilentProfileUpdatesName[];
 extern const char kAutofillDisableSilentProfileUpdatesDescription[];
 
-extern const char kAutofillDropNamesWithInvalidCharactersForCardUploadName[];
-extern const char
-    kAutofillDropNamesWithInvalidCharactersForCardUploadDescription[];
-
 extern const char kAutofillEnableAllowlistForBmoCardCategoryBenefitsName[];
 extern const char
     kAutofillEnableAllowlistForBmoCardCategoryBenefitsDescription[];
@@ -63,6 +62,17 @@ extern const char kAutofillEnableCardBenefitsSyncDescription[];
 
 extern const char kAutofillEnableCardInfoRuntimeRetrievalName[];
 extern const char kAutofillEnableCardInfoRuntimeRetrievalDescription[];
+
+extern const char kAutofillEnableCvcStorageAndFillingName[];
+extern const char kAutofillEnableCvcStorageAndFillingDescription[];
+
+extern const char kAutofillEnableCvcStorageAndFillingEnhancementName[];
+extern const char kAutofillEnableCvcStorageAndFillingEnhancementDescription[];
+
+extern const char
+    kAutofillEnableCvcStorageAndFillingStandaloneFormEnhancementName[];
+extern const char
+    kAutofillEnableCvcStorageAndFillingStandaloneFormEnhancementDescription[];
 
 // Title and description for the flag to enable dynamically loading the fields
 // for address input based on the country value.
@@ -395,6 +405,9 @@ extern const char kIOSKeyboardAccessoryUpgradeDescription[];
 extern const char kIOSKeyboardAccessoryUpgradeForIPadName[];
 extern const char kIOSKeyboardAccessoryUpgradeForIPadDescription[];
 
+extern const char kIOSOmniboxAimShortcutName[];
+extern const char kIOSOmniboxAimShortcutDescription[];
+
 extern const char kIOSOneTapMiniMapRemoveSectionBreaksName[];
 extern const char kIOSOneTapMiniMapRemoveSectionBreaksDescription[];
 
@@ -403,9 +416,6 @@ extern const char kIOSMiniMapUniversalLinkDescription[];
 
 extern const char kIOSOneTapMiniMapRestrictionsName[];
 extern const char kIOSOneTapMiniMapRestrictionsDescription[];
-
-extern const char kIOSPasskeysM2Name[];
-extern const char kIOSPasskeysM2Description[];
 
 extern const char kIOSPasswordBottomSheetAutofocusName[];
 extern const char kIOSPasswordBottomSheetAutofocusDescription[];
@@ -754,6 +764,9 @@ extern const char kIPHPriceNotificationsWhileBrowsingDescription[];
 extern const char kNotificationSettingsMenuItemName[];
 extern const char kNotificationSettingsMenuItemDescription[];
 
+extern const char kRcapsDynamicProfileCountryName[];
+extern const char kRcapsDynamicProfileCountryDescription[];
+
 extern const char kReaderModeName[];
 extern const char kReaderModeDescription[];
 
@@ -768,6 +781,9 @@ extern const char kReaderModeReadabilityHeuristicDescription[];
 
 extern const char kReaderModeReadabilityDistillerName[];
 extern const char kReaderModeReadabilityDistillerDescription[];
+
+extern const char kReaderModeDefaultBrowserPromoName[];
+extern const char kReaderModeDefaultBrowserPromoDescription[];
 
 // Title and description for the flag to refactor the toolbarsSize.
 extern const char kRefactorToolbarsSizeName[];
@@ -870,6 +886,9 @@ extern const char kSupervisedUserBlockInterstitialV3Description[];
 extern const char kSupervisedUserLocalWebApprovalsName[];
 extern const char kSupervisedUserLocalWebApprovalsDescription[];
 
+extern const char kSyncAutofillWalletCredentialDataName[];
+extern const char kSyncAutofillWalletCredentialDataDescription[];
+
 extern const char kSyncSandboxName[];
 extern const char kSyncSandboxDescription[];
 
@@ -938,9 +957,6 @@ extern const char kWebPageTextZoomIPadDescription[];
 
 extern const char kWelcomeBackInFirstRunName[];
 extern const char kWelcomeBackInFirstRunDescription[];
-
-extern const char kWidgetsForMultiprofileName[];
-extern const char kWidgetsForMultiprofileDescription[];
 
 extern const char kYoutubeIncognitoName[];
 extern const char kYoutubeIncognitoDescription[];

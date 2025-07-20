@@ -302,6 +302,7 @@ bool IsPasswordSuggestion(FormSuggestion* suggestion) {
     case SuggestionType::kPendingStateSignin:
     case SuggestionType::kLoyaltyCardEntry:
     case SuggestionType::kAllLoyaltyCardsEntry:
+    case SuggestionType::kOneTimePasswordEntry:
       return false;
   }
   NOTREACHED();
@@ -370,7 +371,15 @@ NSString* AccessibilityLabel(NSString* suggestion_text,
     stackView.spacing = kSpacing;
     stackView.translatesAutoresizingMaskIntoConstraints = NO;
     [self addSubview:stackView];
-    AddSameConstraints(stackView, self);
+    if (IsLiquidGlassEffectEnabled()) {
+      AddSameConstraintsToSides(
+          stackView, self,
+          LayoutSides::kTop | LayoutSides::kLeading | LayoutSides::kTrailing);
+      [stackView.heightAnchor constraintEqualToAnchor:self.heightAnchor]
+          .active = true;
+    } else {
+      AddSameConstraints(stackView, self);
+    }
 
     if (suggestion.icon) {
       UIImageView* iconView = [[UIImageView alloc]
@@ -404,7 +413,7 @@ NSString* AccessibilityLabel(NSString* suggestion_text,
         verticalStackView.spacing = kVerticalSpacing;
         [stackView addArrangedSubview:verticalStackView];
 
-        // Insert the next subviews vertically instead of horizonatally.
+        // Insert the next subviews vertically instead of horizontally.
         stackView = verticalStackView;
       }
     }
@@ -433,6 +442,9 @@ NSString* AccessibilityLabel(NSString* suggestion_text,
     }
 
     [self setBackgroundColor:[self customBackgroundColor]];
+    if (IsLiquidGlassEffectEnabled()) {
+      [self setOpaque:NO];
+    }
 
     [self setClipsToBounds:YES];
     [self setUserInteractionEnabled:YES];
@@ -467,7 +479,7 @@ NSString* AccessibilityLabel(NSString* suggestion_text,
 - (void)layoutSubviews {
   [super layoutSubviews];
   self.layer.cornerRadius = [self cornerRadius];
-  if (IsKeyboardAccessoryUpgradeEnabled()) {
+  if (!IsLiquidGlassEffectEnabled() && IsKeyboardAccessoryUpgradeEnabled()) {
     self.layer.shadowRadius = kShadowRadius;
     self.layer.shadowOffset = CGSizeMake(0, kShadowVerticalOffset);
     self.layer.shadowOpacity = kShadowOpacity;
@@ -505,6 +517,10 @@ NSString* AccessibilityLabel(NSString* suggestion_text,
 
 // Color of the suggestion chips.
 - (UIColor*)customBackgroundColor {
+  if (IsLiquidGlassEffectEnabled()) {
+    return UIColor.clearColor;
+  }
+
   return
       [UIColor colorNamed:IsKeyboardAccessoryUpgradeEnabled() ? kBackgroundColor
                                                               : kGrey100Color];

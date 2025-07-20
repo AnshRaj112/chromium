@@ -423,7 +423,6 @@ Kung ayaw mo, iba-block ito ng iyong mga setting ng privacy. Papayagan nito ang 
 <translation id="1706625117072057435">Mga antas ng pag-zoom</translation>
 <translation id="1706922226983368260">Passkey • "<ph name="PHONE_NAME" />"</translation>
 <translation id="1706954506755087368">{1,plural, =1{Hindi mapatunayan ng server na ito na ito ang <ph name="DOMAIN" />; tinatayang mula sa susunod na araw ang certificate ng seguridad nito. Maaaring resulta ito ng maling configuration o kaya ng isang attacker na humahadlang sa iyong koneksyon.}one{Hindi mapatunayan ng server na ito na ito ang <ph name="DOMAIN" />; tinatayang mula sa # araw sa hinaharap ang certificate ng seguridad nito. Maaaring resulta ito ng maling configuration o kaya ng isang attacker na humahadlang sa iyong koneksyon.}other{Hindi mapatunayan ng server na ito na ito ang <ph name="DOMAIN" />; tinatayang mula sa # na araw sa hinaharap ang certificate ng seguridad nito. Maaaring resulta ito ng maling configuration o kaya ng isang attacker na humahadlang sa iyong koneksyon.}}</translation>
-<translation id="1709711942721576168">Button ng AI Mode, i-activate para magtanong sa AI Mode</translation>
 <translation id="1710259589646384581">OS</translation>
 <translation id="1711234383449478798">Binalewala dahil hindi nakatakda ang <ph name="POLICY_NAME" /> sa <ph name="VALUE" />.</translation>
 <translation id="1712552549805331520">Gusto ng <ph name="URL" /> na permanenteng mag-store ng data sa iyong lokal na computer</translation>
@@ -1023,6 +1022,7 @@ Kung ayaw mo, iba-block ito ng iyong mga setting ng privacy. Papayagan nito ang 
 <translation id="2690699652723742414">Nakalipas na 30 araw</translation>
 <translation id="2691385045260836588">Modelo</translation>
 <translation id="2691924980723297736">Babala sa kaligtasan</translation>
+<translation id="2696385693639654606">Nagbibigay-daan sa iyo ang Chrome Enterprise Core na pamahalaan ang mga patakaran ng browser, app, at extension mula sa cloud</translation>
 <translation id="2697248912349197812">Magtanong sa <ph name="KEYWORD_SHORT_NAME" /></translation>
 <translation id="2699273987028089219">May available na submenu, gamitin ang <ph name="SHORTCUT" /> para mag-navigate sa mga karagdagang opsyon.</translation>
 <translation id="2701514975700770343">Nakataob</translation>
@@ -1451,7 +1451,6 @@ Kung ayaw mo, iba-block ito ng iyong mga setting ng privacy. Papayagan nito ang 
 <translation id="343474037147570563">Ipinapadala sa Google Cloud o mga third party para sa pagsusuri ang mga file na ina-upload o ina-attach mo. Halimbawa, puwedeng i-scan ang mga ito para sa sensitibong data o malware at puwede itong i-store batay sa mga patakaran ng kumpanya at posibleng nakikita ito ng iyong administrator.</translation>
 <translation id="3435557549311968410">Tuloy-tuloy (Maikli)</translation>
 <translation id="3435738964857648380">Seguridad</translation>
-<translation id="3436118221454753036">Ask AI Mode</translation>
 <translation id="3440783957068352691">square</translation>
 <translation id="3441653493275994384">Screen</translation>
 <translation id="3443504041532578451">Optical Disc (Satin)</translation>
@@ -1906,6 +1905,7 @@ Kung ayaw mo, iba-block ito ng iyong mga setting ng privacy. Papayagan nito ang 
 <translation id="4173827307318847180">{MORE_ITEMS,plural, =1{<ph name="ITEM_COUNT" /> pang item}one{<ph name="ITEM_COUNT" /> pang item}other{<ph name="ITEM_COUNT" /> pang item}}</translation>
 <translation id="4176463684765177261">Hindi pinapagana</translation>
 <translation id="4177501066905053472">Mga paksa ng ad</translation>
+<translation id="4178863275556660738">Magbayad gamit ang mga paraan ng pagbabayad na non-card</translation>
 <translation id="4179515394835346607"><ph name="ROW_NAME" /> <ph name="ROW_CONTENT" /></translation>
 <translation id="4186035307311647330">Huwag subaybayan ang presyo</translation>
 <translation id="4190446002599583608">Paghahanap sa history, na pinapagana ng AI</translation>
@@ -2669,6 +2669,7 @@ Kung ayaw mo, iba-block ito ng iyong mga setting ng privacy. Papayagan nito ang 
 <translation id="5466018172325111652">Hindi natanggap ang iyong code? <ph name="BEGIN_LINK" />Kumuha ng bagong code<ph name="END_LINK" /></translation>
 <translation id="5470861586879999274">&amp;Gawing muli ang pag-e-edit</translation>
 <translation id="5472588168895083535">Naka-block ang pag-track sa kamay</translation>
+<translation id="5479505548832623900">Malamang na hindi pinansin ng extension.</translation>
 <translation id="547963486735802022">Subukang ilipat ulit ang iyong mga file</translation>
 <translation id="5481076368049295676">Maaaring subukan ng content na ito na mag-install ng mapanganib na software sa iyong device na magnanakaw o magde-delete ng impormasyon mo. <ph name="BEGIN_LINK" />Ipakita pa rin<ph name="END_LINK" /></translation>
 <translation id="5481604577800516617">Pagkakaayos ng mga window at tab</translation>
@@ -3044,7 +3045,6 @@ Kung ayaw mo, iba-block ito ng iyong mga setting ng privacy. Papayagan nito ang 
 <translation id="6108849843016142864">Mga Reptile at Amphibian</translation>
 <translation id="610911394827799129">Maaaring may iba pang anyo ng history ng pag-browse ang iyong Google Account sa <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" /></translation>
 <translation id="611018310643025551">Ipinapadala sa Google ang iyong mga paghahanap, pinakamahusay na tugma, at ang mga content ng page ng mga ito, at puwedeng makita ang mga ito ng mga taong tagasuri para mapahusay ang feature na ito.</translation>
-<translation id="6115793664998531464"><ph name="STARTER_PACK_AI_MODE_FOCUSED_FRIENDLY_MATCH_TEXT" />, pindutin ang Enter para magtanong sa AI Mode</translation>
 <translation id="6116338172782435947">Tingnan ang text at mga larawang kinopya sa clipboard</translation>
 <translation id="6117833587752089929">Photo (Satin)</translation>
 <translation id="6118782133429281336">Walang laman ang listahan ng origin.</translation>
@@ -3144,6 +3144,7 @@ Kung ayaw mo, iba-block ito ng iyong mga setting ng privacy. Papayagan nito ang 
 <translation id="6284449872909111707">Text at Instant Messaging</translation>
 <translation id="6284517535531159884">Uri ng Seed ng Mga Variation</translation>
 <translation id="6287197303017372967">Kumuha ng mga direksyon patungo sa iyong destinasyon nang may gabay sa bawat pagliko gamit ang feature na pag-navigate.</translation>
+<translation id="6288559570252410796">Magtanong sa Google AI Mode</translation>
 <translation id="628877850550444614">May nakitang diskwento</translation>
 <translation id="6289939620939689042">Kulay ng Page</translation>
 <translation id="6292819926564202163">Ang iyong search engine sa Chrome</translation>
@@ -3310,6 +3311,7 @@ Kung ayaw mo, iba-block ito ng iyong mga setting ng privacy. Papayagan nito ang 
 <translation id="6527049834925947126">Paggawa ng Pagkain</translation>
 <translation id="6529173248185917884">Ikapitong Rolyo</translation>
 <translation id="6529602333819889595">&amp;Gawing Muli ang Pagtanggal</translation>
+<translation id="6532101170117367231">I-save sa Google Drive</translation>
 <translation id="6535617236508021606">Na-save ang card na ito sa iyong Google Account, kaya magagamit mo ito sa mga serbisyo ng Google.</translation>
 <translation id="6536221421038631327">Kapag nag-alis ng subscription sa Passpoint sa iyong <ph name="DEVICE_TYPE" />, maaalis ang mga nauugnay na network. Makipag-ugnayan sa "<ph name="FRIENDLY_NAME" />" para gumawa ng mga pagbabago sa iyong plan ng subscription. <ph name="LEARN_MORE" /></translation>
 <translation id="653801826293432362">Para makakita ng mga talahanayan sa paghahambing, i-on ang pag-sync</translation>
@@ -3557,6 +3559,7 @@ Kung ayaw mo, iba-block ito ng iyong mga setting ng privacy. Papayagan nito ang 
 <translation id="6970885655016700774">Tela (Archival)</translation>
 <translation id="6971439137020188025">Gumawa ng bagong Google presentation sa Slides nang mabilis</translation>
 <translation id="6972629891077993081">Mga HID device</translation>
+<translation id="6972867931824045907">Para gamitin ang iyong clipboard, bigyan ng access ang Chrome sa <ph name="LINK" />.</translation>
 <translation id="6973656660372572881">Tinukoy ang parehong mga hindi nababagong proxy server at isang .pac script URL.</translation>
 <translation id="6973988895180423160">3.5 x 5 in</translation>
 <translation id="6978121630131642226">Mga Search Engine</translation>
@@ -3920,6 +3923,7 @@ Mga karagdagang detalye:
 <translation id="7569490014721427265">Golf</translation>
 <translation id="7569952961197462199">Alisin ang credit card sa Chrome?</translation>
 <translation id="7569983096843329377">Itim</translation>
+<translation id="7571813784389228510">Google AI Mode</translation>
 <translation id="7574998639136359461">Kagamitan sa Winter Sports</translation>
 <translation id="7575207903026901870">Button na Alisin ang Suhestyon, pindutin ang Enter para alisin ang suhestyong ito</translation>
 <translation id="7575800019233204241">"Hindi pribado ang iyong koneksyon" o "&lt;span class="error-code"&gt;NET::ERR_CERT_AUTHORITY_INVALID&lt;/span&gt;" o "&lt;span class="error-code"&gt;ERR_CERT_COMMON_NAME_INVALID&lt;/span&gt;" o "&lt;span class="error-code"&gt;NET::ERR_CERT_WEAK_SIGNATURE_ALGORITHM&lt;/span&gt;" o "Error sa SSL certificate"</translation>
@@ -4357,6 +4361,7 @@ Mga karagdagang detalye:
 <translation id="831997045666694187">Gabi</translation>
 <translation id="8321448084834652864">Puwede mong palitan ang iyong search engine anumang oras sa mga setting ng Chromium.</translation>
 <translation id="8321476692217554900">mga notification</translation>
+<translation id="8322230666450346681"><ph name="STARTER_PACK_AI_MODE_FOCUSED_FRIENDLY_MATCH_TEXT" />, pindutin ang Enter para magtanong sa Google AI Mode</translation>
 <translation id="8322402665880479974">Mga Kama at Headboard</translation>
 <translation id="8323505966575306467">Magdagdag ng higit pang proteksyon sa iyong mga password</translation>
 <translation id="832547548543012337">I-delete ang passport</translation>
@@ -4441,7 +4446,6 @@ Mga karagdagang detalye:
 <translation id="8460854335417802511">I-on ito</translation>
 <translation id="8461694314515752532">I-encrypt ang naka-sync na data gamit ang iyong sariling passphrase sa pag-sync</translation>
 <translation id="8461973047386722744">Walang nakitang password</translation>
-<translation id="8465128304789431677">Magbayad gamit ang Pix nang direkta sa Chrome</translation>
 <translation id="8467494337615822642">Pumunta sa page ng pag-check sa kaligtasan ng Chrome sa mga setting</translation>
 <translation id="8468358362970107653">Envelope C3</translation>
 <translation id="8469428721212363950">Pangangalakal na Retail</translation>
@@ -4647,6 +4651,7 @@ Mga karagdagang detalye:
 <translation id="883848425547221593">Iba Pang Mga Bookmark</translation>
 <translation id="8842351563145134519">Mga paraan ng pagbabayad na available na mapunan kapag pinindot na nakabukas nang kalahati ang taas.</translation>
 <translation id="884264119367021077">Shipping address</translation>
+<translation id="8849032795302265570">Pamahalaan kung paano nagba-browse sa web ang iyong mga empleyado nang walang kahirap-hirap</translation>
 <translation id="8849231003559822746">130 x 180 mm</translation>
 <translation id="884923133447025588">Walang nahanap na mekanismo ng pagpapawalang-bisa.</translation>
 <translation id="8849262850971482943">Gamitin ang iyong virtual card para sa karagdagang seguridad</translation>
@@ -4897,6 +4902,7 @@ Mga karagdagang detalye:
 <translation id="950926967802086924">Passkey • Google Password Manager</translation>
 <translation id="955429569736351433">Pinapayagan ang VR</translation>
 <translation id="955627189349169688">Puwede kang mag-opt out sa patakarang ito sa <ph name="BEGIN_LINK" />mga setting ng Chrome Sync<ph name="END_LINK" />.</translation>
+<translation id="95676157383774931">Button ng AI Mode, i-activate para magtanong sa Google AI Mode</translation>
 <translation id="95721182352849470">Dilaw 2</translation>
 <translation id="961663415146723894">Bind bottom</translation>
 <translation id="961856697154696964">I-delete ang browsing data</translation>

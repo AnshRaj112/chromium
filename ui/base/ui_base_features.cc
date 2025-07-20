@@ -22,11 +22,6 @@
 namespace features {
 
 #if BUILDFLAG(IS_WIN)
-// If enabled, the occluded region of the HWND is supplied to WindowTracker.
-BASE_FEATURE(kApplyNativeOccludedRegionToWindowTracker,
-             "ApplyNativeOccludedRegionToWindowTracker",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 // If enabled, calculate native window occlusion - Windows-only.
 BASE_FEATURE(kCalculateNativeWinOcclusion,
              "CalculateNativeWinOcclusion",
@@ -113,7 +108,7 @@ BASE_FEATURE(kOzoneBubblesUsePlatformWidgets,
 // Controls whether support for Wayland's linux-drm-syncobj is enabled.
 BASE_FEATURE(kWaylandLinuxDrmSyncobj,
              "WaylandLinuxDrmSyncobj",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls whether support for Wayland's per-surface scaling is enabled.
 BASE_FEATURE(kWaylandPerSurfaceScale,
@@ -148,14 +143,8 @@ BASE_FEATURE(kWaylandSessionManagement,
 COMPONENT_EXPORT(UI_BASE_FEATURES)
 BASE_FEATURE(kOverrideDefaultOzonePlatformHintToAuto,
              "OverrideDefaultOzonePlatformHintToAuto",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_LINUX)
-
-// Update of the virtual keyboard settings UI as described in
-// https://crbug.com/876901.
-BASE_FEATURE(kInputMethodSettingsUiUpdate,
-             "InputMethodSettingsUiUpdate",
-             base::FEATURE_DISABLED_BY_DEFAULT);
 
 // Uses a stylus-specific tap slop region parameter for gestures.  Stylus taps
 // tend to slip more than touch taps (presumably because the user doesn't feel

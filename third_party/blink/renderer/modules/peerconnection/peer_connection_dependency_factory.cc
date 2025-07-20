@@ -90,6 +90,7 @@
 #include "third_party/blink/renderer/platform/wtf/cross_thread_copier_std.h"
 #include "third_party/blink/renderer/platform/wtf/cross_thread_functional.h"
 #include "third_party/blink/renderer/platform/wtf/functional.h"
+#include "third_party/webrtc/api/create_modular_peer_connection_factory.h"
 #include "third_party/webrtc/api/enable_media.h"
 #include "third_party/webrtc/api/peer_connection_interface.h"
 #include "third_party/webrtc/api/rtc_event_log/rtc_event_log_factory.h"
@@ -139,7 +140,7 @@ network::mojom::IPAddressSpace FromSocketAddress(
     return network::mojom::IPAddressSpace::kLoopback;
   }
   if (socket_address.IsPrivateIP()) {
-    return network::mojom::IPAddressSpace::kPrivate;
+    return network::mojom::IPAddressSpace::kLocal;
   }
   return network::mojom::IPAddressSpace::kPublic;
 }
@@ -1115,8 +1116,16 @@ PeerConnectionDependencyFactory::CreatePortAllocator(
     network_manager =
         std::make_unique<blink::EmptyNetworkManager>(network_manager_.get());
   }
+
+  std::unique_ptr<LocalNetworkAccessPermissionFactory> lna_permission_factory;
+  if (RuntimeEnabledFeatures::LocalNetworkAccessWebRTCEnabled()) {
+    lna_permission_factory =
+        std::make_unique<LocalNetworkAccessPermissionFactory>(this);
+  }
+
   auto port_allocator = std::make_unique<P2PPortAllocator>(
-      std::move(network_manager), socket_factory_.get(), port_config);
+      std::move(network_manager), socket_factory_.get(), port_config,
+      std::move(lna_permission_factory));
   if (IsValidPortRange(min_port, max_port))
     port_allocator->SetPortRange(min_port, max_port);
 

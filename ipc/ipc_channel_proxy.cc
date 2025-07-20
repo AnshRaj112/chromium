@@ -19,7 +19,6 @@
 #include "build/build_config.h"
 #include "ipc/ipc_channel_factory.h"
 #include "ipc/ipc_listener.h"
-#include "ipc/ipc_logging.h"
 #include "ipc/ipc_message_macros.h"
 #include "ipc/message_filter.h"
 #include "ipc/message_filter_router.h"
@@ -78,22 +77,12 @@ void ChannelProxy::Context::CreateChannel(
 
 bool ChannelProxy::Context::TryFilters(const Message& message) {
   DCHECK(message_filter_router_);
-#if BUILDFLAG(IPC_MESSAGE_LOG_ENABLED)
-  Logging* logger = Logging::GetInstance();
-  if (logger->Enabled())
-    logger->OnPreDispatchMessage(message);
-#endif
-
   if (message_filter_router_->TryFilters(message)) {
     if (message.dispatch_error()) {
       GetTaskRunner(message.routing_id())
           ->PostTask(FROM_HERE, base::BindOnce(&Context::OnDispatchBadMessage,
                                                this, message));
     }
-#if BUILDFLAG(IPC_MESSAGE_LOG_ENABLED)
-    if (logger->Enabled())
-      logger->OnPostDispatchMessage(message);
-#endif
     return true;
   }
   return false;
@@ -309,25 +298,9 @@ void ChannelProxy::Context::OnDispatchMessage(const Message& message) {
 
   OnDispatchConnected();
 
-#if BUILDFLAG(IPC_MESSAGE_LOG_ENABLED)
-  Logging* logger = Logging::GetInstance();
-  if (message.type() == IPC_LOGGING_ID) {
-    logger->OnReceivedLoggingMessage(message);
-    return;
-  }
-
-  if (logger->Enabled())
-    logger->OnPreDispatchMessage(message);
-#endif
-
   listener_->OnMessageReceived(message);
   if (message.dispatch_error())
     listener_->OnBadMessageReceived(message);
-
-#if BUILDFLAG(IPC_MESSAGE_LOG_ENABLED)
-  if (logger->Enabled())
-    logger->OnPostDispatchMessage(message);
-#endif
 }
 
 // Called on the listener's thread.
@@ -553,18 +526,6 @@ void ChannelProxy::SendInternal(Message* message) {
 
   // TODO(alexeypa): add DCHECK(CalledOnValidThread()) here. Currently there are
   // tests that call Send() from a wrong thread. See http://crbug.com/163523.
-
-#ifdef ENABLE_IPC_FUZZER
-  // In IPC fuzzing builds, it is possible to define a filter to apply to
-  // outgoing messages. It will either rewrite the message and return a new
-  // one, freeing the original, or return the message unchanged.
-  if (outgoing_message_filter())
-    message = outgoing_message_filter()->Rewrite(message);
-#endif
-
-#if BUILDFLAG(IPC_MESSAGE_LOG_ENABLED)
-  Logging::GetInstance()->OnSendMessage(message);
-#endif
 
   context_->Send(message);
 }

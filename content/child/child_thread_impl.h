@@ -24,7 +24,6 @@
 #include "content/common/child_process.mojom.h"
 #include "content/public/child/child_thread.h"
 #include "ipc/ipc.mojom.h"
-#include "ipc/ipc_buildflags.h"  // For BUILDFLAG(IPC_MESSAGE_LOG_ENABLED).
 #include "ipc/ipc_listener.h"
 #include "ipc/ipc_platform_file.h"
 #include "mojo/public/cpp/bindings/associated_receiver_set.h"
@@ -141,7 +140,6 @@ class ChildThreadImpl : public IPC::Listener, virtual public ChildThread {
   void ExposeInterfacesToBrowser(mojo::BinderMap binders);
 
   // IPC::Listener implementation:
-  bool OnMessageReceived(const IPC::Message& msg) override;
   void OnAssociatedInterfaceRequest(
       const std::string& interface_name,
       mojo::ScopedInterfaceEndpointHandle handle) override;

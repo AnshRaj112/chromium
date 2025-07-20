@@ -196,23 +196,30 @@ void WidgetAXManager::AccessibilityHitTest(
 }
 
 gfx::NativeWindow WidgetAXManager::GetTopLevelNativeWindow() {
-  // TODO(accessibility): Implement.
-  return gfx::NativeWindow();
+  if (!widget_) {
+    return gfx::NativeWindow();
+  }
+
+  auto* top = widget_->GetTopLevelWidget();
+  if (!top) {
+    return gfx::NativeWindow();
+  }
+
+  return top->GetNativeWindow();
 }
 
 bool WidgetAXManager::CanFireAccessibilityEvents() const {
-  // TODO(accessibility): Implement.
-  return false;
+  return widget_ ? widget_->IsActive() : false;
 }
 
 bool WidgetAXManager::AccessibilityIsRootFrame() const {
-  // TODO(accessibility): Implement.
+  // This always returns false for WidgetAXManager, since the "frame" concept is
+  // unique to web content.
   return false;
 }
 
 bool WidgetAXManager::ShouldSuppressAXLoadComplete() {
-  // TODO(accessibility): Implement.
-  return false;
+  return true;
 }
 
 content::WebContentsAccessibility*

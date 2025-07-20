@@ -49,6 +49,7 @@
 #include "components/commerce/core/metrics/discounts_metric_collector.h"
 #include "components/commerce/core/metrics/metrics_utils.h"
 #include "components/commerce/core/price_tracking_utils.h"
+#include "components/commerce/core/shopping_service.h"
 #include "components/image_fetcher/core/image_fetcher.h"
 #include "components/strings/grit/components_strings.h"
 #include "components/vector_icons/vector_icons.h"
@@ -634,12 +635,7 @@ views::View* CommerceUiTabHelper::GetDiscountsIconView() {
     return nullptr;
   }
 
-  if (IsPageActionMigrated(PageActionIconType::kDiscounts)) {
-    return toolbar_button_provider->GetPageActionView(kActionCommerceDiscounts);
-  }
-
-  return toolbar_button_provider->GetPageActionIconView(
-      PageActionIconType::kDiscounts);
+  return toolbar_button_provider->GetPageActionView(kActionCommerceDiscounts);
 }
 
 void CommerceUiTabHelper::ComputePageActionToExpand() {

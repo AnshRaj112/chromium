@@ -331,17 +331,6 @@ bool ShouldEnableFeatureOnProcess(
   }
 }
 
-#if PA_CONFIG(ENABLE_SHADOW_METADATA)
-bool ShouldEnableShadowMetadata(const std::string& process_type) {
-  if (!base::FeatureList::IsEnabled(
-          base::features::kPartitionAllocShadowMetadata)) {
-    return false;
-  }
-  return ShouldEnableFeatureOnProcess(
-      features::kShadowMetadataEnabledProcessesParam.Get(), process_type);
-}
-#endif  // PA_CONFIG(ENABLE_SHADOW_METADATA)
-
 }  // namespace
 
 #if PA_BUILDFLAG(ENABLE_DANGLING_RAW_PTR_CHECKS)
@@ -814,7 +803,6 @@ bool PartitionAllocSupport::ShouldEnableMemoryTagging(
     return false;
   }
 
-  DCHECK(base::FeatureList::GetInstance());
   if (base::FeatureList::IsEnabled(
           base::features::kKillPartitionAllocMemoryTagging)) {
     return false;
@@ -888,9 +876,6 @@ bool PartitionAllocSupport::ShouldEnablePartitionAllocWithAdvancedChecks(
 // static
 PartitionAllocSupport::BrpConfiguration
 PartitionAllocSupport::GetBrpConfiguration(const std::string& process_type) {
-  // TODO(bartekn): Switch to DCHECK once confirmed there are no issues.
-  CHECK(base::FeatureList::GetInstance());
-
 #if PA_BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC) && \
     PA_BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT) && \
     !PA_BUILDFLAG(FORCE_DISABLE_BACKUP_REF_PTR_FEATURE)
@@ -948,6 +933,15 @@ void PartitionAllocSupport::ReconfigureEarlyish(
     ReconfigurePartitionForKnownProcess(process_type);
   }
 
+#if PA_BUILDFLAG(ENABLE_PARTITION_LOCK_PRIORITY_INHERITANCE) && \
+    PA_BUILDFLAG(IS_ANDROID)
+  if (base::android::BackgroundThreadPoolFieldTrial::
+          ShouldUsePriorityInheritanceLocks()) {
+    partition_alloc::internal::SpinningMutex::EnableUsePriorityInheritance();
+  }
+#endif  // PA_BUILDFLAG(ENABLE_PARTITION_LOCK_PRIORITY_INHERITANCE) &&
+        // PA_BUILDFLAG(IS_ANDROID)
+
   // These initializations are only relevant for PartitionAlloc-Everywhere
   // builds.
 #if PA_BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
@@ -985,7 +979,15 @@ void PartitionAllocSupport::ReconfigureAfterZygoteFork(
 
 void PartitionAllocSupport::ReconfigureAfterFeatureListInit(
     const std::string& process_type,
-    bool configure_dangling_pointer_detector) {
+    bool configure_dangling_pointer_detector,
+    bool is_in_death_test_child) {
+  // In Death Tests, `FeatureList` is never initialized. Even in these cases
+  // we call this method to finalize the allocator configuration.
+  // TODO(https://crbug.com/432019338): Remove this param once fixed.
+  if (!is_in_death_test_child) {
+    CHECK(base::FeatureList::GetInstance());
+  }
+
   if (configure_dangling_pointer_detector) {
     base::allocator::InstallDanglingRawPtrChecks();
   }
@@ -1167,15 +1169,6 @@ void PartitionAllocSupport::ReconfigureAfterFeatureListInit(
   }
 #endif  // PA_BUILDFLAG(HAS_MEMORY_TAGGING)
 
-#if PA_BUILDFLAG(ENABLE_PARTITION_LOCK_PRIORITY_INHERITANCE) && \
-    PA_BUILDFLAG(IS_ANDROID)
-  if (base::android::BackgroundThreadPoolFieldTrial::
-          ShouldUsePriorityInheritanceLocks()) {
-    partition_alloc::internal::SpinningMutex::EnableUsePriorityInheritance();
-  }
-#endif  // PA_BUILDFLAG(ENABLE_PARTITION_LOCK_PRIORITY_INHERITANCE) &&
-        // PA_BUILDFLAG(IS_ANDROID)
-
   allocator_shim::ConfigurePartitions(
       allocator_shim::EnableBrp(brp_config.enable_brp),
       brp_config.extra_extras_size,
@@ -1337,15 +1330,6 @@ void PartitionAllocSupport::ReconfigureAfterTaskRunnerInit(
   partition_alloc::PartitionRoot::SetSortActiveSlotSpansEnabled(
       base::FeatureList::IsEnabled(
           base::features::kPartitionAllocSortActiveSlotSpans));
-
-#if PA_CONFIG(ENABLE_SHADOW_METADATA)
-  if (ShouldEnableShadowMetadata(process_type)) {
-    partition_alloc::PartitionRoot::EnableShadowMetadata(
-        partition_alloc::internal::PoolHandleMask::kRegular |
-        partition_alloc::internal::PoolHandleMask::kBRP |
-        partition_alloc::internal::PoolHandleMask::kConfigurable);
-  }
-#endif  // PA_CONFIG(ENABLE_SHADOW_METADATA)
 }
 
 void PartitionAllocSupport::OnForegrounded(bool has_main_frame) {

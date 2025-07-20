@@ -32,6 +32,7 @@ CSPCheckResult CSPDirectiveListAllowFromSource(
     const network::mojom::blink::ContentSecurityPolicy& csp,
     ContentSecurityPolicy* policy,
     CSPDirectiveName type,
+    const KURL& document_url,
     const KURL& url,
     const KURL& url_before_redirects,
     ResourceRequest::RedirectStatus redirect_status,
@@ -91,7 +92,8 @@ bool CSPDirectiveListAllowEval(
     ReportingDisposition reporting_disposition,
     ContentSecurityPolicy::ExceptionStatus exception_status,
     const String& content,
-    const Vector<network::mojom::blink::CSPHashSourcePtr>& script_hash_values);
+    const Vector<network::mojom::blink::IntegrityMetadataPtr>&
+        script_hash_values);
 
 CORE_EXPORT
 bool CSPDirectiveListAllowWasmCodeGeneration(
@@ -129,12 +131,13 @@ bool CSPDirectiveListAllowDynamicUrl(
 CORE_EXPORT
 bool CSPDirectiveListAllowHash(
     const network::mojom::blink::ContentSecurityPolicy& csp,
-    const network::mojom::blink::CSPHashSource& hash_value,
+    const network::mojom::blink::IntegrityMetadata& hash_value,
     const ContentSecurityPolicy::InlineType inline_type);
 
 CORE_EXPORT
 bool CSPDirectiveListAllowEvalHash(
-    const Vector<network::mojom::blink::CSPHashSourcePtr>& script_hash_values,
+    const Vector<network::mojom::blink::IntegrityMetadataPtr>&
+        script_hash_values,
     CSPOperativeDirective directive);
 
 // We consider `object-src` restrictions to be reasonable iff they're
@@ -176,7 +179,16 @@ CSPOperativeDirective CSPDirectiveListOperativeDirective(
 void FillInCSPHashValues(
     const String& source,
     const WTF::HashSet<IntegrityAlgorithm>& hash_algorithms_used,
-    Vector<network::mojom::blink::CSPHashSourcePtr>& csp_hash_values);
+    Vector<network::mojom::blink::IntegrityMetadataPtr>& csp_hash_values);
+
+// Given a document URL and a script URL, returns the relative path of the
+// script URL. Document URL is the URL of the document that contains the script.
+// Only computed if document_url and script_url are same origin and Http(s).
+// Returns empty String otherwise. This function implements roughly the opposite
+// of remove_dot_segments algorithm defined in
+// https://datatracker.ietf.org/doc/html/rfc3986#section-5.2.4
+CORE_EXPORT
+String GetRelativeScriptUrl(const KURL& document_url, const KURL& script_url);
 
 }  // namespace blink
 

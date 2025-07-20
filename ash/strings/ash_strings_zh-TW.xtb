@@ -1499,7 +1499,7 @@
 <translation id="584525477304726060">按住視窗即可放到最大</translation>
 <translation id="5856638668464565213"><ph name="NETWORK_NAME" /> 尚未啟用。</translation>
 <translation id="5860033963881614850">關閉</translation>
-<translation id="5860491529813859533">啟用</translation>
+<translation id="5860491529813859533">開啟</translation>
 <translation id="5864691701242730005">顯示「快速分享」設定。目前選取「<ph name="VISIBILITY" />」瀏覽權限</translation>
 <translation id="5864748620896638071">電池電量：<ph name="BATTERY_PERCENTAGE" />%</translation>
 <translation id="5867217927013474703">正在收集網路資訊</translation>
@@ -1911,6 +1911,7 @@
 <translation id="7240636904654154599">已建立 Google 試算表</translation>
 <translation id="7244725679040769470">剩餘電量：<ph name="PERCENTAGE" />%。請將裝置接上電源。</translation>
 <translation id="7246071203293827765"><ph name="UPDATE_TEXT" />。這部 Chromebook 需要重新啟動才能套用更新。最多可能需要 1 分鐘才能完成。</translation>
+<translation id="7248100343060254997">搜尋我的畫面</translation>
 <translation id="7256057185598509352">ExpressKey 2</translation>
 <translation id="7256634071279256947">後置麥克風</translation>
 <translation id="7258828758145722155">昨天編輯過</translation>

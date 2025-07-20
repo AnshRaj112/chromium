@@ -23,6 +23,7 @@
 #include "third_party/blink/renderer/core/script/classic_script.h"
 #include "third_party/blink/renderer/core/testing/core_unit_test_helper.h"
 #include "third_party/blink/renderer/platform/testing/paint_test_configurations.h"
+#include "third_party/perfetto/protos/perfetto/config/trace_config.gen.h"
 
 using ::blink_testing::ClearRectFlags;
 using ::blink_testing::FillFlags;
@@ -234,6 +235,30 @@ TEST_P(HTMLCanvasElementTest, BrokenCanvasHighRes) {
   EXPECT_EQ(HTMLCanvasElement::BrokenCanvas(1.0).second, 1.0);
 }
 
+TEST_P(HTMLCanvasElementTest, FallbackContentUseCounter) {
+  SetBodyInnerHTML(R"HTML(
+    <canvas></canvas>
+  )HTML");
+  EXPECT_FALSE(GetDocument().IsUseCounted(WebFeature::kCanvasFallbackContent));
+  EXPECT_FALSE(
+      GetDocument().IsUseCounted(WebFeature::kCanvasFallbackElementContent));
+
+  SetBodyInnerHTML(R"HTML(
+    <canvas>fallback</canvas>
+  )HTML");
+  EXPECT_TRUE(GetDocument().IsUseCounted(WebFeature::kCanvasFallbackContent));
+  EXPECT_FALSE(
+      GetDocument().IsUseCounted(WebFeature::kCanvasFallbackElementContent));
+
+  GetDocument().ClearUseCounterForTesting(WebFeature::kCanvasFallbackContent);
+
+  SetBodyInnerHTML(R"HTML(
+    <canvas><div>hello</div></canvas>
+  )HTML");
+  EXPECT_TRUE(GetDocument().IsUseCounted(WebFeature::kCanvasFallbackContent));
+  EXPECT_TRUE(
+      GetDocument().IsUseCounted(WebFeature::kCanvasFallbackElementContent));
+}
 
 class HTMLCanvasElementWithTracingTest : public RenderingTest {
  public:

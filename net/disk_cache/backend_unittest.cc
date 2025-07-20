@@ -35,6 +35,7 @@
 #include "base/time/time.h"
 #include "base/trace_event/memory_allocator_dump.h"
 #include "base/trace_event/process_memory_dump.h"
+#include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
 #include "net/base/cache_type.h"
 #include "net/base/completion_once_callback.h"
@@ -42,7 +43,6 @@
 #include "net/base/net_errors.h"
 #include "net/base/request_priority.h"
 #include "net/base/test_completion_callback.h"
-#include "net/base/tracing.h"
 #include "net/disk_cache/backend_cleanup_tracker.h"
 #include "net/disk_cache/blockfile/backend_impl.h"
 #include "net/disk_cache/blockfile/entry_impl.h"
@@ -4293,7 +4293,13 @@ TEST_F(DiskCacheBackendTest, SimpleCacheLateDoom) {
             simple_cache_impl_->index()->init_method());
 }
 
-TEST_F(DiskCacheBackendTest, SimpleCacheNegMaxSize) {
+// TODO(crbug.com/430656242): Flaky on Android.
+#if BUILDFLAG(IS_ANDROID)
+#define MAYBE_SimpleCacheNegMaxSize DISABLED_SimpleCacheNegMaxSize
+#else
+#define MAYBE_SimpleCacheNegMaxSize SimpleCacheNegMaxSize
+#endif
+TEST_F(DiskCacheBackendTest, MAYBE_SimpleCacheNegMaxSize) {
   SetCacheType(net::GENERATED_BYTE_CODE_CACHE);
 
   SetMaxSize(-1);

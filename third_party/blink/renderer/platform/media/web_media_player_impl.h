@@ -40,8 +40,8 @@
 #include "media/base/routing_token_callback.h"
 #include "media/base/simple_watch_timer.h"
 #include "media/filters/demuxer_manager.h"
-#include "media/mojo/mojom/media_metrics_provider.mojom.h"
-#include "media/mojo/mojom/playback_events_recorder.mojom.h"
+#include "media/mojo/mojom/media_metrics_provider.mojom-blink.h"
+#include "media/mojo/mojom/playback_events_recorder.mojom-blink.h"
 #include "media/renderers/paint_canvas_video_renderer.h"
 #include "mojo/public/cpp/bindings/pending_remote.h"
 #include "mojo/public/cpp/bindings/remote.h"
@@ -157,7 +157,8 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
       base::WeakPtr<media::MediaObserver> media_observer,
       bool enable_instant_source_buffer_gc,
       bool embedded_media_experience_enabled,
-      mojo::PendingRemote<media::mojom::MediaMetricsProvider> metrics_provider,
+      mojo::PendingRemote<media::mojom::blink::MediaMetricsProvider>
+          metrics_provider,
       CreateSurfaceLayerBridgeCB create_bridge_callback,
       scoped_refptr<viz::RasterContextProvider> raster_context_provider,
       bool use_surface_layer,
@@ -1085,8 +1086,10 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
   // base::CancellableOnceClosure.
   bool is_background_status_change_cancelled_ = true;
 
-  mojo::Remote<media::mojom::MediaMetricsProvider> media_metrics_provider_;
-  mojo::Remote<media::mojom::PlaybackEventsRecorder> playback_events_recorder_;
+  mojo::Remote<media::mojom::blink::MediaMetricsProvider>
+      media_metrics_provider_;
+  mojo::Remote<media::mojom::blink::PlaybackEventsRecorder>
+      playback_events_recorder_;
 
   std::optional<ReadyState> stale_state_override_for_testing_;
 
@@ -1120,7 +1123,7 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
 
   const bool should_pause_background_muted_audio_;
 
-  bool was_suspended_for_frame_closed_ = false;
+  bool was_suspended_for_frame_closed_or_frozen_ = false;
 
   // Request pipeline to suspend. It should not block other signals after
   // suspended.

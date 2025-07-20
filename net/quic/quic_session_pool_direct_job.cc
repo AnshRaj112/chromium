@@ -5,12 +5,12 @@
 #include "net/quic/quic_session_pool_direct_job.h"
 
 #include "base/memory/weak_ptr.h"
+#include "base/trace_event/trace_event.h"
 #include "net/base/completion_once_callback.h"
 #include "net/base/network_change_notifier.h"
 #include "net/base/network_handle.h"
 #include "net/base/request_priority.h"
 #include "net/base/trace_constants.h"
-#include "net/base/tracing.h"
 #include "net/dns/host_resolver.h"
 #include "net/dns/public/host_resolver_results.h"
 #include "net/log/net_log_with_source.h"
@@ -243,13 +243,13 @@ void QuicSessionPool::DirectJob::OnSessionAttemptComplete(int rv) {
 bool QuicSessionPool::DirectJob::IsSvcbOptional(
     base::span<const HostResolverEndpointResult> results) const {
   // If SVCB/HTTPS resolution succeeded, the client supports ECH, and all
-  // routes support ECH, disable the A/AAAA fallback. See Section 10.1 of
-  // draft-ietf-dnsop-svcb-https-11.
+  // alternative endpoints support ECH, disable the A/AAAA fallback. See
+  // Section 5.1 of draft-ietf-tls-svcb-ech-08.
   if (!pool_->ssl_config_service_->GetSSLContextConfig().ech_enabled) {
     return true;  // ECH is not supported for this request.
   }
 
-  return !HostResolver::AllProtocolEndpointsHaveEch(results);
+  return !HostResolver::AllAlternativeEndpointsHaveEch(results);
 }
 
 }  // namespace net

@@ -24,6 +24,10 @@ int TabListBridge::GetActiveIndex() const {
   return tab_strip_->active_index();
 }
 
+tabs::TabInterface* TabListBridge::GetActiveTab() {
+  return tab_strip_->GetActiveTab();
+}
+
 void TabListBridge::OpenTab(const GURL& url, int index) {}
 
 void TabListBridge::DiscardTab(tabs::TabHandle tab) {}
@@ -34,7 +38,12 @@ tabs::TabInterface* TabListBridge::GetTab(int index) {
   return tab_strip_->GetTabAtIndex(index);
 }
 
-void TabListBridge::HighlightTabs(const std::set<tabs::TabHandle>& tabs) {}
+int TabListBridge::GetIndexOfTab(tabs::TabHandle tab) {
+  return tab_strip_->GetIndexOfTab(tab.Get());
+}
+
+void TabListBridge::HighlightTabs(tabs::TabHandle tab_to_activate,
+                                  const std::set<tabs::TabHandle>& tabs) {}
 
 void TabListBridge::MoveTab(tabs::TabHandle tab, int index) {}
 
@@ -50,9 +59,19 @@ std::vector<tabs::TabInterface*> TabListBridge::GetAllTabs() {
   return all_tabs;
 }
 
-void TabListBridge::PinTab(tabs::TabHandle tab) {}
+void TabListBridge::PinTab(tabs::TabHandle tab) {
+  int index = GetIndexOfTab(tab);
+  CHECK_NE(index, TabStripModel::kNoTab)
+      << "Trying to pin a tab that doesn't exist in this tab list.";
+  tab_strip_->SetTabPinned(index, true);
+}
 
-void TabListBridge::UnpinTab(tabs::TabHandle tab) {}
+void TabListBridge::UnpinTab(tabs::TabHandle tab) {
+  int index = GetIndexOfTab(tab);
+  CHECK_NE(index, TabStripModel::kNoTab)
+      << "Trying to unpin a tab that doesn't exist in this tab list.";
+  tab_strip_->SetTabPinned(index, false);
+}
 
 std::optional<tab_groups::TabGroupId> TabListBridge::AddTabsToGroup(
     std::optional<tab_groups::TabGroupId> group_id,

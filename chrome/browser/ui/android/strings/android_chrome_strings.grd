@@ -607,8 +607,17 @@ For more settings that use data to improve your Chrome experience, go to <ph nam
       <message name="IDS_AUTOFILL_OPTIONS_RESTART_PROMPT_TITLE" desc="Title of the dialog prompting the user to restart to apply the new Autofill settings." formatter_data="android_java">
         Restart Chrome?
       </message>
+      <message name="IDS_AUTOFILL_OPTIONS_CHANGE_AUTOFILL_SERVICE_TITLE" desc="Title of the dialog prompting the user to restart to apply the new Autofill settings." formatter_data="android_java">
+        Change autofill service?
+      </message>
       <message name="IDS_AUTOFILL_OPTIONS_RESTART_PROMPT_TEXT" desc="Title of the dialog prompting the user to restart to apply the new Autofill settings." formatter_data="android_java">
         To finish setting up autofill, restart Chrome now. Your tabs will automatically reopen.
+      </message>
+      <message name="IDS_AUTOFILL_OPTIONS_RESTART_PROMPT_PARAGRAPH_1_TEXT" desc="Title of the dialog prompting the user to restart to apply the new Autofill settings." formatter_data="android_java">
+        After Chrome restarts, your info saved from your new provider will be used to autofill passwords, passkeys, addresses, payment methods, and other info.
+      </message>
+      <message name="IDS_AUTOFILL_OPTIONS_RESTART_PROMPT_PARAGRAPH_2_TEXT" desc="Title of the dialog prompting the user to restart to apply the new Autofill settings." formatter_data="android_java">
+        Restart Chrome to finish this change. Tabs automatically reopen when you restart.
       </message>
       <message name="IDS_AUTOFILL_OPTIONS_UNDO_TOGGLE_CHANGE" desc="Description below switch toggling the use of third-party autofill in Chrome." formatter_data="android_java">
         Cancel
@@ -4496,8 +4505,17 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_READER_MODE_BOTTOM_SHEET_TITLE" desc="Title of the Reading Mode bottom sheet. [CHAR_LIMIT=27]">
         Reading mode
       </message>
-      <message name="IDS_READER_MODE_BOTTOM_SHEET_CONTENT_DESCRIPTION" desc="Content description of the Reading Mode bottom sheet. [CHAR_LIMIT=27]">
+      <message name="IDS_READER_MODE_BOTTOM_SHEET_CONTENT_DESCRIPTION" desc="Content description of the Reading Mode bottom sheet.">
         Reading mode bottom sheet
+      </message>
+      <message name="IDS_READER_MODE_BOTTOM_SHEET_CLOSED_CONTENT_DESCRIPTION" desc="Content description of the Reading Mode bottom sheet when closed.">
+        Reading mode bottom sheet closed
+      </message>
+      <message name="IDS_READER_MODE_BOTTOM_SHEET_HALF_HEIGHT_CONTENT_DESCRIPTION" desc="Content description of the Reading Mode bottom sheet when opened at half height.">
+        Reading mode bottom sheet opened at half height
+      </message>
+      <message name="IDS_READER_MODE_BOTTOM_SHEET_FULL_HEIGHT_CONTENT_DESCRIPTION" desc="Content description of the Reading Mode bottom sheet when opened at full height.">
+        Reading mode bottom sheet opened at full height
       </message>
       <message name="IDS_MENU_SETTINGS" desc="Menu item for opening browser settings. [CHAR_LIMIT=27]">
         Settings
@@ -4965,6 +4983,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_HIDE_READING_MODE_TEXT" desc='Message shown on the reader mode button bar, to invite the user to tap to close reading mode. Returns user to a non-distilled version of the same web page.'>
         Hide Reading Mode
       </message>
+      <message name="IDS_READER_MODE_CPA_BUTTON_TEXT" desc="Message shown on the reader mode CPA button, to invite the user to tap to open a reading mode.">
+        Reading Mode
+      </message>
       <message name="IDS_READER_MODE_MESSAGE_TITLE" desc="Message shown on the reader mode prompt, to invite the user to tap to open a reading mode.">
         View Reading Mode?
       </message>
@@ -5096,6 +5117,12 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_ACCESSIBILITY_FIND_TOOLBAR_BTN_PREV" desc="Content description for the button to go to the previous find in page result.">
         Previous
       </message>
+
+      <if expr="enable_extensions_core">
+        <message name="IDS_ACCESSIBILITY_BTN_EXTENSIONS" desc="Content description for the extension button.">
+          Extensions
+        </message>
+      </if>
 
       <!-- Accessibility strings for tablet tab strip -->
       <message name="IDS_ACCESSIBILITY_TABSTRIP_BTN_INCOGNITO_TOGGLE_STANDARD" desc="Content description for the Incognito tabs toggle button when viewing standard tabs.">

@@ -256,7 +256,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.BackgroundRefresh.LaunchType"
-    enum="LaunchTypeForBackgroundRefreshType" expires_after="2025-08-24">
+    enum="LaunchTypeForBackgroundRefreshType" expires_after="2026-02-24">
   <owner>fedegermi@google.com</owner>
   <owner>marq@chromium.org</owner>
   <summary>
@@ -386,35 +386,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="IOS.BWG.Eligibility" enum="Boolean" expires_after="2026-02-01">
-  <owner>sebsg@chromium.org</owner>
-  <owner>bling-alchemy@google.com</owner>
-  <summary>
-    Records whether the user is eligible for BWG. Logged when eligibility is
-    checked prior to showing entry points, promos, etc.
-  </summary>
-</histogram>
-
-<histogram name="IOS.BWG.EntryPoint" enum="IOSBWGEntryPoint"
-    expires_after="2026-02-01">
-  <owner>sebsg@chromium.org</owner>
-  <owner>bling-alchemy@google.com</owner>
-  <summary>
-    Records the entry point source from which BWG was triggered. Recorded when
-    BWG is triggered.
-  </summary>
-</histogram>
-
-<histogram name="IOS.BWG.FRE.EntryPoint" enum="IOSBWGEntryPoint"
-    expires_after="2026-02-01">
-  <owner>sebsg@chromium.org</owner>
-  <owner>bling-alchemy@google.com</owner>
-  <summary>
-    Records the entry point source from which BWG First Run Experience (FRE) was
-    triggered. Recorded when the BWG FRE is triggered.
-  </summary>
-</histogram>
-
 <histogram name="IOS.CaptivePortal.SecureConnectionFailed"
     enum="CaptivePortalStatus" expires_after="2023-09-07">
   <owner>michaeldo@chromium.org</owner>
@@ -484,7 +455,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.ContextMenu.ImagePreviewDisplayed" enum="BooleanSuccess"
-    expires_after="2025-11-09">
+    expires_after="2026-01-11">
   <owner>olivierrobin@google.com</owner>
   <owner>bling-squid-squad@google.com</owner>
   <summary>Whether the loading of the image preview succeeded.</summary>
@@ -679,6 +650,27 @@ chromium-metrics-reviews@google.com.
     cancels the request, no metric is fired.
   </summary>
   <token key="ContextualPanelItemType" variants="ContextualPanelItemType"/>
+</histogram>
+
+<histogram name="IOS.CookieCopyWorkaroundMissingCookies" units="count"
+    expires_after="2026-07-01">
+  <owner>justincohen@chromium.org</owner>
+  <owner>bling-fundamentals@google.com</owner>
+  <summary>
+    Used by the SkipCookieCaching experiment in the enabled-with-copy-workaround
+    mode. Records the count of cookies that failed a round-trip conversion from
+    NSHTTPCookie to net::CanonicalCookie and back again.
+  </summary>
+</histogram>
+
+<histogram name="IOS.CookieCopyWorkaroundTime" units="ms"
+    expires_after="2026-07-01">
+  <owner>justincohen@chromium.org</owner>
+  <owner>bling-fundamentals@google.com</owner>
+  <summary>
+    Used by the SkipCookieCaching experiment in the enabled-with-copy-workaround
+    mode. Records the performance overhead of the copy operation.
+  </summary>
 </histogram>
 
 <histogram name="IOS.CredentialExtension.CopyCreationDateCount" units="count"
@@ -954,7 +946,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.CredentialExtension.SyncedStore" enum="Boolean"
-    expires_after="2025-09-28">
+    expires_after="2026-01-11">
   <owner>sebsg@chromium.org</owner>
   <owner>bling-transactions-eng@google.com</owner>
   <summary>
@@ -2043,7 +2035,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.Fullscreen.TransitionReason.{Toggle}"
-    enum="FullscreenModeTransitionReason" expires_after="2025-10-31">
+    enum="FullscreenModeTransitionReason" expires_after="2026-01-11">
   <owner>alionadangla@chromium.org</owner>
   <owner>prasanaa@google.com</owner>
   <summary>The action that leads to {Toggle} fullscreen.</summary>
@@ -2051,6 +2043,54 @@ chromium-metrics-reviews@google.com.
     <variant name="Enter" summary="enter"/>
     <variant name="Exit" summary="exit"/>
   </token>
+</histogram>
+
+<histogram name="IOS.Gemini.Eligibility" enum="Boolean"
+    expires_after="2026-02-01">
+  <owner>sebsg@chromium.org</owner>
+  <owner>bling-alchemy@google.com</owner>
+  <summary>
+    Records whether the user is eligible for Gemini. Logged when eligibility is
+    checked prior to showing entry points, promos, etc.
+  </summary>
+</histogram>
+
+<histogram name="IOS.Gemini.EntryPoint" enum="IOSGeminiEntryPoint"
+    expires_after="2026-02-01">
+  <owner>sebsg@chromium.org</owner>
+  <owner>bling-alchemy@google.com</owner>
+  <summary>
+    Records the entry point source from which Gemini was triggered. Recorded
+    when Gemini is triggered.
+  </summary>
+</histogram>
+
+<histogram name="IOS.Gemini.FRE.ConsentAction" enum="IOSGeminiFREAction"
+    expires_after="2026-06-01">
+  <owner>sebsg@chromium.org</owner>
+  <owner>bling-alchemy@google.com</owner>
+  <summary>
+    Records the user's selection on the Gemini FRE consent screen.
+  </summary>
+</histogram>
+
+<histogram name="IOS.Gemini.FRE.EntryPoint" enum="IOSGeminiEntryPoint"
+    expires_after="2026-02-01">
+  <owner>sebsg@chromium.org</owner>
+  <owner>bling-alchemy@google.com</owner>
+  <summary>
+    Records the entry point source from which Gemini First Run Experience (FRE)
+    was triggered. Recorded when the Gemini FRE is triggered.
+  </summary>
+</histogram>
+
+<histogram name="IOS.Gemini.FRE.PromoAction" enum="IOSGeminiFREAction"
+    expires_after="2026-06-01">
+  <owner>sebsg@chromium.org</owner>
+  <owner>bling-alchemy@google.com</owner>
+  <summary>
+    Records the user's selection on the Gemini FRE promo screen.
+  </summary>
 </histogram>
 
 <histogram name="IOS.GoogleOne.Outcome.{EntryPoint}" enum="GoogleOneOutcome"
@@ -2225,7 +2265,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.IncognitoLockImpression"
-    enum="IncognitoLockImpressionType" expires_after="2025-08-24">
+    enum="IncognitoLockImpressionType" expires_after="2025-12-14">
   <owner>alimariam@google.com</owner>
   <owner>chrome-browser-privacy-team@google.com</owner>
   <summary>Logged when the Incognito lock overlay is displayed.</summary>
@@ -2241,7 +2281,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.IncognitoLockSettingInteraction"
-    enum="IncognitoLockSettingInteractionType" expires_after="2025-03-31">
+    enum="IncognitoLockSettingInteractionType" expires_after="2025-12-14">
   <owner>alimariam@google.com</owner>
   <owner>chrome-browser-privacy-team@google.com</owner>
   <summary>
@@ -2297,7 +2337,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.IsDefaultBrowser{NumberOfDays}" enum="Boolean"
-    expires_after="2025-11-09">
+    expires_after="2026-01-11">
   <owner>sebsg@chromium.org</owner>
   <owner>gujen@chromium.org</owner>
   <summary>
@@ -2486,7 +2526,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.LocationBar.LensOverlayEntrypointAvailable" enum="Boolean"
-    expires_after="2025-11-09">
+    expires_after="2026-01-11">
   <owner>christianxu@chromium.org</owner>
   <owner>stkhapugin@chromium.org</owner>
   <summary>
@@ -2496,7 +2536,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.LocationBar.LensOverlayEntrypointHidden"
-    enum="IOSLocationBarLeadingIconType" expires_after="2025-11-09">
+    enum="IOSLocationBarLeadingIconType" expires_after="2026-01-11">
   <owner>christianxu@chromium.org</owner>
   <owner>stkhapugin@chromium.org</owner>
   <summary>
@@ -2617,7 +2657,7 @@ chromium-metrics-reviews@google.com.
 
 <histogram
     name="IOS.MagicStack.Module.{Event}.TabResumption.{Surface}.{Source}"
-    units="index" expires_after="2025-11-09">
+    units="index" expires_after="2026-01-11">
   <owner>thegreenfrog@chromium.org</owner>
   <owner>bling-get-set-up@google.com</owner>
   <summary>
@@ -3151,6 +3191,26 @@ chromium-metrics-reviews@google.com.
     newly created window is added to a session. Collection of
     WindowActivityRestoredOrigin data is intentionally skipped. Note that
     computation was wrong until M125.
+  </summary>
+</histogram>
+
+<histogram name="IOS.Notification.Dismissed" enum="NotificationType"
+    expires_after="2026-01-09">
+  <owner>scottyoder@google.com</owner>
+  <owner>bling-get-set-up@google.com</owner>
+  <summary>
+    Logs when a notification was dismissed on a user's device. Will be logged
+    when the user opens the app.
+  </summary>
+</histogram>
+
+<histogram name="IOS.Notification.Interaction" enum="NotificationType"
+    expires_after="2026-01-09">
+  <owner>scottyoder@google.com</owner>
+  <owner>bling-get-set-up@google.com</owner>
+  <summary>
+    Logs when a notification was interacted with on a user's device. Will be
+    logged when the user opens the app.
   </summary>
 </histogram>
 
@@ -3848,6 +3908,16 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
+<histogram name="IOS.PasswordManager.TrustedVaultNotification.Events"
+    enum="IOSTipsTrustedVaultNotificationEvents" expires_after="2026-06-01">
+  <owner>ylahodiuk@google.com</owner>
+  <owner>rgod@google.com</owner>
+  <summary>
+    [iOS Only] Tracks events of the Password Manager Trusted Vault tips
+    notification.
+  </summary>
+</histogram>
+
 <histogram name="IOS.PasswordManager.WidgetPromo.Action"
     enum="PromoWithInstructionsAction" expires_after="2025-11-16">
   <owner>noemies@google.com</owner>
@@ -4294,7 +4364,7 @@ chromium-metrics-reviews@google.com.
 <histogram
     name="IOS.PushNotification.NotificationAutorizationStatusChangedToProvisional"
     enum="PushNotificationSettingsAuthorizationStatus"
-    expires_after="2025-11-09">
+    expires_after="2026-01-11">
   <owner>scottyoder@google.com</owner>
   <owner>bling-get-set-up@google.com</owner>
   <summary>
@@ -4481,6 +4551,19 @@ chromium-metrics-reviews@google.com.
     Logs any change the user has made to the default Reading Mode UI theme
     including background customizations to sepia, dark, and light colors on iOS
     devices.
+  </summary>
+</histogram>
+
+<histogram name="IOS.ReaderMode.TimeSpent" units="ms"
+    expires_after="2025-11-24">
+  <owner>fernandex@google.com</owner>
+  <owner>bling-squid-squad@google.com</owner>
+  <summary>
+    Logs the amount of time spent (in ms) in Reading Mode from when the user
+    first loads the content on the page either via a direct entrypoint or by
+    switching tabs back to a page that had it previously enabled to when the
+    user closes Reading Mode or moves away from the screen (e.g. by switching
+    tabs or closing the browser). Tracked for the iOS platform.
   </summary>
 </histogram>
 
@@ -5094,24 +5177,6 @@ chromium-metrics-reviews@google.com.
   </summary>
 </histogram>
 
-<histogram name="IOS.SearchExtension.Action" enum="IOSSearchExtensionAction"
-    expires_after="2024-09-18">
-  <owner>olivierrobin@chromium.org</owner>
-  <owner>rkgibson@chromium.org</owner>
-  <summary>The action selected by the user in the Search Extension.</summary>
-</histogram>
-
-<histogram name="IOS.SearchExtension.DisplayCount" units="count"
-    expires_after="2024-09-18">
-  <owner>olivierrobin@chromium.org</owner>
-  <owner>rkgibson@chromium.org</owner>
-  <summary>
-    The number of times the Search Extension was displayed since last Chrome
-    foregrounding. Reported when Chrome is put in foreground. Note: events where
-    the count is zero were removed in M91.
-  </summary>
-</histogram>
-
 <histogram name="IOS.SearchWith.CharSelected" units="characters"
     expires_after="2025-08-31">
   <owner>olivierrobin@chromium.org</owner>
@@ -5122,7 +5187,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.SearchWith.Trigger" enum="IOSSearchWithContext"
-    expires_after="2025-11-09">
+    expires_after="2026-01-11">
   <owner>olivierrobin@chromium.org</owner>
   <owner>bling-squid-squad@google.com</owner>
   <summary>The context in which Search With has been triggered.</summary>
@@ -5185,7 +5250,7 @@ chromium-metrics-reviews@google.com.
 </histogram>
 
 <histogram name="IOS.SetUpList.AllItemsCompleted" enum="Boolean"
-    expires_after="2025-09-21">
+    expires_after="2026-01-11">
   <owner>scottyoder@google.com</owner>
   <owner>bling-get-set-up@google.com</owner>
   <summary>

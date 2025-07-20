@@ -235,7 +235,6 @@ struct WebClientInitialState {
   bool can_attach;
   // Whether the panel is active. See `NotifyPanelActiveChange`.
   bool panel_is_active;
-  WebClientSizingMode sizing_mode;
   bool browser_is_open;
   // Reflects the enabling state of always-detached mode.
   bool always_detached_mode;
@@ -253,6 +252,8 @@ struct WebClientInitialState {
   bool enable_maybe_refresh_user_status;
   // Whether multi tab is enabled.
   bool enable_multi_tab;
+  // The list of capabilities of the host.
+  array<HostCapability> host_capabilities;
 };
 
 // Options for getting tab context.
@@ -402,12 +403,27 @@ struct ZeroStateSuggestions {
 struct ZeroStateSuggestionsV2 {
   // The list of suggestions to present to the user.
   array<SuggestionContent> suggestions;
+  // Whether there is a current outstanding request to generate suggestions for
+  // the current tab context.
+  bool is_pending;
 };
 
 // The options associated with the current zero state suggestions.
 struct ZeroStateSuggestionsOptions {
   bool is_first_run;
   array<string> supported_tools;
+};
+
+// A candidate for pinning.
+struct PinCandidate {
+  // The tab that is a candidate for pinning.
+  TabData tab_data;
+};
+
+// Observes changes to pin candidates.
+interface PinCandidatesObserver {
+  // Called when the list of pin candidates has changed.
+  OnPinCandidatesChanged(array<PinCandidate> candidates);
 };
 
 // Access to the browser from the web client by proxy through the WebUI.
@@ -494,10 +510,11 @@ interface WebClientHandler {
   [RuntimeFeature=glic.mojom.features.kGlicMultiTab]
   UnpinAllTabs();
 
-  // Requests candidates for pinning.
+  // Subscribes to receive updates on pin candidates.
   [RuntimeFeature=glic.mojom.features.kGlicMultiTab]
-  GetPinCandidates(GetPinCandidatesOptions options)
-      => (array<TabData> candidates);
+  SubscribeToPinCandidates(
+      GetPinCandidatesOptions options,
+      pending_remote<PinCandidatesObserver> observer);
 
   // Creates a new task in the actor framework and returns the new task's ID.
   CreateTask() => result<int32, CreateTaskErrorReason>;
@@ -644,6 +661,11 @@ interface WebClientHandler {
   // Stop journal collection.
   JournalStop();
 
+  // Record the journal in a listnr feedback. The reason will be sent to listnr
+  // as the feedback description exactly as is without being parsed or processed
+  // in the browser process.
+  JournalRecordFeedback(bool positive, string reason);
+
   // Called when the user submits input.
   OnUserInputSubmitted(WebClientMode mode);
 
@@ -693,7 +715,7 @@ interface WebClientHandler {
   [RuntimeFeature=glic.mojom.features.kZeroStateSuggestionsV2]
   GetZeroStateSuggestionsAndSubscribe(bool is_live,
                           ZeroStateSuggestionsOptions options) =>
-    (ZeroStateSuggestionsV2 zero_state_suggestions);
+    (ZeroStateSuggestionsV2? zero_state_suggestions);
 
   // Returns zero-state suggestions from the currently active tab.
   GetZeroStateSuggestionsForFocusedTab(bool? is_first_run)
@@ -867,7 +889,7 @@ interface WebClient {
 
   // Informs the client that the zero state suggestions have changed.
   NotifyZeroStateSuggestionsChanged(
-    ZeroStateSuggestionsV2 suggestions,
+    ZeroStateSuggestionsV2? suggestions,
     ZeroStateSuggestionsOptions options);
 };
 
@@ -893,6 +915,12 @@ struct TabContext {
 struct ActInFocusedTabResponse {
   // The context of the focused tab after the action was completed.
   TabContext tab_context;
+  // The outcome of the action.
+  // Note that this is an enum ActionResultCode from chrome/common/actor.mojom.
+  // It would be tedious to import the actual enum here and the renderer doesn't
+  // need the type, so we just use an int here. It is expected that the client
+  // has an equivalent enum definition. See http://shortn/_gLyPxrRm6p
+  int32 action_result;
 };
 
 // Information about a web page being rendered in a tab.
@@ -997,16 +1025,6 @@ struct Screenshot {
   ImageOriginAnnotations origin_annotations;
 };
 
-// The sizing mode of web client.
-enum WebClientSizingMode {
-  // The web client uses natural (aka. intrinsic) sizing.
-  // This is the default mode.
-  kNatural,
-  // The web client resizes its content to fit the window size.
-  // This can be tested using "--glic-sizing-fit-window".
-  kFitWindow,
-};
-
 // Fields of interest from the Glic settings page.
 [Stable, Extensible]
 enum SettingsPageField {
@@ -1022,4 +1040,10 @@ struct OpenSettingsOptions {
   // Optionally select a field to be highlighted while opening the Glic settings
   // page.
   SettingsPageField highlightField;
+};
+
+// Describes the capability of the glic host.
+enum HostCapability {
+  // Glic host supports ScrollTo() with PDF documents.
+  kScrollToPdf = 0,
 };

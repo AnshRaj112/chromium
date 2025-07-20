@@ -34,6 +34,7 @@ import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
+import org.chromium.chrome.browser.tasks.tab_management.TabShareUtils;
 import org.chromium.components.tab_group_sync.LocalTabGroupId;
 import org.chromium.components.tab_group_sync.SavedTabGroup;
 import org.chromium.components.tab_group_sync.TabGroupSyncService;
@@ -158,10 +159,14 @@ public class TabArchiverImpl implements TabArchiver {
         broadcastDeclutterComplete();
     }
 
-    private List<Tab> getTabsToArchive(TabGroupModelFilter regularTabGroupModelFilter) {
-        TabModel model = regularTabGroupModelFilter.getTabModel();
-        Tab activeTab = model.getTabByIdChecked(TabModelUtils.getCurrentTabId(model));
+    @VisibleForTesting
+    List<Tab> getTabsToArchive(TabGroupModelFilter regularTabGroupModelFilter) {
         List<Tab> tabsToArchive = new ArrayList<>();
+        TabModel model = regularTabGroupModelFilter.getTabModel();
+        int activeTabId = TabModelUtils.getCurrentTabId(model);
+        if (activeTabId == Tab.INVALID_TAB_ID) return tabsToArchive;
+
+        Tab activeTab = model.getTabByIdChecked(activeTabId);
         // Maps unique URLs to their MRU timestamp, used to declutter duplicate tabs.
         Map<GURL, Long> tabUrlToLastActiveTimestampMap = createUrlToMruTimestampMap(model);
         // Maps unique tab group tokens to the eligibility of that group.
@@ -543,6 +548,13 @@ public class TabArchiverImpl implements TabArchiver {
             TabGroupModelFilter regularTabGroupModelFilter,
             Map<GURL, Long> tabUrlToLastActiveTimestampMap,
             Tab tab) {
+        // Do not archived shared tab groups, defined by a null collaboration ID.
+        if (TabShareUtils.getCollaborationIdOrNull(
+                        tab.getId(), regularTabGroupModelFilter.getTabModel(), mTabGroupSyncService)
+                != null) {
+            return false;
+        }
+
         List<Tab> relatedTabList = regularTabGroupModelFilter.getTabsInGroup(tab.getTabGroupId());
         for (Tab relatedTab : relatedTabList) {
             if (!isTabEligibleForArchive(tabUrlToLastActiveTimestampMap, relatedTab)) {

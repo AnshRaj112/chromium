@@ -10,6 +10,7 @@
 #include "base/feature_list.h"
 #include "base/memory/ptr_util.h"
 #include "base/no_destructor.h"
+#include "chrome/browser/actor/ui/actor_overlay_window_controller.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/collaboration/collaboration_service_factory.h"
 #include "chrome/browser/commerce/shopping_service_factory.h"
@@ -45,6 +46,7 @@
 #include "chrome/browser/ui/performance_controls/memory_saver_opt_in_iph_controller.h"
 #include "chrome/browser/ui/signin/signin_view_controller.h"
 #include "chrome/browser/ui/sync/browser_synced_window_delegate.h"
+#include "chrome/browser/ui/tabs/glic_actor_task_icon_controller.h"
 #include "chrome/browser/ui/tabs/glic_nudge_controller.h"
 #include "chrome/browser/ui/tabs/organization/tab_declutter_controller.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/most_recent_shared_tab_update_store.h"
@@ -75,6 +77,7 @@
 #include "chrome/browser/ui/views/profiles/profile_menu_coordinator.h"
 #include "chrome/browser/ui/views/send_tab_to_self/send_tab_to_self_toolbar_bubble_controller.h"
 #include "chrome/browser/ui/views/side_panel/bookmarks/bookmarks_side_panel_coordinator.h"
+#include "chrome/browser/ui/views/side_panel/comments/comments_side_panel_coordinator.h"
 #include "chrome/browser/ui/views/side_panel/extensions/extension_side_panel_manager.h"
 #include "chrome/browser/ui/views/side_panel/history/history_side_panel_coordinator.h"
 #include "chrome/browser/ui/views/side_panel/history_clusters/history_clusters_side_panel_coordinator.h"
@@ -192,6 +195,11 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
       glic_iph_controller_ = std::make_unique<glic::GlicIphController>(browser);
       glic_nudge_controller_ =
           std::make_unique<tabs::GlicNudgeController>(browser);
+
+      if (features::kGlicActorUiTaskIcon.Get()) {
+        glic_actor_task_icon_controller_ =
+            std::make_unique<tabs::GlicActorTaskIconController>(browser);
+      }
     }
 #endif  // BUILDFLAG(ENABLE_GLIC)
   }
@@ -226,7 +234,8 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
           browser->GetAppBrowserController());
 
   tab_group_deletion_dialog_controller_ =
-      std::make_unique<tab_groups::DeletionDialogController>(browser);
+      std::make_unique<tab_groups::DeletionDialogController>(
+          browser, browser->GetProfile(), tab_strip_model_);
 
   user_education_ =
       GetUserDataFactory().CreateInstance<BrowserUserEducationInterfaceImpl>(
@@ -241,7 +250,8 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
       std::make_unique<ReadingListSidePanelCoordinator>(
           browser->GetProfile(), browser->GetTabStripModel());
 
-  signin_view_controller_ = std::make_unique<SigninViewController>(browser);
+  signin_view_controller_ = std::make_unique<SigninViewController>(
+      browser, browser->GetProfile(), tab_strip_model_);
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
   if (base::FeatureList::IsEnabled(features::kPdfInfoBar)) {
@@ -258,7 +268,8 @@ void BrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
 #endif
 
   data_sharing_bubble_controller_ =
-      std::make_unique<DataSharingBubbleController>(browser);
+      std::make_unique<DataSharingBubbleController>(
+          browser, browser->GetProfile(), tab_strip_model_);
 
   content_setting_bubble_model_delegate_ =
       std::make_unique<BrowserContentSettingBubbleModelDelegate>(browser);
@@ -378,13 +389,15 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
     }
   }
 
-  synced_window_delegate_ =
-      std::make_unique<BrowserSyncedWindowDelegate>(browser);
+  synced_window_delegate_ = std::make_unique<BrowserSyncedWindowDelegate>(
+      browser, browser->GetTabStripModel(), browser->GetSessionID(),
+      browser->GetType());
 
   extension_window_controller_ =
       std::make_unique<extensions::BrowserExtensionWindowController>(browser);
 
-  profile_menu_coordinator_ = std::make_unique<ProfileMenuCoordinator>(browser);
+  profile_menu_coordinator_ =
+      std::make_unique<ProfileMenuCoordinator>(browser, browser->GetProfile());
 
   upgrade_notification_controller_ =
       std::make_unique<UpgradeNotificationController>(browser);
@@ -399,7 +412,10 @@ void BrowserWindowFeatures::InitPostWindowConstruction(Browser* browser) {
             browser->GetTabStripModel(), browser_view->GetWidget());
   }
 
-  live_tab_context_ = std::make_unique<BrowserLiveTabContext>(browser);
+  live_tab_context_ = std::make_unique<BrowserLiveTabContext>(
+      browser, browser->GetTabStripModel(), browser->GetProfile(),
+      browser->GetWindow(), browser->GetType(), browser->app_name(),
+      browser->GetSessionID());
 
   if (browser->is_type_normal() || browser->is_type_app()) {
     toast_service_ = std::make_unique<ToastService>(browser);
@@ -424,10 +440,16 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
   }
 
   history_clusters_side_panel_coordinator_ =
-      std::make_unique<HistoryClustersSidePanelCoordinator>(browser_);
+      std::make_unique<HistoryClustersSidePanelCoordinator>(
+          browser_, browser_->GetProfile(), side_panel_coordinator_.get());
 
   bookmarks_side_panel_coordinator_ =
       std::make_unique<BookmarksSidePanelCoordinator>();
+
+  if (CommentsSidePanelCoordinator::IsSupported()) {
+    comments_side_panel_coordinator_ =
+        std::make_unique<CommentsSidePanelCoordinator>();
+  }
 
   side_panel_coordinator_->Init(browser_view->browser());
 
@@ -464,6 +486,12 @@ void BrowserWindowFeatures::InitPostBrowserViewConstruction(
           std::make_unique<media_router::CastBrowserController>(
               browser_view->browser());
     }
+
+    if (features::kGlicActorUiOverlay.Get()) {
+      actor_overlay_window_controller_ =
+          std::make_unique<actor::ui::ActorOverlayWindowController>(
+              browser_view->GetActorOverlayView());
+    }
   }
 
   if (download::IsDownloadBubbleEnabled()) {
@@ -495,6 +523,7 @@ void BrowserWindowFeatures::TearDownPreBrowserWindowDestruction() {
   profile_menu_coordinator_.reset();
   toast_service_.reset();
   extension_window_controller_.reset();
+  actor_overlay_window_controller_.reset();
 
 #if BUILDFLAG(ENABLE_GLIC)
   glic_button_controller_.reset();

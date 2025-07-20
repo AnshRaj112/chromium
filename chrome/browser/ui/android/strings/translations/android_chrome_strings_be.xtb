@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">Спампаваць файлы PDF можна тут</translation>
 <translation id="107147699690128016">Калі вы зменіце пашырэнне файла, ён можа адкрыцца ў іншай праграме, што можа быць небяспечным для вашай прылады.</translation>
 <translation id="1080365971383768617">Паролі на ўсіх вашых прыладах</translation>
-<translation id="1087176310396019910">Магчымы спам</translation>
 <translation id="1087799850623149508">Націсніце і ўтрымлівайце адрасны радок, каб перамясціць яго ў ніжнюю частку экрана</translation>
 <translation id="1089606299949659462">Праверка завершана!</translation>
 <translation id="1094555143448724771">Каб бачыць укладкі з іншых прылад, сінхранізуйце ўкладкі і гісторыю</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">Перазапусціць Chrome?</translation>
 <translation id="1428770807407000502">Выключыць сінхранізацыю?</translation>
 <translation id="1430915738399379752">Друк</translation>
+<translation id="1433478348197382180">Рэжым чытання</translation>
 <translation id="1435593198351412143">Адкрываць PDF аўтаматычна</translation>
 <translation id="1437543266176261764">Выконваецца ў <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Упарадкоўвайце тавары, за якімі сочыце, у Закладках</translation>
@@ -720,6 +720,7 @@
 <translation id="4306489587293957491">Увод</translation>
 <translation id="4307992518367153382">Асноўнае</translation>
 <translation id="4311652497846705514">Адкрыць файл PDF?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Магчымы спам}one{Магчымы спам (#)}few{Магчымы спам (#)}many{Магчымы спам (#)}other{Магчымы спам (#)}}</translation>
 <translation id="4320177379694898372">Няма падключэння да інтэрнэту</translation>
 <translation id="4326079409704643112">Каб захоўваць даныя Chrome ва Уліковым запісе Google і выкарыстоўваць іх, пацвердзіце сваю асобу</translation>
 <translation id="433213510553688132">Выконваецца падпіска...</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">Выберыце, якія тэмы і сайты вас цікавяць</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# гадзіну таму}one{# гадзіну таму}few{# гадзіны таму}many{# гадзін таму}other{# гадзіны таму}}</translation>
 <translation id="5810288467834065221">© <ph name="YEAR" /> Google LLC. Усе правы абароненыя.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Паказаць апавяшчэнне}one{Паказаць апавяшчэнні}few{Паказаць апавяшчэнні}many{Паказаць апавяшчэнні}other{Паказаць апавяшчэнні}}</translation>
 <translation id="5814749351757353073">Падпісвайцеся на любімыя сайты</translation>
 <translation id="5823093032261493462">Усё роўна спампаваць файл "<ph name="FILE_NAME" />" з дамена "<ph name="DOWNLOAD_DOMAIN" />"?</translation>
 <translation id="5828921839638612740">Даныя можна выдаліць у наладах Chrome</translation>
@@ -1168,6 +1170,7 @@
 <translation id="6255809143828972562">Інструменты Chrome абараняюць вашы даныя пры рабоце ў інтэрнэце</translation>
 <translation id="6264376385120300461">Усё роўна спампаваць</translation>
 <translation id="6264485186158353794">Назад да бяспечнага карыстання</translation>
+<translation id="6267063201726531683">Ніжні аркуш "Рэжым чытання"</translation>
 <translation id="6277522088822131679">Узнікла праблема з друкам старонкі. Паўтарыце спробу.</translation>
 <translation id="6278428485366576908">Тэма</translation>
 <translation id="6284472661216707937">Аркуш "Паролі на ўсіх вашых прыладах" закрыты</translation>
@@ -1191,7 +1194,6 @@
 <translation id="6342069812937806050">Толькі што</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 і яшчэ <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}one{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 і яшчэ <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}few{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 і яшчэ <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}many{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 і яшчэ <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 і яшчэ <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}}</translation>
 <translation id="6345878117466430440">Пазначыць як прачытанае</translation>
-<translation id="6347010704471250799">Паказваць апавяшчэнне</translation>
 <translation id="6356893102071098867">Упэўніцеся, што вы выбралі патрэбны ўліковы запіс</translation>
 <translation id="6363990818884053551">Каб пачаць сінхранізацыю, пацвердзіце сваю асобу</translation>
 <translation id="6364438453358674297">Выдаліць прапанову з гісторыі?</translation>

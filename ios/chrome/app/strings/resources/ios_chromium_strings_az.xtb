@@ -91,7 +91,6 @@ Chromium təcrübənizi təkmilləşdirmək məqsədilə data istifadə edən di
 <translation id="3102849287235003384">Bütün vebsaytlarda Google Hesabınızdan çıxmaq üçün <ph name="BEGIN_LINK" />Chromium'dan çıxın<ph name="END_LINK" />.</translation>
 <translation id="3115956258722352278">Chromium defolt brauzer edilsin?</translation>
 <translation id="3180939591219927904">"Chromium-u bağladıqda Anonim tabları kilidləyin" funksiyasını yandırın</translation>
-<translation id="3242612358525156339">Cihaz ayarlarında "<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />" seçimini açın və "Chromium" seçin</translation>
 <translation id="328933489847748230">{count,plural, =1{1 Chromium pəncərəsi göstərilir}other{{count} Chromium pəncərəsi göstərilir}}</translation>
 <translation id="3344973607274501920">Chromium parollarınızı yoxlaya bilmədi. İnternet bağlantınızı yoxlayın.</translation>
 <translation id="3366305173356742781">Hesabdakı Chromium datası</translation>
@@ -164,7 +163,6 @@ Bu ayarı dəyişmək üçün <ph name="BEGIN_LINK" />hesabda Chromium datasın�
 <translation id="5042011327527167688">"Chromium-da Google Xəritə ilə baxın" üzərinə toxunun.</translation>
 <translation id="5044871537677053278">Chromium istiqamət və yerli məlumat təqdim etmək üçün ünvanları aşkarlayır və Google Xəritədən istifadə edir.</translation>
 <translation id="5048140766121299007">"<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />" ayarlarında "Chromium"-u yandırın</translation>
-<translation id="5048795749726991615">Yadda saxlanmış parollarınızı digər tətbiqlərinizdə asanlıqla əldə etmək üçün Avtomatik Doldurma üçün Chromium istifadə edin</translation>
 <translation id="5053429694249468757">Chromium datası silinir…</translation>
 <translation id="5071749685031362629">iOS üçün Chromium</translation>
 <translation id="5124429847818367226">Artıq istənilən vaxt Chromium ilə axtarış edə və ya mesaj, sənəd və digər tətbiqlərdə keçidləri aça bilərsiniz.</translation>
@@ -254,6 +252,7 @@ Nəzərə alın ki:
 
 Yalnız parol ifadəsini bilən şəxs şifrələnmiş datanı oxuya bilər. Google parol ifadəsini əldə etmir və ya saxlamır. Parol ifadəsini unutsanız, yaxud bu ayarı dəyişmək istəsəniz, <ph name="BEGIN_LINK" />hesabda Chromium datasını silin<ph name="END_LINK" />.</translation>
 <translation id="7192111075364461693">Hazırda Chromium bildirişləri cihaz ayarlarında deaktivdir.</translation>
+<translation id="7195217321165708458">Gemini Chromium-da</translation>
 <translation id="7219205286115692265">iPad-in əsas ekran dokundan Chromium-a tez daxil olun.</translation>
 <translation id="7222001353246886083">Chromium-da ${searchPhrase} axtarın</translation>
 <translation id="7228180817326917122">Chromium tövsiyəsi: Ünvan panelinin yerini seçin</translation>

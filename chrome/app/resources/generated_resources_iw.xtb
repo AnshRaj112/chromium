@@ -592,7 +592,6 @@
 <translation id="1407069428457324124">עיצוב כהה</translation>
 <translation id="1407135791313364759">פתיחת כל הכרטיסיות</translation>
 <translation id="140723521119632973">הפעלה סלולרית</translation>
-<translation id="1407908250220330281">הפרופיל הזה ינוהל מעכשיו</translation>
 <translation id="1407970155431887387">אפשר ללחוץ כדי לפתוח את תיבת הדו-שיח לעריכה של <ph name="SEARCH_ENGINE_NAME" /></translation>
 <translation id="1408504635543854729">ניתן לעיין בתוכן של המכשיר באמצעות האפליקציה 'קבצים'. התוכן מוגבל על-ידי מנהל מערכת, ואי אפשר לשנות אותו.</translation>
 <translation id="1408980562518920698">ניהול מידע אישי</translation>
@@ -802,7 +801,6 @@
 <translation id="1549966883323105187">אפשר לגשת מהר יותר לסיסמאות השמורות</translation>
 <translation id="1550656959113606473">‏ברירת המחדל של Chrome</translation>
 <translation id="1552301827267621511">התוסף "<ph name="EXTENSION_NAME" />" שינה את הגדרות החיפוש לשימוש ב-<ph name="SEARCH_PROVIDER_DOMAIN" /></translation>
-<translation id="1552357433305859738">המשך הסנכרון עם הפרופיל הזה ומיזוג הנתונים</translation>
 <translation id="1552752544932680961">נהל תוספים</translation>
 <translation id="1553538517812678578">לא מוגבל</translation>
 <translation id="1553947773881524342">‏<ph name="LINK_BEGIN" />מידע נוסף<ph name="LINK_END" /> על Microsoft 365 ב-Chromebook.</translation>
@@ -1093,7 +1091,6 @@
 <translation id="1741190788710022490">טעינה דינמית</translation>
 <translation id="174123615272205933">בהתאמה אישית</translation>
 <translation id="1741314857973421784">המשך</translation>
-<translation id="1743970419083351269">סגירת סרגל ההורדות</translation>
 <translation id="1744108098763830590">דף רקע</translation>
 <translation id="1745732479023874451">ניהול אנשי קשר</translation>
 <translation id="1748283190377208783">{0,plural, =1{unused plural form}one{לפתוח ולערוך # קבצים באפליקציית האינטרנט הזו?}two{לפתוח ולערוך # קבצים באפליקציית האינטרנט הזו?}other{לפתוח ולערוך # קבצים באפליקציית האינטרנט הזו?}}</translation>
@@ -1208,6 +1205,7 @@
 <translation id="1822635184853104396">הצגה של היסטוריית ההורדות המלאה בכרטיסייה חדשה</translation>
 <translation id="1823768272150895732">גופן</translation>
 <translation id="1823781806707127806">הוספת נתוני הגלישה הקיימים לפרופיל מנוהל</translation>
+<translation id="1824499847634940868">בדיקת העדכון לאפליקציה</translation>
 <translation id="18245044880483936">‏נתוני הגיבוי לא נחשבים כחלק ממכסת האחסון של הילד או הילדה ב-Drive.</translation>
 <translation id="1824870205483790748">הצמדת הקבוצה לסרגל הסימניות</translation>
 <translation id="1825073796163165618">הפעלת קישורים</translation>
@@ -1643,6 +1641,7 @@
 <translation id="2121825465123208577">שינוי גודל</translation>
 <translation id="2123766928840368256">בחירת קובץ אחר</translation>
 <translation id="2124930039827422115">{1,plural, =1{משתמש אחד נתן דירוג של <ph name="AVERAGE_RATING" />.}one{# משתמשים נתנו דירוג של <ph name="AVERAGE_RATING" />.}two{# משתמשים נתנו דירוג של <ph name="AVERAGE_RATING" />.}other{# משתמשים נתנו דירוג של <ph name="AVERAGE_RATING" />.}}</translation>
+<translation id="2125715366913703594">תוספים שכדאי להכיר</translation>
 <translation id="2126167708562367080">מנהל המערכת שלך השבית את הסנכרון.</translation>
 <translation id="2127372758936585790">מטען בעל מתח נמוך</translation>
 <translation id="212862741129535676">אחוז תפוסה במצב תדירות</translation>
@@ -1999,7 +1998,6 @@
 <translation id="2359556993567737338">‏חיבור התקן Bluetooth</translation>
 <translation id="2359808026110333948">המשך</translation>
 <translation id="2360792123962658445">‏כדי לקבל סיכום של הדף, חיפושים קשורים ומידע שימושי נוסף על הדף הזה, צריך ללחוץ על כפתור החלונית הצדדית של חיפוש Google בסרגל הכלים</translation>
-<translation id="2361100938102002520">בחרת להוסיף פרופיל מנוהל לדפדפן הזה. למנהל המערכת שלך יש שליטה על הפרופיל וגישה לנתונים שלו.</translation>
 <translation id="236117173274098341">אופטימיזציה</translation>
 <translation id="2361340419970998028">המשוב מיד יישלח…</translation>
 <translation id="236141728043665931">תמיד לחסום גישה למיקרופון</translation>
@@ -2245,7 +2243,6 @@
 <translation id="2520961587246779103">אפשרויות נוספות לתצוגה מפוצלת</translation>
 <translation id="2521427645491031107">סנכרון האפליקציות נקבע בהגדרות המכשיר</translation>
 <translation id="2521835766824839541">הטראק הקודם</translation>
-<translation id="2521854691574443804">המערכת בודקת אם הקובץ <ph name="FILE_NAME" /> מציית למדיניות האבטחה של הארגון שלך...</translation>
 <translation id="252277619743753687">בחירת סיסמאות</translation>
 <translation id="2523184218357549926">‏שליחת כתובות אתרים של דפים שבהם ביקרת ל-Google</translation>
 <translation id="2524093372979370955">‏הפעולה הזו תשבית את ההתראות לכל ציוד היקפי חדש בחיבור USB בכל המערכת. להמשיך?</translation>
@@ -2758,7 +2755,6 @@
 <translation id="2876484123356705658">בחירת טווח הזמן</translation>
 <translation id="2876556152483133018">חיפוש באתרים ספציפיים</translation>
 <translation id="2877467134191447552">אפשר להוסיף עוד חשבונות כדי לגשת לאתרים ולאפליקציות.</translation>
-<translation id="2878782256107578644">הסריקה מתבצעת. לפתוח עכשיו?</translation>
 <translation id="2878889940310164513">הוספת רשת סלולרית…</translation>
 <translation id="288042212351694283">‏גישה למכשירי Universal 2nd Factor שלך</translation>
 <translation id="2881076733170862447">בלחיצה על התוסף</translation>
@@ -3190,7 +3186,6 @@
 <translation id="3202499879214571401">השהיה של העברת המסך אל <ph name="DEVICE_NAME" /></translation>
 <translation id="3202578601642193415">החדש ביותר</translation>
 <translation id="3204648577100496185">יכול להיות שיוסרו מהמכשיר נתונים המשויכים לאפליקציה הזו</translation>
-<translation id="3204717934117444051">נתונים שנשמרים רק במכשיר הזה יישארו בפרופיל הקיים. הם לא ייסנכרנו עם <ph name="EMAIL" /></translation>
 <translation id="3206289903841621620">מילון משתמש <ph name="NUMBER" /></translation>
 <translation id="3207344462385471911">‏מוצגות לך הצעות לחיפושים והנחות לקניות שעשויות לעניין אותך על סמך הפעילות שלך מהזמן האחרון.
         <ph name="BREAK" />
@@ -3417,6 +3412,7 @@
 <translation id="3373196968211632036">‏אי אפשר להשתמש ב-Steam ל-Chromebook (בטא) בחשבונות Google של ילדים</translation>
 <translation id="3373701465337594448">כשההגדרה מופעלת, מוצגת כאן רשימה של אתרים שיכולים להעריך את תחומי העניין שלך</translation>
 <translation id="3374294321938930390">העברת את '<ph name="BOOKMARK_TITLE" />' אל '<ph name="NEW_FOLDER_TITLE" />'.</translation>
+<translation id="3376035595160918049">בדיקת העדכון לאפליקציה</translation>
 <translation id="3378517653648586174">אישורים מקומיים</translation>
 <translation id="3378572629723696641">ייתכן שתוסף זה פגום.</translation>
 <translation id="3378627645871606983">‏ההרשאות שניתנות ל-Steam חלות על כל האפליקציות והמשחקים של Steam.</translation>
@@ -4237,7 +4233,6 @@
 <translation id="3914173277599553213">נדרש</translation>
 <translation id="3914568430265141791">פתיחת התיקייה <ph name="FOLDER_TITLE" /></translation>
 <translation id="3915280005470252504">חיפוש קולי</translation>
-<translation id="3916233823027929090">בדיקות האבטחה הסתיימו</translation>
 <translation id="3916445069167113093">סוג קובץ זה עלול לגרום נזק למחשב שלך. האם ברצונך לשמור את <ph name="FILE_NAME" /> בכל מקרה?</translation>
 <translation id="3917184139185490151">‏המחשב שלך מכיל מודול מאובטח המשמש ליישום תכונות אבטחה קריטיות רבות ב-ChromeOS. אפשר להיכנס למרכז העזרה של Chromebook כדי לקבל מידע נוסף: https://support.google.com/chromebook/?p=sm</translation>
 <translation id="3917644013202553949">אין מספיק נפח אחסון לסנכרון הקבצים. כדאי לפנות מקום.</translation>
@@ -4274,7 +4269,6 @@
 <translation id="3933121352599513978">כיווץ בקשות לא רצויות (מומלץ)</translation>
 <translation id="3936260554100916852">‏המכשיר <ph name="DEVICE_NAME" /> משתף איתך רשת Wi-Fi</translation>
 <translation id="3936390757709632190">&amp;פתיחת אודיו בכרטיסייה חדשה</translation>
-<translation id="3937110354160507845">‏האפליקציה הזו פתחה <ph name="OPENINGS_COUNT" /> חלונות או כרטיסיות חדשות של Chrome. אפשר לשנות את ההתנהגות הזו בהרשאה "חלונות קופצים והפניות אוטומטיות".</translation>
 <translation id="3937640725563832867">שם חלופי של מנפיק האישור</translation>
 <translation id="3937734102568271121">תמיד יש לתרגם <ph name="LANGUAGE" /></translation>
 <translation id="3938128855950761626">מכשירים של הספק <ph name="VENDOR_ID" /></translation>
@@ -4375,7 +4369,6 @@
 <translation id="3994878504415702912">מרחק מתצוגה</translation>
 <translation id="3995138139523574647">‏מכשיר עם יציאת USB-C (יציאה ימנית-אחורית)</translation>
 <translation id="3995963973192100066">הפעלת האנימציה</translation>
-<translation id="3997537546406230684">אני רוצה ליצור פרופיל חדש לצורכי עבודה ולשמור את הנתונים הקיימים שלי בנפרד</translation>
 <translation id="399788104667917863">הצמדה לסרגל הכלים</translation>
 <translation id="3998780825367526465">הצגת תצוגה מקדימה של הכרטיסייה</translation>
 <translation id="3998976413398910035">ניהול המדפסות</translation>
@@ -4397,7 +4390,6 @@
 <translation id="4016762287427926315">ההרשאות שמוענקות לאפליקציה <ph name="APP_NAME" /> יוענקו גם לאפליקציה הזו. <ph name="BEGIN_LINK" />לניהול ההרשאות<ph name="END_LINK" /></translation>
 <translation id="4017225831995090447">‏צריך ליצור קוד QR לקישור הזה</translation>
 <translation id="4019983356493507433">עריכה של רשימת הסימניות</translation>
-<translation id="4020327272915390518">תפריט אפשרויות</translation>
 <translation id="4021279097213088397">‏–</translation>
 <translation id="4021727050945670219">אפשר למנוע מהסמן לדלג ממקום למקום כשעושים תנועות ראש קלות, אבל צריך לצפות לעיכוב קצר.</translation>
 <translation id="402184264550408568">(TCP)</translation>
@@ -4524,6 +4516,7 @@
 <translation id="4109135793348361820">העברת חלון אל <ph name="USER_NAME" /> (<ph name="USER_EMAIL" />)</translation>
 <translation id="4110485659976215879">שחזור האזהרה</translation>
 <translation id="4112194537011183136"><ph name="DEVICE_NAME" /> (אופליין)</translation>
+<translation id="4113030288477039509">מנוהל על ידי מנהל המערכת שלך</translation>
 <translation id="4113743276555482284">סיסמה לקובץ</translation>
 <translation id="4113888471797244232">‏<ph name="BEGIN_PARAGRAPH1" />כשההגדרה 'קביעת מיקום יותר מדויקת' מופעלת, המידע על אותות אלחוטיים, כמו נקודות גישה ל-Wi-Fi ואנטנות סלולריות, וגם נתוני חיישנים מהמכשיר, כמו מד התאוצה והג'ירוסקופ, משמשים כדי לקבוע את המיקום של המכשיר בצורה יותר מדויקת. אפליקציות ושירותים של Android משתמשים במידע הזה כדי לספק תכונות שמבוססות על המיקום. כדי לעשות את זה Google אוספת מדי פעם נתונים על חיישני מכשיר ואותות אלחוטיים בקרבת המכשיר שלך כדי לתמוך במיקור המונים של מיקומי אותות אלחוטיים.<ph name="END_PARAGRAPH1" />
     ‫<ph name="BEGIN_PARAGRAPH2" />Google משתמשת בנתונים האלה, ללא זיהוי שלך, כדי: לשפר את הדיוק של קביעת המיקום ואת השירותים מבוססי-המיקום וגם כדי לשפר, לספק ולתחזק באופן כללי את שירותי Google. אנחנו מעבדים את המידע הזה על סמך האינטרסים הלגיטימיים של Google ושל צדדים שלישיים כדי לשרת את צורכי המשתמשים.<ph name="END_PARAGRAPH2" />
@@ -4627,7 +4620,6 @@
 <translation id="4195814663415092787">אני רוצה להמשיך מהמקום שבו הפסקתי</translation>
 <translation id="4198268995694216131">אתרים נוספים</translation>
 <translation id="4198420883535766848">הסרת הכרטיסייה מהרשימה</translation>
-<translation id="4198664641856813238">לאחר הכניסה לחשבון הסימניות, הסיסמאות ונתונים נוספים יופיעו בכל המכשירים שלך</translation>
 <translation id="4200609364258658652">העתקת הפריים</translation>
 <translation id="4200689466366162458">מילים מותאמות אישית</translation>
 <translation id="4200983522494130825">כרטיסייה חדשה</translation>
@@ -4770,7 +4762,7 @@
 <translation id="4291265871880246274">תיבת דו-שיח להתחברות</translation>
 <translation id="4292613336957320546">שינוי המהירות</translation>
 <translation id="429312253194641664">אתר מסוים מפעיל מדיה</translation>
-<translation id="4293219510510666933">שימוש בשפה יומיומית כדי לחפש בהיסטוריית הגלישה ולמצוא אתרים שביקרת בהם. אפשר גם לשאול שאלות ולקבל תשובות על סמך היסטוריית הגלישה. ההגדרה הזו פועלת.</translation>
+<translation id="4293219510510666933">אפשר להשתמש בשפה יומיומית כדי לחפש בהיסטוריית הגלישה ולמצוא אתרים שביקרת בהם. אפשר גם לשאול שאלות ולקבל תשובות על סמך היסטוריית הגלישה. ההגדרה הזו פועלת.</translation>
 <translation id="4294392694389031609">מחקת את <ph name="FILE_NAME" /> מהיסטוריית ההורדות, אבל הקובץ עדיין שמור במכשיר</translation>
 <translation id="4295072614469448764">האפליקציה זמינה במסוף שלך. בחלק מהמקרים מופיע סמל במרכז האפליקציות.</translation>
 <translation id="4295979599050707005">‏יש להיכנס שוב כדי לאשר את השימוש בחשבון שלך, <ph name="USER_EMAIL" />, ביחד עם אתרים, אפליקציות ותוספים ב-Chrome וב-Google Play. ניתן גם להסיר את החשבון הזה. <ph name="LINK_BEGIN" />מידע נוסף<ph name="LINK_END" /></translation>
@@ -5826,7 +5818,6 @@
 <translation id="5059526285558225588">בחירת הפרטים לשיתוף</translation>
 <translation id="5060332552815861872">יש מדפסת אחת זמינה לשמירה.</translation>
 <translation id="5060419232449737386">הגדרות לכתוביות</translation>
-<translation id="5061270227873845372">כרגע יש לך <ph name="NUMBERED_ITEM_1" />, ‏<ph name="NUMBERED_ITEM_2" />, ‏<ph name="NUMBERED_ITEM_3" /> ועוד. האדמין בארגון שלך יוכל לראות את הנתונים האלה ולנהל אותם</translation>
 <translation id="5061347216700970798">{NUM_BOOKMARKS,plural, =1{תיקייה זו מכילה סימנייה. ברצונך באמת למחוק אותה?}one{תיקייה זו מכילה # סימניות. ברצונך באמת למחוק אותה?}two{תיקייה זו מכילה שתי סימניות. ברצונך באמת למחוק אותה?}other{תיקייה זו מכילה # סימניות. ברצונך באמת למחוק אותה?}}</translation>
 <translation id="5061531353537614467">טונדרה</translation>
 <translation id="5062930723426326933">הכניסה לחשבון נכשלה. צריך להתחבר לאינטרנט ולנסות שוב.</translation>
@@ -6141,7 +6132,7 @@
 <translation id="5280064835262749532">עדכון פרטי הכניסה אל <ph name="SHARE_PATH" /></translation>
 <translation id="5280303168922585051">ההגדרה הזו נקבעה על ידי הארגון שלך. בחרת למחוק את מנוע החיפוש הזה. להמשיך?</translation>
 <translation id="5280426389926346830">ליצור קיצור דרך?</translation>
-<translation id="5280966903879030278">שימוש בשפה יומיומית כדי לחפש בהיסטוריית הגלישה ולמצוא אתרים שביקרת בהם. ההגדרה הזו מושבתת.</translation>
+<translation id="5280966903879030278">אפשר להשתמש בשפה יומיומית כדי לחפש בהיסטוריית הגלישה ולמצוא אתרים שביקרת בהם. ההגדרה הזו מושבתת.</translation>
 <translation id="5281013262333731149">פתיחה בדפדפן: <ph name="OPEN_BROWSER" /></translation>
 <translation id="528208740344463258">‏צריך להתקין את העדכון הנדרש הזה כדי להוריד אפליקציות Android ולהשתמש בהן. לא יתאפשר לך להשתמש ב-<ph name="DEVICE_TYPE" /> בזמן העדכון. כשההתקנה תסתיים, ה-<ph name="DEVICE_TYPE" /> יופעל מחדש.</translation>
 <translation id="5283677936944177147">אופס! המערכת לא הצליחה לזהות את דגם המכשיר או את המספר הסידורי.</translation>
@@ -7045,7 +7036,6 @@
 <translation id="594221546068848596">חיפוש בדף באמצעות <ph name="VISUAL_SEARCH_PROVIDER" /></translation>
 <translation id="5942779427914696408">הרשאות גישה למכשיר</translation>
 <translation id="5943127421590245687">האימות הסתיים בהצלחה. כדי לבטל את הנעילה של הנתונים המקומיים ולשחזר אותם, יש להזין את הסיסמה הקודמת שלך עבור <ph name="DEVICE_TYPE" />.</translation>
-<translation id="5945002094477276055">‏הקובץ <ph name="FILE_NAME" /> עלול להיות מסוכן. לשלוח אותו לשירות הגלישה הבטוחה של Google לצורך סריקה?</translation>
 <translation id="5945192511027649793">השבתת לוח המגע</translation>
 <translation id="5945363896952315544">אין מקום לטביעות אצבע נוספות במפתח האבטחה שלך. כדי להוסיף טביעת אצבע חדשה, קודם צריך למחוק אחת מהקיימות.</translation>
 <translation id="5946591249682680882">מזהה דיווח <ph name="WEBRTC_LOG_REPORT_ID" /></translation>
@@ -7253,7 +7243,6 @@
 <translation id="6096326118418049043">‏שם X.500</translation>
 <translation id="6097480669505687979">אם לא יתפנה שטח, ייתכן שמשתמשים ונתונים יוסרו באופן אוטומטי.</translation>
 <translation id="6097600385983390082">החיפוש הקולי נסגר</translation>
-<translation id="6098793583803863900">קובץ לא ידוע נסרק כעת לאיתור תוכן מסוכן.</translation>
 <translation id="609892108553214365">שימוש בכרטיס הזה באייפון</translation>
 <translation id="609942571968311933">הטקסט הועתק מהמכשיר הבא: <ph name="DEVICE_NAME" /></translation>
 <translation id="6099766472403716061">‏יש להתיר תמיד ל-<ph name="HOST" /> לשלוט במכשירי ה-MIDI ולתכנת אותם מחדש.</translation>
@@ -7307,7 +7296,6 @@
 <translation id="6134418895482326458">הסתרת כותרת תחתונה בדף הכרטיסייה החדשה</translation>
 <translation id="6134428719487602109">‏הסרת כל חשבונות המשתמשים ואיפוס Chromebook כך שיהיה כמו חדש.</translation>
 <translation id="6135826623269483856">אין הרשאה לנהל את החלונות בכל המסכים</translation>
-<translation id="6136114942382973861">סגירת סרגל ההורדות</translation>
 <translation id="6136285399872347291">מחיקת תו אחד</translation>
 <translation id="6136287496450963112">מפתח האבטחה שלך אינו מוגן באמצעות קוד אימות. כדי לנהל טביעות אצבע, יש ליצור תחילה קוד אימות.</translation>
 <translation id="6136872094979134163">‏לא ניתן לאחזר את החדשות של Steam ל-Chromebook.</translation>
@@ -7460,7 +7448,6 @@
 <translation id="6240964651812394252">‏כדי להשתמש במנהל הסיסמאות של Google עם מערכת ההפעלה, צריך להפעיל מחדש את Chrome ולאפשר גישה למנהל הסיסמאות במחשב. הכרטיסיות ייפתחו מחדש אחרי ההפעלה.</translation>
 <translation id="6241530762627360640">‏פרטי גישה של מכשירי Bluetooth המותאמים למערכת שלך ומגלים מכשירי Bluetooth קרובים.</translation>
 <translation id="6241844896329831164">אין צורך בגישה</translation>
-<translation id="6242574558232861452">המערכת בודקת אם הקובץ עומד בדרישות של מדיניות האבטחה של הארגון.</translation>
 <translation id="6242589501614145408">איפוס מפתח האבטחה</translation>
 <translation id="6242605626259978229">הדפדפן והפרופיל שלך מנוהלים</translation>
 <translation id="6242852299490624841">הדגשת הכרטיסייה הזו</translation>
@@ -7570,7 +7557,6 @@
 <translation id="6316432269411143858">‏תוכן התנאים של Google ChromeOS</translation>
 <translation id="6317369057005134371">בהמתנה לחלון האפליקציה...</translation>
 <translation id="6318125393809743217">‏הכללה של קובץ policies.json עם הגדרות המדיניות.</translation>
-<translation id="6318407754858604988">ההורדה התחילה</translation>
 <translation id="6318944945640833942">לא אותרה מדפסת. יש להזין שוב את כתובת המדפסת.</translation>
 <translation id="6319278239690147683">‏כדי למחוק את נתוני הגלישה מכל המכשירים המסונכרנים ומהחשבון שלך ב-Google, <ph name="BEGIN_LINK" />עליך להיכנס להגדרות של הסנכרון<ph name="END_LINK" />.</translation>
 <translation id="6322370287306604163">ביטול נעילה מהיר יותר באמצעות טביעת אצבע</translation>
@@ -7784,7 +7770,6 @@
 <translation id="6482559668224714696">זכוכית מגדלת במסך מלא</translation>
 <translation id="6483485061007832714">פתיחת הקובץ שהורדת</translation>
 <translation id="6483727753854114405">{NUM_GROUPS,plural, =1{לשמור את קבוצת הכרטיסיות?}one{לשמור את קבוצות הכרטיסיות?}two{לשמור את קבוצות הכרטיסיות?}other{לשמור את קבוצות הכרטיסיות?}}</translation>
-<translation id="6483805311199035658">הפתיחה של <ph name="FILE" /> מתבצעת...</translation>
 <translation id="6486301003991593638">‏כדי לנהל מפתחות גישה יש להשתמש בגרסה חדשה יותר של Windows</translation>
 <translation id="6488266788670893993">ל<ph name="BRAND" /> אין אפשרות לבדוק אם הסיסמאות שלך נחשפו בפרצות באבטחת מידע. יש לבדוק את החיבור לאינטרנט.</translation>
 <translation id="6488384360522318064">בחירת שפה</translation>
@@ -8216,6 +8201,7 @@
 <translation id="6790428901817661496">הפעלה</translation>
 <translation id="6790497603648687708"><ph name="EXTENSION_NAME" /> נוסף מרחוק</translation>
 <translation id="6790820461102226165">הוספת משתמש...</translation>
+<translation id="6792351896138862473">אי אפשר להפעיל אפליקציית קיוסק שלא נתמכת. צריך לדווח על הבעיה לאדמין.</translation>
 <translation id="6793610798874309813">קוד האימות צריך להיות באורך של 4 תווים לפחות</translation>
 <translation id="6793879402816827484">↓ <ph name="STATUS" /></translation>
 <translation id="6794175321111873395">הקישור <ph name="DOWNLOAD_URL" /> הועתק ללוח</translation>
@@ -8427,7 +8413,6 @@
 <translation id="6922763095098248079">המכשיר מנוהל על ידי הארגון שלך. למנהלי המערכת יש גישה לנתונים של כל פרופיל במכשיר הזה.</translation>
 <translation id="6923633482430812883">‏קרתה שגיאה בטעינת התקן הרשת לשיתוף קבצים. יש לוודא ששרת הקבצים שאליו ניסית להתחבר תומך ב-SMBv2 ואילך.</translation>
 <translation id="6924109527536857168">נדרש סנכרון</translation>
-<translation id="6925127338315966709">בחרת להוסיף פרופיל מנוהל לדפדפן הזה. למנהל המערכת שלך יש שליטה על הפרופיל וגישה לנתונים שלו. ניתן לסנכרן את הסימניות, ההיסטוריה, הסיסמאות והגדרות אחרות עם חשבון שלך, והן ינוהלו ידי מנהל המערכת.</translation>
 <translation id="6928650056523249512">הסרה אוטומטית של הרשאות מאתרים שלא בשימוש</translation>
 <translation id="6929126689972602640">‏בחשבונות בית ספריים, אין תמיכה באמצעי בקרת הורים. כדי להוסיף חשבון בית ספרי לצורך גישה אל Google Classroom ואתרים אחרים למטלות לימודיות, תחילה יש להיכנס באמצעות החשבון האישי של הילד או הילדה. ניתן להוסיף את החשבון הבית ספרי בשלב מאוחר יותר בהגדרה.</translation>
 <translation id="6929760895658557216">Okay Google</translation>
@@ -9267,6 +9252,7 @@
 <translation id="7541773865713908457"><ph name="ACTION_NAME" /> עם האפליקציה <ph name="APP_NAME" /></translation>
 <translation id="754207240458482646">הסנכרון עם מכשירים אחרים בחשבון שלך בוצע. <ph name="LINK_BEGIN" />מידע נוסף<ph name="LINK_END" /></translation>
 <translation id="7542113656240799536">‏פרטי אימות רשת של EAP</translation>
+<translation id="754225194829660954">מ-<ph name="DISPLAY_INITIATOR_ORIGIN" /></translation>
 <translation id="7542619176101025604"><ph name="ACTION_NAME" /> – בוצעה הצמדה</translation>
 <translation id="7543104066686362383">יש להפעיל תכונות ניפוי באגים במכשיר <ph name="IDS_SHORT_PRODUCT_NAME" /> זה</translation>
 <translation id="7544227555407951270">רישום המכשיר</translation>
@@ -9298,7 +9284,7 @@
 <translation id="7561196759112975576">תמיד</translation>
 <translation id="7561759921596375678">הפעלת השמע</translation>
 <translation id="7561982940498449837">סגירת התפריט</translation>
-<translation id="7563576896417108627">התאמה אישית ושליטה ב-<ph name="APP_NAME" />. יש עדכון זמין.</translation>
+<translation id="7563576896417108627">התאמה אישית ושליטה באפליקציית <ph name="APP_NAME" />. יש עדכון זמין.</translation>
 <translation id="756445078718366910">פתיחת חלון דפדפן</translation>
 <translation id="7564847347806291057">סיום התהליך</translation>
 <translation id="756503097602602175">‏ב<ph name="LINK_BEGIN" />הגדרות<ph name="LINK_END" /> אפשר לנהל את חשבונות Google המחוברים. ייתכן שהרשאות שנתת לאתרים ולאפליקציות יחולו על כל החשבונות. אם אינך רוצה שלאתרים או לאפליקציות תהיה גישה לפרטי החשבון שלך, ניתן להיכנס אל <ph name="DEVICE_TYPE" /> כאורח או לגלוש באינטרנט ב<ph name="LINK_2_BEGIN" />חלון אנונימי<ph name="LINK_2_END" />.</translation>
@@ -9700,7 +9686,6 @@
 <translation id="7833720883933317473">כאן יופיעו המילים המותאמות ששמרת</translation>
 <translation id="7834832693620032149">כדי לשתף אודיו, צריך לשתף את הכרטיסייה או החלון במקום זאת</translation>
 <translation id="7836577093182643605">רשימת נושאים חסומים שאינך רוצה לשתף עם אתרים</translation>
-<translation id="7836745198769390202">כרגע יש לך <ph name="NUMBERED_ITEM_1" />, <ph name="NUMBERED_ITEM_2" /> ועוד האדמין בארגון שלך יוכל לראות את הנתונים האלה ולנהל אותם</translation>
 <translation id="7836850009646241041">עליך לנסות לגעת שוב במפתח האבטחה</translation>
 <translation id="7838838951812478896">לא ניתן היה לשמור את '<ph name="NETWORK_NAME" />' דרך <ph name="DEVICE_NAME" /></translation>
 <translation id="7838971600045234625">{COUNT,plural, =1{בוצעה שליחה של <ph name="ATTACHMENTS" /> אל <ph name="DEVICE_NAME" />}one{בוצעה שליחה של <ph name="ATTACHMENTS" /> אל <ph name="DEVICE_NAME" />}two{בוצעה שליחה של <ph name="ATTACHMENTS" /> אל <ph name="DEVICE_NAME" />}other{בוצעה שליחה של <ph name="ATTACHMENTS" /> אל <ph name="DEVICE_NAME" />}}</translation>
@@ -10057,7 +10042,7 @@
 <translation id="8064015586118426197">ChromeOS Flex</translation>
 <translation id="8065144531309810062">‏שימוש ב-AI מבית Google לשיפור היצירתיות והפרודוקטיביות</translation>
 <translation id="8066444921260601116">תיבת דו-שיח לחיבור</translation>
-<translation id="8068904756674285749">שימוש בשפה יומיומית כדי לחפש בהיסטוריית הגלישה ולמצוא אתרים שביקרת בהם. אפשר גם לשאול שאלות ולקבל תשובות על סמך היסטוריית הגלישה. ההגדרה מושבתת.</translation>
+<translation id="8068904756674285749">אפשר להשתמש בשפה יומיומית כדי לחפש בהיסטוריית הגלישה ולמצוא אתרים שביקרת בהם. אפשר גם לשאול שאלות ולקבל תשובות על סמך היסטוריית הגלישה. ההגדרה הזו מושבתת.</translation>
 <translation id="8070572887926783747">הרשאת גישה למיקום לאפליקציה <ph name="APP_NAME" /></translation>
 <translation id="8070662218171013510">משוב פיזי</translation>
 <translation id="8071033114691184017">אפשר להשתמש בסיסמה הזו באייפון</translation>
@@ -10633,7 +10618,6 @@
 <translation id="846205103980293931">{NUM_TABS,plural, =1{תיבת רשימה עם פריט אחד}one{תיבת רשימה עם {NUM_TABS} פריטים}two{תיבת רשימה עם {NUM_TABS} פריטים}other{תיבת רשימה עם {NUM_TABS} פריטים}}</translation>
 <translation id="8463001014623882202">ההרשאה נכשלה</translation>
 <translation id="8463348458784127076">‏ניהול מפתחות הגישה בפרופיל Chrome</translation>
-<translation id="846374874681391779">סרגל ההורדות</translation>
 <translation id="8463955938112983119"><ph name="PLUGIN_NAME" /> מושבת.</translation>
 <translation id="846399539692727039">‏הרצה של בדיקות ניתוחים לגבי ChromeOS Flex</translation>
 <translation id="8464132254133862871">חשבון משתמש זה אינו זכאי לקבלת השירות.</translation>
@@ -10818,6 +10802,7 @@
 <translation id="8602851771975208551">‏תוכנית אחרת במחשב שלך הוסיפה אפליקציה שעשויה לשנות את אופן הפעולה של Chrome.</translation>
 <translation id="8605428685123651449">‏זיכרון SQLite</translation>
 <translation id="8607171490667464784">בזמן שימוש בסוללה ובמצב לא פעיל</translation>
+<translation id="8607661817136110841">קבוצות הכרטיסיות שלך</translation>
 <translation id="8607828412110648570">‏צריך לוודא שמכשיר ה-Bluetooth נמצא במצב התאמה ובקרבת מקום. חשוב לבצע התאמה רק עם מכשירים מהימנים. המכשירים המותאמים גלויים לכל החשבונות ב-Chromebook הזה. <ph name="BEGIN_LINK_LEARN_MORE" />מידע נוסף<ph name="END_LINK_LEARN_MORE" /></translation>
 <translation id="8608618451198398104">‏הוספת כרטיס Kerberos</translation>
 <translation id="8609465669617005112">הזזה למעלה</translation>
@@ -11496,7 +11481,6 @@
 <translation id="9052404922357793350">המשך חסימה</translation>
 <translation id="90528604757378587">פעילות ברקע ואפקטים חזותיים מסוימים, כמו גלילה חלקה, עשויים להיות מוגבלים.</translation>
 <translation id="9053563360605707198">הדפסה על שני הצדדים</translation>
-<translation id="9055810458113674066">כרגע יש לך <ph name="NUMBERED_ITEM" /> ועוד. האדמין בארגון שלך יוכל לראות את הנתונים האלה ולנהל אותם</translation>
 <translation id="9056788090206401048">‏יש להפעיל Bluetooth כדי להשתמש במפתח הגישה במכשיר אחר. אפשר לנהל זאת בהגדרות בכל שלב.</translation>
 <translation id="9056810968620647706">לא נמצאו התאמות.</translation>
 <translation id="9057007989365783744"><ph name="SUPERVISED_USER_NAME" /> רוצה לקבל גישה לתוכן הבא:</translation>
@@ -11613,7 +11597,6 @@
 <translation id="9128335130883257666">פתיחת דף ההגדרות של <ph name="INPUT_METHOD_NAME" /></translation>
 <translation id="9128870381267983090">התחברות לרשת</translation>
 <translation id="9129562557082598582">ייצוא של כל האישורים ברשימה '<ph name="CERT_GROUP" />'</translation>
-<translation id="9129857793923570143">האפליקציה <ph name="APP_NAME" /> פתחה כמה חלונות.</translation>
 <translation id="9130015405878219958">הוזן מצב לא חוקי.</translation>
 <translation id="9130135798965366513">כדי להמשיך, הפרטים '<ph name="FIELDS_STRING" />' ישותפו על ידי <ph name="IDENTITY_PROVIDER_ETLD_PLUS_ONE" /> עם האתר הזה. בקישורים הבאים ניתן לצפות ב<ph name="BEGIN_LINK1" />מדיניות הפרטיות<ph name="END_LINK1" /> ו<ph name="BEGIN_LINK2" />בתנאים ובהגבלות<ph name="END_LINK2" /> של האתר הזה.</translation>
 <translation id="9130208109420587135">עריכת שם הקבוצה <ph name="NAME" /></translation>

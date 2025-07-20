@@ -52,6 +52,7 @@ import org.chromium.base.test.util.CallbackHelper;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Criteria;
 import org.chromium.base.test.util.CriteriaHelper;
+import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Features.DisableFeatures;
 import org.chromium.base.test.util.Features.EnableFeatures;
 import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -251,8 +252,9 @@ public class InstanceSwitcherCoordinatorTest {
                 createPersistedInstances(
                         /* numActiveInstances= */ 1, /* numInactiveInstances= */ 3);
         final CallbackHelper itemClickCallbackHelper = new CallbackHelper();
-        final int itemClickCount = itemClickCallbackHelper.getCallCount();
+        final CallbackHelper closeCallbackHelper = new CallbackHelper();
         Callback<InstanceInfo> openCallback = (item) -> itemClickCallbackHelper.notifyCalled();
+        Callback<InstanceInfo> closeCallback = (item) -> closeCallbackHelper.notifyCalled();
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     InstanceSwitcherCoordinator.showDialog(
@@ -260,7 +262,7 @@ public class InstanceSwitcherCoordinatorTest {
                             mModalDialogManager,
                             mIconBridge,
                             openCallback,
-                            null,
+                            closeCallback,
                             null,
                             MAX_INSTANCE_COUNT,
                             Arrays.asList(instances));
@@ -286,9 +288,7 @@ public class InstanceSwitcherCoordinatorTest {
                 .check(matches(isEnabled()));
 
         // Close the selected instance.
-        onView(withId(R.id.inactive_instance_list))
-                .inRoot(isDialog())
-                .perform(actionOnItemAtPosition(0, click()));
+        closeInstanceAt(0, /* isActiveInstance= */ false, closeCallbackHelper);
 
         // Verify "Restore" button is now disabled.
         onView(allOf(withId(R.id.positive_button), withText(R.string.restore)))
@@ -306,8 +306,9 @@ public class InstanceSwitcherCoordinatorTest {
                 createPersistedInstances(
                         /* numActiveInstances= */ 1, /* numInactiveInstances= */ 3);
         final CallbackHelper itemClickCallbackHelper = new CallbackHelper();
-        final int itemClickCount = itemClickCallbackHelper.getCallCount();
+        final CallbackHelper closeCallbackHelper = new CallbackHelper();
         Callback<InstanceInfo> openCallback = (item) -> itemClickCallbackHelper.notifyCalled();
+        Callback<InstanceInfo> closeCallback = (item) -> closeCallbackHelper.notifyCalled();
         ThreadUtils.runOnUiThreadBlocking(
                 () -> {
                     InstanceSwitcherCoordinator.showDialog(
@@ -315,7 +316,7 @@ public class InstanceSwitcherCoordinatorTest {
                             mModalDialogManager,
                             mIconBridge,
                             openCallback,
-                            null,
+                            closeCallback,
                             null,
                             MAX_INSTANCE_COUNT,
                             Arrays.asList(instances));
@@ -341,9 +342,7 @@ public class InstanceSwitcherCoordinatorTest {
                 .check(matches(isEnabled()));
 
         // Close the first instance.
-        onView(withId(R.id.inactive_instance_list))
-                .inRoot(isDialog())
-                .perform(actionOnItemAtPosition(0, click()));
+        closeInstanceAt(0, /* isActiveInstance= */ false, closeCallbackHelper);
 
         // Verify "Restore" button is still enabled.
         onView(allOf(withId(R.id.positive_button), withText(R.string.restore)))
@@ -619,6 +618,7 @@ public class InstanceSwitcherCoordinatorTest {
     @Test
     @SmallTest
     @EnableFeatures(ChromeFeatureList.INSTANCE_SWITCHER_V2)
+    @DisabledTest(message = "crbug.com/430445069")
     public void testExceedsMaxNumberOfWindows_InstanceSwitcherV2() throws Exception {
         // Simulate persistence of MAX_INSTANCE_COUNT active instances and 1 inactive instance.
         InstanceInfo[] instances =
@@ -834,10 +834,10 @@ public class InstanceSwitcherCoordinatorTest {
                 .check(matches(isDisplayed()));
 
         onView(withText(R.string.cancel)).perform(click());
-        // The cancel button closes the instance switcher and opens the last opened window/tab
+        // The cancel button does not close the instance switcher dialog.
         CriteriaHelper.pollUiThread(
                 () -> {
-                    Criteria.checkThat(mModalDialogManager.isShowing(), Matchers.is(false));
+                    Criteria.checkThat(mModalDialogManager.isShowing(), Matchers.is(true));
                 });
     }
 

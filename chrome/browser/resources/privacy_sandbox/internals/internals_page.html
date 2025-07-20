@@ -1,25 +1,27 @@
 <style>
-h1, h2, h3, h4 {
-  color: var(--header-text-color);
-}
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--header-text-color);
+  }
 
-#ps-page {
-  width: 100%;
-}
+  #ps-page {
+    width: 100%;
+  }
 
 div.content-settings {
   display: grid;
-  grid-template-columns: auto auto auto;
-}
-
-content-setting-pattern-source:nth-of-type(odd) {
-  background: rgb(239, 243, 255);
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
 }
 
 content-setting-pattern-source {
   display: grid;
-  border: 1px solid lightgray;
-  margin: 5px;
+  box-shadow: rgba(0, 0, 0, 0.3) 0 1px 2px 0,
+                 rgba(0, 0, 0, 0.15) 0 2px 6px 2px;
+  background: white;
+  border-radius: 8px;
 }
 </style>
 

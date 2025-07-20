@@ -43,8 +43,8 @@
 #include "chrome/browser/ash/platform_keys/mock_platform_keys_service.h"
 #include "chrome/browser/ash/platform_keys/platform_keys_service.h"
 #include "chrome/browser/ash/platform_keys/platform_keys_service_factory.h"
-#include "chrome/browser/chromeos/platform_keys/platform_keys.h"
 #include "chromeos/ash/components/dbus/attestation/fake_attestation_client.h"
+#include "chromeos/ash/components/platform_keys/platform_keys.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_service.h"
 #include "components/prefs/testing_pref_service.h"
@@ -336,6 +336,7 @@ CertProvisioningClient::Error BackendError(
     em::CertProvBackendError::Error error) {
   em::CertProvBackendError backend_error;
   backend_error.set_error(error);
+  backend_error.set_debug_message("Test debug message");
   return {policy::DM_STATUS_SUCCESS, backend_error};
 }
 

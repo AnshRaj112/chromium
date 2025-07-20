@@ -166,7 +166,7 @@ class MODULES_EXPORT CanvasRenderingContext2D final
     }
 
     int buffer_count = 0;
-    auto* provider = canvas()->GetResourceProviderForCanvas2D();
+    auto* provider = GetResourceProviderForCanvas2D();
     if (provider) {
       buffer_count = 1;
       if (provider->IsAccelerated()) {
@@ -201,6 +201,7 @@ class MODULES_EXPORT CanvasRenderingContext2D final
 
   sk_sp<PaintFilter> StateGetFilter() final;
 
+  void PreFinalizeFrame() override;
   void FinalizeFrame(FlushReason) override;
 
   void drawElement(Element* element,
@@ -265,10 +266,14 @@ class MODULES_EXPORT CanvasRenderingContext2D final
 
   CanvasResourceProvider* GetOrCreateCanvas2DResourceProvider() override;
   CanvasResourceProvider* GetResourceProviderForCanvas2D() const override;
+  void SetCanvas2DResourceProviderForTesting(
+      std::unique_ptr<CanvasResourceProvider> provider,
+      const gfx::Size& size);
 
  protected:
   HTMLCanvasElement* HostAsHTMLCanvasElement() const final;
   UniqueFontSelector* GetFontSelector() const final;
+  void SizeChanged() final;
 
   bool WritePixels(const SkImageInfo& orig_info,
                    const void* pixels,
@@ -285,6 +290,8 @@ class MODULES_EXPORT CanvasRenderingContext2D final
   friend class CanvasRenderingContext2DTestBase;
   FRIEND_TEST_ALL_PREFIXES(CanvasRenderingContext2DTestAccelerated,
                            PrepareMailboxWhenContextIsLostWithFailedRestore);
+
+  std::unique_ptr<CanvasResourceProvider> CreateCanvasResourceProvider();
 
   void EnableAccelerationIfPossible() override;
 
@@ -323,11 +330,18 @@ class MODULES_EXPORT CanvasRenderingContext2D final
 
   std::unique_ptr<CanvasResourceProvider> ReplaceResourceProviderForCanvas2D(
       std::unique_ptr<CanvasResourceProvider>) override;
+  void DropAndRecreateExistingCanvas2DResourceProvider() override;
+
+  CanvasResourceProvider* RecreateCanvasResourceProviderForCanvas2D();
 
   FilterOperations filter_operations_;
   HashMap<String, FontDescription> fonts_resolved_using_current_style_;
   bool should_prune_local_font_cache_;
   LinkedHashSet<String> font_lru_list_;
+
+  // `did_fail_to_create_resource_provider_` prevents repeated attempts in
+  // allocating resources after the first attempt failed.
+  bool did_fail_to_create_resource_provider_ = false;
 
   // For privacy reasons we need to delay contextLost events until the page is
   // visible. In order to do this we will hold on to a bool here

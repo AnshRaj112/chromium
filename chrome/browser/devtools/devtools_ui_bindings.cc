@@ -780,8 +780,7 @@ DevToolsUIBindings::DevToolsUIBindings(content::WebContents* web_contents)
 }
 
 DevToolsUIBindings::~DevToolsUIBindings() {
-  if (base::FeatureList::IsEnabled(::features::kDevToolsVeLogging) &&
-      !session_id_for_logging_.is_empty()) {
+  if (!session_id_for_logging_.is_empty()) {
     metrics::structured::StructuredMetricsClient::Record(
         metrics::structured::events::v2::dev_tools::SessionEnd()
             .SetTrigger(delegate_->GetClosedByForLogging())
@@ -1806,9 +1805,8 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
   response_dict.Set("devToolsWellKnown", std::move(devtools_well_known_dict));
 
   base::Value::Dict ve_logging_dict;
-  ve_logging_dict.Set(
-      "enabled", base::FeatureList::IsEnabled(::features::kDevToolsVeLogging));
-  ve_logging_dict.Set("testing", ::features::kDevToolsVeLoggingTesting.Get());
+  ve_logging_dict.Set("enabled", true);
+  ve_logging_dict.Set("testing", false);
   response_dict.Set("devToolsVeLogging", std::move(ve_logging_dict));
 
   response_dict.Set("isOffTheRecord", profile_->IsOffTheRecord());
@@ -1881,6 +1879,14 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
                       std::move(devtools_ip_protection_dict));
   }
 
+  if (net::features::kIpPrivacyEnableIppPanelInDevTools.Get()) {
+    base::Value::Dict devtools_ip_protection_panel_dict;
+    devtools_ip_protection_panel_dict.Set(
+        "enabled", net::features::kIpPrivacyEnableIppPanelInDevTools.Get());
+    response_dict.Set("devToolsIpProtectionPanelInDevTools",
+                      std::move(devtools_ip_protection_panel_dict));
+  }
+
   base::Value::Dict deep_links_via_extensibility_api_dict;
   deep_links_via_extensibility_api_dict.Set(
       "enabled",
@@ -1895,6 +1901,13 @@ void DevToolsUIBindings::GetHostConfig(DispatchCallback callback) {
                      ::features::kDevToolsAiGeneratedTimelineLabels));
   response_dict.Set("devToolsAiGeneratedTimelineLabels",
                     std::move(ai_generated_timeline_labels_dict));
+
+  base::Value::Dict devtools_force_popover_dict;
+  devtools_force_popover_dict.Set(
+      "enabled", base::FeatureList::IsEnabled(
+                     blink::features::kDevToolsAllowPopoverForcing));
+  response_dict.Set("devToolsAllowPopoverForcing",
+                    std::move(devtools_force_popover_dict));
 
   base::Value::Dict flexible_layout_dict;
   flexible_layout_dict.Set(
@@ -2022,10 +2035,7 @@ void DevToolsUIBindings::RecordUserMetricsAction(const std::string& name) {
   base::RecordComputedAction(name);
 }
 
-bool DevToolsUIBindings::MaybeStartLogging() {
-  if (!base::FeatureList::IsEnabled(::features::kDevToolsVeLogging)) {
-    return false;
-  }
+void DevToolsUIBindings::MaybeStartLogging() {
   if (session_id_for_logging_.is_empty()) {
     session_id_for_logging_ = base::UnguessableToken::Create();
     session_start_time_ = base::TimeTicks::Now();
@@ -2062,7 +2072,6 @@ bool DevToolsUIBindings::MaybeStartLogging() {
             .SetSessionId(session_id_for_logging_.GetLowForSerialization())
             .SetIsSignedIn(is_signed_in));
   }
-  return true;
 }
 
 base::TimeDelta DevToolsUIBindings::GetTimeSinceSessionStart() {

@@ -205,10 +205,8 @@ void BackForwardCacheBrowserTest::SetUpCommandLine(
 #endif
     // Allow BackForwardCache for all devices regardless of their memory.
     DisableFeature(features::kBackForwardCacheMemoryControls);
-    // Disables BackForwardCache cache size overwritten by
-    // `content::kBackForwardCacheSize`, as many browser tests here assume
-    // specific or smaller cache size (e.g. 1) rather than 6.
-    DisableFeature(kBackForwardCacheSize);
+    // Many browser tests assume a cache size of 1.
+    EnableCacheSize(1, std::nullopt);
 
     SetupFeaturesAndParameters();
 
@@ -218,6 +216,7 @@ void BackForwardCacheBrowserTest::SetUpCommandLine(
     // Unfortunately needed for one test on slow bots, TextInputStateUpdated,
     // where deferred commits delays input too much.
     command_line->AppendSwitch(blink::switches::kAllowPreCommitInput);
+    ContentBrowserTest::SetUpCommandLine(command_line);
 }
 
 void BackForwardCacheBrowserTest::SetUpInProcessBrowserTestFixture() {
@@ -246,11 +245,39 @@ void BackForwardCacheBrowserTest::EnableFeatureAndSetParams(
     const base::Feature& feature,
     std::string param_name,
     std::string param_value) {
+  const auto& it = features_with_params_.find(feature);
+  if (it != features_with_params_.end()) {
+    // If the feature-param has been set already, do not update it.
+    if (it->second.contains(param_name)) {
+      return;
+    }
+  }
   features_with_params_[feature][param_name] = param_value;
 }
 
 void BackForwardCacheBrowserTest::DisableFeature(const base::Feature& feature) {
+  if (features_with_params_.contains(feature)) {
+    // If the feature has been explicitly enabled, ignore any subsequent
+    // disables.
+    return;
+  }
   disabled_features_.push_back(feature);
+}
+
+void BackForwardCacheBrowserTest::EnableCacheSize(
+    std::optional<int> cache_size,
+    std::optional<int> foreground_cache_size) {
+  if (cache_size) {
+    EnableFeatureAndSetParams(content::kBackForwardCacheSize,
+                              kBackForwardCacheSizeCacheSize.name,
+                              base::NumberToString(cache_size.value()));
+  }
+  if (foreground_cache_size) {
+    EnableFeatureAndSetParams(
+        content::kBackForwardCacheSize,
+        kBackForwardCacheSizeForegroundCacheSize.name,
+        base::NumberToString(foreground_cache_size.value()));
+  }
 }
 
 void BackForwardCacheBrowserTest::SetUpOnMainThread() {
@@ -776,8 +803,7 @@ IN_PROC_BROWSER_TEST_F(BackForwardCacheBrowserTest, ResponseHeaders) {
 
 void HighCacheSizeBackForwardCacheBrowserTest::SetUpCommandLine(
     base::CommandLine* command_line) {
-  EnableFeatureAndSetParams(features::kBackForwardCache, "cache_size",
-                            base::NumberToString(kBackForwardCacheSize));
+  EnableCacheSize(kBackForwardCacheSize, std::nullopt);
   BackForwardCacheBrowserTest::SetUpCommandLine(command_line);
 }
 
@@ -3021,8 +3047,7 @@ class BackForwardCacheWithSubframeNavigationBrowserTest
   }
 
   void SetUpCommandLine(base::CommandLine* command_line) override {
-    EnableFeatureAndSetParams(features::kBackForwardCache, "cache_size",
-                              base::NumberToString(2));
+    EnableCacheSize(2, std::nullopt);
     BackForwardCacheBrowserTest::SetUpCommandLine(command_line);
   }
 

@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">PDF failus galite atsisiųsti čia</translation>
 <translation id="107147699690128016">Jei pakeisite failo plėtinį, failas gali būti atidaromas naudojant kitą programą ir galimai pakenkti įrenginiui.</translation>
 <translation id="1080365971383768617">Slaptažodžiai visuose jūsų įrenginiuose</translation>
-<translation id="1087176310396019910">Galimas šlamštas</translation>
 <translation id="1087799850623149508">Palietę ir palaikę galite perkelti adreso juostą į apačią</translation>
 <translation id="1089606299949659462">Peržiūra baigta!</translation>
 <translation id="1094555143448724771">Jei norite peržiūrėti kitų įrenginių skirtukus, sinchronizuokite skirtukus ir istoriją</translation>
@@ -109,6 +108,7 @@ Jei reikia daugiau nustatymų, pagal kuriuos duomenys naudojami „Chrome“ fun
 <translation id="1419753403124156396">Iš naujo paleisti „Chrome“?</translation>
 <translation id="1428770807407000502">Išjungti sinchronizavimą?</translation>
 <translation id="1430915738399379752">Spausdinti</translation>
+<translation id="1433478348197382180">Skaitymo režimas</translation>
 <translation id="1435593198351412143">Automatinis PDF failų atidarymas</translation>
 <translation id="1437543266176261764">Vykdoma programoje „<ph name="APP_NAME" />“</translation>
 <translation id="1448440926884431741">Tvarkykite stebimus produktus Žymėse</translation>
@@ -720,6 +720,7 @@ Tik jūsų slaptafrazę turintis asmuo galės perskaityti šifruotus duomenis. S
 <translation id="4306489587293957491">Klavišas „Enter“</translation>
 <translation id="4307992518367153382">Pagrindai</translation>
 <translation id="4311652497846705514">Atidaryti PDF?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Galimas šlamštas}one{Galimas šlamštas (#)}few{Galimas šlamštas (#)}many{Galimas šlamštas (#)}other{Galimas šlamštas (#)}}</translation>
 <translation id="4320177379694898372">Nėra interneto ryšio</translation>
 <translation id="4326079409704643112">Jei norite naudoti ir išsaugoti „Chrome“ duomenis „Google“ paskyroje, patvirtinkite savo tapatybę</translation>
 <translation id="433213510553688132">Stebima...</translation>
@@ -1058,6 +1059,7 @@ Adresu <ph name="BEGIN_LINK" />myactivity.google.com<ph name="END_LINK" /> gali 
 <translation id="580893287573699959">Tvarkykite dominančias temas ir svetaines</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{Prieš 1 valandą}one{Prieš # valandą}few{Prieš # valandas}many{Prieš # valandos}other{Prieš # valandų}}</translation>
 <translation id="5810288467834065221">Autorių teisės „Google LLC.“, <ph name="YEAR" /> m. Visos teisės saugomos.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Pranešimo rodymas}one{Pranešimų rodymas}few{Pranešimų rodymas}many{Pranešimų rodymas}other{Pranešimų rodymas}}</translation>
 <translation id="5814749351757353073">Stebėkite mėgstamiausias svetaines</translation>
 <translation id="5823093032261493462">Ar vis tiek norite atsisiųsti „<ph name="FILE_NAME" />“ iš „<ph name="DOWNLOAD_DOMAIN" />“?</translation>
 <translation id="5828921839638612740">Duomenis galite ištrinti „Chrome“ nustatymų“ skiltyje</translation>
@@ -1168,6 +1170,7 @@ Pavyzdžiui, kai kurios svetainės gali atsakyti į šią užklausą rodydamos j
 <translation id="6255809143828972562">Naudodami „Chrome“ įrankius galite saugiai naršyti ir valdyti situaciją</translation>
 <translation id="6264376385120300461">Vis tiek atsisiųsti</translation>
 <translation id="6264485186158353794">Grįžti prie saugumo</translation>
+<translation id="6267063201726531683">Teksto persk. r. apat. lap.</translation>
 <translation id="6277522088822131679">Spausdinant puslapį kilo problema. Bandykite dar kartą.</translation>
 <translation id="6278428485366576908">Tema</translation>
 <translation id="6284472661216707937">Slaptažodžiai visuose jūsų įrenginiuose uždaryti</translation>
@@ -1191,7 +1194,6 @@ Pavyzdžiui, kai kurios svetainės gali atsakyti į šią užklausą rodydamos j
 <translation id="6342069812937806050">Ką tik</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 ir dar <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}one{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 ir dar <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}few{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 ir dar <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}many{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 ir dar <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 ir dar <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}}</translation>
 <translation id="6345878117466430440">Žymėti kaip skaitytą</translation>
-<translation id="6347010704471250799">Pranešimo rodymas</translation>
 <translation id="6356893102071098867">Patikrinkite, ar pasirinkote tinkamą paskyrą</translation>
 <translation id="6363990818884053551">Jei norite pradėti sinchronizuoti, patvirtinkite savo tapatybę</translation>
 <translation id="6364438453358674297">Pašalinti pasiūlymą iš istorijos?</translation>

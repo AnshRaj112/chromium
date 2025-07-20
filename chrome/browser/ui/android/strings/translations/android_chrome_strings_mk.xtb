@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">Може да преземате PDF-датотеки овде</translation>
 <translation id="107147699690128016">Ако ја промените наставката на датотеката, таа може да се отвори во друга апликација и да стане потенцијална опасност за вашиот уред.</translation>
 <translation id="1080365971383768617">Лозинки на сите ваши уреди</translation>
-<translation id="1087176310396019910">Можен спам</translation>
 <translation id="1087799850623149508">Може да допрете и да задржите за да ја преместите лентата за адреса најдолу</translation>
 <translation id="1089606299949659462">Прегледот е завршен!</translation>
 <translation id="1094555143448724771">За да ги гледате картичките од другите ваши уреди, синхронизирајте ги вашите картички и историја</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">Да се рестартира Chrome?</translation>
 <translation id="1428770807407000502">Да се исклучи синхронизацијата?</translation>
 <translation id="1430915738399379752">Печати</translation>
+<translation id="1433478348197382180">Режим на читање</translation>
 <translation id="1435593198351412143">Отворај ги PDF-датотеките автоматски</translation>
 <translation id="1437543266176261764">Се извршува во <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">Организирајте ги следените производи во „Обележувачи“</translation>
@@ -720,6 +720,7 @@
 <translation id="4306489587293957491">Внеси</translation>
 <translation id="4307992518367153382">Основи</translation>
 <translation id="4311652497846705514">Да се отвори PDF-датотеката?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Можен спам}one{Можен спам (#)}other{Можен спам (#)}}</translation>
 <translation id="4320177379694898372">Нема интернет поврзување</translation>
 <translation id="4326079409704643112">За да користите и зачувувате податоци од Chrome во вашата сметка на Google, потврдете го вашиот идентитет</translation>
 <translation id="433213510553688132">Се следи…</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">Управувајте со темите и сајтовите што ве интересираат</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{Пред # час}one{Пред # час}other{Пред # часа}}</translation>
 <translation id="5810288467834065221">Авторски права <ph name="YEAR" /> Google LLC. Сите права се задржани.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Прикажи го известувањето}one{Прикажи ги известувањата}other{Прикажи ги известувањата}}</translation>
 <translation id="5814749351757353073">Следете ги новостите на омилените сајтови</translation>
 <translation id="5823093032261493462">Дали сепак сакате да ја преземете датотеката „<ph name="FILE_NAME" />“ од <ph name="DOWNLOAD_DOMAIN" />?</translation>
 <translation id="5828921839638612740">Податоците може да ги избришете во „Поставки за Chrome“</translation>
@@ -1168,6 +1170,7 @@
 <translation id="6255809143828972562">Со алатките од Chrome, може да прелистувате безбедно и да ја контролирате ситуацијата</translation>
 <translation id="6264376385120300461">Сепак преземи</translation>
 <translation id="6264485186158353794">Назад во безбедност</translation>
+<translation id="6267063201726531683">Долен лист со режим за чит.</translation>
 <translation id="6277522088822131679">Настана проблем при печатење на страницата. Обидете се повторно.</translation>
 <translation id="6278428485366576908">Тема</translation>
 <translation id="6284472661216707937">Лозинките на сите ваши уреди се затворени</translation>
@@ -1191,7 +1194,6 @@
 <translation id="6342069812937806050">Пред малку</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />… и уште <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}one{<ph name="SHIPPING_ADDRESS_PREVIEW" />… и уште <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />… и уште <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}}</translation>
 <translation id="6345878117466430440">Означи како прочитано</translation>
-<translation id="6347010704471250799">Прикажувај известувања</translation>
 <translation id="6356893102071098867">Погрижете се да ја изберете точната сметка</translation>
 <translation id="6363990818884053551">За да започне синхронизацијата, потврдете дека сте вие</translation>
 <translation id="6364438453358674297">Да се отстрани предлогот од историјата?</translation>

@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">Կարող եք ներբեռնել PDF ֆայլերն այստեղ</translation>
 <translation id="107147699690128016">Եթե փոխեք ընդլայնումը, ֆայլը կարող է բացվել այլ հավելվածով և վնասել ձեր սարքը:</translation>
 <translation id="1080365971383768617">Գաղտնաբառերը ձեր բոլոր սարքերում</translation>
-<translation id="1087176310396019910">Հնարավոր սպամ</translation>
 <translation id="1087799850623149508">Հպեք և պահեք՝ հասցեագոտին ներքև տեղափոխելու համար</translation>
 <translation id="1089606299949659462">Ստուգումն ավարտված է</translation>
 <translation id="1094555143448724771">Ձեր մյուս սարքերի ներդիրները տեսնելու համար համաժամացրեք ձեր ներդիրներն ու պատմությունը</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">Վերագործարկե՞լ Chrome-ը</translation>
 <translation id="1428770807407000502">Անջատե՞լ համաժամացումը</translation>
 <translation id="1430915738399379752">Տպում</translation>
+<translation id="1433478348197382180">Ընթերցման ռեժիմ</translation>
 <translation id="1435593198351412143">Ավտոմատ բացել PDF ֆայլերը</translation>
 <translation id="1437543266176261764">Կատարվում է <ph name="APP_NAME" />-ում</translation>
 <translation id="1448440926884431741">Էջանիշներում դասավորեք ապրանքները, որոնց հետևում եք</translation>
@@ -187,7 +187,7 @@
 <translation id="1829244130665387512">Գտնել էջում</translation>
 <translation id="1832459821645506983">Այո, թույլատրել</translation>
 <translation id="1845958458910716240">Ձեր տվյալները պաշտպանելու համար թույլ տվեք Chrome-ին հեռացնել թույլտվություններն այն կայքերից, որոնք վերջին ժամանակահատվածում չեք այցելել</translation>
-<translation id="1850996571200618383">{NUM_REVOKED_PERMISSIONS,plural, =1{Chrome-ը դադարեցրել է ծանուցումներ ուղարկել այս կայքից։ Դիտեք և կառավարեք կարգավորումները։}one{Chrome-ը դադարեցրել է ծանուցումներ ուղարկել այս կայքից։ Դիտեք և կառավարեք կարգավորումները։}other{Chrome-ը դադարեցրել է ծանուցումներ ուղարկել այս կայքերից։ Դիտեք և կառավարեք կարգավորումները։}}</translation>
+<translation id="1850996571200618383">{NUM_REVOKED_PERMISSIONS,plural, =1{Chrome-ը դադարեցրել է ծանուցումներն այս կայքից։ Դուք կարող եք ստուգել և փոփոխել կարգավորումները։}one{Chrome-ը դադարեցրել է ծանուցումներն այս կայքից։ Դուք կարող եք ստուգել և փոփոխել կարգավորումները։}other{Chrome-ը դադարեցրել է ծանուցումներն այս կայքից։ Դուք կարող եք ստուգել և փոփոխել կարգավորումները։}}</translation>
 <translation id="1871098866036088250">Բացել Chrome դիտարկիչում</translation>
 <translation id="1877026089748256423">Chrome-ը հնացած է</translation>
 <translation id="1877073879466606884">Պրոֆիլը, որը մուտք եք գործել, կառավարվող է։ Ձեր ադմինիստրատորը կարող է հեռակա կարգով փոխել պրոֆիլի կարգավորումները, վերլուծել դիտարկիչի մասին տեղեկությունները հաշվետվությունների միջոցով և կատարել այլ անհրաժեշտ առաջադրանքներ։</translation>
@@ -720,6 +720,7 @@
 <translation id="4306489587293957491">Մուտքագրեք</translation>
 <translation id="4307992518367153382">Հիմնական</translation>
 <translation id="4311652497846705514">Բացե՞լ PDF ֆայլը</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Հնարավոր սպամ}one{Հնարավոր սպամ (#)}other{Հնարավոր սպամ (#)}}</translation>
 <translation id="4320177379694898372">Համացանցի կապակցում չկա</translation>
 <translation id="4326079409704643112">Հաստատեք ձեր ինքնությունը՝ Chrome-ի տվյալները ձեր Google հաշվում օգտագործելու և պահելու համար</translation>
 <translation id="433213510553688132">Բաժանորդագրում…</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">Կառավարեք ձեզ հետաքրքրող թեմաները և որոնման հարցումները</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# ժամ առաջ}one{# ժամ առաջ}other{# ժամ առաջ}}</translation>
 <translation id="5810288467834065221">© Google LLC <ph name="YEAR" />։ Բոլոր իրավունքները պահպանված են:</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Ցույց տալ ծանուցումը}one{Ցույց տալ ծանուցումը}other{Ցույց տալ ծանուցումները}}</translation>
 <translation id="5814749351757353073">Բաժանորդագրվեք ձեր սիրած կայքերին</translation>
 <translation id="5823093032261493462">Ներբեռնե՞լ «<ph name="FILE_NAME" />» ֆայլը <ph name="DOWNLOAD_DOMAIN" /> կայքից</translation>
 <translation id="5828921839638612740">Տվյալները կարող եք ջնջել Chrome-ի կարգավորումներում</translation>
@@ -1168,6 +1170,7 @@
 <translation id="6255809143828972562">Chrome-ի գործիքների միջոցով դուք կարող եք ապահով դիտարկել և կառավարել կարգավորումները</translation>
 <translation id="6264376385120300461">Ներբեռնել</translation>
 <translation id="6264485186158353794">Վերադառնալ անվտանգության</translation>
+<translation id="6267063201726531683">Ընթերց․ ռեժիմի ներքևի էկրան</translation>
 <translation id="6277522088822131679">Այս էջը տպելիս խնդիր առաջացավ: Նորից փորձեք:</translation>
 <translation id="6278428485366576908">Թեմա</translation>
 <translation id="6284472661216707937">«Գաղտնաբառերը ձեր բոլոր սարքերում» պատուհանը փակված է</translation>
@@ -1191,7 +1194,6 @@
 <translation id="6342069812937806050">Հենց նոր</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 ու առաքման ևս <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> հասցե}one{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 ու առաքման ևս <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> հասցե}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 ու առաքման ևս <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> հասցե}}</translation>
 <translation id="6345878117466430440">Նշել որպես կարդացված</translation>
-<translation id="6347010704471250799">Ցուցադրել ծանուցում</translation>
 <translation id="6356893102071098867">Համոզվեք, որ ընտրել եք ճիշտ հաշիվը</translation>
 <translation id="6363990818884053551">Համաժամացումը սկսելու համար հաստատեք ձեր ինքնությունը</translation>
 <translation id="6364438453358674297">Հեռացնե՞լ առաջարկը պատմությունից:</translation>

@@ -562,7 +562,7 @@ public final class ProductionSupportedFlagList {
                 "If enabled, allows navigations to be queued when there is "
                         + "an existing pending commit navigation in progress."),
         Flag.baseFeature(
-                ContentFeatures.RENDER_DOCUMENT,
+                AwFeatures.WEBVIEW_RENDER_DOCUMENT,
                 "If enabled, same-site navigations will change RenderFrameHosts"),
         Flag.baseFeature(
                 ContentFeatures.RENDER_DOCUMENT_COMPOSITOR_REUSE,
@@ -871,7 +871,6 @@ public final class ProductionSupportedFlagList {
         Flag.baseFeature(
                 AwFeatures.WEBVIEW_HYPERLINK_CONTEXT_MENU,
                 "Enables hyperlink context menu in WebView"),
-        Flag.baseFeature("MojoUseBinder"),
         Flag.baseFeature(
                 ContentFeatures.WEB_PERMISSIONS_API, "Enables navigator.permissions.query()"),
         Flag.baseFeature(
@@ -916,9 +915,6 @@ public final class ProductionSupportedFlagList {
         Flag.baseFeature(
                 ContentFeatures.IGNORE_DUPLICATE_NAVS,
                 "Ignore duplicate navigations, keeping the older navigations instead."),
-        Flag.baseFeature(
-                "AllowSensorsToEnterBfcache",
-                "Allow pages with sensors to enter back/forward cache."),
         Flag.baseFeature("OverrideAPIKey"),
         Flag.baseFeature(
                 "RustyPng", "When enabled, uses Rust `png` crate to decode and encode PNG images."),

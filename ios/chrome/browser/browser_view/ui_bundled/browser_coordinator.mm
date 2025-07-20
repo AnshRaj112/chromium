@@ -394,6 +394,7 @@ enum class ToolbarKind {
     PolicyChangeCommands,
     PreloadControllerDelegate,
     QuickDeleteCommands,
+    ReaderModeCommands,
     ReadingListCoordinatorDelegate,
     RecentTabsCoordinatorDelegate,
     ReminderNotificationsCommands,
@@ -2369,7 +2370,7 @@ enum class ToolbarKind {
     return;
   }
 
-  BOOL canShowTabStrip = IsRegularXRegularSizeClass(self.viewController);
+  BOOL canShowTabStrip = CanShowTabStrip(self.viewController);
 
   UIView* contentArea = self.browserContainerCoordinator.viewController.view;
   UIView* snapshotView = nil;
@@ -2507,12 +2508,10 @@ enum class ToolbarKind {
 }
 
 - (void)showAddAccountWithAccessPoint:(signin_metrics::AccessPoint)accessPoint {
-  if (_signinCoordinator) {
-    // The browser agent may trigger the add account any time in case of network
-    // delay. Early return ensure we don’t interrupt the sign-in operation the
-    // user is currently doing.
-    return;
-  }
+  // In case of double-tap, we must stop the first coordinator. This may occur
+  // because, up to iOS 18, the view may have disappeared without calling the
+  // signin completion. See crbug.com/395959814
+  [_signinCoordinator stop];
   SigninContextStyle contextStyle = SigninContextStyle::kDefault;
   _signinCoordinator = [SigninCoordinator
       addAccountCoordinatorWithBaseViewController:self.viewController
@@ -2527,6 +2526,11 @@ enum class ToolbarKind {
         [weakSelf stopSigninCoordinator];
       };
   [_signinCoordinator start];
+}
+
+- (void)performReauthToRetrieveTrustedVaultKey:
+    (syncer::TrustedVaultUserActionTriggerForUMA)trigger {
+  [self showTrustedVaultReauthForFetchKeysWithTrigger:trigger];
 }
 
 #pragma mark - ContextualPanelEntrypointIPHCommands
@@ -2727,6 +2731,17 @@ enum class ToolbarKind {
 #pragma mark - ReaderModeCommands
 
 - (void)showReaderMode {
+  web::WebState* activeWebState = self.activeWebState;
+  if (!activeWebState) {
+    return;
+  }
+  ReaderModeTabHelper* readerModeTabHelper =
+      ReaderModeTabHelper::FromWebState(activeWebState);
+  if (!readerModeTabHelper->IsActive()) {
+    readerModeTabHelper->SetActive(true);
+    return;
+  }
+
   if (_readerModeCoordinator) {
     // If the Reader mode UI is already presented then there is nothing to do.
     return;
@@ -2738,6 +2753,17 @@ enum class ToolbarKind {
 }
 
 - (void)hideReaderMode {
+  web::WebState* activeWebState = self.activeWebState;
+  if (!activeWebState) {
+    return;
+  }
+  ReaderModeTabHelper* readerModeTabHelper =
+      ReaderModeTabHelper::FromWebState(activeWebState);
+  if (readerModeTabHelper->IsActive()) {
+    readerModeTabHelper->SetActive(false);
+    return;
+  }
+
   if (!_readerModeCoordinator) {
     // If the Reader mode UI is already dismissed then there is nothing to do.
     return;
@@ -2966,8 +2992,8 @@ enum class ToolbarKind {
   [_BWGCoordinator start];
 }
 
-- (void)dismissBWGFlow {
-  [_BWGCoordinator stop];
+- (void)dismissBWGFlowWithCompletion:(ProceduralBlock)completion {
+  [_BWGCoordinator stopWithCompletion:completion];
   _BWGCoordinator = nil;
 }
 
@@ -3785,6 +3811,10 @@ enum class ToolbarKind {
 #pragma mark - SyncPresenter (Public)
 
 - (void)showPrimaryAccountReauth {
+  // In case of double-tap, we must stop the first coordinator. This may occur
+  // because, up to iOS 18, the view may have disappeared without calling the
+  // signin completion. See crbug.com/395959814
+  [_signinCoordinator stop];
   signin_metrics::PromoAction promoAction =
       signin_metrics::PromoAction::PROMO_ACTION_NO_SIGNIN_PROMO;
   signin_metrics::AccessPoint accessPoint =
@@ -3858,6 +3888,10 @@ enum class ToolbarKind {
 #pragma mark - ReSigninPresenter
 
 - (void)showReSignin {
+  // In case of double-tap, we must stop the first coordinator. This may occur
+  // because, up to iOS 18, the view may have disappeared without calling the
+  // signin completion. See crbug.com/395959814
+  [_signinCoordinator stop];
   signin_metrics::AccessPoint accessPoint =
       signin_metrics::AccessPoint::kResigninInfobar;
   signin_metrics::PromoAction promoAction =
@@ -3883,6 +3917,10 @@ enum class ToolbarKind {
 #pragma mark - SigninPresenter
 
 - (void)showSignin:(ShowSigninCommand*)command {
+  // The sign-in coordinator may be a resignin, in which case, up to iOS18, the
+  // view may be dismissed without the signinCompletion being called. See
+  // crbug.com/395959814.
+  [_signinCoordinator stop];
   _signinCoordinator =
       [SigninCoordinator signinCoordinatorWithCommand:command
                                               browser:self.browser
@@ -3960,8 +3998,7 @@ enum class ToolbarKind {
 
   NewTabPageTabHelper* NTPHelper = NewTabPageTabHelper::FromWebState(webState);
   if (NTPHelper && NTPHelper->IsActive()) {
-    const BOOL canShowTabStrip =
-        IsRegularXRegularSizeClass(self.viewController);
+    const BOOL canShowTabStrip = CanShowTabStrip(self.viewController);
     const BOOL isSplitToolbarMode = IsSplitToolbarMode(self.viewController);
     // If the NTP is active, then it's used as the base view for snapshotting.
     // When the tab strip is visible, the toolbars are not splitted or for the

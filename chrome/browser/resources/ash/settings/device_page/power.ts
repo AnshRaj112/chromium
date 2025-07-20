@@ -15,6 +15,7 @@ import '../controls/settings_toggle_button.js';
 import '../settings_shared.css.js';
 import './power_optimized_charging_dialog.js';
 
+import {CrPolicyPrefMixin} from '/shared/settings/controls/cr_policy_pref_mixin.js';
 import {PrefsMixin} from '/shared/settings/prefs/prefs_mixin.js';
 import type {CrButtonElement} from 'chrome://resources/ash/common/cr_elements/cr_button/cr_button.js';
 import {I18nMixin} from 'chrome://resources/ash/common/cr_elements/i18n_mixin.js';
@@ -36,7 +37,7 @@ import type {Route} from '../router.js';
 import {routes} from '../router.js';
 
 import type {BatteryStatus, DevicePageBrowserProxy, PowerManagementSettings, PowerSource} from './device_page_browser_proxy.js';
-import {DevicePageBrowserProxyImpl, IdleBehavior, LidClosedBehavior} from './device_page_browser_proxy.js';
+import {DevicePageBrowserProxyImpl, IdleBehavior, LidClosedBehavior, OptimizedChargingStrategy} from './device_page_browser_proxy.js';
 import {getTemplate} from './power.html.js';
 
 interface IdleOption {
@@ -54,10 +55,14 @@ export interface SettingsPowerElement {
   };
 }
 
-const SettingsPowerElementBase = DeepLinkingMixin(RouteObserverMixin(
-    PrefsMixin(WebUiListenerMixin(I18nMixin(PolymerElement)))));
+const SettingsPowerElementBase =
+    CrPolicyPrefMixin(DeepLinkingMixin(RouteObserverMixin(
+        PrefsMixin(WebUiListenerMixin(I18nMixin(PolymerElement))))));
 
 export class SettingsPowerElement extends SettingsPowerElementBase {
+  static readonly OPTIMIZED_CHARGING_STRATEGY_PREF_NAME =
+      'power.optimized_charging_strategy';
+
   static get is() {
     return 'settings-power';
   }
@@ -201,7 +206,7 @@ export class SettingsPowerElement extends SettingsPowerElementBase {
       optimizedChargingSublabel_: {
         type: String,
         computed:
-            'computeOptimizedChargingSublabel_(adaptiveChargingPref_.value, false)',
+            'computeOptimizedChargingSublabel_(selectedOptimizedChargingStrategy_)',
       },
 
       optimizedChargingHidden_: {
@@ -209,8 +214,20 @@ export class SettingsPowerElement extends SettingsPowerElementBase {
         computed:
             'computeOptimizedChargingHidden_(adaptiveChargingSupported_, batteryChargeLimitAvailable_)',
       },
+
+      selectedOptimizedChargingStrategy_: {
+        type: Number,
+        value: OptimizedChargingStrategy.STRATEGY_ADAPTIVE_CHARGING,
+      },
     };
   }
+
+  static get observers() {
+    return [
+      'optimizedChargingStrategyChanged_(prefs.power.optimized_charging_strategy.value)',
+    ];
+  }
+
 
   // DeepLinkingMixin override
   override supportedSettingIds = new Set<Setting>([
@@ -233,6 +250,7 @@ export class SettingsPowerElement extends SettingsPowerElementBase {
   private optimizedChargingSublabel_: string;
   private optimizedChargingHidden_: boolean;
   private optimizedChargingDialogVisible_: boolean;
+  private selectedOptimizedChargingStrategy_: OptimizedChargingStrategy;
   private batteryIdleManaged_: boolean;
   private batteryIdleOptions_: IdleOption[];
   private batterySaverHidden_: boolean;
@@ -341,15 +359,16 @@ export class SettingsPowerElement extends SettingsPowerElementBase {
   }
 
   private computeOptimizedChargingSublabel_(
-      adaptiveChargingEnabled: boolean, chargeLimitEnabled: boolean): string {
-    if (adaptiveChargingEnabled) {
-      return this.i18n('powerAdaptiveChargingLabel');
+      strategy: OptimizedChargingStrategy): string {
+    switch (strategy) {
+      case OptimizedChargingStrategy.STRATEGY_ADAPTIVE_CHARGING:
+        return this.i18n('powerAdaptiveChargingLabel');
+      case OptimizedChargingStrategy.STRATEGY_CHARGE_LIMIT:
+        return this.i18n('powerBatteryChargeLimitLabel');
+      default:
+        // Return empty string if no policy is selected.
+        return '';
     }
-    if (chargeLimitEnabled) {
-      return this.i18n('powerBatteryChargeLimitLabel');
-    }
-    // Return empty string if no policy is selected.
-    return '';
   }
 
   private computeOptimizedChargingHidden_(
@@ -574,6 +593,11 @@ export class SettingsPowerElement extends SettingsPowerElementBase {
     this.adaptiveChargingPref_ = adaptiveChargingPref;
     this.batterySaverFeatureEnabled_ =
         powerManagementSettings.batterySaverFeatureEnabled;
+  }
+
+  private optimizedChargingStrategyChanged_(
+      strategy: OptimizedChargingStrategy): void {
+    this.selectedOptimizedChargingStrategy_ = strategy;
   }
 
   /**

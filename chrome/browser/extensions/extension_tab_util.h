@@ -30,6 +30,7 @@ class BrowserWindowInterface;
 class ExtensionFunction;
 class GURL;
 class Profile;
+class TabListInterface;
 class TabStripModel;
 
 namespace content {
@@ -66,9 +67,9 @@ class ExtensionTabUtil {
 #endif
   static constexpr char kNoCurrentWindowError[] = "No current window";
   static constexpr char kWindowNotFoundError[] = "No window with id: *.";
-#if !BUILDFLAG(IS_ANDROID)
   static constexpr char kTabStripNotEditableError[] =
       "Tabs cannot be edited right now (user may be dragging a tab).";
+#if !BUILDFLAG(IS_ANDROID)
   static constexpr char kTabStripDoesNotSupportTabGroupsError[] =
       "Grouping is not supported by tabs in this window.";
 #endif
@@ -131,11 +132,6 @@ class ExtensionTabUtil {
 #endif
 
   static int GetWindowId(BrowserWindowInterface* browser);
-
-#if !BUILDFLAG(IS_ANDROID)
-  static int GetWindowIdOfTabStripModel(const TabStripModel* tab_strip_model);
-#endif  // !BUILDFLAG(IS_ANDROID)
-
   static int GetTabId(const content::WebContents* web_contents);
   static int GetWindowIdOfTab(const content::WebContents* web_contents);
 
@@ -177,7 +173,7 @@ class ExtensionTabUtil {
   static api::tabs::Tab CreateTabObject(content::WebContents* web_contents,
                                         ScrubTabBehavior scrub_tab_behavior,
                                         const Extension* extension,
-                                        TabStripModel* tab_strip,
+                                        TabListInterface* tab_list,
                                         int tab_index);
   // Creates a base::Value::Dict representing the window for the given
   // `browser`, and scrubs any privacy-sensitive data that `extension` does not
@@ -217,6 +213,12 @@ class ExtensionTabUtil {
                                    api::tabs::Tab* tab,
                                    ScrubTabBehavior scrub_tab_behavior);
 
+  // Populates `tab_list_interface` and `tab_index` for the tab indicated by
+  // the given `web_contents`. Returns true on success.
+  static bool GetTabListInterface(content::WebContents& web_contents,
+                                  TabListInterface** tab_list_out,
+                                  int* tab_index_out);
+
 #if !BUILDFLAG(IS_ANDROID)
   // Gets the `tab_strip_model` and `tab_index` for the given `web_contents`.
   static bool GetTabStripModel(const content::WebContents* web_contents,
@@ -243,10 +245,10 @@ class ExtensionTabUtil {
                          bool include_incognito,
                          content::WebContents** contents);
 
-#if !BUILDFLAG(IS_ANDROID)
   // Gets the extensions-specific Group ID.
   static int GetGroupId(const tab_groups::TabGroupId& id);
 
+#if !BUILDFLAG(IS_ANDROID)
   // Gets the window ID that the group belongs to.
   static int GetWindowIdOfGroup(const tab_groups::TabGroupId& id);
 
@@ -370,13 +372,20 @@ class ExtensionTabUtil {
   // contexts.
   static void ClearBackForwardCache();
 
-#if !BUILDFLAG(IS_ANDROID)
   // Check TabStripModel editability in every browser because a drag session
   // could be running in another browser that reverts to the current browser. Or
   // a drag could be mid-handoff if from one browser to another.
   static bool IsTabStripEditable();
 
+  // Retrieve the corresponding TabListInterface for the specified `browser` if
+  // and only if every browser's tab list is editable. See comments above
+  // IsTabStripEditable() for details.
+  static TabListInterface* GetEditableTabList(BrowserWindowInterface& browser);
+
+#if !BUILDFLAG(IS_ANDROID)
   // Retrieve a TabStripModel only if every browser is editable.
+  // TODO(https://crbug.com/430344931): Remove this in favor of
+  // GetEditableTabList().
   static TabStripModel* GetEditableTabStripModel(Browser* browser);
 
   static bool TabIsInSavedTabGroup(content::WebContents* contents,

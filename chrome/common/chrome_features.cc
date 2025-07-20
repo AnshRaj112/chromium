@@ -345,10 +345,27 @@ BASE_FEATURE(kGeoLanguage, "GeoLanguage", base::FEATURE_DISABLED_BY_DEFAULT);
 // Controls whether the actor component of Glic is enabled.
 BASE_FEATURE(kGlicActor, "GlicActor", base::FEATURE_ENABLED_BY_DEFAULT);
 
-// Controls whether the actor ui state manager is enabled.
-BASE_FEATURE(kGlicActorUiStateManager,
-             "GlicActorUiStateManager",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+// Controls whether the Actor UI components are enabled.
+BASE_FEATURE(kGlicActorUi, "GlicActorUi", base::FEATURE_DISABLED_BY_DEFAULT);
+
+const char kGlicActorUiTaskIconName[] = "glic-actor-ui-task-icon";
+const char kGlicActorUiOverlayName[] = "glic-actor-ui-overlay";
+const char kGlicActorUiOverlayMagicCursorName[] =
+    "glic-actor-ui-overlay-magic-cursor";
+const char kGlicActorUiToastName[] = "glic-actor-ui-toast";
+
+// Controls whether the task icon in the actor ui is enabled.
+const base::FeatureParam<bool> kGlicActorUiTaskIcon{
+    &kGlicActorUi, kGlicActorUiTaskIconName, false};
+// Controls whether the Actor Overlay in the actor ui is enabled.
+const base::FeatureParam<bool> kGlicActorUiOverlay{
+    &kGlicActorUi, kGlicActorUiOverlayName, false};
+// Controls whether the Magic Cursor in the Actor Overlay is enabled.
+const base::FeatureParam<bool> kGlicActorUiOverlayMagicCursor{
+    &kGlicActorUi, kGlicActorUiOverlayMagicCursorName, false};
+// Controls whether the toast in the actor ui is enabled.
+const base::FeatureParam<bool> kGlicActorUiToast{&kGlicActorUi,
+                                                 kGlicActorUiToastName, false};
 
 // Controls renderer tool observation timeout when waiting on local
 // (non-network) work.
@@ -359,10 +376,25 @@ const base::FeatureParam<base::TimeDelta> kGlicActorPageStabilityLocalTimeout{
 const base::FeatureParam<base::TimeDelta> kGlicActorPageStabilityTimeout{
     &kGlicActor, "glic-actor-page-stability-timeout", base::Seconds(10)};
 
-// Controls whether the task icon in the actor ui is enabled.
-BASE_FEATURE(kGlicActorTaskIcon,
-             "GlicActorTaskIcon",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+// An artificial delay before signalling the tools that the page has become
+// stable.
+const base::FeatureParam<base::TimeDelta>
+    kGlicActorPageStabilityInvokeCallbackDelay{
+        &kGlicActor, "glic-actor-page-stability-invoke-callback-delay",
+        base::Milliseconds(200)};
+
+// Controls whether typing happens incrementally.
+BASE_FEATURE(kGlicActorIncrementalTyping,
+             "GlicActorIncrementalTyping",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+const base::FeatureParam<base::TimeDelta> kGlicActorKeyDownDuration{
+    &kGlicActorIncrementalTyping,
+    "glic-actor-incremental-typing-key-down-duration", base::Milliseconds(5)};
+
+const base::FeatureParam<base::TimeDelta> kGlicActorKeyUpDuration{
+    &kGlicActorIncrementalTyping,
+    "glic-actor-incremental-typing-key-up-duration", base::Milliseconds(5)};
 
 #if BUILDFLAG(ENABLE_GLIC)
 // Controls whether the Glic feature is enabled.
@@ -420,17 +452,9 @@ const base::FeatureParam<int> kGlicScreenshotEncodeQuality{
 const base::FeatureParam<std::string> kGlicDefaultHotkey{
     &kGlic, "glic-default-hotkey", ""};
 
-BASE_FEATURE(kGlicURLConfig,
-             "GlicURLConfig",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kGlicURLConfig, "GlicURLConfig", base::FEATURE_ENABLED_BY_DEFAULT);
 const base::FeatureParam<std::string> kGlicGuestURL{
-    &kGlicURLConfig, "glic-guest-url",
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-    "https://gemini.google.com/glic"
-#else
-    ""
-#endif
-};
+    &kGlicURLConfig, "glic-guest-url", "https://gemini.google.com/glic"};
 
 BASE_FEATURE_PARAM(std::string,
                    kGlicUserStatusUrl,
@@ -491,21 +515,16 @@ BASE_FEATURE_PARAM(base::TimeDelta,
 
 BASE_FEATURE(kGlicFreURLConfig,
              "GlicFreURLConfig",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE_PARAM(std::string,
                    kGlicFreURL,
                    &kGlicFreURLConfig,
                    "glic-fre-url",
-#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-                   "https://gemini.google.com/glic/intro?"
-#else
-                   ""
-#endif
-);
+                   "https://gemini.google.com/glic/intro?");
 
 BASE_FEATURE(kGlicLearnMoreURLConfig,
              "GlicLearnMoreURLConfig",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 BASE_FEATURE_PARAM(std::string,
                    kGlicShortcutsLearnMoreURL,
                    &kGlicLearnMoreURLConfig,
@@ -538,14 +557,15 @@ BASE_FEATURE_PARAM(std::string,
                    "glic-settings-page-learn-more-url",
                    "");
 
-BASE_FEATURE(kGlicCSPConfig,
-             "GlicCSPConfig",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+BASE_FEATURE(kGlicCSPConfig, "GlicCSPConfig", base::FEATURE_ENABLED_BY_DEFAULT);
 // TODO(crbug.com/378951332): Set appropriate default.
 const base::FeatureParam<std::string> kGlicAllowedOriginsOverride{
     &kGlicCSPConfig, "glic-allowed-origins-override",
     // Space-delimited set of allowed origins.
-    "https://*.google.com"};
+    "https://gemini.google.com https://gemini-autopush.corp.google.com "
+    "https://gemini-preprod.corp.google.com "
+    "https://gemini-staging.corp.google.com https://gemini-dev.corp.google.com "
+    "https://www.google.com"};
 
 // Enable/disable Glic web client responsiveness check feature.
 BASE_FEATURE(kGlicClientResponsivenessCheck,
@@ -581,11 +601,11 @@ BASE_FEATURE(kGlicUseShaderCache,
 
 BASE_FEATURE(kGlicKeyboardShortcutNewBadge,
              "GlicKeyboardShortcutNewBadge",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGlicAppMenuNewBadge,
              "GlicAppMenuNewBadge",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGlicDebugWebview,
              "GlicDebugWebview",
@@ -600,11 +620,6 @@ const base::FeatureParam<bool> kGlicScrollToEnforceDocumentId{
 const base::FeatureParam<bool> kGlicScrollToPDF{&kGlicScrollTo,
                                                 "glic-scroll-to-pdf", false};
 
-// Controls whether the web client should resize itself to fit the window.
-BASE_FEATURE(kGlicSizingFitWindow,
-             "GlicSizingFitWindow",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kGlicWarming, "GlicWarming", base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGlicDisableWarming,
@@ -614,7 +629,7 @@ BASE_FEATURE(kGlicDisableWarming,
 // Controls the amount of time from the GlicButtonController scheduling
 // preload to the start of preloading (if preloading is possible).
 const base::FeatureParam<int> kGlicWarmingDelayMs{
-    &kGlicWarming, "glic-warming-delay-ms", 30 * 1000};
+    &kGlicWarming, "glic-warming-delay-ms", 20 * 1000};
 
 // Adds noise to the warming delay. The effective delay is increased by a
 // random positive number of milliseconds between 0 and kGlicWarmingJitterMs.
@@ -641,7 +656,7 @@ BASE_FEATURE(kGlicUserStatusCheck,
 
 BASE_FEATURE(kGlicClosedCaptioning,
              "GlicClosedCaptioning",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGlicUnloadOnClose,
              "GlicUnloadOnClose",
@@ -649,10 +664,6 @@ BASE_FEATURE(kGlicUnloadOnClose,
 
 BASE_FEATURE(kGlicApiActivationGating,
              "GlicApiActivationGating",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kGlicGetUserProfileInfoApiActivationGating,
-             "GlicGetUserProfileInfoApiActivationGating",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When enabled, don't try to update the views background color based on the
@@ -687,8 +698,6 @@ BASE_FEATURE(kGlicRecordActorJournal,
 BASE_FEATURE(kGlicWebClientUnresponsiveMetrics,
              "GlicWebClientUnresponsiveMetrics",
              base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kGlicTabGlow, "GlicTabGlow", base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGlicParameterizedShader,
              "GlicParameterizedShader",

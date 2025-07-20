@@ -44,13 +44,15 @@ enum class TextScaleType : uint8_t { kLengthAdjust, kFitText, kFitTextInline };
 // TODO(crbug.com/417306102): We should rename it.
 struct SvgFragmentData : public GarbageCollected<SvgFragmentData> {
  public:
-  void Trace(Visitor*) const {}
+  void Trace(Visitor* visitor) const { visitor->Trace(scaled_font); }
   bool IsSvg() const { return scale_type == TextScaleType::kLengthAdjust; }
 
   gfx::RectF rect;
   float length_adjust_scale;
   float angle;
   float baseline_shift;
+  // `scaled_font` is not used for SVG text.
+  Member<Font> scaled_font;
   bool in_text_path;
   TextScaleType scale_type;
 };
@@ -545,8 +547,9 @@ class CORE_EXPORT FragmentItem final {
   // LayoutSVGInlineText.
   const Font& ScaledFont() const;
 
-  // Returns a FitTextScale for text-grow / text-shrink.
-  FitTextScale GetFitTextScale() const;
+  // Returns a pair of text scaling factor and is_scaled_inline_only flag for
+  // text-grow and text-shrink properties.
+  std::pair<float, bool> GetFitTextScale() const;
 
   // Get a description of |this| for the debug purposes.
   String ToString() const;
@@ -606,7 +609,7 @@ class CORE_EXPORT FragmentItem final {
       const AffineTransform& length_adjust) const;
   AffineTransform BuildSvgTransformForLengthAdjust() const;
 
-  void SetFitTextScale(FitTextScale scale);
+  void SetFitTextScale(const FitTextScale* scale);
 
   // TODO(kojii): We can make them sub-classes if we need to make the vector of
   // pointers. Sub-classing from DisplayItemClient prohibits copying and that we

@@ -16,7 +16,8 @@ TEST(PaymentLinkValidatorTest, validUrls) {
       GURL("shopeepay://shopeepay.com.my?path=fake_path"),
       GURL("tngd://tngdigital.com.my?path=fake_path"),
       GURL("https://www.itmx.co.th/facilitated-payment/"
-           "prompt-pay?path=fake_path")};
+           "prompt-pay?path=fake_path"),
+      GURL("momo://app?path=fake_path")};
 
   for (const auto& link : kValidUrls) {
     EXPECT_NE(validator.GetScheme(link), PaymentLinkValidator::Scheme::kInvalid)
@@ -59,19 +60,17 @@ TEST(PaymentLinkValidatorTest, CaseSensitive) {
 }
 
 TEST(PaymentLinkValidatorTest, SanitizeForPaymentAppRetrieval) {
-  PaymentLinkValidator validator;
   GURL link(
       "https://www.itmx.co.th/facilitated-payment/prompt-pay?path=fake_path");
-  EXPECT_EQ(validator.SanitizeForPaymentAppRetrieval(link),
+  EXPECT_EQ(PaymentLinkValidator::SanitizeForPaymentAppRetrieval(link),
             GURL("https://www.itmx.co.th/facilitated-payment/prompt-pay"));
 }
 
 TEST(PaymentLinkValidatorTest, SanitizeForPaymentAppRetrieval_ExtraCase) {
-  PaymentLinkValidator validator;
   GURL link(
       "https://username:password@www.itmx.co.th:8080/facilitated-payment/"
       "prompt-pay?path=fake_path#anchor");
-  EXPECT_EQ(validator.SanitizeForPaymentAppRetrieval(link),
+  EXPECT_EQ(PaymentLinkValidator::SanitizeForPaymentAppRetrieval(link),
             GURL("https://www.itmx.co.th/facilitated-payment/prompt-pay"));
 }
 

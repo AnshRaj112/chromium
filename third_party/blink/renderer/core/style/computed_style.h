@@ -57,6 +57,7 @@
 #include "third_party/blink/renderer/core/style/filter_operations.h"
 #include "third_party/blink/renderer/core/style/font_size_style.h"
 #include "third_party/blink/renderer/core/style/gap_data_list.h"
+#include "third_party/blink/renderer/core/style/scroll_marker_group.h"
 #include "third_party/blink/renderer/core/style/style_cached_data.h"
 #include "third_party/blink/renderer/core/style/style_highlight_data.h"
 #include "third_party/blink/renderer/core/style/style_scrollbar_color.h"
@@ -1100,6 +1101,20 @@ class ComputedStyle final : public ComputedStyleBase {
     return (GridAutoFlowInternal() &
             static_cast<int>(kInternalAutoFlowAlgorithmDense)) ==
            kInternalAutoFlowAlgorithmDense;
+  }
+
+  // grid-template-*
+  const ComputedGridTrackList& GridTemplateColumns() const {
+    return ComputedGridTemplate(
+        SpecifiedGridTemplateColumns(),
+        /*use_masonry_default=*/IsDisplayMasonryBox() &&
+            MasonryTrackSizingDirection() == kForColumns);
+  }
+
+  const ComputedGridTrackList& GridTemplateRows() const {
+    return ComputedGridTemplate(SpecifiedGridTemplateRows(),
+                                /*use_masonry_default=*/IsDisplayMasonryBox() &&
+                                    MasonryTrackSizingDirection() == kForRows);
   }
 
   // Masonry utility functions.
@@ -2440,6 +2455,15 @@ class ComputedStyle final : public ComputedStyleBase {
     return GetScrollMarkerGroup() && GetScrollMarkerGroup()->PositionAfter();
   }
 
+  // Empty value means scroll-marker-group: none.
+  std::optional<ScrollMarkerGroup::ScrollMarkerMode> ScrollMarkerGroupMode()
+      const {
+    if (!GetScrollMarkerGroup()) {
+      return std::nullopt;
+    }
+    return GetScrollMarkerGroup()->Mode();
+  }
+
   bool ScrollMarkerGroupNone() const { return !GetScrollMarkerGroup(); }
 
   bool ScrollMarkerGroupEqual(const ComputedStyle& other) const {
@@ -2602,6 +2626,23 @@ class ComputedStyle final : public ComputedStyleBase {
            display == EDisplay::kTableCell ||
            display == EDisplay::kTableCaption;
   }
+
+  static GridTrackSizingDirection MasonryTrackSizingDirection(
+      EMasonryDirection direction) {
+    switch (direction) {
+      case EMasonryDirection::kColumn:
+      case EMasonryDirection::kColumnReverse:
+        return kForColumns;
+      case EMasonryDirection::kRow:
+      case EMasonryDirection::kRowReverse:
+        return kForRows;
+    }
+    NOTREACHED();
+  }
+
+  static CORE_EXPORT const ComputedGridTrackList& ComputedGridTemplate(
+      const Member<ComputedGridTrackList>& track_list,
+      const bool use_masonry_default);
 
   [[nodiscard]] bool HasPropertyDependingOnCurrentColor() const;
 
@@ -3112,6 +3153,9 @@ class ComputedStyleBuilder final : public ComputedStyleBuilderBase {
            Display() == EDisplay::kTableColumn ||
            Display() == EDisplay::kTableColumnGroup;
   }
+  bool IsDisplayMasonryBox() const {
+    return ComputedStyle::IsDisplayMasonryBox(Display());
+  }
   DisplayStyle GetDisplayStyle() const {
     return DisplayStyle(Display(), StyleType(), GetContentData());
   }
@@ -3145,6 +3189,21 @@ class ComputedStyleBuilder final : public ComputedStyleBuilderBase {
 
   FontSizeStyle GetFontSizeStyle() const {
     return FontSizeStyle(GetFont(), LineHeightInternal(), EffectiveZoom());
+  }
+
+  // grid-template-*
+  const ComputedGridTrackList& GridTemplateColumns() const {
+    return ComputedStyle::ComputedGridTemplate(
+        SpecifiedGridTemplateColumns(),
+        /*use_masonry_default=*/IsDisplayMasonryBox() &&
+            MasonryTrackSizingDirection() == kForColumns);
+  }
+
+  const ComputedGridTrackList& GridTemplateRows() const {
+    return ComputedStyle::ComputedGridTemplate(
+        SpecifiedGridTemplateRows(),
+        /*use_masonry_default=*/IsDisplayMasonryBox() &&
+            MasonryTrackSizingDirection() == kForRows);
   }
 
   // letter-spacing
@@ -3235,6 +3294,11 @@ class ComputedStyleBuilder final : public ComputedStyleBuilderBase {
   }
   StyleImage* MaskBoxImageSource() const {
     return MaskBoxImageInternal().GetImage();
+  }
+
+  // masonry
+  GridTrackSizingDirection MasonryTrackSizingDirection() const {
+    return ComputedStyle::MasonryTrackSizingDirection(MasonryDirection());
   }
 
   // opacity

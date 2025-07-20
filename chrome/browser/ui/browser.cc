@@ -138,6 +138,7 @@
 #include "chrome/browser/ui/unload_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/status_bubble_views.h"
 #include "chrome/browser/ui/web_applications/app_browser_controller.h"
 #include "chrome/browser/ui/web_applications/web_app_launch_utils.h"
@@ -1106,19 +1107,6 @@ std::vector<StatusBubble*> Browser::GetStatusBubblesForTesting() {
   return GetStatusBubbles();
 }
 
-// TODO(crbug.com/418896419): Consider moving bookmark bar flag operations
-// directly to BrowserView to eliminate these delegation methods, since
-// both SetForceShowBookmarkBarFlag() and ClearForceShowBookmarkBarFlag()
-// are only called from BrowserView.
-void Browser::SetForceShowBookmarkBarFlag(ForceShowBookmarkBarFlag flag) {
-  features_->bookmark_bar_controller()->SetForceShowBookmarkBarFlag(
-      static_cast<BookmarkBarController::ForceShowFlag>(flag));
-}
-
-void Browser::ClearForceShowBookmarkBarFlag(ForceShowBookmarkBarFlag flag) {
-  features_->bookmark_bar_controller()->ClearForceShowBookmarkBarFlag(
-      static_cast<BookmarkBarController::ForceShowFlag>(flag));
-}
 
 views::WebView* Browser::GetWebView() {
   return window_->GetContentsWebView();
@@ -1128,9 +1116,6 @@ Profile* Browser::GetProfile() {
   return profile();
 }
 
-BookmarkBar::State Browser::bookmark_bar_state() const {
-  return features_->bookmark_bar_controller()->bookmark_bar_state();
-}
 
 void Browser::OpenGURL(const GURL& gurl, WindowOpenDisposition disposition) {
   OpenURL(content::OpenURLParams(gurl, content::Referrer(), disposition,
@@ -1440,13 +1425,13 @@ void Browser::WindowFullscreenStateChanged() {
       ->fullscreen_controller()
       ->WindowFullscreenStateChanged();
   command_controller_->FullscreenStateChanged();
-  features_->bookmark_bar_controller()->UpdateBookmarkBarState(
+  BookmarkBarController::From(this)->UpdateBookmarkBarState(
       BookmarkBarController::StateChangeReason::kToggleFullscreen);
 }
 
 void Browser::FullscreenTopUIStateChanged() {
   command_controller_->FullscreenStateChanged();
-  features_->bookmark_bar_controller()->UpdateBookmarkBarState(
+  BookmarkBarController::From(this)->UpdateBookmarkBarState(
       BookmarkBarController::StateChangeReason::kToolbarOptionChange);
 }
 
@@ -1504,13 +1489,6 @@ void Browser::OpenFile() {
   select_file_dialog_->SelectFile(ui::SelectFileDialog::SELECT_OPEN_FILE,
                                   std::u16string(), directory, &file_types, 0,
                                   base::FilePath::StringType(), parent_window);
-}
-
-void Browser::UpdateDownloadShelfVisibility(bool visible) {
-  std::vector<StatusBubble*> status_bubbles = GetStatusBubbles();
-  for (StatusBubble* status_bubble : status_bubbles) {
-    status_bubble->UpdateDownloadShelfVisibility(visible);
-  }
 }
 
 bool Browser::CanSaveContents(content::WebContents* web_contents) const {
@@ -1751,10 +1729,11 @@ void Browser::OnSplitTabChanged(const SplitTabChange& change) {
       UpdateSplitTabSessionVisualData(change.split_id);
       break;
     }
+
     case SplitTabChange::Type::kVisualsChanged: {
-      // Update for ratio is done from resize from multicontent view delegate.
-      if (change.GetVisualsChange()->reason() !=
-          SplitTabChange::SplitVisualChangeReason::kRatioUpdated) {
+      // Update for resize from the handle is done from multicontent view
+      // delegate.
+      if (!GetBrowserView().multi_contents_view()->IsSplitResizing()) {
         UpdateSplitTabSessionVisualData(change.split_id);
       }
       break;
@@ -3146,7 +3125,7 @@ void Browser::OnActiveTabChanged(WebContents* old_contents,
 
   // Update the bookmark state, since the BrowserWindow may query it during
   // OnActiveTabChanged() below.
-  features_->bookmark_bar_controller()->UpdateBookmarkBarState(
+  BookmarkBarController::From(this)->UpdateBookmarkBarState(
       BookmarkBarController::StateChangeReason::kTabSwitch);
 
   bool is_blocked = tab_strip_model_->IsTabBlocked(index);
@@ -3400,7 +3379,7 @@ void Browser::ProcessPendingUIUpdates() {
       // Update bookmark bar state with kTabState to handle tab state changes
       // (like crashes). This is different from kTabSwitch which is already
       // handled in Browser::OnActiveTabChanged().
-      features_->bookmark_bar_controller()->UpdateBookmarkBarState(
+      BookmarkBarController::From(this)->UpdateBookmarkBarState(
           BookmarkBarController::StateChangeReason::kTabState);
 
       // TODO(crbug.com/40122780): Ideally, we should simply ask the state to
@@ -3775,10 +3754,16 @@ bool Browser::SupportsWindowFeatureImpl(WindowFeature feature,
 
 
 bool Browser::IsBrowserClosing() const {
-  const BrowserList::BrowserSet& closing_browsers =
-      BrowserList::GetInstance()->currently_closing_browsers();
+  BrowserList* browser_list = BrowserList::GetInstance();
+  const bool removed_from_browserlist =
+      std::ranges::find_if(*browser_list, [this](Browser* browser) {
+        return browser == this;
+      }) == browser_list->end();
 
-  return base::Contains(closing_browsers, this);
+  const BrowserList::BrowserSet& closing_browsers =
+      browser_list->currently_closing_browsers();
+
+  return base::Contains(closing_browsers, this) || removed_from_browserlist;
 }
 
 bool Browser::ShouldStartShutdown() const {

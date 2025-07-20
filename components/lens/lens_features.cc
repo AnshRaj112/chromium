@@ -41,7 +41,7 @@ BASE_FEATURE(kLensOverlayImageContextMenuActions,
 
 BASE_FEATURE(kLensOverlayContextualSearchbox,
              "LensOverlayContextualSearchbox",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kLensOverlayContextualSearchboxForOmniboxSuggestions,
              "LensOverlayContextualSearchboxForOmniboxSuggestions",
@@ -93,7 +93,7 @@ BASE_FEATURE(kLensSearchSidePanelNewFeedback,
 
 BASE_FEATURE(kLensSearchSidePanelScrollToAPI,
              "LensSearchSidePanelScrollToAPI",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables the Lens Overlay omnibox entry point. This is a separate feature from
 // kLensOverlay so that the omnibox entry point can be disabled without a
@@ -141,6 +141,10 @@ BASE_FEATURE(kLensOverlayBackToPage,
 
 BASE_FEATURE(kLensSearchNotFoundOnPageToast,
              "kLensSearchNotFoundOnPageToast",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kLensOverlayStraightToSrp,
+             "LensOverlayStraightToSrp",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 const base::FeatureParam<int> kLensOverlayMinRamMb{&kLensOverlay, "min_ram_mb",
@@ -563,6 +567,9 @@ const base::FeatureParam<bool> kLensOverlayEduActionChipDisabledByGlic{
 constexpr base::FeatureParam<int> kLensSearchSidePanelDefaultWidth{
     &kLensSearchSidePanelDefaultWidthChange, "lens-panel-default-width", 440};
 
+constexpr base::FeatureParam<std::string> kLensOverlayStraightToSrpQuery{
+    &kLensOverlayStraightToSrp, "query", ""};
+
 std::string GetHomepageURLForLens() {
   return kHomepageURLForLens.Get();
 }
@@ -877,12 +884,6 @@ int GetLensOverlayImageContextMenuActionsTextReceivedTimeout() {
   return kLensOverlayImageContextMenuActionsTextReceivedTimeout.Get();
 }
 
-bool IsLensOverlayContextualSearchboxEnabled() {
-  return base::FeatureList::IsEnabled(kLensOverlayContextualSearchbox) ||
-         base::FeatureList::IsEnabled(
-             kLensOverlayContextualSearchboxForOmniboxSuggestions);
-}
-
 bool IsLensOverlaySidePanelOpenInNewTabEnabled() {
   return base::FeatureList::IsEnabled(kLensOverlaySidePanelOpenInNewTab);
 }
@@ -1183,6 +1184,14 @@ bool IsLensOverlayBackToPageEnabled() {
 
 bool IsLensSearchNotFoundOnPageToastEnabled() {
   return base::FeatureList::IsEnabled(kLensSearchNotFoundOnPageToast);
+}
+
+bool IsLensOverlayStraightToSrpEnabled() {
+  return base::FeatureList::IsEnabled(kLensOverlayStraightToSrp);
+}
+
+std::string GetStraightToSrpQuery() {
+  return kLensOverlayStraightToSrpQuery.Get();
 }
 
 }  // namespace lens::features

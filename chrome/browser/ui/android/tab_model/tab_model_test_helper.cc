@@ -43,6 +43,10 @@ int TestTabModel::GetActiveIndex() const {
   return 0;
 }
 
+tabs::TabInterface* TestTabModel::GetActiveTab() {
+  return nullptr;
+}
+
 content::WebContents* TestTabModel::GetWebContentsAt(int index) const {
   if (index < static_cast<int>(web_contents_list_.size())) {
     return web_contents_list_[index];
@@ -137,7 +141,13 @@ tabs::TabInterface* TestTabModel::GetTab(int index) {
   return nullptr;
 }
 
-void TestTabModel::HighlightTabs(const std::set<tabs::TabHandle>& tabs) {
+int TestTabModel::GetIndexOfTab(tabs::TabHandle tab) {
+  NOTIMPLEMENTED();
+  return -1;
+}
+
+void TestTabModel::HighlightTabs(tabs::TabHandle tab_to_activate,
+                                 const std::set<tabs::TabHandle>& tabs) {
   NOTIMPLEMENTED();
 }
 
@@ -205,6 +215,11 @@ int OwningTestTabModel::GetActiveIndex() const {
     }
   }
   NOTREACHED();
+}
+
+tabs::TabInterface* OwningTestTabModel::GetActiveTab() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  return active_tab_.get();
 }
 
 content::WebContents* OwningTestTabModel::GetWebContentsAt(int index) const {
@@ -336,7 +351,13 @@ tabs::TabInterface* OwningTestTabModel::GetTab(int index) {
   return nullptr;
 }
 
-void OwningTestTabModel::HighlightTabs(const std::set<tabs::TabHandle>& tabs) {
+int OwningTestTabModel::GetIndexOfTab(tabs::TabHandle tab) {
+  NOTIMPLEMENTED();
+  return -1;
+}
+
+void OwningTestTabModel::HighlightTabs(tabs::TabHandle tab_to_activate,
+                                       const std::set<tabs::TabHandle>& tabs) {
   NOTIMPLEMENTED();
 }
 

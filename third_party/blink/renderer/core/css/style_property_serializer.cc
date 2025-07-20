@@ -526,12 +526,6 @@ String StylePropertySerializer::SerializeShorthand(
       return GetLayeredShorthandValue(animationShorthand());
     case CSSPropertyID::kAnimationRange:
       return AnimationRangeShorthandValue();
-    case CSSPropertyID::kAnimationTrigger:
-      return GetLayeredShorthandValue(animationTriggerShorthand());
-    case CSSPropertyID::kAnimationTriggerRange:
-      return AnimationTriggerRangeShorthandValue();
-    case CSSPropertyID::kAnimationTriggerExitRange:
-      return AnimationTriggerExitRangeShorthandValue();
     case CSSPropertyID::kBorderSpacing:
       return Get2Values(borderSpacingShorthand());
     case CSSPropertyID::kBackgroundPosition:
@@ -1078,61 +1072,6 @@ String StylePropertySerializer::AnimationRangeShorthandValue() const {
       *property_set_.GetPropertyCSSValue(GetCSSPropertyAnimationRangeStart()));
   const CSSValueList& end_list = To<CSSValueList>(
       *property_set_.GetPropertyCSSValue(GetCSSPropertyAnimationRangeEnd()));
-
-  if (start_list.length() != end_list.length()) {
-    return "";
-  }
-
-  CSSValueList* list = CSSValueList::CreateCommaSeparated();
-
-  for (wtf_size_t i = 0; i < start_list.length(); ++i) {
-    list->Append(*AnimationRangeShorthandValueItem(i, start_list, end_list));
-  }
-
-  return list->CssText();
-}
-
-String StylePropertySerializer::AnimationTriggerRangeShorthandValue() const {
-  CHECK_EQ(animationTriggerRangeShorthand().length(), 2u);
-  CHECK_EQ(animationTriggerRangeShorthand().properties()[0],
-           &GetCSSPropertyAnimationTriggerRangeStart());
-  CHECK_EQ(animationTriggerRangeShorthand().properties()[1],
-           &GetCSSPropertyAnimationTriggerRangeEnd());
-
-  const CSSValueList& start_list =
-      To<CSSValueList>(*property_set_.GetPropertyCSSValue(
-          GetCSSPropertyAnimationTriggerRangeStart()));
-  const CSSValueList& end_list =
-      To<CSSValueList>(*property_set_.GetPropertyCSSValue(
-          GetCSSPropertyAnimationTriggerRangeEnd()));
-
-  if (start_list.length() != end_list.length()) {
-    return "";
-  }
-
-  CSSValueList* list = CSSValueList::CreateCommaSeparated();
-
-  for (wtf_size_t i = 0; i < start_list.length(); ++i) {
-    list->Append(*AnimationRangeShorthandValueItem(i, start_list, end_list));
-  }
-
-  return list->CssText();
-}
-
-String StylePropertySerializer::AnimationTriggerExitRangeShorthandValue()
-    const {
-  CHECK_EQ(animationTriggerExitRangeShorthand().length(), 2u);
-  CHECK_EQ(animationTriggerExitRangeShorthand().properties()[0],
-           &GetCSSPropertyAnimationTriggerExitRangeStart());
-  CHECK_EQ(animationTriggerExitRangeShorthand().properties()[1],
-           &GetCSSPropertyAnimationTriggerExitRangeEnd());
-
-  const CSSValueList& start_list =
-      To<CSSValueList>(*property_set_.GetPropertyCSSValue(
-          GetCSSPropertyAnimationTriggerExitRangeStart()));
-  const CSSValueList& end_list =
-      To<CSSValueList>(*property_set_.GetPropertyCSSValue(
-          GetCSSPropertyAnimationTriggerExitRangeEnd()));
 
   if (start_list.length() != end_list.length()) {
     return "";
@@ -2333,12 +2272,9 @@ String StylePropertySerializer::GetShorthandValueForGrid(
   // `grid-template-rows` and `grid-template-columns` are shorthards within this
   // shorthand. Based on how parsing works, we can't differentiate between an
   // author specifying `none` and uninitialized.
-  const bool non_initial_template_rows =
-      (*template_row_values !=
-       *GetCSSPropertyGridTemplateRows().InitialValue());
-  const bool non_initial_template_columns =
-      *template_column_values !=
-      *GetCSSPropertyGridTemplateColumns().InitialValue();
+  CSSValue* none_value = CSSIdentifierValue::Create(CSSValueID::kNone);
+  bool non_initial_template_rows = *template_row_values != *none_value;
+  bool non_initial_template_columns = *template_column_values != *none_value;
 
   // `grid-template-*` and `grid-auto-*` are mutually exclusive per direction.
   if ((non_initial_template_rows && specified_non_initial_auto_rows) ||

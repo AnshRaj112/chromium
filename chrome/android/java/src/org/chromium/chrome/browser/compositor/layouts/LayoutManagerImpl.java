@@ -275,7 +275,8 @@ public class LayoutManagerImpl
         }
 
         @Override
-        public void multipleTabsPendingClosure(List<Tab> tabs, boolean isAllTabs) {
+        public void multipleTabsPendingClosure(
+                List<Tab> tabs, boolean isAllTabs, @TabClosingSource int closingSource) {
             // Handled by willCloseAllTabs;
             if (isAllTabs) return;
 
@@ -711,7 +712,7 @@ public class LayoutManagerImpl
 
         if (mNextActiveLayout != null) startShowing(mNextActiveLayout, true);
 
-        selector.getCurrentTabModelSupplier().addObserver(mCurrentTabModelObserver);
+        selector.getCurrentTabModelSupplier().addSyncObserver(mCurrentTabModelObserver);
 
         mTabGroupModelFilterObserver = createTabModelObserver();
         getTabModelSelector()

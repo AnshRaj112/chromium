@@ -259,23 +259,42 @@ bool ScaleLine(bool is_grow,
     if (item.item->Type() != InlineItem::kText) {
       continue;
     }
+    if (!item.fit_text_scale) {
+      item.fit_text_scale = MakeGarbageCollected<FitTextScale>();
+    }
     if (limit) {
       if (is_grow) {
         float max_scale = *limit / item.item->Style()->ComputedFontSize();
-        item.fit_text_scale.scale = std::min(scale_factor, max_scale);
+        item.fit_text_scale->scale = std::min(scale_factor, max_scale);
       } else {
         float min_scale = *limit / item.item->Style()->ComputedFontSize();
-        item.fit_text_scale.scale = std::max(scale_factor, min_scale);
+        item.fit_text_scale->scale = std::max(scale_factor, min_scale);
       }
     } else {
-      item.fit_text_scale.scale = scale_factor;
+      item.fit_text_scale->scale = scale_factor;
     }
-    item.fit_text_scale.is_scaled_inline_only = is_scaled_inline_only;
-    if (item.fit_text_scale.scale != 1.0f) {
+    item.fit_text_scale->is_scaled_inline_only = is_scaled_inline_only;
+    if (item.fit_text_scale->scale != 1.0f) {
       should_scale_line_height = true;
     }
   }
   return !is_scaled_inline_only && should_scale_line_height;
+}
+
+ShapeResult* ShapeForFit(const InlineItemResult& item,
+                         const HarfBuzzShaper& shaper,
+                         const Font& font,
+                         const InlineItemSegments* segments) {
+  ShapeOptions options;  // TODO(crbug.com/417306102): Pass correct options.
+  if (segments) {
+    return segments->ShapeText(&shaper, &font, item.item->Direction(),
+                               item.StartOffset(), item.EndOffset(),
+                               item.item->Index(), options);
+  }
+  RunSegmenter::RunSegmenterRange range = item.item->CreateRunSegmenterRange();
+  range.end = item.item->EndOffset();
+  return shaper.Shape(&font, item.item->Direction(), item.item->StartOffset(),
+                      item.item->EndOffset(), range, options);
 }
 
 // Updates text scaling factor of InlineItemResults in `line_info`.
@@ -303,14 +322,33 @@ NOINLINE bool FitLine(const InlineNode node, LineInfo& line_info) {
   const bool is_grow = diff > LayoutUnit();
   const FitText& fit_text = is_grow ? text_grow : text_shrink;
 
+  // Measure the static parts and the flexible parts in the items.
   LayoutUnit static_total_size;
   LayoutUnit flexible_total_size;
+  const auto& items_data = node.ItemsData(line_info.UseFirstLineStyle());
+  HarfBuzzShaper shaper(items_data.text_content);
+  ShapeResultSpacing<String> spacing(items_data.text_content);
+  // TODO(crbug.com/4173061029): Apply TextAutoSpace as well as letter-spacing
+  // and word-spacing.
   for (auto& item : *line_info.MutableResults()) {
     if (item.item->Type() == InlineItem::kText) {
-      flexible_total_size += item.inline_size;
+      if (fit_text.Method() == FitTextMethod::kFontSize &&
+          spacing.SetSpacing(item.item->Style()->GetFontDescription())) {
+        ShapeResult* nospacing_shape =
+            ShapeForFit(item, shaper, *item.item->Style()->GetFont(),
+                        items_data.segments.get());
+        LayoutUnit size = nospacing_shape->SnappedWidth().ClampNegativeToZero();
+        flexible_total_size += size;
+        static_total_size += item.inline_size - size;
+      } else {
+        flexible_total_size += item.inline_size;
+      }
     } else {
       static_total_size += item.inline_size;
     }
+  }
+  if (flexible_total_size <= 0) {
+    return false;
   }
 
   float scale_factor =
@@ -334,12 +372,63 @@ NOINLINE bool FitLine(const InlineNode node, LineInfo& line_info) {
       return ScaleLine(is_grow, scale_factor,
                        /* is_scaled_inline_only */ true, limit, line_info);
 
-    case FitTextMethod::kFontSize:
-      AddConsoleMessage(
-          node, ConsoleMessage::Level::kInfo,
-          StrCat({"`text-", is_grow ? StringView("grow") : StringView("shrink"),
-                  ": ... font-size` is not implemented yet."}));
-      break;
+    case FitTextMethod::kFontSize: {
+      flexible_total_size = LayoutUnit();
+      bool restricted = false;
+      for (auto& item : *line_info.MutableResults()) {
+        if (item.item->Type() != InlineItem::kText) {
+          continue;
+        }
+        float item_scale = scale_factor;
+        if (limit) {
+          if (is_grow) {
+            float max_scale = *limit / item.item->Style()->ComputedFontSize();
+            item_scale = std::min(scale_factor, max_scale);
+          } else {
+            float min_scale = *limit / item.item->Style()->ComputedFontSize();
+            item_scale = std::max(scale_factor, min_scale);
+          }
+          if (item_scale != scale_factor) {
+            restricted = true;
+          }
+        }
+        const Font& font = *item.item->Style()->GetFont();
+        FontDescription scaled_desc(font.GetFontDescription());
+        scaled_desc.SetComputedSize(font.GetFontDescription().ComputedSize() *
+                                    item_scale);
+        Font* scaled_font =
+            MakeGarbageCollected<Font>(scaled_desc, font.GetFontSelector());
+        ShapeResult* shape_result =
+            ShapeForFit(item, shaper, *scaled_font, items_data.segments.get());
+        LayoutUnit size_without_spacing =
+            shape_result->SnappedWidth().ClampNegativeToZero();
+        if (spacing.SetSpacing(scaled_desc)) {
+          shape_result->ApplySpacing(spacing);
+          item.inline_size = shape_result->SnappedWidth().ClampNegativeToZero();
+        } else {
+          item.inline_size = size_without_spacing;
+        }
+        item.shape_result = ShapeResultView::Create(shape_result);
+        if (!item.fit_text_scale) {
+          item.fit_text_scale = MakeGarbageCollected<FitTextScale>();
+        }
+        item.fit_text_scale->font = scaled_font;
+        item.fit_text_scale->scale = 1.0f;
+        item.fit_text_scale->is_scaled_inline_only = false;
+        flexible_total_size += size_without_spacing;
+      }
+      // Final adjustment by paint-time scaling. We skip it if font-size
+      // scaling for an item was restricted by specifying a minimum or maximum
+      // value.
+      if (!restricted &&
+          (container_width - line_info.ComputeWidth()).Abs() >= epsilon) {
+        scale_factor =
+            (container_width - static_total_size) / flexible_total_size;
+        ScaleLine(is_grow, scale_factor, /* is_scaled_inline_only */ false,
+                  limit, line_info);
+      }
+      return true;
+    }
 
     case FitTextMethod::kLetterSpacing:
       AddConsoleMessage(
@@ -500,10 +589,10 @@ void InlineLayoutAlgorithm::CreateLine(const LineLayoutOpportunity& opportunity,
   // metrics, so that is has a height.
   if (line_info->HasLineEvenIfEmpty() || !box_states_->RubyColumnList().empty())
       [[unlikely]] {
-    constexpr float kFixedScale = 1.0f;  // No text in this case.
+    // No scaling because of no text.
     box_states_->LineBoxState().EnsureTextMetrics(
         line_info->LineStyle(), *box_states_->LineBoxState().font,
-        baseline_type_, kFixedScale);
+        baseline_type_, FitTextBlockScale::kFixed);
   } else if (line_builder.InitialLetterItemResult() &&
              box_states_->LineBoxState().metrics.IsEmpty()) [[unlikely]] {
     box_states_->LineBoxState().metrics = FontHeight();

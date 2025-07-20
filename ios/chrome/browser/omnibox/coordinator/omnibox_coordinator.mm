@@ -245,6 +245,7 @@
   AutocompleteResultWrapper* autocompleteResultWrapper =
       [[AutocompleteResultWrapper alloc] initWithOmniboxClient:_client.get()];
   autocompleteResultWrapper.pedalAnnotator = annotator;
+  autocompleteResultWrapper.profilePrefService = self.profile->GetPrefs();
   autocompleteResultWrapper.templateURLService = templateURLService;
   autocompleteResultWrapper.incognito = incognito;
   autocompleteResultWrapper.delegate = _omniboxAutocompleteController;
@@ -258,13 +259,6 @@
 }
 
 - (void)stop {
-  [_omniboxAutocompleteController disconnect];
-  _omniboxAutocompleteController = nil;
-  [_omniboxTextController disconnect];
-  _omniboxTextController = nil;
-  [_omniboxMetricsRecorder disconnect];
-  _omniboxMetricsRecorder = nil;
-
   [self.popupCoordinator stop];
   self.popupCoordinator = nil;
 
@@ -283,6 +277,12 @@
   self.mediator = nil;
   [self.zeroSuggestPrefetchHelper disconnect];
   self.zeroSuggestPrefetchHelper = nil;
+  [_omniboxAutocompleteController disconnect];
+  _omniboxAutocompleteController = nil;
+  [_omniboxTextController disconnect];
+  _omniboxTextController = nil;
+  [_omniboxMetricsRecorder disconnect];
+  _omniboxMetricsRecorder = nil;
 }
 
 - (void)updateOmniboxState {

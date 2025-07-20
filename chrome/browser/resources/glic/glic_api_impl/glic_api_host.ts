@@ -16,9 +16,10 @@ import type {Url} from '//resources/mojo/url/mojom/url.mojom-webui.js';
 
 import type {BrowserProxy} from '../browser_proxy.js';
 import {ContentSettingsType} from '../content_settings_types.mojom-webui.js';
-import type {FocusedTabData as FocusedTabDataMojo, GetPinCandidatesOptionsMojoType as GetPinCandidatesOptionsMojo, GetTabContextOptionsMojoType as TabContextOptionsMojo, OpenPanelInfo as OpenPanelInfoMojo, OpenSettingsOptions as OpenSettingsOptionsMojo, PanelOpeningData as PanelOpeningDataMojo, PanelState as PanelStateMojo, ScrollToSelector as ScrollToSelectorMojo, TabContextMojoType as TabContextMojo, TabData as TabDataMojo, WebClientHandlerInterface, WebClientInterface, ZeroStateSuggestionsOptions as ZeroStateSuggestionsOptionsMojo, ZeroStateSuggestionsV2 as ZeroStateSuggestionsV2Mojo} from '../glic.mojom-webui.js';
-import {SettingsPageField as SettingsPageFieldMojo, WebClientHandlerRemote, WebClientMode, WebClientReceiver, WebClientSizingMode} from '../glic.mojom-webui.js';
-import type {ActInFocusedTabParams, DraggableArea, GetPinCandidatesOptions, Journal, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, Screenshot, ScrollToParams, TabContextOptions, WebPageData, ZeroStateSuggestions, ZeroStateSuggestionsOptions, ZeroStateSuggestionsV2} from '../glic_api/glic_api.js';
+import type {FocusedTabData as FocusedTabDataMojo, GetPinCandidatesOptions as GetPinCandidatesOptionsMojo, GetTabContextOptions as TabContextOptionsMojo, OpenPanelInfo as OpenPanelInfoMojo, OpenSettingsOptions as OpenSettingsOptionsMojo, PanelOpeningData as PanelOpeningDataMojo, PanelState as PanelStateMojo, PinCandidate as PinCandidateMojo, PinCandidatesObserver, ScrollToSelector as ScrollToSelectorMojo, TabContext as TabContextMojo, TabData as TabDataMojo, WebClientHandlerInterface, WebClientInterface, ZeroStateSuggestionsOptions as ZeroStateSuggestionsOptionsMojo, ZeroStateSuggestionsV2 as ZeroStateSuggestionsV2Mojo} from '../glic.mojom-webui.js';
+import {PinCandidatesObserverReceiver, SettingsPageField as SettingsPageFieldMojo, WebClientHandlerRemote, WebClientMode, WebClientReceiver} from '../glic.mojom-webui.js';
+import type {HostCapability as HostCapabilityMojo} from '../glic.mojom-webui.js';
+import type {ActInFocusedTabParams, DraggableArea, GetPinCandidatesOptions, HostCapability, Journal, OpenSettingsOptions, PageMetadata, PanelOpeningData, PanelState, Screenshot, ScrollToParams, TabContextOptions, WebPageData, ZeroStateSuggestions, ZeroStateSuggestionsOptions, ZeroStateSuggestionsV2} from '../glic_api/glic_api.js';
 import {ActInFocusedTabErrorReason, CaptureScreenshotErrorReason, CreateTaskErrorReason, DEFAULT_INNER_TEXT_BYTES_LIMIT, DEFAULT_PDF_SIZE_LIMIT, PerformActionsErrorReason, ScrollToErrorReason} from '../glic_api/glic_api.js';
 import {ObservableValue} from '../observable.js';
 import type {ObservableValueReadOnly} from '../observable.js';
@@ -232,10 +233,27 @@ class WebClientImpl implements WebClientInterface {
   }
 }
 
+class PinCandidatesObserverImpl implements PinCandidatesObserver {
+  constructor(private sender: PostMessageRequestSender) {}
+
+  onPinCandidatesChanged(candidates: PinCandidateMojo[]): void {
+    const extras = new ResponseExtras();
+    this.sender.requestNoResponse(
+        'glicWebClientPinCandidatesChanged', {
+          candidates:
+              candidates.map(c => ({
+                               tabData: tabDataToClient(c.tabData, extras),
+                             })),
+        },
+        extras.transfers);
+  }
+}
+
 // Handles all requests to the host.
 class HostMessageHandler implements HostMessageHandlerInterface {
   // Undefined until the web client is initialized.
   private receiver: WebClientReceiver|undefined;
+  private pinCandidatesObserver: PinCandidatesObserverReceiver|undefined;
 
   constructor(
       private handler: WebClientHandlerInterface,
@@ -247,6 +265,7 @@ class HostMessageHandler implements HostMessageHandlerInterface {
       this.receiver.$.close();
       this.receiver = undefined;
     }
+    this.glicBrowserUnsubscribeFromPinCandidates();
   }
 
   async glicBrowserWebClientCreated(_request: void, extras: ResponseExtras):
@@ -261,6 +280,7 @@ class HostMessageHandler implements HostMessageHandlerInterface {
     const {initialState} = await this.handler.webClientCreated(
         this.receiver.$.bindNewPipeAndPassRemote());
     const chromeVersion = initialState.chromeVersion.components;
+    const hostCapabilities = initialState.hostCapabilities;
 
     return {
       initialState: replaceProperties(initialState, {
@@ -274,7 +294,7 @@ class HostMessageHandler implements HostMessageHandlerInterface {
           patch: chromeVersion[3] || 0,
         },
         loggingEnabled: loadTimeData.getBoolean('loggingEnabled'),
-        fitWindow: initialState.sizingMode === WebClientSizingMode.kFitWindow,
+        hostCapabilities: hostCapabilitiesToClient(hostCapabilities),
       }),
     };
   }
@@ -452,6 +472,7 @@ class HostMessageHandler implements HostMessageHandlerInterface {
     return {
       actInFocusedTabResult: {
         tabContextResult: tabContextResult,
+        actionResult: actInFocusedTabResponse.actionResult,
       },
     };
   }
@@ -642,6 +663,11 @@ class HostMessageHandler implements HostMessageHandlerInterface {
     this.handler.journalStop();
   }
 
+  glicBrowserJournalRecordFeedback(
+      request: {positive: boolean, reason: string}): void {
+    this.handler.journalRecordFeedback(request.positive, request.reason);
+  }
+
   glicBrowserOnResponseRated(request: {positive: boolean}): void {
     this.handler.onResponseRated(request.positive);
   }
@@ -756,16 +782,21 @@ class HostMessageHandler implements HostMessageHandlerInterface {
     this.handler.unpinAllTabs();
   }
 
-  async glicBrowserGetPinCandidates(
-      request: {
-        options: GetPinCandidatesOptions,
-      },
-      extras: ResponseExtras): Promise<{candidates: TabDataPrivate[]}> {
-    const result = await this.handler.getPinCandidates(
-        getPinCandidatesOptionsFromClient(request.options));
-    return {
-      candidates: result.candidates.map((x) => tabDataToClient(x, extras)),
-    };
+  glicBrowserSubscribeToPinCandidates(request: {
+    options: GetPinCandidatesOptions,
+  }): void {
+    const observer = new PinCandidatesObserverImpl(this.sender);
+    this.pinCandidatesObserver = new PinCandidatesObserverReceiver(observer);
+    this.handler.subscribeToPinCandidates(
+        getPinCandidatesOptionsFromClient(request.options),
+        this.pinCandidatesObserver.$.bindNewPipeAndPassRemote());
+  }
+
+  glicBrowserUnsubscribeFromPinCandidates(): void {
+    if (this.pinCandidatesObserver) {
+      this.pinCandidatesObserver.$.close();
+      this.pinCandidatesObserver = undefined;
+    }
   }
 
   async glicBrowserGetZeroStateSuggestionsForFocusedTab(request: {
@@ -802,9 +833,7 @@ class HostMessageHandler implements HostMessageHandlerInterface {
     if (!zeroStateData) {
       return {};
     } else {
-      return {
-        suggestions: {suggestions: zeroStateData.suggestions},
-      };
+      return {suggestions: zeroStateData};
     }
   }
   glicBrowserDropScrollToHighlight(): void {
@@ -884,6 +913,9 @@ export class GlicApiHost implements PostMessageRequestHandler {
   panelOpenStateChanged(state: PanelOpenState) {
     this.panelOpenState = state;
     this.clientActiveObs.assignAndSignal(this.isClientActive());
+    if (state === PanelOpenState.CLOSED) {
+      this.messageHandler.glicBrowserUnsubscribeFromPinCandidates();
+    }
   }
 
   isClientActive() {
@@ -1426,4 +1458,9 @@ function getPinCandidatesOptionsFromClient(options: GetPinCandidatesOptions):
 function byteArrayFromClient(buffer: ArrayBuffer): number[] {
   const byteArray = new Uint8Array(buffer);
   return Array.from(byteArray);
+}
+
+function hostCapabilitiesToClient(capabilities: HostCapabilityMojo[]):
+    HostCapability[] {
+  return capabilities.map(capability => capability as number as HostCapability);
 }

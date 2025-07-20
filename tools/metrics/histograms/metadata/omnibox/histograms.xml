@@ -1534,7 +1534,7 @@ Keep consistent with active providers. Doesn't need to include every provider in
 </histogram>
 
 <histogram name="Omnibox.IsPasteAndGo" enum="Boolean"
-    expires_after="2025-11-09">
+    expires_after="2026-01-11">
   <owner>jdonnelly@chromium.org</owner>
   <owner>chrome-desktop-search@google.com</owner>
   <summary>
@@ -2370,6 +2370,19 @@ Keep consistent with active providers. Doesn't need to include every provider in
   </token>
 </histogram>
 
+<histogram name="Omnibox.SearchPrefetch.CacheAliasOnCompleteNetError"
+    enum="NetErrorCodes" expires_after="2026-01-11">
+  <owner>lingqi@chromium.org</owner>
+  <owner>chrome-prerendering@google.com</owner>
+  <summary>
+    Records the network error code from the completion status when a search
+    prefetch request using CacheAliasSearchPrefetchURLLoader completes. This is
+    recorded in CacheAliasSearchPrefetchURLLoader::OnComplete. net::OK (value 0)
+    is recorded on success. This helps monitor network failures for search
+    prefetches that are aliased in the cache.
+  </summary>
+</histogram>
+
 <histogram name="Omnibox.SearchPrefetch.DuplicateSearchTermsAge" units="ms"
     expires_after="2025-11-23">
   <owner>lingqi@chromium.org</owner>
@@ -2415,20 +2428,6 @@ Keep consistent with active providers. Doesn't need to include every provider in
     <variant name="HistoryOrSuggest" summary="history or suggest"/>
     <variant name="Suggest" summary="suggest"/>
   </token>
-</histogram>
-
-<histogram name="Omnibox.SearchPrefetch.ServedToOnlyFromCacheRequest"
-    enum="Boolean" expires_after="2025-11-23">
-  <owner>lingqi@chromium.org</owner>
-  <owner>nhiroki@chromium.org</owner>
-  <owner>chrome-prerendering@google.com</owner>
-  <summary>
-    Whether the search prefetch response is served to a resource request that
-    only allows loading from cache, which is likely a DiskCache warm-up request.
-
-    Recorded at SearchPrefetchURLLoaderInterceptor::MaybeCreateLoaderForRequest
-    when a search prefetch response is served to a resource request.
-  </summary>
 </histogram>
 
 <histogram name="Omnibox.SearchPrefetch.Within1sDuplicateSearchTermsAge"
@@ -3455,7 +3454,7 @@ Keep consistent with active providers. Doesn't need to include every provider in
 
 <histogram
     name="Omnibox.URLScoringModelExecuted.ScoringSignalCoverage.{ProviderType}.{ScoringSignalType}"
-    enum="BooleanNonNull" expires_after="2025-11-09">
+    enum="BooleanNonNull" expires_after="2026-01-11">
   <owner>khalidpeer@chromium.org</owner>
   <owner>manukh@chromium.org</owner>
   <owner>chrome-desktop-search@google.com</owner>
@@ -3847,7 +3846,7 @@ Keep consistent with active providers. Doesn't need to include every provider in
 </histogram>
 
 <histogram name="Omnibox.{SearchPrefetch}.CacheAliasElapsedTimeToFallback"
-    units="ms" expires_after="2025-11-09">
+    units="ms" expires_after="2026-01-11">
   <owner>nhiroki@chromium.org</owner>
   <owner>chrome-prerendering@google.com</owner>
   <summary>
@@ -3862,7 +3861,7 @@ Keep consistent with active providers. Doesn't need to include every provider in
 </histogram>
 
 <histogram name="Omnibox.{SearchPrefetch}.CacheAliasFallbackReason"
-    enum="SearchPrefetchCacheAliasFallbackReason" expires_after="2025-11-09">
+    enum="SearchPrefetchCacheAliasFallbackReason" expires_after="2026-01-11">
   <owner>nhiroki@chromium.org</owner>
   <owner>chrome-prerendering@google.com</owner>
   <summary>

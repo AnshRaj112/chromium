@@ -46,6 +46,9 @@ ContextMenuHelper::ContextMenuHelper(content::WebContents* web_contents)
 }
 
 ContextMenuHelper::~ContextMenuHelper() {
+#if BUILDFLAG(ENABLE_DESKTOP_ANDROID_EXTENSIONS)
+  extension_delegate_.reset();
+#endif  // BUILDFLAG(ENABLE_DESKTOP_ANDROID_EXTENSIONS)
   JNIEnv* env = base::android::AttachCurrentThread();
   Java_ContextMenuHelper_destroy(env, java_obj_);
 }
@@ -58,10 +61,13 @@ void ContextMenuHelper::ShowContextMenu(
   gfx::NativeView view = GetWebContents().GetNativeView();
 
 #if BUILDFLAG(ENABLE_DESKTOP_ANDROID_EXTENSIONS)
-  auto extension_delegate = std::make_unique<extensions::ExtensionMenuDelegate>(
+  // Reset any previous delegate, in case a new menu is shown
+  // before the old one was gracefully closed.
+  extension_delegate_.reset();
+  extension_delegate_ = std::make_unique<extensions::ExtensionMenuDelegate>(
       render_frame_host, params);
-  extension_delegate->PopulateModel();
-  ui::MenuModel* model_ptr = extension_delegate->GetModel();
+  extension_delegate_->PopulateModel();
+  ui::MenuModel* model_ptr = extension_delegate_->GetModel();
 #else
   ui::MenuModel* model_ptr = nullptr;
 #endif  // BUILDFLAG(ENABLE_DESKTOP_ANDROID_EXTENSIONS)
@@ -81,9 +87,7 @@ void ContextMenuHelper::DismissContextMenu() {
   Java_ContextMenuHelper_dismissContextMenu(env, java_obj_);
 }
 
-void ContextMenuHelper::OnContextMenuClosed(
-    JNIEnv* env,
-    const base::android::JavaParamRef<jobject>& obj) {
+void ContextMenuHelper::OnContextMenuClosed(JNIEnv* env) {
   GetWebContents().NotifyContextMenuClosed(context_menu_params_.link_followed,
                                            context_menu_params_.impression);
 }

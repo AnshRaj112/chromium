@@ -92,14 +92,13 @@ class CONTENT_EXPORT ChildProcessHostImpl : public ChildProcessHost,
  private:
   friend class content::ChildProcessHost;
 
-  ChildProcessHostImpl(ChildProcessHostDelegate* delegate, IpcMode ipc_mode);
+  explicit ChildProcessHostImpl(ChildProcessHostDelegate* delegate);
 
   // mojom::ChildProcessHost implementation:
   void Ping(PingCallback callback) override;
   void BindHostReceiver(mojo::GenericPendingReceiver receiver) override;
 
   // IPC::Listener methods:
-  bool OnMessageReceived(const IPC::Message& msg) override;
   void OnChannelConnected(int32_t peer_pid) override;
   void OnChannelError() override;
   void OnBadMessageReceived(const IPC::Message& message) override;
@@ -119,7 +118,6 @@ class CONTENT_EXPORT ChildProcessHostImpl : public ChildProcessHost,
   // to the child process.
   std::optional<mojo::OutgoingInvitation> mojo_invitation_{std::in_place};
 
-  const IpcMode ipc_mode_;
   raw_ptr<ChildProcessHostDelegate> delegate_;
   base::Process peer_process_;
   bool opening_channel_;  // True while we're waiting the channel to be opened.

@@ -517,6 +517,11 @@ bool ContentBrowserClient::AllowServiceWorkerToControlSrcdocIframe(
   return true;
 }
 
+bool ContentBrowserClient::IsServiceWorkerAutoPreloadAllowed(
+    BrowserContext* context) {
+  return true;
+}
+
 bool ContentBrowserClient::AllowSharedWorkerBlobURLFix(
     BrowserContext* context) {
   return true;
@@ -1211,9 +1216,10 @@ bool ContentBrowserClient::SupportsAvoidUnnecessaryBeforeUnloadCheckSync() {
   return true;
 }
 
-bool ContentBrowserClient::ShouldAllowSameSiteRenderFrameHostChange(
+ContentBrowserClient::ShouldAllowSameSiteRenderFrameHostChangeResult
+ContentBrowserClient::ShouldAllowSameSiteRenderFrameHostChange(
     const RenderFrameHost& rfh) {
-  return true;
+  return ShouldAllowSameSiteRenderFrameHostChangeResult::kAllowed;
 }
 
 bool ContentBrowserClient::AllowRenderingMhtmlOverHttp(

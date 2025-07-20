@@ -39,6 +39,12 @@ NSSet<NSString*>* ConvertClearBrowsingDataMask(ClearBrowsingDataMask types) {
   if (IsRemoveDataMaskSet(types, ClearBrowsingDataMask::kRemoveCookies)) {
     [result addObject:WKWebsiteDataTypeCookies];
   }
+  if (IsRemoveDataMaskSet(
+          types, ClearBrowsingDataMask::kRemoveOriginPrivateFileSystem)) {
+    if (@available(iOS 16.0, *)) {
+      [result addObject:WKWebsiteDataTypeFileSystem];
+    }
+  }
   return result;
 }
 

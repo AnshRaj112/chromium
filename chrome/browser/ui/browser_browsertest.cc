@@ -62,6 +62,7 @@
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/translate/chrome_translate_client.h"
+#include "chrome/browser/ui/bookmarks/bookmark_bar_controller.h"
 #include "chrome/browser/ui/browser_command_controller.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_finder.h"
@@ -1960,15 +1961,18 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, FullscreenBookmarkBar) {
 #endif
 
   chrome::ToggleBookmarkBar(browser());
-  EXPECT_EQ(BookmarkBar::SHOW, browser()->bookmark_bar_state());
+  EXPECT_EQ(BookmarkBar::SHOW,
+            BookmarkBarController::From(browser())->bookmark_bar_state());
   chrome::ToggleFullscreenMode(browser());
   EXPECT_TRUE(browser()->window()->IsFullscreen());
 #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_CHROMEOS)
   // Mac and Chrome OS both have an "immersive style" fullscreen where the
   // bookmark bar is visible when the top views slide down.
-  EXPECT_EQ(BookmarkBar::SHOW, browser()->bookmark_bar_state());
+  EXPECT_EQ(BookmarkBar::SHOW,
+            BookmarkBarController::From(browser())->bookmark_bar_state());
 #else
-  EXPECT_EQ(BookmarkBar::HIDDEN, browser()->bookmark_bar_state());
+  EXPECT_EQ(BookmarkBar::HIDDEN,
+            BookmarkBarController::From(browser())->bookmark_bar_state());
 #endif
 }
 #endif
@@ -2455,7 +2459,8 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, GetSizeForNewRenderView) {
 
   // Start with NTP.
   ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL("chrome://newtab")));
-  ASSERT_EQ(BookmarkBar::HIDDEN, browser()->bookmark_bar_state());
+  ASSERT_EQ(BookmarkBar::HIDDEN,
+            BookmarkBarController::From(browser())->bookmark_bar_state());
   WebContents* web_contents =
       browser()->tab_strip_model()->GetActiveWebContents();
   content::RenderViewHost* prev_rvh =
@@ -2466,7 +2471,8 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, GetSizeForNewRenderView) {
   // Navigate to a non-NTP page, without resizing WebContentsView.
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       browser(), embedded_test_server()->GetURL("/title1.html")));
-  ASSERT_EQ(BookmarkBar::HIDDEN, browser()->bookmark_bar_state());
+  ASSERT_EQ(BookmarkBar::HIDDEN,
+            BookmarkBarController::From(browser())->bookmark_bar_state());
   // A new RenderViewHost should be created.
   EXPECT_NE(prev_rvh, web_contents->GetPrimaryMainFrame()->GetRenderViewHost());
   prev_rvh = web_contents->GetPrimaryMainFrame()->GetRenderViewHost();
@@ -2500,7 +2506,8 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, GetSizeForNewRenderView) {
   // Navigate to another non-NTP page, without resizing WebContentsView.
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       browser(), https_test_server.GetURL("/title2.html")));
-  ASSERT_EQ(BookmarkBar::HIDDEN, browser()->bookmark_bar_state());
+  ASSERT_EQ(BookmarkBar::HIDDEN,
+            BookmarkBarController::From(browser())->bookmark_bar_state());
   // A new RenderVieHost should be created.
   EXPECT_NE(prev_rvh, web_contents->GetPrimaryMainFrame()->GetRenderViewHost());
   gfx::Size rwhv_create_size1, rwhv_commit_size1, wcv_commit_size1;
@@ -2519,7 +2526,8 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, GetSizeForNewRenderView) {
   observer.set_wcv_resize_insets(wcv_resize_insets);
   ASSERT_TRUE(ui_test_utils::NavigateToURL(
       browser(), embedded_test_server()->GetURL("/title2.html")));
-  ASSERT_EQ(BookmarkBar::HIDDEN, browser()->bookmark_bar_state());
+  ASSERT_EQ(BookmarkBar::HIDDEN,
+            BookmarkBarController::From(browser())->bookmark_bar_state());
   gfx::Size rwhv_create_size2, rwhv_commit_size2, wcv_commit_size2;
   observer.GetSizeForRenderViewHost(
       web_contents->GetPrimaryMainFrame()->GetRenderViewHost(),

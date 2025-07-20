@@ -2203,7 +2203,7 @@ IN_PROC_BROWSER_TEST_P(StorageAccessAPIStorageBrowserTest,
 #define MAYBE_NestedThirdPartyIFrameStorage NestedThirdPartyIFrameStorage
 #endif
 IN_PROC_BROWSER_TEST_P(StorageAccessAPIStorageBrowserTest,
-                       NestedThirdPartyIFrameStorage) {
+                       MAYBE_NestedThirdPartyIFrameStorage) {
   EnsureUserInteractionOn(kHostC);
 
   NavigateToPageWithFrame(kHostA);

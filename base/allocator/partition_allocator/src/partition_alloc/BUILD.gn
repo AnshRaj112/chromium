@@ -155,7 +155,6 @@ pa_buildflag_header("buildflags") {
     "ENABLE_POINTER_ARITHMETIC_TRAIT_CHECK=$enable_pointer_arithmetic_trait_check",
     "ENABLE_POINTER_COMPRESSION=$enable_pointer_compression",
     "ENABLE_POINTER_SUBTRACTION_CHECK=$enable_pointer_subtraction_check",
-    "ENABLE_SHADOW_METADATA_FOR_64_BITS_POINTERS=$enable_shadow_metadata",
     "ENABLE_THREAD_ISOLATION=$enable_pkeys",
     "EXPENSIVE_DCHECKS_ARE_ON=$enable_expensive_dchecks",
     "FORCE_DISABLE_BACKUP_REF_PTR_FEATURE=$force_disable_backup_ref_ptr_feature",
@@ -586,9 +585,6 @@ if (is_clang_or_gcc) {
     # This is incompatible with stack protectors since the TLS won't be pkey-tagged.
     if (enable_pkeys && partition_alloc_is_debug) {
       configs += [ ":no_stack_protector" ]
-
-      # -fno-stack-protector is incompatible with libc++ modules.
-      use_libcxx_modules = false
     }
   }
 
@@ -616,6 +612,7 @@ if (is_clang_or_gcc) {
       "partition_alloc_base/containers/flat_tree.h",
       "partition_alloc_base/cpu.cc",
       "partition_alloc_base/cpu.h",
+      "partition_alloc_base/cxx20_identity.h",
       "partition_alloc_base/cxx20_is_constant_evaluated.h",
       "partition_alloc_base/cxx_wrapper/algorithm.h",
       "partition_alloc_base/cxx_wrapper/optional.h",
@@ -1060,9 +1057,6 @@ if (build_with_chromium) {
       # value from the TLS which won't be pkey-tagged, hence disabling it for
       # the test.
       configs += [ ":no_stack_protector" ]
-
-      # -fno-stack-protector is incompatible with libc++ modules.
-      use_libcxx_modules = false
     }
 
     frameworks = []
@@ -1082,6 +1076,10 @@ if (build_with_chromium) {
 
     configs -= partition_alloc_remove_configs
     configs += partition_alloc_add_configs
+
+    # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+    # enable the diagnostic by removing this line.
+    configs += [ "//build/config/compiler:no_exit_time_destructors" ]
   }
 }
 

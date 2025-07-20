@@ -13,6 +13,9 @@
   <message name="IDS_SETTINGS_MORE_ACTIONS" desc="Tooltip text (shows on hover or for screenreaders) for a button that shows a menu with more actions when clicked or tapped">
     More actions
   </message>
+  <message name="IDS_SETTINGS_MORE_ACTIONS_BUTTON_ARIA_LABEL" desc="Aria (accessibility) label for a button that shows a menu with more actions when clicked or tapped">
+    More actions for <ph name="BUTTON_TITLE">$1</ph>
+  </message>
   <message name="IDS_SETTINGS_OPENS_IN_NEW_TAB" desc="ARIA (accessibility) label describing a link which opens in a new tab.">
     Opens in new tab
   </message>
@@ -3629,6 +3632,15 @@
     </message>
     <message name="IDS_SETTINGS_ACCOUNT_PAGE_TITLE" desc="Name of the settings page which manages the signed in account.">
       Your account
+    </message>
+    <message name="IDS_SETTINGS_ACCOUNT_DATATYPES_HEADING" desc="Heading of the section in the account settings page for managing data types.">
+      In your Google Account
+    </message>
+    <message name="IDS_SETTINGS_ACCOUNT_BODY" desc="Description of the section in the account settings page for managing data types.">
+      When on, data is saved in your Google Account and can be used on all your devices. When off, data is saved only to this device.
+    </message>
+    <message name="IDS_SETTINGS_ACCOUNT_SYNC_DISABLED"  desc="Section in the account settings page informing the user when the toggles to save a specific data type to the user's Google Account are disabled as per an Enterprise policy.">
+      Managed by your administrator
     </message>
   </if>
 

@@ -18,6 +18,14 @@ ObjectTemplateBuilder WrappableBase::GetObjectTemplateBuilder(
   return ObjectTemplateBuilder(isolate, GetHumanReadableName());
 }
 
+void WrappableBase::AssociateWithWrapper(v8::Isolate* isolate,
+                                         v8::Local<v8::Object> wrapper) {
+  const WrapperInfo* info = wrapper_info();
+  v8::Object::Wrap(isolate, wrapper, this,
+                   static_cast<v8::CppHeapPointerTag>(info->pointer_tag));
+  wrapper_.Reset(isolate, wrapper);
+}
+
 void WrappableBase::Trace(cppgc::Visitor* visitor) const {
   visitor->Trace(wrapper_);
 }
@@ -44,10 +52,20 @@ v8::MaybeLocal<v8::Object> WrappableBase::GetWrapper(v8::Isolate* isolate) {
     return {};
   }
 
-  v8::Object::Wrap(isolate, wrapper, this,
-                   static_cast<v8::CppHeapPointerTag>(info->pointer_tag));
-  wrapper_.Reset(isolate, wrapper);
+  // TODO(345640553): Delete the internal fields once DeprecatedWrappable does
+  // not exist anymore.
+  int indices[] = {kWrapperInfoIndex, kEncodedValueIndex};
+  void* values[] = {nullptr, nullptr};
+  wrapper->SetAlignedPointerInInternalFields(2, indices, values);
+
+  AssociateWithWrapper(isolate, wrapper);
   return wrapper;
+}
+
+void WrappableBase::SetWrapper(v8::Isolate* isolate,
+                               v8::Local<v8::Object> wrapper) {
+  CHECK(wrapper_.IsEmpty());
+  AssociateWithWrapper(isolate, wrapper);
 }
 
 DeprecatedWrappableBase::DeprecatedWrappableBase() = default;

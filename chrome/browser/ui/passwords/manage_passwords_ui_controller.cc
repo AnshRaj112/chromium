@@ -80,6 +80,7 @@
 #include "components/password_manager/core/browser/password_store/interactions_stats.h"
 #include "components/password_manager/core/browser/password_ui_utils.h"
 #include "components/password_manager/core/browser/ui/password_check_referrer.h"
+#include "components/password_manager/core/browser/undo_password_change_controller.h"
 #include "components/password_manager/core/common/credential_manager_types.h"
 #include "components/password_manager/core/common/password_manager_features.h"
 #include "components/password_manager/core/common/password_manager_pref_names.h"
@@ -908,8 +909,30 @@ void ManagePasswordsUIController::OnPasswordsRevealed() {
   passwords_data_.form_manager()->OnPasswordsRevealed();
 }
 
+void ManagePasswordsUIController::MaybeRecordPasswordRecoveryFinished(
+    const std::u16string& username,
+    const std::u16string& password) const {
+  auto pending_credentials = GetPendingPassword();
+  if (pending_credentials.password_value != password ||
+      pending_credentials.username_value != username) {
+    return;
+  }
+
+  const password_manager::PasswordForm* changed_password_credentials =
+      password_manager_util::FindLoginWithChangedPassword(
+          *passwords_data_.form_manager());
+  if (changed_password_credentials &&
+      changed_password_credentials->GetPasswordBackup() == password) {
+    base::UmaHistogramEnumeration(
+        "PasswordManager.PasswordChangeRecoveryFlow",
+        password_manager::PasswordChangeRecoveryFlowState::
+            kPrimaryPasswordUpdated);
+  }
+}
+
 void ManagePasswordsUIController::SavePassword(const std::u16string& username,
                                                const std::u16string& password) {
+  MaybeRecordPasswordRecoveryFinished(username, password);
   UpdatePasswordFormUsernameAndPassword(username, password,
                                         passwords_data_.form_manager());
 
@@ -1209,6 +1232,13 @@ void ManagePasswordsUIController::UpdateBubbleAndIconVisibility() {
     last_page_action_state_ = state;
     last_page_action_is_blocklisted_ = is_blocklisted;
 
+    actions::ActionItem* passwords_action_item =
+        actions::ActionManager::Get().FindAction(
+            kActionShowPasswordsBubbleOrPage,
+            browser->browser_actions()->root_action_item());
+
+    controller->UpdateVisibility(state, is_blocklisted, *this,
+                                 *passwords_action_item);
     if (IsAutomaticallyOpeningBubble() ||
         bubble_status_ == BubbleStatus::SHOULD_POP_UP_WITH_FOCUS) {
       // This will detach any existing bubble so OnBubbleHidden() isn't called.
@@ -1217,12 +1247,6 @@ void ManagePasswordsUIController::UpdateBubbleAndIconVisibility() {
       // If the bubble appeared then the status is updated in OnBubbleShown().
       ClearPopUpFlagForBubble();
     }
-    actions::ActionItem* passwords_action_item =
-        actions::ActionManager::Get().FindAction(
-            kActionShowPasswordsBubbleOrPage,
-            browser->browser_actions()->root_action_item());
-    controller->UpdateVisibility(state, is_blocklisted, *this,
-                                 *passwords_action_item);
   } else {
     browser->window()->UpdatePageActionIcon(
         PageActionIconType::kManagePasswords);

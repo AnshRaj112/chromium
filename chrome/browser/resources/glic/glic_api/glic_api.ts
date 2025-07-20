@@ -132,15 +132,6 @@ export declare interface GlicBrowserHost {
   enableDragResize?(enabled: boolean): Promise<void>;
 
   /**
-   * Returns true if the web client should resize its content to fit the
-   * window.
-   *
-   * @todo This should be the default sizing mode. Remove after the manual
-   * resizing is landed. crbug.com/402795394.
-   */
-  shouldFitWindow?(): Promise<boolean>;
-
-  /**
    * Set the areas of the glic window from which it should be draggable. If
    * `areas` is empty, a default draggable area will be created.
    *
@@ -579,14 +570,24 @@ export declare interface GlicBrowserHost {
 
   /**
    * Returns an observable that emits a ranked list of pin tab candidates per
-   * the given options. The list is currently only returned once. The results
-   * are sorted by string match and then last active time.
+   * the given options. The list is returned once, and then again whenever the
+   * list of candidates changes. The results are sorted by string match and then
+   * last active time.
    *
    * If a query is provided, it currently returns all top sorted results, even
    * if entries don't match the query.
    *
-   * @todo Actually implement dynamic updates based on tab changes.
-   * crbug.com/429022523
+   * Calling this function will invalidate any previously returned
+   * `ObservableValue` instances. So if a previous one existed, it will stop
+   * receiving updates when a new one is obtained.
+   *
+   * Dynamic updates can be a costly operation so the observable value should be
+   * released/destroyed as soon as it's not useful anymore.
+   *
+   * TODO(b/432258121): A race condition can occur when a consumer
+   * unsubscribes and a new one subscribes. An update from the first
+   * subscription that is already in-flight may be delivered to the second
+   * consumer.
    */
   getPinCandidates?
       (options: GetPinCandidatesOptions): ObservableValue<PinCandidate[]>;
@@ -601,6 +602,11 @@ export declare interface GlicBrowserHost {
    */
   getZeroStateSuggestions?(options?: ZeroStateSuggestionsOptions):
       ObservableValue<ZeroStateSuggestionsV2>;
+
+  /**
+   * Returns the list of capabilities of the glic host.
+   */
+  getHostCapabilities?(): Set<HostCapability>;
 }
 /** Fields of interest from the system settings page. */
 export type OsPermissionType = 'media'|'geolocation';
@@ -761,6 +767,12 @@ export declare interface GlicBrowserHostJournal {
    * Requests journal stop logging.
    */
   stop(): void;
+
+  /**
+   * Called when the user rates a response to submit a feedback with the current
+   * journal snapshot.
+   */
+  recordFeedback?(positive: boolean, reason: string): void;
 }
 
 /** Data sent back to the host about the opening of the panel. */
@@ -1211,6 +1223,11 @@ export enum CaptureScreenshotErrorReason {
 export declare interface ActInFocusedTabResult {
   // The tab context result after acting and gathering new context.
   tabContextResult?: TabContextResult;
+  // The outcome of the action.
+  // Note that this is an enum ActionResultCode from chrome/common/actor.mojom.
+  // It is expected that the client has an equivalent enum definition. See
+  // http://shortn/_gLyPxrRm6p
+  actionResult?: number;
 }
 
 export declare interface ActInFocusedTabParams {
@@ -1405,7 +1422,13 @@ export declare interface Observable<T> {
  *
  * See also comments about Observable.
  */
-export interface ObservableValue<T> extends Observable<T> {}
+export interface ObservableValue<T> extends Observable<T> {
+  /**
+   * Provides synchronous access to the current value. Returns undefined if the
+   * initial value has not yet been populated.
+   */
+  getCurrentValue(): T|undefined;
+}
 
 /** Allows control of a subscription to an Observable. */
 export declare interface Subscriber {
@@ -1461,6 +1484,11 @@ export declare interface ZeroStateSuggestionsV2 {
    * be empty.
    */
   suggestions: SuggestionContent[];
+  /**
+   * Whether there is a current outstanding request to generate suggestions for
+   * the current tab context.
+   */
+  isPending?: boolean;
 }
 
 /**
@@ -1491,6 +1519,12 @@ export declare interface ZeroStateSuggestions {
 export declare interface SuggestionContent {
   /** The suggestion text. Always provided. */
   suggestion: string;
+}
+
+/** Describes the capability of the glic host. */
+export enum HostCapability {
+  /** Glic host supports scrollTo() on PDF documents. */
+  SCROLL_TO_PDF = 0,
 }
 
 //
@@ -1553,4 +1587,5 @@ export interface ExtensibleEnums {
   createTaskErrorReason: typeof CreateTaskErrorReason;
   performActionsErrorReason: typeof PerformActionsErrorReason;
   settingsPageField: typeof SettingsPageField;
+  hostCapability: typeof HostCapability;
 }

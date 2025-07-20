@@ -7,7 +7,6 @@
 #include <memory>
 #include <string>
 
-#include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_storage_location.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolation_data.h"
 #include "chrome/browser/web_applications/proto/web_app.pb.h"
 #include "chrome/browser/web_applications/test/web_app_test.h"
@@ -16,10 +15,10 @@
 #include "chrome/browser/web_applications/web_app_helpers.h"
 #include "chrome/browser/web_applications/web_app_proto_utils.h"
 #include "chrome/browser/web_applications/web_app_utils.h"
-#include "chrome/browser/web_applications/test/web_app_test_utils.h"
 #include "components/sync/base/time.h"
 #include "components/webapps/browser/installable/installable_metrics.h"
 #include "components/webapps/common/web_app_id.h"
+#include "components/webapps/isolated_web_apps/types/storage_location.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -639,6 +638,61 @@ TEST_F(WebAppDatabaseSerializationTest,
       sync_pb::WebAppIconInfo_Purpose::WebAppIconInfo_Purpose_ANY);
 
   EXPECT_THAT(ParseWebAppProto(proto), IsNull());
+}
+
+TEST_F(WebAppDatabaseSerializationTest,
+       ParseWebAppProto_HasTrustedIcons_Valid) {
+  GURL start_url("https://example.com/");
+  proto::WebApp proto = CreateWebAppProtoForTesting("Test App", start_url);
+
+  sync_pb::WebAppIconInfo* icon1 = proto.add_trusted_icons();
+  icon1->set_url(start_url.Resolve(std::string("/icon") + "1").spec());
+  icon1->set_purpose(
+      sync_pb::WebAppIconInfo_Purpose::WebAppIconInfo_Purpose_ANY);
+  icon1->set_size_in_px(32);
+
+  EXPECT_THAT(ParseWebAppProto(proto), NotNull());
+}
+
+TEST_F(WebAppDatabaseSerializationTest,
+       ParseWebAppProto_HasTrustedIcons_InvalidMissingUrl) {
+  GURL start_url("https://example.com/");
+  proto::WebApp proto = CreateWebAppProtoForTesting("Test App", start_url);
+
+  sync_pb::WebAppIconInfo* icon1 = proto.add_trusted_icons();
+  icon1->set_purpose(
+      sync_pb::WebAppIconInfo_Purpose::WebAppIconInfo_Purpose_ANY);
+  icon1->set_size_in_px(32);
+
+  EXPECT_THAT(ParseWebAppProto(proto), IsNull());
+}
+
+TEST_F(WebAppDatabaseSerializationTest,
+       ParseWebAppProto_HasTrustedIcons_MissingPurposeANY) {
+  GURL start_url("https://example.com/");
+  proto::WebApp proto = CreateWebAppProtoForTesting("Test App", start_url);
+
+  sync_pb::WebAppIconInfo* icon1 = proto.add_trusted_icons();
+  icon1->set_url(start_url.Resolve(std::string("/icon") + "1").spec());
+  icon1->set_size_in_px(32);
+  auto web_app = ParseWebAppProto(proto);
+
+  ASSERT_THAT(web_app, NotNull());
+  ASSERT_EQ(1u, web_app->trusted_icons().size());
+  EXPECT_EQ(apps::IconInfo::Purpose::kAny, web_app->trusted_icons()[0].purpose);
+}
+
+TEST_F(WebAppDatabaseSerializationTest,
+       ParseWebAppProto_HasTrustedIcons_MissingSizeValid) {
+  GURL start_url("https://example.com/");
+  proto::WebApp proto = CreateWebAppProtoForTesting("Test App", start_url);
+
+  sync_pb::WebAppIconInfo* icon1 = proto.add_trusted_icons();
+  icon1->set_url(start_url.Resolve(std::string("/icon") + "1").spec());
+  icon1->set_purpose(
+      sync_pb::WebAppIconInfo_Purpose::WebAppIconInfo_Purpose_ANY);
+
+  EXPECT_THAT(ParseWebAppProto(proto), NotNull());
 }
 
 }  // namespace

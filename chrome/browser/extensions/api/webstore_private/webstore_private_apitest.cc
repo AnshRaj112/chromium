@@ -65,7 +65,6 @@
 #if BUILDFLAG(IS_CHROMEOS)
 #include "chrome/browser/supervised_user/chromeos/parent_access_extension_approvals_manager.h"
 #include "chrome/browser/ui/webui/ash/parent_access/fake_parent_access_dialog.h"
-#include "chromeos/crosapi/mojom/parent_access.mojom.h"
 #endif  // BUILDFLAG(IS_CHROMEOS)
 
 namespace extensions {
@@ -350,8 +349,9 @@ class SupervisedUserExtensionWebstorePrivateApiTest
   void SetUpOnMainThread() override {
     ExtensionWebstorePrivateApiTest::SetUpOnMainThread();
 
-    extensions_delegate_ =
-        std::make_unique<SupervisedUserExtensionsDelegateImpl>(profile());
+    extensions_delegate_ = static_cast<SupervisedUserExtensionsDelegateImpl*>(
+        BrowserContextKeyedAPIFactory<ManagementAPI>::GetIfExists(profile())
+            ->GetSupervisedUserExtensionsDelegate());
 
 #if BUILDFLAG(IS_CHROMEOS)
     auto dialog_provider =
@@ -372,7 +372,7 @@ class SupervisedUserExtensionWebstorePrivateApiTest
 #if BUILDFLAG(IS_CHROMEOS)
     fake_parent_access_dialog_provider_ = nullptr;
 #endif
-    extensions_delegate_.reset();
+    extensions_delegate_ = nullptr;
     ExtensionWebstorePrivateApiTest::TearDownOnMainThread();
   }
 
@@ -436,7 +436,7 @@ class SupervisedUserExtensionWebstorePrivateApiTest
   }
 
  protected:
-  std::unique_ptr<SupervisedUserExtensionsDelegateImpl> extensions_delegate_;
+  raw_ptr<SupervisedUserExtensionsDelegateImpl> extensions_delegate_;
 
  private:
   // Create another embedded test server to avoid starting the same one twice.

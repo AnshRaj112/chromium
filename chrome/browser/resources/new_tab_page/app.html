@@ -1,3 +1,6 @@
+<!-- #html_wrapper_imports_start
+import {nothing} from '//resources/lit/v3_0/lit.rollup.js';
+#html_wrapper_imports_end -->
 <div id="content">
   ${this.lazyRender_ && this.microsoftModuleEnabled_ ? html`
     <iframe id="microsoftAuth" src="${this.microsoftAuthIframePath_}"></iframe>
@@ -70,6 +73,9 @@
         </ntp-modules>
       `}
     ` : ''}
+    ${this.browserPromosEnabled_ ? html`
+      <ntp-single-promo></ntp-single-promo>
+    ` : ''}
   ${!this.isFooterVisible_ ? html`
       <a id="backgroundImageAttribution"
           href="${this.backgroundImageAttributionUrl_}"
@@ -111,7 +117,8 @@ ${this.showVoiceSearchOverlay_ ? html`
   </ntp-voice-search-overlay>
 ` : ''}
 ${this.showComposebox_ ? html`
-  <div id="composeboxScrim" @click="${this.closeComposebox_}"></div>
+  <div id="composeboxScrim"
+       @click="${this.composeboxCloseByClickOutside_ ? this.closeComposebox_ : nothing}"></div>
 ` : ''}
 <svg>
   <defs>

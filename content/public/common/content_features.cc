@@ -76,6 +76,12 @@ const base::FeatureParam<bool> kAndroidSpareRendererKillWhenBackgrounded{
 const base::FeatureParam<bool> kAndroidSpareRendererOnlyForNavigation{
     &kAndroidWarmUpSpareRendererWithTimeout, "only_for_navigation", false};
 
+// Only allow the navigation related allocation to use the spare renderer.
+const base::FeatureParam<bool>
+    kAndroidSpareRendererOnlyWarmupAfterWebPageLoaded{
+        &kAndroidWarmUpSpareRendererWithTimeout,
+        "only_warmup_after_web_page_loaded", false};
+
 // Whether to allow attaching an inner WebContents not owned by the outer
 // WebContents. This is for prototyping purposes and should not be enabled in
 // production.
@@ -1563,7 +1569,7 @@ const base::FeatureParam<CapturingState> kNavigationCapturingDefaultState{
 #if BUILDFLAG(IS_CHROMEOS)
     CapturingState::kReimplDefaultOff,
 #else
-    CapturingState::kReimplOnViaClientMode,
+    CapturingState::kReimplDefaultOn,
 #endif
     &kNavigationCapturingParams};
 

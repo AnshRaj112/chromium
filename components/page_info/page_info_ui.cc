@@ -33,7 +33,7 @@
 #include "components/url_formatter/elide_url.h"
 #include "content/public/browser/permission_result.h"
 #include "content/public/common/content_features.h"
-#include "ppapi/buildflags/buildflags.h"
+#include "net/base/features.h"
 #include "services/device/public/cpp/device_features.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/time_format.h"
@@ -432,10 +432,9 @@ std::u16string GetPermissionAskStateString(ContentSettingsType type) {
 
 }  // namespace
 
-PageInfoUI::CookiesNewInfo::CookiesNewInfo() = default;
-PageInfoUI::CookiesNewInfo::CookiesNewInfo(CookiesNewInfo&& cookie_info) =
-    default;
-PageInfoUI::CookiesNewInfo::~CookiesNewInfo() = default;
+PageInfoUI::CookiesInfo::CookiesInfo() = default;
+PageInfoUI::CookiesInfo::CookiesInfo(CookiesInfo&& cookie_info) = default;
+PageInfoUI::CookiesInfo::~CookiesInfo() = default;
 
 PageInfoUI::CookiesRwsInfo::CookiesRwsInfo(const std::u16string& owner_name)
     : owner_name(owner_name) {}
@@ -567,9 +566,15 @@ PageInfoUI::GetSecurityDescription(const IdentityInfo& identity_info) const {
               SecurityDescriptionType::CONNECTION);
         default:
           // Do not show details for secure connections.
-          return CreateSecurityDescription(SecuritySummaryColor::GREEN,
-                                           IDS_PAGE_INFO_SECURE_SUMMARY, 0,
-                                           SecurityDescriptionType::CONNECTION);
+          int details = 0;
+          if (base::FeatureList::IsEnabled(net::features::kVerifyQWACs)) {
+            // When the QWAC feature is enabled, a UI that more closely matches
+            // desktop is used.
+            details = IDS_PAGE_INFO_SECURE_DETAILS;
+          }
+          return CreateSecurityDescription(
+              SecuritySummaryColor::GREEN, IDS_PAGE_INFO_SECURE_SUMMARY,
+              details, SecurityDescriptionType::CONNECTION);
       }
     case PageInfo::SITE_IDENTITY_STATUS_DEPRECATED_SIGNATURE_ALGORITHM:
     case PageInfo::SITE_IDENTITY_STATUS_UNKNOWN:
@@ -1003,29 +1008,14 @@ int PageInfoUI::GetIdentityIconID(PageInfo::SiteIdentityStatus status) {
     case PageInfo::SITE_IDENTITY_STATUS_EV_CERT:
     case PageInfo::SITE_IDENTITY_STATUS_1QWAC_CERT:
     case PageInfo::SITE_IDENTITY_STATUS_ISOLATED_WEB_APP:
-      return IDR_PAGEINFO_GOOD;
+      if (base::FeatureList::IsEnabled(net::features::kVerifyQWACs)) {
+        return IDR_PAGEINFO_GOOD_NEW;
+      } else {
+        return IDR_PAGEINFO_GOOD;
+      }
     case PageInfo::SITE_IDENTITY_STATUS_NO_CERT:
     case PageInfo::SITE_IDENTITY_STATUS_ERROR:
     case PageInfo::SITE_IDENTITY_STATUS_DEPRECATED_SIGNATURE_ALGORITHM:
-      return IDR_PAGEINFO_BAD;
-  }
-
-  return 0;
-}
-
-// static
-int PageInfoUI::GetConnectionIconID(PageInfo::SiteConnectionStatus status) {
-  switch (status) {
-    case PageInfo::SITE_CONNECTION_STATUS_UNKNOWN:
-    case PageInfo::SITE_CONNECTION_STATUS_INTERNAL_PAGE:
-    case PageInfo::SITE_CONNECTION_STATUS_ENCRYPTED:
-    case PageInfo::SITE_CONNECTION_STATUS_ISOLATED_WEB_APP:
-      return IDR_PAGEINFO_GOOD;
-    case PageInfo::SITE_CONNECTION_STATUS_INSECURE_PASSIVE_SUBRESOURCE:
-    case PageInfo::SITE_CONNECTION_STATUS_INSECURE_FORM_ACTION:
-    case PageInfo::SITE_CONNECTION_STATUS_UNENCRYPTED:
-    case PageInfo::SITE_CONNECTION_STATUS_INSECURE_ACTIVE_SUBRESOURCE:
-    case PageInfo::SITE_CONNECTION_STATUS_ENCRYPTED_ERROR:
       return IDR_PAGEINFO_BAD;
   }
 

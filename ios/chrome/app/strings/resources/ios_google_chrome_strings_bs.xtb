@@ -5,6 +5,7 @@
 <translation id="1086486568852410168">Pretraži putem Google Objektiva</translation>
 <translation id="1143896152279775643">Vaša lozinka će se sačuvati u Googleov Upravitelj lozinki za račun <ph name="EMAIL" />.</translation>
 <translation id="1146503048444965320">Otvaranje nove kartice u Chromeu</translation>
+<translation id="1158134713295836892">Gemini u Chromeu</translation>
 <translation id="1166460004393506534">Brisanje podataka pregledanja u Chromeu</translation>
 <translation id="1179527450541388808">Brže pristupajte Chromeu s donje trake na početnom ekranu iPada.</translation>
 <translation id="1180362651362502943">Nastavite koristiti podatke Chromea na Google računu.</translation>
@@ -63,7 +64,6 @@ Stvari za razmatranje:
 <translation id="2423077901494354337">Sada možete iskoristiti sve prednosti Chromea na uređaju.</translation>
 <translation id="2427791862912929107">Chrome sadržava funkcije koje vam pomažu prilikom upravljanja internetskim podacima i brzinom učitavanja web lokacija.
 <ph name="BEGIN_LINK" />Saznajte više<ph name="END_LINK" /></translation>
-<translation id="2444854139071078915">Da lako dobijete sačuvane lozinke u drugim aplikacijama, koristite Chrome za automatsko popunjavanje</translation>
 <translation id="2464852008153767546">{THRESHOLD,plural, =1{Ovo se dešava kad se Chrome ne koristi {THRESHOLD} minutu. Ovo može uključivati historiju i automatsko popunjavanje.}one{Ovo se dešava kad se Chrome ne koristi {THRESHOLD} minutu. Ovo može uključivati historiju i automatsko popunjavanje.}few{Ovo se dešava kad se Chrome ne koristi {THRESHOLD} minute. Ovo može uključivati historiju i automatsko popunjavanje.}other{Ovo se dešava kad se Chrome ne koristi {THRESHOLD} minuta. Ovo može uključivati historiju i automatsko popunjavanje.}}</translation>
 <translation id="2561231791489583059">Koristite Chrome kao zadani preglednik da se zaštitite od opasnih web lokacija i da zaštitite lozinke</translation>
 <translation id="2574249610672786438">Da vidite kartice s bilo kojeg uređaja na kojem koristite Chrome, prijavite se na svim uređajima</translation>
@@ -118,6 +118,7 @@ Pričekajte nekoliko minuta prije odjave. Ako se sada odjavite, ovi podaci će s
 <translation id="3863841106411295595">Dodaje unesene URL-ove na listu za čitanje u Chromeu.</translation>
 <translation id="3901001113120561395">Iskoristite sve prednosti Chromea.</translation>
 <translation id="3913386780052199712">Prijavljeni ste na Chrome</translation>
+<translation id="3932250749914183695">Savjet za Chrome: potvrdite identitet</translation>
 <translation id="3984746313391923992">Vaša organizacija zahtijeva da ostanete odjavljeni s Chromea.</translation>
 <translation id="3988789688219830639">Google Chrome nema pristup vašim fotografijama ili videozapisima. Omogućite pristup u meniju iOS postavke &gt; Privatnost &gt; Fotografije.</translation>
 <translation id="4064699917955374540">Da koristite i sačuvate podatke Chromea na Google računu, potvrdite identitet.</translation>
@@ -219,7 +220,6 @@ Vaši podaci su šifrirani pristupnim izrazom. Unesite ga da koristite i sačuva
 <translation id="6684809838922667136">Poboljšajte Chrome</translation>
 <translation id="6695698548122852044">{THRESHOLD,plural, =1{Ovo se dešava kad se Chrome ne koristi {THRESHOLD} minutu. Podaci sačuvani samo na ovom uređaju dok ste bili prijavljeni će se izbrisati. Ovo može uključivati historiju i lozinke.}one{Ovo se dešava kad se Chrome ne koristi {THRESHOLD} minutu. Podaci sačuvani samo na ovom uređaju dok ste bili prijavljeni će se izbrisati. Ovo može uključivati historiju i lozinke.}few{Ovo se dešava kad se Chrome ne koristi {THRESHOLD} minute. Podaci sačuvani samo na ovom uređaju dok ste bili prijavljeni će se izbrisati. Ovo može uključivati historiju i lozinke.}other{Ovo se dešava kad se Chrome ne koristi {THRESHOLD} minuta. Podaci sačuvani samo na ovom uređaju dok ste bili prijavljeni će se izbrisati. Ovo može uključivati historiju i lozinke.}}</translation>
 <translation id="6709398533399187136">Vaša lozinka je bila izložena prilikom narušavanja podataka. Googleov Upravitelj lozinki preporučuje da je odmah promijenite.</translation>
-<translation id="6788035488757621217">U postavkama uređaja otvorite "<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />" i odaberite "Chrome"</translation>
 <translation id="6820553595690137150">Šifriranje pristupnim izrazom ne obuhvata načine plaćanja i adrese.
 
 Da promijenite ovu postavku, <ph name="BEGIN_LINK" />izbrišite podatke Chromea na računu<ph name="END_LINK" />.</translation>

@@ -76,12 +76,6 @@ TEST_F(SqlBackendImplTest, GetStats) {
   EXPECT_THAT(stats, ElementsAre(Pair("Cache type", "SQL Cache")));
 }
 
-TEST_F(SqlBackendImplTest, OnExternalCacheHit) {
-  auto backend = CreateBackendAndInit();
-  // Should not crash.
-  backend->OnExternalCacheHit("test_key");
-}
-
 // Tests a race condition where an entry is doomed via `SqlEntryImpl::Doom()`
 // while an iterator is in the process of opening it. The iterator should still
 // successfully open the entry, but the entry should be marked as doomed. This
@@ -188,16 +182,27 @@ TEST_F(SqlBackendImplTest, IteratorParallelEntryDoomOpenNext) {
 // to `Backend::DoomEntry`.
 TEST_F(SqlBackendImplTest, IteratorParallelDoom) {
   auto backend = CreateBackendAndInit();
+
+  // 1. Create an entry and write some data to it.
   TestEntryResultCompletionCallback cb_create;
   disk_cache::EntryResult create_result = cb_create.GetResult(
       backend->CreateEntry("key", net::HIGHEST, cb_create.callback()));
-  auto* entry = create_result.ReleaseEntry();
-  entry->Close();
+  auto* entry1 = create_result.ReleaseEntry();
+  const std::string kData = "some data";
+  auto buffer = base::MakeRefCounted<net::StringIOBuffer>(kData);
+  net::TestCompletionCallback cb_write;
+  int rv_write = entry1->WriteData(1, 0, buffer.get(), buffer->size(),
+                                   cb_write.callback(), false);
+  EXPECT_EQ(cb_write.GetResult(rv_write), static_cast<int>(buffer->size()));
 
+  entry1->Close();
+
+  // 2. Start opening the entry via an iterator. This is an async operation.
   auto iter = backend->CreateIterator();
   TestEntryResultCompletionCallback cb;
   EntryResult result_iter = iter->OpenNextEntry(cb.callback());
 
+  // 3. Immediately call `DoomEntry` for the same key. This is also async.
   net::TestCompletionCallback cb_doom;
   int rv_doom = backend->DoomEntry("key", net::HIGHEST, cb_doom.callback());
   EXPECT_EQ(net::OK, cb_doom.GetResult(rv_doom));
@@ -207,12 +212,19 @@ TEST_F(SqlBackendImplTest, IteratorParallelDoom) {
   // before the `DoomEntry()` operation, which gets queued. After the iterator
   // returns the entry, the `DoomEntry()` operation runs and marks the entry as
   // doomed.
+  // 4. Wait for the iterator to finish opening the entry.
   result_iter = cb.GetResult(std::move(result_iter));
   ASSERT_THAT(result_iter.net_error(), IsOk());
-  entry = result_iter.ReleaseEntry();
-  EXPECT_TRUE((static_cast<SqlEntryImpl*>(entry))->doomed());
-  // TODO(crbug.com/422065015): Check that the `entry` data can be read from the
-  // storage after implementing the entry data read/write operations.
+  auto* entry = result_iter.ReleaseEntry();
+  EXPECT_TRUE(static_cast<SqlEntryImpl*>(entry)->doomed());
+
+  // 5. Verify that the data can still be read from the doomed entry.
+  auto read_buffer = base::MakeRefCounted<net::IOBufferWithSize>(kData.size());
+  net::TestCompletionCallback cb_read;
+  int rv_read = entry->ReadData(1, 0, read_buffer.get(), read_buffer->size(),
+                                cb_read.callback());
+  EXPECT_EQ(cb_read.GetResult(rv_read), static_cast<int>(kData.size()));
+  EXPECT_EQ(std::string_view(read_buffer->data(), kData.size()), kData);
   entry->Close();
 }
 
@@ -220,16 +232,26 @@ TEST_F(SqlBackendImplTest, IteratorParallelDoom) {
 // `Backend::DoomAllEntries`.
 TEST_F(SqlBackendImplTest, IteratorParallelDoomAll) {
   auto backend = CreateBackendAndInit();
+
+  // 1. Create an entry and write some data to it.
   TestEntryResultCompletionCallback cb_create;
   disk_cache::EntryResult create_result = cb_create.GetResult(
       backend->CreateEntry("key", net::HIGHEST, cb_create.callback()));
-  auto* entry = create_result.ReleaseEntry();
-  entry->Close();
+  auto* entry1 = create_result.ReleaseEntry();
+  const std::string kData = "some data";
+  auto buffer = base::MakeRefCounted<net::StringIOBuffer>(kData);
+  net::TestCompletionCallback cb_write;
+  int rv_write = entry1->WriteData(1, 0, buffer.get(), buffer->size(),
+                                   cb_write.callback(), false);
+  EXPECT_EQ(cb_write.GetResult(rv_write), static_cast<int>(buffer->size()));
+  entry1->Close();
 
+  // 2. Start opening the entry via an iterator. This is an async operation.
   auto iter = backend->CreateIterator();
   TestEntryResultCompletionCallback cb;
   EntryResult result_iter = iter->OpenNextEntry(cb.callback());
 
+  // 3. Immediately call `DoomAllEntries`. This is also an async operation.
   net::TestCompletionCallback cb_doom;
   int rv_doom = backend->DoomAllEntries(cb_doom.callback());
   EXPECT_EQ(net::OK, cb_doom.GetResult(rv_doom));
@@ -238,12 +260,19 @@ TEST_F(SqlBackendImplTest, IteratorParallelDoomAll) {
   // are serialized. Since `OpenNextEntry()` is posted first, it will run
   // first, retrieving the entry. Then, `DoomAllEntries()` will run and doom all
   // entries, including the one just opened.
+  // 4. Wait for the iterator to finish opening the entry.
   result_iter = cb.GetResult(std::move(result_iter));
   ASSERT_THAT(result_iter.net_error(), IsOk());
-  entry = result_iter.ReleaseEntry();
-  EXPECT_TRUE((static_cast<SqlEntryImpl*>(entry))->doomed());
-  // TODO(crbug.com/422065015): Check that the `entry` data can be read from the
-  // storage after implementing the entry data read/write operations.
+  auto* entry = result_iter.ReleaseEntry();
+  EXPECT_TRUE(static_cast<SqlEntryImpl*>(entry)->doomed());
+
+  // 5. Verify that the data can still be read from the doomed entry.
+  auto read_buffer = base::MakeRefCounted<net::IOBufferWithSize>(kData.size());
+  net::TestCompletionCallback cb_read;
+  int rv_read = entry->ReadData(1, 0, read_buffer.get(), read_buffer->size(),
+                                cb_read.callback());
+  EXPECT_EQ(cb_read.GetResult(rv_read), static_cast<int>(kData.size()));
+  EXPECT_EQ(std::string_view(read_buffer->data(), kData.size()), kData);
   entry->Close();
 }
 
@@ -639,6 +668,45 @@ TEST_F(SqlBackendImplTest, OpenEntryRacesWithIteratorAndWriteData) {
   entry->Close();
 }
 
+// Tests that OnExternalCacheHit correctly updates the last_used time, even when
+// an OpenEntry operation is in-flight.
+TEST_F(SqlBackendImplTest, OnExternalCacheHitRacesWithOpen) {
+  auto backend = CreateBackendAndInit();
+
+  // 1. Create an entry and close it.
+  const std::string kKey = "my-key";
+  TestEntryResultCompletionCallback create_cb;
+  disk_cache::EntryResult create_result = create_cb.GetResult(
+      backend->CreateEntry(kKey, net::HIGHEST, create_cb.callback()));
+  ASSERT_THAT(create_result.net_error(), IsOk());
+  auto* created_entry = create_result.ReleaseEntry();
+  base::Time create_time = created_entry->GetLastUsed();
+  created_entry->Close();
+
+  // 2. Advance time.
+  task_environment_.AdvanceClock(base::Minutes(1));
+
+  // 3. Start opening the entry. This is an async operation.
+  base::test::TestFuture<EntryResult> open_future;
+  ASSERT_EQ(backend->OpenEntry(kKey, net::HIGHEST, open_future.GetCallback())
+                .net_error(),
+            net::ERR_IO_PENDING);
+
+  // 4. Call OnExternalCacheHit.
+  base::Time hit_time = base::Time::Now();
+  EXPECT_NE(create_time, hit_time);
+  backend->OnExternalCacheHit(kKey);
+
+  // 5. Wait for OpenEntry to complete.
+  EntryResult open_result = open_future.Take();
+  ASSERT_THAT(open_result.net_error(), IsOk());
+  auto* entry = open_result.ReleaseEntry();
+
+  // 6. The entry's last_used time should be the time of the external hit.
+  EXPECT_EQ(entry->GetLastUsed(), hit_time);
+  entry->Close();
+}
+
 // Tests that calling Doom() multiple times on the same entry is safe and
 // idempotent.
 TEST_F(SqlBackendImplTest, MultipleDoomsOnSameEntry) {
@@ -666,8 +734,9 @@ TEST_F(SqlBackendImplTest, MultipleDoomsOnSameEntry) {
 }
 
 // Tests that recursive calls to OpenNextEntry from within its callback do not
-// starve normal operations. This is prevented by releasing the exclusive
-// operation handle before invoking the callback.
+// starve normal operations. The ExclusiveOperationCoordinator's sequence-based
+// scheduling ensures that the older normal operation (CreateEntry) is executed
+// before the newer exclusive operation (the second OpenNextEntry).
 TEST_F(SqlBackendImplTest, RecursiveOpenNextEntry) {
   auto backend = CreateBackendAndInit();
 

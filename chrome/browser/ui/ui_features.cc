@@ -100,6 +100,13 @@ BASE_FEATURE(kPressAndHoldEscToExitBrowserFullscreen,
              "PressAndHoldEscToExitBrowserFullscreen",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// When enabled, reloading using the toolbar button, hotkey, and web contents
+// context menu will only reload the active tab. The tab context menu will still
+// use the selection model to reload.
+BASE_FEATURE(kReloadSelectionModel,
+             "ReloadSelectionModel",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // When enabled, a scrim is shown behind window modal dialogs to cover the
 // entire browser window. This gives user a visual cue that the browser window
 // is not interactable.
@@ -122,13 +129,21 @@ BASE_FEATURE_PARAM(base::TimeDelta,
                    &kSideBySide,
                    "drop_target_show_delay",
                    base::Milliseconds(700));
-
-// The padding inside the drop target that determines the overall width.
 BASE_FEATURE_PARAM(int,
-                   kSideBySideDropTargetInnerPadding,
+                   kSideBySideDropTargetMinWidth,
                    &kSideBySide,
-                   "drop_target_inner_padding",
-                   37);
+                   "drop_target_min_width",
+                   88);
+BASE_FEATURE_PARAM(int,
+                   kSideBySideDropTargetMaxWidth,
+                   &kSideBySide,
+                   "drop_target_max_width",
+                   360);
+BASE_FEATURE_PARAM(int,
+                   kSideBySideDropTargetTargetWidthPercentage,
+                   &kSideBySide,
+                   "drop_target_width_percentage",
+                   20);
 
 constexpr base::FeatureParam<MiniToolbarActiveConfiguration>::Option
     kMiniToolbarActiveConfigurationOptions[] = {
@@ -161,7 +176,7 @@ BASE_FEATURE(kSideBySideLinkMenuNewBadge,
 
 BASE_FEATURE(kSidePanelResizing,
              "SidePanelResizing",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTabDuplicateMetrics,
              "TabDuplicateMetrics",
@@ -503,6 +518,12 @@ BASE_FEATURE_PARAM(bool,
                    kPageActionsMigrationFind,
                    &kPageActionsMigration,
                    "find",
+                   false);
+
+BASE_FEATURE_PARAM(bool,
+                   kPageActionsMigrationCollaborationMessaging,
+                   &kPageActionsMigration,
+                   "collaboration_messaging",
                    false);
 
 BASE_FEATURE(kSavePasswordsContextualUi,

@@ -103,6 +103,10 @@ tabs::GlicNudgeController* ContextualCueingHelper::GetGlicNudgeController() {
   return browser->browser_window_features()->glic_nudge_controller();
 }
 
+void ContextualCueingHelper::PrimaryPageChanged(content::Page& page) {
+  has_first_contentful_paint_ = false;
+}
+
 void ContextualCueingHelper::DidFinishNavigation(
     content::NavigationHandle* navigation_handle) {
   // Ignore sub-frame and uncommitted navigations.
@@ -124,21 +128,21 @@ void ContextualCueingHelper::DidFinishNavigation(
     return;
   }
 
-  // Ignore fragment changes.
-  if (navigation_handle->GetPreviousPrimaryMainFrameURL().GetWithoutRef() ==
-      navigation_handle->GetURL().GetWithoutRef()) {
-    return;
-  }
-
   // Reset FCP state.
   has_first_contentful_paint_ = false;
 
   // Clear zero state suggestions if needed.
-  if (base::FeatureList::IsEnabled(kGlicZeroStateSuggestions) &&
+  if (IsZeroStateSuggestionsEnabled() && navigation_handle->IsSameDocument() &&
       ZeroStateSuggestionsPageData::GetForPage(
           web_contents()->GetPrimaryPage())) {
     ZeroStateSuggestionsPageData::DeleteForPage(
         web_contents()->GetPrimaryPage());
+  }
+
+  // Ignore fragment changes.
+  if (navigation_handle->GetPreviousPrimaryMainFrameURL().GetWithoutRef() ==
+      navigation_handle->GetURL().GetWithoutRef()) {
+    return;
   }
 
   if (!base::FeatureList::IsEnabled(kContextualCueing)) {
@@ -194,7 +198,7 @@ void ContextualCueingHelper::PrimaryMainDocumentElementAvailable() {
 }
 
 void ContextualCueingHelper::OnFirstContentfulPaintInPrimaryMainFrame() {
-  if (!base::FeatureList::IsEnabled(kGlicZeroStateSuggestions)) {
+  if (!IsZeroStateSuggestionsEnabled()) {
     return;
   }
 
@@ -209,7 +213,7 @@ void ContextualCueingHelper::OnFirstContentfulPaintInPrimaryMainFrame() {
 }
 
 void ContextualCueingHelper::DocumentOnLoadCompletedInPrimaryMainFrame() {
-  if (!base::FeatureList::IsEnabled(kGlicZeroStateSuggestions)) {
+  if (!IsZeroStateSuggestionsEnabled()) {
     return;
   }
 

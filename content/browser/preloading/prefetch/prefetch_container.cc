@@ -290,9 +290,6 @@ class PrefetchContainer::SinglePrefetch {
 
   const bool is_isolated_network_context_required_;
 
-  // Whether this |url_| is eligible to be prefetched
-  std::optional<PreloadingEligibility> eligibility_;
-
   // This tracks whether the cookies associated with |url_| have changed at
   // some point after the initial eligibility check.
   std::unique_ptr<PrefetchCookieListener> cookie_listener_;
@@ -777,8 +774,17 @@ void PrefetchContainer::SetPrefetchStatus(PrefetchStatus prefetch_status) {
   // only be called once prefetching has actually started, and not for
   // ineligible or eligibled but not started triggers (e.g., holdback triggers,
   // triggers waiting on a queue).
-  if (GetLoadState() == LoadState::kStarted) {
-    SetTriggeringOutcomeAndFailureReasonFromStatus(prefetch_status);
+  switch (GetLoadState()) {
+    case LoadState::kStarted:
+    case LoadState::kDeterminedHead:
+    case LoadState::kCompletedOrFailed:
+      SetTriggeringOutcomeAndFailureReasonFromStatus(prefetch_status);
+      break;
+    case LoadState::kNotStarted:
+    case LoadState::kEligible:
+    case LoadState::kFailedIneligible:
+    case LoadState::kFailedHeldback:
+      break;
   }
   SetPrefetchStatusWithoutUpdatingTriggeringOutcome(prefetch_status);
 }
@@ -860,6 +866,14 @@ void PrefetchContainer::SetLoadState(LoadState new_load_state) {
     case LoadState::kFailedHeldback:
       CHECK_EQ(load_state_, LoadState::kEligible);
       break;
+
+    case LoadState::kDeterminedHead:
+      CHECK_EQ(load_state_, LoadState::kStarted);
+      break;
+
+    case LoadState::kCompletedOrFailed:
+      CHECK_EQ(load_state_, LoadState::kDeterminedHead);
+      break;
   }
   DVLOG(1) << (*this) << " LoadState " << load_state_ << " -> "
            << new_load_state;
@@ -876,8 +890,6 @@ void PrefetchContainer::OnAddedToPrefetchService() {
 
 void PrefetchContainer::OnEligibilityCheckComplete(
     PreloadingEligibility eligibility) {
-  SinglePrefetch& this_prefetch = GetCurrentSinglePrefetchToPrefetch();
-  this_prefetch.eligibility_ = eligibility;
   preload_pipeline_info_->SetPrefetchEligibility(eligibility);
   for (auto& preload_pipeline_info : inherited_preload_pipeline_infos_) {
     preload_pipeline_info->SetPrefetchEligibility(eligibility);
@@ -925,13 +937,6 @@ void PrefetchContainer::OnEligibilityCheckComplete(
       SetPrefetchStatus(PrefetchStatus::kPrefetchFailedIneligibleRedirect);
     }
   }
-}
-
-bool PrefetchContainer::IsInitialPrefetchEligible() const {
-  DCHECK(redirect_chain_.size() > 0);
-  return redirect_chain_[0]->eligibility_ &&
-         redirect_chain_[0]->eligibility_.value() ==
-             PreloadingEligibility::kEligible;
 }
 
 void PrefetchContainer::AddRedirectHop(const net::RedirectInfo& redirect_info) {
@@ -1277,6 +1282,8 @@ void PrefetchContainer::Reader::OnPrefetchProbeResult(
 }
 
 void PrefetchContainer::OnDeterminedHead() {
+  SetLoadState(LoadState::kDeterminedHead);
+
   if (GetNonRedirectHead()) {
     time_header_determined_successfully_ = base::TimeTicks::Now();
   }
@@ -1321,7 +1328,7 @@ void PrefetchContainer::SetPrefetchResponseCompletedCallbackForTesting(
       std::move(callback);
 }
 
-void PrefetchContainer::OnPrefetchComplete(
+void PrefetchContainer::OnPrefetchCompleteInternal(
     const network::URLLoaderCompletionStatus& completion_status) {
   DVLOG(1) << *this << "::OnPrefetchComplete";
 
@@ -1396,8 +1403,15 @@ void PrefetchContainer::OnPrefetchComplete(
         break;
     }
   }
+}
+
+void PrefetchContainer::OnPrefetchComplete(
+    const network::URLLoaderCompletionStatus& completion_status) {
+  SetLoadState(LoadState::kCompletedOrFailed);
+  OnPrefetchCompleteInternal(completion_status);
 
   std::optional<int> response_code = std::nullopt;
+  int net_error = completion_status.error_code;
   if (net_error == net::OK && GetNonRedirectHead() &&
       GetNonRedirectHead()->headers) {
     response_code = GetNonRedirectHead()->headers->response_code();
@@ -1449,6 +1463,8 @@ PrefetchContainer::ServableState PrefetchContainer::GetServableState(
         return ServableState::kShouldBlockUntilEligibilityGot;
       case LoadState::kFailedIneligible:
       case LoadState::kStarted:
+      case LoadState::kDeterminedHead:
+      case LoadState::kCompletedOrFailed:
       case LoadState::kFailedHeldback:
         // nop
         break;
@@ -1874,6 +1890,10 @@ std::ostream& operator<<(std::ostream& ostream,
       return ostream << "FailedIneligible";
     case PrefetchContainer::LoadState::kStarted:
       return ostream << "Started";
+    case PrefetchContainer::LoadState::kDeterminedHead:
+      return ostream << "DeterminedHead";
+    case PrefetchContainer::LoadState::kCompletedOrFailed:
+      return ostream << "CompletedOrFailed";
     case PrefetchContainer::LoadState::kFailedHeldback:
       return ostream << "FailedHeldback";
   }

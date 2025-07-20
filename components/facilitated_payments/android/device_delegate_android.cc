@@ -23,11 +23,7 @@
 namespace payments::facilitated {
 
 DeviceDelegateAndroid::DeviceDelegateAndroid(content::WebContents* web_contents)
-    : web_contents_(web_contents->GetWeakPtr()) {
-  app_status_listener_ = base::android::ApplicationStatusListener::New(
-      base::BindRepeating(&DeviceDelegateAndroid::OnApplicationStateChanged,
-                          weak_ptr_factory_.GetWeakPtr()));
-}
+    : web_contents_(web_contents->GetWeakPtr()) {}
 
 DeviceDelegateAndroid::~DeviceDelegateAndroid() = default;
 
@@ -47,31 +43,44 @@ void DeviceDelegateAndroid::LaunchPixAccountLinkingPage() {
       env, web_contents_->GetTopLevelNativeWindow()->GetJavaObject());
 }
 
-void DeviceDelegateAndroid::SetOnReturnToChromeCallback(
+void DeviceDelegateAndroid::SetOnReturnToChromeCallbackAndObserveAppState(
     base::OnceClosure callback) {
   on_return_to_chrome_callback_ = std::move(callback);
+  // It's possible that Chrome is already in the background when the app status
+  // listener is initialized.
+  is_chrome_in_background_ =
+      base::android::ApplicationStatusListener::GetState() ==
+      base::android::ApplicationState::APPLICATION_STATE_HAS_STOPPED_ACTIVITIES;
+  app_status_listener_ = base::android::ApplicationStatusListener::New(
+      base::BindRepeating(&DeviceDelegateAndroid::OnApplicationStateChanged,
+                          weak_ptr_factory_.GetWeakPtr()));
 }
 
 void DeviceDelegateAndroid::OnApplicationStateChanged(
     base::android::ApplicationState state) {
-  // If there's no active callback, there's no need to track app state.
-  if (!on_return_to_chrome_callback_) {
-    return;
+  if (on_application_state_changed_callback_for_testing_) {
+    std::move(on_application_state_changed_callback_for_testing_).Run();
   }
-  // Chrome app is moved to the background.
-  if (state == base::android::ApplicationState::
-                   APPLICATION_STATE_HAS_STOPPED_ACTIVITIES) {
+
+  // The observer is initialized only after setting the callback, and is reset
+  // after the callback is run.
+  CHECK(on_return_to_chrome_callback_);
+
+  if (state ==
+      base::android::ApplicationState::
+          APPLICATION_STATE_HAS_STOPPED_ACTIVITIES) {  // Chrome to background.
     is_chrome_in_background_ = true;
-    // Chrome app is moved to the foreground.
-  } else if (state == base::android::ApplicationState::
-                          APPLICATION_STATE_HAS_RUNNING_ACTIVITIES) {
-    // The callback is run only if Chrome was moved to background before coming
-    // back to the foreground.
+  } else if (state ==
+             base::android::ApplicationState::
+                 APPLICATION_STATE_HAS_RUNNING_ACTIVITIES) {  // Chrome to
+                                                              // foreground.
     if (!is_chrome_in_background_) {
       return;
     }
-    is_chrome_in_background_ = false;
     std::move(on_return_to_chrome_callback_).Run();
+
+    // No need to observe until the next Pix account linking flow.
+    app_status_listener_.reset();
   }
 }
 
@@ -80,7 +89,8 @@ DeviceDelegateAndroid::GetSupportedPaymentApps(const GURL& payment_link_url) {
   JNIEnv* env = base::android::AttachCurrentThread();
   base::android::ScopedJavaLocalRef<jobjectArray> raw_array =
       Java_DeviceDelegate_getSupportedPaymentApps(
-          env, url::GURLAndroid::FromNativeGURL(env, payment_link_url));
+          env, url::GURLAndroid::FromNativeGURL(env, payment_link_url),
+          web_contents_->GetTopLevelNativeWindow()->GetJavaObject());
   return std::make_unique<FacilitatedPaymentsAppInfoListAndroid>(
       std::move(raw_array));
 }

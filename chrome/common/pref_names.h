@@ -1841,6 +1841,10 @@ inline constexpr char kWebRTCIPHandlingPolicy[] = "webrtc.ip_handling_policy";
 // When no URL pattern matches, WebRTC will default to the policy
 // WebRTCIPHandlingPolicy above.
 inline constexpr char kWebRTCIPHandlingUrl[] = "webrtc.ip_handling_url";
+// Define the WebRTCPostQuantumKeyAgreement policy that controls enabling
+// post-quantum key agreement for WebRTC.
+inline constexpr char kWebRTCPostQuantumKeyAgreement[] =
+    "webrtc.post_quantum_key_agreement";
 // Define range of UDP ports allowed to be used by WebRTC PeerConnections.
 inline constexpr char kWebRTCUDPPortRange[] = "webrtc.udp_port_range";
 // Whether WebRTC event log collection by Google domains is allowed.
@@ -2091,6 +2095,15 @@ inline constexpr char kBrowserSuppressDefaultBrowserPrompt[] =
 // Used to implement the sticky experiment tracking.
 inline constexpr char kDefaultBrowserPromptRefreshStudyGroup[] =
     "browser.default_browser_prompt_refresh_study_group";
+
+#if BUILDFLAG(IS_WIN)
+// The time at which the pin-to-taskbar infobar was last shown.
+inline constexpr char kPinInfoBarLastShown[] = "browser.pin_infobar_last_shown";
+
+// How many times the pin-to-taskbar infobar has been shown.
+inline constexpr char kPinInfoBarTimesShown[] =
+    "browser.pin_infobar_times_shown";
+#endif  // BUILDFLAG(IS_WIN)
 
 #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
 // The time at which the default-PDF-viewer infobar was last shown.
@@ -2649,6 +2662,13 @@ inline constexpr char kMediaCdmOriginData[] = "media.cdm.origin_data";
 inline constexpr char kNetworkServiceSandboxEnabled[] =
     "net.network_service_sandbox";
 #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX)
+
+// If non-zero, then the last major version of Chrome where a failed launch of
+// the network service occurred. A failed launch is defined as either the
+// sandboxed network service process failed to launch entirely, or the network
+// service process was unable to reach UtilityMain to bootstrap IPC and mojo.
+inline constexpr char kNetworkServiceFailedLaunchMajorVersion[] =
+    "net.network_service_failed_launch_major_version";
 
 #if BUILDFLAG(IS_LINUX)
 // Records whether the user has seen an HTTP auth "negotiate" header.
@@ -4261,6 +4281,10 @@ inline constexpr char kManagedLocalNetworkAccessRestrictionsEnabled[] =
 // ServiceWorker-controlled URLs.
 inline constexpr char kPrefetchWithServiceWorkerEnabled[] =
     "preloading.prefetch_with_service_worker_enabled";
+
+// Boolean that specifies whether ServiceWorkerAutoPreload is enabled.
+inline constexpr char kServiceWorkerAutoPreloadEnabled[] =
+    "worker.service_worker_auto_preload_enabled";
 
 }  // namespace prefs
 

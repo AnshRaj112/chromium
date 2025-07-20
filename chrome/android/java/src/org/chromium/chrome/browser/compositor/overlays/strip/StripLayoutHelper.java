@@ -101,6 +101,7 @@ import org.chromium.chrome.browser.tabmodel.TabGroupColorUtils;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilterObserver;
 import org.chromium.chrome.browser.tabmodel.TabModel;
+import org.chromium.chrome.browser.tabmodel.TabModelObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
 import org.chromium.chrome.browser.tasks.tab_management.GroupSharedState;
 import org.chromium.chrome.browser.tasks.tab_management.TabBubbler;
@@ -134,6 +135,7 @@ import org.chromium.ui.widget.RectProvider;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -224,7 +226,7 @@ public class StripLayoutHelper
                 @Nullable Token mSourceTabGroupId;
 
                 @Override
-                public void willMoveTabGroup(int tabModelOldIndex, int tabModelNewIndex) {
+                public void willMoveTabGroup(Token tabGroupId, int currentIndex) {
                     mMovingGroup = true;
                 }
 
@@ -353,6 +355,19 @@ public class StripLayoutHelper
                 }
             };
 
+    private final TabModelObserver mTabModelObserver =
+            new TabModelObserver() {
+                @Override
+                public void onTabSelectionChanged() {
+                    if (mModel == null || mStripTabs.length == 0) return;
+                    for (StripLayoutTab stripTab : mStripTabs) {
+                        mTabDelegate.setIsTabMultiSelected(
+                                stripTab, mModel.isTabMultiSelected(stripTab.getTabId()));
+                    }
+                    mUpdateHost.requestUpdate();
+                }
+            };
+
     // External influences
     private final LayoutUpdateHost mUpdateHost;
     private final LayoutRenderHost mRenderHost;
@@ -431,7 +446,6 @@ public class StripLayoutHelper
     private @Nullable Float mClosingEndMostTabWidth;
 
     // Multi-selection state
-    private final Set<Integer> mMultiSelectedTabs = new HashSet<>();
     private int mAnchorTabId = Tab.INVALID_TAB_ID;
 
     // Tab switch efficiency
@@ -528,6 +542,11 @@ public class StripLayoutHelper
     private @MonotonicNonNull TabContextMenuCoordinator mTabContextMenuCoordinator;
     private @MonotonicNonNull TabGroupListBottomSheetCoordinator
             mTabGroupListBottomSheetCoordinator;
+
+    // Multi selected tab context menu
+    // Set when showMultiSelectedTabsContextMenu is called for the first time.
+    private @MonotonicNonNull MultiSelectedTabsContextMenuCoordinator
+            mMultiSelectedTabsContextMenuCoordinator;
 
     // Tab group share.
     // These are set if shouldEnableGroupSharing() is true.
@@ -790,6 +809,10 @@ public class StripLayoutHelper
         if (mTabGroupListBottomSheetCoordinator != null) {
             mTabGroupListBottomSheetCoordinator.destroy();
             mTabGroupListBottomSheetCoordinator = null;
+        }
+        if (mModel != null) {
+            mModel.removeObserver(mTabModelObserver);
+            mModel = null;
         }
     }
 
@@ -1089,6 +1112,7 @@ public class StripLayoutHelper
         if (getSelectedTabId() != Tab.INVALID_TAB_ID) {
             tabSelected(LayoutManagerImpl.time(), getSelectedTabId(), Tab.INVALID_TAB_ID);
         }
+        mModel.addObserver(mTabModelObserver);
     }
 
     /** Called to notify that the tab state has been initialized. */
@@ -1507,8 +1531,6 @@ public class StripLayoutHelper
      */
     public void willCloseTab(long time, Tab tab) {
         if (tab == null) return;
-        // Remove from multi-selection.
-        mMultiSelectedTabs.remove(tab.getId());
         updateGroupTextAndSharedState(tab.getTabGroupId());
         onWillCloseView(findTabById(tab.getId()));
     }
@@ -2219,6 +2241,39 @@ public class StripLayoutHelper
         mTabContextMenuCoordinator.showMenu(anchorRectProvider, tab.getTabId());
     }
 
+    private void showMultiSelectedTabsContextMenu(List<Integer> tabIds, StripLayoutTab clickedTab) {
+        if (mModel == null || mTabGroupModelFilter == null) return;
+        if (mMultiSelectedTabsContextMenuCoordinator == null) {
+            if (mTabGroupListBottomSheetCoordinator == null) {
+                mTabGroupListBottomSheetCoordinator =
+                        mTabGroupListBottomSheetCoordinatorFactory.create(
+                                mContext,
+                                assumeNonNull(mTabGroupModelFilter.getTabModel().getProfile()),
+                                (newTabGroupId) -> {
+                                    showTabGroupContextMenu(
+                                            findGroupTitle(newTabGroupId),
+                                            /* shouldWaitForUpdate= */ true);
+                                },
+                                /* tabMovedCallback= */ null,
+                                mTabGroupModelFilter,
+                                mBottomSheetController,
+                                /* supportsShowNewGroup= */ true,
+                                /* destroyOnHide= */ false);
+            }
+            mMultiSelectedTabsContextMenuCoordinator =
+                    MultiSelectedTabsContextMenuCoordinator.createContextMenuCoordinator(
+                            mModel,
+                            mTabGroupModelFilter,
+                            mTabGroupListBottomSheetCoordinator,
+                            mMultiInstanceManager,
+                            mWindowAndroid);
+        }
+        RectProvider anchorRectProvider = new RectProvider();
+        getAnchorRect(clickedTab, anchorRectProvider);
+        StripLayoutUtils.performHapticFeedback(mToolbarContainerView);
+        mMultiSelectedTabsContextMenuCoordinator.showMenu(anchorRectProvider, tabIds);
+    }
+
     /**
      * Opens the context menu for the keyboard-focused view, if applicable.
      *
@@ -2566,6 +2621,11 @@ public class StripLayoutHelper
         ResettersForTesting.register(() -> mTabContextMenuCoordinator = null);
     }
 
+    void setMultiSelectedTabsContextMenuCoordinatorForTesting(
+            MultiSelectedTabsContextMenuCoordinator multiSelectedTabsGroupContextMenuCoordinator) {
+        mMultiSelectedTabsContextMenuCoordinator = multiSelectedTabsGroupContextMenuCoordinator;
+    }
+
     private void clearLastHoveredTab() {
         if (mLastHoveredTab == null) {
             return;
@@ -2889,7 +2949,7 @@ public class StripLayoutHelper
         }
         // If multi-selection is active, any click on the tab strip that is not a tab should clear
         // the selection.
-        clearMultiSelection(true);
+        clearMultiSelection(/* clearAnchor= */ true, /* notifyObservers= */ true);
     }
 
     @Override
@@ -2913,17 +2973,48 @@ public class StripLayoutHelper
     private boolean showContextMenu(@Nullable StripLayoutView clickedView) {
         if (clickedView == null) return false;
         if (clickedView instanceof StripLayoutTab clickedTab) {
-            showTabContextMenu(clickedTab);
+            // The current tab is always multi selected. So we need to check if there are more tabs
+            // in multi-selection.
+            if (mModel != null
+                    && mModel.isTabMultiSelected(clickedTab.getTabId())
+                    && mModel.getMultiSelectedTabsCount() > 1) {
+                showMultiSelectedTabsContextMenu(getMultiSelectedTabIds(), clickedTab);
+            } else {
+                if (mModel != null) {
+                    mModel.clearMultiSelection(/* notifyObservers= */ true);
+                }
+                showTabContextMenu(clickedTab);
+            }
             return true;
         } else if (clickedView instanceof CompositorButton button
                 && button.getType() == ButtonType.TAB_CLOSE) {
+            if (mModel != null) {
+                mModel.clearMultiSelection(/* notifyObservers= */ true);
+            }
             showCloseButtonMenu(assumeNonNull((StripLayoutTab) button.getParentView()));
             return true;
         } else if (clickedView instanceof StripLayoutGroupTitle groupTitle) {
+            if (mModel != null) {
+                mModel.clearMultiSelection(/* notifyObservers= */ true);
+            }
             showTabGroupContextMenu(groupTitle, /* shouldWaitForUpdate= */ false);
             return true;
         }
         return false;
+    }
+
+    private List<Integer> getMultiSelectedTabIds() {
+        List<Integer> multiSelectedTabs = new ArrayList<>();
+        if (mModel == null) return multiSelectedTabs;
+        for (StripLayoutTab stripTab : mStripTabs) {
+            if (mModel.isTabMultiSelected(stripTab.getTabId())) {
+                multiSelectedTabs.add(stripTab.getTabId());
+            }
+        }
+        assert multiSelectedTabs.size() == mModel.getMultiSelectedTabsCount()
+                : "Count of multi selected tabs don't match.";
+        assert multiSelectedTabs.size() >= 2 : "Too few tabs in multi selection";
+        return multiSelectedTabs;
     }
 
     /**
@@ -2941,8 +3032,8 @@ public class StripLayoutHelper
         // Restrict modified clicks to mouse input only for a predictable experience.
         // If feature disabled, return to legacy behaviour.
         if (!ChromeFeatureList.sAndroidTabHighlighting.isEnabled() || !isMouseClick) {
-            clearMultiSelection(/* clearAnchor */ true);
             selectTab(tab);
+            clearMultiSelection(/* clearAnchor= */ true, /* notifyObservers= */ true);
             mRenderHost.requestRender();
             return;
         }
@@ -2957,8 +3048,8 @@ public class StripLayoutHelper
         } else if (isCtrlPressed) {
             handleCtrlClick(tab);
         } else {
-            clearMultiSelection(/* clearAnchor */ true);
             selectTab(tab);
+            clearMultiSelection(/* clearAnchor= */ true, /* notifyObservers= */ true);
         }
 
         mRenderHost.requestRender();
@@ -2973,21 +3064,22 @@ public class StripLayoutHelper
      */
     private void handleCtrlClick(StripLayoutTab clickedTab) {
         if (clickedTab == null || clickedTab.isDying() || mModel == null) return;
+        int tabId = clickedTab.getTabId();
         // If the tab is already multi-selected, ctrl click should unselect it.
-        if (mMultiSelectedTabs.contains(clickedTab.getTabId())) {
-            setMultiSelected(clickedTab, false);
-        } else {
-            // If no tabs have been selected, we should multi-select both the newly clicked tab and
-            // the previously selected tab.
-            if (mMultiSelectedTabs.isEmpty()) {
-                StripLayoutTab tab = getSelectedStripTab();
-                if (tab != null) {
-                    setMultiSelected(tab, true);
-                }
+        if (mModel.isTabMultiSelected(tabId)) {
+            if (tabId == getSelectedTabId()) {
+                handleSelectedTabCtrlClicked(tabId);
+                return;
             }
+            mModel.setTabsMultiSelected(Collections.singleton(tabId), false);
+        } else {
+            int oldSelectedTabId = getSelectedTabId();
             // select clicked tab.
-            setMultiSelected(clickedTab, true);
             selectTab(clickedTab);
+            // When Ctrl clicked, even the previous tab gets selected.
+            mModel.setTabsMultiSelected(Set.of(tabId, oldSelectedTabId), true);
+            // Clear anchor tab.
+            mAnchorTabId = Tab.INVALID_TAB_ID;
         }
     }
 
@@ -3002,7 +3094,7 @@ public class StripLayoutHelper
     private void handleShiftClick(StripLayoutTab clickedTab, boolean isDestructive) {
         if (clickedTab == null || clickedTab.isDying() || mModel == null) return;
         if (isDestructive) {
-            clearMultiSelection(/* clearAnchor */ false);
+            clearMultiSelection(/* clearAnchor= */ false, /* notifyObservers= */ false);
         }
         if (mAnchorTabId == Tab.INVALID_TAB_ID) {
             // If there's no anchor, treat the previously selected tab as anchor.
@@ -3015,13 +3107,27 @@ public class StripLayoutHelper
         int startIndex = Math.min(anchorIndex, clickedIndex);
         int endIndex = Math.max(anchorIndex, clickedIndex);
 
+        Set<Integer> selectedTabIds = new HashSet<>();
+        Set<Token> tabGroupIds = new HashSet<>();
         if (startIndex != -1 && endIndex != -1) {
             for (int i = startIndex; i <= endIndex; i++) {
-                if (mMultiSelectedTabs.contains(mStripTabs[i].getTabId())) continue;
-                setMultiSelected(mStripTabs[i], true);
+                int tabId = mStripTabs[i].getTabId();
+                selectedTabIds.add(tabId);
+                Tab tab = mModel.getTabById(tabId);
+                // If part of a tab group, expand the tab group.
+                if (tab == null) return;
+                Token tabGroupId = tab.getTabGroupId();
+                if (tabGroupId != null
+                        && !tabGroupIds.contains(tabGroupId)
+                        && mTabGroupModelFilter != null) {
+                    mTabGroupModelFilter.setTabGroupCollapsed(
+                            tabGroupId, false, /* animate= */ true);
+                    tabGroupIds.add(tabGroupId);
+                }
             }
         }
         selectTab(clickedTab);
+        mModel.setTabsMultiSelected(/* tabIds= */ selectedTabIds, /* isSelected= */ true);
     }
 
     /**
@@ -3042,58 +3148,44 @@ public class StripLayoutHelper
     }
 
     /**
-     * Clears the entire set of multi-selected tabs and updates their visual state.
+     * Clears the entire set of multi-selected tabs.
      *
      * @param clearAnchor If true, the anchor tab for Shift+Click range selection is also reset.
      */
-    private void clearMultiSelection(boolean clearAnchor) {
+    private void clearMultiSelection(boolean clearAnchor, boolean notifyObservers) {
         if (clearAnchor) {
             // Clear anchor tab.
             mAnchorTabId = Tab.INVALID_TAB_ID;
         }
-        if (mMultiSelectedTabs.isEmpty()) return;
-        List<StripLayoutTab> multiSelectedTabs = findTabsByIds(mMultiSelectedTabs);
-        if (multiSelectedTabs != null) {
-            for (StripLayoutTab tab : multiSelectedTabs) {
-                mTabDelegate.setIsTabMultiSelected(tab, false);
+        if (mModel == null) return;
+        mModel.clearMultiSelection(notifyObservers);
+    }
+
+    /**
+     * Handles the specific user action of Ctrl+clicking the currently active tab. This action
+     * deselects the active tab and transfers the active status to another tab within the existing
+     * multi-selection. The new active tab will be the leftmost tab in the current selection. if the
+     * clicked tab is the only one selected, this method does nothing to prevent a state with no
+     * active tab.
+     *
+     * @param tabId The ID of the currently active tab that was clicked.
+     */
+    private void handleSelectedTabCtrlClicked(int tabId) {
+        if (mModel == null || mModel.getMultiSelectedTabsCount() <= 1 || mStripTabs.length <= 1) {
+            // Can't deselect the only tab.
+            return;
+        }
+
+        // Find and select the new active tab, which will be the leftmost tab
+        // in the selection that isn't the one being deselected.
+        for (StripLayoutTab stripTab : mStripTabs) {
+            int id = stripTab.getTabId();
+            if (id != tabId && mModel.isTabMultiSelected(id)) {
+                selectTab(stripTab);
+                mModel.setTabsMultiSelected(Collections.singleton(tabId), false);
+                break;
             }
         }
-        mMultiSelectedTabs.clear();
-    }
-
-    /**
-     * Sets the multi-selected state for a given tab. This updates both the internal tracking set of
-     * selected tabs and the visual state of the tab itself.
-     *
-     * @param tab The {@link StripLayoutTab} to modify.
-     * @param isMultiSelected {@code true} to add the tab to the selection, {@code false} to remove
-     *     it.
-     */
-    private void setMultiSelected(StripLayoutTab tab, boolean isMultiSelected) {
-        if (isMultiSelected) {
-            mMultiSelectedTabs.add(tab.getTabId());
-        } else {
-            mMultiSelectedTabs.remove(tab.getTabId());
-        }
-        mTabDelegate.setIsTabMultiSelected(tab, isMultiSelected);
-    }
-
-    /**
-     * Finds and returns an array of all {@link StripLayoutTab}s that are currently in the
-     * multi-selection set, in the order they appear on the strip.
-     *
-     * @return An immutable {@link List} of the selected {@link StripLayoutTab}s.
-     */
-    public @Nullable List<Integer> getMultiSelectedTabIds() {
-        if (mMultiSelectedTabs.isEmpty()) return null;
-        List<Integer> selectedTabs = getTabIdsInOrder(mMultiSelectedTabs);
-        assert selectedTabs != null && selectedTabs.size() == mMultiSelectedTabs.size()
-                : "Stale TabIds in mMultiSelectedTabs";
-        return selectedTabs;
-    }
-
-    public Set<Integer> getMultiSelectedTabsForTesting() {
-        return mMultiSelectedTabs;
     }
 
     public int getAnchorTabIdForTesting() {

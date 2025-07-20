@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "base/containers/contains.h"
-#include "base/containers/fixed_flat_set.h"
 #include "base/containers/flat_map.h"
 #include "base/containers/flat_set.h"
 #include "base/containers/flat_tree.h"
@@ -45,7 +44,6 @@
 #include "components/optimization_guide/proto/models.pb.h"
 #include "components/prefs/pref_service.h"
 #include "components/services/unzip/public/cpp/unzip.h"
-#include "google_apis/google_api_keys.h"
 #include "mojo/public/cpp/bindings/remote.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 
@@ -110,17 +108,6 @@ void RecordLifecycleState(proto::OptimizationTarget optimization_target,
       event);
 }
 
-// Returns whether models should be fetched from the
-// remote Optimization Guide Service.
-bool ShouldFetchModels(bool off_the_record,
-                       bool component_updates_enabled,
-                       bool should_check_google_api_key_configuration) {
-  return !off_the_record && features::IsModelDownloadingEnabled() &&
-         component_updates_enabled &&
-         (!should_check_google_api_key_configuration ||
-          google_apis::HasAPIKeyConfigured());
-}
-
 // Returns whether the model metadata proto is on the server allowlist.
 bool IsModelMetadataTypeOnServerAllowlist(const proto::Any& model_metadata) {
   static const auto* const kAllowList = new base::flat_set<std::string>{
@@ -180,30 +167,23 @@ PredictionManager::ModelRegistrationInfo::~ModelRegistrationInfo() = default;
 PredictionManager::PredictionManager(
     PredictionModelStore* prediction_model_store,
     scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory,
-    PrefService* pref_service,
-    bool off_the_record,
+    PrefService* local_state,
     const std::string& application_locale,
     OptimizationGuideLogger* optimization_guide_logger,
-    ComponentUpdatesEnabledProvider component_updates_enabled_provider,
     unzip::UnzipperFactory unzipper_factory)
-    : prediction_model_download_manager_(nullptr),
-      prediction_model_store_(prediction_model_store),
+    : prediction_model_store_(prediction_model_store),
       url_loader_factory_(url_loader_factory),
       optimization_guide_logger_(optimization_guide_logger),
-      component_updates_enabled_provider_(component_updates_enabled_provider),
       unzipper_factory_(std::move(unzipper_factory)),
       prediction_model_fetch_timer_(
-          pref_service,
+          local_state,
           base::BindRepeating(
               &PredictionManager::FetchModels,
               // Its safe to use `base::Unretained(this)` here since
               // `prediction_model_fetch_timer_` is owned by `this`.
               base::Unretained(this))),
-      off_the_record_(off_the_record),
       application_locale_(application_locale),
-      model_cache_key_(GetModelCacheKey(application_locale_)),
-      should_check_google_api_key_configuration_(
-          !switches::ShouldSkipGoogleApiKeyConfigurationCheck()) {
+      model_cache_key_(GetModelCacheKey(application_locale_)) {
   DCHECK(prediction_model_store_);
   LoadPredictionModels(GetRegisteredOptimizationTargets());
   LOCAL_HISTOGRAM_BOOLEAN(
@@ -222,40 +202,13 @@ void PredictionManager::AddObserverForOptimizationTargetModel(
     OptimizationTargetModelObserver* observer) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  // A limited number of targets support multiple registrations. In general
-  // multiple registrations are disallowed to mitigate the risk of subtle,
-  // conflicting behavior between two different uses of the same model file. If
-  // adding a target to this set, please document below why it's necessary.
-  constexpr auto kAllowedMultipleRegistrations =
-      base::MakeFixedFlatSet<proto::OptimizationTarget>({
-          // In addition to use by Translate's language detection features, this
-          // model is also needed by the On-Device Model service process, and
-          // ModelExecutionManager monitors for updates on its behalf.
-          proto::OptimizationTarget::OPTIMIZATION_TARGET_LANGUAGE_DETECTION,
-      });
+  CHECK(!model_metadata ||
+        IsModelMetadataTypeOnServerAllowlist(*model_metadata));
 
-  DCHECK(base::Contains(kAllowedMultipleRegistrations, optimization_target) ||
-         !base::Contains(model_registration_info_map_, optimization_target));
-  DCHECK(!model_metadata ||
-         IsModelMetadataTypeOnServerAllowlist(*model_metadata));
-
-  // As DCHECKS don't run in the wild, just do not register the observer if
-  // something is already registered for the type. Otherwise, file reads may
-  // blow up.
-  if (!base::Contains(kAllowedMultipleRegistrations, optimization_target) &&
-      base::Contains(model_registration_info_map_, optimization_target)) {
-    DLOG(ERROR) << "Did not add observer for optimization target "
-                << static_cast<int>(optimization_target)
-                << " since an observer for the target was already registered ";
-    return;
-  }
-
-  auto [it, registered] = model_registration_info_map_.emplace(
+  auto it = model_registration_info_map_.emplace(
       std::piecewise_construct, std::forward_as_tuple(optimization_target),
       std::forward_as_tuple(model_metadata));
-  DCHECK(registered ||
-         base::Contains(kAllowedMultipleRegistrations, optimization_target));
-  it->second.model_observers.AddObserver(observer);
+  it.first->second.model_observers.AddObserver(observer);
   if (optimization_guide_logger_->ShouldEnableDebugLogs()) {
     OPTIMIZATION_GUIDE_LOGGER(
         optimization_guide_common::mojom::LogSource::MODEL_MANAGEMENT,
@@ -292,9 +245,8 @@ void PredictionManager::AddObserverForOptimizationTargetModel(
         << "Registered new OptimizationTarget: " << optimization_target;
   }
 
-  if (ShouldFetchModels(off_the_record_,
-                        component_updates_enabled_provider_.Run(),
-                        should_check_google_api_key_configuration_)) {
+  if (prediction_model_download_manager_ &&
+      prediction_model_download_manager_->ShouldFetchModels()) {
     prediction_model_fetch_timer_.ScheduleFetchOnModelRegistration();
   }
 
@@ -359,9 +311,8 @@ void PredictionManager::FetchModels() {
       static_cast<int>(
           *base_model_info.supported_model_engine_versions().begin()));
 
-  if (!ShouldFetchModels(off_the_record_,
-                         component_updates_enabled_provider_.Run(),
-                         should_check_google_api_key_configuration_)) {
+  if (!prediction_model_download_manager_ ||
+      !prediction_model_download_manager_->ShouldFetchModels()) {
     return;
   }
 
@@ -380,25 +331,21 @@ void PredictionManager::FetchModels() {
 
   // We should have already created a prediction model download manager if we
   // initiated the fetching of models.
-  DCHECK(prediction_model_download_manager_);
-  if (prediction_model_download_manager_) {
-    bool download_service_available =
-        prediction_model_download_manager_->IsAvailableForDownloads();
-    base::UmaHistogramBoolean(
-        "OptimizationGuide.PredictionManager."
-        "DownloadServiceAvailabilityBlockedFetch",
-        !download_service_available);
-    if (!download_service_available) {
-      for (const auto& registration_info : model_registration_info_map_) {
-        RecordLifecycleState(registration_info.first,
-                             ModelDeliveryEvent::kDownloadServiceUnavailable);
-      }
-      // We cannot download any models from the server, so don't refresh them.
-      return;
+  bool download_service_available =
+      prediction_model_download_manager_->IsAvailableForDownloads();
+  base::UmaHistogramBoolean(
+      "OptimizationGuide.PredictionManager."
+      "DownloadServiceAvailabilityBlockedFetch",
+      !download_service_available);
+  if (!download_service_available) {
+    for (const auto& registration_info : model_registration_info_map_) {
+      RecordLifecycleState(registration_info.first,
+                           ModelDeliveryEvent::kDownloadServiceUnavailable);
     }
-
-    prediction_model_download_manager_->CancelAllPendingDownloads();
+    // We cannot download any models from the server, so don't refresh them.
+    return;
   }
+  prediction_model_download_manager_->CancelAllPendingDownloads();
 
   std::vector<proto::ModelInfo> models_info = std::vector<proto::ModelInfo>();
   models_info.reserve(model_registration_info_map_.size());
@@ -535,12 +482,6 @@ bool PredictionManager::ShouldDownloadNewModel(
 void PredictionManager::StartModelDownload(
     proto::OptimizationTarget optimization_target,
     const GURL& download_url) {
-  // We should only be downloading models and updating the store for
-  // on-the-record profiles and after the store has been initialized.
-  DCHECK(prediction_model_download_manager_);
-  if (!prediction_model_download_manager_) {
-    return;
-  }
   if (download_url.is_valid()) {
     prediction_model_download_manager_->StartDownload(download_url,
                                                       optimization_target);
@@ -763,16 +704,15 @@ void PredictionManager::OnPredictionModelsStored() {
 }
 
 void PredictionManager::MaybeInitializeModelDownloads(
+    PrefService* local_state,
     download::BackgroundDownloadService* background_download_service) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   init_time_ = base::TimeTicks::Now();
 
-  // Create the download manager here if we are allowed to.
-  if (features::IsModelDownloadingEnabled() && !off_the_record_ &&
-      !prediction_model_download_manager_) {
+  if (!prediction_model_download_manager_) {
     prediction_model_download_manager_ =
         std::make_unique<PredictionModelDownloadManager>(
-            background_download_service,
+            local_state, background_download_service,
             base::BindRepeating(
                 &PredictionManager::GetBaseModelDirForDownload,
                 // base::Unretained is safe here because the
@@ -787,9 +727,7 @@ void PredictionManager::MaybeInitializeModelDownloads(
 
   // Only load models if there are optimization targets registered.
   if (!model_registration_info_map_.empty() &&
-      ShouldFetchModels(off_the_record_,
-                        component_updates_enabled_provider_.Run(),
-                        should_check_google_api_key_configuration_)) {
+      prediction_model_download_manager_->ShouldFetchModels()) {
     prediction_model_fetch_timer_.MaybeScheduleFirstModelFetch();
   }
 }

@@ -17,6 +17,8 @@
 #include "components/signin/public/identity_manager/identity_utils.h"
 #include "content/public/test/browser_test.h"
 #include "ui/views/test/widget_test.h"
+#include "ui/views/view_class_properties.h"
+#include "ui/views/window/dialog_client_view.h"
 
 namespace {
 
@@ -25,7 +27,10 @@ class DiceMigrationServiceBrowserTest : public SyncTest {
   DiceMigrationServiceBrowserTest() : SyncTest(SINGLE_CLIENT) {}
 
   DiceMigrationService* GetDiceMigrationService() {
-    return DiceMigrationServiceFactory::GetForProfile(GetProfile(0));
+    DiceMigrationService* service =
+        DiceMigrationServiceFactory::GetForProfileIfExists(GetProfile(0));
+    EXPECT_TRUE(service);
+    return service;
   }
 
   signin::IdentityManager* GetIdentityManager() {
@@ -197,6 +202,202 @@ IN_PROC_BROWSER_TEST_F(DiceMigrationServiceBrowserTest,
   EXPECT_EQ(preferences_helper::GetPrefs(0)->GetBoolean(
                 prefs::kExplicitBrowserSignin),
             false);
+}
+
+IN_PROC_BROWSER_TEST_F(DiceMigrationServiceBrowserTest,
+                       PRE_IncrementDialogShownCount) {
+  ASSERT_TRUE(SetupClients());
+
+  signin::MakeAccountAvailable(
+      GetIdentityManager(),
+      signin::AccountAvailabilityOptionsBuilder()
+          .AsPrimary(signin::ConsentLevel::kSignin)
+          // `kWebSignin` is not explicit signin.
+          .WithAccessPoint(signin_metrics::AccessPoint::kWebSignin)
+          .Build(GetAccountEmail()));
+
+  // The user is implicitly signed in.
+  ASSERT_TRUE(
+      GetIdentityManager()->HasPrimaryAccount(signin::ConsentLevel::kSignin));
+  ASSERT_FALSE(preferences_helper::GetPrefs(0)->GetBoolean(
+      prefs::kExplicitBrowserSignin));
+
+  // Show the migration bubble.
+  GetDiceMigrationService()->ShowDiceMigrationOfferDialogIfUserEligible();
+
+  // The dialog shown count is incremented.
+  EXPECT_EQ(preferences_helper::GetPrefs(0)->GetInteger(
+                kDiceMigrationDialogShownCount),
+            1);
+}
+
+IN_PROC_BROWSER_TEST_F(DiceMigrationServiceBrowserTest,
+                       IncrementDialogShownCount) {
+  ASSERT_TRUE(SetupClients());
+
+  ASSERT_EQ(preferences_helper::GetPrefs(0)->GetInteger(
+                kDiceMigrationDialogShownCount),
+            1);
+
+  // The user is implicitly signed in.
+  ASSERT_TRUE(
+      GetIdentityManager()->HasPrimaryAccount(signin::ConsentLevel::kSignin));
+  ASSERT_FALSE(preferences_helper::GetPrefs(0)->GetBoolean(
+      prefs::kExplicitBrowserSignin));
+
+  // Show the migration bubble.
+  GetDiceMigrationService()->ShowDiceMigrationOfferDialogIfUserEligible();
+
+  // The dialog shown count is incremented.
+  EXPECT_EQ(preferences_helper::GetPrefs(0)->GetInteger(
+                kDiceMigrationDialogShownCount),
+            2);
+}
+
+IN_PROC_BROWSER_TEST_F(DiceMigrationServiceBrowserTest, LimitDialogShownCount) {
+  ASSERT_TRUE(SetupClients());
+
+  signin::MakeAccountAvailable(
+      GetIdentityManager(),
+      signin::AccountAvailabilityOptionsBuilder()
+          .AsPrimary(signin::ConsentLevel::kSignin)
+          // `kWebSignin` is not explicit signin.
+          .WithAccessPoint(signin_metrics::AccessPoint::kWebSignin)
+          .Build(GetAccountEmail()));
+
+  // The user is implicitly signed in.
+  ASSERT_TRUE(
+      GetIdentityManager()->HasPrimaryAccount(signin::ConsentLevel::kSignin));
+  ASSERT_FALSE(preferences_helper::GetPrefs(0)->GetBoolean(
+      prefs::kExplicitBrowserSignin));
+
+  // Migration dialog is shown `DiceMigrationService::kMaxDialogShownCount`
+  // times.
+  for (int i = 0; i < DiceMigrationService::kMaxDialogShownCount; ++i) {
+    // Show the migration bubble.
+    GetDiceMigrationService()->ShowDiceMigrationOfferDialogIfUserEligible();
+    ASSERT_TRUE(GetDiceMigrationService()->IsDialogShowing());
+
+    // Dismiss the dialog.
+    views::Widget* dialog_widget =
+        GetDiceMigrationService()->GetDialogWidgetForTesting();
+    ASSERT_TRUE(dialog_widget);
+    views::test::WidgetDestroyedWaiter waiter(dialog_widget);
+    dialog_widget->CloseWithReason(
+        views::Widget::ClosedReason::kCloseButtonClicked);
+    waiter.Wait();
+  }
+
+  // Migration dialog is not shown anymore.
+  GetDiceMigrationService()->ShowDiceMigrationOfferDialogIfUserEligible();
+  EXPECT_FALSE(GetDiceMigrationService()->IsDialogShowing());
+}
+
+IN_PROC_BROWSER_TEST_F(DiceMigrationServiceBrowserTest, FinalDialogVariant) {
+  ASSERT_TRUE(SetupClients());
+
+  signin::MakeAccountAvailable(
+      GetIdentityManager(),
+      signin::AccountAvailabilityOptionsBuilder()
+          .AsPrimary(signin::ConsentLevel::kSignin)
+          // `kWebSignin` is not explicit signin.
+          .WithAccessPoint(signin_metrics::AccessPoint::kWebSignin)
+          .Build(GetAccountEmail()));
+
+  // The user is implicitly signed in.
+  ASSERT_TRUE(
+      GetIdentityManager()->HasPrimaryAccount(signin::ConsentLevel::kSignin));
+  ASSERT_FALSE(preferences_helper::GetPrefs(0)->GetBoolean(
+      prefs::kExplicitBrowserSignin));
+
+  // Returns true if the widget or any of its children has the close button.
+  auto contains_close_button = [&](views::Widget* widget) {
+    auto search = [&](const auto& self, const views::View* view) -> bool {
+      for (const views::View* child : view->children()) {
+        if (child->GetProperty(views::kElementIdentifierKey) ==
+                DiceMigrationService::kCancelButtonElementId ||
+            // Recurse into the child.
+            self(self, child)) {
+          return true;
+        }
+      }
+      return false;
+    };
+    return search(search, widget->GetRootView());
+  };
+
+  for (int i = 0; i < DiceMigrationService::kMaxDialogShownCount; ++i) {
+    // Show the migration bubble.
+    GetDiceMigrationService()->ShowDiceMigrationOfferDialogIfUserEligible();
+    ASSERT_TRUE(GetDiceMigrationService()->IsDialogShowing());
+
+    views::Widget* dialog_widget =
+        GetDiceMigrationService()->GetDialogWidgetForTesting();
+    ASSERT_TRUE(dialog_widget);
+    EXPECT_EQ(contains_close_button(dialog_widget),
+              i != DiceMigrationService::kMaxDialogShownCount - 1);
+
+    // Dismiss the dialog.
+    views::test::WidgetDestroyedWaiter waiter(dialog_widget);
+    dialog_widget->CloseWithReason(
+        views::Widget::ClosedReason::kCloseButtonClicked);
+    waiter.Wait();
+  }
+}
+
+// Account setup is done in the PRE test because the timer is started right upon
+// profile creation when the service is created.
+IN_PROC_BROWSER_TEST_F(DiceMigrationServiceBrowserTest, PRE_StartTimer) {
+  ASSERT_TRUE(SetupClients());
+
+  // Implicitly sign in.
+  signin::MakeAccountAvailable(
+      GetIdentityManager(),
+      signin::AccountAvailabilityOptionsBuilder()
+          .AsPrimary(signin::ConsentLevel::kSignin)
+          // `kWebSignin` is not explicit signin.
+          .WithAccessPoint(signin_metrics::AccessPoint::kWebSignin)
+          .Build(GetAccountEmail()));
+}
+
+IN_PROC_BROWSER_TEST_F(DiceMigrationServiceBrowserTest, StartTimer) {
+  ASSERT_TRUE(SetupClients());
+
+  // The user is implicitly signed in.
+  ASSERT_TRUE(
+      GetIdentityManager()->HasPrimaryAccount(signin::ConsentLevel::kSignin));
+  ASSERT_FALSE(preferences_helper::GetPrefs(0)->GetBoolean(
+      prefs::kExplicitBrowserSignin));
+
+  base::OneShotTimer& timer =
+      GetDiceMigrationService()->GetDialogTriggerTimerForTesting();
+  ASSERT_FALSE(GetDiceMigrationService()->IsDialogShowing());
+  EXPECT_TRUE(timer.IsRunning());
+
+  // Simulate the timer firing.
+  timer.FireNow();
+  EXPECT_TRUE(GetDiceMigrationService()->IsDialogShowing());
+}
+
+// Account setup is done in the PRE test because the timer is started right upon
+// profile creation when the service is created.
+IN_PROC_BROWSER_TEST_F(DiceMigrationServiceBrowserTest,
+                       PRE_ShouldNotStartTimerIfIneligible) {
+  // Turn sync on.
+  ASSERT_TRUE(SetupSync());
+}
+
+IN_PROC_BROWSER_TEST_F(DiceMigrationServiceBrowserTest,
+                       ShouldNotStartTimerIfIneligible) {
+  ASSERT_TRUE(SetupClients());
+  // The user is syncing.
+  ASSERT_TRUE(
+      GetIdentityManager()->HasPrimaryAccount(signin::ConsentLevel::kSync));
+
+  // Syncing user is not eligible, thus the timer was not started.
+  EXPECT_FALSE(
+      GetDiceMigrationService()->GetDialogTriggerTimerForTesting().IsRunning());
+  ASSERT_FALSE(GetDiceMigrationService()->IsDialogShowing());
 }
 
 }  // namespace

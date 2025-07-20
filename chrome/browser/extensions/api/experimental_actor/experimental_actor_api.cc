@@ -9,12 +9,15 @@
 #include <vector>
 
 #include "base/check.h"
+#include "base/command_line.h"
 #include "base/functional/bind.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/version_info/channel.h"
 #include "chrome/browser/actor/actor_keyed_service.h"
 #include "chrome/browser/actor/actor_keyed_service_factory.h"
+#include "chrome/browser/actor/aggregated_journal_file_serializer.h"
 #include "chrome/browser/actor/browser_action_util.h"
 #include "chrome/browser/actor/task_id.h"
 #include "chrome/browser/actor/tools/tab_management_tool_request.h"
@@ -29,6 +32,7 @@
 #include "components/optimization_guide/proto/features/actions_data.pb.h"
 #include "components/optimization_guide/proto/features/model_prototyping.pb.h"
 #include "components/sessions/content/session_tab_helper.h"
+#include "components/tabs/public/tab_interface.h"
 #include "extensions/common/features/feature_channel.h"
 
 namespace extensions {
@@ -74,6 +78,44 @@ void ConvertActionTabId(T* action_payload,
   action_payload->set_tab_id(ConvertSessionTabIdToTabHandle(
       action_payload->tab_id(), browser_context));
 }
+
+const void* const kSerializerKey = &kSerializerKey;
+
+// File location that the actor journal should be serialized to.
+const char kExperimentalActorJournalLog[] = "experimental-actor-journal";
+
+class Serializer : public base::SupportsUserData::Data {
+ public:
+  explicit Serializer(actor::AggregatedJournal& journal) {
+    base::FilePath path =
+        base::CommandLine::ForCurrentProcess()->GetSwitchValuePath(
+            kExperimentalActorJournalLog);
+    if (!path.empty()) {
+      serializer_ =
+          std::make_unique<actor::AggregatedJournalFileSerializer>(journal);
+      serializer_->Init(
+          path, base::BindOnce(&Serializer::InitDone, base::Unretained(this)));
+    }
+  }
+
+  static void EnsureInitialized(content::BrowserContext* context,
+                                actor::AggregatedJournal& journal) {
+    if (!context->GetUserData(kSerializerKey)) {
+      context->SetUserData(kSerializerKey,
+                           std::make_unique<Serializer>(journal));
+    }
+  }
+
+ private:
+  void InitDone(bool success) {
+    if (!success) {
+      serializer_.reset();
+    }
+  }
+
+  std::unique_ptr<actor::AggregatedJournalFileSerializer> serializer_;
+};
+
 }  // namespace
 
 ExperimentalActorApiFunction::ExperimentalActorApiFunction() = default;
@@ -98,6 +140,7 @@ bool ExperimentalActorApiFunction::PreRunValidation(std::string* error) {
     return false;
   }
 
+  Serializer::EnsureInitialized(browser_context(), actor_service->GetJournal());
   return true;
 }
 
@@ -233,8 +276,21 @@ ExperimentalActorExecuteActionFunction::Run() {
   auto* actor_service =
       actor::ActorKeyedServiceFactory::GetActorKeyedService(browser_context());
 
+  actor_service->GetJournal().Log(
+      GURL(), actor::TaskId(action.task_id()), "ExperimentalActorExecutAction",
+      absl::StrFormat("Proto: %s", actor::ToBase64(action)));
+
+  // BuildToolRequest looks for tab_ids on the individual action structs since
+  // that's where Glic puts them. However, the extension puts the tab_id on the
+  // BrowserAction itself. Use the BrowserAction's tab_id as the fallback tab so
+  // that, if Action doesn't provide a tab_id we'll use the
+  // BrowserAction.tab_id. This path should go away once extension clients are
+  // migrated to PerformActions.
+  tabs::TabInterface* browser_action_tab =
+      action.has_tab_id() ? tabs::TabHandle(action.tab_id()).Get() : nullptr;
+
   actor::BuildToolRequestResult requests =
-      actor::BuildToolRequest(action, /*deprecated_fallback_tab=*/nullptr);
+      actor::BuildToolRequest(action, browser_action_tab);
 
   if (!requests.has_value()) {
     return RespondNow(
@@ -348,6 +404,10 @@ ExperimentalActorPerformActionsFunction::Run() {
   }
 
   auto* actor_service = actor::ActorKeyedService::Get(browser_context());
+  actor_service->GetJournal().Log(
+      GURL(), actor::TaskId(actions.task_id()), "ExperimentalActorExecutAction",
+      absl::StrFormat("Proto: %s", actor::ToBase64(actions)));
+
   actor::TaskId task_id(actions.task_id());
 
   actor::BuildToolRequestResult requests = actor::BuildToolRequest(actions);
@@ -385,6 +445,62 @@ void ExperimentalActorPerformActionsFunction::OnActionsFinished(
   }
   Respond(ArgumentList(api::experimental_actor::PerformActions::Results::Create(
       std::move(data_buffer))));
+}
+
+ExperimentalActorRequestTabObservationFunction::
+    ExperimentalActorRequestTabObservationFunction() = default;
+ExperimentalActorRequestTabObservationFunction::
+    ~ExperimentalActorRequestTabObservationFunction() = default;
+
+ExtensionFunction::ResponseAction
+ExperimentalActorRequestTabObservationFunction::Run() {
+  auto params =
+      api::experimental_actor::RequestTabObservation::Params::Create(args());
+  EXTENSION_FUNCTION_VALIDATE(params);
+
+  content::WebContents* web_contents = nullptr;
+  if (!ExtensionTabUtil::GetTabById(params->tab_id, browser_context(),
+                                    include_incognito_information(),
+                                    &web_contents)) {
+    return RespondNow(Error(
+        ErrorUtils::FormatErrorMessage(ExtensionTabUtil::kTabNotFoundError,
+                                       base::NumberToString(params->tab_id))));
+  }
+  tabs::TabInterface* tab =
+      tabs::TabInterface::MaybeGetFromContents(web_contents);
+  // Can be null for pre-render web-contents.
+  // TODO(crbug.com/369319589): Remove this logic.
+  if (!tab) {
+    return RespondNow(Error(
+        ErrorUtils::FormatErrorMessage(ExtensionTabUtil::kTabNotFoundError,
+                                       base::NumberToString(params->tab_id))));
+  }
+
+  auto* actor_service = actor::ActorKeyedService::Get(browser_context());
+  actor_service->RequestTabObservation(
+      *tab, base::BindOnce(&ExperimentalActorRequestTabObservationFunction::
+                               OnObservationFinished,
+                           this));
+
+  return RespondLater();
+}
+
+void ExperimentalActorRequestTabObservationFunction::OnObservationFinished(
+    actor::ActorKeyedService::TabObservationResult observation_result) {
+  if (!observation_result.has_value()) {
+    Respond(Error(observation_result.error()));
+    return;
+  }
+
+  optimization_guide::proto::TabObservation& tab_observation =
+      **observation_result;
+  std::vector<uint8_t> data_buffer(tab_observation.ByteSizeLong());
+  if (!data_buffer.empty()) {
+    tab_observation.SerializeToArray(&data_buffer[0], data_buffer.size());
+  }
+  Respond(ArgumentList(
+      api::experimental_actor::RequestTabObservation::Results::Create(
+          std::move(data_buffer))));
 }
 
 }  // namespace extensions

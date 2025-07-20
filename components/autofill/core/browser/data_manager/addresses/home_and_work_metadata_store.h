@@ -10,10 +10,16 @@
 
 #include "base/functional/callback_forward.h"
 #include "base/memory/raw_ptr.h"
+#include "base/scoped_observation.h"
 #include "components/autofill/core/browser/webdata/autofill_change.h"
 #include "components/prefs/pref_change_registrar.h"
+#include "components/sync/service/sync_service_observer.h"
 
 class PrefService;
+
+namespace syncer {
+class SyncService;
+}
 
 namespace autofill {
 
@@ -46,15 +52,14 @@ class AutofillProfile;
 //   updated.
 // - When profiles are updated remotely, profiles are reloaded from the database
 //   to apply any metadata changes.
-//
-// TODO(crbug.com/354706653): Ensure prefs are cleared on sign-out, after sync
-// has shutdown, to prevent leaking them into different profiles.
-class HomeAndWorkMetadataStore {
+class HomeAndWorkMetadataStore : public syncer::SyncServiceObserver {
  public:
   // `on_change` is called whenever the result of `ApplyMetadata()` changes,
   // for example because pref updates through sync were received.
   HomeAndWorkMetadataStore(PrefService* pref_service,
+                           syncer::SyncService* sync_service,
                            base::RepeatingClosure on_change);
+  ~HomeAndWorkMetadataStore() override;
 
   // Applies any metadata stored to all Home and Work profiles in `profiles`.
   // If the address was removed from Chrome, it is dropped.
@@ -62,10 +67,19 @@ class HomeAndWorkMetadataStore {
   // Conceptually const, but during the initial integration, this populates H/W
   // metadata with default values.
   std::vector<AutofillProfile> ApplyMetadata(
-      std::vector<AutofillProfile> profiles);
+      std::vector<AutofillProfile> profiles,
+      bool is_initial_load);
 
   // Persists the `change` in prefs, if it applies to a Home and Work profile.
   void ApplyChange(const AutofillProfileChange& change);
+
+  // Metadata around address substructure learned through silent updates are
+  // synced for non-H/W addresses. For H/W, they are only kept locally and not
+  // synced through this class. In order to understand how much utility is lost
+  // metrics around silent updates and the usage of silently updated profiles
+  // are tracked.
+  void RecordSilentUpdate(const AutofillProfile& profile);
+  void RecordProfileFill(const AutofillProfile& profile) const;
 
  private:
   // Applies metadata to a single profile, returning the modified profile.
@@ -75,8 +89,13 @@ class HomeAndWorkMetadataStore {
   std::optional<AutofillProfile> ApplyMetadata(AutofillProfile profiles,
                                                int max_use_count);
 
+  // syncer::SyncServiceObserver:
+  void OnStateChanged(syncer::SyncService* sync_service) override;
+
   raw_ptr<PrefService> pref_service_;
   PrefChangeRegistrar change_registrar_;
+  base::ScopedObservation<syncer::SyncService, syncer::SyncServiceObserver>
+      sync_observer_{this};
 };
 
 }  // namespace autofill

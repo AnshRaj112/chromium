@@ -335,4 +335,38 @@ TEST_F(WidgetAXManagerTest, AccessibilityGetNativeViewAccessibleForWindow) {
 #endif
 }
 
+TEST_F(WidgetAXManagerTest, GetTopLevelNativeWindow) {
+  // Null widget should return nullptr.
+  WidgetAXManager null_manager(nullptr);
+  EXPECT_EQ(null_manager.GetTopLevelNativeWindow(), gfx::NativeWindow());
+
+  // Top-level widget should return its native window.
+  gfx::NativeWindow top_native = widget()->GetNativeWindow();
+  EXPECT_EQ(manager()->GetTopLevelNativeWindow(), top_native);
+
+  // Child widget should still return the top-level native window.
+  std::unique_ptr<Widget> child_widget =
+      base::WrapUnique(CreateChildNativeWidgetWithParent(
+          widget(), Widget::InitParams::CLIENT_OWNS_WIDGET));
+  auto* child_mgr = child_widget->ax_manager();
+  EXPECT_EQ(child_mgr->GetTopLevelNativeWindow(), top_native);
+
+  child_widget->CloseNow();
+}
+
+TEST_F(WidgetAXManagerTest, CanFireAccessibilityEvents) {
+  // Null widget should always return false.
+  WidgetAXManager null_mgr(nullptr);
+  EXPECT_FALSE(null_mgr.CanFireAccessibilityEvents());
+
+  // Newly created widget is inactive by default.
+  EXPECT_FALSE(widget()->IsActive());
+  EXPECT_FALSE(manager()->CanFireAccessibilityEvents());
+
+  // Once activated, it should return true.
+  widget()->Activate();
+  EXPECT_TRUE(widget()->IsActive());
+  EXPECT_TRUE(manager()->CanFireAccessibilityEvents());
+}
+
 }  // namespace views::test

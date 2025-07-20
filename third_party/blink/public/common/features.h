@@ -89,6 +89,9 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAudioWorkletThreadRealtimePeriodMac);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAudioWorkletThreadPool);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
+    kAutofillEnableSyntheticSelectMetricsLogging);
+
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
     kAutofillFixFieldsAssociatedWithNestedFormsByParser);
 
 BLINK_COMMON_EXPORT
@@ -98,13 +101,6 @@ BASE_DECLARE_FEATURE(kAutofillSendUnidentifiedKeyAfterFill);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kAutoSpeculationRules);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE_PARAM(bool,
                                                kAutoSpeculationRulesHoldback);
-
-// When synchronousy loading the initial empty document, perform the layout
-// asynchronously.
-// TODO(http://crbug.com/324572951): Remove flag after Finch shows that this is
-// safe and has positive impact.
-BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
-    kAvoidForcedLayoutOnInitialEmptyDocumentInSubframe);
 
 // If enabled, open broadcast channels do not block back/forward cache.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kBFCacheOpenBroadcastChannel);
@@ -242,8 +238,6 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kClientHintsDPR_DEPRECATED);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kClientHintsResourceWidth_DEPRECATED);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kClientHintsViewportWidth_DEPRECATED);
 
-BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kClientHintsXRFormFactor);
-
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kCompressParkableStrings);
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE_PARAM(int,
                                                kMaxDiskDataAllocatorCapacityMB);
@@ -371,6 +365,8 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE_PARAM(
 // DevTools Console.
 // See http://crbug.com/40788570.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kDevToolsImprovedNetworkError);
+
+BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kDevToolsAllowPopoverForcing);
 
 // Enables input IPC to directly target the renderer's compositor thread without
 // hopping through the IO thread first.
@@ -1350,8 +1346,6 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPath2DPaintCache);
 
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPaintHolding);
 
-BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kParkableImagesToDisk);
-
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_CHROMEOS)
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE_PARAM(
     bool,
@@ -1462,9 +1456,6 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
 // crbug.com/353628449 for more details.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPageHideEventForPrerender2);
 
-BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(
-    kPreviewsResourceLoadingHintsSpecificResourceTypes);
-
 #if BUILDFLAG(IS_WIN)
 // Enables prewarming the default font families.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kPrewarmDefaultFontFamilies);
@@ -1527,11 +1518,6 @@ BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE_PARAM(
 // For forcing producing compile hints independent of the platform and
 // kProduceCompileHintsDataProductionLevel.
 BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kForceProduceCompileHints);
-
-// Load V8_COMPILE_HINTS optimization data from OptimizationGuide and
-// transmit it to V8. See `ProduceCompileHints` for the data producer side of
-// this feature.
-BLINK_COMMON_EXPORT BASE_DECLARE_FEATURE(kConsumeCompileHints);
 
 // Cache information about which functions are compiled and use it for eager-
 // compiling those functions when the same script is loaded again.
@@ -1878,8 +1864,6 @@ BLINK_COMMON_EXPORT bool DisplayWarningDeprecateURNIframesUseFencedFrames();
 BLINK_COMMON_EXPORT bool IsFencedFramesEnabled();
 
 BLINK_COMMON_EXPORT bool IsParkableStringsToDiskEnabled();
-
-BLINK_COMMON_EXPORT bool IsParkableImagesToDiskEnabled();
 
 BLINK_COMMON_EXPORT bool IsSetIntervalWithoutClampEnabled();
 

@@ -179,6 +179,9 @@ class CORE_EXPORT HTMLCanvasElement final
   void SetOriginTainted() override { origin_clean_ = false; }
 
   CanvasHibernationHandler* GetHibernationHandler() const;
+  void RecreateHibernationHandler() {
+    hibernation_handler_ = std::make_unique<CanvasHibernationHandler>(*this);
+  }
 
   unsigned IncrementFramesSinceLastCommit() {
     return ++frames_since_last_commit_;
@@ -214,7 +217,6 @@ class CORE_EXPORT HTMLCanvasElement final
   void DoDeferredPaintInvalidation();
 
   void InitializeLayerWithCSSProperties(cc::Layer* layer) override;
-  void PreFinalizeFrame() override;
   void PostFinalizeFrame(FlushReason) override;
 
   CanvasResourceDispatcher* GetOrCreateResourceDispatcher() override;
@@ -286,8 +288,6 @@ class CORE_EXPORT HTMLCanvasElement final
   // method.
   void EnableAccelerationForCanvas2D();
 
-  CanvasResourceProvider* GetOrCreateCanvasResourceProviderForCanvas2D();
-
   void DisableAccelerationForCanvas2D();
 
   // ImageBitmapSource implementation
@@ -301,10 +301,6 @@ class CORE_EXPORT HTMLCanvasElement final
   void SetOffscreenCanvasResource(scoped_refptr<CanvasResource>&&,
                                   viz::ResourceId resource_id) override;
   void Trace(Visitor*) const override;
-
-  void SetCanvas2DResourceProviderForTesting(
-      std::unique_ptr<CanvasResourceProvider> provider,
-      const gfx::Size& size);
 
   static void RegisterRenderingContextFactory(
       std::unique_ptr<CanvasRenderingContextFactory>);
@@ -382,6 +378,24 @@ class CORE_EXPORT HTMLCanvasElement final
   void SetHitTestRegions(VectorOf<ElementHitTestRegion> hit_test_regions);
   const VectorOf<ElementHitTestRegion>& GetHitTestRegions() const;
 
+  // `resource_provider_` must be null.
+  void SetResourceProviderForCanvas2D(
+      std::unique_ptr<CanvasResourceProvider> resource_provider) {
+    CHECK(IsRenderingContext2D());
+    CHECK(!resource_provider_for_canvas2d_);
+    resource_provider_for_canvas2d_ = std::move(resource_provider);
+    UpdateMemoryUsage();
+  }
+
+  // Updates the preferred 2D raster mode based on the state of the context and
+  // GPU acceleration.
+  void UpdatePreferred2DRasterMode();
+
+  // Recreates the resource provider.
+  CanvasResourceProvider* RecreateCanvasResourceProviderForCanvas2D();
+
+  void ResetLayer();
+
  protected:
   void DidMoveToNewDocument(Document& old_document) override;
   void DidRecalcStyle(const StyleRecalcChange change) override;
@@ -395,15 +409,6 @@ class CORE_EXPORT HTMLCanvasElement final
 
   void Dispose();
 
-  // Updates the preferred 2D raster mode based on the state of the context and
-  // GPU acceleration.
-  void UpdatePreferred2DRasterMode();
-
-  // Recreates the resource provider.
-  // TODO(crbug.com/40280152): Remove parameter once the hibernation handler is
-  // an instance variable of this class.
-  CanvasResourceProvider* RecreateCanvasResourceProviderForCanvas2D(
-      CanvasHibernationHandler& hibernation_handler);
   void CreateCanvasResourceProviderForCanvas2D();
 
   void ColorSchemeMayHaveChanged();
@@ -432,7 +437,6 @@ class CORE_EXPORT HTMLCanvasElement final
   bool AreAuthorShadowsAllowed() const override { return false; }
 
   void Reset();
-  void ResetLayer();
 
   void SetSurfaceSize(gfx::Size);
 
@@ -462,21 +466,11 @@ class CORE_EXPORT HTMLCanvasElement final
 
   bool RecreateCanvasInGPURasterModeForCanvas2D();
 
-  // `resource_provider_` must be null.
-  void SetResourceProviderForCanvas2D(
-      std::unique_ptr<CanvasResourceProvider> resource_provider) {
-    CHECK(IsRenderingContext2D());
-    CHECK(!resource_provider_for_canvas2d_);
-    resource_provider_for_canvas2d_ = std::move(resource_provider);
-    UpdateMemoryUsage();
-  }
+  void ChildrenChanged(const ChildrenChange&) override;
 
   FRIEND_TEST_ALL_PREFIXES(HTMLCanvasElementTest, BrokenCanvasHighRes);
 
   std::unique_ptr<CanvasResourceProvider> resource_provider_for_canvas2d_;
-  // `did_fail_to_create_resource_provider_` prevents repeated attempts in
-  // allocating resources after the first attempt failed.
-  bool did_fail_to_create_resource_provider_ = false;
 
   HeapHashSet<WeakMember<CanvasDrawListener>> listeners_;
 
@@ -503,10 +497,6 @@ class CORE_EXPORT HTMLCanvasElement final
 
   // CanvasHibernationHandler is used when canvas has 2d rendering context
   std::unique_ptr<CanvasHibernationHandler> hibernation_handler_;
-
-  // If the ResourceProvider currently exists, replaces it with a
-  // CanvasResourceProvider that was newly created for usage with a 2D context.
-  void DropAndRecreateExistingCanvas2DResourceProvider();
 
   // Used for OffscreenCanvas that controls this HTML canvas element
   // and for low latency mode.

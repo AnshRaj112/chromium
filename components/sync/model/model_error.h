@@ -21,10 +21,7 @@ class ModelError {
 
   // LINT.IfChange(Type)
   enum class Type {
-    // Default value if the error type is not set.
-    // TODO(crbug.com/425629291): Remove this value once we have implemented
-    // proper error handling for all callsites.
-    kUnspecified = 0,
+    // kUnspecified = 0, //deprecated
     kPasswordDbInitFailed = 1,
     kPasswordMergeDecryptionFailed = 2,
     kPasswordMergeUpdateFailed = 3,
@@ -197,18 +194,12 @@ class ModelError {
     kContactInfoFailedToDeleteProfilesOnDisableSync = 184,
     kContactInfoFailedToLoadAutofillWebDatabase = 185,
     kContactInfoFailedToLoadProfilesFromTable = 186,
-    kMaxValue = kContactInfoFailedToLoadProfilesFromTable,
+    kGenericTestError = 187,
+    kMaxValue = kGenericTestError,
   };
   // LINT.ThenChange(//tools/metrics/histograms/metadata/sync/enums.xml:SyncModelError)
 
-  // Creates a set error object with the given location and message.
-
-  // DEPRECATED. Use the constructor with ModelError::Type instead. See
-  // crbug.com/40886237.
-  ModelError(const base::Location& location, const std::string& message);
-
-  // Creates a set error object with the given location and error
-  // type. Do not use this with the default ModelErrorType::kUnspecified value.
+  // Creates a set error object with the given location and error type.
   ModelError(const base::Location& location, Type model_error_type);
 
   ~ModelError();
@@ -216,10 +207,6 @@ class ModelError {
   // The location of the error this object represents. Can only be called if the
   // error is set.
   const base::Location& location() const;
-
-  // The message explaining the error this object represents. Can only be called
-  // if the error is set.
-  const std::string& message() const;
 
   // The type of the error this object represents. Only set if the error type is
   // known. Otherwise, returns ModelErrorType::kUnspecified.
@@ -230,10 +217,9 @@ class ModelError {
 
  private:
   base::Location location_;
-  std::string message_;
   // The type of the error. This is optional to ensure backwards compatibility.
   // It is used for metrics collection.
-  Type type_ = Type::kUnspecified;
+  Type type_;
 };
 
 // Typedef for a simple error handler callback.

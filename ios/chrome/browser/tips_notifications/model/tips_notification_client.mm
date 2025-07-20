@@ -81,6 +81,19 @@ bool TipsNotificationClient::CanHandleNotification(
   return IsTipsNotification(notification.request);
 }
 
+std::optional<NotificationType> TipsNotificationClient::GetNotificationType(
+    UNNotification* notification) {
+  if (!CanHandleNotification(notification)) {
+    return std::nullopt;
+  }
+  std::optional<TipsNotificationType> tips_type =
+      ParseTipsNotificationType(notification.request);
+  if (!tips_type) {
+    return std::nullopt;
+  }
+  return NotificationTypeForTipsNotificationType(tips_type.value());
+}
+
 bool TipsNotificationClient::HandleNotificationInteraction(
     UNNotificationResponse* response) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
@@ -333,6 +346,10 @@ void TipsNotificationClient::RequestNotification(TipsNotificationType type,
         kTipsNotificationId,
         ContentForTipsNotificationType(type, CanSendReactivation(),
                                        profile_name),
+        // TODO(crbug.com/413671723): Implement the logic that uses an almost
+        // instant trigger delta for the notification type
+        // `kTrustedVaultKeyRetrieval` (because we want to ensure that users fix
+        // this issue as soon as possible).
         TipsNotificationTriggerDelta(CanSendReactivation(), user_type_)};
     CheckRateLimitBeforeSchedulingNotification(
         request,
@@ -419,8 +436,6 @@ void TipsNotificationClient::MaybeLogTriggeredNotification() {
       CanSendReactivation() ? "IOS.Notifications.Tips.Proactive.Triggered"
                             : "IOS.Notifications.Tips.Triggered";
   base::UmaHistogramEnumeration(triggered_histogram, type);
-  base::UmaHistogramEnumeration("IOS.Notification.Received",
-                                NotificationTypeForTipsNotificationType(type));
   local_state_->SetInteger(kTipsNotificationsLastTriggered, int(type));
   local_state_->ClearPref(kTipsNotificationsLastSent);
 }

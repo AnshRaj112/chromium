@@ -7,6 +7,7 @@
 #include <optional>
 #include <string_view>
 
+#include "base/test/bind.h"
 #include "base/test/metrics/histogram_tester.h"
 #include "base/test/scoped_feature_list.h"
 #include "base/test/test_future.h"
@@ -70,7 +71,8 @@ class ExecutionEngineBrowserTest : public InProcessBrowserTest {
     ASSERT_TRUE(embedded_test_server()->Start());
     ASSERT_TRUE(embedded_https_test_server().Start());
 
-    auto execution_engine = InitializeExecutionEngine();
+    auto execution_engine =
+        std::make_unique<ExecutionEngine>(browser()->profile());
     ExecutionEngine* raw_execution_engine = execution_engine.get();
     auto task =
         std::make_unique<ActorTask>(GetProfile(), std::move(execution_engine));
@@ -85,11 +87,6 @@ class ExecutionEngineBrowserTest : public InProcessBrowserTest {
   }
 
  protected:
-  virtual std::unique_ptr<ExecutionEngine> InitializeExecutionEngine() {
-    return std::make_unique<ExecutionEngine>(
-        browser()->profile(), browser()->GetActiveTabInterface());
-  }
-
   tabs::TabInterface* active_tab() {
     return browser()->tab_strip_model()->GetActiveTab();
   }
@@ -187,25 +184,7 @@ IN_PROC_BROWSER_TEST_F(ExecutionEngineBrowserTest, TwoClicks) {
   EXPECT_EQ("green", EvalJs(web_contents(), "document.body.bgColor"));
 }
 
-// ActorToolsTest but using the V2 ExecutionEngine API.
-// TODO(crbug.com/411462297): All tests should eventually use the V2 API and the
-// original test harness should be migrated to the new API. New tests should use
-// this harness.
-class ExecutionEngineBrowserTestV2 : public ExecutionEngineBrowserTest {
- public:
-  ExecutionEngineBrowserTestV2() = default;
-  ~ExecutionEngineBrowserTestV2() override = default;
-  explicit ExecutionEngineBrowserTestV2(const ExecutionEngineBrowserTestV2&) =
-      delete;
-  ExecutionEngineBrowserTestV2& operator=(const ExecutionEngineBrowserTestV2&) =
-      delete;
-
-  std::unique_ptr<ExecutionEngine> InitializeExecutionEngine() override {
-    return std::make_unique<ExecutionEngine>(browser()->profile());
-  }
-};
-
-IN_PROC_BROWSER_TEST_F(ExecutionEngineBrowserTestV2, TwoClicksInBackgroundTab) {
+IN_PROC_BROWSER_TEST_F(ExecutionEngineBrowserTest, TwoClicksInBackgroundTab) {
   const GURL url = embedded_test_server()->GetURL("/actor/two_clicks.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
 
@@ -282,7 +261,14 @@ IN_PROC_BROWSER_TEST_F(ExecutionEngineBrowserTest, PrerenderBlockedSite) {
   EXPECT_TRUE(content::ExecJs(
       web_contents(), content::JsReplace("setBlockedSite($1);", blocked_url)));
 
-  actor_task().AddToTabSet(active_tab()->GetHandle());
+  base::RunLoop loop;
+  actor_task().AddTab(
+      active_tab()->GetHandle(),
+      base::BindLambdaForTesting([&](mojom::ActionResultPtr result) {
+        EXPECT_TRUE(IsOk(*result));
+        loop.Quit();
+      }));
+  loop.Run();
 
   // While we have an active task, cancel any prerenders which would be to a
   // blocked site.

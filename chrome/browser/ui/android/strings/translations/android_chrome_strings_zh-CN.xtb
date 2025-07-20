@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">您可以在此处下载 PDF 文件</translation>
 <translation id="107147699690128016">如果您更改文件扩展名，此文件可能会在另一应用中打开并对您的设备造成危害。</translation>
 <translation id="1080365971383768617">在所有设备上使用您的密码</translation>
-<translation id="1087176310396019910">可能是垃圾内容</translation>
 <translation id="1087799850623149508">您可以轻触并按住地址栏将其移到底部</translation>
 <translation id="1089606299949659462">查看完毕！</translation>
 <translation id="1094555143448724771">如需查看您在其他设备中打开的标签页，请同步您的标签页和历史记录</translation>
@@ -32,7 +31,7 @@
 <translation id="1111673857033749125">您在其他设备上保存的书签将列在此处。</translation>
 <translation id="1126696498560056882">管理此设备上的账号</translation>
 <translation id="1129510026454351943">错误详情：<ph name="ERROR_DESCRIPTION" /></translation>
-<translation id="1135018701024399762">无痕模式可实现私密浏览，其他使用此设备的人员无法得知您的浏览信息</translation>
+<translation id="1135018701024399762">无痕模式可实现私密浏览，与您共用设备的其他人无法知晓您浏览了什么内容</translation>
 <translation id="1138458427267715730">当网络中任一网站上的商品降价时，您会收到提醒</translation>
 <translation id="1140317858355046628">如果删除，所有人将立即失去对标签页分组“<ph name="GROUP_NAME" />”的访问权限，并且该分组将从所有设备中删除。</translation>
 <translation id="1142732900304639782">不询问是否翻译这些网站</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">重启 Chrome？</translation>
 <translation id="1428770807407000502">关闭同步功能？</translation>
 <translation id="1430915738399379752">打印</translation>
+<translation id="1433478348197382180">阅读模式</translation>
 <translation id="1435593198351412143">自动打开 PDF 文件</translation>
 <translation id="1437543266176261764">正在“<ph name="APP_NAME" />”应用内运行</translation>
 <translation id="1448440926884431741">在“书签”页面中整理您跟踪的商品</translation>
@@ -248,7 +248,7 @@
 <translation id="213279576345780926">已关闭“<ph name="TAB_TITLE" />”</translation>
 <translation id="2138283760993967204">“管理”图标</translation>
 <translation id="2141396931810938595">根据您的使用情况</translation>
-<translation id="2145315049852051678">Chrome 会定期进行检查，以确保您的浏览器使用最安全的设置。如有任何事项需要审核，我们会通知您。</translation>
+<translation id="2145315049852051678">Chrome 会定期进行检查，确保您的浏览器使用的是最安全的设置。如有任何事项需要审核，我们会通知您。</translation>
 <translation id="2149973817440762519">修改书签</translation>
 <translation id="2158408438301413340">Chrome 无法检查所有密码</translation>
 <translation id="2163089732491971196">如要将 Chrome 数据保存在您的 Google 账号中并使用这些数据，请输入您的口令</translation>
@@ -317,7 +317,7 @@
 <translation id="2453860139492968684">完成</translation>
 <translation id="2461378706168271257">搜索标签页</translation>
 <translation id="2461822463642141190">当前</translation>
-<translation id="2468444275314013497">您的浏览器看起来很安全</translation>
+<translation id="2468444275314013497">您的浏览器很安全</translation>
 <translation id="2472163211318554013">登录即可充分利用 Chrome</translation>
 <translation id="247737702124049222">“图片说明”功能已开启</translation>
 <translation id="2479148705183875116">前往“设置”</translation>
@@ -720,10 +720,11 @@
 <translation id="4306489587293957491">输入</translation>
 <translation id="4307992518367153382">基本</translation>
 <translation id="4311652497846705514">打开 PDF 文件？</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{疑似垃圾内容}other{疑似垃圾内容 (#)}}</translation>
 <translation id="4320177379694898372">未连接到互联网</translation>
 <translation id="4326079409704643112">如要将 Chrome 数据保存在您的 Google 账号中并使用这些数据，请验证是您本人在操作</translation>
 <translation id="433213510553688132">正在关注…</translation>
-<translation id="4335835283689002019">“安全浏览”功能处于关闭状态</translation>
+<translation id="4335835283689002019">“安全浏览”功能已关闭</translation>
 <translation id="4351244548802238354">关闭对话框</translation>
 <translation id="4352287748243729941">要使用您的 <ph name="PROVIDER" /> 密码吗？</translation>
 <translation id="4355272626458588338">您可为重要网页添加书签以便返回查看</translation>
@@ -944,7 +945,7 @@
 <translation id="5246093389635966745">修改工具栏快捷方式</translation>
 <translation id="5252768492075585080">第三方 Cookie 设置</translation>
 <translation id="5264813352784073502">过去 24 小时</translation>
-<translation id="5267572070504076962">开启安全浏览功能，防范危险网站</translation>
+<translation id="5267572070504076962">开启“安全浏览”功能，防范危险网站</translation>
 <translation id="5271967389191913893">设备无法打开要下载的内容。</translation>
 <translation id="5273031377282080577">此设置由您的管理员管理。</translation>
 <translation id="5287338992381051621">{NUM_REVOKED_PERMISSIONS,plural, =1{已退订 1 个未使用网站的通知}other{已退订 # 个未使用网站的通知}}</translation>
@@ -1058,6 +1059,7 @@
 <translation id="580893287573699959">管理您感兴趣的主题和网站</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# 小时前}other{# 小时前}}</translation>
 <translation id="5810288467834065221">版权所有 <ph name="YEAR" /> Google LLC. 保留所有权利。</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{显示通知}other{显示通知}}</translation>
 <translation id="5814749351757353073">随时掌握您最喜爱的网站的最新动态</translation>
 <translation id="5823093032261493462">您仍要从 <ph name="DOWNLOAD_DOMAIN" /> 下载“<ph name="FILE_NAME" />”吗？</translation>
 <translation id="5828921839638612740">您可以在 Chrome 的“设置”页面中删除数据</translation>
@@ -1168,6 +1170,7 @@
 <translation id="6255809143828972562">借助 Chrome 中的工具，您可以安全地浏览并掌控个人数据的安全</translation>
 <translation id="6264376385120300461">仍然下载</translation>
 <translation id="6264485186158353794">返回安全连接</translation>
+<translation id="6267063201726531683">阅读模式底部动作条</translation>
 <translation id="6277522088822131679">打印该页面时出现问题，请重试。</translation>
 <translation id="6278428485366576908">主题</translation>
 <translation id="6284472661216707937">已关闭“在所有设备上都能使用您的密码”功能</translation>
@@ -1191,7 +1194,6 @@
 <translation id="6342069812937806050">刚刚</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026以及另外 <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> 个地址}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026以及另外 <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> 个地址}}</translation>
 <translation id="6345878117466430440">标记为已读</translation>
-<translation id="6347010704471250799">显示通知</translation>
 <translation id="6356893102071098867">确保您选择的是正确的账号</translation>
 <translation id="6363990818884053551">若要开始同步，请验证是您本人在操作</translation>
 <translation id="6364438453358674297">要从历史记录中移除建议吗？</translation>

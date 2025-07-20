@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">អ្នកអាច​ទាញយក PDF បាន​នៅទីនេះ</translation>
 <translation id="107147699690128016">ប្រសិនបើអ្នក​ប្ដូរកន្ទុយ​ឯកសារ ឯកសារនេះ​អាចបើកនៅក្នុងកម្មវិធី​ផ្សេង និងអាចបង្កគ្រោះថ្នាក់ដល់​ឧបករណ៍​របស់អ្នក។</translation>
 <translation id="1080365971383768617">ពាក្យសម្ងាត់លើឧបករណ៍ទាំងអស់របស់អ្នក</translation>
-<translation id="1087176310396019910">អាចជា​សារឥតបានការ</translation>
 <translation id="1087799850623149508">អ្នកអាចចុចឱ្យជាប់ ដើម្បីផ្លាស់ទីរបារអាសយដ្ឋានទៅផ្នែកខាងក្រោម</translation>
 <translation id="1089606299949659462">បញ្ចប់ការពិនិត្យមើលហើយ!</translation>
 <translation id="1094555143448724771">ដើម្បីមើលឃើញផ្ទាំងពីឧបករណ៍ផ្សេងទៀតរបស់អ្នក សូមធ្វើសមកាលកម្មផ្ទាំង និងប្រវត្តិរបស់អ្នក</translation>
@@ -109,6 +108,7 @@
 <translation id="1419753403124156396">ចាប់ផ្ដើម Chrome ឡើងវិញឬ?</translation>
 <translation id="1428770807407000502">បិទ​សមកាលកម្មឬ?</translation>
 <translation id="1430915738399379752">បោះពុម្ព</translation>
+<translation id="1433478348197382180">មុខងារអាន</translation>
 <translation id="1435593198351412143">បើក PDF ដោយ​ស្វ័យប្រវត្តិ</translation>
 <translation id="1437543266176261764">កំពុងដំណើរការក្នុង <ph name="APP_NAME" /></translation>
 <translation id="1448440926884431741">រៀបចំផលិតផលដែលអ្នកតាមដាននៅក្នុងចំណាំ</translation>
@@ -240,6 +240,7 @@
 <translation id="2088833076121753253">ដើម្បីបញ្ចប់​ការរៀបចំការបំពេញស្វ័យប្រវត្តិ សូមចាប់ផ្ដើម Chrome ឡើងវិញឥឡូវនេះ។ ផ្ទាំងរបស់អ្នកនឹងបើកឡើងវិញដោយស្វ័យប្រវត្តិ។</translation>
 <translation id="2091863218454846791">បង្ហាញទិដ្ឋភាពចង្អៀតខ្លាំង</translation>
 <translation id="2093731487903423814">15 នាទី​ចុងក្រោយ</translation>
+<translation id="2096577711562668473">ប្ដូរ​សេវាកម្ម​បំពេញ​ស្វ័យប្រវត្តិ​ដែរទេ?</translation>
 <translation id="2100273922101894616">ចូលស្វ័យប្រវត្តិ</translation>
 <translation id="2109384632594340939">រូបភាព​កម្រងព័ត៌មាន</translation>
 <translation id="2111511281910874386">ចូល​ទៅ​កាន់​ទំព័រ</translation>
@@ -325,6 +326,7 @@
 <translation id="2496180316473517155">ប្រវត្តិរុករក</translation>
 <translation id="2497852260688568942">សមកាលកម្មបានបិទដោយអ្នកគ្រប់គ្រងរបស់អ្នក</translation>
 <translation id="250020030759455918">អ្នក​នឹងមើលឃើញ​ស្ថានភាព​ចូល <ph name="SITE_NAME" />, ទិន្នន័យ​រុករក និង​ទិន្នន័យគេហទំព័រ​របស់អ្នក​នៅក្នុង Chrome</translation>
+<translation id="2502798195266898572">បានបើក​សន្លឹក​ខាងក្រោម​មុខងារអាន​ពេញអេក្រង់</translation>
 <translation id="2510106555128151389">កំពុង​ដំឡើង <ph name="WEBAPK_NAME" />...</translation>
 <translation id="2512234228327349533">ស្វែងរកជម្រើសទិញ</translation>
 <translation id="2513403576141822879">សម្រាប់​ការកំណត់​ច្រើនទៀតពាក់ព័ន្ធនឹង​ឯកជន​ភាព សុវត្ថិភាព និង​ការ​ប្រមូល​ទិន្នន័យ សូមមើល<ph name="BEGIN_LINK" />សមកាលកម្ម​ និង​សេវាកម្ម Google<ph name="END_LINK" /></translation>
@@ -720,6 +722,7 @@
 <translation id="4306489587293957491">បញ្ចូល</translation>
 <translation id="4307992518367153382">មូលដ្ឋាន</translation>
 <translation id="4311652497846705514">បើក PDF ឬ?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{អាចជា​សារឥត​បានការ}other{អាចជា​សារឥត​បានការ (#)}}</translation>
 <translation id="4320177379694898372">គ្មានការភ្ជាប់អ៊ីនធឺណិតទេ</translation>
 <translation id="4326079409704643112">ដើម្បីប្រើ និងរក្សាទុកទិន្នន័យ Chrome នៅក្នុងគណនី Google របស់អ្នក សូមផ្ទៀងផ្ទាត់ថាជាអ្នក</translation>
 <translation id="433213510553688132">កំពុងតាមដាន...</translation>
@@ -933,6 +936,7 @@
 <translation id="5206168361184759344">{FILE_COUNT,plural, =1{កំពុង​ទាញយក​ឯកសារ…}other{កំពុង​ទាញយក​ឯកសារ #…}}</translation>
 <translation id="5210286577605176222">លោតទៅផ្ទាំងពីមុន</translation>
 <translation id="5210365745912300556">បិទផ្ទាំង</translation>
+<translation id="5212800876504289412">ចាប់ផ្ដើម Chrome ឡើងវិញ ដើម្បី​បញ្ចប់​ការផ្លាស់ប្ដូរនេះ។ ផ្ទាំង​បើក​ឡើងវិញ​ដោយ​ស្វ័យប្រវត្តិ នៅពេលអ្នក​ចាប់ផ្ដើម​ឡើងវិញ។</translation>
 <translation id="5215957675041756913">គ្រប់គ្រងទិន្នន័យ និងគណនីរបស់អ្នក</translation>
 <translation id="5218324087477576825">លេខកាត (តម្រូវឲ្យមាន)</translation>
 <translation id="5221437554987713282"><ph name="PERMISSION_1" /> <ph name="PERMISSION_2" /> និង​ច្រើនទៀត <ph name="SEPARATOR" /> Chrome បានដក​ការអនុញ្ញាត​ទាំងនេះ​ចេញ ដោយសារ​អ្នកមិនបាន​ចូលមើល​នាពេល​ថ្មីៗនេះ</translation>
@@ -1058,8 +1062,10 @@
 <translation id="580893287573699959">គ្រប់គ្រង​ប្រធានបទ និង​គេហទំព័រ​ដែលអ្នក​ចាប់អារម្មណ៍</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# ម៉ោងមុន}other{# ម៉ោងមុន}}</translation>
 <translation id="5810288467834065221">រក្សា​សិទ្ធិ <ph name="YEAR" /> Google LLC ។ រក្សាសិទ្ធិ​គ្រប់យ៉ាង។</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{បង្ហាញ​ការជូនដំណឹង}other{បង្ហាញ​ការជូនដំណឹង}}</translation>
 <translation id="5814749351757353073">តាមដានគេហទំព័រដែលអ្នកចូលចិត្ត</translation>
 <translation id="5823093032261493462">តើអ្នក​នៅតែចង់​ទាញយក "<ph name="FILE_NAME" />" ពី <ph name="DOWNLOAD_DOMAIN" /> ឬ?</translation>
+<translation id="5825135637446025843">បន្ទាប់ពី Chrome ចាប់ផ្ដើម​ឡើងវិញ ព័ត៌មាន​ដែលអ្នក​បានរក្សាទុកពី​ក្រុមហ៊ុនផ្ដល់​សេវាកម្មថ្មី​របស់អ្នក​នឹង​ត្រូវបាន​ប្រើ ដើម្បី​បំពេញ​ពាក្យ​សម្ងាត់ កូដសម្ងាត់ អាសយដ្ឋាន វិធីបង់ប្រាក់ និង​ព័ត៌មាន​ផ្សេងទៀត​ដោយ​ស្វ័យប្រវត្តិ។</translation>
 <translation id="5828921839638612740">អ្នកអាច​លុប​ទិន្នន័យ​នៅក្នុង​ការកំណត់ Chrome</translation>
 <translation id="5829586821381540080">បាន​រក្សាទុក​នៅក្នុង <ph name="FOLDER_NAME" /></translation>
 <translation id="583281660410589416">មិនស្គាល់</translation>
@@ -1168,6 +1174,7 @@
 <translation id="6255809143828972562">តាមរយៈ​ឧបករណ៍​ពី Chrome អ្នកអាច​រុករក​ដោយ​សុវត្ថិភាព និង​រក្សា​ការគ្រប់គ្រងបាន</translation>
 <translation id="6264376385120300461">មិនអីទេ ទាញយកចុះ</translation>
 <translation id="6264485186158353794">ត្រលប់ទៅកន្លែងសុវត្ថិភាព</translation>
+<translation id="6267063201726531683">សន្លឹក​ខាងក្រោម​មុខងារអាន</translation>
 <translation id="6277522088822131679">មានបញ្ហាក្នុងការបោះពុម្ពទំព័រ។ សូមព្យាយាមម្តងទៀត។</translation>
 <translation id="6278428485366576908">ធីម</translation>
 <translation id="6284472661216707937">ពាក្យ​សម្ងាត់​នៅលើ​ឧបករណ៍​ទាំងអស់​របស់អ្នក​ត្រូវបានបិទ</translation>
@@ -1175,6 +1182,7 @@
 <translation id="6295158916970320988">គេហទំព័រទាំងអស់</translation>
 <translation id="6296366034485697675">នាំចេញ រួចលុប</translation>
 <translation id="629730747756840877">គណនី</translation>
+<translation id="6300697579369314762">បានបើក​សន្លឹក​ខាងក្រោម​មុខងារអាន​ពាក់កណ្ដាល​អេក្រង់</translation>
 <translation id="6301526076346731664">បើក​ឧបករណ៍​អ្នក​អភិវឌ្ឍន៍</translation>
 <translation id="6303969859164067831">ចាកចេញ ហើយបិទការធ្វើសមកាលកម្ម</translation>
 <translation id="6307241780749477694">ផ្ទៀងផ្ទាត់​ថាជាអ្នក ដើម្បីយក​ពាក្យ​សម្ងាត់​ទាំងអស់​របស់អ្នក​នៅលើ​ឧបករណ៍នេះ</translation>
@@ -1191,7 +1199,6 @@
 <translation id="6342069812937806050">អំបាញ់មិញនេះ</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 និង <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> ទៀត}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 និង <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" /> ទៀត}}</translation>
 <translation id="6345878117466430440">សម្គាល់​ថា​បានអាន​ហើយ</translation>
-<translation id="6347010704471250799">បង្ហាញ​ការជូនដំណឹង</translation>
 <translation id="6356893102071098867">ពិនិត្យមើលថា​អ្នកបាន​ជ្រើសរើស​គណនី​ដែលត្រឹមត្រូវ</translation>
 <translation id="6363990818884053551">ដើម្បី​ចាប់ផ្ដើម​សមកាលកម្ម សូមផ្ទៀងផ្ទាត់ថា​ជាអ្នក</translation>
 <translation id="6364438453358674297">យកការផ្តល់យោបល់ចេញពីប្រវត្តិ?</translation>
@@ -1396,6 +1403,7 @@
 <translation id="71503698506017927">ការ​អ៊ីនគ្រីបដោយប្រើ​ឃ្លាសម្ងាត់​មិនរួមបញ្ចូល​វិធីបង់ប្រាក់ និង​អាសយដ្ឋាន​ពី Google Pay ទេ។
 
 ដើម្បីប្ដូរ​ការកំណត់នេះ សូម<ph name="BEGIN_LINK" />លុប​ទិន្នន័យ Chrome នៅក្នុង​គណនី​របស់អ្នក<ph name="END_LINK" />។</translation>
+<translation id="7151332203500147130">បានបិទ​សន្លឹក​ខាងក្រោម​មុខងារអាន</translation>
 <translation id="7165972437814027679">ស្វែងយល់​បន្ថែម​អំពី​មូលហេតុ​ដែល Chrome ទប់ស្កាត់​ឯកសារ​មួយចំនួន</translation>
 <translation id="7168323970702333693">បានចូលគណនី​ជា <ph name="USER_NAME" />។ បើកការកំណត់។</translation>
 <translation id="7173114856073700355">បើកការកំណត់</translation>

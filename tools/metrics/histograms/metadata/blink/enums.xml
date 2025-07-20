@@ -4663,7 +4663,7 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="4188" label="Fledge"/>
   <int value="4189" label="ElementShowPopover"/>
   <int value="4190" label="ElementHidePopover"/>
-  <int value="4191" label="ValidPopoverAttribute"/>
+  <int value="4191" label="OBSOLETE_ValidPopoverAttribute"/>
   <int value="4192" label="DeprecationExample"/>
   <int value="4193" label="RTCLocalSdpModificationOpusStereo"/>
   <int value="4194" label="NavigatorUAData_Mobile"/>
@@ -6237,6 +6237,11 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="5604" label="HTMLCanvasElementLowLatency_WebGL_Discard"/>
   <int value="5605" label="AnimatedImageUsedMoreThanOnce"/>
   <int value="5606" label="ClipboardPlatformPermissionDenied"/>
+  <int value="5607" label="ValidPopoverAttribute"/>
+  <int value="5608" label="CanvasFallbackContent"/>
+  <int value="5609" label="CanvasFallbackElementContent"/>
+  <int value="5610" label="AutofillMaybeSyntheticSelect"/>
+  <int value="5611" label="AutofillSyntheticSelect"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/public/mojom/use_counter/metrics/web_feature.mojom:WebFeature) -->
@@ -7789,11 +7794,11 @@ Called by update_use_counter_css.py.-->
   <int value="815" label="masonry-auto-tracks (obsolete)"/>
   <int value="816" label="result"/>
   <int value="817" label="animation-trigger-type (obsolete)"/>
-  <int value="818" label="animation-trigger-timeline"/>
-  <int value="819" label="animation-trigger-range-start"/>
-  <int value="820" label="animation-trigger-range-end"/>
-  <int value="821" label="animation-trigger-exit-range-start"/>
-  <int value="822" label="animation-trigger-exit-range-end"/>
+  <int value="818" label="animation-trigger-timeline (obsolete)"/>
+  <int value="819" label="animation-trigger-range-start (obsolete)"/>
+  <int value="820" label="animation-trigger-range-end (obsolete)"/>
+  <int value="821" label="animation-trigger-exit-range-start (obsolete)"/>
+  <int value="822" label="animation-trigger-exit-range-end (obsolete)"/>
   <int value="823" label="interest-show-delay"/>
   <int value="824" label="interest-hide-delay"/>
   <int value="825" label="animation-trigger-range"/>
@@ -7841,7 +7846,7 @@ Called by update_use_counter_css.py.-->
   <int value="867" label="corner-inline-end-shape"/>
   <int value="868" label="corners"/>
   <int value="869" label="border-shape"/>
-  <int value="870" label="animation-trigger-behavior"/>
+  <int value="870" label="animation-trigger-behavior (obsolete)"/>
   <int value="871" label="timeline-trigger-name"/>
   <int value="872" label="timeline-trigger-behavior"/>
   <int value="873" label="timeline-trigger-range-start"/>
@@ -7977,7 +7982,7 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="0" label="PageVisits"/>
   <int value="1" label="CompressionStreams"/>
   <int value="2" label="ViewTransitions"/>
-  <int value="3" label="Popover"/>
+  <int value="3" label="OBSOLETE_Popover"/>
   <int value="4" label="Subgrid"/>
   <int value="5" label="CascadeLayers"/>
   <int value="6" label="AccentColor"/>
@@ -8347,7 +8352,8 @@ Called by update_use_counter_feature_enum.py.-->
   <int value="370" label="WasmMutableGlobals"/>
   <int value="371" label="WasmNonTrappingFloatToInt"/>
   <int value="372" label="WasmSignExtensionOperators"/>
-  <int value="373" label="IncomingCallNotifications"/>
+  <int value="373" label="DRAFT_IncomingCallNotifications"/>
+  <int value="374" label="Popover"/>
 </enum>
 
 <!-- LINT.ThenChange(//third_party/blink/public/mojom/use_counter/metrics/webdx_feature.mojom:WebDXFeature) -->

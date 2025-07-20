@@ -50,6 +50,12 @@ struct CrossThreadCopier<std::optional<media::AudioEncoder::CodecDescription>>
   STATIC_ONLY(CrossThreadCopier);
 };
 
+template <>
+struct CrossThreadCopier<media::EncoderStatus>
+    : public CrossThreadCopierPassThrough<media::EncoderStatus> {
+  STATIC_ONLY(CrossThreadCopier);
+};
+
 // Max size of buffers passed on to encoders.
 const int kMaxChunkedBufferDurationMs = 60;
 
@@ -74,12 +80,12 @@ AudioTrackRecorder::AudioTrackRecorder(
       encoder_task_runner_(std::move(encoder_task_runner)),
       encoder_(CreateAudioEncoder(
           codec,
-          WTF::BindPostTask(
+          BindPostTask(
               main_thread_task_runner,
               CrossThreadBindRepeating(
                   &CallbackInterface::OnEncodedAudio,
                   MakeUnwrappingCrossThreadHandle(callback_interface))),
-          WTF::BindPostTask(
+          BindPostTask(
               main_thread_task_runner,
               CrossThreadBindOnce(
                   &CallbackInterface::OnAudioEncodingError,

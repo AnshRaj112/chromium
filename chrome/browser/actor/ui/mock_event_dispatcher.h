@@ -30,6 +30,16 @@ class MockUiEventDispatcher : public UiEventDispatcher {
               OnPreFirstAct,
               (const FirstActInfo& first_act_info, UiCompleteCallback callback),
               (override));
+
+  MOCK_METHOD(void,
+              OnActorTaskAsyncChange,
+              (const ActorTaskAsyncChange& change, UiCompleteCallback callback),
+              (override));
+
+  MOCK_METHOD(void,
+              OnActorTaskSyncChange,
+              (const ActorTaskSyncChange& change),
+              (override));
 };
 
 std::unique_ptr<UiEventDispatcher> NewMockUiEventDispatcher();

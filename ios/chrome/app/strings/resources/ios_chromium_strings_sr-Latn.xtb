@@ -91,7 +91,6 @@ Još podešavanja koja koriste podatke za poboljšanje doživljaja Chromium-a po
 <translation id="3102849287235003384">Da biste se odjavili sa Google naloga na svim veb-sajtovima, <ph name="BEGIN_LINK" />odjavite se iz Chromium-a<ph name="END_LINK" />.</translation>
 <translation id="3115956258722352278">Želite da podesite Chromium za podrazumevani pregledač?</translation>
 <translation id="3180939591219927904">Uključite Zaključaj kartice bez arhiviranja posle zatvaranja Chromium-a</translation>
-<translation id="3242612358525156339">U podešavanjima uređaja otvorite „<ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" />“ i izaberite „Chromium“</translation>
 <translation id="328933489847748230">{count,plural, =1{Sada se prikazuje 1 Chromium prozor}one{Sada se prikazuje {count} Chromium prozor}few{Sada se prikazuju {count} Chromium prozora}other{Sada se prikazuje {count} Chromium prozora}}</translation>
 <translation id="3344973607274501920">Chromium nije uspeo da vam proveri lozinke. Proverite internet vezu.</translation>
 <translation id="3366305173356742781">Chromium podaci na nalogu</translation>
@@ -114,6 +113,7 @@ Sačekajte nekoliko minuta pre nego što promenite nalog. Ako sada promenite nal
 <translation id="3728124580182886854">Povežite Chromium i druge Google usluge radi personalizacije i drugih svrha</translation>
 <translation id="377649297473651452">Prošireni prikaz Chromium automatskog popunjavanja</translation>
 <translation id="3780779443901618967">Upozorava vas na opasne sajtove, čak i na one za koje Google ranije nije znao, analizirajući više podataka sa sajtova nego standardna zaštita. Možete da izaberete da preskočite upozorenja Chromium-a.</translation>
+<translation id="3804124559081428680">Napomena za Chromium: Potvrdite identitet</translation>
 <translation id="3805899903892079518">Chromium ne može da pristupa slikama ili videima. Omogućite pristup u iOS Settings (Podešavanja iOS-a) &gt; Privacy (Privatnost) &gt; Photos (Slike).</translation>
 <translation id="3816686541346279443">Chromium će vam ponuditi da sačuva lozinku.</translation>
 <translation id="3827545470516145620">Dobijate standardnu bezbednosnu zaštitu na ovom uređaju</translation>
@@ -164,7 +164,6 @@ Da biste promenili ovo podešavanje, <ph name="BEGIN_LINK" />izbrišite Chromium
 <translation id="5042011327527167688">Dodirnite Prikaži pomoću Google mapa u Chromium-u.</translation>
 <translation id="5044871537677053278">Chromium otkriva adrese i koristi Google mape da bi vam pružao uputstva i lokalne informacije.</translation>
 <translation id="5048140766121299007">U podešavanjima <ph name="TEXT_OF_THE_SETTINGS_MENU_ITEM" /> uključite Chromium</translation>
-<translation id="5048795749726991615">Da biste lako pristupali sačuvanim lozinkama u drugim aplikacijama, koristite Chromium za automatsko popunjavanje</translation>
 <translation id="5053429694249468757">Brišu se Chromium podaci…</translation>
 <translation id="5071749685031362629">Chromium za iOS</translation>
 <translation id="5124429847818367226">Sada možete da koristite Chromium svaki put kada pregledate ili dodirnete linkove u porukama, dokumentima i drugim aplikacijama.</translation>

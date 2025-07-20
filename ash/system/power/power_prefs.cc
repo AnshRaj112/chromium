@@ -84,12 +84,14 @@ void RegisterProfilePrefs(PrefRegistrySimple* registry) {
   registry->RegisterIntegerPref(prefs::kPowerAcScreenLockDelayMs, 0);
   registry->RegisterIntegerPref(prefs::kPowerAcIdleWarningDelayMs, 0);
   registry->RegisterIntegerPref(prefs::kPowerAcIdleDelayMs, 510000);
-  registry->RegisterBooleanPref(
-      prefs::kPowerAdaptiveChargingEnabled, true,
-      user_prefs::PrefRegistrySyncable::SYNCABLE_OS_PREF);
+  registry->RegisterBooleanPref(prefs::kPowerAdaptiveChargingEnabled, true);
   registry->RegisterBooleanPref(
       prefs::kPowerAdaptiveChargingNudgeShown, false,
       user_prefs::PrefRegistrySyncable::SYNCABLE_OS_PREF);
+  registry->RegisterBooleanPref(prefs::kPowerChargeLimitEnabled, false);
+  registry->RegisterIntegerPref(
+      prefs::kPowerOptimizedChargingStrategy,
+      chromeos::PowerPolicyController::STRATEGY_ADAPTIVE_CHARGING);
   registry->RegisterIntegerPref(prefs::kPowerBatteryScreenBrightnessPercent,
                                 -1);
   registry->RegisterIntegerPref(prefs::kPowerBatteryScreenDimDelayMs, 300000);
@@ -208,7 +210,6 @@ void PowerPrefs::RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
   registry->RegisterIntegerPref(prefs::kBatteryChargeCustomStopCharging, -1);
 
   registry->RegisterBooleanPref(prefs::kUsbPowerShareEnabled, true);
-  registry->RegisterBooleanPref(prefs::kPowerChargeLimitEnabled, false);
 }
 
 // static
@@ -463,7 +464,7 @@ void PowerPrefs::UpdatePowerPolicyFromPrefs() {
     std::optional<bool> adaptive_charging_enabled =
         prefs->GetBoolean(prefs::kPowerAdaptiveChargingEnabled);
     std::optional<bool> charge_limit_enabled =
-        local_state_->GetBoolean(prefs::kPowerChargeLimitEnabled);
+        prefs->GetBoolean(prefs::kPowerChargeLimitEnabled);
 
     if (adaptive_charging_enabled.value_or(false) &&
         charge_limit_enabled.value_or(false)) {
@@ -542,6 +543,7 @@ void PowerPrefs::ObservePrefs(PrefService* prefs) {
   profile_registrar_->Add(prefs::kPowerQuickLockDelay, update_callback);
   profile_registrar_->Add(prefs::kPowerAdaptiveChargingEnabled,
                           update_callback);
+  profile_registrar_->Add(prefs::kPowerChargeLimitEnabled, update_callback);
 
   UpdatePowerPolicyFromPrefs();
 }
@@ -572,8 +574,6 @@ void PowerPrefs::ObserveLocalStatePrefs(PrefService* prefs) {
   local_state_registrar_->Add(prefs::kBootOnAcEnabled, update_callback);
 
   local_state_registrar_->Add(prefs::kUsbPowerShareEnabled, update_callback);
-
-  local_state_registrar_->Add(prefs::kPowerChargeLimitEnabled, update_callback);
 
   UpdatePowerPolicyFromPrefs();
 }

@@ -302,10 +302,6 @@ void MasonryLayoutAlgorithm::PlaceMasonryItems(
     // Update `running_positions` of the tracks that the items spans to include
     // the size of the item, the size of the gap in the stacking axis, and the
     // margin.
-    //
-    // TODO(celestepan): Once we account for writing direction, we may have to
-    // ensure that we are adding the block/inline size of the item based on
-    // whether or not it is parallel to the direction of the masonry axis.
     auto new_running_position =
         max_position + stacking_axis_gap +
         (is_for_columns ? fragment.BlockSize() + margins.BlockSum()
@@ -367,17 +363,18 @@ GridItems MasonryLayoutAlgorithm::BuildVirtualMasonryItems(
           item_style.GetWritingMode(), GetConstraintSpace().GetWritingMode());
       bool use_item_inline_contribution =
           is_for_columns ? is_parallel : !is_parallel;
-
       // TODO(almaher): Subgrids have extra margin to handle unique gap sizes.
       // This requires access to the subgrid track collection, where that extra
       // margin is accumulated.
       const BoxStrut margins =
           ComputeMarginsFor(space, item_style, GetConstraintSpace());
+      const LayoutUnit margins_sum =
+          is_for_columns ? margins.InlineSum() : margins.BlockSum();
 
       if (use_item_inline_contribution) {
         MinMaxSizes min_max_sizes =
             ComputeMinAndMaxContentContributionForSelf(item_node, space).sizes;
-        min_max_sizes += margins.InlineSum();
+        min_max_sizes += margins_sum;
 
         // We have a repeat() track definition with an auto sized track(s). The
         // current track sizing pass is used to find the track size to apply
@@ -398,7 +395,7 @@ GridItems MasonryLayoutAlgorithm::BuildVirtualMasonryItems(
             ComputeMasonryItemBlockContribution(
                 grid_axis_direction, sizing_constraint, space, &item_data,
                 needs_auto_track_size) +
-            margins.BlockSum();
+            margins_sum;
 
         // We have a repeat() track definition with an auto sized track(s). The
         // current track sizing pass is used to find the track size to apply
@@ -560,16 +557,15 @@ GridSizingTrackCollection MasonryLayoutAlgorithm::ComputeGridAxisTracks(
     node.AdjustMasonryItemSpans(masonry_items, line_resolver);
   }
 
-  return BuildGridAxisTracks(line_resolver, masonry_items,
-                             needs_auto_track_size, sizing_constraint,
-                             start_offset);
+  return BuildGridAxisTracks(line_resolver, masonry_items, sizing_constraint,
+                             needs_auto_track_size, start_offset);
 }
 
 GridSizingTrackCollection MasonryLayoutAlgorithm::BuildGridAxisTracks(
     const GridLineResolver& line_resolver,
     const GridItems& masonry_items,
-    const bool needs_auto_track_size,
     SizingConstraint sizing_constraint,
+    bool& needs_auto_track_size,
     wtf_size_t& start_offset) const {
   const auto& style = Style();
   const auto grid_axis_direction = style.MasonryTrackSizingDirection();
@@ -596,6 +592,13 @@ GridSizingTrackCollection MasonryLayoutAlgorithm::BuildGridAxisTracks(
   GridSizingTrackCollection track_collection(BuildRanges(),
                                              grid_axis_direction);
   track_collection.BuildSets(style, masonry_available_size_);
+
+  // If we didn't find an auto repeater, and we are currently looking for
+  // an auto track size for an auto repeater, unset `needs_auto_track_size`
+  // because that means all repeat tracks have been collapsed, and we no
+  // longer need to run two different track sizing passes.
+  needs_auto_track_size &=
+      track_collection.GetAutoSizedRepeaterTrackIndex() != kNotFound;
 
   if (track_collection.HasNonDefiniteTrack()) {
     GridTrackSizingAlgorithm::CacheGridItemsProperties(track_collection,
@@ -628,9 +631,9 @@ wtf_size_t MasonryLayoutAlgorithm::ComputeAutomaticRepetitions(
       style.MasonryTrackSizingDirection();
   const bool is_for_columns = masonry_track_sizing_direction == kForColumns;
 
-  const GridTrackList& track_list = is_for_columns
-                                        ? style.GridTemplateColumns().track_list
-                                        : style.GridTemplateRows().track_list;
+  const GridTrackList& track_list =
+      is_for_columns ? style.GridTemplateColumns().GetTrackList()
+                     : style.GridTemplateRows().GetTrackList();
 
   if (!track_list.HasAutoRepeater()) {
     return 0;

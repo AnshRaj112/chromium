@@ -27,6 +27,9 @@
 <translation id="1011266755572744012">1 回の印刷ジョブでユーザーが印刷できる用紙の最大数を指定します。
 
       設定しない場合、制限は適用されず、ユーザーは任意の枚数のドキュメントを印刷できます。</translation>
+<translation id="1013949464926722411">このポリシーを設定した場合、リストで指定したオリジンは Device Attributes API を使用してデバイスの属性（シリアル番号やホスト名など）を取得できません。
+
+オリジンは、<ph name="ISOLATED_WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" /> ポリシーを使用して自動インストールされたウェブ アプリケーションか、キオスクアプリとして設定されたウェブ アプリケーションに対応している必要があります。Device Attributes API の仕様については、https://wicg.github.io/WebApiDevice/device_attributes をご覧ください。有効な <ph name="URL_LABEL" /> パターンについて詳しくは、https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns をご覧ください。このポリシーの値に「<ph name="WILDCARD_VALUE" />」は使用できません。</translation>
 <translation id="101438888985615157">画面を 180 度回転</translation>
 <translation id="1017967144265860778">ログイン画面の電源管理</translation>
 <translation id="1018427234617066902">言語のスペルチェックを自動的に有効にします。指定した言語のうち認識されないものは無視されます。
@@ -234,19 +237,6 @@
       このポリシーを無効に設定した場合、ログイン インターセプト ダイアログは表示されません。
       このポリシーを無効に設定した場合でも、管理対象アカウントのプロファイル分離が <ph name="MANAGED_ACCOUNTS_SIGNIN_RESTRICTION_POLICY_NAME" /> によって強制されると、ダイアログが表示されます。</translation>
 <translation id="1158844608156732189">Kerberos 設定（配列アイテムごとに 1 行）です。https://web.mit.edu/kerberos/krb5-1.12/doc/admin/conf_files/krb5_conf.html を参照してください。</translation>
-<translation id="1159241725763211010">レンズ オーバーレイを使用すると、実際のウェブ コンテンツに重ねた現在のページのスクリーンショットを操作して Google で検索することができます。また、現在のページのコンテンツに基づいて Google で検索することもできます。レンズ オーバーレイでは、コンテンツに基づく回答を提供するため、ページのコンテンツが Google に送信され、ユーザーが現在閲覧しているページのコンテキストに沿ってユーザーのクエリの回答が返されます。
-
-この機能を制御するユーザー設定はありません。通常、このポリシーで無効にしない限り、Google をデフォルトの検索エンジンに設定しているすべてのユーザーが使用できます。
-
-0 = この機能の使用と、Google が AI モデルを改善する目的で関連データを使用することを許可します。関連データには、機能に応じてプロンプト、入力内容、出力内容、ソース資料、フィードバックの文面などが含まれます。AI モデルを改善するため、人間のレビュアーが確認する場合もあります。以下に記載している場合を除き、0 がデフォルト値です。
-
-1 = この機能の使用を許可しますが、Google がモデルを改善する目的でユーザーのコンテンツ（プロンプト、入力内容、出力内容、ソース資料、フィードバックの文面など）を使用することは許可しません。1 は、<ph name="GOOGLE_ADMIN_CONSOLE_PRODUCT_NAME" /> で管理されている企業ユーザーと、<ph name="GOOGLE_WORKSPACE_PRODUCT_NAME" /> で管理されている教育機関向けアカウントのデフォルト値です。
-
-2 = この機能を許可しません。
-
-このポリシーを未設定のままにした場合、動作は <ph name="GEN_AI_DEFAULT_SETTINGS_POLICY_NAME" /> ポリシーによって決まります。
-
-生成 AI 機能のデータ処理について詳しくは、https://support.google.com/chrome/a?p=generative_ai_settings をご覧ください。</translation>
 <translation id="1160479894929412407">QUIC プロトコルを許可する</translation>
 <translation id="1160939557934457296">セーフ ブラウジングの警告ページからの続行を無効にする</translation>
 <translation id="1161685818042751282">プラットフォームのトラストストアからユーザーが追加した TLS サーバー証明書をインポートしない。</translation>
@@ -364,7 +354,6 @@
 <translation id="1262993197422487260">ログイン画面とロック画面にパスワード表示ボタンを表示しない</translation>
 <translation id="1265053460044691532">SAML 経由で認証されたユーザーがオフラインでログインできる時間を制限する</translation>
 <translation id="1265076559723566171">EDU ユーザーの設定を管理します</translation>
-<translation id="1268561791350382977">レンズ オーバーレイと AI モデルの改善を許可する。</translation>
 <translation id="1271811620059192171">ポリシーの最小単位グループを有効にする</translation>
 <translation id="127264587838521316"><ph name="PRODUCT_NAME" /> 拡張機能のインストールのリクエストを有効にする</translation>
 <translation id="1272798957154751008">Chromad デバイスのクラウド管理への移行を有効にします</translation>
@@ -1576,6 +1565,17 @@ accounts.google.com など一部の URL は認証に必要です。オンライ�
 <translation id="2168397434410358693">アイドル待機時間（AC 電源での実行時）</translation>
 <translation id="217013996107840632">代替ブラウザからの切り替えに使用するコマンドライン パラメータです。</translation>
 <translation id="2170233653554726857">WPAD 最適化を有効にする</translation>
+<translation id="2170953111275398079">このポリシーでは、<ph name="PRODUCT_NAME" /> が TLS で ML-KEM NIST 標準を使用したポスト量子鍵交換アルゴリズムを提供するかどうかを設定します。<ph name="PRODUCT_NAME" /> 131 より前のアルゴリズムは、標準の初期のドラフト イテレーションである Kyber でした。これにより、対応サーバーでユーザー トラフィックが後から量子コンピュータにより復号されないよう保護できます。
+
+このポリシーを有効に設定するか未設定のままにした場合、<ph name="PRODUCT_NAME" /> により TLS 接続でポスト量子鍵交換が提供されます。その結果、互換性のあるサーバーと通信する際に、ユーザー トラフィックは量子コンピュータから保護されます。
+
+このポリシーを無効にした場合、<ph name="PRODUCT_NAME" /> により TLS 接続でポスト量子鍵交換は提供されません。その結果、ユーザー トラフィックは量子コンピュータから保護されなくなります。
+
+ポスト量子鍵交換の提供には下位互換性があります。既存の TLS サーバーとネットワーク ミドルウェアでは、新しいオプションを無視し、引き続き以前のオプションを選択するものと想定されます。
+
+ただし、デバイスで TLS が正しく実装されていない場合、新しいオプションの提供時に正しく動作しなくなる可能性があります。たとえば、オプションを認識できない場合や、生成されるメッセージが大きくなる場合は、接続が切断されることがあります。このようなデバイスはポスト量子に対応していないため、ポスト量子への移行の妨げになります。その場合は、管理者からベンダーに修正を依頼する必要があります。
+
+このポリシーは一時的なもので、<ph name="PRODUCT_NAME" /> バージョン 145 以降に削除される予定です。テストして問題を探す際には有効にし、問題を解決している間は無効にするとよいでしょう。</translation>
 <translation id="2172201084331314152">カメラ、ブラウザ設定、OS 設定、スキャン、ウェブストア、キャンバス、使い方・ヒント、Crosh、ギャラリー、ターミナル、レコーダー、印刷ジョブ、キー ショートカット、Gmail、Google ドキュメント、Google スライド、Google スプレッドシート、Google ドライブ、Google Keep、Google カレンダー、Google Chat、YouTube、Google マップ、計算機、テキスト エディタの機能を無効にする</translation>
 <translation id="2174946221763588594">ユーザーがアクセスしたサイトで <ph name="WEBXR_API_NAME" /> を使用した没入的な拡張現実セッションの作成を許可するかどうかを構成します。このポリシーを設定しない場合または有効にした場合、<ph name="WEBXR_API_NAME" /> では、<ph name="WEBXR_AR_SESSION_ENUM_VALUE" /> モードでのセッション作成が許可され、ユーザーは拡張現実を体験できるようになります。このポリシーを無効にした場合、<ph name="WEBXR_API_NAME" /> では、<ph name="WEBXR_AR_SESSION_ENUM_VALUE" /> モードでのセッション作成リクエストが拒否されます。既存の <ph name="WEBXR_AR_SESSION_ENUM_VALUE" /> セッションは終了されません（存在する場合）。<ph name="WEBXR_AR_SESSION_ENUM_VALUE" /> セッションの詳細については、<ph name="WEBXR_AR_MODULE_API_NAME" /> 仕様をご覧ください。</translation>
 <translation id="2175353308236295184">一連の Key-Value ペアを指定したアプリ固有の JSON 設定オブジェクトです（例: '"managedConfiguration": { "key1": value1, "key2": value2 }）。キーはアプリのマニフェストで定義されます。</translation>
@@ -1957,6 +1957,7 @@ Android アプリの場合はパッケージ名（「com.google.android.gm」な
 <translation id="2436302465999055995"><ph name="LACROS_NAME" /> のみを使用可能なブラウザにする（未実装）</translation>
 <translation id="2439187682308339104">どのサイトにも WebHID API 経由での HID デバイスへのアクセス要求を許可しない</translation>
 <translation id="2439733504887695659">入力した認証情報に対して不正使用されたパスワードのアラートを非表示にすることを許可する</translation>
+<translation id="2446029789419870019">機能の使用と AI モデルの改善を許可する</translation>
 <translation id="2446244536806499267">オーディオ再生中はユーザーをアイドル状態と見なさない</translation>
 <translation id="2452225615952836461">リクエスト メソッドを常に大文字にする</translation>
 <translation id="2454228136871844693">安定性を重視します。</translation>
@@ -2008,6 +2009,7 @@ Android アプリの場合はパッケージ名（「com.google.android.gm」な
 このポリシーを <ph name="POLICY_VALUE_DISABLEDE" /> に設定した場合、それまでユーザーがファイル同期をオンにしていても、ファイル同期がオフになります。ファイルアプリと設定ではこの機能が非表示になり、ユーザーはこの機能を再びオンにできなくなります。ユーザーがオフラインで使用可能にするよう設定した既存のファイルは引き続きオフラインで使用できます。その場合でも、ユーザーは手動でアイテムをオフラインで使用可能にできます。
 
 このポリシーを未設定のままにした場合は、デフォルトで <ph name="POLICY_VALUE_VISIBLE" /> が選択されます。</translation>
+<translation id="2488455166114458307">Device Attributes API を許可するサイトを指定する</translation>
 <translation id="2489558694350871332">デバイスでの仮想マシンの実行を許可する</translation>
 <translation id="2492240920793040106">セーフ ブラウジングの改善に役立てるためのシステム情報とページ コンテンツのレポートを有効にする</translation>
 <translation id="2496180316473517155">閲覧履歴</translation>
@@ -2121,6 +2123,7 @@ Android アプリの場合はパッケージ名（「com.google.android.gm」な
 <translation id="2568488785376704318">このポリシーはサポートを終了しました。代わりに <ph name="REMOTE_ACCESS_HOST_DOMAIN_LIST_POLICY_NAME" /> を使用してください。</translation>
 <translation id="2570059561924004903">音声フィードバックを無効にする</translation>
 <translation id="2570181623957732921"><ph name="DESK_API_NAME" /> の使用を許可するサードパーティのドメインリストを指定する</translation>
+<translation id="2571821662934804440">AI モデルの改善は行わずに、機能の使用を許可する</translation>
 <translation id="2573850437942404034">許可しない</translation>
 <translation id="2575198840408498393">ローミング プロファイルの作成を無効にする</translation>
 <translation id="25765864042030871"><ph name="UNLOAD_EVENT_NAME" /> イベント ハンドラはサポートを終了する予定です。このイベントが発生するかどうかは、<ph name="UNLOAD_EVENT_NAME" /> の <ph name="PERMISSIONS_POLICY_NAME" /> によって決まります。現在は、ポリシーによりデフォルトで許可されています。今後は、デフォルトで無効になるよう段階的に移行します。サイトでは <ph name="PERMISSIONS_POLICY_NAME" /> ヘッダーを使用して明示的に有効にすることが必要になります。この企業向けのポリシーを使用すると、強制的にデフォルトで有効を維持して、段階的なサポート終了をオプトアウトできます。
@@ -2554,6 +2557,12 @@ Android アプリの場合はパッケージ名（「com.google.android.gm」な
 <translation id="2932796739547676677">このポリシーを True に設定した場合、仮想キーボードはデフォルトでレイアウト ビューポートのサイズを変更します。その他の状態（False や未設定）の場合、効果はありません。なお、これはデフォルトのサイズ変更動作にのみ影響します。ページが &lt;meta&gt; タグや Virtual Keyboard API を使用して特定の動作をリクエストした場合でも、リクエストされたその動作が引き続き適用されます。また、これは短期間だけ有効な「エスケープ ハッチ」ポリシーです。
       </translation>
 <translation id="2939335382784544151">初回実行時の閲覧履歴のインポートを有効にする</translation>
+<translation id="2939606629175440564">このポリシーでは、自動インストールされた独立したウェブアプリまたはキオス アプリケーションにデフォルトで Device Attributes API へのアクセスを許可するかどうかを指定します。
+詳細については、https://wicg.github.io/WebApiDevice/device_attributes をご覧ください。
+
+このポリシーを 1 に設定するか未設定のままにした場合、自動インストールされた独立したウェブアプリとキオスク アプリケーションに API の使用を許可します。
+
+このポリシーを 2 に設定した場合、自動インストールされた独立したウェブアプリとキオスク アプリケーションに API の使用を許可しません。</translation>
 <translation id="2940127076681735544">このポリシーが有効な URL に設定されている場合、<ph name="PRODUCT_NAME" /> はその URL からサイトリストをダウンロードし、<ph name="SITELIST_POLICY_NAME" /> ポリシーで設定されているものとしてルールを適用します。
 
       このポリシーが未設定のままか、無効な URL に設定されている場合、<ph name="PRODUCT_NAME" /> は、このポリシーをブラウザの切り替えを行うルールの参照元として使用しません。
@@ -2780,6 +2789,7 @@ false に設定した場合、教師はこの機能にアクセスできませ�
 レポートには、プロファイルの状態と使用状況に関する情報が含められます。これには、OS バージョン、ブラウザ バージョン、インストールされている拡張機能と適用されているポリシーが含まれます（ただしこれらに限定されません）。
 
 このポリシーは、クラウド ユーザー ポリシーとしてのみ設定できます。</translation>
+<translation id="3062559845875011810">機能を許可しない</translation>
 <translation id="3063302084011279315">スクリーンキャストを無効にする</translation>
 <translation id="3063307261083019730"><ph name="CACHE_CONTROL_NO_STORE_NAME" /> ヘッダーを含むページのバックフォワード キャッシュへの保存を許可しない。</translation>
 <translation id="3064530882228745118">Kerberos 認証時に CNAME 検索を使用する</translation>
@@ -3564,12 +3574,19 @@ SwiftShader は、ヘッドレス システムや仮想マシンなど、GPU ア
 <translation id="3647212518036289905">このポリシーでは、HTTP 認証で使用する GSSAPI ライブラリを指定できます。ポリシーには、ライブラリ名またはフルパスのいずれかを指定します。
 
       このポリシーを未設定のままにした場合、<ph name="PRODUCT_NAME" /> ではデフォルトのライブラリ名が使用されます。</translation>
+<translation id="3647756189889410780">https://github.com/WICG/service-worker-auto-preload
+ServiceWorkerAutoPreload 機能では、ServiceWorker ブートストラップ プロセスの開始と同時にメインリソースのネットワーク リクエストをディスパッチします。
+
+このポリシーを有効に設定するか未設定のままにした場合、<ph name="PRODUCT_NAME" /> で ServiceWorkerAutoPreload が有効になります。ナビゲーション リクエストは、特定の状況（ServiceWorker が実行されていない場合など）で ServiceWorker の起動時に自動的にディスパッチされます。
+
+この設定を無効に設定した場合、<ph name="PRODUCT_NAME" /> で ServiceWorkerAutoPreload は有効になりません。ナビゲーション リクエストは、必ず ServiceWorker の起動後にディスパッチされます。
+
+このポリシーは機能を制御するための一時的な措置で、M144 で削除される予定です。</translation>
 <translation id="3650122925429054129">ログイン画面でカーソルによるハイライト表示を無効にする</translation>
 <translation id="365093517647222762">関連付けられたユーザーのデバイスから、<ph name="REPORT_WEBSITE_TELEMETRY_ALLOWLIST_POLICY_NAME" /> ポリシーで指定した許可リストの URL について、ウェブサイトのテレメトリー データをレポートします。
 
 このポリシーを設定した場合、指定したテレメトリー データのタイプについて、ウェブサイトのテレメトリー レポートを送信します。
 設定しない場合、ウェブサイトのテレメトリー データは報告されません。</translation>
-<translation id="3651483357891254380">AI モデルの改善は行わずにレンズ オーバーレイを許可する。</translation>
 <translation id="3652670852519271837">サイトが File System API を経由したファイルとディレクトリへの読み取りアクセスをユーザーに要求することを許可する</translation>
 <translation id="3653237928288822292">デフォルトの検索プロバイダ アイコン</translation>
 <translation id="3654906736796256792">音声処理のサンドボックス化を許可する</translation>
@@ -3744,6 +3761,10 @@ Chrome 114 までは、このポリシーを使用するには <ph name="SYNC_DI
 <translation id="376375951585423504">永続的な割り当てを無効にする。</translation>
 <translation id="3765260570442823273">アイドル時のログアウト警告メッセージの表示期間</translation>
 <translation id="3766695867369523703">サードパーティのストレージ パーティションをデフォルトで許可する。</translation>
+<translation id="3770044943398389276">フローティング SSO では、デフォルトで永続 Cookie のみをデバイス間で移動します。このポリシーでは、セッション Cookie も含めるかどうかを制御します。このポリシーは、<ph name="FLOATING_SSO_ENABLED_POLICY_NAME" /> ポリシーが有効になっている場合にのみ有効になります。
+
+このポリシーを有効に設定した場合、フローティング SSO ではセッション Cookie と永続 Cookie の両方を同期します。
+このポリシーを無効にするか未設定のままにした場合、フローティング SSO では永続 Cookie のみを同期します。</translation>
 <translation id="3770407495263198786">このポリシーを設定した場合、管理者はユーザー用のプリンタのリストを設定できます。プリンタの選択は、ユーザーが初めて印刷しようとしたときに行われます。
 
       このポリシーの使用方法:
@@ -3844,6 +3865,7 @@ Chrome 114 までは、このポリシーを使用するには <ph name="SYNC_DI
 
 <ph name="MAC_OS_NAME" /> では、MDM を介して管理されるインスタンス、MCX を介してドメインに追加されたインスタンス、または <ph name="CHROME_ENTERPRISE_CORE_NAME" /> に登録されているインスタンスでのみこのポリシーを使用できます。</translation>
 <translation id="3845318141474759319">AI モデルの改善は行わずに生成 AI 壁紙を許可する</translation>
+<translation id="3848302969721895938">ServiceWorkerAutoPreload を無効にする</translation>
 <translation id="3849923496599301707">キオスクモードで Chrome アプリを強制的に許可する</translation>
 <translation id="3851443303439635700">JavaScript の setTimeout() 関数のクランプを開始するネストのしきい値を管理します</translation>
 <translation id="3854609566862485607">このポリシーでは、管理対象プロフィールの識別に使用するカスタムラベルを管理します。管理対象プロフィールでは、このラベルがツールバーのアバターの横に表示されます。カスタムラベルは翻訳されません。
@@ -4119,6 +4141,19 @@ Chrome 114 までは、このポリシーを使用するには <ph name="SYNC_DI
 * アダルト コンテンツのサイトを除外する: ポルノに分類されたサイトは除外されます。
 
 このポリシーは、ユーザーの移動先の URL と iframe の両方に適用されます。<ph name="URL_ALLOWLIST_POLICY_NAME" /> ポリシーはこのポリシーより優先され、Google Safe Search API の判定をオーバーライドする目的で使用できます。</translation>
+<translation id="4049706391182174257">このポリシーでは、<ph name="PRODUCT_NAME" /> のパスワード自動変更機能を使用できるかどうかを制御します。
+
+有効にすると、ユーザーは、ブラウザがウェブサイトでパスワードを自動的に変更するプロセスをトリガーできます。このプロセスは生成 AI によって管理されます。新しいパスワードはブラウザのパスワード マネージャーに保存されます。
+
+0 = この機能の使用と、Google が AI モデルを改善する目的で関連データを使用することを許可します。関連データには、機能に応じてプロンプト、入力内容、出力内容、ソース資料、フィードバックの文面などが含まれます。AI モデルを改善するため、人間のレビュアーが確認する場合もあります。以下に記載している場合を除き、0 がデフォルト値です。
+
+1 = この機能の使用を許可しますが、Google がモデルを改善する目的でユーザーのコンテンツ（プロンプト、入力内容、出力内容、ソース資料、フィードバックの文面など）を使用することは許可しません。1 は、Google 管理コンソールで管理されている企業ユーザーと、Google Workspace で管理されている教育機関向けアカウントのデフォルト値です。
+
+2 = この機能を許可しません。
+
+このポリシーを未設定のままにした場合、動作は GenAiDefaultSettings ポリシーによって決まります。
+
+生成 AI 機能のデータ処理について詳しくは、https://support.google.com/chrome/a?p=generative_ai_settings をご覧ください。</translation>
 <translation id="4051723201852944592">ウィンドウ オクルージョンを有効にします</translation>
 <translation id="4052529125939620019">起動時に CryptoToken コンポーネント拡張機能を読み込む</translation>
 <translation id="4053157306171963473">デバイスのアクティビティ時間の報告を無効にする</translation>
@@ -4135,6 +4170,7 @@ Chrome 114 までは、このポリシーを使用するには <ph name="SYNC_DI
 
 有効な <ph name="URL_LABEL" /> パターンについて詳しくは、https://support.google.com/chrome/a?p=url_blocklist_filter_format をご覧ください。</translation>
 <translation id="4070039109671307724">その他</translation>
+<translation id="4071922398488395340">フローティング SSO 機能にセッション Cookie を含める</translation>
 <translation id="4072225853834793549">ログイン画面でユーザー補助のショートカットを無効にする</translation>
 <translation id="4074922053013383215">適度にメモリを節約する。</translation>
 <translation id="4075675819066819571">シェルフを画面の左側に配置する</translation>
@@ -4405,6 +4441,7 @@ URL パターンは、<ph name="CONTROLLED_FRAME_BLOCKED_FOR_URLS_POLICY_NAME" /
       このポリシーを未設定のままにした場合、ウェブサイトによるアクセス要求は許可されますが、ユーザーはこの設定を変更できます。</translation>
 <translation id="4275048399551500192">他のデバイスによって開始された <ph name="PRODUCT_NAME" /> セッションのメディア コントロールを表示しない</translation>
 <translation id="4278656834593750050">充電時のサウンドを有効にする</translation>
+<translation id="4281322231545828290">自動パスワード変更を有効にする</translation>
 <translation id="4282243913059705499">ツールバーに <ph name="PRODUCT_NAME" /> アイコンを常に表示する</translation>
 <translation id="4285510855646731405">Google カレンダー（バージョン 135 以降でサポート）</translation>
 <translation id="4285674129118156176">外部のユーザーに ARC の使用を許可する</translation>
@@ -4756,21 +4793,6 @@ WebSQL は M112 で削除されました。</translation>
 <translation id="4557134566541205630">デフォルトの検索プロバイダの新しいタブ ページ URL</translation>
 <translation id="4558166110367609724">利用規約を自動的にスキップし、ブラウザを読み込みます。</translation>
 <translation id="4559846397119102037"><ph name="LACROS_NAME" /> の使用を許可する</translation>
-<translation id="456018799964679771">このデバイスレベルのポリシーでは、<ph name="PRODUCT_OS_NAME" /> が TLS で ML-KEM NIST 標準を使用したポスト量子鍵交換アルゴリズムを提供するかどうかを設定します。<ph name="PRODUCT_OS_NAME" /> 131 より前のアルゴリズムは、標準の初期のドラフト イテレーションである Kyber でした。これにより、対応サーバーでユーザー トラフィックが後から量子コンピュータにより復号されないよう保護できます。
-
-このポリシーを有効にした場合、<ph name="PRODUCT_OS_NAME" /> により TLS 接続でポスト量子鍵交換が提供されます。その結果、互換性のあるサーバーと通信する際に、ユーザー トラフィックは量子コンピュータから保護されます。
-
-このポリシーを無効にした場合、<ph name="PRODUCT_OS_NAME" /> により TLS 接続でポスト量子鍵交換は提供されません。その結果、ユーザー トラフィックは量子コンピュータから保護されなくなります。
-
-このポリシーを設定しない場合、<ph name="PRODUCT_OS_NAME" /> ではデフォルトのロールアウト プロセスに沿ってポスト量子鍵交換が提供されます。
-
-Kyber の提供には下位互換性があります。既存の TLS サーバーとネットワーク ミドルウェアでは、新しいオプションを無視し、引き続き以前のオプションを選択するものと想定されます。
-
-ただし、デバイスで TLS が正しく実装されていない場合、新しいオプションの提供時に正しく動作しなくなる可能性があります。たとえば、オプションを認識できない場合や、生成されるメッセージが大きくなる場合は、接続が切断されることがあります。このようなデバイスはポスト量子に対応していないため、ポスト量子への移行の妨げになります。その場合は、管理者からベンダーに修正を依頼する必要があります。
-
-このポリシーは一時的なもので、<ph name="PRODUCT_OS_NAME" /> バージョン 141 以降に削除される予定です。テストして問題を探す際には有効にし、問題を解決している間は無効にするとよいでしょう。
-
-このポリシーと PostQuantumKeyAgreementEnabled ポリシーの両方を設定した場合は、このポリシーが優先されます。</translation>
 <translation id="4561560385824323005">読み込む事前設定のパソコン用レイアウトの選択をユーザーに許可する</translation>
 <translation id="4561940244682063697">画面の動画ストリームの共有をユーザーに求めることをサイトに許可しない</translation>
 <translation id="4562165737444703281">Crostini ポート転送の [有効化 / 設定] をユーザーに許可する</translation>
@@ -5830,6 +5852,11 @@ URL パターンと処理タイプの組み合わせのリストを指定しま�
 
 注: このポリシーは HSTS アップグレードには適用されません。</translation>
 <translation id="5297948043665200363">アカウントの認証が無効になった後もユーザーがログイン状態を維持できるようにする</translation>
+<translation id="5298594338496226089">このポリシーを設定した場合、リストで指定したオリジンは Device Attributes API を使用してデバイスの属性（シリアル番号やホスト名など）を取得できます。
+
+オリジンは、<ph name="WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" /> ポリシーまたは <ph name="ISOLATED_WEB_APP_INSTALL_FORCE_LIST_POLICY_NAME" /> ポリシー（バージョン 125 以降）を使用して自動インストールされたウェブ アプリケーションか、キオスクアプリとして設定されたウェブ アプリケーションに対応している必要があります。Device Attributes API の仕様については、https://wicg.github.io/WebApiDevice/device_attributes をご覧ください。
+
+有効な <ph name="URL_LABEL" /> パターン（バージョン 127 以降）について詳しくは、https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns をご覧ください。このポリシーの値に「<ph name="WILDCARD_VALUE" />」は使用できません。</translation>
 <translation id="5298949392804966105">管理対象アカウントに制限を課さない</translation>
 <translation id="530111809849214840"><ph name="GOOGLE_DRIVE_NAME" />　オプションを非表示にする。</translation>
 <translation id="530134925949808452">使用時間の割り当てが更新される時間（現地時間）です。</translation>
@@ -5840,6 +5867,7 @@ URL パターンと処理タイプの組み合わせのリストを指定しま�
 <translation id="5307432759655324440">シークレット モードが利用可能かどうかを設定する</translation>
 <translation id="5308551343115571396"><ph name="LACROS_NAME" /> が無効になった後、ブラウザデータをすべて削除する一方、ユーザーデータはできるだけ多く保持するよう試みる。</translation>
 <translation id="530949964068726932">システムトレイ メニューにユーザー補助オプションを表示しない</translation>
+<translation id="5309944663104291505">自動インストールされた独立したウェブアプリとキオスク アプリケーションに Device Attributes API の使用を許可しない</translation>
 <translation id="5310544046492594469">このポリシーを 0（デフォルト）に設定した場合、デベロッパー ツールと JavaScript コンソールにアクセスできますが、企業ポリシーによりインストールされた拡張機能または M114 以降、および管理対象ユーザーの場合はブラウザに組み込まれた拡張機能では、アクセスは許可されません。このポリシーを 1 に設定した場合、あらゆる状況でデベロッパー ツールと JavaScript コンソールにアクセスできます。企業ポリシーによってインストールされた拡張機能でのアクセスも許可されます。このポリシーを 2 に設定した場合、デベロッパー ツールにアクセスできず、ウェブサイト要素も検査できなくなります。
 
       この設定では、デベロッパー ツールや JavaScript コンソールを開くためのキーボード ショートカット、メニューのエントリ、コンテキスト メニューのエントリも無効になります。
@@ -6165,6 +6193,7 @@ Microsoft SharePoint と OneDrive のカードには、追加の管理者設定�
 <translation id="5534235660122271432">外部ストレージ デバイスへの書き込みを許可しない</translation>
 <translation id="5535256585099022933">再起動の時間間隔を設定する</translation>
 <translation id="5537400155400537818">無効: CSS のズームで従来の標準化前の動作を維持する。</translation>
+<translation id="5537587542872235553">自動インストールされた独立したウェブアプリとキオスク アプリケーションに Device Attributes API の使用を許可する</translation>
 <translation id="553806128266843748">ネットワーク制限を有効にするかどうかを示すブール値のフラグです。</translation>
 <translation id="5540885720415375851">ローカル デバイスの検出を許可する</translation>
 <translation id="5542235730745104308">このポリシーを True に設定した場合、<ph name="PRODUCT_NAME" /> では組み込まれている別のエラーページ（「ページが見つかりません」など）が使用されます。このポリシーを False に設定した場合、<ph name="PRODUCT_NAME" /> では別のエラーページは使用されません。
@@ -6367,6 +6396,7 @@ https://wiki.samba.org/index.php/Samba_4.6_Features_added/changed#Kerberos_clien
 <translation id="5645779841392247734">これらのサイトの Cookie を許可する</translation>
 <translation id="5646234199535103501">OnBulkDataEntry Chrome Enterprise コネクタの設定ポリシー</translation>
 <translation id="5648016151508002741">オンラインの <ph name="OCSP_CRL_LABEL" /> チェックを許可しない</translation>
+<translation id="5648436277949979783">Device Attributes API の使用を管理する</translation>
 <translation id="5649046890958064703"><ph name="DEVICE_PRINTERS_ACCESS_MODE_POLICY_NAME" /> の値に <ph name="PRINTERS_BLACKLIST" /> が選択されている場合、<ph name="DEVICE_NATIVE_PRINTERS_BLACKLIST_POLICY_NAME" /> でユーザーが使用できないプリンタを指定できます。ユーザーは、このポリシーで指定されている ID 以外のすべてのプリンタを使用できます。この ID は、<ph name="DEVICE_PRINTERS_POLICY_NAME" /> で指定されたファイル内の「<ph name="ID_FIELD" />」または「<ph name="GUID_FIELD" />」フィールドに対応している必要があります。
 
       このポリシーはサポートが終了しています。代わりに <ph name="DEVICE_PRINTERS_BLOCKLIST_POLICY_NAME" /> を使用してください。</translation>
@@ -6594,6 +6624,7 @@ URL パターンは、<ph name="DIRECT_SOCKETS_PRIVATE_NETWORK_ACCESS_BLOCKED_FO
 <translation id="5815129011704381141">更新後に自動再起動</translation>
 <translation id="5815990343032461023">以前の動作: キオスク Chrome アプリで、拡張機能システムによる拡張機能マニフェストの更新 URL を使用した更新と、キャッシュ マネージャーによるポリシーの更新 URL を使用した更新を行う</translation>
 <translation id="5816688024515869030"><ph name="UIA_NAME" /> プロバイダを無効にする。</translation>
+<translation id="581737504822041364">ServiceWorker の起動を待たずにナビゲーション リクエストをディスパッチすることを許可する</translation>
 <translation id="5828008775808363753">ログイン時にブラウザを起動しない</translation>
 <translation id="582857022372205358">短辺とじの両面印刷を有効にする</translation>
 <translation id="5830196507442186669">デバイスに対して <ph name="PRODUCT_OS_NAME" /> での <ph name="BOREALIS_NAME" /> の使用を許可する</translation>
@@ -7453,22 +7484,6 @@ DevTools の生成 AI 機能は次のとおりです。
 
 生成 AI 機能のデータ処理について詳しくは、https://support.google.com/chrome/a?p=generative_ai_settings をご覧ください。</translation>
 <translation id="6394350458541421998">このポリシーは <ph name="PRODUCT_OS_NAME" /> バージョン 29 で廃止されました。PresentationScreenDimDelayScale ポリシーを代わりに使用してください。</translation>
-<translation id="6397424663361748439"><ph name="PRIVACY_SANDBOX_NAME" /> の <ph name="IP_PROTECTION_NAME" /> 機能を有効にするかどうかを管理するポリシーです。
-
-<ph name="IP_PROTECTION_NAME" /> はシークレット モードでのブラウジング中に、特定のサードパーティのネットワーク リクエストに対して、ユーザーの元の IP アドレスの使用を制限する機能です。これにより、シークレット モードのブラウジング セッションでクロスサイト トラッキングに対する保護が強化されます。
-
-このポリシーを無効に設定した場合、<ph name="IP_PROTECTION_NAME" /> は無効になり、ユーザーは UI 設定でこの機能を有効にできなくなります。
-このポリシーを有効に設定した場合、<ph name="IP_PROTECTION_NAME" /> は有効になり、ユーザーは UI 設定でこの機能を無効にできなくなります。
-このポリシーを未設定のままにした場合、<ph name="IP_PROTECTION_NAME" /> はデフォルトで有効になり、ユーザーはデバイスの UI 設定でこの機能を制御できるようになります。
-
-企業で <ph name="IP_PROTECTION_NAME" /> を無効にするかどうかを検討する際は、次のような点を考慮します。
-- プロキシされるリクエストに対して DNS ルックアップは実行されません。このため、DNS ベースのモニタリングやフィルタリングに影響する可能性があります。
-- Masked Domain List（<ph name="MASKED_DOMAIN_LIST_URL" />）のドメイン（またはそのサブドメイン）へのリクエスト送信が必要で、送信元を特定の IP アドレス範囲に制限している企業アプリケーションの場合、シークレット モードで使用すると機能しない可能性があります。- 特定の条件下では、シークレット モードでトラフィックがプロキシされない場合があります。たとえば、ユーザーがログインしていない Chrome プロフィールでシークレット モードを開始した場合などです。通常、この機能では、シークレット モードを開始するときに、ユーザーが個人の Google アカウントで Chrome にログインしていることが必要となります。
-- Masked Domain List のドメインリストは今後変更される可能性があり、変更された場合はユーザーに自動的にプッシュされます。Masked Domain List について詳しくは、<ph name="MASKED_DOMAIN_LIST_CRITERIA_URL" /> をご覧ください。
-
-<ph name="IP_PROTECTION_NAME" /> について詳しくは、<ph name="IP_PROTECTION_README_URL" /> をご覧ください。
-
-<ph name="IP_PROTECTION_NAME" /> は M139 以降にリリースされます。</translation>
 <translation id="6397588391180665797">登録済みデバイスのユーザーのネットワーク設定を報告します。
 
       このポリシーを false に設定した場合、この情報は報告されません。
@@ -8009,7 +8024,6 @@ URL が <ph name="SERIAL_ASK_FOR_URLS_POLICY_NAME" /> の URL パターンと競
       このポリシーが true に設定されている場合、<ph name="PLUGIN_VM_NAME" /> はユーザーに対して有効になります（ただし他の設定でも許可されている必要があります）。<ph name="PLUGIN_VM_NAME" /> を実行するには、<ph name="PLUGIN_VM_ALLOWED_POLICY_NAME" /> と <ph name="USER_PLUGIN_VM_ALLOWED_POLICY_NAME" /> を true に設定し、<ph name="PLUGIN_VM_LICENSE_KEY_POLICY_NAME" /> または <ph name="PLUGIN_VM_USER_ID_POLICY_NAME" /> のいずれかを設定する必要があります。</translation>
 <translation id="6741318452269220158">このポリシーを True に設定した場合、デフォルトの動作でネイティブ クライアントが無効になっている場合でもネイティブ クライアントの実行を許可します。
 このポリシーを False に設定するか未設定のままにした場合、デフォルトの動作が使用されます。</translation>
-<translation id="6743006196954236593">レンズ オーバーレイを許可しない。</translation>
 <translation id="6749641778238480311">事前のユーザー操作やユーザーの確認なしで、subApps API の呼び出しを許可する</translation>
 <translation id="6750902920405577210">電波強度に変化があった場合に報告するテレメトリー データのリスト。
 
@@ -8813,6 +8827,7 @@ EphemeralNetworkPolicies 機能がデフォルトで有効になると、この�
       有効なサイトの URL パターンについて詳しくは、https://cloud.google.com/docs/chrome-enterprise/policies/url-patterns をご覧ください。ワイルドカード（<ph name="WILDCARD_VALUE" />）を使用できます。このポリシーでは、オリジンのみが照合されるため、URL パターンのパスは無視されます。
 
       このポリシーでサイトを指定しない場合は、<ph name="DEFAULT_WINDOW_PLACEMENT_SETTING_POLICY_NAME" /> のポリシーが適用されます。このポリシーでサイトを指定した場合は、ブラウザのデフォルトの権限設定が適用され、ユーザーはサイトごとに権限を選択できます。</translation>
+<translation id="7358299261566939984">ServiceWorkerAutoPreload を有効にする</translation>
 <translation id="7358359585412734876"><ph name="LACROS_NAME" /> を有効にする</translation>
 <translation id="7362566456990049303">ユーザーのみ</translation>
 <translation id="736486789939370545">外部の拡張機能のインストールを許可する</translation>
@@ -8868,6 +8883,19 @@ EphemeralNetworkPolicies 機能がデフォルトで有効になると、この�
 
       このポリシーが未設定の場合、または false に設定されている場合、「<ph name="TLS_FALSE_START" />」は有効になります。true に設定されている場合、「<ph name="TLS_FALSE_START" />」は無効になります。</translation>
 <translation id="7427607504279694910">Android アプリのインストールのイベントログを Google と共有しない</translation>
+<translation id="7431456748240652287">このデバイスレベルのポリシーでは、<ph name="PRODUCT_OS_NAME" /> が TLS で ML-KEM NIST 標準を使用したポスト量子鍵交換アルゴリズムを提供するかどうかを設定します。<ph name="PRODUCT_OS_NAME" /> 131 より前のアルゴリズムは、標準の初期のドラフト イテレーションである Kyber でした。これにより、対応サーバーでユーザー トラフィックが後から量子コンピュータにより復号されないよう保護できます。
+
+このポリシーを有効に設定するか未設定のままにした場合、<ph name="PRODUCT_OS_NAME" /> により TLS 接続でポスト量子鍵交換が提供されます。その結果、互換性のあるサーバーと通信する際に、ユーザー トラフィックは量子コンピュータから保護されます。
+
+このポリシーを無効にした場合、<ph name="PRODUCT_OS_NAME" /> により TLS 接続でポスト量子鍵交換は提供されません。その結果、ユーザー トラフィックは量子コンピュータから保護されなくなります。
+
+Kyber の提供には下位互換性があります。既存の TLS サーバーとネットワーク ミドルウェアでは、新しいオプションを無視し、引き続き以前のオプションを選択するものと想定されます。
+
+ただし、デバイスで TLS が正しく実装されていない場合、新しいオプションの提供時に正しく動作しなくなる可能性があります。たとえば、オプションを認識できない場合や、生成されるメッセージが大きくなる場合は、接続が切断されることがあります。このようなデバイスはポスト量子に対応していないため、ポスト量子への移行の妨げになります。その場合は、管理者からベンダーに修正を依頼する必要があります。
+
+このポリシーは一時的なもので、<ph name="PRODUCT_OS_NAME" /> バージョン 145 以降に削除される予定です。テストして問題を探す際には有効にし、問題を解決している間は無効にするとよいでしょう。
+
+このポリシーと PostQuantumKeyAgreementEnabled ポリシーの両方を設定した場合は、このポリシーが優先されます。</translation>
 <translation id="7433253680989311514">ヒンディー語（字母）レイアウトを有効にする</translation>
 <translation id="7433714841194914373">インスタント検索を有効にする</translation>
 <translation id="7434202861148928348">リモート アクセス クライアントの必須のドメイン名を設定する</translation>
@@ -9679,19 +9707,6 @@ Internet Explorer の <ph name="IEEM_SITELIST_POLICY" /> ポリシーについ�
       このポリシーは Chrome 88 で削除されたため、設定しても無視されます。
 
       詳しくは、https://www.chromestatus.com/feature/5989473649164288 をご覧ください。</translation>
-<translation id="8137301668000005268">このポリシーでは、<ph name="PRODUCT_NAME" /> が TLS で ML-KEM NIST 標準を使用したポスト量子鍵交換アルゴリズムを提供するかどうかを設定します。<ph name="PRODUCT_NAME" /> 131 より前のアルゴリズムは、標準の初期のドラフト イテレーションである Kyber でした。これにより、対応サーバーでユーザー トラフィックが後から量子コンピュータにより復号されないよう保護できます。
-
-このポリシーを有効にした場合、<ph name="PRODUCT_NAME" /> により TLS 接続でポスト量子鍵交換が提供されます。その結果、互換性のあるサーバーと通信する際に、ユーザー トラフィックは量子コンピュータから保護されます。
-
-このポリシーを無効にした場合、<ph name="PRODUCT_NAME" /> により TLS 接続でポスト量子鍵交換は提供されません。その結果、ユーザー トラフィックは量子コンピュータから保護されなくなります。
-
-このポリシーを設定しない場合、<ph name="PRODUCT_NAME" /> ではデフォルトのロールアウト プロセスに沿ってポスト量子鍵交換が提供されます。
-
-ポスト量子鍵交換の提供には下位互換性があります。既存の TLS サーバーとネットワーク ミドルウェアでは、新しいオプションを無視し、引き続き以前のオプションを選択するものと想定されます。
-
-ただし、デバイスで TLS が正しく実装されていない場合、新しいオプションの提供時に正しく動作しなくなる可能性があります。たとえば、オプションを認識できない場合や、生成されるメッセージが大きくなる場合は、接続が切断されることがあります。このようなデバイスはポスト量子に対応していないため、ポスト量子への移行の妨げになります。その場合は、管理者からベンダーに修正を依頼する必要があります。
-
-このポリシーは一時的なもので、<ph name="PRODUCT_NAME" /> バージョン 141 以降に削除される予定です。テストして問題を探す際には有効にし、問題を解決している間は無効にするとよいでしょう。</translation>
 <translation id="8137443729340035928">ログイン時に、最後のセッションを復元するかどうかをユーザーに確認する。</translation>
 <translation id="8141795997560411818">このポリシーを設定しても、ユーザーが Android Google ドライブアプリを使用するのを阻止することはできません。Google ドライブへのアクセスを禁止するには、Android Google ドライブアプリのインストールも禁止する必要があります。</translation>
 <translation id="8142894094385450823">管理対象セッション向けに推奨する言語 / 地域を設定する</translation>
@@ -11026,6 +11041,7 @@ URL パターンは、<ph name="WEB_PRINTING_BLOCKED_FOR_URLS_POLICY_NAME" /> �
 <translation id="9015952763003753868"><ph name="CORS" /> プリフライトで<ph name="ACAM_HEADER_NAME" /> の照合を仕様に沿って行う</translation>
 <translation id="9020630127193895800">インディゴ色のキーボード バックライト</translation>
 <translation id="9025912013525357598">すべてのメディアタイプで DataURL 空白文字を保持する</translation>
+<translation id="9029815312472546960">Device Attributes API をブロックするサイトを指定する</translation>
 <translation id="9031831501689819108">従来のブラウザのサポートを有効にする</translation>
 <translation id="9032595854515551464"><ph name="PRODUCT_NAME" /> V2 サービスを有効にして、ログイン時にリモートデスクを起動する</translation>
 <translation id="9034285085962866065">システム ショートカットのカスタマイズを許可する</translation>
@@ -11127,6 +11143,7 @@ URL パターンは、<ph name="WEB_PRINTING_BLOCKED_FOR_URLS_POLICY_NAME" /> �
 <translation id="9073405975862312795">このポリシーを有効にするか、未設定のままにすると、登録済みのデバイスはユーザーがデバイス上でアクティブになっていた期間を報告します。
 
       このポリシーを無効に設定すると、登録済みのデバイスはアクティブな期間を記録または報告しません。</translation>
+<translation id="9075183018289926453">フローティング SSO でセッション Cookie を同期しない</translation>
 <translation id="9076477053438828079">ユーザー名と写真を常に表示する</translation>
 <translation id="9077227880520270584">デバイスのローカル アカウントの自動ログイン タイマー</translation>
 <translation id="9079158199923156713">管理対象プロフィールの企業ロゴの URL</translation>

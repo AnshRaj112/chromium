@@ -171,6 +171,7 @@
 #include "gpu/command_buffer/client/gpu_switches.h"
 #include "gpu/command_buffer/service/gpu_switches.h"
 #include "gpu/config/gpu_switches.h"
+#include "ipc/constants.mojom.h"
 #include "ipc/ipc_channel_mojo.h"
 #include "ipc/ipc_channel_proxy.h"
 #include "ipc/trace_ipc_message.h"
@@ -270,10 +271,6 @@
 
 #if BUILDFLAG(ENABLE_PLUGINS)
 #include "content/browser/renderer_host/plugin_registry_impl.h"
-#endif
-
-#if BUILDFLAG(IPC_MESSAGE_LOG_ENABLED)
-#include "ipc/ipc_logging.h"
 #endif
 
 #if BUILDFLAG(IS_OZONE)
@@ -878,7 +875,7 @@ class SiteProcessCountTracker : public base::SupportsUserData::Data,
 
     // There may be process hosts without sites. To ensure all process hosts are
     // represented, start by adding entries for all hosts.
-    rph_to_sites_map.reserve(RenderProcessHostImpl::GetProcessCount());
+    rph_to_sites_map.reserve(RenderProcessHostImpl::GetCount());
     for (auto iter(RenderProcessHost::AllHostsIterator()); !iter.IsAtEnd();
          iter.Advance()) {
       rph_to_sites_map[iter.GetCurrentValue()->GetID()];
@@ -938,7 +935,7 @@ std::string GetCurrentHostMapDebugString(
     const SiteProcessCountTracker* tracker) {
   std::string output =
       base::StringPrintf("There are now %zu RenderProcessHosts.",
-                         RenderProcessHostImpl::GetProcessCount());
+                         RenderProcessHostImpl::GetCount());
   if (tracker) {
     output += base::StringPrintf("\nThe mappings are:\n%s",
                                  tracker->GetDebugString().c_str());
@@ -1437,7 +1434,7 @@ void RenderProcessHost::SetMaxRendererProcessCount(size_t count) {
   MAYBEVLOG(1) << __func__ << ": Max override set to " << count;
   g_max_renderer_count_override = count;
 
-  if (RenderProcessHostImpl::GetProcessCount() > count) {
+  if (RenderProcessHostImpl::GetCount() > count) {
     // TODO(pmonette): Only cleanup n spares, where n is the count of processes
     // that is over the limit.
     SpareRenderProcessHostManagerImpl::Get().CleanupSpares(
@@ -1594,7 +1591,7 @@ RenderProcessHostImpl::RenderProcessHostImpl(
 void RenderProcessHostImpl::ShutDownInProcessRenderer() {
   DCHECK(g_run_renderer_in_process);
 
-  switch (RenderProcessHostImpl::GetProcessCount()) {
+  switch (RenderProcessHostImpl::GetCount()) {
     case 0:
       return;
     case 1: {
@@ -2082,7 +2079,7 @@ void RenderProcessHostImpl::BindFileSystemAccessManager(
     mojo::PendingReceiver<blink::mojom::FileSystemAccessManager> receiver) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   // This code path is only for workers, hence always pass in
-  // MSG_ROUTING_NONE as frame ID. Frames themselves go through
+  // IPC::mojom::kRoutingIdNone as frame ID. Frames themselves go through
   // RenderFrameHostImpl instead.
   auto* manager = storage_partition_impl_->GetFileSystemAccessManager();
   manager->BindReceiver(FileSystemAccessManagerImpl::BindingContext(
@@ -2135,7 +2132,7 @@ void RenderProcessHostImpl::BindRestrictedCookieManagerForServiceWorker(
   storage_partition_impl_->CreateRestrictedCookieManager(
       network::mojom::RestrictedCookieManagerRole::SCRIPT, storage_key.origin(),
       storage_key.ToPartialNetIsolationInfo(),
-      /*is_service_worker=*/true, GetDeprecatedID(), MSG_ROUTING_NONE,
+      /*is_service_worker=*/true, GetDeprecatedID(), IPC::mojom::kRoutingIdNone,
       /*cookie_setting_overrides=*/net::CookieSettingOverrides(),
       /*devtools_cookie_setting_overrides=*/net::CookieSettingOverrides(),
       std::move(receiver),
@@ -2242,7 +2239,7 @@ void RenderProcessHostImpl::CreateWebSocketConnector(
   // shared and service workers?
   mojo::MakeSelfOwnedReceiver(
       std::make_unique<WebSocketConnectorImpl>(
-          GetDeprecatedID(), MSG_ROUTING_NONE, storage_key.origin(),
+          GetDeprecatedID(), IPC::mojom::kRoutingIdNone, storage_key.origin(),
           storage_key.ToPartialNetIsolationInfo()),
       std::move(receiver));
 }
@@ -3901,10 +3898,6 @@ void RenderProcessHostImpl::OnChannelConnected(int32_t peer_pid) {
     ProvideSwapFileForRenderer();
   }
 
-#if BUILDFLAG(IPC_MESSAGE_LOG_ENABLED)
-  child_process_->SetIPCLoggingEnabled(IPC::Logging::GetInstance()->Enabled());
-#endif
-
 #if BUILDFLAG(CLANG_PROFILING_INSIDE_SANDBOX)
   child_process_->SetProfilingFile(OpenProfilingFile());
 #endif
@@ -4707,8 +4700,23 @@ RenderProcessHost* RenderProcessHost::FromID(ChildProcessId render_process_id) {
 }
 
 // static
-size_t RenderProcessHostImpl::GetProcessCount() {
+size_t RenderProcessHostImpl::GetCount() {
   return GetAllHosts().size();
+}
+
+// static
+size_t RenderProcessHostImpl::GetLiveCount() {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+
+  size_t count = 0;
+  for (auto iter = RenderProcessHost::AllHostsIterator(); !iter.IsAtEnd();
+       iter.Advance()) {
+    RenderProcessHost& render_process_host = *iter.GetCurrentValue();
+    if (render_process_host.IsInitializedAndNotDead()) {
+      count++;
+    }
+  }
+  return count;
 }
 
 // static
@@ -4718,8 +4726,8 @@ size_t RenderProcessHostImpl::GetProcessCountForLimit() {
   // too soon.
   size_t process_count_to_ignore =
       GetContentClient()->browser()->GetProcessCountToIgnoreForLimit();
-  CHECK_LE(process_count_to_ignore, RenderProcessHostImpl::GetProcessCount());
-  return RenderProcessHostImpl::GetProcessCount() - process_count_to_ignore;
+  CHECK_LE(process_count_to_ignore, RenderProcessHostImpl::GetCount());
+  return RenderProcessHostImpl::GetCount() - process_count_to_ignore;
 }
 
 // static
@@ -4767,7 +4775,7 @@ RenderProcessHost* RenderProcessHostImpl::GetExistingProcessHost(
     SiteInstanceImpl* site_instance) {
   // First figure out which existing renderers we can use.
   std::vector<RenderProcessHost*> suitable_renderers;
-  suitable_renderers.reserve(RenderProcessHostImpl::GetProcessCount());
+  suitable_renderers.reserve(RenderProcessHostImpl::GetCount());
 
   for (iterator iter(AllHostsIterator()); !iter.IsAtEnd(); iter.Advance()) {
     // The spare RenderProcessHost will have been considered by this point.
@@ -4781,7 +4789,7 @@ RenderProcessHost* RenderProcessHostImpl::GetExistingProcessHost(
 
   MAYBEVLOG(4) << __func__ << ": Found " << suitable_renderers.size()
                << " suitable process hosts out of "
-               << RenderProcessHostImpl::GetProcessCount() << ".";
+               << RenderProcessHostImpl::GetCount() << ".";
 
   // Now pick a random suitable renderer, if we have any.
   if (!suitable_renderers.empty()) {
@@ -5823,11 +5831,6 @@ void RenderProcessHostImpl::ProvideStatusFileForRenderer() {
 #endif
 
 void RenderProcessHostImpl::ProvideSwapFileForRenderer() {
-  if (!blink::features::IsParkableStringsToDiskEnabled() &&
-      !blink::features::IsParkableImagesToDiskEnabled()) {
-    return;
-  }
-
   // In Incognito, nothing should be written to disk. Don't provide a file..
   if (GetBrowserContext()->IsOffTheRecord())
     return;

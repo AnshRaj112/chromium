@@ -60,6 +60,7 @@
 #include "components/strings/grit/privacy_sandbox_strings.h"
 #include "components/ukm/test_ukm_recorder.h"
 #include "content/public/browser/ssl_status.h"
+#include "content/public/common/buildflags.h"
 #include "content/public/test/browser_task_environment.h"
 #include "content/public/test/navigation_simulator.h"
 #include "content/public/test/test_renderer_host.h"
@@ -72,7 +73,6 @@
 #include "net/test/cert_test_util.h"
 #include "net/test/test_certificate_data.h"
 #include "net/test/test_data_directory.h"
-#include "ppapi/buildflags/buildflags.h"
 #include "services/device/public/cpp/test/fake_usb_device_manager.h"
 #include "services/device/public/mojom/usb_device.mojom.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -319,7 +319,7 @@ class PageInfoBubbleViewTestApi {
   }
 
   // Simulates updating the number of blocked and allowed sites and rws info.
-  void SetCookieInfo(const PageInfoUI::CookiesNewInfo& cookie_info) {
+  void SetCookieInfo(const PageInfoUI::CookiesInfo& cookie_info) {
     presenter_->ui_for_testing()->SetCookieInfo(cookie_info);
   }
 
@@ -1016,7 +1016,7 @@ TEST_F(PageInfoBubbleViewTest, UpdatingSiteDataRetainsLayout) {
   EXPECT_EQ(kExpectedChildren, api_->current_view()->children().size());
 
   // Create a fake cookies info.
-  PageInfoUI::CookiesNewInfo cookies;
+  PageInfoUI::CookiesInfo cookies;
   cookies.allowed_sites_count = 10;
   cookies.enforcement = CookieControlsEnforcement::kNoEnforcement;
   cookies.blocking_status = CookieBlocking3pcdStatus::kNotIn3pcd;
@@ -1269,7 +1269,7 @@ class PageInfoBubbleViewCookiesSubpageTitleTest
 
 TEST_P(PageInfoBubbleViewCookiesSubpageTitleTest,
        DisplaysCookiesAndSiteDataTitle) {
-  PageInfoUI::CookiesNewInfo cookie_info;
+  PageInfoUI::CookiesInfo cookie_info;
   cookie_info.controls_state = testing::get<0>(GetParam());
   cookie_info.blocking_status = testing::get<1>(GetParam());
   api_->SetCookieInfo(cookie_info);
@@ -1304,7 +1304,7 @@ class PageInfoBubbleViewPrivacyAndSiteDataSubpageTitleTest
 
 TEST_P(PageInfoBubbleViewPrivacyAndSiteDataSubpageTitleTest,
        DisplaysPrivacyAndSiteDataTitle) {
-  PageInfoUI::CookiesNewInfo cookie_info;
+  PageInfoUI::CookiesInfo cookie_info;
   cookie_info.controls_state = GetParam();
   api_->SetCookieInfo(cookie_info);
 

@@ -37,9 +37,11 @@ import org.chromium.content_public.browser.WebContents;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * This is the implementation of the synchronous {@link TabModel} for the {@link
@@ -78,6 +80,7 @@ public class TabModelImpl extends TabModelJniBridge {
     private final ObservableSupplierImpl<Integer> mTabCountSupplier =
             new ObservableSupplierImpl<>();
     private final boolean mIsArchivedTabModel;
+    private final Set<Integer> mMultiSelectedTabs = new HashSet<>();
 
     /** This specifies the current {@link Tab} in {@link #mTabs}. */
     private int mIndex = INVALID_TAB_INDEX;
@@ -100,7 +103,7 @@ public class TabModelImpl extends TabModelJniBridge {
             if (mIndex >= insertIndex) mIndex++;
             assert !tab.isDestroyed() : "Attempting to undo tab that is destroyed.";
             mTabs.add(insertIndex, tab);
-            tab.onAddedToTabModel(mCurrentTabSupplier);
+            tab.onAddedToTabModel(mCurrentTabSupplier, TabModelImpl.this::isTabMultiSelected);
             mTabIdToTabs.put(tab.getId(), tab);
             mTabCountSupplier.set(mTabs.size());
 
@@ -320,7 +323,19 @@ public class TabModelImpl extends TabModelJniBridge {
                                     && type == TabLaunchType.FROM_LONGPRESS_BACKGROUND);
 
             index = mOrderController.determineInsertionIndex(type, index, tab);
-            assert index <= mTabs.size();
+            if (tab.getIsPinned()) {
+                int firstNonPinnedTabIndex = mPinnedTabReorderManager.findFirstNonPinnedTabIndex();
+                if (firstNonPinnedTabIndex == INVALID_TAB_INDEX) {
+                    // All tabs are pinned or the model is empty, next valid non-pinned index is at
+                    // the end of the list.
+                    firstNonPinnedTabIndex = mTabs.size();
+                }
+
+                // Insert in next non-pinned index if index wasn't handled in
+                // TabModelOrderController.
+                if (index == INVALID_TAB_INDEX) index = firstNonPinnedTabIndex;
+                assert index <= firstNonPinnedTabIndex;
+            }
 
             if (tab.isIncognito() != isIncognito()) {
                 throw new IllegalStateException("Attempting to open tab in wrong model");
@@ -337,7 +352,7 @@ public class TabModelImpl extends TabModelJniBridge {
                     mIndex++;
                 }
             }
-            tab.onAddedToTabModel(mCurrentTabSupplier);
+            tab.onAddedToTabModel(mCurrentTabSupplier, this::isTabMultiSelected);
             mTabIdToTabs.put(tab.getId(), tab);
             mTabCountSupplier.set(mTabs.size());
 
@@ -592,7 +607,9 @@ public class TabModelImpl extends TabModelJniBridge {
         if (allowUndo) {
             assumeNonNull(mPendingTabClosureManager);
             mPendingTabClosureManager.addTabClosureEvent(tabs, undoRunnable);
-            for (TabModelObserver obs : mObservers) obs.multipleTabsPendingClosure(tabs, false);
+            for (TabModelObserver obs : mObservers) {
+                obs.multipleTabsPendingClosure(tabs, false, tabClosingSource);
+            }
         }
     }
 
@@ -657,7 +674,7 @@ public class TabModelImpl extends TabModelJniBridge {
         if (supportsPendingClosures()) {
             mPendingTabClosureManager.addTabClosureEvent(closedTabs, undoRunnable);
             for (TabModelObserver obs : mObservers) {
-                obs.multipleTabsPendingClosure(closedTabs, true);
+                obs.multipleTabsPendingClosure(closedTabs, true, tabClosingSource);
             }
         }
     }
@@ -783,13 +800,15 @@ public class TabModelImpl extends TabModelJniBridge {
             }
 
             Tab tab = TabModelUtils.getCurrentTab(this);
-
             mModelDelegate.requestToShowTab(tab, type);
-
             mCurrentTabSupplier.set(tab);
             if (tab != null) {
-                for (TabModelObserver obs : mObservers) obs.didSelectTab(tab, type, lastId);
-
+                for (TabModelObserver obs : mObservers) {
+                    obs.didSelectTab(tab, type, lastId);
+                    // Required, otherwise the previously active tab will have MULTISELECTED as its
+                    // VisualState.
+                    obs.onTabSelectionChanged();
+                }
                 boolean wasAlreadySelected = tab.getId() == lastId;
                 if (!wasAlreadySelected && type == TabSelectionType.FROM_USER) {
                     // We only want to record when the user actively switches to a different tab.
@@ -1070,5 +1089,32 @@ public class TabModelImpl extends TabModelJniBridge {
         for (TabModelObserver obs : mObservers) {
             obs.didChangePinState(tab);
         }
+    }
+
+    @Override
+    public void setTabsMultiSelected(Set<Integer> tabIds, boolean isSelected) {
+        TabModelImplUtil.setTabsMultiSelected(tabIds, isSelected, mMultiSelectedTabs, mObservers);
+        assert mMultiSelectedTabs.isEmpty()
+                        || mMultiSelectedTabs.contains(TabModelUtils.getCurrentTabId(this))
+                : "If the selection is not empty, the current tab must always be present within the"
+                        + " set.";
+    }
+
+    @Override
+    public void clearMultiSelection(boolean notifyObservers) {
+        TabModelImplUtil.clearMultiSelection(notifyObservers, mMultiSelectedTabs, mObservers);
+    }
+
+    @Override
+    public boolean isTabMultiSelected(int tabId) {
+        return TabModelImplUtil.isTabMultiSelected(tabId, mMultiSelectedTabs, this);
+    }
+
+    @Override
+    public int getMultiSelectedTabsCount() {
+        if (mTabs.isEmpty()) return 0;
+        // If no other tabs are in multi-selection, this returns 1, as the active tab is always
+        // considered selected.
+        return mMultiSelectedTabs.isEmpty() ? 1 : mMultiSelectedTabs.size();
     }
 }

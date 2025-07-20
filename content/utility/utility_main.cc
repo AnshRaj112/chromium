@@ -9,6 +9,7 @@
 #include "base/debug/alias.h"
 #include "base/debug/leak_annotations.h"
 #include "base/functional/bind.h"
+#include "base/immediate_crash.h"
 #include "base/message_loop/message_pump_type.h"
 #include "base/metrics/histogram_functions.h"
 #include "base/power_monitor/power_monitor.h"
@@ -28,12 +29,13 @@
 #include "content/public/common/content_switches.h"
 #include "content/public/common/main_function_params.h"
 #include "content/public/utility/content_utility_client.h"
+#include "content/utility/on_device_model/on_device_model_sandbox_init.h"
 #include "content/utility/utility_thread_impl.h"
 #include "printing/buildflags/buildflags.h"
 #include "sandbox/policy/mojom/sandbox.mojom.h"
 #include "sandbox/policy/sandbox.h"
 #include "sandbox/policy/sandbox_type.h"
-#include "services/on_device_model/on_device_model_service.h"
+#include "services/on_device_model/public/mojom/on_device_model_service.mojom.h"
 #include "services/tracing/public/cpp/trace_startup.h"
 #include "services/video_effects/public/cpp/buildflags.h"
 
@@ -106,8 +108,10 @@
 #include "base/native_library.h"
 #include "base/rand_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/synchronization/waitable_event.h"
 #include "base/win/scoped_com_initializer.h"
 #include "base/win/win_util.h"
+#include "base/win/windows_handle_util.h"
 #include "base/win/windows_version.h"
 #include "content/utility/sandbox_delegate_data.mojom.h"
 #include "sandbox/policy/win/sandbox_warmup.h"
@@ -201,6 +205,15 @@ bool PreLockdownSandboxHook(base::span<const uint8_t> delegate_blob) {
       }
     }
   }
+
+  HANDLE event =
+      base::win::Uint32ToHandle(sandbox_config->bootstrap_event_handle);
+
+  CHECK(event && event != INVALID_HANDLE_VALUE);
+  CHECK(::SetEvent(event));
+  // Close handle to ensure nothing can reset it after sandbox lockdown.
+  CHECK(::CloseHandle(event));
+
   return true;
 }
 #endif  // BUILDFLAG(IS_WIN)
@@ -221,6 +234,11 @@ void SetUtilityThreadName(const std::string& utility_sub_type) {
 
 // Mainline routine for running as the utility process.
 int UtilityMain(MainFunctionParams parameters) {
+  if (parameters.command_line->HasSwitch(
+          switches::kUtilityImmediateCrashForTesting)) {
+    base::ImmediateCrash();
+  }
+
   base::MessagePumpType message_pump_type =
       parameters.command_line->HasSwitch(switches::kMessageLoopTypeUi)
           ? base::MessagePumpType::UI
@@ -264,7 +282,7 @@ int UtilityMain(MainFunctionParams parameters) {
   }
 
   if (utility_sub_type == on_device_model::mojom::OnDeviceModelService::Name_) {
-    CHECK(on_device_model::OnDeviceModelService::PreSandboxInit());
+    CHECK(on_device_model::PreSandboxInit());
   }
 
 #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
@@ -307,9 +325,8 @@ int UtilityMain(MainFunctionParams parameters) {
       pre_sandbox_hook = base::BindOnce(&audio::AudioPreSandboxHook);
       break;
     case sandbox::mojom::Sandbox::kOnDeviceModelExecution:
-      on_device_model::OnDeviceModelService::AddSandboxLinuxOptions(
-          sandbox_options);
-      pre_sandbox_hook = base::BindOnce(&GpuPreSandboxHook);
+      on_device_model::AddSandboxLinuxOptions(sandbox_options);
+      pre_sandbox_hook = base::BindOnce(&on_device_model::PreSandboxHook);
       break;
     case sandbox::mojom::Sandbox::kSpeechRecognition:
       pre_sandbox_hook =
@@ -420,33 +437,7 @@ int UtilityMain(MainFunctionParams parameters) {
       PreLockdownSandboxHook(delegate_data.value());
     }
   }
-#endif
 
-  ChildProcess utility_process(base::ThreadType::kDefault);
-  GetContentClient()->utility()->PostIOThreadCreated(
-      utility_process.io_task_runner());
-  base::RunLoop run_loop;
-  utility_process.set_main_thread(
-      new UtilityThreadImpl(run_loop.QuitClosure()));
-
-  // Both utility process and service utility process would come
-  // here, but the later is launched without connection to service manager, so
-  // there has no base::PowerMonitor be created(See ChildThreadImpl::Init()).
-  // As base::PowerMonitor is necessary to base::HighResolutionTimerManager, for
-  // such case we just disable base::HighResolutionTimerManager for now.
-  // Note that disabling base::HighResolutionTimerManager means high resolution
-  // timer is always disabled no matter on battery or not, but it should have
-  // no any bad influence because currently service utility process is not using
-  // any high resolution timer.
-  // TODO(leonhsl): Once http://crbug.com/646833 got resolved, re-enable
-  // base::HighResolutionTimerManager here for future possible usage of high
-  // resolution timer in service utility process.
-  std::optional<base::HighResolutionTimerManager> hi_res_timer_manager;
-  if (base::PowerMonitor::GetInstance()->IsInitialized()) {
-    hi_res_timer_manager.emplace();
-  }
-
-#if BUILDFLAG(IS_WIN)
   auto sandbox_type =
       sandbox::policy::SandboxTypeFromCommandLine(*parameters.command_line);
   DVLOG(1) << "Sandbox type: " << static_cast<int>(sandbox_type);
@@ -486,13 +477,37 @@ int UtilityMain(MainFunctionParams parameters) {
   }
 #endif
 
+  ChildProcess utility_process(base::ThreadType::kDefault);
+  GetContentClient()->utility()->PostIOThreadCreated(
+      utility_process.io_task_runner());
+  base::RunLoop run_loop;
+  utility_process.set_main_thread(
+      new UtilityThreadImpl(run_loop.QuitClosure()));
+
+  // Both utility process and service utility process would come
+  // here, but the later is launched without connection to service manager, so
+  // there has no base::PowerMonitor be created(See ChildThreadImpl::Init()).
+  // As base::PowerMonitor is necessary to base::HighResolutionTimerManager, for
+  // such case we just disable base::HighResolutionTimerManager for now.
+  // Note that disabling base::HighResolutionTimerManager means high resolution
+  // timer is always disabled no matter on battery or not, but it should have
+  // no any bad influence because currently service utility process is not using
+  // any high resolution timer.
+  // TODO(leonhsl): Once http://crbug.com/646833 got resolved, re-enable
+  // base::HighResolutionTimerManager here for future possible usage of high
+  // resolution timer in service utility process.
+  std::optional<base::HighResolutionTimerManager> hi_res_timer_manager;
+  if (base::PowerMonitor::GetInstance()->IsInitialized()) {
+    hi_res_timer_manager.emplace();
+  }
+
   base::allocator::PartitionAllocSupport::Get()->ReconfigureAfterTaskRunnerInit(
       switches::kUtilityProcess);
 
   run_loop.Run();
 
   if (utility_sub_type == on_device_model::mojom::OnDeviceModelService::Name_) {
-    CHECK(on_device_model::OnDeviceModelService::Shutdown());
+    CHECK(on_device_model::Shutdown());
   }
 
 #if defined(LEAK_SANITIZER)

@@ -21,7 +21,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import static org.chromium.chrome.browser.hub.HubColorMixer.COLOR_MIXER;
-import static org.chromium.chrome.browser.hub.HubToolbarProperties.ACTION_BUTTON_DATA;
 import static org.chromium.chrome.browser.hub.HubToolbarProperties.APPLY_DELAY_FOR_SEARCH_BOX_ANIMATION;
 import static org.chromium.chrome.browser.hub.HubToolbarProperties.HUB_SEARCH_ENABLED_STATE;
 import static org.chromium.chrome.browser.hub.HubToolbarProperties.IS_INCOGNITO;
@@ -85,7 +84,6 @@ public class HubToolbarMediatorUnitTest {
     @Mock private Pane mIncognitoTabSwitcherPane;
     @Mock private Pane mTabGroupsPane;
     @Mock private Pane mBookmarksPane;
-    @Mock private FullButtonData mFullButtonData;
     @Mock private PaneOrderController mPaneOrderController;
     @Mock private DisplayButtonData mDisplayButtonData;
     @Mock private PropertyObserver<PropertyKey> mPropertyObserver;
@@ -223,15 +221,6 @@ public class HubToolbarMediatorUnitTest {
         // TOggle panes back to the incognito tab switcher
         mFocusedPaneSupplier.set(mIncognitoTabSwitcherPane);
         assertFalse(mModel.get(HUB_SEARCH_ENABLED_STATE));
-    }
-
-    @Test
-    @SmallTest
-    public void testWithActionButtonData() {
-        new HubToolbarMediator(mActivity, mModel, mPaneManager, mTracker, mSearchActivityClient);
-        mFocusedPaneSupplier.set(mTabSwitcherPane);
-        mActionButtonSupplier.set(mFullButtonData);
-        assertEquals(mFullButtonData, mModel.get(ACTION_BUTTON_DATA));
     }
 
     @Test
@@ -519,6 +508,52 @@ public class HubToolbarMediatorUnitTest {
         mFocusedPaneSupplier.set(mIncognitoTabSwitcherPane);
         mModel.get(SEARCH_LISTENER).run();
         histograms.assertExpected();
+    }
+
+    @Test
+    @SmallTest
+    public void testSearchBox_UsesConfigurationParameterNotContext() {
+        // Set up a scenario where context configuration and parameter configuration differ
+        // to verify that the parameter configuration is used
+
+        // Context configuration shows narrow screen (phone)
+        mConfiguration.screenWidthDp = NARROW_SCREEN_WIDTH_DP;
+
+        // Set up mediator with phone configuration
+        when(mTabSwitcherPane.getPaneId()).thenReturn(PaneId.TAB_SWITCHER);
+        mFocusedPaneSupplier.set(mTabSwitcherPane);
+        HubToolbarMediator mediator =
+                new HubToolbarMediator(
+                        mActivity, mModel, mPaneManager, mTracker, mSearchActivityClient);
+
+        // Initially should show search box (phone behavior)
+        assertTrue(mModel.get(SEARCH_BOX_VISIBLE));
+        assertFalse(mModel.get(SEARCH_LOUPE_VISIBLE));
+
+        // Create a configuration parameter with wide screen (tablet)
+        Configuration tabletConfig = new Configuration();
+        tabletConfig.screenWidthDp = WIDE_SCREEN_WIDTH_DP;
+        tabletConfig.orientation = Configuration.ORIENTATION_LANDSCAPE;
+
+        // Simulate configuration change with tablet config parameter
+        // while context still has phone config
+        mediator.triggerConfigurationChangeForTesting(tabletConfig);
+
+        // Should now show loupe (tablet behavior) - proving it uses parameter config
+        assertFalse(mModel.get(SEARCH_BOX_VISIBLE));
+        assertTrue(mModel.get(SEARCH_LOUPE_VISIBLE));
+
+        // Create another configuration parameter with narrow screen (phone)
+        Configuration phoneConfig = new Configuration();
+        phoneConfig.screenWidthDp = NARROW_SCREEN_WIDTH_DP;
+        phoneConfig.orientation = Configuration.ORIENTATION_PORTRAIT;
+
+        // Simulate configuration change back to phone config
+        mediator.triggerConfigurationChangeForTesting(phoneConfig);
+
+        // Should now show search box (phone behavior)
+        assertTrue(mModel.get(SEARCH_BOX_VISIBLE));
+        assertFalse(mModel.get(SEARCH_LOUPE_VISIBLE));
     }
 
     private void mockSearchActivityClient() {

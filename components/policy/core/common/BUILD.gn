@@ -193,7 +193,6 @@ source_set("internal") {
     "proxy_policy_provider.h",
     "remote_commands/remote_command_job.cc",
     "remote_commands/remote_command_job.h",
-    "remote_commands/remote_commands_constants.cc",
     "remote_commands/remote_commands_constants.h",
     "remote_commands/remote_commands_factory.cc",
     "remote_commands/remote_commands_factory.h",
@@ -664,6 +663,10 @@ source_set("unit_tests") {
   if (is_android) {
     deps += [ "//components/policy/android:test_jni_headers" ]
   }
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 fuzzer_test("policy_schema_fuzzer") {

@@ -23,6 +23,7 @@
 #import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey_app_interface.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin_earl_grey_ui_test_util.h"
+#import "ios/chrome/browser/credential_provider/model/features.h"
 #import "ios/chrome/browser/metrics/model/metrics_app_interface.h"
 #import "ios/chrome/browser/passwords/model/metrics/ios_password_manager_metrics.h"
 #import "ios/chrome/browser/passwords/model/password_manager_app_interface.h"
@@ -67,6 +68,7 @@ using chrome_test_util::PasswordsTableViewMatcher;
 using chrome_test_util::SettingsCollectionView;
 using chrome_test_util::SettingsDoneButton;
 using chrome_test_util::SettingsNavigationBar;
+using chrome_test_util::SwipeActionDeleteButton;
 using chrome_test_util::TextFieldForCellWithLabelId;
 using chrome_test_util::TurnTableViewSwitchOn;
 using password_manager::kPasswordManagerSurfaceVisitHistogramName;
@@ -741,6 +743,11 @@ void OpenPasswordManagerWidgetPromoInstructions() {
           (testOpeningPasswordManagerWidgetPromoInstructionsWithFailedAuth)] ||
       [self isRunningTest:@selector(testDeletingLastAffiliatedGroup)]) {
     config.iph_feature_enabled = "IPH_iOSPromoPasswordManagerWidget";
+  }
+
+  if ([self isRunningTest:@selector(testAutomaticPasskeyUpgradesPrefToggle)]) {
+    config.features_enabled.push_back(
+        kCredentialProviderAutomaticPasskeyUpgrade);
   }
 
   return config;
@@ -1633,6 +1640,41 @@ void OpenPasswordManagerWidgetPromoInstructions() {
                 @"PasswordManager.Settings.ToggleOfferToSavePasswords"],
         @"Unexpected histogram error for password settings toggle offer to "
         @"save passwords switch");
+  }
+
+  // "Done" to close settings submenu.
+  [[EarlGrey
+      selectElementWithMatcher:grey_allOf(SettingsDoneButton(),
+                                          grey_sufficientlyVisible(), nil)]
+      performAction:grey_tap()];
+  // "Back" to go to root settings menu.
+  [[EarlGrey selectElementWithMatcher:NavigationBarBackButton()]
+      performAction:grey_tap()];
+  // "Done" to close out.
+  [[EarlGrey selectElementWithMatcher:SettingsDoneButton()]
+      performAction:grey_tap()];
+}
+
+// Check that toggling the switch for the "automatic passkey upgrades" changes
+// the preference value.
+- (void)testAutomaticPasskeyUpgradesPrefToggle {
+  OpenPasswordManager();
+  OpenSettingsSubmenu();
+
+  // Toggle the "Automatic passkey upgrades" control off and back on and check
+  // the preferences.
+  constexpr BOOL kExpectedState[] = {YES, NO};
+  for (BOOL expected_initial_state : kExpectedState) {
+    [[EarlGrey selectElementWithMatcher:
+                   chrome_test_util::TableViewSwitchCell(
+                       kPasswordSettingsAutomaticPasskeyUpgradeToggleId,
+                       expected_initial_state)]
+        performAction:TurnTableViewSwitchOn(!expected_initial_state)];
+    const bool expected_final_state = !expected_initial_state;
+    GREYAssertEqual(
+        expected_final_state,
+        [PasswordSettingsAppInterface isAutomaticPasskeyUpgradesEnabled],
+        @"State of the UI toggle differs from real preferences.");
   }
 
   // "Done" to close settings submenu.
@@ -4031,8 +4073,7 @@ void OpenPasswordManagerWidgetPromoInstructions() {
   [ChromeEarlGreyUI waitForAppToIdle];
 
   // Assert that "Delete" button is displayed.
-  [[EarlGrey selectElementWithMatcher:grey_kindOfClassName(
-                                          @"UISwipeActionStandardButton")]
+  [[EarlGrey selectElementWithMatcher:SwipeActionDeleteButton()]
       assertWithMatcher:grey_sufficientlyVisible()];
 
   // Swipe the next affiliated group until the "Delete" button is revealed.
@@ -4044,8 +4085,7 @@ void OpenPasswordManagerWidgetPromoInstructions() {
   [ChromeEarlGreyUI waitForAppToIdle];
 
   // Assert that "Delete" button is displayed for the second affiliated group.
-  [[EarlGrey selectElementWithMatcher:grey_kindOfClassName(
-                                          @"UISwipeActionStandardButton")]
+  [[EarlGrey selectElementWithMatcher:SwipeActionDeleteButton()]
       assertWithMatcher:grey_sufficientlyVisible()];
 }
 

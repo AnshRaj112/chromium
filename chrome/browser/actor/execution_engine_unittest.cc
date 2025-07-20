@@ -38,8 +38,12 @@ namespace actor {
 using ::optimization_guide::proto::Actions;
 using testing::_;
 using testing::Eq;
+using testing::Field;
 using testing::Invoke;
 using testing::Property;
+using testing::VariantWith;
+using ChangeTaskState = ui::UiEventDispatcher::ChangeTaskState;
+using AddTab = ui::UiEventDispatcher::AddTab;
 
 namespace {
 constexpr int kFakeContentNodeId = 123;
@@ -122,31 +126,47 @@ class ExecutionEngineTest : public ChromeRenderViewHostTestHarness {
     ChromeRenderViewHostTestHarness::SetUp();
     AssociateTabInterface();
 
+    // ExecutionEngine & ActorTask use separate UiEventDispatcher objects, so
+    // we create separate mocks for each.
     std::unique_ptr<ui::UiEventDispatcher> ui_event_dispatcher =
+        ui::NewMockUiEventDispatcher();
+    std::unique_ptr<ui::UiEventDispatcher> task_ui_event_dispatcher =
         ui::NewMockUiEventDispatcher();
     mock_ui_event_dispatcher_ =
         static_cast<ui::MockUiEventDispatcher*>(ui_event_dispatcher.get());
+    task_mock_ui_event_dispatcher_ =
+        static_cast<ui::MockUiEventDispatcher*>(task_ui_event_dispatcher.get());
+
     auto execution_engine = ExecutionEngine::CreateForTesting(
         profile(), std::move(ui_event_dispatcher));
     auto raw_execution_engine = execution_engine.get();
-    task_ = std::make_unique<ActorTask>(profile(), std::move(execution_engine));
+    task_ = ActorTask::CreateForTesting(profile(), std::move(execution_engine),
+                                        std::move(task_ui_event_dispatcher));
     task_->SetIdForTesting(0);
     raw_execution_engine->SetOwner(task_.get());
 
-    ON_CALL(*mock_ui_event_dispatcher_, OnPreFirstAct(_, _))
-        .WillByDefault(Invoke(Invoke(
-            UiEventDispatcherCallback<ui::UiEventDispatcher::FirstActInfo>(
-                base::BindRepeating(MakeOkResult)))));
-    ON_CALL(*mock_ui_event_dispatcher_, OnPreTool(_, _))
-        .WillByDefault(Invoke(UiEventDispatcherCallback<ToolRequest>(
-            base::BindRepeating(MakeOkResult))));
-    ON_CALL(*mock_ui_event_dispatcher_, OnPostTool(_, _))
-        .WillByDefault(Invoke(UiEventDispatcherCallback<ToolRequest>(
-            base::BindRepeating(MakeOkResult))));
+    for (auto& mock :
+         {mock_ui_event_dispatcher_, task_mock_ui_event_dispatcher_}) {
+      ON_CALL(*mock, OnPreFirstAct(_, _))
+          .WillByDefault(Invoke(Invoke(
+              UiEventDispatcherCallback<ui::UiEventDispatcher::FirstActInfo>(
+                  base::BindRepeating(MakeOkResult)))));
+      ON_CALL(*mock, OnPreTool(_, _))
+          .WillByDefault(Invoke(UiEventDispatcherCallback<ToolRequest>(
+              base::BindRepeating(MakeOkResult))));
+      ON_CALL(*mock, OnPostTool(_, _))
+          .WillByDefault(Invoke(UiEventDispatcherCallback<ToolRequest>(
+              base::BindRepeating(MakeOkResult))));
+      ON_CALL(*mock, OnActorTaskAsyncChange(_, _))
+          .WillByDefault(Invoke(UiEventDispatcherCallback<
+                                ui::UiEventDispatcher::ActorTaskAsyncChange>(
+              base::BindRepeating(MakeOkResult))));
+    }
   }
 
   void TearDown() override {
     mock_ui_event_dispatcher_ = nullptr;
+    task_mock_ui_event_dispatcher_ = nullptr;
     task_.reset();
     ClearTabInterface();
 
@@ -172,8 +192,8 @@ class ExecutionEngineTest : public ChromeRenderViewHostTestHarness {
 
  protected:
   // Note: action must be generated from a callback because this method
-  // navigates the render frame and the generated action must include a document
-  // identifier token which is only available after the navigation.
+  // navigates the render frame and the generated action must include a
+  // document identifier token which is only available after the navigation.
   bool Act(const GURL& url,
            base::OnceCallback<std::unique_ptr<ToolRequest>()> make_action) {
     content::NavigationSimulator::NavigateAndCommitFromBrowser(web_contents(),
@@ -198,6 +218,7 @@ class ExecutionEngineTest : public ChromeRenderViewHostTestHarness {
   FakeChromeRenderFrame fake_chrome_render_frame_;
   std::unique_ptr<ActorTask> task_;
   raw_ptr<ui::MockUiEventDispatcher> mock_ui_event_dispatcher_;
+  raw_ptr<ui::MockUiEventDispatcher> task_mock_ui_event_dispatcher_;
 
  private:
   struct TabState {
@@ -233,6 +254,20 @@ TEST_F(ExecutionEngineTest, ActSucceedsOnSupportedUrl) {
       .Times(1);
   EXPECT_CALL(*mock_ui_event_dispatcher_,
               OnPostTool(Property(&ToolRequest::JournalEvent, Eq("Click")), _))
+      .Times(1);
+  EXPECT_CALL(
+      *task_mock_ui_event_dispatcher_,
+      OnActorTaskSyncChange(VariantWith<ChangeTaskState>(AllOf(
+          Field(&ChangeTaskState::old_state, ActorTask::State::kCreated),
+          Field(&ChangeTaskState::new_state, ActorTask::State::kActing)))))
+      .Times(1);
+  EXPECT_CALL(
+      *task_mock_ui_event_dispatcher_,
+      OnActorTaskSyncChange(VariantWith<ChangeTaskState>(AllOf(
+          Field(&ChangeTaskState::old_state, ActorTask::State::kActing),
+          Field(&ChangeTaskState::new_state, ActorTask::State::kReflecting)))));
+  EXPECT_CALL(*task_mock_ui_event_dispatcher_,
+              OnActorTaskAsyncChange(VariantWith<AddTab>(_), _))
       .Times(1);
   EXPECT_TRUE(
       Act(GURL("http://localhost/"), MakeClickCallback(kFakeContentNodeId)));
@@ -278,6 +313,18 @@ TEST_F(ExecutionEngineTest, UiOnPostToolFails) {
   EXPECT_CALL(*mock_ui_event_dispatcher_, OnPreTool(_, _)).Times(1);
   EXPECT_CALL(*mock_ui_event_dispatcher_, OnPostTool(_, _))
       .WillOnce(Invoke(UiEventDispatcherCallback<ToolRequest>(
+          base::BindRepeating(MakeErrorResult))));
+  EXPECT_FALSE(
+      Act(GURL("http://localhost/"), MakeClickCallback(kFakeContentNodeId)));
+  histograms_.ExpectUniqueSample(kActionResultHistogram,
+                                 mojom::ActionResultCode::kError, 1);
+}
+
+TEST_F(ExecutionEngineTest, ActFailsWhenAddTabFails) {
+  EXPECT_CALL(*task_mock_ui_event_dispatcher_,
+              OnActorTaskAsyncChange(VariantWith<AddTab>(_), _))
+      .WillOnce(Invoke(UiEventDispatcherCallback<
+                       ui::UiEventDispatcher::ActorTaskAsyncChange>(
           base::BindRepeating(MakeErrorResult))));
   EXPECT_FALSE(
       Act(GURL("http://localhost/"), MakeClickCallback(kFakeContentNodeId)));

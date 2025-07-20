@@ -9,17 +9,22 @@
 #include "chrome/browser/signin/identity_manager_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+#include "chrome/browser/ui/toasts/api/toast_id.h"
+#include "chrome/browser/ui/toasts/toast_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
 #include "chrome/browser/ui/views/profiles/avatar_toolbar_button.h"
 #include "chrome/grit/branded_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/theme_resources.h"
+#include "components/pref_registry/pref_registry_syncable.h"
 #include "components/signin/public/base/signin_pref_names.h"
 #include "components/signin/public/base/signin_switches.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/identity_utils.h"
 #include "components/strings/grit/components_strings.h"
+#include "components/user_education/common/user_education_features.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/dialog_model.h"
 #include "ui/views/bubble/bubble_dialog_model_host.h"
@@ -79,9 +84,9 @@ void SetBannerImage(ui::DialogModel::Builder& builder,
                              avatar_image, kAvatarPosition, kAvatarSize));
 }
 
-void MigrateUser(Profile* profile) {
+bool MaybeMigrateUser(Profile* profile) {
   if (!IsUserEligibleForDiceMigration(profile)) {
-    return;
+    return false;
   }
   PrefService* prefs = profile->GetPrefs();
   prefs->SetBoolean(prefs::kExplicitBrowserSignin, true);
@@ -91,15 +96,41 @@ void MigrateUser(Profile* profile) {
   // pref change.
   prefs->SetBoolean(prefs::kPrefsThemesSearchEnginesAccountStorageEnabled,
                     true);
+  return true;
+}
+
+void MaybeShowToast(Browser* browser) {
+  ToastController* const toast_controller =
+      browser->browser_window_features()->toast_controller();
+  if (!toast_controller) {
+    return;
+  }
+  toast_controller->MaybeShowToast(ToastParams(ToastId::kDiceUserMigrated));
 }
 
 }  // namespace
 
+const char kDiceMigrationDialogShownCount[] =
+    "signin.dice_migration.dialog_shown_count";
+
+// static
+const int DiceMigrationService::kMaxDialogShownCount = 3;
+
 DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(DiceMigrationService,
                                       kAcceptButtonElementId);
+DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(DiceMigrationService,
+                                      kCancelButtonElementId);
 
 DiceMigrationService::DiceMigrationService(Profile* profile)
-    : profile_(profile) {}
+    : profile_(profile) {
+  if (IsUserEligibleForDiceMigration(profile_)) {
+    dialog_trigger_timer_.Start(
+        FROM_HERE, user_education::features::GetSessionStartGracePeriod(),
+        base::BindOnce(
+            &DiceMigrationService::ShowDiceMigrationOfferDialogIfUserEligible,
+            base::Unretained(this)));
+  }
+}
 
 DiceMigrationService::~DiceMigrationService() {
   if (dialog_widget_) {
@@ -110,10 +141,13 @@ DiceMigrationService::~DiceMigrationService() {
 
 // static
 void DiceMigrationService::RegisterProfilePrefs(
-    user_prefs::PrefRegistrySyncable* registry) {}
+    user_prefs::PrefRegistrySyncable* registry) {
+  registry->RegisterIntegerPref(kDiceMigrationDialogShownCount, 0);
+}
 
 void DiceMigrationService::ShowDiceMigrationOfferDialogIfUserEligible() {
-  if (!IsUserEligibleForDiceMigration(profile_) || IsDialogShowing()) {
+  if (!IsUserEligibleForDiceMigration(profile_) || IsDialogShowing() ||
+      GetDialogShownCount() >= kMaxDialogShownCount) {
     return;
   }
 
@@ -132,6 +166,7 @@ void DiceMigrationService::ShowDiceMigrationOfferDialogIfUserEligible() {
 
   auto builder =
       ui::DialogModel::Builder(std::make_unique<ui::DialogModelDelegate>());
+  SetBannerImage(builder, IdentityManagerFactory::GetForProfile(profile_));
   builder.SetTitle(l10n_util::GetStringUTF16(IDS_DICE_MIGRATION_DIALOG_TITLE));
   builder.AddParagraph(description_text);
   builder.AddOkButton(base::DoNothing(),
@@ -139,7 +174,19 @@ void DiceMigrationService::ShowDiceMigrationOfferDialogIfUserEligible() {
                           .SetId(kAcceptButtonElementId)
                           .SetLabel(l10n_util::GetStringUTF16(
                               IDS_DICE_MIGRATION_DIALOG_OK_BUTTON)));
-  SetBannerImage(builder, IdentityManagerFactory::GetForProfile(profile_));
+
+  // The "final" variant does not include a close button, but rather the close-x
+  // button.
+  if (GetDialogShownCount() < kMaxDialogShownCount - 1) {
+    // Non-"final" variant.
+    builder.OverrideShowCloseButton(false);
+    builder.AddCancelButton(
+        base::DoNothing(),
+        ui::DialogModel::Button::Params()
+            .SetId(kCancelButtonElementId)
+            .SetLabel(l10n_util::GetStringUTF16(IDS_NOT_NOW)));
+  }
+
   // TODO(crbug.com/399838468): Refine the dialog behavior.
   builder.DisableCloseOnDeactivate();
   builder.SetIsAlertDialog();
@@ -157,7 +204,15 @@ void DiceMigrationService::ShowDiceMigrationOfferDialogIfUserEligible() {
       builder.Build(), avatar_button, views::BubbleBorder::TOP_RIGHT);
   dialog_widget_ = views::BubbleDialogDelegate::CreateBubble(std::move(bubble));
   dialog_widget_observation_.Observe(dialog_widget_);
+  browser_ = browser->AsWeakPtr();
   dialog_widget_->Show();
+
+  // TODO(crbug.com/399838468): Only increment the count if and when the dialog
+  // is actually visible to the user. For example, showing the dialog on a
+  // minimized browser window should not increment the count.
+  // TODO(crbug.com/399838468): Consider instead tracking the number of times
+  // the user actually interacts with the dialog and using that for limiting.
+  IncrementDialogShownCount();
 
   // TODO(crbug.com/399838468): Close the dialog when the avatar pill is
   // clicked.
@@ -169,6 +224,10 @@ bool DiceMigrationService::IsDialogShowing() {
 
 views::Widget* DiceMigrationService::GetDialogWidgetForTesting() {
   return dialog_widget_.get();
+}
+
+base::OneShotTimer& DiceMigrationService::GetDialogTriggerTimerForTesting() {
+  return dialog_trigger_timer_;
 }
 
 void DiceMigrationService::OnWidgetDestroying(views::Widget* widget) {
@@ -183,11 +242,26 @@ void DiceMigrationService::OnWidgetDestroying(views::Widget* widget) {
     case views::Widget::ClosedReason::kCancelButtonClicked:
       NOTREACHED();
     case views::Widget::ClosedReason::kAcceptButtonClicked:
-      MigrateUser(profile_);
+      if (MaybeMigrateUser(profile_) && browser_) {
+        MaybeShowToast(browser_.get());
+      }
       break;
     case views::Widget::ClosedReason::kUnspecified:
     case views::Widget::ClosedReason::kEscKeyPressed:
     case views::Widget::ClosedReason::kCloseButtonClicked:
       break;
   }
+  browser_.reset();
+}
+
+int DiceMigrationService::GetDialogShownCount() const {
+  PrefService* prefs = profile_->GetPrefs();
+  CHECK(prefs);
+  return prefs->GetInteger(kDiceMigrationDialogShownCount);
+}
+
+void DiceMigrationService::IncrementDialogShownCount() {
+  PrefService* prefs = profile_->GetPrefs();
+  CHECK(prefs);
+  prefs->SetInteger(kDiceMigrationDialogShownCount, GetDialogShownCount() + 1);
 }

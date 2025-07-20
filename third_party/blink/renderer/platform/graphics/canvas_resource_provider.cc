@@ -90,7 +90,7 @@ class FlushForImageListener {
   }
 
  private:
-  friend class WTF::ThreadSpecific<FlushForImageListener>;
+  friend class ThreadSpecific<FlushForImageListener>;
   base::ObserverList<CanvasResourceProvider> observers_;
 };
 
@@ -1290,8 +1290,10 @@ CanvasResourceProvider::CreateSharedImageProvider(
   const auto& shared_image_caps = context_provider_wrapper->ContextProvider()
                                       .SharedImageInterface()
                                       ->GetCapabilities();
-  if (!is_gpu_memory_buffer_image_allowed ||
-      (is_accelerated && !shared_image_caps.supports_scanout_shared_images)) {
+  bool is_overlay_supported_via_gmb =
+      is_gpu_memory_buffer_image_allowed &&
+      (!is_accelerated || shared_image_caps.supports_scanout_shared_images);
+  if (!is_overlay_supported_via_gmb) {
     shared_image_usage_flags.RemoveAll(
         gpu::SHARED_IMAGE_USAGE_CONCURRENT_READ_WRITE |
         gpu::SHARED_IMAGE_USAGE_SCANOUT);
@@ -1854,7 +1856,7 @@ void CanvasResourceProvider::RasterRecordOOP(cc::PaintRecord last_recording,
                           oopr_uses_dmsaa_ ? gpu::raster::MsaaMode::kDMSAA
                                            : gpu::raster::MsaaMode::kNoMSAA,
                           can_use_lcd_text, /*visible=*/true, GetColorSpace(),
-                          /*hdr_headroom=*/1.f, mailbox.name);
+                          /*hdr_headroom=*/0.f, mailbox.name);
 
   ri->RasterCHROMIUM(
       list.get(), GetOrCreateCanvasImageProvider(), size, full_raster_rect,

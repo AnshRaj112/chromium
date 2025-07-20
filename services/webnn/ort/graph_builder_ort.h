@@ -122,12 +122,24 @@ class GraphBuilderOrt {
   std::string CreateInt64InitializerForUint32Array(
       base::span<const uint32_t> array);
 
-  // A helper method wrapping the `CreateScalarInitializer` method above. It
-  // adds a scalar initializer with the given float value to the graph,
-  // returning the name of the initializer. The data type of the initializer is
-  // determined by the `data_type` parameter.
+  // A helper method wrapping the `CreateInitializer` method above. It creates
+  // an initializer of `shape` with all elements set to `value`. The data type
+  // of the initializer is determined by the `data_type` parameter.
+  std::string CreateInitializerForFloat(OperandDataType data_type,
+                                        base::span<const int64_t> shape,
+                                        float value);
+
+  // A helper method creating a scalar initializer with the given float value.
   std::string CreateScalarInitializerForFloat(OperandDataType data_type,
                                               float value);
+
+  // A helper method creating an initializer with all elements set to 1.
+  std::string CreateOneInitializer(OperandDataType data_type,
+                                   base::span<const int64_t> shape);
+
+  // A helper method creating an initializer with all elements set to 0.
+  std::string CreateZeroInitializer(OperandDataType data_type,
+                                    base::span<const int64_t> shape);
 
   void AddCastNode(base::cstring_view node_name,
                    base::cstring_view input,
@@ -145,6 +157,16 @@ class GraphBuilderOrt {
                      base::span<const uint32_t> shape);
   std::string CreateExpandNode(base::cstring_view input,
                                base::span<const uint32_t> shape);
+
+  void AddReshapeNode(base::cstring_view node_name,
+                      base::cstring_view input,
+                      base::cstring_view output,
+                      base::span<const uint32_t> shape);
+  std::string CreateReshapeNode(base::cstring_view input,
+                                base::span<const uint32_t> shape);
+  void InsertReshapeNode(base::cstring_view input,
+                         base::cstring_view output,
+                         base::span<const uint32_t> shape);
 
   void AddSliceNode(base::cstring_view node_name,
                     base::cstring_view input,
@@ -175,11 +197,14 @@ class GraphBuilderOrt {
   void AddGatherOperation(const T& operation, base::cstring_view op_type);
 
   void AddArgMinMaxOperation(const mojom::ArgMinMax& arg_min_max);
+  void AddBatchNormalizationOperation(
+      const mojom::BatchNormalization& batch_normalization);
   void AddCastOperation(const mojom::ElementWiseUnary& cast);
   void AddClampOperation(const mojom::Clamp& clamp);
   void AddConcatOperation(const mojom::Concat& concat);
   void AddConv2dOperation(const mojom::Conv2d& conv2d);
   void AddCumulativeSumOperation(const mojom::CumulativeSum& cumulative_sum);
+  void AddEluOperation(const mojom::Elu& elu);
   void AddLogicalBinaryOperation(const mojom::ElementWiseBinary& logical_binary,
                                  base::cstring_view op_type);
   void AddLogicalNotOperation(const mojom::ElementWiseUnary& logical_not);
@@ -191,6 +216,9 @@ class GraphBuilderOrt {
   void AddExpandOperation(const mojom::Expand& expand);
   void AddGatherNDOperation(const mojom::GatherND& gather_nd);
   void AddGemmOperation(const mojom::Gemm& gemm);
+  void AddHardSigmoidOperation(const mojom::HardSigmoid& hard_sigmoid);
+  void AddInstanceNormalizationOperation(
+      const mojom::InstanceNormalization& instance_normalization);
   void AddLeakyReluOperation(const mojom::LeakyRelu& leaky_relu);
   void AddLinearOperation(const mojom::Linear& linear);
   void AddMatMulOperation(const mojom::Matmul& matmul);
@@ -209,6 +237,7 @@ class GraphBuilderOrt {
   void AddSplitOperation(const mojom::Split& split);
   void AddTileOperation(const mojom::Tile& tile);
   void AddTransposeOperation(const mojom::Transpose& transpose);
+  void AddTriangularOperation(const mojom::Triangular& triangular);
   void AddWhereOperation(const mojom::Where& where);
 
   [[nodiscard]] base::expected<std::unique_ptr<ModelEditor::ModelInfo>,

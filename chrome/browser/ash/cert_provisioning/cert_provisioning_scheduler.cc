@@ -30,11 +30,11 @@
 #include "chrome/browser/ash/policy/core/user_cloud_policy_manager_ash.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browser_process_platform_part.h"
-#include "chrome/browser/chromeos/platform_keys/platform_keys.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/pref_names.h"
 #include "chromeos/ash/components/network/network_handler.h"
 #include "chromeos/ash/components/network/network_state_handler.h"
+#include "chromeos/ash/components/platform_keys/platform_keys.h"
 #include "components/invalidation/invalidation_listener.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/browser_thread.h"
@@ -42,16 +42,6 @@
 namespace ash::cert_provisioning {
 
 namespace {
-
-template <typename Container, typename Value>
-void EraseByKey(Container& container, const Value& value) {
-  auto iter = container.find(value);
-  if (iter == container.end()) {
-    return;
-  }
-
-  container.erase(iter);
-}
 
 const base::TimeDelta kInconsistentDataErrorRetryDelay = base::Seconds(30);
 
@@ -293,7 +283,7 @@ void CertProvisioningSchedulerImpl::RegisterForPrefsChanges() {
 void CertProvisioningSchedulerImpl::DailyUpdateWorkers() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
-  failed_cert_profiles_.clear();
+  ClearFailedWorkers();
   UpdateAllWorkers();
   ScheduleDailyUpdate();
 }
@@ -327,6 +317,7 @@ void CertProvisioningSchedulerImpl::DeserializeWorkers() {
 
 void CertProvisioningSchedulerImpl::OnPrefsChange() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  ClearFailedWorkers();
   UpdateAllWorkers();
 }
 
@@ -355,7 +346,7 @@ void CertProvisioningSchedulerImpl::UpdateOneWorkerImpl(
     const CertProfileId& cert_profile_id) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
-  EraseByKey(failed_cert_profiles_, cert_profile_id);
+  RemoveFailedWorker(cert_profile_id);
 
   std::optional<CertProfile> cert_profile = GetOneCertProfile(cert_profile_id);
   if (!cert_profile) {
@@ -563,6 +554,8 @@ bool CertProvisioningSchedulerImpl::ResetOneWorker(
     const CertProfileId& cert_profile_id) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
+  RemoveFailedWorker(cert_profile_id);
+
   std::optional<CertProfile> cert_profile = GetOneCertProfile(cert_profile_id);
   if (!cert_profile) {
     return false;
@@ -609,6 +602,22 @@ void CertProvisioningSchedulerImpl::RemoveWorkerFromMap(
   // dialogue to be closed. Instead, the ui update will be triggered by the new
   // worker.
   if (send_visible_state_changed_update) {
+    OnVisibleStateChanged();
+  }
+}
+
+void CertProvisioningSchedulerImpl::RemoveFailedWorker(
+    const CertProfileId& cert_profile_id) {
+  auto failed_profile = failed_cert_profiles_.find(cert_profile_id);
+  if (failed_profile != failed_cert_profiles_.end()) {
+    failed_cert_profiles_.erase(failed_profile);
+    OnVisibleStateChanged();
+  }
+}
+
+void CertProvisioningSchedulerImpl::ClearFailedWorkers() {
+  if (!failed_cert_profiles_.empty()) {
+    failed_cert_profiles_.clear();
     OnVisibleStateChanged();
   }
 }

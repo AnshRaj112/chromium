@@ -556,7 +556,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_NonExistentNode) {
             EvalJs(web_contents(), "document.getElementById('input').value"));
 }
 
-// TypeTool fails when target is disabled or readonly input.
+// TypeTool fails when target is disabled.
 IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_DisabledInput) {
   const GURL url = embedded_test_server()->GetURL("/actor/input.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
@@ -579,8 +579,8 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_DisabledInput) {
               EvalJs(web_contents(), "document.getElementById('input').value"));
   }
 
-  // Reenable the input and set it to readOnly, the action should also fail
-  // disabled in this case.
+  // Reenable the input and set it to readOnly, the action should now pass but
+  // the input value won't change.
 
   ASSERT_TRUE(ExecJs(web_contents(),
                      "document.getElementById('input').disabled = false"));
@@ -593,7 +593,7 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_DisabledInput) {
                         /*follow_by_enter=*/true);
     TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
     actor_task().Act(ToRequestList(action), result.GetCallback());
-    ExpectErrorResult(result, mojom::ActionResultCode::kElementDisabled);
+    ExpectOkResult(result);
     EXPECT_EQ("",
               EvalJs(web_contents(), "document.getElementById('input').value"));
   }
@@ -784,6 +784,38 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_FocusMovesFocus) {
             EvalJs(web_contents(), "document.getElementById('input').value"));
   EXPECT_EQ(typed_string,
             EvalJs(web_contents(), "document.getElementById('input2').value"));
+}
+
+// Ensure that if the page creates and focus on to a new input upon focusing on
+// the original target (even if the original target is readonly), type tool will
+// continue on to the new input.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_TextInputAtNewlyCreatedNode) {
+  const GURL url =
+      embedded_test_server()->GetURL("/actor/type_dynamic_input.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  // #input3 is set up to be readonly with a click handler that will spawn a
+  // clone of itself (#input3-clone) in its place without the readonly tag
+  // that's focused and ready to accept input.
+  std::optional<int> input_id = GetDOMNodeId(*main_frame(), "#input");
+  ASSERT_TRUE(input_id);
+
+  std::string typed_string = "abc";
+  std::unique_ptr<ToolRequest> action =
+      MakeTypeRequest(*main_frame(), input_id.value(), typed_string,
+                      /*follow_by_enter=*/false);
+
+  TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
+  actor_task().Act(ToRequestList(action), result.GetCallback());
+  ExpectOkResult(result);
+
+  // The input should go to the cloned input while original input remains
+  // readonly.
+  EXPECT_EQ("",
+            EvalJs(web_contents(), "document.getElementById('input').value"));
+  EXPECT_EQ(
+      typed_string,
+      EvalJs(web_contents(), "document.getElementById('inputclone').value"));
 }
 
 // Basic test of the TypeTool coordinate target - ensure typed string is entered
@@ -986,24 +1018,63 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_DomNodeIdTargetsNonEditable) {
       EvalJs(web_contents(), "input_event_log.join(',')"));
 }
 
-// Ensure the type tool fails if targeting a non-focusable DOMNodeId.
-IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_DomNodeIdTargetsNonFocusable) {
-  const GURL url = embedded_test_server()->GetURL("/actor/type_non_input.html");
+// Ensure the type tool emits events at the expected intervals when typing
+// incrementally.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, TypeTool_IncrementalTyping) {
+  if (!base::FeatureList::IsEnabled(features::kGlicActorIncrementalTyping)) {
+    GTEST_SKIP() << "GlicActorIncrementalTyping feature is disabled";
+  }
+
+  const GURL url = embedded_test_server()->GetURL("/actor/input.html");
   ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
 
   // The log starts empty.
   ASSERT_EQ("", EvalJs(web_contents(), "input_event_log.join(',')"));
 
-  std::string typed_string = "abc";
-  std::optional<int> input_id = GetDOMNodeId(*main_frame(), "#unfocusableDiv");
+  const std::string_view typed_string = "Test";
+  std::optional<int> input_id = GetDOMNodeId(*main_frame(), "#input");
   ASSERT_TRUE(input_id);
   std::unique_ptr<ToolRequest> action =
       MakeTypeRequest(*main_frame(), input_id.value(), typed_string,
                       /*follow_by_enter=*/false);
+
   TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
   actor_task().Act(ToRequestList(action), result.GetCallback());
-  ExpectErrorResult(result, mojom::ActionResultCode::kTypeTargetNotFocusable);
-  EXPECT_EQ("", EvalJs(web_contents(), "input_event_log.join(',')"));
+  ExpectOkResult(result);
+
+  // Check that the events are what we expect.
+  ASSERT_EQ(
+      "keydown,input,keyup,"  // T
+      "keydown,input,keyup,"  // e
+      "keydown,input,keyup,"  // s
+      "keydown,input,keyup",  // t
+      EvalJs(web_contents(), "input_event_log.join(',')"));
+
+  base::Value::List timestamps =
+      EvalJs(web_contents(), "input_event_log_times").ExtractList();
+
+  // There are 3 events per character (keydown, input, keyup).
+  ASSERT_EQ(timestamps.size(), typed_string.length() * 3);
+
+  // Check that the time between events is what we expect.
+  for (size_t i = 0; i < typed_string.length(); ++i) {
+    const double key_down_ts = timestamps[i * 3].GetDouble();
+    const double key_up_ts = timestamps[i * 3 + 2].GetDouble();
+    const base::TimeDelta key_down_to_up_delta =
+        base::Milliseconds(key_up_ts - key_down_ts);
+
+    // Check the delay between keydown and keyup.
+    EXPECT_GE(key_down_to_up_delta, features::kGlicActorKeyDownDuration.Get());
+
+    // Check the delay between this character's keyup and the next character's
+    // keydown.
+    if (i < typed_string.length() - 1) {
+      const double next_key_down_ts = timestamps[(i + 1) * 3].GetDouble();
+      const base::TimeDelta key_up_to_down_delta =
+          base::Milliseconds(next_key_down_ts - key_up_ts);
+      EXPECT_GE(key_up_to_down_delta, features::kGlicActorKeyUpDuration.Get());
+    }
+  }
 }
 
 // ===============================================
@@ -1298,6 +1369,30 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, ScrollTool_NonScrollable) {
                       mojom::ActionResultCode::kScrollTargetNotUserScrollable);
     EXPECT_EQ(0, EvalJs(web_contents(),
                         "document.getElementById('nonscroll').scrollTop"));
+    EXPECT_EQ(0, EvalJs(web_contents(), "window.scrollY"));
+  }
+}
+
+// Test scrolling over a non-scrollable element returns failure.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, ScrollTool_OffscreenScrollable) {
+  const GURL url =
+      embedded_test_server()->GetURL("/actor/scrollable_page.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  int scroll_offset_y = 80;
+
+  int scroller = GetDOMNodeId(*main_frame(), "#offscreenscroller").value();
+
+  {
+    std::unique_ptr<ToolRequest> action =
+        MakeScrollRequest(*main_frame(), scroller,
+                          /*scroll_offset_x=*/0, scroll_offset_y);
+    TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
+    actor_task().Act(ToRequestList(action), result.GetCallback());
+    ExpectErrorResult(result, mojom::ActionResultCode::kElementOffscreen);
+    EXPECT_EQ(0,
+              EvalJs(web_contents(),
+                     "document.getElementById('offscreenscroller').scrollTop"));
     EXPECT_EQ(0, EvalJs(web_contents(), "window.scrollY"));
   }
 }
@@ -2104,6 +2199,29 @@ IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_OptionSelected) {
   }
 
   EXPECT_EQ(GetSelectElementCurrentValue(plain_select_id), "last");
+}
+
+// Test that attempting to select a value that does not exist in the <option>
+// list fails and does not change the current selection.
+IN_PROC_BROWSER_TEST_F(ActorToolsTest, SelectTool_OffscreenFails) {
+  const GURL url = embedded_test_server()->GetURL("/actor/select_tool.html");
+  ASSERT_TRUE(content::NavigateToURL(web_contents(), url));
+
+  const std::string offscreen_select_id = "#offscreenSelect";
+  int32_t offscreen_select_dom_node_id =
+      GetDOMNodeId(*main_frame(), offscreen_select_id).value();
+
+  const std::string initial_value =
+      GetSelectElementCurrentValue(offscreen_select_id);
+  ASSERT_EQ(initial_value, "alpha");
+
+  std::unique_ptr<ToolRequest> action =
+      MakeSelectRequest(*main_frame(), offscreen_select_dom_node_id, "beta");
+  TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
+  actor_task().Act(ToRequestList(action), result.GetCallback());
+  ExpectErrorResult(result, mojom::ActionResultCode::kElementOffscreen);
+
+  EXPECT_EQ(GetSelectElementCurrentValue(offscreen_select_id), initial_value);
 }
 
 // Test that the SelectTool causes the change and input events to fire on the

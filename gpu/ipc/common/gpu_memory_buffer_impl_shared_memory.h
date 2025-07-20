@@ -34,17 +34,14 @@ class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImplSharedMemory
   CreateFromHandleForTesting(gfx::GpuMemoryBufferHandle handle,
                              const gfx::Size& size,
                              gfx::BufferFormat format,
-                             gfx::BufferUsage usage,
-                             DestructionCallback callback) {
-    return CreateFromHandle(std::move(handle), size, format, usage,
-                            std::move(callback));
+                             gfx::BufferUsage usage) {
+    return CreateFromHandle(std::move(handle), size, format, usage);
   }
 
   static std::unique_ptr<GpuMemoryBufferImplSharedMemory> CreateForTesting(
       const gfx::Size& size,
       gfx::BufferFormat format,
-      gfx::BufferUsage usage,
-      DestructionCallback callback);
+      gfx::BufferUsage usage);
 
   static gfx::GpuMemoryBufferHandle CreateGpuMemoryBuffer(
       const gfx::Size& size,
@@ -61,7 +58,7 @@ class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImplSharedMemory
       gfx::BufferUsage usage,
       gfx::GpuMemoryBufferHandle* handle);
 
-  // Overridden from gfx::GpuMemoryBuffer:
+  // Overridden from GpuMemoryBufferImpl:
   bool Map() override;
   void* memory(size_t plane) override;
   void Unmap() override;
@@ -76,18 +73,17 @@ class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImplSharedMemory
       gfx::GpuMemoryBufferHandle handle,
       const gfx::Size& size,
       gfx::BufferFormat format,
-      gfx::BufferUsage usage,
-      DestructionCallback callback);
+      gfx::BufferUsage usage);
 
   GpuMemoryBufferImplSharedMemory(
       const gfx::Size& size,
       gfx::BufferFormat format,
       gfx::BufferUsage usage,
-      DestructionCallback callback,
       base::UnsafeSharedMemoryRegion shared_memory_region,
       base::WritableSharedMemoryMapping shared_memory_mapping,
       size_t offset,
-      uint32_t stride);
+      uint32_t stride,
+      bool for_testing = false);
 
   base::UnsafeSharedMemoryRegion shared_memory_region_;
   base::WritableSharedMemoryMapping shared_memory_mapping_;

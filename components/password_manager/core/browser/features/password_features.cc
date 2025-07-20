@@ -147,6 +147,10 @@ BASE_FEATURE(kShowRecoveryPassword,
              "ShowRecoveryPassword",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kShowTabWithPasswordChangeOnSuccess,
+             "ShowTabWithPasswordChangeOnSuccess",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 BASE_FEATURE(kSkipUndecryptablePasswords,
              "SkipUndecryptablePasswords",
 #if BUILDFLAG(IS_WIN)
@@ -161,11 +165,11 @@ BASE_FEATURE(kTriggerPasswordResyncAfterDeletingUndecryptablePasswords,
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kTriggerPasswordResyncWhenUndecryptablePasswordsDetected,
-            "TriggerPasswordResyncWhenUndecryptablePasswordsDetected",
+             "TriggerPasswordResyncWhenUndecryptablePasswordsDetected",
 #if BUILDFLAG(IS_WIN)
-            base::FEATURE_ENABLED_BY_DEFAULT
+             base::FEATURE_ENABLED_BY_DEFAULT
 #else
-            base::FEATURE_DISABLED_BY_DEFAULT
+             base::FEATURE_DISABLED_BY_DEFAULT
 #endif
 );
 
@@ -194,5 +198,15 @@ BASE_FEATURE(kMarkAllCredentialsAsLeaked,
 BASE_FEATURE(kImprovedPasswordChangeService,
              "ImprovedPasswordChangeService",
              base::FEATURE_DISABLED_BY_DEFAULT);
+
+#if BUILDFLAG(IS_ANDROID)
+BASE_FEATURE(kReloadPasswordsOnTrustedVaultEncryptionChange,
+             "ReloadPasswordsOnTrustedVaultEncryptionChange",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+BASE_FEATURE(kRetrieveTrustedVaultKeyKeyboardAccessoryAction,
+             "RetrieveTrustedVaultKeyKeyboardAccessoryAction",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(IS_ANDROID)
 
 }  // namespace password_manager::features

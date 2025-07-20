@@ -9,6 +9,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "components/enterprise/common/proto/synced/browser_events.pb.h"
 #include "components/enterprise/connectors/core/common.h"
+#include "components/enterprise/connectors/core/features.h"
 #include "components/enterprise/connectors/core/reporting_constants.h"
 #include "components/safe_browsing/core/common/features.h"
 #include "components/safe_browsing/core/common/proto/realtimeapi.pb.h"
@@ -116,6 +117,97 @@ InterstitialThreatType ConvertThreatTypeToProto(std::string threat_type) {
   if (threat_type.empty()) {
     return proto::UrlFilteringInterstitialEvent::
         UNKNOWN_INTERSTITIAL_THREAT_TYPE;
+  }
+  NOTREACHED();
+}
+
+proto::UnscannedFileEvent::UnscannedReason ToProtoUnscannedReason(
+    const std::string& unscanned_reason) {
+  if (unscanned_reason == kFilePasswordProtectedUnscannedReason) {
+    return proto::UnscannedFileEvent::FILE_PASSWORD_PROTECTED;
+  }
+  if (unscanned_reason == kFileTooLargeUnscannedReason) {
+    return proto::UnscannedFileEvent::FILE_TOO_LARGE;
+  }
+  if (unscanned_reason == kDlpScanFailedUnscannedReason) {
+    return proto::UnscannedFileEvent::DLP_SCAN_FAILED;
+  }
+  if (unscanned_reason == kMalwareScanFailedUnscannedReason) {
+    return proto::UnscannedFileEvent::MALWARE_SCAN_FAILED;
+  }
+  if (unscanned_reason == kDlpScanUnsupportedFileTypeUnscannedReason) {
+    return proto::UnscannedFileEvent::DLP_SCAN_UNSUPPORTED_FILE_TYPE;
+  }
+  if (unscanned_reason == kMalwareScanUnsupportedFileTypeUnscannedReason) {
+    return proto::UnscannedFileEvent::MALWARE_SCAN_UNSUPPORTED_FILE_TYPE;
+  }
+  if (unscanned_reason == kServiceUnavailableUnscannedReason) {
+    return proto::UnscannedFileEvent::SERVICE_UNAVAILABLE;
+  }
+  if (unscanned_reason == kTooManyRequestsUnscannedReason) {
+    return proto::UnscannedFileEvent::TOO_MANY_REQUESTS;
+  }
+  if (unscanned_reason == kTimeoutUnscannedReason) {
+    return proto::UnscannedFileEvent::TIMEOUT;
+  }
+  if (unscanned_reason.empty()) {
+    return proto::UnscannedFileEvent::UNSCANNED_REASON_UNKNOWN;
+  }
+  NOTREACHED();
+}
+
+proto::DataTransferEventTrigger ToProtoDataTransferEventTrigger(
+    const std::string& trigger) {
+  if (trigger == kFileDownloadDataTransferEventTrigger) {
+    return proto::DataTransferEventTrigger::FILE_DOWNLOAD;
+  }
+  if (trigger == kFileUploadDataTransferEventTrigger) {
+    return proto::DataTransferEventTrigger::FILE_UPLOAD;
+  }
+  if (trigger == kWebContentUploadDataTransferEventTrigger) {
+    return proto::DataTransferEventTrigger::WEB_CONTENT_UPLOAD;
+  }
+  if (trigger == kPagePrintDataTransferEventTrigger) {
+    return proto::DataTransferEventTrigger::PAGE_PRINT;
+  }
+  if (trigger == kUrlVisitedDataTransferEventTrigger) {
+    return proto::DataTransferEventTrigger::URL_VISITED;
+  }
+  if (trigger == kFileTransferDataTransferEventTrigger) {
+    return proto::DataTransferEventTrigger::FILE_TRANSFER;
+  }
+  if (trigger == kPageLoadDataTransferEventTrigger) {
+    return proto::DataTransferEventTrigger::PAGE_LOAD;
+  }
+  if (trigger == kMutationDataTransferEventTrigger) {
+    return proto::DataTransferEventTrigger::MUTATION;
+  }
+  if (trigger == kMouseActionDataTransferEventTrigger) {
+    return proto::DataTransferEventTrigger::MOUSE_ACTION;
+  }
+  if (trigger.empty()) {
+    return proto::DataTransferEventTrigger::
+        DATA_TRANSFER_EVENT_TRIGGER_TYPE_UNSPECIFIED;
+  }
+  NOTREACHED();
+}
+
+proto::ContentTransferMethod ToProtoContentTransferMethod(
+    const std::string& method) {
+  // If `method` is empty, it means the field is not applicable and this method
+  // won't be called. Only converts the string to
+  // `CONTENT_TRANSFER_METHOD_UNKNOWN`, if it is explicitly set this way.
+  if (method == kContentTransferMethodUnknown) {
+    return proto::CONTENT_TRANSFER_METHOD_UNKNOWN;
+  }
+  if (method == kContentTransferMethodFilePicker) {
+    return proto::CONTENT_TRANSFER_METHOD_FILE_PICKER;
+  }
+  if (method == kContentTransferMethodDragAndDrop) {
+    return proto::CONTENT_TRANSFER_METHOD_DRAG_AND_DROP;
+  }
+  if (method == kContentTransferMethodFilePaste) {
+    return proto::CONTENT_TRANSFER_METHOD_FILE_PASTE;
   }
   NOTREACHED();
 }
@@ -350,6 +442,7 @@ proto::UrlFilteringInterstitialEvent GetUrlFilteringInterstitialEvent(
     const safe_browsing::RTLookupResponse& response,
     const std::string& profile_identifier,
     const std::string& profile_username,
+    const std::string& active_user,
     const ReferrerChain& referrer_chain) {
   proto::UrlFilteringInterstitialEvent event;
   event.set_url(url.spec());
@@ -362,6 +455,10 @@ proto::UrlFilteringInterstitialEvent GetUrlFilteringInterstitialEvent(
   event.set_event_result(GetEventResult(event_result));
   event.set_profile_identifier(profile_identifier);
   event.set_profile_user_name(profile_username);
+
+  if (!active_user.empty()) {
+    event.set_web_app_signed_in_account(active_user);
+  }
 
   for (const safe_browsing::RTLookupResponse::ThreatInfo& threat_info :
        response.threat_info()) {
@@ -396,6 +493,50 @@ proto::BrowserCrashEvent GetBrowserCrashEvent(const std::string& channel,
   event.set_report_id(report_id);
   event.set_platform(platform);
 
+  return event;
+}
+
+proto::UnscannedFileEvent GetUnscannedFileEvent(
+    const GURL& url,
+    const GURL& tab_url,
+    const std::string& source,
+    const std::string& destination,
+    const std::string& file_name,
+    const std::string& download_digest_sha256,
+    const std::string& mime_type,
+    const std::string& trigger,
+    const std::string& reason,
+    const std::string& content_transfer_method,
+    const std::string& profile_identifier,
+    const std::string& profile_username,
+    const int64_t content_size,
+    EventResult event_result) {
+  proto::UnscannedFileEvent event;
+  event.set_url(url.spec());
+  event.set_tab_url(tab_url.spec());
+  event.set_source(source);
+  event.set_destination(destination);
+  event.set_file_name(file_name);
+  event.set_download_digest_sha_256(download_digest_sha256);
+  event.set_content_type(mime_type);
+
+  // |content_size| can be set to -1 to indicate an unknown size, in
+  // which case the field is not set.
+  if (content_size >= 0) {
+    event.set_content_size(content_size);
+  }
+  event.set_unscanned_reason(ToProtoUnscannedReason(reason));
+  event.set_trigger(ToProtoDataTransferEventTrigger(trigger));
+  event.set_event_result(GetEventResult(event_result));
+  event.set_clicked_through(event_result ==
+                            enterprise_connectors::EventResult::BYPASSED);
+  if (!content_transfer_method.empty()) {
+    event.set_content_transfer_method(
+        ToProtoContentTransferMethod(content_transfer_method));
+  }
+
+  event.set_profile_identifier(profile_identifier);
+  event.set_profile_user_name(profile_username);
   return event;
 }
 

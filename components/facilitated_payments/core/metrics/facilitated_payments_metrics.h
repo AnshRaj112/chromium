@@ -118,9 +118,21 @@ enum class PixFlowExitedReason {
   kPurchaseActionCouldNotBeInvoked = 13,
   // Autofilling payment FOPs disabled.
   kAutofillPaymentMethodsDisabled = 14,
-  kMaxValue = kAutofillPaymentMethodsDisabled
+  // Pix code was copied on a merchant website that wasn't allowlisted.
+  kMerchantNotAllowlisted = 15,
+  kMaxValue = kMerchantNotAllowlisted
 };
 // LINT.ThenChange(/tools/metrics/histograms/metadata/facilitated_payments/enums.xml:FacilitatedPayments.PixFlowExitedReason)
+
+// LINT.IfChange(PixAccountLinkingFlowExitedReason)
+enum class PixAccountLinkingFlowExitedReason {
+  kScreenNotShown = 0,
+  kScreenClosedNotByUser = 1,
+  kScreenClosedByUser = 2,
+  kUserDeclined = 3,
+  kMaxValue = kUserDeclined
+};
+// LINT.ThenChange(/tools/metrics/histograms/metadata/facilitated_payments/enums.xml:FacilitatedPayments.Pix.AccountLinking.FlowExitedReason)
 
 // Log when a Pix code is copied to the clippboard on an allowlisted merchant
 // website.
@@ -277,6 +289,19 @@ void LogFopSelectorShownLatency(
 
 // Logs that the Pix account linking prompt was shown.
 void LogPixAccountLinkingPromptShown();
+
+// Logs that the Pix account linking prompt was accepted by user.
+void LogPixAccountLinkingPromptAccepted();
+
+// Logs the result and latency for GetDetailsForCreatePaymentInstrument
+// endpoint.
+void LogGetDetailsForCreatePaymentInstrumentResultAndLatency(
+    bool is_eligible,
+    base::TimeDelta latency);
+
+// Log the reason for the Pix account linking flow was exited early.
+void LogPixAccountLinkingFlowExitedReason(
+    PixAccountLinkingFlowExitedReason reason);
 
 }  // namespace payments::facilitated
 

@@ -136,6 +136,10 @@ BASE_DECLARE_FEATURE(kSetLeakCheckRequestCriticality);
 // management UI.
 BASE_DECLARE_FEATURE(kShowRecoveryPassword);
 
+// Shows a tab with password change instead of bubble/settings page after
+// successful password change.
+BASE_DECLARE_FEATURE(kShowTabWithPasswordChangeOnSuccess);
+
 // Displays at least the decryptable and never saved logins in the password
 // manager
 BASE_DECLARE_FEATURE(kSkipUndecryptablePasswords);
@@ -180,6 +184,16 @@ BASE_DECLARE_FEATURE(kMarkAllCredentialsAsLeaked);
 
 // Enables improvements to password change functionality.
 BASE_DECLARE_FEATURE(kImprovedPasswordChangeService);
+
+#if BUILDFLAG(IS_ANDROID)
+// The feature flag for reloading passwords when the trusted vault encryption
+// state changes.
+BASE_DECLARE_FEATURE(kReloadPasswordsOnTrustedVaultEncryptionChange);
+
+// The feature flag for showing an action to unlock passwords in case of a
+// trusted vault error in the keyboard accessory.
+BASE_DECLARE_FEATURE(kRetrieveTrustedVaultKeyKeyboardAccessoryAction);
+#endif  // BUILDFLAG(IS_ANDROID)
 
 inline constexpr base::FeatureParam<std::string>
     kPasswordChangeSuccessSurveyTriggerId{

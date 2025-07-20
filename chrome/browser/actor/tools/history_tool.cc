@@ -114,8 +114,9 @@ std::unique_ptr<ObservationDelayController> HistoryTool::GetObservationDelayer()
       *web_contents()->GetPrimaryMainFrame());
 }
 
-void HistoryTool::UpdateTaskBeforeInvoke(ActorTask& task) const {
-  task.AddToTabSet(tab_handle_);
+void HistoryTool::UpdateTaskBeforeInvoke(ActorTask& task,
+                                         InvokeCallback callback) const {
+  task.AddTab(tab_handle_, std::move(callback));
 }
 
 void HistoryTool::DidStartNavigation(NavigationHandle* navigation_handle) {

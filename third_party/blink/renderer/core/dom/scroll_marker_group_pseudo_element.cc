@@ -163,4 +163,11 @@ void ScrollMarkerGroupPseudoElement::ScrollSelectedIntoView(bool apply_snap) {
   }
 }
 
+ScrollMarkerGroup::ScrollMarkerMode
+ScrollMarkerGroupPseudoElement::ScrollMarkerGroupMode() const {
+  const ComputedStyle& parent_style = parentElement()->ComputedStyleRef();
+  CHECK(parent_style.ScrollMarkerGroupMode().has_value());
+  return parent_style.ScrollMarkerGroupMode().value();
+}
+
 }  // namespace blink

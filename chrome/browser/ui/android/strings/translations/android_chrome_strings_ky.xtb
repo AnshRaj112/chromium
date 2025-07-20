@@ -19,7 +19,6 @@
 <translation id="1070689840697074178">Бул жерде PDF файлдарды жүктөй аласыз</translation>
 <translation id="107147699690128016">Файлдын кеңейтүүсүн өзгөртсөңүз, ал башка колдонмодо ачылып, түзмөгүңүзгө зыян келтириши мүмкүн.</translation>
 <translation id="1080365971383768617">Бардык түзмөктөрүңүздөгү сырсөздөр</translation>
-<translation id="1087176310396019910">Спам болушу мүмкүн</translation>
 <translation id="1087799850623149508">Дарек тилкесин коё бербей басып туруп, ылдый жакка жылдыра аласыз</translation>
 <translation id="1089606299949659462">Карап чыгуу аяктады!</translation>
 <translation id="1094555143448724771">Башка түзмөктөрүңүздөгү өтмөктөрдү көрүү үчүн өтмөктөрүңүздү жана таржымалды шайкештириңиз</translation>
@@ -109,6 +108,7 @@ Chrome'дун ишин жакшыртуу үчүн маалыматтарды к
 <translation id="1419753403124156396">Chrome өчүрүлүп күйгүзүлсүнбү?</translation>
 <translation id="1428770807407000502">Шайкештирүү өчүрүлсүнбү?</translation>
 <translation id="1430915738399379752">Басып чыгаруу</translation>
+<translation id="1433478348197382180">Окуу режими</translation>
 <translation id="1435593198351412143">PDF файлдарын автоматтык түрдө ачуу</translation>
 <translation id="1437543266176261764"><ph name="APP_NAME" /> колдонмосунда иштеп жатат</translation>
 <translation id="1448440926884431741">Көз салган товарларды Кыстармаларда иреттей аласыз</translation>
@@ -720,6 +720,7 @@ Chrome'дун ишин жакшыртуу үчүн маалыматтарды к
 <translation id="4306489587293957491">Киргизүү</translation>
 <translation id="4307992518367153382">Негизги параметрлер</translation>
 <translation id="4311652497846705514">PDF файл ачылсынбы?</translation>
+<translation id="4313895677475587452">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Спам болушу мүмкүн}other{Спам болушу мүмкүн (#)}}</translation>
 <translation id="4320177379694898372">Интернет жок</translation>
 <translation id="4326079409704643112">Chrome маалыматын Google аккаунтуңузга сактоо жана колдонуу үчүн өзүңүздү ырастаңыз</translation>
 <translation id="433213510553688132">Көз салынууда...</translation>
@@ -1058,6 +1059,7 @@ Google аккаунтуңуздун башка Google кызматтарынан
 <translation id="580893287573699959">Өзүңүздү кызыктырган темаларды жана изделген нерселерди тескеңиз</translation>
 <translation id="5809361687334836369">{HOURS,plural, =1{# саат мурун}other{# саат мурун}}</translation>
 <translation id="5810288467834065221">© Google LLC, <ph name="YEAR" /> Баардык укуктар корголгон.</translation>
+<translation id="581030587084991751">{NUM_SUSPICIOUS_NOTIFICATIONS,plural, =1{Билдирмени көрсөтүү}other{Билдирмелерди көрсөтүү}}</translation>
 <translation id="5814749351757353073">Жактырган сайттарыңызды колдоно бериңиз</translation>
 <translation id="5823093032261493462"><ph name="DOWNLOAD_DOMAIN" /> сайтындагы "<ph name="FILE_NAME" />" файлын баары бир жүктөп аласызбы?</translation>
 <translation id="5828921839638612740">Бул маалыматты Chrome'дун параметрлеринен өчүрө аласыз</translation>
@@ -1168,6 +1170,7 @@ Google аккаунтуңуздун башка Google кызматтарынан
 <translation id="6255809143828972562">Chrome'дун куралдары менен коопсуз серептеп, баарын көзөмөлдөй аласыз</translation>
 <translation id="6264376385120300461">Баары бир жүктөп алуу</translation>
 <translation id="6264485186158353794">Коопсуздукка кайтуу</translation>
+<translation id="6267063201726531683">Окуу режиминин ылдыйкы экраны</translation>
 <translation id="6277522088822131679">Баракты басып чыгарууда көйгөй келип чыкты. Дагы аракет кылып көрүңүз.</translation>
 <translation id="6278428485366576908">Тема</translation>
 <translation id="6284472661216707937">Бардык түзмөктөрдөгү сырсөздөр барагы жабылды</translation>
@@ -1191,7 +1194,6 @@ Google аккаунтуңуздун башка Google кызматтарынан
 <translation id="6342069812937806050">Жаңы эле</translation>
 <translation id="6343495912647200061">{SHIPPING_ADDRESS,plural, =1{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 жана дагы <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}other{<ph name="SHIPPING_ADDRESS_PREVIEW" />\u2026 жана дагы <ph name="NUMBER_OF_ADDITIONAL_ADDRESSES" />}}</translation>
 <translation id="6345878117466430440">Окулду деп белгилөө</translation>
-<translation id="6347010704471250799">Билдирмени көрсөтүү</translation>
 <translation id="6356893102071098867">Туура аккаунтту тандаганыңызды текшериңиз</translation>
 <translation id="6363990818884053551">Шайкештирүүнү баштоо үчүн өзүңүз экениңизди ырастаңыз</translation>
 <translation id="6364438453358674297">Сунуш таржымалдан алынып салынсынбы?</translation>

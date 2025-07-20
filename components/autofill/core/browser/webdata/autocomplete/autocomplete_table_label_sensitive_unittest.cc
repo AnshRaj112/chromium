@@ -14,6 +14,7 @@
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/task_environment.h"
 #include "base/time/time.h"
@@ -31,19 +32,33 @@ namespace autofill {
 
 namespace {
 
+using ::autofill::test::CreateTestFormField;
 using AutocompleteEntryLabelSensitiveSet =
     std::set<AutocompleteEntryLabelSensitive,
              bool (*)(const AutocompleteEntryLabelSensitive&,
                       const AutocompleteEntryLabelSensitive&)>;
-using base::Time;
-using testing::ElementsAre;
+using ::base::Time;
+using ::testing::ElementsAre;
+using ::testing::Eq;
+using ::testing::Optional;
+using ::testing::Property;
+using ::testing::UnorderedElementsAre;
 
 bool CompareAutocompleteEntries(const AutocompleteEntryLabelSensitive& a,
                                 const AutocompleteEntryLabelSensitive& b) {
-  return std::tie(a.key().name(), a.key().label(), a.key().value(),
-                  a.date_created(), a.date_last_used()) <
-         std::tie(b.key().name(), b.key().label(), b.key().value(),
-                  b.date_created(), b.date_last_used());
+  // AutocompleteEntryLabelSensitive contains dates of type base::Time, but the
+  // database stores them with sub-second precision. To avoid mismatches, we
+  // call ToTimeT(), which returns time in seconds.
+  time_t a_created = a.date_created().ToTimeT();
+  time_t a_used = a.date_last_used().ToTimeT();
+  time_t b_created = b.date_created().ToTimeT();
+  time_t b_used = b.date_last_used().ToTimeT();
+
+  // Tie requires lvalues, so a_created, a_used, b_created, and b_used cannot be
+  // inlined.
+  return std::tie(a.key().name(), a.key().label(), a.key().value(), a_created,
+                  a_used) < std::tie(b.key().name(), b.key().label(),
+                                     b.key().value(), b_created, b_used);
 }
 
 AutocompleteEntryLabelSensitive MakeAutocompleteEntryLabelSensitive(
@@ -52,24 +67,28 @@ AutocompleteEntryLabelSensitive MakeAutocompleteEntryLabelSensitive(
     const std::u16string& value,
     time_t date_created,
     time_t date_last_used) {
-  if (date_last_used < 0) {
-    date_last_used = date_created;
-  }
   return AutocompleteEntryLabelSensitive(
       AutocompleteKeyLabelSensitive(name, label, value),
       Time::FromTimeT(date_created), Time::FromTimeT(date_last_used));
 }
 
-// Checks |actual| and |expected| contain the same elements.
-void CompareAutocompleteEntryLabelSensitiveSets(
+// Checks that `actual` and `expected` contain the same elements.
+[[nodiscard]] testing::AssertionResult
+CompareAutocompleteEntryLabelSensitiveSets(
     const AutocompleteEntryLabelSensitiveSet& actual,
     const AutocompleteEntryLabelSensitiveSet& expected) {
-  ASSERT_EQ(expected.size(), actual.size());
+  if (actual.size() != expected.size()) {
+    return testing::AssertionFailure() << "Mismatching sizes: " << actual.size()
+                                       << " vs. " << expected.size();
+  }
   size_t count = 0;
   for (const auto& it : actual) {
     count += expected.count(it);
   }
-  EXPECT_EQ(actual.size(), count);
+  return (actual.size() == count) ? testing::AssertionSuccess()
+                                  : testing::AssertionFailure()
+                                        << "actual.size() = " << actual.size()
+                                        << " but count = " << count;
 }
 
 int GetAutocompleteEntryLabelSensitiveCount(const std::u16string& name,
@@ -88,34 +107,83 @@ int GetAutocompleteEntryLabelSensitiveCount(const std::u16string& name,
   return s.ColumnInt(0);
 }
 
+auto EqualsSearchResult(std::u16string value, int count) {
+  return AllOf(Property("AutocompleteSearchResultLabelSensitive::value",
+                        &AutocompleteSearchResultLabelSensitive::value, value),
+               Property("AutocompleteSearchResultLabelSensitive::count",
+                        &AutocompleteSearchResultLabelSensitive::count, count));
+}
+
+auto HasCreationAndUseDate(base::Time date_created, base::Time date_last_used) {
+  return AllOf(
+      Property("AutocompleteEntryLabelSensitive::date_created",
+               &AutocompleteEntryLabelSensitive::date_created, date_created),
+      Property("AutocompleteEntryLabelSensitive::date_last_used",
+               &AutocompleteEntryLabelSensitive::date_last_used,
+               date_last_used));
+}
+
 class AutocompleteTableLabelSensitiveTest : public testing::Test {
  protected:
+  const std::u16string kDefaultLabel = u"Your Name";
+  const std::u16string kDefaultName = u"your_name";
+  const std::u16string kDefaultValue = u"Superman";
+
   void SetUp() override {
     ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
     file_ = temp_dir_.GetPath().AppendASCII("TestWebDatabase");
     table_ = std::make_unique<AutocompleteTableLabelSensitive>();
     db_ = std::make_unique<WebDatabase>();
     db_->AddTable(table_.get());
-    ASSERT_EQ(sql::INIT_OK, db_->Init(file_));
-  }
-
-  void SetClock(base::Time target) {
-    // When we compare last used dates, we fast forward the current time to a
-    // fixed date that has no sub-second component. This is because creation and
-    // last_used dates are serialized to seconds and sub-second components are
-    // lost.
-    base::Time rounded_target = base::Time::FromSecondsSinceUnixEpoch(
-        target.InMillisecondsSinceUnixEpoch() / 1000);
-    AdvanceClock(rounded_target - base::Time::Now());
-    ASSERT_EQ(base::Time::Now().InMillisecondsSinceUnixEpoch() % 1000, 0);
+    changes_.clear();
+    ASSERT_EQ(db_->Init(file_), sql::INIT_OK);
   }
 
   void AdvanceClock(base::TimeDelta delta) {
     task_environment_.AdvanceClock(delta);
   }
 
+  [[nodiscard]] FormFieldData CreateDefaultFieldWithValue(
+      std::u16string_view value) {
+    return test::CreateTestFormField(kDefaultLabel, kDefaultName, value,
+                                     FormControlType::kInputText);
+  }
+
+  [[nodiscard]] FormFieldData CreateDefaultField() {
+    return CreateDefaultFieldWithValue(kDefaultValue);
+  }
+
+  // Submits a vector of form fields to the table, returns true if successful.
+  [[nodiscard]] bool SubmitFormFields(
+      const std::vector<FormFieldData>& elements) {
+    return table().AddFormFieldValues(elements, &changes_);
+  }
+
+  // Submits a single form field to the table, returns true if successful.
+  [[nodiscard]] bool SubmitFormField(const FormFieldData& field) {
+    return SubmitFormFields({field});
+  }
+
+  // Will return optional field on successful submission, or std::nullopt if
+  // submission fails
+  [[nodiscard]] std::optional<FormFieldData>
+  CreateAndSubmitDefaultFieldWithValue(std::u16string_view value) {
+    FormFieldData field = CreateDefaultFieldWithValue(value);
+    if (!SubmitFormField(field)) {
+      return std::nullopt;
+    }
+    return field;
+  }
+
+  // Will return optional field on successful submission, or std::nullopt if
+  // submission fails
+  [[nodiscard]] std::optional<FormFieldData> CreateAndSubmitDefaultField() {
+    return CreateAndSubmitDefaultFieldWithValue(kDefaultValue);
+  }
+
   WebDatabase& db() { return *db_; }
   AutocompleteTableLabelSensitive& table() { return *table_; }
+  AutocompleteChangeLabelSensitiveList& changes() { return changes_; }
 
  private:
   base::test::TaskEnvironment task_environment_{
@@ -124,846 +192,1013 @@ class AutocompleteTableLabelSensitiveTest : public testing::Test {
   base::ScopedTempDir temp_dir_;
   std::unique_ptr<AutocompleteTableLabelSensitive> table_;
   std::unique_ptr<WebDatabase> db_;
+  test::AutofillUnitTestEnvironment autofill_test_environment_;
+  AutocompleteChangeLabelSensitiveList changes_;
 };
 
-TEST_F(AutocompleteTableLabelSensitiveTest, Autocomplete) {
-  const base::Time begin = base::Time::Now();
+// TODO(crbug.com/346507576): Add happy path tests
 
-  // Simulate the submission of a handful of entries in a field called "Name",
-  // some more often than others.
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"first_name");
-  field.set_label(u"First Name");
-  field.set_value(u"Superman");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
+using AddFormFieldValuesTest = AutocompleteTableLabelSensitiveTest;
 
-  std::vector<AutocompleteSearchResultLabelSensitive> v;
-  for (int i = 0; i < 5; ++i) {
-    field.set_value(u"Clark Kent");
-    EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-    AdvanceClock(base::Seconds(2));
-  }
-  for (int i = 0; i < 3; ++i) {
-    field.set_value(u"Clark Sutter");
-    EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-    AdvanceClock(base::Seconds(2));
-  }
-  for (int i = 0; i < 2; ++i) {
-    field.set_name(u"favorite_color");
-    field.set_label(u"Favorite Color");
-    field.set_value(u"Green");
-    EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-    AdvanceClock(base::Seconds(2));
-  }
+// Check that AddFormFieldValues correctly appends an ADD entry to change log
+// that is passed as an output parameter to AddFormFieldValues if no
+// autocomplete entry for the same key (field label + name + value) exists in
+// the database, yet.
+TEST_F(AddFormFieldValuesTest, InsertsNewEntry) {
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
 
-  // We have added the name Clark Kent 5 times, so count should be 5.
-  EXPECT_EQ(5, GetAutocompleteEntryLabelSensitiveCount(
-                   u"first_name", u"First Name", u"Clark Kent", &db()));
-
-  // Storing in the data base should be case sensitive, so there should be no
-  // database entry for clark kent lowercase.
-  EXPECT_EQ(0, GetAutocompleteEntryLabelSensitiveCount(
-                   u"first_name", u"First Name", u"clark kent", &db()));
-
-  EXPECT_EQ(2, GetAutocompleteEntryLabelSensitiveCount(
-                   u"favorite_color", u"Favorite Color", u"Green", &db()));
-
-  // This is meant to get a list of suggestions for Name and Label. The empty
-  // prefix in the second argument means it should return all suggestions for a
-  // name no matter what they start with. The order that the names occur in the
-  // list should be decreasing order by count and matching type(in this example
-  // only count matters).
-  EXPECT_TRUE(table().GetFormValuesForElementNameAndLabel(
-      u"first_name", u"First Name", std::u16string(), 6, v));
-  EXPECT_EQ(3U, v.size());
-  if (v.size() == 3) {
-    EXPECT_EQ(u"Clark Kent", v[0].value());
-    EXPECT_EQ(u"Clark Sutter", v[1].value());
-    EXPECT_EQ(u"Superman", v[2].value());
-  }
-
-  // If we query again limiting the list size to 1, we should only get the most
-  // frequent entry.
-  EXPECT_TRUE(table().GetFormValuesForElementNameAndLabel(
-      u"first_name", u"First Name", std::u16string(), 1, v));
-  EXPECT_EQ(1U, v.size());
-  if (v.size() == 1) {
-    EXPECT_EQ(u"Clark Kent", v[0].value());
-  }
-
-  // Querying for suggestions given a prefix is case-insensitive, so the prefix
-  // "cLa" should get suggestions for both Clarks.
-  EXPECT_TRUE(table().GetFormValuesForElementNameAndLabel(
-      u"first_name", u"First Name", u"cLa", 6, v));
-  EXPECT_EQ(2U, v.size());
-  if (v.size() == 2) {
-    EXPECT_EQ(u"Clark Kent", v[0].value());
-    EXPECT_EQ(u"Clark Sutter", v[1].value());
-  }
-
-  // Removing all elements since the beginning of this function should remove
-  // everything from the database.
-  changes.clear();
-  EXPECT_TRUE(table().RemoveFormElementsAddedBetween(begin, Time(), changes));
-
-  const auto kExpectedChanges = std::array{
-      AutocompleteChangeLabelSensitive(
-          AutocompleteChangeLabelSensitive::REMOVE,
-          AutocompleteKeyLabelSensitive(u"first_name", u"First Name",
-                                        u"Superman")),
-      AutocompleteChangeLabelSensitive(
-          AutocompleteChangeLabelSensitive::REMOVE,
-          AutocompleteKeyLabelSensitive(u"first_name", u"First Name",
-                                        u"Clark Kent")),
-      AutocompleteChangeLabelSensitive(
-          AutocompleteChangeLabelSensitive::REMOVE,
-          AutocompleteKeyLabelSensitive(u"first_name", u"First Name",
-                                        u"Clark Sutter")),
-      AutocompleteChangeLabelSensitive(
-          AutocompleteChangeLabelSensitive::REMOVE,
-          AutocompleteKeyLabelSensitive(u"favorite_color", u"Favorite Color",
-                                        u"Green")),
-  };
-  EXPECT_EQ(kExpectedChanges.size(), changes.size());
-  for (size_t i = 0; i < std::size(kExpectedChanges); ++i) {
-    EXPECT_EQ(kExpectedChanges[i], changes[i]);
-  }
-
-  EXPECT_EQ(0, GetAutocompleteEntryLabelSensitiveCount(
-                   u"first_name", u"First Name", u"Clark Kent", &db()));
-
-  EXPECT_TRUE(table().GetFormValuesForElementNameAndLabel(
-      u"first_name", u"First Name", std::u16string(), 6, v));
-  EXPECT_EQ(0U, v.size());
-
-  // Now add some values with empty strings.
-  const std::u16string kValue = u"  toto   ";
-
-  field.set_name(u"blank");
-  field.set_label(u"Blank");
-
-  field.set_value(std::u16string());
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-
-  field.set_value(u" ");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-
-  field.set_value(u"      ");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-
-  field.set_value(kValue);
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-
-  // They should be stored normally as the DB layer does not check for empty
-  // values.
-  v.clear();
-  EXPECT_TRUE(table().GetFormValuesForElementNameAndLabel(
-      u"blank", u"Blank", std::u16string(), 10, v));
-  EXPECT_EQ(4U, v.size());
+  EXPECT_THAT(changes(), ElementsAre(AutocompleteChangeLabelSensitive(
+                             AutocompleteChangeLabelSensitive::ADD,
+                             AutocompleteKeyLabelSensitive(
+                                 kDefaultName, kDefaultLabel, kDefaultValue))));
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest, Autocomplete_GetEntry_Populated) {
-  SetClock(autofill::test::kJune2017);
+// Check that AddFormFieldValues creates an UPDATE entry in the change log
+// that is passed as an output parameter to AddFormFieldValues if an
+// autocomplete entry with the same key (field label + name + value) exists in
+// the database already.
+TEST_F(AddFormFieldValuesTest, UpdatesExistingEntry) {
+  FormFieldData field = CreateDefaultField();
 
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"first_name");
-  field.set_label(u"First Name");
-  field.set_value(u"Superman");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
+  // Add new entry
+  ASSERT_TRUE(SubmitFormField(field));
+  changes().clear();
 
-  std::vector<AutocompleteSearchResultLabelSensitive> prefix_v;
-  EXPECT_TRUE(table().GetFormValuesForElementNameAndLabel(
-      field.name(), field.label(), u"Super", 10, prefix_v));
+  // Update existing entry
+  ASSERT_TRUE(SubmitFormField(field));
 
-  std::vector<AutocompleteSearchResultLabelSensitive> no_prefix_v;
-  EXPECT_TRUE(table().GetFormValuesForElementNameAndLabel(
-      field.name(), field.label(), u"", 10, no_prefix_v));
-
-  AutocompleteSearchResultLabelSensitive expected_entry(
-      field.value(), MatchingType::kNameAndLabel, 1);
-
-  EXPECT_THAT(prefix_v, ElementsAre(expected_entry));
-  EXPECT_THAT(no_prefix_v, ElementsAre(expected_entry));
+  EXPECT_THAT(changes(), ElementsAre(AutocompleteChangeLabelSensitive(
+                             AutocompleteChangeLabelSensitive::UPDATE,
+                             AutocompleteKeyLabelSensitive(
+                                 kDefaultName, kDefaultLabel, kDefaultValue))));
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_GetCountOfValuesContainedBetween) {
-  AutocompleteChangeLabelSensitiveList changes;
-  // This test makes time comparisons that are precise to a microsecond, but the
-  // database uses the time_t format which is only precise to a second.
-  // Make sure we use timestamps rounded to a second.
-  const auto begin = base::Time::Now();
+// Check that AddFormFieldValues modifies the underlying database by inserting
+// an entry and later incrementing the use count of the previously inserting
+// entry.
+TEST_F(AddFormFieldValuesTest, UpdatesExistingEntryCount) {
+  FormFieldData field = CreateDefaultField();
 
-  struct Entry {
-    const char16_t* name;
-    const char16_t* label;
-    const char16_t* value;
-  } entries[] = {{u"alter_ego", u"Alter ego", u"Superman"},
-                 {u"name", u"Name", u"Superman"},
-                 {u"name", u"Name", u"Clark Kent"},
-                 {u"name", u"Name", u"Superman"},
-                 {u"name", u"Name", u"Clark Sutter"},
-                 {u"name", u"Nomen", u"Clark Kent"}};
+  // Add new entry
+  ASSERT_TRUE(SubmitFormField(field));
 
-  for (Entry entry : entries) {
-    autofill::FormFieldData field;
-    field.set_name(entry.name);
-    field.set_label(entry.label);
-    field.set_value(entry.value);
-    ASSERT_TRUE(table().AddFormFieldValues({field}, &changes));
+  // Update existing entry
+  ASSERT_TRUE(SubmitFormField(field));
+
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    kDefaultValue, &db()),
+            2);
+}
+
+// Check if AddFormFieldValues stores and queries the value of autocomplete
+// entry in case-sensitive manner.
+TEST_F(AddFormFieldValuesTest, StoresDataCaseSensitive) {
+  ASSERT_TRUE(CreateAndSubmitDefaultFieldWithValue(u"Clark Kent").has_value());
+
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    u"clark kent", &db()),
+            0);
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    u"Clark Kent", &db()),
+            1);
+}
+
+// Check if AddFormFieldValues stores empty and whitespace values without any
+// changes.
+TEST_F(AddFormFieldValuesTest, StoresEmptyValuesAsIs) {
+  std::optional<FormFieldData> optional_empty_field =
+      CreateAndSubmitDefaultFieldWithValue(u"");
+  ASSERT_TRUE(optional_empty_field.has_value());
+  std::optional<FormFieldData> optional_whitespace_field =
+      CreateAndSubmitDefaultFieldWithValue(u"   ");
+  ASSERT_TRUE(optional_whitespace_field.has_value());
+
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(
+                kDefaultName, kDefaultLabel,
+                optional_empty_field.value().value(), &db()),
+            1);
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(
+                kDefaultName, kDefaultLabel,
+                optional_whitespace_field.value().value(), &db()),
+            1);
+}
+
+// Check if AddFormFieldValues stores null terminated values as is in the
+// database.
+TEST_F(AddFormFieldValuesTest, InsertsNullTerminatedValuesAsIs) {
+  const std::u16string kValueNullTerminated(kDefaultValue,
+                                            std::size(kDefaultValue));
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+  ASSERT_TRUE(
+      CreateAndSubmitDefaultFieldWithValue(kValueNullTerminated).has_value());
+
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    kDefaultValue, &db()),
+            1);
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(
+                kDefaultName, kDefaultLabel, kValueNullTerminated, &db()),
+            1);
+}
+
+// Check if AddFormFieldValues ignores a field if the name AND/OR label
+// of the field already appeared in the form before.
+TEST_F(AddFormFieldValuesTest, IgnoresIdenticalNameOrLabel) {
+  // Will be added to the database.
+  auto field1 = test::CreateTestFormField(u"label", u"name", u"Superman",
+                                          FormControlType::kInputText);
+
+  // Ignored due to an identical name.
+  auto field2 = test::CreateTestFormField(u"label123", u"name", u"Superman",
+                                          FormControlType::kInputText);
+
+  // Ignored due to an identical label.
+  auto field3 = test::CreateTestFormField(u"label", u"name123", u"Superman",
+                                          FormControlType::kInputText);
+
+  // Ignored due to identical name and label.
+  auto field4 = test::CreateTestFormField(u"label", u"name", u"Superman",
+                                          FormControlType::kInputText);
+
+  ASSERT_TRUE(SubmitFormFields({field1, field2, field3, field4}));
+
+  EXPECT_THAT(changes(),
+              UnorderedElementsAre(AutocompleteChangeLabelSensitive(
+                  AutocompleteChangeLabelSensitive::ADD,
+                  AutocompleteKeyLabelSensitive(field1.name(), field1.label(),
+                                                field1.value()))));
+}
+
+// Check if AddFormFieldValues inserts at most 256 entries.
+TEST_F(AddFormFieldValuesTest, InsertsAtMost256Entries) {
+  std::vector<FormFieldData> elements;
+  for (int i = 0; i < 300; ++i) {
+    elements.push_back(test::CreateTestFormField(
+        u"name" + base::NumberToString16(i),
+        u"label" + base::NumberToString16(i),
+        u"Superman" + base::NumberToString16(i), FormControlType::kInputText));
+  }
+  ASSERT_TRUE(SubmitFormFields(elements));
+
+  EXPECT_EQ(changes().size(), 256U);
+}
+
+using GetFormValuesForElementNameAndLabelTest =
+    AutocompleteTableLabelSensitiveTest;
+
+// GetFormValuesForElementNameAndLabel returns the correct set of suggestions
+// for a given name/label and empty value prefix.
+TEST_F(GetFormValuesForElementNameAndLabelTest, ReturnsSuggestion) {
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  std::vector<AutocompleteSearchResultLabelSensitive> entries;
+
+  ASSERT_TRUE(table().GetFormValuesForElementNameAndLabel(
+      kDefaultName, kDefaultLabel, /*prefix=*/std::u16string(), /*limit=*/10,
+      entries));
+
+  EXPECT_THAT(entries, ElementsAre(EqualsSearchResult(kDefaultValue, 1)));
+}
+
+// When asked for 1 result, GetFormValuesForElementNameAndLabel returns the top
+// suggestion for given name/label and empty value prefix.
+TEST_F(GetFormValuesForElementNameAndLabelTest, ReturnsTopSuggestion) {
+  // Add 3 entries
+  std::optional<FormFieldData> optional_field = CreateAndSubmitDefaultField();
+  ASSERT_TRUE(CreateAndSubmitDefaultFieldWithValue(u"Clark Kent").has_value());
+  ASSERT_TRUE(optional_field.has_value());
+  ASSERT_TRUE(
+      CreateAndSubmitDefaultFieldWithValue(u"Clark Sutter").has_value());
+
+  // Reinforce the first entry which should make it the top suggestion
+  ASSERT_TRUE(SubmitFormField(optional_field.value()));
+
+  std::vector<AutocompleteSearchResultLabelSensitive> entries;
+  ASSERT_TRUE(table().GetFormValuesForElementNameAndLabel(
+      kDefaultName, kDefaultLabel, /*prefix=*/std::u16string(), /*limit=*/1,
+      entries));
+
+  EXPECT_THAT(entries, ElementsAre(EqualsSearchResult(kDefaultValue, 2)));
+}
+
+// When asked for multiple results, GetFormValuesForElementNameAndLabel returns
+// them in correct order based on frequency of previous submissions.
+TEST_F(GetFormValuesForElementNameAndLabelTest,
+       ReturnsMultipleSuggestionsInCorrectOrder) {
+  FormFieldData field1 = CreateDefaultFieldWithValue(u"Clark Kent");
+  FormFieldData field2 = CreateDefaultFieldWithValue(u"Clark Sutter");
+  // Add 2 entries, one with count 1, the other with count 2
+  ASSERT_TRUE(SubmitFormField(field1));
+  ASSERT_TRUE(SubmitFormField(field2));
+  ASSERT_TRUE(SubmitFormField(field2));
+
+  std::vector<AutocompleteSearchResultLabelSensitive> entries;
+  ASSERT_TRUE(table().GetFormValuesForElementNameAndLabel(
+      kDefaultName, kDefaultLabel, /*prefix=*/std::u16string(), /*limit=*/10,
+      entries));
+
+  EXPECT_THAT(entries, ElementsAre(EqualsSearchResult(field2.value(), 2),
+                                   EqualsSearchResult(field1.value(), 1)));
+}
+
+// GetFormValuesForElementNameAndLabelTest should match the value prefix
+// case-insensitively.
+TEST_F(GetFormValuesForElementNameAndLabelTest, MatchesPrefixCaseInsensitive) {
+  std::optional<FormFieldData> optional_field =
+      CreateAndSubmitDefaultFieldWithValue(u"SUPERMAN");
+  ASSERT_TRUE(optional_field.has_value());
+
+  std::vector<AutocompleteSearchResultLabelSensitive> entries;
+  ASSERT_TRUE(table().GetFormValuesForElementNameAndLabel(
+      optional_field.value().name(), optional_field.value().label(),
+      /*prefix=*/u"superman",
+      /*limit=*/1, entries));
+
+  EXPECT_THAT(entries, ElementsAre(EqualsSearchResult(
+                           optional_field.value().value(), 1)));
+}
+
+// GetFormValuesForElementNameAndLabelTest should return the correct set of
+// suggestions when the provided value prefix narrows down the results.
+TEST_F(GetFormValuesForElementNameAndLabelTest, PrefixNarrowsDownResults) {
+  std::optional<FormFieldData> optional_field1 =
+      CreateAndSubmitDefaultFieldWithValue(u"Clark Kent");
+  ASSERT_TRUE(optional_field1.has_value());
+  std::optional<FormFieldData> optional_field2 =
+      CreateAndSubmitDefaultFieldWithValue(u"Clark Sutter");
+  ASSERT_TRUE(optional_field2.has_value());
+
+  std::vector<AutocompleteSearchResultLabelSensitive> entries;
+  ASSERT_TRUE(table().GetFormValuesForElementNameAndLabel(
+      kDefaultName, kDefaultLabel, /*prefix=*/u"clark ", /*limit=*/10,
+      entries));
+
+  std::vector<AutocompleteSearchResultLabelSensitive> entries_narrowed_down;
+  ASSERT_TRUE(table().GetFormValuesForElementNameAndLabel(
+      kDefaultName, kDefaultLabel, /*prefix=*/u"clark k", /*limit=*/10,
+      entries_narrowed_down));
+
+  EXPECT_THAT(entries,
+              UnorderedElementsAre(
+                  EqualsSearchResult(optional_field1.value().value(), 1),
+                  EqualsSearchResult(optional_field2.value().value(), 1)));
+  EXPECT_THAT(entries_narrowed_down, ElementsAre(EqualsSearchResult(
+                                         optional_field1.value().value(), 1)));
+}
+
+using GetCountOfValuesContainedBetweenTest =
+    AutocompleteTableLabelSensitiveTest;
+
+// Add several entries to the database with different timestamps and expect
+// GetCountOfValuesContainedBetween to return all of them if the time interval
+// is large enough.
+TEST_F(GetCountOfValuesContainedBetweenTest, ReturnsCorrectCount) {
+  const Time begin = base::Time::Now();
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  AdvanceClock(base::Seconds(1));
+  ASSERT_TRUE(CreateAndSubmitDefaultFieldWithValue(u"Clark Kent").has_value());
+
+  AdvanceClock(base::Seconds(1));
+  ASSERT_TRUE(
+      CreateAndSubmitDefaultFieldWithValue(u"Clark Sutter").has_value());
+
+  EXPECT_EQ(
+      table().GetCountOfValuesContainedBetween(begin, begin + base::Seconds(4)),
+      3);
+}
+
+// Add several entries to the database with different timestamps and expect
+// GetCountOfValuesContainedBetween to return nothing if the time interval
+// provided does not contain any of the entries.
+TEST_F(GetCountOfValuesContainedBetweenTest,
+       ReturnsZeroIfNothingIsInTheInterval) {
+  const Time begin = base::Time::Now();
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  AdvanceClock(base::Seconds(1));
+  ASSERT_TRUE(CreateAndSubmitDefaultFieldWithValue(u"Clark Kent").has_value());
+
+  EXPECT_EQ(table().GetCountOfValuesContainedBetween(begin + base::Seconds(5),
+                                                     begin + base::Seconds(6)),
+            0);
+}
+
+// Add several entries to the database with different timestamps. Call
+// GetCountOfValuesContainedBetween with such an interval that some entries are
+// contained and some are not. Expect to return the number of entries that are
+// contained in the time interval provided.
+TEST_F(GetCountOfValuesContainedBetweenTest,
+       ReturnsCountOfEntriesOnlyInTheInterval) {
+  const Time begin = base::Time::Now();
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  AdvanceClock(base::Seconds(2));
+  ASSERT_TRUE(CreateAndSubmitDefaultFieldWithValue(u"Clark Kent").has_value());
+
+  AdvanceClock(base::Seconds(2));
+  ASSERT_TRUE(
+      CreateAndSubmitDefaultFieldWithValue(u"Clark Sutter").has_value());
+
+  EXPECT_EQ(table().GetCountOfValuesContainedBetween(begin + base::Seconds(1),
+                                                     begin + base::Seconds(3)),
+            1);
+}
+
+// Add several entries to the database with different timestamps. Call
+// GetCountOfValuesContainedBetween with interval [0, MAX_VALUE) interval.
+// Expect to return all the entries.
+TEST_F(GetCountOfValuesContainedBetweenTest,
+       ReturnsEverythingForUnboundedInterval) {
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  AdvanceClock(base::Seconds(2));
+  ASSERT_TRUE(CreateAndSubmitDefaultFieldWithValue(u"Clark Kent").has_value());
+
+  AdvanceClock(base::Seconds(2));
+  ASSERT_TRUE(
+      CreateAndSubmitDefaultFieldWithValue(u"Clark Sutter").has_value());
+
+  EXPECT_EQ(table().GetCountOfValuesContainedBetween(base::Time(), Time::Max()),
+            3);
+}
+
+// GetCountOfValuesContainedBetween should treat provided interval as
+// closed-open, e.g. include begin and exclude end. Both entry's creation and
+// update time, should be in the interval to be counted. Interval [1, 5) should
+// not contain an entry with creation/update timespan [0, 1].
+TEST_F(GetCountOfValuesContainedBetweenTest,
+       ShouldNotIncludeIfUpdateEqualsBegin) {
+  const Time begin = base::Time::Now();
+
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+  AdvanceClock(base::Seconds(1));
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  EXPECT_EQ(table().GetCountOfValuesContainedBetween(begin + base::Seconds(1),
+                                                     begin + base::Seconds(5)),
+            0);
+}
+
+// GetCountOfValuesContainedBetween should treat provided interval as
+// closed-open, e.g. include begin and exclude end. Both entry's creation and
+// update time, should be in the interval to be counted. Interval [1, 5) should
+// contain an entry with creation/update timespan [1, 1].
+TEST_F(GetCountOfValuesContainedBetweenTest,
+       ShouldIncludeIfCreateAndUpdateEqualsBegin) {
+  const Time begin = base::Time::Now();
+
+  AdvanceClock(base::Seconds(1));
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  EXPECT_EQ(table().GetCountOfValuesContainedBetween(begin + base::Seconds(1),
+                                                     begin + base::Seconds(5)),
+            1);
+}
+
+// GetCountOfValuesContainedBetween should treat provided interval as
+// closed-open, e.g. include begin and exclude end. Both entry's creation and
+// update time, should be in the interval to be counted. Interval [1, 5) should
+// contain an entry with creation/update timespan [1, 5].
+TEST_F(GetCountOfValuesContainedBetweenTest,
+       ShouldNotIncludeIfCreateEqualsBeginAndUpdateEqualsEnd) {
+  const Time begin = base::Time::Now();
+
+  AdvanceClock(base::Seconds(1));
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+  AdvanceClock(base::Seconds(4));
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  EXPECT_EQ(table().GetCountOfValuesContainedBetween(begin + base::Seconds(1),
+                                                     begin + base::Seconds(5)),
+            0);
+}
+
+// GetCountOfValuesContainedBetween should treat provided interval as
+// closed-open, e.g. include begin and exclude end. Both entry's creation and
+// update time, should be in the interval to be counted. Interval [1, 5) should
+// not contain an entry with creation/update timespan [5, 5].
+TEST_F(GetCountOfValuesContainedBetweenTest,
+       ShouldNotIncludeIfCreateAndUpdateEqualsEnd) {
+  const Time begin = base::Time::Now();
+
+  AdvanceClock(base::Seconds(5));
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  EXPECT_EQ(table().GetCountOfValuesContainedBetween(begin + base::Seconds(1),
+                                                     begin + base::Seconds(5)),
+            0);
+}
+
+// GetCountOfValuesContainedBetween should treat provided interval as
+// closed-open, e.g. include begin and exclude end. Both entry's creation and
+// update time, should be in the interval to be counted. Interval [1, 5) should
+// not contain an entry with creation/update timespan [5, 6].
+TEST_F(GetCountOfValuesContainedBetweenTest,
+       ShouldNotIncludeIfCreateEqualsEnd) {
+  const Time begin = base::Time::Now();
+
+  AdvanceClock(base::Seconds(5));
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+  AdvanceClock(base::Seconds(1));
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  EXPECT_EQ(table().GetCountOfValuesContainedBetween(begin + base::Seconds(1),
+                                                     begin + base::Seconds(5)),
+            0);
+}
+
+using RemoveFormElementsAddedBetweenTest = AutocompleteTableLabelSensitiveTest;
+
+// Add an entry to the database at a specified timestamp and expect it to be
+// removed by RemoveFormElementsAddedBetween when the entry's timestamp is in
+// the time range provided.
+TEST_F(RemoveFormElementsAddedBetweenTest,
+       RemovesEntryAddedDuringTheSpecifiedRange) {
+  const Time begin = base::Time::Now();
+
+  AdvanceClock(base::Seconds(1));
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  ASSERT_TRUE(table().RemoveFormElementsAddedBetween(
+      begin, begin + base::Seconds(2), changes()));
+
+  EXPECT_THAT(changes(), ElementsAre(AutocompleteChangeLabelSensitive(
+                             AutocompleteChangeLabelSensitive::REMOVE,
+                             AutocompleteKeyLabelSensitive(
+                                 kDefaultName, kDefaultLabel, kDefaultValue))));
+}
+
+// Add an entry to the database at a specified timestamp and expect it not to be
+// removed by RemoveFormElementsAddedBetween when the entry's timestamp is
+// outside the time range provided.
+TEST_F(RemoveFormElementsAddedBetweenTest,
+       DoesNotRemoveEntryAddedOutsideTheRange) {
+  const Time begin = base::Time::Now();
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  ASSERT_TRUE(table().RemoveFormElementsAddedBetween(
+      begin + base::Seconds(10), begin + base::Seconds(20), changes()));
+
+  EXPECT_EQ(changes().size(), 0U);
+}
+
+// Add multiple entries to the database with specified timestamps and expect
+// them all to be removed by RemoveFormElementsAddedBetween when the entries'
+// timestamps are in the time range provided.
+TEST_F(RemoveFormElementsAddedBetweenTest,
+       RemovesMultipleEntriesAddedDuringTheRange) {
+  const Time begin = base::Time::Now();
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  AdvanceClock(base::Seconds(1));
+  std::optional<FormFieldData> optional_second_field =
+      CreateAndSubmitDefaultFieldWithValue(u"Clark Kent");
+  ASSERT_TRUE(optional_second_field.has_value());
+
+  ASSERT_TRUE(table().RemoveFormElementsAddedBetween(
+      begin, begin + base::Seconds(10), changes()));
+
+  EXPECT_THAT(changes(),
+              ElementsAre(AutocompleteChangeLabelSensitive(
+                              AutocompleteChangeLabelSensitive::REMOVE,
+                              AutocompleteKeyLabelSensitive(
+                                  kDefaultName, kDefaultLabel, kDefaultValue)),
+                          AutocompleteChangeLabelSensitive(
+                              AutocompleteChangeLabelSensitive::REMOVE,
+                              AutocompleteKeyLabelSensitive(
+                                  kDefaultName, kDefaultLabel,
+                                  optional_second_field.value().value()))));
+}
+
+// RemoveFormElementsAddedBetween should remove an entry when it was added and
+// updated during the provided time range.
+TEST_F(RemoveFormElementsAddedBetweenTest,
+       RemovesEntryAddedAndUpdatedDuringTheRange) {
+  const Time begin = base::Time::Now();
+  std::optional<FormFieldData> optional_field = CreateAndSubmitDefaultField();
+  ASSERT_TRUE(optional_field.has_value());
+
+  AdvanceClock(base::Seconds(1));
+  ASSERT_TRUE(SubmitFormField(optional_field.value()));
+
+  ASSERT_TRUE(table().RemoveFormElementsAddedBetween(
+      begin, begin + base::Seconds(10), changes()));
+
+  EXPECT_THAT(changes(), ElementsAre(AutocompleteChangeLabelSensitive(
+                             AutocompleteChangeLabelSensitive::REMOVE,
+                             AutocompleteKeyLabelSensitive(
+                                 kDefaultName, kDefaultLabel, kDefaultValue))));
+}
+
+// RemoveFormElementsAddedBetween should UPDATE entry when it was added outside
+// of the provided time range, but was updated during the provided time range.
+TEST_F(RemoveFormElementsAddedBetweenTest,
+       UpdatesEntryAddedBeforeAndUpdatedDuringTheRange) {
+  const Time begin = base::Time::Now();
+  std::optional<FormFieldData> optional_field = CreateAndSubmitDefaultField();
+  ASSERT_TRUE(optional_field.has_value());
+
+  AdvanceClock(base::Seconds(10));
+  ASSERT_TRUE(SubmitFormField(optional_field.value()));
+
+  ASSERT_TRUE(table().RemoveFormElementsAddedBetween(
+      begin + base::Seconds(5), begin + base::Seconds(15), changes()));
+
+  EXPECT_THAT(changes(), ElementsAre(AutocompleteChangeLabelSensitive(
+                             AutocompleteChangeLabelSensitive::UPDATE,
+                             AutocompleteKeyLabelSensitive(
+                                 kDefaultName, kDefaultLabel, kDefaultValue))));
+}
+
+// RemoveFormElementsAddedBetween should update entry when it was added inside
+// of the provided time range, but was updated outside of the provided time
+// range.
+TEST_F(RemoveFormElementsAddedBetweenTest,
+       UpdatesEntryAddedDuringAndUpdatedAfterTheRange) {
+  const Time begin = base::Time::Now();
+
+  AdvanceClock(base::Seconds(10));
+  std::optional<FormFieldData> optional_field = CreateAndSubmitDefaultField();
+  ASSERT_TRUE(optional_field.has_value());
+
+  AdvanceClock(base::Seconds(10));
+  ASSERT_TRUE(SubmitFormField(optional_field.value()));
+
+  ASSERT_TRUE(table().RemoveFormElementsAddedBetween(
+      begin + base::Seconds(5), begin + base::Seconds(15), changes()));
+
+  EXPECT_THAT(changes(), ElementsAre(AutocompleteChangeLabelSensitive(
+                             AutocompleteChangeLabelSensitive::UPDATE,
+                             AutocompleteKeyLabelSensitive(
+                                 kDefaultName, kDefaultLabel, kDefaultValue))));
+}
+
+// Add two entries to the database. Call RemoveFormElementsAddedBetween with
+// such range that first entry is fully inside of the range, second entry is
+// partially inside of the range. Expect one entry to be REMOVED and another
+// one to be UPDATED.
+TEST_F(RemoveFormElementsAddedBetweenTest, RemovesAndUpdatesAtTheSameTime) {
+  const Time begin = base::Time::Now();
+  std::optional<FormFieldData> optional_field1 = CreateAndSubmitDefaultField();
+  ASSERT_TRUE(optional_field1.has_value());
+
+  AdvanceClock(base::Seconds(5));
+  ASSERT_TRUE(SubmitFormField(optional_field1.value()));
+
+  AdvanceClock(base::Seconds(5));
+  std::optional<FormFieldData> optional_field2 =
+      CreateAndSubmitDefaultFieldWithValue(u"Clark Kent");
+  ASSERT_TRUE(optional_field2.has_value());
+
+  AdvanceClock(base::Seconds(5));
+  ASSERT_TRUE(SubmitFormField(optional_field2.value()));
+
+  ASSERT_TRUE(table().RemoveFormElementsAddedBetween(
+      begin, begin + base::Seconds(12), changes()));
+
+  EXPECT_THAT(
+      changes(),
+      ElementsAre(
+          AutocompleteChangeLabelSensitive(
+              AutocompleteChangeLabelSensitive::REMOVE,
+              AutocompleteKeyLabelSensitive(kDefaultName, kDefaultLabel,
+                                            optional_field1.value().value())),
+          AutocompleteChangeLabelSensitive(
+              AutocompleteChangeLabelSensitive::UPDATE,
+              AutocompleteKeyLabelSensitive(kDefaultName, kDefaultLabel,
+                                            optional_field2.value().value()))));
+}
+
+// Add and update entry every X seconds. Call RemoveFormElementsAddedBetween
+// with such range that covers half of the entry's [create, last_update] span.
+// Expect the use counter to be updated to become interpolated to half of the
+// original number.
+TEST_F(RemoveFormElementsAddedBetweenTest, UpdatesCountCorrectly) {
+  const Time begin = base::Time::Now();
+  FormFieldData field = CreateDefaultField();
+
+  AdvanceClock(base::Seconds(10));
+
+  for (int i = 0; i < 10; ++i) {
+    ASSERT_TRUE(SubmitFormField(field));
     AdvanceClock(base::Seconds(1));
   }
 
-  // While the entry "Alter ego" : "Superman" is entirely contained within
-  // the first second, the value "Superman" itself appears in another entry,
-  // so it is not contained.
-  EXPECT_EQ(0, table().GetCountOfValuesContainedBetween(
-                   begin, begin + base::Seconds(1)));
+  // Sanity check
+  ASSERT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    kDefaultValue, &db()),
+            10);
 
-  // No values are entirely contained within the first three seconds either
-  // (note that the second time constraint is exclusive).
-  EXPECT_EQ(0, table().GetCountOfValuesContainedBetween(
-                   begin, begin + base::Seconds(3)));
+  // The element had 10 uses between timestamp 10 (exclusive) and 19
+  // (inclusive). Remove entries that were submitted between 5th second
+  // (inclusive) and 15th second (exclusive). This corresponds to 5 uses in
+  // reality. The database applies linear interpolation and also decreases the
+  // use counter by 5.
+  ASSERT_TRUE(table().RemoveFormElementsAddedBetween(
+      begin + base::Seconds(5), begin + base::Seconds(15), changes()));
 
-  // Only "Superman" is entirely contained within the first four seconds.
-  EXPECT_EQ(1, table().GetCountOfValuesContainedBetween(
-                   begin, begin + base::Seconds(4)));
-
-  // "Clark Kent" and "Clark Sutter" are contained between the first
-  // and seventh second.
-  EXPECT_EQ(2, table().GetCountOfValuesContainedBetween(
-                   begin + base::Seconds(1), begin + base::Seconds(7)));
-
-  // Beginning from the third second, "Clark Kent" is not contained.
-  EXPECT_EQ(1, table().GetCountOfValuesContainedBetween(
-                   begin + base::Seconds(3), begin + base::Seconds(7)));
-
-  // We have three distinct values total.
-  EXPECT_EQ(3, table().GetCountOfValuesContainedBetween(
-                   begin, begin + base::Seconds(7)));
-
-  // And we should get the same result for unlimited time interval.
-  EXPECT_EQ(3, table().GetCountOfValuesContainedBetween(Time(), Time::Max()));
-
-  // The null time interval is also interpreted as unlimited.
-  EXPECT_EQ(3, table().GetCountOfValuesContainedBetween(Time(), Time()));
-
-  // An interval that does not fully contain any entries returns zero.
-  EXPECT_EQ(0, table().GetCountOfValuesContainedBetween(
-                   begin + base::Seconds(1), begin + base::Seconds(2)));
-
-  // So does an interval which has no intersection with any entry.
-  EXPECT_EQ(0, table().GetCountOfValuesContainedBetween(Time(), begin));
+  EXPECT_THAT(changes(), ElementsAre(AutocompleteChangeLabelSensitive(
+                             AutocompleteChangeLabelSensitive::UPDATE,
+                             AutocompleteKeyLabelSensitive(
+                                 kDefaultName, kDefaultLabel, kDefaultValue))));
+  // The number of usages should be half of the original number.
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    kDefaultValue, &db()),
+            5);
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest, Autocomplete_RemoveBetweenChanges) {
-  const base::Time t1 = base::Time::Now();
-  const base::Time t2 = t1 + base::Days(1);
+// As we store only creation and last update timestamps,
+// RemoveFormElementsAddedBetween assumes that all updates during given time
+// range appeared uniformly distributed in time. This test adds and update the
+// same entry multiple times with the same timestamp than makes another update X
+// seconds later. This means that all except the last update happened in the
+// beginning of [create, last_update] timespan. Nevertheless, call of
+// RemoveFormElementsAddedBetween with the time range that covers the half of
+// aforementioned timespan would still half the count instead of decreasing it
+// to 1.
+TEST_F(RemoveFormElementsAddedBetweenTest,
+       AssumesUniformallyDistributedTimestampsOnUpdate) {
+  const Time begin = base::Time::Now();
+  FormFieldData field = CreateDefaultField();
 
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  AdvanceClock(base::Days(1));
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
+  AdvanceClock(base::Seconds(10));
 
-  changes.clear();
-  EXPECT_TRUE(table().RemoveFormElementsAddedBetween(t1, t2, changes));
-  ASSERT_EQ(1U, changes.size());
-  EXPECT_EQ(AutocompleteChangeLabelSensitive(
-                AutocompleteChangeLabelSensitive::UPDATE,
-                AutocompleteKeyLabelSensitive(u"name", u"Name", u"Superman")),
-            changes[0]);
-  changes.clear();
+  // Create a timespan [creation_time, last_update_time] where all usages except
+  // the last one happen at the beginning of the timespan, creation_time = 10s,
+  // last_update_time = 13s.
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_TRUE(SubmitFormField(field));
+  }
+  AdvanceClock(base::Seconds(3));
+  ASSERT_TRUE(SubmitFormField(field));
 
-  EXPECT_TRUE(
-      table().RemoveFormElementsAddedBetween(t2, t2 + base::Days(1), changes));
-  ASSERT_EQ(1U, changes.size());
-  EXPECT_EQ(AutocompleteChangeLabelSensitive(
-                AutocompleteChangeLabelSensitive::REMOVE,
-                AutocompleteKeyLabelSensitive(u"name", u"Name", u"Superman")),
-            changes[0]);
+  // Sanity check
+  ASSERT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    kDefaultValue, &db()),
+            4);
+
+  // Remove half of the entry's timespan (up to second 12 inclusive).
+  ASSERT_TRUE(table().RemoveFormElementsAddedBetween(
+      begin + base::Seconds(5), begin + base::Seconds(12), changes()));
+
+  EXPECT_THAT(changes(), ElementsAre(AutocompleteChangeLabelSensitive(
+                             AutocompleteChangeLabelSensitive::UPDATE,
+                             AutocompleteKeyLabelSensitive(
+                                 kDefaultName, kDefaultLabel, kDefaultValue))));
+  // The number of usages should be half of the original number.
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    kDefaultValue, &db()),
+            2);
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest, Autocomplete_AddChanges) {
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  ASSERT_EQ(1U, changes.size());
-  EXPECT_EQ(AutocompleteChangeLabelSensitive(
-                AutocompleteChangeLabelSensitive::ADD,
-                AutocompleteKeyLabelSensitive(u"name", u"Name", u"Superman")),
-            changes[0]);
+// Previous tests were always removing the first half of the entry's [create,
+// last_update] span. This test checks that RemoveFormElementsAddedBetween works
+// the same when removing the second half of the span.
+TEST_F(RemoveFormElementsAddedBetweenTest,
+       UpdatesCountCorrectlyWhenRemovingSecondHalfOfEntrySpan) {
+  const Time begin = base::Time::Now();
+  FormFieldData field = CreateDefaultField();
 
-  changes.clear();
-  AdvanceClock(base::Days(1));
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  ASSERT_EQ(1U, changes.size());
-  EXPECT_EQ(AutocompleteChangeLabelSensitive(
-                AutocompleteChangeLabelSensitive::UPDATE,
-                AutocompleteKeyLabelSensitive(u"name", u"Name", u"Superman")),
-            changes[0]);
+  AdvanceClock(base::Seconds(10));
+
+  for (int i = 0; i < 10; ++i) {
+    ASSERT_TRUE(SubmitFormField(field));
+    AdvanceClock(base::Seconds(1));
+  }
+
+  // Sanity check
+  ASSERT_EQ(10, GetAutocompleteEntryLabelSensitiveCount(
+                    kDefaultName, kDefaultLabel, kDefaultValue, &db()));
+
+  // Remove half of the entry's span.
+  ASSERT_TRUE(table().RemoveFormElementsAddedBetween(
+      begin + base::Seconds(15), begin + base::Seconds(30), changes()));
+
+  EXPECT_THAT(changes(), ElementsAre(AutocompleteChangeLabelSensitive(
+                             AutocompleteChangeLabelSensitive::UPDATE,
+                             AutocompleteKeyLabelSensitive(
+                                 kDefaultName, kDefaultLabel, kDefaultValue))));
+  // The number of usages should be half of the original number.
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    kDefaultValue, &db()),
+            5);
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_UpdateOneWithOneTimestamp) {
-  AutocompleteEntryLabelSensitive entry(
-      MakeAutocompleteEntryLabelSensitive(u"foo", u"bar", u"baz", 1, -1));
+// RemoveFormElementsAddedBetween should work correctly when called to remove
+// everything older than 30 days.
+TEST_F(RemoveFormElementsAddedBetweenTest,
+       CorrectlyRemovesEverythingOlderThan30Days) {
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  AdvanceClock(base::Days(2));
+  ASSERT_TRUE(CreateAndSubmitDefaultFieldWithValue(u"Clark Kent").has_value());
+
+  AdvanceClock(base::Days(29));
+  ASSERT_TRUE(
+      CreateAndSubmitDefaultFieldWithValue(u"Clark Sutter").has_value());
+
+  ASSERT_TRUE(table().RemoveFormElementsAddedBetween(
+      base::Time(), base::Time::Now() - base::Days(30), changes()));
+
+  EXPECT_THAT(changes(), ElementsAre(AutocompleteChangeLabelSensitive(
+                             AutocompleteChangeLabelSensitive::REMOVE,
+                             AutocompleteKeyLabelSensitive(
+                                 kDefaultName, kDefaultLabel, kDefaultValue))));
+}
+
+using RemoveFormElementTest = AutocompleteTableLabelSensitiveTest;
+
+// RemoveFormElement should remove a specified entry from the database.
+TEST_F(RemoveFormElementTest, RemovesEntry) {
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  ASSERT_TRUE(
+      table().RemoveFormElement(kDefaultName, kDefaultLabel, kDefaultValue));
+
+  EXPECT_THAT(table().GetAutocompleteEntryLabelSensitive(
+                  kDefaultName, kDefaultLabel, kDefaultValue),
+              Eq(std::nullopt));
+}
+
+// RemoveFormElement should do nothing if the entry does not exist.
+TEST_F(RemoveFormElementTest, DoesNothingIfEntryDoesNotExist) {
+  // The database stores timestamps with second precision. The test needs to
+  // do the same to be able to compare entries.
+  base::Time seconds_precision_now = base::Time::FromSecondsSinceUnixEpoch(
+      base::Time::Now().InMillisecondsSinceUnixEpoch() / 1000);
+
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  ASSERT_TRUE(
+      table().RemoveFormElement(kDefaultName, kDefaultLabel, u"Wrong Value"));
+
+  EXPECT_THAT(table().GetAutocompleteEntryLabelSensitive(
+                  kDefaultName, kDefaultLabel, kDefaultValue),
+              Optional(AutocompleteEntryLabelSensitive(
+                  AutocompleteKeyLabelSensitive(kDefaultName, kDefaultLabel,
+                                                kDefaultValue),
+                  seconds_precision_now, seconds_precision_now)));
+}
+
+using UpdateAutocompleteEntriesTest = AutocompleteTableLabelSensitiveTest;
+
+// UpdateAutocompleteEntries works in `update or insert` fashion. If given entry
+// does not exist in the table, it should be inserted.
+TEST_F(UpdateAutocompleteEntriesTest, AddsNewEntry) {
+  AutocompleteEntryLabelSensitive entry(MakeAutocompleteEntryLabelSensitive(
+      kDefaultName, kDefaultLabel, kDefaultValue, 5, 5));
   std::vector<AutocompleteEntryLabelSensitive> entries;
   entries.push_back(entry);
-  ASSERT_TRUE(table().UpdateAutocompleteEntries(entries));
 
-  EXPECT_EQ(1, GetAutocompleteEntryLabelSensitiveCount(u"foo", u"bar", u"baz",
-                                                       &db()));
-
-  std::vector<AutocompleteEntryLabelSensitive> all_entries;
-  ASSERT_TRUE(table().GetAllAutocompleteEntries(&all_entries));
-  ASSERT_EQ(1U, all_entries.size());
-  EXPECT_EQ(entry, all_entries[0]);
-}
-
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_UpdateOneWithTwoTimestamps) {
-  AutocompleteEntryLabelSensitive entry(
-      MakeAutocompleteEntryLabelSensitive(u"foo", u"bar", u"baz", 1, 2));
-  std::vector<AutocompleteEntryLabelSensitive> entries;
-  entries.push_back(entry);
-  ASSERT_TRUE(table().UpdateAutocompleteEntries(entries));
-
-  EXPECT_EQ(2, GetAutocompleteEntryLabelSensitiveCount(u"foo", u"bar", u"baz",
-                                                       &db()));
-
-  std::vector<AutocompleteEntryLabelSensitive> all_entries;
-  ASSERT_TRUE(table().GetAllAutocompleteEntries(&all_entries));
-  ASSERT_EQ(1U, all_entries.size());
-  EXPECT_EQ(entry, all_entries[0]);
-}
-
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_GetAutofillTimestamps) {
-  AutocompleteEntryLabelSensitive entry(
-      MakeAutocompleteEntryLabelSensitive(u"foo", u"bar", u"baz", 1, 2));
-  std::vector<AutocompleteEntryLabelSensitive> entries;
-  entries.push_back(entry);
   ASSERT_TRUE(table().UpdateAutocompleteEntries(entries));
 
   std::optional<AutocompleteEntryLabelSensitive> table_entry =
-      table().GetAutocompleteEntryLabelSensitive(u"foo", u"bar", u"baz");
-  ASSERT_TRUE(table_entry);
-  EXPECT_EQ(Time::FromTimeT(1), table_entry->date_created());
-  EXPECT_EQ(Time::FromTimeT(2), table_entry->date_last_used());
+      table().GetAutocompleteEntryLabelSensitive(kDefaultName, kDefaultLabel,
+                                                 kDefaultValue);
+  EXPECT_THAT(table_entry, Optional(HasCreationAndUseDate(Time::FromTimeT(5),
+                                                          Time::FromTimeT(5))));
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest, Autocomplete_UpdateTwo) {
-  AutocompleteEntryLabelSensitive entry0(
-      MakeAutocompleteEntryLabelSensitive(u"foo", u"bar", u"baz0", 1, -1));
-  AutocompleteEntryLabelSensitive entry1(
-      MakeAutocompleteEntryLabelSensitive(u"foo", u"bar", u"baz1", 2, 3));
-  std::vector<AutocompleteEntryLabelSensitive> entries;
-  entries.push_back(entry0);
-  entries.push_back(entry1);
+// UpdateAutocompleteEntries should add several new entries if the user submits
+// different values for the same field. The use count can be updated only to
+// value 1 or 2, depending on timestamps provided to UpdateAutocompleteEntries
+// for given entry. This is a workaround for count sync not be implemented. If
+// the creation timestamp is equal to the last used timestamp, then the use
+// count will be set to 1, otherwise count will be set to 2.
+TEST_F(UpdateAutocompleteEntriesTest, AddsSeveralNewEntriesWithProperCounts) {
+  const std::u16string kAnotherValue = u"Clark Sutter";
+  std::vector<AutocompleteEntryLabelSensitive> entries = {
+      MakeAutocompleteEntryLabelSensitive(kDefaultName, kDefaultLabel,
+                                          kDefaultValue, 1, 1),
+      MakeAutocompleteEntryLabelSensitive(kDefaultName, kDefaultLabel,
+                                          kAnotherValue, 2, 3)};
+
   ASSERT_TRUE(table().UpdateAutocompleteEntries(entries));
 
-  EXPECT_EQ(1, GetAutocompleteEntryLabelSensitiveCount(u"foo", u"bar", u"baz0",
-                                                       &db()));
-  EXPECT_EQ(2, GetAutocompleteEntryLabelSensitiveCount(u"foo", u"bar", u"baz1",
-                                                       &db()));
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    kDefaultValue, &db()),
+            1);
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    kAnotherValue, &db()),
+            2);
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest, Autocomplete_UpdateNullTerminated) {
-  const char16_t kName[] = u"foo";
-  const char16_t kLabel[] = u"bar";
-  const char16_t kValue[] = u"baz";
-  // A value which contains terminating character.
-  std::u16string value(kValue, std::size(kValue));
+// If nan entry already exists in the table, its timestamps and use count should
+// be updated with value provided in UpdateAutocompleteEntries.
+TEST_F(UpdateAutocompleteEntriesTest,
+       OverridesExistingEntrysTimestampsAndCount) {
+  // Add one entry ten times to make its count reach 10.
+  for (int i = 0; i < 10; ++i) {
+    ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+  }
+  std::vector<AutocompleteEntryLabelSensitive> entries = {
+      MakeAutocompleteEntryLabelSensitive(kDefaultName, kDefaultLabel,
+                                          kDefaultValue, 1, 1)};
 
-  AutocompleteEntryLabelSensitive entry0(
-      MakeAutocompleteEntryLabelSensitive(kName, kLabel, kValue, 1, -1));
-  AutocompleteEntryLabelSensitive entry1(
-      MakeAutocompleteEntryLabelSensitive(kName, kLabel, value, 2, 3));
-  std::vector<AutocompleteEntryLabelSensitive> entries;
-  entries.push_back(entry0);
-  entries.push_back(entry1);
-  ASSERT_TRUE(table().UpdateAutocompleteEntries(entries));
-
-  EXPECT_EQ(
-      1, GetAutocompleteEntryLabelSensitiveCount(kName, kLabel, kValue, &db()));
-  EXPECT_EQ(
-      2, GetAutocompleteEntryLabelSensitiveCount(kName, kLabel, value, &db()));
-
-  std::vector<AutocompleteEntryLabelSensitive> all_entries;
-  ASSERT_TRUE(table().GetAllAutocompleteEntries(&all_entries));
-  ASSERT_EQ(2U, all_entries.size());
-  EXPECT_EQ(entry0, all_entries[0]);
-  EXPECT_EQ(entry1, all_entries[1]);
-}
-
-TEST_F(AutocompleteTableLabelSensitiveTest, Autocomplete_UpdateReplace) {
-  AutocompleteChangeLabelSensitiveList changes;
-  // Add a form field.  This will be replaced.
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-
-  AutocompleteEntryLabelSensitive entry(
-      MakeAutocompleteEntryLabelSensitive(u"name", u"Name", u"Superman", 1, 2));
-  std::vector<AutocompleteEntryLabelSensitive> entries;
-  entries.push_back(entry);
   ASSERT_TRUE(table().UpdateAutocompleteEntries(entries));
 
   std::vector<AutocompleteEntryLabelSensitive> all_entries;
   ASSERT_TRUE(table().GetAllAutocompleteEntries(&all_entries));
-  ASSERT_EQ(1U, all_entries.size());
-  EXPECT_EQ(entry, all_entries[0]);
+  EXPECT_THAT(all_entries, ElementsAre(entries[0]));
+  EXPECT_EQ(GetAutocompleteEntryLabelSensitiveCount(kDefaultName, kDefaultLabel,
+                                                    kDefaultValue, &db()),
+            1);
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest, Autocomplete_UpdateDontReplace) {
-  AutocompleteEntryLabelSensitive existing(MakeAutocompleteEntryLabelSensitive(
-      u"name", u"Name", u"Superman", base::Time::Now().ToTimeT(), -1));
+// UpdateAutocompleteEntries should insert new entry and not replace existing
+// entry.
+TEST_F(UpdateAutocompleteEntriesTest, AddsWithoutReplacing) {
+  AutocompleteEntryLabelSensitive existing_entry(
+      MakeAutocompleteEntryLabelSensitive(
+          kDefaultName, kDefaultLabel, kDefaultValue,
+          base::Time::Now().ToTimeT(), base::Time::Now().ToTimeT()));
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
 
-  AutocompleteChangeLabelSensitiveList changes;
-  // Add a form field.  This will NOT be replaced.
-  autofill::FormFieldData field;
-  field.set_name(existing.key().name());
-  field.set_label(existing.key().label());
-  field.set_value(existing.key().value());
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  AutocompleteEntryLabelSensitive entry(MakeAutocompleteEntryLabelSensitive(
-      u"name", u"Name", u"Clark Kent", 1, 2));
-  std::vector<AutocompleteEntryLabelSensitive> entries;
-  entries.push_back(entry);
-  ASSERT_TRUE(table().UpdateAutocompleteEntries(entries));
+  AutocompleteEntryLabelSensitive new_entry(MakeAutocompleteEntryLabelSensitive(
+      kDefaultName, kDefaultLabel, u"Clark Sutter", 1, 2));
+
+  ASSERT_TRUE(table().UpdateAutocompleteEntries({new_entry}));
 
   std::vector<AutocompleteEntryLabelSensitive> all_entries;
   ASSERT_TRUE(table().GetAllAutocompleteEntries(&all_entries));
-  ASSERT_EQ(2U, all_entries.size());
+  ASSERT_EQ(all_entries.size(), 2U);
   AutocompleteEntryLabelSensitiveSet expected_entries(
       all_entries.begin(), all_entries.end(), CompareAutocompleteEntries);
-  EXPECT_EQ(1U, expected_entries.count(existing));
-  EXPECT_EQ(1U, expected_entries.count(entry));
+  EXPECT_EQ(expected_entries.count(existing_entry), 1U);
+  EXPECT_EQ(expected_entries.count(new_entry), 1U);
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest, Autocomplete_AddFormFieldValues) {
-  // Add multiple values for "firstname" and "lastname" names.  Test that only
-  // first value of each gets added. Related to security issue:
-  // http://crbug.com/51727.
-  std::vector<autofill::FormFieldData> elements;
-  autofill::FormFieldData field;
-  field.set_name(u"firstname");
-  field.set_label(u"First Name");
-  field.set_value(u"Joe");
-  elements.push_back(field);
+using RemoveExpiredFormElementsTest = AutocompleteTableLabelSensitiveTest;
 
-  field.set_name(u"firstname");
-  field.set_label(u"First Name");
-  field.set_value(u"Jane");
-  elements.push_back(field);
-
-  field.set_name(u"lastname");
-  field.set_label(u"Last Name");
-  field.set_value(u"Smith");
-  elements.push_back(field);
-
-  field.set_name(u"lastname");
-  field.set_label(u"Last Name");
-  field.set_value(u"Jones");
-  elements.push_back(field);
-
-  std::vector<AutocompleteChangeLabelSensitive> changes;
-  table().AddFormFieldValues(elements, &changes);
-
-  ASSERT_EQ(2U, changes.size());
-  EXPECT_EQ(changes[0], AutocompleteChangeLabelSensitive(
-                            AutocompleteChangeLabelSensitive::ADD,
-                            AutocompleteKeyLabelSensitive(
-                                u"firstname", u"First Name", u"Joe")));
-  EXPECT_EQ(changes[1], AutocompleteChangeLabelSensitive(
-                            AutocompleteChangeLabelSensitive::ADD,
-                            AutocompleteKeyLabelSensitive(
-                                u"lastname", u"Last Name", u"Smith")));
-
-  std::vector<AutocompleteEntryLabelSensitive> all_entries;
-  ASSERT_TRUE(table().GetAllAutocompleteEntries(&all_entries));
-  ASSERT_EQ(2U, all_entries.size());
-}
-
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_RemoveFormElementsAddedBetween_UsedOnlyBefore) {
-  // Add an entry used only before the targeted range.
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  for (int i = 0; i < 5; i++) {
-    EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-    AdvanceClock(base::Seconds(10));
-  }
-
-  EXPECT_EQ(5, GetAutocompleteEntryLabelSensitiveCount(
-                   field.name(), field.label(), field.value(), &db()));
-
-  changes.clear();
-  EXPECT_TRUE(table().RemoveFormElementsAddedBetween(
-      base::Time::Now() - base::Seconds(9), base::Time::Now(), changes));
-  EXPECT_TRUE(changes.empty());
-  EXPECT_EQ(5, GetAutocompleteEntryLabelSensitiveCount(
-                   field.name(), field.label(), field.value(), &db()));
-}
-
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_RemoveFormElementsAddedBetween_UsedOnlyAfter) {
-  // Add an entry used only after the targeted range.
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  for (int i = 0; i < 5; i++) {
-    AdvanceClock(base::Seconds(10));
-    EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  }
-
-  EXPECT_EQ(5, GetAutocompleteEntryLabelSensitiveCount(
-                   field.name(), field.label(), field.value(), &db()));
-
-  changes.clear();
-  EXPECT_TRUE(table().RemoveFormElementsAddedBetween(
-      base::Time::Now() - base::Seconds(50),
-      base::Time::Now() - base::Seconds(41), changes));
-  EXPECT_TRUE(changes.empty());
-  EXPECT_EQ(5, GetAutocompleteEntryLabelSensitiveCount(
-                   field.name(), field.label(), field.value(), &db()));
-}
-
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_RemoveFormElementsAddedBetween_UsedOnlyDuring) {
-  // Add an entry used entirely during the targeted range.
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  for (int i = 0; i < 5; i++) {
-    EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-    AdvanceClock(base::Seconds(10));
-  }
-
-  EXPECT_EQ(5, GetAutocompleteEntryLabelSensitiveCount(
-                   field.name(), field.label(), field.value(), &db()));
-
-  changes.clear();
-  EXPECT_TRUE(table().RemoveFormElementsAddedBetween(
-      base::Time::Now() - base::Seconds(50), base::Time::Now(), changes));
-  ASSERT_EQ(1U, changes.size());
-  EXPECT_EQ(AutocompleteChangeLabelSensitive(
-                AutocompleteChangeLabelSensitive::REMOVE,
-                AutocompleteKeyLabelSensitive(field.name(), field.label(),
-                                              field.value())),
-            changes[0]);
-  EXPECT_EQ(0, GetAutocompleteEntryLabelSensitiveCount(
-                   field.name(), field.label(), field.value(), &db()));
-}
-
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_RemoveFormElementsAddedBetween_UsedBeforeAndDuring) {
-  SetClock(autofill::test::kJune2017);
-  // Add an entry used both before and during the targeted range.
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  for (int i = 0; i < 5; i++) {
-    AdvanceClock(base::Seconds(10));
-    EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  }
-
-  EXPECT_EQ(5, GetAutocompleteEntryLabelSensitiveCount(
-                   field.name(), field.label(), field.value(), &db()));
-
-  changes.clear();
-  EXPECT_TRUE(table().RemoveFormElementsAddedBetween(
-      base::Time::Now() - base::Seconds(10),
-      base::Time::Now() + base::Seconds(10), changes));
-  ASSERT_EQ(1U, changes.size());
-  EXPECT_EQ(AutocompleteChangeLabelSensitive(
-                AutocompleteChangeLabelSensitive::UPDATE,
-                AutocompleteKeyLabelSensitive(field.name(), field.label(),
-                                              field.value())),
-            changes[0]);
-  EXPECT_EQ(4, GetAutocompleteEntryLabelSensitiveCount(
-                   field.name(), field.label(), field.value(), &db()));
-  std::optional<AutocompleteEntryLabelSensitive> entry =
-      table().GetAutocompleteEntryLabelSensitive(field.name(), field.label(),
-                                                 field.value());
-  ASSERT_TRUE(entry);
-  EXPECT_EQ(base::Time::Now() - base::Seconds(40), entry->date_created());
-  EXPECT_EQ(base::Time::Now() - base::Seconds(11), entry->date_last_used());
-}
-
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_RemoveFormElementsAddedBetween_UsedDuringAndAfter) {
-  SetClock(autofill::test::kJune2017);
-  // Add an entry used both during and after the targeted range.
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  for (int i = 0; i < 5; i++) {
-    AdvanceClock(base::Seconds(10));
-    EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  }
-
-  EXPECT_EQ(5, GetAutocompleteEntryLabelSensitiveCount(
-                   field.name(), field.label(), field.value(), &db()));
-
-  changes.clear();
-  EXPECT_TRUE(table().RemoveFormElementsAddedBetween(
-      base::Time::Now() - base::Seconds(50),
-      base::Time::Now() - base::Seconds(10), changes));
-  ASSERT_EQ(1U, changes.size());
-  EXPECT_EQ(AutocompleteChangeLabelSensitive(
-                AutocompleteChangeLabelSensitive::UPDATE,
-                AutocompleteKeyLabelSensitive(field.name(), field.label(),
-                                              field.value())),
-            changes[0]);
-  EXPECT_EQ(2, GetAutocompleteEntryLabelSensitiveCount(
-                   field.name(), field.label(), field.value(), &db()));
-  std::optional<AutocompleteEntryLabelSensitive> entry =
-      table().GetAutocompleteEntryLabelSensitive(field.name(), field.label(),
-                                                 field.value());
-  ASSERT_TRUE(entry);
-  EXPECT_EQ(base::Time::Now() - base::Seconds(10), entry->date_created());
-  EXPECT_EQ(base::Time::Now(), entry->date_last_used());
-}
-
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_RemoveFormElementsAddedBetween_OlderThan30Days) {
-  // Add some form field entries.
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-
-  field.set_value(u"Clark Sutter");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  AdvanceClock(base::Days(2));
-
-  field.set_value(u"Clark Kent");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  AdvanceClock(base::Days(29));
-
-  field.set_value(u"Superman");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-
-  EXPECT_EQ(3U, changes.size());
-
-  // Removing all elements added before 30 days from the database.
-  changes.clear();
-  EXPECT_TRUE(table().RemoveFormElementsAddedBetween(
-      base::Time(), base::Time::Now() - base::Days(30), changes));
-  ASSERT_EQ(1U, changes.size());
-  EXPECT_EQ(
-      AutocompleteChangeLabelSensitive(
-          AutocompleteChangeLabelSensitive::REMOVE,
-          AutocompleteKeyLabelSensitive(u"name", u"Name", u"Clark Sutter")),
-      changes[0]);
-  EXPECT_EQ(0, GetAutocompleteEntryLabelSensitiveCount(u"name", u"Name",
-                                                       u"Clark Sutter", &db()));
-  EXPECT_EQ(1, GetAutocompleteEntryLabelSensitiveCount(u"name", u"Name",
-                                                       u"Superman", &db()));
-  EXPECT_EQ(1, GetAutocompleteEntryLabelSensitiveCount(u"name", u"Name",
-                                                       u"Clark Kent", &db()));
-  changes.clear();
-}
-
-// Tests that we set the change type to EXPIRE for expired elements and we
-// delete an old entry.
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       RemoveExpiredFormElements_Expires_DeleteEntry) {
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
+// Add an entry and advance the clock to make it expired.
+// RemoveExpiredFormElements should remove the entry.
+TEST_F(RemoveExpiredFormElementsTest, RemovesExpiredEntries) {
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
   AdvanceClock(2 * autofill::kAutocompleteRetentionPolicyPeriod);
-  changes.clear();
+  changes().clear();
 
-  EXPECT_TRUE(table().RemoveExpiredFormElements(changes));
-  EXPECT_EQ(AutocompleteChangeLabelSensitive(
-                AutocompleteChangeLabelSensitive::EXPIRE,
-                AutocompleteKeyLabelSensitive(field.name(), field.label(),
-                                              field.value())),
-            changes[0]);
+  ASSERT_TRUE(table().RemoveExpiredFormElements(changes()));
+
+  EXPECT_THAT(changes(), ElementsAre(AutocompleteChangeLabelSensitive(
+                             AutocompleteChangeLabelSensitive::EXPIRE,
+                             AutocompleteKeyLabelSensitive(
+                                 kDefaultName, kDefaultLabel, kDefaultValue))));
 }
 
-// Tests that we don't
-// delete non-expired entries' data from the SQLite table.
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       RemoveExpiredFormElements_NotOldEnough) {
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
+// Add an entry and advance the clock but not enough to make it expired.
+// RemoveExpiredFormElements should not remove the entry.
+TEST_F(RemoveExpiredFormElementsTest, DoesNotRemoveNonExpiredEntries) {
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+  ASSERT_LT(base::Days(2), autofill::kAutocompleteRetentionPolicyPeriod);
   AdvanceClock(base::Days(2));
-  changes.clear();
+  changes().clear();
 
-  EXPECT_TRUE(table().RemoveExpiredFormElements(changes));
-  EXPECT_TRUE(changes.empty());
+  ASSERT_TRUE(table().RemoveExpiredFormElements(changes()));
+
+  EXPECT_TRUE(changes().empty());
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_GetAllAutocompleteEntries_NoResults) {
+using GetAllAutocompleteEntriesTest = AutocompleteTableLabelSensitiveTest;
+
+// If database is empty, GetAllAutocompleteEntries should return no results.
+TEST_F(GetAllAutocompleteEntriesTest, ReturnsNoResults) {
   std::vector<AutocompleteEntryLabelSensitive> entries;
+
   ASSERT_TRUE(table().GetAllAutocompleteEntries(&entries));
 
-  EXPECT_EQ(0U, entries.size());
+  EXPECT_EQ(entries.size(), 0U);
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_GetAllAutocompleteEntries_OneResult) {
-  SetClock(autofill::test::kJune2017);
-  AutocompleteChangeLabelSensitiveList changes;
-  std::map<std::string, std::vector<Time>> name_value_times_map;
+// If database contains one entry, GetAllAutocompleteEntries should return it.
+TEST_F(GetAllAutocompleteEntriesTest, ReturnsOneResult) {
+  AutocompleteEntryLabelSensitive entry(
+      {kDefaultName, kDefaultLabel, kDefaultValue}, base::Time::Now(),
+      base::Time::Now());
 
-  std::vector<Time> timestamps1;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  timestamps1.push_back(base::Time::Now());
-  std::string key1("NameSuperman");
-  name_value_times_map.insert(
-      std::pair<std::string, std::vector<Time>>(key1, timestamps1));
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
 
   AutocompleteEntryLabelSensitiveSet expected_entries(
       CompareAutocompleteEntries);
-  AutocompleteKeyLabelSensitive ak1(u"name", u"Name", u"Superman");
-  AutocompleteEntryLabelSensitive ae1(ak1, timestamps1.front(),
-                                      timestamps1.back());
-
-  expected_entries.insert(ae1);
+  expected_entries.insert(entry);
 
   std::vector<AutocompleteEntryLabelSensitive> entries;
+
   ASSERT_TRUE(table().GetAllAutocompleteEntries(&entries));
+
   AutocompleteEntryLabelSensitiveSet entry_set(entries.begin(), entries.end(),
                                                CompareAutocompleteEntries);
 
-  CompareAutocompleteEntryLabelSensitiveSets(entry_set, expected_entries);
+  EXPECT_TRUE(
+      CompareAutocompleteEntryLabelSensitiveSets(entry_set, expected_entries));
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_GetAllAutocompleteEntries_TwoDistinct) {
-  SetClock(autofill::test::kJune2017);
-  AutocompleteChangeLabelSensitiveList changes;
-  std::map<std::string, std::vector<Time>> name_value_times_map;
-
-  std::vector<Time> timestamps1;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  timestamps1.push_back(base::Time::Now());
-  std::string key1("NameSuperman");
-  name_value_times_map.insert(
-      std::pair<std::string, std::vector<Time>>(key1, timestamps1));
+// If database contains two distinct entries, GetAllAutocompleteEntries should
+// return both of them.
+TEST_F(GetAllAutocompleteEntriesTest, ReturnsTwoDistinct) {
+  std::optional<FormFieldData> optional_field1 = CreateAndSubmitDefaultField();
+  ASSERT_TRUE(optional_field1.has_value());
+  Time timestamps1(base::Time::Now());
 
   AdvanceClock(base::Seconds(1));
-  std::vector<Time> timestamps2;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Clark Kent");
-  EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-  timestamps2.push_back(base::Time::Now());
-  std::string key2("NameClark Kent");
-  name_value_times_map.insert(
-      std::pair<std::string, std::vector<Time>>(key2, timestamps2));
+  std::optional<FormFieldData> optional_field2 =
+      CreateAndSubmitDefaultFieldWithValue(u"Clark Sutter");
+  ASSERT_TRUE(optional_field2.has_value());
+  Time timestamps2(base::Time::Now());
 
   AutocompleteEntryLabelSensitiveSet expected_entries(
       CompareAutocompleteEntries);
-  AutocompleteKeyLabelSensitive ak1(u"name", u"Name", u"Superman");
-  AutocompleteKeyLabelSensitive ak2(u"name", u"Name", u"Clark Kent");
-  AutocompleteEntryLabelSensitive ae1(ak1, timestamps1.front(),
-                                      timestamps1.back());
-  AutocompleteEntryLabelSensitive ae2(ak2, timestamps2.front(),
-                                      timestamps2.back());
+  AutocompleteEntryLabelSensitive entry1(
+      {kDefaultName, kDefaultLabel, optional_field1.value().value()},
+      timestamps1, timestamps1);
+  AutocompleteEntryLabelSensitive entry2(
+      {kDefaultName, kDefaultLabel, optional_field2.value().value()},
+      timestamps2, timestamps2);
 
-  expected_entries.insert(ae1);
-  expected_entries.insert(ae2);
+  expected_entries.insert(entry1);
+  expected_entries.insert(entry2);
 
   std::vector<AutocompleteEntryLabelSensitive> entries;
+
   ASSERT_TRUE(table().GetAllAutocompleteEntries(&entries));
+
   AutocompleteEntryLabelSensitiveSet entry_set(entries.begin(), entries.end(),
                                                CompareAutocompleteEntries);
 
-  CompareAutocompleteEntryLabelSensitiveSets(entry_set, expected_entries);
+  EXPECT_TRUE(
+      CompareAutocompleteEntryLabelSensitiveSets(entry_set, expected_entries));
 }
 
-TEST_F(AutocompleteTableLabelSensitiveTest,
-       Autocomplete_GetAllAutocompleteEntries_TwoSame) {
-  SetClock(autofill::test::kJune2017);
-  AutocompleteChangeLabelSensitiveList changes;
-  std::map<std::string, std::vector<Time>> name_value_times_map;
+// If we add one entry twice, GetAllAutocompleteEntries should return it once.
+TEST_F(GetAllAutocompleteEntriesTest, ReturnsTwoIdentical) {
+  std::optional<FormFieldData> optional_field = CreateAndSubmitDefaultField();
+  ASSERT_TRUE(optional_field.has_value());
+  Time timestamp1(base::Time::Now());
 
-  std::vector<Time> timestamps;
-  for (int i = 0; i < 2; ++i) {
-    autofill::FormFieldData field;
-    field.set_name(u"name");
-    field.set_label(u"Name");
-    field.set_value(u"Superman");
-    AdvanceClock(base::Seconds(1));
-    EXPECT_TRUE(table().AddFormFieldValues({field}, &changes));
-    timestamps.push_back(base::Time::Now());
-  }
-
-  std::string key("NameSuperman");
-  name_value_times_map.insert(
-      std::pair<std::string, std::vector<Time>>(key, timestamps));
+  AdvanceClock(base::Seconds(1));
+  ASSERT_TRUE(SubmitFormField(optional_field.value()));
+  Time timestamp2(base::Time::Now());
 
   AutocompleteEntryLabelSensitiveSet expected_entries(
       CompareAutocompleteEntries);
-  AutocompleteKeyLabelSensitive ak1(u"name", u"Name", u"Superman");
-  AutocompleteEntryLabelSensitive ae1(ak1, timestamps.front(),
-                                      timestamps.back());
+  AutocompleteEntryLabelSensitive entry(
+      {kDefaultName, kDefaultLabel, kDefaultValue}, timestamp1, timestamp2);
 
-  expected_entries.insert(ae1);
+  expected_entries.insert(entry);
 
   std::vector<AutocompleteEntryLabelSensitive> entries;
+
   ASSERT_TRUE(table().GetAllAutocompleteEntries(&entries));
+
   AutocompleteEntryLabelSensitiveSet entry_set(entries.begin(), entries.end(),
                                                CompareAutocompleteEntries);
 
-  CompareAutocompleteEntryLabelSensitiveSets(entry_set, expected_entries);
+  EXPECT_TRUE(
+      CompareAutocompleteEntryLabelSensitiveSets(entry_set, expected_entries));
 }
 
+using GetAutocompleteEntryLabelSensitiveTest =
+    AutocompleteTableLabelSensitiveTest;
+
+// If the database contains a specific entry (with a given name, label, and value),
+// GetAutocompleteEntryLabelSensitive should return it.
+TEST_F(GetAutocompleteEntryLabelSensitiveTest, ReturnsEntry) {
+  // The database stores timestamps with second precision. The test needs to
+  // do the same to be able to compare entries.
+  base::Time seconds_precision_now = base::Time::FromSecondsSinceUnixEpoch(
+      base::Time::Now().InMillisecondsSinceUnixEpoch() / 1000);
+
+  ASSERT_TRUE(CreateAndSubmitDefaultField().has_value());
+
+  std::optional<AutocompleteEntryLabelSensitive> entry =
+      table().GetAutocompleteEntryLabelSensitive(kDefaultName, kDefaultLabel,
+                                                 kDefaultValue);
+
+  EXPECT_THAT(entry, Optional(AutocompleteEntryLabelSensitive(
+                         AutocompleteKeyLabelSensitive(
+                             kDefaultName, kDefaultLabel, kDefaultValue),
+                         seconds_precision_now, seconds_precision_now)));
+}
+
+// If the database does not contain a specific entry (with a given name, label, and
+// value), GetAutocompleteEntryLabelSensitive should return nullopt.
+TEST_F(GetAutocompleteEntryLabelSensitiveTest,
+       ReturnsNulloptIfEntryDoesNotExist) {
+  std::optional<AutocompleteEntryLabelSensitive> entry =
+      table().GetAutocompleteEntryLabelSensitive(kDefaultName, kDefaultLabel,
+                                                 kDefaultValue);
+
+  EXPECT_FALSE(entry.has_value());
+}
+
+// Poison the database and check that we don't crash when adding a value.
 TEST_F(AutocompleteTableLabelSensitiveTest,
        DontCrashWhenAddingValueToPoisonedDB) {
   // Simulate a preceding fatal error.
   db().GetSQLConnection()->Poison();
 
   // Simulate the submission of a form.
-  AutocompleteChangeLabelSensitiveList changes;
-  autofill::FormFieldData field;
-  field.set_name(u"name");
-  field.set_label(u"Name");
-  field.set_value(u"Superman");
-  EXPECT_FALSE(table().AddFormFieldValues({field}, &changes));
+  FormFieldData field = CreateDefaultField();
+  EXPECT_FALSE(table().AddFormFieldValues({field}, &changes()));
 }
 
 }  // namespace

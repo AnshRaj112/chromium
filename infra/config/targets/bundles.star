@@ -4776,7 +4776,6 @@ targets.bundle(
     per_test_modifications = {
         "webgl_conformance_validating_graphite_tests": [
             targets.mixin(
-                ci_only = True,
                 swarming = targets.swarming(
                     shards = 2,
                 ),
@@ -5468,7 +5467,7 @@ targets.bundle(
     per_test_modifications = {
         "ios_chrome_bookmarks_eg2tests_module": targets.mixin(
             swarming = targets.swarming(
-                shards = 2,
+                shards = 3,
             ),
         ),
         "ios_chrome_settings_eg2tests_module": [
@@ -5503,7 +5502,6 @@ targets.bundle(
 targets.bundle(
     name = "ios_failing_screen_size_dependent_tests",
     targets = [
-        "ios_chrome_unittests",
         "ios_web_inttests",
         "ios_web_unittests",
     ],
@@ -5572,6 +5570,7 @@ targets.bundle(
         "base_unittests",
         "components_unittests",
         "gfx_unittests",
+        "ios_chrome_unittests",
         "ios_web_view_inttests",
         "ios_web_view_unittests",
         "skia_unittests",
