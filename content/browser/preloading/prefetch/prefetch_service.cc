@@ -695,23 +695,11 @@ void PrefetchService::PrefetchUrl(
                           weak_method_factory_.GetWeakPtr())});
 
   if (delegate_) {
+    const auto eligibility_from_delegate = delegate_->IsSomePreloadingEnabled();
     // If pre* actions are disabled then don't prefetch.
-    switch (delegate_->IsSomePreloadingEnabled()) {
-      case PreloadingEligibility::kEligible:
-        break;
-      case PreloadingEligibility::kDataSaverEnabled:
-        std::move(params).Finish(PreloadingEligibility::kDataSaverEnabled);
-        return;
-      case PreloadingEligibility::kBatterySaverEnabled:
-        std::move(params).Finish(PreloadingEligibility::kBatterySaverEnabled);
-        return;
-      case PreloadingEligibility::kPreloadingDisabled:
-        std::move(params).Finish(PreloadingEligibility::kPreloadingDisabled);
-        return;
-      default:
-        DVLOG(1) << *prefetch_container
-                 << ": not prefetched (PrefetchServiceDelegate)";
-        return;
+    if (eligibility_from_delegate != PreloadingEligibility::kEligible) {
+      std::move(params).Finish(eligibility_from_delegate);
+      return;
     }
 
     const auto& prefetch_type = prefetch_container->GetPrefetchType();
@@ -755,7 +743,12 @@ void PrefetchService::PrefetchUrl(
 void PrefetchService::CheckEligibilityOfPrefetch(
     CheckEligibilityParams params) {
   const auto prefetch_container = params.prefetch_container;
-
+  if (!prefetch_container) {
+    // Test-only where the eligibility check is paused and resumed via
+    // `GetDelayEligibilityCheckForTesting()`.
+    std::move(params).Finish(PreloadingEligibility::kEligible);
+    return;
+  }
   CHECK(prefetch_container);
   TRACE_EVENT_NESTABLE_ASYNC_BEGIN0("loading",
                                     "PrefetchService::CheckEligibility", this);
@@ -1672,11 +1665,8 @@ void PrefetchService::SendPrefetchRequest(
       PrefetchTimeoutDuration(),
       base::BindOnce(&PrefetchService::OnPrefetchResponseStarted,
                      base::Unretained(this), prefetch_container),
-      base::BindOnce(&PrefetchContainer::OnPrefetchComplete,
-                     prefetch_container),
       base::BindRepeating(&PrefetchService::OnPrefetchRedirect,
                           base::Unretained(this), prefetch_container),
-      base::BindOnce(&PrefetchContainer::OnDeterminedHead, prefetch_container),
       prefetch_container->GetResponseReaderForCurrentPrefetch(),
       prefetch_container->service_worker_state(), browser_context_,
       base::BindOnce(&PrefetchContainer::OnServiceWorkerStateDetermined,

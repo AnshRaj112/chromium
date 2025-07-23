@@ -497,10 +497,6 @@ BASE_FEATURE(kContentCaptureConstantStreaming,
              "ContentCaptureConstantStreaming",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
-BASE_FEATURE(kCorrectFloatExtensionTestForWebGL,
-             "CorrectFloatExtensionTestForWebGL",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
 // When enabled, add a new option, {imageOrientation: 'none'}, to
 // createImageBitmap, which ignores the image orientation metadata of the source
 // and renders the image as encoded.
@@ -1918,6 +1914,36 @@ BASE_FEATURE(kMixedContentAutoupgrade,
              "AutoupgradeMixedContent",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+BASE_FEATURE(kMemoryCacheIntelligentPruning,
+             "MemoryCacheIntelligentPruning",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+// Weight for the resource's type priority in the value calculation.
+// A high default makes type a primary factor in determining importance.
+BASE_FEATURE_PARAM(double,
+                   kMemoryCacheIntelligentPruningFreqWeight,
+                   &kMemoryCacheIntelligentPruning,
+                   "freq_weight",
+                   50.0);
+
+// This weight is intentionally low to scale down the raw byte size. It ensures
+// that cost acts as a secondary, tie-breaking factor and does not dominate
+// the score compared to the more critical signals of resource type or
+// frequency.
+BASE_FEATURE_PARAM(double,
+                   kMemoryCacheIntelligentPruningCostWeight,
+                   &kMemoryCacheIntelligentPruning,
+                   "cost_weight",
+                   0.0001);
+
+// Weight for the resource's usage frequency score in the value calculation.
+// This is tuned to balance the logarithmic hit count against other factors.
+BASE_FEATURE_PARAM(double,
+                   kMemoryCacheIntelligentPruningTypeWeight,
+                   &kMemoryCacheIntelligentPruning,
+                   "type_weight",
+                   100.0);
+
 BASE_FEATURE(kMemoryCacheStrongReference,
              "MemoryCacheStrongReference",
 // Finch study showed no improvement on Android for strong memory cache.
@@ -2020,10 +2046,6 @@ BASE_FEATURE_PARAM(size_t,
 
 BASE_FEATURE(kOriginAgentClusterDefaultEnabled,
              "OriginAgentClusterDefaultEnable",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-BASE_FEATURE(kOriginTrialStateHostApplyFeatureDiff,
-             "OriginTrialStateHostApplyFeatureDiff",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enable defer commits to avoid flash of unstyled content, for all navigations.
@@ -2153,42 +2175,6 @@ const char kPrerender2MemoryAcceptablePercentOfSystemMemoryParamName[] =
 BASE_FEATURE(kPrerender2EarlyDocumentLifecycleUpdate,
              "Prerender2EarlyDocumentLifecycleUpdate",
              base::FEATURE_DISABLED_BY_DEFAULT);
-
-#if BUILDFLAG(IS_WIN)
-BASE_FEATURE(kPrewarmDefaultFontFamilies,
-             "PrewarmDefaultFontFamilies",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-BASE_FEATURE_PARAM(bool,
-                   kPrewarmStandard,
-                   &kPrewarmDefaultFontFamilies,
-                   "prewarm_standard",
-                   false);
-BASE_FEATURE_PARAM(bool,
-                   kPrewarmFixed,
-                   &kPrewarmDefaultFontFamilies,
-                   "prewarm_fixed",
-                   false);
-BASE_FEATURE_PARAM(bool,
-                   kPrewarmSerif,
-                   &kPrewarmDefaultFontFamilies,
-                   "prewarm_serif",
-                   true);
-BASE_FEATURE_PARAM(bool,
-                   kPrewarmSansSerif,
-                   &kPrewarmDefaultFontFamilies,
-                   "prewarm_sans_serif",
-                   true);
-BASE_FEATURE_PARAM(bool,
-                   kPrewarmCursive,
-                   &kPrewarmDefaultFontFamilies,
-                   "prewarm_cursive",
-                   false);
-BASE_FEATURE_PARAM(bool,
-                   kPrewarmFantasy,
-                   &kPrewarmDefaultFontFamilies,
-                   "prewarm_fantasy",
-                   false);
-#endif
 
 // Enables the Private Aggregation API.
 BASE_FEATURE(kPrivateAggregationApi,
@@ -2333,11 +2319,6 @@ BASE_FEATURE(kResourceFetcherStoresStrongReferences,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // https://html.spec.whatwg.org/multipage/system-state.html#safelisted-scheme
-BASE_FEATURE(kSafelistFTPToRegisterProtocolHandler,
-             "SafelistFTPToRegisterProtocolHandler",
-             base::FEATURE_ENABLED_BY_DEFAULT);
-
-// https://html.spec.whatwg.org/multipage/system-state.html#safelisted-scheme
 BASE_FEATURE(kSafelistPaytoToRegisterProtocolHandler,
              "SafelistPaytoToRegisterProtocolHandler",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -2364,6 +2345,12 @@ BASE_FEATURE(kScriptStreamingForNonHTTP,
 #endif
 );
 
+// Enables sending Sec-Purpose: "prefetch" header for
+// NoStatePrefetchURLLoaderThrottle.
+BASE_FEATURE(kSecPurposePrefetchHeaderNoStatePrefetch,
+             "SecPurposePrefetchHeaderNoStatePrefetch",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
 // Enables sending Sec-Purpose: "prefetch" header for rel="prefetch".
 BASE_FEATURE(kSecPurposePrefetchHeaderRelPrefetch,
              "SecPurposePrefetchHeaderRelPrefetch",
@@ -2389,12 +2376,6 @@ BASE_FEATURE(kSendCnameAliasesToSubresourceFilterFromRenderer,
 // worker's script.
 BASE_FEATURE(kServiceWorkerUpdateDelay,
              "ServiceWorkerUpdateDelay",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
-// When enabled, beacons (and friends) have ResourceLoadPriority::kLow,
-// not ResourceLoadPriority::kVeryLow.
-BASE_FEATURE(kSetLowPriorityForBeacon,
-             "SetLowPriorityForBeacon",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 // If enabled, calling setInterval(..., 0) will not clamp to 1ms.
@@ -2784,10 +2765,6 @@ BASE_FEATURE(kWebFontsCacheAwareTimeoutAdaption,
              base::FEATURE_ENABLED_BY_DEFAULT
 #endif
 );
-
-BASE_FEATURE(kWebRtcCombinedNetworkAndWorkerThread,
-             "WebRtcCombinedNetworkAndWorkerThread",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // TODO(crbug.com/355256378): OpenH264 for encoding and FFmpeg for H264 decoding
 // should be detangled such that software decoding can be enabled without

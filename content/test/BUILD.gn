@@ -605,7 +605,6 @@ static_library("test_support") {
     "//device/base/synchronization",
     "//google_apis",
     "//gpu/ipc:gl_in_process_context",
-    "//ipc:test_sink",
     "//media",
     "//media/capture",
     "//media/capture/mojom:image_capture",
@@ -1207,6 +1206,20 @@ mojom("web_ui_ts_test_mojo_bindings") {
           ts = "MappedOptionalContainer"
           ts_import = "./web_ui_mojo_ts_test_mapped_types.js"
           converter = "OptionalTypemapConverter"
+        },
+        {
+          mojom = "content.mojom.TypeWithNestedEnum"
+          ts = "TypeWithNestedEnumTypemap"
+          ts_import = "./web_ui_mojo_ts_test_converters.js"
+          converter = "TypeWithNestedEnumConverter"
+        },
+
+        # TODO(crbug.com/433351955): fix broken enum typemapping.
+        {
+          mojom = "content.mojom.TypemappedEnum"
+          ts = "NativeEnum"
+          ts_import = "./web_ui_mojo_ts_test_converters.js"
+          converter = "TypemappedEnumConverter"
         },
       ]
     },
@@ -1907,7 +1920,6 @@ test("content_browsertests") {
     "//gin",
     "//gpu/ipc/host",
     "//ipc",
-    "//ipc:test_sink",
     "//media:media_buildflags",
     "//media:test_support",
     "//media/midi:midi",
@@ -3211,7 +3223,6 @@ test("content_unittests") {
     "//gpu/ipc/common:test_support",
     "//gpu/ipc/host",
     "//gpu/ipc/service",
-    "//ipc:test_sink",
     "//media:test_support",
     "//media/capture",
     "//media/midi:midi",

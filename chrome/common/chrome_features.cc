@@ -381,7 +381,7 @@ const base::FeatureParam<base::TimeDelta> kGlicActorPageStabilityTimeout{
 const base::FeatureParam<base::TimeDelta>
     kGlicActorPageStabilityInvokeCallbackDelay{
         &kGlicActor, "glic-actor-page-stability-invoke-callback-delay",
-        base::Milliseconds(200)};
+        base::Milliseconds(0)};
 
 // Controls whether typing happens incrementally.
 BASE_FEATURE(kGlicActorIncrementalTyping,
@@ -556,6 +556,16 @@ BASE_FEATURE_PARAM(std::string,
                    &kGlicLearnMoreURLConfig,
                    "glic-settings-page-learn-more-url",
                    "");
+BASE_FEATURE_PARAM(std::string,
+                   kGlicExtensionsManagementUrl,
+                   &kGlicLearnMoreURLConfig,
+                   "glic-extensions-management-url",
+#if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+                   "https://gemini.google.com/apps"
+#else
+                   ""
+#endif
+);
 
 BASE_FEATURE(kGlicCSPConfig, "GlicCSPConfig", base::FEATURE_ENABLED_BY_DEFAULT);
 // TODO(crbug.com/378951332): Set appropriate default.
@@ -612,13 +622,19 @@ BASE_FEATURE(kGlicDebugWebview,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGlicScrollTo, "GlicScrollTo", base::FEATURE_DISABLED_BY_DEFAULT);
-// Controls whether we enforce that documentId (a currently optional parameter)
-// is set (and fail the request if it's not).
+
+// Controls whether we enforce that documentId (an optional parameter) is set
+// when trying to scroll all documents except PDFs (and fail the request if
+// it's not set).
 const base::FeatureParam<bool> kGlicScrollToEnforceDocumentId{
     &kGlicScrollTo, "glic-scroll-to-enforce-document-id", false};
 // Expand the scrollTo capability to PDF documents.
 const base::FeatureParam<bool> kGlicScrollToPDF{&kGlicScrollTo,
                                                 "glic-scroll-to-pdf", false};
+// Controls whether we enforce that url (an optional parameter) is set when
+// trying to scroll a PDF document (and fail the request if it's not set).
+const base::FeatureParam<bool> kGlicScrollToEnforceURLForPDF{
+    &kGlicScrollTo, "glic-scroll-to-enforce-url-for-pdf", true};
 
 BASE_FEATURE(kGlicWarming, "GlicWarming", base::FEATURE_DISABLED_BY_DEFAULT);
 
@@ -687,13 +703,13 @@ BASE_FEATURE(kGlicPanelSetPositionOnDrag,
 BASE_FEATURE(kGlicPanelResetOnSessionTimeout,
              "GlicPanelResetOnSessionTimeout",
              base::FEATURE_ENABLED_BY_DEFAULT);
-const base::FeatureParam<int> kGlicPanelResetOnSessionTimeoutDelayH{
+const base::FeatureParam<double> kGlicPanelResetOnSessionTimeoutDelayH{
     &kGlicPanelResetOnSessionTimeout,
     "glic-panel-reset-session-timeout-delay-h", 4};
 
 BASE_FEATURE(kGlicRecordActorJournal,
              "GlicRecordActorJournal",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGlicWebClientUnresponsiveMetrics,
              "GlicWebClientUnresponsiveMetrics",
@@ -720,6 +736,10 @@ BASE_FEATURE(kGlicAssetsV2, "GlicAssetsV2", base::FEATURE_DISABLED_BY_DEFAULT);
 
 BASE_FEATURE(kGlicFaviconDataUrls,
              "GlicFaviconDataUrls",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kGlicExtensions,
+             "GlicExtensions",
              base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(ENABLE_GLIC)
 
@@ -1930,5 +1950,11 @@ BASE_FEATURE(kClassManagementEnabledMetricsProvider,
 BASE_FEATURE(kDisableShortcutsEnableDiy,
              "DisableShortcutsEnableDiy",
              base::FEATURE_ENABLED_BY_DEFAULT);
+
+// A feature to enabled updating policy and default management installed PWAs to
+// happen silently without prompting an updating dialog.
+BASE_FEATURE(kSilentPolicyAndDefaultAppUpdating,
+             "SilentPolicyAndDefaultAppUpdating",
+             base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace features

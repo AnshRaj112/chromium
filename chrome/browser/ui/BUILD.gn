@@ -825,8 +825,6 @@ static_library("ui") {
       "android/fast_checkout/ui_view_android_utils.h",
       "android/infobars/autofill_save_card_infobar.cc",
       "android/infobars/autofill_save_card_infobar.h",
-      "android/infobars/autofill_virtual_card_enrollment_infobar.cc",
-      "android/infobars/autofill_virtual_card_enrollment_infobar.h",
       "android/infobars/infobar_container_android.cc",
       "android/infobars/infobar_container_android.h",
       "android/infobars/simple_confirm_infobar_builder.cc",
@@ -1114,6 +1112,8 @@ static_library("ui") {
       "sync/profile_signin_confirmation_helper.h",
       "tab_modal_confirm_dialog_delegate.cc",
       "tab_modal_confirm_dialog_delegate.h",
+      "tabs/glic_actor_task_icon_controller.cc",
+      "tabs/glic_actor_task_icon_controller.h",
       "tabs/glic_nudge_controller.cc",
       "tabs/glic_nudge_controller.h",
       "tabs/glic_nudge_delegate.cc",
@@ -1551,6 +1551,7 @@ static_library("ui") {
       "//chrome/browser/media/router/discovery/access_code:access_code_sink_service",
       "//chrome/browser/metrics/desktop_session_duration",
       "//chrome/browser/new_tab_page/chrome_colors",
+      "//chrome/browser/password_manager/password_change",
       "//chrome/browser/reading_list",
       "//chrome/browser/regional_capabilities",
       "//chrome/browser/safe_browsing",
@@ -1795,11 +1796,6 @@ static_library("ui") {
       "//chrome/browser/ui/webui/searchbox",
       "//chrome/browser/ui/webui/top_chrome:impl",
       "//chrome/browser/ui/search:impl",
-
-      # TODO(crbug.com/364501603): remove this as it depends on
-      # //c/b/ui/tabs/tab_strip_model.h, which is still part of
-      # //c/b/ui.
-      "//chrome/browser/ui/tabs:tab_strip_model_observer_impl",
 
       # TODO(crbug.com/382237520): Remove this once NTP code is modularized.
       "//chrome/browser/ui/lens:impl",
@@ -2151,7 +2147,6 @@ static_library("ui") {
       "//chrome/browser/ash/audio",
       "//chrome/browser/ash/auth",
       "//chrome/browser/ash/base",
-      "//chrome/browser/ash/boca",
       "//chrome/browser/ash/boca/on_task",
       "//chrome/browser/ash/boot_times_recorder",
       "//chrome/browser/ash/borealis",
@@ -2447,8 +2442,6 @@ static_library("ui") {
       "//chromeos/ash/components/human_presence",
       "//chromeos/ash/components/install_attributes",
       "//chromeos/ash/components/kcer",
-      "//chromeos/ash/components/kiosk/vision",
-      "//chromeos/ash/components/kiosk/vision/webui",
       "//chromeos/ash/components/language_packs",
       "//chromeos/ash/components/launcher_search",
       "//chromeos/ash/components/local_search_service/public/cpp",
@@ -2672,9 +2665,7 @@ static_library("ui") {
       "//chrome/browser/ash/attestation",
       "//chrome/browser/ash/audio",
       "//chrome/browser/ash/base",
-      "//chrome/browser/ash/boca",
       "//chrome/browser/ash/boca/on_task",
-      "//chrome/browser/ash/boot_times_recorder",
       "//chrome/browser/ash/borealis",
       "//chrome/browser/ash/browser_delegate:impl",
       "//chrome/browser/ash/camera_mic",
@@ -3477,7 +3468,6 @@ static_library("ui") {
       "views/device_signals_consent/consent_dialog_coordinator.cc",
       "views/device_signals_consent/consent_dialog_coordinator.h",
     ]
-    deps += [ "//chrome/browser/ui/device_signals_consent" ]
   }
 
   if (enable_webui_certificate_viewer) {
@@ -4547,8 +4537,6 @@ static_library("ui") {
       "views/tabs/tab_strip.h",
       "views/tabs/tab_strip_action_container.cc",
       "views/tabs/tab_strip_action_container.h",
-      "views/tabs/tab_strip_combo_button.cc",
-      "views/tabs/tab_strip_combo_button.h",
       "views/tabs/tab_strip_control_button.cc",
       "views/tabs/tab_strip_control_button.h",
       "views/tabs/tab_strip_controller.h",
@@ -4673,6 +4661,10 @@ static_library("ui") {
       "views/web_apps/web_app_simple_install_dialog.cc",
       "views/web_apps/web_app_uninstall_dialog_view.cc",
       "views/web_apps/web_app_uninstall_dialog_view.h",
+      "views/web_apps/web_app_update_identity_view.cc",
+      "views/web_apps/web_app_update_identity_view.h",
+      "views/web_apps/web_app_update_review_dialog.cc",
+      "views/web_apps/web_app_update_review_dialog.h",
       "views/web_apps/web_app_views_utils.cc",
       "views/web_apps/web_app_views_utils.h",
       "views/webauthn/ambient/ambient_signin_bubble_view.cc",
@@ -4762,6 +4754,13 @@ static_library("ui") {
     ]
 
     sources += get_target_outputs(":webui_name_variants")
+
+    if (is_chromeos) {
+      sources += [
+        "views/web_apps/isolated_web_apps/multi_capture_notification_details_view.cc",
+        "views/web_apps/isolated_web_apps/multi_capture_notification_details_view.h",
+      ]
+    }
 
     if (is_mac) {
       sources +=
@@ -5492,8 +5491,6 @@ static_library("ui") {
 
   if (enable_glic) {
     sources += [
-      "tabs/glic_actor_task_icon_controller.cc",
-      "tabs/glic_actor_task_icon_controller.h",
       "views/tabs/glic_actor_task_icon.cc",
       "views/tabs/glic_actor_task_icon.h",
       "views/tabs/glic_button.cc",

@@ -272,7 +272,7 @@ void SupervisedUserTestEnvironment::SetManualFilterForUrl(
 SupervisedUserURLFilter* SupervisedUserTestEnvironment::url_filter() const {
   return service()->GetURLFilter();
 }
-SupervisedUserService* SupervisedUserTestEnvironment::service() const {
+TestSupervisedUserService* SupervisedUserTestEnvironment::service() const {
   return service_.get();
 }
 PrefService* SupervisedUserTestEnvironment::pref_service() {
@@ -302,11 +302,17 @@ SupervisedUserTestEnvironment::search_content_filters_observer() {
 FakeContentFiltersObserverBridge::FakeContentFiltersObserverBridge(
     std::string_view setting_name,
     base::RepeatingClosure on_enabled,
-    base::RepeatingClosure on_disabled)
-    : ContentFiltersObserverBridge(setting_name, on_enabled, on_disabled) {}
+    base::RepeatingClosure on_disabled,
+    bool initial_value)
+    : ContentFiltersObserverBridge(setting_name, on_enabled, on_disabled) {
+  initial_value_ = initial_value;
+}
+
 FakeContentFiltersObserverBridge::~FakeContentFiltersObserverBridge() = default;
 
-void FakeContentFiltersObserverBridge::Init() {}
+void FakeContentFiltersObserverBridge::Init() {
+  SetEnabled(initial_value_);
+}
 
 void FakeContentFiltersObserverBridge::Shutdown() {
   // Do nothing, specifically do not destroy the java bridge from super.

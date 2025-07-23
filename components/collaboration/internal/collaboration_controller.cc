@@ -882,21 +882,6 @@ class WaitingForSyncAndDataSharingGroup
             CollaborationServiceJoinEvent::
                 kTimeoutWaitingForSyncAndDataSharingGroup),
         kTimeoutWaitingForDataSharingGroup);
-    const data_sharing::GroupId group_id =
-        controller->flow().join_token().group_id;
-
-    if (IsTabGroupInSync(group_id) && IsPeopleGroupInDataSharing(group_id)) {
-      OnProcessingFinishedWithSuccess();
-      return;
-    }
-
-    if (!IsTabGroupInSync(group_id)) {
-      tab_group_sync_observer_.Observe(controller->tab_group_sync_service());
-    }
-
-    if (!IsPeopleGroupInDataSharing(group_id)) {
-      data_sharing_observer_.Observe(controller->data_sharing_service());
-    }
   }
 
   // ControllerState implementation.
@@ -915,9 +900,19 @@ class WaitingForSyncAndDataSharingGroup
         controller_->flow().join_token().group_id;
     bool tab_group_exists = IsTabGroupInSync(group_id);
     bool people_group_exists = IsPeopleGroupInDataSharing(group_id);
-    CHECK(!tab_group_exists || !people_group_exists);
-    // Force update data sharing service.
-    if (!IsPeopleGroupInDataSharing(group_id)) {
+
+    if (tab_group_exists && people_group_exists) {
+      OnProcessingFinishedWithSuccess();
+      return;
+    }
+
+    if (!tab_group_exists) {
+      tab_group_sync_observer_.Observe(controller_->tab_group_sync_service());
+    }
+
+    if (!people_group_exists) {
+      data_sharing_observer_.Observe(controller_->data_sharing_service());
+      // Force update data sharing service.
       controller_->data_sharing_service()->ReadGroupDeprecated(
           group_id, base::DoNothing());
     }
@@ -1458,7 +1453,10 @@ void CollaborationController::Exit() {
     return;
   }
 
-  current_state_->OnExit();
+  // Transition to the cancel state while waiting for full deletion.
+  if (current_state_->id() != StateId::kCancel) {
+    TransitionTo(StateId::kCancel);
+  }
   delegate_->OnFlowFinished();
   is_deleting_ = true;
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(

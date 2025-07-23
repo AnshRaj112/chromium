@@ -13,10 +13,7 @@
 #include "base/trace_event/trace_event.h"
 #include "base/types/optional_util.h"
 #include "chrome/browser/predictors/predictors_features.h"
-#include "chrome/browser/predictors/predictors_traffic_annotations.h"
 #include "chrome/browser/predictors/resource_prefetch_predictor.h"
-#include "chrome/browser/preloading/preloading_prefs.h"
-#include "chrome/browser/profiles/profile.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_task_traits.h"
 #include "content/public/browser/browser_thread.h"
@@ -77,13 +74,15 @@ PreresolveJob::PreresolveJob(
   DCHECK(!this->network_anonymization_key.IsEmpty());
 }
 
-PreresolveJob::PreresolveJob(content::PreconnectRequest preconnect_request,
-                             PreresolveInfo* info)
+PreresolveJob::PreresolveJob(
+    content::PreconnectRequest preconnect_request,
+    PreresolveInfo* info,
+    net::NetworkTrafficAnnotationTag traffic_annotation_tag)
     : PreresolveJob(preconnect_request.origin.GetURL(),
                     preconnect_request.num_sockets,
                     preconnect_request.allow_credentials,
                     std::move(preconnect_request.network_anonymization_key),
-                    kLoadingPredictorPreconnectTrafficAnnotation,
+                    traffic_annotation_tag,
                     /*storage_partition_config=*/std::nullopt,
                     std::nullopt,
                     mojo::NullRemote(),
@@ -104,15 +103,6 @@ PreconnectManagerImpl::PreconnectManagerImpl(
 
 PreconnectManagerImpl::~PreconnectManagerImpl() = default;
 
-bool PreconnectManagerImpl::IsEnabled() {
-  Profile* profile = Profile::FromBrowserContext(browser_context_);
-  if (!profile) {
-    return false;
-  }
-  return prefetch::IsSomePreloadingEnabled(*profile->GetPrefs()) ==
-         content::PreloadingEligibility::kEligible;
-}
-
 base::WeakPtr<PreconnectManager> PreconnectManagerImpl::GetWeakPtr() {
   return weak_factory_.GetWeakPtr();
 }
@@ -128,9 +118,10 @@ void PreconnectManagerImpl::SetObserverForTesting(Observer* observer) {
 
 void PreconnectManagerImpl::Start(
     const GURL& url,
-    std::vector<content::PreconnectRequest> requests) {
+    std::vector<content::PreconnectRequest> requests,
+    net::NetworkTrafficAnnotationTag traffic_annotation) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!IsEnabled()) {
+  if (!delegate_ || !delegate_->IsPreconnectEnabled()) {
     return;
   }
   if (!url.SchemeIsHTTPOrHTTPS()) {
@@ -147,8 +138,9 @@ void PreconnectManagerImpl::Start(
   }
 
   for (auto& request : requests) {
-    PreresolveJobId job_id = preresolve_jobs_.Add(
-        std::make_unique<PreresolveJob>(std::move(request), info));
+    PreresolveJobId job_id =
+        preresolve_jobs_.Add(std::make_unique<PreresolveJob>(
+            std::move(request), info, traffic_annotation));
     queued_jobs_.push_back(job_id);
   }
 
@@ -161,7 +153,7 @@ void PreconnectManagerImpl::StartPreresolveHost(
     net::NetworkTrafficAnnotationTag traffic_annotation,
     const content::StoragePartitionConfig* storage_partition_config) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!IsEnabled()) {
+  if (!delegate_ || !delegate_->IsPreconnectEnabled()) {
     return;
   }
   if (!url.SchemeIsHTTPOrHTTPS()) {
@@ -183,7 +175,7 @@ void PreconnectManagerImpl::StartPreresolveHosts(
     net::NetworkTrafficAnnotationTag traffic_annotation,
     const content::StoragePartitionConfig* storage_partition_config) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!IsEnabled()) {
+  if (!delegate_ || !delegate_->IsPreconnectEnabled()) {
     return;
   }
   // Push jobs in front of the queue due to higher priority.
@@ -213,7 +205,7 @@ void PreconnectManagerImpl::StartPreconnectUrl(
     mojo::PendingRemote<network::mojom::ConnectionChangeObserverClient>
         connection_change_observer_client) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  if (!IsEnabled()) {
+  if (!delegate_ || !delegate_->IsPreconnectEnabled()) {
     return;
   }
   if (!url.SchemeIsHTTPOrHTTPS()) {

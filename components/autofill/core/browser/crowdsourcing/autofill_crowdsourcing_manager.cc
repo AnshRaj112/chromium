@@ -62,6 +62,7 @@
 #include "net/traffic_annotation/network_traffic_annotation.h"
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
+#include "services/network/public/cpp/simple_url_loader.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
 #include "url/gurl.h"
 
@@ -800,7 +801,7 @@ bool AutofillCrowdsourcingManager::StartUploadRequest(
       upload_contents[0].structural_form_signature());
   const FormSignature throttled_form_signature =
       base::FeatureList::IsEnabled(
-          features::kUseStructuralSignatureInsteadOfSecondary)
+          features::kAutofillUseStructuralSignatureInsteadOfSecondary)
           ? structural_form_signature
           : secondary_form_signature;
   // Autofill vote uploads are limited via throttling so that only one vote is

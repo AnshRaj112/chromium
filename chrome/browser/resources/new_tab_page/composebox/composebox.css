@@ -48,6 +48,34 @@
   width: var(--ntp-composebox-width, 337px);
 }
 
+:host([show-error-scrim_]) #composebox {
+  opacity: 0.05;
+}
+
+#errorScrim {
+  align-items: center;
+  color: var(--color-new-tab-page-composebox-font);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+  height: 100%;
+  position: absolute;
+  opacity: 0.90;
+  width: 100%;
+  z-index: 1;
+}
+
+#errorScrim > p {
+  margin: 0;
+}
+
+#dismissErrorButton {
+  --cr-button-background-color: var(--ntp-composebox-background-color);
+  --cr-button-border-color: var(--color-new-tab-page-composebox-font);
+  --cr-button-text-color: var(--color-new-tab-page-composebox-font);
+}
+
 #composebox {
   animation: var(--height-expand-duration) slide-down var(--standard-curve);
   display: flex;
@@ -77,6 +105,10 @@
   padding: 0 var(--text-input-right-spacing) var(--input-bottom-spacing) var(--input-left-spacing);
   overflow: hidden;
   width: 100%;
+}
+
+:host-context([dir='rtl']) #inputContainer {
+  padding: 0 var(--input-left-spacing) var(--input-bottom-spacing) var(--text-input-right-spacing);
 }
 
 #input {
@@ -132,6 +164,10 @@
   opacity: 1;
 }
 
+:host([inputs-disabled_]) .upload-icon {
+  color: var(--color-new-tab-page-composebox-upload-button-disabled);
+}
+
 #imageUploadButton {
   --cr-icon-button-margin-start: -12px;
 }
@@ -147,6 +183,20 @@
   opacity: 1;
   position: absolute;
   right: 16px;
+}
+
+@keyframes icon-fade-in {
+  0% {
+    opacity: 0;
+  }
+  70% {
+    opacity: 0;
+  }
+}
+
+:host-context([dir='rtl']) .action-icon {
+  left: 16px;
+  right: unset;
 }
 
 #cancelIcon {
@@ -177,12 +227,10 @@
   opacity: 100%;
 }
 
-@keyframes icon-fade-in {
-  0% {
-    opacity: 0;
-  }
-  70% {
-    opacity: 0;
+@media (forced-colors: active) {
+  :host,
+  .action-icon {
+    border: solid var(--color-new-tab-page-composebox-outline-hcm);
   }
 }
 

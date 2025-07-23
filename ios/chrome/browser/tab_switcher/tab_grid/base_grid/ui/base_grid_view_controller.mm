@@ -20,10 +20,14 @@
 #import "ios/chrome/browser/commerce/ui_bundled/price_card/price_card_data_source.h"
 #import "ios/chrome/browser/commerce/ui_bundled/price_card/price_card_item.h"
 #import "ios/chrome/browser/menu/ui_bundled/menu_histograms.h"
+#import "ios/chrome/browser/shared/model/url/url_util.h"
 #import "ios/chrome/browser/shared/public/commands/tab_grid_commands.h"
 #import "ios/chrome/browser/shared/public/commands/tab_group_confirmation_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
+#import "ios/chrome/browser/tab_switcher/tab_grid/base_grid/suggested_actions/suggested_actions_delegate.h"
+#import "ios/chrome/browser/tab_switcher/tab_grid/base_grid/suggested_actions/suggested_actions_grid_cell.h"
+#import "ios/chrome/browser/tab_switcher/tab_grid/base_grid/suggested_actions/suggested_actions_view_controller.h"
 #import "ios/chrome/browser/tab_switcher/tab_grid/base_grid/ui/base_grid_mediator_items_provider.h"
 #import "ios/chrome/browser/tab_switcher/tab_grid/base_grid/ui/base_grid_view_controller+Testing.h"
 #import "ios/chrome/browser/tab_switcher/tab_grid/base_grid/ui/base_grid_view_controller+subclassing.h"
@@ -37,9 +41,6 @@
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/grid/grid_layout.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/grid/grid_view_controller_mutator.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/grid/group_grid_cell.h"
-#import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/suggested_actions/suggested_actions_delegate.h"
-#import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/suggested_actions/suggested_actions_grid_cell.h"
-#import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/suggested_actions/suggested_actions_view_controller.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/tab_context_menu/tab_context_menu_provider.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/transitions/legacy_grid_transition_layout.h"
 #import "ios/chrome/browser/tab_switcher/ui_bundled/tab_grid/transitions/tab_grid_transition_item.h"
@@ -105,9 +106,6 @@ NSString* GroupGridCellAccessibilityIdentifier(NSUInteger index) {
 @property(nonatomic, strong) GridItemIdentifier* selectedItemIdentifier;
 // Index of the selected item.
 @property(nonatomic, readonly) NSUInteger selectedIndex;
-// ID of the last item to be inserted. This is used to track if the active tab
-// was newly created when building the animation layout for transitions.
-@property(nonatomic, assign) web::WebStateID lastInsertedItemID;
 // Animator to show or hide the empty state.
 @property(nonatomic, strong) UIViewPropertyAnimator* emptyStateAnimator;
 // The layout for the tab grid.
@@ -473,11 +471,9 @@ NSString* GroupGridCellAccessibilityIdentifier(NSUInteger index) {
           [LegacyGridTransitionActiveItem itemWithCell:activeCell
                                                 center:attributes.center
                                                   size:attributes.size];
-      // If the active item is the last inserted item, it needs to be animated
-      // differently.
-      if (cell.itemIdentifier.tabSwitcherItem.identifier ==
-          self.lastInsertedItemID) {
-        activeItem.isAppearing = YES;
+      // NTP items need to be animated differently.
+      if (IsUrlNtp(cell.itemIdentifier.tabSwitcherItem.URL)) {
+        activeItem.shouldUseBVCSnapshot = YES;
       }
       selectionItem = [LegacyGridTransitionItem
           itemWithCell:[GridCell transitionSelectionCellFromCell:cell]
@@ -529,7 +525,6 @@ NSString* GroupGridCellAccessibilityIdentifier(NSUInteger index) {
   [self updateSelectedCollectionViewItemRingAndBringIntoView:YES];
 
   [self removeEmptyStateAnimated:NO];
-  self.lastInsertedItemID = web::WebStateID();
 }
 
 - (void)prepareForDismissal {
@@ -1350,11 +1345,6 @@ NSString* GroupGridCellAccessibilityIdentifier(NSUInteger index) {
   CHECK(![self.diffableDataSource indexPathForItemIdentifier:item]);
 
   self.selectedItemIdentifier = selectedItemIdentifier;
-  if (item.type == GridItemType::kTab) {
-    self.lastInsertedItemID = item.tabSwitcherItem.identifier;
-  } else if (item.type == GridItemType::kGroup) {
-    self.lastInsertedItemID = web::WebStateID();
-  }
 
   if (nextItemIdentifier) {
     [snapshot insertItemsWithIdentifiers:@[ item ]

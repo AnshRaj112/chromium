@@ -50,16 +50,6 @@ constexpr int kFakeContentNodeId = 123;
 constexpr char kActionResultHistogram[] =
     "Actor.ExecutionEngine.Action.ResultCode";
 
-template <typename T>
-auto UiEventDispatcherCallback(
-    base::RepeatingCallback<mojom::ActionResultPtr()> result_fn) {
-  return [result_fn = std::move(result_fn)](
-             const T&,
-             ui::UiEventDispatcher::UiCompleteCallback callback) mutable {
-    std::move(callback).Run(result_fn.Run());
-  };
-}
-
 class FakeChromeRenderFrame : public chrome::mojom::ChromeRenderFrame {
  public:
   FakeChromeRenderFrame() = default;
@@ -140,7 +130,7 @@ class ExecutionEngineTest : public ChromeRenderViewHostTestHarness {
     auto execution_engine = ExecutionEngine::CreateForTesting(
         profile(), std::move(ui_event_dispatcher));
     auto raw_execution_engine = execution_engine.get();
-    task_ = ActorTask::CreateForTesting(profile(), std::move(execution_engine),
+    task_ = std::make_unique<ActorTask>(profile(), std::move(execution_engine),
                                         std::move(task_ui_event_dispatcher));
     task_->SetIdForTesting(0);
     raw_execution_engine->SetOwner(task_.get());
@@ -362,7 +352,8 @@ TEST_F(ExecutionEngineTest, CrossOriginNavigationBeforeAction) {
 
   base::test::TestFuture<mojom::ActionResultPtr, std::optional<size_t>> result;
   auto execution_engine = std::make_unique<ExecutionEngine>(profile());
-  ActorTask task(profile(), std::move(execution_engine));
+  ActorTask task(profile(), std::move(execution_engine),
+                 ui::NewMockUiEventDispatcher());
   std::unique_ptr<ToolRequest> action =
       MakeClickCallback(kFakeContentNodeId).Run();
   task_->Act(ToRequestList(std::move(action)), result.GetCallback());

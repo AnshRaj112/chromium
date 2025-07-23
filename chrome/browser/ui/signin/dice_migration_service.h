@@ -15,6 +15,9 @@
 
 class Browser;
 class Profile;
+namespace signin {
+class AccountManagedStatusFinder;
+}  // namespace signin
 namespace user_prefs {
 class PrefRegistrySyncable;
 }  // namespace user_prefs
@@ -25,10 +28,15 @@ class Widget;
 // Tracks the number of times the DICe migration dialog has been shown.
 extern const char kDiceMigrationDialogShownCount[];
 
+// Tracks the last time the DICe migration dialog has been shown.
+extern const char kDiceMigrationDialogLastShownTime[];
+
 class DiceMigrationService : public KeyedService, public views::WidgetObserver {
  public:
   // The maximum number of times the dialog can be shown.
   static const int kMaxDialogShownCount;
+  // The minimum time between dialogs.
+  static const base::TimeDelta kMinTimeBetweenDialogInDays;
 
   DECLARE_CLASS_ELEMENT_IDENTIFIER_VALUE(kAcceptButtonElementId);
   DECLARE_CLASS_ELEMENT_IDENTIFIER_VALUE(kCancelButtonElementId);
@@ -40,16 +48,6 @@ class DiceMigrationService : public KeyedService, public views::WidgetObserver {
 
   static void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry);
 
-  // Shows the Dice migration offer dialog if the user is eligible for it.
-  // TODO(crbug.com/399838468): Mark this method as private and instead expose a
-  // test-only method instead.
-  void ShowDiceMigrationOfferDialogIfUserEligible();
-
-  // Returns true if the Dice migration offer dialog is currently showing.
-  // TODO(crbug.com/399838468): Remove this method since this is mostly
-  // test-only and can be replaced with `GetDialogWidgetForTesting()`.
-  bool IsDialogShowing();
-
   views::Widget* GetDialogWidgetForTesting();
 
   base::OneShotTimer& GetDialogTriggerTimerForTesting();
@@ -58,11 +56,19 @@ class DiceMigrationService : public KeyedService, public views::WidgetObserver {
   // `views::WidgetObserver`:
   void OnWidgetDestroying(views::Widget* widget) override;
 
+  void OnTimerFinishOrAccountManagedStatusKnown();
+
+  // Shows the Dice migration offer dialog if the user is eligible for it.
+  void ShowDiceMigrationOfferDialogIfUserEligible();
+
   int GetDialogShownCount() const;
-  void IncrementDialogShownCount();
+  base::Time GetDialogLastShownTime() const;
+  void UpdateDialogShownCountAndTime();
 
   raw_ptr<Profile> profile_ = nullptr;
   base::OneShotTimer dialog_trigger_timer_;
+  std::unique_ptr<signin::AccountManagedStatusFinder>
+      account_managed_status_finder_;
 
   raw_ptr<views::Widget> dialog_widget_ = nullptr;
   base::ScopedObservation<views::Widget, views::WidgetObserver>

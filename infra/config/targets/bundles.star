@@ -6,7 +6,7 @@
 # be referenced by other bundles or by builders. Bundles cannot be used in
 # //testing/buildbot
 
-load("//lib/targets.star", "targets")
+load("@chromium-luci//targets.star", "targets")
 
 # No bundle definitions should be above
 # TODO: b/402830227 - Once the AyeAye analyzer correctly includes the closing
@@ -285,6 +285,14 @@ targets.bundle(
         "minidump_uploader_test",
         "system_webview_shell_instrumentation_tests",  # Not an experimental test
         "webview_ui_instrumentation_tests",
+        targets.bundle(
+            targets = "webview_trichrome_64_cts_tests_suite",
+            variants = [
+                "WEBVIEW_TRICHROME_FULL_CTS_TESTS",
+                "WEBVIEW_TRICHROME_INSTANT_CTS_TESTS",
+            ],
+        ),
+        "android_ci_only_fieldtrial_webview_tests",
     ],
 )
 
@@ -5458,18 +5466,11 @@ targets.bundle(
 targets.bundle(
     name = "ios_failing_eg2_tests",
     targets = [
-        "ios_chrome_bookmarks_eg2tests_module",
         "ios_chrome_settings_eg2tests_module",
         "ios_chrome_signin_eg2tests_module",
         "ios_chrome_ui_eg2tests_module",
-        "ios_chrome_web_eg2tests_module",
     ],
     per_test_modifications = {
-        "ios_chrome_bookmarks_eg2tests_module": targets.mixin(
-            swarming = targets.swarming(
-                shards = 3,
-            ),
-        ),
         "ios_chrome_settings_eg2tests_module": [
             targets.mixin(
                 swarming = targets.swarming(
@@ -5491,11 +5492,6 @@ targets.bundle(
             ),
             "ios_parallel_simulators",
         ],
-        "ios_chrome_web_eg2tests_module": targets.mixin(
-            swarming = targets.swarming(
-                shards = 2,
-            ),
-        ),
     },
 )
 
@@ -5560,8 +5556,22 @@ targets.bundle(
 targets.bundle(
     name = "ios_passing_eg2_tests",
     targets = [
+        "ios_chrome_bookmarks_eg2tests_module",
         "ios_chrome_smoke_eg2tests_module",
+        "ios_chrome_web_eg2tests_module",
     ],
+    per_test_modifications = {
+        "ios_chrome_bookmarks_eg2tests_module": targets.mixin(
+            swarming = targets.swarming(
+                shards = 3,
+            ),
+        ),
+        "ios_chrome_web_eg2tests_module": targets.mixin(
+            swarming = targets.swarming(
+                shards = 2,
+            ),
+        ),
+    },
 )
 
 targets.bundle(

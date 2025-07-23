@@ -789,8 +789,9 @@ inline constexpr char kIOSBWGPreciseLocationSetting[] =
 inline constexpr char kIOSBWGPageContentSetting[] =
     "ios.bwg.page.content.setting";
 
-// A boolean specifying whether the BWG Promo was shown manually.
-inline constexpr char kIOSBWGManualPromo[] = "ios.bwg.manual_promo";
+// An integer specifying how many times the BWG Promo was shown.
+inline constexpr char kIOSBWGPromoImpressionCount[] =
+    "ios.bwg.promo_impressions";
 
 // A time object storing the first browser startup with a managed primary
 // identity in the personal profile after multi-profile becomes supported. Used
@@ -810,6 +811,10 @@ inline constexpr char kGeminiEnabledByPolicy[] = "ios.gemini_enabled_by_policy";
 // A boolean specifying if the multi-profile force-migration is done.
 inline constexpr char kMultiProfileForcedMigrationDone[] =
     "ios.multi_profile_forced_migration_done";
+
+// A bool checking that multi-profile support for widgets is available.
+inline constexpr char kWidgetsForMultiProfile[] =
+    "ios.multi_profile_for_widgets";
 
 }  // namespace prefs
 

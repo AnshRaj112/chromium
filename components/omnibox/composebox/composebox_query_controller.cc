@@ -186,33 +186,21 @@ ComposeboxQueryController::ComposeboxQueryController(
        base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN});
 }
 
-ComposeboxQueryController::~ComposeboxQueryController() {
-  // Ensure NTP exits are tracked. i.e. The user starts a composebox session,
-  // and closes the NTP without explicitly exiting the session or submitting a
-  // query.
-  // TODO(420701010): Add unittest coverage, e.g. ensuring abandoned metrics
-  // are correctly emitted.
-  if (session_state() == SessionState::kSessionStarted) {
-    NotifySessionAbandoned();
-  }
-}
+ComposeboxQueryController::~ComposeboxQueryController() = default;
 
 void ComposeboxQueryController::NotifySessionStarted() {
-  session_state_ = SessionState::kSessionStarted;
-  session_start_time_ = base::Time::Now();
   FetchClusterInfo();
 }
 
 void ComposeboxQueryController::NotifySessionAbandoned() {
-  session_state_ = SessionState::kSessionAbandoned;
+  ClearFiles();
+  ClearClusterInfo();
   SetQueryControllerState(QueryControllerState::kOff);
-  cluster_info_access_token_fetcher_.reset();
-  cluster_info_endpoint_fetcher_.reset();
+  session_id_++;
 }
 
 GURL ComposeboxQueryController::CreateAimUrl(const std::string& query_text,
                                              base::Time query_start_time) {
-  session_state_ = SessionState::kQuerySubmitted;
   if (!active_files_.empty() && cluster_info_.has_value()) {
     // Since multiple file upload isn't supported right now, use the last file
     // uploaded to determine `vit` param.
@@ -373,12 +361,19 @@ ComposeboxQueryController::CreateOAuthHeadersAndContinue(
   return nullptr;
 }
 
-void ComposeboxQueryController::ResetRequestClusterInfoState() {
+void ComposeboxQueryController::ClearClusterInfo() {
   cluster_info_access_token_fetcher_.reset();
   cluster_info_endpoint_fetcher_.reset();
   cluster_info_.reset();
   request_id_generator_.ResetRequestId();
+}
 
+void ComposeboxQueryController::ResetRequestClusterInfoState(int session_id) {
+  if (session_id != session_id_) {
+    // The session associated with this timer has been invalidated.
+    return;
+  }
+  ClearClusterInfo();
   // Iterate through any existing files and mark them as expired.
   // TODO(crbug.com/432125987): Handle file reupload after cluster info
   // expiration.
@@ -462,10 +457,14 @@ void ComposeboxQueryController::HandleClusterInfoResponse(
   }
 
   // Store the cluster info.
-  // TODO(crbug.com/425377511): Add TTL timer for the cluster info.
   cluster_info_ = std::make_optional<lens::LensOverlayClusterInfo>();
   cluster_info_->set_server_session_id(server_response.server_session_id());
   cluster_info_->set_search_session_id(server_response.search_session_id());
+  if (server_response.has_routing_info() &&
+      !request_id_generator_.HasRoutingInfo()) {
+    std::unique_ptr<lens::LensOverlayRequestId> request_id =
+        request_id_generator_.SetRoutingInfo(server_response.routing_info());
+  }
   SetQueryControllerState(QueryControllerState::kClusterInfoReceived);
 
   // Iterate through any existing files and send the upload requests if ready.
@@ -477,7 +476,7 @@ void ComposeboxQueryController::HandleClusterInfoResponse(
   base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
       FROM_HERE,
       base::BindOnce(&ComposeboxQueryController::ResetRequestClusterInfoState,
-                     weak_ptr_factory_.GetWeakPtr()),
+                     weak_ptr_factory_.GetWeakPtr(), session_id_),
       base::Seconds(
           lens::features::GetLensOverlayClusterInfoLifetimeSeconds()));
 }
@@ -517,7 +516,7 @@ void ComposeboxQueryController::ProcessDecodedImageAndContinue(
       base::MakeRefCounted<lens::RefCountedLensOverlayClientLogs>();
   if (bitmap.isNull() || bitmap.empty()) {
     std::move(callback).Run(lens::LensOverlayServerRequest(),
-                            FileUploadErrorType::kBrowserProcessingError);
+                            FileUploadErrorType::kImageProcessingError);
     return;
   }
 

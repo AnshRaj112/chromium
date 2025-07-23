@@ -21,6 +21,8 @@
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/signin/public/base/signin_pref_names.h"
 #include "components/signin/public/base/signin_switches.h"
+#include "components/signin/public/identity_manager/account_managed_status_finder.h"
+#include "components/signin/public/identity_manager/account_managed_status_finder_outcome.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "components/signin/public/identity_manager/identity_utils.h"
 #include "components/strings/grit/components_strings.h"
@@ -53,8 +55,8 @@ bool IsUserEligibleForDiceMigration(Profile* profile) {
     // The user is not implicitly signed in.
     return false;
   }
-  // TODO(crbug.com/399838468): Add more eligibility checks, for example, when
-  // was the last time the user was shown the migration dialog.
+  // TODO(crbug.com/399838468): Add more eligibility checks, for example,
+  // whether there is a persistent auth error.
   return true;
 }
 
@@ -113,8 +115,15 @@ void MaybeShowToast(Browser* browser) {
 const char kDiceMigrationDialogShownCount[] =
     "signin.dice_migration.dialog_shown_count";
 
+const char kDiceMigrationDialogLastShownTime[] =
+    "signin.dice_migration.dialog_last_shown_time";
+
 // static
 const int DiceMigrationService::kMaxDialogShownCount = 3;
+
+// static
+const base::TimeDelta DiceMigrationService::kMinTimeBetweenDialogInDays =
+    base::Days(7);
 
 DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(DiceMigrationService,
                                       kAcceptButtonElementId);
@@ -123,13 +132,31 @@ DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(DiceMigrationService,
 
 DiceMigrationService::DiceMigrationService(Profile* profile)
     : profile_(profile) {
-  if (IsUserEligibleForDiceMigration(profile_)) {
-    dialog_trigger_timer_.Start(
-        FROM_HERE, user_education::features::GetSessionStartGracePeriod(),
-        base::BindOnce(
-            &DiceMigrationService::ShowDiceMigrationOfferDialogIfUserEligible,
-            base::Unretained(this)));
+  if (!IsUserEligibleForDiceMigration(profile_) ||
+      // Show the dialog at most `kMaxDialogShownCount` times.
+      GetDialogShownCount() >= kMaxDialogShownCount ||
+      // Show the dialog at least one week after the last time it was shown.
+      GetDialogLastShownTime() >
+          base::Time::Now() - kMinTimeBetweenDialogInDays) {
+    return;
   }
+
+  dialog_trigger_timer_.Start(
+      FROM_HERE, user_education::features::GetSessionStartGracePeriod(),
+      base::BindOnce(
+          &DiceMigrationService::OnTimerFinishOrAccountManagedStatusKnown,
+          base::Unretained(this)));
+
+  signin::IdentityManager* identity_manager =
+      IdentityManagerFactory::GetForProfile(profile_);
+  account_managed_status_finder_ =
+      std::make_unique<signin::AccountManagedStatusFinder>(
+          identity_manager,
+          identity_manager->GetPrimaryAccountInfo(
+              signin::ConsentLevel::kSignin),
+          base::BindOnce(
+              &DiceMigrationService::OnTimerFinishOrAccountManagedStatusKnown,
+              base::Unretained(this)));
 }
 
 DiceMigrationService::~DiceMigrationService() {
@@ -143,11 +170,17 @@ DiceMigrationService::~DiceMigrationService() {
 void DiceMigrationService::RegisterProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterIntegerPref(kDiceMigrationDialogShownCount, 0);
+  registry->RegisterTimePref(kDiceMigrationDialogLastShownTime, base::Time());
 }
 
 void DiceMigrationService::ShowDiceMigrationOfferDialogIfUserEligible() {
-  if (!IsUserEligibleForDiceMigration(profile_) || IsDialogShowing() ||
-      GetDialogShownCount() >= kMaxDialogShownCount) {
+  CHECK(!dialog_trigger_timer_.IsRunning());
+  CHECK(!dialog_widget_);
+  CHECK_LT(GetDialogShownCount(), kMaxDialogShownCount);
+  CHECK_LT(GetDialogLastShownTime(),
+           base::Time::Now() - kMinTimeBetweenDialogInDays);
+
+  if (!IsUserEligibleForDiceMigration(profile_)) {
     return;
   }
 
@@ -212,14 +245,10 @@ void DiceMigrationService::ShowDiceMigrationOfferDialogIfUserEligible() {
   // minimized browser window should not increment the count.
   // TODO(crbug.com/399838468): Consider instead tracking the number of times
   // the user actually interacts with the dialog and using that for limiting.
-  IncrementDialogShownCount();
+  UpdateDialogShownCountAndTime();
 
   // TODO(crbug.com/399838468): Close the dialog when the avatar pill is
   // clicked.
-}
-
-bool DiceMigrationService::IsDialogShowing() {
-  return dialog_widget_ && !dialog_widget_->IsClosed();
 }
 
 views::Widget* DiceMigrationService::GetDialogWidgetForTesting() {
@@ -238,20 +267,48 @@ void DiceMigrationService::OnWidgetDestroying(views::Widget* widget) {
   switch (widget->closed_reason()) {
     // Losing focus should not close the dialog.
     case views::Widget::ClosedReason::kLostFocus:
-    // No close button in the dialog.
-    case views::Widget::ClosedReason::kCancelButtonClicked:
       NOTREACHED();
     case views::Widget::ClosedReason::kAcceptButtonClicked:
       if (MaybeMigrateUser(profile_) && browser_) {
         MaybeShowToast(browser_.get());
       }
       break;
+    case views::Widget::ClosedReason::kCancelButtonClicked:
+      // Cancel button is only available in the non-"final" variant.
+      CHECK_LT(GetDialogShownCount(), kMaxDialogShownCount);
+      break;
+    case views::Widget::ClosedReason::kCloseButtonClicked:
+      // Close button is only available in the "final" variant.
+      CHECK_EQ(GetDialogShownCount(), kMaxDialogShownCount);
+      break;
     case views::Widget::ClosedReason::kUnspecified:
     case views::Widget::ClosedReason::kEscKeyPressed:
-    case views::Widget::ClosedReason::kCloseButtonClicked:
       break;
   }
   browser_.reset();
+}
+
+void DiceMigrationService::OnTimerFinishOrAccountManagedStatusKnown() {
+  if (dialog_trigger_timer_.IsRunning() ||
+      !IsUserEligibleForDiceMigration(profile_)) {
+    return;
+  }
+  switch (account_managed_status_finder_->GetOutcome()) {
+    case signin::AccountManagedStatusFinderOutcome::kPending:
+    case signin::AccountManagedStatusFinderOutcome::kError:
+    case signin::AccountManagedStatusFinderOutcome::kTimeout:
+      return;
+    // Consumer accounts.
+    case signin::AccountManagedStatusFinderOutcome::kConsumerGmail:
+    case signin::AccountManagedStatusFinderOutcome::kConsumerWellKnown:
+    case signin::AccountManagedStatusFinderOutcome::kConsumerNotWellKnown:
+      ShowDiceMigrationOfferDialogIfUserEligible();
+      break;
+    // Managed accounts are not shown the migration dialog.
+    case signin::AccountManagedStatusFinderOutcome::kEnterpriseGoogleDotCom:
+    case signin::AccountManagedStatusFinderOutcome::kEnterprise:
+      return;
+  }
 }
 
 int DiceMigrationService::GetDialogShownCount() const {
@@ -260,8 +317,15 @@ int DiceMigrationService::GetDialogShownCount() const {
   return prefs->GetInteger(kDiceMigrationDialogShownCount);
 }
 
-void DiceMigrationService::IncrementDialogShownCount() {
+base::Time DiceMigrationService::GetDialogLastShownTime() const {
+  PrefService* prefs = profile_->GetPrefs();
+  CHECK(prefs);
+  return prefs->GetTime(kDiceMigrationDialogLastShownTime);
+}
+
+void DiceMigrationService::UpdateDialogShownCountAndTime() {
   PrefService* prefs = profile_->GetPrefs();
   CHECK(prefs);
   prefs->SetInteger(kDiceMigrationDialogShownCount, GetDialogShownCount() + 1);
+  prefs->SetTime(kDiceMigrationDialogLastShownTime, base::Time::Now());
 }

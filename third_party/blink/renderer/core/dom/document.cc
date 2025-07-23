@@ -542,6 +542,7 @@ template <typename CharType>
 std::optional<CharType> ParseNamespacePrefixNewSpec(
     base::span<const CharType> characters) {
   DCHECK(RuntimeEnabledFeatures::RelaxDOMValidNamesEnabled());
+  DCHECK(!characters.empty());
   for (size_t i = 0; i < characters.size(); i++) {
     CharType c = characters[i];
     // A string is a valid namespace prefix if its length is at least 1 and
@@ -1542,8 +1543,9 @@ Element* Document::CreateElement(const QualifiedName& q_name,
       q_name.NamespaceURI() == html_names::xhtmlNamespaceURI) {
     const CustomElementDescriptor desc(is.IsNull() ? q_name.LocalName() : is,
                                        q_name.LocalName());
-    if (CustomElementRegistry* registry = CustomElement::Registry(*this))
+    if (CustomElementRegistry* registry = customElementRegistry()) {
       definition = registry->DefinitionFor(desc);
+    }
   }
 
   if (definition)
@@ -7313,19 +7315,31 @@ ParseQualifiedNameResult ParseQualifiedNameInternalNewSpec(
   // Do a first pass to look for the colon. Otherwise, we don't know which
   // parsing rules to apply to the text we are iterating.
   std::optional<size_t> colon_index;
+  std::optional<size_t> second_colon_index;
   for (size_t i = 0; i < characters.size(); i++) {
     if (characters[i] == ':') {
-      colon_index = i;
-      break;
+      if (colon_index) {
+        second_colon_index = i;
+        break;
+      } else {
+        colon_index = i;
+      }
     }
   }
 
   base::span<const CharType> prefix;
   base::span<const CharType> local_name;
   if (colon_index) {
-    auto split_pair = characters.split_at(*colon_index);
-    prefix = split_pair.first;
-    local_name = split_pair.second.subspan(1u);
+    prefix = characters.subspan(0u, *colon_index);
+    if (second_colon_index) {
+      local_name = characters.subspan(*colon_index + 1,
+                                      *second_colon_index - *colon_index - 1);
+    } else {
+      local_name = characters.subspan(*colon_index + 1);
+    }
+    if (!prefix.size()) {
+      return ParseQualifiedNameResult(kQNEmptyPrefix, ':');
+    }
     if (auto invalid_char = ParseNamespacePrefixNewSpec(prefix)) {
       return ParseQualifiedNameResult(kQNInvalidChar, *invalid_char);
     }
@@ -8227,7 +8241,7 @@ void Document::MaybeRecordSvgImageProcessingTime(
 bool Document::AllowInlineEventHandler(Node* node,
                                        EventListener* listener,
                                        const String& context_url,
-                                       const WTF::OrdinalNumber& context_line) {
+                                       const OrdinalNumber& context_line) {
   auto* element = DynamicTo<Element>(node);
   // HTML says that inline script needs browsing context to create its execution
   // environment.

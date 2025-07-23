@@ -121,10 +121,6 @@ namespace enterprise_watermark {
 class WatermarkView;
 }
 
-namespace glic {
-class GlicBorderView;
-}  // namespace glic
-
 ///////////////////////////////////////////////////////////////////////////////
 // BrowserView
 //
@@ -306,10 +302,6 @@ class BrowserView : public BrowserWindow,
   }
 
   ScrimView* devtools_scrim_view() { return devtools_scrim_view_; }
-
-#if BUILDFLAG(ENABLE_GLIC)
-  glic::GlicBorderView* glic_border() const { return glic_border_; }
-#endif
 
   ScrimView* window_scrim_view() { return window_scrim_view_; }
 
@@ -830,8 +822,7 @@ class BrowserView : public BrowserWindow,
   // gestures. These NativeViewHosts include the one hosting the active tab's\
   // WebContents, and the one hosting the webui tabstrip contents (if the
   // feature is enabled).
-  std::vector<views::NativeViewHost*> GetNativeViewHostsForTopControlsSlide()
-      const;
+  std::vector<views::NativeViewHost*> GetNativeViewHostsForTopControlsSlide();
 
   using BrowserWindow::CreateTabSearchBubble;
   void CreateTabSearchBubble(
@@ -845,6 +836,8 @@ class BrowserView : public BrowserWindow,
   }
 #endif
 
+  // Returns the list of tab content's web views that is visible.
+  // It returns > 1 elements when there is a split view that is active.
   std::vector<ContentsWebView*> GetAllVisibleContentsWebViews();
 
   bool should_show_window_controls_overlay_toggle() const {
@@ -1241,22 +1234,8 @@ class BrowserView : public BrowserWindow,
   // The InfoBarContainerView that contains InfoBars for the current tab.
   raw_ptr<InfoBarContainerView> infobar_container_ = nullptr;
 
-  // The view that contains the active WebContents. Will be nullptr if the
-  // side-by-side feature is enabled; use multi_contents_view_ and its nested
-  // contents views instead.
-  raw_ptr<ContentsWebView> contents_web_view_ = nullptr;
-
   // The view that contains all visible WebContents.
   raw_ptr<MultiContentsView> multi_contents_view_ = nullptr;
-
-  // The scrim view that covers the content area when a tab-modal dialog is
-  // open.
-  raw_ptr<ScrimView> contents_scrim_view_ = nullptr;
-
-  // It draws a border around the web contents area, on top of the
-  // WebContents. Null if the feature isn't enabled, or the platform
-  // isn't supported.
-  raw_ptr<glic::GlicBorderView> glic_border_ = nullptr;
 
   // The view that contains devtools window for the selected WebContents.
   raw_ptr<views::WebView> devtools_web_view_ = nullptr;

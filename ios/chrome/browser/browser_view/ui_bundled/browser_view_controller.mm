@@ -65,6 +65,7 @@
 #import "ios/chrome/browser/shared/public/commands/settings_commands.h"
 #import "ios/chrome/browser/shared/public/commands/text_zoom_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/public/prototypes/diamond/utils.h"
 #import "ios/chrome/browser/shared/ui/util/named_guide.h"
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/shared/ui/util/url_with_title.h"
@@ -226,6 +227,9 @@ const CGFloat kTopDynamicIslandInset = 24;
 
   // Fake status bar view used to blend the toolbar into the status bar.
   UIView* _fakeStatusBarView;
+
+  // Background view behind the `_fakeStatusBarView and the `tabStripView`.
+  UIView* _topBackgroundView;
 
   // The service used to load url parameters in current or new tab.
   raw_ptr<UrlLoadingBrowserAgent> _urlLoadingBrowserAgent;
@@ -905,6 +909,7 @@ const CGFloat kTopDynamicIslandInset = 24;
   [self buildToolbarAndTabStrip];
   [self setUpViewLayout:YES];
   [self addConstraintsToToolbar];
+  [self configureTopBackgroundView];
 
   [_sideSwipeCoordinator addHorizontalGesturesToView:self.view];
 
@@ -1137,12 +1142,10 @@ const CGFloat kTopDynamicIslandInset = 24;
 
       // Load view from Launch Screen and add it to window.
       NSBundle* mainBundle = base::apple::FrameworkBundle();
-      NSArray* topObjects = [mainBundle loadNibNamed:@"LaunchScreen"
-                                               owner:self
-                                             options:nil];
+      UIStoryboard* storyboard =
+          [UIStoryboard storyboardWithName:@"LaunchScreen" bundle:mainBundle];
       UIViewController* launchScreenController =
-          base::apple::ObjCCastStrict<UIViewController>(
-              [topObjects lastObject]);
+          [storyboard instantiateInitialViewController];
       // `launchScreenView` is loaded as an autoreleased object, and is retained
       // by the `completion` block below.
       UIView* launchScreenView = launchScreenController.view;
@@ -1312,11 +1315,11 @@ const CGFloat kTopDynamicIslandInset = 24;
 // Returns 0 if the toolbar should be hidden.
 - (CGFloat)secondaryToolbarHeightWithInset {
   CGFloat height = self.toolbarCoordinator.expandedSecondaryToolbarHeight;
-  if (IsDiamondPrototypeEnabled()) {
-    return height;
-  }
   if (!height) {
     return 0.0;
+  }
+  if (IsDiamondPrototypeEnabled()) {
+    return kDiamondToolbarHeight;
   }
   // Add the safe area inset to the toolbar height.
   CGFloat unsafeHeight = self.rootSafeAreaInsets.bottom;
@@ -1840,6 +1843,35 @@ const CGFloat kTopDynamicIslandInset = 24;
   return 0;
 }
 
+// Adds a a background filler below the top of the fake status bar to the bottom
+// of the tab strip. This is needed on iPad when the app is windowed and pinned
+// to the top with fullscreen is enabled.
+- (void)configureTopBackgroundView {
+#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+  if (@available(iOS 26, *)) {
+    if (self.tabStripView) {
+      _topBackgroundView = [[UIView alloc] init];
+      _topBackgroundView.translatesAutoresizingMaskIntoConstraints = NO;
+      _topBackgroundView.backgroundColor =
+          [UIColor colorNamed:kBackgroundColor];
+      [self.view insertSubview:_topBackgroundView
+                  belowSubview:_fakeStatusBarView];
+
+      [NSLayoutConstraint activateConstraints:@[
+        [_topBackgroundView.topAnchor
+            constraintEqualToAnchor:_fakeStatusBarView.topAnchor],
+        [_topBackgroundView.bottomAnchor
+            constraintEqualToAnchor:self.tabStripView.bottomAnchor],
+        [_topBackgroundView.leadingAnchor
+            constraintEqualToAnchor:_fakeStatusBarView.leadingAnchor],
+        [_topBackgroundView.trailingAnchor
+            constraintEqualToAnchor:_fakeStatusBarView.trailingAnchor],
+      ]];
+    }
+  }
+#endif
+}
+
 #pragma mark - Private Methods: Tap handling
 
 // Record the last tap point based on the `originPoint` (if any) passed in
@@ -2053,6 +2085,9 @@ const CGFloat kTopDynamicIslandInset = 24;
   if (!height) {
     return 0.0;
   }
+  if (IsDiamondPrototypeEnabled()) {
+    return kDiamondCollapsedToolbarHeight;
+  }
   // Height is non-zero only when bottom omnibox is enabled.
   return self.rootSafeAreaInsets.bottom + height;
 }
@@ -2108,6 +2143,14 @@ const CGFloat kTopDynamicIslandInset = 24;
 // progress of 1.0 fully shows the headers and a progress of 0.0 fully hides
 // them.
 - (void)updateHeadersForFullscreenProgress:(CGFloat)progress {
+#if defined(__IPHONE_26_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_26_0
+  if (@available(iOS 26, *)) {
+    if (self.tabStripView) {
+      self.tabStripView.alpha = progress;
+      _fakeStatusBarView.alpha = progress;
+    }
+  }
+#endif
   CGFloat offset =
       AlignValueToPixel((1.0 - progress) * [self primaryToolbarHeightDelta]);
   [self setFramesForHeaders:[self headerViews] atOffset:offset];

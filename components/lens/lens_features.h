@@ -88,10 +88,6 @@ BASE_DECLARE_FEATURE(kLensOverlayVisualSelectionUpdatesForOmniboxSuggestions);
 COMPONENT_EXPORT(LENS_FEATURES)
 BASE_DECLARE_FEATURE(kLensOverlayUpdatedClientContext);
 
-// Enables opening the Lens overlay MGT feature in the side panel.
-COMPONENT_EXPORT(LENS_FEATURES)
-BASE_DECLARE_FEATURE(kLensOverlayMGTInSidePanel);
-
 // Enables the Lens Overlay omnibox entry point.
 COMPONENT_EXPORT(LENS_FEATURES)
 BASE_DECLARE_FEATURE(kLensOverlayOmniboxEntryPoint);
@@ -149,6 +145,15 @@ BASE_DECLARE_FEATURE(kLensSearchNotFoundOnPageToast);
 COMPONENT_EXPORT(LENS_FEATURES)
 BASE_DECLARE_FEATURE(kLensOverlayStraightToSrp);
 
+// Enables AIM follow ups with the Lens overlay results side panel.
+COMPONENT_EXPORT(LENS_FEATURES)
+BASE_DECLARE_FEATURE(kLensSearchAimM3);
+
+// Enables overriding the Lens overlay entrypoint label with an alternate
+// string.
+COMPONENT_EXPORT(LENS_FEATURES)
+BASE_DECLARE_FEATURE(kLensOverlayEntrypointLabelAlt);
+
 // The base URL for Lens.
 COMPONENT_EXPORT(LENS_FEATURES)
 extern const base::FeatureParam<std::string> kHomepageURLForLens;
@@ -202,6 +207,11 @@ extern const base::FeatureParam<bool> kLensOverlayEduActionChipDisabledByGlic;
 // The default width of the Lens search side panel.
 COMPONENT_EXPORT(LENS_FEATURES)
 extern const base::FeatureParam<int> kLensSearchSidePanelDefaultWidth;
+
+// Value representing the string to use to override the Lens overlay entrypoint
+// label.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern const base::FeatureParam<int> kLensOverlayEntrypointLabelAltId;
 
 // The URL for the Lens home page.
 COMPONENT_EXPORT(LENS_FEATURES)
@@ -708,7 +718,6 @@ extern bool IsLensOverlayRoutingInfoEnabled();
 COMPONENT_EXPORT(LENS_FEATURES)
 extern bool HandleSidePanelTextDirectivesEnabled();
 
-
 // The compression level to use when compressing the PDF bytes using zstd.
 // Higher values mean better compression but also take longer to compress.
 // See the introduction section in third_party/zstd/src/lib/zstd.h for more
@@ -822,9 +831,13 @@ extern bool ShowContextualSearchboxZeroPrefixSuggest();
 COMPONENT_EXPORT(LENS_FEATURES)
 extern bool IsUpdatedClientContextEnabled();
 
-// Whether to show open MGT search pages in the side panel.
+// Whether to show open AIM search pages in the side panel.
 COMPONENT_EXPORT(LENS_FEATURES)
-extern bool ShouldShowMGTInSidePanel();
+extern bool ShouldShowAimInSidePanel();
+
+// Whether the AIM searchbox is enabled.
+COMPONENT_EXPORT(LENS_FEATURES)
+extern bool GetAimSearchboxEnabled();
 
 // Whether to use the alt loading hint when overlay is opened on web pages.
 COMPONENT_EXPORT(LENS_FEATURES)

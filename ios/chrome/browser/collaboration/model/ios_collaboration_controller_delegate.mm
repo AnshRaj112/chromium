@@ -831,6 +831,9 @@ void IOSCollaborationControllerDelegate::ConfigureAndManageTabGroup(
   config.tabGroup = tab_group;
   config.groupImage = faviconsGridImage;
   config.collabID = base::SysUTF8ToNSString(collaboration_id.value());
+  config.enterpriseSharingDisabled =
+      collaboration_service_->GetServiceStatus().collaboration_status ==
+      CollaborationStatus::kDisabledForPolicy;
   config.applicationHandler =
       HandlerForProtocol(browser_->GetCommandDispatcher(), ApplicationCommands);
   auto completion_block = base::CallbackToBlock(std::move(result));
@@ -857,6 +860,8 @@ UIImage* IOSCollaborationControllerDelegate::JoinGroupImage(
   CGRect frame = CGRectMake(0, 0, kJoinGroupImageSize, kJoinGroupImageSize);
   TabGroupFaviconsGrid* favicons_grid =
       [[TabGroupFaviconsGrid alloc] initWithFrame:frame];
+  favicons_grid.overrideUserInterfaceStyle =
+      base_view_controller_.traitCollection.userInterfaceStyle;
   favicons_grid.translatesAutoresizingMaskIntoConstraints = NO;
   favicons_grid.numberOfTabs = [preview_items count];
   favicons_grid_configurator_->ConfigureFaviconsGrid(favicons_grid,

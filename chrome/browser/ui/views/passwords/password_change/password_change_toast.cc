@@ -81,8 +81,8 @@ PasswordChangeToast::PasswordChangeToast(ToastOptions toast_configuration) {
   SetProperty(views::kElementIdentifierKey, kPasswordChangeViewId);
 
   // FlexLayout lets the toast compress itself in narrow browser windows.
-  SetLayoutManager(std::make_unique<views::FlexLayout>())
-      ->SetOrientation(views::LayoutOrientation::kHorizontal);
+  layout_manager_ = SetLayoutManager(std::make_unique<views::FlexLayout>());
+  layout_manager_->SetOrientation(views::LayoutOrientation::kHorizontal);
 
   ChromeLayoutProvider* layout_provider = ChromeLayoutProvider::Get();
   icon_view_ = AddChildView(std::make_unique<views::ImageView>());
@@ -161,40 +161,12 @@ PasswordChangeToast::PasswordChangeToast(ToastOptions toast_configuration) {
   close_button_->SetTooltipText(
       l10n_util::GetStringUTF16(IDS_TOAST_CLOSE_TOOLTIP));
 
-  UpdateConfiguration(std::move(toast_configuration));
+  UpdateLayout(std::move(toast_configuration));
 }
 
 PasswordChangeToast::~PasswordChangeToast() = default;
 
 void PasswordChangeToast::UpdateLayout(ToastOptions configuration) {
-  UpdateConfiguration(std::move(configuration));
-}
-
-gfx::Insets PasswordChangeToast::CalculateMargins() {
-  ChromeLayoutProvider* layout_provider = ChromeLayoutProvider::Get();
-  bool action_button_has_text = !action_button_->GetText().empty();
-  const int max_child_height =
-      action_button_has_text ? layout_provider->GetDistanceMetric(
-                                   DISTANCE_TOAST_BUBBLE_HEIGHT_ACTION_BUTTON)
-                             : layout_provider->GetDistanceMetric(
-                                   DISTANCE_TOAST_BUBBLE_HEIGHT_CONTENT);
-  const int right_margin_token =
-      close_button_->GetVisible()
-          ? DISTANCE_TOAST_BUBBLE_MARGIN_RIGHT_CLOSE_BUTTON
-      : action_button_has_text
-          ? DISTANCE_TOAST_BUBBLE_MARGIN_RIGHT_ACTION_BUTTON
-          : DISTANCE_TOAST_BUBBLE_MARGIN_RIGHT_LABEL;
-  const int total_vertical_margins =
-      layout_provider->GetDistanceMetric(DISTANCE_TOAST_BUBBLE_HEIGHT) -
-      max_child_height;
-  return gfx::Insets::TLBR(
-      total_vertical_margins / 2,
-      layout_provider->GetDistanceMetric(DISTANCE_TOAST_BUBBLE_MARGIN_LEFT),
-      total_vertical_margins / 2,
-      layout_provider->GetDistanceMetric(right_margin_token));
-}
-
-void PasswordChangeToast::UpdateConfiguration(ToastOptions configuration) {
   action_button_closure_ = std::move(configuration.action_button_closure);
   ChromeLayoutProvider* layout_provider = ChromeLayoutProvider::Get();
   icon_ = configuration.icon;
@@ -231,6 +203,31 @@ void PasswordChangeToast::UpdateConfiguration(ToastOptions configuration) {
     action_button_->SetVisible(false);
   }
   close_button_->SetVisible(configuration.has_close_button);
+
+  layout_manager_->SetInteriorMargin(CalculateInteriorMargin());
+}
+
+gfx::Insets PasswordChangeToast::CalculateInteriorMargin() {
+  ChromeLayoutProvider* layout_provider = ChromeLayoutProvider::Get();
+  bool action_button_visible = action_button_->GetVisible();
+  const int max_child_height =
+      action_button_visible ? layout_provider->GetDistanceMetric(
+                                  DISTANCE_TOAST_BUBBLE_HEIGHT_ACTION_BUTTON)
+                            : layout_provider->GetDistanceMetric(
+                                  DISTANCE_TOAST_BUBBLE_HEIGHT_CONTENT);
+  const int right_margin_token =
+      close_button_->GetVisible()
+          ? DISTANCE_TOAST_BUBBLE_MARGIN_RIGHT_CLOSE_BUTTON
+      : action_button_visible ? DISTANCE_TOAST_BUBBLE_MARGIN_RIGHT_ACTION_BUTTON
+                              : DISTANCE_TOAST_BUBBLE_MARGIN_RIGHT_LABEL;
+  const int total_vertical_margins =
+      layout_provider->GetDistanceMetric(DISTANCE_TOAST_BUBBLE_HEIGHT) -
+      max_child_height;
+  return gfx::Insets::TLBR(
+      total_vertical_margins / 2,
+      layout_provider->GetDistanceMetric(DISTANCE_TOAST_BUBBLE_MARGIN_LEFT),
+      total_vertical_margins / 2,
+      layout_provider->GetDistanceMetric(right_margin_token));
 }
 
 void PasswordChangeToast::OnThemeChanged() {

@@ -319,9 +319,33 @@ TEST_F(GpuMemoryBufferVideoFramePoolTest, CreateOneHardwareFrameWithOddSize) {
     EXPECT_EQ(1u, sii_->shared_image_count());
 
     // Y plane = 9x9, U and V plan = 5x5.
-    EXPECT_EQ(kYValue, software_frame->visible_data(VideoFrame::Plane::kY)[80]);
-    EXPECT_EQ(kUValue, software_frame->visible_data(VideoFrame::Plane::kU)[24]);
-    EXPECT_EQ(kVValue, software_frame->visible_data(VideoFrame::Plane::kV)[24]);
+    ASSERT_EQ(kYValue, software_frame->visible_data(VideoFrame::Plane::kY)[80]);
+    ASSERT_EQ(kUValue, software_frame->visible_data(VideoFrame::Plane::kU)[24]);
+    ASSERT_EQ(kVValue, software_frame->visible_data(VideoFrame::Plane::kV)[24]);
+
+    // Compare the last pixel of each plane in |software_frame| and |frame|.
+    auto* client_si = sii_->MostRecentMappableSharedImage();
+    EXPECT_TRUE(!!client_si);
+    auto mapping = client_si->Map();
+
+    // Note: The output is in YV12, i.e. the `u` and `v` planes are swapped.
+    const auto* y_memory =
+        reinterpret_cast<uint8_t*>(mapping->GetMemoryForPlane(0).data());
+    const auto* v_memory =
+        reinterpret_cast<uint8_t*>(mapping->GetMemoryForPlane(1).data());
+    const auto* u_memory =
+        reinterpret_cast<uint8_t*>(mapping->GetMemoryForPlane(2).data());
+
+    auto y_stride = mapping->Stride(0);
+    EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kY)[80],
+              y_memory[y_stride * 8 + 8]);
+    auto v_stride = mapping->Stride(1);
+    EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kV)[24],
+              v_memory[v_stride * 4 + 4]);
+    auto u_stride = mapping->Stride(2);
+    EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kU)[24],
+              u_memory[u_stride * 4 + 4]);
+
   } else {
     EXPECT_EQ(software_frame.get(), frame.get());
   }
@@ -396,9 +420,9 @@ TEST_F(GpuMemoryBufferVideoFramePoolTest,
         software_frame->visible_data(VideoFrame::Plane::kV));
 
     // Y plane = 17x17 = 289, U and V plan = 9x9.
-    EXPECT_EQ(kYValue, y_plane_data[288]);
-    EXPECT_EQ(kUValue, u_plane_data[80]);
-    EXPECT_EQ(kVValue, v_plane_data[80]);
+    ASSERT_EQ(kYValue, y_plane_data[288]);
+    ASSERT_EQ(kUValue, u_plane_data[80]);
+    ASSERT_EQ(kVValue, v_plane_data[80]);
   } else {
     EXPECT_EQ(software_frame.get(), frame.get());
   }
@@ -504,9 +528,29 @@ TEST_F(GpuMemoryBufferVideoFramePoolTest,
     EXPECT_TRUE(frame->metadata().read_lock_fences_enabled);
 
     // Y plane = 5x5, U and V plan = 3x3.
-    EXPECT_EQ(kYValue, software_frame->visible_data(VideoFrame::Plane::kY)[24]);
-    EXPECT_EQ(kUValue, software_frame->visible_data(VideoFrame::Plane::kU)[8]);
-    EXPECT_EQ(kVValue, software_frame->visible_data(VideoFrame::Plane::kV)[8]);
+    ASSERT_EQ(kYValue, software_frame->visible_data(VideoFrame::Plane::kY)[24]);
+    ASSERT_EQ(kUValue, software_frame->visible_data(VideoFrame::Plane::kU)[8]);
+    ASSERT_EQ(kVValue, software_frame->visible_data(VideoFrame::Plane::kV)[8]);
+
+    auto* client_si = sii_->MostRecentMappableSharedImage();
+    EXPECT_TRUE(!!client_si);
+    auto mapping = client_si->Map();
+
+    const auto* y_memory =
+        reinterpret_cast<uint8_t*>(mapping->GetMemoryForPlane(0).data());
+    const auto* uv_memory =
+        reinterpret_cast<uint8_t*>(mapping->GetMemoryForPlane(1).data());
+
+    // Compare the last pixel of each plane in |software_frame| and |frame|.
+    // y_memory = 5x5, uv_memory = 6x3.
+    auto y_stride = mapping->Stride(0);
+    EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kY)[24],
+              y_memory[y_stride * 4 + 4]);
+    auto uv_stride = mapping->Stride(1);
+    EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kU)[8],
+              uv_memory[uv_stride * 2 + 4]);
+    EXPECT_EQ(software_frame->visible_data(VideoFrame::Plane::kV)[8],
+              uv_memory[uv_stride * 2 + 5]);
   } else {
     EXPECT_EQ(software_frame.get(), frame.get());
   }
@@ -548,11 +592,11 @@ TEST_F(GpuMemoryBufferVideoFramePoolTest,
     EXPECT_EQ(1u, sii_->shared_image_count());
 
     // Y plane = 135x135 = 18225, UV plan = 136x68 = 9248.
-    EXPECT_EQ(kYValue,
+    ASSERT_EQ(kYValue,
               software_frame->visible_data(VideoFrame::Plane::kY)[18224]);
-    EXPECT_EQ(kUValue,
+    ASSERT_EQ(kUValue,
               software_frame->visible_data(VideoFrame::Plane::kUV)[9246]);
-    EXPECT_EQ(kVValue,
+    ASSERT_EQ(kVValue,
               software_frame->visible_data(VideoFrame::Plane::kUV)[9247]);
   } else {
     EXPECT_EQ(software_frame.get(), frame.get());
@@ -625,9 +669,9 @@ TEST_F(GpuMemoryBufferVideoFramePoolTest,
         software_frame->visible_data(VideoFrame::Plane::kV));
 
     // Y plane = 7x7 = 49, U and V plan = 4x4 = 16.
-    EXPECT_EQ(kYValue, y_plane_data[48]);
-    EXPECT_EQ(kUValue, u_plane_data[15]);
-    EXPECT_EQ(kVValue, v_plane_data[15]);
+    ASSERT_EQ(kYValue, y_plane_data[48]);
+    ASSERT_EQ(kUValue, u_plane_data[15]);
+    ASSERT_EQ(kVValue, v_plane_data[15]);
   } else {
     EXPECT_EQ(software_frame.get(), frame.get());
   }

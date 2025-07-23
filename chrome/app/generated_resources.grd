@@ -464,6 +464,9 @@ are declared in tools/grit/grit_args.gni.
       <message name="IDS_HISTORY_DELETE" desc="Text for delete button contained in the history page toolbar">
         Delete
       </message>
+      <message name="IDS_HISTORY_OPEN" desc="Text for open button contained in the history page toolbar. Opens selected history items as new tabs.">
+        Open
+      </message>
       <message name="IDS_HISTORY_ITEMS_SELECTED" desc="Label displayed in history toolbar telling the user how many items they have selected.">
         <ph name="NUMBER_OF_ITEMS_SELECTED">$1</ph> selected
       </message>
@@ -3450,6 +3453,18 @@ are declared in tools/grit/grit_args.gni.
         </message>
       </if>
 
+      <if expr="not is_android">
+        <message name="IDS_WEBAPP_UPDATE_REVIEW_ACCEPT_BUTTON" desc="The text content of the acceptance button for the PWA app update review dialog. Clicking on this button confirms the user wants to update how the installed app looks.">
+          Update
+        </message>
+        <message name="IDS_WEBAPP_UPDATE_REVIEW_UNINSTALL_BUTTON" desc="The text content of the uninstall button for the PWA app update review dialog. Clicking on this button uninstalls the app.">
+          Uninstall
+        </message>
+        <message name="IDS_WEBAPP_UPDATE_REVIEW_IGNORE_BUTTON" desc="The text content of the ignore button for the PWA app update review dialog. Clicking on this button ignores the update and closes the dialog.">
+          Ignore
+        </message>
+      </if>
+
       <!-- Bookmark app bubble -->
       <if expr="use_titlecase">
         <message name="IDS_ADD_TO_OS_LAUNCH_SURFACE_BUBBLE_TITLE" desc="In Title Case: Title of the bubble for adding a bookmark app shortcut to the operating system.">
@@ -3515,15 +3530,38 @@ are declared in tools/grit/grit_args.gni.
       </message>
 
       <!-- WebApp name/icon update dialog -->
-      <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_NAME" desc="The title at the top of the dialog when only the name changed." formatter_data="android_java">
+      <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_NAME" desc="The title at the top of the web app update dialog when only the name changed." formatter_data="android_java">
         Review name update
       </message>
-      <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_ICON" desc="The title at the top of the dialog when only the icon changed." formatter_data="android_java">
+      <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_ICON" desc="The title at the top of the web app update dialog when only the icon changed." formatter_data="android_java">
         Review icon update
       </message>
-      <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_NAME_AND_ICON" desc="The title at the top of the dialog when the name and icon changed." formatter_data="android_java">
+      <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_NAME_AND_ICON" desc="The title at the top of the web app update dialog when the name and icon changed." formatter_data="android_java">
         Review name &amp; icon updates
       </message>
+      <if expr="not is_android">
+        <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_LOGO" desc="The title at the top of the web app update dialog when only the icon changed.">
+          Review logo update
+        </message>
+        <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_NAME_AND_LOGO" desc="The title at the top of the web app update dialog when the name and icon changed.">
+          Review logo and name updates
+        </message>
+        <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_URL" desc="The title at the top of an web app update dialog when only the name changed.">
+          Review URL update
+        </message>
+        <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_NAME_AND_URL" desc="The title at the top of the web app update dialog when only the name changed.">
+          Review name and URL updates
+        </message>
+        <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_LOGO_AND_URL" desc="The title at the top of the web app update dialog when only the icon changed.">
+          Review logo and URL updates
+        </message>
+        <message name="IDS_WEBAPP_UPDATE_DIALOG_TITLE_NAME_AND_LOGO_AND_URL" desc="The title at the top of the web app update dialog when the name and icon changed.">
+          Review logo, name, and URL updates
+        </message>
+        <message name="IDS_WEBAPP_UPDATE_NEW_EXPLANATION" desc="The text at the top of the web app update dialog, explaining what to do when an app changes its identity.">
+          Apps sometimes update their branding. Review all changes to make sure you're comfortable with them before updating.
+        </message>
+      </if>
       <message name="IDS_WEBAPP_UPDATE_EXPLANATION" desc="The text at the top of the dialog, explaining what to do when an app changes its identity." formatter_data="android_java">
         If this web app is trying to trick you into thinking it's a different app, uninstall it.
       </message>
@@ -6491,10 +6529,10 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_EXTENSIONS_MENU_TITLE" desc="Title of the Extensions Menu" formatter_data="android_java">
           Extensions
         </message>
-      </if>
-      <message name="IDS_EXTENSIONS_MENU_CONTEXT_MENU_TOOLTIP" desc="Title of the context menu for individual extensions in the Extensions Menu">
+        <message name="IDS_EXTENSIONS_MENU_CONTEXT_MENU_TOOLTIP" desc="Title of the context menu for individual extensions in the Extensions Menu" formatter_data="android_java">
           More options
-      </message>
+        </message>
+      </if>
       <message name="IDS_EXTENSIONS_MENU_CONTEXT_MENU_TOOLTIP_ACCESSIBLE_NAME" desc="Title of the context menu for individual extensions in the Extensions Menu">
           <ph name="EXTENSION_NAME">More options for $1<ex>MyExtension</ex></ph>
       </message>
@@ -7686,6 +7724,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_NTP_CUSTOM_BG_CUSTOMIZE_NTP_WALLPAPER_SEARCH_LABEL" desc="Accessibility label for the wallpaper search gear icon. (On the New Tab Page)">
         Customize this page with AI
       </message>
+       <message name="IDS_NTP_DISMISS" desc="Used for Dismiss buttons" translateable="false">
+        Dismiss
+      </message>
       <message name="IDS_NTP_DISMISS_PROMO" desc="The tooltip title and accessibility label for the (X) button to dismiss promotional messages on the middle / bottom of the New Tab page.">
         Dismiss this message
       </message>
@@ -8461,8 +8502,11 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_NTP_COMPOSE_PLACEHOLDER_TEXT" desc="The placeholder for the input in the compose box.">
         Ask anything
       </message>
-      <message name="IDS_NTP_COMPOSE_CANCEL_BUTTON_A11Y_LABEL" desc="The accessibility label for the cancel button on the compose box.">
+      <message name="IDS_NTP_COMPOSE_CANCEL_BUTTON_A11Y_LABEL" desc="The accessibility label for the cancel button on the compose box when there is no input.">
         Dismiss
+      </message>
+      <message name="IDS_NTP_COMPOSE_CANCEL_BUTTON_A11Y_LABEL_INPUT" desc="The accessibility label for the cancel button on the compose box when there is input." translateable="false">
+        Dismiss entry
       </message>
       <message name="IDS_NTP_COMPOSE_IMAGE_UPLOAD_BUTTON_A11Y_LABEL" desc="The accessibility label for the image upload button on the compose box.">
         Upload an image
@@ -8475,6 +8519,24 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_NTP_COMPOSE_DELETE_FILE_A11Y_LABEL" desc="The accessibility label for the delete button shown on hover for uploaded files." translateable="false">
         <ph name="FILE_NAME">$1<ex>recipe.pdf</ex></ph> press enter to delete file
+      </message>
+      <message name="IDS_NTP_COMPOSE_FILE_UPLOAD_INVALID_EMPTY_SIZE" desc="The text to display when a file upload is empty." translateable="false">
+        Can't upload. File appears to be empty.
+      </message>
+      <message name="IDS_NTP_COMPOSE_FILE_UPLOAD_INVALID_TOO_LARGE" desc="The text to display when a file upload exceeds the allowed size" translateable="false">
+        Can't upload. File exceeds maximum supported size.
+      </message>
+      <message name="IDS_NTP_COMPOSE_FILE_UPLOAD_IMAGE_PROCESSING_ERROR" desc="The text to display when an file upload image can't be processed." translateable="false">
+        Can't upload. Failed to process image file.
+      </message>
+      <message name="IDS_NTP_COMPOSE_FILE_UPLOAD_VALIDATION_FAILED" desc="The generic text to display when a file upload fails a validation step." translateable="false">
+        Can't upload. File upload failed validation checks.
+      </message>
+      <message name="IDS_NTP_COMPOSE_FILE_UPLOAD_FAILED"  translateable="false">
+        Unexpected error, file upload failed.
+      </message>
+      <message name="IDS_NTP_COMPOSE_FILE_UPLOAD_EXPIRED" translateable="false">
+        File upload has expired and been removed.
       </message>
 
       <!-- NTP Modules -->
@@ -9554,6 +9616,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_TOOLTIP_DOWNLOAD_ICON"
           desc="The tooltip for download toolbar button icon">
           Downloads
+      </message>
+      <message name="IDS_TOOLTIP_DOWNLOAD_ICON_NEW_DOWNLOAD" desc="The tooltip for download toolbar button icon when at least one newly completed download is available">
+        New download available
       </message>
       <message name="IDS_TOOLTIP_HOME" desc="The tooltip for the home button">
         Open the home page
@@ -18988,6 +19053,30 @@ Please help our engineers fix this problem. Tell us what happened right before y
       </message>
       <message name="IDS_MULTI_CAPTURE_ACTIVE_CAPTURE_NOTIFICATION_MESSAGE" desc="String notifying that the screens are captured by a specific app.">
         Your administrator is recording your screen with <ph name="APP0_NAME">{APP_NAME}</ph>.
+      </message>
+      <message name="IDS_MULTI_CAPTURE_DETAILS_DIALOG_HEADING" desc="Heading for the multi capture details view.">
+        Your administrator can record your screen
+      </message>
+      <message name="IDS_MULTI_CAPTURE_DETAILS_DIALOG_NO_APP_ON_ALLOWLIST_MESSAGE" desc="Message for the multi capture details view where no app is on the allowlist that enables an app not to show a notification.">
+        These apps will be used to record your screen:
+      </message>
+      <message name="IDS_MULTI_CAPTURE_DETAILS_DIALOG_SOME_APPS_ON_ALLOWLIST_FIRST_MESSAGE" desc="First message for the multi capture details view where some apps are allowlisted.">
+        You will be notified when these apps are used to record your screen:
+      </message>
+      <message name="IDS_MULTI_CAPTURE_DETAILS_DIALOG_SOME_APPS_ON_ALLOWLIST_SECOND_MESSAGE" desc="First message for the multi capture details view where some apps are allowlisted.">
+        You will not be notified when these apps are used to record your screen:
+      </message>
+      <message name="IDS_MULTI_CAPTURE_DETAILS_DIALOG_NO_APP_ON_ALLOWLIST_FOOTER_MESSAGE" desc="Footer for the multi capture details view where no app is on the allowlist that enables an app not to show a notification.">
+        You will be notified when the recording starts.
+      </message>
+      <message name="IDS_MULTI_CAPTURE_DETAILS_DIALOG_ALL_APPS_ON_ALLOWLIST_FOOTER_MESSAGE" desc="Footer for the multi capture details view where all apps is on the notification bypass allowlist.">
+        You will not be notified when the recording starts.
+      </message>
+      <message name="IDS_MULTI_CAPTURE_DETAILS_DIALOG_CLOSE_BUTTON_TEXT" desc="Close button text for the multi capture details view.">
+        Got it
+      </message>
+      <message name="IDS_MULTI_CAPTURE_NOTIFICATION_BUTTON_TEXT" desc="Text for the notification button to reach the details view.">
+        View details
       </message>
     </if>
 

@@ -243,6 +243,7 @@ bool CalculateIsLikelyAheadOfPrerender(
     case PreloadingType::kPrefetch:
       return false;
     case PreloadingType::kPrerender:
+    case PreloadingType::kPrerenderUntilScript:
       return true;
     case PreloadingType::kUnspecified:
     case PreloadingType::kPreconnect:
@@ -276,8 +277,9 @@ GetPrefetchResponseCompletedCallbackForTesting() {
 // during serving.
 class PrefetchContainer::SinglePrefetch {
  public:
-  explicit SinglePrefetch(const GURL& url,
-                          bool is_isolated_network_context_required);
+  SinglePrefetch(PrefetchContainer& prefetch_container,
+                 const GURL& url,
+                 bool is_isolated_network_context_required);
   ~SinglePrefetch();
 
   SinglePrefetch(const SinglePrefetch&) = delete;
@@ -506,7 +508,7 @@ PrefetchContainer::PrefetchContainer(
       CalculateIsLikelyAheadOfPrerender(*preload_pipeline_info_);
 
   redirect_chain_.push_back(std::make_unique<SinglePrefetch>(
-      GetURL(), IsCrossSiteRequest(url::Origin::Create(GetURL()))));
+      *this, GetURL(), IsCrossSiteRequest(url::Origin::Create(GetURL()))));
 
   // Disallow prefetching ServiceWorker-controlled responses for isolated
   // network contexts.
@@ -1012,7 +1014,7 @@ void PrefetchContainer::AddRedirectHop(const net::RedirectInfo& redirect_info) {
   AddXClientDataHeader(*resource_request_.get());
 
   redirect_chain_.push_back(std::make_unique<SinglePrefetch>(
-      redirect_info.new_url,
+      *this, redirect_info.new_url,
       IsCrossSiteRequest(url::Origin::Create(redirect_info.new_url))));
 }
 
@@ -1915,12 +1917,17 @@ CONTENT_EXPORT std::ostream& operator<<(
 }
 
 PrefetchContainer::SinglePrefetch::SinglePrefetch(
+    PrefetchContainer& prefetch_container,
     const GURL& url,
     bool is_isolated_network_context_required)
     : url_(url),
       is_isolated_network_context_required_(
           is_isolated_network_context_required),
-      response_reader_(base::MakeRefCounted<PrefetchResponseReader>()) {}
+      response_reader_(base::MakeRefCounted<PrefetchResponseReader>(
+          base::BindOnce(&PrefetchContainer::OnDeterminedHead,
+                         prefetch_container.GetWeakPtr()),
+          base::BindOnce(&PrefetchContainer::OnPrefetchComplete,
+                         prefetch_container.GetWeakPtr()))) {}
 
 PrefetchContainer::SinglePrefetch::~SinglePrefetch() {
   CHECK(response_reader_);
@@ -1937,6 +1944,7 @@ const char* PrefetchContainer::GetSecPurposeHeaderValue(
       } else {
         return blink::kSecPurposePrefetchHeaderValue;
       }
+    case PreloadingType::kPrerenderUntilScript:
     case PreloadingType::kPrerender:
       if (IsProxyRequiredForURL(request_url)) {
         // Note that this path would be reachable if a prefetch ahead of

@@ -200,6 +200,7 @@ class CORE_EXPORT CanvasRenderingContext
     NOTREACHED();
   }
   virtual bool IsPaintable() const = 0;
+  virtual bool IsHibernating() const { return false; }
   void DidDraw(CanvasPerformanceMonitor::DrawType draw_type) {
     const CanvasRenderingContextHost* const host = Host();
     return DidDraw(host ? SkIRect::MakeWH(host->width(), host->height())
@@ -287,6 +288,12 @@ class CORE_EXPORT CanvasRenderingContext
   virtual void DropAndRecreateExistingCanvas2DResourceProvider() {
     NOTREACHED();
   }
+  virtual CanvasResourceProvider* GetResourceProviderForCanvas2D() const {
+    NOTREACHED();
+  }
+  virtual const std::optional<cc::PaintRecord>& GetLastRecordingForCanvas2D() {
+    return empty_recording_;
+  }
 
   virtual void setFontForTesting(const String&) { NOTREACHED(); }
 
@@ -365,6 +372,8 @@ class CORE_EXPORT CanvasRenderingContext
       VectorOf<ElementHitTestRegion>& result,
       const String& func_name,
       ExceptionState& exception_state);
+
+  std::optional<cc::PaintRecord> empty_recording_;
 
  private:
   Member<CanvasRenderingContextHost> host_;

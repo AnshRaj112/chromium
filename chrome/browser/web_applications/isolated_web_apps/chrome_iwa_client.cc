@@ -7,8 +7,13 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_trust_checker.h"
 #include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_url_info.h"
+#include "chrome/browser/web_applications/web_app_provider.h"
+#include "chrome/browser/web_applications/web_app_ui_manager.h"
+#include "chrome/browser/web_applications/web_app_utils.h"
 #include "chrome/common/url_constants.h"
 #include "components/web_package/signed_web_bundles/signed_web_bundle_id.h"
+#include "content/public/browser/browser_context.h"
+#include "content/public/browser/storage_partition_config.h"
 
 namespace web_app {
 
@@ -36,6 +41,27 @@ GURL ChromeIwaClient::CreateBaseURLForWebBundleId(
   return GURL(
       base::StrCat({chrome::kIsolatedAppScheme, url::kStandardSchemeSeparator,
                     web_bundle_id.id()}));
+}
+
+void ChromeIwaClient::RunWhenAppCloses(
+    content::BrowserContext* browser_context,
+    const web_package::SignedWebBundleId& web_bundle_id,
+    base::OnceClosure callback) {
+  WebAppProvider::GetForWebApps(Profile::FromBrowserContext(browser_context))
+      ->ui_manager()
+      .NotifyOnAllAppWindowsClosed(
+          IsolatedWebAppUrlInfo::CreateFromSignedWebBundleId(web_bundle_id)
+              .app_id(),
+          std::move(callback));
+}
+
+content::StoragePartition* ChromeIwaClient::GetStoragePartition(
+    content::BrowserContext* browser_context,
+    const web_package::SignedWebBundleId& web_bundle_id) {
+  return browser_context->GetStoragePartition(
+      IsolatedWebAppUrlInfo::CreateFromSignedWebBundleId(web_bundle_id)
+          .storage_partition_config(browser_context),
+      /*can_create=*/false);
 }
 
 }  // namespace web_app

@@ -542,6 +542,8 @@ static_library("browser") {
     "enterprise/reporting/prefs.h",
     "enterprise/reporting/profile_report_generator_delegate_base.cc",
     "enterprise/reporting/profile_report_generator_delegate_base.h",
+    "enterprise/signals/profile_signals_collector.cc",
+    "enterprise/signals/profile_signals_collector.h",
     "enterprise/signin/enterprise_identity_service_factory.cc",
     "enterprise/signin/enterprise_identity_service_factory.h",
     "enterprise/signin/interstitials/managed_profile_required_controller_client.cc",
@@ -3871,8 +3873,6 @@ static_library("browser") {
       "enterprise/signals/context_info_fetcher.h",
       "enterprise/signals/device_info_fetcher.cc",
       "enterprise/signals/device_info_fetcher.h",
-      "enterprise/signals/profile_signals_collector.cc",
-      "enterprise/signals/profile_signals_collector.h",
       "first_run/first_run.cc",
       "first_run/first_run.h",
       "first_run/first_run_dialog.h",
@@ -4373,6 +4373,7 @@ static_library("browser") {
       "//chrome/browser/accessibility/tree_fixing:service",
       "//chrome/browser/actor",
       "//chrome/browser/actor:impl",
+      "//chrome/browser/actor/ui",
       "//chrome/browser/apps/app_service",
       "//chrome/browser/apps/link_capturing",
       "//chrome/browser/contextual_cueing",
@@ -5663,8 +5664,6 @@ static_library("browser") {
       "//chromeos/ash/components/growth:config_provider",
       "//chromeos/ash/components/install_attributes",
       "//chromeos/ash/components/kcer",
-      "//chromeos/ash/components/kiosk/vision:vision_prefs",
-      "//chromeos/ash/components/kiosk/vision/webui",
       "//chromeos/ash/components/local_search_service",
       "//chromeos/ash/components/local_search_service/public/cpp",
       "//chromeos/ash/components/local_search_service/public/mojom",
@@ -6770,7 +6769,6 @@ static_library("browser") {
       "//chrome/browser/enterprise/connectors/device_trust/common",
       "//chrome/browser/enterprise/connectors/device_trust/signals",
       "//chrome/browser/enterprise/connectors/device_trust/signals/decorators/common",
-      "//chrome/browser/ui/device_signals_consent",
       "//components/device_signals/core/browser",
       "//components/device_signals/core/common",
       "//components/enterprise/core",
@@ -6790,6 +6788,8 @@ static_library("browser") {
       "enterprise/idle/idle_service.h",
       "enterprise/idle/idle_service_factory.cc",
       "enterprise/idle/idle_service_factory.h",
+      "enterprise/signals/signals_aggregator_factory.cc",
+      "enterprise/signals/signals_aggregator_factory.h",
     ]
     deps += [ "//components/enterprise/idle" ]
   }
@@ -6907,8 +6907,6 @@ static_library("browser") {
       "enterprise/profile_management/profile_management_navigation_throttle.h",
       "enterprise/remote_commands/rotate_attestation_credential_job.cc",
       "enterprise/remote_commands/rotate_attestation_credential_job.h",
-      "enterprise/signals/signals_aggregator_factory.cc",
-      "enterprise/signals/signals_aggregator_factory.h",
       "enterprise/signals/system_signals_service_host_factory.cc",
       "enterprise/signals/system_signals_service_host_factory.h",
       "enterprise/signin/enterprise_signin_prefs.cc",
@@ -7548,6 +7546,12 @@ static_library("browser") {
       "autocomplete/unscoped_extension_provider_delegate_impl.cc",
       "autocomplete/unscoped_extension_provider_delegate_impl.h",
       "download/download_crx_util.cc",
+      "speech/extension_api/tts_engine_extension_api.cc",
+      "speech/extension_api/tts_engine_extension_api.h",
+      "speech/extension_api/tts_extension_api.cc",
+      "speech/extension_api/tts_extension_api.h",
+      "speech/extension_api/tts_extension_api_constants.cc",
+      "speech/extension_api/tts_extension_api_constants.h",
     ]
 
     # Any circular includes must depend on the target
@@ -7622,12 +7626,6 @@ static_library("browser") {
       "renderer_context_menu/context_menu_content_type_extension_popup.h",
       "renderer_context_menu/context_menu_content_type_platform_app.cc",
       "renderer_context_menu/context_menu_content_type_platform_app.h",
-      "speech/extension_api/tts_engine_extension_api.cc",
-      "speech/extension_api/tts_engine_extension_api.h",
-      "speech/extension_api/tts_extension_api.cc",
-      "speech/extension_api/tts_extension_api.h",
-      "speech/extension_api/tts_extension_api_constants.cc",
-      "speech/extension_api/tts_extension_api_constants.h",
       "sync_file_system/conflict_resolution_policy.h",
       "sync_file_system/drive_backend/callback_helper.h",
       "sync_file_system/drive_backend/callback_tracker.cc",
@@ -7913,7 +7911,10 @@ static_library("browser") {
       "media/media_foundation_service_monitor.cc",
       "media/media_foundation_service_monitor.h",
     ]
-    deps += [ "//components/live_caption:utils" ]
+    deps += [
+      "//components/live_caption:utils",
+      "//components/stylus_handwriting/win",
+    ]
 
     if (enable_media_foundation_widevine_cdm) {
       sources += [

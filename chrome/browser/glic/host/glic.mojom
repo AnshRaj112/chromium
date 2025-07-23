@@ -252,6 +252,8 @@ struct WebClientInitialState {
   bool enable_maybe_refresh_user_status;
   // Whether multi tab is enabled.
   bool enable_multi_tab;
+  // Whether get context for actor from tab is enabled.
+  bool enable_get_context_actor;
   // The list of capabilities of the host.
   array<HostCapability> host_capabilities;
 };
@@ -298,8 +300,14 @@ struct ScrollToParams {
 
   // The document targeted by this operation. When specified, it verifies
   // that the document in the primary main frame of the currently focused tab
-  // matches the ID (and fails the operation if it doesn't).
+  // matches the ID (and fails the operation if it doesn't). The verification
+  // does not happen for PDFs.
   string? document_id;
+
+  // The URL of the document targeted by this operation. If the currently
+  // focused tab has a PDF loaded, this url is matched and verified against the
+  // tab's primary main frame's URL (and is ignored otherwise).
+  url.mojom.Url? url;
 };
 
 // Used to select content in a page to scroll to and highlight.
@@ -365,8 +373,8 @@ enum ScrollToErrorReason {
   // ScrollTo() call.
   [MinVersion=1] kFocusedTabChangedOrNavigated,
 
-  // The document_id provided doesn't match the active document in the primary
-  // main frame of the currently focused tab. The document may have been
+  // The document_id or url provided doesn't match the active document in the
+  // primary main frame of the currently focused tab. The document may have been
   // navigated away, may not currently be in focus, or may not be in a primary
   // main frame (we don't currently support iframes).
   [MinVersion=2] kNoMatchingDocument,
@@ -472,6 +480,10 @@ interface WebClientHandler {
   // favor of a new one.
   ShowProfilePicker();
 
+  // Returns the current model quality client id.
+  [RuntimeFeature=glic.mojom.features.kGlicAppendModelQualityClientId]
+  GetModelQualityClientId() => (string model_quality_client_id);
+
   // Returns the context from the currently active tab.
   // `tab_context_result` is null if tab content could not be captured.
   // This may fail if the tab is navigated while collecting data, or closed
@@ -485,6 +497,12 @@ interface WebClientHandler {
   // before data is collected.
   [RuntimeFeature=glic.mojom.features.kGlicMultiTab]
   GetContextFromTab(int32 tab_id, GetTabContextOptions options)
+      => (GetContextResult result);
+
+  // Returns the context from the tab associated with `tab_id` for an actor.
+  // This skips the focus check.
+  [RuntimeFeature=glic.mojom.features.kGlicActorTabContext]
+  GetContextForActorFromTab(int32 tab_id, GetTabContextOptions options)
       => (GetContextResult result);
 
   // Sets the maximum number of supported pinned tabs. Negative means that the

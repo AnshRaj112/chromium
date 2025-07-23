@@ -109,45 +109,34 @@ views::Widget* PermissionPromptChip::GetPromptBubbleWidgetForTesting() {
 }
 
 void PermissionPromptChip::ModulatePermissionPromiseLifetime() {
+  // Lifetime modulation is allowed only for the quiet chip. The quiet chip is
+  // enabled only for `NOTIFICATIONS` and `GEOLOCATION`.
   DCHECK(delegate()->ShouldCurrentRequestUseQuietUI());
 
+#if !BUILDFLAG(IS_ANDROID)
+  // TODO(crbug.com/412616723): Support Android
   if (base::FeatureList::IsEnabled(
           permissions::features::kPermissionPromiseLifetimeModulation)) {
     delegate()->PreIgnoreQuietPrompt();
     return;
   }
-
-  bool is_subscribed_to_permission_change_event = true;
+#endif
   content::PermissionController* permission_controller =
       web_contents()->GetBrowserContext()->GetPermissionController();
 
   // If at least one RFH is not subscribed to the PermissionChange event, we
   // should not preemptively resolve a prompt.
   for (const auto& request : delegate()->Requests()) {
-    content::RenderFrameHost* rfh =
-        content::RenderFrameHost::FromID(request->get_requesting_frame_id());
-    if (rfh == nullptr) {
+    DCHECK(request->request_type() ==
+               permissions::RequestType::kNotifications ||
+           request->request_type() == permissions::RequestType::kGeolocation);
+
+    if (!request->IsSourceSubscribedToPermissionChangeEvent(
+            permission_controller)) {
       return;
     }
-
-    ContentSettingsType type = request->GetContentSettingsType();
-
-    blink::PermissionType permission_type =
-        permissions::PermissionUtil::ContentSettingsTypeToPermissionType(type);
-
-    // Pre-ignore is allowed only for the quiet chip. The quiet chip is
-    // enabled only for `NOTIFICATIONS` and `GEOLOCATION`.
-    DCHECK(permission_type == blink::PermissionType::NOTIFICATIONS ||
-           permission_type == blink::PermissionType::GEOLOCATION);
-
-    is_subscribed_to_permission_change_event &=
-        permission_controller->IsSubscribedToPermissionChangeEvent(
-            permission_type, rfh);
   }
-
-  if (is_subscribed_to_permission_change_event) {
-    // This will resolve a promise so an origin is not waiting for the user's
-    // decision.
-    delegate()->PreIgnoreQuietPrompt();
-  }
+  // This will resolve a promise so an origin is not waiting for the user's
+  // decision.
+  delegate()->PreIgnoreQuietPrompt();
 }

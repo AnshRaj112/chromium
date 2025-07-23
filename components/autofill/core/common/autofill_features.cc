@@ -89,6 +89,12 @@ BASE_FEATURE(kAutofillAiIgnoreLocale,
              "AutofillAiIgnoreLocale",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+// If enabled, the existence of address or payments data is not required to show
+// the Iph bubble for AutofillAi.
+BASE_FEATURE(kAutofillAiIgnoreWhetherUserHasAddressOrPaymentsDataForIph,
+             "AutofillAiIgnoreWhetherUserHasAddressOrPaymentsDataForIph",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, AutofillAi supports national id cards.
 BASE_FEATURE(kAutofillAiNationalIdCard,
              "AutofillAiNationalIdCard",
@@ -357,7 +363,7 @@ BASE_FEATURE(kAutofillImproveCityFieldClassification,
 // we have guarantees that in the meantime the form couldn't have changed.
 BASE_FEATURE(kAutofillOptimizeFormExtraction,
              "AutofillOptimizeFormExtraction",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, credit cards that are split into different fields are imported.
 // TODO: crbug.com/392179445 - Clean up when launched.
@@ -732,7 +738,7 @@ BASE_FEATURE(kAutofillServerUploadMoreData,
 // For Queries still only the secondary (alternative) signature is used.
 // TODO(crbug.com/431737839): Clean up when roll out finishes successfully.
 COMPONENT_EXPORT(AUTOFILL)
-BASE_FEATURE(kUseStructuralSignatureInsteadOfSecondary,
+BASE_FEATURE(kAutofillUseStructuralSignatureInsteadOfSecondary,
              "AutofillUseStructuralSignatureInsteadOfSecondary",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
@@ -815,6 +821,12 @@ BASE_FEATURE(kUseSettingsAddressEditorInPaymentsRequest,
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 #if BUILDFLAG(IS_ANDROID)
+// If enabled, on Android desktop, Autofill keyboard accessory will be
+// suppressed when there are no autofill suggestions.
+BASE_FEATURE(kAutofillAndroidDesktopSuppressAccessoryOnEmpty,
+             "AutofillAndroidDesktopSuppressAccessoryOnEmpty",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // If enabled, other apps can open the Autofill Options in Chrome.
 BASE_FEATURE(kAutofillDeepLinkAutofillOptions,
              "AutofillDeepLinkAutofillOptions",

@@ -84,9 +84,9 @@ class AutofillKeyboardAccessoryControllerImpl
   // AutofillKeyboardAccessoryController:
   std::vector<std::vector<Suggestion::Text>> GetSuggestionLabelsAt(
       int row) const override;
-  bool GetRemovalConfirmationText(int index,
-                                  std::u16string* title,
-                                  std::u16string* body) override;
+  bool GetRemovalConfirmationText(
+      int index,
+      RemovalConfirmationText* removal_text) override;
 
   base::WeakPtr<AutofillKeyboardAccessoryControllerImpl> GetWeakPtr() {
     return weak_ptr_factory_.GetWeakPtr();

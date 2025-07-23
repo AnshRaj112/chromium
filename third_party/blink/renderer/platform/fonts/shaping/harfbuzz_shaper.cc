@@ -918,6 +918,7 @@ void HarfBuzzShaper::ShapeSegment(
   bool needs_caps_handling =
       font_description.VariantCaps() != FontDescription::kCapsNormal;
   OpenTypeCapsSupport caps_support;
+  HanKerning han_kerning(text_, segment.start, segment.end, font_description);
 
   FontFallbackIterator fallback_iterator(
       font->CreateFontFallbackIterator(ApplyFontVariantEmojiOnFallbackPriority(
@@ -1044,16 +1045,19 @@ void HarfBuzzShaper::ShapeSegment(
         &font_features, caps_support.FontFeatureToUse(small_caps_behavior));
     hb_direction_t direction = range_data->HarfBuzzDirection(canvas_rotation);
     FontFeatureRangesSaver font_features_saver(&font_features);
-    HanKerning han_kerning(
-        text_, shape_start, shape_end, *adjusted_font, font_description,
-        {.is_horizontal = HB_DIRECTION_IS_HORIZONTAL(direction),
-         .is_line_start = range_data->options.is_line_start &&
+    bool is_han_kerning_comptued = false;
+    if (han_kerning.MayApply()) [[unlikely]] {
+      is_han_kerning_comptued = han_kerning.AppendFontFeatures(
+          text_, shape_start, shape_end, *adjusted_font, locale,
+          {.is_horizontal = HB_DIRECTION_IS_HORIZONTAL(direction),
+           .is_line_start = range_data->options.is_line_start &&
+                            range_data->start == shape_start,
+           .apply_start = range_data->options.han_kerning_start &&
                           range_data->start == shape_start,
-         .apply_start = range_data->options.han_kerning_start &&
-                        range_data->start == shape_start,
-         .apply_end = range_data->options.han_kerning_end &&
-                      range_data->end == shape_end},
-        &font_features);
+           .apply_end = range_data->options.han_kerning_end &&
+                        range_data->end == shape_end},
+          font_features);
+    }
 
     if (!ShapeRange(range_data->buffer.Get(), range_data->font_features,
                     adjusted_font, current_font_data_for_range_set->Ranges(),
@@ -1066,8 +1070,15 @@ void HarfBuzzShaper::ShapeSegment(
                         adjusted_font, segment.script, canvas_rotation,
                         fallback_stage, result);
 
-    if (!han_kerning.UnsafeToBreakBefore().empty()) [[unlikely]] {
-      result->AddUnsafeToBreak(han_kerning.UnsafeToBreakBefore());
+    if (is_han_kerning_comptued) [[unlikely]] {
+      if (!han_kerning.UnsafeToBreakBefore().empty()) [[unlikely]] {
+        result->AddUnsafeToBreak(han_kerning.UnsafeToBreakBefore());
+        han_kerning.ClearUnsafeToBreakBefore();
+      }
+      if (!range_data->reshape_queue.empty() &&
+          RuntimeEnabledFeatures::TextSpacingTrimFallbackEnabled()) {
+        han_kerning.PrepareFallback(text_);
+      }
     }
 
     hb_buffer_reset(range_data->buffer.Get());

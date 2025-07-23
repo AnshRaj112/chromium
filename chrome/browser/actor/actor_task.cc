@@ -22,14 +22,6 @@
 namespace actor {
 
 ActorTask::ActorTask(Profile* profile,
-                     std::unique_ptr<ExecutionEngine> execution_engine)
-    : profile_(profile),
-      execution_engine_(std::move(execution_engine)),
-      ui_event_dispatcher_(ui::NewUiEventDispatcher(
-          ActorKeyedService::Get(profile)->GetActorUiStateManager())),
-      ui_weak_ptr_factory_(ui_event_dispatcher_.get()) {}
-
-ActorTask::ActorTask(Profile* profile,
                      std::unique_ptr<ExecutionEngine> execution_engine,
                      std::unique_ptr<ui::UiEventDispatcher> ui_event_dispatcher)
     : profile_(profile),
@@ -38,14 +30,6 @@ ActorTask::ActorTask(Profile* profile,
       ui_weak_ptr_factory_(ui_event_dispatcher_.get()) {}
 
 ActorTask::~ActorTask() = default;
-
-std::unique_ptr<ActorTask> ActorTask::CreateForTesting(
-    Profile* profile,
-    std::unique_ptr<ExecutionEngine> execution_engine,
-    std::unique_ptr<ui::UiEventDispatcher> ui_event_dispatcher) {
-  return base::WrapUnique<ActorTask>(new ActorTask(
-      profile, std::move(execution_engine), std::move(ui_event_dispatcher)));
-}
 
 void ActorTask::SetId(base::PassKey<ActorKeyedService>, TaskId id) {
   id_ = id;
@@ -124,6 +108,11 @@ void ActorTask::Stop() {
         mojom::ActionResultCode::kTaskWentAway);
   }
   end_time_ = base::Time::Now();
+  // Remove all the tabs from the task.
+  auto tabs_to_remove = tab_handles_;
+  for (auto& tab : tabs_to_remove) {
+    RemoveTab(tab);
+  }
   SetState(State::kFinished);
 }
 
@@ -168,7 +157,19 @@ void ActorTask::AddTab(tabs::TabHandle tab_handle, AddTabCallback callback) {
                                 std::move(callback)));
 }
 
-bool ActorTask::HasActedOnTab(tabs::TabHandle tab) const {
+void ActorTask::RemoveTab(tabs::TabHandle tab_handle) {
+  auto num_removed = tab_handles_.erase(tab_handle);
+  if (num_removed > 0) {
+    // Notify the UI of the tab removal.
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&ui::UiEventDispatcher::OnActorTaskSyncChange,
+                                  ui_weak_ptr_factory_.GetWeakPtr(),
+                                  ui::UiEventDispatcher::RemoveTab{
+                                      .task_id = id_, .handle = tab_handle}));
+  }
+}
+
+bool ActorTask::IsActingOnTab(tabs::TabHandle tab) const {
   return tab_handles_.contains(tab);
 }
 

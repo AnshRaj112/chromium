@@ -6,6 +6,8 @@
 #define COMPONENTS_FACILITATED_PAYMENTS_CORE_BROWSER_DEVICE_DELEGATE_H_
 
 #include <memory>
+#include <string>
+#include <string_view>
 
 #include "base/functional/callback.h"
 #include "components/facilitated_payments/core/browser/facilitated_payments_app_info_list.h"
@@ -26,8 +28,9 @@ class DeviceDelegate {
   // Returns true if Pix account linking is supported by the device.
   virtual bool IsPixAccountLinkingSupported() const = 0;
 
-  // Takes user to the Pix account linking page.
-  virtual void LaunchPixAccountLinkingPage() = 0;
+  // Takes user to the Pix account linking page. The `email` is used to provide
+  // the gaia account that the user is signed into.
+  virtual void LaunchPixAccountLinkingPage(std::string email) = 0;
 
   // Observes the Chrome app, and runs the `callback` when the user returns to
   // Chrome.
@@ -36,6 +39,12 @@ class DeviceDelegate {
 
   virtual std::unique_ptr<FacilitatedPaymentsAppInfoList>
   GetSupportedPaymentApps(const GURL& payment_link_url) = 0;
+
+  // Invokes a payment app with the given `package_name`, `activity_name`, and
+  // `payment_link_url`. Returns `true` if the app was invoked successfully.
+  virtual bool InvokePaymentApp(std::string_view package_name,
+                                std::string_view activity_name,
+                                const GURL& payment_link_url) = 0;
 };
 
 }  // namespace payments::facilitated

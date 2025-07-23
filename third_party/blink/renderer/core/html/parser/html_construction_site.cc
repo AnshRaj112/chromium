@@ -40,6 +40,7 @@
 #include "third_party/blink/renderer/core/dom/element_traversal.h"
 #include "third_party/blink/renderer/core/dom/node.h"
 #include "third_party/blink/renderer/core/dom/node_part.h"
+#include "third_party/blink/renderer/core/dom/parser_content_policy.h"
 #include "third_party/blink/renderer/core/dom/shadow_root.h"
 #include "third_party/blink/renderer/core/dom/template_content_document_fragment.h"
 #include "third_party/blink/renderer/core/dom/text.h"
@@ -69,6 +70,7 @@
 #include "third_party/blink/renderer/core/html_element_factory.h"
 #include "third_party/blink/renderer/core/html_names.h"
 #include "third_party/blink/renderer/core/loader/frame_loader.h"
+#include "third_party/blink/renderer/core/patching/dom_patch_status.h"
 #include "third_party/blink/renderer/core/script/ignore_destructive_write_count_incrementer.h"
 #include "third_party/blink/renderer/core/svg/svg_script_element.h"
 #include "third_party/blink/renderer/platform/bindings/v8_per_isolate_data.h"
@@ -493,12 +495,13 @@ HTMLConstructionSite::HTMLConstructionSite(
     HTMLParserReentryPermit* reentry_permit,
     Document& document,
     ParserContentPolicy parser_content_policy,
-    DocumentFragment* fragment,
+    ContainerNode* fragment_target,
     Element* context_element)
     : reentry_permit_(reentry_permit),
       document_(&document),
-      attachment_root_(fragment ? fragment
-                                : static_cast<ContainerNode*>(&document)),
+      attachment_root_(fragment_target && fragment_target->IsDocumentFragment()
+                           ? fragment_target
+                           : static_cast<ContainerNode*>(&document)),
       pending_dom_parts_(
           RuntimeEnabledFeatures::DOMPartsAPIEnabled()
               ? MakeGarbageCollected<PendingDOMParts>(attachment_root_)
@@ -506,16 +509,16 @@ HTMLConstructionSite::HTMLConstructionSite(
       parser_content_policy_(parser_content_policy),
       is_scripting_content_allowed_(
           ScriptingContentIsAllowed(parser_content_policy)),
-      is_parsing_fragment_(fragment),
+      is_parsing_fragment_(fragment_target),
       redirect_attach_to_foster_parent_(false),
       in_quirks_mode_(document.InQuirksMode()) {
   DCHECK(document_->IsHTMLDocument() || document_->IsXHTMLDocument() ||
          is_parsing_fragment_);
 
-  DCHECK_EQ(!fragment, !context_element);
-  if (fragment) {
-    DCHECK_EQ(document_, &fragment->GetDocument());
-    DCHECK_EQ(in_quirks_mode_, fragment->GetDocument().InQuirksMode());
+  DCHECK_EQ(!fragment_target, !context_element);
+  if (fragment_target) {
+    DCHECK_EQ(document_, &fragment_target->GetDocument());
+    DCHECK_EQ(in_quirks_mode_, fragment_target->GetDocument().InQuirksMode());
     if (!context_element->GetDocument().IsTemplateDocument()) {
       form_ = Traversal<HTMLFormElement>::FirstAncestorOrSelf(*context_element);
     }
@@ -903,9 +906,9 @@ void HTMLConstructionSite::InsertHTMLTemplateElement(
   if (RuntimeEnabledFeatures::DocumentPatchingEnabled()) {
     if (Attribute* patchfor_attribute =
             token->GetAttributeItem(html_names::kPatchforAttr)) {
-      TreeScope* scope = &CurrentElement()->GetTreeScope();
+      TreeScope* scope = &CurrentNode()->GetTreeScope();
       if (HTMLTemplateElement* template_parent =
-              DynamicTo<HTMLTemplateElement>(CurrentElement())) {
+              DynamicTo<HTMLTemplateElement>(CurrentNode())) {
         if (ShadowRoot* shadow_root =
                 DynamicTo<ShadowRoot>(template_parent->InsertionTarget())) {
           scope = shadow_root;
@@ -920,12 +923,9 @@ void HTMLConstructionSite::InsertHTMLTemplateElement(
         // Like with shadowrootmode, the template is discarded.
         should_attach_template = false;
 
-        // A patch replaces the existing children of the target.
-        patch_target->RemoveChildren();
-
         // From now on, parsed children of the template are inserted directly to
         // the patch target.
-        template_element->SetOverrideInsertionTarget(*patch_target);
+        template_element->BeginPatch(*patch_target);
       }
     }
   }
@@ -1057,6 +1057,13 @@ void HTMLConstructionSite::InsertForeignElement(
 
 void HTMLConstructionSite::InsertTextNode(const StringView& string,
                                           WhitespaceMode whitespace_mode) {
+  if (HTMLTemplateElement* current =
+          DynamicTo<HTMLTemplateElement>(CurrentNode())) {
+    if (DOMPatchStatus* patch = current->OutgoingPatch()) {
+      patch->Append(string.ToString());
+      return;
+    }
+  }
   HTMLConstructionSiteTask dummy_task(HTMLConstructionSiteTask::kInsert);
   dummy_task.parent = CurrentNode();
 

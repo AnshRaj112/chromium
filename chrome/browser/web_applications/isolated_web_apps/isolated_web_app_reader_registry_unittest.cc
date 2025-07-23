@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "chrome/browser/web_applications/isolated_web_apps/isolated_web_app_reader_registry.h"
-
 #include <memory>
 #include <optional>
 
@@ -39,6 +37,7 @@
 #include "components/webapps/isolated_web_apps/error/uma_logging.h"
 #include "components/webapps/isolated_web_apps/reading/response_reader.h"
 #include "components/webapps/isolated_web_apps/reading/response_reader_factory.h"
+#include "components/webapps/isolated_web_apps/reading/response_reader_registry.h"
 #include "components/webapps/isolated_web_apps/reading/signed_web_bundle_reader.h"
 #include "components/webapps/isolated_web_apps/reading/validator.h"
 #include "content/public/common/content_features.h"
@@ -124,7 +123,7 @@ class IsolatedWebAppReaderRegistryTest : public ::testing::Test {
         web_package::test::GetAttributesForSignedWebBundleId(kWebBundleId.id());
 
     registry_ = std::make_unique<IsolatedWebAppReaderRegistry>(
-        *profile_,
+        profile_.get(),
         std::make_unique<IsolatedWebAppResponseReaderFactory>(profile_.get()));
 
     EXPECT_TRUE(temp_dir_.CreateUniqueTempDir());
@@ -430,7 +429,7 @@ TEST_F(IsolatedWebAppReaderRegistryTest, TestSignedWebBundleReaderLifetime) {
 #endif
 
   // Verify that the cache cleanup timer has not yet started.
-  EXPECT_FALSE(registry_->reader_cache_.IsCleanupTimerRunningForTesting());
+  EXPECT_FALSE(registry_->IsCleanupTimerRunningForTesting());
 
   {
     base::test::TestFuture<ReadResult> read_response_future;
@@ -456,7 +455,7 @@ TEST_F(IsolatedWebAppReaderRegistryTest, TestSignedWebBundleReaderLifetime) {
   }
 
   // Verify that the cache cleanup timer has started.
-  EXPECT_TRUE(registry_->reader_cache_.IsCleanupTimerRunningForTesting());
+  EXPECT_TRUE(registry_->IsCleanupTimerRunningForTesting());
 
   {
     base::test::TestFuture<ReadResult> read_response_future;
@@ -474,7 +473,7 @@ TEST_F(IsolatedWebAppReaderRegistryTest, TestSignedWebBundleReaderLifetime) {
   }
 
   // Verify that the cache cleanup timer is still running.
-  EXPECT_TRUE(registry_->reader_cache_.IsCleanupTimerRunningForTesting());
+  EXPECT_TRUE(registry_->IsCleanupTimerRunningForTesting());
 
   // After some time has passed, the `SignedWebBundleReader` should be evicted
   // from the cache.
@@ -482,7 +481,7 @@ TEST_F(IsolatedWebAppReaderRegistryTest, TestSignedWebBundleReaderLifetime) {
 
   // Verify that the cache cleanup timer has stopped, given that the cache is
   // now empty again.
-  EXPECT_FALSE(registry_->reader_cache_.IsCleanupTimerRunningForTesting());
+  EXPECT_FALSE(registry_->IsCleanupTimerRunningForTesting());
 
   {
     base::test::TestFuture<ReadResult> read_response_future;
@@ -502,7 +501,7 @@ TEST_F(IsolatedWebAppReaderRegistryTest, TestSignedWebBundleReaderLifetime) {
   }
 
   // Verify that the cache cleanup timer has started again.
-  EXPECT_TRUE(registry_->reader_cache_.IsCleanupTimerRunningForTesting());
+  EXPECT_TRUE(registry_->IsCleanupTimerRunningForTesting());
 }
 
 class IsolatedWebAppReaderRegistryIntegrityBlockParserErrorTest

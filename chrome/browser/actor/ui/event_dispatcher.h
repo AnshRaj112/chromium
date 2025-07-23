@@ -22,7 +22,8 @@ class ActorUiStateManagerInterface;
 // This object is not thread safe; it expects to be called from a single thread.
 class UiEventDispatcher {
  public:
-  using UiCompleteCallback = base::OnceCallback<void(mojom::ActionResultPtr)>;
+  using UiCompleteCallback =
+      base::OnceCallback<void(::actor::mojom::ActionResultPtr)>;
   struct FirstActInfo {
     TaskId task_id;
     std::optional<tabs::TabInterface::Handle> tab_handle;
@@ -38,8 +39,12 @@ class UiEventDispatcher {
     ActorTask::State old_state;
     ActorTask::State new_state;
   };
+  struct RemoveTab {
+    TaskId task_id;
+    tabs::TabInterface::Handle handle;
+  };
   // TODO(crbug.com/425784083): Add tab changes from ActorTask.
-  using ActorTaskSyncChange = std::variant<ChangeTaskState>;
+  using ActorTaskSyncChange = std::variant<ChangeTaskState, RemoveTab>;
 
   virtual ~UiEventDispatcher() = default;
 

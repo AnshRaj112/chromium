@@ -16,7 +16,8 @@
 #endif
 
 namespace actor::ui {
-using UiCompleteCallback = base::OnceCallback<void(mojom::ActionResultPtr)>;
+using UiCompleteCallback =
+    base::OnceCallback<void(::actor::mojom::ActionResultPtr)>;
 
 // ExpiryPeriod from when the user completes a task and when it should no longer
 // show on the ui
@@ -54,6 +55,14 @@ class ActorUiStateManagerInterface {
   // Called on glic window (floaty) state change.
   virtual void OnGlicUpdateFloatyState(
       glic::GlicWindowController::State floaty_state) = 0;
+
+  // Register for this callback to detect changes to the glic floaty status and
+  // UiState.
+  using FloatyTaskStateChangeCallback =
+      base::RepeatingCallback<void(ActorUiStateManagerInterface::UiState,
+                                   glic::GlicWindowController::State)>;
+  virtual base::CallbackListSubscription RegisterFloatyTaskStateChange(
+      FloatyTaskStateChangeCallback callback) = 0;
 #endif
 };
 

@@ -688,7 +688,7 @@
     "META": {"sizes": {"includes": [30]}},
     "includes": [5020],
   }, "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/tab_group_home/resources.grd": {
-    "META": {"sizes": {"includes": [10]}},
+    "META": {"sizes": {"includes": [20]}},
     "includes": [5030],
   },
   "<(SHARED_INTERMEDIATE_DIR)/chrome/browser/resources/tab_search/resources.grd": {
@@ -786,10 +786,6 @@
   "chromeos/ash/components/emoji/emoji.grd" : {
     "META": {"sizes": {"includes": [45],}},
     "includes" : [5740],
-  },
-  "<(SHARED_INTERMEDIATE_DIR)/chromeos/ash/components/kiosk/vision/webui/resources.grd" : {
-    "META": {"sizes": {"includes": [15]}},
-    "includes" : [5760],
   },
   "chromeos/ash/resources/ash_resources.grd": {
     "includes": [5780],

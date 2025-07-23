@@ -21,6 +21,7 @@
 #import "components/prefs/pref_service.h"
 #import "ios/chrome/browser/shared/model/application_context/application_context.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
+#import "ios/chrome/browser/shared/model/profile/features.h"
 #import "ios/chrome/browser/widget_kit/model/model_swift.h"  // nogncheck
 #endif
 
@@ -198,7 +199,8 @@ void SystemAccountUpdater::UpdateLoadedAccounts() {
     NSMutableDictionary* updated_dates = [NSMutableDictionary dictionary];
 
     for (NSString* gaia in urls_info) {
-      if (accounts[gaia] || [gaia isEqualToString:app_group::kDefaultAccount]) {
+      if (accounts[gaia] || [gaia isEqualToString:app_group::kNoAccount] ||
+          [gaia isEqualToString:app_group::kDefault]) {
         updated_urls[gaia] = urls_info[gaia];
         updated_dates[gaia] = last_modification_dates_info[gaia];
       }
@@ -232,11 +234,21 @@ void SystemAccountUpdater::HandleMigrationIfNeeded() {
 
   bool migration_performed =
       local_state->GetBoolean(prefs::kMigrateWidgetsPrefs);
-  // Don't migrate prefs again if migration was already performed.
-  if (migration_performed) {
-    return;
+
+  if (!migration_performed) {
+    // Only migrate prefs if a migration was never performed.
+    local_state->SetBoolean(prefs::kMigrateWidgetsPrefs, true);
+    UpdateLoadedAccounts();
+  } else if (!local_state->GetBoolean(prefs::kWidgetsForMultiProfile) &&
+             AreSeparateProfilesForManagedAccountsEnabled()) {
+    // Reload timelines if multi-profile was enabled since last build.
+    local_state->SetBoolean(prefs::kWidgetsForMultiProfile, true);
+    ReloadAllTimelines();
+  } else if (local_state->GetBoolean(prefs::kWidgetsForMultiProfile) &&
+             !AreSeparateProfilesForManagedAccountsEnabled()) {
+    // Reload timelines if multi-profile was disabled since last build.
+    local_state->SetBoolean(prefs::kWidgetsForMultiProfile, false);
+    ReloadAllTimelines();
   }
-  local_state->SetBoolean(prefs::kMigrateWidgetsPrefs, true);
-  UpdateLoadedAccounts();
 #endif
 }

@@ -14,6 +14,14 @@ export function getHtml(this: ComposeboxElement) {
   <div class="gradient gradient-outer-glow"></div>
   <div class="gradient"></div>
   <div class="background"></div>
+  ${this.showErrorScrim_ ? html`
+    <div id="errorScrim">
+      <p>${this.errorMessage_}</p>
+      <cr-button id="dismissErrorButton"
+        @click="${this.onDismissErrorButtonClick_}">$i18n{dismissButton}
+      </cr-button>
+    </div>
+  `: ''}
   <div id="composebox" tabindex="-1" @keydown="${this.onKeydown_}">
     <div id="inputContainer">
       <ntp-composebox-file-carousel
@@ -24,7 +32,8 @@ export function getHtml(this: ComposeboxElement) {
       <textarea autocomplete="off" id="input"
           type="search" spellcheck="false"
           placeholder="$i18n{composeboxPlaceholderText}"
-          @keydown="${this.onInputKeydown_}"></textarea>
+          @keydown="${this.onInputKeydown_}"
+          @input=${this.handleInput_}></textarea>
       <div id="uploadContainer">
         <cr-icon-button
             class="upload-icon no-overlap"
@@ -47,7 +56,7 @@ export function getHtml(this: ComposeboxElement) {
     <cr-icon-button
         class="action-icon icon-clear"
         id="cancelIcon"
-        title="$i18n{composeboxCancelButtonTitle}"
+        title="${this.computeCancelButtonTitle_()}"
         @click="${this.onCancelClick_}">
     </cr-icon-button>
     <cr-icon-button

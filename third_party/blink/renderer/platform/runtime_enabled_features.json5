@@ -818,6 +818,11 @@
     },
     {
       // crbug.com/389726691.
+      name: "CanvasTextCacheLimit",
+      status: "stable",
+    },
+    {
+      // crbug.com/389726691.
       name: "CanvasTextNg",
       origin_trial_feature_name: "CanvasTextNg",
       status: "stable",
@@ -907,7 +912,8 @@
       // system clipboard
       // https://chromestatus.com/feature/5085102657503232
       name: "ClipboardChangeEvent",
-      base_feature: "none",
+      origin_trial_feature_name: "ClipboardChangeEvent",
+      status: "experimental",
     },
     // This ensures that clipboard event fires on a target node which is
     // focused in case no visible selection is present.
@@ -1128,7 +1134,7 @@
     {
       // Allows using counter() and counters() in alt text (after / in content property).
       name: "CSSAltCounter",
-      status: "experimental",
+      status: "stable",
     },
     {
       // Support for the anchor-scope property.
@@ -1965,6 +1971,16 @@
       status: "stable",
     },
     {
+      // ElementInternals.type allows web authors to create autonomous
+      // custom elements that inherit specific behaviors from native
+      // HTML elements, while maintaining the ability to use shadow DOM
+      // and custom rendering.
+      // crbug.com/422947646
+      // https://github.com/MicrosoftEdge/MSEdgeExplainers/blob/main/ElementInternalsType/explainer.md
+      name: "ElementInternalsDotType",
+      status: "experimental",
+    },
+    {
       // crbug.com/40118302
       name: "EmptyReferenceFilterInvalidation",
       status: "stable",
@@ -1976,6 +1992,13 @@
     {
       // See: crbug.com/40771555
       name: "EnterInOpenShadowRoots",
+      status: "stable",
+    },
+    {
+      // Escapes "<" and ">" in attribute values. This was launched
+      // in M139, and this flag can be removed in M141.
+      // See: crbug.com/1175016
+      name: "EscapeLtGtInAttributes",
       status: "stable",
     },
     {
@@ -2392,6 +2415,11 @@
       // a Chromium level feature.
     },
     {
+      // crbug.com/393391746
+      name: "FontStyleObliqueZeroDegreeAsNormal",
+      status: "stable",
+    },
+    {
       name: "FontSystemFallbackNotoCjk",
       status: "stable",
     },
@@ -2482,6 +2510,10 @@
       name: "GetDisplayMediaWindowAudioCapture",
       status: "experimental",
       browser_process_read_write_access: true,
+    },
+    {
+      name: "GetUserMediaEchoCancellationModes",
+      status: "experimental",
     },
     {
       name: "GroupEffect",
@@ -3277,11 +3309,6 @@
       status: "stable",
     },
     {
-      name: "ObservableAPI",
-      status: "stable",
-      public: true,
-    },
-    {
       name: "OffMainThreadCSSPaint",
       status: "stable",
     },
@@ -3658,7 +3685,6 @@
       name: "PrerenderUntilScript",
       public: true,
       status: "test",
-      base_feature: "none",
     },
     {
       name: "Presentation",
@@ -3799,8 +3825,18 @@
     {
       // crbug.com/427520278
       // Fix looking for next keyboard focusable radio button. This was added
-      // in M140 and can be removed after M143.
+      // in M140 and can be removed after M143. This flag is no longer needed
+      // after RadioKeyboardFocusableOptimize ships.
       name: "RadioInputNextKeyboardFocusable",
+      status: "stable",
+    },
+    {
+      // https://issues.chromium.org/issues/421837104
+      // Optimize keyboard focusable for the radio element. Making
+      // the focus navigation of the radio group more reasonable and
+      // consistent with Firefox.
+      // This was added in M140 and can be removed after M143.
+      name: "RadioKeyboardFocusableOptimize",
       status: "stable",
     },
     {
@@ -4297,6 +4333,11 @@
       status: "stable",
     },
     {
+      // See https://crbug.com/40664519
+      name: "SelectionAndFocusedVisiblePositionMatch",
+      status: "stable",
+    },
+    {
       // See https://crbug.com/417823377
       name: "SelectionDeleteFromDocumentUaShadowFix",
       status: "stable",
@@ -4445,6 +4486,7 @@
       // Allow Android to run the origin trial.
       origin_trial_feature_name: "SharedWorkerOnAndroid",
       origin_trial_os: ["android"],
+      origin_trial_allows_third_party: true,
     },
     {
       // If enabled, SharedWorker supports extendedLifetime
@@ -4557,6 +4599,14 @@
     {
       name: "SpecCompliantJsonMimeTypes",
       status: "stable",
+    },
+    // This is a flag that re-enables some deprecated/removed "special rules"
+    // that apply to the styles of an <h1> element nested within <article>,
+    // <aside>, <nav>, or <section>. It is disabled by default, and here as a
+    // Finch killswitch only. This was shipped (disabled) in M140, and the flag
+    // can be removed in M142.
+    {
+      name: "SpecialRulesForNestedH1Elements",
     },
     {
       name: "SpeculationRulesPrefetchWithSubresources",
@@ -4793,6 +4843,11 @@
       status: "stable",
     },
     {
+      // crbug.com/40098316
+      name: "TextDecorationShortSerialization",
+      status: "stable",
+    },
+    {
       name: "TextDetector",
       status: "experimental",
     },
@@ -4828,6 +4883,11 @@
     },
     {
       name: "TextMetricsBaselines",
+      status: "stable",
+    },
+    {
+      // crbug.com/431660829
+      name: "TextSpacingTrimFallback",
       status: "stable",
     },
     // This feature is used to inform the renderer of a user bypass from the
@@ -5099,7 +5159,6 @@
       // This flag uses the original DOM text for input when the password
       // echo is enabled to create the offset_map.
       name: "UseOriginalDomOffsetsForOffsetMap",
-      status: "stable",
     },
     {
       name: "UsePositionForPointInFlexibleBoxWithSingleChildElement",

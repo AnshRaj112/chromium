@@ -35,7 +35,7 @@ public class DeviceDelegate {
     private static final String GOOGLE_WALLET_PACKAGE_NAME = "com.google.android.apps.walletnfcrel";
     // Deeplink to the Pix account linking page on Google Wallet.
     private static final String GOOGLE_WALLET_ADD_PIX_ACCOUNT_LINK =
-            "https://wallet.google.com/gw/app/addbankaccount?utm_source=chrome";
+            "https://wallet.google.com/gw/app/addbankaccount?utm_source=chrome&email=%s";
     // Minimum Google Wallet version that supports Pix account linking.
     private static final long PIX_MIN_SUPPORTED_WALLET_VERSION = 931593518;
 
@@ -64,7 +64,7 @@ public class DeviceDelegate {
 
     @CalledByNative
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    static void openPixAccountLinkingPageInWallet(WindowAndroid windowAndroid) {
+    static void openPixAccountLinkingPageInWallet(WindowAndroid windowAndroid, String email) {
         if (windowAndroid == null) {
             return;
         }
@@ -73,7 +73,7 @@ public class DeviceDelegate {
             return;
         }
         Intent intent = new Intent(Intent.ACTION_VIEW);
-        intent.setData(Uri.parse(GOOGLE_WALLET_ADD_PIX_ACCOUNT_LINK));
+        intent.setData(Uri.parse(String.format(GOOGLE_WALLET_ADD_PIX_ACCOUNT_LINK, email)));
         intent.setPackage(GOOGLE_WALLET_PACKAGE_NAME);
         try {
             context.startActivity(intent);
@@ -97,6 +97,34 @@ public class DeviceDelegate {
         }
         return getSupportedPaymentApps(
                 paymentLinkUrl, windowAndroid, new PackageManagerDelegate(packageManager));
+    }
+
+    /**
+     * Invokes a payment app by launching an intent.
+     *
+     * @param packageName The package name of the payment app.
+     * @param activityName The activity name of the payment app.
+     * @param paymentLinkUrl The payment link URL to be included as data in the intent.
+     * @param windowAndroid The {@link WindowAndroid} for launching the intent.
+     * @return True if the intent was shown successfully, false otherwise.
+     */
+    @CalledByNative
+    static boolean invokePaymentApp(
+            String packageName,
+            String activityName,
+            GURL paymentLinkUrl,
+            WindowAndroid windowAndroid) {
+        if (windowAndroid == null) {
+            return false;
+        }
+        Intent intent = new Intent();
+        intent.setAction(A2A_INTENT_ACTION_NAME);
+        intent.setData(Uri.parse(paymentLinkUrl.getSpec()));
+        intent.setClassName(packageName, activityName);
+        // showIntent returns true if the intent was shown successfully.
+        // TODO(crbug.com/432821264): Handle returned transaction result and specify the `errorId`.
+        return windowAndroid.showIntent(
+                intent, /* callback= */ (resultCode, data) -> {}, /* errorId= */ null);
     }
 
     @VisibleForTesting

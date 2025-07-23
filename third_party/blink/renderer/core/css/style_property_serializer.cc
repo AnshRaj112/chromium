@@ -617,6 +617,10 @@ String StylePropertySerializer::SerializeShorthand(
       return Get2Values(insetBlockShorthand());
     case CSSPropertyID::kInsetInline:
       return Get2Values(insetInlineShorthand());
+    case CSSPropertyID::kLineClamp:
+      return LineClampValue(/* is_webkit_line_clamp */ false);
+    case CSSPropertyID::kAlternativeWebkitLineClamp:
+      return LineClampValue(/* is_webkit_line_clamp */ true);
     case CSSPropertyID::kPlaceContent:
       return Get2Values(placeContentShorthand());
     case CSSPropertyID::kPlaceItems:
@@ -1477,6 +1481,32 @@ String StylePropertySerializer::TextDecorationValue() const {
         CSSValueID value_id = identifier_value->GetValueID();
         if (value_id == CSSValueID::kAuto) {
           continue;
+        }
+      }
+    } else if (RuntimeEnabledFeatures::
+                   TextDecorationShortSerializationEnabled()) {
+      if (longhand->PropertyID() == CSSPropertyID::kTextDecorationLine) {
+        if (auto* identifier_value = DynamicTo<CSSIdentifierValue>(value)) {
+          // Skip the initial value.
+          if (identifier_value->GetValueID() == CSSValueID::kNone) {
+            continue;
+          }
+        }
+      } else if (longhand->PropertyID() ==
+                 CSSPropertyID::kTextDecorationStyle) {
+        if (auto* identifier_value = DynamicTo<CSSIdentifierValue>(value)) {
+          // Skip the initial value.
+          if (identifier_value->GetValueID() == CSSValueID::kSolid) {
+            continue;
+          }
+        }
+      } else if (longhand->PropertyID() ==
+                 CSSPropertyID::kTextDecorationColor) {
+        if (auto* identifier_value = DynamicTo<CSSIdentifierValue>(value)) {
+          // Skip the initial value.
+          if (identifier_value->GetValueID() == CSSValueID::kCurrentcolor) {
+            continue;
+          }
         }
       }
     }
@@ -2872,6 +2902,51 @@ String StylePropertySerializer::ScrollStartValue() const {
     list->Append(*inline_value);
   }
 
+  return list->CssText();
+}
+
+String StylePropertySerializer::LineClampValue(
+    bool is_webkit_line_clamp) const {
+  DCHECK(RuntimeEnabledFeatures::CSSLineClampEnabled());
+
+  const CSSValue* max_lines =
+      property_set_.GetPropertyCSSValue(GetCSSPropertyMaxLines());
+  const CSSIdentifierValue* continue_value = To<CSSIdentifierValue>(
+      property_set_.GetPropertyCSSValue(GetCSSPropertyContinue()));
+
+  if (continue_value->GetValueID() == CSSValueID::kAuto) {
+    if (max_lines->IsIdentifierValue()) {
+      DCHECK_EQ(To<CSSIdentifierValue>(max_lines)->GetValueID(),
+                CSSValueID::kNone);
+      return "none";
+    }
+    return g_empty_string;
+  }
+
+  CSSValueList* list = CSSValueList::CreateSpaceSeparated();
+  if (max_lines->IsNumericLiteralValue()) {
+    list->Append(*max_lines);
+  } else {
+    DCHECK_EQ(To<CSSIdentifierValue>(max_lines)->GetValueID(),
+              CSSValueID::kNone);
+    list->Append(*CSSIdentifierValue::Create(CSSValueID::kAuto));
+  }
+
+  if (continue_value->GetValueID() == CSSValueID::kWebkitLegacy) {
+    if (!is_webkit_line_clamp) {
+      list->Append(*continue_value);
+    }
+  } else {
+    if (is_webkit_line_clamp) {
+      return g_empty_string;
+    }
+    DCHECK_EQ(To<CSSIdentifierValue>(continue_value)->GetValueID(),
+              CSSValueID::kCollapse);
+  }
+
+  if (is_webkit_line_clamp) {
+    DCHECK_EQ(list->length(), 1u);
+  }
   return list->CssText();
 }
 

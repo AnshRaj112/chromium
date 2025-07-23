@@ -59,7 +59,7 @@ const base::FeatureParam<bool> kDevToolsFreestylerMultimodal{
 const base::FeatureParam<bool> kDevToolsFreestylerMultimodalUploadInput{
     &kDevToolsFreestyler, "multimodal_upload_input", /*default_value=*/true};
 const base::FeatureParam<bool> kDevToolsFreestylerFunctionCalling{
-    &kDevToolsFreestyler, "function_calling", /*default_value=*/false};
+    &kDevToolsFreestyler, "function_calling", /*default_value=*/true};
 
 // Whether the DevTools AI Assistance Network Agent is enabled.
 BASE_FEATURE(kDevToolsAiAssistanceNetworkAgent,
@@ -161,6 +161,19 @@ BASE_FEATURE(kDevToolsNewPermissionDialog,
 // Whether DevTools drawer can be toggled to vertical orientation.
 BASE_FEATURE(kDevToolsVerticalDrawer,
              "DevToolsVerticalDrawer",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+#if BUILDFLAG(ENABLE_PWA_INSTALL_ON_CROS_TEST)
+// Enables creating PWA handler for DevTools.
+BASE_FEATURE(kDevToolsPwaHandler,
+             "DevToolsPwaHandler",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+#endif  // BUILDFLAG(ENABLE_PWA_INSTALL_ON_CROS_TEST)
+
+// Whether DevTools shows submenu example prompts for the AI Assistance panel
+// in context menus.
+BASE_FEATURE(kDevToolsAiSubmenuPrompts,
+             "DevToolsAiSubmenuPrompts",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 }  // namespace features

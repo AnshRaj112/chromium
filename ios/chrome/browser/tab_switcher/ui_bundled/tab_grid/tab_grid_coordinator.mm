@@ -402,6 +402,8 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
     [_tabGroupsPanelCoordinator stopChildCoordinators];
   }
 
+  [self cancelCollaborationFlows];
+
   [self dismissPopovers];
 
   [self.inactiveTabsCoordinator hide];
@@ -435,6 +437,12 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
   CHECK_NE(page, TabGridPageRemoteTabs);
   CHECK_NE(page, TabGridPageTabGroups);
   [_mediator setActivePage:page];
+
+  if (IsDiamondPrototypeEnabled()) {
+    [[NSNotificationCenter defaultCenter]
+        postNotificationName:kDiamondEnterTabGridNotification
+                      object:nil];
+  }
 
   BOOL animated = !self.animationsDisabledForTesting;
 
@@ -590,8 +598,18 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
 
   __weak TabGridCoordinator* weakSelf = self;
 
+  if (IsDiamondPrototypeEnabled()) {
+    [[NSNotificationCenter defaultCenter]
+        postNotificationName:kDiamondLeaveTabGridNotification
+                      object:nil];
+  }
+
   completion = ^{
-    [weakSelf hideTabGroupsViews];
+    if (self.tabGridEnterTime.is_null()) {
+      // Only hide the TabGroup if the TabGrid hasn't been reopened since the
+      // beginning of the animation. See crbug.com/432227955 for more details.
+      [weakSelf hideTabGroupsViews];
+    }
     if (completion) {
       completion();
     }
@@ -673,7 +691,6 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
       completion();
     }
     self.firstPresentation = NO;
-    [weakSelf hideTabGroupsViews];
   };
 
   self.baseViewController.childViewControllerForStatusBarStyle =
@@ -943,6 +960,16 @@ bool FindNavigatorShouldBePresentedInBrowser(Browser* browser) {
     [applicationHandler displayTabGridInMode:TabGridOpeningMode::kDefault];
   } else {
     [self exitTabGrid];
+  }
+}
+
+// Cancels all the currently active collaboration flows.
+- (void)cancelCollaborationFlows {
+  collaboration::CollaborationService* collaborationService =
+      collaboration::CollaborationServiceFactory::GetForProfile(
+          self.regularBrowser->GetProfile());
+  if (collaborationService) {
+    collaborationService->CancelAllFlows();
   }
 }
 

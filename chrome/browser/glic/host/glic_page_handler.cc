@@ -63,6 +63,7 @@
 #include "components/feedback/feedback_data.h"
 #include "components/feedback/feedback_uploader.h"
 #include "components/metrics/metrics_service.h"
+#include "components/optimization_guide/core/model_quality/model_quality_util.h"
 #include "components/prefs/pref_service.h"
 #include "components/signin/public/identity_manager/identity_manager.h"
 #include "content/public/browser/devtools_agent_host.h"
@@ -76,10 +77,6 @@
 #include "ui/gfx/geometry/mojom/geometry.mojom.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/views/widget/widget.h"
-
-namespace FeedbackConstants {
-const char kThumbsDownFeedbackPrefix[] = "Response feedback thumbs down - ";
-}
 
 namespace mojo {
 
@@ -590,6 +587,8 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
         features::kGlicUserStatusRefreshApi.Get();
     state->enable_multi_tab =
         base::FeatureList::IsEnabled(glic::mojom::features::kGlicMultiTab);
+    state->enable_get_context_actor = base::FeatureList::IsEnabled(
+        glic::mojom::features::kGlicActorTabContext);
 #if BUILDFLAG(ENABLE_PDF)
     if (features::kGlicScrollToPDF.Get()) {
       state->host_capabilities.push_back(mojom::HostCapability::kScrollToPdf);
@@ -702,6 +701,14 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     glic_service_->ResizePanel(size, duration, std::move(callback));
   }
 
+  void GetModelQualityClientId(
+      GetModelQualityClientIdCallback callback) override {
+    auto* local_state = g_browser_process->local_state();
+    std::string client_id = optimization_guide::
+        GetOrCreateGlicModelQualityClientId(local_state);
+    std::move(callback).Run(std::move(client_id));
+  }
+
   void GetContextFromFocusedTab(
       glic::mojom::GetTabContextOptionsPtr options,
       GetContextFromFocusedTabCallback callback) override {
@@ -717,6 +724,14 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
     // Activation gating is handled in this function.
     glic_sharing_manager_->GetContextFromTab(tabs::TabHandle(tab_id), *options,
                                              std::move(callback));
+  }
+
+  void GetContextForActorFromTab(
+      int32_t tab_id,
+      glic::mojom::GetTabContextOptionsPtr options,
+      GetContextForActorFromTabCallback callback) override {
+    glic_sharing_manager_->GetContextForActorFromTab(
+        tabs::TabHandle(tab_id), *options, std::move(callback));
   }
 
   void SetMaximumNumberOfPinnedTabs(
@@ -1013,12 +1028,6 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
 
   void OnResponseRated(bool positive) override {
     glic_service_->metrics()->OnResponseRated(positive);
-    // TODO(b/430055759): Remove this block once RecordFeedback API is wired to
-    // be called from the client.
-    if (base::FeatureList::IsEnabled(features::kGlicRecordActorJournal) &&
-        !positive) {
-      SendResponseFeedback();
-    }
   }
 
   void OnClosedCaptionsShown() override {
@@ -1339,31 +1348,6 @@ class GlicWebClientHandler : public glic::mojom::WebClientHandler,
 
   void NotifyWebClientFocusedTabChanged(glic::mojom::FocusedTabDataPtr data) {
     web_client_->NotifyFocusedTabChanged(std::move(data));
-  }
-
-  // TODO(b/430055759): Delete this function once RecordFeedback API is wired to
-  // be called from the client.
-  void SendResponseFeedback() {
-    base::WeakPtr<feedback::FeedbackUploader> uploader =
-        feedback::FeedbackUploaderFactoryChrome::GetForBrowserContext(profile_)
-            ->AsWeakPtr();
-    scoped_refptr<::feedback::FeedbackData> feedback_data =
-        base::MakeRefCounted<feedback::FeedbackData>(
-            std::move(uploader), ContentTracingManager::Get());
-    auto journal = journal_handler_.GetSnapshot(false);
-
-    // TODO(b/430054430): Fetch and include system data to the feedback.
-    feedback_data->set_description(
-        FeedbackConstants::kThumbsDownFeedbackPrefix +
-        base::Uuid::GenerateRandomV4().AsLowercaseString());
-    feedback_data->set_product_id(feedback::kGeminiWebProductId);
-    feedback_data->set_category_tag(
-        std::string(feedback::kGeminiWebJournalCategoryTag));
-    feedback_data->set_is_offensive_or_unsafe(false);
-    feedback_data->AddFile("actor-journal", journal);
-
-    feedback_data->CompressSystemInfo();
-    feedback_data->OnFeedbackPageDataComplete();
   }
 
   glic::mojom::FocusedTabDataPtr cached_focused_tab_data_ = nullptr;

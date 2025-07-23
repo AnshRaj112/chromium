@@ -372,6 +372,10 @@ class HostMessageHandler implements HostMessageHandlerInterface {
     this.handler.showProfilePicker();
   }
 
+  glicBrowserGetModelQualityClientId(): Promise<{modelQualityClientId: string}> {
+    return this.handler.getModelQualityClientId();
+  }
+
   async glicBrowserGetContextFromFocusedTab(
       request: {options: TabContextOptions}, extras: ResponseExtras):
       Promise<{tabContextResult: TabContextResultPrivate}> {
@@ -394,6 +398,24 @@ class HostMessageHandler implements HostMessageHandlerInterface {
       Promise<{tabContextResult: TabContextResultPrivate}> {
     const {result: {errorReason, tabContext}} =
         await this.handler.getContextFromTab(
+            tabIdFromClient(request.tabId),
+            tabContextOptionsFromClient(request.options));
+    if (!tabContext) {
+      throw new Error(`tabContext failed: ${errorReason}`);
+    }
+    const tabContextResult = tabContextToClient(tabContext, extras);
+
+    return {
+      tabContextResult: tabContextResult,
+    };
+  }
+
+  async glicBrowserGetContextForActorFromTab(
+      request: {tabId: string, options: TabContextOptions},
+      extras: ResponseExtras):
+      Promise<{tabContextResult: TabContextResultPrivate}> {
+    const {result: {errorReason, tabContext}} =
+        await this.handler.getContextForActorFromTab(
             tabIdFromClient(request.tabId),
             tabContextOptionsFromClient(request.options));
     if (!tabContext) {
@@ -732,6 +754,7 @@ class HostMessageHandler implements HostMessageHandlerInterface {
       highlight: params.highlight === undefined ? true : params.highlight,
       selector: getMojoSelector(),
       documentId: params.documentId ?? null,
+      url: params.url ? urlFromClient(params.url) : null,
     };
     const {errorReason} = (await this.handler.scrollTo(mojoParams));
     if (errorReason !== null) {

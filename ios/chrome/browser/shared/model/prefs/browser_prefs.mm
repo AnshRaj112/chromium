@@ -665,7 +665,6 @@ void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
       kIosMagicStackSegmentationPriceTrackingPromoImpressionsSinceFreshness,
       -1);
 
-  // Deprecated 03/2025 (migrated to profile pref).
   registry->RegisterBooleanPref(prefs::kMigrateWidgetsPrefs, false);
 
   // Deprecated 03/2025 (migrated to profile pref).
@@ -690,6 +689,8 @@ void RegisterLocalStatePrefs(PrefRegistrySimple* registry) {
   registry->RegisterIntegerPref(prefs::kNTPLensEntryPointNewBadgeShownCount, 0);
   registry->RegisterIntegerPref(
       prefs::kNTPHomeCustomizationNewBadgeImpressionCount, 0);
+
+  registry->RegisterBooleanPref(prefs::kWidgetsForMultiProfile, false);
 }
 
 void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
@@ -1034,15 +1035,12 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterBooleanPref(prefs::kProvisionalNotificationsAllowedByPolicy,
                                 true);
 
+  // BWG prefs.
   registry->RegisterDictionaryPref(prefs::kBwgSessionMap);
-
   registry->RegisterBooleanPref(prefs::kIOSBwgConsent, false);
-
   registry->RegisterBooleanPref(prefs::kIOSBWGPreciseLocationSetting, false);
-
   registry->RegisterBooleanPref(prefs::kIOSBWGPageContentSetting, true);
-
-  registry->RegisterBooleanPref(prefs::kIOSBWGManualPromo, false);
+  registry->RegisterIntegerPref(prefs::kIOSBWGPromoImpressionCount, 0);
 
   registry->RegisterTimePref(prefs::kIosSyncInfobarErrorLastDismissedTimestamp,
                              base::Time());

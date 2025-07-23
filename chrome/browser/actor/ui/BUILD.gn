@@ -2,12 +2,26 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//mojo/public/tools/bindings/mojom.gni")
+
 assert(!is_android)
+
+mojom("mojo_bindings") {
+  disable_variants = true
+  public_deps = [ "//mojo/public/mojom/base" ]
+
+  deps = [ "//ui/gfx/geometry/mojom" ]
+
+  sources = [ "actor_overlay.mojom" ]
+  webui_module_path = "/"
+}
 
 source_set("ui") {
   sources = [
     "actor_overlay_ui.cc",
     "actor_overlay_ui.h",
+    "actor_overlay_view_controller.cc",
+    "actor_overlay_view_controller.h",
     "actor_overlay_window_controller.cc",
     "actor_overlay_window_controller.h",
     "actor_ui_state_manager.cc",
@@ -18,6 +32,8 @@ source_set("ui") {
     "actor_ui_tab_controller.cc",
     "actor_ui_tab_controller.h",
     "actor_ui_tab_controller_interface.h",
+    "handoff_button_controller.cc",
+    "handoff_button_controller.h",
   ]
   deps = [
     ":ui_event_types",
@@ -26,6 +42,7 @@ source_set("ui") {
     "//chrome/browser/actor:variant_visitor",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/resources/actor_overlay:resources",
+    "//chrome/browser/ui/browser_window:browser_window",
     "//chrome/browser/ui/tabs:tabs_public",
     "//chrome/browser/ui/webui:webui_util",
     "//chrome/common",
@@ -34,6 +51,12 @@ source_set("ui") {
     "//ui/views/controls/webview:webview",
     "//ui/webui",
   ]
+
+  public_deps = [ ":mojo_bindings" ]
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 source_set("states") {
@@ -86,6 +109,10 @@ source_set("test_support") {
     ":ui",
     "//chrome/browser/actor:actor",
   ]
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 source_set("tool_request_variant") {
@@ -130,8 +157,11 @@ source_set("ui_event_utils") {
 source_set("unit_tests") {
   testonly = true
   sources = [
+    "actor_overlay_view_controller_unittest.cc",
     "actor_ui_state_manager_unittest.cc",
+    "actor_ui_tab_controller_unittest.cc",
     "event_dispatcher_unittest.cc",
+    "handoff_button_controller_unittest.cc",
     "ui_event_debugstring_unittest.cc",
   ]
   deps = [
@@ -142,6 +172,7 @@ source_set("unit_tests") {
     ":ui_event_utils",
     "//chrome/browser/actor:actor",
     "//chrome/browser/actor:impl",
+    "//chrome/browser/actor:test_support",
     "//chrome/browser/ui/tabs:tabs_public",
     "//chrome/common",
     "//chrome/test:test_support",
@@ -151,6 +182,10 @@ source_set("unit_tests") {
     "//testing/gmock",
     "//testing/gtest",
   ]
+
+  # TODO(crbug.com/40031409): Fix code that adds exit-time destructors and
+  # enable the diagnostic by removing this line.
+  configs += [ "//build/config/compiler:no_exit_time_destructors" ]
 }
 
 source_set("browser_tests") {

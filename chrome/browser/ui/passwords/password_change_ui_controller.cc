@@ -183,10 +183,9 @@ std::unique_ptr<ui::DialogModel> CreatePasswordChangeFailedDialog(
 // toast widget. This frame view provides rounded corners and a custom
 // background color.
 std::unique_ptr<views::NonClientFrameView> CreateToastFrameView(
-    const gfx::Insets& content_margins,
     views::Widget* widget) {
-  auto frame_view =
-      std::make_unique<views::BubbleFrameView>(gfx::Insets(), content_margins);
+  auto frame_view = std::make_unique<views::BubbleFrameView>(
+      /*title_margins=*/gfx::Insets(), /*content_margins=*/gfx::Insets());
   auto border = std::make_unique<views::BubbleBorder>(
       views::BubbleBorder::Arrow::NONE,
       views::BubbleBorder::Shadow::STANDARD_SHADOW);
@@ -365,8 +364,8 @@ void PasswordChangeUIController::ShowToast(ToastOptions options) {
   toast_delegate->SetAccessibleWindowRole(ax::mojom::Role::kAlert);
   toast_delegate->SetAccessibleTitle(title);
   toast_delegate->SetShowCloseButton(false);
-  toast_delegate->SetNonClientFrameViewFactory(base::BindRepeating(
-      &CreateToastFrameView, toast_view_->CalculateMargins()));
+  toast_delegate->SetNonClientFrameViewFactory(
+      base::BindRepeating(&CreateToastFrameView));
   toast_delegate_ = std::move(toast_delegate);
 
   auto* tab_dialog_manager =
@@ -413,11 +412,13 @@ void PasswordChangeUIController::ShowDialog(
   // TODO(crbug.com/338254375): Remove once it is a default state.
   model_host->SetOwnershipOfNewWidget(
       views::Widget::InitParams::CLIENT_OWNS_WIDGET);
+
+  auto tab_dialog_params = std::make_unique<tabs::TabDialogManager::Params>();
+  tab_dialog_params->close_on_navigate = false;
   dialog_widget_ = tab_interface_->GetTabFeatures()
                        ->tab_dialog_manager()
-                       ->CreateAndShowDialog(
-                           model_host.release(),
-                           std::make_unique<tabs::TabDialogManager::Params>());
+                       ->CreateAndShowDialog(model_host.release(),
+                                             std::move(tab_dialog_params));
   dialog_widget_->MakeCloseSynchronous(
       base::BindOnce(&PasswordChangeUIController::CloseDialogWidget,
                      weak_ptr_factory_.GetWeakPtr()));

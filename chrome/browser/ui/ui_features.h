@@ -150,9 +150,9 @@ enum class MiniToolbarActiveConfiguration {
   // Hides the toolbar in the active view.
   Hide,
   // Shows only the menu button in the active view.
-  ShowMenuOnly,
-  // Shows favicon, domain, alerts and menu button in the active view.
-  ShowAll
+  ShowMenu,
+  // Shows only the close button in the active view.
+  ShowClose,
 };
 
 BASE_DECLARE_FEATURE_PARAM(MiniToolbarActiveConfiguration,
@@ -349,17 +349,15 @@ BASE_DECLARE_FEATURE(kByDateHistoryInSidePanel);
 // Controls whether to use the TabStrip browser api's controller.
 BASE_DECLARE_FEATURE(kTabStripBrowserApi);
 
-// Controls where tab search lives in the browser.
+// Controls where tab search lives in the browser. By default, the tab search
+// feature lives in the tab strip. The feature moves to the toolbar button if
+// the user is in the US and `kLaunchedTabSearchToolbarButton` is enabled or if
+// `kTabstripComboButton` is enabled and `kTabSearchToolbarButton` is true.
 BASE_DECLARE_FEATURE(kTabstripComboButton);
 BASE_DECLARE_FEATURE(kLaunchedTabSearchToolbarButton);
 
-BASE_DECLARE_FEATURE_PARAM(bool, kTabstripComboButtonHasBackground);
-BASE_DECLARE_FEATURE_PARAM(bool, kTabstripComboButtonHasReverseButtonOrder);
 BASE_DECLARE_FEATURE_PARAM(bool, kTabSearchToolbarButton);
 
-bool IsTabSearchMoving();
-bool HasTabstripComboButtonWithBackground();
-bool HasTabstripComboButtonWithReverseButtonOrder();
 bool HasTabSearchToolbarButton();
 
 }  // namespace features

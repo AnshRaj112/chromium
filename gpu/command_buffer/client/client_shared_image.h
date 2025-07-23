@@ -105,9 +105,6 @@ class GPU_COMMAND_BUFFER_CLIENT_EXPORT ClientSharedImage
     // Returns the size of the buffer.
     virtual gfx::Size Size() = 0;
 
-    // Returns BufferFormat.
-    virtual gfx::BufferFormat Format() = 0;
-
     // Returns whether the underlying resource is shared memory.
     virtual bool IsSharedMemory() = 0;
 
@@ -247,7 +244,6 @@ class GPU_COMMAND_BUFFER_CLIENT_EXPORT ClientSharedImage
       const Mailbox& mailbox,
       const SharedImageMetadata& metadata,
       const SyncToken& sync_token,
-      std::unique_ptr<GpuMemoryBufferImpl> gpu_memory_buffer,
       gfx::BufferUsage buffer_usage,
       scoped_refptr<SharedImageInterfaceHolder> sii_holder);
 

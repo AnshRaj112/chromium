@@ -186,8 +186,6 @@ COMPONENT_EXPORT(UI_BASE_FEATURES) bool IsUsingRawDraw();
 COMPONENT_EXPORT(UI_BASE_FEATURES) double RawDrawTileSizeFactor();
 COMPONENT_EXPORT(UI_BASE_FEATURES) bool IsRawDrawUsingMSAA();
 
-COMPONENT_EXPORT(UI_BASE_FEATURES) BASE_DECLARE_FEATURE(kStylusSpecificTapSlop);
-
 // This feature indicates that this device should have variable refresh rates
 // enabled by default if available. This overrides the default value of
 // |kEnableVariableRefreshRate|. This flag is added by cros-config and not
@@ -202,6 +200,9 @@ COMPONENT_EXPORT(UI_BASE_FEATURES) bool IsVariableRefreshRateEnabled();
 COMPONENT_EXPORT(UI_BASE_FEATURES)
 BASE_DECLARE_FEATURE(kEnableVariableRefreshRateAlwaysOn);
 COMPONENT_EXPORT(UI_BASE_FEATURES) bool IsVariableRefreshRateAlwaysOn();
+
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+BASE_DECLARE_FEATURE(kBubbleMetricsApi);
 
 #if BUILDFLAG(IS_WIN)
 // Use font settings for contrast and gamma as specified in system settings.
@@ -230,12 +231,18 @@ BASE_DECLARE_FEATURE(kAsyncFullscreenWindowState);
 // Enable ClipboardChange event API
 // https://chromestatus.com/feature/5085102657503232
 COMPONENT_EXPORT(UI_BASE_FEATURES)
-BASE_DECLARE_FEATURE(kClipboardChangeEvent);
+BASE_DECLARE_FEATURE(kPlatformClipboardMonitor);
 
 COMPONENT_EXPORT(UI_BASE_FEATURES)
 BASE_DECLARE_FEATURE(kEnablePixelCanvasRecording);
 
 bool COMPONENT_EXPORT(UI_BASE_FEATURES) IsPixelCanvasRecordingEnabled();
+
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+BASE_DECLARE_FEATURE(kHandleIMESpanChangesOnUpdateComposition);
+
+COMPONENT_EXPORT(UI_BASE_FEATURES)
+bool IsHandleIMESpanChangesOnUpdateCompositionEnabled();
 
 }  // namespace features
 

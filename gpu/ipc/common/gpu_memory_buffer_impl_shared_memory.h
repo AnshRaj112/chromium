@@ -43,11 +43,6 @@ class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImplSharedMemory
       gfx::BufferFormat format,
       gfx::BufferUsage usage);
 
-  static gfx::GpuMemoryBufferHandle CreateGpuMemoryBuffer(
-      const gfx::Size& size,
-      gfx::BufferFormat format,
-      gfx::BufferUsage usage);
-
   static bool IsUsageSupported(gfx::BufferUsage usage);
   static bool IsSizeValidForFormat(const gfx::Size& size,
                                    gfx::BufferFormat format);
@@ -82,8 +77,7 @@ class GPU_IPC_COMMON_EXPORT GpuMemoryBufferImplSharedMemory
       base::UnsafeSharedMemoryRegion shared_memory_region,
       base::WritableSharedMemoryMapping shared_memory_mapping,
       size_t offset,
-      uint32_t stride,
-      bool for_testing = false);
+      uint32_t stride);
 
   base::UnsafeSharedMemoryRegion shared_memory_region_;
   base::WritableSharedMemoryMapping shared_memory_mapping_;

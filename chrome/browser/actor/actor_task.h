@@ -36,15 +36,11 @@ class ActorTask {
 
   ActorTask() = delete;
   ActorTask(Profile* profile,
-            std::unique_ptr<ExecutionEngine> execution_engine);
+            std::unique_ptr<ExecutionEngine> execution_engine,
+            std::unique_ptr<ui::UiEventDispatcher> ui_event_dispatcher);
   ActorTask(const ActorTask&) = delete;
   ActorTask& operator=(const ActorTask&) = delete;
   ~ActorTask();
-
-  static std::unique_ptr<ActorTask> CreateForTesting(
-      Profile* profile,
-      std::unique_ptr<ExecutionEngine> execution_engine,
-      std::unique_ptr<ui::UiEventDispatcher> ui_event_dispatcher);
 
   // Can only be called by ActorKeyedService
   void SetId(base::PassKey<ActorKeyedService>, TaskId id);
@@ -86,13 +82,14 @@ class ActorTask {
 
   ExecutionEngine* GetExecutionEngine() const;
 
-  // Add the given TabHandle to the set of tabs this task is operating over
-  // and notify the UI if this is a new tab for the task.
+  // Add/remove the given TabHandle to the set of tabs this task is operating
+  // over and notify the UI if this is a new tab for the task.
   using AddTabCallback = base::OnceCallback<void(mojom::ActionResultPtr)>;
   void AddTab(tabs::TabHandle tab, AddTabCallback callback);
+  void RemoveTab(tabs::TabHandle tab);
 
   // Returns true if the given tab is part of this task's acting set.
-  bool HasActedOnTab(tabs::TabHandle tab) const;
+  bool IsActingOnTab(tabs::TabHandle tab) const;
 
   // Returns the tab to use to capture new context observations after an
   // execution turn. In the future this will be extended to multiple tabs and
@@ -106,10 +103,6 @@ class ActorTask {
   }
 
  private:
-  // Used by tests only.
-  ActorTask(Profile* profile,
-            std::unique_ptr<ExecutionEngine> execution_engine,
-            std::unique_ptr<ui::UiEventDispatcher> ui_event_dispatcher);
   void OnFinishedAct(ActCallback callback,
                      mojom::ActionResultPtr result,
                      std::optional<size_t> index_of_failed_action);

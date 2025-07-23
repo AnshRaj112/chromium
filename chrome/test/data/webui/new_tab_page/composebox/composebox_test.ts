@@ -4,7 +4,7 @@
 
 import {PageCallbackRouter, PageHandlerRemote} from 'chrome://new-tab-page/composebox.mojom-webui.js';
 import type {PageRemote} from 'chrome://new-tab-page/composebox.mojom-webui.js';
-import {FileUploadStatus} from 'chrome://new-tab-page/composebox_query.mojom-webui.js';
+import {FileUploadErrorType, FileUploadStatus} from 'chrome://new-tab-page/composebox_query.mojom-webui.js';
 import {ComposeboxElement, ComposeboxProxyImpl} from 'chrome://new-tab-page/lazy_load.js';
 import {$$} from 'chrome://new-tab-page/new_tab_page.js';
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
@@ -12,7 +12,7 @@ import {assertDeepEquals, assertEquals, assertFalse, assertTrue} from 'chrome://
 import type {TestMock} from 'chrome://webui-test/test_mock.js';
 import {eventToPromise, microtasksFinished} from 'chrome://webui-test/test_util.js';
 
-import {installMock} from '../test_support.js';
+import {assertStyle, installMock} from '../test_support.js';
 
 function generateZeroId(): string {
   // Generate 128 bit unique identifier.
@@ -62,39 +62,52 @@ suite('NewTabPageComposeboxTest', () => {
     });
   }
 
-  async function uploadImageAndVerify(token: Object) {
-    handler.setResultFor('addFile', Promise.resolve({token: token}));
+  function getInputForFileType(fileType: string): HTMLInputElement {
+    return fileType === 'application/pdf' ? composeboxElement.$.fileInput :
+                                            composeboxElement.$.imageInput;
+  }
 
-    // Assert no files.
-    assertEquals(composeboxElement.$.carousel.files.length, 0);
+  function getMockFileChangeEventForType(fileType: string): Event {
+    if (fileType === 'application/pdf') {
+      return new Event('change');
+    }
 
-    // Act.
-    const dataTransfer = new DataTransfer();
-
-    const file = new File(['foo'], 'foo.jpg', {type: 'image/jpeg'});
-    dataTransfer.items.add(file);
-
-    // Since the `onFileChange_` method checks the event target when creating
-    // the `objectUrl`, we have to mock it here.
     const mockFileChange = new Event('change', {bubbles: true});
     Object.defineProperty(mockFileChange, 'target', {
       writable: false,
       value: composeboxElement.$.imageInput,
     });
-    composeboxElement.$.imageInput.files = dataTransfer.files;
-    composeboxElement.$.imageInput.dispatchEvent(mockFileChange);
+    return mockFileChange;
+  }
+
+  async function uploadFileAndVerify(token: Object, file: File) {
+    // Assert no files.
+    assertEquals(composeboxElement.$.carousel.files.length, 0);
+
+    handler.setResultFor('addFile', Promise.resolve({token: token}));
+
+    // Act.
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+
+    const input: HTMLInputElement = getInputForFileType(file.type);
+    input.files = dataTransfer.files;
+    input.dispatchEvent(getMockFileChangeEventForType(file.type));
 
     await handler.whenCalled('addFile');
     await microtasksFinished();
 
-    // Assert one image file.
+    assertEquals(handler.getCallCount('notifySessionStarted'), 1);
+    await verifyFileUpload(file);
+  }
+
+  async function verifyFileUpload(file: File) {
+    // Assert one file.
     const files = composeboxElement.$.carousel.files;
     assertEquals(files.length, 1);
-    assertEquals(files[0]!.type, 'image/jpeg');
-    assertEquals(files[0]!.name, 'foo.jpg');
-    assertTrue(!!files[0]!.objectUrl);
 
-    assertEquals(handler.getCallCount('notifySessionStarted'), 1);
+    assertEquals(files[0]!.type, file.type);
+    assertEquals(files[0]!.name, file.name);
 
     // Assert file is uploaded.
     assertEquals(handler.getCallCount('addFile'), 1);
@@ -103,7 +116,7 @@ suite('NewTabPageComposeboxTest', () => {
     const fileArray = Array.from(new Uint8Array(fileBuffer));
 
     const [[fileInfo, fileData]] = handler.getArgs('addFile');
-    assertEquals(fileInfo.fileName, 'foo.jpg');
+    assertEquals(fileInfo.fileName, file.name);
     assertDeepEquals(fileData.bytes, fileArray);
   }
 
@@ -113,13 +126,7 @@ suite('NewTabPageComposeboxTest', () => {
         'addFile', Promise.resolve({token: {low: BigInt(1), high: BigInt(2)}}));
 
     // Check submit button disabled.
-    assertEquals(
-        window
-            .getComputedStyle(
-                $$<HTMLElement>(composeboxElement, '#submitIcon')!)
-            .cursor,
-        'default');
-
+    assertStyle(composeboxElement.$.submitIcon, 'cursor', 'default');
     // Add input.
     composeboxElement.$.input.value = 'test';
     composeboxElement.$.input.dispatchEvent(new Event('input'));
@@ -133,12 +140,7 @@ suite('NewTabPageComposeboxTest', () => {
     await microtasksFinished();
 
     // Check submit button enabled and file uploaded.
-    assertEquals(
-        window
-            .getComputedStyle(
-                $$<HTMLElement>(composeboxElement, '#submitIcon')!)
-            .cursor,
-        'pointer');
+    assertStyle(composeboxElement.$.submitIcon, 'cursor', 'pointer');
     assertEquals(composeboxElement.$.carousel.files.length, 1);
 
     // Clear input.
@@ -149,41 +151,97 @@ suite('NewTabPageComposeboxTest', () => {
     assertEquals(handler.getCallCount('clearFiles'), 1);
 
     // Check submit button disabled and files empty.
-    assertEquals(
-        window
-            .getComputedStyle(
-                $$<HTMLElement>(composeboxElement, '#submitIcon')!)
-            .cursor,
-        'default');
+    assertStyle(composeboxElement.$.submitIcon, 'cursor', 'default');
     assertEquals(composeboxElement.$.carousel.files.length, 0);
 
     // Close composebox.
-    const whenToggleComposebox =
-        eventToPromise('toggle-composebox', composeboxElement);
+    const whenCloseComposebox =
+        eventToPromise('close-composebox', composeboxElement);
     $$<HTMLElement>(composeboxElement, '#cancelIcon')!.click();
-    await whenToggleComposebox;
+    await whenCloseComposebox;
   });
 
   test('upload image', async () => {
     createComposeboxElement();
+    assertStyle(composeboxElement.$.submitIcon, 'cursor', 'default');
     const token = {low: BigInt(1), high: BigInt(2)};
-    await uploadImageAndVerify(token);
+    await uploadFileAndVerify(
+        token, new File(['foo'], 'foo.jpg', {type: 'image/jpeg'}));
+    assertStyle(composeboxElement.$.submitIcon, 'cursor', 'pointer');
   });
 
-
-
-  test('invalid image upload is removed', async () => {
+  test('upload empty file fails', async () => {
     createComposeboxElement();
-    const id = generateZeroId();
-    await uploadImageAndVerify(id);
+    const file = new File([''], 'foo.jpg', {type: 'image/jpeg'});
 
-    callbackRouterRemote.onFileUploadStatusChanged(
-        id, FileUploadStatus.kValidationFailed);
-    await callbackRouterRemote.$.flushForTesting();
+    // Act.
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    const input: HTMLInputElement = getInputForFileType(file.type);
+    input.files = dataTransfer.files;
+    input.dispatchEvent(getMockFileChangeEventForType(file.type));
+    await microtasksFinished();
 
-    // Assert no files in the carousel.
+    // Assert no files uploaded or rendered on the carousel
+    assertEquals(handler.getCallCount('addFile'), 0);
     const files = composeboxElement.$.carousel.files;
     assertEquals(files.length, 0);
+  });
+
+  test('upload large file fails', async () => {
+    const sampleFileMaxSize = 10;
+    loadTimeData.overrideValues({'composeboxFileMaxSize': sampleFileMaxSize});
+    createComposeboxElement();
+    const blob = new Blob(
+        [new Uint8Array(sampleFileMaxSize + 1)],
+        {type: 'application/octet-stream'});
+    const file = new File([blob], 'foo.jpg', {type: 'image/jpeg'});
+
+    // Act.
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    const input: HTMLInputElement = getInputForFileType(file.type);
+    input.files = dataTransfer.files;
+    input.dispatchEvent(getMockFileChangeEventForType(file.type));
+    await microtasksFinished();
+
+    // Assert no files uploaded or rendered on the carousel
+    assertEquals(handler.getCallCount('addFile'), 0);
+    const files = composeboxElement.$.carousel.files;
+    assertEquals(files.length, 0);
+  });
+
+  [[
+    FileUploadStatus.kValidationFailed,
+    FileUploadErrorType.kImageProcessingError,
+  ],
+   [
+     FileUploadStatus.kUploadFailed,
+     null,
+   ],
+   [
+     FileUploadStatus.kUploadExpired,
+     null,
+   ],
+  ].forEach(([fileUploadStatus, fileUploadErrorType, ..._]) => {
+    test(
+        `Image upload is removed on failed upload status ${fileUploadStatus}`,
+        async () => {
+          createComposeboxElement();
+          const id = generateZeroId();
+          const file = new File(['foo'], 'foo.jpg', {type: 'image/jpeg'});
+          await uploadFileAndVerify(id, file);
+
+          // These statuses
+          callbackRouterRemote.onFileUploadStatusChanged(
+              id, fileUploadStatus as FileUploadStatus,
+              fileUploadErrorType as FileUploadErrorType | null);
+          await callbackRouterRemote.$.flushForTesting();
+
+          // Assert no files in the carousel.
+          const files = composeboxElement.$.carousel.files;
+          assertEquals(files.length, 0);
+        });
   });
 
   test('upload pdf', async () => {
@@ -333,31 +391,34 @@ suite('NewTabPageComposeboxTest', () => {
     // Arrange.
     createComposeboxElement();
 
-    // Assert call has not occurred.
-    assertEquals(handler.getCallCount('notifySessionAbandoned'), 0);
+    composeboxElement.$.input.value = 'test';
+    composeboxElement.$.input.dispatchEvent(new Event('input'));
+    await microtasksFinished();
+
+    const whenCloseComposebox =
+        eventToPromise('close-composebox', composeboxElement);
 
     // Assert call occurs.
     composeboxElement.$.composebox.dispatchEvent(
         new KeyboardEvent('keydown', {key: 'Escape'}));
     await microtasksFinished();
-    assertEquals(handler.getCallCount('notifySessionAbandoned'), 1);
+    const event = await whenCloseComposebox;
+    assertEquals(event.detail.composeboxText, 'test');
   });
 
   test('session abandoned on cancel button click', async () => {
     // Arrange.
     createComposeboxElement();
 
-    // Assert call has not occurred.
-    assertEquals(handler.getCallCount('notifySessionAbandoned'), 0);
+    await microtasksFinished();
 
     // Close composebox.
-    const whenToggleComposebox =
-        eventToPromise('toggle-composebox', composeboxElement);
+    const whenCloseComposebox =
+        eventToPromise('close-composebox', composeboxElement);
     const cancelIcon = $$<HTMLElement>(composeboxElement, '#cancelIcon');
     assertTrue(!!cancelIcon);
     cancelIcon.click();
-    await whenToggleComposebox;
-    assertEquals(handler.getCallCount('notifySessionAbandoned'), 1);
+    await whenCloseComposebox;
   });
 
   test('submit button click leads to handler called', async () => {
@@ -369,9 +430,7 @@ suite('NewTabPageComposeboxTest', () => {
     composeboxElement.$.input.value = 'test';
     composeboxElement.$.input.dispatchEvent(new Event('input'));
     await microtasksFinished();
-    const submitIcon = $$<HTMLElement>(composeboxElement, '#submitIcon');
-    assertTrue(!!submitIcon);
-    submitIcon.click();
+    composeboxElement.$.submitIcon.click();
     await microtasksFinished();
 
     // Assert call occurs.
@@ -387,9 +446,7 @@ suite('NewTabPageComposeboxTest', () => {
     composeboxElement.$.input.value = '';
     composeboxElement.$.input.dispatchEvent(new Event('input'));
     await microtasksFinished();
-    const submitIcon = $$<HTMLElement>(composeboxElement, '#submitIcon');
-    assertTrue(!!submitIcon);
-    submitIcon.click();
+    composeboxElement.$.submitIcon.click();
     await microtasksFinished();
 
     // Assert call does not occur.
@@ -401,11 +458,9 @@ suite('NewTabPageComposeboxTest', () => {
     composeboxElement.$.input.value = ' ';
     composeboxElement.$.input.dispatchEvent(new Event('input'));
     await microtasksFinished();
-    const submitIcon = $$<HTMLElement>(composeboxElement, '#submitIcon');
-    assertTrue(!!submitIcon);
 
     // Assert.
-    assertTrue(submitIcon.hasAttribute('disabled'));
+    assertTrue(composeboxElement.$.submitIcon.hasAttribute('disabled'));
   });
 
   test('keydown submit only works for enter', async () => {
@@ -439,5 +494,21 @@ suite('NewTabPageComposeboxTest', () => {
 
     // Assert call occurs.
     assertEquals(handler.getCallCount('submitQuery'), 1);
+  });
+
+  test('clear button title changes with input', async () => {
+    createComposeboxElement();
+    assertEquals(
+        composeboxElement.$.cancelIcon.getAttribute('title'),
+        loadTimeData.getString('composeboxCancelButtonTitle'));
+    // Arrange.
+    composeboxElement.$.input.value = 'Test';
+    composeboxElement.$.input.dispatchEvent(new Event('input'));
+    await microtasksFinished();
+
+    // Assert.
+    assertEquals(
+        composeboxElement.$.cancelIcon.getAttribute('title'),
+        loadTimeData.getString('composeboxCancelButtonTitleInput'));
   });
 });

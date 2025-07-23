@@ -726,7 +726,6 @@ component("net") {
     "http/transport_security_persister.cc",
     "http/transport_security_persister.h",
     "http/transport_security_state.h",
-    "http/transport_security_state_source.cc",
     "http/transport_security_state_source.h",
     "http/url_security_manager.cc",
     "http/url_security_manager.h",
@@ -2294,7 +2293,6 @@ static_library("test_support") {
     "data/parse_certificate_unittest/",
     "data/ssl/",
     "data/url_request_unittest/",
-    "data/websocket/",
   ]
 
   if (is_mac) {
@@ -3969,6 +3967,15 @@ if (use_fuzzing_engine) {
     testonly = true
     visibility = [
       ":net_web_socket_encoder_fuzzer",
+      ":net_web_socket_encoder_fuzzer__apk__compile_java",
+      ":net_web_socket_encoder_fuzzer__apk__compile_resources",
+      ":net_web_socket_encoder_fuzzer__apk__create",
+      ":net_web_socket_encoder_fuzzer__apk__java",
+      ":net_web_socket_encoder_fuzzer__apk__java__dex",
+      ":net_web_socket_encoder_fuzzer__apk__java__header",
+      ":net_web_socket_encoder_fuzzer__apk__java__validate",
+      ":net_web_socket_encoder_fuzzer__library",
+      ":net_web_socket_encoder_fuzzer__library__jni_registration__native_sources",
       ":net_web_socket_encoder_fuzzer_executable",
       ":run_net_web_socket_encoder_fuzzer",
     ]

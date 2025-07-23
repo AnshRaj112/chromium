@@ -947,9 +947,6 @@ For more settings that use data to improve your Chrome experience, go to <ph nam
       <message name="IDS_POST_PWD_MIGRATION_SHEET_SUBTITLE_ABOUT_LOCAL_PWD" desc="The subtitle of the post password migration sheet that emphasises on merging local passwords." formatter_data="android_java">
         All passwords saved only to this device for Chrome and <ph name="CHROME_CHANNEL">%1$s<ex>Chrome Dev</ex></ph> were merged. You can autofill all your saved passwords on both apps.
       </message>
-      <message name="IDS_EXPORTED_PASSWORDS_DELETION_IN_PROGRESS_TITLE" desc="The title of the progress bar that is visible while the passwords are being deleted." formatter_data="android_java">
-        Deleting
-      </message>
       <message name="IDS_PASSWORDS_EXPORT_IN_PROGRESS_TITLE" desc="The title of the progress bar that is visible while the passwords are being exported." formatter_data="android_java">
         Exporting
       </message>
@@ -989,18 +986,6 @@ For more settings that use data to improve your Chrome experience, go to <ph nam
       <message name="IDS_ACCESS_LOSS_NO_GMS_POSITIVE_BUTTON_TEXT" desc="If the user has no Google Play services installed on the phone, they see the modal dialog warning them that passwords will stop working soon and proposing them to export their paswords before that. This string is the agreement button text in the warning.">
         Export passwords
       </message>
-      <message name="IDS_ACCESS_LOSS_EXPORT_DIALOG_TITLE" desc="The title of the modal dialog proposing the user to export their passwords from Chrome and remove them from Chrome's database (to later import them in Google Play Services).">
-        First, export and delete the passwords from Chrome
-      </message>
-      <message name="IDS_ACCESS_LOSS_EXPORT_DIALOG_TITLE_NO_GMS" desc="The title of the modal dialog proposing the user to export their passwords from Chrome and remove them from Chrome's database.">
-        Export and delete the passwords
-      </message>
-      <message name="IDS_ACCESS_LOSS_EXPORT_DIALOG_MESSAGE" desc="The message of the modal dialog proposing the user to export their passwords from Chrome and remove them from Chrome's database (to later import them in Google Play Services).">
-        Your passwords will be downloaded as a CSV file. They will be visible to anyone who can access the file, including apps. Exported passwords will be deleted from Chrome.
-      </message>
-      <message name="IDS_ACCESS_LOSS_EXPORT_DIALOG_POSITIVE_BUTTON_TEXT" desc="The text on the button, confirming the user's agreement to export passwords and remove them from Chrome's database.">
-        Export and delete
-      </message>
       <message name="IDS_ACCESS_LOSS_IMPORT_DIALOG_TITLE" desc="The title of the dialog instructing the user to import passwords into Google Password Manager.">
         Next, import the passwords
       </message>
@@ -1009,21 +994,6 @@ For more settings that use data to improve your Chrome experience, go to <ph nam
       </message>
       <message name="IDS_ACCESS_LOSS_IMPORT_DIALOG_POSITIVE_BUTTON_TEXT" desc="The positive button text in the dialog instructing the user to import passwords into Google Password Manager.">
         Take me there
-      </message>
-      <message name="IDS_ACCESS_LOSS_PREF_DESC_NO_UPM" desc="The subtitle of the Google Password Manager item in Chrome main settings when the GMS core version on the device is too outdated to support UPM. Displayed only if the UPM is not functioning properly.">
-        Passwords will stop working soon
-      </message>
-      <message name="IDS_ACCESS_LOSS_PREF_DESC_MIGRATION_FAILED" desc="The subtitle of the Google Password Manager item in Chrome main settings when the automatic migration to UPM failed. Displayed only if the UPM is not functioning properly.">
-        Some passwords will stop working soon
-      </message>
-      <message name="IDS_ACCESS_LOSS_PREF_DESC_NO_GMS_CORE" desc="The subtitle of the Google Password Manager item in Chrome main settings when there is no GMS Core on the device. Displayed only if the UPM is not functioning properly.">
-        Passwords will stop working on this device
-      </message>
-      <message name="IDS_ACCESS_LOSS_PREF_DESC_ONLY_ACCOUNT_UPM" desc="The subtitle of the Google Password Manager item in Chrome main settings when GMS Core version on the device supports only account passwords. Displayed only if the UPM is not functioning properly.">
-        Passwords may stop working soon
-      </message>
-      <message name="IDS_ACCESS_LOSS_PREF_DESC_NO_PWDS" desc="The subtitle of the Google Password Manager item in Chrome main settings when there is no GMS Core on the device and there are no local passwords saved in Chrome. Displayed only if the UPM is not functioning properly.">
-        Passwords will stop working on this device
       </message>
       <message name="IDS_ACCESS_LOSS_NO_GMS_NO_PASSWORDS_TITLE" desc="The title of the password access loss warning shown in Settings when the user tries to navigate to the Password Manager settings if no Google Play Services is installed on the phone and there are no passwords saved in the profile store.">
         Google Password Manager will stop working soon on this device
@@ -2534,9 +2504,6 @@ Your Google account may have other forms of browsing history like searches and a
       <message name="IDS_SIGNOUT_MESSAGE" desc="The text is displayed as the message of a dialog to confirm whether the user wants to sign out of Chrome. The dialog is titled ‘Sign out of Chrome?’. The user can cancel and stay signed in, or confirm and sign out.">
         Some Chrome features won\u2019t be available anymore
       </message>
-      <message name="IDS_TURN_OFF_SYNC_AND_SIGNOUT_MESSAGE" desc="Message to display in 'Sign out and turn off sync?' dialog">
-        Your bookmarks, history, passwords, and other Chrome data will no longer be synced to your Google Account
-      </message>
       <message name="IDS_TURN_OFF_SYNC_AND_SIGNOUT_MESSAGE_WITHOUT_PASSWORDS" desc="Message to display in 'Sign out and turn off sync?' dialog, without explicitly mentioning passwords. Similar to IDS_TURN_OFF_SYNC_AND_SIGNOUT_MESSAGE">
         Your bookmarks, history, and other Chrome data will no longer be synced to your Google Account
       </message>
@@ -4020,12 +3987,6 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
       <message name="IDS_RECENT_TABS" desc="Text for button to show 'Recent tabs', i.e. recently closed tabs and tabs that are open on other devices [CHAR_LIMIT=20]">
         Recent tabs
-      </message>
-      <message name="IDS_MOST_VISITED_PLACEHOLDER_TITLE" desc="Header text shown on the new tab page when there are no most visited tiles yet.">
-        Nothing to see here… yet
-      </message>
-      <message name="IDS_MOST_VISITED_PLACEHOLDER_SUMMARY" desc="Explanation text shown on the new tab page when there are no most visited tiles yet.">
-        Your most visited pages will appear here
       </message>
       <message name="IDS_MOST_VISITED_ITEM_REMOVED" desc="Text shown when the user removes one of the most visited websites on the new tab page.">
         Item removed
@@ -6550,6 +6511,12 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       <message name="IDS_CUSTOM_TAB_CANT_PERFORM_ACTION_TOAST" desc="Toast displayed when the URL currently being displayed in the Custom Tab cannot be opened in the regular browser.">
         Something went wrong. Try again.
       </message>
+      <message name="IDS_ACCESSIBILITY_CUSTOM_TAB_MENU_WITH_DOT" desc="Content description for the menu with a dot indicating the fallback UI for contextual page action is highlighted.">
+        Customize and control Google Chrome with a highlighted item
+      </message>
+      <message name="IDS_ACCESSIBILITY_CUSTOM_TAB_MENU_ITEM_HIGHLIGHT" desc="Announcement made when the overflow menu has a highlighted item for a recommended contextual page action.">
+        <ph name="MENU_NAME">%1$s<ex>Price Tracking</ex></ph> menu is highlighted.
+      </message>
 
       <message name="IDS_ACCOUNT_SELECTION_CONTINUE" desc="Title of the button that continues filling with the only available set of credentials.">
         Continue as <ph name="NAME">%1$s<ex>Albus (or Albus Dumbledore)</ex></ph>
@@ -7233,6 +7200,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
       </message>
       <message name="IDS_HUB_SEARCH_STATUS_VIEW_BACK_BUTTON_ICON_DESCRIPTION" desc="Accessibility string describing the back icon in the search box to exit hub search.">
         Back
+      </message>
+      <message name="IDS_ACCESSIBILITY_SEARCH_LOUPE_TOOLTIP_TEXT" desc="Content description for opening up the tab search window, which allows users to search their tabs.">
+        Open tab search
       </message>
 
       <!-- Default browser promo -->

@@ -34,6 +34,9 @@ BASE_DECLARE_FEATURE(kAutofillAiIgnoreGeoIp);
 COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillAiIgnoreLocale);
 COMPONENT_EXPORT(AUTOFILL)
+BASE_DECLARE_FEATURE(
+    kAutofillAiIgnoreWhetherUserHasAddressOrPaymentsDataForIph);
+COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillAiNationalIdCard);
 COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillAiNoTagTypes);
@@ -285,7 +288,7 @@ BASE_DECLARE_FEATURE(kAutofillBetterLocalHeuristicPlaceholderSupport);
 COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kUseSettingsAddressEditorInPaymentsRequest);
 COMPONENT_EXPORT(AUTOFILL)
-BASE_DECLARE_FEATURE(kUseStructuralSignatureInsteadOfSecondary);
+BASE_DECLARE_FEATURE(kAutofillUseStructuralSignatureInsteadOfSecondary);
 
 // Identifies different strings that can be used in the CTA button for the
 // Autofill Iph.
@@ -297,6 +300,8 @@ enum class AutofillIphCTAVariationsStringVarations {
 };
 
 #if BUILDFLAG(IS_ANDROID)
+COMPONENT_EXPORT(AUTOFILL)
+BASE_DECLARE_FEATURE(kAutofillAndroidDesktopSuppressAccessoryOnEmpty);
 COMPONENT_EXPORT(AUTOFILL)
 BASE_DECLARE_FEATURE(kAutofillDeepLinkAutofillOptions);
 COMPONENT_EXPORT(AUTOFILL)

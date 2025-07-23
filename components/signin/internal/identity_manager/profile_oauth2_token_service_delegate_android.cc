@@ -162,7 +162,7 @@ ProfileOAuth2TokenServiceDelegateAndroid::
   base::android::ScopedJavaLocalRef<jobject> local_java_ref =
       signin::Java_ProfileOAuth2TokenServiceDelegate_Constructor(
           env, reinterpret_cast<intptr_t>(this));
-  java_ref_.Reset(env, local_java_ref.obj());
+  java_ref_.Reset(env, local_java_ref);
 }
 
 ProfileOAuth2TokenServiceDelegateAndroid::
@@ -377,6 +377,14 @@ bool ProfileOAuth2TokenServiceDelegateAndroid::UpdateAccountList(
     }
   }
   return keep_accounts;
+}
+
+void ProfileOAuth2TokenServiceDelegateAndroid::UpdateAuthErrorFromJava(
+    JNIEnv* env,
+    CoreAccountId& core_account_id,
+    GoogleServiceAuthError& auth_error,
+    jboolean fire_auth_error_changed) {
+  UpdateAuthError(core_account_id, auth_error, fire_auth_error_changed);
 }
 
 void ProfileOAuth2TokenServiceDelegateAndroid::FireRefreshTokensLoaded() {

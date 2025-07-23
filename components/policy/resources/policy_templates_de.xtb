@@ -314,6 +314,7 @@ Die Muster für diese Richtlinie dürfen allerdings keine „/path“- oder „@
       <ph name="IMAGE_SEARCH_SOURCE" />,
       <ph name="IMAGE_THUMBNAIL" />,
       <ph name="IMAGE_THUMBNAIL_BASE64" />.</translation>
+<translation id="1238150413700645698">Geschützte Inhalte</translation>
 <translation id="1238868319430505522">Konfiguration des <ph name="CLOUD_UPLOAD_NAME" />-Ablaufs für <ph name="GOOGLE_DRIVE_NAME" /> und <ph name="GOOGLE_WORKSPACE_NAME" /></translation>
 <translation id="1239526922294123540">Diese Richtlinie legt fest, ob Websites unsichere Anfragen an eher private Netzwerk-Endpunkte senden dürfen.
 
@@ -601,6 +602,7 @@ Eine erneute Onlineauthentifizierung kann aus verschiedenen Gründen erforderlic
       Wenn du die Richtlinie auf „Fast“ setzt, vermeidet <ph name="PRODUCT_NAME" /> das Rastern, wenn möglich. Wenn weniger gerastert wird, können die Größe der Druckaufträge reduziert und die Druckgeschwindigkeit erhöht werden.
 
       Wird sie nicht konfiguriert, befindet sich <ph name="PRODUCT_NAME" /> im Modus „Full“.</translation>
+<translation id="1453707129684226879">Hiermit werden Richtlinien für geschützte Inhalte gesteuert.</translation>
 <translation id="1455351936334569779">Druckertypen auf der Verweigerungsliste können nicht gefunden und die entsprechenden Eigenschaften nicht abgerufen werden.
 
       Wenn alle Druckertypen auf die Verweigerungsliste gesetzt werden, sind keine Druckziele mehr verfügbar und es kann daher nicht mehr gedruckt werden.
@@ -1762,31 +1764,6 @@ Wenn die Richtlinie nicht konfiguriert oder deaktiviert ist, ist eine Dateiüber
 <translation id="225830954785359083">Verhindern, dass Seiten beim Entfernen Pop-ups anzeigen</translation>
 <translation id="2261648512244797294">Veraltetes Drucken über Privet deaktivieren</translation>
 <translation id="2263881357524831360">Verwendung von Drittanbieter-Passwortmanagern in <ph name="PRODUCT_NAME" /> unter <ph name="ANDROID_NAME" /> erlauben</translation>
-<translation id="2264286153777425328">Liste der Aktionen, die ausgeführt werden sollen, wenn das Zeitlimit in der Richtlinie <ph name="IDLE_TIMEOUT_POLICY_NAME" /> erreicht ist.
-
-Warnung: Das Festlegen dieser Richtlinie kann sich auf lokale private Daten auswirken und diese dauerhaft entfernen. Wir empfehlen, die Einstellungen vor der Bereitstellung zu testen, um das versehentliche Löschen von privaten Daten zu verhindern.
-
-Wenn die Richtlinie „<ph name="IDLE_TIMEOUT_POLICY_NAME" />“ nicht konfiguriert ist, hat diese Richtlinie keine Auswirkungen.
-
-Wird das Zeitlimit in der Richtlinie „<ph name="IDLE_TIMEOUT_POLICY_NAME" />“ erreicht, führt der Browser die in dieser Richtlinie konfigurierten Aktionen aus.
-
-Wenn diese Richtlinie leer oder nicht konfiguriert ist, hat die Richtlinie „<ph name="IDLE_TIMEOUT_POLICY_NAME" />“ keine Auswirkungen.
-
-Unterstützte Aktionen:
-
-      „<ph name="CLOSE_BROWSERS_ACTION" />“: Alle Browserfenster und PWAs für dieses Profil werden geschlossen. Diese Aktion wird auf Android- und iOS‑Geräten nicht unterstützt.
-
-„<ph name="CLOSE_TABS_ACTION" />“: Alle geöffneten Tabs in geöffneten Fenstern werden geschlossen. Diese Aktion wird nur auf iOS‑Geräten unterstützt.
-
-„<ph name="SHOW_PROFILE_PICKER_ACTION" />“: Das Fenster mit der Profilauswahl wird angezeigt. Diese Aktion wird auf Android- und iOS‑Geräten nicht unterstützt.
-
-„<ph name="SIGN_OUT_ACTION" />“: Der aktuell angemeldete Nutzer wird abgemeldet. Diese Aktion wird nur auf iOS‑Geräten unterstützt.
-
-„<ph name="CLEAR_BROWSING_HISTORY_ACTION" />“, „<ph name="CLEAR_DOWNLOAD_HISTORY_ACTION" />“, „<ph name="CLEAR_COOKIES_AND_OTHER_SITE_DATA_ACTION" />“, „<ph name="CLEAR_CACHED_IMAGES_AND_FILES_ACTION" />“, „<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />“, „<ph name="CLEAR_AUTOFILL_ACTION" />“, „<ph name="CLEAR_SITE_SETTINGS_ACTION" />“, „<ph name="CLEAR_HOSTED_APP_DATA_ACTION" />“: Die entsprechenden Browserdaten werden gelöscht. Weitere Informationen findest du in der Richtlinie „<ph name="CLEAR_BROWSING_DATA_ON_EXIT_LIST_POLICY_NAME" />“. Auf iOS‑Geräten werden folgende Typen unterstützt: „<ph name="CLEAR_BROWSING_HISTORY_ACTION" />“, „<ph name="CLEAR_COOKIES_AND_OTHER_SITE_DATA_ACTION" />“, „<ph name="CLEAR_CACHED_IMAGES_AND_FILES_ACTION" />“, „<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />“ und „<ph name="CLEAR_AUTOFILL_ACTION" />“'
-
-      „<ph name="RELOAD_PAGES_ACTION" />“: Alle Webseiten werden neu geladen. Bei einigen Seiten wird der Nutzer eventuell zuerst um Bestätigung gebeten. Diese Funktion wird auf iOS‑Geräten nicht unterstützt.
-
-Wenn du „<ph name="CLEAR_BROWSING_HISTORY_ACTION" />“, „<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />“, „<ph name="CLEAR_AUTOFILL_ACTION" />“ und „<ph name="CLEAR_SITE_SETTINGS_ACTION" />“ festlegst, wird die Synchronisierung für die entsprechenden Datentypen deaktiviert, wenn weder „<ph name="CHROME_SYNC_NAME" />“ durch Festlegen der Richtlinie „<ph name="SYNC_DISABLED_POLICY_NAME" />“ noch „<ph name="BROWSER_SIGNIN_POLICY_NAME" />“ deaktiviert ist.</translation>
 <translation id="2266422599396179941">Zulassen, dass Nutzer Feedback geben</translation>
 <translation id="2268891553068901979">Wenn die Richtlinie aktiviert ist, wird bei einer Mobilfunkverbindung die Synchronisierung zwischen <ph name="GOOGLE_DRIVE_NAME" /> und der App „Dateien“ von <ph name="PRODUCT_OS_NAME" /> deaktiviert. Dateien werden nur mit Drive synchronisiert, wenn eine WLAN- oder Ethernet-Verbindung besteht.
 
@@ -2193,6 +2170,7 @@ Wenn diese Richtlinie nicht konfiguriert oder auf „True“ gesetzt ist, ist di
 Wenn sie auf „False“ gesetzt ist, ist die Funktion für Gruppen ähnlicher Websites deaktiviert.</translation>
 <translation id="2555244983262829274">„Home“-Schaltfläche in der Symbolleiste ausblenden</translation>
 <translation id="2558154810835597313">Ermöglicht die Bereitstellung von Clientzertifikaten für verwaltete Nutzer und Profile</translation>
+<translation id="2559274305158103883">Post-Quanten-Algorithmus für Schlüsselvereinbarungen mit WebRTC deaktivieren</translation>
 <translation id="2562213287271514629">Zulassen, dass veraltete <ph name="FLASH_PLUGIN_NAME" />-Plug-ins als normale <ph name="FLASH_PLUGIN_NAME" />-Plug-ins verwendet werden</translation>
 <translation id="2562339630163277285">Gibt die URL an, die die Suchmaschine für die Bereitstellung von Instant-Ergebnissen verwendet. Die URL sollte den String "<ph name="SEARCH_TERM_MARKER" />" enthalten, der bei der Abfrage durch den Text ersetzt wird, den der Nutzer bisher eingegeben hat.
 
@@ -2740,6 +2718,14 @@ Ist sie auf „false“ gesetzt, können sie nicht auf die Funktion zugreifen.</
 <translation id="2985927503455169394">Standardmodus für das Einrichten von Assistant verwenden</translation>
 <translation id="2987155890997901449">ARC aktivieren</translation>
 <translation id="2987227569419001736">Verwendung der Web Bluetooth API steuern</translation>
+<translation id="2988299727303303535">Diese Richtlinie bietet für bestimmte Domains eine vorübergehende Ausnahme vom neuen ursprungsgebundenen Cookie-Verhalten.
+
+Wenn du eine Domain zur Liste hinzufügst, können Cookies aus dieser Domain über ein anderes Schema oder einen anderen Port verwendet werden.
+Weitere Informationen findest du unter <ph name="LEGACY_COOKIE_SCOPE_ENABLED_POLICY_NAME" />.
+
+Für Cookies in Domains, die diesen Mustern nicht entsprechen, oder für alle Cookies, falls diese Richtlinie nicht konfiguriert ist, gilt das ursprungsgebundene Cookie-Verhalten.
+
+Diese Richtlinie wird in Zukunft entfernt.</translation>
 <translation id="2989404644164421834">Seiten neu laden</translation>
 <translation id="299127280603727143">Eine Gruppe von Richtlinien zu den Einstellungen für den Zugriff auf das lokale Netzwerk.  Siehe https://developer.chrome.com/blog/local-network-access</translation>
 <translation id="299446489108785864">Eine Liste von URLs, die angibt, auf welche URLs die Richtlinie <ph name="AUTO_OPEN_FILE_TYPES_POLICY_NAME" /> angewendet wird. Diese Richtlinie hat keine Auswirkung auf automatisch geöffnete Werte, die von Nutzern festgelegt werden.
@@ -3736,17 +3722,6 @@ Verbindungen, die diese Prüfung nicht bestehen, schlagen mit dem Fehler ERR_SSL
       Ist die Richtlinie deaktiviert, darf die Translator API nicht verwendet werden.</translation>
 <translation id="366494444808132420">Gemini-Integrationen zulassen.</translation>
 <translation id="3665437376055221832">Nutzer nur dann auffordern, wenn kein Zertifikat zur automatischen Auswahl passt.</translation>
-<translation id="3667467644216039144">Konfiguriert eine Liste von Browserdatentypen, die beim Schließen aller Browserfenster gelöscht werden sollen.
-
-Warnung: Das Festlegen dieser Richtlinie kann sich auf lokale private Daten auswirken und diese dauerhaft entfernen. Wir empfehlen, die Einstellungen vor der Bereitstellung zu testen, um das versehentliche Löschen von privaten Daten zu verhindern.
-
-Die folgenden Datentypen sind verfügbar: Browserverlauf (<ph name="DATA_TYPE_BROWSING_HISTORY" />), Downloadverlauf (<ph name="DATA_TYPE_DOWNLOAD_HISTORY" />), Cookies (<ph name="DATA_TYPE_COOKIES_AND_OTHER_SITE_DATA" />), Cache (<ph name="DATA_TYPE_CACHED_IMAGES_AND_FILES" />), die Funktion „Autofill“ (<ph name="DATA_TYPE_AUTOFILL" />), Passwörter (<ph name="DATA_TYPE_PASSWORD" />), Website-Einstellungen (<ph name="DATA_TYPE_SITE_SETTINGS" />) und Daten von gehosteten Apps (<ph name="DATA_TYPE_HOSTED_APP_DATA" />). Diese Richtlinie hat keinen Vorrang vor <ph name="ALLOW_DELETING_BROWSER_HISTORY_POLICY_NAME" />.
-
-Bis Chrome 114 musste die Richtlinie „<ph name="SYNC_DISABLED_POLICY_NAME" />“ auf „True“ gesetzt werden. Ab Chrome 115 wird mit dieser Richtlinie die Synchronisierung für die jeweiligen Datentypen deaktiviert, wenn weder „<ph name="CHROME_SYNC_NAME" />“ durch Festlegen der Richtlinie „<ph name="SYNC_DISABLED_POLICY_NAME" />“ noch „<ph name="BROWSER_SIGNIN_POLICY_NAME" />“ deaktiviert ist.
-
-Wenn die Datenlöschung gestartet, aber aus irgendeinem Grund nicht abgeschlossen wurde, werden die Browserdaten beim nächsten Laden des Profils gelöscht.
-
-Wenn <ph name="PRODUCT_NAME" /> nicht ordnungsgemäß beendet wird, z. B. beim Absturz des Browsers oder Betriebssystems, werden die Browserdaten nicht gelöscht, da der Browser nicht durch den Nutzer geschlossen wurde.</translation>
 <translation id="3671773704245936868">„Objekt mit Tastaturfokus hervorheben“ deaktivieren</translation>
 <translation id="3674010627788940405">CORS-Anfrageheader ohne Platzhalter nicht unterstützen.</translation>
 <translation id="3675303748198647471">„setTimeout(…, 0)“ wird häufig verwendet, um lange JavaScript-Aufgaben aufzuteilen.
@@ -4867,6 +4842,27 @@ Diese Richtlinie ist nicht wirksam, wenn sie aktiviert ist, leer gelassen oder n
       Diese Richtlinie betrifft nur Nutzer, die sich über GAIA ohne SAML authentifizieren.
 
       Der Wert der Richtlinie muss in Tagen angegeben werden.</translation>
+<translation id="4523997900743255417">Durch diese Richtlinie wird festgelegt, ob die <ph name="PRIVACY_SANDBOX_NAME" />-Funktion „<ph name="IP_PROTECTION_NAME" />“ aktiviert werden soll.
+
+Durch die Funktion „<ph name="IP_PROTECTION_NAME" />“ wird die Verfügbarkeit der ursprünglichen IP-Adresse von Nutzern, die im Inkognitomodus surfen, für bestimmte Netzwerkanfragen von Drittanbietern eingeschränkt. Dadurch werden Nutzer im Inkognitomodus besser vor websiteübergreifendem Tracking geschützt.
+
+Ist die Richtlinie deaktiviert, ist die Funktion „<ph name="IP_PROTECTION_NAME" />“ deaktiviert und Nutzer können sie nicht über die Einstellungen der Benutzeroberfläche aktivieren.
+Ist die Richtlinie aktiviert, ist die Funktion „<ph name="IP_PROTECTION_NAME" />“ aktiviert und Nutzer können sie nicht über die Einstellungen der Benutzeroberfläche deaktivieren.
+Ist die Richtlinie nicht konfiguriert, ist die Funktion „<ph name="IP_PROTECTION_NAME" />“ standardmäßig aktiviert und Nutzer können sie auf ihrem Gerät über die Einstellungen der Benutzeroberfläche steuern.
+
+Hinweise für Unternehmen, die erwägen, die Funktion „<ph name="IP_PROTECTION_NAME" />“ zu deaktivieren:
+
+– Bei Anfragen über einen Proxy werden keine DNS-Lookups durchgeführt. Dies kann sich auf die DNS-basierte Kontrolle oder Filterung auswirken.
+
+– Bei Unternehmensanwendungen, die im Inkognitomodus verwendet werden, können Probleme auftreten, wenn sie auf Anfragen an Domains (oder zugehörige Subdomains) auf der Liste der maskierten Domains (<ph name="MASKED_DOMAIN_LIST_URL" />) angewiesen sind und diese Anfragen aus bestimmten IP-Adressbereichen stammen müssen.
+
+– Unter bestimmten Bedingungen wird der Traffic im Inkognitomodus möglicherweise nicht über einen Proxy geleitet, z. B. wenn Nutzer den Inkognitomodus über ein Chrome-Profil starten, in dem sie nicht angemeldet sind. Im Allgemeinen erfordert die Funktion, dass die Nutzer beim Starten des Inkognitomodus in Chrome in einem privaten Google-Konto angemeldet sind.
+
+– Die Liste der maskierten Domains kann sich im Laufe der Zeit ändern. Neue Versionen werden automatisch an Nutzer gesendet. Weitere Informationen zur Liste der maskierten Domains findest du unter <ph name="MASKED_DOMAIN_LIST_CRITERIA_URL" />.
+
+Weitere Informationen zur Funktion „<ph name="IP_PROTECTION_NAME" />“ findest du unter <ph name="IP_PROTECTION_README_URL" />.
+
+Die Funktion „<ph name="IP_PROTECTION_NAME" />“ wird frühestens mit M139 eingeführt.</translation>
 <translation id="4525328580251166229">Steuert zum Bruschetta-Subsystem gehörige Richtlinien.</translation>
 <translation id="4528981768990874684">Funktion „<ph name="IP_PROTECTION_NAME" />“ deaktivieren.</translation>
 <translation id="453031441196755904">Diese Richtlinie ist veraltet.</translation>
@@ -5097,6 +5093,7 @@ Diese Richtlinie ist vorübergehend und wird zukünftig entfernt.</translation>
 
       Hinweis: Diese Einstellung überschreibt <ph name="REMOTE_ACCESS_HOST_CLIENT_DOMAIN_POLICY_NAME" />, sofern vorhanden.</translation>
 <translation id="4658380868451934335">„Spracheingabe“ auf dem Anmeldebildschirm aktivieren</translation>
+<translation id="4658420696622830453">Einstellungen für geschützte Inhalte</translation>
 <translation id="4660356908994631271">Schaltfläche „Google Lens“ im Suchfeld auf der Seite „Neuer Tab“ anzeigen.</translation>
 <translation id="4661885151480410620">Verhaltensänderungen können abhängig vom Funktionseinführungsprozess wirksam werden.</translation>
 <translation id="4661889655253181651">Unter "Inhaltseinstellungen" kannst du angeben, wie Inhalte bestimmter Typen (z. B. Cookies, Bilder oder JavaScript) verarbeitet werden.</translation>
@@ -6363,6 +6360,9 @@ Unter <ph name="MAC_OS_NAME" /> steht diese Richtlinie nur bei Instanzen zur Ver
 <translation id="5488268615614906498">Mit dieser Richtlinie wird festgelegt, ob der Nutzer Dateien direkt über den Download-Manager in <ph name="GOOGLE_DRIVE_NAME" /> speichern darf.
 Wenn die Richtlinie aktiviert oder nicht konfiguriert ist, kann der Nutzer Dateien über den Download-Manager in <ph name="GOOGLE_DRIVE_NAME" /> speichern. Wenn die Richtlinie deaktiviert ist, kann der Nutzer die Option im Download-Manager nicht sehen.
 Diese Richtlinie hindert den Nutzer nicht daran, andere Möglichkeiten als den Download-Manager zum Speichern von Dateien in <ph name="GOOGLE_DRIVE_NAME" /> zu nutzen.</translation>
+<translation id="5490462588616309068">Wenn die Richtlinie auf „True“ gesetzt oder nicht konfiguriert ist, ist die Verwendung von Kennungen für geschützte Inhalte zulässig. Dadurch kann die Wiedergabequalität geschützter Inhalte verbessert werden.
+
+Wenn die Richtlinie auf „False“ gesetzt ist, dürfen keine Kennungen für geschützte Inhalte verwendet werden.</translation>
 <translation id="5494322570831642650">Gibt an, ob der Nutzer Seiten in <ph name="PRODUCT_NAME" /> im Inkognitomodus öffnen kann.
 
       Ist diese Richtlinie aktiviert oder nicht konfiguriert, können Seiten im Inkognitomodus geöffnet werden.
@@ -6648,6 +6648,7 @@ Wenn die Richtlinie nicht konfiguriert ist oder das Alter des Release nicht ermi
       Die Richtlinie kann für bestimmte URL-Muster überschrieben werden. Hierfür stehen die Richtlinien „<ph name="CLIPBOARD_ALLOWED_FOR_URLS_POLICY_NAME" />“ und „<ph name="CLIPBOARD_BLOCKED_FOR_URLS_POLICY_NAME" />“ zur Verfügung.
 
       Diese Richtlinie bezieht sich nur auf Aktionen in der Zwischenablage, die in der entsprechenden Websiteberechtigung konfiguriert werden. Sie hat keinerlei Auswirkung auf unformatierte Inhalte in der Zwischenablage oder vertrauenswürdige Kopieren/Einfügen-Vorgänge.</translation>
+<translation id="5649788773465136073">Die Verwendung von Kennungen für geschützte Inhalte auf Websites deaktivieren. Dies kann zu einer geringeren Wiedergabequalität geschützter Inhalte führen.</translation>
 <translation id="5650256117857913687">Nutzer mit Remote-Zugriff daran hindern, URLs auf Hostseite in ihrem lokalen Clientbrowser zu öffnen</translation>
 <translation id="5650716720715977549">Einschränkungen auf Anfragen an eher private Netzwerk-Endpunkte anwenden</translation>
 <translation id="5651538748810288218">Wenn die Richtlinie auf 1 gesetzt ist, dürfen Websites auf Sensoren wie Bewegungs- und Lichtsensoren zugreifen und diese nutzen. Ist sie auf 2 gesetzt, wird der Zugriff auf alle Sensoren verweigert.
@@ -6939,6 +6940,7 @@ Wenn keine der beiden Richtlinien konfiguriert ist, werden alle Webdienstauthent
       Wenn die Richtlinie auf "false" gesetzt oder nicht konfiguriert ist, darf <ph name="PLUGIN_VM_NAME" /> keine Daten erheben.
       Ist die Richtlinie auf "true" gesetzt, erhebt <ph name="PLUGIN_VM_NAME" /> möglicherweise Nutzerdaten von <ph name="PLUGIN_VM_NAME" />, die dann kombiniert und gründlich analysiert werden, um die Nutzung von <ph name="PLUGIN_VM_NAME" /> weiter zu verbessern.</translation>
 <translation id="5872738620659477303">Google-Anmeldedaten an ein Gerät binden</translation>
+<translation id="5873333871812203119">Ermöglicht Webseiten, Kennungen für die Wiedergabe geschützter Inhalte zu verwenden</translation>
 <translation id="5875873062228321803">Mit dieser Richtlinie wird die Anforderung an die zulässige Mindestversion von <ph name="PRODUCT_OS_NAME" /> konfiguriert.
 
       Wenn diese Richtlinie auf eine nicht leere Liste festgelegt wird, passiert Folgendes:
@@ -8124,10 +8126,12 @@ Hinweis: Durch einen Neustart oder eine Abmeldung wird der Cache geleert.</trans
 <translation id="6614648642325603511">Algorithmus für die Generierung von Schlüsselpaaren. Die EC-Option wird seit Version 132 unterstützt.</translation>
 <translation id="661610294649586421">WebAuthn-API-Anfragen auf Websites mit fehlerhaften TLS-Zertifikaten nicht zulassen.</translation>
 <translation id="6617589895942747919">Beginn des Intervalls, inklusiv.</translation>
+<translation id="6620966939519407082">Einstellungen für den alten Cookie-Bereich</translation>
 <translation id="6621830999036927230">Wenn diese Richtlinie konfiguriert ist, verwendet der Host für den Remote-Zugriff diese URL zur Validierung von Authentifizierungstokens von Clients für den Remote-Zugriff, um Verbindungen zu akzeptieren. Diese Funktion ist deaktiviert, wenn sie leer oder nicht konfiguriert ist.
 
       Hinweis: Verwende diese Richtlinie mit <ph name="REMOTE_ACCESS_HOST_TOKEN_URL_POLICY_NAME" />.</translation>
 <translation id="6625136649067113817">Boolescher Parameter, der angibt, ob für die Bildschirmtastatur die Rechtschreibprüfung aktiviert ist.</translation>
+<translation id="6625716212597516929">Altes Verhalten des Cookie-Bereichs wiederherstellen</translation>
 <translation id="6626319579493977784">Einstellungen für dynamischen Code</translation>
 <translation id="66265932317331474">CPU-Informationen ausgeben</translation>
 <translation id="6628120204569232711">Speicherstatus melden</translation>
@@ -8177,6 +8181,17 @@ Unter <ph name="MS_WIN_NAME" /> wird die KDC-Richtlinie immer umgesetzt.</transl
 <translation id="6665670272107384733">Festlegen, wie oft der Nutzer das Passwort eingeben muss, um das schnelle Entsperren zu verwenden</translation>
 <translation id="6667586534922258705">Schaltfläche zum Anzeigen des Passworts auf dem Start- oder Sperrbildschirm anzeigen</translation>
 <translation id="6667636336079341367">Funktion „Scanner“ zulassen, ohne KI‑Modelle zu verbessern.</translation>
+<translation id="6668559639284945695">Mit dieser Richtlinie kann das alte Verhalten für den Cookie-Bereich wiederhergestellt werden.
+
+Das bedeutet, dass auf Cookies, die über ein bestimmtes Protokoll (z. B. HTTPS) oder einen bestimmten Port festgelegt wurden, über ein anderes Protokoll oder einen anderen Port zugegriffen werden kann.
+
+Wenn die Richtlinie aktiviert ist, sind Cookies nicht an ihr ursprüngliches Schema und ihren ursprünglichen Port gebunden.
+
+Wenn die Richtlinie deaktiviert oder nicht konfiguriert ist, verhalten sich Cookies entsprechend dem ursprungsgebundenen Bereich.
+
+Diese Konfiguration gilt nur für Top-Level-Domains (z. B. beispiel.de) und nicht für Subdomains (z. B. sub.beispiel.de).
+
+Diese Richtlinie wird in Zukunft entfernt.</translation>
 <translation id="6669244130218275293">Festlegen, ob die <ph name="PRIVACY_SANDBOX_NAME" />-Funktion „Fingerprinting-Schutz“ im Inkognitomodus aktiviert werden soll.</translation>
 <translation id="6669691206059842248">Zusätzliche OAuth-Weiterleitungs-URLs pro Erweiterung konfigurieren</translation>
 <translation id="6669700740683748046">Durch diese Funktion wird die vollständige URL in der Adressleiste angezeigt.
@@ -8333,17 +8348,6 @@ Ist die Richtlinie auf „False“ gesetzt oder nicht konfiguriert, wird das Sta
 <translation id="6757413365906304125">Diese Richtlinie bestimmt das Verhalten für die Neuzuordnung der Taste „Bild-auf“ und „Bild-ab“ auf der Unterseite für die Tastenneuzuordnung. Auf dieser Unterseite können Nutzer Tasten anpassen. Wenn die Richtlinie aktiviert ist, können Nutzer diese spezifischen Neuzuordnungen nicht anpassen. Ist die Richtlinie nicht konfiguriert, gelten suchbasierte Tastenkombinationen als Standard und Nutzer können die Tastenkombinationen ändern.</translation>
 <translation id="6757613329154374267">"Sichern und wiederherstellen" aktiviert</translation>
 <translation id="6758659208493449452">Mit dieser Richtlinie wird festgelegt, ob Teilnehmer am erweiterten Sicherheitsprogramm zusätzlich geschützt werden. Bei manchen dieser Funktionen werden unter Umständen Daten mit Google geteilt. Teilnehmer am erweiterten Sicherheitsprogramm können beispielsweise ihre heruntergeladenen Dateien für einen Malware-Scan an Google senden. Wird die Richtlinie auf "true" gesetzt oder nicht konfiguriert, werden entsprechende Nutzer zusätzlich geschützt. Wird die Richtlinie auf "false" gesetzt, stehen ihnen nur die Standardfunktionen für Privatnutzer zur Verfügung.</translation>
-<translation id="6759078816721385015">Konfiguriert die Einstellungen für die Lebensdauer von Browserdaten für <ph name="PRODUCT_NAME" />. Mit dieser Richtlinie können Administratoren (nach Datentyp) festlegen, wann Daten vom Browser gelöscht werden. Das bietet Vorteile für Kunden, die mit sensiblen Kundendaten arbeiten.
-
-Warnung: Das Festlegen dieser Richtlinie kann sich auf lokale private Daten auswirken und diese dauerhaft entfernen. Wir empfehlen, die Einstellungen vor der Bereitstellung zu testen, um das versehentliche Löschen von privaten Daten zu verhindern.
-
-Die folgenden Datentypen sind verfügbar: <ph name="DATA_TYPE_BROWSING_HISTORY" />, <ph name="DATA_TYPE_DOWNLOAD_HISTORY" />, <ph name="DATA_TYPE_COOKIES_AND_OTHER_SITE_DATA" />, <ph name="DATA_TYPE_CACHED_IMAGES_AND_FILES" />, <ph name="DATA_TYPE_PASSWORD" />, <ph name="DATA_TYPE_AUTOFILL" />, <ph name="DATA_TYPE_SITE_SETTINGS" /> und <ph name="DATA_TYPE_HOSTED_APP_DATA" />. <ph name="DATA_TYPE_DOWNLOAD_HISTORY" /> und <ph name="DATA_TYPE_HOSTED_APP_DATA" /> werden unter Android nicht unterstützt.
-
-Der Browser entfernt automatisch Daten der ausgewählten Typen, die älter sind als <ph name="TIME_TO_LIVE_IN_HOURS" />. Als kleinster Wert kann eine Stunde festgelegt werden.
-
-Abgelaufene Daten werden 15 Sekunden, nachdem der Browser gestartet wurde, und anschließend alle 30 Minuten gelöscht, während der Browser geöffnet ist.
-
-Bis Chrome 114 musste die Richtlinie <ph name="SYNC_DISABLED_POLICY_NAME" /> auf „true“ gesetzt werden. Ab Chrome 115 wird mit dieser Richtlinie die Synchronisierung für die jeweiligen Datentypen deaktiviert, wenn weder „<ph name="CHROME_SYNC_NAME" />“ durch Festlegen der Richtlinie <ph name="SYNC_DISABLED_POLICY_NAME" /> noch <ph name="BROWSER_SIGNIN_POLICY_NAME" /> deaktiviert ist.</translation>
 <translation id="6763023079133439068">Zertifikate ohne die Erweiterung „subjectAlternativeName“ zulassen, wenn sie von lokalen Trust-Anchors ausgestellt sind</translation>
 <translation id="6766216162565713893">Websites dürfen den Nutzer um Zugriff auf ein Bluetooth-Gerät in der Nähe bitten</translation>
 <translation id="6770454900105963262">Informationen zu aktiven Kiosksitzungen senden</translation>
@@ -8699,6 +8703,7 @@ Wenn diese Richtlinie auf „<ph name="PROVISION_MANAGED_CLIENT_CERTIFICATE_FOR_
 <translation id="7016587686120059767">Gastmodus deaktivieren</translation>
 <translation id="7019805045859631636">Schnell</translation>
 <translation id="7021590945154530517">Überwachung des Gerätestatus aktivieren</translation>
+<translation id="7025153290982655996">Altes Verhalten des Cookie-Bereichs wiederherstellen</translation>
 <translation id="7025332601572838001">Konfiguriert die Nutzungsbedingungen während der ersten Ausführung für CCT</translation>
 <translation id="7026351325994257733">Erlauben, dass WLAN-Konfigurationen auf allen <ph name="PRODUCT_OS_NAME" />-Geräten und einem verbundenen Android-Smartphone synchronisiert werden.</translation>
 <translation id="7027057540229843762">Helles Design verwenden</translation>
@@ -8812,6 +8817,7 @@ Wenn diese Richtlinie festgelegt ist, wird die Liste der Standardwerte um die ne
 
       Wenn die Richtlinie auf "false" gesetzt oder nicht konfiguriert ist, werden keine Informationen ausgegeben.
       Ist sie auf "true" gesetzt, werden Informationen zum Lüfter des Geräts ausgegeben.</translation>
+<translation id="7097146706461004834">Cookies haben einen ursprungsgebundenen Bereich</translation>
 <translation id="710003290625031750">Ausführliche Schemabeschreibung:</translation>
 <translation id="7101550508196914704">App-Verknüpfung nicht in der Lesezeichenleiste anzeigen</translation>
 <translation id="7105084505972468353">Wenn diese Richtlinie konfiguriert ist, wird damit der Lupentyp bestimmt, der aktiviert ist.
@@ -9236,6 +9242,7 @@ Wenn diese Richtlinie auf „false“ gesetzt ist, ist das alte Verhalten aktivi
 
       Wenn die Richtlinie nicht konfiguriert oder auf "false" festgelegt ist, wird die Funktion "<ph name="TLS_FALSE_START" />" aktiviert. Ist "true" festgelegt, wird die Funktion "<ph name="TLS_FALSE_START" />" deaktiviert.</translation>
 <translation id="7427607504279694910">Ereignisprotokolle für die Android-App-Installation werden nicht an Google weitergegeben</translation>
+<translation id="7428523340768505080">Post-Quanten-Algorithmus für Schlüsselvereinbarungen mit WebRTC aktivieren</translation>
 <translation id="7431456748240652287">Diese Richtlinie auf Geräteebene bestimmt, ob <ph name="PRODUCT_OS_NAME" /> unter Verwendung des NIST-Standards ML-KEM einen Post-Quanten-Algorithmus für Schlüsselvereinbarungen bei TLS anbietet. Vor <ph name="PRODUCT_OS_NAME" /> 131 war der Algorithmus Kyber, eine frühere Entwurfsversion des Standards. Durch diese Richtlinie können Server, die dies unterstützen, Nutzertraffic vor der späteren Entschlüsselung durch Quantencomputer schützen.
 
 Wenn diese Richtlinie aktiviert oder nicht konfiguriert ist, bietet <ph name="PRODUCT_OS_NAME" /> bei TLS‑Verbindungen eine Post-Quanten-Schlüsselvereinbarung an. Nutzertraffic wird dann bei der Kommunikation mit kompatiblen Servern vor Quantencomputern geschützt.
@@ -9545,6 +9552,7 @@ Diese Richtlinie kann für bestimmte Ursprünge der isolierten Web-App überschr
 <translation id="7696534428021833264">Karte mit SharePoint- und OneDrive-Dateien auf der Seite „Neuer Tab“ aktivieren</translation>
 <translation id="7699644797467448158">„window.name“ löschen, wenn websiteübergreifende Seitenaufrufe auf oberster Ebene stattfinden und einen Wechsel von „BrowsingContextGroup“ herbeiführen.</translation>
 <translation id="7701341006446125684">Cache-Größe für Apps und Erweiterungen in Byte festlegen</translation>
+<translation id="7701825382808690457">Standardwert für den Post-Quanten-Algorithmus für Schlüsselvereinbarungen mit WebRTC verwenden</translation>
 <translation id="7703041979684393741">Erfassen von WebRTC-Ereignisprotokollen aus Google-Diensten nicht zulassen</translation>
 <translation id="770339941914297201">Neues Verhalten: Kiosk-Chrome-Apps werden nur anhand der von der Richtlinie stammenden Update-URL aktualisiert</translation>
 <translation id="7703737669292992839">Dialogfelder zur Dateiauswahl verhindern</translation>
@@ -9820,6 +9828,7 @@ Wenn die Richtlinie deaktiviert oder nicht konfiguriert ist, wird kein Zertifika
 <translation id="7906983682927840536">Fetch-Keepalive-Dauer beim Herunterfahren</translation>
 <translation id="7908384265697653397">Zeitraum in Tagen, nach dem der Nutzer abgemeldet wird, wenn die Version von <ph name="PRODUCT_OS_NAME" /> niedriger ist als der angegebene <ph name="CHROMEOS_VERSION_PROPERTY_NAME" />-Wert.</translation>
 <translation id="7909751052609510518">Druckaufträge (seit Version 129 unterstützt)</translation>
+<translation id="7909839744818798105">Altes Verhalten des Cookie-Bereichs für eine Liste von Domains aktivieren</translation>
 <translation id="7911685775490889216">Dadurch wird festgelegt, für wie viele Sekunden ein Bild angezeigt wird, wenn für den Bildschirmschoner des Sperrbildschirms mehrere Bilder verwendet werden.
 
 Gültige Werte reichen von 1 Sekunde bis 9.999 Sekunden. Ist diese Richtlinie nicht konfiguriert, verwendet <ph name="PRODUCT_OS_NAME" /> den Standardwert von 60 Sekunden.
@@ -10917,6 +10926,19 @@ Wenn JavaScript-Optimierungen deaktiviert sind (indem du den Wert dieser Richtli
 Die Richtlinie kann für bestimmte URL‑Muster überschrieben werden. Hierfür stehen die Richtlinien „<ph name="JAVA_SCRIPT_OPTIMIZER_ALLOWED_FOR_SITES_POLICY_NAME" />“ und „<ph name="JAVA_SCRIPT_OPTIMIZER_BLOCKED_FOR_SITES_POLICY_NAME" />“ zur Verfügung.
 
 Ist diese Richtlinie nicht konfiguriert, sind JavaScript-Optimierungen aktiviert.</translation>
+<translation id="8669238010996709070">Mit dieser Richtlinie lässt sich die Post-Quanten-Schlüsselvereinbarung mit WebRTC verwalten.
+
+Wenn diese Richtlinie aktiviert ist, wird die Post-Quanten-Schlüsselvereinbarung mit WebRTC angeboten.
+
+Wenn diese Richtlinie deaktiviert ist, wird keine Post-Quanten-Schlüsselvereinbarung mit WebRTC angeboten.
+
+Wenn diese Richtlinie nicht konfiguriert ist, wird der Wert durch den standardmäßigen Einführungsprozess für die Post-Quanten-Schlüsselvereinbarung mit WebRTC festgelegt.
+
+Das Anbieten einer Post-Quanten-Schlüsselvereinbarung ist abwärtskompatibel. Bei vorhandenen DTLS-Peers und Netzwerk-Middleware wird voraussichtlich die neue Option ignoriert und eine frühere ausgewählt.
+
+Auf Geräten, auf denen DTLS nicht korrekt implementiert ist, kann eine Fehlfunktion auftreten, wenn die neue Option angeboten wird. Beispielsweise kann bei unbekannten Optionen oder den resultierenden umfangreicheren Nachrichten die Verbindung dieser Geräte unterbrochen werden. Solche Geräte sind nicht post-quanten-kompatibel und beeinträchtigen die Post-Quanten-Umstellung von Unternehmen. Administratoren sollten in solchen Fällen den Anbieter fragen, wie sich das Problem beheben lässt.
+
+Diese Richtlinie ist eine vorübergehende Maßnahme und wird nach einigen Meilensteinen entfernt.</translation>
 <translation id="8671119576957984818">Desktop-Freigabe-Hub aktivieren</translation>
 <translation id="8671193325113134911">Strikte MIME-Typprüfung für Worker-Skripts aktivieren</translation>
 <translation id="8671303329680827168">Diese Richtlinie wurde eingestellt. Bitte verwende stattdessen die Richtlinie „<ph name="AUTH_NEGOTIATE_DELEGATE_ALLOWLIST_POLICY_NAME" />“.</translation>
@@ -11688,6 +11710,7 @@ Standardwert ist RollbackDisabled.</translation>
 <translation id="9197740283131855199">Prozentsatz für die Skalierung der Spanne für die Bildschirmabdunkelung, wenn der Nutzer nach der Abdunkelung aktiv wird</translation>
 <translation id="9200828125069750521">Parameter für URL der Bildsuche, die POST verwendet</translation>
 <translation id="9202520409249547230">Autofill mit KI nicht zulassen.</translation>
+<translation id="9204520300236345497">Die Verwendung von Kennungen für geschützte Inhalte auf Websites erlauben. Dies kann zu einer besseren Wiedergabequalität geschützter Inhalte führen</translation>
 <translation id="9204863016826119209">Schlüssel für die geschäftliche Nutzung können von installierten und in dieser Richtlinie aufgeführten Android-Apps verwendet werden.</translation>
 <translation id="9206472508136116830">NetBIOS-Freigabenerkennung nicht zulassen</translation>
 <translation id="9207596996305971030">Anmelde-/Abmeldeereignisse nicht melden</translation>

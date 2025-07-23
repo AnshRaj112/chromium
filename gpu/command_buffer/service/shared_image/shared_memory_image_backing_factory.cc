@@ -12,9 +12,36 @@
 #include "gpu/command_buffer/service/shared_image/shared_memory_image_backing.h"
 #include "gpu/command_buffer/service/shared_memory_region_wrapper.h"
 #include "gpu/ipc/common/gpu_memory_buffer_impl_shared_memory.h"
+#include "ui/gfx/buffer_format_util.h"
 #include "ui/gfx/gpu_memory_buffer_handle.h"
 
 namespace gpu {
+
+// static
+gfx::GpuMemoryBufferHandle
+SharedMemoryImageBackingFactory::CreateGpuMemoryBufferHandle(
+    const gfx::Size& size,
+    gfx::BufferFormat buffer_format,
+    gfx::BufferUsage buffer_usage) {
+  size_t buffer_size = 0u;
+  if (!gfx::BufferSizeForBufferFormatChecked(size, buffer_format,
+                                             &buffer_size)) {
+    return gfx::GpuMemoryBufferHandle();
+  }
+
+  auto shared_memory_region =
+      base::UnsafeSharedMemoryRegion::Create(buffer_size);
+  if (!shared_memory_region.IsValid()) {
+    return gfx::GpuMemoryBufferHandle();
+  }
+
+  gfx::GpuMemoryBufferHandle handle(std::move(shared_memory_region));
+  handle.type = gfx::SHARED_MEMORY_BUFFER;
+  handle.offset = 0;
+  handle.stride = static_cast<uint32_t>(
+      gfx::RowSizeForBufferFormat(size.width(), buffer_format, 0));
+  return handle;
+}
 
 SharedMemoryImageBackingFactory::SharedMemoryImageBackingFactory()
     : SharedImageBackingFactory(SHARED_IMAGE_USAGE_CPU_WRITE_ONLY |
@@ -59,8 +86,10 @@ SharedMemoryImageBackingFactory::CreateSharedImage(
     bool is_thread_safe,
     gfx::BufferUsage buffer_usage) {
   auto buffer_format = ToBufferFormat(format);
-  auto handle = GpuMemoryBufferImplSharedMemory::CreateGpuMemoryBuffer(
-      size, buffer_format, buffer_usage);
+  gfx::GpuMemoryBufferHandle handle;
+  if (GpuMemoryBufferImplSharedMemory::IsUsageSupported(buffer_usage)) {
+    handle = CreateGpuMemoryBufferHandle(size, buffer_format, buffer_usage);
+  }
   SharedMemoryRegionWrapper shm_wrapper;
   if (!shm_wrapper.Initialize(handle, size, buffer_format)) {
     return nullptr;

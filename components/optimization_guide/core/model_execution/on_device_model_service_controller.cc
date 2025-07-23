@@ -577,17 +577,34 @@ void OnDeviceModelServiceController::BaseModelController::OnModelAssetsLoaded(
     mojo::PendingReceiver<on_device_model::mojom::OnDeviceModel> model,
     on_device_model::ModelAssets assets) {
   auto params = on_device_model::mojom::LoadModelParams::New();
-  params->backend_type =
-      base::FeatureList::IsEnabled(
-          on_device_model::features::kOnDeviceModelForceCpuBackend)
-          ? ml::ModelBackendType::kCpuBackend
-          : ml::ModelBackendType::kGpuBackend;
+  params->backend_type = ml::ModelBackendType::kGpuBackend;
   params->assets = std::move(assets);
   // TODO(crbug.com/302402959): Choose max_tokens based on device.
   params->max_tokens = features::GetOnDeviceModelMaxTokens();
   params->adaptation_ranks = supported_adaptation_ranks_;
-  if (controller_->on_device_component_state_manager_ &&
-      controller_->on_device_component_state_manager_->IsLowTierDevice()) {
+
+  proto::OnDeviceModelPerformanceHint hint =
+      proto::ON_DEVICE_MODEL_PERFORMANCE_HINT_HIGHEST_QUALITY;
+  auto state_manager = controller_->on_device_component_state_manager_;
+  if (base::FeatureList::IsEnabled(
+          on_device_model::features::kOnDeviceModelForceCpuBackend)) {
+    hint = proto::ON_DEVICE_MODEL_PERFORMANCE_HINT_CPU;
+  } else if (state_manager && state_manager->GetState() &&
+             !state_manager->GetState()
+                  ->GetBaseModelSpec()
+                  .supported_performance_hints.empty()) {
+    DCHECK_EQ(state_manager->GetState()
+                  ->GetBaseModelSpec()
+                  .supported_performance_hints.size(),
+              1u);
+    hint = *state_manager->GetState()
+                ->GetBaseModelSpec()
+                .supported_performance_hints.begin();
+  }
+  if (hint == proto::ON_DEVICE_MODEL_PERFORMANCE_HINT_CPU) {
+    params->backend_type = ml::ModelBackendType::kCpuBackend;
+  } else if (hint ==
+             proto::ON_DEVICE_MODEL_PERFORMANCE_HINT_FASTEST_INFERENCE) {
     params->performance_hint = ml::ModelPerformanceHint::kFastestInference;
   }
   controller_->service_client_.Get()->LoadModel(
@@ -773,19 +790,9 @@ void OnDeviceModelServiceController::Solution::ReportHealthyCompletion() {
 
 void OnDeviceModelServiceController::EnsurePerformanceClassAvailable(
     base::OnceClosure complete) {
-  if (!on_device_component_state_manager_ ||
-      !on_device_component_state_manager_->NeedsPerformanceClassUpdate()) {
-    std::move(complete).Run();
+  if (ListenForPerformanceClassAvailable(std::move(complete))) {
     return;
   }
-
-  if (performance_class_state_ == PerformanceClassState::kComplete) {
-    std::move(complete).Run();
-    return;
-  }
-
-  // Use unsafe because cancellation isn't needed.
-  performance_class_callbacks_.AddUnsafe(std::move(complete));
 
   if (performance_class_state_ == PerformanceClassState::kComputing) {
     return;
@@ -800,8 +807,26 @@ void OnDeviceModelServiceController::EnsurePerformanceClassAvailable(
                     .Then(mojo::WrapCallbackWithDefaultInvokeIfNotRun(
                         base::BindOnce(&OnDeviceModelServiceController::
                                            PerformanceClassUpdated,
-                                       base::RetainedRef(this)),
+                                       weak_ptr_factory_.GetWeakPtr()),
                         OnDeviceModelPerformanceClass::kServiceCrash))));
+}
+
+bool OnDeviceModelServiceController::ListenForPerformanceClassAvailable(
+    base::OnceClosure available) {
+  if (!on_device_component_state_manager_ ||
+      !on_device_component_state_manager_->NeedsPerformanceClassUpdate()) {
+    std::move(available).Run();
+    return true;
+  }
+
+  if (performance_class_state_ == PerformanceClassState::kComplete) {
+    std::move(available).Run();
+    return true;
+  }
+
+  // Use unsafe because cancellation isn't needed.
+  performance_class_callbacks_.AddUnsafe(std::move(available));
+  return false;
 }
 
 void OnDeviceModelServiceController::PerformanceClassUpdated(
@@ -809,20 +834,21 @@ void OnDeviceModelServiceController::PerformanceClassUpdated(
   base::UmaHistogramEnumeration(
       "OptimizationGuide.ModelExecution.OnDeviceModelPerformanceClass",
       perf_class);
-  RegisterPerformanceClassSyntheticTrial(perf_class);
 
   auto complete = base::BindOnce(
-      [](scoped_refptr<OnDeviceModelServiceController> controller) {
-        controller->performance_class_state_ = PerformanceClassState::kComplete;
-        controller->performance_class_callbacks_.Notify();
-      },
-      base::RetainedRef(this));
+      &OnDeviceModelServiceController::NotifyPerformanceClassAvailable,
+      weak_ptr_factory_.GetWeakPtr());
   if (on_device_component_state_manager_) {
     on_device_component_state_manager_->DevicePerformanceClassChanged(
         std::move(complete), perf_class);
   } else {
     std::move(complete).Run();
   }
+}
+
+void OnDeviceModelServiceController::NotifyPerformanceClassAvailable() {
+  performance_class_state_ = PerformanceClassState::kComplete;
+  performance_class_callbacks_.Notify();
 }
 
 }  // namespace optimization_guide

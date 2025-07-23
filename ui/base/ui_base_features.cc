@@ -143,17 +143,8 @@ BASE_FEATURE(kWaylandSessionManagement,
 COMPONENT_EXPORT(UI_BASE_FEATURES)
 BASE_FEATURE(kOverrideDefaultOzonePlatformHintToAuto,
              "OverrideDefaultOzonePlatformHintToAuto",
-             base::FEATURE_ENABLED_BY_DEFAULT);
+             base::FEATURE_DISABLED_BY_DEFAULT);
 #endif  // BUILDFLAG(IS_LINUX)
-
-// Uses a stylus-specific tap slop region parameter for gestures.  Stylus taps
-// tend to slip more than touch taps (presumably because the user doesn't feel
-// the movement friction with a stylus).  As a result, it is harder to tap with
-// a stylus. This feature makes the slop region for stylus input bigger than the
-// touch slop.
-BASE_FEATURE(kStylusSpecificTapSlop,
-             "StylusSpecificTapSlop",
-             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // When enabled, the feature will query the OS for a default cursor size,
 // to be used in determining the concrete object size of a custom cursor in
@@ -428,6 +419,10 @@ bool IsVariableRefreshRateAlwaysOn() {
   return base::FeatureList::IsEnabled(kEnableVariableRefreshRateAlwaysOn);
 }
 
+BASE_FEATURE(kBubbleMetricsApi,
+             "BubbleMetricsApi",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 #if BUILDFLAG(IS_WIN)
 BASE_FEATURE(kUseGammaContrastRegistrySettings,
              "UseGammaContrastRegistrySettings",
@@ -461,10 +456,10 @@ BASE_FEATURE(kAsyncFullscreenWindowState,
              "AsyncFullscreenWindowState",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-// Feature flag for enabling the clipboardchange event.
-BASE_FEATURE(kClipboardChangeEvent,
-             "ClipboardChangeEvent",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+// Feature flag for enabling platform clipboard monitoring.
+BASE_FEATURE(kPlatformClipboardMonitor,
+             "PlatformClipboardMonitor",
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // If enabled, all draw commands recorded on canvas are done in pixel aligned
 // measurements. This also enables scaling of all elements in views and layers
@@ -480,6 +475,15 @@ BASE_FEATURE(kEnablePixelCanvasRecording,
 
 bool IsPixelCanvasRecordingEnabled() {
   return base::FeatureList::IsEnabled(features::kEnablePixelCanvasRecording);
+}
+
+BASE_FEATURE(kHandleIMESpanChangesOnUpdateComposition,
+             "HandleIMESpanChangesOnUpdateComposition",
+             base::FEATURE_ENABLED_BY_DEFAULT);
+
+bool IsHandleIMESpanChangesOnUpdateCompositionEnabled() {
+  return base::FeatureList::IsEnabled(
+      features::kHandleIMESpanChangesOnUpdateComposition);
 }
 
 }  // namespace features

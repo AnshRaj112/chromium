@@ -39,11 +39,10 @@ bool IsEventInReportingSettings(const std::string& event,
 }
 
 void AddAnalysisConnectorVerdictToEvent(
-    const enterprise_connectors::ContentAnalysisResponse::Result& result,
+    const ContentAnalysisResponse::Result& result,
     base::Value::Dict& event) {
   base::Value::List triggered_rule_info;
-  for (const enterprise_connectors::TriggeredRule& trigger :
-       result.triggered_rules()) {
+  for (const TriggeredRule& trigger : result.triggered_rules()) {
     base::Value::Dict triggered_rule;
     triggered_rule.Set(kKeyTriggeredRuleName, trigger.rule_name());
     int rule_id_int = 0;
@@ -87,12 +86,12 @@ void ReportingEventRouter::OnLoginEvent(
     bool is_federated,
     const url::SchemeHostPort& federated_origin,
     const std::u16string& username) {
-  std::optional<ReportingSettings> settings =
-      reporting_client_->GetReportingSettings();
-  if (!settings.has_value()) {
+  if (!IsEventEnabled(kKeyLoginEvent)) {
     return;
   }
 
+  std::optional<ReportingSettings> settings =
+      reporting_client_->GetReportingSettings();
   std::unique_ptr<url_matcher::URLMatcher> matcher =
       CreateURLMatcherForOptInEvent(settings.value(),
                                     enterprise_connectors::kKeyLoginEvent);
@@ -128,12 +127,12 @@ void ReportingEventRouter::OnLoginEvent(
 void ReportingEventRouter::OnPasswordBreach(
     const std::string& trigger,
     const std::vector<std::pair<GURL, std::u16string>>& identities) {
-  std::optional<ReportingSettings> settings =
-      reporting_client_->GetReportingSettings();
-  if (!settings.has_value()) {
+  if (!IsEventEnabled(kKeyPasswordBreachEvent)) {
     return;
   }
 
+  std::optional<ReportingSettings> settings =
+      reporting_client_->GetReportingSettings();
   std::unique_ptr<url_matcher::URLMatcher> matcher =
       CreateURLMatcherForOptInEvent(settings.value(), kKeyPasswordBreachEvent);
   if (!matcher) {
@@ -190,13 +189,12 @@ void ReportingEventRouter::OnPasswordReuse(const GURL& url,
                                            const std::string& user_name,
                                            bool is_phishing_url,
                                            bool warning_shown) {
-  std::optional<ReportingSettings> settings =
-      reporting_client_->GetReportingSettings();
-  if (!settings.has_value() ||
-      settings->enabled_event_names.count(kKeyPasswordReuseEvent) == 0) {
+  if (!IsEventEnabled(kKeyPasswordReuseEvent)) {
     return;
   }
 
+  std::optional<ReportingSettings> settings =
+      reporting_client_->GetReportingSettings();
   if (base::FeatureList::IsEnabled(
           policy::kUploadRealtimeReportingEventsUsingProto)) {
     chrome::cros::reporting::proto::Event event;
@@ -224,13 +222,12 @@ void ReportingEventRouter::OnPasswordReuse(const GURL& url,
 }
 
 void ReportingEventRouter::OnPasswordChanged(const std::string& user_name) {
-  std::optional<ReportingSettings> settings =
-      reporting_client_->GetReportingSettings();
-  if (!settings.has_value() ||
-      settings->enabled_event_names.count(kKeyPasswordChangedEvent) == 0) {
+  if (!IsEventEnabled(kKeyPasswordChangedEvent)) {
     return;
   }
 
+  std::optional<ReportingSettings> settings =
+      reporting_client_->GetReportingSettings();
   if (base::FeatureList::IsEnabled(
           policy::kUploadRealtimeReportingEventsUsingProto)) {
     chrome::cros::reporting::proto::Event event;
@@ -256,13 +253,12 @@ void ReportingEventRouter::OnUrlFilteringInterstitial(
     const std::string& threat_type,
     const safe_browsing::RTLookupResponse& response,
     const ReferrerChain& referrer_chain) {
-  std::optional<ReportingSettings> settings =
-      reporting_client_->GetReportingSettings();
-  if (!settings.has_value() || settings->enabled_event_names.count(
-                                   kKeyUrlFilteringInterstitialEvent) == 0) {
+  if (!IsEventEnabled(kKeyUrlFilteringInterstitialEvent)) {
     return;
   }
 
+  std::optional<ReportingSettings> settings =
+      reporting_client_->GetReportingSettings();
   std::string active_user;
   if (base::FeatureList::IsEnabled(
           enterprise_connectors::kEnterpriseActiveUserDetection)) {
@@ -315,14 +311,12 @@ void ReportingEventRouter::OnSecurityInterstitialProceeded(
     const std::string& reason,
     int net_error_code,
     const ReferrerChain& referrer_chain) {
-  std::optional<enterprise_connectors::ReportingSettings> settings =
-      reporting_client_->GetReportingSettings();
-  if (!settings.has_value() ||
-      settings->enabled_event_names.count(
-          enterprise_connectors::kKeyInterstitialEvent) == 0) {
+  if (!IsEventEnabled(kKeyInterstitialEvent)) {
     return;
   }
 
+  std::optional<ReportingSettings> settings =
+      reporting_client_->GetReportingSettings();
   if (base::FeatureList::IsEnabled(
           policy::kUploadRealtimeReportingEventsUsingProto)) {
     chrome::cros::reporting::proto::Event event;
@@ -361,14 +355,12 @@ void ReportingEventRouter::OnSecurityInterstitialShown(
     int net_error_code,
     bool proceed_anyway_disabled,
     const ReferrerChain& referrer_chain) {
-  std::optional<enterprise_connectors::ReportingSettings> settings =
-      reporting_client_->GetReportingSettings();
-  if (!settings.has_value() ||
-      settings->enabled_event_names.count(
-          enterprise_connectors::kKeyInterstitialEvent) == 0) {
+  if (!IsEventEnabled(kKeyInterstitialEvent)) {
     return;
   }
 
+  std::optional<ReportingSettings> settings =
+      reporting_client_->GetReportingSettings();
   enterprise_connectors::EventResult event_result =
       proceed_anyway_disabled ? enterprise_connectors::EventResult::BLOCKED
                               : enterprise_connectors::EventResult::WARNED;
@@ -417,14 +409,12 @@ void ReportingEventRouter::OnUnscannedFileEvent(
     const std::string& content_transfer_method,
     const int64_t content_size,
     EventResult event_result) {
-  std::optional<ReportingSettings> settings =
-      reporting_client_->GetReportingSettings();
-  if (!settings.has_value() ||
-      settings->enabled_event_names.count(
-          enterprise_connectors::kKeyUnscannedFileEvent) == 0) {
+  if (!IsEventEnabled(kKeyUnscannedFileEvent)) {
     return;
   }
 
+  std::optional<ReportingSettings> settings =
+      reporting_client_->GetReportingSettings();
   std::string final_file_name = GetFileName(
       file_name,
       reporting_client_->ShouldIncludeDeviceInfo(settings->per_profile));
@@ -488,57 +478,74 @@ void ReportingEventRouter::OnSensitiveDataEvent(
     const int64_t content_size,
     const ReferrerChain& referrer_chain,
     enterprise_connectors::EventResult event_result) {
-  std::optional<enterprise_connectors::ReportingSettings> settings =
-      reporting_client_->GetReportingSettings();
-  if (!settings.has_value() ||
-      settings->enabled_event_names.count(
-          enterprise_connectors::kKeySensitiveDataEvent) == 0) {
+  if (!IsEventEnabled(kKeySensitiveDataEvent)) {
     return;
   }
 
-  base::Value::Dict event;
-  event.Set(kKeyUrl, url.spec());
-  event.Set(kKeyTabUrl, tab_url.spec());
-  event.Set(kKeySource, source);
-  event.Set(kKeyDestination, destination);
-  event.Set(kKeyFileName,
-            GetFileName(file_name, reporting_client_->ShouldIncludeDeviceInfo(
-                                       settings->per_profile)));
-  event.Set(kKeyDownloadDigestSha256, download_digest_sha256);
-  event.Set(kKeyContentType, mime_type);
-  // |content_size| can be set to -1 to indicate an unknown size, in
-  // which case the field is not set.
-  if (content_size >= 0) {
-    event.Set(kKeyContentSize, base::Int64ToValue(content_size));
-  }
-  event.Set(kKeyTrigger, trigger);
+  std::optional<ReportingSettings> settings =
+      reporting_client_->GetReportingSettings();
+  std::string final_file_name = GetFileName(
+      file_name,
+      reporting_client_->ShouldIncludeDeviceInfo(settings->per_profile));
 
-  if (base::FeatureList::IsEnabled(safe_browsing::kEnhancedFieldsForSecOps)) {
-    enterprise_connectors::AddReferrerChainToEvent(referrer_chain, event);
-  }
+  if (base::FeatureList::IsEnabled(
+          policy::kUploadRealtimeReportingEventsUsingProto)) {
+    chrome::cros::reporting::proto::Event event;
+    *event.mutable_sensitive_data_event() = GetDlpSensitiveDataEvent(
+        url, tab_url, source, destination, final_file_name,
+        download_digest_sha256, mime_type, trigger, scan_id,
+        content_transfer_method, source_email, content_area_account_email,
+        reporting_client_->GetProfileIdentifier(),
+        reporting_client_->GetProfileUserName(), content_size, result,
+        referrer_chain, event_result);
+    *event.mutable_time() = ToProtoTimestamp(base::Time::Now());
 
-  event.Set(kKeyEventResult,
-            enterprise_connectors::EventResultToString(event_result));
-  event.Set(kKeyClickedThrough,
-            event_result == enterprise_connectors::EventResult::BYPASSED);
-  event.Set(kKeyScanId, scan_id);
+    reporting_client_->ReportEvent(std::move(event), settings.value());
+  } else {
+    base::Value::Dict event;
+    event.Set(kKeyUrl, url.spec());
+    event.Set(kKeyTabUrl, tab_url.spec());
+    event.Set(kKeySource, source);
+    event.Set(kKeyDestination, destination);
+    event.Set(kKeyFileName,
+              GetFileName(file_name, reporting_client_->ShouldIncludeDeviceInfo(
+                                         settings->per_profile)));
+    event.Set(kKeyDownloadDigestSha256, download_digest_sha256);
+    event.Set(kKeyContentType, mime_type);
+    // |content_size| can be set to -1 to indicate an unknown size, in
+    // which case the field is not set.
+    if (content_size >= 0) {
+      event.Set(kKeyContentSize, base::Int64ToValue(content_size));
+    }
+    event.Set(kKeyTrigger, trigger);
 
-  if (!content_transfer_method.empty()) {
-    event.Set(kKeyContentTransferMethod, content_transfer_method);
-  }
-  if (!content_area_account_email.empty()) {
-    event.Set(kKeyWebAppSignedInAccount, content_area_account_email);
-  }
-  if (!source_email.empty()) {
-    event.Set(kKeySourceWebAppSignedInAccount, source_email);
-  }
+    if (base::FeatureList::IsEnabled(safe_browsing::kEnhancedFieldsForSecOps)) {
+      enterprise_connectors::AddReferrerChainToEvent(referrer_chain, event);
+    }
 
-  AddAnalysisConnectorVerdictToEvent(result, event);
+    event.Set(kKeyEventResult,
+              enterprise_connectors::EventResultToString(event_result));
+    event.Set(kKeyClickedThrough,
+              event_result == enterprise_connectors::EventResult::BYPASSED);
+    event.Set(kKeyScanId, scan_id);
 
-  reporting_client_->ReportEventWithTimestampDeprecated(
-      enterprise_connectors::kKeySensitiveDataEvent,
-      std::move(settings.value()), std::move(event), base::Time::Now(),
-      /*include_profile_user_name=*/true);
+    if (!content_transfer_method.empty()) {
+      event.Set(kKeyContentTransferMethod, content_transfer_method);
+    }
+    if (!content_area_account_email.empty()) {
+      event.Set(kKeyWebAppSignedInAccount, content_area_account_email);
+    }
+    if (!source_email.empty()) {
+      event.Set(kKeySourceWebAppSignedInAccount, source_email);
+    }
+
+    AddAnalysisConnectorVerdictToEvent(result, event);
+
+    reporting_client_->ReportEventWithTimestampDeprecated(
+        enterprise_connectors::kKeySensitiveDataEvent,
+        std::move(settings.value()), std::move(event), base::Time::Now(),
+        /*include_profile_user_name=*/true);
+  }
 }
 
 void ReportingEventRouter::OnDangerousDeepScanningResult(
@@ -556,14 +563,12 @@ void ReportingEventRouter::OnDangerousDeepScanningResult(
     enterprise_connectors::EventResult event_result,
     const std::string& scan_id,
     const std::string& content_transfer_method) {
-  std::optional<enterprise_connectors::ReportingSettings> settings =
-      reporting_client_->GetReportingSettings();
-  if (!settings.has_value() ||
-      settings->enabled_event_names.count(
-          enterprise_connectors::kKeyDangerousDownloadEvent) == 0) {
+  if (!IsEventEnabled(kKeyDangerousDownloadEvent)) {
     return;
   }
 
+  std::optional<ReportingSettings> settings =
+      reporting_client_->GetReportingSettings();
   base::Value::Dict event;
   event.Set(kKeyUrl, url.spec());
   event.Set(kKeyTabUrl, tab_url.spec());

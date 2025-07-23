@@ -5,6 +5,7 @@
 package org.chromium.chrome.browser.compositor.overlays.strip;
 
 import static org.chromium.build.NullUtil.assumeNonNull;
+import static org.chromium.ui.listmenu.BasicListMenu.buildMenuDivider;
 
 import android.content.res.Resources;
 
@@ -19,9 +20,13 @@ import org.chromium.build.annotations.NullMarked;
 import org.chromium.build.annotations.Nullable;
 import org.chromium.chrome.browser.collaboration.CollaborationServiceFactory;
 import org.chromium.chrome.browser.multiwindow.MultiInstanceManager;
+import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab_group_sync.TabGroupSyncServiceFactory;
+import org.chromium.chrome.browser.tabmodel.TabClosingSource;
+import org.chromium.chrome.browser.tabmodel.TabClosureParams;
+import org.chromium.chrome.browser.tabmodel.TabClosureParamsUtils;
 import org.chromium.chrome.browser.tabmodel.TabGroupModelFilter;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
@@ -120,16 +125,34 @@ public class MultiSelectedTabsContextMenuCoordinator
             assert !tabIds.isEmpty() : "Empty tab id list provided";
             TabModel tabModel = tabModelSupplier.get();
             List<Tab> tabs = TabModelUtils.getTabsById(tabIds, tabModel, false);
+            List<Tab> groupedTabs = getGroupedTabs(tabGroupModelFilter, tabs);
 
             if (menuId == R.id.add_to_tab_group) {
                 // The bottom sheet will handle ungrouping any grouped tabs.
                 tabGroupListBottomSheetCoordinator.showBottomSheet(tabs);
             } else if (menuId == R.id.remove_from_tab_group) {
-                List<Tab> groupedTabs = getGroupedTabs(tabGroupModelFilter, tabs);
                 assert !groupedTabs.isEmpty() : "No grouped tabs in the list.";
                 tabGroupModelFilter
                         .getTabUngrouper()
                         .ungroupTabs(groupedTabs, /* trailing= */ true, /* allowDialog= */ true);
+            } else if (menuId == R.id.move_to_other_window_menu_id) {
+                if (!groupedTabs.isEmpty()) {
+                    // Ungroup all tabs before performing the move operation.
+                    tabGroupModelFilter
+                            .getTabUngrouper()
+                            .ungroupTabs(
+                                    groupedTabs, /* trailing= */ true, /* allowDialog= */ false);
+                }
+                multiInstanceManager.moveTabsToOtherWindow(tabs);
+            } else if (menuId == R.id.close_tab) {
+                boolean allowUndo = TabClosureParamsUtils.shouldAllowUndo(listViewTouchTracker);
+                tabModel.getTabRemover()
+                        .closeTabs(
+                                TabClosureParams.closeTabs(tabs)
+                                        .allowUndo(allowUndo)
+                                        .tabClosingSource(TabClosingSource.TABLET_TAB_STRIP)
+                                        .build(),
+                                /* allowDialog= */ true);
             }
         };
     }
@@ -157,7 +180,6 @@ public class MultiSelectedTabsContextMenuCoordinator
     protected void buildMenuActionItems(ModelList itemList, List<Integer> ids) {
         assert !ids.isEmpty() : "Empty ids list provided";
         boolean isIncognito = mTabModel.isIncognitoBranded();
-
         Resources res = assumeNonNull(mWindowAndroid.getActivity().get()).getResources();
         String title;
 
@@ -169,7 +191,6 @@ public class MultiSelectedTabsContextMenuCoordinator
                         .withMenuId(R.id.add_to_tab_group)
                         .withIsIncognito(isIncognito)
                         .build());
-
         // Remove tabs from group.
         if (isAnyTabGrouped(TabModelUtils.getTabsById(ids, mTabModel, false))) {
             // Show the option if any selected tab is part of a group.
@@ -179,6 +200,23 @@ public class MultiSelectedTabsContextMenuCoordinator
                             R.id.remove_from_tab_group,
                             isIncognito));
         }
+        // Move tabs to another window.
+        if (MultiWindowUtils.isMultiInstanceApi31Enabled()) {
+            title =
+                    res.getQuantityString(
+                            R.plurals.move_tabs_to_another_window,
+                            MultiWindowUtils.getInstanceCount());
+            itemList.add(
+                    new ListItemBuilder()
+                            .withTitle(title)
+                            .withMenuId(R.id.move_to_other_window_menu_id)
+                            .withIsIncognito(isIncognito)
+                            .build());
+        }
+        // Divider
+        itemList.add(buildMenuDivider(isIncognito));
+        // Close tabs
+        itemList.add(buildListItem(R.string.close, R.id.close_tab, isIncognito));
     }
 
     private static ListItem buildListItem(

@@ -62,7 +62,7 @@ import './people_page/account_page.js';
 import './people_page/manage_profile.js';
 // </if>
 import './people_page/signout_dialog.js';
-import './people_page/sync_controls.js';
+import './people_page/sync_controls_page.js';
 import './people_page/sync_page.js';
 // Sections
 import './a11y_page/a11y_page_index.js';
@@ -97,6 +97,7 @@ export {CrInputElement} from 'chrome://resources/cr_elements/cr_input/cr_input.j
 export {CrLazyRenderElement} from 'chrome://resources/cr_elements/cr_lazy_render/cr_lazy_render.js';
 export {CrSliderElement} from 'chrome://resources/cr_elements/cr_slider/cr_slider.js';
 export {CrTextareaElement} from 'chrome://resources/cr_elements/cr_textarea/cr_textarea.js';
+export {CrToastElement} from 'chrome://resources/cr_elements/cr_toast/cr_toast.js';
 export {getToastManager} from 'chrome://resources/cr_elements/cr_toast/cr_toast_manager.js';
 export {CrTooltipElement} from 'chrome://resources/cr_elements/cr_tooltip/cr_tooltip.js';
 export {IronListElement} from 'chrome://resources/polymer/v3_0/iron-list/iron-list.js';
@@ -122,7 +123,7 @@ export {SettingsAddressRemoveConfirmationDialogElement} from './autofill_page/ad
 export {SettingsAutofillAiAddOrEditDialogElement} from './autofill_page/autofill_ai_add_or_edit_dialog.js';
 export {SettingsAutofillAiSectionElement} from './autofill_page/autofill_ai_section.js';
 export {AutofillManagerImpl, AutofillManagerProxy, PersonalDataChangedListener} from './autofill_page/autofill_manager_proxy.js';
-export {SettingsAutofillSectionElement} from './autofill_page/autofill_section.js';
+export {AutofillAddressOptInChange, SettingsAutofillSectionElement} from './autofill_page/autofill_section.js';
 export {CountryDetailManagerProxy, CountryDetailManagerProxyImpl} from './autofill_page/country_detail_manager_proxy.js';
 export {SettingsCreditCardEditDialogElement} from './autofill_page/credit_card_edit_dialog.js';
 export {SettingsCreditCardListEntryElement} from './autofill_page/credit_card_list_entry.js';

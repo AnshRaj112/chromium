@@ -83,10 +83,6 @@ BASE_FEATURE(kLensOverlayUpdatedClientContext,
              "LensOverlayUpdatedClientContext",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
-BASE_FEATURE(kLensOverlayMGTInSidePanel,
-             "LensOverlayMGTInSidePanel",
-             base::FEATURE_DISABLED_BY_DEFAULT);
-
 BASE_FEATURE(kLensSearchSidePanelNewFeedback,
              "LensSearchSidePanelNewFeedback",
              base::FEATURE_DISABLED_BY_DEFAULT);
@@ -145,6 +141,14 @@ BASE_FEATURE(kLensSearchNotFoundOnPageToast,
 
 BASE_FEATURE(kLensOverlayStraightToSrp,
              "LensOverlayStraightToSrp",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kLensSearchAimM3,
+             "LensSearchAimM3",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
+BASE_FEATURE(kLensOverlayEntrypointLabelAlt,
+             "LensOverlayEntrypointLabelAlt",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
 const base::FeatureParam<int> kLensOverlayMinRamMb{&kLensOverlay, "min_ram_mb",
@@ -389,7 +393,6 @@ constexpr base::FeatureParam<bool> kHandleSidePanelTextDirectives{
     &kLensOverlayContextualSearchbox, "handle-side-panel-text-directives",
     true};
 
-
 constexpr base::FeatureParam<int> kZstdCompressionLevel{
     &kLensOverlayContextualSearchbox, "zstd-compression-level", 3};
 
@@ -569,6 +572,15 @@ constexpr base::FeatureParam<int> kLensSearchSidePanelDefaultWidth{
 
 constexpr base::FeatureParam<std::string> kLensOverlayStraightToSrpQuery{
     &kLensOverlayStraightToSrp, "query", ""};
+
+constexpr base::FeatureParam<bool> kOpenAimInSidePanel{
+    &kLensSearchAimM3, "open-aim-in-side-panel", true};
+
+constexpr base::FeatureParam<bool> kAimSearchboxEnabled{
+    &kLensSearchAimM3, "aim-searchbox-enabled", true};
+
+const base::FeatureParam<int> kLensOverlayEntrypointLabelAltId{
+    &kLensOverlayEntrypointLabelAlt, "id", 0};
 
 std::string GetHomepageURLForLens() {
   return kHomepageURLForLens.Get();
@@ -955,7 +967,6 @@ bool HandleSidePanelTextDirectivesEnabled() {
   return kHandleSidePanelTextDirectives.Get();
 }
 
-
 int GetZstdCompressionLevel() {
   return kZstdCompressionLevel.Get();
 }
@@ -1067,8 +1078,14 @@ bool IsUpdatedClientContextEnabled() {
   return base::FeatureList::IsEnabled(kLensOverlayUpdatedClientContext);
 }
 
-bool ShouldShowMGTInSidePanel() {
-  return base::FeatureList::IsEnabled(kLensOverlayMGTInSidePanel);
+bool ShouldShowAimInSidePanel() {
+  return base::FeatureList::IsEnabled(kLensSearchAimM3) &&
+         kOpenAimInSidePanel.Get();
+}
+
+bool GetAimSearchboxEnabled() {
+  return base::FeatureList::IsEnabled(kLensSearchAimM3) &&
+         kAimSearchboxEnabled.Get();
 }
 
 bool ShouldUseAltLoadingHintWeb() {

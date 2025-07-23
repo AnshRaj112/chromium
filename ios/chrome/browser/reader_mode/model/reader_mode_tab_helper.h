@@ -33,6 +33,10 @@ class ReaderModeTabHelper : public web::WebStateObserver,
     virtual void ReaderModeWebStateWillBecomeUnavailable(
         ReaderModeTabHelper* tab_helper) = 0;
 
+    // Called when distillation fails.
+    virtual void ReaderModeDistillationFailed(
+        ReaderModeTabHelper* tab_helper) = 0;
+
     // Called when the ReaderModeTabHelper is destroyed.
     virtual void ReaderModeTabHelperDestroyed(
         ReaderModeTabHelper* tab_helper) = 0;
@@ -139,6 +143,9 @@ class ReaderModeTabHelper : public web::WebStateObserver,
   // Calls the callbacks waiting for the last committed URL eligibility result.
   void CallLastCommittedUrlEligibilityCallbacks(std::optional<bool> result);
 
+  // Cancels any ongoing distillation and destroys the `reader_mode_web_state_`.
+  void CancelDistillation();
+
   // Whether Reader mode is active in this tab.
   bool active_ = false;
   // Whether the Reader mode WebState content was loaded.
@@ -147,6 +154,7 @@ class ReaderModeTabHelper : public web::WebStateObserver,
   std::unique_ptr<web::WebState> reader_mode_web_state_;
   id<SnackbarCommands> snackbar_handler_;
   base::OneShotTimer trigger_reader_mode_timer_;
+  base::OneShotTimer reader_mode_distillation_timer_;
 
   // Last committed URL, ignoring ref.
   GURL last_committed_url_without_ref_;

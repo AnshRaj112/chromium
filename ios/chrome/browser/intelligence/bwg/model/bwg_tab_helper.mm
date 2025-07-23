@@ -10,19 +10,15 @@
 #import "components/google/core/common/google_util.h"
 #import "components/prefs/pref_service.h"
 #import "components/prefs/scoped_user_pref_update.h"
-#import "ios/chrome/browser/intelligence/bwg/model/bwg_service.h"
-#import "ios/chrome/browser/intelligence/bwg/model/bwg_service_factory.h"
 #import "ios/chrome/browser/intelligence/bwg/model/bwg_snapshot_utils.h"
 #import "ios/chrome/browser/intelligence/bwg/utils/bwg_constants.h"
 #import "ios/chrome/browser/intelligence/features/features.h"
 #import "ios/chrome/browser/shared/model/prefs/pref_names.h"
 #import "ios/chrome/browser/shared/model/profile/profile_ios.h"
-#import "ios/chrome/browser/shared/model/url/url_util.h"
 #import "ios/chrome/browser/shared/public/commands/bwg_commands.h"
 #import "ios/chrome/browser/snapshots/model/snapshot_tab_helper.h"
 #import "ios/web/public/navigation/navigation_context.h"
 #import "ios/web/public/web_state.h"
-#import "ios/web/util/content_type_util.h"
 #import "url/gurl.h"
 
 namespace {
@@ -116,25 +112,6 @@ void BwgTabHelper::DeleteBwgSessionInStorage() {
   CleanupSessionFromPrefs(GetClientId());
 }
 
-bool BwgTabHelper::IsBwgAvailableForWebState() {
-  ProfileIOS* profile =
-      ProfileIOS::FromBrowserState(web_state_->GetBrowserState());
-
-  // The BWG Service determines whether the profile is eligible.
-  BwgService* bwg_service = BwgServiceFactory::GetForProfile(profile);
-  const bool is_profile_eligible =
-      !profile->IsOffTheRecord() && bwg_service->IsEligibleForBwg();
-
-  // The web state is eligible for HTML and images that use http/https schemes.
-  const GURL& url = web_state_->GetVisibleURL();
-  const std::string mime_type = web_state_->GetContentsMimeType();
-  const BOOL is_web_state_eligible =
-      url.SchemeIsHTTPOrHTTPS() &&
-      (web::IsContentTypeHtml(mime_type) || web::IsContentTypeImage(mime_type));
-
-  return is_profile_eligible && is_web_state_eligible;
-}
-
 void BwgTabHelper::PrepareBwgFreBackgrounding() {
   cached_snapshot_ =
       bwg_snapshot_utils::GetCroppedFullscreenSnapshot(web_state_->GetView());
@@ -173,7 +150,6 @@ void BwgTabHelper::WasShown(web::WebState* web_state) {
   if (is_bwg_session_active_in_background_) {
     [bwg_commands_handler_
         startBWGFlowWithEntryPoint:bwg::EntryPoint::TabReopen];
-    is_bwg_session_active_in_background_ = false;
     cached_snapshot_ = nil;
   }
 }
@@ -182,13 +158,22 @@ void BwgTabHelper::WasHidden(web::WebState* web_state) {
   if (is_bwg_ui_showing_) {
     cached_snapshot_ =
         bwg_snapshot_utils::GetCroppedFullscreenSnapshot(web_state_->GetView());
+    is_bwg_session_active_in_background_ = true;
+    [bwg_commands_handler_ dismissBWGFlowWithCompletion:nil];
   }
 
   UpdateWebStateSnapshotInStorage();
+}
 
-  if (is_bwg_ui_showing_) {
-    is_bwg_session_active_in_background_ = true;
-    [bwg_commands_handler_ dismissBWGFlowWithCompletion:nil];
+void BwgTabHelper::PageLoaded(
+    web::WebState* web_state,
+    web::PageLoadCompletionStatus load_completion_status) {
+  ProfileIOS* profile =
+      ProfileIOS::FromBrowserState(web_state->GetBrowserState());
+  bool bwg_promo_shown =
+      profile->GetPrefs()->GetInteger(prefs::kIOSBWGPromoImpressionCount) > 0;
+  if (!bwg_promo_shown) {
+    [bwg_commands_handler_ showBWGPromoIfPageIsEligible];
   }
 }
 

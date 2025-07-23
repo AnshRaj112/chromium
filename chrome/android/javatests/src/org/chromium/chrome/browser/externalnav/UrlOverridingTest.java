@@ -548,6 +548,7 @@ public class UrlOverridingTest {
                                 public void onNewTabCreated(
                                         Tab newTab, @TabCreationState int creationState) {
                                     Assert.assertTrue(params.createsNewTab);
+                                    latestTabHolder.value = newTab;
                                     newTabCallback.notifyCalled();
                                     loadCallback.notifyCalled();
                                     newTab.addObserver(
@@ -557,7 +558,6 @@ public class UrlOverridingTest {
                                                     destroyedCallback,
                                                     failCallback,
                                                     loadCallback));
-                                    latestTabHolder.value = newTab;
                                     TestChildFrameNavigationObserver
                                             .createAndAttachToNativeWebContents(
                                                     newTab.getWebContents(),
@@ -619,11 +619,20 @@ public class UrlOverridingTest {
             newTabCallback.waitForCallback("New Tab was not created.", 0, 1, 20, TimeUnit.SECONDS);
         }
 
-        if (params.createsNewTab
-                && UrlUtilities.isHttpOrHttps(latestTabHolder.value.getUrl())
-                && !params.shouldLaunchExternalIntent) {
-            firstPaintCallback.waitForCallback(
-                    "New Tab content was not drawn.", 1, 1, 20, TimeUnit.SECONDS);
+        if (params.createsNewTab && !params.shouldLaunchExternalIntent) {
+            ChromeTabUtils.waitForInteractable(tab);
+            // The new tab URL is sometimes empty and not strictly linked to the interactable state.
+            CriteriaHelper.pollUiThread(
+                    () -> {
+                        Criteria.checkThat(
+                                GURL.isEmptyOrInvalid(latestTabHolder.value.getUrl()),
+                                Matchers.is(false));
+                    });
+
+            if (UrlUtilities.isHttpOrHttps(latestTabHolder.value.getUrl())) {
+                firstPaintCallback.waitForCallback(
+                        "New Tab content was not drawn.", 1, 1, 20, TimeUnit.SECONDS);
+            }
         }
 
         if (params.shouldFailNavigation) {
@@ -2289,6 +2298,8 @@ public class UrlOverridingTest {
     @EnableFeatures({ExternalIntentsFeatures.AUXILIARY_NAVIGATION_STAYS_IN_BROWSER_NAME})
     @LargeTest
     public void testAuxiliaryNavigationShouldStayInBrowser() throws Exception {
+        InterceptNavigationDelegateClientImpl.setIsDesktopWindowingModeForTesting(true);
+
         mTabbedActivityTestRule.startOnBlankPage();
 
         String url_external = EXTERNAL_APP_SCHEME + "://example.com";
@@ -2318,6 +2329,8 @@ public class UrlOverridingTest {
     @EnableFeatures({ExternalIntentsFeatures.AUXILIARY_NAVIGATION_STAYS_IN_BROWSER_NAME})
     @LargeTest
     public void testTopLevelNavigationShouldBeIntercepted() throws Exception {
+        InterceptNavigationDelegateClientImpl.setIsDesktopWindowingModeForTesting(true);
+
         mTabbedActivityTestRule.startOnBlankPage();
 
         String url_external = EXTERNAL_APP_SCHEME + "://example.com";
@@ -2346,6 +2359,8 @@ public class UrlOverridingTest {
     @EnableFeatures({ExternalIntentsFeatures.AUXILIARY_NAVIGATION_STAYS_IN_BROWSER_NAME})
     @LargeTest
     public void testSelfNavigationInAuxiliaryPage() throws Exception {
+        InterceptNavigationDelegateClientImpl.setIsDesktopWindowingModeForTesting(true);
+
         String page_with_self_link =
                 getUrlWithParam(
                         NAVIGATION_FROM_TARGET_SELF_LINK, EXTERNAL_APP_SCHEME + "://example.com");

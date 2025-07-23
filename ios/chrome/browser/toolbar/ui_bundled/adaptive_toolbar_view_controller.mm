@@ -13,6 +13,7 @@
 #import "ios/chrome/browser/fullscreen/ui_bundled/fullscreen_reason.h"
 #import "ios/chrome/browser/shared/public/commands/omnibox_commands.h"
 #import "ios/chrome/browser/shared/public/features/features.h"
+#import "ios/chrome/browser/shared/public/prototypes/diamond/utils.h"
 #import "ios/chrome/browser/shared/ui/symbols/symbols.h"
 #import "ios/chrome/browser/shared/ui/util/animation_util.h"
 #import "ios/chrome/browser/shared/ui/util/layout_guide_names.h"
@@ -71,6 +72,10 @@ const CGFloat kFullscreenProgressFullyExpanded = 1.0;
 @synthesize isNTP = _isNTP;
 
 #pragma mark - Public
+
+- (ToolbarButton*)tabGridButton {
+  return self.view.tabGridButton;
+}
 
 - (ToolbarButton*)toolsMenuButton {
   return self.view.toolsMenuButton;
@@ -256,10 +261,16 @@ const CGFloat kFullscreenProgressFullyExpanded = 1.0;
 
 - (void)setCanGoForward:(BOOL)canGoForward {
   self.view.forwardButton.enabled = canGoForward;
+  if (IsDiamondPrototypeEnabled()) {
+    self.view.forwardButton.hidden = !canGoForward;
+  }
 }
 
 - (void)setCanGoBack:(BOOL)canGoBack {
   self.view.backButton.enabled = canGoBack;
+  if (IsDiamondPrototypeEnabled()) {
+    self.view.backButton.hidden = !canGoBack;
+  }
 }
 
 - (void)setLoadingState:(BOOL)loading {
@@ -449,6 +460,13 @@ const CGFloat kFullscreenProgressFullyExpanded = 1.0;
 // Updates `locationBarContainer` height and adjusts its corner radius for the
 // fullscreen `progress`
 - (void)updateLocationBarHeightForFullscreenProgress:(CGFloat)progress {
+  if (IsDiamondPrototypeEnabled()) {
+    const CGFloat height = kDiamondLocationBarHeight * progress +
+                           kDiamondCollapsedToolbarHeight * (1 - progress);
+    self.view.locationBarContainerHeight.constant = height;
+    self.view.locationBarContainer.layer.cornerRadius = height / 2;
+    return;
+  }
   const CGFloat expandedHeight =
       LocationBarHeight(self.traitCollection.preferredContentSizeCategory);
   const CGFloat collapsedHeight =
@@ -492,6 +510,11 @@ const CGFloat kFullscreenProgressFullyExpanded = 1.0;
 // change.
 - (void)updateAllButtonsVisibility {
   for (ToolbarButton* button in self.view.allButtons) {
+    if (IsDiamondPrototypeEnabled()) {
+      if (button == self.view.backButton || button == self.view.forwardButton) {
+        continue;
+      }
+    }
     [button updateHiddenInCurrentSizeClass];
   }
 }

@@ -57,6 +57,8 @@ constexpr char kTimeZone[] = "America/Los_Angeles";
 constexpr char kRequestIdParameterKey[] = "vsrid";
 constexpr char kVisualInputTypeParameterKey[] = "vit";
 constexpr char kLnsSurfaceParameterKey[] = "lns_surface";
+constexpr char kTestCellAddress[] = "test_cell_address";
+constexpr char kTestServerAddress[] = "test_server_address";
 base::Time kTestQueryStartTime =
     base::Time::FromMillisecondsSinceUnixEpoch(1000);
 
@@ -81,6 +83,10 @@ class ComposeboxQueryControllerTest
     lens::LensOverlayServerClusterInfoResponse cluster_info_response;
     cluster_info_response.set_search_session_id(kTestSearchSessionId);
     cluster_info_response.set_server_session_id(kTestServerSessionId);
+    cluster_info_response.mutable_routing_info()->set_cell_address(
+        kTestCellAddress);
+    cluster_info_response.mutable_routing_info()->set_server_address(
+        kTestServerAddress);
     controller_->set_fake_cluster_info_response(cluster_info_response);
 
     controller().set_on_query_controller_state_changed_callback(
@@ -277,14 +283,6 @@ class ComposeboxQueryControllerTest
                                              "id_token"};
 };
 
-TEST_F(ComposeboxQueryControllerTest, NotifySessionStarted) {
-  // Act: Start the session.
-  controller().NotifySessionStarted();
-
-  // Assert: Validate the session state.
-  EXPECT_EQ(SessionState::kSessionStarted, controller().session_state());
-}
-
 TEST_F(ComposeboxQueryControllerTest,
        NotifySessionStartedIssuesClusterInfoRequest) {
   // Act: Start the session.
@@ -324,11 +322,30 @@ TEST_F(ComposeboxQueryControllerTest,
 }
 
 TEST_F(ComposeboxQueryControllerTest, NotifySessionAbandoned) {
+  // Act: Start the session.
+  controller().NotifySessionStarted();
+
+  // Assert: Validate cluster info request and state changes.
+  WaitForClusterInfo();
+
+  // Act: Start the file upload flow.
+  const base::UnguessableToken file_token = base::UnguessableToken::Create();
+  StartPdfFileUploadFlow(
+      file_token,
+      /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
+
+  // Assert: Validate file upload request and status changes.
+  WaitForFileUpload(file_token);
+
+  // Check that file is in cache.
+  EXPECT_TRUE(controller().GetFileInfo(file_token));
+
   // Act: End the session.
   controller().NotifySessionAbandoned();
 
-  // Assert: Validate the session state.
-  EXPECT_EQ(SessionState::kSessionAbandoned, controller().session_state());
+  // Check that file is no longer in cache.
+  EXPECT_FALSE(controller().GetFileInfo(file_token));
+  EXPECT_EQ(QueryControllerState::kOff, controller().query_controller_state());
 }
 
 TEST_F(ComposeboxQueryControllerTest, UploadFileRequestFailure) {
@@ -420,6 +437,19 @@ TEST_F(ComposeboxQueryControllerTest, UploadImageFileRequestSuccess) {
                 ->GetRequestIdForTesting()
                 ->long_context_id(),
             0);
+  // Check that the routing info is in the vsrid.
+  EXPECT_EQ(controller()
+                .GetFileInfo(file_token)
+                ->GetRequestIdForTesting()
+                ->routing_info()
+                .cell_address(),
+            kTestCellAddress);
+  EXPECT_EQ(controller()
+                .GetFileInfo(file_token)
+                ->GetRequestIdForTesting()
+                ->routing_info()
+                .server_address(),
+            kTestServerAddress);
 }
 
 TEST_F(ComposeboxQueryControllerTest, UploadEmptyImageFileRequestFailure) {
@@ -443,7 +473,7 @@ TEST_F(ComposeboxQueryControllerTest, UploadEmptyImageFileRequestFailure) {
 
   // Assert: Validate file upload request and status changes.
   WaitForFileUpload(file_token, FileUploadStatus::kValidationFailed,
-                    FileUploadErrorType::kBrowserProcessingError);
+                    FileUploadErrorType::kImageProcessingError);
 }
 #endif  // !BUILDFLAG(IS_IOS)
 
@@ -516,6 +546,19 @@ TEST_F(ComposeboxQueryControllerTest, UploadPdfFileRequestSuccess) {
                 .request_id()
                 .long_context_id(),
             1);
+  // Check that the routing info is in the vsrid.
+  EXPECT_EQ(controller()
+                .GetFileInfo(file_token)
+                ->GetRequestIdForTesting()
+                ->routing_info()
+                .cell_address(),
+            kTestCellAddress);
+  EXPECT_EQ(controller()
+                .GetFileInfo(file_token)
+                ->GetRequestIdForTesting()
+                ->routing_info()
+                .server_address(),
+            kTestServerAddress);
 }
 
 TEST_F(ComposeboxQueryControllerTest, UploadInvalidMimeTypeFileRequestFailure) {
@@ -683,6 +726,112 @@ TEST_F(ComposeboxQueryControllerTest, CreateClientContextHasCorrectValues) {
   EXPECT_EQ(client_context.locale_context().time_zone(), kTimeZone);
 }
 
+TEST_F(ComposeboxQueryControllerTest, AbandonSessionClearsFiles) {
+  // Act: Start the session.
+  controller().NotifySessionStarted();
+
+  // Assert: Validate cluster info request and state changes.
+  WaitForClusterInfo();
+
+  // Act: Start the file upload flow.
+  const base::UnguessableToken file_token = base::UnguessableToken::Create();
+  StartPdfFileUploadFlow(
+      file_token,
+      /*file_data=*/base::MakeRefCounted<base::RefCountedBytes>());
+
+  // Assert: Validate file upload request and status changes.
+  WaitForFileUpload(file_token);
+
+  // Act: Abandon the session.
+  controller().NotifySessionAbandoned();
+
+  // Assert: Validate the state change.
+  EXPECT_EQ(QueryControllerState::kOff, controller_state_future_.Take());
+
+  // Act: Start the session again.
+  controller().NotifySessionStarted();
+
+  // Assert: Validate the state change.
+  EXPECT_EQ(QueryControllerState::kAwaitingClusterInfoResponse,
+            controller_state_future_.Take());
+
+  // Assert: Validate the state change.
+  EXPECT_EQ(QueryControllerState::kClusterInfoReceived,
+            controller_state_future_.Take());
+
+  // Act: Generate the destination URL for the query.
+  GURL aim_url = controller().CreateAimUrl("test", kTestQueryStartTime);
+
+  // Assert: Lens request id is NOT added to unimodal text queries.
+  std::string vsrid_value;
+  EXPECT_FALSE(net::GetValueForKeyInQuery(aim_url, kRequestIdParameterKey,
+                                          &vsrid_value));
+
+  // Assert: Visual input type is NOT added to unimodal text queries.
+  std::string vit_value;
+  EXPECT_FALSE(net::GetValueForKeyInQuery(aim_url, kVisualInputTypeParameterKey,
+                                          &vit_value));
+
+  // Assert: Gsession id is NOT added to unimodal text queries.
+  std::string gsession_id_value;
+  EXPECT_FALSE(net::GetValueForKeyInQuery(aim_url, kSessionIdQueryParameterKey,
+                                          &gsession_id_value));
+
+  // Check that the timestamps are attached to the url.
+  std::string qsubts_value;
+  EXPECT_TRUE(net::GetValueForKeyInQuery(
+      aim_url, kQuerySubmissionTimeQueryParameter, &qsubts_value));
+
+  std::string pqsubts_value;
+  EXPECT_TRUE(net::GetValueForKeyInQuery(
+      aim_url, kUserPerceivedQuerySubmissionTimeQueryParameter,
+      &pqsubts_value));
+  EXPECT_EQ(pqsubts_value, "1000");
+}
+
+TEST_F(ComposeboxQueryControllerTest,
+       AbandonSessionPreventsMultipleClusterInfoFetch) {
+  // Enable cluster info TTL.
+  controller().set_enable_cluster_info_ttl(true);
+
+  // Act: Start the session.
+  controller().NotifySessionStarted();
+
+  // Assert: Validate cluster info request and state changes.
+  WaitForClusterInfo();
+
+  // Act: Abandon the session.
+  controller().NotifySessionAbandoned();
+
+  // Assert: Validate the state change.
+  EXPECT_EQ(QueryControllerState::kOff, controller_state_future_.Take());
+
+  // Act: Start the session again.
+  controller().NotifySessionStarted();
+
+  // Assert: Validate the state change.
+  EXPECT_EQ(QueryControllerState::kAwaitingClusterInfoResponse,
+            controller_state_future_.Take());
+
+  // Assert: Validate the state change.
+  EXPECT_EQ(QueryControllerState::kClusterInfoReceived,
+            controller_state_future_.Take());
+
+  // Wait 45 minutes, long enough for the cluster info to expire once.
+  task_environment().FastForwardBy(base::Minutes(45));
+
+  // Assert: Validate the state change sequence.
+  EXPECT_EQ(QueryControllerState::kClusterInfoInvalid,
+            controller_state_future_.Take());
+  EXPECT_EQ(QueryControllerState::kAwaitingClusterInfoResponse,
+            controller_state_future_.Take());
+  EXPECT_EQ(QueryControllerState::kClusterInfoReceived,
+            controller_state_future_.Take());
+
+  // Assert: The cluster info fetch request was only sent 3 times.
+  EXPECT_EQ(controller().num_cluster_info_fetch_requests_sent(), 3);
+}
+
 TEST_F(ComposeboxQueryControllerTest,
        UnimodalTextQuerySubmittedWithInvalidClusterInfoSuccess) {
   controller().set_next_cluster_info_request_should_return_error(true);
@@ -695,9 +844,6 @@ TEST_F(ComposeboxQueryControllerTest,
 
   // Act: Generate the destination URL for the query.
   GURL aim_url = controller().CreateAimUrl("test", kTestQueryStartTime);
-
-  // Assert: Validate the state change.
-  EXPECT_EQ(SessionState::kQuerySubmitted, controller().session_state());
 
   // Assert: Lens request id is NOT added to unimodal text queries.
   std::string vsrid_value;
@@ -735,9 +881,6 @@ TEST_F(ComposeboxQueryControllerTest, QuerySubmitted) {
 
   // Act: Generate the destination URL for the query.
   GURL aim_url = controller().CreateAimUrl("test", kTestQueryStartTime);
-
-  // Assert: Validate the state change.
-  EXPECT_EQ(SessionState::kQuerySubmitted, controller().session_state());
 
   // Assert: Lens request id is NOT added to unimodal text queries.
   std::string vsrid_value;
@@ -785,9 +928,6 @@ TEST_F(ComposeboxQueryControllerTest, QuerySubmittedWithUploadedPdf) {
   // Act: Create the destination URL for the query. The destination URL can
   // only be created after the cluster info is received.
   GURL aim_url = controller().CreateAimUrl("hello", kTestQueryStartTime);
-
-  // Assert: Validate the state change.
-  EXPECT_EQ(SessionState::kQuerySubmitted, controller().session_state());
 
   // Assert: Lens request id is NOT added to multimodal pdf queries.
   std::string vsrid_value;
@@ -851,9 +991,6 @@ TEST_F(ComposeboxQueryControllerTest,
 
   // Act: Create the destination URL for the query.
   GURL aim_url = controller().CreateAimUrl("hello", kTestQueryStartTime);
-
-  // Assert: Validate the state change.
-  EXPECT_EQ(SessionState::kQuerySubmitted, controller().session_state());
 
   // Assert: Lens request id is NOT added to unimodal text queries.
   std::string vsrid_value;

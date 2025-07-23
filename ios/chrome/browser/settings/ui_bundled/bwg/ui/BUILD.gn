@@ -4,6 +4,8 @@
 
 source_set("ui") {
   sources = [
+    "bwg_location_view_controller.h",
+    "bwg_location_view_controller.mm",
     "bwg_settings_consumer.h",
     "bwg_settings_view_controller.h",
     "bwg_settings_view_controller.mm",
@@ -12,6 +14,7 @@ source_set("ui") {
     "//base",
     "//components/prefs",
     "//ios/chrome/app/strings",
+    "//ios/chrome/browser/intelligence/features",
     "//ios/chrome/browser/net/model:crurl",
     "//ios/chrome/browser/settings/ui_bundled:settings_root",
     "//ios/chrome/browser/settings/ui_bundled/bwg/coordinator:protocols",

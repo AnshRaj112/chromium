@@ -20,6 +20,11 @@ class MockActorUiTabController : public ActorUiTabControllerInterface {
               (const UiTabState& ui_tab_state, UiResultCallback callback),
               (override));
 
+  MOCK_METHOD(void,
+              OnTabActiveStatusChanged,
+              (bool tab_active_status, tabs::TabInterface* tab),
+              (override));
+
   MOCK_METHOD(void, SetActiveTaskId, (TaskId task_id), (override));
 
   MOCK_METHOD(void, ClearActiveTaskId, (), (override));
@@ -28,6 +33,17 @@ class MockActorUiTabController : public ActorUiTabControllerInterface {
               GetWeakPtr,
               (),
               (override));
+
+  MOCK_METHOD(void, SetActorTaskPaused, (), (override));
+
+  MOCK_METHOD(void, SetActorTaskResume, (), (override));
+
+  MOCK_METHOD(void,
+              BindActorOverlay,
+              (mojo::PendingReceiver<mojom::ActorOverlayPageHandler> receiver),
+              (override));
+
+  MOCK_METHOD(void, SetHandoffButtonVisibility, (bool is_visible), (override));
 
  private:
   base::WeakPtrFactory<MockActorUiTabController> weak_factory_{this};

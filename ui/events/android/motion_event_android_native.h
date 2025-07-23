@@ -10,11 +10,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "base/android/scoped_input_event.h"
-#include "base/android/scoped_java_ref.h"
-#include "base/memory/raw_ptr.h"
-#include "base/time/time.h"
 #include "ui/events/android/motion_event_android.h"
+#include "ui/events/android/motion_event_android_source.h"
 #include "ui/events/events_export.h"
 #include "ui/events/velocity_tracker/motion_event.h"
 #include "ui/gfx/geometry/point_f.h"
@@ -32,37 +29,18 @@ class EVENTS_EXPORT MotionEventAndroidNative : public MotionEventAndroid {
   void operator=(const MotionEventAndroidNative&) = delete;
 
   // Start ui::MotionEvent overrides
-  int GetPointerId(size_t pointer_index) const override;
-  float GetX(size_t pointer_index) const override;
-  float GetY(size_t pointer_index) const override;
-  float GetTouchMajor(size_t pointer_index) const override;
-  float GetTouchMinor(size_t pointer_index) const override;
-  float GetOrientation(size_t pointer_index) const override;
   float GetPressure(size_t pointer_index) const override;
-  float GetTiltX(size_t pointer_index) const override;
-  float GetTiltY(size_t pointer_index) const override;
-  base::TimeTicks GetHistoricalEventTime(
-      size_t historical_index) const override;
-  float GetHistoricalTouchMajor(size_t pointer_index,
-                                size_t historical_index) const override;
-  float GetHistoricalX(size_t pointer_index,
-                       size_t historical_index) const override;
-  float GetHistoricalY(size_t pointer_index,
-                       size_t historical_index) const override;
-  ToolType GetToolType(size_t pointer_index) const override;
   // End ui::MotionEvent overrides
 
   // Start MotionEventAndroid overrides
   float GetXPix(size_t pointer_index) const override;
   float GetYPix(size_t pointer_index) const override;
-  int GetSource() const override;
   // End MotionEventAndroid overrides
 
  private:
   friend class MotionEventAndroidFactory;
 
-  MotionEventAndroidNative(base::android::ScopedInputEvent input_event,
-                           float pix_to_dip,
+  MotionEventAndroidNative(float pix_to_dip,
                            float ticks_x,
                            float ticks_y,
                            float tick_multiplier,
@@ -82,11 +60,7 @@ class EVENTS_EXPORT MotionEventAndroidNative : public MotionEventAndroid {
                            bool for_touch_handle,
                            const Pointer* const pointer0,
                            const Pointer* const pointer1,
-                           float y_offset_pix);
-
-  const base::android::ScopedInputEvent native_event_;
-  // Amount of value to offset Y axis values by to accommodate for top controls.
-  float y_offset_pix_;
+                           std::unique_ptr<MotionEventAndroidSource> source);
 };
 
 }  // namespace ui

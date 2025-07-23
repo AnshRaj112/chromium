@@ -11,10 +11,12 @@
 #include "base/types/expected.h"
 #include "base/version.h"
 #include "components/web_package/signed_web_bundles/signed_web_bundle_id.h"
+#include "components/webapps/isolated_web_apps/types/source.h"
 #include "url/gurl.h"
 
 namespace content {
 class BrowserContext;
+class StoragePartition;
 }  // namespace content
 
 namespace web_app {
@@ -48,6 +50,19 @@ class IwaClient {
   // TODO(crbug.com/431980377): Consider moving chrome::kIsolatedAppScheme to
   // components/webapps/isolated_web_apps/ to remove this link.
   virtual GURL CreateBaseURLForWebBundleId(
+      const web_package::SignedWebBundleId& web_bundle_id) = 0;
+
+  // Tells the embedder (who manages the app system) to run the supplied
+  // `callback` once all windows of the app defined by `web_bundle_id` are
+  // closed.
+  virtual void RunWhenAppCloses(
+      content::BrowserContext* browser_context,
+      const web_package::SignedWebBundleId& web_bundle_id,
+      base::OnceClosure callback) = 0;
+
+  // TODO
+  virtual content::StoragePartition* GetStoragePartition(
+      content::BrowserContext* browser_context,
       const web_package::SignedWebBundleId& web_bundle_id) = 0;
 
  protected:

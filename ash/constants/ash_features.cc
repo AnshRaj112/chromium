@@ -113,6 +113,10 @@ BASE_FEATURE(kAutoScreenBrightness,
              "AutoScreenBrightness",
              base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Enables a setting to automatically sign out a user when their account signs
+// in on a new device.
+BASE_FEATURE(kAutoSignOut, "AutoSignOut", base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enables params tuning experiment for autocorrect on ChromeOS.
 BASE_FEATURE(kAutocorrectParamsTuning,
              "AutocorrectParamsTuning",
@@ -1696,6 +1700,10 @@ BASE_FEATURE(kJapaneseOSSettings,
              "JapaneseOSSettings",
              base::FEATURE_DISABLED_BY_DEFAULT);
 
+BASE_FEATURE(kJupiterScreensaver,
+             "JupiterScreensaver",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Controls whether the "Remember password" button in the Kerberos "Add account"
 // dialog should be checked by default.
 BASE_FEATURE(kKerberosRememberPasswordByDefault,
@@ -2562,7 +2570,7 @@ BASE_FEATURE(kSeaPenTextInput,
 // Enables sea pen text input translation feature.
 BASE_FEATURE(kSeaPenTextInputTranslation,
              "SeaPenTextInputTranslation",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Enables sea pen feature for ChromeOS demo mode.
 BASE_FEATURE(kSeaPenDemoMode,
@@ -3312,6 +3320,10 @@ bool IsAutoNightLightEnabled() {
   return base::FeatureList::IsEnabled(kAutoNightLight);
 }
 
+bool IsAutoSignOutEnabled() {
+  return base::FeatureList::IsEnabled(kAutoSignOut);
+}
+
 bool IsBackgroundBlurEnabled() {
   bool enabled_by_feature_flag =
       base::FeatureList::IsEnabled(kEnableBackgroundBlur);
@@ -3924,6 +3936,11 @@ bool IsIppClientInfoEnabled() {
 
 bool IsIsolatedWebAppKioskEnabled() {
   return base::FeatureList::IsEnabled(kIsolatedWebAppKiosk);
+}
+
+bool IsJupiterScreensaverEnabled() {
+  return base::FeatureList::IsEnabled(kJupiterScreensaver) &&
+         IsTimeOfDayScreenSaverEnabled();
 }
 
 bool IsKerberosRememberPasswordByDefaultEnabled() {

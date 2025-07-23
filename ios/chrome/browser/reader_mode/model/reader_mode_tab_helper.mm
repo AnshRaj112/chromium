@@ -159,7 +159,7 @@ void ReaderModeTabHelper::TriggerReaderModeHeuristicAsync(const GURL& url) {
   ResetUrlEligibility(url);
 
   trigger_reader_mode_timer_.Start(
-      FROM_HERE, ReaderModeDistillerPageLoadDelay(),
+      FROM_HERE, ReaderModeHeuristicPageLoadDelay(),
       base::BindOnce(&ReaderModeTabHelper::TriggerReaderModeHeuristic,
                      weak_ptr_factory_.GetWeakPtr(), url));
 }
@@ -198,7 +198,7 @@ void ReaderModeTabHelper::ResetUrlEligibility(const GURL& url) {
   // Ensure that only one asynchronous eligibility check is running at a time.
   if (trigger_reader_mode_timer_.IsRunning()) {
     trigger_reader_mode_timer_.Stop();
-    metrics_helper_.CancelReaderHeuristicRecording();
+    metrics_helper_.RecordReaderHeuristicCanceled();
   } else {
     // If there is no trigger in progress ensure any metrics related to a
     // past navigation have been recorded.
@@ -271,8 +271,7 @@ void ReaderModeTabHelper::HandleReaderModeHeuristicResult(
   }
   reader_mode_eligible_url_ =
       result == ReaderModeHeuristicResult::kReaderModeEligible ? url : GURL();
-  if (last_committed_url_without_ref_.EqualsIgnoringRef(
-          reader_mode_eligible_url_)) {
+  if (last_committed_url_without_ref_.EqualsIgnoringRef(url)) {
     last_committed_url_eligibility_ready_ = true;
     CallLastCommittedUrlEligibilityCallbacks(CurrentPageSupportsReaderMode());
   }
@@ -319,6 +318,9 @@ void ReaderModeTabHelper::PageDistillationCompleted(
     const std::vector<DistillerViewerInterface::ImageInfo>& images,
     const std::string& title,
     const std::string& csp_nonce) {
+  // Cancel the distillation timeout request if page distillation completes.
+  reader_mode_distillation_timer_.Stop();
+
   // If ExecuteJavaScript completion is run after WebState is destroyed, do
   // not continue metrics collection.
   if (!web_state_ || web_state_->IsBeingDestroyed()) {
@@ -349,6 +351,9 @@ void ReaderModeTabHelper::PageDistillationCompleted(
     } else {
       // If the page could not be distilled, deactivate Reader mode in this tab.
       SetActive(false);
+      for (auto& observer : observers_) {
+        observer.ReaderModeDistillationFailed(this);
+      }
     }
   }
 }
@@ -374,6 +379,11 @@ void ReaderModeTabHelper::CreateReaderModeWebState() {
       std::move(distiller_page), web_state_->GetLastCommittedURL(),
       base::BindRepeating(&ReaderModeTabHelper::PageDistillationCompleted,
                           weak_ptr_factory_.GetWeakPtr())));
+
+  reader_mode_distillation_timer_.Start(
+      FROM_HERE, ReaderModeDistillationTimeout(),
+      base::BindOnce(&ReaderModeTabHelper::CancelDistillation,
+                     weak_ptr_factory_.GetWeakPtr()));
 }
 
 void ReaderModeTabHelper::DestroyReaderModeWebState() {
@@ -417,4 +427,9 @@ void ReaderModeTabHelper::CallLastCommittedUrlEligibilityCallbacks(
     std::move(callback).Run(result);
   }
   last_committed_url_eligibility_callbacks_.clear();
+}
+
+void ReaderModeTabHelper::CancelDistillation() {
+  metrics_helper_.RecordReaderDistillerTimedOut();
+  SetActive(false);
 }

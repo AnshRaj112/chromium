@@ -313,6 +313,7 @@
       <ph name="IMAGE_SEARCH_SOURCE" />,
       <ph name="IMAGE_THUMBNAIL" />,
       <ph name="IMAGE_THUMBNAIL_BASE64" /></translation>
+<translation id="1238150413700645698">보호된 콘텐츠</translation>
 <translation id="1238868319430505522"><ph name="GOOGLE_DRIVE_NAME" /> 및 <ph name="GOOGLE_WORKSPACE_NAME" />의 <ph name="CLOUD_UPLOAD_NAME" /> 흐름 구성</translation>
 <translation id="1239526922294123540">웹사이트가 안전하지 않은 방식으로 더 높은 수준의 비공개 네트워크 엔드포인트에 요청할 수 있도록 허용할지 제어합니다.
 
@@ -604,6 +605,7 @@ https://support.google.com/chrome/a/?p=extended_updates_support 페이지를 참
       정책이 Fast로 설정되면 가능한 경우 <ph name="PRODUCT_NAME" />에서 래스터화를 방지합니다. 래스터화 작업량을 줄이면 인쇄 작업 크기를 줄이고 인쇄 속도를 높이는 데 도움이 됩니다.
 
       정책이 설정되지 않으면 <ph name="PRODUCT_NAME" />이 Full 모드로 설정됩니다.</translation>
+<translation id="1453707129684226879">보호된 콘텐츠의 정책을 제어합니다.</translation>
 <translation id="1455351936334569779">거부 목록에 있는 유형의 프린터를 검색하거나 이러한 프린터의 기능을 가져올 수 없게 됩니다.
 
       모든 프린터 유형을 거부 목록에 포함하면 인쇄가 사실상 사용 중지됩니다. 문서를 인쇄하기 위해 보낼 프린터가 없어지기 때문입니다.
@@ -1779,31 +1781,6 @@ URI 템플릿에 <ph name="HTTP_VARIABLE_DNS" /> 변수가 포함된 경우 리�
 <translation id="225830954785359083">로드 취소 중 페이지에서 팝업을 표시하지 않도록 차단</translation>
 <translation id="2261648512244797294">지원 중단된 Privet 인쇄 사용 중지</translation>
 <translation id="2263881357524831360"><ph name="ANDROID_NAME" />에서 <ph name="PRODUCT_NAME" />의 서드 파티 비밀번호 관리자 사용 허용</translation>
-<translation id="2264286153777425328"><ph name="IDLE_TIMEOUT_POLICY_NAME" /> 정책에 설정된 제한 시간 도달 시 실행할 작업 목록입니다.
-
-경고: 이 정책을 설정하면 로컬 개인 정보가 영향을 받아 영구적으로 삭제될 수 있습니다. 개인 정보가 실수로 삭제되지 않도록 배포하기 전에 설정을 테스트하는 것이 좋습니다.
-
-<ph name="IDLE_TIMEOUT_POLICY_NAME" /> 정책이 설정되어 있지 않으면 이 정책이 적용되지 않습니다.
-
-<ph name="IDLE_TIMEOUT_POLICY_NAME" /> 정책에 설정된 제한 시간 도달 시 브라우저에서 이 정책에 구성된 작업을 실행합니다.
-
-정책이 비어 있거나 설정되어 있지 않으면 <ph name="IDLE_TIMEOUT_POLICY_NAME" /> 정책이 적용되지 않습니다.
-
-지원되는 작업은 다음과 같습니다.
-
-      '<ph name="CLOSE_BROWSERS_ACTION" />': 프로필의 모든 브라우저 창과 PWA를 닫습니다. Android와 iOS에서는 지원되지 않습니다.
-
-'<ph name="CLOSE_TABS_ACTION" />': 열려 있는 창의 열려 있는 모든 탭을 닫습니다. iOS에서만 지원됩니다.
-
-'<ph name="SHOW_PROFILE_PICKER_ACTION" />': 프로필 선택 도구 창을 표시합니다. Android와 iOS에서는 지원되지 않습니다.
-
-'<ph name="SIGN_OUT_ACTION" />': 현재 로그인한 사용자를 로그아웃시킵니다. iOS에서만 지원됩니다.
-
-'<ph name="CLEAR_BROWSING_HISTORY_ACTION" />', '<ph name="CLEAR_DOWNLOAD_HISTORY_ACTION" />', '<ph name="CLEAR_COOKIES_AND_OTHER_SITE_DATA_ACTION" />', '<ph name="CLEAR_CACHED_IMAGES_AND_FILES_ACTION" />', '<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />', '<ph name="CLEAR_AUTOFILL_ACTION" />', '<ph name="CLEAR_SITE_SETTINGS_ACTION" />', '<ph name="CLEAR_HOSTED_APP_DATA_ACTION" />': 해당 인터넷 사용 기록을 삭제합니다. 자세한 내용은 <ph name="CLEAR_BROWSING_DATA_ON_EXIT_LIST_POLICY_NAME" /> 정책을 참고하세요. iOS에서 지원되는 유형은 '<ph name="CLEAR_BROWSING_HISTORY_ACTION" />', '<ph name="CLEAR_COOKIES_AND_OTHER_SITE_DATA_ACTION" />', '<ph name="CLEAR_CACHED_IMAGES_AND_FILES_ACTION" />', '<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />', '<ph name="CLEAR_AUTOFILL_ACTION" />'입니다.
-
-      '<ph name="RELOAD_PAGES_ACTION" />': 모든 웹페이지를 새로고침합니다. 일부 페이지에서는 사용자에게 먼저 확인 프롬프트가 표시될 수 있습니다. iOS에서는 지원되지 않습니다.
-
-'<ph name="CLEAR_BROWSING_HISTORY_ACTION" />', '<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />', '<ph name="CLEAR_AUTOFILL_ACTION" />', '<ph name="CLEAR_SITE_SETTINGS_ACTION" />'를 설정하면 <ph name="SYNC_DISABLED_POLICY_NAME" /> 정책을 설정하여 '<ph name="CHROME_SYNC_NAME" />`를 사용 중지하지 않거나 <ph name="BROWSER_SIGNIN_POLICY_NAME" /> 정책을 사용 중지하지 않으면 각 데이터 유형의 동기화가 사용 중지됩니다.</translation>
 <translation id="2266422599396179941">사용자가 의견을 제출하도록 허용</translation>
 <translation id="2268891553068901979">정책을 사용 설정하면 모바일 데이터에 연결되어 있을 때 <ph name="PRODUCT_OS_NAME" /> 파일 앱에서 <ph name="GOOGLE_DRIVE_NAME" /> 동기화가 사용 중지됩니다. Wi-Fi 또는 이더넷으로 연결되어 있을 때만 데이터가 드라이브와 동기화됩니다.
 
@@ -2210,6 +2187,7 @@ False로 설정하면 개인 정보 보호 화면은 항상 사용 중지됩니�
 False로 설정되면 관련 웹사이트 세트 기능이 사용 중지됩니다.</translation>
 <translation id="2555244983262829274">툴바에서 홈 버튼 숨기기</translation>
 <translation id="2558154810835597313">관리 사용자 또는 프로필의 클라이언트 인증서 프로비저닝 사용 설정</translation>
+<translation id="2559274305158103883">WebRTC의 포스트 퀀텀 키 계약 사용 중지</translation>
 <translation id="2562213287271514629">오래된 <ph name="FLASH_PLUGIN_NAME" />을(를) 일반 <ph name="FLASH_PLUGIN_NAME" />(으)로 사용하도록 허용</translation>
 <translation id="2562339630163277285">순간 검색결과를 제공하는 데 사용되는 검색엔진의 URL을 지정합니다. URL에는 <ph name="SEARCH_TERM_MARKER" /> 문자열이 포함되어야 하며 이 문자열은 검색 시 사용자가 지금까지 입력한 내용으로 대체됩니다.
 
@@ -2760,6 +2738,14 @@ false로 설정되면 기능에 액세스할 수 없습니다.</translation>
 <translation id="2985927503455169394">어시스턴트 온보딩 환경의 기본 모드 사용</translation>
 <translation id="2987155890997901449">ARC 사용</translation>
 <translation id="2987227569419001736">Web Bluetooth API 사용 조정</translation>
+<translation id="2988299727303303535">이 정책은 지정된 도메인에 새로운 출처 바인딩 쿠키 동작을 일시적으로 적용하지 않습니다.
+
+목록에 도메인을 추가하면 다른 스킴 또는 포트에서 해당 도메인의 쿠키를 사용할 수 있습니다.
+<ph name="LEGACY_COOKIE_SCOPE_ENABLED_POLICY_NAME" />에서 자세한 내용을 확인할 수 있습니다.
+
+여기 명시된 패턴에 해당하지 않는 도메인의 쿠키 또는 이 정책을 설정하지 않은 경우의 모든 쿠키에 대해서는 출처 바인딩 쿠키 동작이 적용됩니다.
+
+이 정책은 향후 삭제될 예정입니다.</translation>
 <translation id="2989404644164421834">페이지 새로고침</translation>
 <translation id="299127280603727143">로컬 네트워크 액세스 설정과 관련된 정책 그룹입니다.  https://developer.chrome.com/blog/local-network-access를 참고하세요.</translation>
 <translation id="299446489108785864"><ph name="AUTO_OPEN_FILE_TYPES_POLICY_NAME" />가 적용될 URL을 지정하는 URL 목록입니다. 이 정책은 사용자가 설정한 자동으로 열리는 값에 영향을 미치지 않습니다.
@@ -3777,17 +3763,6 @@ HTTPS용 RSA 인증서에 두 가지를 모두 포함해야 합니다.</translat
       정책을 사용 중지로 설정하면 Translator AP를 사용할 수 없습니다.</translation>
 <translation id="366494444808132420">Gemini 통합을 허용합니다.</translation>
 <translation id="3665437376055221832">자동 선택과 일치하는 인증서가 없을 때만 사용자에게 메시지 표시</translation>
-<translation id="3667467644216039144">사용자가 모든 브라우저 창을 닫을 때 삭제되어야 하는 인터넷 사용 기록 유형의 목록을 구성합니다.
-
-경고: 이 정책을 설정하면 로컬 개인 정보가 영향을 받아 영구적으로 삭제될 수 있습니다. 개인 정보가 실수로 삭제되지 않도록 배포하기 전에 설정을 테스트하는 것이 좋습니다.
-
-사용 가능한 데이터 유형은 방문 기록(<ph name="DATA_TYPE_BROWSING_HISTORY" />), 다운로드 기록(<ph name="DATA_TYPE_DOWNLOAD_HISTORY" />), 쿠키(<ph name="DATA_TYPE_COOKIES_AND_OTHER_SITE_DATA" />), 캐시<ph name="DATA_TYPE_CACHED_IMAGES_AND_FILES" />, 자동 완성(<ph name="DATA_TYPE_AUTOFILL" />), 비밀번호(<ph name="DATA_TYPE_PASSWORD" />), 사이트 설정(<ph name="DATA_TYPE_SITE_SETTINGS" />) 및 호스팅된 앱 데이터(<ph name="DATA_TYPE_HOSTED_APP_DATA" />)입니다. 본 정책은 <ph name="ALLOW_DELETING_BROWSER_HISTORY_POLICY_NAME" />보다 우선 적용되지 않습니다.
-
-Chrome 114까지 이 정책을 적용하려면 <ph name="SYNC_DISABLED_POLICY_NAME" /> 정책을 true로 설정해야 합니다. Chrome 115부터 이 정책을 설정하면 <ph name="SYNC_DISABLED_POLICY_NAME" /> 정책을 설정하여 `<ph name="CHROME_SYNC_NAME" />`를 사용 중지하지 않거나 <ph name="BROWSER_SIGNIN_POLICY_NAME" /> 정책을 사용 중지하지 않으면 각 데이터 유형의 동기화가 사용 중지됩니다.
-
-어떤 이유로 데이터 삭제가 시작되었지만 완료되지 않은 경우 다음에 프로필이 로드될 때 인터넷 사용 기록이 지워집니다.
-
-<ph name="PRODUCT_NAME" />이 올바르게 종료되지 않으면(예: 브라우저 또는 OS 비정상 종료) 브라우저 창을 모두 닫아서 브라우저가 종료된 것이 아니기 때문에 인터넷 사용 기록이 삭제되지 않습니다.</translation>
 <translation id="3671773704245936868">키보드 포커스 강조표시 사용 중지</translation>
 <translation id="3674010627788940405">와일드카드가 아닌 CORS 요청 헤더는 지원되지 않습니다.</translation>
 <translation id="3675303748198647471">setTimeout(…, 0)은 흔히 시간이 오래 걸리는 자바스크립트 작업을 세분화하는 데 사용됩니다.
@@ -4923,6 +4898,27 @@ false로 설정되면 확장 프로그램 및 플러그인 데이터가 수집�
       정책은 SAML 없이 GAIA를 사용해 인증된 사용자에게만 적용됩니다.
 
       정책 값은 일 단위로 지정해야 합니다.</translation>
+<translation id="4523997900743255417"><ph name="PRIVACY_SANDBOX_NAME" /> <ph name="IP_PROTECTION_NAME" /> 기능의 사용 설정 여부를 제어하는 정책입니다.
+
+<ph name="IP_PROTECTION_NAME" /> 기능은 시크릿 모드에서 탐색하는 동안 발생하는 특정 서드 파티 네트워크 요청에 대해 사용자의 원래 IP 주소의 사용 가능 여부를 제한하여, 시크릿 모드 탐색 세션 중 크로스 사이트 추적에 대한 보호를 강화합니다.
+
+정책을 사용 중지하면 <ph name="IP_PROTECTION_NAME" /> 기능이 사용 중지되며, 사용자가 UI 설정을 통해 이 기능을 사용 설정할 수 없게 됩니다.
+정책을 사용 설정하면 <ph name="IP_PROTECTION_NAME" /> 기능이 사용 설정되며, 사용자가 UI 설정을 통해 이 기능을 사용 중지할 수 없게 됩니다.
+정책을 설정하지 않으면 <ph name="IP_PROTECTION_NAME" /> 기능이 기본적으로 사용 설정되며 사용자가 UI 설정을 통해 기기에서 이 기능을 제어할 수 있습니다.
+
+기업에서 <ph name="IP_PROTECTION_NAME" /> 기능을 사용 중지할지 여부를 결정할 때 고려해야 할 사항은 다음과 같습니다.
+
+- 프록시된 요청에 대해 DNS 조회가 수행되지 않으며, 이는 DNS 기반 모니터링 또는 필터링에 영향을 미칠 수 있습니다.
+
+- 엔터프라이즈 애플리케이션이 마스크된 도메인 목록(<ph name="MASKED_DOMAIN_LIST_URL" />)에 포함된 도메인(또는 해당 도메인의 하위 도메인)에 대한 요청에 의존하고, 해당 요청이 특정 IP 주소 범위에서 이루어져야 하는 경우, 시크릿 모드에서 애플리케이션이 제대로 작동하지 않을 수 있습니다.
+
+- 특정 조건에서는 시크릿 모드에서 트래픽이 프록시되지 않을 수 있습니다(예: 사용자가 로그인하지 않은 Chrome 프로필에서 시크릿 모드를 실행하는 경우). 일반적으로 이 기능을 사용하려면 시크릿 모드를 실행할 때 사용자가 개인 Google 계정으로 Chrome에 로그인한 상태여야 합니다.
+
+- 마스크된 도메인 목록의 도메인 목록은 시간이 지남에 따라 변경될 수 있으며, 새 버전은 사용자에게 자동으로 푸시됩니다. 마스크된 도메인 목록에 관한 자세한 내용은 <ph name="MASKED_DOMAIN_LIST_CRITERIA_URL" /> 페이지를 참고하세요.
+
+<ph name="IP_PROTECTION_NAME" />에 대한 자세한 내용은 <ph name="IP_PROTECTION_README_URL" /> 페이지를 참고하세요.
+
+<ph name="IP_PROTECTION_NAME" /> 기능은 M139 이후에 출시될 예정입니다.</translation>
 <translation id="4525328580251166229">Bruschetta 하위 시스템과 관련된 정책을 관리합니다.</translation>
 <translation id="4528981768990874684"><ph name="IP_PROTECTION_NAME" /> 기능을 사용 중지합니다.</translation>
 <translation id="453031441196755904">지원 중단된 정책입니다.</translation>
@@ -5169,6 +5165,7 @@ SpeculationRules 미리 가져오기가 허용되지 않습니다. 이는 기존
 
       참고: <ph name="REMOTE_ACCESS_HOST_CLIENT_DOMAIN_POLICY_NAME" />이 있더라도 이 설정이 우선 적용됩니다.</translation>
 <translation id="4658380868451934335">로그인 화면에서 음성기록 사용</translation>
+<translation id="4658420696622830453">보호된 콘텐츠 제어</translation>
 <translation id="4660356908994631271">새 탭 페이지의 검색창에 Google 렌즈 버튼을 표시합니다.</translation>
 <translation id="4661885151480410620">동작 변경사항은 기능 출시 프로세스에 따라 적용될 수 있습니다.</translation>
 <translation id="4661889655253181651">콘텐츠 설정을 사용하면 특정 유형(예: 쿠키, 이미지 또는 자바스크립트)의 콘텐츠가 처리되는 방법을 지정할 수 있습니다.</translation>
@@ -6447,6 +6444,9 @@ false로 설정되면 기능에 액세스할 수 없습니다.</translation>
 <translation id="5488268615614906498">이 정책은 사용자가 다운로드 관리자에서 파일을 <ph name="GOOGLE_DRIVE_NAME" />에 직접 저장할 수 있는지를 제어합니다.
 정책을 사용 설정하거나 설정하지 않은 상태로 두면 사용자가 다운로드 관리자에서 파일을 <ph name="GOOGLE_DRIVE_NAME" />에 저장할 수 있습니다. 정책을 사용 중지하면 다운로드 관리자에서 해당 옵션이 사용자에게 표시되지 않습니다.
 이 정책은 사용자가 다운로드 관리자 외에 다른 방법을 사용하여 파일을 <ph name="GOOGLE_DRIVE_NAME" />에 저장하는 것을 차단하지 않습니다.</translation>
+<translation id="5490462588616309068">정책을 true로 설정하거나 설정하지 않으면 보호된 콘텐츠 식별자를 사용할 수 있으며, 이를 통해 보호된 콘텐츠 재생 품질을 높일 수 있습니다.
+
+정책이 false로 설정되면 보호된 콘텐츠 식별자를 사용할 수 없습니다.</translation>
 <translation id="5494322570831642650">사용자가 <ph name="PRODUCT_NAME" />에서 시크릿 모드로 페이지를 열 수 있는지를 선택합니다.
 
       '사용'이 선택되거나 정책이 설정되어 있지 않으면 페이지가 시크릿 모드로 열릴 수 있습니다.
@@ -6733,6 +6733,7 @@ Microsoft SharePoint 및 OneDrive 카드에는 추가 관리자 구성이 필요
       <ph name="CLIPBOARD_ALLOWED_FOR_URLS_POLICY_NAME" /> 및 <ph name="CLIPBOARD_BLOCKED_FOR_URLS_POLICY_NAME" /> 정책을 사용하는 특정 URL 패턴의 경우 이 정책보다 우선 적용될 수 있습니다.
 
       이 정책은 클립보드 사이트 권한으로 제어되는 클립보드 작업에만 영향을 미치며, 검사된 클립보드 쓰기 또는 신뢰할 수 있는 복사하여 붙여넣기 작업에는 영향을 미치지 않습니다.</translation>
+<translation id="5649788773465136073">사이트에서 보호된 콘텐츠 식별자를 사용하지 않도록 설정하며, 이로 인해 보호된 콘텐츠 재생 품질이 저하될 수 있습니다.</translation>
 <translation id="5650256117857913687">원격 액세스 사용자가 로컬 클라이언트 브라우저에서 호스트 측 URL을 열지 못하도록 차단</translation>
 <translation id="5650716720715977549">비공개 수준이 더 높은 네트워크 엔드포인트에 대한 요청에 제한사항 적용</translation>
 <translation id="5651538748810288218">정책을 1로 설정하면 웹사이트에서 움직임 감지 센서 및 조도 센서 등의 센서에 액세스하고 이러한 센서를 사용할 수 있습니다. 정책을 2로 설정하면 센서 액세스가 거부됩니다.
@@ -7041,6 +7042,7 @@ URL 패턴은 <ph name="DIRECT_SOCKETS_PRIVATE_NETWORK_ACCESS_BLOCKED_FOR_URLS_P
       정책을 False로 설정하거나 설정하지 않으면 <ph name="PLUGIN_VM_NAME" />에서 데이터를 수집할 수 없습니다.
       정책을 True로 설정하면 <ph name="PLUGIN_VM_NAME" /> 사용 환경 개선을 위해 <ph name="PLUGIN_VM_NAME" />에서 <ph name="PLUGIN_VM_NAME" /> 사용 데이터를 수집하여 데이터를 결합하고 철저하게 분석합니다.</translation>
 <translation id="5872738620659477303">기기에 Google 사용자 인증 정보 결합</translation>
+<translation id="5873333871812203119">웹페이지가 보호된 콘텐츠를 재생할 목적으로 식별자를 사용하도록 허용</translation>
 <translation id="5875873062228321803"><ph name="PRODUCT_OS_NAME" />의 최소 허용 버전 요건을 구성합니다.
 
       정책이 비어 있지 않은 목록으로 설정된 경우:
@@ -8233,10 +8235,12 @@ URL 패턴이 <ph name="SERIAL_ASK_FOR_URLS_POLICY_NAME" />와 충돌하는 경�
 <translation id="6614648642325603511">키 쌍 생성을 위한 알고리즘입니다. EC 옵션은 버전 132부터 지원됩니다.</translation>
 <translation id="661610294649586421">손상된 TLS 인증서가 있는 사이트의 WebAuthn API 요청을 허용하지 않습니다.</translation>
 <translation id="6617589895942747919">시작과 끝 값을 포함한 간격의 시작 시간입니다.</translation>
+<translation id="6620966939519407082">기존 쿠키 범위 설정</translation>
 <translation id="6621830999036927230">정책을 설정하면 원격 액세스 호스트에서 연결을 수락하기 위해 이 URL을 사용하여 원격 액세스 클라이언트의 인증 토큰을 검사합니다. 비어 있거나 설정되어 있지 않으면 이 기능이 사용 중지됩니다.
 
       참고: 정책을 <ph name="REMOTE_ACCESS_HOST_TOKEN_URL_POLICY_NAME" />과 함께 사용하세요.</translation>
 <translation id="6625136649067113817">터치 키보드가 맞춤법 검사를 지원할 수 있는지 나타내는 부울 플래그입니다.</translation>
+<translation id="6625716212597516929">기존 쿠키 범위 동작으로 되돌리기</translation>
 <translation id="6626319579493977784">동적 코드 설정</translation>
 <translation id="66265932317331474">CPU 정보 보고</translation>
 <translation id="6628120204569232711">저장용량 상태 보고</translation>
@@ -8286,6 +8290,17 @@ URL 패턴이 <ph name="SERIAL_ASK_FOR_URLS_POLICY_NAME" />와 충돌하는 경�
 <translation id="6665670272107384733">빠른 잠금 해제를 사용하기 위해 사용자가 비밀번호를 얼마나 자주 입력해야 하는지 설정</translation>
 <translation id="6667586534922258705">로그인 및 잠금 화면에 비밀번호 표시 버튼이 표시됩니다</translation>
 <translation id="6667636336079341367">AI 모델을 개선하지 않고 스캐너를 허용합니다.</translation>
+<translation id="6668559639284945695">이 정책을 사용하면 쿠키 범위 지정의 기존 동작으로 되돌릴 수 있습니다.
+
+특정 프로토콜(예: HTTPS) 또는 포트에 설정된 쿠키를 다른 프로토콜 또는 포트에서 액세스할 수 있다는 의미입니다.
+
+정책을 사용 설정하면 쿠키가 원래 스킴 및 포트에 바인딩되지 않습니다.
+
+정책을 사용 중지하거나 설정하지 않으면 쿠키가 출처 바인딩 범위로 동작합니다.
+
+이 구성은 최상위 도메인(예: example.com)에만 적용되며 하위 도메인(예: sub.example.com)에는 적용되지 않습니다.
+
+이 정책은 향후 삭제될 예정입니다.</translation>
 <translation id="6669244130218275293">시크릿 모드에서 <ph name="PRIVACY_SANDBOX_NAME" /> 디지털 지문 수집 보호 기능의 사용 설정 여부를 선택합니다.</translation>
 <translation id="6669691206059842248">각 확장 프로그램의 추가 OAuth 리디렉션 URL 구성</translation>
 <translation id="6669700740683748046">이 기능을 사용하여 주소 표시줄에 전체 URL을 표시할 수 있습니다.
@@ -8448,17 +8463,6 @@ false로 설정되면 Crostini 컨테이너로 포트 전달이 사용 중지됩
 단축키를 구성할 수 있습니다.</translation>
 <translation id="6757613329154374267">백업 및 복원 사용 설정됨</translation>
 <translation id="6758659208493449452">이 정책은 고급 보호 프로그램에 등록한 사용자에게 추가 보호를 제공할지 결정합니다. 추가 기능 중 일부를 사용하려면 Google과 데이터를 공유해야 합니다. 예를 들어, 고급 보호 사용자가 멀웨어 검사를 위해 다운로드 항목을 Google에 전송할 수 있습니다. 정책을 True로 설정하거나 설정하지 않으면 등록된 사용자에게 추가 보호가 제공됩니다. False로 설정하면 고급 보호 사용자에게 표준 소비자 기능만 제공됩니다.</translation>
-<translation id="6759078816721385015"><ph name="PRODUCT_NAME" />의 인터넷 사용 기록 보관 기간 설정을 구성합니다. 이 정책을 통해 관리자가 데이터 유형별로 브라우저에서 데이터를 삭제할 시점을 설정할 수 있습니다. 민감한 고객 데이터를 다루는 고객에게 유용합니다.
-
-경고: 이 정책을 설정하면 로컬 개인 정보가 영향을 받아 영구적으로 삭제될 수 있습니다. 개인 정보가 실수로 삭제되지 않도록 배포하기 전에 설정을 테스트하는 것이 좋습니다.
-
-사용 가능한 데이터 유형은 <ph name="DATA_TYPE_BROWSING_HISTORY" />, <ph name="DATA_TYPE_DOWNLOAD_HISTORY" />, <ph name="DATA_TYPE_COOKIES_AND_OTHER_SITE_DATA" />, <ph name="DATA_TYPE_CACHED_IMAGES_AND_FILES" />, <ph name="DATA_TYPE_PASSWORD" />, <ph name="DATA_TYPE_AUTOFILL" />, <ph name="DATA_TYPE_SITE_SETTINGS" />, <ph name="DATA_TYPE_HOSTED_APP_DATA" />입니다. <ph name="DATA_TYPE_DOWNLOAD_HISTORY" /> 및 <ph name="DATA_TYPE_HOSTED_APP_DATA" />는 Android에서 지원되지 않습니다.
-
-브라우저에서 <ph name="TIME_TO_LIVE_IN_HOURS" /> 값을 경과한 데이터 중 선택된 유형의 데이터를 자동으로 삭제합니다. 설정 가능한 최솟값은 1시간입니다.
-
-만료된 데이터 삭제는 브라우저를 시작하고 15초 후에 이루어지며, 브라우저가 실행되는 동안에는 30분마다 이루어집니다.
-
-Chrome 114까지 이 정책을 적용하려면 <ph name="SYNC_DISABLED_POLICY_NAME" /> 정책을 true로 설정해야 합니다. Chrome 115부터 이 정책을 설정하면 <ph name="SYNC_DISABLED_POLICY_NAME" /> 정책을 설정하여 `<ph name="CHROME_SYNC_NAME" />`를 사용 중지하지 않거나 <ph name="BROWSER_SIGNIN_POLICY_NAME" /> 정책을 사용 중지하지 않으면 각 데이터 유형의 동기화가 사용 중지됩니다.</translation>
 <translation id="6763023079133439068">로컬 신뢰 앵커에서 발급할 때 subjectAlternativeName 확장이 없는 인증서 허용</translation>
 <translation id="6766216162565713893">사이트에서 사용자에게 근처 블루투스 기기에 대한 액세스 권한을 부여할 것인지 묻도록 허용합니다.</translation>
 <translation id="6770454900105963262">활성 키오스크 세션에 관한 정보 보고</translation>
@@ -8815,6 +8819,7 @@ SkyVault 사용자에게만 적용됩니다. 즉, LocalUserFilesAllowed가 false
 <translation id="7016587686120059767">게스트 모드 사용 안함</translation>
 <translation id="7019805045859631636">Fast</translation>
 <translation id="7021590945154530517">기기 상태 모니터링 사용</translation>
+<translation id="7025153290982655996">기존 쿠키 범위 동작으로 되돌리기</translation>
 <translation id="7025332601572838001">CCT 첫 실행 시 서비스 약관 동작 구성</translation>
 <translation id="7026351325994257733"><ph name="PRODUCT_OS_NAME" /> 기기 및 연결된 Android 휴대전화 전체에서 Wi-Fi 네트워크 구성을 동기화하도록 허용합니다.</translation>
 <translation id="7027057540229843762">밝은 테마 사용</translation>
@@ -8930,6 +8935,7 @@ SkyVault 사용자에게만 적용됩니다. 즉, LocalUserFilesAllowed가 false
 
       정책을 False로 설정하거나 설정하지 않으면 정보가 보고되지 않습니다.
       True로 설정하면 기기의 팬 정보가 보고됩니다.</translation>
+<translation id="7097146706461004834">쿠키에 출처 바인딩 범위가 있음</translation>
 <translation id="710003290625031750">확장된 스키마 설명:</translation>
 <translation id="7101550508196914704">북마크바에 앱 바로가기 표시 안함</translation>
 <translation id="7105084505972468353">이 정책이 설정되어 있으면 사용 설정된 화면 돋보기 유형을 제어합니다.
@@ -9377,6 +9383,7 @@ true로 설정하면 <ph name="PRODUCT_NAME" />에서는
 
       이 정책이 설정되지 않거나 false로 설정되면 <ph name="TLS_FALSE_START" />가 사용됩니다. 이 정책이 true로 설정되면 <ph name="TLS_FALSE_START" />가 사용 중지됩니다.</translation>
 <translation id="7427607504279694910">Android 앱 설치 이벤트 로그가 Google과 공유되지 않음</translation>
+<translation id="7428523340768505080">WebRTC의 포스트 퀀텀 키 계약 사용 설정</translation>
 <translation id="7431456748240652287">이 기기 수준 정책은 <ph name="PRODUCT_OS_NAME" />에서 ML-KEM NIST 표준을 사용하여 TLS에 포스트 퀀텀 키 계약 알고리즘을 제공할지 설정합니다. <ph name="PRODUCT_OS_NAME" /> 131 이전에는 Kyber 알고리즘이 사용되었으며, 이는 표준의 초기 초안 버전이었습니다. 이를 통해 지원 서버가 나중에 퀀텀 컴퓨터에서 복호화되는 사용자 트래픽을 보호할 수 있습니다.
 
 정책을 사용 설정하거나 설정하지 않으면 <ph name="PRODUCT_OS_NAME" />에서 TLS 연결에 포스트 퀀텀 키 계약을 제공합니다. 그러면 호환되는 서버와 통신할 때 사용자 트래픽이 퀀텀 컴퓨터로부터 보호됩니다.
@@ -9693,6 +9700,7 @@ Kyber 제공 서비스는 이전 버전과 호환됩니다. 기존 TLS 서버 �
 <translation id="7696534428021833264">NTP SharePoint 및 OneDrive 파일 카드 사용 설정</translation>
 <translation id="7699644797467448158">크로스 사이트 최상위 탐색이고 BrowsingContextGroup을 교체할 때 window.name을 삭제합니다.</translation>
 <translation id="7701341006446125684">앱 및 확장 프로그램 캐시 크기 설정(단위: 바이트)</translation>
+<translation id="7701825382808690457">WebRTC의 포스트 퀀텀 키 계약에 기본값 사용</translation>
 <translation id="7703041979684393741">Google 서비스에서 WebRTC 이벤트 로그 수집 허용 안함</translation>
 <translation id="770339941914297201">새 동작: 키오스크 Chrome 앱이 정책의 업데이트 URL만 사용하여 업데이트됨</translation>
 <translation id="7703737669292992839">파일 선택 대화상자 차단</translation>
@@ -9967,6 +9975,7 @@ Internet Explorer의 <ph name="IEEM_SITELIST_POLICY" /> 정책(https://docs.micr
 <translation id="7906983682927840536">종료 시 연결 유지 길이 가져오기</translation>
 <translation id="7908384265697653397"><ph name="PRODUCT_OS_NAME" /> 버전이 지정된 <ph name="CHROMEOS_VERSION_PROPERTY_NAME" />보다 낮은 경우 사용자가 로그아웃될 때까지의 기간(일)입니다.</translation>
 <translation id="7909751052609510518">인쇄 작업(버전 129부터 지원됨)</translation>
+<translation id="7909839744818798105">도메인 목록에 기존 쿠키 범위 동작 사용 설정</translation>
 <translation id="7911685775490889216">잠금 화면의 화면 보호기에 표시할 이미지가 여러 개 있는 경우 이미지를 표시하는 간격(초)을 구성합니다.
 
 유효한 값의 범위는 1초~9,999초입니다. 정책을 설정하지 않으면 <ph name="PRODUCT_OS_NAME" />에서 기본값인 60초를 사용합니다.
@@ -11081,6 +11090,19 @@ JavaScript 최적화를 사용 중지하면(이 정책의 값을 2로 설정) <p
 <ph name="JAVA_SCRIPT_OPTIMIZER_ALLOWED_FOR_SITES_POLICY_NAME" /> 및 <ph name="JAVA_SCRIPT_OPTIMIZER_BLOCKED_FOR_SITES_POLICY_NAME" /> 정책을 사용하는 특정 URL 패턴의 경우 이 정책보다 우선 적용될 수 있습니다.
 
 정책을 설정하지 않으면 JavaScript 최적화가 사용 설정됩니다.</translation>
+<translation id="8669238010996709070">이 정책을 통해 WebRTC의 포스트 퀀텀 키 계약을 제어할 수 있습니다.
+
+이 정책을 사용 설정하면 WebRTC에 포스트 퀀텀 키 계약이 제공됩니다.
+
+이 정책을 사용 중지하면 WebRTC에 포스트 퀀텀 키 계약이 제공되지 않습니다.
+
+정책을 설정하지 않으면 WebRTC에 제공되는 포스트 퀀텀 키 계약의 기본 출시 프로세스에 따라 값이 설정됩니다.
+
+포스트 퀀텀 키 계약 제공 서비스는 하위 호환됩니다. 기존 DTLS 피어 및 네트워킹 미들웨어는 새 옵션을 무시하고 이전 옵션을 계속 선택해야 합니다.
+
+하지만 새로운 옵션을 제공하더라도 DTLS를 올바르게 구현하지 않는 기기는 오작동할 수 있습니다. 예를 들어 알 수 없는 옵션이나 더 큰 메시지로 인해 연결이 끊길 수 있습니다. 이러한 기기는 포스트 퀀텀 준비가 되지 않았으며 기업의 포스트 퀀텀 전환을 방해합니다. 문제가 발생하면 관리자가 공급업체에 문의하여 문제를 해결해야 합니다.
+
+이 정책은 일시적인 조치이며 향후 삭제될 예정입니다.</translation>
 <translation id="8671119576957984818">데스크톱 공유 허브 사용 설정</translation>
 <translation id="8671193325113134911">작업자 스크립트에 엄격한 MIME 유형 검사 사용 설정</translation>
 <translation id="8671303329680827168">이 정책은 지원 중단되었으므로 대신 '<ph name="AUTH_NEGOTIATE_DELEGATE_ALLOWLIST_POLICY_NAME" />' 정책을 사용하세요.</translation>
@@ -11863,6 +11885,7 @@ URL 패턴은 <ph name="WEB_PRINTING_BLOCKED_FOR_URLS_POLICY_NAME" />와 충돌�
 <translation id="9197740283131855199">화면이 어두워진 후 사용자의 활동이 감지될 때 화면 어둡게 하기 지연 시간이 조정되는 비율</translation>
 <translation id="9200828125069750521">POST를 사용하는 이미지 URL용 매개변수</translation>
 <translation id="9202520409249547230">AI 자동 완성 허용 안함</translation>
+<translation id="9204520300236345497">사이트에서 보호된 콘텐츠 식별자를 사용하도록 허용하며, 이를 통해 보호된 콘텐츠 재생 품질을 높일 수 있습니다.</translation>
 <translation id="9204863016826119209">회사 키가 설치되고 이 정책 목록에 포함된 Android 애플리케이션에서 사용할 수 있습니다.</translation>
 <translation id="9206472508136116830">NetBIOS 공유 검색 허용 안함</translation>
 <translation id="9207596996305971030">로그인/로그아웃 이벤트 보고하지 않음</translation>

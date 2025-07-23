@@ -7,8 +7,10 @@
 #import "base/apple/foundation_util.h"
 #import "base/metrics/user_metrics.h"
 #import "base/metrics/user_metrics_action.h"
+#import "ios/chrome/browser/intelligence/features/features.h"
 #import "ios/chrome/browser/net/model/crurl.h"
 #import "ios/chrome/browser/settings/ui_bundled/bwg/coordinator/bwg_settings_mutator.h"
+#import "ios/chrome/browser/settings/ui_bundled/bwg/ui/bwg_location_view_controller.h"
 #import "ios/chrome/browser/shared/model/url/chrome_url_constants.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_detail_text_item.h"
 #import "ios/chrome/browser/shared/ui/table_view/cells/table_view_link_header_footer_item.h"
@@ -65,6 +67,8 @@ NSString* const kPageContentSharingAction = @"PageContentSharingAction";
   TableViewSwitchItem* _pageContentSharingItem;
   // BWG Apps activity item. Uses `accessoryView` to create a tappable icon.
   TableViewDetailTextItem* _BWGAppsActivityItem;
+  // Location view controller shown when precise location row is tapped.
+  BWGLocationViewController* _locationViewController;
   // Precise location preference value.
   BOOL _preciseLocationEnabled;
   // Page content sharing preference value.
@@ -84,11 +88,6 @@ NSString* const kPageContentSharingAction = @"PageContentSharingAction";
 
 - (void)loadModel {
   [super loadModel];
-  TableViewModel* model = self.tableViewModel;
-  [model addSectionWithIdentifier:SectionIdentifierLocation];
-  [model addSectionWithIdentifier:SectionIdentifierPageContent];
-  [model addSectionWithIdentifier:SectionIdentifierActivity];
-
   _preciseLocationItem =
       [self detailItemWithType:ItemTypeLocation
                              text:l10n_util::GetNSString(
@@ -121,16 +120,22 @@ NSString* const kPageContentSharingAction = @"PageContentSharingAction";
                                   IDS_IOS_BWG_SETTINGS_APP_ACTIVITY_FOOTER_TEXT)
                        linkURL:GURL()];
 
-  [model addItem:_preciseLocationItem
-      toSectionWithIdentifier:SectionIdentifierLocation];
-  [model setFooter:locationFooterItem
-      forSectionWithIdentifier:SectionIdentifierLocation];
+  TableViewModel* model = self.tableViewModel;
+  if (IsBWGPreciseLocationEnabled()) {
+    [model addSectionWithIdentifier:SectionIdentifierLocation];
+    [model addItem:_preciseLocationItem
+        toSectionWithIdentifier:SectionIdentifierLocation];
+    [model setFooter:locationFooterItem
+        forSectionWithIdentifier:SectionIdentifierLocation];
+  }
 
+  [model addSectionWithIdentifier:SectionIdentifierPageContent];
   [model addItem:_pageContentSharingItem
       toSectionWithIdentifier:SectionIdentifierPageContent];
   [model setFooter:pageContentSharingFooterItem
       forSectionWithIdentifier:SectionIdentifierPageContent];
 
+  [model addSectionWithIdentifier:SectionIdentifierActivity];
   [model addItem:[self BWGAppActivityItem]
       toSectionWithIdentifier:SectionIdentifierActivity];
   [model setFooter:BWGAppActivityFooterItem
@@ -140,11 +145,11 @@ NSString* const kPageContentSharingAction = @"PageContentSharingAction";
 #pragma mark - SettingsControllerProtocol
 
 - (void)reportDismissalUserAction {
-  base::RecordAction(base::UserMetricsAction("MobileBWGSettingsClose"));
+  base::RecordAction(base::UserMetricsAction("MobileGeminiSettingsClose"));
 }
 
 - (void)reportBackUserAction {
-  base::RecordAction(base::UserMetricsAction("MobileBWGSettingsBack"));
+  base::RecordAction(base::UserMetricsAction("MobileGeminiSettingsBack"));
 }
 
 #pragma mark - Private
@@ -227,11 +232,24 @@ NSString* const kPageContentSharingAction = @"PageContentSharingAction";
 - (void)tableView:(UITableView*)tableView
     performPrimaryActionForRowAtIndexPath:(NSIndexPath*)indexPath {
   if ([self.tableViewModel itemTypeForIndexPath:indexPath] ==
+      ItemTypeLocation) {
+    _locationViewController = [[BWGLocationViewController alloc]
+        initWithStyle:ChromeTableViewStyle()];
+    _locationViewController.navigationItem.backButtonTitle =
+        l10n_util::GetNSString(IDS_IOS_BWG_LOCATION_BACK_BUTTON_TITLE);
+    _locationViewController.preciseLocationEnabled = _preciseLocationEnabled;
+    _locationViewController.mutator = self.mutator;
+    [self.navigationController pushViewController:_locationViewController
+                                         animated:YES];
+  }
+
+  if ([self.tableViewModel itemTypeForIndexPath:indexPath] ==
       ItemTypeAppActivity) {
     base::RecordAction(
         base::UserMetricsAction("Settings.BWGSettings.BWGAppActivity"));
     [self.mutator openNewTabWithURL:GURL(kBWGAppActivityURL)];
   }
+
   [self.tableView deselectRowAtIndexPath:indexPath animated:YES];
 }
 
@@ -275,6 +293,12 @@ NSString* const kPageContentSharingAction = @"PageContentSharingAction";
 
 - (void)setPreciseLocationEnabled:(BOOL)enabled {
   _preciseLocationEnabled = enabled;
+
+  // Propagate precise location pref changes to other views that may be opened
+  // such as an alternate multi-window screen.
+  if (_locationViewController) {
+    _locationViewController.preciseLocationEnabled = enabled;
+  }
 
   if ([self isViewLoaded]) {
     _preciseLocationItem.trailingDetailText =

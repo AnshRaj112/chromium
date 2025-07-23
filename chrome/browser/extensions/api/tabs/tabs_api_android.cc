@@ -192,10 +192,6 @@ ExtensionFunction::ResponseAction TabsDuplicateFunction::Run() {
   return RespondNow(Error(kTabsNotImplemented));
 }
 
-ExtensionFunction::ResponseAction TabsGetCurrentFunction::Run() {
-  return RespondNow(Error(kTabsNotImplemented));
-}
-
 ExtensionFunction::ResponseAction TabsHighlightFunction::Run() {
   std::optional<tabs::Highlight::Params> params =
       tabs::Highlight::Params::Create(args());
@@ -225,16 +221,6 @@ ExtensionFunction::ResponseAction TabsReloadFunction::Run() {
   return RespondNow(Error(kTabsNotImplemented));
 }
 
-TabsRemoveFunction::TabsRemoveFunction() = default;
-TabsRemoveFunction::~TabsRemoveFunction() = default;
-
-ExtensionFunction::ResponseAction TabsRemoveFunction::Run() {
-  std::optional<tabs::Remove::Params> params =
-      tabs::Remove::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-  return RespondNow(Error(kTabsNotImplemented));
-}
-
 ExtensionFunction::ResponseAction TabsGroupFunction::Run() {
   std::optional<tabs::Group::Params> params =
       tabs::Group::Params::Create(args());
@@ -247,69 +233,6 @@ ExtensionFunction::ResponseAction TabsUngroupFunction::Run() {
       tabs::Ungroup::Params::Create(args());
   EXTENSION_FUNCTION_VALIDATE(params);
   return RespondNow(Error(kTabsNotImplemented));
-}
-
-TabsCaptureVisibleTabFunction::TabsCaptureVisibleTabFunction() = default;
-
-ExtensionFunction::ResponseAction TabsCaptureVisibleTabFunction::Run() {
-  EXTENSION_FUNCTION_VALIDATE(has_args());
-  return RespondNow(Error(kTabsNotImplemented));
-}
-
-ExtensionFunction::ResponseAction TabsDetectLanguageFunction::Run() {
-  std::optional<tabs::DetectLanguage::Params> params =
-      tabs::DetectLanguage::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-  return RespondNow(Error(kTabsNotImplemented));
-}
-
-ExecuteCodeInTabFunction::ExecuteCodeInTabFunction() = default;
-ExecuteCodeInTabFunction::~ExecuteCodeInTabFunction() = default;
-
-ExecuteCodeFunction::InitResult ExecuteCodeInTabFunction::Init() {
-  NOTIMPLEMENTED();
-  return set_init_result(VALIDATION_FAILURE);
-}
-
-bool ExecuteCodeInTabFunction::ShouldInsertCSS() const {
-  return false;
-}
-
-bool ExecuteCodeInTabFunction::ShouldRemoveCSS() const {
-  return false;
-}
-
-bool ExecuteCodeInTabFunction::CanExecuteScriptOnPage(std::string* error) {
-  NOTIMPLEMENTED();
-  return false;
-}
-
-ScriptExecutor* ExecuteCodeInTabFunction::GetScriptExecutor(
-    std::string* error) {
-  NOTIMPLEMENTED();
-  return nullptr;
-}
-
-bool ExecuteCodeInTabFunction::IsWebView() const {
-  return false;
-}
-
-int ExecuteCodeInTabFunction::GetRootFrameId() const {
-  NOTIMPLEMENTED();
-  return ExtensionApiFrameIdMap::kTopFrameId;
-}
-
-const GURL& ExecuteCodeInTabFunction::GetWebViewSrc() const {
-  NOTIMPLEMENTED();
-  return GURL::EmptyGURL();
-}
-
-bool TabsInsertCSSFunction::ShouldInsertCSS() const {
-  return true;
-}
-
-bool TabsRemoveCSSFunction::ShouldRemoveCSS() const {
-  return true;
 }
 
 ExtensionFunction::ResponseAction TabsSetZoomFunction::Run() {
@@ -346,20 +269,6 @@ TabsDiscardFunction::~TabsDiscardFunction() = default;
 ExtensionFunction::ResponseAction TabsDiscardFunction::Run() {
   std::optional<tabs::Discard::Params> params =
       tabs::Discard::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-  return RespondNow(Error(kTabsNotImplemented));
-}
-
-ExtensionFunction::ResponseAction TabsGoForwardFunction::Run() {
-  std::optional<tabs::GoForward::Params> params =
-      tabs::GoForward::Params::Create(args());
-  EXTENSION_FUNCTION_VALIDATE(params);
-  return RespondNow(Error(kTabsNotImplemented));
-}
-
-ExtensionFunction::ResponseAction TabsGoBackFunction::Run() {
-  std::optional<tabs::GoBack::Params> params =
-      tabs::GoBack::Params::Create(args());
   EXTENSION_FUNCTION_VALIDATE(params);
   return RespondNow(Error(kTabsNotImplemented));
 }

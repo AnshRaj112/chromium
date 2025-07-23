@@ -120,6 +120,10 @@
       page_context_completion_callback =
           base::BindOnce(^void(PageContextWrapperCallbackResponse response) {
             BWGMediator* strongSelf = weakSelf;
+            if (!strongSelf) {
+              return;
+            }
+
             [strongSelf openBWGOverlayForPage:std::move(response)];
             strongSelf->_pageContextWrapper = nil;
           });
@@ -151,6 +155,7 @@
     return;
   }
 
+  BWGTabHelper->SetBwgUiShowing(false);
   BWGTabHelper->PrepareBwgFreBackgrounding();
 }
 

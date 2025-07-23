@@ -313,6 +313,7 @@
       <ph name="IMAGE_SEARCH_SOURCE" />、
       <ph name="IMAGE_THUMBNAIL" />、
       <ph name="IMAGE_THUMBNAIL_BASE64" />。</translation>
+<translation id="1238150413700645698">受保护的内容</translation>
 <translation id="1238868319430505522">为 <ph name="GOOGLE_DRIVE_NAME" />和 <ph name="GOOGLE_WORKSPACE_NAME" /> 配置<ph name="CLOUD_UPLOAD_NAME" />流程</translation>
 <translation id="1239526922294123540">控制是否允许网站以不安全方式向更专用网络端点发送请求。
 
@@ -599,6 +600,7 @@
       当此政策设为 Fast 时，<ph name="PRODUCT_NAME" /> 会尽量避免执行光栅化。减少光栅化操作有助于缩小打印任务的规模并提高打印速度。
 
       如果您未设置此政策，<ph name="PRODUCT_NAME" /> 将处于 Full 模式。</translation>
+<translation id="1453707129684226879">控制针对受保护内容的政策。</translation>
 <translation id="1455351936334569779">已在拒绝列表中的各类打印机将被停用，因此用户将无法发现或使用它们。
 
       将所有打印机类型都添加到拒绝列表中相当于停用打印功能，因为没有任何可用来接收要打印的文档的目的地。
@@ -1751,31 +1753,6 @@ IPv4 地址的前缀为 0010；IPv6 地址的前缀为 0020。对于双栈网络
 <translation id="225830954785359083">禁止页面在卸载期间显示弹出式窗口</translation>
 <translation id="2261648512244797294">停用已弃用的 Privet 本地打印</translation>
 <translation id="2263881357524831360">允许在 <ph name="ANDROID_NAME" /> 设备上的 <ph name="PRODUCT_NAME" /> 中使用第三方密码管理工具</translation>
-<translation id="2264286153777425328">在达到 <ph name="IDLE_TIMEOUT_POLICY_NAME" /> 政策所设的超时时限后要运行的一系列操作。
-
-警告：设置此政策可能会影响并永久移除本地个人数据。建议您在部署之前测试设置，以免意外删除个人数据。
-
-如果 <ph name="IDLE_TIMEOUT_POLICY_NAME" /> 政策未设置，此政策将不会产生任何影响。
-
-达到 <ph name="IDLE_TIMEOUT_POLICY_NAME" /> 政策所设的超时时限后，浏览器会运行此政策中配置的操作。
-
-如果此政策为空或未设置，<ph name="IDLE_TIMEOUT_POLICY_NAME" /> 政策将不会产生任何影响。
-
-支持的操作如下：
-
-“<ph name="CLOSE_BROWSERS_ACTION" />”：关闭该个人资料的所有浏览器窗口和 PWA。在 Android 和 iOS 设备上不受支持。
-
-“<ph name="CLOSE_TABS_ACTION" />”：关闭已打开窗口中所有打开的标签页。仅适用于 iOS 设备。
-
-“<ph name="SHOW_PROFILE_PICKER_ACTION" />”：显示“个人资料选择器”窗口。在 Android 和 iOS 设备上不受支持。
-
-“<ph name="SIGN_OUT_ACTION" />”：退出当前登录用户的账号。仅适用于 iOS 设备。
-
-“<ph name="CLEAR_BROWSING_HISTORY_ACTION" />”“<ph name="CLEAR_DOWNLOAD_HISTORY_ACTION" />”“<ph name="CLEAR_COOKIES_AND_OTHER_SITE_DATA_ACTION" />”“<ph name="CLEAR_CACHED_IMAGES_AND_FILES_ACTION" />”“<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />”“<ph name="CLEAR_AUTOFILL_ACTION" />”“<ph name="CLEAR_SITE_SETTINGS_ACTION" />”“<ph name="CLEAR_HOSTED_APP_DATA_ACTION" />”：清除相应的浏览数据。有关详情，请参阅 <ph name="CLEAR_BROWSING_DATA_ON_EXIT_LIST_POLICY_NAME" /> 政策。iOS 设备上支持的类型包括“<ph name="CLEAR_BROWSING_HISTORY_ACTION" />”“<ph name="CLEAR_COOKIES_AND_OTHER_SITE_DATA_ACTION" />”“<ph name="CLEAR_CACHED_IMAGES_AND_FILES_ACTION" />”“<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />”和“<ph name="CLEAR_AUTOFILL_ACTION" />”
-
-“<ph name="RELOAD_PAGES_ACTION" />”：重新加载所有网页。对于某些页面，系统可能会提示用户先进行确认。在 iOS 设备上不受支持。
-
-如果既未通过设置 <ph name="SYNC_DISABLED_POLICY_NAME" /> 政策停用“<ph name="CHROME_SYNC_NAME" />”，也未停用 <ph name="BROWSER_SIGNIN_POLICY_NAME" />，设置“<ph name="CLEAR_BROWSING_HISTORY_ACTION" />”“<ph name="CLEAR_PASSWORD_SIGNIN_ACTION" />”“<ph name="CLEAR_AUTOFILL_ACTION" />”和“<ph name="CLEAR_SITE_SETTINGS_ACTION" />”将为相应的数据类型停用同步功能。</translation>
 <translation id="2266422599396179941">允许用户提交反馈</translation>
 <translation id="2268891553068901979">如果此政策已启用，系统会在使用移动网络连接时在 <ph name="PRODUCT_OS_NAME" /> 的“文件”应用中关闭 <ph name="GOOGLE_DRIVE_NAME" />同步功能。仅当通过 Wi-Fi 或以太网连接时，系统才会将数据同步到 Google 云端硬盘。
 
@@ -2182,6 +2159,7 @@ IPv4 地址的前缀为 0010；IPv6 地址的前缀为 0020。对于双栈网络
 如果此政策设为 False，系统会停用 Related Website Sets 功能。</translation>
 <translation id="2555244983262829274">从工具栏中隐藏首页按钮</translation>
 <translation id="2558154810835597313">允许为受管理的用户或个人资料配置客户端证书</translation>
+<translation id="2559274305158103883">为 WebRTC 停用后量子密钥协议</translation>
 <translation id="2562213287271514629">允许像运行正常 <ph name="FLASH_PLUGIN_NAME" /> 一样使用已过时的 <ph name="FLASH_PLUGIN_NAME" /></translation>
 <translation id="2562339630163277285">指定用于提供即搜即得结果的搜索引擎网址。该网址应包含字符串“<ph name="SEARCH_TERM_MARKER" />”，系统会在用户进行查询时将该字符串替换为用户输入的文字。
 
@@ -2728,6 +2706,14 @@ IPv4 地址的前缀为 0010；IPv6 地址的前缀为 0020。对于双栈网络
 <translation id="2985927503455169394">使用 Google 助理新手入门体验的默认模式</translation>
 <translation id="2987155890997901449">启用 ARC</translation>
 <translation id="2987227569419001736">控制对 Web Bluetooth API 的使用</translation>
+<translation id="2988299727303303535">此政策可让指定网域暂时不受新的源绑定 Cookie 行为的影响。
+
+将网域添加到此列表后，可允许不同方案或端口使用来自这些网域的 Cookie。
+如需了解更多信息，请查看 <ph name="LEGACY_COOKIE_SCOPE_ENABLED_POLICY_NAME" />。
+
+对于不符合此处所列格式的网域上的 Cookie，或者未设置此政策时的所有 Cookie，它们将采用源绑定的 Cookie 行为。
+
+日后我们会移除此政策。</translation>
 <translation id="2989404644164421834">重新加载页面</translation>
 <translation id="299127280603727143">一组与“本地网络访问权限”设置相关的政策。请参阅 https://developer.chrome.com/blog/local-network-access</translation>
 <translation id="299446489108785864">以列表形式指定 <ph name="AUTO_OPEN_FILE_TYPES_POLICY_NAME" /> 会应用于哪些网址。此政策对用户设定的自动打开值没有任何影响。
@@ -3717,17 +3703,6 @@ ServiceWorkerAutoPreload 功能会在 ServiceWorker 引导过程开始的同时�
       如果此政策已停用，系统将禁止使用 Translator API。</translation>
 <translation id="366494444808132420">允许集成 Gemini。</translation>
 <translation id="3665437376055221832">仅当没有任何证书与自动选择政策匹配时才提示用户。</translation>
-<translation id="3667467644216039144">以列表形式配置，系统应在用户关闭所有浏览器窗口时删除哪些类型的浏览数据。
-
-警告：设置此政策可能会影响并永久移除本地个人数据。建议您在部署之前测试设置，以免意外删除个人数据。
-
-可用的数据类型包括浏览记录 (<ph name="DATA_TYPE_BROWSING_HISTORY" />)、下载记录 (<ph name="DATA_TYPE_DOWNLOAD_HISTORY" />)、Cookie (<ph name="DATA_TYPE_COOKIES_AND_OTHER_SITE_DATA" />)、缓存 <ph name="DATA_TYPE_CACHED_IMAGES_AND_FILES" />、自动填充 (<ph name="DATA_TYPE_AUTOFILL" />)、密码 (<ph name="DATA_TYPE_PASSWORD" />)、网站设置 (<ph name="DATA_TYPE_SITE_SETTINGS" />) 和托管的应用数据 (<ph name="DATA_TYPE_HOSTED_APP_DATA" />)。此政策不会优先于 <ph name="ALLOW_DELETING_BROWSER_HISTORY_POLICY_NAME" />。
-
-截至 Chrome 114，此政策要求将 <ph name="SYNC_DISABLED_POLICY_NAME" /> 政策设为 true。从 Chrome 115 开始，如果既未通过设置 <ph name="SYNC_DISABLED_POLICY_NAME" /> 政策停用“<ph name="CHROME_SYNC_NAME" />”，也未停用 <ph name="BROWSER_SIGNIN_POLICY_NAME" />，设置此政策会为相应的数据类型停用同步功能。
-
-如果出于某种原因，数据删除已开始但未完成，系统将在下次加载个人资料时清除浏览数据。
-
-如果 <ph name="PRODUCT_NAME" /> 未正常关闭（例如发生浏览器或操作系统崩溃的情况），系统不会清除浏览数据，因为浏览器关闭并非由用户关闭所有浏览器窗口所致。</translation>
 <translation id="3671773704245936868">禁止使用键盘焦点突出显示</translation>
 <translation id="3674010627788940405">不支持 CORS 非通配符式请求标头。</translation>
 <translation id="3675303748198647471">setTimeout(…, 0) 通常用于中断耗时较长的 JavaScript 任务。
@@ -4838,6 +4813,27 @@ ServiceWorkerAutoPreload 功能会在 ServiceWorker 引导过程开始的同时�
       此政策仅会影响那些使用 GAIA（不使用 SAML）验证身份的用户。
 
       此政策的值应以天为单位。</translation>
+<translation id="4523997900743255417">此政策用于控制是否应启用 <ph name="PRIVACY_SANDBOX_NAME" /> 的 <ph name="IP_PROTECTION_NAME" />功能。
+
+<ph name="IP_PROTECTION_NAME" />功能可限制在无痕模式浏览期间发出的某些第三方网络请求使用用户的原始 IP 地址，从而加强无痕模式浏览会话期间的跨网站跟踪防护。
+
+如果此政策已停用，<ph name="IP_PROTECTION_NAME" />功能将会停用，而且用户无法通过界面设置启用该功能。
+如果此政策已启用，<ph name="IP_PROTECTION_NAME" />功能将会启用，而且用户无法通过界面设置停用该功能。
+如果此政策未设置，<ph name="IP_PROTECTION_NAME" />功能将默认处于启用状态，而且用户将能够在其设备上通过界面设置控制该功能。
+
+关于企业是否应停用 <ph name="IP_PROTECTION_NAME" />功能的考虑事项包括：
+
+- 对于通过代理传输的请求，系统不会执行 DNS 查找，这可能会影响基于 DNS 的监控或过滤。
+
+- 如果企业应用依赖于向掩码网域列表 (<ph name="MASKED_DOMAIN_LIST_URL" />) 中的网域（或这些网域的子网域）发出的请求，并且要求这些请求来自特定范围内的 IP 地址，那么在无痕模式下使用时，这些应用可能会出现功能异常。
+
+- 在特定条件下，无痕模式下的流量可能不会通过代理传输，例如当用户通过未登录的 Chrome 个人资料启动无痕模式时。一般来说，该功能要求用户在启动无痕模式时，已使用个人 Google 账号登录 Chrome。
+
+- 掩码网域列表可能会随时间更新，新版本会自动推送给用户。如需详细了解掩码网域列表，请参阅：<ph name="MASKED_DOMAIN_LIST_CRITERIA_URL" />。
+
+如需详细了解 <ph name="IP_PROTECTION_NAME" />功能，请参阅：<ph name="IP_PROTECTION_README_URL" />。
+
+<ph name="IP_PROTECTION_NAME" />功能最快会在 M139 中推出。</translation>
 <translation id="4525328580251166229">控制与 Bruschetta 子系统相关的政策。</translation>
 <translation id="4528981768990874684">停用 <ph name="IP_PROTECTION_NAME" />功能。</translation>
 <translation id="453031441196755904">此政策已被弃用。</translation>
@@ -5068,6 +5064,7 @@ ServiceWorkerAutoPreload 功能会在 ServiceWorker 引导过程开始的同时�
 
       注意：此设置会覆盖 <ph name="REMOTE_ACCESS_HOST_CLIENT_DOMAIN_POLICY_NAME" />（若已设置）。</translation>
 <translation id="4658380868451934335">允许在登录屏幕上输入语音</translation>
+<translation id="4658420696622830453">受保护内容控件</translation>
 <translation id="4660356908994631271">在“新标签页”页面上的搜索框中显示 Google 智能镜头按钮。</translation>
 <translation id="4661885151480410620">行为变更可能会生效，具体取决于功能启动流程。</translation>
 <translation id="4661889655253181651">“内容设置”可用来指定对特定类型内容（例如 Cookie、图片或 JavaScript）的处理方式。</translation>
@@ -6308,6 +6305,9 @@ ServiceWorkerAutoPreload 功能会在 ServiceWorker 引导过程开始的同时�
 <translation id="5488268615614906498">此政策旨在控制是否允许用户直接通过内容下载管理器将文件保存到 <ph name="GOOGLE_DRIVE_NAME" />。
 如果此政策已启用或未设置，用户将可以通过内容下载管理器将文件保存到 <ph name="GOOGLE_DRIVE_NAME" />。如果此政策已停用，用户将无法在内容下载管理器中看到此选项。
 此政策不会阻止用户使用内容下载管理器之外的其他方式将文件保存到 <ph name="GOOGLE_DRIVE_NAME" />。</translation>
+<translation id="5490462588616309068">如果此政策设为 true 或未设置，则允许使用受保护内容标识符，这有助于提升受保护内容的播放质量。
+
+如果此政策设为 false，则不允许使用受保护内容标识符。</translation>
 <translation id="5494322570831642650">此政策旨在指定用户可否在 <ph name="PRODUCT_NAME" /> 中以无痕模式打开网页。
 
       如果您选择了“Enabled”或未设置此政策，用户将能够以无痕模式打开网页。
@@ -6591,6 +6591,7 @@ Microsoft SharePoint 和 OneDrive 卡片需要由管理员进行额外配置。�
       您可通过在 <ph name="CLIPBOARD_ALLOWED_FOR_URLS_POLICY_NAME" /> 和 <ph name="CLIPBOARD_BLOCKED_FOR_URLS_POLICY_NAME" /> 政策中设置特定网址格式来覆盖此政策。
 
       此政策仅影响由剪贴板网站权限控制的剪贴板操作，不影响已清理的剪贴板写入操作或受信任的复制和粘贴操作。</translation>
+<translation id="5649788773465136073">禁止网站使用受保护内容标识符，这可能会导致受保护内容的播放质量下降。</translation>
 <translation id="5650256117857913687">禁止远程访问用户在本地客户端浏览器中打开主机端网址</translation>
 <translation id="5650716720715977549">对向更私密的网络端点发送的请求施加限制</translation>
 <translation id="5651538748810288218">如果此政策设为 1，系统会允许网站访问和使用传感器（例如移动传感器和光传感器）。如果此政策设为 2，系统会禁止访问传感器。
@@ -6882,6 +6883,7 @@ Microsoft SharePoint 和 OneDrive 卡片需要由管理员进行额外配置。�
       如果此政策设为 false 或未设置，系统将不允许 <ph name="PLUGIN_VM_NAME" /> 收集数据。
       如果此政策设为 true，<ph name="PLUGIN_VM_NAME" /> 可能会收集 <ph name="PLUGIN_VM_NAME" /> 使用情况数据，然后整合并全面分析该数据以提升 <ph name="PLUGIN_VM_NAME" /> 使用体验。</translation>
 <translation id="5872738620659477303">将 Google 凭据绑定到设备</translation>
+<translation id="5873333871812203119">允许网页出于播放受保护内容的目的使用标识符</translation>
 <translation id="5875873062228321803">此政策旨在配置允许使用的最低 <ph name="PRODUCT_OS_NAME" />版本的要求。
 
       当此政策设为非空列表时：
@@ -8067,10 +8069,12 @@ Origin-Agent-Cluster HTTP 标头可控制是将某个文档隔离在以源为键
 <translation id="6614648642325603511">用于生成密钥对的算法。从 132 版开始支持 EC 选项。</translation>
 <translation id="661610294649586421">禁止在 TLS 证书已损坏的网站上发出 WebAuthn API 请求。</translation>
 <translation id="6617589895942747919">间隔时段（含端点值）的开始时间。</translation>
+<translation id="6620966939519407082">旧版 Cookie 范围设置</translation>
 <translation id="6621830999036927230">如果您设置了此政策，远程访问主机会使用该网址来验证远程访问客户端的身份验证令牌，以便确定是否接受连接。如果您未设置此政策或将它留空，系统会停用此功能。
 
       注意：请将此政策与 <ph name="REMOTE_ACCESS_HOST_TOKEN_URL_POLICY_NAME" /> 搭配使用。</translation>
 <translation id="6625136649067113817">一个布尔值标记，用于表明屏幕键盘能否提供拼写检查功能。</translation>
+<translation id="6625716212597516929">还原为旧版 Cookie 范围行为</translation>
 <translation id="6626319579493977784">动态代码设置</translation>
 <translation id="66265932317331474">报告 CPU 信息</translation>
 <translation id="6628120204569232711">报告存储状态</translation>
@@ -8120,6 +8124,17 @@ Origin-Agent-Cluster HTTP 标头可控制是将某个文档隔离在以源为键
 <translation id="6665670272107384733">指定用户必须按什么样的频率输入密码才能使用快速解锁功能</translation>
 <translation id="6667586534922258705">在登录屏幕和锁定的屏幕上显示“显示密码”按钮</translation>
 <translation id="6667636336079341367">允许使用扫描仪，但不改进 AI 模型。</translation>
+<translation id="6668559639284945695">此政策允许还原为旧版 Cookie 范围行为。
+
+这意味着，在特定协议（例如 HTTPS）或端口上设置的 Cookie 可以从另一个协议或端口访问。
+
+如果已启用此政策，Cookie 将不会绑定到其原始方案和端口。
+
+如果已停用或未设置此政策，Cookie 将遵循源绑定范围的行为。
+
+此配置仅适用于顶级网域（例如 example.com），不适用于子网域（例如 sub.example.com）。
+
+日后我们会移除此政策。</translation>
 <translation id="6669244130218275293">选择是否在无痕模式下启用 <ph name="PRIVACY_SANDBOX_NAME" /> 数字“指纹”收集保护功能。</translation>
 <translation id="6669691206059842248">为每个扩展程序配置额外的 OAuth 重定向网址</translation>
 <translation id="6669700740683748046">此功能可让系统在地址栏中显示完整网址。
@@ -8277,17 +8292,6 @@ Origin-Agent-Cluster HTTP 标头可控制是将某个文档隔离在以源为键
 <translation id="6757413365906304125">此政策可决定在“重新映射按键”子页面中重新映射 PageUp/PageDown 键的行为。用户可以在“重新映射按键”子页面自定义键盘按键。如果启用，此政策会阻止用户自定义这些特定的重新映射。如果未设置此政策，基于搜索键的快捷键将作为默认设置，并允许用户配置快捷键。</translation>
 <translation id="6757613329154374267">已启用备份和恢复服务</translation>
 <translation id="6758659208493449452">此政策决定了加入“高级保护”计划的用户是否可获享额外的保护。其中部分功能可能涉及与 Google 共享数据（例如，加入“高级保护”计划的用户可将他们的下载内容发送给 Google 进行恶意软件扫描）。如果此政策设为 True 或未设置，已加入“高级保护”计划的用户将会获享额外的保护。如果此政策设为 False，已加入“高级保护”计划的用户只能使用标准的消费者级功能。</translation>
-<translation id="6759078816721385015">为 <ph name="PRODUCT_NAME" /> 配置浏览数据生命周期设置。此政策让管理员能够（按数据类型）配置浏览器对数据的删除时间点。这对需要处理敏感客户数据的客户非常有用。
-
-警告：设置此政策可能会影响并永久移除本地个人数据。建议您在部署之前测试设置，以免意外删除个人数据。
-
-可用的数据类型有 <ph name="DATA_TYPE_BROWSING_HISTORY" />、<ph name="DATA_TYPE_DOWNLOAD_HISTORY" />、<ph name="DATA_TYPE_COOKIES_AND_OTHER_SITE_DATA" />、<ph name="DATA_TYPE_CACHED_IMAGES_AND_FILES" />、<ph name="DATA_TYPE_PASSWORD" />、<ph name="DATA_TYPE_AUTOFILL" />、<ph name="DATA_TYPE_SITE_SETTINGS" /> 和 <ph name="DATA_TYPE_HOSTED_APP_DATA" />。不过，<ph name="DATA_TYPE_DOWNLOAD_HISTORY" /> 和<ph name="DATA_TYPE_HOSTED_APP_DATA" /> 在 Android 上不受支持。
-
-浏览器会自动移除留存时长已超过 <ph name="TIME_TO_LIVE_IN_HOURS" />的所选类型数据。可设置的最小值为 1 小时。
-
-浏览器启动 15 秒后便会开始删除过期数据，运行期间则会每 30 分钟删除一次。
-
-截至 Chrome 114，此政策要求将 <ph name="SYNC_DISABLED_POLICY_NAME" /> 政策设为 true。从 Chrome 115 开始，如果既未通过设置 <ph name="SYNC_DISABLED_POLICY_NAME" /> 政策停用“<ph name="CHROME_SYNC_NAME" />”，也未停用 <ph name="BROWSER_SIGNIN_POLICY_NAME" />，设置此政策会为相应的数据类型停用同步功能。</translation>
 <translation id="6763023079133439068">允许使用由本地信任锚颁发的缺少 subjectAlternativeName 扩展项的证书</translation>
 <translation id="6766216162565713893">允许网站请求用户授予对附近蓝牙设备的访问权限</translation>
 <translation id="6770454900105963262">报告自助服务终端的相关信息</translation>
@@ -8644,6 +8648,7 @@ Origin-Agent-Cluster HTTP 标头可控制是将某个文档隔离在以源为键
 <translation id="7016587686120059767">停用访客模式</translation>
 <translation id="7019805045859631636">快</translation>
 <translation id="7021590945154530517">启用设备运行状况监测</translation>
+<translation id="7025153290982655996">还原为旧版 Cookie 范围行为</translation>
 <translation id="7025332601572838001">配置 CCT 首次运行期间的《服务条款》行为</translation>
 <translation id="7026351325994257733">允许在 <ph name="PRODUCT_OS_NAME" />设备和一部已连接的 Android 手机之间同步 Wi-Fi 网络配置。</translation>
 <translation id="7027057540229843762">使用浅色主题</translation>
@@ -8755,6 +8760,7 @@ Origin-Agent-Cluster HTTP 标头可控制是将某个文档隔离在以源为键
 
       如果此政策设为 false 或未设置，系统将不会报告这些信息。
       如果此政策设为 true，系统将会报告设备的风扇信息。</translation>
+<translation id="7097146706461004834">Cookie 具有源绑定的范围</translation>
 <translation id="710003290625031750">已展开的架构说明：</translation>
 <translation id="7101550508196914704">不在书签栏中显示应用快捷方式</translation>
 <translation id="7105084505972468353">如果此政策已设置，它就会控制启用的屏幕放大镜类型。
@@ -9176,6 +9182,7 @@ Origin-Agent-Cluster HTTP 标头可控制是将某个文档隔离在以源为键
 
       如果此政策未设置或设为 false，系统将启用 <ph name="TLS_FALSE_START" />。如果此政策设为 true，系统将停用 <ph name="TLS_FALSE_START" />。</translation>
 <translation id="7427607504279694910">不与 Google 分享 Android 应用安装事件日志</translation>
+<translation id="7428523340768505080">为 WebRTC 启用后量子密钥协议</translation>
 <translation id="7431456748240652287">此设备级政策用于配置 <ph name="PRODUCT_OS_NAME" /> 是否在 TLS 中提供使用 ML-KEM NIST 标准的后量子密钥协议算法。在 <ph name="PRODUCT_OS_NAME" /> 131 之前，算法为 Kyber，这是该标准的早期草案迭代版本。这让支持该算法的服务器能够保护用户流量，防止以后被量子计算机解密。
 
 如果此政策已启用或未设置，<ph name="PRODUCT_OS_NAME" /> 将在 TLS 连接中提供后量子密钥协议。系统将在与兼容的服务器通信时保护用户流量，防止被量子计算机解密。
@@ -9485,6 +9492,7 @@ Origin-Agent-Cluster HTTP 标头可控制是将某个文档隔离在以源为键
 <translation id="7696534428021833264">启用 NTP SharePoint 和 OneDrive 文件卡片</translation>
 <translation id="7699644797467448158">如果进行顶层跨网站导航且交换 BrowsingContextGroup，则清除 window.name。</translation>
 <translation id="7701341006446125684">设置应用和扩展程序缓存大小（以字节为单位）</translation>
+<translation id="7701825382808690457">对 WebRTC 使用后量子密钥协议的默认值</translation>
 <translation id="7703041979684393741">不允许从 Google 服务收集 WebRTC 事件日志</translation>
 <translation id="770339941914297201">新行为：自助服务终端 Chrome 应用将仅使用政策提供的更新网址进行更新</translation>
 <translation id="7703737669292992839">阻止显示文件选择对话框</translation>
@@ -9759,6 +9767,7 @@ Origin-Agent-Cluster HTTP 标头可控制是将某个文档隔离在以源为键
 <translation id="7906983682927840536">浏览器关闭时的 Fetch keepalive 时长</translation>
 <translation id="7908384265697653397">如果 <ph name="PRODUCT_OS_NAME" />版本低于指定的 <ph name="CHROMEOS_VERSION_PROPERTY_NAME" />，系统会在多少天后强制用户退出登录</translation>
 <translation id="7909751052609510518">打印任务（在 129 版及更高版本中受支持）</translation>
+<translation id="7909839744818798105">为一系列网域启用旧版 Cookie 范围行为</translation>
 <translation id="7911685775490889216">当为锁定屏幕设定的屏保有多张可显示的图片时，此政策可用于指定图片显示的间隔时间（以秒为单位）。
 
 有效值范围为 1 秒到 9999 秒。如果您未设置此政策，<ph name="PRODUCT_OS_NAME" /> 将会使用默认值（60 秒）。
@@ -10844,6 +10853,19 @@ Related Website Set 中的所有网站都必须是采用 HTTPS 协议的可注�
 您可以使用 <ph name="JAVA_SCRIPT_OPTIMIZER_ALLOWED_FOR_SITES_POLICY_NAME" /> 和 <ph name="JAVA_SCRIPT_OPTIMIZER_BLOCKED_FOR_SITES_POLICY_NAME" /> 政策为特定网址格式覆盖此政策。
 
 如果您未设置此政策，系统会启用 JavaScript 优化功能。</translation>
+<translation id="8669238010996709070">此政策用于控制 WebRTC 的后量子密钥协议。
+
+如果已启用此政策，系统将为 WebRTC 提供后量子密钥协议。
+
+如果已停用此政策，系统将不会为 WebRTC 提供后量子密钥协议。
+
+如果未设置此政策，系统将会按照为 WebRTC 提供的后量子密钥协议的默认发布流程来设置相应的值。
+
+提供后量子密钥协议可实现向后兼容。现有的 DTLS 对等体和网络中间件预计会忽略这个新选项，并继续沿用以前的选项。
+
+但是，在提供新选项后，未正确实现 DTLS 的设备可能会发生故障。例如，当遇到无法识别的选项或产生较长的消息时，这些设备可能会断开连接。这些设备尚不支持后量子密钥协议，会妨碍企业改用该算法。如果遇到这种情况，管理员应联系供应商以寻求解决方案。
+
+此政策只是一种临时的变通方案，将在达成几个里程碑后被移除。</translation>
 <translation id="8671119576957984818">启用桌面分享中心</translation>
 <translation id="8671193325113134911">为工作器脚本启用严格的 MIME 类型检查</translation>
 <translation id="8671303329680827168">此政策已被弃用，请改用“<ph name="AUTH_NEGOTIATE_DELEGATE_ALLOWLIST_POLICY_NAME" />”政策。</translation>
@@ -11611,6 +11633,7 @@ Related Website Set 中的所有网站都必须是采用 HTTPS 协议的可注�
 <translation id="9197740283131855199">系统在屏幕变暗后察觉到用户活动时，屏幕变暗延迟时间的调整幅度（百分比）</translation>
 <translation id="9200828125069750521">在使用 POST 的图片网址中所需的参数</translation>
 <translation id="9202520409249547230">不允许使用“利用 AI 自动填充”功能。</translation>
+<translation id="9204520300236345497">允许网站使用受保护内容标识符，这有助于提升受保护内容的播放质量。</translation>
 <translation id="9204863016826119209">已安装完毕且列在此政策中的 Android 应用可以使用企业密钥。</translation>
 <translation id="9206472508136116830">不允许 NetBIOS 共享操作发现</translation>
 <translation id="9207596996305971030">不报告登录/退出事件</translation>

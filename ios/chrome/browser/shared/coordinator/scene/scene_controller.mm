@@ -61,6 +61,7 @@
 #import "ios/chrome/browser/authentication/ui_bundled/account_menu/account_menu_coordinator_delegate.h"
 #import "ios/chrome/browser/authentication/ui_bundled/change_profile/change_profile_authentication_continuation.h"
 #import "ios/chrome/browser/authentication/ui_bundled/change_profile/change_profile_load_url.h"
+#import "ios/chrome/browser/authentication/ui_bundled/change_profile/change_profile_signout_continuation.h"
 #import "ios/chrome/browser/authentication/ui_bundled/continuation.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/features.h"
 #import "ios/chrome/browser/authentication/ui_bundled/signin/promo/signin_fullscreen_promo_scene_agent.h"
@@ -179,6 +180,7 @@
 #import "ios/chrome/browser/shared/ui/util/uikit_ui_util.h"
 #import "ios/chrome/browser/signin/model/authentication_service.h"
 #import "ios/chrome/browser/signin/model/authentication_service_factory.h"
+#import "ios/chrome/browser/signin/model/authentication_service_observer_bridge.h"
 #import "ios/chrome/browser/signin/model/chrome_account_manager_service.h"
 #import "ios/chrome/browser/signin/model/chrome_account_manager_service_factory.h"
 #import "ios/chrome/browser/signin/model/constants.h"
@@ -269,9 +271,6 @@ const char kContextsToOpen[] = "IOS.NumberOfContextsToOpen";
 
 // The App Store page for Google Chrome.
 NSString* const kChromeAppStoreURL = @"https://apps.apple.com/app/id535886823";
-
-// String passed in the URL context to request to open it in a sign-out state.
-NSString* const kNoAccountId = @"No account";
 
 // Enum for IOS.NumberOfContextsToOpen histogram.
 // Keep in sync with "ContextsToOpen" in tools/metrics/histograms/enums.xml.
@@ -401,6 +400,7 @@ void OnListFamilyMembersResponse(
 // TODO(crbug.com/429354805): Add method comments(!)
 
 @interface SceneController () <AccountMenuCoordinatorDelegate,
+                               AuthenticationServiceObserving,
                                HistoryCoordinatorDelegate,
                                IncognitoInterstitialCoordinatorDelegate,
                                PasswordCheckupCoordinatorDelegate,
@@ -449,6 +449,9 @@ void OnListFamilyMembersResponse(
   // This is used to ensure that the image search is only triggered when the BVC
   // is active.
   NSData* _imageSearchData;
+  // Observer for auth service status changes.
+  std::unique_ptr<AuthenticationServiceObserverBridge>
+      _authServiceObserverBridge;
 }
 
 // Navigation View controller for the settings.
@@ -532,6 +535,9 @@ void OnListFamilyMembersResponse(
 @property(nonatomic, strong)
     YoutubeIncognitoCoordinator* youtubeIncognitoCoordinator;
 
+// The profile of the current scene.
+@property(nonatomic, readonly) ProfileIOS* profile;
+
 @end
 
 @implementation SceneController
@@ -588,6 +594,10 @@ void OnListFamilyMembersResponse(
 // TODO(crbug.com/429347474): Get rid of BrowserProviderInterface
 - (WrangledBrowser*)mainInterface {
   return self.browserViewWrangler.mainInterface;
+}
+
+- (ProfileIOS*)profile {
+  return self.sceneState.profileState.profile;
 }
 
 - (WrangledBrowser*)currentInterface {
@@ -869,6 +879,39 @@ void OnListFamilyMembersResponse(
 
 #pragma mark - private
 
+// If sign-in is disabled, switch to the personal profile and sign-out.
+- (void)signoutIfNeeded {
+  AuthenticationService* authenticationService =
+      AuthenticationServiceFactory::GetForProfile(
+          self.sceneState.profileState.profile);
+  if (authenticationService->SigninEnabled()) {
+    return;
+  }
+  // If sign-in is disabled, switch to personal profile and sign-out.
+  ProfileIOS* profile = self.sceneState.profileState.profile;
+  const std::string& profileName = profile->GetProfileName();
+  BOOL isPersonalProfile = GetApplicationContext()
+                               ->GetProfileManager()
+                               ->GetProfileAttributesStorage()
+                               ->GetPersonalProfileName() == profileName;
+  if (!isPersonalProfile) {
+    auto signoutSource = signin_metrics::ProfileSignout::kPrefChanged;
+    ChangeProfileContinuation continuation =
+        CreateChangeProfileSignoutContinuation(
+            signoutSource, /*force_snackbar_over_toolbar=*/false,
+            /*should_record_metrics=*/false, /*snackbar_message =*/nil,
+            base::DoNothing());
+    signin::SwitchToPersonalProfile(self.sceneState,
+                                    ChangeProfileReason::kManagedAccountSignOut,
+                                    std::move(continuation));
+    return;
+  }
+  if (![self isSignedIn]) {
+    authenticationService->SignOut(signin_metrics::ProfileSignout::kPrefChanged,
+                                   nil);
+  }
+}
+
 - (void)stopAccountMenu {
   [_accountMenuCoordinator stop];
   _accountMenuCoordinator.delegate = nil;
@@ -910,7 +953,7 @@ void OnListFamilyMembersResponse(
 
       std::optional<std::string> profileName;
 
-      if ([context.gaiaID isEqualToString:kNoAccountId]) {
+      if ([context.gaiaID isEqualToString:app_group::kNoAccount]) {
         // Use the personal profile name if there is no GaiaID (this happens in
         // the sign-out scenario).
         profileName = GetApplicationContext()
@@ -991,8 +1034,7 @@ void OnListFamilyMembersResponse(
     NSString* newGaiaID = base::SysUTF8ToNSString(newGaia);
 
     AuthenticationService* authService =
-        AuthenticationServiceFactory::GetForProfile(
-            self.sceneState.profileState.profile);
+        AuthenticationServiceFactory::GetForProfile(self.profile);
     id<SystemIdentity> identityOnDevice =
         authService->GetPrimaryIdentity(signin::ConsentLevel::kSignin);
     gaiaInApp = identityOnDevice.gaiaID;
@@ -1003,14 +1045,14 @@ void OnListFamilyMembersResponse(
       continue;
     }
 
-    if ([newGaiaID isEqualToString:kNoAccountId] && gaiaInApp) {
+    if ([newGaiaID isEqualToString:app_group::kNoAccount] && gaiaInApp) {
       return
           [[WidgetContext alloc] initWithContext:context
                                           gaiaID:newGaiaID
                                             type:AccountSwitchType::kSignOut];
     }
     if (![newGaiaID isEqualToString:gaiaInApp] &&
-        ![newGaiaID isEqualToString:kNoAccountId]) {
+        ![newGaiaID isEqualToString:app_group::kNoAccount]) {
       return [[WidgetContext alloc] initWithContext:context
                                              gaiaID:newGaiaID
                                                type:AccountSwitchType::kSignIn];
@@ -1174,6 +1216,16 @@ void OnListFamilyMembersResponse(
       [applicationHandler openURLInNewTab:command];
       [self finishActivatingBrowserDismissingTabSwitcher];
     }
+
+    AuthenticationService* authenticationService =
+        AuthenticationServiceFactory::GetForProfile(
+            self.sceneState.profileState.profile);
+    _authServiceObserverBridge =
+        std::make_unique<AuthenticationServiceObserverBridge>(
+            authenticationService, self);
+    // The user may be signed-in while sign-in is disabled. In which case,
+    // we must sign the user out, potentially switching profile.
+    [self signoutIfNeeded];
   }
   if (level == SceneActivationLevelBackground) {
     [self recordWindowCreationForSceneState:self.sceneState];
@@ -1193,10 +1245,10 @@ void OnListFamilyMembersResponse(
 - (void)startUpChromeUI {
   DCHECK(!self.browserViewWrangler);
   DCHECK(_sceneURLLoadingService.get());
-  DCHECK(self.sceneState.profileState.profile);
+  DCHECK(self.profile);
 
   SceneState* sceneState = self.sceneState;
-  ProfileIOS* profile = sceneState.profileState.profile;
+  ProfileIOS* profile = self.profile;
 
   self.browserViewWrangler =
       [[BrowserViewWrangler alloc] initWithProfile:profile
@@ -1489,6 +1541,7 @@ void OnListFamilyMembersResponse(
 
   _incognitoWebStateObserver.reset();
   _mainWebStateObserver.reset();
+  _authServiceObserverBridge.reset();
   _policyWatcherObserver.reset();
 
   // TODO(crbug.com/40778288): Consider moving this at the beginning of
@@ -1515,7 +1568,7 @@ void OnListFamilyMembersResponse(
   Browser* browser = self.currentInterface.browser;
   DCHECK(browser);
 
-  if (browser->GetProfile()->IsOffTheRecord()) {
+  if (self.profile->IsOffTheRecord()) {
     return nil;
   }
   web::WebState* webState = browser->GetWebStateList()->GetActiveWebState();
@@ -1630,10 +1683,8 @@ void OnListFamilyMembersResponse(
   if (![self isTabAvailableToPresentViewController]) {
     return NO;
   }
-  if (!signin::ShouldPresentUserSigninUpgrade(
-          self.sceneState.browserProviderInterface.mainBrowserProvider.browser
-              ->GetProfile(),
-          version_info::GetVersion())) {
+  if (!signin::ShouldPresentUserSigninUpgrade(self.profile,
+                                              version_info::GetVersion())) {
     return NO;
   }
   // Don't show the promo in Incognito mode.
@@ -1700,9 +1751,7 @@ void OnListFamilyMembersResponse(
 
 - (BOOL)isSignedIn {
   AuthenticationService* authenticationService =
-      AuthenticationServiceFactory::GetForProfile(
-          self.sceneState.browserProviderInterface.mainBrowserProvider.browser
-              ->GetProfile());
+      AuthenticationServiceFactory::GetForProfile(self.profile);
   DCHECK(authenticationService);
   DCHECK(authenticationService->initialized());
 
@@ -2226,8 +2275,7 @@ using UserFeedbackDataCallback =
   id<SettingsCommands> settingsHandler =
       HandlerForProtocol(dispatcher, SettingsCommands);
   SigninNotificationInfoBarDelegate::Create(
-      infoBarManager, self.mainInterface.browser->GetProfile(), settingsHandler,
-      baseViewController);
+      infoBarManager, self.profile, settingsHandler, baseViewController);
 }
 
 - (void)setIncognitoContentVisible:(BOOL)incognitoContentVisible {
@@ -2261,8 +2309,7 @@ using UserFeedbackDataCallback =
   Browser* browser = self.mainInterface.browser;
   if (browser) {
     feature_engagement::Tracker* tracker =
-        feature_engagement::TrackerFactory::GetForProfile(
-            browser->GetProfile());
+        feature_engagement::TrackerFactory::GetForProfile(self.profile);
     if (tracker) {
       hasDefaultBrowserBlueDot =
           ShouldTriggerDefaultBrowserHighlightFeature(tracker);
@@ -2339,7 +2386,7 @@ using UserFeedbackDataCallback =
       [[UISceneActivationRequestOptions alloc] init];
   options.requestingScene = self.sceneState.scene;
 
-  ProfileIOS* profile = self.sceneState.profileState.profile;
+  ProfileIOS* profile = self.profile;
   if (profile) {
     AttachProfileNameToActivity(userActivity, profile->GetProfileName());
   }
@@ -3166,7 +3213,7 @@ using UserFeedbackDataCallback =
     return;
   }
   feature_engagement::Tracker* tracker =
-      feature_engagement::TrackerFactory::GetForProfile(browser->GetProfile());
+      feature_engagement::TrackerFactory::GetForProfile(self.profile);
   if (tracker) {
     tracker->NotifyEvent(
         feature_engagement::events::kPasswordManagerWidgetPromoUsed);
@@ -3944,9 +3991,7 @@ using UserFeedbackDataCallback =
     (SigninCoordinatorCompletionCallback)completion {
   DCHECK(self.signinCoordinator);
   AuthenticationService* authenticationService =
-      AuthenticationServiceFactory::GetForProfile(
-          self.sceneState.browserProviderInterface.mainBrowserProvider.browser
-              ->GetProfile());
+      AuthenticationServiceFactory::GetForProfile(self.profile);
   AuthenticationService::ServiceStatus statusService =
       authenticationService->GetServiceStatus();
   switch (statusService) {
@@ -4250,13 +4295,8 @@ using UserFeedbackDataCallback =
 // Clears incognito data that is specific to iOS and won't be cleared by
 // deleting the profile.
 - (void)clearIOSSpecificIncognitoData {
-  DCHECK(self.sceneState.browserProviderInterface.mainBrowserProvider.browser
-             ->GetProfile()
-             ->HasOffTheRecordProfile());
-  ProfileIOS* otrProfile =
-      self.sceneState.browserProviderInterface.mainBrowserProvider.browser
-          ->GetProfile()
-          ->GetOffTheRecordProfile();
+  DCHECK(self.profile->HasOffTheRecordProfile());
+  ProfileIOS* otrProfile = self.profile->GetOffTheRecordProfile();
 
   __weak SceneController* weakSelf = self;
   BrowsingDataRemover* browsingDataRemover =
@@ -4363,8 +4403,7 @@ using UserFeedbackDataCallback =
 // closed (i.e. if there are other incognito tabs open in another Scene, the
 // Profile must not be destroyed).
 - (BOOL)shouldDestroyAndRebuildIncognitoProfile {
-  ProfileIOS* profile = self.sceneState.browserProviderInterface
-                            .mainBrowserProvider.browser->GetProfile();
+  ProfileIOS* profile = self.profile;
   if (!profile->HasOffTheRecordProfile()) {
     return NO;
   }
@@ -4395,8 +4434,7 @@ using UserFeedbackDataCallback =
 
   [self clearIOSSpecificIncognitoData];
 
-  ProfileIOS* profile = self.sceneState.browserProviderInterface
-                            .mainBrowserProvider.browser->GetProfile();
+  ProfileIOS* profile = self.profile;
   DCHECK(profile->HasOffTheRecordProfile());
   ProfileIOS* otrProfile = profile->GetOffTheRecordProfile();
 
@@ -4522,6 +4560,12 @@ using UserFeedbackDataCallback =
   CHECK_EQ(coordinator, _safariImportCoordinator);
   [_safariImportCoordinator stop];
   _safariImportCoordinator = nil;
+}
+
+#pragma mark - AuthenticationServiceObserving
+
+- (void)onServiceStatusChanged {
+  [self signoutIfNeeded];
 }
 
 @end

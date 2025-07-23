@@ -101,7 +101,9 @@ class ProductSpecificationsEntryPointController;
 
 namespace tabs {
 class GlicNudgeController;
+#if BUILDFLAG(ENABLE_GLIC)
 class GlicActorTaskIconController;
+#endif
 }
 
 namespace tab_groups {
@@ -240,9 +242,11 @@ class BrowserWindowFeatures {
     return glic_nudge_controller_.get();
   }
 
+#if BUILDFLAG(ENABLE_GLIC)
   tabs::GlicActorTaskIconController* glic_actor_task_icon_controller() {
     return glic_actor_task_icon_controller_.get();
   }
+#endif
 
   TabStripModel* tab_strip_model() { return tab_strip_model_; }
 
@@ -471,15 +475,14 @@ class BrowserWindowFeatures {
 
   std::unique_ptr<DownloadToolbarUIController> download_toolbar_ui_controller_;
 
-  std::unique_ptr<tabs::GlicNudgeController> glic_nudge_controller_;
-
-  std::unique_ptr<tabs::GlicActorTaskIconController>
-      glic_actor_task_icon_controller_;
-
   std::unique_ptr<actor::ui::ActorOverlayWindowController>
       actor_overlay_window_controller_;
 
+  std::unique_ptr<tabs::GlicNudgeController> glic_nudge_controller_;
+
 #if BUILDFLAG(ENABLE_GLIC)
+  std::unique_ptr<tabs::GlicActorTaskIconController>
+      glic_actor_task_icon_controller_;
   std::unique_ptr<glic::GlicButtonController> glic_button_controller_;
   std::unique_ptr<glic::GlicIphController> glic_iph_controller_;
 #endif
@@ -522,9 +525,6 @@ class BrowserWindowFeatures {
   std::unique_ptr<ReadingListSidePanelCoordinator>
       reading_list_side_panel_coordinator_;
 
-  std::unique_ptr<extensions::BrowserExtensionWindowController>
-      extension_window_controller_;
-
   std::unique_ptr<ProfileMenuCoordinator> profile_menu_coordinator_;
 
   std::unique_ptr<IncognitoClearBrowsingDataDialogCoordinator>
@@ -546,6 +546,10 @@ class BrowserWindowFeatures {
   std::unique_ptr<DataSharingBubbleController> data_sharing_bubble_controller_;
 
   std::unique_ptr<TabListBridge> tab_list_bridge_;
+
+  // Note: Depends on TabListBridge, so should come after it in the member list.
+  std::unique_ptr<extensions::BrowserExtensionWindowController>
+      extension_window_controller_;
 
   std::unique_ptr<HistoryClustersSidePanelCoordinator>
       history_clusters_side_panel_coordinator_;

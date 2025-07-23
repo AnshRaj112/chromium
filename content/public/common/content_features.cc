@@ -1079,6 +1079,12 @@ BASE_FEATURE(kWebAppPredictableAppUpdating,
 // this feature, the experimental web platform features flag should be set.
 BASE_FEATURE(kWebOTP, "WebOTP", base::FEATURE_ENABLED_BY_DEFAULT);
 
+// Trial to disable synchronous draw for synchronous compositor (ie Android
+// WebView).
+BASE_FEATURE(kWebViewAsyncDrawOnly,
+             "WebViewAsyncDrawOnly",
+             base::FEATURE_DISABLED_BY_DEFAULT);
+
 // Enable the web lockscreen API implementation
 // (https://github.com/WICG/lock-screen) in Chrome.
 BASE_FEATURE(kWebLockScreenApi,
@@ -1096,7 +1102,7 @@ BASE_FEATURE(kSiteInstanceGroupsForDataUrls,
 // SiteInstance.
 BASE_FEATURE(kDefaultSiteInstanceGroups,
              "DefaultSiteInstanceGroups",
-             base::FEATURE_DISABLED_BY_DEFAULT);
+             base::FEATURE_ENABLED_BY_DEFAULT);
 
 // Controls whether to isolate sites of documents that specify an eligible
 // Cross-Origin-Opener-Policy header.  Note that this is only intended to be

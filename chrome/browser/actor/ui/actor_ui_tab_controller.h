@@ -7,30 +7,45 @@
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ref.h"
+#include "chrome/browser/actor/ui/actor_overlay.mojom.h"
+#include "chrome/browser/actor/ui/actor_overlay_view_controller.h"
 #include "chrome/browser/actor/ui/actor_ui_tab_controller_interface.h"
 #include "components/tabs/public/tab_interface.h"
+#include "mojo/public/cpp/bindings/receiver.h"
+
+namespace actor {
+class ActorKeyedService;
+}
 
 namespace actor::ui {
 
 class ActorUiTabController : public ActorUiTabControllerInterface {
  public:
-  explicit ActorUiTabController(tabs::TabInterface& tab);
+  ActorUiTabController(tabs::TabInterface& tab,
+                       ActorKeyedService* actor_service);
   ~ActorUiTabController() override;
 
   // ActorUiTabControllerInterface:
   void OnUiTabStateChange(const UiTabState& ui_tab_state,
                           UiResultCallback callback) override;
+  void OnTabActiveStatusChanged(bool tab_active_status,
+                                tabs::TabInterface* tab) override;
   void SetActiveTaskId(TaskId task_id) override;
   void ClearActiveTaskId() override;
   base::WeakPtr<ActorUiTabControllerInterface> GetWeakPtr() override;
+  void SetActorTaskPaused() override;
+  void SetActorTaskResume() override;
+
+  void BindActorOverlay(
+      mojo::PendingReceiver<mojom::ActorOverlayPageHandler> receiver) override;
+  void SetHandoffButtonVisibility(bool is_visible) override;
 
  private:
-  // Notifies tab scoped ui components that their state has changed.
-  void NotifyTabScopedUiComponents(const UiTabState& ui_tab_state,
-                                   bool tab_activated);
+  // Called to propagate a UiTabState and tab status change to UI controllers.
+  void UpdateState(const UiTabState& ui_tab_state,
+                   bool tab_active_status,
+                   UiResultCallback callback);
   // Tab subscriptions:
-  // Called when this tab's activation status changes.
-  void OnTabActivationChanged(bool is_activated, tabs::TabInterface* tab);
   // Called when the tab is detached.
   void OnTabWillDetach(tabs::TabInterface* tab,
                        tabs::TabInterface::DetachReason reason);
@@ -48,8 +63,13 @@ class ActorUiTabController : public ActorUiTabControllerInterface {
       .actor_overlay = ActorOverlayState(),
       .handoff_button = HandoffButtonState(),
   };
+  // The current active status of the tab.
+  bool current_tab_active_status_ = false;
   // The last active task id actuating on this tab.
   TaskId active_task_id_;
+
+  raw_ptr<ActorKeyedService> actor_keyed_service_ = nullptr;
+  std::unique_ptr<ActorOverlayViewController> actor_overlay_view_controller_;
   base::WeakPtrFactory<ActorUiTabController> weak_factory_{this};
 };
 
